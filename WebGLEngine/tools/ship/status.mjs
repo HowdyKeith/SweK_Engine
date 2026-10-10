@@ -13,10 +13,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
+import { parseOrExit } from "./cliArgs.mjs";   // v4826 -- an option this tool does not know is refused, not read past
 
 function findAtRoot(name) { let d = process.cwd(); for (let i = 0; i < 5; i++) { const p = path.join(d, name); if (fs.existsSync(p)) return p; const up = path.dirname(d); if (up === d) break; d = up; } return null; }
 function findEngine() { let d = process.cwd(); for (let i = 0; i < 6; i++) { const p = path.join(d, "WebGLEngine", "main.js"); if (fs.existsSync(p)) return p; if (fs.existsSync(path.join(d, "main.js")) && d.endsWith("WebGLEngine")) return path.join(d, "main.js"); const up = path.dirname(d); if (up === d) break; d = up; } return null; }
-function arg(name) { const i = process.argv.indexOf(name); return i >= 0 ? process.argv[i + 1] : null; }
+const CLI = parseOrExit("status", { values: { "--next": "path" } });
+function arg(name) { return name in CLI.values ? CLI.values[name] : null; }
 
 const backlogPath = findAtRoot("BACKLOG.md");
 const statusPath = backlogPath ? path.join(path.dirname(backlogPath), "STATUS.md") : null;

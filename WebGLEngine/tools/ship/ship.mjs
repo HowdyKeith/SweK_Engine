@@ -28,6 +28,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
+import { parseOrExit } from "./cliArgs.mjs";   // v4826 -- an option this tool does not know is refused, not read past
 import { readChangelog, namesVersion, newestVersion, CHANGELOG_REL } from "./changelogSource.mjs";
 import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
 
@@ -37,11 +38,12 @@ const PROJECT = path.resolve(ENGINE, "..");           // .../SweK_Engine_vNNNN
 const WORK = path.resolve(PROJECT, "..");             // .../work
 const OUTPUTS = "/mnt/user-data/outputs";
 
-const argv = process.argv;
-const arg = (name, def = null) => { const i = argv.indexOf(name); return i > 0 && argv[i + 1] ? argv[i + 1] : def; };
+const CLI = parseOrExit("ship", { values: { "--version": "string", "--markers": "string", "--step-timeout": "number" }, flags: ["--dry-run"] });
+// the call shape `arg("--step-timeout", "900")` is READ BY ai-bridge/shipBridge.js (it derives the ship's budget from that default), so it stays spelled so
+const arg = (name, def = null) => (name in CLI.values ? String(CLI.values[name]) : def);
 const version = arg("--version");
 const markers = arg("--markers", "");
-const dryRun = argv.includes("--dry-run");
+const dryRun = CLI.flags.has("--dry-run");
 
 if (!version || !/^v\d+$/.test(version)) {
     console.error("\nusage: node tools/ship/ship.mjs --version vNNNN --markers \"a,b\" [--dry-run]\n");

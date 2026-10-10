@@ -162,10 +162,13 @@ console.log("\n3. *** A POINTER IS NOT AN INCLUSION: what the copies carried bef
     // xatlas/LICENSE plus the two source files it papers (xatlas.cpp, xatlas.h). None is a copy outside vendor/;
     // the count moved because the vendor tree grew, which is exactly what section 1 says this gate does not
     // police -- it only re-counts to catch a REGRESSION in what was already there.
-    ok("the tree held " + preexisting.length + " MIT permission notices (15 before v4263, plus vendor/three-webgpu at v4319), quoters and in-file copies aside",
-        preexisting.length === 27, preexisting.join(" ").slice(0, 120) + "...");
-    ok("*** and 26 of those 27 are under vendor/ -- the 27th is a packaged dependency, not engine code ***",
-        underVendor.length === 26 && preexisting.filter((f) => !f.startsWith("vendor/")).join("") ===
+    // v4826 -- twenty-eight: vendor/three-webgpu-r185/LICENSE arrived at v4805 (the engine's three-webgpu moved to r186, measured first, and r185 stayed beside it as the
+    // comparison), under vendor/ where a vendored copy's notice belongs. This gate is over the quick sweep's budget and nothing read it for five versions; the v4826 probe
+    // round ran the over-budget gates its edits could reach and found it red on main with nothing of its own in it. The count moved because the vendor tree grew.
+    ok("the tree held " + preexisting.length + " MIT permission notices (15 before v4263, plus vendor/three-webgpu at v4319 and vendor/three-webgpu-r185 at v4805), quoters and in-file copies aside",
+        preexisting.length === 28, preexisting.join(" ").slice(0, 120) + "...");
+    ok("*** and 27 of those 28 are under vendor/ -- the 28th is a packaged dependency, not engine code ***",
+        underVendor.length === 27 && preexisting.filter((f) => !f.startsWith("vendor/")).join("") ===
         "tools/strict-libm-pkg/LICENSE",
         underVendor.length + " under vendor/, plus " + preexisting.filter((f) => !f.startsWith("vendor/")).join(" "));
     ok("  so NO engine-source copy outside vendor/ carried one",

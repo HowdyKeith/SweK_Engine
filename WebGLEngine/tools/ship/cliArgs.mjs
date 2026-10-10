@@ -68,25 +68,29 @@ export function silentReaders(dir, { fs, path } = {}) {
 }
 const f_of = (m) => m.split("/").pop();
 
-/** What the tree held when this was written. A CEILING, and the gate re-derives it every run. */
+/**
+ * What the tree held when this was written, and what became of it. v4647g found 13 tools that read argv the silent way and recorded them as a CEILING; v4826
+ * converted all 13 (`wasSilent`, one list, in the order the first record had them), so `tools` -- the tools STILL silent, which the gate re-derives every run and
+ * compares to this list -- is empty, and the ratchet is at zero: a tool that reads argv with the silent idiom again is a red the day it is written.
+ */
 export const SILENT_AT_V4647G = Object.freeze({
     at: "v4647g",
-    tools: Object.freeze(["tools/ship/changelog.mjs", "tools/ship/claimsGate.mjs", "tools/ship/dockFraming.mjs",
-                          "tools/ship/failLines.mjs", "tools/ship/gateSelection.mjs", "tools/ship/gateSweep.mjs",
-                          "tools/ship/packRelease.mjs", "tools/ship/recordInputs.mjs",
-                          "tools/ship/refreshReleases.mjs", "tools/ship/selfchecks.mjs", "tools/ship/ship.mjs",
-                          "tools/ship/status.mjs", "tools/ship/verify.mjs"]),
+    tools: Object.freeze([]),
+    wasSilent: Object.freeze(["tools/ship/changelog.mjs", "tools/ship/claimsGate.mjs", "tools/ship/dockFraming.mjs",
+                              "tools/ship/failLines.mjs", "tools/ship/gateSelection.mjs", "tools/ship/gateSweep.mjs",
+                              "tools/ship/packRelease.mjs", "tools/ship/recordInputs.mjs",
+                              "tools/ship/refreshReleases.mjs", "tools/ship/selfchecks.mjs", "tools/ship/ship.mjs",
+                              "tools/ship/status.mjs", "tools/ship/verify.mjs"]),
+    convertedAt: "v4826",
     adopted: Object.freeze(["tools/ship/quickSweep.mjs", "tools/ship/sweepRotation.mjs"]),
     firstDraftSaid: 5,
     // The two spellings of the gate option, both live in this directory.
     gateSpellings: Object.freeze({ "--gates": Object.freeze(["tools/ship/failLines.mjs", "tools/ship/recordInputs.mjs"]),
                                    "--gate": Object.freeze(["tools/ship/sweepRotation.mjs"]) }),
-    why: "A CEILING, NOT A TARGET, and the ceiling is 13 rather than the 5 I first wrote. The two adopted " +
-         "here are the two whose silence COST something measured: 32 minutes of sweep answering a question " +
-         "nobody asked, and a cap reading written into sweep-timings.json by a typo. Converting eleven more " +
-         "tools in the round that found the first two would be a change made on a hunch; what this record " +
-         "buys is that the eleven are COUNTABLE instead of forgotten, and that the number is re-derived " +
-         "every run rather than retyped.",
+    why: "WAS A CEILING, IS A FLOOR. v4647g converted the two whose silence COST something measured (32 minutes of sweep answering a question nobody asked, a " +
+         "cap reading written into the timings file by a typo) and recorded the other thirteen as countable rather than forgotten. v4826 converted them: the one " +
+         "that matters most is verify.mjs, which shipVerdict hands its argv verbatim -- a mistyped --versoin used to verify against no version at all and print " +
+         "ALL GREEN.",
 });
 
 // Edit distance, bounded. Only ever used to say "did you mean", never to decide anything.
@@ -114,13 +118,14 @@ export function nearestOption(name, known) {
  *
  *   spec.values : { "--budget": "number" | "path" | "string", ... }
  *   spec.flags  : ["--json", ...]
+ *   spec.positional : true when bare words are arguments too (collected in `rest`) -- v4826
  *
- * Returns { values, flags, errors }. A non-empty `errors` means the caller must refuse. Nothing throws.
+ * Returns { values, flags, errors, rest }. A non-empty `errors` means the caller must refuse. Nothing throws.
  */
 export function parseArgs(argv, spec) {
     const vs = spec.values || {}, fl = spec.flags || [];
     const known = [...Object.keys(vs), ...fl];
-    const values = {}, flags = new Set(), errors = [];
+    const values = {}, flags = new Set(), errors = [], rest = [];
     for (let i = 0; i < argv.length; i++) {
         const tok = argv[i];
         if (fl.includes(tok)) { flags.add(tok); continue; }
@@ -143,12 +148,14 @@ export function parseArgs(argv, spec) {
             } else values[tok] = v;
             continue;
         }
+        // v4826 -- a tool that takes FILES (gateSelection: the changed paths) says so, and its bare words are collected; an unknown OPTION is still refused
+        if (spec.positional && !tok.startsWith("-")) { rest.push(tok); continue; }
         const near = tok.startsWith("-") ? nearestOption(tok, known) : null;
         errors.push(tok.startsWith("-")
             ? `unknown option ${tok}` + (near ? ` -- did you mean ${near}?` : "")
             : `unexpected argument "${tok}" -- every value belongs to an option`);
     }
-    return { values, flags, errors };
+    return { values, flags, errors, rest };
 }
 
 /** The refusal a CLI prints. Returned as lines so a gate can read them without capturing a process. */
@@ -158,4 +165,15 @@ export function refusalLines(tag, errors, spec) {
     L.push(`[${tag}] nothing was run. An argument the tool does not understand is refused here rather than ` +
            `ignored on the way past -- this one cost 1,914 s of sweep the day it was found.`);
     return L;
+}
+
+/**
+ * v4826 -- THE FRONT DOOR EVERY ADOPTING TOOL USES: parse argv, and on ANY error print the refusal and exit 2 before anything runs. `io` is injected by the
+ * gate (a gate cannot let a process exit under it); a tool passes nothing. Returns { values, flags, errors, rest } when argv is clean. Exit code 2 is the
+ * tree's "the run itself broke" (lockstepPeer, flakeProbe, quickSweep): a refusal is not a verdict about the code, so it is never 1.
+ */
+export function parseOrExit(tag, spec, argv = process.argv.slice(2), io = { err: (l) => console.error(l), exit: (c) => process.exit(c) }) {
+    const cli = parseArgs(argv, spec);
+    if (cli.errors.length) { for (const l of refusalLines(tag, cli.errors, spec)) io.err(l); io.exit(2); }
+    return cli;
 }

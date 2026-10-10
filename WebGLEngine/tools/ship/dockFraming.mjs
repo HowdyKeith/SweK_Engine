@@ -19,6 +19,7 @@ import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import { decodePNG, subjectFraction, spread } from "./pngCoverage.mjs";
+import { parseOrExit } from "./cliArgs.mjs";   // v4826 -- an option this tool does not know is refused, not read past
 
 const require_ = createRequire(import.meta.url);
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -79,10 +80,10 @@ export async function measureDock(opts = {}) {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
-    const arg = (n, d) => { const i = process.argv.indexOf(n); return i >= 0 ? process.argv[i + 1] : d; };
-    const r = await measureDock({ page: arg("--page", DEFAULTS.page), shots: Number(arg("--shots", DEFAULTS.shots)), gapMs: Number(arg("--gap", DEFAULTS.gapMs)) })
+    const cli = parseOrExit("dockFraming", { values: { "--page": "string", "--shots": "number", "--gap": "number" }, flags: ["--json"] });
+    const r = await measureDock({ page: cli.values["--page"] || DEFAULTS.page, shots: cli.values["--shots"] || DEFAULTS.shots, gapMs: cli.values["--gap"] || DEFAULTS.gapMs })
         .catch((e) => { console.error("[dockFraming] " + (e && e.message)); process.exit(2); });
-    if (process.argv.includes("--json")) console.log(JSON.stringify(r, null, 1));
+    if (cli.flags.has("--json")) console.log(JSON.stringify(r, null, 1));
     else console.log(`[dockFraming] ${r.page} ${r.selector} ${r.width}x${r.height} css (${r.pixelW}x${r.pixelH} px): ${r.shots} shots, coverage ` +
         r.fractions.map((f) => f.toFixed(3)).join(" ") + ` -> mean ${r.mean.toFixed(3)} sd ${r.sd.toFixed(3)} [${r.min.toFixed(3)}, ${r.max.toFixed(3)}]`);
 }

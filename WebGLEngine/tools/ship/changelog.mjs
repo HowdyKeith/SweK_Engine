@@ -14,6 +14,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { changelogPath, CHANGELOG_REL, ENTRY_HEAD } from "./changelogSource.mjs";
+import { parseOrExit } from "./cliArgs.mjs";   // v4826 -- an option this tool does not know is refused, not read past
 
 // v4003 -- THE PROJECT ROOT IS FOUND BY THE FILE THAT IS ACTUALLY THERE. The old walk looked for BACKLOG.md,
 // which exists on no machine, so it fell through to its cwd-relative fallback every time -- a landmark search
@@ -43,7 +44,8 @@ function findAtRoot(name) {
   return name; // fall back to cwd-relative (will error clearly if missing)
 }
 
-function arg(name) { const i = process.argv.indexOf(name); return i >= 0 ? process.argv[i + 1] : null; }
+const CLI = parseOrExit("changelog", { values: { "--backlog": "path", "--todo": "path", "--version": "string" } });
+function arg(name) { return name in CLI.values ? CLI.values[name] : null; }
 
 // Find the first non-ASCII char and report it clearly (helps fix the source, not just fail).
 function firstNonAscii(s) {

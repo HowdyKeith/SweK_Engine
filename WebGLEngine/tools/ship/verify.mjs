@@ -19,8 +19,10 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { withheldFromMirror } from "./withheld.mjs";
 import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
+import { parseOrExit } from "./cliArgs.mjs";   // v4826 -- an option this tool does not know is refused, not read past (shipVerdict forwards its argv here verbatim, so a mistyped --versoin used to verify against NO version)
 
-function arg(name) { const i = process.argv.indexOf(name); return i >= 0 ? process.argv[i + 1] : null; }
+const CLI = parseOrExit("verify", { values: { "--version": "string", "--markers": "string", "--zip": "path", "--sweep-budget": "number" }, flags: ["--skip-qa"] });
+function arg(name) { return name in CLI.values ? CLI.values[name] : null; }
 const version = arg("--version");
 const markers = (arg("--markers") || "").split(",").map(s => s.trim()).filter(Boolean);
 const zipPath = arg("--zip");
@@ -600,7 +602,7 @@ if (zipPath) {
 // 8. QA GATE: the headless invariant suite (physics no-clip/finite/settle, shader shadows bit-identical to CPU,
 // vortex dipole) must all pass -- a regression that breaks physics or drifts a shader from its verified reference
 // cannot reach a release. Opt out only with --skip-qa (don't).
-if (process.argv.indexOf("--skip-qa") < 0) {
+if (!CLI.flags.has("--skip-qa")) {
   try {
     const { runQA } = await import("./qa-suite.mjs");
     const { results } = await runQA();

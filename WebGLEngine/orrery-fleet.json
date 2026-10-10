@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "3f7934247f393d14f9e4978d946eff7a10af0c60",
+ "head": "3af35b8f8b35a2e1fc2d2eae1cd7d9943fedb6d9",
  "bodies": {
   "box3d": [
    {
@@ -121,7 +121,7 @@
    },
    {
     "path": "tools/ship/copiedOutsideVendor-selfcheck.mjs",
-    "bytes": 23201,
+    "bytes": 23745,
     "sha": "5d3d8d83a3e03fe43ca343af0b34483783a2b4e8"
    },
    {
@@ -722,7 +722,7 @@
    {
     "path": "main.js",
     "bytes": 3495718,
-    "sha": "4f306f5111cf03c30136ac854ad21b2d5e8bd0af"
+    "sha": "89b9999f0689caa4ea19a97fdd7d1d3c923d950d"
    },
    {
     "path": "mpm3d.html",
@@ -924,7 +924,7 @@
    {
     "path": "ai-presence-orb.html",
     "bytes": 11946,
-    "sha": "d68f2a290afb2f5a9332ffa479024ee77e38df05"
+    "sha": "89b9999f0689caa4ea19a97fdd7d1d3c923d950d"
    },
    {
     "path": "fsr-three.html",
@@ -1274,7 +1274,7 @@
    {
     "path": "ui/aiPresenceOrbWidget.js",
     "bytes": 18817,
-    "sha": "d68f2a290afb2f5a9332ffa479024ee77e38df05"
+    "sha": "89b9999f0689caa4ea19a97fdd7d1d3c923d950d"
    }
   ],
   "three-webgpu-r185": [

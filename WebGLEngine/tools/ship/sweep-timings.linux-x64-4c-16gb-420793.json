@@ -1,7 +1,7 @@
 {
  "host": "linux-x64-4c-16gb-420793",
  "note": "THIS BOX'S OWN gate runtimes, written by tools/ship/boxTimings.mjs. The shared sweep-timings.json is host-claimed and a foreign box cannot write it (v4647, and that refusal is right); this is how a box records what IT measured without overwriting another machine's numbers. `kinds` says which quantity each ms is, as in the shared record: `alone` is an uncontended serial reading, `capped` is a FLOOR and not a runtime. Read for COVERAGE -- has this gate ever been timed -- and NOT for the ship-time budget, which still reads the shared file. See task #87. `serialRing` holds the last three alone readings; recordReach's margin row reads it on a box that does not own the shared record, because that row asks what a gate costs HERE and nothing here can refresh another box's ring.",
- "captured": "2026-10-09T22:53:38.811Z",
+ "captured": "2026-10-10T06:41:10.358Z",
  "timings": {
   "tools/ship/cloneProvision-selfcheck.mjs": 7171,
   "tools/ship/exitBusy-selfcheck.mjs": 15284,
@@ -18,7 +18,9 @@
   "tools/ship/gateReport-selfcheck.mjs": 16575,
   "brain/raceLockstep-selfcheck.mjs": 3187,
   "tools/ship/lockstepRelay-selfcheck.mjs": 13759,
-  "ui/pick-selfcheck.mjs": 87
+  "ui/pick-selfcheck.mjs": 87,
+  "tools/ship/flakeProbe-selfcheck.mjs": 1165,
+  "tools/ship/stableWrite-selfcheck.mjs": 71
  },
  "at": {
   "tools/ship/cloneProvision-selfcheck.mjs": "2026-09-25T03:35:16.858Z",
@@ -36,7 +38,9 @@
   "tools/ship/gateReport-selfcheck.mjs": "2026-10-08T00:25:48.255Z",
   "brain/raceLockstep-selfcheck.mjs": "2026-10-09T00:20:17.046Z",
   "tools/ship/lockstepRelay-selfcheck.mjs": "2026-10-09T00:20:17.046Z",
-  "ui/pick-selfcheck.mjs": "2026-10-09T22:53:38.811Z"
+  "ui/pick-selfcheck.mjs": "2026-10-09T22:53:38.811Z",
+  "tools/ship/flakeProbe-selfcheck.mjs": "2026-10-10T06:41:10.358Z",
+  "tools/ship/stableWrite-selfcheck.mjs": "2026-10-10T06:41:10.358Z"
  },
  "kinds": {
   "tools/ship/cloneProvision-selfcheck.mjs": "alone",
@@ -54,7 +58,9 @@
   "tools/ship/gateReport-selfcheck.mjs": "alone",
   "brain/raceLockstep-selfcheck.mjs": "alone",
   "tools/ship/lockstepRelay-selfcheck.mjs": "alone",
-  "ui/pick-selfcheck.mjs": "alone"
+  "ui/pick-selfcheck.mjs": "alone",
+  "tools/ship/flakeProbe-selfcheck.mjs": "alone",
+  "tools/ship/stableWrite-selfcheck.mjs": "alone"
  },
  "codes": {
   "tools/ship/cloneProvision-selfcheck.mjs": 0,
@@ -72,7 +78,9 @@
   "tools/ship/gateReport-selfcheck.mjs": 0,
   "brain/raceLockstep-selfcheck.mjs": 0,
   "tools/ship/lockstepRelay-selfcheck.mjs": 0,
-  "ui/pick-selfcheck.mjs": 0
+  "ui/pick-selfcheck.mjs": 0,
+  "tools/ship/flakeProbe-selfcheck.mjs": 0,
+  "tools/ship/stableWrite-selfcheck.mjs": 0
  },
  "serialRing": {
   "tools/ship/frozenRecords-selfcheck.mjs": [
@@ -134,6 +142,16 @@
    87,
    88,
    87
+  ],
+  "tools/ship/flakeProbe-selfcheck.mjs": [
+   1114,
+   1095,
+   1165
+  ],
+  "tools/ship/stableWrite-selfcheck.mjs": [
+   70,
+   63,
+   71
   ]
  }
 }

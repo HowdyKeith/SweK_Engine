@@ -32,6 +32,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { parseOrExit } from "./cliArgs.mjs";   // v4826 -- an option this tool does not know is refused, not read past
 
 const KNOWN_STATES = ["open", "settled", "broken"];
 
@@ -134,8 +135,8 @@ const state = (c) => (c.state === "broken" ? "BROKEN" : "settled");
 
 // ---- CLI ---------------------------------------------------------------------------------------------------
 if (process.argv[1] && process.argv[1].endsWith("claimsGate.mjs")) {
-    const idx = process.argv.indexOf("--file");
-    const file = idx > 0 ? process.argv[idx + 1] : path.join(process.cwd(), "predictions.html");
+    const cli = parseOrExit("claimsGate", { values: { "--file": "path" } });
+    const file = cli.values["--file"] || path.join(process.cwd(), "predictions.html");
     if (!fs.existsSync(file)) {
         console.error("claimsGate: no " + file + " -- the engine makes claims and does not write them down. That is the failure, not a missing file.");
         process.exit(1);

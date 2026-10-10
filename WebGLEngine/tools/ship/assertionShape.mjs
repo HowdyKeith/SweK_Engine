@@ -891,8 +891,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // nameFirst each by two; the rest hold (the gate's own drift row named exactly these four).
     // v4824 -- 1934 -> 1935 for ui/pick-selfcheck.mjs, the npc audit's target-scoring utility held to the hand-written loop. usesOk,
     // definesOk and nameFirst each by one; the rest hold (the gate's own drift row named exactly these four).
-    gates: 1935, usesOk: 1914, definesOk: 1906, importsOk: 0,
-    distinctDefinitions: 42, nameFirst: 1806, condFirst: 97, unknownSignature: 11,
+    // v4826 -- 1935 -> 1937 for tools/ship/flakeProbe-selfcheck.mjs and tools/ship/stableWrite-selfcheck.mjs. usesOk, definesOk and nameFirst each by two; the rest hold
+    // (the gate's own drift row named exactly these four).
+    gates: 1937, usesOk: 1916, definesOk: 1908, importsOk: 0,
+    distinctDefinitions: 42, nameFirst: 1808, condFirst: 97, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

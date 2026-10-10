@@ -34,6 +34,7 @@
 import fs from "node:fs";
 import { LEDGER, readLedger } from "./releaseLedger.mjs";
 import { pathToFileURL } from "node:url";
+import { parseOrExit } from "./cliArgs.mjs";   // v4826 -- an option this tool does not know is refused, not read past
 
 /**
  * *** THE PARSE IS A PURE FUNCTION SO IT CAN BE GRADED WITHOUT THE NETWORK, AND THAT IS NOT TIDINESS. ***
@@ -58,10 +59,11 @@ const RUN = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]
 if (!RUN) { /* imported for rowsFrom() -- no network, no exit */ }
 
 const REPO = process.env.SWEK_ENGINE_REPO || "HowdyKeith/SweK_Engine";
-const write = process.argv.includes("--write");
-const flag = (n) => { const i = process.argv.indexOf(n); return i >= 0 ? process.argv[i + 1] : null; };
-const fromFile = flag("--from");
-const via = flag("--via");
+// v4826 -- parsed only when RUN: the module is imported (githubBridge, two gates) and an importer's argv is not this tool's
+const CLI = RUN ? parseOrExit("refreshReleases", { values: { "--from": "path", "--via": "string" }, flags: ["--write"] }) : { values: {}, flags: new Set() };
+const write = CLI.flags.has("--write");
+const fromFile = CLI.values["--from"] || null;
+const via = CLI.values["--via"] || null;
 
 const tok = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || "";
 const headers = { "Accept": "application/vnd.github+json", "User-Agent": "swek-release-ledger" };

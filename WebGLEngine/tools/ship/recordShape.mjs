@@ -145,6 +145,8 @@ export function writeShapes(root = ENG) {
  */
 export const DROPPED_ON_PURPOSE = Object.freeze([
     // { record: "tools/ship/example.json", field: "top:oldName", round: "v4572", why: "..." },
+    { record: "tools/ship/trader-policy.json", field: "top:measuredAt", round: "v4826", why: "renamed `changedAt` (tools/ship/stableWrite.mjs): the field was stamped with the running engine's version on every run, so it dirtied the tree in each new version; the new one moves only when the numbers do. The old value was handed over as the new one's." },
+    { record: "tools/ship/trader-policy-spread.json", field: "top:measuredAt", round: "v4826", why: "renamed `changedAt` (tools/ship/stableWrite.mjs), exactly as in trader-policy.json: the version stamp moved on every run and dirtied the tree, and the new field moves only with the numbers." },
 ]);
 
 export function compare(root = ENG) {

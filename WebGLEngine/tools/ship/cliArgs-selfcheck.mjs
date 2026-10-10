@@ -22,6 +22,19 @@
 //   TG. parseArgs THROWS on a bad token instead of returning it   -> 3 RED
 //   TH. the refusal is printed but the tool runs anyway           -> 1 RED
 //
+// v4826 SABOTAGES, RESULTS BY NAME (the 13 remaining silent tools converted; the census is at zero; every tool is DRIVEN):
+//   S1. status.mjs stops parsing (back to ignoring what it is given)         -> 1 RED: the all-tools-refuse row (exit 2 for the wrong reason: no BACKLOG.md).
+//   S2. parseOrExit exits 1, not 2                                           -> 4 RED: the pure exit-code row, both positional rows, and the all-tools row.
+//   S3. a positional spec drops the bare words                               -> 1 RED: the `rest` row.
+//   S4. a positional spec swallows unknown options too                       -> 2 RED: the positional-still-refuses row and the all-tools row.
+//   S5. a silent reader written back into status.mjs                         -> 3 RED: the derived census, the zero ratchet, and the repair row.
+//   S6. gateSelection parses below its work (no refusal)                     -> 1 RED: the all-tools row. THE CENSUS ALONE PASSES THIS ONE: it reads no argv the silent way, it
+//       just never refuses. That is why the tools are driven and not only counted.
+//   FINDING (the rows' first draft): the new rows were written name-first against a file whose ok() takes the CONDITION first, so every one passed with a
+//   string for a condition -- eight rows printing `PASS  true`. The sabotage of the first row would have gone 0 red; noticed because the names did not print.
+//   FINDING (the population): twenty-three tools in tools/ship import the parser, not the fifteen this gate was recording; the other eight (gateProfile,
+//   realGpuRun, rtPipelineDiag, textureInProbe, threePatch, boxTimings and this round's three) were adopted without ever being driven. They are now.
+//
 // *** TA IS THE MEASUREMENT THIS FILE EXISTS FOR, AND IT RAN THE WRONG THING AGAIN WHILE BEING TAKEN. ***
 // With unknown options accepted, `sweepRotation --gates eulerGpu` started the 21-gate rotation -- live, the
 // same wrong run the typo produced the first time -- and `quickSweep --reed w4.json` started a full sweep.
@@ -37,13 +50,14 @@
 // Run: node tools/ship/cliArgs-selfcheck.mjs
 "use strict";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawnSync, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { parseArgs, nearestOption, editDistance, refusalLines, silentReaders, SILENT_READER, HUNTER,
+import { parseArgs, parseOrExit, nearestOption, editDistance, refusalLines, silentReaders, SILENT_READER, HUNTER,
          SILENT_AT_V4647G } from "./cliArgs.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
+const report = (m) => console.log("  ----  " + m);
 const ok = (c, name, detail) => { console.log(`  ${c ? "PASS" : "FAIL"}${c ? "  " : "  !! "}${name}${detail ? "   " + detail : ""}`); if (!c) fails++; };
 const sec = (t) => console.log("\n" + t);
 
@@ -197,23 +211,25 @@ sec("7. THE CENSUS OF WHAT IS STILL SILENT, DERIVED RATHER THAN CLAIMED");
     ok(JSON.stringify(live) === JSON.stringify(recorded),
        "!! *** the tools still taking arguments the silent way are DERIVED, and match the record ***",
        `live ${live.length}, recorded ${recorded.length}. The first draft said ${SILENT_AT_V4647G.firstDraftSaid}`);
-    ok(live.length > SILENT_AT_V4647G.firstDraftSaid,
-       "...and the derived population is LARGER than the hand-typed one it replaced",
-       `${live.length} against ${SILENT_AT_V4647G.firstDraftSaid}. A list typed from a grep is a claim about ` +
-       `a spelling; three tools commit this under spellings that grep did not match`);
-    ok(SILENT_AT_V4647G.adopted.every((m) => !live.includes(m)),
-       "!! neither adopted tool is on the list, so the detector does not fire on the repair",
-       SILENT_AT_V4647G.adopted.join(", ") + " -- their reader is `(n in cli.values ...)`, and the first " +
-       "detector matched it anyway");
+    ok(live.length === 0 && SILENT_AT_V4647G.wasSilent.length === 13 && SILENT_AT_V4647G.convertedAt === "v4826",
+       "!! *** the ratchet is at ZERO: none of the 13 tools v4647g found is silent any more, and a new one would be a red the day it is written ***",
+       `${live.length} silent now, ${SILENT_AT_V4647G.wasSilent.length} converted at ${SILENT_AT_V4647G.convertedAt}. It was a ceiling of 13 for 179 versions`);
+    ok(SILENT_AT_V4647G.adopted.concat(SILENT_AT_V4647G.wasSilent).every((m) => !live.includes(m)),
+       "!! neither the two adopted at v4647g nor the thirteen converted at v4826 are on the list, so the detector does not fire on the repair",
+       "their reader is `parseOrExit(...)` / `(n in cli.values ...)`, and the first detector matched that anyway");
     ok(!live.includes(HUNTER) && SILENT_READER.test(fs.default.readFileSync(path.join(ENG, HUNTER), "utf8")),
        "!! *** the hunter EXCLUDES ITSELF BY PATH, and the exclusion is load-bearing ***",
        "cliArgs.mjs matches its own pattern -- its header quotes the idiom. Excluded by path and said so, " +
        "exactly as the licence scan was after it flagged the comment explaining it");
 
-    // Three spellings the shape catches and a name-grep does not. Named, because they are the evidence.
-    for (const m of ["tools/ship/packRelease.mjs", "tools/ship/ship.mjs", "tools/ship/refreshReleases.mjs"])
-        ok(live.includes(m), `...including ${m.split("/").pop()}, which the first detector missed`,
-           "a different helper name, or indexOf('--' + name), or a local argv -- same defect");
+    // The three spellings the shape caught and a name-grep did not -- now that those three tools are repaired, the DETECTOR is shown on the old code, as literals.
+    const OLD = {
+        "packRelease (indexOf('--' + name))": 'const arg = (name) => {\n    const i = process.argv.indexOf("--" + name);\n    return i >= 0 && process.argv[i + 1] && !process.argv[i + 1].startsWith("--") ? process.argv[i + 1] : "";\n};',
+        "ship (a local `argv`)": 'const argv = process.argv;\nconst arg = (name, def = null) => { const i = argv.indexOf(name); return i > 0 && argv[i + 1] ? argv[i + 1] : def; };',
+        "refreshReleases (a helper named flag)": 'const flag = (n) => { const i = process.argv.indexOf(n); return i >= 0 ? process.argv[i + 1] : null; };',
+    };
+    for (const [who, code] of Object.entries(OLD)) ok(SILENT_READER.test(code), `...the detector still fires on ${who}, the spelling the first detector missed`, "a different helper name, or indexOf('--' + name), or a local argv -- same defect");
+    ok(!SILENT_READER.test('const CLI = parseOrExit("t", { values: { "--out": "path" } });\nconst out = CLI.values["--out"] || "";'), "...and does not fire on the repair");
 
     const spell = SILENT_AT_V4647G.gateSpellings;
     const livesIn = (opt, mod) => new RegExp(`"${opt}"`).test(fs.default.readFileSync(path.join(ENG, mod), "utf8"));
@@ -225,10 +241,45 @@ sec("7. THE CENSUS OF WHAT IS STILL SILENT, DERIVED RATHER THAN CLAIMED");
        "the refusal lists the options the tool actually takes", "a refusal that does not say what IS accepted is half a message");
 }
 
+// ---------------------------------------------------------------------------------------------------------
+// v4826 -- parseOrExit AND THE POSITIONAL SPEC, PURE; THEN EVERY ONE OF THE FIFTEEN TOOLS, SPAWNED, REFUSING.
+// The census above says no tool READS argv the silent way. It cannot say a converted tool REFUSES: a tool whose parse sits below the work, or whose
+// spec was written with the option the typo hit, passes the census and still runs. So each is driven with an option nobody has ever spelled.
+console.log("\nv4826. parseOrExit, the positional spec, and the fifteen tools");
+{
+    const ok2 = (name, cond, detail) => ok(cond, name, detail);   // this file ok() takes the condition FIRST; the rows below read name-first
+    const io = (log) => ({ err: (l) => log.err.push(l), exit: (c) => { log.exit.push(c); } });
+    const L1 = { err: [], exit: [] }, r1 = parseOrExit("t", { values: { "--out": "path" }, flags: ["--w"] }, ["--out", "x", "--w"], io(L1));
+    ok2("a clean command line returns its values and flags and prints and exits NOTHING", r1.values["--out"] === "x" && r1.flags.has("--w") && L1.err.length === 0 && L1.exit.length === 0);
+    const L2 = { err: [], exit: [] }; parseOrExit("t", { values: { "--out": "path" } }, ["--ot", "x"], io(L2));
+    ok2("!! an unknown option prints the refusal (the error, the options accepted, 'nothing was run') and exits 2 -- never 1, which is a verdict about code", L2.exit[0] === 2 && /unknown option --ot -- did you mean --out/.test(L2.err[0]) && L2.err.some((l) => /options: --out/.test(l)) && L2.err.some((l) => /nothing was run/.test(l)), L2.err[0]);
+    const L3 = { err: [], exit: [] }, r3 = parseOrExit("t", { values: { "--budget": "number" }, positional: true }, ["a.js", "--budget", "30", "b.js"], io(L3));
+    ok2("a positional spec collects the bare words as `rest` (the changed files) and still takes its options", JSON.stringify(r3.rest) === '["a.js","b.js"]' && r3.values["--budget"] === 30 && L3.exit.length === 0);
+    const L4 = { err: [], exit: [] }; parseOrExit("t", { values: { "--budget": "number" }, positional: true }, ["a.js", "--budgte", "30"], io(L4));
+    ok2("...and an unknown OPTION is still refused under a positional spec (a file-taking tool must not become one that takes anything)", L4.exit[0] === 2 && /unknown option --budgte/.test(L4.err[0]));
+    const L5 = { err: [], exit: [] }; parseOrExit("t", { values: { "--out": "path" } }, ["loose"], io(L5));
+    ok2("a bare word under a spec that takes no files is refused, by name", L5.exit[0] === 2 && /unexpected argument "loose"/.test(L5.err[0]));
+
+    const fs2 = (await import("node:fs")).default, NEWER = ["tools/ship/lockstepPeer.mjs", "tools/ship/lockstepRelay.mjs", "tools/ship/flakeProbe.mjs"], BETWEEN = ["tools/ship/boxTimings.mjs", "tools/ship/gateProfile.mjs", "tools/ship/realGpuRun.mjs", "tools/ship/rtPipelineDiag.mjs", "tools/ship/textureInProbe.mjs", "tools/ship/threePatch.mjs"];
+    const tools = [...SILENT_AT_V4647G.wasSilent, ...SILENT_AT_V4647G.adopted, ...BETWEEN, ...NEWER];
+    const spawnRefusal = (m) => new Promise((resolve) => {
+        const p = spawn(process.execPath, [path.join(ENG, m), "--an-option-nobody-has-spelled"], { cwd: ENG }); let out = ""; const t0 = Date.now();
+        p.stdout.on("data", (d) => { out += d; }); p.stderr.on("data", (d) => { out += d; });
+        const k = setTimeout(() => p.kill("SIGKILL"), 20000); p.on("close", (code) => { clearTimeout(k); resolve({ m, code, out, ms: Date.now() - t0 }); });
+    });
+    const runs = await Promise.all(tools.map(spawnRefusal)), bad = runs.filter((r) => !(r.code === 2 && /unknown option --an-option-nobody-has-spelled/.test(r.out) && /nothing was run/.test(r.out)));
+    ok2("!! all " + tools.length + " tools -- the 13 converted at v4826, the 2 adopted at v4647g, the 6 adopted in between and the 3 written this round -- REFUSE an option nobody has spelled: exit 2, the option named, 'nothing was run', each inside 20 s", bad.length === 0, bad.length ? bad.map((r) => `${r.m} exit ${r.code}: ${r.out.split("\n")[0].slice(0, 90)}`).join(" | ") : `${runs.length} refused, slowest ${Math.max(...runs.map((r) => r.ms))} ms`);
+    ok2("...and every tool in tools/ship that IMPORTS the parser to use it is in that list (so a tool that adopts later is driven too, or the gate names it as a library that has no command line)", (() => {
+        const LIB = new Set([]);   // no declared exceptions: every importer of the parser is a command line and is driven
+        const importers = fs2.readdirSync(path.join(ENG, "tools", "ship")).filter((f) => f.endsWith(".mjs") && !f.endsWith("-selfcheck.mjs") && f !== "cliArgs.mjs").map((f) => "tools/ship/" + f).filter((m) => /import\s*\{[^}]*\b(parseArgs|parseOrExit)\b[^}]*\}\s*from\s*"\.\/cliArgs\.mjs"/.test(fs2.readFileSync(path.join(ENG, m), "utf8")));
+        const unaccounted = importers.filter((m) => !tools.includes(m) && !LIB.has(m));
+        report("importers of the parser: " + importers.length + "; in the driven list " + importers.filter((m) => tools.includes(m)).length + "; declared " + importers.filter((m) => LIB.has(m)).length + "; unaccounted " + (unaccounted.join(", ") || "none"));
+        return unaccounted.length === 0;
+    })());
+}
+
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("unchecked here: the thirteen tools in SILENT_AT_V4647G. They still ignore an unknown option, and " +
-    "that is a CEILING rather than a target -- the two converted are the two whose silence cost something " +
-    "measured (32 minutes of sweep; a cap reading written into the timings file). Converting eleven more in " +
-    "the round that found the first two would be a change made on a hunch, and the DERIVED census above is " +
-    "what keeps them countable instead of forgotten -- a hand-typed one already said five.");
+console.log("unchecked here: a tool with NO options that ignores a stray one (recordReach prints its report whatever it is given -- it reads no argv, so the detector " +
+    "cannot see it); that the 13 converted tools still do their work with their real arguments, beyond the ones driven above (claimsGate, gateSelection, " +
+    "refreshReleases, packRelease and the verdict were run by hand; verify and ship by the ship itself).");
 process.exit(fails ? 1 : 0);

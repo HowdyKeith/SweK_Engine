@@ -34,6 +34,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { toPosix } from "./posixAssumption.mjs";
+import { parseOrExit } from "./cliArgs.mjs";   // v4826 -- the CLI at the bottom refuses an option it does not know
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -8891,6 +8892,32 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The CLIs refuse an unknown option (cliArgs) and the peer's transport is a row of its own. Thirteen sabotages red by name, " +
                  "logged in the two headers. NOT CLOSED: the pair has run over loopback and in one browser, not between two machines.",
     }),
+    // v4826 -- TWO new gate files: tools/ship/flakeProbe-selfcheck.mjs (the tool that runs a gate K times and reports the rows that flip or read a thin number) and
+    // tools/ship/stableWrite-selfcheck.mjs (the one definition of writing a stamped record without dirtying the tree).
+    since518: Object.freeze({
+        at: "v4826", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "tools/ship/flakeProbe-selfcheck.mjs",
+            "tools/ship/stableWrite-selfcheck.mjs",
+        ]),
+        widened: Object.freeze([
+            "world/buildingTopple-selfcheck.mjs (section 5c: the body made again from what a chip leaves -- mass by impulse, collider by resting height, spin by rotation rate)",
+            "tools/ship/raceTurret-selfcheck.mjs (the scripted demolition now chips twice, the second a refit: the node-and-browser fingerprint rows run a race that contains one)",
+            "tools/ship/cliArgs-selfcheck.mjs (the ratchet is at zero silent readers; parseOrExit and the positional spec; all 24 command lines driven with an option nobody has spelled)",
+            "tools/ship/traderPolicy-selfcheck.mjs (the artifacts' stamp moves only when their numbers do: a later version re-running the same numbers leaves the tree clean)",
+            "tools/ship/rigCanvas-selfcheck.mjs (rig-expected.json is rewritten only when its pixel counts change, not stamped with the clock on every run)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** A GATE THAT FAILS ONE RUN IN EIGHT IS NOT FOUND BY RUNNING IT ONCE. *** v4822's step 4b found tslRace red, green, red: its page row asked one " +
+                 "pick of a live scene for a Chaos ship, and the fleet is one to three pixels of the pick. tools/ship/flakeProbe.mjs runs a gate K times, serially, " +
+                 "and names the rows that FLIPPED between runs and the rows that PASSED every run but read a small number that varied (THIN: the species that row was " +
+                 "before it failed). Its gate holds the parser, the comparison on fixtures and the CLI end to end on a gate that flips one row and thins another. " +
+                 "Run over the live-page gates (see the record). The same round: the thirteen tools that read argv the silent way are converted, so the cliArgs census " +
+                 "is at zero and every command line is driven; verify.mjs, which shipVerdict hands its argv verbatim, no longer verifies against no version when " +
+                 "--version is mistyped. Three gates used to rewrite a tracked file on every run with a stamp that moved with the clock or the version " +
+                 "(traderPolicy twice, rigCanvas once -- the second found by the probe's own git status); all three go through tools/ship/stableWrite.mjs now, " +
+                 "and a re-run leaves bytes and mtime alone. Ten sabotages red for the probe, eight for the helper, six for the census, thirteen for the refit.",
+    }),
     // v4824 -- since517, not since516: v4822 on main took since516 in the same days. ONE new gate file: ui/pick-selfcheck.mjs, the target-scoring utility the npc audit's third cluster needed.
     since517: Object.freeze({
         at: "v4824", swept: 1, green: 1, red: 0,
@@ -14487,7 +14514,8 @@ export const SWEEP_V4297 = Object.freeze({
 // refusal, which is the only thing that makes the number real.
 // ---------------------------------------------------------------------------------------------------------
 if (process.argv[1] && import.meta.url === new URL("file://" + path.resolve(process.argv[1])).href) {
-    const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
+    const cli = parseOrExit("gateSweep", { values: { "--phase2": "path", "--timeout": "number", "--out": "path" } });
+    const arg = (k, d) => (k in cli.values ? cli.values[k] : d);
     const p1 = arg("--phase2");
     if (!p1) { console.log("usage: node tools/ship/gateSweep.mjs --phase2 <phase1.tsv> [--out f] [--timeout ms]"); process.exit(2); }
     const timeoutMs = Number(arg("--timeout", 300000));

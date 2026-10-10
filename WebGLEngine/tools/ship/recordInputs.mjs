@@ -16,6 +16,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
+import { parseOrExit } from "./cliArgs.mjs";   // v4826 -- an option this tool does not know is refused, not read past
 import { enumerateGates } from "./gateSweep.mjs";
 import { ENG, RECORD, hashFile, hashDir, readRecord, encode, carryForward,
          markChangedDuringPass } from "./inputSets.mjs";
@@ -192,14 +193,14 @@ export function conflictReport(enc, gates) {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
-    const arg = (n, d) => { const i = process.argv.indexOf(n); return i >= 0 ? process.argv[i + 1] : d; };
-    const only = arg("--gates", null), limit = Number(arg("--limit", 0));
-    const workers = Number(arg("--workers", 8)), timeoutMs = Number(arg("--timeout-s", 25)) * 1000;
+    const cli = parseOrExit("recordInputs", { values: { "--gates": "string", "--limit": "number", "--workers": "number", "--timeout-s": "number" }, flags: ["--all", "--write"] });
+    const only = cli.values["--gates"] || null, limit = cli.values["--limit"] || 0;
+    const workers = cli.values["--workers"] || 8, timeoutMs = (cli.values["--timeout-s"] || 25) * 1000;
     // *** THE SCOPE IS THE SWEEP'S OWN POPULATION, NOT THE TREE. *** Skipping can only save time on a gate the
     // sweep actually runs, and the sweep runs what is under budget. Probing the 359 gates outside it costs the
     // full run of each -- the 140 cap-hitters alone are 140 x 20 s -- to record a set nothing will ever consult.
     // --all overrides, for the day the exiled pool comes back (OVER_BUDGET_PASS_V4565 returned 105 of them).
-    const all = process.argv.includes("--all");
+    const all = cli.flags.has("--all");
     let gates = enumerateGates(ENG);
     if (!all && !only) {
         const t = JSON.parse(fs.readFileSync(path.join(ENG, "tools/ship/sweep-timings.json"), "utf8"));
@@ -269,7 +270,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
                 `${changedDuringPass.length} moved DURING the pass` +
                 (changedDuringPass.length ? " -- " + changedDuringPass.slice(0, 8).join(", ") +
                  (changedDuringPass.length > 8 ? ` and ${changedDuringPass.length - 8} more` : "") : ""));
-    if (process.argv.includes("--write")) {
+    if (cli.flags.has("--write")) {
         // INDEXED, not one path list per gate -- see the note above `FORMAT` in inputSets.mjs. Written
         // compactly rather than with an indent: this is a 4,072-row table with 443,405 references into it,
         // and an indent per line is a megabyte of spaces.
