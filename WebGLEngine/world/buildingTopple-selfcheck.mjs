@@ -53,7 +53,7 @@
 // asserted of the record: the mass by what an impulse does to the body (dv = J / m), the collider by the height the shortened block rests at, the spin
 // by the rotation rate one tick on against the same tip with nothing shot.
 //
-// SABOTAGE LOG -- v4826, each applied to world/buildingTopple.mjs, the gate run, the file restored (12; every one red by name):
+// SABOTAGE LOG -- v4826, each applied to world/buildingTopple.mjs, the gate run, the file restored (13; every one red by name):
 //   A  density from the OLD mass (the new box weighs what the old one did)              -> 2 red: the mass row (J / dv), and the spin row (a heavier body turns at 0.219 rad/s, not 0.247).
 //   B  the old half on the new body (the collider not shrunk)                           -> 4 red: mass (the old-size box at the density worked out for the small one weighs 2.25 times what it should), the collider row (rests
 //      at 5.56 m, not 4.0), the spin row (-0.431: the wrong inertia flung the spin the other way), and tips-faster.
@@ -67,6 +67,7 @@
 //   J  the offset applied backwards (pos - r)                                            -> 3 red: voxels-where-they-were, tips-faster, and the bar row.
 //   K  mass and rebuilds not folded into toppleHash                                      -> 1 red: the lockstep-fold row.
 //   L  comOffset not divided by the voxel count                                          -> 1 red: the centre-of-mass row.
+//   M  the body-slot guard removed (a refit asks for a slot with none to spare)           -> 1 red: the world-short-of-slots row (the refit goes ahead; the record shows rebuilds 1, capped undefined).
 //   FINDING (J): the first draft of the voxels-where-they-were row asked whether each survivor's world cell was one of the ORIGINAL block's cells, and
 //   sabotage J went 0 red on it: a body shifted by whole voxels along its own axis lands every survivor on another original voxel's cell, so a lattice is
 //   no witness. The expected set is the voxels that stood OUTSIDE the blast, by where they stood, with no knowledge of the refit in it.
@@ -376,6 +377,11 @@ sec("5c. HONEST CHIPPED PHYSICS (v4826): the body is made again from the voxels 
     const fold = (h, v) => { for (let k = 0; k < 4; k++) { h ^= (v >>> (k * 8)) & 0xff; h = Math.imul(h, 0x01000193); } return h; };
     const F = standing(), fh = () => BT.toppleHash(0x811c9dc5, F.t, fold), f0 = fh(); F.rec.mass += 600; const f1 = fh(); F.rec.mass -= 600; F.t.rebuilt = 1; const f2 = fh(); F.t.rebuilt = 0;
     ok("the lockstep fold sees what the refit changes: the block's MASS moves the fingerprint (everything else equal), and so does the count of bodies made again", f1 !== f0 && f2 !== f0 && f1 !== f2 && fh() === f0, `${(f0 >>> 0).toString(16)} / mass +600 ${(f1 >>> 0).toString(16)} / rebuilt 1 ${(f2 >>> 0).toString(16)}`);
+
+    // THE WORLD RUNNING OUT OF BODIES: box3d's slots are 4,096 and a refit takes one. Near the end the refit is declined and counted; the voxels still come off.
+    const Y = standing(), ybody = Y.rec.body, realCount = Y.phys.bodyCount.bind(Y.phys); Y.phys.bodyCount = () => BT.TOPPLE.bodyLimit - BT.TOPPLE.bodyReserve + 2;
+    const ycut = BT.shellOnBlock(Y.t, Y.rec.slot, topPoint(Y.rec), 5.0); Y.phys.bodyCount = realCount;
+    ok("!! with the world short of body slots (" + (BT.TOPPLE.bodyLimit - BT.TOPPLE.bodyReserve + 2) + " of " + BT.TOPPLE.bodyLimit + " in use) a big chip is NOT made into a new body -- it is declined and COUNTED (capped 1, refitCapped 1), the same body stays, and the voxels still come off; a refit that threw `body limit reached` from inside a race would end it", ycut.removed > 60 && Y.rec.body === ybody && Y.rec.rebuilds === 0 && Y.rec.capped === 1 && Y.t.refitCapped === 1 && !Y.t.rebuilt && Y.rec.count === ycut.left, `body ${ybody} kept, ${ycut.left} voxels left, capped ${Y.rec.capped}`);
 
     // WHAT IT IS NOT: the centre of mass of a box is its centre. An off-centre bite moves the voxels' centroid off it, and the event says by how much
     const Z = standing(), zc = BT.shellOnBlock(Z.t, Z.rec.slot, (() => { const r = rotateQ(Z.rec.pose.quat, [1.5, 4, 1.5]); return [Z.rec.pose.pos[0] + r[0], Z.rec.pose.pos[1] + r[1], Z.rec.pose.pos[2] + r[2]]; })(), 3.0), zev = Z.t.events.find((e) => e.kind === "refit");

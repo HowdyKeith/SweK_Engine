@@ -52,6 +52,8 @@ export const TOPPLE = Object.freeze({
     breakFraction: 0.25,          // a block shot down to this share of the voxels it fell with comes apart where it is (v4822)
     leanUp: 0.999,                // ...unless it is tilted past this (2.6 degrees) and at rest: a lean-to on its stub and the road (measured 0.986 and 0.97), settles like a fallen one; a standing block reads 1.0000
     dt: 1 / 60,                   // the sim's tick, for the angular velocity a refit carries over (read off two consecutive poses: the wasm shim has no getter for it)
+    bodyLimit: 4096,              // box3d's body slots (swk_body_box's MAX_BODIES): a refit asks for one and has none to spare near the end, so it is declined and COUNTED, not thrown from the middle of a race
+    bodyReserve: 64,              // slots kept for what a fall itself needs (stubs, the next building's block)
     rebuild: Object.freeze({ massShare: 0.1, maxPerBlock: 8 }),   // v4826: a chipped block's body is made again once its mass has moved this share, or its tight box has shrunk by a voxel; at most this many times (box3d has no body destroy: each costs a slot of 4,096)
     rubbleId: 7,                  // MaterialRegistry's RUBBLE
     debrisEvery: 3,               // one debris burst per this many voxels of a shattering block (the pool is capped at 400)
@@ -291,7 +293,7 @@ export function refitBlock(t, rec) {
     const half = [(hi[0] - lo[0]) / 2, (hi[1] - lo[1]) / 2, (hi[2] - lo[2]) / 2], d = [(hi[0] + lo[0]) / 2, (hi[1] + lo[1]) / 2, (hi[2] + lo[2]) / 2], mass = L.length * spec.density;
     const shrunk = half.some((h, a) => Math.abs(h - rec.half[a]) > 1e-6), massMoved = Math.abs(mass - rec.mass) / rec.mass >= spec.rebuild.massShare;
     if (!(shrunk || massMoved)) return null;
-    if (rec.rebuilds >= spec.rebuild.maxPerBlock) { rec.capped = (rec.capped || 0) + 1; t.refitCapped = (t.refitCapped || 0) + 1; return null; }   // said, not silent: the voxels came off and the body could not follow
+    if (rec.rebuilds >= spec.rebuild.maxPerBlock || (phys.bodyCount && phys.bodyCount() >= spec.bodyLimit - spec.bodyReserve)) { rec.capped = (rec.capped || 0) + 1; t.refitCapped = (t.refitCapped || 0) + 1; return null; }   // said, not silent: the voxels came off and the body could not follow
     // the pose is the record's: a shell is resolved BEFORE the tick's world step and stepTopple reads AFTER it, so rec.pose is box3d's state right now; the velocity is read
     const vel = phys.readVelocities(), vo = rec.body * 3, pos = rec.pose.pos.slice(), quat = rec.pose.quat.slice(), v = [vel[vo], vel[vo + 1], vel[vo + 2]];
     const w = angularVelocity(rec.prevQuat || quat, quat, spec.dt), r = rotateQ(quat, d), wr = cross(w, r);
