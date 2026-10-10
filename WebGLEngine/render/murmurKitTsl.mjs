@@ -402,6 +402,17 @@ export function makeMurmurKitTsl(TSL) {
     };
 
     /** Identity below the knee, an asymptotic compression above -- so a specular keeps its SHAPE, not a plateau. */
+    // v4827 -- mh_out's noise, kit.ts:316-317, in code values; see the CPU twin mhOutTri. fract(x) is x - floor(x),
+    // which is GLSL's own definition of it.
+    const mhOutTri = Fn(([pixel]) => {
+        const a = dot(pixel, vec2(0.06711056, 0.00583715)).toVar();
+        const b = float(52.9829189).mul(a.sub(floor(a))).toVar();
+        const n = b.sub(floor(b)).toVar();
+        return select(n.lessThan(0.5), sqrt(n.mul(2.0)).sub(1.0),
+                      float(1.0).sub(sqrt(max(float(0.0), float(2.0).sub(n.mul(2.0))))));
+    });
+    // mh_out on an ENCODED colour: + one code value of triangular dither, then the clamp mh_out ends with
+    const mhOutEncoded = (srgb, pixel) => clamp(srgb.add(mhOutTri(pixel).div(255.0)), 0.0, 1.0);
     const mhKnee = (x, knee) => select(x.lessThan(knee), x,
         knee.add(float(1.0).sub(knee).mul(float(1.0).sub(exp(x.sub(knee).div(max(float(1.0).sub(knee), float(1e-3))).negate())))));
 
@@ -696,7 +707,7 @@ export function makeMurmurKitTsl(TSL) {
         mhRefract, mhLook, mhExit, mhHaze, mhMedium, mhInside, mhTransmit, mhScatter,
         mhDeform, mhBody, MH_AMP_CAP,
         mhKey, mhSmall, mhSurface, mhContainment, mhOpalLife, mhAbyssSlot, mhCompleteLift, mhIgniteAxis, mhIgniteLap, mhIgniteTurn,
-        mhPaper, mhPalette, mhShade, mhKnee, mhTier, mhPresentFinish, mhPresentPaper, mhPresentKnee, mhLit, mhLchT, labOfSrgb, srgbToLinearT, linearToOklabT, oklabToLinearT,
+        mhPaper, mhPalette, mhShade, mhOutTri, mhOutEncoded, mhKnee, mhTier, mhPresentFinish, mhPresentPaper, mhPresentKnee, mhLit, mhLchT, labOfSrgb, srgbToLinearT, linearToOklabT, oklabToLinearT,
         Loop,
     };
 }
@@ -990,6 +1001,18 @@ export function makeMurmurKitProbeTsl(THREE, TSL, { mode = "hash", n = 16 } = {}
             // the lap peaks at flat + gain = 0.98 and needs no scale; the turn peaks at 2.90 and takes /3.
             return vec4(clamp(r, 0.0, 1.0), clamp(g.div(3.0), 0.0, 1.0),
                         clamp(b, 0.0, 1.0), clamp(a.div(3.0), 0.0, 1.0));
+        }
+        if (mode === "dither") {
+            // *** mh_out, THE KIT'S 41st FUNCTION -- v4827. ***
+            // R  mh_out on a flat grey of 128 code values, at the FRAGMENT'S OWN screen position -- the argument
+            //    the species shader hands it -- so this channel grades the pixel convention as well as the noise.
+            // G  the noise ALONE, (tri + 1) / 2, at the LATTICE's pixel centres -- the function apart from where
+            //    the shader says the pixel is, so a red on R alone says the convention and not the formula.
+            // B  mh_out on black: half the dither is negative and mh_out's clamp is what keeps it from wrapping.
+            const R = K.mhOutEncoded(vec3(128.0 / 255.0), TSL.screenCoordinate).x;
+            const G = K.mhOutTri(vec2(px.add(0.5), py.add(0.5))).add(1.0).mul(0.5);
+            const B = K.mhOutEncoded(vec3(0.0), TSL.screenCoordinate).z;
+            return vec4(R, clamp(G, 0.0, 1.0), B, float(1.0));
         }
         if (mode === "live") {
             // *** mh_live OVER THE WHOLE INPUT SQUARE, AGAINST THE f64 TWIN. *** x is the raw signal 0..1 and

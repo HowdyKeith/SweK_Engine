@@ -44,6 +44,9 @@
 // v4825 SABOTAGES, each RED on its own row and restored: geode's spinPhase handed kp 0 (the cadence census --
 // a route with no coefficient is no cadence); tempest's THINKING read inline off uniforms.stateIndex instead of
 // THINK (the raw-uniform row, stateIndex 5); tempest's energy put back on VOICE (the 42/21 code count).
+// v4827 -- section 1's arc row allows at most 4 bytes off by 1: mh_out's dither puts pixels on rounding edges, and
+// two conditioned levels equal to float precision can land either side of one (measured: 1 byte). SABOTAGE,
+// restored: arc's voice read as the raw knob -> RED.
 // v4827 -- comet's r0 moved from VOICE to PACE, duet's separation took pace, and chorus's period and sol's
 // granulation left for integrals: 41 voice readers, 21 cadence. sweep has a ninth reader (limn's lap). chorus
 // is the fourth builder to reach its cadence by a named route, the host's breath integral. SABOTAGE, restored:
@@ -129,8 +132,12 @@ if (!run.ok) {
             `bytes differ, worst ${eq.mx}` + (near ? `; against the 0.5-exponent partner ${L_SQRT.toFixed(6)}, ` +
             `${near.n} bytes differ, worst ${near.mx}, total ${near.sum}` : ""));
         ok(`!! *** ${name}: THE EXPONENT IS 0.65 AND THE RESTING WEIGHT IS 0.55, TO THE BYTE ***`,
-            eq.n === 0 && (near === null || near.sum > 2000),
-            `${eq.n} differing bytes between the two frames -- a level of ${L_LISTEN} conditioned in LISTENING ` +
+            // v4827: AT MOST ONE CODE VALUE ON A HANDFUL OF BYTES, where it had been zero. The two conditioned levels
+            // are equal to float precision (pow, a few ulp apart), and mh_out's dither -- deterministic per pixel --
+            // now puts some pixels within an ulp of a rounding edge, so such a pixel can land either side. MEASURED: 1
+            // byte of 9,216, off by 1. A shader reading the raw knob moves thousands, which is what the row is about.
+            eq.n <= 4 && eq.mx <= 1 && (near === null || near.sum > 2000),
+            `${eq.n} differing bytes (worst ${eq.mx}) between the two frames -- a level of ${L_LISTEN} conditioned in LISTENING ` +
             `and ${L_PARTNER.toFixed(6)} conditioned in IDLE are the same number, so they are the same picture. ` +
             (near ? `The near-miss a square-root port would need, ${L_SQRT.toFixed(6)}, disagrees by ${near.sum} ` +
                     `across ${near.n} bytes: the row is not passing because both frames are dark. ` : "") +
@@ -425,11 +432,12 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
         readSe === 4 && readC === 24 && readSw === 9 && driveDecl === 1 && drive - 1 >= 10,
         `stateTau is read ${rawT} time, by mh_state, and mh_state's four outputs now reach ` +
         `${readSe + readC + readSw + (drive - 1)} sites between them: settled ${readSe}, complete ${readC}, ` +
-        `sweep ${readSw}, and drive ${drive - 1} from one declaration. THE FOURTH WAS THE LARGEST AND ONLY ` +
-        `PART OF IT IS HERE: murmur spends st.drive at 45 sites doing three different things, and v4653 ` +
-        `wired the two that are a DIRECTION or a SIZE and left the sixteen that multiply a local clock. ` +
-        `That deferral is not stated here and hoped for -- tools/ship/murmurDrive-selfcheck.mjs checks that ` +
-        `no line in the shader reads both DRIVE and uniforms.time.`);
+        `sweep ${readSw}, and drive ${drive - 1} from one declaration. THE FOURTH WAS THE LARGEST: murmur ` +
+        `spends st.drive doing three different things, and v4653 wired the two that are a DIRECTION or a ` +
+        `SIZE; the sixteen that multiply a local clock followed at v4654-v4657 on the integrated clock ` +
+        `(driveInt), and v4827's full read added the last drive terms it found (aura, flux, duet, prism, arc). ` +
+        `(v4827: this sentence still said those sixteen were left.) tools/ship/murmurDrive-selfcheck.mjs checks ` +
+        `that no line in the shader reads both DRIVE and uniforms.time.`);
 
     // The per-species tables have to be READ and not merely imported, or MH_IGNITE is a table the shader
     // agrees with by coincidence. Seven entries, eleven species without one, and the eleven build no nodes.

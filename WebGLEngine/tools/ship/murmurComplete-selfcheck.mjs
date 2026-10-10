@@ -367,10 +367,13 @@ console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "leaves the dark dark. Inside the silhouette these four frames have NO pixel at or below 6 of 255, so " +
     "the obvious row read a worst rise of 0.0 from a population of zero and would have passed forever while " +
     "measuring the paper behind the orb. The claim is graded as the arithmetic it is." +
-    "\nWHAT IS NOT CLAIMED: the eight per-species ignition FIGURES that are still missing -- comet, fathom, " +
-    "geode, arc, aura, flux, prism and helix each spend complete on a gaussian of their own (arc on its " +
-    "filament, aura on a von Mises that follows the sweep round its ribbons, geode on a flat lit += 0.70) " +
-    "and none is the one shape MH_IGNITE holds. The SINGLES are section 5 since v4825, all but limn's ring " +
-    "and second interior, which wait on limn's rim/interior split. Counted in murmur's own sources st.complete appears 47 times; " +
-    "this round takes 8 of them and the census in tools/ship/murmurLive-selfcheck.mjs holds the total.");
+    "\nWHAT IS NOT CLAIMED HERE, AND WHERE IT IS: the eight per-species ignition FIGURES -- arc, flux, prism " +
+    "and helix's travelling fronts (v4659, tools/ship/murmurIgniteAxis-selfcheck.mjs), aura's von Mises, " +
+    "fathom's per-shell window, geode's flat lift and comet's trail decay (v4660, murmurIgniteFour) -- are " +
+    "graded in their own gates, not this one. The SINGLES are section 5, limn's ring and second interior " +
+    "included since v4825 split its rim from its interior. (v4827: this sentence said the eight figures were " +
+    "still missing and that limn's two waited on that split -- both closed rounds earlier, and a closing that " +
+    "under-claims sends the next reader to build what is already there.) murmur's eighteen shaders at 1c23b99 " +
+    "spell st.complete 48 times; the port's 24 COMPLETE readers are those sites collapsed onto shared shapes, " +
+    "and tools/ship/murmurLive-selfcheck.mjs holds that count.");
 process.exit(fails ? 1 : 0);

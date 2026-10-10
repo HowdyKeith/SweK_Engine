@@ -12,6 +12,10 @@
 // never read the shader, letting three sabotages through. Here the two implementations are genuinely
 // independent -- f64 scalar JS against an f32 node graph compiled to WGSL and executed on a GPU -- and for an
 // INTEGER hash there is no tolerance to hide behind: 256 of 256 uint32s match or they do not.
+// v4827 -- section 18 and a probe mode (`dither`) for mh_out, the kit's 41st function: grey 128 at the fragment's own
+// pixel (256/256 bytes equal to the CPU twin at murmur's y-down convention, 156 at y up), the noise alone at the
+// lattice's centres, and black's clamp. SABOTAGES, restored: the pixel's y flipped in the probe -> RED; 52.9829189
+// typed 52.98 in the TSL twin -> RED.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -326,7 +330,8 @@ const probeRun = await renderThreeTslToPixels({
                { factoryArgs: { mode: "heading", n: N } },
                { factoryArgs: { mode: "drift", n: N } },
                { factoryArgs: { mode: "igniteAxis", n: N } },
-               { factoryArgs: { mode: "igniteRound", n: N } }],
+               { factoryArgs: { mode: "igniteRound", n: N } },
+               { factoryArgs: { mode: "dither", n: N } }],
 });
 
 sec("6. *** THE PAIR: THE REAL COMPILED SHADER AGAINST THE CPU REFERENCE, BIT FOR BIT ***");
@@ -2015,13 +2020,50 @@ sec("17. *** THE TWO IGNITION FIGURES THAT ARE NOT AN AXIS: aura's CIRCLE AND fa
     }
 }
 
+// =============================================================================================================
+sec("18. *** mh_out: THE TRIANGULAR DITHER, THE KIT'S 41st AND LAST FUNCTION, ON A REAL GPU -- v4827 ***");
+{
+    // kit.ts:311-321. Until v4827 the port carried 40 of the kit's 41 functions and this one was the gap; the
+    // HDR path has always dithered (render/aiPresenceOrbPresent.mjs, present.wgsl's port), the DIRECT path had
+    // nothing between linearToSrgb and the byte.
+    const r = probeRun;
+    if (!r.ok) {
+        ok("!! mh_out matches a real GPU render", false, `could not render: ${r.reason || "unknown"}`);
+    } else {
+        const fr = r.frames[16];
+        // R and B are at the FRAGMENT's position: readback row `row` is screen y = row + 0.5, y DOWN, as murmur's
+        // position * pixelScale is. Counted the other way round as well, and asserted to lose.
+        let hitR = 0, hitRflip = 0, hitB = 0, wG = 0;
+        const hist = [0, 0, 0];
+        for (let row = 0; row < N; row++) for (let x = 0; x < N; x++) {
+            const i = (row * N + x) * 4;
+            const want = (sy) => Math.round(Math.min(1, Math.max(0, 128 / 255 + K.mhOutTri(x + 0.5, sy) / 255)) * 255);
+            if (fr[i] === want(row + 0.5)) hitR++;
+            if (fr[i] === want(N - 1 - row + 0.5)) hitRflip++;
+            hist[fr[i] - 127] = (hist[fr[i] - 127] || 0) + 1;
+            if (fr[i + 2] === Math.round(Math.max(0, K.mhOutTri(x + 0.5, row + 0.5)) * 1)) hitB++;
+            const ly = N - 1 - row;   // the lattice's y runs UP
+            wG = Math.max(wG, Math.abs(fr[i + 1] - Math.round((K.mhOutTri(x + 0.5, ly + 0.5) + 1) * 0.5 * 255)));
+        }
+        say(`grey 128 dithered: ${hitR}/${N * N} bytes as the CPU twin predicts at y down (${hitRflip} at y up); bytes 127/128/129: ${hist.join("/")}; ` +
+            `the noise alone within ${wG}/255; black clamps to the twin on ${hitB}/${N * N}`);
+        ok("!! *** ONE CODE VALUE OF TRIANGULAR DITHER, AFTER THE ENCODE, AT THE FRAGMENT's OWN PIXEL -- kit.ts:315 ***",
+            hitR === N * N && hitRflip < N * N && wG <= 1 && hitB === N * N && hist[0] > 0 && hist[2] > 0,
+            `every one of ${N * N} bytes is the twin's, at murmur's y-down pixel convention and not the other; ` +
+            `the flat grey spreads over 127, 128 and 129 (${hist.join(" / ")}) -- one code value either side, the ` +
+            `triangle's whole support -- and black never wraps, because mh_out clamps after the dither and the ` +
+            `twin does too.`);
+    }
+}
+
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nWHAT THIS KIT IS FOR: four of murmur-web's eighteen species are built out of it, and the other fourteen " +
     "would each otherwise have re-approximated the march, the medium, the gesture clock and the hash " +
     "separately. The SPECIES themselves are gated next door in tools/ship/murmurSpecies-selfcheck.mjs -- they " +
     "need real renders and this gate does not, which is a budget fact before it is a tidiness one. " +
-    "\nWHAT IS NOT CLAIMED: mh_out, the triangular-PDF interleaved-gradient dither -- which is why section 12 " +
-    "grades mhPresentFinish and not mhPresent. mh_present's own TONE CURVE and its two ground-dependent terms " +
+    "\nmh_out IS CLAIMED SINCE v4827, at section 18 -- the kit's 41st function and the last one; section 12 still " +
+    "grades mhPresentFinish rather than mhPresent because the dither is spent after the encode, on the direct path." +
+    " mh_present's own TONE CURVE and its two ground-dependent terms " +
     "ARE claimed now, at section 12, bit-exactly on three grounds: the catchlight, the contact shadow and the " +
     "knee that moves 0.90 -> 0.96 with the ground. AND THIS SENTENCE CARRIED A STALE CLAIM FOR TWELVE ROUNDS: " +
     "it said the HUE channel \"reaches no pixel and every species passes 0\", which v4631 closed -- every " +

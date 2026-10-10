@@ -2845,7 +2845,13 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // So the knee goes exactly where linearToSrgb already goes, and for the same reason.
         const litPaper = KIT.mhPresentPaper(railColor, sf.spec, sf.glow, uvY, pal, inkLin);
         const colorLinear = max(linear ? litPaper : KIT.mhPresentKnee(litPaper, pal.paper), vec3(0.0));
-        const outColor = linear ? colorLinear : linearToSrgb(colorLinear);
+        // *** v4827 -- AND mh_out's DITHER ON THE DIRECT PATH, AFTER THE ENCODE, WHERE murmur SPENDS IT. *** kit.ts:315
+        // "one code value of triangular-PDF interleaved-gradient dither, in the encoded space where the quantization
+        // actually happens", then the clamp. The linear path does NOT take it: render/aiPresenceOrbPresent.mjs is
+        // present.wgsl's port and dithers on the encoded byte itself, so dithering here too would put two on it --
+        // the second-knee mistake v4643 made, in a new place. screenCoordinate is murmur's position * pixelScale:
+        // device pixels, y down, centres at .5.
+        const outColor = linear ? colorLinear : KIT.mhOutEncoded(linearToSrgb(colorLinear), TSL.screenCoordinate);
 
         // *** smoothstep(edge0, edge1, x) NEEDS edge0 < edge1 -- "results are undefined" otherwise (GLSL spec,
         // and WGSL inherits the same contract). The mask wants to fall from 1 to 0 as rho RISES past R, which

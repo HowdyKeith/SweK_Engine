@@ -2203,9 +2203,9 @@ export function mhShade(p, t, hue = 0) {
  * past the body, bottom-over-top light: limn 1.426, still 1.074, abyss 1.015. All above 1, so +y in this
  * file's body coordinates IS the image bottom and the caller passes uvY unnegated, exactly as murmur spells it.
  *
- * WHAT THIS IS NOT: mh_out. The triangular-PDF interleaved-gradient dither is still unported, so the
- * quantisation this compresses into is still the raw one. Named here rather than implied by the function's
- * name, which is why it is mhPresentFinish and not mhPresent.
+ * WHAT THIS IS NOT: mh_out, which is mhOut below (v4827) and is spent by the shader's direct path after the
+ * encode, where murmur spends it. Named here rather than implied by the function's name, which is why it is
+ * mhPresentFinish and not mhPresent.
  */
 export function mhPresentFinish(rgb, spec, contact, uvY, pal, inkLinear) {
     return mhPresentKnee(mhPresentPaper(rgb, spec, contact, uvY, pal, inkLinear), pal.paper);
@@ -2260,6 +2260,24 @@ export function mhPresentPaper(rgb, spec, contact, uvY, pal, inkLinear) {
     const kShade = Math.min(1, Math.max(0, contact * 2.60)) * (0.06 + 1.05 * below) * paper;
     const shade = [inkLinear[0] * 0.55, inkLinear[1] * 0.55, inkLinear[2] * 0.55];
     return [out[0] + (shade[0] - out[0]) * kShade, out[1] + (shade[1] - out[1]) * kShade, out[2] + (shade[2] - out[2]) * kShade];
+}
+
+/**
+ * *** mh_out -- THE LAST THING EVERY FIELD DOES, AND THE 41st OF THE KIT'S 41 FUNCTIONS (v4827). *** kit.ts:311-321:
+ * "One code value of triangular-PDF interleaved-gradient dither, in the encoded space where the quantization
+ * actually happens. Triangular rather than uniform because uniform dither leaves a faint texture of its own in
+ * flat areas; triangular does not." `pixel` is murmur's position * pixelScale -- DEVICE pixels, y down, centres
+ * at .5 -- which is WebGPU's fragment position exactly. Returns the ENCODED colour, clamped, as mh_out does.
+ * mhOutTri is the noise alone, in code values (-1..1), exported because a gate predicts bytes from it.
+ */
+export function mhOutTri(px, py) {
+    const fract = (x) => x - Math.floor(x);
+    const n = fract(52.9829189 * fract(px * 0.06711056 + py * 0.00583715));
+    return n < 0.5 ? (Math.sqrt(2.0 * n) - 1.0) : (1.0 - Math.sqrt(Math.max(0.0, 2.0 - 2.0 * n)));
+}
+export function mhOut(linearRgb, px, py) {
+    const tri = mhOutTri(px, py) / 255;
+    return linearRgb.map((c) => Math.min(1, Math.max(0, linearToSrgb(c) + tri)));
 }
 
 /** kit.ts's knee: identity below it, an asymptotic compression above, so a specular keeps its shape. */

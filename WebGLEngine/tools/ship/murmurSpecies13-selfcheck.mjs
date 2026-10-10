@@ -75,19 +75,31 @@ const voiceLight = (px, q = 0.80) => {
 // Local maxima are threshold-free, and subtracting the median makes the ratio genuinely gain-invariant:
 // (b + g*v1 - b) / (b + g*v5 - b) = v1/v5 for any g. Measured, the uniform lift now reads x0.858 against the
 // front-weighted x3.828.
+//
+// *** v4827 -- ONE PEAK PER VOICE: A 5x5 WINDOW, AND PEAKS WITHIN 4 px MERGED TO THE BRIGHTER. *** The 4-neighbour
+// `>=` test counted every TIED pixel of a flat top as its own maximum, so a bright voice whose top was a plateau
+// supplied several of the five "peaks" and the fifth was a duplicate of a bright voice rather than the fifth
+// voice. murmur's mh_out dither (v4827) breaks those ties by one code value, the duplicates vanished, and voice 0
+// read 7.938 where it had read 3.663 -- the instrument had been measuring plateau widths. A window wider than a
+// dither speckle and a merge radius narrower than the voices' spacing (about 0.35 of the body) count voices.
+// RE-MEASURED on it: the front-weighted lift reads x1.71, the equal-average UNIFORM lift (liftFront spent at
+// front = 0.5 everywhere) x1.31 -- the floor is 1.5, between them. SABOTAGE, restored: that uniform lift -> RED.
 const voiceSpread = (px, n = 5) => {
     const V = [], M = [];
-    for (let y = 1; y < N3 - 1; y++) for (let x = 1; x < N3 - 1; x++) {
+    for (let y = 2; y < N3 - 2; y++) for (let x = 2; x < N3 - 2; x++) {
         const dx = (x + 0.5) / N3 * 2 - 1, dy = (y + 0.5) / N3 * 2 - 1;
         if (Math.hypot(dx, dy) > 0.55) continue;
         const v = light(px, x, y); V.push(v);
-        if (v >= light(px, x + 1, y) && v >= light(px, x - 1, y) &&
-            v >= light(px, x, y + 1) && v >= light(px, x, y - 1)) M.push(v);
+        let top = true;
+        for (let j = -2; j <= 2 && top; j++) for (let i = -2; i <= 2; i++) if (light(px, x + i, y + j) > v) { top = false; break; }
+        if (top) M.push([v, x, y]);
     }
     V.sort((a, b) => a - b);
     const med = V[Math.floor(V.length / 2)];
-    M.sort((a, b) => b - a);
-    return M.length < n ? 1 : (M[0] - med) / Math.max(M[n - 1] - med, 1e-9);
+    M.sort((a, b) => b[0] - a[0]);
+    const P = [];
+    for (const m of M) if (P.every((q) => Math.hypot(q[1] - m[1], q[2] - m[2]) > 4)) P.push(m);
+    return P.length < n ? 1 : (P[0][0] - med) / Math.max(P[n - 1][0] - med, 1e-9);
 };
 
 // =============================================================================================================
@@ -135,9 +147,10 @@ sec("2. *** LEVEL PICKS OUT THE NEAREST, rather than turning everybody up ***");
         // and the measurable consequence is that the SPREAD across the ensemble widens, which a uniform gain
         // cannot do at all: multiplying every voice by one number leaves a ratio of two of them unchanged.
         ok("!! *** THE ENSEMBLE GETS MORE UNEQUAL, WHICH A UNIFORM GAIN CANNOT DO ***",
-            b > a * 1.8 && a > 1.5,
+            b > a * 1.5 && a > 1.5,
             `voice 0 -> 1 takes the brightest peak over the fifth-brightest from ${a.toFixed(3)} to ` +
-            `${b.toFixed(3)}, x${(b / a).toFixed(2)} -- against x0.858 for a uniform lift of the same average, ` +
+            `${b.toFixed(3)}, x${(b / a).toFixed(2)} -- against x1.31 for a uniform lift of the same average on this ` +
+            `instrument (v4827; x0.858 on the old one, whose fifth peak was a plateau duplicate), ` +
             `which is the sabotage that forced this instrument. The lift is 1 + voice * (${K.MH_CHORUS.liftB} + ` +
             `${K.MH_CHORUS.liftFront} * front), so the back of the shell gains ` +
             `${(1 + K.MH_CHORUS.liftB).toFixed(2)}x and the front ` +

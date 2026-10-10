@@ -32,7 +32,7 @@
 // tapGate(pM) (section 1); duet's braid lost DRIVE.mul(DU.braidDrive) (section 2); tempest's drift wobble put
 // back on float(0.45) (section 2); limn's lap deleted (section 3); comet's r0 back on VOICE (section 3); sol's
 // halo back on mhTube(wl * 3.19, sinA, pp / 10.2) (section 3); comet's head put back into its density (section 3);
-// chorus's breath back on uniforms.time / per (section 4).
+// chorus's breath back on uniforms.time / per (section 4); the direct path's mhOutEncoded deleted (section 1).
 "use strict";
 
 import fs from "node:fs";
@@ -58,7 +58,7 @@ const bodyOf = (b) => { const i = raw.indexOf(`const build${b} = () => {`); if (
     const j = raw.indexOf("const build", i + 20); return raw.slice(i, j < 0 ? raw.length : j); };
 
 // =============================================================================================================
-sec("1. *** THE THREE PORT-WIDE GAPS: depth once, each species' own defaults, and the skipped tap ***");
+sec("1. *** THE PORT-WIDE GAPS: depth once, each species' own defaults, the skipped tap, and the last kit function ***");
 {
     // (1) u_depth: murmur's every shader reads it once, as mh_palette's last argument (still.ts:134, duet.ts:158,
     // ... sol.ts:218 -- eighteen identical lines). The port reads it once, in the same call, and nowhere else.
@@ -121,6 +121,18 @@ sec("1. *** THE THREE PORT-WIDE GAPS: depth once, each species' own defaults, an
         `droplet, nebula, tempest, aura, flux, prism and helix's strands, which scale the whole emission). ` +
         `Until v4827 every one of the eighteen absorbed on taps murmur never takes, and the edge of each body ` +
         `lost light to them.`);
+
+    // (4) v4827 -- mh_out, kit.ts:311-321: the last thing every field does, after the encode. The DIRECT path takes it;
+    // the linear path must NOT, because render/aiPresenceOrbPresent.mjs (present.wgsl's port) dithers the encoded
+    // byte itself and a second dither there is v4643's second knee in a new place.
+    const outLine = /const outColor = linear \? colorLinear : KIT\.mhOutEncoded\(linearToSrgb\(colorLinear\), TSL\.screenCoordinate\);/.test(raw);
+    const outCalls = (code.match(/KIT\.mhOutEncoded\(/g) || []).length;
+    const presentDithers = /dither/i.test(fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbPresent.mjs"), "utf8"));
+    ok("!! *** mh_out's DITHER IS SPENT ONCE, ON THE DIRECT PATH, AFTER THE ENCODE -- and the HDR path keeps the present pass's ***",
+        outLine && outCalls === 1 && presentDithers,
+        `outColor ${outLine ? "takes" : "does NOT take"} mhOutEncoded on its sRGB branch and leaves the linear branch ` +
+        `alone; ${outCalls} call in the shader. The kit's 41st function -- the last -- and its bytes are graded ` +
+        `on a real GPU at tools/ship/murmurKit-selfcheck.mjs section 18.`);
 }
 
 // =============================================================================================================
