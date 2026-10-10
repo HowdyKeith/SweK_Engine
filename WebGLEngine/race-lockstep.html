@@ -83,7 +83,7 @@ let physMod = null, fleet = "";
 function startRace() {
     state.phase = "running";
     state.peer = createRacePeer({
-        selfId: peerId, peers: cfg.peers, owner: cfg.owner, worldFrom: () => worldFromModule(physMod, [0, -9.81, 0]), drivers: cfg.drivers, gunners: cfg.gunners, seed: cfg.seed, seconds: cfg.seconds, fleet, city: cfg.city,
+        selfId: peerId, peers: cfg.peers, owner: cfg.owner, worldFrom: () => worldFromModule(physMod, [0, -9.81, 0]), drivers: cfg.drivers, gunners: cfg.gunners, seed: cfg.seed, seconds: cfg.seconds, fleet, city: cfg.city, stopTick,
         send, backendId: fleet + "|" + sig, inputDelay, inputFn: P.humanInputFn(peerId, state.keys, { human: cfg.human[peerId] }),
         onBackendMismatch: (h) => { const [ef, es] = String(h.ours).split("|"), [tf, ts] = String(h.theirs).split("|"); state.halt = ef !== tf ? "the other machine's physics engine differs from yours (" + h.theirs + " against " + h.ours + "): lockstep cannot work across two engines, so it stopped before the first step" : "the two of you opened different races (" + (ts || "?") + " against " + (es || "?") + "): open the same link, with only peer= different"; send({ t: "halt", peer: peerId, halted: state.halt }); },   // the peer that halts never announces its own identity (the net stops pumping), so the OTHER page is told here, or it would wait for commands that will never come
     });

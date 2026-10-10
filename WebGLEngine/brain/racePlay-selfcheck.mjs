@@ -17,7 +17,38 @@
 // the browser stepped reproduce IN NODE), two players through a real relay on two iframes (both end AGREED on one fingerprint, each car followed its own player), two
 // players who opened different races (both stop, naming it), and a relay that is not there (said, not hung).
 //
-// SABOTAGE LOG -- v4827 (filled in below once run).
+// SABOTAGE LOG -- v4827, twenty-three, each applied to the file named, the gate run, the file restored. Reds are rows (`grep -c '^  FAIL'`).
+//   A  racePlay.mjs: LEFT_STEER back to -1, the first draft             2 red: the turn-on-the-road row (A went to +z, D to -z: a RIGHT turn on a north-up map) and the row that reads A's steer off the other machine's log
+//   B  racePlay.mjs: down while rolling reverses instead of braking     1 red (the key table)
+//   C  racePlay.mjs: the steer not scaled by speed                      1 red (the shrink row: 1.000 at 20 m/s)
+//   D  racePlay.mjs: the keys ignored for driving                       10 red (every row that moves a car)
+//   E  racePlay.mjs: the gunner's own drop replaced by the key's        1 red (the gunner's slick survives the keys: 0 ticks of 240)
+//   F  racePlay.mjs: every owned car is the human's                     1 red (the bot's car did not drive away: 0.00 m)
+//   G  raceLockstep.mjs: createRacePeer ignores opts.inputFn            10 red (the same rows as D: the keys never reach the wire)
+//   H1 racePlay.mjs: the play loop with no backlog cap                  1 red (the stall row: 24 ticks over three frames, not 15)
+//   H2 racePlay.mjs: the play loop with no per-frame pump cap           1 red (the stall row: 15 in the first frame, not 8)
+//   I  racePlay.mjs: the play loop pumps past the stop tick             3 red (the stop row, and in the browser the replay-in-node row and the pair row: ticks past the end)
+//   J  racePlay.mjs: "waiting" never reported                           1 red (a peer not heard from is 'running', tick 0, waits 40)
+//   K  racePlay.mjs: the signature ignores the seed                     3 red (the five-signatures row, the node halt-on-different-races row, the browser one)
+//   T  racePlay.mjs: solo gives car 1 to a peer that is not there       1 red (the bot did not drive: 0.00 m)
+//   L  race-lockstep.html: no final word sent                           3 red (the pair never agrees; each car follows its player; the AGREED row)
+//   M  race-lockstep.html: AGREED printed without comparing             1 red (handed a final word off by one bit it still says AGREED)
+//   N  racePlay.mjs: KeyA is "right"                                    3 red (the key table, the turn on the road, the steer in the other machine's log)
+//   O  race-lockstep.html: draw() returns at once                       1 red (the red car's pixels are not on the canvas)
+//   P  race-lockstep.html: nothing said when the relay is unreachable   1 red (the no-relay row)
+//   Q  race-lockstep.html: the halting page does not tell the other     1 red, DETERMINISTIC ONLY AFTER THE COUNTDOWN. The first form of this row started both pages at once, and the bug (a page that
+//      halts on a mismatch never announces its own identity, because the net stops pumping, so the OTHER page waits forever for a peer that has stopped) showed or hid depending on which
+//      page pumped first: three runs of the sabotage were 0, 1 and 1 red. B now opens with countdown=2, so A has always pumped first and B hears it before it has pumped itself.
+//   U  raceLockstep.mjs: the session ignores its stop tick              2 red (the 600-tick row: 765 ticks, and the confirmed-whole-race row)
+//   V  race-lockstep.html: the page does not hand the session its stop tick   1 red (the session reports Infinity)
+//   W  race-lockstep.html: the countdown ignored                        0 red the first time (the gate started every page at countdown=0 and the mismatch row passes with or without the delay once the
+//      fix is in); a row added that boots a page at countdown=2 and reads it 0.7 s in (tick 0, no pumps, 'starting in 2...') and then 1 red.
+//   A FIRST BATTERY OF TWENTY WENT WRONG IN A WAY WORTH SAYING: the pair row ("both pages print AGREED on one fingerprint") also went red under sabotages that cannot touch it (A, C, E, N, Q), and
+//   not under others. It was not the sabotage. Looping the UNSABOTAGED gate ten times found three reds in ten, of two kinds: (1) the harness read the result block in the same breath as the last
+//   message, one frame before the page redrew it (waits 500 ms now); (2) A REAL BUG -- one pump can step a dozen ticks it already holds commands for, so a page paced by the clock ran past the end
+//   of the race by a different number of ticks on each machine, and printed a final fingerprint, log and results from there (the AGREED check compared the right tick, so it said AGREED
+//   over two different printed fingerprints). createRaceSession takes a stopTick now and never steps it; the pair row reads the tick, the log length and the stop each page holds. Ten
+//   unsabotaged runs after: ten clean.
 "use strict";
 import path from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
@@ -106,7 +137,7 @@ let two = null;
     const cfg = P.playableRace({ seconds: SECONDS3 }), mA = await newModule(), mB = await newModule(), sg = P.configSignature(cfg), keyA = P.createKeys(), keyB = P.createKeys();
     const q = { A: [], B: [] }; let clock = 0;
     const sendFrom = (from) => (msg) => q[from === "A" ? "B" : "A"].push({ msg: JSON.parse(JSON.stringify(msg)), due: clock + 2 });
-    const mk = (id, m, keys, cfgx = cfg) => createRacePeer({ selfId: id, peers: cfgx.peers, owner: cfgx.owner, worldFrom: () => worldFromModule(m, [0, -9.81, 0]), drivers: cfgx.drivers, gunners: cfgx.gunners, seed: cfgx.seed, seconds: SECONDS3, fleet, city: cfgx.city, send: sendFrom(id), backendId: fleet + "|" + P.configSignature(cfgx), inputDelay: 4, inputFn: P.humanInputFn(id, keys, { human: cfgx.human[id] }) });
+    const mk = (id, m, keys, cfgx = cfg) => createRacePeer({ selfId: id, peers: cfgx.peers, owner: cfgx.owner, worldFrom: () => worldFromModule(m, [0, -9.81, 0]), drivers: cfgx.drivers, gunners: cfgx.gunners, seed: cfgx.seed, seconds: SECONDS3, fleet, city: cfgx.city, stopTick: TICKS3, send: sendFrom(id), backendId: fleet + "|" + P.configSignature(cfgx), inputDelay: 4, inputFn: P.humanInputFn(id, keys, { human: cfgx.human[id] }) });
     const A = mk("A", mA, keyA), B = mk("B", mB, keyB);
     const round = () => { for (const [id, p] of [["A", A], ["B", B]]) { const due = q[id].filter((e) => e.due <= clock); q[id] = q[id].filter((e) => e.due > clock); for (const e of due) p.receive(e.msg); } A.pump(); B.pump(); clock++; };
     const trail = { A: [], B: [] };
@@ -119,11 +150,14 @@ let two = null;
         round();
         if (r % 30 === 0) { trail.A.push(A.session.race.poses()); trail.B.push(B.session.race.poses()); }
     }
+    for (let extra = 0; extra < 100; extra++) round();   // a hundred more rounds with commands still flowing: a session that has been told where the race ends must not go on
+    const overA = A.session.tick, overB = B.session.tick, lenA = A.session.log.length, lenB = B.session.log.length;
     const n = Math.min(A.session.tick, B.session.tick), a = A.session, b = B.session;
     let bad = -1; for (let t = 0; t < n; t++) if ((a.localHash(t) >>> 0) !== (b.localHash(t) >>> 0)) { bad = t; break; }
     two = { A, B, n, bad };
     report(`${n} ticks over ${clock} rounds; fingerprint A ${a.localHash(n - 1).toString(16)} B ${b.localHash(n - 1).toString(16)}; lead ${A.net.lead()} / ${B.net.lead()}`);
     ok("!! both machines confirmed the whole race (10 s) with a human at each wheel, one hash on both for every confirmed tick, and no desync", n === TICKS3 && bad === -1 && !a.desync() && !b.desync(), `${n} ticks, first disagreement ${bad}`);
+    ok("!! neither machine steps PAST the end of the race: told the race is 600 ticks long (stopTick) and given a hundred more rounds of commands, both stop at exactly 600, their logs are 600 long, and the running fingerprint the session reports at finish() is the one at tick 599 (a page that paced the race by the clock ran a few ticks over, on a different number of them per machine, and printed results from there)", overA === TICKS3 && overB === TICKS3 && lenA === TICKS3 && lenB === TICKS3 && A.session.fingerprint() === a.localHash(TICKS3 - 1).toString(16).padStart(8, "0"), `ticks ${overA} / ${overB}, logs ${lenA} / ${lenB}, fingerprint ${A.session.fingerprint()} against tick 599 ${a.localHash(TICKS3 - 1).toString(16).padStart(8, "0")}`);
     ok("the commands each machine stepped are identical (A's log and B's log are the same), so the keyboard is the replay log arriving live", JSON.stringify(a.log.slice(0, n)) === JSON.stringify(b.log.slice(0, n)));
     const last = trail.A.length - 1, v1 = P.forwardSpeed(trail.A[last][1]), far0 = Math.max(...trail.A.map((p) => dist(trail.A[0][0], p[0])));
     ok("!! each car did what its OWN player's keys said: A held W the whole race and car 0 got far from the grid (over 20 m at its farthest); B held nothing until tick 240 and then W, and car 1 is driving at the end (over 2 m/s along its nose)", far0 > 20 && v1 > 2, `car 0 ${far0.toFixed(1)} m at its farthest; car 1 ${v1.toFixed(1)} m/s at the end`);
@@ -201,6 +235,10 @@ sec("5. THE PAGE: race-lockstep.html in a real browser");
                 out.soloFinished = await waitFor(() => R.summary, 60000, "solo finish");
                 if (out.soloFinished) { out.soloFingerprint = R.summary.fingerprint; out.soloLog = R.peer.session.log; out.soloResult = txt(S, "result"); out.soloState = txt(S, "state"); out.soloKeysAfter = null; }
             }
+            // ---- the countdown: nothing is stepped or sent until it has run out ----
+            const CD = mk("?seconds=3&countdown=2");
+            out.cdBooted = await waitFor(() => rl(CD) && rl(CD).peer && rl(CD).loop, 90000, "countdown boot");
+            if (out.cdBooted) { const t0 = performance.now(); await new Promise((r) => setTimeout(r, 700)); out.cdEarly = { tick: rl(CD).peer.session.tick, text: txt(CD, "state"), sentPumps: rl(CD).loop.status().pumps }; out.cdRan = await waitFor(() => rl(CD).peer.session.tick > 20, 15000, "countdown over"); out.cdAfter = { tick: rl(CD).peer.session.tick, ms: Math.round(performance.now() - t0) }; }
             // ---- two players through the real relay ----
             const q = (peer, extra) => "?relay=" + encodeURIComponent(args.RELAY) + "&room=" + extra.room + "&peer=" + peer + "&seconds=6&countdown=" + (extra.countdown != null ? extra.countdown : 0) + (extra.more || "");
             const FA = mk(q("A", { room: "ok" })), FB = mk(q("B", { room: "ok" }));
@@ -208,8 +246,9 @@ sec("5. THE PAGE: race-lockstep.html in a real browser");
             if (out.pairBooted) {
                 key(FA.contentWindow, "KeyW", true);
                 out.pairFinished = await waitFor(() => rl(FA).summary && rl(FB).summary && rl(FA).state.peerFin && rl(FB).state.peerFin, 120000, "pair finish");
+                await new Promise((r) => setTimeout(r, 500));   // the result block is redrawn on the page's next frame; read it after, not in the same breath as the last message
                 const A = rl(FA), B = rl(FB);
-                out.pair = { aFp: A.summary.fingerprint, bFp: B.summary.fingerprint, aText: txt(FA, "result"), bText: txt(FB, "result"), aHalt: A.state.halt, bHalt: B.state.halt, sameLog: JSON.stringify(A.peer.session.log) === JSON.stringify(B.peer.session.log), aCar0: A.summary.rows[0].metres, aCar1: A.summary.rows[1].metres, bCar0: B.summary.rows[0].metres, bCar1: B.summary.rows[1].metres, aHuman: A.config.human.A, bHuman: B.config.human.B, ticks: A.stopTick };
+                out.pair = { aStop: A.peer.session.stopTick(), bStop: B.peer.session.stopTick(), soloStop: S.contentWindow.__raceLockstep.peer.session.stopTick(), aTick: A.peer.session.tick, bTick: B.peer.session.tick, aLogLen: A.peer.session.log.length, bLogLen: B.peer.session.log.length, aFp: A.summary.fingerprint, bFp: B.summary.fingerprint, aText: txt(FA, "result"), bText: txt(FB, "result"), aHalt: A.state.halt, bHalt: B.state.halt, sameLog: JSON.stringify(A.peer.session.log) === JSON.stringify(B.peer.session.log), aCar0: A.summary.rows[0].metres, aCar1: A.summary.rows[1].metres, bCar0: B.summary.rows[0].metres, bCar1: B.summary.rows[1].metres, aHuman: A.config.human.A, bHuman: B.config.human.B, ticks: A.stopTick };
             }
             // the page's comparison is a comparison: hand page A a final word from B that disagrees by one bit and it says so
             if (out.pairFinished) { const A = rl(FA), saved = A.state.peerFin; A.state.peerFin = { ...saved, hash: (saved.hash ^ 1) >>> 0 }; await new Promise((r) => setTimeout(r, 300)); out.pairDisagree = txt(FA, "result"); A.state.peerFin = saved; await new Promise((r) => setTimeout(r, 200)); out.pairAgainAgree = txt(FA, "result"); }
@@ -240,8 +279,9 @@ sec("5. THE PAGE: race-lockstep.html in a real browser");
             }
             ok("!! THE BROWSER'S RACE REPLAYS IN NODE: the commands the page stepped (a human's W through a canvas in a browser) fed to raceWithGunners in node reach the browser's own final fingerprint, tick for tick", replayOk, why || "the solo race did not finish");
             ok("the finished page says so: the result block lists both cars and the final fingerprint, and the state line reads 'finished'", p.soloFinished && /final fingerprint [0-9a-f]{8}/.test(p.soloResult) && /1\. |2\. /.test(p.soloResult) && /finished/.test(p.soloState), (p.soloResult || "").split("\n").slice(0, 2).join(" | "));
+            ok("the page COUNTS DOWN before it starts: 0.7 s after the peer exists with countdown=2 nothing has been stepped or pumped and the state line says 'starting in', and the race then runs (tick over 20 within 15 s, no sooner than the countdown)", p.cdBooted && p.cdEarly.tick === 0 && p.cdEarly.sentPumps === 0 && /starting in/.test(p.cdEarly.text) && p.cdRan && p.cdAfter.ms >= 1900, p.cdEarly ? `at 0.7 s: tick ${p.cdEarly.tick}, pumps ${p.cdEarly.sentPumps}, "${p.cdEarly.text}"; tick ${p.cdAfter && p.cdAfter.tick} after ${p.cdAfter && p.cdAfter.ms} ms` : "no boot");
             const q2 = p.pair || {};
-            ok("!! TWO PLAYERS through a real relay, two browser instances (each its own wasm): both pages finish the 6 s race and print AGREED, on ONE fingerprint, with the same commands stepped on both", p.pairFinished && q2.aFp === q2.bFp && /AGREED/.test(q2.aText) && /AGREED/.test(q2.bText) && q2.sameLog && !q2.aHalt && !q2.bHalt, `finished ${p.pairFinished}; A ${q2.aFp} B ${q2.bFp}, same log ${q2.sameLog}, halts ${q2.aHalt} / ${q2.bHalt}; A says ${(q2.aText || "").split("\n").slice(-1)[0]}; B says ${(q2.bText || "").split("\n").slice(-1)[0]}`);
+            ok("!! TWO PLAYERS through a real relay, two browser instances (each its own wasm): both pages finish the 6 s race and print AGREED, on ONE fingerprint, with the same commands stepped on both", p.pairFinished && q2.aFp === q2.bFp && /AGREED/.test(q2.aText) && /AGREED/.test(q2.bText) && q2.sameLog && !q2.aHalt && !q2.bHalt && q2.aStop === q2.ticks && q2.bStop === q2.ticks && q2.soloStop === 300 && q2.aTick === q2.ticks && q2.bTick === q2.ticks && q2.aLogLen === q2.ticks && q2.bLogLen === q2.ticks, `finished ${p.pairFinished}; ticks ${q2.aTick}/${q2.bTick} of ${q2.ticks}; A ${q2.aFp} B ${q2.bFp}, same log ${q2.sameLog}, halts ${q2.aHalt} / ${q2.bHalt}; A says ${(q2.aText || "").split("\n").slice(-1)[0]}; B says ${(q2.bText || "").split("\n").slice(-1)[0]}`);
             ok("!! each car followed its OWN player: A held W (car 0 drove, over 15 m on both pages) and B held nothing (car 1 went less than half as far, on both pages), and A's page drives the red car and B's the green", p.pairFinished && q2.aCar0 > 15 && q2.bCar0 === q2.aCar0 && q2.aCar1 < q2.aCar0 / 2 && q2.aHuman[0] === 0 && q2.bHuman[0] === 1, p.pairFinished ? `car 0 ${q2.aCar0} m / ${q2.bCar0} m, car 1 ${q2.aCar1} m / ${q2.bCar1} m` : "");
             ok("the page's AGREED is a comparison and not a constant: handed a final word from the other machine that differs by one bit it prints DID NOT AGREE, and AGREED again when the true word is back", /DID NOT AGREE/.test(p.pairDisagree || "") && !/AGREED/.test((p.pairDisagree || "").replace(/DID NOT AGREE/g, "")) && /AGREED/.test(p.pairAgainAgree || ""), (p.pairDisagree || "").split("\n").slice(-1)[0]);
             const m = p.mis || {};
