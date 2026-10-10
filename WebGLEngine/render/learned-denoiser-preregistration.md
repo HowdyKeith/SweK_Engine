@@ -2204,3 +2204,98 @@ interactive, and not worth carrying a second kernel path. SwiftShader's speedup 
   restated as a bound, and that is a later round's pre-registration.
 - A smaller network. That reopens the quality question, and would need its own round against the filter.
 - Upload, read-back and pipeline creation, as in section 37.
+
+## 40. ROUND 12 -- REPORTED: THE GTX 1080
+
+Keith ran section 37's command on the GTX 1080 box at 1a9926d1 (section 38's commit).
+- **The machine.** Windows 11 (10.0.22631), node v24.15.0, "nvidia pascal" through D3D12, driver 32.0.15.8180.
+- **The report.** It is `render/denoise-rig-r12-gtx1080.json`, byte for byte as sent, committed at 0d56b279.
+- **Read on arrival, before that commit,** as section 38's was. Section 37 pre-registered no number. Section 39 was
+  written before the report arrived, and nothing in it changed after, apart from the two lines saying so.
+
+**Both gates held, on a second real GPU.**
+
+| Gate | Kind | Adapters | Result |
+|---|---|---|---|
+| `render/denoiseDevice-selfcheck.mjs` | exact | nvidia pascal (Chrome, `--use-angle=d3d11`) | PASS, 8.8 s |
+| `render/denoiseTiming-selfcheck.mjs` | timing | nvidia pascal through D3D12 (node-webgpu); nvidia pascal (Chrome) | PASS, 24.8 s |
+
+As on the Intel, the exact gate has no hardware exemption. So every conv cell of every layer was the twin's or the
+fused mirror's on this GPU too. How many were fused is not in the report.
+
+**The times.** These are medians on the device's clock, in ms a pass, with the wall clock in brackets.
+
+| Size | Native (D3D12) | Page (Chrome) | Mpx/s native | Against the Intel (native) |
+|---|---|---|---|---|
+| 64 x 64 | 4.26 (4.55) | 4.63 (5.70) | 0.90 | 8.1 times |
+| 128 x 128 | 8.91 (9.34) | 8.32 (9.70) | 1.75 | 13.4 times |
+| 256 x 256 | 60.7 (61.1) | 59.7 (61.1) | 1.07 | 8.6 times |
+| 512 x 512 | 239.9 (240.5) | 234.5 (235.5) | 1.09 | -- |
+| 1024 x 1024 | 978.1 (978.5) | 947.1 (948.6) | 1.07 | -- |
+| 1920 x 1080 | skipped: predicted 1,935 ms | skipped: predicted 1,877 ms | -- | -- |
+
+- **The page matches native here.** It is within 5% of native from 256 x 256 up, and slightly faster on the device's
+  clock. On the Intel it was 6-13% slower.
+- **Throughput is flat from 256 x 256 up,** at 1.07-1.11 Mpx/s, so the ladder's 1080p prediction is believable. It is
+  still a prediction.
+
+**Where a pass goes.** This is GFLOP/s by layer, natively, from the per-layer times.
+
+| Size | layer 0 (10 -> 32) | layers 1-3 (32 -> 32), each | layer 4, the head (32 -> 81, 1 x 1, direct) | head's share | kernel's share |
+|---|---|---|---|---|---|
+| 64 x 64 | 60 | 68 | 54 | 9% | 3% |
+| 128 x 128 | 180 | 209 | 28 | 35% | 9% |
+| 256 x 256 | 222 | 252 | 9 | 65% | 8% |
+| 512 x 512 | 230 | 254-255 | 9 | 65% | 8% |
+| 1024 x 1024 | 236 | 256-260 | 8 | 66% | 8% |
+
+- **The 3 x 3 layers, on the tiled kernel, reach about 250 GFLOP/s.** That is about 2.8% of a GTX 1080's fp32 peak
+  (about 8.9 TFLOP/s at boost): the same order as the Intel's 2-2.5%, on a GPU twenty-odd times faster.
+- **The head, on the direct kernel, falls off a cliff between 128 x 128 and 256 x 256.** It drops from 54 GFLOP/s to
+  8-9, thirty times slower per flop than the tiled layers. It takes 65-69% of every pass from there up. (The Intel
+  showed no such cliff: its head ran at half its tiled layers' rate at every size.)
+  - **A candidate cause, not measured:** the direct kernel reads each pixel's 32 inputs once for each of 81 output
+    channels, from storage, with neighbouring threads 32 floats apart. That pattern lives on cache.
+  - At 256 x 256 the head's output alone is 21 MB, and its input 8 MB, against this GPU's 2 MB of L2.
+- **Had the head run at the tiled layers' rate,** the 1024 x 1024 pass would have taken about 350 ms instead of 978.
+  That is arithmetic on these numbers, not a measurement.
+
+**What it means.**
+- **Real time is still far away.** 30 frames a second at 1080p needs 62 Mpx/s, and the GTX 1080 does about 1.1, 57
+  times short.
+- **The GPU is not the limit; the kernels are.** At this GPU's peak the network's 137 GFLOP 1080p frame takes about
+  15 ms. Unlike on the Intel (section 38), real time at 1080p is within the GTX 1080's arithmetic.
+- **Round 13 already covers the head.** Section 39's fast kernel runs all five layers, the head included, and reads
+  each input once from workgroup memory instead of 81 times from storage. Section 39 fixed what its run decides before
+  this report arrived. On this box, K1's largest common size will be 1024 x 1024, where round 12's pass is 978 ms.
+  `k_apply`, 4-8% of a pass here, is unchanged by round 13.
+
+**What it has not shown.**
+- **A measured 1080p frame.** That row is a prediction.
+- **The head's cliff, explained.** No profiler ran, so the cause above is a candidate.
+- **The GPU's clocks or thermal state** during the run.
+
+## 41. ROUND 13 -- REPORTED HERE: K0 (a), THE FAST SET ON THE 24 TEST IMAGES
+
+`node tools/denoiseDevice.mjs --measure-r13 --cache <dir>` ran at 3fe9419a, the commit that carries section 39 and the
+fast kernel, in one run (03:22:04Z to 03:32:48Z).
+- Its output, unedited, is `render/denoise-results-r13.json`, committed at 70522e69 before it was read.
+- The cache served all 24 test images (hits 24, misses 0), hard-linked from round 12's measurement cache.
+- Every layer on every image ran on the fast kernel.
+
+**K0 (a) holds.**
+
+| Criterion | Result |
+|---|---|
+| D0, the shipped file is the harvest's network | its f64 relMSE equals round 11's seed 1 on all 24 images, bit for bit |
+| D1, the layers | 20,545,536 conv cells, every one the twin's: none fused, none unexplained |
+| D2, the kernel | worst 6.4e-7 relative to its twin (bound 1e-5) |
+| D3, the verdict on the device | relMSE within 3.8e-7 of the f64 network's on every image (bound 1e-4); the primary filter beaten on 12 of 12 images of R and 12 of 12 of C, the same images as on the CPU |
+
+- **The same figures as round 12's (section 36), to the digit.** They should be: if every cell of both sets is the
+  twin's, the two sets hand `k_apply` the same logits, and it writes the same image.
+- **Reported, not a criterion:** a 64 x 64 image took 371-489 ms here (median 408), with read-back, against round
+  12's 620-830 ms (median 702). That is SwiftShader, and no evidence for K1.
+
+**Still open:** K0 (b) and (c), and K1, on Keith's two GPUs. That is one run each of
+`node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise-r13.json` on `claude/denoiser-kernel-speed`.
