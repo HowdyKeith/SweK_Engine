@@ -151,6 +151,29 @@ node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise-r15.json
 As in round 14 it may take half an hour or more on the Intel. Send the JSON back, and any dump files the compile gate
 names.
 
+### Round 16: the hidden layers, several pixels a thread (pre-registration section 54)
+
+After round 15 the four hidden 3 x 3 layers are three quarters of a 1080p frame on the GTX 1080, and nine tenths of a
+1024 x 1024 one on the Intel. The branch `claude/denoiser-round16` adds:
+- **a pixel-tiled convolution kernel**, `conv2dTileWgsl` in `brain/conv2d.mjs`. Each thread computes several pixels, so
+  every weight it reads feeds all of them. It adds every number in the same order as before, so it is held to the same
+  CPU twin, cell for cell;
+- **two kernel sets, r16a and r16b:** r15 with the hidden layers on the new kernel, at 2 pixels x 32 channels a thread
+  and at 4 x 16;
+- **ladders that time r12, r15, r16a and r16b**, natively and on the page. They print each new set's hidden layers
+  against r15's;
+- **two more kernels in the compile gate:** the new kernel at both configurations.
+
+On each GPU, run once, on that branch:
+
+```
+git fetch origin claude/denoiser-round16
+git checkout -B claude/denoiser-round16 FETCH_HEAD
+node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise-r16.json
+```
+
+Send the JSON back. Section 54 fixes, before any GPU runs the new kernel, what its numbers decide.
+
 
 ## Send back
 

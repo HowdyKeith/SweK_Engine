@@ -380,6 +380,112 @@ export function packHeadUniforms({ H, W, layer }) {
     for (let co = 0; co < Cout; co++) for (let ci = 0; ci < Cin; ci++) f[w0 + ci * 4 * S.C4 + co] = layer.W[co * Cin + ci];
     return f;
 }
+// ---- THE PIXEL-TILED KERNEL (the denoiser arc, round 16: pre-registration section 54) ------------------------------
+//
+// Round 15 left the four hidden 3 x 3 layers three quarters of a 1080p frame on the GTX 1080 and 89% of a 1024 x 1024
+// one on the Intel, both near a fifth of the GPU's peak. In the fast kernel a thread is one pixel: for each tap and input
+// channel it reads one value from the tile and FAST_GROUP / 4 vec4s of weights from the uniform block, and every weight
+// it reads feeds that one pixel. This kernel gives a thread PX pixels, so each weight read feeds PX of them:
+//   - pixel p of a thread is column p * TILE + lid.x of the workgroup's tile -- PX TILE-wide strips side by side, so
+//     neighbouring threads still read neighbouring words of the tile, and the workgroup covers TILE PX x TILE pixels;
+//   - a thread keeps G4 vec4s of output channels for each of its PX pixels (a<p>_<j>), and a wider layer is split into
+//     groups across z, as the fast kernel splits;
+//   - the weights are the fast kernel's uniform block, with C4 padded to a whole number of G4-groups (packTileUniforms).
+// *** NOT ONE CELL'S ORDER MOVES. *** Each accumulator still adds b, then block by block, ky, kx, ci, and skips a tap
+// outside the image for ITS pixel alone -- one branch for a tap all PX pixels may take, a guarded one at the image's
+// edge. So it is held to conv2dCpu, or the fused mirror, cell for cell, at zero, like every kernel before it.
+const TILE_PX = Object.freeze([1, 2, 4]);
+/**
+ * The pixel-tiled kernel's shape for a layer and a configuration { px, g4 }: G4 vec4s a pixel keeps (at most the layer's
+ * own), groups of them across z, C4 vec4s of padded output channels, the uniform block's bytes, the tile's width and
+ * height with its halo, its workgroup bytes, and whether the device's default limits hold it.
+ */
+export function tileShape({ Cin, Cout, k }, { px = 2, g4 = FAST_GROUP / 4 } = {}) {
+    const c4 = Math.ceil(Cout / 4), G = Math.min(g4, c4), groups = Math.ceil(c4 / G), C4 = groups * G;
+    const bytes = 16 + 16 * C4 + 16 * k * k * Cin * C4, TW = TILE * px + k - 1, TH = TILE + k - 1, wgBytes = TW * TH * CB * 4;
+    return { px, g4: G, groups, C4, bytes, TW, TH, wgBytes,
+             fits: k % 2 === 1 && TILE_PX.includes(px) && g4 >= 1 && bytes <= UNIFORM_MAX && wgBytes <= WORKGROUP_MAX };
+}
+
+/** The pixel-tiled kernel (entry k_conv_tile), generated for one layer and one { px, g4 }. */
+export function conv2dTileWgsl({ Cin, Cout, k, act = "none" }, cfg = {}) {
+    const S = tileShape({ Cin, Cout, k }, cfg);
+    if (!S.fits) throw new Error(`conv2d: the pixel-tiled kernel holds an odd k, px in ${TILE_PX.join("/")}, weights in one ${UNIFORM_MAX}-byte uniform binding and a tile in ${WORKGROUP_MAX} bytes -- got ${Cin} -> ${Cout}, k ${k}, px ${cfg.px}, ${S.bytes} + ${S.wgBytes} bytes`);
+    const R = (k - 1) / 2, G = S.g4, P = S.px, js = Array.from({ length: G }, (_, j) => j), ps = Array.from({ length: P }, (_, p) => p);
+    const lanes = ["x", "y", "z", "w"], a = (p, j) => `a${p}_${j}`;
+    return `
+struct FP { H: u32, W: u32, pad0: u32, pad1: u32, b: array<vec4<f32>, ${S.C4}>, w: array<vec4<f32>, ${k * k * Cin * S.C4}> };
+@group(0) @binding(0) var<storage, read_write> Y: array<f32>;   // H x W x ${Cout}
+@group(0) @binding(1) var<uniform> F: FP;                        // packTileUniforms
+@group(0) @binding(2) var<storage, read>       X: array<f32>;   // H x W x ${Cin}
+var<workgroup> T: array<f32, ${S.TW * S.TH * CB}>;
+@compute @workgroup_size(${TILE}, ${TILE}, 1)
+fn k_conv_tile(@builtin(local_invocation_id) lid: vec3<u32>, @builtin(workgroup_id) wid: vec3<u32>) {
+    let ox = i32(wid.x * ${TILE * P}u) - ${R}; let oy = i32(wid.y * ${TILE}u) - ${R};
+    let py = wid.y * ${TILE}u + lid.y; let g = wid.z;
+    // pixel p of this thread: column p * ${TILE} + lid.x of the tile
+    ${ps.map((p) => `let x${p} = wid.x * ${TILE * P}u + ${p * TILE}u + lid.x;`).join(" ")}
+    ${ps.map((p) => js.map((j) => `var ${a(p, j)} = F.b[g * ${G}u + ${j}u];`).join(" ")).join("\n    ")}
+    for (var c0 = 0u; c0 < ${Cin}u; c0 = c0 + ${CB}u) {
+        let nb = min(${CB}u, ${Cin}u - c0);
+        for (var i = lid.y * ${TILE}u + lid.x; i < ${S.TW * S.TH}u * nb; i = i + ${TILE * TILE}u) {
+            let cj = i % nb; let t = i / nb; let sx = ox + i32(t % ${S.TW}u); let sy = oy + i32(t / ${S.TW}u);
+            var v = 0.0;
+            if (sx >= 0 && sx < i32(F.W) && sy >= 0 && sy < i32(F.H)) { v = X[(u32(sy) * F.W + u32(sx)) * ${Cin}u + c0 + cj]; }
+            T[i] = v;
+        }
+        workgroupBarrier();
+        if (py < F.H) {
+            for (var ky = 0u; ky < ${k}u; ky = ky + 1u) {
+                let sy = i32(py) + i32(ky) - ${R};
+                if (sy < 0 || sy >= i32(F.H)) { continue; }
+                for (var kx = 0u; kx < ${k}u; kx = kx + 1u) {
+                    // a tap inside the image for pixel p, and where pixel p reads it in the tile
+                    ${ps.map((p) => `let s${p} = i32(x${p}) + i32(kx) - ${R}; let o${p} = s${p} >= 0 && s${p} < i32(F.W); let t${p} = ((lid.y + ky) * ${S.TW}u + ${p * TILE}u + lid.x + kx) * nb;`).join("\n                    ")}
+                    let wb = ((ky * ${k}u + kx) * ${Cin}u + c0) * ${S.C4}u + g * ${G}u;
+                    if (${ps.map((p) => `o${p}`).join(" && ")}) {
+                        for (var cj = 0u; cj < nb; cj = cj + 1u) {
+                            ${ps.map((p) => `let v${p} = T[t${p} + cj];`).join(" ")}
+                            let w = wb + cj * ${S.C4}u;
+                            ${js.map((j) => `let w${j} = F.w[w + ${j}u]; ` + ps.map((p) => `${a(p, j)} = ${a(p, j)} + v${p} * w${j};`).join(" ")).join("\n                            ")}
+                        }
+                    } else {
+                        for (var cj = 0u; cj < nb; cj = cj + 1u) {
+                            let w = wb + cj * ${S.C4}u;
+                            ${ps.map((p) => `if (o${p}) { let v = T[t${p} + cj]; ` + js.map((j) => `${a(p, j)} = ${a(p, j)} + v * F.w[w + ${j}u];`).join(" ") + " }").join("\n                            ")}
+                        }
+                    }
+                }
+            }
+        }
+        workgroupBarrier();
+    }
+    if (py >= F.H) { return; }
+    let c = g * ${G * 4}u;
+    ${ps.map((p) => `if (x${p} < F.W) {\n        let o = (py * F.W + x${p}) * ${Cout}u;\n        ` + js.map((j) => (act === "relu" ? `${a(p, j)} = max(${a(p, j)}, vec4<f32>(0.0)); ` : "") +
+        lanes.map((l, n) => `if (c + ${4 * j + n}u < ${Cout}u) { Y[o + c + ${4 * j + n}u] = ${a(p, j)}.${l}; }`).join(" ")).join("\n        ") + "\n    }").join("\n    ")}
+}
+`;
+}
+
+/**
+ * The pixel-tiled kernel's uniform block: the fast kernel's layout (H and W, then the bias, then the weights as vec4s of
+ * four output channels) with C4 the configuration's -- weight (co, ky, kx, ci) at float ((ky k + kx) Cin + ci) 4 C4 + co
+ * after the bias. Refuses a layer the configuration cannot hold, by name.
+ */
+export function packTileUniforms({ H, W, layer }, cfg = {}) {
+    const { Cin, Cout, k } = layer, S = tileShape(layer, cfg);
+    if (!S.fits) throw new Error(`conv2d: the pixel-tiled kernel cannot hold ${Cin} -> ${Cout}, k ${k}, px ${cfg.px}: ${S.bytes} + ${S.wgBytes} bytes`);
+    const buf = new ArrayBuffer(S.bytes), u = new Uint32Array(buf), f = new Float32Array(buf), w0 = 4 + 4 * S.C4;
+    u[0] = H; u[1] = W;
+    for (let co = 0; co < Cout; co++) f[4 + co] = layer.b[co];
+    for (let co = 0; co < Cout; co++) for (let ky = 0; ky < k; ky++) for (let kx = 0; kx < k; kx++) for (let ci = 0; ci < Cin; ci++)
+        f[w0 + ((ky * k + kx) * Cin + ci) * 4 * S.C4 + co] = layer.W[((co * k + ky) * k + kx) * Cin + ci];
+    return f;
+}
+/** The pixel-tiled kernel's dispatch at H x W: a workgroup per TILE PX x TILE pixels, a z group per G4 vec4s. */
+export const tileWorkgroups = (H, W, layer, cfg = {}) => { const S = tileShape(layer, cfg); return [Math.ceil(W / (TILE * S.px)), Math.ceil(H / TILE), S.groups]; };
+
 /** Planar (Cout planes of n) to channels last (n x Cout): how a planar layer's output is judged against the twin. */
 export function planarToChannelsLast(y, n, Cout) {
     const out = new Float32Array(n * Cout);
@@ -450,4 +556,10 @@ export const PROBES = Object.freeze([
         workgroups: (a) => [Math.ceil(a.H * a.W / 64), headShape(a).C4, 1],
         cpu: (a) => { const y = probeCpu(a), n = a.H * a.W, out = new Float32Array(y.length);
                       for (let p = 0; p < n; p++) for (let c = 0; c < a.Cout; c++) out[c * n + p] = y[p * a.Cout + c]; return out; } }),
+    // round 16: the same case through the pixel-tiled kernel, two pixels a thread -- 10 columns are one workgroup of two
+    // 8-wide strips, the second three-fifths outside the image, so the guarded path runs beside the fast one
+    Object.freeze({ ...probe("conv2d.conv2dTileWgsl", (a) => conv2dTileWgsl(a, a), "k_conv_tile", { H: 12, W: 10, Cin: 13, Cout: 4, k: 3, act: "relu", seed: 7, px: 2, g4: 8 }),
+        pack: (a) => packTileUniforms({ H: a.H, W: a.W, layer: probeFixture(a).layer }, a),
+        inputs: (a) => [{ binding: 2, data: probeFixture(a).x }],
+        workgroups: (a) => tileWorkgroups(a.H, a.W, a, a) }),
 ]);

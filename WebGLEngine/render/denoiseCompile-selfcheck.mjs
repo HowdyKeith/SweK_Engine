@@ -12,6 +12,8 @@
 // Round 15 (section 46) adds an eighth: k_head_apply, the head and the kernel apply in one pass, run on
 // render/denoiseCompile.mjs's order probe -- a head whose products are exact and whose sums are not, so its image is
 // within APPLY_TOL of the twin's only if the head added in the twin's order.
+// Round 16 (section 54) adds a ninth and a tenth: the pixel-tiled kernel on round 13's 32 -> 32 layer at r16a's and r16b's
+// configurations, 2 pixels x 32 channels a thread and 4 x 16 -- its native build and pass beside the fast kernel's.
 //
 // Each native measurement is its own process: one kernel, one adapter, one device, one compiler -- Dawn's dump goes to
 // stdout, so a process apiece keeps each kernel's dump its own, and a compile that never finishes is killed, not waited on.
@@ -49,6 +51,14 @@
 //   Both restored, md5 verified.
 //   after both GPUs' use_dxc runs came back with empty dumps (section 49):
 //   D1  the child's Dawn features in two entries again                          1 RED (the one-entry row). Restored, md5 verified.
+//   round 16, against the pixel-tiled kernel (brain/conv2d-selfcheck.mjs's P1-P4, P6, P7):
+//   P1  a block's channels summed last-first                                    2 RED (native and browser, both variants)
+//   P2  pixel p reads pixel 0's window                                          2 RED
+//   P3  the second barrier removed                                              2 RED
+//   P4  the weights read without the group offset                               2 RED (r16b-tile4-3x3 only: two z groups)
+//   P6  tileWorkgroups dispatches half the columns                              2 RED (both variants: at 64 wide, 4 workgroups become 2
+//       and 2 become 1)
+//   P7  the guarded branch's per-pixel bound test removed                       0 RED (brain/conv2d-selfcheck.mjs's P7). Restored, md5 verified.
 "use strict";
 import fs from "node:fs";
 import os from "node:os";

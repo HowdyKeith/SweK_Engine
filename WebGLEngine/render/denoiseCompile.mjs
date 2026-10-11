@@ -22,6 +22,9 @@ export const VARIANTS = Object.freeze([
     { id: "r12-apply", what: "k_apply, the 81-tap kernel", kind: "apply" },
     { id: "r14-apply-fast", what: "k_apply_fast, planar logits and a halo in workgroup memory", kind: "apply_fast" },
     { id: "r15-head-apply", what: "k_head_apply, the head and the kernel apply in one pass -- on the order probe", kind: "head_apply" },
+    // round 16 (section 54): the pixel-tiled kernel at r16a's and r16b's configurations, on round 13's 3 x 3 layer
+    { id: "r16a-tile2-3x3", what: "the pixel-tiled kernel, 2 pixels x 32 channels a thread, 32 -> 32 at 3 x 3", kind: "tile2", L: () => conv(32, 32, 3, "relu", 11) },
+    { id: "r16b-tile4-3x3", what: "the pixel-tiled kernel, 4 pixels x 16 channels a thread, 32 -> 32 at 3 x 3", kind: "tile4", L: () => conv(32, 32, 3, "relu", 11) },
 ].map((v) => Object.freeze(v)));
 
 // ---- THE ORDER PROBE (round 15, section 46) -------------------------------------------------------------------------
@@ -77,6 +80,9 @@ export function jobFor(v) {
     const F = v.L(), L = F.layer, tw = Cv.conv2dCpu(F.x, N, N, L), fm = Cv.conv2dCpuFma(F.x, N, N, L);
     const judge = (y) => { let plain = 0, fused = 0, un = 0; for (let i = 0; i < tw.length; i++) { const c = Math.fround(y[i]); if (c === tw[i]) plain++; else if (c === fm[i]) fused++; else un++; }
                            return { ok: un === 0, detail: `${plain} plain, ${fused} fused, ${un} unexplained` }; };
+    if (v.kind in D.TILE_CONFIGS) { const cfg = D.TILE_CONFIGS[v.kind];
+        return { code: Cv.conv2dTileWgsl(L, cfg), entry: "k_conv_tile", uniforms: Cv.packTileUniforms({ H: N, W: N, layer: L }, cfg),
+                 inputs: [{ binding: 2, data: F.x }], wg: Cv.tileWorkgroups(N, N, L, cfg), out: n * L.Cout, judge }; }
     if (v.kind === "fast") return { code: Cv.conv2dFastWgsl(L), entry: "k_conv_fast", uniforms: Cv.packFastUniforms({ H: N, W: N, layer: L }),
                                     inputs: [{ binding: 2, data: F.x }], wg: [N / 8, N / 8, Cv.fastShape(L).groups], out: n * L.Cout, judge };
     if (v.kind === "head") return { code: Cv.conv2dHeadWgsl(L), entry: "k_head", uniforms: Cv.packHeadUniforms({ H: N, W: N, layer: L }),

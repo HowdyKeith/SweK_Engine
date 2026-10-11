@@ -5,13 +5,14 @@
 // GATES brain/conv2d.mjs -- the convolution layer the path-tracer denoiser is built from. Its exports, each named
 // here: TILE, K_MAX, CB, COUT_MAX, conv2dForward, conv2dCpu, conv2dCpuFma, conv2dBackward, conv2dWgsl,
 // conv2dTiledWgsl, packProbeUniforms, probeFixture, probeCpu, keyCpu, PROBES -- round 13's (section 39): FAST_GROUP,
-// UNIFORM_MAX, fastShape, conv2dFastWgsl, packFastUniforms -- and round 14's (section 43): headShape, conv2dHeadWgsl,
-// packHeadUniforms, planarToChannelsLast.
+// UNIFORM_MAX, fastShape, conv2dFastWgsl, packFastUniforms -- round 14's (section 43): headShape, conv2dHeadWgsl,
+// packHeadUniforms, planarToChannelsLast -- and round 16's (section 54): tileShape, conv2dTileWgsl, packTileUniforms,
+// tileWorkgroups.
 //
 // What it holds: the twin to the f64 reference within f32 rounding; the identity kernel exact through every pass;
 // a 1x1 convolution BIT-IDENTICAL to the GPU Brain's dense layer (render/brainTsl.mjs's mlpLayerCpu), so the dense
 // and the convolutional networks share one arithmetic; the channel-block order load-bearing where it should be and
-// invisible where it should be; the backward pass to central finite differences; and all three WGSL kernels to the twin,
+// invisible where it should be; the backward pass to central finite differences; and every WGSL kernel to the twin,
 // cell for cell, on Dawn -- the fast kernel on the shapes the denoiser runs it at, the head's three channel groups
 // among them, with its uniform block laid out as its header says and its limits refused by name.
 //
@@ -39,6 +40,19 @@
 //   H2  the head kernel writes channels last, not planar                       5 RED (the manifest case, the three device cases, the key)
 //   H3  packHeadUniforms puts the bias one float late                          5 RED (the layout row, the manifest case, the three
 //       device cases)
+//   round 16, against the pixel-tiled kernel (each also against render/denoiseDevice-selfcheck.mjs and
+//   render/denoiseCompile-selfcheck.mjs; all restored, md5 verified):
+//   P1  a block's channels summed last-first                                   10 RED (the manifest case: 189 unexplained and 26
+//       fused by accident, F1's count exactly -- the same reversal on the same case)
+//   P2  pixel p reads pixel 0's window (its strip offset dropped)              10 RED (and the identity key)
+//   P3  the second barrier removed                                             10 RED (deterministic on SwiftShader, as S5 and F4 were;
+//       the identity key holds -- five channels are one block, and one block needs no second barrier)
+//   P4  the weights read without the group offset                               5 RED (exactly the five cases with z groups)
+//   P6  tileWorkgroups dispatches half the columns                              6 RED (the shape row, the wide cases, the key)
+//   P7  the guarded branch's per-pixel bound test removed                       0 RED, AND IT CANNOT BE OTHERWISE PORTABLY: the tile
+//       holds zero outside the image, so the tap adds a zero product, which is the skip except in the sign of a zero --
+//       which `===` does not see, and which WGSL lets an implementation ignore. The guard stays because the twin skips
+//       (the header's "skipping and adding a zero"), and no row holds it
 //
 // *** S5 WAS EXPECTED TO GO ZERO RED AND DID NOT. *** A missing barrier is a race, and races hide on a device that
 // runs a workgroup's threads one after another. SwiftShader does run them in order -- which is exactly why it is
@@ -53,7 +67,7 @@ const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
 const C = await imp("brain/conv2d.mjs");
 const { TILE, K_MAX, CB, COUT_MAX, conv2dForward, conv2dCpu, conv2dCpuFma, conv2dBackward, conv2dWgsl, conv2dTiledWgsl,
         packProbeUniforms, probeFixture, probeCpu, keyCpu, PROBES, FAST_GROUP, UNIFORM_MAX, fastShape, conv2dFastWgsl, packFastUniforms,
-        headShape, conv2dHeadWgsl, packHeadUniforms, planarToChannelsLast } = C;
+        headShape, conv2dHeadWgsl, packHeadUniforms, planarToChannelsLast, tileShape, conv2dTileWgsl, packTileUniforms, tileWorkgroups } = C;
 const { mlpLayerCpu } = await imp("render/brainTsl.mjs");
 const H = await imp("tools/ship/headlessGpu.mjs");
 
@@ -200,7 +214,42 @@ console.log("\n5b. THE HEAD KERNEL'S UNIFORM BLOCK AND ITS PLANAR OUTPUT, ON THE
         /fn k_head/.test(code) && (code.match(/@binding\(/g) || []).length === 3 && !/var<workgroup>/.test(code) && !/workgroupBarrier/.test(code));
 }
 
-console.log("\n6. *** ALL FOUR KERNELS ON THE DEVICE, CELL FOR CELL AGAINST THE TWIN ***");
+console.log("\n5c. THE PIXEL-TILED KERNEL'S SHAPE AND UNIFORM BLOCK, ON THE CPU (round 16)");
+{
+    // the fast kernel's layout with the configuration's own C4: where the two C4s agree the blocks are the same bytes; where
+    // they do not (70 channels in groups of 4 vec4s: C4 20, the fast kernel's 24), every weight is read back where it lands
+    const T2 = { px: 2, g4: 8 }, T4 = { px: 4, g4: 4 };
+    const F32 = probeFixture({ H: 5, W: 6, Cin: 32, Cout: 32, k: 3, act: "relu", seed: 23 }), fast32 = packFastUniforms({ H: 5, W: 6, layer: F32.layer });
+    const asFast = [T2, T4].every((c) => same(Array.from(packTileUniforms({ H: 5, W: 6, layer: F32.layer }, c)), Array.from(fast32)));
+    const F = probeFixture({ H: 5, W: 6, Cin: 3, Cout: 70, k: 3, act: "none", seed: 9 }), L = F.layer, S = tileShape(L, T4);
+    const f = packTileUniforms({ H: 5, W: 6, layer: L }, T4), u = new Uint32Array(f.buffer), w0 = 4 + 4 * S.C4;
+    let misplaced = 0, padding = 0;
+    for (let co = 0; co < 70; co++) {
+        if (f[4 + co] !== L.b[co]) misplaced++;
+        for (let t = 0; t < 9; t++) for (let ci = 0; ci < 3; ci++) if (f[w0 + (t * 3 + ci) * 4 * S.C4 + co] !== L.W[(co * 9 + t) * 3 + ci]) misplaced++;
+    }
+    for (let c = 70; c < 4 * S.C4; c++) { if (f[4 + c] !== 0) padding++; for (let t = 0; t < 27; t++) if (f[w0 + t * 4 * S.C4 + c] !== 0) padding++; }
+    ok(`!! the pixel-tiled kernel's block is the fast kernel's layout with its own C4: 32 -> 32 the fast block bit for bit at both configurations; 3 -> 70 in groups of 4 vec4s, C4 ${S.C4} (the fast kernel's ${fastShape(L).C4}), every weight and bias where the kernel reads it, the padding zero`,
+        asFast && S.C4 === 20 && S.groups === 5 && u[0] === 5 && u[1] === 6 && misplaced === 0 && padding === 0 && f.length * 4 === S.bytes,
+        `${misplaced} misplaced, ${padding} nonzero padding, ${S.bytes} bytes`);
+    const s2 = tileShape({ Cin: 32, Cout: 32, k: 3 }, T2), s4 = tileShape({ Cin: 32, Cout: 32, k: 3 }, T4);
+    ok(`  its shape: a workgroup ${TILE * 2} x ${TILE} pixels at 2 a thread (a ${s2.TW} x ${s2.TH} tile, ${s2.wgBytes} bytes), ${TILE * 4} x ${TILE} at 4 (${s4.TW} x ${s4.TH}, ${s4.wgBytes}); 32 channels in 1 z group of 8 vec4s, or 2 of 4`,
+        s2.TW === 18 && s2.TH === 10 && s2.wgBytes === 18 * 10 * CB * 4 && s4.TW === 34 && s4.wgBytes === 34 * 10 * CB * 4 && s2.groups === 1 && s2.g4 === 8 && s4.groups === 2 && s4.g4 === 4 &&
+        tileWorkgroups(1080, 1920, { Cin: 32, Cout: 32, k: 3 }, T2).join() === "120,135,1" && tileWorkgroups(1080, 1920, { Cin: 32, Cout: 32, k: 3 }, T4).join() === "60,135,2" &&
+        tileShape({ Cin: 9, Cout: 16, k: 3 }, T2).g4 === 4);
+    const refuse = (fn) => { try { fn(); return null; } catch (e) { return e.message; } };
+    const big = { Cin: 64, Cout: 32, k: 3 }, rBig = refuse(() => conv2dTileWgsl(big, T2)), rPx = refuse(() => conv2dTileWgsl({ Cin: 4, Cout: 4, k: 3 }, { px: 3, g4: 1 }));
+    const rK = refuse(() => conv2dTileWgsl({ Cin: 4, Cout: 4, k: 2 }, T2)), rP = refuse(() => packTileUniforms({ H: 2, W: 2, layer: { ...big, W: new Float32Array(64 * 32 * 9), b: new Float32Array(32) } }, T2));
+    ok("  what it cannot hold is refused by name, by the kernel and by the packer: weights past one uniform binding (64 -> 32), px 3, an even k",
+        /uniform binding/.test(rBig || "") && /px in 1\/2\/4/.test(rPx || "") && /odd k/.test(rK || "") && /cannot hold/.test(rP || ""));
+    const code = conv2dTileWgsl({ Cin: 32, Cout: 32, k: 3, act: "relu" }, T2), code4 = conv2dTileWgsl({ Cin: 32, Cout: 32, k: 3, act: "none" }, T4);
+    ok("  it is generated for its layer and configuration: one entry, three bindings, px x g4 named vec4 accumulators (2 x 8, 4 x 4), each weight read once a channel, the relu only when asked",
+        /fn k_conv_tile/.test(code) && (code.match(/@binding\(/g) || []).length === 3 && /var a1_7 = /.test(code) && !/var a2_0 = /.test(code) && !/var a1_8 = /.test(code) &&
+        /var a3_3 = /.test(code4) && !/var a3_4 = /.test(code4) && !/var a4_0 = /.test(code4) && (code.match(/let w7 = F\.w\[w \+ 7u\];/g) || []).length === 1 &&
+        /max\(a1_7, vec4<f32>\(0\.0\)\)/.test(code) && !/max\(a/.test(code4));
+}
+
+console.log("\n6. *** EVERY KERNEL ON THE DEVICE, CELL FOR CELL AGAINST THE TWIN ***");
 const skip = H.headlessGpuSkipReason ? H.headlessGpuSkipReason() : null;
 if (skip) console.log("  SKIP  " + skip);
 else {
@@ -265,6 +314,33 @@ else {
             rh.ok && rd.ok && jh.unexplained === 0 && (jh.fused || jd.fused || same(Array.from(cl), Array.from(rd.values).map(Math.fround))),
             rh.ok && rd.ok ? `head ${jh.fused} fused, direct ${jd.fused} fused of ${jh.n}` : (rh.reason || rd.reason) + " " + (rh.errors || []).join("; "));
     }
+    // round 16: the pixel-tiled kernel at both configurations and a third -- the denoiser's 10 -> 32 and 32 -> 32 at 3 x 3 on
+    // odd sizes, a wide image of 13 -> 11 (several strips, the last partial), a 1 x 1 head in z groups, a 5 x 3 image
+    // narrower than one strip -- against the twin, and against the fast kernel's bits on the same case where neither fused
+    const tile = (a, cfg) => { const F = probeFixture(a); return H.runWgslComputeNative({ code: conv2dTileWgsl(a, cfg), entryPoint: "k_conv_tile", outCount: a.H * a.W * a.Cout,
+        uniforms: packTileUniforms({ H: a.H, W: a.W, layer: F.layer }, cfg), workgroups: tileWorkgroups(a.H, a.W, a, cfg), inputs: [{ binding: 2, data: F.x }] }); };
+    for (const [a, cfgs] of [[{ H: 21, W: 19, Cin: 10, Cout: 32, k: 3, act: "relu", seed: 41 }, [{ px: 2, g4: 8 }, { px: 4, g4: 4 }]],
+                             [{ H: 19, W: 13, Cin: 32, Cout: 32, k: 3, act: "relu", seed: 43 }, [{ px: 2, g4: 8 }, { px: 4, g4: 4 }]],
+                             [{ H: 11, W: 37, Cin: 13, Cout: 11, k: 3, act: "none", seed: 53 }, [{ px: 4, g4: 4 }, { px: 2, g4: 2 }]],
+                             [{ H: 9, W: 17, Cin: 32, Cout: 81, k: 1, act: "none", seed: 47 }, [{ px: 2, g4: 8 }, { px: 4, g4: 4 }]],
+                             [{ H: 5, W: 3, Cin: 19, Cout: 6, k: 3, act: "relu", seed: 3 }, [{ px: 4, g4: 4 }]]]) {
+        const rf = await fast(a), jf = rf.ok ? judge(rf, a) : null;
+        for (const cfg of cfgs) {
+            const rt = await tile(a, cfg), jt = rt.ok ? judge(rt, a) : null, S = tileShape(a, cfg);
+            ok(`!! the pixel-tiled kernel, ${a.H} x ${a.W}, ${a.Cin} -> ${a.Cout}, k ${a.k}, ${cfg.px} px x ${S.g4} vec4s a thread (${S.groups} z group${S.groups > 1 ? "s" : ""}): every cell explained -- and where neither fused, the fast kernel's own bits`,
+                rt.ok && rf.ok && jt.unexplained === 0 && (jt.fused || jf.fused || same(Array.from(rt.values), Array.from(rf.values))),
+                rt.ok && rf.ok ? `tile ${jt.fused} fused, fast ${jf.fused} fused of ${jt.n}` : (rt.reason || rf.reason) + " " + (rt.errors || []).join("; "));
+        }
+    }
+    {
+        const K = keyCpu({ H: 9, W: 21, C: 5 }), out = [];
+        for (const cfg of [{ px: 2, g4: 8 }, { px: 4, g4: 4 }]) {
+            const kt = await H.runWgslComputeNative({ code: conv2dTileWgsl(K.layer, cfg), entryPoint: "k_conv_tile", outCount: K.x.length, uniforms: packTileUniforms({ H: K.H, W: K.W, layer: K.layer }, cfg),
+                workgroups: tileWorkgroups(K.H, K.W, K.layer, cfg), inputs: [{ binding: 2, data: K.x }] });
+            out.push(kt.ok && K.x.every((v, i) => Math.fround(kt.values[i]) === v));
+        }
+        ok("  the identity key on the device, 9 x 21: the pixel-tiled kernel returns its input bit for bit at 2 and at 4 pixels a thread", out.every(Boolean), out.join(", "));
+    }
     {
         const K1 = keyCpu({ k: 1, C: 5 }), n = K1.H * K1.W, ka1 = { H: K1.H, W: K1.W, Cin: K1.layer.Cin, Cout: K1.layer.Cout, k: 1, act: "none" };
         const kh = await H.runWgslComputeNative({ code: conv2dHeadWgsl(ka1), entryPoint: "k_head", outCount: K1.x.length, uniforms: packHeadUniforms({ H: K1.H, W: K1.W, layer: K1.layer }),
@@ -289,7 +365,7 @@ else {
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
     "\nnot closed here: SPEED. No kernel is timed by this gate, because the only device here is SwiftShader, whose costs " +
-    "are a JIT's and not a GPU's; render/denoiseTiming-selfcheck.mjs times the denoiser on round 12's kernels and the fast " +
-    "one side by side, and a GPU's figures come from the rig (section 39's K1). Nor is there a device BACKWARD pass yet: training starts on the CPU, against " +
+    "are a JIT's and not a GPU's; render/denoiseTiming-selfcheck.mjs times the denoiser's kernel sets " +
+    "side by side, and a GPU's figures come from the rig (section 39's K1). Nor is there a device BACKWARD pass yet: training starts on the CPU, against " +
     "conv2dBackward, and moves to the device when a measurement says the CPU is the wall.");
 H.exitCleanly ? H.exitCleanly(fails ? 1 : 0) : process.exit(fails ? 1 : 0);
