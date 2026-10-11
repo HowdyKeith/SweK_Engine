@@ -15,6 +15,10 @@
 // Round 16 (section 54) added a ninth and a tenth, the pixel-tiled kernel at r16a's and r16b's configurations; on both GPUs
 // FXC never finished building them, and the gate was stopped at realGpuRun's cap (section 56). Section 57 took them out of
 // VARIANTS; tools/denoiseBuildProbe.mjs builds them, each in its own process under a cap.
+// Round 18 (section 61): each native child's device has an unrounded clock, tools/ship/headlessGpu.mjs's FINE_CLOCK_FLAG --
+// Dawn otherwise rounds every timestamp down to a whole 65,536 ns, as every native time in round 17's probes was -- and a row
+// holds that the native passes are not all on that grid. Round 18's two page sets add no variant: their kernels are round 17's
+// probe shapes, which FXC does not build (section 60).
 //
 // Each native measurement is its own process: one kernel, one adapter, one device, one compiler -- Dawn's dump goes to
 // stdout, so a process apiece keeps each kernel's dump its own, and a compile that never finishes is killed, not waited on.
@@ -60,6 +64,9 @@
 //   P6  tileWorkgroups dispatches half the columns                              2 RED (both variants: at 64 wide, 4 workgroups become 2
 //       and 2 become 1)
 //   P7  the guarded branch's per-pixel bound test removed                       0 RED (brain/conv2d-selfcheck.mjs's P7). Restored, md5 verified.
+//   round 18, against the native children's clock:
+//   U10 the child's device made without FINE_CLOCK_FLAG                         1 RED (the clock row: 8 of 8 native passes on the
+//       65,536 ns grid). Restored, md5 verified.
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -83,7 +90,8 @@ if (process.argv.includes("--child")) {
     let result;
     try {
         H.configureVulkanIcd();
-        const { mod } = H.resolveWebgpu(), gpu = mod.create(dawnFlags(flags));
+        // section 61: the device's clock unrounded, beside whatever Dawn features the run asks for
+        const { mod } = H.resolveWebgpu(), gpu = mod.create([...dawnFlags(flags), H.FINE_CLOCK_FLAG]);
         const v = VARIANTS.find((x) => x.id === vid), a = await gpu.requestAdapter();
         const dev = await a.requestDevice({ requiredFeatures: a.features.has("timestamp-query") ? ["timestamp-query"] : [] });
         try { result = await measure(dev, jobFor(v)); } finally { dev.destroy(); }
@@ -211,6 +219,11 @@ else {
     const silent = rows.filter((x) => x.path === "native" && x.result.noResult);
     ok("!! every native child reported a result -- a child that exits without one is the instrument failing, not a kernel saying why",
         silent.length === 0, silent.length ? silent.map((x) => `${x.compiler}/${x.id}`).join(", ") : `${rows.filter((x) => x.path === "native").length} children, each with a result`);
+    // section 61: each child's clock is unrounded -- with Dawn's default, every pass is a whole number of 65,536 ns (section 60)
+    const timed = rows.filter((x) => x.path === "native" && x.result.built && x.result.clock === "device"), grid = (ms) => Math.round(ms * 1e6) % 65536 === 0;
+    if (timed.length < 3) console.log(`  SKIP  the native clock's grain: ${timed.length} native pass(es) on the device's clock -- too few to read a grid from`);
+    else ok("!! section 61: the native children's clocks are not Dawn's rounded one -- not every pass time is a whole number of 65,536 ns",
+        !timed.every((x) => grid(x.result.passMs)), `${timed.filter((x) => grid(x.result.passMs)).length} of ${timed.length} native passes on the 65,536 ns grid`);
 }
 
 console.log("\n3. THE BROWSER: denoise.html's \"Time each kernel\", in Chromium, on its own adapter");

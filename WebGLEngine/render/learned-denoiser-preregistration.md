@@ -3647,3 +3647,139 @@ wrote a few subtractions.
 - **A kernel chosen by adapter in the page.** Writing the block out was 2.11 x on the Intel in Chrome and 0.57 x on the
   1080. No round has let the page choose a kernel by vendor.
 - **A finer native clock.** Turning off the quantization natively would be an instrument change. It needs its own gate.
+
+## 61. ROUND 18 -- THE PAGE CHOOSES ITS SET BY ADAPTER, FROM TWO CHROME-ONLY SETS; THE NATIVE CLOCK UNROUNDED: FIXED BEFORE THE RIG RUNS IT
+
+**Why this round.** Section 60 left three options for a later round, and Keith asked for all three:
+1. **A set for the page only,** on round 17's 2 x 8 tile with inline weights: 1.14 and 1.17 x the fast kernel in Chrome
+   at 1024, on both GPUs.
+2. **The page choosing its kernel by GPU.** Writing a block out was 2.11 x on the Intel in Chrome and 0.57 x on the 1080.
+3. **A native clock that is not rounded.** Every native time in round 17's probes was a whole number of 65,536 ns.
+
+**What changes. Built and piloted here first, on SwiftShader only.**
+- **Two sets in `render/denoiseDevice.mjs`,** each with r15's fused last pass (`k_head_apply`). Every other layer runs on
+  the set's kernel when it fits, else on r15's kernel for it:
+  - **"r18t":** brain/conv2d.mjs's pixel-tiled kernel at 2 pixels x 8 vec4s, edge zero, weights read where they are used.
+    This is round 17's `tile2-zero-inline-32`. Its layers are named `tile_inline`.
+  - **"r18u":** the fast kernel with a block of 8 channels written out, f32 reads. This is round 17's `fast-unroll-32`.
+    Its layers are named `fast_unroll`.
+  - `R18_KERNELS` holds each set's kernel and configuration.
+- **Neither is built natively on D3D12.** node-webgpu's FXC stopped on r18t's kernel and crashed on r18u's (section 60).
+  - `BROWSER_ONLY_SETS` names both. `nativeSetsFor(adapter, sets)` leaves them out when a native adapter's description
+    names D3D12 (`isD3D12Native`).
+  - On such an adapter, every native row for them prints SKIP: the exact gate's K0 rows and the native ladder's turns.
+  - A browser's adapter is never asked. Chrome builds their kernels through DXC: in round 17's probe, each 32 -> 32 layer in 0.16 to 2.1 s.
+- **The page chooses by adapter.**
+  - `pageAdapterKey(info, navigator.userAgentData)` is "platform/vendor/architecture", for example
+    "Windows/intel/gen-9".
+  - Only Chromium browsers report a platform there. Any other browser makes no key.
+  - `pageKernelsFor(key)` gives `PAGE_KERNELS_BY_ADAPTER`'s set for a key the table names, else `PAGE_KERNELS` ("r15").
+  - The table is empty in this commit, so the page runs r15 everywhere until the rule below is read off the rig.
+  - The page's caption names the set it ran. Its timing report carries the adapter's key (`pageKey`).
+- **The ladders.**
+  - Both now time r12, r15, r18t and r18u (`TIMED_SETS`), on the page always.
+  - Natively, on a D3D12 adapter, they time r12 and r15 alone, as since section 57.
+  - The budgets stay: 600 s natively and 300 s on the page.
+  - Each size's lines now add each round-18 set against r15 on the device's clock.
+- **The native clock.**
+  - `tools/ship/headlessGpu.mjs` exports `FINE_CLOCK_FLAG`, `disable-dawn-features=timestamp_quantization`.
+  - It is passed to `create()` in three places: the timing gate's native ladder, the compile gate's native children, and
+    `tools/denoiseBuildProbe.mjs`.
+  - **Shown here on SwiftShader.** By default the low 16 bits of every timestamp were zero. With the flag they were not.
+    So section 60's inference holds on SwiftShader at least.
+  - Two rows now hold that the native times are not all on the 65,536 ns grid, one in each gate: 0 of 153 times in the
+    timing gate here, and 0 of 8 passes in the compile gate.
+- **`tools/denoiseDevice.mjs --measure-r18t` and `--measure-r18u`:** K0 (a) on round 11's 24 test images.
+- **The pilot.**
+  - At 21 x 19, 64 x 64 and 37 x 70, natively on SwiftShader, both sets were exact. Every hidden cell was the twin's, plain.
+  - Every hidden layer and the image were r15's, bit for bit.
+  - The gates' rows found the same in Chromium.
+  - **Pipeline builds on SwiftShader** took about 7 s for r18t, 26 s for r18u and 5 s for r15. r18u writes out four layers'
+    blocks. That cost is SwiftShader's, a CPU's.
+  - No threshold below was read from the pilot's times.
+
+**What exactness means for r18t and r18u.** The same as section 54 said for r16a and r16b:
+- not one cell's order moves: each cell adds b, then block by block, ky, kx (in bounds), ci;
+- so every hidden cell is held to the twin or the fused mirror, at zero, given the device's own input;
+- the last pass is r15's, judged through the image.
+
+**K0 for r18t or r18u holds** when the hidden layers, the head and kernel pass, and the order probe hold, as section 54's
+K0. It must hold in each of:
+- **(a) here:** `--measure-r18t`, then `--measure-r18u`, on the 24 test images, with D0-D3. Each output is committed before
+  it is read.
+- **(b) natively where the adapter is not D3D12.** On the rig it is untested, and nothing below needs it.
+- **(c) in the browser on each GPU:** the exact gate's section 5 rows for the set.
+
+**The rule, fixed now: `PAGE_KERNELS_BY_ADAPTER`.** It is read off each GPU's round-18 run, in its page ladder (Chrome).
+- **A set qualifies on a GPU** when all three hold there:
+  1. **K0 (c):** the set's browser row in the exact gate is green on that GPU.
+  2. **K1 against r12 in the browser on that GPU:** section 39's rule. At least 2 times at the largest size both measured,
+     and at least 1 time at every size both measured.
+  3. **At least 1.05 times as fast as r15.** At the largest size where the set and r15 were both measured on that GPU's
+     page ladder, r15's median over the set's, on the device's clock. The ladder prints it as "rXX against r15".
+- **That GPU's entry.**
+  - The key is the `pageKey` the page reported on that GPU.
+  - The set is the qualifying one with the larger ratio in 3. A tie goes to the later set, r18u.
+  - If neither qualifies, or the run did not reach the page's ladder, or the report carries no key, the GPU gets no
+    entry and its adapter runs `PAGE_KERNELS`.
+- **`PAGE_KERNELS` stays "r15"** for every adapter the table does not name: other GPUs, other platforms, other browsers.
+- **`DEFAULT_KERNELS` stays "r15".** The default rule needs K1 natively on every GPU, and neither round-18 set is built
+  natively on D3D12.
+- **The threshold was set knowing section 60's probe.** 1.05 is the smallest gain this round counts as worth a set for one
+  adapter. The predictions below are fixed now and reported either way.
+
+**Predictions, fixed now, deciding nothing.**
+- **The arithmetic.** Section 54's table puts the hidden layers at 75% of r15's page pass on the 1080 and 89% on the Intel.
+  If the network's hidden layers gain what round 17's single 32 -> 32 layer gained at 1024, the whole pass would be:
+
+| Set | GTX 1080 | Intel gen-9 |
+|---|---|---|
+| r18t | 1.12 x r15 | 1.13 x |
+| r18u | 0.64 x | 1.88 x |
+
+- **So the expected table** is r18t on the 1080 and r18u on the Intel.
+- **Said now:**
+  - P1: r18t qualifies on both GPUs.
+  - P2: r18u qualifies on the Intel and not on the 1080.
+  - P3: the Intel's entry is r18u.
+  - All three are reported either way.
+
+**Reported, deciding nothing.**
+- **Each round-18 set's four hidden layers against r15's,** per GPU, on the page, at the largest size both measured.
+- **The native clock on the rig.** Whether the two gates' grid rows are green there, that is, whether Dawn's D3D12 path
+  honours the toggle as its Vulkan path does here. If they are red, the flag did not reach the D3D12 device. That is an
+  instrument finding and moves nothing above.
+- **The native ladder's r15 against r12 at 64 x 64 and 128 x 128,** beside round 15's (`render/denoise-rig-r15-*.json`).
+  Section 60 left open whether the rounding mattered there.
+
+**After the rule is read.** The verdict section writes `PAGE_KERNELS_BY_ADAPTER` with the entries it gives. The exact
+gate's "names no adapter" row becomes a row holding the verdict's table.
+
+**On the rig.**
+- **One run per GPU** of `node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise-r18.json`, on
+  `claude/denoiser-round18`, at a commit carrying this section.
+- **Each report is committed byte for byte** before it is read.
+- **A gate stopped by `realGpuRun`'s 30-minute cap reaches no verdict on its path.** A rule that needs it cannot move.
+- **Section 59's instrument mending is not needed.** It was required before a full run builds a new kernel natively, and
+  this run builds no new kernel natively on D3D12.
+
+**Sabotages.**
+- **Fourteen runs, U1-U13 and U11b,** each restored and md5-verified, logged in each gate's header. Thirteen are red as
+  built; U11 is 0 red.
+  - **The set choice.** r18t or r18u never picking its kernel: 6 red each (U1, U2), the sets row, K0 natively and in the
+    browser, the small network, and both ladders' different-kernels rows.
+  - **The D3D12 stand-aside.** `nativeSetsFor` keeping every set, or `isD3D12Native` blind: 2 red each (U3, U4).
+  - **The page's table.** A table ignored, a key without a platform, the table read without `Object.hasOwn`, the page
+    hard-wired to r18t, its report without a key: 1 red each (U5-U8, U13).
+  - **The clock.** The flag dropped from the timing gate's native device (U9) or the compile gate's children (U10): 1 red
+    each, with every native time on the 65,536 ns grid (165 of 165; 8 of 8).
+  - **The kernels' wiring.** The written-out layers packed as the fast kernel's: 4 red (U12). The tile layers dispatched
+    with half the columns: 3 red (U11b).
+- **U11 is 0 red, and is logged as a blind spot.** It dispatches the tile layers with the fast kernel's workgroup count,
+  twice the columns. Every extra pixel is outside the image, so no cell moves. It wastes time, not exactness, and no gate
+  here times it.
+
+**Not in this round.**
+- A default change, or any native use of r18t or r18u on D3D12.
+- Measuring other browsers, platforms or GPUs. They run r15.
+- A third kernel, or a set chosen after the rig's run. That is a later round.

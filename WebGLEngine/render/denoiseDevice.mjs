@@ -36,6 +36,14 @@
 // Round 16 (section 54) added "r16a" and "r16b": r15 with every hidden layer on brain/conv2d.mjs's pixel-tiled kernel. Section
 // 57 withdrew both, by section 56's rule: node-webgpu's FXC did not build that kernel at 32 -> 32 within 3 minutes on either
 // GPU, at either edge, so no gate could run them natively there. The kernel stays in brain/conv2d.mjs; no set uses it.
+// Round 18 (section 61) adds two sets for THE PAGE, in Chromium, on the adapters section 61's rule names:
+//   "r18t"  r15 with every hidden layer on the pixel-tiled kernel at 2 pixels x 8 vec4s, edge zero, weights read where
+//           they are used -- round 17's tile2-zero-inline, 1.14 and 1.17 x the fast kernel in Chrome at 1024 (section 60)
+//   "r18u"  r15 with every hidden layer on the fast kernel with a block of 8 channels written out -- round 17's
+//           fast-unroll, 2.11 x on the Intel in Chrome, 0.57 x on the 1080 (section 60)
+// node-webgpu's FXC builds neither (section 60: it stopped on the first, crashed on the second), so they are BROWSER_ONLY_SETS:
+// no gate builds them natively on a D3D12 adapter (nativeSetsFor), and the default rule cannot choose them. The page runs
+// pageKernelsFor(its adapter): PAGE_KERNELS_BY_ADAPTER's set for a measured adapter, PAGE_KERNELS for any other.
 // The page runs PAGE_KERNELS and every other caller DEFAULT_KERNELS. Section 43's rules, read off both GPUs' round-14 runs
 // (section 49), put the page on r13 and the default on r14; section 46's, read off their round-15 runs (section 50), put
 // both on r15 -- the later run's decision stands.
@@ -44,6 +52,7 @@
 // the sets it is handed, taking turns on one device.
 "use strict";
 import { conv2dWgsl, conv2dTiledWgsl, conv2dFastWgsl, conv2dHeadWgsl, packProbeUniforms, packFastUniforms, packHeadUniforms, fastShape, headShape,
+         conv2dTileWgsl, packTileUniforms, tileShape, tileWorkgroups, conv2dFastAltWgsl, packFastAltUniforms, fastAltShape,
          planarToChannelsLast, conv2dCpu, conv2dCpuFma, TILE, K_MAX, COUT_MAX } from "../brain/conv2d.mjs";
 import { KERNEL_RADIUS, KERNEL_TAPS, headOf } from "./denoiseNet.mjs";
 import { ALBEDO_FLOOR, strideOf } from "./denoiseScenes.mjs";
@@ -293,30 +302,60 @@ export function kernelApplyCpu(x, logits, H, W) {
     return y;
 }
 
-/** The kernel sets a pass can run on: round 12's, round 13's fast kernel (section 39), round 14's (section 43), round 15's (section 46). */
-export const KERNEL_SETS = Object.freeze(["r12", "r13", "r14", "r15"]);
+/** The kernel sets a pass can run on: round 12's, round 13's fast kernel (section 39), round 14's (section 43), round 15's (section 46), round 18's two (section 61). */
+export const KERNEL_SETS = Object.freeze(["r12", "r13", "r14", "r15", "r18t", "r18u"]);
 /**
- * The sets the ladders time, natively and on the page: r12, the reference every speedup is read against, and r15, the default
- * and the page's (section 50). Section 54 added round 16's two candidates; section 57 withdrew them. r13 and r14 are decided
- * (sections 49 and 50) and left out.
+ * Round 18 (section 61): the kernel each round-18 set runs its hidden layers on, and that kernel's configuration --
+ * brain/conv2d.mjs's pixel-tiled kernel (tileShape's cfg) or its fast kernel written another way (fastAltShape's opts).
  */
-export const TIMED_SETS = Object.freeze(["r12", "r15"]);
+export const R18_KERNELS = Object.freeze({
+    r18t: Object.freeze({ kernel: "tile_inline", cfg: Object.freeze({ px: 2, g4: 8, edge: "zero", weights: "inline" }) }),
+    r18u: Object.freeze({ kernel: "fast_unroll", cfg: Object.freeze({ reads: "f32", unroll: true }) }),
+});
+/** The sets no gate builds natively on a D3D12 adapter: node-webgpu's FXC stopped on r18t's kernel and crashed on r18u's (section 60). */
+export const BROWSER_ONLY_SETS = Object.freeze(["r18t", "r18u"]);
+/** A NATIVE adapter (node-webgpu's) that compiles through D3D12 -- on the rig, FXC: its description names the backend. */
+export const isD3D12Native = (adapter) => /\bD3D12\b/i.test(adapter?.info?.description || "");
+/** `sets` as a native ladder or gate may build them on `adapter`: on a D3D12 adapter, without BROWSER_ONLY_SETS. Never for a browser's adapter. */
+export const nativeSetsFor = (adapter, sets) => (isD3D12Native(adapter) ? sets.filter((s) => !BROWSER_ONLY_SETS.includes(s)) : [...sets]);
+/**
+ * The sets the ladders time: r12, the reference every speedup is read against; r15, the default and the page's (section 50);
+ * and round 18's two (section 61) -- on the page always, natively where nativeSetsFor allows. Section 54 added round 16's two
+ * candidates and section 57 withdrew them; r13 and r14 are decided (sections 49 and 50) and left out.
+ */
+export const TIMED_SETS = Object.freeze(["r12", "r15", "r18t", "r18u"]);
 /** The set a pass runs unless told otherwise: r15, by section 46's default rule on both GPUs (section 50) -- 9.25 x against r14's 6.33. */
 export const DEFAULT_KERNELS = "r15";
-/** The set denoise.html runs: r15, by section 46's page rule on both GPUs (section 50) -- 9.25 x against r13's 6.49 and r14's 6.33. */
+/** The set denoise.html runs on an adapter PAGE_KERNELS_BY_ADAPTER does not name: r15, by section 46's page rule on both GPUs (section 50) -- 9.25 x against r13's 6.49 and r14's 6.33. */
 export const PAGE_KERNELS = "r15";
+/**
+ * Round 18 (section 61): the set denoise.html runs on an adapter section 61's rule measured, by pageAdapterKey -- empty until
+ * that rule is read off both GPUs' round-18 runs. Only a Chromium browser on the measured platform makes a key that can match.
+ */
+export const PAGE_KERNELS_BY_ADAPTER = Object.freeze({});
+/**
+ * The page's key for an adapter: "<platform>/<vendor>/<architecture>", the platform from navigator.userAgentData -- which only
+ * Chromium browsers have, so any other browser makes no key and runs PAGE_KERNELS. Section 61's sets were measured in Chrome
+ * on Windows, through its D3D12 compiler (DXC), and nowhere else.
+ */
+export const pageAdapterKey = (info, uaData) => (uaData && uaData.platform && info && info.vendor ? `${uaData.platform}/${info.vendor}/${info.architecture || ""}` : null);
+/** The set denoise.html runs for an adapter's key: PAGE_KERNELS_BY_ADAPTER's, else PAGE_KERNELS. */
+export const pageKernelsFor = (key, table = PAGE_KERNELS_BY_ADAPTER) => (key && Object.hasOwn(table, key) ? table[key] : PAGE_KERNELS);
 
 /**
  * The kernel a layer runs on in a set. r12: tiled when the tiled kernel can hold it, direct otherwise (the 81-logit
  * head). r13: the fast kernel when its uniform block and tile fit the device's default limits, else the layer's r12 kernel.
  * r14: r13's, except that the LAST layer (`last`), when it is 1 x 1 and fits, runs the head kernel and writes planar --
  * only the last, because only k_apply_fast reads a planar layer. r15: r13's, except that the last layer, when it is the 1 x 1
- * head of KERNEL_TAPS logits and fits, runs with the kernel apply as one pass, k_head_apply.
+ * head of KERNEL_TAPS logits and fits, runs with the kernel apply as one pass, k_head_apply. r18t and r18u: r15's last layer;
+ * every other layer on the set's R18_KERNELS kernel when it fits, else r15's kernel for it.
  */
 export const kernelFor = (L, set = DEFAULT_KERNELS, last = false) => {
     if (!KERNEL_SETS.includes(set)) throw new Error(`denoiseDevice: no kernel set "${set}" -- the sets are ${KERNEL_SETS.join(", ")}`);
     if (set === "r14" && last && headShape(L).fits) return "head";
-    if (set === "r15" && last && L.Cout === KERNEL_TAPS && headShape(L).fits) return "head_apply";
+    if ((set === "r15" || set in R18_KERNELS) && last && L.Cout === KERNEL_TAPS && headShape(L).fits) return "head_apply";
+    if (set === "r18t" && tileShape(L, R18_KERNELS.r18t.cfg).fits) return "tile_inline";
+    if (set === "r18u" && fastAltShape(L, R18_KERNELS.r18u.cfg).fits) return "fast_unroll";
     return set !== "r12" && fastShape(L).fits ? "fast" : L.k <= K_MAX && L.Cout <= COUT_MAX ? "tiled" : "direct";
 };
 /**
@@ -360,6 +399,8 @@ export async function createDeviceDenoiser(dev, net, { H, W, C, kernels = DEFAUL
     if (used.has("direct")) await build("direct", conv2dWgsl(), "k_conv");
     if (used.has("tiled")) await build("tiled", conv2dTiledWgsl(), "k_conv_tiled");
     for (const [i, L] of layers.entries()) if (L.kernel === "fast") await build("fast" + i, conv2dFastWgsl(L), "k_conv_fast");
+    for (const [i, L] of layers.entries()) if (L.kernel === "tile_inline") await build("tile_inline" + i, conv2dTileWgsl(L, R18_KERNELS.r18t.cfg), "k_conv_tile");
+    for (const [i, L] of layers.entries()) if (L.kernel === "fast_unroll") await build("fast_unroll" + i, conv2dFastAltWgsl(L, R18_KERNELS.r18u.cfg), "k_conv_fast_alt");
     for (const [i, L] of layers.entries()) if (L.kernel === "head") await build("head" + i, conv2dHeadWgsl(L), "k_head");
     for (const [i, L] of layers.entries()) if (L.kernel === "head_apply") await build("head_apply" + i, kernelHeadApplyWgsl(L), "k_head_apply");
     const apply = applyFor(layers);
@@ -399,6 +440,20 @@ export async function createDeviceDenoiser(dev, net, { H, W, C, kernels = DEFAUL
             // the fast kernel: its weights and bias in the uniform block, the image alone at binding 2, a z group per FAST_GROUP channels
             const p = pipe["fast" + i], uni = packFastUniforms({ H, W, layer: L });
             return { p, wg: [...groups, fastShape(L).groups], bind: dev.createBindGroup({ layout: p.getBindGroupLayout(0), entries: [
+                { binding: 0, resource: { buffer: outs[i] } }, { binding: 1, resource: { buffer: buffer(uni.byteLength, BU.UNIFORM | BU.COPY_DST, uni) } },
+                { binding: 2, resource: { buffer: i ? outs[i - 1] : xBuf } }] }) };
+        }
+        if (L.kernel === "tile_inline") {
+            // round 18's r18t: the pixel-tiled kernel, the fast kernel's bindings, a workgroup per TILE px x TILE pixels
+            const cfg = R18_KERNELS.r18t.cfg, p = pipe["tile_inline" + i], uni = packTileUniforms({ H, W, layer: L }, cfg);
+            return { p, wg: tileWorkgroups(H, W, L, cfg), bind: dev.createBindGroup({ layout: p.getBindGroupLayout(0), entries: [
+                { binding: 0, resource: { buffer: outs[i] } }, { binding: 1, resource: { buffer: buffer(uni.byteLength, BU.UNIFORM | BU.COPY_DST, uni) } },
+                { binding: 2, resource: { buffer: i ? outs[i - 1] : xBuf } }] }) };
+        }
+        if (L.kernel === "fast_unroll") {
+            // round 18's r18u: the fast kernel's thread, bindings and dispatch, its weights packed block by block
+            const cfg = R18_KERNELS.r18u.cfg, p = pipe["fast_unroll" + i], uni = packFastAltUniforms({ H, W, layer: L }, cfg);
+            return { p, wg: [...groups, fastAltShape(L, cfg).groups], bind: dev.createBindGroup({ layout: p.getBindGroupLayout(0), entries: [
                 { binding: 0, resource: { buffer: outs[i] } }, { binding: 1, resource: { buffer: buffer(uni.byteLength, BU.UNIFORM | BU.COPY_DST, uni) } },
                 { binding: 2, resource: { buffer: i ? outs[i - 1] : xBuf } }] }) };
         }

@@ -17,6 +17,11 @@
 // ladder also prints that pass against r14's two, and each set's buffers at each size.
 // Round 16 (section 54) put r12, r15, r16a and r16b on both ladders (TIMED_SETS). Section 57 withdrew r16a and r16b --
 // node-webgpu's FXC never built their kernel on either GPU -- so both ladders now time r12 and r15.
+// Round 18 (section 61): both ladders time r12, r15, r18t and r18u (TIMED_SETS) -- natively without the BROWSER_ONLY_SETS on a
+// D3D12 adapter (nativeSetsFor), where node-webgpu's FXC stopped on one's kernel and crashed on the other's (section 60); and
+// the native ladder's device has an unrounded clock, tools/ship/headlessGpu.mjs's FINE_CLOCK_FLAG: Dawn otherwise rounds every
+// timestamp down to a whole 65,536 ns, as it did in every native time of round 17's probes. The page's report carries its
+// adapter's key (pageKey), which section 61's rule fills render/denoiseDevice.mjs's PAGE_KERNELS_BY_ADAPTER by.
 //
 // *** WHAT IS ASSERTED IS THE TIMER, NOT THE TIME. *** On any device: the first size is measured; every time is a finite
 // positive number; the device's clock, where it has one, nests inside the wall clock and each layer's span inside the
@@ -50,6 +55,15 @@
 //   R10 applyFor gives the fused set a separate k_apply                           2 RED (neither ladder builds)
 //   round 16, against the ladders of TIMED_SETS while r16a and r16b were on them (also against render/denoiseDevice-selfcheck.mjs):
 //   P5  the r16a set never picks the pixel-tiled kernel                         2 RED (different-kernels, native and page)
+//   round 18, against the round-18 ladders, the native clock and the page's key (U1-U4 also against
+//   render/denoiseDevice-selfcheck.mjs). Each restored, md5 verified:
+//   U1  the r18t set never picks the pixel-tiled kernel                         2 RED (different-kernels, native and page)
+//   U2  the r18u set never picks the written-out fast kernel                    2 RED (the same two)
+//   U3  nativeSetsFor keeps every set on a D3D12 adapter                        1 RED (the sets row)
+//   U4  isD3D12Native never sees D3D12                                          1 RED (the same row)
+//   U9  the native ladder's device made without FINE_CLOCK_FLAG                 1 RED (the clock row: 165 of 165 device times on
+//       the 65,536 ns grid -- section 60's finding, made on SwiftShader)
+//   U13 the page's timing report without its adapter's key                      1 RED (the key row)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -57,7 +71,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
-const { TIMING_SIZES, largestBuffer, passBytes, timingInput, summarize, adapterOf, timingLadder, decodeNet, KERNEL_SETS, TIMED_SETS } = await imp("render/denoiseDevice.mjs");
+const { TIMING_SIZES, largestBuffer, passBytes, timingInput, summarize, adapterOf, timingLadder, decodeNet, KERNEL_SETS, TIMED_SETS, BROWSER_ONLY_SETS, nativeSetsFor } = await imp("render/denoiseDevice.mjs");
 const H = await imp("tools/ship/headlessGpu.mjs");
 const { runInEngineOrigin } = await imp("tools/ship/webgpuHarness.mjs");
 
@@ -67,7 +81,10 @@ const say = (m) => console.log("  ----  " + m);
 const t0 = Date.now();
 const net = decodeNet(JSON.parse(fs.readFileSync(path.join(ENG, "render/denoise-net-r11.json"), "utf8")).net);
 const CAP = 1500, QUANTUM = 0.2;   // the ladder's cap a pass, ms; a browser rounds timestamps to 0.1 ms, so nesting gets two quanta
-const NATIVE_SETS = TIMED_SETS;   // both ladders time TIMED_SETS, r12 and r15 (section 57) -- sections 43 and 46 timed r12, r14, r15 natively
+// both ladders time TIMED_SETS (section 61); natively, nativeSetsFor() leaves out the BROWSER_ONLY_SETS on a D3D12 adapter --
+// sections 43 and 46 timed r12, r14, r15 natively, and section 57 r12 and r15
+const GRID_NS = 65536;   // Dawn's timestamp quantum when timestamp_quantization is on (section 60)
+const onGrid = (ms) => Math.round(ms * 1e6) % GRID_NS === 0;
 
 // what any ladder must be, wherever it ran: returns the rows that were measured
 function holds(label, r) {
@@ -120,6 +137,13 @@ function report(label, r) {
     });
     for (const [B, qs] of Object.entries(r.speedup)) for (const q of qs) if (q.measured)
         say(`${label}: ${B} against ${r.sets[0]} at ${q.W} x ${q.H}: ${q.ratio.toFixed(2)} x as fast, on the ${q.clock === "device" ? "device's clock" : "wall clock"}`);
+    // round 18 (section 61): each round-18 set against r15 at every size both measured -- the ratio section 61's page rule reads
+    if (r.rows.r15) for (const B of r.sets.filter((s) => /^r18/.test(s))) r.rows[B].forEach((b, i) => {
+        const a = r.rows.r15[i];
+        if (a.skipped || b.skipped) return;
+        const dev = !!(a.gpu && b.gpu), ratio = dev ? a.gpu.median / b.gpu.median : a.wall.median / b.wall.median;
+        say(`${label}: ${B} against r15 at ${b.W} x ${b.H}: ${ratio.toFixed(3)} x as fast, on the ${dev ? "device's clock" : "wall clock"} -- section 61`);
+    });
 }
 // what a PAIRED ladder must be, wherever it ran (section 39): both sets, each held as a ladder, taking turns in the stated
 // order on one device, different kernels, and a speedup that is the ratio of the two medians on the clock it names
@@ -136,7 +160,8 @@ function pairedHolds(label, r, want = KERNEL_SETS) {
         all.length ? `${all.length} size(s) with every set; ${all[0].map((x) => x.wall.n).join(", ")} passes at the first` : "none with every set");
     // what each set's layers run on, read off the pass names the ladder printed
     const kinds = { r12: "tiled,tiled,tiled,tiled,direct|apply", r13: "fast,fast,fast,fast,fast|apply", r14: "fast,fast,fast,fast,head|apply_fast",
-                    r15: "fast,fast,fast,fast,head_apply|head_apply" };
+                    r15: "fast,fast,fast,fast,head_apply|head_apply", r18t: "tile_inline,tile_inline,tile_inline,tile_inline,head_apply|head_apply",
+                    r18u: "fast_unroll,fast_unroll,fast_unroll,fast_unroll,head_apply|head_apply" };
     // the apply is the sixth pass, or -- r15, whose head and kernel are one pass -- the fifth's
     const kindOf = (x) => x.passes.slice(0, 5).map((n) => /\((\w+),/.exec(n)[1]).join() + "|" + (x.passes[5] ? /\((\w+)\)$/.exec(x.passes[5])[1] : /\((\w+),/.exec(x.passes[4])[1]);
     ok(`  ${label}: and they are different kernels -- ${want.map((s) => `${s} ${kinds[s]}`).join("; ")}`,
@@ -165,8 +190,13 @@ console.log("1. THE LADDER'S ARITHMETIC");
         passBytes(net, 1080, 1920, "r14") === px * 4 * (10 + 4 * 32 + 81 + 3) && passBytes(net, 1080, 1920, "r15") === passBytes(net, 1080, 1920, "r14") - px * 81 * 4 &&
         passBytes(net, 1080, 1920, "r12") === passBytes(net, 1080, 1920, "r14"),
         `at 1080p: r14 ${(passBytes(net, 1080, 1920, "r14") / 2 ** 20).toFixed(0)} MiB, r15 ${(passBytes(net, 1080, 1920, "r15") / 2 ** 20).toFixed(0)} MiB`);
-    ok("  both ladders time r12 and r15 -- r12 first, the reference every speedup is read against; round 16's two candidates left with section 57",
-        TIMED_SETS.join() === "r12,r15" && NATIVE_SETS === TIMED_SETS && TIMED_SETS.every((s) => KERNEL_SETS.includes(s)));
+    const d3d = { info: { vendor: "nvidia", architecture: "pascal", description: "D3D12 driver version 32.0.15.8180" } }, vk = { info: { vendor: "google", architecture: "swiftshader", description: "Vulkan" } };
+    ok("  round 18: both ladders time r12, r15, r18t and r18u -- r12 first, the reference every speedup is read against -- and natively on a D3D12 adapter, r12 and r15 alone",
+        TIMED_SETS.join() === "r12,r15,r18t,r18u" && TIMED_SETS.every((s) => KERNEL_SETS.includes(s)) && BROWSER_ONLY_SETS.join() === "r18t,r18u" &&
+        nativeSetsFor(d3d, TIMED_SETS).join() === "r12,r15" && nativeSetsFor(vk, TIMED_SETS).join() === TIMED_SETS.join() && nativeSetsFor({ info: {} }, TIMED_SETS).join() === TIMED_SETS.join(),
+        "section 60: node-webgpu's FXC stopped on r18t's kernel and crashed on r18u's");
+    ok("  a time is on Dawn's rounded grid when it is a whole number of 65,536 ns -- section 60's finding, read off round 17's native times",
+        onGrid(0.131072) && onGrid(8.912896) && !onGrid(0.101376) && !onGrid(9.059328) && H.FINE_CLOCK_FLAG === "disable-dawn-features=timestamp_quantization");
     const a = timingInput(8, 16), b = timingInput(8, 16);
     ok("  the input is the same every time, in the network's ranges, with both sides of a mask",
         a.every((v, i) => v === b[i]) && a.length === 8 * 16 * 10 && new Set(Array.from({ length: 128 }, (_, p) => a[p * 10 + 9])).size === 2);
@@ -177,16 +207,22 @@ console.log("1. THE LADDER'S ARITHMETIC");
 }
 
 const skip = H.headlessGpuSkipReason ? H.headlessGpuSkipReason() : null;
+let NATIVE_SETS = TIMED_SETS;
 console.log("\n2. NATIVE: node-webgpu's default adapter (on the rig, the GPU)");
 if (skip) console.log("  SKIP  " + skip);
 else {
     let r = null, err = null;
     try {
         H.configureVulkanIcd();
-        const { mod } = H.resolveWebgpu(), gpu = mod.create([]);
+        // section 61: the device's clock unrounded -- Dawn otherwise rounds every timestamp down to a whole 65,536 ns
+        const { mod } = H.resolveWebgpu(), gpu = mod.create([H.FINE_CLOCK_FLAG]);
         // round 14 (section 43): natively r12 against r14 -- r13's native failure is section 42's finding, and each native
         // fast pipeline costs minutes to build under the D3D12 compiler node-webgpu ships -- with a 600 s ladder budget;
-        // round 15 (section 46) adds r15, whose hidden layers are r14's; since section 57, r12 and r15 (TIMED_SETS)
+        // round 15 (section 46) adds r15, whose hidden layers are r14's; since section 57, r12 and r15; since section 61,
+        // TIMED_SETS less what nativeSetsFor leaves out on this adapter
+        NATIVE_SETS = nativeSetsFor(await gpu.requestAdapter(), TIMED_SETS);
+        for (const s of TIMED_SETS.filter((x) => !NATIVE_SETS.includes(x)))
+            console.log(`  SKIP  native ${s}: a browser-only set on a D3D12 adapter -- node-webgpu's FXC does not build its kernel (section 60); the page times it`);
         r = await timingLadder(net, () => gpu.requestAdapter(), { sets: NATIVE_SETS, capMs: CAP, warmup: 1, minReps: 3, budgetMs: 1500, totalMs: 600000 });
         // the rig's report names every adapter a gate ran on; this one is not reached through the browser harness, so it says itself
         if (process.env.SWEK_ADAPTER_LOG) {
@@ -196,7 +232,14 @@ else {
         }
     } catch (e) { err = String(e && e.message || e); }
     if (err) ok("!! the native ladder ran", false, err.slice(0, 200));
-    else { pairedHolds("native", r, NATIVE_SETS); report("native", r); }
+    else {
+        pairedHolds("native", r, NATIVE_SETS); report("native", r);
+        // section 61: the flag reached the device -- with timestamps on a 1 ns grid, a whole number of 65,536 ns is a 1-in-65,536 chance a time
+        const ts = NATIVE_SETS.flatMap((s) => r.rows[s].filter((x) => !x.skipped && x.timestamps).flatMap((x) => [...x.raw.gpu, ...x.raw.perPass.flat()]));
+        if (!r.adapter.timestamps) console.log("  SKIP  the native clock's grain: this adapter offers no timestamp queries");
+        else ok("!! section 61: the native device's clock is not Dawn's rounded one -- not every time is a whole number of 65,536 ns, as every native time in round 17's probes was",
+            ts.length >= 10 && !ts.every(onGrid), `${ts.filter(onGrid).length} of ${ts.length} device times on the 65,536 ns grid`);
+    }
 }
 
 console.log("\n3. THE PAGE: denoise.html's \"Time the network\", in Chromium (on the rig, the browser's GPU)");
@@ -221,6 +264,10 @@ console.log("\n3. THE PAGE: denoise.html's \"Time the network\", in Chromium (on
         if (L) {
             // the page's rows, as the gate's own ladder: raw times are kept for the rows above
             pairedHolds("page", L, TIMED_SETS); report("page", L);
+            // section 61's rule fills PAGE_KERNELS_BY_ADAPTER by this key: the report carries it
+            say(`page: this adapter's key for section 61's table: ${L.pageKey === null ? "none -- the browser reported no platform" : L.pageKey}`);
+            ok("  round 18: the page's report carries its adapter's key -- platform, vendor and architecture -- or says it has none", "pageKey" in L &&
+                (L.pageKey === null || /^[^/]+\/[^/]+\/[^/]*$/.test(L.pageKey)), String(L.pageKey));
             ok("  the page and the harness agree on what the device is", r.software === null || L.adapter.software === r.software, `harness says ${r.software ? "software" : "hardware"}`);
         }
     }

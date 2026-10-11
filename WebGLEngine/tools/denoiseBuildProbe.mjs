@@ -45,7 +45,8 @@ if (args.includes("--child")) {
     let result;
     try {
         H.configureVulkanIcd();
-        const { mod } = H.resolveWebgpu(), gpu = mod.create(["enable-dawn-features=dump_shaders"]);
+        // section 61: the device's clock unrounded -- round 17's native times were all whole multiples of 65,536 ns (section 60)
+        const { mod } = H.resolveWebgpu(), gpu = mod.create(["enable-dawn-features=dump_shaders", H.FINE_CLOCK_FLAG]);
         const v = SHAPES.find((x) => x.id === id), a = await gpu.requestAdapter(), info = a.info || {};
         const dev = await a.requestDevice({ requiredFeatures: a.features.has("timestamp-query") ? ["timestamp-query"] : [], requiredLimits: limitsOf(a) });
         try { result = { ...(await measureSizes(dev, v, SIZES)), adapter: [info.vendor, info.architecture, info.description].filter(Boolean).join(" / ") }; }

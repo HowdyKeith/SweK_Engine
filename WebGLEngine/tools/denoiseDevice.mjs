@@ -12,6 +12,9 @@
 //       node tools/denoiseDevice.mjs --measure-r15 [--cache <dir>]
 //           section 46's K0 (a): the same on round 15's set (fast kernel, then k_head_apply) -> render/denoise-results-r15.json;
 //           its last pass stores no logit, so it is judged through the image (judgeHeadApply), its hidden layers cell for cell
+//       node tools/denoiseDevice.mjs --measure-r18t [--cache <dir>]   (and --measure-r18u)
+//           section 61's K0 (a): the same on round 18's page sets (the pixel-tiled kernel with inline weights, or the fast
+//           kernel with a block written out, then k_head_apply) -> render/denoise-results-r18t.json, -r18u.json; judged as r15 is
 //       (round 16's --measure-r16a and --measure-r16b wrote render/denoise-results-r16a.json and -r16b.json at 4b8e9d92,
 //       section 55; section 57 withdrew both sets, and their flags with them)
 //
@@ -38,9 +41,11 @@ import * as GPU from "./ship/headlessGpu.mjs";
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const NET_FILE = "render/denoise-net-r11.json", RESULTS_R12 = "render/denoise-results-r12.json", RESULTS_R13 = "render/denoise-results-r13.json";
 const RESULTS_R14 = "render/denoise-results-r14.json", RESULTS_R15 = "render/denoise-results-r15.json";
-// each measurement, by flag: the kernel set it runs the device pass on, and the file it writes (sections 35, 39, 43, 46 and 54)
+const RESULTS_R18T = "render/denoise-results-r18t.json", RESULTS_R18U = "render/denoise-results-r18u.json";
+// each measurement, by flag: the kernel set it runs the device pass on, and the file it writes (sections 35, 39, 43, 46 and 61)
 const MEASURES = { "--measure-r12": { kernels: "r12", results: RESULTS_R12 }, "--measure-r13": { kernels: "r13", results: RESULTS_R13 },
-                   "--measure-r14": { kernels: "r14", results: RESULTS_R14 }, "--measure-r15": { kernels: "r15", results: RESULTS_R15 } };
+                   "--measure-r14": { kernels: "r14", results: RESULTS_R14 }, "--measure-r15": { kernels: "r15", results: RESULTS_R15 },
+                   "--measure-r18t": { kernels: "r18t", results: RESULTS_R18T }, "--measure-r18u": { kernels: "r18u", results: RESULTS_R18U } };
 const measure = Object.keys(MEASURES).find((k) => process.argv.includes(k));
 // section 35's bound for D3: the device's relMSE on an image within this relative distance of the f64 network's
 const D3_REL = 1e-4;
@@ -74,7 +79,7 @@ if (args.includes("--export-r11")) {
     GPU.configureVulkanIcd();
     const { mod } = GPU.resolveWebgpu(), gpu = mod.create([]);
     const t0 = Date.now(), rows = [];
-    // a set whose last pass is k_head_apply (r15) stores no logit: its head is judged through the image
+    // a set whose last pass is k_head_apply (r15, r18t, r18u) stores no logit: its head is judged through the image
     const fusedSet = deviceLayers(net, kernels).at(-1).kernel === "head_apply";
     let adapterName = null;
     for (const name of ["T1", "T2"]) {
@@ -135,6 +140,6 @@ if (args.includes("--export-r11")) {
     GPU.exitCleanly(0);
 } else {
     console.log("usage: node tools/denoiseDevice.mjs --export-r11 --cache <dir> --key <record> | --measure-r12 [--cache <dir>] | --measure-r13 [--cache <dir>] | --measure-r14 [--cache <dir>]" +
-                " | --measure-r15 [--cache <dir>]   (see render/learned-denoiser-preregistration.md, sections 35, 39, 43 and 46)");
+                " | --measure-r15 | --measure-r18t | --measure-r18u [--cache <dir>]   (see render/learned-denoiser-preregistration.md, sections 35, 39, 43, 46 and 61)");
     process.exit(2);
 }

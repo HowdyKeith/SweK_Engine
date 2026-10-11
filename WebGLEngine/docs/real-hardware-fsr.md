@@ -220,6 +220,23 @@ in Chrome. Send back `denoise-build-probe-r17.json`. Section 59 fixes, before it
 written-out shapes crashed on both GPUs and all three tile shapes stopped at 3 minutes. The vec4 shape built, but in Chrome
 at 1024 square it was slower than the fast kernel on the 1080. There is nothing more to run on this branch.
 
+### Round 18: the page picks its kernels by GPU (pre-registration section 61)
+
+The branch `claude/denoiser-round18` adds two kernel sets that only the page runs, in Chrome: round 17's 2 x 8 tile with
+inline weights (r18t), and the fast kernel with a block written out (r18u). It also adds a table the page reads its set
+from, keyed by platform, vendor and architecture. The table is empty until this run decides it. Natively, neither set is
+built on D3D12, so the native gates time r12 and r15 alone; the native clock is no longer rounded to 65.5 µs. On
+each GPU:
+
+```
+git fetch origin claude/denoiser-round18
+git checkout -B claude/denoiser-round18 FETCH_HEAD
+cd WebGLEngine
+node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise-r18.json
+```
+
+Send back `real-gpu-denoise-r18.json`. Section 61 fixes, before it runs, which set the page takes on each GPU.
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and
