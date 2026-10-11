@@ -43,7 +43,8 @@
 //           fast-unroll, 2.11 x on the Intel in Chrome, 0.57 x on the 1080 (section 60)
 // node-webgpu's FXC builds neither (section 60: it stopped on the first, crashed on the second), so they are BROWSER_ONLY_SETS:
 // no gate builds them natively on a D3D12 adapter (nativeSetsFor), and the default rule cannot choose them. The page runs
-// pageKernelsFor(its adapter): PAGE_KERNELS_BY_ADAPTER's set for a measured adapter, PAGE_KERNELS for any other.
+// pageKernelsFor(its adapter): PAGE_KERNELS_BY_ADAPTER's set for a measured adapter, PAGE_KERNELS for any other. Section 63
+// filled the table: r18u on the Intel gen-9, r18t on the GTX 1080, in Chrome on Windows.
 // The page runs PAGE_KERNELS and every other caller DEFAULT_KERNELS. Section 43's rules, read off both GPUs' round-14 runs
 // (section 49), put the page on r13 and the default on r14; section 46's, read off their round-15 runs (section 50), put
 // both on r15 -- the later run's decision stands.
@@ -329,10 +330,12 @@ export const DEFAULT_KERNELS = "r15";
 /** The set denoise.html runs on an adapter PAGE_KERNELS_BY_ADAPTER does not name: r15, by section 46's page rule on both GPUs (section 50) -- 9.25 x against r13's 6.49 and r14's 6.33. */
 export const PAGE_KERNELS = "r15";
 /**
- * Round 18 (section 61): the set denoise.html runs on an adapter section 61's rule measured, by pageAdapterKey -- empty until
- * that rule is read off both GPUs' round-18 runs. Only a Chromium browser on the measured platform makes a key that can match.
+ * Round 18: the set denoise.html runs on an adapter section 61's rule measured, by pageAdapterKey. Section 63 read the rule
+ * off both GPUs' round-18 runs, in Chrome on Windows: on the Intel gen-9, r18u's pass was 1.524 x r15's at 1024 x 1024 and
+ * r18t's 1.026 x (under 1.05); on the GTX 1080, r18t's was 1.087 x at 1920 x 1080 and r18u's 0.657 x. Only a Chromium browser
+ * on the measured platform makes a key that can match.
  */
-export const PAGE_KERNELS_BY_ADAPTER = Object.freeze({});
+export const PAGE_KERNELS_BY_ADAPTER = Object.freeze({ "Windows/intel/gen-9": "r18u", "Windows/nvidia/pascal": "r18t" });
 /**
  * The page's key for an adapter: "<platform>/<vendor>/<architecture>", the platform from navigator.userAgentData -- which only
  * Chromium browsers have, so any other browser makes no key and runs PAGE_KERNELS. Section 61's sets were measured in Chrome

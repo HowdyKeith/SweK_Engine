@@ -131,6 +131,11 @@
 //       same-bits-as-r15 row)
 //   U12 the fast_unroll layers packed as the fast kernel's (not block by block) 4 RED (r18u's K0 natively and in the browser, the
 //       same-bits row, the small network)
+//   round 18's verdict (section 63: r18u on the Intel gen-9, r18t on the GTX 1080). Each restored, md5 verified:
+//   V5  the table's two entries swapped                                         1 RED (the verdict row)
+//   V6  the page refuses the table's set for an adapter the table names         0 RED HERE -- this box's adapter (SwiftShader) is not
+//       in the table, so the page row checks the miss path; on either rig GPU the same row checks the table's set
+//   V7  the table names a third adapter (this box's)                            1 RED (the verdict row)
 "use strict";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -231,11 +236,14 @@ console.log("1. THE KERNEL'S TWIN, ON THE CPU");
             pageAdapterKey({ vendor: "intel", architecture: "gen-9" }, undefined) === null && pageAdapterKey({ vendor: "intel", architecture: "gen-9" }, { platform: "" }) === null &&
             pageAdapterKey({}, { platform: "Windows" }) === null &&
             pageKernelsFor("Windows/intel/gen-9", tbl) === "r18u" && pageKernelsFor("macOS/intel/gen-9", tbl) === PAGE_KERNELS && pageKernelsFor(null, tbl) === PAGE_KERNELS &&
-            pageKernelsFor("constructor", tbl) === PAGE_KERNELS && pageKernelsFor("Windows/intel/gen-9") === PAGE_KERNELS,
-            "the table's own prototype is not a key; the shipped table is empty until section 61's rule is read off the rig");
-        ok("!! round 18: before section 61's rule is read, the page's table names no adapter, and every value it could hold is a set the page can build -- the page runs r15 everywhere",
-            Object.keys(PAGE_KERNELS_BY_ADAPTER).length === 0 && Object.isFrozen(PAGE_KERNELS_BY_ADAPTER) && Object.values(PAGE_KERNELS_BY_ADAPTER).every((v) => KERNEL_SETS.includes(v)) && PAGE_KERNELS === "r15",
-            JSON.stringify(PAGE_KERNELS_BY_ADAPTER));
+            pageKernelsFor("constructor", tbl) === PAGE_KERNELS && pageKernelsFor("constructor") === PAGE_KERNELS && pageKernelsFor("Windows/amd/rdna-3") === PAGE_KERNELS,
+            "the table's own prototype is not a key; an adapter the shipped table does not name runs PAGE_KERNELS");
+        const verdict = [["Windows/intel/gen-9", "r18u"], ["Windows/nvidia/pascal", "r18t"]];
+        ok("!! round 18's verdict (section 63): the page's table is section 61's rule read off both GPUs' runs -- r18u for the Intel gen-9, r18t for the GTX 1080, in Chrome on Windows -- and nothing else; PAGE_KERNELS and DEFAULT_KERNELS stay r15",
+            JSON.stringify(Object.entries(PAGE_KERNELS_BY_ADAPTER).sort()) === JSON.stringify(verdict) && Object.isFrozen(PAGE_KERNELS_BY_ADAPTER) &&
+            Object.values(PAGE_KERNELS_BY_ADAPTER).every((v) => KERNEL_SETS.includes(v) && BROWSER_ONLY_SETS.includes(v)) && PAGE_KERNELS === "r15" && DEFAULT_KERNELS === "r15" &&
+            pageKernelsFor("Windows/intel/gen-9") === "r18u" && pageKernelsFor("Windows/nvidia/pascal") === "r18t" && pageKernelsFor("Linux/google/swiftshader") === "r15",
+            JSON.stringify(PAGE_KERNELS_BY_ADAPTER) + " -- section 63: r18u 1.524 x r15 at 1024 on the Intel, r18t 1.087 x at 1080p on the 1080");
     }
     ok("  k_head_apply: five bindings, one barrier, its 81 taps unrolled -- each logit a named lane, no private array a compiler would put in memory",
         /fn k_head_apply/.test(code15) && (code15.match(/@binding\(/g) || []).length === 5 && (code15.match(/workgroupBarrier\(\)/g) || []).length === 1 &&
@@ -426,7 +434,9 @@ console.log("\n4. THE PAGE, IN CHROMIUM: denoise.html ON ITS OWN DEVICE");
             return { status: $("status").textContent, cap: $("netCap").textContent, e: ["eNoisy", "eFilter", "eNet"].map((k) => $(k).textContent) };
         };
         const run = await press(a.seed), refused = await press(a.dataset);
-        return { run, refused, scope: $("scope").textContent };
+        // the key the page looked its set up by, made the page's way in the same browser (section 61)
+        const D = await import("/render/denoiseDevice.mjs"), ad = navigator.gpu ? await navigator.gpu.requestAdapter() : null;
+        return { run, refused, scope: $("scope").textContent, key: D.pageAdapterKey(ad && ad.info, navigator.userAgentData) };
     }` });
     if (r.skipped) console.log("  SKIP  " + r.reason);
     else {
@@ -434,8 +444,11 @@ console.log("\n4. THE PAGE, IN CHROMIUM: denoise.html ON ITS OWN DEVICE");
         ok("!! *** the page renders a scene of C, runs the network ON ITS DEVICE, and finds the image the f64 network's within f32 rounding -- no page error ***",
             r.ok && !r.pageErrors.length && /on the device/.test(run.cap || "") && wd < 1e-5 && run.e.every((v) => /^\d\.\d{4}$/.test(v)),
             r.ok ? `${(run.status || "").slice(0, 150)}; errors ${r.pageErrors.length}` : r.reason);
-        ok("  round 18: ...and on an adapter section 61's table does not name, the page runs PAGE_KERNELS, and its caption says which set",
-            r.ok && new RegExp(`kernels ${PAGE_KERNELS}(?![\\w(])`).test(run.cap || "") && !/section 61's for/.test(run.cap || ""), (run.cap || "").slice(0, 120));
+        // the set the page must run: the table's for an adapter it names (on the rig's two GPUs since section 63), PAGE_KERNELS otherwise
+        const named = !!R.key && Object.hasOwn(PAGE_KERNELS_BY_ADAPTER, R.key), want = pageKernelsFor(R.key);
+        ok(`  round 18: ...and the page runs the set section 61's table gives its adapter's key -- ${named ? `${want}, the table's for ${R.key}` : `PAGE_KERNELS (${want}), the key ${R.key || "(none)"} not in the table`} -- and its caption says which`,
+            r.ok && new RegExp(`kernels ${want}(?![\\w(])`).test(run.cap || "") && /section 61's for/.test(run.cap || "") === named &&
+            (!named || (run.cap || "").includes(`section 61's for ${R.key}`)), (run.cap || "").slice(0, 120));
         ok("  ...and it refuses a round 11 test seed before rendering it, and says above everything that it covers R and C only",
             /35000 belongs to the arc's dataset and is refused/.test(R.refused?.status || "") && /only those/.test(R.scope || "") && /not<\/b>|not trained on/.test(R.scope || ""),
             (R.refused?.status || "").slice(0, 100));

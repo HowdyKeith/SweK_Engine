@@ -237,6 +237,10 @@ node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise-r18.json
 
 Send back `real-gpu-denoise-r18.json`. Section 61 fixes, before it runs, which set the page takes on each GPU.
 
+**The outcome (section 63).** In Chrome on Windows the page now runs r18u on the Intel gen-9 (1.52 x r15 at 1024 square) and
+r18t on the GTX 1080 (1.09 x at 1080p). Every other GPU, platform and browser, and everything native, stays on r15. The
+native clock is unrounded on both GPUs. There is nothing more to run on this branch.
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and

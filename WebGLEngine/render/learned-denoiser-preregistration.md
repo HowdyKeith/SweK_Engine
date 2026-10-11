@@ -3820,3 +3820,108 @@ cache, so each rendered the 24 test images itself.
   `claude/denoiser-round18`.
 - Until section 61's rule fills it, `PAGE_KERNELS_BY_ADAPTER` is empty. The page runs "r15" everywhere, and so does the
   default.
+
+## 63. ROUND 18 -- THE VERDICT: THE PAGE RUNS r18u ON THE INTEL AND r18t ON THE GTX 1080, IN CHROME ON WINDOWS; r15 EVERYWHERE ELSE
+
+**What arrived.**
+- **One `realGpuRun --only denoise` per GPU,** at 01429c8e, committed byte for byte at 227d3f83:
+  - `render/denoise-rig-r18-intel-gen9.json`: natively "intel / gen-9 / D3D12 driver version 31.0.101.2137", in Chrome
+    "intel / gen-9";
+  - `render/denoise-rig-r18-gtx1080.json`: natively "nvidia / pascal / D3D12 driver version 32.0.15.8180", in Chrome
+    "nvidia / pascal".
+- **Every gate was green on both GPUs,** and none came near the 30-minute cap:
+
+| Gate | Intel gen-9 | GTX 1080 |
+|---|---|---|
+| exact | 180 s | 97 s |
+| timing | 243 s | 178 s |
+| compile | 750 s | 368 s |
+
+**Section 61's three conditions, set by set.**
+
+| Condition | r18t, Intel | r18u, Intel | r18t, 1080 | r18u, 1080 |
+|---|---|---|---|---|
+| 1. K0 (c), the exact gate's browser row | green | green | green | green |
+| 2. K1 against r12 in Chrome | 9.44 x at 256, at least 8.55 | 14.12 x at 256, at least 13.59 | 25.90 x at 1024, at least 9.09 | 15.29 x at 1024, at least 8.73 |
+| 3. Against r15 at the largest size both measured | **1.026 x at 1024: under 1.05** | 1.524 x at 1024 | 1.087 x at 1080p | **0.657 x at 1080p** |
+| Qualifies | no | **yes** | **yes** | no |
+
+- **On K0 (c).** The report lists failing rows, not passing ones. The exact gate had no failing row on either GPU, and
+  the harness logged its browser sessions on each GPU's own adapter. That is the same reading earlier rounds gave K0 (c).
+- **By section 61's rule:**
+  - the Intel's entry is r18u, the only set that qualified there;
+  - the 1080's is r18t, the only set that qualified there.
+- **So `PAGE_KERNELS_BY_ADAPTER` is `{ "Windows/intel/gen-9": "r18u", "Windows/nvidia/pascal": "r18t" }`.** The keys are
+  the ones each GPU's page reported.
+- **`PAGE_KERNELS` and `DEFAULT_KERNELS` stay "r15".** Every other adapter, platform and browser runs r15, and so does
+  everything native.
+
+**The predictions.**
+
+| Set and GPU | Predicted, against r15 | Measured |
+|---|---|---|
+| r18t, GTX 1080 | 1.12 x | 1.087 x at 1080p |
+| r18t, Intel | 1.13 x | 1.026 x at 1024 |
+| r18u, Intel | 1.88 x | 1.524 x at 1024 |
+| r18u, GTX 1080 | 0.64 x | 0.657 x at 1080p |
+
+- **P1 is false.** r18t qualified on the 1080 only.
+- **P2 and P3 are true.** r18u qualified on the Intel and not on the 1080, and the Intel's entry is r18u.
+- **Both gains on the faster side fell short of the arithmetic,** which assumed the network's hidden layers would gain what
+  round 17's single 32 -> 32 layer gained:
+
+| Hidden layers, against r15's | Round 17's layer, Chrome at 1024 | Round 18's four, on the page |
+|---|---|---|
+| r18t, Intel | 1.14 x | 1.037 x at 1024 (857.2 ms against 888.9) |
+| r18u, Intel | 2.11 x | 1.688 x at 1024 (526.4 against 888.9) |
+| r18t, GTX 1080 | 1.17 x | 1.118 x at 1080p (55.2 against 61.7) |
+| r18u, GTX 1080 | 0.57 x | 0.585 x at 1080p (105.5 against 61.7) |
+
+**Reported, deciding nothing.**
+- **The page's own image is 64 x 64,** and there the sets compare differently:
+  - On the 1080, r18t's pass was 0.80 x r15's: 0.535 against 0.429 ms on the device's clock. It was slower at 128 too
+    (0.96 x), and faster from 256 up.
+  - On the Intel, r18u's was 1.67 x r15's at 64 x 64: 2.94 against 4.92 ms.
+  - Section 61's rule reads the largest size both measured, so this moves nothing. On the 1080 it costs the page's 64 x 64
+    denoise about 0.1 ms of GPU time against r15. The page's wall clock read 2.7 ms for every set there.
+- **The Intel's head and kernel pass.** The same kernel, `k_head_apply`, took 97.6 ms after r18t's layers and 97.0 after
+  r18u's, against 90.5 after r15's, at 1024. The 1080's agreed to within 0.9 ms. The cause is not shown. The Intel's
+  1024 rows rest on 3 passes for r15 and r18t and 6 for r18u.
+- **r18u climbed further on the Intel.** It measured 1080p (1,190 ms) where r15 stopped, predicted at 1,947 ms.
+- **The native clock on the rig is unrounded.**
+  - Both gates' grid rows were green on both GPUs.
+  - None of the native device-clock medians the reports carry is a whole number of 65,536 ns: 0 of 8 on the Intel, 0 of 11
+    on the 1080.
+  - So Dawn's D3D12 path honours `timestamp_quantization` off, as its Vulkan path does here.
+- **Native r15 against r12 at the small sizes, beside round 15's runs:**
+
+| GPU, size | Round 15 | Round 18 |
+|---|---|---|
+| Intel, 64 x 64 | 8.92 x (second run 8.87) | 9.04 x |
+| Intel, 128 x 128 | 10.52 x (10.25) | 10.63 x |
+| 1080, 64 x 64 | 4.31 x | 9.17 x |
+| 1080, 128 x 128 | 10.46 x | 10.92 x |
+
+  - Three of the four agree to within 4%.
+  - On the 1080 at 64 x 64, r15's own pass halved: from 1.049 to 0.515 ms on the device's clock, and from 1.292 to
+    0.708 ms on the wall clock, which was never rounded. The rounding can move a span by one 65.5 µs tick at most, so it is
+    not the cause. The cause is not shown.
+
+**What changes.**
+- `render/denoiseDevice.mjs`: `PAGE_KERNELS_BY_ADAPTER` holds the two entries above.
+- **The exact gate's rows.**
+  - The "names no adapter" row now holds the verdict's table.
+  - The page row holds the set the table gives the page's own key: on this box, SwiftShader's key is not in the table, so
+    r15; on either rig GPU, the table's set.
+- **Sabotages V5-V7:**
+  - V5, the table's entries swapped: 1 red.
+  - V7, a third adapter added: 1 red.
+  - V6, the page refusing the table's set for an adapter the table names: 0 red here. This box's adapter is not in the
+    table. On the rig's GPUs the page row checks exactly that.
+
+**What this leaves. Nothing here is pre-registered.**
+- **The page's choice rests on one run per GPU.** r18t's 1.087 x on the 1080 cleared 1.05 by 0.037. A later run that reads
+  it again would show whether the margin holds.
+- **The page's own 64 x 64 image is where r18t is slower on the 1080.** A rule read at the page's working size would choose
+  differently there.
+- **Natively nothing changed.** The default stays r15, and FXC still builds neither round-18 set.
