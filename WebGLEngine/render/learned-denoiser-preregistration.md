@@ -2854,3 +2854,87 @@ the browser.
   each 1 red.
 - **Round 15's run times every set again, and section 46's rules read it.** The later run's decision stands (section
   50).
+
+## 50. ROUND 15 -- THE VERDICT: K0 AND K1 HOLD ON BOTH GPUS; BY SECTION 46 THE PAGE AND THE DEFAULT BOTH GO TO r15
+
+**What arrived.**
+- **The Intel's report:** `realGpuRun --only denoise` at 3c881f35, committed byte for byte at 1c6f8cf2 as
+  `render/denoise-rig-r15-intel-gen9.json`.
+  - That commit carries round 15's kernels and gates, and section 45's compile-gate fixes.
+  - It does not carry section 49's Dawn-flags fix.
+- The 1080's round-15 report is section 48's.
+
+**The Intel's three gates at 3c881f35.**
+
+| Gate | Verdict | Time |
+|---|---|---|
+| exact | green: K0 (b) natively and K0 (c) in the browser hold for r15 and r14; r13 in the browser | 174 s |
+| timing | green | 457 s |
+| compile | red on one row only: the `use_dxc` dumps were empty (section 49's fault, fixed after this commit) | 896 s |
+
+**K0 for r15 holds:**
+- (a) section 47;
+- (b) natively, the exact gates on both GPUs: the hidden layers cell for cell, the fused pass through its image, the
+  order probe, the bias-plus-100 row and the no-mask row;
+- (c) in the browser, the exact gates' browser sections on both GPUs.
+
+The compile gate agrees wherever it measured `k_head_apply` on the probe:
+
+| Where | Worst against the twin's logits |
+|---|---|
+| 1080, native, FXC and `use_dxc` | 6.26e-7 |
+| 1080, Chrome | 6.26e-7 |
+| Intel, native, FXC and `use_dxc` | 5.45e-7 |
+| Intel, Chrome | 5.45e-7 |
+
+- In Chrome on the Intel, round 14's head kernel fused most of its cells (section 49). The probe's products are exact,
+  so fusing cannot move its logits, and its image says the head inside `k_head_apply` kept the twin's order there too.
+
+**K1, every set against r12, round 15's runs, on the device's clock, at the largest size each set and r12 both measured.**
+
+| GPU | Path | r13 | r14 | r15 | size |
+|---|---|---|---|---|---|
+| GTX 1080 | native | not timed | 15.80 x | 26.16 x | 1024 x 1024 |
+| GTX 1080 | browser | 13.07 x | 15.11 x | 24.50 x | 1024 x 1024 |
+| Intel gen-9 | native | not timed | 6.87 x | 10.76 x | 256 x 256 |
+| Intel gen-9 | browser | 6.49 x | 6.33 x | 9.25 x | 256 x 256 |
+
+Every set is at least 1 time at every size both measured. On the Intel, r15 against r12 was 8.92, 10.52 and 10.76 times
+natively, and 8.05, 9.98 and 9.25 in the browser.
+
+**The reported measures.**
+- **F1 holds on both GPUs.** In the browser, r15's head-and-kernel pass against r14's head plus `k_apply_fast`, at the
+  largest size both measured:
+  - the 1080 at 1080p: 3.46 times;
+  - the Intel at 1024 x 1024: **6.25 times** (90.6 ms against 442.7 + 123.7).
+  - Natively: 4.26 and 8.75 times.
+- **F2, the whole pass, r15 against r14:**
+
+  | GPU | Size | Browser | Native |
+  |---|---|---|---|
+  | GTX 1080 | 1080p | 1.60 x | 1.67 x |
+  | Intel gen-9 | 1024 x 1024 | 1.55 x (887.9 ms against 1,378.1) | 1.75 x (652.0 ms against 1,138.6) |
+
+  Natively on the Intel, r15 reached 1080p at 1,283.8 ms, where r14 stopped (predicted 2,253 ms).
+- **F3:** 1,115 MiB at 1080p against r14's 1,756.
+- **Building `k_head_apply` costs seconds.** Natively under FXC it took 9.1 s on the 1080 and 20.9 s on the Intel; in
+  Chrome 1.4 s and 2.9 s. That is the unrolled taps, paid once per pipeline. Its pass on the probe, natively, took
+  0.131 and 0.393 ms.
+
+**The rules (section 46, applied to round 15's runs).**
+- **The page:** r13, r14 and r15 all qualify, with K0 and K1 in the browser on both GPUs. Their smaller speedups across
+  the two GPUs are 6.49, 6.33 and **9.25** times. **`PAGE_KERNELS` becomes "r15".**
+- **The default:** r14 and r15 qualify, with K0 everywhere and K1 on every GPU and path. Their smallest speedups across
+  every GPU and path are 6.33 and **9.25** times. **`DEFAULT_KERNELS` becomes "r15".**
+- **This supersedes section 49's r13 and r14.** Section 46 fixed that the later run's decision stands.
+- **Both are set in `render/denoiseDevice.mjs` at this commit.** The exact gate's r15 row now asserts them, and V3 and V4
+  are each 1 red.
+
+**Where the time goes now.**
+- On the 1080, a 1080p frame in Chrome takes 80.3 ms, against 150.4 in round 13. Its four hidden layers take 60.4 ms.
+- On the Intel, a 1024 x 1024 frame in Chrome takes 887.9 ms, against r13's 1,346.0 and r14's 1,378.1. Its four hidden
+  layers take 787.0 ms, 89% of it.
+- The head and the kernel apply are no longer where a frame's time goes. The hidden 3 x 3 layers are.
+
+**Still open.** A1 is untested on both GPUs (section 49). With the Dawn flags fixed, one more run of the compile gate on
+either GPU would test it, though it decides nothing.

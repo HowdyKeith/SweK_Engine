@@ -84,6 +84,9 @@
 //   round 14's verdict (section 49: the default r14, the page r13):
 //   V1  the default left at r12                                                 1 RED (the r14 row)
 //   V2  the page given rule B's runner-up, r14                                  1 RED (the same row)
+//   round 15's verdict (section 50: the default and the page both r15; the assertion moved to the r15 row):
+//   V3  the default left at r14                                                 1 RED (the r15 row)
+//   V4  the page left at r13                                                    1 RED (the same row)
 "use strict";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -145,11 +148,10 @@ console.log("1. THE KERNEL'S TWIN, ON THE CPU");
     let noSet = null; try { kernelFor({ k: 3, Cout: 4, Cin: 4 }, "r16"); } catch (e) { noSet = e.message; }
     const L14 = deviceLayers(net, "r14"), L14s = deviceLayers(makeDenoiser(4, "he", "kernel", 9), "r14");
     ok(`!! round 14: the r14 set runs the hidden layers on the fast kernel and the ${KERNEL_TAPS}-logit head -- the last layer only -- on the head kernel, then k_apply_fast; ` +
-       `r12 and r13 keep k_apply; by section 43's rules on both GPUs the default is r14 and the page r13 (section 49)`,
+       `r12 and r13 keep k_apply (section 49 put the default on r14 and the page on r13; section 50 moved both to r15)`,
         L14.map((l) => l.kernel).join() === "fast,fast,fast,fast,head" && applyFor(L14) === "apply_fast" && applyFor(L13) === "apply" && applyFor(L) === "apply" &&
-        L14s.map((l) => l.kernel).join() === "fast,fast,fast,head" && kernelFor({ Cin: 32, Cout: 81, k: 1 }, "r14", false) === "fast" &&
-        DEFAULT_KERNELS === "r14" && PAGE_KERNELS === "r13" && deviceLayers(net).map((l) => l.kernel).join() === L14.map((l) => l.kernel).join(),
-        `${L14.map((l) => l.kernel).join()} + ${applyFor(L14)}; a 1 x 1 layer that is not the last stays on the fast kernel; default ${DEFAULT_KERNELS}, page ${PAGE_KERNELS}`);
+        L14s.map((l) => l.kernel).join() === "fast,fast,fast,head" && kernelFor({ Cin: 32, Cout: 81, k: 1 }, "r14", false) === "fast",
+        `${L14.map((l) => l.kernel).join()} + ${applyFor(L14)}; a 1 x 1 layer that is not the last stays on the fast kernel`);
     ok(`!! round 13: the r13 set runs every layer of the large network on the fast kernel, the ${KERNEL_TAPS}-logit head among them (section 39)`,
         L13.map((l) => l.kernel).join() === "fast,fast,fast,fast,fast" && KERNEL_SETS.join() === "r12,r13,r14,r15" &&
         kernelFor({ Cin: 64, Cout: 32, k: 3 }, "r13") === "tiled" && /no kernel set "r16"/.test(noSet || ""),
@@ -157,7 +159,8 @@ console.log("1. THE KERNEL'S TWIN, ON THE CPU");
     const L15 = deviceLayers(net, "r15"), L15s = deviceLayers(makeDenoiser(4, "he", "kernel", 9), "r15");
     let noFuse = null; try { kernelHeadApplyWgsl({ Cin: 32, Cout: 6, k: 1 }); } catch (e) { noFuse = e.message; }
     const code15 = kernelHeadApplyWgsl(L15[4]);
-    ok(`!! round 15: the r15 set runs the hidden layers on the fast kernel and the ${KERNEL_TAPS}-logit head WITH the kernel apply as one pass, k_head_apply -- no apply pass of its own (section 46)`,
+    ok(`!! round 15: the r15 set runs the hidden layers on the fast kernel and the ${KERNEL_TAPS}-logit head WITH the kernel apply as one pass, k_head_apply -- no apply pass of its own; by section 46's rules on both GPUs it is the default and the page (section 50)`,
+        DEFAULT_KERNELS === "r15" && PAGE_KERNELS === "r15" && deviceLayers(net).map((l) => l.kernel).join() === L15.map((l) => l.kernel).join() &&
         L15.map((l) => l.kernel).join() === "fast,fast,fast,fast,head_apply" && applyFor(L15) === "head_apply" && L15s.map((l) => l.kernel).join() === "fast,fast,fast,head_apply" &&
         kernelFor({ Cin: 32, Cout: 81, k: 1 }, "r15", false) === "fast" && kernelFor({ Cin: 32, Cout: 6, k: 1 }, "r15", true) === "fast" && /fused head holds a 1 x 1 layer of 81 logits/.test(noFuse || ""),
         `${L15.map((l) => l.kernel).join()}; a 1 x 1 layer that is not the last, or not of ${KERNEL_TAPS} logits, stays on the fast kernel -- and the generator refuses one by name`);
