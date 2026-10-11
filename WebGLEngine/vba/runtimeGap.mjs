@@ -605,7 +605,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4830 -- 4617 -> 4621 for brain/pilotRoster.mjs, brain/pilot6dofPolicy.mjs and the two gates beside them (pilotRoster-selfcheck, pilot6dofPolicy-selfcheck), over v4829's murmurParity-selfcheck.mjs (4616 -> 4617); the fly3d and 6DOF pages grew a panel each.
     // v4831 -- 4621 -> 4625 for ui/publishCommands.mjs, ui/brainAsk.mjs and their two gates (publishHygiene-selfcheck, brainStages-selfcheck).
     // v4834 -- 4625 -> 4626 for tools/ship/reportFresh-selfcheck.mjs.
-    files: 4626,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
+    // v4835 -- 4626 -> 4628 for tools/ship/afterVerdict.mjs and its gate.
+    files: 4628,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
     // (v4691 note, carried)                               // v4691 -- RE-DERIVED: tools/ship/textureInProbe.mjs arrived, one ES module with a closure and top-level await -- four rows moved (files, ES modules, closures, async/await) and eight held.
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
@@ -1164,7 +1165,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // gates; the other rows hold. fetch/XHR holds at 251: brainAsk.mjs calls an injected fetchImpl, and the gate's own fetch went (see
     // tools/ship/brainStages-selfcheck.mjs on gateAxioms).
     // v4834 -- ES modules 4320 -> 4321, closures 4166 -> 4167: tools/ship/reportFresh-selfcheck.mjs; the other rows hold.
-    esModules: 4321, closures: 4167, asyncAwait: 1735, typedArrays: 1274, promises: 417,
+    // v4835 -- ES modules 4321 -> 4323, closures 4167 -> 4169: tools/ship/afterVerdict.mjs and its gate; the other rows hold.
+    esModules: 4323, closures: 4169, asyncAwait: 1735, typedArrays: 1274, promises: 417,
     fetchXhr: 251, performanceNow: 245, raf: 127, webgl: 200, webgpu: 57, threads: 25, wasm: 24,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

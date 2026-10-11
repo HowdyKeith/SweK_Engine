@@ -8892,6 +8892,22 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The CLIs refuse an unknown option (cliArgs) and the peer's transport is a row of its own. Thirteen sabotages red by name, " +
                  "logged in the two headers. NOT CLOSED: the pair has run over loopback and in one browser, not between two machines.",
     }),
+    // v4835 -- ONE new gate file: tools/ship/afterVerdict-selfcheck.mjs (the ship ritual's step 4b as a command).
+    since526: Object.freeze({
+        at: "v4835", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/afterVerdict-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/sweepRotation-selfcheck.mjs (a write on a box that does not own the record merges into that box's own file)",
+            "tools/ship/cliArgs-selfcheck.mjs (afterVerdict.mjs refuses an unknown option)",
+            "gfx/frontDoor-selfcheck.mjs (ui/publishCommands.mjs named as an arrival: red since v4831 with nothing running it)",
+        ]),
+        verdict: "*** STEP 4b WAS A REGEX IN A MARKDOWN FILE AND IT ASKED ONE OF TWO QUESTIONS. *** tools/ship/afterVerdict.mjs runs, alone, " +
+                 "every gate whose CODE reads the timing record (85 by the old pattern, 41 of them only in comments, labResults' and " +
+                 "claimTrace's minutes among them) and recordReach's blockers, the gates that are a record's only guard and over " +
+                 "the sweep's line. Its first run found frontDoor-selfcheck red since v4831 (ui/publishCommands.mjs unnamed), and " +
+                 "building it found sweepRotation dropping a foreign box's earlier local readings on every write. Both repaired.",
+    }),
     // v4834 -- ONE new gate file: tools/ship/reportFresh-selfcheck.mjs (no report older than the last commit to its own gate).
     since525: Object.freeze({
         at: "v4834", swept: 1, green: 1, red: 0,
