@@ -330,6 +330,18 @@ export const REACH_ARRIVALS_SINCE_V4407 = Object.freeze([
     Object.freeze({ module: "world/worldColliderBVH.mjs",
         why: "64ccd1af, task #89. main.js -> simulation/KaijuManager.js -> worldColliderBVH: kaiju ground " +
              "positioning moved onto the real terrain collider" }),
+    // v4830 -- FOUR ARRIVALS THIS LIST HAD NOT NAMED. The row that holds the reach to 695 + the named arrivals was red at 728 against 724, in no
+    // register: gfx/frontDoor-selfcheck.mjs is over the quick sweep's budget, so no ship-time step ran it, and the rotation returned it red. Found by
+    // walking main.js's reach at the last commit that edited this list (08011513, 724 modules) and at HEAD (728): these four are the whole difference,
+    // and nothing fell out. Named with why, not registered; each is a real import, one hop from the module that pulls it in.
+    Object.freeze({ module: "camera/cameraBoom.js",
+        why: "ab583367 (Round A): the third-person camera boom sweeps its box against the voxels; camera/camera.js imports it for the voxel eye" }),
+    Object.freeze({ module: "physics/character/kinematic.js",
+        why: "imported by camera/camera.js and by camera/cameraBoom.js (the boom reuses the character's kinematic box sweep)" }),
+    Object.freeze({ module: "ui/pick.mjs",
+        why: "984157d3: the target-scoring utility the npc audit's third cluster needed; simulation/Kaiju.js, KaijuManager.js, KaijuRivalry.js and OgreScenario.js import it" }),
+    Object.freeze({ module: "world/splatVoxelWorld.mjs",
+        why: "1c8785b0 (splat collision): a splat cloud as a voxel world the walker stands in; main.js imports it directly" }),
 ]);
 export const REACH_LOST_SINCE_V4407 = Object.freeze([]);
 

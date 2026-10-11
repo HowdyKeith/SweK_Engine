@@ -44,13 +44,20 @@
 // v4825 SABOTAGES, each RED on its own row and restored: geode's spinPhase handed kp 0 (the cadence census --
 // a route with no coefficient is no cadence); tempest's THINKING read inline off uniforms.stateIndex instead of
 // THINK (the raw-uniform row, stateIndex 5); tempest's energy put back on VOICE (the 42/21 code count).
+// v4829 -- section 1's arc row allows at most 4 bytes off by 1: mh_out's dither puts pixels on rounding edges, and
+// two conditioned levels equal to float precision can land either side of one (measured: 1 byte). SABOTAGE,
+// restored: arc's voice read as the raw knob -> RED.
+// v4829 -- comet's r0 moved from VOICE to PACE, duet's separation took pace, and chorus's period and sol's
+// granulation left for integrals: 41 voice readers, 21 cadence. sweep has a ninth reader (limn's lap). chorus
+// is the fourth builder to reach its cadence by a named route, the host's breath integral. SABOTAGE, restored:
+// chorus's breath back on uniforms.time / 8.4 -> RED (the route row).
 "use strict";
 
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { renderSpecies, ENG, VOICE, ACTIVITY, VOICE_LIVE, PACE_LIVE } from "./murmurSpeciesFrames.mjs";
-import { mhLive, MH_SETTLED, MH_SETTLED_INTERIOR, MH_IGNITE, MH_OPAL_DRIVE, MH_SPIN_DRIVE } from "../../render/murmurKit.mjs";
+import { mhLive, MH_SETTLED, MH_SETTLED_INTERIOR, MH_IGNITE, MH_OPAL_DRIVE, MH_SPIN_DRIVE, MH_CHORUS } from "../../render/murmurKit.mjs";
 import { codeOnly } from "./sourceScan.mjs";
 
 let fails = 0;
@@ -125,8 +132,12 @@ if (!run.ok) {
             `bytes differ, worst ${eq.mx}` + (near ? `; against the 0.5-exponent partner ${L_SQRT.toFixed(6)}, ` +
             `${near.n} bytes differ, worst ${near.mx}, total ${near.sum}` : ""));
         ok(`!! *** ${name}: THE EXPONENT IS 0.65 AND THE RESTING WEIGHT IS 0.55, TO THE BYTE ***`,
-            eq.n === 0 && (near === null || near.sum > 2000),
-            `${eq.n} differing bytes between the two frames -- a level of ${L_LISTEN} conditioned in LISTENING ` +
+            // v4829: AT MOST ONE CODE VALUE ON A HANDFUL OF BYTES, where it had been zero. The two conditioned levels
+            // are equal to float precision (pow, a few ulp apart), and mh_out's dither -- deterministic per pixel --
+            // now puts some pixels within an ulp of a rounding edge, so such a pixel can land either side. MEASURED: 1
+            // byte of 9,216, off by 1. A shader reading the raw knob moves thousands, which is what the row is about.
+            eq.n <= 4 && eq.mx <= 1 && (near === null || near.sum > 2000),
+            `${eq.n} differing bytes (worst ${eq.mx}) between the two frames -- a level of ${L_LISTEN} conditioned in LISTENING ` +
             `and ${L_PARTNER.toFixed(6)} conditioned in IDLE are the same number, so they are the same picture. ` +
             (near ? `The near-miss a square-root port would need, ${L_SQRT.toFixed(6)}, disagrees by ${near.sum} ` +
                     `across ${near.n} bytes: the row is not passing because both frames are dark. ` : "") +
@@ -245,8 +256,12 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
     // v4825: 42 and 21 -- tempest's energy LOST its 0.85 * VOICE (tempest.ts reads pace, think and drive, not
     // voice), and the cadence gained six: tempest's energy, nebula's fold and its drift factor, droplet's
     // tremor, fathom's spin and the shared spinPhase helper's own rate.
-    ok("!! the conditioned pair is declared once each and read 42 and 21 times, counting CODE and not comments",
-        decl === 2 && readV === 42 && readP === 21,
+    // v4829: 41 and 21 -- comet's orbit radius took comet.ts:73's live.pace where the port read VOICE (one voice
+    // reader becomes a cadence one), duet's separation took duet.ts:76's (1 - 0.14 * live.pace), and two cadence
+    // readers LEFT the shader for integrals: chorus's breath period (the host's chorusBreathInt) and sol's
+    // granulation clock (paceInt). +2 -2: the cadence count holds at 21 with four of its sites changed.
+    ok("!! the conditioned pair is declared once each and read 41 and 21 times, counting CODE and not comments",
+        decl === 2 && readV === 41 && readP === 21,
         `${readV} readers of the conditioned voice and ${readP} of the conditioned cadence, with comments and ` +
         `strings stripped. The cadence count has moved in each of the last three rounds -- 11, then 14, then 15 ` +
         `-- and every step was an ABSENCE being filled rather than a number being invented: helix's climb ` +
@@ -261,7 +276,7 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
     const readSe = cc(/\bSETTLED\b/g) - 1, readC = cc(/\bCOMPLETE\b/g) - 1, readSw = cc(/\bSWEEP\b/g) - 1;
     const igAt = cc(/\bigniteAt\b/g) - 1, igMist = cc(/\bigniteMist\b/g) - 1;
     ok("!! *** mh_state's THREE WIRED OUTPUTS ARE DECLARED ONCE EACH AND LAND ON EXACTLY THE SITES murmur HAS ***",
-        declS === 3 && readSe === 4 && readC === 24 && readSw === 8 && igAt === 6 && igMist === 2,
+        declS === 3 && readSe === 4 && readC === 24 && readSw === 9 && igAt === 6 && igMist === 2,
         `settled ${readSe} readers -- the shared interior factor, comet's headBright, droplet's coreBright and ` +
         `(since v4825) limn's RIM, where limn.ts carries its settle -- ` +
         `which is murmur's nineteen sites collapsed onto the three shapes they take; complete ${readC} at ` +
@@ -281,7 +296,8 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
         `moved nothing until v4660 gave them theirs. sweep ${readSw} -- the shell, the four axis fronts, and ` +
         `v4660's three: aura's angle, fathom's turn and comet's trail length, which is the one figure in the ` +
         `roster that reads the sweep under its own guard rather than through a figure (since v4825, under ` +
-        `complete > 0.001, as comet.ts writes it -- before that it read the sweep unguarded). The ` +
+        `complete > 0.001, as comet.ts writes it -- before that it read the sweep unguarded) -- and since ` +
+        `v4829 limn's extra LAP, limn.ts:73's phi0 += st.sweep * 2 pi, "so the ignition travels". The ` +
         `shell itself is ` +
         `spelled ONCE, as igniteAt, called from ${igAt} sites covering seven species because nebula and ` +
         `tempest share igniteMist, which is called ${igMist} times. murmur writes those four lines out seven ` +
@@ -331,15 +347,21 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
         geode: /spinPhase\(\{[^}]*kp:\s*SG\.kp/.test(blkOf("geode")) && MH_SPIN_DRIVE.geode.kp > 0 &&
             /const sp = float\(1\.0\)\.add\(PACE\.mul\(kp\)\)/.test(code),
         droplet: /species === "droplet"\s*\?\s*PACE\.mul\(0\.012/.test(src),   // src, not code: codeOnly blanks the string
+        // v4829 -- chorus's one cadence site is its breath PERIOD, and its phase is the host's integral of 1 / per
+        // now (chorus.ts:104 spells 2 pi t / per, which jumps all seven voices when pace moves)
+        chorus: /uniforms\.chorusBreathInt\.mul\(2 \* Math\.PI\)/.test(blkOf("chorus")) && MH_CHORUS.perPace > 0 &&
+            /chorusBreathInt \+= dPhase \/ \(MH_CHORUS\.perB - MH_CHORUS\.perPace \* lv\.pace\)/.test(
+                fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbState.mjs"), "utf8")),
     };
     const cadenced = ALL.filter((n) => paced.includes(n) || routes[n]);
-    ok("!! *** murmur GIVES A CADENCE TO ALL EIGHTEEN AND SO DOES THIS PORT -- seventeen builders, three by a named route ***",
-        cadenced.length === ALL.length && ALL.length === MURMUR_PACED - 1 && unpaced.length === 3 &&
-        ["droplet", "opal", "geode"].every((n) => unpaced.includes(n) && routes[n]),
+    ok("!! *** murmur GIVES A CADENCE TO ALL EIGHTEEN AND SO DOES THIS PORT -- seventeen builders, four by a named route ***",
+        cadenced.length === ALL.length && ALL.length === MURMUR_PACED - 1 && unpaced.length === 4 &&
+        ["droplet", "opal", "geode", "chorus"].every((n) => unpaced.includes(n) && routes[n]),
         `${cadenced.length} of ${ALL.length} builders (${MURMUR_PACED} species, since mist draws nebula and ` +
         `tempest). ${paced.length} read PACE in their own body; ${unpaced.join(", ")} reach it by route: ` +
         `opal through ratePhase's pace coefficient ${MH_OPAL_DRIVE.pace}, geode through spinPhase's kp ` +
-        `${MH_SPIN_DRIVE.geode.kp}, droplet through the shared tremor 0.012 * PACE. The v4825 five were the ` +
+        `${MH_SPIN_DRIVE.geode.kp}, droplet through the shared tremor 0.012 * PACE, and (v4829) chorus through the ` +
+        `host's breath integral, the integral of 1 / (${MH_CHORUS.perB} - ${MH_CHORUS.perPace.toFixed(2)} * pace). The v4825 five were the ` +
         `last: mist (tempest's energy, nebula's fold and drift), fathom and geode (their spins, which murmur ` +
         `scales by 1 + kp*pace + kd*drive and MIXES toward a target by m*drive), opal (its flash drift) and ` +
         `droplet (its tremor). THE ROW USED TO SAY SIX WAS THE WHOLE DESIGN, then counted the port up to ` +
@@ -407,14 +429,15 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
     const driveDecl = (code.match(/const DRIVE = /g) || []).length;
     ok("!! *** ALL FOUR OF mh_state's OUTPUTS ARE READ NOW -- drive was the last, and it is declared once ***",
         rawT === 1 && /KIT\.mhState\(uniforms\.stateIndex,\s*uniforms\.stateTau\)/.test(src) &&
-        readSe === 4 && readC === 24 && readSw === 8 && driveDecl === 1 && drive - 1 >= 10,
+        readSe === 4 && readC === 24 && readSw === 9 && driveDecl === 1 && drive - 1 >= 10,
         `stateTau is read ${rawT} time, by mh_state, and mh_state's four outputs now reach ` +
         `${readSe + readC + readSw + (drive - 1)} sites between them: settled ${readSe}, complete ${readC}, ` +
-        `sweep ${readSw}, and drive ${drive - 1} from one declaration. THE FOURTH WAS THE LARGEST AND ONLY ` +
-        `PART OF IT IS HERE: murmur spends st.drive at 45 sites doing three different things, and v4653 ` +
-        `wired the two that are a DIRECTION or a SIZE and left the sixteen that multiply a local clock. ` +
-        `That deferral is not stated here and hoped for -- tools/ship/murmurDrive-selfcheck.mjs checks that ` +
-        `no line in the shader reads both DRIVE and uniforms.time.`);
+        `sweep ${readSw}, and drive ${drive - 1} from one declaration. THE FOURTH WAS THE LARGEST: murmur ` +
+        `spends st.drive doing three different things, and v4653 wired the two that are a DIRECTION or a ` +
+        `SIZE; the sixteen that multiply a local clock followed at v4654-v4657 on the integrated clock ` +
+        `(driveInt), and v4829's full read added the last drive terms it found (aura, flux, duet, prism, arc). ` +
+        `(v4829: this sentence still said those sixteen were left.) tools/ship/murmurDrive-selfcheck.mjs checks ` +
+        `that no line in the shader reads both DRIVE and uniforms.time.`);
 
     // The per-species tables have to be READ and not merely imported, or MH_IGNITE is a table the shader
     // agrees with by coincidence. Seven entries, eleven species without one, and the eleven build no nodes.

@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "0a8d63e83bc4aee7219b4c3a4add85802a356421",
+ "head": "131ea1bbe3646d89bee5e915f1a404dd9e1a829b",
  "bodies": {
   "box3d": [
    {
@@ -721,8 +721,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3514904,
-    "sha": "ec20d5c77a43bae5dcae443d01d16262024f1612"
+    "bytes": 3519557,
+    "sha": "131ea1bbe3646d89bee5e915f1a404dd9e1a829b"
    },
    {
     "path": "mpm3d.html",
@@ -923,7 +923,7 @@
   "three-webgpu": [
    {
     "path": "ai-presence-orb.html",
-    "bytes": 11946,
+    "bytes": 12018,
     "sha": "89b9999f0689caa4ea19a97fdd7d1d3c923d950d"
    },
    {
@@ -1273,7 +1273,7 @@
    },
    {
     "path": "ui/aiPresenceOrbWidget.js",
-    "bytes": 18817,
+    "bytes": 18889,
     "sha": "89b9999f0689caa4ea19a97fdd7d1d3c923d950d"
    }
   ],
