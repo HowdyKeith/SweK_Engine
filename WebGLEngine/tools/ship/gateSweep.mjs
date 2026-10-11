@@ -8900,6 +8900,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         redOnArrival: Object.freeze([]),
         widened: Object.freeze([
             "tools/ship/threeUpstream-selfcheck.mjs (section 6: the sixteen stack in slot order -- no context line is a line an earlier patch removes, import lines apart)",
+            "tools/ship/shipVerdict-selfcheck.mjs (section 8: after a SHIP the verdict names step 4b with afterVerdict's plan count; the verdict line stays last)",
         ]),
         verdict: "*** NOTHING THREE MERGED IN 107 COMMITS FIXES ANY OF THE SIXTEEN, AND THREE PATCHES HAD TO BE MADE AGAIN FOR THREE REASONS. *** " +
                  "On dev 11738a9 every reproduction prints what it printed on 576b084 -- r186, dev, its own patch, all sixteen. 04 and 06 " +

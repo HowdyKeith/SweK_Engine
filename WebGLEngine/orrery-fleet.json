@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "5c0068595d5b96ad1d9136f90a5e1952440f11a2",
+ "head": "b9e53dc30371ed286a119c7eb57eba8b9e42083e",
  "bodies": {
   "box3d": [
    {
@@ -721,8 +721,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3537518,
-    "sha": "5c0068595d5b96ad1d9136f90a5e1952440f11a2"
+    "bytes": 3538542,
+    "sha": "aff5ba3934aa930e51f9f8631108e51f72c7f4aa"
    },
    {
     "path": "mpm3d.html",
@@ -1219,7 +1219,7 @@
    {
     "path": "tools/ship/threeUpstream-selfcheck.mjs",
     "bytes": 68423,
-    "sha": "6b7e4579f4006952a2a688062ad9035f7c4311c2"
+    "sha": "aff5ba3934aa930e51f9f8631108e51f72c7f4aa"
    },
    {
     "path": "tools/ship/tsl-selfcheck.mjs",
@@ -1281,12 +1281,12 @@
    {
     "path": "tools/ship/threePatch.mjs",
     "bytes": 21567,
-    "sha": "108bd2aed5dd03dc7d8f85be07230b46c8225bee"
+    "sha": "aff5ba3934aa930e51f9f8631108e51f72c7f4aa"
    },
    {
     "path": "tools/ship/threeUpstream-selfcheck.mjs",
     "bytes": 68423,
-    "sha": "6b7e4579f4006952a2a688062ad9035f7c4311c2"
+    "sha": "aff5ba3934aa930e51f9f8631108e51f72c7f4aa"
    }
   ],
   "wasm": [
