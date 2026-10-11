@@ -1,0 +1,289 @@
+{
+ "at": "2026-10-11T13:37:24.192Z",
+ "platform": "win32 10.0.22631 x64",
+ "node": "v24.15.0",
+ "commit": "7698a4cf 2026-10-11 Denoiser arc, section 56 -- round 16 stopped at 30 minutes on both GPUs; edge \"zero\" and a build pro",
+ "capSeconds": 180,
+ "native": [
+  {
+   "id": "fast-32",
+   "what": "the fast kernel, 32 -> 32 at 3 x 3: the baseline",
+   "cfg": null,
+   "seconds": 4.85,
+   "dumpFile": "C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-denoise-probe-dump-fast-32.txt",
+   "built": true,
+   "buildMs": 3546.6283000000003,
+   "passMs": 0.131072,
+   "passes": 30,
+   "clock": "device",
+   "exact": true,
+   "detail": "131072 plain, 0 fused, 0 unexplained",
+   "adapter": "nvidia / pascal / D3D12 driver version 32.0.15.8180",
+   "dump": {
+    "compiler": "FXC (DXBC)",
+    "lines": 537,
+    "loops": 6,
+    "indexableTemps": 0,
+    "barriers": 3
+   }
+  },
+  {
+   "id": "tile2-zero-32",
+   "what": "2 pixels x 8 vec4s, edge zero, 32 -> 32",
+   "cfg": {
+    "px": 2,
+    "g4": 8,
+    "edge": "zero"
+   },
+   "seconds": 180.092,
+   "dumpFile": "C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-denoise-probe-dump-tile2-zero-32.txt",
+   "built": false,
+   "stopped": true,
+   "reason": "stopped at the 180 s cap"
+  },
+  {
+   "id": "tile4-zero-32",
+   "what": "4 pixels x 4 vec4s, edge zero, 32 -> 32",
+   "cfg": {
+    "px": 4,
+    "g4": 4,
+    "edge": "zero"
+   },
+   "seconds": 180.08,
+   "dumpFile": "C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-denoise-probe-dump-tile4-zero-32.txt",
+   "built": false,
+   "stopped": true,
+   "reason": "stopped at the 180 s cap"
+  },
+  {
+   "id": "tile2g4-zero-32",
+   "what": "2 pixels x 4 vec4s (the fast kernel's accumulator count), edge zero, 32 -> 32",
+   "cfg": {
+    "px": 2,
+    "g4": 4,
+    "edge": "zero"
+   },
+   "seconds": 180.081,
+   "dumpFile": "C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-denoise-probe-dump-tile2g4-zero-32.txt",
+   "built": false,
+   "stopped": true,
+   "reason": "stopped at the 180 s cap"
+  },
+  {
+   "id": "tile2-zero-10",
+   "what": "2 pixels x 8 vec4s, edge zero, the first layer's 10 -> 32",
+   "cfg": {
+    "px": 2,
+    "g4": 8,
+    "edge": "zero"
+   },
+   "seconds": 146.504,
+   "dumpFile": "C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-denoise-probe-dump-tile2-zero-10.txt",
+   "built": true,
+   "buildMs": 144782.9503,
+   "passMs": 19.98848,
+   "passes": 30,
+   "clock": "device",
+   "exact": true,
+   "detail": "131072 plain, 0 fused, 0 unexplained",
+   "adapter": "nvidia / pascal / D3D12 driver version 32.0.15.8180",
+   "dump": {
+    "compiler": "FXC (DXBC)",
+    "lines": 9527,
+    "loops": 6,
+    "indexableTemps": 0,
+    "barriers": 3
+   }
+  },
+  {
+   "id": "tile4-zero-10",
+   "what": "4 pixels x 4 vec4s, edge zero, the first layer's 10 -> 32",
+   "cfg": {
+    "px": 4,
+    "g4": 4,
+    "edge": "zero"
+   },
+   "seconds": 38.965,
+   "dumpFile": "C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-denoise-probe-dump-tile4-zero-10.txt",
+   "built": true,
+   "buildMs": 37733.8108,
+   "passMs": 5.308416,
+   "passes": 30,
+   "clock": "device",
+   "exact": true,
+   "detail": "131072 plain, 0 fused, 0 unexplained",
+   "adapter": "nvidia / pascal / D3D12 driver version 32.0.15.8180",
+   "dump": {
+    "compiler": "FXC (DXBC)",
+    "lines": 5335,
+    "loops": 6,
+    "indexableTemps": 0,
+    "barriers": 3
+   }
+  },
+  {
+   "id": "tile1-skip-32",
+   "what": "1 pixel x 8 vec4s, edge skip: the guarded copy at the fast kernel's accumulator count",
+   "cfg": {
+    "px": 1,
+    "g4": 8,
+    "edge": "skip"
+   },
+   "seconds": 180.11,
+   "dumpFile": "C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-denoise-probe-dump-tile1-skip-32.txt",
+   "built": false,
+   "stopped": true,
+   "reason": "stopped at the 180 s cap"
+  },
+  {
+   "id": "tile2g4-skip-32",
+   "what": "2 pixels x 4 vec4s, edge skip",
+   "cfg": {
+    "px": 2,
+    "g4": 4,
+    "edge": "skip"
+   },
+   "seconds": 180.136,
+   "dumpFile": "C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-denoise-probe-dump-tile2g4-skip-32.txt",
+   "built": false,
+   "stopped": true,
+   "reason": "stopped at the 180 s cap"
+  },
+  {
+   "id": "tile2-skip-32",
+   "what": "r16a's kernel as section 54 shipped it: 2 pixels x 8 vec4s, edge skip",
+   "cfg": {
+    "px": 2,
+    "g4": 8,
+    "edge": "skip"
+   },
+   "seconds": 180.228,
+   "dumpFile": "C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-denoise-probe-dump-tile2-skip-32.txt",
+   "built": false,
+   "stopped": true,
+   "reason": "stopped at the 180 s cap"
+  },
+  {
+   "id": "tile4-skip-32",
+   "what": "r16b's kernel as section 54 shipped it: 4 pixels x 4 vec4s, edge skip",
+   "cfg": {
+    "px": 4,
+    "g4": 4,
+    "edge": "skip"
+   },
+   "seconds": 180.174,
+   "dumpFile": "C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-denoise-probe-dump-tile4-skip-32.txt",
+   "built": false,
+   "stopped": true,
+   "reason": "stopped at the 180 s cap"
+  }
+ ],
+ "browser": {
+  "ok": true,
+  "pageErrors": [],
+  "adapter": "google / swiftshader",
+  "error": null,
+  "rows": [
+   {
+    "id": "fast-32",
+    "built": true,
+    "buildMs": 395.59999999403954,
+    "passMs": 47.1107,
+    "passes": 30,
+    "clock": "device",
+    "exact": true,
+    "detail": "131072 plain, 0 fused, 0 unexplained"
+   },
+   {
+    "id": "tile2-zero-32",
+    "built": true,
+    "buildMs": 688.2000000178814,
+    "passMs": 30.255,
+    "passes": 30,
+    "clock": "device",
+    "exact": true,
+    "detail": "131072 plain, 0 fused, 0 unexplained"
+   },
+   {
+    "id": "tile4-zero-32",
+    "built": true,
+    "buildMs": 1111.300000011921,
+    "passMs": 23.9842,
+    "passes": 30,
+    "clock": "device",
+    "exact": true,
+    "detail": "131072 plain, 0 fused, 0 unexplained"
+   },
+   {
+    "id": "tile2g4-zero-32",
+    "built": true,
+    "buildMs": 588.5,
+    "passMs": 30.8095,
+    "passes": 30,
+    "clock": "device",
+    "exact": true,
+    "detail": "131072 plain, 0 fused, 0 unexplained"
+   },
+   {
+    "id": "tile2-zero-10",
+    "built": true,
+    "buildMs": 710,
+    "passMs": 11.8306,
+    "passes": 30,
+    "clock": "device",
+    "exact": true,
+    "detail": "131072 plain, 0 fused, 0 unexplained"
+   },
+   {
+    "id": "tile4-zero-10",
+    "built": true,
+    "buildMs": 1169,
+    "passMs": 11.0567,
+    "passes": 30,
+    "clock": "device",
+    "exact": true,
+    "detail": "131072 plain, 0 fused, 0 unexplained"
+   },
+   {
+    "id": "tile1-skip-32",
+    "built": true,
+    "buildMs": 471.59999999403954,
+    "passMs": 47.0299,
+    "passes": 30,
+    "clock": "device",
+    "exact": true,
+    "detail": "131072 plain, 0 fused, 0 unexplained"
+   },
+   {
+    "id": "tile2g4-skip-32",
+    "built": true,
+    "buildMs": 656.5,
+    "passMs": 40.4382,
+    "passes": 30,
+    "clock": "device",
+    "exact": true,
+    "detail": "131072 plain, 0 fused, 0 unexplained"
+   },
+   {
+    "id": "tile2-skip-32",
+    "built": true,
+    "buildMs": 865,
+    "passMs": 38.9604,
+    "passes": 30,
+    "clock": "device",
+    "exact": true,
+    "detail": "131072 plain, 0 fused, 0 unexplained"
+   },
+   {
+    "id": "tile4-skip-32",
+    "built": true,
+    "buildMs": 1262.6000000238419,
+    "passMs": 38.7615,
+    "passes": 30,
+    "clock": "device",
+    "exact": true,
+    "detail": "131072 plain, 0 fused, 0 unexplained"
+   }
+  ]
+ }
+}
