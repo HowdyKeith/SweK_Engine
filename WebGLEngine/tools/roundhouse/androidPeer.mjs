@@ -97,6 +97,19 @@ export const DEP_CLASSIFICATION = {
     "@modelcontextprotocol/sdk": { kind: "pure-js", note: "TypeScript compiled to JS; would run on bionic fine. Optional because tools/mcp/physicsAi.mjs is a rig-only shim -- no selfcheck path awaits it, so an absent SDK stays green" },
     "ffmpeg-static":      { kind: "binary",  note: "prebuilt ffmpeg; no android binary; skipped by --omit=optional" },
     "puppeteer-core":     { kind: "pure-js", note: "pure JS, but drives a desktop Chrome that is not there; optional" },
+    // v4778 -- the rtx merge added these three to ai-bridge's optionalDependencies and NOT to this table, the
+    // same rot v4072 caught. All three are "native": each resolves to a per-platform npm package holding a
+    // compiled .node addon (skia.linux-x64-gnu.node, clipboard.linux-x64-gnu.node, webcodecs.linux-x64-gnu.node
+    // on this box), prebuilt by napi-rs, so there is no gyp step even when installed -- VERIFIED against the
+    // installed tree: no "gypfile" under any of the six packages. Every caller requires it lazily inside a
+    // try/catch; canvas and webcodecs then report available:false, and typeBridge.js falls back to xclip for
+    // the clipboard (available:false only when xclip is missing too). tools/ship/qrBridge-selfcheck.mjs and
+    // webcodecsFramesToMp4-selfcheck.mjs SKIP their rendering sections by name, so --omit=optional costs
+    // features, not a crash. Which ones have an android build is read from each package's own
+    // optionalDependencies, not tried on a phone.
+    "@napi-rs/canvas":    { kind: "native",  note: "Skia as a prebuilt .node addon (MIT); canvasBridge.js, qrBridge.js and the webcodecs frame decode. Its manifest lists @napi-rs/canvas-android-arm64, so Termux may get one -- untested" },
+    "@napi-rs/clipboard": { kind: "native",  note: "prebuilt .node addon (MIT); typeBridge.js's clipboard set, required lazily and only on Linux. No android package in its manifest, so absent under Termux" },
+    "@napi-rs/webcodecs": { kind: "native",  note: "prebuilt .node addon bundling FFmpeg; webcodecsBridge.js. The wrapper is MIT; that file records a statically linked GPL libx264 in the binary as an open licensing question. No android package in its manifest, so absent under Termux" },
 };
 
 export function readBridgeManifest(root = ENGINE_ROOT) {

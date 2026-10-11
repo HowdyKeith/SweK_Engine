@@ -82,10 +82,53 @@ function expandRecurrent(Wrec) {
 }
 
 /**
+ * layersOf(), memoised per weight vector -- brain/gunnerPolicy.mjs's own v4778 memo and masked step (see that file's
+ * memoOf()/maskedStep() comments for the full exactness argument), applied here because this file had the same waste.
+ * v4778 (2026-10-04): Keith's rig listed tools/ship/pilotPolicy-selfcheck.mjs newly over the quick sweep's budget; a
+ * --cpu-prof of its section 4 training (3 x train(), 25 iters, 2 seeds, 20 s duels: 3,518 ms) put 32.4 % of the run in
+ * expandRecurrent() and another 11.0 % in its forEach callback, plus 36.9 % self time in forward() -- pilotFor() called
+ * forward() every tick, and forward() rebuilt the whole HIDDEN x HIDDEN matrix, four subarray views and the layer objects
+ * each time, for a weight vector that never changes within a duel. Keyed on the vector object AND checked against a
+ * snapshot of its REC_EDGES recurrent weights, so a caller that edits a vector in place still gets a fresh expansion; the
+ * encoder and decoder are live views of the vector either way. The returned list and its matrices are shared between
+ * calls and read-only to callers. A recurrent weight's sign of zero never reaches the matrix (1 + -0 = 1, +0 + -0 = +0),
+ * so the snapshot's === is exact. The entry also keeps the matrix's nonzero columns per row, ascending, for maskedStep().
+ */
+const LAYERS_MEMO = new WeakMap(), REC_OFFSET = FEATURES * HIDDEN + HIDDEN;
+function memoOf(w) {
+    const m = LAYERS_MEMO.get(w);
+    if (m) { let k = 0; while (k < REC_EDGES && m.snap[k] === w[REC_OFFSET + k]) k++; if (k === REC_EDGES) return m; }
+    const layers = splitLayers(w), rec = layers[1], rowStart = new Int32Array(HIDDEN + 1), cols = [];
+    for (let o = 0; o < HIDDEN; o++) { rowStart[o] = cols.length; for (let k = 0; k < HIDDEN; k++) if (rec.W[o * HIDDEN + k] !== 0) cols.push(k); }
+    rowStart[HIDDEN] = cols.length;
+    const entry = { snap: Float32Array.from(w.subarray(REC_OFFSET, REC_OFFSET + REC_EDGES)), layers, rec, rowStart, cols: Int32Array.from(cols) };
+    LAYERS_MEMO.set(w, entry);
+    return entry;
+}
+
+/**
+ * One recurrent step, relu(Wm @ h), over the matrix's nonzero entries only -- the SAME float32 values mlpLayerCpu returns:
+ * it walks k upward with f(acc + f(x[k] * W[k])), a zero weight on a FINITE x[k] adds +-0, which leaves a nonzero acc
+ * unchanged and can only flip the sign of a zero one, and the relu (max(-0, 0) = +0) erases that. A NON-finite input is
+ * exactly where it is not exact (Infinity * 0 = NaN), so any non-finite input takes mlpLayerCpu's dense path.
+ */
+function maskedStep(layer, rowStart, cols, x) {
+    for (let k = 0; k < HIDDEN; k++) if (!Number.isFinite(x[k])) return mlpLayerCpu(layer, x, 1);
+    const f = Math.fround, W = layer.W, y = new Float32Array(HIDDEN);
+    for (let o = 0; o < HIDDEN; o++) {
+        const woff = o * HIDDEN; let acc = f(layer.b[o]);
+        for (let j = rowStart[o]; j < rowStart[o + 1]; j++) { const k = cols[j]; acc = f(acc + f(f(x[k]) * f(W[woff + k]))); }
+        y[o] = f(Math.max(acc, 0));
+    }
+    return y;
+}
+
+/**
  * Split a flat weight vector into the sequence mlpLayerCpu applies in order: the encoder (7 -> 34, dense, relu), REC_STEPS
  * weight-tied copies of the connectome-masked recurrent layer (34 -> 34, relu), and the decoder (34 -> 4, none).
  */
-export function layersOf(w) {
+export function layersOf(w) { return memoOf(w).layers; }
+function splitLayers(w) {
     let o = 0;
     const W1 = w.subarray(o, o += FEATURES * HIDDEN), b1 = w.subarray(o, o += HIDDEN);
     const Wrec = w.subarray(o, o += REC_EDGES);
@@ -101,9 +144,9 @@ export function layersOf(w) {
 /** The forward pass: features -> [turn, pitch, thrust, firing] in [-1, 1], through the encoder, the connectome-masked
  *  recurrent core, and the decoder; thrust/firing are honoured when their output is positive (pilotFor's own rule). */
 export function forward(w, x) {
-    const layers = layersOf(w);
+    const { layers, rec, rowStart, cols } = memoOf(w);
     let h = Float32Array.from(x);
-    for (let i = 0; i < layers.length - 1; i++) h = mlpLayerCpu(layers[i], h, 1);
+    for (let i = 0; i < layers.length - 1; i++) h = layers[i] === rec ? maskedStep(rec, rowStart, cols, h) : mlpLayerCpu(layers[i], h, 1);
     const y = mlpLayerCpu(layers[layers.length - 1], h, 1);
     return [Math.tanh(y[0]), Math.tanh(y[1]), Math.tanh(y[2]), Math.tanh(y[3])];
 }
@@ -202,6 +245,7 @@ function startGeom(seed, gap) {
  * ONE-ON-ONE: the candidate pilot (team A, weights `w`) against `opponent`'s pilot (team B), `seconds` in physics/esBox3d.js's
  * fly3d mode on the headless planar-fallback substrate. `opponent` is "scripted" (ev/flightModel3d.js's own stepAI3d, the
  * default -- the AI already flying this demo), "hand" (this module's own handWeights()), or "zero" (never turns or fires).
+ * v4829: `opponent` may also be a weight vector (a Float32Array of pilotFor's length), flown as team B's pilot; the result then reports opponent "weights".
  * `altOffset` (default 0) shifts BOTH ships' starting altitude by the same amount -- their altitude DIFFERENCE, and so every
  * yaw/pitch/thrust/fire decision either pilot makes, is unchanged, but the two runs occupy different absolute altitude. A
  * gate uses this to isolate whether the fingerprint actually sees altitude, independent of any behavior difference.
@@ -213,7 +257,7 @@ export function duel(worldFrom, w, { seed = 1, seconds = 30, standoff = 140, ran
     const a = makeDuelShip("A", "A", g.ax, 0, g.aAlt + altOffset, g.aHead), b = makeDuelShip("B", "B", g.bx, 0, g.bAlt + altOffset, g.bHead);
     const ra = esbx.add(a, STATS), rb = esbx.add(b, STATS);
     const pilotA = pilotFor(w);
-    const pilotB = opponent === "hand" ? pilotFor(handWeights()) : opponent === "zero" ? pilotFor(zeroWeights()) : null;   // null -> the original scripted AI
+    const pilotB = opponent === "hand" ? pilotFor(handWeights()) : opponent === "zero" ? pilotFor(zeroWeights()) : (opponent && typeof opponent === "object") ? pilotFor(opponent) : null;   // v4829: a weight VECTOR is a pilot too (brain/pilotRoster.mjs flies any weights against any); null -> the original scripted AI
     const dt = 1 / 30, steps = Math.round(seconds / dt);
     let shots = [], nowMs = 0, h = 0x811c9dc5, t = 0;
     const tally = { hits: 0, shotsFired: 0, damageDealt: 0, damageTaken: 0 };
@@ -250,7 +294,7 @@ export function duel(worldFrom, w, { seed = 1, seconds = 30, standoff = 140, ran
     }
     esbx.destroy();   // esBox3d.js's own destroy() already guards world.destroy not existing (planarFallbackWorld.js has none)
     const score = tally.hits * REWARD.hit - tally.shotsFired * REWARD.waste - tally.damageTaken * REWARD.damageTaken + (b.dead ? REWARD.kill : 0);
-    return { ...tally, aDead: a.dead, bDead: b.dead, score, ticks: t, seed, opponent, fingerprint: (h >>> 0).toString(16).padStart(8, "0") };
+    return { ...tally, aDead: a.dead, bDead: b.dead, score, ticks: t, seed, opponent: typeof opponent === "string" ? opponent : "weights", fingerprint: (h >>> 0).toString(16).padStart(8, "0") };
 }
 
 /** The mean duel score of a pilot over track seeds, against `opts.opponent` (default: the scripted AI it replaces). */

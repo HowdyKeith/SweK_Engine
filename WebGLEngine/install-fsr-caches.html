@@ -1,0 +1,128 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<title>Install FSR caches (opt-in)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="demo:desc" content="Install FSR caches (opt-in): the frame-generation measurement data the release zip leaves out -- twelve harvested caches, about 300 MB -- downloaded from the release tag into WebGLEngine/fsr-caches/ and kept only when each file's sha256 matches the manifest. Only the H3-H16 measurement gates read them; nothing at runtime does.">
+<!-- v4778 -- Keith: "Can we put the FSR frame caches in its own repo folder, and access /install from there if the
+     user chooses? So there would be an install FSR caches page." This is that page. It reads GET /install/fsr-caches
+     (tools/ship/fsrCaches.mjs, forwarded by ai-bridge/server.js) and POSTs the same route to install. It downloads
+     NOTHING on load: the cost is on screen before the button does anything. -->
+<style>
+  :root { --bg:#070b11; --ink:#cfe0f2; --dim:#7690ad; --line:#16283c; --ok:#4e9e78; --hot:#d9695f; --warn:#c8a24e; }
+  * { box-sizing:border-box }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.6 system-ui,-apple-system,Segoe UI,Roboto,sans-serif }
+  .wrap { max-width:960px; margin:0 auto; padding:26px 16px 60px }
+  h1 { font-size:20px; margin:0 0 4px } .sub { color:var(--dim); font-size:12.5px; margin:0 0 20px }
+  .card { border:1px solid var(--line); border-radius:10px; padding:15px 16px; margin-bottom:14px; background:#050a12 }
+  h2 { font-size:14px; margin:0 0 9px; color:#9fc4e6 }
+  .note { color:var(--dim); font-size:12px; margin:0 0 10px }
+  .scroll { overflow-x:auto }
+  table { border-collapse:collapse; width:100%; font-size:12.5px }
+  th { text-align:left; color:var(--dim); font-weight:normal; padding:4px 8px 4px 0; border-bottom:1px solid var(--line) }
+  td { padding:5px 8px 5px 0; vertical-align:top; border-bottom:1px solid #0d1826 }
+  td.n { white-space:nowrap; text-align:right }
+  code { color:#9fd7ff; font-size:11.5px; word-break:break-all }
+  .yes { color:var(--ok) } .no { color:var(--hot) } .unk { color:var(--warn) }
+  button { background:#12243a; color:var(--ink); border:1px solid #24405e; border-radius:7px; padding:6px 13px; cursor:pointer; font:inherit }
+  button:disabled { opacity:.4; cursor:not-allowed }
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap }
+  .big { font-size:16px; color:#e2eefa }
+  ul { margin:6px 0 0; padding-left:18px } li { margin:5px 0; font-size:12px; color:var(--dim) }
+  a { color:#5ad6ff }
+</style>
+</head><body>
+<div class="wrap">
+<h1>Install FSR caches &mdash; opt-in</h1>
+<p class="sub">The frame-generation measurement data the release zip leaves out. Nothing downloads until you press Install.</p>
+
+<div class="card">
+  <h2>What these are</h2>
+  <p class="note">fsr.html's frame generator was put through a run of pre-registered hypotheses (H1&ndash;H16): does
+  a gate, a rule or a learned model know when generating a middle frame beats cross-fading? Each one was answered
+  on per-block feature rows <b>harvested off the page itself</b> by a WebGPU browser drive
+  (<code>tools/ship/genGateTrain.mjs</code>) &mdash; minutes per scene, up to an hour per harvest. Those harvests are
+  these files. The measurement gates (<code>tools/ship/frame*Measure-selfcheck.mjs</code>,
+  <code>genGate*Measure-selfcheck.mjs</code> and their siblings) re-derive every verdict from them.</p>
+  <p class="note"><b>Nothing at runtime reads them</b> &mdash; no page, no bridge route, no engine module. Without
+  them every one of those gates prints a named SKIP that says it is <b>not a pass</b>, and the engine itself is
+  unaffected. Install them if you want to re-check the FSR arc's claims on this machine.</p>
+</div>
+
+<div class="card">
+  <h2>On this machine</h2>
+  <div class="row"><span class="big" id="summary">asking the bridge&hellip;</span></div>
+  <p class="note" id="where"></p>
+  <div class="scroll"><table id="files"><thead><tr><th>File</th><th>For</th><th class="n">Size</th><th>Status</th></tr></thead><tbody></tbody></table></div>
+</div>
+
+<div class="card">
+  <h2>Install</h2>
+  <p class="note">Each missing or damaged file is downloaded from the release tag on GitHub
+  (<code id="src">&hellip;</code>) into a temporary name, hashed, and kept <b>only</b> when its size and sha256
+  match <code>fsr-caches/manifest.json</code>; anything else is deleted and reported. Files already present and
+  correct are not fetched again.</p>
+  <div class="row"><button id="install" disabled>Install</button> <span id="state" class="note"></span></div>
+  <div class="scroll"><table id="results" style="display:none"><thead><tr><th>File</th><th>Result</th></tr></thead><tbody></tbody></table></div>
+</div>
+
+<div class="card">
+  <h2>What this page will not do</h2>
+  <ul>
+    <li><b>Fetch a file the manifest does not name.</b> The bridge refuses any other name and never writes outside <code>WebGLEngine/fsr-caches/</code>.</li>
+    <li><b>Keep a file whose hash is wrong.</b> A truncated, corrupted or substituted download is deleted, not kept with a warning.</li>
+    <li><b>Re-harvest.</b> Regenerating these needs a WebGPU browser driving fsr.html; that is the runners' job (<code>node tools/ship/frameGate.mjs</code> and its siblings), followed by <code>node tools/ship/fsrCaches.mjs --write-manifest</code>.</li>
+  </ul>
+</div>
+</div>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const api = async (u, o) => { try { const r = await fetch(u, o); return await r.json(); } catch (e) { return { ok: false, error: String(e && e.message || e) }; } };
+const mb = (n) => (n / 1048576).toFixed(1) + " MB";
+const pill = (f) => f.state === "present" ? '<b class="yes">installed</b>'
+  : f.state === "missing" ? '<b class="unk">not installed</b>'
+  : '<b class="no">damaged</b> <span class="note">' + esc(f.why || "") + "</span>";
+let installing = false, poll = null;
+
+function render(s) {
+  const need = s.files.filter((f) => f.state !== "present");
+  $("summary").innerHTML = need.length
+    ? esc(need.length) + " of " + esc(s.files.length) + " caches to download &mdash; <b>" + esc(mb(s.missingBytes)) + "</b> of " + esc(mb(s.totalBytes))
+    : '<b class="yes">all ' + esc(s.files.length) + " caches installed</b> &mdash; " + esc(mb(s.totalBytes));
+  $("where").innerHTML = "Folder <code>WebGLEngine/" + esc(s.folder) + "/</code>, release tag <code>" + esc(s.tag || "?") + "</code>.";
+  $("src").textContent = s.base || s.source || "";
+  $("files").tBodies[0].innerHTML = s.files.map((f) =>
+    "<tr><td><code>" + esc(f.name) + "</code></td><td>" + esc(f.what) + "<br><span class='note'>read by " +
+    esc((f.readers || []).map((r) => r.split("/").pop()).join(", ") || "-") + "</span></td><td class='n'>" + esc(mb(f.bytes)) +
+    "</td><td>" + pill(f) + "</td></tr>").join("");
+  const j = s.job;
+  if (j && j.running) $("state").textContent = "downloading " + (j.current || "") + " (" + j.results.length + " done)";
+  $("install").disabled = installing || !need.length;
+}
+
+async function refresh() {
+  const s = await api("/install/fsr-caches");
+  if (!s.ok) { $("summary").innerHTML = '<b class="no">' + esc(s.error || "bridge unavailable") + "</b>"; return; }
+  render(s);
+}
+
+$("install").onclick = async () => {
+  installing = true; $("install").disabled = true;
+  $("state").textContent = "starting...";
+  poll = setInterval(refresh, 1500);
+  const r = await api("/install/fsr-caches", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+  clearInterval(poll); poll = null; installing = false;
+  if (r.results) {
+    $("results").style.display = "table";
+    $("results").tBodies[0].innerHTML = r.results.map((x) => "<tr><td><code>" + esc(x.name) + "</code></td><td>" +
+      (x.ok ? '<b class="yes">' + (x.already ? "already installed" : "installed, sha256 verified") + "</b>"
+            : '<b class="no">' + (x.refused ? "refused" : "not kept") + "</b> <span class='note'>" + esc(x.why || "") + "</span>") +
+      "</td></tr>").join("");
+  }
+  $("state").innerHTML = r.ok ? '<b class="yes">done</b>' : '<b class="no">' + esc(r.error || ((r.results || []).filter((x) => !x.ok).length + " file(s) failed")) + "</b>";
+  refresh();
+};
+
+refresh();
+</script>
+</body></html>

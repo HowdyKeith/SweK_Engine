@@ -358,16 +358,30 @@ console.log("\n7. *** EXEMPT TWICE OVER, AND THE SECOND LAYER RECORDS A CAP AS A
     // CORRECTED state, and the historical claim is kept beside them as what the file used to say rather
     // than deleted, because the reason those readings existed is the finding.
     const codes = prior.codes || {};
+    const T_FIN = prior.finished || {};
     const stillCapped = cap.filter((c) => c.recorded >= 20000 && c.recorded < 21000);
     ok("*** v4568: these gates carry a REAL runtime now, not the 20 s cap that stood in for one ***",
         cap.length > 0 && stillCapped.length === 0,
         `${cap.length} decided gates, ${stillCapped.length} still reading inside [20000, 21000). Every one of ` +
         "them held the cap until the killed bucket got a door: a reading nothing could refresh, because the " +
         "sweep skips what is over budget and the rotation walked a different bucket.");
-    ok("  ...and the recorded exit code is what the gate RETURNED, not 124 for 'gave up'",
-        cap.every((c) => codes[c.gate] !== 124),
-        `${cap.filter((c) => codes[c.gate] === 124).length} of ${cap.length} still read 124. They ran to ` +
-        "completion under KILLED_PASS_V4568 and the field holds what each returned.");
+    // *** v4637 -- `!== 124` IS A TEST ON ONE SPELLING OF THE SENTINEL, AND THE FILE HAS THREE. ***
+    // quickSweep writes 124 for a killed process; an older writer put the STRING "timeout/signal" in the same
+    // field; and `finished: false` is the fact both of those are proxies for. After v4637 restored the killed
+    // pass's readings, ELEVEN of these 42 carry the 90 s cap with "timeout/signal" beside it -- and `!== 124`
+    // would have called all forty-two clean, passing because a sentinel changed spelling. That is the exact
+    // failure this file's own header is about: a proxy read as the fact.
+    //
+    // So the row asks `finished` and both sentinels, and it no longer claims all 42. 31 ran to completion.
+    // The other 11 are members of the 37 KILLED_PASS_V4568 itself declined to claim -- "they are gates that
+    // need more than 90 seconds, and this round did not find out how much more" -- and they carry a 90 s
+    // floor, which is a lower bound four and a half times better than the 20 s one a merge had written over it.
+    const killedNow = (g) => codes[g] === 124 || typeof codes[g] === "string" || (T_FIN[g] === false);
+    const finishedNow = cap.filter((c) => !killedNow(c.gate));
+    ok(`  ...and for the ${finishedNow.length} that FINISHED the recorded exit code is what the gate RETURNED, not a sentinel for 'gave up'`,
+        finishedNow.length > 0 && finishedNow.every((c) => codes[c.gate] === 0 || codes[c.gate] === 1),
+        `${cap.length - finishedNow.length} of ${cap.length} still read a kill sentinel (124, "timeout/signal" or ` +
+        `finished:false) -- they are the 37 the pass declined to claim, and they hold a ${Math.min(...cap.filter((c) => killedNow(c.gate)).map((c) => c.recorded), Infinity)} ms floor rather than a 20 s one`);
     const u = cap.map((c) => c.understatedBy).sort((a, b) => a - b);
     ok("*** so the file no longer understates them by a factor it cannot know ***",
         u.length > 0 && medianOf(u) < 1.25,

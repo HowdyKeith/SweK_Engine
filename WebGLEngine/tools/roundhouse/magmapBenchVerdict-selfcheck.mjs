@@ -38,6 +38,7 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "../ship/playwrightResolve.mjs";
 import { codeOnly } from "../ship/sourceScan.mjs";
+import { LAUNCH_ARGS } from "../ship/webgpuHarness.mjs";
 
 const require_ = createRequire(import.meta.url);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -52,7 +53,13 @@ console.log("magmapBenchVerdict-selfcheck -- can the A/B bench actually reject a
 
 const b = await chromium.launch({
     executablePath: HEADLESS_SHELL,
-    args: ["--enable-unsafe-webgpu", "--enable-features=Vulkan,WebGPU"],
+    // *** v4778 RIG RUN 11 -- THE HARNESS'S FLAGS, NOT A COPY OF ONE OF THEM. *** This hand-spelled --enable-unsafe-webgpu alone,
+    // and on win32 the headless shell hands out no adapter without --use-angle=d3d11 (webgpuHarness.mjs's measurement):
+    // navigator.gpu existed, so the gate did not skip, the bench never got a device and the table never came -- red on
+    // Keith's rig at the 180 s wait, every run. magmapDefault and magmapTaichiRun take LAUNCH_ARGS for the same reason.
+    // Not sabotageable here: on Linux --enable-unsafe-webgpu alone reaches SwiftShader, so the old spelling is green on this
+    // box. The rig's next run is the measurement.
+    args: [...LAUNCH_ARGS, "--enable-features=Vulkan,WebGPU"],
 });
 const page = await (await b.newContext()).newPage();
 
@@ -80,6 +87,7 @@ await page.route("**/*", (route) => {
     }
     return route.fulfill({ status: 404, body: "not found" });
 });
+const pageErrs = []; page.on("pageerror", (e) => pageErrs.push(String(e).slice(0, 160)));
 await page.goto("http://localhost:8787/magmap-bench.html", { waitUntil: "domcontentloaded" }).catch(() => { });
 
 if (!(await page.evaluate(() => !!navigator.gpu))) {
@@ -89,7 +97,8 @@ if (!(await page.evaluate(() => !!navigator.gpu))) {
 
 await page.click("#run").catch(() => { });
 const appeared = await page.waitForSelector("#out table", { timeout: 180000 }).then(() => true).catch(() => false);
-ok("the bench runs and renders a table at all", appeared);
+ok("the bench runs and renders a table at all", appeared,
+    appeared ? "" : `what the page shows instead: "${(await page.evaluate(() => (document.getElementById("out") || document.body).innerText).catch(() => "")).replace(/\s+/g, " ").slice(0, 200)}"; page errors: ${pageErrs.slice(0, 2).join(" | ") || "none"}`);
 if (!appeared) { await b.close(); console.log("\n" + fails + " FAILED"); process.exit(1); }
 
 const rows = await page.evaluate(() => [...document.querySelectorAll("#out table tbody tr")].map((tr) => {

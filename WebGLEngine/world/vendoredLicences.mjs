@@ -104,7 +104,7 @@ export const VENDORED = Object.freeze([
     { path: "vendor/taichi-js", kind: KIND.THIRD_PARTY, spdx: "MIT",       grant: GRANT.LICENCE_FILE, file: "LICENSE" },
     { path: "vendor/three",     kind: KIND.THIRD_PARTY, spdx: "MIT",       grant: GRANT.LICENCE_FILE, file: "LICENSE" },
     { path: "vendor/three-webgpu", kind: KIND.THIRD_PARTY, spdx: "MIT",    grant: GRANT.LICENCE_FILE, file: "LICENSE",
-      upstream: "https://registry.npmjs.org/three/-/three-0.185.1.tgz", pin: "three@0.185.1",
+      upstream: "https://registry.npmjs.org/three/-/three-0.186.1.tgz", pin: "three@0.186.1",
       note: "*** VENDORED AT v4319 AND UNDECLARED UNTIL v4371 -- FIFTY ROUNDS RED AND NOBODY SAW IT. *** The " +
             "TSL build (three.webgpu.js, three.core.js, three.tsl.js) beside r160, with three's own MIT LICENSE " +
             "copied in the same commit, so nothing was ever unpapered on disk; what was missing was the RECORD, " +
@@ -114,7 +114,15 @@ export const VENDORED = Object.freeze([
             "*** RE-VENDORED 2026-09-08, 0.178.0 -> 0.185.1: *** tools/ship/three-probe.json settled the question " +
             "vendor/three-webgpu/README.md's history section describes -- the 0.185 refusal at v4319 was one " +
             "build box's WebGPU implementation lagging the spec, not a fact about the fleet. Same pin shape, " +
-            "same one-line edit, same grant." },
+            "same one-line edit, same grant. *** v4805: 0.185.1 -> 0.186.1, *** the same three files and edit again, the " +
+            "LICENSE byte for byte the same; the 0.185.1 files moved, unchanged, to vendor/three-webgpu-r185." },
+    { path: "vendor/three-webgpu-r185", kind: KIND.THIRD_PARTY, spdx: "MIT", grant: GRANT.LICENCE_FILE, file: "LICENSE",
+      upstream: "https://registry.npmjs.org/three/-/three-0.185.1.tgz", pin: "three@0.185.1",
+      note: "*** KEPT, NOT IMPORTED BY THE ENGINE. *** vendor/three-webgpu's files from 2026-09-08 until v4805, moved here " +
+            "unchanged when that directory went to 0.186.1, so the r185 drafts in docs/upstream-three/ and their patches " +
+            "still have the build they are written against: tools/ship/threePatch.mjs applies the patches to it, and " +
+            "threeUpstream-selfcheck.mjs and threeUpstreamPaths-selfcheck.mjs run it. The same blobs git already held, so " +
+            "the copy adds nothing to the repository; three's own MIT LICENSE beside it, as for the other two copies." },
     { path: "vendor/wasm",      kind: KIND.FIRST_PARTY, spdx: null,        grant: GRANT.NONE,         file: null,
       note: "*** OURS, NOT SOMEBODY ELSE'S. *** sha256.wasm and graphlayout.wasm are AssemblyScript output " +
             "from sha256.ts and graphlayout.ts in the same directory. A filename census calls this unpapered; " +
@@ -130,6 +138,25 @@ export const VENDORED = Object.freeze([
             "is what says it was read rather than assumed, and world/licenceSweep.mjs records the hash for " +
             "exactly that reason. Only the two source files and the licence were taken: no models, no build " +
             "script, no thirdparty tree. vendor/xatlas/PROVENANCE.txt carries the evidence commands." },
+    // v4778 -- TWO BODIES THE rtx LINE VENDORED WITHOUT A LINE HERE, found by this gate at the merge. Each grant was read
+    // off the files in this tree, not remembered: the zlib text at the top of both MikkTSpace sources, and the licence
+    // line of male-cns's PROVENANCE.md, which records what the Neuprint server declares and says in the same breath that
+    // the declaration was not re-confirmed against Janelia's own terms. That caveat is carried below, not dropped.
+    { path: "vendor/male-cns",  kind: KIND.THIRD_PARTY, spdx: "CC-BY-4.0", grant: GRANT.NAMED_OTHER,  file: "PROVENANCE.md",
+      upstream: "https://neuprint.janelia.org (Janelia FlyEM male-cns connectome)", pin: "male-cns:v1.0, fetched 2026-09-21T13:46:26Z",
+      note: "*** DATA, NOT CODE, AND THE GRANT IS A SERVER'S DECLARATION RECORDED IN PROVENANCE.md. *** Two baked " +
+            "circuits (the 34-neuron Giant Fiber Circuit and the 50-neuron EPG compass) from a Neuprint fetch the " +
+            "maintainer ran on their own machine. PROVENANCE.md states CC-BY-4.0 'as declared by the Neuprint server' " +
+            "and that the version was not independently re-confirmed against Janelia's publication terms -- verify " +
+            "before any redistribution wider than this repo's demo use. CC-BY asks for attribution, which that " +
+            "file carries." },
+    { path: "vendor/mikktspace", kind: KIND.THIRD_PARTY, spdx: "Zlib",     grant: GRANT.IN_HEADER,    file: "mikktspace.h",
+      upstream: "https://github.com/mmikk/MikkTSpace", pin: "3e895b49d05ea07e4c2133156cfa94369e19e409",
+      note: "*** A REFERENCE ORACLE LIKE xatlas, AND PAPERED IN THE HEADER LIKE ui/vendor. *** (C) 2011 Morten S. " +
+            "Mikkelsen, zlib; the upstream repository carries no LICENSE file and the grant is the comment at the " +
+            "top of mikktspace.c and mikktspace.h, verbatim. tools/mesh/mikktRef.mjs compiles the two files with " +
+            "g++ to grade physics/mesh/mikktSpace.mjs; nothing the engine ships loads them. PROVENANCE.txt beside " +
+            "them carries the pin and both sha256 digests." },
     { path: "ui/vendor",        kind: KIND.THIRD_PARTY, spdx: "MIT",       grant: GRANT.IN_HEADER,    file: "qrcode.mjs",
       upstream: "qrcode-generator, Kazuhiko Arase, 2009",
       note: "*** AND A SECOND vendor/ DIRECTORY ENTIRELY, which a census pointed at the top-level one misses. " +

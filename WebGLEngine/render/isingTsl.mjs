@@ -94,6 +94,12 @@ export function makeIsingPassTsl(TSL, { L = 64 } = {}) {
     // silently falls back to inferring "float" from the collapsed scalar -- every OTHER uniform(vec4(...)) in this
     // codebase (physicsTsl.mjs, fleetTsl.mjs, carveTsl.mjs, ...) gets away with the same bare call only because
     // float is what they actually want. uvec4 needs the type spelled out as the second argument to survive that.
+    // *** v4544 -- THE TYPE IS NAMED BECAUSE r184 STOPPED INFERRING IT, AND THE FAILURE IS SILENT. *** At r178
+    // `uniform(uvec4(0,0,0,0))` carried its uvec4-ness from the node; MEASURED at r184 the UniformNode comes back
+    // with nodeType null and the type is settled later from the JS value -- a Vector4 -- so three emits
+    // `cfg : vec4<f32>` and this pass's philox reads its seeds as floats. Nothing about the graph says so; what
+    // said so was the transplant refusing "uniform cfg is vec4 in the pass and uvec4 in the shell". Do not drop
+    // the second argument to save a word: uvec4(...) alone no longer means unsigned.
     const uniforms = { cfg: uniform(uvec4(0, 0, 0, 0), "uvec4").label("cfg") };   // sweep, parity, seed, philox key1
     const { philox } = philoxNodes(TSL);
 

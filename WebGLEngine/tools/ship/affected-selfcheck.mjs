@@ -20,6 +20,7 @@
 // that bug.
 import { buildGraph, affectedGates, importsOf, resolveSpec } from "./affected.mjs";
 import { prose } from "./sourceScan.mjs";
+import { gateFiles } from "./staleness.mjs";
 import { MUTATIONS } from "../mutate/mutate.mjs";
 import fs from "node:fs";
 import path from "node:path";
@@ -34,6 +35,23 @@ const graph = buildGraph();
 
 // ---- 1. the graph covers the tree ------------------------------------------------------------------------------
 {
+    // v4778 rig run 13: buildGraph reads each module's edges once per build. Against the walk it replaced -- every gate's
+    // walk reading and resolving every module it reaches -- on every 25th gate: the same sets, and the same unresolved
+    // count, which counts an edge each time a gate's walk expands the module holding it. Sabotage V1 (a cached module's
+    // unresolved edges counted for its first gate only) read green in every gate until this row.
+    const sample = gateFiles().filter((_, i) => i % 25 === 0);
+    const ref = { deps: new Map(), unresolved: 0 };
+    for (const g of sample) {
+        const seen = new Set([g]), stack = [g];
+        while (stack.length) { const cur = stack.pop();
+            for (const spec of importsOf(cur)) { const r = resolveSpec(cur, spec); if (!r) { ref.unresolved++; continue; } if (!seen.has(r)) { seen.add(r); stack.push(r); } } }
+        ref.deps.set(path.relative(ENG, g).replace(/\\/g, "/"), [...seen].map((f) => path.relative(ENG, f).replace(/\\/g, "/")).sort().join("|"));
+    }
+    const got = buildGraph({ gates: sample });
+    const differ = [...ref.deps].filter(([k, v]) => !got.deps.has(k) || [...got.deps.get(k)].sort().join("|") !== v).map(([k]) => k);
+    ok("!! the graph is the per-gate walk's, read once per module: the same sets and the same unresolved count",
+       got.deps.size === ref.deps.size && differ.length === 0 && got.unresolved === ref.unresolved,
+       `${sample.length} gates sampled, ${differ.length} differing${differ.length ? " (" + differ.slice(0, 3).join(", ") + ")" : ""}; unresolved ${got.unresolved} against ${ref.unresolved}`);
     ok("the graph reaches every gate in the tree", graph.gateCount > 400, graph.gateCount + " gates");
     ok("...and every gate has a dependency set", graph.deps.size === graph.gateCount);
     ok("a gate always includes ITSELF", [...graph.deps.entries()].every(([g, set]) => set.has(g)),
@@ -78,5 +96,10 @@ const graph = buildGraph();
        "a module no check can reach is a different problem wearing the same output");
 }
 
+// ---- v4778 RIG RUN 13 SABOTAGE LOG ----
+// Against tools/ship/affected.mjs's per-build edge cache: V1 a cached module's unresolved edges counted for its first gate
+// only -> 0 red in affected, gateSelection and gateReach, so the reference-walk row was written; then 1 red, that row
+// ("unresolved 7 against 23"). V2 the cache keeping only a module's first resolved edge -> 2 red here (the reference row,
+// 44 of 77 differing; and the mutation-table row), 3 in gateSelection, 1 in gateReach. Both restored, md5 verified.
 console.log(fails ? "\naffected-selfcheck: " + fails + " FAILED" : "\naffected-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);

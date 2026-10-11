@@ -45,6 +45,7 @@
 import {
     gateFiles, signatureOf, suspectCalls, census, reportLines, SIG, SHAPE,
     SHAPE_AT_V4480 as REC, ENG,
+    maskStrings, firstArgOf, looksLikeCondition,
 } from "./assertionShape.mjs";
 import fs from "fs";
 import path from "path";
@@ -106,6 +107,57 @@ console.log("\n2. the three shapes, each demonstrated before the tree is reporte
     ok("!! a string in the condition slot of a condition-first helper is caught",
         f.length === 1 && f[0].shape === SHAPE.stringAsCondition,
         "78 gates in this tree take the condition first; a line pasted from the other 1,403 always passes");
+}
+{
+    // *** THE MIRROR, WHICH WAS MISSING FOR 1,637 FILES AGAINST 91 -- v4647e. ***
+    // The row above catches the swap under condFirst. Under nameFirst, suspectCalls only ever looked for the
+    // two ARROW shapes and ASSUMED the first argument was a name, so ok(cond, "name") printed "PASS true"
+    // forever. The census read suspects: 0 while THREE shipped in one session, all in nameFirst files, all
+    // mine -- the detector covered the smaller population by a factor of eighteen and its zero was read as an
+    // all-clear.
+    const swaps = [
+        ['a regex .test in the name slot',            NAME_FIRST + '\nok(/a/.test(v) && /b/.test(v), "n", "d");'],
+        ['a comparison in the name slot',             NAME_FIRST + '\nok(EXPECTED === "a" && EXPECTED !== "b", "n", "d");'],
+        // *** THIS ONE WAS MISSED BY THE FIRST DRAFT AND IS WHY THE MASKER NOW KNOWS REGEX LITERALS. ***
+        // The `\(` inside the pattern counted as an open paren, so the balancer never found the top-level
+        // comma. Two of the three real swaps were caught and this was the third.
+        ['a regex literal CONTAINING a paren',        NAME_FIRST + '\nok(!/scaled\\(/.test(q), "n", "d");'],
+    ];
+    for (const [label, src] of swaps) {
+        const f = suspectCalls(src, SIG.nameFirst);
+        ok("!! *** " + label + " is caught under nameFirst ***",
+            f.length === 1 && f[0].shape === SHAPE.boolAsName,
+            f.length ? f[0].text.slice(0, 70) : "NOT FOUND -- this is the shape that prints PASS true forever");
+    }
+    // The controls matter more than the catches here: this shape runs over 1,637 files, and a false positive
+    // in a detector nobody can silence is worse than the hole it closed.
+    const legit = [
+        ['a correct row',                             NAME_FIRST + '\nok("a correct row", x === 1, "d");'],
+        // glbConformance-selfcheck really writes this: a ternary CHOOSING A PREFIX, concatenated into a name.
+        // It was the only survivor of the first tree-wide run and it is not a defect.
+        ['a name BUILT by a ternary and concatenation', NAME_FIRST + '\nok((f ? "!! " : "  ") + code + " -- " + what, hit, "d");'],
+        ['a division, which is not a regex',          NAME_FIRST + '\nok("n", a / b > 2, "d");'],
+        // gateQuality-selfcheck PINS example calls as data. Four of the first run's six hits were this.
+        ['an example call quoted as DATA',            NAME_FIRST + '\npinned("ok(\\"five knobs\\", Object.keys(K).length === 5)");'],
+    ];
+    // *** AND THE UNKNOWN-SIGNATURE GUARD IS DRIVEN, BECAUSE THE TREE NO LONGER EXERCISES IT. ***
+    // Before signatureOf learned the `function ok(a, b)` form, ev/esFlight3dMath-selfcheck.mjs was UNKNOWN
+    // and this shape reported every correct call in it as a swap. Fixing signatureOf removed the only live
+    // example -- so removing the guard now goes 0 RED against the tree, and the property is a fixture.
+    const UNREADABLE = 'const helper = makeOk();\nok(a === 1, "n");\nok(b !== 2, "n");';
+    ok("!! *** an UNKNOWN signature yields NO suspects: a shape about WHICH SLOT cannot run without the order ***",
+        signatureOf(UNREADABLE) === SIG.unknown && suspectCalls(UNREADABLE, SIG.unknown).length === 0,
+        "guessing nameFirst there turns every correct condition-first call into a reported swap -- a flood, " +
+        "in a detector running over sixteen hundred files");
+    ok("  ...and the SAME source under a known condFirst order is still clean, so the guard is not hiding a catch",
+        suspectCalls(UNREADABLE, SIG.condFirst).length === 0,
+        "the calls are correct; it is only the ORDER that was unreadable");
+
+    for (const [label, src] of legit) {
+        ok("  CONTROL: " + label + " is NOT flagged",
+            suspectCalls(src, SIG.nameFirst).length === 0,
+            "a detector over 1,637 files earns its keep by what it leaves alone");
+    }
 }
 {
     const good = [
@@ -195,6 +247,155 @@ ok("...and each recorded shape is one this file can actually find", (() => {
     });
 })(), "a record naming a shape the detector cannot find would be a claim about nothing");
 ok("the record is frozen", Object.isFrozen(REC) && REC.writtenThisSession.every(Object.isFrozen));
+
+// ---------------------------------------------------------------------------------------------------------
+// THE THREE PARTS boolAsName IS BUILT OUT OF, GRADED APART (v4647q)
+// ---------------------------------------------------------------------------------------------------------
+// definitionGates counts an exported symbol no gate names, and maskStrings, firstArgOf and looksLikeCondition
+// were on that list: NOTHING in the tree named them, not this gate and not any other. They were graded only
+// THROUGH suspectCalls, which is the composition of all three -- so a fault in one could be cancelled by a
+// second and the end-to-end row would stay green. Each is graded here on its own, against the cases the
+// module's own comments record it getting WRONG, because those are the ones that actually happened.
+{
+    // maskStrings: offsets must survive, or every `at` this detector reports points at the wrong place.
+    const src = 'ok(a === b, "a === b");';
+    const m = maskStrings(src);
+    ok("!! *** maskStrings replaces a string BODY with filler of the SAME LENGTH ***",
+       m.length === src.length && m.indexOf('"') === src.indexOf('"'),
+       `${m.length} against ${src.length}. Every at-offset suspectCalls reports is an index into the masked copy ` +
+       `and is printed against the real source; a mask that changed a length would move every one of them`);
+    ok("!! ...and the masked copy no longer contains the condition that was INSIDE the literal",
+       !/a === b/.test(m.slice(src.indexOf('"'))) && /a === b/.test(m.slice(0, src.indexOf('"'))),
+       `masked: ${m}. gateQuality-selfcheck PINS example calls as data, and the first tree-wide run counted ` +
+       `four of those as real calls -- a census matching its own prose, the third time this tree met it`);
+    // The regex case is the one that broke the balancer on the first real test, and it is not hypothetical.
+    const rx = 'ok(!/scaled\\(/.test(q), "name");';
+    const mrx = maskStrings(rx);
+    ok("!! *** a REGEX literal is masked too, so an escaped paren inside a pattern cannot open a depth ***",
+       mrx.length === rx.length && !/scaled/.test(mrx),
+       `masked: ${mrx}. This exact call was MISSED: the \\( inside the pattern counted as an open paren, so ` +
+       `firstArgOf never found the top-level comma. Two of my own three swaps were caught and this was the third`);
+    ok("CONTROL: code outside any literal is returned untouched",
+       maskStrings("const x = a + b;") === "const x = a + b;",
+       "a masker that altered ordinary code would corrupt the thing being scanned");
+
+    // firstArgOf: BALANCED, not pattern-matched -- layout must not decide a verdict.
+    const open = (t) => t.indexOf("(");
+    ok("!! *** firstArgOf balances to the top-level comma, through nested calls and commas ***",
+       firstArgOf("ok(f(a, b) === c, \"n\")", open("ok(")) === "f(a, b) === c",
+       `got ${JSON.stringify(firstArgOf("ok(f(a, b) === c, \"n\")", 2))} -- the comma inside f(a, b) is at ` +
+       `depth 2 and is not the argument boundary. A regex to the first comma would cut this in half and ` +
+       `hand looksLikeCondition the text "f(a"`);
+    ok("...and a call with ONE argument yields that argument, up to its closing paren",
+       firstArgOf("ok(done)", 2) === "done", "the boundary is whichever comes first, comma or close");
+    ok("!! *** a call that never closes returns null rather than a truncated guess ***",
+       firstArgOf("ok(a === b", 2) === null,
+       "null is the one honest answer for text that does not parse; a partial slice would be graded as though " +
+       "it were the whole argument");
+    ok("...and a comma inside a STRING does not end the argument either",
+       firstArgOf('ok("a, b" === c, "n")', 2) === '"a, b" === c',
+       "firstArgOf skips a literal whole, so it is correct on raw source as well as on a masked copy");
+
+    // looksLikeCondition: conservative on purpose, and the one survivor of the first tree-wide run is a NAME.
+    ok("!! *** a comparison is a condition ***",
+       ["a === b", "a !== b", "x <= 1", "a && b", "!ok", "s.includes(x)", "xs.every(f)"].every(looksLikeCondition),
+       "these are the shapes that put a boolean in the name slot");
+    // *** THE THIRD CASE HERE IS THE REAL CALL, AND MY FIRST DRAFT'S WAS A CONTROL THAT COULD NOT FAIL. ***
+    // I first wrote `(cond ? "!! " : "   ") + code + " -- " + what`, which contains no comparison operator at
+    // all -- so deleting the concatenation guard entirely (sabotage SA-3) left this row GREEN and only the
+    // tree-wide scan went red. The text below is glbConformance-selfcheck:275 verbatim, which carries BOTH a
+    // concatenation and `||` and `===`, so it is rescued by the guard and by nothing else.
+    const builtName = '(code.startsWith("ACCESSOR_MIN") || code.startsWith("ACCESSOR_MAX") || ' +
+                      'code === "ACCESSOR_INDEX_OOB" ? "!! " : "   ") + code + " -- " + what';
+    ok("!! *** a string literal is a NAME, however it was assembled ***",
+       !looksLikeCondition('"a name"') && !looksLikeCondition('`a ${x} name`') &&
+       !looksLikeCondition(builtName),
+       "the third is the ONLY survivor of the first tree-wide run -- glbConformance-selfcheck:275 builds a " +
+       "name from a ternary CHOOSING A PREFIX, and the ternary's own test carries || and ===. It is not a " +
+       "defect, and a detector that called it one would have made its own first result a false positive");
+    ok("CONTROL: the same text WITHOUT the concatenation reads as a condition",
+       looksLikeCondition('code.startsWith("ACCESSOR_MIN") || code === "ACCESSOR_INDEX_OOB"'),
+       "without this the row above passes on a function that calls nothing a condition -- which is exactly " +
+       "how my first draft of it passed under a sabotage that deleted the guard it was written to check");
+    ok("CONTROL: empty and absent argument text is not a condition",
+       !looksLikeCondition("") && !looksLikeCondition(null) && !looksLikeCondition(undefined),
+       "firstArgOf returns null on text that does not parse, and null must not read as a finding");
+
+    // And the composition still agrees with its parts, so grading them apart did not replace the end-to-end row.
+    const swapped = "ok(a === b, \"a name\");";
+    const found = suspectCalls(swapped, SIG.nameFirst);
+    ok("!! *** the three compose: suspectCalls finds the swap its parts predict ***",
+       found.some((f) => f.shape === SHAPE.boolAsName) &&
+       looksLikeCondition(firstArgOf(maskStrings(swapped), swapped.indexOf("("))),
+       `${found.length} found. Grading the parts apart is only worth anything if the whole still agrees with ` +
+       `them -- otherwise this section is a second spelling of the detector rather than a check on it`);
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// shapes:false -- THE PARAMETER MUST BE HONOURED, AND MUST CHANGE NOTHING ELSE (v4647q)
+// ---------------------------------------------------------------------------------------------------------
+// definitionGates' own gate states the rule this section exists for: "a signature that takes a population and
+// ignores it is how a caller comes to believe a census covered more than it did". census({shapes:false}) is
+// exactly such a signature, and recordDrift now depends on it for 379 ms.
+{
+    // A real file on disk with a real swap in it, written and removed here. NOT named *-selfcheck.mjs and
+    // prefixed __, because a gate that plants a gate grows the population it measures -- gateSweep's v4639
+    // race, which this tree has already paid for once.
+    const FIXTURE = path.join(ENG, "tools", "ship", "__assertionshape-swap-fixture.mjs");
+    // *** `c` IS THE CENSUS SECTION 3 ALREADY TOOK, AND TAKING A SECOND ONE PUT THIS GATE OVER BUDGET. ***
+    // My first draft called census() again here. This file already pays for TWO full walks -- section 3's `c`
+    // and the one reportLines() takes inside itself -- and a third took the gate to 3119 ms against the
+    // 3,000 ms sweep budget, which the very next sweep reported as "slower ... now over budget" and DROPPED
+    // it from the swept set. A gate that falls out of the budget stops running at ship time, so an added
+    // check bought with an extra tree walk can cost more coverage than it adds. Reusing the existing result
+    // is free and identical: census() is pure over an unchanged tree.
+    const full = c;
+    const lean = census({ shapes: false });
+    ok("!! *** shapes:false returns the SAME structural counts as the full census ***",
+       lean.gates === full.gates && lean.usesOk === full.usesOk && lean.definesOk === full.definesOk &&
+       lean.importsOk === full.importsOk && lean.distinctDefinitions === full.distinctDefinitions &&
+       JSON.stringify(lean.bySignature) === JSON.stringify(full.bySignature),
+       `gates ${lean.gates}, definesOk ${lean.definesOk}, distinct ${lean.distinctDefinitions} -- identical ` +
+       `to the full census. recordDrift reads definesOk and gates off the lean one, so if skipping the scan ` +
+       `moved either of them it would be silently comparing a different number against a frozen record`);
+    ok("!! *** ...and the skipped scan is null, NOT an empty list ***",
+       lean.suspects === null && lean.byShape === null,
+       "[] would mean THE SCAN RAN AND FOUND NOTHING, which is this file's headline result and the thing a " +
+       "reader would act on. null means nobody looked. Same distinction reachedLicences draws with " +
+       "licenceExists and world/orrery.mjs draws between UNPAPERED and unchecked");
+    // *** THE WORK IS COUNTED, NOT THE FLAG -- AND TWO SABOTAGES ARE WHY. *** The first draft of these rows
+    // asserted `shapesScanned === false`, which is the ARGUMENT echoed back, and a `byShape !== null` control.
+    // SA-9 (accept shapes:false and scan anyway) went 0 RED: nulling the output preserves the contract while
+    // still paying the 379 ms this whole change exists to save. SA-10 (delete the scan entirely) went 0 RED
+    // too: [] is still an array and byShape over nothing is still an object. A control that cannot fail, for
+    // the second time in one session. filesScanned is incremented INSIDE the scan, so both now go red.
+    ok("!! *** shapes:false does not merely NULL the answer, it does not do the WORK ***",
+       lean.filesScanned === 0 && full.filesScanned === full.gates,
+       `lean scanned ${lean.filesScanned} files, full scanned ${full.filesScanned} of ${full.gates}. This is ` +
+       `the row that pays: recordDrift is a SWEPT gate and the scan it no longer runs is 379 ms of its ` +
+       `3,000 ms budget, spent on a result it never read`);
+    // The fixture is written, read and removed here, and is NOT named *-selfcheck.mjs and IS prefixed __,
+    // because a gate that plants a gate grows the population it measures -- gateSweep's v4639 race, which
+    // this tree has already paid for once. It is passed to census() explicitly, so it never has to be found.
+    let planted = null;
+    try {
+        // The helper must be UNAMBIGUOUSLY name-first: suspectCalls refuses to run the masked nameFirst
+        // scan on an `unknown` signature, and says why in its own comment -- guessing there would turn every
+        // correct condition-first call in the tree into a reported swap. My first fixture's helper body was
+        // `=> c`, which branches on nothing, so it classified unknown and this control failed for the right
+        // reason. Reusing the NAME_FIRST shape from section 1, which signatureOf is already graded against.
+        fs.writeFileSync(FIXTURE, NAME_FIRST + "\n" + OK + '(a === b, "a name");\n');
+        planted = census({ files: [FIXTURE] });
+    } finally {
+        try { fs.unlinkSync(FIXTURE); } catch { /* the row below fails on a null census, which is the report */ }
+    }
+    ok("CONTROL: the DEFAULT census really does still find a planted swap",
+       !!planted && planted.filesScanned === 1 && (planted.suspects || []).length >= 1 &&
+       (planted.suspects || []).some((x) => x.shape === SHAPE.boolAsName),
+       `${planted ? (planted.suspects || []).map((x) => x.shape).join(", ") || "nothing found" : "no census"}` +
+       ` -- a positive control over a file with a KNOWN swap in it. Without this, deleting the detector ` +
+       `outright leaves every row above green, which is exactly what sabotage SA-10 measured`);
+}
 
 console.log(`\nassertionShape-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
 process.exit(fails === 0 ? 0 : 1);

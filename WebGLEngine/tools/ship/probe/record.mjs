@@ -18,7 +18,9 @@ export function rel(p) {
         // fileURLToPath, not `.pathname`: on Windows a file URL's pathname is "/C:/x" and the leading slash
         // makes every path.relative wrong. winPathGuard-selfcheck names both idioms.
         const s = typeof p === "string" ? p : (p && p.href ? fileURLToPath(p.href) : String(p));
-        if (!s.startsWith("/")) return null;                  // an fd or a Buffer: not a path we can hash
+        // v4681: path.isAbsolute, not startsWith("/") -- "C:\\swek_src\\..." is absolute and does not start with a
+        // slash, so on Windows EVERY fs read returned null here and a probe pass recorded loads and nothing else.
+        if (!path.isAbsolute(s)) return null;                 // an fd or a Buffer: not a path we can hash
         const r = path.relative(ENG, s).split(path.sep).join("/");
         return r.startsWith("..") ? null : r;                 // outside the tree: not ours to invalidate on
     } catch { return null; }

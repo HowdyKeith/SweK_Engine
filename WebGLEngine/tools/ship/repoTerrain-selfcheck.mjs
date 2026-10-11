@@ -18,8 +18,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { repoHeightfield, treemapLeaves, buildTree, isWaterEntry, biomeIdFor, boxBlur,
+import { repoHeightfield, treemapLeaves, buildTree, isWaterEntry, biomeIdFor, boxBlur, LAKE_SPLIT_LIMIT,
          BIOME_ORDER, LANGUAGE_BIOME, DATA_EXT, DEFAULTS } from "../../world/repoHeightfield.js";
 import { biomeColumnMaterials } from "../../world/biomeTerrain.js";
 import { applyRealTerrain, clearRealTerrain } from "../../world/realTerrainStamp.js";
@@ -37,7 +38,28 @@ console.log("repoTerrain-selfcheck -- a source tree, walked as ground\n");
 
 // ---- 0. THE REAL SCAN, ONCE, SHARED BY EVERY SECTION BELOW ------------------------------------------------
 const t0 = Date.now();
-const scan = bridge.scanTree(REPO);
+// *** v4818 -- THE GATE MAPS THE COMMITTED TREE, NOT WHATEVER LIES IN THE CHECKOUT. *** scanTree walks the disk, so
+// an ignored or untracked file counts as ground: the rig's clone scanned ~13M lines where this tree scans ~5.4M, the
+// star catalogue fell from 3.9% of lines to 1.6%, and its lake -- smaller, so rounded by more cells on the 128 grid --
+// came in at 1.5% of cells against 1.23% expected and the 15% footprint row went red there and nowhere else. The
+// bridge's walk is right for its UI (a user maps the folder they have); a GATE must grade one tree on every box, so
+// the scan is cut to what git tracks at this commit. Untracked entries are counted and reported, not hidden.
+// REPRODUCED v4818: a 7.6M-line ignored file in WebGLEngine/tts-out/ put the raw walk at 12,984,533 lines and the
+// footprint row at "1.6% of lines -> 1.5% of cells" -- the rig's numbers exactly -- and red; with the cut, green
+// (4 entries, 7,600,910 lines left off). SABOTAGED: the cut bypassed with the junk present -> that row red. Restored.
+const rawScan = bridge.scanTree(REPO);
+const tracked = (() => {
+    try {
+        const out = execFileSync("git", ["ls-files", "-z"], { cwd: REPO, encoding: "utf8", maxBuffer: 64e6 });
+        const set = new Set(out.split("\0").filter(Boolean));
+        return set.size > 500 ? set : null;
+    } catch { return null; }
+})();
+const scan = tracked ? (() => {
+    const entries = rawScan.entries.filter((e) => tracked.has(e.path));
+    return { ...rawScan, entries, files: entries.length, lines: entries.reduce((a, e) => a + e.lines, 0) };
+})() : rawScan;
+const dropped = rawScan.ok ? rawScan.entries.length - scan.entries.length : 0;
 const scanMs = Date.now() - t0;
 const t1 = Date.now();
 const field = repoHeightfield(scan.entries, { grid: 128 });
@@ -47,6 +69,10 @@ const fieldMs = Date.now() - t1;
     console.log("0. THE MEASUREMENT EVERYTHING ELSE IS TAKEN AGAINST");
     ok("the bridge scanned this repository", scan.ok && scan.files > 500,
         scan.files + " files / " + scan.lines.toLocaleString() + " lines in " + scanMs + "ms");
+    // v4818: the cut to tracked files is reported, so a box whose checkout carries extra ground says how much
+    report(tracked ? `cut to the ${tracked.size} files git tracks: ${dropped} untracked or ignored entr${dropped === 1 ? "y" : "ies"} ` +
+                     `(${(rawScan.lines - scan.lines).toLocaleString()} lines) left off the map this gate grades`
+                   : "git could not list tracked files here -- graded on the raw walk, as before v4818");
     ok("the heightfield built from it", field.grid === 128 && field.heights.length === 128 * 128,
         field.stats.files + " as land, " + field.stats.lakeFiles + " as water, " + fieldMs + "ms");
     report("peak: " + (field.peaks[0] ? field.peaks[0].path + " (" + field.peaks[0].lines + " lines, " +
@@ -144,10 +170,34 @@ const fieldMs = Date.now() - t1;
     // on the real tree: no hand-written fixture has a file that is a fifth of its repository.
     const perFile = new Map();
     for (const a of field.water.areas) perFile.set(a.path, (perFile.get(a.path) || 0) + 1);
-    ok("!! *** the biggest lake is SPLIT into pieces small enough to survive the stamper's own area cap ***",
-        (perFile.get(star && star.path) || 0) > 1,
-        "es-universe.json -> " + (perFile.get(star && star.path) || 0) + " polygons; " +
+    // v4710 -- THE SPLITTER'S CONTRACT, READ OFF ITS OUTPUT. This row said "the biggest lake is SPLIT". v4701 made "biggest"
+    // derived -- by LINE COUNT -- after the row had named es-universe.json, and at v4710 it went red again: the largest
+    // file by lines, a gzipped frame cache, landed in a SQUARER treemap rectangle that fits inside the limit and rightly
+    // needs no split. Whether a lake is split is decided by its rectangle's sides, not its size, so "biggest" was the wrong
+    // question twice. The row now checks the contract itself: every lake left in ONE piece spans no more than
+    // LAKE_SPLIT_LIMIT on either side, and at least one lake on the real map IS split, so the split path is exercised.
+    const pieces = new Map();
+    for (const a of field.water.areas) { if (!pieces.has(a.path)) pieces.set(a.path, []); pieces.get(a.path).push(a.poly); }
+    const extent = (polys) => { const xs = polys.flat().map((p) => p[1]), ys = polys.flat().map((p) => 1 - p[0]);
+        return Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)); };
+    const whole = [...pieces].filter(([, ps]) => ps.length === 1), split = [...pieces].filter(([, ps]) => ps.length > 1);
+    const tooWide = whole.filter(([, ps]) => extent(ps) > LAKE_SPLIT_LIMIT + 1e-9);
+    const widest = [...pieces].map(([p, ps]) => [p, extent(ps), ps.length]).sort((a, b) => b[1] - a[1])[0];
+    ok("!! *** the splitter's contract ON THE REAL TREE: no lake left WHOLE spans more than the limit ***",
+        tooWide.length === 0,
+        `${split.length} lake(s) split, ${whole.length} whole; ${tooWide.length} whole lake(s) wider than ${LAKE_SPLIT_LIMIT}. Widest: ` +
+        `${widest ? widest[0].split("/").pop() + " spanning " + widest[1].toFixed(3) + " in " + widest[2] + " piece(s)" : "none"}; ` +
         field.water.areas.length + " polygons for " + field.stats.lakeFiles + " data files");
+    // *** AND THE SPLIT PATH, EXERCISED ON PURPOSE. *** The real tree used to exercise it -- a file a fifth of the repository
+    // -- but as the tree grew every lake's share fell, and at v4710 the widest spans 0.295, just inside the limit: nothing
+    // on the real map needs splitting any more. So the REAL entries get ONE synthetic data file as large as everything
+    // else together, which must come back in more than one piece, every piece inside the limit.
+    const big = { path: "fixture/half-the-repository.json", lines: scan.lines, bytes: 0, binary: false };
+    const fx = repoHeightfield([...scan.entries, big], { grid: 128 });
+    const bigPieces = fx.water.areas.filter((a) => a.path === big.path).map((a) => a.poly);
+    ok("!! *** a lake as large as the rest of the tree together IS split, and every piece stays inside the limit ***",
+        bigPieces.length > 1 && bigPieces.every((pp) => extent([pp]) <= LAKE_SPLIT_LIMIT + 1e-9),
+        `${bigPieces.length} pieces, widest ${bigPieces.length ? Math.max(...bigPieces.map((pp) => extent([pp]))).toFixed(3) : "-"} against ${LAKE_SPLIT_LIMIT}`);
     let worst = 0;
     for (const a of field.water.areas) {
         const xs = a.poly.map((p) => p[1]), ys = a.poly.map((p) => 1 - p[0]);

@@ -1,0 +1,411 @@
+// WebGLEngine/tools/ship/wasmTeardown-selfcheck.mjs -- v4663
+//
+// Run: node tools/ship/wasmTeardown-selfcheck.mjs
+//
+// *** THREE GATES PRINTED "all checks pass" AND THEN ABORTED THE PROCESS, AND NOTHING THIS TREE OWNS WAS
+// OPEN WHEN THEY DID. ***
+//
+// The mechanism, the population and the repair are all in tools/ship/wasmTeardown.mjs. What is here is the
+// evidence: the window is DRIVEN rather than described, on this box, which cannot reproduce the crash and can
+// measure everything that leads to it.
+//
+// SABOTAGES, RESULTS BY NAME:
+//   A. the control window is taken AFTER the module is loaded and stepped   -> RED (2 rows)
+//   B. the main row's threshold drops from `> control + 3` to `>= 0`        -> 0 red   (see below)
+//   C. one member's terminal process.exit() is put back (labScenes)          -> RED (1 row, the ratchet)
+//   D. the member section 4 measures LIVE has its exit put back              -> RED (2 rows)
+//   E. the repaired fixture reports exit code 0 instead of 1                 -> RED (1 row)
+//   F. the drain deadline drops to 50 ms, so the pool can never go quiet     -> RED (1 row)
+//   G. gateReport loses the `else` this round gave it                        -> RED (1 row)
+//
+// *** B IS ZERO AND CANNOT BE OTHERWISE, WHICH IS A LIMIT OF THE METHOD RATHER THAN A GAP. *** It replaces an
+// assertion with a tautology, and running a gate cannot detect that its own row was deleted. It is recorded
+// here as zero rather than left out, because a sabotage log that lists only the ones that worked is an
+// advertisement.
+//
+// *** AND ONE SABOTAGE WAS RUN BY ACCIDENT, ON THE FIRST VERSION OF SECTION 1, BY THE BOX ITSELF. *** That
+// version took ONE fixed 200 ms idle window and compared it to a control window. On an idle box it read 38.0 ms
+// against 0.4. Under a load average of 7 -- which is what this tree's own sweep workers produce -- it read 0.7
+// against 0.4 and WENT RED, because the compiler had been descheduled out of the window rather than because it
+// had nothing left to do. A fixed window measures WHEN the work ran; the claim is about WHETHER there was any.
+// drainBackgroundCpu accumulates until the pool is quiet instead, and contention now costs time and not a
+// verdict.
+"use strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { execFileSync } from "node:child_process";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { liveHandles } from "./serverShutdown.mjs";
+import { noComments, codeOnly } from "./sourceScan.mjs";
+import { drainBackgroundCpu, idleBackgroundCpuMs, measureExit, HOOK, WASM_AT_V4663, exitCallCount } from "./wasmTeardown.mjs";
+import * as WT from "./wasmTeardown.mjs";
+
+const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+let fails = 0;
+const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
+const report = (l) => console.log(`  ----  ${l}`);
+
+console.log("wasmTeardown-selfcheck -- a gate that compiles wasm and then calls process.exit() is racing V8\n");
+
+// -----------------------------------------------------------------------------------------------------------
+console.log("1. *** THE WINDOW, MEASURED IN ONE PROCESS BEFORE AND AFTER IT OPENS ***");
+//
+// The control is THIS PROCESS a moment earlier, which is the tightest control available: same box, same load,
+// same node, and the only difference across the two readings is whether a wasm module has been compiled and
+// worked. A separate control process would also be measuring the difference between two machines-in-time.
+const quiet = await drainBackgroundCpu();
+
+const { initNode, mod } = await import("../../physics/box3d/box3dNode.mjs");
+const st = await initNode();
+let busy = { cpuMs: 0, ms: 0, slices: 0, hitDeadline: false };
+let handlesAtExit = ["not reached"];
+if (!st.ready) {
+    ok("!! box3d wasm loads, which everything below is measured through", false, st.reason +
+       " -- this is NOT a pass: the window cannot be measured without the module that opens it");
+} else {
+    const e = mod().__wasmExports;
+    const w = e.swk_world_create(0, -10, 0);
+    for (let i = 0; i < 40; i++) e.swk_body_box(w, 0, 5 + i, 0, 0.5, 0.5, 0.5, 1);
+    for (let i = 0; i < 300; i++) e.swk_world_step(w, 1 / 60, 4);
+    busy = await drainBackgroundCpu();
+    handlesAtExit = liveHandles();
+}
+report(`before any wasm: ${quiet.cpuMs.toFixed(1)} ms of CPU on other threads, quiet after ${quiet.ms} ms`);
+report(`after 300 world steps: ${busy.cpuMs.toFixed(1)} ms, quiet after ${busy.ms} ms` +
+       (busy.hitDeadline ? " -- AT THE DEADLINE, so this figure is a floor" : ""));
+// *** v4681 -- ASSERTED ONLY WHERE THE INSTRUMENT CAN RESOLVE IT, AND THE RESOLUTION IS MEASURED, NOT ASSUMED. ***
+// The row below needs a 3 ms difference. On the rig cpuUsage steps in whole scheduler ticks and this row read
+// "0.0 ms against a control of 0.0 ms" -- red for the ruler, not the compiler. Where one step is coarser than
+// the 3 ms the claim turns on, the row REPORTS the reading with the step beside it rather than asserting, and
+// the quantum row after it keeps the escape honest: it must have measured a real step, and it says which.
+const QUANTUM = WT.cpuQuantumMs();
+const resolvable = QUANTUM != null && QUANTUM <= 1;
+ok("*** the process is STILL BURNING CPU with its main thread asleep, right where a gate's last line runs ***" +
+   (resolvable ? "" : " -- NOT ASSERTED ON THIS BOX: cpuUsage cannot resolve it"),
+    st.ready && (!resolvable || busy.cpuMs > quiet.cpuMs + 3),
+    `${busy.cpuMs.toFixed(1)} ms against a same-process control of ${quiet.cpuMs.toFixed(1)} ms. Nothing here ` +
+    "is doing I/O and the main thread is on a timer, so that is V8's compiler pool tiering up a 829 KB module. " +
+    "process.exit() at this instant disposes the platform underneath a job that will post its result back " +
+    "through NodePlatform's own uv_async_t -- and win/async.c asserts !(handle->flags & UV_HANDLE_CLOSING)");
+ok("  ...and the instrument's step was MEASURED, so 'cannot resolve it' is a reading and not a default",
+    QUANTUM != null && QUANTUM > 0,
+    `smallest cpuUsage step on this box: ${QUANTUM == null ? "none seen" : QUANTUM.toFixed(3) + " ms"} -- ` +
+    (resolvable ? "fine enough for the 3 ms row above, so it was asserted"
+                : "coarser than 1 ms, so the row above reported rather than asserted. The rig's libuv aborts are the " +
+                  "evidence the window exists there; this instrument cannot size it"));
+{   // the coarse case, driven here: a cpuUsage that advances in 15.625 ms ticks, which is a Windows scheduler tick.
+    // *** v4683 -- A CLOCK OF ITS OWN, NOT ONE DERIVED FROM THE REAL ONE. *** The v4682 fixture quantised the REAL
+    // user time, and on the rig it read "measured null": no step at all in 120 ms, because what the rig's spin
+    // accrues and where it books it is the very thing this instrument cannot see there. A fixture about the
+    // instrument must not depend on the instrument -- this one advances one tick every 40 reads, on any box.
+    const real = process.cpuUsage;
+    let reads = 0;
+    process.cpuUsage = () => ({ user: Math.floor(reads++ / 40) * 15625, system: 0 });
+    let coarse = null; try { coarse = WT.cpuQuantumMs(120); } finally { process.cpuUsage = real; }
+    ok("  ...and a TICK-GRAINED cpuUsage (15.625 ms, a Windows tick) is measured as one -- so the escape above fires there and only there",
+        coarse != null && Math.abs(coarse - 15.625) < 0.001, `measured ${coarse} ms under the simulated tick`);
+}
+ok("  ...and it GOES QUIET, which is what makes it compilation rather than a standing cost",
+    st.ready && !busy.hitDeadline,
+    `the pool fell silent ${busy.ms} ms after the last step. A fixed overhead would hold and this row would ` +
+    "read AT THE DEADLINE; a finite pile of functions to compile drains and stops");
+// *** THE CONTROL THAT MAKES THE ROW ABOVE MEAN SOMETHING. *** If an idle process burned CPU anyway, the
+// figure after wasm would be a reading of this box and not of the compiler.
+ok("!! CONTROL: an idle process with no wasm compiled burns essentially nothing over the same measurement",
+    quiet.cpuMs < 3,
+    `${quiet.cpuMs.toFixed(1)} ms. If this were large the contrast above would be measuring the box, not the ` +
+    "module -- and the FIRST version of this section was a single fixed 200 ms window, which read 38.0 ms " +
+    "against 0.4 on an idle box and 0.7 against 0.4 under a load average of 7. It went red for contention. " +
+    "Accumulating until the pool is quiet measures WHETHER there was work left rather than WHEN it ran");
+
+// *** AND THE PRIMITIVE UNDERNEATH IT, DRIVEN ON ITS OWN, BECAUSE THE ACCUMULATOR CAN HIDE A BROKEN ONE. ***
+// drainBackgroundCpu sums slices of idleBackgroundCpuMs and stops when they go quiet. If the primitive
+// returned a constant the sum would still look like a plausible reading and the quiet test would never fire;
+// asked directly, on a process whose compiler pool has just been drained, one window must read near zero and
+// must not read negative -- cpuUsage() is monotonic, so a negative here would be the subtraction inverted.
+{
+    const one = await idleBackgroundCpuMs(100);
+    ok("!! CONTROL: one window of the primitive reads near zero once the pool is quiet, and never below it",
+        one >= 0 && one < 5,
+        `${one.toFixed(1)} ms across a 100 ms window taken immediately after the drain above returned. The ` +
+        "accumulator is built from this call; a primitive stuck at a constant would make every figure in " +
+        "this section a plausible-looking fiction");
+}
+
+// -----------------------------------------------------------------------------------------------------------
+console.log("\n2. *** AND NOTHING WE OWN IS OPEN, SO THE TREE'S EXISTING TEARDOWN CANNOT REACH IT ***");
+//
+// serverShutdown.mjs was written for this same assertion at v4000 and fixes a DIFFERENT cause: sockets, a
+// listener, a child, all of them things the process owns and liveHandles() can name. Here it names nothing.
+ok("*** liveHandles() is EMPTY at the moment these gates exit -- the handle that aborts them is not ours ***",
+    st.ready && handlesAtExit.length === 0,
+    `liveHandles() = ${JSON.stringify(handlesAtExit)}. serverShutdown's drain is sound and is not the fix for ` +
+    "this: it waits for handles to finish closing, and there are none. The one that trips the assert belongs " +
+    "to NodePlatform, is never listed, and cannot be drained from JavaScript at all");
+
+// -----------------------------------------------------------------------------------------------------------
+console.log("\n3. *** THE REPAIR, DRIVEN ON TWO SCRIPTS IDENTICAL BUT FOR THEIR LAST LINE ***");
+{
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "wasmteardown-"));
+    try {
+        const body = (last) => `
+import { initNode, mod } from ${JSON.stringify(pathToFileURL(path.join(ENG, "physics/box3d/box3dNode.mjs")).href)};   // v4676: a file:// URL, not a path -- see thrownRow-selfcheck
+await initNode();
+const e = mod().__wasmExports;
+const w = e.swk_world_create(0, -10, 0);
+for (let i = 0; i < 40; i++) e.swk_body_box(w, 0, 5 + i, 0.0, 0.5, 0.5, 0.5, 1);
+for (let i = 0; i < 120; i++) e.swk_world_step(w, 1 / 60, 4);
+${last}
+`;
+        const A = path.join(dir, "exit.mjs"), B = path.join(dir, "code.mjs");
+        fs.writeFileSync(A, body("process.exit(1);"));
+        fs.writeFileSync(B, body("process.exitCode = 1;"));
+        const run = (f) => {
+            const t = Date.now();
+            let status = 0;
+            try { execFileSync(process.execPath, [f], { stdio: "ignore" }); }
+            catch (err) { status = err.status; }
+            return { status, ms: Date.now() - t };
+        };
+        const a = run(A), b = run(B);
+        report(`process.exit(1)      status ${a.status} in ${a.ms} ms      ` +
+               `process.exitCode = 1  status ${b.status} in ${b.ms} ms`);
+        // *** v4692 -- "BOTH LEAVE WITH 1" WAS LINUX'S READING, ASSERTED AS EVERY PLATFORM'S. *** Keith's rig failed this
+        // row: on Windows process.exit() after wasm work is the teardown race this gate exists for, and when it lands
+        // the forced exit's status is the crash, not 1. What the repair must never change is the VERDICT -- red stays
+        // red -- and what it must guarantee is that the repaired script leaves with exactly the code it set.
+        ok("*** setting the code gives the SAME VERDICT after the same wasm work, and exactly the code it set ***",
+            b.status === 1 && a.status !== 0 && a.status != null,
+            `process.exit(1) left with ${a.status}${a.status === 1 ? "" : " (the teardown race landed -- the crash this gate is about)"}, ` +
+            `process.exitCode = 1 with ${b.status}. A gate's exit code is what the sweep reads: both are red, and the ` +
+            "repaired one is red with its own code rather than the crash's");
+        // *** AND IT DOES NOT HANG, WHICH IS THE ONE REAL RISK IN THE SWAP. *** process.exitCode does not stop
+        // the process; it waits for the loop to drain. If a wasm gate held the loop open, the repair would turn
+        // a crash into a cap kill, which is a worse trade.
+        ok("  ...and it does not wait, so the swap cannot turn a crash into a gate that hangs at the cap",
+            b.ms < a.ms + 2000,
+            `${b.ms} ms against ${a.ms} ms. Background compilation does not ref the event loop, so a normal ` +
+            "exit leaves as promptly as a forced one and lets V8 dispose its own threads on the way");
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+}
+
+// -----------------------------------------------------------------------------------------------------------
+console.log("\n4. *** THE PROPERTY, ON A REAL MEMBER, MEASURED RATHER THAN READ OFF ITS SOURCE ***");
+{
+    // A source scan cannot grade this. `process.exit(1)` on the line that bails out when the wasm FAILED to
+    // load is correct -- nothing was compiled, there is no window -- and it is spelt exactly like the one that
+    // ends a green run. The hook watches what the process actually did, in order.
+    const SUBJECT = "tools/ship/ragdollSelfCollide-selfcheck.mjs";
+    const m = measureExit(SUBJECT);
+    report(`${SUBJECT}: marker ${m.ok ? "written" : "MISSING"}, exit ${m.code}, ` +
+           `${m.wasmCalls} wasm compile(s)${m.how ? " via " + m.how.join(", ") : ""}, ` +
+           `process.exit() ${m.exitCalled ? "called" : "not called"}`);
+    // *** AND THE INSTRUMENT IS NAMED, BECAUSE A CENSUS IS ONLY AS GOOD AS THE THING THAT TOOK IT. ***
+    ok("  the hook that took this reading is the one on disk, loaded before the gate's first import",
+        fs.existsSync(HOOK) && /--require/.test(fs.readFileSync(HOOK, "utf8")),
+        `${path.relative(ENG, HOOK)} -- a node --require preload, so it is in place before the gate's first ` +
+        "import runs and cannot miss a module compiled at import time, which is when box3d's is");
+    ok("*** it really does compile a wasm module, or the row below would be about nothing ***",
+        m.ok && m.wasmCalls > 0,
+        m.ok ? `${m.wasmCalls} compiled, ${m.wasmBytes} bytes through the synchronous door`
+             : "no marker was written -- the run is UNKNOWN, not green");
+    ok("*** and it leaves WITHOUT calling process.exit() with that module behind it ***",
+        m.ok && !m.exitAfterWasm,
+        m.exitAfterWasm ? "process.exit() was called after wasm was compiled -- this is the crash shape, live"
+                        : "the verdict travels through process.exitCode and the process ends on its own terms");
+}
+
+// -----------------------------------------------------------------------------------------------------------
+console.log("\n5. *** HOW BIG THE POPULATION IS, MEASURED ONCE, WITH ITS GAP NAMED ***");
+{
+    report(`${WASM_AT_V4663.candidates} candidate gates run under the hook at ${WASM_AT_V4663.at}; ` +
+           `${WASM_AT_V4663.compilers.length} COMPILED a wasm module. A further ${WASM_AT_V4663.noMarker} of ` +
+           `the ${WASM_AT_V4663.screened} screened were killed at the first pass's cap and wrote no marker: UNKNOWN`);
+    // The frozen set is a MEASUREMENT and re-deriving it costs a full pass, so what runs here is a ratchet on
+    // its inputs: if a member's exit shape changes, this says so and the census is re-run. A count standing in
+    // for a property is the defect this tree names most often, and this is deliberately not one -- the property
+    // itself is measured in section 4, on a live member, with the instrument that took the census.
+    const drifted = WASM_AT_V4663.compilers.filter((c) => {
+        const src = noComments(fs.readFileSync(path.join(ENG, c.gate), "utf8"));
+        return exitCallCount(src) !== c.exitCalls;
+    });
+    ok("*** every measured wasm compiler still has the exit shape the census recorded for it ***",
+        WASM_AT_V4663.compilers.length > 0 && drifted.length === 0,
+        drifted.length ? "changed since the census, re-run it: " +
+                         drifted.map((d) => d.gate + " (recorded " + d.exitCalls + ")").join(", ")
+                       : `${WASM_AT_V4663.compilers.length} members, none moved`);
+    ok("  ...and the set is not empty, which would make the row above vacuous",
+        WASM_AT_V4663.compilers.length > 0,
+        "a population of zero passes any property asked of its members");
+    // *** AND THE TRAP IN THE SWAP, WHICH HAS ALREADY BITTEN ONCE. *** process.exit() stopped execution and
+    // process.exitCode does not, so a member whose verdict sat in an `if` needs an `else` or a failing run
+    // prints its failure count AND "all checks pass". pipeTruncation-selfcheck holds this row for
+    // statedRuntime, which is where v4640 found it; gateReport is the one member this round had to reshape.
+    const GR = noComments(fs.readFileSync(path.join(ENG, "tools/ship/gateReport-selfcheck.mjs"), "utf8"));
+    ok("*** the one member whose verdict sat in an `if` got an `else`, so a failing run cannot also claim to pass ***",
+        /process\.exitCode = 1; \}\s*\n\s*else console\.log/.test(GR),
+        "it prints `gateReport-selfcheck: 4 FAILURES` and nothing else today. Left sequential, the line after " +
+        "it would run as well -- which is exactly what the same repair did to statedRuntime at v4640");
+    report(`NOT MEASURED: a gate that spawns a node CHILD which compiles wasm. The child is the process that ` +
+        `exits and the hook is not in it. ${WASM_AT_V4663.noMarker} further gates were killed at the first ` +
+        "pass's cap and wrote nothing, so the compiler count is a FLOOR and not a census of the tree.");
+}
+
+// -----------------------------------------------------------------------------------------------------------
+console.log("\n5. *** v4676 -- THE RIG ANSWERED, AND THE POPULATION WAS DRAWN BY THE WRONG QUESTION ***");
+{
+    // The round above screened 246 gates by asking DOES THIS COMPILE A WASM MODULE and converted the 48 that
+    // did. The rig's v4667 clone-verify then produced ai-bridge/tools/localModelResolve-selfcheck.mjs dying
+    // with the identical assertion -- win/async.c line 94, exit 0xC0000409 -- AFTER printing ALL PASS. It
+    // compiles no wasm, holds no dynamic import, and was never a candidate.
+    //
+    // *** THE DEFECT IS A SYMPTOM AND THE SCREEN ASKED ABOUT A CAUSE. *** What tears the process down badly
+    // is the PLATFORM STILL HAVING QUEUED WORK when process.exit() runs. Compiling wasm is one way to be in
+    // that state; loading node:http and a createRequire graph is another, and there is no reason to think
+    // those are the only two.
+    const LMR = "ai-bridge/tools/localModelResolve-selfcheck.mjs";
+    const lmrSrc = fs.readFileSync(path.join(ENG, LMR), "utf8");
+    ok("!! *** the gate the rig found is converted, and it was never in the 48 ***",
+        exitCallCount(codeOnly(lmrSrc)) === 0 && !WASM_AT_V4663.compilers.some((c) => String(c.gate || c) === LMR),
+        `${LMR}: ${exitCallCount(codeOnly(lmrSrc))} process.exit() call(s) left, and it is absent from the ` +
+        `${WASM_AT_V4663.compilers.length} compilers this round screened for`);
+
+    // *** THE NUMBER, WITH ITS PROVENANCE, BECAUSE A FIGURE WITHOUT ONE IS THE THING THIS SESSION KEEPS
+    // FINDING. *** Measured by patching a COPY of that gate to replace its last line with an awaited 300 ms
+    // timer across process.cpuUsage(), which is idleBackgroundCpuMs' method applied to one file:
+    //     94.6 ms of background CPU over a 300 ms idle window, at the instant the last line runs.
+    // Against this round's own figures -- a same-process control of 0.8 ms, and 23 ms for the wasm gates
+    // that motivated the conversion -- the gate EXCLUDED from the population is four times busier at exit
+    // than the ones included. It is not frozen as an assertion because it is one reading on one box of a
+    // quantity that moves with load; it is recorded so the next reader has the evidence rather than the
+    // conclusion.
+    report("MEASURED at v4676: localModelResolve idles 94.6 ms of background CPU per 300 ms at exit, against " +
+        "0.8 ms for the control and 23 ms for the wasm population. ONE READING, ONE BOX, and the method is " +
+        "idleBackgroundCpuMs' -- an awaited timer across cpuUsage -- applied to a patched copy of the gate.");
+
+    // *** THREE MORE FROM THE SAME CLONE-VERIFY, AND THE POPULATION IS NOW FOUR. ***
+    // The v4667 run named three further gates: ai-bridge/tools/range-selfcheck.mjs and
+    // bz/tools/bz-tactics-selfcheck.mjs, both aborting on the assertion, and tools/ship/skillbookDoor-selfcheck.mjs.
+    // None of the three compiles wasm either. Each was measured with the same instrument as above, on this
+    // box, against the same 0.9 ms same-process control:
+    //
+    //     range-selfcheck        103.7 ms   /300 ms idle
+    //     bz-tactics-selfcheck    81.7 ms
+    //     skillbookDoor          7.0 ms   (5.9 / 8.2 / 7.5 on repeats)
+    //     CONTROL                 0.9 ms
+    //
+    // skillbookDoor is the honest one to look at: eight times the control, and a FOURTEENTH of range's
+    // reading. If the rule were "convert what the number says is busy" it would not obviously qualify -- so
+    // the rule is not that. The rule is that process.exit() during a live platform teardown is wrong at 7 ms
+    // exactly as at 103, and the number is evidence that background work exists, not a ranking or a threshold.
+    //
+    // TWO FACTS ABOUT THE CRASH THAT A READER WILL OTHERWISE GET WRONG:
+    //
+    //   1. IT IS INTERMITTENT. bz-tactics came back GREEN on a re-run alone on the same rig -- 381 ms alone
+    //      against 1090 ms under the sweep's load. A re-run that passes is therefore NOT a clearance. It is a
+    //      measurement of how narrow the window is, and a race between queued work and teardown is precisely
+    //      the shape that behaves this way.
+    //   2. THE ASSERTION'S SOURCE LINE IS NOT AN IDENTIFIER. `src\win\async.c` reads line 94 on node
+    //      v24.17.0 and line 76 on v24.15.0. Matching on the line number across boxes would split one defect
+    //      into two, or merge two into one.
+    //
+    // AND THE LIVENESS ROW CANNOT CATCH IT. range-selfcheck prints `52 passed, 0 failed` AND its own
+    // "nothing is still holding the event loop open at exit" row passes, AND THEN THE PLATFORM ABORTS. Both
+    // are true: liveHandles() enumerates sockets, servers and timers, and the handle libuv asserts on is
+    // NodePlatform's `flush_tasks_` async, which no JS API exposes. A gate cannot assert its way out of this.
+    const V4668_FOUND = [
+        ["ai-bridge/tools/range-selfcheck.mjs", 103.7],
+        ["bz/tools/bz-tactics-selfcheck.mjs", 81.7],
+        ["tools/ship/skillbookDoor-selfcheck.mjs", 7.0],
+    ];
+    for (const [rel, cpuMs] of V4668_FOUND) {
+        const src = fs.readFileSync(path.join(ENG, rel), "utf8");
+        const left = exitCallCount(codeOnly(src));
+        ok(`...and so is ${rel.split("/").pop()}`, left === 0 && /process\.exitCode\s*=/.test(src),
+            `${left} process.exit() call(s) left in code; measured ${cpuMs} ms background CPU per 300 ms idle ` +
+            "at the exit line, against a 0.9 ms same-process control");
+    }
+    // THE ROW ABOVE CAN FAIL, SHOWN RATHER THAN CLAIMED: the same predicate run over a source that still
+    // calls process.exit() has to come back false, or the four PASSes above mean nothing.
+    {
+        const sab = "console.log('x');\nprocess.exit(fail ? 1 : 0);\n";
+        ok("...and the predicate those four rows use is one a still-unconverted gate FAILS",
+            exitCallCount(codeOnly(sab)) === 1 && !/process\.exitCode\s*=/.test(sab),
+            "a control that cannot fail is not a control -- the same two tests, over a two-line source with " +
+            "the old shape, and both come back the other way");
+    }
+
+    report("MEASURED at v4676, same instrument, same box: range 103.7 ms, bz-tactics 81.7 ms, skillbookDoor " +
+        "7.0 ms of background CPU per 300 ms idle window at the exit line, control 0.9 ms. bz-tactics is " +
+        "INTERMITTENT (381 ms alone vs 1090 ms loaded on the rig), so a green re-run is not a clearance. The " +
+        "assert's source line moves with the node build -- 94 on v24.17.0, 76 on v24.15.0 -- and is not an id.");
+
+    // *** AND THE TRUE CANDIDATE SET, STATED AS A CEILING RATHER THAN A TO-DO LIST. ***
+    // The walk is local and cheap: names only, no lexing, and the -selfcheck suffix is the tree's own
+    // definition of a gate (the same one buildKnowledgeIndex uses).
+    const allGates = (dir = ENG, out = []) => {
+        for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+            if (e.name === "node_modules" || e.name === ".git" || e.name === "vendor" || e.name === "GPU_Assets") continue;
+            const q = path.join(dir, e.name);
+            if (e.isDirectory()) allGates(q, out);
+            else if (/-selfcheck\.mjs$/.test(e.name)) out.push(q);
+        }
+        return out;
+    };
+    const gates = allGates();
+    const stillExit = gates.filter((g) => { try { return exitCallCount(codeOnly(fs.readFileSync(g, "utf8"))) > 0; }
+                                           catch { return false; } });
+    ok("the size of the question is reported rather than implied",
+        stillExit.length > 0 && stillExit.length <= gates.length,
+        `${stillExit.length} of ${gates.length} gates still call process.exit(). THAT IS A CEILING AND NOT A ` +
+        "TARGET: process.exit() is correct whenever nothing is queued, and converting a gate that is idle at " +
+        "exit buys nothing. WHAT IS NOT BUILT is the screen that would say WHICH of them are busy -- the " +
+        "measurement above costs a patched copy and a 300 ms window per gate, and running it over this many " +
+        "is a round of its own. THAT ROUND IS v4677: tools/ship/exitBusy.mjs is the screen, and " +
+        "tools/ship/exit-busy-census.json is what it measured. The width below is what was known BEFORE it.");
+
+    // *** v4677 -- THE WIDTH ABOVE, NARROWED BY MEASUREMENT, AND THE NUMBER IS A FLOOR. ***
+    // A seeded uniform sample of 120 of the screenable gates, measured serially: 114 read, 16 BUSY and 2 LATE
+    // (a burst that had not begun inside the first 300 ms), 1 STEADY, 95 QUIET, 6 UNKNOWN. That is 15.8% of the
+    // measured set, 95% CI 10.2-23.6%, which over the 1413 gates with a terminal exit is ABOUT 223 (145-333).
+    // Set against "at least 52, at most 1708", the interval is twelve times narrower and it has an argument.
+    // IT IS A FLOOR FOR THREE REASONS, ALL IN THE RECORD: the two late-burst gates say one window under-reads;
+    // the 5 cap kills are UNKNOWN and are the EXPENSIVE gates, the likelier members; and every reading is Linux,
+    // where this teardown is silent. The 18 found are converted. The STEADY one is NOT -- its work never drains,
+    // so converting it could hang rather than help, and it is named in the record instead of quietly listed.
+    {
+        const CENSUS = path.join(ENG, "tools", "ship", "exit-busy-census.json");
+        let c = null; try { c = JSON.parse(fs.readFileSync(CENSUS, "utf8")); } catch {}
+        ok("!! *** the width is now a measured interval with its sample, its seed and its holes ***",
+            !!c && c.estimate && c.estimate.loCount > 52 && c.estimate.hiCount < stillExit.length &&
+            c.sample.measured > 100 && c.sample.unknown > 0 && Object.keys(c.sample.unknownReasons).length > 0 &&
+            c.members.length === c.counts.busy + c.counts.late && c.steadyMembers.length === c.counts.steady,
+            c ? `${c.estimate.overPopulation} of ${c.sample.population} (${c.estimate.loCount}-${c.estimate.hiCount}), ` +
+                `from ${c.sample.measured} measured of ${c.sample.drawn} drawn at seed ${c.sample.seed}, with ` +
+                `${c.sample.unknown} UNKNOWN. Prior: ${c.estimate.priorRange}`
+              : "exit-busy-census.json is missing, so there is no measured width -- the row above is all there is");
+        ok("...and every member it names is converted, while the STEADY one is deliberately not",
+            !!c && c.members.every((m) => m.converted === true) &&
+            c.steadyMembers.every((m) => m.converted === false && /could HANG/.test(m.why || "")),
+            c ? `${c.members.length} converted, ${c.steadyMembers.length} left alone with the reason recorded` : "");
+        ok("...and the census records the instrument that DID NOT work, so it is not rebuilt",
+            !!c && /Atomics\.wait/.test(c.method.disprovenInstrument || "") &&
+            /forbids the work/.test(c.method.disprovenInstrument || ""),
+            "a --require hook parking the main thread read 0.1-0.2 ms for all four gates the rig crashed on");
+    }
+    {
+        // Keep the old width, computed, so the narrowing can be seen rather than asserted.
+        const floor = 48 + 1 + V4668_FOUND.length;
+        report(`THE WIDTH BEFORE v4677: at least ${floor} and at most ${stillExit.length} -- a factor of ` +
+            `${(stillExit.length / floor).toFixed(0)}. AFTER: 145 to 333, a factor of 2.3, from a sample whose ` +
+            "seed, cap, holes and disproven first instrument are all in exit-busy-census.json.");
+    }
+}
+
+console.log(fails ? `\nwasmTeardown-selfcheck: ${fails} FAILED` : "\nwasmTeardown-selfcheck: all checks pass");
+console.log("\nunchecked here: THE CRASH ITSELF. unix/async.c's uv_async_send has no UV_HANDLE_CLOSING " +
+    "assertion, so the identical teardown is silent on this platform and no row below can go red for the " +
+    "reason the round exists. What is measured here is that the window is wide, that nothing this tree owns " +
+    "is in it, and that closing it costs nothing. THE RIG'S NEXT CLONE-VERIFY IS THE INSTRUMENT FOR THE FACT.");
+process.exitCode = fails ? 1 : 0;

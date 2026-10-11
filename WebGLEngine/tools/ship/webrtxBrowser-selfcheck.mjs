@@ -24,7 +24,7 @@ import http from "node:http";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { codeOnly, noComments } from "./sourceScan.mjs";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import { UPSTREAM, MAINTENANCE, BUILD_STEPS, MEASURED_HERE, REFUSED, STAGED_PATH,
          initialState, nextStep, blockersFrom, warningsFrom, humanBytes, totalBytes } from "../../ui/webrtxBrowser.js";
 
@@ -154,7 +154,7 @@ console.log("\n4. *** THE PAGE ITSELF -- SERVED FROM AN ADDRESS THAT IS NOT loca
         });
         await new Promise((r) => srv.listen(0, "0.0.0.0", r));
         const port = srv.address().port;
-        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
         const pg = await (await b.newContext()).newPage();
         const errs = [];
         pg.on("pageerror", (e) => errs.push(String(e.message)));

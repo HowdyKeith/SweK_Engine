@@ -36,7 +36,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
+// rig run 12 (option a): the two-backend launches take PARITY_ARGS, and rows that hold a backend to a model of SwiftShader's
+// rasterisation go through softwareClaims -- asserted on software, reported on a GPU (tools/ship/webgpuHarness.mjs)
+import { runInEngineOrigin, webgpuSkipReason, PARITY_ARGS, softwareClaims } from "./webgpuHarness.mjs";
 import { nullBackend } from "../../gfx/device.js";
 import { parseFont } from "../../text/slugFont.js";
 import { slugRender } from "../../text/slugEval.js";
@@ -188,7 +190,7 @@ sec("2. THE FRAME, ON BOTH BACKENDS: the strips through render/slugDevice.mjs ag
     const skip = webgpuSkipReason();
     if (skip) { console.log(`  SKIP  ${skip}`); report("*** NOT A PASS. ***"); fails++; }
     else {
-        const r = await runInEngineOrigin({ engineRoot: ENG, args: { W, H, SIZE, ORIGIN, TEXT, CHARS, RADIUS, STRIPS }, script: `async (a) => {
+        const r = await runInEngineOrigin({ launchArgs: PARITY_ARGS, engineRoot: ENG, args: { W, H, SIZE, ORIGIN, TEXT, CHARS, RADIUS, STRIPS }, script: `async (a) => {
             const { requestDevice } = await import("/gfx/device.js");
             const { parseFont } = await import("/text/slugFont.js");
             const M = await import("/render/slugDevice.mjs");
@@ -228,12 +230,13 @@ sec("2. THE FRAME, ON BOTH BACKENDS: the strips through render/slugDevice.mjs ag
             fd = new SlugFontDevice(nb, font, CHARS, { logWidth: r.result.webgl2.logWidth });
             const curve = arcFor(RADIUS), built = buildCurvedVertices(laid.glyphs, entryFor, curve, { strips: STRIPS });
             const exact = exactFrame(curve);
+            const SW = softwareClaims(ok, r);
             for (const bk of ["webgpu", "webgl2"]) {
                 const o = r.result[bk];
                 ok(`${bk}: the texcoord captures compiled and drew`, o.capErrors.length === 0 && Object.keys(o.cap).length === 2 && o.strips === built.strips && o.logWidth === fd.logWidth, o.capErrors.join(" | ") || `logWidth ${o.logWidth}`);
                 if (o.capErrors.length) continue;
                 const fit = fitSubpixel(built.records, o.cap);
-                ok(`*** ${bk}: the snapped-corner model with the STRIPS' Jacobians reproduces the fragment's texcoord to ${MODEL_TOL_EM} em ***`, fit.best.worst < MODEL_TOL_EM && fit.best.n > 1000,
+                SW(`*** ${bk}: the snapped-corner model with the STRIPS' Jacobians reproduces the fragment's texcoord to ${MODEL_TOL_EM} em ***`, fit.best.worst < MODEL_TOL_EM && fit.best.n > 1000,
                     `worst ${fit.best.worst.toExponential(2)} em over ${fit.best.n} fragments at 1/${fit.best.Q}`);
                 const key = expectedFrame(built.records, fit.best.Q);
                 const lit = key.filter((v) => v > 0.02).length, partial = key.filter((v) => v > 0.02 && v < 0.98).length;
@@ -245,7 +248,7 @@ sec("2. THE FRAME, ON BOTH BACKENDS: the strips through render/slugDevice.mjs ag
                     const ex = Math.round(exact[i] * 255); if (got < 5 && ex < 5) continue;
                     const de = Math.abs(got - ex); exN++; exSum += de; if (de > TOL) exOver++; if (de > 32) exBig++; if (de > exWorst) { exWorst = de; exWorstAt = i; }
                 }
-                ok(`*** ${bk}: every pixel within ${TOL} of 255 of slugEval through the model -- the dilation and the Jacobian are right per strip ***`, over === 0,
+                SW(`*** ${bk}: every pixel within ${TOL} of 255 of slugEval through the model -- the dilation and the Jacobian are right per strip ***`, over === 0,
                     `worst ${worst} at (${worstAt % W}, ${Math.floor(worstAt / W)}), ${exactN} of ${W * H} exact`);
                 // THE TESSELLATION'S VISIBLE COST, COUNTED AND NOT PRESUMED. A first draft held "fewer than 3% of the lit pixels differ by more
                 // than 2": measured, MORE THAN HALF do -- a 0.08 px texcoord error moves every antialiased edge by a few levels of 255, and
@@ -259,6 +262,7 @@ sec("2. THE FRAME, ON BOTH BACKENDS: the strips through render/slugDevice.mjs ag
             }
             const L = r.result.webgl2.pixels, G = r.result.webgpu.pixels; let pw = 0, po = 0;
             for (let i = 0; i < W * H; i++) { const d = Math.abs(G[i * 4] - L[i * 4]); if (d > TOL) po++; if (d > pw) pw = d; }
+            SW.held(4);
             ok(`*** the two backends agree within ${TOL} of 255 on every pixel of the curved text ***`, po === 0, `worst ${pw}`);
         }
         if (r && r.pageErrors && r.pageErrors.length) report("page errors: " + r.pageErrors.slice(0, 3).join(" | "));

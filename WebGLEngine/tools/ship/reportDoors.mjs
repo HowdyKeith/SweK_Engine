@@ -56,7 +56,18 @@ const SKIP_DIR = /^(node_modules|vendor|\.git|\.venv)$/;
 //
 // So the walk collects every gate BASENAME as it goes and answers both questions. The debt is the second
 // number, and it was hidden inside the first.
+// *** v4814 -- ONE WALK PER GATE RUN, AND ONLY WHEN THE CALLER ASKS FOR IT. *** reportDoors-selfcheck reached this
+// function three times in one process -- classify(), its own population row, and this module's reportLines() run as a
+// member of the population it counts -- and each walk read every .js/.mjs in the tree: 7,953 reads and 127 MB of the
+// gate's 2.7 s here, and the rig, slow at file reads, took the gate to 5,065 ms, over its sweep line and leaving 8
+// records unchecked at ship time. The census cannot change while that gate runs (it writes nothing into the tree), so
+// it turns the memo on. EVERYONE ELSE GETS A FRESH WALK: the bridge and server.html call reportLines() on members in
+// long-lived processes, and a census frozen at the first call would be wrong by the second. Copies are handed out, so
+// a caller that decorates a row cannot change the next caller's answer.
+let _memo = null;
+export function cachePopulation(on = true) { _memo = on ? new Map() : null; }
 export function population(root) {
+    if (_memo && _memo.has(root)) return _memo.get(root).map((r) => ({ ...r }));
     const out = [];
     const gateNames = new Set();
     const walk = (dir) => {
@@ -84,7 +95,9 @@ export function population(root) {
     // second pass, once the whole tree's gate names are known: a gate that does not sit beside its subject
     // is still a gate, and the two facts are kept apart rather than one standing in for the other
     for (const r of out) r.gateAnywhere = r.hasGate || gateNames.has(path.basename(r.rel).replace(/\.(js|mjs)$/, "-selfcheck.mjs"));
-    return out.sort((a, b) => a.rel.localeCompare(b.rel));
+    out.sort((a, b) => a.rel.localeCompare(b.rel));
+    if (_memo) _memo.set(root, out.map((r) => ({ ...r })));
+    return out;
 }
 
 /** The runtime arity, which is the only one that answers "can a consumer call this with nothing?". */
@@ -124,6 +137,12 @@ export const FORMATTERS = Object.freeze([
     // options -- a mesh, a ground function -- which is why Function.length reports them as requiring one.
     "nav/navmesh.mjs",                    // v4543: reportLines(mesh, path) -- arity 2, the widest here
     "physics/character/terrainWalk.mjs",  // v4544: reportLines(ground) -- refuses bare with "g is not a function"
+    // *** A THIRD ARRIVAL FROM A ROUND THAT DID NOT REGISTER ITSELF HERE, AND IT IS MINE. *** v4647f
+    // factored quickSweep's human report out of its command line into `reportLines(r)` so a gate could call
+    // it -- and registered it in physics/instruments.mjs, which is a DIFFERENT registry, while leaving this
+    // one alone. The note above was written about exactly this and it did not stop me: the round that adds
+    // a formatter is the round least likely to remember there are two lists of them.
+    "tools/ship/quickSweep.mjs",          // v4647f: reportLines(r) -- renders a sweep result, bare call throws
 ]);
 
 // *** AND Function.length CANNOT TELL THE LAST TWO FROM THE FIRST FOUR EITHER, WHICH IS THE THIRD INSTRUMENT
@@ -166,6 +185,9 @@ export const STRICT_FORMATTERS = Object.freeze([
     // physics/character/terrainWalk.mjs with "g is not a function". Neither fabricates a report.
     "nav/navmesh.mjs",
     "physics/character/terrainWalk.mjs",
+    // v4647o -- measured the same way, by CALLING it bare: "Cannot read properties of undefined (reading
+    // 'ran')". It refuses, so it is strict; it does not fabricate a report out of nothing.
+    "tools/ship/quickSweep.mjs",
 ]);
 export const TOLERANT_FORMATTERS = Object.freeze([
     "tools/roundhouse/curriculum.mjs",
@@ -338,6 +360,21 @@ export const NO_GATE_V4531 = Object.freeze([
 export const NO_GATE_V4565 = Object.freeze([
     "nav/navmesh.mjs",
 ]);
+// *** v4540 -- ONE ARRIVAL, AND IT ARRIVED THROUGH A MERGE RATHER THAN THROUGH THIS ROUND'S OWN WORK. ***
+// brain/fleetRouting.mjs, added by commit 30fba56e on the other line with a reportLines() and a gate at
+// tools/ship/fleetRouting-selfcheck.mjs -- gated ANYWHERE, so UNGATED_ANYWHERE_V4565 is untouched and stays
+// at two; ungated BESIDE, so this list owes it a name. That round did not re-take the list, so the red
+// travelled here with the merge and is registered here rather than argued about: the row went red on a
+// tree neither line had run this census over, which is what a union ratchet is for.
+//
+// *** THE VERSION ON THIS LIST IS LOWER THAN THE ONE ABOVE IT, ON PURPOSE. *** Two lines number this tree
+// from two counters and the other one is ahead; freezing by name AT A VERSION means the name records WHICH
+// ROUND WROTE IT DOWN, not what order the rounds happened in. Renumbering this to sort after V4565 would
+// make the list read as a chronology it is not.
+export const NO_GATE_V4540 = Object.freeze([
+    "brain/fleetRouting.mjs",
+]);
+
 // *** v4587 -- TWO ARRIVED OVER THREE ROUNDS AND WERE NOT WRITTEN DOWN WHEN THEY ARRIVED, WHICH IS THE FINDING. ***
 // brain/fleetRouting.mjs (v4584, the routing ledger) and physics/labHome.mjs (v4585, the lab's front door) each grew
 // a reportLines() with its gate in tools/ship/ (fleetRouting-selfcheck.mjs, labHome-selfcheck.mjs) and nothing
@@ -351,6 +388,19 @@ export const NO_GATE_V4565 = Object.freeze([
 export const NO_GATE_V4587 = Object.freeze([
     "brain/fleetRouting.mjs",
     "physics/labHome.mjs",
+]);
+
+// *** v4778 -- TWO ARRIVALS, THROUGH THE rtx MERGE, THE SAME SHAPE AS v4540's. *** Both grew a reportLines() on
+// the rtx line with their gate in tools/ship/ and nothing beside the module: brain/pilotPolicy.mjs (14c5b597,
+// the fly-brain pilot for the space dogfight, whose gate calls itself "THE SIBLING GATE OF brain/pilotPolicy.mjs"
+// from tools/ship/pilotPolicy-selfcheck.mjs) and world/cityChunkScene.mjs (4f0c5d7a, RTX round 5's CityGen-to-
+// ray-tracer glue, gated by tools/ship/cityChunkScene-selfcheck.mjs). Gated ANYWHERE, so UNGATED_ANYWHERE_V4565
+// stays at two; ungated BESIDE, so this list owes them names. The row was ALREADY on that line -- it branched at
+// 82ebd940 with NO_GATE_V4587 in place and never edited this file -- so it went red there as each arrived and no
+// round on that line wrote the names down; the red travelled here with the merge, v4587's finding a second time.
+export const NO_GATE_V4778 = Object.freeze([
+    "brain/pilotPolicy.mjs",
+    "world/cityChunkScene.mjs",
 ]);
 
 /**
@@ -375,8 +425,14 @@ export const UNGATED_ANYWHERE_V4565 = Object.freeze([
     "tools/ship/morphCounter.mjs",
 ]);
 
-/** Every provider with no gate BESIDE it, across the four dated lists. Derived, so no list can drift. */
-export const NO_GATE_ALL = Object.freeze([...NO_GATE_V4458, ...NO_GATE_V4531, ...NO_GATE_V4565, ...NO_GATE_V4587].sort());
+/** Every provider with no gate BESIDE it, across all six dated lists. Derived, so no list can drift alone.
+ *  DEDUPED BY NAME: brain/fleetRouting.mjs is in BOTH NO_GATE_V4540 and NO_GATE_V4587 -- the two lines each
+ *  wrote it down, v4540 when it arrived here through a merge and v4587 on main. Concatenating would count it
+ *  twice and hand every future arrival a permanent credit of one, which is the fault closingCoverage was
+ *  rebuilt for at v4399: freeze by NAME, not by COUNT. */
+export const NO_GATE_ALL = Object.freeze([...new Set(
+    [...NO_GATE_V4458, ...NO_GATE_V4531, ...NO_GATE_V4565, ...NO_GATE_V4540, ...NO_GATE_V4587,
+     ...NO_GATE_V4778])].sort());
 
 /** This module's own front door -- it is a member of the population it counts. */
 export function reportLines() {

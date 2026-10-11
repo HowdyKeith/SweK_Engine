@@ -30,6 +30,11 @@
     <label style="margin-left:12px"><input id="sub" type="checkbox" checked> substepping</label>
     <span class="dim">&mdash; switch it off and drive fast at a wall</span>
     <div style="margin-top:8px">
+      <label><input id="tp" type="checkbox" checked> third-person camera</label>
+      <label><input id="plant" type="checkbox"> test only the endpoint</label>
+      <span class="dim">&mdash; the planted version; walk left from the wall to see it put the camera through it</span>
+    </div>
+    <div style="margin-top:8px">
       <button id="go">walk right</button><button id="left">walk left</button><button id="reset">reset</button>
       <span class="dim" id="warn"></span>
     </div>
@@ -38,7 +43,9 @@
   <div class="card"><canvas id="cv" width="940" height="420"></canvas>
     <div class="dim" style="margin-top:4px">Side view. <span class="good">green</span> contact normals point back
       out of whatever blocked the body. The lip on the right is one voxel tall &mdash; drop the step height to 0
-      and it becomes a wall.</div>
+      and it becomes a wall. <span style="color:#e8c870">Yellow</span> is the third-person camera
+      (<code>camera/cameraBoom.js</code>): its box swept up the lift and back along the boom, stopped a
+      skin short of the first voxel it would touch. The dashed line is where it wants to be.</div>
   </div>
 
   <div class="card"><table id="tbl"></table></div>
@@ -46,6 +53,7 @@
 
 <script type="module">
 import { stepCharacter, overlapsSolid } from "/physics/character/kinematic.js";
+import { cameraBoom, easeBoom, placeAt } from "/camera/cameraBoom.js";
 
 const $=(id)=>document.getElementById(id);
 const HALF=[0.3,0.9,0.3];
@@ -57,7 +65,8 @@ const solid=(x,y,z)=>{
   if (x>=13 && x<=15 && y===3) return true;// overhang
   return false;
 };
-let pos=[2,0.9,0], vel=[0,0,0], dir=0, lastNormals=[], lastMoved=[0,0,0];
+let pos=[2,0.9,0], vel=[0,0,0], dir=0, lastNormals=[], lastMoved=[0,0,0], facing=1, boomLen;
+const CAM_HALF=[0.2,0.2,0.2], BOOM={ dist:4.5, lift:0.6, skin:0.3 };
 const sync=()=>{ $("speedv").textContent=$("speed").value; $("stepv").textContent=($("step").value/10).toFixed(1); };
 $("speed").oninput=$("step").oninput=sync; sync();
 $("go").onclick=()=>{dir=1;}; $("left").onclick=()=>{dir=-1;};
@@ -70,6 +79,19 @@ function frame(){
   vel[0]=dir*speed;
   const s=stepCharacter({pos,half:HALF,velocity:vel,isSolid:solid,dt:1/60,gravity:-24,stepHeight,maxSubstep});
   pos=s.pos; vel=s.velocity; lastNormals=s.normals; lastMoved=s.moved;
+  if (dir) facing=dir;
+  // the camera: behind the way the body faces, a little above, eased out and snapped in
+  const pivot=[pos[0], pos[1]+0.7, 0], back=[-facing, 0.3, 0];
+  const boom=cameraBoom({ pivot, back, dist:BOOM.dist, lift:BOOM.lift, half:CAM_HALF, skin:BOOM.skin, isSolid:solid });
+  boomLen=easeBoom(boomLen, boom.dist, 1/60);
+  const camPos=placeAt(boom, boomLen);
+  const l=Math.hypot(back[0],back[1]), want=[boom.start[0]+back[0]/l*BOOM.dist, boom.start[1]+back[1]/l*BOOM.dist, 0];
+  // THE PLANTED VERSION: the destination is tested and nothing on the way to it
+  const planted = overlapsSolid(want, CAM_HALF, solid) ? pivot : want;
+  const shown = $("plant").checked ? planted : camPos;
+  const camInside = overlapsSolid(shown, CAM_HALF, solid);
+  // past the safe point = something solid lies between the body and the camera, which the endpoint test never asks
+  const camBeyond = shown!==camPos && shown!==pivot && Math.hypot(shown[0]-boom.start[0], shown[1]-boom.start[1]) > boom.dist + 1e-9;
   const inside=overlapsSolid(pos,HALF,solid);
   $("warn").innerHTML = inside ? '<span class="bad">the body is INSIDE a solid &mdash; that is the tunnelling this prevents</span>' : "";
 
@@ -93,6 +115,16 @@ function frame(){
     g.beginPath(); g.moveTo(bx,by); g.lineTo(bx+n[0]*S*0.9, by-n[1]*S*0.9); g.stroke();
     g.beginPath(); g.arc(bx+n[0]*S*0.9, by-n[1]*S*0.9, 3, 0, 7); g.fillStyle="#8fe0a8"; g.fill();
   }
+  if ($("tp").checked) {
+    const P=(p)=>[p[0]*S, oy-p[1]*S];
+    g.setLineDash([4,4]); g.strokeStyle="#6b6040"; g.lineWidth=1;
+    g.beginPath(); g.moveTo(...P(boom.start)); g.lineTo(...P(want)); g.stroke(); g.setLineDash([]);
+    g.strokeStyle="#e8c870"; g.lineWidth=2;
+    g.beginPath(); g.moveTo(...P(pivot)); g.lineTo(...P(boom.start)); g.lineTo(...P(shown)); g.stroke();
+    const [cx,cy]=P(shown);
+    g.fillStyle = camInside || camBeyond ? "#e8a0a0" : "#e8c870";
+    g.fillRect(cx-CAM_HALF[0]*S, cy-CAM_HALF[1]*S, CAM_HALF[0]*2*S, CAM_HALF[1]*2*S);
+  }
   g.fillStyle="#7d8a90"; g.font="11px monospace";
   g.fillText("lip", 10*S+4, oy-S-6); g.fillText("wall", 18*S+4, oy-4*S); g.fillText("overhang", 13*S+4, oy-4*S-6);
 
@@ -104,7 +136,10 @@ function frame(){
     <tr><td class="dim">requested / achieved</td><td class="num">${s.requestedDist.toFixed(4)} / ${s.movedDist.toFixed(4)}</td>
         <td class="dim">never further?</td><td class="${s.movedDist<=s.requestedDist+1e-9?"good":"bad"}">${s.movedDist<=s.requestedDist+1e-9}</td></tr>
     <tr><td class="dim">contacts</td><td class="num" colspan="3">${lastNormals.length?lastNormals.map(n=>"["+n.join(",")+"]").join(" "):"none"}</td></tr>
-    <tr><td class="dim">inside a solid?</td><td class="${inside?"bad":"good"}" colspan="3">${inside?"YES - invariant broken":"no - the invariant holds"}</td></tr>`;
+    <tr><td class="dim">inside a solid?</td><td class="${inside?"bad":"good"}" colspan="3">${inside?"YES - invariant broken":"no - the invariant holds"}</td></tr>
+    <tr><td class="dim">camera boom asked / safe / shown</td><td class="num">${BOOM.dist.toFixed(2)} / ${boom.dist.toFixed(3)} / ${boomLen.toFixed(3)}</td>
+        <td class="dim">pulled in</td><td class="${boom.blocked?"num":"dim"}">${boom.blocked}</td></tr>
+    <tr><td class="dim">camera box inside a solid?</td><td class="${camInside?"bad":"good"}" colspan="3">${camInside?"YES":"no"}${camBeyond?' <span class="bad">-- but it is PAST something solid: the endpoint-only test put it through a wall</span>':""}</td></tr>`;
   requestAnimationFrame(frame);
 }
 frame();

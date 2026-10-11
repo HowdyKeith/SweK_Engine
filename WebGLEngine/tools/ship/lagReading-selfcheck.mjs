@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/lagReading-selfcheck.mjs — v3317
 //
-// Run: node tools/ship/lagReading-selfcheck.mjs   (~0.4s — MEASURED individually)
+// Run: node tools/ship/lagReading-selfcheck.mjs   (~1.0s — MEASURED individually: 1.27-1.51 s alone, 893 ms the sweep's serial median, v4803; it read ~0.4s)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // *** A MEASUREMENT WAS TAKEN CORRECTLY AND THEN READ WRONG, AND THE WRONG READING BECAME THE DIAGNOSIS. ***

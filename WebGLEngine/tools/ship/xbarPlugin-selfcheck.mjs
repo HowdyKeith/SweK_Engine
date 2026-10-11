@@ -60,19 +60,37 @@ console.log("\n3. no PATH, no working directory");
     let threw = false; try { buildPlugin({}); } catch { threw = true; }
     ok("!! generating without an engineRoot is refused", threw,
         "a menubar host has no working directory worth relying on, so a relative import cannot resolve");
-    const src = buildPlugin({ engineRoot: "/Users/k/SweK_Engine/WebGLEngine" });
+    // *** v4649 -- THE SHAPE ROWS NOW READ A FIXED macOS BUILD, NOT ONE MADE OF THIS BOX. ***
+    // nodePath defaults to process.execPath, which is right when a Mac generates its own plugin and
+    // nonsense everywhere else: on Windows the shebang came out `#!C:\\Program Files\\nodejs\\node.exe`
+    // and the row asserting an ABSOLUTE path failed for the platform rather than for the generator.
+    // The interpreter and the root are fixtures here, so these rows say the same thing on every box --
+    // which is the only way a gate about a macOS artifact can be run anywhere.
+    const MAC_NODE = "/opt/homebrew/bin/node";
+    const src = buildPlugin({ engineRoot: "/Users/k/SweK_Engine/WebGLEngine", nodePath: MAC_NODE });
     // *** CHECK LINE ONE, NOT THE FILE. *** The first draft searched the whole source for "/usr/bin/env" and
     // found it in the COMMENT that explains why /usr/bin/env is wrong -- v3449's founding defect for the third
     // time in this session. A shebang is line one by definition, so that is the only line worth reading.
     const shebang = src.split("\n")[0];
     ok("!! *** the shebang is an ABSOLUTE interpreter path, not /usr/bin/env node ***",
-        /^#!\//.test(shebang) && !/\/usr\/bin\/env/.test(shebang),
+        shebang === "#!" + MAC_NODE && /^#!\//.test(shebang) && !/\/usr\/bin\/env/.test(shebang),
         "a menubar app launched from Finder does not inherit a login shell's PATH -- the classic way these " +
         "plugins work in a terminal and show NOTHING in the menubar");
     ok("!! no runner frame contains the parameter separator",
         MENUBAR_RUNNER.every((f) => !f.includes("|")),
         "the gauge's own frames start with '|', which IS the grammar -- the renderer brings menubar-safe ones");
-    ok("!! the gauge is imported by absolute file:// URL", /import \{[^}]*\} from "file:\/\/\/Users\/k\/SweK_Engine/.test(src));
+    ok("!! the gauge is imported by absolute file:// URL, POSIX-shaped whatever box built it",
+        /import \{[^}]*\} from "file:\/\/\/Users\/k\/SweK_Engine\/WebGLEngine\/ui\/runnerGauge\.mjs"/.test(src),
+        "a backslash inside a file URL is not a path any host resolves, and path.join put them there on Windows");
+    // Driven on a WINDOWS-SHAPED root from any box, because the repair is invisible otherwise: path.join on
+    // Linux already answers with forward slashes, so restoring the bug here would measure zero and the row
+    // would be graded by the one platform that never had it.
+    const winBuilt = buildPlugin({ engineRoot: "C:\\SweK_src\\WebGLEngine", nodePath: MAC_NODE });
+    const winUrl = (winBuilt.match(/from "(file:[^"]+)"/) || [])[1] || "";
+    ok("!! *** and a root spelled with backslashes still yields a POSIX file URL -- the plugin runs on a Mac ***",
+        winUrl === "file://C:/SweK_src/WebGLEngine/ui/runnerGauge.mjs" && !winUrl.includes("\\"),
+        `${winUrl} -- generated from C:\\SweK_src\\WebGLEngine. A backslash inside a file URL is not a path ` +
+        "any host resolves, and it is what path.join produced when the generator ran on Keith's rig");
     ok("!! the fetch is bounded, so a hung endpoint cannot freeze the slot",
         /AbortController/.test(src) && /setTimeout\(\(\) => ac\.abort\(\), \d+\)/.test(src),
         "a plugin that hangs holds its menubar slot until the host kills it");
@@ -95,7 +113,11 @@ console.log("\n4. generated, executed, and parsed back");
     // out, and the gate reported the plugin broken when the HARNESS was. A test that blocks the thing it is
     // testing against measures only itself.
     let out = "", err = "";
-    try { const r0 = await run(file, { encoding: "utf8", timeout: 15000 }); out = r0.stdout; err = r0.stderr; }
+    // *** RUN THROUGH THIS BOX'S NODE, NOT THROUGH THE SHEBANG. *** Executing the file directly asks the
+    // OS to honour `#!<path>`, which Windows does not do at all -- so every row below reported the plugin
+    // broken on a box where nothing about the plugin was being tested. The shebang's TEXT is asserted
+    // above, on a fixed macOS build; what these rows are about is what the plugin PRINTS.
+    try { const r0 = await run(process.execPath, [file], { encoding: "utf8", timeout: 15000 }); out = r0.stdout; err = r0.stderr; }
     catch (e) { out = (e.stdout || "").toString(); err = (e.stderr || e.message || "").toString(); }
     const lines = out.trim().split("\n");
     const sep = lines.indexOf("---");
@@ -114,7 +136,7 @@ console.log("\n4. generated, executed, and parsed back");
     srv.close();
     await new Promise((r) => setTimeout(r, 50));
     let out2 = "";
-    try { out2 = (await run(file, { encoding: "utf8", timeout: 15000 })).stdout; }
+    try { out2 = (await run(process.execPath, [file], { encoding: "utf8", timeout: 15000 })).stdout; }
     catch (e) { out2 = (e.stdout || "").toString(); }
     const l2 = out2.trim().split("\n");
     ok("!! *** with the endpoint gone, the menubar line greys out and shows no number ***",

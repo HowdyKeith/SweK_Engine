@@ -9,6 +9,30 @@
 // filesystem clause, v4478's rows-that-worked count -- and the pattern is always the same: the zero was never
 // driven.
 //
+// ---- *** v4647 -- THREE RED HERE MEANT THE TREE HAD DRIFTED, AND IT WAS FILED AS THIS GATE BEING BROKEN ***
+//
+// A full verify found this gate 3 red on BOTH boxes, and the reds were opened as a backlog item reading "its
+// own sabotage rows are what fail" -- because the FAIL text names sabotage F and a fixture, so it READ like a
+// detector whose controls had stopped discriminating. That is the failure mode the header above is about, and
+// it was the wrong diagnosis. THE GATE WAS EXACTLY RIGHT: three derived records really had gone stale, all
+// three created by the rounds that were reading its output.
+//
+// *** SETTLED BY AN EXPERIMENT RATHER THAN BY READING, AND THE EXPERIMENT IS THE POINT. *** Each stale record
+// was restored independently and this gate re-run:
+//
+//     assertionShape's census stale alone           -> 0 red   (not the cause at all)
+//     vba/runtimeGap's census stale alone           -> 2 red
+//     both stale together                           -> 2 red
+//     all three, including the missing sweep closing -> 3 red, the state it was filed in
+//
+// So the third row was the closing ledger -- which the verify pre-flight had named in plain words ("sweep
+// closings: 5 gate(s) no closing names") in the same output the reds were read from. Restoring the three
+// records takes this gate green with nothing here touched.
+//
+// WHAT TO DO WHEN IT IS RED AGAIN: read the drift pre-flight's line first, and restore each named record one
+// at a time. This gate's prose describes its FIXTURES, so a red always reads like a fixture failing; what it
+// is reporting is the tree.
+//
 // ---- *** SIX SABOTAGES, AND TWO OF THEM WENT ZERO-RED FIRST *** ------------------------------------------------
 //
 //  A. `drift` reports every record fresh                  -> 0 RED, THEN 1 RED AFTER THE REPAIR
@@ -31,7 +55,10 @@
 // ---- *** WHAT THIS GATE DOES NOT CLAIM *** ------------------------------------------------------------------
 //
 // That a clean report predicts a passing verify -- it checks derived records, not the subject of any gate.
-// That the five records are all of them; they are the ones this session was bitten by. And that this file
+// That the six records are all of them; they are the ones this session was bitten by -- and v4551 is the
+// proof that the set was NOT complete, since it added a sixth after the FSR arc drifted four records over
+// five rounds and this pre-flight, run on any of them, would have named only two. The seventh (redCensus's
+// registered reds) is named in reportLines as a gap with its reason, not quietly left out. And that this file
 // should re-take anything: it reads and reports, per v3698's refusal that a loop writing and grading the same
 // record can mark its own work passed.
 
@@ -49,11 +76,12 @@ console.log("recordDrift-selfcheck -- the records a new module invalidates\n");
 console.log("1. what the tree says right now");
 
 const live = await drift();
-say(reportLines ? (await reportLines()).join("\n  ----  ") : "");
+say(reportLines ? (await reportLines(live)).join("\n  ----  ") : "");
 ok("every check returns a name, a verdict and what the record OWES",
     live.all.every((c) => c.name && typeof c.stale === "boolean" && typeof c.owes === "string" && c.owes.length > 20),
     "sabotage C: 'something drifted' is not a finding anybody can act on");
-ok("the checks cover the four re-derivable records", live.all.length === REC.checked);
+ok("the checks cover every re-derivable record the register counts", live.all.length === REC.checked,
+    `${live.all.length} checks, record says ${REC.checked} checked and ${REC.notChecked} not`);
 
 // ---- 2. *** EACH CHECK, DRIVEN AGAINST A RECORD THAT HAS ACTUALLY DRIFTED *** -------------------------------------
 console.log("\n2. handed a stale record, each check names it");
@@ -75,10 +103,24 @@ console.log("\n2. handed a stale record, each check names it");
     // stale" and went red -- because this round's own new gate had already made three records stale, which is
     // the very cost the file exists to surface. A control that assumes a clean tree is a control that only
     // works on a tree nobody is working on.
-    const baseline = live.stale.filter((c) => c.name !== "assertionShape census").length;
-    ok("...and the OTHER checks are unaffected by that fixture",
-        d.filter((c) => c.stale).length === baseline + 1,
-        `sabotage F: marking everything stale is as useless as marking nothing stale (baseline ${baseline})`);
+    //
+    // *** v4647f -- AND THE FIX FOR THAT WAS ITSELF UNABLE TO SEE WHAT IT NAMED. *** The row read "the OTHER
+    // checks are unaffected by that fixture" and compared `d.filter(stale).length` against `baseline + 1`,
+    // where `d` came from a call carrying `only: "assertionShape census"` -- ONE check. `d` can therefore
+    // only ever hold 1 stale, so the row passed exactly when `baseline` was 0 and went red the instant
+    // anything in the tree had drifted, whatever the fixture did. FOUND BY MEASUREMENT: this gate was red
+    // with `baseline 2` while the two stale records were the knowledge index and the instrument registry,
+    // both moved by the round that was running -- the same shape v4647 already recorded here, where three
+    // reds meant the TREE had drifted and were filed as the gate being broken.
+    //
+    // So the row now asserts what a one-check run CAN establish: that `only` narrows to the check it names.
+    // The claim about the other checks is made in section 4, which calls drift() over the FULL set against
+    // the same live baseline and is the row that can actually make it. Re-running all six here would cost a
+    // second full drift pass in a gate that is 2.6 s against a 3,000 ms membership threshold.
+    ok("!! ...and `only` runs the check it names and no other, which is all a one-check run can establish",
+        d.length === 1 && d[0].name === "assertionShape census",
+        `${d.length} check(s) ran. The "other checks are unaffected" claim lives in section 4, over the ` +
+        `full set -- a row cannot grade what it did not run, and this one used to try`);
 }
 {
     // closingCoverage: a gate no closing names
@@ -137,12 +179,21 @@ console.log("\n2. handed a stale record, each check names it");
         const good = fs.readFileSync(TP, "utf8");
         const RD = await import("./recordDrift.mjs");
         let healed = null, broken = null;
+        // *** v4778 -- THE BROKEN CASE WAITS 1 ms, AND NOTHING ELSE HERE MOVED. *** These two cases were 176 ms
+        // of this gate, measured, nearly all of it waiting on timers, and half of that was the broken case: it
+        // never heals, so how long it waits between attempts proves nothing, and it waits 1 ms. Its ATTEMPT
+        // count is still the DEFAULT (`undefined`, not 3), because `tries === 3` is the only thing in this gate
+        // that pins it. The healed case keeps the 50 ms restore and the default 40 ms wait, so it still fails at
+        // 0 and 40 and heals at 80. A first draft of this cut restored at 10 ms and passed an explicit 3, and
+        // went 0-RED, measured, on three retry sabotages the old pair took red: default attempts 3 -> 2, 3 -> 5,
+        // and default wait 40 -> 8 ms. A 10 ms tear heals under any wait over 5 ms; a 50 ms one needs the
+        // default to span it. The row keeps its window, and pays about 40 ms for it.
         try {
             fs.writeFileSync(TP, good.slice(0, 300));                                  // torn
             setTimeout(() => { try { fs.writeFileSync(TP, good); } catch {} }, 50);    // ...and healed
             healed = await RD.readTimingsWithRetry(ENG);
             fs.writeFileSync(TP, good.slice(0, 300));                                  // and never healed
-            broken = await RD.readTimingsWithRetry(ENG);
+            broken = await RD.readTimingsWithRetry(ENG, undefined, 1);
         } finally { fs.writeFileSync(TP, good); }
         ok("!! *** A TORN READ HEALS ON RETRY, AND A BROKEN FILE IS NAMED RATHER THAN CRASHING ***",
             healed && healed.rec && healed.tries > 1 && broken && !broken.rec && broken.tries === 3 &&
@@ -157,18 +208,183 @@ console.log("\n2. handed a stale record, each check names it");
             `\`tries > 1\` IS THE POINT OF THE HEALED CASE -- succeeding on attempt one would prove nothing.`);
     }
     say(`the live timings hold ${Object.keys(t.timings).length} readings and ${Object.keys(t.at).length} stamps`);
-    const noStamp = { ...t, at: Object.fromEntries(Object.entries(t.at).filter(([k]) => k !== rel)) };
-    const dStamp = await checks({ timings: noStamp, only: "sweep timings" });
+    // *** v4680 -- THE SABOTAGE IS APPLIED TO EVERY RECORD, NOT ONLY THE SHARED ONE. *** Coverage is the union of
+    // every box's record (v4679), so a gate deleted from the shared file alone is still covered by whichever
+    // other record holds it -- the untracked sweep-timings.local.json a foreign box's sweep writes, for one. These
+    // rows were green only while no such file existed, and went red the first time a local verify wrote it.
+    const BT = await import("./boxTimings.mjs");
+    const world = BT.records(ENG);
+    const without = (field) => world.map((r) => ({ ...r, rec: { ...r.rec,
+        [field]: Object.fromEntries(Object.entries(r.rec[field] || {}).filter(([k]) => k !== rel)) } }));
+    const dStamp = await checks({ records: without("at"), only: "sweep timings" });
     const rowStamp = dStamp.find((c) => c.name === "sweep timings");
     ok("!! a reading WITH a time but WITHOUT its own capture stamp counts as missing evidence",
         rowStamp.stale === true && rowStamp.detail.includes(rel),
         "sabotage D: v4408 found one file-level `captured` covering 1,440 readings of which the run had taken " +
-        "937 -- an entry carries its own stamp or it carries nothing");
-    const noTime = { ...t, timings: Object.fromEntries(Object.entries(t.timings).filter(([k]) => k !== rel)) };
+        `937 -- an entry carries its own stamp or it carries nothing. Removed from all ${world.length} record(s) ` +
+        `(${world.map((r) => r.kind).join(", ")}), since any one of them covers the gate for the rest`);
     ok("...and a missing reading is caught too, so the check is not only about stamps",
-        (await checks({ timings: noTime, only: "sweep timings" })).find((c) => c.name === "sweep timings").stale === true);
-    ok("...while the untouched record is clean, so neither is simply always true",
-        (await checks({ timings: t, only: "sweep timings" })).find((c) => c.name === "sweep timings").stale === false);
+        (await checks({ records: without("timings"), only: "sweep timings" })).find((c) => c.name === "sweep timings").stale === true);
+    ok("...while the untouched records are clean, so neither is simply always true",
+        (await checks({ records: world, only: "sweep timings" })).find((c) => c.name === "sweep timings").stale === false);
+    // *** v4797 -- THE MASKING WITNESS ON A WORLD IT BUILDS, NOT THE ONE IT FINDS. *** Until v4791 it asked whether any local
+    // record HELD the gate; v4791 made it ask which record coverage READS -- and on a box whose own record is not the one read
+    // for this gate, that left it passing on nothing (it did, on every box this session). The masking is a property of
+    // coverageOf, so it is shown on a world made for it: the real records with the shared one given a host that is not this
+    // box, and one more record that IS this box's and times the gate. Hole the shared entry and this box's reading fills it
+    // -- MASKED; make the extra record foreign too and the first record is read, holed -- NOT masked. Both on every box.
+    {   const { boxId } = await import("./hostScale.mjs"), here = boxId(), now = new Date().toISOString();
+        const holed = (w) => w.map((r) => r.kind !== "shared" ? r : { ...r, rec: { ...r.rec, at: Object.fromEntries(Object.entries(r.rec.at || {}).filter(([k]) => k !== rel)) } });
+        // every other real record loses this gate, so the shared entry and the one made here are the only two that time it
+        const without = (rec) => ({ ...rec, timings: Object.fromEntries(Object.entries(rec.timings || {}).filter(([k]) => k !== rel)) });
+        const built = (host) => [...world.map((r) => r.kind === "shared" ? { ...r, host: "fixture-foreign-host", rec: { ...r.rec, host: "fixture-foreign-host" } } : { ...r, rec: without(r.rec) }),
+            { file: "tools/ship/sweep-timings.fixture.json", kind: "per-box", host, rec: { host, timings: { [rel]: 1 }, at: { [rel]: now }, kinds: { [rel]: "alone" }, codes: { [rel]: 0 } } }];
+        const staleOf = async (w) => (await checks({ records: w, only: "sweep timings" })).find((c) => c.name === "sweep timings").stale;
+        const clean = await staleOf(built(here)), masked = await staleOf(holed(built(here))), unmasked = await staleOf(holed(built("fixture-other-box")));
+        ok("!! ...and a hole in the shared record IS masked where this box's own record times the gate -- which is WHY the rows above sabotage every record",
+            clean === false && masked === false, `built world clean: ${!clean}; holed shared entry with this box's reading beside it: ${masked ? "stale" : "masked"}`);
+        ok("  ...and NOT masked where the record beside it is another box's, which coverage reads after the shared one",
+            unmasked === true, `holed shared entry with a foreign reading beside it: ${unmasked ? "stale" : "masked"}`);
+        // SABOTAGES (v4797), on tools/ship/boxTimings.mjs's coverageOf: the first record always read -> 1, the masked row; the
+        // last record always read -> 1, the control. The first draft built the world from the live records as they stood, and
+        // the control came out masked -- this box's own local timings file already held the gate -- so every other record
+        // gives the gate up before the two that matter are added.
+    }
+}
+
+{
+    // ---- *** v4551 -- THE SIXTH CHECK, DRIVEN ON A ROW THAT IS NOT THE FILE COUNT. *** ----------------------
+    // The fixture corrupts ONE capability row and leaves `files` alone, because a check that reads only the
+    // file count would pass this and is exactly the check that would have been easy to write. The row is
+    // picked BY INDEX and its label comes from CENSUS_FIELDS -- no capability name is spelled in this file,
+    // since the census greps file text and a gate that names a row changes the row. That is not a
+    // hypothetical: writing those twelve labels into recordDrift.mjs moved two rows by one on the run that
+    // first exercised this check.
+    const real = await import("../../vba/runtimeGap.mjs");
+    const label = Object.keys(real.PATTERNS)[3];
+    const field = real.CENSUS_FIELDS[label];
+    const rowOnly = {
+        ...real,
+        MEASURED_AT_V4462: Object.freeze({ ...real.MEASURED_AT_V4462, [field]: real.MEASURED_AT_V4462[field] + 1000 }),
+    };
+    // *** v4645 -- `only` ON THE FOUR SABOTAGE CALLS: 5,097 ms -> 2,541 ms, AND IT WAS NOT A MICRO-OPTIMISATION. ***
+    // This gate ran four checks() calls with no filter while reading ONE row out of each. The note below is
+    // right that the derived census is memoised, but the row above it is right too -- "an injected census is
+    // measured, not served from cache" -- so each of these three injected calls paid for the OTHER FIVE checks
+    // as well, and those walk the tree. THE COST WAS THE REASON A RECORD WENT UNGUARDED: at 4,892 ms this gate
+    // sat over the sweep's 3,000 ms budget, so DRIFT_AT_V4482 -- whose only guardian it is -- was classified
+    // `over-budget` rather than `checked` by tools/ship/recordReach.mjs, and had been for rounds. A gate too
+    // expensive to run is a guard on paper; halving it puts a record back under a live check.
+    const dRow = await checks({ load: async (p) => (p.includes("runtimeGap") ? rowOnly : import(p)), only: "runtimeGap census" });
+    const rRow = dRow.find((c) => c.name === "runtimeGap census");
+    say(`fixture: the '${label}' row overstated by 1000, files left correct`);
+    ok("!! a capability row that drifted is found, and the ROW is named -- not just 'the census moved'",
+        rRow.stale === true && rRow.detail.includes(label) && !rRow.detail.includes("files "),
+        "sabotage: a files-only check passes this fixture, and a files-only check is what v4550 and v4548 " +
+        "both show is not enough -- a two-file round moved four rows and a four-file round moved two");
+    const fileOnly = {
+        ...real,
+        MEASURED_AT_V4462: Object.freeze({ ...real.MEASURED_AT_V4462, files: real.MEASURED_AT_V4462.files + 7 }),
+    };
+    const dFile = await checks({ load: async (p) => (p.includes("runtimeGap") ? fileOnly : import(p)), only: "runtimeGap census" });
+    const rFile = dFile.find((c) => c.name === "runtimeGap census");
+    ok("...and a drifted file count is found too, so the check is not only about the rows",
+        rFile.stale === true && rFile.detail.includes("files "));
+    ok("...while the untouched census is clean, so neither is simply always true",
+        (await checks({ only: "runtimeGap census" })).find((c) => c.name === "runtimeGap census").stale === false,
+        "this is the record the FSR arc drifted for five rounds with nothing reading it");
+
+    // ---- *** THE MEMO'S KEY, WHICH WENT 0-RED AND IS THE REASON THIS ROW EXISTS. *** -----------------------
+    // The check caches the derived census so that eleven checks() calls pay for it once. recordDrift.mjs says
+    // in as many words that the key is the census FUNCTION and not a bare flag, "because a future fixture that
+    // injects a fake census would otherwise be handed the real answer and pass while measuring nothing" --
+    // and then NOTHING IN THIS GATE COULD TELL THE DIFFERENCE: swapping the key for the constant "one" left
+    // all five sabotages' worth of rows green. A comment asserting a property is not the property.
+    // The fixture injects a census that returns counts nothing on disk could produce. Order matters and is
+    // stated rather than assumed: the live drift() at the top of this file has already cached the real
+    // function's result, which is what a constant key would wrongly return here.
+    const fakeCensus = { ...real, census: () => ({ files: 1, counts: Object.fromEntries(
+        Object.keys(real.PATTERNS).map((k) => [k, 0])) }) };
+    const dFake = await checks({ load: async (p) => (p.includes("runtimeGap") ? fakeCensus : import(p)), only: "runtimeGap census" });
+    const rFake = dFake.find((c) => c.name === "runtimeGap census");
+    ok("!! the memo is keyed on the census FUNCTION -- an injected census is measured, not served from cache",
+        rFake.stale === true && rFake.detail.includes("-> 1"),
+        "sabotage BN: keying the memo on a constant went 0-RED against every other row in this gate, which " +
+        "is what made this row necessary. A cache the fixtures cannot get past turns them all into decoration");
+}
+{
+    // ---- *** THE MEMO NOW HOLDS FOUR DERIVATIONS, AND ONE PROVEN KEY IS NOT FOUR. *** ----------------------
+    //
+    // The row above proved the key for runtimeGap's census, back when that was the only thing memoised. This
+    // round put assertionShape's census, its gate-file walk and the knowledge-index rebuild behind the SAME
+    // map -- the gate makes three full passes over the tree per run and the index rebuild alone was 310 ms of
+    // each. Every one of those is a derivation a fixture is supposed to be able to replace, so every one of
+    // them needs its own proof that the key is the function and not something coarser. One proof standing in
+    // for four is a count standing in for a property.
+    //
+    // *** THE SABOTAGE WAS RUN PER SITE, BECAUSE THE OBVIOUS ONE IS NOT THE DISCRIMINATING ONE. *** Keying
+    // the whole memo on a single constant does not go 0-red, it CRASHES: the first derivation's result is
+    // served to the second, `gateFiles` comes back as a census object and checks() throws at line 219, so the
+    // gate dies before any row runs. Loud, and therefore not the failure these rows are for. The realistic
+    // coarse key is a per-site STRING -- "assertionShapeCensus", "knowledgeIndex" -- which is type-safe and
+    // silently serves the fixture the real tree's answer. Measured with exactly that, one site at a time:
+    // each produced exactly one red, its own, and nothing else in this gate moved.
+    //
+    // gateFiles is not given a row: it takes ENG and returns a file list, no check reads it directly, and the
+    // two checks that use it are both covered here and above. Said rather than left as a gap.
+    // *** v4778 -- THIS FAKE RAN THE WHOLE REAL CENSUS, SWAP SCAN INCLUDED, AND THAT WAS 907 ms OF THIS GATE. ***
+    // It read `census: () => ({ ...aReal.census(), definesOk: 1, gates: 1 })`. The bare call dropped the
+    // { shapes: false } checks() passes, so the one fixture paid for the swap scan the live check was cut
+    // loose from at v4548 -- 844 ms under --cpu-prof, of a 3,317 ms serial median on a tree the rtx merge grew
+    // to 4,581 sources and 70 MB -- and even with the flag passed through, the census it spread was 63 ms of
+    // gate walk for two fields the fake then overwrote. The check reads `definesOk` and `gates` and nothing
+    // else, so the fake returns those two, the way the runtimeGap fake above returns counts no tree could
+    // produce. What the row proves is unchanged: the fake is a different FUNCTION, and a memo keyed any
+    // coarser than the function hands it the live pass's real answer, which has no "vs 1" in it.
+    const aReal = await import("./assertionShape.mjs");
+    const aFake = { ...aReal, census: () => ({ definesOk: 1, gates: 1 }) };
+    const dA = await checks({ load: async (p) => (p.includes("assertionShape") ? aFake : import(p)), only: "assertionShape census" });
+    const rA = dA.find((c) => c.name === "assertionShape census");
+    ok("!! an injected assertionShape census is MEASURED, not served from the memo the live pass filled",
+        rA.stale === true && /vs 1,/.test(rA.detail) && /vs 1$/.test(rA.detail),
+        `the live drift() at the top of this file has already memoised the real census under the real ` +
+        `function; a coarser key would hand this fixture that answer and pass. Got: ${rA.detail}`);
+
+    // *** v4664 -- THE CHECK THAT SHOULD HAVE EXISTED FOR TWO ROUNDS, DRIVEN BOTH WAYS. ***
+    // v4663 added a frozen record and v4664 added another; this pre-flight reported "nothing stale" on both
+    // and BOTH verifies then came back with frozenRecords-selfcheck and recordReach-selfcheck red. The
+    // instrument whose whole job is to ask "what did a new module invalidate" was not asking about the two
+    // censuses that COUNT records, while the record in frozenRecords.mjs has carried the line "a round that
+    // adds a record re-takes this, and that is the point" since v4647f.
+    const fReal = await import("./frozenRecords.mjs");
+    const fFake = { ...fReal, PROBE_AT_V4536: Object.freeze({ ...fReal.PROBE_AT_V4536,
+        currentIncludingModule: Object.freeze({ ...fReal.PROBE_AT_V4536.currentIncludingModule, records: 1 }) }) };
+    const dF = await checks({ load: async (p) => (p.includes("frozenRecords") ? fFake : import(p)), only: "record censuses" });
+    const rF = dF.find((c) => c.name === "record censuses");
+    ok("!! a stale frozenRecords count is FOUND, and the detail names both records that hold one",
+        rF.stale === true && /frozenRecords records 1/.test(rF.detail) && /recordReach records/.test(rF.detail),
+        `it compares the live census against BOTH frozen counts, because a round that re-takes one and not ` +
+        `the other is exactly what happened here twice. Got: ${rF.detail}`);
+    const rrReal = await import("./recordReach.mjs");
+    const rrFake = { ...rrReal, REACH_AT_V4548: Object.freeze({ ...rrReal.REACH_AT_V4548, total: 1 }) };
+    const dR = await checks({ load: async (p) => (p.includes("recordReach") ? rrFake : import(p)), only: "record censuses" });
+    const rR = dR.find((c) => c.name === "record censuses");
+    ok("  ...and a stale recordReach total is found too, so the check is not only about the other one",
+        rR.stale === true && /recordReach records 1/.test(rR.detail),
+        `two records, two ways to be stale, and a check reading one of them would pass on half the cases. ` +
+        `Got: ${rR.detail}`);
+    ok("!! CONTROL: the untouched pair is clean, so neither row is simply always true",
+        (await checks({ only: "record censuses" })).find((c) => c.name === "record censuses").stale === false,
+        "the live tree agrees with both frozen counts today, which is what makes the two fixtures above " +
+        "measurements rather than a detector that reports everything");
+
+    const kReal = await import("./buildKnowledgeIndex.mjs");
+    const kFake = { ...kReal, buildIndex: () => ({ gates: [{ path: "physics/made-up.mjs", kind: "gate", id: "made-up", text: "not on disk" }], claims: [], findings: [] }) };
+    const dK = await checks({ load: async (p) => (p.includes("buildKnowledgeIndex") ? kFake : import(p)), only: "knowledge index" });
+    const rK = dK.find((c) => c.name === "knowledge index");
+    ok("!! an injected index rebuild is MEASURED too, and the diff names what moved",
+        rK.stale === true && rK.detail.includes("physics/made-up.mjs") && rK.detail.includes("buildKnowledgeIndex.mjs"),
+        `this is the 310 ms one, so it is the one a cache would most want to skip. Got: ${rK.detail}`);
 }
 
 // ---- 2b. THE TOP-LEVEL PARTITION, WHICH NOTHING GRADED IN THE FIRST DRAFT ---------------------------------------
@@ -221,11 +437,138 @@ console.log("\n4. the frozen record");
 ok("the rounds and their record counts are what the commits show",
     REC.rounds.length === 4 && REC.rounds.map((r) => r.records).join(",") === "3,2,4,4",
     "two to four, varying by what the round added -- which is why the list cannot be memorised");
-ok("!! re-deriving every checked record costs less than a second, against a five-minute verify",
-    Object.values(REC.cost).reduce((a, b) => a + b, 0) < 1000 && REC.verifyMs >= 300000,
-    `${Object.values(REC.cost).reduce((a, b) => a + b, 0)} ms vs ${REC.verifyMs} ms`);
-ok("the record admits the one it does not check", REC.notChecked === 1);
+// *** v4664 -- THE BOUND WAS A ROUND NUMBER AND IS NOW A RATIO, AND THE SWAP IS THE ARGUMENT THE RECORD
+// DEMANDED RATHER THAN A WIDENING. *** It read `sum < 1000`, and the record's own note beside the cost table
+// said the next check added "has to justify itself against that, or the budget has to move on an argument
+// instead of by drift". The seventh check costs 740 ms, the sum is 1,585, and the argument is that two
+// CONSECUTIVE rounds shipped a red verify for precisely the question it asks. A round number says nothing
+// about what the bound is for; what it is for is that the pre-flight must be cheap AGAINST THE THING IT
+// PROTECTS, and that is a ratio. 0.53% of a five-minute verify. If the checks ever grow to a tenth of the
+// verify they are guarding, they are not a pre-flight any more and this row says so at 1%.
+const COST_MS = Object.values(REC.cost).reduce((a, b) => a + b, 0);
+ok("!! re-deriving every checked record costs a small fraction of the verify it protects",
+    COST_MS < REC.verifyMs / 100 && REC.verifyMs >= 300000,
+    `${COST_MS} ms against a ${REC.verifyMs} ms verify -- ${(100 * COST_MS / REC.verifyMs).toFixed(2)}%, ` +
+    `bound 1%. The old form was a flat 1,000 ms and the seventh check at a FULL census would not have fit ` +
+    `under it; the check was made cheap (740 -> 285 ms, guardians off) AND the bound was given a shape, ` +
+    `because a round number says nothing about what it is guarding`);
+// v4665 -- TWO now, and both are ADMITTED rather than added. The second is orrery-fleet.json's byte counts,
+// whose only re-derivation costs 2,580 ms against a pre-flight totalling 1,130 -- see the note on the
+// register. What this row asserts is that the number and the CLAUSES agree: an OWES entry for every duty
+// this tool names but does not discharge, so "not checked" cannot quietly become "not mentioned".
+{
+    const admitted = Object.keys(OWES).length - REC.checked;
+    // *** AND THIS ROW WAS WRITTEN WITH ITS ARGUMENTS SWAPPED, WHICH MADE IT A CONTROL THAT COULD NOT FAIL.
+    // *** This file's ok() is (name, cond): I wrote ok(cond, message), so the ASSERTION was a template
+    // string -- always truthy -- and the name was a boolean. It "passed" on every tree. Nothing in this gate
+    // noticed; tools/ship/assertionShape-selfcheck.mjs did, by name, on the next full sweep, and its census
+    // moved suspects 0 -> 1 in the same breath. That detector exists for exactly this and this round is its
+    // fourth catch of the shape in one session.
+    ok(`the record admits the ${REC.notChecked} it does not check, and OWES carries a clause for each ` +
+       `(${Object.keys(OWES).length} clauses, ${REC.checked} checks)`,
+       REC.notChecked === 2 && admitted === REC.notChecked);
+}
 ok("the record is frozen", Object.isFrozen(REC) && REC.rounds.every(Object.isFrozen));
+
+// SABOTAGE LOG -- v4551, the sixth check. Applied to tools/ship/recordDrift.mjs and vba/runtimeGap.mjs, gate
+// run, red count read, all three files restored and md5-verified. Baseline 0 red.
+//   BI the per-row loop deleted, only `files` compared        -> 1 red. The fixture that catches it drifts ONE
+//      capability row and leaves the file count correct, which is the whole reason it is built that way: a
+//      files-only check is the easy thing to write and v4548 and v4550 both recorded rounds where the file
+//      count and the row count moved by different amounts.
+//   BJ the check hard-coded to `stale: false`                 -> 3 red.
+//   BK the detail reduced to "a row moved", no label          -> 1 red. "Something drifted" is not a finding
+//      anybody can act on, and this gate has held that line since v4482 for the other five checks.
+//   BL the whole check removed from the pre-flight            -> 1 red, on the count row against the register.
+//      That row is why the register carries `checked` and `notChecked` as numbers rather than as prose.
+//   BM CENSUS_FIELDS mismapped, "typed arrays" pointed at the promises field -> 1 red. The nastiest of the
+//      five, because it drifts nothing and breaks nothing: the check still runs, still compares twelve rows,
+//      and silently compares two of them against the wrong record.
+//   BN the memo keyed on the constant "one" instead of on the census function -> 1 red, AFTER this round
+//      added the row for it. *** IT WENT 0-RED FIRST AND THAT IS THE FINDING OF THIS SET. *** The memo was
+//      added because the check took this gate from 1,799 ms to 6,813 ms, past the sweep's 3,000 ms budget --
+//      and recordDrift.mjs states in as many words why the key is the FUNCTION: a fixture injecting a fake
+//      census would otherwise be served the real answer and pass while measuring nothing. Every other row in
+//      this gate stayed green under the constant key, including the five above, because all their fixtures
+//      override the recorded NUMBERS and share the real census function. So the file argued for a property
+//      that nothing tested, one round after this same session recorded two 0-REDs of exactly that shape in
+//      temporalAccumulate. A cache the fixtures cannot get past turns all of them into decoration; the row
+//      that catches it injects a census returning counts no tree could produce.
+//   No 0-RED among the six, once BN's row exists. Cost of the memo, measured: 6,813 -> 2,647 ms.
+
+// ---- 5. THE PRE-FLIGHT HAS A RUNNER ------------------------------------------------------------------------
+console.log("\n5. *** AND SOMETHING ACTUALLY RUNS IT, WHICH FOR FIVE ROUNDS NOTHING DID ***");
+{
+    // *** v4639. *** Everything above grades what recordDrift.mjs ANSWERS. Nothing graded whether the answer is
+    // ever asked for, and it was not: the tree imported that module exactly twice -- from this gate, and from
+    // runtimeGap-selfcheck.mjs for the tree walk it also exports and not for the drift check -- while THIS GATE
+    // runs 4,997 ms against quickSweep's 3,000 ms budget, so the ship-time sweep skips it. A pre-flight whose
+    // only caller is a gate nobody runs is a pre-flight that protects nothing.
+    //
+    // It was found the way it always is, by the round that needed it: adding one page gate moved five
+    // hand-maintained records, recordDrift named the stale one exactly, and it was run by hand after the verify
+    // had already gone red. tools/ship/recordReach-selfcheck.mjs has carried a red row saying this outright and
+    // it sat unread among the reds nobody was working.
+    //
+    // Two runners now, and the rows below hold both, because either one alone is how this was lost.
+    const RD_SRC = fs.readFileSync(path.join(ENG, "tools", "ship", "recordDrift.mjs"), "utf8");
+    ok("*** recordDrift.mjs has a CLI, so the pre-flight can be run on its own rather than only through this gate ***",
+        /import\.meta\.url === pathToFileURL\(process\.argv\[1\]/.test(RD_SRC) && /process\.exit\(stale\.length/.test(RD_SRC),
+        "node tools/ship/recordDrift.mjs prints the report and exits 1 on stale, so a ritual step reads a status " +
+        "rather than grepping a log");
+    const V_SRC = fs.readFileSync(path.join(ENG, "tools", "ship", "verify.mjs"), "utf8");
+    ok("  ...and verify.mjs runs the drift check itself, so a ship cannot skip it by this gate being slow",
+        /recordDrift\.mjs/.test(V_SRC) && /drift\(\)/.test(V_SRC),
+        "the check was 1,776 ms while this gate was 4,997 ms -- the expensive half was the GATE, so the step " +
+        "calls the module in-process. That stays true now the gate is fast: the in-process call is what makes " +
+        "the pre-flight independent of whether this gate is IN the sweep at all");
+    // *** THE ROW BELOW USED TO ASSERT THE OPPOSITE, AND ITS COMMENT SAID SO. ***
+    //
+    // It read: "this gate is STILL over the ship-time budget, which is the fact the two rows above exist for",
+    // and held the 4,997 ms so the reason for the CLI stayed findable -- with the note that if the gate ever
+    // came back under budget the row would go red and the reason would be owed a re-reading. That is the
+    // register-of-grievances shape: a witness row that goes red FOR THE REPAIR, so the only way to green is to
+    // leave the gate slow. It went red this round, exactly as predicted, and this is the re-reading.
+    //
+    // Where it went, measured on this box, three runs each, not remembered. Baseline 5,097 ms:
+    //   - 1,972 ms (to 3,125): `only` did not reach four of the six checks. An early
+    //     `if (!wanted("sweep timings")) return out;` sat above the runtimeGap census, so a fixture that named
+    //     that census got an EMPTY array back -- and four of this gate's own checks() calls passed no filter at
+    //     all while reading one row each, paying for a whole census apiece.
+    //   -   529 ms (to 2,596): drift() at the top of this file, then reportLines() on the next line running
+    //     drift() AGAIN -- a second full six-check pass to print a report on the one just finished.
+    //     reportLines now takes the result the caller already has.
+    // The rest is module import plus the two full passes this gate genuinely needs, which is the floor.
+    //
+    // *** v4778 -- AND IT CREPT BACK: 3,317 ms SERIAL MEDIAN AFTER THE rtx MERGE, AGAINST recordReach's 2,200. ***
+    // The tree had grown to 4,581 sources and 70 MB. Profiled with --cpu-prof rather than guessed, and NOT
+    // recovered by widening anything -- every sabotage in this file and its v4551 log was re-run on a scratch
+    // copy of HEAD, old gate beside new, and each took the same rows red in both:
+    //   -   907 ms: section 2's assertionShape fake called the real census with no arguments, so it ran the
+    //     swap scan the live check skips. The fake now returns the two fields the check reads.
+    //   -   ~110 ms: section 2b's second full pass re-ran closingCoverage.coverage() and registryOrphans.scan(),
+    //     both pure in the tree. They sit behind recordDrift.mjs's function-keyed memo now, and a string key
+    //     on either takes its own fixture row red, measured.
+    //   -   ~80 ms: the torn-read pair's broken case waited 40 ms between attempts that cannot heal (see its
+    //     note -- the healed case keeps its 50 ms window, because cutting it went 0-red on three retry
+    //     sabotages), and knowledge-index.json plus sweep-timings.json were parsed on calls that never read them.
+    // Serial median of seven alone after it, no other gate running: 1,994 ms with the healed window cut to
+    // 10 ms; with it kept at 50, five clean runs of eight read 1,956-2,072 ms, median 2,023. Interleaved with
+    // the old gate on a scratch copy while another agent's gates ran: 3,337 -> 2,127 ms. What is left is the live pass itself,
+    // about 1,600 ms -- the runtimeGap census over every source (~650), the index rebuild (~280), and the 70 MB
+    // read they share (~300) -- which is the tree's size, not this gate's overhead.
+    //
+    // So the row now asserts the live fact, in the direction where repair is green: the gate is in the sweep.
+    // If it ever goes back over, THAT is the red, and the CLI plus verify.mjs's in-process call are what keep
+    // the pre-flight running in the meantime -- which is why those two rows are above this one and not below.
+    const T = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-timings.json"), "utf8"));
+    const mine = T.timings["tools/ship/recordDrift-selfcheck.mjs"];
+    ok("  and this gate is back UNDER the ship-time budget, so the sweep actually runs it",
+        typeof mine === "number" && mine < T.budgetMs,
+        `${mine} ms against a ${T.budgetMs} ms budget, down from 4,997. This is the RECORDED timing, which is ` +
+        "what quickSweep reads to decide membership -- not a live measurement, so a run that slows the gate " +
+        "without re-timing it keeps this green until the next sweepRotation --write");
+}
 
 console.log(`\nrecordDrift-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
 process.exit(fails === 0 ? 0 : 1);

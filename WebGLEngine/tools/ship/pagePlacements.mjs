@@ -10,6 +10,8 @@
 //   topics[]    WHICH TOPIC DRAWERS on server.html list it. An ARRAY, not a choice -- Keith: "a page such as
 //               Cosmic Map could show some or all or none of the sections". A page can genuinely belong to two
 //               subjects and the old registry could not say so, because SECTIONS.pages is a partition.
+//               (v4778: it no longer is -- Keith: "There can be duplicate links in folder buckets." Two sections
+//               may now claim one page, and baseTopics() below already returns every claim, not the first.)
 //   bigButton   whether it gets a BIG BUTTON under the topics section on server.html.
 //   apps        whether it appears in the APPLICATIONS panel on the render page.
 //   auto        accept pagePlacement.mjs's SUGGESTION for topics rather than pinning one by hand. It is a

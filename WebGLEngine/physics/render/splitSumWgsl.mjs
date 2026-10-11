@@ -183,6 +183,11 @@ fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
  *  alignment; a lone vec4 sidesteps padding rules a struct of scalars would need worked out by hand). */
 export function packLutParams(K, R, samples) { return new Float32Array([K, R, samples, 0]); }
 
+/** v4814 -- the f32 floor splitSumWgsl-selfcheck.mjs holds the device's BRDF table to against splitSum.mjs's f64 brdfLut,
+ *  as |gpu - cpu|, per cell. ONE declaration: that gate reads it, and deviceCompute-selfcheck reads it to decide whether
+ *  two WebGPU paths that round pow/sqrt/trig differently on a hardware adapter are BOTH still right (Keith's call). */
+export const F32_FLOOR_ABS = 1e-4;
+
 /** One prefilterEnv test case, stride 8 floats, matching PREFILTER_ENV_WGSL's case layout exactly. */
 export function packPrefilterCase(R, alpha, envKind, samples) {
     const n = Math.hypot(R[0], R[1], R[2]) || 1;

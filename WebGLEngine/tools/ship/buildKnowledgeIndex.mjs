@@ -19,6 +19,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { extractClaims } from "./claimsGate.mjs";
 import { gateFiles } from "./staleness.mjs";
+import * as TR from "./treeRead.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENG = path.resolve(HERE, "..", "..");
@@ -26,13 +27,16 @@ const OUT = path.join(ENG, "knowledge-index.json");
 const SKIP = /node_modules|[\\/]\.git|[\\/]vendor|GPU_Assets|demos_code/;
 
 function walk(dir, test, out = []) {
+    // v4813: typed listing instead of a statSync per entry (6,174 per walk); see staleness.gateFiles, same change,
+    // same reason. A symlink still goes to statSync so the files found cannot change.
     let entries = [];
-    try { entries = fs.readdirSync(dir); } catch { return out; }
-    for (const f of entries) {
-        const p = path.join(dir, f);
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return out; }
+    for (const e of entries) {
+        const f = e.name, p = path.join(dir, f);
         if (SKIP.test(p)) continue;
-        let st; try { st = fs.statSync(p); } catch { continue; }
-        if (st.isDirectory()) walk(p, test, out);
+        let isDir = e.isDirectory();
+        if (e.isSymbolicLink()) { try { isDir = fs.statSync(p).isDirectory(); } catch { continue; } }
+        if (isDir) walk(p, test, out);
         else if (test(f)) out.push(p);
     }
     return out;
@@ -67,7 +71,10 @@ export function buildIndex() {
     const gates = gateFiles().map((p) => {
         const rel = path.relative(ENG, p).replace(/\\/g, "/");
         let purpose = "";
-        try { purpose = gatePurpose(fs.readFileSync(p, "utf8")); } catch {}
+        // v4718 -- THROUGH treeRead's MEMO, NOT THE DISK. The same paths as before and the same text -- textOf returns the walk's
+        // copy when it has one and reads the file when it does not -- but recordDrift-selfcheck runs this beside three censuses
+        // that have already read every one of these files, and re-reading ~5,800 from disk put it within recordReach's margin.
+        try { purpose = gatePurpose(TR.textOf(p)); } catch {}
         return { kind: "gate", id: path.basename(p, ".mjs"), path: rel, text: purpose };
     }).sort((a, b) => a.path.localeCompare(b.path));
 
@@ -94,7 +101,7 @@ export function buildIndex() {
     const findings = [];
     for (const f of walk(ENG, (n) => /\.mjs$|\.js$/.test(n))) {
         let src = "";
-        try { src = fs.readFileSync(f, "utf8"); } catch { continue; }
+        try { src = TR.textOf(f); } catch { continue; }   // v4718: the memo, as above; the walk that chose `f` is unchanged
         // The same shape the census uses to recognise an analysis record -- derived, never declared.
         for (const m of src.matchAll(/export\s+const\s+(MEASURED[A-Z_0-9]*|[A-Z_0-9]*REGISTRATION|[A-Z_0-9]*OUTCOMES|[A-Z_0-9]*_V\d+)\s*=/g)) {
             // Take the contiguous run of // lines immediately above the export -- that is where the finding is
@@ -132,6 +139,62 @@ export function writeIndex() {
 
 export function readIndex() {
     try { return JSON.parse(fs.readFileSync(OUT, "utf8")); } catch { return null; }
+}
+
+/**
+ * WHAT CHANGED BETWEEN TWO INDEXES, KEYED BY PATH -- because the checks that compare them could only say
+ * WHETHER, and one of them could not even say that.
+ *
+ * *** v4587 -- THE INDEX WAS STALE FOR THREE ROUNDS AND THE PRE-FLIGHT SAID "index agrees" EVERY TIME. ***
+ * recordDrift's knowledge-index check was `K.gates.length !== onDisk` -- A POPULATION COUNT WEARING THE NAME OF
+ * A CONTENT CHECK. Adding or removing a gate moves the count and it catches that; EDITING A GATE'S HEADER does
+ * not, and the header text is the entire reason this index exists ("one searchable answer to does this already
+ * exist?"). v4585 added redAction-selfcheck with a placeholder runtime line, filled in the real measurement the
+ * same round, and the index kept the placeholder through v4585, v4586 and two commits of v4586's follow-up.
+ * instruments-selfcheck DID compare bytes and was red the whole time -- read below for how that red read.
+ *
+ * *** AND KEYING THIS BY `id` IS THE TRAP THAT MANUFACTURED A PHANTOM FINDING. *** `id` is path.basename, and 25
+ * of them collide across 50 files (physics/X vs tools/roundhouse/X, eighteen times; plus downloadScan, fleet,
+ * frontDoor, fresnel, volume, mpmDevice). A throwaway comparison keyed on `id` built a Map that kept one entry
+ * per basename, reported 26 entries "changed" between two identical builds, and that non-finding was carried
+ * into a round summary as the next round's scope. THE REAL DRIFT WAS ONE ENTRY. Nothing in the tree keys on
+ * `id` -- instruments.html renders it beside `path` and filters on both -- so the uniqueness was never owed;
+ * what was owed was not assuming it. `path` is unique: 1643 entries, 1643 paths.
+ *
+ * Returns { same, added, removed, changed, summary } where changed names the fields that differ, so a red can
+ * say WHAT moved instead of how many things exist.
+ */
+export function diffIndex(a, b) {
+    const byPath = (idx) => new Map(((idx && idx.gates) || []).map((g) => [g.path, g]));
+    const A = byPath(a), B = byPath(b);
+    const added = [...B.keys()].filter((k) => !A.has(k)).sort();
+    const removed = [...A.keys()].filter((k) => !B.has(k)).sort();
+    const changed = [];
+    for (const [k, gb] of B) {
+        const ga = A.get(k);
+        if (!ga) continue;
+        const fields = ["kind", "id", "path", "text"].filter((f) => ga[f] !== gb[f]);
+        if (fields.length) changed.push({ path: k, fields, was: ga.text, now: gb.text });
+    }
+    // The non-gate sections are counted rather than diffed: claims come from one parsed page and findings from a
+    // comment scan, and neither has a stable per-entry key to diff ON. Saying so beats implying a comparison
+    // that is not being made.
+    const others = ["claims", "findings"].map((k) => {
+        const na = ((a && a[k]) || []).length, nb = ((b && b[k]) || []).length;
+        return na === nb ? null : `${k} ${na} -> ${nb}`;
+    }).filter(Boolean);
+    const same = !added.length && !removed.length && !changed.length && !others.length &&
+                 JSON.stringify(a) === JSON.stringify(b);
+    const bits = [];
+    if (added.length) bits.push(`${added.length} added (${added.slice(0, 3).join(", ")}${added.length > 3 ? ", ..." : ""})`);
+    if (removed.length) bits.push(`${removed.length} removed (${removed.slice(0, 3).join(", ")}${removed.length > 3 ? ", ..." : ""})`);
+    if (changed.length) bits.push(`${changed.length} changed: ` +
+        changed.slice(0, 3).map((c) => `${c.path} [${c.fields.join("+")}]`).join(", ") + (changed.length > 3 ? ", ..." : ""));
+    if (others.length) bits.push(others.join("; "));
+    // BYTE-IDENTICAL IS THE CLAIM, so a difference this function cannot name is still a difference: say that
+    // rather than reporting "same" for a file whose bytes disagree.
+    if (!bits.length && !same) bits.push("byte difference outside the gate list, claim count and finding count");
+    return { same, added, removed, changed, summary: same ? "byte-identical" : bits.join("; ") };
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {

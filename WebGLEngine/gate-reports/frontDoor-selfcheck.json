@@ -1,6 +1,6 @@
 {
  "gate": "gfx/frontDoor-selfcheck.mjs",
- "at": "2026-09-03",
+ "at": "2026-10-02",
  "tables": [
   {
    "title": "the WebGPU/TSL population and whether the front door reaches it",
@@ -50,7 +50,7 @@
      "no"
     ]
    ],
-   "note": "695 modules reached in total, walked with tools/ship/moduleRefs.mjs"
+   "note": "724 modules reached in total, walked with tools/ship/moduleRefs.mjs"
   },
   {
    "title": "one server, two origins, in a real browser",

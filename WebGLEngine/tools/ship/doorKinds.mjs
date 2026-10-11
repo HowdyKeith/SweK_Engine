@@ -265,6 +265,18 @@ export const MEASURED_V3608 = {
             "tool's own header calls itself 'the expensive half ... meant to be run rarely', so a button would " +
             "either be truncated by that cap or be the one press that reproduces the whole-suite cost the cap " +
             "exists to bound.",
+        // v4776 -- READ, THEN REFUSED, at the merge that brought it. genGateAbsolute is the runner a PRE-
+        // REGISTRATION names (render/learned-absolute-preregistration.md: "written before any frame ... has been
+        // harvested ... and before any fold of this design is run"), and its outputs -- the harvest cache and the
+        // result -- are committed and graded by genGateAbsoluteMeasure-selfcheck. The document's control for a
+        // re-run is C12: ONE fold, every arm, one seed, reproducing the recorded AUCs bit for bit -- not the whole
+        // design again. A button that re-harvests and re-folds the full H5 design is the one shape a
+        // pre-registered test must not have: a press that can be repeated until an answer pleases.
+        "tools/ship/genGateAbsolute.mjs": "the runner of a PRE-REGISTERED test (render/learned-absolute-" +
+            "preregistration.md), already run, its cache and result committed and graded by " +
+            "genGateAbsoluteMeasure-selfcheck. The design's own re-run control is C12 -- one fold reproduced bit " +
+            "for bit -- not the whole design again; a Run button for the full harvest and fold is a press that " +
+            "can be repeated until the answer pleases, which is what pre-registration exists to rule out.",
     },
     genuinelyOwed: {
         "physics/backend-qa-check.mjs": "needs a rig where box3d's WASM builds; a gate importing " +

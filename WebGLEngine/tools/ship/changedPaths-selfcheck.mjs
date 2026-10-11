@@ -175,16 +175,19 @@ console.log("\n4. THE INVARIANT THAT WOULD HAVE CAUGHT IT, AND WHY IT IS SOUND")
     const src = fs.readFileSync(RUNNER, "utf8");
     ok("the runner refuses when its kept set differs from the selected set",
         /all\.length !== a\.gates\.length/.test(src) && /process\.exit\(2\)/.test(src));
+    // "a/b" on every platform (rig run 2): the row below names "tools/ship/selfchecks.mjs", and Keith's rig read
+    // "tools\ship\selfchecks.mjs" against it -- the same file, red on the separator.
+    const relPosix = (p) => path.relative(ENG, p).split(path.sep).join("/");
     const walkSet = new Set();
     (function w(dir) {
         for (const f of fs.readdirSync(dir)) {
             if (f === "node_modules" || f === ".git" || f === "vendor" || f === ".venv") continue;
             const p = path.join(dir, f);
             let st; try { st = fs.statSync(p); } catch { continue; }
-            if (st.isDirectory()) w(p); else if (/selfcheck.*\.mjs$/.test(f)) walkSet.add(path.relative(ENG, p));
+            if (st.isDirectory()) w(p); else if (/selfcheck.*\.mjs$/.test(f)) walkSet.add(relPosix(p));
         }
     })(ENG);
-    const gset = new Set(gateFiles().map((p) => path.relative(ENG, p)));
+    const gset = new Set(gateFiles().map(relPosix));
     const extra = [...walkSet].filter((x) => !gset.has(x));
     const missing = [...gset].filter((x) => !walkSet.has(x));
     ok("*** the runner's walk and gateFiles() hold the same gates ***", missing.length === 0,

@@ -61,7 +61,8 @@ console.log("\n2. THE FOUR FACTS ARE INDEPENDENT, AND A PAGE CAN BE IN SEVERAL T
 
     ok("!! a page can be listed in TWO topics at once",
         r.topics.length === 2 && r.topics.includes("cosmic") && r.topics.includes("voxels"),
-        "*** SECTIONS.pages IS A PARTITION AND COULD NOT SAY THIS. *** Keith: \"a page such as Cosmic Map could " +
+        "*** SECTIONS.pages WAS A PARTITION AND COULD NOT SAY THIS (until v4778: \"There can be duplicate links in " +
+        "folder buckets\" -- two sections may now claim one page). *** Keith: \"a page such as Cosmic Map could " +
         "show some or all or none of the sections\" -- so topics is a SET, and the base registry's one-panel-" +
         "per-page shape was a limit of the storage rather than a fact about pages.");
     ok("!! bigButton and apps are independent of topics and of each other",
@@ -205,7 +206,7 @@ console.log("\n6. THE FOUR SURFACES READ THIS AND NOT EACH OTHER");
 console.log("\n7. *** NOTHING IS UNREACHABLE: THE REMAINDER GETS ALPHABETICAL HOLDING PANELS ***");
 {
     const P = await import("./pagePlacement.mjs");
-    const inv = P.inventory();
+    let inv; try { inv = P.inventory(); } catch (e) { console.log("  FAIL  the page inventory can be read   " + e.message); process.exit(1); }   // v4828: the cause on a row, not a stack
     const rem = unclaimed(resolve(), inv.pages.keys());
     const b = alphaBuckets(rem);
     report("unclaimed pages / buckets", rem.length + " / " + b.length);

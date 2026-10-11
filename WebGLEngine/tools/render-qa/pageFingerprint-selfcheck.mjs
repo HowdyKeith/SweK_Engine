@@ -12,6 +12,7 @@ import path from "node:path";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { importClosure, fingerprint, loadPrints, savePrints, shouldRun } from "./pageFingerprint.mjs";
+import { mutateFile, restoreMutation, armExitSweep } from "../ship/fixtureLitter.mjs";
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -25,14 +26,15 @@ const P = (f) => path.join(ROOT, f);
 {
     const page = P("blob-selfie.html");
     const dep = P("simulation/tomo/blobPhantom.js");
-    const orig = fs.readFileSync(dep);
-
+    // v4815 -- the edit to a tracked source file goes through fixtureLitter's ledger, so a run killed between the two
+    // writes is put back by the next sweep's reclaim instead of leaving "// touched by the gate" in the tree for git add.
+    armExitSweep();
     const printBefore = fingerprint(page, ROOT);
-    fs.appendFileSync(dep, "\n// touched by the gate\n");
+    const orig = mutateFile(dep, fs.readFileSync(dep, "utf8") + "\n// touched by the gate\n");
     const printAfter = fingerprint(page, ROOT);
     // and the page's OWN bytes, for contrast
     const pageBytesUnchanged = fs.readFileSync(page).equals(fs.readFileSync(page));
-    fs.writeFileSync(dep, orig);
+    restoreMutation(dep);
 
     ok("!! THE CLOSURE HASH SEES A DEPENDENCY CHANGE", printBefore.hash !== printAfter.hash,
        "touched blobPhantom.js -> blob-selfie.html's fingerprint moved " + printBefore.hash + " -> " + printAfter.hash +

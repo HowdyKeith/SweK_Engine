@@ -51,6 +51,15 @@ export const codeOnly = (t) => t.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[
 // and joined box3d's fleet, taking it 26 -> 27. A file whose subject is the scanner is not a dependant of what
 // it scans, and the exclusion is BY PATH rather than by hope.
 export const NOT_IMPORTERS = Object.freeze([
+    // v4667: SIXTH instance, and the first that is not a gate. gfx/frontDoor.mjs's REACH_ARRIVALS_SINCE_V4407
+    // is an ACCOUNT OF WHAT main.js's WALK REACHES, so the modules it names are written as the walk spells
+    // them -- and five of the eight arrivals recorded this round are vendor/three/ paths. The classifier read
+    // them as `path`, which is the right reading of a bare quoted vendor path almost everywhere and the wrong
+    // one here: this file has NO import statement at all, its single dynamic import is "./device.js", and it
+    // opens nothing. A file whose subject is what another file reaches is not a dependant of what that file
+    // reaches. Measured both ways: three at 79 with it in, 78 with it out, and the gate reported it as an
+    // ARRIVAL the same hour the record gained those names.
+    "gfx/frontDoor.mjs",
     "tools/ship/orreryEjecta-selfcheck.mjs",
     "tools/ship/importPosition-selfcheck.mjs",
     // v4416: FOURTH instance. This gate names vendor/keyhunt and vendor/three while measuring what a URL scrape
@@ -85,6 +94,24 @@ export const NOT_IMPORTERS = Object.freeze([
     // here. Identical in the report ("ARRIVED: <file>"), opposite fixes, and the substring rule cannot tell
     // an import from a readFileSync.
     "tools/ship/gltfKtx2-selfcheck.mjs",
+    // v4688: EIGHTH instance, and the FIRST where the vendor path is neither imported NOR read -- it is a
+    // TEST INPUT. constantRows-selfcheck.mjs feeds the literal string "vendor/box3d/LICENSE" to
+    // isConstantCondition to assert that a census stripping string contents sees no free identifiers in it.
+    // The file has zero readFileSync calls, zero dynamic imports, and imports only node builtins and three
+    // tools/ship modules. So box3d gained a dependant that neither depends on it nor even looks at it.
+    // *** WHICH IS A THIRD KIND, AND THE LIST HAS ONLY EVER HELD TWO. *** The seven above are files that
+    // ENUMERATE or READ a vendor directory to assert facts about it; this one uses a vendor path as a string
+    // whose WORDS happen to be the thing under test. Identical in the report ("ARRIVED: <file>"), and the
+    // substring rule cannot tell an import from a readFileSync from a quoted fixture -- which is the same
+    // limit stated seven times above, reached from one step further out.
+    // *** AND IT SAT UNREPORTED, BECAUSE THE GATE THAT WOULD HAVE SAID SO WAS RED. *** orreryEjecta-selfcheck
+    // was one of six gates red outside the register from before v4686 through v4687. The name-frozen ratchet
+    // did its job and named the file within the minute of being RUN; nothing ran it. What v4412 bought was a
+    // report that says WHICH FILE, and a report nobody reads costs the same as a count.
+    "tools/ship/constantRows-selfcheck.mjs",
+    // SABOTAGE v4688: this entry removed -> 1 red on orreryEjecta-selfcheck, NAMING the file. That is the
+    // property v4412 bought when it made the baseline a list of names instead of a count, and the reason an
+    // arrival is fixed either by this list or by the baseline and never by a bumped number.
 
     // *** v4477 -- MAIN REACHED THE SAME ENTRY INDEPENDENTLY, AT v4461, AND ARGUED IT BETTER. ***
     // Both branches added orreryUniverse-selfcheck.mjs to this list in the same window; main's reasoning is

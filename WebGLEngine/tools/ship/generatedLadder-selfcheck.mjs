@@ -154,7 +154,7 @@ else {
             const renderer = new THREE.WebGPURenderer({ canvas: document.createElement("canvas"), forceWebGL: false, antialias: false }); await renderer.init();
             const g = P.makeCullPassTsl(T, { count: COUNT, lodCount: LODS, regions: LODS, cap: CAP, fleets: false, planesUniform: true });
             await renderer.computeAsync(g.node);
-            const emitted = renderer._nodes.getForCompute(g.node).computeShader;
+            const emitted = S.emitCompute(renderer, g.node).wgsl;
             const shell = S.computeShell({ name: "generated cull, driving", workgroupSize: G.CULL_WORKGROUP,
                 storage: [{ name: "inst", element: "vec4<f32>", access: "read" }, { name: "extras", element: "vec4<f32>", access: "read" },
                           { name: "cmds", struct: P.CMD_STRUCT }, { name: "records", element: "vec4<f32>" }],

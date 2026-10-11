@@ -4,6 +4,18 @@ author: three.js authors (a collective, not a person -- see LICENSE)
 
 Recorded at v4416.
 
+RE-VENDORED 2026-10-04 (v4807): 0.185.1 -> 0.186.1, after vendor/three-webgpu moved to 0.186.1 at v4805, from the
+same npm tarball (https://registry.npmjs.org/three/-/three-0.186.1.tgz). Seven files changed: three.module.js,
+three.core.js, jsm/controls/OrbitControls.js, jsm/exporters/GLTFExporter.js, jsm/loaders/FBXLoader.js,
+jsm/loaders/GLTFLoader.js, jsm/utils/BufferGeometryUtils.js. The other thirteen upstream files are byte-identical in
+0.186.1 (KTX2Loader.js, WorkerPool.js, SkeletonUtils.js, ColorSpaces.js, NURBSCurve.js, NURBSUtils.js, the four libs,
+basis_transcoder.js, .wasm and README.md), so tools/ship/gltfKtx2-selfcheck.mjs's digests stand. Every relative import
+in the directory resolves (12 of 12), `three` exports 444 names where 0.185.1 exported 441 and drops none
+(LightShadow, RenderObjectRefreshType and TextureSource added), and LICENSE is unchanged. jsm/libs/meshoptGltf.js is
+this engine's own and was not touched. Measured before the swap: the 305 gates whose imports reach vendor/three, run on
+this tree and on a worktree with 0.186.1, differ by this record (krbnCompareLive reads the revision from the line
+below's shape) and the orrery's bake -- nothing else.
+
 RE-VENDORED 2026-09-14: r160 -> 0.185.1, backlog "vendor-three-r160-stale" (tools/ship/nextRounds.mjs).
 Same version vendor/three-webgpu already re-vendored to on 2026-09-08 (see that directory's own
 PROVENANCE.txt/README.md, used as this record's template) -- reusing tools/ship/three-probe.json's

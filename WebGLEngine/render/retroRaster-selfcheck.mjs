@@ -138,8 +138,12 @@ ok("Bayer dithering is still the tree's existing one, not a second copy", (() =>
 
 console.log(`\nretroRaster-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
 // v4534: these numbers used to die with the terminal -- gateReport-selfcheck named this gate for it.
-REPORT.table("perspective-correct warp against depth ratio", ["depth ratio", "worst warp", "at barycentric"],
-    sweep.map((r) => [String(r.k), r.err.toFixed(6), r.b.map((v) => v.toFixed(3)).join(", ")]),
+// v4558: the three cells were String(), toFixed(6), and a THREE-VECTOR joined into one text cell -- so a
+// reader wanting the barycentric coordinates had to split a string and parse each part back into a number.
+// One column per coordinate, and every value a number.
+REPORT.table("perspective-correct warp against depth ratio",
+    ["depth ratio", "worst warp", "at bary u", "at bary v", "at bary w"],
+    sweep.map((r) => [r.k, r.err, r.b[0], r.b[1], r.b[2]]),
     "The warp is what a depth-unaware rasteriser gets wrong, and it grows with the depth ratio -- which is " +
     "why a single flat-triangle fixture cannot tell a correct interpolator from a lucky one.");
 REPORT.write();

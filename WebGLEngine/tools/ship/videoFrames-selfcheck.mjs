@@ -21,6 +21,7 @@ import * as V from "../../render/videoFrames.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { SOURCE_EXT } from "./moduleRefs.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 let fails = 0;
@@ -63,7 +64,7 @@ console.log("1. *** THE GAP IS RE-COUNTED EVERY RUN, so it cannot quietly stop b
     const walk = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) {
         if (/node_modules|^\.git$|^vendor$|^GPU_Assets$|^demos_code$/.test(e.name)) continue;
         const p = path.join(d, e.name);
-        if (e.isDirectory()) walk(p); else if (/\.(js|mjs|html)$/.test(e.name)) files.push(p);
+        if (e.isDirectory()) walk(p); else if (SOURCE_EXT.test(e.name)) files.push(p);
     } };
     walk(ROOT);
     // The ONLY thing that seeks a video is this round's own module and its wiring. Anything else is a

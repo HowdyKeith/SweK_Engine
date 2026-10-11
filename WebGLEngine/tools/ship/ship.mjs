@@ -28,6 +28,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
+import { parseOrExit } from "./cliArgs.mjs";   // v4826 -- an option this tool does not know is refused, not read past
 import { readChangelog, namesVersion, newestVersion, CHANGELOG_REL } from "./changelogSource.mjs";
 import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
 
@@ -37,11 +38,12 @@ const PROJECT = path.resolve(ENGINE, "..");           // .../SweK_Engine_vNNNN
 const WORK = path.resolve(PROJECT, "..");             // .../work
 const OUTPUTS = "/mnt/user-data/outputs";
 
-const argv = process.argv;
-const arg = (name, def = null) => { const i = argv.indexOf(name); return i > 0 && argv[i + 1] ? argv[i + 1] : def; };
+const CLI = parseOrExit("ship", { values: { "--version": "string", "--markers": "string", "--step-timeout": "number" }, flags: ["--dry-run"] });
+// the call shape `arg("--step-timeout", "900")` is READ BY ai-bridge/shipBridge.js (it derives the ship's budget from that default), so it stays spelled so
+const arg = (name, def = null) => (name in CLI.values ? String(CLI.values[name]) : def);
 const version = arg("--version");
 const markers = arg("--markers", "");
-const dryRun = argv.includes("--dry-run");
+const dryRun = CLI.flags.has("--dry-run");
 
 if (!version || !/^v\d+$/.test(version)) {
     console.error("\nusage: node tools/ship/ship.mjs --version vNNNN --markers \"a,b\" [--dry-run]\n");
@@ -92,6 +94,20 @@ function stage(name, fn) {
 // slower box is a cap that turns a slow machine into a red tree.
 const RUN_TIMEOUT_MS = Number(arg("--step-timeout", "900")) * 1000;
 const run = (cmd, args, opts = {}) => execFileSync(cmd, args, { encoding: "utf8", timeout: RUN_TIMEOUT_MS, ...opts });
+
+// *** v4583 -- DECLARED, AND THE CAP IS PER STEP RATHER THAN PER GATE. ***
+//
+// tools/ship/runnerBudget-selfcheck.mjs requires a runner that budgets a gate either to read gateBudget.MEASURED or
+// to say why not. This ritual was outside that check's population until v4583 -- its scan wanted process.execPath as
+// the literal first argument of a spawn call, and `run` passes it through a helper, so the cap above was never asked
+// for an account of itself even though v3936 records it killing a sweep at 923 seconds.
+export const budgetIsOwn =
+    "RUN_TIMEOUT_MS is a PER-STEP ritual cap, not a per-gate budget, so gateBudget.MEASURED cannot produce it: this " +
+    "runs verify.mjs, packRelease.mjs and the rest as whole steps, and a step contains hundreds of gates whose own " +
+    "budgets that table already sets. It exists so a hung step cannot leave a half-written release, and v3936 " +
+    "records the cost of getting it wrong -- a 923-second ritual against this 900-second cap reported an EMPTY " +
+    "verdict, because a killed child's buffered stdout never flushes. Overridable with --step-timeout for that " +
+    "reason: a cap that cannot be raised on a slower box turns a slow machine into a red tree.";
 
 // Classify what actually happened, because "it threw" covers three different events that deserve three different
 // sentences. NEVER RETURNS AN EMPTY REASON: a refusal that names nothing is indistinguishable from a bug in the

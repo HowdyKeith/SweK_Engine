@@ -39,10 +39,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
+import { noComments } from "./sourceScan.mjs";
 import * as F from "../../brain/fleetRouting.mjs";
 import * as D from "../../brain/drivePolicy.mjs";
 import { initNode, mod } from "../../physics/box3d/box3dNode.mjs";
 import { worldFromModule } from "../../render/slugTicker.mjs";
+import { gateReport } from "./gateReport.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const require_ = createRequire(import.meta.url);
@@ -50,6 +52,15 @@ let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const report = (m) => console.log("  ----  " + m);
 const sec = (t) => console.log("\n" + t);
+// *** v4558 -- THIS GATE REACHED gateReport'S RATCHET BY THE DETECTOR'S CRUDE PATH AND THE VERDICT WAS STILL
+// RIGHT. *** arguesInNumbers matched the `for (const l of F.reportLines())` at the foot of this file plus a
+// toFixed in an assertion detail -- and fleetRouting.reportLines() returns TWO SENTENCES OF PROSE with no
+// number in them, so on the detector's own terms this is the false positive its header names ("it will
+// count one that formats a single number in a loop"). It is not one in substance. THE ROUTING ARGUMENT IS
+// NUMERIC AND ALWAYS WAS: a 20 ms brain and an 80 ms brain, and which of them the scheduler hands work to.
+// That claim lived in a one-line assertion detail, `gate-fast 4, gate-slow 2`, which is a table with the
+// table taken out. The two below are that argument with its rows back.
+const REPORT = gateReport("tools/ship/fleetRouting-selfcheck.mjs");
 const read = (f) => fs.readFileSync(path.join(ENG, f), "utf8");
 // a row's peer id, or null: the gate must REPORT a row that names no peer, never die on it (sabotage A crashed the first draft at A's fourth check)
 const pid = (row) => (row && row.peer && row.peer.id) || null;
@@ -103,6 +114,14 @@ sec("B. *** THE BRIDGE: POST /ai/brain/route OVER THE LIVE REGISTRY, THE LEDGER 
         r.c + " " + (r.o.rows || []).map((x) => x.line).join(" | "));
     const took = (id) => ((r.o.summary.peers || []).find((p) => p.id === id) || { count: 0 }).count;
     ok("!! ...and the registry's own solve times decide: the 20 ms brain takes more than the 80 ms one", took("gate-fast") > took("gate-slow") && took("gate-slow") >= 1, `gate-fast ${took("gate-fast")}, gate-slow ${took("gate-slow")}`);
+    REPORT.table("the registry's own solve times decide who takes the work",
+                 ["peer", "solve ms (ewma)", "requests taken", "kinds"],
+                 (r.o.summary.peers || []).map((p) => {
+                     const b = (fleet.o.brains || []).find((x) => x.id === p.id) || {};
+                     return [p.id, b.solveMsEwma ?? null, p.count, Array.isArray(p.kinds) ? p.kinds.join(" ") : p.kinds];
+                 }),
+                 "six identical train requests over two registered brains whose only difference is a " +
+                 "reported solve time of 20 ms against 80 ms");
     const g = await call("GET", "/ai/brain/routed?last=3");
     ok("GET /ai/brain/routed reads the ledger: the count, the per-peer summary, the last rows", g.c === 200 && g.o.count === 6 && g.o.rows.length === 3 && g.o.summary.peers.length === 2 && g.o.summary.unattributed === 0 && !("weights" in g.o.rows[0]), JSON.stringify(g.o.summary.peers.map((p) => [p.id, p.count, p.kinds])));
     const h = await call("GET", "/ai/brain/health");
@@ -127,6 +146,11 @@ sec("C. *** THE TRAINER'S EPISODES ROUTED AND RUN: EACH SCORE IS drivePolicy.epi
     const t0 = Date.now(), ran = F.runRoutedTrain(worldFrom, D, rows, { seconds: SECONDS }); const ms = Date.now() - t0;
     const same = ran.map((r) => { const e = D.episode(worldFrom, r.weights, D.surfaceFor(r.seed), { seconds: SECONDS, seed: r.seed }); return r.score === e.score && r.fingerprint === e.fingerprint; });
     ok("!! *** every routed episode's score AND fingerprint equal a direct drivePolicy.episode of the same candidate and seed ***", same.every(Boolean), ran.map((r, i) => `${pid(r)}: ${r.score.toFixed(2)} ${same[i] ? "=" : "!="}`).join(", "));
+    REPORT.table("every routed episode against a direct drivePolicy.episode of the same candidate and seed",
+                 ["peer", "seed", "score", "ms", "equals a direct episode"],
+                 ran.map((x, i) => [pid(x), x.seed, x.score, x.ms, same[i]]),
+                 "routing must not change a result: the score AND the fingerprint have to match the " +
+                 "unrouted call, and the fingerprint is compared but is not a number to table");
     ok("every result says where it ran and keeps its attribution", ran.every((r) => r.ranOn === "this box" && F.isAttributed(r) && r.ms >= 0), `${ran.length} episodes in ${ms} ms`);
     ok("the two candidates score differently (the routed policy reached the car)", new Set(ran.map((r) => r.score.toFixed(3))).size >= 2);
 }
@@ -152,8 +176,18 @@ sec("E. *** THE SURFACES READ THE LEDGER: THE GAUGE CARD, THE GRID ROWS, THE POO
     const server = read("server.html"), rep = read("report.html"), pool = read("brain-fleet.html"), inst = read("physics/instruments.mjs"), bridge = read("ai-bridge/gpuBrainBridge.js");
     ok("server.html's gauge row has the routed card and fills it from health's `routed` (peer as the value, the request as the note)",
         /id="bgRouted"/.test(server) && /id="bgRoutedNote"/.test(server) && /h\.routed/.test(server) && /rt\.last\.peer\.id/.test(server) && /rt\.last\.what/.test(server));
+    // v4642 -- THE ROUTE MAY BE REQUESTED THROUGH A HELPER, AND THE CLAIM IS THE WIRING AND NOT THE SPELLING.
+    // report.html read this route as `await (await fetch(route)).json()`, which is boundaryLint's
+    // UNCHECKED_JSON_BODY: on an HTML error page .json() throws a SyntaxError about a stray "<" and the page
+    // reports the fleet as unreachable for a server that answered with a 500. It goes through a local
+    // getLocalJson() that checks response.ok first, and this row went red on the CALL SYNTAX while the fact it
+    // names -- that the grid requests /ai/brain/routed -- was never in doubt. Both spellings are accepted now,
+    // and the route is looked for in the page's CODE rather than its raw text. noComments and not codeOnly:
+    // codeOnly blanks string CONTENT, and the route IS a string, so it would delete the subject. Written
+    // first without either, the row was satisfied by a commented-out call -- found by sabotage, one line
+    // after a note claiming it would not be.
     ok("report.html's fleet grid fetches /ai/brain/routed and writes 'took N, last <what>' on a peer's row and a line per peer",
-        /fetch\("\/ai\/brain\/routed"/.test(rep) && /took ' \+ p\.count/.test(rep) && /id="fleetRouted"/.test(rep) && /UNATTRIBUTED/.test(rep));
+        /(?:fetch|getLocalJson)\("\/ai\/brain\/routed"/.test(noComments(rep)) && /took ' \+ p\.count/.test(rep) && /id="fleetRouted"/.test(rep) && /UNATTRIBUTED/.test(rep));
     ok("brain-fleet.html's pool cards fetch /ai/brain/routed and say what each brain took",
         /fetch\("\/ai\/brain\/routed"/.test(pool) && /tookOf\(r\.id\)/.test(pool) && /no requests routed/.test(pool));
     ok("the bridge registers both routes through the registry (declared checks, a schema, a body bound) and exports the ledger",
@@ -163,4 +197,7 @@ sec("E. *** THE SURFACES READ THE LEDGER: THE GAUGE CARD, THE GRID ROWS, THE POO
 
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nall checks pass");
 for (const l of F.reportLines()) console.log("  " + l);
-process.exit(fails ? 1 : 0);
+REPORT.write();
+// v4663 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
+// background compiler still has work posts a task into a torn-down platform. tools/ship/wasmTeardown.mjs.
+process.exitCode = fails ? 1 : 0;

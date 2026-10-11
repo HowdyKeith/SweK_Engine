@@ -16,7 +16,7 @@
 import * as THREE from "../../vendor/three/three.module.js";
 import { classifyDiagonals, barycentricGeometry, wireframeMesh } from "../../ui/barycentricWireframe.js";
 import { SECURE_HOST } from "./webgpuHarness.mjs";
-import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
@@ -31,7 +31,7 @@ const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..
  * measured thickness 0.5 at 587 lit pixels through that harness and 4486 through a plain WebGL2 launch. The cause
  * was found by bisection, not guessed -- runInEngineOrigin launches Chromium with LAUNCH_ARGS =
  * ["--enable-unsafe-webgpu"], while this file's own renderThreePassToPixels (the THREE.js-through-WebGLRenderer
- * path this gate's own subject matches) launches with ["--use-gl=swiftshader"] instead. fwidth()'s exact
+ * path this gate's own subject matches) launches with [...webglLaunchArgs().args] instead. fwidth()'s exact
  * per-pixel derivative is implementation-defined, and the two launch configurations resolve to genuinely
  * different GL backends underneath -- a real, expected difference in WHICH numbers a real device gives, the
  * same category of fact this whole tree's f32-vs-f64 tolerance discipline already exists for, not a logic bug
@@ -41,7 +41,7 @@ const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..
 async function runWebGL2InEngineOrigin({ engineRoot, script, args = null }) {
     if (!fs.existsSync(HEADLESS_SHELL)) return { ok: false, skipped: true, reason: "no headless shell", result: null, pageErrors: [] };
     const pw = resolvePlaywright();
-    if (!pw) return { ok: false, skipped: true, reason: "playwright not resolvable", result: null, pageErrors: [] };
+    if (!pw.chromium) return { ok: false, skipped: true, reason: browserSkipReason(pw.chromium, pw.from, HEADLESS_SHELL), result: null, pageErrors: [] };
     const root = path.resolve(engineRoot);
     const MIME = { ".js": "text/javascript", ".mjs": "text/javascript", ".html": "text/html" };
     const srv = http.createServer((q, s) => {
@@ -55,7 +55,7 @@ async function runWebGL2InEngineOrigin({ engineRoot, script, args = null }) {
     await new Promise((r) => srv.listen(0, SECURE_HOST, r));
     let browser = null;
     try {
-        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
         const page = await browser.newPage();
         const pageErrors = [];
         page.on("pageerror", (e) => pageErrors.push(String(e).slice(0, 300)));

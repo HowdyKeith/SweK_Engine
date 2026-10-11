@@ -19,7 +19,7 @@ import {
 } from "../../render/glCapture.mjs";
 import { makeRecordingGL } from "../../render/glBootstrap.js";
 import { normalize, fingerprint, diffTraces, describeDiff } from "../../render/frameTrace.js";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import { codeOnly } from "./sourceScan.mjs";
 import fs from "node:fs";
 import path from "node:path";
@@ -283,7 +283,7 @@ console.log("\n8. *** THE ONLY CHECK THAT MATTERS: REPLAY IT INTO A REAL, UNPATC
         console.log("        is the pixel, which needs a driver -- and a fingerprint match is agreement about COMMANDS.");
     } else {
         const b64 = Buffer.from(fs.readFileSync(path.join(ROOT, "render", "glCapture.mjs"), "utf8"), "utf8").toString("base64");
-        const browser = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const browser = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
         let out = null;
         try {
             const page = await browser.newPage();

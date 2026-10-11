@@ -78,6 +78,12 @@ export const SHELL_LEAVES = Object.freeze([
     path.join("chrome-linux", "headless_shell"),
     path.join("chrome-win", "headless_shell.exe"),
     path.join("chrome-headless-shell-win64", "chrome-headless-shell.exe"),
+    // v4778 rig run 4: and the SAME rename on Linux and macOS, which v4617 measured only on Windows. Playwright 1.63's
+    // chromium_headless_shell-1243 unpacks on Linux to chrome-headless-shell-linux64/chrome-headless-shell (installed and
+    // listed in this sandbox), so a Linux box with a current Playwright resolved an older build or nothing at all.
+    path.join("chrome-headless-shell-linux64", "chrome-headless-shell"),
+    path.join("chrome-headless-shell-mac-arm64", "chrome-headless-shell"),
+    path.join("chrome-headless-shell-mac-x64", "chrome-headless-shell"),
     path.join("chrome-mac", "headless_shell"),
     path.join("chrome-linux", "chrome"),
     path.join("chrome-win", "chrome.exe"),
@@ -99,6 +105,19 @@ export function askPlaywright(requireFn) {
 
 /** A browser directory, with NO build number pinned -- 1194 was, and that is a date stamp on a constant. */
 export const SHELL_DIR = /^chromium(_headless_shell)?-\d+$/;
+
+// *** v4647 -- ONE SPELLING, FOR THE FIXTURES TOO, BECAUSE "IT IS ONLY A FIXTURE" IS HOW THE FOURTH COPY
+// GETS IN. *** playwrightResolve-selfcheck asserts that NO FILE OUTSIDE THIS ONE spells a browser directory
+// by hand, after four gates had quietly copied the list underneath a header warning about exactly that. The
+// v4646 round then wrote two new gates whose INJECTED filesystems name "chromium_headless_shell-1243"
+// directly -- fixtures, not real paths, and the rule caught them anyway. It was right to: a rule that
+// exempts fixtures is a rule that cannot tell a fixture from a fifth copy, and the exemption is what the
+// next author would reach for.
+//
+// So the sample directory names live HERE, beside the pattern that has to match them, and a fixture imports
+// them. The gate asserts SHELL_DIR accepts both -- which also makes the pattern's own claim checkable
+// without a real playwright install.
+export const SHELL_DIR_SAMPLES = Object.freeze(["chromium-1243", "chromium_headless_shell-1243"]);
 
 /**
  * Try every root, every chromium build in it, every platform leaf, and return the first that exists plus
@@ -162,14 +181,46 @@ export function resolveHeadlessShell({ env = process.env, home = os.homedir(), e
 // fix here is stronger than another global-install guess, because it does not need one: tools/render-qa's own
 // package.json is THIS TREE'S OWN declared dependency, at a path relative to this file that does not change
 // per box the way a global npm root does.
+// *** v4778 RIG RUN -- 248 GATES RED ON ONE MISSING PACKAGE, AND THIS LIST COULD NOT HAVE FOUND IT ON WINDOWS. ***
+// Keith's rig ran C:\Intel\SweK_Engine_v4778 -- a fresh copy per version, so tools/render-qa/node_modules (where
+// render-qa's package.json puts playwright) is empty in every new folder while the headless shell survives in
+// %LOCALAPPDATA%\ms-playwright. The other places a package can live on that box were never asked: the three global
+// paths below are POSIX-only, so even `npm i -g playwright` would have resolved nothing. Added, in order after the
+// in-tree install: node_modules at the engine and repo roots, the global npm root (%APPDATA%\npm on Windows,
+// npm_config_prefix anywhere), and -- last, and named as such in `from` -- the same render-qa install in a SIBLING
+// copy of this repo (C:\Intel\SweK_Engine_v4777\...), newest version first, only where one exists on disk.
+// Joined with THAT platform's separator, not this process's: asked about POSIX from a Windows box, path.join wrote
+// "\\opt\\npm\\lib\\..." (Keith's second rig run), which is neither box's path.
+export function globalNpmPaths(env = process.env, platform = process.platform) {
+    const P = platform === "win32" ? path.win32 : path.posix;
+    const out = [];
+    if (env.APPDATA) out.push(P.join(env.APPDATA, "npm", "node_modules", "playwright"));
+    if (env.npm_config_prefix) out.push(platform === "win32" ? P.join(env.npm_config_prefix, "node_modules", "playwright")
+                                                              : P.join(env.npm_config_prefix, "lib", "node_modules", "playwright"));
+    return out;
+}
+export function siblingCopies(eng = ENG, { readdir = fs.readdirSync, exists = fs.existsSync } = {}) {
+    const root = path.resolve(eng, ".."), parent = path.dirname(root), base = path.basename(root);
+    const stem = base.replace(/[_-]?v?\d+[a-z]?$/i, "");
+    if (!stem || parent === root) return [];
+    let dirs = [];
+    try { dirs = readdir(parent); } catch { return []; }
+    const ver = (d) => { const m = d.match(/(\d+)[a-z]?$/i); return m ? Number(m[1]) : -1; };
+    return dirs.filter((d) => d !== base && d.startsWith(stem)).sort((a, b) => ver(b) - ver(a))
+        .map((d) => path.join(parent, d, path.basename(eng), "tools", "render-qa", "node_modules", "playwright")).filter((c) => exists(c));
+}
 export const PLAYWRIGHT_PATHS = [
     "playwright",
     "playwright-core",
     path.join(ENG, "tools", "render-qa", "node_modules", "playwright"),
+    path.join(ENG, "node_modules", "playwright"),
+    path.join(ENG, "..", "node_modules", "playwright"),
+    ...globalNpmPaths(),
     "/opt/node22/lib/node_modules/playwright/index.js",
     "/home/claude/.npm-global/lib/node_modules/playwright/index.js",
     "/usr/local/lib/node_modules/playwright/index.js",
-];
+    ...siblingCopies(),
+].filter((p, i, a) => a.indexOf(p) === i);
 
 /**
  * Try every known path IN ORDER and return the first that resolves, plus which one it was -- the "plus which
@@ -198,8 +249,11 @@ export function browserSkipReason(chromium, pwFrom, shell = HEADLESS_SHELL) {
     const where = HEADLESS_SHELL_TRIED.length
         ? HEADLESS_SHELL_TRIED.length + " candidate(s) under " + shellRoots().join(", ")
         : "no browser directory under " + shellRoots().join(", ");
-    if (!chromium && !shellThere) return "neither playwright (tried: " + PLAYWRIGHT_PATHS.join(", ") + ") nor a headless shell (" + where + ")";
-    if (!chromium) return "playwright is not installed here -- tried: " + PLAYWRIGHT_PATHS.join(", ") + " (a headless shell at " + shell + " IS present)";
+    if (!chromium && !shellThere) return "neither playwright (tried: " + PLAYWRIGHT_PATHS.join(", ") + ") nor a headless shell (" + where + ")" +
+        " -- to fix: cd " + path.join(ENG, "tools", "render-qa") + " && npm install (its postinstall fetches the browser)";
+    if (!chromium) return "playwright is not installed here -- tried: " + PLAYWRIGHT_PATHS.join(", ") + " (a headless shell at " + shell + " IS present)" +
+        // v4778 rig: say the one command that fixes it -- the browser is already on disk, so nothing need be downloaded
+        " -- to fix: cd " + path.join(ENG, "tools", "render-qa") + " && npm install --ignore-scripts";
     if (!shellThere) return "playwright resolved from " + pwFrom + " but no headless shell was found (" + where + ")";
     return "";
 }
@@ -217,5 +271,123 @@ const RESOLVED = resolveHeadlessShell();
  * caller passes it to browserSkipReason first, which refuses on "" -- so an empty value can never reach a
  * launch.
  */
+// *** v4646 -- DAWN'S D3D12 BACKEND NEEDS dxil.dll AND THE HEADLESS SHELL BUNDLE DOES NOT SHIP IT. ***
+//
+// Measured on Keith's Windows rig at v4645: chrome-headless-shell-win64 carries NO dx*.dll, while the full
+// chrome-win64 bundle of the SAME Chrome for Testing build (153.0.8010.12) carries dxcompiler.dll and
+// dxil.dll. resolveHeadlessShell sorts the shell ahead of the full browser -- deliberately, see v4486 above,
+// because 96 gates were calibrated against the shell -- so HEADLESS_SHELL lands on the bundle without them
+// and every browser-side requestDevice dies with "DynamicLib.Open: dxil.dll Windows Error: 87". About a
+// hundred gates inherited that in one sweep.
+//
+// *** NOTHING IS COPIED, AND THAT IS THE POINT. *** Copying the two DLLs into the shell's directory works and
+// was proven to (headlessGpu-selfcheck went 3 FAIL to ALL GREEN that way) -- and then it did not travel: the
+// next run was under a different Windows user, a different %LOCALAPPDATA%, and the fault was back verbatim.
+// A per-machine file copy outside the repo is a fix that has to be re-done by hand on every box and is wiped
+// by the next `playwright install`.
+//
+// Dawn calls DynamicLib::Open("dxil.dll") with a BARE NAME, and on Windows LoadLibrary resolves a bare name
+// against the child process's PATH. So the browser is launched with the DXC-carrying directory prepended to
+// its PATH and finds the compiler where it already sits. No file moves, and the 96 gates still launch the
+// same binary they were calibrated against.
+/**
+ * *** v4683 -- THE WEBGL2 HARNESS FLAGS, IN ONE PLACE, WITH A NAMED OVERRIDE FOR MEASURING THEM. ***
+ * Four gates (atmosphere, perspectiveWarp, solidTexture, noisePrecision) launched the headless shell with a
+ * literal ["--use-gl=swiftshader"]. On the rig (Chrome 141, NVIDIA Pascal) all four LOST THEIR WEBGL2 CONTEXT at
+ * shader compile on ANGLE/Vulkan/SwiftShader -- named by v4682's harness messages -- while the same flag is green
+ * on Linux, and Chrome 141 itself logs that the automatic software-WebGL fallback is deprecated in favour of
+ * --enable-unsafe-swiftshader. Which flag set keeps the context is a reading of THAT box, so SWEK_GL_ARGS may
+ * replace the default (comma-separated; "none" means no flags) and the gate prints what it launched with. The
+ * default is unchanged until a rig reading says which set to adopt: an override is an instrument, not a fix.
+ */
+// *** v4684 -- ADOPTED FROM THE RIG'S READING. *** All four gates lost the context under --use-gl=swiftshader on
+// the rig and all four were GREEN there under each of three alternatives: --use-angle=swiftshader with
+// --enable-unsafe-swiftshader, --enable-unsafe-swiftshader alone, and no flags at all (the NVIDIA through ANGLE).
+// The first is the default because it names the SAME software renderer Linux runs -- so a pixel-exact row means
+// the same thing on both boxes -- and it is the spelling Chrome 141's own deprecation message asks for. "none"
+// passed too, and is not chosen: it would make these rows depend on whose GPU ran them.
+export const WEBGL_DEFAULT_ARGS = Object.freeze(["--use-angle=swiftshader", "--enable-unsafe-swiftshader"]);
+export function webglLaunchArgs(env = process.env) {
+    const v = env.SWEK_GL_ARGS;
+    if (v == null || v === "") return { args: [...WEBGL_DEFAULT_ARGS], overridden: false };
+    if (v === "none") return { args: [], overridden: true };
+    return { args: v.split(",").map((x) => x.trim()).filter(Boolean), overridden: true };
+}
+
+// *** v4821 -- KEYED ON dxcompiler.dll, BECAUSE CHROME 156 STOPPED SHIPPING dxil.dll. *** Read from the Chrome for
+// Testing 156.0.8078.4 archives' own central directories: chrome-win64 carries dxcompiler.dll and D3DCompiler_47.dll
+// and NO dxil.dll; chrome-headless-shell-win64 carries no dx*.dll at all. The rig's first v4820 clone verify then
+// died in four PARITY_ARGS gates with "DynamicLib.Open: dxcompiler.dll Windows Error: 87" -- the same fault under the
+// other file's name -- and the remedy below could not help, because it searched for the one file the new bundle no
+// longer has. dxcompiler.dll is in both generations, so it is what a source bundle is found by.
+export const DXC_LEAVES = Object.freeze([
+    path.join("chrome-win64", "dxcompiler.dll"),
+    path.join("chrome-win", "dxcompiler.dll"),
+    path.join("chrome-headless-shell-win64", "dxcompiler.dll"),
+]);
+
+/** The directory holding dxcompiler.dll, found the same way the shell is: every root, every build, newest first. */
+export function resolveDxcDir({ env = process.env, home = os.homedir(), exists = fs.existsSync,
+                               readdir = fs.readdirSync } = {}) {
+    const tried = [];
+    for (const root of shellRoots(env, home)) {
+        let dirs = [];
+        try { dirs = readdir(root).filter((d) => SHELL_DIR.test(d)); } catch { continue; }
+        dirs.sort((a, b) => (parseInt(b.split("-").pop(), 10) || 0) - (parseInt(a.split("-").pop(), 10) || 0));
+        for (const d of dirs) for (const leaf of DXC_LEAVES) {
+            const q = path.join(root, d, leaf);
+            tried.push(q);
+            if (exists(q)) return { dir: path.dirname(q), from: q, tried };
+        }
+    }
+    return { dir: "", from: "", tried };
+}
+
+/**
+ * *** THIS RETURNS undefined ALWAYS, AND THE REASON IS A MEASUREMENT THAT KILLED THE ROUND THAT WROTE IT. ***
+ *
+ * v4646 shipped this putting the DXC directory on the launched browser's PATH, reasoning that Dawn calls
+ * DynamicLib::Open("dxil.dll") with a bare name and that LoadLibrary resolves a bare name against PATH.
+ * Measured on Keith's rig immediately afterwards: dxcResolve-selfcheck reported "this box (win32) resolves
+ * launchEnv() to a PATH -- DXC dir prepended", the launch site really does pass it (runInEngineOrigin's own
+ * chromium.launch carries env), AND microfacetWgsl STILL DIED with the identical
+ * "DynamicLib.Open: dxil.dll Windows Error: 87". The PATH reached the browser and changed nothing.
+ *
+ * HYPOTHESIS, NOT ESTABLISHED HERE, because this box cannot run Windows: Chromium hardens its DLL search
+ * early (SetDefaultDllDirectories with LOAD_LIBRARY_SEARCH_SYSTEM32), which removes PATH and the current
+ * directory from bare-name resolution altogether -- and ERROR_INVALID_PARAMETER (87) is what a LoadLibraryEx
+ * whose search flags cannot be satisfied returns, rather than the ERROR_MOD_NOT_FOUND (126) a plain missing
+ * file would give. What IS established is only the first sentence: the PATH is passed and it does not help.
+ *
+ * The one thing measured to work is the DLL sitting in the executable's OWN directory, which the loader
+ * searches first under every hardening mode. tools/ship/ensureDxc.mjs does that, as a command rather than a
+ * silent side effect of running a gate. This function is kept, returning undefined, so the falsification has
+ * somewhere to live and nobody re-derives the PATH idea from first principles a third time.
+ */
+export function launchEnv() { return undefined; }
+
 export const HEADLESS_SHELL = RESOLVED.shell;
 export const HEADLESS_SHELL_TRIED = Object.freeze(RESOLVED.tried);
+
+/**
+ * *** THE REMEDY IS NAMED WHERE THE SYMPTOM IS SEEN, NOT WHERE A FILE IS MISSING. ***
+ *
+ * browserSkipReason above is deliberately NOT extended for this: on a Windows box with the DXC-less shell the
+ * browser resolves and launches fine, so a skip there would report "not applicable on this box" for a box that
+ * is merely misconfigured -- and would turn ~96 gates that currently FAIL loudly into silent skips. That is the
+ * count-standing-in-for-a-property trade this tree keeps paying for.
+ *
+ * So the test is the SYMPTOM ITSELF. Dawn's message is distinctive; when it appears in a page error or a
+ * failure reason, the one command measured to fix it is appended to that reason. When it does not appear,
+ * nothing is added and nothing is claimed.
+ */
+export const DXC_FAULT = /DynamicLib\.Open|dxil\.dll|dxcompiler\.dll/i;
+
+/** @param {string|string[]} text a reason, or the reason plus pageErrors */
+export function dxcAdvice(text) {
+    const joined = Array.isArray(text) ? text.filter(Boolean).join("\n") : String(text || "");
+    if (!DXC_FAULT.test(joined)) return "";
+    return "Dawn could not load the DXC compiler. This browser bundle ships without dxcompiler.dll; "
+         + "run `node tools/ship/ensureDxc.mjs --write` from WebGLEngine to copy it next to the executable "
+         + "(the PATH route was tried at v4646 and measured NOT to work -- see launchEnv above).";
+}

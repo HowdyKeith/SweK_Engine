@@ -1,0 +1,48 @@
+diff --git a/src/nodes/accessors/Skinning.js b/src/nodes/accessors/Skinning.js
+index 2356aed..abd2663 100644
+--- a/src/nodes/accessors/Skinning.js
++++ b/src/nodes/accessors/Skinning.js
+@@ -134,19 +134,19 @@ export const skinning = /*@__PURE__*/ Fn( ( [ skinnedMesh ], builder ) => {
+ 	const skinIndexNode = attribute( 'skinIndex', 'uvec4' );
+ 	const skinWeightNode = attribute( 'skinWeight', 'vec4' );
+ 	const bindMatrixNode = reference( 'bindMatrix', 'mat4' );
+ 	const bindMatrixInverseNode = reference( 'bindMatrixInverse', 'mat4' );
+ 	const boneMatricesNode = referenceBuffer( 'skeleton.boneMatrices', 'mat4', skinnedMesh.skeleton.bones.length );
+ 
+-	OnObjectUpdate( ( { object, frameId } ) => {
++	OnObjectUpdate( ( { object, renderId } ) => {
+ 
+ 		const skeleton = object.skeleton;
+ 
+-		if ( _skeletonsUpdated.get( skeleton ) !== frameId ) {
++		if ( _skeletonsUpdated.get( skeleton ) !== renderId ) {
+ 
+-			_skeletonsUpdated.set( skeleton, frameId );
++			_skeletonsUpdated.set( skeleton, renderId );
+ 
+ 			const skeletonData = _previousBoneMatricesData.get( skeleton );
+ 
+ 			if ( skeletonData !== undefined ) {
+ 
+ 				skeletonData.previousBoneMatrices.set( skeleton.boneMatrices );
+@@ -203,17 +203,17 @@ export const computeSkinning = /*@__PURE__*/ Fn( ( [ skinnedMesh, toPosition = n
+ 	const bindMatrixNode = uniform( skinnedMesh.bindMatrix, 'mat4' );
+ 	const bindMatrixInverseNode = uniform( skinnedMesh.bindMatrixInverse, 'mat4' );
+ 	const boneMatricesNode = buffer( skinnedMesh.skeleton.boneMatrices, 'mat4', skinnedMesh.skeleton.bones.length );
+ 
+ 	const skeleton = skinnedMesh.skeleton;
+ 
+-	OnObjectUpdate( ( { frameId } ) => {
++	OnObjectUpdate( ( { renderId } ) => {
+ 
+-		if ( _skeletonsUpdated.get( skeleton ) !== frameId ) {
++		if ( _skeletonsUpdated.get( skeleton ) !== renderId ) {
+ 
+-			_skeletonsUpdated.set( skeleton, frameId );
++			_skeletonsUpdated.set( skeleton, renderId );
+ 
+ 			const state = _previousBoneMatricesData.get( skeleton );
+ 
+ 			if ( state !== undefined ) {
+ 
+ 				state.previousBoneMatrices.set( skeleton.boneMatrices );

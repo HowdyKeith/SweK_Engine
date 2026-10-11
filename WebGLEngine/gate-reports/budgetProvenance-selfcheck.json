@@ -1,0 +1,92 @@
+{
+ "gate": "tools/ship/budgetProvenance-selfcheck.mjs",
+ "at": "2026-09-29",
+ "tables": [
+  {
+   "title": "MEASURED entries against an independent observation, by ratio",
+   "columns": [
+    "band",
+    "from x",
+    "below x",
+    "entries"
+   ],
+   "rows": [
+    [
+     "10x or more",
+     10,
+     "Infinity",
+     0
+    ],
+    [
+     "3x - 10x",
+     3,
+     10,
+     1
+    ],
+    [
+     "1.5x - 3x",
+     1.5,
+     3,
+     6
+    ],
+    [
+     "within 1.5x",
+     0.7,
+     1.5,
+     55
+    ],
+    [
+     "MEASURED is LOWER",
+     0,
+     0.7,
+     0
+    ]
+   ],
+   "note": "62 of 63 entries have an independent observation"
+  },
+  {
+   "title": "the five largest ratios remaining",
+   "columns": [
+    "gate",
+    "MEASURED ms",
+    "observed ms",
+    "ratio"
+   ],
+   "rows": [
+    [
+     "tools/roundhouse/thermalScaling-selfcheck.mjs",
+     232051,
+     75230,
+     3.084554034294829
+    ],
+    [
+     "tools/roundhouse/pipeFlowKey-selfcheck.mjs",
+     250473,
+     91719,
+     2.7308736466817125
+    ],
+    [
+     "tools/roundhouse/knobLiveness-selfcheck.mjs",
+     750318,
+     291628,
+     2.5728599448612615
+    ],
+    [
+     "tools/roundhouse/rayleighOnset-selfcheck.mjs",
+     279845,
+     123897,
+     2.2586906866187237
+    ],
+    [
+     "tools/ship/doorKinds-selfcheck.mjs",
+     212608,
+     100047,
+     2.1250812118304396
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

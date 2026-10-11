@@ -74,7 +74,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { MeshBVH } from "../../mesh/meshBVH.mjs";
-import { pairOverlap } from "./bvhPairOverlap.mjs";
+import { pairOverlap, reportLines } from "./bvhPairOverlap.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -322,6 +322,18 @@ function unitCubeTris(ox, oy, oz) {
     ok("!! 500 vs 9 (large size/depth asymmetry, both interior): matches brute force exactly",
         keySet(fast).size === keySet(brute).size && [...keySet(fast)].every((k) => keySet(brute).has(k)),
         `fast=${fast.length} brute=${brute.length}`);
+}
+
+// v4778 -- THE FRONT DOOR. bvhPairOverlap.mjs grew a no-argument reportLines() at the rtx merge so instrument-bench.html
+// can serve it (physics/instruments.mjs, the BVH-CSG rows). A report is not a verdict, but an export no gate
+// names is what definitionGates counts, so this section reads the report's own hand-checkable numbers back.
+console.log("\nTHE FRONT DOOR");
+{
+    const L = reportLines();
+    ok("reportLines names the module and prints the three cube pairs, the walk equal to the all-pairs loop on each",
+        /bvhPairOverlap/.test(L[0]) && /walk\s+24\s+all-pairs\s+24$/.test(L[2]) && /walk\s+84\s+all-pairs\s+84$/.test(L[3]) &&
+        /walk\s+0\s+all-pairs\s+0$/.test(L[4]), L.slice(2, 5).map((l) => l.trim()).join(" | "));
+    ok("...and no report line stringifies a missing field as the literal word \"undefined\"", L.every((l) => !/\bundefined\b/.test(l)));
 }
 
 console.log(`bvhPairOverlap-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

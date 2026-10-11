@@ -1,0 +1,214 @@
+{
+ "declared": {
+  "scenes": [
+   "zone",
+   "smooth",
+   "checker",
+   "bars",
+   "edges",
+   "noise",
+   "ramp"
+  ],
+  "speed": "8",
+  "ratios": [
+   "1.5",
+   "3"
+  ],
+  "alpha": 0.05,
+  "minFolds": 5,
+  "upto": 40,
+  "minGroup": 2
+ },
+ "per": {
+  "3": {
+   "zone": {
+    "n": 39,
+    "nHoled": 5,
+    "nClean": 34,
+    "holedAdv": -0.7815223693183249,
+    "cleanAdv": -0.5179351146280089,
+    "contrast": 0.26358725469031596
+   },
+   "smooth": {
+    "n": 39,
+    "nHoled": 7,
+    "nClean": 32,
+    "holedAdv": -0.24283263039181843,
+    "cleanAdv": -0.013500068787955621,
+    "contrast": 0.2293325616038628
+   },
+   "checker": {
+    "n": 39,
+    "nHoled": 13,
+    "nClean": 26,
+    "holedAdv": -1.3197052074276014,
+    "cleanAdv": -1.0601743525605782,
+    "contrast": 0.2595308548670232
+   },
+   "bars": {
+    "n": 39,
+    "nHoled": 4,
+    "nClean": 35,
+    "holedAdv": -0.5448805597042665,
+    "cleanAdv": -0.01331393249484226,
+    "contrast": 0.5315666272094243
+   },
+   "edges": {
+    "n": 39,
+    "nHoled": 7,
+    "nClean": 32,
+    "holedAdv": -1.3683623067407549,
+    "cleanAdv": -0.1685093985729596,
+    "contrast": 1.1998529081677953
+   },
+   "noise": {
+    "n": 39,
+    "nHoled": 5,
+    "nClean": 34,
+    "holedAdv": -1.456200465937097,
+    "cleanAdv": -0.029652722281814422,
+    "contrast": 1.4265477436552827
+   },
+   "ramp": {
+    "n": 39,
+    "nHoled": 6,
+    "nClean": 33,
+    "holedAdv": -0.30288330417648623,
+    "cleanAdv": -0.05036101149380944,
+    "contrast": 0.2525222926826768
+   }
+  },
+  "1.5": {
+   "zone": {
+    "n": 39,
+    "nHoled": 5,
+    "nClean": 34,
+    "holedAdv": -1.5916958218230648,
+    "cleanAdv": -0.5534546126978158,
+    "contrast": 1.0382412091252489
+   },
+   "smooth": {
+    "n": 39,
+    "nHoled": 6,
+    "nClean": 33,
+    "holedAdv": -0.8305622039945177,
+    "cleanAdv": 0.03448707119800195,
+    "contrast": 0.8650492751925197
+   },
+   "checker": {
+    "n": 39,
+    "nHoled": 6,
+    "nClean": 33,
+    "holedAdv": 0.3047407698533853,
+    "cleanAdv": 0.012589187580848224,
+    "contrast": -0.29215158227253707
+   },
+   "bars": {
+    "n": 39,
+    "nHoled": 5,
+    "nClean": 34,
+    "holedAdv": -0.6420861973237233,
+    "cleanAdv": -0.010985800432950676,
+    "contrast": 0.6311003968907726
+   },
+   "edges": {
+    "n": 39,
+    "nHoled": 7,
+    "nClean": 32,
+    "holedAdv": -2.0328229895394494,
+    "cleanAdv": -0.13237989942802436,
+    "contrast": 1.900443090111425
+   },
+   "noise": {
+    "n": 39,
+    "nHoled": 6,
+    "nClean": 33,
+    "holedAdv": -1.0139554385446445,
+    "cleanAdv": -0.026604759956007012,
+    "contrast": 0.9873506785886376
+   },
+   "ramp": {
+    "n": 39,
+    "nHoled": 6,
+    "nClean": 33,
+    "holedAdv": -1.4022761150592,
+    "cleanAdv": 0.10289003014258374,
+    "contrast": 1.5051661452017837
+   }
+  }
+ },
+ "h9": {
+  "cells": {
+   "3": {
+    "usable": [
+     "zone",
+     "smooth",
+     "checker",
+     "bars",
+     "edges",
+     "noise",
+     "ramp"
+    ],
+    "excluded": [],
+    "reportable": true,
+    "test": {
+     "t": {
+      "n": 7,
+      "mean": 0.5947057489823402,
+      "sd": 0.5057534787815212,
+      "t": 3.111087873994402,
+      "df": 6,
+      "p": 0.010409977710526166
+     },
+     "sign": {
+      "up": 7,
+      "down": 0,
+      "ties": 0,
+      "n": 7,
+      "p": 0.0078125,
+      "exact": true
+     },
+     "alpha": 0.05,
+     "cleared": true
+    },
+    "cleared": true
+   },
+   "1.5": {
+    "usable": [
+     "zone",
+     "smooth",
+     "checker",
+     "bars",
+     "edges",
+     "noise",
+     "ramp"
+    ],
+    "excluded": [],
+    "reportable": true,
+    "test": {
+     "t": {
+      "n": 7,
+      "mean": 0.9478856018339787,
+      "sd": 0.6919243626282615,
+      "t": 3.624485144973654,
+      "df": 6,
+      "p": 0.00551887278934846
+     },
+     "sign": {
+      "up": 6,
+      "down": 1,
+      "ties": 0,
+      "n": 7,
+      "p": 0.0625,
+      "exact": true
+     },
+     "alpha": 0.05,
+     "cleared": false
+    },
+    "cleared": false
+   }
+  },
+  "reportable": true,
+  "supported": false
+ }
+}

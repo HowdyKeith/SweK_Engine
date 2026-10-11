@@ -114,8 +114,11 @@ export const CONFLICT = "!conflict";
 // pre-rename name here and the skip count ROSE from 956 to 1,121, which read as the round succeeding.
 // tools/ship/recordShape.mjs now ratchets the record's own key set for exactly that reason, and
 // `reachesUnrecorded` was added to this list and to entryFor() in the same edit.
+// v4647 adds `noProbeOutput`. It is added HERE IN THE SAME EDIT as entryFor(), which is the whole discipline
+// this list encodes: a field the recorder produces and this list omits is written as undefined and read as
+// false, which is exactly how v4567 turned every spawning gate skippable while the count looked like success.
 export const FLAGS = Object.freeze(["spawnedNonNode", "spawnedNode", "procs", "net", "namedFsImport",
-                                   "reachesUnrecorded"]);
+                                   "reachesUnrecorded", "noProbeOutput"]);
 
 /** Decode the indexed on-disk form into the {gate: {reads, dirs, hashes, dirHashes, ...}} shape the rule wants. */
 export function decode(raw) {
@@ -131,22 +134,41 @@ export function decode(raw) {
         for (const f of FLAGS) gates[g][f] = e[f];
     }
     return { note: raw.note, at: raw.at, probedMs: raw.probedMs, format: raw.format,
-             conflicts: raw.conflicts || [], gates };
+             conflicts: raw.conflicts || [], changedDuringPass: raw.changedDuringPass || [], gates };
 }
 
 /**
  * Build the indexed on-disk form from {gate: entry} in the decoded shape.
  *
- * *** ONE HASH PER PATH IS AN ASSUMPTION AND THE PASS ITSELF CAN BREAK IT. *** The recording pass runs every
- * gate, and some gates WRITE into the tree -- tools/ship/tslRace-selfcheck.mjs rewrites
- * tools/ship/tsl-emitted-race.json on every run, quickSweep rewrites sweep-timings.json, and v4566 spent a
- * round on what happens when one of those writes goes wrong. So a path read early in the pass and again at
- * the end can carry two different hashes, and folding them into one silently picks a winner.
+ * *** THIS NOTE DESCRIBED A RACE THIS FUNCTION CANNOT SEE, AND THE SENTINEL IT JUSTIFIES WAS FIRING ON
+ * SOMETHING ELSE ENTIRELY. IT COST 283 GATES OF SKIPPING. *** What stood here said: the pass runs every gate,
+ * some gates WRITE into the tree, "so a path read early in the pass and again at the end can carry two
+ * different hashes, and folding them into one silently picks a winner". Every clause of that is true about
+ * the tree and false about this code, because hashFile is MEMOISED for the whole pass. Measured, in
+ * tools/ship/inputSets-selfcheck.mjs section 4: write a file, hash it, rewrite it, hash it again, and the
+ * second reading comes back EQUAL TO THE FIRST while the file on disk says something else. The late gate
+ * never records a different hash, so encode() sees one value and reports NO conflict. *** THE MID-PASS RACE
+ * PRODUCES ZERO CONFLICTS, BY CONSTRUCTION. ***
  *
- * A CONFLICTING PATH IS RECORDED AS ONE. Its hash is stored as CONFLICT -- a sentinel no live reading can
- * produce, for the reason beside that constant -- so every gate that touched it is refused with `changed:`
- * rather than skipped on a coin flip. That is the refusing
- * direction, and `conflicts` carries the count so the number is visible instead of inferred.
+ * So what were the 130 conflicts in the shipped record? tools/ship/recordInputs.mjs seeds its output with the
+ * PREVIOUS record (`out = { ...prior.gates }`) so a partial re-probe does not erase everything else, and the
+ * hashes of a carried-over entry are from the previous pass. Folding a T0 hash with a T1 hash for one path is
+ * a conflict, and the tree changes between passes -- so the conflicting paths were exactly the files and
+ * directories that rounds edit: tools/ship (a directory that gains a gate most rounds), gate-reports,
+ * gateSweep.mjs, nextRounds.mjs, runtimeGap.mjs. Re-run with an empty prior on the same tree: 0 conflicts.
+ *
+ * *** AND THE SENTINEL'S BLAST RADIUS WAS THE WRONG SHAPE. *** A stale carried-over entry is ALREADY refused,
+ * correctly and by itself, by whyRun's own re-hash of that gate's own paths. The sentinel adds nothing there
+ * -- what it adds is poisoning the PATH for every other gate, including gates probed in this very pass whose
+ * reading of it is perfectly current. Measured on the shipped record against the tree it shipped with: 283 of
+ * 1,293 gates were refused by a sentinel and only 23 by a hash that genuinely differs, off 58 poisoned paths.
+ *
+ * THE SENTINEL STAYS, and it now has a detector that can actually fire it. recordInputs re-hashes every
+ * recorded path AFTER the pass, with the memo cleared, and any path that moved is a path some gate wrote
+ * while the pass was reading it -- the real form of the hazard this note used to claim. Those paths are
+ * marked CONFLICT, so every gate that touched one is refused rather than skipped on a coin flip. `conflicts`
+ * from the fold below must now be EMPTY, and it is kept as a ratchet: a nonzero count means a caller mixed
+ * two passes into one encode(), which is the bug this note exists to have caught once.
  */
 export function encode(gates, meta = {}) {
     const index = new Map(), paths = [], hashes = [], dirHashes = [];
@@ -163,6 +185,18 @@ export function encode(gates, meta = {}) {
         out[g] = { r, d, ms: e.probeMs, exit: e.exit };
         for (const f of FLAGS) out[g][f] = e[f];
     }
+    // *** v4558 -- encode(decode(x)) LOST THE CONFLICT LIST WHILE KEEPING EVERY SENTINEL. *** A conflict is
+    // detected by two gates DISAGREEING during this encode; after a decode they no longer disagree, because
+    // both now read the same stored `!conflict`. So a record round-tripped through this module kept all 81
+    // sentinels -- 290 gates still correctly refused, no false green -- and declared ZERO conflicts, which
+    // made the file's own list stop describing its own contents and made recordInputs' conflictReport say
+    // the pass was clean. FOUND by re-encoding the live record to drop one bad entry and noticing the count
+    // go 21 -> 0 while the sentinels stayed.
+    //
+    // A STORED SENTINEL IS A CONFLICT WHETHER OR NOT THIS PASS IS THE ONE THAT SAW IT. The disagreement
+    // above adds to the set; so does a value that arrived already refusing.
+    for (let i = 0; i < paths.length; i++)
+        if (hashes[i] === CONFLICT || dirHashes[i] === CONFLICT) conflicts.add(paths[i]);
     return { ...meta, format: FORMAT,
              conflicts: [...conflicts].sort(),
              paths, hashes: hashes.map((h) => h ?? null), dirHashes: dirHashes.map((h) => h ?? null), gates: out };
@@ -171,6 +205,25 @@ export function encode(gates, meta = {}) {
 export function readRecord(root = ENG) {
     try { return decode(JSON.parse(fs.readFileSync(path.join(root, RECORD), "utf8"))); }
     catch { return { note: "", at: null, gates: {} }; }
+}
+
+/**
+ * *** v4725 -- THE SAME RECORD, READ ONCE PER PROCESS WHILE THE FILE IS UNCHANGED. *** runQuickSweep read and decoded the
+ * 3.5 MB record on every call, and a gate that drives three small sweeps paid for it three times -- sweepCoverage-selfcheck,
+ * which on the slower host sat 42 ms over the quick sweep's budget and took eight frozen records out of the ship-time check.
+ * The key is the file's path, mtime and size, so any rewrite -- recordInputs' included -- is a miss. For READERS ONLY: the
+ * object is shared between callers, which is why readRecord, which recordInputs mutates before writing, is left as it was.
+ */
+const _recordMemo = new Map();
+export function readRecordCached(root = ENG) {
+    const file = path.join(root, RECORD);
+    let st = null;
+    try { st = fs.statSync(file); } catch { return readRecord(root); }
+    const key = `${st.mtimeMs}:${st.size}`, hit = _recordMemo.get(file);
+    if (hit && hit.key === key) return hit.value;
+    const value = readRecord(root);
+    _recordMemo.set(file, { key, value });
+    return value;
 }
 
 /**
@@ -204,6 +257,11 @@ export function whyRun(gate, rec, root = ENG) {
     // about: such a gate recorded an EMPTY set, not a partial one. A module.register() loader hook redirects
     // node:fs to a shim, so the named bindings ARE the recording functions. The field is still recorded so
     // the population can be counted; it no longer decides anything.
+    // *** BEFORE EVERY OTHER DISQUALIFIER, BECAUSE IT IS THE ONLY ONE THAT MEANS "THERE IS NO SET". *** The
+    // others describe a set that exists and cannot be trusted; this one says the probe never produced one.
+    // Placed after the `!e` check and before the rest, a killed probe on a real gate was reporting "reaches a
+    // module its recorded set does not carry" -- true of an empty set in a vacuous way, and the wrong story.
+    if (e.noProbeOutput) return "the probe produced no output, so nothing was recorded (killed at the cap, or died before its exit handler)";
     if (e.spawnedNonNode) return "spawned a child the probe could not follow";
     if (e.net) return "opens a socket or fetches";
     // *** v4573 -- THE DISQUALIFIER THAT ANSWERS THE REASON THIS WAS SHIPPED DISARMED. ***
@@ -224,14 +282,103 @@ export function whyRun(gate, rec, root = ENG) {
     // it is the price of the skip being a structural claim rather than a sample of one run.
     if (e.reachesUnrecorded) return "reaches a module its recorded set does not carry";
     const reads = e.reads || [], dirs = e.dirs || [];
+    // "We failed to look" and "there is nothing there" are different and this said the second; the specific
+    // reason is checked above, before the disqualifiers. Both refuse the skip, so the VERDICT was never
+    // wrong -- the reason was, and the reason is what the skip histogram groups by, so a pass full of killed
+    // probes read as a tree full of gates that touch no files.
     if (!reads.length && !dirs.length) return "recorded an empty input set";
     if (!reads.includes(gate)) return "its own source is not in its recorded set";
-    for (const r of reads) if (hashFile(r, root) !== (e.hashes || {})[r]) return "changed: " + r;
-    for (const d of dirs) if (hashDir(d, root) !== (e.dirHashes || {})[d]) return "changed: " + d;
+    const moved = firstMoved(e, root);
+    return moved === null ? null : "changed: " + moved;
+}
+
+/**
+ * THE FIRST PATH IN THIS ENTRY WHOSE CONTENT NO LONGER MATCHES WHAT WAS RECORDED, or null.
+ *
+ * *** SPLIT OUT OF whyRun AT v4633 SO THE RECORDER AND THE RULE CANNOT DISAGREE ABOUT WHAT "STALE" MEANS. ***
+ * The recorder needs exactly this question when it decides whether a PRIOR entry may be carried into a new
+ * pass, and the alternative was a second copy of these two loops -- which is this tree's single most repeated
+ * defect and the reason the species gates share one measurements module. One definition, two callers.
+ */
+export function firstMoved(e, root = ENG) {
+    for (const r of e.reads || []) if (hashFile(r, root) !== (e.hashes || {})[r]) return r;
+    for (const d of e.dirs || []) if (hashDir(d, root) !== (e.dirHashes || {})[d]) return d;
     return null;
 }
 
 export function skippable(gate, rec, root = ENG) { return whyRun(gate, rec, root) === null; }
+
+/**
+ * THE PRIOR RECORD'S ENTRIES THAT MAY BE CARRIED INTO A NEW PASS, and the ones that may not.
+ *
+ * *** SEEDING A PASS WITH THE PREVIOUS RECORD IS RIGHT; BLENDING THEIR HASHES IS NOT, AND THE DIFFERENCE COST
+ * 283 GATES THEIR SKIP FROM v4622 TO v4632. *** `recordInputs --gates x` must not erase the other 1,300
+ * entries, so the prior is seeded. But a carried entry's hashes are from the PREVIOUS pass, and encode()
+ * stores ONE hash per path -- so folding a T0 hash with a T1 hash marks the path CONFLICT, which refuses not
+ * just the stale gate but every gate that shares the path.
+ *
+ * So each prior entry is asked the question the skip rule would ask it: has anything it read moved? An entry
+ * that still matches contributes the same hash a fresh entry would, so no conflict can arise and carrying it
+ * is free. An entry that does not match is DROPPED rather than carried stale -- no loss, because whyRun
+ * refuses it either way ("changed: x" and "no recorded input set" both mean the gate runs) -- and dropping it
+ * is what keeps every hash in the written file from ONE instant, which is what the record's `at` stamp has
+ * always claimed and could not previously support.
+ */
+export function carryForward(priorGates, root = ENG) {
+    clearHashCache();
+    const carried = {}, dropped = [];
+    for (const [g, e] of Object.entries(priorGates || {})) {
+        // *** v4647 -- AN ENTRY THAT RECORDED NOTHING IS IMMORTAL UNDER THE RULE ABOVE, AND THAT IS THE
+        // UNHANDLED HALF OF THE TIMED-OUT PROBE. *** firstMoved walks the entry's reads and dirs; an entry
+        // with neither has nothing that can move, so it returns null and the entry is carried -- forever,
+        // through every pass, never dropped as stale and never re-probed unless a run names that gate by
+        // hand. A failed measurement that can never expire is worse than no measurement, because the slot
+        // being occupied is what stops the next full pass from filling it.
+        //
+        // Dropped on the STRUCTURAL condition rather than on the new flag, so records written before v4647
+        // are covered too: an entry carrying no reads and no dirs cannot be validated by any means this
+        // function has, whatever wrote it. Dropping costs nothing -- whyRun refuses it either way -- and it
+        // is what makes the next pass re-probe the gate.
+        if (!(e.reads || []).length && !(e.dirs || []).length) { dropped.push(g); continue; }
+        if (firstMoved(e, root) === null) carried[g] = e; else dropped.push(g);
+    }
+    return { carried, dropped };
+}
+
+/**
+ * THE PATHS SOME GATE WROTE WHILE THE PASS WAS READING THEM -- the hazard the CONFLICT sentinel exists for,
+ * with a reading that can actually see it. Marks each one CONFLICT in every entry that touched it, so those
+ * gates are refused rather than skipped on a stale reading, and returns the sorted list.
+ *
+ * *** IT HAS TO CLEAR THE MEMO, AND THAT IS THE WHOLE MECHANISM. *** hashFile is memoised for the life of a
+ * pass -- that is what turns 443,405 hashes into 4,072 -- and the memo is exactly why encode() cannot see a
+ * mid-pass write: the late gate asks, and gets handed the EARLY reading. So the only place the question can
+ * be asked is AFTER the pass, with the cache cleared, comparing what was recorded against what the file says
+ * now. tools/ship/inputSets-selfcheck.mjs section 4 drives both halves of that on a real file.
+ *
+ * BEST-EFFORT, AND THE LIMIT IS NAMED RATHER THAN GLOSSED: a file written and then restored during the pass
+ * reads the same at both ends and is missed. What this catches is the shape that occurs -- a gate that leaves
+ * its output behind (tools/ship/tslRace-selfcheck.mjs rewrites tsl-emitted-race.json on every run; quickSweep
+ * rewrites sweep-timings.json).
+ */
+export function markChangedDuringPass(gates, root = ENG) {
+    const observed = new Map();
+    for (const e of Object.values(gates)) {
+        for (const r of e.reads || []) if (!observed.has(r)) observed.set(r, ["f", (e.hashes || {})[r]]);
+        for (const d of e.dirs || []) if (!observed.has(d)) observed.set(d, ["d", (e.dirHashes || {})[d]]);
+    }
+    clearHashCache();
+    const changed = [];
+    for (const [rel, [kind, was]] of observed) {
+        if ((kind === "f" ? hashFile(rel, root) : hashDir(rel, root)) !== was) changed.push(rel);
+    }
+    changed.sort();
+    for (const e of Object.values(gates)) for (const rel of changed) {
+        if (e.hashes && rel in e.hashes) e.hashes[rel] = CONFLICT;
+        if (e.dirHashes && rel in e.dirHashes) e.dirHashes[rel] = CONFLICT;
+    }
+    return { changed, observed: observed.size };
+}
 
 /**
  * The split, for a report or a gate: { skip: [...], run: [{gate, why}] }.

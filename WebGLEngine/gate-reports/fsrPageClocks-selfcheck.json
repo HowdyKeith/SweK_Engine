@@ -1,0 +1,46 @@
+{
+ "gate": "tools/ship/fsrPageClocks-selfcheck.mjs",
+ "at": "2026-09-29",
+ "tables": [
+  {
+   "title": "the same scene time at two history ages: what the scene fixes and what the history does",
+   "columns": [
+    "history age",
+    "scene time",
+    "disocclusions: control",
+    "disocclusions: other clock",
+    "PSNR dB: control",
+    "PSNR dB: other clock"
+   ],
+   "rows": [
+    [
+     2,
+     7,
+     106,
+     106,
+     34,
+     34.97
+    ],
+    [
+     3,
+     8,
+     212,
+     212,
+     38.78,
+     40.31
+    ],
+    [
+     4,
+     9,
+     106,
+     106,
+     38.58,
+     39.99
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

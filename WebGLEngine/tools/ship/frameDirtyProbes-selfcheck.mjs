@@ -34,7 +34,7 @@
 //
 // Falling back to `true` is itself correct -- a probe that cannot tell must say dirty, because the cost of a
 // wrong "clean" is a frozen screen. What was wrong is that the fallback was doing ALL the work, silently.
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import { codeOnly, proseHas } from "./sourceScan.mjs";
 import fs from "node:fs";
 import path from "node:path";
@@ -137,7 +137,7 @@ console.log("\n3. *** THE ONLY CHECK A CONSTANT CANNOT PASS: MAKE THE WORLD QUIE
         console.log("        one against the real engine can show that its answer moves when the world does,");
         console.log("        which is the exact thing the dayNight probe failed at for eight rounds.");
     } else {
-        const browser = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const browser = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
         try {
             const page = await browser.newPage();
             await page.route("**/*", (r) => {
@@ -157,6 +157,11 @@ console.log("\n3. *** THE ONLY CHECK A CONSTANT CANNOT PASS: MAKE THE WORLD QUIE
             });
             await page.goto("http://swek.local/index.html", { waitUntil: "domcontentloaded" });
             await page.waitForFunction(() => !!window.frameDirty, null, { timeout: 60000 });
+            // *** v4778 RIG RUN 10 -- WAIT FOR WHAT THIS SECTION CALLS, NOT FOR A FIXED 2.5 s. *** It reads window.dayNight, and
+            // only waited for frameDirty: dayNight arrived 2.6 s after load under --use-gl=swiftshader and 7.0-7.8 s under the
+            // ANGLE-SwiftShader spelling every launch now takes (webglLaunchArgs(), measured here, three runs), so the same
+            // engine read "undefined (reading 'pause')". The race was always there; the slower boot only lost it.
+            await page.waitForFunction(() => !!window.dayNight, null, { timeout: 60000 });
             await page.waitForTimeout(2500);
 
             const r = await page.evaluate(async () => {

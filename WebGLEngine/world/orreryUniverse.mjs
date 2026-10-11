@@ -196,13 +196,15 @@ export const MEASURED_AT_V4432 = Object.freeze({
     vendoredBytesMisattributed: 810948,
     axesReachable: 1,
     axesRefused: 2,
-    languageAgree: 7,       // v4560: xatlas, C++ against C++
+    languageAgree: 8,       // v4560: xatlas, C++ against C++; v4805: three-webgpu-r185, JavaScript against three.js's JavaScript
     languageBuilt: 2,
     languageTranspiled: 2,
     languagePaperwork: 1,
     languageAssets: 2,       // Racing city 0: kenney-city and kenney-racing, .glb and .png only
-    languageUnmeasured: 2,   // Racing city 0: morphicons; draco-encoder (Task 53, vendored with a PROVENANCE.txt
+    languageUnmeasured: 3,   // Racing city 0: morphicons; draco-encoder (Task 53, vendored with a PROVENANCE.txt
                              // naming google/draco) joined it -- neither upstream has a row in orrery-universe.json,
                              // which is fetched by a round with GitHub reach and cannot be re-fetched here
+                             // v4778 -- 2 -> 3 at the rtx merge: mikktspace, whose PROVENANCE.txt names mmikk/MikkTSpace,
+                             // arrived with the rtx line and owes its row the same way. male-cns names no GitHub upstream
     languageUnexplained: 0,
 });

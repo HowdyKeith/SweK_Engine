@@ -78,7 +78,9 @@ export function shaderCensus(root) {
             if (!/\.(js|mjs)$/.test(e.name)) continue;
             let src = "";
             try { src = fs.readFileSync(p, "utf8"); } catch { continue; }
-            const rel = path.relative(root, p);
+            // v4681: posix at the source -- the gates compare against "render/tslSource.mjs" literals, and on the
+            // rig this was "render\\tslSource.mjs", so shaderPairs went red on membership with its counts right.
+            const rel = path.relative(root, p).split(path.sep).join("/");
             // *** A CHEAP GATE BEFORE THE EXPENSIVE ONE, AND IT IS NOT AN OPTIMISATION FOR ITS OWN SAKE. ***
             // prose() is the full lexer and this walk sees 2,265 files; running it on all of them put the gate
             // over the quick sweep's 3 s budget at v4383 -- out of the sweep that runs every round and into the

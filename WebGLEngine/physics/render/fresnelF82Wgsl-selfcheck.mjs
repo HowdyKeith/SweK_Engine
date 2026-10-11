@@ -11,7 +11,7 @@
 // number, not assumed to be zero and not assumed to fit a tolerance picked before the device answered.
 "use strict";
 import { runWgslComputeNative, headlessGpuSkipReason } from "../../tools/ship/headlessGpu.mjs";
-import { F82_TINT_WGSL, packF82Params } from "./fresnelF82Wgsl.mjs";
+import { F82_TINT_WGSL, packF82Params, F32_FLOOR_ABS } from "./fresnelF82Wgsl.mjs";
 import { f82Tint } from "./fresnelF82.mjs";
 
 let fails = 0;
@@ -45,7 +45,7 @@ async function main() {
         }
         if (worst > worstOverall) { worstOverall = worst; worstAt = `f0=${f0} b=${b} mu=${worstMu.toFixed(4)}`; }
         ok(`!! f0=${f0} b=${b}: device f32 agrees with the f64 CPU reference to the f32 floor across ${COUNT} angles`,
-           worst < 1e-4, `worst |gpu - cpu| = ${worst.toExponential(3)} at mu=${worstMu.toFixed(4)}`);
+           worst < F32_FLOOR_ABS, `worst |gpu - cpu| = ${worst.toExponential(3)} at mu=${worstMu.toFixed(4)}`);   // v4814: one declaration
 
         // the two exact grid endpoints (mu = 0 and mu = 1, both hit exactly by this shader's own i/(count-1)
         // grid) are the structural identities fresnelF82-selfcheck.mjs section 1 asserts at f64 -- checked here

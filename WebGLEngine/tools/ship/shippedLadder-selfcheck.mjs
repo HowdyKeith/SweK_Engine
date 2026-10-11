@@ -84,7 +84,7 @@ import { fileURLToPath } from "node:url";
 import http from "node:http";
 import { createRequire } from "node:module";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
-import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import { discLadderThresholds, costAtMetric, COST_PIXELS as BUDGET } from "../../render/lodBudget.mjs";
 import { LOD_RECORD } from "../../render/lodRecord.mjs";
 import { lodThresholdsFor, ladderKind, priceRung, FRAME, COST_PIXELS } from "../../render/lodBudget.mjs";
@@ -367,7 +367,7 @@ else {
         if (!f.startsWith(ENG) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { s2.writeHead(404); return s2.end("no"); }
         s2.writeHead(200, { "Content-Type": MIME[path.extname(f)] || "application/octet-stream" }); s2.end(fs.readFileSync(f)); });
     await new Promise((res) => srv.listen(0, "127.0.0.1", res));
-    const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+    const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
     const load = async (url) => { const pg = await br.newPage({ viewport: { width: 640, height: 480 } });
         const errs = []; pg.on("pageerror", (e) => errs.push(String(e).slice(0, 200)));
         await pg.goto(url, { waitUntil: "load" }); await pg.waitForTimeout(6000);

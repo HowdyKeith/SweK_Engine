@@ -78,9 +78,19 @@ export function tokens(file, title = "") {
     return new Set(raw.filter((w) => w && w.length > 1 && !STOP.has(w)));
 }
 
+/**
+ * v4828 -- A GENERATED INDEX THAT DOES NOT PARSE SAYS SO, with its size, its last bytes and the command that regenerates it. The rig's v4826 verify reported three gates "NO FAILING
+ * ROW: it died" on a bare `at JSON.parse` -- the verdict's tail shows the last three lines of a stack, and the line that said what was wrong was above them.
+ */
+export function readJsonOrSay(file, regenerate) {
+    const text = fs.readFileSync(file, "utf8");
+    try { return JSON.parse(text); }
+    catch (e) { throw new Error(path.basename(file) + " is not valid JSON (" + text.length + " characters, ends " + JSON.stringify(text.slice(-30)) + "): " + e.message + " -- regenerate it with `" + regenerate + "`"); }
+}
+
 /** Read the page list the rest of the ship tooling already derives. No second walker. */
 export function readPages() {
-    const j = JSON.parse(fs.readFileSync(path.join(ENG, "page-index.json"), "utf8"));
+    const j = readJsonOrSay(path.join(ENG, "page-index.json"), "node tools/ship/buildPageIndex.mjs");
     const byFile = new Map(j.pages.map((p) => [p.f, p.t || p.f]));
     // launch-index carries eight pages the page walker misses; fold them in so the inventory is of the TREE
     try {
@@ -97,7 +107,10 @@ export function readPages() {
 export function inventory() {
     const pages = readPages();
     const placed = new Map();
-    for (const s of SECTIONS) for (const f of s.pages) placed.set(f, s.id);
+    // v4778 -- THE FIRST CLAIM, as page-index.json's `g` and server.html's mover both read it. Keith: "There can be
+    // duplicate links in folder buckets." A page two sections claim is placed ONCE here (this is a partition of
+    // pages, not of slots) under the section that moves its anchor; a plain set() would have kept the LAST.
+    for (const s of SECTIONS) for (const f of s.pages) if (!placed.has(f)) placed.set(f, s.id);
     const reasoned = new Set(UNPLACED.keys());
     const silent = [];
     for (const f of pages.keys()) if (!placed.has(f) && !reasoned.has(f)) silent.push(f);
@@ -114,8 +127,11 @@ export function capacity(inv = inventory()) {
     const free = per.reduce((a, p) => a + p.free, 0);
     const need = inv.counts.silent;
     const shortfall = Math.max(0, need - free);
+    // v4778 -- USED IS SLOTS, NOT PAGES. Keith: "There can be duplicate links in folder buckets." A page in two
+    // drawers fills a slot in each, so slots used is the sum over drawers; inv.counts.placed stays the count of
+    // DISTINCT pages, because that is the number the placed + reasoned + silent partition is made of.
     return { panels: SECTIONS.length, cap: MAX_PER_PANEL, totalSlots: SECTIONS.length * MAX_PER_PANEL,
-             used: inv.counts.placed, free, need, shortfall,
+             used: per.reduce((a, p) => a + p.used, 0), free, need, shortfall,
              extraPanelsNeeded: Math.ceil(shortfall / MAX_PER_PANEL), per };
 }
 

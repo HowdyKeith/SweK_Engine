@@ -135,9 +135,12 @@ export const AXES = Object.freeze([
     // recorded verbatim and it was always the runner's -- and the ATTRIBUTION is now a field rather than an
     // assumption in the header. "have: false" means THIS RUNNER cannot see it, which is not the same claim as
     // "GitHub refuses it" and was being read as though it were.
+    // v4687: `usedBy` -- the axis is refused HERE and read where GitHub answers; world/traderGraphGithub.mjs takes it
+    // on such a box and the record is committed. `have` stays false: it describes this runner, not the tree.
     Object.freeze({ axis: "contributor list as GitHub counts it", have: false, blockedBy: RUNNER,
         blocked: "GitHub access to this repository is not enabled for this session. Use add_repo",
-        remedy: "attach the repository with add_repo, one at a time" }),
+        remedy: "attach the repository with add_repo, one at a time",
+        usedBy: "world/traderGraphGithub.mjs -> world/trader-graph-github.json (repository record, fork parent, contributors by login)" }),
     Object.freeze({ axis: "our own repo's contributors", have: false, blockedBy: RUNNER,
         blocked: "GitHub access is not enabled for this session. An org admin must connect",
         remedy: "an org admin connects GitHub for the account",
@@ -150,12 +153,26 @@ export const AXES = Object.freeze([
     Object.freeze({ axis: "a contributor's profile, their other repos, followers", have: false, blockedBy: RUNNER,
         blocked: "This GitHub API path is not available: sessions are bound to their configured repositories",
         remedy: "NONE from here -- the whole /users path class is refused by the RUNNER, not rate-limited " +
-                "and not refused by GitHub, which serves this path publicly" }),
+                "and not refused by GitHub, which serves this path publicly",
+        // v4687: open on the rig, and NOT taken. Following each trader out of the project to everything else they
+        // have touched is the database of people this file's header refuses to build.
+        declined: "following a contributor to their profile, followers and other repositories maps PEOPLE, not " +
+                  "this project; the graph stays the 35 repositories it covers and who crossed between them" }),
     Object.freeze({ axis: "user search (location, language)", have: false, blockedBy: RUNNER,
         blocked: "This GitHub API path is not available: sessions are bound to their configured repositories",
         remedy: "NONE from here. It is also the axis most worth leaving alone: searching users by " +
-                "location to decorate a visualisation is profiling strangers, not mapping a project" }),
+                "location to decorate a visualisation is profiling strangers, not mapping a project",
+        declined: "profiling strangers, as the remedy above says" }),
 ]);
+
+/**
+ * v4687 -- WHICH AXIS EACH OF THE GATE'S PROBE PATHS OPENS. An open path is only an invitation until its axis is
+ * either USED (usedBy, with the record present) or DECLINED with a reason; the gate asserts exactly that.
+ */
+export const PROBE_AXIS = Object.freeze({
+    "users/but0n": "a contributor's profile, their other repos, followers",
+    "repos/but0n/vixel": "contributor list as GitHub counts it",
+});
 
 /** The sweep, as run: no failures, and the number of commits it read. */
 export const SWEEP = Object.freeze({ repos: 35, commits: 11172, cloneFailures: 0,

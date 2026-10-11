@@ -27,7 +27,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import { noComments } from "./sourceScan.mjs";
 
 const require_ = createRequire(import.meta.url);
@@ -230,7 +230,7 @@ const serverSrc = fs.readFileSync(path.join(ENG, "ai-bridge", "server.js"), "utf
             ok("!! *** Cross-Origin-Opener-Policy / Cross-Origin-Embedder-Policy are real HTTP headers on a plain fetch (no JS, no service worker involved) ***",
                 headers && headers["cross-origin-opener-policy"] === "same-origin" && headers["cross-origin-embedder-policy"] === "require-corp");
 
-            const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+            const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
             const pg = await (await b.newContext()).newPage();
             const errs = [];
             pg.on("pageerror", (e) => errs.push(String(e.message)));

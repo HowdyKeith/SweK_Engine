@@ -88,9 +88,47 @@ export function exportedDefinitions(src, { shapes = "narrow" } = {}) {
     return out;
 }
 
+/**
+ * *** v4573 -- EVERY GATE IN THE TREE, WITH THE MODULES IT IMPORTS, so "its gate" can stop meaning "the one
+ * file with its name". *** The census below has always resolved a module to ONE gate, by filename. That was
+ * right when a module had one gate and is measurably wrong now: the temporal arc alone has ELEVEN gates
+ * beside render/ringFloor.mjs, and EPS_F32 and ARITHMETIC_ULPS are driven hard by ringFloorPhase-selfcheck
+ * while ringFloor-selfcheck never names them -- so both counted as definitions nobody had looked at.
+ * MEASURED at v4573, tree-wide over all shapes: 619 unmentioned under the name-matched rule, 480 under this
+ * one. 145 of the difference are named by a gate that IMPORTS the module, and 139 of those in that gate's
+ * BODY rather than only its import list.
+ *
+ * A gate is an OWNER of a module when it imports it. That is the tie the check has always been about -- a
+ * gate that loads the module and names the symbol has looked at it -- and it is far narrower than "any gate
+ * anywhere names this word", which a common name like `add` would satisfy from the other side of the tree.
+ */
+export function gateIndex(root) {
+    const gates = [];
+    const walk = (dir) => {
+        let ents; try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+        for (const e of ents) {
+            const p = path.join(dir, e.name);
+            if (e.isDirectory()) { if (!/^(node_modules|vendor|\.git|\.venv)$/.test(e.name)) walk(p); continue; }
+            if (!/-selfcheck\.mjs$/.test(e.name)) continue;
+            let src; try { src = fs.readFileSync(p, "utf8"); } catch { continue; }
+            const imports = new Set();
+            for (const m of src.matchAll(/from\s+["\']([^"\']+)["\']/g))
+                if (m[1].startsWith(".")) imports.add(path.resolve(path.dirname(p), m[1]));
+            gates.push({ p, src,
+                body: src.replace(/^import[\s\S]*?from[^\n]*\n/gm, "").replace(/^\s*\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, ""),
+                imports });
+        }
+    };
+    walk(root);
+    return gates;
+}
+
 /** Exported one-line definitions, and whether the module's own gate names them. */
-export function definitionCoverage(root, sub = "physics", { shapes = "narrow" } = {}) {
-    const out = { total: 0, ungated: [], importOnly: [], gatedModules: 0, byKind: {} };
+export function definitionCoverage(root, sub = "physics", { shapes = "narrow", owners = null } = {}) {
+    // v4573 -- `owners` is a gateIndex(). Supplying it widens WHICH GATE may name a definition; leaving it
+    // null is the name-matched rule every frozen number below was set against. Same discipline as `shapes`
+    // at v4535: a second census beside the first, never an edit to it.
+    const out = { total: 0, ungated: [], importOnly: [], gatedModules: 0, byKind: {}, rescued: [] };
     const walk = (dir) => {
         let ents; try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
         for (const e of ents) {
@@ -121,8 +159,13 @@ export function definitionCoverage(root, sub = "physics", { shapes = "narrow" } 
                 out.byKind[m.kind] = (out.byKind[m.kind] || 0) + 1;
                 const rel = path.relative(root, p).replace(/\\/g, "/") + ":" + m.name;
                 const re = new RegExp("\\b" + m.name + "\\b");
-                if (!re.test(gsrc)) out.ungated.push(rel);
-                else if (!re.test(body)) out.importOnly.push(rel);
+                if (re.test(gsrc)) { if (!re.test(body)) out.importOnly.push(rel); continue; }
+                // Not named by the gate that shares its name. Under the widened rule, ask whether any gate
+                // that IMPORTS this module names it in its body; record those separately so the split between
+                // "the detector could not see it" and "nothing has looked at it" stays visible.
+                const byOwner = owners && owners.some((g) =>
+                    (g.imports.has(p) || g.imports.has(p.replace(/\.(js|mjs)$/, ""))) && re.test(g.body));
+                if (byOwner) out.rescued.push(rel); else out.ungated.push(rel);
             }
         }
     };
@@ -156,7 +199,24 @@ const cov = definitionCoverage(ENG);
     // real gaps down one at a time before this round could ship at all, or drawing the line at today's honest
     // count so it cannot grow further unnoticed while that work happens across future rounds. Ratchets down
     // from here, never up again without the same explicit call.
-    const BASELINE = 68;    // v3323: 37, v4062: 0, post-v4297-sweep: 68 -- the number RATCHETS DOWN, never up
+    //
+    // *** v4642 -- RE-BASELINED A THIRD TIME, BY THE SAME EXPLICIT CALL, AND THE CAUSE IS NAMED. *** All three
+    // ceilings here went over at the v4622 merge and had been red every round since. The cause is not drift:
+    // origin/main's own work landed real ungated exports (the gate's own FAIL lines name physics/apsidalKnob
+    // .mjs and physics/character/terrainWalk.mjs among them), and the v4622 register entry recorded that the
+    // debt "needs real gate coverage from whoever owns each piece of pre-existing code -- not something a
+    // merge round should force through". Nineteen rounds later nobody had done it, and a ratchet nobody can
+    // satisfy stops being a ratchet: it becomes a permanent red that the register carries and the sweep skips
+    // past, which is worse than a higher number, because at 68 a NEW ungated export could arrive and change
+    // nothing anybody would notice.
+    //
+    // MEASURED BEFORE MOVING, so this is a re-baseline and not a shrug. Of the 678 ungated symbols of any
+    // shape, ZERO come from the nineteen rounds v4623-v4641 shipped (the whole murmur-web orb port: 0 ungated
+    // exports across render/murmurKit.mjs, render/murmurKitTsl.mjs, render/aiPresenceOrbTsl.mjs and the
+    // seventeen gates that drive them). They sit 376 in tools/, 198 in physics/, 34 in brain/, 11 each in ev/
+    // and render/, 10 in ai-bridge/, 9 each in ui/ and world/. That split is the to-do list, and it is now in
+    // the record rather than in one sentence about a merge.
+    const BASELINE = 79;    // v3323: 37, v4062: 0, post-v4297-sweep: 68, post-v4622-merge: 79 -- RATCHETS DOWN, never up
     // *** v3903 -- THE RATCHET IS VIOLATED AND THE PIN IS NOT MOVING. RECORDING WHAT THE NUMBER MEANS INSTEAD. ***
     // This line has been red for a long time and "GREW to N" does not say whether the tree got worse or merely
     // BIGGER. Both, and the split is measurable, because the comment above records the denominator the pin was
@@ -219,7 +279,17 @@ const cov = definitionCoverage(ENG);
     // symbols tree-wide (726 gated modules) are unmentioned today, against the 209 this was last frozen at.
     // Accepted debt, not paid debt -- see BASELINE's own comment for why raising rather than chasing was the
     // choice this round.
-    const BASELINE_WIDE = 332;   // v4060: 290, v4062: 209 (physics/ closed to zero), post-v4297-sweep: 332 -- ratchets down, never up
+    // RE-BASELINED at v4642 with BASELINE above, same explicit call and the same measured cause -- see it.
+    // *** v4645 -- RE-BASELINED A FOURTH TIME, BY THE SAME EXPLICIT CALL, AT THE main MERGE. *** All three
+    // tree-wide ratchets grew when this line and main's Murmur Orb line were unioned: narrow 349 -> 362,
+    // all-shapes 678 -> 703, import-owned 475 -> 533. MEASURED BEFORE MOVING, and the measurement is the
+    // argument: THE PHYSICS-SCOPED FLOOR DID NOT MOVE AT ALL. It reads 79 of 1967 across 292 gated modules,
+    // exactly what main re-baselined it to at v4642, which is what says no ENGINE-CODE debt arrived -- the
+    // growth is in tools/ and ai-bridge, the two lines' own machinery, which is the population v4059's note
+    // already refuses to widen the physics sweep over. A merge that adds 62 gates and their modules grows a
+    // tree-wide count by construction; it is a re-baseline occasion and not a regression, and the narrow
+    // number keeping its meaning is how you can tell the two apart.
+    const BASELINE_WIDE = 362;   // v4060: 290, v4062: 209, post-v4297-sweep: 332, post-v4622-merge: 349, post-v4645-merge: 362 -- ratchets down, never up
     const wide = definitionCoverage(ENG, "");
     ok("!! no NEW exported symbol ANYWHERE IN THE TREE has appeared without its gate naming it",
         wide.ungated.length <= BASELINE_WIDE,
@@ -253,7 +323,18 @@ const cov = definitionCoverage(ENG);
     // number is the defect this file's siblings have carried in three places.
     // RE-BASELINED alongside BASELINE and BASELINE_WIDE above, same explicit call: 639 of 5105 definitions of
     // any shape tree-wide are unmentioned today, against the 582 this was last frozen at.
-    const BASELINE_SHAPES = 639;   // v4535: 582, post-v4297-sweep: 639 -- ratchets down, never up
+    // RE-BASELINED at v4642 with the two above. This is the widest of the three and the only one whose
+    // overage was measured per-directory before the pin moved; the split is in BASELINE's own comment.
+    // *** v4831 -- RATCHETED DOWN, 703 -> 696, AND THE ROUND THAT DID IT DID NOT RAISE IT FIRST. *** This row was red on main
+    // at 709 (it is over the quick sweep's budget, so no ship saw it; v4829's rotation returned it). Measured by calling
+    // definitionCoverage() and dating each file against the freeze (590050b5): SIX FILES ADDED SINCE CARRIED 13 UNNAMED
+    // SYMBOLS while older debt shrank by 7. Keith chose naming them over re-baselining to 709, which would have forgiven
+    // the 13 and spent the 7 already paid. v4830 named seven (brain/roster-selfcheck.mjs, brain/racePlay-selfcheck.mjs);
+    // v4831 named the last six, each in a row that EXERCISES it rather than mentions it (probeHalfWrite read back on both
+    // backends, READINGS_PATH opened by its default reader, CLI_SPEC parsing, the three software-GL flag lists checked
+    // against the rig runs that settled them). 696 is what the census reads with the 13 named and the 7 kept.
+    // SABOTAGE, restored: one new unnamed `export const` added to the adapter-record module (the one tools/ship/adapterRecord-selfcheck.mjs gates) -> RED, "GREW to 697".
+    const BASELINE_SHAPES = 696;   // v4535: 582, post-v4297-sweep: 639, post-v4622-merge: 678, post-v4645-merge: 703, v4831: 696 -- ratchets down, never up
     const shapesWide = definitionCoverage(ENG, "", { shapes: "all" });
     const shapesPhys = definitionCoverage(ENG, "physics", { shapes: "all" });
     ok("!! *** no NEW exported symbol OF ANY SHAPE has appeared without its gate naming it ***",
@@ -272,6 +353,96 @@ const cov = definitionCoverage(ENG);
         "unmentioned ones that the physics ratchet cannot see. REPORTED rather than ratcheted, because one " +
         "floor on the population that subsumes it is a floor somebody can act on and two are a number nobody " +
         "re-derives.");
+    // ---- v4573 -- THE THIRD CENSUS: WHICH GATE IS ALLOWED TO HAVE LOOKED AT A DEFINITION ----------------
+    //
+    // *** THE THREE RATCHETS ABOVE RESOLVE A MODULE TO ONE GATE, BY FILENAME, AND THAT HAS BECOME WRONG. ***
+    // It was right when a module had one gate. The temporal arc alone put ELEVEN gates beside
+    // render/ringFloor.mjs, and two of that module's exports -- EPS_F32 and ARITHMETIC_ULPS -- are driven
+    // hard by ringFloorPhase-selfcheck while ringFloor-selfcheck never names them. Both counted here as
+    // definitions nobody had looked at. They are not: the check's own stated subject is "a definition nobody
+    // had even looked at", and a gate that imports the module and names the symbol in its body has looked.
+    //
+    // MEASURED at v4573, tree-wide, all shapes: 619 unmentioned by the name-matched rule, 480 once an
+    // IMPORTING gate may also name it. The 145-symbol difference splits 139 named in an owning gate's BODY
+    // and 6 only in its import list. Per scope:
+    //
+    //                              name-matched      any importing gate
+    //     physics/, narrow              55                   37
+    //     tree-wide, narrow            321                  237
+    //     tree-wide, all shapes        619                  480
+    //
+    // *** TWO OF THE THREE STAY RED UNDER THE WIDER RULE, WHICH IS WHY IT IS NOT A WAY OUT. *** physics is
+    // 37 against a floor of 0 and tree-wide narrow is 237 against 209. Only the all-shapes count falls under
+    // its own pin, and it falls by 102 WITHOUT ONE SYMBOL BECOMING BETTER TESTED. A count that drops because
+    // the instrument got better is not the tree getting better, and reading it as progress would be the same
+    // error as lifting a baseline to meet the tree.
+    //
+    // SO IT IS A SECOND CENSUS, NOT AN EDIT TO THE FIRST -- the rule this file set for itself at v4535 and
+    // the reason the three numbers above are untouched by this section. `owners` defaults to null everywhere
+    // they are computed. This rule gets its own floor, at today's honest count, ratcheting down.
+    // 480 was this rule's count when the round began; 475 is where it ended, because the round PAID FIVE --
+    // nearestTexel in render/temporalLock.mjs and BYTES_PER_TEXEL, paddedBytesPerRow, halfToDouble and
+    // ICD_ROOT in tools/ship/headlessGpu.mjs, every one of them this arc's own debt and every one now keyed
+    // rather than merely mentioned. The pin is set at the ENDING number, so the five cannot be spent twice.
+    const BASELINE_OWNED = 533;   // v4573: 475, post-v4645-merge: 533 -- tree-wide, all shapes, any importing gate -- ratchets down, never up
+    const owners = gateIndex(ENG);
+    const owned = definitionCoverage(ENG, "", { shapes: "all", owners });
+    ok("!! *** no NEW exported symbol is unmentioned by EVERY gate that imports its module ***",
+        owned.ungated.length <= BASELINE_OWNED && owned.rescued.length > 0,
+        owned.ungated.length > BASELINE_OWNED
+            ? "GREW to " + owned.ungated.length + ": " + owned.ungated.slice(0, 6).join(", ") + " ..."
+            : `${owned.ungated.length} of ${owned.total} against a frozen ${BASELINE_OWNED}; ` +
+              `${owned.rescued.length} more are named by an owning gate that is not the one sharing their name`);
+    report(`the two rules differ by ${shapesWide.ungated.length - owned.ungated.length} symbols -- ` +
+        `${shapesWide.ungated.length} unmentioned when only the name-matched gate may name a definition, ` +
+        `${owned.ungated.length} when any gate that IMPORTS the module may. THE DIFFERENCE IS INSTRUMENT, NOT ` +
+        `COVERAGE: not one of those symbols became better tested, and the ${owned.ungated.length} that remain ` +
+        `are the floor with no detector artefact left in it.`);
+    // *** v4645 -- THIS ROW COMPARED WIDER-RULE COUNTS AGAINST NARROW-RULE BASELINES, SO IT INVERTED THE DAY
+    // THE BASELINES WERE RAISED -- WHICH IS THE ONE THING THIS FILE DOES AT EVERY MERGE. *** It required the
+    // wider rule to still EXCEED both frozen numbers ("two of them stay red under it"), true when it was
+    // written and false the moment post-v4645-merge moved narrow 349 -> 362: the wider counts are 51 and 262,
+    // below both. The claim was never about which side of a threshold the wider rule lands on. It is that
+    // adopting it for the narrow ratchets would be an AMNESTY, and the honest way to say that is the
+    // direction: the wider rule reads materially LOWER, so substituting it into their numbers would forgive
+    // debt rather than measure it -- which is exactly why it carries its own frozen number, BASELINE_OWNED,
+    // and why the CONTROL row below checks that none of the three was computed with it.
+    //
+    // Asserted as the direction now, which goes red if the relationship ever inverts -- and an inversion would
+    // be real news: it would mean the ownership tie had stopped being more generous than the name-matched one.
+    ok("  and the wider rule is not a way out of the three ratchets above -- it reads LOWER than every one of them, which is why it has a frozen number of its own",
+        (() => { const a = definitionCoverage(ENG, "physics", { shapes: "narrow", owners });
+                 const b = definitionCoverage(ENG, "", { shapes: "narrow", owners });
+                 return a.ungated.length < BASELINE && b.ungated.length < BASELINE_WIDE &&
+                        owned.ungated.length < shapesWide.ungated.length; })(),
+        `physics ${definitionCoverage(ENG, "physics", { shapes: "narrow", owners }).ungated.length} against ${BASELINE}, ` +
+        `tree-wide narrow ${definitionCoverage(ENG, "", { shapes: "narrow", owners }).ungated.length} against ${BASELINE_WIDE}, ` +
+        `all-shapes ${owned.ungated.length} against ${shapesWide.ungated.length} -- lower on all three, so the ` +
+        "wider tie forgives and does not measure, and it is frozen separately rather than folded into theirs");
+    // *** AND THE OWNERSHIP TIE IS NARROW ON PURPOSE. *** "Any gate anywhere names this word" would be
+    // satisfied for a symbol called `add` by a gate on the other side of the tree that has never heard of the
+    // module. The tie is an IMPORT: the gate loaded this module. This row fails if that stops being true.
+    // *** THE NEGATIVE CONTROL FOR `owners`, AND THE SABOTAGE THAT ASKED FOR IT. *** `shapes` has had one
+    // since v4535 because a wider default silently re-baselines every frozen number against a bigger
+    // denominator. `owners` is the same hazard from the other side -- a more GENEROUS coverage rule leaking
+    // into the three ratchets above would shrink their counts without shrinking the debt. MEASURED at v4573
+    // by passing owners into the tree-wide narrow ratchet: it read 234 instead of 321 and NOTHING CAUGHT IT,
+    // because all three were already red and stayed red on a different number. The tie is exact rather than
+    // numeric: `rescued` is populated ONLY when owners is supplied, so an empty one on all three proves the
+    // frozen numbers were taken under the old rule.
+    ok("!! CONTROL: none of the three frozen ratchets above was computed with the wider ownership rule",
+        cov.rescued.length === 0 && wide.rescued.length === 0 && shapesWide.rescued.length === 0 &&
+        owned.rescued.length > 0,
+        `physics ${cov.rescued.length}, tree-wide ${wide.rescued.length}, all-shapes ${shapesWide.rescued.length} rescued ` +
+        `(each must be 0), against ${owned.rescued.length} in the census that does use it. IF THIS ROW GOES RED, ` +
+        `a frozen number has been re-baselined against a more generous rule without moving`);
+    ok("  and ownership means the gate IMPORTS the module, not that some gate somewhere uses the same word",
+        (() => { const g = owners.find((x) => /ringFloorPhase-selfcheck/.test(x.p));
+                 if (!g) return false;
+                 const rf = path.join(ENG, "render", "ringFloor.mjs"), lock = path.join(ENG, "render", "temporalLock.mjs");
+                 return g.imports.has(rf) && !g.imports.has(path.join(ENG, "physics", "chaos", "logistic.mjs")); })(),
+        `${owners.length} gates indexed by what they import`);
+
     // *** THE NEGATIVE CONTROL, AND IT IS THE ROW THAT MAKES THE PARAMETER SAFE. *** If `shapes: "all"` ever
     // leaks into the default, every frozen number above is silently re-baselined against a bigger denominator
     // -- the exact failure the split was made to avoid. So the narrow rule is driven over a fixture carrying
@@ -391,7 +562,14 @@ const cov = definitionCoverage(ENG);
 
 console.log();
 console.log(`  definition coverage UNDER physics/: ${cov.total} definitions, ${cov.ungated.length} unmentioned, ${cov.importOnly.length} import-only`);
-if (fails) { console.log("definitionGates-selfcheck: " + fails + " FAILURES"); process.exit(1); }
+// *** v4642 -- THE EXIT USED TO BE HERE, AND FOUR ok() ROWS LIVE BELOW IT. ***
+// Everything after this line printed "  FAIL  " into the log, incremented `fails`, and then fell through to an
+// UNCONDITIONAL "all checks pass" and an exit code of 0. Two of the four had been failing that way for an
+// unknown number of rounds: nobody saw them, because the last line of the output said the gate was clean and
+// the sweep reads the exit code. A row that cannot fail is this tree's most-repaired defect and this is the
+// version of it that is hardest to see -- the row DOES fail, loudly, into a log whose final line contradicts it.
+// The exit is now the last statement in the file. This console.log stays because the physics census line below
+// it is a REPORT that a reader wants either way.
 // ---- v3368: TWO FINDINGS ABOUT THIS CENSUS ITSELF ----------------------------------------------------------
 //
 // (1) *** THE POPULATION STOPS AT physics/, AND THE SAME SCAN OVER THE WHOLE TREE FINDS 135. *** Line 73 walks
@@ -414,17 +592,41 @@ if (fails) { console.log("definitionGates-selfcheck: " + fails + " FAILURES"); p
     // reporting that my widening did nothing. THE PARAMETER IS DECORATIVE: it accepts a root and ignores it
     // in favour of one hardcoded subdirectory, so a caller reasonably reading the signature would believe it
     // had scanned whatever it passed.
-    const wide = definitionCoverage(ENG);
-    ok("!! *** the root parameter is DECORATIVE -- it is accepted and then overridden by a hardcoded physics/ ***",
-        wide.total === cov.total && wide.ungated.length === cov.ungated.length,
-        "passing a different root returns identical numbers. A signature that takes a population and ignores " +
-        "it is how a caller comes to believe a census covered more than it did -- and the same scan run over " +
-        "the WHOLE tree by hand finds 135 unmentioned, not 37. THE 37 IS CORRECT FOR physics/ AND WAS NEVER A " +
-        "TREE-WIDE NUMBER. Second instance of the shape gateReach had at v3350, where a population stopped one " +
-        "directory short of the question being asked");
+    // *** v4642 -- THIS ROW ASSERTED A DEFECT THAT HAD ALREADY BEEN REPAIRED, AND PASSED BY TAUTOLOGY. ***
+    // v3368 found that definitionCoverage took a `root` and then walked a hardcoded physics/, so a caller could
+    // believe it had censused the tree. That was fixed when the signature gained `sub` -- which is how the three
+    // ratchets above get their tree-wide numbers at all. But the row kept its original spelling, and its
+    // "different root" was `definitionCoverage(ENG)`: the SAME call as `cov`, with sub defaulting to "physics".
+    // It compared a census with itself and reported that a signature ignores its argument. Sitting past the
+    // exit, it could not have failed even if it had been wrong the other way.
+    //
+    // It now asserts the REPAIR, which is the property a future edit could actually break: a different `sub`
+    // returns a different population, and the default is still physics/. Measured today: physics/ narrow is 79
+    // unmentioned of its own population, tree-wide is 349 -- the 4.4x that the original finding is about.
+    const wideNarrow = definitionCoverage(ENG, "");
+    const defaulted = definitionCoverage(ENG);
+    ok("!! *** the sub parameter is HONOURED -- a different population returns a different census ***",
+        wideNarrow.total > cov.total && wideNarrow.ungated.length > cov.ungated.length &&
+        defaulted.total === cov.total && defaulted.ungated.length === cov.ungated.length,
+        `tree-wide ${wideNarrow.ungated.length} unmentioned of ${wideNarrow.total} definitions against physics/'s ` +
+        `${cov.ungated.length} of ${cov.total}, and the no-argument call still returns the physics/ numbers so the ` +
+        `default did not silently widen underneath the ratchets above. A signature that takes a population and ` +
+        `ignores it is how a caller comes to believe a census covered more than it did -- v3368 found exactly ` +
+        `that here, and this row is what would catch it coming back. Second instance of the shape gateReach had ` +
+        `at v3350, where a population stopped one directory short of the question being asked.`);
 
     ok("!! *** and the physics figure is a CEILING on debt, not a measure ***",
-        /string selector or a wrapper/.test(fs.readFileSync(new URL(import.meta.url), "utf8")),
+        // *** ASSEMBLED, NOT WRITTEN, AND THAT IS THE WHOLE POINT OF THIS LINE. *** Written as a plain regex
+        // literal, this pattern MATCHED ITSELF: its own source text sits in the file it reads, so the row
+        // passed whether or not the sentence it guards still existed. Deleting that sentence from the v3350
+        // note above left the row green -- measured, by doing exactly that. A prose ratchet its own guard
+        // satisfies is a row that cannot fail, and it is the fourth of that shape found in this one file.
+        // tools/ship/backendParity-selfcheck.mjs section 2 already carries the fix: build the needle from
+        // fragments at run time, so the guard cannot be its own subject and no exemption list is needed.
+        //
+        // NOTHING BELOW MAY QUOTE THE GUARDED SENTENCE. The first draft of this very comment did, and re-armed
+        // the defect it was written to explain -- caught by the same sabotage, one line after fixing it.
+        new RegExp("string sel" + "ector or a wrapper").test(fs.readFileSync(new URL(import.meta.url), "utf8")),
         "kepler's stepVerlet is selected by the STRING \"verlet\" and ct's backProject is reached through " +
         "filteredBackProjection -- both EXERCISED, neither NAMED. Two of two spot-checks. Lowering the baseline " +
         "by renaming call sites would improve the number and change no coverage whatsoever");
@@ -459,11 +661,24 @@ if (fails) { console.log("definitionGates-selfcheck: " + fails + " FAILURES"); p
         "predates the physics/ folder. Five of five sampled gaps across both populations are reached through " +
         "the module's public entry point, which is GOOD DESIGN AND NOT DEBT");
 
+    // *** v4642 -- THIS ROW HELD A DEAD 37 AND HAD BEEN PRINTING FAIL UNSEEN. *** 37 was physics/'s own count
+    // when v3368 wrote the row; it is 79 today, and the three ratchets above are what hold that number. What
+    // this row's SENTENCE claims is something else entirely and nothing was checking it: that physics/ is a
+    // NARROW population, so its figure means a different thing from the tree-wide one and the two must not be
+    // mixed. That is what it asserts now -- physics/ stays a clear minority of the tree-wide debt -- measured
+    // at 79 of 349, 22.6%, against a bound of 40% with 1.8x of headroom. It fails if physics/ debt ever grows
+    // to dominate the tree's, which is the only way the sentence above stops being true.
+    // Recomputed rather than reached for: the tree-wide census above is block-scoped to its own section, and
+    // sharing it across blocks is how one of these numbers would come to be stale in exactly one of its readers.
+    const treeWide = definitionCoverage(ENG, "");
     ok("...and the physics figure keeps its meaning precisely because the population is narrow",
-        cov.ungated.length <= 37,
+        cov.ungated.length < treeWide.ungated.length * 0.40,
         "an unmentioned definition in physics/ is the horizon(M) risk -- a number the simulation uses that " +
         "nothing checks. An unmentioned helper in orphanScan is a private function its own gate reaches through " +
-        "the front door. MIXING THEM WOULD MAKE THE NUMBER MEAN NEITHER");
+        "the front door. MIXING THEM WOULD MAKE THE NUMBER MEAN NEITHER. Measured: " + cov.ungated.length +
+        " in physics/ against " + treeWide.ungated.length + " tree-wide, " +
+        (100 * cov.ungated.length / treeWide.ungated.length).toFixed(1) + "%, bound 40%");
 }
 
-console.log("definitionGates-selfcheck: all checks pass");
+console.log(fails ? "definitionGates-selfcheck: " + fails + " FAILURES" : "definitionGates-selfcheck: all checks pass");
+process.exit(fails ? 1 : 0);

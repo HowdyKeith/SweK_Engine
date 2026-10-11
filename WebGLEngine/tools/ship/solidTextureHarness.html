@@ -9,6 +9,11 @@ import { FBM3_FN, CONCRETE_FN, TRIPLANAR_FN, CONCRETE } from "/render/solidTextu
 
 const N = 96;
 const gl = document.getElementById("c").getContext("webgl2", { antialias: false, preserveDrawingBuffer: true });
+// v4681 -- WHY a compile or link failed, not just its info log: the rig's v4680 run threw "Error: null" from
+// here, and WebGL returns null for an info log when the CONTEXT IS LOST. A lost context and a rejected shader
+// are different findings, so the message says which, and names the renderer read at load.
+const REN = (() => { try { const x = gl.getExtension("WEBGL_debug_renderer_info"); return String(x ? gl.getParameter(x.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)); } catch { return "unknown"; } })();
+const glWhy = (stage, log) => gl.isContextLost() ? `WEBGL CONTEXT LOST at ${stage} (renderer ${REN})` : `${stage} failed on ${REN}: ${log}`;
 
 const VS = `#version 300 es
 out vec2 vUV;
@@ -34,7 +39,18 @@ ${SNOISE3.join("\n")}
 ${FBM3_FN}
 ${CONCRETE_FN}
 uniform float uRaw;
+uniform float uProbe;
 void main() {
+    // *** v4649 -- THE READBACK PATH, ON ITS OWN, WITH NO NOISE IN IT. ***
+    // Keith's box reports 0 of 9216 points agreeing with EITHER mirror and a worst deviation of 4.83 on a
+    // quantity whose whole range is 8. That is not rounding; it is the picture arriving different. This mode
+    // writes bytes that are a pure function of the pixel address, so the gate can ask whether readPixels
+    // returns what was written before it asks anything about noise -- a comparison against a corrupted
+    // readback measures the compositor, not the shader.
+    if (uProbe > 0.5) {
+        fragColor = vec4(floor(gl_FragCoord.x) / 255.0, floor(gl_FragCoord.y) / 255.0, 128.0 / 255.0, 1.0);
+        return;
+    }
     vec3 p = uOrigin + uDU * vUV.x + uDV * vUV.y;
     if (uRaw > 0.5) {
         // RAW snoise, encoded across rgb at 24 bits so the readback is not the limiting precision. This mode
@@ -58,11 +74,11 @@ function compile(vs, fs) {
     for (const [t, src] of [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]]) {
         const s = gl.createShader(t);
         gl.shaderSource(s, src); gl.compileShader(s);
-        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(glWhy("compile", gl.getShaderInfoLog(s)));
         gl.attachShader(p, s);
     }
     gl.linkProgram(p);
-    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(glWhy("link", gl.getProgramInfoLog(p)));
     return p;
 }
 
@@ -75,7 +91,7 @@ catch (e) { window.__err = String(e && e.message || e); }
  * stands for, so the CPU reference can be evaluated at the same coordinates rather than at coordinates the
  * gate reconstructed and hoped were the same.
  */
-window.__render = (origin, du, dv, weathered, raw) => {
+window.__render = (origin, du, dv, weathered, raw, probe) => {
     if (!prog) return { ok: false, error: window.__err };
     gl.viewport(0, 0, N, N);
     gl.useProgram(prog);
@@ -84,6 +100,7 @@ window.__render = (origin, du, dv, weathered, raw) => {
     gl.uniform3f(gl.getUniformLocation(prog, "uDV"), dv[0], dv[1], dv[2]);
     gl.uniform1f(gl.getUniformLocation(prog, "uWeathered"), weathered ? 1 : 0);
     gl.uniform1f(gl.getUniformLocation(prog, "uRaw"), raw ? 1 : 0);
+    gl.uniform1f(gl.getUniformLocation(prog, "uProbe"), probe ? 1 : 0);
     for (const [k, v] of [["uScale", CONCRETE.scale], ["uAggregate", CONCRETE.aggregate],
                           ["uStoneLight", CONCRETE.stoneLight], ["uGrain", CONCRETE.grain]]) {
         gl.uniform1f(gl.getUniformLocation(prog, k), v);
@@ -96,7 +113,7 @@ window.__render = (origin, du, dv, weathered, raw) => {
     gl.bindVertexArray(null);
     const px = new Uint8Array(N * N * 4);
     gl.readPixels(0, 0, N, N, gl.RGBA, gl.UNSIGNED_BYTE, px);
-    return { ok: true, px: [...px], n: N };
+    return { ok: true, px: [...px], n: N, lost: gl.isContextLost(), glErr: gl.getError(), renderer: REN };   // v4681: the state beside the bytes
 };
 
 // The GLSL text itself, so the gate can assert what it does NOT contain -- a sampler, a varying uv -- rather

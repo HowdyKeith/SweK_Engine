@@ -53,7 +53,15 @@ function walk(dir = ENGINE, out = []) {
         let st;
         try { st = fs.statSync(p); } catch { continue; }
         if (st.isDirectory()) walk(p, out);
-        else if (GATE_RE.test(f)) out.push(path.relative(ENGINE, p).split(path.sep).join("/"));
+        // *** v4584 -- AND THE SAME TRANSIENT-FIXTURE EXCLUSION THE SUITE NOW CARRIES. ***
+        //
+        // This file is a deliberate twin of tools/ship/selfchecks.mjs's walk, and gateWalk-selfcheck.mjs asserts
+        // the two return the same set. THEY DID -- both were missing v4409's rule, so the comparison agreed on a
+        // false answer, which is the two-copies-of-one-wrong-probe shape timingCoverage-selfcheck recorded at
+        // v3584. Four gates plant a `__`-prefixed *-selfcheck.mjs while they run; rig.html and gates.html would
+        // OFFER one as a clickable gate, and rigProgress's fixture is built to exit 1. Measured at v4584 by
+        // planting one: this walk returned it and treeRead/gateSweep did not.
+        else if (GATE_RE.test(f) && !f.startsWith("__")) out.push(path.relative(ENGINE, p).split(path.sep).join("/"));
     }
     return out;
 }

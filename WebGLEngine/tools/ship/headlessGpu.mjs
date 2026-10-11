@@ -281,6 +281,15 @@ export const MEASURED = Object.freeze({
  * multiple of 4 (WebGPU refuses an odd-sized buffer, and a Uint16Array of odd length is one). The padding is
  * zero and sits past the last real element, where a shader that indexes correctly never reads.
  */
+/**
+ * *** v4572 -- THE VALUE AN UNTOUCHED READ-BACK CARRIES, so that "nothing ran" and "it wrote zeros" stop
+ * being the same reading. *** -999999 is outside every range this corpus computes (the widest is the path
+ * tracer's coverage buffer) and is exactly representable in f32, so an equality test against it is not a
+ * tolerance. The browser harness fills with the same number; the two must agree or a liveness failure would
+ * read as a divergence.
+ */
+export const LIVENESS_SENTINEL = -999999;
+
 export function storageWords(data) {
     const u8 = data instanceof ArrayBuffer ? new Uint8Array(data)
              : ArrayBuffer.isView(data) ? new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
@@ -293,31 +302,43 @@ export function storageWords(data) {
 }
 
 /**
- * v4580 -- `texture`: { width, height, data, binding, format = "rgba16float" }, so a compute shader can sample a
- * REAL bound texture (a captured cubemap atlas, not a storage buffer read by hand) rather than only receiving
- * numbers through `uniforms` or `inputs`. `data` is a flat f32 RGBA array (the same shape every atlas in this
- * tree already produces, e.g. specularIBLSample.packSpecularAtlas's `.data`); the half-float upload conversion
- * is done here, with THIS FILE'S OWN doubleToHalf, matching the codec its own texture-OUTPUT path already uses
- * below rather than importing a second implementation for the input side. This is the exact capability
- * specularProbeBake.mjs's and this file's own header named as missing ("headlessGpu.mjs to grow a cubemap-
- * texture binding it does not have") -- physics/render/specularProbeCapture.mjs is the first caller.
- * specularProbeLit-selfcheck.mjs's OWN hand-rolled texture-in/buffer-out shim predates this (neither this
- * function nor runWgslComputeToTextureNative supported the shape when it was written) and is left as it is
- * rather than retrofitted: its CPU reference is graded against text/slugAtlas.js's toHalf/fromHalf specifically,
- * and swapping its upload path to this function's doubleToHalf would change which half-float codec the two
- * sides of that gate share without a measured reason to -- a second real caller is worth more evidence of
- * reusability than editing a passing gate for tidiness alone.
+ * *** v4691 -- ONE DAWN INSTANCE PER PROCESS, NOT ONE PER CALL. *** Both helpers used to call mod.create([]) on
+ * every run and drop the instance when they returned, so a process that made several calls carried several
+ * unreachable instances, each torn down whenever V8 happened to FINALIZE it -- possibly while a later call's
+ * device was mid-read-back. That is bloomFusedTexture-selfcheck on Keith's rig: 0xC0000005 (access violation)
+ * every run, in section 3, its fifth native call and the one that fills 4,096 texels -- enough allocation to
+ * trigger a collection by itself. This box never crashed in the gate, but tools/ship/textureInProbe.mjs forces
+ * the collection after each of the gate's calls (its `order-gc` mode) and reproduces it: SIGSEGV or SIGABRT
+ * ("The futex facility returned an unexpected error code") in the texture-input call's map read-back.
+ * MEASURED, five runs each in that mode: per-call instances 5 of 5 crashed; destroying every resource AND the
+ * device before returning, instances still per call, 5 of 5 crashed -- so the live device is not what the
+ * finalizer breaks; one shared instance, 0 of 5, with or without that teardown, which is why there is none.
+ *
+ * Keeping the instance reachable is not EXIT_HAZARD's shape: that is a DEVICE reachable at exit. Adapters and
+ * devices stay per call and function-local, so harnessIsSafeByConstruction still holds, and a natural exit with
+ * the cached instance alive returned 0 in 5 of 5 here.
+ *
+ * SWEK_GPU_INSTANCE_PER_CALL=1 restores the old per-call instance. It exists for one reader: headlessGpu-selfcheck's
+ * section 4b runs the probe both ways, so the shared instance is watched preventing the crash, not assumed to.
  */
+const INSTANCES = new Map();
+function instanceFor(mod) {
+    if (process.env.SWEK_GPU_INSTANCE_PER_CALL === "1") return mod.create([]);
+    if (!INSTANCES.has(mod)) INSTANCES.set(mod, mod.create([]));
+    return INSTANCES.get(mod);
+}
+
 export async function runWgslComputeNative({ code, entryPoint = "main", outCount, uniforms = null,
                                              workgroups = 1, compileOnly = false, requireFn = null,
-                                             inputs = null, outInit = null, texture = null } = {}) {
+                                             inputs = null, outInit = null, texture = null,
+                                             outBinding = 0, uniformBinding = 1 } = {}) {
     const skip = headlessGpuSkipReason(requireFn);
     if (skip) return { ok: false, skipped: true, reason: skip, values: [], errors: [] };
     const icd = configureVulkanIcd();
     const { mod, from } = resolveWebgpu(requireFn);
 
     try {
-        const gpu = mod.create([]);
+        const gpu = instanceFor(mod);
         const adapter = await gpu.requestAdapter();
         if (!adapter) return { ok: false, skipped: false, reason: "requestAdapter() returned null with ICD " + icd.path, values: [], errors: [] };
         const info = adapter.info || {};
@@ -341,14 +362,19 @@ export async function runWgslComputeNative({ code, entryPoint = "main", outCount
         const outBuf = dev.createBuffer({ size: bytes, usage: U.STORAGE | U.COPY_SRC | U.COPY_DST });
         // v4465 -- `outInit`: the out buffer's starting contents, for a kernel that works IN PLACE on binding 0 (the
         // XPBD solve relaxes the prediction it is handed). Same option on the browser harness, same signature.
+        // *** v4572 -- AND WHEN THE CALLER SUPPLIES NONE, THE FILL IS A SENTINEL RATHER THAN ZEROS. *** A
+        // zero-filled read-back is indistinguishable from a kernel that wrote zeros, so "the buffer is still
+        // as created" was not a question this harness could answer. LIVENESS_SENTINEL is a value no kernel
+        // here produces, and `wroteNothing` below reports a run that left every word of it intact.
         if (outInit) dev.queue.writeBuffer(outBuf, 0, storageWords(outInit).subarray(0, outCount));
+        else dev.queue.writeBuffer(outBuf, 0, new Float32Array(outCount).fill(LIVENESS_SENTINEL));
         const readBuf = dev.createBuffer({ size: bytes, usage: U.COPY_DST | U.MAP_READ });
-        const entries = [{ binding: 0, resource: { buffer: outBuf } }];
+        const entries = [{ binding: outBinding, resource: { buffer: outBuf } }];
         let uniBuf = null;
         if (uniforms) {
             uniBuf = dev.createBuffer({ size: Math.max(16, uniforms.length * 4), usage: U.UNIFORM | U.COPY_DST });
             dev.queue.writeBuffer(uniBuf, 0, new Float32Array(uniforms));
-            entries.push({ binding: 1, resource: { buffer: uniBuf } });
+            entries.push({ binding: uniformBinding, resource: { buffer: uniBuf } });
         }
         // v4457 -- READ-ONLY STORAGE INPUTS, so a probe can read the bytes a texture would hold. The Slug gate
         // hands the atlas's own Uint16Arrays in here and unpacks halves on the device; a uniform buffer could not
@@ -371,6 +397,18 @@ export async function runWgslComputeNative({ code, entryPoint = "main", outCount
             dev.queue.writeTexture({ texture: tex }, half, { bytesPerRow: width * 8 }, [width, height]);
             entries.push({ binding, resource: tex.createView() });
         }
+
+        // *** v4572 -- EVERYTHING FROM HERE IS INSIDE A VALIDATION ERROR SCOPE, AND THE REASON IS THE WORST
+        // KIND OF PASS. *** Until this round a bind group the device REJECTED cost nothing: createBindGroup
+        // returns an invalid object rather than throwing, the submit is dropped, the read-back is still the
+        // zeros the buffer was created with, and this function returned { ok: true, errors: [] } beside them.
+        // MEASURED at v4572: a kernel that must write src + 7 everywhere, run with its input bound where the
+        // code declares read_write, returned ok:true and eight zeros on BOTH harnesses -- and
+        // wgslCorpus.compare scored it { n: 8, same: 8, identical: true }. The corpus's headline claim, "no
+        // divergence anywhere", is satisfiable by a kernel that never ran on either side. Two backends
+        // agreeing because neither did anything is v4402's fault sitting inside the instrument this tree
+        // uses to prove parity.
+        dev.pushErrorScope("validation");
         const pipe = dev.createComputePipeline({ layout: "auto", compute: { module: shader, entryPoint } });
         const bind = dev.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries });
         const enc = dev.createCommandEncoder();
@@ -379,12 +417,21 @@ export async function runWgslComputeNative({ code, entryPoint = "main", outCount
         cp.setPipeline(pipe); cp.setBindGroup(0, bind); cp.dispatchWorkgroups(...(Array.isArray(workgroups) ? workgroups : [workgroups])); cp.end();
         enc.copyBufferToBuffer(outBuf, 0, readBuf, 0, bytes);
         dev.queue.submit([enc.finish()]);
+        const validation = await dev.popErrorScope();
+        if (validation) {
+            outBuf.destroy(); readBuf.destroy(); uniBuf?.destroy();
+            for (const b of inBufs) b.destroy();
+            return { ok: false, skipped: false, values: [], ...meta,
+                     reason: "the device REJECTED this run -- an empty read-back is not a measurement",
+                     errors: [String(validation.message || validation).slice(0, 300)] };
+        }
         await readBuf.mapAsync(M.READ);
         const values = Array.from(new Float32Array(readBuf.getMappedRange()));
         readBuf.unmap();
         outBuf.destroy(); readBuf.destroy(); uniBuf?.destroy(); tex?.destroy();
         for (const b of inBufs) b.destroy();
-        return { ok: true, skipped: false, values, errors: [], ...meta };
+        const wroteNothing = !outInit && outCount > 0 && values.every((v) => v === LIVENESS_SENTINEL);
+        return { ok: true, skipped: false, values, errors: [], wroteNothing, ...meta };
     } catch (e) {
         return { ok: false, skipped: false, reason: "headlessGpu error: " + String(e).slice(0, 200), values: [], errors: [] };
     }
@@ -446,26 +493,32 @@ export const paddedBytesPerRow = (n, format) =>
 export async function runWgslComputeToTextureNative({ code, entryPoint = "main", n = 64,
                                                       format = "rgba16float", uniforms = null,
                                                       workgroups = 1, inputTexel = null,
-                                                      requireFn = null } = {}) {
+                                                      requireFn = null, trace = null } = {}) {
     const skip = headlessGpuSkipReason(requireFn);
     if (skip) return { ok: false, skipped: true, reason: skip, pixels: null };
     const icd = configureVulkanIcd();
     const { mod, from } = resolveWebgpu(requireFn);
+    // v4691 -- `trace` names each native step BEFORE it is taken, so a process that dies inside Dawn says where.
+    // tools/ship/textureInProbe.mjs passes one that writes synchronously; a buffered line is lost in a native crash.
+    const step = (s) => { if (trace) trace(s); };
 
     try {
-        const gpu = mod.create([]);
+        step("create instance");
+        const gpu = instanceFor(mod);
         const adapter = await gpu.requestAdapter();
         if (!adapter) return { ok: false, skipped: false, reason: "requestAdapter() returned null with ICD " + icd.path, pixels: null };
         const info = adapter.info || {};
         const meta = { from, icd: icd.path,
                        adapter: { vendor: info.vendor || null, architecture: info.architecture || null,
                                   description: info.description || null } };
+        step("request device");
         const dev = await adapter.requestDevice();
         const G = mod.globals || globalThis;
         const TU = G.GPUTextureUsage || globalThis.GPUTextureUsage;
         const BU = G.GPUBufferUsage || globalThis.GPUBufferUsage;
         const MM = G.GPUMapMode || globalThis.GPUMapMode;
 
+        step("compile shader");
         const shader = dev.createShaderModule({ code });
         const ci = await shader.getCompilationInfo();
         const errors = ci.messages.filter((m) => m.type === "error").map((m) => `${m.lineNum}:${m.linePos} ${m.message}`);
@@ -478,13 +531,16 @@ export async function runWgslComputeToTextureNative({ code, entryPoint = "main",
 
         const entries = [{ binding: 0, resource: tex.createView() }];
         if (inputTexel) {
+            step("fill input texels");
             const u = new Uint16Array(n * n * 4);
             for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
                 const p = inputTexel(x, y, n);
                 for (let c = 0; c < 4; c++) u[(y * n + x) * 4 + c] = doubleToHalf(p[c]);
             }
+            step("create input texture");
             const src = dev.createTexture({ size: [n, n], format: "rgba16float",
                 usage: TU.TEXTURE_BINDING | TU.COPY_DST });
+            step("upload input texture");
             dev.queue.writeTexture({ texture: src }, u, { bytesPerRow: n * 8 }, [n, n]);
             entries.push({ binding: 2, resource: src.createView() });
         }
@@ -494,17 +550,42 @@ export async function runWgslComputeToTextureNative({ code, entryPoint = "main",
             entries.push({ binding: 1, resource: { buffer: ub } });
         }
 
+        // *** v4572 -- THE TEXTURE PATH TAKES THE SAME SCOPE, FOR THE SAME REASON. *** See the buffer
+        // path above: a rejected bind group returned ok:true beside a read-back nobody wrote. *** Until this round a bind group the device REJECTED cost nothing: createBindGroup
+        // returns an invalid object rather than throwing, the submit is dropped, the read-back is still the
+        // zeros the buffer was created with, and this function returned { ok: true, errors: [] } beside them.
+        // MEASURED at v4572: a kernel that must write src + 7 everywhere, run with its input bound where the
+        // code declares read_write, returned ok:true and eight zeros on BOTH harnesses -- and
+        // wgslCorpus.compare scored it { n: 8, same: 8, identical: true }. The corpus's headline claim, "no
+        // divergence anywhere", is satisfiable by a kernel that never ran on either side. Two backends
+        // agreeing because neither did anything is v4402's fault sitting inside the instrument this tree
+        // uses to prove parity.
+        dev.pushErrorScope("validation");
+        step("create pipeline");
         const pipe = dev.createComputePipeline({ layout: "auto", compute: { module: shader, entryPoint } });
+        step("create bind group");
         const bind = dev.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries });
+        step("encode and submit");
         const enc = dev.createCommandEncoder();
         const cp = enc.beginComputePass();
         cp.setPipeline(pipe); cp.setBindGroup(0, bind); cp.dispatchWorkgroups(...(Array.isArray(workgroups) ? workgroups : [workgroups])); cp.end();
         enc.copyTextureToBuffer({ texture: tex }, { buffer: readBuf, bytesPerRow }, [n, n]);
         dev.queue.submit([enc.finish()]);
+        step("wait for validation");
+        const validation = await dev.popErrorScope();
+        if (validation) {
+            tex.destroy(); readBuf.destroy();
+            return { ok: false, skipped: false, pixels: [], ...meta,
+                     reason: "the device REJECTED this run -- an empty read-back is not a measurement",
+                     errors: [String(validation.message || validation).slice(0, 300)] };
+        }
+        step("map read-back");
         await readBuf.mapAsync(MM.READ);
         const raw = new Uint8Array(readBuf.getMappedRange()).slice();
         readBuf.unmap();
+        step("destroy");
         tex.destroy(); readBuf.destroy();
+        step("decode");
 
         // ROW BY ROW. Reading the padding as pixels shears the image, which reads as a shader defect.
         const px = new Float32Array(n * n * 4);

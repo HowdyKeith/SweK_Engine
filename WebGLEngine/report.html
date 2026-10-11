@@ -246,10 +246,25 @@
 <script type="module">
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
 
+  // v4642 -- THE RESPONSE IS CHECKED BEFORE IT IS PARSED. Three call sites in this block read
+  // `await (await fetch(route)).json()`, which is tools/ship/boundaryLint.mjs's UNCHECKED_JSON_BODY: on an
+  // HTML error page .json() throws a SyntaxError about a stray "<", so the catch below reports "unreachable"
+  // for a server that answered perfectly well with a 500. The block at the top of this file already had
+  // getJson() doing exactly this check -- it is in a different <script type="module"> and out of scope here,
+  // which is how three sites came to be written the long way beside a helper that existed.
+  //
+  // BEHAVIOUR ON SUCCESS IS UNCHANGED and every one of the three sites is already inside a try/catch with its
+  // own fallback text, so the only difference is WHICH error arrives: an HTTP status instead of a parse error.
+  const getLocalJson = async (route) => {
+    const res = await fetch(route, { cache: "no-store" });
+    if (!res.ok) throw new Error(route + " -> HTTP " + res.status);
+    return res.json();
+  };
+
   (async () => {
     const el = document.getElementById("fleetVer");
     try {
-      const j = await (await fetch("/lighthouse", { cache: "no-store" })).json();
+      const j = await getLocalJson("/lighthouse");
       const rows = (j && (j.roster || j.peers)) || [];
       if (!rows.length) { el.innerHTML = '<span style="color:#6f8a7c">no peers have checked in</span>'; return; }
       const vers = [...new Set(rows.map((r) => r.engineVersion).filter(Boolean))];
@@ -290,7 +305,7 @@
       // tick range). A peer whose id names a roster host gets the line ON ITS ROW; every peer gets a line below, so a
       // brain the lighthouse never rostered is still attributed. "none routed yet" is a true reading, not a fault.
       try {
-        const q = await (await fetch("/ai/brain/routed", { cache: "no-store" })).json();
+        const q = await getLocalJson("/ai/brain/routed");
         const peers = (q && q.summary && q.summary.peers) || [];
         const rt = document.getElementById("fleetRouted");
         const line = (p) => esc(p.id) + " (" + esc(p.gpu) + ") took " + p.count + " request" + (p.count === 1 ? "" : "s") +
@@ -310,7 +325,7 @@
   (async () => {
     const el = document.getElementById("taskerChain");
     try {
-      const j = await (await fetch("/android/tasker", { cache: "no-store" })).json();
+      const j = await getLocalJson("/android/tasker");
       if (!j || !j.rows) { el.textContent = "no chain reported"; return; }
       const colour = (v) => v === "done" ? "#7fe0a4" : v === "human" ? "#9fb8ab"
                           : v === "stale" ? "#e6c877" : v === "unconfirmable" ? "#6f8a7c" : "#f28b8b";

@@ -140,7 +140,7 @@ else {
             const renderer = new THREE.WebGPURenderer({ canvas, forceWebGL: false, antialias: false }); await renderer.init();
             const g = C.makeCarvePassTsl(T, { n: a.n, views: a.V });
             await renderer.computeAsync(g.node);
-            const emitted = renderer._nodes.getForCompute(g.node).computeShader;
+            const emitted = S2.emitCompute(renderer, g.node).wgsl;
             const gen = S2.transplantCompute(emitted, a.shell);
             out.wgsl = gen.wgsl; out.reads = gen.reads; out.writes = gen.writes;
             // SPECIFIED OPERATIONS ONLY: the four trig values arrive in a buffer, so no vendor transcendental is in play

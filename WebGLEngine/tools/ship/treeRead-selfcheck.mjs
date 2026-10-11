@@ -76,15 +76,45 @@ console.log("\n3. *** THE THREE WALKERS THIS REPLACED SELECTED THE SAME FILES, A
 {
     TR.clear();
     const unified = TR.treePaths().slice().sort();
-    const byFrozen = TR.treeFiles(ENG, TR.SKIP_AGREE.frozenRecords).map((f) => f.path).sort();
-    const byDrift = TR.treeFiles(ENG, TR.SKIP_AGREE.recordDrift).map((f) => f.path).sort();
+    // *** v4681 -- NORMALISED DURING THE WALK, NOT AFTER IT. *** v4646 normalised the RESULTS, but the old rule
+    // /\/vendor\// is applied to each native path AS the walk descends, so on Windows it skipped nothing and 117
+    // vendor files were already in the selection before any rewrite -- red on every Windows run since. The
+    // question is whether the two authors' rules pick the same files, so each rule is shown the posix spelling.
+    const posix = (re) => ({ test: (p) => re.test(p.replace(/\\/g, "/")) });
+    const byFrozen = TR.treeFiles(ENG, posix(TR.SKIP_AGREE.frozenRecords)).map((f) => f.path).sort();
+    const byDrift = TR.treeFiles(ENG, posix(TR.SKIP_AGREE.recordDrift)).map((f) => f.path).sort();
     say(`unified ${unified.length}, frozenRecords' old rule ${byFrozen.length}, recordDrift's old rule ${byDrift.length}`);
-    ok("!! *** THE TWO OLD SKIP RULES STILL AGREE WITH THE UNIFIED ONE, FILE FOR FILE ***",
-        unified.length === byFrozen.length && unified.every((p, i) => p === byFrozen[i]) &&
-        unified.length === byDrift.length && unified.every((p, i) => p === byDrift[i]),
-        "they were two different regexes written by two authors -- /[\\\\/]vendor[\\\\/]/ against /\\/vendor\\// " +
-        "-- and they agree by coincidence rather than by construction, which is why both are kept in " +
-        "SKIP_AGREE and compared here instead of a note claiming they matched once.");
+    // *** THIS ROW SAID "BY COINCIDENCE RATHER THAN BY CONSTRUCTION" AND THE COINCIDENCE WAS THE PLATFORM. ***
+    //
+    // It walked the LOCAL tree with each rule and compared the selections -- and a local tree only ever
+    // produces its own host's separator, so the comparison could exercise exactly one of the two cases the
+    // rules differ on. Green here every round since it was written; on Keith's Windows rig at v4645 it read
+    // unified 4,275, frozenRecords 4,275, recordDrift 4,392, because /\/vendor\// matches no Windows path.
+    //
+    // The walk comparison is kept and now runs on separator-NORMALISED paths, so it still asks the question
+    // it was built for -- do the two authors' rules still pick the same files? -- instead of re-discovering
+    // the host's separator on one platform and never on the other. The literal test below is the one that
+    // would have caught it here, and it is a fact about the regexes rather than about who is running them.
+    const norm = (a) => a.map((q) => q.replace(/\\/g, "/"));
+    const [uN, fN, dN] = [norm(unified), norm(byFrozen), norm(byDrift)];
+    ok("!! *** THE TWO OLD SKIP RULES STILL SELECT THE SAME FILES AS THE UNIFIED ONE, FILE FOR FILE ***",
+        uN.length === fN.length && uN.every((p, i) => p === fN[i]) &&
+        uN.length === dN.length && uN.every((p, i) => p === dN[i]),
+        "compared on normalised paths: this row is about whether two authors' rules still agree on WHICH " +
+        "files, not about which separator the host writes -- that is the row below, and conflating them is " +
+        "what let a separator-blind rule read as agreement for as long as nobody ran the gate on Windows.");
+    // *** THE ROW THAT DOES NOT DEPEND ON WHO IS RUNNING IT. ***
+    // Driven against literal strings, both separators, so a posix box reaches the Windows case and vice versa.
+    const POSIX = "WebGLEngine/vendor/three/three.module.js";
+    const WIN32 = "WebGLEngine\\vendor\\three\\three.module.js";
+    ok("!! *** the UNIFIED rule skips a vendor path written with EITHER separator -- checked as literals ***",
+        TR.SKIP.test(POSIX) && TR.SKIP.test(WIN32),
+        `posix ${TR.SKIP.test(POSIX)}, win32 ${TR.SKIP.test(WIN32)} -- [\\\\/] is what makes it portable`);
+    ok("  ...and the archived recordDrift rule is SEPARATOR-BLIND, which is why nothing walks with it any more",
+        TR.SKIP_AGREE.recordDrift.test(POSIX) && !TR.SKIP_AGREE.recordDrift.test(WIN32),
+        "posix true, win32 FALSE. Kept in SKIP_AGREE as the archive of what was unified, and recordDrift.mjs's " +
+        "live SOURCE_SKIP points at TR.SKIP instead -- measured leak before that change: 117 vendor files into " +
+        "the census on Windows, none on posix, which is how it survived every green run this gate ever had");
     // A rule that selects a different set must be VISIBLE as different, or the row above proves nothing.
     const narrower = TR.treeFiles(ENG, /node_modules|[\\/](vendor|dist|physics)[\\/]/).map((f) => f.path);
     ok("...and a rule that really differs is seen to differ, so the agreement above is a finding",
@@ -169,6 +199,96 @@ console.log("\n6. *** THE FOUR CENSUSES STILL AGREE WITH EACH OTHER ON THE SIZE 
     ok("...and the gates are a strict subset of it",
         gates > 0 && gates < tree && AS.gateFiles().every((g) => TR.treePaths().includes(g)),
         `${gates} of ${tree}`);
+}
+
+console.log("\n7. *** A TRANSIENT FIXTURE IS NOT A SOURCE FILE, AND THE RACE WAS OPEN AT THIS WALKER ***");
+{
+    // Four gates plant a `__`-prefixed *-selfcheck.mjs on disk while they run and delete it after. v4409 closed
+    // this for tools/ship/gateSweep.mjs's enumerateGates, where a discovered fixture got RUN; the same rule was
+    // never applied to the shared walker, so the four censuses it feeds counted them whenever a run overlapped.
+    // MEASURED at v4580: runtimeGap-selfcheck read 4081 files instead of 4080 about half the time at eight-wide
+    // and was green in three runs alone -- a ship failure that never reproduces by itself.
+    //
+    // DRIVEN ON A REAL FILE, not on the walker's opinion of one. Planting and removing a fixture is the only way
+    // to check an exclusion that only matters while a file exists.
+    const fixture = path.join(ENG, "tools", "ship", "__treeread-fixture-selfcheck.mjs");
+    const decoy = path.join(ENG, "tools", "ship", "zz-treeread-fixture-selfcheck.mjs");
+    const body = "// transient fixture planted by treeRead-selfcheck; delete if you find it.\nexport const x = 1;\n";
+    const base = TR.treeFiles(ENG, /node_modules|[/\\]dist[/\\]|[/\\]vendor[/\\]/).length;
+    let withFixture = null, withDecoy = null;
+    // v4639 -- cleared on entry too: the decoy is an ORDINARY name by design (that is what it proves), so a
+    // leftover is counted as a gate. See tools/ship/gateSweep.mjs's TRANSIENT_FIXTURES.
+    for (const f of [fixture, decoy]) { try { fs.unlinkSync(f); } catch { /* the normal case */ } }
+    try {
+        fs.writeFileSync(fixture, body);
+        withFixture = TR.treeFiles(ENG, /node_modules|[/\\]dist[/\\]|[/\\]vendor[/\\]/).length;
+        fs.unlinkSync(fixture);
+        fs.writeFileSync(decoy, body);
+        withDecoy = TR.treeFiles(ENG, /node_modules|[/\\]dist[/\\]|[/\\]vendor[/\\]/).length;
+    } finally {
+        for (const f of [fixture, decoy]) { try { fs.unlinkSync(f); } catch { /* already gone */ } }
+    }
+    say(`walk size: ${base} bare, ${withFixture} with a __ fixture on disk, ${withDecoy} with an ordinary one`);
+    ok("!! *** a `__` fixture on disk does not change the population ***",
+        withFixture === base,
+        "the exclusion is in walk() itself, so all four censuses get it at once rather than one gate at a time");
+    ok("...and the exclusion is NARROW: an ordinary new file still counts, so this is not a walk that ignores arrivals",
+        withDecoy === base + 1,
+        `${withDecoy} against ${base}. Without this half the row above would pass for a walker that had stopped ` +
+        "seeing new files altogether -- which is the flattering failure, and it would make every census blind.");
+    ok("...and nothing permanent is being hidden: no tracked source file in the tree starts with `__`",
+        TR.treePaths().every((q) => !path.basename(q).startsWith("__")),
+        "so the counts every census recorded before this change are the counts it reads after it");
+}
+
+// ---- v4681 -- A DOT-PREFIXED DIRECTORY IS SCRATCH, AND A KILLED RUN LEAVES IT BEHIND ------------------------
+console.log("\n9. *** IN-TREE SCRATCH: THE WALK DOES NOT COUNT IT ***");
+{
+    const os = await import("node:os");
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "treeread-dot-"));
+    try {
+        fs.mkdirSync(path.join(root, "tools", "ship", ".sabotage-orbpresent-a1B2c3"), { recursive: true });
+        fs.writeFileSync(path.join(root, "tools", "ship", ".sabotage-orbpresent-a1B2c3", "aiPresenceOrbPresent.mjs"), "export const x = 1;\n");
+        fs.writeFileSync(path.join(root, "tools", "ship", "real.mjs"), "export const y = 2;\n");
+        TR.clear();
+        const seen = TR.treeFiles(root).map((f) => path.relative(root, f.path).split(path.sep).join("/"));
+        ok("!! *** the walk counts the real module and NOT the stranded scratch copy beside it ***",
+            seen.includes("tools/ship/real.mjs") && !seen.some((q) => q.includes(".sabotage-orbpresent-")),
+            seen.join(", ") + " -- the rig's census read four such files as source (4314 -> 4318) and took three gates red");
+        // the reclaim itself is gated where it lives -- tools/ship/gateSweep-selfcheck.mjs, section "v4681"
+    } finally { fs.rmSync(root, { recursive: true, force: true }); TR.clear(); }
+    ok("...and nothing tracked is hidden: no tracked source lives under a dot-directory, so no census moves",
+        TR.treePaths().length > 1000 && TR.treePaths().every((q) => !path.relative(ENG, q).split(path.sep).some((seg) => seg.startsWith("."))));
+}
+
+// ---- v4814 -- readOnce: ONE READ PER FILE PER PROCESS, FOR THE WALKERS WITH RULES OF THEIR OWN -------------
+// SABOTAGES (v4814, each restored md5-identical): A readOnce's `_once.set` removed, so every ask reads the disk ->
+// 1 RED, the memory row ("reads 2"). B orreryEjecta's section-3 walk put back on fs.readFileSync -> 1 RED, the
+// walkers row, naming orreryEjecta-selfcheck.mjs.
+console.log("\n10. *** readOnce READS A FILE ONCE, AND THREE OF THE RIG-SLOW GATES READ THROUGH IT ***");
+{
+    const os = await import("node:os");
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "treeread-once-"));
+    const f = path.join(root, "a.mjs");
+    try {
+        fs.writeFileSync(f, "export const first = 1;\n");
+        TR.clear();
+        const a = TR.readOnce(f);
+        fs.writeFileSync(f, "export const second = 2;\n");      // changed on disk between the two asks
+        const b = TR.readOnce(f), st = TR.readOnceStats();
+        ok("!! *** the second ask is answered from memory: the same text, one disk read, one hit ***",
+            a === b && a.includes("first") && st.reads === 1 && st.hits === 1,
+            `reads ${st.reads}, hits ${st.hits}; a cache that re-read would have returned the edited text`);
+        TR.clear();
+        ok("...and clear() drops it, so a gate that must read cold can",
+            TR.readOnce(f).includes("second") && TR.readOnceStats().reads === 1);
+    } finally { fs.rmSync(root, { recursive: true, force: true }); TR.clear(); }
+    // gateProfile --rig-slow (Keith's rig, v4814): these read the same files 2-4 times, 0.42 ms a read there.
+    const users = ["tools/ship/citedSources-selfcheck.mjs", "tools/ship/windowsImport-selfcheck.mjs", "tools/ship/orreryEjecta-selfcheck.mjs"];
+    const raw = users.filter((u) => { const t = fs.readFileSync(path.join(ENG, u), "utf8");
+        return !/import \{ readOnce \} from "\.\/treeRead\.mjs"/.test(t) || /readFileSync\((?:p|f), "utf8"\)/.test(t); });
+    ok("!! *** the rig-slow walkers read through readOnce, and none still reads its walked file directly ***",
+        raw.length === 0, raw.length ? "reading raw: " + raw.join(", ") : users.length + " gates, 19,182 + 9,040 + 10,024 reads on the rig before");
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +

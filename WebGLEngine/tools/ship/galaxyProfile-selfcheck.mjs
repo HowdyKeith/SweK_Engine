@@ -18,7 +18,7 @@ import path from "node:path";
 import http from "node:http";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import { prose, noComments } from "./sourceScan.mjs";   // v4145 -- prose() for the header reasoning, noComments() for the REFUSED strings
 
 const require_ = createRequire(import.meta.url);
@@ -199,12 +199,16 @@ const serverSrc = fs.readFileSync(path.join(ENG, "ai-bridge", "server.js"), "utf
         if (!port) {
             report("SKIPPED -- could not determine the port server.js bound to (no PORT=0 listening line matched)");
         } else {
-            const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+            const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
             const pg = await (await b.newContext()).newPage();
             const errs = [];
             pg.on("pageerror", (e) => errs.push(String(e.message)));
             await pg.goto("http://127.0.0.1:" + port + "/galaxy-profile.html", { waitUntil: "load" }).catch(() => {});
-            await pg.waitForTimeout(400);
+            // *** v4778 RIG RUN 11 -- WAIT FOR THE TABLE, NOT FOR 400 ms. *** The page fills #prov from server.js after load; on
+            // Keith's rig the read came back before it had, every run, and green here where the round trip is quicker.
+            // SABOTAGE P1: the repo URL misspelt in ai-bridge/galaxyProfileBridge.js -> this row red (with the two install rows,
+            // which clone it). Restored, md5 verified.
+            await pg.waitForFunction(() => /vinimlo\/galaxy-profile/.test((document.getElementById("prov") || {}).innerText || ""), null, { timeout: 15000 }).catch(() => {});
             const prov = await pg.evaluate(() => document.getElementById("prov").innerText).catch(() => "");
             ok("!! provenance table renders the real repo URL on load", /vinimlo\/galaxy-profile/.test(prov));
 

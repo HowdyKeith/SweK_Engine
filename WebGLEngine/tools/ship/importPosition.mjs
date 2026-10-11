@@ -127,9 +127,17 @@ export const DEPENDS = Object.freeze(["import", "load", "path", "joined"]);
 export const depends = (src, needle, name = null) => DEPENDS.includes(kindOf(src, needle, name));
 
 /** The census across a file set: which depend, which only mention, and by which kind. */
+// *** v4814 -- THE FILES THAT CANNOT DEPEND ON A BODY ARE NOT SCANNED FOR EACH BODY. *** The gate asks this census once
+// per vendored body over the same ~2,500 files, and each ask ran occurrences() and JOINED over every file's whole source --
+// 480 + 138 ms of importPosition-selfcheck's 3.0 s, which sits on the sweep line. Both can only fire on a file containing
+// "vendor": occurrences() needs the needle, and JOINED needs a quoted "vendor". So when the needle itself contains
+// "vendor", a file without that substring is "none" whatever the body -- decided once per file list, not once per body.
+const _vendorFiles = new WeakMap();
+const vendorSet = (files) => { let v = _vendorFiles.get(files); if (!v) { v = new Set(files.filter((f) => String(f.source).includes("vendor"))); _vendorFiles.set(files, v); } return v; };
 export function census(files, needle, name = null) {
     const by = { import: [], load: [], path: [], joined: [], record: [], none: [] };
-    for (const f of files) by[kindOf(f.source, needle, name) || "none"].push(f.path);
+    const v = String(needle).includes("vendor") ? vendorSet(files) : null;
+    for (const f of files) by[v && !v.has(f) ? "none" : (kindOf(f.source, needle, name) || "none")].push(f.path);
     return { ...by, depends: DEPENDS.reduce((a, k) => a + by[k].length, 0),
              mentions: by.record.length, seen: files.length };
 }

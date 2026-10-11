@@ -105,6 +105,12 @@ WebGLEngine/tools/ship/host-timings.local.json
 # (the transmitter, the OpenGL render engine and the connector workbook ship separately); this file only says
 # where a copy of it lives here. Deleting it unlinks the archive and changes nothing else.
 WebGLEngine/tools/ship/vba-archive.local.json
+# v4647 -- a box that does not OWN sweep-timings.json writes here instead, so a second machine's
+# runtimes never overwrite the shared record and never block its `git pull`. See quickSweep.timingsTarget.
+WebGLEngine/tools/ship/sweep-timings.local.json
+WebGLEngine/tools/ship/sweep-rotation.local.json
+# rtCpuCache.mjs -- this box's f64 reference means for rtPipeline-selfcheck; --promote folds them into the committed file
+WebGLEngine/physics/render/rtPipeline-cpu-cache.local.json
 # v3951 -- install-history.json is the SAME KIND OF THING one line up: ai-bridge/installHistory.js writes THIS
 # box's boot timings into it (installToReadyMs, bootAt, downMs), so it is a per-machine measurement and not
 # source. It appeared untracked during a routine round; committing it would have exported a sandbox's boot times
@@ -124,6 +130,14 @@ WebGLEngine/tools/ship/install-history.json
 WebGLEngine/tools/ship/last-refusal-*.log
 WebGLEngine/tools/ship/last-selfchecks-full.log
 
+# v4649 -- THE BRIDGE'S OWN LOG, WHICH MADE EVERY `git status` ON THE RIG READ DIRTY.
+# ai-bridge/server.js writes debug.log (NDJSON, rotating to debug.log.1) beside itself. On a box where the
+# bridge is up -- which on the rig means nine hours at a stretch -- the tree is untracked-dirty the whole
+# time, and the capture a sweep writes is stamped WORKING TREE DIRTY over reds that have nothing to do with
+# any edit. Same class as the refusal log above: a claim about one run on one machine, not about the tree.
+WebGLEngine/ai-bridge/debug.log
+WebGLEngine/ai-bridge/debug.log.1
+
 # v4408 -- A LOCKFILE THIS TREE HAS NEVER TRACKED, WRITTEN BY A GATE.
 # ai-bridge/bun.lock appeared untracked mid-ritual: a selfcheck runs `bun install` and bun writes the lockfile
 # as a side effect, which is the same class as the sweep rewriting sweep-timings.json -- a gate finishing
@@ -139,3 +153,11 @@ WebGLEngine/ai-bridge/bun.lock
 
 # v4527 -- the lab-scene-run route stores the accepted driver's replay here at run time (see physics/raceKnob.mjs)
 WebGLEngine/tools/roundhouse/lab-replays/
+
+# v4831 -- two things that kept appearing in the rig's `git status` and must never reach a commit or a release:
+# a clone of this repo made INSIDE it (the GitHub panel's exported publish commands used to put
+# "<repo>_<ver>_clone" there; ai-bridge/packagerBridge.js's _skipDir keeps one out of a zip either way), and
+# the Tasker R2 state ai-bridge/server.js persists beside its AutoRemote config (also in the packer's SKIP_FILES).
+/*_clone/
+.*_clone.tmp/
+WebGLEngine/ai-bridge/tasker-state.json

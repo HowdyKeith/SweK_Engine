@@ -25,10 +25,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import { noComments } from "./sourceScan.mjs";   // v4052 -- strings kept, comments dropped: see the JS sweep's own note
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
+import { SOURCE_EXT } from "./moduleRefs.mjs";   // v4798 -- one definition of a source file, not a regex spelled by hand
 const ENG = path.join(HERE, "..", "..");
 const require_ = createRequire(import.meta.url);
 
@@ -263,7 +264,7 @@ const ALL = FIELD.concat(PLOT);
             const p = path.join(d, f);
             let st; try { st = fs.statSync(p); } catch { continue; }
             if (st.isDirectory()) walkJs(p);
-            else if (/\.(js|mjs|html)$/.test(f)) jsFiles.push(p);
+            else if (SOURCE_EXT.test(f)) jsFiles.push(p);
         }
     })(ENG);
     // *** IT MUST BE A REPLACED ELEMENT, AND MY FIRST VERSION OF THIS CHECK FORGOT THAT AND WENT RED ON 29
@@ -305,7 +306,7 @@ const ALL = FIELD.concat(PLOT);
     if (skip) {
         console.log("  ----  browser half of the section-7 fix SKIPPED -- " + skip);
     } else {
-        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader", "--enable-webgl"] });
+        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args, "--enable-webgl"] });
         for (const page of ["graph_viewer.html", "glb_viewer.html"]) {
             const ctx = await b.newContext();
             const pg = await ctx.newPage();

@@ -1,0 +1,35 @@
+{
+ "gate": "tools/ship/statedRuntime-selfcheck.mjs",
+ "at": "2026-09-29",
+ "tables": [
+  {
+   "title": "stated runtimes against the record and a run",
+   "columns": [
+    "gate",
+    "header ms",
+    "record ms",
+    "ran ms",
+    "verdict"
+   ],
+   "rows": [
+    [
+     "tools/ship/asciify-selfcheck.mjs",
+     290,
+     3701,
+     411,
+     "header agrees"
+    ],
+    [
+     "tools/ship/voxelAvatar-selfcheck.mjs",
+     110,
+     3472,
+     114,
+     "header agrees"
+    ]
+   ],
+   "note": "this box is 1.15x the headers' box"
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

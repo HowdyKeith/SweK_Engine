@@ -1,0 +1,44 @@
+{
+ "gate": "fx/fsr/fsrFlowStill-selfcheck.mjs",
+ "at": "2026-09-29",
+ "tables": [
+  {
+   "title": "a still highlight over a moving belt: dB by motion source",
+   "columns": [
+    "case",
+    "highlight px",
+    "highlight: vectors",
+    "highlight: flow",
+    "highlight: still guessed",
+    "frame: vectors",
+    "frame: flow",
+    "frame: still guessed"
+   ],
+   "rows": [
+    [
+     "belt8",
+     219,
+     20.017006098002184,
+     29.43182880219512,
+     29.43182880219512,
+     35.40539734837006,
+     41.84576605880571,
+     41.84576605880571
+    ],
+    [
+     "belt16",
+     199,
+     9.136576942476374,
+     11.908630744419895,
+     11.908630744419895,
+     25.71828258259839,
+     28.069759298735455,
+     28.070490139313925
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

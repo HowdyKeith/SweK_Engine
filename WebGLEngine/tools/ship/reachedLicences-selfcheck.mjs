@@ -99,16 +99,38 @@ const read = (rel) => fs.readFileSync(path.join(ENG, rel), "utf8");
     const EXT = /\.(js|mjs|glsl|html|css|json)$/;
     const SKIP = /(^|\/)(node_modules|\.git|vendor)(\/|$)/;
     const files = [];
+    // *** v4649 -- BOTH COMPARISONS BELOW ARE SEPARATOR-BLIND, AND ON WINDOWS BOTH OF THEM MISSED. ***
+    // path.relative answers with backslashes there, while ALLOWED is keyed on the register's forward-slash
+    // paths and SKIP is written with them. Measured on Keith's rig: all three token rows went red naming
+    // `world\reachedLicences.mjs` and `tools\ship\reachedLicences-selfcheck.mjs` -- the REGISTER and this
+    // GATE reported as unlicensed copies of the thing they license -- and the walk descended into
+    // node_modules and vendor because SKIP could not match either, which is most of the 17.4 s it took.
+    // Task #63's shape for the third time: a comparison that is right on one box and blind on the other.
+    // Spelled with the regex rather than with path.sep so it is not a NO-OP on the box that writes it:
+    // split(path.sep) does nothing on POSIX, so a row asserting it here could never fail and the fix
+    // would be graded by the one platform that never had the bug. This form normalises either way, and
+    // the row below drives it on a Windows-shaped path from any box.
+    const slash = (r) => r.replace(/\\/g, "/");
     (function walk(dir) {
         let ents; try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
         for (const en of ents) {
-            const full = path.join(dir, en.name), rel = path.relative(ENG, full);
+            const full = path.join(dir, en.name), rel = slash(path.relative(ENG, full));
             if (SKIP.test(rel)) continue;
             if (en.isDirectory()) walk(full);
             else if (EXT.test(en.name)) files.push(rel);
         }
     })(ENG);
     ok(files.length > 500, `scanned ${files.length} source files`);
+    // Driven rather than assumed: the set the two comparisons read is stated in ONE spelling, whatever
+    // separator this platform's path module hands back.
+    const winShaped = "world\\reachedLicences.mjs";
+    ok(slash(winShaped) === "world/reachedLicences.mjs" && ALLOWED.has(slash(winShaped)) &&
+       SKIP.test(slash("node_modules\\three\\build")) &&
+       !files.some((f) => f.includes("\\")) && files.includes("world/reachedLicences.mjs"),
+        `the register's own path arrives at ALLOWED in the spelling ALLOWED keys on, from EITHER separator, ` +
+        `and SKIP matches a backslash-shaped vendor path. ${files.length} scanned paths, none carrying a ` +
+        "backslash. Without this the allowance matched nothing on Windows -- the gate reported its own " +
+        "register and its own source as unlicensed copies -- and the walk descended into node_modules");
 
     // One distinctive token per publisher. Chosen to be the name a vendored copy would carry.
     const TOKENS = [["codrops", /codrops/i], ["beez/zengularity", /zengularity/i], ["ChuckClose-SparkAR", /ChuckClose-SparkAR/]];

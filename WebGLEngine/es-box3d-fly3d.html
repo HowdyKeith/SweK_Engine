@@ -48,6 +48,7 @@
   <button id="descendBtn" title="Cinematic descent (v4053): fly from orbit down onto the planet's surface on a parametric shot -- logarithmic distance (constant perceived zoom rate) and a singularity-free rig that does not roll over at the poles. One-shot" style="background:#152c3a;color:#9fd8ff;border:1px solid #2f6c8c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">&#128640; Descend</button>
   <button id="jumpBtn" title="Fold/warp jump tunnel: the swept-spine tube down a fold spine, viewed from inside, ring pattern scrolling via a fract wrap; ramps in and out. One-shot" style="background:#2a2140;color:#c7b3ff;border:1px solid #4a3f6c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">&#9889; Jump</button>
   <button id="brainBtn" title="Fly-brain pilot (task 4 of the fly-connectome integration): team A flies on brain/pilotPolicy.mjs -- a connectome-masked MLP through the real male-cns Giant Fiber Circuit, drop-in for stepAI3d's own {turn,pitch,thrust,firing} contract -- instead of the scripted AI. Team B always stays scripted, so this is a live brain-vs-scripted dogfight. Off = both sides scripted (stepAI3d)" style="background:#152136;color:#b9d4ff;border:1px solid #2f486c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">&#129504; Brain pilot</button>
+  <button id="rosterBtn" title="Load Pilots (v4829): choose who flies EACH side -- the scripted AI, or a brain (hand weights, zero, noise, the shipped pilot, one you imported) -- then Start Fight. Every brain is the same fly-wired network; a choice is a choice of weights" style="background:#152136;color:#b9d4ff;border:1px solid #2f486c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">&#127899; Load Pilots</button>
   <button id="pilotPanelBtn" title="Export/import/publish this brain, or pull one flying on another box in the fleet (ai-bridge/server.js's /brain/publish, the same peer-sharing transport race-brain.html uses)" style="background:#152136;color:#b9d4ff;border:1px solid #2f486c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">&#128279; Pilot brain</button>
 </div>
 <div id="modelsPanel" style="position:fixed;top:40px;right:10px;z-index:3;display:none;background:#0a1220;border:1px solid #2f486c;border-radius:8px;padding:10px;max-width:520px;max-height:80vh;overflow:auto;box-shadow:0 8px 30px #000a;"></div>
@@ -64,6 +65,19 @@
   <div id="pilotFleetStatus"></div>
   <div id="pilotFleetList"></div>
 </div>
+<div id="rosterPanel" style="position:fixed;top:40px;right:870px;z-index:3;display:none;background:#0a1220;border:1px solid #2f486c;border-radius:8px;padding:10px;max-width:420px;box-shadow:0 8px 30px #000a;color:#b9d4ff;font:11px ui-monospace,monospace;">
+  <div style="margin-bottom:6px;color:#f6a623;letter-spacing:.08em;">LOAD PILOTS</div>
+  <table style="border-collapse:collapse;margin-bottom:6px;"><tbody>
+    <tr><td style="padding:2px 10px 2px 0;color:#7fa8ff;">team A</td><td><select id="pilotA" style="background:#0c1424;color:#b9d4ff;border:1px solid #2f486c;font:inherit;max-width:260px;"></select></td></tr>
+    <tr><td style="padding:2px 10px 2px 0;color:#ff9a7f;">team B</td><td><select id="pilotB" style="background:#0c1424;color:#b9d4ff;border:1px solid #2f486c;font:inherit;max-width:260px;"></select></td></tr>
+  </tbody></table>
+  <div style="display:flex;gap:6px;margin-bottom:6px;">
+    <button id="startFight" style="background:#1d3a2a;color:#9fe6c0;border:1px solid #2f486c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">Start Fight</button>
+    <button id="rosterReset" style="background:#152136;color:#b9d4ff;border:1px solid #2f486c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">Default pilots</button>
+  </div>
+  <div id="rosterNote" style="color:#7fb069;margin-bottom:4px;"></div>
+  <div style="color:#5f7aa0;line-height:1.4;">Every brain pilot is the same network, wired like a fly's Giant Fiber circuit; a choice picks which WEIGHTS fly it. The scripted AI is not a brain: it is what team B has always been. A choice that needs something not loaded yet is not offered. Start Fight resets the battle and the tally; the Brain pilot button still steers "default" for team A.</div>
+</div>
 <div id="hint">drag to orbit &middot; scroll to zoom &middot; ships pitch, climb and dive &mdash; collisions are the x-z projection (box3d owns the plane, altitude flies free)</div>
 
 <script type="importmap">
@@ -79,6 +93,7 @@ import { box3d } from "/physics/box3d/box3dLoader.js";
 import { planarFallbackWorld } from "/physics/planarFallbackWorld.js";
 import { forward3d, stepAI3d } from "/ev/flightModel3d.js";
 import * as PP from "/brain/pilotPolicy.mjs";   // task 4 of the fly-connectome integration -- the brain pilots this dogfight
+import * as PR from "/brain/pilotRoster.mjs";   // v4829 -- who flies each side: the scripted AI or a brain on one of several weight sets
 import * as PB from "/brain/peerBrain.mjs";      // the same portable export/import/fleet-share format race-brain.html uses
 import { weightsHash } from "/brain/drivePolicy.mjs";   // FNV-1a over the weight bytes, for the export filename (race-brain.html's own convention)
 import { bakeNebulaCubemap } from "/render/nebulaSkybox.js";   // v3833 -- baked nebula/star backdrop
@@ -671,8 +686,10 @@ function frame() {
   const liveA = A.some((e) => !e.dead), liveB = B.some((e) => !e.dead);
   if (!liveA || !liveB) { if (liveA) wins.A++; else if (liveB) wins.B++; newBattle(); }
   else {
-    const sA = sideDriveShots(A, snapshot(B), W_A, esbx, dt, nowMs, brainPilotOn ? PP.pilotFor(pilotWeights || defaultPilotWeights || PP.handWeights()) : null);
-    const sB = sideDriveShots(B, snapshot(A), W_B, esbx, dt, nowMs);   // team B is always the scripted AI -- brain vs. scripted, not brain vs. brain
+    // v4829 -- each side's pilot is the roster's (brain/pilotRoster.mjs): "default for this team" is exactly what this line used to be, team A on the Brain panel's pilot when Brain pilot is on
+    // and the scripted AI otherwise, team B always scripted -- and a side can be given any other pilot from the Load Pilots panel
+    const sA = sideDriveShots(A, snapshot(B), W_A, esbx, dt, nowMs, pilotAi("A"));
+    const sB = sideDriveShots(B, snapshot(A), W_B, esbx, dt, nowMs, pilotAi("B"));
     if (collide3dOn) esbx.collide3d({ rH: 120, rV: 80 });   // v3832 -- altitude-band collision, after drive so box3d integrates it
     esbx.step(dt); esbx.sync();
     shots = advanceShots(shots.concat(sA, sB), A.concat(B), dt); t += dt;
@@ -820,6 +837,7 @@ function pilotLine() {
       ? `the shipped default failed to load (${defaultLoadError}) -- team A (when Brain pilot is on) falls back to brain/pilotPolicy.mjs's handWeights()`
       : "loading the shipped default pilot brain… -- team A (when Brain pilot is on) flies brain/pilotPolicy.mjs's handWeights() until it resolves";
   document.getElementById("clearPilot").disabled = !pilotWeights;
+  if (rosterReady) renderRoster();   // v4829 -- what the Load Pilots selects offer depends on whether the shipped pilot has loaded and whether one is imported: rebuilt whenever either changes
 }
 pilotLine();   // overwrite the static placeholder immediately, from the SAME code path the fetch updates later -- one source of truth, not two copies of similar text that could drift
 document.getElementById("brainBtn").onclick = (e) => {
@@ -827,6 +845,49 @@ document.getElementById("brainBtn").onclick = (e) => {
   e.target.style.background = brainPilotOn ? "#1d3a2a" : "#152136";
   e.target.style.color = brainPilotOn ? "#9fe6c0" : "#b9d4ff";
 };
+// ---- v4829 -- LOAD PILOTS: brain/pilotRoster.mjs behind two selects --------------------------------------------------------------------------------------------------------------
+// `specs` is the choice per team (ids, kept in this browser); `lineup` what the last Start Fight / battle was built from. A side's pilot function is rebuilt when its choice, the Brain
+// pilot toggle (for "default" on team A), the imported/shipped weights or the battle changes -- not every frame.
+const ROSTER_KEY = "swek.flyRoster.v1";
+let specs = (() => { try { return PR.sanitizeSpecs(JSON.parse(localStorage.getItem(ROSTER_KEY) || "null")); } catch { return PR.defaultSpecs(); } })();
+var rosterReady = false;   // var, not let: pilotLine() reads it from the fetch and from the first call above, both before this block has run
+let lineup = null, battleNo = 0; const pilotCache = {};
+const rosterCtx = () => ({ PP, shipped: defaultPilotWeights, imported: pilotWeights, brainPilotOn });
+function saveSpecs() { try { localStorage.setItem(ROSTER_KEY, JSON.stringify(specs)); } catch {} }
+function pilotAi(team) {
+  const key = [specs[team], team === "A" ? brainPilotOn : "-", pilotWeights ? "i" : "", defaultPilotWeights ? "s" : "", battleNo, A.length].join("|");
+  let c = pilotCache[team];
+  if (!c || c.key !== key) {
+    const r = PR.resolveTeam(team, specs[team], rosterCtx(), team === "A" ? A.length : B.length);
+    c = pilotCache[team] = { key, resolved: r, fn: PR.teamPilot(r, PP) };
+    lineup = Object.assign(lineup || {}, { [team]: r });
+    rosterNote();
+  }
+  return c.fn;
+}
+function rosterNote() {
+  const el = document.getElementById("rosterNote"); if (!el || !lineup || !lineup.A || !lineup.B) return;
+  const probs = [...lineup.A.problems, ...lineup.B.problems];
+  el.textContent = PR.describe(lineup, A.length) + (probs.length ? "  --  " + probs.join("; ") : "");
+}
+function renderRoster() {
+  const ch = PR.choices({ shipped: !!defaultPilotWeights, imported: !!pilotWeights });
+  for (const t of PR.TEAMS) {
+    const sel = document.getElementById("pilot" + t), keep = specs[t];
+    sel.textContent = "";
+    for (const c of ch) { const o = document.createElement("option"); o.value = c.id; o.textContent = c.label; sel.appendChild(o); }
+    if (!ch.some((c) => c.id === keep)) { const o = document.createElement("option"); o.value = keep; o.textContent = keep + " (not available here)"; sel.appendChild(o); }
+    sel.value = keep;
+    sel.onchange = () => { specs = { ...specs, [t]: sel.value }; saveSpecs(); };
+  }
+}
+function startFight() { if (!booted) return false; wins.A = 0; wins.B = 0; battleNo++; newBattle(); pilotAi("A"); pilotAi("B"); return true; }
+document.getElementById("rosterBtn").onclick = () => { const p = document.getElementById("rosterPanel"); p.style.display = p.style.display === "none" ? "block" : "none"; renderRoster(); };
+document.getElementById("startFight").onclick = () => { startFight(); };
+document.getElementById("rosterReset").onclick = () => { specs = PR.defaultSpecs(); saveSpecs(); renderRoster(); };
+renderRoster(); rosterReady = true;
+window.__fly3d = { get specs() { return specs; }, setSpecs(x) { specs = PR.sanitizeSpecs(x); saveSpecs(); renderRoster(); }, startFight, get lineup() { return lineup; }, get A() { return A; }, get B() { return B; }, get wins() { return wins; }, get booted() { return booted; },
+  get brainPilotOn() { return brainPilotOn; }, get shipped() { return defaultPilotWeights; }, setImported(w) { pilotWeights = w; pilotMeta = null; pilotLine(); renderRoster(); }, get fleetSize() { return fleetSize; }, pilotAi };
 const pilotPanel = document.getElementById("pilotPanel");
 document.getElementById("pilotPanelBtn").onclick = () => { pilotPanel.style.display = pilotPanel.style.display === "none" ? "block" : "none"; };
 function downloadJSON(name, obj) {   // race-brain.html's own helper, restated here rather than imported (no shared module for it)

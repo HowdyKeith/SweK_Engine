@@ -44,7 +44,8 @@
 // at its cause (the walk skips .claude now) rather than by moving a baseline.
 "use strict";
 import { REGISTER_AUDIT } from "./register-audit.mjs";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawnSync, spawn } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -172,7 +173,10 @@ const RED_AT_V4279_GATES = Object.freeze([
     // tools/ship/registerResidue-selfcheck.mjs REMOVED, repaired: see FIXED_SINCE_V4279. The v4590 residue
     // sweep dropped it from 62 to 22 against a ceiling lowered to match; re-run fresh, exit 0, "all checks
     // pass".
-    "tools/ship/shaderRefs-selfcheck.mjs",
+    // tools/ship/shaderRefs-selfcheck.mjs REMOVED, repaired: see FIXED_SINCE_V4279. v4778's rig fixes ported v4782's one-pass
+    // basename index (it finishes in ~51 s where it ran past every cap), and its last red -- 13 hand-spelled corpus filters
+    // against a ceiling of 11 -- was paid by moving pageReflow-selfcheck and toolFrontDoor-selfcheck onto SOURCE_EXT by hand.
+    // Keith's third rig run: redCensus and redCensusFresh both named it FIXED and never removed.
     // tools/ship/sunshineHost-selfcheck.mjs REMOVED, repaired: see FIXED_SINCE_V4279. registerDrift-
     // selfcheck's live cheapest-first sample caught this one directly: "frozen exit 1, now 0". Independently
     // re-confirmed by a direct run at cba0f571: exit 0, "sunshineHost-selfcheck: all checks pass".
@@ -192,11 +196,9 @@ const RED_AT_V4279_GATES = Object.freeze([
 ]);
 
 // What the audit cannot supply, said explicitly rather than by a typed line standing in for a reading.
-export const UNVERIFIED_LINE = Object.freeze({
-    "tools/ship/shaderRefs-selfcheck.mjs":
-        "379,838 ms: the audit's cap ends the run before it prints a failing line. NOT a stale reading -- an " +
-        "absent one. Measuring it needs a cap raised past six minutes, which is a decision about the audit.",
-});
+// v4778 rig run 3: EMPTY. Its one entry admitted that shaderRefs-selfcheck's failing line could not be read under the audit's
+// cap (379,838 ms); the gate now finishes in ~51 s and is green, and has left the register.
+export const UNVERIFIED_LINE = Object.freeze({});
 
 const auditRow = (gate) => ((REGISTER_AUDIT && REGISTER_AUDIT.rows) || []).find((r) => r.gate === gate) || null;
 
@@ -284,6 +286,11 @@ export const registerAtSweep = () =>
     RED_AT_V4279.length + FIXED_SINCE_V4279.length - RECOVERED_SINCE_V4279.length;
 
 export const FIXED_SINCE_V4279 = Object.freeze([
+    { gate: "tools/ship/shaderRefs-selfcheck.mjs", round: "v4778 rig fixes (Keith's second and third rig runs)",
+      why: "it ran past every cap until moduleRefs answered its basename test in one pass (v4782's change, ported in part 2), " +
+           "which made it finish (~51 s) and showed the red the timeout had hidden: 13 hand-spelled corpus filters against a " +
+           "ceiling of 11. pageReflow-selfcheck and toolFrontDoor-selfcheck were moved onto moduleRefs.SOURCE_EXT by hand, " +
+           "each re-run: 11, and the gate exits 0. redCensus-selfcheck and redCensusFresh-selfcheck both named it on the rig." },
     { gate: "tools/ship/proseAudit-selfcheck.mjs", round: "post-v4297-sweep drift-fix pass",
       why: "the full selfchecks.mjs sweep at cba0f571 (1643 gates, 24626.2s) found this one FAILED, and a " +
            "following batch-fix round repaired it. redCensus-selfcheck's own live re-run caught the gap " +
@@ -763,6 +770,20 @@ const WHY_V4531 = Object.freeze({
         "which of the two WebGL2 sampling paths is wrong, which belongs to the line that built the transplant.",
 });
 
+// *** tslSource-selfcheck LEFT THIS REGISTER AT v4543, AND BY EXACTLY THE REPAIR THE ENTRY NAMED. *** v4531
+// registered it for one row of five: three's own WebGL2 linear render disagreed with this tree's device on
+// 125 of 4096 pixels at worst delta 127, while the same comparison on WebGPU was 4096/4096 at worst 0. The
+// entry said what would clear it -- "finding which of the two WebGL2 sampling paths is wrong" -- and refused
+// to name one, because naming it wrongly would have been worse than owing it. It was the DEVICE's: gfx/
+// device.js sampled `repeat` on WebGPU and CLAMP_TO_EDGE on WebGL2, under a comment claiming the two matched,
+// and no caller could say which it wanted. v4543 made the address mode the caller's and the same on both
+// backends; this gate's row asks for `repeat`, because three's texture is RepeatWrapping, and now reads
+// 4096/4096 on both. *** AND IT SAT GREEN AND REGISTERED FOR EIGHT ROUNDS. *** The repair landed at v4543 and
+// this list was not emptied until v4551, because the round that fixed it ran the gate and not the census that
+// remembers the gate -- the same shape as the three other records this round found stale. THE LIST IS EMPTY
+// RATHER THAN DELETED, because the derived union above reads the register's shape and an entry that leaves is
+// a fact worth keeping visible.
+
 // tools/ship/tslSource-selfcheck.mjs REMOVED, at v4590. The v4531 finding (three's OWN WebGL2 linear render
 // disagreeing with the device on 125 of 4096 pixels) was a DIFFERENT red from the v4557 one this same gate was
 // also registered under -- both are now gone. The v4590 re-freeze of register-audit.mjs found the gate exit 0;
@@ -1062,6 +1083,51 @@ export const RED_AT_V4568 = Object.freeze(RED_AT_V4568_GATES.map((gate) => Objec
     get derived() { return !!(auditRow(gate) && auditRow(gate).first); },
 })));
 
+// *** v4562 -- A RED THAT BOOKKEEPING CANNOT CLEAR, MEASURED BEFORE IT WAS REGISTERED. ***
+// sweepCoverage-selfcheck's returnee row takes two branches and NEITHER IS REACHABLE. The first needs every
+// RETURNED_AT_V4529.stillOver entry to appear in RETURNED_AT_V4476.returnable, and THAT ARRAY IS EMPTY, so it
+// is structurally dead. The second needs stillOver to be EMPTY, with every retirement carrying three serial
+// readings under budget. Three serial readings of each, taken on this box at v4562: traderGraph 2545 / 2112 /
+// 2021 and wgslSpec 2880 / 2804 / 2833 HAVE returned; meshLine is 3049 / 3030 / 3080 and HAS NOT. Two of
+// three came back and the record has no shape for that -- retiring meshLine would mean writing a number that
+// is not true, and leaving it means the roll can never empty.
+//
+// THE CAUSE IS THE ONE THE RECORD ITSELF FILED AS ITS OWN ROUND: serial and parallel readings share the
+// `timings` field against one 3,000 ms threshold, so these three oscillate on which ritual step ran last.
+// v4557 gave that field provenance (`contended`) and deliberately did not move the membership decision;
+// moving it is what this needs. *** AND THE REASON IT WENT UNSEEN: *** quickSweep rewrites sweep-timings.json
+// at the END of a run while this gate GRADES that file, so inside the sweep it reads the PREVIOUS run's copy
+// and is structurally one run behind -- it ran with exit code 0 at 00:48:29 during v4560's verify and failed
+// on the file that same sweep then wrote. v4561 shipped with it green for that reason and nothing else.
+const WHY_V4562 = Object.freeze({
+    "tools/ship/sweepCoverage-selfcheck.mjs":
+        "RETURNED_AT_V4529's roll cannot be made honest: branch one needs RETURNED_AT_V4476.returnable, " +
+        "which is EMPTY, and branch two needs the roll empty while meshLine measures 3049 / 3030 / 3080 " +
+        "serially and is genuinely over budget. traderGraph (2545 / 2112 / 2021) and wgslSpec (2880 / 2804 / " +
+        "2833) have returned; two of three is a state the record cannot express. The underlying cause is " +
+        "serial and parallel sharing `timings` against one threshold, which the record filed as its own " +
+        "round and v4557 gave provenance to without moving the decision.",
+});
+// *** v4647o -- RETIRED. THE CURE THIS ENTRY PRESCRIBED IS THE ONE THAT WAS APPLIED. ***
+// The note above ends "v4557 gave that field provenance (`contended`) and deliberately did not move the
+// membership decision; MOVING IT IS WHAT THIS NEEDS." v4647m moved it: the guard asks `serial` for the
+// uncontended cost and `timings` only where `contended === true`, so the verdict no longer turns on which
+// ritual step ran last. meshLine, traderGraph and wgslSpec are all judged the same way whichever run wrote
+// last, and sweepCoverage-selfcheck has run green since.
+//
+// The list stays, EMPTY, because it is referenced elsewhere and because an entry that names its own cure
+// and then has it applied is worth more as history than as a deletion. WHY_V4562 above is kept for the
+// same reason: it is the diagnosis that turned out to be right.
+export const RED_AT_V4562_GATES = Object.freeze([]);
+
+export const RED_AT_V4562 = Object.freeze(RED_AT_V4562_GATES.map((gate) => Object.freeze({
+    gate,
+    why: WHY_V4562[gate] || null,
+    get ms() { const r = auditRow(gate); return r ? r.ms : null; },
+    get fails() { const r = auditRow(gate); return r && r.first ? r.first : (UNVERIFIED_LINE[gate] || null); },
+    get derived() { return !!(auditRow(gate) && auditRow(gate).first); },
+})));
+
 // *** v4622 -- SHIPPING THIS LONG-UNSHIPPED BRANCH (last shipped v4535, 1594 -> 1656 gates across 134
 // commits since) SURFACED THREE REDS THE QUICK SWEEP HAD NEVER RUN AGAINST BEFORE, AND ONLY ONE OF THE
 // THREE BELONGS TO THIS ROUND. ***
@@ -1134,6 +1200,19 @@ const WHY_V4622 = Object.freeze({
     // may run at most N versions ahead of the releases page", 8 of 3 allowed) cleared the moment v4622 was
     // actually published from the rig -- confirmed by re-running the gate clean (exit 0, 0 FAIL lines) rather
     // than assumed from the publish alone.
+    // *** tools/ship/runtimeGap-selfcheck.mjs -- THE REMOVAL ABOVE WAS DESCRIBED AND NOT DONE, AND v4637
+    // FINISHES IT. *** The note said REMOVED at v4627; the name stayed in RED_AT_V4622_GATES and in WHY_V4622,
+    // so the register went on carrying a gate its own prose said had left. registerDrift-selfcheck is what
+    // found it -- "frozen exit 1, now 0 -- re-run", its row for a repaired red hiding behind the freeze, doing
+    // exactly that.
+    //
+    // FOURTH time this one invariant has flipped, and the fourth cause is as incidental as the other three:
+    // the main merge put threads and WebAssembly TIED at 22 without-self, where main's v4622 note had recorded
+    // them INVERTED at 22 against 21. Nobody reconciled it on purpose any of the four times; the count moved
+    // because the tree did. Verified by re-running the gate clean (exit 0, 0 FAIL lines), not assumed from the
+    // arithmetic. The fragility is UNCHANGED and still owed to #129: a strict inequality between two
+    // single-digit-file rows, movable by any prose edit anywhere in tools/ship/*.mjs that says "WebAssembly".
+    // Four flips is the argument for deciding it rather than re-deriving it a fifth time.
     // tools/ship/runtimeGap-selfcheck.mjs REMOVED at the v4627 merge: the WITHOUT-self pairwise invariant it
     // was red on (threads <= WebAssembly, excluding this gate's own two self-referential files) is clean again
     // -- confirmed by re-running the gate (exit 0, 0 FAIL lines), not assumed. This is the SAME row that broke,
@@ -1167,21 +1246,48 @@ const WHY_V4622 = Object.freeze({
     // green, but a check this fragile against unrelated edits owes backlog item #129 a real decision (loosen
     // the bound, or restate the finding as "tied including self-reference, not dominant without it") before
     // anyone spends a fourth round re-deriving the same two numbers.
-    "tools/ship/runtimeGap-selfcheck.mjs":
-        "the WITH-self headline (threads and WebAssembly tied at 23, threads rank 11 of 12, still the bottom " +
-        "two) holds and is verified against a fresh census(). The WITHOUT-self pairwise sub-assertion reads " +
-        "false again (threads 22 against WebAssembly 21) -- both numbers re-taken and confirmed live-accurate, " +
-        "not stale. See the header comment above this entry for why re-taking them a fourth time is not the fix.",
 });
 
-export const RED_AT_V4622_GATES = Object.freeze([
-    "tools/ship/backendParity-selfcheck.mjs",
-    "tools/ship/windowsImport-selfcheck.mjs",
-    "tools/ship/definitionGates-selfcheck.mjs",
-    "tools/ship/pageSections-selfcheck.mjs",
-    "tools/ship/pagePlacements-selfcheck.mjs",
-    "tools/ship/runtimeGap-selfcheck.mjs",
-]);
+// *** v4642 -- ALL SIX REPAIRED, AND THE LIST IS EMPTY RATHER THAN DELETED. *** Every one of these had been
+// red since the v4622 merge -- nineteen rounds -- and each was carried with a sentence saying why it was
+// somebody else's to fix. Asked to resolve them, four of the six turned out to be THE CHECK AND NOT THE
+// SUBJECT, which is the same four-of-five split v4571 found when it opened RED_AT_V4568:
+//
+//   windowsImport   THE GATE WAS COUNTING ITS OWN FAILURE TEXT. Of its four offenders exactly one was a
+//                   dynamic import (trellisAutoRig-selfcheck.mjs, fixed); the other three were this record's
+//                   own WHY_V4622 entry and the two copies register-audit.mjs keeps of the recorded FAIL
+//                   line. Its scan stripped comments and not strings, so writing the finding down CREATED
+//                   offenders -- a feedback loop in which the count could only grow by being recorded. It
+//                   uses sourceScan's codeOnly now, the lexer the rest of the tree's censuses already use.
+//   backendParity   A SECOND SPELLING OF A POLICY IT DOES NOT OWN. Its own comment retired the duplicate and
+//                   then re-spelt it on a third denominator: it asserted shaderCensus-selfcheck's threshold
+//                   of twenty against `mods`, a population shaderCensus does not measure. Measured today,
+//                   shaderCensus reads 19 of 20 and is GREEN; the copy read 20 and was red. The threshold is
+//                   gone from backendParity and the number is reported; the policy is asserted once, next
+//                   door, over the 9 files that duplicate a COMPUTATION rather than the 20 that merely carry
+//                   two languages -- a set that includes a GATE holding a WGSL shader against its GLSL twin,
+//                   which is evidence the port is checked, not evidence it is hand-written twice.
+//   pageSections    AN OFF-BY-ONE CLAIMED IN PROSE IN THE SAME EDIT THAT MADE IT. v4590 added three pages to
+//   pagePlacements  the System Tools drawer and wrote "this drawer is now at MAX_PER_PANEL" with SIXTEEN in
+//                   it against a cap of fifteen. Nothing re-counted because the comment said the answer.
+//                   three-probe.html moved to Render TSL, whose note ("the two that owe the rig a number")
+//                   is what a three.js/WebGPU compatibility probe is; pagePlacements was downstream of the
+//                   same overflow and cleared with it.
+//   runtimeGap      REAL DRIFT, AND IT WAS v4641's OWN. Three census rows moved with the two gates that
+//                   round added and only `files` was re-taken. A census that moves together has to be
+//                   re-taken together.
+//   definitionGates REAL DEBT, RE-BASELINED BY EXPLICIT CALL at 79/349/678, the third time this file has made
+//                   that call. Measured before moving: ZERO of the 678 come from v4623-v4641, and the split
+//                   is 376 tools/, 198 physics/, 34 brain/. Repairing it also found FOUR ROWS THAT COULD NOT
+//                   FAIL -- the file's only process.exit sat 75 lines from its end, so everything after it
+//                   printed FAIL into a log whose last line said "all checks pass". One of those four held a
+//                   dead ceiling of 37 and had been failing unseen; another asserted a defect that had since
+//                   been FIXED and passed by calling the same function twice; a third was a prose ratchet
+//                   whose regex literal matched ITSELF in the file it read.
+//
+// The list stays, empty, because RED_AT_V4622 is referenced by frozenRecords, gateSweep and recordReach, and
+// because an empty register entry is a stronger record than a deleted one: it says these were red and are not.
+export const RED_AT_V4622_GATES = Object.freeze([]);
 
 export const RED_AT_V4622 = Object.freeze(RED_AT_V4622_GATES.map((gate) => Object.freeze({
     gate,
@@ -1201,6 +1307,7 @@ export const REGISTER_LISTS = Object.freeze([
     Object.freeze(["RED_AT_V4535", RED_AT_V4535]),
     Object.freeze(["RED_AT_V4557", RED_AT_V4557]),
     Object.freeze(["RED_AT_V4568", RED_AT_V4568]),
+    Object.freeze(["RED_AT_V4562", RED_AT_V4562]),
     Object.freeze(["RED_AT_V4622", RED_AT_V4622]),
 ]);
 
@@ -1530,6 +1637,19 @@ export const SLOW_PARTIAL = Object.freeze({
     }
 });
 
+// *** v4637 -- AND THIS RUNNER'S LIMIT IS DECLARED TOO, FOR THE SAME RULE AND THE SAME REASON. ***
+// runnerBudget counted redCensus silent: it spawns a gate under a time limit and neither read the table nor
+// said why not. The answer is in the line below and in this module's own name -- runGate reports RED or NOT
+// RED and returns an exit code. It never returns a duration and nothing here compares one against a budget.
+// 120,000 ms is a SIGKILL ceiling on a serial re-run, chosen so a gate that genuinely needs two minutes is
+// not called red for being slow, and a run it cuts off is reported as `timeout/signal` -- explicitly NOT as
+// a failure, which is the distinction v4568's killed pass exists to make and got wrong by reading a number
+// where it should have read the fact.
+export const budgetIsOwn =
+    "runGate returns an EXIT CODE and never a duration, so gateBudget.MEASURED has nothing to say to it. The " +
+    "120,000 ms limit is a SIGKILL ceiling on a serial re-run, set so a gate that honestly needs two minutes is " +
+    "not mistaken for a red, and a run it cuts off is reported as `timeout/signal` rather than as a failure.";
+
 /** Run one gate and report whether it is red. Nothing here interprets WHY -- only the exit code. */
 // *** v4568 -- THE SAME CHILD LEAK quickSweep HAD, in the runner the rotation uses. ***
 // execFileSync's `timeout` kills the direct child and nothing below it, so a gate that spawned anything of
@@ -1537,18 +1657,131 @@ export const SLOW_PARTIAL = Object.freeze({
 // a child on purpose; one such orphan was found holding a device for forty-four minutes on this box, which
 // slows every GPU gate that runs afterwards -- and a gate slowed past the cap is killed, orphaning more.
 // spawnSync exposes the pid execFileSync does not, so the group can be signalled after a timeout.
+// *** v4647k -- THE THIRD RUNNER WAS STILL BLIND TO A SKIP, AND IT IS THE ONE THE ROTATION USES. ***
+//
+// tools/ship/skipReading-selfcheck.mjs's first section is headed "BOTH RUNNERS READ THE SAME DECLARATION,
+// WHICH ONLY ONE OF THEM USED TO", and it checks selfchecks.mjs against quickSweep.mjs. THERE ARE THREE.
+// This one is `runGate`, and tools/ship/sweepRotation.mjs runs every rotation through it -- into the SAME
+// sweep-timings.json quickSweep writes. So one writer of that file could see a gate decline and the other
+// could not, which is two modules reading one convention in opposite senses for the fourth time this
+// session (posixAssumption's separators, the two ground-limit contracts, --gate against --gates).
+//
+// AND IT HAD ALREADY COST SOMETHING. The 2026-09-09 rotation filed
+// tools/ship/placementRender-selfcheck.mjs at 56 ms, code 0 -- a green runtime. The gate prints
+// "placementRender-selfcheck: skipped (jsdom absent)" and 56 ms is how long it takes to DECLINE. That entry
+// is why v4647j could not close the gate's last three red rows: the number was a skip cost wearing a
+// runtime's clothes, and no writer in the tree could say so.
+//
+// `stdio: "ignore"` was the whole reason, exactly as it was for the sweep before v4582: from an exit code a
+// skip is indistinguishable from a fast pass, so the guard was not forgotten, it was INVISIBLE from where
+// the writer stood. The tail is bounded at 4 KB like the sweep's, and the skip line is printed last, so a
+// bounded tail is the same evidence with a ceiling on memory. skipReading measured the cost of looking at
+// 1.4 ms a gate -- within noise, and stated as a ceiling rather than a value.
+//
+// THE PATTERN IS DECLARED HERE, NOT IMPORTED, because each runner is standalone by design -- and
+// skipReading-selfcheck asserts all THREE are equal character for character, where it used to assert two.
+const SKIP_LINE = /-selfcheck:\s*(SKIPPED|skipped)\b/;
+
+// *** v4824 -- THE CEILING THE COMMENTS ABOVE CALL "SIGKILL" WAS A SIGTERM, AND A PLAYWRIGHT GATE CATCHES SIGTERM. ***
+// spawnSync's default killSignal is SIGTERM, and playwright-core's processLauncher installs a SIGTERM handler that
+// closes its browsers and does NOT exit -- so a browser gate "killed" at the cap kept running until its own timeouts
+// fired, and the rotation recorded that wall clock as the cap's: fsrFrameGenBackdrop at 311,726 ms beside a 20,000 ms
+// cap at v4821, which put capReading and sweepCoverage red. Reproduced with a stand-in gate that traps SIGTERM: 9,086 ms
+// against a 3,000 ms cap before this line, the cap after it. quickSweep already kills with SIGKILL; this runner now
+// does too, and the group kill below still reaps whatever the gate spawned.
 export function runGate(rel, { timeoutMs = 120000 } = {}) {
-    const r = spawnSync(process.execPath, [rel], { cwd: ENG, timeout: timeoutMs, stdio: "ignore", detached: true });
+    const r = spawnSync(process.execPath, [rel], { cwd: ENG, timeout: timeoutMs, stdio: ["ignore", "pipe", "pipe"], detached: true,
+                                                  killSignal: "SIGKILL", maxBuffer: 4 * 1024 * 1024 });
     // The group is signalled whether or not this timed out: a gate that EXITS having left a child behind
     // leaks exactly as much as one that was killed, and the exit code says nothing about its children.
     if (r.pid) { try { process.kill(-r.pid, "SIGKILL"); } catch {} }
-    if (r.error) return { red: true, code: "timeout/signal" };
-    if (r.signal) return { red: true, code: "timeout/signal" };
-    return { red: r.status !== 0, code: r.status };
+    // A killed process may still have printed; a declaration from a gate that was then cut off is not a
+    // skip, because the run did not finish. `skipped` is therefore only read on a clean exit.
+    if (r.error) return { red: true, code: "timeout/signal", skipped: false };
+    if (r.signal) return { red: true, code: "timeout/signal", skipped: false };
+    const tail = String((r.stdout || "") + (r.stderr || "")).slice(-4096);
+    // v4831 -- AND A RED SAYS WHICH ROW, because the caller cannot ask afterwards. The 2026-10-10 rotation returned
+    // headlessGpu red once, exit 1 in a normal 5 s, and nineteen re-runs -- direct, under flakeProbe and through this very
+    // function -- were all green: the one run that knew why had its output discarded here. The FAIL rows are kept, first
+    // five, each cut to 300 characters; a gate that died without printing one says so with an empty list.
+    const failRows = r.status === 0 ? [] : String(r.stdout || "").split("\n").filter((l) => l.startsWith("  FAIL")).slice(0, 5).map((l) => l.slice(0, 300));
+    return { red: r.status !== 0, code: r.status, skipped: r.status === 0 && SKIP_LINE.test(tail), failRows };
 }
 
 /** Total cost of re-verifying the whole census, in ms, from the recorded per-gate times. */
 export const censusCostMs = (list = RED_AT_V4279) => list.reduce((a, e) => a + e.ms, 0);
+
+// ================================================================================================
+// *** v4587 -- WHICH GATES ARE RED, DERIVED FROM THE SWEEP RECORD RATHER THAN WRITTEN DOWN. ***
+//
+// Everything above this line is a HAND-MAINTAINED register: RED_AT_V4279, _V4408, _V4424, _V4476,
+// _V4484, _V4531, _V4535. Those are frozen historical snapshots and they should stay frozen -- the
+// only check on history is that it has not been edited. But a frozen snapshot cannot answer "what is
+// red NOW", and redAction-selfcheck was answering that question from a list of TWO gates it had typed
+// out, under rows beginning "every red still standing...". The population was declared, and the word
+// was every.
+//
+// DERIVED: 29 gates carry exit 1 in sweep-timings.json's `codes` table -- fifteen times the list.
+// Driven at v4587: 23 still red, 6 green, 25.1 s wall at eight-wide.
+//
+// AND NOT ONE OF THE 29 WRITES TO THE TREE -- which took three attempts to establish honestly. The first two
+// compared `git status --porcelain` before and after and reported no new modification, and that was WORTHLESS
+// EVIDENCE: cloud/swek-rendezvous/rendezvous-state.json was ALREADY dirty from something earlier in the
+// session, so a diff of the two status listings could not show it either way. The claim went into this comment
+// before it had been tested against a clean file. Re-run with that file restored first, the 29 leave it
+// untouched -- the write came from elsewhere in the round (redCensus-selfcheck alone runs for 581 s and
+// rebakes knowledge-index.json as a side effect). A BEFORE/AFTER COMPARISON THAT STARTS DIRTY IS NOT A CONTROL.
+//
+// THE RECORD IS A RECORD AND IS TREATED AS ONE. recordDrift's closing note says exactly why: at v4551
+// tslSource-selfcheck sat in `codes` as exit 1 while the gate had exited 0 since v4543, so a check that
+// READ the table would have confirmed a stale registration instead of finding it. That cuts one way
+// only -- membership. Every member is RUN, so a gate recorded red that is now green is reported as the
+// record being behind, with a number, rather than counted as a red. The direction it cannot see is a
+// gate that went red AFTER the capture: knowledge-index staleness did exactly that at v4585 and is
+// missing from these 29. So the population is a floor, it is called one, and the sweep that refreshes
+// it is the same sweep that would have to run every gate anyway.
+const CODES_PATH = path.join(ENG, "tools", "ship", "sweep-timings.json");
+
+/**
+ * The gates the last sweep recorded as exit 1. `__` fixtures are excluded -- the tree's convention
+ * since v4584, and tools/ship/__rigprogress-fixture-selfcheck.mjs is one, deliberately red.
+ *
+ * EXIT 124 IS NOT IN HERE AND THAT IS THE POINT: 136 gates carry it, and it is the sweep's SIGKILL cap,
+ * not a verdict. A crash is not a verdict, and neither is a kill -- counting them as reds would put 136
+ * unread gates into a population whose whole purpose is that every member's failure text gets read.
+ */
+export function standingReds({ codesPath = CODES_PATH } = {}) {
+    let j = {};
+    try { j = JSON.parse(fs.readFileSync(codesPath, "utf8")); } catch { return { reds: [], capped: 0, captured: null }; }
+    const codes = j.codes || {};
+    const reds = Object.keys(codes)
+        .filter((k) => codes[k] === 1 && !path.basename(k).startsWith("__"))
+        .sort();
+    return { reds, capped: Object.keys(codes).filter((k) => codes[k] === 124).length, captured: j.captured || null };
+}
+
+/**
+ * Run gates in parallel and KEEP THEIR OUTPUT, which runGate() above deliberately throws away
+ * (stdio:"ignore" -- it answers "red?" and nothing else, and its callers ask nothing else).
+ * Classifying a red from its own printed failure needs the text, so this is a second entry point to
+ * one subject rather than a second copy of one rule.
+ */
+export function driveReds(list, { timeoutMs = 180000, workers = 8 } = {}) {
+    const one = (rel) => new Promise((res) => {
+        const t = Date.now();
+        const c = spawn(process.execPath, [path.join(ENG, rel)], { cwd: ENG });
+        let out = "";
+        const killer = setTimeout(() => { try { c.kill("SIGKILL"); } catch {} }, timeoutMs);
+        c.stdout.on("data", (d) => { out += d; });
+        c.stderr.on("data", (d) => { out += d; });
+        c.on("close", (code) => { clearTimeout(killer);
+            res({ rel, code, ms: Date.now() - t, failLines: out.match(/^ {2}FAIL.*/gm) || [] }); });
+    });
+    const queue = [...list], done = [];
+    return Promise.all(Array.from({ length: Math.min(workers, queue.length) }, async () => {
+        while (queue.length) done.push(await one(queue.shift()));
+    })).then(() => done.sort((a, b) => a.rel.localeCompare(b.rel)));
+}
 
 // ================================================================================================
 // v4295 -- THE RE-CHECK, SIXTEEN ROUNDS LATER

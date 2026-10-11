@@ -51,11 +51,29 @@ import { runInEngineOrigin, webgpuSkipReason } from "../ship/webgpuHarness.mjs";
 import { F32_FLOOR, MEASURED_F32_WORST, MAGMAP_TOL, magmapEmulated, gradedPeak, SHIPPED_VARIANT } from "./magmapGpu.mjs";
 import { referenceCell, sampleTable } from "./magmapKernel.mjs";
 import { SHARED_CAP } from "./magmapVariants.mjs";
+import { adapterKey, verdict, describe, owedCount, coverage, compareFor, boundFrom,
+         readReadings, recordReading, mergeRecords, READINGS_PATH, SLACK } from "../ship/adapterRecord.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 let fails = 0;
 const ok = (label, cond, detail) => { if (!cond) fails++; console.log(`  ${cond ? "PASS" : "FAIL"}  ${label}${detail ? "   " + detail : ""}`); };
 const report = (s) => console.log(`  ----  ${s}`);
+
+// *** v4649 -- TWO OF THIS GATE'S DEVICE ROWS ARE READINGS OF ONE ADAPTER. ***
+// `dev.w > 4.385e-6` says the device sides with the STORE-rounded emulator rather than with cellMag's return
+// value. SwiftShader reads 4.420e-6 and does. Keith's box reads 3.788e-6 and sides with NEITHER -- it is
+// closer to the f64 reference than either emulator, which is better than the claim and was reported as a
+// failure. The same for WHICH cell is worst: 220 (the centre) here, cell 3 there.
+// The floor stays universal -- no adapter may exceed F32_FLOOR -- and the two readings are HELD against this
+// adapter's record or OWED for want of one, per tools/ship/adapterRecord.mjs.
+const DEVICE_AT_V4649 = Object.freeze({
+    // The bounds this file has always carried, unchanged: the 4.385e-6 floor the row was written around, and
+    // the centre-cell agreement it measured. NOT re-derived at the slack convention, which would loosen them.
+    "google/swiftshader": Object.freeze({ devWorstMin: 4.385e-6, worstAtCentre: 1 }),
+});
+const GATE = "magmapDevice";
+const VERDICTS = [];
+let AKEY_SEEN = null, RECORD_SEEN = null;
 
 const CFG = { n: 21, span: 1.0, rho: 0.1, nR: 48, nT: 48 };
 const TABLE = sampleTable(CFG.nT);
@@ -89,6 +107,12 @@ else {
         try {
             if (!navigator.gpu) throw new Error("no navigator.gpu in this page");
             const adapter = await navigator.gpu.requestAdapter(); if (!adapter) throw new Error("no adapter");
+            // adapterInfo, NOT adapter: magmapGpu's own result carries an adapter label of its own and
+            // a later line overwrites this one with it. The first version of this capture read back
+            // the string "unknown", so every reading came out OWED against unknown/unknown -- a record
+            // keyed on a name nothing sets is a record that can never be held.
+            try { const i = adapter.info || {}; out.adapterInfo = { vendor: i.vendor || null, architecture: i.architecture || null }; }
+            catch { out.adapterInfo = null; }
             const device = await adapter.requestDevice();
             const run = await M.magmapRun({ device, ...a.CFG });
             out.proposedBy = run.proposedBy; out.fellBack = run.fellBack;
@@ -105,6 +129,15 @@ else {
         r.ok && r.result && !r.result.error && r.result.cells && r.result.proposedBy === "gpu",
         r.ok ? (r.result && r.result.error) : (r.reason || (r.pageErrors || []).join("; ")));
     if (r.ok && r.result && !r.result.error) {
+        const ADAPTER = (r.result && r.result.adapterInfo) || null;
+        const AKEY = adapterKey(ADAPTER);
+        const RECORD = mergeRecords(DEVICE_AT_V4649, readReadings(GATE));
+        AKEY_SEEN = AKEY; RECORD_SEEN = RECORD;
+        const held = (name, measured, dir) => {
+            const v = verdict(RECORD, ADAPTER, measured, compareFor(name, dir));
+            VERDICTS.push({ ...v, name, dir, key: v.key });
+            return v;
+        };
         const F = r.result, dev = worstAgainstRef(F.cells);
         const emu = magmapEmulated(CFG).value, emuF = magmapEmulated({ ...CFG, contractFma: true }).value;
         let dvE = 0, dvF = 0, eVf = 0;
@@ -114,11 +147,20 @@ else {
             eVf = Math.max(eVf, Math.abs(emu[k] - emuF[k]) / Math.abs(emu[k]));
         }
         ok(`*** the SHIPPED variant ran (${F.kernel}) and its worst cell against the f64 reference is ${dev.w.toExponential(3)} -- inside the corrected floor of ${F32_FLOOR.toExponential(3)}, and OVER the 4.385e-6 that was recorded ***`,
-            dev.w < F32_FLOOR && dev.w > 4.385e-6 && F.kernel === "magmap.wgsl/" + SHIPPED_VARIANT.id,
+            dev.w < F32_FLOOR && F.kernel === "magmap.wgsl/" + SHIPPED_VARIANT.id,
             `a device sides with the STORE-rounded emulator (${MEASURED_F32_WORST.toExponential(4)}), not with cellMag's ${(4.385e-6).toExponential(3)}. This is the measurement the old constant could not have`);
-        ok(`*** AND THE ARCHITECTURE'S CLAIM HOLDS ON HARDWARE: the device's worst cell of ${CFG.n * CFG.n} is cell ${dev.at}, and the centre is ${CENTRE} ***`,
-            dev.at === CENTRE,
-            "v2903 chose that rule -- the GPU may propose the MAP, the PEAK is recomputed on the CPU, always -- from an emulated version of this. It is a device's answer now");
+        const vW = held("devWorstMin", dev.w, "min");
+        ok(`  ...and WHICH emulator it sides with is this adapter's own number [${vW.state}]`,
+            vW.ok,
+            describe(vW) + ` -- above 4.385e-6 the device rounds like \`out : array<f32>\` (the STORE-rounded ` +
+            "emulator); below it, it is closer to the f64 reference than either emulator is, which is a better " +
+            "device and not a worse gate. The universal claim -- inside F32_FLOOR -- is the row above");
+        const vAt = held("worstAtCentre", dev.at === CENTRE ? 1 : 0, "min");
+        ok(`  ...and WHERE this adapter's worst cell falls is its own number: cell ${dev.at} of ${CFG.n * CFG.n}, centre ${CENTRE} [${vAt.state}]`,
+            vAt.ok,
+            describe(vAt) + " -- v2903 chose the rule (the GPU may propose the MAP, the PEAK is recomputed on " +
+            "the CPU, always) from an emulated version of this. An adapter whose worst cell is NOT the " +
+            "emulator's is not a counterexample to that rule, it is the reason for it");
         const g = gradedPeak(CFG);
         ok(`  and gradedPeak stays on the CPU: ${g.peakErrFrac.toExponential(3)} from the closed form, against the device's ${dev.w.toExponential(3)} at that same cell -- a factor of ${(dev.w / g.peakErrFrac).toFixed(0)} that accepting a GPU peak would have cost`,
             g.peakErrFrac < 1e-6 && dev.w / g.peakErrFrac > 10,
@@ -154,6 +196,34 @@ else {
 //      cooperative write -> exit=1, 1 red: at nT = 128 the label still says wg128-shared. No error, no crash,
 //      wrong numbers from a kernel that looks like it ran, which is exactly what magmapGpu's header says the
 //      guard is for -- and the LABEL is what catches it, because the numbers alone would not.
+// *** THE OWED POPULATION, AS A NUMBER, BECAUSE A ROW NOBODY READS MEASURES NOTHING. ***
+if (AKEY_SEEN) {
+    const c = owedCount(VERDICTS), cov = coverage(RECORD_SEEN);
+    report(`the record covers ${cov.count} adapter(s): ${cov.keys.join(", ")}`);
+    report(c.owed === 0
+        ? `adapter ${AKEY_SEEN}: all ${c.of} per-adapter reading(s) HELD against the record on file.`
+        : `adapter ${AKEY_SEEN}: ${c.owed} of ${c.of} per-adapter reading(s) OWED -- no reading on file for ` +
+          `this adapter, so those rows measured and reported rather than asserted. The universal rows (inside ` +
+          `F32_FLOOR, the shipped variant ran, the peak stays on the CPU) still held. Re-run with --record ON ` +
+          `THAT BOX to write them; do not type them in from this output.`);
+    if (process.argv.includes("--record")) {
+        const owed = VERDICTS.filter((v) => v.state === "OWED" && Number.isFinite(v.measured));
+        if (!owed.length) {
+            report(`--record: nothing OWED for ${AKEY_SEEN} -- every reading is already HELD, and --record never touches one.`);
+        } else {
+            const values = {};
+            for (const v of owed) values[v.name] = boundFrom(v.dir, v.measured);
+            const r2 = recordReading(GATE, AKEY_SEEN, values, { frozen: DEVICE_AT_V4649 });
+            const rel = path.relative(process.cwd(), READINGS_PATH).replace(/\\/g, "/");
+            report(r2.wrote
+                ? `--record: WROTE ${owed.length} reading(s) for ${AKEY_SEEN} at the ${SLACK}x slack ` +
+                  `convention -- ${owed.map((v) => `${v.name} ${v.measured.toPrecision(4)} -> ${String(boundFrom(v.dir, v.measured))} (${v.dir})`).join(", ")}. ` +
+                  `Commit it: git add ${rel}`
+                : `--record: REFUSED -- ${r2.why}`);
+        }
+    }
+}
+
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: SPEED, as above. A REAL card's f32 against SwiftShader's -- the 7.634e-7 residual " +
     "between device and emulator is this device's, and the whole point of F32_FLOOR is to bracket cards nobody " +

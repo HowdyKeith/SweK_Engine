@@ -47,16 +47,20 @@ console.log("1. *** THE REGISTER AND THE DISK AGREE IN BOTH DIRECTIONS ***");
 console.log("\n2. *** COUNTING BY FILENAME IS WRONG IN BOTH DIRECTIONS, AND HERE IS BY HOW MUCH ***");
 {
     const naive = naiveUnpapered();
+    // v4778 -- 4 -> 6 at the rtx merge: vendor/male-cns (grant in PROVENANCE.md) and vendor/mikktspace (grant in the
+    // source header) arrived, and neither has a file a LICENSE pattern matches -- two more for the naive census to get wrong.
     ok("!! a filename census flags " + naive.length + " directories as unpapered",
-        naive.length === 4, naive.join(", "));
+        naive.length === 6, naive.join(", "));
     const real = unpapered();
-    ok("!! *** AND THE TRUE ANSWER IS " + real.length + ", SO THREE OF THE FOUR ARE WRONG ***",
+    ok("!! *** AND THE TRUE ANSWER IS " + real.length + ", SO EVERY ONE OF THE " + naive.length + " IS WRONG ***",
         real.length === 0,
         "vendor/fonts IS papered -- the grant is IBMPlexSerif-OFL.txt, the SIL Open Font License, under a " +
         "name no LICENSE pattern matches. vendor/keyhunt needs no grant because NOTHING IS VENDORED: its " +
         "ATTRIBUTION.txt records a technique reference and states 'NO CODE WAS COPIED'. vendor/wasm needs " +
         "none because it is OURS -- sha256.wasm and graphlayout.wasm are AssemblyScript output from .ts " +
-        "files in the same directory. And ui/vendor is papered IN THE FILE HEADER. *** A LICENCE CENSUS " +
+        "files in the same directory. And ui/vendor is papered IN THE FILE HEADER, as vendor/mikktspace is; " +
+        "vendor/male-cns's grant is the licence line of its PROVENANCE.md. (At v4257 it was three of four: " +
+        "htmx was the real gap, and it is closed below.) *** A LICENCE CENSUS " +
         "KEYED ON FILENAMES FINDS ONLY THE LICENCES SOMEBODY NAMED CONVENTIONALLY, and flags things that " +
         "need no licence at all.");
     ok("!! the one genuine gap was htmx, and it is closed",

@@ -47,10 +47,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { specifiers, resolveSpec } from "../tools/ship/moduleRefs.mjs";
 import { noComments } from "../tools/ship/sourceScan.mjs";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "../tools/ship/playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "../tools/ship/playwrightResolve.mjs";
 import { createRequire } from "node:module";
 import * as FD from "./frontDoor.mjs";
 import { gateReport } from "../tools/ship/gateReport.mjs";
+import { LAUNCH_ARGS } from "../tools/ship/webgpuHarness.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENG = path.resolve(HERE, "..");
@@ -113,7 +114,19 @@ let stillUnreached = [];
     // round adding an import anywhere in main.js's reach broke it, and the break said nothing about what
     // v4407 claimed. Growth is accounted instead: the total is the v4407 number plus the NAMED arrivals, each
     // with a reason, and anything reached at v4407 that has since fallen out is a separate, real red.
-    const arrivals = FD.REACH_ARRIVALS_SINCE_V4407.map((a) => a.module);
+    // *** v4667 -- THE COUNT IS OF DISTINCT MODULES, BECAUSE TWO WERE RECORDED TWICE AND THE CHECK FORGAVE
+    // ITSELF BY EXACTLY THAT MUCH. *** `arrivals.length` counted the ARRAY, so skyStars and exactHash -- both
+    // listed once at v4580 and again eleven entries later -- padded the expected total by two while
+    // accounting for no module at all. A list that may be double-counted is not an accounting, so the
+    // arithmetic uses the SET and a duplicate is its own red rather than a silent credit.
+    const arrivals = [...new Set(FD.REACH_ARRIVALS_SINCE_V4407.map((a) => a.module))];
+    const dupes = FD.REACH_ARRIVALS_SINCE_V4407.map((a) => a.module)
+        .filter((m, i, all) => all.indexOf(m) !== i);
+    ok("!! *** no module is named twice in the arrivals list, which used to pad the total by one each ***",
+       dupes.length === 0,
+       dupes.length ? "DUPLICATED: " + [...new Set(dupes)].join(", ") +
+                      " -- each one credits the expected total without explaining a module"
+                    : `${FD.REACH_ARRIVALS_SINCE_V4407.length} entries, ${arrivals.length} distinct modules`);
     const arrivalsReached = arrivals.filter((m) => R.seen.has(path.join(ENG, m)));
     ok("...and the reach grew by exactly what the module records, arrival by named arrival",
        R.seen.size === FD.MAIN_REACH_AFTER_V4407 + arrivals.length &&
@@ -220,8 +233,13 @@ window.__door = r;
 </script></body>`;
     fs.writeFileSync(path.join(ENG, "gfx-door-probe.html"), probe);
     // TWO LAUNCHES, because the flag turns out to matter as much as the address -- see section 5.
-    const bPlain = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
-    const bFlag = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader", "--enable-unsafe-webgpu"] });
+    const bPlain = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
+    // RIG RUN 2: the harness's OWN flags, not a copy of one of them. On win32 LAUNCH_ARGS is --enable-unsafe-webgpu
+    // --use-angle=d3d11 -- the pair webgpuHarness.mjs measured necessary and sufficient there -- and this launch carried
+    // the first alone (plus --use-gl=swiftshader), so Keith's rig read "no-device" on the very box the claim is about.
+    // (Rig run 4: win32's LAUNCH_ARGS also carries --use-webgpu-adapter=swiftshader now; WebGPU is live under it, measured.)
+    // SABOTAGE F1: this launch given no WebGPU flag at all -> 2 red, the one-flag row and the three-reasons row. Restored, md5.
+    const bFlag = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...LAUNCH_ARGS] });
     const read = async (host, b = bPlain) => {
         const pg = await (await b.newContext()).newPage();
         const errs = []; pg.on("pageerror", (e) => errs.push(String(e.message)));
@@ -274,7 +292,7 @@ window.__door = r;
     // =========================================================================================================
     console.log("\n5b. *** AND THE SAME ORIGIN AGAIN WITH ONE LAUNCH FLAG, WHICH IS A THIRD ANSWER ***");
     const flagR = await read("127.0.0.1", bFlag);
-    console.log(`        from http://127.0.0.1:${port} with --enable-unsafe-webgpu -> ` +
+    console.log(`        from http://127.0.0.1:${port} with ${LAUNCH_ARGS.join(" ")} -> ` +
                 (flagR.d ? `secure=${flagR.d.secure} webgpu=${flagR.d.state.webgpu} backend=${flagR.d.backend}` : "no parse"));
     ok("*** one launch flag turns 'no adapter' into an adapter, on the SAME origin and the SAME box ***",
        !!flagR.d && flagR.d.detected && flagR.d.detected.webgpu === true &&

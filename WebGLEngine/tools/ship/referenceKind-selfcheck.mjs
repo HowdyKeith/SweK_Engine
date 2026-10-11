@@ -60,7 +60,7 @@ import { gateFiles } from "./staleness.mjs";
 // v3450 -- THE RESOLVER IS NO LONGER PRIVATE TO THIS FILE. moduleRefs.mjs is the one definition and it is
 // PROVEN ON A FIXTURE before it is pointed at anything; keeping a second copy here is how the earlier attempt
 // drifted between runs, and it is the second-declaration defect this project names more often than any other.
-import { referenceGraph } from "./moduleRefs.mjs";
+import { referenceGraph, SOURCE_EXT } from "./moduleRefs.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -82,7 +82,7 @@ function corpus() {
         for (const e of es) {
             const p = path.join(d, e.name);
             if (e.isDirectory()) { if (!/node_modules|\.git/.test(p)) walk(p); }
-            else if (/\.(js|mjs|html)$/.test(e.name)) all.push(p);
+            else if (SOURCE_EXT.test(e.name)) all.push(p);
         }
     })(ENG);
     const text = new Map(all.map((f) => { try { return [f, fs.readFileSync(f, "utf8")]; } catch { return [f, ""]; } }));
@@ -101,8 +101,9 @@ const { all, text } = corpus();
 // The graph is built with NO exclusions, because this file measures the exposure INCLUDING what the registers
 // rescue -- excluding them here would quietly lower the very number being ratcheted. The two established
 // exclusions are applied to the MENTION side only, below, where they mirror what graveyard actually does.
-const GRAPH = referenceGraph(all, (f) => text.get(f) || "", ENG, { exclude: new Set() });
+const GRAPH = referenceGraph(all, (f) => text.get(f) || "", ENG, { exclude: new Set(), allBases: true });
 const RESOLVED = new Map(all.map((f) => [f, (GRAPH.refs.get(f) || []).map((r) => r.from)]));
+const WHERE = GRAPH.where;
 
 /* ------------------------------------------------------------------------------------------------------------
  * 1. THE PROVEN INSTANCE -- a mention rescues a module, and the mention is a changelog line
@@ -225,7 +226,38 @@ const RESOLVED = new Map(all.map((f) => [f, (GRAPH.refs.get(f) || []).map((r) =>
 // with slack, per this file's own rule that a ratchet with slack is a ratchet holding nothing (v3195) -- the
 // gate's own 8-slack budget check confirmed 289 - 288 = 1 is inside tolerance, but the true count is 288 and
 // there is no reason to leave a stale ceiling standing once the real number is in hand.
-const RESCUED_CEILING = 288;
+// v4781 -- 288 -> 324 AFTER THE v4776 MERGE, BY THE SAME METHOD THE v4535 NOTE ABOVE USED, AND FOR ITS REASON: this
+// gate takes ~175 s, so no verify runs it and the merge of the exported-functions-mesh line landed unmeasured. 32 of
+// the 36 are graveyard's arrivals over the same interval, named there -- each a module only gates import that
+// something in the tree mentions (19 of them in vba/runtimeGap.mjs's census notes, which name the files they count).
+// The other 4 are not named here: this file prints the population's rescuers, not its members. Paying them down is
+// the same three routes one module at a time; raising the ceiling catches up to the merge and excuses none of it.
+// v4781 SABOTAGES: graveyard's new note with its module names WITH their extensions (its first draft) -> 1 red, 326
+// against 324; a sweep closing naming one more gate-only module -> 1 red on the ritual row, 59 against 58, naming it.
+// v4805 -- 324 -> 325, ONE NEW ENTRY, MEASURED BY NAME (the rescued sets of v4804 and v4805 diffed): vendor/three-webgpu-r185/
+// three.tsl.js. vendor/three-webgpu moved to r186 and its r185 files were kept beside it for the r185 drafts; three.webgpu.js is read
+// by tools/ship/threePatch.mjs and imports three.core.js, but three.tsl.js is loaded only by the upstream gates, through a path they
+// compose ("/vendor/three-webgpu-r185" + "/three.tsl.js"), and mentioned by the READMEs that say so. A gate-only module by design --
+// the r185 build exists for gates -- so the routes that pay it down are this census learning composed paths, or the r185 drafts
+// retiring and the copy going with them.
+// *** v4778 -- RAISED FROM 288 TO 332, BY NAME, ON KEITH'S DECISION, by the method the v4535 note above used and for its
+// reason: this gate ran over the budget, so the v4776 and v4778 merges landed unmeasured. The member list diffed
+// against a run at 5d3d8d83, the commit that set 288 (it reproduces 288 there): 49 arrived and 5 left (anim/ik,
+// tools/ship/absenceScope, recordDrift, wgslCorpus, world/vendoredLicences) -- 288 + 49 - 5 = 332. 36 of the 49 are
+// graveyard-selfcheck's arrivals over the same interval, named there. The other 13, without extensions so this note
+// rescues none of them: brain/capsuleHazard, mesh/colliderFromGLB, nav/partitionScore, nav/pathCost,
+// physics/character/groundProbe, tools/bakeConnectomeTopology, tools/bakeGfcTopology, tools/ship/backlogAbsence,
+// controllerAgreement, fixtures/tslBuilderThrows, ship, verify, wasmTeardown. Catching up to the merges, excusing none:
+// the three routes down are unchanged.
+// v4778 SABOTAGES, each on the real file, restored and md5 verified: graveyard-selfcheck's note spelling one module
+// with its extension (adapterRecord.mjs, the one arrival no prose rescued) -> 1 red, 333 against 332; a sweep closing
+// in gateSweep.mjs naming one more gate-only module (anim/reachIK.mjs) -> 1 red on the ritual row, 58 against 57,
+// naming it.
+// v4819 -- 332 -> 333 AT THE MERGE OF THE TWO LINES, MEASURED (333 over the merged tree). main's 332 already holds the
+// exported-functions line through v4775 (the v4776 merge); that line moved its own count once since, 324 -> 325 at v4805, and
+// named the one arrival: vendor/three-webgpu-r185/three.tsl.js, the r185 build kept for the r185 drafts (its note is above).
+// 332 + 1 = 333, the reading; the arithmetic of two named lists, not a member-by-member diff, and said as such.
+const RESCUED_CEILING = 333;
 
 const rescued = [];
 {
@@ -242,7 +274,11 @@ const rescued = [];
         // not a consumer of them" -- and the right response is to close the CLASS rather than raise a number:
         // a file whose job is to NAME these modules is never their caller. Excluded by identity, not by a
         // hardcoded path, so it stays true if this file is ever renamed.
-        const mentions = all.filter((c) => c !== f && !EXCLUDED.has(c) && !res.includes(c) && (text.get(c) || "").includes(base));
+        // v4782: the same substring test, answered from one index over the corpus (moduleRefs.basenameHits) rather
+        // than by reading every file for every candidate -- 1,881 x 5,087 was most of this gate's ~175 s.
+        const holders = WHERE.get(base);
+        const mentions = holders ? all.filter((c) => holders.has(c) && c !== f && !EXCLUDED.has(c) && !res.includes(c))
+                                 : all.filter((c) => c !== f && !EXCLUDED.has(c) && !res.includes(c) && (text.get(c) || "").includes(base));
         if (mentions.length) rescued.push({ f: rel(f), by: mentions.map(rel) });
     }
     const freq = {};
@@ -308,7 +344,23 @@ const rescued = [];
     // they would -- one paragraph per round, unmeasured because nothing forced a re-run. Paying each of the 39
     // down by the same three routes is real work and a separate round; this fixing pass added none of the 39
     // and wired none of them either, so raising the ceiling here is catching up to the merge, not excusing it.
-    const RITUAL_CEILING = 39;
+    // v4781 -- 39 -> 58 AFTER THE v4776 MERGE, MEASURED BY NAME. 10 from the merged line, each a module its round
+    // built, gated and named in its closing: render/dilate.mjs, render/flicker.mjs, render/luminancePyramidGPU.mjs,
+    // render/opticalFlowGPU.mjs, render/reactive.mjs, tools/ship/constantRows.mjs, tools/ship/fsr2Coverage.mjs,
+    // tools/ship/pageShot.mjs, tools/ship/realGpuRun.mjs, tools/ship/threePatch.mjs. 4 from main after the ceiling
+    // was set (fc12eefc): render/ringFloor.mjs, render/temporalLock.mjs, tools/ship/kernelReach.mjs,
+    // tools/ship/murmurSpeciesFrames.mjs. 5 older modules joined since -- named by a later closing or left without
+    // their last non-gate importer. Exactly the accrual the v4386 note predicted, one paragraph per round.
+    // *** v4778 -- RAISED FROM 39 TO 57, BY NAME, ON KEITH'S DECISION. *** Diffed against 5d3d8d83 (39 there): 22
+    // arrived and 4 left (tools/ship/absenceScope, recordDrift, wgslCorpus, world/vendoredLicences) -- 39 + 22 - 4 =
+    // 57. Named without extensions: from the exported-functions line, each a module its round built, gated and named
+    // in its closing -- render/dilate, flicker, luminancePyramidGPU, opticalFlowGPU, reactive, ringFloor,
+    // temporalLock, tools/ship/constantRows, fsr2Coverage, kernelReach, murmurSpeciesFrames, pageShot, realGpuRun,
+    // threePatch; and brain/agent/dispatch, math/solverFit, tools/roundhouse/androidRunner, tools/ship/budgetExile,
+    // gateMutation, nextRounds, ship, verify -- named by a later closing, or left without their last non-gate
+    // importer. The accrual the v4386 note predicted, one paragraph per round.
+    // v4819 -- 57 at the merge, MEASURED over the merged tree: 57 against 57 (the exported-functions line alone had read 58).
+    const RITUAL_CEILING = 57;
     const ritual = rescued.filter((r) => r.by.includes("tools/ship/gateSweep.mjs"));
     ok("!! *** no NEW module is hidden from the orphan census by the ship ritual's own sweep closing ***",
        ritual.length <= RITUAL_CEILING,
@@ -328,10 +380,13 @@ const rescued = [];
  * 3. THE SAME DEFECT ONE LEVEL UP, WHERE ONE SENTENCE EXEMPTS A WHOLE DIRECTORY
  * --------------------------------------------------------------------------------------------------------- */
 {
-    const causes = new Map();
+    const causes = new Map(), asked = new Set();
     for (const f of all) {
         const dir = path.dirname(f), dirRel = rel(dir);
-        if (!dirRel || dirRel === "." || causes.has(dir)) continue;
+        // v4782 -- once per directory, as graveyard's twin of this loop now is: `causes.has(dir)` skipped only the
+        // directories already found named, so one nobody names was re-scanned against the corpus for every file in it.
+        if (!dirRel || dirRel === "." || asked.has(dir)) continue;
+        asked.add(dir);
         for (const c of all) {
             if (c.startsWith(dir + path.sep)) continue;
             if ((text.get(c) || "").includes(dirRel)) { causes.set(dir, rel(c)); break; }

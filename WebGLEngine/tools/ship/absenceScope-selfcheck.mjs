@@ -36,7 +36,7 @@ import path from "node:path";
 import os from "node:os";
 import {
     ENG, KINDS, tokenMatch, denialRe, classifyFile, scan, gradeClaim, sourceFiles, BVH_AT_V4435,
-    INSCOPE_ARRIVALS_SINCE_V4435, clearScanCache, scanStats,
+    INSCOPE_ARRIVALS_SINCE_V4435, OUTOFSCOPE_ARRIVALS_SINCE_V4435, clearScanCache, scanStats,
 } from "./absenceScope.mjs";
 import { codeOnly } from "./sourceScan.mjs";
 
@@ -127,6 +127,12 @@ eq("out of scope -- real BVH code the three directories could not reach", graded
 // arrived from v4544's terrain controller, both carrying the term in CODE and both inside the claim's own
 // search scope, and this row went red for as long as nothing ran this gate.
 const ARRIVED = INSCOPE_ARRIVALS_SINCE_V4435.map((a) => a.file);
+// *** v4539 -- THE COUNT ADDS BOTH LISTS AND THE MEMBERSHIP ROW USES ONLY THE IN-SCOPE ONE. *** They were
+// the same list until a module-plus-gate round put one file in each half, and no way of naming the
+// out-of-scope file left both rows green: in ARRIVED the membership row went red on a file that is not in
+// scope, out of it the count went one short. See OUTOFSCOPE_ARRIVALS_SINCE_V4435's header.
+const OUT_ARRIVED = OUTOFSCOPE_ARRIVALS_SINCE_V4435.map((a) => a.file);
+const ALL_ARRIVED = ARRIVED.length + OUT_ARRIVED.length;
 eq("in scope and summarised away, plus the arrivals named since",
    graded.inScopeMissed, [...BVH_AT_V4435.inScopeMissed, ...ARRIVED].sort());
 ok("...and every arrival carries a reason and a version, so a later reader sees WHEN and WHY",
@@ -140,17 +146,25 @@ eq("matched only because they ASSERT the absence", graded.wide.denial, [...BVH_A
 // corrected too: this counts FILES WHOSE CODE CARRIES THE TERM, not implementations -- splatMesh-selfcheck
 // imports MeshBVH and builds nothing, and calling it an implementation is the field's name overstating it.
 ok("the tree holds files whose code carries the term where the claim named two, and the record says how many",
-   graded.realImplementations === BVH_AT_V4435.realImplementations + ARRIVED.length && BVH_AT_V4435.said.length === 2,
-   `${graded.realImplementations} files carry it (${BVH_AT_V4435.realImplementations} at v4435 plus ${ARRIVED.length} ` +
+   graded.realImplementations === BVH_AT_V4435.realImplementations + ALL_ARRIVED && BVH_AT_V4435.said.length === 2,
+   `${graded.realImplementations} files carry it (${BVH_AT_V4435.realImplementations} at v4435 plus ${ALL_ARRIVED} ` +
    `named arrivals) against ${BVH_AT_V4435.said.length} the claim named -- not all of them build one, which ` +
    "the field's name does not say and its comment now does");
 
-// *** AND THE NARROW CLAIM SURVIVES, WHICH IS THE HALF THAT IS STILL TRUE. *** The tracer has no BVH. It is
-// asserted from the tracer's own file rather than from the absence of a hit, because an absence read as a
-// pass is v4402's defect.
+// *** AND THE NARROW CLAIM SURVIVED v4435 -- AND DID NOT SURVIVE THE rtx MERGE, SO THE CLAIM IS WHAT CHANGED. ***
+// Until v4778 this row read "the tracer really has no BVH -- rtPipeline.mjs says so in its own words", held by
+// the NO BVH sentence and a `denial` grade. The rtx line's 71d40a6d ("Add a triangle BVH to rtPipeline, from
+// meshBVH") made both false: the sentence became "Linear over the spheres", and the file now packs meshBVH's
+// build into storage buffers and traverses it in WGSL. The row went red on the true thing it could no longer
+// say. It is not deleted and not loosened; it asserts the opposite, from the same file and the same
+// grader, and the half of item 10 that is still open -- TWO-level, a TLAS over instances -- gets its own row.
 const rt = fs.readFileSync(path.join(ENG, "physics", "render", "rtPipeline.mjs"), "utf8");
-ok("the tracer really has no BVH -- rtPipeline.mjs says so in its own words",
-   /NO BVH/i.test(rt) && classifyFile(rt, "bvh") === "denial");
+ok("the tracer HAS a BVH since the rtx merge -- rtPipeline.mjs builds on meshBVH and traverses it in WGSL",
+   !/NO BVH/i.test(rt) && classifyFile(rt, "bvh") === "code" &&
+   /from "\.\.\/\.\.\/mesh\/meshBVH\.mjs"/.test(rt) && /fn rtTraverseBvh\(/.test(rt),
+   "the narrow claim v4435 kept is false as of v4778 -- see BVH_AT_V4435's v4778 note and docs/EXPLAIN-ITSELF.md item 10");
+ok("  ...and it is ONE level: no TLAS anywhere in the file, so item 10's two-level half is still open",
+   !/\btlas\b/i.test(rt), "a single BLAS per scene; the day a TLAS lands this row goes red and item 10 moves again");
 
 // ---- 4. THE FROZEN RECORD MATCHES THE TREE ---------------------------------------------------------------
 console.log("\n4. the record is a record, not a rendering");
@@ -163,8 +177,11 @@ ok("every name in the record is a file that exists",
    [...BVH_AT_V4435.outOfScope, ...BVH_AT_V4435.inScopeMissed, ...BVH_AT_V4435.denial]
        .every((f) => fs.existsSync(path.join(ENG, f))));
 ok("realImplementations agrees with a fresh grade once the named arrivals are added",
-   graded.realImplementations === BVH_AT_V4435.realImplementations + ARRIVED.length,
-   `${BVH_AT_V4435.realImplementations} at v4435 + ${ARRIVED.length} named arrivals = ${graded.realImplementations} now`);
+   graded.realImplementations === BVH_AT_V4435.realImplementations + ALL_ARRIVED &&
+   OUT_ARRIVED.every((f) => BVH_AT_V4435.outOfScope.includes(f)),
+   `${BVH_AT_V4435.realImplementations} at v4435 + ${ARRIVED.length} in-scope + ${OUT_ARRIVED.length} ` +
+   `out-of-scope named arrivals = ${graded.realImplementations} now, and every out-of-scope arrival is also ` +
+   `named in outOfScope -- the two lists cannot drift apart without this row saying so`);
 
 // ---- 5. THE HOLE, HELD SHUT BY NAME ----------------------------------------------------------------------
 console.log("\n5. `exclude` is a hole, and this is the lid");

@@ -17,6 +17,7 @@ import path from "node:path";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describeWebGPU, probeAdapter } from "./webgpuProbe.mjs";
+import { SOURCE_EXT } from "../tools/ship/moduleRefs.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -107,7 +108,7 @@ const env = (gpu, secure, host, proto = "http:") => ({
             if (SKIP.has(name)) continue;
             const q = path.join(dir, name);
             if (statSync(q).isDirectory()) { walk(q); continue; }
-            if (!/\.(js|mjs|html)$/.test(name)) continue;
+            if (!SOURCE_EXT.test(name)) continue;
             if (readFileSync(q, "utf8").includes("navigator.gpu")) list.push(path.relative(ENG, q));
         }
     })(ENG);

@@ -139,6 +139,9 @@ import { overNonEmpty, emptyOfNonEmpty } from "./vacuity.mjs";
 import * as QS from "./quickSweep.mjs";
 import * as Q from "./quickSweep.mjs";
 import { gateReport } from "./gateReport.mjs";
+import { mergeTimings, restoreLost, CORROBORATION_BAND, UNDATED } from "./sweepRotation.mjs";
+import { writeFixture, dropFixture, armExitSweep } from "./fixtureLitter.mjs";
+armExitSweep();   // v4649 -- a throw between the write below and its unlink drops the fixture anyway
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -147,6 +150,91 @@ const say = (m) => console.log("  ----  " + m);
 const REPORT = gateReport("tools/ship/sweepCoverage-selfcheck.mjs");
 
 const FILE = SC.readFile();
+// *** v4813 -- "IN THE SWEEP" IS ASKED OF THE SWEEP. *** Since v4536 quickSweep keeps a gate after ONE crossing of the
+// budget and evicts it on the second (MIN_CROSSINGS_TO_EVICT), so a gate filed at 3,099 with one crossing is still
+// run at ship time. Rows here that read "returned and back in" or "outside the sweep" off the raw timing called it
+// out; on the v4813 tree 31 such gates sat on probation and three rows went red on gates the sweep was running.
+// The membership is the selector's, through the selector -- not a second spelling of it without the probation.
+const inSweep = (g, F = FILE) => QS.selectGates([g], F.timings || {}, SC.BUDGET_MS, { crossings: F.crossings || {} }).run.includes(g);
+
+// *** v4547 -- ONE RULE FOR "IS THIS STILL-OVER ENTRY JUSTIFIED", WHERE THERE WERE THREE. ***
+// "Is it live over budget right now" is not a well-defined question for a straddler, and this round
+// measured why: the ritual runs a SERIAL rotation (step 3b) and an 8-WAY quick sweep (step 4), both write
+// tools/ship/sweep-timings.json, and the two measurements differ by 2.4-2.5x on this box in the same
+// minute -- meshLine 2963 / 3009 / 3146 serial against 7259 parallel, wgslSpec 2688-2927 against 7087,
+// sweepBudget 2459-2576 against 6316. So a straddler's filed number says which step ran last. INSIDE THIS
+// ROUND the verify re-filed wgslSpec at 2,764 where its entry recorded 3,737 and meshLine at 3,222 against
+// 4,379: the entries were live-over before the verify and one was not after it.
+// An entry is justified by its RECORDED measurements -- at least one over budget, which is what makes it a
+// straddler -- plus a live reading that is not COMFORTABLY under, so a gate that has genuinely become fast
+// everywhere still falls off the roll and this can still fail. The live number is reported, not asserted.
+// Filed as its own round: two fields in the timings file, one per measurement.
+const overInSomeReading = (x) => [x.hereMs, x.recordedWas, x.overMs, x.v4476Ms, x.v4461Ms,
+                                  ...(x.serialMs || []), ...(x.quietMs || []), ...(x.serialNow || [])]
+    .filter(Number.isFinite).some((v) => v > SC.BUDGET_MS);
+// *** v4647m -- THE GUARD READ `timings[]`, WHICH IS WHICHEVER RUN HAPPENED LAST. ***
+//
+// The comment above ends "Filed as its own round: two fields in the timings file, one per measurement."
+// This is that round, and the two fields now exist -- `serial` (v4562) and `contended` (v4556) landed after
+// that sentence was written.
+//
+// `timings[g]` is `serialMs ?? parallelMs`. For an oscillator those are DIFFERENT QUANTITIES: meshLine is
+// 2,963-3,146 alone and 7,259 eight-way; traderGraph 2,245-2,437 alone and 3,003; wgslSpec 2,688-2,927 and
+// 7,087. So the clause `timings[g] > 0.8 * budget` asked one field that holds both, and its answer moved
+// with the ORDERING of runs rather than with anything about the gate. The roll's own note says exactly
+// that: "these gates oscillate every round forever and the rows over them go red on the ordering rather
+// than on anything being wrong."
+//
+// MEASURED: with all three clauses evaluated per gate, the ONLY failing one was traderGraph at
+// `timings[] = 2312 < 2400`, and 2,312 is its SERIAL number -- filed because the last thing that ran it ran
+// it alone. Nothing about the gate had changed.
+//
+// The two halves are asked separately now, and each is ordering-stable:
+//
+//   ALONE   `serial[g]` is only ever written by a serial run, so it cannot be clobbered by a sweep.
+//   LOADED  `timings[g]` only when `contended[g] === true` -- a genuine parallel sample, or nothing.
+//
+// An entry is justified while it is CHEAP ALONE and the record states a LOADED reading over budget. The
+// retirement path the old clause existed for is kept and sharpened: if a live CONTENDED sample says the
+// gate is under budget under load too, it is fast everywhere and falls off the roll -- which is a fact
+// about the gate rather than about which run was most recent.
+// v4782 -- THE MEDIAN OF THE RING, NOT THE LAST READING. headlessGpu's alone readings ran 2,770 / 2,722 / 11,890 /
+// 2,659 across four sweeps, and this read only the newest: the "12 OF THE 22" row was red on the record one pass
+// wrote and green on the next, nothing about any gate having changed. quickSweep keeps the last three serial
+// readings for exactly this reason (its SERIAL_RING note, v4648: "one sample was standing in for a property").
+const aloneMs = (g, F = FILE) => {
+    const ring = ((F.serialRing || {})[g] || []).filter((n) => typeof n === "number" && n > 0);
+    if (ring.length >= 2) { const a = ring.slice().sort((x, y) => x - y); return a[(a.length - 1) >> 1]; }
+    const s = (F.serial || {})[g];
+    if (typeof s === "number") return s;
+    return (F.contended || {})[g] === false ? (F.timings || {})[g] : null;
+};
+const liveLoadedMs = (g, F = FILE) => ((F.contended || {})[g] === true ? (F.timings || {})[g] : null);
+// *** AND ONE PREDICATE WAS CERTIFYING TWO POPULATIONS WITH OPPOSITE PROPERTIES. ***
+// There are two stillOver rolls and they hold different kinds of claim:
+//
+//   RETURNED_AT_V4476  crossBackend-selfcheck.mjs, live 25,772 ms -- GENUINELY OVER, by 8x. Nothing
+//                      subtle: it belongs out of the sweep in every reading anybody has taken.
+//   RETURNED_AT_V4529  meshLine / traderGraph / wgslSpec -- OSCILLATORS. Cheap alone (2,245-3,146) and
+//                      over under load (3,003-7,259). Their whole content is that the two differ.
+//
+// `justifiedOver` was asked to certify both with one rule, which is why it needed a fudge factor: 0.8 of
+// the budget is low enough to admit a straddler and high enough to look like a bar. It is not one property
+// and no threshold makes it one. Two predicates, and `justifiedOver` is their union so the callers that
+// grade the combined roll keep working.
+const stillGenuinelyOver = (x, F = FILE) => (aloneMs(x.gate, F) ?? (F.timings || {})[x.gate] ?? 0) > SC.BUDGET_MS;
+const oscillates = (x, F = FILE) => {
+    // The record must state the loaded side as a NUMBER. It used to live in the prose ("8-way it is 7,259"),
+    // where nothing could read it -- a claim in a sentence is a claim no gate keeps honest.
+    if (!Number.isFinite(x.loadedMs) || x.loadedMs <= SC.BUDGET_MS) return false;
+    const alone = aloneMs(x.gate, F);
+    if (alone == null || alone > SC.BUDGET_MS * 1.15) return false;   // not cheap alone: not an oscillator
+    const loaded = liveLoadedMs(x.gate, F);
+    return loaded == null || loaded > SC.BUDGET_MS;                   // a live loaded sample may retire it
+};
+const justifiedOver = (x) => overInSomeReading(x) &&
+    typeof x.why === "string" && x.why.length > 40 &&
+    (stillGenuinelyOver(x) || oscillates(x));
 const GATES = enumerateGates(ENG);
 const C = SC.census(GATES, FILE);
 
@@ -171,7 +259,7 @@ console.log("\n2. a killed process's nonzero exit code is NOT counted as a red")
 {
     const codes = FILE.codes || {};
     const reds = SC.standingReds(C, { codes });
-    const notV = SC.notVerdicts(C, { codes });
+    const notV = SC.notVerdicts(C, { codes, finished: FILE.finished || {} });
     ok("!! *** the cap-hitters are counted as NO VERDICT, not as failures ***", notV.every((g) => !reds.includes(g)),
         `${notV.length} entry(ies) nonzero AFTER being killed at the cap, and none of them is reported red. ` +
         "v4392's rule, sitting in a data file: A COUNT OF FAILURES IS NOT A VERDICT UNLESS THE PROCESS FINISHED");
@@ -323,7 +411,14 @@ console.log("\n7. *** THE MIRROR standingReds NEVER HAD: A ZERO IS AS OLD AS THE
     const REC = SC.STALE_GREENS_V4460;
 
     ok("!! *** every over-budget entry is a standing green, a standing red, or has no code -- a PARTITION ***",
-       cls.partitions && cls.green.length > 0 && cls.red.length > 0,
+       // v4816: `cls.red.length > 0` required a standing red to exist, and v4816 re-filed the last two (budgetExile,
+       // moduleHistory, both green live) so the record holds none -- a partition does not need every class inhabited.
+       // The red arm is driven on a fixture instead, so a classifier that stopped finding reds still fails here.
+       // SABOTAGE: verdictClasses made to put every coded gate in `green` -> 2 red, this row and the no-code fixture row
+       // below (its red count reads 0); restored md5-identical.
+       cls.partitions && cls.green.length > 0 &&
+       (() => { const f = SC.verdictClasses({ over: ["g", "r", "n"] }, { codes: { g: 0, r: 1 } });
+                return f.partitions && f.green.join() === "g" && f.red.join() === "r" && f.none.join() === "n"; })(),
        `${cls.green.length} green + ${cls.red.length} red + ${cls.none.length} uncoded = ${cls.sum} of ` +
        `${C.over.length}. Section 2 counted one of these three and called the answer complete.`);
     ok("...and the two verdict classes do not overlap",
@@ -409,9 +504,15 @@ console.log("\n7. *** THE MIRROR standingReds NEVER HAD: A ZERO IS AS OLD AS THE
     // v4529: a returnee can go back OVER on a later box (meshLine, 2,929 at v4476, 3,154 here), and the property holds the
     // same way crossBackend's did -- named, with a reason and a live reading that is genuinely over
     const stillOverNamed = (g) => {
-        const row = V76.stillOver.find((x) => x.gate === g) || V29.stillOver.find((x) => x.gate === g);
-        return !!row && typeof row.why === "string" && row.why.length > 40 &&
-               (FILE.timings || {})[g] > SC.BUDGET_MS;
+        // v4800: and a returnee genuinely over on the box that owned the record then (RETURNED_AT_V4800). SABOTAGES: the
+        // record not consulted -> 1 red (the first verify of the re-hosted record found it so); its reason emptied -> 1;
+        // its readings put under budget -> 1. And the share row: compared against afterPct instead -> 1.
+        const row = V76.stillOver.find((x) => x.gate === g) || V29.stillOver.find((x) => x.gate === g) ||
+                    SC.RETURNED_AT_V4800.stillOver.find((x) => x.gate === g) ||      // v4800, the other line
+                    SC.STILL_OVER_AT_V4813.stillOver.find((x) => x.gate === g) ||   // v4813
+                    SC.STILL_OVER_AT_V4815.stillOver.find((x) => x.gate === g) ||   // v4815: the host change
+                    SC.STILL_OVER_AT_V4818.stillOver.find((x) => x.gate === g);     // v4818: and back
+        return !!row && justifiedOver(row);
     };
     const returned = new Map([
         ...REC.returnedAt_v4461.map((r) => [r.gate, r]),
@@ -426,7 +527,7 @@ console.log("\n7. *** THE MIRROR standingReds NEVER HAD: A ZERO IS AS OLD AS THE
        back.length === REC.confirmed.nowUnderBudget &&
        overNonEmpty(back, (r) => r.nowMs < SC.BUDGET_MS && r.recordedMs > SC.BUDGET_MS &&
                                  ((FILE.timings || {})[r.gate] === r.recordedMs ||
-                                  (returned.has(r.gate) && (FILE.timings || {})[r.gate] < SC.BUDGET_MS) ||
+                                  (returned.has(r.gate) && inSweep(r.gate)) ||
                                   // v4477: the THIRD state, which the merged tree created and neither branch
                                   // had alone -- RE-MEASURED AND STILL OVER. crossBackend was re-timed at v4476
                                   // to 12,851 ms here against main's 376, a 34x disagreement between two boxes
@@ -455,16 +556,20 @@ console.log("\n7. *** THE MIRROR standingReds NEVER HAD: A ZERO IS AS OLD AS THE
     // The returned rolls accumulate by round -- v4565 added its own rather than appending to v4535's, so a
     // retirement carries the round that measured it. The row checks the union: what matters is that every gate
     // that LEFT the still-over roll left it with readings, whichever round took them.
-    const V29ret = [...(SC.RETURNED_AT_V4529.returnedAt_v4535 || []), ...(SC.RETURNED_AT_V4529.returnedAt_v4565 || [])];
+    const V29ret = [...(SC.RETURNED_AT_V4529.returnedAt_v4535 || []), ...(SC.RETURNED_AT_V4529.returnedAt_v4565 || []),
+                    ...(SC.RETURNED_AT_V4529.returnedAt_v4545 || [])];
     ok("!! a returnee that went back over the budget on a later box is NAMED with its serial readings, and is live over",
-       overNonEmpty(SC.RETURNED_AT_V4529.stillOver, (x) => (FILE.timings || {})[x.gate] > SC.BUDGET_MS && typeof x.why === "string" && x.why.length > 40 && x.hereMs > SC.BUDGET_MS && back.some((b) => b.gate === x.gate)) ||
+       // v4647m: this roll is the OSCILLATOR roll, so it is graded by the oscillator predicate rather than
+       // by the union -- an entry here that were merely over everywhere would be on the wrong roll.
+       overNonEmpty(SC.RETURNED_AT_V4529.stillOver, (x) => overInSomeReading(x) && oscillates(x) &&
+                    x.hereMs > SC.BUDGET_MS && back.some((b) => b.gate === x.gate)) ||
        (emptyOfNonEmpty(SC.RETURNED_AT_V4529.stillOver, V29ret) &&
         overNonEmpty(V29ret, (x) => (FILE.timings || {})[x.gate] < SC.BUDGET_MS && x.overMs > SC.BUDGET_MS &&
                                     typeof x.why === "string" && x.why.length > 40 &&
                                     Array.isArray(x.serialNow) && x.serialNow.length >= 3 &&
                                     x.serialNow.every((ms) => ms < SC.BUDGET_MS))),
        SC.RETURNED_AT_V4529.stillOver.length
-         ? SC.RETURNED_AT_V4529.stillOver.map((x) => x.gate.split("/").pop() + " " + (FILE.timings || {})[x.gate] + " ms on file, " + x.hereMs + " ms recorded").join("; ")
+         ? SC.RETURNED_AT_V4529.stillOver.map((x) => x.gate.split("/").pop() + " " + (FILE.timings || {})[x.gate] + " ms on file, " + x.hereMs + " ms recorded").join("; ") + " -- justified by the RECORDED readings rather than by the filed one, which says which ritual step ran last; see the note above the v4476 row"
          : "the roll is EMPTY and that is the pass: " + V29ret.length + " returned, " +
            V29ret.map((x) => x.gate.split("/").pop() + " " + x.overMs + " -> " + x.serialNow.join("/") + " ms").join("; ") +
            ". Each was named over budget WITH ITS NUMBERS, so returning it took re-running it rather than arguing about it.");
@@ -473,11 +578,24 @@ console.log("\n7. *** THE MIRROR standingReds NEVER HAD: A ZERO IS AS OLD AS THE
     const T = FILE.timings || {};
     const stillStale = back.filter((r) => T[r.gate] === r.recordedMs);
     const RET = SC.RETURNED_AT_V4476;
+    // *** v4547 -- "IS IT LIVE OVER BUDGET RIGHT NOW" IS NOT A WELL-DEFINED QUESTION FOR A STRADDLER, AND
+    // THIS ROUND MEASURED WHY. *** The ritual runs a SERIAL rotation (step 3b) and an 8-WAY quick sweep
+    // (step 4) and both write tools/ship/sweep-timings.json, and the two measurements differ by 2.4-2.5x on
+    // this box in the same minute -- meshLine 2963/3009/3146 serial against 7259 parallel. So a straddling
+    // gate's filed number says which step ran last. Inside THIS round the sweep re-filed wgslSpec at 2,764
+    // where the entry recorded 3,737, and meshLine at 3,222 where it recorded 4,379: the same two entries
+    // were live-over before the verify and one was not after it.
+    // A still-over entry is justified by its RECORDED MEASUREMENTS -- at least one of them over budget,
+    // which is what makes it a straddler -- plus a live reading that is not COMFORTABLY under, so a gate
+    // that has genuinely become fast everywhere still falls off the roll and the row can still fail. The
+    // live number is reported. Filed as its own round: two fields, one per measurement.
+    // (justifiedOver is hoisted to the top of this file: THREE separate copies of this predicate lived in
+    // it, and finding the third only when the second was fixed is why there is now one.)
     ok("!! *** the twelve v4460 found returnable no longer carry the time that evicted them ***",
        back.length === REC.confirmed.nowUnderBudget &&
        overNonEmpty(back, (r) => r.nowMs < SC.BUDGET_MS && r.recordedMs > SC.BUDGET_MS) &&
        stillStale.length === 0 && RET.reTimed + RET.stillOver.length === RET.ofTwelve &&
-       overNonEmpty(RET.stillOver, (x) => T[x.gate] > SC.BUDGET_MS && typeof x.why === "string" && x.why.length > 40),
+       overNonEmpty(RET.stillOver, justifiedOver),
        stillStale.length
          ? `${stillStale.length} of ${back.length} STILL carry the evicting time: ` +
            stillStale.map((r) => r.gate.split("/").pop() + " " + r.recordedMs + " ms on file, " + r.nowMs + " ms now").join("; ")
@@ -733,19 +851,91 @@ console.log("\n*** THE FILED READING IS A CONTENDED SAMPLE AND THE COST IS A DIF
     // stays outside the ship-time sweep -- a record whose only guardian is over budget is a record nothing
     // checks, which is exactly the population tools/ship/recordReach-selfcheck.mjs counts.
     const t = QS.readTimings(QS.DEFAULTS.timingsFile, ENG);
-    const pairs = Object.keys(t.serial || {})
-        .filter((g) => t.timings[g] > 50 && t.serial[g] > 50)
-        .map((g) => t.timings[g] / t.serial[g]).sort((a, b) => a - b);
+    // *** v4556 -- THIS ROW WAS DIVIDING 164 MEASUREMENTS BY THEMSELVES. *** It took every gate in `serial`
+    // as a pair, and `timings[g]` is NOT always a parallel sample: quickSweep files `r.serialMs ??
+    // r.parallelMs`, so every red and every budget crosser carries THE SAME NUMBER in both fields. Each of
+    // those divides to exactly 1.00. MEASURED on the live file at the time of the repair: 1,262 pairs read
+    // p10 1.00 and median 2.07x; the 1,098 real pairs read p10 1.41 and median 2.17x. THE p10 OF 1.00 WAS
+    // NOT A GATE THAT ESCAPED CONTENTION, IT WAS A GATE COMPARED WITH ITSELF -- and the shortfall against
+    // v4562's 2.41x was being narrated here as sweep-to-sweep variation. The population rule lives in
+    // quickSweep.contentionPairs() rather than here, because a rule about what a field means belongs beside
+    // the writer of the field and this gate is the second place it was spelled out.
+    const cp = QS.contentionPairs(t);
+    const pairs = cp.ratios;
+    const excluded = cp.excluded;   // taken over contentionPairs' OWN eligible set, so the two halves agree
     const med = pairs.length ? pairs[pairs.length >> 1] : null;
     const R = SC.SWEEP_CONTENTION_V4562;
     ok("!! *** THE FILED READING RUNS WELL ABOVE THE COST, ON THE LIVE FILE, RIGHT NOW ***",
        pairs.length > 500 && med > 1.2,
-       `${pairs.length} gates carry both a filed and a serial reading; filed/serial median ` +
+       `${pairs.length} gates carry a CONTENDED filed reading and a separate serial one; filed/serial median ` +
        `${med === null ? "n/a" : med.toFixed(2) + "x"} here against the ${R.ratio.median}x recorded at ` +
        `v4562 from a full 8-worker against 1-worker pair (p10 ${R.ratio.p10}, p90 ${R.ratio.p90}, max ` +
        `${R.ratio.max}). The two need not agree -- the record is one pair of sweeps and this is whatever the ` +
        "last one saw -- and BOTH BEING ABOVE 1 is the claim. Eight workers on four cores is 2x " +
-       "oversubscription: it buys 1.63x of wall clock (230 s against 374 s) and costs this.");
+       `oversubscription: it buys 1.63x of wall clock (230 s against 374 s) and costs this. ${excluded} gate(s) ` +
+       "were EXCLUDED as one measurement filed in two fields, which is what this row used to average in at " +
+       `1.00; ${cp.inferred.length} of the pairs kept have no recorded provenance and were inferred from the ` +
+       "two readings differing, which is the fallback for entries written before `contended` existed.");
+    // *** AND THE EXCLUSION IS DRIVEN, not trusted. *** A population rule that quietly matched nothing would
+    // leave this row reading exactly as it did before the repair, which is the failure mode the repair is
+    // about. Two fixtures: one gate whose readings are one measurement, one whose readings are two.
+    {
+        // *** SABOTAGE S3 WENT 0 RED AGAINST THE FIRST DRAFT OF THIS FIXTURE, AND THE REASON IS THE ROW'S
+        // OWN SENTENCE. *** It read {self: 900/900, real: 2000/1000} and claimed in its detail that the
+        // self-pair "is dropped by its recorded provenance and not by its value" -- which the fixture could
+        // not tell apart, because deleting the provenance branch left the equality fallback to drop the same
+        // gate for the other reason. A fixture where both rules give the same answer cannot grade either.
+        // So the two cases below are the ones where THEY DISAGREE, and nothing else will do:
+        //   twinned  -- two honest readings that landed on the same millisecond. Provenance says KEEP;
+        //               equality says drop. It is kept, and its ratio of 1.00 is a real observation.
+        //   filed    -- a rotation filed ONE uncontended reading into both fields, and a later serial slice
+        //               then refreshed `serial` alone: the two numbers now DIFFER and are BOTH uncontended,
+        //               so their ratio is serial-over-serial and means nothing. Provenance says DROP;
+        //               equality says keep. (A returnee really does travel this path -- the rotation writes
+        //               both, the gate comes back under budget, and the slice draws from the run.)
+        const fix = { timings: { twinned: 1000, filed: 2400, real: 2000 },
+                      serial:  { twinned: 1000, filed: 2200, real: 1000 },
+                      contended: { twinned: true, filed: false, real: true } };
+        const got = QS.contentionPairs(fix);
+        ok("  and the rule is driven on the two cases where provenance and the value DISAGREE",
+           got.pairs.slice().sort().join() === "real,twinned" && got.inferred.length === 0 &&
+           got.excluded === 1 && got.ratios.join() === "1,2",
+           `kept ${JSON.stringify(got.pairs.slice().sort())} at ${JSON.stringify(got.ratios)}, excluded ` +
+           `${got.excluded}. A 1.00 that is REALLY 1.00 stays in the population -- dropping it would bias ` +
+           "the median upward -- and a pair of two UNCONTENDED readings is dropped however far apart its " +
+           "numbers happen to be, because serial over serial is not a contention ratio.");
+        const noProv = QS.contentionPairs({ timings: { self: 900, real: 2000 }, serial: { self: 900, real: 1000 } });
+        ok("  ...and with no provenance on file it falls back to the readings differing, and SAYS how many",
+           noProv.pairs.join() === "real" && noProv.inferred.join() === "real",
+           `kept ${JSON.stringify(noProv.pairs)}, inferred ${JSON.stringify(noProv.inferred)}`);
+    }
+    // *** v4556 -- AND THE ROTATION'S READING REACHES THE FIELD BUILT FOR IT, WHICH IT DID NOT. ***
+    // sweepRotation runs SERIALLY on purpose -- its header says so twice, "the budget is a serial number"
+    // -- and its merge wrote `timings`, `codes`, `at`, `finished` and never `serial`. MEASURED on the file
+    // before the repair: of the 237 rotation readings still filed, costOf() called 210 of them "parallel".
+    // The accessor built to separate the two measurements was wrong about provenance for the whole exiled
+    // pool, and wrong in the direction that matters -- it labelled the good number as the untrustworthy one.
+    // Driven on a fixture rather than by running eighty gates: mergeTimings is pure and exported for it.
+    {
+        const before = { timings: { g: 9000 }, codes: { g: 1 }, at: { g: "old" } };
+        const after = mergeTimings(before, [{ gate: "g", ms: 2500, code: 0, finished: true }], "now").merged;
+        ok("!! *** a rotation reading lands in `serial` AND in `timings`, and says the copy is not a sample ***",
+           after.serial.g === 2500 && after.serialAt.g === "now" && after.contended.g === false &&
+           after.timings.g === 2500,
+           `serial ${after.serial.g}, timings ${after.timings.g}, contended ${after.contended.g}. BOTH, not ` +
+           "either: `timings` is still the membership number, so a rotation that stopped writing it would " +
+           "stop returning gates to the sweep, which is the pass's whole purpose.");
+        ok("  ...so costOf now reports the rotation's own measurement as SERIAL, which it always was",
+           QS.costOf(after, "g").source === "serial" && QS.costOf(after, "g").ms === 2500 &&
+           QS.costOf(before, "g").source === "parallel",
+           `after the repair costOf says ${QS.costOf(after, "g").source}; on the same row written the old ` +
+           `way it says ${QS.costOf(before, "g").source} -- that was 210 of 237 filed readings`);
+        ok("  ...and the merge does not touch a gate this pass did not re-time",
+           mergeTimings({ timings: { a: 1, b: 2 }, serial: { b: 7 }, contended: { b: true } },
+                        [{ gate: "a", ms: 5, code: 0, finished: true }], "now").merged.serial.b === 7,
+           "a merge that rebuilt the maps instead of folding into them is the shape that erased `finished` " +
+           "at v4568 and the rotation ledger at v4461");
+    }
     ok("!! ...and the record's own arithmetic holds, so it cannot drift from itself",
        Math.abs(R.wallMs.workers1 / R.wallMs.workers8 - R.speedup) < 0.01 &&
        R.filedTotalMs.workers8 > R.filedTotalMs.workers1 && R.crossedInOneButNotTheOther === 0 &&
@@ -774,40 +964,106 @@ console.log("\n*** THE FIRST BULK PASS AT THE EXILED POOL (v4565): HALF THE 3-8 
     // used again. The group is a CEILING that only falls, so that is what is checked -- plus every row still
     // in it being in-band, which is the claim about --band that a shrinking count cannot weaken.
     const leftTheGroup = R.ran - pass.length;
+    // *** v4545 -- THE FRACTION WAS A GUARD THE SHIP RITUAL IS GUARANTEED TO BREAK, AND IT BROKE. *** This
+    // asserted `pass.length >= R.ran * 0.9`. The stamp group erodes BY DESIGN -- the ledger merges by gate,
+    // so any later re-timing moves a row out -- and step 3b of the ritual mandates an 80-slot rotation EVERY
+    // ROUND over this exact pool, covering it in about five. The v4545 rotation re-timed 62 gates, 53 from
+    // this group, and the row went red at 156 of 210 with nothing wrong. The comment below already stated
+    // the right rule in prose: a row leaves only by being RE-TIMED BY NAME under a LATER stamp, and a
+    // COLLAPSE would mean a wholesale rewrite. That is now what is checked, gate by gate against
+    // R.ranGates, and it does not decay however many rotations run. `back` keeps a floor because it counts
+    // READINGS rather than membership and a returnee that crosses back is the file working (see the row
+    // below), but it is a floor on the pass's own 105 and not on a group that is supposed to shrink.
+    const byGate = new Map((led.rotated || []).map((r) => [r.gate, r]));
+    const unaccounted = R.ranGates.filter((g) => { const r = byGate.get(g); return !r || r.at < R.stamp; });
+    const reTimedLater = R.ranGates.filter((g) => (byGate.get(g) || {}).at > R.stamp);
+    // *** v4647j -- `back` WAS THE ONE CLAUSE STILL COUNTING ROWS UNDER THE OLD STAMP, AND IT DECAYED. ***
+    // Above it, `pass.length` was already converted to a gate-by-gate check because "the row went red at 156
+    // of 210 with nothing wrong" -- a rotation re-times gates by name, they leave the old stamp, the count
+    // falls, and nothing is wrong. `back` was left reading `pass`, so it had the SAME defect: this round
+    // re-timed twelve gates by name (the honest answer to twelve disagreeing readings) and the count went
+    // 104 -> 92 against a floor of 95. MEASURED both ways on the live ledger: old rule 92, gate-by-gate 108.
+    //
+    // A returnee is a GATE, not a row under one stamp. The UPPER bound goes with the change: it read
+    // `back.length <= R.returnees`, and gate by gate a gate the pass found OVER budget that a later
+    // re-timing finds under legitimately joins -- 108 against the pass's 105 is three of those. The comment
+    // below already says a returnee crossing back is the file working; capping it made that an error. The
+    // floor stays, because that is what it was always for: a COLLAPSE means the ledger was rewritten.
+    const backGates = R.ranGates.filter((g) => { const r = byGate.get(g); return r && r.ms <= SC.BUDGET_MS; });
     ok("!! *** THE PASS'S OWN LEDGER STILL SHOWS THE RETURNEES, GATE BY GATE ***",
-       pass.length <= R.ran && pass.length >= R.ran * 0.9 &&
-       back.length <= R.returnees && back.length >= R.returnees * 0.9 &&
+       R.ranGates.length === R.ran - 1 && unaccounted.length === 0 &&
+       pass.length + reTimedLater.length === R.ranGates.length && pass.length <= R.ran &&
+       backGates.length >= R.returnees * 0.9 &&
        pass.every((r) => r.priorMs > R.band[0] && r.priorMs <= R.band[1]),
-       `${pass.length} of the ${R.ran} rows still carry the pass stamp ${R.stamp} and ${back.length} of them ` +
-       `read at or under the ${SC.BUDGET_MS} ms budget, against ${R.returnees} returnees recorded. ` +
-       `${leftTheGroup} row(s) have since been re-timed by name and carry a later stamp, which is the ledger's ` +
-       "merge-by-gate rule and not a loss -- the group can only shrink, never grow, and a COLLAPSE of it would " +
-       `mean the ledger had been rewritten wholesale. Every row still in it has a PRIOR reading inside the ` +
-       `${R.band[0]}-${R.band[1]} ms band the pass selected, which is --band doing what it says.`);
+       `every one of the ${R.ranGates.length} named gates is still in the ledger: ${pass.length} under the ` +
+       `pass stamp ${R.stamp} and ${reTimedLater.length} re-timed by name since, ${unaccounted.length} ` +
+       `unaccounted. ${backGates.length} of them read at or under the ${SC.BUDGET_MS} ms budget in the ` +
+       `ledger TODAY -- counted GATE BY GATE across every stamp, not row by row under the pass's -- against ` +
+       `${R.returnees} recorded at the pass and a floor of ${Math.ceil(R.returnees * 0.9)}; ${back.length} ` +
+       `under the pass stamp alone, which is the number that used to be asserted and which falls every time ` +
+       `a gate is legitimately re-timed by name. ${leftTheGroup} row(s) have left the group, which is the ` +
+       "ledger's merge-by-gate rule and not a loss -- the group can only shrink, never grow, and a COLLAPSE " +
+       "of it would mean the ledger had been rewritten wholesale, which is exactly what `unaccounted` " +
+       `catches now that the names are frozen rather than a fraction of a count. Every row still in the ` +
+       `group has a PRIOR reading inside the ${R.band[0]}-${R.band[1]} ms band the pass selected, which is ` +
+       "--band doing what it says. The list is 209 against a recorded `ran` of 210: one gate had already " +
+       "been merged away before the pass's own commit, which a count cannot notice and a list can.");
     // The point of a returnee is that it is back IN the sweep, so that is the thing checked -- in the file the
     // sweep actually reads, not in the ledger that recorded the measurement.
     const t = SC.readFile();
     const stillIn = back.filter((r) => (t.timings || {})[r.gate] <= SC.BUDGET_MS);
-    ok("!! ...and they are under budget in sweep-timings.json TOO, which is the file that decides membership",
-       stillIn.length >= R.returnees * 0.9,
-       `${stillIn.length} of ${back.length} returnees are still filed under budget. These need not be equal: ` +
-       "every sweep since re-times them under contention, and a returnee that crosses back is the file working, " +
-       "not the pass being wrong -- ROTATION_BOUNDARY_V4535 names five gates that do exactly that. A COLLAPSE " +
-       "here would mean the pass bought nothing.");
+    // *** v4547 -- THE FLOOR WAS THE DECAYING-FRACTION DEFECT AGAIN, AND THE ROOT CAUSE IS NOW MEASURED. ***
+    // It asserted `stillIn >= returnees * 0.9` and read 74 of 101. Nothing was wrong: the ship ritual runs a
+    // SERIAL rotation and an 8-WAY quick sweep every round and both write to the same `timings` field, and
+    // those two measurements differ by 2.4-2.5x on this box (meshLine 2963-3146 serial, 7259 parallel). So
+    // whether a straddling gate is "filed under budget" is a fact about which step ran last. The names are
+    // frozen now and the check is ACCOUNTING -- every gate the pass returned is still IN the ledger -- while
+    // the filed count is REPORTED, because it is not a number this row can hold anyone to.
+    const ledgerGates = new Set((led.rotated || []).map((r) => r.gate));
+    const lost = R.returneeGates.filter((g) => !ledgerGates.has(g));
+    ok("!! *** EVERY GATE THE PASS RETURNED IS STILL IN THE LEDGER, AND THE FILED COUNT IS REPORTED ***",
+       R.returneeGates.length === R.returnees && lost.length === 0 && ledgerGates.size >= R.returnees,
+       `all ${R.returneeGates.length} named returnees are accounted for in the ledger, ${lost.length} lost. ` +
+       `${stillIn.length} of ${back.length} are filed under budget in sweep-timings.json right now -- ` +
+       "REPORTED and not asserted, because the same gate reads 2.4 to 2.5 times slower under the 8-way " +
+       "sweep than under the serial rotation and both write that number to the same field. A gate crossing " +
+       "back is the file recording a different measurement, not the pass being wrong. *** WHAT WOULD MEAN " +
+       "THE PASS BOUGHT NOTHING IS A NAME VANISHING, *** and that is what `lost` catches.");
     const gates = enumerateGates(ENG), c = SC.census(gates, t);
-    const outside = c.over.length + c.killed.length;
+    // v4813: outside means NOT SELECTED by the sweep (see inSweep) -- c.over counts a gate on probation as out
+    const outside = QS.selectGates(gates, t.timings || {}, SC.BUDGET_MS, { crossings: t.crossings || {} }).skipped.length;
+    // *** v4776 -- "IT CAN ONLY SHRINK" WAS WRONG, AND THE BUCKET SAID SO AT 142. *** The ceiling below used to be
+    // `c.killed.length <= 140` over the WHOLE tree, on the reasoning that nothing puts a gate back into a bucket
+    // it was re-timed out of. Two things put gates in that the reasoning never counted. BIRTHS: 22 of the 142
+    // did not exist at e6455e52, the commit that froze the v4565 record -- twenty frame-generation gates from the
+    // exported-functions line (finished green alone at 21..158 s), kernelReach and redAction. GROWTH: redCensus
+    // and budgetExile existed then and were under the cap, and they read the whole tree, so they cost more every
+    // round the tree grows. The same row sat red on the other line at 155 and nothing saw it, because this gate
+    // is over the budget and no ship-time sweep runs it. The ceiling now holds only on the population it was drawn
+    // from -- the gates v4568's pass named -- and what it was protecting against is asserted for everything else:
+    // a gate may ENTER the bucket only on a reading that FINISHED (census's `graded` side), never on a starved or
+    // killed one. That is the v4568 witness's failure -- placementRender filed at the cap and running in 51 ms --
+    // and it is the only way into the bucket that says nothing true about the gate.
+    const drawnFrom = new Set(SC.KILLED_PASS_V4568.passGates);
+    const entrants = c.killed.filter((g) => !drawnFrom.has(g));
+    const entrantsUnmeasured = entrants.filter((g) => !c.graded.includes(g));
+    const fromPopulation = c.killed.length - entrants.length;
     ok("!! ...and the population outside the ship-time sweep is down by roughly what the pass moved",
-       // *** `killed` WAS PINNED TO 140 AND v4568 MOVED IT, which is the door working rather than a drift.
-       // While the bucket had no way out its size was a constant and pinning it was right; now 35 gates have
-       // beaten the cap that exiled them and left it. It can only SHRINK -- nothing puts a gate back into a
-       // bucket it was re-timed out of -- so that is what is checked, with the v4565 figure as the ceiling.
-       outside <= R.outsideTheSweep.before && c.killed.length <= R.remaining.killedUnreachable &&
+       // v4815 (Keith's call): the SHARE, not the count. 464 was counted over a tree of 1,617 gates; the tree holds 1,926
+       // and the record moved to a slower host (quickSweep's v4815 handover), which put 475 outside -- 24.7% against
+       // 28.7%. A count ceiling on a growing population goes red on growth alone. SABOTAGE: the comparison made
+       // `outside / gates.length <= 0.20` -> this row red by name; restored md5-identical.
+       outside / gates.length <= R.outsideTheSweep.beforePct / 100 && fromPopulation <= R.remaining.killedUnreachable &&
+       entrantsUnmeasured.length === 0 &&
        R.pool.overBefore - R.returnees - R.hitTheCap === R.pool.overAfter &&
        R.pool.killedBefore + R.hitTheCap === R.pool.killedAfter,
        `${outside} of ${gates.length} gates (${(100 * outside / gates.length).toFixed(1)}%) are outside it now, ` +
        `against ${R.outsideTheSweep.before} (${R.outsideTheSweep.beforePct}%) before the pass. The killed ` +
-       `bucket reads ${c.killed.length} against the ${R.remaining.killedUnreachable} v4565 recorded as ` +
-       "unreachable -- v4568 opened that door and 35 gates walked out of it. The record's own " +
+       `bucket reads ${c.killed.length}: ${fromPopulation} from the ${drawnFrom.size} v4568's pass named, against ` +
+       `the ${R.remaining.killedUnreachable} v4565 recorded as unreachable, and ${entrants.length} that entered ` +
+       `since, ${entrants.length - entrantsUnmeasured.length} of them on a FINISHED reading` +
+       (entrantsUnmeasured.length ? ` and ${entrantsUnmeasured.length} on NO VERDICT -- ${entrantsUnmeasured.join(", ")}` : "") +
+       ". v4568 opened that door and 35 gates walked out of it. The record's own " +
        `arithmetic closes: ${R.pool.overBefore} over - ${R.returnees} returned - ${R.hitTheCap} capped = ` +
        `${R.pool.overAfter}, and the ${R.hitTheCap} capped are what took killed from ${R.pool.killedBefore} to ` +
        `${R.pool.killedAfter}.`);
@@ -830,14 +1086,23 @@ console.log("\n*** THE FIRST BULK PASS AT THE EXILED POOL (v4565): HALF THE 3-8 
     // classify() files anything over CAP_MS as `killed`, and the tree reads that bucket as unjudged -- which
     // is right for a process that was cut off and wrong for one that ran to completion in 50 s. `finished`
     // is written by the runner from what the process DID, so the two are told apart by a recorded fact.
-    ok("!! *** `killed` SPLITS INTO GRADED AND NO-VERDICT, and the split is a recorded fact not a threshold ***",
+    // *** v4641 -- AND THIS ROW ASSERTED THE ONE-FIELD DEFINITION, SO IT DEFENDED THE DEFECT. *** It required
+    // graded to be exactly `finished === true`, which is the split that put 23 KILLED processes on the graded
+    // side: each of them carries code 124 or the "timeout/signal" string beside `finished: true`, a pair that
+    // cannot both be true, all of them written by a runner older than per-entry stamping. The row is now
+    // asserted against wasKilled -- the same disjunction v4637 established for this question -- and it still
+    // holds the partition, which is the part that was never wrong.
+    const killedNow = (g) => SC.wasKilled(g, { codes: (t.codes || {}), finished: (t.finished || {}) });
+    const liars = c.killed.filter((g) => (t.finished || {})[g] === true && killedNow(g));
+    ok("!! *** `killed` SPLITS INTO GRADED AND NO-VERDICT, and the split is a recorded FACT rather than one FIELD ***",
        (c.graded || []).length + (c.noVerdict || []).length === c.killed.length &&
-       (c.graded || []).every((g) => (t.finished || {})[g] === true) &&
-       (c.noVerdict || []).every((g) => (t.finished || {})[g] !== true),
+       (c.graded || []).every((g) => !killedNow(g)) &&
+       (c.noVerdict || []).every((g) => killedNow(g)),
        `${c.killed.length} over the cap: ${(c.graded || []).length} FINISHED and therefore have a verdict, ` +
        `${(c.noVerdict || []).length} were cut off and have none. Before v4568 the file could not tell those ` +
        "apart, so a gate that ran green in 50 s and a gate killed at 20 s were the same entry -- and so was " +
-       "a gate that ran RED.");
+       `a gate that ran RED. ${liars.length} entries claim finished:true BESIDE a kill code and are filed as ` +
+       "cut off on the strength of the code, which is the contradiction v4641 found by trusting the field alone.");
 
     // The reds that were hiding in it. Empty is a legitimate answer -- but only once something has run them.
     const hidden = SC.gradedReds(c, t);
@@ -852,6 +1117,53 @@ console.log("\n*** THE FIRST BULK PASS AT THE EXILED POOL (v4565): HALF THE 3-8 
 
 console.log("\n*** THE BUCKET NOTHING COULD RUN, RUN (v4568) ***");
 {
+{
+    // ---- EXILED_PASS_V4664: the whole pool, and the number nobody had ------------------------------------
+    const R = SC.EXILED_PASS_V4664;
+    say(`EXILED_PASS_V4664: ${R.pool} gates outside the sweep, ${R.green} green, ${R.redCount} red ` +
+        `(${R.failRows} FAIL rows), ${R.stillKilledCount} still killed at ${R.capMs} ms`);
+    // *** THE ARITHMETIC FIRST, because a census whose own parts do not add up is not evidence of anything.
+    ok("!! *** the pool's three outcomes add up to the pool, and each list is the length its count claims ***",
+       R.green + R.redCount + R.stillKilledCount === R.pool &&
+       R.red.length === R.redCount && R.stillKilled.length === R.stillKilledCount &&
+       R.red.reduce((a, x) => a + x.failRows, 0) === R.failRows,
+       `${R.green} + ${R.redCount} + ${R.stillKilledCount} = ${R.green + R.redCount + R.stillKilledCount} ` +
+       `against a pool of ${R.pool}; ${R.red.length} red rows, ${R.stillKilled.length} killed names, ` +
+       `${R.red.reduce((a, x) => a + x.failRows, 0)} FAIL rows summed from the rows themselves`);
+    // *** AND EVERY NAME IS A FILE, because a rename strands a record silently and a count cannot see it.
+    const gone = [...R.red.map((x) => x.gate), ...R.stillKilled, ...R.repairedAtV4664]
+        .filter((g2) => !fs.existsSync(path.join(ENG, g2)));
+    ok("  ...and every gate it names still exists on disk",
+       gone.length === 0,
+       gone.length ? "named by the record and absent from the tree: " + gone.join(", ")
+                   : `${R.red.length + R.stillKilled.length} names checked against the tree`);
+    // *** THE POPULATION IS RE-DERIVED, NOT QUOTED. *** The record's whole claim is about gates OUTSIDE the
+    // sweep; if one of them is inside it today then the ship runs it and this record no longer describes it.
+    // A gate coming back under budget is GOOD NEWS and is reported rather than failed -- the returnees in the
+    // v4565 record above are exactly that -- so what is asserted is that the record is not describing a pool
+    // that has entirely evaporated underneath it.
+    const cen = SC.census(enumerateGates(ENG), SC.readFile());
+    const outside = new Set([...cen.over, ...cen.killed]);
+    const returned = R.red.map((x) => x.gate).filter((g2) => !outside.has(g2));
+    say(`of the ${R.redCount} reds, ${R.redCount - returned.length} are still outside the sweep today` +
+        (returned.length ? `; RETURNED and now swept: ${returned.join(", ")}` : ""));
+    ok("!! *** the reds it names are still gates the ship never runs -- or they have returned, and that is said ***",
+       returned.length < R.redCount,
+       returned.length
+         ? `${returned.length} of ${R.redCount} came back under budget and are swept now, which is the ` +
+           "outcome this record exists to make visible. A row that failed on it would punish the recovery"
+         : `all ${R.redCount} are over budget or killed today, so not one of them is graded at ship time`);
+    // *** AND THE REPAIRS ARE A TERM. *** v4571 found the shape on the record below: a floor demanding the
+    // reds STAY red goes off when somebody fixes them. What must hold is that a gate recorded as red is
+    // ACCOUNTED FOR -- still red, or named among the round's repairs and green when run.
+    const claimed = R.repairedAtV4664;
+    const notInRed = claimed.filter((g2) => !R.red.some((x) => x.gate === g2));
+    ok("!! CONTROL: every gate claimed as repaired was actually IN the red list, so the claim is about this pass",
+       notInRed.length === 0 && claimed.length > 0,
+       notInRed.length ? "claimed as repaired but never recorded red here: " + notInRed.join(", ")
+                       : `${claimed.length} repaired, both of them rows in this record's own red list`);
+}
+
     const R = SC.KILLED_PASS_V4568;
     const t = SC.readFile();
     // RE-DERIVED FROM THE LIVE FILES. The ledger is the pass's receipt and the timings are what the tree
@@ -866,6 +1178,7 @@ console.log("\n*** THE BUCKET NOTHING COULD RUN, RUN (v4568) ***");
     // wrote it down -- "the census's arithmetic punished the pruning the census demands" -- and the fix there
     // is the fix here: a repair is a TERM, not an exception. What must hold is that every red the pass found
     // is still ACCOUNTED FOR, either as a red in the ledger today or as a recorded repair.
+    const ledger2 = new Set((led.rotated || []).map((r) => r.gate));
     const fixedGates = new Set([...RC.FIXED_AT_V4279, ...RC.FIXED_SINCE_V4279, ...RC.FIXED_SINCE_V4408]
         .map((e) => (typeof e === "string" ? e : e.gate)));
     const stillRed = new Set(fin.filter((r) => r.code !== 0).map((r) => r.gate));
@@ -876,10 +1189,15 @@ console.log("\n*** THE BUCKET NOTHING COULD RUN, RUN (v4568) ***");
        // group. Three had within the hour -- domScope, redCensus and placementRender, each re-timed for a
        // reason this round names -- and a tolerance of two reddened on the third. What must hold is that
        // the group has not COLLAPSED, which would mean the ledger was rewritten wholesale.
-       pass.length >= R.ran * 0.9 && fin.length >= R.finished * 0.9 &&
-       unaccountedReds.length === 0 &&
-       fin.filter((r) => r.ms < SC.CAP_MS).length >= R.underOldCap * 0.9,
-       `${pass.length} rows carry the pass stamp and ${fin.length} of them FINISHED, against ${R.ran} run and ` +
+       // v4547 -- the proportional floors are replaced by accounting over R.passGates, for the reason the
+       // row above now records: these groups erode by design and the ritual erodes them twice a round.
+       R.passGates.length === R.ran - 3 &&
+       R.passGates.filter((g) => !ledger2.has(g)).length === 0 &&
+       unaccountedReds.length === 0,
+       `all ${R.passGates.length} named rows of the ${R.ran} run are still in the ledger -- three were ` +
+       "already merged away before the first commit that holds this stamp, which a count cannot notice and " +
+       "a list can. " +
+       `${pass.length} rows still carry the pass stamp and ${fin.length} of them FINISHED, against ${R.ran} run and ` +
        `${R.finished} recorded. ${fin.filter((r) => r.ms < SC.CAP_MS).length} came in under the ${SC.CAP_MS} ms ` +
        `cap that exiled them. Of the ${R.red} reds the pass found, ${stillRed.size ? [...stillRed].length : 0} ` +
        `are still red in the ledger and ${R.reds.filter((g) => fixedGates.has(g)).length} carry a recorded ` +
@@ -940,7 +1258,28 @@ console.log("\n*** THE CAP KILLED THE GATE AND LEFT ITS CHILDREN RUNNING (v4568)
     // Driven on a real capped run rather than on the source text, because "the code says detached" is the
     // claim, and whether the orphan survives is the fact.
     const fixture = path.join(ENG, "tools", "ship", "__sweepcov_leaker_fixture.mjs");
-    const MARK = "swek-orphan-probe-" + process.pid;
+    // *** v4648 -- THE MARKER IS TERMINATED, BECAUSE AN UNANCHORED pid IS A PREFIX OF ANOTHER pid. ***
+    // This was "swek-orphan-probe-" + process.pid, matched with includes(). A run whose pid is 7579 then
+    // matches the marker of a run whose pid is 75790 -- and counts that stranger's child as ITS OWN
+    // survivor. MEASURED: six copies of this gate run concurrently, 2 of 6 went red with "1 survivor(s)
+    // before the capped run, 0 after" -- a survivor counted BEFORE this run had spawned anything, which is
+    // the tell. It is why sweepCoverage came back NEW RED inside the v4648 verify sweep and GREEN every
+    // time it was run alone afterwards, and it blocked a ship.
+    //
+    // *** AND IT IS THE SPECIES winPathGuard's OWN ITEM 3 ALREADY NAMES: *** "an UNANCHORED endsWith is
+    // wrong even once the split is fixed". Same defect, different file, and I made it twice myself this
+    // session with `pgrep -f`, which matched the bash wrapper running the pgrep.
+    //
+    // The trailing "~" makes the token self-terminating: no pid can be a prefix of another pid PLUS a
+    // character that cannot occur in a pid.
+    // *** AND A pid IS NOT AN IDENTITY EITHER, WHICH THE SECOND MEASUREMENT SHOWED. ***
+    // Terminating the token took 8 concurrent copies from 2-of-6 red to 1-of-8 -- better and not fixed,
+    // because pids are REUSED. Run A spawns a child carrying A's pid; A exits leaving the child orphaned;
+    // run B is handed A's old pid and now shares A's marker exactly, so B counts A's orphan as its own
+    // survivor BEFORE it has spawned anything. Identity has to be unique across TIME, not just across the
+    // processes alive at one instant, so the token carries a clock and a nonce as well.
+    const MARK = "swek-orphan-probe-" + process.pid + "-" + Date.now().toString(36) +
+                 "-" + Math.random().toString(36).slice(2, 10) + "~";
     // *** THE FIXTURE IS BUILT WITH JSON.stringify AT EVERY LEVEL, AND ITS FIRST DRAFT WAS NOT. ***
     // It interpolated a double-quoted mark INSIDE a double-quoted `-e` script inside a template literal, so
     // the file it wrote was a SyntaxError, the fixture never spawned anything, and this row read "0 before,
@@ -948,7 +1287,9 @@ console.log("\n*** THE CAP KILLED THE GATE AND LEFT ITS CHILDREN RUNNING (v4568)
     // twice, which is the only reason it was found: a row that cannot fail is exactly what this gate's
     // sibling assertionShape-selfcheck exists to catch, arriving in a row about leaks.
     const childScript = `/*${MARK}*/setTimeout(()=>{},600000)`;
-    fs.writeFileSync(fixture, [
+    // v4649 -- written through the registry, so a throw on the way to the unlink below drops it anyway and
+    // a kill leaves it for the next run's reclaim. This fixture was found stranded in Keith's tree.
+    writeFixture(path.relative(ENG, fixture), [
         'import { spawn } from "node:child_process";',
         `spawn(process.execPath, ["-e", ${JSON.stringify(childScript)}], { stdio: "ignore" });`,
         "setTimeout(() => {}, 600000);",
@@ -998,7 +1339,7 @@ console.log("\n*** THE CAP KILLED THE GATE AND LEFT ITS CHILDREN RUNNING (v4568)
     const after = survivors();
     // Whatever the outcome, do not leave the probe's own children behind.
     reap();
-    try { fs.unlinkSync(fixture); } catch {}
+    dropFixture(path.relative(ENG, fixture));
     ok("!! *** A GATE KILLED AT THE CAP TAKES ITS CHILDREN WITH IT -- the group is signalled, not the process ***",
        POSIX ? after === before : (before === null && after === null),
        (POSIX ? `${before} survivor(s) before the capped run, ${after} after.`
@@ -1009,6 +1350,278 @@ console.log("\n*** THE CAP KILLED THE GATE AND LEFT ITS CHILDREN RUNNING (v4568)
        "makes the gate a process-GROUP leader and a negative pid signals the whole group. The fallback to " +
        "the old form is deliberate -- a group kill can fail if the child never formed one, and a cap that " +
        "throws instead of killing is worse than one that leaks.");
+}
+
+// =============================================================================================================
+console.log("\n*** v4647j -- THE FIVE RED ROWS ABOVE WERE RIGHT FOR FIVE WEEKS, AND THIS IS WHAT THEY MEANT ***");
+// v4647j SABOTAGES, RESULTS BY NAME (baseline 5 live reds, so a sabotage shows as 6 or 7):
+//   WA. the stamp written is today's, not the surviving reading's   -> +2
+//   WB. restored with no second witness, from the ledger alone      -> +2
+//   WC. the corroboration band is removed                           -> +2
+//   WD. a DATED entry is restored over                              -> +2
+//   WE. a gate both readings call SLOW is restored                  -> +2
+//   WF. a gate the rotation ran RED is restored                     -> +2
+//   WG. a CAP reading is restored over as a stale runtime           -> +2
+//   WH. measuredUnder ignores the exit code again                   -> +1
+//
+// *** WG AND WH FIRST MEASURED AT ZERO. *** Both change real behaviour and no row moved: the fixture had no
+// capped entry, and rotationHeld's own filter was never driven on a red row. Two rows were added for them
+// and both sabotages now land. A sabotage that costs nothing is a row that is not there.
+// =============================================================================================================
+// Measured on the live file before anything was written: 98 gates sit OVER the 3,000 ms budget in `timings`
+// and UNDER it in `serial`; 98 of 98 carry at[g] === "unknown -- before v4408", so no run ever dated the
+// membership number; 98 of 98 are in sweep-rotation.json, all rotated 2026-09-09; and the ledger reading
+// agrees with the LATER serial-slice reading at a median of 0.91x, 83 of 98 within 20%.
+//
+// So the rotation measured them alone, wrote `timings` and `at`, and that write was lost when the file was
+// replaced -- which is exactly what the returnee rows and the "fingerprint of a REPLACED file" row have been
+// saying. SECOND TIME THIS SESSION A RECORD-CHECKING GATE WAS RIGHT AND WAS FILED AS BROKEN.
+//
+// restoreLost() is driven HERE ON FIXTURES, not on the live file: the property is about the rule, and a rule
+// tested against whatever the tree happens to hold today is tested against one sample of it.
+{
+    const S = (over) => ({
+        budgetMs: 3000,
+        timings: { keep: 1000, lost: over, dated: over, nowit: over, disagree: over, slow: over, red: over, capd: over },
+        kinds: { capd: "capped" },
+        at: { keep: UNDATED, lost: UNDATED, dated: "2026-09-18T00:00:00.000Z", nowit: UNDATED, disagree: UNDATED,
+              slow: UNDATED, red: UNDATED, capd: UNDATED },
+        codes: { keep: 0, lost: 0, dated: 0, nowit: 0, disagree: 0, slow: 0, red: 1, capd: 124 },
+        serial:   { keep: 900, lost: 2000, dated: 2000, disagree: 900, slow: 9000, red: 2000, capd: 2000 },
+        serialAt: { keep: "2026-09-16T00:00:00.000Z", lost: "2026-09-16T00:00:00.000Z", dated: "2026-09-16T00:00:00.000Z",
+                    disagree: "2026-09-16T00:00:00.000Z", slow: "2026-09-16T00:00:00.000Z", red: "2026-09-16T00:00:00.000Z",
+                    capd: "2026-09-16T00:00:00.000Z" },
+    });
+    const L = { rotated: [{ gate: "keep", ms: 1000, code: 0 }, { gate: "lost", ms: 2050, code: 0 },
+                          { gate: "dated", ms: 2050, code: 0 }, { gate: "nowit", ms: 2000, code: 0 },
+                          { gate: "disagree", ms: 2000, code: 0 }, { gate: "slow", ms: 9100, code: 0 },
+                          { gate: "red", ms: 2000, code: 1 },
+                          { gate: "capd", ms: 2050, code: 0 }] };
+    const r = restoreLost(S(5000), L);
+    const M = r.merged;
+    const names = (xs) => xs.map((x) => x.gate || x).sort().join(",");
+
+    ok("!! *** a membership number nothing ever dated is restored from a reading that exists TWICE ***",
+       names(r.restored) === "lost" && M.timings.lost === 2000 && M.at.lost === "2026-09-16T00:00:00.000Z",
+       `restored ${names(r.restored)} -> ${M.timings.lost} ms. The ledger alone is the file that was already ` +
+       `replaced; the corroborating serial reading is what earns the write`);
+    ok("!! ...and the stamp written is the SURVIVING reading's date, not today's and not the ledger's",
+       M.at.lost === S(5000).serialAt.lost,
+       "a number written by something other than the thing that measured it, carrying a stamp it did not " +
+       "earn, is the 2026-09-03 fault this whole file is built around");
+    ok("!! a DATED entry is an observation and is left alone, however much the ledger disagrees",
+       M.timings.dated === 5000 && !names(r.restored).includes("dated"),
+       "something looked at it after the loss. Restoring over that would be the replacement fault again, " +
+       "pointing the other way");
+    ok("!! a row with NO second witness is not restored -- it is listed as unwitnessed",
+       r.unwitnessed.includes("nowit") && M.timings.nowit === 5000,
+       `one reading is an assertion; two independent ones days apart are evidence`);
+    ok("!! two readings that DISAGREE beyond the band are refused and named, not averaged",
+       r.refused.some((x) => x.gate === "disagree" && !x.why) && M.timings.disagree === 5000,
+       `900 against 2000 is ${(900 / 2000).toFixed(2)}x, outside ${CORROBORATION_BAND}. One of the two is ` +
+       `wrong and this cannot say which -- 28 live rows land here and are told to re-time with --gate`);
+    ok("!! a gate both readings agree is SLOW stays out, which is the rule working",
+       r.refused.some((x) => x.gate === "slow" && x.why === "over budget") && M.timings.slow === 5000,
+       "9,000 ms against a 3,000 ms budget: correctly outside the sweep, and restoring it would be the " +
+       "opposite of a repair");
+    ok("!! a gate the rotation found RED is refused, whatever its clock said",
+       r.refused.some((x) => x.gate === "red" && x.why === "not green") && M.timings.red === 5000,
+       "membership is for gates that PASS in the time recorded; a red gate under the budget is still red, " +
+       "and restoring its number would put it in the sweep on the strength of how fast it failed");
+    ok("!! *** the maps are written by mergeTimings, so a restored row carries ALL of them ***",
+       M.codes.lost === 0 && M.kinds.lost === "alone" && M.contended.lost === false &&
+       M.serial.lost === 2000 && M.finished.lost === true && !(M.kindsInferred || []).includes("lost"),
+       "the first draft wrote two maps by hand and timingKind went red; then four, and skipReading went " +
+       "red on a 45 ms reading carrying exit 124. mergeTimings is the one list of fields this file has");
+    ok("!! *** a CAP reading is not a stale runtime, so there is nothing to restore -- it needs a RUN ***",
+       r.refused.some((x) => x.gate === "capd" && /not a runtime/.test(String(x.why))) && M.timings.capd === 5000,
+       "budgetIsOwn: a cap reading is the killer's clock and is NEVER compared against a measurement. The " +
+       "first draft restored over one and tools/ship/placementRender-selfcheck.mjs came out holding 45 ms " +
+       "with kind ALONE -- a gate that PRINTS `skipped (jsdom absent)` in 53 ms. skipReading-selfcheck went " +
+       "red naming it, and was right: only the sweep reads a gate's OUTPUT, so only the sweep can say SKIPPED");
+
+    // *** rotationHeld's OWN filter, driven here, because sabotage WH changed it and NOTHING went red. ***
+    const heldFile = { budgetMs: 3000, timings: { g: 5000 }, at: { g: UNDATED } };
+    const heldRed = SC.rotationHeld(heldFile, { at: "2026-09-09T00:00:00.000Z", rotated: [{ gate: "g", ms: 2000, code: 1, at: "2026-09-09T00:00:00.000Z" }] });
+    const heldGreen = SC.rotationHeld(heldFile, { at: "2026-09-09T00:00:00.000Z", rotated: [{ gate: "g", ms: 2000, code: 0, at: "2026-09-09T00:00:00.000Z" }] });
+    ok("!! *** a gate the rotation ran RED is not 'measured under budget' -- that number is how long it took to FAIL ***",
+       heldRed.measuredUnder === 0 && heldRed.lost.length === 0 && heldGreen.measuredUnder === 1 && heldGreen.lost.length === 1,
+       `red ${heldRed.measuredUnder} measured / ${heldRed.lost.length} lost, green ${heldGreen.measuredUnder} / ` +
+       `${heldGreen.lost.length}. Four live rows survived the restore as LOST on ledger code 1 -- a count ` +
+       `standing in for a property, which is this session's most-met species`);
+
+    ok("CONTROL: a gate already inside the sweep is untouched and unreported",
+       M.timings.keep === 1000 && !names(r.restored).includes("keep") &&
+       !names(r.refused).includes("keep") && !r.unwitnessed.includes("keep"),
+       "without this every row above passes on a function that rewrites the whole file");
+    ok("!! CONTROL: nothing is restored when no entry is over budget, so the rule is not 'always write'",
+       restoreLost(S(1200), L).restored.length === 0,
+       "the same fixture with the disputed entries UNDER budget yields an empty restore");
+
+    // PURE: the input must not be mutated, because the caller writes `{ ...file, timings, at }` and a
+    // half-mutated `file` would carry the change twice under two different stamps.
+    const before = S(5000);
+    const snapshot = JSON.stringify(before);
+    restoreLost(before, L);
+    ok("!! restoreLost does not mutate the file it is handed",
+       JSON.stringify(before) === snapshot,
+       "the caller spreads the original and overrides two maps; a mutated input would write the change twice");
+}
+
+// =============================================================================================================
+// v4647m SABOTAGES, RESULTS BY NAME:
+//   ZA. aloneMs reads timings[] again, the field with two quantities  -> 1 RED
+//   ZB. the loaded side is no longer required to be a number          -> 1 RED
+//   ZC. a gate that is slow ALONE counts as an oscillator             -> 1 RED
+//   ZD. a live contended sample under budget no longer retires it     -> 1 RED
+//   ZE. the oscillator roll is graded by the UNION again              -> 0 RED  (see below)
+//   ZF. a merely-slow gate is admitted to the oscillator roll         -> 2 RED
+//
+// *** ZA MEASURED ZERO ON ITS FIRST FIXTURE, AND THE FIXTURE WAS THE REASON. *** It used traderGraph's
+// pair, 2,312 alone against 3,003 loaded -- and BOTH clear the "cheap alone" bar, so reading the wrong
+// field changed no answer. meshLine's pair is 3,010 against 7,259 and does discriminate. A fixture whose
+// two quantities are close enough to agree cannot test that they are told apart.
+//
+// *** ZE IS ZERO AND IS LEFT THAT WAY, STATED RATHER THAN PAPERED OVER. *** Today all three entries on the
+// oscillator roll satisfy BOTH predicates -- meshLine is 3,010 alone, which is over the budget outright --
+// so the union and the specific predicate give the same answer and the sabotage is invisible. What
+// protects the roll is ZF's row: the moment an entry that is merely slow everywhere is added, the
+// disjointness row fails. Verified by doing it, not argued: inserting crossBackend (25,772 ms, no cheap
+// side) into the oscillator roll turns that row red.
+
+console.log("\n*** v4647m -- THE VERDICT MUST NOT DEPEND ON WHICH RUN HAPPENED LAST ***");
+// =============================================================================================================
+// The roll's own note says these gates "oscillate every round forever and the rows over them go red on the
+// ordering rather than on anything being wrong". That is the property, so it is stated as one: the same
+// gate, the same record, two files differing ONLY in whether the most recent write was serial or parallel,
+// must get the same answer. The old `timings[g] > 0.8 * budget` clause could not, because `timings[g]` is
+// `serialMs ?? parallelMs` -- one field holding two quantities.
+{
+    // traderGraph's REAL pair, because it is the gate that actually flipped: 2,312 filed by a serial run,
+    // 3,003 filed by the next 8-way sweep. Its own entry calls that "THREE MILLISECONDS OVER".
+    const OSC = { gate: "osc", loadedMs: 3003, hereMs: 3008, why: "x".repeat(50) };
+    // The SAME gate, written twice: once by a serial run, once by a parallel one.
+    const afterSerial   = { timings: { osc: 2312 }, serial: { osc: 2312 }, contended: { osc: false } };
+    const afterParallel = { timings: { osc: 3003 }, serial: { osc: 2312 }, contended: { osc: true } };
+    ok("!! *** the same oscillator is judged the same way whichever run wrote last ***",
+       oscillates(OSC, afterSerial) === true && oscillates(OSC, afterParallel) === true,
+       "serial -> " + oscillates(OSC, afterSerial) + ", parallel -> " + oscillates(OSC, afterParallel) +
+       ". Under the old clause the parallel write passed and the serial write FAILED, on 2,312 against a " +
+       "2,400 bar -- and 2,312 was traderGraph's serial number, filed because the last thing to run it ran " +
+       "it alone. Nothing about the gate had changed.");
+    // And the old rule really did flip. Stated as the counter-example rather than asserted from memory.
+    const oldRule = (F) => ((F.timings || {})[OSC.gate] || 0) > SC.BUDGET_MS * 0.8;
+    ok("!! ...and the rule it replaced DID flip on the same pair, which is why this row exists",
+       oldRule(afterSerial) === false && oldRule(afterParallel) === true,
+       "`timings[] > 0.8 * budget`: false after a serial write, true after a parallel one, same gate, same " +
+       "minute. A threshold cannot fix that -- the field holds two different quantities.");
+
+    // *** meshLine's REAL pair, because traderGraph's does not discriminate. *** Its serial and 8-way
+    // numbers are 3,010 and 7,259, so reading the wrong field puts the gate 2.4x over the "cheap alone"
+    // bar instead of just under it. Sabotage ZA -- aloneMs reading `timings[]` again -- went ZERO RED on
+    // the traderGraph fixture, where the two numbers are 2,312 and 3,003 and BOTH clear the bar. A fixture
+    // whose two quantities are close enough to agree cannot test that they are told apart.
+    const MESH = { gate: "mesh", loadedMs: 7259, hereMs: 4379, why: "x".repeat(50) };
+    const meshSerial   = { timings: { mesh: 3010 }, serial: { mesh: 3010 }, contended: { mesh: false } };
+    const meshParallel = { timings: { mesh: 7259 }, serial: { mesh: 3010 }, contended: { mesh: true } };
+    ok("!! *** the ALONE cost is read from `serial`, so a parallel write cannot clobber it ***",
+       oscillates(MESH, meshSerial) === true && oscillates(MESH, meshParallel) === true &&
+       aloneMs("mesh", meshParallel) === 3010,
+       `aloneMs after a parallel write is ${aloneMs("mesh", meshParallel)}, not ${meshParallel.timings.mesh}. ` +
+       "`serial` is only ever written by a serial run; `timings` is whichever ran last");
+
+    // The two rolls hold opposite claims, so no entry belongs on both. This is what keeps a merely-slow gate
+    // off the oscillator roll, whatever any single row happens to call.
+    ok("!! *** every entry on the OSCILLATOR roll is an oscillator, and no entry on the other roll is ***",
+       SC.RETURNED_AT_V4529.stillOver.every((x) => oscillates(x)) &&
+       SC.RETURNED_AT_V4476.stillOver.every((x) => !oscillates(x) && stillGenuinelyOver(x)),
+       `${SC.RETURNED_AT_V4529.stillOver.length} oscillators, ${SC.RETURNED_AT_V4476.stillOver.length} ` +
+       "genuinely over. A gate cheap alone and slow loaded is a different claim from a gate slow everywhere, " +
+       "and one predicate for both is what forced the 0.8 fudge factor this round removed.");
+    // v4813: the roll an entry moves to when its ALONE cost crosses too. Graded by the union, justifiedOver, because
+    // its entry straddles (2,882 / 3,056 / 3,589) and the roll must not flip with the sitting. SABOTAGED v4813:
+    // wgslSpec's live serial set to 2,000 with its loaded side removed from the entry -> this row red by name.
+    // v4818: an entry RETIRES by the rule written above -- a live alone reading under the bar AND back in the sweep --
+    // and carries `returned` with the readings that retired it. wgslSpec did, at v4818 (alone 1,625, loaded 2,981), and
+    // the row went red at the step-4b check because it still demanded justifiedOver of every entry: the retirement
+    // path the comment promised had no branch here. A returned entry is now held to the opposite property, live, and a
+    // still-over one to the old one; the fixtures below drive both, so neither branch passes on an empty population.
+    // SABOTAGED v4818: rollEntryHolds made to refuse every entry -> 2 red, this row and the fixture row, by name; the
+    // returned branch made to accept unconditionally -> the fixture row red (returned + dear). Both restored.
+    const rollEntryHolds = (x, F = FILE) => x.returned
+        ? (aloneMs(x.gate, F) ?? Infinity) < SC.BUDGET_MS && inSweep(x.gate, F) && x.returned.aloneMs < SC.BUDGET_MS
+        : overInSomeReading(x) && typeof x.why === "string" && x.why.length > 40 && (stillGenuinelyOver(x, F) || oscillates(x, F));
+    ok("!! *** the v4813 still-over roll holds only gates that left the oscillator roll, each justified live -- or returned, live ***",
+       SC.STILL_OVER_AT_V4813.stillOver.length > 0 &&
+       SC.STILL_OVER_AT_V4813.stillOver.every((x) => rollEntryHolds(x) && !SC.RETURNED_AT_V4529.stillOver.some((y) => y.gate === x.gate)),
+       SC.STILL_OVER_AT_V4813.stillOver.map((x) => `${x.gate.split("/").pop()} ${x.returned ? "RETURNED " + x.returned.at + ", " : ""}` +
+           `alone ${aloneMs(x.gate)} ms, ${inSweep(x.gate) ? "in" : "out of"} the sweep`).join("; "));
+    {
+        const E = { gate: "fx", loadedMs: 7000, serialMs: [2900, 3100, 3500], why: "x".repeat(50) };
+        const cheap = { timings: { fx: 1600 }, serial: { fx: 1600 }, contended: { fx: false } };
+        const dear  = { timings: { fx: 9000 }, serial: { fx: 3600 }, contended: { fx: false } };
+        const R = { ...E, returned: { at: "vX", aloneMs: 1600 } };
+        ok("  ...and a RETURNED entry must be cheap alone and back in the sweep, a still-over one must be over or oscillating",
+           rollEntryHolds(R, cheap) === true && rollEntryHolds(R, dear) === false &&
+           rollEntryHolds(E, dear) === true && rollEntryHolds({ ...E, loadedMs: 2000 }, cheap) === false,
+           "fixture: returned+cheap holds, returned+dear does not; still-over+dear holds, still-over+cheap-everywhere does not");
+    }
+
+    // v4815: the same roll for the host change. SABOTAGE: headlessGpu's entry given readings none of which is over
+    // (serialMs [2400, 2500, 2600], hereMs 2500, recordedWas 2900) -> 2 red by name, this row and the 12-of-22 row,
+    // which consults the roll; restored md5-identical.
+    // v4829: the v4813 row's rule, for this roll too -- an entry is justified over live, OR carries `returned` and is cheap alone, in the sweep, and retired on readings under the bar.
+    // sweepBudget retired at v4829 (2,328 / 2,503 / 2,462 alone) and this row went red at step 4b because it still demanded justifiedOver of every entry.
+    // SABOTAGE v4829: sweepBudget's returned.aloneMs set to 3,500 -> this row red by name; headlessGpu's entry given readings none of which is over -> this row red; both restored.
+    ok("!! *** the v4815 still-over roll names only returnees genuinely over on the new host, each justified live -- or returned, live ***",
+       SC.STILL_OVER_AT_V4815.stillOver.length > 0 && SC.STILL_OVER_AT_V4815.stillOver.every((x) => rollEntryHolds(x)) && SC.STILL_OVER_AT_V4815.stillOver.some((x) => x.returned) && SC.STILL_OVER_AT_V4815.stillOver.some((x) => !x.returned),
+       SC.STILL_OVER_AT_V4815.stillOver.map((x) => `${x.gate.split("/").pop()} ${x.returned ? "RETURNED " + x.returned.at + ", " : ""}alone ${aloneMs(x.gate)} ms, ` +
+           `${inSweep(x.gate) ? "in" : "out of"} the sweep`).join("; "));
+
+    // v4818: and back. SABOTAGE: orreryEjecta's entry given readings none of which is over (serialMs [2700, 2800,
+    // 2900], hereMs 2800, recordedWas 2900) -> 2 red by name, this row and the 12-of-22 row; restored.
+    ok("!! *** the v4818 still-over roll names only returnees genuinely over on the host the record came back to ***",
+       SC.STILL_OVER_AT_V4818.stillOver.length > 0 && SC.STILL_OVER_AT_V4818.stillOver.every((x) => justifiedOver(x)),
+       SC.STILL_OVER_AT_V4818.stillOver.map((x) => `${x.gate.split("/").pop()} alone ${aloneMs(x.gate)} ms, ` +
+           `${inSweep(x.gate) ? "in" : "out of"} the sweep`).join("; "));
+
+    ok("!! a live CONTENDED sample that is UNDER budget retires the entry: it is fast everywhere now",
+       oscillates(OSC, { timings: { osc: 2500 }, serial: { osc: 2400 }, contended: { osc: true } }) === false,
+       "the retirement path the old clause existed for, kept and sharpened -- a fact about the gate rather " +
+       "than about which run was most recent");
+    ok("!! ...and a gate that is not cheap ALONE is not an oscillator, whatever the record says",
+       oscillates(OSC, { timings: { osc: 9000 }, serial: { osc: 9000 }, contended: { osc: false } }) === false,
+       "9,000 ms alone against a 3,000 ms budget: genuinely slow, and it belongs on the other roll");
+    ok("!! ...and the loaded side must be a NUMBER in the record, not a sentence",
+       oscillates({ ...OSC, loadedMs: undefined }, afterSerial) === false &&
+       oscillates({ ...OSC, loadedMs: 2000 }, afterSerial) === false,
+       "it used to live in the prose -- \"8-way it is 7,259\" -- where nothing could read it. A missing " +
+       "number refuses, and so does one that does not clear the budget");
+
+    // The OTHER roll, whose entries make the opposite claim. One predicate for both is what forced the fudge.
+    const OVER = { gate: "slow", hereMs: 25772, why: "x".repeat(50) };
+    ok("!! *** and a genuinely-over entry is certified by the OTHER predicate, with no loadedMs at all ***",
+       stillGenuinelyOver(OVER, { timings: { slow: 25772 } }) === true &&
+       oscillates(OVER, { timings: { slow: 25772 } }) === false &&
+       stillGenuinelyOver(OVER, { timings: { slow: 1000 } }) === false,
+       "crossBackend-selfcheck.mjs sits at 25,772 ms -- over by 8x in every reading anybody has taken, and " +
+       "it carries no loadedMs because it has no cheap side. Requiring one of it was this round's own first " +
+       "draft, and it reddened two rows that had nothing to do with the oscillation.");
+}
+
+// ---- v4726: THE LEDGER STAMPS THIS MODULE OWNS, NAMED BY THE GATE THAT SHARES ITS NAME ------------------------
+// v4725 put ledgerStamps and selectionKind here and graded them only in tools/ship/timingKind-selfcheck.mjs, so
+// definitionGates' tree-wide ratchet -- which asks THIS file to name them -- sat at 364 against a frozen 362 from
+// that commit on, unseen because it runs outside the quick sweep. timingKind keeps the fixtures that drive the
+// arrival rule; what belongs here is the ledger's own invariant, on the live file.
+{
+    const led = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-rotation.json"), "utf8"));
+    const at = Date.parse(led.at || ""), pool = Date.parse(led.poolAt || led.at || "");
+    const next = SC.ledgerStamps(led, "2099-01-01T00:00:00.000Z", SC.selectionKind({ gate: "any" }));
+    ok("v4726: the live rotation ledger's poolAt is not later than its at, and a named write keeps it",
+       Number.isFinite(at) && Number.isFinite(pool) && pool <= at && next.poolAt === (led.poolAt || led.at) &&
+       SC.ledgerStamps(led, "2099-01-01T00:00:00.000Z", SC.selectionKind({})).poolAt === "2099-01-01T00:00:00.000Z",
+       `at ${led.at}, poolAt ${led.poolAt || "(absent: reads at)"} -- only an unfiltered pool pass may move poolAt`);
 }
 
 REPORT.write();

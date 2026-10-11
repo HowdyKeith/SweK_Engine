@@ -20,6 +20,9 @@ import { fileURLToPath } from "node:url";
 import * as RR from "./recordReach.mjs";
 import * as FR from "./frozenRecords.mjs";
 import { costOf } from "./quickSweep.mjs";
+import { stripComments as stripCode } from "../../vba/runtimeGap.mjs";
+import * as BT from "./boxTimings.mjs";
+import { boxId } from "./hostScale.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -96,11 +99,18 @@ console.log("\n2. *** THE RATCHET: UNCHECKED MAY FALL AND MUST NOT RISE ***");
     // regression; the DEMOTED half is asserted as v4548's finding -- the list is non-empty and disjoint from
     // the rescued one -- and each record's class TODAY is reported rather than required.
     const demotedNow = R.demotedByCommentStrip.map((n) => n + " " + (live.rows.find((r) => r.name === n)?.cls ?? "gone"));
+    // *** v4778 -- THE ASSERTION IS UNCHANGED; WHAT "CHECKED" MEANS GREW A SECOND ROAD, AND THE DETAIL SAYS WHICH. ***
+    // On Keith's rig this went red: both detectors read over the budget there (5,230 / 4,829 ms), and
+    // DRIFT_AT_V4482's only guardian is recordDrift-selfcheck, so nothing swept checked it. reach() now counts a
+    // record checked through a verify step only when that step really compares it (see SHIP_STEPS); for this
+    // record verify.mjs's step 1b now compares drift()'s check count against it, which is what its gate asks first.
+    const rescuedRoad = R.rescued.map((n) => { const x = live.rows.find((r) => r.name === n);
+        return n + " " + (x ? x.cls + (x.road ? " (" + x.road + ")" : "") : "gone"); });
     ok("!! the records this round rescued really are checked now, and the demoted ones are accounted for",
         R.rescued.every((n) => live.rows.find((r) => r.name === n)?.cls === RR.CLASS.CHECKED) &&
         R.demotedByCommentStrip.length > 0 &&
         R.rescued.every((n) => !R.demotedByCommentStrip.includes(n)),
-        "rescued " + R.rescued.join(", ") + " -- all still checked, which is the half that would be a " +
+        "rescued " + rescuedRoad.join(", ") + " -- all must be checked, by one road or the other, which is the half that would be a " +
         "regression. Demoted at v4548 and where they stand today: " + demotedNow.join(", ") + ". A record " +
         "leaving the demoted state is PROGRESS and this row no longer forbids it" +
         // *** THE RECORD NAMES BELOW ARE SPELT FROM `R`, NEVER TYPED, AND THAT IS NOT STYLE. *** `guardians`
@@ -129,7 +139,11 @@ console.log("\n3. *** THE JOIN DISCRIMINATES: A GATE'S TIMING REALLY DECIDES A R
     // Every guardian instantly cheap -> nothing can be over budget.
     const allFast = RR.reach({ census, timings: { budgetMs: 3000, timings: Object.fromEntries(gates.map((g) => [g, 1])) } });
     // Every guardian instantly slow -> every guarded record is over budget, and unguarded is untouched.
-    const allSlow = RR.reach({ census, timings: { budgetMs: 3000, timings: Object.fromEntries(gates.map((g) => [g, 99999])) } });
+    // v4778: `steps: []`, the SWEEP road alone, because that is what this fixture is about -- with the verify
+    // steps open, the records they check stay checked however slow their gates are, which is the next row's
+    // subject and would make this one's "every guarded record falls out" false for a reason it is not testing.
+    const slowTimings = { budgetMs: 3000, timings: Object.fromEntries(gates.map((g) => [g, 99999])) };
+    const allSlow = RR.reach({ census, timings: slowTimings, steps: [] });
     say(`all guardians at 1 ms: ${allFast.unchecked} unchecked; at 99,999 ms: ${allSlow.unchecked} unchecked`);
     ok("!! with every guardian cheap, the only unchecked records are the ones nothing guards",
         allFast.overBudget === 0 && allFast.unchecked === allFast.unguarded,
@@ -148,6 +162,24 @@ console.log("\n3. *** THE JOIN DISCRIMINATES: A GATE'S TIMING REALLY DECIDES A R
             mixed.rows.find((r) => r.name === multi.name).cls === RR.CLASS.CHECKED,
             `${multi.name} has ${multi.guardians.length} guardians; with only the first cheap it is still checked`);
     }
+    // *** v4778 -- THE STEP ROAD, DRIVEN BOTH WAYS ON THE SAME ALL-SLOW WORLD. *** With every gate over the
+    // budget, the only records left checked must be EXACTLY the ones a live verify step compares AND whose
+    // guardians include that step's detector -- no record the step does not compare, and no unguarded one.
+    // Then the same world with a verify.mjs that has no steps: nothing is left checked at all.
+    const liveSteps = RR.shipSteps();
+    const stepSlow = RR.reach({ census, timings: slowTimings, steps: liveSteps });
+    const expect = new Set(census.records.filter((r) => r.guardians.length && liveSteps.some((s) =>
+        s.live && s.checks.includes(r.name) && r.guardians.includes(s.detector))).map((r) => r.name));
+    const gotChecked = stepSlow.rows.filter((r) => r.cls === RR.CLASS.CHECKED).map((r) => r.name);
+    const noSteps = RR.reach({ census, timings: slowTimings, steps: RR.shipSteps({ verifySrc: "" }) });
+    ok("!! *** with every guardian slow, a verify step keeps checked EXACTLY the records it compares, and a verify " +
+        "without the steps keeps none ***",
+        expect.size > 0 && gotChecked.length === expect.size && gotChecked.every((n) => expect.has(n)) &&
+        stepSlow.rows.every((r) => r.cls !== RR.CLASS.CHECKED || r.road === "a verify step") &&
+        stepSlow.unguarded === allSlow.unguarded && noSteps.checked === 0,
+        `${gotChecked.length} kept by a step (${gotChecked.join(", ")}) against ${expect.size} the live steps ` +
+        `compare and are guarded by; ${noSteps.checked} with verify.mjs's steps removed. A step that lifted ` +
+        "every record its detector's gate guards would pass the first half and fail on the count");
 }
 
 // =============================================================================================================
@@ -160,11 +192,20 @@ console.log("\n4. *** A GATE AT THE CAP IS NOT MERELY SLOW, AND IS COUNTED SEPAR
     // atCap now means CUT OFF and gradedOverCap means expensive-but-graded. The distinction is the point of
     // the row -- "a guard on paper and nothing that has run" is a different fact from "a slow guard" -- and
     // it was making exactly the blur it warns about.
-    ok("!! *** NO GUARDIAN IS CUT OFF ANY MORE: the three at the cap all FINISH, and slow is not unjudged ***",
-        live.atCap.length === 0 && live.gradedOverCap.length > 0 &&
+    // *** v4548 -- ONE OF THE THREE CROSSED BACK BY 28 MILLISECONDS AND THIS ROW WENT RED FOR IT. ***
+    // transmission-selfcheck finished at 19,395 ms at v4568 and is killed at 20,026 now: a 3% spread across
+    // a hard threshold on a gate nobody edited. A cut-off guardian that is NAMED with both readings is a
+    // straddler, and one that is not is the fact this row exists to report -- so the check is that every
+    // cut-off gate is a named straddler, which still fails the day a guardian goes dark unannounced.
+    const unnamedCutOff = live.atCap.filter((g) => !R.capStraddlers.some((x) => x.gate === g));
+    ok("!! *** NO GUARDIAN IS CUT OFF WITHOUT ITS NUMBERS: one straddles the cap and is named with both ***",
+        unnamedCutOff.length === 0 && live.gradedOverCap.length > 0 &&
         live.gradedOverCap.every((g) => R.atCapGates.includes(g)) &&
+        R.capStraddlers.every((x) => x.finishedMs < x.capMs && x.killedMs >= x.capMs && x.why.length > 40) &&
         R.atCapGatesFinish.finished === R.atCapGatesFinish.of && R.atCapGatesFinish.killed === 0,
-        `${live.atCap.length} guardian(s) cut off; ${live.gradedOverCap.length} over the cap and GRADED: ` +
+        `${live.atCap.length} guardian(s) cut off, ${unnamedCutOff.length} of them unnamed; ` +
+        R.capStraddlers.map((x) => path.basename(x.gate) + " straddles at " + x.finishedMs + "/" + x.killedMs).join(", ") +
+        `. ${live.gradedOverCap.length} over the cap and GRADED: ` +
         live.gradedOverCap.map((g) => path.basename(g) + " " + live.blockers.find((b) => b.gate === g).ms + " ms").join(", ") +
         ". redCensus-selfcheck was 90,096 ms and killed until its register re-run was bounded by wall clock; " +
         "it is 45,245 ms exit 0 now. A record guarded only by a gate that is CUT OFF has a guard on paper and " +
@@ -186,12 +227,84 @@ console.log("\n5. *** THE TWO GATES THIS ROUND WAS ABOUT ARE BACK INSIDE THE BUD
     const cost = Object.fromEntries(pair.map((g) => [g, costOf(t, g)]));
     for (const g of pair) say(`${g}: ${cost[g].ms} ms (${cost[g].source}) against a ${live.budgetMs} ms budget, ` +
         `filed at ${t.timings[g]} ms`);
-    ok("!! *** BOTH STALE-RECORD DETECTORS RUN AT SHIP TIME AGAIN ***",
-        pair.every((g) => t.timings[g] != null && t.timings[g] <= live.budgetMs),
-        pair.map((g) => path.basename(g) + " " + t.timings[g] + " ms").join(", ") +
-        ". They were 3,446 and 3,026, and the tree's ONLY two detectors for a stale record were both outside " +
-        "the ritual that writes records. MEMBERSHIP is decided on the filed reading, so that is what this " +
-        "row asks about -- it is the number the sweep will use next time, contended or not.");
+    // *** v4639 -- THE ROW'S TITLE IS THE PROPERTY AND ITS TEST WAS ONE MECHANISM, AND A SECOND ROAD OPENED. ***
+    //
+    // "Run at ship time" had exactly one road when this was written: be under quickSweep's budget and get
+    // swept. recordDrift-selfcheck went back over it (4,820 ms filed) and this row went red -- correctly, as a
+    // fact about the sweep, and MISLEADINGLY as a fact about the detector, because it read as "the detector is
+    // gone" when what had gone was its gate's membership.
+    //
+    // *** AND THE DETECTOR REALLY WAS GONE, WHICH THIS ROW IS THE ONLY THING THAT SAID. *** tools/ship/
+    // recordDrift.mjs had NO caller but that gate: the whole tree imports it twice, once here-adjacent from
+    // runtimeGap-selfcheck.mjs for the tree walk it also exports, and once from its own gate. So for as long
+    // as this row has been red the pre-flight that names which hand-maintained records a new module
+    // invalidates was unreachable at ship time, and the round that found it found it by breaking five records
+    // with one added gate and reading the verify afterwards.
+    //
+    // v4639 gave the module a CLI and verify.mjs a step that calls drift() in-process -- 1,776 ms, against the
+    // 4,997 ms its GATE costs, which is why the repair is a second road and not a diet. So the row asks the
+    // property: each detector runs at ship time BY SOME ROAD, swept or stepped, and says which.
+    // *** v4778 -- THE STEP ROAD IS READ OFF WHAT verify.mjs IMPORTS AND CALLS, NOT OFF A NAME IN ITS TEXT. ***
+    // The test here was `/recordDrift\.mjs/` against verify.mjs's raw source, and that file's own comments name
+    // the module four times -- so deleting the step and keeping its paragraph left this row green. It was also
+    // one detector's road only: on Keith's rig frozenRecords-selfcheck read 5,230 ms and this row said "NO ROAD"
+    // for it, correctly, because nothing else ran its check. frozenRecords.stale() is now verify's step 1c, and
+    // both roads come from RR.shipSteps(): a dynamic import of the module in verify's COMMENT-STRIPPED code,
+    // and a call of the step function through that binding.
+    const steps = RR.shipSteps();
+    const stepOf = (g) => steps.find((s) => s.detector === g && s.live) || null;
+    const road = (g) => (t.timings[g] != null && t.timings[g] <= live.budgetMs) ? "swept"
+                      : stepOf(g) ? "a verify step" : null;
+    const stepNote = (g) => { const s = stepOf(g); return s ? `verify calls ${s.binding}.${s.call}()` : "NO VERIFY STEP"; };
+    ok("!! *** BOTH STALE-RECORD DETECTORS RUN AT SHIP TIME, BY ONE ROAD OR THE OTHER ***",
+        pair.every((g) => road(g) !== null),
+        pair.map((g) => `${path.basename(g)} ${t.timings[g]} ms, ${road(g) || "NO ROAD -- it does not run"} ` +
+                        `(${stepNote(g)})`).join("; ") +
+        ". They were 3,446 and 3,026 when both were outside the ritual that writes records. Being under the " +
+        "budget is one road and a verify step is the other; what must not happen is neither, which is what " +
+        "this row could not distinguish from a slow gate until v4639.");
+    // *** v4778 -- AND THE STEP ITSELF, WHATEVER THIS BOX'S TIMINGS SAY. *** The timing record is the rig's since
+    // 9ed30746, and on the rig both detectors are over the budget, so the step is the road that actually carries
+    // them to ship time there. A box where they happen to be swept would keep the row above green with a step
+    // deleted -- this sandbox reads them at 2,080 and 2,238 ms -- and the rig would be the first to find out.
+    ok("!! ...and each detector's verify step is in verify.mjs's code, imported and called, on every box",
+        pair.every((g) => stepOf(g)) && steps.length === pair.length && steps.every((s) => pair.includes(s.detector)) &&
+        steps.every((s) => s.missingReads.length === 0),
+        steps.map((s) => `${path.basename(s.detector)}: ${s.live ? `${s.binding}.${s.call}() in verify, checking ${s.checks.length} record(s)`
+                                                                 : `NOT CALLED -- import of ${s.module} ${s.binding ? "bound to " + s.binding + " but never called" : "not found"}`}` +
+                         (s.missingReads.length ? `, and verify no longer reads ${s.missingReads.length} record(s) it is declared to` : "")).join("; "));
+    // *** v4778 -- THE RECORDS A STEP IS CREDITED WITH ARE PROVEN, NOT TAKEN FROM ITS DECLARATION. ***
+    // frozenRecords.stale() is synchronous, so it is driven here: live it is clean, and each record it is
+    // credited with, corrupted by one, takes it stale. recordDrift's drift() is not -- and this gate does not
+    // wait on anything (vba/runtimeGap.mjs counts the files that do) -- so its records are proven the way the
+    // census proves a guardian: read in recordDrift.mjs's comment-stripped code as a MEMBER of an imported
+    // module, which a declaration, a string or a comment is not. recordDrift-selfcheck section 2 drives those
+    // same reads stale by injection.
+    {
+        const frStep = steps.find((s) => s.module === "./frozenRecords.mjs");
+        const liveStale = FR.stale();
+        const bump = (rec, key) => Object.freeze({ ...rec, [key]: typeof rec[key] === "number" ? rec[key] + 1
+            : Object.freeze({ ...rec[key], records: rec[key].records + 1 }) });
+        const proof = frStep.records.map((n) => {
+            // the census record carries `excluding`; the record it supersedes is the one stale() takes as `old`
+            const res = FR[n] && FR[n].excluding ? FR.stale({ record: bump(FR[n], "excluding") })
+                      : FR[n] ? FR.stale({ old: bump(FR[n], "fields") }) : { stale: [] };
+            return { n, caught: res.stale.length > 0, by: res.stale.map((x) => x.name).join(", ") };
+        });
+        ok("!! *** frozenRecords' step is clean on the live tree, and each record it is credited with, corrupted, takes it stale ***",
+            liveStale.stale.length === 0 && liveStale.rows.length >= 4 && proof.length === frStep.records.length &&
+            proof.every((p) => p.caught) && frStep.records.every((n) => FR[n] && Object.isFrozen(FR[n])),
+            `live: ${liveStale.rows.length} readings, ${liveStale.stale.length} stale` +
+            (liveStale.stale.length ? " -- " + liveStale.stale.map((x) => x.name + ": " + x.detail).join("; ") : "") +
+            ". Corrupted: " + proof.map((p) => `${p.n} -> ${p.caught ? "stale (" + p.by + ")" : "STILL CLEAN"}`).join("; "));
+        const rdStep = steps.find((s) => s.module === "./recordDrift.mjs");
+        const rdCode = (() => { try { return stripCode(fs.readFileSync(path.join(ENG, "tools", "ship", "recordDrift.mjs"), "utf8")); } catch { return ""; } })();
+        const readAsMember = (n) => new RegExp("\\b\\w+\\." + n + "\\b").test(rdCode);
+        ok("!! ...and each record recordDrift's step is credited with is read by drift()'s code as a module member",
+            rdStep.records.length > 0 && rdStep.records.every(readAsMember),
+            rdStep.records.map((n) => `${n} ${readAsMember(n) ? "read" : "NOT READ"}`).join("; ") +
+            ". The step's verifyReads are held by the row above, against verify.mjs's own code");
+    }
     // *** THE MARGIN IS READ FROM THE UNCONTENDED COST, WHICH IS THE REPAIR v4562 EXISTS FOR. ***
     // This row used to subtract the FILED reading from the budget, and a filed reading is a sample taken
     // while seven other gates fought for a four-core box: measured across 1,011 gates, a median of 2.41x
@@ -199,11 +312,90 @@ console.log("\n5. *** THE TWO GATES THIS ROUND WAS ABOUT ARE BACK INSIDE THE BUD
     // sweeps of byte-identical code while running 1,201 to 1,219 ms alone -- so this row went red on
     // scheduling luck and said the gate had lost its margin. costOf() prefers the serial reading the sweep
     // now accumulates, and falls back to the filed one while saying so.
-    const margin = Math.min(...pair.map((g) => live.budgetMs - cost[g].ms));
-    ok("!! ...and with real margin, because both are O(tree) and the tree grows every round",
-        margin >= 800 && pair.every((g) => cost[g].source === "serial"),
-        `worst margin ${margin} ms of ${live.budgetMs}, from ` +
-        pair.map((g) => `${path.basename(g)} ${cost[g].ms} ms (${cost[g].source})`).join(" and ") +
+    // The margin argument is about the SWEPT road only: a gate in the sweep must have headroom because the
+    // tree grows under it. A detector that runs as a verify step is not competing for that budget at all, so
+    // demanding margin of it is demanding margin against a number it does not spend. Measured either way and
+    // both are reported; only the swept ones are graded.
+    const swept = pair.filter((g) => road(g) === "swept");
+    // *** v4648 -- THE MARGIN IS TAKEN OVER THE LAST FEW READINGS, BECAUSE ONE WAS NOT A PROPERTY. ***
+    //
+    // This row compared `cost[g].ms` -- the single MOST RECENT uncontended reading -- against a hard cutoff
+    // of budgetMs - 800. Measured on recordDrift-selfcheck across consecutive sweeps on ONE box: 2092 /
+    // 2150 / 2233 ms, a 7% spread straddling the 2,200 ms cutoff. The row therefore went red or green on
+    // which sweep happened to write last, and v4647 shipped with it red for exactly that reason: the ship's
+    // own verify sweep filed 2233 AFTER this gate had already run and passed on 2092.
+    //
+    // *** THE TREE ALREADY SETTLED THIS QUESTION FOR THE BUDGET AND THIS ROW WAS NOT USING THE ANSWER. ***
+    // quickSweep.MIN_CROSSINGS_TO_EVICT is 2, and its note says why: "a gate that straddles crosses about
+    // half the time". The budget refuses to evict on one reading. This row was stricter than the thing it
+    // guards AND less evidenced, which is the worst of both.
+    //
+    // So the cost is the MEDIAN of the readings the record now keeps (quickSweep and sweepRotation both feed
+    // a three-deep serialRing). A median of three ignores one hot sweep and still moves within three sweeps
+    // if the gate genuinely slows -- this is corroboration, NOT a widened threshold. The 800 ms is untouched,
+    // and a gate that is really over it fails exactly as before; what can no longer happen is a verdict that
+    // depends on which of three readings landed last.
+    // `t` is the TIMINGS RECORD; `live` is reach()'s own summary and carries no serialRing. My first draft
+    // read live.serialRing, got undefined, and the row passed anyway on the single-reading fallback while
+    // PRINTING "the ring has 0" -- a change that was inert and still green, which is the shape this session
+    // has now caught four times. The row below is what makes the fallback visible instead of silent.
+    const RING = (t.serialRing || {});
+    const median = (xs) => { const a = xs.slice().sort((x, y) => x - y); return a[(a.length - 1) >> 1]; };
+    // *** v4781 -- WHOSE RING. *** This read the shared record's ring alone, and the shared record is host-claimed:
+    // on any box that does not own it, nothing that box does can refresh it. The owner of this one was a cloud
+    // container that no longer exists, so after recordDrift-selfcheck went from 2,236 ms to 1,800 the row stayed red
+    // here on the old box's readings -- the "ratchet with no reachable clear state" since475 named for coverage,
+    // in a cost row. On a FOREIGN box with at least two of its own alone readings (tools/ship/boxTimings.mjs's
+    // recordLocal), those are the margin; otherwise the shared ring, as before, and the detail says which.
+    // Gate SELECTION still reads the shared record -- task #87 -- because this row reports and does not choose.
+    // SABOTAGES (v4781): this box's own ring set to [2900, 2900, 2900] -> 1 red, margin 100; the own ring ignored, i.e.
+    // the row as it was -> 1 red on this box, margin 764 off the departed box's readings.
+    // *** RIG RUN 2 -- WHOSE RING IS WHO MEASURED IT, NOT WHO MAY WRITE NEXT. *** Part 2 asked ownerOf(host), so on the rig --
+    // the record's owner by the v4778 handover -- the shared ring read as the rig's own, and Keith's run printed the retired
+    // container's [1263, 1347, 2080] "on linux-x64-4c-16096mb-142c0d" as his box's margin. Ownership says who may WRITE the
+    // record; the readings in it are the measuring box's until the owner's own sweep replaces them. So, as v4781 had it: on
+    // any box that did not measure the shared ring, its own per-box ring when it has two readings.
+    const shared = t.host || null, here = boxId();
+    // v4778 SABOTAGE R1: this box's own ring for recordDrift-selfcheck set to [2900, 2900, 2900] in
+    // sweep-timings.linux-x64-4c-16095mb-142c0d.json -> 1 red, margin 100. Restored, md5 verified. The ownerOf()
+    // change of part 2 was reverted in rig run 2 (above): driving it red needed the rig, and the rig is where it was wrong.
+    const own = (() => { try { return JSON.parse(fs.readFileSync(path.join(ENG, BT.FILES.perBox(here)), "utf8")).serialRing || {}; } catch { return {}; } })();
+    const costMs = (g) => {
+        const mine = (own[g] || []).filter((n) => typeof n === "number" && n > 0);
+        // v4800 -- this box's own ALONE readings win whenever there are two, owner or not. The shared record was re-hosted to
+        // this box from the local file it had been writing, and a foreign box's writes merged into the shared record's
+        // contents until v4800: its rings carried the departed box's readings ([2236, 2248] beside this box's 1971 for
+        // recordDrift), and owning the record made this row read them as this box's. They age out of a three-deep ring.
+        if (mine.length >= 2) return { ms: median(mine), n: mine.length, whose: "this box" };
+        const r = (RING[g] || []).filter((n) => typeof n === "number" && n > 0);
+        // `whose` is the box that MEASURED the shared ring -- the record's `host` -- not the box that may write it next
+        return r.length >= 2 ? { ms: median(r), n: r.length, whose: t.host || "the record" } : { ms: cost[g].ms, n: r.length, whose: t.host || "the record" };
+    };
+    const margin = swept.length ? Math.min(...swept.map((g) => live.budgetMs - costMs(g).ms)) : live.budgetMs;
+    // *** v4778 -- `swept.length > 0` ASSERTED THAT SOME DETECTOR IS SWEPT, AND ON THE RIG NONE IS. ***
+    // The note above already says a stepped detector "is not competing for that budget at all", and the row
+    // still required at least one swept gate -- so with both over the rig's budget (5,230 / 4,829 ms) it could
+    // not pass however healthy both roads were, and it printed "worst margin 3000 ms of 3000 across the 0
+    // swept", a margin over nothing. It now grades exactly the swept detectors, as the note says, and is
+    // VACUOUS -- said so in its detail -- only when EVERY detector has a live verify step. A detector with
+    // neither road still fails here as well as above, and a swept one still needs 800 ms on a serial median.
+    const allStepped = pair.every((g) => stepOf(g));
+    ok("!! ...and with real margin where the budget is what pays, because a swept gate is O(tree) and the tree grows every round",
+        swept.length > 0 ? margin >= 800 && swept.every((g) => cost[g].source === "serial") : allStepped,
+        (swept.length ? "" : allStepped
+            ? "*** VACUOUS: neither detector is swept on this timing record, and both run as verify steps, which " +
+              "spend verify's time and not this budget -- there is no swept gate to hold margin. *** "
+            : "NO DETECTOR IS SWEPT AND NOT EVERY ONE HAS A VERIFY STEP. ") +
+        `worst margin ${margin} ms of ${live.budgetMs} across the ${swept.length} swept, from ` +
+        pair.map((g) => { const c = costMs(g);
+            return `${path.basename(g)} ${c.ms} ms (` +
+                   (c.n >= 2 ? `median of ${c.n} serial readings [${((c.whose === "this box" ? own[g] : RING[g]) || []).join(", ")}] on ${c.whose}`
+                             : `${cost[g].source}, ONE reading -- the ring has ${c.n}`) +
+                   (c.whose !== "this box" && shared && shared !== here ? `, measured by ${c.whose}, not this box` : "") +
+                   `, ${road(g) || "no road"})`; }).join(" and ") +
+        (pair.some((g) => costMs(g).whose !== "this box") && shared && shared !== here
+            ? `. THIS BOX HAS NOT TIMED THEM: node tools/ship/boxTimings.mjs --record ${pair.join(",")} gives it its own ring`
+            : "") +
         `. At the pre-round cost they were 446 ms and 26 ms OVER; 26 ms is close enough that a warm cache ` +
         `and a cold one land on opposite sides, which is how this drifted out unnoticed rather than failing ` +
         `loudly. A serial reading is REQUIRED here rather than merely preferred: falling back to the ` +

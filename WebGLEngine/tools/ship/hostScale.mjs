@@ -23,6 +23,8 @@
 // every slow gate is killed, no completed run ever teaches the scale anything. So a timeout contributes
 // budget/recorded as a bound the scale must at least meet. Keith's assumptionMap alone says his box is >= 2x.
 import fs from "node:fs";
+import os from "node:os";
+import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -45,6 +47,57 @@ export const SCALE_CEILING = 8;
 // ai-bridge/rigRunner.js, and on Windows that is `\`. Normalised at BOTH ends -- on write so new records are
 // canonical, and on read so a local file already full of backslash keys is salvaged rather than thrown away.
 const norm = (p) => String(p).replace(/\\/g, "/");
+
+// *** v4580 -- WHOSE STOPWATCH WAS THIS. ***
+//
+// This module exists because a runtime is a property of a MACHINE and a gate together, and every budget in the
+// tree was one machine's stopwatch applied as a hard limit on any machine. It answered that by scaling the
+// budget on the reading box. It never answered the other half: gate-timings.json records 1289 runtimes and
+// NOTHING IN IT SAYS WHICH MACHINE PRODUCED ANY OF THEM. Its own `captured` sentence names at least two -- a
+// v3211 full-suite capture and a long series of "timed individually on this box" additions -- and the scale this
+// module derives between two machines has been measured at 2.05x. So two entries a factor of two apart may be
+// two boxes agreeing, and nothing can tell that from one box's record going stale.
+//
+// A BOX IDENTITY THAT IS DERIVED, NOT CONFIGURED. Typing a name into a config is the same failure as typing a
+// runtime into a header: it is right until the machine changes underneath it and then it is confidently wrong.
+// These are the facts that actually move a runtime -- core count, memory, the CPU's own model string, the
+// platform it runs on -- read from the machine each time.
+//
+// NODE VERSION IS IN THE FACTS AND NOT IN THE ID. It genuinely changes runtimes, so a reader wants it; but a
+// node upgrade is not a new machine, and folding it into the id would split one box's history in half on the
+// day somebody runs nvm. The id answers "same box?"; the facts answer "what was it, exactly".
+export function hostFacts() {
+    const c = os.cpus() || [];
+    return { platform: process.platform, arch: process.arch, node: process.version,
+             osRelease: os.release(), cpus: c.length,
+             totalMemMB: Math.round(os.totalmem() / 1048576), model: (c[0] || {}).model || "unknown" };
+}
+
+/** A short readable id for the machine, derived from hostFacts(). Stable across node upgrades, by construction. */
+export function boxId(facts = hostFacts()) {
+    const f = facts || {};
+    // the model string is hashed rather than embedded: "Intel(R) Xeon(R) Processor @ 2.80GHz" carries spaces,
+    // parentheses and an @, and an id that needs quoting is an id that will be mangled by something.
+    const m = crypto.createHash("md5").update(String(f.model || "unknown")).digest("hex").slice(0, 6);
+    // *** v4796 -- MEMORY IN WHOLE GIGABYTES, BECAUSE ONE MACHINE TYPE REPORTED TWO MEGABYTE COUNTS. *** The same
+    // container type read 16095 MB in one session and 16096 MB in the next, and the id split it in two: two per-box
+    // records for one box, and recordReach red on a box that had readings filed under its twin. A gigabyte is coarser than
+    // any one machine's drift and finer than any difference between machine types this tree has met (4c-16gb, 12c-32gb).
+    // Every comparison stays EXACT: the shared record's host is the old format, so no box owns it -- as no live box did.
+    return `${f.platform || "?"}-${f.arch || "?"}-${f.cpus || 0}c-${Math.round((f.totalMemMB || 0) / 1024)}gb-${m}`;
+}
+
+/**
+ * v4819 -- AN ID WRITTEN BEFORE v4796 READ IN TODAY'S FORM. Two lines of this tree met at v4819: one had carried memory in
+ * whole gigabytes since v4796, the other still in megabytes, and that one's records -- the shared timing record's `host`,
+ * quickSweep's RECORD_HANDOVERS, the per-box files -- name boxes as `linux-x64-4c-16095mb-142c0d`. The same machine is
+ * `linux-x64-4c-16gb-142c0d` here. Wherever an id from a record is compared with boxId(), it is read through this first,
+ * so a record written in either form names the same box. An id already in gigabytes, or in no known form, is returned as is.
+ */
+export function canonicalId(id) {
+    if (typeof id !== "string") return id;
+    return id.replace(/-(\d+)mb-([0-9a-f]{6})$/, (_, mb, m) => `-${Math.round(Number(mb) / 1024)}gb-${m}`);
+}
 
 // *** THE DENOMINATOR IS gateBudget.MEASURED, AND gate-timings.json IS THE WRONG FILE FOR IT. ***
 //

@@ -65,21 +65,34 @@ export function resolveSpec(fromFile, spec) {
 }
 
 /** { gate -> Set(files it transitively reads) }, plus a count of edges that could not be resolved. */
-export function buildGraph() {
+export function buildGraph({ gates = null } = {}) {   // `gates`: a subset, for affected-selfcheck's reference walk
     // v3041 -- was a THIRD definition of "a gate exists here" (/selfcheck.*\.mjs$/), which matched
     // tools/ship/selfchecks.mjs -- the runner -- and built an import graph rooted at it. staleness.mjs owns the
     // one walker; this imports it. Three walkers, two patterns, one silent extra gate for 153 versions.
-    const gates = gateFiles();
+    gates = gates || gateFiles();
     const deps = new Map();
     let unresolved = 0;
+    // v4778 rig run 13 -- each module's edges are read ONCE per build, not once per gate that reaches it. The walk below
+    // used to re-read and re-resolve every shared module for every gate: 88,034 edges from 1,925 gates, about 4 s a
+    // build here and enough on the rig's Windows file system that gateSelection-selfcheck, which builds it twenty-odd
+    // times, ran out its 500 s. Same graph, same unresolved count (an edge is still counted each time a gate's walk
+    // expands the module that holds it) -- affected-selfcheck and gateSelection-selfcheck read both.
+    const edges = new Map();
+    const edgesOf = (cur) => {
+        let e = edges.get(cur);
+        if (!e) { const to = []; let miss = 0;
+            for (const spec of importsOf(cur)) { const r = resolveSpec(cur, spec); if (r) to.push(r); else miss++; }
+            e = { to, miss }; edges.set(cur, e); }
+        return e;
+    };
     for (const g of gates) {
         const seen = new Set([g]);
         const stack = [g];
         while (stack.length) {
             const cur = stack.pop();
-            for (const spec of importsOf(cur)) {
-                const r = resolveSpec(cur, spec);
-                if (!r) { unresolved++; continue; }
+            const e = edgesOf(cur);
+            unresolved += e.miss;
+            for (const r of e.to) {
                 if (seen.has(r)) continue;
                 seen.add(r); stack.push(r);
             }

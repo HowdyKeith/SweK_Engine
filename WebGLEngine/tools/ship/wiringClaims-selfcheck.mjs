@@ -44,6 +44,16 @@ const KNOWN_CONTRAST = {
         "engine/xrSession.mjs, so nothing feeds it a real head pose'. The subject of 'not wired into' is gaze " +
         "(ui/gazeDwell.mjs) -- xrSession.mjs is the FEED IT IS MISSING, named as the target rather than as the " +
         "thing lacking a consumer, and xrSession.mjs itself has real importers elsewhere in the engine",
+    // *** v4778 -- TWO MORE, ARRIVED WITH THE rtx MERGE, AND BOTH READ BEFORE BEING ADMITTED. *** Same shape as
+    // the four above: the claim is true of a module the line does not spell as a path, and the path it does
+    // spell is the comparison.
+    "brain/policy.js": "capsuleHazard.js's header reads 'WHY THIS IS A SEPARATE FILE FROM policy.js, AND WHY IT " +
+        "IS NOT WIRED INTO brain.js'. The subject is capsuleHazard.js itself (THIS file), which only its own gate " +
+        "imports, so the claim is TRUE; policy.js is the live file it is kept apart from",
+    "gpu/SplatLoader.js": "nextRounds' splat-walk closing note reads 'not a real splat capture loaded through " +
+        "gpu/SplatLoader.js ... carryOnPlatform() ... is still not wired into any live caller'. The subject of " +
+        "'not wired into' is carryOnPlatform (task #80, wired by the very next entry, #84); SplatLoader.js is " +
+        "the loader a REAL capture would come through, named to say this cloud did not",
 };
 ok("!! *** every remaining hit is a CONTRAST LINE, adjudicated by name ***",
     claims.every((c) => KNOWN_CONTRAST[c.subject]),
@@ -81,4 +91,21 @@ ok("!! the check does not FORBID the sentences, and that is deliberate",
         " claims, every one adjudicated and every adjudication still used"));
 
 console.log(failed ? "wiringClaims-selfcheck: " + failed + " FAILED" : "wiringClaims-selfcheck: all checks pass");
-process.exit(failed ? 1 : 0);
+// *** v4677 -- process.exitCode, NOT process.exit(). MEASURED, NOT ASSUMED. ***
+// libuv aborts a Windows process.exit() taken while the platform still has queued work:
+//   Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\win\async.c   (exit 0xC0000409)
+// after a clean scoreline. v4663 picked its 48 conversions by asking DOES THIS GATE COMPILE A WASM MODULE -- a
+// CAUSE. This one was found by measuring the SYMPTOM with tools/ship/exitBusy.mjs: process CPU across an
+// awaited 300 ms window starting at this line, taken twice.
+//   window 1: 13.2 ms (ONE reading); re-measured three times: [0.5, 12.2, 17.7], median 12.2 ms.
+// *** AND THIS GATE IS PERTURBED BY THE INSTRUMENT, SO ITS MEMBERSHIP IS UNCERTAIN AND MARKED SO. ***
+// The screen writes a copy of the gate beside the original while it runs. This gate WALKS THE TREE, sees the
+// extra file, adjudicates it and goes RED -- green by hand, exit 1 under the probe, which is why
+// tools/ship/exitBusy.mjs now takes a baseline run and reports `perturbed`. The consequence is worse than a
+// wrong exit code: a perturbed gate RUNS DIFFERENT CODE, so the CPU reading is suspect too, and the three
+// readings above are bimodal (0.5 / 12.2 / 17.7) rather than noisy around a mean. The conversion stands on its
+// own -- process.exit() during a live teardown is wrong regardless -- but this gate is NOT counted as evidence.
+// Against a same-process control of 0.9 ms on this box. ONE READING, ON LINUX, where the identical teardown is
+// SILENT -- unix/async.c carries no such assertion. So this is a CANDIDATE, not a confirmed crash, and the
+// rig's clone-verify remains the instrument for the fact. The conversion costs nothing either way.
+process.exitCode = failed ? 1 : 0;

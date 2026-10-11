@@ -48,6 +48,9 @@ import * as D from "./drivePolicy.mjs";
 import * as U from "../physics/turret.mjs";
 import * as S from "../physics/slick.mjs";
 import * as A from "../physics/spellAmmo.mjs";   // v4592 (task 81): the spellbook as ammunition, and the pickups
+import * as CD from "../world/crashDamage.mjs";   // v4822: a shell against a building is the same wall a car crash breaks
+import * as BT from "../world/buildingTopple.mjs";   // v4822: ...and a shell against the block that building became
+import { CityGen, cityHash } from "../world/CityGen.js";   // v4822: the city a raceWithGunners `city` option races through
 import { worldFromModule } from "../render/slugTicker.mjs";
 
 // v4590 (task 79) -- two more features and two more outputs: the gunner sees whether a car is close BEHIND (the slick's target)
@@ -91,12 +94,59 @@ function expandRecurrent(Wrec) {
 }
 
 /**
+ * layersOf(), memoised per weight vector. After the rtx merge (v4778) tools/gunnerTraceDemo-selfcheck.mjs took 16.8-20+ s
+ * alone and was killed at the sweep's 20 s cap; its --cpu-prof put 30 % of the run in the two expandRecurrent()s
+ * (this file's and brain/drivePolicy.mjs's; 30.3 % and 30.8 % in two review re-takes, the garbage collector under 3 %
+ * in both, not the 11 % one first profile read): forward() rebuilt and
+ * threw away the whole HIDDEN x HIDDEN matrix, four subarray views and the layer objects on EVERY tick of every duel,
+ * for a weight vector that does not change within a duel. The memo is keyed on the vector object AND checked against
+ * a snapshot of its REC_EDGES recurrent weights, so a caller that edits a vector in place still gets a fresh expansion
+ * (a REC_EDGES compare, not a reallocation); the encoder and decoder are live views of the vector either way. The
+ * returned list and its matrices are shared between calls and, as they always were in practice, read-only to callers.
+ * A recurrent weight's sign of zero never reaches the matrix (1 + -0 = 1, +0 + -0 = +0), so the snapshot's === is exact.
+ * The entry also keeps the matrix's nonzero columns per row, ascending, for forward()'s maskedStep() below.
+ */
+const LAYERS_MEMO = new WeakMap(), REC_OFFSET = FEATURES * HIDDEN + HIDDEN;
+function memoOf(w) {
+    const m = LAYERS_MEMO.get(w);
+    if (m) { let k = 0; while (k < REC_EDGES && m.snap[k] === w[REC_OFFSET + k]) k++; if (k === REC_EDGES) return m; }
+    const layers = splitLayers(w), rec = layers[1], rowStart = new Int32Array(HIDDEN + 1), cols = [];
+    for (let o = 0; o < HIDDEN; o++) { rowStart[o] = cols.length; for (let k = 0; k < HIDDEN; k++) if (rec.W[o * HIDDEN + k] !== 0) cols.push(k); }
+    rowStart[HIDDEN] = cols.length;
+    const entry = { snap: Float32Array.from(w.subarray(REC_OFFSET, REC_OFFSET + REC_EDGES)), layers, rec, rowStart, cols: Int32Array.from(cols) };
+    LAYERS_MEMO.set(w, entry);
+    return entry;
+}
+
+/**
+ * One recurrent step, relu(Wm @ h), over the matrix's nonzero entries only -- the SAME float32 values mlpLayerCpu returns,
+ * not an approximation of them. Measured after the layersOf() memo: the dense 3 x HIDDEN x HIDDEN relaxation was still the
+ * largest self time in tools/gunnerTraceDemo-selfcheck.mjs, and most of it multiplied the structural zeros. Why dropping
+ * them is exact: mlpLayerCpu walks k upward with f(acc + f(x[k] * W[k])); for a FINITE x[k] a zero weight contributes
+ * f(x[k] * 0) = +-0, and adding +-0 leaves a nonzero f32 acc unchanged and can only flip the sign of a zero one. Visiting
+ * the nonzero columns in the same ascending order therefore reaches the same acc up to the sign of zero, and the relu
+ * (f(max(acc, 0)), max(-0, 0) = +0) erases that. A NON-finite x[k] is exactly where it is not exact -- Infinity * 0 = NaN,
+ * the contamination expandRecurrent()'s comment describes -- so any non-finite input takes mlpLayerCpu's dense path.
+ */
+function maskedStep(layer, rowStart, cols, x) {
+    for (let k = 0; k < HIDDEN; k++) if (!Number.isFinite(x[k])) return mlpLayerCpu(layer, x, 1);
+    const f = Math.fround, W = layer.W, y = new Float32Array(HIDDEN);
+    for (let o = 0; o < HIDDEN; o++) {
+        const woff = o * HIDDEN; let acc = f(layer.b[o]);
+        for (let j = rowStart[o]; j < rowStart[o + 1]; j++) { const k = cols[j]; acc = f(acc + f(f(x[k]) * f(W[woff + k]))); }
+        y[o] = f(Math.max(acc, 0));
+    }
+    return y;
+}
+
+/**
  * Split a flat weight vector into the sequence mlpLayerCpu applies in order: the encoder (11 -> 34, dense,
  * relu), REC_STEPS weight-tied copies of the connectome-masked recurrent layer (34 -> 34, relu), and the
  * decoder (34 -> 5, none). forward() below and render/carViews.mjs's activationsOf() both walk this same
  * array rather than assuming a fixed depth, so either can grow or shrink REC_STEPS with no second edit.
  */
-export function layersOf(w) {
+export function layersOf(w) { return memoOf(w).layers; }
+function splitLayers(w) {
     let o = 0;
     const Win = w.subarray(o, o += FEATURES * HIDDEN), bin = w.subarray(o, o += HIDDEN);
     const Wrec = w.subarray(o, o += REC_EDGES);
@@ -112,9 +162,9 @@ export function layersOf(w) {
 /** The forward pass: features -> [yaw rate, pitch rate, fire, drop, ignite] in [-1, 1], through the encoder, the
  *  connectome-masked recurrent core, and the decoder; a trigger is honoured when its output is positive. */
 export function forward(w, x) {
-    const layers = layersOf(w);
+    const { layers, rec, rowStart, cols } = memoOf(w);
     let h = Float32Array.from(x);
-    for (let i = 0; i < layers.length - 1; i++) h = mlpLayerCpu(layers[i], h, 1);
+    for (let i = 0; i < layers.length - 1; i++) h = layers[i] === rec ? maskedStep(rec, rowStart, cols, h) : mlpLayerCpu(layers[i], h, 1);
     const y = mlpLayerCpu(layers[layers.length - 1], h, 1);
     return [Math.tanh(y[0]), Math.tanh(y[1]), Math.tanh(y[2]), Math.tanh(y[3]), Math.tanh(y[4])];
 }
@@ -184,18 +234,50 @@ export function perturb(w, sigma, rng) { const o = Float32Array.from(w); for (le
 /**
  * One tick of every turret in a world of cars: the gunners' commands from the poses before the step, the mounts turned, the shells
  * fired and flown, hits turned into impulses on the target chassis; and, with a slick state, drops laid, ignitions lit, the fires
- * stepped and the burns tallied. Returns the commands (for the log), the hit events and the burn events.
+ * stepped and the burns tallied. Since v4680, `buildings` (physics/raceCar.mjs's buildingBox() per rect) gives the same shells
+ * something solid to stop on besides a car -- omit it and buildings are exactly as invisible to shells as they were before
+ * that round, which is what every OTHER caller of this function still gets by not passing it. Since v4822, `cityCtx`
+ * (world/crashDamage.mjs's crashWorld() + buildingColliders(), the same context a car crash damages) turns a building hit
+ * into a real one -- hit points, crumble, rebar, a topple that parks the collider -- through CD.shellInto; without it a
+ * building still blocks a shot (nothing passes through) but nothing happens to the wall, same as before that round.
+ * Returns the commands (for the log), the hit events, the burn events and the building effects.
  */
-export function turretTick(world, cars, turrets, shells, poses, cmds, t, spec, slicks = null, pickups = null) {
+export function turretTick(world, cars, turrets, shells, poses, cmds, t, spec, slicks = null, pickups = null, buildings = null, cityCtx = null) {
     const fired = cmds.map((c, i) => U.stepTurret(turrets[i], c, C.CAR.dt));
     // v4592: a shell carries the spell its turret has loaded (spark, the plain shell, without a magazine); the pickups load the rest
     fired.forEach((f, i) => { if (f.fires) { const sh = U.fireShell(shells, poses[i], turrets[i], i, t); sh.ammo = turrets[i].ammo ? A.spendShell(turrets[i].ammo) : A.AMMO.plain; sh.ammoIndex = A.ammoIndex(sh.ammo); } });
     if (slicks) fired.forEach((f, i) => { if (f.drop && S.dropSlick(slicks, poses[i], i, t)) turrets[i].drops = (turrets[i].drops || 0) + 1; if (f.ignite) S.igniteSlick(slicks, i, t); });
     const targets = cars.map((car, i) => ({ index: i, pose: poses[i], half: car.spec.half }));
-    const events = U.stepShells(shells, targets, C.CAR.dt, { groundY: T.ROAD_Y - 2, gravity: spec.gravity, spec });
-    // a hit is the spell's row applied: the impulse scaled by its damage over spark's, the splash, the slow, the fire or the pool under the target
+    // v4822 -- a building cityCtx's own city has already toppled is a null slot here, not a removed one: stepShells skips a
+    // falsy entry rather than dereference it, so a shell flies through where a wall used to stand, and every OTHER index
+    // still names the same rect it always did (physics/turret.mjs's stepShells doc, the same rule the caller must keep).
+    const live = cityCtx ? (buildings || []).map((bx, i) => { const r = cityCtx.rects[i], b = r && cityCtx.city.buildingAt(r.x + 0.5, r.z + 0.5); return b && b.state === "toppled" ? null : bx; }) : buildings;
+    // v4822 -- and the block a toppled building became is a body in the sky that a shell hits where it LIES, in its pose, by its slot
+    const tp = cityCtx && cityCtx.topple, blocks = tp ? tp.slots.map((r) => (r ? { pos: r.pose.pos, quat: r.pose.quat, half: r.half } : null)) : [];
+    const events = U.stepShells(shells, targets, C.CAR.dt, { groundY: T.ROAD_Y - 2, gravity: spec.gravity, spec, buildings: live || [], blocks });
+    // a hit is the spell's row applied: the impulse scaled by its damage over spark's, the splash, the slow, the fire or the pool under the target;
+    // a building hit reads the same row for the scoreboard (physics/spellAmmo.mjs's hitEffect -- a wall has no chassis to push or slow) and, with
+    // a cityCtx, hands the point to world/crashDamage.mjs's shellInto for what actually happens to the wall
     const effects = [];
-    for (const e of events) { turrets[e.owner].hits++; effects.push(...A.applyHit(e, { world, cars, turrets, poses, slicks, t, spec })); }
+    for (const e of events) {
+        if (e.building !== undefined) {
+            if (cityCtx) {
+                const eff = A.hitEffect(e.ammo || A.AMMO.plain, 0);
+                CD.shellInto(cityCtx, e.building, e.point, CD.blastRadius(eff.damage), { x: e.dir[0], z: e.dir[2] });
+                if (turrets[e.owner]) turrets[e.owner].damageDealt = (turrets[e.owner].damageDealt || 0) + eff.damage;
+                effects.push({ ...eff, building: e.building, owner: e.owner });
+            }
+        }
+        else if (e.block !== undefined) {
+            const eff = A.hitEffect(e.ammo || A.AMMO.plain, 0), res = BT.shellOnBlock(tp, e.block, e.point, CD.blastRadius(eff.damage));
+            if (res) {
+                const k = spec.hitImpulse * eff.impulseScale;
+                if (!res.shattered && world && world.impulse) world.impulse(res.rec.body, [e.dir[0] * k, e.dir[1] * k, e.dir[2] * k]);
+                effects.push({ ...eff, block: e.block, owner: e.owner, removed: res.removed + res.loose, hp: res.hp, shattered: res.shattered });
+            }
+        }
+        else { turrets[e.owner].hits++; effects.push(...A.applyHit(e, { world, cars, turrets, poses, slicks, t, spec })); }
+    }
     const taken = pickups ? A.collectPickups(pickups, poses, turrets, t) : [];
     const burns = slicks ? S.stepSlicks(slicks, targets, t).events : [];
     for (const b of burns) {
@@ -289,34 +371,72 @@ export function gunnerStore({ persist = null, restore = null } = {}) {
  * every gunner shoots at the nearest other car. The log carries both contracts per car per tick; `inputsLog` replays one with no
  * policies. Returns { order, results, fingerprint, log, ticks, seed, fleet, shellSpeed } with results[i] carrying hits and shots.
  */
-export function raceWithGunners(worldFrom, drivers, gunners, { seed = 1, seconds = 60, fleet = "00000000", gap = 4, shellSpeed = U.TURRET.shellSpeed, inputsLog = null, onTick = null, pickups: withPickups = true } = {}) {
-    const surface = D.surfaceFor(seed), world = worldFrom(), cp = T.checkpoints(surface.track)[0]; C.addBuildings(world, T.cityRects(surface.track));
+export function raceWithGunners(worldFrom, drivers, gunners, { seed = 1, seconds = 60, fleet = "00000000", gap = 4, shellSpeed = U.TURRET.shellSpeed, inputsLog = null, onTick = null, pickups: withPickups = true, city = null } = {}) {
+    const race = createRace(worldFrom, drivers, gunners, { seed, seconds, fleet, gap, shellSpeed, onTick, pickups: withPickups, city });
+    for (let t = 0; t < race.ticks; t++) race.step(inputsLog ? inputsLog[t] : null);
+    return race.finish();
+}
+
+/**
+ * v4822 -- THE RACE AS A STEPPER: raceWithGunners's loop body made callable one tick at a time, so a lockstep (brain/raceLockstep.mjs) can hold a
+ * tick until every peer's commands are in. raceWithGunners above is now this plus a for-loop and finish(); every fingerprint the tree records is the
+ * same number it was. step(rec) takes a tick's commands per car -- null asks the policies (the original behaviour), an array of
+ * { throttle, steer, brake, yaw, pitch, fire, drop, ignite } is the replay path a log takes, and a lockstep's wire takes -- and returns { tick, hash }, the
+ * RUNNING fingerprint (it folds the whole history, so a divergence stays visible at every tick after it). propose(cars) is what the policies would
+ * command for those cars from the state NOW, in that same raw shape: the owner of a car sends it, every peer (the owner too) steps it.
+ *
+ * `city` (v4822): { script(t, ctx) } races through the REAL city (world/crashDamage.mjs's crashWorld, its buildings box3d colliders, world/buildingTopple.mjs
+ * installed so a building at zero hit points is a falling body) with turretTick handed the city, and folds cityHash and toppleHash into the fingerprint.
+ * `script` runs at the top of each tick with { world, cars, poses, shells, turrets, cityCtx } -- a scripted demolition for the gate that holds node's fall to
+ * the browser's. Without it nothing changes: the same static boxes, the same hash.
+ */
+export function createRace(worldFrom, drivers, gunners, { seed = 1, seconds = 60, fleet = "00000000", gap = 4, shellSpeed = U.TURRET.shellSpeed, onTick = null, pickups: withPickups = true, city = null } = {}) {
+    const surface = D.surfaceFor(seed), world = worldFrom(), cp = T.checkpoints(surface.track)[0];
+    let cityCtx = null, cityBoxes = null;
+    if (city) { cityCtx = CD.crashWorld(surface.track, CityGen); CD.buildingColliders(cityCtx, world); BT.toppleWorld(cityCtx, {}); cityBoxes = cityCtx.rects.map((r) => C.buildingBox(r)); }
+    else C.addBuildings(world, T.cityRects(surface.track));
     const n = drivers.length, cars = drivers.map((w, i) => C.createCar(world, { x: cp.x + 5 - gap * i, z: cp.z, yaw: Math.PI / 2 }));
     const drive = drivers.map((w, i) => D.policyDriver(w, surface, cars[i])), gun = gunners.map((w) => gunnerFor(w)), trackers = cars.map(() => C.lapTracker(surface));
     const spec = Object.freeze({ ...U.TURRET, shellSpeed }), turrets = cars.map(() => U.createTurret(spec)), shells = [];
     const slicks = S.createSlicks(), surf = S.slickSurface(surface, slicks);   // v4590: the oil and the fire under the wheels
     const field = withPickups ? A.pickupField(surface, { seed }) : null; turrets.forEach((tr) => { tr.ammo = A.createAmmo(); });   // v4592: the spellbook's pickups
     const s0 = cars.map((c, i) => surface.along(cp.x + 5 - gap * i, cp.z).s), metres = cars.map(() => 0), lapTimes = cars.map(() => null);
-    const ticks = Math.round(seconds / C.CAR.dt), log = []; let h = 0x811c9dc5;
-    for (let t = 0; t < ticks; t++) {
-        const xf = world.readTransforms(), vel = world.readVelocities(), poses = cars.map((c) => C.carPose(world, c, xf, vel));
-        const rec = inputsLog ? inputsLog[t] : null;
-        const inputs = rec ? rec.map((r) => C.clampInput(r)) : poses.map((p, i) => C.clampInput(drive[i](p)));
-        const cmds = rec ? rec.map((r) => U.clampGun(r)) : poses.map((p, i) => { const j = nearestOther(i, poses); return U.clampGun(gun[i](p, turrets[i], j === null ? null : { pose: poses[j] }, pursuerInfo(i, poses, slicks))); });
-        const tt = turretTick(world, cars, turrets, shells, poses, cmds, t, spec, slicks, field);
+    const ticks = Math.round(seconds / C.CAR.dt), log = []; let h = 0x811c9dc5, t = 0;
+    const readPoses = () => { const xf = world.readTransforms(), vel = world.readVelocities(); return cars.map((c) => C.carPose(world, c, xf, vel)); };
+    const driveOf = (poses, i) => C.clampInput(drive[i](poses[i]));
+    const gunOf = (poses, i) => { const j = nearestOther(i, poses); return U.clampGun(gun[i](poses[i], turrets[i], j === null ? null : { pose: poses[j] }, pursuerInfo(i, poses, slicks))); };
+    function step(rec = null) {
+        const poses = readPoses();
+        const inputs = rec ? rec.map((r) => C.clampInput(r)) : poses.map((p, i) => driveOf(poses, i));
+        const cmds = rec ? rec.map((r) => U.clampGun(r)) : poses.map((p, i) => gunOf(poses, i));
+        if (city && city.script) city.script(t, { world, cars, poses, shells, turrets, cityCtx });
+        const tt = cityCtx ? turretTick(world, cars, turrets, shells, poses, cmds, t, spec, slicks, field, cityBoxes, cityCtx) : turretTick(world, cars, turrets, shells, poses, cmds, t, spec, slicks, field);
         log.push(inputs.map((u, i) => ({ throttle: u.throttle, steer: u.steer, brake: u.brake, yaw: tt.cmds[i].yaw, pitch: tt.cmds[i].pitch, fire: tt.cmds[i].fire, drop: tt.cmds[i].drop, ignite: tt.cmds[i].ignite })));
         // v4592: a frostbitten car drives at half throttle -- applied after the log (the log is the policy's word; the slow is the world's, and the replay re-derives it)
         const slowed = inputs.map((u, i) => ({ ...u, throttle: u.throttle * A.throttleFactor(turrets[i], t) }));
         const rs = C.stepCars(world, cars, surf, slowed, C.CAR.dt);
+        if (cityCtx) BT.stepTopple(cityCtx.topple);   // the falling blocks' poses after the world stepped, as race-brain.html's stepRace does
         rs.forEach((r, i) => { const s1 = surface.along(r.pose.pos[0], r.pose.pos[2]).s; metres[i] += D.metresBetween(surface, s0[i], s1); s0[i] = s1; const tk = trackers[i].update(r.pose); if (tk.laps >= 1 && lapTimes[i] === null) lapTimes[i] = (t + 1) * C.CAR.dt; });
         h = C.foldHash(h, world.stateHash()); h = U.turretHash(h, turrets, shells, C.foldHash); h = S.slickHash(h, slicks, C.foldHash); h = A.ammoHash(h, turrets, C.foldHash); if (field) h = A.pickupHash(h, field, C.foldHash);
+        if (cityCtx) { h = cityHash(h, cityCtx.city, C.foldHash); h = BT.toppleHash(h, cityCtx.topple, C.foldHash); }
         if (onTick) onTick(t, rs.map((r) => r.pose), turrets, shells, tt.events, slicks, tt.burns, field, tt.taken, tt.effects);
+        return { tick: t++, hash: h >>> 0 };
     }
-    const poses = cars.map((c) => C.carPose(world, c)); world.destroy();
-    const results = drivers.map((w, i) => ({ car: i, laps: trackers[i].laps, metres: metres[i], lapTime: lapTimes[i], hash: D.weightsHash(w), gunnerHash: D.weightsHash(gunners[i]), hits: turrets[i].hits, shots: turrets[i].shots, drops: turrets[i].drops || 0, burned: turrets[i].burned || 0, damageDealt: turrets[i].damageDealt || 0, damageTaken: turrets[i].damageTaken || 0, acid: turrets[i].acid || 0, pickups: turrets[i].ammo.taken, ammo: turrets[i].ammo.loaded, pose: poses[i] }));
-    const tieKey = (r) => { let k = 0x811c9dc5; for (const ch of fleet + r.hash + r.gunnerHash) { k ^= ch.charCodeAt(0); k = Math.imul(k, 0x01000193); } return k >>> 0; };
-    const order = results.slice().sort((a, b) => (b.laps - a.laps) || (Math.abs(b.metres - a.metres) > 1 ? b.metres - a.metres : tieKey(a) - tieKey(b))).map((r) => r.car);
-    return { order, results, fingerprint: (h >>> 0).toString(16).padStart(8, "0"), log, ticks, seed, fleet, shellSpeed, n, pickups: !!field, pickupCount: field ? field.pickups.length : 0 };
+    /** what the policies command from the state now, for these cars (all of them by default), raw: the shape step() takes and a lockstep puts on the wire */
+    function propose(carIdx = null) {
+        const poses = readPoses();
+        return (carIdx || cars.map((_, i) => i)).map((i) => ({ car: i, ...driveOf(poses, i), ...gunOf(poses, i) }));
+    }
+    function finish() {
+        const poses = cars.map((c) => C.carPose(world, c));
+        const cityOut = cityCtx ? { impacts: cityCtx.impacts.length, hp: Math.round(cityCtx.city.buildings.reduce((a, b) => a + b.hp, 0)), topple: { fallen: cityCtx.topple.fallen, shattered: cityCtx.topple.shattered, shellHits: cityCtx.topple.shellHits || 0, chipped: cityCtx.topple.chipped || 0, rebuilt: cityCtx.topple.rebuilt || 0, rubble: cityCtx.topple.rubble, bodies: cityCtx.topple.bodies.length, events: cityCtx.topple.events.map((e) => e.kind + (e.at != null ? "@" + e.at : "")) } } : null;
+        world.destroy();
+        const results = drivers.map((w, i) => ({ car: i, laps: trackers[i].laps, metres: metres[i], lapTime: lapTimes[i], hash: D.weightsHash(w), gunnerHash: D.weightsHash(gunners[i]), hits: turrets[i].hits, shots: turrets[i].shots, drops: turrets[i].drops || 0, burned: turrets[i].burned || 0, damageDealt: turrets[i].damageDealt || 0, damageTaken: turrets[i].damageTaken || 0, acid: turrets[i].acid || 0, pickups: turrets[i].ammo.taken, ammo: turrets[i].ammo.loaded, pose: poses[i] }));
+        const tieKey = (r) => { let k = 0x811c9dc5; for (const ch of fleet + r.hash + r.gunnerHash) { k ^= ch.charCodeAt(0); k = Math.imul(k, 0x01000193); } return k >>> 0; };
+        const order = results.slice().sort((a, b) => (b.laps - a.laps) || (Math.abs(b.metres - a.metres) > 1 ? b.metres - a.metres : tieKey(a) - tieKey(b))).map((r) => r.car);
+        return { order, results, fingerprint: (h >>> 0).toString(16).padStart(8, "0"), log, ticks, seed, fleet, shellSpeed, n, pickups: !!field, pickupCount: field ? field.pickups.length : 0, city: cityOut };
+    }
+    return { step, propose, finish, ticks, n, cars, world, turrets, shells, cityCtx, get tick() { return t; }, get fingerprint() { return (h >>> 0).toString(16).padStart(8, "0"); }, poses: readPoses };
 }
 
 /** Replay a gunners' race from its log alone: the same seed, car count and shell speed, no policies. Must reach the same fingerprint. */

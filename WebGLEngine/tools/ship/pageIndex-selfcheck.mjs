@@ -27,6 +27,7 @@ import { fileURLToPath } from "node:url";
 import { allPages } from "../pageReach.mjs";
 import { SECTIONS, claimedPages } from "./pageSections.mjs";
 import { buildPageIndex, descOf } from "./buildPageIndex.mjs";
+import { readJsonOrSay } from "./pagePlacement.mjs";
 import { noComments } from "./sourceScan.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -35,7 +36,10 @@ let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 
 const onDisk = allPages(ROOT).map((p) => path.basename(p)).sort();
-const shipped = JSON.parse(fs.readFileSync(path.join(ROOT, "page-index.json"), "utf8"));
+// v4828 -- a page-index.json that does not parse is a ROW, with the cause on it, and not a stack the verdict cuts to its last three lines
+let shipped = null;
+try { shipped = readJsonOrSay(path.join(ROOT, "page-index.json"), "node tools/ship/buildPageIndex.mjs"); }
+catch (e) { console.log("  FAIL  page-index.json is readable   " + e.message); console.log("\npageIndex-selfcheck: 1 FAILED"); process.exit(1); }
 const page = fs.readFileSync(path.join(ROOT, "page-index.html"), "utf8");
 
 // ---- 1. THE TWO COUNTS AGREE, WHICH IS THE WHOLE POINT --------------------------------------------------------------

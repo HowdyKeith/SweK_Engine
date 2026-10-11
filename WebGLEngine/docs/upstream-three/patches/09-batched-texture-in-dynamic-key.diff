@@ -1,0 +1,19 @@
+diff --git a/src/renderers/common/RenderObject.js b/src/renderers/common/RenderObject.js
+index c900fa4..df63383 100644
+--- a/src/renderers/common/RenderObject.js
++++ b/src/renderers/common/RenderObject.js
+@@ -935,6 +935,14 @@ class RenderObject {
+ 
+ 		}
+ 
++		if ( this.object.isBatchedMesh ) {
++
++			// a batch that grows re-makes its textures, and must be drawn from the new ones
++
++			cacheKey = hash( cacheKey, this.object._matricesTexture.id );
++
++		}
++
+ 		cacheKey = hash( cacheKey, this.renderer.contextNode.id, this.renderer.contextNode.version );
+ 
+ 		return cacheKey;

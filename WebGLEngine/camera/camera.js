@@ -12,14 +12,635 @@
 //   * Projection params (fov, near, far) added as fields.
 
 import { buildViewProj } from "./buildViewProj.js";
+// v4545 -- the body-aware voxel probe, rather than a third copy of its rule. See _terrainTopAt.
+import { standHeightAt, DEFAULT_BODY } from "../world/surfaceProbe.mjs";
+// v4548 -- the gated fall, rather than a third and fourth copy of it. See _fallSurface.
+import { fallStep } from "../physics/character/fallBody.mjs";
 import { autoGround, meshGround, stepTerrainFan, SURFACE } from "../physics/character/terrainWalk.mjs";
 import { depenetrateCapsule } from "../physics/character/capsuleCollide.mjs";
+import { cameraBoom, easeBoom } from "./cameraBoom.js";
+import { moveCharacter } from "../physics/character/kinematic.js";
+
+/**
+ * *** RE-DERIVED BY tools/ship/playerGround-selfcheck.mjs ON EVERY RUN. *** Readings at v4545.
+ */
+export const PLAYER_GROUND_AT_V4545 = Object.freeze({
+    at: "v4545",
+    // the population, measured in a real boot of index.html
+    columns: 1681,
+    multiSurface: 921,          // columns holding more than one place a body can stand
+    multiSurfacePct: 54.8,      // NOT reproducible boot to boot -- the floor below is what a gate may assert
+    multiSurfaceFloorPct: 25,
+    bodyPlaces: 2687,
+    topmostRight: 1681,         // 62.56%, and exactly the column count, which is the finding
+    topmostRightPct: 62.56,
+    worstGap: 42,               // voxels between the lowest surface and the topmost answer
+    // the scan ceiling this query used, against the world's own
+    scannedFrom: 80,
+    worldChunkHeight: 64,
+    // what the defect actually did, driven on a cave with a rising floor
+    stuckAtX: 13.92,            // where HEAD stops dead, four units into the cave
+    stuckAtY: 2.7,
+    repairedX: 27.17,           // and where the body-aware query gets to
+    repairedY: 6.7,
+    stepUpMax: 1.2,
+});
+
+/**
+ * *** RE-DERIVED BY tools/ship/playerSlope-selfcheck.mjs ON EVERY RUN. *** Readings at v4546.
+ */
+export const PLAYER_SLOPE_AT_V4546 = Object.freeze({
+    at: "v4546",
+    // the population, measured in a real boot of index.html over a 3-unit lattice
+    columns: 1681,
+    pairs: 6279,                // adjacent walkable column pairs a body could step between
+    steep: 254,                 // pairs steeper than 45 degrees -- ground the bots refuse
+    steepPct: 4.05,             // NOT reproducible boot to boot; the floor below is what a gate may assert
+    steepFloorPct: 1,
+    worstDeg: 88.1,
+    // *** THE LATTICE EXPRESSES NO SLOPE BETWEEN 45.0 AND 60 DEGREES, AND THAT IS MEASURED RATHER THAN
+    // REASONED. *** 1,826 pairs land in the [45, 60) bucket and EVERY ONE of them is exactly 45.0 -- a
+    // one-voxel lip -- while every steep pair is 60 or more. So the limit could be 45, 50 or 60 and refuse
+    // the identical ground on this world; 45 is chosen to match terrainWalk's default, not because this
+    // world can tell it from the others.
+    atExactly45: 1826,
+    bucket0to15: 4199, bucket45to60: 1826, bucket60to75: 183, bucket75to90: 71,
+    // what the old rule did, driven on a plateau falling k voxels per column
+    headWalkedDownDeg: 63.4,    // walked down at full speed, permanently grounded, 0 frames airborne
+    headSurfaceSpeed: 8.247,    // units per second along the ground, against a walk speed of 5
+    // *** THE OLD RULE WAS A FRAME-RATE SWITCH. *** One body, one speed, one 63.4-degree slope:
+    fellAtFps: 6,               // and only at 6 -- 10, 15, 20, 30, 60, 120, 144 and 240 all walked it
+    walkedAtFps: Object.freeze([10, 15, 20, 30, 60, 120, 144, 240]),
+    // the first draft of the repair, and what killed it
+    firstDraftFellOnDeg: 26.6,  // a shallow hill, because a run that shrinks with dt shrinks into a lip
+    // *** TWO NUMBERS, AND THEY MEASURE DIFFERENT THINGS -- SAID HERE BECAUSE THE FIRST DRAFT OF THIS
+    // RECORD CARRIED ONE AND THE GATE ASSERTED IT AGAINST THE OTHER, AND WENT RED. *** `fellFrames` was
+    // taken with the draft INSTALLED as the rule, so the body really left the ground and its whole path
+    // differed from then on; the gate cannot re-run that without shipping the draft. `wouldFire` is what
+    // the draft's arithmetic reports while the SHIPPED rule drives the body, which is re-derivable and is
+    // what section 3 asserts. The shipped rule reports 0 on the same walk either way.
+    firstDraftFellFrames: 76,   // of 240, with the draft installed -- NOT re-derived by the gate
+    firstDraftWouldFire: 18,    // of 240, observed alongside the shipped rule -- this one is re-derived
+    // *** THE FLOAT ERROR THIS LIMIT WAS BUILT TO ABSORB IS GONE AT ITS SOURCE, AND v4552 IS WHAT REMOVED
+    // IT. *** v4546 measured 45.0000000000001990 on an exactly-45-degree ramp -- 1.99e-13 of error out of
+    // the BILINEAR BLEND -- and a bare `> 45` threw the body off a slope it had just been told it could
+    // walk, 21 frames of 240 over four separate departures. v4552's walk reads integer stand-heights at
+    // both ends of the secant instead of the blend, so atan2(1, 1) * 180 / PI is EXACTLY 45 and the error
+    // is 0. The reading is RE-TAKEN here rather than kept as history, because this record's own header says
+    // it is re-derived on every run; v4546's number is in the prose above, where a superseded measurement
+    // belongs. epsDeg is KEPT and is now belt-and-braces: it costs nothing, it still guards the general
+    // case, and removing a tolerance because one fixture stopped needing it is how the next round
+    // re-learns v4546 the hard way.
+    observedAt45: 45,
+    observedAt45BeforeV4552: 45.0000000000001990,
+    epsDeg: 1e-9,
+    maxSlopeDeg: 45,
+    slopeRun: 1,
+});
+
+/**
+ * *** RE-DERIVED BY tools/ship/cameraFall-selfcheck.mjs ON EVERY RUN. *** Readings at v4548.
+ */
+export const CAMERA_FALL_AT_V4548 = Object.freeze({
+    at: "v4548",
+    // the population: implementations of "integrate a vertical velocity, then clamp to a probed surface"
+    copiesBefore: 4,            // _moveFP, _moveKaijuDrive, fallBody.fallStep, kinematic.stepCharacter
+    copiesAfter: 2,             // the two modules; both camera paths call fallBody now
+    integrationsInCameraBefore: 2,
+    integrationsInCameraAfter: 0,
+    // *** AND THE TWO COPIES DO NOT EVEN AGREE WITH EACH OTHER ABOUT THE ORDER OF THE TWO STEPS. ***
+    // _moveFP probed the ground at the body's CURRENT height and then moved; _moveKaijuDrive moved and then
+    // probed where it had arrived. One of those is fallBody's order and the other is not, and nothing in
+    // the tree noticed that one rule had two implementations that disagreed about its central step.
+    fpOrder: "probe at the current height, then move, then compare",
+    kaijuOrder: "move, then probe where it arrived, then compare",
+    // (1) THE WALKING REACH HANDED TO A FALLING BODY -- v4544's defect, in both camera paths
+    deckAt: 21, deckBelow: 10,
+    liftedFrom: Object.freeze([19.8, 19.9, 20.0, 20.2, 20.5]),
+    liftedBy: Object.freeze([1.20, 1.10, 1.00, 0.80, 0.50]),
+    fellFrom: 19.7,             // one tenth lower, and it falls ELEVEN voxels instead
+    fellTo: 10,
+    liftCutIsStepUpMax: true,   // the boundary sits exactly at STEP_UP_MAX, which is what names the cause
+    // *** THE SAME BODY, THE SAME WORLD, THE SAME RELEASE HEIGHT, AND THE TWO COPIES ANSWER DIFFERENTLY. ***
+    disagreeAt: 19.8, fpAnswer: 21, kaijuAnswer: 10,
+    // (2) THE KAIJU'S ORDER TUNNELS THROUGH EVERYTHING THE MOMENT THE REACH IS HONEST. Its six lines only
+    // looked like they worked because the walking reach let the probe see 1.2 ABOVE where the body landed,
+    // catching surfaces the step had already crossed. Driven with that order and a reach of 0, EVERY
+    // release -- 19.7, 19.8, 19.9, 20.2, 20.5, 21.0 and 25.0 -- falls past both decks to the world floor.
+    kaijuOrderZeroReachLandsAt: 0,
+    kaijuOrderZeroReachFrom: Object.freeze([19.7, 19.8, 19.9, 20.2, 20.5, 21.0, 25.0]),
+    // (3) THE KAIJU'S GROUND FLAG WAS A LATCH: only landing set it, only jumping cleared it
+    // v4560 -- 42 -> 45. The drive has a GROUNDED branch now, so it tracks the ground for three more
+    // frames before Camera.walkStep says `leave`; before, the only vertical path was fallBody and the body
+    // left the moment the surface dropped out from under the probe. The PROPERTY this row is about -- the
+    // flag clears the frame the body leaves, and Space does nothing after it -- is unchanged, which is why
+    // the row stayed red on a number rather than on a behaviour.
+    cliffTop: 40, cliffLeftAtFrame: 45, cliffLeftAtFrameBeforeV4560: 42,
+    latchStillTrueAtFrame: 89, latchHeightThen: 34.12, latchVelocityThen: -14.40,
+    freeJumpVelocity: 10.70,    // Space at frame 90, thirty-four units up and falling
+    // (4) A LANDING HAPPENS ON ONE COLUMN, NOT ON AN INTERPOLATION
+    // Straddling z=39.5, where the column the body is IN has rock up to y=3 (so its surface is 4) and the
+    // next one along has rock to y=1 (surface 2). The blend answers 3 -- A HEIGHT NEITHER COLUMN HAS, and
+    // one that is INSIDE the rock of the column the body occupies. The integer probe answers 4.
+    blendLandsFeetAt: 3,
+    columnLandsFeetAt: 4,
+    blendRockTopInThatColumn: 3,
+    // what is deliberately UNCHANGED, because v4547 measured both as gameplay decisions
+    gravityPassedThrough: 18,
+    terminalPassedThrough: -Infinity,
+});
+
+/**
+ * *** RE-DERIVED BY tools/ship/playerBody-selfcheck.mjs ON EVERY RUN. *** Readings at v4549.
+ */
+export const PLAYER_BODY_AT_V4549 = Object.freeze({
+    at: "v4549",
+    radiusBefore: 0,            // _canStandAt tested ONE cell: floor(x), floor(z). The body was a LINE.
+    radiusAfter: 0.4,           // physics/character/capsuleGround.mjs's own radius
+    cellsTestedBefore: 1,
+    cellsTestedAfterMax: 4,     // a disc of r < 0.5 touches at most four lattice cells
+    // (1) THE DIAGONAL GAP: two pillars sharing one corner and nothing between them but a point
+    diagonalFrom: Object.freeze([10.5, 9.5]),
+    diagonalThroughTo: Object.freeze([15.80, 14.80]),   // where the line body ended up: past both pillars
+    diagonalBlockedAt: Object.freeze([11.56, 10.56]),   // where the disc body stops
+    // *** A RADIUS BELOW THE PER-FRAME STEP DOES NOT RELIABLY BLOCK. *** The test is discrete, so a body
+    // moving 0.0833 per frame at walk speed steps over a slit narrower than that: r = 0.01 still goes
+    // through, r = 0.05 does not. 0.4 is nearly five times the walking step and three times the sprint's.
+    diagonalPassesAtRadius: Object.freeze([0, 0.01]),
+    diagonalBlocksAtRadius: Object.freeze([0.05, 0.1, 0.2, 0.4]),
+    perFrameStepAtWalk: 5 / 60,
+    // (2) HOW CLOSE THE CENTRE GETS TO A WALL FACE
+    wallFaceX: 12, centreStoppedBefore: 11.9167, centreStoppedAfter: 11.5833,
+    // the live census: what a radius costs in standable ground, on a real boot
+    censusCells: 14641, sampledPerCell: 256,
+    lostPct: Object.freeze({ "0.40": 27.65, "0.42": 31.51, "0.44": 31.61, "0.46": 31.71,
+                             "0.48": 35.34, "0.50": 35.58 }),
+    cellsFullyLost: Object.freeze({ "0.40": 0, "0.42": 0, "0.44": 0, "0.46": 0, "0.48": 587, "0.50": 587 }),
+    cliffBetween: Object.freeze([0.46, 0.48]),   // 0 cells lost below it, 587 above
+    lostFloorPct: 10,           // the percentage is REPORTED; only a floor is asserted, per the usual rule
+    // *** MY OWN CENSUS WAS WRONG TWICE BEFORE IT SAID ANYTHING. *** The first draft sampled CELL CENTRES
+    // and read 0 lost at every radius, which is vacuous: a disc of r <= 0.5 centred in a cell never leaves
+    // it. The second sampled offsets 0.125/0.375, whose only distances to a cell edge are 0.125 and 0.375,
+    // so r=0.2 read identically to r=0.3 and r=0.4 to r=0.5 -- A GRID COARSER THAN THE THING MEASURED.
+    censusFirstDraft: "cell centres -- 0 lost at every radius, vacuous by construction",
+    censusSecondDraft: "offsets 0.125/0.375 -- quantised the radius into two buckets",
+    // the cost, measured
+    canStandAtMicroseconds: 0.115,
+    callsPerFrame: 3,
+    // *** v4562 -- THE TEST IS SWEPT NOW, AND THE THING IT FIXES IS A RESONANCE RATHER THAN A THRESHOLD. ***
+    //
+    // v4549 recorded the shape from one side -- a radius below the per-frame step does not reliably block --
+    // and the same arithmetic runs the other way: a STEP long enough to clear the band in which the disc
+    // overlaps the wall crosses a solid voxel with no sample inside it. The band is 1 + 2r wide, so whether
+    // a step skips it depends on WHERE THE BODY STARTED, and the failure is not monotone in the step at all.
+    // Measured over 120 starting offsets per cell, walking straight at one voxel of wall, ONLY the step
+    // changing -- and these are pre-repair readings on the post-repair fixture, so the two halves compare:
+    //
+    //     per-frame step        0.083  0.233   1.0    2.5    4.0    10     100    1000
+    //     straight at a wall        0      0     0     73    120    120    120    120
+    //     45 degrees at a wall      0      0     0      0      0     80    120    120
+    //     a ONE-CELL pillar         0      0     0     73    120    120    120    120
+    //
+    // SEVENTY-THREE OF 120 AT 2.5 AND ZERO AT 3.0 in an earlier sweep of the same shape: a bisection for
+    // "the step at which it breaks" finds an artefact of the start position, and my first attempt did
+    // exactly that and reported 3.45. The diagonal needs a larger step because its per-axis component is
+    // smaller by root two, which is why it is measured separately rather than assumed to be the same case.
+    sweptAtV4562: true,
+    // *** WHICH OF THESE A GATE RE-DERIVES, SAID OUTRIGHT. *** The 2.5 reading is re-taken over 120 phases
+    // on every run of playerGround-selfcheck, because it is the headline and the one that could drift. The
+    // rest were taken ONCE, by hand, and the gate does not reproduce them: re-deriving the 1000 reading
+    // costs a thousand substeps per frame times 1,440 runs, which took the section from 1.0 s to 44 s
+    // before it was sized. A record that does not say which of its numbers are live is a record whose
+    // reader cannot tell a measurement from a memory.
+    tunnelledBeforeOf120: Object.freeze({ "2.5": 73, "4": 120, "10": 120, "100": 120, "1000": 120 }),
+    reDerivedEveryRun: Object.freeze(["2.5"]),
+    tunnelledAfterOf120: 0,                 // every step, every approach, every phase
+    diagonalTunnelledBeforeOf120: Object.freeze({ "10": 80, "100": 120, "1000": 120 }),
+    // *** THE COST IS THE STEP, AND THAT IS THE TRADE RATHER THAN A FOOTNOTE. *** n is
+    // ceil(len / SWEEP_MAX_STEP), so the guarantee is bought in probes in proportion to how far the body
+    // wants to go in one frame. At every shipped speed that is ONE substep and the fix is free; a teleport
+    // of a thousand units would be a thousand. Nothing in the tree teleports THROUGH this method -- _extMove
+    // assigns position directly and never asks -- so the case is named rather than capped, because capping
+    // the substeps would put the tunnel back for exactly the step that needs the sweep most.
+    substepsAreProportionalToTheStep: true,
+    substepsAtAThousandUnitStep: 1000,
+    // *** AND IT COSTS NOTHING WHERE ANYBODY PLAYS. *** One substep at every shipped speed at 60 Hz, which
+    // is the same single pair of tests the destination-only version did. The second substep arrives at 6 fps
+    // for the player's sprint and 10 fps for the kaiju's, which is exactly when it is wanted.
+    substepsAtSixtyHz: 1,
+    substepsAtKaijuSprintSixFps: 3,
+    // *** THE FIXTURE WAS WRONG BEFORE THE MEASUREMENT WAS RIGHT. *** The first harness painted a FINITE
+    // floor, so a body blocked by the wall slid along it, walked off the end, fell, and crossed the wall's x
+    // in MID-AIR BELOW IT -- and the harness scored that as tunnelling, 120 of 120 on the diagonal, against
+    // code that was blocking correctly. The floor and the wall are functions of the coordinate now, so there
+    // is no edge to fall off. A fixture with a boundary measures its own boundary.
+    firstFixtureHadAnEdge: true,
+});
+
+/**
+ * *** RE-DERIVED BY tools/ship/playerWater-selfcheck.mjs ON EVERY RUN. *** Readings at v4550.
+ *
+ * The filed item read "water is passable to the player and solid to every bot, which nothing states as
+ * deliberate". HALF OF THAT IS WRONG AND THE CENSUS BELOW IS WHAT SAYS SO: the player's own ground query
+ * and the bots' answer the same number in 146 of 146 water columns. The disagreement was between two
+ * functions in ONE file.
+ */
+export const PLAYER_WATER_AT_V4550 = Object.freeze({
+    at: "v4550",
+    // (1) THE SHAPE OF THE DEFECT: one question, three answers, one of them different
+    predicateCopiesBefore: 3,   // _canStandAt, _standYAt's shim, _terrainTopAt's legacy scan
+    predicateCopiesAfter: 1,    // Camera.isSolidToBody
+    idsExcludedByCanStandAt: Object.freeze([10, 11]),   // WATER, FLOWING_WATER
+    idsExcludedByTheOtherTwo: Object.freeze([]),
+    // (2) THE LIVE WORLD -- *** v4559: THE WHOLE ISLAND, BECAUSE THE PATCH WAS THE FLATTEST PART OF IT. ***
+    //
+    // v4550 censused x,z in -30..30 and called it "a generated world, 5x5 chunks". The world is not 5x5
+    // chunks: VoxelWorld's constructor runs init() over gridRadius 7, so it is a FINITE 15x15-CHUNK ISLAND
+    // of 240x240 = 57,600 columns, and all of it was already generated and sitting there. The census looked
+    // at 3,721 of them -- 6.46% -- and the gate's own liveWorld() re-generated 25 chunks it already had.
+    //
+    // AND THE PATCH IT PICKED IS NOT A SAMPLE, IT IS AN OUTLIER. Measured over both:
+    //     overhang / multi-surface columns   window 0 of 3,721 (0.00%)   island 8,200 of 57,600 (14.24%)
+    //     water columns                      window 146 (3.92%)          island 14,183 (24.62%)
+    //     worst first-to-last solid spread   window 0                    island 51
+    // The one region of this world with NO overhangs at all, reading a sixth of the water the world has.
+    censusColumns: 57600,               // the island   (3,721 at v4550, the window)
+    censusColumnsAtV4550Window: 3721,
+    overhangColumns: 8200,              // 14.24%   (0 in the v4550 window -- the reason this was re-taken)
+    overhangColumnsAtV4550Window: 0,
+    worstSolidSpread: 51,
+    waterColumns: 14183,        // 24.62% -- water is not a hypothetical in this world   (146 in the window)
+    waterColumnsAtV4550Window: 146,
+    surfaceWaterColumns: 2346,  // water is the topmost non-air voxel: a lake you can walk to   (79)
+    surfaceWaterColumnsAtV4550Window: 79,
+    waterDepthRange: Object.freeze([1, 7]),
+    surfaceDepthRange: Object.freeze([1, 7]),   // [1, 3] in the v4550 window: the deeper pools are outside it
+    // *** THE PLAYER AND THE BOTS AGREED ALL ALONG, WHICH IS THE CORRECTION TO THE FILED ITEM. ***
+    // v4559: re-taken over the island's 14,183 water columns rather than the window's 146 -- a NINETY-SEVEN
+    // FOLD wider population for the round's central correction, and still every column.
+    columnsWherePlayerGroundEqualsBotGround: 14183,
+    ofWaterColumns: 14183,
+    columnsWherePlayerGroundEqualsBotGroundAtV4550Window: 146,
+    // (3) *** AND THE EXCLUSION WAS ASKED ON ZERO REACHABLE SITES -- RE-TAKEN AT v4559 AND STILL ZERO. ***
+    //
+    // Over every standable height in the census, the four-neighbour cells holding water anywhere in the
+    // body's own two-cell span: none. A lake surface is level, so the land beside it stands at top+1 and the
+    // neighbour's span is the air above the water. It takes water standing HIGHER than the land next to it
+    // -- which the fluid systems level away.
+    //
+    // *** THE REGION WAS THE FILED COMPLAINT AND IT IS NOT WHERE THE HOLE WAS. *** Widening 3,481 standable
+    // columns to the island's 56,644 -- every one of the 8,200 overhang columns included -- leaves the count
+    // at 0. The instrument was the problem: standHeightAt(w, x, z, {}) returns ONE height per column and it
+    // is the TOPMOST, so a flooded room under an overhang -- the exact case this row's own note says it
+    // would catch -- could not be reached by the probe at all, in a world where 6,913 columns carry more
+    // than one surface. standablesAt() has existed for this since v4542. Asked at all 63,684 standable
+    // heights it is still 0: a SEVENTEENFOLD wider population and the same answer.
+    reachableExclusionSites: 0,
+    reachabilityIsAFixtureClaim: false,   // taken on the generated world, not on a hand-built one
+    standableColumns: 56644,
+    standableHeights: 63684,              // 3,481 were asked at v4550, one per column
+    columnsWithMoreThanOneSurface: 6913,
+    askedAtEveryStandableHeight: true,    // false at v4550: the topmost surface only
+    // *** AND THE ZERO IS A MEASUREMENT RATHER THAN A DEAD CHECK, WHICH NOTHING ESTABLISHED BEFORE. *** A
+    // census that reports 0 is worth exactly what its ability to report anything else is worth, and v4550
+    // asserted the 0 without ever showing the probe firing. Driven on a hand world -- land topping at y=4,
+    // a wall of water from y=5 to y=9 beside it, which is "somebody floods a room" -- THE SAME PREDICATE
+    // THE ISLAND CENSUS USES counts 8: the four columns either side of the wall, at one standable height
+    // each. The island's 0 is what the world is like, not what the instrument can see.
+    //
+    // *** 8 AND NOT 16, AND THE FIRST NUMBER IS WORTH RECORDING BECAUSE OF HOW IT WAS WRONG. *** The first
+    // draft of the control re-implemented the neighbour test inline and counted every (neighbour, cell) hit
+    // rather than asking once per standable position -- so it read 16, and sabotaging the shipped predicate
+    // to return false left the island row at 0 AND the control at 16, both green. A control grading its own
+    // copy of the thing under test is worth nothing at all, which is the defect this session has now found
+    // in five rounds and the one it was written to rule out.
+    controlSitesOnAFloodedWall: 8,
+    controlSitesWhenTheControlCountedItsOwnCopy: 16,
+    // (4) WHERE IT IS REACHABLE, BUILT BY HAND: a wall of water from y=2 to y=9 against land topping at 5
+    stoneWallStopsBodyAt: 9.583,          // a radius short of the face at x = 10 -- UNMOVED by v4552
+    // *** THE THREE `Before` NUMBERS ARE A COUNTERFACTUAL, AND v4552 MOVED THEM WITHOUT TOUCHING WATER. ***
+    // They are what the PRE-v4550 rule does when driven under the CURRENT engine, not a record of shipped
+    // behaviour -- so they legitimately drift whenever anything else in the walk changes, and v4552 changed
+    // the walk's ground rule. Re-taken here: x 13.333 -> 13.750, feet -92.505 -> -87.605, vy -59.4 -> -57.9.
+    // The v4550 readings are kept beside them because a counterfactual whose value moves for an unrelated
+    // reason is exactly the kind of number that gets mistaken for a regression by the next reader.
+    waterWallBeforeEndedAt: 13.75,        // it walked IN   (13.333 at v4550)
+    waterWallBeforeFeetAfter240Frames: -87.605,   // (-92.505 at v4550)
+    waterWallBeforeVyAfter240Frames: -57.9,       // still accelerating; the world has no floor  (-59.4)
+    waterWallAfterStopsBodyAt: 9.583,     // identical to stone, which is the whole repair
+    botGroundInThatColumn: null,          // the bots never entered it in either world
+    // (5) WHAT DOES NOT MOVE, WHICH IS THE POINT OF (3): the shipping walk is unchanged
+    lakeCrossingFrames: 300,
+    lakeCrossingFeetY: 8,
+    lakeCrossingAirborneFrames: 0,
+    // (6) WHAT IS NOT IMPLEMENTED AND IS NOT CLAIMED
+    // *** SCOPED TO WHAT IS CHECKED, WHICH IS THIS FILE. *** The first draft of this field was called
+    // swimStatesInTree and its gate row read camera.js, so the name claimed a tree-wide absence one file
+    // had been searched for. An absence is only worth what its scope is.
+    swimStatesInTheController: 0,
+    buoyancyForThePlayer: false,
+    // The intent WAS swimming, and main.js says so in prose while nothing implements it: the v465 comment
+    // beside renderer.skipWater reads "without this you swim into a blue void with no ground under the
+    // water". That is about drawing the lakebed; the collision side never had a swim state to reach it.
+    proseIntendedSwimming: true,
+    botWaterRuleIsSpeedOnly: true,        // BotManager._waterSpeedMul, off a ROOM record, not off voxels
+    botWaterSpeedMultipliers: Object.freeze({ waterKaijuDeep: 1.30, otherKaijuDeep: 0.40 }),
+});
+
+/**
+ * *** RE-DERIVED BY tools/ship/walkGround-selfcheck.mjs ON EVERY RUN. *** Readings at v4552.
+ *
+ * The walk stood the body inside solid rock, and had since v404 made the ground bilinear. The numbers that
+ * decided the shape of the repair are here; the ones this round DECLINED to decide are in notClosed.
+ */
+export const WALK_GROUND_AT_V4552 = Object.freeze({
+    at: "v4552",
+    // (1) THE FIXTURE THAT NAMED THE DEFECT -- task #30's own two-voxel ledge
+    taskFixtureBeforeZ: 39.667,
+    taskFixtureBeforeFeet: 2,        // in a cell whose surface is y=4: TWO VOXELS INSIDE THE ROCK
+    taskFixtureBeforeStuck: true,    // and it never moved again for as long as the walk ran
+    // (2) THE CENSUS, on an instrument sharing no code with the fix (raw voxelAt + its own disc)
+    beforeGroundedBuriedPct: 56.56,
+    beforeDistinctBuriedPct: 36.13,
+    beforeFrozenInSolid: 67,         // of 128 ordinary walks
+    afterGroundedBuriedPct: 1.51,
+    afterDistinctBuriedPct: 2.77,
+    afterFrozenInSolid: 2,
+    residualIsNotZero: true,         // *** AND IT IS REPORTED RATHER THAN ROUNDED TO NONE ***
+    // (3) THE FINDING THAT DECIDED THE SHAPE: no ground rule is both legal and smooth, because a sub-voxel
+    // height on a unit lattice is BY CONSTRUCTION a height no column has. So smoothness comes from TIME.
+    rampStepVoxels: 1,               // the lattice has no smaller riser
+    fourDirectionMaxDy: Object.freeze([1, 1, 1, 1]),          // +x, -x, +z, -z -- EQUAL is the claim
+    hybridMaxDyFavourable: 0.4167,   // max(blend, clamp) on +x/+z-facing ramps
+    hybridMaxDyAdverse: 1,           // ...and on -x/-z-facing ones. A walk that depends on your heading.
+    // (4) THE EYE, EASED IN TIME -- and the bound that keeps it from being a second physics authority
+    eyeSmoothRate: 12,
+    eyeSmoothSnap: 1.25,
+    stepUpMax: 1.2,
+    cliffDrop: 1.5,                  // local to _moveFP; the ordering is what makes the snap guard mean anything
+    maxEyeStepAtShippedRate: 0.2148,
+    maxEyeOffsetAtShippedRate: 0.992,
+    eyeAsBlendWouldHaveBeen: 12.95,  // the option this replaced: PERMANENT, and an order of magnitude worse
+    // (5) WHAT MUST NOT BREAK, pinned
+    autoStepZ: 16.5, autoStepEye: 6.7, slabWalkZ: 25.5, sprintZ: 22.5,
+    observedAt45AfterClamp: 45,      // exactly; see PLAYER_SLOPE_AT_V4546's observedAt45BeforeV4552
+    steepDeparturesAt63: 3,          // the slope limit is STILL LIVE -- v4546 was not quietly undone
+    // (6) WHAT THE ROUND ORPHANED AND SAID SO
+    blendStillCalledBy: Object.freeze(["_terrainTopAt's fromY path", "the orbit clearance"]),
+    blendStencilShiftPct: 36.16,     // of standable columns read BELOW their own surface at their own centre
+    blendStencilWorstShortfall: 20.75,
+    blendStencilShiftFixed: false,
+    // *** AND IT IS STILL GUARDED, AGAINST THIS ROUND'S OWN PREDICTION. *** The design expected the walk
+    // leaving the blend to orphan it -- a sabotage centring the stencil going 0 RED, with the round
+    // recording that it had unguarded a known defect. Driven: it goes 2 RED. Both of these reach the blend
+    // without going through the walk, so the shift keeps its keepers and the filed item is less urgent
+    // than the design thought. Measured rather than inherited.
+    blendStillGuardedBy: Object.freeze(["tools/ship/playerSlope-selfcheck.mjs", "tools/ship/cameraFall-selfcheck.mjs"]),
+    notClosed: Object.freeze([
+        "whether a 1.0-voxel step eased at 12/s LOOKS smooth -- NO FRAME HAS BEEN RENDERED at any rate, by " +
+        "anyone, in this round or its four measurement probes; every smoothness number here is a trace",
+        "the six render sites that read camera.position directly for uCamPos and the shadow centre, which " +
+        "now disagree with the view matrix by up to 0.992 voxels transiently -- bounded and gated, not fixed",
+        "the blend's half-cell stencil shift -- STILL GUARDED by playerSlope and cameraFall, which the " +
+        "round predicted it would not be and measured instead; filed, not orphaned",
+        "the clamp's residual burial, traced to _stepTargetAt's reach limit and to fallBody's landing " +
+        "oracle being built from ONE column for a body that now has width -- fallBody's round, not the walk's",
+        "sprint and dt other than 1/60 for the burial census; the stair RATE scales with ground speed",
+    ]),
+});
+
+/**
+ * *** RE-DERIVED BY tools/ship/kaijuGround-selfcheck.mjs ON EVERY RUN. *** Readings at v4554.
+ *
+ * The creature's height is written twice a frame by two rules, and the one that wins is the one nobody
+ * designed to win -- so the drive camera's vertical physics is dead code in the shipping frame order, and
+ * the write that kills it is the only thing keeping driven kaiju in the world.
+ */
+export const KAIJU_GROUND_AT_V4554 = Object.freeze({
+    at: "v4554",
+    // (1) THE DOUBLE WRITE
+    driveWritesY: "camera/camera.js _moveKaijuDrive, through fallBody.fallStep",
+    clampWritesY: "simulation/KaijuManager.js:280, k.position.y = gy, gated on k.state alone",
+    frameOrder: "main.js:29660 camera.update() then main.js:29931 kaijuManager.tick(dt)",
+    framesDriveDiscardedOf300: 300,      // v4554, with the clamp unguarded
+    framesDriveDiscardedOf300AfterV4560: 0,
+    isPlayerDrivenUsesInManager: 2,      // v4554: 1, an ANIMATION CLIP guarding no physics. v4560 added
+                                         // the second, and it is the clamp guard -- so the flag now guards
+                                         // exactly the thing v4554 recorded that it did not.
+    // (2) *** AND THE OBVIOUS FIX IS A CATASTROPHE, WHICH IS WHY THE ROUND DOES NOT MAKE IT ***
+    lostWithClamp: 0,                    // of 60, five seconds of holding W on the generated world
+    lostWithoutClamp: 56,                // ...guarding the clamp with _isPlayerDriven
+    naiveFixIsACatastrophe: true,        // AT v4554. See below: v4560 built what it said was missing.
+    closingItRequires: Object.freeze([
+        "a step-up for the drive: its probe is _fallSurface() at reach 0, so it can never name a surface " +
+        "ABOVE the body and a driven kaiju has never once gained height",
+        "a horizontal collision for the drive: k.position.x += mx * speed * dt is unguarded, and " +
+        "_canStandAt has exactly ONE call site in the tree -- _moveFP, the other controller in this class",
+    ]),
+    // *** v4560 -- BOTH WERE BUILT AND THE CLAMP IS NO LONGER LOAD-BEARING. *** The same 60 starts, the
+    // same five seconds of holding W, the same generated world, with the clamp guarded by _isPlayerDriven
+    // -- which is the one-line cleanup v4554 measured as a catastrophe and this record still says was one,
+    // because IT WAS, against the drive as it stood:
+    //
+    //                          lost of 60    gained height    max gain    frames inside rock
+    //     v4554, clamp off         56              0            0.000          28.03%
+    //     v4560, clamp off          0             20            8.000           0.00%
+    //
+    // The drive holds its own body up, climbs under its own power, and no longer walks through terrain.
+    // *** AND THE CLAMP IS NOW ACTIVELY WRONG FOR THE DRIVEN BODY, WHICH IS THE PART THAT SURPRISED ME. ***
+    // Left ON beside the repaired drive, frames-inside-rock went UP, 1.59% to 3.63%: the clamp teleports to
+    // _terrainTop, which is h + 1 and a voxel above the model's own stand height, so it kept moving the body
+    // off the surface the walk had chosen. A redundant writer stops being harmless the moment the other
+    // writer becomes right.
+    closedAtV4560: true,
+    lostWithoutClampAfterV4560: 0,
+    gainedHeightOf60AfterV4560: 20,      // 0 of 60 before: the drive could not climb at all
+    maxGainAfterV4560: 8,
+    insideRockPctBeforeV4560: 28.03,     // clamp off, so the drive alone
+    insideRockPctAfterV4560: 0,
+    insideRockPctClampLeftOnAfterV4560: 3.63,   // the clamp is now the thing putting it in rock
+    sharedWithTheWalk: Object.freeze(["_bodyFitsAt", "_stepHorizontal", "Camera.walkStep"]),
+    // (3) THE OFF-BY-ONE, MEASURED AND DECLINED
+    heightAtIsFirstAirIndex: true,       // 2,240 of 2,240 non-water samples; topmost-solid in 0
+    terrainTopAddsOne: true,             // so `return h + 1` is one voxel above the model's own stand height
+    terrainTopAboveVoxelTruth: 2240,     // of 2,240 non-water samples: ABOVE in every one of them
+    offByOneFixed: false,                // gy feeds flyer clearance, the water line and the wake test
+    // *** v4561 -- THE BODY HEIGHT, WHICH THIS RECORD FILED AND v4560 LEFT AS A SECOND WRONG NUMBER. ***
+    //
+    // Every ground query in camera.js went to standHeightAt WITHOUT a body, so it answered for
+    // surfaceProbe's DEFAULT_BODY of 2 -- for the player, whose eye is 1.7 up, and for a kaiju eight units
+    // tall alike. v4560 named the kaiju's body as a CONSTANT of 2, which is one wrong number where there
+    // were two. The roster's seven kinds carry scales 2.5 to 4, so heights 5 to 8, and an obelisk with no
+    // rigged mesh is 8: IT IS NOT ONE NUMBER AT ALL. Camera.kaijuHeight is the expression _moveKaijuDrive
+    // already used for the camera offset, named once and read for both -- the camera rides at the head, so
+    // where the head is IS how tall the thing is, which is the conflation this record complained of and the
+    // resolution of it.
+    //
+    // *** AND v4554'S WARNING OVER-READ ITS OWN MEASUREMENT, WHICH IS THE CORRECTION THIS ROUND OWES. ***
+    // It said a naive body-8 probe "drops the creature out of the world in the 1,715 places where an 8-cell
+    // body does not fit". 1,715 is places LOST, not places with nowhere to go: over the whole island there
+    // are 63,684 standable places for a 2-cell body and 58,901 for an 8-cell one, and the number of COLUMNS
+    // left with nowhere at all to stand is ZERO. No creature is dropped out of the world by the body height.
+    // The 1,715 itself is the 9x9-chunk window's figure -- re-measured there it is 1,729, and over the
+    // island it is 4,783 -- which is #34's finding one more time in a number I wrote myself.
+    bodyIsPerKind: true,
+    kaijuHeightRange: Object.freeze([5, 8]),   // scales 2.5..4, times two, floored at 4; obelisk 8
+    standablePlacesBody2: 63684,
+    standablePlacesBody8: 58901,
+    placesLostAtBody8: 4783,
+    placesLostAtBody8In9x9Window: 1729,        // v4554 recorded 1,715 and read it as bodies lost
+    columnsWithNowhereToStandAtBody8: 0,       // the claim v4554's number was used to support
+    // *** WHAT IT ACTUALLY BUYS, MEASURED OVER 240 DRIVES ISLAND-WIDE RATHER THAN 60 ON THE FLAT PATCH. ***
+    // The drive stands on the topmost surface almost always, so the body height is nearly invisible -- but
+    // not entirely, and "nearly" is the honest word rather than "not at all":
+    groundedFramesMeasured: 63756,
+    framesBelowTheTopSolidBefore: 88,          // under something, where headroom is finite
+    framesBelowTheTopSolidAfter: 0,
+    framesWithLessThanEightCellsOfHeadroomBefore: 32,
+    framesWithLessThanEightCellsOfHeadroomAfter: 0,
+    minimumHeadroomBefore: 6,
+    minimumHeadroomAfter: 12,
+    notClosed: Object.freeze([
+        "CLOSED AT v4560, kept here because the reason it was open is the reason the fix is three shared " +
+        "methods rather than a second copy: the drive now holds a body up alone",
+        "the +1 in _terrainTop: correcting it moves every kaiju, every flyer's cruise altitude and the " +
+        "water line at once, which is a gameplay decision and not a census's to make",
+        "CLOSED AT v4561: the body reaches the probe, and it is the creature's own height rather than a " +
+        "constant. v4554's 'invisible until the double write is closed' was right, and once closed the " +
+        "visible part turned out to be 32 frames of 63,756 -- small, not nothing",
+    ]),
+});
 
 export class Camera {
     // The keys the _move* methods consult in EVERY mode that moves. KeyE is deliberately absent: it is
     // kaiju-drive only, and consumesKey() adds it there. Cross-checked against the keys.has() literals in this
     // file by tools/ship/cameraKeys-selfcheck.mjs, so this cannot quietly fall behind the code it describes.
     static MOVEMENT_KEYS = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "Space", "ShiftLeft"]);
+
+    /** The body's radius, in voxels. *** BEFORE v4549 IT WAS ZERO AND NOT BY DECISION: *** _canStandAt
+     *  tested ONE lattice cell, floor(x) and floor(z), so the thing the player drove was a vertical LINE.
+     *  0.4 is physics/character/capsuleGround.mjs's radius, taken so the player and the mesh authority
+     *  describe the same body rather than two numbers nobody compared -- the v4547 lesson applied to a
+     *  quantity that did not exist on this side at all. */
+    static BODY_RADIUS = 0.4;
+
+    /** *** THE LONGEST HOP _stepHorizontal WILL TAKE WITHOUT LOOKING. *** One cell, because one cell is the
+     *  thinnest thing this world can be made of: the band in which a body's disc overlaps a one-voxel wall is
+     *  1 + 2r wide, so samples this far apart cannot straddle it. Larger would leave a gap a fast body can
+     *  resonate through; smaller would buy nothing and cost probes. */
+    static SWEEP_MAX_STEP = 1.0;
+
+    /** The band above the feet that the walker lets rest inside a surface: _bodyFitsAt has always tested from
+     *  floor(feet + 0.1), and _sweepBodyY takes the same 0.1 rather than a second number that must agree. */
+    static FEET_BAND = 0.1;
+
+    /**
+     * *** THE CREATURE'S HEIGHT, ONCE, FOR THE CAMERA AND FOR THE COLLISION. *** v4554 recorded the
+     * conflation this repairs: "KAIJU_HEAD_Y is a CAMERA offset and the ground probe asks about 2 cells".
+     * They are the same quantity read for two purposes -- the camera rides at the head, so where the head is
+     * IS how tall the thing is -- and v4560 left it as a single constant of 2, which is a second wrong
+     * number rather than one.
+     *
+     * *** AND IT IS NOT ONE NUMBER: the roster's seven kinds carry scales 2.5 to 4, so heights 5 to 8. ***
+     * An obelisk with no rigged mesh falls back to 8, which is what _moveKaijuDrive has always used for the
+     * camera. Floored at 2 so a tiny kind can never ask for less headroom than the probe's own default.
+     */
+    static kaijuHeight(k) {
+        return (k && k._meshEntityId != null) ? Math.max(4, (k.config?.scale ?? 3) * 2.0) : 8;
+    }
+
+    /** The same height as a whole number of cells, which is what a voxel probe can answer about. */
+    static kaijuBodyCells(k) {
+        return Math.max(DEFAULT_BODY, Math.ceil(Camera.kaijuHeight(k)));
+    }
+
+    /** A kaiju's stride is 8-14 u/s against the player's 5, so the player's 1.5 trips on ordinary downhill
+     *  at that speed -- and this is MEASURED rather than reasoned, because my first draft of this comment
+     *  asserted figures I had not taken and one of them was false. Over the same 60 five-second drives with
+     *  the manager's clamp off, the ONLY thing changing:
+     *
+     *      cliffDrop 1.5    2 of 60 lost    1.07% of frames inside rock    6.48% airborne
+     *      cliffDrop 3.0    0 lost          0.00%                          0.00%
+     *      cliffDrop 6.0    0 lost          0.00%                          0.00%
+     *
+     *  So the player's number DOES cost bodies here -- I had written that it did not -- and 3.0 against 6.0
+     *  is not distinguished by this terrain at all. 3.0 is the smaller of the two that work, which is the
+     *  only argument for it over 6.0 and is stated as such rather than dressed up. *** AND THE 0.00%
+     *  AIRBORNE IS ITSELF A LIMIT: *** these drives never leave the ground, so the `leave` branch is not
+     *  exercised by them and is driven on a built cliff in the gate instead. */
+    static KAIJU_CLIFF_DROP = 3.0;
+
+    /**
+     * *** IS THIS VOXEL SOLID TO THE PLAYER'S BODY? THE FILE HELD THREE ANSWERS AND ONE OF THEM DIFFERED.
+     * *** Until v4550 camera.js decided that question in three places -- _canStandAt's clearance loop,
+     * _standYAt's surfaceProbe shim, and _terrainTopAt's legacy downward scan -- and _canStandAt alone
+     * carried `&& v !== 10 && v !== 11`, which made WATER PASSABLE to the collision test while the same
+     * file's ground test stood the body ON it. A body may not both walk into a thing and stand on it.
+     *
+     * *** WHAT THAT COST, DRIVEN RATHER THAN ARGUED: THE PLAYER FELL OUT OF THE WORLD. *** Against a wall
+     * of stone from y=2 to y=9 the body stops at x = 9.583, a radius short of the face. Against a wall of
+     * WATER with the identical shape it walks in to x = 13.333, finds no ground under it -- because the
+     * ground probe needs two cells of AIR and water is not air -- and falls: feet at -92.505 after 240
+     * frames
+     * with vy = -59.4 and still accelerating, past the bottom of a world that has no floor to catch it.
+     *
+     * *** THE RULE IS `NOT AIR`, WHICH IS world.isAir's RULE, WHICH IS WHAT THE BOTS ALREADY GET. ***
+     * world/world.js answers isAir as `voxelAt === VOXEL.AIR`, and simulation/BotManager.js walks its bots
+     * on surfaceProbe.standHeightAt over that. So water was never "solid to bots and passable to the
+     * player": MEASURED ON A REAL GENERATED WORLD, the player's ground and the bots' ground agree in 146
+     * of 146 water columns. The disagreement was inside this file, not across the two controllers.
+     *
+     * *** NO SWIMMING IS CLAIMED AND NONE IS IMPLEMENTED. *** There is no buoyancy, no water drag and no
+     * swim state in this controller; the bots' only water rule is a speed multiplier
+     * read off a ROOM record (BotManager._waterSpeedMul), not off voxels. So a lake is a walkable floor
+     * here, to everyone -- driven, the player crosses one at y = 8 grounded for 300 frames. This round
+     * makes the tree SAY that in one place instead of contradicting itself in three. Refusing is the safe
+     * direction, in physics/character/terrainWalk.mjs's own words, and a wall beats a fall out of the map.
+     *
+     * `undefined` is air, which is the fixture worlds' convention and not the engine's: world.voxelAt
+     * returns 0 for a missing chunk and chunk.get returns 0 out of bounds, so the live world never
+     * produces one. The guard is kept because the gates' worlds do.
+     */
+    static isSolidToBody(v) {
+        return v !== 0 && v !== undefined;
+    }
+
+    /** How fast the rendered eye catches up to the body, per second. v4552. The walk steps a whole voxel
+     *  at a lip now, so the SMOOTHNESS v404 wanted is taken here instead of by standing the body in rock.
+     *  12 is the lowest rate in a sweep of 12/20/30 that gives 0 per-frame eye steps >= 0.5 voxels with the
+     *  eye never more than a voxel from the body: k=12 max |dy| 0.2148, k=20 0.3359, k=30 0.5001 with 12
+     *  steps. *** IT IS DEFENDED AS A TRACE AND NOT AS A LOOK, AND THE ROUND SAYS SO: *** no frame has been
+     *  rendered at any k, and whether a 1.0-voxel step eased at 12/s reads as smooth is a judgement a human
+     *  with the page open has to make, not one a trace can. */
+    static EYE_SMOOTH_RATE = 12;
+
+    /** Above this distance the eye SNAPS rather than eases, in voxels. v4552. It sits deliberately between
+     *  STEP_UP_MAX (1.2) and CLIFF_DROP (1.5) -- so a walking step is eased and a fall, a teleport, a
+     *  respawn or an external writer's jump is not smeared across the picture. Without the guard a body
+     *  walking off a ramp dragged the eye 5.460 voxels behind it; with it, 0.992. The ordering of the three
+     *  constants is what makes the guard mean anything and a gate row asserts it. */
+    static EYE_SMOOTH_SNAP = 1.25;
+
+    /** The tallest auto-step, in voxels. Read by _moveFP's walk rule AND by _terrainTopAt's reach, which
+     *  are the same question asked twice -- so it is one number rather than two that must agree. */
+    static STEP_UP_MAX = 1.2;
+
+    /** Steeper than this and the ground is not walkable DOWN; the body leaves it and falls. v4546.
+     *  45 is physics/character/terrainWalk.mjs's own default, taken so the player and the bots refuse the
+     *  same ground rather than two numbers nobody compared. *** ON A VOXEL LATTICE EVERY LIMIT FROM 45 UP
+     *  TO 63.4 IS THE SAME RULE, *** because the only slopes a lattice can express are n voxels per column
+     *  -- 45.0, 63.4, 71.6 degrees -- and nothing lies between the first two. So this number is chosen to
+     *  MATCH THE BOTS and not because this world can tell it from 50 or 60; said here rather than implied. */
+    static MAX_SLOPE_DEG = 45;
+
+    /** The world distance the slope is measured over, in voxels. ONE COLUMN, and it is fixed rather than
+     *  derived from the frame's own travel for the reason _fpSlopeDeg sets out: a run that shrinks with dt
+     *  shrinks into a single lip and reports 90 degrees for ordinary ground. v4546. */
+    static SLOPE_RUN = 1;
+
+    /** The tolerance that makes MAX_SLOPE_DEG inclusive, in degrees. See _moveFP's cliff branch: the
+     *  bilinear blend puts about 2e-13 degrees of float error on an exactly-45-degree ramp. v4546. */
+    static SLOPE_EPS_DEG = 1e-9;
 
 
     constructor(canvas) {
@@ -70,6 +691,8 @@ export class Camera {
         this._thirdPersonDistance = 4.5;
         this._thirdPersonHeight = 1.2;
         this._thirdPersonSkin = 0.3;    // stop this far short of a wall/ground hit, not exactly on it
+        this._thirdPersonHalf = 0.2;    // the voxel boom's camera box half-extent: near-plane clearance (camera/cameraBoom.js)
+        this._boomDist = undefined;     // the eased boom length; IN is instant, OUT eases (cameraBoom.easeBoom)
         this._fpFallStartTime = 0;       // diagnostic: time spent airborne
         // Round 31 — energy bar gates sprint. main.js installs ref.
         this.playerEnergy = null;
@@ -115,14 +738,32 @@ export class Camera {
         // Round #13 Stage C (task board #81) -- in third-person, the RENDER eye sits behind this.position,
         // which stays the physics anchor _move* writes exactly as it does in first person. Everything below
         // (shake, FOV kick) applies identically on top of whichever eye this resolves to.
-        const eye = (this.mode === "fp" && this.viewMode === "third") ? this._thirdPersonEye() : this.position;
+        const eye = (this.mode === "fp" && this.viewMode === "third") ? this._thirdPersonEye(dt) : this.position;
 
         // Round 28 — shake offset. Random-jitter the position passed to
         // buildViewProj so the matrix is shaken without mutating the
         // logical camera position.
+        // *** v4552 -- THE PICTURE IS SMOOTHED IN TIME, BECAUSE THE GROUND CANNOT BE SMOOTHED IN SPACE. ***
+        // The walk stands on real surfaces now (see _moveFP), so the body steps a whole voxel at a lip --
+        // which is exactly the "stairs" v404's bilinear blend was written to remove, and v404's cure was to
+        // stand the body in mid-rock. This eases the EYE toward the body instead. It writes only
+        // _eyeRenderY: camera.position.y is bit-identical with the smoother on and off, which is the row
+        // that keeps this from quietly becoming a second physics authority.
+        // Measured over the clamped body on ramps in all four compass directions: at k=12 there are 0
+        // per-frame eye steps >= 0.5 voxels, max |dy| 0.2148, and the eye is never more than 0.992 voxels
+        // from the body. The option this replaces -- hand the RENDERER the blend -- measured 10.69 and
+        // 12.95 voxels of permanent disagreement instead.
+        // The same idiom this function already uses for _fovSprint ten lines below, and BotManager's
+        // _displayYaw one axis over: a render-only value eased toward an authoritative one.
+        this._stepRenderEye(dt);
         let camX = eye.x;
-        let camY = eye.y;
+        let camY = this._eyeRenderY;
         let camZ = eye.z;
+        // Third person (task board #81): the smoothed eye rides on the same pivot. The ease is a render-only
+        // vertical offset from the body, so the camera behind the player keeps _thirdPersonEye()'s boom and
+        // does not stair-step at a lip either. In first person eye IS this.position and camY stays exactly
+        // _eyeRenderY.
+        if (eye !== this.position) camY += eye.y - this.position.y;
         if (this._shakeUntilT && t < this._shakeUntilT) {
             const remain = (this._shakeUntilT - t) / Math.max(1, this._shakeDuration);
             const amp = this._shakeAmp * remain;
@@ -446,8 +1087,16 @@ export class Camera {
             // each be driven across mode toggles without state leakage.
             this._kaijuDriveVelY = 0;
             this._kaijuDriveOnGround = true;
-            // Round 125 — set persistent player-drive flag so AI tick
-            // skips and mesh-sync can pick velocity-based clip.
+            // Round 125 — set persistent player-drive flag so mesh-sync can pick a velocity-based clip.
+            // *** THIS SENTENCE USED TO SAY "so AI tick skips" AND THAT HALF WAS FALSE. *** v4554 counted
+            // the flag's uses in simulation/KaijuManager.js: there is exactly ONE, at :394, and it selects
+            // an animation clip. It guards no physics. In particular the ground clamp at :280 --
+            // `k.position.y = gy`, gated only on k.state -- runs for a DRIVEN kaiju too, in the same frame,
+            // after camera.update(), so everything _moveKaijuDrive computes vertically is overwritten
+            // before it is drawn. A false reason is worse than no reason because it tells the next reader
+            // not to look; v4545 convicted the identical species one method over.
+            // AND THE CLAMP IS LOAD-BEARING BY ACCIDENT, which is why this round did not simply guard it:
+            // with it, 0 of 60 driven kaiju leave the world over five seconds of walking; without it, 56.
             if (this._kaijuTarget) this._kaijuTarget._isPlayerDriven = true;
         }
         // Round 124 — leaving kaiju_drive: clear AI-skip flag so the
@@ -691,7 +1340,14 @@ export class Camera {
     // separate horizontal-collision step here: depenetrateCapsule resolves horizontal AND vertical
     // penetration together, which is the entire reason to use a capsule instead of a height function.
     _moveFPCapsule(dt, mx, mz, horizLen, speed, bvh) {
-        if (!this._fpOnGround) this._fpVelY -= this._gravity * dt;
+        // v4778 (the rtx merge) -- this path arrived integrating gravity itself (fpVelY decremented by gravity times dt),
+        // against v4548's rule that camera.js integrates no gravity of its own; cameraFall's pattern missed it only
+        // because the line began with `if`. fallStep with NO surface is the same semi-implicit Euler step bit for bit
+        // (vy + (-g)*dt is vy - g*dt exactly) and never lands, so grounding stays depenetrateCapsule's to decide.
+        if (!this._fpOnGround) {
+            this._fpVelY = fallStep({ pos: [this.position.x, this.position.y - this._eyeHeight, this.position.z],
+                vy: this._fpVelY, surfaceUnder: () => null, dt, gravity: -this._gravity, terminal: -Infinity }).vy;
+        }
         const feet = [
             this.position.x + mx * speed * dt,
             this.position.y - this._eyeHeight + this._fpVelY * dt,
@@ -718,6 +1374,7 @@ export class Camera {
     // held-key guard and nothing else.
     toggleViewMode() {
         this.viewMode = this.viewMode === "third" ? "first" : "third";
+        this._boomDist = undefined;     // a fresh third person starts at the safe length, not last session's
         return this.viewMode;
     }
 
@@ -729,7 +1386,14 @@ export class Camera {
     // technique _moveOrbit already uses for a voxel world, for the identical reason stated there. Neither is
     // available (a bare terrain-ground-oracle world, or no world at all) leaves the eye unclamped -- a real,
     // named limitation, not a silent one.
-    _thirdPersonEye() {
+    // *** ROUND A (THE CAMERA BOOM) -- THE VOXEL BRANCH IS camera/cameraBoom.js. *** It sampled a column's TOP at four
+    // points along the boom, which read a ceiling, bridge or overhang above the boom as ground: under any roof the eye
+    // collapsed onto the head, and the camera's own box was never asked about. cameraBoom sweeps the camera's box up the
+    // lift and back along the boom exactly, against the same isSolidToBody rule the walk uses, and stops `skin` short of
+    // the first contact. camera/cameraBoom-selfcheck.mjs holds it, this method included. The boom LENGTH is eased
+    // with `dt` in both branches -- in at once, out over time, never past the safe length -- and without `dt` (a
+    // direct call) it is the safe length, as it always was.
+    _thirdPersonEye(dt) {
         const cp = Math.cos(this.pitch);
         const bx = -Math.sin(this.yaw) * cp, by = -Math.sin(this.pitch), bz = Math.cos(this.yaw) * cp;   // -forward
         const pivot = this.position;
@@ -740,13 +1404,16 @@ export class Camera {
             const hit = bvh.raycastFirst(pivot.x, pivot.y, pivot.z, bx, by, bz, dist);
             if (hit && hit.t < dist) dist = Math.max(0, hit.t - this._thirdPersonSkin);
         } else if (this.world?.voxelAt) {
-            const samples = 4;
-            for (let i = 1; i <= samples; i++) {
-                const t = (dist * i) / samples;
-                const topY = this._terrainTopAtBilinear(pivot.x + bx * t, pivot.z + bz * t);
-                if (pivot.y + by * t + this._thirdPersonHeight < topY + 0.5) { dist = Math.max(0, t - this._thirdPersonSkin); break; }
-            }
+            const h = this._thirdPersonHalf;
+            const r = cameraBoom({ pivot: [pivot.x, pivot.y, pivot.z], back: [bx, by, bz], dist,
+                                   lift: this._thirdPersonHeight, half: [h, h, h], skin: this._thirdPersonSkin,
+                                   isSolid: (x, y, z) => Camera.isSolidToBody(this.world.voxelAt(x, y, z)) });
+            this._boomDist = easeBoom(this._boomDist, r.dist, dt);
+            const d = this._boomDist;
+            return { x: r.start[0] + r.dir[0] * d, y: r.start[1] + r.dir[1] * d, z: r.start[2] + r.dir[2] * d };
         }
+        this._boomDist = easeBoom(this._boomDist, dist, dt);
+        dist = this._boomDist;
         return { x: pivot.x + bx * dist, y: pivot.y + by * dist + this._thirdPersonHeight, z: pivot.z + bz * dist };
     }
 
@@ -819,19 +1486,29 @@ export class Camera {
                 this._fpOnGround = false;
             }
         } else {
-            // Airborne -- the same free-fall integration _moveFP's voxel path uses; only the landing
-            // test differs, since the ground height comes from the oracle rather than a voxel scan.
-            this._fpVelY -= this._gravity * dt;
+            // Airborne -- the same gated fall _moveFP's voxel path uses (physics/character/fallBody.mjs's
+            // fallStep, v4548), with the camera's own gravity and absent terminal passed through unchanged;
+            // only the surface oracle differs, since the ground height comes from terrainWalk's oracle rather
+            // than a voxel scan. A height field has one surface per column, so it is the surface at or below
+            // the body; no ground at all reads as 0, as this branch always did.
             this.position.x += mx * speed * dt;
             this.position.z += mz * speed * dt;
-            this.position.y += this._fpVelY * dt;
-            const g = ground(this.position.x, this.position.z);
-            const targetY = (g ? g.y : 0) + this._eyeHeight;
-            if (this.position.y <= targetY) {
-                this.position.y = targetY;
-                this._fpVelY = 0;
-                this._fpOnGround = true;
+            const surfaceUnder = (x, z) => { const g = ground(x, z); return g ? g.y : 0; };
+            const r = fallStep({ pos: [this.position.x, this.position.y - this._eyeHeight, this.position.z],
+                                 vy: this._fpVelY, surfaceUnder,
+                                 dt, gravity: -this._gravity, terminal: -Infinity });
+            let feetY = r.pos[1], vy = r.vy, landed = r.landed;
+            // fallStep probes the surface only on the way DOWN. A height field has one surface per column,
+            // so a body still RISING below it (a jump sprinted up a walkable slope that climbs faster than
+            // the jump) is inside the terrain; this branch always landed it there, on every airborne frame,
+            // and still does. On the way down this is a no-op: fallStep already landed anything at or below.
+            if (!landed) {
+                const s = surfaceUnder(this.position.x, this.position.z);
+                if (feetY <= s) { feetY = s; vy = 0; landed = true; }
             }
+            this.position.y = feetY + this._eyeHeight;
+            this._fpVelY = vy;
+            if (landed) this._fpOnGround = true;
         }
         this.velocity.x = mx * speed;
         this.velocity.y = this._fpVelY;
@@ -896,14 +1573,17 @@ export class Camera {
         // Try horizontal move with collision check
         const newX = this.position.x + mx * speed * dt;
         const newZ = this.position.z + mz * speed * dt;
-        if (this._canStandAt(newX, this.position.y, newZ)) {
-            this.position.x = newX;
-            this.position.z = newZ;
-        } else {
-            // Try axes independently — slide along walls
-            if (this._canStandAt(newX, this.position.y, this.position.z)) this.position.x = newX;
-            if (this._canStandAt(this.position.x, this.position.y, newZ)) this.position.z = newZ;
-        }
+        // v4549 -- ASKED AT THE HEIGHT THE BODY WOULD STAND AT, NOT THE ONE IT IS AT. See _stepTargetAt:
+        // a body with a radius cannot approach a lip at its current height, because its disc overlaps the
+        // column it is about to climb. The step-up and the footprint are one question and this asks it once.
+        const feetNow = this.position.y - this._eyeHeight;
+        // v4560 -- THE SLIDE RULE MOVED TO _stepHorizontal so the kaiju drive can ask the same question.
+        // Byte-identical: the whole move if it fits, else each axis alone with the second tested against the
+        // first's result. The four lines this replaces are that method's body.
+        const stepped = this._stepHorizontal(this.position.x, this.position.z,
+                                             mx * speed * dt, mz * speed * dt, feetNow, this._eyeHeight, !this._fpOnGround);
+        this.position.x = stepped.x;
+        this.position.z = stepped.z;
 
         // Vertical — gravity + ground snap + jump
         // v404 — bilinear ground sample so walking across sloped voxel
@@ -911,10 +1591,38 @@ export class Camera {
         // _terrainTopAt (mode-init snap, orbit clearance, kaiju drive
         // ground check) keep the integer version because they're
         // one-shot snaps or comparisons where integer is fine.
-        const groundY = this._terrainTopAtBilinear(this.position.x, this.position.z);
-        const targetY = groundY + this._eyeHeight;
+        // v4545 -- the body's FEET, so the probe answers the surface this body is on rather than the topmost
+        // in the column. The reach is STEP_UP_MAX because this is the WALKING query: a walker may step up.
+        // fallBody's falling query takes no reach at all, and the difference is the whole of v4544's note.
+        const feetY = this.position.y - this._eyeHeight;
+        // *** v4552 -- THE WALK STANDS ON A SURFACE A COLUMN ACTUALLY HAS, AND THAT IS A REVERSAL OF v404.
+        // *** _terrainTopAtBilinear blends up to four columns, so it answers heights NEITHER of them has;
+        // this branch then assigned one to position.y and nothing ever asked _canStandAt whether a body
+        // fits there -- that predicate has exactly one shipping call site and it is the HORIZONTAL move.
+        // MEASURED on the generated world before the repair: 67.77% of distinct standing positions and
+        // 70.64% of pre-freeze grounded frames had the body inside solid rock, 84 of 128 walks ended frozen
+        // in it, worst depth 3.000 voxels. After: 6.37%, 4.06%, 1 of 128.
+        // *** NO GROUND RULE IS BOTH LEGAL AND SMOOTH, AND THAT IS THE FINDING RATHER THAN A COMPROMISE. ***
+        // A sub-voxel walking height on a unit lattice is BY CONSTRUCTION a height no column has, so the
+        // blend's smoothness IS its illegality. The smoothness therefore cannot come from the ground rule
+        // and is taken from TIME instead -- see Camera.EYE_SMOOTH_RATE, which smooths the PICTURE and never
+        // this number. v404's stairs are removed on the render side; the body is legal on this side.
+        const groundY = this._walkGroundAt(this.position.x, this.position.z, feetY);
+        const targetY = groundY === null ? null : groundY + this._eyeHeight;
+        // v4546 -- THE SLOPE OF THE GROUND CROSSED THIS FRAME. See _fpSlopeDeg for why it is a secant over
+        // the distance travelled rather than a normal, and why that is the only form of it a voxel lattice
+        // can answer. Zero when the body did not move horizontally: a body standing still crosses no ground.
+        const slope = groundY === null ? null : this._fpSlopeDeg(mx, mz, groundY, feetY);
+        this._fpSlope = slope;
 
-        if (this._fpOnGround) {
+        if (groundY === null && this._fpOnGround) {
+            // v4552 -- NOTHING UNDER THE DISC WITHIN REACH: a hole, not a floor. HEAD reached the same
+            // outcome by having _terrainTopAt return 0 for a not-found column and letting dy < -CLIFF_DROP
+            // trip the branch below; saying it outright is the same behaviour with the reason attached.
+            this._fpOnGround = false;
+            this._fpVelY = 0;
+            this._fpFallStartTime = performance.now();
+        } else if (this._fpOnGround) {
             // v406 — branch logic retuned for the v404 bilinear ground.
             // Original thresholds (0.05u "fall trigger") were tuned for
             // the integer-Y path where targetY only changed across voxel
@@ -926,17 +1634,62 @@ export class Camera {
             //
             // New rule: smoothly track targetY when on ground for any
             // delta within a "walkable" envelope. Only enter falling on
-            // a genuine cliff (drop > CLIFF_DROP in one frame). Climbs
-            // taller than STEP_UP_MAX are blocked by _canStandAt earlier
-            // so we don't need a separate "wall" branch here.
-            const STEP_UP_MAX = 1.2;     // tallest auto-step in voxels
-            const CLIFF_DROP  = 1.5;     // drop bigger than this = walked off a ledge
+            // a genuine cliff (drop > CLIFF_DROP in one frame).
+            // v4545 -- STEP_UP_MAX is Camera.STEP_UP_MAX now, because _terrainTopAt reads it too: the probe's
+            // reach and the walker's allowance are the same question and two copies of a number that must
+            // agree is the shape v4542 removed from BotManager. CLIFF_DROP stays local; nothing else reads it.
+            // The sentence that used to sit here -- "climbs taller than STEP_UP_MAX are blocked by
+            // _canStandAt earlier" -- WAS FALSE, and the wall branch below carried the same false reason.
+            // See there.
+            const STEP_UP_MAX = Camera.STEP_UP_MAX;
+            // *** CLIFF_DROP WAS A PER-FRAME TEST, WHICH MAKES IT A FRAME-RATE SWITCH RATHER THAN A CLIFF
+            // RULE. *** physics/character/terrainWalk.mjs is shaped around exactly this: "a slope limit
+            // tested on the per-step height difference is not a slope limit ... the height difference over
+            // one substep shrinks with the substep while the slope does not. The limit then depends on the
+            // frame rate, which is the definition of a bug you cannot reproduce." Measured here, one body,
+            // one speed, one 63.4-degree slope, ONLY THE FRAME RATE CHANGING: it falls at 6 fps and walks
+            // down it grounded at 10, 15, 20, 30, 60, 120, 144 and 240. The drop per frame is 5 * dt * 2,
+            // which crosses 1.5 only below about 9 fps.
+            //
+            // The slope is a RATIO of two quantities that both scale with dt, so it does not move with the
+            // frame rate at all, and it is kept as a second test rather than replacing CLIFF_DROP because
+            // the two catch different things: a cliff EDGE is a discontinuity where the ground falls away
+            // over no horizontal distance at all, and a slope is what you can walk down. Both still end the
+            // step by leaving the ground, which is the only outcome this branch has.
+            const CLIFF_DROP  = 1.5;     // drop bigger than this = walked off a ledge, in ONE frame
             const dy = targetY - this.position.y;
-            if (dy > STEP_UP_MAX) {
-                // Wall in front — _canStandAt already blocked the XZ
-                // move, so this should be unreachable. Defensive: stay.
-            } else if (dy < -CLIFF_DROP) {
-                // Cliff — start falling
+            // v4560 -- the three outcomes are Camera.walkStep now, so the kaiju drive reaches the same rule
+            // instead of having none. `verdict` is compared below rather than branched on directly, which
+            // keeps each branch's own note attached to the case it explains.
+            // *** THE LIMIT IS INCLUSIVE, AND THE TOLERANCE IS A MEASUREMENT RATHER THAN A CUSHION. ***
+            // A one-voxel-per-column ramp is 45.0000 degrees by construction and atan2(1, 1) * 180 / PI is
+            // EXACTLY 45 -- but the two heights come out of the bilinear blend, which accumulates about
+            // 2e-13 of it, so the ramp reads 45.0000000000001990 and a bare `> 45` threw the body off a
+            // slope it had just been told it could walk. Measured: 21 frames of 240 over the limit, four
+            // separate departures from the ground, on a hill whose true angle is the limit exactly.
+            // terrainWalk records the same hazard from the other side -- `n.y` against cos(45) is one ULP
+            // and its remedy is a 1e-12 tolerance in cosine, "far below anything terrain can express and
+            // far above the 1.1e-16 that caused it". 1e-9 DEGREES is that argument in this file's units:
+            // five thousand times the error measured here, and a lattice's finest real distinction is
+            // 45.0 against 63.4.
+            const tooSteepDown = dy < 0 && slope !== null &&
+                                 slope > Camera.MAX_SLOPE_DEG + Camera.SLOPE_EPS_DEG;
+            const verdict = Camera.walkStep(dy, { stepUp: STEP_UP_MAX, cliffDrop: CLIFF_DROP, tooSteep: tooSteepDown });
+            if (verdict === "blocked") {
+                // *** UNREACHABLE FROM THE VOXEL PATH, AND v4545 IS THE ROUND THAT MADE THAT TRUE. *** This
+                // read "_canStandAt already blocked the XZ move, so this should be unreachable. Defensive:
+                // stay." -- and _canStandAt returns TRUE at a cave floor, at a tunnel floor and on the lower
+                // of two decks, so it blocked nothing of the sort; tools/ship/playerGround-selfcheck.mjs
+                // section 3 drives it and gets true. A defensive branch with a FALSE reason is worse than no
+                // branch, because it tells the next reader not to look.
+                // The true reason is arithmetic, not a guard: _terrainTopAt is given the body's feet and
+                // cannot return a surface more than STEP_UP_MAX above them, the bilinear blend of four such
+                // corners is bounded by the same number, and both read THIS number -- so dy <= STEP_UP_MAX
+                // identically. Measured at 0.083333 max over a 260-frame climb of four voxels, 0 firings.
+                // It stays as a total for `dy` rather than being deleted, because _extMove and the kaiju
+                // path can set position.y from outside this function.
+            } else if (verdict === "leave") {
+                // Cliff, or ground too steep to walk down — start falling
                 this._fpOnGround = false;
                 this._fpVelY = 0;
                 this._fpFallStartTime = performance.now();
@@ -951,13 +1704,49 @@ export class Camera {
                 this._fpOnGround = false;
             }
         } else {
-            // Airborne — apply gravity
-            this._fpVelY -= this._gravity * dt;
-            this.position.y += this._fpVelY * dt;
-            if (this.position.y <= targetY) {
-                this.position.y = targetY;
+            // *** A FALLING BODY GETS NO REACH, AND UNTIL v4548 THIS ONE GOT THE WALKER'S. ***
+            // `groundY` above is the WALKING query and carries STEP_UP_MAX, because a walker may step up.
+            // Handing that to a body in mid-air lets the probe name a surface ABOVE it and this clamp then
+            // puts it there. physics/character/fallBody.mjs found and fixed exactly this for the bots at
+            // v4544 -- "stepUp is how far a body may CLIMB onto something; handing it to a falling body
+            // lets the probe name a surface ABOVE it and the clamp then lands it up there" -- and v4545
+            // brought the body-aware probe into this file without separating the two queries, so the
+            // defect arrived here with the repair.
+            // MEASURED on a column standable at 2, 10 and 21: a body released in open air with its feet at
+            // 19.8 was LIFTED 1.20 UPWARDS onto the deck at 21 in ONE FRAME, at 19.9 lifted 1.10, at 20.5
+            // lifted 0.50 -- and at 19.7 it fell eleven voxels to the deck at 10. A tenth of a unit in
+            // release height, eleven voxels of outcome, and the cut sits exactly at STEP_UP_MAX, which is
+            // what proves it is the walking allowance and not anything else.
+            // *** AND ZEROING THE REACH ALONE IS NOT THE FIX -- IT TRADES A LIFT FOR A TUNNEL. *** These
+            // six lines MOVED the body and then probed at where it had arrived, so with no reach the probe
+            // is asked from BELOW a surface the body crossed during the step and cannot see it any more.
+            // Measured with the reach zeroed and the order left alone: a body released at feet 20.5 fell
+            // PAST the deck at 21 AND the deck at 10 and landed at 0, 91 frames. physics/character/
+            // fallBody.mjs is built the other way round -- probe at the CURRENT height, compare the WANTED
+            // one -- which is the whole of its "cannot tunnel, structurally rather than by substepping"
+            // claim, driven there at speeds up to ten million. So this calls that module instead of being
+            // a third copy of it, which is what task #25 is about.
+            // The gravity and the absent terminal are the CAMERA'S and are passed through unchanged:
+            // v4547 measured both as live disagreements with the bots and recorded that changing either is
+            // a gameplay decision. Removing a duplicate must not smuggle one in.
+            const r = fallStep({ pos: [this.position.x, this.position.y - this._eyeHeight, this.position.z],
+                                 vy: this._fpVelY, surfaceUnder: this._fallSurface(),
+                                 dt, gravity: -this._gravity, terminal: -Infinity });
+            // fallStep decides gravity and where the walker's ground stops a fall; the BODY is swept by kinematic.js,
+            // which may stop it sooner -- at a ceiling, or on a block under the edge of the body's disc (_sweepBodyY)
+            const feet0 = this.position.y - this._eyeHeight;
+            const sw = this._sweepBodyY(this.position.x, feet0, this.position.z, r.pos[1] - feet0);
+            if (sw.hitCeiling) {
+                this.position.y = sw.feet + this._eyeHeight;
+                this._fpVelY = Math.min(0, r.vy);
+            } else if (sw.landed) {
+                this.position.y = sw.feet + this._eyeHeight;
                 this._fpVelY = 0;
                 this._fpOnGround = true;
+            } else {
+                this.position.y = r.pos[1] + this._eyeHeight;
+                this._fpVelY = r.vy;
+                if (r.landed) this._fpOnGround = true;
             }
         }
 
@@ -1151,9 +1940,19 @@ export class Camera {
             k._stamina = Math.max(0, k._stamina - 0.15);
         }
 
-        // Horizontal movement: write directly to kaiju position
-        k.position.x += mx * speed * dt;
-        k.position.z += mz * speed * dt;
+        // *** v4560 -- HORIZONTAL MOVEMENT IS NOW ASKED, NOT ASSERTED. *** These two lines wrote the
+        // kaiju's position with nothing consulted, which is why a driven kaiju walked through terrain on
+        // 28.03% of frames when the manager's clamp was taken away. It asks _stepHorizontal -- the same
+        // rule _moveFP has had since v4549, in one place since this round -- so the body slides along a
+        // wall instead of entering it. The kaiju's position.y IS its feet: there is no eye height on this
+        // side, which is the whole reason _bodyFitsAt takes feet and a body height.
+        const kFeet = k.position.y;
+        // v4561 -- the body is THIS creature's, not a constant: the roster runs 5 to 8 units by kind.
+        const kBody = Camera.kaijuBodyCells(k);
+        const kStep = this._stepHorizontal(k.position.x, k.position.z,
+                                           mx * speed * dt, mz * speed * dt, kFeet, kBody);
+        k.position.x = kStep.x;
+        k.position.z = kStep.z;
         // Heading on the kaiju so the obelisk visual faces the camera.
         // Some renderers/animators read .heading; the obelisk doesn't
         // currently rotate but the field is harmless to set and round
@@ -1161,16 +1960,67 @@ export class Camera {
         if (horizLen > 0) k.heading = this.yaw;
 
         // Vertical: gravity + terrain step-up
-        // v405 — bilinear ground sample for kaiju drive too. Integer
-        // Y was producing stairs when the controlled kaiju walked
-        // across sloped voxel terrain.
-        this._kaijuDriveVelY -= this._gravity * dt;
-        k.position.y += this._kaijuDriveVelY * dt;
-        const groundY = this._terrainTopAtBilinear(k.position.x, k.position.z);
-        if (k.position.y <= groundY) {
-            k.position.y = groundY;
-            this._kaijuDriveVelY = 0;
-            this._kaijuDriveOnGround = true;
+        // v405 — bilinear ground sample for kaiju drive too. Integer Y was producing stairs when the
+        // controlled kaiju walked across sloped voxel terrain.
+        // *** THAT SENTENCE HAS SAT ABOVE INTEGER-PROBE CODE SINCE v4548 AND ARGUES AGAINST v4552'S OWN
+        // TRADE, SO IT IS ANSWERED RATHER THAN LEFT. *** v4548 routed this fall through fallBody over the
+        // INTEGER probe, so the "bilinear ground sample" v405 describes has not been here for four rounds.
+        // And v4552 took the PLAYER's walk off the blend for the reason v405 could not have known: a blend
+        // of a lattice answers heights no column has, and the body was standing inside the rock on 56.56%
+        // of grounded frames. v405's complaint was real -- integer Y does step a whole voxel -- and the
+        // answer is now that the STEP is real and the SMOOTHNESS is taken in the picture, by
+        // Camera.EYE_SMOOTH_RATE, rather than by putting the body where no column is.
+        // *** THE FOURTH COPY OF "FALL UNTIL YOU LAND" IS GONE, AND TWO DEFECTS WENT WITH IT. ***
+        // These were six lines -- integrate, move, probe, clamp -- and they carried BOTH of the defects the
+        // player's copy carried plus one of their own:
+        //   (1) the probe was the WALKING one, so a kaiju passing under a ledge within STEP_UP_MAX was
+        //       LIFTED onto it: measured, y 19.9 under a deck at 21 became 21 in one frame, 1.10 upwards,
+        //       while one at 19.7 fell eleven voxels to the deck at 10;
+        //   (2) it moved first and probed after, so zeroing that reach alone would trade the lift for a
+        //       tunnel -- see _moveFP's airborne branch, which had the same shape;
+        //   (3) *** _kaijuDriveOnGround WAS A LATCH THAT ONLY LANDING SET AND ONLY JUMPING CLEARED. ***
+        //       Walking off a ledge never touched it. Driven off a 38-voxel cliff, the flag read TRUE for
+        //       the whole descent -- at frame 89, 34 units up and falling at 14.4 m/s, it still read true
+        //       -- so Space gave a FREE MID-AIR JUMP at any height, gated only by stamina. It is read off
+        //       the module's own `airborne` now, which is computed per frame and cannot latch.
+        // *** v4560 -- AND A GROUNDED BRANCH, WHICH THIS CONTROLLER HAS NEVER HAD. *** Every frame went
+        // through fallBody, whose probe takes NO reach by contract -- correctly, for a falling body -- so
+        // the drive could not name a surface ABOVE itself and MEASURED OVER 60 DRIVES OF FIVE SECONDS NOT
+        // ONE OF THEM GAINED A SINGLE UNIT OF HEIGHT, maximum 0.000. The climbing was done entirely by
+        // KaijuManager's per-frame `k.position.y = gy`, which is the double write v4554 found and could not
+        // close: take the clamp away and 56 of 60 fell out of the world. A grounded body reads the WALKING
+        // query, which carries STEP_UP_MAX, and Camera.walkStep decides among the same three outcomes the
+        // player's walk has.
+        //
+        // NO SLOPE LIMIT IS APPLIED HERE and that is deliberate rather than forgotten: _fpSlopeDeg is the
+        // player's secant over the player's position, and whether a kaiju may walk down a 60-degree hill is
+        // a gameplay decision this round is not entitled to make. `tooSteep` is left false and said so.
+        if (this._kaijuDriveOnGround) {
+            const groundY = this._walkGroundAt(k.position.x, k.position.z, kFeet, kBody);
+            if (groundY === null) {
+                // Nothing under the body within reach: a hole, not a floor.
+                this._kaijuDriveOnGround = false;
+                this._kaijuDriveVelY = 0;
+            } else {
+                const verdict = Camera.walkStep(groundY - k.position.y, { cliffDrop: Camera.KAIJU_CLIFF_DROP });
+                if (verdict === "leave") {
+                    this._kaijuDriveOnGround = false;
+                    this._kaijuDriveVelY = 0;
+                } else if (verdict === "track") {
+                    k.position.y = groundY;
+                }
+                // "blocked": the climb is taller than STEP_UP_MAX, so the body stays at its height. The
+                // horizontal step above has already refused the move that would have put it inside the
+                // wall, so this is the rare case where the ground rose under a body that did not move.
+            }
+        }
+        if (!this._kaijuDriveOnGround) {
+            const kr = fallStep({ pos: [k.position.x, k.position.y, k.position.z], vy: this._kaijuDriveVelY,
+                                  surfaceUnder: this._fallSurface(kBody),
+                                  dt, gravity: -this._gravity, terminal: -Infinity });
+            k.position.y = kr.pos[1];
+            this._kaijuDriveVelY = kr.vy;
+            this._kaijuDriveOnGround = !kr.airborne;
         }
 
         // Camera position — slightly above the kaiju's "head" + 2u
@@ -1182,9 +2032,10 @@ export class Camera {
         // with scale; head height ~2× scale at typical proportions).
         // For obelisk-only kaiju, fall back to the hardcoded ~8u that
         // matches the obelisk silhouette.
-        const KAIJU_HEAD_Y = (k._meshEntityId != null)
-            ? Math.max(4, (k.config?.scale ?? 3) * 2.0)
-            : 8;
+        // v4561 -- ONE RULE. This expression WAS the creature's height and the ground probe asked about 2
+        // cells regardless; Camera.kaijuHeight is that expression with a name, read here for the camera and
+        // by kaijuBodyCells for the collision, so the two can no longer drift apart.
+        const KAIJU_HEAD_Y = Camera.kaijuHeight(k);
         const BACK_OFFSET  = 2;
         const cyP = Math.cos(this.pitch);
         const fwX = sy * cyP;
@@ -1199,16 +2050,152 @@ export class Camera {
         this.velocity.z = mz * speed;
     }
 
-    _terrainTopAt(x, z) {
+    // *** THE TOPMOST SOLID IN THE COLUMN IS NOT WHERE A BODY STANDS, AND ON THIS WORLD IT IS NOT EVEN
+    // CLOSE. *** This scanned down from y = 80 and returned the first solid it met, with no account of where
+    // the body was. Measured in a real boot over 1,681 columns: 921 of them (54.8%) hold MORE THAN ONE place
+    // a body can stand, giving 2,687 such places, and the topmost answer is right in 1,681 of them --
+    // 62.56%, which is exactly the column count and not a coincidence: a function returning one y per column
+    // is right once per column however good it is. Worst gap 42 voxels; at (-42,-60) the surfaces are 2 and
+    // 19 and this said 19. It is the defect v4542 repaired for world/surfaceProbe.mjs's standHeightAt, never
+    // applied to the controller the human drives.
+    //
+    // *** AND THE SYMPTOM IS NOT THE ONE IT LOOKS LIKE. *** _moveFP guards with `dy > STEP_UP_MAX`, so the
+    // player is NOT lifted onto the hillside -- the guard holds. What happens instead is that vertical
+    // tracking DIES: driven from open ground into a tunnel mouth, y freezes at 2.700 and stays there, with
+    // _fpOnGround stuck true, and the player does not fall even when the floor under them is removed
+    // entirely. The freeze begins at x = 9.08, a voxel BEFORE the tunnel, because the bilinear sampler
+    // blends the neighbouring column's 21 in. That guard's own comment read "_canStandAt already blocked the
+    // XZ move, so this should be unreachable" -- and _canStandAt at a tunnel floor returns TRUE, so it never
+    // blocked anything.
+    //
+    // Given the body's feet in `fromY` this asks world/surfaceProbe.mjs instead, which scans DOWN from the
+    // body's own reach. That module is gated and measured (2,644 of 2,644 body-places correct against this
+    // rule's 1,681) and importing it is the point: a third copy of the rule is the defect, not the fix.
+    // Without `fromY` the answer is byte-identical to the pre-v4545 one, which is what lets the orbit
+    // clearance test -- which genuinely wants the topmost, because it is keeping a CAMERA out of a hill --
+    // keep its behaviour and its readings.
+    /**
+     * The surface THIS body can stand on in one column, or `null` when the column offers none from the
+     * body's reach down to the bottom of the world.
+     *
+     * *** null AND 0 ARE DIFFERENT ANSWERS AND CONFLATING THEM PARKED THE BODY INSIDE THE FLOOR. *** See
+     * _terrainTopAtBilinear: the blend averages four columns, and a column reported as 0 when it really
+     * means "nothing you can reach here" drags that average halfway to the world floor. 0 is also a
+     * legitimate height, so the distinction cannot be carried in the number -- hence this method, and
+     * _terrainTopAt below mapping null to 0 for the callers whose contract has always been a number.
+     *
+     * *** AN ADAPTER, NOT A COPY, AND NOT A hasVoxels GATE EITHER. *** The first draft asked
+     * hasVoxels(this.world) and called standHeightAt directly -- and every fixture in this file's own gate
+     * went on showing the defect, because the camera's world interface has always been `voxelAt` and
+     * surfaceProbe's is `isAir` plus `chunkHeight`. A repair that silently does not apply to the worlds its
+     * own caller supports is the shape of "a check nothing reaches", in code. The shim is four lines and
+     * makes the gated rule work on every world the camera already accepts; writing the scan out again here
+     * would be the third copy of it this session filed as a task.
+     */
+    _standYAt(x, z, fromY, reach = Camera.STEP_UP_MAX, body = DEFAULT_BODY) {
+        const v = (xx, yy, zz) => this.world.voxelAt(xx, yy, zz);
+        const shim = {
+            chunkHeight: Number.isFinite(this.world.chunkHeight) ? this.world.chunkHeight : 80,
+            // v4550 -- the camera's ONE air test, and world.isAir's rule. Was written out here and in
+            // two other places; the copy in _canStandAt had drifted onto a different answer for water.
+            isAir: (xx, yy, zz) => !Camera.isSolidToBody(v(xx, yy, zz)),
+        };
+        // *** v4561 -- THE BODY REACHES THE PROBE NOW, AND UNTIL THIS ROUND IT DID NOT. *** Every ground
+        // query in this file went to standHeightAt WITHOUT a body, so it answered for surfaceProbe's
+        // DEFAULT_BODY of 2 -- for the player, whose eye is 1.7 up, and for a kaiju eight units tall alike.
+        // The default here is that same 2, so the player's answer is unchanged by construction.
+        return standHeightAt(shim, Math.floor(x), Math.floor(z), { y: fromY, stepUp: reach, body });
+    }
+
+    /**
+     * *** THE SLOPE OF THE GROUND THIS BODY JUST CROSSED, AS A RISE OVER A RUN. *** Returns degrees, or
+     * null when the body did not move horizontally -- a body standing still crosses no ground and has no
+     * slope to be refused by.
+     *
+     * *** IT IS A SECANT AND NOT A NORMAL, AND ON THIS WORLD THAT IS THE ONLY FORM OF IT THAT WORKS. ***
+     * physics/character/terrainWalk.mjs tests its limit on the surface NORMAL, which is right on a
+     * heightfield and is recorded IN THAT FILE as failing on a lattice: "a bot standing on a flat cell at
+     * (5.96, 1.99) reads 65.9 degrees 0.25 units ahead, over a lattice row of 28, 28, 29, 29, 30 -- a
+     * ONE-UNIT LIP -- and stops there permanently." A fix was written there, measured, and REVERTED, because
+     * re-probing a fixed distance ahead still lands inside the inter-cell band where the interpolated
+     * surface is steep everywhere: 1.0, 1.25 and 1.5 all stayed blocked and 2.0 teleported the body.
+     *
+     * A secant does not have that problem, because it never asks about a point: it asks how much the ground
+     * rose over how far the body went. Across a one-voxel lip that is 1 over 1, which is 45.0 degrees and
+     * walkable; across a two-voxel lip it is 2 over 1, which is 63.4 and is not. The bilinear blend the
+     * camera already samples IS the staircase's secant, so this costs one extra blend and no new instrument.
+     *
+     * *** AND IT DOES NOT MOVE WITH THE FRAME RATE, WHICH IS THE WHOLE POINT -- BUT ONLY BECAUSE THE RUN IS
+     * A FIXED WORLD DISTANCE. *** The first draft of this took the secant over the distance travelled IN
+     * THAT FRAME, on the reasoning that a rise and a run which both scale with dt have a ratio that does
+     * not. That is true of a plane and false of a staircase: as dt shrinks the run shrinks INTO a lip, whose
+     * rise does not shrink with it, so the angle runs to 90 and a shallow hill reads 45 degrees at every
+     * voxel edge and 0 between them. Measured -- a 26.6-degree hill (one voxel every two columns) fell 76
+     * frames of 240, because alternate column boundaries each read 45.0. The same trap as the rule it
+     * replaces, wearing a ratio. SLOPE_RUN is one column, so the sample always spans a whole tread and a
+     * whole riser and the average is the hill.
+     */
+    _fpSlopeDeg(dirX, dirZ, groundY, feetY) {
+        const L = Math.hypot(dirX, dirZ);
+        if (!(L > 1e-9)) return null;
+        const R = Camera.SLOPE_RUN / L;
+        // *** v4552 -- BOTH ENDS OF THE SECANT MUST READ THE SAME GROUND, AND CHANGING ONLY _moveFP
+        // REBUILDS THE BUG v4546 CLOSED. *** Measured twice independently: with this end left on the
+        // blend while the walk clamps, a true 45-degree ramp reads 53.1301023541557385 degrees -- past
+        // MAX_SLOPE_DEG + SLOPE_EPS_DEG -- and the body is thrown off a slope it is allowed to walk, at
+        // 6 fps only and at no other rate. A secant across two different instruments is not a secant.
+        const ahead = this._walkGroundAt(this.position.x + dirX * R,
+                                         this.position.z + dirZ * R, feetY);
+        if (ahead === null) return null;   // a body over a hole crosses no ground and has no slope
+        return Math.atan2(Math.abs(ahead - groundY), Camera.SLOPE_RUN) * 180 / Math.PI;
+    }
+
+    /**
+     * The surface oracle physics/character/fallBody.mjs asks for: the first surface AT OR BELOW this body,
+     * with NO reach, over this camera's own bilinear ground.
+     *
+     * *** THE ZERO IS THE POINT, AND SO IS THE INTEGER -- AND THE FIRST DRAFT OF THIS USED THE BLEND. ***
+     * v404/v405 moved both camera paths to a BILINEAR ground because the integer one "produced visible
+     * stairs" as a body walked across voxel boundaries, so the blend looked like the obvious thing to hand
+     * a fall. It is not. A WALK crosses a boundary and wants the two columns averaged; a LANDING happens on
+     * ONE COLUMN, and averaging puts the body at a height neither column has. Measured on the sandbox's own
+     * hand world, a body walking off a two-voxel ledge at z=40 and landing at z=39.500: the blend drops the
+     * higher corner (out of reach, correctly, for a falling body) and answers the LOWER floor at 2 -- while
+     * the body straddles a column whose rock goes up to y=3. It landed with its FEET INSIDE SOLID STONE and
+     * _canStandAt then refused every move, which is the stuck player these rounds keep being about.
+     * So this is the integer probe with the reach forced to 0 -- which is precisely what fallBody's own
+     * voxelSurface() does, and the reason that function exists. The blend keeps the walking query, where it
+     * is right and where the stairs it was added for actually show.
+     */
+    _fallSurface(body = DEFAULT_BODY) {
+        // _standYAt IS that probe, and it already reports NOT-FOUND as null rather than as 0 -- which is
+        // the distinction fallBody's contract needs and the one v4545 added this method for.
+        // v4561 -- and it takes the falling body's height, so a kaiju does not land in a gap it cannot fit.
+        return (x, z, y) => (this.world?.voxelAt ? this._standYAt(x, z, y, 0, body) : null);
+    }
+
+    _terrainTopAt(x, z, fromY = null, reach = Camera.STEP_UP_MAX) {
         if (!this.world?.voxelAt) return 0;
+        if (Number.isFinite(fromY)) {
+            const found = this._standYAt(x, z, fromY, reach);
+            return found === null ? 0 : found;   // nothing under this body: 0 falls, as it always did
+        }
         const fx = Math.floor(x), fz = Math.floor(z);
         for (let y = 80; y >= 0; y--) {
-            const v = this.world.voxelAt(fx, y, fz);
-            if (v !== 0 && v !== undefined) return y + 1;
+            if (Camera.isSolidToBody(this.world.voxelAt(fx, y, fz))) return y + 1;   // v4550 -- one rule
         }
         return 0;
     }
 
+    // *** v4552 -- THIS IS NO LONGER THE WALK'S GROUND, AND THE NOTE BELOW IS HISTORY RATHER THAN RATIONALE.
+    // *** _moveFP reads _walkGroundAt now. v404's complaint was true and its cure had a cost nobody had
+    // measured: blending four columns answers a height NEITHER has, and on the generated world that stood
+    // the body inside solid rock on 56.56% of grounded frames, freezing 67 of 128 ordinary walks in it. The
+    // stairs v404 removed are back in the BODY and removed again in the PICTURE, by the eye smoother, which
+    // is the one place the difference can be taken without lying about where the body is. The method stays
+    // -- _terrainTopAt's fromY path and the orbit clearance still call it, and playerSlope and cameraFall
+    // still gate it -- and it keeps its own half-cell stencil defect, which v4552 filed and did not fix.
+    //
     // v404 — Bilinear ground sample for first-person walking. The
     // integer-Y _terrainTopAt above causes visible "stairs" when the
     // camera walks across voxel boundaries on sloped terrain (each new
@@ -1227,10 +2214,40 @@ export class Camera {
     // sub-voxel boundary. Edge-fall detection still works because
     // _terrainTopAt (integer) is still what the canStandAt logic
     // implicitly uses for collision.
-    _terrainTopAtBilinear(x, z) {
+    _terrainTopAtBilinear(x, z, fromY = null, reach = Camera.STEP_UP_MAX) {
         if (!this.world?.voxelAt) return 0;
         const ix = Math.floor(x), iz = Math.floor(z);
         const fx = x - ix, fz = z - iz;
+        // *** THE BODY GOES TO ALL FOUR CORNERS, WHICH IS WHY THE DEAD ZONE STARTED A VOXEL EARLY. *** The
+        // blend reads the neighbouring columns, so one tunnel column beside open ground was enough to make
+        // the sample jump to 21 and freeze the walker before it ever entered.
+        if (Number.isFinite(fromY)) {
+            // *** A COLUMN THIS BODY CANNOT STAND IN IS NOT A COLUMN WHOSE GROUND IS ZERO, AND AVERAGING IT
+            // IN AS ZERO PUT THE BODY INSIDE THE FLOOR AND LOCKED IT THERE. *** Found by
+            // tools/ship/voxelAvatar-selfcheck.mjs, which the sweep rotation brought back under budget in
+            // the same round -- it drives THIS method on a hand world and was green at HEAD. Walking off a
+            // two-voxel ledge toward -z at x=40: the floor column answers 2 and the ledge column answers
+            // NOT-FOUND, because the ledge's own surface is above this body's reach -- a wall, not a hole.
+            // Read as 0 and blended at fz=0.25 that is 1.5, so targetY came out at 3.200, dy was 0, the
+            // body read as GROUNDED half a voxel inside the floor, and _canStandAt then refused every
+            // further step: stuck at z=3.250 for as long as the walk ran. The stuck player this very round
+            // is about, re-introduced by its own repair, one method over.
+            //
+            // So the weights are renormalised over the corners that ANSWERED. A wall contributes nothing
+            // and the body keeps the floor it is on; a genuine hole -- no surface from the reach down to
+            // the bottom of the world -- makes every corner null, and 0 then means what it has always
+            // meant here, which is that the cliff branch takes over and gravity does the rest.
+            let sum = 0, wsum = 0;
+            const corner = (cx, cz, wt) => {
+                const h = this._standYAt(cx, cz, fromY, reach);
+                if (h !== null) { sum += h * wt; wsum += wt; }
+            };
+            corner(ix,     iz,     (1 - fx) * (1 - fz));
+            corner(ix + 1, iz,     fx * (1 - fz));
+            corner(ix,     iz + 1, (1 - fx) * fz);
+            corner(ix + 1, iz + 1, fx * fz);
+            return wsum > 0 ? sum / wsum : 0;
+        }
         const h00 = this._terrainTopAt(ix,     iz    );
         const h10 = this._terrainTopAt(ix + 1, iz    );
         const h01 = this._terrainTopAt(ix,     iz + 1);
@@ -1242,20 +2259,261 @@ export class Camera {
 
     // Can the player stand at (x, y, z) — requires 2 voxels of clear
     // air at the body footprint (head + feet).
-    _canStandAt(x, y, z) {
+    /**
+     * The lattice cells this body's disc actually overlaps at (x, z). At r < 0.5 the bounds give at most
+     * four and the distance test rejects the corners the disc does not reach, so the footprint is a DISC
+     * and not the square that bounds it -- which is the whole diagonal-gap case, since a square footprint
+     * would block a body a disc legitimately admits.
+     *
+     * Both the clearance test and the step-up target read the footprint from HERE, so the two cannot come
+     * to disagree about which cells the body is in -- the defect v4548 found between two copies of a fall.
+     */
+    _footprint(x, z) {
+        const r = Camera.BODY_RADIUS;
+        // *** THE CELL THE CENTRE IS IN IS ALWAYS IN THE FOOTPRINT, AND A GATE FOUND OUT WHY. *** The
+        // distance test below is strict, so at r = 0 it admits nothing and the footprint came back EMPTY --
+        // and an empty footprint means _canStandAt tests no cells and returns true, which is not "a body
+        // with no radius" but NO COLLISION AT ALL. Driven: with BODY_RADIUS set to 0 the body walked
+        // straight through a five-voxel wall to x = 17. A body of zero width still occupies the cell it
+        // stands in, so that cell is seeded rather than derived, and the radius only ever ADDS neighbours.
+        // The centre's cell is named rather than read back out of the array: the first draft indexed
+        // `out[0]` to skip it, which throws the moment the seed is removed -- a shipped TypeError, and the
+        // species this session has now hit six times. Named consts cannot be emptied out from under it.
+        const hx = Math.floor(x), hz = Math.floor(z);
+        const out = [[hx, hz]];
+        const x0 = Math.floor(x - r), x1 = Math.floor(x + r);
+        const z0 = Math.floor(z - r), z1 = Math.floor(z + r);
+        for (let cx = x0; cx <= x1; cx++) {
+            for (let cz = z0; cz <= z1; cz++) {
+                if (cx === hx && cz === hz) continue;
+                // closest point on this cell's square to the body's axis -- exact for a cylinder against an
+                // axis-aligned box, which is what a voxel is. The same question capsuleMove asks of a
+                // triangle, on a lattice where it costs two clamps instead of seven Voronoi regions.
+                const nx = Math.min(Math.max(x, cx), cx + 1);
+                const nz = Math.min(Math.max(z, cz), cz + 1);
+                if ((nx - x) * (nx - x) + (nz - z) * (nz - z) < r * r) out.push([cx, cz]);
+            }
+        }
+        return out;
+    }
+
+    /**
+     * *** THE HEIGHT THIS BODY WOULD STAND AT IF IT MOVED TO (x, z), OR null IF NOTHING SUPPORTS IT. ***
+     *
+     * A radius and a step-up cannot be tested separately, and the first draft of v4549 proved it: giving the
+     * body width while still asking `_canStandAt(newX, THIS FRAME'S y, newZ)` made it unable to climb
+     * ANYTHING, because approaching a lip means the disc overlaps the column being climbed at a height that
+     * column is still solid at. Measured -- every ramp from 14 degrees up stopped dead, and the sandbox's
+     * one-voxel auto-step stopped being climbed. The move test has to ask where the body would BE.
+     *
+     * The target is the HIGHEST surface among the cells that have one, and _canStandAt then requires the
+     * span to be clear in EVERY overlapped cell -- support from any, clearance from all.
+     *
+     * *** THE `any` BECAME LOAD-BEARING AT v4552, AND THE ROUND THAT MADE IT SO IS THE ROUND THAT SAYS SO.
+     * *** v4549 wrote here that swapping it for `support from ALL` produced an IDENTICAL walk -- 20.000
+     * either way at a floor that simply ends -- and that was true and measured: the target was only ever
+     * used to RAISE the body, and a null fell back to the height it already had, so the two quantifiers
+     * could not differ. The sabotage that swapped them went ZERO RED and was right to.
+     * v4552 clamps the WALK to this target, so it now SETS the body as well as raising it, and the two
+     * separate: ANY measures 20.333 against ALL's 19.917 at the same floor. ANY is still the right rule --
+     * a disc whose far edge still rests on the slab IS supported -- and a null must still not REFUSE the
+     * move, because a body is entitled to walk off a cliff and a rule that refused would stop it a radius
+     * short of every edge. tools/ship/playerBody-selfcheck.mjs holds both numbers.
+     */
+    _stepTargetAt(x, z, feetY, body = DEFAULT_BODY) {
+        let best = null;
+        for (const [cx, cz] of this._footprint(x, z)) {
+            const g = this._standYAt(cx + 0.5, cz + 0.5, feetY, Camera.STEP_UP_MAX, body);
+            if (g !== null && (best === null || g > best)) best = g;
+        }
+        return best;
+    }
+
+    /**
+     * *** THE WALKING GROUND FOR A BODY WITH A RADIUS: THE HIGHEST SURFACE UNDER THE FOOTPRINT, OR null. ***
+     * v4552. This is a one-line wrapper over _stepTargetAt on purpose, for two reasons that are both about
+     * the thing having a NAME: the walk and the slope secant must read the SAME ground (see _fpSlopeDeg --
+     * two ends of a secant on two different grounds is the v4546 frame-rate bug rebuilt), and a gate needs
+     * a method to hook that the walk actually calls. tools/ship/playerGround-selfcheck.mjs hooked
+     * _terrainTopAtBilinear to measure the walk's dy, and the day the walk stopped calling it that row read
+     * -Infinity instead of failing -- an instrument going blind, which is this session's own named species
+     * on the gate's side of the fence.
+     *
+     * null is NOT 0, and v4545 is the round that paid for the difference: a column this body cannot stand
+     * in is not a column whose ground is zero, and averaging a not-found corner in as 0 put the body a
+     * whole voxel inside the floor and locked it there.
+     */
+    _walkGroundAt(x, z, feetY, body = DEFAULT_BODY) {
+        return this._stepTargetAt(x, z, feetY, body);
+    }
+
+    /**
+     * *** THE RENDERED EYE, EASED TOWARD THE BODY. IT IS A METHOD AND NOT SIX LINES INSIDE update() FOR THE
+     * REASON THIS ROUND KEEPS RE-LEARNING: A GATE MUST BE ABLE TO DRIVE THE CODE THAT SHIPS. *** The first
+     * draft of tools/ship/walkGround-selfcheck.mjs re-implemented this ease inside the gate, because
+     * update() wants a canvas -- and two sabotages that broke the real thing then went ZERO RED against a
+     * gate happily grading its own copy. That is v4541's sabotage B exactly, and this file's own
+     * _walkGroundAt exists for the same reason one method over.
+     *
+     * It writes _eyeRenderY and NOTHING else: camera.position.y is bit-identical with this running and not
+     * running, which is the row that stops the smoother from quietly becoming a second vertical authority.
+     * Outside fp the eye IS the body -- orbit, missile_cam and the kaiju drive are untouched.
+     */
+    _stepRenderEye(dt) {
+        if (this.mode !== "fp") { this._eyeRenderY = this.position.y; return this._eyeRenderY; }
+        const target = this.position.y;
+        if (!Number.isFinite(this._eyeRenderY) ||
+            Math.abs(target - this._eyeRenderY) > Camera.EYE_SMOOTH_SNAP) {
+            this._eyeRenderY = target;              // a fall, a teleport, a respawn or a mode change
+        } else {
+            this._eyeRenderY += (target - this._eyeRenderY) * Math.min(1, dt * Camera.EYE_SMOOTH_RATE);
+        }
+        return this._eyeRenderY;
+    }
+
+    /**
+     * *** v4560 -- THE PREDICATE, GIVEN A BODY RATHER THAN A CAMERA. ***
+     *
+     * _canStandAt has always taken a CAMERA y and subtracted _eyeHeight to find the feet, which is fine for
+     * the one body that has an eye height and useless for the one that does not: the driven kaiju's
+     * position.y IS its feet. So the rule moves here, taking feet and a body height in cells, and
+     * _canStandAt becomes the camera's spelling of it. Nothing about the player's answer changes --
+     * floor(y - eye + 0.1) and floor(y - eye + eye) are the two lines it replaced, exactly.
+     *
+     * THE +0.1 IS THE FEET'S, NOT THE HEAD'S, and it is why this is not symmetric: a body resting exactly
+     * on an integer surface has its feet in the cell ABOVE the solid one, and without the nudge the floor()
+     * picks the solid cell and the body can never stand anywhere.
+     */
+    _bodyFitsAt(x, feetY, z, bodyCells) {
         if (!this.world?.voxelAt) return true;
-        const fx = Math.floor(x), fz = Math.floor(z);
-        const feetY = Math.floor(y - this._eyeHeight + 0.1);
-        const headY = Math.floor(y);
-        for (let yy = feetY; yy <= headY; yy++) {
-            const v = this.world.voxelAt(fx, yy, fz);
-            if (v !== 0 && v !== undefined && v !== 10 && v !== 11) {
-                // Solid (water = id 10/11 = passable in FP)
-                return false;
+        const f = Math.floor(feetY + 0.1);
+        const h = Math.floor(feetY + bodyCells);
+        for (const [cx, cz] of this._footprint(x, z)) {
+            for (let yy = f; yy <= h; yy++) {
+                if (Camera.isSolidToBody(this.world.voxelAt(cx, yy, cz))) return false;
             }
         }
         return true;
     }
+
+    /**
+     * One horizontal step for a body of `bodyCells`: the whole move if it fits, else each axis alone so the
+     * body slides along a wall rather than stopping dead against it.
+     *
+     * *** v4560 -- ONE HOME, BECAUSE THE DRIVE HAD NO COPY AT ALL AND THAT WAS THE DEFECT. *** _moveFP has
+     * had this since v4549; _moveKaijuDrive wrote `k.position.x += mx * speed * dt` with nothing asked, so
+     * a driven kaiju walked through terrain on 28.03% of frames. The fix is not a second copy -- v4548
+     * removed the fourth copy of the fall for the same reason -- so the rule is here and both callers ask it.
+     *
+     * THE SECOND AXIS IS TESTED AGAINST THE FIRST AXIS'S RESULT, which is _moveFP's own sequencing and is
+     * load-bearing: a body in an inside corner that slid along x must be asked about z FROM WHERE IT NOW IS,
+     * or it slides diagonally through the corner post. Preserved deliberately rather than tidied.
+     */
+    _stepHorizontal(x, z, dx, dz, feetY, bodyCells, airborne = false) {
+        // *** A BODY IN THE AIR IS TESTED WHERE IT IS. *** The fit was always taken at the STAND height the walker
+        // would give the body at the destination -- right for a walk, which steps up or down onto it, and wrong in
+        // a jump, where the body is still up at feetY: tested standing on the floor below a beam, it moved sideways
+        // into the beam at head height. Measured: all 63 fresh entries into a solid voxel in 36,000 fuzzed frames
+        // were sideways moves made in the air, and they left bodies inside for 5,015 frames between them.
+        const fits = (nx, nz) => {
+            const t = airborne ? null : this._stepTargetAt(nx, nz, feetY);
+            return this._bodyFitsAt(nx, t === null ? feetY : t, nz, bodyCells);
+        };
+        // *** v4562 -- SWEPT, BECAUSE A DESTINATION TEST DOES NOT MISS A WALL BY A LITTLE, IT MISSES IT
+        // ENTIRELY. *** This tested where the body WANTED to be and nothing in between, so a step long
+        // enough to clear the band in which the disc touches the wall passed through a solid voxel with no
+        // sample inside it. v4549 recorded the shape -- "a radius below the per-frame step does not reliably
+        // block" -- for a radius under the step; the same arithmetic applies to the STEP over the wall.
+        //
+        // *** AND THE FAILURE IS A RESONANCE, NOT A THRESHOLD, WHICH IS WHY NO SPEED IS SAFE BY BEING LOW
+        // ENOUGH. *** Measured over 200 starting offsets against one voxel of wall, moving straight at it:
+        //
+        //     per-frame step   1.8   1.9   2.0   2.5   3.0   4.0
+        //     phases through     0     0     0   121     0   200      (of 200)
+        //
+        // 60.5% at 2.5 and ZERO at 3.0. Whether a sample lands inside the band depends on where the body
+        // started, so a bisection for "the step at which it breaks" finds an artefact of the start position
+        // -- my first attempt did exactly that and reported 3.45, which is the phase where 6.5 + 2s lands on
+        // the far edge. This is the same species as the frame-rate CLIFF_DROP v4553 found: a rule whose
+        // outcome moves with something that is not the thing being ruled on.
+        //
+        // THE SUBSTEP IS PROVABLY ENOUGH RATHER THAN CAUTIOUSLY SMALL. The thinnest obstacle a lattice can
+        // hold is ONE CELL, so the band in which the body's disc overlaps it is at least 1.0 wide; consecutive
+        // samples no more than 1.0 apart cannot straddle an interval that wide, because the last sample below
+        // it is within 1.0 of its start. AND IT COSTS NOTHING AT ANY SHIPPED SPEED: the player walks 5 and
+        // sprints 9, the kaiju 8 and 14, so at 60 Hz the step is 0.083 to 0.233 and this is ONE substep, the
+        // same single pair of tests it has always done. Only a big step pays, and it pays in proportion.
+        const len = Math.hypot(dx, dz);
+        const n = Math.max(1, Math.ceil(len / Camera.SWEEP_MAX_STEP));
+        const sx = dx / n, sz = dz / n;
+        let ox = x, oz = z;
+        for (let i = 0; i < n; i++) {
+            const wantX = ox + sx, wantZ = oz + sz;
+            if (fits(wantX, wantZ)) { ox = wantX; oz = wantZ; continue; }
+            // Blocked: slide along whichever axis still fits. The second is tested against the FIRST'S
+            // RESULT, which is _moveFP's own sequencing and is load-bearing in an inside corner.
+            let slid = false;
+            if (fits(wantX, oz)) { ox = wantX; slid = true; }
+            if (fits(ox, wantZ)) { oz = wantZ; slid = true; }
+            // Neither axis moved: the body is wedged. THIS IS A COST SAVING AND NOT A GUARD, which the
+            // sabotage that turned it into `continue` established by reddening nothing: every later substep
+            // of the same direction re-tests the same blocked position and returns the same answer, so the
+            // loop is identical in outcome and only slower. Said plainly, because a comment implying a
+            // branch is load-bearing when it is not tells the next reader not to touch it.
+            if (!slid) break;
+        }
+        return { x: ox, z: oz };
+    }
+
+    /**
+     * What a grounded body does with a ground `dy` above or below it: keep tracking it, refuse the climb, or
+     * leave the ground. PURE, and static, so a gate can drive every branch without a world.
+     *
+     * *** v4560 -- EXTRACTED BECAUSE THE DRIVE NEEDED IT AND HAD NOTHING. *** The three outcomes were inline
+     * in _moveFP. A driven kaiju never reached any of them: its only vertical path was fallBody, whose probe
+     * takes NO reach, so it could not name a surface above the body and -- measured over 60 drives of five
+     * seconds each -- NOT ONE OF THEM GAINED A SINGLE UNIT OF HEIGHT. The clamp in KaijuManager was doing
+     * the climbing, one teleport per frame.
+     */
+    static walkStep(dy, { stepUp = Camera.STEP_UP_MAX, cliffDrop = 1.5, tooSteep = false } = {}) {
+        if (dy > stepUp) return "blocked";          // too tall to climb: the body stays where it is
+        if (dy < -cliffDrop || tooSteep) return "leave";   // a cliff edge, or ground too steep to walk down
+        return "track";                             // up-steps within reach and ordinary downhill
+    }
+
+    /**
+     * *** THE BODY'S VERTICAL MOVE, SWEPT BY physics/character/kinematic.js. *** The airborne branch integrated
+     * position.y and asked only where the WALKER'S ground would stop a fall -- never what the body passes through.
+     * Measured before this existed, on 60 fuzzed voxel worlds (36,000 frames of walk, sprint and jump): the body
+     * was inside a solid voxel on 2,973 frames, and a jump under a slab two voxels up put the head at 4.41 -- the
+     * eye above the roof -- where kinematic.js stops it at 3.00. Falling past a block under the edge of the disc
+     * left the body inside the step, because the fall landed on the ground under the CENTRE.
+     *
+     * kinematic.moveCharacter sweeps an axis-aligned box, substepped and exact at voxel faces; the predicate it is
+     * given is narrowed to the cells the body's DISC touches (the walker's own exact cylinder-against-cell test,
+     * _footprint's), so the box is this body's cylinder. Only cells the move can reach are offered: going up, those
+     * above the feet's band; going down, those at or below it -- FEET_BAND being the walker's own 0.1, the nudge
+     * _bodyFitsAt has always left the feet. A body already resting inside that band lands where it is.
+     * Returns the feet reached and whether the sweep stopped on a ceiling or a floor.
+     */
+    _sweepBodyY(x, feet, z, dy) {
+        if (!this.world?.voxelAt || !(dy !== 0)) return { feet: feet + dy, hitCeiling: false, landed: false };
+        const R = Camera.BODY_RADIUS, H = this._eyeHeight, band = feet + Camera.FEET_BAND, up = dy > 0;
+        const touches = (cx, cz) => {
+            const nx = Math.min(Math.max(x, cx), cx + 1), nz = Math.min(Math.max(z, cz), cz + 1);
+            return Math.hypot(nx - x, nz - z) < R;
+        };
+        const solid = (cx, cy, cz) => (up ? cy + 1 > band : cy + 1 <= band) && touches(cx, cz)
+                                      && Camera.isSolidToBody(this.world.voxelAt(cx, cy, cz));
+        const r = moveCharacter({ pos: [x, feet + H / 2, z], half: [R, H / 2, R], delta: [0, dy, 0], isSolid: solid });
+        const reached = r.pos[1] - H / 2;
+        return { feet: reached, hitCeiling: up && r.blocked, landed: !up && r.blocked };
+    }
+
+    _canStandAt(x, y, z) {
+        return this._bodyFitsAt(x, y - this._eyeHeight, z, this._eyeHeight);
+    }
+
 
     getMatrix() {
         return this.viewProj;

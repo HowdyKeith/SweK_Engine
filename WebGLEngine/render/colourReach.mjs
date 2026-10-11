@@ -58,12 +58,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { SOURCES } from "./fireColour.mjs";
+import { SOURCE_EXT } from "../tools/ship/moduleRefs.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 /** Directories a colour census has no business walking. vendor is somebody else's palette. */
 const SKIP = new Set(["node_modules", ".git", "vendor", "GPU_Assets"]);
-const CODE = /\.(js|mjs|html)$/;
+const CODE = SOURCE_EXT;
 
 export function walk(dir = ENG, out = []) {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -208,11 +209,25 @@ export const HOT_UNREGISTERED = Object.freeze([
  * [1, 1, 1, 1] (gpuDriven's default) on the empty mesh a falling block's fleet is reserved with; the block's own colours are
  * the mesher's, unpacked per vertex, and it draws through the bodies' lit pipeline in quat mode, nothing additively; the
  * overlap stays 0.
+ * v4571: 86 -> 87. The arrival is fx/fsr/fsr.js (added at ff463a60), and it is a FALSE POSITIVE of the literal-colour
+ * predicate, which this file's own comment already calls crude. What it matched is EASU's tap accumulator,
+ * `const a = { r: 0, g: 0, b: 0, w: 0 }` -- four running sums, not a colour anybody chose; the `w` beside them is the
+ * weight total, which is the tell. The predicate reads a SHAPE (r:, g:, b: adjacent) and cannot see that. THE PREDICATE IS
+ * NOT CHANGED HERE: narrowing it moves this census and the hot one with it, and that is a round of its own. The count is
+ * re-taken because it is a true count of what the detector detects, and the detector is described accurately.
+ * *** AND IT WAS RED IN THE TREE FOR TWO ROUNDS BEFORE ANYONE LOOKED. *** ff463a60 landed on 2026-09-09; v4569 and v4570
+ * both shipped after it with this gate red, because those rounds' verify sweeps ran the arc they were working in rather
+ * than the directory. recordDrift's six pre-flight checks do not cover this record either -- they know about gates,
+ * modules exporting reportLines, and .mjs file counts, and a per-module census like this one is outside all six. That is
+ * the seventh obligation, and nothing names it.
  */
 export const MEASURED_AT_V4424 = Object.freeze({
     namedRamps: 5,
     drawSiteFiles: 13,
-    literalColourFiles: 87,
+    // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
+    // and the readings overlap on everything predating the split, so they are run over the merged tree rather
+    // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
+    literalColourFiles: 88,   // RE-DERIVED AT THE main MERGE: both lines re-took this at 87 for DIFFERENT arrivals -- fx/fsr/fsr.js here (a false positive of the crude predicate, EASU's tap accumulator) and world/buildingTopple.mjs on main. Two arrivals, one shared baseline of 86, so the merged reading is 88 and not 87
     overlapDrawAndLiteral: 0,
     hotUnregistered: 24,   // v4505: ascii-shape.html arrived (see HOT_UNREGISTERED)   // v4500: slug-fire.html arrived; v4501: slug-morph.html's melt mode; v4502: slug-ticker.html's napalm mode (see HOT_UNREGISTERED)
     // The three Keith named, and what the old detector saw of them.

@@ -1,0 +1,29 @@
+{
+ "at": "v4790",
+ "builds": {
+  "r185": "50e4013dd3903e8afb09a4829962dbf105488de7bd47f61308f44bd2e66b3340",
+  "allPatched": "54962de6fce080f84f7c2c248e2fdae1f1b57d7aaf0a014d7c61ce3b463f0c4f"
+ },
+ "run": "the r185 tag of three with examples/ checked out; node test/e2e/puppeteer-local.js --webgpu (puppeteer-local.diff) with THREE_WEBGPU_BUILD set to the build of all eleven patches; r185 is the v4789 run of the same r185 build",
+ "examples": 187,
+ "passed": 176,
+ "samePerExample": true,
+ "failed": {
+  "webgpu_compute_texture_3d": "THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The dimension (TextureViewDimension::e2D) of the t",
+  "webgpu_loader_gltf": "Failed to fetch",
+  "webgpu_loader_materialx": "Failed to fetch",
+  "webgpu_postprocessing_3dlut": "THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The dimension (TextureViewDimension::e2D) of the t",
+  "webgpu_video_panorama": "RAF is not defined",
+  "webgpu_volume_caustics": "THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The dimension (TextureViewDimension::e2D) of the t",
+  "webgpu_volume_cloud": "THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The dimension (TextureViewDimension::e2D) of the t",
+  "webgpu_volume_lighting": "THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The dimension (TextureViewDimension::e2D) of the t",
+  "webgpu_volume_lighting_rectarea": "THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The dimension (TextureViewDimension::e2D) of the t",
+  "webgpu_volume_perlin": "THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The dimension (TextureViewDimension::e2D) of the t",
+  "webgpu_xr_native_layers": "diff 0.4% of pixels"
+ },
+ "screenshotsIdentical": 185,
+ "varyingOnOneBuild": {
+  "webgpu_compute_rasterizer": "a different image on each of four runs of the same build (v4789)",
+  "webgpu_video_panorama": "one of two frames on each run, both builds giving both (v4789)"
+ }
+}

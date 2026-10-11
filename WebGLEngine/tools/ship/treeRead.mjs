@@ -53,7 +53,7 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -69,6 +69,24 @@ export const SKIP_AGREE = Object.freeze({
     frozenRecords: /node_modules|[\\/]vendor[\\/]|[\\/]dist[\\/]/,
     recordDrift: /node_modules|\/vendor\/|\/dist\//,
 });
+
+// *** v4646 -- "THEY AGREE BY COINCIDENCE" WAS RIGHT, AND THE COINCIDENCE IS A PLATFORM. ***
+//
+// recordDrift's rule is written with a literal forward slash, so it cannot see a Windows path separator at
+// all. On a posix tree both rules select the same 4,275 files and the gate above has said so every round.
+// MEASURED ON KEITH'S WINDOWS RIG, v4645: unified 4,275, frozenRecords' rule 4,275, recordDrift's rule
+// 4,392 -- 117 vendor files leaking into a census, on one platform, silently.
+//
+// *** AND IT WAS PROVABLE HERE THE WHOLE TIME. *** The gate compared the two rules by RUNNING THEM ON THE
+// LOCAL TREE, and a local tree only ever produces one separator, so the comparison could only exercise the
+// host's own. Two lines against literal strings settle it on any box:
+//     /\/vendor\//.test("a\\vendor\\b")        === false
+//     /[\\/]vendor[\\/]/.test("a\\vendor\\b")  === true
+// The gate now asserts that, which is a fact about the REGEXES rather than about whoever is running it.
+//
+// SKIP_AGREE keeps both rules verbatim because it is the archive of what was unified -- rewriting the
+// history to match the present would make the comparison vacuous, two identical patterns trivially agreeing.
+// What changed is that recordDrift.mjs's live SOURCE_SKIP no longer points at the separator-blind one.
 
 /**
  * *** COMMONJS IS A RUNTIME SOURCE FILE AND THIS RULE DID NOT THINK SO. ***
@@ -98,7 +116,7 @@ let _walks = 0, _hits = 0, _reads = 0;
 export function stats() { return { walks: _walks, hits: _hits, reads: _reads, roots: _cache.size }; }
 
 /** Drop the memo. Exists for the gate, which must be able to make a cold read on purpose. */
-export function clear() { _cache.clear(); _byPath.clear(); _walks = 0; _hits = 0; _reads = 0; }
+export function clear() { _cache.clear(); _byPath.clear(); _once.clear(); _walks = 0; _hits = 0; _reads = 0; _onceReads = 0; _onceHits = 0; }
 
 function walk(dir, out, skip) {
     let ents;
@@ -106,8 +124,34 @@ function walk(dir, out, skip) {
     for (const e of ents.sort((a, b) => a.name.localeCompare(b.name))) {
         const p = path.join(dir, e.name);
         if (skip.test(p)) continue;
-        if (e.isDirectory()) walk(p, out, skip);
-        else if (SOURCE_EXT.test(e.name)) out.push(p);
+        // *** v4681 -- AND A DOT-PREFIXED DIRECTORY IS THE SAME RACE FROM THE OTHER SIDE. *** Three gates make their
+        // scratch INSIDE the tree because a browser page must load it same-origin -- aiPresenceOrbPresent's
+        // .sabotage-orbpresent-*, ffmpegWasmBridge's .ffwasm-gate-*, unboundBuiltin's tools/.ub-* -- and remove it
+        // in a `finally` that a cap kill skips. The rig's v4680 verify found two stranded .sabotage-orbpresent
+        // directories (four .mjs files) and the census read 4314 -> 4318 files, ES modules and closures +4, which
+        // took the drift pre-flight, recordDrift-selfcheck and runtimeGap-selfcheck red together. While such a
+        // gate is RUNNING the same files exist for seconds, so an eight-wide sweep could read them even without
+        // a kill. No tracked source file lives under a dot-directory in this tree (git ls-files), so every
+        // census this walker feeds reads the number it read before.
+        if (e.isDirectory()) { if (!e.name.startsWith(".")) walk(p, out, skip); continue; }
+        // *** v4580 -- A TRANSIENT FIXTURE IS NOT A SOURCE FILE, AND FOUR GATES PLANT ONE WHILE THEY RUN. ***
+        //
+        // rigProgress's __rigprogress-fixture, gateActivity's __routeProbe, and gateMutation's __mutation-decoy
+        // and __mutation-crash exist on disk only for the seconds their own gate is running. v4409 found this
+        // race and closed it AT ONE WALKER: tools/ship/gateSweep.mjs's enumerateGates skips `__`-prefixed names,
+        // because a fixture discovered as a gate got RUN, and rigProgress's is built to exit 1. The rule was
+        // never applied here, so the four censuses this walker feeds kept counting them.
+        //
+        // MEASURED: vba/runtimeGap.mjs's census read 4081 files instead of 4080 whenever it overlapped
+        // gateActivity-selfcheck, moving closures 3657 -> 3658, async/await 1438 -> 1439 and Promises 345 -> 346,
+        // and runtimeGap-selfcheck went red on it. Green in three runs alone and red about half the time at
+        // eight-wide -- A SHIP FAILURE THAT NEVER REPRODUCES ALONE, which is the shape v4409 named as the worst
+        // a ship-time check can have. Found by catching the file in the act: polling the tree during a sweep
+        // turned up ./tools/roundhouse/__routeProbe-selfcheck.mjs, rather than by reasoning about the counts.
+        //
+        // NOTHING PERMANENT IS LOST: no tracked source file in this tree starts with `__` (the only match is
+        // inside node_modules, already skipped), so every census this feeds reads the same number it did before.
+        else if (SOURCE_EXT.test(e.name) && !e.name.startsWith("__")) out.push(p);
     }
     return out;
 }
@@ -161,6 +205,28 @@ export function textOf(p, root = ENG) {
     return hit ? hit.text : fs.readFileSync(p, "utf8");
 }
 
+// *** v4814 -- ONE READ PER FILE PER PROCESS, FOR THE WALKERS THAT KEEP THEIR OWN RULES. ***
+//
+// treeFiles() serves the censuses that agree on SKIP and SOURCE_EXT. Four gates walk with rules of their own --
+// citedSources adds .html and drops GPU_Assets, windowsImport and orreryEjecta keep vendor/, corpusFilters reads
+// .wgsl and .json -- and each read the same file two or more times in one run. On the sandbox that was invisible
+// (about 0.035 ms a read); on Keith's Windows rig it is about 0.42 ms, and tools/ship/gateProfile.mjs --rig-slow
+// (v4814) measured it as the bulk of those gates' wall: citedSources 8,064 ms of fs in 10,178 (19,182 reads),
+// corpusFilters 5,404 of 8,785 (15,921), orreryEjecta 3,480 of 6,553 (2 x 5,012), windowsImport 3,046 of
+// 4,667 (2 x 4,520). Changing their walks to treeFiles' would move their populations, so they keep their walks
+// and share this memo instead: same files, same bytes, read once. Keyed by the path string the caller passes.
+const _once = new Map();
+let _onceReads = 0, _onceHits = 0;
+export function readOnce(p) {
+    const t = _once.get(p);
+    if (t !== undefined) { _onceHits++; return t; }
+    const s = fs.readFileSync(p, "utf8");
+    _onceReads++; _once.set(p, s);
+    return s;
+}
+/** readOnce's own counters: `reads` hit the disk, `hits` did not. */
+export function readOnceStats() { return { reads: _onceReads, hits: _onceHits, files: _once.size }; }
+
 /** What the last walk of `root` cost, for a gate that wants to report it rather than guess. */
 export function walkCost(root = ENG) {
     const c = _cache.get(root);
@@ -178,5 +244,5 @@ export function reportLines() {
     ];
 }
 
-if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href)
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1] || "").href)
     for (const l of reportLines()) console.log(l);

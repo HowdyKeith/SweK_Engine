@@ -6,6 +6,10 @@ async (a) => {
   const out = { gen: [], shipped: [] };
   try {
     const adapter = await navigator.gpu.requestAdapter();
+    // v4649 -- which adapter these readings belong to. A device number with no adapter beside it is a number
+    // that cannot be compared with another box's.
+    try { const i = adapter.info || {}; out.adapterInfo = { vendor: i.vendor || null, architecture: i.architecture || null }; }
+    catch { out.adapterInfo = null; }
     const dev = await adapter.requestDevice();
     const SHIPPED = (await import("/brain/mlp.js")).MLP_LAYER_WGSL;   // v4470 -- the module exports its kernel; no regex over its source
     const ACT = { none: 0, relu: 1, sigmoid: 2 };
@@ -36,7 +40,7 @@ async (a) => {
     for (const c of a.cases) {
       const g = B.makeMlpLayerTsl(T, { batch: c.batch, nIn: c.nIn, nOut: c.nOut, act: c.act });
       await renderer.computeAsync(g.node);
-      const emitted = renderer._nodes.getForCompute(g.node).computeShader;
+      const emitted = S.emitCompute(renderer, g.node).wgsl;
       const gen = S.transplantCompute(emitted, S.computeShell(B.MLP_SHELL));
       out.gen.push(await runRaw(gen.wgsl, "main", c, false));
       out.shipped.push(await runRaw(SHIPPED, "k_layer", c, true));

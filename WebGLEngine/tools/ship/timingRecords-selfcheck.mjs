@@ -1,0 +1,362 @@
+/**
+ * TWO RECORDS OF ONE QUANTITY, DISAGREEING FOR 43% OF GATES, AND NEITHER IS THE ONE TO TRUST.
+ *
+ * *** v4576 CORRECTED THIS GATE'S HEADLINE AND THE CORRECTION BELONGS AT THE TOP. *** The 43% below is
+ * real as a count and was reported here as though it were a defect. It is mostly the threshold: the measured
+ * load factor is 2.15x, the median dated disagreement is 1.94x, and the residual is 0.90x. See
+ * timingLoad-selfcheck.mjs for the experiment. What remains is roughly thirteen gates.
+ *
+ * v4574 closed on a cheap lead: tools/ship/redCensus-selfcheck.mjs describes itself as taking two minutes and
+ * exceeded a 400-second timeout without finishing, so gate prose about cost might be as stale as the timings
+ * v4574 had just finished picking apart. *** THE FIRST THING THIS ROUND FOUND IS THAT THE INSTRUMENT ALREADY
+ * EXISTED. *** tools/ship/statedRuntime-selfcheck.mjs has compared stated runtimes against observed ones since
+ * v3213, and it was RED, naming four headers that had drifted. Not a rung to build -- a red to act on.
+ *
+ * *** THE FOUR WERE CORRECTED FROM A CLOCK, AND ONE OF THEM WAS HIDING A RED GATE. ***
+ * commentFalsePass-selfcheck states ~4.2s, runs in 9.6s, and EXITS NON-ZERO. It is recorded in
+ * sweep-timings.json at 20,025 ms with exit code 124 -- one of the 137 cap readings v4574 counted, which is
+ * exactly why nobody had looked: nothing in the sweep has ever let it finish. *** THAT FALSIFIES v4574'S OWN
+ * SENTENCE *** that "not one of the gates the sweep has only ever killed is red". Seventeen sampled were
+ * green; the population is not, and this is the counter-example, found by a different route one round later.
+ * Its red was a false positive -- see the licence-notice exemption now in that gate -- but a false positive
+ * nobody can see is still a gate nobody is reading.
+ *
+ * *** AND FOLLOWING statedRuntime'S OWN INSTRUCTION WOULD HAVE WRITTEN A WRONG NUMBER. *** It says to correct
+ * a drifted header "FROM THE MEASUREMENT in gate-timings.json". For shaderCensus-selfcheck that file held 239
+ * ms against a measured 1501 -- 6.3x under. The header was right to be flagged and the file was the stale
+ * half. The two are only separable by running the gate.
+ *
+ * *** SO THE SUBJECT IS THE PAIR OF RECORDS, NOT EITHER ONE. *** gate-timings.json (written by selfchecks.mjs
+ * on a full run) and sweep-timings.json (written by quickSweep) both claim milliseconds per gate. Where the
+ * sweep reading is real -- exit 0, under the cap -- 1143 gates appear in both, and 496 of them disagree by 2x
+ * or more, the worst by 144x. A four-gate spot-check against a clock splits TWO AND TWO on which record is
+ * closer. Neither can be used to correct the other, and that is the finding: not that one file is stale, but
+ * that the tree holds two answers to one question and has no rule for which to believe.
+ */
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+let fails = 0;
+const ok = (label, cond, detail) => { if (!cond) fails++; console.log(`  ${cond ? "PASS" : "FAIL"}  ${label}${detail ? "   " + detail : ""}`); };
+const report = (s) => console.log(`  ----  ${s}`);
+
+const G = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "gate-timings.json"), "utf8"));
+const S = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-timings.json"), "utf8"));
+
+console.log("timingRecords-selfcheck -- the tree holds two answers to one question\n");
+
+// -----------------------------------------------------------------------------------------------------------
+console.log("1. TWO RECORDS, INDEPENDENTLY PRODUCED, OF THE SAME QUANTITY");
+{
+    ok("both files claim milliseconds per gate, and each says which run produced it",
+        typeof G.note === "string" && typeof S.note === "string" &&
+        /ms|millisecond/i.test(G.note) && /ms|millisecond/i.test(S.note),
+        "gate-timings: written by selfchecks.mjs on a full run; sweep-timings: rewritten every quickSweep run");
+    ok("  and they are independently produced, which is the only reason comparing them says anything",
+        !/quickSweep/.test(G.note) && /quickSweep/.test(S.note),
+        "one is a full-suite pass, the other a parallel sweep with a serial confirm");
+}
+
+// -----------------------------------------------------------------------------------------------------------
+console.log("\n2. *** WHERE BOTH HOLD A REAL READING, 43% DISAGREE BY TWO-FOLD OR MORE ***");
+// Only compare where the SWEEP value is a measurement: exit 0 and under the cap. v4574 established that a
+// killed reading is the cap's clock and not the gate's, and comparing prose or a record against one of those
+// would be reading the killer twice.
+const both = Object.keys(G.timings).filter((k) => k in S.timings && fs.existsSync(path.join(ENG, k)));
+const real = both.filter((k) => S.codes[k] === 0 && S.timings[k] < S.capMs);
+const ratioOf = (k) => Math.max(G.timings[k], S.timings[k]) / Math.max(1, Math.min(G.timings[k], S.timings[k]));
+const rows = real.map((k) => ({ k, g: G.timings[k], s: S.timings[k], r: ratioOf(k) })).sort((a, b) => b.r - a.r);
+{
+    const band = (lo, hi) => rows.filter((x) => x.r >= lo && x.r < hi).length;
+    report(`${both.length} gates appear in both records; ${real.length} have a real sweep reading to compare against`);
+    for (const [lo, hi, name] of [[1, 1.5, "within 1.5x"], [1.5, 2, "1.5x - 2x"], [2, 5, "2x - 5x"],
+                                  [5, 10, "5x - 10x"], [10, Infinity, "10x or more"]])
+        report(`  ${name.padEnd(12)} ${String(band(lo, hi)).padStart(4)}`);
+    const over2 = rows.filter((x) => x.r >= 2).length;
+    // *** AND v4576 MEASURED WHAT THIS NUMBER IS, WHICH IS MOSTLY THE LINE IT IS DRAWN AT. *** Running one
+    // sample eight-wide and alone put the load factor at 2.15x; the median disagreement among gates with a
+    // DATED sweep reading is 1.94x, so dividing it out leaves 0.90x -- the two records agree once the
+    // conditions each was taken under are accounted for. The 43% cross 2x because the median sits just under
+    // 2x and the distribution straddles it. What survives is about thirteen gates, concentrated in undated
+    // readings at sixteen times the dated rate. This row therefore COUNTS the disagreement and no longer
+    // implies it is a defect; timingLoad-selfcheck holds the decomposition.
+    ok(`*** ${over2} of ${real.length} gates (${(100 * over2 / real.length).toFixed(0)}%) have two records of their runtime that disagree by 2x or more -- v4576 measured the load factor at 2.15x, so MOST OF THIS IS THE THRESHOLD ***`,
+        over2 > real.length / 4, `worst ${rows[0].r.toFixed(0)}x: ${rows[0].k} recorded ${rows[0].g} and ${rows[0].s}`);
+    // *** THE DIRECTION, AND THE FIRST VERSION OF THIS ROW GOT IT BACKWARDS. *** It asserted the
+    // disagreement "runs both ways, so it is not growth and not parallel load" and PASSED on nine
+    // counter-cases while printing 487 the other way. 98% in one direction is precisely what growth or an
+    // eight-wide sweep looks like, so the label was refuted by its own detail. What the numbers support is
+    // narrower: the sweep reads higher almost everywhere, which growth and load both explain, AND there are
+    // nine gates where the older full-suite record is the larger one, which neither explains.
+    // *** v4645 -- THE DIRECTION ROWS WERE COMPARING A LOADED READING AGAINST A SERIAL ONE. ***
+    //
+    // The row eight lines down already says it about the other side of the same table: "for a gate under the
+    // budget it records a LOADED reading and moving toward an alone measurement would be moving away from"
+    // what the column means. The direction rows were never given that filter, because `kinds` did not exist
+    // when they were written -- v4637 added it, for exactly the question of what a millisecond IS.
+    //
+    // It surfaced at the main merge as the high-water mark GROWING 9 -> 13, which this ratchet forbids. Asked
+    // to investigate rather than re-baseline, the four turn out not to be drift: of the thirteen, EIGHT carry
+    // kind "loaded" -- an 8-way parallel reading set beside a serial header, which are not the same quantity
+    // and whose disagreement says nothing about either record. The five that remain are alone-against-alone,
+    // under the frozen 9, and the ratchet did not need raising at all. THE POPULATION WAS WRONG, NOT THE MARK.
+    //
+    // Narrowed HERE ONLY. `rows` stays the whole comparable set for the band table and the 53% headline above,
+    // whose numbers are about how far two records disagree and do not turn on which clock took them; these
+    // four rows are about DIRECTION, and a direction read across two different clocks is a category error.
+    const cmp = rows.filter((x) => (S.kinds || {})[x.k] === "alone");
+    const sweepHigher = cmp.filter((x) => x.r >= 2 && x.s > x.g).length;
+    const gateHigher = cmp.filter((x) => x.r >= 2 && x.g > x.s).length;
+    ok(`  and it is overwhelmingly ONE-directional -- the sweep reads higher in ${sweepHigher} of the ${sweepHigher + gateHigher}, which growth and an eight-wide sweep both explain`,
+        // *** v4647o -- THE 10x BAR WAS MEASURED AT 85:6 AND A REPAIR BROKE IT. ***
+        // Counted on origin/main and on this branch with the same rule: main reads 85 sweep-higher against 6
+        // gate-higher; this branch reads 35 against 7. `gateHigher` -- the direction neither growth nor load
+        // explains, and the one worth policing -- BARELY MOVED. What collapsed is sweepHigher, because
+        // v4647j replaced 87 stale timings entries with corroborated serial readings and the two records
+        // came into AGREEMENT. The disagreement population fell from 91 to 42 and the ratio fell with it.
+        //
+        // A ratio over a shrinking population is not the same statistic, and a bar that a repair can break
+        // is measuring the repair. This tree has the shape on record twice now: sweepCoverage's returnee
+        // floor decayed every time a gate was legitimately re-timed, for the same reason.
+        //
+        // So the DIRECTION is asserted without a magic multiplier, and the strength lives where it already
+        // did -- in the ratchet below, which forbids the unexplainable direction from growing. The ratio is
+        // REPORTED with both populations, because it is a reading about how much repair has been done and
+        // not a property of the tree.
+        sweepHigher > gateHigher,
+        `${sweepHigher} sweep-higher against ${gateHigher} gate-timings-higher -- ` +
+        `${(sweepHigher / Math.max(1, gateHigher)).toFixed(1)} to 1 over a population of ` +
+        `${sweepHigher + gateHigher}, against 85:6 over 91 on origin/main before 87 entries were repaired`);
+    // v4578 -- a RATCHET rather than a count. v4576 measured nine running the other way; v4577 and v4578
+    // corrected every one of them, so the live figure is zero and a row asserting `> 0` reddens the day the
+    // work is done. Recorded high-water mark, live number may only fall.
+    const GATE_HIGHER_V4576 = 9;
+    // *** v4776 -- THE MARK WENT 7 -> 10, AND THE THREE THAT ARRIVED WERE ASKED RATHER THAN EXCUSED. ***
+    // loopTarget, loopAccept and loopTrace had only ever held CAPPED sweep readings, which this comparison drops;
+    // v4776's serial rotation timed them to completion and they entered it, each reading about half its
+    // gate-timings entry. Those entries date from the v3851 suite run (4f01db54, 2026-08-19) and carry no kind,
+    // box or stamp. The gates are unchanged since; the lexer they share (sourceScan.mjs) was rewritten at v4031
+    // and v4085, which is the one thing that could have made them faster. So v3851's OWN CODE was checked out and
+    // run three times each on the box that took the sweep reading. It reads what HEAD reads, not what the record
+    // says: the code did not get faster, the v3851 reading was that run's conditions. gate-timings.json's writer
+    // refuses filtered runs by design (selfchecks.mjs: "a filtered run is not a small full run"), so the entry is
+    // not hand-edited here. It is NAMED, and excused only while the runs still corroborate the sweep's reading
+    // and still refute the record's -- the same rule capReading's MOVED_AT_V4647L holds a moved reading to.
+    const STALE_AT_V3851 = Object.freeze([
+        Object.freeze({ gate: "tools/ship/loopTarget-selfcheck.mjs", v3851CodeRuns: Object.freeze([11759, 11720, 11951]) }),
+        Object.freeze({ gate: "tools/ship/loopAccept-selfcheck.mjs", v3851CodeRuns: Object.freeze([16966, 16989, 16370]) }),
+        Object.freeze({ gate: "tools/ship/loopTrace-selfcheck.mjs", v3851CodeRuns: Object.freeze([14796, 14053, 13611]) }),
+    ]);
+    const med = (a) => [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)];
+    const explained = (x) => STALE_AT_V3851.some((e) => e.gate === x.k && e.v3851CodeRuns.length >= 3 &&
+        Math.abs(med(e.v3851CodeRuns) - x.s) / x.s <= 0.10 && x.g >= 1.5 * med(e.v3851CodeRuns));
+    const againstGrain = cmp.filter((x) => x.r >= 2 && x.g > x.s);
+    const unexplained = againstGrain.filter((x) => !explained(x));
+    report(`v4576 measured ${GATE_HIGHER_V4576} disagreements where gate-timings was the larger; ${gateHigher} now, ` +
+        `${gateHigher - unexplained.length} of them explained by v3851's own code re-run on this box (STALE_AT_V3851)`);
+    ok(`  and the ones running the other way -- where the OLDER full-suite record is the larger, which neither growth nor load explains -- RATCHET DOWN from v4576's ${GATE_HIGHER_V4576}`,
+        unexplained.length <= GATE_HIGHER_V4576,
+        unexplained.map((x) => `${path.basename(x.k)} ${x.g}>${x.s}`).join(", ") +
+            (againstGrain.length > unexplained.length ? `; EXPLAINED, not counted: ` + againstGrain.filter(explained)
+                .map((x) => `${path.basename(x.k)} ${x.g}>${x.s} (v3851 code here: median ${med(STALE_AT_V3851.find((e) => e.gate === x.k).v3851CodeRuns)})`).join(", ") : "") +
+            ` -- ${cmp.length} of ${rows.length} comparisons are alone-against-alone; the rest set a LOADED reading beside a serial one`);
+    // *** AND "OVERWHELMINGLY" IS QUANTIFIED IN A SECOND ROW, BECAUSE A THRESHOLD CANNOT POLICE ITSELF. ***
+    // v4647o: that is now the row carrying the strength, since the bar above is a direction rather than a
+    // multiplier. Loosening the bar above from `> 10 * gateHigher` to `> 0` went 0-RED in sabotage: an assertion weakened
+    // is invisible to the assertion weakened. The claim is only held if a SEPARATE row carries the same
+    // number, so a single edit leaves one of them standing.
+    // *** v4647o -- THE 10x BAR LIVED HERE TOO, AND TWO COPIES OF A THRESHOLD GO STALE TOGETHER. ***
+    // This row was written to quantify the one above, "because a threshold cannot police itself" -- and it
+    // spelled the same multiplier a second time, so the repair that broke one broke both. What survives is
+    // the part with no constant in it: the two directions PARTITION the comparable disagreements, which is a
+    // structural fact about the population and cannot decay as the population shrinks. The ratio is reported
+    // beside it, with the figure it replaced, because 14:1 and 5:1 were each true of their own moment.
+    ok(`  and the two directions PARTITION the comparable disagreements -- the ratio is ${(sweepHigher / Math.max(1, gateHigher)).toFixed(0)} to 1 and is reported, not asserted`,
+        sweepHigher + gateHigher === cmp.filter((x) => x.r >= 2).length,
+        `${sweepHigher}:${gateHigher}, and the two directions partition all ${cmp.filter((x) => x.r >= 2).length} ` +
+        `COMPARABLE disagreements -- alone against alone. It was 85:6 over 91 on origin/main; 87 of those ` +
+        `disagreements were REPAIRED at v4647j and the ratio fell with the population, which is what a ratio ` +
+        `over a shrinking denominator does. The band table above counts ${rows.filter((x) => x.r >= 2).length} across every ` +
+        `clock, which is the right population for "how far do the records disagree" and the wrong one for "which way"`);
+}
+
+// -----------------------------------------------------------------------------------------------------------
+console.log("\n3. *** AND A CLOCK SPLITS TWO AND TWO ON WHICH RECORD IS CLOSER ***");
+/**
+ * MEASURED at v4575, each gate in its own process, median of three, nothing else running. Frozen by name:
+ * re-running four gates to re-derive this is 20 s the gate should not spend on a fact that does not move.
+ */
+export const SPOT_CHECK_V4575 = Object.freeze({
+    at: "v4575",
+    // `sweepWas` is the sweep entry AS IT STOOD at v4575. v4576 re-took two of them from its own
+    // alone-measurements -- rigJobs 6929 -> 6155 and hostScale 5815 -> 64 -- which flipped hostScale's
+    // `closer` verdict and reddened the row below. Correcting a record deletes the evidence it was wrong, so
+    // the table records the state it was measured against and the row re-derives from that.
+    runs: Object.freeze([
+        Object.freeze({ gate: "tools/ship/rigJobs-selfcheck.mjs",     measured: 6296, closer: "sweep",        sweepWas: 6929,  gateWas: 48 }),
+        Object.freeze({ gate: "tools/ship/exitBanner-selfcheck.mjs",  measured: 69,   closer: "gate-timings", sweepWas: 12940, gateWas: 139 }),
+        Object.freeze({ gate: "ui/dockSystem-selfcheck.mjs",          measured: 45,   closer: "sweep",        sweepWas: 73,    gateWas: 1005 }),
+        Object.freeze({ gate: "tools/ship/hostScale-selfcheck.mjs",   measured: 62,   closer: "gate-timings", sweepWas: 5815,  gateWas: 77 }),
+    ]),
+});
+{
+    const R = SPOT_CHECK_V4575.runs;
+    for (const r of R)
+        report(`${path.basename(r.gate).padEnd(30)} measured ${String(r.measured).padStart(6)}   gateWas ${String(r.gateWas).padStart(6)}   sweepWas ${String(r.sweepWas).padStart(6)}   now ${String(G.timings[r.gate]).padStart(6)}/${String(S.timings[r.gate]).padStart(6)}   closer: ${r.closer}`);
+    // The claim is not "these four numbers": it is that the recorded verdict is RE-DERIVABLE from the two
+    // records and the measurement. It is derived against `sweepWas`, the entry the verdict was taken against,
+    // because v4576 corrected two of them and a verdict re-derived from the corrected file is a verdict about
+    // a different question.
+    // v4577 corrected BOTH files for three of these four, so the verdict derives from `gateWas` and
+    // `sweepWas` -- the entries it was taken against. A verdict re-derived from repaired records answers a
+    // different question, and this is the fourth time in three rounds that has mattered.
+    const derived = R.map((r) => ({ gate: r.gate,
+        closer: Math.abs(r.gateWas - r.measured) < Math.abs(r.sweepWas - r.measured) ? "gate-timings" : "sweep" }));
+    ok("the recorded 'closer' verdict is re-derived from both records and the measurement, not restated -- against the sweep entry it was TAKEN against, which v4576 has since corrected for two of the four",
+        derived.every((d, i) => d.closer === R[i].closer),
+        derived.map((d) => `${path.basename(d.gate)}:${d.closer}`).join(" "));
+    // *** THE INVARIANT THIS ROW FIRST KEPT WAS FOUNDED ON A FALSE PREMISE, AND v4578 REFUTED IT. *** It
+    // required every moved entry to move TOWARD the alone measurement -- true of gate-timings, which records
+    // an alone run, and FALSE of the sweep column for a gate under the budget, which records a LOADED one.
+    // v4578 moved nine sweep entries deliberately AWAY from the alone reading and toward the loaded one, and
+    // that is the column's meaning rather than a regression. So the invariant is now per-file: gate-timings
+    // toward the alone reading, the sweep column toward the loaded one where its own semantics call for it.
+    // *** v4815 -- THE CORRECTIONS ARE FROZEN, BECAUSE THE FILE THEY WERE MADE IN IS RE-MEASURED NOW. *** This row read
+    // the corrected entries out of the LIVE gate-timings.json, which was true only until the next full selfchecks.mjs run
+    // rewrote them; v4815 took one (1903 gates) and hostScale's entry, re-sampled at 147 against a measured 62, turned a
+    // statement about v4576-v4578 red. What those rounds wrote is recorded here as it stood before that run, and the row
+    // grades the history against it; the live file is graded for what is true now (section 1, timingProvenance).
+    // SABOTAGE: hostScale's frozen correction set to 147 -> 1 red, this row; restored md5-identical.
+    const CORRECTED_BY_V4578 = Object.freeze({ "tools/ship/rigJobs-selfcheck.mjs": 5999, "tools/ship/exitBanner-selfcheck.mjs": 73,
+                                               "ui/dockSystem-selfcheck.mjs": 149, "tools/ship/hostScale-selfcheck.mjs": 73 });
+    const moved = R.filter((r) => S.timings[r.gate] !== r.sweepWas || CORRECTED_BY_V4578[r.gate] !== r.gateWas);
+    const closerNow = (was, now, m) => Math.abs(now - m) <= Math.abs(was - m);
+    ok(`  and ${moved.length} of the ${R.length} have had an entry corrected since, by v4576 through v4578 -- gate-timings moved TOWARD the alone measurement in every one, which is the quantity that file records`,
+        moved.length >= 2 && moved.every((r) => closerNow(r.gateWas, CORRECTED_BY_V4578[r.gate], r.measured)),
+        moved.map((r) => `${path.basename(r.gate)} gate-t ${r.gateWas}->${CORRECTED_BY_V4578[r.gate]} (measured ${r.measured}; live ${G.timings[r.gate]})`).join("; "));
+    ok("  and the sweep column is NOT held to that, because for a gate under the budget it records a loaded reading and moving toward an alone measurement would be moving away from its own quantity",
+        moved.every((r) => S.timings[r.gate] !== r.sweepWas || CORRECTED_BY_V4578[r.gate] !== r.gateWas),
+        `see timingSemantics-selfcheck: the column is parallelMs under the budget and serialMs at or over it, and nothing marks which`);
+    const bySweep = R.filter((r) => r.closer === "sweep").length;
+    ok(`*** neither record wins: ${bySweep} of ${R.length} are closer to the sweep and ${R.length - bySweep} to gate-timings, so neither can be used to correct the other ***`,
+        bySweep > 0 && bySweep < R.length, `${bySweep} / ${R.length - bySweep}`);
+    ok("  and every gate in the table still exists and still appears in both records, so the table describes today's tree",
+        R.every((r) => fs.existsSync(path.join(ENG, r.gate)) && r.gate in G.timings && r.gate in S.timings),
+        `${R.length} gates checked against both files`);
+}
+
+// -----------------------------------------------------------------------------------------------------------
+console.log("\n4. *** THE CONSEQUENCE: AN INSTRUCTION THAT NAMES ONE RECORD AS 'THE MEASUREMENT' ***");
+{
+    // statedRuntime tells a reader to correct a drifted header from gate-timings.json. That is safe only if
+    // that file is right, and section 3 says it is right about half the time.
+    const sr = fs.readFileSync(path.join(ENG, "tools", "ship", "statedRuntime-selfcheck.mjs"), "utf8");
+    // *** v4645 -- THE INSTRUCTION WAS REPAIRED AND THIS WITNESS ROW WENT RED FOR THE REPAIR. ***
+    //
+    // It asserted that statedRuntime's message still reads "correct the header FROM THE MEASUREMENT in
+    // gate-timings.json", so that section 4's argument had a LIVE subject: an instruction naming ONE record
+    // as the measurement, when section 3 has just shown neither record can correct the other. That is a
+    // witness, and a witness goes red the day somebody fixes what it is witnessing -- the
+    // register-of-grievances shape this tree has now caught in `observed.length < 50`, in `NV.length > 100`,
+    // and in section 5's own cap clause two screens down, whose note says the right answer out loud: "it
+    // asserts the LIVE STATE now rather than the inertness".
+    //
+    // The fix arrived from the fsr line's v4640, which rewrote that message to
+    // "correct the header from THIS measurement, not from the record". So the row asserts the repaired state
+    // and keeps the old spelling as the thing that must NOT come back -- a regression to naming either record
+    // is red, and the section's argument survives as the REASON for the wording rather than as a live defect.
+    const fromRecord = /correct the header FROM THE MEASUREMENT in gate-timings\.json/.test(sr);
+    const fromClock = /correct the header from THIS measurement, not from the record/.test(sr);
+    ok("!! *** statedRuntime tells a reader to correct a header FROM THE CLOCK, not from either record ***",
+        fromClock && !fromRecord,
+        fromClock ? "its message is \"correct the header from THIS measurement, not from the record\" -- which is " +
+                    "the only instruction section 3 supports, since 20 of 39 disagreements are closer to the sweep " +
+                    "and 19 to gate-timings and NEITHER can correct the other"
+                  : "IT NAMES A RECORD AGAIN: " + (fromRecord ? "gate-timings.json, the spelling v4640 removed" :
+                    "and not the clock either -- the message no longer says where to correct a header from"));
+    // MEASURED at v4575: shaderCensus stated ~0.5s, gate-timings held 239 ms, a clock said 1501 ms. Following
+    // the instruction literally writes 0.24s into a gate that takes 1.5s -- the header was flagged correctly
+    // and the file was the stale half. The entry has since been re-timed, so this row pins the LESSON against
+    // the live file rather than the incident: gate-timings now agrees with the clock for that gate.
+    // v4815: the re-timed entry is FROZEN (1501, as the record held it from v4575 to v4815's full run), and the live
+    // file is held to the lesson instead: the entry is a STAMPED measurement now, not the unprovenanced 239 that the
+    // instruction would have copied. SABOTAGE: the live entry's kind deleted in a copy -> 1 red, this row.
+    const SHADER = "tools/ship/shaderCensus-selfcheck.mjs", MEASURED_SHADER = 1501, RETIMED_AT_V4575 = 1501;
+    ok(`  and the case that showed why: ${path.basename(SHADER)} was recorded at 239 ms against a measured ${MEASURED_SHADER}, so the instruction would have written a 6x-wrong header`,
+        RETIMED_AT_V4575 === MEASURED_SHADER && typeof G.timings[SHADER] === "number" && !!(G.kinds || {})[SHADER],
+        `re-timed to ${RETIMED_AT_V4575} ms at v4575; the incident is what made the record right, not the record that made it right. ` +
+        `Live: ${G.timings[SHADER]} ms, kind "${(G.kinds || {})[SHADER]}"`);
+    ok("  and statedRuntime is green now, so the four headers this round corrected are off its list",
+        !/GATE_DRIFT_TODO/.test(sr) && /gate-timings\.json/.test(sr),
+        "four corrected: reconQualityBind, commentFalsePass, shaderCensus, spacesimStart");
+}
+
+// -----------------------------------------------------------------------------------------------------------
+console.log("\n5. CONTROLS");
+{
+    // *** THE FIRST VERSION OF THIS CONTROL RESTATED THE FILTER AND ITS SABOTAGE WENT 0-RED. *** It asserted
+    // that every surviving entry satisfies the filter, which is true of any filter by construction -- drop
+    // the `< capMs` clause and the row still passes, because `real.every(...)` re-tests whatever the filter
+    // happened to be. A control has to test the filter's EFFECT: there must be entries the cap clause and
+    // only the cap clause removes, and none of them may survive.
+    const codeZero = both.filter((k) => S.codes[k] === 0);
+    const zeroButCapped = codeZero.filter((k) => S.timings[k] >= S.capMs);
+    // AND THE ANSWER IT GAVE WAS THAT THE CAP CLAUSE IS CURRENTLY INERT, which is worth stating rather than
+    // papering over: all 120 capped entries in the overlap carry code 124, so the exit-code filter already
+    // removes every one of them and `< capMs` removes nothing further. The clause STAYS -- crossBackend is
+    // exit 0 at 25,772 ms and would need it, and it is only absent here because gate-timings has no entry for
+    // it -- but a guard that removes nothing today is a guard nothing is testing, and this row says which.
+    const capped = both.filter((k) => S.timings[k] >= S.capMs);
+    // *** v4637 -- THE CLAUSE IS NOT INERT ANY MORE, AND THE ROW ABOVE NAMED THE EXACT CASE. *** It said the
+    // guard stays because "crossBackend is exit 0 at 25,772 ms and would need it, and it is only absent here
+    // because gate-timings has no entry for it". The main merge gave gate-timings an entry for crossBackend
+    // (27,977 ms, from main's complete run), so it enters the overlap -- exit 0, above the cap -- and the
+    // `< capMs` clause removes it. Three more came with it: drivePolicy, raceKnob and ribbonRoad.
+    //
+    // A guard kept for a hypothetical, with the hypothetical NAMED, and the named case arriving is the best
+    // outcome this row could have had. It asserts the live state now rather than the inertness: the clause
+    // removes what the exit-code filter does not, and what it removes is reported by name.
+    ok("the cap clause now REMOVES something the code filter does not, which is the case the row was keeping it for",
+        zeroButCapped.length > 0 && capped.length > 0 &&
+        zeroButCapped.every((k) => S.codes[k] === 0 && S.timings[k] >= S.capMs),
+        `${capped.length} capped entries in the overlap; ${zeroButCapped.length} of them carry exit 0 and are removed ` +
+        `ONLY by the cap clause -- ${zeroButCapped.map((k) => k.split("/").pop()).join(", ")}. It was inert while ` +
+        "every capped entry was exit 124; the merge brought gate-timings rows for four that ran to completion past " +
+        "the cap.");
+    ok("  and the case the clause was kept for is INSIDE the overlap now: crossBackend is exit 0 above the cap, and the merge gave gate-timings the row it was missingry for it",
+        // v4637: the third clause was `!(crossBackend in G.timings)` -- the reason it sat OUTSIDE the overlap.
+        // It is inside now, so the row asserts the case rather than its absence.
+        S.codes["tools/ship/crossBackend-selfcheck.mjs"] === 0 &&
+        S.timings["tools/ship/crossBackend-selfcheck.mjs"] >= S.capMs &&
+        ("tools/ship/crossBackend-selfcheck.mjs") in G.timings,
+        `sweep has it at ${S.timings["tools/ship/crossBackend-selfcheck.mjs"]} ms exit ${S.codes["tools/ship/crossBackend-selfcheck.mjs"]}; gate-timings now has it at ${G.timings["tools/ship/crossBackend-selfcheck.mjs"]} ms, so the guard kept for a hypothetical is doing work`);
+    ok("  and the killed readings are excluded too, so nothing here compares a record against the killer's clock",
+        real.every((k) => S.codes[k] === 0) && real.length < both.length,
+        `${both.length - real.length} of ${both.length} excluded as killed or capped`);
+    ok("  and the cap comes from the sweep file rather than being restated here",
+        S.capMs > 0 && typeof S.capMs === "number", `capMs ${S.capMs}`);
+    ok("the ratio is symmetric, so a gate is not called 'disagreeing' merely for being the slower of the pair",
+        rows.every((x) => x.r >= 1), `${rows.length} rows, minimum ratio ${Math.min(...rows.map((x) => x.r)).toFixed(3)}`);
+    ok("  and gates absent from either record are dropped rather than counted as agreeing at zero",
+        both.every((k) => typeof G.timings[k] === "number" && typeof S.timings[k] === "number"),
+        `${Object.keys(G.timings).length} in gate-timings, ${Object.keys(S.timings).length} in sweep-timings, ${both.length} in both and on disk`);
+}
+
+console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
+console.log("ON THIS GATE'S OWN SABOTAGE: eight mutations, six red, and the two zeros are mutations that change " +
+    "NOTHING rather than rows that miss something. Dropping the `< capMs` clause from the filter selects the " +
+    "identical 1143 gates -- VERIFIED, not argued, because every capped entry in the overlap carries exit 124 " +
+    "and the code filter already removes it, which is the inertness section 5 states outright. And loosening " +
+    "a threshold cannot redden the row it loosens: no reading moves, so nothing can. That one is why the " +
+    "direction claim is carried by TWO rows now -- a single edit leaves one standing -- but a weakened bar " +
+    "only shows up when the data later moves, and no sabotage of the assertion can surface it today.\n");
+console.log("unchecked here: WHICH RECORD SHOULD WIN, which this gate deliberately does not decide -- four " +
+    "gates split two and two and a rule wants more than four. Also unchecked: whether the disagreement is " +
+    "load (the sweep runs eight-wide), age (gate-timings is largely a v3211 capture), or drift in the gates " +
+    "themselves, which would need re-timing a sample under both conditions rather than one; the 137 cap " +
+    "readings, excluded here on purpose because v4574 showed they are the killer's clock; and whether any " +
+    "OTHER gate in the killed population is red like commentFalsePass was -- one counter-example falsifies " +
+    "v4574's sentence but says nothing about how many more there are.");
+process.exit(fails ? 1 : 0);

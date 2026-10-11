@@ -1,0 +1,194 @@
+{
+ "note": "WebGLEngine/fsr-caches/ holds the FSR frame-generation measurement caches: per-block feature rows harvested off fsr.html by a WebGPU browser drive (tools/ship/genGateTrain.mjs), which the H3-H16 measurement gates re-derive their verdicts from. Nothing at runtime reads them. The release zip leaves every file listed here out and keeps this manifest; install-fsr-caches.html (GET/POST /install/fsr-caches) downloads them from the release tag and keeps a file only if its sha256 matches. A gate whose cache is absent skips by name and says it is NOT a pass. Rebuild this file with node tools/ship/fsrCaches.mjs --write-manifest after a re-harvest.",
+ "generatedBy": "tools/ship/fsrCaches.mjs --write-manifest",
+ "installPage": "install-fsr-caches.html",
+ "route": "/install/fsr-caches",
+ "source": "https://raw.githubusercontent.com/HowdyKeith/SweK_Engine/<tag>/WebGLEngine/fsr-caches/<file>",
+ "totalBytes": 300016258,
+ "files": [
+  {
+   "name": "frameGate-cache.json.gz",
+   "bytes": 28594603,
+   "sha256": "9aa728883f9f198b008279f4cbe89f125b500b3b4311960a9ed6e177125d2f59",
+   "hyp": "H7",
+   "what": "H7 frame-level gate: per-frame laplacian vs generated-minus-crossfade dB, harvested at every declared speed",
+   "writer": "tools/ship/frameGate.mjs",
+   "readers": [
+    "tools/ship/frameGain-selfcheck.mjs",
+    "tools/ship/frameGainMeasure-selfcheck.mjs",
+    "tools/ship/frameGate-selfcheck.mjs",
+    "tools/ship/frameGate.mjs",
+    "tools/ship/frameGateMeasure-selfcheck.mjs",
+    "tools/ship/frameReverseMeasure-selfcheck.mjs",
+    "tools/ship/frameSway-selfcheck.mjs",
+    "tools/ship/frameSwayMeasure-selfcheck.mjs",
+    "tools/ship/frameVerdicts-selfcheck.mjs"
+   ]
+  },
+  {
+   "name": "frameHoles-cache.json.gz",
+   "bytes": 28636057,
+   "sha256": "988c31479352d01cf59fe4abd1329da133530d02a3172b77739e4c755dd76235",
+   "hyp": "H8",
+   "what": "H8 occlusion: per-frame hole fraction vs the generation advantage",
+   "writer": "tools/ship/frameHoles.mjs",
+   "readers": [
+    "tools/ship/frameDisagree-selfcheck.mjs",
+    "tools/ship/frameGain-selfcheck.mjs",
+    "tools/ship/frameHoled-selfcheck.mjs",
+    "tools/ship/frameHoledMeasure-selfcheck.mjs",
+    "tools/ship/frameHoles-selfcheck.mjs",
+    "tools/ship/frameHoles.mjs",
+    "tools/ship/frameHolesMeasure-selfcheck.mjs",
+    "tools/ship/frameReverse-selfcheck.mjs",
+    "tools/ship/frameSway-selfcheck.mjs",
+    "tools/ship/frameVerdicts-selfcheck.mjs",
+    "tools/ship/frameVertical-selfcheck.mjs",
+    "tools/ship/frameVerticalMeasure-selfcheck.mjs"
+   ]
+  },
+  {
+   "name": "frameHoled-cache.json.gz",
+   "bytes": 28179875,
+   "sha256": "2a75070443dad58ed09ff69db6d36e577a32c6b346982a0a930a05e7193e68b0",
+   "hyp": "H9",
+   "what": "H9 replication of the holed-frame contrast on fresh cells",
+   "writer": "tools/ship/frameHoled.mjs",
+   "readers": [
+    "tools/ship/frameHoled-selfcheck.mjs",
+    "tools/ship/frameHoled.mjs",
+    "tools/ship/frameHoledMeasure-selfcheck.mjs",
+    "tools/ship/frameVerdicts-selfcheck.mjs",
+    "tools/ship/frameVerticalMeasure-selfcheck.mjs"
+   ]
+  },
+  {
+   "name": "frameVertical-cache.json.gz",
+   "bytes": 14309423,
+   "sha256": "9c71abde6e9796173a2c903f77d26ae96c197f9351887c997e7f20d4c1610994",
+   "hyp": "H10",
+   "what": "H10 the holed-frame question on vertical slab motion nobody had harvested",
+   "writer": "tools/ship/frameVertical.mjs",
+   "readers": [
+    "tools/ship/frameVerdicts-selfcheck.mjs",
+    "tools/ship/frameVertical-selfcheck.mjs",
+    "tools/ship/frameVertical.mjs",
+    "tools/ship/frameVerticalMeasure-selfcheck.mjs"
+   ]
+  },
+  {
+   "name": "frameGain-cache.json.gz",
+   "bytes": 28876886,
+   "sha256": "c339f443343022d4de68c95973bfecdfdfe72095f002e094872584e8442fd6c6",
+   "hyp": "H11",
+   "what": "H11 the motion-gain score asked of the whole frame",
+   "writer": "tools/ship/frameGain.mjs",
+   "readers": [
+    "tools/ship/frameGain-selfcheck.mjs",
+    "tools/ship/frameGain.mjs",
+    "tools/ship/frameGainMeasure-selfcheck.mjs",
+    "tools/ship/frameSway-selfcheck.mjs",
+    "tools/ship/frameSwayMeasure-selfcheck.mjs",
+    "tools/ship/frameVerdicts-selfcheck.mjs"
+   ]
+  },
+  {
+   "name": "frameReverse-cache.json.gz",
+   "bytes": 29637811,
+   "sha256": "a86d0859116edb67c40c186c746b8416cffb25e449a7cf90b0df4958d6906d95",
+   "hyp": "H12/H13",
+   "what": "H12/H13 H11's negation on unseen cells, and the same question with the clock partialled out",
+   "writer": "tools/ship/frameReverse.mjs",
+   "readers": [
+    "tools/ship/frameReverse-selfcheck.mjs",
+    "tools/ship/frameReverse.mjs",
+    "tools/ship/frameReverseMeasure-selfcheck.mjs",
+    "tools/ship/frameVerdicts-selfcheck.mjs"
+   ]
+  },
+  {
+   "name": "frameSway-cache.json.gz",
+   "bytes": 30215102,
+   "sha256": "c2cc7fe2b1bac46f949744835f7adaa94228a6552173d1e8157d546a28926e9e",
+   "hyp": "H14",
+   "what": "H14 the sway path: the window's clock removed by design",
+   "writer": "tools/ship/frameSway.mjs",
+   "readers": [
+    "tools/ship/frameSway-selfcheck.mjs",
+    "tools/ship/frameSway.mjs",
+    "tools/ship/frameSwayMeasure-selfcheck.mjs",
+    "tools/ship/frameVerdicts-selfcheck.mjs"
+   ]
+  },
+  {
+   "name": "frameSwayRep-cache.json.gz",
+   "bytes": 30788492,
+   "sha256": "cbff37099b096d2eb1e2205205ab99f8374ed2d7383539e8ed756a5a4d62d1b5",
+   "hyp": "H15",
+   "what": "H15 H14 replicated at a second speed",
+   "writer": "tools/ship/frameSwayRep.mjs",
+   "readers": [
+    "tools/ship/frameSwayRep-selfcheck.mjs",
+    "tools/ship/frameSwayRep.mjs",
+    "tools/ship/frameSwayRepMeasure-selfcheck.mjs",
+    "tools/ship/frameVerdicts-selfcheck.mjs"
+   ]
+  },
+  {
+   "name": "frameDisagree-cache.json.gz",
+   "bytes": 30834665,
+   "sha256": "077559284090c76466a58e35d273bccccca241a675acdb54da8ef185a9ff9870",
+   "hyp": "H16",
+   "what": "H16 motion-candidate disagreement as a trust signal",
+   "writer": "tools/ship/frameDisagree.mjs",
+   "readers": [
+    "tools/ship/frameDisagree-selfcheck.mjs",
+    "tools/ship/frameDisagree.mjs",
+    "tools/ship/frameDisagreeMeasure-selfcheck.mjs",
+    "tools/ship/frameVerdicts-selfcheck.mjs"
+   ]
+  },
+  {
+   "name": "genGate-folds.json",
+   "bytes": 21371322,
+   "sha256": "f8e47ec9b9922a8eef13343f21a07c803e9b97f88a2ea004d2df0311f0d2baf6",
+   "hyp": "H3",
+   "what": "H3 learned-gate transfer: three scenes of per-block v1/v2 features, leave one scene out",
+   "writer": "tools/ship/genGateTransfer.mjs",
+   "readers": [
+    "tools/ship/genGateTransfer-selfcheck.mjs",
+    "tools/ship/genGateTransfer.mjs"
+   ]
+  },
+  {
+   "name": "genGate-folds7.json.gz",
+   "bytes": 14465294,
+   "sha256": "382277e8a3871a14633d454ff92907575b8111f21183eb9314865f1d323f63dd",
+   "hyp": "H4/H6",
+   "what": "H4 seven-fold learned gate at x2 (also H6's x2 cell)",
+   "writer": "tools/ship/genGateFolds.mjs",
+   "readers": [
+    "tools/ship/genGateFolds.mjs",
+    "tools/ship/genGateFoldsMeasure-selfcheck.mjs",
+    "tools/ship/genGateRule-selfcheck.mjs",
+    "tools/ship/genGateRule.mjs",
+    "tools/ship/genGateRuleMeasure-selfcheck.mjs"
+   ]
+  },
+  {
+   "name": "genGate-absolute4.json.gz",
+   "bytes": 14106728,
+   "sha256": "8b533ce696d6ceca6665b7b5d0843c7f8007d736537fcb26325d4dc923f83fb3",
+   "hyp": "H5/H6",
+   "what": "H5 absolute feature set at x4 (also H6's x4 cell)",
+   "writer": "tools/ship/genGateAbsolute.mjs",
+   "readers": [
+    "tools/ship/genGateAbsolute.mjs",
+    "tools/ship/genGateAbsoluteMeasure-selfcheck.mjs",
+    "tools/ship/genGateRule-selfcheck.mjs",
+    "tools/ship/genGateRule.mjs",
+    "tools/ship/genGateRuleMeasure-selfcheck.mjs"
+   ]
+  }
+ ]
+}

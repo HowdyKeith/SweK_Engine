@@ -40,12 +40,14 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
+import { whereWorst } from "./pixelWorst.mjs";
+// rig run 10: launched with PARITY_ARGS -- the two backends held to one picture must be on one rasteriser (tools/ship/webgpuHarness.mjs)
+import { runInEngineOrigin, webgpuSkipReason, PARITY_ARGS } from "./webgpuHarness.mjs";
 import { parseFont } from "../../text/slugFont.js";
 import { slugRender } from "../../text/slugEval.js";
 import { glyphMorph, packMorphed, polygonArea } from "../../render/slugMorph.mjs";
 import { puddleContour, inscribedEllipseArea, pinholeContour, contourArea, meltTarget, meltRect, meltMorph, meltEase } from "../../render/slugMelt.mjs";
-import { fireFill, flatModel, gradeFilled } from "../../render/slugFill.mjs";
+import { fireFill, flatModel, gradeFilled, SUBPIXEL_GRIDS } from "../../render/slugFill.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -100,7 +102,7 @@ sec("2. THE FRAME, ON BOTH BACKENDS: t = 0, 0.5, 1 through fromAtlas with one sh
     const skip = webgpuSkipReason();
     if (skip) { console.log(`  SKIP  ${skip}`); report("*** NOT A PASS. ***"); fails++; }
     else {
-        const r = await runInEngineOrigin({ engineRoot: ENG, args: { W, H, SIZE, ORIGIN, N, FIRE, COLOUR }, script: `async (a) => {
+        const r = await runInEngineOrigin({ launchArgs: PARITY_ARGS, engineRoot: ENG, args: { W, H, SIZE, ORIGIN, N, FIRE, COLOUR }, script: `async (a) => {
             const { requestDevice } = await import("/gfx/device.js");
             const { parseFont } = await import("/text/slugFont.js");
             const M = await import("/render/slugDevice.mjs");
@@ -146,14 +148,28 @@ sec("2. THE FRAME, ON BOTH BACKENDS: t = 0, 0.5, 1 through fromAtlas with one sh
                 // toward the source (render/doomFire.mjs PALETTE), so the hold is the mean green of the lit pixels.
                 const heat = (px) => { let lit = 0, g = 0; for (let i = 0; i < W * H; i++) { if (px[i * 4] > 32) { lit++; g += px[i * 4 + 1]; } } return { lit, g: lit ? g / lit : 0 }; };
                 const stats = {};
+                // *** v4686 -- ONE DEVICE, ONE SNAP: chosen over all three frames, then every frame is graded at it. *** See
+                // render/slugFill.mjs SUBPIXEL_GRIDS -- the rig's NVIDIA snaps at 1/256 and this box's SwiftShader at 1/16.
+                const atlasAt = (t) => packMorphed(m.at(t).contours, { logWidth: o.logWidth });
+                const missAt = (q) => [0, 0.5, 1].reduce((n, t) => { const a = atlasAt(t), ge = a.glyphs.get(0);
+                    const g = gradeFilled(o.frames["t" + t], W, H, flatModel(ge.bbox, SIZE, ORIGIN, q), (tx, ty, fw) => slugRender(a, ge, tx, ty, fw), fire, m.rect, COLOUR, TOL);
+                    return n + g.unexplained; }, 0);
+                const byGrid = SUBPIXEL_GRIDS.map((q) => ({ q, miss: missAt(q) }));
+                const SNAP = byGrid.reduce((m2, g) => (g.miss < m2.miss ? g : m2));
+                report(`${bk}: this device snaps vertices at 1/${SNAP.q} px -- ` + byGrid.map((g) => `1/${g.q}: ${g.miss} unexplained over three frames`).join(", "));
+                ok(`  ${bk}: the snap is IDENTIFIED, not assumed -- the other legal grid misses on these frames`,
+                    SUBPIXEL_GRIDS.length > 1 && byGrid.filter((g) => g !== SNAP).every((g) => g.miss > SNAP.miss), byGrid.map((g) => `1/${g.q}: ${g.miss}`).join(" vs "));
                 for (const t of [0, 0.5, 1]) {
                     const atlas = packMorphed(m.at(t).contours, { logWidth: o.logWidth }), e = atlas.glyphs.get(0), ent = o.entries["t" + t];
                     ok(`  ${bk}: the atlas packed here at t = ${t} is the atlas the page packed (same loc and curve count)`, ent.loc[0] === e.loc[0] && ent.loc[1] === e.loc[1] && ent.curveCount === e.curveCount, `${e.curveCount} curves`);
-                    const texAt = flatModel(e.bbox, SIZE, ORIGIN);
+                    const texAt = flatModel(e.bbox, SIZE, ORIGIN, SNAP.q);
                     const g = gradeFilled(o.frames["t" + t], W, H, texAt, (tx, ty, fw) => slugRender(atlas, e, tx, ty, fw), fire, m.rect, COLOUR, TOL);
                     stats[t] = g;
                     report(`${bk} t = ${t}: ${g.exact} of ${W * H} exact, ${g.boundary} texel-boundary neighbours, ${g.unexplained} unexplained, worst ${g.worst}, ${g.lit} lit`);
-                    ok(`*** ${bk}: the t = ${t} frame is coverage x the fire's nearest texel within ${TOL} of 255 on every pixel but texel-boundary neighbours (fewer than 0.5%) ***`, g.unexplained === 0 && g.boundary < W * H * 0.005 && g.lit > 20);
+                    ok(`*** ${bk}: the t = ${t} frame is coverage x the fire's nearest texel within ${TOL} of 255 on every pixel but texel-boundary neighbours (fewer than 0.5%) ***`, g.unexplained === 0 && g.boundary < W * H * 0.005 && g.lit > 20,
+                        // v4649 -- this row had NO detail at all, so a red on another box arrived as a
+                        // headline and nothing else. worst, the counts, and WHERE the worst pixel is.
+                        `worst ${g.worst}, ${g.boundary} boundary, ${g.unexplained} unexplained, ${g.lit} lit; ${whereWorst(g.at)}`);
                 }
                 let above = 0, lit1 = 0; for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) if (o.frames.t1[(j * W + i) * 4] > 32) { lit1++; if (j + 0.5 < topPx - 1 || j + 0.5 > floorPx + 1) above++; }
                 ok(`  ${bk}: the puddle's ink lies within its height of the floor (rows ${topPx.toFixed(1)}..${floorPx.toFixed(1)}), none above or below by more than a pixel`, above === 0 && lit1 > 100, `${lit1} lit, ${above} outside`);

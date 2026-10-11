@@ -10,7 +10,8 @@
 "use strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
+// rig run 10: launched with PARITY_ARGS -- the two backends held to one picture must be on one rasteriser (tools/ship/webgpuHarness.mjs)
+import { runInEngineOrigin, webgpuSkipReason, PARITY_ARGS } from "./webgpuHarness.mjs";
 import { validateWgsl, parseBindings } from "../../render/wgslSpec.mjs";
 import { checkHostUniforms } from "../../render/wgslLayout.mjs";
 import * as G from "../../render/gpuDriven.mjs";
@@ -56,7 +57,7 @@ console.log("\n2. ON BOTH BACKENDS: EVERY VISIBLE CHUNK SHOWS ITS CENTRE TEXEL'S
 const skip = webgpuSkipReason();
 if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
 else {
-    const r = await runInEngineOrigin({ engineRoot: ENG, args: { N, H, SIDE, PARAMS, CAM, THRESHOLDS, field: { width: H, height: H, data: Array.from(field.data) } }, script: `async (a) => {
+    const r = await runInEngineOrigin({ launchArgs: PARITY_ARGS, engineRoot: ENG, args: { N, H, SIDE, PARAMS, CAM, THRESHOLDS, field: { width: H, height: H, data: Array.from(field.data) } }, script: `async (a) => {
         const G = await import("/render/gpuDriven.mjs"); const T = await import("/render/gpuTerrain.mjs"); const { requestDevice } = await import("/gfx/device.js");
         const records = T.chunkRecords(a.PARAMS, a.SIDE);
         const lods = () => [{ name: "coarse", mesh: G.quadMesh(1) }, { name: "fine", mesh: G.quadMesh(8) }, { name: "mid", mesh: G.quadMesh(4) }];
@@ -137,7 +138,7 @@ else {
     const W2 = 16, slope = T.heightfield(W2, W2, (u, v) => 0.5 + 0.4 * Math.sin(v * 9));   // curved along the seam: a line cannot follow it
     const P2 = { originX: -4, originZ: -4, extent: 8, heightScale: 3 };
     const C2 = { eye: [-3.5, 3.2, 0], target: [0, 1.2, 0], fov: 0.9, near: 0.2, far: 100 };
-    const r = await runInEngineOrigin({ engineRoot: ENG, args: { N, P2, C2, field: { width: W2, height: W2, data: Array.from(slope.data) } }, script: `async (a) => {
+    const r = await runInEngineOrigin({ launchArgs: PARITY_ARGS, engineRoot: ENG, args: { N, P2, C2, field: { width: W2, height: W2, data: Array.from(slope.data) } }, script: `async (a) => {
         const G = await import("/render/gpuDriven.mjs"); const T = await import("/render/gpuTerrain.mjs"); const { requestDevice } = await import("/gfx/device.js");
         const proj = G.perspective(a.C2.fov, 1, a.C2.near, a.C2.far), view = G.lookAt(a.C2.eye, a.C2.target), viewProj = G.multiply(proj, view);
         const half = 2, records = new Float32Array([-2, 0, 0, half * T.RADIUS_PER_HALF + a.P2.heightScale / 2, 2, 0, 0, half * T.RADIUS_PER_HALF + a.P2.heightScale / 2]);

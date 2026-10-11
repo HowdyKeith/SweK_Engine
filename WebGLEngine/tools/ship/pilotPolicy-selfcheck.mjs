@@ -122,6 +122,38 @@ console.log("1. THE SHAPE: 7 -> 34 (ENCODER) -> CONNECTOME-MASKED RECURRENT CORE
     const got = P.forward(w, x);
     ok("!! forward equals a plain float32 relu MLP written here (encoder, REC_STEPS recurrent steps, decoder), then tanh, on all four outputs", got.length === 4 && got.every((v, i) => near(v, plain[i], 1e-6)), `${got.map((v) => v.toFixed(5))} vs ${plain.map((v) => v.toFixed(5))}`);
 
+    // v4778 (2026-10-04, adversarial review): the row above never reaches the recurrent core. perturb(zero, 0.7, () => 0.37)
+    // sets every weight to the same -0.6757, so the encoder's 34 relu outputs on that x are ALL zero (measured) and any
+    // recurrent step at all passes it -- proved on a scratch copy whose new maskedStep() drops each row's last nonzero
+    // column: that row stayed PASS. The row stays as it was; this one adds the case it was named for, now that forward()
+    // runs the recurrent step through its own sparse path instead of mlpLayerCpu: varied random weights (scale 0.3, seed 7:
+    // 15 of 34 encoder units live, the core moves 25 of 34, no output saturated), against the same plain dense float32 MLP,
+    // EXACTLY -- the masked step skips only zero weights, so it is the same float32 arithmetic, bit for bit. The row also
+    // asserts its own core is live, so it cannot go vacuous the way the one above did.
+    {
+        const wl = P.perturb(P.zeroWeights(), 0.3, (() => { let s = 7; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; })());
+        const f = Math.fround, ls = P.layersOf(wl);
+        const dense = (l, xin) => { const y = []; for (let o = 0; o < l.nOut; o++) { let acc = f(l.b[o]); for (let k = 0; k < l.nIn; k++) acc = f(acc + f(f(xin[k]) * f(l.W[o * l.nIn + k]))); y.push(l.act === "relu" ? f(Math.max(0, acc)) : acc); } return y; };
+        const enc = dense(ls[0], x); let h = enc;
+        for (let s = 1; s < ls.length - 1; s++) h = dense(ls[s], h);
+        const plainLive = dense(ls[ls.length - 1], h).map((v) => Math.tanh(v)), gotLive = P.forward(wl, x);
+        const live = enc.filter((v) => v !== 0).length, moved = h.filter((v, i) => v !== enc[i]).length;
+        ok("!! ...and with the recurrent core LIVE (varied random weights: encoder units on, the core moving them, no output saturated), forward equals that plain float32 MLP exactly, on all four outputs",
+            live > 0 && moved > 0 && plainLive.every((v) => Math.abs(v) < 0.999) && gotLive.length === 4 && gotLive.every((v, i) => v === plainLive[i]),
+            `${live} encoder unit(s) live, ${moved} moved by the core; ${gotLive.map((v) => v.toFixed(5))} vs ${plainLive.map((v) => v.toFixed(5))}`);
+    }
+
+    // v4778 (2026-10-04): forward() now reuses one expanded recurrent matrix per weight vector (brain/pilotPolicy.mjs's
+    // memoOf(), which took this gate 4.4 -> 1.75 s here with byte-identical output), so a vector edited IN PLACE must still
+    // be re-expanded. Sabotaged on a scratch copy (the memo returning its entry without the recurrent-weight snapshot
+    // check): every other row in this file stayed green, because nothing else here edits a vector in place -- this one went red.
+    const wEd = P.handWeights(), xEd = [1, 0.3, -0.2, 0.5, -0.4, 1, 0], recAt = P.FEATURES * P.HIDDEN + P.HIDDEN;
+    const edBefore = P.forward(wEd, xEd);
+    for (let k = 0; k < P.REC_EDGES; k++) wEd[recAt + k] = 0.5;
+    const edAfter = P.forward(wEd, xEd), edFresh = P.forward(Float32Array.from(wEd), xEd);
+    ok("!! a weight vector whose recurrent weights are edited IN PLACE answers exactly as a fresh copy of it does (the per-vector layer memo is not stale), and the edit really moved the answer",
+        edAfter.every((v, i) => v === edFresh[i]) && edAfter.some((v, i) => v !== edBefore[i]), `${edBefore.map((v) => v.toFixed(5))} -> ${edAfter.map((v) => v.toFixed(5))}, fresh ${edFresh.map((v) => v.toFixed(5))}`);
+
     const zeroOut = P.forward(P.zeroWeights(), x);
     ok("the zero pilot answers four zeros; its thrust and firing (tanh 0, not positive) are both off", zeroOut.every((v) => v === 0));
     const shipS = { x: 0, y: 0, alt: 0, heading: 0, pitch: 0 };

@@ -75,15 +75,31 @@ console.log("\n2. *** THE COMMONJS TWIN AGREES WITH THE ESM SUITE IT MIRRORS -- 
     // is never compared to its original is just a third opinion with a nicer comment, so this imports the REAL
     // suite and re-derives its walk against the same tree.
     const suiteSrc = fs.readFileSync(path.join(ROOT, "tools", "ship", "selfchecks.mjs"), "utf8");
+    const twinSrc = fs.readFileSync(path.join(ROOT, "ai-bridge", "gateWalk.js"), "utf8");
     const skipDirs = [...suiteSrc.matchAll(/f === "([^"]+)"/g)].map((m) => m[1]);
     ok("!! the suite's skipped directory names are exactly the twin's",
         [...gateWalk.SKIP_DIRS].sort().join(",") === skipDirs.sort().join(","),
         "twin: " + [...gateWalk.SKIP_DIRS].sort().join(",") + "  |  suite: " + skipDirs.sort().join(","));
 
-    const suitePattern = (suiteSrc.match(/else if \((\/[^/]+\/)\.test\(f\)\)/) || [])[1];
+    // *** v4584 -- THE EXTRACTION WANTED A BARE PATTERN AND WENT `undefined` THE MOMENT A CLAUSE WAS ADDED. ***
+    // Its regex was /else if \((\/[^/]+\/)\.test\(f\)\)/, which only matches a predicate that is NOTHING BUT the
+    // pattern test. v4584 added the transient-fixture guard beside it and this row reported "suite: undefined" --
+    // a parse failure wearing a mismatch's clothes, which is the shape this file's own `parsedExclusions` row
+    // exists to prevent one section down. The pattern is captured out of a longer predicate now.
+    const suitePattern = (suiteSrc.match(/else if \((\/[^/]+\/)\.test\(f\)/) || [])[1];
     ok("!! ...and the suite's filename pattern is the twin's, character for character",
-        suitePattern === String(gateWalk.GATE_RE),
+        !!suitePattern && suitePattern === String(gateWalk.GATE_RE),
         "twin: " + gateWalk.GATE_RE + "  |  suite: " + suitePattern);
+
+    // *** AND BOTH WALKS EXCLUDE A TRANSIENT FIXTURE, WHICH NEITHER DID UNTIL v4584. ***
+    // Four gates plant a `__`-prefixed *-selfcheck.mjs while they run. v4409 closed that race at gateSweep's
+    // enumerateGates and v4580 at treeRead; these two twins were both still missing it, SO THE SET COMPARISON
+    // BELOW AGREED ON A FALSE ANSWER -- two copies of one wrong rule, which timingCoverage-selfcheck recorded at
+    // v3584 as the second-copy defect one level up. Checked as a predicate here and DRIVEN on a real file below.
+    ok("!! *** and both walks refuse a `__` transient fixture, which is v4409's rule reaching its third walker ***",
+        /!f\.startsWith\("__"\)/.test(suiteSrc) && /!f\.startsWith\("__"\)/.test(twinSrc),
+        "the suite runs what it discovers, and rigProgress's fixture is built to exit 1 -- MEASURED at v4584, " +
+        "planting one took the suite's walk from 1,634 files to 1,635 and its selection from 23 gates to 24");
 
     // AND THE SETS THEMSELVES, against the real tree rather than against the rules that produce them.
     const twin = gateWalk.walk().sort();
@@ -93,7 +109,9 @@ console.log("\n2. *** THE COMMONJS TWIN AGREES WITH THE ESM SUITE IT MIRRORS -- 
             const p = path.join(dir, f);
             let st; try { st = fs.statSync(p); } catch { continue; }
             if (st.isDirectory()) suiteWalk(p, out);
-            else if (/selfcheck.*\.mjs$/.test(f)) out.push(path.relative(ROOT, p).split(path.sep).join("/"));
+            // v4584 -- carries the transient-fixture rule too, because THIS IS A THIRD COPY OF THE SUITE'S WALK
+            // and a copy that lags is how the comparison above came to agree on a false answer.
+            else if (/selfcheck.*\.mjs$/.test(f) && !f.startsWith("__")) out.push(path.relative(ROOT, p).split(path.sep).join("/"));
         }
         return out;
     };
@@ -101,6 +119,23 @@ console.log("\n2. *** THE COMMONJS TWIN AGREES WITH THE ESM SUITE IT MIRRORS -- 
     ok("!! *** THE TWIN RETURNS THE SAME SET AS THE SUITE'S OWN RULES, ON THIS TREE ***",
         twin.length === real.length && twin.every((f, i) => f === real[i]),
         twin.length + " files both ways -- a twin nobody compares is a third opinion");
+
+    // *** DRIVEN, NOT REASONED: the sets above agree on a tree with no fixture in it, which is exactly the state
+    // in which the old rule looked correct. A fixture is planted and both walks are asked again. ***
+    const planted = path.join(ROOT, "tools", "ship", "__gatewalkparity-fixture-selfcheck.mjs");
+    let twinSaw = null, suiteSaw = null;
+    try {
+        fs.writeFileSync(planted, "// transient fixture planted by gateWalk-selfcheck; delete if you find it.\n");
+        twinSaw = gateWalk.walk().some((f) => /__gatewalkparity/.test(f));
+        suiteSaw = suiteWalk(ROOT).some((f) => /__gatewalkparity/.test(f));
+    } finally {
+        try { fs.unlinkSync(planted); } catch { /* already gone */ }
+    }
+    ok("!! ...and neither returns a fixture that is ACTUALLY ON DISK while it is asked",
+        twinSaw === false && suiteSaw === false && !fs.existsSync(planted),
+        `twin saw it: ${twinSaw}, suite's rules saw it: ${suiteSaw}. Before v4584 both answered true, and the ` +
+        "set comparison above still passed -- because they agreed. AGREEMENT BETWEEN TWO COPIES OF ONE RULE IS " +
+        "NOT EVIDENCE ABOUT THE RULE, and only a file on disk can tell them apart.");
 }
 
 // ---------------------------------------------------------------------------

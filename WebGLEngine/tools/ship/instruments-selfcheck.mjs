@@ -201,13 +201,27 @@ const has = (rel) => fs.existsSync(path.join(ENG, rel));
 // unfindable. A browser cannot walk a filesystem, so the page reads a PREBUILT index -- and a prebuilt index
 // ROTS, which is that same failure wearing a different hat. So it is rebuilt here and compared.
 {
-    const { buildIndex, readIndex } = await import("./buildKnowledgeIndex.mjs");
+    const { buildIndex, readIndex, diffIndex } = await import("./buildKnowledgeIndex.mjs");
     const fresh = buildIndex();
     const onDisk = readIndex();
-    ok("knowledge-index.json exists", !!onDisk, "run tools/ship/buildKnowledgeIndex.mjs");
-    ok("!! ...and is NOT STALE", onDisk && JSON.stringify(onDisk) === JSON.stringify(fresh),
-       onDisk ? "rebuilt and byte-identical: " + fresh.counts.gates + " gates, " + fresh.counts.claims + " claims"
-              : "missing");
+    ok("knowledge-index.json exists", !!onDisk, "run node tools/ship/buildKnowledgeIndex.mjs");
+    // *** v4587 -- THIS ROW WAS RED FOR THREE ROUNDS AND ITS FAILURE LINE PRINTED THE PASS SENTENCE. ***
+    //
+    // It read, on FAIL:  "!! ...and is NOT STALE   rebuilt and byte-identical: 1643 gates, 262 claims".
+    // A label that asserts a positive, and ONE detail string computed entirely from `fresh` -- so the detail
+    // could not describe the disagreement even in principle, and what it printed instead was the outcome that
+    // had not happened. That is not a wording slip. redAction-selfcheck (v4585) exists to say every red must
+    // name a COMMAND or a COUNT; this one named a count OF THE POPULATION rather than of the DIFFERENCE, which
+    // is the same shape as an unactionable red wearing numbers. It was not caught because redAction asks its
+    // question of a hand-written list of two gates -- see section 4 there, rebuilt this round.
+    //
+    // The rule, and it is general: A SINGLE DETAIL STRING CANNOT BE RIGHT FOR BOTH OUTCOMES. Where the two
+    // outcomes have different content, the detail is a ternary on the same condition the row tests.
+    const d = onDisk ? diffIndex(onDisk, fresh) : null;
+    ok("!! ...and is NOT STALE", !!d && d.same,
+       d && d.same ? "rebuilt and byte-identical: " + fresh.counts.gates + " gates, " + fresh.counts.claims + " claims"
+       : !d ? "missing -- run node tools/ship/buildKnowledgeIndex.mjs"
+       : "STALE: " + d.summary + ". THE FIX IS ONE COMMAND: node tools/ship/buildKnowledgeIndex.mjs");
     ok("it covers every gate file in the tree", fresh.counts.gates > 300, fresh.counts.gates + " gates");
     ok("!! ...and its claim count MATCHES the claims gate", fresh.counts.claims === 240 || fresh.counts.claims > 200,
        fresh.counts.claims + " -- my first version regex-scraped and got 239, a second parser disagreeing with the first on its first run");

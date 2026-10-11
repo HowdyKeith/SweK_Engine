@@ -262,14 +262,27 @@ console.log("\n5. v4400 -- THE REGISTER KEEPS A RENDERING WHERE IT SHOULD KEEP T
     // freezeRegisterAudit.mjs wrote `at: "v4380"` as a STRING LITERAL, so every re-freeze produced a file
     // claiming v4380 -- including one taken at v4399 while measuring exactly this species. It reads main.js now.
     // A canonical source nobody can date is a projection with extra steps, which is this section one level down.
+    // *** AND THE CEILING WAS ONE-SIDED, WHICH v4641 TRIPPED AND THIS ROW DID NOT NOTICE. *** That round
+    // bumped the marker to v4641, re-froze the audit because this row went red at 19, then REVERTED the bump
+    // when the release ratchet refused the ship -- leaving the audit stamped v4641 against a marker reading
+    // v4622. age.rounds came back -19, `-19 <= 12` is true, and the row passed and printed the negative number
+    // in its own detail string. An audit from the FUTURE is not fresh: it was taken against a tree that is not
+    // this one, which is the same defect as an old one and reads as the best possible score. A ratchet that
+    // cannot tell growth from regression is a recurring species in this tree and here it is again, in the row
+    // whose whole job is asking how old the canonical thing is.
+    // SABOTAGE v4641: none was needed -- the LIVE TREE tripped it. The audit stood at v4641 against a marker
+    // reading v4622 for as long as it took to notice, the row read -19 and passed, and the repaired row goes
+    // red on exactly that state. A mutation nobody had to write is the strongest version of this evidence.
     const AGE_CEILING = 12;
-    ok(`!! ...and the audit the register renders from is no more than ${AGE_CEILING} rounds old`,
-       age.rounds !== null && age.rounds <= AGE_CEILING,
+    ok(`!! ...and the audit the register renders from is no more than ${AGE_CEILING} rounds old, and is not from the FUTURE`,
+       age.rounds !== null && age.rounds <= AGE_CEILING && age.rounds >= 0,
        age.rounds === null ? "THE AUDIT CANNOT SAY WHEN IT WAS TAKEN, which is how this went unasked: the " +
        "freezer typed the version instead of reading it" :
        `frozen at ${age.frozenAt}, read at ${age.current} -- ${age.rounds} round(s). It was TWENTY when this ` +
        "section was written, and nine readings had drifted in that gap. THE CANONICAL THING GOES STALE TOO; " +
-       "the difference is that re-taking it is a command, and retyping nine numbers is a chore nobody does");
+       "the difference is that re-taking it is a command, and retyping nine numbers is a chore nobody does. " +
+       "A NEGATIVE reading means the audit was frozen against a version this tree is not at -- a reverted " +
+       "bump, or a freeze on the wrong branch -- and until v4641 it passed this row as the freshest possible.");
 
     // AND THE LINE A READER SHOULD SEE IS DERIVED, not stored. Proven on the entries that have a run: the
     // rendered line comes from the audit and matches what the gate printed, at the register's own width.

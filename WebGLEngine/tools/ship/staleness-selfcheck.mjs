@@ -17,7 +17,7 @@
 // SO THE POINT OF THIS FILE IS NOT THE CHECKS. It is that they are CHEAP -- 48ms for all three -- and therefore
 // live in verify.mjs where they run every time. This gate exists to keep them that way.
 import fs from "node:fs";
-import { prose } from "./sourceScan.mjs";
+import { prose, codeHas } from "./sourceScan.mjs";
 import path from "node:path";
 import { fixDerived, gateFiles } from "./staleness.mjs";
 import { fileURLToPath } from "node:url";
@@ -91,8 +91,34 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
     // Count gates with a deliberately wrong claim and confirm the comparison is real rather than always-true.
     const rows = stalenessRows();
     const gateRow = rows.find((r) => r.id === "case-study gate count");
-    ok("!! the comparison is a real equality, not a tautology", gateRow.claimed === gateRow.actual && gateRow.actual > 100,
-       "actual = " + gateRow.actual + " read by walking the tree, claimed = " + gateRow.claimed + " read from the page -- two independent reads");
+
+    // *** v4585 -- THIS ROW PROMISED A FALSIFIABILITY TEST AND DELIVERED A SECOND COPY OF SECTION 1. ***
+    //
+    // Its condition was `gateRow.claimed === gateRow.actual && gateRow.actual > 100` -- the equality section 1
+    // already asserts -- under a heading that says "a control that cannot fail is decoration" and a comment that
+    // says "Count gates with a deliberately wrong claim and confirm the comparison is real rather than
+    // always-true". THE COMMENT DESCRIBED THE RIGHT DESIGN AND THE CODE DID THE WRONG THING, which is this tree's
+    // signature defect, committed inside the section whose whole subject is controls that cannot fail. The cost was
+    // not only a missing test: one stale number reported as TWO reds for six rounds, and I carried "budgetExile,
+    // definitionGates and staleness, equally red at HEAD" into six round summaries without once measuring it --
+    // the same deference that left configContract 24x wrong in gateBudget.MEASURED for eleven rounds (v4581).
+    //
+    // DRIVEN NOW: the comparison is handed a page claiming a number that cannot be right, and must report not-ok.
+    // Only the one file is substituted; everything else is read from disk exactly as the real reader does, so the
+    // other two rows keep their true values and a failure here cannot come from a stub that is too total.
+    const onDisk = (f) => { try { return fs.readFileSync(path.join(ENG, f), "utf8"); } catch { return ""; } };
+    const wrong = stalenessRows({ read: (f) => (f === "case-study.html" ? "<b>1</b><span>gates</span>" : onDisk(f)) })
+        .find((r) => r.id === "case-study gate count");
+    ok("!! *** the comparison reports STALE when it is handed a wrong claim -- driven, not asserted ***",
+        wrong && wrong.ok === false && wrong.claimed === 1 && wrong.actual === gateRow.actual,
+        `fed a page claiming 1 gate against ${gateRow.actual} on disk, the row came back ok=${wrong && wrong.ok}. ` +
+        "The injection is recordDrift.checks()'s shape since v4482: a drift detector that cannot be given drift is " +
+        "a detector nobody has run.");
+    ok("...and on the real page the two reads agree, which is the check passing rather than the control",
+        gateRow.claimed === gateRow.actual && gateRow.actual > 100,
+        "actual = " + gateRow.actual + " read by walking the tree, claimed = " + gateRow.claimed + " read from the " +
+        "page -- two independent reads. SEPARATED FROM THE ROW ABOVE ON PURPOSE: one says the instrument works, " +
+        "the other says today's answer, and merging them is how the first went missing.");
     // STRIP COMMENTS BEFORE ASKING WHAT THE CODE DOES. This first failed by matching the numbers in staleness.mjs's
     // own header, which DOCUMENTS the counts that rotted. Prose read as code -- the same mistake made repeatedly
     // earlier in this project (the /codemap guard quoted in its own fix note, the aholo swap note, the word
@@ -157,7 +183,16 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
             : "nothing stale right now, so the refusal path is exercised by the shape of the list rather than by " +
               "a live example -- which is honest about what this run proved");
 
-    const callers = gateFiles().filter((g) => !g.endsWith("staleness-selfcheck.mjs") && /fixDerived\s*\(/.test(fs.readFileSync(g, "utf8")));
+    // *** v4585 -- codeOnly, BECAUSE A GATE DESCRIBING fixDerived IS NOT A GATE CALLING IT. ***
+    //
+    // This scanned the RAW file for /fixDerived\s*\(/ and named tools/ship/redAction-selfcheck.mjs as an offender
+    // for a COMMENT recording that it had removed its own call -- so the rule could only be satisfied by deleting
+    // the history of having broken it. That gate is the one this round wrote about reading a red's own message, and
+    // the row caught it correctly on the first run when it really did call the fixer; this is the second run, where
+    // only the note remains. THIS FILE ALREADY PREACHES THE FIX TWO ROWS UP: "STRIP COMMENTS BEFORE ASKING WHAT THE
+    // CODE DOES... ask the code, never the commentary." codeOnly drops comments AND string literals, so a gate that
+    // asserts about the fixer's source is not mistaken for one that runs it.
+    const callers = gateFiles().filter((g) => !g.endsWith("staleness-selfcheck.mjs") && codeHas(fs.readFileSync(g, "utf8"), /fixDerived\s*\(/));
     ok("...and NO gate calls fixDerived, so nothing repairs what it measures", callers.length === 0,
         callers.length ? "offenders: " + callers.join(", ") : "only this file touches it, and only as a dry run");
 }

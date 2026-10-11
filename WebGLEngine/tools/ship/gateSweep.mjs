@@ -34,6 +34,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { toPosix } from "./posixAssumption.mjs";
+import { parseOrExit } from "./cliArgs.mjs";   // v4826 -- the CLI at the bottom refuses an option it does not know
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -76,6 +77,72 @@ export const VERDICT = Object.freeze({
  * `parallel` and `serial` are each {code, ms, timedOut} or null. The whole discipline of the two-phase method
  * lives in the four lines below, which is the reason it is a function and not a comment.
  */
+/**
+ * *** v4647i -- AN EXIT CODE THE OPERATING SYSTEM PRODUCED IS NOT A VERDICT THE GATE PRODUCED. ***
+ *
+ * Keith's gen-9 sweep filed three gates as NEW RED at `exit 3221226505`, in the same list as thirty-odd
+ * gates that exited 1 because they had found something:
+ *
+ *     NEW    ai-bridge/tools/localModelResolve-selfcheck.mjs  exit 3221226505 in 872 ms
+ *     NEW    ai-bridge/tools/range-selfcheck.mjs              exit 3221226505 in 724 ms
+ *     NEW    physics/box3d/box3dConformance-selfcheck.mjs     exit 3221226505 in 509 ms
+ *
+ * 3221226505 is 0xC0000409, STATUS_STACK_BUFFER_OVERRUN -- Windows fail-fast. The process was KILLED before
+ * it could print a thing. All three pass on this box in under 350 ms, so there is nothing here to read as a
+ * finding, and `grep -c '^  FAIL'` over their output returns ZERO. TWELFTH crash-instead-of-a-finding this
+ * session, and the first one that is not mine: it is in the gates, reported by a sweep that cannot tell the
+ * two apart.
+ *
+ * *** AND THE TREE ALREADY HAD AN INSTRUMENT THAT COULD. *** tools/ship/failLines.mjs -- written five rounds
+ * ago for exactly this -- classifies RED / CRASHED / TIMEOUT by whether any `^  FAIL` line was printed.
+ * classify() below, in the same directory, returns RED for every non-zero code. Two modules reading one
+ * convention in opposite senses, which is the species this session has now met in posixAssumption's
+ * separators, the two ground-limit contracts, and --gate against --gates.
+ *
+ * THE VERDICT DOES NOT CHANGE. A crashed gate is still red and still fails the ship -- softening that would
+ * be the opposite of the point. What changes is that the report no longer sends a reader hunting for a FAIL
+ * line that was never printed.
+ *
+ * The table is Windows NTSTATUS values as Node surfaces them. They are decided by RANGE and not by a list of
+ * three: any code above 255 is not something a harness in this tree chose, because POSIX masks an exit
+ * status to 8 bits and every gate here exits 0 or 1. A name is offered where one is known.
+ *
+ * *** v4649 -- AND ONE OF THOSE NAMES SENDS A READER TO THE WRONG PLACE. *** STATUS_STACK_BUFFER_OVERRUN
+ * is what Windows raises for __fastfail, and V8 calls __fastfail for an OOM abort and for a failed CHECK
+ * as well as for a smashed stack cookie. Five gates on Keith's 7908 MB box die with it and the set is
+ * different every run, which is not the shape of five buffer overruns. The name is kept because it is
+ * what the OS said; what it MEANS is written down here so nobody spends a round reading those gates for
+ * a memory bug that is not in them.
+ */
+export const OS_KILL_CODES = Object.freeze({
+    3221225477: "STATUS_ACCESS_VIOLATION (0xC0000005)",
+    3221225495: "STATUS_NO_MEMORY (0xC0000017)",
+    3221225725: "STATUS_STACK_OVERFLOW (0xC00000FD)",
+    3221225786: "STATUS_CONTROL_C_EXIT (0xC000013A)",
+    3221225794: "STATUS_DLL_INIT_FAILED (0xC0000142)",
+    3221226505: "STATUS_STACK_BUFFER_OVERRUN (0xC0000409)",
+});
+
+export const EXIT_KIND = Object.freeze({ PASS: "pass", FINDING: "finding", OS_KILL: "os-kill", TIMEOUT: "timeout" });
+
+/**
+ * What KIND of thing an exit code is. Never throws; an unrecognised code above 255 is still an os-kill,
+ * because the alternative -- reading it as a finding -- is the conflation this exists to end.
+ */
+export function exitKind(code, { timedOut = false } = {}) {
+    if (timedOut) return EXIT_KIND.TIMEOUT;
+    if (code === 0) return EXIT_KIND.PASS;
+    // 124 is this sweep's own stand-in for "killed by signal" (runOneAsync), so it is a timeout, not a kill.
+    if (code === 124) return EXIT_KIND.TIMEOUT;
+    return Number(code) > 255 ? EXIT_KIND.OS_KILL : EXIT_KIND.FINDING;
+}
+
+/** The human name for a code, or a hex rendering, or null when it is an ordinary exit status. */
+export function exitName(code) {
+    if (exitKind(code) !== EXIT_KIND.OS_KILL) return null;
+    return OS_KILL_CODES[code] || `0x${(Number(code) >>> 0).toString(16).toUpperCase()}`;
+}
+
 export function classify(parallel, serial = null) {
     if (!parallel) throw new Error("classify: a phase-1 result is required");
     if (parallel.code === 0 && !parallel.timedOut)
@@ -85,9 +152,14 @@ export function classify(parallel, serial = null) {
                  note: parallel.timedOut ? "timed out under -P 8; not a verdict" : "parallel red is a hypothesis" };
     if (serial.timedOut)
         return { verdict: VERDICT.UNCONFIRMED, from: "serial", note: "timed out alone on an idle box; still unmeasured" };
-    return serial.code === 0
-        ? { verdict: VERDICT.GREEN, from: "serial", note: "false red -- starved in phase 1" }
-        : { verdict: VERDICT.RED, from: "serial", note: "confirmed" };
+    if (serial.code === 0) return { verdict: VERDICT.GREEN, from: "serial", note: "false red -- starved in phase 1" };
+    // v4647i -- `kind` is ADDITIVE. The verdict stays RED for an os-kill: a gate the OS killed is still a
+    // gate that did not pass, and every existing consumer reads `verdict` and is unaffected.
+    const kind = exitKind(serial.code);
+    return { verdict: VERDICT.RED, from: "serial", kind, name: exitName(serial.code),
+             note: kind === EXIT_KIND.OS_KILL
+                 ? `confirmed, but the OS killed it: ${exitName(serial.code)}. There is no FAIL line to read`
+                 : "confirmed" };
 }
 
 /**
@@ -2484,13 +2556,16 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         ]),
         redOnArrival: Object.freeze([]),
         widened: Object.freeze([]),
-        verdict: "green here, RIG-PENDING on the rig. three-probe.html fetches a named three version from the npm registry in the " +
-                 "browser, walks the tarball, blob-imports the build beside the vendored 0.178 and renders one TSL gradient with each; " +
-                 "render/threeProbe.mjs holds untar, pickBuild, rewriteImports and a grader that refuses eight lies. MEASURED on this " +
-                 "box: the control draws on both routes; three@0.185.1 draws on three's WebGL2 backend and is refused on WebGPU by the " +
-                 "browser's GPUTextureViewDescriptor lacking swizzle -- v4319's finding by name, so the pin is at least the build box's. " +
+        verdict: "green here, RIG-PENDING on the rig (and the record on disk is STALE -- taken against the 0.178 pin). three-probe.html " +
+                 "fetches named three versions from the npm registry in the browser, walks the tarballs, blob-imports each build beside the " +
+                 "vendored one and renders one TSL gradient with each; the gate probes BOTH SIDES of PROBE_BOUNDARY, not one version; " +
+                 "render/threeProbe.mjs holds untar, pickBuild, rewriteImports and a grader that refuses eight lies. MEASURED at v4545 on this " +
+                 "box: the control draws on both routes; BOTH sides draw on three's WebGL2 backend; on WebGPU 0.184.0 draws and 0.185.1 is " +
+                 "refused by the browser's GPUTextureViewDescriptor lacking swizzle -- v4319's finding by name, so the pin is at least the " +
+                 "build box's, and the swizzle is read on both sides so the line is a line and not an anecdote. The rig record on disk says " +
+                 "0.185.1 DREW on a rig's WebGPU, and is STALE (taken against the 0.178 pin), which the gate now says in those words. " +
                  "The tarball cache went outside the tree after colourReach counted the cached build as an arrival. Sabotages red at " +
-                 "1 / 3 / 1 / 1.",
+                 "1 / 3 / 1 / 1 (v4494) and 3 / 2 / 1 / 2 / 2 (v4545).",
     }),
     since117: Object.freeze({
         at: "v4495", swept: 1, green: 1, red: 0,
@@ -3831,6 +3906,2682 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "named in earlier closings -- so this surplus is this branch's own unswept backlog, not the " +
                  "merge's.",
     }),
+
+    // *** THE FIFTH ORDINAL COLLISION, AND THE FIRST BIG ENOUGH TO HAVE DESTROYED WORK SILENTLY. ***
+    //
+    // The merge-base of these two lines tops out at since205. EVERY ORDINAL FROM 206 UP WAS ALLOCATED
+    // TWICE, independently, for entirely different closings -- 40 of them. This is an OBJECT LITERAL, so a
+    // duplicate key does not error, IT SILENTLY WINS: taking both blocks as written would have deleted
+    // 40 closings and left a green tree. Counted rather than assumed -- 40 entries on this line, 47 on the
+    // temporal/FSR line, 87 after the merge.
+    //
+    // Resolved by this file's own recorded rule, from the v4537 note below: "the list shape exists exactly
+    // so a round appends and nobody renegotiates a name, AND THE SIDE THAT MERGES SECOND IS THE SIDE THAT
+    // MOVES." The temporal/FSR line is the incoming one, so its since206-since252 become since247-since293,
+    // prose ordinals included. Nothing looks a closing up BY NAME -- closingCoverage reads the union of the
+    // `added` lists as a SET, and the four live mentions of since230 are prose about an earlier collision --
+    // which is what makes the renumber safe, and is worth stating because it is the property the next
+    // collision will rest on too.
+    //
+    // *** AND FIVE COLLISIONS IN IS WHERE THE SHAPE STOPS BEING BAD LUCK. *** An ordinal-keyed object hands
+    // two concurrent lines a shared namespace with no allocator and a silent failure mode; a LIST gives them
+    // append-only entries that cannot collide at all -- which is the shape `closings` itself was given at
+    // v4399 for this exact reason, four ordinals ago. Registered rather than done here: a merge is the wrong
+    // commit in which to change the shape of the thing being merged.
+
+    since323: Object.freeze({
+        at: "v4641", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/fsrPageDevice-selfcheck.mjs"]),
+        widened: Object.freeze(["fsr.html", "render/temporalRejectWgsl.mjs", "render/temporalRejectGPU.mjs",
+                                "render/temporalRejectGPU-selfcheck.mjs", "tools/ship/fsrPage-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE REJECT CHAIN RUNS FROM A PAGE, AND THE GATE THAT SAYS SO HAD TO BE ITS OWN FILE TO " +
+                 "KEEP RUNNING. *** fsr.html's dolly now calls render/temporalRejectGPU.mjs -- three dispatches " +
+                 "on one encoder, the first time DISOCCLUSION_WGSL, FACTOR_WGSL and RECTIFY_WGSL have run " +
+                 "anywhere but their own selfcheck. It could not be wired as it stood: the runner returned no " +
+                 "tallies and its comment told callers to count them from the mask, which recovers `flagged` and " +
+                 "CANNOT recover `noHistory`, because the kernel writes the same 1.0 for a disocclusion, an " +
+                 "invalid motion vector and a reprojection that left the frame -- and `genuine = flagged - " +
+                 "noHistory` is the number the page prints. Two mainCounted entry points later the device and the " +
+                 "CPU agree on all eight counters as integers. THE GATE IS A SEPARATE FILE FOR A MEASURED " +
+                 "REASON: as section 5 of fsrPage-selfcheck it put that file at 4,744 ms against the sweep's " +
+                 "3,000 ms membership threshold, which would have dropped the page's only gate out of every " +
+                 "ship -- 'over budget means skipped means never re-timed', the failure this file has counted " +
+                 "twice. Split, both are under it: 2,749 / 2,818 / 2,755 ms and 2,230 / 2,201 / 2,191 ms, three " +
+                 "serial runs each. The new one is about 200 ms under and is called a straddler here rather " +
+                 "than left for a later round to find as drift.",
+    }),
+    since322: Object.freeze({
+        at: "v4640", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/pipeTruncation-selfcheck.mjs"]),
+        widened: Object.freeze(["tools/ship/statedRuntime-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** A GATE THAT CALLS process.exit() DELETES ITS OWN OUTPUT THROUGH A PIPE, AND THE SHIP " +
+                 "RITUAL COUNTS REDS THROUGH A PIPE. *** Node does not flush pending async writes on exit(); a " +
+                 "write to a file is synchronous and a write to a pipe is not. MEASURED on a real gate: " +
+                 "statedRuntime-selfcheck emitted 70,608 bytes to a file and 65,861 through a pipe, twelve lines " +
+                 "became one, and the line that vanished was its only `  FAIL`. The skill's own instruction is " +
+                 "`node <gate> | grep -c '^  FAIL'`, so the prescribed count read ZERO for a failing gate -- IT " +
+                 "READ ZERO FOR ME, and v4639's commit message went out calling that gate 'a crash, not a " +
+                 "verdict'. It was never a crash. The exit CODE was always right, which is why no sweep verdict " +
+                 "was ever wrong and why nothing noticed: what was lost is the evidence, not the judgement. " +
+                 "1,717 of 1,738 gates call process.exit(), but the ones it BITES are those whose output exceeds " +
+                 "the pipe buffer -- measured across a 20-gate sample, exactly one, and it is the one that " +
+                 "misled me. The new gate DRIVES the mechanism rather than asserting it: two scripts identical " +
+                 "but for the last line, 244,000 bytes each, and process.exit() loses 219,905 of them through a " +
+                 "pipe while process.exitCode loses none. *** AND THE FIRST VERSION OF THE REPAIR MADE THE GATE " +
+                 "CONTRADICT ITSELF: *** exitCode does not stop execution and exit() did, so a failing run " +
+                 "printed `1 FAILURES` and then `all checks pass`, which is why the `else` is its own row. THE " +
+                 "NEW GATE ALSO WALKED INTO THE TREE'S OLDEST TRAP ON ITS FIRST RUN -- it scanned its subject's " +
+                 "raw text and found `process.exit(1)` inside the COMMENT explaining the repair, reporting the " +
+                 "gate unrepaired; it reads comment-stripped now. Every record this round owed was named by " +
+                 "v4639's own pre-flight in one command, before the verify, which is what that runner was for.",
+    }),
+    since321: Object.freeze({
+        at: "v4638", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/fsrPage-selfcheck.mjs"]),
+        widened: Object.freeze(["fsr.html", "render/jitter.mjs", "render/motionVectorsGPU.mjs",
+                                "render/motionVectorsWgsl.mjs", "render/temporalAccumulate.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE TEMPORAL ARC GOT ITS FIRST CALLER, AND fsr.html HAD NO GATE AT ALL. *** Sixteen rounds " +
+                 "built jitter, resolve, accumulate, motion vectors, disocclusion and rectify; every one is gated " +
+                 "against a fixture and the one page a reader opens was graded by nothing. The page now carries a " +
+                 "third camera -- a perspective dolly over two planes -- and it is the first thing in this tree to " +
+                 "run the reject chain outside a gate: 106 genuine disocclusions, a one-pixel sliver down the slab's " +
+                 "trailing edge, against exactly 0 for the two orthographic cameras. ALL FOUR CELLS WERE MEASURED " +
+                 "BEFORE ANY OF IT WAS WRITTEN and the second one is the finding: an orthographic camera moving " +
+                 "parallel to the image plane reveals nothing HOWEVER MUCH DEPTH THE SCENE HAS, because the image " +
+                 "and the depth buffer translate together. Depth alone is not the condition and perspective alone " +
+                 "is not; parallax is, and it needs both. *** AND THE PAGE IS THE FIRST CALLER OF jitterProjection " +
+                 "AND resolveJitterAwareCPU TOGETHER, WHICH READ ONE OFFSET IN OPPOSITE SENSES. *** jitter.mjs's " +
+                 "convention block fixes the units and the axes and never said which way the offset points; " +
+                 "jitterProjection moves the IMAGE, the resolve assumes the SAMPLE moved. Paired without negating " +
+                 "one, the zone plate scored 11.61 dB and the neighbourhood clamp fired on 34,191 of 36,864 pixels; " +
+                 "negated, 16.27 dB and 466. Both modules are gated and both are right alone. Measured as a " +
+                 "reconstruction: the resolve's own floor is 8.4187e-4 rms, same-sign 8.2060e-3, negated 1.0318e-3. " +
+                 "NEITHER IS CHANGED -- both senses are in use and flipping one moves a fixture rather than fixing a " +
+                 "defect; what was missing is the sentence, and the measurement now lives in a gate. FOUR STALE " +
+                 "CONTRACT COPIES corrected alongside: temporalAccumulate.mjs and motionVectorsWgsl.mjs both " +
+                 "documented the motion buffer as (du, dv, valid, 0) when the producer writes zPrev -- the WGSL " +
+                 "header contradicted its own line 38 -- orthoPanVP's docstring said ndc.z = 0 where its z row is " +
+                 "the identity, and fsr.html's note still told readers the temporal pane is CPU-only, which v4590 " +
+                 "falsified and two rounds corrected in the comment beside the call and not in the prose. FIVE " +
+                 "SABOTAGES, all red by name, and the sharpest is the mask fed straight in as the factor: 36,758 " +
+                 "pixels discarded instead of 106, which is the polarity inversion the reject module's own header " +
+                 "warns about.",
+    }),
+    since320: Object.freeze({
+        at: "v4595", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["render/temporalRejectGPU-selfcheck.mjs", "render/temporalRejectGPU.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "no gate added; a CORRECTION, found by trying to build on a number this arc had already shipped. " +
+                 "*** v4593 ASSERTED THAT fsr.html CANNOT DISOCCLUDE BECAUSE ITS SCENE IS FLAT, AND OFFERED '384 " +
+                 "GENUINE WITH A NEAR SLAB' AS THE CONTROL PROVING THE DETECTOR FIRES. THE 384 WAS THE FIXTURE'S " +
+                 "PREV-DEPTH SHIFTED AGAINST THE MOTION. *** du is +PAN/D, so last frame every feature sat at " +
+                 "HIGHER x; the fixture put the slab at LOWER x -- a camera panning the other way -- and the " +
+                 "reprojection landed across the slab's edge and reported disocclusion that never happened. " +
+                 "Measured all three ways at v4595: wrong way 384, right way 0, slab not moving 192. The number " +
+                 "had gone into a gate ROW, a runner header and this changelog, and the round that found it was " +
+                 "the round that tried to USE it -- the next rung proposed was giving the page occluding " +
+                 "geometry, which the corrected measurement says would have changed nothing. *** THE TRUE REASON " +
+                 "IS STRONGER AND SIMPLER: AN ORTHOGRAPHIC PROJECTION HAS NO PARALLAX. *** Every pixel moves the " +
+                 "same screen distance whatever its depth, so the depth at the reprojected position always " +
+                 "matches and nothing is ever revealed -- with a flat scene or with an occluder, both 0. The " +
+                 "page's CAMERA was the binding constraint, not its content. The valid control is a PERSPECTIVE " +
+                 "camera whose slab band is PROJECTED from world space rather than nudged by a chosen pixel " +
+                 "count -- the nudging is what produced 384 -- and it fires: 192 genuine. Both the corrected and " +
+                 "the spurious measurement are rows now, because an erratum nobody can re-run is a claim about a " +
+                 "claim. Sabotage: 4 mutations, 4 caught, one of them only after the gate STOPPED CRASHING -- " +
+                 "putting the slab at the background's depth zeroes the threshold, disocclusionCPU refuses it, " +
+                 "and the gate exited 1 with no FAIL line, which is no verdict. A degenerate fixture is a real " +
+                 "thing to guard and has a row. Also recorded: this gate's runtime is NOISY at the " +
+                 "few-hundred-millisecond scale (1671-2108 over five samples) and v4594's three-sample median " +
+                 "of 2573 sat at the top of that spread -- three samples were too few to say so.",
+    }),
+    since319: Object.freeze({
+        at: "v4594", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["render/temporalRejectWgsl.mjs", "render/temporalRejectGPU.mjs",
+                                "render/temporalRejectGPU-selfcheck.mjs", "tools/ship/temporalCorpus.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "no gate added; the round closed the hole v4593 MEASURED AND REFUSED TO PAPER OVER. DISOCCLUSION " +
+                 "writes a mask (1 = history wrong), RECTIFY reads a factor (1 = history trusted), and the " +
+                 "inversion -- historyFactorCPU -- had no WGSL anywhere in the tree, so v4593 shipped its runner " +
+                 "deliberately WITHOUT a rejectAndAccumulate() after its own first draft wrote one that bound an " +
+                 "all-zero factor under a comment claiming otherwise. FACTOR_WGSL is that inversion and the chain " +
+                 "is three dispatches on one encoder, asserted bit-identical to the standalone rectify. The " +
+                 "kernel mirrors historyFactorCPU including the part that is a DECISION rather than arithmetic -- " +
+                 "the three reasons MULTIPLY, because each is an independent probability and a max() would let " +
+                 "the strongest hide the others. *** TWO SABOTAGES WENT 0-RED AND THEY FAILED DIFFERENTLY. *** " +
+                 "Dropping the clamp was a MIS-AIMED MUTATION: it hit the disocclusion term, whose mask is 0 or 1 " +
+                 "by construction, so that clamp is unobservable through that input -- a property of the producer, " +
+                 "not a gap. Re-aimed at the reactive term, whose fixture carries 1.4 and -0.2, it takes two " +
+                 "rows. *** THE OTHER WAS A REAL HOLE NOTHING COULD HAVE CAUGHT: *** the corpus hardcoded a 2D " +
+                 "dispatch for every entry, which was right while every kernel in the arc was 8x8 over a picture; " +
+                 "FACTOR_WGSL is the first 1D one, and putting the 2D shape back left half its output untouched " +
+                 "ON BOTH BACKENDS, so crossBackend agreed. A COMPARISON OF TWO BACKENDS CANNOT SEE AN ERROR THEY " +
+                 "SHARE. temporalCorpus now refuses at construction by name, and a pure invocation count would " +
+                 "not have done it -- [2,2] over @workgroup_size(64,1,1) is 256 invocations, exactly the picture, " +
+                 "with the y axis thrown away -- so the axes the SHADER USES decide.",
+    }),
+    since318: Object.freeze({
+        at: "v4593", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/temporalRejectGPU-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/temporalRejectGPU.mjs", "tools/ship/kernelReach-selfcheck.mjs"]),
+        verdict: "green, 1862 ms alone. FIVE of the seventeen: DISOCCLUSION_WGSL and RECTIFY_WGSL have a caller " +
+                 "and the census reads 12, with five of the temporal arc's original ten left. *** AND THE PAGE IS " +
+                 "DELIBERATELY NOT WIRED TO IT, WHICH IS A MEASUREMENT RATHER THAN A SHRUG: *** fsr.html's scene " +
+                 "is a continuous function of (u, v) with no z, so nothing is hidden and nothing can be revealed. " +
+                 "At the page's own size, pan and camera the test flags 192 of 36,864 and ALL 192 ARE THE " +
+                 "OFFSCREEN COLUMN -- genuine disocclusion zero. The same frame with a near slab: 384. Wiring it " +
+                 "would ship a pass whose output is provably the column the accumulate already rejected, on a " +
+                 "page that exists to show things firing, after four rounds spent finding controls that cannot " +
+                 "fail. What a caller needs is occluding geometry, which is a change to what the page IS. *** AND " +
+                 "THE TWO KERNELS CANNOT BE CHAINED, WHICH THE FIRST DRAFT PRETENDED THEY COULD: *** DISOCCLUSION " +
+                 "writes a MASK (1 = history wrong), RECTIFY reads a FACTOR (1 = history trusted), and the thing " +
+                 "that inverts is historyFactorCPU, which has no WGSL anywhere in the tree. The draft dispatched " +
+                 "both, bound an ALL-ZERO factor, and carried a comment claiming it fed the mask in -- code and " +
+                 "comment disagreeing, with the code meaning DISCARD ALL HISTORY on every pixel. Removed, the " +
+                 "reason recorded where the method would have been, and its absence asserted so it cannot come " +
+                 "back quietly -- a sabotage putting it back goes red. Sabotage: 6 mutations, 6 caught, and TWO " +
+                 "OF THEM DID NOT APPLY ON THE FIRST ATTEMPT AND SCORED FAIL=0 -- no-ops, not 0-REDs, which is " +
+                 "v4587's distinction and would otherwise have recorded the threshold refusal and the kernel's " +
+                 "own gap test as exercised while nothing had touched either.",
+    }),
+    since317: Object.freeze({
+        at: "v4592", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/motionVectorsGPU-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/motionVectorsGPU.mjs", "fsr.html", "tools/ship/kernelReach-selfcheck.mjs"]),
+        verdict: "green, 1618 ms alone. Three of the seventeen: MOTION_WGSL has a caller and the census reads 14. " +
+                 "*** THE ROUND'S PREMISE WAS WRONG AND ITS OWN PRIOR-ART CHECK SAID SO -- THE SECOND HAND-OFF " +
+                 "CLAIM IN FOUR ROUNDS TO DIE THAT WAY. *** v4591 closed by proposing that fsr.html's hand-written " +
+                 "motion vectors were 'a second implementation of motionVectorsCPU'. They were not: that function " +
+                 "takes a depth buffer and two 4x4 matrices, and the page had neither -- it panned a 2D scene and " +
+                 "wrote a constant. What IS true is smaller and worth more: the constant was DECLARED, and it is " +
+                 "DERIVED now. Measured before anything was built, at four frames over 36,864 pixels: an " +
+                 "orthographic pan camera through motionVectorsCPU reproduces the hand-written du at 0.000e+0 with " +
+                 "dv at 2.8e-17. The page's numbers after the change are identical to v4586's -- pan 17.61 dB, " +
+                 "offscreen 192, clamped 914; static 21.56 dB -- which is the point: nothing moved, the number " +
+                 "just stopped being a claim. It HAD been wrong once, the sign, caught by a counter rather than a " +
+                 "check, and the gate now drives a reversed camera as a control so that exact mistake fails a row. " +
+                 "*** SABOTAGE FOUND TWO 0-REDS AND BOTH WERE THIS GATE'S FIXTURES: *** packing dims as [h, w] " +
+                 "moved nothing because every fixture was SQUARE, and forcing every pixel valid moved nothing " +
+                 "because an orthographic pair over a flat scene is all-valid. The obvious repair for the second " +
+                 "-- the eye position the neighbouring gate uses for its single-pixel invalid case -- put the " +
+                 "WHOLE surface behind the camera and compared all-zeros to all-zeros at 0.000e+0: one vacuous " +
+                 "fixture traded for another inside the row added to fix the first. Eight eye positions measured " +
+                 "to find the straddle, and that one is pathological for NUMBERS (|du| to 57 UV units near the " +
+                 "projection singularity), so parity moved to a third well-conditioned camera. Two fixtures, " +
+                 "because one cannot answer both questions and a tolerance wide enough for both is a number " +
+                 "chosen to fit the answer. Also repaired: the device row was written at 1e-9 straight after " +
+                 "reading the CPU row's exact zero -- the same category error as v4590's copy-through row, one " +
+                 "round later. The CPU's zero is f64 doing an exact translation; the kernel is f32 through two " +
+                 "transforms and a divide and lands an ulp away, and the round MEASURED that the ulp does not " +
+                 "move a pixel across the accumulate's offscreen bound rather than dismissing it.",
+    }),
+    since316: Object.freeze({
+        at: "v4591", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/temporalAccumulateWgsl.mjs", "render/temporalGPU.mjs",
+                                "render/temporalGPU-selfcheck.mjs", "render/wgslSpec.mjs", "gfx/device.js",
+                                "tools/ship/temporalCorpus.mjs", "fsr.html"]),
+        verdict: "no gate added; the round closed the gap v4590 SHIPPED AS A DECLARED ABSENCE. ACCUMULATE_WGSL " +
+                 "counted nothing, so the temporal port returned stats: null and fsr.html printed \"CPU ONLY\" -- " +
+                 "and those counters are the diagnostic that proved the motion-vector sign at v4586. The kernel " +
+                 "now has a SECOND ENTRY POINT, mainCounted, recording four atomics, and the device's counts are " +
+                 "asserted EQUAL to the CPU's rather than close: reused 8455, offscreen 89, invalid 672, clamped " +
+                 "8410 on both. *** TWO ENTRY POINTS RATHER THAN A SECOND KERNEL, BECAUSE A COUNTER THAT COULD " +
+                 "DISAGREE WITH THE PASS IT COUNTS IS WORSE THAN NO COUNTER: *** accumulateAt() decides once and " +
+                 "returns what it did, and a sabotage that makes mainCounted write a slightly different blend is " +
+                 "caught by the row asserting counting does not move a pixel. MEASURED BEFORE BUILDING, on this " +
+                 "adapter: a module compiled for `main` does not demand the binding `main` never uses -- which is " +
+                 "what keeps temporalAccumulate-selfcheck.mjs green UNCHANGED. *** AND THE PROBE WAS HALF A " +
+                 "PROBE. *** It proved an unused binding need not be bound; it did not ask whether binding it " +
+                 "anyway is refused. It is -- gfx/device.js's own v4466 note says so in as many words -- and " +
+                 "tools/ship/temporalCorpus.mjs found out by being REFUSED BY THE DEVICE, because it builds an " +
+                 "entry from every binding the SOURCE declares where the device binds by USE. The two agreed " +
+                 "only while no kernel in that corpus had more than one entry point. usedNames() moved from " +
+                 "gfx/device.js into render/wgslSpec.mjs so both can ask the same question; a sabotage that " +
+                 "un-filters it takes the runner's device AND the corpus down together, which is what says the " +
+                 "move was load-bearing. A first attempt papered over it with an inert four-zero fixture and the " +
+                 "device refused that too. Sabotage: 6 mutations, 6 caught.",
+    }),
+    since315: Object.freeze({
+        at: "v4590", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/temporalGPU-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/temporalGPU.mjs", "fsr.html", "tools/ship/kernelReach-selfcheck.mjs"]),
+        verdict: "green, 2766 ms alone. *** TWO OF THE SEVENTEEN, AND THE FIRST TWO OF THE TEMPORAL ARC'S TEN. *** " +
+                 "v4589 counted 17 dispatchable kernels reachable only from a gate; render/temporalGPU.mjs is the " +
+                 "caller for RESOLVE_WGSL and ACCUMULATE_WGSL and the census now reads 15, with the ratchet " +
+                 "LOWERED to match rather than left where it was convenient -- its own second half asks for that. " +
+                 "fsr.html's temporal pane runs on the adapter, resolve and accumulate chained on one encoder, and " +
+                 "the comment in that page saying the two modules 'have no WGSL at all' is gone: they have had it " +
+                 "since v4552 and what they had none of was a caller. *** THE PORT LOSES A DIAGNOSTIC AND SAYS SO " +
+                 "RATHER THAN DISCOVERING IT: *** temporalAccumulateCPU returns reused/rejectedOffscreen/" +
+                 "rejectedInvalid/clamped and ACCUMULATE_WGSL counts NOTHING -- no atomics, every rejection an " +
+                 "early return. Those counters are what proved the motion-vector sign at v4586 (rejectedOffscreen " +
+                 "reading exactly one column of 192). So the runner returns stats: NULL with a reason, the page " +
+                 "prints 'CPU ONLY -- not zero: uncounted', and the gate asserts null-rather-than-zeroes: a frame " +
+                 "that reused nothing and a frame nobody counted must not print the same number. Atomics in a " +
+                 "gated kernel are their own rung. Also asserted, and never asked before: resolve THEN accumulate " +
+                 "on one device, which is the order every frame of a temporal upscaler uses and which each " +
+                 "kernel's own gate cannot reach, driving each alone. *** ONE DEFECT IN THE ROUND'S OWN WORK: *** " +
+                 "the no-history row asserted the copy-through path at 1e-6 against the CPU's first frame and went " +
+                 "red at 1.73e-6. The tolerance was not the mistake, the REASONING was -- 'it copies' is exact " +
+                 "only against the buffer it was handed, and comparing to a CPU run measured the RESOLVE's f32 " +
+                 "error and called it the accumulate's. Split into an exact row and a parity row that says what " +
+                 "it is made of. Sabotage: 7 mutations, 7 caught; S3 (stats as zeroes instead of null) is the one " +
+                 "the round is about, and S7 breaks the KERNEL rather than the runner.",
+    }),
+    since314: Object.freeze({
+        at: "v4589", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/kernelReach-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/kernelReach.mjs"]),
+        verdict: "green, 25575 ms alone -- it imports 107 producer modules to hash the shader text each yields. " +
+                 "*** v4588 FOUND ONE FILE'S KERNELS UNRUNNABLE OUTSIDE THEIR GATE AND WROTE IT UP AS A STORY. " +
+                 "IT IS A POPULATION: 17 dispatchable kernels in 11 files, and TEN ARE THE TEMPORAL ARC *** -- " +
+                 "MOTION_WGSL, RESOLVE_WGSL, ACCUMULATE_WGSL, RING_FLOOR_WGSL, DISOCCLUSION_WGSL, RECTIFY_WGSL " +
+                 "and temporalLock's four. Nineteen rounds of kernels, v4552 to v4570, every one validated on a " +
+                 "real device by its own gate, and nothing in the engine can dispatch any of them; fsr.html runs " +
+                 "the CPU versions of two every frame. *** AND THE ROUND'S OWN HAND-OFF CLAIM WAS FALSE: *** v4588 " +
+                 "closed by proposing 'the temporal half has no WGSL at all'. temporalResolveWgsl.mjs and " +
+                 "temporalAccumulateWgsl.mjs have existed since v4552 -- the prior-art check refuted the round's " +
+                 "premise in its first two commands, which is the check earning its place rather than a near miss. " +
+                 "*** THE NUMBER WENT 67 -> 41 -> 34 -> 31 -> 17 UNDER ITS AUTHOR'S OWN SCRUTINY, *** and each " +
+                 "step was a KIND of reachability the instrument could not see: probes exist to be dispatched BY a " +
+                 "gate (18 of them); a module can dispatch its own kernel (gpuHaul, gpuOrbits, bloomFused); two " +
+                 "exports can be one shader text (worleyWgsl() and WORLEY_WGSL = worleyWgsl(), one imported and " +
+                 "one looking dead); and a kernel can travel BY DATA rather than by symbol (fleets.mjs puts " +
+                 "HOLO_WGSL in a materials table and never dispatches). Reporting 67 would have been a bigger " +
+                 "headline and a worse measurement. Population imported from wgslCorpus.census() rather than " +
+                 "re-walked -- that walker has been wrong three times for three reasons and every fix lives " +
+                 "there. Sabotage: 6 mutations, 6 caught; the instructive one is M4, counting `export { X }` as a " +
+                 "use site, which would have driven the finding to ZERO because the whole arc re-exports at the " +
+                 "foot of the file.",
+    }),
+    since313: Object.freeze({
+        at: "v4588", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsrGPU-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["fx/fsr/fsr.js", "fx/fsr/fsr-selfcheck.mjs", "fsr.html"]),
+        verdict: "green, 3084 ms alone (median of 3132/3084/3017), just over the sweep budget because it spawns a " +
+                 "browser origin and a real adapter and times 60 dispatches inside it. *** THE FSR KERNELS WERE " +
+                 "WRITTEN, VALIDATED, RUN ON A REAL DEVICE AND HELD TO THE CPU REFERENCE TO 3e-7 -- AND NOTHING " +
+                 "OUTSIDE A GATE COULD DISPATCH THEM. *** fx/fsr/fsr-selfcheck.mjs built the buffers, the pipeline " +
+                 "and the dispatch inline, twice, inside a page it spawns itself, and that was the only code in " +
+                 "the tree that ran the WGSL. A gate is not a caller: it proves a kernel and ships nothing. That " +
+                 "gate's own closing named the gap in its own words -- 'no caller in this tree yet uses it' and " +
+                 "'SPEED -- nobody has timed either kernel'. fx/fsr/fsrGPU.js is the caller, through gfx/device.js " +
+                 "and NOT through a second raw-WebGPU dispatcher (fx/anime4k's Anime4KGPU is that, and carries the " +
+                 "comment 'correct-by-construction; no WebGPU headless here' -- a driver nobody has run). *** THREE " +
+                 "THINGS THE KERNEL GATE COULD NOT ASK BECAUSE IT HAD NO RUNNER: *** the two kernels had never been " +
+                 "run BACK TO BACK on the device at all, so fsr1() chains them on one encoder and is asserted " +
+                 "BIT-IDENTICAL to the same two passes with a readback between -- 0 of 49152 channels, and the " +
+                 "sabotage that binds the second pass to the wrong buffer moves 48589 of them. SPEED: 4.6-6.9 ms " +
+                 "chained against 28.8-35.1 ms for fsr1CPU at 64x64 -> 128x128 on this box's software adapter, and " +
+                 "the chain saves 26-37% against the two-call form, which is one 256 KB readback and upload not " +
+                 "taken. THE OVERSHOOT: RCAS_LIMIT keeps the resolve off the pole of 1/(4*lobe+1) and does NOT " +
+                 "bound the range; the kernel gate measured 1.000 -> 1.166 on a synthetic peak and wrote 'no caller " +
+                 "in this tree yet clamps it, because no caller in this tree yet uses it'. There is one now, so it " +
+                 "is measured on an ordinary picture -- 344 channels above 1.0 and 399 below 0.0 of 49152, range " +
+                 "[-0.573, 1.221] -- and the runner REPORTS the range rather than clamping, because clamping in " +
+                 "the pass changes the algorithm for every caller. *** THREE DEFECTS IN THE ROUND'S OWN WORK, ALL " +
+                 "CAUGHT BY THE GATE ON ITS FIRST RUN: *** the runner was written with an options object and " +
+                 "denoise defaulting to TRUE while fsr.js declares positional arguments and FALSE -- a GPU path " +
+                 "that answers a different question from the reference it mirrors, which surfaced as 'worst NaN' " +
+                 "when an object reached fsr1CPU's positional sharpness. The gate's own source check for raw " +
+                 "WebGPU calls went red on the runner's COMMENT explaining that it makes none -- the " +
+                 "absence-check trap, fifth time in this arc, fixed with codeOnly(). And the row next to it then " +
+                 "failed because codeOnly EMPTIES string literals, so `backend !== \"webgpu\"` read as " +
+                 "`backend !== \"\"`: noComments() is the instrument for a quoted literal in live code. Also " +
+                 "corrected next door: fsr-selfcheck's header and closing both said the temporal path was blocked " +
+                 "because 'this tree has NO motion vectors and no previous-frame view-projection matrix anywhere " +
+                 "in it'. All three prerequisites arrived after that was written and fsr.html has been running the " +
+                 "whole chain since v4586 -- a stated limit that outlived the limit, describing a page that " +
+                 "already existed as a rung nobody could reach.",
+    }),
+    since312: Object.freeze({
+        at: "v4585", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/redAction-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/staleness.mjs", "tools/ship/staleness-selfcheck.mjs", "case-study.html"]),
+        verdict: "green, 6925 ms at eight-wide and 6822 ms alone -- over the sweep budget because it RUNS three " +
+                 "gates to classify their reds from what they print. *** A RED THAT NAMED ITS OWN ONE-COMMAND FIX " +
+                 "WAS CARRIED AS FURNITURE FOR FIVE ROUNDS. *** staleness-selfcheck was red on a case-study page " +
+                 "37 gates behind, and its failure text said in capitals: THE FIX IS ONE COMMAND: node " +
+                 "tools/ship/staleness.mjs --fix. v3087 decided deliberately that --fix never runs during a check " +
+                 "-- 'a ritual that auto-fixed before asserting would be a gate that agrees with whatever " +
+                 "shipped' -- and v3922 added the sentence naming the command so the human step would be obvious. " +
+                 "THE DESIGN WAS COMPLETE AND CORRECT. I read that red across v4580-v4584, wrote 'budgetExile, " +
+                 "definitionGates and staleness, equally red at HEAD' into five round summaries, and never opened " +
+                 "the message. One command closed it AND budgetExile with it -- that gate had only ever been " +
+                 "reporting staleness's debt from another instrument. Nothing was built for this finding. *** AND " +
+                 "THE THIRD RED WAS MISDESCRIBED: *** definitionGates' rows are frozen ratchets that may only move " +
+                 "DOWN, which is design, but the REDNESS is unpaid debt its own file prescribes a repair for -- 55 " +
+                 "exported symbols under physics/, 319 tree-wide, 617 of any shape, each owed a check that calls it " +
+                 "and grades the answer. Calling debt 'deliberately immovable' five times is how it stops being " +
+                 "paid. *** THREE DEFECTS IN THE ROUND'S OWN WORK, EACH CAUGHT BY THE TREE RATHER THAN BY CARE: *** " +
+                 "a duplicate baker was written into staleness.mjs before checking, twenty lines above fixDerived(), " +
+                 "which has done the same since v3087 -- a second copy of one rule, committed by the round three " +
+                 "deep in finding second copies elsewhere. A draft proposed adding a ship stage that auto-fixed " +
+                 "before verify, which is exactly what v3087's sentence refuses, and reading the file refused it. " +
+                 "And the gate's first version called fixDerived({write:false}) to prove the row was closable: " +
+                 "staleness-selfcheck asserts NO gate calls fixDerived and went red naming this file -- the red " +
+                 "this round spent itself learning to read caught its author on the first run. write:false is a " +
+                 "promise about an argument, not a property of a design. Also repaired: that detector scanned the " +
+                 "RAW file, so a COMMENT recording the removed call kept it red -- the rule could only be satisfied " +
+                 "by deleting the history of having broken it -- and this file already preaches the fix two rows up " +
+                 "('ask the code, never the commentary'). It uses codeHas now. And staleness-selfcheck's " +
+                 "falsifiability row was a second copy of the row it protected: headed 'the comparison is a real " +
+                 "equality, not a tautology' under a section headed 'a control that cannot fail is decoration', its " +
+                 "condition was claimed === actual -- WHAT SECTION 1 ALREADY ASSERTS -- while its own comment " +
+                 "described the right design. ONE STALE NUMBER WAS REPORTING AS TWO REDS for five sweeps. " +
+                 "stalenessRows is injectable now (recordDrift.checks()'s shape since v4482) and the control is " +
+                 "driven with a page claiming 1 gate. 14 sabotages, 14/14 red, no 0-RED -- after eight 0-REDs and a " +
+                 "crash, all of them here: the first baseline was itself red because ADDING THIS GATE RE-STALED THE " +
+                 "PAGE, which is the documented cycle and is why the sweep is re-run after the command; the harness " +
+                 "counted a red going GREEN as a catch; and three anchors were satisfied by a sibling line or a " +
+                 "substring, including a consistency check on the frozen figures that a coherent rewrite satisfied " +
+                 "while shrinking the finding from 37 gates to 1. Verify: the three reds this arc has been " +
+                 "reporting are now one -- and a second one surfaced that had been hiding behind them. " +
+                 "gateSelection-selfcheck is reproducibly red (twice alone) and its failure read \"first 123 " +
+                 "selected are all reachable\", which describes the INTENT and reads like a pass: neither a command " +
+                 "nor a count, the one unactionable class. It is growth, not staleness -- `reachable` now exceeds " +
+                 "what a 180 s budget selects, so truncation is the normal case and 22 of the first 123 selected are " +
+                 "not reachable from the change. Its message says how many, which, and what is OWED now. Also " +
+                 "recorded: adding it to the DRIVEN list took this gate past seventy seconds and the sabotage sweep " +
+                 "from four minutes to twenty, so the costly red is classified from the one named row of its source " +
+                 "-- redCensus's own rule, that re-verifying a registered red belongs to its two minutes and not to " +
+                 "a routine check -- and the first read arm classified the WHOLE file, which any of thirty rows " +
+                 "satisfied. 16 sabotages, 16/16 red, no 0-RED. Verify: 37 green, 2 red, 1 load-only, 0 crash-only.",
+    }),
+    since311: Object.freeze({
+        at: "v4584", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/walkerParity-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["ai-bridge/gateWalk.js", "tools/ship/selfchecks.mjs",
+                                "tools/ship/gateWalk-selfcheck.mjs"]),
+        verdict: "green, 3973 ms at eight-wide and 3901 ms alone -- OVER the 3000 ms sweep budget on purpose, " +
+                 "because it runs selfchecks.mjs twice as a child to read the suite's own population, which is " +
+                 "the only way to ask the one walker with no exported walk. *** THE SHIP'S SUITE RUNNER WAS " +
+                 "DISCOVERING AND SCHEDULING TRANSIENT FIXTURES. *** Four gates plant a `__`-prefixed " +
+                 "*-selfcheck.mjs while they run. v4409 found what that costs and closed it at ONE walker -- a " +
+                 "discovered fixture gets RUN, rigProgress's is built to exit 1, 'a NEW RED outside every " +
+                 "register... a race, so it fails a ship at random and never reproduces alone, which is the worst " +
+                 "shape a ship-time check can have'. v4580 closed it at treeRead and wrote that the fix lands at " +
+                 "the walker 'so all four censuses get it at once'. THAT WAS TRUE OF treeRead'S FOUR CONSUMERS " +
+                 "AND I LET IT READ AS FOUR WALKERS. Measured at v4584 by planting one file: " +
+                 "tools/ship/selfchecks.mjs went from 1,634 files to 1,635 AND its selection from 23 gates to 24, " +
+                 "so the fixture was discovered and scheduled; ai-bridge/gateWalk.js -- the shared discovery for " +
+                 "rig.html and gates.html -- returned it as a clickable gate. *** AND THE GATE COMPARING THE TWO " +
+                 "TWINS COULD NOT SEE IT, BECAUSE THEY AGREED. *** gateWalk-selfcheck asserts the twin returns " +
+                 "the same set as the suite's rules; both were missing v4409's rule, so it passed on a false " +
+                 "answer -- the second-copy defect timingCoverage recorded at v3584 -- and it held a THIRD copy " +
+                 "of the walk inline, also missing it. Three copies, one omission, unanimous. *** A FIFTH WALKER " +
+                 "HAD THE RULE ALL ALONG, IN A SPELLING NOTHING GREPPED FOR: *** staleness.mjs's pattern is " +
+                 "/^(?!__)[^/]*-selfcheck.mjs$/, a negative lookahead, and a row in the arriving gate that " +
+                 "grepped for `!f.startsWith(\"__\")` would have failed it while it was CORRECT -- a string proxy " +
+                 "for a property, written into the row built to catch string proxies. That row is gone; all six " +
+                 "exported gate populations are DRIVEN against a planted file instead, and a seventh fails on " +
+                 "arrival. *** AND THE ROUND'S PROPOSED RUNG WAS WRONG THREE TIMES OVER, WHICH IS RECORDED IN THE " +
+                 "GATE. *** v4583 closed by proposing that rigRunner builds its gate list from a payload the rig " +
+                 "sends: it discovers from disk through the shared walk (v4018). Nor is /rig/run unvalidated -- " +
+                 "suffix, existence, no parent escape. Nor do those predicates diverge from the offered menu: " +
+                 "1,641 against 1,641, zero either way. THE DEFECT WAS ONE LAYER PAST ALL THREE GUESSES and no " +
+                 "amount of reading found it. 13 sabotages, 13/13 red, no 0-RED -- after FIVE 0-REDs, all of them " +
+                 "here, two arriving by fixing an earlier row: the suite probe could return a constant and pass " +
+                 "on 0 === 0; pinning `selected` to fix that was itself wrong, because it is the budget planner's " +
+                 "output and read 27 then 26 with no fixture involved; and dropping that clause lost coverage it " +
+                 "had been giving by accident, so three sabotages went 0-RED until each earned a row -- including " +
+                 "one asserting the fixture ACTUALLY EXISTED while the walkers were asked, which is the same " +
+                 "absence the defect hid behind for three rounds. *** AND THE PROBE ITSELF WAS REWRITING THE RECORD IT " +
+                 "REPORTS ON. *** Asking the suite runner for its population meant `--budget 1`, and writeTimings " +
+                 "only refuses for --affected -- so this gate wrote gate-timings.json twice per run, 116 entries " +
+                 "before it was caught, which is v4580's unprotected-filter finding committed by the round that " +
+                 "cited it. selfchecks.mjs gained --count-only: the population, no spawn, no write, and the gate " +
+                 "dropped from 3901 ms to 1754. The 116 are kept rather than reverted -- each is a real exit-0 run " +
+                 "labelled `complete`, which v4580 defined as one cold sample, so the record says what they are -- " +
+                 "and statedRuntime-selfcheck found the one badly out, extrudePolygon at 229 ms against a 31 ms " +
+                 "gate with the HEADER as the correct half. Three gates were then repaired for the same class of " +
+                 "pin: timingSemantics and timingSurvivors held a 0.6x-1.7x band around a frozen alone reading, " +
+                 "and a gate is allowed to outgrow one -- dockSystem costs 149 ms against 45, puppeteer-bridge 133 " +
+                 "against 44, both measured. They require movement off the stale value and a KIND now, and report " +
+                 "the ratio; that demand sent four unprovenanced entries to be re-measured rather than excused, " +
+                 "taking the count 397 -> 394. Verify: 33 green, 3 red, 1 load-only, 0 crash-only.",
+    }),
+    since310: Object.freeze({
+        at: "v4583", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/runnerReach-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/runnerBudget-selfcheck.mjs", "tools/ship/ship.mjs",
+                                "tools/ship/verify.mjs", "ai-bridge/shipBridge.js", "ai-bridge/sourceChainBridge.js"]),
+        verdict: "green, 3431 ms at eight-wide and 3414 ms alone -- OVER the 3000 ms sweep budget on purpose, " +
+                 "because the row that matters runs runnerBudget-selfcheck and reads the population it prints. " +
+                 "*** THE CHECK THAT ASKS WHO BUDGETS A GATE DEFINED ITS POPULATION BY THREE STRING " +
+                 "COINCIDENCES, AND ALL THREE ARE WRONG. *** v4582 found the third by accident: adding a " +
+                 "SKIP_LINE regex to quickSweep introduced the string `-selfcheck` and pulled a runner of eleven " +
+                 "rounds' standing into the population for the first time. Asked what else the predicates hid: " +
+                 "(1) THE SPAWN TEST wanted process.execPath as the literal first argument, so verify.mjs (which " +
+                 "destructures execFileSync from a dynamic import) and ship.mjs (which passes it through a `run` " +
+                 "helper) were both outside -- THE SHIP AND ITS OWN GATE RUNNER -- and so was shipBridge, which " +
+                 "reaches gates only through ship.mjs. (2) THE TIME-LIMIT TEST admits any `timeout:`, so " +
+                 "sourceChainBridge entered on a 1500 ms HTTP health probe and was excluded again for naming no " +
+                 "selfcheck, while the verify.mjs it spawns over a cloned tree carries NO cap at all: admitted " +
+                 "for one wrong reason, excluded for another, so the absence was never a decision. (3) THE " +
+                 "`-selfcheck` MENTION misses one level of indirection and misses enumeration entirely. *** THE " +
+                 "MEASURED CONSEQUENCE, AT ITS TRUE SIZE: *** shipBridge's dry-run total was 600,000 ms around a " +
+                 "process whose own per-step cap is 900,000 -- AN OUTER TOTAL BELOW THE INNER PER-STEP LIMIT IT " +
+                 "CONTAINS -- so a dry run could die while its slowest step sat well inside its budget, reporting " +
+                 "timedOut with no text, which is exactly what ship.mjs's v3936 note records after a 923-second " +
+                 "ritual. Fixed: the bridge now reads ship.mjs's --step-timeout out of its source and uses a " +
+                 "named multiple of it. verify.mjs's flat 180 s is NOT a live problem and is declared as such: " +
+                 "the three lockstep gates it guards cost 61, 127 and 112 ms. No ship limit can come from " +
+                 "gateBudget.MEASURED at all -- three single gates each exceed 900 s and the tail sums to 267 " +
+                 "minutes -- so these are declared rather than derived, and budgetIsOwn says why. *** THE " +
+                 "POPULATION IS A CLOSURE NOW: *** a runner spawns a gate, or spawns a file that is itself a " +
+                 "runner, to a fixed point. 5 modules became 14, and FOUR REFINEMENTS WERE EACH FORCED BY A WRONG " +
+                 "RESULT rather than foreseen -- a gate spawning a gate as a fixture is not an authority (25 " +
+                 "members), requiring a runner is not being one (15), accepting a caller's timeout is not " +
+                 "choosing one (six silent), and a runner may ENUMERATE rather than name, which the import-line " +
+                 "fix had just pushed quickSweep back out over. What remains is named: a target built entirely " +
+                 "from run-time data stays invisible, and that hole was load-bearing within minutes of being " +
+                 "written down. 15 sabotages, 15/15 red, no 0-RED -- after a first pass with SEVEN 0-REDs, all " +
+                 "of them here: six rows tested that a declaration EXISTS while the sabotage changed the " +
+                 "BEHAVIOUR it declares, now replaced by one row that runs the check and reads its number, and " +
+                 "one was a substring -- renaming budgetIsOwn to budgetIsOwnX left `/budgetIsOwn/` matching, so " +
+                 "three declarations could be removed invisibly. Verify: 30 green, 3 red, 0 crash-only.",
+    }),
+    since309: Object.freeze({
+        at: "v4582", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/skipReading-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/quickSweep.mjs", "tools/ship/timingKind-selfcheck.mjs",
+                                "tools/ship/sweep-timings.json"]),
+        verdict: "green, 322 ms at eight-wide and 267 ms alone, under the 3000 ms budget. *** THREE ENTRIES IN " +
+                 "THE SWEEP RECORD WERE A GATE SAYING 'I DID NOT RUN'. *** render/holoPicture, render/holoAgree " +
+                 "and tools/ship/pageFxOverlay skip without a rasteriser, exit 0 well under the budget, and sat " +
+                 "in sweep-timings.json at 234, 164 and 175 ms with a confident `loaded` kind -- 2.4x to 3.6x " +
+                 "their bare skip cost, so they were LOADED measurements of a refusal. tools/ship/selfchecks.mjs " +
+                 "has refused to record a skip since v3941, after placementRender was filed at its skip time " +
+                 "THREE TIMES, and gateBudget.UNRESOLVED names two of these three saying 'its former 55ms entry " +
+                 "was the SKIP time'. THE TREE KNEW, FOR THE OTHER FILE -- v4580's fixture race and v4581's prose " +
+                 "rule wearing a third face. *** AND THE MECHANICAL REASON IS BETTER THAN FORGETFULNESS: THE " +
+                 "SWEEP COULD NOT SEE. *** runOneAsync spawned with `stdio: \"ignore\"`, and a skip's only " +
+                 "evidence is the gate's printed declaration, so from an exit code a skip is indistinguishable " +
+                 "from a fast pass. MEASURED BEFORE PAYING FOR IT: piping and keeping a 4 KB tail costs 1.4 ms a " +
+                 "gate over eight gates timed three times each -- inside the noise, with two of the eight coming " +
+                 "out FASTER captured -- about 2 s across a full sweep. Eleven rounds of blindness for two " +
+                 "seconds. A fourth KIND was added, and it answers a DIFFERENT question from the other three: " +
+                 "loaded/alone/capped say under what conditions the number was taken, skipped says the gate never " +
+                 "started, and the branch rule CANNOT produce it -- ms-and-code can only ever call a skipping " +
+                 "gate loaded, which is why it needed a writer and why no entry may carry it by inference. *** " +
+                 "AND DRIVING THE FIXED WRITER ERASED v4579'S OTHER RECORD. *** kindsInferred names the 1,620 " +
+                 "entries whose kind was back-derived rather than watched, written because 'an inference dressed " +
+                 "as an observation is the fault five rounds of this arc have been about' -- and the writer was " +
+                 "never taught the field, so a five-gate run took the list to ZERO and left 1,637 inferred kinds " +
+                 "presenting as observed. Found by RUNNING the writer, as v4580's `complete: true` was; reading " +
+                 "it shows a field that is simply absent. Now carried forward minus what each run observes. The " +
+                 "census was driven by running all 22 skippable gates rather than by matching the record: 4 " +
+                 "decline here, 3 held a code-0 reading, and the fourth was already safe because v4574's CAPPED " +
+                 "kind had it. 18 of 22 produced real measurements, which is why this is narrow and not a claim " +
+                 "the record is untrustworthy -- and gateBudget-selfcheck's UNRESOLVED cross-check was green " +
+                 "before and after, correctly, because it reads the guarded file. A GREEN ROW IS NOT EVIDENCE " +
+                 "THAT A RULE IS APPLIED, ONLY THAT IT IS APPLIED HERE. 15 sabotages, 15/15 red, no 0-RED, after " +
+                 "one 0-RED that was this gate's own: timingKind's member-count condition could be replaced by " +
+                 "`true` with nothing noticing, so this gate vouches for that pin from outside. Also recorded: " +
+                 "the absence-check trap fired a FOURTH time in three rounds, and the three instruments are now " +
+                 "written down -- raw source finds the text in the comment recording its removal, codeOnly EMPTIES " +
+                 "string literals and broke the clause brought in to fix it, and noComments is the one for a " +
+                 "string literal in live code. AND THE SKIP GUARD REVEALED AN ELEVEN-ROUND SILENCE ON ITS " +
+                 "WAY IN: runnerBudget-selfcheck admits a runner that mentions `-selfcheck` outside its own name, " +
+                 "and quickSweep happened never to contain the string until the new SKIP_LINE regex introduced it. " +
+                 "It has budgeted gates with its own two numbers since it was written and never declared them. " +
+                 "budgetIsOwn now says what they are: budgetMs is a MEMBERSHIP THRESHOLD about the sweep's total " +
+                 "cost, capMs is a SIGKILL ceiling whose readings are the cap's clock. Verify: 29 green, 3 red, 0 " +
+                 "load-only, 0 crash-only; the three reds equally red at HEAD.",
+        widenedLate: Object.freeze(["tools/ship/quickSweep.mjs"]),
+    }),
+    since308: Object.freeze({
+        at: "v4581", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/budgetProvenance-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/gateBudget.mjs", "tools/ship/gateBudget-selfcheck.mjs",
+                                "tools/ship/hostScale-selfcheck.mjs", "tools/ship/gate-timings.json"]),
+        verdict: "green, 132 ms at eight-wide and 84 ms alone, under the 3000 ms budget. *** THE TABLE EVERY " +
+                 "BUDGET IN THE TREE RESTS ON HAD FOUR KEYS WRITTEN TWICE, AND NOTHING PARSES IT. *** " +
+                 "gateBudget.MEASURED is the curated slow tail and hostScale divides every rig budget by it. " +
+                 "configContract, compose, assumptionMap and census each appeared twice in one object literal; a " +
+                 "repeated key is not an error in JavaScript and the later one silently wins. Three re-stated the " +
+                 "same number and were harmless -- WHICH IS WHY ALL FOUR SURVIVED. configContract re-stated a " +
+                 "DIFFERENT one, 78000 at one site and 72509 three hundred lines later, so one typed budget was " +
+                 "discarded with no trace and THE SMALLER READING WAS IN FORCE -- against the losing entry's own " +
+                 "written rule, 'the larger of the two readings is used'. The language overruled the table quietly, " +
+                 "because a rule stated in prose is enforced by whoever happens to read it. *** AND THE ENTRY WAS " +
+                 "WRONG BY TWENTY-FOUR TIMES EITHER WAY: *** re-measured at 2997/2856/3473 ms, three runs alone, " +
+                 "all exit 0. hostScale-selfcheck has REPORTED it as the table's worst under-record for rounds and " +
+                 "reporting is where it stopped. So the conservative rule pointed the wrong way -- 'take the " +
+                 "larger' protects against a fast sample when both readings are current and entrenches the staler " +
+                 "one when they are not, and the accident was LESS wrong than the rule. Removed rather than " +
+                 "corrected: the table is the slow tail and a 3 s gate is the population, so it falls to the " +
+                 "default and its budget RISES from 145,018 to 329,697 ms; correcting in place to 3473 x 2 would " +
+                 "have given 6,946 ms to a gate observed at 5,769 ms under load. Its own first sentence had always " +
+                 "said 'IT NEVER NEEDED A BIGGER BUDGET AT ALL'. *** THE GATE GUARDING THE TABLE ASSERTED " +
+                 "PROVENANCE AND CHECKED ARITHMETIC IT DEFINES ITSELF: *** gateBudget-selfcheck's row read " +
+                 "`budgetFor(k) === MEASURED[k] * TAIL_HEADROOM` under the sentence 'every named budget is derived " +
+                 "from a recorded completion, not a guess'. budgetFor's body IS that expression, so it could not " +
+                 "fail for any entry -- including the 24x one -- and the sentence is false for 50 of 62 rows, which " +
+                 "have no MEASURED_RUNS at all. The mechanism for provenance EXISTS here, is derived rather than " +
+                 "typed, and covers a fifth of the table. Replaced by a branch check, an independent maximum, a " +
+                 "spelling check and a ratchet. *** AND v4580'S OWN CLAIM IS WITHDRAWN WHERE I WROTE IT: *** " +
+                 "'the denominator stays MEASURED because its numbers were all obtained the same way', written " +
+                 "into hostScale-selfcheck one round ago without measuring it, in the very row that exists to name " +
+                 "unprovenanced records. The conclusion survives on a smaller measured reason: 43 of 49 entries " +
+                 "agree with the independent records within 1.5x and NONE is lower, which is the half that matters " +
+                 "-- so the round's finding is the PROCESS, not the numbers, and a row says which. 17 sabotages, " +
+                 "17/17 red, no 0-RED -- AFTER A FIRST PASS THAT PRODUCED FOUR 0-REDS, EVERY ONE A DEFECT IN THIS " +
+                 "ROUND'S OWN WORK: the nested-row guard was unreachable behind a `^\\s*` anchor and two fixtures " +
+                 "failed to drive it; the withdrawn-claim row used codeOnly, which empties string literals, so " +
+                 "re-adding the claim to a detail string moved nothing; gateBudget-selfcheck's new ratchet baseline " +
+                 "could be raised from 50 to 60 with nothing noticing, so the honesty check now lives in the other " +
+                 "gate; and one was the HARNESS scoring each mutation against a single gate, which reported the " +
+                 "restored tautology as invisible when the whole point is that only the other gate can see it.",
+    }),
+    since307: Object.freeze({
+        at: "v4580", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/timingProvenance-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/selfchecks.mjs", "tools/ship/gateBudget.mjs", "tools/ship/hostScale.mjs",
+                                "tools/ship/hostScale-selfcheck.mjs", "tools/ship/gate-timings.json",
+                                "tools/ship/treeRead.mjs", "tools/ship/treeRead-selfcheck.mjs",
+                                "tools/ship/timingCoverage-selfcheck.mjs", "tools/ship/timingLoad-selfcheck.mjs",
+                                "tools/ship/timingSurvivors-selfcheck.mjs", "tools/ship/timingSemantics-selfcheck.mjs",
+                                "tools/ship/timingRecords-selfcheck.mjs"]),
+        verdict: "green, 197 ms at eight-wide and 133 ms alone, under the 3000 ms budget. *** THE ROUND'S OWN " +
+                 "PREMISE WAS WRONG AND THE FIRST MEASUREMENT SAID SO. *** v4579's close proposed that " +
+                 "gate-timings.json 'mixes a batch quantity with individual ones exactly as the sweep column " +
+                 "did'. IT DOES NOT: the runner's loop is `for (const f of toRun)` around execFileSync, so a " +
+                 "full-run entry and a hand-timed entry are the same physical quantity. Measured rather than " +
+                 "read -- 89 gates summed 30,525 ms inside a 51,259 ms wall, 0.60x, where a five-worker pool " +
+                 "would sit near 5x. The analogy had been carried across on the strength of two files looking " +
+                 "alike. *** WHAT WAS ACTUALLY THERE IS A CLAIM THAT THE FIX COULD NOT BE DONE. *** " +
+                 "hostScale-selfcheck has asserted since v3936 that 'an entry cannot say whether it is a TIME " +
+                 "or a TRUNCATION' and concluded 'it cannot be detected from here'. True of a READER, false of " +
+                 "the PRODUCER: tools/ship/selfchecks.mjs branches on completed / killed / declined-to-run BY " +
+                 "NAME and then wrote a bare integer. 644 versions of the tree acted on the general version of " +
+                 "that sentence, and v4579 had just made this exact repair on the other file. *** AND THE ROW " +
+                 "PINNED A REPRESENTATION WHILE CLAIMING A PROPERTY, SO IT COULD NEVER HAVE NOTICED. *** Its " +
+                 "condition was `entries.every(([, v]) => typeof v === 'number')`, which is TRUE of " +
+                 "sweep-timings.json -- a file where every entry does say what it is, via a sibling map. It " +
+                 "would have stayed green straight through the repair with its own sentence gone false; " +
+                 "measured on both files to establish that it is a fact about the predicate, not about the " +
+                 "data. Repaired to pin the unprovenanced COUNT, which goes red the day it reaches zero -- the " +
+                 "day the reason expires. *** THE REPAIR: the runner stamps kinds, boxes and per-entry stamps " +
+                 "at the point of decision, *** plus a boxLegend decoding each machine id and " +
+                 "coverage.unprovenanced counting what carries none of it. 934 of 1,332 entries stamped by one " +
+                 "bounded pass; the remaining 398 are UNRECOVERABLE, and the ratchet may only fall. The box id " +
+                 "is derived from the machine and deliberately excludes the node version, which is not a new " +
+                 "machine; its facts are asserted equal to androidRunner.mjs's existing fingerprint rather " +
+                 "than defined a second time. *** RUNNING THE WRITER FOUND A SECOND FAULT THAT READING IT DID " +
+                 "NOT. *** writeTimings was called with a literal `true`, so a --budget pass covering 953 of " +
+                 "1,630 gates wrote coverage.complete: true -- exactly the 'partial measurement wearing a " +
+                 "complete one's name' v3584's own note warned of, arriving through a filter added one round " +
+                 "after the note. `complete` is now derived from the population; the true that pass wrote is " +
+                 "corrected to false by hand in the record, with the reason beside it. *** AND THE HEADLINE " +
+                 "THIS ROUND WANTED WAS REFUSED BY ITS OWN ARITHMETIC. *** The sixteen entries this arc " +
+                 "re-timed by hand went 12 DOWN and 4 UP. A faster second machine predicts 16-0; staleness " +
+                 "alone predicts a coin toss; 12-4 gives two-sided p 0.077 and the threshold on n=16 is 13. ONE " +
+                 "MORE CORRECTION WOULD HAVE CARRIED IT, so whether this file mixes two boxes or is merely " +
+                 "stale is left unsettled and is not claimed either way -- and v4578's 10-0 cohort is not the " +
+                 "evidence it looked like, because the detector that found it SELECTS for entries that are too " +
+                 "high. Also recorded: hostScale.mjs still cites assumptionMap at 47,729 ms as its reason for " +
+                 "refusing this file, and the file holds 333,639 -- 7.0x -- which its own gate noticed at v3936 " +
+                 "while the module's header was never re-read; and the 300 s truncation story does not describe " +
+                 "today's file, which holds 13 entries above 300 s outright. 17 sabotages, 17/17 red, no 0-RED, " +
+                 "nothing crashed. TWO OF THE SEVENTEEN EXIST BECAUSE THE FIRST DRAFT CARRIED A CLAUSE THAT " +
+                 "COULD NOT FAIL: `pTwoSided > 0.05` alongside a pinned 12-4, where the counts determine p. " +
+                 "Replaced by the threshold derivation, which can be wrong and is now checked. *** AND THE VERIFY SWEEP " +
+                 "FLAPPED, WHICH TURNED OUT TO BE A RACE v4409 HAD ALREADY CLOSED SOMEWHERE ELSE. *** " +
+                 "runtimeGap-selfcheck went red about half the time at eight-wide and green in three runs alone, " +
+                 "reading 4081 files instead of 4080. Four gates plant a `__`-prefixed *-selfcheck.mjs on disk " +
+                 "while they run; v4409 taught gateSweep's enumerateGates to skip them, because a discovered " +
+                 "fixture got RUN, and the rule was never applied to tools/ship/treeRead.mjs -- the SHARED walker " +
+                 "four censuses read. Caught by polling the tree during a sweep and finding " +
+                 "tools/roundhouse/__routeProbe-selfcheck.mjs in the act, not by reasoning about the counts. " +
+                 "Excluded at the walker so all four get it at once, with a driven control that plants a real " +
+                 "fixture and a real ordinary file, because an exclusion that dropped every arrival would pass " +
+                 "the first half and blind every census. gateQuality-selfcheck was ALSO red at HEAD, for a " +
+                 "prose-debt site in timingRecords absent from its frozen baseline; converting it to proseHas " +
+                 "made the row FAIL, which is the answer -- the phrase is a string literal, and gateQuality's own " +
+                 "header measured at v3106 that 28 of 38 such conversions break because the regex was never " +
+                 "hunting a comment. A substring test fixed it and that gate is green for the first time in this arc. " +
+                 "Five downstream gates needed repair, all of them pinned to something this round moved: three " +
+                 "pinned an exact millisecond and went red on a BETTER measurement, timingCoverage pinned a " +
+                 "count of the record's top-level keys, and timingLoad recomputed a v4576 finding against a live " +
+                 "file. Standing reds left in place: budgetExile, definitionGates' three immovable ratchets, and " +
+                 "staleness, all equally red at HEAD -- staleness confirmed so by a probe run BEFORE this round's first " +
+                 "edit, not assumed. *** AND THE VERIFY HARNESS ITSELF WAS WRONG ABOUT THREE GATES. *** At " +
+                 "eight-wide it reported rigProgress, sweepBudget and shadowedHelper as reds; each is green alone, " +
+                 "twice. They are load-sensitive, and a harness that calls a load failure a red is the harness " +
+                 "being wrong about the tree -- the same shape as 'a crash is not a verdict', one level out. It " +
+                 "now re-runs every red ALONE before naming it, and reports LOAD-ONLY apart from RED. Final: 26 " +
+                 "green, 3 red, 1 load-only, 0 crash-only over 30 gates.",
+    }),
+    since306: Object.freeze({
+        at: "v4579", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/timingKind-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/quickSweep.mjs", "tools/ship/recordDrift.mjs", "tools/ship/timingLoad-selfcheck.mjs"]),
+        verdict: "green, 0.10 s at eight-wide, under the 3000 ms budget. *** v4578 NAMED THE REPAIR IT DID NOT " +
+                 "DO AND THIS IS IT: THE COLUMN SAYS WHAT ITS NUMBERS ARE. *** quickSweep writes `kinds[gate]` " +
+                 "-- loaded, alone or capped -- in the SAME STATEMENT that chooses the millisecond, so the " +
+                 "label cannot drift from the branch that picked it. The 1,620 entries predating this round " +
+                 "have the kind INFERRED from the branch rule and every one of them is named in " +
+                 "`kindsInferred`, because an inference dressed as an observation is the fault five rounds of " +
+                 "this arc have been about. Census: 1,167 loaded, 335 alone, 137 capped. *** AND WRITING THE " +
+                 "FIELD FORCED THE QUESTION FOR EVERY ENTRY, WHICH FOUND EIGHT MORE WRONG ONES, ALL OF THEM " +
+                 "THIS ARC'S. *** v4578 found nine and fixed nine because it looked only at what v4577 wrote. " +
+                 "Asking of every entry this arc ever hand-wrote turns up eight more alone readings in " +
+                 "under-budget slots, from v4575, v4576, v4577 AND v4578 -- one per round, INCLUDING the " +
+                 "round that diagnosed the problem. *** FOUR OF THE EIGHT ARE THE ARC'S OWN GATES: *** " +
+                 "timingRecords, timingLoad, timingSurvivors and timingSemantics, whose runtimes were filed " +
+                 "as alone readings every single round while those same files argued about this defect. " +
+                 "Seventeen wrong entries across five rounds. *** THE ENUMERATION ALSO HAD TWO FALSE MEMBERS " +
+                 "AND THE MEASUREMENT REFUSED THEM. *** reskin and winPathGuard were listed as arc-written " +
+                 "and are not -- v4577 corrected their gate-timings rows, not their sweep rows -- and reskin " +
+                 "measured 0.56x of its recorded value at eight-wide, which is impossible for an alone " +
+                 "reading and ordinary for a correct loaded one. Ten became eight because the numbers " +
+                 "disagreed with the list. *** AND THE PRE-FLIGHT DEMANDS A KIND NOW, WHICH IS WHAT ENDS THE " +
+                 "CLASS RATHER THAN THIS INSTANCE OF IT. *** recordDrift has asked for a runtime and a stamp " +
+                 "since v4408; a new gate owes it a kind too. A reading whose quantity is unknown is not a " +
+                 "reading anybody can compare, and seventeen entries are the evidence. THE NEW GATE'S OWN " +
+                 "ENTRY IS A LOADED READING measured at exactly eight concurrent, because the gate that " +
+                 "demands kinds cannot carry the wrong one. Eight sabotages, 8/8 red, no 0-RED. Two " +
+                 "downstream reds along the way: timingLoad still asserted the ALONE reading for a repaired " +
+                 "entry -- the third gate in this arc to carry that mistaken assertion -- and " +
+                 "recordDrift-selfcheck was red on its own fixture because a new file had made the runtimeGap " +
+                 "census stale, which the bookkeeping closed. The second one was NOT this round's edit: " +
+                 "reverting the edit left it equally red, which is how that was established rather than " +
+                 "assumed. The final verify also surfaced budgetExile-selfcheck red and it is equally red at " +
+                 "HEAD: it reports a recorded REPAIR regressed in staleness-selfcheck and caseStudy-selfcheck, " +
+                 "and staleness was already on v4571's list of tree-wide census gates red at HEAD. Same " +
+                 "standing debt seen from another instrument, left where it was.",
+    }),
+    since305: Object.freeze({
+        at: "v4578", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/timingSemantics-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/timingSurvivors-selfcheck.mjs", "tools/ship/timingRecords-selfcheck.mjs"]),
+        verdict: "green, 0.06 s, under the 3000 ms budget. *** v4577 PROPOSED A SHARPER DETECTOR AND CHECKING " +
+                 "ITS PREMISE FOUND SOMETHING BIGGER: THE SWEEP'S MS COLUMN HOLDS TWO DIFFERENT QUANTITIES. " +
+                 "*** quickSweep writes `serialMs ?? parallelMs`, and a gate only gets a serialMs if it was " +
+                 "red or crossed the budget. So UNDER the budget the number is a LOADED eight-wide reading " +
+                 "and AT OR OVER it an ALONE one, in one column, with nothing marking which. MEASURED over " +
+                 "the dated comparable gates: under the budget the column sits at 1.93x gate-timings, which " +
+                 "IS the load factor, and at or over it at 0.98x, which is two alone readings agreeing. The " +
+                 "boundary is exactly the budget, predicted from the source before it was measured. *** AND " +
+                 "THIS ARC PUT THE WRONG QUANTITY IN NINE ENTRIES. *** v4577 wrote alone readings into " +
+                 "sweep-timings reasoning that quickSweep `prefers the serial -- which is an alone reading " +
+                 "too`; true only for a gate that GETS one, and nine of its fourteen sit under the budget " +
+                 "and never do. Re-measured at exactly eight concurrent -- two batches of eight covering all " +
+                 "nine, three rounds -- and replaced. Those numbers have now moved TWICE, once wrongly by " +
+                 "this arc. *** THE DETECTOR ITSELF WORKS WHERE THE COLUMN'S MEANING IS KNOWN: TEN FOR TEN, " +
+                 "NO FALSE POSITIVES. *** Eleven candidates, ten usable -- the eleventh dropped because this " +
+                 "arc had corrupted its column -- all ten green, all ten with a gate-timings entry between " +
+                 "2.0x and 6.3x too high. *** AND NOT ONE WAS VISIBLE TO v4577'S OWN CRITERION: *** their " +
+                 "residuals run 0.66x to 2.73x, all under its 3x line, because an entry three times too high " +
+                 "makes a SYMMETRIC ratio of about 1.4x, which reads as agreement. The old criterion " +
+                 "conflates `gate-timings is wrong` with `gate-timings is right`. Its magnitude is not " +
+                 "usable below about 100 ms -- esFlight3dMath predicted 12.63x and measured 5.34x, because a " +
+                 "40 ms loaded reading is mostly process startup -- but the DIRECTION held for all ten. " +
+                 "Nineteen entries corrected. *** AND TWO DOWNSTREAM GATES WENT RED ON CONCEPTUAL GROUNDS, " +
+                 "NOT BOOKKEEPING. *** timingSurvivors asserted the repaired sweep entries hold the ALONE " +
+                 "reading -- the very thing refuted here -- and timingRecords kept an invariant that every " +
+                 "moved entry moves TOWARD the alone measurement, which is false for the sweep column by " +
+                 "construction. Both now hold the per-file rule: gate-timings toward the alone reading, the " +
+                 "sweep column toward the quantity its own branch records. Eight sabotages, seven red. The " +
+                 "one zero is loosening a bar, the class v4576 proved inert and v4577 failed to fix with a " +
+                 "second row; three rounds have met it, so this file pins the number it REPORTS instead of " +
+                 "pretending to police its bar. That zero was also scored RED once by mistake when the " +
+                 "sabotage harness itself was edited and crashed -- rc 1 with no FAIL line, which the " +
+                 "crash-aware rule reads as red. Applied cleanly it is rc 0, and a crash is not a verdict.",
+    }),
+    since304: Object.freeze({
+        at: "v4577", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/timingSurvivors-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/timingLoad-selfcheck.mjs", "tools/ship/timingRecords-selfcheck.mjs"]),
+        verdict: "green, 0.06 s, under the 3000 ms budget. *** v4576 CLOSED SAYING THE SURVIVORS WERE A RATE " +
+                 "AND NOT A LIST. THE LIST IS TWELVE AND ALL TWELVE WERE RUN. *** Three times alone, twice " +
+                 "with all twelve at once, 60 runs. *** EVERY ONE IS GREEN *** -- whatever these numbers are " +
+                 "wrong about, none hides a failing gate, which is a different answer from v4575's " +
+                 "commentFalsePass because that was the CAP-READING population and none of these twelve was " +
+                 "ever killed. *** AND THE STAMP PREDICTS WHICH FILE IS WRONG, BOTH WAYS, TWELVE FOR TWELVE. " +
+                 "*** The step v4576 got half-right is that gate-timings records an ALONE run and the sweep " +
+                 "records a LOADED one, so `which is closer to the measurement` is the wrong question -- the " +
+                 "sweep entry is SUPPOSED to be higher. Judging each entry against what it claims to be: ALL " +
+                 "EIGHT UNDATED entries have a stale SWEEP number, and ALL FOUR DATED entries have a stale " +
+                 "GATE-TIMINGS number. No exceptions in either direction, which is what the stamp should " +
+                 "mean -- an undated reading is pre-v4408 and therefore the sweep drifted, a dated one is " +
+                 "recent so a disagreement surviving load belongs to the other file. v4576 saw one direction " +
+                 "of this from four gates; twelve give both. *** THE CRITERION HAS NO FALSE POSITIVES: *** " +
+                 "two of the twelve are stale in BOTH files and ten in exactly one, and NONE has two " +
+                 "plausible entries -- a test costing no runs at all fired twelve times and was right twelve " +
+                 "times. Twelve-wide costs 3.56x against 2.15x at eight, and even that MORE load falls short " +
+                 "of all eight sweep entries that are too high, the worst by 45x, which is what rules load " +
+                 "out rather than making it unlikely. One is stale the OTHER way -- dockSystem recorded BELOW " +
+                 "its own loaded reading -- and a row claiming `falls short of every` could not hold both, " +
+                 "which is how that came out. FOURTEEN ENTRIES CORRECTED, five in gate-timings and nine in " +
+                 "the sweep, all from this round's alone readings, and entries judged SOUND were left alone. " +
+                 "*** AND THE REPAIR BROKE TWO DOWNSTREAM GATES, WHICH IS THE THIRD AND FOURTH TIME IN THREE " +
+                 "ROUNDS. *** timingLoad went red on three rows and timingRecords on two, because both " +
+                 "derive findings from records this round repaired. The rule that settles it is now written " +
+                 "in both: a gate reporting a MEASUREMENT OF A RECORD'S STATE must freeze that state, and " +
+                 "only a row asserting a live INVARIANT may read the current file. timingLoad's survivor " +
+                 "count became a RATCHET -- v4576's thirteen recorded, the live count may only fall, a rise " +
+                 "means new drift -- and timingRecords' verdict row now derives from `gateWas` and " +
+                 "`sweepWas` with a live row requiring that every moved entry moved TOWARD the measurement. " +
+                 "Eight sabotages, seven red. The one zero is loosening the precision bar from `=== 0` to " +
+                 "`<= 1`, which is the class v4576 proved inert: weakening an assertion moves no reading. " +
+                 "This round added a second row carrying the claim as a partition, re-ran the mutation, and " +
+                 "it was STILL invisible -- the row is kept for being the stronger statement, not for " +
+                 "catching anything, and the gate says so rather than implying the repair worked.",
+    }),
+    since303: Object.freeze({
+        at: "v4576", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/timingLoad-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/timingRecords-selfcheck.mjs"]),
+        verdict: "green, 0.07 s, under the 3000 ms budget. *** v4575 NAMED THREE EXPLANATIONS FOR ITS 43% AND " +
+                 "COULD NOT SEPARATE THEM. SIX RUNS SEPARATED THEM. *** Eight gates, three rounds with all " +
+                 "eight dispatched at once exactly as quickSweep runs them, three rounds each alone. *** THE " +
+                 "LOAD FACTOR IS 2.15x AND THE THRESHOLD WAS 2x -- which is most of v4575's finding, and this " +
+                 "round is the correction. *** Across the 949 gates whose sweep reading carries a real capture " +
+                 "stamp the median disagreement is 1.94x; divided by the measured load factor that is a " +
+                 "residual of 0.90x. THE TWO RECORDS AGREE once the conditions each was taken under are " +
+                 "accounted for, and 46% cross a 2x line only because the median sits just under it. A " +
+                 "threshold artifact was reported as a defect, and timingRecords-selfcheck's headline now " +
+                 "says so at the top of its own file. *** WHAT SURVIVES IS ABOUT THIRTEEN GATES, AND THE TWO " +
+                 "FILES FAIL IN DIFFERENT COLUMNS. *** `sweepWas / 8-wide` asks whether the SWEEP entry is " +
+                 "explained by load: seven of eight are, and the one that is not is hostScale at 5815 against " +
+                 "160 measured eight-wide, a 36x residual. `alone / gate-timings` asks whether the " +
+                 "GATE-TIMINGS entry is right: six of eight are within 30%, so that file is NOT broadly stale " +
+                 "-- the age explanation is refuted for most of the sample -- and the two that fail go in " +
+                 "OPPOSITE directions, rigJobs having grown 128x and dockSystem shrunk 20x. Three wrong " +
+                 "numbers across two files, which is why v4575's spot-check split two and two: not noise, two " +
+                 "failure modes in two records. *** AND THE CAPTURE STAMP PREDICTS ONE FILE'S STALENESS AND " +
+                 "NOT THE OTHER'S. *** Every unexplained SWEEP reading in the sample is undated, and across " +
+                 "the population undated readings carry a residual above 3x at 5.1% against 0.3% for dated " +
+                 "ones -- SIXTEEN TIMES the rate. But dockSystem's bad number is in gate-timings while its " +
+                 "sweep reading is dated and fine, so the stamp says nothing about the other file. *** THE " +
+                 "ROUND THEN DELETED ITS OWN EVIDENCE AND HAD TO RESTRUCTURE. *** Re-taking the two stale " +
+                 "sweep entries from this experiment's own alone-readings -- the right thing to do -- made the " +
+                 "residual row read 0 unexplained and went red. The table now carries `sweepWas` and " +
+                 "`datedWas`, the state as the experiment found it, and a second row checks the repair against " +
+                 "the live file: v4476's shape, a row built to go red the day somebody fixes it, followed by " +
+                 "the record of that day. AND IT HAPPENED TWICE: the same correction flipped a verdict in " +
+                 "v4575's own four-gate spot-check one gate over, reddening timingRecords-selfcheck in the " +
+                 "final verify. That table carries `sweepWas` now as well. Nine sabotages, 9/9 red, no 0-RED after one repair: the load " +
+                 "factor's first row accepted anything between 1.5x and 3x, and lowering one table reading " +
+                 "moved the median 2.15x -> 2.08x inside that band. A number everything downstream divides by " +
+                 "cannot sit in a tolerance a single edit fits through, so it is pinned to the hundredth now. " +
+                 "One row also went red on its own data first: it claimed all but the slowest gate slow down " +
+                 "under load, and the slowest does too, by 1.01x -- monotone for eight of eight is the true " +
+                 "and stronger property.",
+    }),
+    since302: Object.freeze({
+        at: "v4575", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/timingRecords-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/commentFalsePass-selfcheck.mjs"]),
+        verdict: "green, 0.06 s, under the 3000 ms budget. *** v4574 CLOSED ON GATE PROSE ABOUT COST AND THE " +
+                 "INSTRUMENT ALREADY EXISTED. *** statedRuntime-selfcheck has compared stated runtimes against " +
+                 "observed ones since v3213, and it was RED, naming four drifted headers. Not a rung to build " +
+                 "-- a red to act on, and the second round running where the first finding was that the tree " +
+                 "already knew. All four were corrected FROM A CLOCK: reconQualityBind ~0.4s against a " +
+                 "measured 2.35s, commentFalsePass ~4.2s against 9.6s, shaderCensus ~0.5s against 1.5s, " +
+                 "spacesimStart ~1.4s against 0.14s -- three under, one 10x over. *** AND ONE OF THE FOUR WAS " +
+                 "HIDING A RED GATE. *** commentFalsePass EXITS NON-ZERO, and is recorded in sweep-timings at " +
+                 "20,025 ms with exit 124 -- one of the 137 cap readings v4574 counted, which is exactly why " +
+                 "nobody had looked. *** THAT FALSIFIES v4574'S OWN SENTENCE *** that 'not one of the gates " +
+                 "the sweep has only ever killed is red'. Seventeen sampled were green; the population is " +
+                 "not, and capReading-selfcheck's row now says so instead. Its red was a FALSE POSITIVE -- " +
+                 "qrChannel asserts the vendored QR decoder carries the MIT copyright and permission notice " +
+                 "in full, and a licence notice exists only as a comment, so reading it off raw source is the " +
+                 "row working. Repaired with a DECIDABLE exemption on the asserted text, which is what that " +
+                 "gate's own second row demands. *** AND FOLLOWING statedRuntime'S INSTRUCTION WOULD HAVE " +
+                 "WRITTEN A WRONG NUMBER. *** It says to correct a drifted header 'FROM THE MEASUREMENT in " +
+                 "gate-timings.json'. For shaderCensus that file held 239 ms against a measured 1501 -- the " +
+                 "header was right to be flagged and THE RECORD WAS THE STALE HALF. Re-timed there, with the " +
+                 "reason in the file's own captured note. *** SO THE ROUND'S SUBJECT BECAME THE PAIR OF " +
+                 "RECORDS. *** gate-timings.json and sweep-timings.json both claim ms per gate. Where the " +
+                 "sweep reading is real, 1143 gates appear in both and 496 of them -- 43% -- DISAGREE BY 2x " +
+                 "OR MORE, the worst by 144x. A four-gate spot-check against a clock splits TWO AND TWO on " +
+                 "which record is closer, so neither can correct the other. The disagreement is 487-to-9 " +
+                 "one-directional, which growth and an eight-wide sweep both explain -- and the nine that run " +
+                 "the other way, neither does. Eight sabotages: six red, and the two zeros are mutations that " +
+                 "CHANGE NOTHING rather than rows that miss something. Dropping the cap clause from the filter " +
+                 "selects the identical 1143 gates, VERIFIED -- every capped entry in the overlap carries exit " +
+                 "124, so the code filter already removes it, which is the inertness the gate states outright. " +
+                 "And loosening a threshold cannot redden the row it loosens. One row was repaired before " +
+                 "that stood: the first version asserted the disagreement 'runs both ways, so it is not " +
+                 "growth and not parallel load' while PRINTING 487 against 9 -- a label refuted by its own " +
+                 "detail, and 98% in one direction is precisely what growth looks like.",
+    }),
+    since301: Object.freeze({
+        at: "v4574", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/capReading-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 0.11 s, under the 3000 ms budget. *** v4573 LEFT THE BIMODALITY AS THE NEXT RUNG AND " +
+                 "THIS ROUND FAILED TO REPRODUCE IT. *** Three hypotheses for headlessGpu-selfcheck's 181 s " +
+                 "stall, each tested and REFUTED: the section that spawns a deliberately-crashing child (18 " +
+                 "child runs, 55-73 ms, zero stalls); plain concurrency (2, 4 and 8 copies at once scale to " +
+                 "2.6 s, not 180); a dirty working tree (green clean and dirty alike). Roughly twenty-five " +
+                 "runs, no reproduction. It is real -- seen twice at ~181 s -- and it is NOT explained here, " +
+                 "which is recorded rather than dressed up. *** SO THE ROUND TOOK THE MEASURABLE HALF, AND " +
+                 "FOUND THE TREE ALREADY KNEW PART OF IT. *** sweepCoverage's notVerdicts has said since " +
+                 "v4460 that a non-zero code beside a killed process is no verdict, and v4460 studied the " +
+                 "OTHER class at length: 314 over-budget entries carrying a stale code 0, of which running " +
+                 "them one at a time found TWENTY-TWO RED. *** THE 137 ARE THE CLASS NOBODY RAN. *** They " +
+                 "carry code 124: killed in parallel AND in the serial re-run every phase-1 red gets, since " +
+                 "quickSweep files serialMs ?? parallelMs. Their recorded millisecond is the cap plus a few " +
+                 "-- the whole population spans 20,006 to 20,461, a 2.27% band, which is what a killer's " +
+                 "clock looks like and not what runtimes look like. Only TWO of the 137 are named anywhere " +
+                 "in sweepCoverage. *** SEVENTEEN WERE LET FINISH. ALL SEVENTEEN ARE GREEN. *** And SEVEN OF " +
+                 "THE SEVENTEEN finish INSIDE the 20 s cap they were killed at, the fastest in 13,473 ms, " +
+                 "while the rest run out to 549,048 -- a 41x spread filed under one indistinguishable " +
+                 "number. *** THE CONSEQUENCE IS NOT THE ONE THE ROUND WENT LOOKING FOR, AND THE GATE SAYS " +
+                 "SO. *** The hypothesis was that rotation() spends a cap reading as if it were a cost. It " +
+                 "does not: rotation and doorCandidates draw from c.over, and classify() files a killed " +
+                 "reading under c.killed -- ZERO of the 24 gates the rotation picks is a cap reading. An " +
+                 "earlier draft of this gate asserted the opposite, from a scratch probe that had built its " +
+                 "own coverage object with everything in `over`; the measurement was of a rotation that does " +
+                 "not exist. What IS wrong is the other side of that exclusion: rotation is the mechanism by " +
+                 "which an over-budget gate gets re-observed, and the killed bucket sits outside it, so " +
+                 "nothing ever schedules these 137. Their absent verdict is a property of the machinery, and " +
+                 "it shows -- 129 of the 137 still carry the pre-v4408 `unknown` stamp. Eight sabotages " +
+                 "scored 2/1/1/1/2/1/2/6, no 0-RED, after one repair: the row counting how many finish under " +
+                 "the cap said `>= 6` where the derived answer is 7, and moving a frozen table entry above " +
+                 "the cap went 0-RED -- a threshold set one below the value it guards absorbs exactly one " +
+                 "defect, and a frozen table needs no slack. ALSO CORRECTED: v4573 reported " +
+                 "gateSelection-selfcheck red at HEAD. It is green in four subsequent runs, clean tree and " +
+                 "dirty, at ~68 s. That gate is non-deterministic; the earlier report rested on one " +
+                 "observation and does not hold. AND AN EIGHTEENTH GATE ARRIVED FROM THIS ROUND'S OWN " +
+                 "VERIFY: tools/ship/redCensus-selfcheck.mjs, recorded at 20,021 ms with code 124 and the " +
+                 "same pre-v4408 stamp, exceeded a 400-SECOND harness timeout without completing. It is kept " +
+                 "OUT of the frozen table -- a timeout is a lower bound, not a measurement -- but it puts " +
+                 "the population's upper end past 400 s, and that gate's own header describes it as taking " +
+                 "two minutes.",
+    }),
+    since300: Object.freeze({
+        at: "v4573", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/definitionGates-selfcheck.mjs",
+                                "tools/ship/headlessGpu-selfcheck.mjs",
+                                "render/temporalLock-selfcheck.mjs"]),
+        verdict: "NO NEW GATE. Three existing ones widened, which is what the work was. *** v4572 LEFT SEVEN " +
+                 "TREE-WIDE CENSUS GATES RED AND NAMED definitionGates FIRST: 618 EXPORTED SYMBOLS WITH NO " +
+                 "GATE NAMING THEM, AND THE QUESTION WAS WHETHER THAT IS DEBT OR A DETECTOR MISCOUNTING. *** " +
+                 "It is both, and the split is measurable. The census resolves a module to ONE gate, by " +
+                 "filename. That was right when a module had one gate; the temporal arc alone put ELEVEN " +
+                 "beside render/ringFloor.mjs, and EPS_F32 and ARITHMETIC_ULPS are driven hard by " +
+                 "ringFloorPhase-selfcheck while ringFloor-selfcheck never names them -- so both counted as " +
+                 "definitions nobody had looked at. MEASURED tree-wide over all shapes: 619 unmentioned under " +
+                 "the name-matched rule, 480 once a gate that IMPORTS the module may also name it, the " +
+                 "difference being 139 symbols named in an owning gate's BODY. *** BUT IT IS NOT A WAY OUT, " +
+                 "AND THAT IS THE POINT: *** physics reads 55 -> 37 against a floor of 0 and tree-wide narrow " +
+                 "321 -> 237 against 209, so TWO OF THE THREE FROZEN RATCHETS STAY RED under the wider rule. " +
+                 "Only the all-shapes count falls under its pin, by 102, WITHOUT ONE SYMBOL BECOMING BETTER " +
+                 "TESTED -- a count that drops because the instrument improved is not the tree improving, and " +
+                 "reading it as progress would be the same error as lifting a baseline to meet the tree. *** " +
+                 "SO IT IS A SECOND CENSUS, NOT AN EDIT TO THE FIRST *** -- the rule this file set for itself " +
+                 "at v4535 -- and the three frozen numbers are untouched: `owners` defaults to null wherever " +
+                 "they are computed, and they still read 55 / 321 / 613. The new rule gets its own floor at " +
+                 "475. *** AND THE ROUND PAID FIVE, ALL OF THEM THIS ARC'S OWN DEBT. *** Of 21 unmentioned " +
+                 "symbols in the arc's modules, 16 were the detector's blind spot and FIVE were genuinely " +
+                 "unlooked-at: nearestTexel, which every ring fetch in temporalLock goes through and whose one " +
+                 "interesting choice was explained only by a comment in the SHADER beside it (floor, not " +
+                 "round, because round ties to even in WGSL and half-up in JavaScript); and BYTES_PER_TEXEL, " +
+                 "paddedBytesPerRow, halfToDouble and ICD_ROOT -- the arithmetic that turns a read-back " +
+                 "texture into numbers, which v4572's closing listed as the thing it could not check. All " +
+                 "five are keyed now, not mentioned: the half decode is held to the format's OWN mantissa " +
+                 "(worst 4.685e-4 against 2^-11 = 4.883e-4 over 2000 values), all three exponent branches are " +
+                 "reached, and the unknown-format fallback is taken at a width where four and eight bytes " +
+                 "DIFFER, because 64 is exactly the width where they do not. The arc now owes zero. *** A " +
+                 "SABOTAGE ASKED FOR THE ROUND'S LAST ROW. *** Nine mutations scored 2/1/1/2/5/1/1/4 and then " +
+                 "a ninth: leaking `owners` into a frozen ratchet moved it from 321 to 234 and NOTHING CAUGHT " +
+                 "IT, because all three were already red and stayed red on a different number. `shapes` has " +
+                 "had a negative control since v4535 for exactly this; `owners` now has one, tied to " +
+                 "something exact rather than numeric -- `rescued` is populated only when owners is supplied, " +
+                 "so an empty one on all three proves the frozen numbers were taken under the old rule. 9/9 " +
+                 "red after. *** TIMINGS, AND TWO CORRECTIONS THIS ROUND MADE TO ITSELF. *** definitionGates " +
+                 "502 -> 1841 ms, mine and inside budget. render/temporalLock-selfcheck read 3346 ms and " +
+                 "looked like my doing -- it measures 4009 ms AT HEAD on the same code, so it was over the " +
+                 "3000 ms budget before this round and its recorded 2160 ms was the low end of a wide spread " +
+                 "(3911/2655/2464 across three runs); re-recorded at 2655. headlessGpu-selfcheck ran 180,857 " +
+                 "ms and looked like a 200x regression -- run again back to back on the identical file it " +
+                 "took 805 ms, against 870 at HEAD. IT IS BIMODAL, not regressed, and a gate that sometimes " +
+                 "takes three minutes against quickSweep's 20 s SIGKILL cap is a concrete mechanism for the " +
+                 "138 gates v4572 observed at or over that cap. NOT INVESTIGATED HERE. And the pre-flight " +
+                 "earned its keep: a stray tools/ship/temporalLock-selfcheck.mjs, created by a bug in this " +
+                 "round's own sabotage-restore loop where the first cp succeeded instead of falling through, " +
+                 "was named by the gate-count check before the verify rather than found in the diff.",
+    }),
+    since299: Object.freeze({
+        at: "v4572", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/harnessLiveness-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/crossBackend-selfcheck.mjs"]),
+        verdict: "green, 2.44 s, under the 3000 ms budget. *** v4571 LEFT crossBackend NAMING THIRTEEN " +
+                 "UNREGISTERED KERNELS AND ANSWERING THEM FOUND SOMETHING UNDERNEATH: THE CROSS-BACKEND " +
+                 "HARNESS COULD NOT TELL AGREEMENT FROM SILENCE. *** MEASURED on a kernel that must write " +
+                 "src + 7 at every lane: bound so the device REJECTS the bind group, both harnesses returned " +
+                 "{ ok: true, errors: [] } and a field of zeros -- createBindGroup hands back an invalid " +
+                 "object rather than throwing, the submit is dropped, and the read-back is the zeros it was " +
+                 "created with. Bound VALIDLY but with the read-back where the kernel reads its INPUT, no " +
+                 "error is raised on either side at all: a legal program writing to a buffer nobody reads. " +
+                 "Either way wgslCorpus.compare scored { n: 8, same: 8, identical: true }. The corpus's " +
+                 "headline claim, 'no divergence anywhere', was satisfiable by a kernel that never ran on " +
+                 "either side -- and the whole temporal arc was one option away from that state, since its " +
+                 "thirteen kernels put dst at bindings 1 to 4 and the uniform last while both harnesses " +
+                 "hard-coded out-at-0 and uniform-at-1. Registering them without this would have added " +
+                 "thirteen silent passes. *** THREE REPAIRS AND ONLY ONE IS AN ERROR CHECK. *** A validation " +
+                 "error scope catches the rejected case. NOTHING catches the second -- no error exists -- so " +
+                 "the read-back is filled with LIVENESS_SENTINEL and a run leaving every word intact reports " +
+                 "`wroteNothing`, which compare() refuses. And the browser TEXTURE path already had a scope " +
+                 "whose finding it pushed into a list and returned ok:true beside: gathering evidence and " +
+                 "not acting on it is the same fault as never gathering it. `outBinding`/`uniformBinding` " +
+                 "make the arc's convention runnable. MEASURED SAFE: the existing 70-entry corpus and all 20 " +
+                 "harness-calling gates in the tree swept green with all of it in place. *** AND THE " +
+                 "THIRTEEN ARE ANSWERED: crossBackend IS GREEN, a red that had stood since v4560. *** 101 " +
+                 "corpus entries, 35 excluded, ZERO unaccounted. Eleven kernels dispatched -- 7,680 floats, " +
+                 "0 untouched, all identical across backends -- and LUMA_WGSL and YCOCG_WGSL turned out not " +
+                 "to be kernels at all but function fragments with no entry point, so they are compiled " +
+                 "inside a shell that CALLS them, because a fragment is only covered where the splice site " +
+                 "uses it. *** THE BINDINGS ARE PARSED OUT OF EACH KERNEL, NOT RESTATED. *** Thirteen " +
+                 "hand-copied binding tables is thirteen chances to write 2 for 3, and this round measured " +
+                 "what a wrong one costs. *** LIVENESS IS NOT EXERCISE, AND THIS ROUND'S OWN FIXTURE PROVED " +
+                 "IT. *** DISOCCLUSION passed every check above while writing 256 identical zeros: the " +
+                 "shared motion field's expected-depth channel sat 0.08 below the threshold at every pixel. " +
+                 "Two backends agreeing on one constant is not evidence about a branch. A dedicated fixture " +
+                 "straddles it, and a row now refuses any dispatched entry whose output has one distinct " +
+                 "value. Eight sabotages scored 2/3/2/1/3/1/3/crash-only, no 0-RED -- after a repair: the " +
+                 "FIRST run went 0-RED on giving the two harnesses DIFFERENT sentinels, because all three " +
+                 "sentinel rows read the constant in THIS process and none watched either harness use it, a " +
+                 "claim about a label rather than behaviour and the same fault v4571's window-form control " +
+                 "made one round earlier. The separating case is a PARTIALLY written read-back, where two " +
+                 "fills read as a DIVERGENCE -- a red pointing at the kernel for a defect in the harness. " +
+                 "*** OBSERVED, NOT CLAIMED: *** 138 gates sit at or over quickSweep's 20 s SIGKILL cap, and " +
+                 "the cluster at 20.2 s records code 124; crossBackend records code 0 at what was 20,487 ms " +
+                 "and is now 25,772 ms with the thirteen, consistent with the serial re-run the timings note " +
+                 "describes rather than with a killed verdict. This round did not investigate that and does " +
+                 "not claim it. Of the eight tree-wide census gates v4571 found red at HEAD, this round " +
+                 "answered ONE; frameDirtyCensus, gateSelection, referenceKind, definitionGates, staleness, " +
+                 "statedRuntime and recordReach are exactly where they were. *** AND out-AT-0 / uniform-AT-1 " +
+                 "WAS BAKED IN THREE PLACES. *** Both harnesses hard-coded it and so did computeRun.mjs's " +
+                 "corpusSpec, the device path deviceCompute-selfcheck drives: every corpus entry until now " +
+                 "happened to follow the convention, so nothing ever had to declare it, and adding the " +
+                 "thirteen turned corpusSpec's at(0) into a demand for a buffer nobody supplies -- TWELVE " +
+                 "REDS, found by the verify sweep and by none of the three harnesses. Repaired in the third " +
+                 "place and in deviceCompute's packer, which dropped the two options crossing into the page: " +
+                 "a field that exists is not a field that travels. The thirteen therefore run on THREE paths " +
+                 "now, and deviceCompute reports 86,541 floats across 32 kernels.",
+    }),
+    since298: Object.freeze({
+        at: "v4571", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/ringFloorPhase-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 1.03 s, under the 3000 ms budget. *** v4570 CLOSED BY NOTICING THAT THREE SEPARATE " +
+                 "BLIND SPOTS SAT AT ONE FIXTURE CONSTANT, AND THIS ROUND MEASURED WHY. *** f = 1/2 is the " +
+                 "unique fixed point of sigma: f -> 1-f. A pair {g, g . sigma} agrees exactly there; a " +
+                 "sigma-symmetric g is STATIONARY there, so it meets its own maximum. MEASURED over a " +
+                 "3999-phase sweep: SIX of the eight phase-expression pairs this arc uses agree at 1/2 and " +
+                 "nowhere else in (0,1), and the two that do not are round-vs-floor, where 1/2 is not a " +
+                 "meeting point but the BOUNDARY between the half-intervals each agrees on. Not three " +
+                 "coincidences -- one fixed point, seen three times. *** AND THE COST IS AN ARC-WIDE 0-RED. " +
+                 "*** Substituting 0.5*min(f,1-f) for f(1-f) -- an impostor agreeing with truth at f = 0 and " +
+                 "f = 1/2, reading 0.667x of it at a quarter texel, UNSAFE in the direction a margin cares " +
+                 "about -- into BOTH the mirror and the kernel scored ZERO RED across all eleven gates of " +
+                 "this arc. 21 of 475 reported lines moved; no row failed. FOUR reasons, and only the last " +
+                 "is a tolerance: STRUCTURAL (Light/Margin/Yaw and most of Step call only the window form, " +
+                 "whose factor is the constant 0.25 and reads no phase); NUMERICAL (ringFloor and " +
+                 "ringFloorDevice call the frame form only at f in {0, 1/2}, where the impostor EQUALS " +
+                 "truth); DEGENERATE (Stat's frame-form calls are on zero and flat fields); UNASSERTED " +
+                 "(Cost/Perspective/Control/kernelAudit DID move and every moved number was printed and " +
+                 "asserted around -- ringFloorControl's headline row went from 21.5% to 32.7% of pixels " +
+                 "below their own error and still PASSED, because it asserts the defect EXISTS and reports " +
+                 "its size rather than pinning it). *** A PHASE CENSUS WAS TAKEN AND IT DOES NOT EXPLAIN THE " +
+                 "ZERO, WHICH IS WHY IT IS RECORDED. *** Instrumenting ringFloorCPU to log every (fx, fy) it " +
+                 "computes: three gates reach TWO distinct phases, {0, 1/2}; ringFloorYaw reaches 1986 and " +
+                 "still reported not one moved number, because it calls only the window form. Breadth of " +
+                 "fixture is not the same as reaching the quantity. *** THE REPAIR IS A SHAPE ROW, NOT A " +
+                 "TIGHTER TOLERANCE. *** Every row that missed this was checking the bound's SAFETY or its " +
+                 "DIRECTION, and the arc's headroom over observed error is only 1.10x-1.62x at the median, " +
+                 "so tightening was never available. The phase factor is a multiplicative law and can be " +
+                 "read off: a synthetic motion buffer puts every pixel at one chosen sub-texel phase, and " +
+                 "the frame form's per-pixel floor then scales as f(1-f) to 9.43e-8 relative across eight " +
+                 "phases and 5408 readings, where the closest impostor is 16.8% off. The same row runs on " +
+                 "the DEVICE against the law rather than against the mirror -- 8.40e-8 over 2704 readings -- " +
+                 "because v4570 established that a parity row is immune by construction to a mutation " +
+                 "applied to both sides, and a phase edit is exactly that. *** AND v4570's \"ROUGHLY TWENTY " +
+                 "GATES HARD-CODE IT\" WAS AN IMPRESSION, SO IT WAS COUNTED. *** 18 gates under render/ carry a " +
+                 "half-texel fixture construct and 11 tree-wide NAME one -- five in this arc and six outside " +
+                 "it (strengthField, badTvDevicePass, xrStereo, slugFill, deviceTexture, water2d), none of " +
+                 "which this round looked at. The law's own limit is predicted " +
+                 "too: which pixel leaves it, and at which phase, follows from the arithmetic floor alone, " +
+                 "7 of 7 phases agreeing pixel-for-pixel. *** THE ROUND'S OWN 0-RED, AND IT IS THE ROUND'S " +
+                 "OWN SUBJECT. *** Eight sabotages scored 1/1/1/1/1/1/0/2; the zero was moving the window " +
+                 "form's constant from 0.25 to 0.24, invisible because the control asserted the window form " +
+                 "is phase-INDEPENDENT -- a DIRECTION -- which 0.24 leaves perfectly true. Repaired by a row " +
+                 "that names the constant the way the module earns it: the window form at any phase IS the " +
+                 "frame form at the fixed point, bit for bit, 2704 readings at 0.00e+0, with 0.25 appearing " +
+                 "nowhere in the row. 8/8 red after. Six of the eight score exactly ONE red, which is the " +
+                 "thin margin v4570 named about kernels and is no better here. AND THE PHASE PROBE'S FIRST " +
+                 "RUN REPORTED NO FLOOR CALL FOR ALL ELEVEN GATES -- a relative import resolving against the " +
+                 "probe's own directory. An absence read as a measurement is v4402's fault, produced again " +
+                 "in the round built to catch it, and recorded in the gate. *** THE VERIFY SWEEP WAS WIDENED " +
+                 "AND IMMEDIATELY FOUND A RED THIS ROUND DID NOT CAUSE. *** render/colourReach-selfcheck has " +
+                 "been red since ff463a60 on 2026-09-09: fx/fsr/fsr.js pushed its literal-colour census 86 -> " +
+                 "87, and v4569 and v4570 both shipped over it because those rounds swept the arc they were " +
+                 "working in rather than the directory. The arrival is a FALSE POSITIVE of a predicate that " +
+                 "already calls itself crude -- EASU's tap accumulator `{ r: 0, g: 0, b: 0, w: 0 }`, four " +
+                 "running sums whose `w` is the tell -- and the PREDICATE IS NOT CHANGED, because narrowing " +
+                 "it moves that census and the hot one with it. The count is re-taken as a true count of what " +
+                 "the detector detects, with the reason in the header. recordDrift's six pre-flight checks do " +
+                 "not cover a per-module census like this one: that is a seventh obligation and nothing names " +
+                 "it, which is the round's own subject arriving in the round's own bookkeeping. A second, " +
+                 "smaller instance of the same shape: this pre-flight's assertionShape check compares FOUR of " +
+                 "that census's nine rows, so nameFirst (1501 -> 1502) read clean there and red in the gate, " +
+                 "which compares all nine and labels itself so. Designed behaviour, not a defect, and the " +
+                 "same lesson -- a check covering part of a record reports on the part it covers. *** AND " +
+                 "WIDENING THE SWEEP AGAIN, TO THE 37 GATES THAT PIN A TREE-WIDE CENSUS, FOUND EIGHT MORE RED " +
+                 "AT HEAD: *** frameDirtyCensus, gateSelection, referenceKind, definitionGates, staleness, " +
+                 "crossBackend, statedRuntime, recordReach. All predate this round and none is re-taken here " +
+                 "-- re-taking a record without understanding what moved it is the fault this arc warns " +
+                 "about, and eight is a round of its own; they are named so the next round starts from a list " +
+                 "rather than a discovery. ONE IS THIS ARC'S OWN DEBT AND IS ANSWERED: crossBackend has named " +
+                 "RING_FLOOR_WGSL as neither in the WGSL corpus nor excluded with a reason since v4560, and " +
+                 "it could name only ONE of the arc's THIRTEEN kernels because wgslCorpus's census detector " +
+                 "reads `export const X` while the whole temporal arc re-exports at the foot of the file as " +
+                 "`export { A, B }`. MEASURED: 95 producers seen, TWELVE invisible -- 11% of the tree's WGSL " +
+                 "outside a census whose purpose is to notice absences, and the THIRD distinct reason this " +
+                 "census has failed to see a producer (v4464: a root outside the scan; v4472: a file type " +
+                 "with no export to match; v4571: a spelling). The detector is widened so the red names all " +
+                 "thirteen. The gate was already red on that line, so no verdict changes -- only whether the " +
+                 "red tells the truth. Answering the thirteen is not done here.",
+    }),
+    since297: Object.freeze({
+        at: "v4570", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/kernelAudit-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 0.30 s, under the 3000 ms budget. *** v4569 ASKED WHETHER ANYTHING WOULD NOTICE IF A " +
+                 "KERNEL IN THIS ARC WERE WRONG, AND THIS ROUND MEASURED IT. *** One behaviour-changing " +
+                 "mutation per kernel, twelve kernels, run against the arc's fourteen device-touching gates: " +
+                 "ELEVEN OF THIRTEEN applied mutations caught. *** AND EIGHT OF THOSE ELEVEN ARE PINNED BY " +
+                 "EXACTLY ONE ROW, IN THEIR OWN GATE *** -- LUMA, SHADING_SHIFT twice, RIDGE, YCOCG, " +
+                 "DISOCCLUSION twice. One row weakened anywhere in that list and the kernel behind it is " +
+                 "unpinned; that is not a defect today and it is the whole margin. THE TWO ZEROS WERE " +
+                 "FIXTURES UNABLE TO REACH THE THING, NOT GATES BEING LAX. *** FIRST: LANCZOS2'S SUPPORT " +
+                 "GUARD IS UNREACHABLE DEAD CODE. *** The resolve kernel's tap loop is 3x3 about round(s), so " +
+                 "the offsets it evaluates span [-1.5, 1.5] and the guard at |x| >= 2 is never reached -- " +
+                 "doubling it to 4.0 changed nothing anywhere. The module's own justification said a 3x3 " +
+                 "footprint was ENOUGH because Lanczos2 is zero beyond 2, and the arithmetic refutes that " +
+                 "flatly: Lanczos2 is NOT zero on [1.5, 2). MEASURED, the weight left unevaluated is 0.00% at " +
+                 "an integer offset, 1.47% at a quarter texel and 5.00% at a half -- 9.75% of the separable " +
+                 "2-D weight -- where a four-tap window leaves 0.00% at every phase. IN OUTPUT, resolving " +
+                 "64x64 to 128x128, the two footprints differ by up to 1.0% of the range on a smooth " +
+                 "sinusoid, 6.3% on a hard edge and 15.7% on a pixel-scale chequer. That is not a rounding " +
+                 "detail. *** THE FOOTPRINT IS NOT WIDENED: *** that moves every number " +
+                 "temporalResolve-selfcheck records and is a round of its own, and 3x3 is a legitimate choice " +
+                 "described as one. What was not legitimate was the justification, and that sentence is now " +
+                 "the measurement. Both mirrors take nine taps, so the device-parity row agrees on a " +
+                 "truncated Lanczos2 and can see none of this. *** SECOND: A PHASE TERM INVISIBLE AT THE " +
+                 "SPEED EVERY FIXTURE USES. *** v4569 pinned RING_FLOOR's window phase with a two-axis " +
+                 "sabotage; a one-axis version scored nothing. Two reasons, and the second is the keeper: at " +
+                 "a HALF-TEXEL speed f(1-f) is 0.2500 and the window form's constant is 0.25 -- the same " +
+                 "number. Measured, the two forms separate 4.77x at a tenth of a texel, 2.32x at a quarter " +
+                 "and 1.74x at a half, so a fixture running at half a texel cannot tell them apart however " +
+                 "many axes a sabotage touches, and half a texel is what almost every fixture in this arc " +
+                 "uses. The term also only appears on the RESOLVED branch, which v4569's separating edge has " +
+                 "none of. Six sabotages of this round's own work red at 3/8/2/2/2/5, no 0-RED; TE is the " +
+                 "one that matters, being exactly the mutation the audit found invisible, and it now scores " +
+                 "two. The audit harness itself is scratch and not a gate: the census it produced is a " +
+                 "snapshot and will rot like any record here that nothing re-takes.",
+    }),
+    since296: Object.freeze({
+        at: "v4569", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/ringFloorDevice-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 1.45 s, under the 3000 ms budget. *** THE KERNEL AND THE MIRROR HAD BECOME DIFFERENT " +
+                 "FUNCTIONS AND THE PARITY ROW COULD NOT TELL. *** RING_FLOOR_WGSL was written at v4562 and " +
+                 "four rounds of corrections landed on the CPU mirror alone: v4564's WINDOW phase, v4565's " +
+                 "RING TERM on the step branch, v4566's DISPLACEMENT GATE. (v4562's arithmetic floor DID " +
+                 "reach the kernel -- this round's own closing said it had not, and the kernel says " +
+                 "otherwise; v4568's quantiles are a reduction the kernel does not do at all.) " +
+                 "ringFloorPerspective's parity row went on passing, and HONESTLY: it drives the FRAME form " +
+                 "on both sides and the kernel implemented that correctly. What it could not say is that the " +
+                 "window form -- the one v4563 onward actually spends per pixel -- had NO device coverage " +
+                 "whatsoever. A parity row is only as wide as the configurations it runs. The kernel now " +
+                 "carries all three, reading the ring from device memory where RING_PUSH_WGSL already wrote " +
+                 "it, and is pinned on an EDGE that has swept past -- where the window form reads 3.2e+6x " +
+                 "the frame form at its worst pixel, so a lagging kernel FAILS rather than passes. On a " +
+                 "chequer the two forms are far closer, which is exactly the fixture that would have let it " +
+                 "through. *** THE TOLERANCE IS ONE ULP OF WHAT IS BEING DIFFERENCED, DERIVED RATHER THAN " +
+                 "PICKED: *** the ring term is |newer mean - older mean|, and on the flat side of an edge " +
+                 "those are the SAME NUMBER -- measured as exactly 0.00e+0 in f64 across a run of pixels, " +
+                 "whose floor is therefore the arithmetic floor. In f32 the difference leaves one epsilon of " +
+                 "residue, so a RELATIVE comparison reads 8.3e-4 and means nothing; the absolute worst is " +
+                 "5.96e-8 against f32's own 2.19e-7, half an ulp. Eight sabotages red at 4/2/3/2/3/3/3/5. SA " +
+                 "restores exactly what the kernel was when the round started and scores four, where before " +
+                 "this gate it scored nothing. *** SC AND SD BOTH WENT 0-RED AND BOTH WERE HOLES IN THIS " +
+                 "GATE'S OWN FIXTURES -- the same shape as the defect the round is about. *** SC drops the " +
+                 "displacement gate: the still case paired a still motion buffer with a ring built WITHOUT " +
+                 "motion, so the difference was already zero and there was nothing to refuse; it now pairs a " +
+                 "MOVING ring with a still buffer, the only combination where the gate is visible. SD applies " +
+                 "the ring term on the resolved branch: an edge is 0% resolved-branch pixels and a chequer " +
+                 "nearly so, so neither can show a term leaking onto a branch they do not have -- a smooth " +
+                 "sinusoid is 96% resolved and shows it at once. Also: the kernel gained a fifth binding, and " +
+                 "two older device gates had to bind the ring they do not read, since a declared binding must " +
+                 "still be bound. And the nested-backtick trap bit for the THIRD time this session -- a " +
+                 "backtick inside a WGSL comment closes the JS template literal the kernel lives in; the file " +
+                 "now says so and a row counts them.",
+    }),
+    since295: Object.freeze({
+        at: "v4568", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/ringFloorStat-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 0.42 s, under the 3000 ms budget. *** THE NUMBER THIS ARC HAS REPORTED SINCE v4560 IS " +
+                 "AN ORDER STATISTIC, AND IT MOVES THE WRONG WAY WHEN THE PICTURE IMPROVES. *** ringFloorCPU's " +
+                 "headline is `worst`, a MAX over the frame, and every floor published in this arc is one -- " +
+                 "v4559's 8.6e-1, v4562's 24x, v4564's ladder, v4567's yaw comparison. A max over N samples " +
+                 "grows with N whether or not the thing measured has changed: on ONE FIXED FRAME, the max over " +
+                 "a random subset of its pixels reads 44% of the all-pixel max at N = 64, 77% at 256, 93% at " +
+                 "1024 and 100% at 3673, while the MEDIAN over the same pixels does not move. *** AND IN A REAL " +
+                 "RESOLUTION CHANGE THE TWO EFFECTS CANCEL: *** sampling the same scene three times finer cuts " +
+                 "the typical pixel's floor 11x, 3.4e-3 to 3.1e-4, which is v4559's quadratic law doing exactly " +
+                 "what it should -- and over the same four runs `worst` stays flat at 3.6e-2 to 4.4e-2, while " +
+                 "the ESTIMATE's worst RISES 1.07 to 1.60. A caller watching the headline would conclude the " +
+                 "frame got worse where it got eleven times better. `worst` is still the only one of these " +
+                 "that is a BOUND and it is kept unchanged; what is added is the distribution underneath it, " +
+                 "so a caller can tell \"this frame is bad\" from \"this frame has a horizon\". *** BY " +
+                 "HISTOGRAM, NOT BY SORT, AND THE DIFFERENCE IS PRICED: *** a full sort of the per-pixel field " +
+                 "costs 68-72% of the estimator's own run at 128x128 through 512x512 -- it would nearly double " +
+                 "the floor's price -- where a 1024-bucket log-scale histogram costs 15.6-18.7%, about 1.2% of " +
+                 "a frame against v4561's measurement of the estimator at 7.6% of the ring push. The bucket " +
+                 "width BOUNDS the error rather than a tolerance being chosen: over a dynamic range R it is " +
+                 "R^(1/1024) - 1, which reads 1.62% on this frame and is matched to within 0.83% by an exact " +
+                 "sort at p50, p90 and p99. An empty field returns NULL quantiles rather than zeros, and a " +
+                 "flat one returns the value its pixels hold with zero error. Eight sabotages red at " +
+                 "1/1/2/2/1/1/1/1 against six gates. *** TWO WENT 0-RED AND BOTH WERE ROWS OF MINE CHECKING " +
+                 "THE WRONG THING. *** RE hard-codes the stated error to 1.62% and passed, because the section " +
+                 "measured exactly ONE field and 1.62% is its true answer -- a derived number and a constant " +
+                 "are indistinguishable when there is only one case; it is now checked against the bucket " +
+                 "formula applied to each field's own observed range, on two fields whose ranges differ. RH " +
+                 "returns zero for a flat field and passed a row asserting `p50 !== null`, because zero is not " +
+                 "null -- a check on the shape of the answer where the claim was about its value.",
+    }),
+    since294: Object.freeze({
+        at: "v4567", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/ringFloorYaw-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 0.28 s, under the 3000 ms budget. *** THIS ARC HAS ONE CAMERA MOTION AND IT IS THE " +
+                 "ONE THAT PROTECTS THE FLOOR. *** Every fixture from v4553 to v4566 TRANSLATES the camera -- " +
+                 "along X for thirteen rounds, along Y since v4566 -- and v4558's roll was orthographic. " +
+                 "Nothing has yawed one under perspective, which is what a camera actually does. IT IS A " +
+                 "DIFFERENT KIND OF MOTION, NOT A FASTER ONE: translation moves a pixel by PARALLAX, " +
+                 "measured varying 9.3x across the frame's depth bands, so the far field barely moves; yaw's " +
+                 "displacement varies 1.0x across the same bands because it depends on where a pixel sits in " +
+                 "the frame and NOT on how far away it is. So the far field -- where a foreshortened ground " +
+                 "plane carries its highest spatial frequency -- loses the protection parallax was giving it. " +
+                 "MEASURED AT MATCHED NEAR-FIELD SPEED, the floor is worse under yaw and the gap WIDENS with " +
+                 "depth: 3.3x at p99 within depth 8, 7.2x within 15, 7.5x within 30. *** AND THE FRAME-WIDE " +
+                 "MAX IS A HORIZON PIXEL, WHICH IS THE STATISTIC EVERY FLOOR THIS ARC HAS PUBLISHED SINCE " +
+                 "v4560 USES: *** uncapped it reads 7.3x the within-depth-30 max under yaw and 3.3x under " +
+                 "translation, while the MEDIAN moves 1.15x between the same two sets -- so the horizon moves " +
+                 "the max and almost nothing else. Not wrong; unrepresentative, and nothing has replaced it. " +
+                 "THE BOUND HOLDS under a motion it has never seen: 0 of 1314 step-branch pixels under their " +
+                 "own error across four runs, which is a result rather than an assumption, since nothing in " +
+                 "its derivation mentions the KIND of motion and this is the first fixture that separates " +
+                 "kind from magnitude. Six sabotages red at 35/4/2/2/5/6 against seven gates. QA scores " +
+                 "THIRTY-FIVE and is the round in one number: a reconstruction that ignores the previous " +
+                 "frame's rotation is a perfect no-op on a translating camera, and until this fixture there " +
+                 "was nothing in the arc it could fail against. *** QC WENT 0-RED AND FOUND A FIXTURE THAT " +
+                 "CANNOT SEPARATE TWO NUMBERS: *** the motion buffer's fourth channel is the depth the " +
+                 "surface had LAST frame, and replacing it with the depth it has NOW passed every gate -- " +
+                 "including motionVectors-selfcheck's own device-parity row, which compared the two " +
+                 "implementations to 3.33e-6 and passed, because the fixture sabotaged both in the same " +
+                 "direction. Every fixture in this tree moves the camera sideways past a surface at constant " +
+                 "distance, and under a lateral move a surface's depth does not change: the previous depth " +
+                 "and the current one are literally the same number. A DOLLY separates them, and " +
+                 "motionVectors-selfcheck now carries one, with the channel asserted against an independent " +
+                 "projection and a third row recording that a lateral move makes the two agree -- which is " +
+                 "why nothing caught it for fourteen rounds.",
+    }),
+    since293: Object.freeze({
+        at: "v4566", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/ringFloorLight-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 0.41 s, under the 3000 ms budget. *** THE FLOOR AND THE SHADING DETECTOR HAVE BEEN " +
+                 "READING THE SAME NUMBER AND CALLING IT OPPOSITE THINGS. *** v4553 built shadingShiftCPU on " +
+                 "|newer period mean - older period mean| to DETECT a lighting change; v4565 spends that same " +
+                 "quantity as REPROJECTION NOISE in the floor's step branch. Every fixture in this arc is " +
+                 "statically lit, so nothing has ever had to tell them apart. Measured on a chequer with a " +
+                 "still camera: |newer - older| is 0.000 under static light -- the jitter cancels over a whole " +
+                 "period exactly, as v4553 built it to -- and 0.520 under an 8%-per-frame ramp, while the " +
+                 "error actually present stays at 1e-7 because at zero displacement the reprojection is " +
+                 "EXACT. shadingShiftCPU reads 0.578 of its [0,1] range on the same frames and calls it " +
+                 "signal. *** AT ZERO DISPLACEMENT THE SEPARATION IS THEREFORE COMPLETE, AND THAT IS WHAT " +
+                 "THIS ROUND FIXES: *** the ring term is now gated on a displacement having happened at all, " +
+                 "which is a hard test with nothing to tune. On the edge fixture under that ramp it lowers " +
+                 "92% of step-branch pixels by a median 9.5e+5x, and under static light it changes 0% of " +
+                 "them, because there is nothing there to remove. It remains a bound on both albedos and all " +
+                 "three lighting regimes, still and moving. *** UNDER MOTION THE TWO MIX AND THIS DOES NOT " +
+                 "SEPARATE THEM: *** the same ramp still lifts the moving-camera floor 2.8x, and part of that " +
+                 "lift is real -- the true floor rises 2.5x -- which is exactly why it cannot be gated away. " +
+                 "Section 3 measures it rather than waving at it. Seven sabotages red at 3/8/1/1/4/1/3 " +
+                 "against seven gates. *** TWO WENT 0-RED AND BOTH WERE FIXTURE BLINDNESS. *** PC reads only " +
+                 "the u component of the motion vector, so a camera moving straight down reads as a still " +
+                 "one -- invisible because EVERY FIXTURE IN THIS ARC, v4553 through v4565, translates the " +
+                 "camera in X and nowhere else. Thirteen rounds, and a bound ignoring half the motion vector " +
+                 "behaves identically on all of them; section 5 is a horizontal edge swept vertically, the " +
+                 "smallest fixture that separates them. PD treats a null motion buffer as motion, unchecked " +
+                 "because the callers that pass null use the frame form, which has no ring term -- so the one " +
+                 "combination that matters, a per-pixel bound with no displacement information, had no " +
+                 "reader. *** AND THE PROBE THAT OPENED THE ROUND READ ss[i] WHERE shadingShiftCPU RETURNS " +
+                 "{ data, unknown }: *** every read undefined, every comparison false, and it reported the " +
+                 "detector firing on 0% of pixels across three lighting regimes -- the exact number that " +
+                 "would have made this collision look like it was not there. An absence read as a " +
+                 "measurement, this arc's oldest fault, in the round that is about two readings of one " +
+                 "quantity. Two rows of the new gate also had to be corrected: one asserted the floor itself " +
+                 "would vanish where the gate only removes the ring term (the geometry stays, and a step " +
+                 "scales with the light too), and one multiplied by zero and compared the result to nothing.",
+    }),
+    since292: Object.freeze({
+        at: "v4565", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/ringFloorStep-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 0.41 s, under the 3000 ms budget. *** v4564 NAMED TIGHTENING THE STEP BOUND AS THIS " +
+                 "RUNG. IT IS NOT TIGHTENED, BECAUSE IT WAS NOT A BOUND. *** max(f, 1-f) * step reads only " +
+                 "THIS frame's neighbourhood, and where a high-contrast feature has SWEPT PAST a pixel is " +
+                 "locally flat now and still carries that feature's reprojection error in the ring: the " +
+                 "stencil is flat, the bound returns nearly nothing, the error is large. Measured on this " +
+                 "arc's own EDGE fixture, the geometric step bound is BELOW the error actually present at " +
+                 "70-86% of step-branch pixels, with a median of 0.00x of the error. v4564 shipped that form " +
+                 "as a per-pixel bound on the strength of ONE fixture -- a perspective ground plane, where it " +
+                 "reads 0.03%. *** AND THE CHEQUER IS CLEAN AT 0.00%, WHICH IS WHY NOTHING CAUGHT IT: *** the " +
+                 "two contents fail the geometry in opposite ways and the arc has had both since v4553. THE " +
+                 "MISSING HALF IS THE RING, which has been in the tree since v4553: |newer period mean - " +
+                 "older period mean| is what the reprojection did over one period and the spread within the " +
+                 "newer period is what it is still doing. It is safe on the edge and UNDER by 5-14% on the " +
+                 "chequer, whose error is a persistent BIAS that a difference between two periods cannot see. " +
+                 "*** NEITHER IS A BOUND ALONE AND NEITHER DOMINATES: *** on the two sinusoids the ring reads " +
+                 "1200-2256x where the geometry reads 33-65x. Their MAX is under at 0.00% across ten " +
+                 "content-and-phase combinations and 13,398 step-branch pixel-frames. IT TIGHTENS NOTHING -- " +
+                 "the max can only be the looser of the two, so the 90x on a perspective plane stands " +
+                 "untouched. What changed is that it is a bound at all. The window form now REFUSES to run " +
+                 "without the ring rather than returning the half-bound v4564 shipped; the frame form is " +
+                 "untouched, so every frame-wide number v4560 through v4562 recorded reads what it read. " +
+                 "*** THE COMPOSITION SHIPPED IS THE SECOND ONE WRITTEN: *** the first added the ring term " +
+                 "into BOTH axis terms, double-counting a quantity the ring holds once per pixel rather than " +
+                 "once per direction -- safer than what replaced it, and arithmetic nobody could justify. " +
+                 "What caught it was the row comparing this module's private ring readings against " +
+                 "temporalLock's exported ones on a FLAT field, the one place the geometric term is zero and " +
+                 "the ring term is visible alone. A second copy of three functions is allowed only because " +
+                 "something compares it to the original, and that row earned its place on its first run. " +
+                 "Eight sabotages red at 3/2/3/2/6/2/2/2 against six gates; NC and ND are a pair, each half " +
+                 "of the ring term load-bearing for a different failure. Two rows of v4564's own gate needed " +
+                 "correcting: its residue is now ONE pixel, all on the Taylor branch, the step half having " +
+                 "been closed -- which confirms the reading v4564 gave, that what remains is the curvature " +
+                 "surrogate. AND A DERIVED RECORD MOVED FOR THE FIRST TIME SINCE v4551: runtimeGap's " +
+                 "closuresOverThreads, 3641 / 22, went 165 -> 166, and its own gate caught the stale value " +
+                 "rather than a reader noticing.",
+    }),
+    since291: Object.freeze({
+        at: "v4564", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/ringFloorControl-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 0.31 s, under the 3000 ms budget. *** v4563 REPORTED 28.9% CHURN AND HAD NOTHING TO " +
+                 "COMPARE IT AGAINST. *** This round builds the ladder: the SCENE alone, with no ring in the " +
+                 "picture, churns 8.3% because the camera is moving and features genuinely enter and leave; " +
+                 "the ring at the fixed 0.05 churns 10.7%; a PERFECT per-pixel margin, derived from the error " +
+                 "actually there, churns 14.8%; the estimator churns 27.7%. *** SO A PERFECT MARGIN CHURNS " +
+                 "MORE THAN A CONSTANT ONE, AND PER-PIXEL CHURN IS INTRINSIC RATHER THAN ESTIMATOR ERROR. *** " +
+                 "The oracle also finds MORE ridges than either (411 against 305), so its extra churn is the " +
+                 "price of tracking, not of caution. v4563's number has a floor of 14.8% and not of zero. " +
+                 "*** AND MEASURING THAT FOUND SOMETHING WORSE THAN THE CHURN: THE ESTIMATOR WAS NEVER A " +
+                 "BOUND PER PIXEL, AND v4563 SPENT IT PER PIXEL. *** Every safety row from v4560 on compared " +
+                 "the frame's WORST estimate against the frame's WORST error -- a frame-wide claim, and it " +
+                 "holds on 14 of 14 frames. Per pixel the same numbers are BELOW the error actually present " +
+                 "at 21.5% of pixels, 36.4% of those on the resolved branch. v4563's own safety row could " +
+                 "not see it: it compared each ridge against the floor its margin was derived from, which " +
+                 "can only ever return zero. THE REASON IS ONE v4562 WROTE DOWN ABOUT A DIFFERENT FORM AND " +
+                 "NOBODY FOLLOWED THROUGH -- the ring's window spans P frames at P jitter phases, so THIS " +
+                 "frame's f does not bound the window's worst; frame-wide it washes out because some pixel " +
+                 "always has a large phase. The repair is to use the phase factor's MAXIMUM, 0.25, instead of " +
+                 "this frame's: from 21.5% under to 0.03%, four pixels in 12,348, split across both branches " +
+                 "-- so what is left is the curvature surrogate rather than the phase. It costs 19x on the " +
+                 "resolved branch, which is what a bound that holds at every pixel costs over one that holds " +
+                 "across a frame. ringFloorCPU takes a `phase` of \"frame\" (the default, so every number " +
+                 "v4560-v4562 recorded is unchanged) or \"window\"; marginsFromFloor now REFUSES the frame " +
+                 "form outright and the floor pool carries the form with the numbers, which caught this " +
+                 "round's own gates twice while they were being corrected. *** AND CORRECTING v4563's TABLE " +
+                 "CHANGED ITS HEADLINE: *** pooling was measured there as halving the churn, 51.8% to 28.9%. " +
+                 "Most of what it removed was phase noise the frame-form bound should never have carried. On " +
+                 "the window form the margin starts steady -- 15% p90 rather than 30% -- and pooling buys 15% " +
+                 "of the churn, not 50%. The four-fold steadying of the margin itself survives. Section 2 " +
+                 "locates the remaining gap to the oracle in ONE branch: the step bound runs 90x loose at " +
+                 "the median where the Taylor bound runs 17x, on 41% of on-plane pixels, and no uniform " +
+                 "scaling closes it -- dividing by 4 leaves the median 8.9x loose and already puts 2.13% of " +
+                 "pixels under their own error. Seven sabotages red at 4/3/10/2/2/1/1 against five gates. MA " +
+                 "restores exactly what v4563 shipped and now scores four; when v4563 did it nothing went " +
+                 "red, and the difference is not better code but a measurement against the error actually " +
+                 "there instead of against the estimate.",
+    }),
+    since290: Object.freeze({
+        at: "v4563", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/ringFloorMargin-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 0.26 s, comfortably under the 3000 ms budget. *** v4562's CLOSING WAS WRONG TWICE AND " +
+                 "THIS ROUND MEASURES WHY. *** It called a per-BAND floor worth 6x. The right unit is not a " +
+                 "band -- ringFloor.mjs already produces a floor per PIXEL, and bands were an artefact of how " +
+                 "I read it -- and the frame-wide alternative is not 6x worse: on this perspective scene the " +
+                 "derived frame-wide margin is INFEASIBLE on all fourteen frames, so it locks NOTHING. The " +
+                 "choice was never 6%, it was between a derived margin that works and one that does not " +
+                 "exist. Per pixel, 66-71% of the ground IS lockable; the frame-wide number is set by the " +
+                 "worst pixel in the frame and then spent everywhere. *** WHAT A PER-PIXEL MARGIN COSTS IS " +
+                 "CHURN: 51.8% of held ridges change state between frames, against 10.7% for the arc's fixed " +
+                 "0.05 -- 4.9x -- and a lock that blinks is worse than no lock, since blinking is the " +
+                 "artefact the lock exists to suppress. *** The cause is the jitter, and v4553's insight " +
+                 "applies unchanged: any P consecutive frames span a whole period. Pooling the floor over one " +
+                 "period halves the churn to 28.9% and steadies the margin itself from 30% to 4% p90. *** AND " +
+                 "THE POOL IS A MAX, NOT A MEAN, BECAUSE THE FLOOR IS A BOUND: *** the mean is just as steady " +
+                 "and stops being one -- 5.9% of the locks it keeps stand UNDER the floor of the very frame " +
+                 "they are in -- where the max includes the current frame and therefore cannot. It costs 22% " +
+                 "of the ridges the instantaneous floor keeps, which is what a threshold holding still costs. " +
+                 "*** AND 71% OF THE ARC'S FIXED-MARGIN RIDGES STAND ON PIXELS WHOSE OWN FLOOR EXCEEDS THE " +
+                 "0.05 THAT FOUND THEM *** -- locks reading the ring's resampling error, which is what " +
+                 "ridgeMarginBounds was built at v4557 to refuse. A TRUTH COMPARISON CANNOT SEE THIS, and " +
+                 "that is worth stating plainly: scored against the noiseless field the fixed margin is 97.9% " +
+                 "precise and 94.9% recalling, because the artefact and the feature are in the same PLACE -- " +
+                 "a ridge placed on resampling error still lands where the truth has a ridge. Both statements " +
+                 "are true at once. *** AND MY FIRST SCORING WAS RIGGED: *** it scored both detectors against " +
+                 "truth ridges taken at 0.05, the fixed detector's own threshold, and produced 44.8% " +
+                 "precision and 23.4% recall for the derived margin -- a strong negative result that " +
+                 "evaporated once each detector was scored against truth at ITS OWN threshold (98.3% and " +
+                 "97.8%). A margin DEFINES what counts as a feature; a target built with one detector's " +
+                 "definition cannot judge the other. New here: ridgesCPU accepts a per-pixel margin field as " +
+                 "well as a scalar, and ringFloor gains makeFloorPool/pushFloor/pooledFloor and " +
+                 "marginsFromFloor, which takes ridgeMarginBounds as an argument so the interval has one " +
+                 "definition and not a second copy. Eight sabotages red at 3/6/1/1/7/8/2/6 against six gates. " +
+                 "*** ONE WENT 0-RED AND FOUND A COMMENT PRETENDING TO BE A DECISION: *** ridgesCPU reads the " +
+                 "CENTRE pixel's margin and the comment calls that deliberate, but rewriting it to read each " +
+                 "NEIGHBOUR's changed nothing -- the margin field is smooth almost everywhere, so the two " +
+                 "readings agree. It has exactly one discontinuity and it is maximal: an INFEASIBLE pixel is " +
+                 "Infinity beside a finite neighbour, and read at the neighbour that pixel gets a finite " +
+                 "threshold and becomes lockable -- the one pixel the empty interval exists to refuse. The " +
+                 "sabotage places 23 ridges on infeasible pixels where the kept form places 0 of 6094. A " +
+                 "design decision written into a comment and held by nothing is indistinguishable from a " +
+                 "decision nobody made, and this arc has now found two of them: v4561's stencil width and " +
+                 "this one.",
+    }),
+    since289: Object.freeze({
+        at: "v4562", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/ringFloorPerspective-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 0.83 s, under the 3000 ms budget. *** EVERY NUMBER THIS ARC HAS RECORDED SINCE v4553 " +
+                 "WAS MEASURED UNDER AN ORTHOGRAPHIC PROJECTION, WHERE A CAMERA TRANSLATION MOVES EVERY PIXEL " +
+                 "BY THE SAME AMOUNT. *** v4558 named perspective as unmeasured and v4559, v4560 and v4561 " +
+                 "each repeated the note. It matters because the floor is gated by SUB-PIXEL PHASE and under " +
+                 "perspective the phase varies across the frame with depth: measured, a 31x spread of " +
+                 "displacement inside ONE frame against orthographic's exactly 1. THE ANSWER IS THAT ONE " +
+                 "FRAME-WIDE FLOOR IS STILL SAFE AND MUCH LOOSER: 24x frame-wide where twelve orthographic " +
+                 "readings ran 1.05x to 4.48x, with the loosest band at 77x. *** AND IT IS SET BY THE FAR " +
+                 "FIELD, NOT THE NEAR ONE, WHICH IS BACKWARDS FROM THE OBVIOUS GUESS: *** parallax is largest " +
+                 "near, but a ground plane is FORESHORTENED with distance, so the far field carries the " +
+                 "highest spatial frequency per pixel -- and the floor is a content law (v4559) before it is " +
+                 "a motion one. The far band's true floor is 3.72e-2 against the fastest band's 6.56e-3, so a " +
+                 "single margin over-margins the fast band by 6x and a caller wanting that back needs a " +
+                 "per-band floor, which this round does not build. *** A REAL DEFECT IN v4560's ESTIMATOR, " +
+                 "FOUND BY THE PHASE SWEEP: it returned EXACTLY ZERO at an integer displacement. *** f(1-f) " +
+                 "is exactly zero there, so on resolved content the estimate was 0 -- and v4561's own " +
+                 "sampling section calls a zero floor the most dangerous answer there is, since " +
+                 "ridgeMarginBounds turns noiseFloor 0 into margin 0 and a margin of zero makes every " +
+                 "fluctuation a feature. The ring is not exact there; it is exact to within the ARITHMETIC. " +
+                 "Measured on four contents over a 64x range of magnitude, the ring mean's error at an " +
+                 "integer displacement is 1.05, 1.05, 1.05 and 0.54 ulps of the LOCAL MAGNITUDE -- so the " +
+                 "floor is relative, not absolute, which is what an HDR caller needs. It is bounded at two " +
+                 "ulps, which is the measurement rounded up to a power of two and is labelled as that rather " +
+                 "than dressed as a derivation: the (P+1)/2-ulp argument predicts 4.5 and over-predicts by " +
+                 "4x. *** THE REPAIR THE LOOSENESS SUGGESTS IS UNSAFE AND THE MEASUREMENT SAID SO BEFORE IT " +
+                 "SHIPPED. *** max(f, 1-f) returns the whole step at f = 0 where v4558 proved the fetch is " +
+                 "exact, and min(f, 1-f) is the obvious fix. Measured across phases it reads 0.37x, 0.79x and " +
+                 "0.68x of truth -- UNDER, the direction that matters for a margin -- because the ring's " +
+                 "window spans many frames at many jitter phases, so THIS frame's f does not bound the " +
+                 "window's worst. The crude max form is kept. A first draft of that row asserted the two " +
+                 "forms COINCIDE at a half-texel speed; they do not, and the fixture refutes it: only the " +
+                 "moving axis sits at f = 0.5, while the still axis sits at f = 0 where max returns the whole " +
+                 "step and min returns nothing. So it is a rejected alternative, not a blind spot -- what was " +
+                 "missing was anyone writing the second form down. Seven sabotages red at 4/1/2/9/4/10/1 " +
+                 "against four gates. *** KF IS THE ONE THIS ARC COULD NOT HAVE RUN BEFORE TODAY: *** " +
+                 "dropping the perspective divide from the motion-vector reconstruction is a PERFECT no-op " +
+                 "under orthographic, where w is 1 everywhere, so nine rounds left that path unpinned not for " +
+                 "want of a row but for want of a fixture that could reach it. It scores ten. *** AND KG WENT " +
+                 "0-RED: *** removing the arithmetic floor from the KERNEL while keeping it in the mirror " +
+                 "moves every affected pixel by 2.3e-7, and the parity row's tolerance is 1e-5 -- fifty times " +
+                 "coarser than the whole defect. An absolute tolerance is blind to anything smaller than " +
+                 "itself, and this arc has now built two things that live below one. The repair is a RELATIVE " +
+                 "comparison over the floored pixels, and it is a general lesson: every parity row in this " +
+                 "arc carries an absolute tolerance chosen for values of order one. Adding the floor also " +
+                 "broke v4561's sampling row, which asserted an exact zero: a sampled max on the edge now " +
+                 "returns one arithmetic floor instead of 0.00e+0. Same severity -- a factor of two million " +
+                 "-- worse signal, since a small plausible number reads like a measurement where a zero reads " +
+                 "like a bug. That row is rewritten against the ratio and its runtime re-taken at 1.33 s.",
+    }),
+    since288: Object.freeze({
+        at: "v4561", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/ringFloorCost-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 1.30 s (1280/1304/1284 over three serial runs), under the 3000 ms budget -- AFTER a " +
+                 "first version that ran 17.4 s, which is the over-budget fault v4551, v4553, v4558 and v4559 " +
+                 "each recorded, made a fifth time and worse than any of them. *** WHAT THE DERIVED FLOOR " +
+                 "COSTS: 7.6% of the ring push it would run beside, at 128x128. *** v4560 left this as its " +
+                 "own named gap. Nothing here asserts a duration -- meshPerf-selfcheck already says a speed " +
+                 "threshold is a flaky gate, and sweep-timings' note records this box moving 12-36% between " +
+                 "hours -- so the claim is a RATIO taken in one process with the two subjects INTERLEAVED " +
+                 "A/B/A, and the ratio's own spread is measured before the ratio is used: 5-8% of median over " +
+                 "five repeats. The assertion's threshold is derived from the claim it protects rather than " +
+                 "picked, namely that the error bar does not reach the line being asserted against; it clears " +
+                 "it by 69-95x. AND IT BEATS ITS OWN OP-COUNT PREDICTION BY 3.5x: 21 array touches per pixel " +
+                 "against the push's 79 predicts 0.266 and it measures 0.076, because the push is " +
+                 "BANDWIDTH-bound on 64 bytes of ring per pixel while the estimator's stencil stays in cache. " +
+                 "Its per-pixel cost is flat with resolution (473 -> 475 ns) where the estimator's is not " +
+                 "(34 -> 37 ns), the y-stencil starting to cross the row stride. *** THE OBVIOUS " +
+                 "OPTIMISATION IS UNSAFE AND FAILS IN THE WORST POSSIBLE DIRECTION. *** The floor is a MAX, " +
+                 "so a sampled max can only go DOWN, which is the direction that sets a margin below the " +
+                 "noise. At 1-in-64 it is within 1% on the smooth, finer and chequer fixtures -- which is " +
+                 "exactly why it looks free -- and reports EXACTLY ZERO on the edge, a 100% under-report " +
+                 "saying there is no noise to clear. The three that survive have their worst pixel " +
+                 "EVERYWHERE; the one that fails has it in a single column. Sampling is safe precisely when " +
+                 "the feature is common, and a rare high-error feature is what a lock is for. *** AND THE " +
+                 "DEVICE COST IS NOT MEASURABLE IN THIS CONTAINER, WHICH THIS ROUND FOUND BY NEARLY " +
+                 "PUBLISHING IT. *** A dispatch ratio was measured -- 0.68 at 128x128, against 0.076 on the " +
+                 "CPU, an inversion striking enough to be the headline -- and only then was the adapter " +
+                 "asked: vendor google, architecture SWIFTSHADER, a software rasteriser. dev.backend reads " +
+                 "\"webgpu\" and means a CPU running WGSL. Every device row this arc has written, all ten of " +
+                 "them, ran there, and none of the 109 gates calling runInEngineOrigin had any way to know, " +
+                 "because the harness never returned the adapter. It does now, for all of them, using " +
+                 "ui/localModelProbe.js's SOFTWARE_HINTS rather than a second copy of that list. WHAT IS NOT " +
+                 "RETRACTED: parity is parity whatever executes it -- the ten existing rows stand; it is the " +
+                 "TIMING claim alone the adapter invalidates, and the 0.68 is recorded here as a software " +
+                 "measurement and asserted nowhere. Seven sabotages red at 1/2/4/2/5/12/2 against three " +
+                 "gates. *** ONE WENT 0-RED AND IT WAS THE ROUND'S BEST FINDING: *** narrowing the range " +
+                 "stencil from five taps to three changed NOTHING any gate could see, because all four of " +
+                 "v4560's contents classify identically under both -- the 47x gap that makes tau robust is " +
+                 "far too wide for a stencil change to cross. v4560's own row noted its contents sit 39, 14, " +
+                 "3.1 and 4.0 samples per period against tau's 7.9 and read that as a virtue: the threshold " +
+                 "is not fitted to the data. It is ALSO A HOLE -- no fixture exercised the regime boundary, " +
+                 "so anything mattering only there was invisible. Measured on content built AT the " +
+                 "threshold, three taps read 2.92x of truth where five read 1.66x, and flip 79% of the frame " +
+                 "to the step bound. Not wrong, since a smaller range only pushes the bound UP, but LOOSER, " +
+                 "and the tightness is what v4560 spent a round earning. ringFloor-selfcheck now carries the " +
+                 "threshold fixture and two rows that pin the width; its runtime is re-taken at 0.90 s.",
+    }),
+    since287: Object.freeze({
+        at: "v4560", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/ringFloor-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 0.93 s (888/930/899 over three serial runs), comfortably under the 3000 ms budget. " +
+                 "*** ridgeMarginBounds HAS DEMANDED A NUMBER NOBODY IN THIS TREE COULD PRODUCE SINCE v4557. " +
+                 "*** It refuses an unmeasured noiseFloor, which is right, but v4558 and v4559 both measured " +
+                 "that floor against the ANALYTIC SURFACE their fixtures were drawn from, and a renderer has " +
+                 "no analytic surface. For three rounds it has been a control nobody could call. This round " +
+                 "derives the floor from the frame and the motion vectors and nothing else. THE IDENTITY: " +
+                 "interpolating g at x = n + f leaves exactly -1/2 f(1-f) g''(xi), and both factors are in " +
+                 "the renderer's hands -- f is frac(hu*w) out of the motion vectors, g'' is the frame's own " +
+                 "second difference. It reproduces, with no fitted constant, everything v4559 measured: " +
+                 "exact at integer displacements because f(1-f) is zero there, quadratic in cycles per pixel " +
+                 "because a sinusoid's second derivative is, saturating above Nyquist. *** THE ACCUMULATION " +
+                 "DEPTH IS DERIVED TOO, AND IT IS NOT THE OBVIOUS (1+P)/2. *** pushLuma writes the current " +
+                 "luma into the newest slot and reprojects the rest, so lumaMean averages resample depths " +
+                 "0..P-1 and the mean depth is (P-1)/2 -- which at P = 1 is ZERO. Measured: a P = 1 ring's " +
+                 "floor is exactly 0.00e+0 on the chequer, the content with the largest single-step error in " +
+                 "the arc, where one step is worth 2.15e-1. The obvious guess would have predicted that step. " +
+                 "*** AND TAYLOR IS VOID AT A STEP, WHICH IS HALF OF WHY THE MODULE IS NOT ONE LINE: *** the " +
+                 "Taylor term alone under-predicts a chequer's floor by 4x, and for a margin the under " +
+                 "direction is the dangerous one. Where the field is not resolved the bound is the step's " +
+                 "own, max(f,1-f) * step size -- near-exact on a chequer and an edge, and 141x LOOSE on the " +
+                 "arc's smooth fixture. Neither bound serves alone. FINAL: safe on all twelve readings, " +
+                 "worst ratio 1.05x, and TIGHT where the field is resolved -- 1.43x at worst over six " +
+                 "readings against 141x for the step bound alone. *** MY FIRST TWO REGIME TESTS WERE BOTH " +
+                 "WRONG THE SAME WAY. *** |D2| < first difference reads every EXTREMUM of a smooth sinusoid " +
+                 "as a step, because the slope vanishes there while the curvature is maximal; |D3| < |D2| " +
+                 "moves the same degeneracy to the INFLECTIONS, where D2 passes through zero. Each " +
+                 "mis-classifies up to 5.7% and 5.0% of the arc's own smooth fixture, and a worst-over-frame " +
+                 "is a MAXIMUM, so a few false pixels own the answer: the smooth estimate went from 1.05x of " +
+                 "truth to 9.93x and then 95x. Both compared against a quantity that VANISHES somewhere on a " +
+                 "perfectly smooth field. The module's test is normalised by the local RANGE, which vanishes " +
+                 "only on a flat field where every bound is zero anyway. tau NAMES A RESOLUTION rather than " +
+                 "a preference: a sinusoid at n samples per period has |D3|/range = (2pi/n)^3/2, so 0.25 is " +
+                 "7.9 samples per period -- above Nyquist's 2 and below v4559's measured 12-pixel margin " +
+                 "crossing -- and the four contents measure 39, 14, 3.1 and 4.0, the nearest 1.81x away. The " +
+                 "separation is 47x in the statistic, which is only 3.5x once expressed as a resolution, " +
+                 "because the statistic goes as the cube. *** WHAT IT SAYS ABOUT THE ARC'S DECLARED 0.05: on " +
+                 "the arc's OWN fixture the derived margin is 2.28e-3, so 0.05 is 22x too loose and pays " +
+                 "5.8% of the range in blind window where 0.26% would do; on the chequer and the edge the " +
+                 "interval is INFEASIBLE and 0.05 sits 26x BELOW the floor, so every lock placed there reads " +
+                 "resampling error as a feature. One declared number, simultaneously 22x too loose and below " +
+                 "the floor, on two contents in the same arc. *** THIS ROUND DOES NOT ADOPT IT. *** Moving " +
+                 "the margin would move every number v4553 onward recorded and is a round of its own; and " +
+                 "the finer sinusoid is the case against assuming the declared number is always wrong, since " +
+                 "there it is 0.79x of derived. Nine sabotages red at 2/4/3/4/1/4/4/2/2. The lowest is the " +
+                 "one that matters most: restoring the D2max-alone curvature surrogate scores ONE red, the " +
+                 "safety row reading 0.98x, which is the exact 2% shortfall this round measured and fixed -- " +
+                 "a bound that goes 2% under looks identical to one that does not unless something watches " +
+                 "the direction. THE SET IS ONE GATE, weaker than v4559's four, because nothing else imports " +
+                 "the module yet: the day a caller uses the derived margin the set has to be re-run against " +
+                 "it. *** AND SECTION 4 ALMOST SHIPPED AS A WRONG CONSTANT: *** its first version built the " +
+                 "field once with no jitter and no camera offset and measured 0.0% false-unresolved for a " +
+                 "test that mis-classifies up to 5.7%, so the row went red looking like a bad number when it " +
+                 "was a blind fixture -- v4559's 24x24 finding, made again one round later. The rate had to " +
+                 "be swept over the jitter, because the jitter is what moves the sample grid relative to the " +
+                 "extrema the degeneracy lives on, and it turns out to be INTERMITTENT (1.9%-5.7% on one " +
+                 "fixed scene), which is worse than a constant error.",
+    }),
+    since286: Object.freeze({
+        at: "v4559", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/temporalRingContent-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 2.77 s (2772/2671/2698 over three serial runs, under the 3000 ms sweep budget but " +
+                 "only by 8% -- and the split is worth recording, since this arc has run over budget four " +
+                 "times: the CPU sections cost 368 ms and the headless browser boot and 21 dispatches cost " +
+                 "1,907 ms, so if the budget bites here the answer is the harness every device gate pays, " +
+                 "not this fixture. *** THE RING'S FLOOR IS A CONTENT LAW WITH A PHASE GATE, AND v4558's " +
+                 "PHASE LAW HOLDS ON ALL FOUR CONTENTS. *** v4558 established that integer displacements are " +
+                 "exact on one smooth sinusoid; measured here on a smooth sinusoid, a finer one, a " +
+                 "pixel-scale chequer and a hard edge, the EXACTNESS is content-independent -- a whole-pixel " +
+                 "step lands the bilinear fetch on texel centres whatever the picture. The MAGNITUDE is the " +
+                 "picture's: at a half-pixel phase the chequer's floor is 8.7x the arc's 0.05 margin where " +
+                 "the smooth fixture is 300x under it. The floor is QUADRATIC in cycles per pixel below " +
+                 "Nyquist -- e/f^2 holds within 8% at 7.1 and 6.6, which is what linear interpolation's " +
+                 "residual does since it follows the second derivative -- crossing 0.05 at 0.084 cyc/px, a " +
+                 "period of about TWELVE PIXELS, which is ordinary detail and not pixel-scale texture; above " +
+                 "Nyquist it SATURATES at the signal's own range rather than growing. So the two claims are " +
+                 "told apart by holding one thing still: across speeds on fixed content the floor spans " +
+                 "2.1e-7, across content at fixed speed it spans 272x. The consequence is not abstract -- on " +
+                 "that content the ring's ridges and the truth's agree on only 87% of their union, so a lock " +
+                 "placed there is placed on the reprojection's artefacts as much as on the picture. *** AN " +
+                 "OPEN DEFECT IS RECORDED RATHER THAN DRESSED. *** At a half-texel camera speed the CPU " +
+                 "mirror and the WGSL kernel disagree on 192 of 576 pixels' BOUNDS TEST -- the same count on " +
+                 "both contents, because what resets is decided by geometry, not by the picture -- and the " +
+                 "COST is the content's: 8.60e-1 on the chequer, 100% of its contrast, against 2.07e-2 on " +
+                 "the smooth surface. Four repairs were tried and none held (a half-texel guard and an " +
+                 "integer tap test both made it WORSE; computing the mirror's uv in f32 moved which column " +
+                 "straddles), so the code is left as it was and the failures are written into " +
+                 "render/temporalLock.mjs so a fifth is not guessed at. It needs a hard threshold that a " +
+                 "camera speed can land on exactly; the bilinear FETCH survives because a floor off by one " +
+                 "carries a compensating weight. It appears at 24x24 and NOT at 16x16, which is most of why " +
+                 "six rounds of device-parity rows never met it -- a defect a fixture can hide by accident. " +
+                 "*** ONE THING WAS FIXED: the ring's fill index, round(u*w - 0.5) -> floor(u*w), a real tie " +
+                 "bug since JavaScript rounds half UP and WGSL half to EVEN. *** advanceLocks held a SECOND " +
+                 "copy of the same law in the condemned spelling; both now call one exported nearestTexel, " +
+                 "and both call sites are pinned. Seven sabotages red at 7/5/4/3/3/1/17 against four gates, " +
+                 "with v4557's crash rule applied. *** THE FIRST SWEEP READ THREE ZEROS AND ALL THREE WERE " +
+                 "MINE. *** The tie row asserted Math.floor(22.5/24*24) === 22 -- a fact about JavaScript, " +
+                 "not a call into the module; there was no device tie row at all, so the fix was pinned only " +
+                 "on the mirror it was FOR; and the coverage rows live in temporalRidgeMargin-selfcheck, " +
+                 "which was not in the sabotage SET. A hole in the set reads exactly like a hole in the " +
+                 "gates. *** AND THE FIXTURE VALUE DECIDED WHETHER THE CONTROL COULD FAIL: *** at the tie " +
+                 "22.5, WGSL's half-to-even gives 22 -- floor's own answer -- so a rounded kernel read the " +
+                 "RIGHT texel and the new device row stayed green on a kernel with the defect in it. Moving " +
+                 "the tie to 23.5, where both roundings give 24 and floor gives 23, took that sabotage from " +
+                 "3 red to 4. On a defect whose whole subject is which way a tie breaks, the fixture had " +
+                 "picked the one tie where it does not.",
+    }),
+    since285: Object.freeze({
+        at: "v4558", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/temporalRingFloor-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 2.44 s (2438/2432/2445 over three serial runs, under the 3000 ms sweep budget -- after " +
+                 "an optimisation; see below). *** v4557 MEASURED THE RING'S NOISE FLOOR AGAINST THE WRONG " +
+                 "REFERENCE AND ITS HEADLINE IS WITHDRAWN. *** Its analytic average evaluated the surface at " +
+                 "pixel i using EACH FRAME'S OWN camera position, which is a different world point once the " +
+                 "camera moves -- so it measured HOW FAR THE SCENE SHIFTED across the window, not what the " +
+                 "reprojection got wrong. At one pixel per frame it read 6.87e-2 where the ring's actual " +
+                 "error is 1.19e-7: five orders of magnitude. WITHDRAWN with it: 'the floor climbs THROUGH " +
+                 "the margin', 'every lock placed while the camera moves is partly reading resampling error', " +
+                 "and three feasibility intervals reported EMPTY -- all artefacts. The worst TRUE floor over " +
+                 "every speed measured is 3.68e-4, which is 136x BELOW the arc's 0.05 rather than 1.7x above " +
+                 "it, so v4556's blind window is the only binding constraint on the margin and always was. " +
+                 "*** WHY IT SURVIVED: at rest the two references AGREE, bit for bit, because a reference " +
+                 "that moves with the camera does not move when the camera does not -- and every convergence " +
+                 "fixture in this arc holds the camera still. *** WHAT SURVIVES v4557 UNTOUCHED: the ring's " +
+                 "speed ceiling, which is a count of `filled` and never depended on the reference, and the " +
+                 "SHAPE of the argument. Only the floor's value was wrong. THE LAW THE FLOOR ACTUALLY " +
+                 "FOLLOWS is the reprojection's SUB-PIXEL PHASE, not its speed: integer displacements are " +
+                 "EXACT (1.19e-7 at 0, 1 and 2) because a whole-pixel step lands the bilinear fetch on texel " +
+                 "centres, and a half-pixel phase reads the same at every speed that has one. So a bound from " +
+                 "THIS frame's phase is wrong next frame and the usable floor is the worst over phases. AND " +
+                 "THE QUESTION v4557's CLOSING LEFT OPEN IS ANSWERED NO: under camera ROLL the displacement " +
+                 "runs from zero at the centre to over a pixel at the corners, and the rotation CENTRE has " +
+                 "the SMALLEST error in the frame (2.9e-5) -- the per-pixel structure is real but a hundred " +
+                 "times too small to need its own bound, so one frame-wide number is safe under rotation too. " +
+                 "Against v4557's reference that centre read 8.2e-3 and looked exactly like the anomaly a " +
+                 "per-pixel bound would be for. Six sabotages red at 18/12/3/4/4/7. *** ONE WAS A NO-OP AND " +
+                 "READ 0 RED: *** wrapping the ring fetch's already-integer indices in Math.round left the " +
+                 "bilinear WEIGHTS untouched, so nothing changed -- second time this session (v4553's BS was " +
+                 "the first), and it matters most here, because this round's whole subject is the error " +
+                 "bilinear interpolation leaves behind. The real mutation replaces the four-tap sum with one " +
+                 "nearest sample. The corrected reference gets a sabotage of its own, since the reference IS " +
+                 "the finding. Also: the first draft ran seventeen 32-frame sweeps at 64x64 and came in at " +
+                 "3,070 ms, OVER the budget -- the fault v4551 and v4553 both recorded; sharing one sweep per " +
+                 "speed between two sections and dropping to the arc's 48x48 brought it to 2,438.",
+    }),
+    since284: Object.freeze({
+        at: "v4557", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/temporalRidgeMargin-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 1.84 s (1835/1837/1816 over three serial runs, under the 3000 ms sweep budget). *** " +
+                 "THE RIDGE MARGIN HAS BEEN 0.05 SINCE v4553 BECAUSE THAT IS WHAT THE FIXTURES WANTED, AND " +
+                 "v4556 MADE IT LOAD-BEARING *** by showing the lock detector's blind window is " +
+                 "margin/contrast wide. This round derives what it should be standing above, and the answer " +
+                 "is that it is not a constant. THE RING MEAN'S OWN ERROR IS A FUNCTION OF CAMERA SPEED, " +
+                 "MEASURED against the analytic average the ring is supposed to reproduce: 1.2e-7 at rest, " +
+                 "2.3e-2 at a quarter pixel per frame, 4.6e-2 at a half, and 8.4e-2 at ONE -- which is 1.7x " +
+                 "the 0.05 the arc uses. So at rest the margin sits 400,000x above the floor, pure blind " +
+                 "window bought for nothing; and under ordinary camera motion every lock this arc places is " +
+                 "partly reading its own resampling error. BOTH FAILURE MODES ARE SHOWN ON A PICTURE, not in " +
+                 "arithmetic: a thin feature of contrast 0.06 with the camera still gives 0 ridges at 0.05 " +
+                 "and 46 at a floor-derived margin; the same smooth surface at 1 px/frame gives 116 ridges " +
+                 "-- on content that has none -- at a margin derived at REST. Wrong in both directions, by " +
+                 "different amounts at different speeds. *** AND THE RING HAS A HARD SPEED CEILING NOBODY HAD " +
+                 "MEASURED: *** its footprint is 2*period*speed pixels, so on a 48-pixel frame coverage falls " +
+                 "100% -> 83% -> 67% -> 33% and reaches ZERO at 3 px/frame, where the entire lock and shading " +
+                 "mechanism is off and reporting 'unknown' correctly to nobody who was asking. ringCoverage " +
+                 "is what a caller asks to find that out. COMPOSING v4556's CEILING WITH THIS ROUND'S FLOOR " +
+                 "gives an interval, and it is EMPTY more often than a fixed 0.05 suggests: a feature of " +
+                 "contrast 0.2 is lockable at rest and not at one pixel per frame, where the floor alone " +
+                 "(1.26e-1) exceeds the ceiling (2.0e-2) and the faintest lockable feature would need a " +
+                 "contrast of 1.26, which does not exist in a [0,1] signal -- printed as an impossibility " +
+                 "rather than as a threshold a reader could aim at. Eight sabotages red at 3/3/2/2/1/1/2/8. " +
+                 "*** ONE READ 0 RED AND IT WAS A CRASH, NOT A PASS, WHICH IS WORTH MORE THAN THE SABOTAGE " +
+                 "WAS. *** Hard-coding `feasible` true left an interval with a null margin, the report loop " +
+                 "guarded on `feasible` and then read `margin`, and the TypeError produced a stack trace with " +
+                 "no FAIL lines -- which a harness that counts FAIL lines reads as green. The harness now " +
+                 "scores a non-zero exit with no verdict as red, the loop guards on the value it uses, and a " +
+                 "row asserts that `feasible` and `margin` agree. This file's own blind budget of 0.1 is " +
+                 "named in its closing as the constant IT does not derive, which is the same debt one level up.",
+    }),
+    since283: Object.freeze({
+        at: "v4556", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/temporalRidgePhase-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 0.99 s (989/949/998 over three serial runs, under the 3000 ms sweep budget). *** " +
+                 "v4555 CLOSED BY NAMING A WORRY THAT DOES NOT EXIST, AND CHECKING IT FOUND A REAL ONE " +
+                 "UNDERNEATH. *** The worry was diagonals: every line the arc locks is axis aligned, the band " +
+                 "is measured along an axis, and a diagonal ridge's band is wider by root two. MEASURED at " +
+                 "seven angles, the band test keeps ONE HUNDRED PER CENT of the ridges it finds at every one " +
+                 "-- 46/46, 50/50, 47/47, 45/45, 46/46, 49/49, 46/46 -- and the count barely moves with angle " +
+                 "(spread 5). The band is min(bandX, bandY) and a straight line is one pixel across along at " +
+                 "least ONE axis whatever its angle; a 45-degree line is the most favourable case, not the " +
+                 "worst. The concern was arithmetic nobody had run. *** WHAT THE CHECK TURNED UP IS A BLIND " +
+                 "SPOT IN EVERY LOCK DETECTOR THIS ARC HAS BUILT, SINCE v4553. *** A thin feature whose two " +
+                 "covered pixels come out within `margin` of each other -- what happens whenever it straddles " +
+                 "a pixel boundary evenly -- is a strict extremum in NEITHER: two equal columns give ZERO " +
+                 "ridges where one column gives 14, at every scale and every band setting. AND IT IS NOT A " +
+                 "KNIFE EDGE: the blind window is margin/contrast wide, so a 0.4 px line is invisible at 5.5% " +
+                 "of sub-pixel positions at contrast 0.90 and 24.5% at contrast 0.20 -- and faint thin " +
+                 "features are exactly what a lock exists to protect. THE REPAIR is one line of reasoning: the " +
+                 "deciding neighbour is the first that differs by more than the margin, not the adjacent one. " +
+                 "Two equal columns go 0 -> 28, a one-column feature is unchanged, and a FLAT field stays at " +
+                 "0 because still-inside-a-plateau-at-the-bound is UNDECIDED rather than a ridge -- which is " +
+                 "the whole thing stopping a tie-tolerant test calling everything an extremum. On a one-pixel " +
+                 "alternation the walk changes nothing (196 either way) and v4555's band test still takes it " +
+                 "to 0: the two compose. WHAT IT COST THE THREE GATES THAT ALREADY READ THIS PRIMITIVE, since " +
+                 "the change was made to the default rather than hidden behind an opt-in: raw ridges on a " +
+                 "chequer 1,873 -> 1,935, a 3% rise the band test absorbs; v4555's own two fixtures read the " +
+                 "SAME 4.00x on the line and the SAME 0% on the bar, on FEWER locks (13 against 193), so the " +
+                 "fix is free on the pictures the arc argues over. Its coherent count moved 93 -> 179 and its " +
+                 "band moved 1 -> 2, because a plateau of p makes a band of at least p; a maxBand below " +
+                 "maxPlateau is now refused by name rather than quietly disagreeing. All three WGSL kernels " +
+                 "carry the walk too. Seven sabotages red at 30/5/8/1/2/1/22 -- DA at THIRTY is the widest " +
+                 "this arc has recorded, and DC is worth reading twice: that sabotage IS v4555's shipped " +
+                 "behaviour, and it goes red only because section 2 finally has a picture that asks the " +
+                 "question. ONE 0-RED FIRST: the WGSL tie tolerance, because the device fixture held only 0.1 " +
+                 "and 0.9 so every neighbour difference was 0 or 0.8 and NOTHING ever fell inside the margin " +
+                 "-- the CPU's fixture had a 0.02 pair and caught it. Same shape as v4554's pair: a property " +
+                 "one side's pictures exercise and the other's do not. The device field now carries 0.90 " +
+                 "against 0.88.",
+    }),
+    since282: Object.freeze({
+        at: "v4555", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/temporalCoherentLock-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 1.09 s (1089/1104/1075 over three serial runs, under the 3000 ms sweep budget). *** " +
+                 "v4554 CLOSED BY NAMING THE WRONG NEXT STEP AND THIS ROUND IS THE CORRECTION. *** It said an " +
+                 "object-ID or material channel was what separates a painted thin line from a pixel-scale " +
+                 "texture, and that it would be a renderer change rather than a pass change. BOTH HALVES WERE " +
+                 "WRONG. A painted line and a painted chequer are both albedo on ONE flat surface -- same " +
+                 "depth, same normal, same material, same draw -- so every per-pixel buffer a renderer writes " +
+                 "gives them the same answer, and the gate asserts that by showing their depth buffers " +
+                 "identical pixel for pixel. What differs is not what they are made of but their SHAPE, and " +
+                 "shape was already in the buffers this pipeline had. A ridge ONE PIXEL ACROSS is a thin " +
+                 "feature; a texture at the pixel scale is ridges everywhere. MEASURED on the ring's " +
+                 "jitter-free mean: the band test keeps 46 of the line's 46 ridges and cuts the chequer's " +
+                 "1,873 to 93 -- 20x with the feature untouched -- and on a PURE one-pixel alternation it " +
+                 "finds EXACTLY ZERO where the plain test finds 2,116. ON THE TWO FIXTURES THIS ARC HAS BEEN " +
+                 "ARGUING OVER IT DOMINATES BOTH EARLIER GATES: on v4554's painted line it gives 4.00x where " +
+                 "the depth gate gave 1.00x, matching the luma gate exactly; on v4553's bar-over-chequer it " +
+                 "pays 0% where the luma gate paid 26%, on 193 locks rather than 1,990. The luma gate's " +
+                 "benefit with the depth gate's protection, and neither buffer. IT DOES NOT MAKE DEPTH " +
+                 "REDUNDANT and saying so would be the easy overclaim: a wire whose luma contrast is half the " +
+                 "ridge margin is invisible to every luma test at every scale (0 ridges, 0 coherent) and " +
+                 "depth finds 46, so v4554's gate is narrowed rather than replaced and gateLocks still " +
+                 "composes them. THREE THINGS THIS ROUND GOT WRONG FIRST AND FIXED BY MEASUREMENT. The ridge's " +
+                 "run length ALONG its direction was the obvious test and it fails, because a run in the MASK " +
+                 "is not a run in the feature -- and the row asserting so was written with a threshold carried " +
+                 "from a DIFFERENT scene (690 of 713) that read 342 of 1,873 here, which is v4549's mistake " +
+                 "exactly; it now compares the two candidate tests on the SAME picture and the band test wins " +
+                 "by 3.7x. Section 4's depth row read a single frame and reported 0, repeating the very " +
+                 "single-frame fault v4554 established. And the device fixture's 'three-pixel band' was a " +
+                 "solid bar, which produces ZERO ridges -- an interior pixel is not an extremum and its edges " +
+                 "are steps -- so maxBand 3 read the same count as maxBand 1 and the parameter was never " +
+                 "tested. ALSO CHECKED BEFORE BEING BUILT ON: every scene since v4552 jittered in X only, " +
+                 "discarding j[1]. It did not distort anything -- 1,840 chequer ridges against 1,873 with the " +
+                 "full 2-D sequence -- and could not have, since a +/-0.5 px shift cannot average away 1.13 px " +
+                 "structure in either direction. Eight sabotages red at 7/5/4/1/7/2/2, ONE 0-RED FIRST: " +
+                 "conflating the ridge axes was invisible across ALL THREE lock gates, because the band is " +
+                 "min(bandX, bandY) and the min quietly takes whichever axis is still correct. Unlike v4554's " +
+                 "pair that was not a missing picture but a MASKING OPERATOR, and the property is now asserted " +
+                 "where it lives rather than through a consequence.",
+    }),
+    since281: Object.freeze({
+        at: "v4554", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/temporalDepthLock-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 1.18 s (1180/1166/1178 over three serial runs, under the 3000 ms sweep budget). THE ONE " +
+                 "THING v4553 SECTION 5 SAID LUMA CANNOT DO, DONE WITH DEPTH -- AND WHAT IT COSTS. That row " +
+                 "measured a luma lock detector locking 1,340 of 2,304 pixels on a chequer at the pixel scale " +
+                 "and making the ghost 26% worse, and concluded no luma-only test separates a thin bright " +
+                 "feature from a texture at that scale because they are the same signal. THEY ARE NOT THE SAME " +
+                 "SIGNAL IN DEPTH: a wire is nearer than both its neighbours, a painted texture is at its " +
+                 "neighbours' depth. MEASURED: on a geometric line over a pixel-scale chequer the candidate " +
+                 "set falls from 1,834 luma ridges to 46 depth ridges -- 40x fewer, and 46 is exactly the " +
+                 "line's own pixels -- while the chequer contributes ZERO, so the same picture with the line " +
+                 "PAINTED gives 1,834 luma ridges and 0 depth ridges. On v4553's OWN penalty fixture the luma " +
+                 "gate reproduces its 26% exactly on 1,990 locks and the depth gate removes it ENTIRELY: 0%, " +
+                 "on 26 locks, which are the bar's own pixels. *** AND THE RESULT IS TWO-SIDED, WHICH IS THE " +
+                 "ROUND RATHER THAN A CAVEAT ON IT: *** on a 0.4 px line PAINTED on a flat wall the gate " +
+                 "refuses everything, giving away the whole 4.00x a luma lock buys there. Depth separates " +
+                 "GEOMETRY from TEXTURE, which is a different cut than THIN from NOT THIN, and v4553's limit " +
+                 "has not gone away -- it has been LOCALISED: a painted thin line and a pixel-scale texture " +
+                 "are the same thing to every buffer this pipeline carries. WHY THIS IS A RIDGE TEST AND NOT " +
+                 "A DEPTH-DISCONTINUITY TEST, on four hand-built fields: a wire gives 14, a SLOT 14, a " +
+                 "SILHOUETTE EDGE 0 and a TILTED SURFACE 0. Every object boundary is a depth discontinuity, " +
+                 "and locking them all would relax the clamp along exactly the silhouettes ghosting lives on. " +
+                 "TWO FINDINGS FOUND THE HARD WAY AND HELD AS ROWS. First, a single frame's depth finds ZERO " +
+                 "ridges on a sub-pixel feature, for v4553's reason restated on a different buffer -- so the " +
+                 "ridges are remembered over a period, and that memory is a LOCK with life = P rather than a " +
+                 "second mechanism. Second, that memory needs the SAME KILL RULES as the lock: it is " +
+                 "reprojected by motion vectors, this tree's describe the CAMERA, and with a still camera and " +
+                 "a moving bar 26 real ridges became 312 stale ones and the whole penalty came back. AND " +
+                 "v4552's WIDE-BOX FINDING REACHES THIS RUNG TOO: a lock only earns anything where the clamp " +
+                 "is BINDING -- 4.00x on a flat ground, 0.97x on a chequer, where the box already admits the " +
+                 "feature -- and those are the same pictures where the luma detector's false positives live. " +
+                 "Eight sabotages red at 5/1/3/7/1/2/3/3, TWO 0-RED FIRST and they are a PAIR: dropping the " +
+                 "vertical ridge axis was invisible on the CPU AND on the device, because every feature in " +
+                 "every picture here was VERTICAL and ridgeY was never once exercised. Not a mirror agreeing " +
+                 "with itself, which is the shape v4550, v4552 and v4553 each found -- BOTH sides implemented " +
+                 "a property no picture ever asked for. A horizontal wire now sits in section 1 and in the " +
+                 "device field. One earlier sabotage attempt did not apply at all (its anchor matched both " +
+                 "kernels) and its zero was recorded as a failed edit rather than read as a measurement.",
+    }),
+    since280: Object.freeze({
+        at: "v4553", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/temporalLock-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 2.14 s (2142/2124/2280 over three serial runs, under the 3000 ms sweep budget -- but " +
+                 "only after an optimisation; see below). PER-PIXEL STATE ACROSS FRAMES, AND A RUNG THAT " +
+                 "ANSWERS A REFUSAL RATHER THAN ADDING A FEATURE. v4552 wrote a shading-change detector three " +
+                 "ways and refused all three, because on a high-contrast surface a ONE-PIXEL JITTER MOVES A " +
+                 "PIXEL BY AS MUCH AS A LIGHTING CHANGE DOES. *** THAT REFUSAL STILL STANDS: a one-frame " +
+                 "detector is still refused and v4552 section 5 still holds it. *** What is shown here is that " +
+                 "a WINDOW can do what a frame cannot, and the reason is arithmetic. MEASURED FIRST, BEFORE " +
+                 "ANYTHING WAS BUILT ON IT: on a static jittered scene the worst difference between adjacent " +
+                 "window means is 2.365e-1 at one frame, 1.182e-1 at two, 1.577e-1 at THREE -- worse than two " +
+                 "-- 5.912e-2 at four, and EXACTLY ZERO at eight, the jitter phase count, because the same " +
+                 "phase offsets recur in both windows and cancel. Against a light-drop signal of 0.2331 that " +
+                 "makes a one-frame detector's signal-to-residue 0.99, which is v4552's refusal restated as " +
+                 "arithmetic. *** AND IT IS NOT MONOTONIC IN THE WINDOW LENGTH, WHICH IS THE DESIGN RULE: *** " +
+                 "the ring is jitterPhaseCount(ratio), not a taste parameter, and FSR2's 4 leaves 5.912e-2 " +
+                 "where the phase count leaves 0 -- a choice about memory, not accuracy. ON v4552's OWN TWO " +
+                 "FIXTURES: at a period of 8 the detector costs EXACTLY NOTHING, 3.660e-8 against 3.660e-8 " +
+                 "with no detection, THE SAME FLOAT TO THE BIT, where v4552's one-frame form cost 3.0e5x; a " +
+                 "period of 2 or 4 still costs 2.0e6x and 8.8e5x. It still catches the light change, worth " +
+                 "1.82x over the following 8 frames, and the price is ONE PERIOD OF LATENCY that is exact -- " +
+                 "the first four frames after the change are BIT-IDENTICAL to no detection, because both " +
+                 "windows still straddle it. THE LOCK is the other thing the ring buys: a single frame finds " +
+                 "ZERO lock candidates on a line 0.4 px wide (most jitter phases miss a sub-pixel feature " +
+                 "entirely) where the ring finds all 46, worth 3.14x on the feature while holding 2.0% of the " +
+                 "frame open -- and once the detector finds the feature every frame the LIFETIME STOPS " +
+                 "MATTERING, life 4/8/16 identical, so FSR2's lifetime is compensating for detection that " +
+                 "misses. *** THE LIMIT IS STATED WITH A NUMBER RATHER THAN LEFT TO BE FOUND: *** on a chequer " +
+                 "at the pixel scale the ring still locks 1,340 of 2,304 and the lock makes the ghost 26% " +
+                 "WORSE. There is no luma-only test separating a thin feature from a texture at the pixel " +
+                 "scale, because at that scale they are the same signal -- and v4552 established those are " +
+                 "exactly the pictures that matter. Ten sabotages red at 3/3/2/5/3/1/3/3/1/1 with one " +
+                 "deliberate 0-RED. *** THE 0-RED THAT MATTERED WAS THIS ROUND'S OWN OPTIMISATION. *** The " +
+                 "gate first ran at 3,180 ms, OVER the 3,000 ms budget -- the same fault v4551 and v4552 both " +
+                 "recorded, an over-budget gate being skipped and its control stopping. Profiling put 25.6% in " +
+                 "the harness serialising 313,000 numbers and 10% in the garbage collector, so the device " +
+                 "section moved to a quarter of the area and pushLuma began swapping a scratch pair instead of " +
+                 "allocating 147 KB a frame. Aliasing that pair with the live ring then changed NOTHING " +
+                 "anywhere in the gate: with zero motion the reprojection is the identity, so each pixel only " +
+                 "shifts its own slots. An optimisation whose safety nothing asserts is a defect waiting for a " +
+                 "different motion vector, and it now has two rows -- bit-identity against a fresh allocation " +
+                 "every frame, and the buffers staying distinct. The tenth sabotage, swapping back to " +
+                 "reallocation, is 0-RED BY RIGHT: it is behaviour-preserving and only slower, and performance " +
+                 "is held by sweep-timings and the budget rather than by a correctness row.",
+    }),
+    since279: Object.freeze({
+        at: "v4552", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/temporalReject-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 1.51 s (1509/1513/1492 over three serial runs, under the 3000 ms sweep budget). THE LAST " +
+                 "FOUR TEMPORAL ITEMS -- disocclusion, reactive masks, shading-change detection and the YCoCg " +
+                 "box. THREE SHIP AND THE FOURTH IS REFUSED BY MEASUREMENT, which is the round's result. *** THE " +
+                 "FINDING THAT ORGANISES ALL OF THEM: A NEIGHBOURHOOD CLAMP FAILS BY BEING TOO WIDE, NOT TOO " +
+                 "TIGHT. *** v4550 measured that from the other side without naming it -- its anti-ghosting row " +
+                 "cleared 2,304 pixels to 322 and the 322 were the EDGE pixels, where the 3x3 spans the range. " +
+                 "So every picture here is deliberately high contrast (mean 3x3 span 0.7549 of the range, " +
+                 "measured not assumed), because on a flat picture the clamp already does the work and any of " +
+                 "these would read as an improvement it is not. DISOCCLUSION is exact: 52 of 52 true positives " +
+                 "and 52 flagged, so no false positives either, and the ghost it prevents is 0.4256 rms of what " +
+                 "the clamp ALONE leaves. It needed a new input, and rather than re-derive the reprojection it " +
+                 "took render/motionVectors.mjs's fourth channel, which was a HARD-CODED ZERO, and made it " +
+                 "zPrev -- one line further down a reprojection that function already performed. THE REACTIVE " +
+                 "MASK removes 0.14885 rms the clamp cannot, and the gate says plainly that the masked rms is 0 " +
+                 "BY CONSTRUCTION and the informative number is what the clamp leaves. YCoCg IS THE FOLKLORE " +
+                 "CLAIM CUT DOWN: measured over 200,000 two-material neighbourhoods it is only 1.07x tighter, " +
+                 "not the decisive win, and neither box contains the other (RGB-only 4,745, YCoCg-only 4,257). " +
+                 "What IS real is which errors get through -- what RGB uniquely admits sits 16% farther from " +
+                 "any real neighbour. On a picture it buys 1.06x where a box can act and EXACTLY 1.00x, " +
+                 "identical to 0e+0, where the 3x3 touches the occluder: no box in any space can reject a " +
+                 "colour its own neighbours have. *** SHADING-CHANGE DETECTION IS REFUSED AND SECTION 5 IS THE " +
+                 "ROW THAT KEEPS IT REFUSED. *** Three formulations were written and measured -- point-vs-" +
+                 "history 2.3e5x, mean-vs-history 1.7e5x, mean-vs-previous-frame 2.5e5x -- and all three " +
+                 "destroy convergence on a static jittered scene, because on a high-contrast surface a ONE-" +
+                 "PIXEL JITTER MOVES A PIXEL BY AS MUCH AS A LIGHTING CHANGE DOES, and moving the sample point " +
+                 "by a pixel is what jitter is FOR. At a strength weak enough not to be degenerate it buys 1.5x " +
+                 "on the case it is sold for while still costing 3.0e5x on the case the arc is for; there is no " +
+                 "setting where the trade is worth making. It is not exported, and the gate re-derives it " +
+                 "inline so the refusal cannot be quietly undone. TWO CORRECTIONS TO CLAIMS THIS ROUND ITSELF " +
+                 "WROTE: the YCoCg round trip is NOT bit exact (42.4% of colours exact, the rest one ulp -- " +
+                 "which compounds to 1.8e-12 of an 8-bit LSB over 32 frames, so the concern was right and the " +
+                 "assertion was wrong); and the static-convergence scene was PHASE-LOCKED, its chequer cell " +
+                 "exactly one pixel and aligned to the grid, so 32 jittered frames came out bit-identical and " +
+                 "every variant read rms 0 and looked like a pass -- a picture with nothing to average is not a " +
+                 "test of an averaging pass. Nine sabotages red at 4/5/1/5/1/1/5/2/2, TWO 0-RED FIRST and both " +
+                 "the same fault: a value produced on one side and consumed on the other with nothing between " +
+                 "them asserting it. zPrev was blanked in the WGSL and NEITHER gate noticed -- the motion gate " +
+                 "read channels 0, 1 and 2, and this gate uploads a CPU-built motion buffer and never runs that " +
+                 "kernel; and the disocclusion THRESHOLD was decoration, because a 3-to-8 depth separation " +
+                 "makes every gap either 0.556 or exactly 0 and no threshold between them is distinguishable. " +
+                 "Both now have rows. A third sabotage was itself a no-op and is recorded as one.",
+    }),
+    since278: Object.freeze({
+        at: "v4551", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/temporalResolve-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        // *** THE SECOND HALF OF THIS ROUND WAS NOT PLANNED AND IS THE MORE IMPORTANT HALF. ***
+        // Re-taking the records after the resolve rung found FOUR of them stale, all naming the same five
+        // gates: assertionShape's census (1605 -> 1610), runtimeGap's twelve rows (4031 -> 4045 files and
+        // four rows moved), sweep-timings.json (no reading or stamp for any of the five), and redCensus,
+        // which still parked tslSource-selfcheck as red EIGHT ROUNDS after v4543 turned it green. Every
+        // round of the FSR arc ran gateSweep, instruments and sweepCoverage and called that the ritual;
+        // none of those four is in that set. v4548 already shipped a round titled "the ship ritual does not
+        // check half its own records" -- and its repair re-took the records instead of making the ritual
+        // reach them, so the same fault recurred five rounds later at four times the size. THE REPAIR THIS
+        // TIME IS THE RITUAL: recordDrift's pre-flight gained a sixth check, over the runtimeGap census,
+        // whose obligation OWES.runtimeGap had DECLARED since v4482 with nothing behind it -- the one clause
+        // of six that named a duty and never enforced it. Its stated obstacle ("the walker cannot leave its
+        // gate without putting fs into a module with zero imports") did not hold: recordDrift.mjs imports fs
+        // and exports the walker. Of the four stale records, that pre-flight now catches three; the fourth
+        // is named in reportLines as a gap WITH ITS REASON rather than left out, because the only cheap
+        // signal for a registered red is sweep-timings' codes table and that table said tslSource exited 1
+        // while it had exited 0 since v4543 -- a check reading it would have confirmed the stale
+        // registration instead of finding it. Sabotages BI/BJ/BK/BL/BM/BN red at 1/3/1/1/1/1, BN 0-RED
+        // first: the memo that keeps the new check inside the sweep budget was documented as keyed on the
+        // census function "so an injected fake is not served from cache", and nothing tested that -- a
+        // constant key left every other row green. Two further findings fell out. The check's first draft
+        // spelled the twelve capability labels in recordDrift.mjs and MOVED TWO OF THE ROWS IT CHECKS
+        // (performance.now 220 -> 221, raf 116 -> 117), because the census greps file text: a drift detector
+        // that changes the number it detects is not a detector, and the map moved to runtimeGap.mjs, which
+        // owns both tables. That move then moved WebGL 141 -> 142 and exposed the second: runtimeGap.mjs's
+        // own headline, "THE MODULE THAT DEFINES THE CENSUS MATCHES EVERY SINGLE ONE OF ITS OWN TWELVE
+        // PATTERNS", was FALSE and had been since the WebGL lookbehind landed -- the module matched eleven,
+        // the twelfth hit came from its gate, and the row passes because it derives over both files while
+        // its headline names one. And the check nearly repeated the fault it was written to fix: eleven
+        // checks() calls at 554 ms each took recordDrift-selfcheck from 1,799 ms to 6,813 ms, past the
+        // 3,000 ms budget that is exactly why these detectors go unrun; the memo brought it to 2,647.
+        verdict: "green, 1.04 s (1102/1040/1043 over three serial runs, under the 3000 ms sweep budget). THE PIECE " +
+                 "THAT MAKES IT UPSCALING RATHER THAN ANTI-ALIASING: v4550 accumulated at ratio 1, where the samples " +
+                 "and the output share a grid; this is the one place a render-resolution sample has to land BETWEEN " +
+                 "display pixels, and the whole thing turns on subtracting the jitter from the source position -- " +
+                 "srcPos = uv*renderSize - 0.5 - jitter. MEASURED against the same 256-sample analytic ground truth " +
+                 "at ratio 2: temporal 0.05541 rms vs EASU's 0.09317, which is 1.68x better than the best SPATIAL " +
+                 "upscaler in this tree, and better than one resolve (0.09582) or bilinear (0.09699). THE JITTER " +
+                 "SUBTRACTION ALONE BUYS 28% OF IT: run jitter-BLIND -- same frames, same accumulation, same kernel, " +
+                 "only the subtraction removed -- and the same pipeline reads 0.07102. WHAT UPSCALING COSTS, stated " +
+                 "in the one number that can state it: v4550's ratio-1 accumulation reaches 0.01041 and this reaches " +
+                 "0.05541, so 2x upscaling is 5.3x worse than not upscaling and the comparison worth making is " +
+                 "against other upscalers, not against native. The kernel is checked at its own values (1 at 0, " +
+                 "2.5e-17 at 1, -0.063684 at 1.5, 0 at 2 and 3) and the resolve is BIT EXACT at ratio 1 with zero " +
+                 "jitter -- worst 0.00e+0 -- which is the row that covers weight normalisation and nothing else does. " +
+                 "The dering clamp is asserted on BOTH sides independently: CPU undered [-0.0336, 1.0691] vs dered " +
+                 "[0.0000, 1.0000], and the DEVICE's own output [0, 1] vs its own undered [-0.1478, 1.1478], so the " +
+                 "property is measured on the device rather than inherited from the CPU. Confidence at 2x with zero " +
+                 "jitter is 0.6464 on every pixel = 1 - hypot(0.25, 0.25), the distance to the base texel, derived " +
+                 "and not declared. Period holds: frames 32 and 64 agree to 3.78e-10. Device parity worst 1.73e-5 = " +
+                 "4.4e-3 of an 8-bit LSB, stated in LSBs because a nine-tap sin() kernel in f32 against f64 will not " +
+                 "be bit-identical and what matters is whether a viewer could see it. Seven sabotages red at " +
+                 "1/3/7/2/1/1/2, no 0-RED. One was deliberately WGSL-ONLY (the base texel floored instead of " +
+                 "rounded) because v4550's two 0-REDs were both changes made to BOTH sides that left the mirror " +
+                 "agreeing; it caught at 1.43e-1, 36 LSBs. The thin one is the weight normalisation at 1 red, which " +
+                 "survives only because the identity row is bit-exact -- loosen that row and it stops being covered.",
+    }),
+    since277: Object.freeze({
+        at: "v4550", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/temporalAccumulate-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 1.38 s (1387/1356/1389 over three serial runs, under the 3000 ms sweep budget). THE FIRST " +
+                 "RUNG OF THIS ARC THAT MAKES A PICTURE, and the first that can test the claim the others rest on: " +
+                 "render/jitter-selfcheck.mjs can say the Halton sequence is low-discrepancy, but that the " +
+                 "accumulation CONVERGES TO A SUPER-SAMPLED RESULT is a claim about an image and nothing here blended " +
+                 "a history buffer. MEASURED against a 256-sample-per-pixel analytic ground truth: rms falls 0.05819 " +
+                 "-> 0.01653 (8 frames) -> 0.01041 (32), which is 5.4x better than the single point-sampled frame's " +
+                 "0.05675 -- and with the JITTER OFF the same accumulation reads 0.05675 at every one of 64 frames, " +
+                 "identical to one frame, so the jitter does the work and not the blend. The period is the phase " +
+                 "count (frames 32 and 64 agree to 2.8e-7 of the error). The anti-ghosting clamp costs 1.2% of " +
+                 "convergence on a static scene, and stops a ghost on 2,304 of 2,304 pixels down to 322 -- the edge " +
+                 "pixels, where the current frame's own 3x3 spans the range and the ghost is a value that could " +
+                 "legitimately be there. A HYPOTHESIS THAT DID NOT SURVIVE, recorded so it is not guessed again: the " +
+                 "residual is NOT v4549's off-centre bias -- 63 phases reaches 0.00489 at an offset of 1.4e-2 while " +
+                 "127 reaches 0.00553 at half that offset, so it is QMC sampling error on a hard edge and a phase " +
+                 "count picked by the offset would be picked wrong. TEMPORAL ANTI-ALIASING, NOT UPSCALING, and said " +
+                 "so: at ratio 1 the samples and the output share a grid; above 1 the jitter-aware Lanczos2 upsample " +
+                 "is its own piece. Seven sabotages red at 2/3/2/1/2/6/1 -- TWO OF THEM 0-RED FIRST and recorded as " +
+                 "findings: a nearest-instead-of-bilinear history fetch was invisible because every convergence row " +
+                 "holds the camera still (so the reprojection lands on a texel centre) and a change made to both " +
+                 "sides leaves the parity row agreeing; and a WGSL-only swap of the clamp's source was invisible " +
+                 "because the parity history was nearly the current frame. Both gaps were the same shape -- a " +
+                 "property that only shows under conditions no row arranged -- and both now have a row.",
+    }),
+    since276: Object.freeze({
+        at: "v4549", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/jitter-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 0.06 s (63/57/62 over three serial runs -- CPU only, no browser). THE THIRD AND LAST " +
+                 "PREREQUISITE the temporal path was missing: render/jitter.mjs holds the Halton(2,3) sub-pixel " +
+                 "sequence FSR2/3 offsets each frame by, and the PAIR of matrices that offset produces -- jittered " +
+                 "for rendering, unjittered for motion vectors. MEASURED: the radical inverse is exact against " +
+                 "hand-checkable values; the phase count is FSR's own 8*ratio^2 (8/32/72/128 at 1x/2x/3x/4x); a " +
+                 "(+0.5, +0.25) pixel jitter moves the projected point by exactly that at EVERY depth from 0.5 to 95 " +
+                 "units, to 3.6e-15 of a pixel, because it is applied as a CLIP-space translation and so works on a " +
+                 "view-projection and not only on a bare projection. *** THE PROPOSED PROPERTY 'the jitter cancels " +
+                 "exactly over a full period' IS FALSE AND THE GATE SAYS SO: *** a centred Halton mean vanishes " +
+                 "exactly at n = base^k - 1 (1,3,7,15,31,63,127,255 for base 2; 2,8,26,80,242 for base 3), those " +
+                 "sets never meet, no n up to 300 zeroes both axes, and FSR's 8*ratio^2 is not one of them -- at 32 " +
+                 "phases the sequence sits 1.5% of a pixel off-centre in x and 1.9% in y. Low discrepancy is measured " +
+                 "against 2,000 random draws rather than one: Halton's 4x4 occupancy spread is 2, random's median 5, " +
+                 "and random was better in 0 of 2,000. The coupling row is the point of the rung: with a STATIC " +
+                 "camera the unjittered pair reports 1.3e-7 of a pixel and the jittered pair 0.083 of a pixel of " +
+                 "motion that never happened, which is exactly the jitter difference between the two phases. Eight " +
+                 "sabotages, seven red at 2/3/5/3/2/1/1 -- and one 0-RED recorded as a finding: the sequence's " +
+                 "1-based start was asserted nowhere, because every row either called halton() directly or compared " +
+                 "the sequence against itself, so a row was added that pins the first element and refuses the " +
+                 "index-0 pixel corner, after which it goes red too.",
+    }),
+    since275: Object.freeze({
+        at: "v4548", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/motionVectors-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 0.75 s (750/747/741 over three serial runs, well under the 3000 ms sweep budget). PER-PIXEL " +
+                 "MOTION VECTORS and the previous-frame view-projection to make them from -- the prerequisite rung " +
+                 "fx/fsr's gate named when it said the temporal path cannot start here, and useful without it, since " +
+                 "a velocity buffer is what temporal AA, motion blur and any reprojection want. render/motionVectors.mjs " +
+                 "holds the history and the CPU reference, render/motionVectorsWgsl.mjs the WGSL, and it runs on a real " +
+                 "WebGPU device through gfx/device.js. MEASURED: a STATIC camera gives zero on every pixel to 8.1e-9 on " +
+                 "the CPU and 2.4e-5 of a PIXEL on the device, under BOTH clip conventions (GL's z in [-1,1] and " +
+                 "WebGPU's [0,1]), which is what makes the module's claim to be agnostic in z a measurement rather than " +
+                 "prose; a known camera move gives what an INDEPENDENT projection of the same point computes, to six " +
+                 "decimals, by a different path; PARALLAX goes as 1/distance with |velocity| * distance constant to " +
+                 "9.8e-4% across a 64x range; and a surface behind the previous eye comes back INVALID rather than " +
+                 "plausibly zero. The device parity bound is stated in PIXELS (2.4e-4 px) and not in fx/fsr's 1e-6: an " +
+                 "unprojection through an inverse matrix followed by a difference of nearly-equal uv values is " +
+                 "catastrophic cancellation by construction, and 1e-6 was a number copied from a better-conditioned " +
+                 "problem. The first frame has NO history and says so -- advance() returns null, because zero velocity " +
+                 "and no velocity are different answers and a temporal pass believes the first. Seven sabotages red at " +
+                 "5/2/2/6/1/1/2, none 0-RED; ignoring depth leaves both static-camera rows GREEN and is caught only by " +
+                 "the parallax row, which is why that row exists. Unchecked: a MOVING OBJECT (every row moves the camera " +
+                 "and holds the world still, so a per-object previous model matrix is its own rung), reading the depth " +
+                 "through dev.depthTexture() rather than handing it in, the JITTERED projection which is the third " +
+                 "prerequisite, and DISOCCLUSION, which `valid` does not catch.",
+    }),
+    since274: Object.freeze({
+        at: "v4546", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "fx/fsr/fsr-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "fx/fsr/fsr-selfcheck.mjs (v4547: RCAS, FSR1's other half, and the device run graded on BOTH denoise settings)",
+        ]),
+        verdict: "green, 1.42 s (1422/1502/1426 over three serial runs at v4547, from 1.02 s at v4546; well under the " +
+                 "3000 ms sweep budget). FSR1 -- EASU then RCAS -- as an ALGORITHM rather than a dependency: fx/fsr/fsr.js " +
+                 "transcribes the f32 references FsrEasuF and FsrRcasF from ffx_fsr1.h (MIT), fx/fsr/fsrKernels.js mirrors " +
+                 "them in WGSL statement by statement, and both run on a real WebGPU device through gfx/device.js. The " +
+                 "vendor-or-implement question was MEASURED: @pmndrs/upscaler@0.2.0 carries 2,743 lines of WGSL that import " +
+                 "no three at all and 3,331 lines of three.js DRIVER around them, and gfx/device.js already is that driver " +
+                 "-- the same reading fx/anime4k wrote into its own header two upscalers ago. MEASURED: the GPU picture is " +
+                 "the CPU reference's to 2.98e-7 (EASU) and 1.19e-7 (RCAS, both denoise settings) on every one of 12,288 " +
+                 "channels; a constant field survives both passes to 2.4e-8; EASU rings 0 of 12,288 channels outside the " +
+                 "four-nearest bounds and leaves 67 intermediate pixels on a pure diagonal where bilinear leaves 248; RCAS's " +
+                 "sharpness knob is monotone in Laplacian energy (11.09 -> 11.36) and its denoise pulls back 44% on grain " +
+                 "against 0.6% on a clean edge. TWO FINDINGS ABOUT RCAS's LIMITER, both recorded in the gate: its " +
+                 "denominators are 0/0 on flat black and flat white, where WGSL's NaN-swallowing max() silently resolves a " +
+                 "lone white pixel on black to 4.0 and JS's Math.max returns NaN -- both sides carry an epsilon now; and " +
+                 "RCAS_LIMIT keeps the resolve off the POLE of 1/(4*lobe+1) rather than bounding the output, so RCAS " +
+                 "overshoots a local peak (1.000 in, 1.166 out) and a caller writing 8 bits must clamp. SPATIAL ONLY and " +
+                 "said so: the temporal path wants depth, per-pixel motion vectors and a jittered projection with history, " +
+                 "and this tree has no motion vectors and no previous-frame view-projection matrix anywhere in it. Eleven " +
+                 "sabotages red at 2/2/2/1/2 (EASU) and 5/1/3/1/4/1 (RCAS), none 0-RED; dropping RCAS_LIMIT reaches " +
+                 "Infinity at the peak, which is that claim demonstrated.",
+    }),
+
+    // v4539 -- THE 233rd CLOSING, for the gate this round added.
+    since260: Object.freeze({
+        at: "v4539", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/groundProbe-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly: 6 pass, 77 ms. *** PIECE (3) OF terrain-controller CANNOT BE " +
+                 "CLOSED WHILE PIECE (2) IS OPEN, AND THAT IS A PROOF. *** An overhang really does read as a " +
+                 "wall -- the body stops at x=8.0000 on a covered walkway, refused by the STEP test and not " +
+                 "the slope test the entry's wording points at. But casting from the body's own height opens " +
+                 "the walkway to 20.0000 AND WALKS THROUGH A SOLID PILLAR to 20.0000, where the shipped " +
+                 "oracle correctly stops at 8.0000. Build the pillar to the roof's height and every surface " +
+                 "under a vertical ray is [5, 0] at both: BYTE-IDENTICAL, because a downward ray never " +
+                 "touches a side face and the side faces are the whole difference between a doorway and a " +
+                 "wall. The missing information is in the swept volume, which is piece (2). The entry also " +
+                 "points at an adapter with NO shipping caller while the live instance -- surfaceProbe's " +
+                 "standHeightAt, read by the bot manager and the pathfinder pool -- answers 21 for a body " +
+                 "standing at y=1. Sabotages A/B/C/D red by name, and TWO of them went 0 RED first: B " +
+                 "because deleting a side quad cannot move a number a downward ray produced (the row was " +
+                 "checking the thesis with the instrument the thesis calls blind, and is a horizontal ray " +
+                 "now), and C because I had the nudge backwards -- 0 works and 6 breaks it, the hazard being " +
+                 "a nudge too LARGE to stay above the next surface rather than too small to leave the last.",
+    }),
+    // v4538 -- THE 232nd CLOSING, for the gate this round added.
+    since259: Object.freeze({
+        at: "v4538", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/pathCost-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["nav/navmesh.mjs"]),
+        verdict: "green on this box, run singly: 6 pass, 362-376 ms. *** THE A* COST MODEL WAS FILED AS " +
+                 "UNGUARDED FOR TWENTY ROUNDS AND WHEN IT WAS MEASURED IT WAS ALSO WRONG. *** The item asked " +
+                 "for a fixture separating g + distance from a flat g + 1 and named a trap map that had " +
+                 "failed to. That map punishes GREEDINESS, and both models are greedy once the heuristic " +
+                 "dominates, so it could never have separated them. Ranking two routes OPPOSITELY by metres " +
+                 "and by polygon count is the question, and asking it found the planner declining a route it " +
+                 "can itself find: 193.13 m returned where the mesh holds 141.42, proved by splitting the " +
+                 "query -- 70.71 m to the diagonal's midpoint and 70.71 m onward, both legs planned by the " +
+                 "same planner on the same mesh. THE CAUSE IS ONE LINE, and not the one I predicted: I " +
+                 "guessed the staircase over-priced the diagonal, and it is the reverse -- the diagonal reads " +
+                 "140.71 against a walked 141.42 while the L accumulates 100.10 for a walked 193.13, " +
+                 "UNDER-PRICED BY 48.2%, because g chained entry point to portal MIDPOINT and a long portal " +
+                 "cuts a corner in proportion to POLYGON SIZE. Entering at the nearest point returns the " +
+                 "witness exactly, at six geometries. It moves NOTHING already measured, which is why the " +
+                 "round ships a fixture rather than a row: no gate the tree had would catch the repair being " +
+                 "undone. Sabotages A/B/C/D all 2 RED by name, and B WENT 0 RED ON ITS FIRST DRAFT because it " +
+                 "passed a third argument the callee never receives -- a sabotage that goes zero red is a " +
+                 "finding about the sabotage until proven otherwise.",
+    }),
+    // v4537 -- BOTH LINES APPENDED CLOSINGS IN THE SAME WINDOW AND BOTH REACHED FOR 223 AND 224. Main got
+    // there with seven of them, so these two are renumbered to 230 and 231 rather than main's renamed: the
+    // list shape exists exactly so a round appends and nobody renegotiates a name, and the side that merges
+    // second is the side that moves. FOURTH MERGE RUNNING where both lines re-took the same records.
+    // v4536 -- THE 230th CLOSING, for the gate this round added. *** THE ORDINAL IS A KNOWN COLLISION AND IS
+    // RECORDED RATHER THAN RENUMBERED: *** the entry below is stamped v4572 from the other line's counter,
+    // which runs ahead of the one main.js keeps -- main carried v4535 when that entry landed. The list shape
+    // is what makes that survivable; a round appends and nobody renegotiates a name.
+    // v4537 -- THE 231st CLOSING, for the gate this round added.
+    since258: Object.freeze({
+        at: "v4537", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/backlogAbsence-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly: 6 pass, 1,855-1,986 ms over three readings. *** THE " +
+                 "INSTRUMENT FOR GRADING ABSENCE CLAIMS HAD BEEN RUN ON ONE CLAIM IN ITS LIFE: ITS OWN. *** " +
+                 "absenceScope.mjs (v4435) separates OUT OF SCOPE from IN SCOPE AND MISSED from A DENIAL " +
+                 "COUNTED AS A PRESENCE, and gradeClaim() is called from one file -- absenceScope's own " +
+                 "selfcheck, on absenceScope's own frozen record. nextRounds.mjs carries the live absence " +
+                 "claims, NAMES the grader in its own prose, and imports node:url. Six live claims graded, " +
+                 "six hold -- and the acquittals are the argument, not the convictions: one entry's token " +
+                 "returns TWELVE code files tree-wide, every one outside the directory its author scoped the " +
+                 "claim to, because the same word names a matrix layout in math/solverFit.mjs. The seventh " +
+                 "row is a CONTROL that must convict, restating the off-branch entry's claim that this tree " +
+                 "has nothing resembling a GPU path tracer as a rendering feature: SIXTEEN code files in " +
+                 "scope and missed. Sabotages A 3 RED / B 1 / C 1 / D 2, and D is the thesis driven -- drop " +
+                 "the scope and a TRUE claim reads as false. *** AND THE FIRST DRAFT LANDED IN ALL SIX OF " +
+                 "ITS OWN CENSUSES, *** spelling its needles as string literals and quoting them again in " +
+                 "prose, moving two of them from one denial to two before it had graded anything: v4409's " +
+                 "rule for the sixth time this session, inside the check written to apply it. The gate also " +
+                 "first came in at 3,011 ms against the 3,000 ms budget because it cleared absenceScope's " +
+                 "read cache out of tidiness -- eleven milliseconds is not a failed gate, it is an EXILED " +
+                 "one.",
+    }),
+    // v4540 -- RENUMBERED 230 -> 234 AT THE MERGE. Main's v4584 reached for 230 while this branch's v4536
+    // already held it, which gateSweep's own duplicate-ordinal row caught -- a runtime read cannot see two
+    // object keys of the same name, the later one wins silently and the earlier round's swept count vanishes
+    // from the surplus arithmetic. FIFTH ORDINAL COLLISION between the two lines this session; the side that
+    // merges second is the side that moves.
+    since273: Object.freeze({
+        at: "v4554", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/kaijuGround-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly: 19 checks in six sections, 708-721 ms over three runs. "
+               + "*** THE KAIJU'S HEIGHT IS WRITTEN TWICE EVERY FRAME BY TWO RULES, AND THE ONE THAT WINS IS "
+               + "THE ONE NOBODY DESIGNED TO WIN. *** main.js calls camera.update() at :29660 and "
+               + "kaijuManager.tick(dt) at :29931, same frame, camera first. _moveKaijuDrive integrates a "
+               + "fall through fallBody.fallStep and writes k.position.y; KaijuManager.js:280 then assigns "
+               + "`k.position.y = gy` outright, guarded on k.state ALONE. Measured: the clamp overwrote the "
+               + "drive's answer on 300 of 300 frames. So v4548's work removing the fourth copy of 'fall "
+               + "until you land' from this path is correct and DEAD in the shipping frame order. "
+               + "*** AND THE OBVIOUS ONE-LINE FIX IS A CATASTROPHE, WHICH IS THE ROUND: *** guarding the "
+               + "clamp with _isPlayerDriven -- exactly what two writers for one quantity usually deserve -- "
+               + "drops 56 of 60 driven kaiju below y = -20 over five seconds of walking, against 0 of 60 "
+               + "with the clamp left alone. The drive cannot hold a body up: its probe is _fallSurface() at "
+               + "reach 0 so it has never once gained height, and its horizontal move is unguarded because "
+               + "_canStandAt has exactly ONE call site in the tree and it is the other controller in the "
+               + "same class. The redundant write is load-bearing by accident. FIVE SABOTAGES: K1 the naive "
+               + "guard 1 RED, K2 _terrainTop drops its +1 1, K3 the drive stops writing y 5, K4 the drive "
+               + "given a step-up 4, K5 the false comment restored 2. *** K2 WENT ZERO RED FIRST BECAUSE "
+               + "SECTIONS 2-4 DRIVE A TRANSCRIPTION OF _terrainTop *** -- a check grading its own copy, for "
+               + "the third time in five rounds; the copy is pinned to the source's text now. ALSO MEASURED "
+               + "AND DECLINED: _heightAt is the FIRST AIR index in 2,240 of 2,240 non-water samples, so "
+               + "_terrainTop's `return h + 1` is one voxel too high by the model's own convention and reads "
+               + "above the voxel stand height in every sample. NOT FIXED: gy feeds the flyers' cruise "
+               + "altitude, the swimmers' water line and the wake test, so a one-voxel correction moves every "
+               + "kaiju in the game -- a gameplay decision, not a census's. AND THE FALSE COMMENT IS "
+               + "CORRECTED: camera.js said the drive flag is set 'so AI tick skips'; the flag has exactly "
+               + "ONE use in the manager and it picks an animation clip.",
+    }),
+    since272: Object.freeze({
+        at: "v4552", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/walkGround-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly: 35 checks in eleven sections, 840-922 ms over three runs. "
+               + "*** THE WALK STOOD THE BODY INSIDE SOLID ROCK AND HAD DONE SINCE v404 MADE THE GROUND "
+               + "BILINEAR. *** _terrainTopAtBilinear blends up to four columns and so answers heights "
+               + "NEITHER has; _moveFP assigned one to position.y and nothing asked _canStandAt whether a "
+               + "body fits there -- that predicate has one shipping call site and it is the HORIZONTAL "
+               + "move. Measured on the generated world with an instrument sharing no code with the fix: "
+               + "56.56% of grounded frames and 36.13% of distinct standing positions buried, 67 of 128 "
+               + "ordinary walks frozen inside rock. After: 1.51%, 2.77%, 2 of 128. *** THE FINDING THAT "
+               + "DECIDED THE SHAPE IS THAT NO GROUND RULE IS BOTH LEGAL AND SMOOTH: *** a sub-voxel height "
+               + "on a unit lattice is by construction a height no column has, so the blend's smoothness IS "
+               + "its illegality, and the smoothness has to come from TIME instead. The body stands on real "
+               + "surfaces and the EYE eases toward it at 12/s, bounded by a snap guard between STEP_UP_MAX "
+               + "and CLIFF_DROP. *** THE HYBRID max(blend, legal) LOOKED LIKE A FREE LUNCH AND IS A STENCIL "
+               + "BUG: *** the blend samples the body's own cell and the three in +x/+z ONLY, so it leads "
+               + "the terrain by half a cell and that shift cancels the footprint lookahead one way and "
+               + "doubles it the other -- 0.4167 max |dy| on +x/+z ramps against 1.0000 on -x/-z. A hill "
+               + "that glides walking north and stairs walking south is a new defect; the four-direction row "
+               + "that catches it is new and no prior round had one. ELEVEN SABOTAGES: S1 18 RED, S2 10, S3 "
+               + "6, S4 2, S5 15, S6 15, S7 6, S8 3, S9 1, S10 4, S11 2. *** S8 AND S9 WENT ZERO RED FIRST "
+               + "AND BOTH WERE THE GATE'S OWN FAULT -- IT WAS GRADING A COPY OF THE SMOOTHER because "
+               + "update() wants a canvas, which is v4541's sabotage B in the round that keeps naming the "
+               + "species; camera.js grew _stepRenderEye so the gate drives what ships. S9 then still read 0 "
+               + "because a natural fall never trips the snap guard: MEASURED, gravity 18 at 60 Hz moves a "
+               + "body at most 0.45 in a frame, so the guard is for the ten external writers of position.y "
+               + "and the fixture teleports instead. *** S6 CARRIED A DECLARED STOP CONDITION AND SHARPENED "
+               + "THE ANSWER RATHER THAN TRIPPING IT: with BODY_RADIUS = 0 the residual burial goes to "
+               + "0.00%, so the clamp's entire residual is the RADIUS meeting the step-up reach limit. AND "
+               + "S11 FALSIFIED THE ROUND'S OWN PREDICTION: the design expected taking the walk off the "
+               + "blend to ORPHAN its stencil defect at 0 RED; it goes 2, because playerSlope and cameraFall "
+               + "drive the blend directly. Filed, not unguarded. NOT CLOSED AND SAID PLAINLY: whether a "
+               + "1.0-voxel step eased at 12/s LOOKS smooth -- no frame has been rendered at any rate by "
+               + "anyone in this round or its four measurement probes, so every smoothness number here is a "
+               + "trace and the perceptual question is a human's.",
+    }),
+    since271: Object.freeze({
+        at: "v4551", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/voxelAvatarDevice-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly: 6 checks, 2,796-2,928 ms over three runs -- OVER the 3,000 "
+               + "ms budget on purpose, which is the round. *** A GATE THAT BOOTS A BROWSER CANNOT FIT IN A "
+               + "SHIP-TIME BUDGET, AND THE CPU ROWS SHARING ITS FILE ARE EXILED WITH IT. *** "
+               + "tools/ship/voxelAvatar-selfcheck read 3,063 ms against 3,000, so the quick sweep skipped "
+               + "the WHOLE file -- including the rows that had actually caught a camera regression, v4545's "
+               + "repair being red there and green at HEAD. Timed by section: the walk 40 ms, the matrix "
+               + "twin 2 ms, both-backends ~2,800 ms. 42 MS OF 2,850 WAS CPU. The device half is a Chromium "
+               + "launch plus two GPU device initialisations already reduced to one origin call looping over "
+               + "both backends, so there is nothing to compress and 'make the gate faster' has one "
+               + "available meaning: make the SHIP-TIME gate cheap. Split here; voxelAvatar-selfcheck now "
+               + "runs in 102-138 ms, a 22-30x drop, with margin enough that it is no longer a straddler. "
+               + "*** NO COVERAGE MOVED DOWN AND THE COUNTS SAY SO: *** the whole file was over budget "
+               + "before, so both halves were covered only by the sweep rotation; 21 ok() sites became 17 + "
+               + "4 and 23 PASS rows became 17 + 6. AND THE v4522 BATTERY WAS RE-RUN ACROSS BOTH HALVES "
+               + "RATHER THAN THE NEW FILE MERELY PASSING: A 5 RED, B 12, C 13, D 4 -- every count IDENTICAL "
+               + "to v4522's, every sabotage caught by BOTH halves, and all four now caught at ship time "
+               + "where none of them was. A fifth sabotage deletes this file and reddens "
+               + "instruments-selfcheck by name, because physics/instruments.mjs carries a voxel-avatar-"
+               + "device entry: the device half cannot evaporate and leave a register claiming coverage "
+               + "nobody runs. *** AND voxelAvatar WAS ONE OF FIFTY-TWO: *** 95 gates call "
+               + "runInEngineOrigin and 52 were over the budget; the remaining 50 carry 698 ok() sites "
+               + "BEFORE their first harness call. That 698 is a CANDIDATE COUNT BY ROW POSITION AND NOT A "
+               + "MEASUREMENT OF TIME -- said plainly because only voxelAvatar was timed by section, and "
+               + "turning a candidate into a split means timing that gate the same way first.",
+    }),
+    since270: Object.freeze({
+        at: "v4550", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/playerWater-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly: 44 checks in twelve sections, 370-388 ms over three runs. "
+               + "*** camera/camera.js DECIDED 'IS THIS VOXEL SOLID' IN THREE PLACES AND ONE OF THEM SAID "
+               + "SOMETHING ELSE. *** _canStandAt's clearance loop carried `&& v !== 10 && v !== 11` -- "
+               + "water passable -- while _standYAt's surfaceProbe shim and _terrainTopAt's legacy scan "
+               + "both stood the body ON water. *** THE FILED ITEM SAID WATER WAS 'PASSABLE TO THE PLAYER "
+               + "AND SOLID TO EVERY BOT' AND HALF OF THAT IS WRONG: *** on a world generated from "
+               + "world/world.js, 3,721 columns of which 146 hold water, the player's own ground query and "
+               + "the bots' agree in 146 OF 146. The disagreement was between two functions in one file. "
+               + "*** WHAT IT COST, DRIVEN: THE PLAYER FELL OUT OF THE WORLD. *** Against a wall of stone "
+               + "from y=2 to y=9 the body stops at x = 9.583; against a wall of WATER of identical shape "
+               + "it walks IN to 13.333, finds no ground -- the probe needs two cells of AIR and water is "
+               + "not air -- and falls to feet -92.505 after 240 frames with vy -59.4, still accelerating. "
+               + "The bot oracle answers null for that column in BOTH worlds and never enters either, so "
+               + "the repair moves the player TOWARD the bots. One predicate now, Camera.isSolidToBody, "
+               + "which is world.isAir's rule: not air is solid. *** AND IT WAS ASKED ON ZERO REACHABLE "
+               + "SITES, WHICH IS WHY NOTHING SHIPPING MOVES: *** over every standable column, the "
+               + "four-neighbour cells holding water inside the body's own two-cell span number NONE -- a "
+               + "lake surface is level, so the land beside it stands above the water. The walk across a "
+               + "lake is byte-identical before and after, 300 frames grounded at feet 8. Section 8 holds "
+               + "that 0 and goes RED the day somebody floods a room, which is the row working. FIVE "
+               + "SABOTAGES: A 8 RED, B 12, C 3, D 16, E 4. *** THE FIRST BATTERY PUT EVERY RED IN THIS "
+               + "GATE ALONE -- six other camera gates green through all five, none of their fixtures "
+               + "holding a water voxel -- so a second keeper was written into controllerAgreement, the "
+               + "gate about the two controllers agreeing. *** AND THE FIRST COUNT WAS WRONG IN MY FAVOUR: "
+               + "*** it read one extra red per sabotage from playerGround, which was that gate's .js "
+               + "record-census pin going from six to seven under this round's own new record, firing with "
+               + "or without a sabotage. The pin is raised and the claim deleted. Three gate rows also "
+               + "went red against correct code because their regexes matched the very PROSE camera.js now "
+               + "carries about the removed exclusion -- 'a wiring row anchored on prose' for the third "
+               + "time this session; they read tools/ship/sourceScan.mjs's noComments now, which is the "
+               + "tree's own answer and has been since v4418. NOT CLAIMED: swimming. There is no buoyancy, "
+               + "no water drag and no swim state for the player anywhere in this tree, and the bots' only "
+               + "water rule is a speed multiplier off a ROOM record. A lake is a walkable floor here; "
+               + "this round makes the tree say so in one place instead of contradicting itself in three.",
+    }),
+    since269: Object.freeze({
+        at: "v4549", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/playerBody-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly: 12 checks in six sections, 145-152 ms over three runs. " +
+                 "*** THE THING THE PLAYER DROVE WAS A VERTICAL LINE. *** _canStandAt tested ONE lattice " +
+                 "cell -- floor(x), floor(z) -- so the body had no width, and none of v4541's capsuleMove " +
+                 "findings or v4543's capsuleGround ones could reach it. Driven diagonally between two " +
+                 "pillars that share a single corner and nothing else, the line body goes STRAIGHT " +
+                 "THROUGH to (15.80, 14.80): a slit of zero width admits a body of zero width. It has a " +
+                 "radius now, 0.4, which is capsuleGround's own, and stops at (11.56, 10.56); against a " +
+                 "wall face its centre stops 0.417 away rather than 0.083, which was one frame's travel " +
+                 "and not a body. *** A RADIUS ALONE MAKES THE PLAYER UNABLE TO CLIMB ANYTHING AND THE " +
+                 "FIRST DRAFT SHIPPED THAT: *** approaching a lip means the disc overlaps the column being " +
+                 "climbed at a height it is still solid at, so every ramp from 14 degrees up stopped dead " +
+                 "and the sandbox's one-voxel auto-step stopped being climbed. The footprint and the " +
+                 "step-up are ONE question; _stepTargetAt asks it. LIVE CENSUS over 14,641 standable cells " +
+                 "at 256 sub-cell positions each: at r = 0.4 NOT ONE CELL is fully lost, at 0.48 five " +
+                 "hundred and eighty-seven are, and the cliff is structural -- a disc of r >= 0.5 cannot " +
+                 "fit in a cell. *** THE CENSUS WAS WRONG TWICE BEFORE IT SAID ANYTHING, BOTH VACUOUSLY: " +
+                 "*** the first sampled CELL CENTRES and read 0 at every radius, which a disc of r <= 0.5 " +
+                 "cannot do otherwise; the second used offsets whose only distances to a cell edge were " +
+                 "0.125 and 0.375, so r=0.2 read identically to r=0.3 -- a grid coarser than the thing " +
+                 "measured. Seven sabotages: A 6 RED, B 1, C 12, D 0, E 16, F 2, G 5. D IS ZERO AND THAT " +
+                 "IS THE ANSWER: `support from any cell` and `from all` cannot differ, because the target " +
+                 "is only used to RAISE the body and a null falls back to the current height -- the code " +
+                 "comment claimed a distinction the driving does not support and was corrected. F CRASHED " +
+                 "camera.js rather than failing a row, an `out[0]` read on a seed that sabotage removes. " +
+                 "NOT CLOSED: the walk's bilinear ground can stand the body INSIDE SOLID ROCK, and could " +
+                 "before this round gave it a radius to notice with -- driven at v4548 with no radius at " +
+                 "all, feet at 3.000 in a cell solid to y=3. Clamping that brings back the stairs v404 " +
+                 "removed, so it is filed rather than chosen.",
+    }),
+    since268: Object.freeze({
+        at: "v4548", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/cameraFall-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly: 11 checks in seven sections, 67-72 ms over three runs. " +
+                 "*** THE TREE HAD FOUR IMPLEMENTATIONS OF 'FALL UNTIL YOU LAND' AND TWO OF THEM WERE SIX " +
+                 "LINES INSIDE A CAMERA. *** camera/camera.js integrates no gravity of its own now: " +
+                 "_moveFP's airborne branch and _moveKaijuDrive's vertical block are both calls to " +
+                 "physics/character/fallBody.mjs. *** AND THE TWO COPIES DID NOT AGREE WITH EACH OTHER " +
+                 "ABOUT THE ORDER OF THE TWO STEPS: *** _moveFP probed at the body's CURRENT height then " +
+                 "moved; _moveKaijuDrive moved then probed where it arrived. Driven on one fixture, one " +
+                 "body, one release height of 19.8, they answer ELEVEN VOXELS APART -- 21 against 10 -- " +
+                 "and nothing in the tree noticed one rule had two implementations that disagreed about " +
+                 "its central step. THREE DEFECTS CAME OUT WITH THE COPIES. (1) Both handed the WALKING " +
+                 "reach to a falling body, which is v4544's defect arriving via v4545's repair: a body " +
+                 "1.2 below a ledge was YANKED ONTO IT and one 1.3 below fell eleven voxels, the cut " +
+                 "sitting exactly at STEP_UP_MAX. (2) The kaiju's order TUNNELS THROUGH EVERYTHING the " +
+                 "moment the reach is honest -- with reach 0 every release from 19.7 to 25.0 falls past " +
+                 "both decks to the floor -- so its six lines only looked like they worked because the " +
+                 "walking reach let the probe see above where the body landed. One defect was concealing " +
+                 "the other and removing either alone makes it worse. (3) *** _kaijuDriveOnGround WAS A " +
+                 "LATCH: *** only landing set it, only jumping cleared it, so walking off a 38-voxel " +
+                 "cliff left it TRUE for the whole descent -- at frame 89, 34 units up and falling at " +
+                 "14.4 m/s, Space still gave a free jump. It is read off fallBody's own `airborne` now. " +
+                 "A THIRD DRAFT FED THE FALL THE CAMERA'S BILINEAR GROUND and landed a body with its feet " +
+                 "INSIDE SOLID ROCK: a walk crosses a boundary and wants two columns averaged, a LANDING " +
+                 "happens on ONE COLUMN, which is why fallBody ships voxelSurface over the integer probe. " +
+                 "Seven sabotages, none crashing: A 2 RED, B 2, C 1, D 7, E 5, F 3, G 3, every one caught " +
+                 "by this file too. B went ZERO here first -- section 5 compared two probes and never " +
+                 "dropped a body through either, so it asserted a property of the probes rather than " +
+                 "which one the fall asks. NOT UNIFIED: the camera's gravity of 18 and its absent terminal " +
+                 "are passed through explicitly, because v4547 measured both as gameplay decisions and " +
+                 "removing a duplicate must not smuggle one in.",
+    }),
+    since267: Object.freeze({
+        at: "v4547", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/controllerAgreement-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly: 12 checks in seven sections, 81-82 ms over three runs. " +
+                 "*** SIX CHARACTER-PHYSICS QUANTITIES, EIGHTEEN SITES, AND NOT ONE LINE IN THE TREE " +
+                 "COMPARED ANY TWO OF THEM. *** The player falls at 18 and every bot at 20; the player has " +
+                 "NO terminal velocity and a falling bot clamps at 55; the player refuses ground at 45 and " +
+                 "the shipping bots at 55. *** BUT THE CENTRAL RESULT IS THAT MOST OF THE DISAGREEMENTS DO " +
+                 "NOTHING: *** driven over every slope a voxel lattice can express, the bot numbers " +
+                 "(1.2/1.2/55) and the player numbers (1.2/1.5/45) give BYTE-IDENTICAL walks -- same x, y, " +
+                 "blocked and airborne on 45.0 up, 63.4 up, 45.0 down and 63.4 down -- so each row carries " +
+                 "a measured verdict, LIVE or LATENT, rather than a count. The two LIVE ones point OPPOSITE " +
+                 "WAYS and cross at about 150 units: from 100 a bot lands first, 189 frames against 198, " +
+                 "and from 2,000 the PLAYER lands first, 894 against 2,262, arriving at 267.9 m/s against " +
+                 "the bot's clamped 55 -- 4.87 times as fast. *** IT DOES NOT TUNNEL, WHICH WAS THE " +
+                 "HYPOTHESIS AND IS NOT THE ANSWER, *** so nothing is unified: changing either number is a " +
+                 "gameplay decision and a census does not make one. ALSO A CORRECTION TO v4546, the round " +
+                 "before and also mine: it set Camera.MAX_SLOPE_DEG to 45 saying that 'matches the bots', " +
+                 "and the bots ship 55 -- the 45 came from terrainWalk's module DEFAULT, which no shipping " +
+                 "caller reads. That is why every site here carries a `ships` flag. Eight sabotages, none " +
+                 "crashing: A 3 RED, B 5, C 5, D 3, E 3, F 2, G 1, H 1. TWO ROWS EXIST BECAUSE THE BATTERY " +
+                 "FOUND THEM MISSING: the first draft read `terminal` as AGREED, because an ABSENCE is not " +
+                 "a site and one value has nothing to differ from -- a check that cannot fail, on the " +
+                 "quantity with the largest gap in the file; and moving a NON-shipping default left every " +
+                 "row green, so the record now pins each site's VALUE and not only the counts.",
+    }),
+    since266: Object.freeze({
+        at: "v4546", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/playerSlope-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly: 13 checks in eight sections, 125-130 ms over three runs. " +
+                 "*** THE PLAYER HAD NO SLOPE LIMIT, AND WHAT IT HAD INSTEAD WAS A FRAME-RATE SWITCH. *** " +
+                 "_moveFP never computed a normal and decided `is this a cliff` by comparing ONE FRAME\'S " +
+                 "drop against 1.5 -- which is the exact anti-pattern physics/character/terrainWalk.mjs is " +
+                 "shaped around and names in its own header. Driven: one body, one speed, one 63.4-degree " +
+                 "slope, only the frame rate changing, it FELL AT 6 fps and WALKED DOWN IT GROUNDED at " +
+                 "10, 15, 20, 30, 60, 120, 144 and 240, covering 8.247 units per second along the ground " +
+                 "against a walk speed of 5. Measured in a real boot: 254 of 6,279 adjacent walkable " +
+                 "column pairs (4.05%) are steeper than terrainWalk\'s own 45-degree default, worst 88.1. " +
+                 "*** AND THE LATTICE EXPRESSES NOTHING BETWEEN 45.0 AND 60, MEASURED RATHER THAN " +
+                 "REASONED: *** all 1,826 pairs in the [45, 60) bucket are exactly 45.0, a one-voxel lip, " +
+                 "and every steep pair is 60 or more -- so 45, 50 and 60 refuse identical ground here and " +
+                 "45 is chosen to match the bots. The repair is a SECANT over a fixed one-column run, not " +
+                 "a normal: terrainWalk tests its limit on the normal and RECORDS IN THAT FILE that a " +
+                 "lattice defeats it (65.9 degrees over a one-unit lip, a fix written, measured and " +
+                 "reverted). *** THE FIRST DRAFT HAD THE SAME BUG IN A RATIO *** -- it took the run from " +
+                 "the frame\'s own travel, and a run that shrinks with dt shrinks INTO a lip whose rise " +
+                 "does not, so a 26.6-degree hill fell 76 frames of 240. Seven sabotages, none crashing " +
+                 "after a repair: A 5 RED, B 2, C 2, D 8, E 7, F 3, G 1. F and G went ZERO on this file " +
+                 "first while two other gates caught them, which added section 6; and three sabotages " +
+                 "CRASHED the gate instead of failing it, an eager detail string reading off a null -- " +
+                 "the FIFTH instance of that species this session, written one round after a header that " +
+                 "names it. WHAT DOES NOT CHANGE: the climb, because STEP_UP_MAX already admitted " +
+                 "1-per-column and refused 2-per-column and the lattice has nothing in between, so this " +
+                 "round changes the DESCENT and nothing else; and the speed convention, which is " +
+                 "HORIZONTAL where every bot is SURFACE -- named here rather than changed, because which " +
+                 "one the player uses is a gameplay decision and not a correctness one.",
+    }),
+    since265: Object.freeze({
+        at: "v4545", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/playerGround-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly: 15 checks in nine sections, 693-758 ms over three runs. " +
+                 "*** THE LAST FIVE ROUNDS GAVE THE BOTS A BODY-AWARE GROUND AND THE PLAYER READ NONE OF " +
+                 "THEM. *** camera/camera.js is a separate controller with its own gravity, its own " +
+                 "step-up, its own cliff rule and its own ground query, and _terrainTopAt scanned down from " +
+                 "y=80 and returned the first solid it met. Measured in a real boot over 1,681 columns: 921 " +
+                 "(54.8%) hold more than one place a body can stand, giving 2,687 such places, and the " +
+                 "topmost answer is right in 1,681 of them -- EXACTLY THE COLUMN COUNT, which is the " +
+                 "finding and not a coincidence. Worst gap 42 voxels. *** AND THE SYMPTOM IS NOT THE " +
+                 "TELEPORT IT LOOKS LIKE: *** the `dy > STEP_UP_MAX` guard holds, so the body is never " +
+                 "lifted -- vertical tracking DIES instead. Driven east into a cave whose floor rises one " +
+                 "voxel every four units, 260 frames: HEAD stops at x=13.92, y=2.70 AND STAYS, onGround " +
+                 "stuck true, no fall even with the floor removed; the repair tracks 2.70 -> 3.70 -> 4.70 " +
+                 "-> 5.70 -> 6.70 and reaches x=27.17. A frozen body in a cave is a STUCK PLAYER. *** THE " +
+                 "REPAIR\'S FIRST DRAFT DID NOT APPLY AT ALL: *** it gated on hasVoxels(this.world) and " +
+                 "the camera\'s world interface has always been `voxelAt` while surfaceProbe\'s is `isAir` " +
+                 "plus `chunkHeight`, so the branch was never entered and every fixture went on showing " +
+                 "the defect -- \'a check nothing reaches\', in code. A four-line shim adapts the one to " +
+                 "the other so the GATED rule runs rather than a third copy of it being written. Six " +
+                 "sabotages, none crashing: A 4 RED, B 8, C 5, D 4, E 2, F 1 -- and E and F went ZERO on " +
+                 "the first battery, which is what added two rows. E (the not-found fallback) was " +
+                 "invisible because the only fixture for it was an EMPTY world, where the topmost scan " +
+                 "also answers 0 and both arms agree by accident; the discriminating fixture is a body " +
+                 "under a floating slab, which a fallback would teleport six voxels up through solid " +
+                 "stone. F is not a defect and is recorded as one: replacing Camera.STEP_UP_MAX with the " +
+                 "literal 1.2 inside _moveFP changes no behaviour, because *** THE WALL BRANCH CANNOT FIRE " +
+                 "-- dy <= STEP_UP_MAX BY ARITHMETIC once the probe is given the feet *** (0.083333 max " +
+                 "over a 260-frame four-voxel climb, 0 firings), so the load-bearing use of that constant " +
+                 "is the PROBE\'S REACH and the row for it is a wiring row anchored on the functions\' own " +
+                 "text. That branch\'s comment claimed _canStandAt had already blocked such moves; section " +
+                 "3 drives _canStandAt at a cave floor and gets TRUE, so the reason was false and has been " +
+                 "replaced by the arithmetic one. *** AND THE PRE-FLIGHT STAYED GREEN THROUGH A ROUND THAT " +
+                 "ADDED A RECORD, WHICH IS THE ONE THING IT EXISTS TO NOTICE: *** frozenRecords.census() " +
+                 "narrows to `.mjs` one line before the record search, so PLAYER_GROUND_AT_V4545 in " +
+                 "camera/camera.js is invisible to it, along with ADDED_AT_V4403 and MEASURED_AT_V4463, " +
+                 "which have been outside every headline that module ever published. Section 9 pins the " +
+                 "hole at three records and is written to GO RED the day somebody widens the walk -- not " +
+                 "repaired here because the widening also reddens a REPLAY of commit 75f0c033 that was " +
+                 "taken with the same narrow ruler.",
+    }),
+    since264: Object.freeze({
+        at: "v4544", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/fallBody-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly: 12 pass, 59-64 ms. Backlog terrain-controller piece (1), " +
+                 "the vertical half nothing in this tree played -- and the round found the entry names the " +
+                 "WRONG STATE. *** AT A CLIFF, EVERY ADAPTER A LIVE WORLD USES REPORTS blocked AND NEVER " +
+                 "airborne *** (lattice 165 blocked / 0 airborne over 200 frames, functionGround the same, " +
+                 "meshGround the opposite at 153 airborne), because the drop reads as a steep slope and the " +
+                 "slope test runs before the step test. What DOES reach airborne is a body ABOVE the ground " +
+                 "-- 1.2 up is grounded and 1.3 up is airborne at snapDown 1.2 -- and simulation/" +
+                 "BotManager.js branched on `grounded || blocked`, so every such body fell to a line that " +
+                 "wrote world._heightAt(x, z) + BOT_EYE: the terrain MODEL, in ONE frame, with no fall and " +
+                 "no voxel check. MEASURED IN A REAL BOOT over 441 columns, that write disagrees with where " +
+                 "a falling body lands in 167 of them (37.9%), by up to 44 voxels, and lands INSIDE SOLID " +
+                 "ROCK in 39 (8.8%) -- the defect v4542 repaired, on the branch v4542 did not touch, and " +
+                 "the standing-still line undid v4540 the same way by writing the model every frame. Both " +
+                 "fall now: at column (-57,-60), standable at 12 and 23, a bot from y=43 falls 81 frames " +
+                 "and lands at 24, and one starting BETWEEN the surfaces at 17.5 falls 35 frames to 13 " +
+                 "where the old line snapped it to 24, eleven voxels UP. *** THE PROBE TAKES NO REACH AND " +
+                 "THE FIRST DRAFT LIFTED A FALLING BODY: *** stepUp is how far a body may CLIMB, and with " +
+                 "1.2 a body falling from 20.5 was put at 21 in one frame instead of falling to 9 in 64. " +
+                 "AND THE FALL CANNOT TUNNEL, structurally rather than by substepping -- the oracle is " +
+                 "re-asked at the body's current height and returns the first surface below it, so a drop " +
+                 "onto a thin ledge lands on it at initial speeds from 1 to ten million, where capsuleMove " +
+                 "must substep because its query is local and this one is a column. Six sabotages, none " +
+                 "crashing: A 2 RED, B 5, C 1, D 1, E 6, F 1. Two of the file's OWN rows failed first: one " +
+                 "called a record method that does not exist and CRASHED instead of failing, the fourth " +
+                 "instance of that species this session; the other anchored on the comment 'standing still' " +
+                 "and went red when this same round rewrote that comment in capitals.",
+    }),
+    since263: Object.freeze({
+        at: "v4543", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/capsuleGround-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly: 13 pass, 327-351 ms over three runs. Backlog " +
+                 "terrain-controller piece (3), the ground that is not a function of (x, z). *** THE " +
+                 "SHIPPED ADAPTER ANSWERS x = 8.000 FOR FIVE DIFFERENT WORLDS *** -- a bridge you fit " +
+                 "under, a pillar you do not, a roof at 1.8 that clears a 1.8 body, a roof at 1.7 that does " +
+                 "not, and a solid wall -- and on a sixth, a doorway whose jamb the body clips, it walks the " +
+                 "body THROUGH to x = 20. One number for five worlds is not caution. The body-aware oracle " +
+                 "gives five different answers and the sixth is 7.583. *** SIX FORMULATIONS WERE BUILT AND " +
+                 "FIVE DIED TO A FIXTURE THE ONE BEFORE IT DID NOT HAVE, *** which is the round's real " +
+                 "content and is written into the module header: cast-from-the-body walks through the " +
+                 "pillar because the ray STARTS INSIDE the stone; refuse-on-any-contact refuses every ramp, " +
+                 "because a capsule placed at a surface point cuts any slope; refuse-on-sideways-push and " +
+                 "refuse-on-depth both fail because the ranges OVERLAP (a 45-degree ramp displaces 0.0828 " +
+                 "and penetrates 0.1172, a wall displaces 0.1 to 0.3 and a roof 0.1 too low penetrates " +
+                 "0.1000); and falling back to the sky when obstructed walks a body through a DOORFRAME, " +
+                 "because a refusal answered by the oracle it just refused is not a refusal. The sixth " +
+                 "classified every contact and a 26.6-degree ramp then refused ITSELF at x = 13.597, at its " +
+                 "own tessellation seam -- v4541's internal-edge artefact arriving from the other side, and " +
+                 "its conclusion, deepest-first, holds for CLASSIFYING as it did for RESOLVING. What ships " +
+                 "classifies the deepest contact by DIRECTION against stepTerrain's own slope limit. Seven " +
+                 "sabotages, none crashing: A 8 RED, B 8, C 3, D 8, E 1, F 1, G 2 -- and TWO PREDICTIONS " +
+                 "WERE WRONG IN THE SAME DIRECTION, B and D predicted at 2 and 1 and measured at 8 apiece, " +
+                 "because neither defect fails narrowly once the descend loop is load-bearing. NOT CLAIMED: " +
+                 "step-up, which neither this nor capsuleMove does -- both stop a 0.4 body at x = 7.6 " +
+                 "before a 0.4 riser, independently, and a riser of 0.2 IS mounted by capsuleMove's bottom " +
+                 "sphere; and containment, because `contacts` is a SURFACE query and a body fits inside a " +
+                 "wall thicker than its own diameter (0.79 blocked, 0.80 clear, and 0.80 is 2r).",
+    }),
+    since262: Object.freeze({
+        at: "v4541", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/capsuleMove-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly: 15 pass, 242-275 ms over three runs. Backlog " +
+                 "terrain-controller piece (2), capsule against triangles, which v4539 proved is the blocker " +
+                 "under piece (3). *** THE SEPARATION IS THE ROUND: *** a bridge and a pillar of the same " +
+                 "height give byte-identical columns to any downward ray -- [5,0] and [5,0] -- and one " +
+                 "capsule rule with no ground oracle at all walks under the first to x=20 and is stopped by " +
+                 "the second at x=7.6, which is x0 minus the RADIUS at four different radii. FOUR THINGS " +
+                 "MEASURED BEFORE BUILDING AND THREE CHANGED THE DESIGN: the closest-point direction is the " +
+                 "zero vector for EVERY depth past the axis crossing and the depth saturates at the radius, " +
+                 "so the formulation has a domain rather than a tolerance; that domain's boundary is the " +
+                 "radius EXACTLY, bisected to twelve decimals -- 0.2 per frame stops, 0.4 walks through four " +
+                 "square metres of stone, with 0 dropped degenerate contacts on one side and 2 on the other, " +
+                 "so the dropped contact IS the tunnel; summing every contact drifts a body 0.63 m sideways " +
+                 "and costs 2.55 m of progress on a PERFECTLY FLAT tessellated floor, while deepest-first " +
+                 "drifts exact zero and handles an inside corner identically; and every floor triangle in " +
+                 "this tree's own fixtures is wound INWARD (n.y = -1), so nothing here may read a cross " +
+                 "product -- reversing the winding of both fixtures gives bit-identical walks. AND THE GATE " +
+                 "CONVICTED THE MODULE'S OWN JUSTIFICATION: the header claimed five boundary sub-problems " +
+                 "were complete because 'a segment that crosses the triangle reports zero in all five'. It " +
+                 "does not. A body with a thin ledge through its chest reads 0.400000 -- exactly the radius, " +
+                 "so depth 0, so NO CONTACT AT ALL. The sixth sub-problem is meshBVH's own rayTriangle. Five " +
+                 "sabotages, A 2 RED, B 2 RED, C 2 RED, D 8 RED, E 2 RED -- and TWO WENT 0 RED FIRST, " +
+                 "neither the module's fault: A and E crashed the gate instead of failing it (an eager " +
+                 "detail string reading degenerate[0] under the sabotage that empties it, inside a run " +
+                 "already red elsewhere), and B found section 5 grading a hand-rolled COPY of depenetrate " +
+                 "rather than the shipped one.",
+    }),
+    since261: Object.freeze({
+        at: "v4536", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/partitionScore-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly: 9 pass, 483 ms. *** THE ROUND REFUSED THE BACKLOG ITEM IT WAS " +
+                 "STARTED TO BUILD, AND THE REFUSAL IS ARITHMETIC RATHER THAN OPINION: *** navmesh-recast piece " +
+                 "(1) says a 45-degree wall becomes 737 thin rectangles where a contour mesh would give a " +
+                 "handful. Lipski/Ohtsuki gives the minimum rectangle partition as N - L + 1 - H = 738 reflex " +
+                 "- 0 chords + 1 - 2 holes = 737, exactly what the sweep emits, and a union of axis-aligned " +
+                 "unit cells is convex only when it is a rectangle -- so the sweep is OPTIMAL and nothing on " +
+                 "the lattice can beat it. Seven sabotages: A vertical mutual test deleted RED, B horizontal " +
+                 "RED, C max-matching term dropped RED, D hole term dropped RED, E inRing made total RED, " +
+                 "G mutualViolations Z clause RED -- and F, its X clause, WENT 0 RED, because the conviction " +
+                 "fixture built its wrong label on one axis only. That is the same defect the gate exists to " +
+                 "report, reproduced inside it on the first try; it convicts on both axes now and F is red. " +
+                 "The finding the round shipped for: deleting the row sweep's VERTICAL mutual-step test left " +
+                 "navmesh, navWiring, navWiringLive and funnel ALL GREEN while returning a 110 m path UP a " +
+                 "cliff on a z-oriented ledge, one axis of a two-axis correctness property ungraded in the " +
+                 "gate whose own section 7 exists BECAUSE A SABOTAGE DID NOT FIRE.",
+    }),
     // v4576 -- the 225th closing: a tier for the guardians the sweep cannot afford, and it caught two on sight.
     since229: Object.freeze({
         at: "v4582", swept: 1, green: 1, red: 0,
@@ -5085,6 +7836,6305 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "it (interior mean 441 against 254); and one sabotage's anchor had gone stale against a " +
                  "multi-line ternary and was reported as green rather than as missing.",
     }),
+    // v4630 -- THE 242nd CLOSING, and a note on why it is a NEW key rather than an edit to since250. The first
+    // attempt overwrote since250's `added` list with this gate's name, which kept the total at 290 and silently
+    // dropped tools/ship/murmurSpecies-selfcheck.mjs from the tally -- the equality below went red by exactly
+    // one and said so. A closing is a dated FACT about a round, not a slot to reuse.
+    since251: Object.freeze({
+        at: "v4630", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurSpecies2-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2.2 s, real WebGPU, 9 rows. SPLIT OUT of tools/ship/murmurSpecies-selfcheck.mjs and " +
+                 "made BEFORE the species that forced it rather than after -- which is the whole point. That " +
+                 "gate stood at 2,780 ms against a 3,000 ms ceiling with FOUR of murmur's eighteen species " +
+                 "ported, and a species costs about 195 ms (one WGSL compile plus one render), so the fifth " +
+                 "crossed it. reuseInstances was already spent: ten frames built five shaders. A gate over " +
+                 "budget does not run at ship time AT ALL, so the round that adds the species that crosses the " +
+                 "line is the round whose red nobody sees. THE CUT IS BY SUBJECT, NOT ALPHABET: what needs " +
+                 "SEVERAL HEROES IN ONE FRAME SET (the rim ranking, the ring's evenness, the contact glow, the " +
+                 "paper ground) stays next door; what needs ONE HERO AT SEVERAL TIMES (comet's point going " +
+                 "round its orbit, droplet's body wobbling) is here. Those are different frame budgets -- three " +
+                 "shaders at one time each against two shaders at four times and two -- and keeping them apart " +
+                 "is what stops either gate paying for the other's frames. 19 rows before the split and 19 " +
+                 "after, counted: 10 there and 9 here, nothing dropped in the move. The MEASUREMENTS both gates " +
+                 "use live in tools/ship/murmurSpeciesFrames.mjs rather than being copied into each, because " +
+                 "two gates with their own idea of what the light at a point IS eventually disagree about what " +
+                 "they measured -- the defect this tree has repaired in its own census records three times. " +
+                 "Timings after: 1,937 ms there, 2,194 ms here, roughly 800 ms of headroom apiece.",
+    }),
+    // v4632 -- THE 243rd AND 244th CLOSINGS. New keys, not edits to since251: a closing is a dated fact
+    // about a round.
+    since252: Object.freeze({
+        at: "v4632", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurSpecies3-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2,357 ms on the rotation, real WebGPU, 9 rows. Carries OPAL and ABYSS, the fifth and sixth " +
+                 "of murmur's eighteen, and it is a third gate rather than more rows next door because these " +
+                 "two need a THIRD frame budget: gate one wants several heroes at one time, gate two one hero " +
+                 "over a SHORT span, and these two one hero over TWENTY SECONDS -- abyss's slot at these " +
+                 "knobs is 16.48 s and opal's four lives run at 14.3 to 22.4, so sampling them in a " +
+                 "2.2-second window would measure nothing. THIRTEEN FRAMES AND TWO SHADERS, and all three " +
+                 "numbers are budget decisions: a first cut at six times and fifteen frames measured 3,097 " +
+                 "ms; four abyss lane frames later took it to 2,956, which is green and is NOT enough margin " +
+                 "when the run-to-run spread is about 100 ms and eviction needs two consecutive crossings; so " +
+                 "the neutral third SPECIES went, costing a WGSL compile as well as a render. What that cost " +
+                 "is named in the file rather than glossed: two rows that read against `still` now read " +
+                 "against opal, the numbers got STRONGER (abyss's edge outruns opal's by 112x where it " +
+                 "outran still's by 10x) and the CLAIM GOT NARROWER -- 'the highest rim in the roster' is a " +
+                 "ranking over eighteen and neither version of that row ever measured it. THE FOUR SAMPLE " +
+                 "TIMES ARE CHOSEN BY THE CPU HALF, not spaced evenly: mhFlourish is the same envelope the " +
+                 "shader runs, so it says which of abyss's three lanes is passing when -- two nights, one " +
+                 "third-lane pass and one first-lane pass -- and that is what lets the hue row name a LANE " +
+                 "instead of a moment. ONE ROW WAS REBALANCED BEFORE SHIPPING: the rarity swing reads 31.8x " +
+                 "at six sample times and 8.8x at four, because the PEAK depends on whether a sample lands on " +
+                 "a pass while the FLOOR is in every frame -- so the limit sits at 4x and the floor plus the " +
+                 "count on it carry the row, rather than a bound set at a lucky maximum.",
+    }),
+    // swept is 1 and not 2, and the gate that would have taken it to 2 is named in the verdict instead:
+    // tools/ship/murmurSpecies2-selfcheck.mjs was RE-swept in this round, not added by it, and `added` is the
+    // list of new gates. gateSweep-selfcheck asserts added.length === swept on every closing precisely so a
+    // re-sweep cannot be counted as coverage of a gate the surplus arithmetic already owns.
+    since253: Object.freeze({
+        at: "v4632", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurSpecies4-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2,095 ms on the rotation, real WebGPU, 5 rows -- and the gate it was split " +
+                 "OUT of, tools/ship/murmurSpecies2-selfcheck.mjs, re-swept green at 2,000 ms from a " +
+                 "recorded 2,260 and a measured ~2,740 on this box. " +
+                 "*** THE TRIGGER WAS A PAIRED MEASUREMENT, WHICH IS THE ONLY KIND THIS BOX CAN SUPPORT. *** " +
+                 "droplet's swell pair cost 206, 264, 216 and 287 ms over four INTERLEAVED runs of the two " +
+                 "versions of gate two, taking it from about 2,740 to about 2,980 against the 3,000 ms " +
+                 "ceiling. Interleaved because the box is not the box the timings file was written on: gate " +
+                 "one, UNCHANGED this round, reads 2,776 ms against a recorded 2,016, and murmurKit 1,754 " +
+                 "against 1,633 -- so a single before-and-after pair would have blamed the box's drift on the " +
+                 "change or the change on the box. An earlier unpaired attempt did exactly that and read the " +
+                 "four frames as free. THE TWO HEROES NEVER SHARED A FRAME: comet needs four phases of a " +
+                 "2.2-second lap, droplet two times eight seconds apart on 76-to-134-second periods. This is " +
+                 "the third split in the murmur tree and all three were made BEFORE the addition that would " +
+                 "have crossed the line -- v4626 between the kit and the species, v4630 between gate one and " +
+                 "gate two, this one between comet and droplet. TWO ROWS WERE FOUND STATING FIGURES THAT DO " +
+                 "NOT REPRODUCE while moving them: comet's hotspot row claimed still's catchlight travels " +
+                 "0.067 radii at 48 px and 0.071 at 64 and that it 'must not be asserted as zero' -- it reads " +
+                 "0.000 and 0.050, and zero is CORRECT, because the key turns 0.35 degrees across comet's lap " +
+                 "and a hotspot is an integer pixel. Its ratio clause was therefore satisfied by anything and " +
+                 "printed '1150352337x less' out of its own divide-by-zero guard; the two sides are bounded " +
+                 "separately now. droplet's silhouette row quoted 71.3/31.3% against 9.5/3.8% and 'roughly " +
+                 "EIGHT HUNDRED TIMES apart'; on the frames that run it is 74.09/71.03% against " +
+                 "10.977/11.437%, a 6.7x and 6.2x ratio, because still stopped being drawn as a sphere.",
+    }),
+    // v4633 -- THE 245th CLOSING: a gate that was RED for nine rounds because it was 27 ms over budget.
+    // swept is ZERO and that is the honest count, not a formality: this closing ADDED no gate, so it owes
+    // the surplus arithmetic nothing. gateSweep-selfcheck asserts added.length === swept on every closing
+    // precisely so a re-sweep cannot be counted as coverage of a gate the population already owns -- the
+    // same rule that corrected v4632's since253 a round earlier. What this entry records is a VERDICT.
+    since254: Object.freeze({
+        at: "v4633", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** NO GATE WAS ADDED AND THAT IS THE POINT: tools/ship/inputSets-selfcheck.mjs ALREADY " +
+                 "EXISTED, WAS ALREADY RED, AND HAD BEEN SINCE THE v4622 MERGE. *** It was recorded at 3,027 " +
+                 "ms against the 3,000 ms quick-sweep budget -- 27 milliseconds over -- so the sweep skipped " +
+                 "it every round and its red was seen by nobody until v4632 ran the cascade by hand. That is " +
+                 "backlog item #14's own shape, arriving on a gate rather than on a population. Both halves " +
+                 "are repaired: the red is fixed and the gate is 2,052 ms on the rotation, 948 ms of margin. " +
+                 "WHAT THE RED WAS: its own record carried 130 conflicting paths, and a conflicting path is " +
+                 "refused for EVERY gate that touches it -- 283 of 1,293 gates, against 23 refused by a hash " +
+                 "that genuinely differed. The conflicts were not a race in the recording pass, which is " +
+                 "what the code's own note had claimed for six rounds; they were tools/ship/recordInputs.mjs " +
+                 "seeding each pass with the PREVIOUS record, so a carried entry's T0 hashes folded with a " +
+                 "fresh pass's T1 hashes. *** AND THE RACE THE SENTINEL WAS NAMED FOR CANNOT FIRE AT ALL: *** " +
+                 "hashFile is memoised for the life of a pass, so a gate that rewrites a file another gate " +
+                 "already read hands the late reader the EARLY hash -- driven on a real file in the gate, " +
+                 "which reports zero conflicts for a write that demonstrably happened. So the recorder now " +
+                 "VALIDATES its prior instead of blending it, and the real hazard got a reading that can see " +
+                 "it: re-hash every recorded path AFTER the pass with the memo cleared, 630 ms over 13,073 " +
+                 "paths, which finds two gitignored outputs that gates write on every single run. NINE " +
+                 "SABOTAGES, ALL RED. The gate came down from 7,439 ms by measurement rather than by " +
+                 "deletion: a transitive-closure fixture that cost 3,016 ms became one that costs 167 and " +
+                 "names the file it proves (brain/flowfieldCpu.js, reached only through dispatch.js); three " +
+                 "probes of one gate became one; and a section that cloned the 1,302-entry record three " +
+                 "times stopped doing that. Every row it had is still there.",
+    }),
+    // v4634 -- THE 246th CLOSING: nebula and tempest, the pair murmur's own source names.
+    since255: Object.freeze({
+        at: "v4634", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurSpecies5-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2,663 ms on the rotation, real WebGPU, 9 rows, carrying NEBULA and TEMPEST -- the " +
+                 "seventh and eighth of murmur's eighteen and the only two with NO OBJECT INSIDE THE GLASS AT " +
+                 "ALL. They ship together because the source pairs them: tempest.ts opens \"NEBULA'S SIBLING " +
+                 "AND ITS OPPOSITE TEMPERAMENT ... Nebula is lit evenly from within and its business is " +
+                 "DEPTH. This one is lit from INSIDE ITS OWN FLASHES ... and its business is ENERGY.\" They " +
+                 "call a BYTE-IDENTICAL kit set (diffed) and are the only two of the eighteen that never " +
+                 "call mh_medium, so the pair needed no new kit. MEASURED: tempest holds its lightning to " +
+                 "the inner two thirds and its rings at 0.62 and 0.78 of the radius move EXACTLY 0.00% under " +
+                 "its own brightness knob, where nebula -- which has no depth mask -- moves 20.08% at the " +
+                 "same radius off the same knob, and tempest's own 0.25 ring moves 246%; its interior runs " +
+                 "12.5x from tenth to ninetieth percentile against nebula's 6.3x. THIRTEEN SABOTAGES, ALL " +
+                 "RED, and FOUR survived the first cut. Three were constants inline in the species file -- " +
+                 "tempest's absorption at 3.60 against nebula's 3.10 (the coefficient nebula.ts calls \"THE " +
+                 "LINE\"), its density curve, its specular -- all changeable with every row green, so they " +
+                 "moved into the kit as MH_MIST and MH_TEMPEST_BOLT and are graded there. *** THE FOURTH WAS " +
+                 "A ROW MEASURING THE TONE CURVE AND REPORTING IT AS THE PHYSICS. *** The density-saturation " +
+                 "row ran at the default glow where nebula peaks at 646 of 765: it read 0.680 on the correct " +
+                 "shader and 0.558 with the absorption DELETED -- passing HARDER on the broken one. At glow " +
+                 "0.15, peak 247, it reads 0.581 against 1.012, and 1.00 is not a threshold anybody chose, " +
+                 "it is what linear-in-emission means. A FIFTH GATE rather than rows next door because gate " +
+                 "one had 494 ms of margin and a species costs about 375. AND THE ROUND LEFT A BLOCKER IT " +
+                 "MEASURED: this file builds every species' block into every species' shader, so the two new " +
+                 "heroes cost gate one a PAIRED 213-288 ms although it renders neither. Logged as " +
+                 "orb-species-block-per-shader; the next orb round starts there.",
+    }),
+    // v4643 -- THE 254th CLOSING: mh_present's tail, and a second tone curve a gate refused.
+    since329: Object.freeze({
+        at: "v4643", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "NO GATE ADDED -- rows added to three that existed, which is why swept is 0. *** mh_present's " +
+                 "TAIL: THE CATCHLIGHT, THE CONTACT SHADOW AND THE KNEE. *** v4627 took mh_present's " +
+                 "arrangement (railE = body + (spec + contact) * dark, the rail, the containment) and stopped " +
+                 "there. ON INK THAT COST ONE TERM, THE KNEE. ON PAPER IT COST THREE, and two of them are what " +
+                 "make paper a different GROUND rather than a lighter one: `dark` SUBTRACTS the specular from " +
+                 "the energy on a light ground and murmur adds it back as a mix toward a warm white, so this " +
+                 "port did the subtracting and not the adding -- a paper orb LOST its highlight instead of " +
+                 "gaining a white one -- and without the contact shadow the object floats. " +
+                 "*** THE PAIR IS BIT-EXACT ON THREE GROUNDS: *** worst |gpu - cpu| is 0 of 255 over 16 " +
+                 "speculars x 16 heights x 3 channels on paper, on ink and on a light grey, against 127 / 0 / " +
+                 "94 for the unflipped reading. THE THREE TERMS ARE THEN SEPARATED, because an agreement bound " +
+                 "does not say which one is present: across a specular sweep of 0 to 1.2 the paper ground " +
+                 "climbs 69 counts of 255 and the ink ground moves 0; at a specular of ZERO the page darkens " +
+                 "60 counts from the top of the frame to the bottom while ink moves 0; and the knee compresses " +
+                 "1.5 to 0.9998 at ink's 0.90 against 1.0000 at paper's 0.96 while 0.5 passes untouched at both. " +
+                 "*** THE SIGN OF THE SHADOW WAS MEASURED, NOT COPIED. *** murmur reads gl_FragCoord, where y " +
+                 "runs DOWN; this port takes its quad from three's uv(). The direction came off the contact " +
+                 "GLOW instead -- the only term outside the silhouette, which murmur already weights downward " +
+                 "-- at 128 px over the annulus past the body: limn 1.426 bottom-over-top, still 1.074, abyss " +
+                 "1.015, all above 1. v4638 is what reading that from the source costs. " +
+                 "*** AND A GATE CAUGHT A SECOND TONE CURVE, WHICH IS THE FINDING OF THE ROUND. *** The first " +
+                 "cut applied the whole finish in the fragment shader. render/aiPresenceOrbPresent.mjs -- this " +
+                 "tree's port of murmur-web's OWN present.wgsl -- already applies knee(x, 0.90), quoting that " +
+                 "file's header verbatim: \"exposure, bloom, THE TONE CURVE, the dither and the sRGB encode " +
+                 "are WRITTEN ONCE\". Two knees compressed the peak twice and " +
+                 "tools/ship/aiPresenceOrbPresent-selfcheck.mjs's Y-FLIP harness went red: the direct render's " +
+                 "brightest pixel held at (12,12) and the pipeline's slid to (17,15), because flattening an " +
+                 "already-flattened lobe reordered the peaks. THE LOCATION MOVING WAS A SECOND-ORDER SYMPTOM, " +
+                 "so the first-order fact is now its own row -- the two paths must agree about how BRIGHT the " +
+                 "brightest pixel is, measured 672 against 674, bound 12 of 765 -- because a double tone curve " +
+                 "that happened not to move an argmax would have left that harness green and the picture wrong. " +
+                 "THE REPAIR IS A SPLIT: mhPresentPaper (the two ground-dependent terms, which read `paper` " +
+                 "and must run in the species shader on BOTH paths) and mhPresentKnee (which goes in the same " +
+                 "`linear ?` bracket the sRGB encode has been in since the HDR pass was built). " +
+                 "*** TWELVE SABOTAGES, ALL TWELVE CAUGHT, AND THREE OF THEM ONLY AFTER THE PROBE GREW A THIRD " +
+                 "GROUND. *** Two of mh_present's constants are INVISIBLE on the two grounds that ship, " +
+                 "measured rather than assumed: the catchlight's 1.06 gain is DEAD on house paper (s0.L is " +
+                 "0.9701, so 0.9701 * 1.06 + 0.05 = 1.0782 and the 1.02 cap takes it -- the gain could be 1.5 " +
+                 "and the frame would not move), and the shadow's 0.55 tint multiplies the INK colour, which " +
+                 "is 0.00304 in linear light, so 0.55 of it against 0.75 of it differ by 0.00061 where one " +
+                 "8-bit step is 0.00392. A light-grey ground with a mid-grey page makes both bite, and the " +
+                 "probe carries it. A THIRTEENTH was added for the direction the pixels cannot see at all: " +
+                 "deleting the knee from the direct path too moves 20 bytes on arc and 4 on sol -- the only " +
+                 "species whose linear light passes 0.90 at 0.9647 and 0.9387 -- and every species gate stayed " +
+                 "GREEN through it, so where the knee is CALLED is held by a source census that says so. " +
+                 "*** AND TWO RECORDS THAT HAD OUTLIVED THEIR OWN REPAIR. *** murmurKit-selfcheck's closing " +
+                 "still said the HUE channel \"reaches no pixel and every species passes 0\" -- closed at " +
+                 "v4631, and murmurSpecies4 measures droplet turning 1.57 degrees of hue against 0.0008 of " +
+                 "lightness. render/aiPresenceOrbTsl.mjs carried BOTH the stale note and the one that replaced " +
+                 "it, three lines apart, for twelve rounds: the round that closed the gap added its paragraph " +
+                 "without deleting the one it contradicted. A closing that UNDER-claims sends the next reader " +
+                 "to build what is already there. " +
+                 "MEASURED IN PIXELS: on ink the whole round touches 24 bytes across the eighteen species at " +
+                 "the gates' glow of 0.15, and at the DEFAULT glow of 1 it moves 50 of 54 baseline frames by " +
+                 "at most 4 counts of 255 -- the knee, compressing bright output, which is its whole job. On " +
+                 "paper all 18 frames move. WHAT IS STILL NOT PORTED: mh_out's triangular-PDF dither, which is " +
+                 "why the kit function is mhPresentFinish and not mhPresent; and present.wgsl's knee is a " +
+                 "fixed 0.90 where mh_present's moves to 0.96 on paper, so the HDR path compresses a paper " +
+                 "ground at the wrong constant. Both named in the kit, neither closed here.",
+    }),
+    // v4778 -- THE FSR CACHES LEAVE THE ZIP FOR THEIR OWN FOLDER, AND A ROUTE BRINGS THEM BACK ON REQUEST.
+    // v4819 -- RENUMBERED since477 -> since511 at the merge of the two lines: both reached for since476..since480 in the same days,
+    // and in an object literal the later key silently wins (gateSweep-selfcheck's duplicate row, v4394). Ordinals only need to be distinct.
+    since511: Object.freeze({
+        at: "v4778", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/fsrCaches-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** TWELVE HARVESTS WERE 300 MB OF A 333 MB RELEASE ZIP, AND NOTHING AT RUNTIME READS THEM. *** Keith: \"put the FSR " +
+                 "frame caches in its own repo folder, and access /install from there if the user chooses.\" The nine frame*-cache " +
+                 "files and three genGate harvests moved with git mv into WebGLEngine/fsr-caches/, with a manifest (bytes, sha256, " +
+                 "readers derived from the imports) built by tools/ship/fsrCaches.mjs --write-manifest. The packer reads the manifest's " +
+                 "names and skips them; a real pack of the same tree, the skip off then on, went 332,679,578 -> 46,792,031 bytes " +
+                 "(6619 -> 6607 files), manifest kept. 24 reader gates now skip by " +
+                 "name, NOT a pass, when a cache is absent -- none regenerates on a miss, a harvest is a WebGPU drive of fsr.html -- " +
+                 "and all 24 ran green here with the caches present. GET/POST /install/fsr-caches and install-fsr-caches.html fetch " +
+                 "from the release tag and keep a file only on a sha256 match. 27 sabotages; one (both escape guards removed) was " +
+                 "green until the fixture served the hostile name's bytes -- nothing escaped only because nothing arrived.",
+    }),
+    // Round A -- THE THIRD-PERSON CAMERA BOOM: camera/cameraBoom.js, swept and stopped short of the first voxel it would touch.
+    // v4819 -- RENUMBERED since478 -> since512 at the merge of the two lines: both reached for since476..since480 in the same days,
+    // and in an object literal the later key silently wins (gateSweep-selfcheck's duplicate row, v4394). Ordinals only need to be distinct.
+    since512: Object.freeze({
+        at: "Round A (unshipped)", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["camera/cameraBoom-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** THE VOXEL CAMERA READ A COLUMN'S TOP, SO EVERY ROOF WAS GROUND. *** camera/camera.js's third-person eye " +
+                 "sampled four column tops along the boom: under a ceiling, a bridge or an overhang it collapsed to 0.825 of " +
+                 "4.5, and under an overhang low enough to cross the boom it left the camera's box inside a voxel. " +
+                 "camera/cameraBoom.js sweeps the camera's box up the lift and back along the boom against the voxels " +
+                 "themselves, exactly, and stops a skin short of the first contact. Its gate holds the box never inside a " +
+                 "solid (1,384 fuzzed booms over 60 worlds), every point of the path free, never further than asked, exact " +
+                 "when clear, pulled in by exactly the skin, no one-voxel wall skipped (the planted endpoint-only test goes " +
+                 "through 300 of 300), and easing that never passes the safe length; camera.js's own eye is driven in a wall, " +
+                 "an overhang, a bridge and a room. Five sabotages, all red. NOT CLOSED: the render eye adds the body's " +
+                 "vertical smoothing on top of the boom, so the guarantee is the boom's and not that offset's, as the mesh " +
+                 "branch's always was; and nothing here has been looked at on the rig.",
+    }),
+    // the lock-sums round -- THE LOCK's TWO WINDOWS AS RUNNING SUMS: render/temporalLock.mjs's makeLumaSums and its TSL port.
+    // v4819 -- RENUMBERED since479 -> since513 at the merge of the two lines: both reached for since476..since480 in the same days,
+    // and in an object literal the later key silently wins (gateSweep-selfcheck's duplicate row, v4394). Ordinals only need to be distinct.
+    since513: Object.freeze({
+        at: "the lock-sums round (unshipped)", swept: 2, green: 2, red: 0,
+        added: Object.freeze(["render/temporalLockSums-selfcheck.mjs", "render/temporalLockSumsTsl-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/temporalLock-selfcheck.mjs (its moving-camera detector row judged 0 of 2304 pixels and passed on zeros; repaired the round before)"]),
+        verdict: "*** THE LOCK WAS OFF BECAUSE IT KEPT EVERY LUMA. *** The ring holds 2 x period lumas a pixel -- 282 MB on " +
+                 "the device at 2x at 960x540, in a target 8640 rows tall that WebGPU refused here (fsr-three.html's lock " +
+                 "ring at 2x drew validation errors every frame, on the unmodified page too) -- and both of its outputs are " +
+                 "sums of them. render/temporalLockSums.mjs keeps three running sums and the fill count in one float " +
+                 "texel: 16.6 MB at any ratio. Bilinear reprojection is linear, so at every period boundary the sums ARE " +
+                 "the ring's two halves summed -- held within frames x 2^-24, still and moving -- and the still picture and " +
+                 "the lock on a 0.4 px line come out identical. What it gives up is when a change is seen: the windows " +
+                 "tumble, so a light drop is caught at the end of its period, exactly P - 1 - phase frames later. On the " +
+                 "device (render/temporalLockSumsTsl.mjs), both backends, to 1.8e-7, and fx/fsr/fsrTemporalTsl.mjs takes " +
+                 "lock: \"sums\". 14 sabotages, all red; one (the mean a period stale) only by a row written for it. " +
+                 "The driver's lock DEFAULTS to the sums since: measured past the 63-frame warm-up every other gate sits " +
+                 "inside, on fsr-three.html's scene, neutral (-0.010 to +0.014 dB over six cases), the still picture " +
+                 "within 2e-5 and its mask never firing -- section 4 of the device gate holds that.",
+    }),
+    // the splat-collision round -- A SPLAT SCENE AS A VOXEL WORLD THE WALKER STANDS IN: world/splatVoxelWorld.mjs.
+    // v4819 -- RENUMBERED since480 -> since514 at the merge of the two lines: both reached for since476..since480 in the same days,
+    // and in an object literal the later key silently wins (gateSweep-selfcheck's duplicate row, v4394). Ordinals only need to be distinct.
+    since514: Object.freeze({
+        at: "the splat-collision round (unshipped)", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/splatVoxelWorld-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** A SURFACE LIES ON A CELL BOUNDARY, SO 'THE CELL A SPLAT IS IN' STANDS THE BODY ONE VOXEL HIGH. *** " +
+                 "Measured on a 24 x 8 x 24 level captured as splats on every face a camera could see: the centre-cell " +
+                 "rule put 566 of 576 columns at the wrong height and every-touched-cell 576. world/splatVoxelWorld.mjs " +
+                 "stamps each splat's ellipsoid into a grid four times finer and scans every fine column top-down for " +
+                 "PARITY -- a run of shell is one crossing -- then takes a walker cell as solid when half its fine cells " +
+                 "are: 0 wrong, 0 fall-through. Holes stay local and EVERY column a body would fall through is listed " +
+                 "(7 of 7 for a 1.5-unit floor hole, 26 of 26 and 85 of 85 for sparse captures); fillHoles closes them " +
+                 "at the height most of the rim agrees on. Opaque floaters are dropped as small shell components; " +
+                 "loader-shaped clouds (alpha opacity, float and packed quaternions) build the same world. camera.js's " +
+                 "walker lands on every probe at the level's height and is inside a captured voxel on 0 of 4,800 fuzzed " +
+                 "frames. main.js's splat_voxel_walk demo is the live consumer, booted headless with 0 page errors. " +
+                 "12 sabotages, all red -- two only after rows were written for them, and V8's row found the fill's " +
+                 "real defect (ring by ring raised a step out of the floor beside the block). NOT CLOSED: unseen " +
+                 "undersides read solid (pinned at +40 cells), and no real .ply has been through it.",
+    }),
+    // v4644 -- THE 255th CLOSING: the SUCCESS flash, from a constant table to a ring that travels in pixels.
+    // *** since331 -- SIX GATES ARRIVED ACROSS SIX ROUNDS AND NOT ONE ROUND CLOSED THEM. ***
+    // Every one was written, sabotaged and run singly in the round that added it; what none of those rounds
+    // did was run the censuses that COUNT gates. This surplus was found only when a full verify was finally
+    // run -- on Keith's gen-9 box and then here -- and it was red on BOTH, alongside assertionShape's
+    // 1751 -> 1757 and runtimeGap's 4275 -> 4286, which are the same six arrivals seen from two other
+    // instruments. The surplus mechanism worked exactly as designed; nobody looked at it for six rounds.
+    // *** v4667 -- THESE THREE SLOTS WERE WRITTEN AS since334-since336 AND ARE RENUMBERED FORWARD TO
+    // since345-since347, for the same reason and at the same merge as v4650-v4654 -> v4663-v4667. main's
+    // murmuration line spent since334..since342 on its own arrivals while this branch spent since334..336
+    // on these; the slot ordinal is a second number a round wears and it collided exactly as the version
+    // did. Kept in round order beneath, newest first, so the list still reads as a sequence. ***
+    // v4819 -- RENUMBERED since476 -> since510 at the merge of the two lines: both reached for since476..since480 in the same days,
+    // and in an object literal the later key silently wins (gateSweep-selfcheck's duplicate row, v4394). Ordinals only need to be distinct.
+    since510: Object.freeze({
+        at: "v4778", swept: 45, green: 45, red: 0,
+        added: Object.freeze([
+            "brain/autopilot6dof-selfcheck.mjs",
+            "brain/autopilotAircraft-selfcheck.mjs",
+            "brain/fleetAssign-selfcheck.mjs",
+            "physics/mechanics/aeroSurface-selfcheck.mjs",
+            "physics/mechanics/aircraftAssembly-selfcheck.mjs",
+            "physics/mechanics/rigidBody6dof-selfcheck.mjs",
+            "physics/mechanics/rigidBody6dofCollision-selfcheck.mjs",
+            "physics/mechanics/rigidBody6dofWeapon-selfcheck.mjs",
+            "physics/mesh/bvhPairOverlap-selfcheck.mjs",
+            "physics/mesh/meshBoolean-selfcheck.mjs",
+            "physics/mesh/meshBooleanBlast-selfcheck.mjs",
+            "physics/mesh/meshPointClassify-selfcheck.mjs",
+            "physics/mesh/triClip-selfcheck.mjs",
+            "physics/mesh/triFragmentAccumulate-selfcheck.mjs",
+            "physics/mesh/triTriIntersect-selfcheck.mjs",
+            "physics/obbManifold-selfcheck.mjs",
+            "tools/gunnerTraceDemo-selfcheck.mjs",
+            "tools/maleCnsLoader-selfcheck.mjs",
+            "tools/roundhouse/capsuleDepenetrateDevice-selfcheck.mjs",
+            "tools/ship/aggroHazardFeature-selfcheck.mjs",
+            "tools/ship/aircraftPage-selfcheck.mjs",
+            "tools/ship/botCapsuleNav-selfcheck.mjs",
+            "tools/ship/cameraCapsuleWalk-selfcheck.mjs",
+            "tools/ship/cameraTerrainWalk-selfcheck.mjs",
+            "tools/ship/cameraViewMode-selfcheck.mjs",
+            "tools/ship/capsuleCollide-selfcheck.mjs",
+            "tools/ship/capsuleCollideTsl-selfcheck.mjs",
+            "tools/ship/capsuleHazardPolicy-selfcheck.mjs",
+            "tools/ship/cityChunkScene-selfcheck.mjs",
+            "tools/ship/controllerLabWorld-selfcheck.mjs",
+            "tools/ship/flyConnectomePage-selfcheck.mjs",
+            "tools/ship/gltfConformance-selfcheck.mjs",
+            "tools/ship/kaijuGroundCollider-selfcheck.mjs",
+            "tools/ship/mikktSpace-selfcheck.mjs",
+            "tools/ship/peerBrain-selfcheck.mjs",
+            "tools/ship/peerBrainFleet-selfcheck.mjs",
+            "tools/ship/pilotPolicy-selfcheck.mjs",
+            "tools/ship/platformCarryWorld-selfcheck.mjs",
+            "tools/ship/precisionProbe-selfcheck.mjs",
+            "tools/ship/qrBridge-selfcheck.mjs",
+            "tools/ship/rigidBody6dofPage-selfcheck.mjs",
+            "tools/ship/rtViewer-selfcheck.mjs",
+            "tools/ship/splatWalkWorld-selfcheck.mjs",
+            "tools/ship/webcodecsFramesToMp4-selfcheck.mjs",
+            "tools/ship/worldColliderBVH-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "the rtx line's forty-five, merged at v4778 -- it never wrote closings, so this one names them all. Swept " +
+                 "three-way on the merged tree: 43 green at once. TWO ARRIVED RED AND ARE GREEN AT THE CLOSE, which is why " +
+                 "redOnArrival is empty rather than hiding them: qrBridge and webcodecsFramesToMp4 need @napi-rs/canvas " +
+                 "(and webcodecs), optionalDependencies of ai-bridge/ that nothing on the verify route installs; one " +
+                 "asserted the module was present and one died with MODULE_NOT_FOUND. With the modules installed both are " +
+                 "green; without them they now SKIP BY NAME and say 'NOT a pass'. Slowest: rigidBody6dofPage at 65 s, " +
+                 "gunnerTraceDemo 19 s, peerBrainFleet 16 s -- over the ship-time budget, so they join the pool no verify runs.",
+    }),
+    since475: Object.freeze({
+        at: "v4679", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/boxTimings-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 76 ms. A RATCHET WITH NO REACHABLE CLEAR STATE. recordDrift's sweep-timings row asked " +
+                 "whether every gate has a reading in sweep-timings.json -- a HOST-CLAIMED file whose owner is a " +
+                 "cloud container that no longer exists. The rig cannot claim it and a new container hashes " +
+                 "differently, so NO LIVE BOX COULD ADD AN ENTRY and every round that added a gate left the row red " +
+                 "with no action that would clear it. The row was asking a COVERAGE question (has this gate ever " +
+                 "been timed) of a COST-scoped record (what does it cost on the box that owns this file). " +
+                 "*** AND THE FALLBACK THE REFUSAL WROTE TO WAS NEVER READ: *** LOCAL_TIMINGS occurred six times in " +
+                 "the tree -- its definition, one default parameter, and four assertions about the FILENAME and the " +
+                 "ROUTING -- so the rig's 1,409 readings per sweep went to a dead file while its gate selection came " +
+                 "from a foreign box's numbers, which its own verify says in so many words. Per-box records are read " +
+                 "now, the legacy single-name file is still read so the rig's existing measurements are not " +
+                 "orphaned, and this box's four previously-untimed gates are recorded. THE BUDGET IS UNTOUCHED and " +
+                 "says so in a row: quickSweep does not import this module, gate selection on the rig is still " +
+                 "computed from another machine, and that is task #87 because it changes which gates run.",
+    }),
+    since474: Object.freeze({
+        at: "v4678", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/deadlineLeak-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 11 s. A DISCARDED DEADLINE HANDLE COST 53 SECONDS AND NO CHECK COULD SEE IT. v4676 wrote " +
+                 "`setTimeout(() => fin(...), 60000)` in sourceChainBridge's resolver probe with the handle thrown " +
+                 "away; fin() is once-only so the late fire did nothing, and the timer held the loop open for the " +
+                 "full minute after the answer arrived. cloneProvision-selfcheck did 7,100 ms of work in 60,136 ms " +
+                 "of wall clock -- twenty times the sweep's 3,000 ms budget -- with every row passing throughout. " +
+                 "FOUND BY ASKING WHY THAT GATE DECLARED 0.2s. Fixed by clearTimeout in the settle path AND unref " +
+                 "on the handle (clearing depends on the settle path being reached; unref does not): 60,136 -> " +
+                 "7,158 ms on unchanged work. *** TWO INSTRUMENTS, AND THEY DISAGREE USEFULLY: *** a source rule " +
+                 "finds 13 sites carrying the shape, and the dead-tail measurement -- wall clock minus work, per " +
+                 "gate, needing no source rule -- finds 0 of 115 measured gates paying for one. 13 is a CEILING " +
+                 "(the rest are in bridges, held open regardless); 0 is the measured debt; the 5 gates killed at " +
+                 "the 60 s cap are UNKNOWN and named, because a cap kill hides a tail rather than clearing it and " +
+                 "those five are exactly where a leak would survive. Also closed: declaredCost's `noRecord` list " +
+                 "had been computed since the module was written and NO GATE READ IT -- third sighting of that " +
+                 "shape after assertionShape's four-of-nine and runtimeGap's three-of-twelve, and this time the " +
+                 "unread list was the only place the 0.2s-vs-60s disagreement appeared.",
+    }),
+    since473: Object.freeze({
+        at: "v4677", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "tools/ship/cloneProvision-selfcheck.mjs",
+            "tools/ship/exitBusy-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 1.3 s and 46 s. TWO gates in one closing because v4676 added cloneProvision and did NOT write " +
+                 "one -- the tree shipped a gate ahead of this ledger, assertionShape's record was already red at " +
+                 "b826aea8 before v4677 touched anything, and the omission was found by recordDrift rather than by " +
+                 "reading. cloneProvision drives the provisioning branch with an injected runner and now also drives the " +
+                 "timeout's kill escalation against a real SIGTERM-ignoring child. exitBusy is the screen that narrowed " +
+                 "the libuv-teardown population from 'at least 52, at most 1708' to about 223 of 1413 (145-333). " +
+                 "*** THE FIRST INSTRUMENT IT SHIPPED WITH MEASURED ZERO AND IS RECORDED RATHER THAN DELETED: *** a " +
+                 "--require hook parking the main thread with Atomics.wait read 0.1-0.2 ms for all four gates the rig has " +
+                 "actually crashed on, against 7-104 ms taken by hand, because the work is ON the main thread and parking " +
+                 "it forbids the work being measured. *** AND THE SCREEN WAS WRONG IN BOTH DIRECTIONS ON A SINGLE " +
+                 "READING: *** 6 of 20 gates in the 3-20 ms band changed class between runs, pageGround read 6.2 once and " +
+                 "medians 2.5 (a false positive, demoted, conversion kept) while lockstepDt read 4.2 once and medians 5.4 " +
+                 "(a false negative, converted). The rate survived the re-measurement and the membership did not. " +
+                 "Two gates are PERTURBED by the probe copy -- wiringClaims walks the tree, finds it and goes red -- so " +
+                 "measure() takes a baseline run and reports it, and a perturbed row counts as evidence for nothing.",
+    }),
+    since472: Object.freeze({
+        at: "v4666", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/declaredCost-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 0.56-0.58 s alone, well inside the 3,000 ms budget. It gates a census of a thing " +
+                 "271 gates in this tree have been writing down since before any of them were swept and " +
+                 "nothing had ever read: the `// Run: node <gate>   (~616s)` header line. Found by profiling " +
+                 "the sixteen roundhouse gates that produce no verdict at any cap -- the profile said they " +
+                 "are SIMULATIONS rather than slow instruments, and khConvergence's third line said 616 " +
+                 "seconds, where it had been sitting unread. 126 headers agree with the record, 138 have " +
+                 "ROTTED, and SEVEN supply a floor the record cannot: their gate has never finished, so the " +
+                 "header is the only measurement of it that exists. The two disagreements are different " +
+                 "facts and the record's own `finished` field decides which -- a capped reading is a lower " +
+                 "bound, a completed one is a measurement. sweepRotation --killed consumes it: the pool is " +
+                 "ordered cheapest-expected-first and a gate declaring more than the cap is NAMED and " +
+                 "skipped with the --cap-s that would reach it, instead of being run for 90 s to reproduce " +
+                 "a death that mode's own note already predicted. Six sabotages, all red; the unit one " +
+                 "matters most, since ~0.2s and ~200ms are both in the tree and differ by a thousand.",
+    }),
+    since471: Object.freeze({
+        at: "v4664", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/thrownRow-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 1.57-2.10 s alone across three runs, INSIDE the 3,000 ms membership threshold -- and " +
+                 "it arrived at 3,117 ms, outside it, which would have made a new gate the sixth instance of the " +
+                 "defect the round beside it is about. Two causes, both measured: every fixture was spawned " +
+                 "TWICE (once for both streams, once for stdout alone, because the ritual counts reds through a " +
+                 "pipe and grep reads stdout only) and spawnSync separates them in one run; and section 5 ran " +
+                 "codeOnly over all 1,761 gate sources for two questions, where a raw indexOf is a necessary " +
+                 "condition for both -- the same pre-filter windowsImport-selfcheck records for the same reason. " +
+                 "It arrives with the four gates the rig filed as CRASHED-with-" +
+                 "no-FAIL-row netted, and with two of its own sabotages coming back ZERO and BOTH being real " +
+                 "findings rather than gaps: deleting the unhandledRejection handler changes nothing on node " +
+                 "22 (a rejection reaches uncaughtException when a handler is installed there), and the " +
+                 "re-entry guard's first fixture threw from the cleanup, which cannot re-enter the handler at " +
+                 "all. Both are re-pointed and the section headed 'one handler is half a net' now says the " +
+                 "opposite, because that is what the measurement said.",
+    }),
+    since470: Object.freeze({
+        at: "v4663", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/wasmTeardown-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 1.22 s alone on this box -- inside the 3,000 ms ship-time budget, which the first " +
+                 "version of its section 1 was NOT safe at for a different reason: it read one fixed 200 ms " +
+                 "idle window and went red under contention rather than over time. *** THE GATE CANNOT GO RED " +
+                 "FOR THE REASON IT EXISTS AND SAYS SO IN ITS OWN CLOSING: *** the crash it is about is " +
+                 "win/async.c's UV_HANDLE_CLOSING assertion, and unix/async.c has no such assertion, so the " +
+                 "identical teardown is silent here. What it measures instead is that V8's compiler pool is " +
+                 "still burning CPU at the instant a gate's last line runs (23 ms against a same-process " +
+                 "control of 0.8), that liveHandles() is EMPTY there so serverShutdown's drain cannot reach " +
+                 "it, and that process.exitCode costs nothing. It arrives with 48 gates converted -- the " +
+                 "measured population of wasm compilers that called process.exit() with a module behind them.",
+    }),
+    // v4660 -- THE 343rd CLOSING: the other four ignition figures, which really were four shapes -- and the
+    // control species another gate had been resting on for fifteen rounds without ever checking it.
+    since469: Object.freeze({
+        at: "v4660", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/murmurIgniteFour-selfcheck.mjs"]),
+        // EMPTY, AND THE FIRST DRAFT PUT tools/ship/murmurIgnite-selfcheck.mjs HERE. It is not an arrival:
+        // it shipped at v4644 and this round turned it red by taking its control species away. Naming it
+        // here put a gate in the ledger twice -- closingCoverage-selfcheck read 388 names over 387 distinct
+        // and went red on the duplicate, because one duplicate buys one credit and one credit hides one
+        // future unswept gate. The repair belongs in the verdict, which is where it is.
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2,690 ms on this box, 9 rows in five sections over four rendered species, plus a " +
+                 "new section 17 and a new probe mode (igniteRound) in tools/ship/murmurKit-selfcheck.mjs, " +
+                 "which goes 2,260 -> 2,285 ms for it. " +
+                 "*** THE OTHER FOUR FIGURES ARE FOUR SHAPES AND NOT A FIFTH TABLE ENTRY. *** aura's is a " +
+                 "von MISES on the angle -- the only figure in the roster that spends sweep going ROUND " +
+                 "something -- fathom's is a triangular window per shell so the nest lights innermost " +
+                 "first, geode's is a flat lift with no sweep in it at all, and comet's adds NO LIGHT: it " +
+                 "lengthens the trail, decay = mix(decay, 9.0, sweep), and decay is in the denominator. " +
+                 "*** fathom AND geode WERE STILL NOT FLASHING AT ALL: *** both moved 0.0% of their bytes " +
+                 "and x1.000 of interior light at the peak of their own SUCCESS state. They now read x4.03 " +
+                 "and x4.90; aura goes x2.45 -> x3.59 and comet x1.00 -> x1.14, which is small BECAUSE its " +
+                 "flash adds no light. comet's decay also took murmur's drive and small factors, which this " +
+                 "port never had. " +
+                 "*** AND WIRING geode's FIGURE TURNED ANOTHER GATE RED, WHICH IS THE ROUND'S REAL FINDING. " +
+                 "*** tools/ship/murmurIgnite-selfcheck.mjs is built around a PAIR -- one species that " +
+                 "flashes and one whose SUCCESS is a settle and NOTHING else -- and geode had been the " +
+                 "second since v4644 on the strength of a sentence nothing ever checked. Giving geode an " +
+                 "ignition made its SUCCESS rise and fall, and three settle rows went red about a settle " +
+                 "when the defect was in the control. The control is comet now, which after this round is " +
+                 "the LAST species with no complete term anywhere, and that gate's new section 4 measures " +
+                 "that property over the whole roster -- reading the builder DISPATCH, because nebula and " +
+                 "tempest share buildMist and a name match reports both unflashed. The first cut of that " +
+                 "census read 16 entries for 18 species and its own size assertion said so. " +
+                 "*** A GAIN CAME OUT OF THE REPAIR: *** comet's sweep saturates at tau 0.95 and it has no " +
+                 "complete, so frames at tau 0.95 and 1.40 differ in `settled` and in nothing else -- the " +
+                 "first isolated settle in pixels this tree has had. It reads x1.278 with its centroid " +
+                 "moving 0.0011. " +
+                 "SIXTEEN SABOTAGES ACROSS THREE GATES, ALL CAUGHT -- including two aimed at the repair " +
+                 "itself: giving comet a complete term reddens the control census BY NAME, and stretching " +
+                 "mh_state's sweep so it no longer saturates before tau 1.40 reddens the isolated-settle " +
+                 "row, whose whole claim is that those two frames differ in one signal. FOUR OF THEM NAMED " +
+                 "THE WRONG ROW at first: the geode " +
+                 "census carried its own control as a conjunct, so unwiring fathom or comet reddened a row " +
+                 "titled for geode. The control is its own row now. " +
+                 "AND TWO OF THIS ROUND'S OWN ROWS WERE WRONG BEFORE THEY SHIPPED: one asserted aura's lap " +
+                 "is EXACTLY equal at -pi and +pi and measured 4.44e-16, which is two ulp of the 2*pi that " +
+                 "binary cannot hold, not a seam; and one mapped five sweeps through an arrow that never " +
+                 "read its argument, then asserted the five results were equal -- a row that could not " +
+                 "fail, under a title claiming a sweep had been tried. Both replaced by measurements: the " +
+                 "gaussian in the lap's place tears by 0.80 at the same join, and geode's WHOLE builder is " +
+                 "counted for the word SWEEP with the other three as the control.",
+    }),
+    // v4659 -- THE 342nd CLOSING: four figures that turned out to be one shape, and the two species that
+    // were STILL not flashing after the round before.
+    since468: Object.freeze({
+        at: "v4659", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/murmurIgniteAxis-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2,621 ms on this box, 8 rows in four sections over four rendered species, plus a " +
+                 "new section 16 and a new probe mode in tools/ship/murmurKit-selfcheck.mjs. " +
+                 "*** MH_IGNITE's OWN NOTE CALLED THE REMAINING EIGHT FIGURES \"per-species transcriptions " +
+                 "rather than this one shape\". FOUR OF THEM ARE ONE SHAPE. *** r = (coord - mix(lo, hi, " +
+                 "st.sweep)) / width, figure += st.complete * (flat + gain * exp(-r*r)) -- arc along the " +
+                 "angle round its arc, flux along the length of its stream, prism along the distance out its " +
+                 "beams, helix along the height of its strands. The SHELL's coordinate is |p| for all seven " +
+                 "species that run it; these four are four different quantities, which is why it is a second " +
+                 "table and not four more rows in the first. " +
+                 "*** AND EACH IS THAT SPECIES' OWN GESTURE FIGURE, RUN ON sweep AND DRAWN TIGHTER: *** arc " +
+                 "0.34 against 0.30, flux 0.42 against 0.38, prism 0.28 against 0.26. The success is the " +
+                 "thing the species already does, once, travelling the whole length. " +
+                 "*** prism AND helix WERE STILL NOT FLASHING AT ALL AFTER v4658: *** both moved 0.0% of " +
+                 "their bytes and x1.000 of interior light at the peak of their own SUCCESS state, because " +
+                 "neither has an interior factor and this figure IS their whole flash. They now read x2.08 " +
+                 "and x2.93; arc goes x1.81 -> x2.18 and flux x4.33 -> x5.92 on top of what v4658 gave them. " +
+                 "*** WHERE THE FRONT TRAVELS IS GRADED IN THE KIT AND THE REASON IS MEASURED: *** isolating " +
+                 "sweep in a rendered frame needs two taus with equal complete and different sweep, and " +
+                 "mh_state's settled turns on at EXACTLY the complete peak (tau 0.3600) -- searched, and " +
+                 "there is no such pair. So a new probe mode grades the front against the CPU twin on a real " +
+                 "GPU at 0/255 over three different axes, and its peak sits at mix(lo, hi, sweep) to 0.0010 " +
+                 "of the axis at every sweep. " +
+                 "THIRTEEN SABOTAGES, ALL CAUGHT, ONE ONLY AFTER REPAIR: moving helix's FLAT term outside " +
+                 "the complete multiply -- which would lift every strand in every state -- read identically " +
+                 "on the probe's alpha channel, because that channel ran FLUX's constants and flux has no " +
+                 "flat term. It runs helix's now. " +
+                 "AND THE ROUND's OWN BASELINE LIED ONCE: the neutralisation that measures what the port did " +
+                 "BEFORE a change is a regex over the table, and prism's entry has two spaces after `lo:` " +
+                 "where the others have one -- so prism was never neutralised and its \"before\" reading was " +
+                 "the wired version, which read as though the change did nothing. The script asserts the " +
+                 "count of entries it neutralised now.",
+    }),
+    // v4658 -- THE 341st CLOSING: the half of the SUCCESS flash that is not the shell, and the six species
+    // that reached the peak of their own success state without moving a byte.
+    since467: Object.freeze({
+        at: "v4658", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/murmurComplete-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2,969 ms on this box, 11 rows in four sections over four rendered species. " +
+                 "*** kit.ts: \"The light in a success is NOT an overlay: every species multiplies its own " +
+                 "interior energy by (1 + complete), which brightens exactly what is already there and " +
+                 "leaves the dark dark.\" v4644 PORTED THE SHELL AND NOT THAT SENTENCE. *** Measured on real " +
+                 "pixels at stateTau 0.360, where mh_state's complete is exactly 1.0 and settled exactly 0: " +
+                 "limn, arc, aura, flux, sol and chorus each moved 0 of 9,216 bytes between the start of " +
+                 "their own SUCCESS state and its brightest instant. The flash was computed, sent to the " +
+                 "shader as a uniform, and spent by nobody. " +
+                 "AFTER: limn x3.74 of interior light, flux x4.33, chorus x3.88, sol x2.22 -- all four read " +
+                 "x1.000 at HEAD on the same frames. " +
+                 "*** THE FOUR ON THE SHARED INTERIOR LINE ARE FOUND BY A RULE AND NOT BY A LIST: *** every " +
+                 "one of murmur's eighteen species ends its interior with (1 + S * st.settled), and exactly " +
+                 "four of those eighteen lines also carry a complete factor -- limn 1.60, arc 0.90, aura " +
+                 "0.45, flux 0.75. A site belongs in MH_COMPLETE_INTERIOR if and only if its complete factor " +
+                 "sits on the same source line as its settled factor, which a census can check. The table is " +
+                 "a strict SUBSET of MH_SETTLED_INTERIOR and the gate asserts that. " +
+                 "*** AND THREE SPECIES SATURATE WHERE FOUR SCALE, WHICH IS THE OPPOSITE OPERATION. *** " +
+                 "opal's flashes, sol's prominences and chorus's voices are pulled toward a target -- " +
+                 "mix(life, target, complete * k) -- so the differences between them CLOSE: two figures " +
+                 "4.00x apart come out 1.09x apart, where a gain leaves the ratio at exactly 4.00. chorus " +
+                 "alone overshoots, toward 1 + 0.45*complete, because its subject is an ensemble arriving " +
+                 "together and going past full is how that reads as louder than its parts. " +
+                 "THIRTEEN SABOTAGES, ALL CAUGHT, THREE ONLY AFTER REPAIR. *** A PIXEL ROW ABOUT THE DARK " +
+                 "STAYING DARK WAS WRITTEN AND DELETED: *** it read a worst rise of 0.0 counts on all four " +
+                 "species and the population it read that from was ZERO -- every pixel at or below 6 of 255 " +
+                 "was OUTSIDE the silhouette, and it would have passed forever while measuring the paper " +
+                 "behind the orb. The claim is arithmetic and is graded as arithmetic. sol's 0.55 core gain " +
+                 "was invisible because at the roster's default glow its disc is SATURATED (2.0937 against " +
+                 "2.0916 across the flash, a ratio of 0.999); sol is rendered at glow 0.25 now, where the " +
+                 "same core reads x2.56, and has its own row. And the shader twin of the saturation, " +
+                 "rewritten as a GAIN, walked through every pixel row in the round -- because a gain " +
+                 "brightens too -- until mh_complete_lift went into the kit probe's alpha channel on " +
+                 "chorus's overshooting pair, which is where a saturation and a gain part company.",
+    }),
+    // v4657 -- THE 340th CLOSING: the two rates this tree recorded as out of reach, one of them because a
+    // record said the host could not see a signal it had been keeping all along.
+    since466: Object.freeze({
+        at: "v4657", swept: 0, green: 0, red: 0,
+        // NO NEW GATE FILE. The subject is two more clocks of a kind tools/ship/murmurClock-selfcheck.mjs
+        // already owns, so the round added a section and four rows to it rather than a seventh murmur gate,
+        // and paid for them by replacing a 438,000-tick settle with the closed form it computes (3,345 ms
+        // to 3,042 on this box). A gate file per round is a habit, not a rule.
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "no gate added; murmurClock-selfcheck.mjs green at 3,042 ms on this box against a " +
+                 "murmurKit measuring 2,861 here and RECORDED at 2,035 -- a drift of 1.41, so about 2,160 " +
+                 "recorded, up from 1,611 for six new rows and two more rendered species. " +
+                 "*** THE RATE FAMILY IS FINISHED, AND THE LAST TWO WERE THE ONES THIS TREE HAD WRITTEN " +
+                 "OFF. *** duet's rate was recorded in murmurClock-selfcheck.mjs for three rounds as " +
+                 "structurally unreachable: \"its rate reads the species' OWN FLOURISH envelope, which is " +
+                 "computed inside the shader from a hash and cannot be integrated by a host that has never " +
+                 "seen it. A signal the host does not know has no integral to send.\" THE HOST DOES KNOW " +
+                 "IT. mh_flourish is a pure function of shader time, a lane and a slot LENGTH, and duet's " +
+                 "lane and slot are style constants out of MH_DUET -- so the envelope is a deterministic " +
+                 "function of the very clock render/aiPresenceOrbState.mjs already integrates. The sentence " +
+                 "was true of a signal the host does not know; duet's was never one of those, and it read " +
+                 "as a property of the mechanism. " +
+                 "MEASURED: duet's orbital phase advanced 1.8152 rad in ONE 1/60 s frame after half an hour " +
+                 "-- 29% of a whole turn of the pair's shared orbit -- against a flat 0.006244, and the " +
+                 "trigger was the species' own gesture rather than anything the user did. limn's, which " +
+                 "v4654 priced correctly at two more accumulators, reached 68.3121 rad in a frame: nearly " +
+                 "eleven whole turns. Both reduce to murmur's own expression at a held signal, limn's " +
+                 "product to 3.6e-12 over 180 operating points. " +
+                 "THREE NEW HOST INTEGRALS, and the cross ones are the interesting pair: the integral of " +
+                 "pace*drive is NOT the product of the two integrals -- 8.20 against 68.35 after twenty " +
+                 "seconds idle and six busy -- because a product of integrals carries t SQUARED. " +
+                 "*** AND THREE INSTRUMENTS WERE REPAIRED, EACH OF WHICH HAD STOPPED MEANING WHAT IT " +
+                 "SAID. *** murmurSpecies12 divided its fourteen orbit samples out of duet's BASE rate; " +
+                 "with murmur's three modulated terms in, that covers 86% of a turn and every row still " +
+                 "passed, saying \"across one full orbit\" about something that was not one -- the times " +
+                 "are SOLVED from the phase now and the gate asserts its own coverage at 1.0004 turns. " +
+                 "murmurDrive tested \"no line reads both DRIVE and uniforms.time\" as a proxy for \"no " +
+                 "expression multiplies drive by elapsed time\", and fired on limn's flattening wobble -- a " +
+                 "bounded amplitude, which is the arrangement the row exists to bless. murmurDrive2 bounded " +
+                 "helix's contraction as `pct < 10 * limn.pct` with both numbers NEGATIVE, so limn moving " +
+                 "more made helix's claim HARDER: a ratio of magnitudes now. " +
+                 "FIFTEEN SABOTAGES, ALL CAUGHT, FOUR ONLY AFTER REPAIR: the gesture-integral row graded a " +
+                 "sum this GATE kept beside the module's rather than the module's own, so accumulating " +
+                 "against wall dt and reading the wrong lane both walked through; the frame helper deriving " +
+                 "the cross terms as a product of integrals walked through everything; and nothing noticed " +
+                 "duet's orbit samples silently covering less than they claimed.",
+    }),
+    // v4656 -- THE 339th CLOSING: the gesture clock, where a slot that changes length does not advance the
+    // gesture, it replaces it.
+    since465: Object.freeze({
+        at: "v4656", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/murmurGesture-selfcheck.mjs"]),
+        // EMPTY because the new gate arrived GREEN. murmurSpecies3 went red on this round's CHANGE, which is
+        // a recorded bound moving under a repaired mechanism and not a gate arriving broken -- this field is
+        // for the second. What happened to it is in the verdict, where it can be read rather than counted.
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 3,135 ms on this box against a murmurKit measuring 2,861 here and RECORDED at " +
+                 "2,035 -- a drift of 1.41, so about 2,230 recorded. 12 rows in five sections over three " +
+                 "species. *** mh_flourish's SLOT INDEX IS NOT A PHASE: every number in the gesture is a " +
+                 "hash of floor(t / SLOT) -- where it starts, how long it lasts, and the per-gesture random " +
+                 "its species spends as a DIRECTION. *** Three of murmur's species make the slot length a " +
+                 "function of the live signals, and a divisor that moves makes that index JUMP, which " +
+                 "re-rolls every hash at once. The bolt in the air becomes a different bolt between one " +
+                 "frame and the next. " +
+                 "MEASURED across three species and seven session lengths: the index moves up to 21 SLOTS " +
+                 "in a single 16.7 ms frame and the envelope steps 0.9996 of its 0..1 range -- and sin^2 " +
+                 "has ZERO SLOPE at both ends by design, so it cannot legitimately arrive there from 0 in " +
+                 "one frame. The per-gesture random changed MID-GESTURE on 14 frames, envelope up on both " +
+                 "sides: the same creature's direction redrawn while it is on screen. " +
+                 "*** AND IT IS NOT THE PHASE TELEPORT'S SHAPE, which is a distinction worth having. *** " +
+                 "The envelope step is already 0.9950 after thirty seconds; one re-index ruins one gesture " +
+                 "completely at any t. What grows with the session is the FREQUENCY -- 0 re-rolls at 30 s " +
+                 "and 7 at half an hour -- because d(floor(t/SLOT))/dSLOT is -t/SLOT^2, so at large t an " +
+                 "arbitrarily small change of slot length flips the index and the gesture flickers. " +
+                 "*** tempest's TWO LIGHTNING LANES WERE DOING THIS TODAY. *** It is the one of the three " +
+                 "whose divisor was already wired; still's was absent entirely and abyss's carried one of " +
+                 "murmur's three terms, so those two are an ABSENCE filled and tempest's is a defect fixed. " +
+                 "THE REPAIR IS v4654's FACTORING ON A DIFFERENT STRUCTURE AND COSTS NO NEW UNIFORM: a " +
+                 "boundary falls where the accumulated slot COUNT crosses an integer, and that count is " +
+                 "(t + a*P + b*V + c*D)/B -- mhRatePhase with a base of 1/B. S is continuous and strictly " +
+                 "increasing, so floor(S) steps by one: ZERO jumps, ZERO reversals and ZERO mid-gesture " +
+                 "re-seeds over 5,019 frames, against a held-signal reduction of 1.5e-12 across all four " +
+                 "outputs and 62,400 points. " +
+                 "*** A SHADER TWIN HAD BEEN MISSING TWO OF ITS FOUR SIGNAL TERMS AND THE PROBE COULD NOT " +
+                 "SEE IT: *** mhAbyssSlot divided by (1 + 0.55*voice) where abyss.ts and this tree's own " +
+                 "CPU abyssSlot divide by all four, and the kit probe swept rarity and voice ONLY -- the " +
+                 "pair that was missing sat at zero in every pixel. Repaired, the probe now sweeps pace " +
+                 "against drive in a second channel and catches the old twin at 101/255. Two arguments " +
+                 "pinned at zero grade nothing, for the third round running. " +
+                 "*** murmurSpecies3 WENT RED ON ARRIVAL AND ITS CONSTANTS WERE DROPPED RATHER THAN " +
+                 "RE-FITTED. *** Its four frame times were hand-written [2.0, 9.0, 16.0, 22.5], fitted to " +
+                 "a slot of 16.48 s -- which was abyss's slot only while the cadence term was missing. With " +
+                 "it the slot is 15.12 s, the lanes moved, and the row about two lanes turning opposite " +
+                 "ways read 15.25 degrees against 0.00 because the first lane was no longer passing at all. " +
+                 "The times are SEARCHED FOR now, at the gate's own operating point against its own clock, " +
+                 "and the numbers got stronger: +17.80 and -11.93 degrees, genuinely opposite, and the " +
+                 "interior swing went from 4.7x to 10.9x. " +
+                 "THIRTEEN SABOTAGES, ALL CAUGHT, TWO ONLY AFTER REPAIR: handing abyss its BASE slot length " +
+                 "where the instantaneous one belongs walked through both pixel rows and every species gate " +
+                 "(it is worth 1.3% of a slot), and dropping the 1.30 from tempest's folded coefficient " +
+                 "walked through everything because every pixel row asked only whether the frame MOVED. " +
+                 "Closed by a structural census -- the count must integrate against a base with no live " +
+                 "signal and the length must carry one -- and by reading tempest's 1.30 and 0.85 out of the " +
+                 "shader and multiplying them. The census's own first cut took a 240-character declaration " +
+                 "window that spilled into the next statement and scored every correct site as wrong.",
+    }),
+    // v4655 -- THE 338th CLOSING: the clocks whose OUTPUT is multiplied, which last round's census could
+    // not see, and a row that had outlived its own repair two gates away.
+    since464: Object.freeze({
+        at: "v4655", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/murmurClock2-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 3,005 ms on this box against a murmurKit that measures 2,705 here and is " +
+                 "RECORDED at 2,035 -- a box drift of 1.33, so about 2,260 recorded, under the 2,772 at " +
+                 "which this tree splits. 12 rows in five sections over three species. " +
+                 "*** LAST ROUND'S CENSUS PRINTED \"modulated rates still on murmur's rate * t: (none)\" " +
+                 "WHILE TWO CLOCKS WERE TELEPORTING. *** It inspected mh_drift's RATE ARGUMENT, and only " +
+                 "when that argument was a bare identifier it could chase back to a const. The shape it " +
+                 "could not see is a drift with a CONSTANT rate whose whole RESULT is multiplied by a live " +
+                 "signal afterwards -- nebula's and tempest's cloud drift and flux's stream both carried " +
+                 "it. A census that reports a clean result about a subset it never names is this tree's " +
+                 "oldest defect and this one shipped it ONE ROUND AGO. " +
+                 "MEASURED, at a 1/60 s frame: tempest's cloud drift advances 0.0199 rad after 5 s of " +
+                 "running and 6.8535 after 1800 -- 7,791x the integrated frame's 0.000880 -- and helix's " +
+                 "strand climb 0.0849 against 29.5654, which is 1,344x. Both grow within 4.1% of linear " +
+                 "for 360x the wait, because the error IS t * dF and it has no ceiling. The integrated " +
+                 "form reaches EXACTLY 100.0% of its derived bound base * (1 + k*sup) * speed * dt at " +
+                 "every session length and varies by 7e-14 across five spanning 5 s to half an hour. " +
+                 "*** THE REPAIR PUTS THE INTEGRALS IN THE SECULAR TERM AND LEAVES THE WOBBLE READING THE " +
+                 "INSTANTANEOUS FACTOR, *** because murmur's product expands to base*F*t + " +
+                 "(k*base*F/w2)*sin and only the first summand has a t in it. The two agree to 4.6e-13 " +
+                 "across 480 operating points out to an hour and part by 405 rad where the signal has just " +
+                 "moved -- the second number is what stops the first being two spellings of one thing. " +
+                 "*** helix's CLIMB WAS AN ABSENCE, NOT A TELEPORT: *** helix.ts scales it by 0.75*live.pace " +
+                 "and 0.85*st.drive and this port carried the bare drift, so the strands rose at one speed " +
+                 "whatever the exchange was doing. No signal-hunting census could ever have found it; it " +
+                 "came out of reading helix.ts against the file line for line, and it moves this tree's " +
+                 "cadence count from eight species to nine. " +
+                 "*** AND A ROW TWO GATES AWAY HAD OUTLIVED ITS OWN REPAIR. *** murmurDrive's " +
+                 "\"NOTHING THIS ROUND WIRED MULTIPLIES A CLOCK\" tested that no line reads both DRIVE and " +
+                 "uniforms.time. v4654 and v4655 UNDEFERRED the rate family, helix's climb now reads both " +
+                 "-- and the test KEPT PASSING because the two reads sit on two source lines. A condition " +
+                 "outliving its sentence is worse than a red one: it reads like a live guarantee. Rewritten " +
+                 "to what is true now, that instantaneous drive reaches a clock at exactly one place, as " +
+                 "the BOUNDED wobble amplitude, while every secular term reads the integral. " +
+                 "FIFTEEN SABOTAGES, ALL CAUGHT, and one of them found a real gap first: deleting the drive " +
+                 "term from the CPU mhRatePhase left murmurKit green -- correctly, its section 15 grades " +
+                 "the SHADER twin against a hand-written reference -- and left murmurClock green too, " +
+                 "because every row there passed 0 for three of the four coefficients. A COEFFICIENT OF " +
+                 "ZERO GRADES NOTHING, for the second round running. Closed by grading mhRatePhase against " +
+                 "a 4,096-step quadrature of the moving rate it claims to integrate, over three signals at " +
+                 "unrelated frequencies: 1.0e-12 rad over 46.8 rad of accumulated phase, and the reference " +
+                 "is the DEFINITION rather than a second spelling of the implementation.",
+    }),
+    // v4654 -- THE 337th CLOSING: the species' own clocks, and this port's one deliberate divergence.
+    since463: Object.freeze({
+        at: "v4654", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/murmurClock-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 1,611 ms on real WebGPU, 10 rows in four sections, plus a new section 15 in " +
+                 "tools/ship/murmurKit-selfcheck.mjs. *** v4653 DEFERRED THE RATE FAMILY AND NAMED THE " +
+                 "DECISION; THE OWNER CHOSE TO DIVERGE FROM murmur RATHER THAN INHERIT ITS JUMP. *** A " +
+                 "species builds a rate from the live signals and hands it to mh_drift, whose phase is " +
+                 "rate * t; a moving rate makes that jump by t * dRate, with no ceiling. MEASURED on comet's " +
+                 "orbit as the cadence rises: 0.1676 rad in one frame after 5 s of running and 57.7341 " +
+                 "after 1800 -- NINE FULL TURNS OF THE ORBIT IN 16.7 ms -- growing 344x for 360x the wait. " +
+                 "The integrated form advances 0.00793 rad and varies by 4e-16 across the same five " +
+                 "sessions: it does not depend on the session at all. " +
+                 "*** THE REPAIR IS EXACT AND COSTS THREE NUMBERS, BECAUSE THE INTEGRAL FACTORS: *** base " +
+                 "and the coefficients come from style knobs and do not move, so integral(base * (1 + " +
+                 "a*pace + b*voice + c*drive)) is base * (t + a*P + b*V + c*D). The host accumulates the " +
+                 "three in SHADER time -- against the tempo integral, not wall seconds -- and it reduces to " +
+                 "murmur's own expression wherever a signal is held, to 9.1e-13 out to an hour. THAT ROW IS " +
+                 "WHAT MADE THE DIVERGENCE SAFE and it is not theory: HEAD read limn's hue turn at 26.84 " +
+                 "degrees and the integrated clock with no other change read 26.84, identical. " +
+                 "*** AND THE ROUND FOUND THREE SIGNAL-ROUTING DEFECTS IT HAD TO FIX FIRST. *** comet's " +
+                 "orbital rate read VOICE where comet.ts reads live.pace, and its whole closure never " +
+                 "touched the cadence; limn carried the SMALLER of murmur's two rate terms and not the " +
+                 "larger; aura carried the voice term alone where aura.ts has voice, pace and drive. Adding " +
+                 "a cadence term to rate * t would have shipped three NEW teleports, so the mechanism was " +
+                 "not a refinement on top of the fix -- it is what made the fix safe to make. " +
+                 "*** A GATE ROW WAS ASSERTING SOMETHING FALSE ABOUT murmur FOR THIRTEEN ROUNDS: *** " +
+                 "\"THE SIX SPECIES WITH A CADENCE ARE murmur's SIX ... a port that routed the cadence to " +
+                 "every species would draw a shimmer on eleven bodies murmur leaves still.\" Counted in " +
+                 "murmur's own sources, live.pace appears in ALL EIGHTEEN. The six were never murmur's -- " +
+                 "they were the six this port happened to reach at v4641 -- and the row now counts how many " +
+                 "of the eighteen are reached (eight) and NAMES THE TEN THAT ARE NOT. " +
+                 "TWELVE SABOTAGES, ALL CAUGHT, THREE AFTER REPAIR: the kit probe passed 0 for two of " +
+                 "mhRatePhase's four coefficients, so deleting a term from the TSL twin moved no pixel (a " +
+                 "coefficient of zero grades nothing); aura's per-lane scale on the secular phase was " +
+                 "ungraded because no section renders aura; and nothing checked that the shared frame " +
+                 "helper DERIVES the three integrals rather than defaulting them -- which is not " +
+                 "hypothetical, it went red on limn at 26.45 the moment the clock landed. " +
+                 "ONE RECORDED BOUND WAS DROPPED RATHER THAN RE-FITTED: limn's hue centre moved 26.84 -> " +
+                 "25.12 because murmur's missing pace term runs its arc 28.5% faster, so the row now asserts " +
+                 "the PHYSICS -- a saturating share approaches MH_SPREAD from below -- instead of a centre " +
+                 "fitted to wherever the arc happened to be.",
+    }),
+    // v4653 -- THE 336th CLOSING: st.drive, the last of mh_state's four, and the half of it that is safe.
+    since462: Object.freeze({
+        at: "v4653", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurDrive-selfcheck.mjs",
+            "tools/ship/murmurDrive2-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2,225 and 2,260 ms on real WebGPU, 11 rows between them, plus a new section 14 " +
+                 "in tools/ship/murmurKit-selfcheck.mjs. *** st.drive IS THE LAST OF mh_state's FOUR AND " +
+                 "THE ONLY ONE WHOSE SUBJECT IS A DIRECTION. *** Its 45 references across murmur's eighteen " +
+                 "sources do THREE things -- they point a wander at a heading, they collapse the scatter " +
+                 "around it, and they run sixteen local clocks faster -- and this round took the first two " +
+                 "and left the third. THE LINE IS NOT WHERE THE WORK GOT TIRING: every term wired here is a " +
+                 "DIRECTION or a SIZE, and the deferral is a CHECKED RULE (no line in the shader reads both " +
+                 "DRIVE and uniforms.time) rather than an intention. The rate family hands rate * (1 + k * " +
+                 "st.drive) to mh_drift, whose phase is rate * t, so a drive ramping at large t teleports " +
+                 "it -- the same shape v4650 repaired on this orb's HOST clock, and it needs a decision " +
+                 "about faithfulness rather than a transcription. " +
+                 "*** THE HEADING'S CLAIM IS GEOMETRY AND THE GATE SAYS SO INSTEAD OF DRESSING IT UP: *** " +
+                 "still's twelve gesture directions sit 86.82 degrees apart at rest (worst pair 177.3, very " +
+                 "nearly opposite) and collapse to EXACTLY one axis at full drive, while abyss -- same call, " +
+                 "k 0.80 instead of 1.00 -- keeps a 12.02 degree residual and stays a current rather than a " +
+                 "ray. AND IT DOES NOT CONVERGE IN A STRAIGHT LINE: the quarter point reads 87.34, HIGHER " +
+                 "than the 86.82 it started at, because normalize(mix(a, b, t)) is not a rotation. A port " +
+                 "that slerped would read 65.11 there. " +
+                 "*** THE NARROWING IS WHAT A FRAME CAN SHOW: *** helix's light draws in 3.51% (duet 7.21%, " +
+                 "prism 4.05%, arc 2.98%, measured this round and not rendered by the shipped gate for " +
+                 "budget) while limn -- the one species in MH_DRIVE_FORM whose lean is NOT a contraction -- " +
+                 "moves 0.21% and still shifts 8.1% of its bytes. droplet's lean goes into the SILHOUETTE " +
+                 "and still's does not: 539.7% against 1.2% on the same 0.62 ring, and droplet's route is " +
+                 "the kit's flow deformation, a term BOTH HALVES HAVE CARRIED SINCE THE PORT AND NO CALL " +
+                 "SITE HAD EVER SET -- every one passed (0,0,1), 0, 0. " +
+                 "FOURTEEN SABOTAGES, ALL CAUGHT, AND SIX OF THEM WALKED THROUGH FIRST. The largest hole: " +
+                 "mhDriveHeading's CPU/GPU pair was graded NOWHERE, so deleting the mix -- or the normalize " +
+                 "-- from the TSL twin left every pixel gate green, because the species carrying a heading " +
+                 "also carry a narrowing and their frames still moved. Closed by kit section 14, which also " +
+                 "reads the LENGTH back out of the frame: without the normalize it reads 0.30 at mid-ramp. " +
+                 "Two more were bounds loosened on a correct subject (v4650's lesson, twice): the angular " +
+                 "epsilon is now DERIVED from Number.EPSILON through acos's square-root amplification, and " +
+                 "the unit-vector bound carries its own negative control -- the row builds a tidied vector " +
+                 "and requires it to FAIL. One row was DELETED rather than repaired: a helix inference that " +
+                 "survived its own negation, replaced by a source census that says what altitude it answers " +
+                 "at. AND ONE SABOTAGE WAS WRONG, NOT THE GATE: a needle matched MH_IGNITE before " +
+                 "MH_DRIVE_HEADING and tested the wrong table.",
+    }),
+    // v4650 -- THE 335th CLOSING: the orb's clock was an integral that reached no shader.
+    since461: Object.freeze({
+        at: "v4650", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurTempo-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2,213 ms on real WebGPU, 10 rows in four sections. *** render/aiPresenceOrbState" +
+                 ".mjs HAS INTEGRATED SPEED EVERY TICK SINCE THE PORT'S FIRST ROUND AND BOTH CALL SITES THAT " +
+                 "FEED A SHADER MULTIPLIED INSTEAD. *** That module's own header names the defect in as many " +
+                 "words -- \"multiplying elapsed time by the CURRENT speed would then jump the animation's " +
+                 "PHASE too (a visible pop)\" -- and ui/aiPresenceOrbWidget.js and ai-presence-orb.html both " +
+                 "wrote time: (now - t0) / 1000 * p.speed, the expression that sentence forbids. The " +
+                 "integral was computed, accumulated, returned by getParams() as `phase`, and dropped. " +
+                 "*** \"A VISIBLE POP\" UNDERSELLS IT AND THE ROUND'S WORK IS SAYING BY HOW MUCH. *** The " +
+                 "error is t * (speedNew - speedOld), so it is set by how long the orb has been on screen " +
+                 "and has no ceiling: entering RESPONDING after 60 s of idle advanced the shader's clock " +
+                 "2.902 SECONDS IN ONE 16.7 ms FRAME; after 1800 s, 86.191 s. Measured across five session " +
+                 "lengths the old jump tracks the wait to within 11% (360x the wait, 320x the jump) while " +
+                 "phase's worst frame varies by 3.6e-14 s -- it does not depend on the session at all. AND " +
+                 "IT IS NOT A TRANSIENT: once the crossfade settles the old clock is permanently 69.355 s " +
+                 "displaced, and every later state change displaces it again. " +
+                 "*** THE ROW THAT MAKES THE REPAIR SAFE IS THE ONE SAYING THE TWO ARE THE SAME EXPRESSION: " +
+                 "*** the integral of a constant from zero IS elapsed-time-times-that-constant, so in a " +
+                 "steady state they agree to 1.6e-12 over 3,600 ticks. That is why eighteen species' byte " +
+                 "baselines did not move and why \"just use phase\" is measured here rather than asserted. " +
+                 "*** AND SECONDS ARE NOT A PICTURE, SO SECTION 4 RENDERS THEM: *** the jumped frame moves " +
+                 "73x (limn) and 99x (still) the light of one honest frame, worst channel 239 and 30 of 255 " +
+                 "against 18 and 1. The two fail differently on purpose -- limn's arc is a POSITION, still " +
+                 "is the quietest species in the roster and has nothing for a jump to hide behind. " +
+                 "TWELVE SABOTAGES, ALL CAUGHT, AND TWO OF THEM CHANGED THE GATE: the ceiling row asked " +
+                 "only that phase stay UNDER maxSpeed * dt, and widening that ceiling to a flat second " +
+                 "walked through -- a bound nothing approaches is a comment, so the row now brackets it " +
+                 "from both sides and reports 100.00% of it. A row demanding ZERO readers of `speed` also " +
+                 "went red on the demo's own speed READOUT, a bound set where it was easy to state rather " +
+                 "than where the invariant is; it now names where each reader is instead of counting to " +
+                 "zero. WHAT IS NOT CLAIMED: the SHADER's own rate multipliers. murmur's species multiply " +
+                 "local rates by (1 + k * live.pace) and (1 + k * st.drive) and hand the product to " +
+                 "mh_drift, whose phase is rate * t -- the same shape one level down, where no host-side " +
+                 "integrator can reach it. That is murmur's design as shipped and it is recorded against " +
+                 "the st.drive entry in tools/ship/nextRounds.mjs rather than quietly corrected here.",
+    }),
+    since460: Object.freeze({
+        at: "v4647p", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/sweepRotation-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 84 ms alone -- inside the 3,000 ms ship-time budget. It gates the module that " +
+                 "WRITES sweep-timings.json, which had no gate at all: definitionGates counts exports no " +
+                 "gate names and all SEVEN of sweepRotation's were on that list, three of them added by me " +
+                 "two rounds after I noticed the absence out loud. Writing it found a defect on the first " +
+                 "run: classifyRows put a gate that exited 1 in 800 ms into `returnees`, because the filter " +
+                 "asked the clock and never the exit code -- the same defect, in the same words, that " +
+                 "sweepCoverage's measuredUnder had two rounds earlier.",
+    }),
+    since459: Object.freeze({
+        at: "v4647g", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/cliArgs-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 574 ms run alone on this box -- under the 3,000 ms membership threshold, so it arrives " +
+                 "INSIDE the ship-time sweep rather than outside it. It gates tools/ship/cliArgs.mjs, the " +
+                 "argument parser written because an option seven tools did not recognise was IGNORED and the " +
+                 "run proceeded for 1,914 s. Eight sabotages red by name (7/3/1/2/1/5/3/1). Two of its rows " +
+                 "drive REAL command lines through spawnSync, bounded at 20,000 ms: a refusal is 81 ms, so " +
+                 "anything slower is the tool failing to refuse -- and the first, unbounded, draft HUNG when " +
+                 "the sabotage sent it into a genuine 32-minute sweep. A hang is not a verdict.",
+    }),
+    since458: Object.freeze({
+        at: "v4647", swept: 6, green: 6, red: 0,
+        added: Object.freeze([
+            "tools/ship/adapterRecord-selfcheck.mjs",
+            "tools/ship/capsuleSettle-selfcheck.mjs",
+            "tools/ship/colliderFromGLB-selfcheck.mjs",
+            "tools/ship/dxcResolve-selfcheck.mjs",
+            "tools/ship/ensureDxc-selfcheck.mjs",
+            "tools/ship/failLines-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "all 6 green, run singly on this box (47 ms to 117 ms -- none launches a browser). " +
+                 "capsuleSettle and colliderFromGLB are the Murmur-Orb physics port; adapterRecord is the " +
+                 "HELD/OWED record that let a second adapter's readings be written BY the gate ON that box; " +
+                 "dxcResolve and ensureDxc are the dxil.dll work, where the PATH route was falsified on real " +
+                 "hardware and the file-beside-the-binary route measured to work; failLines turns another " +
+                 "machine's exit codes into assertion lines, which is what found this surplus.",
+    }),
+
+    since330: Object.freeze({
+        at: "v4644", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurIgnite-selfcheck.mjs",
+            "tools/ship/murmurIgnite2-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2,106 and 2,278 ms on real WebGPU, 9 rows between them. *** mh_state WAS PORTED AT " +
+                 "v4641 AND GRADED IN THE KIT AND REACHED NO PIXEL FOR THREE ROUNDS. *** This round wires " +
+                 "THREE of its four outputs: `settled` on all eighteen interiors and the pair (complete, " +
+                 "sweep) that murmur's SUCCESS shell travels on, in the seven marched heroes. The fourth, " +
+                 "st.drive, is still unported and still named. " +
+                 "*** THE SHELL IS ONE FORMULA murmur WRITES OUT SEVEN TIMES WITH FOUR NUMBERS CHANGED: *** " +
+                 "sr = (length(p) - mix(lo, hi, sweep)) / width; e += complete * gain * exp(-sr*sr). The kit " +
+                 "owns the profile (mhIgnite) and MH_IGNITE owns the four numbers, so the orb spells it ONCE " +
+                 "and calls it from six sites covering seven species. Bit-exact against a real GPU at " +
+                 "murmurKit section 13: worst |gpu - cpu| 0 of 255 over 16 radii x 16 rows x 3 species, " +
+                 "against 255 unflipped, and the ring's measured centre lands within 0.0013 body radii of " +
+                 "mix(lo, hi, sweep) at every sweep. " +
+                 "*** AND THE PIXEL GATES ASK THE QUESTION A BRIGHTNESS BOUND CANNOT: WHERE IS THE ADDED " +
+                 "LIGHT. *** still's flash centroid climbs 0.1947 -> 0.3981 monotonically while its amplitude " +
+                 "goes 23% -> 187% -> 335% -> 113% of the whole idle frame, so the centroid is tracking " +
+                 "position and not brightness; geode, which has NO shell, grows 5.7x over the same taus and " +
+                 "its centroid moves 0.0041 -- fifty times less. abyss travels 0.2870 and tempest's " +
+                 "pre-multiplied cloud gains 135.5% at tau 0.20 within 0.0344 of its own centroid, which is " +
+                 "the term a port can drop while still drawing a perfectly good ring. " +
+                 "*** ALL 72 BASELINE FRAMES ARE BYTE-IDENTICAL: *** eighteen species x four cases, 0 bytes " +
+                 "differ, because complete and settled are EXACTLY zero outside SUCCESS -- which is what lets " +
+                 "eighteen shaders add the shell without a branch, and is its own row on both sides. " +
+                 "*** TWO SABOTAGES WALKED THROUGH AND BOTH WERE TABLE-VERSUS-WIRING DRIFT NO RENDER CAN " +
+                 "SEE. *** A dead MH_IGNITE entry draws nothing; droplet's settle doubled needs droplet " +
+                 "rendered in SUCCESS, which no gate does. The first is closed by a census asserting set " +
+                 "EQUALITY between MH_IGNITE's keys and the closures that call the shell; the second by " +
+                 "making droplet's exclusion a MISSING KEY in MH_SETTLED_INTERIOR rather than a ternary a " +
+                 "tidying pass can delete. A THIRD was caught by the gate itself: the quiet-state control " +
+                 "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
+                 "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
+    }),
+    // v4822 -- TWO new gates: the race lockstep in one process (a mock wire) and across real processes and a real socket (a relay, node peers, a headless Chromium peer).
+    since516: Object.freeze({
+        at: "v4822", swept: 2, green: 2, red: 0,
+        added: Object.freeze(["brain/raceLockstep-selfcheck.mjs", "tools/ship/lockstepRelay-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "brain/gunnerPolicy-selfcheck.mjs (raceWithGunners is a loop over createRace now; the block hit and the chip in its fingerprint)",
+            "world/buildingTopple-selfcheck.mjs (the chip: shellOnBlock, localSig, toppleHash, the demolition script)",
+            "physics/turret-selfcheck.mjs (stepShells reports a shot that lands on a falling block)",
+            "tools/ship/crashDamage-selfcheck.mjs, tools/ship/cityGenSeed-selfcheck.mjs, tools/ship/raceTurret-selfcheck.mjs, physics/spellAmmo-selfcheck.mjs, tools/ship/carViews-selfcheck.mjs",
+            "tools/ship/tslRace-selfcheck.mjs (the page row that asks the pick for a Chaos ship takes up to six picks: the fleet is 1-3 pixels of it, and one pick was red about one run in eight on main; sabotage Q, 11 red)",
+        ]),
+        verdict: "*** THE RACE NOW RUNS IN LOCKSTEP BETWEEN PROCESSES, AND THE PAIR AGREES WITH ITSELF, NOT WITH EVERY OTHER RUN. *** " +
+                 "brain/raceLockstep.mjs puts the race stepper (createRace) behind physics/box3dLockstepNet.js: inputs sent ahead and " +
+                 "redundantly, a hash of the whole sim exchanged per tick, the engine identity announced. Its gate holds the session over " +
+                 "a mock wire; tools/ship/lockstepRelay-selfcheck.mjs puts a TCP socket and an OS process boundary between the peers: " +
+                 "frames of every length class intact and in order, two cold node processes (one started 1.5 s late) agree on one " +
+                 "fingerprint and their exchanged commands replay offline to it, a headless Chromium peer and a node peer agree, a tamper " +
+                 "at tick 100 is named AT tick 100 by both, and a peer announcing another engine halts the pair before a step. Two runs of " +
+                 "the same race differ (the policies are asked for each tick when a peer's pump reaches it); a pair and its log never do. " +
+                 "The CLIs refuse an unknown option (cliArgs) and the peer's transport is a row of its own. Thirteen sabotages red by name, " +
+                 "logged in the two headers. NOT CLOSED: the pair has run over loopback and in one browser, not between two machines.",
+    }),
+    // v4831 -- TWO new gate files: tools/ship/publishHygiene-selfcheck.mjs (what a release can carry, and the publish commands the GitHub
+    // panel prints) and tools/ship/brainStages-selfcheck.mjs (the ship's computer's two stages on the wire, and the orb states on them).
+    since522: Object.freeze({
+        at: "v4831", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "tools/ship/publishHygiene-selfcheck.mjs",
+            "tools/ship/brainStages-selfcheck.mjs",
+        ]),
+        widened: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THREE CLONES OF THE ENGINE WERE ONE PACK AWAY FROM A PUBLIC RELEASE, AND THE TEXT THAT PUT THEM THERE HAD NO GATE. *** The " +
+                 "GitHub panel's exported publish commands cloned to \"../\" from WebGLEngine/ -- inside the project -- and packed to a folder the " +
+                 "packer refuses. They are ui/publishCommands.mjs now, walked like a shell by publishHygiene (clone beside the project, pack beside " +
+                 "both, gh handed the zip the packer wrote, pushd/popd back), and the packer skips a clone and the rig's Tasker state by name. The " +
+                 "three published zips were downloaded and checked: none carried either. brainStages drives ai-bridge/ragBridge.js over real HTTP " +
+                 "against a stand-in model that takes 300 ms: retrieval is now seen finishing ~300 ms before the answer, which the single fetch it " +
+                 "replaces could never show -- so the presence orb's searching (rendered as thinking) and weaving (as responding, brighter with " +
+                 "more sources) have a moment to light up during. Seven sabotages each, red by name.",
+    }),
+    // v4830 -- since521, not since520: the murmur parity round took since520 on main in the same days. TWO new gate files: brain/pilotRoster-selfcheck.mjs (who flies each side of the plane dogfight, and the Load Pilots panel on es-box3d-fly3d.html) and
+    // brain/pilot6dofPolicy-selfcheck.mjs (a learned pilot with the PD autopilot's contract, and the same panel on es-box3d-6dof.html).
+    since521: Object.freeze({
+        at: "v4830", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "brain/pilotRoster-selfcheck.mjs",
+            "brain/pilot6dofPolicy-selfcheck.mjs",
+        ]),
+        widened: Object.freeze([
+            "tools/ship/pilotPolicy-selfcheck.mjs (unchanged and re-run: duel() now takes a weight vector as the opponent, and the existing rows hold the string opponents to what they were)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE GATE FOUND A DEFECT IN ITS OWN PAGE BEFORE THE SABOTAGE DID, AND A SABOTAGE THAT WENT 0 RED WAS A CRASH. *** The first run of the plane-page gate failed one row: the shipped pilot was never " +
+                 "offered, because the selects were built once at load, before the shipped file had arrived; pilotLine() now rebuilds them whenever availability changes. In the 6DOF gate, the sabotage that " +
+                 "made the zero pilot call the hand pilot (which calls the zero pilot) recursed to a stack overflow and exited 1 with no FAIL row: a crash that looks like a catch. Re-done as a " +
+                 "real breakage, it is three red. And the closing-speed feature has no weight in the hand brain, so nothing read it until a row was added for its sign and size. Twenty-one sabotages " +
+                 "for the plane gate, sixteen for the 6DOF gate. NOT CLOSED: no 6DOF brain has been trained or shipped, so the 'shipped' and 'imported' choices are not on that page.",
+    }),
+    // v4829 -- ONE new gate file: tools/ship/murmurParity-selfcheck.mjs (the full read of murmur-web at 1c23b99, every difference it found held
+    // against the murmur line it transcribes).
+    since520: Object.freeze({
+        at: "v4829", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurParity-selfcheck.mjs",
+        ]),
+        widened: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** u_depth WAS COUNTED TWICE, AND IT TOUCHED EVERY PIXEL THE ORB DRAWS. *** murmur spends it in mh_palette alone; the port also multiplied " +
+                 "every species' interior by it, so thinking and responding drew 25% hot and idle 25% cold. Read all eighteen shaders and kit.ts against the " +
+                 "port and closed what the earlier notes never named: each species' own knob defaults (styles.ts), murmur's skipped edge taps, nine drive and " +
+                 "cadence terms, eight shapes (sol's halo was 3.19x too wide), two clocks integrated host-side (chorus's breath jumped 2.15 turns in a frame " +
+                 "after half an hour; tempest's lane 0 now honours mh_flourish's floor, closing v4825's 1.7%), and mh_out's dither, the kit's 41st and last " +
+                 "function, graded byte for byte on a GPU. Green in about 0.2 s: source and CPU rows against QUOTED lines, because murmur is not on the rig. " +
+                 "Eleven sabotages red by name, logged in its header; seven existing gates restated with their own. NOT CLOSED: formScale and the small-mount " +
+                 "mixes, inert at the one form and mount this port draws.",
+    }),
+    // v4827 -- TWO new gate files: brain/roster-selfcheck.mjs (the Load Racers panel on race-brain.html and the lineup resolver behind it) and brain/racePlay-selfcheck.mjs
+    // (a keyboard on the lockstep wire, and race-lockstep.html in two browsers through a real relay).
+    since519: Object.freeze({
+        at: "v4827", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "brain/roster-selfcheck.mjs",
+            "brain/racePlay-selfcheck.mjs",
+        ]),
+        widened: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** A GATE I TRUSTED FAILED THREE RUNS IN TEN FOR A REASON THAT WAS MINE. *** The pair row of the new lockstep gate (two pages, a real relay, both print AGREED on one " +
+                 "fingerprint) went red under sabotages that could not touch it, so the unsabotaged gate was looped ten times: twice the harness read the result block one frame " +
+                 "before the page redrew it, and once, with both pages printing AGREED, the printed fingerprints differed -- a real bug (a pump can step a dozen ticks it holds commands " +
+                 "for, so a clock-paced page ran past the end of the race by a different number on each machine). The session takes a stopTick now. The roster gate's page row " +
+                 "removed the LAST car, where a slot and a position are the same number, so the sabotage that numbered trucks by position went 0 red until a row removed a middle car. " +
+                 "Fifteen sabotages for the roster gate, twenty-two for the lockstep gate, logged in the two headers. NOT CLOSED: nobody has played the page; every key is synthetic.",
+    }),
+    // v4826 -- TWO new gate files: tools/ship/flakeProbe-selfcheck.mjs (the tool that runs a gate K times and reports the rows that flip or read a thin number) and
+    // tools/ship/stableWrite-selfcheck.mjs (the one definition of writing a stamped record without dirtying the tree).
+    since518: Object.freeze({
+        at: "v4826", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "tools/ship/flakeProbe-selfcheck.mjs",
+            "tools/ship/stableWrite-selfcheck.mjs",
+        ]),
+        widened: Object.freeze([
+            "world/buildingTopple-selfcheck.mjs (section 5c: the body made again from what a chip leaves -- mass by impulse, collider by resting height, spin by rotation rate)",
+            "tools/ship/raceTurret-selfcheck.mjs (the scripted demolition now chips twice, the second a refit: the node-and-browser fingerprint rows run a race that contains one)",
+            "tools/ship/cliArgs-selfcheck.mjs (the ratchet is at zero silent readers; parseOrExit and the positional spec; all 24 command lines driven with an option nobody has spelled)",
+            "tools/ship/traderPolicy-selfcheck.mjs (the artifacts' stamp moves only when their numbers do: a later version re-running the same numbers leaves the tree clean)",
+            "tools/ship/rigCanvas-selfcheck.mjs (rig-expected.json is rewritten only when its pixel counts change, not stamped with the clock on every run)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** A GATE THAT FAILS ONE RUN IN EIGHT IS NOT FOUND BY RUNNING IT ONCE. *** v4822's step 4b found tslRace red, green, red: its page row asked one " +
+                 "pick of a live scene for a Chaos ship, and the fleet is one to three pixels of the pick. tools/ship/flakeProbe.mjs runs a gate K times, serially, " +
+                 "and names the rows that FLIPPED between runs and the rows that PASSED every run but read a small number that varied (THIN: the species that row was " +
+                 "before it failed). Its gate holds the parser, the comparison on fixtures and the CLI end to end on a gate that flips one row and thins another. " +
+                 "Run over the live-page gates (see the record). The same round: the thirteen tools that read argv the silent way are converted, so the cliArgs census " +
+                 "is at zero and every command line is driven; verify.mjs, which shipVerdict hands its argv verbatim, no longer verifies against no version when " +
+                 "--version is mistyped. Three gates used to rewrite a tracked file on every run with a stamp that moved with the clock or the version " +
+                 "(traderPolicy twice, rigCanvas once -- the second found by the probe's own git status); all three go through tools/ship/stableWrite.mjs now, " +
+                 "and a re-run leaves bytes and mtime alone. Ten sabotages red for the probe, eight for the helper, six for the census, thirteen for the refit.",
+    }),
+    // v4824 -- since517, not since516: v4822 on main took since516 in the same days. ONE new gate file: ui/pick-selfcheck.mjs, the target-scoring utility the npc audit's third cluster needed.
+    since517: Object.freeze({
+        at: "v4824", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "ui/pick-selfcheck.mjs",
+        ]),
+        widened: Object.freeze([
+            "tools/ship/navmesh-selfcheck.mjs (section 9: the owner-grid adjacency against an all-pairs reference)",
+            "tools/ship/dungeonAI-selfcheck.mjs (section 5b: the aggro gate as AGGRO_MACHINE)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green, about 0.2 s. ui/pick.mjs's pickMin/pickMax keep the three properties every hand-written target scan had -- " +
+                 "strict comparison so the first of a tie wins, an exclusive bound that is the starting best, one key call per item " +
+                 "in order -- held by the contract, a 3,000-list differential against the loop itself, KaijuRivalry's site end to " +
+                 "end through exact distance ties, and a source census of the eight migrated scans. Four sabotages red.",
+    }),
+    // v4820 -- NO new gate file -- declaredCost's ratchet held on a machine with no readings of its own (the rig's clone read 2).
+    since515: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4820", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/declaredCost-selfcheck.mjs (the ratchet counted as a machine with no readings of its own counts it, and on this one)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** v4819'S 0 WAS THE SANDBOX'S COUNT; THE RIG'S CLONE READ 2. *** The census reads the running machine's own alone " +
+                 "readings first (v4810), and the sandbox had readings of statedRuntime and gateSelection that the shared record " +
+                 "does not: its statedRuntime ring is 8.6-9.0 s from main's line, where the gate runs ~1.5 s alone now, and " +
+                 "gateSelection's only reading is a loaded 69 s. The ratchet is held on the count a machine with no readings of its " +
+                 "own takes -- frozen at 2, both named -- and on this machine's count. One sabotage red.",
+    }),
+    // v4812 -- THE 416th CLOSING: NO new gate file -- a pull request text for each of the sixteen three.js issues.
+    since509: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4812", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (section 6: one pull request text per issue, each held to its issue, its patch, three's template and e2e.json's unit figures)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE PULL REQUESTS, READY TO PASTE. *** docs/upstream-three/dev/pr/ holds one text per issue: a title in three's " +
+                 "'Component: What changed.' form, the branch to make in a fork and the commands that make it from the issue's own patch, " +
+                 "and a body in three's pull request template -- the problem, the fix, and what the issue's reproduction printed on dev " +
+                 "and with the patch, quoted from record.json. Each patch was linted alone on dev at 576b084 (eslint clean, all sixteen); " +
+                 "the unit and e2e figures quoted were taken with all sixteen together, and each body says so. The commands were run once " +
+                 "in a scratch checkout: a title's backticks reach the commit as backticks, escaped. Six sabotages red.",
+    }),
+    // v4811 -- THE 415th CLOSING: NO new gate file -- the sixteen drafts re-checked against three's dev at 576b084.
+    since508: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4811", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (section 6: each patch made against dev's own blobs, each issue naming the dev it was measured on)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** NONE OF THE SIXTEEN WAS FIXED IN THE TWELVE COMMITS SINCE 1ea31f3. *** threePatch.mjs re-taken on dev at 576b084 " +
+                 "(4 October): every reproduction prints exactly what it printed on 1ea31f3 -- on dev, with its patch, with all sixteen. " +
+                 "Every patch still applied, and that hid something: 09 and 16 named blobs dev no longer holds, their hunks seven lines " +
+                 "off, in RenderObject.js, Renderer.js and WebGPUBackend.js. Both made again on dev's files; 10, made again with three " +
+                 "lines of context, no longer applied after 04, so it keeps its two. The record now holds dev's blob for each of the 23 " +
+                 "files the patches edit, and section 6 holds each patch's index line to it. Three's tests on 576b084: unit 1525, 1524 " +
+                 "passed, 1 todo, on both builds; e2e 191 of 202 on WebGPU and 148 on WebGL 2, every outcome the same on both builds and " +
+                 "as on 1ea31f3. Five sabotages red.",
+    }),
+    // v4810 -- THE 414th CLOSING: NO new gate file -- declaredCost reads a same-type box's alone readings before the shared record.
+    since507: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4810", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/declaredCost-selfcheck.mjs (section 6: which box's readings cost a gate, planted in a tree of its own)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** A BOX COSTS ITS GATES BY ITS OWN KIND, NOT BY THE SHARED RECORD'S SWEEP. *** Sessions resume on two machines of one " +
+                 "type whose CPU models differ, so each keeps its own per-box record, and a box with no alone readings of a gate fell to the " +
+                 "shared ring -- sweep readings -- and a header went red on a machine change (v4806: statedRuntime and cloneSource). census " +
+                 "now reads this box's ring, then same-type boxes' rings pooled with this box's one reading, then the shared record, and names " +
+                 "the record on each row. Measured: a box of this type that has never run a gate alone rots 0 headers; a box of another type, " +
+                 "which still reads the shared record, rots statedRuntime (1.6 s declared, 6,462 ms recorded) as v4806 did. Another type's " +
+                 "record and sweep-timings.local.json are not witnesses. Six sabotages red.",
+    }),
+    // v4809 -- THE 413th CLOSING: ONE new gate file -- the engine's way around three's issues 17 and 18, until three takes the patches.
+    since506: Object.freeze({
+        at: "v4809", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/threeWorkarounds-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "fx/fsr/fsrFrameGenBackdrop-selfcheck.mjs (both backends; all six cases held again; read back through readTargetPixels)",
+        ]),
+        verdict: "green, 2.2 s. *** GLASS DRAWN RIGHT ON r186, BY THE ENGINE, UNTIL THREE TAKES THE PATCHES. *** Issue 17: three forces a " +
+                 "full refresh on a material holding a node in ANY property, so render/threeWorkarounds.mjs's refreshEveryRender gives a " +
+                 "transmission material one nothing reads -- the same bytes as no mark, and every render rebinds; marked after its first " +
+                 "render it needs the rebuild, which it asks for. Issue 18: readTargetPixels reads back, then renders an empty scene into a " +
+                 "1x1 target of its own, never the canvas. The translucent layer marks every backdrop reader it meets and has prepare(scene) " +
+                 "for an application's first frame. fsrFrameGenBackdrop prints r185's figures on r186 again, on WebGPU and now on WebGL 2 -- " +
+                 "where reading back plainly would have cost its midpoint 30 dB. Three's own behaviour is held beside each workaround, so the " +
+                 "rows go red when three is fixed. Six sabotages red.",
+    }),
+    // v4808 -- THE 412th CLOSING: NO new gate file -- issue 18, the WebGL 2 lens frozen after a readback, drafted with its patch.
+    since505: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4808", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (section 6: issue 18, recorded, run on the vendored r186, three's tests with all sixteen)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE ONE v4806 FOUND BESIDE ITS OWN, TRACED TO A SKIPPED BIND. *** On WebGL 2 a transmission lens rendered into a target " +
+                 "that was read back between renders keeps its first backdrop: the copy runs every render, into the right texture, and " +
+                 "reads the default framebuffer. WebGLState caches gl.FRAMEBUFFER but records only the draw side of what that binds; the " +
+                 "readback binds the read side alone and leaves it at null, so the next bind of the same target is skipped. A diagnostic " +
+                 "that read the copy back by hand made the bug vanish -- it rebound the framebuffer -- which is how the cause was found. " +
+                 "The patch caches gl.FRAMEBUFFER only while draw and read agree: lensMoved 0 -> 8 on WebGL 2, r185 to dev; three's unit " +
+                 "and e2e tests unchanged with all sixteen. Its workaround was tested before it was written. Five sabotages red.",
+    }),
+    // v4807 -- THE 411th CLOSING: NO new gate file -- vendor/three, the classic build, moved to r186 beside three-webgpu.
+    since504: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened three.
+        at: "v4807", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/gltfKtx2-selfcheck.mjs (the other fourteen upstream files of vendor/three, by digest, and nothing untabled)",
+            "tools/ship/tsl-selfcheck.mjs (vendor/three and vendor/three-webgpu the same release)",
+            "tools/krbn/krbnCompareLive-selfcheck.mjs (its provenance row reads the new line)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** MEASURED BEFORE IT WAS MOVED, AGAIN, AND THIS TIME NOTHING MOVED BUT THE RECORD. *** The 305 gates whose imports " +
+                 "reach vendor/three ran on this tree and on a worktree with 0.186.1: they differ by krbnCompareLive's provenance row and " +
+                 "the orrery's bake, nothing else. Seven files changed, thirteen are byte-identical, every relative import resolves, and " +
+                 "`three` drops no export. The seven had no digest anywhere -- a GLTFLoader.js left behind would have passed every gate -- " +
+                 "so gltfKtx2 holds all twenty now, and the classic core turns out to be three-webgpu's own, byte for byte. Four sabotages red.",
+    }),
+    // v4806 -- THE 410th CLOSING: NO new gate file -- issue 17, the transmission regression, drafted with its patch.
+    since503: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.
+        at: "v4806", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (section 6: issue 17, recorded, run on the vendored r186, three's tests with all fifteen)",
+            "fx/fsr/fsrFrameGenBackdrop-selfcheck.mjs (names the issue its three's-own row is)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE REGRESSION v4805 HELD AS THREE'S, DRAFTED FOR THREE. *** A reproduction of thirty lines -- a striped wall, a plain " +
+                 "MeshPhysicalMaterial lens, two renders into two targets with the wall moved between -- prints lensMoved 0 on r186 and dev " +
+                 "and 8 on r185, both backends. The cause is #34162's SHARED refresh: the viewport texture node switches to the current " +
+                 "target's copy, and a shared refresh never rebinds it. The patch runs the full update for a bind group whose sampled " +
+                 "texture no longer matches its node, and only for it; lensMoved 8, alone and with the other fourteen, and three's unit and " +
+                 "e2e tests unchanged on both backends. Its first stated workaround was tested and did not work, so the issue says so. Five " +
+                 "sabotages red.",
+    }),
+    // v4805 -- THE 409th CLOSING: NO new gate file -- the engine's three-webgpu moved to r186.
+    since502: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened nine.
+        at: "v4805", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (section 6: the vendored build is the record's r186, and every issue runs on it at every sweep)",
+            "fx/fsr/fsrFrameGenBackdrop-selfcheck.mjs (the rebuild where three draws it right; three's stale transmission read held as three's)",
+            "render/temporalTslMany-selfcheck.mjs (three's own colour pass past 1024 instances, r186's symptom)",
+            "tools/ship/tsl-selfcheck.mjs (revision 186, the README's heading)",
+            "tools/ship/threeProbe-selfcheck.mjs (RIG-PENDING for 0.186.1 rather than passed on 0.185.1's capture)",
+            "tools/ship/threeUpstreamPaths-selfcheck.mjs (r185 from vendor/three-webgpu-r185)",
+            "tools/ship/predicatePairs-selfcheck.mjs, tools/ship/orreryUniverse-selfcheck.mjs, tools/ship/referenceKind-selfcheck.mjs (the kept r185 body: 27 licences, 17 upstreams, 8 agreeing, one gate-only module named)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** MEASURED BEFORE IT WAS MOVED, AND WHAT MOVED WAS THREE. *** r186 was swapped into a scratch worktree and the 327 gates " +
+                 "that reach the bundle run on both trees: eleven went red on r186 alone. One was ours to fix (render/tslSource.mjs: r186 keys a " +
+                 "render list by the renderer's lighting); the rest were three's own behaviour changing -- issue 08's symptom on the second render " +
+                 "now, the probe and version rows -- and one regression, bisected to #34162: after renders to other targets a transmission lens " +
+                 "samples a stale copy of the frame behind it, on both backends, still so on dev. Held as three's, by a row that goes red when " +
+                 "three fixes it. The stage's own previous instance and batch matrices stay: with three's positionPrevious in their place on the " +
+                 "plain paths a batch is 32.7 px off and instances 40.8. r185 is kept for the r185 drafts. Nine sabotages red.",
+    }),
+    // v4804 -- THE 408th CLOSING: NO new gate file -- the eighteen cost headers, re-measured.
+    since501: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.
+        at: "v4804", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/declaredCost-selfcheck.mjs (the rotted-header ratchet 18 -> 0)",
+            "tools/ship/statedRuntime-selfcheck.mjs (out of its own population by identity)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** PAID DOWN BY RE-MEASURING, ONE GATE AT A TIME. *** The eighteen gates whose Run: line was more than 2x off " +
+                 "the alone median were each run alone three times on this box, and each line re-written to the geometric mean of " +
+                 "that median and the sweep's serial median -- within 2x of both -- with both readings and the old claim beside it: " +
+                 "~40 s became ~2.2s, ~40 ms became ~860 ms, ~11.6s became ~5.5s. The ratchet 18 -> 0. One gate re-written was " +
+                 "statedRuntime, whose new header disagreed with its own stale record: a candidate, so the gate ran itself, which " +
+                 "ran itself, until the cap -- it is out of its own population now, as declaredCost's gate is. Two sabotages red.",
+    }),
+    // v4803 -- THE 407th CLOSING: NO new gate file -- no caller spells the source regex by hand.
+    since500: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened three.
+        at: "v4803", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/shaderRefs-selfcheck.mjs (the hand-spelled ceiling 2 -> 0, a planted control in place of the > 0 bound)",
+            "tools/ship/backendParity-selfcheck.mjs (hands the census SOURCE_EXT as isSource)",
+            "tools/ship/toolFrontDoor-selfcheck.mjs (imports SOURCE_EXT; run alone, 377 s)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE LAST TWO. *** The parity census is pure on purpose -- its readers are handed in -- so it takes isSource the " +
+                 "same way, and its gate hands in SOURCE_EXT: the module stays free of node:fs and applies the one definition of a " +
+                 "source file. The front-door gate imports SOURCE_EXT and was run alone, 377 s, which is why no sweep runs it. The " +
+                 "ceiling 2 -> 0; and at 0 the old bound that the count stay above zero -- the proof, since v4087 found the detector " +
+                 "blind, that it could see -- has nothing to stand on, so a tree made for it holds that proof: one file spelling the " +
+                 "regex, one importing SOURCE_EXT, and the detector must name the first alone. Two sabotages red.",
+    }),
+    // v4802 -- THE 406th CLOSING: NO new gate file -- the fourteenth issue, and the first frame of the thirteenth.
+    since499: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4802", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (section 6: issue 16, issue 15's first frame, and the one import-line merge the all-patch build makes)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** TWO THINGS THE LAST ROUND NAMED AND DID NOT FILE. *** An InstancedMesh whose storage instance matrices a compute pass " +
+                 "writes reads 1.496 px of velocity where a plain mesh reads 5.612, on r186 and dev: r186's fix for 01 copies the previous " +
+                 "matrices from the CPU array, which a compute pass never writes. Issue 16, with a patch that keeps them on the GPU -- " +
+                 "renderer.copyBufferToBuffer, two copies before each draw -- and 5.612. And r186 makes a batch's previous-matrices copy " +
+                 "without marking it for upload, so a fresh still BatchedMesh reads 7.482 px on its first frame: issue 15 gains the row, " +
+                 "its patch already fixing it. 08 and 16 edit one import line three's lint will not let be split; the tool merges that, " +
+                 "and only that, and the record lists it. Three's e2e and unit tests on dev with all fourteen, again.",
+    }),
+    // v4801 -- THE 405th CLOSING: NO new gate file -- five more callers off a hand-spelled regex.
+    since498: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4801", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/shaderRefs-selfcheck.mjs (the hand-spelled corpus filters' ceiling 7 -> 2, the two left named)",
+            "tools/ship/declaredCost-selfcheck.mjs (headers judged against the alone median; the ratchet 138 -> 18)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** FIVE MORE, ONE AT A TIME. *** render/colourReach (named without its extension: a closing that names a module rescues it from the orphan census), mesh/greedyMesh-selfcheck.mjs, tools/ship/ragdollFrom" +
+                 "Skeleton-selfcheck.mjs, tools/ship/videoFrames-selfcheck.mjs and ui/webgpuProbe-selfcheck.mjs import SOURCE_EXT in " +
+                 "place of the regex they spelled by hand, each edited and its gate run before the next, as the ratchet's note asks; " +
+                 "its ceiling 7 -> 2. The two left are named rather than swept: render/backendParity.mjs has no top-level node import " +
+                 "and is named from browser-side code, so moduleRefs' node:fs is not pulled into it unread; toolFrontDoor-selfcheck " +
+                 "is over the sweep's budget and moves when it is run. And the first verify on a record this box rewrites each run " +
+                 "flipped declaredCost between 144 and 136 rotted headers against a frozen 138: it judged each header against " +
+                 "the newest reading, ~2.4x the alone cost when 8-way. Judged by the alone median, 18 -- the ratchet stands " +
+                 "there, not one header re-written. Three sabotages red.",
+    }),
+    // v4800 -- THE 404th CLOSING: NO new gate file -- the sweep chooses by this box's own stopwatch, and the shared record has an owner.
+    since497: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened four.
+        at: "v4800", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/quickSweep-selfcheck.mjs (ownTimings: whose record chooses the gates, on fixtures, and that the sweep uses it)",
+            "tools/ship/boxTimings-selfcheck.mjs (the budget row states the new choice instead of pinning the old one)",
+            "tools/ship/recordReach-selfcheck.mjs (this box's own alone readings win the margin whenever there are two)",
+            "tools/ship/sweepCoverage-selfcheck.mjs (the population outside the sweep as a share of a grown tree; headlessGpu named still over on this box)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** TASK #87. *** quickSweep chose its gates by the shared timing record on every box, and the shared record " +
+                 "belonged to an id no live box has: ~100 gates read \"now over budget\" at each verify this session, and this " +
+                 "box's own readings were written to its local file every sweep and never read back. ownTimings reads them " +
+                 "back -- the shared record where this box owns it or nobody does, else the local file this box wrote, else the " +
+                 "shared one, said as such -- while timingsTarget still routes the write by the shared record's owner. And the " +
+                 "shared record is re-hosted to linux-x64-4c-16gb-420793, from that local file. Three gates moved with it: " +
+                 "boxTimings had pinned the old choice; recordReach read rings the departed box had filled, now that this box " +
+                 "owns them; sweepCoverage compared a count frozen on a 1,617-gate tree -- and once this box's verify " +
+                 "rewrote the record, it found headlessGpu, returned to the sweep at v4461 on the old box's 2,700 ms, over alone " +
+                 "here at 3,240, and named it as meshLine was. Nine sabotages red.",
+    }),
+    // v4799 -- THE 403rd CLOSING: NO new gate file -- the drafts on three's latest release and its dev branch.
+    since496: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4799", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (section 6: the thirteen issues in docs/upstream-three/dev/, held to tools/ship/threePatch.mjs's record of r186 and dev)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE DRAFTS WERE r185'S, AND THREE HAS MOVED. *** Measured on r186 and on dev at 1ea31f3, built by three's own " +
+                 "rollup: r186 fixed 01 and 02 (#34100, #34101, #34107 -- bisected), and the WebGL 2 min/max that kept three's SSR example " +
+                 "from linking (#34018). The other twelve stand, 08 with a new symptom, and r186 brought a thirteenth: a BatchedMesh grown " +
+                 "under a velocity MRT throws on every render. Each is now an issue in three's Bug Report form, its reproduction the draft's " +
+                 "with the version swapped, its patch rebased onto dev -- five by hand, and 10 rebased as it was applied cleanly and fixed " +
+                 "nothing, the compute builder's object having moved to builder.compute. A tool runs them beside a three checkout and " +
+                 "records what each page printed; section 6 holds the issues to the record, and three's own unit and e2e tests to " +
+                 "theirs: the same on dev and with all thirteen. Sixteen sabotages red.",
+    }),
+    // v4798 -- THE 402nd CLOSING: NO new gate file -- a timing row that tolerates load, and four callers off a hand-spelled regex.
+    since495: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.
+        at: "v4798", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "render/ringFloorCost-selfcheck.mjs (the flatness row re-measures under load, up to twice, every attempt printed)",
+            "tools/ship/shaderRefs-selfcheck.mjs (the hand-spelled corpus filters' ceiling 11 -> 7)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** TWO LEFTOVERS, EACH SMALL AND EACH A RATCHET. *** ringFloorCost's flatness row compared two absolute per-pixel " +
+                 "times taken a section apart and went red once in eight verifies under load, passing alone every time. Contention " +
+                 "only adds time, so a missed first attempt is measured again, both sizes together, up to twice, and the flattest " +
+                 "attempt is the reading -- printed, every one: a push made to slow with size fails all three. And four gates -- " +
+                 "roundTrip, glbTexture, wgslSpec, canvasFill -- import SOURCE_EXT in place of the regex they spelled by hand, each " +
+                 "edited and run on its own, as the ratchet's own note asks; its ceiling 11 -> 7. Two sabotages red.",
+    }),
+    // v4797 -- THE 401st CLOSING: NO new gate file -- recordDrift's masking witness on a world it builds.
+    since494: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4797", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/recordDrift-selfcheck.mjs (the masking witness: masked beside this box's reading, not beside another's, on a built world)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** A WITNESS THAT PASSED ON NOTHING. *** Since v4791 recordDrift's masking row asked which record coverage reads for " +
+                 "a gate, and passed vacuously on any box whose own record was not that one -- every box this session. Masking is a " +
+                 "property of coverageOf, so it is shown on a world made for it: the real records, the shared one given a foreign " +
+                 "host, every other giving the gate up, and one more record that is this box's and times it. Holed, the shared entry " +
+                 "is masked by this box's reading; with the extra record foreign it is not. The first draft left the live records " +
+                 "as they stood and the control came out masked -- this box's own local timings already held the gate. Two " +
+                 "sabotages of coverageOf's precedence red, one row each.",
+    }),
+    // v4796 -- THE 400th CLOSING: NO new gate file -- one machine type, one id.
+    since493: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4796", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/hostScale-selfcheck.mjs (the id survives a megabyte of drift and still tells 16, 32 and 8 GB apart)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** ONE MACHINE TYPE HAD TWO IDS, AND A MEGABYTE DECIDED WHICH. *** boxId() carried total memory in megabytes, and " +
+                 "the same container type read 16095 in one session and 16096 in another: two per-box records for one box, and " +
+                 "recordReach red on a box whose readings sat under its twin's name. The id is in whole gigabytes now -- coarser than " +
+                 "any one machine's drift, finer than any difference between machine types this tree has met -- and the records are " +
+                 "merged under it: 16095mb-420793 and 16096mb-420793 into 16gb-420793 (six gates), 16095mb-142c0d into 16gb-142c0d. " +
+                 "EVERY COMPARISON STAYS EXACT: the shared record's host keeps the old format, so no box owns it -- as no live box " +
+                 "has -- and verify never writes the committed file. Re-hosting it is a decision of its own, not a side effect of " +
+                 "a rename. Two sabotages red.",
+    }),
+    // v4795 -- THE 399th CLOSING: NO new gate file -- draft 14, a WebGL2 compute reading a buffer of the other class.
+    since492: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.
+        at: "v4795", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (draft 14 and its patch; both e2e records for all fourteen)",
+            "tools/ship/threeUpstreamPaths-selfcheck.mjs (the instanced-source path v4792 held under 11 removed: it is 14's reproduction)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE PATH DRAFT 11 HELD AS NOT REACHED, TAKEN TO A PATCH OF ITS OWN. *** The WebGL backend draws a compute " +
+                 "instanced only when its FIRST buffer is a StorageInstancedBufferAttribute, and every buffer it reads as a vertex " +
+                 "attribute steps by its OWN class -- so a buffer of the other class holds at its first element: r185 '1 1 1 1 1 1' " +
+                 "copying instanced into plain and plain into instanced. Patch 14 draws every compute as one point and count " +
+                 "instances, with a vertex array of its own that steps every attribute per instance: '1 2 3 4 5 6' both ways. " +
+                 "gl_InstanceID is then the invocation in every compute, so 14 fixes draft 11's reproduction by itself as well. " +
+                 "Since it changes WebGL 2 dispatch, both e2e runs again: the same pass and fail on each backend with the same " +
+                 "reasons; on WebGL 2 one more screenshot differs, gltf_transmission -- measured, not assumed: eight runs of each " +
+                 "build gave four and five different images, four shared. Three sabotages; the compute vertex array's own key is " +
+                 "reached by none and is held by the hash alone, said as such.",
+    }),
+    // v4794 -- THE 398th CLOSING: NO new gate file -- three's e2e on its WebGL 2 backend, r185 and all thirteen patches.
+    since491: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4794", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/threeUpstream-selfcheck.mjs (section 5: one e2e record per backend; the WebGL 2 one)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THREE PATCHES CHANGE ONLY THE WebGL 2 BACKEND, AND THE e2e HAD ONLY EVER RUN ON WebGPU. *** 06, 11 and 12 are " +
+                 "WebGL-backend code no WebGPU example reaches. Run again with navigator.gpu hidden, so WebGPURenderer falls back to " +
+                 "WebGL 2: 187 examples, 135 passed and the same 52 failed on r185 and with all thirteen, each for the same reason -- 33 " +
+                 "a few percent off three's screenshots, which are WebGPU's, 15 that need WebGPU, two fetches, one video, and " +
+                 "webgpu_postprocessing_ssr, whose WebGL program does not link on r185 either -- and 184 of 187 screenshots the same " +
+                 "bytes. The other three vary between runs of ONE build: fsr1 and taau gave a different image on each of three runs " +
+                 "of each, measured before they were set down as noise. The first parse read no failures at all: the GL info logs " +
+                 "carry NUL bytes and grep took the logs for binary. Three sabotages red.",
+    }),
+    // v4793 -- THE 397th CLOSING: NO new gate file -- draft 13, per-instance morphs beside absolute targets or a mesh-level array.
+    since490: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.
+        at: "v4793", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (draft 13 and its patch; the e2e record for all thirteen)",
+            "tools/ship/threeUpstreamPaths-selfcheck.mjs (13: per-instance absolute targets through velocity, a 'together' case held with every patch)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** TWO THROWS v4784 RECORDED AND LEFT, EACH TO ITS CAUSE, IN ONE BRANCH OF Morph.js. *** Per instance three reads the " +
+                 "influences from the instance's row of morphTexture but two things beside them from the MESH: the base, a uniform set " +
+                 "from object.morphTargetInfluences -- undefined on such a mesh, so .reduce throws for absolute targets -- and the " +
+                 "influences array, updated on every draw though per instance the shader never builds it, so its value is null and " +
+                 "update() throws whenever the mesh has an array. setMorphAt already writes each instance's base into column 0 of its " +
+                 "row; nothing read it. Patch 13 reads it, makes no mesh-level array per instance, and guards the mesh-level base. The " +
+                 "reproduction reads WIDTH as well as centre: scaled by a base of 1 instead of 0.5, the absolute instance is drawn " +
+                 "half as wide again at the same centre, and a sabotage that did exactly that went unseen until width was measured. " +
+                 "Patch 03 reads its previous base from the same column, and that velocity -- which needs 13 to draw and 03 to step -- " +
+                 "is held as a 'together' path on the build with every patch: 2.817 px, the plain meshes 2.817; 13 alone -2.770. " +
+                 "three with all thirteen: build matches, lint clean, unit tests 1310 passed, e2e the same 176 of 187 and 185 " +
+                 "screenshots the same bytes. Four sabotages red.",
+    }),
+    // v4792 -- THE 396th CLOSING: NO new gate file -- draft 12, a WebGL2 storage buffer named without its count.
+    since489: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.
+        at: "v4792", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (draft 12 and its patch; the e2e record for all twelve)",
+            "tools/ship/threeUpstreamPaths-selfcheck.mjs (11: an instanced storage source into a plain output, held NOT reached)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE WebGL2 COMPUTE THAT NEVER LINKED, TAKEN TO ITS CAUSE. *** v4790's probe saw 'two transform feedback " +
+                 "varyings specify the same output variable' and set it aside. It is storage(attr, type) with the count left at 0: " +
+                 "StorageBufferNode then shares its hash through builder.globalCache keyed by the buffer, and BufferAttributeNode " +
+                 "does the same through the SAME entry -- and on WebGL2 a storage buffer is read through a BufferAttributeNode of " +
+                 "that very buffer, so the two get one hash. The attribute is never declared, the transform is registered twice, " +
+                 "the program does not link and the compute writes zeros (r185 0 0 0 0 0 0, patched 1 2 3 4 5 6). Patch 12: a slot " +
+                 "each. Forcing the hash to the node's own id fixed it before the patch was written, which is what named the cause. " +
+                 "Run on one renderer, the patched second compute's code equals the first's and meets draft 06's cached stage, so the " +
+                 "reproduction gives each case its own. And a neighbouring fault patch 11 does not reach, held as a path: a storage " +
+                 "source fetched as an attribute follows its own class, so an instanced source into a plain output reads the first " +
+                 "element everywhere. three with all twelve: build matches the applier, lint clean, unit tests 1310 passed, e2e the " +
+                 "same 176 of 187 with 185 screenshots the same bytes as r185. Three sabotages red.",
+    }),
+    // v4791 -- THE 395th CLOSING: NO new gate file -- whose the e2e's seven 3D-texture failures are.
+    since488: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4791", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (section 5: the seven '2D view of a 3D texture' failures, re-measured in raw WebGPU as this browser's)",
+            "tools/ship/recordDrift-selfcheck.mjs (the masking witness asks which record coverage reads for the gate, not whether a local one holds it)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** SEVEN OF THE e2e's ELEVEN FAILURES WERE LEFT UNASSIGNED, AND THEY ARE NOT THREE'S. *** The error names a 2D view " +
+                 "of a 3D texture, but no view is asked for in JS: wrapping createView found none, and the failing call is " +
+                 "queue.writeTexture -- three uploading a 3D texture a slice at a time, a valid call. Taken apart in raw WebGPU with no " +
+                 "three at all: this Chromium (141.0.7390.37) fails ANY writeTexture into a 3D texture with RENDER_ATTACHMENT usage, " +
+                 "every format and size tried, on a view it makes itself, and the same write without that usage succeeds. Three asks " +
+                 "for RENDER_ATTACHMENT on its 3D textures, which WebGPU allows. Held as a live row that goes red when a browser fixes " +
+                 "it, so the e2e is run again to see those seven pass. Two sabotages red. AND THE SESSION MOVED BOX UNDER IT: the " +
+                 "CPU model now hashes to 142c0d, the shared timings record's owner, and recordDrift went red at HEAD -- its " +
+                 "masking witness asked whether any local record HELD the gate, while coverage reads the first record that " +
+                 "times it unless a later one is this box's. It asks which record coverage reads now; on this box that is the " +
+                 "shared one, its own, so the witness has nothing to show here and says so by passing vacuously, as it does " +
+                 "with one record. runtimeGap's WebGPU row 55 -> 56 for the raw probe.",
+    }),
+    // v4790 -- THE 394th CLOSING: NO new gate file -- drafts 10 and 11, computeSkinning's two r185 bugs.
+    since487: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.
+        at: "v4790", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (drafts 10 and 11 with their patches; the e2e section reads the newest record)",
+            "tools/ship/threeUpstreamPaths-selfcheck.mjs (11: invocationLocalIndex in a WebGL2 compute writing a plain storage buffer)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE TWO BUGS v4786 STEPPED AROUND ARE DRAFTS NOW, EACH TO ITS CAUSE. *** WebGPU: needsPreviousData() asks only " +
+                 "whether the MRT has velocity, so a compute built under one gets computeSkinning's positionPrevious, which a compute " +
+                 "shader does not declare -- unresolved value, invalid pipeline, the pass skipped, the buffer zeros (velocityMRT 0, " +
+                 "noMRT 0.5). Patch 10: false for a compute build. WebGL2: a compute is drawn as points, instanced only when its first " +
+                 "buffer is instanced, yet instanceIndex is always gl_InstanceID -- 0 in the other case, so computeSkinning skins every " +
+                 "vertex from the first (1 point of a box's 8). Patch 11: gl_InstanceID + gl_VertexID in a compute, one of the two " +
+                 "always 0; reading gl_VertexID alone breaks the instanced case, which the sabotage that tried it showed through " +
+                 "draft 10's reproduction. invocationLocalIndex had the same fault: 1 distinct value of 64, patched 64. three rebuilt " +
+                 "with all eleven matches the applier, lint clean, unit tests 1310 passed, 1 todo; its e2e on the eleven: the same " +
+                 "176 of 187 pass, the same 11 fail for the same reasons, 185 screenshots the same bytes as r185. Six sabotages red.",
+    }),
+    // v4789 -- THE 393rd CLOSING: NO new gate file -- three's own e2e tests, on r185's build and with all nine patches.
+    since486: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4789", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (section 5: three's e2e record -- it adds up, it names the builds the gate's hashes name, and the README states it)",
+            "tools/ship/redCensus-selfcheck.mjs (an EMPTY register passes only when every gate it recovered is recorded as repaired)",
+            "tools/ship/redCensusFresh-selfcheck.mjs (the subset is still the whole register when the register is empty)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THREE'S OWN e2e TESTS HAD NEVER RUN ON THE PATCHES; THE README SAID SO. *** In a checkout of r185 with its examples, " +
+                 "three's runner drew every WebGPU example BLACK at first, and said nothing: this Chromium refuses three's string " +
+                 "swizzle on createView, the exception is uncaught, and the runner listens only to the console. With this harness's " +
+                 "presenting flags and its swizzle workaround (docs/upstream-three/e2e/puppeteer-local.diff), 187 WebGPU examples: " +
+                 "176 passed and the same 11 failed on r185 and with all nine, each for the same reason, and 185 screenshots are " +
+                 "the same bytes. The other two are not the patches': four runs of one build gave four rasterizer images, and the " +
+                 "video panorama lands on one of two frames whichever build runs it. Recorded in e2e/v4789.json against both build " +
+                 "hashes, so a changed patch has two rows to clear: the hash, then the e2e. Seven sabotages red. AND THE FIRST VERIFY " +
+                 "WAS RED FOR A REASON OLDER THAN THIS ROUND: registerDrift's audit, frozen at v4776, turned 13 rounds old. Re-" +
+                 "frozen, it said the register's ONLY gate, shaderRefs, now passes -- repaired at v4782 (six callers to SOURCE_EXT, " +
+                 "400 s -> 56 s) and carried as a standing red for seven rounds since. Moved to FIXED_SINCE_V4279; the register is " +
+                 "empty, and two census rows that assumed it never would be now accept that only when its history accounts for " +
+                 "it. Two sabotages red (the repair record deleted; the gate put back without a re-freeze).",
+    }),
+    // v4788 -- THE 392nd CLOSING: NO new gate file -- patch 03 reaches per-instance morphs.
+    since485: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4788", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/threeUpstreamPaths-selfcheck.mjs (03's per-instance case: two instances drawn, one still, against two plain meshes; now held reached)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** PATCH 03 STOPPED AT ONE SET OF INFLUENCES PER MESH, SO AN INSTANCED MESH'S OWN MORPHS STILL READ AS 1.871 PX OF " +
+                 "5.612. *** Per instance, three reads each influence from the mesh's morphTexture, row instanceIndex; the patch now " +
+                 "keeps a copy of that texture as it was at the last draw, swapped in the same OnObjectUpdate as the shared " +
+                 "influences, and morphs positionPrevious from it. AND THE CASE HAD TO BE MADE ABLE TO TELL. It drew one instance " +
+                 "with the second scaled to nothing, so an influence read from the wrong row could not show. With the second drawn " +
+                 "and still, held at 0.2, r185 read 2.796 against the plain meshes' 2.806: its still instance's error and its " +
+                 "moving one's averaged to the reference by coincidence. Held at -0.4: r185 -2.770, patched 2.817, the plain " +
+                 "meshes 2.817, both backends; a row-0 mutant reads 0.962. three rebuilt with all nine: its build matches the " +
+                 "applier's byte for byte, lint clean, unit tests 1310 passed, 1 todo, 0 failed. Five sabotages red.",
+    }),
+    // v4787 -- THE 391st CLOSING: NO new gate file -- the nine three.js patches run together, not only applied together.
+    since484: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.
+        at: "v4787", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (section 4: every reproduction on one build with all nine patches, and drafts' \"together\" blocks)",
+            "tools/ship/threeUpstreamPaths-selfcheck.mjs (2b: every path case on the all-nine build, against its own patch's)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE NINE PATCHES HAD ONLY EVER BEEN APPLIED TOGETHER AS TEXT, AND RUN ONE AT A TIME. *** Every hunk was found once " +
+                 "in the combined build and three's own build of the combined source matched it, but no reproduction had run on it. " +
+                 "Run there, eight of nine drafts and all ten path cases print exactly what their own patch prints alone. The ninth " +
+                 "is a change for the better and the gate now says so: 04's mrtSameFrame -- three renders in one frame, a skin read " +
+                 "through MRT -- reads 0.000 with 04 alone and 5.612 with all nine, a plain mesh's number, because 07 steps the bones " +
+                 "per render. Bisected: 07 alone gives 5.612, all nine without 07 give 0.000. Draft 04 had set it aside as 'another " +
+                 "matter' -- it now points at 07 and carries a \"together\" block the gate holds, and a draft may differ together " +
+                 "only by saying so. Per-instance morphs stay at 1.871 with every patch: 03 does not reach them, the next round's. " +
+                 "Six sabotages red.",
+    }),
+    // v4786 -- THE 390th CLOSING: NO new gate file -- what a skin's velocity means when a frame holds two renders.
+    since483: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4786", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/threeUpstreamPaths-selfcheck.mjs (07: two renders a frame against a plain mesh, and computeSkinning twice a frame)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** PATCH 07 MADE A SKIN'S VELOCITY MEAN SOMETHING A PLAIN MESH'S DOES NOT. *** It updated the pose every render but " +
+                 "stepped the previous bones once a frame, so with two renders in one frame the second measured from the last FRAME'S " +
+                 "pose. Measured against a plain mesh moved the same way: three steps a mesh's previous matrix in an OBJECT update, " +
+                 "once per render -- 5.612 then 0.000 px when the mesh moved once before the frame, 2.806 then 2.806 when it moved " +
+                 "again between the renders -- and the old patch read 5.612 then 5.612 and 2.806 then 5.612. Keyed on the render, both " +
+                 "hunks, the skin reads the mesh's numbers exactly on both backends. computeSkinning shares the test, and each compute " +
+                 "advances the render id: the second compute in a frame follows the bone (0.150, r185 0.000), as under the old patch, " +
+                 "which kept a second WeakMap for it; the new one is two keys changed. Its own absolute " +
+                 "output is wrong in r185 in two ways no patch here touches -- zeros on WebGPU under a velocity MRT, the first vertex " +
+                 "for every vertex on WebGL2 -- so only the step is read, and both are named for a draft of their own. three rebuilt " +
+                 "with all nine: the recorded hash updated, lint clean, unit tests 1310 passed, 1 todo, 0 failed. Three sabotages red.",
+    }),
+    // v4785 -- THE 389th CLOSING: NO new gate file -- morph targets in the hundreds and thousands, to three's own limit.
+    since482: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4785", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["render/temporalTslMeshes-selfcheck.mjs (section 3: 1, 200, L and L + 1 morph targets, L read from the renderer)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE STAGE UNROLLED ITS SUM OVER MORPH TARGETS, AND PAST A FEW HUNDRED THE VERTEX STAGE DID NOT SURVIVE IT. *** " +
+                 "One texture read per target written out in JavaScript: the field read NO motion from 150 targets on WebGPU and " +
+                 "from 256 on WebGL2, while three morphed to 256 and 2048 -- this adapter's array-texture layers, which is where " +
+                 "three keeps a geometry's targets. As a TSL Loop the field is a one-target quad's to 0 px at 1, 200 and the " +
+                 "limit, both backends. AND ONE PAST THE LIMIT THE FIELD MUST DESCRIBE WHAT THREE DREW: WebGPU draws nothing, and " +
+                 "WebGL2 draws the mesh UNMORPHED without a word, so the stage reads the renderer's own limit and morphs nothing " +
+                 "past it either -- the limit read, never assumed, since a GPU that allows more layers moves both. Bones past the " +
+                 "uniform buffer (1,100 here) are the same story without a fix to make: three draws nothing, and the field is " +
+                 "empty with it. Three sabotages red.",
+    }),
+    // v4784 -- THE 388th CLOSING: NO new gate file -- an InstancedMesh with morph targets, through the motion stage.
+    since481: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4784", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["render/temporalTslMeshes-selfcheck.mjs (section 2: an InstancedMesh with morph targets, per instance and shared)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE STAGE'S INSTANCED BRANCH NEVER MORPHED. *** It took the bare geometry through the previous instance matrix, " +
+                 "so a morphing herd carried its morph as motion: 1.67 px wrong with influences per instance, 1.39 with the mesh's " +
+                 "own. The previous point is now the geometry morphed as three morphs it, then the previous instance matrix -- per " +
+                 "instance (three's own test, count > 1 and a morphTexture) from a copy of that texture the stage keeps, otherwise " +
+                 "from the mesh's influences as a mesh's: under 1e-5 px against plain meshes on both backends, relative and " +
+                 "absolute, and through a toward stage. AND WHAT THREE ITSELF CANNOT DRAW IS A ROW: per-instance influences over " +
+                 "absolute targets, or beside a mesh-level morphTargetInfluences, throw in r185 on both backends -- its morph " +
+                 "node updates the mesh's influences on every draw whatever the shader reads. Patch 03 still stops at per-instance " +
+                 "morphs; extending it, and a draft for the throw, wait for the round that rebuilds three with every patch. " +
+                 "Five sabotages red.",
+    }),
+    // v4783 -- THE 387th CLOSING: NO new gate file -- instance matrices a compute pass writes, through the motion stage.
+    since480: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4783", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["render/temporalTslCompute-selfcheck.mjs (section 2: instance matrices a compute pass writes)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE STAGE KEPT THE MATRICES THE CPU LAST SET, AND A KERNEL WRITES ELSEWHERE. *** An InstancedMesh whose " +
+                 "instanceMatrix is a StorageInstancedBufferAttribute a compute pass fills leaves the array where the application " +
+                 "set it, so the stage's previous matrices were the first ones for ever: 7.48 px wrong on boxes a kernel moved. " +
+                 "The hook is userData.previousInstanceMatrix, a mat4 storage node -- makePreviousCopy keeps one when stepped " +
+                 "before the pass that moves them -- read by the instance's index: 5.4e-6 px against plain meshes on WebGPU. A " +
+                 "toward stage interpolates instance poses on the CPU and refuses GPU-kept matrices by name rather than draw a " +
+                 "chord. three's WebGL2 backend throws on a storage-matrix InstancedMesh, a row of its own. NOT WRITTEN, AND WHY: " +
+                 "the three.js side (patch 01b) -- three would have to copy the storage attribute after each draw inside its own " +
+                 "render's command stream, which is backend work no public API reaches; the copy an application makes before its " +
+                 "pass is what the stage asks for. Three sabotages red, one equivalent.",
+    }),
+    // v4782 -- THE 386th CLOSING: NO new gate file -- the orphan censuses fifty times faster, and run by name at ship.
+    since479: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened them.
+        at: "v4782", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/moduleRefs-selfcheck.mjs (basenameHits held equal to includes() case by case)",
+                                "tools/ship/graveyard-selfcheck.mjs (157 s to 2.9: the index, and the directory test once per directory)",
+                                "tools/ship/referenceKind-selfcheck.mjs (175 s to 3.1, the same two fixes)",
+                                "tools/ship/sweepCoverage-selfcheck.mjs (a returnee judged by the median of its last three alone readings)",
+                                "tools/ship/verify.mjs (the two orphan ratchets as named ship steps)",
+                                "tools/ship/headlessGpu-selfcheck.mjs (the hazard child that hangs instead of crashing is killed at 10 s)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE REASON NO VERIFY SAW THE ORPHAN RATCHETS WAS TWO QUADRATIC LOOPS. *** moduleRefs' referenceGraph asked " +
+                 "includes(basename) of every file for every unreferenced module -- 2,798 modules, 5,087 files, 90 MB, 107 s -- and " +
+                 "both censuses asked whether a directory is named once per FILE in it. One pass now answers the substring test " +
+                 "for every basename: each ends in .js, .mjs or .html, so each occurrence ends at that anchor, walked backwards " +
+                 "through a trie of reversed stems. Identical on the real tree, 0 of 2,798 mention lists different, 725 ms " +
+                 "against 105,555; the directory test is asked once per directory with the same answer. graveyard 157 s to " +
+                 "2.9, referenceKind 175 to 3.1, shaderRefs from a 400 s timeout to 56 -- WHICH SHOWED A RED THE TIMEOUT HAD " +
+                 "HIDDEN: 17 callers hand-spelling the corpus filter against a ceiling of 11. Six were moved to moduleRefs' " +
+                 "SOURCE_EXT by hand, the three this round touched and three in live tool code, 11 again. AND RUN BY NAME: the " +
+                 "sweep picks gates by a timing record a foreign box cannot refresh, so verify now runs both censuses as " +
+                 "steps whatever any record says. sweepCoverage's 12-of-22 row flipped on headlessGpu reading 11,890 ms alone " +
+                 "once between 2,722 and 2,659; a returnee is judged by the median of its last three alone readings, as " +
+                 "quickSweep's own ring is. Three sabotages red. " +
+                 "THE FIRST VERIFY FOUND WHERE headlessGpu's 11,890 ms CAME FROM: killed at the 20 s cap alone, in section 4. " +
+                 "The child that exits still holding a WebGPU device -- the hazard the gate proves -- ended SIGABRT 8 times, " +
+                 "SIGSEGV 6 and HUNG once in 15, under a 180 s timeout; one gate run in 20 sat past the cap. A hang is the same " +
+                 "not-clean exit, so that child alone is killed at 10 s: 30 runs green, the worst 13.3 s, and an exitCleanly() " +
+                 "in its place reddens two rows.",
+    }),
+    // v4781 -- THE 385th CLOSING: NO new gate file -- the two orphan ratchets the v4776 merge landed over unmeasured.
+    since478: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.
+        at: "v4781", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/graveyard-selfcheck.mjs (a pre-registration is a registration; the baseline caught up by name)",
+                                "tools/ship/referenceKind-selfcheck.mjs (both ceilings caught up by name)",
+                                "tools/ship/patchScanDoor-selfcheck.mjs (the fixture is the zips in the uploads folder, not the folder)",
+                                "tools/ship/recordDrift-selfcheck.mjs (its injected census skips the swap scan nothing compares)",
+                                "tools/ship/recordReach-selfcheck.mjs (the margin row reads THIS box's alone readings where the shared record is another box's)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** TWO RATCHETS THE MERGE LANDED OVER, BECAUSE NOTHING THAT RUNS EVERY ROUND RUNS THEM. *** graveyard takes ~157 s " +
+                 "and referenceKind ~175, so the v4776 merge went in unmeasured and the first run read 188 orphaned utilities against " +
+                 "159, 324 prose-rescued modules against 288, and 58 hidden by sweep closings against 39. MEASURED BY NAME: 32 " +
+                 "arrived in graveyard's pile and 3 left -- 19 from the merged line, absent from main before it, and 13 from main " +
+                 "after the baselines were set; the same 32 are among the 36 prose-rescued; the closings hide 10 of this line's, 4 of " +
+                 "main's and 5 older modules. FOUR WERE PAID BY THE DETECTOR: frameDisagree, frameSwayRep, frameVertical and " +
+                 "genGateAbsolute export a pre-registration (PREREG_H*) and the result their gate re-derives (RESULT_H*), and " +
+                 "graveyard's record test knew *REGISTRATION and not that spelling -- 188 to 184. The rest are caught up and named, " +
+                 "as the v4327 and v4535 merges were, and excused by none of it. AND THE ACCOUNT FIRST HID TWO OF ITS OWN SUBJECTS: " +
+                 "graveyard's note named its modules by basename, referenceKind matches the basename, and the count read 326 -- a " +
+                 "register naming debt is not its consumer, so the note names them without their extensions. Three sabotages red. " +
+                 "THE FIRST VERIFY FOUND TWO MORE. patchScanDoor read 'the uploads folder exists' as 'Keith's patch zips are here', " +
+                 "and this container provides that folder EMPTY: three reds on a scan that correctly found nothing. Whether there " +
+                 "is anything to scan is read off the folder's listing now, never off the scanner. And recordReach's margin fell " +
+                 "to 764 ms on recordDrift-selfcheck at 2,236: its injected-census row ran the full census, swap scan included, " +
+                 "for two fields it overrides -- ~450 ms. 2,300 to 1,800. " +
+                 "*** AND THE SECOND VERIFY STAYED RED, BECAUSE THIS IS ANOTHER BOX. *** The container changed between rounds: " +
+                 "linux-x64-4c-16095mb-420793, while the shared record belongs to -142c0d, which no longer exists. So verify wrote " +
+                 "this box's timings to the ignored local file, and recordReach's margin read the old box's ring, which nothing " +
+                 "here can refresh -- the clear state since475 found unreachable for coverage, in a cost row. boxTimings' " +
+                 "recordLocal keeps the last three alone readings now, and on a box that does not own the shared record the " +
+                 "margin row reads this box's when it has two: frozenRecords 1,423 and recordDrift 1,807 here, margin 1,193. Gate " +
+                 "selection still reads the shared record (task #87). A slow own ring reddens it.",
+    }),
+    // v4780 -- THE 384th CLOSING: NO new gate file -- 55 table-printing gates' numbers reach a reader.
+    since477: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened fifty-six.
+        at: "v4780", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/gateReport-selfcheck.mjs (a non-finite or missing cell stored as its name; the arrivals row green)",
+                                "55 gates that print tables now emit them: 41 fx/fsr, render and genGate/frame*Measure gates of this line, 14 murmur and ship gates"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** A STANDING RED NO VERIFY SAW: 55 GATES PRINTED TABLES AND EMITTED NO REPORT. *** gateReport-selfcheck's arrivals row " +
+                 "names every gate outside its frozen v4399 list that argues in numbers and writes nothing a second reader can open; it " +
+                 "sits over the sweep's budget, so no verify ran it, and it had grown to 55 -- 41 of them this line's FSR, frame-generation " +
+                 "and genGate gates. Each now puts the table it already prints into a report, the numbers as numbers: 86 gates emit, 69 " +
+                 "argue and do not, exactly the frozen list. Three things the wiring found: a PSNR of identical images is Infinity and JSON " +
+                 "writes it as null, which the page shows as an empty cell -- table() stores a non-finite number as its name and a missing " +
+                 "one as \"none\"; object keys are strings, so three reports stored \"20\" and \"1.5\" as text until they were numbers " +
+                 "again; and a one-row table with a numeric first column is plotted as a single point, so those three lead with a name. " +
+                 "fsrFlowCost read 21% against its 20% band beside three other device gates and 15% alone. Four sabotages red. " +
+                 "AND THE SECOND VERIFY FOUND recordReach's budget margin at 794 ms against an 800 ms floor: frozenRecords-selfcheck is " +
+                 "O(tree), and readSites' cheap reject scanned every source once per record name -- 847 ms of its 2,100. One regex of " +
+                 "the 77 names keeps the same 125 files in 38 ms, and the gate runs in 1,350; a pre-filter that drops names reddens " +
+                 "recordReach's control.",
+    }),
+    // v4779 -- THE 383rd CLOSING: the motion field where three draws and nowhere else -- the mesh zoo's gaps.
+    since476: Object.freeze({
+        at: "v4779", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/temporalTslCoverage-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/temporalTslZoo-selfcheck.mjs (the grown batch it refused by name is drawn now)",
+                               "tools/ship/boxTimings-selfcheck.mjs (the shared record's owner is asserted as attribution, not as never this box -- red on the box that owns it)"]),
+        verdict: "*** THE FIELD COVERED PIXELS THREE NEVER DREW AND MISSED PIXELS IT DID. *** An alpha-tested sprite or mesh: motion " +
+                 "on 812 pixels against the 406 its colour pass draws -- a fragmentNode skips three's diffuse and alphaTest setup, " +
+                 "an outputNode keeps it. A double-sided plane shown from behind: no motion at all on its 576 -- three copies " +
+                 "alphaTest and alphaMap to an override material, not side. A plain mesh hidden for a frame read 4.72 px wrong when " +
+                 "shown again, and a box entering from outside the frustum read none: an object not drawn never stepped its previous " +
+                 "matrix. A batch grown by setInstanceCount, which the stage refused by name, is followed now, its last matrices kept. " +
+                 "Each is held against three's own colour pass or against the same motion drawn plainly, 406 = 406, 576 = 576, 0 px, " +
+                 "7e-6 px, both backends; a re-packed batch and a batch's per-instance visibility were already right and are rows. " +
+                 "Nine sabotages red.",
+    }),
+    // v4775 -- THE 382nd CLOSING: NO new gate file -- three more three.js drafts: a render is not a frame.
+    since457: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4775", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/threeUpstream-selfcheck.mjs (drafts 07-09 with their patches; r185's and the patched runs in two pages at once; the nine-patch build recorded)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THREE BUGS IN THREE ITSELF, EACH A RENDER TAKEN FOR A FRAME OR A STALE KEY. *** 07: a SkinnedMesh rendered twice " +
+                 "in one browser frame, its bone moved between, is drawn in the first render's pose -- skeleton.update() runs once per " +
+                 "frameId; patched, the pose follows each render while the previous bones still step once a frame. 08: an InstancedMesh " +
+                 "past the uniform buffer draws its third render in a frame from the second's matrices -- the interleaved buffer's " +
+                 "version is synced once a frame, after the upload check; patched, before each draw. 09: a BatchedMesh grown by " +
+                 "setInstanceCount is drawn from its old matrices texture -- found by v4773's growth row -- because the render object " +
+                 "compares its full key only when the material or the dynamic key changes; patched, the batch's texture is in the " +
+                 "dynamic key. Each reproduction uses public API alone. The nine patches through three's build again (08's import line, " +
+                 "shared with 01, merged by hand): the applier's bytes, lint clean, unit tests as unpatched. One more bundler rename " +
+                 "found (hash -> hash$1 in RenderObject.js), and 07's hunks needed six lines of context to be unique.",
+    }),
+    // v4774 -- THE 381st CLOSING: NO new gate file -- the three.js patches through three's own build, lint and unit tests.
+    since456: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4774", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/threeUpstream-selfcheck.mjs (the vendored build and the six patches held to hashes of three's own rollup builds; the drafts on 0.185.1)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE APPLIER MAKES WHAT THREE'S OWN BUILD MAKES, AND THE DRAFTS NAMED THE WRONG RELEASE. *** In a checkout of three's " +
+                 "r185 tag, npm run build is the vendored three.webgpu.js byte for byte. With the six patches applied by git apply it " +
+                 "is the gates' applied text but for the order of the names in its one import from three.core.js -- rollup lists them " +
+                 "by first use, and patch 02 uses three of them earlier. lint-core is clean; three's unit tests 1311, 1310 passed, 1 " +
+                 "todo, 0 failed, as for r185 unpatched -- and they touch none of the patched paths, which the README says. Both " +
+                 "builds' hashes are held, the patched one with that line's names sorted, so a changed patch reddens until three is " +
+                 "built again. Every draft's reproduction imported three 0.185.0 from the CDN; the vendored build, and every number, " +
+                 "is 0.185.1 -- they import 0.185.1 now. Five sabotages red.",
+    }),
+    // v4773 -- THE 380th CLOSING: the three.js patches on the paths their drafts' reproductions skip.
+    since455: Object.freeze({
+        at: "v4773", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/threeUpstreamPaths-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** ONE PATCH WAS WRONG ON A PATH ITS REPRODUCTION NEVER TOOK, AND ONE ROW PASSED FOR THE WRONG REASON FIRST. *** Each " +
+                 "patch meets the paths its draft's reproduction does not take, on r185's build and patched, both backends. Reached: " +
+                 "instance matrices as a storage attribute written on the CPU (11.224 -> 5.612 px), three relative targets and absolute " +
+                 "ones, velocity drawn by a colorNode. Not reached, and said so: matrices a compute pass writes, per-instance morphs. " +
+                 "Patch 02 read a grown batch as right until the batch's material was updated after the growth -- without it three " +
+                 "itself draws a grown batch from its old texture, and the patch's copy, resized in place, was never uploaded: both " +
+                 "frozen a frame apart. With it the patch read 11.224; its copy is a new texture now, the last draw's matrices kept as " +
+                 "its first entries, 5.612. Ten sabotages red; one only once the morph influences never summed to 0. The hunk applier " +
+                 "is tools/ship/threePatch.mjs, shared with threeUpstream-selfcheck.",
+    }),
+    // v4772 -- THE 379th CLOSING: the motion stage past 1024 instances.
+    since454: Object.freeze({
+        at: "v4772", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/temporalTslMany-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** THE MOTION STAGE BROKE PAST 1024 INSTANCES, AND NO GATE DREW MORE THAN 160. *** Its previous instance matrices were " +
+                 "a uniform buffer, 64 bytes a matrix, and both backends here allow 65536 bytes. Past that WebGPU refused the buffer and " +
+                 "with it the stage's whole pass -- a plain sphere in the same scene lost its field too -- and WebGL2 said nothing and " +
+                 "read a field 46.5 px wrong. They are a float texture now, four texels a matrix, 512 a row: the field is the separate " +
+                 "meshes' to 1.4e-5 px at 1024, 1025 and 10000 instances on both backends, and through the toward stage. And three's own " +
+                 "matrices past that limit are an interleaved attribute synced once a browser frame, after the draw's upload check: the " +
+                 "third render of a program in one frame draws the second's -- held as three's behaviour. Eight sabotages red, one " +
+                 "equivalent; one red only once the population had boxes either side of the texture's first row.",
+    }),
+    // v4771 -- THE 378th CLOSING: NO new gate file -- a patch for each three.js draft, held by the draft's own reproduction.
+    since453: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4771", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/threeUpstream-selfcheck.mjs (section 3: a patch per draft, each hunk found once in r185's build, each reproduction run on it; the index held to the drafts)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** EACH OF THE SIX CAUSES IS VERIFIED BY ITS PATCH NOW, AND TWO WERE NOT WHAT THE DRAFTS SAID. *** Each draft carries a " +
+                 "diff against three's src/ at r185; the gate applies it alone to a copy of the vendored build and runs the draft's " +
+                 "reproduction on it, and the bug is gone on both backends. The instanced mesh's previous matrices were its current ones, " +
+                 "not the identity, and past the uniform buffer they were never uploaded at all -- a case v4763 did not draw, twice the " +
+                 "motion. The skinned mesh's -9.311 was two things: velocity drawn outside MRT builds no previous position for any mesh " +
+                 "(the fourth draft now, patched), and three renders in one browser frame, since a skeleton steps once per frameId (named " +
+                 "and left). The WebGL2 compute patch's release path, which no reproduction took, is held by a row of its own after its " +
+                 "sabotage went green. Nothing posted.",
+    }),
+    // v4770 -- THE 377th CLOSING: what the motion stage refused, followed.
+    since452: Object.freeze({
+        at: "v4770", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/temporalTslNodes-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** THREE THINGS THE STAGE THREW ON, FOLLOWED, EACH TO A REFERENCE IT ALREADY GETS RIGHT, ON BOTH BACKENDS. *** A sprite " +
+                 "turned by a rotation node -- its last angle userData.previousRotationNode -- reads the rotation property's field to the " +
+                 "bit. Sized points on a sprite (PointsNodeMaterial, sized in pixels) are placed as three's points material places them, " +
+                 "the centre through the camera and each corner pixels about it: the field covers exactly the pixels three draws and is " +
+                 "the CPU's corners' to 1.8e-3 px at a pixel ratio of 2, turning and attenuated. And userData.previousPositionNode may be " +
+                 "a function of the point the stage keeps, so a position node displacing a morph, an instance or a skin reads the object " +
+                 "moved instead to 1e-5 px. Sixteen sabotages, three of them seen only once the gate drew at a pixel ratio of 2, turned its " +
+                 "points and read a material's size.",
+    }),
+    // v4769 -- THE 376th CLOSING: where the flow lost to the vectors on pans -- holes left black, and a fill that reaches 16.
+    since451: Object.freeze({
+        at: "v4769", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsrFrameGenReach-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/holeFillTsl-selfcheck.mjs (the reach on three fixtures and a whole interpolation, both backends)", "render/holeFill-selfcheck.mjs (the reach's refusals)", "fx/fsr/fsrFlowSeed-selfcheck.mjs (its verdict re-measured with the holes filled)"]),
+        verdict: "*** v4758's LOSS WAS NOT THE APERTURE PROBLEM: THE FLOW WAS RIGHT, AND THE GAP IT OPENED WAS LEFT BLACK. *** On a wall " +
+                 "scrolling 8.4 px under a 1.2 px pan, four in five of the pixels the flow took carry the wall's true motion; moving the " +
+                 "wall 8 px against the knot opened a gap past the fill's radius of 4, and 81 pixels stayed black. The fill's `reach` " +
+                 "searches again only where the radius found nothing, so every hole it filled is filled as it was -- 18 of the 21 " +
+                 "generator gates read to the bit what they read -- and the default reaches 16: the flow's frame there 28.25 dB to " +
+                 "36.15, the 12 px pans +3.3 and +3.6 over the vectors, a 24 px pan's vectors +5.5, v4759's belts +16.7 over the frame. " +
+                 "v4758's seed, kept an option for costing on that wall, pays there now. A radius of 8 instead lost where 4 already " +
+                 "did well. The fill searches only at holes now: 3.6 ms with none against 51.7 with all. Fifteen sabotages, all red.",
+    }),
+    // v4768 -- THE 375th CLOSING: the flow's blocks the window did not explain, searched again wider.
+    since450: Object.freeze({
+        at: "v4768", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsrFlowRetry-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/flowCost-selfcheck.mjs (the retry counted to the read, and found on 72 scenes)", "render/opticalFlowTsl-selfcheck.mjs (four retry cases in the parity row, both backends)"]),
+        verdict: "*** A SMALL THING MOVING OVER A STILL BACKGROUND IS FOUND BY SEARCHING AGAIN WHERE THE WINDOW EXPLAINED NOTHING -- AND IT " +
+                 "IS NOT THE DEFAULT. *** retryRadius: a block below the coarsest level whose best score is still more than 0.3 of its " +
+                 "own texture energy searches 8 px about its guess, every second offset, and the eight about the winner. Over 72 " +
+                 "scenes on the mirror 169 of 236 square blocks right against 56, for 4 % more reads; the device the mirror's at " +
+                 "every block. In the generator a square in the wall's statistics moving 16 px: +12.06 dB on its pixels, +3.81 over " +
+                 "the frame. And on a wall scrolling behind a turning knot it makes one block at the knot's edge confidently wrong, " +
+                 "and the wall's interior loses 10.75 dB; retry the default and three flow gates go red. 0.3 because 0.5 left a " +
+                 "coarse block half on the square unretried. Twenty sabotages, two equivalent.",
+    }),
+    // v4767 -- THE 374th CLOSING: what the translucent layer costs, and a quad in place of a geometry pass.
+    since449: Object.freeze({
+        at: "v4767", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsrFrameGenLayerCost-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/translucentLayer-selfcheck.mjs (the depth option against the geometry pass, and an empty texel as the far plane, both backends)"]),
+        verdict: "*** THE LAYER HAD COST A REAL FRAME'S GEOMETRY EACH GENERATED FRAME. *** Its depth pass draws the opaque scene: 3.2 ms at " +
+                 "10,560 triangles and 203 at 1,056,000, where a real frame is 4.5 and 211 -- on SwiftShader, the growth the arithmetic's. " +
+                 "The generator already splats a depth at t; depthAt exposes it, a `ui` function is called after the splat, and the " +
+                 "layer's { depth } writes it with one quad: 3.5 to 3.8 ms at any size. On the translucent things' pixels the same dB; " +
+                 "the frame moves only at an occluder's edge, -0.29 and -0.81 dB. From the stage's own clip depth it is the geometry " +
+                 "pass's to the bit on both backends, an empty texel the far plane. fsr-three.html uses it. Six sabotages, one " +
+                 "equivalent, measured (the fill's depth against the splat's).",
+    }),
+    // v4766 -- THE 373rd CLOSING: the demo page shows what the recent rounds took -- and a page gate found red since v4756.
+    since448: Object.freeze({
+        at: "v4766", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/fsrThreeWorld-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/pageShot-selfcheck.mjs (the canvas sampled where the page lays it out; red since v4756, now green)"]),
+        verdict: "*** THE PAGE SHOWS IT, AND THE GATE THAT SHOOTS THE PAGE HAD BEEN READING TEXT. *** fsr-three.html's generated-frame " +
+                 "views gain a world -- glass and additive sparks, a lens with a backdropNode, a BatchedMesh, sprites, 64 particles a " +
+                 "compute pass moves -- and, as a layer, the frames and the motion stage's pass drawn without them, the layer drawn at " +
+                 "the generated time as `ui` with the HUD in it, and the lens as `over`; ?size= draws it small. Presented at 320 x 180 " +
+                 "it runs with no error and counts the particle steps, layer draws and lens draws it made. Shooting it found " +
+                 "tools/ship/pageShot-selfcheck.mjs red since v4756: a new control moved the canvas off the gate's fixed sample box, " +
+                 "its control row read the controls' text -- a 12-second gate the quick sweep does not run -- bisected, and fixed by " +
+                 "sampling the canvas where the page lays it out. Eight sabotages, none green.",
+    }),
+    // v4765 -- THE 372nd CLOSING: refraction -- what reads the frame behind it, drawn over the frame.
+    since447: Object.freeze({
+        at: "v4765", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsrFrameGenBackdrop-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/translucentLayer-selfcheck.mjs (a backdropNode lens behind the panels, renderOver in the rebuilt frame, readsBackdrop, a refusal)"]),
+        verdict: "*** A LENS OVER BLACK SEES NOTHING, SO IT IS DRAWN OVER THE FRAME. *** three puts a backdropNode or transmission material " +
+                 "in its transparent list whatever its `transparent` says; the layer's isTranslucent did not, and such a lens went into " +
+                 "the generator's frames as a surface -- the worst arm on all six cases, 21 to 24 dB on its pixels. readsBackdrop finds " +
+                 "them, hide() hides them, and renderOver draws them at t over the frame -- copied in, the opaque scene's depth first -- " +
+                 "through the generator's new `over`, before `ui`. A real frame rebuilt so is the frame drawn with them, to the bit, " +
+                 "for a backdropNode and a lit transmission lens alike, on both backends; generated, it beats the best field on every " +
+                 "case, +1.4 to +6.7 dB, and is exact against the midpoint where what is behind stands still. Ten sabotages, none green.",
+    }),
+    // v4764 -- THE 371st CLOSING: the FSR gates on a real GPU -- a command, a report that names the GPU, and a doc.
+    since446: Object.freeze({
+        at: "v4764", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/realGpuRun-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** EVERY DEVICE ROW HERE IS SWIFTSHADER'S, AND NOW THE RUN THAT IS NOT CAN SAY SO. *** runInEngineOrigin logs each " +
+                 "call's adapter, software flag and launch flags under SWEK_ADAPTER_LOG and takes SWEK_LAUNCH_ARGS; " +
+                 "tools/ship/realGpuRun.mjs runs every fx/fsr, render/*Tsl* and translucent-layer gate (39) with the log on and writes " +
+                 "one report whose first line names the adapter -- or says, loudly, that it was software. Each gate is exact, quality " +
+                 "or timing by a stated rule (a clock read, a dB grade, neither): 12, 24 and 3. Run whole here: 39 green in 8 min 25 s, " +
+                 "on google swiftshader, and the report says it is not a real-hardware run. docs/real-hardware-fsr.md says how to " +
+                 "run it on Windows, Linux and macOS and what each kind of red means. Ten sabotages, none green.",
+    }),
+    // v4763 -- THE 370th CLOSING: six three.js bug reports, drafted, each held to a reproduction -- and none posted.
+    since445: Object.freeze({
+        at: "v4763", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/threeUpstream-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** WHAT THE MOTION STAGE WORKS AROUND IS THREE'S TO FIX, AND THE DRAFTS SAY SO WITH NUMBERS. *** Three's own velocity " +
+                 "node, on a plain mesh moving 5.612 px a frame, reads 1.871 on an InstancedMesh, a BatchedMesh and a morphed mesh " +
+                 "making the same motion -- the displacement from the bare geometry -- and -9.311 on a skinned one; its colour pass " +
+                 "draws a centred sprite after an off-centre one at the other's centre; its WebGL2 backend runs only the first " +
+                 "particle system a renderer makes. docs/upstream-three/ holds one draft each, with a standalone reproduction importing " +
+                 "r185 from a CDN; this gate runs each against the vendored r185 on both backends, holds the bug to it and the draft's " +
+                 "Observed block to what it prints. Causes are marked as readings of the source. Nothing is posted. Six sabotages " +
+                 "on the drafts, none green.",
+    }),
+    // v4762 -- THE 369th CLOSING: particles a compute pass moves -- the hook, and three's WebGL2 running only one system.
+    since444: Object.freeze({
+        at: "v4762", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/temporalTslCompute-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/temporalTslZoo-selfcheck.mjs (the refusal row re-aimed from positionNode to rotationNode)"]),
+        verdict: "*** A POSITION A NODE WRITES WAS WHERE THE APPLICATION SAYS, AND NOWHERE ELSE CAN SAY IT. *** three draws a material's " +
+                 "positionNode and keeps no previous one: the stage took a displaced mesh's bare geometry as its last point, 11.57 px " +
+                 "off, and refused a sprite placed by a node. The material's userData.previousPositionNode is the whole local position " +
+                 "as it was, and makePreviousCopy keeps a storage buffer's last contents for it; none given, the node stands still. " +
+                 "Twenty-four compute particles drawn as one sprite of count 24 are 24 plain sprites to 5e-6 px, and toward t; as an " +
+                 "InstancedMesh, instance matrices; without the hook the whole 2 px is missing. A sprite sized by scaleNode is taken; " +
+                 "turned by rotationNode, refused. three's WebGL2 backend runs only the first particle system a renderer makes -- " +
+                 "measured, and each system here has a renderer of its own. Twelve sabotages, none green.",
+    }),
+    // v4761 -- THE 368th CLOSING: the rest of the mesh zoo -- two kinds wrong, and two of v4757's wrong where programs are shared.
+    since443: Object.freeze({
+        at: "v4761", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/temporalTslZoo-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** THE MOTION STAGE WAS WRONG ON A BATCHEDMESH, ON SPRITES, AND ON ANY TWO MESHES THREE DRAWS WITH ONE PROGRAM. *** A " +
+                 "BatchedMesh's previous point was the bare geometry's -- three applies the instance matrix to the current point only -- " +
+                 "32.7 px off; the stage keeps its matrices texture as it was and reads it by three's own index. A sprite was drawn " +
+                 "flat by the override, 5.74 px off; the stage draws each with a sprite material whose vertexNode places its corners. " +
+                 "Two skinned meshes of one layout on two skeletons read 44.7 px off and two meshes of one morphed geometry 1.06: three " +
+                 "keys a program by layout and bone count, and v4757's histories were built into it for the first mesh; they are " +
+                 "per-draw nodes now, filled before each draw. Multi-bone weights, skinned-and-morphed and Points were right and are " +
+                 "rows. three binds a sprite's centre the same way in its own colour pass -- measured, and for a report. Twenty-four " +
+                 "sabotages, none green, five only after the gate was made to see them.",
+    }),
+    // v4760 -- THE 367th CLOSING: translucent things in the world -- no one field is right, so they are a layer drawn at t.
+    since442: Object.freeze({
+        at: "v4760", swept: 2, green: 2, red: 0,
+        added: Object.freeze(["render/translucentLayer-selfcheck.mjs", "fx/fsr/fsrFrameGenTranslucent-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** A PIXEL UNDER GLASS HOLDS TWO MOTIONS, AND NO ONE FIELD IS RIGHT, SO THE GLASS IS NOT SPLATTED. *** The motion " +
+                 "stage draws a translucent thing as a surface of its own, and a pass without it -- a game's vectors -- drags it with " +
+                 "the background: drawn is ahead on four of six cases, skipped on two, and the flow sides with the background. " +
+                 "render/translucentLayer.mjs hides them from the frames and the stage's pass and draws them at the generated time, " +
+                 "the opaque scene depth-tested against, over transparent black; given to the generator as `ui`, a function of t, it " +
+                 "beats the best field on every case's translucent pixels, +2.5 to +41.7 dB, and over every frame. On a real frame the " +
+                 "layer over the frame without them IS the frame with them, to the bit where one thing covers and within one f32 " +
+                 "rounding where two panels overlap, on both backends. An additive material's alpha must leave the layer's alone -- " +
+                 "three's own factors put the sparks at 7.9 dB. Seventeen sabotages, none green.",
+    }),
+    // v4759 -- THE 366th CLOSING: small things the flow's pyramid loses -- one kind found for a score, the other measured and left.
+    since441: Object.freeze({
+        at: "v4759", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsrFlowStill-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/flowCost-selfcheck.mjs (section 5: a small square moving otherwise than its background; standing still counted)",
+                                "render/opticalFlowTsl-selfcheck.mjs (two cases with standing still guessed, both backends)"]),
+        verdict: "*** A SMALL THING IS LOST AT THE COARSE LEVELS, AND ONLY THE STILL KIND IS CHEAP TO FIND. *** Its blocks there are mostly " +
+                 "background and take the background's motion; the windows below reach 12 px back. `stillGuess` scores standing " +
+                 "still as a guess at every level below the coarsest, for 1.1 % more reads: a still 16 or 24 px square over a " +
+                 "background moving 16 px goes from 0 of its blocks right to all of them, and a uniform shift changes only the blocks " +
+                 "the content entered the frame at. The same vector as the mirror at every block on both backends. A square MOVING " +
+                 "16 px over a still background is lost either way; a window reaching 16 px at the level below the coarsest finds it " +
+                 "for +45 % of the reads, or at double spacing for nothing more and a zoom's error doubled -- measured on the mirror " +
+                 "and not built. In the generator, on the case it is for where the vectors are wrong -- a still highlight on a moving " +
+                 "belt -- the flow already gives +9.41 and +2.77 dB on its pixels and standing still adds nothing, so it is an option " +
+                 "and not the default. Five sabotages red; four equivalent, the coarsest level's first guess being standing still.",
+    }),
+    // v4758 -- THE 365th CLOSING: the optical flow seeded with the application's vectors -- built, exact, and not the default.
+    since440: Object.freeze({
+        at: "v4758", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsrFlowSeed-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/opticalFlowTsl-selfcheck.mjs (three seeded cases in the parity row, both backends)",
+                                "render/flowCost-selfcheck.mjs (the seed counted to the read)"]),
+        verdict: "*** THE SEED REACHES WHAT THE PYRAMID CANNOT, AND THE FRAMES DID NOT FOLLOW. *** render/opticalFlow.mjs and " +
+                 "render/opticalFlowTsl.mjs take `seed`, the application's motion field: the coarsest level scores the vector at each " +
+                 "block's centre as a second guess, the same vector as the mirror at every block on both backends. On the mirror a " +
+                 "camera's 20 to 40 px with 3 px of scroll on top goes from 0 to 11 % of blocks found to 100 %, for 0.1 % more reads. " +
+                 "In the generator under fast pans it is +0.47 dB on a reflection at 44 px and -0.24 and -0.63 on the scrolling wall " +
+                 "at 27 and 40 px, so `flow: { seed: true }` is an option and not the default. The first seeded call searched " +
+                 "unseeded -- its nodes were made while the pass was built, after the call had set the seed on the nodes that " +
+                 "existed; and three sabotages scored 0 until the fixture's invalid seed pixels carried a junk vector and its valid " +
+                 "region began inside a block. Found while measuring, and a later round's: the flow LOSES to the vectors at a 13 px " +
+                 "scrolling pan (27.61 dB against 31.36) and on a stretched, low texture (28.25 against 36.98).",
+    }),
+    // v4757 -- THE 364th CLOSING: skinned and morphed meshes found carrying the wrong motion, and three smaller items measured.
+    since439: Object.freeze({
+        at: "v4757", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/temporalTslMeshes-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** SKINNED MESHES CARRIED NO MOTION THROUGH THE MOTION STAGE, AND MORPHED ONES THE WHOLE MORPH. *** Held to rigid " +
+                 "meshes making the same motion: three updates a skeleton once per frame of its own animation loop, so a pass drawn " +
+                 "in the same browser frame skinned with the matrices it had then and the current pose was the previous one; and it " +
+                 "keeps no previous morph influences, so the previous point was the unmorphed one, 2.7 px wrong here. " +
+                 "render/temporalTsl.mjs's stage now updates each skeleton before its draw and keeps each skeleton's bone matrices " +
+                 "(stepped once a pass, keyed on three's renderId) and each mesh's influences from its last draw, morphing and skinning " +
+                 "the geometry with them for the previous point, and each on its arc through a toward stage: the rigid mesh's field to " +
+                 "under 1e-5 px on both backends, relative and absolute targets, two meshes on one skeleton. The first morph draft was " +
+                 "not drawn at all -- a uniform array of f32 is not WGSL. An orthographic camera was right already: motionVectorsCPU's " +
+                 "field to 2e-6 px. A fourth flow level was measured in the generator and not built: at 24 px of scroll a frame it " +
+                 "finds the shift at 95 blocks of 256 against 65 and the frame is no better, at 36 neither does. And the splat's depth " +
+                 "key, whose precision is 2.4e-7 in depth and not the 6e-8 its note said, decides no pixel differently from the depths " +
+                 "with the page's camera and 2 of 16384 at a near/far ratio of 1e5. Ten sabotages, all red.",
+    }),
+    // v4756 -- THE 363rd CLOSING: pacing on the browser's own clock, and graded live.
+    since438: Object.freeze({
+        at: "v4756", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsr3LiveClock-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/framePacer-selfcheck.mjs (section 10: the refresh from timestamps, and the live log against the model)"]),
+        verdict: "*** EVERY PACING GATE RAN ON AN IDEAL REFRESH GRID, AND THE PAGE DID TOO. *** render/framePacer.mjs has " +
+                 "refreshFromStamps -- the refresh as the MEDIAN of requestAnimationFrame's intervals, 16.686 ms at 60 Hz where a " +
+                 "vsync missed every 37th callback puts the mean at 17.083 -- and makeLivePacing, a log that dates what a callback " +
+                 "draws at the NEXT callback's timestamp and grades the last seconds with pacingMetrics: on a grid it is the model's " +
+                 "schedule one refresh later, to the bit. fx/fsr/fsr3LiveClock-selfcheck.mjs runs FSR3 on requestAnimationFrame " +
+                 "itself, a real frame ready when the queue drains: the live reading is the log's, every frame on a browser " +
+                 "timestamp. Its first draft asked the pacer for the callback's own time, and the timed policy asked 5 times for " +
+                 "pairs FSR3 had let go -- the frame just rendered was not yet ready to the pacer and was already in FSR3's ring; " +
+                 "asked for the later of the next refresh and now, 0, and the timed policy's judder on this device 6.7 and 11.5 ms " +
+                 "where it read 78 and 89. fsr-three.html's paced view has 'pacing: the browser's clock', and prints the live " +
+                 "grading. Eight sabotages, all red once a row was written for the one that scored 0.",
+    }),
+    // v4755 -- THE 362nd CLOSING: a UI that moves, drawn at the generated time, and one you can see through.
+    since437: Object.freeze({
+        at: "v4755", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsrFrameGenUi-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** THE NEWER FRAME'S UI IS RIGHT FOR A UI THAT STANDS STILL, AND HALF A FRAME WRONG FOR ANYTHING IN IT THAT " +
+                 "MOVES. *** v4745 composited an opaque HUD that stood still, as FSR3 composes UI. Over the knot under a pan, with " +
+                 "two translucent panels, a translucent bar and a marker sliding 6 pixels a real frame: composited, the panels are " +
+                 "+4.6 dB over drawing them into the frames, and the same to the bit whichever frame's UI it is -- but the marker is " +
+                 "3 pixels ahead in the newer frame's UI and 3 behind in the older's, 10 dB on its pixels either way. " +
+                 "fx/fsr/fsrFrameGenTsl.mjs's `ui` may be a function of t now, called with the time being generated: the marker 72.8 " +
+                 "dB, the whole frame +5.1, for a UI draw each generated frame; fx/fsr/fsr3Tsl.mjs passes it through, and with one " +
+                 "real frame composites that frame with the UI at t = 1 without drawing one for the call that only primes. " +
+                 "fsr-three.html's HUD has a marker that slides, drawn at the generated time unless asked for the newer frame's -- " +
+                 "and its paced view had composited real frames from the wrong slot of the three-frame ring under the timed policy " +
+                 "since v4751. The first run read the marker as mostly the bar: three draws opaque before transparent. Seven " +
+                 "sabotages, all red.",
+    }),
+    // v4754 -- THE 361st CLOSING: the nearest blocks' flows weighed again, and what they were for found already done.
+    since436: Object.freeze({
+        at: "v4754", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["fx/fsr/fsrFlowGrid-selfcheck.mjs (the scrolling wall's clear interior, on both grids)"]),
+        verdict: "*** TAKING THE NEAREST BLOCKS' FLOW WHERE THE VECTOR MOVED IS WORTH NOTHING, AND WHAT v4749 WANTED IT FOR THE GRID " +
+                 "HAD ALREADY DONE. *** v4749 measured a pixel choosing among the flows of the 2 x 2 blocks nearest it as mixed and " +
+                 "left it. On v4753's level grid, prototyped again in the TSL over eight cases: only where the pixel's vector moved, " +
+                 "every case within 0.02 dB -- the flow is seldom taken at 0.9 there -- and the moving ball's shadow's changed pixels " +
+                 "down 0.25 to 0.38; only where it stood still, the reflections +0.40 and +0.74 and the panned scroll -0.46; with a " +
+                 "margin, or chosen on a 5 x 5 window, the reflections still gain and the panned scroll still loses. Not built. What " +
+                 "v4749 went after -- the scrolling wall's interior, which v4745's still-surface margin gave up -- is back without it: " +
+                 "+8.5 and +17.3 dB over the block grid there, held in fx/fsr/fsrFlowGrid-selfcheck.mjs; " +
+                 "render/flowReconcile.mjs's note has every measurement.",
+    }),
+    // v4753 -- THE 360th CLOSING: the optical flow with each level of its pyramid on its own block grid.
+    since435: Object.freeze({
+        at: "v4753", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsrFlowGrid-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/flowCost-selfcheck.mjs (the level grid counted, its shifts found, and section 4: a zoom, a turn and two motions)",
+                                "render/opticalFlowTsl-selfcheck.mjs (six level-grid cases in the parity row, both backends)",
+                                "fx/fsr/fsrFlowCost-selfcheck.mjs (the level grid's device time against its reads)",
+                                "fx/fsr/fsrFrameGenFlow-selfcheck.mjs (the refinement row one-sided)"]),
+        verdict: "*** THE COARSE LEVELS WERE MEASURING THE WRONG PLACE, AND PAYING FOR EVERY FINE BLOCK TO DO IT. *** The search ran " +
+                 "every level on the finest level's block grid, each block's coarse patch anchored at its corner: at the coarsest " +
+                 "of three levels it covers 32 full-resolution pixels reaching 24 past the block, so it measured the motion 12 pixels " +
+                 "away. Measured on the mirror, with the patch centred a zoom's end-point error fell from 0.66 px to 0.15 -- and a " +
+                 "grid for each level, each block covering exactly the blocks below it, does the same for 46 % of the search's " +
+                 "reads. A block below the coarsest then shares its parent with three others, so it takes the best of its parent's " +
+                 "guess and the parent's three neighbours on its side: where two motions meet, 39 of 44 blocks right against 26 " +
+                 "on the block grid. render/opticalFlow.mjs and render/opticalFlowTsl.mjs have grid 'level', the same vector at " +
+                 "every block on both backends; render/flowCost.mjs counts it to the read and the device's time follows (48 % of " +
+                 "the time for 47 % of the reads). In the generator it is the default now: no case worse, +0.17 and +0.27 dB where " +
+                 "a texture scrolls behind the knot, 122M reads at 960 x 540 against 264M. Seventeen sabotages; the one that " +
+                 "scored 0 on every answer -- each level's target at the finest size -- changes only the cost, and the timing " +
+                 "gate reads it. A fourth level is cheap on this grid and loses a small fast square on both; that is a later round's.",
+    }),
+    // v4752 -- THE 359th CLOSING: particles, and three's instanced velocity found broken on the way.
+    since434: Object.freeze({
+        at: "v4752", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsrFrameGenParticles-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/temporalTsl-selfcheck.mjs (two InstancedMeshes against three separate meshes, and through a toward stage, on both backends)"]),
+        verdict: "*** THE FIRST PROBE OF PARTICLES FOUND THE MOTION STAGE WRONG FOR EVERY INSTANCED MESH. *** three keeps an " +
+                 "InstancedMesh's previous instance matrices in an array it copies into before the draw and never uploads, so the " +
+                 "vertex stage read the matrices the material was built with: particles moving 5 pixels a frame carried vectors " +
+                 "of 103. render/temporalTsl.mjs's stage now keeps each instanced mesh's matrices from its own last draw, per mesh, " +
+                 "and under a toward stage each instance's pose at t; the field is three separate meshes' to 1.79e-7 on both " +
+                 "backends. Through the generator, 160 particles over a textured wall, graded on their pixels: instanced 14.76 dB, " +
+                 "the same quads written into one buffer each frame -- which carry no vectors -- 12.29, the flow taking those to " +
+                 "14.74 and the instanced to 16.88; and the particles drawn at the generated time over a frame generated without " +
+                 "them, through the generator's composite as a HUD is, 18.65 either way. Eight sabotages, all red; two more scored " +
+                 "0 and were dead lines -- three uploads a buffer node's array at every draw -- which are gone.",
+    }),
+    // v4751 -- THE 358th CLOSING: two pairs held, and frames made early measured and not taken.
+    since433: Object.freeze({
+        at: "v4751", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsr3Hold-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/framePacer-selfcheck.mjs (section 9: two pairs, any, and frames made when their pair arrives)"]),
+        verdict: "*** MAKING THE FRAMES WHEN THEIR PAIR ARRIVES WAS THE PLAN, AND HOLDING TWO PAIRS IS WHAT IT WAS FOR. *** v4747 confined " +
+                 "the timed pacer to the pair the generator holds and took its margin away. Planning each pair's frames when it " +
+                 "arrives and making them then lets the pacer keep the margin -- but the plan is made with the lag as it was, and a " +
+                 "late or uneven frame finds it stale: 13.7 ms of judder on a late frame with a 4 ms generation, against 10.0 for " +
+                 "the newest pair. Holding the TWO newest pairs is what 'any' is in all eight cases measured: even rates at 0 with " +
+                 "the 4 ms generation where the newest pair reads 1.9 to 2.0, a late frame at 7.7 against 10.0. fx/fsr/fsr3Tsl.mjs's " +
+                 "makeFsr3({ hold: 2 }) keeps three frames and copies of each one's field and depth and generates for either pair " +
+                 "(generate({ pair })), the generator taking the pair's older depth handed over (depthPrev) instead of from its own " +
+                 "history; render/framePacer.mjs's pairs 'two' asks for either, with the quarter refresh of margin. On the device, " +
+                 "through the late frame: 8.80 ms of judder against 11.55 holding one, its worst refresh 20.07 dB against 19.15, 0 " +
+                 "refused, and 10 of its frames made from the older pair -- which the textures handed over prove are that pair's " +
+                 "own, since on a steadily turning knot no picture could. fsr-three.html's paced view holds two for timed pacing. " +
+                 "Nine sabotages, all red once an identity row and a deeper-lag row were added for the four that scored 0.",
+    }),
+    // v4750 -- THE 357th CLOSING: a still surface judged in the world, not on the screen.
+    since432: Object.freeze({
+        at: "v4750", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsrFrameGenWorld-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/temporalTsl-selfcheck.mjs (the stage's camera target against motionVectorsCPU)",
+                                "render/flowReconcileTsl-selfcheck.mjs (the world test's three cases, exact on both backends)"]),
+        verdict: "*** A CAMERA THAT MOVES MADE EVERY SURFACE 'MOVING', AND v4745's GAIN ON SHADOWS AND REFLECTIONS WENT WITH IT. *** " +
+                 "The still-surface margin judged a pixel still when its vector was under 0.05 pixels -- on the screen, where a " +
+                 "pan moves everything. makeMotionStage({ camera: true }) now renders the camera's own motion at every pixel (the far " +
+                 "plane's completion at each surface's depth, motionVectorsCPU's to 4e-7 on both backends), and the reconciliation, " +
+                 "given it, judges a pixel still when its vector is within 0.05 pixels of THAT: a surface that did not move in the " +
+                 "world. Under a pan: the reflection +5.12 dB over the screen test, the textured shadow +2.37, the plain one +0.47, " +
+                 "and a textured floor whose vectors are exact +0.32; with the camera still the frame is identical to the bit. The " +
+                 "mirror and the TSL agree at every pixel; the generator takes `camera`, FSR3 asks FSR2's driver for it when the flow " +
+                 "is on, and the page hands it on. Nine sabotages, all red once the gate used one generator for both arms -- the " +
+                 "reconciliation's pass cache was keyed without the camera, which two generators could not show.",
+    }),
+    // v4749 -- THE 356th CLOSING: three gaps the gates named, and one idea measured and not built.
+    since431: Object.freeze({
+        at: "v4749", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/flowReconcileTsl-selfcheck.mjs (its fixture 60 x 36: not a power of two, not a multiple of the block)",
+                                "fx/fsr/fsr3Tsl-selfcheck.mjs (FSR2's frames at half float, the page's default)"]),
+        verdict: "*** THE GAPS THE GATES NAMED WERE NOT FAULTS, AND NOW THEY ARE HELD. *** render/flowReconcileTsl-selfcheck.mjs said " +
+                 "every case was 64 wide and a width that is not a power of two might round -du * w differently on the device (f32) " +
+                 "and in the mirror (f64): at 60 x 36 -- not a power of two, not a multiple of the 8-pixel block, the page's shape -- " +
+                 "every pixel's source and field is the mirror's exactly on both backends, because the product of an f32 and a small " +
+                 "integer is exact in f64 and each side rounds it once. The fixture is 60 x 36 now; every sabotage re-run reads as it " +
+                 "did, but one, which went to 0 because the camera's vectors shrank under both thresholds it compared and was " +
+                 "re-aimed. makeFsr3's frames are half float by default, as fsr-three.html runs them, and every row graded float: " +
+                 "+0.001 to +0.002 dB against float on three cases, the knot at 12x held in the gate. And a pixel choosing among the " +
+                 "flows of the 2 x 2 blocks nearest it was prototyped and measured -- +5 to +7 dB on a scrolling wall's interior, +0.7 " +
+                 "on the HUD scene, and -0.6 to -0.9 on the shadows' changed pixels -- mixed, so not built; the measurement is in " +
+                 "render/flowReconcile.mjs's note.",
+    }),
+    // v4748 -- THE 355th CLOSING: what the optical flow costs.
+    since430: Object.freeze({
+        at: "v4748", swept: 2, green: 2, red: 0,
+        added: Object.freeze(["render/flowCost-selfcheck.mjs", "fx/fsr/fsrFlowCost-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/opticalFlowTsl-selfcheck.mjs (two refineRadius cases, exact on both backends)",
+                                "fx/fsr/fsrFrameGenFlow-selfcheck.mjs (the `refine` arm)"]),
+        verdict: "*** THE FLOW'S COST IS ITS SEARCH, AND HALF OF THE SEARCH FINDS NOTHING THE COARSEST LEVEL DID NOT. *** Timing on " +
+                 "this tree's device says little about a GPU -- SwiftShader rasterises on the CPU, and the generator's splat, 65 536 " +
+                 "instanced quads at 256 x 256, took 1.1 to 1.5 s there against the flow's 0.17 -- so render/flowCost.mjs COUNTS: " +
+                 "every score the search makes and the reads it costs, held to opticalFlowCPU's own tally to the read under six " +
+                 "settings, and the device's time for the flow held to the count's ratios within 11% under five. The search is over " +
+                 "nine tenths of the flow's reads, 264M a frame at 960 x 540. v4748's refineRadius searches the whole window at the " +
+                 "coarsest level only and refines below it: 56% of the reads, and it finds the same shifts -- 99% of blocks at 18 " +
+                 "pixels, as the full window does -- because the reach is the coarsest level's; the same cut made by shrinking every " +
+                 "window finds 18% at 14 pixels. Within 0.1 dB of the full window on fx/fsr/fsrFrameGenFlow-selfcheck.mjs's four " +
+                 "cases; not the default, because a plain shadow's changed pixels read 0.85 dB lower with it. The mirror, the TSL " +
+                 "(exact on both backends) and the generator take it; fsr-three.html gains 'gen: cheaper flow' and prints the flow's " +
+                 "reads. Nine sabotages, all red.",
+    }),
+    // v4747 -- THE 354th CLOSING: pacing on a variable refresh, what generating costs, and a late frame on the device.
+    since429: Object.freeze({
+        at: "v4747", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsr3Late-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/framePacer-selfcheck.mjs (sections 6 to 8: the generation's cost, a variable refresh, and the pair the generator holds)"]),
+        verdict: "*** THE PACER ASKED FOR FRAMES NOBODY HOLDS, AND DROPPED EVERY REAL FRAME ONCE GENERATING TOOK ANY TIME. *** Two " +
+                 "faults, both found by giving the model what v4743 left out. A generation cost: v4743's queue cleared itself when a " +
+                 "new pair arrived, so a half-way frame that missed its refresh took the held real frame with it -- 30 new images " +
+                 "a second at the design case for 2 ms of cost; the queue now shows the newest image that may go up, a pair's real " +
+                 "frame after its own half-way frame or alone if that was dropped, and a generation too slow for its time falls " +
+                 "back to the real frames instead of freezing. And real render times on the device (fx/fsr/fsr3Late-selfcheck.mjs, " +
+                 "frame 7 five refreshes long): the timed policy was refused 12 times, because its line -- an interval, a render " +
+                 "and a quarter refresh behind -- sat in the pair before the newest after every new frame, 58 times in two seconds " +
+                 "at 30 frames a second on the CPU, and fx/fsr/fsr3Tsl.mjs holds the newest pair only. With pairs 'newest' (the " +
+                 "default) and no margin, 0 refused under every policy, and timed generation carries the late frame best: 10.70 " +
+                 "ms of judder against 17.15 for the half-way frame and 20.19 with none, its worst refresh 18.83 dB against 16.80 " +
+                 "and 15.92. A variable refresh (scheduleVrrCPU, 48 to 144 Hz) reverses v4743's finding on the hold: there it is " +
+                 "what spaces the frames, 0 judder at 24 to 45 frames a second against 2 to 7 for showing both as soon as they are " +
+                 "made; with each frame 5 ms either side of 33, a line with 5 ms in hand judders least (1.41). Twelve sabotages, " +
+                 "all red once three rows were added for the three that scored 0.",
+    }),
+    // v4746 -- THE 353rd CLOSING: flicker between real and generated frames.
+    since428: Object.freeze({
+        at: "v4746", swept: 2, green: 2, red: 0,
+        added: Object.freeze(["render/flicker-selfcheck.mjs", "fx/fsr/fsrFlicker-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** FSR3 AS IT IS COMPOSED DOES NOT FLICKER; GENERATION BETWEEN ALIASED FRAMES DOES, AND SHARPENING MAKES IT WORSE. *** " +
+                 "Every frame-generation gate graded one frame; render/flicker.mjs grades the sequence a display shows -- real, " +
+                 "generated, real -- by how much it alternates at half the display rate beyond what the scene does, from each " +
+                 "pixel's second difference (a moving scene's trend is not flicker, and the plain alternating sum the probe began " +
+                 "with read the truth itself as flickering) under a Hann taper (a short window leaks motion into the half-rate " +
+                 "bin: untapered, a held frame under a pan read +0.30 on one window and -1.14 on another). On fsr-three.html's knot " +
+                 "and stripes: between FSR2's frames the generator adds +0.04 / 255 with the knot turning and alternates LESS than " +
+                 "the scene under a pan; between native single-sample frames it adds +1.28 under the pan, its generated frames 1.6 " +
+                 "dB closer to the truth than the real ones -- a blend of two frames anti-aliases what one frame aliases, and the " +
+                 "display alternates the two. 4x MSAA takes the turning knot's (+0.12 to +0.05) and not the stripes'; RCAS over " +
+                 "the generated frames, the obvious fix, makes both worse. Eight sabotages of the measure, all red; the held-frame " +
+                 "control is graded on the knot alone, because under the pan the scene has half-rate content of its own.",
+    }),
+    // v4745 -- THE 352nd CLOSING: shadows, reflections and UI as real content.
+    since427: Object.freeze({
+        at: "v4745", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsrFrameGenScene-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/flowReconcile-selfcheck.mjs (the still-surface margin: which margin a pixel gets, by its own vector)",
+                                "render/flowReconcileTsl-selfcheck.mjs (shaderStill and geometryAll, the still branch held to its mirror on both backends)",
+                                "fx/fsr/fsrFrameGenFlow-selfcheck.mjs (the `moved` arm, v4741's 0.9 everywhere, and what the split gives up)",
+                                "render/frameInterp-selfcheck.mjs (compositeUiCPU)",
+                                "fx/fsr/fsr3Tsl-selfcheck.mjs (the UI over the one real frame and over a generated one)"]),
+        verdict: "*** 0.9 WAS FOR SURFACES THAT MOVED, AND A SHADOW OR A REFLECTION FALLS ON ONE THAT DID NOT. *** Drawn by three.js " +
+                 "itself -- a ball's shadow crossing a plain and a textured floor, a knot over a mirror floor, a HUD over a pan -- " +
+                 "the per-pixel reconciliation at 0.9 left most of the flow's worth unclaimed: +1.06 dB on the reflection's whole " +
+                 "frame, +0.18 on the textured shadow's. 0.5 everywhere hands the moving knot's exact vectors back to the flow " +
+                 "(-0.82 under a pan). So the margin is chosen by the pixel's OWN vector: 0.5 where it is under 0.05 pixels, a " +
+                 "surface that stood still on screen and where whatever moved is shading, and 0.9 elsewhere -- in the CPU mirror " +
+                 "and the TSL, exact on both backends. Where the frame changed: reflection +6.17 dB over the vectors and +5.10 " +
+                 "over 0.9 everywhere, textured shadow +5.40 and +4.87, plain shadow +7.55 and +3.71; on v4741's own cases, " +
+                 "never worse on the whole frame, and what it gives up is stated -- the scrolling wall's clear interior, +10.94 " +
+                 "at 0.9 and +3.92 split. A HUD is not reconciled but COMPOSITED, as FSR3 does: every vector under it is the " +
+                 "scene's, and the vectors and the flow drag it with the pan (20.4 and 21.7 dB on its pixels); generated from " +
+                 "HUD-less frames with the newer frame's UI laid over (makeFrameGen's `ui`, compositeUiCPU its mirror), it is " +
+                 "the HUD exactly and +4.85 dB on the whole frame. three's reflector sizes its target from the canvas, and the " +
+                 "first run graded an 8 x 8 blur. Fifteen sabotages, all red once one equivalent mutant was replaced. fsr-three.html " +
+                 "gains a HUD and the switch between drawing it into the frames and compositing it.",
+    }),
+    // v4744 -- THE 351st CLOSING: motion on the arc, and the premise measured before it was built.
+    since426: Object.freeze({
+        at: "v4744", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsrFrameGenArc-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/frameInterpTsl-selfcheck.mjs (the arc: six cases, both offsets exact, through the fill)",
+                                "render/temporalTsl-selfcheck.mjs (poseAt)"]),
+        verdict: "*** THE ARC IS REAL ONLY WHERE ROTATION IS FAST, AND THE CLAIM THAT STARTED THIS ROUND WAS WRONG. *** v4741 " +
+                 "explained a low reconciliation margin's +1.33 dB on the knot turning at 6x as the vector being the chord of an " +
+                 "arc. Measured on the knot's own vertices: the half-way point is 0.012 pixels off the chord's midpoint at 6x, " +
+                 "0.05 at 12x, 0.28 at 30x, 1.08 at 60x. The gain at 6x is at the knot's silhouettes and self-occlusion edges -- " +
+                 "plain landed pixels, where a block vector blends a hard edge -- and partly the supersampled truth's soft edge " +
+                 "(+0.8, not +1.3, against a single-sample render); an FSR2-style flag taking the newer frame alone where the " +
+                 "older one hid the surface recovered none of it (-0.30 at 6x) and was taken out. Motion on the arc was built all " +
+                 "the same, for fast rotation: render/temporalTsl.mjs's makeMotionStage({ toward: true }) renders each pixel's " +
+                 "displacement to its pose at time t (poseAt: lerped translation and scale, slerped rotation, the camera too -- " +
+                 "exactly the ordinary field at t = 0 and nothing at t = 1), render/frameInterp.mjs's `toT` and its TSL mirror land " +
+                 "each block there and sample each frame at its own offset -- a second splat and fill, the mask and both offsets " +
+                 "exact on both backends -- and fx/fsr/fsrFrameGenTsl.mjs's `arc` wires it: +0.68 dB at 60x the page's spin, " +
+                 "+0.19 at 30x, nothing at 4x or 12x. An option, not a default. Thirteen sabotages, all red. The live notes that " +
+                 "repeated the chord claim are corrected; fsr-three.html gains 'gen: motion on the arc' and a spin rate.",
+    }),
+    // v4743 -- THE 350th CLOSING: when each frame is shown, and what the half-way frame costs off the half.
+    since425: Object.freeze({
+        at: "v4743", swept: 2, green: 2, red: 0,
+        added: Object.freeze(["render/framePacer-selfcheck.mjs", "fx/fsr/fsr3Pacing-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** A GENERATED FRAME IS WORTH WHAT ITS TIMING MAKES IT, AND FSR3'S HALF-WAY FRAME IS EXACT ONLY AT HALF THE " +
+                 "REFRESH. *** render/framePacer.mjs decides at each refresh what a display shows -- no generation, as soon as " +
+                 "possible, FSR3's midpoint hold, or TIMED generation at the t a refresh stands for -- graded by judder (the RMS " +
+                 "distance of the shown scene times from a line, in ms), new images a second and latency. At 30 real frames a " +
+                 "second on 60 Hz the half-way frame takes judder from 8.33 ms to 0 and doubles the new images; at 40, 45 and " +
+                 "24 it judders 3.4 to 5.9 ms and timed generation 0, for 5.7 to 16.7 ms more latency; with each frame 5 ms " +
+                 "either side of 33, 1.85 against 6.05. And the hold FSR3 uses to space the pair buys nothing on a FIXED " +
+                 "refresh -- judder identical to showing both at once in every case, 8.3 ms of latency for it at 20 frames a " +
+                 "second: it is for a display that refreshes when told. fx/fsr/fsr3Pacing-selfcheck.mjs drives fx/fsr/fsr3Tsl.mjs " +
+                 "with it on the device, a real FSR2 frame every third refresh, and grades each refresh's IMAGE against the " +
+                 "scene at the time smooth motion shows there: timed 22.62 dB a refresh, half-way 22.01, none 20.74, worst " +
+                 "refreshes in the same order. makeFrameGen gained a per-call t and a second frame between the same pair " +
+                 "that keeps the pair's older depth. The first draft generated a real frame again at t = 1e-16 -- a float, " +
+                 "snapped now; four generator sabotages scored 0 until rows compared each timed frame with the scene at its " +
+                 "own t. fsr-three.html's 'FSR3 paced' view runs it with a cadence and a policy.",
+    }),
+    // v4742 -- THE 349th CLOSING: FSR3 as FSR3 is composed -- frames generated between FSR2's upscaled frames.
+    since424: Object.freeze({
+        at: "v4742", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsr3Tsl-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** THE GENERATOR RUNS ON THE UPSCALER'S FRAMES NOW, AND DRAWS NO SCENE OF ITS OWN. *** Until this round " +
+                 "fx/fsr/fsrFrameGenTsl.mjs ran only on native frames, the scene rendered at display resolution -- the frames FSR3 " +
+                 "exists not to render. fx/fsr/fsr3Tsl.mjs's makeFsr3 runs FSR2's chain into a pair of display-resolution targets " +
+                 "and makes the frame between each two from the motion field and depth FSR2's stage already renders at display " +
+                 "resolution through the unjittered camera: zero scene renders across fifteen generations, measured by counting " +
+                 "them. Against a 4 x 4-supersampled frame at the midpoint, 64 -> 128 on fsr-three.html's scene: +0.74, +2.10 and " +
+                 "+5.80 dB over showing an upscaled frame twice (the knot at 4x and 12x, a camera pan), +0.49 and +2.77 over a " +
+                 "cross-fade where things move, and within 0.2 dB of the upscaled real frames around it. Two rows were wrong on " +
+                 "the first run: a pan under a pixel a frame could not separate anything from a cross-fade, and a row asserting " +
+                 "the gap to NATIVE generation tracks the real frames' own was broken by the pan -- a frame blended from two " +
+                 "aliased native frames a fraction of a pixel apart beats a native real frame by 1.4 dB against a supersampled " +
+                 "truth, an anti-alias FSR2's accumulated frames had already collected. The raw field and FSR2's dilated one are " +
+                 "within a tenth of a dB; raw is the default. Seven sabotages, all red, two of them after rows were added for them. " +
+                 "fsr-three.html's 'FSR3' view shows the generated frames.",
+    }),
+    // v4741 -- THE 348th CLOSING: the vectors reconciled with the colour's motion, and FSR3's rule measured losing.
+    since423: Object.freeze({
+        at: "v4741", swept: 2, green: 2, red: 0,
+        added: Object.freeze(["render/flowReconcileTsl-selfcheck.mjs", "fx/fsr/fsrFrameGenFlow-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/flowReconcile-selfcheck.mjs (section 9: the per-pixel rule and the per-pixel field on the CPU)"]),
+        verdict: "*** THE GENERATED FRAME NOW SEES WHAT THE VECTORS DO NOT, AND THE RULE THAT DOES IT IS NOT THE ONE THE MIRROR HAD. *** " +
+                 "render/flowReconcileTsl.mjs ports render/flowReconcile.mjs's reconcileFlowCPU exactly -- every block's source and " +
+                 "vector on both backends, the nearest-valid-pixel rule, the strict margin -- and its decision applied per pixel. " +
+                 "Wired into fx/fsr/fsrFrameGenTsl.mjs and measured against frames rendered at the midpoint, on a wall whose " +
+                 "texture scrolls behind the turning knot, that made the frame WORSE than the vectors alone: a block straddling " +
+                 "the silhouette holds two motions, its nearest pixel's vector is the knot's and cannot explain the wall, and the " +
+                 "flow's one vector then overwrote knot pixels whose own vectors were exact. So the decision is per PIXEL now -- " +
+                 "reconcilePixelsCPU, added to the mirror: each pixel's own vector against its block's flow on the 3 x 3 window " +
+                 "about it -- with two rules the measurement found: the flow may not take a pixel on evidence read off the frame " +
+                 "(the scroll's leading edge had been -3 dB), and the margin is 0.9, not 0.05, because a window under an exact " +
+                 "vector still carries the residual of shading that turns with the surface and a small margin handed 42% of the " +
+                 "knot's pixels to the flow. Confirmed on speeds the margin was not chosen on: +0.53 and +0.82 dB over the frame " +
+                 "where the texture scrolls, +10.9 and +15.7 on the wall, -0.03 under a pan; one pre-registered row failed and is " +
+                 "now a finding -- the knot turning at 6x gains +1.33 at the low margin, because its vector is a chord. The first " +
+                 "fixture was a float texture, unfilterable and point-sampled into blocks, and the second a sum of sines the " +
+                 "matcher locked onto the wrong repeat of; the wall is shader noise. mix() missed a copied vector by an ulp and the " +
+                 "weights are written out. Twenty-two sabotages; R8 is equivalent by construction. fsr-three.html's generated " +
+                 "views take the flow with 'gen: + optical flow'.",
+    }),
+    // v4740 -- THE 347th CLOSING: FSR3's optical flow for a three.js scene, as TSL.
+    since422: Object.freeze({
+        at: "v4740", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/opticalFlowTsl-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/shaderRound-selfcheck.mjs (the census reads *Tsl.mjs files: 20 more, and TSL's round() in every spelling)"]),
+        verdict: "*** THE MOTION FSR3 TAKES FROM THE COLOUR, FOR WHAT THE VECTORS DO NOT SEE, RUNS ON A THREE.JS SCENE NOW. *** " +
+                 "render/opticalFlowTsl.mjs ports luminancePyramidCPU and opticalFlowCPU: the pyramid built on the device, one " +
+                 "fragment pass per level into a target of one texel a block, each seeded with the guess's own score, strict on a " +
+                 "tie, refined at the finest level only and clamped to half a pixel, every rounding floor(x + 0.5). The gate grades " +
+                 "the pyramid on its own first -- every level of a 45 x 27 chain, 5.96e-8 -- and then the search against the " +
+                 "mirror on 14 cases, both backends: the same vector at all 868 blocks. The metamer is left out of that row and " +
+                 "says why: flat in the tree's luma, every candidate ties and rounding picks, 56 of 64 vectors apart about nothing; " +
+                 "its confidence is held. The first draft was wrong at 693 of 868 blocks: TSL names a Loop's index by its place in " +
+                 "the call and not its depth, so the nested SAD loop's `i` shadowed the candidate loop's, and the candidate's " +
+                 "offsets, emitted where they were used, read the inner one. Two defences, each enough alone -- named loops, and the " +
+                 "offsets made variables in the outer scope -- and both kept. A window-edge shift of exactly 4.5 put the parabola's " +
+                 "vertex ON the half-pixel clamp and was moved to 4.7. Nineteen sabotages: Q16, the scan order, was 0 until a " +
+                 "diagonal fixture tied six candidates bitwise; Q6 is arithmetic, as v4734's T4 was, and render/shaderRound-" +
+                 "selfcheck.mjs, which said 'unchecked here: TSL', reads *Tsl.mjs files now and holds it. fsr-three.html's " +
+                 "'optical flow' view is the caller, beside a floor whose texture scrolls while its motion vectors stay zero.",
+    }),
+    // v4739 -- THE 346th CLOSING: this box presents a WebGPU canvas after all, and the device loss was the flags.
+    since421: Object.freeze({
+        at: "v4739", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/pageShot-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/devicePresent-selfcheck.mjs (section 3: WebGPU presents under PRESENT_ARGS, all three readbacks exact)"]),
+        verdict: "*** THE BUILD BOX DOES PRESENT A WebGPU CANVAS -- THE DEVICE LOSS gfx/device.js's LEVEL 11 RECORDED WAS THE LAUNCH " +
+                 "FLAGS, NOT THE HEADLESS SHELL. *** Measured, headless shell and full Chromium alike: --enable-unsafe-webgpu alone " +
+                 "loses the device on a presented pass; adding --enable-features=Vulkan --use-vulkan=swiftshader still loses it; " +
+                 "adding --use-angle=swiftshader as well PRESENTS, and each of the three removed alone loses it again " +
+                 "(--use-webgpu-adapter and --ignore-gpu-blocklist were tried and are not needed) -- the compositor has to be on the " +
+                 "same software stack as Dawn's SwiftShader Vulkan. tools/ship/webgpuHarness.mjs gains PRESENT_ARGS and a launchArgs " +
+                 "option, LAUNCH_ARGS unchanged under every other gate's numbers. tools/ship/devicePresent-selfcheck.mjs section 3: " +
+                 "WebGPU presents, the device's canvas readback, the offscreen frame and the compositor's copy exact, three runs of " +
+                 "three -- after a fix the new section forced: the compositor copy was taken after an awaited read, and a WebGPU " +
+                 "canvas's texture expires at the next rendering update, so the copy was the pattern on some runs and transparent " +
+                 "black on others; render/devicePresent.mjs takes it in the same task as a frame with no read now. " +
+                 "tools/ship/pageShot.mjs shoots a page as presented: fsr-three.html on WebGPU paints 24,248 colours in its canvas " +
+                 "under PRESENT_ARGS and one under LAUNCH_ARGS, the control. Seven sabotages, all red.",
+    }),
+    // v4738 -- THE 345th CLOSING: FSR3's frame generation on a three.js scene, and what it buys.
+    since420: Object.freeze({
+        at: "v4738", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsrFrameGen-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** A FRAME NO RENDERER DREW, BETWEEN TWO THAT ONE DID, IS CLOSER TO THE FRAME THAT WOULD HAVE BEEN DRAWN THAN " +
+                 "EITHER THING A GENERATOR MUST BEAT. *** fx/fsr/fsrFrameGenTsl.mjs's makeFrameGen composes v4736's splat and warp and " +
+                 "v4737's fill over the scene's own motion field and depth, keeping the newer depth for the next call's fill. " +
+                 "fx/fsr/fsrFrameGen-selfcheck.mjs renders fsr-three.html's scene at frames k and k + 1 and a 4x4-supersampled " +
+                 "truth AT k + 1/2: the generated frame reads 26.02 dB with the knot turning at 4x the page's rate (+0.15 over a " +
+                 "cross-fade, +1.63 over repeating frame k), 24.44 at 12x (+0.87, +3.44) and 29.83 under a camera pan (+1.00, " +
+                 "+6.58), identically on both backends. THE FILL IS WHAT MAKES IT PAY: holes left at zero put the frame below the " +
+                 "cross-fade (24.03, 20.48). And the DEFAULT FILL IS THE BLEND, a measurement that overrules v4679's: on the hole " +
+                 "pixels a turning, self-occluding knot scores blend 19.87 dB, depth 18.16, derived 15.98 -- both frames are partly " +
+                 "right in a hole, and a one-sided rule that picks the wrong one costs more than a blend that is half right; the " +
+                 "depth mode stays for translating content. fsr-three.html's generated-frame views run the driver. Six sabotages, " +
+                 "all red; the older depth not being kept scored 0 first (it matters from the third call, and the only depth row " +
+                 "favoured a broken depth mode) and is now read back directly. Not ported and named: FSR3's optical flow, for " +
+                 "what motion vectors do not see.",
+    }),
+    // v4737 -- THE 344th CLOSING: the holes of a generated frame, filled, as TSL.
+    since419: Object.freeze({
+        at: "v4737", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/holeFillTsl-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** THE FILL IS A GATHER, SO IT RAN AS A FRAGMENT PASS ON BOTH BACKENDS -- AND THE SIDE-AWARE WARP FOUND A SECOND " +
+                 "WEBGL2 DEFECT. *** render/holeFillTsl.mjs ports fillHolesCPU's neighbourhood search -- the vector `prefer` picks, the " +
+                 "occluder (nearest surface, spatially closest on a tie), and all five side modes, the depth mode's fetch at " +
+                 "floor(x + 0.5) -- in the mirror's scan order with its strict comparisons, so both tie rules keep the first found. " +
+                 "Graded on render/holeFillGPU-selfcheck.mjs's eleven fixtures (the wrapped occluder and v4734's depth tie among them): " +
+                 "side codes, mask, vector and depth EXACT on both backends, filled and abstained counts equal; and render/frameInterpTsl.mjs " +
+                 "gains `fill` and a warp that draws a filled pixel from the one frame its content is in -- splat, fill and warp " +
+                 "together equal interpolateFrameCPU({ fill }) in three cases, 156 to 272 pixels drawn one-sided. The side-aware warp " +
+                 "failed on WebGL2 twice: a vec4 select nested in a select (v4733's defect), then SCALAR selects, which failed with a " +
+                 "TSL build error on WebGL2 alone ('reading addToStack') -- the draw never ran and the target kept its clear colour; " +
+                 "isolated by building the warp with and without the side read, and the weights are arithmetic now. The fill's first " +
+                 "draft unrolled its 81 taps and the gate compiled for 48 s; one loop, 7.6. fsr-three.html's generated frame is " +
+                 "filled now, with the unfilled view kept beside it, and both step the scene a nominal 60 Hz frame per drawn frame -- " +
+                 "under the software renderer the wall clock made the motion between two frames a jump no fill radius could cross. " +
+                 "Fourteen sabotages, thirteen red; the zero (off-frame taps counted) is an equivalent mutant, because a clamped " +
+                 "off-frame copy's real self is always strictly nearer.",
+    }),
+    // v4736 -- THE 343rd CLOSING: FSR3's frame generation begins on a three.js scene -- the splat and the warp.
+    since418: Object.freeze({
+        at: "v4736", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/frameInterpTsl-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** A FRAME NOTHING RENDERED, ON A THREE.JS SCENE, AND ITS SCATTER IS A RASTERISATION BECAUSE WEBGL2 HAS NO " +
+                 "ATOMICS. *** render/frameInterpWgsl.mjs splats a motion field forward to time t with atomicMin on a storage buffer; " +
+                 "three's WebGL2 backend has neither. render/frameInterpTsl.mjs draws ONE INSTANCED QUAD PER BLOCK at its landing, " +
+                 "writes (vx, vy, depth) and a depth key, and lets a strict less depth test on a float target settle ownership: the " +
+                 "nearer block wins and, instances going in index order, a tie keeps the first writer -- interpolateFrameCPU's " +
+                 "`d < zbuf[j]`. Prototyped first on both backends, then graded: fifteen cases (flat, checker and signed depth, " +
+                 "prev and cur indexing, t = 0 and 1, contested blocks at checker and at one depth, nearer-is-more, declined " +
+                 "blocks, zero motion, a whole-pixel flow landing on half pixels, a frame the grid does not divide, and a PER-PIXEL " +
+                 "field) agree with the CPU EXACTLY on the hole mask, the vector and its depth, and to 2.7e-7 on the frame, on both " +
+                 "backends. flowFromMotionNode turns this tree's motion field into the splat's forward per-pixel flow, and " +
+                 "fsr-three.html gains a view of the frame halfway between the last two, holes left black for the fill. Fourteen " +
+                 "sabotages, all red. The first draft's row claimed flat depth made every overlap a tie; under a uniform flow it " +
+                 "had no overlaps -- the row now COUNTS its ties (128) on a case built for them. A guess that the old fixture " +
+                 "would have let a last-writer tie rule through was checked and was WRONG: the checker case already had ties.",
+    }),
+    // v4735 -- THE 342nd CLOSING: the case a lock is dangerous in, drawn through the driver.
+    since417: Object.freeze({
+        at: "v4735", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsrTemporalLockGhost-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** THE GHOST render/temporalLock.mjs MEASURED IS REAL IN THE DRIVER TOO, AND THE DEFAULT IS SAFE ONLY BECAUSE BOTH " +
+                 "MASKS DISCARD WHAT THE LOCKS WOULD LET THROUGH. *** v4732 shipped locks on by default and named, without a row, the " +
+                 "case render/temporalLock-selfcheck.mjs section 5 measured as 26% worse ghosting: a lock detector reads a pixel-scale " +
+                 "texture as ridges everywhere. fx/fsr/fsrTemporalLockGhost-selfcheck.mjs draws it -- a 1.13-pixel chequer, a box " +
+                 "sliding across it, 64 -> 128 against a supersampled truth, graded on the TRAIL the box just uncovered. The frame's " +
+                 "locks hold the clamp open on 70% of the frame. With the depth clip and the reactive mask off, so that the clamp is " +
+                 "the only defence, they cost the trail 0.94 dB -- 11% more RMS, the ghost reproduced; as the driver ships they move " +
+                 "it +0.09. The sabotages sharpened the claim: without the depth clip alone the cost is 0.19 dB, without the reactive " +
+                 "mask alone 0.35, so it takes BOTH; and a lock surviving disocclusion scores 0 RED because disocclusion already " +
+                 "discards that history -- advanceLocks' kill rule is redundant in this chain and load-bearing in one without the " +
+                 "factor, which is why its mirror still holds it (K12). Measured before the gate: at 2.5x the speed and a 2.5-pixel " +
+                 "cell, at most 0.063 dB on the trail as shipped. The gate first took 28 s; the truth and the trail are reduced in " +
+                 "the page now, 8.6 s.",
+    }),
+    // v4734 -- THE 341st CLOSING: three more round() ties, fixed, and a census so there is not a fifth.
+    since416: Object.freeze({
+        at: "v4734", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/shaderRound-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/frameInterpGPU-selfcheck.mjs (whole-pixel flow at t = 0.5 and 0.25: landings on a half pixel)",
+                                "render/holeFillGPU-selfcheck.mjs (a depth-side sample on a half pixel across a depth edge)",
+                                "render/opticalFlow-selfcheck.mjs (block origins on a half pixel: block 8 over five levels, block 12 over four)"]),
+        verdict: "*** THE AUDIT v4728 OWED FOUND ALL THREE, AND ONE WAS 79 PIXELS. *** WGSL's round() ties to EVEN and every " +
+                 "CPU mirror's Math.round ties UP; render/frameInterpWgsl.mjs, holeFillWgsl.mjs and opticalFlowWgsl.mjs rounded " +
+                 "with round(), and no device row had ever landed on a tie. A probe that did: frame interpolation at t = 0.5 with a " +
+                 "whole odd flow put 125 of 127 holes somewhere else on the device, pixels off by 0.79 (and t = 0.25 with a flow of " +
+                 "2, 62); optical flow at block 8 over five levels -- where a block's origin bx * 8 / 16 is a half for every odd " +
+                 "block -- differed on 44 of 512 components, one by 79 pixels, and at block 12 over four levels on 4, one by 18.8; " +
+                 "hole fill's depth side mode split 64 of 256 side codes, on a fixture that had to be FOUND (the tie decides only " +
+                 "when its two candidates straddle a depth edge and the floor is even). All three are floor(x + 0.5) now, v4728's " +
+                 "fix, and each device gate draws its tie with the split population derived from the case. " +
+                 "render/shaderRound-selfcheck.mjs scans the 186 files that ship shader source and asserts the round() calls it " +
+                 "finds EQUAL the kept list, each with a reason -- two: MPM's fixed-point quantiser (a continuous product, the tie " +
+                 "measure-zero and named in its own mirror, and ties-to-even the unbiased rule for a sum) and a JavaScript helper. " +
+                 "Its first draft counted ITSELF, spelling two of the markers it greps for. Ten sabotages, every one red somewhere; " +
+                 "the carried guess back to round() is 0 on the device because it is always whole -- arithmetic, not a blind spot " +
+                 "-- and the census holds it.",
+    }),
+    // v4733 -- THE 340th CLOSING: FSR2's chain graded at the half precision it ships with.
+    since415: Object.freeze({
+        at: "v4733", swept: 2, green: 2, red: 0,
+        added: Object.freeze(["fx/fsr/fsrTemporalHalf-selfcheck.mjs", "fx/fsr/fsrTemporalHalfQuality-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** THE CONFIGURATION fsr-three.html RUNS WAS THE ONE NOTHING HELD TO ANYTHING, AND AT HALF IT IS THE CHAIN TO TWO " +
+                 "ULPS. *** makeFsrTemporal defaults its colour, resolved and history targets to HalfFloatType, and every gate in the " +
+                 "arc replaced that with FloatType to grade the arithmetic. fx/fsr/fsrTemporalHalf-selfcheck.mjs derives where a half " +
+                 "history stops converging -- the step alpha * (current - history) rounds to nothing under half an ulp, so it stalls " +
+                 "within ulp / (2 alpha), five ulps at alpha 0.1, 102 of 102 runs inside -- and runs the CPU chain from the device's " +
+                 "renders ROUNDED TO HALF at the device's three half writes (text/slugAtlas.js's toHalf, one definition): worst 2 " +
+                 "half ulps over 24 frames at 2x on both backends, 239 of 294,912 values differing at all. " +
+                 "fx/fsr/fsrTemporalHalfQuality-selfcheck.mjs measures the cost: half against float, 0.000 dB on fsr-three.html's scene " +
+                 "and on moving wires (25.273 against 25.272 at 64 -> 128), every history value but one within the stall bound. " +
+                 "*** TWO READBACK FACTS, BOTH MEASURED BY GETTING THEM WRONG FIRST. *** A half target reads back as raw binary16 " +
+                 "words in a Uint16Array (read as numbers, the half history sat '12,000' from float); and on WebGPU its rows pad to 256 " +
+                 "bytes like a float target's, at half the bytes a texel, so a width must be a multiple of 32 (a 48-wide history came " +
+                 "back 2,047 ulps off, and WebGL2 read the same run to 2). *** AND PSNR CANNOT TELL HALF FROM 8-BIT. *** Sabotage H7 " +
+                 "made the default 8-bit and PSNR moved 0.003 dB -- against a truth ~20 dB away precision is not the limit -- so the " +
+                 "stall rows are the grade: half within 2.4e-3 of float at 0.5, where 8-bit stalls at 2.0e-2 and clips above 1. Five " +
+                 "sabotages, every one red somewhere; the resolve kept at float is visible only to the composition (393 ulps). The " +
+                 "two sections first took 49 s together and were split.",
+    }),
+    // v4732 -- THE 339th CLOSING: FSR2's lock life and clamp relaxation as TSL, on by default, and what they buy.
+    since414: Object.freeze({
+        at: "v4732", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsrTemporalLocks-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/temporalLockTsl-selfcheck.mjs (lock life: the ridge test, both candidate sources, advanceLocks with every kill, the relaxation, the active mask and the relaxed accumulate)",
+                                "fx/fsr/fsrTemporalTsl-selfcheck.mjs (the locks in the composition, from the ring on webgpu and the frame on webgl2)"]),
+        verdict: "*** THE LOCK AND THE CLAMP RELAXATION -- CODE NO PAGE IN THIS TREE HAD EVER RUN -- NOW RUN ON A THREE.JS SCENE, AND " +
+                 "ON WIRES THINNER THAN A RENDER PIXEL THEY ARE WORTH 0.97 dB. *** Measured on the CPU first, from the device's own " +
+                 "renders: on fsr-three.html's scene REMOVING THE CLAMP ENTIRELY moves the still picture 0.013 dB, so v4728's finding " +
+                 "(the clamp takes half the gain on sub-pixel detail) has nothing to act on there; on seven wires 0.4 render pixels " +
+                 "wide, locks from the ring take the history from 16.838 to 17.932 dB, past no clamp at all (17.785). " +
+                 "render/temporalLockTsl.mjs ports ridgesCPU (the plateau walk, and the linear index's wrap across rows, kept " +
+                 "because the mirror has it), newLocksCPU, lumaMean and lumaInstability as ring passes, advanceLocks (reprojected " +
+                 "at the nearest texel, decayed, killed on invalid motion, disocclusion and instability), lockRelaxation and " +
+                 "activeMask, with makeLockLife holding the state; accumulateNode takes rectifiedAccumulateCPU's relax. Its gate " +
+                 "holds every one to the mirror exactly on both backends -- 0 ridge disagreements at three plateau bounds, lock " +
+                 "life worst 0 over 24 frames with 447 decayed lock-frames carried by the pan, 93 across exact texel ties, and every " +
+                 "kill populated. fx/fsr/fsrTemporalTsl.mjs gains lockFrom (\"frame\", \"ring\" or null) and lockLife, and the driver " +
+                 "the composition gate now mirrors carries them. fx/fsr/fsrTemporalLocks-selfcheck.mjs measures them through the " +
+                 "driver: +0.97 dB on still wires, +0.43 moving, -0.015 on a fast-turning knot with nothing thin; the DEFAULTS are " +
+                 "its rows' -- locks from the frame (no ring; most of what the ring's buy), life 8 (86% of what 32 buys on the " +
+                 "wires at a fraction of its cost on the knot). fsr-three.html's own figure moves 25.24 -> 25.27. The page gains a " +
+                 "locks control and a view with the relaxation in red. *** THIRTY-ONE SABOTAGES, EVERY ONE RED SOMEWHERE. *** " +
+                 "Three scored 0 RED FIRST and none was a blind spot of the port: an EQUIVALENT MUTANT (a vertical walk that leaves " +
+                 "the frame never comes back, so whether leaving is decisive cannot matter -- replaced by taking the out test away); " +
+                 "v4559's condemned round(t - 0.5), which differs from floor only on an exact tie a camera's field never lands on " +
+                 "(rows now move exactly half a texel a frame); and a first advance trusting its state, which read zeros because " +
+                 "both backends zero a new target (the state is now filled first). The tie band found a fact of its own: a vec4 " +
+                 "select nested in a vec4 select draws nothing on WebGL2. Two gates came near the 20 s cap and were brought back " +
+                 "under it: the lock gate's readbacks packed 12 -> 5 a frame (24 s -> 14), the composition gate's history read on " +
+                 "every other frame (19.3 s -> 16).",
+    }),
+    // v4731 -- THE 338th CLOSING: the reactive mask, FSR2's chain over a three.js scene, and what it buys.
+    since413: Object.freeze({
+        at: "v4731", swept: 3, green: 3, red: 0,
+        added: Object.freeze(["render/reactiveTsl-selfcheck.mjs", "fx/fsr/fsrTemporalTsl-selfcheck.mjs", "fx/fsr/fsrTemporalQuality-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** FSR2'S CHAIN RUNS ON A THREE.JS SCENE, IT IS fsr.html's CHAIN, AND IT IS 2.42 dB CLOSER TO THE TRUTH THAN FSR1. *** " +
+                 "render/reactiveTsl.mjs ports reactiveCPU -- colour against the reprojected history, depth-gated -- and its gate " +
+                 "holds it to 3.73e-7 on both backends with all three declines populated (640 invalid, 140 off the frame, 170 " +
+                 "depth-gated). fx/fsr/fsrTemporalTsl.mjs's makeFsrTemporal composes the five rounds' passes in fsr.html's order: " +
+                 "jittered colour, the display-resolution motion field and clip depth, dilation (its depth the next frame's record), " +
+                 "the jitter-aware resolve, the lock ring and its shading mask (optional: 64 lumas a pixel at 2x is 269 MB at " +
+                 "960x540, and the period may not be chosen for cost), the reactive mask, disocclusion, the history factor, the " +
+                 "rectified accumulate and RCAS. fx/fsr/fsrTemporalTsl-selfcheck.mjs runs it 40 frames at 1.5x with every mask live " +
+                 "and, from the device's renders alone, runs fsr.html's order with the CPU references carrying its own history: " +
+                 "worst 1.36e-5 over all 40 frames, every mask the mirror's on the last, the output RCAS of the history to 1.19e-7. " +
+                 "fx/fsr/fsrTemporalQuality-selfcheck.mjs measures what it buys on fsr-three.html's own scene at 2x against a 4x4-" +
+                 "supersampled render: bilinear 22.79 dB, FSR1 22.82, FSR2 25.24 -- the accumulation's gain (the history before " +
+                 "RCAS reads 25.09, FSR2's own first frame 21.83). fsr-three.html gains the FSR2 mode and a lock-ring switch that " +
+                 "states its memory. *** THIRTY-FIVE SABOTAGES ACROSS THE THREE GATES, THIRTY-FOUR RED. *** The 0-RED corrected a " +
+                 "claim: sharing the accumulate's bilinear with the reactive mask differs by rounding, under the bound, so the " +
+                 "reactive module's own order is kept for fidelity and its header now says only that. SIX OTHERS SCORED 0 RED " +
+                 "FIRST, every one a blind spot of the comparison rather than of the chain: a flat wall left declined pixels " +
+                 "unchanged (X4, X5), an unwritten record declined everything on frame one (X6, D11 -- the driver now starts its " +
+                 "record at the far plane), and a CPU chain fed the device's own colour and motion could not see an unjittered " +
+                 "colour pass or a jittered motion pass (D6, D7 -- the colour pass is now redrawn with the reported phase). " +
+                 "pmndrs-upscaler-tsl is CLOSED.",
+    }),
+    // v4730 -- THE 337th CLOSING: the lock ring as TSL.
+    since412: Object.freeze({
+        at: "v4730", swept: 2, green: 2, red: 0,
+        added: Object.freeze(["render/temporalClipTsl-selfcheck.mjs", "render/temporalLockTsl-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/temporalTsl-selfcheck.mjs (narrowed: the depth clip and the lock ring moved to their own gates; requireTsl named)"]),
+        verdict: "*** THE LOCK STAGE fsr.html's CHAIN RUNS -- THE REPROJECTED LUMA RING AND ITS SHADING-SHIFT MASK -- RUNS ON A " +
+                 "THREE.JS SCENE. *** render/temporalTsl.mjs gains makeLumaRing: 2 x period lumas a pixel packed four to a texel in " +
+                 "a float target ceil(F/4) slices tall, every slot bilinearly reprojected through the motion field each push (two " +
+                 "fetches a texel: slots 4s..4s+2 read the next component of their slice, 4s+3 the first of the next), the fill " +
+                 "count at the nearest texel capped at 255, and render/temporalLock.mjs's shadingShiftCPU as a third pass. On a " +
+                 "panning camera over a wall with a pulsing lamp, 24 pushes at period 8 on both backends: every one of 16 slots of " +
+                 "1,024 pixels is pushLuma's to 4.77e-7, the fill counts are exact, the mask is shadingShiftCPU's to 2.68e-7 " +
+                 "(280 pixels firing where the light changed, 576 still unknown where the pan broke the ring) and again at scale " +
+                 "0.5, and 240 still pushes later every count is min(255, count + 240). advanceLocks and lockRelaxation -- lock " +
+                 "life and the clamp relaxation -- have no caller in this tree, fsr.html included, so they are not the chain and " +
+                 "are not ported; v4728 measured what they are for. *** THIRTEEN SABOTAGES, THIRTEEN RED, *** after the first " +
+                 "draft's slow pan left every ring full, scale 1 made the scale term invisible, and L13 scored 0 RED because every " +
+                 "real pixel's motion is valid -- the ring now reads a field with an invalid band. *** AND THE GATE WAS SPLIT, " +
+                 "BECAUSE IT STOPPED FINISHING. *** render/temporalTsl-selfcheck.mjs, grown a section a round, ran 25.4 s and the " +
+                 "rotation killed it at its 20 s cap -- no verdict. The depth clip moved to render/temporalClipTsl.mjs and the " +
+                 "ring to render/temporalLockTsl.mjs, each with a gate of its own name (13.7 s, 6.1 s, 4.3 s now), the way " +
+                 "render/ already holds the CPU references; the eleven clip and thirteen ring sabotages were RE-TAKEN on the " +
+                 "split gates and came back identical, and the split's own rows (a threshold refusal, a period refusal, the " +
+                 "shared requireTsl) are one red each. *** THE RING'S MEMORY, STATED: *** 2 x period lumas a pixel is 64 at 2x -- " +
+                 "265 MB of float at 960x540 across the ping-pong pair -- because render/temporalLock.mjs keeps every luma where " +
+                 "FSR2 keeps a lock and a short history. fsr-three.html's new clip + lock masks view (disocclusion red, " +
+                 "shading shift green, of the live scene) runs the 1x period, 66 MB, and says why; it is also what reaches the " +
+                 "two new modules outside their gates.",
+    }),
+    // v4729 -- THE 336th CLOSING: the depth clip as TSL.
+    since411: Object.freeze({
+        at: "v4729", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/temporalTsl-selfcheck.mjs (dilation, disocclusion, the history factor and clipGapThreshold)"]),
+        verdict: "*** THE DEPTH CLIP RUNS ON A THREE.JS SCENE, AND IT AGREES WITH ITS MIRRORS TO THE BIT. *** render/temporalTsl.mjs " +
+                 "gains dilateNodes (render/dilate.mjs's dilateCPU: the nearest depth in the 3x3 and all four motion channels from " +
+                 "that same texel, off-frame neighbours skipped, a tie keeping the centre), disocclusionNode (disocclusionCPU against " +
+                 "LAST frame's dilated record), historyFactorNode (historyFactorCPU) and clipGapThreshold (fsr.html's quarter of " +
+                 "the clip-z gap between two named surfaces, checked against an independent route through transform4). On a " +
+                 "tilted wall under a moving camera, a box sliding past it and a face-on square spinning in its own plane, five " +
+                 "frames on both backends: dilation moves 22,573 pixels and matches dilateCPU with worst 0; disocclusion flags " +
+                 "1,122 genuine and 352 no-history pixels (1,181 and 352 on WebGL2, whose clip range doubles every gap and the " +
+                 "threshold with it) and matches with worst 0; the factor discards exactly their sum. Selections, not arithmetic, " +
+                 "so the device agrees to the bit or not at all. *** ELEVEN SABOTAGES, ELEVEN RED. *** The fixture was grown " +
+                 "before they ran, on reasoning and said so: a flat wall's tied neighbours carry identical motion, a static edge " +
+                 "reads the same zero, and the completed field has nothing invalid -- three rules with no population in the " +
+                 "first scene.",
+    }),
+    // v4728 -- THE 335th CLOSING: the resolve and the accumulate as TSL, and a tie the WGSL resolve got wrong.
+    since410: Object.freeze({
+        at: "v4728", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/temporalTsl-selfcheck.mjs (the resolve and the rectified accumulate, per frame, end to end, and converging)",
+                                "render/temporalResolve-selfcheck.mjs (a device row at a jitter phase with ties)"]),
+        verdict: "*** THE RESOLVE AND THE ACCUMULATE RUN ON A THREE.JS SCENE, AND PORTING THE RESOLVE FOUND A DEFECT IN THE WGSL " +
+                 "ONE. *** render/temporalTsl.mjs gains resolveNode (resolveJitterAwareCPU: nine Lanczos2 taps, dered) and " +
+                 "accumulateNode (rectifiedAccumulateCPU: bilinear history through the motion field, a YCoCg box of the current " +
+                 "3x3, a factor-weighted blend). render/temporalTsl-selfcheck.mjs runs twelve jittered frames of a moving scene " +
+                 "on both backends and holds each pass to its mirror on the device's own inputs every frame -- the resolve to " +
+                 "1.49e-5 (the WGSL kernel's own LSB/50), the accumulate to 1.13e-6 -- and the whole chain run on the CPU from " +
+                 "the device's renders alone lands 4.71e-6 from the device's picture after twelve frames. A factor texture and " +
+                 "an invalid quarter act as the mirror's do. *** TEMPORAL UPSCALING, MEASURED: *** 32 jittered 32x32 frames of " +
+                 "a still camera beat one resolved frame by 1.68 dB against a 4x4-supersampled 64x64 truth (1.18 on WebGL2), and " +
+                 "the same renders WITHOUT the neighbourhood clamp by 3.39 dB -- the clamp takes half the gain on detail finer than " +
+                 "the render resolution, in the mirror exactly as in the port, which is the question FSR2's locks answer. *** THE " +
+                 "DEFECT: *** the resolve's base texel is Math.round in the mirror and was round() in the WGSL, which ties to EVEN; " +
+                 "at a 2x upscale jitter phases 1 and 2 of 32 land on exact halves on every other column and the kernel read the " +
+                 "other 3x3 window there, 6.31e-2 from its mirror on the device. The device row graded SEQ[7], which has no ties. " +
+                 "render/temporalResolveWgsl.mjs now takes floor(x + 0.5), as render/temporalLockWgsl.mjs already did for the " +
+                 "same pair, and its gate grades a phase it first proves has ties (24 half-texel landings on its grid). " +
+                 "render/frameInterpWgsl.mjs, holeFillWgsl.mjs and opticalFlowWgsl.mjs index with round() too; whether their " +
+                 "mirrors tie the other way was not checked here. *** THIRTEEN SABOTAGES, THIRTEEN RED, *** one only after the " +
+                 "factor row was given an invalid quarter: with the far plane completed, every pixel of the moving run was valid.",
+    }),
+    // v4727 -- THE 334th CLOSING: the temporal chain's inputs for a three.js scene.
+    since409: Object.freeze({
+        at: "v4727", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/temporalTsl-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** THE TEMPORAL HALF FOR A THREE.JS SCENE BEGINS, BY THE TSL ROUTE, AND v4726's BACKLOG LINE SAYING IT NEEDED THE " +
+                 "PACKAGE'S ROUTE IS CORRECTED. *** Every temporal pass already has a CPU mirror in render/, so each is written as TSL " +
+                 "and held to it, one a round. render/temporalTsl.mjs is the INPUTS: applyJitter writes render/jitter.mjs's " +
+                 "jitterProjection into a three.js camera, negated -- the sense fsr.html settled -- and a smooth three.js scene " +
+                 "rendered at half size and resolved reads 6.60e-3 rms against the full render beside an unjittered floor of " +
+                 "5.30e-3, where jitterProjection's own sense reads 5.92e-2. The MOTION FIELD is (du, dv, valid, zPrev) at display " +
+                 "resolution in render/motionVectors.mjs's convention, written by a subclass of three's VelocityNode that carries each " +
+                 "OBJECT's previous matrix -- measured first: three's own velocity, mapped, agreed with motionVectorsCPU to 9.7e-5 UV " +
+                 "-- and completed on every undrawn pixel by motionVectorsCPU's arithmetic on the far plane, so a sky accumulates. " +
+                 "render/temporalTsl-selfcheck.mjs grades a static floor, a box that moves and turns, and a background on both " +
+                 "backends: the background to 4.77e-7 against motionVectorsCPU, every surface to 0.0075 of a display pixel against " +
+                 "render/objectMotion.mjs's objectMotionCPU, the box 3.46 px from camera-only motion, and a turnaround where every " +
+                 "pixel -- wall and sky -- was behind the previous eye and both field and reference mark all 1,024 invalid. " +
+                 "*** TWO THINGS ABOUT THREE, FOUND BY THIS ROUND: *** a NodeMaterial keeps NormalBlending into a render target, so a " +
+                 "data pass's fourth channel scales the other three (0.1, 0.2, 0.3, 0.4 reads back 0.04, 0.08, 0.12, 0.4) -- the " +
+                 "first run read every surface's `valid` as its zPrev -- and an MRT output reaches a target texture only by NAME, so " +
+                 "an unnamed count-2 target draws nothing at all. *** FOURTEEN SABOTAGES, FOURTEEN RED, *** two of them only after " +
+                 "the fixture grew a third frame and a turnaround, because with two frames an object's first record is its previous " +
+                 "one and no pixel was ever behind the eye. The typed bounds of the first draft (0.01 px, 1e-4 clip z) went red on " +
+                 "WebGL2 at exactly twice WebGPU's reading and are restated in the units the consumers read. fsr-three.html gains a " +
+                 "motion-vector view of the live scene, which is this module's caller.",
+    }),
+    // v4726 -- THE 333rd CLOSING: FSR1 for a three.js scene, as TSL nodes held to the CPU reference.
+    since408: Object.freeze({
+        at: "v4726", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsrTsl-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/sweepCoverage-selfcheck.mjs (v4725's ledgerStamps and selectionKind named by the gate that shares their module's name)"]),
+        verdict: "*** BACKLOG ITEM pmndrs-upscaler-tsl WAS MOSTLY DONE, UNDER OTHER NAMES, AND ITS OWN ENTRY SAID 'GENUINELY UNSTARTED'. *** " +
+                 "The entry had searched render/ and gfx/ for the package's four identifiers. FSR1 landed at v4546-v4547 in fx/fsr/ " +
+                 "as this tree's own EASU and RCAS -- after that round measured @pmndrs/upscaler@0.2.0 and chose the algorithm over " +
+                 "the package -- and the temporal chain after it in render/, which fsr.html runs every frame; tools/ship/fsr2Coverage.mjs " +
+                 "derives how much of FSR2 is wired. No branch carries unmerged work on any of it beyond two gate-level fixes. What was " +
+                 "genuinely missing was the package's purpose: a three.js scene could not be put through any of it, because gfx/device.js " +
+                 "creates its own device. *** AND THE PACKAGE IS NOT A TSL PORT, BY ITS OWN README: *** hand-written WGSL on " +
+                 "renderer.backend.device, no TSL, no WebGL fallback; three ships a spatial FSR1Node in TSL. So the spatial half is a " +
+                 "fragment-node job. fx/fsr/fsrTsl.mjs transcribes easuCPU and rcasCPU statement by statement, plus a bilinear node and " +
+                 "a three-pass driver. fx/fsr/fsrTsl-selfcheck.mjs renders them on BOTH of three's backends and holds them to the " +
+                 "reference: EASU 2.98e-7 -- the WGSL kernel's own figure -- RCAS 3.58e-7 and 2.98e-7 on its two settings, a real " +
+                 "three.js scene through the driver 7.15e-7, and the bilinear pane 5.96e-8. Two things the port forced: a colour " +
+                 "transfer (a three.js target is linear and EASU wants perceptual; 'srgb' encodes with three's own sRGBTransferOETF and " +
+                 "decodes after RCAS) and a clamp at 0 before that decode, because RCAS undershoots a local minimum to -1.1 and three's " +
+                 "sRGBTransferEOTF of a negative reads NaN on both backends, measured. fsr-three.html is the caller, linked from " +
+                 "server.html, with the origin notice every WebGPU page carries and the page and launch indexes rebuilt. *** ITS FIRST " +
+                 "DRAFT DREW THE BILINEAR PANE UPSIDE DOWN *** on WebGL2 beside an upright FSR1 pane, seen by screenshot, because it " +
+                 "sampled the target with texture(t, uv()); both panes now read through the same coordinates. The readback of a " +
+                 "float target on WebGPU pads rows to 256 bytes, so every size is a multiple of 16 and every length is asserted. " +
+                 "*** EIGHTEEN SABOTAGES, EIGHTEEN RED, AFTER TWO 0-REDS: *** the RCAS guard's removal, because no fixture had a lone " +
+                 "pixel against a flat ring (the fourteenth empty adversarial population), and a driver skipping the bilinear pass's " +
+                 "scene render, because the gate's order left the same frame behind. *** ALSO: *** definitionGates' tree-wide ratchet " +
+                 "had sat at 364 against 362 since v4725, whose two ledger helpers were named only by timingKind; sweepCoverage's gate " +
+                 "now names them. The backlog entry records what is done and what is left: the temporal half for a three.js scene, " +
+                 "which needs the package's route. Nothing about FSR's quality was measured beyond agreement with the reference.",
+    }),
+    // v4725 -- THE 332nd CLOSING: two guardians back under budget, and a named re-timing no longer passes anything over.
+    since407: Object.freeze({
+        at: "v4725", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/inputSets-selfcheck.mjs (the record read once per process while its file is unchanged)",
+                                "tools/ship/timingKind-selfcheck.mjs (the arrival rule reads the last pool pass, not the last write)"]),
+        verdict: "*** TWO GUARDIANS ARE BACK UNDER BUDGET, AND THE ROUTE THAT BROUGHT THEM BACK HAD A FAULT OF ITS OWN. *** verify's " +
+                 "standing reds were the version markers and recordReach's ceiling, 62 unchecked records against 50, because the host " +
+                 "has been slower since the container restart and two guardians of many records -- sweepCoverage-selfcheck at 3,042 ms " +
+                 "and registerDrift-selfcheck at 3,281 -- sat just over the 3,000 ms budget. quickSweep and its gates re-read the input " +
+                 "record once per gate; tools/ship/inputSets.mjs gains readRecordCached, which reads it once per process and again only " +
+                 "when the file's mtime or size changes, while readRecord stays uncached because recordInputs mutates what it returns. " +
+                 "Two rows grade it, and a rewritten record in a temporary root is a miss. The rotation, which is the only legitimate " +
+                 "re-timer of an over-budget gate, re-timed them by name: 2,744 and 2,810 ms, both returnees, and recordReach is green. " +
+                 "*** THE FAULT: *** every --write moved the rotation ledger's `at`, and timingKind's arrival rule reads that as the last " +
+                 "rotation, reasoning that a rotation run after an over-budget hand-timed gate 'should have taken it'. A --gate run " +
+                 "selects only the gates it names, so after the first attempt 49 arrivals read as unaccounted though the run never had " +
+                 "one of them in its selection. The ledger writes were reverted, and the rotation ledger now keeps `poolAt`, moved " +
+                 "only by an unfiltered stalest-first pass -- --gate, --band and --killed carry it forward, and a ledger without it " +
+                 "backfills from its own `at`, so the first write changed nothing about what counts. timingKind reads `poolAt`. The " +
+                 "two helpers live in sweepCoverage.mjs rather than the rotation: importing the rotation put a file in timingKind's " +
+                 "closure its recorded input set lacked, and importClosure went red. Re-recording that one gate with recordInputs " +
+                 "--gates was tried and reverted -- carryForward drops every entry whose inputs moved, 205 of 1,339, which is " +
+                 "correct for skipping and turned inputSets-selfcheck and recordShape-selfcheck red, because both read the widest " +
+                 "entries as live. That dependence of two gates on a full record is a separate round. Four rows grade the writer, " +
+                 "the reader and the CLI's choice with fixtures. *** SIX SABOTAGES, SIX RED *** across the new rows, and two on the " +
+                 "memo, both red. *** THE MARKERS STAY: *** ENGINE_VERSION and BRAIN_BUILD mark the last SHIPPED " +
+                 "build, v4645, and shipping fast-forwards main, which is not done without the owner's say. Nothing was measured.",
+    }),
+    // v4724 -- THE 331st CLOSING: the frame-level arc is closed, and the page says so.
+    since406: Object.freeze({
+        at: "v4724", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/frameVerdicts-selfcheck.mjs (the closure graded: after every hypothesis, no supported verdict, families derived)"]),
+        verdict: "*** THE FRAME-LEVEL ARC IS CLOSED: NO SIGNAL THE CHAIN MEASURES HAS BEEN SHOWN TO DECIDE WHICH FRAMES TO GENERATE ON " +
+                 "CONTENT AND GEOMETRY IT WAS NOT DECLARED ON. *** Ten pre-registered hypotheses, H7 to H16, over 4,641 harvested " +
+                 "frames, tested four signal families: spatial detail (H7), occlusion (H8-H10), motion's gain over standing still " +
+                 "(H11-H15) and vector disagreement (H16). None was supported. Motion's gain is the only one with a pattern that kept " +
+                 "its sign -- backwards, frames with more gain are where generation does worse -- across both geometries, both paths " +
+                 "and two speeds; with the slab whole in view it was weaker, cleared on one geometry at x4 and on neither at x2. Vector " +
+                 "disagreement was a different signal and barely ordered the frames. The headroom v4706 found stands: a frame oracle " +
+                 "would gain +0.368 dB on ramp and +0.232 on smooth at x4, and nothing tested reaches it. *** THE CLOSURE IS A RECORD " +
+                 "THE PAGE READS. *** render/frameVerdicts.mjs gains FRAME_CLOSED and frameFamilies(), which derives the four families " +
+                 "from the table's own signals, and fsr.html's readout, while generation runs, now says the arc is closed and names " +
+                 "them instead of calling the question open. tools/ship/frameVerdicts-selfcheck.mjs grades it: the closure must come " +
+                 "after every hypothesis in the table, its closing must carry its words, no verdict may be supported, and the families " +
+                 "the page names must be the ones the table gives. Reopening the question needs a signal outside those families and " +
+                 "a document of its own. Nothing was measured. *** FIVE SABOTAGES, FIVE RED: *** the closure dated before the last " +
+                 "hypothesis, a verdict in the table marked supported, the closure's words paraphrased past its closing, the page " +
+                 "left calling the question open, and the families typed instead of derived.",
+    }),
+    // v4723 -- THE 330th CLOSING: H16 not supported -- a different signal from gain, and a weak one.
+    since405: Object.freeze({
+        at: "v4723", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameDisagreeMeasure-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/frameDisagree-selfcheck.mjs (the no-data row inverted, as it said it would be)",
+                                "tools/ship/frameVerdicts-selfcheck.mjs (H16 re-derived)"]),
+        verdict: "*** H16 IS NOT SUPPORTED, AND THE READING IS THE TABLE'S THIRD ROW: VECTOR DISAGREEMENT DOES NOT RANK THE FRAME " +
+                 "DECISION HERE. *** v4722's runner ran as committed on sway at x4, upscale 3x, both geometries -- 546 frames, 945 s. " +
+                 "The forward cell is near chance: 4 of 7, t p 0.247, mean rho -0.051, with bars, edges and ramp against it. The " +
+                 "vertical cell leans the declared way and misses: 6 of 7, exact sign p 0.0625, t p 0.0287, mean rho -0.139, with " +
+                 "noise against it. *** THE QUALIFIER HELD: *** within scenes the signal and H11's gain rank frames at mean |rho| " +
+                 "0.187, far under the 0.7 fixed in advance, so this is a different signal and not gain measured again. As a " +
+                 "description, vector disagreement is a different signal from motion's gain, and it barely orders which frames " +
+                 "generation wins: 10 of 14 scene-cells lean the declared way, no cell's mean reaches 0.2, and motion's gain on the " +
+                 "same path and speed (H14) sat at -0.235 and -0.258. *** C25 AND C26 HELD *** on all 476 scored frames and all " +
+                 "seventy turn-scene pairs, and C12 re-harvested zone identically. The first draft of the gate typed gain's " +
+                 "strength as 'about -0.25'; it is now read from H14's result. H16 joins render/frameVerdicts.mjs, re-derived. " +
+                 "*** TWELVE SABOTAGES, ELEVEN RED. *** The 0-RED -- the qualifier dropped -- is an empty adversarial population, " +
+                 "the THIRTEENTH: H16 neither clears nor fails the qualifier on these data, so removing the qualifier changes " +
+                 "nothing, and the design gate already reddens it (D6 at v4722). A forward scene swapped for H15's x2 sway rows " +
+                 "keeps the slab whole and turns at the wrong times, and C26 alone reddens; tightening the qualifier to 0.1 after " +
+                 "the run reddens it and the provenance row together. The measurement gate runs about 71 s alone and is hand-filed.",
+    }),
+    // v4722 -- THE 329th CLOSING: pre-registration -- a different signal: whether the chain's two motion estimates disagree.
+    since404: Object.freeze({
+        at: "v4722", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameDisagree-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** THREE FRAME SIGNALS DESCRIBED THE PICTURE OR THE MOTION; NONE ASKED WHETHER THE CHAIN'S MOTION IS TRUSTWORTHY. *** " +
+                 "render/frame-disagree-preregistration.md declares H16 with NO DATA IN THE COMMIT: the frame's fraction of blocks " +
+                 "where the colour flow beat the application's own vector on merit -- srcIsFlowBeat, named by the document and found " +
+                 "by name. The direction is fixed by the physics before data: the application's vector is the geometry's motion, so " +
+                 "a colour match that beats it is usually false, and more disagreement should mean generation does worse. On sway at " +
+                 "x4, upscale 3x, both geometries: every cell and every frame unseen, turn frames excluded, H12's test imported. *** " +
+                 "A QUALIFIER FIXED IN ADVANCE: *** disagreement and H11's gain both read the chain's SADs, so if within scenes they " +
+                 "rank frames alike -- mean |rho| above 0.7 -- H16 is reported as NOT DISTINCT from gain and is not supported " +
+                 "whatever the test says. A made-up world where the signal is the gain re-ranked clears the test and is not " +
+                 "supported. *** THE SIGNAL IS GRADED ON BEING NEW: *** its column is none of those the arc's earlier runners used, " +
+                 "read from their own exports, and the spread the document quotes -- cv 0.147 to 0.866 -- is computed at x1, which " +
+                 "nothing declares; no correlation with the advantage is computed on any real frame. *** THIRTEEN SABOTAGES, " +
+                 "THIRTEEN RED -- AFTER TWO CRASHES AND ONE FIXTURE THAT COULD NOT SEE ITS SABOTAGE, ALL THE GATE'S. *** A signal " +
+                 "genGate lacks failed its row and then threw on the first made-up frame; the gate now stops there with the failure " +
+                 "counted. A wrong column left no testable cell and a row read `.sign` off nothing; it now fails on the untested " +
+                 "cell. And dropping the turn exclusion passed: the first draft gave each turn frame an opposite effect ten times " +
+                 "the signal's and claimed only the exclusion kept the world backwards, but five frames in 39 do not move a rank " +
+                 "correlation that far -- measured across six seeds and two placements, the verdict never changed. The row now asks " +
+                 "the summary which frames it scored. Unzipping one cache twice put the gate within 250 ms of the sweep's budget; " +
+                 "memoised, it runs 1.5 s. *** AND THE FIRST VERIFY WENT RED ON tools/ship/timingKind-selfcheck.mjs, FOR A FILING " +
+                 "THIS ROUND GOT WRONG. *** The new gate is under budget, and it was hand-filed as an `alone` reading so the drift " +
+                 "pre-flight would find it (v4716 went red for the lack). timingKind accounts an earlier-stamped `alone` entry only " +
+                 "if it is in the rotation's ledger, one of the three named, or an OVER-budget arrival -- an under-budget gate is the " +
+                 "sweep's to time, and this one was none of those. Reproduced on the rebuilt pre-verify file, and the filing that " +
+                 "satisfies both checks measured there: an under-budget arrival is pre-filed INFERRED -- kind `loaded`, listed in " +
+                 "kindsInferred -- and the sweep then stamps it as observed. The sweep had already re-timed this gate, so the " +
+                 "committed file was consistent; the second verify is the one this closing reports.",
+    }),
+    // v4721 -- THE 328th CLOSING: H15 not supported -- the direction holds at x2 and the consistency does not.
+    since403: Object.freeze({
+        at: "v4721", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameSwayRepMeasure-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/frameSwayRep-selfcheck.mjs (the no-data row inverted, as it said it would be)",
+                                "tools/ship/frameVerdicts-selfcheck.mjs (H15 re-derived)"]),
+        verdict: "*** H15 IS NOT SUPPORTED: NEITHER CELL CLEARS, AND THE READING IS THE TABLE'S THIRD ROW -- THE DIRECTION HOLDS AND " +
+                 "THE STRENGTH DOES NOT REPLICATE. *** v4720's runner ran as committed on sway at x2, upscale 3x, both geometries -- " +
+                 "546 frames, 945 s. Each cell stops at 6 of 7, exact sign p 0.0625: forward with bars against it at +0.466 (t p " +
+                 "0.078), vertical with smooth against it at +0.063 (t p 0.018). 12 of 14 scene-cells rank backwards, mean rho -0.234 " +
+                 "forward and -0.316 vertical. H14's split does not recur: the forward geometry, which cleared at x4, does not clear " +
+                 "at x2. The document named bars and zone as the scenes that had gone against it before; bars did, forward, and " +
+                 "smooth -- not named -- did vertically. *** WHAT DID NOT REPLICATE, AS A DESCRIPTION: *** the mean rho at x2 is " +
+                 "close to H14's -- -0.234 against -0.235 forward, -0.316 against -0.258 vertical -- so what the exact sign test " +
+                 "failed on is consistency. Across the four sway cells 25 of 28 scene-cells rank backwards, and the scenes against " +
+                 "it are bars, smooth, none and bars; five scenes go backwards in all four. No test is attached and no scene is " +
+                 "dropped. *** C25 AND C26 HELD ON BOTH CELLS: *** the slab stayed whole in all 518 scored frames, and it reversed in " +
+                 "the picture within 1.5 frames of both turns in all fourteen scene-cells, so the path was honoured where it was " +
+                 "declared. C12 re-harvested zone on sway identically. The first draft of the description typed 'a different scene " +
+                 "each time', and bars went against it in two of the four cells; the list is now computed. H15 joins " +
+                 "render/frameVerdicts.mjs, re-derived. *** THIRTEEN SABOTAGES, THIRTEEN RED, AFTER ONE CRASH THAT WAS THE GATE'S. " +
+                 "*** Scoring the turn frames let a cell reach 7 of 7, and the verdict row read `.rho` off a scene that was not " +
+                 "against it; it now reads through a lookup that can be empty, and the same sabotage reddens three rows. One C26 " +
+                 "sabotage isolates it: a forward scene swapped for H14's sway rows at x4 keeps the slab whole -- C25 passes -- but " +
+                 "turns at the wrong times, and C26 reddens. The measurement gate runs 70.8 s alone and is hand-filed.",
+    }),
+    // v4720 -- THE 327th CLOSING: pre-registration -- H14 replicated at x2, with a ratio chosen so no declared frame was seen.
+    since402: Object.freeze({
+        at: "v4720", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameSwayRep-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** H14 FOUND A WEAKER BACKWARDS RANKING WITH THE SLAB IN VIEW, CLEARING ON ONE GEOMETRY. ONE SPEED IS ONE " +
+                 "OBSERVATION. *** render/frame-sway2-preregistration.md declares H15 with NO DATA IN THE COMMIT: H14's statistic, " +
+                 "imported, on sway at x2 on both geometries. A new key, `replicates`, names the hypothesis it replicates, and the " +
+                 "gate reads `direction` from THAT hypothesis's result. The reading table names what the forward/vertical split " +
+                 "recurring would mean, as a description. *** THE RATIO IS NOT THE DEFAULT, AND THE REASON IS COMPUTED. *** " +
+                 "Vertically the sway rises at exactly the linear speed until its first turn -- t 8.18 at x2 -- so at upscale 2x " +
+                 "frames 2 to 8 of every vertical scene would re-walk H12's harvested vertical x2 cell: 7 of 39 frames already " +
+                 "seen. At 3x no linear vertical x2 frame exists. The gate derives every harvested cell WITH ITS PATH from the " +
+                 "committed results, and checks that no declared frame sits on a linear path anyone harvested. *** C26 IS NEW: " +
+                 "THE REVERSAL, READ OFF THE PICTURE. *** The slab's centroid along its own screen axis must turn round within 1.5 " +
+                 "frames of each turn. It replaces a linear twin that does not exist for the vertical cell. Its first draft asked " +
+                 "for two consecutive steps of opposite sign; the page, driven at x1, turned on both geometries and that draft saw " +
+                 "neither, because a block-quantised centroid moves in steps with flat runs between. It now compares the net " +
+                 "movement before and after the turn and locates the extreme. *** FOURTEEN SABOTAGES; OF THE FIRST THIRTEEN, ELEVEN RED ON THE FIRST RUN, " +
+                 "AND BOTH 0-REDs WERE C26's. *** Dropping the sign condition passed, and so did dropping the location check, " +
+                 "because the only negative case was the linear path, whose extreme sits at the far end of the window. Each " +
+                 "condition now has the made-up picture that needs it: a monotone slab whose rows end just past the turn (the " +
+                 "sign), and a real reversal asked about 2 frames late (the location). Both sabotages redden. *** AND " +
+                 "definitionGates CAUGHT AN EXPORT THE GATE NEVER NAMED: *** GRID, the block field's side, took the tree's " +
+                 "unmentioned definitions from 703 to 704. It is now asserted rather than mentioned -- the harvested field must be " +
+                 "GRID x GRID at both ratios, or the centroid's columns and rows are not the screen's axes -- and a fourteenth " +
+                 "sabotage, GRID 20, reddens three rows. The gate runs 142.2 s alone and is hand-filed.",
+    }),
+    // v4719 -- THE 326th CLOSING: H14 not supported -- with the slab whole in view, a weaker backwards ranking survives.
+    since401: Object.freeze({
+        at: "v4719", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameSwayMeasure-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/frameSway-selfcheck.mjs (the no-data row inverted, as it said it would be)",
+                                "tools/ship/frameVerdicts-selfcheck.mjs (H14 re-derived; every option that carries a verdict is the one its document declared)"]),
+        verdict: "*** H14 IS NOT SUPPORTED, AND THE SCENE THAT BROKE IT IS NOT THE ONE ITS DOCUMENT NAMED. *** v4718's runner ran as " +
+                 "committed on sway at x4, both geometries -- 546 frames, 883 s. Forward CLEARS, 7 of 7 at t p 0.0129; vertical stops " +
+                 "at 6 of 7, exact sign p 0.0625, with bars against it at +0.243. The document named zone as the likely price, and zone " +
+                 "went WITH the direction in both cells, -0.518 and -0.014. The forward cell is reported as that cell's outcome and not " +
+                 "promoted. *** C25 HELD: *** the slab kept 196 to 210 blocks in every one of the 476 scored frames, so the design did " +
+                 "what the document said. *** THE READING IS THE TABLE'S THIRD ROW: *** with the slab whole in view, a weaker backwards " +
+                 "ranking survives -- 13 of 14 scene-cells backwards, mean rho -0.235 forward and -0.258 vertical, 57% and 65% of H11's " +
+                 "strength at the same speed and geometry on the linear path. So what separates the two paths -- the slab leaving the " +
+                 "view most visibly -- is part of H11's ranking and not all of it; the paths also differ in how the slab moves against " +
+                 "the camera, and nothing here separates those. On sway the clock is nearly gone: partialling out frame order moves the " +
+                 "mean rho by 13% and 15%, against 39% and 68% on the linear path. *** C26 WAS WRONG IN ITS FIRST DRAFT, ABOUT THE PATH " +
+                 "AND NOT THE DATA. *** It demanded that every sway frame differ from its linear twin, and 21 vertical frames did not: " +
+                 "vertically the sway has no camera term, and a triangle wave rises at exactly the linear speed until its first turn at " +
+                 "t 4.09, so frames 2, 3 and 4 sit on the same path to 1e-15. C26 now computes where the paths coincide from " +
+                 "render/slabPath.mjs and requires every frame OFF that set to differ: 21 of 273 match, all 21 on it, none off it. C12 " +
+                 "re-harvested zone on sway identically. *** H14 JOINS render/frameVerdicts.mjs, *** and slabpath=sway -- which exists " +
+                 "only for it -- carries its verdict on the page, as slabdir=z carries H10's. *** FIFTEEN SABOTAGES, FIFTEEN RED, AFTER " +
+                 "ONE CRASH THAT WAS THE SABOTAGE'S. *** Removing H14 from the table first threw a SyntaxError: its entry holds a " +
+                 "nested Object.freeze for its option, and the non-greedy removal stopped inside it and left broken source -- the " +
+                 "table never loaded, which is a malformed mutation and not a verdict. Removed whole, it reddens five rows. One sway " +
+                 "scene swapped for its linear twin reddens C25 and C26 together, on either geometry; declaring the path linear after " +
+                 "the run reddens six rows, C12 among them, because C12 re-harvests on the declared path. The measurement gate runs " +
+                 "about 69 s alone and is hand-filed.",
+    }),
+    // v4718 -- THE 325th CLOSING: the page gains a slab path that never leaves the view, and H14 is declared on it.
+    since400: Object.freeze({
+        at: "v4718", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameSway-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/fsrPage-selfcheck.mjs (the objects-only offset row now requires slabAt, and the linear " +
+                                "expression on the module; the 2.42 px derivation reads SLAB_DX where the page now imports it from)"]),
+        elsewhere: Object.freeze([
+            Object.freeze({ gate: "tools/ship/frameReverseMeasure-selfcheck.mjs", was: "green", now: "green",
+                why: "re-run after fsr.html gained a slab path, with the five other frame-level measurement gates (frameGate, frameHoles, " +
+                     "frameHoled, frameVertical, frameGain): each C12 re-harvests through the page on the default linear path, and all six " +
+                     "reproduced their caches bit for bit -- 234 frames across x1 to x8, ratios 1.5 and 3, and vertical motion." }),
+            Object.freeze({ gate: "tools/ship/genGateCalibrate-selfcheck.mjs", was: "green", now: "green",
+                why: "re-run with every other gate that drives fsr.html -- fsrPageGen, fsrPageObjects, fsrPageConfirm, fsrPageClocks, " +
+                     "fsrPageDevice, genGateVerdicts, frameVerdicts and genGateMeasure -- because four slab-offset sites changed; all green." }),
+            Object.freeze({ gate: "tools/ship/recordReach-selfcheck.mjs", was: "red", now: "red",
+                why: "THIS ROUND'S VERIFY RAN ON A SLOWER HOST, AND recordReach SAID SO TWICE. The container restarted mid-arc, and HEAD's own " +
+                     "fsrPage-selfcheck went from 2.35 s to 3.8 s with no code change; 33 gates crossed the 3,000 ms budget. Its headroom row " +
+                     "read 587 ms where it requires 800, and profiling found two costs that were waste rather than load. frozenRecords' " +
+                     "census stripped comments from all ~4,000 source files before asking which ones define a record; it now asks first, " +
+                     "and census() is byte-identical over the whole tree while the gate falls from ~2.4 s to ~1.6 s. And " +
+                     "buildKnowledgeIndex re-read ~5,800 files from disk that recordDrift's other censuses had already read; it now reads " +
+                     "them through treeRead's memo, the index is byte-identical, and recordDrift falls from ~2.35 s to ~2.15 s. Three " +
+                     "sabotages: two red in frozenRecords-selfcheck, and one red in recordDrift-selfcheck. The index sabotage passes " +
+                     "staleness-selfcheck, which is recorded, not chased. AND recordReach IS STILL RED, SAID EXACTLY: the re-run verify " +
+                     "read its headroom row at 798 ms against 800 -- from 587, with recordDrift at 2,202 ms serial -- and its ceiling row " +
+                     "at 62 records whose only guardians are over budget against 50 recorded, because on this host 524 of 1,799 gates " +
+                     "sit over the budget. The waste is gone; the host speed is not something either change can remove." }),
+        ]),
+        verdict: "*** H11 AT x4 WAS, IN EFFECT, SLAB AGAINST NO SLAB. *** Counted from H11's own committed rows through the depth column " +
+                 "-- a block nearer than the midpoint of the page's two planes is slab -- the slab starts to leave the view at frame 7 " +
+                 "and is gone by frame 18 on forward motion, 6 and 17 vertically, so it is in only 16 and 15 of each scene's 39 frames, " +
+                 "identically in every scene. v4717 could only partial that clock out. *** SO THE PAGE GETS A PATH THAT REMOVES IT BY " +
+                 "DESIGN. *** render/slabPath.mjs owns SLAB_DX and DOLLY now and computes the slab's offset for the page AND the analysis: " +
+                 "`linear` is the old expression exactly, and `sway` moves the slab at the same speed but reverses it -- a triangle wave " +
+                 "of amplitude 0.9 centred on the camera's track along the slab's axis, inside the 0.985 the page's own geometry allows, " +
+                 "so the slab stays whole. Frames whose interval holds a turn move non-linearly and are excluded, computed from the path. " +
+                 "Every site that turns scene time into an offset -- reset, current, previous and the mid-frame truth -- calls slabAt, " +
+                 "and a static row holds that: a mid-frame truth left on the old expression would score every sway frame against the " +
+                 "wrong picture and no driven row would see it. *** THE DEFAULT IS PROVEN INERT BY RUNNING, NOT ARGUED: *** six C12 " +
+                 "re-harvests, 234 frames bit for bit, and the design gate's own x1 drive reproduces v4708's whole cached window with " +
+                 "features. Driven with sway, every frame's dB moves, the slab holds all 196 of its blocks while on linear it falls, and " +
+                 "its screen centroid peaks at the frame turnsBetween names. *** H14 IS DECLARED WITH NO DATA: *** H12's question and " +
+                 "statistic on sway at x4, both geometries, with `direction` read from H12's result and zone named as the price again. " +
+                 "*** THIRTEEN SABOTAGES, THIRTEEN RED -- AFTER ONE EMPTY POPULATION, ONE CRASH AND ONE NO-OP. *** Re-associating the " +
+                 "linear product passed, because every page speed is a power of two and multiplying by one is exact: the row now tries " +
+                 "speeds that are not, and 107 of 324 offsets differ there. Declaring the path linear reddened four rows and then threw " +
+                 "on a turn that did not exist; the row now fails instead. A document edit matched the path twice and changed nothing; " +
+                 "redone on the declared line it reddens five rows. The gate runs 135.4 s alone and is hand-filed.",
+    }),
+    // v4717 -- THE 324th CLOSING: H12 and H13 not supported -- the backwards ranking replicates, and much of it is the clock.
+    since399: Object.freeze({
+        at: "v4717", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameReverseMeasure-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/frameReverse-selfcheck.mjs (the no-data row inverted, as it said it would be)",
+                                "tools/ship/frameVerdicts-selfcheck.mjs (H12 and H13 re-derived; H13 reads H12's frames and is not counted twice)"]),
+        verdict: "*** H12 IS NOT SUPPORTED, BY EXACTLY THE PRICE ITS DOCUMENT NAMED. *** v4716's runner ran as committed on two cells " +
+                 "nobody had harvested -- x2 forward at upscale 3x and x2 vertical -- 546 frames, 951 s. The vertical cell clears, 7 of " +
+                 "7 at t p 0.0003. The forward cell stops at 6 of 7, exact sign p 0.0625, with zone against it: the scene v4716 named " +
+                 "as the likely price, because it was H11's exception on both geometries. Its t-test clears at 0.0077; the document " +
+                 "required both, and the sign test is what fails. The vertical cell is reported as that cell's outcome and NOT " +
+                 "promoted. *** THE RAW PATTERN DID REPLICATE: *** 13 of 14 scene-cells rank backwards at x2, against H11's 12 of 14 " +
+                 "at x4. *** H13 IS NOT SUPPORTED EITHER. *** With the frame's position in the window partialled out, neither cell " +
+                 "clears -- forward 5 of 7, vertical 6 of 7 -- and the document's table says H13 is then reported without " +
+                 "interpretation. *** WHAT THE CLOCK TOOK, AS A DESCRIPTION: *** gain falls with frame index in 11 of 14 scene-cells " +
+                 "and advantage rises with it in 13 of 14, so a large share of that ranking goes with the window's clock -- 39% of " +
+                 "the forward mean rho, 68% of the vertical. What survives the partial beyond 0.25 survives in the SAME three scenes on " +
+                 "both geometries: smooth, checker and ramp. That is a description with no test attached; the partial removes a " +
+                 "monotone trend and nothing else. The design that would separate the clock from the signal rather than partial it " +
+                 "out is a window in which the slab never leaves the view. *** C24 HELD ON BOTH CELLS *** (0 of 273 frames in either " +
+                 "carries v4706's forward x2 2x dB), and C12 re-harvested zone at x2 forward 3x identically. *** THE PAGE SAYS SO " +
+                 "THE DAY IT IS MEASURED: *** H12 and H13 join render/frameVerdicts.mjs, re-derived, and the arc's finding gains the " +
+                 "clock's share as a quote graded against this closing. The first draft of the gate's description said 'most of " +
+                 "that ranking is the clock' -- true vertically, false forward at 39% -- and it is now computed per cell. *** THIRTEEN " +
+                 "SABOTAGES, THIRTEEN RED, AFTER TWO CRASHES AND ONE NO-OP THAT WERE NOT VERDICTS. *** A test that ignores `direction`, " +
+                 "and one decided by the t-test alone, each made the forward cell clear; the H12 rows indexed the one failing cell " +
+                 "they expected and threw. They now read it through a lookup that is null when that population is absent, and both " +
+                 "sabotages redden three and four rows. Flipping a recorded rho first matched two places in the result file and " +
+                 "changed nothing -- a NO-OP, not a 0-RED -- and redone on the per-scene value it reddens the provenance row. H12 " +
+                 "supported if ANY cell clears reddens here, because the vertical cell DOES clear: the adversarial population is not " +
+                 "empty this time. One vertical scene swapped for v4706's forward x2 rows reddens C24. The measurement gate runs " +
+                 "74.7 s alone, and frameVerdicts-selfcheck 14.2 s; both are hand-filed.",
+    }),
+    // v4716 -- THE 323rd CLOSING: pre-registration -- H11's negation on cells it has not seen, and the same with the clock out.
+    since398: Object.freeze({
+        at: "v4716", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameReverse-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** H11 FOUND A PATTERN THAT KEPT ITS SIGN ACROSS GEOMETRY, IN THE WRONG DIRECTION, AND v4703's RULE SAYS WHAT " +
+                 "THAT BUYS: A NEW DOCUMENT AND DATA NOBODY HAS SEEN. *** render/frame-reverse-preregistration.md declares, with NO " +
+                 "DATA IN THE COMMIT, two hypotheses on two cells nobody has harvested -- x2 forward at upscale 3x and x2 vertical, " +
+                 "a speed H11 did not use, one cell per geometry. H12 is the negation, transferred: within scenes, more gain means " +
+                 "generation does WORSE. H13 is the same after the frame's position in the window is partialled out, because " +
+                 "v4705 named a window in which the slab leaves the view and a frame's motion and advantage move together with " +
+                 "time; a gate reading the gain could be reading the frame number. *** THE DIRECTION IS NOT CHOSEN. *** `direction` " +
+                 "is a declared key the statistic multiplies by, and the gate requires it to equal the sign H11 recorded -- the " +
+                 "same in both of H11's cells, read from its committed result. The numbers the document quotes from H11 are " +
+                 "computed, and so is the scene it names as the likely price: zone, H11's shared exception, which if it reverses " +
+                 "again caps each cell at 6 of 7. The document says so rather than dropping zone after seeing it. *** THE CLOCK IS " +
+                 "A ROW. *** A made-up world where gain and advantage merely follow the frame number clears H12 and FAILS H13, and " +
+                 "one where the gain orders the advantage independently of time clears both -- if the partial could not tell them " +
+                 "apart it would be decoration. A variable the clock ranks perfectly has no partial and is excluded rather than " +
+                 "scored. *** TWELVE SABOTAGES, TWELVE RED ON THE FIRST RUN, *** among them the partial replaced by the raw rho, " +
+                 "the partial conditioned on the gain instead of the clock, and a test that ignores `direction`. The gate drives " +
+                 "no page and runs in about a second; C24 and C12 are the measurement round's, on the harvest path v4715 proved.",
+    }),
+    // v4715 -- THE 322nd CLOSING: H11 not supported -- and it failed by the route the document named, on both geometries.
+    since397: Object.freeze({
+        at: "v4715", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameGainMeasure-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/frameGain-selfcheck.mjs (the no-data row inverted, as it said it would be)",
+                                "tools/ship/frameVerdicts-selfcheck.mjs (H11 re-derived, and the arc's finding graded quote by quote against its closings)"]),
+        elsewhere: Object.freeze([
+            Object.freeze({ gate: "tools/ship/splatSort-selfcheck.mjs", was: "red", now: "green",
+                why: "THIS ROUND'S VERIFY FOUND IT RED WITH NO LINE OF THE SORT CHANGED, and verify's serial re-run, uncontended, " +
+                     "agreed. Its frame-budget row asserted an absolute WALL-CLOCK bound -- radix under 16.7 ms at 500K splats -- " +
+                     "with about 1.4x of margin, on the best of two runs. Reproduced on purpose: with the 4 cores oversubscribed " +
+                     "2x the row failed 6 of 6 at 25-35 ms of wall, while the relative rows held at 13-26x. The row is a claim " +
+                     "about the sort's WORK, so it now reads process CPU time, and the radix side takes the best of nine (about " +
+                     "a tenth of a second): 6 of 6 green under the same load at 12.7-14.4 ms. Two sabotages, both red: the row " +
+                     "put back on wall clock under that load, and a radix sort that secretly calls the comparison sort." }),
+            Object.freeze({ gate: "tools/ship/recordReach-selfcheck.mjs", was: "red", now: "green",
+                why: "THE SAME VERIFY FOUND ITS HEADROOM ROW RED, AND THIS TIME IT WAS NOT LOAD: frozenRecords-selfcheck ran " +
+                     "2,216 ms serial and uncontended against a 3,000 ms budget, 784 ms of margin where the row demands 800, " +
+                     "and 2,197-2,265 ms alone. It is the erosion the row exists to catch -- a swept gate that walks the tree " +
+                     "grows with it. Profiled rather than re-filed: the largest self-time in frozenRecords' census was every " +
+                     "gate's source searched for every record name, about 270,000 substring searches. A name is only " +
+                     "[A-Z0-9_] and always holds V and three or four digits, so it can only occur inside one maximal " +
+                     "[A-Z0-9_]+ run that also holds V\\d{3}; the search now collects those runs once per gate and matches " +
+                     "each distinct run once. census() came back byte-identical over the whole tree, 1,124 -> 899 ms, and " +
+                     "the gate runs 1.84-1.94 s. frozenRecords-selfcheck gains a row holding the two methods equal on every " +
+                     "tenth live gate and on the edge cases; its first draft re-read the tree from disk and gave back 280 ms, " +
+                     "and now reads census()'s memo. Three sabotages, all red -- one, exact token match, only by the new row." }),
+        ]),
+        verdict: "*** H11 IS NOT SUPPORTED, AND IT FAILED THE WAY THE DOCUMENT SAID IT MIGHT. *** v4714's runner ran as committed: " +
+                 "seven scenes in each of two cells nobody had harvested -- x4 forward at upscale 3x, and x4 with the slab moving " +
+                 "vertically -- 546 frames, 746 s. Both cells are reportable, no scene excluded, and neither clears: sign 1 of 7 in " +
+                 "each, one-sided p near 1. *** THE RHOS LEAN NEGATIVE, ON BOTH GEOMETRIES, WITH THE SAME EXCEPTION. *** 12 of 14 " +
+                 "scene-cells rank backwards, mean rho -0.412 forward and -0.397 vertical, and zone is the one positive scene in " +
+                 "BOTH. v4714 named exactly this as the reason to expect failure: H6's block-level shape replicated where the " +
+                 "decision is made. H6's mean of block scores agrees in sign on all 14 scene-cells, so summing -- which gives flat " +
+                 "blocks no weight -- did not change the direction either. *** WHAT THIS SETTLES, AS A DESCRIPTION: *** motion's " +
+                 "gain over standing still ranks frames backwards on both geometries -- the first frame-level pattern in this arc " +
+                 "to keep its sign across the two geometries H10 showed disagree about holes, and the opposite of the direction " +
+                 "v4695 and v4702 fixed. THE NEGATION IS NOT TESTED: v4703 requires a negation to get its own document and data it " +
+                 "has not seen, and these are now seen data. The window confound v4705 named still applies -- the slab leaves the " +
+                 "view within the harvest, moving a frame's motion and its advantage together -- and nothing here separates them. " +
+                 "*** C23 HELD ON BOTH CELLS *** (0 of 273 frames in either carries v4706's forward x4 2x dB), and C12 re-harvested " +
+                 "zone at x4 forward 3x identically in 58 s. *** THE PAGE SAYS SO THE DAY IT IS MEASURED. *** H11 joins " +
+                 "render/frameVerdicts.mjs, re-derived by its gate, and the arc's finding is now built from quotes each graded against " +
+                 "the closing it came from, rather than two phrases the gate had hard-coded. *** ELEVEN SABOTAGES, TEN RED, AND ONE " +
+                 "CRASH THAT WAS THE GATE'S. *** Removing H11 from the table threw instead of reddening: every per-hypothesis row " +
+                 "read its entry unguarded. They now read it through one lookup that cannot be undefined, and the same removal " +
+                 "reddens three rows. The one 0-RED -- H11 supported if ANY cell clears -- is an empty adversarial population, the " +
+                 "TWELFTH: neither cell clears, so ANY and ALL agree on these data, and the design gate already reddens it (G6 at " +
+                 "v4714). One vertical scene's rows swapped for v4706's forward rows reddens C23, and a harvest that ignores its " +
+                 "settings reddens C12. The measurement gate runs 56.7 s alone and is hand-filed.",
+    }),
+    // v4714 -- THE 321st CLOSING: pre-registration -- H6's score asked of the frame, on two cells nobody has harvested.
+    since396: Object.freeze({
+        at: "v4714", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameGain-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** THE FRAME ARC HAS HEADROOM AND NO PREDICTOR, AND BOTH SIGNALS IT TRIED DESCRIBED THE PICTURE. *** Spatial " +
+                 "detail (H7) and occlusion (H8-H10) say what the frame looks like; neither says what a cross-fade gets wrong, " +
+                 "which is that it assumes nothing moved. The chain measures how much motion lowers the matching error below " +
+                 "standing still before any middle frame exists -- v4702's score, H6 -- and H6 asked it only of the BLOCK, where " +
+                 "it ranked backwards and its closing shut the question 'at this block size'. *** render/frame-gain-preregistration.md " +
+                 "DECLARES H11 WITH NO DATA IN THE COMMIT: *** the frame's summed sadStill over its summed best-candidate residual, " +
+                 "log-ratio, direction and eps H6's, within scenes by paired t AND exact sign, intersection-union over two cells -- " +
+                 "x4 forward at upscale 3x and x4 vertical -- one per geometry, because H10 is why a single geometry proves nothing. " +
+                 "*** WHAT MAKES IT A DIFFERENT QUESTION IS A ROW, NOT A SENTENCE: *** on a one-block frame the score IS H6's, " +
+                 "exactly, and adding flat blocks leaves it bit-identical while H6's mean of block scores moves -- the flat blocks " +
+                 "v4703 found were 63-68% of edges'. The reason to expect failure is named: if the frame rhos also lean negative, " +
+                 "H6's shape has replicated where the decision is made, and the negation is still not tested. *** 'NOBODY HAS " +
+                 "HARVESTED THESE' IS MEASURED: *** the gate derives every harvested cell from the four frame result files, adds " +
+                 "every pre-v4709 harvest at the page defaults, and checks both declared cells against the union. The runner " +
+                 "drives the page at x1, undeclared, reproducing v4708's cached rows with features, and its settings object at " +
+                 "the defaults changes nothing. *** FOURTEEN SABOTAGES, TWELVE RED ON THE FIRST RUN, AND BOTH 0-REDs WERE THE " +
+                 "GATE'S. *** Swapping sadApp and sadStill in the runner passed because the fixture placed the SADs with the " +
+                 "runner's own column map, so the swap read back consistent; the fixture now places them by genGate's names and " +
+                 "the swap reddens four rows. Removing the cv floor passed because the 'flat' scenes were exactly constant, where " +
+                 "Spearman returns null unaided; they now vary by about 0.1%, below the floor, and only the floor excludes them. " +
+                 "Both re-run red. The gate runs 35.9 s alone and is hand-filed.",
+    }),
+    // v4713 -- THE 320th CLOSING: four frame-level verdicts reach the page, and a sentence that outlived its limit leaves it.
+    since395: Object.freeze({
+        at: "v4713", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameVerdicts-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        elsewhere: Object.freeze([
+            Object.freeze({ gate: "tools/ship/fsrPageGen-selfcheck.mjs", was: "green", now: "green",
+                why: "ITS OWN CLOSING NOTE CONTRADICTED ITS OWN SECTION 3 FOR THIRTY-ONE ROUNDS. Written at v4681, it said a " +
+                     "page control for the slab's speed 'does not exist' and that a paired test was 'a pre-registered round of " +
+                     "its own'; v4682 added the control and this gate's speed curve, and four paired-test rounds followed, and " +
+                     "the note was never re-read. It now says what the gate drives and counts what the frame arc measured from " +
+                     "render/frameVerdicts.mjs rather than typing it. Green at 25.8 s before and after; no row changed." }),
+            Object.freeze({ gate: "tools/ship/genGateVerdicts-selfcheck.mjs", was: "green", now: "green",
+                why: "re-run because its readout row reads the same fsr.html line the frame note now joins: with the cpu arm " +
+                     "running, the readout must still END with H1's record sentence, and it does -- the frame note is placed " +
+                     "before it, not after. 3.4 s." }),
+        ]),
+        verdict: "*** THE PAGE SAID FRAME GENERATION HAD NEVER RUN ON A PICTURE, THIRTY-ONE ROUNDS AND 1,911 HARVESTED FRAMES " +
+                 "AFTER IT FIRST DID. *** fsr.html's OFF readout -- 'seven rounds built that path on synthetic fixtures and none " +
+                 "of it has ever run on a picture' -- was written before v4681 turned the path on, and nothing read it against " +
+                 "the record since. Four pre-registered hypotheses about WHEN to generate a frame were measured, and the page " +
+                 "said nothing about any of them: the ON readout printed each frame's advantage over a cross-fade with no word " +
+                 "on whether anything predicts it, and the vertical slab option existed only for H10 and named no verdict. " +
+                 "*** render/frameVerdicts.mjs HOLDS H7-H10, AND THE PAGE READS IT THREE TIMES, *** as v4704 did for H1-H6: " +
+                 "the OFF readout says what the path has done, the ON readout ends by saying whether to generate a frame is an " +
+                 "open question -- each verdict, the headroom v4706 found (+0.368 dB on ramp, +0.232 on smooth at x4) and " +
+                 "where the arc stands -- and slabdir=z carries 'H10 NOT SUPPORTED at v4712'. *** EVERY LINE IS GRADED. *** " +
+                 "Each entry's numbers must be in its closing and its own evidence, and its document must be its runner's own " +
+                 "PREREG constant; each verdict is RE-DERIVED from its result file through h7-h10 with the constants read from " +
+                 "the document; the frame counts are the caches' rows, the scene count every document's declaration, and the " +
+                 "headroom is recomputed from H7's cache -- with a row that the scenes it names are the LARGEST, so a true " +
+                 "number for a chosen scene reddens it. The page is driven: both readouts and the option label are read from " +
+                 "the running page. *** FOURTEEN SABOTAGES, FOURTEEN RED, *** and one of them was not what it claimed: a " +
+                 "result file with smooth's holed frames flipped reddened on the evidence row, because h10 reads the contrast " +
+                 "and not the field changed, so the verdict-word path had not been exercised. A fourteenth sabotage makes the " +
+                 "H10 result CLEAR -- every contrast positive -- and the re-derivation reads 'supported' and reddens. Nothing " +
+                 "was measured and no verdict moved. The gate runs 8.2 s alone and is hand-filed.",
+    }),
+    // v4712 -- THE 319th CLOSING: H10 not supported -- the holed-frame pattern was one geometry's, not occlusion's.
+    since394: Object.freeze({
+        at: "v4712", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameVerticalMeasure-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/frameVertical-selfcheck.mjs (the no-data row inverted, as it said it would be)"]),
+        verdict: "*** H10 IS NOT SUPPORTED, AND NOT BY A MARGIN. *** v4711's runner ran as committed: seven scenes at x8 with the " +
+                 "slab moving VERTICALLY, 273 frames, 268 s. Contrast mean +0.184 dB, t p 0.356, sign 5 of 7 (p 0.227) -- not the " +
+                 "one-scene price v4711 named, and not its no-answer route either: every scene carried 4 to 7 holed frames. " +
+                 "*** AND TWO SCENES REVERSE HARD. *** On vertical motion bars's holed frames score +2.202 dB against its clean " +
+                 "+0.369, and smooth's +0.912 against -0.020: there, the frames with holes are where generation WINS. Across the " +
+                 "three forward cells no scene's holed frames averaged above +0.305 dB -- a ceiling the gate reads off the forward " +
+                 "caches rather than a number typed into it. " +
+                 "*** WHAT THIS SETTLES, STATED AS A DESCRIPTION: *** holed frames lost in 20 of 21 scene-cells when the slab moved " +
+                 "WITH the dolly, and in 5 of 7 when it moved across it, with the exceptions reversing by up to 1.83 dB. Whether a " +
+                 "holed frame loses depends on the geometry that made the hole, so a hole is not a signal a frame gate can carry " +
+                 "to geometry it has not seen. That is why v4711 built a second geometry, and it did its job: H8's x8 cell, H9's 3x " +
+                 "cell and the 20 of 21 were all the forward geometry speaking. " +
+                 "*** C22 held on the declared cell *** (0 of 273 vertical frames carry the forward dB), and C12 re-harvested zone " +
+                 "on vertical motion identically. " +
+                 "*** EIGHT SABOTAGES, EIGHT RED, *** including one scene's rows swapped for the forward geometry's, which C22 " +
+                 "reddens. Two numbers the first draft of this gate TYPED -- the forward ceiling and the largest reversal -- are now " +
+                 "computed; this time they were right, and the rule exists because twice in this arc they were not. The gate runs " +
+                 "42.2 s alone and is hand-filed.",
+    }),
+    // v4711 -- THE 318th CLOSING: the page gains a second occlusion geometry, and H10 is declared on it.
+    since393: Object.freeze({
+        at: "v4711", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameVertical-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/fsrPage-selfcheck.mjs (the slab-pattern row now requires BOTH axes of the offset)"]),
+        elsewhere: Object.freeze([
+            Object.freeze({ gate: "tools/ship/frameGateMeasure-selfcheck.mjs", was: "green", now: "green",
+                why: "re-run after fsr.html gained a slab direction, because its C12 re-harvests through the page on the default path: zone at x2, 39 rows bit-identical." }),
+            Object.freeze({ gate: "tools/ship/frameHolesMeasure-selfcheck.mjs", was: "green", now: "green",
+                why: "re-run after fsr.html gained a slab direction, because its C12 re-harvests through the page on the default path: zone at x1, 39 rows bit-identical." }),
+            Object.freeze({ gate: "tools/ship/frameHoledMeasure-selfcheck.mjs", was: "green", now: "green",
+                why: "the same, at x8 and upscale 1.5: 39 rows bit-identical -- 117 frames across three speeds, which is the proof that the default direction is inert." }),
+        ]),
+        verdict: "*** EVERY CELL THE HOLED-FRAME CONTRAST HAD BEEN READ AT SHARED ONE OCCLUSION GEOMETRY, SO THE PAGE GOT A SECOND. " +
+                 "*** fsr.html's slab moved only along x, with the dolly, disoccluding its vertical edges; v4710 said a further honest " +
+                 "test needed a camera path the page did not have. The slab's offset was a scalar threaded through a dozen samplers, " +
+                 "but only THREE places turn it into geometry -- hitBoth's bounds, patternUV, and the motion vectors' model matrix -- " +
+                 "so the offset became that scalar times a unit direction, and `slabdir` picks x (the default) or z: VERTICAL, ACROSS " +
+                 "the dolly, disoccluding horizontal edges no harvest has seen. Along x every added term is sx * 0, exactly zero, and " +
+                 "the three frame-level measurement gates' C12 re-harvests PROVE the default inert rather than a comment asserting " +
+                 "it: 117 frames across x1, x2 and x8, bit for bit. " +
+                 "*** H10 IS DECLARED ON IT WITH NO DATA IN THE COMMIT: *** H9's exact question and statistic -- imported, not " +
+                 "rewritten -- at x8 with the slab moving vertically. One cell. The price is named (one scene reversed fails, and " +
+                 "checker is named), and so is a way it can fail to answer: the slab crosses its own height in about five frames " +
+                 "at x8, so it may leave the view before enough frames carry holes. " +
+                 "*** C22 PROVES THE DIRECTION IS HONOURED, AND ONE ROW PROVES IT IS HONOURED GEOMETRICALLY. *** At x1, which H10 " +
+                 "does not declare, the plain harvest reproduces v4708's cached rows and the vertical one moves every frame. But the " +
+                 "dB moving would not catch hitBoth's vertical bounds being missed -- the texture and motion would travel while the " +
+                 "outline stayed -- so the slab's NEAR-DEPTH CLUSTER is tracked across 11 frames: 2 columns and 0 rows by default, " +
+                 "1 column and 3 rows vertically. The first draft required one axis to dominate 3 to 1 within an arm and failed a " +
+                 "correct slab, because the dolly drifts the view along x in BOTH arms; the row now compares the arms. " +
+                 "*** SEVEN SABOTAGES, SEVEN RED, *** after three re-runs: removing the direction read in tick() alone changed " +
+                 "nothing -- every slabdir change goes through reset(), which reads it too -- so both reads were removed and it " +
+                 "reddens; a vertical slab whose TEXTURE stays still is caught by fsrPage-selfcheck's pattern row, widened this round " +
+                 "to both axes; and one sabotage of the document first matched twice and was a no-op until anchored. The gate drives " +
+                 "the page four times and runs 27.2 s alone; its timing is hand-filed.",
+    }),
+    // v4710 -- THE 317th CLOSING: H9 not supported -- one scene, at one ratio, at exactly the declared price.
+    since392: Object.freeze({
+        at: "v4710", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameHoledMeasure-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        elsewhere: Object.freeze([
+            Object.freeze({ gate: "tools/ship/repoTerrain-selfcheck.mjs", was: "green", now: "green",
+                why: "THIS ROUND'S DATA TURNED IT RED A SECOND TIME, AND THE FIRST REPAIR WAS PART OF WHY. At v4701 its split row -- \"the biggest lake is SPLIT\" -- stopped naming es-universe.json and derived the biggest lake by LINE COUNT. At v4710 the biggest by lines became a gzipped frame cache whose treemap rectangle is squarer and fits inside the limit, so it rightly needs no split and the row went red. Whether a lake is split depends on its rectangle's sides, not its size: 'biggest' was the wrong question twice. The row now checks the splitter's CONTRACT from its output -- no lake left whole spans more than LAKE_SPLIT_LIMIT, now exported from world/repoHeightfield.js so the gate reads it rather than restating 0.30 -- and it found something the old row hid: as the tree grew with these caches, every lake's share fell, and NO lake on the real map needs splitting any more (the widest spans 0.295). So the split path is exercised on purpose: the real entries plus one synthetic data file as large as the rest of the tree together, which comes back in 6 pieces, all inside the limit. Two sabotages, two red: a splitter that never splits, and one cutting at 0.5 while the exported limit says 0.3." }),
+        ]),
+        widened: Object.freeze(["tools/ship/frameHoled-selfcheck.mjs (the no-data row inverted, as it said it would be)"]),
+        verdict: "*** H9 IS NOT SUPPORTED, AND THE MARGIN IS THE ONE THE DOCUMENT PRICED IN ADVANCE. *** v4709's runner ran as " +
+                 "committed at x8, ratios 1.5x and 3x: 546 frames, 498 s. At 3x the cell clears, 7 of 7 (sign p 0.0078, t p 0.010). " +
+                 "At 1.5x the t-test clears (p 0.0055) and the exact sign test does not: 6 of 7, p 8/128 = 0.0625, and the one " +
+                 "scene against it is CHECKER, whose holed frames score +0.305 dB against its clean +0.013 -- they do better. H9 was " +
+                 "declared as both ratios, so it is not supported, and the 3x cell is reported as a cell, as v4708's x8 cell was. " +
+                 "Every sabotage that would rescue it -- the t-test alone, any one ratio, checker dropped from the document after " +
+                 "the run -- reddens the gate. " +
+                 "*** C21 HELD ON THE DECLARED CELLS: *** 0 of 273 frames at either ratio carry the dB v4708 read at ratio 2, so " +
+                 "the control v4709 found broken and fixed was honoured throughout. C12 re-harvested zone at x8, ratio 1.5, and " +
+                 "every row came back identical. " +
+                 "*** THE DOCUMENT'S 'LARGELY KNOWN IN ADVANCE' HELD FOR FIVE SCENES, AND NOT FOR THE ONE THAT DECIDED IT. *** " +
+                 "Holed frame indices are shared across ratios for zone, smooth, edges, noise and ramp. bars moves (2 holed at 2x, " +
+                 "5 and 4 at 1.5x and 3x, 2 shared) and checker moves most: 3 at 2x, 6 at 1.5x, 13 at 3x with only 2 shared. The " +
+                 "resolution moves the reconciler's vectors and the splat with them, most on the most detailed scene. " +
+                 "*** AND A DESCRIPTION WAS WRITTEN BEFORE IT WAS COMPUTED, AGAIN. *** The first draft of the cross-cell line said " +
+                 "checker was 'the exception twice' with the weakest rho at v4708; the weakest was bars, and at 2x checker's holed " +
+                 "frames sat below its clean ones. Computed, it reads 7 of 7, 6 of 7, 7 of 7 across the three cells -- one " +
+                 "reversal in 21 scene-cells, landing in a declared cell. The line now counts. " +
+                 "*** NINE SABOTAGES, NINE RED. *** The gate runs 35.1 s alone and is hand-filed.",
+    }),
+    // v4709 -- THE 316th CLOSING: a replication declared, and the control it needed was found broken before any data.
+    since391: Object.freeze({
+        at: "v4709", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameHoled-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        elsewhere: Object.freeze([
+            Object.freeze({ gate: "tools/ship/frameGateMeasure-selfcheck.mjs", was: "green", now: "green",
+                why: "re-run after the harvest's dispatch fix because its C12 re-harvests zone at x2 through that code: all 39 rows identical to v4706's cache, which is the proof that the fix changed no committed measurement." }),
+            Object.freeze({ gate: "tools/ship/frameHolesMeasure-selfcheck.mjs", was: "green", now: "green",
+                why: "re-run for the same reason: its C12 re-harvests zone at x1, and all 39 rows are identical to v4708's cache." }),
+        ]),
+        verdict: "*** H9 IS DECLARED AS A REPLICATION, AND SAYS WHAT IS NOT FRESH ABOUT IT. *** render/frame-holed-" +
+                 "preregistration.md, NO DATA IN THE COMMIT, asks whether frames with any occlusion lose more than frames " +
+                 "with none -- the form taken FROM v4708's secondary, and it says so -- at x8 with the upscale ratio at 1.5x " +
+                 "and 3x. The slab speeds are spent: x1 has no holes, x8 produced the observation, x2 and x4 are forbidden by " +
+                 "v4707's own document, and the gate reads that prohibition from it. The ratio re-renders every presented " +
+                 "frame while leaving geometry alone, so WHICH frames carry holes is largely known in advance: H9 tests the " +
+                 "effect's robustness across resolution, not its discovery, and the document does not claim otherwise. " +
+                 "*** C21 FOUND THE CONTROL BROKEN BEFORE A DECLARED FRAME WAS HARVESTED. *** Setting only the ratio moved no " +
+                 "frame's dB. The cause was not the page: tools/ship/genGateTrain.mjs's harvest set every control and then " +
+                 "dispatched `change` on the LAST one -- genframe -- which fsr.html gives no handler, so reset() NEVER RAN " +
+                 "after a harvest set its controls, in every harvest since v4691. Scene, camera, slab speed and slab alpha " +
+                 "are read LIVE by tick(), so every committed dataset got them right; only reset() reads the ratio and the " +
+                 "start frame, and no harvest set either until this round asked for the ratio. The harvest now dispatches on " +
+                 "`scene`, which carries reset(). THE PROOF THAT NO COMMITTED MEASUREMENT MOVED is run rather than argued: " +
+                 "both earlier C12 re-harvests go through the fixed code and reproduce v4706's and v4708's caches, 39 rows " +
+                 "each, bit for bit. C21 itself is two drives at x1, a speed H9 does not declare: the plain harvest must " +
+                 "reproduce v4708's cached rows, and the ratio-3 harvest must move every one of them, so the difference is " +
+                 "the ratio's and not the page's nondeterminism. " +
+                 "*** THIS IS THE STARTFRAME LESSON A SECOND TIME, CAUGHT ONE STEP EARLIER. *** v4661 found a control that " +
+                 "accepted a value and silently did nothing, by reading a result that did not move; here the check was " +
+                 "written into the pre-registration's own gate, and it fired before any data existed. " +
+                 "*** TWELVE SABOTAGES, TWELVE RED, *** including restoring the old dispatch, which C21 reddens. The gate " +
+                 "drives the page twice and runs 11.3 s alone; its timing is hand-filed.",
+    }),
+    // v4708 -- THE 315th CLOSING: H8 not reported -- by the route the document named -- and one cell that cleared.
+    since390: Object.freeze({
+        at: "v4708", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameHolesMeasure-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/frameHoles-selfcheck.mjs (the no-data row inverted, as it said it would be)"]),
+        verdict: "*** H8 IS NOT REPORTED, AND THE DOCUMENT SAID BEFORE THE DATA EXACTLY HOW THAT WOULD HAPPEN. *** v4707's runner " +
+                 "ran as committed at x1 and x8: 546 frames, 466 s. At x1 the splat left NO hole in any frame of six scenes -- only " +
+                 "zone has any, in two frames -- so one scene was usable against the five the sign test needs, x1 cannot answer, " +
+                 "and H8, declared as BOTH speeds, is neither supported nor refuted. Section 4 wrote that sentence before a frame " +
+                 "was harvested, and a made-up world with no holes had held the gate to it. " +
+                 "*** THE x8 CELL MET ITS DECLARED TEST, AND IT IS NOT PROMOTED. *** All seven within-scene rhos are negative, as " +
+                 "the physics predicted: sign 7 of 7 (p 0.0078), t p 7.4e-4. It is reported as what it is, one declared cell's " +
+                 "outcome; calling it H8 would re-declare the hypothesis after seeing which half cleared, and the sabotage that " +
+                 "does exactly that -- supported if ANY speed clears -- reddens the gate. " +
+                 "*** AND WHAT THAT CELL IS MADE OF IS PRINTED BESIDE IT. *** Holes appear in only 2 to 7 frames per scene at x8 and " +
+                 "cover a few hundredths of a percent of the frame; those frames lose far more (zone -1.708 dB holed against " +
+                 "-0.350 clean, edges -1.841 against -0.103). The rho is close to a holed-against-clean comparison over a handful " +
+                 "of frames. It says holed frames are bad frames; it does not say the hole pixels are why. " +
+                 "*** A PREDICTION IN THE DOCUMENT WAS PARTLY WRONG, AND IS RECORDED SO. *** Section 3 dropped the across-scene " +
+                 "clause because the seven hole sequences would be 'nearly the same sequence'. At x8 their pairwise rho runs " +
+                 "-0.07 to 1.00, median 0.66: related, not nearly identical; the texture moves the holes through the " +
+                 "reconciler's choice of vector more than expected. " +
+                 "*** C12 RAN: *** zone at x1 re-harvested, every row identical, 33 s; the gate is 34.2 s alone and hand-filed. " +
+                 "*** NINE SABOTAGES, EIGHT RED. *** The one 0-RED -- the x8 test made two-sided -- is an empty adversarial " +
+                 "population, the ELEVENTH: every x8 rho is negative, so |rho| and -rho are the same numbers; the design gate " +
+                 "reddens on it (H4 at v4707). A sabotage reading x1's silence as a NULL instead of unanswerable reddens three rows.",
+    }),
+    // v4707 -- THE 314th CLOSING: occlusion, declared on cells nobody has harvested.
+    since389: Object.freeze({
+        at: "v4707", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameHoles-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** v4706 FOUND FRAME-LEVEL HEADROOM AND NOTHING THAT REACHES IT. H8 ASKS THE TEXTBOOK QUESTION. *** " +
+                 "render/frame-holes-preregistration.md declares, with NO DATA IN THE COMMIT, that within a scene the frames " +
+                 "with more OCCLUSION -- the chain's own holeFrac, found by name -- are the frames where generation does worse. " +
+                 "The direction is the physics of interpolation, fixed in the document; a positive relation FAILS it, and a " +
+                 "made-up world with exactly that relation is the row that proves the test is one-sided. " +
+                 "*** THE DOCUMENT SAYS WHAT CONSTRAINS IT. *** The signal was chosen AFTER v4706's within-scene rhos leaned " +
+                 "negative, so v4706's cells are forbidden to it in either direction: H8 runs at x1 and x8, which no frame has " +
+                 "been harvested at with its dB, and the gate reads the forbidden speeds out of v4705's document rather than " +
+                 "restating them. What has been seen at x1 and x8 is listed by round. " +
+                 "*** THERE IS NO ACROSS-SCENE CLAUSE, AND THE REASON IS GEOMETRY. *** All seven scenes share one camera and " +
+                 "one slab; occlusion is geometry, so their hole sequences are nearly the same sequence, and a rank across " +
+                 "seven nearly-equal numbers would be noise with a p-value. The question is within a scene, where v4706 found " +
+                 "the headroom. And a way it can fail to ANSWER is named in advance: at x1 the splat may leave almost no holes, " +
+                 "every scene falls under the floor, and H8 is then not reported rather than read as null -- a made-up world " +
+                 "with no holes is the row that holds the gate to that. " +
+                 "*** ELEVEN SABOTAGES, ELEVEN RED ON THE FIRST RUN *** -- the first round of this frame arc where no row had to " +
+                 "be rebuilt after a sabotage found it blind, which is a statement about this gate's rows and not a claim that " +
+                 "they are complete.",
+    }),
+    // v4706 -- THE 313th CLOSING: H7 measured, "neither" -- the spatial gradient does not decide the frame.
+    since388: Object.freeze({
+        at: "v4706", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameGateMeasure-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/frameGate-selfcheck.mjs (the no-data row inverted, as v4705 said it would be)"]),
+        verdict: "*** H7 IS NOT SUPPORTED, AND THE READING IS THE TABLE'S LAST ROW: NEITHER. *** v4705's runner ran as " +
+                 "committed: seven scenes at x2 and x4, 546 frames, 505 s. ACROSS scenes the laplacian-to-advantage rho is " +
+                 "0.3214 at x2 (exact p 0.2488) and 0.0000 at x4 (p 0.5183), against the 0.7143 it needed. WITHIN scenes the " +
+                 "rhos lean NEGATIVE -- 4 of 7 at x2, 6 of 7 at x4, mean -0.552 -- so inside most scenes the frames with more " +
+                 "detail are where generation does worse. v4683's sentence, \"a compensation's worth scales with the spatial " +
+                 "gradient\", is not supported at frame level across content or within it. Only checker gains, +0.260 dB " +
+                 "at x4 with 36 of 39 frames up; it is the most detailed scene, and the other six do not follow its order. " +
+                 "*** C12 RAN, IT WAS NOT REMEMBERED. *** zone at x2 was harvested again and every row came back identical -- " +
+                 "frame, both dB, labels, features -- in 35 s, so the cache IS the page. That takes the gate to 35.6 s alone, " +
+                 "and its timing is hand-filed. A sabotage that swaps the page's genDb and cfDb reddens it, which a cache-only " +
+                 "gate could never see. " +
+                 "*** THE WITHIN-SCENE NEGATIVES ARE A DESCRIPTION, and the document named the confound before the data: " +
+                 "v4684's slab leaves the frame across this window, moving a frame's detail and its moving content " +
+                 "together. The gate says it cannot separate them and claims no mechanism. " +
+                 "*** AND THE ONE THING THIS MEASUREMENT SHOWS THAT NO EARLIER ONE COULD: FRAME-LEVEL HEADROOM EXISTS. *** " +
+                 "At x4, ramp wins 17 of 39 frames and smooth 19, and a frame oracle would gain +0.368 and +0.232 dB there " +
+                 "over the better fixed policy -- numerically above the per-block oracle's +0.32 dB, though that was v4691's " +
+                 "held-out checker and these are different scenes and a different granularity. Spatial detail is not what " +
+                 "separates those frames. What does is an open question that owes its own document; nothing here has been " +
+                 "shown to reach that headroom. " +
+                 "*** ELEVEN SABOTAGES, TEN RED, after one crash that was not a verdict: *** dropping a scene from the cache " +
+                 "reddened the provenance row and then threw on the next line; the gate now stops at an incomplete cache with " +
+                 "the failure counted. The one 0-RED -- H7 needing one speed -- is an empty adversarial population, the TENTH " +
+                 "in this arc: no cell clears, so any and all agree here, and the design gate reddens on it (F8). v4705's " +
+                 "design gate asserted that no data existed yet and said this round would invert it; it is inverted to 'the " +
+                 "result was produced under this document's constants', and a sabotage of those constants reddens it.",
+    }),
+    // v4705 -- THE 312th CLOSING: the block closed, the question moves to the frame, and the arc's own suspect is declared.
+    since387: Object.freeze({
+        at: "v4705", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameGate-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** THE BLOCK IS CLOSED; A FRAME GENERATOR'S REAL DECISION IS PER FRAME. *** render/frame-gate-" +
+                 "preregistration.md declares H7 with NO DATA IN THE COMMIT. Before writing it, the arc's own frame-level " +
+                 "record was read, and it changed the design: MOTION IS ALREADY REFUTED at frame level (v4682: 0 of 16 " +
+                 "frames up across x1-x8, a curve that falls, falls, rises, falls), so a motion threshold would re-test a " +
+                 "dead hypothesis. The arc named its own suspect at v4683 -- \"a compensation's worth scales with the " +
+                 "spatial gradient\" -- and H7 tests that sentence with its direction fixed there: the frame's mean " +
+                 "per-block laplacian, found by NAME, against genDb minus cfDb. TWO CLAUSES, both at x2 and x4: ACROSS " +
+                 "scenes by exact permutation over all 5,040 orderings (rho >= 0.7143 clears, 0.6786 does not), and WITHIN " +
+                 "scenes by paired t AND exact sign over per-scene rhos. The table reads across-only as a CONTENT decision " +
+                 "and within-only as the per-block pathology one level up. What has been seen is listed by round -- " +
+                 "smooth, zone and checker at frame level in v4682-v4684, where zone already breaks the laplacian order " +
+                 "-- and v4684's window defect, the slab leaving frame, is named rather than corrected. " +
+                 "*** THE PAGE NOW HARVESTS EACH FRAME'S TWO dB, *** which no earlier cache carries, and C18 proves they " +
+                 "are the numbers the readout prints -- by driving the page at x8, a cell the document never names, and " +
+                 "printing no difference between them. C19 refuses a pre-v4705 row instead of averaging a NaN. " +
+                 "*** SIXTEEN SABOTAGES, FIFTEEN RED. *** Two real defects surfaced first. The within clause ignoring the " +
+                 "sign test passed, because every made-up world cleared both tests or neither; six strong positive rhos " +
+                 "and one negative now clear the t-test at 8.6e-4 and fail 6 of 7. And a document that gained a speed " +
+                 "CRASHED the gate instead of reddening it: the worlds were built for two hard-coded speeds and h7 indexed " +
+                 "the missing one. The worlds now follow the declared speeds and h7 refuses a missing cell by name. The " +
+                 "one 0-RED is an empty adversarial population -- the NINTH in this arc: the across clause's `rho > 0` " +
+                 "can never change a verdict, because the permutation distribution is symmetric and a negative rho's " +
+                 "one-sided p is at least 0.5. Two fixtures were wrong before they were right: the critical-value row " +
+                 "first used orderings picked by eye that read 0.8929 and 0.8571, testing neither side of 0.7143 -- " +
+                 "they are now constructed from sum(d^2) = 16 and 18 -- and the cvFloor row first used IDENTICAL " +
+                 "values, where Spearman has no value anyway, so it could not see the floor at all. The gate drives the " +
+                 "page and runs 4.5 s alone, over budget, so its timing is hand-filed.",
+    }),
+    // v4704 -- THE 311th CLOSING: six verdicts that lived in closings now reach the page's user.
+    since386: Object.freeze({
+        at: "v4704", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/genGateVerdicts-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        elsewhere: Object.freeze([
+            Object.freeze({ gate: "tools/ship/fsrPage-selfcheck.mjs", was: "green", now: "green",
+                why: "THIS ROUND'S PAGE EDIT CRASHED IT, and the first verify said so. The gate imports fsr.html's module in node against a stub DOM whose elements carry no .options, and the new load-time loop that appends each arm's verdict to its label iterated $(\"gengate\").options unguarded -- a TypeError on import, a crash rather than a red row. Every other lookup on the page is already guarded against that harness; the loop now is too, and the gate is green at 2.6 s. The two over-budget gates that drive the learned arms end to end, which the quick sweep never runs, were run by hand after the change because the arms now take their weights path from the table: tools/ship/genGateMeasure-selfcheck.mjs (144 s) and tools/ship/genGateCalibrate-selfcheck.mjs (112 s), both green." }),
+        ]),
+        verdict: "*** SIX HYPOTHESES WERE MEASURED AND THE PAGE SAID NOTHING ABOUT ANY OF THEM. *** fsr.html offered three " +
+                 "learned-gate arms labelled only by the weights they load, and its readout reported \"GATE ... kept N of M " +
+                 "blocks\" as though that were a feature. Every verdict lived in a closing -- the place v4688 found six gates' " +
+                 "findings reaching nobody for up to eleven rounds. render/genGateVerdicts.mjs now holds the six, and the " +
+                 "page READS it three times: each learned arm's label carries its verdict (\"-- H1 REFUTED at v4691\"), each " +
+                 "arm's weights path comes from the table so a label and a load cannot disagree, and while a learned arm " +
+                 "runs the readout ends by saying the arm is a refuted hypothesis kept as a record, with its evidence, its " +
+                 "document and where the arc stands. oracle and never are CONTROLS and are labelled as nothing. " +
+                 "*** A SUMMARY IS A CLAIM, SO EVERY LINE OF THIS ONE IS GRADED. *** Each entry's numbers must appear in the " +
+                 "closing it names and in its own evidence; each verdict word must be one its closing uses; H4, H5 and H6 " +
+                 "are RE-DERIVED from their result files through the statistics that decided them. The table can say no " +
+                 "more than the measurements did. " +
+                 "*** AND THE PAGE IS DRIVEN, NOT GREPPED. *** The gate loads fsr.html, reads the labels the running page " +
+                 "shows, RUNS the cpu arm until a gated frame is scored, reads the readout a user would see, and spies on the " +
+                 "page's own fetch to confirm the weights it loaded are the file its verdict names. " +
+                 "*** THIRTEEN SABOTAGES, THIRTEEN RED -- AFTER ONE 0-RED THAT WAS A MISSING ROW. *** Giving H2 the H1 weights " +
+                 "passed: the gate checked only that each file EXISTED. Each file is now graded by its own provenance -- its " +
+                 "note must cite its entry's document, and only H2's may carry the validation-chosen tau H2 was about. " +
+                 "The gate takes 3.2 s alone because it runs an arm, over the 3 s budget, so its timing is hand-filed and the " +
+                 "sweep will not time it. " +
+                 "*** NOTHING WAS MEASURED IN THIS ROUND AND NO VERDICT MOVED. *** It is the round that makes the arc's end " +
+                 "visible where someone would actually choose an arm.",
+    }),
+    // v4703 -- THE 310th CLOSING: H6 not supported, and the rule ranks BACKWARDS.
+    since385: Object.freeze({
+        at: "v4703", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/genGateRuleMeasure-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** H6 IS NOT SUPPORTED -- AND NOT AS THE DOCUMENT EXPECTED. *** The rule ran as committed, in 1.9 s, on " +
+                 "both harvested cells: no page, no training, no seed. Both cells fail with the same shape -- below chance " +
+                 "on five scenes of seven, sign 2/7, mean AUC-0.5 of -0.0797 at x2 and -0.0184 at x4. The pre-registered " +
+                 "reading for this row said block-local motion evidence \"does not rank the decision\", which anticipated " +
+                 "a score NEAR chance. It is FAR from chance and backwards: checker 0.183 at x2, zone 0.330, noise 0.333. " +
+                 "That is ranking information with the wrong sign, not its absence, and the gate records where the " +
+                 "document's reading and the data part while leaving the document standing. " +
+                 "*** THE NEGATION IS NOT TESTED. *** It would sit above chance on five scenes of seven at both speeds, and " +
+                 "choosing a direction after seeing which one wins is the single move a pre-registration exists to " +
+                 "forbid. It is printed as a number, and anything built on it owes a new document and data it has not seen. " +
+                 "*** THE ONE SCENE WHERE THE RULE LOOKED RIGHT WAS MOSTLY AN ARTEFACT, AND THE FIRST DRAFT READ A MECHANISM " +
+                 "INTO IT. *** edges scored 0.747 and 0.753 -- exactly where every learned arm ranked below chance -- and the " +
+                 "draft offered that as the learned sets having learned the gain with the training scenes' sign. Then the " +
+                 "flat blocks were counted: 63-68% of edges' blocks have all three SADs at eps, score EXACTLY 0, and win " +
+                 "0-1% of the time, because a flat block's two candidates tie and a tie is labelled 0. Without them the " +
+                 "rule's edges AUC is 0.543 and 0.546. No mechanism is claimed; the line says what undercut it. " +
+                 "*** AND A DECLARED SECONDARY TURNED OUT EMPTY. *** S21's threshold, generate iff score > 0, keeps 100% of " +
+                 "blocks on six scenes of seven: every textured block's best motion candidate beats standing still, so the " +
+                 "thresholded rule IS always-generate there. A threshold that separated anything would have to be chosen on " +
+                 "data, which would make it the parameter this rule was built not to have. " +
+                 "*** TEN SABOTAGES, NINE RED. *** The tenth -- H6 supported if ANY cell clears -- is an empty adversarial " +
+                 "population: neither cell clears, so ANY and ALL agree on these data. It is recorded and not chased, the " +
+                 "EIGHTH of its kind in this arc, and the design gate already reddens on it (G6 at v4702). The measurement " +
+                 "gate also loads the REAL caches through checkCell and matchesMeta, so pointing the x4 cell at the x2 cache " +
+                 "reddens here on the actual files. C16 holds on all 314,496 usable blocks at 9.1e-7. Rows are built once " +
+                 "per scene: the first draft rebuilt them six times and took 3.4 s. " +
+                 "*** WHERE THIS LEAVES THE PER-BLOCK GATE. *** Six hypotheses. Learned sets rank forwards where this score " +
+                 "ranks backwards (Spearman -0.643 against V1 at x2, -0.321 at x4) and neither holds a sign across content. " +
+                 "The signal in these columns is real and its sign depends on the scene, which a gate deployed on unseen " +
+                 "content cannot know. No per-block rule over the chain's own SADs has been shown to transfer, fitted or " +
+                 "not, and that closes the question this arc has been asking at this block size.",
+    }),
+    // v4702 -- THE 309th CLOSING: learning taken away, and the question put to a rule with nothing fitted.
+    since384: Object.freeze({
+        at: "v4702", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/genGateRule-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/foldStats-selfcheck.mjs (39 checks -> 40, RULE_KEYS closed by assertion)"]),
+        verdict: "*** EVERY LEARNED FAILURE WAS A FAILURE TO TRANSFER, AND A RULE WITH NOTHING FITTED HAS NOTHING TO " +
+                 "TRANSFER. *** v4698 named the next question for the outcome H4 and H5 produced: whether the oracle's " +
+                 "0.32 dB is reachable by anything that does not see the answer. render/gate-rule-preregistration.md " +
+                 "puts it to a score with no weight, threshold, scaler or seed: log(sadStill / min(sadApp, sadFlow)), " +
+                 "how much the chain's best motion candidate beats standing still -- because a cross-fade IS the " +
+                 "no-motion hypothesis. Its direction was fixed by v4695, which named the negated form \"the quantity " +
+                 "the decision is about\", before this document existed. NO DATA IN THE COMMIT: the two harvested " +
+                 "cells (x2, x4) are declared, and what has been seen of them is listed -- learned AUCs and base rates, " +
+                 "never this score. H6 needs BOTH cells to clear, per scene, paired t AND exact sign. " +
+                 "*** THE RULE SHIPS AS CODE AND IS PROVEN ON SYNTHETIC FRAMES THROUGH THE REAL FEATURE CODE. *** C16: " +
+                 "the score is the negated third scale-free column, via features() and featuresV2(), to 1.2e-7 -- the " +
+                 "wrong three columns miss by whole units. C15: scaling the SADs by k leaves it put. C14: rewriting every " +
+                 "scale-free column leaves every AUC identical, and moving the labels moves only the AUC. " +
+                 "*** A GAP FOUND BY READING BEFORE ANY SABOTAGE RAN: *** checkCell tied the RESULT file to its speed and " +
+                 "nothing tied the CACHE to the result, so a cache path pointed at the other cell would have been scored " +
+                 "under this one's name. matchesMeta now requires every scene's usable and positive counts to be the " +
+                 "ones the harvesting run recorded. " +
+                 "*** AND THE FIRST VERIFY CAUGHT WHAT THE GATE DID NOT NAME. *** definitionGates-selfcheck went red on " +
+                 "three exports no name-matched gate mentioned -- loadCell, RESULT_H6 and foldStats' RULE_KEYS -- the " +
+                 "shape rowsOf and flatten had in earlier rounds. Each is closed BY ASSERTION: loadCell must refuse an " +
+                 "undeclared speed by name, which showed its first draft died on a TypeError about `undefined` before " +
+                 "its own check ran; RESULT_H6 must be a path no harvest record uses, so the rule can never overwrite " +
+                 "the files cell identity rests on; RULE_KEYS must refuse a learned key and require its own. " +
+                 "*** NINETEEN SABOTAGES, NINETEEN RED, *** after one crash that was not a verdict -- adding `seeds` to " +
+                 "RULE_KEYS made the row's first call throw out of the row -- and one fixture that could only ever " +
+                 "produce a refusal: a " +
+                 "synthetic signal of 0.3 against noise of 0.2 separated every scene at AUC 1.000, the seven differences " +
+                 "were identical, and pairedT correctly refused a sample with no variance -- so 'a genuine signal clears " +
+                 "H6' failed on a signal too clean to test. And declared() gained a schema, because a rule has no seeds " +
+                 "and a key nothing reads is refused; a sabotage making it ignore the schema reddens rather than crashes, " +
+                 "because the gate now guards its own load.",
+    }),
+    // v4701 -- THE 308th CLOSING: H5 measured on fresh data, and v4699's observation does not replicate.
+    since383: Object.freeze({
+        at: "v4701", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/genGateAbsoluteMeasure-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        elsewhere: Object.freeze([
+            Object.freeze({ gate: "tools/ship/repoTerrain-selfcheck.mjs", was: "green", now: "green",
+                why: "THIS ROUND'S DATA TURNED IT RED, and both verify passes said so. The gate maps the real repository and sizes large files by bytes, so the learned-gate caches are now its biggest lakes -- genGate-folds.json (267,142 line-equivalents, v4696) and the two 14 MB gzipped fold caches (~180k each, v4699 and v4701) -- against the star catalogue's 208,406. Its split row said \"the biggest lake\" and tested es-universe.json by name; the catalogue's share had fallen from ~18% to 9.8%, and v4701's cache took its lake below the size that needs a split. The PROPERTY still held -- the actual biggest lake was split into 2 polygons -- so the row now DERIVES the biggest lake instead of naming it. Three sabotages, three red: a splitter that never splits, the smallest lake, and the old name. Noted and not chased: with splitting disabled the cap row still passes, so at today's sizes no lake would exceed the stamper's cap unsplit -- the split row is what keeps that path exercised." }),
+        ]),
+        verdict: "*** H5 IS NOT SUPPORTED, AND NOT NARROWLY. *** v4700's runner ran as committed at slab speed x4, " +
+                 "seeds 11-20: seven scenes harvested, 350 trainings, 319 s. The absolute set beat its OWN shuffled " +
+                 "twin on four folds of seven with a NEGATIVE mean, -0.0386, t p 0.832, sign p 0.5. This is not the " +
+                 "one-fold price v4700 named in advance -- checker, bars and edges all go the wrong way. The " +
+                 "pre-registered reading: v4699's observation does not replicate as a matched comparison at a fresh " +
+                 "cell, and v4700 section 2 said before the data what that cannot separate -- no transfer, or " +
+                 "transfer at x2 that does not survive x4. The x2 cache was not re-analysed, as the document forbade. " +
+                 "*** THE CONTROLS HELD, SO THE NEGATIVE MAY BE READ. *** C11 quiet both ways (sign p 0.5 and 0.773); " +
+                 "C12 re-derived all FIVE arms at fold zone, seed 11 bit for bit; C5 for the weights and both scalers. " +
+                 "And a check v4699 did not need: FRESHNESS. The whole of v4700 rested on data nobody had seen, and a " +
+                 "harvest that ignored the speed control would have handed back x2's frames under an x4 name -- this " +
+                 "page's startframe once did exactly that. Every scene's positive count moved (checker 16918 -> 19278, " +
+                 "bars 9173 -> 11535), and a sabotage that set them equal reddens it. " +
+                 "*** THE ONE THING THAT REPEATS IS AN INVERSION, AND IT IS A DESCRIPTION. *** On edges both learned " +
+                 "sets rank BELOW chance at x2 (0.413, 0.412) and again at x4 (0.340, 0.386); at x4 checker joins it " +
+                 "(0.400, 0.315). The obvious story -- the held-out base rate sits far from the training folds' -- was " +
+                 "written into the first draft of the secondary line and was FALSE when computed: zone's base rate is " +
+                 "as far from its training scenes' as checker's (0.367 against 0.366) and zone ranks above chance. " +
+                 "The line now prints the distances instead of an explanation. " +
+                 "*** FOURTEEN SABOTAGES, FOURTEEN RED, *** including the stale-data one and v4699's own error as code " +
+                 "(h5 reading SHUF_A). The freshness row first compared the x4 labels block by block against the x2 " +
+                 "cache and took the gate to 3269 ms, over budget, to catch a failure that identical COUNTS already " +
+                 "catch; it now reads v4699's recorded counts and runs in 1.8 s. " +
+                 "*** WHERE THE LEARNED GATE STANDS AFTER FIVE HYPOTHESES. *** H1 refuted, H2 refuted, H3 unreportable, " +
+                 "H4 not supported, H5 not supported: with seeds that seed, a statistic that does not pool and data " +
+                 "nobody had seen, no block-local feature set has been shown to rank the per-block decision on content " +
+                 "it did not train on. v4698 section 7 named the next question for exactly this outcome -- whether the " +
+                 "oracle's 0.32 dB is reachable by ANYTHING that does not see the answer -- and it is a different " +
+                 "question from any this arc has asked, not a sixth feature set.",
+    }),
+    // v4700 -- THE 307th CLOSING: the observation was mis-named, and its test is declared on data nobody has seen.
+    since382: Object.freeze({
+        at: "v4700", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/foldStats-selfcheck.mjs (29 checks -> 39, the H5 document and its arms)",
+            "tools/ship/genGateFoldsMeasure-selfcheck.mjs (12 checks -> 13, C12 across every arm)",
+        ]),
+        verdict: "*** v4699 NAMED ITS OWN OBSERVATION WRONGLY. *** It printed \"V1 minus the shuffled twin\" and its " +
+                 "closing said \"the absolute set beats ITS shuffled twin\" -- but SHUF_A is trained on the SCALE-FREE " +
+                 "features. v4698's design has no shuffled arm on the absolute set at all, so the observation was an " +
+                 "UNMATCHED comparison as well as an undeclared one. The closing stands as written; the gate's label " +
+                 "is corrected, and render/learned-absolute-preregistration.md says so in its first section. " +
+                 "*** H5 IS DECLARED ON DATA NOBODY HAS HARVESTED, WITH NO DATA IN THE COMMIT. *** A hypothesis a " +
+                 "dataset suggested cannot be confirmed on that dataset, so the x2 cache is not re-analysed for H5 " +
+                 "in either direction. The fresh cell is slab speed x4 -- a page axis never harvested for the " +
+                 "learned gate -- with seeds 11-20, disjoint from 1-10. Later scene time was considered and refused: " +
+                 "the dolly and slab move linearly, and picking a window where the scene is still in frame would mean " +
+                 "looking at it first. THE COST IS STATED BEFORE IT IS PAID: x4 moves the motion regime as well as " +
+                 "the frames, so a failure cannot distinguish \"no transfer\" from \"transfer at x2 only\". One " +
+                 "clause: the absolute set against its OWN twin (SHUF1_A, same features, same init and sampling, " +
+                 "permuted labels), fold by fold, paired t AND exact sign; edges, below chance for every learned arm " +
+                 "at x2, is named in advance as the fold that fails it by construction if it recurs. " +
+                 "*** THE RUNNER GAINED ARMS AND LOST NOTHING: *** ARM_SPEC names each arm's feature set and " +
+                 "permutation stream, and v4699's C12 now re-derives ALL FOUR of v4698's arms at fold zone, seed 1, bit " +
+                 "for bit through it -- the first draft of that row called runFolds and retrained seven folds to check " +
+                 "one, 7.6 s; it now retrains the one, 1.95 s. " +
+                 "*** C13 IS WHAT v4699 GOT WRONG, AS A PROPERTY. *** A permutation of a constant label vector is the " +
+                 "identity, so on a fold whose training labels are one class a shuffled arm IS its unshuffled source: " +
+                 "SHUF1_A reproduces V1 and SHUF_A reproduces V2 bit for bit, and V1 differs from V2. Which features a " +
+                 "twin trains on is proved by behaviour, not by its name. " +
+                 "*** FIFTEEN SABOTAGES, FIFTEEN RED -- AFTER ONE 0-RED AND ONE CRASH, BOTH REAL. *** Pointing h5's " +
+                 "baseline at V2 passed: the row meant to pin the baseline pushed SHUF_A below chance and checked " +
+                 "only SHUF_A. Its first draft had pushed SHUF_A UP, where a mis-wired h5 fails as well -- a row that " +
+                 "could not tell two wirings apart, rewritten once and still incomplete. It now IDENTIFIES the " +
+                 "baseline: four arms are each pushed below chance, each would clear a clause taken against it, and " +
+                 "only SHUF1_A moves h5. And a runner ignoring its arms argument CRASHED C13 rather than reddening it; " +
+                 "a crash is not a verdict, so the row now catches and reports it. " +
+                 "*** AND ONE MORE LIMIT THAT OUTLIVED ITS LIMIT: *** foldStats-selfcheck's closing line said \"no AUC " +
+                 "on bars, edges, noise or ramp exists\" for a round after v4699 measured them all -- the defect this " +
+                 "session fixed in v4696's gate one round earlier, found here by reading rather than by a sabotage.",
+    }),
+    // v4699 -- THE 306th CLOSING: H4 measured as declared, and not supported.
+    since381: Object.freeze({
+        at: "v4699", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/genGateFoldsMeasure-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** H4 IS NOT SUPPORTED. NEITHER CLAUSE CLEARED, AND THE CONTROLS SAY IT MAY BE READ. *** " +
+                 "v4698's runner ran as committed: seven scenes harvested, seven folds, four arms, ten seeds, 280 " +
+                 "trainings, 308 s. C11 stayed quiet in both directions (sign p 0.500 forward, 0.773 back); C12 " +
+                 "re-ran fold zone, arm V2, seed 1 -- the first entry of each declared list, so the choice was not " +
+                 "made by looking -- and reproduced 0.48319808943889936 bit for bit; C5 holds for the weights and, " +
+                 "recomputed from the cached rows, for the scaler. No fold was excluded: ramp, named in advance as " +
+                 "the likeliest, has a base rate of 0.826. " +
+                 "*** CLAUSE (a) FAILED AT EXACTLY THE PRICE THE DOCUMENT STATED BEFORE THE DATA EXISTED. *** The " +
+                 "scale-free set beat its shuffled twin on six folds of seven, mean +0.0652 -- and 6 of 7 is 8/128 = " +
+                 "0.0625, t p 0.0946. The one fold against it is edges, the sparse-high-frequency scene v4697 added, " +
+                 "where the scale-free set ranks at 0.4121, BELOW a coin, against its twin's 0.5624. v4698 wrote " +
+                 "\"one fold moving the wrong way fails a clause\" and \"never trending\", and both are honoured: " +
+                 "the clause is NOT SUPPORTED. " +
+                 "*** CLAUSE (b) FAILED OUTRIGHT, AND IN THE WRONG DIRECTION FOR THE MECHANISM. *** The absolute set " +
+                 "beat the scale-free set on five folds of seven, mean -0.0170. v4695 proposed that absolute " +
+                 "magnitudes force a network to learn scene identity and so block transfer; with seeds that seed, a " +
+                 "statistic that does not pool and six training scenes instead of one, the absolute set does at " +
+                 "least as well. The pre-registered reading is the fails/fails row: the features were not the " +
+                 "problem either. " +
+                 "*** WHAT IS REPORTED AND NOT PROMOTED. *** S13: seed spread per fold ranges 7.8x, from 0.029 on zone " +
+                 "to 0.228 on checker -- the fold values do not carry equal weight, which is the first input to any " +
+                 "next design's power calculation. S14: rank correlation of the V2-over-V1 advantage with v4697's " +
+                 "|laplacian| is -0.107, nothing. And one UNDECLARED observation, printed with no test: the ABSOLUTE " +
+                 "set beats ITS shuffled twin on six folds of seven. That contradicts v4693's \"the features do not " +
+                 "transfer\" -- which was measured training on ONE scene -- and it is not a result here, because no " +
+                 "clause named it. It is the obvious question for a next pre-registration, alongside why edges ranks " +
+                 "below chance for both learned sets. " +
+                 "*** TWELVE SABOTAGES, TWELVE RED. *** Each edits what the gate re-derives -- a recorded AUC by " +
+                 "1e-12, the verdict, C11's flag and its differences, a label count, a training record, a scaler " +
+                 "mean by one part in 10^7, an exclusion, the document's seed list, the runner's fit stream, one " +
+                 "frame of the cache -- and each reddens, because the gate trusts none of the runner's own summary. " +
+                 "The 47 MB cache is committed GZIPPED at 14.5 MB, round-trip verified byte-identical; the runner " +
+                 "is unchanged and still writes plain JSON, so re-deriving the data means gzipping its output.",
+    }),
+    // v4698 -- THE 305th CLOSING: a pre-registration whose seeds seed, and the seed that never had.
+    since380: Object.freeze({
+        at: "v4698", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/foldStats-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze(["tools/ship/genGateTransfer-selfcheck.mjs"]),
+        verdict: "*** THE SEED NEVER SEEDED THE TRAINING, AND NOBODY HAD CHECKED. *** Writing a design that " +
+                 "needs ten seeds to carry an error bar meant asking what a seed fixes. brain/learn.js's " +
+                 "MLPTrainer.step() drew its minibatches from Math.random, so every learned round since v4689 " +
+                 "seeded the INITIAL WEIGHTS and nothing after. Measured on synthetic rows: same seed twice, 0 of " +
+                 "192 weights shared, worst |dW| 4.98. v4695 held \"the seed stays 7\" fixed as a control and " +
+                 "v4696 compared v1 against v2 \"on the same seed\" -- two draws, not one draw with one thing " +
+                 "changed -- and genGateTrain's comment said in plain words that the seed made a run " +
+                 "reproducible. The trainer now takes an `rng`, defaulting to Math.random LOOKED UP AT CALL TIME " +
+                 "so the live brain and any gate that swaps Math.random are unchanged; the learned-gate tools " +
+                 "pass a seeded one. The records of v4689 to v4696 stand as measured. " +
+                 "*** THE PROBE THAT FOUND IT WAS WRONG FIRST, AND WRONG IN AN INSTRUCTIVE WAY. *** It fed " +
+                 "Float32Array rows to genGateTrain.train and got 192 of 192 weights IDENTICAL across runs -- " +
+                 "which looked like reproducibility. `.flat()` does not flatten a typed array: every feature " +
+                 "became NaN, every ReLU died, only the output bias trained, and a constant network is trivially " +
+                 "reproducible. No committed result met this -- page rows arrive as plain arrays through JSON -- " +
+                 "but train() accepted it with no error, so it now flattens typed rows correctly AND refuses a " +
+                 "non-finite feature. " +
+                 "*** THE PRE-REGISTRATION: render/learned-folds-preregistration.md, WITH NO DATA IN THE COMMIT. " +
+                 "*** Seven folds, leave one scene out; four arms per fold per seed -- the scale-free set, the " +
+                 "absolute set, and two shuffled-label twins that differ only in their permutation stream; ten " +
+                 "seeds; the UNIT OF REPLICATION IS THE FOLD, one seed-averaged AUC per arm, because 22,464 " +
+                 "correlated blocks are not 22,464 observations and a within-fold AUC cannot see a fold's prior " +
+                 "or score band. H4 needs both clauses -- beats its shuffled twin, beats the absolute set -- by " +
+                 "paired t AND exact sign, an intersection-union test. The price is stated in advance: at seven " +
+                 "folds the sign test clears only at 7 of 7, so ONE fold against the direction fails a clause. " +
+                 "What has already been seen is declared by name. Pooled AUC is retired rather than reported. " +
+                 "*** AND THE ANALYSIS IS COMMITTED AS CODE, NOT PROSE. *** tools/ship/foldStats.mjs parses every " +
+                 "constant out of the document's `declared` block and refuses a missing, duplicated or unread " +
+                 "key; the one constant arithmetic can check -- five folds, the fewest at which the sign test can " +
+                 "reach 0.05 -- is DERIVED and must agree. tools/ship/genGateFolds.mjs is the runner, driven here " +
+                 "over seven made-up scenes and NOT over the page: control C10 shows v4696's band-and-prior " +
+                 "mechanism giving a pooled AUC of 0.6970 and per-fold differences of EXACTLY zero. " +
+                 "*** TWENTY-TWO SABOTAGES, TWENTY-TWO RED -- AFTER ONE 0-RED THAT WAS A MISSING ROW, NOT AN " +
+                 "EMPTY POPULATION. *** Control C5 names the scaler and the weights both, and the gate checked " +
+                 "only which SCENES each fold trained on; a scaler fitted on held-out rows would have passed. " +
+                 "That is v4694's defect -- a pre-registered control nothing asserted -- inside the round that " +
+                 "declared it. The runner now records every fold's scaler, and the gate recomputes it from the " +
+                 "training rows. Two other rows were built so the adversarial population could not be empty: the " +
+                 "half-open generator is tested at the ONE LCG state where a closed one returns exactly 1, " +
+                 "SOLVED for by modular inverse rather than hoped for in 200,000 draws. " +
+                 "*** TWO DEFECTS IN v4696's GATE, BOTH THE PATTERN THIS SESSION KEEPS FINDING. *** rowsOf's " +
+                 "comment promised to drop a non-finite block from BOTH feature sets and the code filtered each " +
+                 "on its own row; its fixture made one block bad in BOTH sets, the single case where the two " +
+                 "agree. And its scene-list row still said \"fsr.html offers exactly these\" a round after v4697 " +
+                 "made that false, green because it never read the page. Both fixed; both inert on the cached " +
+                 "data, which holds no non-finite value in either set.",
+    }),
+    // v4697 -- THE 304th CLOSING: the population widened, and nothing was measured through it.
+    since379: Object.freeze({
+        at: "v4697", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/fsrContent-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** THE BLOCKER v4696 NAMED WAS THREE SCENES, AND THIS ROUND FIXES THE SCENES AND NOTHING " +
+                 "ELSE. *** That closing ended \"more than three scenes, since three folds were never a " +
+                 "distribution\". fsr.html now offers seven: bars, edges, noise and ramp join zone, smooth and " +
+                 "checker. *** THE FOUR WERE CHOSEN ON STATED GROUNDS BEFORE ANY OF THEM WAS MEASURED, *** " +
+                 "each naming an axis the original three do not span -- orientation, SPARSE rather than dense " +
+                 "high frequency, high frequency WITHOUT lockable structure, and a degenerate smooth low end. " +
+                 "The census then confirms all four, by measurement on the page's own sampler: edges 7.3% " +
+                 "edge-pixels against checker's 100.0%, bars anisotropy 0.138 against 0.000 for all three " +
+                 "originals, noise |lap| 0.0075 at 0.0% edge-pixels, ramp |lap| 0.00000 at variance 0.0108 -- " +
+                 "and the seven now span 0.00000 to 0.6400 in high-frequency energy where three spanned less. " +
+                 "*** NOTHING IS MEASURED THROUGH THE NEW POPULATION IN THIS ROUND, ON PURPOSE. *** No PSNR, " +
+                 "no learned gate, no hypothesis. Measuring the content and testing a hypothesis on it in the " +
+                 "same round would make the content's properties answerable to the hypothesis, which is the " +
+                 "defect a pre-registration exists to prevent; using this set owes a fresh one. And the gate " +
+                 "says the harder thing in its own closing line: SEVEN SYNTHETIC SCENES ARE STILL NOT A " +
+                 "DISTRIBUTION, they are seven points chosen to span an axis. " +
+                 "*** A SILENT `else` THAT MERGED MISSPELLED SCENES INTO THE ZONE PLATE IS GONE. *** The " +
+                 "sampler's trailing bare else returned zone for any unrecognised kind, so a typo in a fold " +
+                 "list would have measured zone twice and reported two scenes. It now names every kind and " +
+                 "throws on the rest -- and the gate proves the throw IN THE PAGE rather than asserting the " +
+                 "source text. " +
+                 "*** THE THREE ORIGINALS ARE HELD BIT FOR BIT, AND THE FIRST ATTEMPT AT THAT ROW WAS WRONG. " +
+                 "*** The rewrite must be inert on prior content or every figure this arc pinned moves under " +
+                 "it. Transcribing the prior formulas into the GATE and comparing against the page read " +
+                 "1.11e-16 -- one ULP -- and the row failed. The residual is not the page's: Math.cos and " +
+                 "Math.exp are implementation-defined, and node and the page's Chromium do not agree to the " +
+                 "last bit on the same expression. The comparison was moved INSIDE the page, where both sides " +
+                 "run on one engine, and reads 4800 of 4800 samples bit-identical at worst 0.00e+0. The row " +
+                 "says ON ONE ENGINE in its own title, because that is the claim it can carry. " +
+                 "*** EIGHT SABOTAGES, SEVEN RED. *** Two of them are the SAME ROW checked in both directions: " +
+                 "the scene-list row's first draft asserted only that the gate's list is a SUBSET of the " +
+                 "page's, so adding a scene to the page and not to the gate scored 0 RED -- a gate measuring " +
+                 "six of seven scenes and calling it complete. It is set EQUALITY now and both directions " +
+                 "redden. *** THAT IS THE SAME SHAPE AS v4696's ONE-SIDED COLLAPSE DETECTOR, ONE ROUND " +
+                 "LATER, *** found the same way and by the same sabotage, which is worth recording as a " +
+                 "recurring habit of this session rather than two unrelated slips: a check written against " +
+                 "the failure that was in mind, blind to its mirror. " +
+                 "*** THE ONE 0-RED IS AN EMPTY ADVERSARIAL POPULATION AND IS RECORDED RATHER THAN CHASED: " +
+                 "THE SEVENTH IN THIS ARC. *** Loosening the bit-equality row to a 1e-9 tolerance does not " +
+                 "redden it, because the measured residual is exactly 0.00e+0: no threshold above zero can be " +
+                 "distinguished from bit equality while the code is bit-exact. The mutation is real and the " +
+                 "row is real; there is simply no input on which they disagree. Chasing it would mean " +
+                 "weakening the code to make the test look sharper.",
+    }),
+    // v4696 -- THE 303rd CLOSING: a control fired, and the primary statistic was the thing it caught.
+    since378: Object.freeze({
+        at: "v4696", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/genGateTransfer-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** CONTROL C8 FIRED AND THE ROUND STOPPED, WHICH IS WHAT IT WAS DECLARED FOR. *** v4695 " +
+                 "pre-registered, in a commit with no data, that a SHUFFLED-label run must score pooled AUC " +
+                 "within 0.02 of 0.5, in its own words because \"if shuffling produces signal, every number " +
+                 "here is an artefact of the harness\". It scored 0.2451. Section 7 said what to do -- stop, " +
+                 "report the harness, measure nothing through it -- and H3 IS NOT REPORTED, neither clause, in " +
+                 "either direction. " +
+                 "*** WHAT C8 CAUGHT WAS THE PRE-REGISTRATION'S OWN PRIMARY STATISTIC. *** Section 4 made " +
+                 "POOLED leave-one-scene-out AUC the primary. Pooling ranks blocks scored by THREE DIFFERENT " +
+                 "MODELS, each fitted to a different label prior -- measured at 0.4949, 0.6937 and 0.4355, a " +
+                 "span of 0.258 -- so each fold's scores sit in its own band. And the folds' own base rates " +
+                 "span 0.516 (smooth 0.634, zone 0.237, checker 0.753), so FOLD IDENTITY PREDICTS THE LABEL. " +
+                 "The pooled number is largely which fold a block came from, which is a property of the design " +
+                 "and is present whatever the predictor does. That is exactly why shuffling reproduced it. " +
+                 "*** A SYNTHETIC CONTROL REPRODUCES IT WITH NO FSR DATA AT ALL: *** two made-up groups whose " +
+                 "within-group rankings are coins (0.499 and 0.505) pool to 0.2513, against the real shuffled " +
+                 "run's 0.2451. Removing either the score-band difference or the prior difference sends it back " +
+                 "to 0.5, so the control demonstrates the stated mechanism rather than some other one. " +
+                 "*** AND SWITCHING TO PER-FOLD AUC WOULD NOT HAVE RESCUED THE ROUND, WHICH IS THE HARDER " +
+                 "POINT. *** The SHUFFLED control's per-fold AUCs span 0.364 (0.519, 0.462, 0.156) while the " +
+                 "largest v1-to-v2 per-fold difference is 0.056. At one seed, one step budget and this fold " +
+                 "size the noise floor is six times the effect. Choosing that statistic now, after seeing the " +
+                 "declared one fail, would be the exact move a pre-registration exists to prevent -- and it " +
+                 "would not have worked either. " +
+                 "*** SIX SABOTAGES. TWO OF THEM REDDEN BY EDITING THE PRE-REGISTRATION, *** because the " +
+                 "tolerance and the stop-condition are PARSED out of it rather than restated in the gate: " +
+                 "v4691 restated its window and v4693 restated its rule and both scored 0 RED for it, and this " +
+                 "round inherited the repair instead of the defect. One row had to become a named predicate " +
+                 "with fixtures after `spread >= v1v2` proved to pass just as well as `spread >= 0` -- a row " +
+                 "measuring its own arithmetic. The last is a 0-RED whose adversarial population is empty and " +
+                 "is recorded rather than chased: the FIFTH in this arc. " +
+                 "*** WHAT IS STILL UNKNOWN IS WHETHER THE SCALE-FREE FEATURES TRANSFER. *** They may; they may " +
+                 "not; this design cannot say, and saying so is the round. A sound test needs a statistic that " +
+                 "does not pool across models with different priors, enough seeds to carry an error bar, and " +
+                 "more than three scenes -- three folds were never a distribution and v4693's closing line said " +
+                 "as much before this round began. " +
+                 "*** AND THE GATE WRITTEN TO TEST THE SCALE-FREE CLAIM FOUND THAT ONE PRE-REGISTERED FEATURE " +
+                 "IS NOT SCALE-FREE. *** v4695 section 2 declares lapPerContrast as laplacian / " +
+                 "(sqrt(variance) + eps) with an ABSOLUTE eps. Wherever variance tends to zero -- most of a " +
+                 "flat frame -- the eps dominates the denominator while the numerator still scales with the " +
+                 "picture, so the ratio scales with it too: a 4x brightness scaling moved that feature by " +
+                 "1.50e+5. The denominator is regularised by the FRAME's own contrast instead, which scales " +
+                 "exactly as sqrt(variance) does, and the set then survives the scaling at 5.01e-6 while the " +
+                 "v1 set moves by 1.35e+1 -- which is also the row that says the two sets are different KINDS " +
+                 "and not just different names. v4695 IS LEFT STANDING AND NOT EDITED TO AGREE: it recorded " +
+                 "what was believed before the measurement, and this is the measurement. Nothing in this round " +
+                 "rests on the feature -- C8 failed and H3 was not reported -- so the correction costs no " +
+                 "claim, and a round that wants to USE this set owes a fresh pre-registration naming the " +
+                 "corrected form. The cached folds were re-harvested so the committed data matches the shipped " +
+                 "definition rather than the one that produced the first run.",
+    }),
+    // v4694 -- THE 302nd CLOSING: a pre-registered control that nothing asserted, and a runner nothing ran.
+    since377: Object.freeze({
+        at: "v4694", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        elsewhere: Object.freeze([
+            Object.freeze({ gate: "render/genGate-selfcheck.mjs", was: "green", now: "green",
+                why: "it got CONTROL C4 back. v4690 removed the section with a note saying render/genGateGPU.mjs was held back to avoid forcing runnerCallers' third ratchet widening; that was true then and stopped being true at v4691, which landed the runner WITH its caller. The note outlived the limit by three rounds and the section never came back with the runner, so a grep for GenGateGPU across every selfcheck in the tree returned NOTHING. The gate now drives the device and reads 5.96e-8 against the pre-registered 1e-5, reproducing v4690's figure." }),
+            Object.freeze({ gate: "tools/ship/genGateMeasure-selfcheck.mjs", was: "green", now: "green",
+                why: "it drives the DEVICE arm of fsr.html's gate for the first time. Both measurement gates had driven the CPU arm only, so the page path the readout names was a path nothing had run -- runnerCallers passes on the import alone and its own closing line says it cannot tell an imported runner from a dispatched one. The arm agrees with the CPU arm at 0.00e+0 dB and keeps the identical 122.2 of 576 blocks, and every H1 figure reproduces unchanged." }),
+        ]),
+        verdict: "*** THIS ROUND ADDS NO GATE AND MEASURES NOTHING NEW. IT PAYS FOR TWO CLAIMS THE TREE WAS " +
+                 "CARRYING WITHOUT CHECKING THEM. *** " +
+                 "*** THE FIRST IS A PRE-REGISTERED CONTROL THAT WAS ASSERTED NOWHERE. *** " +
+                 "render/learned-preregistration.md section 7 makes C4 -- CPU and MLP_LAYER_WGSL agreeing to " +
+                 "1e-5 -- the condition on quoting ANY device number. v4690 measured it at 5.96e-8 and then " +
+                 "removed the section in the same round, to keep render/genGateGPU.mjs out of a tree where it " +
+                 "would have been a fifth gate-only runner. v4691 landed the runner with its caller and did not " +
+                 "bring the rows back. For three rounds the control existed only in a commit message, which is " +
+                 "not a control, and the note explaining its absence described a limit that had expired -- the " +
+                 "same rotted-note shape v4688 found in runnerCallers and fixed there. Restored, it reads " +
+                 "5.96e-8 again, and four sabotages of the runner redden it: no ping-pong, a hard-wired " +
+                 "activation, a single workgroup, and a threshold-free keep(). " +
+                 "*** THE SECOND IS A RUNNER NOTHING HAD EVER DISPATCHED THROUGH THE PAGE. *** fsr.html's " +
+                 "`gengate` control has had a device arm since v4691 and both measurement gates drove the CPU " +
+                 "arm only. runnerCallers-selfcheck passes on an IMPORT and says so in its own closing line, so " +
+                 "\"wired\" was a claim nothing checked: a page that quietly ran the CPU forward pass under a " +
+                 "readout saying \"the device\" would have read identically. It is driven now and held to the " +
+                 "CPU arm rather than quoted on its own -- same weights, same layers, same threshold, so " +
+                 "EQUALITY is the claim -- and it agrees at 0.00e+0 dB on all 33 frames while keeping the same " +
+                 "122.2 of 576 blocks. A silent fallback to the CPU reddens it by two; a device arm thresholding " +
+                 "differently reddens it by one. " +
+                 "*** AND THE CENSUS RECORDED THE REPAIR RATHER THAN AN ARRIVAL. *** No file was added, and two " +
+                 "runtimeGap rows moved anyway -- async/await and WebGL, both of which had been counted at v4690 " +
+                 "and were LOST when that round removed the section. A census that moves when nothing arrives is " +
+                 "a census noticing that something came back. " +
+                 "*** AND v4688'S ARRIVAL RULE TRIPPED THIS ROUND'S AUTHOR FOR THE SECOND TIME, CORRECTLY. *** " +
+                 "render/genGate-selfcheck.mjs was hand-timed at 693 ms and filed with an `alone` kind. It is " +
+                 "UNDER the 3000 ms budget, so the quick sweep is what should stamp it, and until the sweep ran " +
+                 "the entry had no legitimate observer -- timingKind-selfcheck went red DURING the verify and " +
+                 "green immediately after, because the sweep rewrites sweep-timings.json mid-run and re-stamped " +
+                 "it at 1464 ms `loaded`. The same trip happened at v4690. The practice the two occurrences " +
+                 "teach is narrow and worth stating: HAND-FILE A TIMING ONLY FOR AN OVER-BUDGET GATE, which the " +
+                 "sweep will not re-time; an under-budget gate's stamp belongs to the sweep. The two gates in " +
+                 "this arc that are over budget keep their hand readings and are accounted as arrivals; the one " +
+                 "that is not, does not.",
+    }),
+    // v4693 -- THE 301st CLOSING: the operating point was never the problem; the features do not transfer.
+    since376: Object.freeze({
+        at: "v4693", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/genGateCalibrate-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** H2 REFUTED, AND THE DIAGNOSTIC SAYS WHY BEFORE THE HELD-OUT SCENE IS EVEN TOUCHED. *** " +
+                 "v4692 pre-registered two explanations for v4691's conservatism -- E1 calibration, E2 " +
+                 "representation -- and declared AUC the number that separates them, along with a three-way " +
+                 "split, a parameter-free threshold rule, six controls and four failure conditions, in a commit " +
+                 "containing no data. Fitting on `smooth` alone and choosing the operating point on `zone`: " +
+                 "*** VALIDATION AUC IS 0.4214, WHICH IS WORSE THAN A COIN. *** The network ranks blocks on a " +
+                 "scene it did not train on slightly worse than chance. That is E2, and section 7 named it in " +
+                 "advance as MORE important than the hypothesis would have been, because it retires the feature " +
+                 "set rather than its threshold. " +
+                 "*** THE BASE RATE MOVES BY A FACTOR OF NEARLY THREE BETWEEN TWO TRAINING-SIDE SCENES: *** " +
+                 "generation wins 63.4% of blocks on `smooth` and 23.7% on `zone`. Neither is held out. A " +
+                 "predictor fitted on one is being asked about a population with a different prior, and the " +
+                 "eleven features did not carry a mechanism across that gap -- they carried scene identity. " +
+                 "*** ON THE HELD-OUT SCENE THE GATE COLLAPSED. *** tau 0.3667, chosen by rate matching on " +
+                 "`zone`, keeps 0.01% of `checker` blocks: NOTHING there scores above a threshold chosen " +
+                 "elsewhere. H2 reads -0.0203 dB, t p=0.648, sign p=0.852, and that number is NOT reported as a " +
+                 "measurement of the predictor -- section 7 says to name a collapse as a collapse, and the " +
+                 "collapse and the refutation are one fact rather than two. C1 carried forward unchanged: the " +
+                 "oracle still wins by +0.3191 dB, 33 of 33 frames, so the rig is the rig and the decision is " +
+                 "still worth a third of a dB to something that could make it. " +
+                 "*** SIX SABOTAGES, FOUR OF WHICH SCORED 0 RED FIRST, AND P6 IS v4691'S DEFECT ONE FIELD " +
+                 "OVER. *** v4691 restated the measurement WINDOW and checked it against its own constants; " +
+                 "this round restated the threshold RULE and checked it against the weights file's own string " +
+                 "-- written by the tool that chose the threshold, so it agrees with itself by construction. " +
+                 "Swapping the pre-registration's primary rule for its declared secondary changed nothing. The " +
+                 "rule is now parsed out of the pre-registration beside the window: a record is only a record " +
+                 "if the code reads it. " +
+                 "*** AND THREE MORE WERE INVISIBLE FOR ONE REASON -- THE DATA HAS NO TIES. *** A tau " +
+                 "interpolated between two observed scores still keeps about the right count on near-continuous " +
+                 "data; an AUC that gives tied scores consecutive ranks never meets a tie; a one-class sample " +
+                 "never occurs. All three now have fixtures and all three redden. FOURTH ROUND RUNNING that " +
+                 "this arc has found a guard whose adversarial population was empty. " +
+                 "*** THE ROUND'S OWN DEFECT WAS A ONE-SIDED DETECTOR. *** The pre-registration named one " +
+                 "collapse -- keeping nearly everything -- and the row written for it PASSED while the gate " +
+                 "kept nearly nothing in the very run it was written for. A detector aimed at one end of a " +
+                 "range is not a detector; it is two-sided now, with fixtures at both ends.",
+    }),
+    // v4691 -- THE 300th CLOSING: H1 refuted on held-out content, and the oracle says the decision is real.
+    since375: Object.freeze({
+        at: "v4691", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/genGateMeasure-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        elsewhere: Object.freeze([
+            Object.freeze({ gate: "tools/ship/runnerCallers-selfcheck.mjs", was: "green", now: "green",
+                why: "v4690 held render/genGateGPU.mjs back rather than take this arc's THIRD widening of the gate-only ratchet in twelve rounds. This round lands it WITH its caller: fsr.html's `gengate` control dispatches it on the device arm, so the runner arrives wired and the frozen 4 is untouched. The debt was deferred by exactly one round and then paid rather than widened." }),
+        ]),
+        verdict: "*** THE PRE-REGISTERED HYPOTHESIS IS REFUTED, AND THE CONTROLS ARE WHAT MAKE THAT A RESULT " +
+                 "RATHER THAN A SHRUG. *** v4689 fixed the hypothesis, the population, the statistic, the " +
+                 "threshold and four controls in a commit containing no data. Trained on `smooth` and `zone` " +
+                 "only -- 78 frames, 44,928 blocks, base rate 0.4355 -- and measured on the HELD-OUT `checker`, " +
+                 "frames 6-38, the learned gate scores +0.0530 dB against ungated generation with paired t " +
+                 "p=0.144 and exact sign p=0.636, 16 of 33 frames up. The bar was BOTH p < 0.05 AND a positive " +
+                 "mean. Positive mean, neither test significant: H1 REFUTED, which section 8 named in advance " +
+                 "as a result and not a disappointment. " +
+                 "*** CONTROL C1 IS WHY THE NULL MEANS SOMETHING. *** A gate using the TRUE label beats ungated " +
+                 "generation by +0.3191 dB, 33 of 33 frames up, t p=2.4e-9. So the decision IS expressible and " +
+                 "IS worth about a third of a dB on this content -- the null is about the predictor, not about " +
+                 "the rig. Without that arm the same numbers would have been indistinguishable from a broken " +
+                 "harness, which is the entire reason C1 was declared before anything ran. " +
+                 "*** CONTROL C2 IS WHY IT IS NOT A COLLAPSE. *** The network did NOT learn to always decline: " +
+                 "it keeps 122.2 of 576 blocks, and it beats the always-cross-fade predictor by +0.0733 dB with " +
+                 "t p=1.8e-4 and sign p=1.8e-5. It learned something real. It simply did not learn enough. " +
+                 "*** AND THE SHAPE OF THE FAILURE IS SPECIFIC, WHICH IS THE USEFUL PART. *** The oracle keeps " +
+                 "437.6 of 576 blocks where the network keeps 122.2: it is FOUR TIMES too conservative, and it " +
+                 "captured about a sixth of the 0.32 dB that was on the table. Trained on two scenes where " +
+                 "generation usually loses, it generalised a bias toward declining rather than a mechanism -- " +
+                 "which is exactly the direction v4689 section 5 said the split was chosen to expose, and the " +
+                 "reason the checker was held out rather than trained on. " +
+                 "*** SIX SABOTAGES, AND THE TWO THAT DID NOT BITE WERE BOTH THIS ROUND'S OWN DEFECTS. *** " +
+                 "Editing the pre-registration's WINDOW scored 0 RED, because this gate had restated FROM and " +
+                 "TO and then checked the window against TO - FROM + 1 -- the same constants on both sides of " +
+                 "the equals sign, a count standing in for a property, in the gate whose whole job is holding a " +
+                 "measurement to a pre-registration. The window, scene and speed are now PARSED OUT OF " +
+                 "render/learned-preregistration.md, so narrowing the population means editing the " +
+                 "pre-registration, which is the act it exists to make visible. And making the page compute the " +
+                 "gate but apply nothing CRASHED this gate rather than reddening it: all four arms become one " +
+                 "arm, every paired difference is CONSTANT, pairedStats returns p: null by design -- v4684 " +
+                 "built that after 20 copies of 0.3 produced t = 2.4e16 -- and the detail strings called " +
+                 "toExponential on it. A crash is not a verdict. Every p-value now goes through a null-safe " +
+                 "printer and that mutation reddens four rows. " +
+                 "*** TWO ROWS IN THE FIRST DRAFT COULD NOT FAIL AT ALL, *** written as ok(label, true, detail) " +
+                 "-- the shape v4688 found in its own new row one round earlier. The H1 verdict is now SAID " +
+                 "rather than asserted, because asserting a pre-registered outcome either forbids the " +
+                 "refutation section 8 allows or is a tautology; what is asserted is that the declared test ran " +
+                 "on the declared data. C2's comparison IS asserted, and the asymmetry is deliberate.",
+    }),
+    // v4690 -- THE 299th CLOSING: the learned gate's apparatus, with no learned result in it.
+    since374: Object.freeze({
+        at: "v4690", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/genGate-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** THE FIRST TIME brain/ HAS TOUCHED THE RENDER PATH, AND THE ROUND MEASURES NO LEARNED " +
+                 "RESULT ON PURPOSE. *** v4689 pre-registered the hypothesis, the statistic, the threshold and " +
+                 "four controls in a commit containing no data; this round builds the apparatus and grades it, " +
+                 "and the measurement is the next round's under that test. " +
+                 "*** WHAT IS LEARNED IS A DECISION, AND ITS SHAPE WAS FIXED BY READING THE TRAINER RATHER THAN " +
+                 "BY TASTE. *** brain/learn.js's MLPTrainer has a SCALAR SIGMOID head -- one z2, one L2.b[0], a " +
+                 "p - r update, binary cross-entropy. It cannot regress a vector or do 3-way classification, so " +
+                 "the learned quantity must be one number in [0, 1]: a per-block gate predicting whether the " +
+                 "generated block will beat a cross-fade there. A learned blend weight or a learned `source` " +
+                 "choice would each have needed the trainer rewritten and neither was attempted. " +
+                 "*** AND brain/mlp.js's BatchedMLP TAKES A RAW WebGPU DEVICE, *** calling createShaderModule and " +
+                 "createComputePipeline itself, while every runner in this arc goes through gfx/device.js. Rather " +
+                 "than make fsr.html hold the arc's first raw-device object, the KERNEL gets a second runner that " +
+                 "imports MLP_LAYER_WGSL rather than copying it -- plumbing that differs, arithmetic that cannot. " +
+                 "*** IT WAS BUILT, MEASURED AT 5.96e-8 AGAINST THE CPU TWIN, AND THEN HELD BACK OUT OF THIS " +
+                 "ROUND. *** tools/ship/runnerCallers-selfcheck.mjs freezes the count of compute runners nothing " +
+                 "outside a gate can construct, and landing it here would have taken that 4 to 5 and forced this " +
+                 "arc's THIRD widening in twelve rounds. v4680's note says the next round that wants to widen has " +
+                 "to write \"the third widening\" and mean it; this one does not have to, because the runner " +
+                 "cannot have a production caller until trained weights exist and the round that trains them is " +
+                 "the round that wires it. So it arrives WITH its caller and the ratchet stays at 4. Control C4 " +
+                 "forbids quoting a DEVICE NUMBER, and this round quotes none -- the 5.96e-8 is why the decision " +
+                 "is about debt rather than about doubt. " +
+                 "*** NO FEATURE CAN SEE THE ANSWER, AND THAT IS STRUCTURAL. *** features() is not GIVEN the true " +
+                 "middle frame -- its parameter list has no slot for one -- and labels(), which needs ground " +
+                 "truth, is a separate function. The separation is in the call signature rather than in a comment " +
+                 "somebody has to keep honest, and a gate row reads the signature back. The scaler is fitted on " +
+                 "training rows alone, with a row measuring that including the held-out rows really does move all " +
+                 "eleven means: fitting on both is the quietest way to make a held-out measurement report an " +
+                 "in-distribution one. " +
+                 "*** FIFTEEN SABOTAGES, ALL FIFTEEN RED, AND ONE THAT WAS A CRASH RATHER THAN A 0-RED. *** " +
+                 "Deleting the relu line left a dangling else-if and killed the gate on a syntax error: 0 FAIL " +
+                 "rows and exit 1 is a process that never reached a verdict. Rewritten as an inert but valid " +
+                 "assignment it reddens, and so does the same mutation on the sigmoid. " +
+                 "*** AND THREE OF THIS GATE'S OWN ROWS WERE WRONG BEFORE ANY SABOTAGE RAN, ALL THREE FIXTURE " +
+                 "ERRORS THE GATE CAUGHT. *** The flat half's Laplacian was asserted zero and measures 5.00e-2, " +
+                 "because it BORDERS the checker and the seam is in the last flat block's neighbourhood -- the " +
+                 "operator working and the fixture misdescribed; the row now claims separation by ratio. The " +
+                 "label row asserted 1 everywhere and read a base rate of 0.5, because the cross-fade IS the " +
+                 "truth on the flat half: those blocks are exact ties, and a tie is not a win -- the row now " +
+                 "asserts both outcomes, which is more than the first draft tried to. And a refusal probe set " +
+                 "nIn without setting W, so the W-length guard fired first and the guard under test was never " +
+                 "reached.",
+    }),
+    // v4688 -- THE 298th CLOSING: six gates were red outside the register, and none of them was this round's.
+    since373: Object.freeze({
+        at: "v4688", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        // *** THE SLOT THIS LEDGER DID NOT HAVE, AND WHOSE ABSENCE IS WHY THIS ROUND EXISTS. ***
+        // tools/ship/runnerCallers-selfcheck.mjs wrote the diagnosis at v4676 and nothing acted on it: the
+        // invariant is `added.length === swept` and every `redOnArrival` entry must name a gate in `added`, so
+        // the ledger can only describe how a round's OWN gates arrived. A round that reddens or repairs a gate
+        // ELSEWHERE has nowhere to say so, and closes clean by declaring swept: 0. Six gates went red under
+        // exactly that hole. `elsewhere` is the slot; tools/ship/gateSweep-selfcheck.mjs grades its shape.
+        elsewhere: Object.freeze([
+            Object.freeze({ gate: "tools/ship/wiringClaims-selfcheck.mjs", was: "red", now: "green",
+                why: "it reported render/opticalFlow.mjs as a prose wiring-claim whose subject is REACHABLE, which is exactly its job. The claim was in runnerCallers-selfcheck's note explaining a ratchet widening, and three of that note's clauses had been false since v4677. Fixed by correcting the prose, not by widening KNOWN_CONTRAST." }),
+            Object.freeze({ gate: "tools/ship/definitionGates-selfcheck.mjs", was: "red", now: "green",
+                why: "ONE symbol took its tree-wide all-shapes census from a frozen 703 to 704: render/temporalLockGPU.mjs:FLOOR_PHASE, found by diffing the ungated population across git worktrees at v4645 and v4686. Closed BY ASSERTION in temporalLockGPU-selfcheck, the way that gate's header says its previous 81 were closed, and both frozen numbers are back at 703 and 533 rather than re-baselined." }),
+            Object.freeze({ gate: "tools/ship/harnessLiveness-selfcheck.mjs", was: "red", now: "green",
+                why: "nine WGSL producers were neither in the corpus nor excluded with a reason. Five are now real corpus entries agreeing bit-for-bit on both backends; two are excluded as ordered multi-dispatch chains. The first draft excluded SEVEN on a reason that temporalCorpus.mjs had disproved since v4572, which is the failure that list exists to prevent." }),
+            Object.freeze({ gate: "tools/ship/backendParity-selfcheck.mjs", was: "red", now: "green",
+                why: "wgslBearing and wgslOnly were eleven rounds stale. The nine new WGSL-only files are NAMED per v4470's rule; the count is nine and not eleven because two of this arc's own gates were counted as shipping WGSL -- one embedded an inline probe kernel, the other contained the stage attribute inside a regex written to count it -- which also made the gfx/device.js consumer row read four consumers. Repaired at the cause per v4278, not with an exemption." }),
+            Object.freeze({ gate: "tools/ship/timingKind-selfcheck.mjs", was: "red", now: "green",
+                why: "six entries were unaccounted, and they shared a structural property: all over the sweep's budget, all stamped after the last rotation. An over-budget gate arriving between two rotations has no legitimate observer, so the name-list became a self-clearing RULE with five positive controls -- two of its three clauses have an empty live population and would have scored 0-RED against the tree alone." }),
+            Object.freeze({ gate: "tools/ship/orreryEjecta-selfcheck.mjs", was: "red", now: "green",
+                why: "box3d gained a dependant that neither imports nor reads it: constantRows-selfcheck feeds the literal string vendor/box3d/LICENSE to a census as a TEST INPUT. Eighth instance of the scanner-in-its-own-sample shape and the first of that third kind, so it joined NOT_IMPORTERS rather than the baseline." }),
+            // *** THE SEVENTH ENTRY IS THE OTHER DIRECTION, AND IT IS WHY THIS SLOT EXISTS AT ALL. ***
+            Object.freeze({ gate: "tools/ship/recordReach-selfcheck.mjs", was: "green", now: "red",
+                why: "this round's verify sweep REFILED two timings and its margin row then failed: frozenRecords-selfcheck 2003 -> 2318 ms and recordDrift-selfcheck 1688 -> 1959 ms, against a 3000 ms budget and a row that demands 800 ms of margin. MEASURED, DIRECTLY, THAT THIS IS NOT A REGRESSION THIS ROUND CAUSED: frozenRecords run serially three times at HEAD reads 2232/2288/2350 ms and three times on this tree reads 2320/2241/2252 -- indistinguishable. Both filed figures rose about 15% TOGETHER, which is the signature of a slower container rather than of either gate changing. HEAD passes only because its filed 2003 was taken on a faster occasion, so the row was resting on a stale reading. The margin really is about 730 ms on this machine and the row is right to say so. NOT FIXED HERE and NOT REGISTERED as a known red: the repair is to make frozenRecords-selfcheck cheaper, which is a round of its own, and widening the 800 ms bar would be the one thing this round spent itself arguing against." }),
+        ]),
+        verdict: "*** SIX GATES WERE RED OUTSIDE THE RED REGISTER, EVERY ONE OF THEM RED AT v4686'S HEAD TOO, " +
+                 "AND NOT ONE OF THEM WAS CAUSED BY THE ROUND THAT FOUND THEM. *** Measured by stashing v4687's " +
+                 "work and running all six at aab8595: six exit 1. They are ratchet censuses whose counts had " +
+                 "been drifting for up to eleven rounds. So the arc shipped several rounds without a full sweep, " +
+                 "and this round found that rather than causing it. " +
+                 "*** THE UNIFYING FINDING IS THAT A RED GATE'S FINDINGS REACH NOBODY. *** Every one of the six " +
+                 "named its own problem correctly, by name, every time it ran -- harnessLiveness printed nine " +
+                 "symbols, backendParity printed both drifted numbers, orreryEjecta printed the arriving file " +
+                 "within the minute, definitionGates printed the growth. Into a log nobody read. A standing red " +
+                 "does not merely fail to check its own subject; it silences every other finding in the same " +
+                 "file, and that is the cost this round paid and is what `elsewhere` exists to stop recurring. " +
+                 "*** EVERY ONE IS FIXED AT ITS CAUSE AND NOT ONE NUMBER WAS WIDENED TO AGREE. *** Two rotted " +
+                 "prose claims corrected, one export closed by assertion, five kernels put INTO the corpus, two " +
+                 "self-counting gates repaired by assembling the marker, one name added to NOT_IMPORTERS, one " +
+                 "name-list replaced by a rule. definitionGates' 703 and 533 and timingKind's three-name list " +
+                 "are all exactly where they were. " +
+                 "*** AND THE ROUND'S OWN MISTAKES WERE THE INSTRUCTIVE PART, ALL FOUR FOUND BY MEASUREMENT. *** " +
+                 "(1) It excluded seven kernels from the corpus on a reason it had not checked, which " +
+                 "temporalCorpus.mjs disproves; five of them are now graded on both backends. (2) Three fixtures " +
+                 "were wrong in ways only the gates could see: a uniform value-converted instead of bit-packed, " +
+                 "a uniform struct short by two words, and a binding supplied to an entry point that does not " +
+                 "declare it. (3) An \"all six green\" reading was an artefact of $(basename) resetting $? " +
+                 "before it was read, and definitionGates was still red. (4) Writing the note about the " +
+                 "self-counting trap SPELLED ALL THREE STAGE ATTRIBUTES in render/backendParity.mjs and turned " +
+                 "that gate's literal-marker row red on the prose explaining why they must not appear -- the " +
+                 "ELEVENTH instance of that shape and the second in this one round, which v4278 recorded " +
+                 "happening to it in the same file for the same reason. " +
+                 "*** TWO 0-REDS, BOTH WITH CAUSES RATHER THAN GAPS, AND ONE MUTATION THAT IS NOT A VERDICT. *** " +
+                 "Changing a corpus fixture's dilation radius reddens nothing, correctly: crossBackend asks " +
+                 "whether two backends AGREE, and both compute the same different thing -- correctness belongs " +
+                 "to the CPU-twin gates. Hardwiring timingKind's live `unaccounted` to [] passes every row " +
+                 "including the partition row, because the true answer IS zero and nothing inside a gate can " +
+                 "tell a computed zero from a written one. And making packU value-convert HANGS the device: the " +
+                 "kernels read a dimension of 1090519040 and loop, so crossBackend ran the full 2400-second " +
+                 "timeout without returning -- recorded as unrunnable, because a crash is not a verdict.",
+    }),
+    // v4687 -- THE 297th CLOSING: the last of FSR3's four passes leaves the CPU, and a gap closes exactly.
+    since372: Object.freeze({
+        at: "v4687", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/holeFillGPU-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** FSR3'S FOURTH AND LAST PASS COMES OFF THE CPU, AND THE CHAIN IS NOW GRADED END TO END " +
+                 "RATHER THAN PASS BY PASS. *** render/holeFillWgsl.mjs and its runner mirror fillHolesCPU; " +
+                 "render/frameInterpWgsl.mjs grew a FOURTH entry point, gatherFilled, which splats nothing and " +
+                 "warps a field somebody else produced. render/frameInterpGPU-selfcheck.mjs section 8 wires all " +
+                 "three device runners together against interpolateFrameCPU({ fill }), which does the same work " +
+                 "in ONE call: frame to 1.19e-7, the SIDE code identical on all 4096 pixels of four cases, the " +
+                 "filled vectors and the post-fill mask exact. Three passes each matching their CPU twin is not " +
+                 "the chain matching; that is a separate claim and this is the round that makes it. " +
+                 "*** THE CHAIN CANNOT BE ONE PIPELINE ON THIS ADAPTER, AND THE ARITHMETIC IS A ROW RATHER THAN " +
+                 "A SENTENCE. *** A joined warp-and-fill holds prev, cur, flow, depthBlock, key, owner, packed, " +
+                 "packed2, frameOut, depthPrev and depthCur -- ELEVEN storage bindings against the TEN this " +
+                 "adapter reports, and the WebGPU default every adapter may report is EIGHT. So the field goes " +
+                 "host -> device -> host -> device, two readbacks the algorithm does not need, bought by a limit. " +
+                 "Bindings 9 and 10 exist on gatherFilled ALONE, which is what lets the kernel grow a stage " +
+                 "without pushing the other three over: gfx/device.js classifies bindings PER ENTRY POINT, the " +
+                 "fact v4686 learned the hard way and this round spent. " +
+                 "*** AND THE PAGE'S TWO ARMS NOW AGREE TO 0.00000 dB, WHICH IS THE STRONGEST FORM v4686'S " +
+                 "ATTRIBUTION COULD TAKE. *** v4686 measured the unfilled device arm 0.13 dB AHEAD of the CPU's " +
+                 "and said the gap was the missing pass, not the port. v4687 gives that arm its fill and the " +
+                 "gap goes to zero with no residue -- a predicted number, then measured. The row in " +
+                 "fsrPageField-selfcheck has now been written three times (0.00000 at v4685, 0.13 at v4686, " +
+                 "0.00000 here) and each version was true when it was written; v4686's record of its 0.13 stands " +
+                 "where it was written rather than being edited to agree. NOTE WHAT THIS DOES NOT SAY: the " +
+                 "filler still COSTS this content 0.13 dB against leaving the holes to a cross-fade. Both arms " +
+                 "now pay it. Agreement between two engines is parity, not quality. " +
+                 "*** ELEVEN SABOTAGES, AND TWO 0-REDS, BOTH OF WHICH WERE FIXTURE GAPS AND BOTH OF WHICH THIS " +
+                 "TREE HAS SEEN BEFORE. *** Swapping gatherFilled's blend weights scored 0 RED because every " +
+                 "fill case sat at t = 0.5, where a*(1-t)+b*t and a*t+b*(1-t) are the SAME EXPRESSION -- v4686's " +
+                 "own W4 (a flag every case left at its default) at a different parameter, one round later, in " +
+                 "the same gate. A case at t = 0.25 reddens it. And warping a still-holed pixel scored 0 RED " +
+                 "because at radius 4 the filler reaches EVERY hole this rig makes (190 of 190, 318 of 318), so " +
+                 "the branch is dead code; a case at radius 1 leaves 116 unreached and the row that counts them " +
+                 "is a precondition of the three above it. " +
+                 "*** THE THIRD 0-RED IS THE ONE WORTH THE MOST, BECAUSE IT IS v4685'S V2 REPEATING ITSELF. *** " +
+                 "Hardwiring the page's new `filled on ...` label to \"the device\" changed nothing, because the " +
+                 "only row reading it looked at the one cell of ten where that is the right answer. That is " +
+                 "EXACTLY V2, whose fix at v4685 was to make the nine CPU cells assert the RECONCILE label -- " +
+                 "applied to the label rather than to the pattern, so the pattern came back with the next label " +
+                 "added to the same readout. Both labels are now asserted on all ten cells. " +
+                 "*** AND THE ROUND'S OWN DEFECT WAS AN INVENTED API. *** The first wiring called " +
+                 "interpolateFrameCPU with a `__filled` argument that does not exist and never did: the page " +
+                 "would have re-splatted, thrown the fill away, and raised no error anywhere. Nothing in this " +
+                 "tree would have caught it. Reading the function being called is what did. " +
+                 "*** FOUR STALE LIMITS WERE RETIRED RATHER THAN LEFT STANDING: *** frameInterpGPU-selfcheck's " +
+                 "\"the runner takes no fill at all\" and \"the page still calls the CPU\", holeFillGPU-selfcheck's " +
+                 "\"the joined chain is unchecked\" (and its wrong section number), and fsrPageField's \"nothing " +
+                 "here is on the device\" -- which is replaced by the sharper limit that NINE OF TEN CELLS still " +
+                 "are, so every figure this arc's findings rest on, including the checker's +0.107 dB, was " +
+                 "computed on the CPU and no row drives a cell both ways.",
+    }),
+    // v4686 -- THE 296th CLOSING: a scatter with a depth compare, and a 0-RED caused by undefined behaviour.
+    since371: Object.freeze({
+        at: "v4686", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/frameInterpGPU-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** THE SPLAT IS A SCATTER WITH A DEPTH COMPARE, WHICH IS THE ONLY GENUINELY HARD PORT IN THIS " +
+                 "ARC. *** On the CPU, blocks are visited in index order and \"strictly nearer wins\" means the " +
+                 "first claimer keeps a pixel against an equal-depth challenger. On a device every block runs at " +
+                 "once and a plain write returns whatever the scheduler ran last -- an answer about the hardware. " +
+                 "INTERP_WGSL reproduces the CPU's rule in THREE DISPATCHES: atomicMin a monotonic depth KEY, " +
+                 "then atomicMin the BLOCK INDEX among those that tied it, then gather. Among equal depths the " +
+                 "lowest index wins, and the CPU visits indices ascending, so the two sentences are one sentence. " +
+                 "Two atomics because one 32-bit slot cannot hold a full-precision depth key AND an index. " +
+                 "PARITY: the hole mask is IDENTICAL on all 4096 pixels of nine cases, the vectors and the depth " +
+                 "buffer agree EXACTLY (0.00e+0), and the frame to 1.19e-7 through two bilinear fetches and a " +
+                 "blend. The flat-depth case is the one that matters: every block at one depth makes EVERY " +
+                 "contested pixel a tie, which is the mirror image of v4685, where a constant-depth rig could not " +
+                 "test a nearest-pixel rule at all. " +
+                 "*** THE DEPTH KEY IS THE ORDER-PRESERVING FLOAT-TO-UINT MAP AND HAS TO BE: *** clip z is " +
+                 "signed and IEEE floats compare backwards as unsigned below zero, so a raw bitcast orders " +
+                 "negative depths wrongly and a scene with only positive depths would never show it -- one case " +
+                 "carries signed depths for exactly that. nearerIsLess complements the key rather than branching, " +
+                 "so one atomicMin serves both directions. " +
+                 "*** TEN SABOTAGES, AND THE 0-RED IS THE FIRST IN THIS ARC CAUSED BY UNDEFINED BEHAVIOUR. *** " +
+                 "Warping a declined NaN vector anyway changes nothing here, and the gate ASKS THE DEVICE WHY: " +
+                 "i32(round(NaN)) is -2147483648 on this adapter, so the block lands at INT_MIN, its footprint " +
+                 "falls outside the frame and the bounds tests discard it -- accidentally doing the guard's job. " +
+                 "WGSL leaves that conversion UNDEFINED; an adapter returning 0 would splat at the origin and put " +
+                 "NaN in the frame. So unlike v4675's denominator guard or v4677's NaN skip, this guard is not a " +
+                 "no-op -- it is unreachable HERE, and the conversion is measured so the distinction is a number. " +
+                 "A second sabotage scored 0 red until a nearerIsLess-FALSE case existed, since all nine cases " +
+                 "left the flag at its default. " +
+                 "*** AND TWO DEFECTS WERE IN TALKING TO gfx/device.js RATHER THAN IN THE ALGORITHM: *** the " +
+                 "option is `entryPoint` and `entry` is silently ignored, so every pipeline was built for a " +
+                 "function called main that this module does not have -- surfacing only as \"Invalid " +
+                 "ComputePipeline\" while the shader compiled clean; and device.js classifies bindings PER ENTRY " +
+                 "POINT, so each of the three pipelines binds only what its own entry declares. The NaN probe " +
+                 "kernel also carried an escape inside a template literal, the seventh such casualty here. " +
+                 "*** AND THE RUNNER WAS WIRED RATHER THAN RATCHETED, AGAIN, WHICH TURNED UP A RESULT. *** It went " +
+                 "red on arrival in runnerCallers-selfcheck as a fifth gate-only runner; fsr.html's `genengine` " +
+                 "device arm now warps there too. The device arm CANNOT FILL -- render/holeFill.mjs has no kernel, " +
+                 "so the runner takes no `fill` and the page cross-fades what is left, exactly as it already does " +
+                 "for anything the filler cannot reach. Which makes the two arms differ by ONE PASS, and the " +
+                 "measurement is the finding: the arm that fills NOTHING scores HIGHER, -0.7800 dB against the " +
+                 "CPU's -0.8575, by up to 0.13 dB a frame. v4678 measured on a fixture that its ring-dilation " +
+                 "filler was 3.6 dB WORSE than leaving the holes to a cross-fade; this is that result on a picture, " +
+                 "from the other direction -- the page's DEFAULT arm fills, and filling costs it. A row in " +
+                 "fsrPageField-selfcheck that had said \"within a hundredth of a dB\" at v4685 is re-measured " +
+                 "rather than loosened, and now names the pass instead of the port.",
+    }),
+    // v4685 -- THE 295th CLOSING: the reconciliation comes off the CPU, and the rig could not test one rule.
+    since370: Object.freeze({
+        at: "v4685", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/flowReconcileGPU-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** EVERY GATE FROM v4676 TO v4684 CLOSED BY SAYING THE FSR3 PATH IS CPU-ONLY. THIS IS THE " +
+                 "FIRST OF THE THREE PASSES OFF IT. *** RECONCILE_WGSL mirrors render/flowReconcile.mjs: one " +
+                 "dispatch over the block grid, the arc's own luma (0.25/0.5/0.25, which is level 0 of " +
+                 "luminancePyramid), the same bilinear SAD, the same strictly-better comparison and the same " +
+                 "nearest-VALID-pixel rule. PARITY: 0 OF 64 BLOCKS DIFFER on every case -- geometry, shader, " +
+                 "both, flat, three margins, invalid, silhouette. `source` is one of three integers, so one " +
+                 "differing block is a different ANSWER and there is no tolerance to hide behind; the vectors " +
+                 "agree to 1.9e-6 and the SADs to 3.7e-6 through 64 bilinear fetches each. The census tracks " +
+                 "across margins 0 / 0.05 / 0.20 at 7 / 2 / 0 flow blocks, so a kernel ignoring the uniform " +
+                 "cannot pass by agreeing at one setting. " +
+                 "*** THE OUTPUT IS ONE PACKED BUFFER BECAUSE WEBGPU ALLOWS EIGHT STORAGE BINDINGS. *** Eight " +
+                 "floats per block, with `source` riding as an f32 the runner converts back to an Int32Array so " +
+                 "the parity row compares two integer arrays. Stated as a limit: a ninth input needs the " +
+                 "packing changed before the pass is. " +
+                 "*** AND WGSL REFUSES TO LET A KERNEL SPELL A NaN. *** bitcast<f32>(0x7fc00000u) is " +
+                 "const-folded and rejected outright, and 0.0/0.0 goes the same way; gfx/device.js surfaced it " +
+                 "only as \"Invalid ComputePipeline\", so the shader module's getCompilationInfo had to be read " +
+                 "directly. The NaN an unanswerable block reports now arrives through the uniform, which is the " +
+                 "better construction anyway: the CPU's own NaN handed over rather than one the kernel " +
+                 "manufactured with a trick a future compiler may fold. " +
+                 "*** NINE SABOTAGES, AND THE ONE THAT SCORED 0 RED WAS THE RIG'S FAULT. *** Taking the block's " +
+                 "FARTHEST pixel instead of its nearest changed nothing across all six rendered cases, because " +
+                 "the wall is perpendicular to the view at constant distance and every pixel of every block " +
+                 "sits at ONE depth -- so the nearest-valid-pixel rule, one of the three things this file names " +
+                 "as what a mirror most easily drops, was covered by none of them. A silhouette built by hand, " +
+                 "as flowReconcile-selfcheck's own section 6 does, and the sabotage then reddens. A parity gate " +
+                 "whose content cannot exercise a rule does not cover that rule. NO TIMING CLAIM: this " +
+                 "container's adapter is SwiftShader and v4561 recorded what a round that forgets that publishes. " +
+                 "*** AND THE RUNNER WENT RED ON ARRIVAL IN tools/ship/runnerCallers-selfcheck.mjs AND WAS WIRED " +
+                 "RATHER THAN RATCHETED. *** A fifth gate-only compute runner would have been the THIRD widening " +
+                 "of that census in ten rounds, and v4680's note demanded the count be written down before a " +
+                 "third. So fsr.html imports and DISPATCHES it instead, behind a `genengine` switch defaulting " +
+                 "to the CPU -- because the two arms are NOT bit-identical (1.9e-6 px on the vectors) and every " +
+                 "figure v4681, v4682 and v4683 pinned is the CPU arm's. On live content the device arm matches " +
+                 "the CPU frame for frame to 0.00000 dB, which is zero at the readout's two decimals and is " +
+                 "stated that way. The ratchet holds at 4. *** AND THE PAGE ROW COST FOUR DEFECTS OF ITS OWN: *** " +
+                 "reading a .gen field off a `seen` array that holds STRINGS here where the sibling gate's holds " +
+                 "OBJECTS (v4682's parse defect, inverted, one round later); sampling on the frame counter's " +
+                 "edge and getting the PREVIOUS frame's readout, which the awaited device dispatch widened into " +
+                 "a NaN; a first fix that accepted the \"not computed\" text at every frame, which is the stale " +
+                 "text it was meant to skip; and BACKTICKS inside a JS template literal, the sixth time in this " +
+                 "arc. A sabotage claiming the device on every frame also scored 0 red until the nine CPU cells " +
+                 "were made to assert their own label.",
+    }),
+    // v4684 -- THE 294th CLOSING: the confirmation failed on its own terms, and its control was impossible.
+    since369: Object.freeze({
+        at: "v4684", swept: 2, green: 2, red: 0,
+        added: Object.freeze(["tools/ship/pairedStats-selfcheck.mjs", "tools/ship/fsrPageConfirm-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** PRE-REGISTERED AS render/checker-preregistration.md, AND THE PRIMARY IS UNINTERPRETABLE " +
+                 "RATHER THAN NULL. *** v4683 found the first positive frame-generation reading on a picture -- " +
+                 "checker, x4, +0.107 dB, 3 of 4 up -- and asked for a paired test. The record declared one " +
+                 "primary (checker x2, scene frames 6-38, a paired t-test AND an exact sign test both clearing " +
+                 "0.05), three secondaries, and a predicted NON-effect S3: the slab's pixel count constant " +
+                 "across the window, *** because if it moves the window is measuring the slab leaving. *** " +
+                 "IT MOVES: 11,130 pixels to 212, a 98% collapse. The primary cleared neither test (mean " +
+                 "+0.0203 dB, t p 0.35, sign 19/33 p 0.24) and by the record's own terms that null says nothing. " +
+                 "*** AND S3 WAS NEVER SATISFIABLE, WHICH IS A DEFECT IN THE PRE-REGISTRATION. *** The slab " +
+                 "TRANSLATES out of frame, so no window on this camera holds it still. A first draft blamed the " +
+                 "dolly; freezing the dolly was measured and the count still collapses, FASTER on x1 (28% of " +
+                 "its start rather than 70%), while stopping the SLAB holds it at 100%. The window came from a " +
+                 "residency probe that printed frames 1-12 and the last non-zero frame -- and at x2 frames 1-12 " +
+                 "really are constant, the shrinking starts at 13. A window derived from a measurement that " +
+                 "stopped before the interesting part is a chosen window in a derived window's clothes. " +
+                 "*** S1 CLEARED BOTH TESTS AND IS NOT PROMOTED. *** checker x1 over 45 frames: mean +0.1240 dB, " +
+                 "t 4.821 p 8.7e-6, sign 34/43 p 8.5e-5. It was declared in advance as a secondary whose " +
+                 "p-values are not to be quoted as the result, which is exactly why it was named before the " +
+                 "data existed -- promoting it now is the move pre-registration exists to prevent. S2 CONFIRMED " +
+                 "decisively: smooth reads -1.0476 dB with 0 of 33 frames up, so the effect is content-specific. " +
+                 "*** AND THE ROUND SHIPPED THE FIRST RECOMPUTABLE STATISTICS IN THIS TREE. *** v4658, v4660, " +
+                 "v4665 and v4671 all computed their p-values in throwaway drivers; not one was reproducible. " +
+                 "tools/ship/pairedStats.mjs is graded against published t-tables at eight degrees of freedom, " +
+                 "against EXACT rationals by === (11/1024 for nine of ten, in BigInt), and against v4665's own " +
+                 "published 43-of-51 sign test, which it reproduces at 3.4336e-7 against the recorded 3.4e-7. " +
+                 "*** AND ITS POSITIVE CONTROLS FOUND A DEFECT IN IT: *** `sd > 0` does not detect a constant " +
+                 "sample, because twenty copies of 0.3 sum to 6.000000000000001 and have an sd of 1.7e-17 -- the " +
+                 "first draft reported t = 2.4e16 with p = 1e-300 for a sample with no variance, which a " +
+                 "deterministic render pipeline produces routinely. Thirteen sabotages across the two gates; " +
+                 "eight on the statistics, and TWO of those had to be corrected before they could fire -- one " +
+                 "sample used 0.3 + 1e-17, which IS 0.3 below the ULP, and one asked a sign test to clear on a " +
+                 "sample with an exactly even sign split. Both were the gate being wrong and the module right.",
+    }),
+    // v4683 -- THE 293rd CLOSING: three explanations refuted, and the first positive reading on a picture.
+    since368: Object.freeze({
+        at: "v4683", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/fsrPageField-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** PRE-REGISTERED AS render/genfield-preregistration.md, IN A COMMIT WITH NO DATA. *** v4682 " +
+                 "refuted displacement and printed the remaining suspect -- the BLOCK GRID -- with fixture " +
+                 "evidence and no page measurement. holeFill reads 36.79 dB at block 1 and 31.48 at block 8 on " +
+                 "a silhouette, so at this page's block size the warp already loses on the fixture. " +
+                 "*** H1 REFUTED, H2 REFUTED IN THE OPPOSITE DIRECTION: the PER-PIXEL field is WORSE. *** " +
+                 "smooth x1 -0.455 -> -0.552 dB, x4 -0.857 -> -1.075, 0 of 4 frames up at the declared cell. " +
+                 "Sixty-four times the field resolution -- 576 cells to 36,864 -- makes this page worse, where " +
+                 "the fixture reads +5.13 dB for the same change. H3 CONFIRMED as the predicted non-effect: the " +
+                 "block arm reproduces v4682's means exactly. " +
+                 "*** AND THE ACCUMULATOR IS NOT IT EITHER, WHICH THE RECORD NAMED AS WHAT A FAILURE WOULD " +
+                 "LEAVE. *** Interpolating between two CLEAN reference renders instead of two presented frames " +
+                 "moves the mean by 0.022 dB at both speeds, while the per-frame deltas and the displacement " +
+                 "DO move -- so the control fired and the answer did not. Labelled SECONDARY and undeclared, " +
+                 "because naming a thing is not testing it. Three explanations offered by this arc, three " +
+                 "measurements, none of them it. " +
+                 "*** AND THEN THE PAGE'S OWN scene CONTROL, WHICH NOBODY HAD VARIED, GAVE THE FIRST POSITIVE " +
+                 "FRAME-GENERATION READING ON A PICTURE IN THIS TREE. *** smooth -0.857, zone plate -0.965, " +
+                 "PIXEL CHECKER +0.107 dB with 3 of 4 frames up. Every figure this arc took on the page was " +
+                 "taken on `smooth`, whose own option text reads \"nothing to recover\". A cross-fade is exactly " +
+                 "right wherever the picture is flat, so a compensation's worth scales with the spatial " +
+                 "gradient -- and the per-pixel field's sign flips with the scene for the same reason, better " +
+                 "on the zone plate (-0.965 -> -0.512) and worse on smooth. *** IT IS A TENTH OF A dB WITH ONE " +
+                 "FRAME DOWN AND THE ROW SAYS SO: *** a direction, not a result, and the pre-registered " +
+                 "confirmation is named rather than claimed. Six sabotages. *** ONE EXPOSED A ROW WHOSE CLAIM " +
+                 "WAS THAT A QUANTITY IS SMALL, WHICH ITS ABSENCE SATISFIES PERFECTLY: *** making gensource a " +
+                 "no-op scored 0 red until the row also required the two arms to DIFFER per frame -- v4682's Q3 " +
+                 "in a new costume. And ONE IS UNREACHABLE ON THIS CONTENT AND IS RECORDED WITH ITS EVIDENCE: " +
+                 "the per-pixel path's fallback for a pixel the application cannot answer never runs, because " +
+                 "the reconciliation's own census prints a flow-only count of 0 on every frame this arc has " +
+                 "driven. Stated rather than deleted; flowReconcile's own gate reaches that case by hand.",
+    }),
+    // v4682 -- THE 292nd CLOSING: the pre-registered primary is refuted, and v4681's diagnosis was wrong.
+    since367: Object.freeze({
+        at: "v4682", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]), redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** PRE-REGISTERED IN A COMMIT WITH NO DATA, AS render/genspeed-preregistration.md. *** " +
+                 "v4681 found frame generation losing to a cross-fade on four of four frames and attributed " +
+                 "it to the page's motion being under 1.3 px where the fixtures run at 3.2 and 8.8. This round " +
+                 "added a slab-SPEED axis to test that. " +
+                 "*** H1 IS REFUTED AT EVERY SPEED: 0 OF 4 FRAMES UP AT x1, x2, x4 AND x8. *** Mean deltas " +
+                 "-0.455, -1.003, -0.857, -1.097 dB at 0.96, 1.82, 3.61 and 6.89 px of mean displacement. " +
+                 "Sixteen frames across an 8x range and not one positive. H2 refuted too -- the curve falls, " +
+                 "falls, RISES, falls, so speed is not even the axis this varies along -- and H3 is not " +
+                 "evaluable because there is no crossover to locate. H4 CONFIRMED as the predicted " +
+                 "non-effect: x1 reproduces v4681's four deltas to the printed digit. " +
+                 "*** SO v4681's DIAGNOSIS WAS WRONG, AND THIS ROUND SAYS SO RATHER THAN QUIETLY MOVING ON. *** " +
+                 "At x8 the page passes 6.89 px, more than double the 3.2 px at which the fixture reads " +
+                 "+9.91 dB, and still loses by a dB. Displacement is not what separates this page from the " +
+                 "fixtures. " +
+                 "*** THE SUSPECT THE PRE-REGISTRATION NAMED FIRST IS THE BLOCK SIZE, AND IT IS ALREADY " +
+                 "MEASURED: *** holeFill's slab scene reads 36.79 dB at block 1 and 31.48 at block 8 against " +
+                 "a cross-fade of 31.66 -- AT BLOCK 8 THE WARP ALREADY LOSES ON THE FIXTURE. The +9.91 dB " +
+                 "figure is the WALL scene, which has no silhouette: uniform motion, where the block grid " +
+                 "costs nothing. This page has a silhouette and uses block 8. A hypothesis with fixture " +
+                 "evidence and NO page measurement, so the gate PRINTS it and asserts nothing. " +
+                 "FOUR SABOTAGES. *** TWO EXPOSED WEAK ROWS WRITTEN THIS SAME ROUND. *** Scaling only the " +
+                 "CURRENT slab offset scored 0 red, because every delta row asserts only that the delta is " +
+                 "NEGATIVE and a worse field satisfies that more comfortably -- closed by a DERIVATION row: " +
+                 "the displacement, taken off the reconciled field, must double when the control doubles. And " +
+                 "fsrPage-selfcheck's new default-is-1 row compared indices, which holds however the options " +
+                 "are ORDERED; swapping them scored 0 red until the row matched the select tag immediately " +
+                 "followed by the x1 option. A row written in the same commit as the feature it guards is not " +
+                 "exempt. AND ONE DEFECT WAS CAUGHT BY A GREEN ROW BEING IMPOSSIBLE: the curve first parsed " +
+                 "the drive's per-frame OBJECT instead of its readout text, every cell was NaN, and the H2 " +
+                 "refutation PASSED on it -- `NaN >= NaN` is false, so `every` was false and the negation " +
+                 "true. A refutation that a total absence of data satisfies is not a refutation, and a " +
+                 "finiteness row now guards all of them. No gate added; the rows joined fsrPageGen, whose " +
+                 "closing line asked for them.",
+    }),
+    // v4681 -- THE 291st CLOSING: frame generation runs on a picture, and loses to a cross-fade.
+    since366: Object.freeze({
+        at: "v4681", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/fsrPageGen-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** EIGHT ROUNDS OF FSR3 AND EVERY ONE CLOSED BY SAYING fsr.html CALLED NONE OF IT. IT DOES " +
+                 "NOW, AND THE RESULT IS NEGATIVE. *** The page generates the frame between two PRESENTED " +
+                 "frames at half-integer scene time and grades it against a reference it simply draws there, " +
+                 "because the scene is an analytic function of that number. On four consecutive frames the " +
+                 "generated frame is WORSE than a plain cross-fade of the same two inputs: -0.38, -0.82, " +
+                 "-0.25, -0.37 dB. Four of four down, against the fixtures' +9.91 and +7.80. " +
+                 "*** AND THE REASON IS A NUMBER. *** This page's motion is 0.80 to 1.26 px MEAN, against the " +
+                 "3.2 and 8.8 px the fixtures run at -- the slab moves 0.055 world units a frame. Under about " +
+                 "a pixel a cross-fade is very nearly exact while a block grid still pays its quantisation " +
+                 "everywhere. The control is not a straw man: the cross-fade beats HOLDING the previous frame " +
+                 "by 3.0 to 3.7 dB. " +
+                 "*** FIVE SABOTAGES, AND THE TWO THAT SCORED 0 RED ARE THE FINDING. *** Feeding the field as " +
+                 "PREV-indexed -- v4677's assumption, which v4680 measured as a 7.35 dB defect on a " +
+                 "silhouette -- moves this page by between 0.00 and 0.33 dB, MEASURED rather than left as a " +
+                 "zero: -0.38, -0.81, -0.58, -0.44 against -0.38, -0.82, -0.25, -0.37. And recording the " +
+                 "pre-RCAS accumulator instead of what was presented moves nothing a threshold here can see. " +
+                 "*** SO THIS PAGE CANNOT DETECT ITS OWN ARC'S LARGEST CORRECTNESS DEFECT, AND THAT IS A " +
+                 "PROPERTY OF THE CONTENT, NOT OF THE ROWS. *** It was built to measure UPSCALING and its " +
+                 "motion is an order of magnitude below what a frame generator is judged on. A slab-SPEED " +
+                 "control would turn one negative reading into a curve and does not exist; the closing line " +
+                 "names it. OFF is the default and a row holds that every other readout is string-identical " +
+                 "between the arms, so the five older page gates still measure what they measured.",
+    }),
+    // v4680 -- THE 290th CLOSING: three rounds of frames were built on the wrong end of the field.
+    since365: Object.freeze({
+        at: "v4680", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]), redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** render/frameInterp.mjs ASSUMED THE MOTION FIELD WAS INDEXED BY THE BLOCK'S POSITION IN " +
+                 "PREV, AND THE ARC'S OWN PRODUCER INDEXES IT BY CUR. *** MEASURED with a bright bar at x 4..7 " +
+                 "in prev and x 12..15 in cur: opticalFlowCPU puts the +8 on the block covering x 12..15 -- its " +
+                 "CUR position -- because the search walks blocks of CUR and looks for them in PREV. Block 1, " +
+                 "the bar's prev position, reports -7, which is the background trying to explain where the bar " +
+                 "went. flowReconcile inherits that indexing and its appFlow comes from a per-pixel field " +
+                 "indexed the same way. So v4677, v4678 and v4679 all splatted every moving block to the wrong " +
+                 "place by t*v. " +
+                 "*** AND NOTHING IN THREE ROUNDS COULD HAVE CAUGHT IT. *** Under a rigid whole-frame " +
+                 "translation every block holds nearly the same vector, so the two indexings differ by 0.0038 " +
+                 "and 0.6202 dB -- and they differ ONLY in which edge strip they vacate, which v4677's rows " +
+                 "excluded by construction because they score on the UNION of the arms' holes. v4678's slab " +
+                 "scene has non-uniform motion but supplies its field prev-indexed by hand. The defect needed " +
+                 "both at once. " +
+                 "*** ON THE SLAB SCENE IT IS WORTH 7.3464 dB, AND THE WRONG ANSWER IS WORSE THAN NO MOTION " +
+                 "FIELD AT ALL: *** 38.0196 -> 30.6732 dB against the cross-fade's 31.6643. `indexedBy` is now " +
+                 "a REQUIRED argument with no default, because a default would let a caller be wrong for free " +
+                 "in the one case where being wrong costs the whole displacement. " +
+                 "*** AND v4677's FIGURES ARE RE-MEASURED RATHER THAN SWAPPED. *** +10.0618 -> +9.9074 dB on " +
+                 "the camera scene and +7.3791 -> +7.7960 on the texture scene; the colour-flow arm gains a " +
+                 "full dB (38.5109 -> 39.5157), which SHRINKS the reconciliation's measured lead on the camera " +
+                 "scene from 2.5109 to 1.3707 dB and that row's threshold with it. Its t = 0 / t = 1 rows are " +
+                 "corrected too: a cur-indexed block ENDS on its own footprint, so t = 1 is the complete frame " +
+                 "and t = 0 is the holed one -- the mirror of what shipped. Six sabotages. *** TWO NOTES: *** " +
+                 "the indexedBy guard scored 0 red until a refusal row existed, because every call site already " +
+                 "passed it; and the bar row is NOT flipped by any minimal mutation of opticalFlowCPU -- the " +
+                 "closest, swapping which frame the search walks, reddens four rows here and SIX in that " +
+                 "module's own gate without flipping it -- so it is recorded as a measurement the consumer " +
+                 "depends on rather than as a guard, because \"covered in aggregate\" is a weaker claim. " +
+                 "THREE DRAFTS OF THE EXPLANATORY ROW OVERCLAIMED AND EACH WENT RED: bit-identical frames " +
+                 "(they differ by 1 at the edges), an identical common footprint (0.0023 and 0.156), and a gap " +
+                 "under 0.2 dB (it is 0.62). A row written to explain why a defect survived should not contain " +
+                 "one, and all three attempts are in the file.",
+    }),
+    // v4679 -- THE 289th CLOSING: a pre-registered replacement, one refuted hypothesis, and a deviation.
+    since364: Object.freeze({
+        at: "v4679", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]), redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** PRE-REGISTERED IN A COMMIT WITH NO DATA IN IT, AS render/holeSide-preregistration.md. *** " +
+                 "v4678's closing named this round: motionVectors' zPrev channel and temporalReject's " +
+                 "disocclusion comparison are the real signal that holeFill's dot-product side rule " +
+                 "approximates without them. `side: \"depth\"` samples each frame's OWN depth buffer where the " +
+                 "background would be and takes the side that is not occluded -- no occluder geometry at all. " +
+                 "H1 CONFIRMED: exact wherever the heuristic already was. *** H2, THE PRIMARY, CONFIRMED AND " +
+                 "THE MARGIN IS REPORTED BECAUSE IT IS THIN: *** 24.7571 -> 25.8220 dB at the declared cell, " +
+                 "+1.0648 against a threshold of 1 dB declared in advance -- it clears by 6.5% of the " +
+                 "threshold, which is a pass by the written rule and is also evidence about how the threshold " +
+                 "was chosen. H4 CONFIRMED as a predicted NON-effect: the unfilled counts are identical under " +
+                 "both rules at every radius, which is what makes H2 interpretable at all. " +
+                 "*** H3 IS REFUTED, AND HOW IT IS REFUTED IS THE ROUND'S BEST FINDING. *** The prediction was " +
+                 "that the abstention count would fall below 256. It is 256 under BOTH rules -- AND THE TWO " +
+                 "SETS SHARE NOT ONE PIXEL. A record comparing COUNTS would have reported no effect. Every one " +
+                 "of the depth test's abstentions holds the OCCLUDER's vector, so its cause is the vector " +
+                 "search failing to cross an 8.79 px hole at radius 4, not the side decision. " +
+                 "*** AND THE DEFAULT WAS NOT FLIPPED, WHICH IS A DEVIATION FROM THE PRE-REGISTERED DECISION " +
+                 "RULE AND IS RECORDED AS ONE. *** The record said H2 clearing 1 dB means make it the default. " +
+                 "It does not, because `depth` needs two inputs `derived` does not: the default would throw for " +
+                 "every un-updated caller, and the only alternative -- falling back to `derived` when the " +
+                 "buffers are absent -- is a silent switch between two rules this very table shows differ by " +
+                 "1.06 dB. A pre-registered decision rule does not outrank that; the defect is in the " +
+                 "pre-registration, which should have anticipated the input requirement. Seven sabotages, and " +
+                 "TWO scored 0 red for one reason that was the SCENE's: the slab's background is static, so its " +
+                 "vector in the holes is exactly zero and lands on an integer, making both the sample's " +
+                 "DIRECTION and the fetch's ROUNDING unreachable. Nine pixels with a background moving +3 px " +
+                 "reach both. No gate added -- the rows joined holeFill-selfcheck, whose subject this is.",
+    }),
+    // v4678 -- THE 288th CLOSING: the obvious algorithm is worse than doing nothing.
+    since363: Object.freeze({
+        at: "v4678", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/holeFill-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** THE FIRST ROUND OF THIS ARC WHOSE HEADLINE RESULT IS NEGATIVE. *** v4677 left 3-6% of a " +
+                 "generated frame at zero and said hole filling was next. The obvious filling is iterative " +
+                 "dilation -- grow the vector field one ring per pass -- and MEASURED against a rendered " +
+                 "middle frame it is 3.6 dB WORSE on the holes than leaving them and cross-fading them: " +
+                 "30.8217 -> 27.2034 dB. A ring front grows from BOTH sides of the strip, so half a " +
+                 "four-pixel hole ends up holding the OCCLUDER's vector, and warping background along a " +
+                 "foreground vector drags the foreground back into the gap the foreground leaving is what " +
+                 "made. `growth: \"ring\"` is kept so the number stays reproducible. " +
+                 "*** AND THIS IS THE FIRST CONTENT IN THIS ARC WITH A SILHOUETTE. *** v4673 to v4677 all " +
+                 "ran on a wall at constant depth and all said so. Here a slab at half the wall's distance " +
+                 "slides across it and its trailing edge opens a TRUE disocclusion. " +
+                 "*** WHAT WORKS IS TO SEARCH THE NEIGHBOURHOOD AND TAKE THE FARTHEST VECTOR, NOT TO GROW A " +
+                 "FRONT. *** 30.8217 dB -- exactly the control, to the digit. And `prefer` is then worth " +
+                 "5.7216 dB (farther 30.8217 against nearer 25.1001), where under ring growth it was INERT " +
+                 "and produced bit-identical frames, because a front only ever offers a hole pixel one kind " +
+                 "of neighbour. " +
+                 "*** TYING THE CONTROL IS NOT WINNING: THE BLEND IS WHAT IS LEFT WRONG. *** A disoccluded " +
+                 "pixel's content is in ONE frame only, so (1-t)p + tc mixes the answer with the occluder at " +
+                 "full strength -- which is what a cross-fade does, which is why they tie. One-sided is EXACT " +
+                 "here, zero error on all 256 hole pixels, and the WRONG side is 24.8011, worse than " +
+                 "blending. So the side is DERIVED: the occluder is the nearest filled pixel in the " +
+                 "neighbourhood, and the sign of its vector dotted with the direction to the hole says " +
+                 "whether it is leaving (content in cur) or arriving (content in prev). That rule reaches " +
+                 "the same zero error with NO oracle and abstains on nothing. " +
+                 "*** AND THE RADIUS IS A FUNCTION OF THE DISPLACEMENT THAT THIS PASS DOES NOT WORK OUT. *** " +
+                 "Hole widths 2.20, 4.39 and 8.79 px need radius 2, 4 and 12; the shipped default of 4 is " +
+                 "6 dB wrong on the 17.6 px case, and a row says so rather than a comment. Seventeen " +
+                 "sabotages. *** THE ONE THAT SCORED 0 RED WAS A GAP IN THE CONTENT, NOT A NO-OP. *** " +
+                 "Dropping the occluder's spatial tie-break changed nothing, because the slab is FLAT -- " +
+                 "hundreds of pixels at one depth -- and lies entirely to one side of the strip, so every " +
+                 "one of them gives the same sign. A nine-pixel grid with an occluder pixel adjacent to the " +
+                 "hole and another at the corner the scan reaches first reads the same vector as LEAVING and " +
+                 "ARRIVING; the row was added and the sabotage then scores 1 red. `fill` defaults to null, " +
+                 "so v4677's gate still measures the unfilled frame it was written for, bit for bit, and " +
+                 "its closing line -- which said the holes were unfilled and the next pass owned them -- is " +
+                 "retired in this commit rather than left to outlive its limit.",
+    }),
+    // v4677 -- THE 287th CLOSING: a frame nothing rendered, graded against one that was.
+    since362: Object.freeze({
+        at: "v4677", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/frameInterp-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** FOUR ROUNDS OF MOTION FIELDS AND NOT ONE PIXEL; THIS IS THE PIXEL. *** v4673 to v4676 " +
+                 "each closed by saying frame interpolation was what they were for and had not been started. " +
+                 "render/frameInterp.mjs splats the block field forward to time t, then each output pixel " +
+                 "that received a vector samples `prev` backwards along it and `cur` forwards along it and " +
+                 "blends. *** THE SCENE HAS A TRUE MIDDLE FRAME, SO THE GENERATED ONE IS GRADED AGAINST A " +
+                 "RENDER AND NOT AGAINST A PROXY. *** The wall is analytic, so t = 0.5 is simply drawn at " +
+                 "half the camera's travel. AND THE CONTROL ARM IS THE CROSS-FADE, which is four instructions " +
+                 "per pixel and exactly right wherever nothing moved: " +
+                 "camera scene 30.9451 -> 41.0068 dB (+10.0618), texture scene 30.9585 -> 38.3376 (+7.3791). " +
+                 "*** AND v4676's RECONCILIATION EARNS ITSELF IN PIXELS RATHER THAN IN VECTOR ERROR. *** " +
+                 "Application field alone: 41.02 on the camera scene, 30.96 on the texture scene -- where its " +
+                 "field is exactly zero, so its generated frame IS the cross-fade, which is all FSR2's inputs " +
+                 "can offer a frame generator. Colour flow alone: 38.51 and 38.34. Reconciled: 41.01 and " +
+                 "38.34 -- within 0.02 dB of the better field on BOTH, and a row says it is NOT the maximum " +
+                 "of the two: it is 0.0140 dB WORSE than the application on the scene the application gets " +
+                 "right, which is v4676's two stolen blocks arriving as picture quality, traded for 7.38 dB " +
+                 "on the scene the application cannot see. " +
+                 "*** THE 3.1% OF PIXELS NOTHING SPLATTED ONTO ARE LEFT AT ZERO WITH NaN VECTORS. *** A " +
+                 "cross-fade would look plausible in every one of them, which is why it is not written there; " +
+                 "hole filling is the next pass and the 39.66 dB this file reports for patching them is " +
+                 "labelled a report, not a result. t = 0 returns `prev` bit-exactly with no hole; t = 1 " +
+                 "returns `cur` bit-exactly and leaves holes where content left the frame, and the asymmetry " +
+                 "is stated rather than hidden. Zero motion reproduces the cross-fade TO THE BIT. " +
+                 "*** FIFTEEN SABOTAGES, AND THE TWO THAT SCORED 0 RED ARE DIFFERENT ANIMALS. *** The " +
+                 "phantom-tail guard was UNREACHABLE under the section's +3 px case, because a tail moving " +
+                 "right leaves the frame anyway -- a hole in the gate, closed with a -3 px row where the tail " +
+                 "lands on px 57..59 of a 60-wide frame from source pixels that do not exist. The NaN-decline " +
+                 "guard is a TRUE no-op: Math.round(NaN) is NaN, a NaN bounds test is false, and zbuf[NaN] " +
+                 "reads undefined, against which both comparisons fail -- so nothing is written and the " +
+                 "pixels stay holes either way. Recorded, not repaired, exactly as v4675 recorded " +
+                 "opticalFlow's denominator guard. AND THE f32-VERSUS-f64 DEFECT ARRIVED A THIRD TIME: the " +
+                 "cross-fade row compared a Float32Array cell to an f64 product and read 0.4679146409 " +
+                 "against 0.4679146484. Math.fround on the expectation, tolerance still zero.",
+    }),
+    // v4676 -- THE 286th CLOSING: the two motion fields, and a header that had the sense backwards.
+    since361: Object.freeze({
+        at: "v4676", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/flowReconcile-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/runnerCallers-selfcheck.mjs"]),
+        verdict: "*** FSR3 HAS TWO MOTION FIELDS ON EVERY FRAME AND FRAME GENERATION NEEDS ONE. *** The " +
+                 "application's vector is EXACT where it applies -- a reprojection, not an estimate -- and " +
+                 "SILENT about everything that is not geometry. The colour flow sees everything and guesses. " +
+                 "render/flowReconcile.mjs picks per block by MEASURING which candidate the two frames " +
+                 "support, not by a heuristic on confidence. Two scenes built so no single arm can pass " +
+                 "both: a wall at constant depth, camera sliding (the application is right to 1.7e-6 px, " +
+                 "the flow is 0.42 px out) and camera still with the texture sliding (the application " +
+                 "reports zero on all 4096 pixels with valid = 1, and is wrong by the whole 3.20 px). " +
+                 "RECONCILED: 0.0043 px on the first, 98x the flow alone, and 0.2651 px on the second " +
+                 "against the application's 3.1997. " +
+                 "*** AND THE FLOW ARM WAS FITTED ON THE STATISTIC THAT JUDGES IT, WHICH IS MEASURED RATHER " +
+                 "THAN ARGUED. *** The search minimised SAD over 81 candidates per block; the application " +
+                 "got one shot. At margin 0 the flow takes 7 of 64 blocks from an application that is " +
+                 "EXACTLY right -- the bias's size in blocks -- and the margin buys them back monotonically, " +
+                 "7 -> 4 -> 2 -> 0. On the shader scene it costs nothing to 0.20. The shipped 0.05 is NOT " +
+                 "tuned on that sweep and a row says so, because 64 blocks of one synthetic shift is a data " +
+                 "point and not a calibration. " +
+                 "*** AND opticalFlow.mjs's HEADER HAD THE SENSE BACKWARDS SINCE v4673. *** It said its " +
+                 "negation put its output in \"the same sense render/motionVectors.mjs uses\". MEASURED: the " +
+                 "two are NEGATIVES of each other -- content displaced +3.20 px gives the flow -3.14 and the " +
+                 "application +3.20. Three rounds of prose nothing forced to agree with the code, which is " +
+                 "the hazard v4638 recorded arriving from the other direction. The negation is kept, the " +
+                 "sentence is what changed, and the one sabotage that can reach those rows is a mutation of " +
+                 "opticalFlow.mjs rather than of this pass. Eleven sabotages; every row reddened by one. " +
+                 "*** ONE IS OF THE RIG AND IS LABELLED AS A WEAKER CLASS. *** Section 3's premise row -- " +
+                 "that the application really is silent -- cannot be reached by any mutation of the pass, " +
+                 "only by moving the scene's camera, and a thousandth of a world unit does it. A FIRST " +
+                 "attempt leaked the slide into the world-point computation instead: the application stayed " +
+                 "genuinely silent, the row stayed green and was RIGHT to, and the near miss is recorded " +
+                 "because a sabotage that misses what a row measures is not evidence about that row. " +
+                 "*** AND THIS ROUND'S VERIFY SWEEP FOUND A RED THIS TREE HAD BEEN CARRYING FOR TWO " +
+                 "VERSIONS. *** render/opticalFlowGPU.mjs arrived at v4674 and reddened " +
+                 "tools/ship/runnerCallers-selfcheck.mjs ON ARRIVAL; v4674 and v4675 both shipped green-" +
+                 "looking and neither named it. *** WHAT LET THAT HAPPEN IS STRUCTURAL AND IS THE FINDING. *** " +
+                 "Both closings declare `swept: 0`, and this record's own invariant is " +
+                 "`red === redOnArrival.length` -- which a round that sweeps NOTHING satisfies trivially. A " +
+                 "round can add a device runner, redden a census, and close with an internally consistent " +
+                 "empty ledger -- and it is worse than that: this record's own shape requires " +
+                 "`added.length === swept` and `redOnArrival` to name only gates in `added`, so a red a round " +
+                 "causes in an EXISTING gate has NO SLOT HERE AT ALL. The ledger is a record of how the " +
+                 "round's OWN gates arrived, and it cannot be made to answer what the round broke elsewhere. The ratchet is widened to 4 with the note it owes -- a flow field has no " +
+                 "consumer on fsr.html, and flowReconcile is CPU-only so it does not retire the debt either " +
+                 "-- and the gate now states that this is the SECOND widening in nine rounds, so the next " +
+                 "round that wants a third has to write the count down. v4674's and v4675's closings are " +
+                 "left exactly as they shipped: a superseded record is evidence about the method. " +
+                 "*** AND THE SAME SWEEP FOUND A SECOND STANDING RED, NAMED HERE AND NOT FIXED HERE. *** " +
+                 "tools/ship/gateReport-selfcheck.mjs is red on four rows and was red at v4675 too, on ten " +
+                 "gates that print a table of numbers and emit no machine-readable report -- " +
+                 "render/opticalFlow-selfcheck.mjs and render/luminancePyramid-selfcheck.mjs among them, so " +
+                 "this arc put two of the ten there. v4676 does not add an eleventh and does not clear it: " +
+                 "that is a round of its own, and claiming it here would be claiming work not done.",
+    }),
+    // v4675 -- THE 285th CLOSING: sub-pixel, and two rows the scoping pass quietly disarmed.
+    since360: Object.freeze({
+        at: "v4675", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]), redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** A WHOLE-PIXEL FLOW CANNOT CARRY A FRAME GENERATOR. *** The true displacement between " +
+                 "two frames is almost never an integer, so an interpolated frame placed on one is misplaced " +
+                 "by a fraction EVERY frame -- judder, not blur. v4673's closing named this first. A parabola " +
+                 "through the winning SAD and its two neighbours locates the vertex, on CPU and in the " +
+                 "kernel, at the FINEST level only. MEASURED against a bilinearly-shifted fixture, with the " +
+                 "refinement switched off as the control arm: 0.500 -> 0.072 px mean error at (3.5, -2), " +
+                 "0.354 -> 0.197 at (2.25, 1.75), 0.585 -> 0.219 at (3.4, -1.6). Better on EVERY shift, not " +
+                 "on average, and it does not drift at a true integer displacement. " +
+                 "*** ADDING IT MADE SECTIONS 1-3 RED, CORRECTLY, AND THE REPAIR DISARMED TWO OTHER ROWS. *** " +
+                 "At a TRUE integer shift the SAD surface of a smoothed random field is not perfectly " +
+                 "symmetric, so the parabola finds a small REAL offset -- 3.0665 rather than 3 -- and rows " +
+                 "asserting integer equality were measuring the search AND the refinement while naming only " +
+                 "the search. Moving them to subpixel: false was right and silently left the CLAMP and the " +
+                 "denominator guard tested by nothing; two sabotages found that. The flat-field row asks for " +
+                 "the refinement again, and a new row drives four displacements at the EDGE of the search " +
+                 "window, where the parabola genuinely overshoots. " +
+                 "*** AND TWO SABOTAGES ARE RECORDED AS 0-RED BECAUSE THEY ARE NOT HOLES. *** Refining at " +
+                 "every level changes nothing: a fraction found on a coarse mip is ROUNDED AWAY when the " +
+                 "guess passes down, exactly as the module's header says -- so `L === 0` is an efficiency " +
+                 "guard and the sabotage turned that sentence from a claim into a measurement. And removing " +
+                 "the denominator guard changes nothing either: on a flat surface d is 0/0 = NaN and " +
+                 "Math.abs(NaN) <= 0.5 is FALSE, so the CLAMP already returns the integer. The guard is " +
+                 "defence in depth and the module now says which line does the work rather than crediting " +
+                 "the wrong one. Device parity holds to 1.9e-6 of a pixel across four cases, two of them " +
+                 "refining. Five sabotages, three caught, two recorded as no-ops with their reasons.",
+    }),
+    // v4674 -- THE 284th CLOSING: the flow on the device, and no tolerance to hide behind.
+    since359: Object.freeze({
+        at: "v4674", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]), redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** OPTICAL_FLOW_WGSL, ONE DISPATCH PER PYRAMID LEVEL. *** The levels are sequential -- " +
+                 "each starts from the one above's answer -- so the runner ping-pongs two flow buffers, " +
+                 "because a single buffer read and written in one dispatch is a race the encoder will not " +
+                 "order. PARITY: 0 OF 256 BLOCKS DIFFER across four cases, worst confidence delta 3.7e-7. " +
+                 "A flow field is INTEGERS, so a single differing block is a different ANSWER and not a " +
+                 "rounding difference -- there is no tolerance to hide behind, which is why this row is " +
+                 "worth more than most parity rows in this arc. " +
+                 "*** AND TWO OF THE FIVE SABOTAGES ARE v4673's OWN DEFECTS, WRITTEN AGAIN. *** Seeding " +
+                 "`best` with a large number instead of the guess, and taking nearer-OR-EQUAL: the exact " +
+                 "pair v4673 found in its CPU search when a row written to check its own header failed. A " +
+                 "mirror drafted from the REPAIRED code still gets them wrong, and the flat-field row is " +
+                 "what catches it -- 64 blocks at the corner of their search window is the signature. " +
+                 "*** THE PYRAMIDS ARE BUILT ON THE CPU AND THAT IS STATED. *** luminancePyramidGPU exists " +
+                 "and could do it, but then the parity row would compare two DEVICE chains and could not " +
+                 "tell a flow defect from a pyramid one. The subject here is the search. Wiring the device " +
+                 "pyramid is a later round and the closing line names it. No gate added.",
+    }),
+    // v4673 -- THE 283rd CLOSING: the first thing in this tree that is not FSR2.
+    since358: Object.freeze({
+        at: "v4673", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/opticalFlow-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** FSR2 IS GIVEN THE APPLICATION'S MOTION VECTORS AND TRUSTS THEM; FSR3 CANNOT. *** Frame " +
+                 "generation needs to know where the PICTURE went, not where the GEOMETRY went -- a shadow " +
+                 "sliding across a wall, a reflection tracking in a mirror, a scrolling texture: the " +
+                 "surface did not move, the vector is zero, and an interpolated frame built on it holds the " +
+                 "shadow still while everything slides around it. render/opticalFlow.mjs estimates a second " +
+                 "field from COLOUR: a pyramidal block matcher, which is what FSR3's optical flow is. " +
+                 "*** AND IT IS WHAT v4668's LUMINANCE PYRAMID WAS BUILT FOR. *** That round shipped FSR2's " +
+                 "mip chain with no caller -- the exposure it drives multiplies by one on this content -- " +
+                 "and widened runnerCallers' ratchet with a note rather than wiring a decorative dispatch. " +
+                 "Its closing named this round: 'FSR3's frame interpolation wants the same chain for a " +
+                 "different reason and is where it earns its keep next.' A coarse-to-fine search needs " +
+                 "exactly a luminance pyramid, and this one imports that module rather than building a " +
+                 "second definition of brightness. " +
+                 "*** WHAT THE PYRAMID BUYS, MEASURED IN BOTH DIRECTIONS. *** A shift of (3, -2) is " +
+                 "recovered by 64 of 64 confident blocks at ONE level and 59 at three -- the pyramid COSTS " +
+                 "a little, because a guess formed on a quarter-resolution mip is a multiple of four full " +
+                 "pixels. A shift of (9, -7) or (14, 11) is recovered by ZERO of ~52 at one level and ~34 " +
+                 "at three: a search of +-4 cannot reach it, and the blocks are still CONFIDENT -- they " +
+                 "found a good match in the wrong place, which is the row that says confidence is not " +
+                 "correctness. A round reporting only the second half would be selling the pyramid as free. " +
+                 "*** AND THE ROUND'S OWN DEFECT WAS FOUND BY A ROW WRITTEN TO CHECK ITS OWN HEADER. *** " +
+                 "Two sabotages scored ZERO because the fixture could not tell: a rigid shift of a smoothed " +
+                 "random field is recovered under ANY monotone luma, and no two candidates tie exactly on " +
+                 "it. Two fixtures answer that -- a FLAT field, and a METAMER holding 0.25r + 0.5g + 0.25b " +
+                 "constant while Rec.709 varies. The flat-field row then FAILED on the unsabotaged module: " +
+                 "`best` began at Infinity, so the first candidate scanned won every tie, not the guess. " +
+                 "Sixty-four blocks reported the corner of their search window while the header said 'a tie " +
+                 "leaves the centre alone'. The sentence was false, the row that checked it found it, and " +
+                 "seeding `best` with the guess's score left every other figure unchanged. " +
+                 "Five sabotages, five caught after two repairs. RUNTIME 100 ms. No device mirror yet, " +
+                 "which the closing line names alongside sub-pixel flow, real content, reconciliation with " +
+                 "the application's vectors, and frame interpolation itself -- none of which is started.",
+    }),
+    // v4672 -- THE 282nd CLOSING: "FSR2 is complete" becomes a number a reader can recompute.
+    since357: Object.freeze({
+        at: "v4672", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/fsr2Coverage-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** FIFTEEN ROUNDS ADDED FSR2 PASSES AND THE ONLY ACCOUNT OF WHAT REMAINED WAS PROSE IN A " +
+                 "CLOSING LINE. *** tools/ship/fsr2Coverage.mjs maps FSR2's dispatches onto this tree's " +
+                 "modules and the gate grades it. MEASURED: 10 WIRED, 1 GATE-ONLY, 3 MISSING, OF 14. " +
+                 "*** THE MAPPING IS A DECLARATION AND THE MODULE SAYS SO IN ITS OWN HEADER. *** That " +
+                 "temporalReject 'is' ffx_fsr2_depth_clip is a judgement about two pieces of software, and a " +
+                 "tool inferring it from file names would invent a correspondence and report it as a " +
+                 "measurement. What is DERIVED is everything a gate can hold: that the named files exist " +
+                 "(20 across 14 passes), that every pass called WIRED is really imported by fsr.html, and " +
+                 "that the summary counts are the rows counted. So the table can be wrong about what a pass " +
+                 "MEANS and cannot be wrong about what this tree HAS. " +
+                 "*** AND TWO CENSUSES WRITTEN IN DIFFERENT ROUNDS FOR DIFFERENT QUESTIONS AGREE. *** The " +
+                 "one gate-only pass is compute_luminance_pyramid, and runnerCallers -- which walks compute " +
+                 "runners and their importers, knowing nothing about FSR2's pipeline -- independently names " +
+                 "render/luminancePyramidGPU.mjs. Neither is derived from the other, which is the only " +
+                 "reason the agreement is worth anything, and v4668 widened that ratchet for exactly this " +
+                 "file with the reason recorded there. " +
+                 "*** WHAT IS ACTUALLY LEFT, AND ONE OF THE THREE IS NOT A FEATURE. *** Auto-exposure " +
+                 "APPLIED to the chain (the pyramid and exposureFrom exist; nothing multiplies by the " +
+                 "result, and on [0,1] content the scale is 1 -- v4668 measured that rather than assuming " +
+                 "it). TCR, the opaque-vs-composed second mask, for which this tree now has the transparent " +
+                 "CONTENT since v4669 and an application-supplied mask since v4670 but no comparison. And " +
+                 "single-pass SPD, which is an OPTIMISATION and is labelled as one: it computes the numbers " +
+                 "luminancePyramidGPU already computes. Counting that as a missing feature would report " +
+                 "this tree as further from FSR2 than it is, and omitting it would claim a like-for-like " +
+                 "port. Every MISSING row carries a note and a gate row fails if one stops. " +
+                 "Five sabotages, five caught, no 0-RED. V2 is the one worth reading: removing the page's " +
+                 "import moves a pass from wired to gate-only WITHOUT touching the table, which is the exact " +
+                 "failure this file exists for -- a coverage document still claiming a pass runs after the " +
+                 "only thing running it stopped. RUNTIME 2,009 ms, inside the sweep.",
+    }),
+    // v4671 -- THE 281st CLOSING: the primary replicates, and the secondary inverts.
+    since356: Object.freeze({
+        at: "v4671", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** H5 IS CONFIRMED AND IT REPLICATES TO TWO HUNDREDTHS OF A dB. *** v4669 and v4670 both " +
+                 "measured the reactive mask on translucent content, both found large effects, and both " +
+                 "said in the record and in a gate row that they were FIRST LOOKS naming this round. " +
+                 "Pre-registered in a commit containing no data -- hypothesis, direction, statistic (a " +
+                 "conjunction of one-sided paired t and sign, both required), and a window DISJOINT from " +
+                 "the one that produced the first look. Result over frames 54-98: +0.6456 dB, 45 UP and 0 " +
+                 "down, t = 16.82 (p = 4.4e-21), sign 45/45 (p = 2.8e-14), against the first look's " +
+                 "+0.6673 and 51 of 51. NINETY-SIX FRAMES ACROSS TWO WINDOWS WITHOUT ONE GOING THE WRONG " +
+                 "WAY -- a record nothing else in this arc has: dilation loses 8 of 51, the reactive mask " +
+                 "on opaque content loses 18. " +
+                 "*** AND THE DECLARED SECONDARY DID NOT REPLICATE. IT INVERTED. *** v4670 reported the " +
+                 "APPLICATION-supplied mask with the LARGER MEAN -- +0.9024 dB against the derived mask's " +
+                 "+0.6673, head to head +0.2351 at 28 up and 23 down -- and framed FSR2's primary path as " +
+                 "'larger on average and less reliable'. On the fresh window it is +0.1793 and LOSES 36 OF " +
+                 "45 head to head, -0.4662 dB. The reliable half of that claim survived and the headline " +
+                 "half did not: 28/23 was already near a coin flip, and a near-coin-flip is precisely the " +
+                 "statistic that does not replicate. " +
+                 "*** WHICH IS WHAT DECLARING IT IN ADVANCE WAS FOR. *** Carried forward as a finding, " +
+                 "v4670's number would have made this round publish a reversal instead of catch one -- " +
+                 "v4659's eight-predictor mistake that v4660 spent a round undoing. And the superseded " +
+                 "record is LEFT STANDING rather than edited to agree: v4670's figures were correctly " +
+                 "measured on the window it named, they are superseded and not wrong, and a record quietly " +
+                 "rewritten to match a later round is a record nobody can audit. A gate row fails if it " +
+                 "ever is. " +
+                 "Six sabotages, six caught, TWO 0-REDs and one no-op first. Both 0-REDs are the SCOPING " +
+                 "defect -- a row reading a whole document that quotes its own figures in a table, a bullet " +
+                 "and a conclusion, so a change in one place is masked by another. One of them survived " +
+                 "being scoped ONCE and needed scoping twice. v4670 built says() for the other half of this " +
+                 "mistake (how a phrase is matched); no helper fixes this half, because WHERE to look has " +
+                 "to be chosen each time. No gate added.",
+    }),
+    // v4670 -- THE 280th CLOSING: FSR2's primary path, larger on average and less reliable.
+    since355: Object.freeze({
+        at: "v4670", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** render/reactive.mjs IS FSR2's FALLBACK, NOT ITS PRIMARY PATH. *** It DERIVES " +
+                 "reactivity from colour against reprojected history -- ffx_fsr2_autogen_reactive, for " +
+                 "content that will not tell the upscaler anything. The API's primary path is a mask the " +
+                 "APPLICATION hands over, because the application drew the transparency and knows its " +
+                 "alpha. reactiveGPU-selfcheck has asked for the comparison since v4657 and v4669 supplied " +
+                 "the content; this is the declaration, and it is a DECLARATION and not a second " +
+                 "derivation -- it reads the geometry predicate hitBoth already computes and the alpha the " +
+                 "page was asked to draw at, and never a colour, a history or a depth. A sabotage making it " +
+                 "infer from the picture reds, because that mask would be the derived one wearing the word " +
+                 "'application'. " +
+                 "*** HEAD TO HEAD ON THE TRANSLUCENT SLAB, AND THE PRIMARY PATH IS THE LESS RELIABLE " +
+                 "ONE. *** Derived vs no mask: +0.6673 dB, 51 up and 0 down. App vs no mask: +0.9024 dB, 48 " +
+                 "up and 3 DOWN, worst -0.90. App against derived directly: +0.2351 dB but 28 up and 23 " +
+                 "down -- near a coin flip, with the mean advantage coming from a few large wins against a " +
+                 "few large losses. The same shape v4658 found between the shading and reactive masks: " +
+                 "helps more on average, far less reliably. That the shape RECURS is worth noticing. " +
+                 "*** AND THE MECHANISM IS ONE NUMBER. *** The derived mask marks 590 pixels of 36,864 at " +
+                 "or above 0.05; the app mask marks 11,130 -- NINETEEN TIMES as many, a third of the " +
+                 "picture. It is exact about COVERAGE and blind to whether the history was actually wrong " +
+                 "there, marking every pixel the slab covers including the many where the background behind " +
+                 "it is uniform and the reprojection was perfectly good. The derived one is the reverse. " +
+                 "Both halves of the result follow from that figure: the larger mean is what the derived " +
+                 "mask misses, the lost frames are good history discarded across a third of the frame. This " +
+                 "is an argument about THIS mask and not about the API -- a real application's is authored " +
+                 "and can tell a reactive particle from a static decal -- and the record says so. " +
+                 "*** AND THE ROUND BUILT A HELPER FOR A DEFECT IT HAS NOW COMMITTED SIX TIMES. *** Two of " +
+                 "its own rows arrived red: one testing a COMMENT against noComments(raw), and one matching " +
+                 "a wrapped phrase literally, which is the fifth instance of that after v4663, v4665 (where " +
+                 "it silently voided a mutation), v4666 and v4667. Writing the fix down five times changed " +
+                 "nothing, so `says()` now escapes a phrase and joins its words with \\s+, and EVERY prose " +
+                 "row in fsrPage-selfcheck was converted rather than only the new ones -- which immediately " +
+                 "caught a row passing on a `.` wildcard that happened to match an EN DASH. The helper does " +
+                 "not reach the sabotage scripts, and the fifth instance was one of them. Five sabotages, " +
+                 "five caught, one recorded no-op. No gate added.",
+    }),
+    // v4669 -- THE 279th CLOSING: the content the reactive mask exists for, and 51 frames of 51.
+    since354: Object.freeze({
+        at: "v4669", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** FOUR ROUNDS SAID THE REACTIVE MASK WAS BEING JUDGED ON A CASE IT WAS NOT DESIGNED FOR " +
+                 "AND NONE COULD ACT ON IT. *** reactiveGPU-selfcheck has carried the sentence since v4657; " +
+                 "v4665 and v4666 each repeated it while reporting the mask at +0.0820 dB and then +0.0059, " +
+                 "measured on a fully opaque scene built to exercise OBJECT MOTION. v4669 adds the missing " +
+                 "content: the slab can be translucent. " +
+                 "*** THE ASYMMETRY IS THE WHOLE DEFECT, AND IT IS WHAT THE SOURCE ROWS HOLD. *** " +
+                 "Alpha-blended geometry is drawn after the depth pass and writes NO DEPTH, so at a " +
+                 "translucent pixel the depth buffer, the id buffer and the MOTION VECTOR describe the " +
+                 "background while the colour is a blend of two surfaces moving differently. Reprojecting " +
+                 "that along the background's vector is wrong by construction -- nothing can fix it -- and " +
+                 "a reactive mask can only tell the accumulator to trust less of it. A 'transparency' that " +
+                 "also wrote depth would be an opaque slab in a different colour and would measure as one: " +
+                 "the experiment would run, produce numbers, and be about nothing. A sabotage on exactly " +
+                 "that reds. " +
+                 "*** MEASURED: +0.6673 dB, 51 FRAMES OF 51 UP, NOT ONE DOWN. *** Against +0.0820 dB and " +
+                 "18 losses on the opaque slab -- eight times the effect and a perfect sign record. For " +
+                 "scale, this page's other features are the shading mask at +0.117 (21/21) and dilation at " +
+                 "+1.799 (43/51, one frame losing 2.43 dB). The reactive mask on transparent content is the " +
+                 "only thing this arc has measured that is both large and never negative. " +
+                 "*** AND THE MECHANISM IS IN THE MASK'S OWN COUNTERS. *** Depth-gated declines go from 106 " +
+                 "or 216 every frame to ZERO: with no depth written for the slab there is no silhouette in " +
+                 "the depth buffer, the gate never fires, every pixel is examined, and the mask has nothing " +
+                 "to hand off to the disocclusion test. The same fact as the dB, stated twice. " +
+                 "*** IT IS NOT A PRE-REGISTERED RESULT AND THE RECORD SAYS SO. *** No statistic or " +
+                 "threshold was fixed before the data existed, which is the standard this arc has held " +
+                 "since v4660. 51 of 51 needs no test to be believed and that is not the point: the " +
+                 "procedure is what stops a round choosing its verdict. v4671 is the confirming round, and " +
+                 "a gate row fails if the record ever stops saying this. " +
+                 "Five sabotages, five caught, no 0-RED. Three rows in fsrPage-selfcheck had to GROW rather " +
+                 "than loosen: every sampler now carries a second defaulted parameter, and the defaults are " +
+                 "the property that keeps the three older cameras untouched. No gate added.",
+    }),
+    // v4668 -- THE 278th CLOSING: FSR2's first dispatch, and an exposure with nothing to do.
+    since353: Object.freeze({
+        at: "v4668", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/luminancePyramid-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/runnerCallers-selfcheck.mjs"]),
+        verdict: "*** ffx_fsr2_compute_luminance_pyramid IS FSR2's FIRST DISPATCH AND THIS TREE DID NOT HAVE " +
+                 "IT. *** The luminance mip chain down to 1x1, whose bottom is the average luminance that " +
+                 "drives auto-exposure. render/luminancePyramid.mjs, LUMA_PYRAMID_WGSL with base and reduce " +
+                 "entry points, LuminancePyramidGPU, and a gate. The base level imports render/temporal" +
+                 "Reject.mjs's `luma` rather than re-deriving it: 0.25/0.5/0.25 is the Y of the YCoCg the " +
+                 "accumulate pass already clamps in, and a pyramid weighting colour differently from the " +
+                 "pass consuming it would be two definitions of brightness in one pipeline. " +
+                 "*** THE ROUND'S REAL FINDING IS THE EDGE BIAS, MEASURED ACROSS SIZES. *** A 2x2 average " +
+                 "of an odd-width row must do something with the last column; DROPPING it is the plausible " +
+                 "choice -- the mips still halve, the chain still reaches 1x1, every surviving pixel is a " +
+                 "correct average, and the frame's mean quietly stops being the frame's mean. This clamps " +
+                 "instead, double-counting the edge, and the cost was measured rather than waved at: EXACT " +
+                 "at powers of two (8x8, 16x16, 64x64 all 0.0000%), -16.59% at 5x3, -8.50% at 9x9, and " +
+                 "-0.03% at 192x192. It is a SMALL-MIP phenomenon and not an odd-size one -- 191x191 also " +
+                 "reads -0.03% -- so the pass is usable at this tree's sizes and would feed auto-exposure a " +
+                 "number wrong by a sixth at a thumbnail. " +
+                 "*** AND THE EXPOSURE HAS NOTHING TO DO HERE, WHICH IS STATED RATHER THAN DISCOVERED. *** " +
+                 "fsr.html's colour is already in [0,1]: no HDR range to compress, no tone curve after the " +
+                 "upscaler. The scale is 1 to float precision and no PSNR is quoted anywhere in this round, " +
+                 "because claiming an image improvement would be claiming something the content cannot " +
+                 "supply. The pyramid is real and gradeable; the exposure on it is honest arithmetic this " +
+                 "page does not need. " +
+                 "*** THE RATCHET WAS WIDENED RATHER THAN SATISFIED WITH A DECORATIVE CALL. *** " +
+                 "runnerCallers' gate-only census went 2 -> 3 on this runner. v4657 and v4664 each took the " +
+                 "other branch and gave reactiveGPU and dilateGPU a production caller on the round that " +
+                 "added them, because both had real work to do on this content. Wiring fsr.html to dispatch " +
+                 "a pyramid whose exposure multiplies by one would satisfy the census with a dispatch that " +
+                 "does nothing -- the decorative wiring the census exists to make VISIBLE, not the debt it " +
+                 "collects. That row's own text already grants this second case ('a note saying why a gate " +
+                 "is the only sensible one'), and the note says what retires it: HDR content with a tone " +
+                 "curve, or FSR3's interpolation, which wants the same chain. " +
+                 "Five sabotages, five caught, no 0-RED -- and the gate records that its most on-the-nose " +
+                 "row, 'every mip is its parent's average', CANNOT see either size-rule mutation, because " +
+                 "it walks whatever sizes the chain reports. One row was red on arrival: a Float32Array " +
+                 "compared against an f64 luma with ===, the second float32 round-trip this session after " +
+                 "v4664's.",
+    }),
+    // v4667 -- THE 277th CLOSING: enabled, and every pinned figure re-measured rather than swapped.
+    since352: Object.freeze({
+        at: "v4667", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** A PASS WORTH +1.80 dB THAT SHIPS OFF IS A PASS NOBODY GETS. *** v4664 shipped FSR2's " +
+                 "dilation behind a switch defaulting to OFF, deliberately, so a round adding the feature " +
+                 "could not be confused with a round that broke this page's figures -- v4649's `sx` " +
+                 "discipline. v4665 measured it and v4666 located it; v4667 flips the default. " +
+                 "EVERY FIGURE THE PROSE AND THE GATES PIN WAS RE-MEASURED, WITH THE OLD VALUE KEPT BESIDE " +
+                 "THE NEW: the dolly's genuine disocclusions 106 -> 108, the objects camera's alternation " +
+                 "212/106 -> 216/108 (same 27/24 frame split), the reactive mask's mean fired set 404 " +
+                 "(1.03%) -> 363 (0.98%), frame 6 on that camera 39.68 -> 41.34 dB. The counts GROW by the " +
+                 "two to four pixels the neighbourhood search hands the foreground at each silhouette: the " +
+                 "same edges, correctly attributed, not larger errors. The OFF arm stays, because the " +
+                 "control an effect was measured against is not scaffolding to remove once the measurement " +
+                 "is quoted. " +
+                 "*** AND v4663's FINDING SURVIVES FOR THE HARM AND NOT FOR THE HELP. *** Re-derived on the " +
+                 "shipped path: the HARMED frames still put their extra error inside the fired region " +
+                 "(+0.6996 against +0.0831, 13 of 18 per frame) -- the harm is still a localised silhouette " +
+                 "event. The HELP is not: -0.4083 inside against -0.2343 outside, only 18 of 33 mostly " +
+                 "inside, and five times smaller than it was. That follows from v4666 rather than " +
+                 "contradicting it -- dilation has already fixed the pixels the mask was earning its keep " +
+                 "on, so the residue is small and diffuse while the wrong-signed part stays put. " +
+                 "*** ONE GATE'S CONTROL HAD SILENTLY STARTED HOLDING A DIFFERENT VARIABLE. *** " +
+                 "fsrPageClocks compares today's page at startFrame 0 against the page as it shipped at " +
+                 "v4659, to hold that v4661's clock split changed nothing. With dilation defaulting on, " +
+                 "that comparison began measuring DILATION -- a pass v4659 did not have -- and went red on " +
+                 "a change it was never about. Both arms are pinned to dilate OFF now. A control that " +
+                 "quietly changes what it controls reports a real difference as a regression in the thing " +
+                 "it names. " +
+                 "Three sabotages, three caught, TWO 0-REDs first, and they are the same defect: a bare " +
+                 "substring satisfied by a different part of the file. /<option value=\"off\"/ is in the " +
+                 "shading, reactive and dilscope selects too, so deleting the dilate control's own OFF arm " +
+                 "scored zero; and \"v4667\" appears in the bullet above the section whose deletion was " +
+                 "meant to red. That is the SAME defect as /counted: true/ at v4659 and again at v4664, and " +
+                 "as the wrapped-prose matches at v4663, v4665 and v4666 -- four rounds of one mistake, " +
+                 "with the fix written down each time and inherited by nothing. No gate added.",
+    }),
+    // v4666 -- THE 276th CLOSING: the clip chain carried 96% of it, and the mask's share is not separable from nothing.
+    since351: Object.freeze({
+        at: "v4666", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** v4664 ROUTED THREE CONSUMERS TO THE DILATED FIELD IN ONE CHANGE AND v4665 MEASURED " +
+                 "THEIR SUM. *** +1.7992 dB, with nothing in it to say whether one consumer carried all of " +
+                 "it or one was losing while the others won. A control now scopes the reactive mask's input " +
+                 "separately while the clip chain keeps the dilated field in both arms. " +
+                 "MEASURED over the same 51 paired frames: clip chain alone +1.7231 dB (t = 5.87, sign " +
+                 "41/51, both clear); both consumers +1.7992 (t = 6.73, sign 43/51, both clear); ADDING THE " +
+                 "MASK +0.0761 dB, t = 1.38 and sign 29/50 -- clearing NEITHER. *** THE CLIP CHAIN CARRIES " +
+                 "96%. *** v4664 routed all three together and for the mask that choice was not justified " +
+                 "by measurement; it is not harmful, it is simply not distinguishable from nothing here, " +
+                 "and now that has been measured rather than assumed either way. " +
+                 "*** AND THE MASK'S OWN VALUE COLLAPSES ON THE CLIP CHAIN'S ACCOUNT, NOT ON ITS OWN INPUT'S. " +
+                 "*** It is worth +0.4004 dB undilated, +0.0059 with dilation on the CLIP ONLY, and +0.0820 " +
+                 "with it on the mask too. Six thousandths of a dB, harming half the frames it touches, the " +
+                 "moment the clip test is fixed. That sharpens v4665's secondary rather than repeating it: " +
+                 "the mask was earning its keep by catching silhouette pixels the clip test MISHANDLED, and " +
+                 "dilation makes the clip test handle them. Still not a case for deleting it -- FSR2 ships " +
+                 "it for shader-animated and transparent content this page does not contain and dilation " +
+                 "cannot help with. " +
+                 "*** THE LOCK RING IS DELIBERATELY NOT IN THE SWITCH, AS A MEASUREMENT. *** It feeds " +
+                 "shadingShift, the shading mask is OFF in every arm these figures were taken on, and its " +
+                 "ring never fills inside scene 3-53 anyway (v4662: identical to four decimals). A third " +
+                 "option would be a control that cannot move its own number. " +
+                 "The decomposition is labelled EXPLORATORY and the contrast between the two dilated arms " +
+                 "as POST-HOC, because it decomposes an already-confirmed effect and was not declared in " +
+                 "advance -- and a gate row holds that the labels are still there. " +
+                 "Six sabotages, six caught, and one row RED ON ARRIVAL for the third time this session in " +
+                 "the same way: a phrase matched literally against a WRAPPED markdown record, where it " +
+                 "straddles a line break. The same shape cost v4665 a sabotage that silently did nothing. " +
+                 "Phrases matched against these records now use \\s+ between words. No gate added.",
+    }),
+    // v4665 -- THE 275th CLOSING: +1.80 dB, and it eats most of the feature beside it.
+    since350: Object.freeze({
+        at: "v4665", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** H4 IS CONFIRMED AND IT IS THE LARGEST EFFECT THIS ARC HAS MEASURED. *** v4664 showed " +
+                 "on a fixture that dilation removes 112 spurious disocclusions and leaves 0, which " +
+                 "describes the MECHANISM and is not evidence the picture improves. Pre-registered in a " +
+                 "commit containing no data -- hypothesis, direction, window, and a CONJUNCTION of a " +
+                 "one-sided paired t-test AND a one-sided sign test, both required to clear, declared that " +
+                 "way because v4658's t-test cleared at 21 frames while its sign test did not and the round " +
+                 "could have quoted whichever it preferred. " +
+                 "RESULT over 51 paired frames: mean +1.7992 dB, sd 1.9086, 43 up and 8 DOWN, t = 6.73 " +
+                 "(p = 7.9e-9), sign 43/51 (p = 3.4e-7). Both clear. Against this page's other two " +
+                 "switchable features -- the shading mask at +0.117 and the reactive mask at +0.400 -- this " +
+                 "is four and a half times the second and fifteen times the first: what a missing " +
+                 "STRUCTURAL pass looks like beside two refinements. " +
+                 "*** AND IT IS NOT FREE, WHICH THE MEAN HIDES. *** Eight frames are worse, one by 2.43 dB " +
+                 "-- a LARGER single-frame loss than the reactive mask's worst (1.22). Giving a background " +
+                 "pixel the foreground's motion sends its history where the background never went. " +
+                 "*** THE DECLARED SECONDARY IS THE INTERESTING HALF: THE TWO FEATURES OVERLAP. *** With " +
+                 "dilation on, the reactive mask is worth +0.0820 dB instead of +0.400 and harms 18 frames " +
+                 "instead of 14. Coherent with v4663 rather than surprising: that round localised the " +
+                 "mask's entire effect, help and harm alike, to the one percent of the picture at the " +
+                 "slab's silhouette, and this pass rewrites exactly that population first. Most of what the " +
+                 "mask was buying, dilation has already bought; what is left is the part going the wrong " +
+                 "way. It does NOT follow that the mask should go -- FSR2 ships it for shader-animated and " +
+                 "transparent content this page does not have and dilation cannot help with, and a null on " +
+                 "one scene is not a verdict on a feature. The secondary was declared IN ADVANCE precisely " +
+                 "so it could not become a finding discovered afterwards, which is v4659's eight-predictor " +
+                 "mistake that v4660 spent a round correcting. " +
+                 "The default stays OFF: every figure in this page's prose and in five gates was measured " +
+                 "on that arm, and moving it is a separate round with its own re-measurement. " +
+                 "Five sabotages, five caught, one recorded NO-OP -- a mutation written out as a whole " +
+                 "sentence the record wraps across a line, which never matched and is logged as a no-op " +
+                 "rather than as a 0-RED, because the difference is the whole value of a sabotage log. " +
+                 "No gate added.",
+    }),
+    // v4664 -- THE 274th CLOSING: FSR2's earliest pass, which this tree never had.
+    since349: Object.freeze({
+        at: "v4664", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/dilateGPU-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** FSR2 DOES NOT HAND DEPTH-CLIP AND THE LOCKS RAW PER-PIXEL DATA, AND THIS TREE ALWAYS " +
+                 "HAD. *** It DILATES first: each pixel takes the nearest depth in its 3x3 neighbourhood and " +
+                 "the motion vector of whichever pixel that depth came from, so a silhouette edge reprojects " +
+                 "with the FOREGROUND. render/dilate.mjs, DILATE_WGSL with a counted entry point, DilateGPU, " +
+                 "and a gate. Every consumer downstream -- disocclusionCPU, the lock ring, the reactive mask " +
+                 "-- had been reading undilated data since it was written. " +
+                 "*** WHAT IT BUYS, MEASURED ON A FIXTURE WHERE THE SLAB HAS NOT MOVED: 112 SPURIOUS " +
+                 "DISOCCLUSIONS BECOME 0. *** Undilated, each silhouette-ring pixel carries the background's " +
+                 "zPrev while the depth recorded there last frame is the slab's, so the clip test reads " +
+                 "something nearer than expected and calls it a disocclusion -- though nothing was " +
+                 "uncovered. Dilated, the ring carries the slab's own zPrev and the test agrees with itself. " +
+                 "*** `source` IS THE INSTRUMENT AND D2 PROVES IT. *** The runner returns WHICH pixel each " +
+                 "output came from, because on flat geometry -- most of any frame -- a dilation that fired " +
+                 "everywhere and one that fired nowhere produce the IDENTICAL depth and motion buffers. " +
+                 "Changing the kernel's tie rule to nearer-OR-EQUAL leaves the depth buffer bit-identical " +
+                 "and is caught only through the source buffer. " +
+                 "*** OFF BY DEFAULT, WHICH IS v4649's `sx` DISCIPLINE AND NOT TIMIDITY. *** This page's " +
+                 "figures -- 106 genuine disocclusions, the 212/106 alternation, the reactive mask's 404 " +
+                 "fired pixels -- are quoted in its prose and pinned by five gates, and dilation moves all " +
+                 "of them. A round that moved them while adding a feature could not be told from a round " +
+                 "that broke them. The page calls the runner anyway, because runnerCallers' ratchet caught " +
+                 "the third gate-only runner on the round that added it, exactly as it caught reactiveGPU at " +
+                 "v4657: this session's instrument catching this session's habit for the second time. " +
+                 "Twelve sabotages, twelve caught, TWO 0-REDs on the page rows and both repairs. The second " +
+                 "is worth reading: v4659 wrote the identical `counted: true` row for the reactive mask, " +
+                 "found a bare substring test satisfied by rejectAndAccumulate's own further down the page, " +
+                 "and fixed it WITH A COMMENT SAYING SO -- and four rounds later the same row was written " +
+                 "the same way in the same file and scored the same zero. A lesson recorded in a file is not " +
+                 "a lesson the next row inherits. " +
+                 "And two of the new gate's own rows were RED ON ARRIVAL, both fixture defects: a " +
+                 "Float32Array value compared against the f64 literal 0.05 (0 of 112), and a section that " +
+                 "asserted what the pass is FOR rather than what the fixture does -- it claimed dilation " +
+                 "would ADD disocclusions by the ring, where both arms read zero because that case is an " +
+                 "occlusion. Rebuilt around what dilation actually removes.",
+    }),
+    // v4663 -- THE 273rd CLOSING: the harm and the help are one mechanism, in one percent of the picture.
+    since348: Object.freeze({
+        at: "v4663", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** EVERY INSTRUMENT THIS ARC BUILT REPORTS A PER-FRAME SCALAR, AND THE HARM IS A " +
+                 "PER-PIXEL EVENT. *** Three rounds correlated frame-level numbers against each other and " +
+                 "spent three explanations (the jitter, the wide/narrow split, the history's age). v4663 " +
+                 "splits the SAME squared error the PSNR is computed from by where the reactive mask " +
+                 "actually fired -- one branch, two sums, and they reconstruct the printed dB to 0.0014 dB, " +
+                 "which is the rounding. Over scene 3-53 the fired set averages 404 of 36,864 pixels, ONE " +
+                 "PERCENT: " +
+                 "on the 14 HARMED frames d(SSE) is +0.628 inside it and +0.085 outside; on the 37 HELPED " +
+                 "frames it is -2.308 inside and +0.062 outside. Per frame rather than as a ratio of means: " +
+                 "11 of 14 harmed frames put most of the extra error inside, and 32 of 37 helped frames put " +
+                 "most of the saving there. " +
+                 "*** SO THE MASK IS NOT DOING COLLATERAL DAMAGE SOMEWHERE ELSE. *** It acts exactly where " +
+                 "it fires, and in that one percent it is a bet whose SIGN varies -- worth -2.3 when right " +
+                 "and +0.6 when wrong, which is why the mean is positive and fourteen frames still lose. " +
+                 "That reframes what three refuted hypotheses were hunting: there may be NO frame-level " +
+                 "property that marks a harmed frame, because the harm is not a property of the frame. The " +
+                 "residue is the three exceptions -- frame 43, the worst at -1.22 dB, puts 1.337 of its " +
+                 "extra error OUTSIDE the fired set against 0.448 inside -- and they are unexplained. " +
+                 "*** THE PARTITION IS EACH ARM'S OWN MASK AND THE READOUT SAYS SO. *** The mask reads the " +
+                 "current frame against the HISTORY, which is precisely what the arms differ in, so the " +
+                 "fired set is not the same set on both sides; both pixel counts are printed (404 on " +
+                 "average with the mask on, 410 with it off) so a reader can see whether the partitions are " +
+                 "comparable instead of assuming it. " +
+                 "Three sabotages. ONE 0-RED: moving the fired threshold from reactiveCPU's reported 0.05 " +
+                 "to `> 0` left the reconstruction row GREEN, because any partition of the same pixels adds " +
+                 "up to the same dB -- v4654's exact mistake, which once reported '36,862 of 36,864 pixels " +
+                 "shading-shifted' and had its conclusion inverted on re-measurement. The row that catches " +
+                 "it is about the fired set's SIZE: 0.87% against nearly 100%. ONE NO-OP recorded as a " +
+                 "no-op and not as a 0-RED: a caveat-deleting mutation hit the phrase's copy in the COMMENT " +
+                 "rather than in the template string and never reached the page. " +
+                 "And the readout's first draft passed two arguments to a one-argument `say`, printing a " +
+                 "bare label with the measurement dropped in silence -- caught by reading the output, which " +
+                 "an exit code would never have shown. No gate added.",
+    }),
+    // v4662 -- THE 272nd CLOSING: the youngest history was harmed least, and the hypothesis was mine.
+    since347: Object.freeze({
+        at: "v4662", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** H2 IS REFUTED, AND THE DATA POINT THE OTHER WAY. *** v4661 split fsr.html's scene " +
+                 "clock from its history's age so the one experiment that could separate them became " +
+                 "possible; v4662 pre-registered it -- hypothesis, DIRECTION, one-sided Fisher's exact, " +
+                 "threshold, windows -- in a commit containing no data, and ran it. Three cells, all with " +
+                 "the shading mask off: scene 3-53 with the history grown alongside, 14 of 51 harmed " +
+                 "(27.5%); scene 54-98 grown alongside, 3 of 45 (6.7%); scene 54-98 on an accumulator EMPTY " +
+                 "at scene 54, ZERO of 45, and the best mean of the three (+0.6371 dB). The youngest " +
+                 "history is harmed LEAST. One-sided p = 1.000. " +
+                 "*** THE CANDIDATE THIS KILLS IS THE ONE THIS SESSION ITSELF PUT FORWARD. *** v4660's " +
+                 "record named convergence as 'the obvious next suspicion' and wrote it down as a candidate " +
+                 "rather than a conclusion, which is the only reason it could be refuted cleanly instead of " +
+                 "quietly assumed. THREE explanations for v4658's harm are now spent: the jitter (v4659, " +
+                 "refuted, wrong sign), the wide/narrow split (v4660, confirmed and beside the point -- it " +
+                 "holds its size in both windows while the harm nearly vanishes), and the history's age. " +
+                 "What is left is the scene window itself, which is an ASSOCIATION and not a mechanism, and " +
+                 "both the page and the record say so. " +
+                 "*** AND THE SHADING MASK WAS RULED OUT BY MEASUREMENT RATHER THAN BY ARGUMENT. *** Cell " +
+                 "A's figures came from v4658 with shading ON while every cell here has it OFF, so A was " +
+                 "re-collected: identical to FOUR DECIMALS. Not luck -- the shading ring is 2 x " +
+                 "jitterPhaseCount slots, 64 at ratio 2, and that window never reaches age 64, so the mask " +
+                 "is all zeros across it by construction. " +
+                 "One frame of cell C is untestable (no previous depth on the first accumulated frame, both " +
+                 "arms identical, delta exactly 0) and is counted as NOT harmed under the pre-declared " +
+                 "rule, which makes C's rate smaller and is conservative against the hypothesis; kept as " +
+                 "written rather than excluded. " +
+                 "Seven sabotages, seven caught, ONE REPAIR: the row holding the 'fourth cell does not " +
+                 "exist' caveat tested the whole file, and that caveat is written TWICE by design -- " +
+                 "declared before the run, restated beside the result -- so deleting the restatement, the " +
+                 "copy a reader of the outcome meets, scored ZERO. The row requires both now. Git holds the " +
+                 "ORDERING of a declaration, not its later integrity. No gate added.",
+    }),
+    // v4661 -- THE 271st CLOSING: one variable was two clocks, and reset() zeroed both.
+    since346: Object.freeze({
+        at: "v4661", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/fsrPageClocks-selfcheck.mjs"]),
+        // EMPTY, and that is the field's meaning rather than a tidy-up: the ledger's own invariant is
+        // red === redOnArrival.length, so this names gates LEFT red, not gates that were briefly red while
+        // being written. This one failed its first run on a bound this round invented and then derived; it
+        // ships green. The story is in the verdict, which is where it belongs.
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** fsr.html's `frame` COUNTED THE ACCUMULATIONS AND ALSO FIXED THE SCENE. *** sxCur = " +
+                 "frame * SLAB_DX, dollyVP(frame), dx = frame * PAN -- and reset() zeroed it, so an EMPTY " +
+                 "history could only be seen at the scene's start and scene time 54 could only be reached " +
+                 "carrying fifty-four frames of history. v4658's open question is exactly which of the two " +
+                 "the reactive mask's harm follows (14 of 51 frames lost over 3-53, 3 of 45 over 54-98) and " +
+                 "no experiment this page could run would have separated them. Six scene sites now read " +
+                 "sceneT() = frame + startFrame; at startFrame 0 that IS the expression it replaced, and the " +
+                 "page reproduces v4659's page EXACTLY over six frames, driven from git rather than from a " +
+                 "second copy on disk. " +
+                 "*** THE CROSSOVER IS THE ROW, AND IT NEEDS BOTH HALVES. *** At history age k the scene is " +
+                 "at time K+k-1, and the disocclusion count -- fixed by two consecutive scene times, with no " +
+                 "colour history in it -- agrees ACROSS the two configurations to the pixel, while the PSNR " +
+                 "does not and the younger accumulator loses at every age. A control that silently did " +
+                 "nothing passes the first and fails the second; one that moved the scene to the wrong place " +
+                 "passes the second and fails the first. " +
+                 "*** AND THE FIRST CONTROL SILENTLY DID NOTHING. *** It was a <select> with four options, " +
+                 "and assigning a value a select has no option for leaves its value EMPTY -- so the page " +
+                 "fell back to 0 and a crossover asking for scene time 8 produced the scene's first four " +
+                 "frames TO THE LAST DECIMAL PLACE. That reads exactly like 'starting later changes " +
+                 "nothing', which is a conclusion, and it would have been wrong. A number input now, and a " +
+                 "row that reads the value back off the element. " +
+                 "*** RED ON ARRIVAL, ON AN INVENTED BOUND OF MY OWN. *** The row holding that the " +
+                 "reconstruction DIFFERS first read `> 0.5 dB`, a level chosen because the first two ages " +
+                 "cleared it; the third reads 0.34 and the gate failed on its threshold rather than on the " +
+                 "page. Both replacements are derived: the floor is 0.01 dB, which is what the readout " +
+                 "PRINTS, and the direction (younger history is worse) is the half with content. " +
+                 "Five sabotages, three caught here and two caught only by fsrPage-selfcheck -- C4 changes " +
+                 "the previous scene time on the first tick alone, where nothing consumes it, and C5 breaks " +
+                 "still panes this gate does not read. Both stated rather than papered over. " +
+                 "*** C2 WAS A 0-RED THAT CAUGHT A FALSE SENTENCE. *** A note claimed the crossover already " +
+                 "held the jitter phase, 'since the depths it counts are rendered through the offset'. " +
+                 "Setting jit.index = 0 scored ZERO. It is false -- renderDepth takes the UNJITTERED matrix, " +
+                 "because motion vectors and the depths they are tested against are jitter-free by " +
+                 "convention -- so the count cannot depend on the phase and never could. A plausible " +
+                 "paragraph was standing where a row belonged; the row now reads the offsets the page prints " +
+                 "and compares them across configurations. " +
+                 "RUNTIME 11,830 ms, out of the quick sweep and stated: three page drives is what a " +
+                 "behavioural claim about two configurations costs. It was 14,544 ms against a 20,000 ms " +
+                 "SIGKILL ceiling, which is a gate that dies on a busy box, and two of the three guesses " +
+                 "about where the time went were wrong -- collapsing twelve resets into three bought 1 s; " +
+                 "the ticks are the cost.",
+    }),
+    // v4660 -- THE 270th CLOSING: the lead confirmed, and the question it was found chasing still open.
+    since345: Object.freeze({
+        at: "v4660", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** H IS CONFIRMED, BY A TEST DECLARED IN A COMMIT THAT CONTAINED NO DATA. *** v4659 found " +
+                 "that frames with the wider (212-pixel) depth-gated set gain less from the reactive mask " +
+                 "than frames with the narrow (106) one -- p = 0.056, the BEST OF EIGHT predictors tried " +
+                 "against the same 51 frames, and worth nothing on its own. render/reactive-preregistration" +
+                 ".md fixed the hypothesis, its DIRECTION, the statistic (one-sided Welch), the threshold " +
+                 "and the frame range BEFORE the data existed; git log holds the ordering. A design probe " +
+                 "collected the GROUPING variable only -- never dTmp -- and found the two groups survive to " +
+                 "frame 98 and then vanish when the slab leaves the depth gate's reach, which fixed the " +
+                 "range at 54-98 and was also committed before any outcome. " +
+                 "RESULT over 45 fresh frames: narrow +0.7457 dB (n=21), wide +0.4029 (n=24), difference " +
+                 "+0.3428, Welch t = 2.17, df 30.2, one-sided p = 0.0192. AND THE EFFECT SIZE REPLICATES " +
+                 "ALMOST EXACTLY: the discovery sample's difference was 0.351 dB, this one's 0.343. Two " +
+                 "disjoint samples, two near-identical differences, the second from a test that did no " +
+                 "searching. " +
+                 "*** AND IT DOES NOT EXPLAIN WHAT IT WAS FOUND WHILE LOOKING FOR, WHICH IS THE PART A " +
+                 "ROUND WOULD BE TEMPTED TO LEAVE OUT. *** The search began at v4659 with one question: why " +
+                 "does the mask make 14 of 51 frames WORSE, one by 1.22 dB? Over 54-98 only THREE of 45 are " +
+                 "harmed, worst -0.50 dB, WHILE THE WIDE/NARROW DIFFERENCE HOLDS ITS SIZE. So the split " +
+                 "predicts how much the mask HELPS and not whether it HURTS, and v4658's defect is still " +
+                 "open -- its jitter explanation refuted at v4659, this one confirmed and beside the point. " +
+                 "Both the page and the record say so in as many words, and a gate row holds that they do: " +
+                 "'confirmed, p = 0.019' printed alone would read as closing a question it does not touch. " +
+                 "Section 7 of fsrPage-selfcheck cross-checks the six figures across the two hand-written " +
+                 "documents and re-derives each stated difference from the means beside it. " +
+                 "Six sabotages, six caught, ONE REPAIR: the subtraction row was first written as " +
+                 "Math.abs((0.586 - 0.235) - 0.351) < 5e-4 -- arithmetic on three literals typed into the " +
+                 "gate, unable to fail unless the gate itself is edited, and the third row of this shape " +
+                 "this session has caught. The figures are parsed out of the record now. No gate added.",
+    }),
+    // v4659 -- THE 269th CLOSING: one counter was three answers, and the name fitted two of them.
+    since344: Object.freeze({
+        at: "v4659", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** THE HYPOTHESIS THIS ROUND SET OUT TO TEST IS REFUTED, AND IN THE WRONG DIRECTION. *** " +
+                 "v4658 measured the reactive mask making 14 of 51 frames WORSE, one by 1.22 dB, and did not " +
+                 "explain it. The stated suspicion was JITTER: the mask compares one frame against history " +
+                 "with no jitter compensation, unlike the shading mask, whose ring spans whole phase periods " +
+                 "so the jitter cancels. Tested by pairing each frame's PSNR delta with the offset the page " +
+                 "itself prints for that frame: r = +0.17 (p = 0.54) against |j|, and the harmed frames " +
+                 "average a SMALLER offset (0.343) than the helped ones (0.401). The frame-to-frame step is " +
+                 "weaker still, r = +0.06. The sign is the opposite of the hypothesis and the magnitude is " +
+                 "nothing. Recorded as the round's finding rather than quietly replaced by whatever was " +
+                 "found next. " +
+                 "*** WHAT THE SEARCH FOUND INSTEAD WAS THAT THE MASK COULD NOT BE ASKED. *** fsr.html " +
+                 "computed the reactive mask, switched it, reported the PSNR it moved, and printed NOTHING " +
+                 "about the mask's own behaviour -- while the shading mask beside it got quantiles at v4655 " +
+                 "for exactly that reason. Worse, nothing was recoverable after the fact: every pixel the " +
+                 "mask DECLINED writes the same 0.0 that a pixel examined and found in perfect agreement " +
+                 "writes. MEASURED on the gate's own fixture: counting zeroes in the finished mask reports " +
+                 "4,608 declined where 3,072 were, overstating by an entire band of contented pixels. " +
+                 "REACTIVE_WGSL gained a mainCounted entry point on the idiom DISOCCLUSION_WGSL already " +
+                 "uses, and the page a readout. " +
+                 "*** AND reactiveCPU's ONE `noHistory` WAS THREE EVENTS UNDER A NAME THAT FITS TWO. *** A " +
+                 "pixel with invalid motion, a pixel reprojected off the frame, and a pixel the DEPTH GATE " +
+                 "turned away are different things, and the third is not 'no history' at all: that pixel HAS " +
+                 "a history, the history is sound, and the mask declined it because the disagreement is " +
+                 "disocclusion's to report. Split into declinedInvalid/declinedOffscreen/declinedDepth with " +
+                 "noHistory DERIVED as their sum on both mirrors. ON THE PAGE THE MISNOMER WAS THE WHOLE " +
+                 "NUMBER: invalid 0, offscreen 0, depth-gated all 106 or 212 of them, every frame. " +
+                 "*** TWO KERNELS, ONE PREDICATE, AND A MEASURED LIMIT ON WHAT THAT PROVES. *** The new " +
+                 "declinedDepth equals the disocclusion counter's `genuine` to the pixel (212 against 212) " +
+                 "from a separately written kernel on a separate dispatch -- and it is the 212/106 " +
+                 "alternation fsrPageObjects-selfcheck has left unexplained since v4649, now visible in a " +
+                 "second place. But handing the reactive mask 1.6x the chain's threshold is a 0-RED, and so " +
+                 "are 1.8x, 2x, 2.5x and 3x; only 4x reds it, and then the count falls straight to zero. The " +
+                 "slab's silhouette is a cliff, so the row pins the predicate and the sign and NOT the " +
+                 "number. Stated on the row rather than repaired by inventing a graded fixture. " +
+                 "*** AND THE LEAD IS NOT A FINDING, BECAUSE OF HOW IT WAS FOUND. *** Frames with the wider " +
+                 "(212-pixel) depth-gated set average +0.235 dB against +0.586 for the narrow (106) ones, " +
+                 "Welch t = 1.97, p = 0.056, and 10 of the 14 harmed frames sit in the wide group. That p " +
+                 "was the BEST of EIGHT predictors tried, and under eight tests the smallest p from pure " +
+                 "noise averages near 0.11 -- so 0.056 is barely better than chance and must not be quoted " +
+                 "as a result. The confirmation is a single pre-declared test on frames not used to find it. " +
+                 "The same gate's closing line already warns that the pixel-boundary story for this " +
+                 "alternation is UNMEASURED and that 2:1 is not what 2.42 px/frame would obviously give; " +
+                 "that warning is honoured here rather than talked past. " +
+                 "Fourteen sabotages, thirteen caught, ONE REPAIR and ONE RECORDED 0-RED. The repair: the " +
+                 "row asserting the page asks for counted: true tested that substring against the WHOLE " +
+                 "page, and rejectAndAccumulate's own `counted: true` satisfied it -- the row named the " +
+                 "reactive call and matched a different one, and only the mutation found it. No gate added.",
+    }),
+    // v4658 -- THE 268th CLOSING: the reactive mask measured, and the sample that was too small.
+    since343: Object.freeze({
+        at: "v4658", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** THE REACTIVE MASK HELPS BY +0.400 dB, AND IT IS THE OPPOSITE SHAPE OF EFFECT FROM THE " +
+                 "SHADING MASK'S. *** Fifty-one paired frames, same content and camera, mask attached and " +
+                 "detached: mean difference +0.4004 dB, sd 0.6563, 37 frames UP and 14 DOWN, one by 1.22 dB, " +
+                 "t = 4.36, sign-test p = 1.8e-3. Against v4656's shading measurement -- +0.117 dB, sd " +
+                 "0.054, 21 of 21 up, t = 10.05 -- this one helps MORE ON AVERAGE and far LESS RELIABLY. " +
+                 "Both are real; only one is safe to turn on and forget, and a round reporting a single " +
+                 "mean would have said they were the same kind of thing. " +
+                 "*** AND THE FIRST SAMPLE WAS TOO SMALL, WHICH IS RECORDED BECAUSE EITHER ANSWER WOULD HAVE " +
+                 "BEEN REPORTABLE. *** At TWENTY-ONE frames the mean read +0.293, the t-test cleared 0.05 " +
+                 "(t = 2.49) and THE SIGN TEST DID NOT (15/21, p = 0.08). Two tests, two verdicts, and this " +
+                 "round could have quoted whichever it preferred -- a real and ordinary way to be wrong, and " +
+                 "the reason the disagreement is written down rather than resolved by choosing. Taking more " +
+                 "samples is what settled it; at fifty-one both agree. " +
+                 "The page gained a second control arm so that number is re-measurable, and the switch is " +
+                 "what made taking more samples possible at all. " +
+                 "Four sabotages, all four caught after ONE REPAIR that was two 0-REDs: the 'defaults to ON' " +
+                 "row named only the SHADING select, so reordering the reactive one scored zero; and nothing " +
+                 "asserted the mask was COMPUTED, only that it was switched -- at the frames any gate runs, " +
+                 "a null mask and a computed-but-ignored one produce identical frames, so the assignment " +
+                 "itself is what had to be held. No gate added.",
+    }),
+    // v4657 -- THE 267th CLOSING: the factor pass's third input, a binding with no source since v4594.
+    since342: Object.freeze({
+        at: "v4657", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/reactiveGPU-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 1,054 ms on real WebGPU, 15 rows. *** THE FACTOR KERNEL MULTIPLIES THREE " +
+                 "INDEPENDENT REASONS THE HISTORY MIGHT BE WRONG AND ONLY TWO HAD PRODUCERS. *** " +
+                 "DISOCCLUSION got one at v4593 and SHADING at v4654; REACTIVE has been a binding with no " +
+                 "source since v4594, with fsr.html passing null and every gate passing zeroes, and " +
+                 "temporalRejectGPU's own closing line saying so. " +
+                 "*** THE DEPTH GATE IS THE DESIGN AND WITHOUT IT THIS IS A SECOND DISOCCLUSION DETECTOR. *** " +
+                 "A pixel is reactive where the colour disagrees with its reprojected history AND the depth " +
+                 "says the reprojection was sound. Where the surface really changed the colour disagrees " +
+                 "too, so an ungated mask reports a disocclusion under another name and multiplies one " +
+                 "reason into the factor twice. The fixture carries all four cases in separate bands and " +
+                 "they separate exactly: reactive 0.4000, unchanged 0.0000, DISOCCLUDED 0.0000 -- with the " +
+                 "same 0.40 colour difference as the reactive band -- and no-history 0.0000. A row confirms " +
+                 "disocclusionCPU claims every one of the 1,536 pixels this mask declined, so the silence is " +
+                 "a division of labour and not a coincidence. " +
+                 "*** AND IT IS NOT THE SHADING MASK, WHICH IS A DIFFERENT INSTRUMENT ON PURPOSE. *** That " +
+                 "one compares halves of a jitter-free LUMA ring over 2*period frames -- slow, sustained " +
+                 "change in the light. This is ONE frame and all THREE channels. The reactive band moves " +
+                 "only BLUE, so a luma-only detector reads almost nothing there, and the sabotage that " +
+                 "swaps three channels for luma goes red on exactly that. Neither contains the other, which " +
+                 "is why the factor pass multiplies rather than maxes. " +
+                 "*** NO HISTORY MEANS 0 AND NOT 1, ON BOTH SIDES. *** The disocclusion mask already writes " +
+                 "1 for a pixel with no reprojection; a second 1 here discards a history the chain had " +
+                 "already decided to discard. And `hasHistory` is a FLAG rather than an inference -- the " +
+                 "history buffer is still bound on frame one, because a bind group is complete or it is " +
+                 "nothing, and a kernel inferring 'no history' from a zeroed buffer would read every pixel " +
+                 "as maximally reactive against black. " +
+                 "*** THE v4654 RATCHET CAUGHT THIS ROUND ON THE ROUND THAT CAUSED IT, WHICH IS WHAT IT IS " +
+                 "FOR. *** runnerCallers-selfcheck went red at 3 against a frozen 2 the moment reactiveGPU " +
+                 "existed with only its gate to construct it -- this session's own instrument catching this " +
+                 "session's own habit, two rounds after being built for exactly that. fsr.html calls it now " +
+                 "and the census is back at 2. " +
+                 "Six sabotages, six caught, NO 0-RED. Parity with the CPU is EXACT (0.00e+0 over 6,144 " +
+                 "pixels) through a gate, a bilinear fetch and a three-channel max. " +
+                 "ONE ERRATUM RECORDED IN THE GATE: its RUNTIME line first read '807 ms median of five' with " +
+                 "five plausible samples, written before the gate was timed. The real figure is 1,054. " +
+                 "fsrPageObjects-selfcheck carries the identical erratum from v4649, so twice is a habit and " +
+                 "it is written down as one rather than quietly swapped.",
+    }),
+    // v4656 -- THE 266th CLOSING: the question v4655 named unestablished, answered by pairing.
+    since341: Object.freeze({
+        at: "v4656", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** v4655 SAID WHETHER THE SHADING MASK HELPS WAS NOT ESTABLISHED. IT DOES, BY +0.117 dB, " +
+                 "AND PAIRING IS THE ONLY REASON THAT IS KNOWABLE. *** The effect is 0.117 dB and the " +
+                 "frame-to-frame spread is 2.12, so UNPAIRED it is EIGHTEEN TIMES smaller than the noise it " +
+                 "sits in and no number of samples taken one way makes it visible -- which is exactly why " +
+                 "two rounds looked at it and could not say. PAIRED over twenty-one frames past the ring's " +
+                 "fill point, same content and same camera, mask attached and detached: mean difference " +
+                 "+0.1171 dB, sd of the difference 0.0534, POSITIVE ON 21 OF 21 FRAMES, sign-test " +
+                 "p = 4.8e-7, t = 10.05. The smallest improvement is 0.02 dB and the largest 0.22. " +
+                 "*** AND THE PAGE GOT THE SWITCH THAT MADE IT MEASURABLE, WHICH IS THE DELIVERABLE. *** An " +
+                 "A/B nobody can flip is a claim about a build that no longer exists. fsr.html has a " +
+                 "shading ON/OFF control now, defaulting to ON, and its readout NAMES the arm -- two runs " +
+                 "produce two lists of numbers, and unlabelled they are one list twice. Verified through " +
+                 "the switch itself after it landed: eleven frames, eleven positive, values identical to " +
+                 "the manual pass. " +
+                 "*** THE METHODOLOGICAL POINT IS THE ROUND'S REAL CONTENT AND IS RECORDED AT THE PAGE: *** " +
+                 "differencing the MEANS throws the pairing away and hands back the 2.12 dB spread. The " +
+                 "measurement is written down as a procedure a person on a rig can repeat -- run to frame " +
+                 "66, record dTmp per frame, flip the switch, run again, difference the two lists FRAME BY " +
+                 "FRAME -- rather than as a number to be believed. " +
+                 "Four sabotages, all four caught after one repair: removing the arm's NAME from the readout " +
+                 "scored 0-RED, because the row claiming a screenshot could not be mistaken for its control " +
+                 "was prose and not a check. It is behavioural now, at frame one, long before the ring " +
+                 "fills. No gate added.",
+    }),
+    // v4655 -- THE 265th CLOSING: v4654 counted a continuous field with a threshold of zero.
+    since340: Object.freeze({
+        at: "v4655", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** v4654 REPORTED '36,862 OF 36,864 PIXELS SHADING-SHIFTED' AND CONCLUDED THE OPPOSITE OF " +
+                 "WHAT ITS OWN NUMBER MEASURED. *** It called the mask 'a global damper rather than a " +
+                 "selective mask' and shipped that in the page, the gate, the closing and the commit " +
+                 "message. THE THRESHOLD WAS ZERO. SHADING_SHIFT is continuous -- clamp(strength * |newer - " +
+                 "older| / scale, 0, 1) -- so on real content almost every pixel differs from its own " +
+                 "history by SOMETHING, and counting floats above zero counts the arithmetic rather than the " +
+                 "signal. " +
+                 "RE-MEASURED AS A DISTRIBUTION, three frames past the ring's fill point: median 0.0009 / " +
+                 "0.0008 / 0.0005, p90 0.0844 / 0.0818 / 0.0763, p99 0.1739 / 0.1698 / 0.1592, peak 0.197 / " +
+                 "0.191 / 0.178, with 5,956 / 5,902 / 6,110 pixels at or above 0.05. The median is a " +
+                 "THOUSANDTH of the scale and about 16% of the frame clears 0.05. *** THE MASK IS " +
+                 "SELECTIVE. *** Whether it HELPS is still not established and is said so: 42.68 / 43.45 / " +
+                 "45.91 dB against a 39.6-42.8 spread before the ring filled is suggestive and is not a " +
+                 "control. " +
+                 "*** AND THE DEVICE GATE STRUCTURALLY CANNOT HOLD ANY OF THIS, WHICH THREE SABOTAGES " +
+                 "PROVED. *** The mask is exactly zero until its ring fills at frame 64 and " +
+                 "fsrPageObjects-selfcheck runs six, so `shading: null`, a constant ring period and a faked " +
+                 "quantile array are all byte-identical there and all scored ZERO. Driving 65 frames costs " +
+                 "~25 s, eight times that gate's budget. The rows moved to fsrPage-selfcheck's new section 6 " +
+                 "and are LABELLED as declaration checks, which this tree rates below behavioural ones -- " +
+                 "runnerReach's header records six sabotages walking past that exact shape -- so each " +
+                 "asserts the VALUE and not the word. " +
+                 "*** ONE OF THIS ROUND'S OWN ROWS WAS A 0-RED AND IT WAS THE CENSUSED DEFECT AGAIN. *** The " +
+                 "first distribution row read `/median /.test(lock) || /NOT YET FILLED/.test(lock)`, and at " +
+                 "six frames the second half is always true, so the quantile half could never fail. That is " +
+                 "tools/ship/constantRows.mjs's fifth mechanism, written by the session that shipped the " +
+                 "census. It is on the source now, where faking the quantiles and reinstating the " +
+                 "count-above-zero both go red. " +
+                 "Seven sabotages, all seven caught after two repairs. No gate added.",
+    }),
+    // v4654 -- THE 264th CLOSING: closing a reachability gap by adding a caller only a gate calls.
+    since339: Object.freeze({
+        at: "v4654", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/runnerCallers-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 1,872 ms, CPU only, 12 rows. *** kernelReach.mjs's OWN CLOSING LINE NAMES THIS AND " +
+                 "CANNOT ANSWER IT: 'a module imported but never called would still read as reachable'. *** A " +
+                 "WGSL kernel becomes reachable the moment a RUNNER imports it, so v4647 closed the temporal " +
+                 "arc's kernel census at zero and v4648 added a rasteriser the same way -- and a runner only " +
+                 "its own gate constructs has MOVED the debt up a level rather than paid it. MEASURED " +
+                 "tree-wide: 15 modules build and dispatch a compute pipeline, and THREE were imported by " +
+                 "nothing but their own selfcheck. Two of the three were this session's. " +
+                 "*** THE ROUND PAYS ONE OF THEM, AND THAT IS HOW THE CENSUS IS KNOWN TO MOVE AT ALL: 3 -> 2. " +
+                 "*** fsr.html now constructs TemporalLockGPU, pushes a luma ring on the objects camera and " +
+                 "feeds SHADING_SHIFT's output to rejectAndAccumulate's `shading` argument -- which that " +
+                 "chain has accepted since v4594 and which NOTHING had ever supplied. " +
+                 "*** AND THE MASK IS EXACTLY ZERO FOR SIXTY-FOUR FRAMES, WHICH THE PAGE SAYS RATHER THAN " +
+                 "LOOKS LIKE. *** SHADING_SHIFT writes 0 at any pixel whose ring is not full, and the ring is " +
+                 "2 x jitterPhaseCount slots because both halves must span the same jitter phases -- that is " +
+                 "the mechanism and not a warm-up that can be shortened. A mask of zeros because the detector " +
+                 "found nothing and one because it has not looked yet are the same picture, so the page " +
+                 "prints the fill state beside it (v4402's rule). MEASURED past the fill point on a real " +
+                 "adapter: at frame 64 the ring is full and 0 pixels are shifted; at frame 70 it is 36,862 " +
+                 "OF 36,864 at peak 0.192. So it engages -- and on this content it marks very nearly EVERY " +
+                 "pixel, which makes it a global history damper rather than a selective mask. WHETHER THAT " +
+                 "HELPS IS NOT ESTABLISHED and is said so: the temporal pane reads 43.21 dB there against a " +
+                 "39.6-42.8 spread over the frames before, which is the same order as the variation. " +
+                 "*** THE TWO SOURCE READERS ARE OPPOSITE CHOICES HERE AND PICKING WRONG IN EACH DIRECTION " +
+                 "IS HOW THAT SECTION WAS EARNED. *** An import PATH is a string, so the import scan reads " +
+                 "noComments -- built on codeOnly it reported all fifteen runners gate-only, including the " +
+                 "five fsr.html plainly imports. A RUNNER is an idiom, so the runner test reads codeOnly -- " +
+                 "built on raw text a header describing a runner reads as one. sourceScan.mjs's docstring " +
+                 "says which answers which, and this round needed both halves of that sentence. " +
+                 "*** PERFORMANCE WAS A CORRECTNESS PROBLEM AT THE SWEEP'S EDGE. *** The first draft stripped " +
+                 "comments once per (runner, file) pair and ran in THIRTY-SIX SECONDS, past the 20,000 ms " +
+                 "SIGKILL cap and not merely the 3,000 ms budget -- and a gate the sweep KILLS reports " +
+                 "nothing at all. Memoise, pre-filter on a raw substring, memoise on top of the filter: " +
+                 "36 s -> 6.5 -> 3.45 -> 1.87, with the census verified identical at every step. The " +
+                 "pre-filters are SOUND rather than approximate, because codeOnly and noComments only ever " +
+                 "REMOVE characters, and two sabotages narrow each past soundness and go red. " +
+                 "Eight sabotages, all eight caught. fsrPageObjects-selfcheck goes 3,358 -> 4,204 ms for the " +
+                 "ring push, which is the cost of the mechanism and is recorded rather than tuned away.",
+    }),
+    // v4653 -- THE 263rd CLOSING: the census was counting fixture source as rows of the tree.
+    since338: Object.freeze({
+        at: "v4653", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** THE 216 BARE `true` ROWS v4651 COUNTED AND DID NOT RATCHET WERE NOT ALL ROWS. *** " +
+                 "Several gates BUILD gate source as string literals -- tools/ship/gateMutation-selfcheck.mjs " +
+                 "plants a decoy that 'counts failures and never reports them' to prove its probe catches " +
+                 "one -- and tools/ship/constantRows.mjs read those through noComments, which keeps string " +
+                 "CONTENTS. That file read as 8 always-true rows out of 17, a 47% INFLATION, and all eight " +
+                 "were lines in a string being written to a temporary file. The aggregate hid it completely: " +
+                 "216 of 29,134 is 0.74%, and the worst gate was at 47%. " +
+                 "*** READING codeOnly INSTEAD IS THE FIX: *** it blanks string contents and regex bodies " +
+                 "while keeping delimiters and line structure, so a fixture's ok( disappears and a real one " +
+                 "does not. alwaysTrue 216 -> 208, population 29,134 -> 29,125, and the gate now drives a " +
+                 "probe holding BOTH halves -- the planted line must be walked past AND the real row beside " +
+                 "it must still be seen, because an extractor that simply refused string-bearing files would " +
+                 "pass the first half and lose the tree. " +
+                 "*** AND codeOnly REVEALED A GENUINE ELEVENTH ROW THAT STRING-STRIPPING ALONE COULD NOT. *** " +
+                 "freeIdentifiers stripped strings and not REGEX BODIES, so /[\\/]vendor/.test(\"...\") read " +
+                 "as though `vendor` were an identifier carrying a value. It is not; a pattern's own words " +
+                 "are text exactly as a string's are. That row is changedPaths-selfcheck's, labelled CONTROL " +
+                 "and deliberate, and the seed moves 10 -> 11. " +
+                 "*** THE REPAIR'S FIRST DRAFT WAS A REGEX FOR FINDING REGEX LITERALS, ONE ROUND AFTER v4652 " +
+                 "SHIPPED A ROUND ABOUT EXACTLY THAT. *** Requiring at least one body character, it skipped " +
+                 "the EMPTY regexes codeOnly leaves behind and then matched from the first slash to the LAST, " +
+                 "eating every identifier between them: `//.test(noComments(hb)) && codeHas(hb, //)` read as " +
+                 "constant with three real values erased. NINE false positives, 11 rows becoming 20. " +
+                 "Importing sourceScan.mjs's regexAllowedHere and regexBody was the fix for the SECOND TIME " +
+                 "IN TWO ROUNDS, and three rows hold that boundary now on both sides: a regex against a " +
+                 "LITERAL is constant, a regex against a VARIABLE is not, and ordinary division is not a " +
+                 "regex at all. " +
+                 "ALSO CHECKED AND NOT THE SAME THING: tools/ship/gateMutation.mjs (v3312) asks whether a " +
+                 "gate PROCESS reports failures at all, by injecting one and watching the exit code. That is " +
+                 "the harness; this is the row. With vacuity.mjs they are three members of one family and " +
+                 "none of them subsumes another. " +
+                 "Four sabotages, all four caught. No gate added; runtime 2,152 -> 1,960 ms, because codeOnly " +
+                 "walks past fixture source instead of tokenising it.",
+    }),
+    // v4652 -- THE 262nd CLOSING: no gate added, and the round before it accused the wrong file.
+    since337: Object.freeze({
+        at: "v4652", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** v4651 BLAMED A SHARED INSTRUMENT FOR ITS OWN EXTRACTOR'S MISTAKE, AND SHIPPED THE " +
+                 "ACCUSATION IN THREE PLACES. *** That round wrote -- in tools/ship/constantRows.mjs, in its " +
+                 "gate, and in this file's since336 -- that its 957 unparsable conditions were caused by " +
+                 "'sourceScan.mjs's noComments cutting a regex literal containing an escaped slash'. IT WAS " +
+                 "NEVER RUN. noComments handles regex literals explicitly through regexAllowedHere and " +
+                 "regexBody, and MEASURED on the exact shape accused -- a pattern containing an escaped " +
+                 "slash -- it returns the source byte for byte. A wrong attribution against a shared " +
+                 "instrument is the worst kind: it sends the next reader to repair a file that is not broken " +
+                 "and leaves the one that is. " +
+                 "*** AND THE FILE THAT WAS BROKEN HAD HAND-ROLLED THE EXACT HEURISTIC sourceScan.mjs " +
+                 "EXPORTS TWO PRIMITIVES TO PREVENT. *** Its header says so in as many words -- 'Rewriting " +
+                 "this heuristic a second time would be exactly the 179-files-mis-lexed-the-same-way defect " +
+                 "this file's own header is about' -- and v4651 wrote the third copy. The copy was worse " +
+                 "than the original in three ways it had no idea about: it did not know that a closing brace " +
+                 "CAN precede a regex, that `return /x/` is a regex because return starts an expression, or " +
+                 "that `<` is unsafe because .html source contains a closing tag. Every one of those was a " +
+                 "condition the census mis-read. " +
+                 "*** THE NUMBER: 957 -> 59, A 94% CUT, WITH THE SEED UNMOVED AT TEN. *** Importing the two " +
+                 "primitives took it to 235; making isParsable's wrapper ASYNC took it to 59, because most " +
+                 "rows that await something put the await inside the condition and that is a syntax error in " +
+                 "a non-async function -- reporting those as unreadable was blaming the tree for a limit of " +
+                 "the test. All 59 that remain contain import.meta, which new Function cannot parse at all, " +
+                 "and the gate now asserts that the WHOLE remainder is that one cause so no reader goes " +
+                 "hunting for a bug that is not there. " +
+                 "*** AND A SABOTAGE FOUND 102 ROWS THE CENSUS HAD NEVER SEEN. *** Mutating the label " +
+                 "scanner's handling of concatenated strings scored ZERO -- a NO-OP and not a 0-RED, because " +
+                 "the code was already inert: it skipped a `+` and then required a comma, which is not what " +
+                 "follows a `+` in ok(\"a \" + \"b\", cond). Every such row was dropped. DEAD CODE DEFENDED BY " +
+                 "A COMMENT DESCRIBING WHAT IT DOES NOT DO is worse than no code, because a reader checking " +
+                 "whether the case is handled finds a sentence saying yes. Repaired, the population goes " +
+                 "29,032 -> 29,134 and none of the new rows is constant. " +
+                 "SECOND ROUND RUNNING THAT A FALSE NEGATIVE HAD TO BE CLOSED BY A DIRECT ROW: v4651's " +
+                 "string-stripping hid one row, this hid 102, and neither is visible to a ceiling ratchet " +
+                 "because both make the number go DOWN. A census needs a row asserting it can still SEE " +
+                 "something, not only rows asserting it has not started seeing too much. " +
+                 "Five sabotages against the repaired extractor, all five caught. No gate was added; " +
+                 "tools/ship/vacuity.mjs's quoted figure was re-derived on the fixed extractor (21,800 of " +
+                 "28,827, 76%) rather than left at the number the broken one produced.",
+    }),
+    // v4651 -- THE 261st CLOSING: a fifth mechanism for vacuity.mjs, and the one that can be scanned for.
+    since336: Object.freeze({
+        at: "v4651", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/constantRows-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2,205 ms, CPU only, 16 rows. *** THIS SESSION WROTE TWO ROWS THAT TESTED THE " +
+                 "LANGUAGE INSTEAD OF THE MODULE, THREE ROUNDS APART, AND FOUND BOTH BY SABOTAGE RATHER THAN " +
+                 "BY READING. *** v4648's packer row asserted `near > 0 && near < 4294967296 && shifted < 0` " +
+                 "with `shifted` computed in the gate; v4650's rounding row read `Math.round(2.5) !== " +
+                 "Math.ceil(2.5 - 0.5)` and never called edgeColumn at all, so swapping the module's ceil for " +
+                 "Math.round scored ZERO failing rows. Twice is a pattern and the tree had no detector. " +
+                 "*** THE PRIOR ART IS tools/ship/vacuity.mjs AND IT REFUSES SCANNERS OF THIS KIND. *** That " +
+                 "file (v4459) names four mechanisms and then declines to build a census, with the number as " +
+                 "its reason: 3,206 candidates across 64% of gates, and 'a scanner that cried wolf three " +
+                 "thousand times would be switched off in a week'. That reasoning is accepted, not disputed. " +
+                 "This is a FIFTH mechanism and it is different in kind -- the predicate is SYNTACTIC rather " +
+                 "than a fact about a collection at run time -- and the number is what earns it: TEN rows " +
+                 "tree-wide out of 28,932 conditions. The looser predicate a reader would try first was " +
+                 "measured and rejected on vacuity's own grounds and the comparison is RUN in the gate rather " +
+                 "than quoted: 'names no imported symbol' flags 21,533, 75%. vacuity.mjs now records the " +
+                 "fifth mechanism and says plainly why the refusal still stands for the other four. " +
+                 "*** THE CENSUS NAMES AND RATCHETS; IT DOES NOT CONDEMN. *** Most of the ten are " +
+                 "language-contract rows a gate is entitled to make -- 0 * Infinity is NaN, ^ and imul " +
+                 "truncate past 2^32 -- each paired with a row that uses the module on the next line. EXACTLY " +
+                 "ONE was an unambiguous defect and it was repaired in this round: " +
+                 "tools/ship/ollamaReadiness-selfcheck.mjs carried a row whose label claimed 'a " +
+                 "no-model-pinned fleet is still READY but says what that means' and whose condition was " +
+                 "`(() => { return true; })()`. The very next row makes that claim properly against a real " +
+                 "unpinned fleet, so the repair was a deletion. Eleven candidates, one defect, seed of ten. " +
+                 "*** THE DETECTOR FOUND ITSELF FIRST, WHICH IS WHY ITS PROBES ARE ASSEMBLED AT RUN TIME. *** " +
+                 "Written as plain literals, the gate's own fixture for v4650's defective row WAS source in a " +
+                 "file this census scans, and it reported twelve where eleven lived. Excluding the file was " +
+                 "the other repair and is worse -- a detector blind to itself is the shape recordDrift.mjs " +
+                 "warns about. Four more false-positive modes were found and each is now a driven row: a " +
+                 "SPREAD read as a property access (5 rows became 56), `of` filtered as a keyword when " +
+                 "kernelReach-selfcheck names a local helper `of` (4 false positives), globalThis listed as a " +
+                 "constant when it is how browser-side gates hand values back, and unparsable fragments -- " +
+                 "sourceScan.mjs's noComments cuts a regex containing an escaped slash, since backslash-slash " +
+                 "ends with the two characters that open a line comment -- counted as constant, which made " +
+                 "the first draft report nine rows, six of them shrapnel. Those 957 are UNRESOLVED and named, " +
+                 "which is kernelReach.mjs's rule. " +
+                 "*** SABOTAGE: FIVE MUTATIONS, ALL FIVE CAUGHT, ONE ONLY AFTER A REPAIR -- AND IT WAS THIS " +
+                 "FILE'S OWN SUBJECT LOOKING BACK AT IT. *** Removing the string-literal stripping scored " +
+                 "ZERO, because the row meant to catch it drove a REGEX where the identifier survived either " +
+                 "way. The damage it hid is the kind a ratchet is worst at seeing: a FALSE NEGATIVE, ten rows " +
+                 "becoming nine, a number that only goes DOWN and so never trips a ceiling. " +
+                 "NAMED UNCHECKED: whether each of the ten IS a defect, which is a judgement about intent and " +
+                 "not a fact this census can derive; the 216 bare `true` rows, the same mechanism in a " +
+                 "blunter form, counted but NOT ratcheted because a placeholder a later row supersedes is a " +
+                 "round of its own; and the 957 unresolved conditions, whose real repair is in " +
+                 "sourceScan.mjs's comment stripper rather than here.",
+    }),
+    // v4650 -- THE 260th CLOSING: the alternation v4649 measured and could not explain.
+    since335: Object.freeze({
+        at: "v4650", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/edgeReveal-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 53 ms, CPU only, 14 rows. *** v4649 LEFT A QUESTION IN ITS CLOSING LINE AND THIS " +
+                 "ANSWERS IT. *** That round's object-motion camera reported a genuine disocclusion count " +
+                 "alternating 212, 106, 212, 106 while the same camera with a static slab read a flat 106. It " +
+                 "named that unexplained rather than offering a plausible story, which is the only reason it " +
+                 "was still there to be answered. The law is exact and holds on ALL TEN frames the page " +
+                 "produced, phase slip included:   genuine(f) = H * (E(f-1) - E(f-2))   where H is the " +
+                 "occluder's screen height in whole pixels and E(f) the integer column of its trailing edge. " +
+                 "A disocclusion is one column of newly uncovered background down that edge, so the count is " +
+                 "the height times the boundaries crossed. *** THE ALTERNATION IS AN INTEGER SAMPLING OF A " +
+                 "NON-INTEGER SPEED AND NOT A PROPERTY OF THE DISOCCLUSION TEST AT ALL: *** the edge advances " +
+                 "1.538 px/frame, which lies between 1 and 2. And H is 106 exactly -- the same 106 the page's " +
+                 "prose calls 'a one-pixel sliver', now derived: from the world size it would be 105.4, so " +
+                 "the continuous figure is 0.6% out and the buffer's count is not. " +
+                 "*** TWO WRONG ANSWERS WERE WRITTEN FIRST, BOTH DEFENDED IN PROSE, AND THE SECOND " +
+                 "CORRECTION CORRECTED THE FIRST. *** floor(p) for the edge column, with a paragraph citing " +
+                 "temporalLockWgsl's floor: 5 of 11 against the page's own hit(), where ceil(p - 0.5) is 11 " +
+                 "of 11 -- the analogy was false, since that floor picks the texel a uv falls inside while " +
+                 "this picks the first column whose CENTRE is inside a region. Then, at length, 'the SPEED " +
+                 "model cannot produce this sequence'. *** THAT IS ALSO FALSE. *** Searching every phase, " +
+                 "floor(f*v + 0.237) - floor((f-1)*v + 0.237) reproduces all ten frames, doubled 212 " +
+                 "included, and such a difference repeats values perfectly happily. It could hardly be " +
+                 "otherwise: the edge's position is LINEAR in f, so the two forms are the same function " +
+                 "written twice. The first attempt left the phase at ZERO and blamed the formula. The module " +
+                 "earns its place on two narrower grounds instead, both now driven: it DERIVES the phase " +
+                 "(which is the edge's sub-pixel offset, so a caller supplying it would be doing the module's " +
+                 "job to call it), and it does not assume a constant speed -- an ACCELERATING occluder gives " +
+                 "four distinct step sizes where any phased constant-speed model gives at most two. " +
+                 "*** SABOTAGE: SEVEN MUTATIONS, ALL SEVEN CAUGHT, TWO ONLY AFTER THE GATE WAS REPAIRED. *** " +
+                 "Swapping ceil for Math.round scored ZERO, because the row meant to catch it read " +
+                 "`Math.round(2.5) !== Math.ceil(2.5 - 0.5)` -- a fact about JavaScript, asserted without " +
+                 "ever calling edgeColumn, and the page's frames never land on an exact tie. THAT IS v4648's " +
+                 "SHIFT ROW IN A NEW COSTUME, the second time in three rounds that a row has tested the " +
+                 "language instead of the module. It drives edgeColumn at a CONSTRUCTED tie now, every value " +
+                 "a power of two so p is exactly 2.5. The other 0-RED was plainer: every comparison started " +
+                 "at index 1, so nothing looked at frame 0, and a frame 0 claiming a full column's reveal " +
+                 "passed. " +
+                 "NAMED UNCHECKED: a VERTICALLY or diagonally moving occluder, where the reveal unit is no " +
+                 "longer a column; ROTATION, which changes H frame to frame and breaks the single height the " +
+                 "law is written around; the LEADING edge, which occludes rather than reveals; and the page's " +
+                 "ten numbers themselves, which are RECORDED here from a v4650 adapter run rather than " +
+                 "re-driven -- fsrPageObjects-selfcheck is what holds the page to still producing them, and " +
+                 "if it ever stops, this gate would go on agreeing with a memory.",
+    }),
+    // v4649 -- THE 259th CLOSING: fsr.html's first motion vector that is not purely the camera's.
+    since334: Object.freeze({
+        at: "v4649", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/fsrPageObjects-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 3,358 ms on real WebGPU, 9 rows, and that runtime is OVER the sweep's 3,000 ms " +
+                 "threshold -- stated below rather than tuned away. *** fsr.html HAS A FOURTH CAMERA AND ITS " +
+                 "OBJECT MOVES. *** Every number this page ever printed came from a scene where only the " +
+                 "camera did, and on such a scene render/objectMotion.mjs IS render/motionVectors.mjs because " +
+                 "every model matrix is the identity. v4646 measured the gap on a synthetic fixture and v4648 " +
+                 "on a rasterised one; neither was a frame. " +
+                 "*** AND THE PRODUCER IS A `return`, NOT A RASTERISER. *** v4648 built a compute rasteriser " +
+                 "because nothing in the tree made an id buffer. This page needs none: hit() returns where " +
+                 "the ray met the scene and its y says which surface that was -- the comparison patternUV has " +
+                 "made on every dolly frame since that camera existed. The identity was computed every frame " +
+                 "and discarded on the next line. " +
+                 "*** ADDITIVE, AND VERIFIED AS SUCH RATHER THAN ASSERTED. *** Every sampler takes a slab " +
+                 "offset defaulting to zero and the three older cameras pass none. Checked by serving the " +
+                 "PRE-CHANGE PAGE ALONGSIDE THE NEW ONE: static, pan and dolly produced IDENTICAL dTmp, " +
+                 "dFsr, disocclusion and accumulate lines over five frames. That control needed the old page " +
+                 "on disk and cannot ship; the zero defaults that made it true are a gate row. " +
+                 "*** THE HEADLINE IS DERIVED: 2.42 px. *** Camera-only predicts ZERO object motion, so its " +
+                 "error IS the slab's screen displacement -- SLAB_DX over the visible span at the slab plane " +
+                 "gives 2.416 px/frame from the geometry against 2.42 measured on a device, and the number is " +
+                 "not free to be anything else. " +
+                 "*** THE ROUND'S FIRST ANSWER WAS WRONG AND THE PRODUCT MEASUREMENT IS WHAT FOUND IT. *** " +
+                 "Object-aware motion scored WORSE than camera-only at every frame -- 13.56 dB against 15.00 " +
+                 "-- and the temporal pane decayed monotonically, 30.94 dB at frame 2 to 19.56 by frame 10. " +
+                 "That would have shipped as a finding about object motion. It was neither: " +
+                 "`ref = truthPersp(vpCur, kind)` did not take the slab's offset, so a moving slab was scored " +
+                 "against a truth that still held it still and the PSNR measured how far it had WALKED. " +
+                 "Corrected, the camera runs 35-43 dB like the dolly's 38-41 and object-aware BEATS " +
+                 "camera-only by up to 4.6 dB. Ruling out a sign error first is what kept it from being " +
+                 "believed: the swapped wiring scored 13.40 against 13.39, so both orientations lost equally " +
+                 "and the fault was not in the motion at all. " +
+                 "*** SABOTAGE: EIGHT MUTATIONS, ALL EIGHT CAUGHT, AND THE FIELD ROWS CAUGHT ONLY FIVE. *** " +
+                 "Swapping the model matrices, letting the depth buffer ignore the slab, and letting the " +
+                 "RENDER ignore it all produce a camera-vs-object gap of exactly the right MAGNITUDE, " +
+                 "because that magnitude is forced by SLAB_DX and the scene's dimensions whatever else is " +
+                 "wrong. Only the reconstructed picture separates them -- and only on the SMOOTH scene: on " +
+                 "the zone plate, detail past Nyquist leaves the temporal pane near 16 dB whatever the " +
+                 "vectors say, and two of them scored zero there. A reconstruction row has to run on content " +
+                 "that can be reconstructed. A ninth defect, the control taking a maximum over an EMPTY SET " +
+                 "and printing a perfect zero, was found by a mutation labelling every pixel the slab; both " +
+                 "populations are counted now. " +
+                 "*** THE BOUND IS PLACED BY MEASURING EVERY WRONG WIRING. *** At frame 6 on smooth: correct " +
+                 "39.92 dB, swapped matrices 35.81, depth ignoring the slab 37.15, camera-only 36.12, fsr1 " +
+                 "34.11. The floor sits at 38.5. A bound at fsr1 would have passed all four, which is what it " +
+                 "did until these were taken. " +
+                 "*** AND THE GATE IS OVER BUDGET, WHICH IS A COST AND NOT A DEFECT. *** These rows took " +
+                 "fsrPageDevice-selfcheck from 2,448 ms to 4,872, so they were SPLIT OUT -- the third split " +
+                 "in this tree for the sweep's threshold and the third taken before the addition landed. That " +
+                 "gate is back to 2,418 and keeps its place; this one runs at 3,358 and does not. The cheap " +
+                 "fix was measured and rejected: at frame 4 the gate costs 2,828 ms and fits, and the four " +
+                 "wirings land inside 0.4 dB of each other because the accumulator has not converged. A gate " +
+                 "that fits the budget and cannot tell a correct wiring from a wrong one is not the cheaper " +
+                 "version of this gate. ALSO PINNED THIS ROUND: the dolly's '106 genuine', which this page " +
+                 "quotes in its own prose and four files repeat, and which no gate held -- the row asked only " +
+                 "for genuine > 0. " +
+                 "NAMED UNCHECKED: why the disocclusion count ALTERNATES 212/106 on the new camera while the " +
+                 "dolly's is a flat 106, measured over frames 2-6 and left unexplained rather than given a " +
+                 "plausible story; and the ZONE PLATE on this camera, where the reconstruction row cannot " +
+                 "separate a correct wiring from a wrong one, so the page's own default scene is the one " +
+                 "case the new gate does not grade.",
+    }),
+    // v4648 -- THE 258th CLOSING: the id buffer v4646 consumed and nothing produced.
+    since333: Object.freeze({
+        at: "v4648", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/visibilityGPU-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 870 ms on real WebGPU, 20 rows. *** v4646 SHIPPED A CONSUMER WITH NO PRODUCER AND " +
+                 "SAID SO. *** render/objectMotionGPU.mjs takes a per-pixel object id; its gate's closing line " +
+                 "named the gap -- 'where the ID BUFFER COMES FROM'. Measured before this round started, over " +
+                 "every .mjs and .js outside vendor: ZERO files mention an object id, primitive id or " +
+                 "visibility buffer, and render/rasterProbe.js -- the tree's only rasteriser -- is a WebGL2 " +
+                 "vertex/fragment pair writing colour and depth and no identity at all. " +
+                 "*** A COMPUTE RASTERISER INTO A STORAGE BUFFER, ONE PACKED WORD PER PIXEL, RESOLVED BY " +
+                 "atomicMin -- THE FIRST atomicMin IN THIS TREE. *** The packing is the correctness argument " +
+                 "and not a saving: the naive form keeps two buffers, atomicMins the depth and has each " +
+                 "triangle write its id where its own depth matched, which is a RACE -- two surfaces at " +
+                 "bit-identical depth both match and the survivor is whichever thread ran last. Depth in the " +
+                 "high 20 bits and id in the low 12 makes one atomicMin decide both: nearest wins, and on an " +
+                 "exact tie the LOWER ID wins on every device, which is more determinism than hardware " +
+                 "offers. Gated three ways -- reversing the triangle list gives the same buffer bit for bit " +
+                 "on the CPU and on a device under real contention, two identical dispatches agree, and " +
+                 "1,600 coincident pixels all resolve to the lower id with the higher id's triangles listed " +
+                 "FIRST. " +
+                 "*** THE QUANTISATION IS STATED AS A NUMBER AND THEN CORRECTED BY ITS OWN MEASUREMENT. *** " +
+                 "The depth step is 9.537e-7, which is 6,560 times below fsr.html's derived disocclusion " +
+                 "threshold. The row asserting the two mirrors therefore land in the same bucket at every " +
+                 "pixel was written before it was run and IS FALSE: 186 of 6,144 words differ, by exactly one " +
+                 "step. What is true, and is the better fact, is that ZERO of the IDS differ -- a one-step " +
+                 "wobble moves the high bits while the surface it competes against is thousands of steps " +
+                 "away, so the winner never changes. " +
+                 "*** THE PAYOFF ROW IS THE ROUND: 4.22 px. *** The ids are fed straight into objectMotionCPU " +
+                 "and camera-only is wrong by 4.22 px on the moving slab and by 0.00 px on the static " +
+                 "background. v4646 measured 2.51 px on a fixture that DECLARED its own id buffer; this is " +
+                 "the same statement with the ids rasterised from geometry by the module under test, and the " +
+                 "second half is what proves the buffer SELECTS rather than perturbs -- a random labelling " +
+                 "would move both numbers. " +
+                 "*** SABOTAGE: NINE MUTATIONS. EIGHT ARE DEFECTS AND ALL EIGHT ARE CAUGHT; THE NINTH IS NOT " +
+                 "A DEFECT. *** Rewriting the JS packer's multiply as a shift plus >>> 0 changed nothing -- " +
+                 "bit-identical at five depths across the range -- so it is a NO-OP and not a 0-RED, and what " +
+                 "it found is that render/visibility.mjs's header was wrong: the load-bearing part is the " +
+                 "unsigned coercion, not the multiply. Drop the >>> 0 and three rows fail. The header is " +
+                 "corrected at its own site rather than quietly rewritten. " +
+                 "THREE MUTATIONS WERE 0-REDS ON THE FIRST PASS AND ALL THREE WERE THE FIXTURE, ALL THE SAME " +
+                 "SHAPE: an axis with no structure on it. Both quads were fronto-parallel, so depth was " +
+                 "CONSTANT across each (spread 0.00e+0 over 2,368 and 3,776 pixels) and flat depth was " +
+                 "indistinguishable from interpolated. The slab spanned the frame's full height, so the id " +
+                 "buffer was exactly y-symmetric (0 of 6,144 differ under a vertical flip) and dropping the " +
+                 "ndc y flip was invisible. Nothing in the DEVICE fixture crossed the eye, so the rejection " +
+                 "count was compared 0 against 0 -- two agreeing absences. THIRD ROUND RUNNING that sabotage " +
+                 "found the fixture rather than the code (v4646's translate(0), v4647's scale = strength and " +
+                 "its one-pixel features), so it has earned a name: A CONTROL IS ONLY A CONTROL ALONG AN AXIS " +
+                 "THE FIXTURE ACTUALLY VARIES. " +
+                 "NAMED UNCHECKED: the THREAD IMBALANCE, since one thread per triangle lets a big triangle's " +
+                 "thread outlive its workgroup and the fix is a tiled binning pass; CLIPPING, which this " +
+                 "REFUSES and counts rather than performs; whether any PAGE calls it -- fsr.html builds its " +
+                 "scene analytically and its hit() already knows which plane it struck, so the page's next " +
+                 "rung is to stop THROWING THAT AWAY rather than to rasterise; and multisampling, absent by " +
+                 "design since the consumer wants the id of the surface at the pixel centre.",
+    }),
+    // v4647 -- THE 257th CLOSING: the temporal arc's last six kernels got a caller, and its census reads zero.
+    since332: Object.freeze({
+        at: "v4647", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/temporalLockGPU-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2,110 ms on real WebGPU, 21 rows. *** tools/ship/kernelReach.mjs's TEMPORAL ARC NOW " +
+                 "READS ZERO. *** The census counts kernels the ENGINE cannot dispatch -- reachable only from a " +
+                 "gate. The arc stood at ten when the census was built, and v4590 took RESOLVE and ACCUMULATE, " +
+                 "v4592 MOTION, v4593 DISOCCLUSION and RECTIFY. render/temporalLockGPU.mjs takes the last six: " +
+                 "RING_PUSH, SHADING_SHIFT, RIDGE, FIELD_RIDGE, COHERENT_RIDGE and RING_FLOOR. Both ratchets " +
+                 "move -- the arc's 6 -> 0 and the tree's 27 -> 21 -- and the SECOND HALF of the tree ratchet " +
+                 "is what asked, going red on the same run the arc row went green, exactly as v4590's note " +
+                 "predicted it would: a ratchet with slack in it is a ratchet holding nothing. " +
+                 "*** WHAT WAS WRONG WAS REACH, NOT COVERAGE, AND THE GATE COUNTS RATHER THAN ASSERTS IT. *** " +
+                 "ELEVEN gates already drove these kernels on a real device, from FOURTEEN hand-rolled dispatch " +
+                 "sites -- and every one of those sites lives inside a runInEngineOrigin script STRING, where " +
+                 "no import graph, validator or rename reaches it. The twelve copies AGREE, which is recorded " +
+                 "because a drift would have been the better story; the one exception is deliberate rather " +
+                 "than drift (temporalRingContent's tie probe packs a one-row strip on purpose). The one cost " +
+                 "that is a NUMBER: all four RING_PUSH frame-loop copies call dev.compute INSIDE the loop, so " +
+                 "an N-frame ring compiles the kernel N times -- free to a gate, impossible for a frame loop, " +
+                 "and the reason the class builds all six pipelines in its constructor. " +
+                 "*** THE HEADER'S OWN NUMBER WAS WRONG AND THE GATE CAUGHT IT ON THE FIRST RUN. *** The " +
+                 "module claimed twelve sites across nine gates, from a grep counting FILES per kernel; the " +
+                 "census counts SITES and found fourteen across eleven. The wrong figure is left recorded " +
+                 "beside the right one, because a number in a header that nothing derives is a number nothing " +
+                 "can correct. " +
+                 "*** SABOTAGE: EIGHT MUTATIONS, ALL EIGHT CAUGHT -- AFTER THE FIXTURE WAS REPAIRED TWICE. *** " +
+                 "Three were 0-REDs on the first pass and all three were the fixture. Swapping scale with " +
+                 "strength did nothing because both were 1. Swapping maxBand with maxPlateau did nothing " +
+                 "because both were 2 -- AND GIVING THEM DISTINCT VALUES WAS NOT ENOUGH: with every feature " +
+                 "one pixel wide, a band of 1 is under either bound and the plateau walk decides at its first " +
+                 "step, so neither word was ever consulted. And the coherence row itself was vacuous, reading " +
+                 "101 coherent of 101 raw at every setting tried, which a kernel that copied the ridge mask " +
+                 "and skipped the band scan would have passed. The repair is a COMB -- alternating depth, " +
+                 "which is pixel-scale texture and exactly what the band test exists to refuse -- taking 303 " +
+                 "raw ridges to 93. THE FIRST OF THE THREE IS A3's Y1 ONE ROUND LATER, where a moving " +
+                 "object's model matrix was written translate(0), which IS the identity. Two rounds running, " +
+                 "so it is written down as a rule: a fixture tests that two parameters are distinct only if " +
+                 "it gives them distinct VALUES, and distinct values are not enough when the content makes " +
+                 "the parameter inert. " +
+                 "TWO of the eight (the dropped ping-pong swap, two kernels sharing a pipeline) are caught by " +
+                 "the DEVICE-ERROR row rather than by parity, which is a weaker catch and is labelled as one " +
+                 "rather than counted the same. " +
+                 "NAMED UNCHECKED: whether any PAGE calls this -- fsr.html still runs the CPU lock path and a " +
+                 "runner existing does not change that; v4559's bounds divergence at an exact texel tie, " +
+                 "deliberately avoided by the fixture's irrational speed and owned by temporalRingContent; and " +
+                 "a per-pixel margin FIELD, which ridgesCPU accepts and every one of these kernels takes as a " +
+                 "scalar uniform, so the runner cannot offer it and says so by not having the argument.",
+    }),
+    // v4646 -- THE 256th CLOSING: the temporal arc's motion vectors stopped being camera-only.
+    since331: Object.freeze({
+        at: "v4646", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/objectMotionGPU-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 779 ms on real WebGPU, 13 rows. *** EVERY MOTION VECTOR IN THIS TREE WAS A CAMERA " +
+                 "MOTION VECTOR. *** render/motionVectors.mjs reprojects depth through the camera's two " +
+                 "matrices, which is exact for a surface that did not move and quietly wrong for one that " +
+                 "did -- the vector stays finite and valid and points at the wrong pixel. MEASURED BEFORE " +
+                 "THE MODULE WAS WRITTEN, three fixtures: static camera with a slab translating 0.30 per " +
+                 "frame is 2.615e-2 uv = 2.51 px from the truth; camera panning with the slab still is " +
+                 "1.676e-8 = 0.00 px; both moving is 2.51 px again. The middle row is why this is an " +
+                 "ADDITION and not a repair -- the old path is exact on its whole domain, and the new one " +
+                 "is held to being BIT-IDENTICAL to it with identity models: 0 of 24,576 floats and 0 of " +
+                 "6,144 valid flags differ. On the moving fixture the object-aware answer is 4.521e-10 uv, " +
+                 "which is the f64 round trip through a matrix inverse rather than a method. " +
+                 "THREE MODULES, the arc's usual three: render/objectMotion.mjs (the CPU truth and the " +
+                 "matrix tables), render/objectMotionWgsl.mjs (six bindings, two of them array<mat4x4<f32>> " +
+                 "indexed by a per-pixel id) and render/objectMotionGPU.mjs (through gfx/device.js, never " +
+                 "raw WebGPU). Device against CPU: 5.960e-8 over 24,576 floats at 96x64. " +
+                 "*** AN ID OFF THE END OF THE TABLE IS REJECTED AND COUNTED, NOT CLAMPED, *** on both " +
+                 "sides: clamping hands the pixel object 0's motion, a well-formed vector for the wrong " +
+                 "surface, which is the exact class of wrongness the module exists to remove. Mismatched " +
+                 "model/prevModel counts and a singular model matrix are refused at build time and say " +
+                 "which object. " +
+                 "*** THE SABOTAGE'S ONE 0-RED WAS THE FIXTURE, NOT THE KERNEL. *** Seven mutations, six " +
+                 "caught at once; the seventh -- the kernel reading invMVPCur[0] instead of invMVPCur[id] " +
+                 "-- passed all thirteen rows, because the first draft gave the two objects models " +
+                 "[IDENT, translate(0)] and translate(0) IS the identity, so both current matrices were " +
+                 "the same matrix and the id lookup was never exercised. The same net motion split across " +
+                 "BOTH frames makes both tables vary by id, and the mutation now takes parity from 5.96e-8 " +
+                 "to 1.31e-2. A TABLE INDEXED BY AN ID IS ONLY UNDER TEST IF ITS ENTRIES DIFFER, and an " +
+                 "identity spelled as an operation that happens to be the identity looks like it differs. " +
+                 "A SECOND WEAK ROW WAS CAUGHT BEFORE the sabotage rather than by it: 'the two objects get " +
+                 "different vectors' first compared each pixel against a wrapped-around neighbour, which is " +
+                 "nearly trivially true; it now reads mean du per object -- 9.387e-3 against -8.717e-3, a " +
+                 "gap of 1.810e-2 -- against the widest within-object spread, 7.451e-8. " +
+                 "NAMED UNCHECKED: where the id buffer COMES FROM -- nothing in the tree rasterises one " +
+                 "yet, which is why fsr.html still runs the camera-only path -- and SKINNED geometry, whose " +
+                 "motion is per-VERTEX and cannot be carried by a per-object matrix at all.",
+    }),
+    // v4641 -- THE 253rd CLOSING: mh_live, the function all eighteen species read and none of them had.
+    since328: Object.freeze({
+        at: "v4641", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurLive-selfcheck.mjs",
+            "tools/ship/murmurLive2-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 1,932 and 1,606 ms on real WebGPU, 10 rows between them, and a correctness fix " +
+                 "rather than a new species. *** EVERY ONE OF murmur's EIGHTEEN SHADERS READS live.voice AND " +
+                 "NOT ONE READS A RAW LEVEL; THIS PORT READ THE RAW UNIFORM AT 44 SITES AND STILL's OWN STYLE " +
+                 "DIAL glintRate AT 8 MORE. *** kit.ts conditions both signals once -- voice^0.65 weighted " +
+                 "1.00 in LISTENING and 0.55 elsewhere, cadence^0.85 weighted 1.00 in THINKING and RESPONDING " +
+                 "and 0.60 elsewhere -- \"so 'loud' and 'busy' mean the same thing across the family\". The " +
+                 "error was not uniform and that is the worst of it: at the species gates' own 0.3 the true " +
+                 "signal is 0.2504 against 0.3000, 20% hot; at 1.0 it is 0.5500 against 1.0000, 45% hot. IT " +
+                 "GROWS WITH THE KNOB, so every species was loudest exactly where it was least faithful and " +
+                 "no single scale factor anywhere could have absorbed it. Measured in the pixels over all " +
+                 "eighteen: at a raw voice of 0 the frames are byte-identical (mean byte change 0.0000), at " +
+                 "0.3 the mean byte falls 51.062 -> 50.837, at 1.0 it falls 56.547 -> 54.479. " +
+                 "*** THE INSTRUMENT IS AN EQUIVALENCE AND NOT A DIFFERENCE, WHICH IS WHY IT COULD BE TIGHT " +
+                 "ENOUGH TO PIN FOUR CONSTANTS. *** A level of 0.30 in LISTENING and 0.752598 in IDLE are the " +
+                 "same conditioned voice, so the two frames must come back BYTE-IDENTICAL -- 0 of 9,216 bytes " +
+                 "differ on arc, still and droplet -- while the 0.991722 a square-root port would need " +
+                 "disagrees by 2,443. Same construction on the cadence (0.729556 against 0.40) and 0 bytes " +
+                 "again on arc and chorus. THINKING and RESPONDING at identical knobs give 0 differing bytes " +
+                 "and LISTENING differs from THINKING by 5,728, which is the two windows being two windows. " +
+                 "still, which murmur gives no cadence, moves EXACTLY 0 bytes across activity 0 to 1 where " +
+                 "arc moves 5,236 and chorus 2,016. *** AND ONE SPECIES' SILHOUETTE WAS WRONG, NOT ITS " +
+                 "EXPOSURE: *** droplet's voice drives mh_shape's swell, which scales the whole body, so its " +
+                 "footprint reads 229 px at the conditioned voice against 221 at the raw one. " +
+                 "*** THE ROUND SPLIT INTO TWO GATES ON A MEASUREMENT AND NOT A PREFERENCE: *** all four " +
+                 "species in one file came back ALL GREEN at 2,772 ms against a 3,000 ms ceiling, 8% of " +
+                 "margin on a box the tree measures 10% slower under a contended sweep. A species costs about " +
+                 "280 ms (one WGSL compile) and a frame about 25, so dropping frames would have bought " +
+                 "nothing. Rendering all eighteen costs 6,439 ms, measured, which is why the all-eighteen row " +
+                 "is a SOURCE CENSUS that says so in its own title -- the v4640 lesson, applied on purpose " +
+                 "this time rather than found by sabotage. *** EIGHTEEN SABOTAGES, ALL EIGHTEEN CAUGHT, *** " +
+                 "including both exponents, both weights, both windows, the state gating of all four mh_state " +
+                 "outputs, the CPU f64 twin, a single species re-routed to the raw knob, the cadence sprayed " +
+                 "onto a species that has none, still's own glintRate dial deleted, and the state table " +
+                 "REORDERED -- which is load-bearing now that a float index picks the window, and which " +
+                 "nothing asserted until this round. *** AND THE SPECIES GATES DID NOT MOVE A BYTE. *** " +
+                 "murmurSpeciesFrames.mjs states its operating point as the CONDITIONED pair and inverts " +
+                 "mh_live for the raw knobs, so all eighteen species render byte-identically to v4640 at " +
+                 "their gates' own point: the alternative was holding the raw knob, which put four gates " +
+                 "below their bounds (abyss's creature, droplet's swell, sol's granulation, and flux, which " +
+                 "stopped finding a half-height at all and CRASHED) and repairing that by lowering four " +
+                 "bounds is indistinguishable from budgeting a red down to green. THE FIRST CUT OF THAT " +
+                 "INVERSION WAS ITSELF WRONG -- it used the RATIO formula that belongs to the equivalence " +
+                 "rows, put the conditioned voice at 0.457 instead of 0.300 and moved all eighteen species -- " +
+                 "and a sabotage then showed droplet's and tempest's gates tolerate a 17% shift in silence, " +
+                 "so the round-trip is now its own f64 row that also requires the two numbers to DIFFER. " +
+                 "*** WHAT IS NOT DONE, DELIBERATELY: *** mh_state is ported, given a TSL twin and graded " +
+                 "bit-exactly against the GPU (worst 0 of 255 over 1,024 samples), and CALLED BY NOTHING. Its " +
+                 "four outputs are 128 transcribed references across murmur's eighteen sources and they are " +
+                 "their own round; the orb therefore gained `activity` and `stateIndex` and NOT `stateTau`, " +
+                 "because a uniform nothing reads is a row that cannot fail. Logged as " +
+                 "orb-state-terms-wiring; the next orb round starts there. " +
+                 "*** AND THE TIMINGS FILE CARRIES TWO HAND-WRITTEN ENTRIES THIS ROUND, WHICH IS THE ESCAPE " +
+                 "budgetExile.mjs NAMES AND NOT A SHORTCUT TAKEN QUIETLY. *** Four full quickSweep passes in " +
+                 "one session left this container about 26% slower than it started, and it did not recover: " +
+                 "tools/ship/murmurKit-selfcheck ran 1,679-1,784 ms early in the session against its recorded " +
+                 "1,710, and 2,124-2,172 ms afterwards at a load average of 0.29. Every sweep taken in that " +
+                 "state wrote inflated costs, and each one evicted a different set of ten to twelve gates -- " +
+                 "including murmurSpecies8 and murmurSpecies13, which had run at 2,382 and 2,438 ms an hour " +
+                 "earlier. budgetExile.mjs's own header is the reason that was refused rather than shipped: " +
+                 "\"ONCE A GATE'S TIME CROSSES THE BUDGET, IT STAYS ACROSS FOREVER. A single slow " +
+                 "observation -- eight-way contention, a cold cache, one unlucky minute -- exiles a gate from " +
+                 "every future ship sweep, permanently.\" So sweep-timings.json was restored to v4640 and the " +
+                 "two new gates alone were added, at the uncontended readings taken BEFORE the box degraded " +
+                 "(1,932 and 1,606 ms, the slowest of three and two runs respectively) -- on the same scale " +
+                 "as the other 1,685 entries, which is the only scale on which a shared budget means " +
+                 "anything. The alternative was to permanently exile ten gates as a side effect of a round " +
+                 "about a voice curve. Logged as sweep-timings-box-drift.",
+    }),
+    // v4635 -- THE 247th CLOSING. No gate added: a row added to one that existed, and a 3,561 ms refund.
+    // v4640 -- THE 252nd CLOSING: prism and helix, the last two -- and four rows, two of which grade tables.
+    since327: Object.freeze({
+        at: "v4640", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurSpecies14-selfcheck.mjs",
+            "tools/ship/murmurSpecies15-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 1,094 and 1,955 ms on the rotation, real WebGPU, 4 rows, carrying PRISM and HELIX " +
+                 "-- and WITH THEM ALL EIGHTEEN OF murmur-web's SPECIES ARE PORTED, across fifteen species " +
+                 "gates and one kit gate. still, limn, comet, droplet, opal, abyss, nebula, tempest, fathom, " +
+                 "geode, arc, sol, aura, flux, duet, chorus, prism, helix. *** AND THE HONEST HEADLINE OF " +
+                 "THIS ROUND IS THAT HALF ITS ROWS DO NOT GRADE THEIR SHADERS, WHICH TEN SABOTAGES ESTABLISHED " +
+                 "AND WHICH THE ROWS NOW SAY IN THEIR OWN TITLES. *** FIVE OF THE TEN ESCAPED. prism's " +
+                 "perpendicular-fan row and helix's antipodal-strands row are both computed in the gates' own " +
+                 "JS from MH_PRISM and MH_HELIX; they never render. So swapping u1 and u2 in the shader -- " +
+                 "the fan opening INTO the screen, which is the failure prism.ts names by name -- left the " +
+                 "row green, as did replacing the mh_key entry with a fixed direction, as did giving helix's " +
+                 "second strand its own phase instead of the negation. That is the v4579 defect in a new " +
+                 "costume: a check that re-derives the answer rather than reading the subject. BOTH ROWS WERE " +
+                 "RE-TITLED RATHER THAN DELETED OR WEAKENED -- they now say \"the TABLE, not the shader\" and " +
+                 "\"the constants, not the shader that reads them\" -- because what they do assert is true, " +
+                 "exact and worth holding (the worst departure from perpendicular across 1,623 time-and-swing " +
+                 "samples is 5.65e-5, which is the shader's own 1e-4 guard; helix's strand midpoint is 0.000 " +
+                 "from the axis across 9,288 samples). *** AND FIVE PIXEL INSTRUMENTS WERE BUILT TO CLOSE THE " +
+                 "GAP AND ALL FIVE WERE REJECTED, WITH THEIR NUMBERS, so nobody repeats the search. *** " +
+                 "helix's per-row strand midpoint at 128 px scatters 6.10 px at baseline and 2.43 px with the " +
+                 "strands deliberately NOT antipodal -- THE SABOTAGE SCORES BETTER, because two strands at a " +
+                 "fixed offset track each other more steadily than two that cross; an instrument that prefers " +
+                 "the broken shader is not weak, it is wrong. prism's fan width resisted three: the lit " +
+                 "region's principal axis moved the wrong way (3.96 to 4.80 as the fan opened), its x and y " +
+                 "spreads moved the wrong way (sx 2.88 to 2.32) because neither axis aligns with a diagonal " +
+                 "fan, and a profile across the CPU-computed fan direction came back identical at split 0.0, " +
+                 "0.5 and 1.0 -- a registration failure in the probe, since those frames differ by 18% of " +
+                 "total light. And helix's tap count: setting MH_TAPS_HI from MH_TAPS * 4 back to MH_TAPS " +
+                 "makes the strands BRIGHTER (13.12 against 11.72) rather than the \"empty bead\" helix.ts " +
+                 "describes, because a larger ds accumulates more per tap that lands. WHAT THE TWO SURVIVING " +
+                 "SHADER ROWS DO MEASURE: prism's `split` takes the frame's light DOWN 18% while `beams` " +
+                 "takes it UP 49% -- opposite SIGNS, so neither knob is the other, which no single-frame " +
+                 "brightness bound could show; and helix's strands pinch 5 times up the figure at 1.75 turns " +
+                 "and 8 at 2.85, the crossing rhythm counted rather than left to fall out. *** THIS GATE " +
+                 "RENDERS AT 128 PIXELS AND THAT IS A FINDING. *** At 48 a helix strand is about one pixel " +
+                 "across and no row has two peaks to separate -- the same wall chorus's countability hit at " +
+                 "v4639. renderSpecies gained an optional size for it, and the cost is small because the " +
+                 "LAUNCH is the cost: the same two-frame render is 888 ms at 48 and 1,229 ms at 128, a 7.1x " +
+                 "increase in pixels for 1.38x the time. Callers that pass nothing are byte-for-byte " +
+                 "unaffected. VERIFIED BY BYTES across all EIGHTEEN species and three time-and-knob cases: " +
+                 "54 frames, 0 bytes different.",
+    }),
+    // v4639 -- THE 251st CLOSING: duet and chorus, and a headline that measurement would not support.
+    since326: Object.freeze({
+        at: "v4639", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurSpecies12-selfcheck.mjs",
+            "tools/ship/murmurSpecies13-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 1,736 and 2,344 ms on the rotation, real WebGPU, 5 rows, carrying DUET and CHORUS " +
+                 "-- the fifteenth and sixteenth of murmur's eighteen, and the pair that solves its lights at " +
+                 "the ray's CLOSEST APPROACH rather than marching them: duet two of them, chorus seven on a " +
+                 "Fibonacci shell. *** THE ROUND'S FINDING IS THAT CHORUS'S HEADLINE IS NOT WHAT ITS " +
+                 "ARITHMETIC DOES, AND THE GATE REPORTS IT RATHER THAN ASSERTING IT. *** chorus.ts: \"As sync " +
+                 "rises they gather, and at one they breathe as a single body. That transition from many " +
+                 "rhythms to one is the whole species.\" The line that implements it is phase = " +
+                 "mix(fk * 0.897, 0.0, sync) * 2pi -- WHICH SCALES A MODULAR QUANTITY LINEARLY. Phase lives " +
+                 "on a circle, so multiplying the ladder by (1 - sync) does not gather the seven, it " +
+                 "RE-SPACES them, and whether the new spacing clusters them depends on its fractional part. " +
+                 "Computed off the shader's own constants over three breath periods, the ensemble's " +
+                 "modulation runs 9.89%, 6.63%, 14.65%, 2.61%, 8.17%, 42.43% at sync 0, 0.25, 0.50, 0.75, " +
+                 "0.90 and 1.00: NOT MONOTONIC, and the gather is an endpoint effect that happens only AT " +
+                 "1.00. AND THIS PORT CANNOT REACH THAT ENDPOINT: the shader computes sync = " +
+                 "clamp(syncK * 0.75 + 0.85 * drive + 0.55 * complete) and neither drive nor complete is " +
+                 "wired here, so the knob tops out at 0.75 -- the LEAST modulated setting of any sampled. " +
+                 "The first cut of the gate trusted the prose and wrote the row anyway: it read 4.32% at " +
+                 "sync 0 against 3.52% at sync 1, backwards and small enough to pass for noise. The port is " +
+                 "faithful, the constant is murmur's, the clamp is murmur's, and what is reported is a " +
+                 "property of murmur's SOURCE -- reported rather than repaired, because repairing it means " +
+                 "diverging from the source on this port's own authority. TEN SABOTAGES, NINE RED BY NAME. " +
+                 "*** AND ONE OF THEM CAUGHT AN INSTRUMENT THAT WAS NOT MEASURING WHAT ITS ROW CLAIMED. *** " +
+                 "chorus's level row asserts the ensemble gets more UNEQUAL, \"which a uniform gain cannot " +
+                 "do\" -- and the first instrument, brightest-over-dimmest above an 88th-percentile " +
+                 "threshold, was not blind to one: the voices sit on a background that does not scale with " +
+                 "level, so a uniform lift changes WHICH pixels clear the threshold and the ratio grows " +
+                 "anyway. An equal-average uniform lift read 5.00x to 13.11x, indistinguishable from the " +
+                 "real thing. Replaced by local maxima with the frame's median subtracted, which is " +
+                 "genuinely gain-invariant: the real front-weighting now reads x3.828 and the uniform lift " +
+                 "x0.858. WHAT ELSE THE ROWS MEASURE: duet's level multiplies the louder body x4.18 and the " +
+                 "quieter one x0.85 -- it goes DOWN -- taking the pair's ratio 2.384x to 11.686x, because " +
+                 "the weights are 2*bal and 2*(1-bal) and sum to two at every balance; sep moves them 6.1 px " +
+                 "to 10.4 while voice moves them 0.3; and across one full orbit read off the species' own " +
+                 "0.675 rad/s the depth ordering swings 1.07x to 4.77x while the pair never closes under " +
+                 "6 px, which rejects face-on and edge-on at once. chorus's ensemble never falls below 0.375 " +
+                 "of its own peak at the deepest breath. THREE MECHANISMS ARE TRANSCRIBED AND EXPLICITLY NOT " +
+                 "GRADED, each with its number: duet's occlusion (worth 3.9% -- the two bodies are 0.60 of " +
+                 "the body apart and 0.15 wide, so they almost never overlap on screen), chorus's shell " +
+                 "arrangement, and chorus's countability (a voice is about 1.5 px across at this frame size, " +
+                 "so a flood fill finds two or three blobs and not seven -- the FRAME's limit, not the " +
+                 "shader's). VERIFIED BY BYTES across all SIXTEEN species and three cases: 48 frames, 0 " +
+                 "bytes different.",
+    }),
+    // v4638 -- THE 250th CLOSING: aura and flux, the two sheet heroes, and a frame convention that bit.
+    since325: Object.freeze({
+        at: "v4638", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurSpecies10-selfcheck.mjs",
+            "tools/ship/murmurSpecies11-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 1,442 and 1,741 ms on the rotation, real WebGPU, 6 rows, carrying AURA and FLUX -- " +
+                 "the thirteenth and fourteenth of murmur's eighteen and the pair that WANTS the march the " +
+                 "four heroes before them were built to escape. aura.ts: the crossings \"resolve as OCCLUSION " +
+                 "rather than as ADDITION\" because \"a tap that lands in a near sheet attenuates what the far " +
+                 "ones contribute behind it\" -- which a closed form would have to sort for and a march gets " +
+                 "from the marching. *** THE FLAGSHIP ROW IS BRACKETED BY THE SOURCE'S OWN TWO NAMED " +
+                 "FAILURES, which makes it a measurement rather than a threshold: *** aura.ts says of its " +
+                 "occlusion coefficient that \"at 9 the far ribbon vanishes entirely and the body loses its " +
+                 "sense of fullness, at 1.5 nothing occludes anything and it is smoke again\". Both were " +
+                 "rendered. The knob that buys the third sheet multiplies the frame's light x1.886 at 1.5 " +
+                 "(very nearly the x2 of pure addition, which is what \"nothing occludes\" IS when measured), " +
+                 "x1.104 at 9.0 (a ribbon that is not there), and x1.307 at the shipped 4.50. The interior " +
+                 "spread brackets the same way: 10.06x, 1.94x, 3.92x. *** AND THE ROUND'S FINDING IS THAT " +
+                 "THIS PORT GOT flux UPSIDE DOWN BY TRANSCRIBING THE SOURCE CORRECTLY. *** flux.ts negates " +
+                 "its height because \"a colorEffect's y runs DOWN the screen, so the body frame's +y is the " +
+                 "bottom of the picture\", and it names the failure: \"An upside-down aurora is not a subtle " +
+                 "mistake; it reads as light pouring in from above rather than as curtains standing on " +
+                 "something.\" THIS PORT'S FRAME IS NOT A colorEffect'S -- the quad comes from three's uv(), " +
+                 "whose v is 0 at the BOTTOM -- so copying the negation reproduced exactly the bug the " +
+                 "comment is about. Measured row by row, the profile peaked at y = -0.396, the upper third, " +
+                 "and read 0.443 as a lower-to-upper ratio. Dropping the negation gives 2.523, against " +
+                 "nebula's 1.073 and aura's 1.623. A PORT THAT COPIES A FRAME CONVENTION IT DOES NOT SHARE " +
+                 "HAS TRANSCRIBED THE LETTER AND LOST THE THING, and only a pixel measurement says which. " +
+                 "TEN SABOTAGES, EIGHT RED BY NAME. One bound was tightened because a sabotage showed it was " +
+                 "a coincidence rather than a bound: the asymmetry row measured 1.601 against a 1.5 " +
+                 "threshold, seven per cent of headroom, and a plain gaussian of the same scale -- the " +
+                 "literal symmetric profile flux.ts rejects -- reads 0.877, the asymmetry INVERTED, so the " +
+                 "bound moved to 1.25, the middle of the gap rather than one edge. TWO MECHANISMS ARE " +
+                 "TRANSCRIBED AND EXPLICITLY NOT GRADED, each with its number: aura's three depth offsets " +
+                 "(collapsing them moves the frame total 24.21 to 24.76, because aura's own sentence says " +
+                 "the rolls and tilts carry the separation WITH them, and those are untouched) and flux's " +
+                 "three x offsets (moving two together reads 2.523 to 2.438, because every row in that gate " +
+                 "is a VERTICAL measurement and the stacking is horizontal). VERIFIED BY BYTES across all " +
+                 "FOURTEEN species and three time-and-knob cases: 42 frames, 0 bytes different.",
+    }),
+    // v4637 -- THE 249th CLOSING: arc and sol, the two heroes that draw a LINE.
+    // *** v4645 -- SEVEN ORDINALS COLLIDED AT THE main MERGE, AND v4535 SAW IT COMING IN THIS FILE. ***
+    // That round wrote, of exactly this key space: "An ordinal-keyed object hands two concurrent lines a
+    // shared namespace with no allocator and a silent failure mode; a LIST gives them append-only entries
+    // that cannot collide at all -- which is the shape `closings` itself was given at v4399 for this exact
+    // reason." It then declined to change the shape mid-merge, for the same reason this round declines to:
+    // "a merge is the wrong commit in which to change the shape of the thing being merged."
+    //
+    // The failure mode arrived as predicted. This line used since258-264 at v4537-v4545; main's Murmur Orb
+    // rounds independently used since258-264 at v4637-v4644. The later declaration wins, JS says nothing,
+    // and SEVEN of this line's rounds lost their swept counts -- which surfaced two screens away as "7 STILL
+    // UNSWEPT", a number that looked like missing gates and was actually missing CLOSINGS. Renumbered
+    // FORWARD, which is the rule the changelog header states for version ordinals and applies here too: the
+    // arrivals move, the incumbents keep the keys anything older might name. THE SHAPE IS STILL WRONG and
+    // this is now the SIXTH collision; a list is still the answer and is still owed its own round.
+    since324: Object.freeze({
+        at: "v4637", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurSpecies8-selfcheck.mjs",
+            "tools/ship/murmurSpecies9-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2,396 and 2,016 ms on the rotation, real WebGPU, 10 rows, carrying ARC and SOL -- " +
+                 "the eleventh and twelfth of murmur's eighteen and the two that draw a LINE. arc.ts opens " +
+                 "with the hardest sentence in the collection: \"THE SPECIES IS A LINE ... Everything else is " +
+                 "either compact enough to solve at the ray's closest approach or broad enough that five " +
+                 "samples average it honestly. A FILAMENT IS NEITHER.\" They ship together because sol.ts " +
+                 "says so in six words -- \"THE PROMINENCES, solved the way arc's filament is\" -- so the " +
+                 "closed-form tube, w * sqrt(pi) / sin(alpha) * exp(-perp^2 / w^2), moved into " +
+                 "render/murmurKit.mjs as mhTube rather than being written twice, alongside mhRoll (the third " +
+                 "rotation, without which every curve's projected ellipse keeps its long axis horizontal) and " +
+                 "mhAa (the moire gate, COMPUTED at this port's one mount rather than baked as the 1 it " +
+                 "returns there). *** AND THE CONSTRAINT THE SPECIES ESCAPES IS ARITHMETIC THAT DIFFERS FROM " +
+                 "murmur's, WHICH IS THE ROUND'S FIRST CORRECTION. *** arc.ts states it at ten taps -- \"the " +
+                 "interval is 0.2, so a tube narrower than that is caught by whichever tap lands in it and " +
+                 "missed otherwise\" -- but this tree marches at MH_TAPS = 24, kit.ts's own demo value, so " +
+                 "the interval here is 0.0833 and the 0.0530 thread is 0.636 of a step rather than 0.265 of " +
+                 "one. Every row computes the step from MH_TAPS instead of quoting 0.2, and the bound is " +
+                 "two-sided so neither inheriting murmur's tap count nor widening the thread until a march " +
+                 "could see it would pass. FIFTEEN SABOTAGES, TWELVE RED BY NAME. *** AND THE SECOND " +
+                 "CORRECTION WAS THE INSTRUMENT, NOT THE SHADER: the first flicker row measured the " +
+                 "FLOURISH. *** At evenly spaced times arc's frame total moved up to 67.85% and averaged " +
+                 "23.36% -- exactly the \"dim, uneven and flickering\" a marched filament gives -- and it was " +
+                 "mh_flourish firing on its own schedule, multiplying brightness by (1 + 0.45 * env) and " +
+                 "adding a travelling pulse. Driving the CPU kit's own mhFlourish finds where it is silent on " +
+                 "BOTH species' lanes, t = 45.0 to 51.1, and in that window arc reads 6.45% max and 3.32% " +
+                 "mean against nebula's 5.55% and 1.44%: a solved filament is as steady as the marched cloud " +
+                 "that cannot flicker. THE OTHER MEASURED RESULTS: half of arc's light lands in 2.16% of the " +
+                 "lit disc against nebula's 17.28%, x8; its centroid never moves a whole pixel between " +
+                 "frames, which is what the parabolic refinement buys over twenty discrete places; `pin` " +
+                 "takes the centre-to-annulus ratio from 0.404 to 21.997, moving light rather than making " +
+                 "it; sol's half-max outline is 4.12% out of round against nebula's 23.13%, one square root " +
+                 "against five samples; `simmer` multiplies the interior's neighbour-to-neighbour difference " +
+                 "by 1.68 while moving its mean 1.1%, which is what a zero-mean noise does and a brightness " +
+                 "cannot; and a tongue appears only when the knob is up AND its own sin-squared phase is up " +
+                 "-- 3.76% to 38.69% of angular asymmetry with one tongue lifted, 2.02% to 1.85% with all " +
+                 "three flat, the corona being unable to fake either because it is a function of radius " +
+                 "alone. *** A SABOTAGE ALSO CAUGHT A FALSE SENTENCE IN A ROW'S OWN TEXT, which is a first " +
+                 "for this session: *** the simmer row claimed it would catch the granulation weighting being " +
+                 "removed, and it does not -- moving it to cover the limb, sol.ts's own named first-build " +
+                 "bug, changes the interior texture response by nothing to three decimals and the outline by " +
+                 "0.01 percentage points, because the term it perturbs carries almost no light out where the " +
+                 "disc is small. That claim is retracted in place. THREE CONSTANTS ARE TRANSCRIBED AND " +
+                 "EXPLICITLY NOT GRADED, each with the measurement that decided it: the granulation " +
+                 "weighting above, arc's grazing floor (3.8% of frame total), and sol's core occlusion (9.0% " +
+                 "of the tongues' contribution at the most favourable moment in 400 s of the species' own " +
+                 "clock, because a lifted tongue arches OUT of the disc where `hidden` is zero). A sabotage " +
+                 "also forced a third conjunct into the bow row: zeroing the span terms so the knob drives " +
+                 "WIDTH alone left the total light and the concentration both up by half, since a closed-form " +
+                 "integral scales with w -- only the stroke's end-to-end reach separates longer from fatter, " +
+                 "and under that sabotage it went the wrong way, x0.901 against the real x1.202. VERIFIED BY " +
+                 "BYTES across all TWELVE species and three time-and-knob cases: 36 frames, 0 bytes different.",
+    }),
+    // v4636 -- THE 248th CLOSING: fathom and geode, the two heroes whose interiors are SOLVED, not marched.
+    since257: Object.freeze({
+        at: "v4636", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurSpecies6-selfcheck.mjs",
+            "tools/ship/murmurSpecies7-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2,435 and 2,146 ms on the rotation, real WebGPU, 8 rows, carrying FATHOM and " +
+                 "GEODE -- the ninth and tenth of murmur's eighteen and the only two that do not build " +
+                 "their interiors out of the five taps of a ray march. fathom intersects three spheres " +
+                 "analytically; geode intersects eight planes by the slab method. geode.ts opens by " +
+                 "rejecting its own first build in terms this port has now met three times: \"A FACET IS A " +
+                 "PLANE, AND THE FIRST BUILD'S WASN'T ... integrating a hard-edged structure through five " +
+                 "samples averages exactly the angularity that was the point.\" *** TWO GATES FOR TWO " +
+                 "SPECIES WHERE THE ROUND BEFORE MANAGED ONE FOR TWO, AND THE SPLIT WAS FORCED BY A " +
+                 "MEASUREMENT RATHER THAN CHOSEN: *** written as one gate the pair came in at 5,064 ms " +
+                 "against a 3,000 ms budget -- 69% over, which is the hazard the file's own header was " +
+                 "about, met by the file itself on its first run. The cost is compiles, priced rather than " +
+                 "guessed: one species and one frame is 931 ms and each additional species about 280. " +
+                 "Trimming the shared ridge control from ten species to five landed at 3,499 and to four at " +
+                 "3,161 -- both still over. FOURTEEN SABOTAGES, THIRTEEN RED BY NAME and the fourteenth " +
+                 "green BY DESIGN (halting one of geode's two rotation angles leaves the stone turning, so " +
+                 "the row must pass). *** TWO OF THE THIRTEEN WERE GREEN ON THE FIRST PASS AND ARE WHY TWO " +
+                 "ROWS CHANGED SHAPE. *** Zeroing fathom's rk constants walked through the layers row " +
+                 "because the row computed its prediction FROM the same table the shader reads -- the " +
+                 "v4579 defect, a gate re-stating the formula it grades -- so the two ratios are now " +
+                 "literals (x0.9600 and x0.8000) with the table checked against them, and the row's result " +
+                 "is that the two visible ridges are the MIDDLE and SMALLEST shells, shell 0 predicting " +
+                 "x1.0857 and missing by 13%. And halting geode's spin drift walked through the faces row, " +
+                 "because mhKey turns with time for every species in this engine: a RIGID stone under a " +
+                 "MOVING KEY gives exactly \"brightness swings, hotspot pinned\". That row now also reads " +
+                 "the FOOTPRINT -- the pixels above the frame's own p90, a set the chord decides and the " +
+                 "key cannot touch -- whose smallest step-to-step change is 0.409 live, 0.167 with the " +
+                 "drift halted and 0.149 with both angles halted. THREE INSTRUMENTS WERE BUILT AND " +
+                 "REJECTED, kept in the source with their numbers: gradient concentration measured " +
+                 "SPARSENESS (still 75.1% and comet 72.1% beat geode's 27.0%), edge width measured the murk " +
+                 "HALO (geode widest of ten at 12.96 px), and hue turn was too small to grade at 2.1 " +
+                 "degrees. AND ONE CLAIM WAS RETRACTED RATHER THAN GRADED: fathom's composite order is its " +
+                 "headline -- outer-in, inner-out, no sort -- and reversing it moves 361 bytes of 248,832 " +
+                 "across 27 frames, every one by exactly 1 of 255, because the leading order-sensitive term " +
+                 "is a SYMMETRIC pair sum. A row for it could only have asserted the frames are nearly the " +
+                 "same either way, which is a row that cannot fail. VERIFIED BY BYTES across all TEN " +
+                 "species and three time-and-knob cases: 30 frames, 0 bytes different -- and the baseline " +
+                 "now carries its own case list, after capture and verify each held a private copy and a " +
+                 "fresh capture failed its own verify on 2 of 30 frames the moment one was edited.",
+    }),
+    since256: Object.freeze({
+        at: "v4635", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** NO GATE WAS ADDED AND FIVE GOT FASTER: render/aiPresenceOrbTsl.mjs STOPPED BUILDING " +
+                 "EVERY SPECIES' BLOCK INTO EVERY SPECIES' SHADER. *** still's compiled fragment carried " +
+                 "abyss's three-lane march, opal's four flashes, droplet's solve and both mist marches; only " +
+                 "the density selector at the bottom picked one. THE EVIDENCE IS THE EMITTED WGSL RATHER " +
+                 "THAN THE CLOCK: before, the eight species' shaders spanned 159,447 to 160,185 characters " +
+                 "-- a spread of 738, 0.5%, which is the selector line and nothing else, because they were " +
+                 "the same shader eight times. After: 41,231 to 56,776, a spread of 38%, and 1,277,983 -> " +
+                 "394,231 in total, a 69% cut. On the rotation: gate one 2,834 -> 1,971 ms, two 2,256 -> " +
+                 "1,515, three 2,565 -> 1,828, four 2,244 -> 1,607, five 2,663 -> 2,080, and " +
+                 "aiPresenceOrb 2,440 -> 2,234 DESPITE gaining a second WGSL emission. Gate one went from " +
+                 "166 ms of margin to 1,029, which is what unblocks the remaining ten species. VERIFIED BY " +
+                 "BYTES, all eight species across three time-and-knob cases: 24 frames, 0 bytes different -- " +
+                 "and all eight rather than the two touched, which is v4634's lesson wired in, since that " +
+                 "round verified two species and took four gates red on the six it had not rendered. GATED " +
+                 "IN tools/ship/aiPresenceOrb-selfcheck.mjs on a second emission that costs nothing, and the " +
+                 "bound is on STILL because its shader cannot grow when species are added -- a first cut " +
+                 "bounded the larger of two at 120,000 and a sabotage building two extra blocks slipped " +
+                 "under it, since both shaders grew together and the spread never moved.",
+    }),
     since249: Object.freeze({
         at: "v4623", swept: 1, green: 1, red: 0,
         added: Object.freeze([
@@ -5281,6 +14331,64 @@ export function repairsAgainst(baselineRed, confirmedRed) {
 // both are real, pre-existing, ALREADY-REGISTERED reds, misreported only by the separator. toPosix() is the
 // exact helper this tree already uses in 30+ other files for this exact reason; the fix is that this file
 // join(s the convention instead of being the one population-defining exception to it.
+/**
+ * *** v4639 -- THE NAMES THAT LOOK LIKE GATES, ARE NOT, AND CANNOT BE SPELLED OUT OF THE POPULATION. ***
+ *
+ * Two gates plant a file named `*-selfcheck.mjs` at an ordinary path and delete it in a `finally`:
+ *
+ *   tools/ship/zz-temp-fixture-selfcheck.mjs      gatesBridge-selfcheck.mjs, whose body is `process.exit(3)`
+ *   tools/ship/zz-treeread-fixture-selfcheck.mjs  treeRead-selfcheck.mjs's DECOY
+ *
+ * `finally` does not run under SIGKILL, and quickSweep SIGKILLs a gate at a 20 s cap. MEASURED: with the
+ * first one on disk enumerateGates returns 1738 instead of 1737 AND INCLUDES IT, so the next sweep reports
+ * `zz-temp-fixture-selfcheck.mjs exit 3` as a NEW RED for a gate that is in no commit, and the count moves
+ * four hand-maintained censuses with it.
+ *
+ * *** AND THE OBVIOUS FIX IS WRONG, WHICH IS WHY THIS IS A LIST AND NOT A PREFIX RULE. *** Renaming them to
+ * the `__` convention this enumerator already excludes would break both callers: gatesBridge only runs a name
+ * that appears in its DISCOVERED list ("ONLY a discovered gate may run", gatesBridge.js:107), so an excluded
+ * fixture returns not-a-gate and section 5 stops testing anything; and treeRead's `zz-` file is a DECOY whose
+ * entire job is to be an ORDINARY name, proving the exclusion turns on `__` and not on fixtures generally.
+ * Both must look like real gates WHILE THEY LIVE. So the population is not narrowed -- a LEFTOVER is named.
+ */
+export const TRANSIENT_FIXTURES = Object.freeze([
+    "tools/ship/zz-temp-fixture-selfcheck.mjs",
+    "tools/ship/zz-treeread-fixture-selfcheck.mjs",
+]);
+
+/**
+ * *** v4681 -- AND THE SCRATCH DIRECTORIES THREE GATES MAKE INSIDE THE TREE, WHICH THE SAME KILL STRANDS. ***
+ *
+ * aiPresenceOrbPresent, ffmpegWasmBridge and unboundBuiltin each mkdtemp a DOT-prefixed directory under the
+ * engine root -- a browser page has to load the files same-origin, so os.tmpdir() will not do -- and remove it in
+ * a `finally`. The rig's v4680 verify found two stranded .sabotage-orbpresent-* directories: four .mjs files
+ * that took the census to 4318 and three gates red with it. treeRead now skips dot-directories, which ends the
+ * census half; this is the other half, so nothing else that walks the tree ever meets them. Prefixes are
+ * SPELLED, not globbed -- this deletes inside a source directory -- and each is a mkdtemp prefix, so the six
+ * random characters after it are the only thing matched.
+ */
+export const TRANSIENT_DIRS = Object.freeze([
+    ["tools/ship", ".sabotage-orbpresent-"],   // aiPresenceOrbPresent-selfcheck.mjs
+    ["tools/ship", ".ffwasm-gate-"],           // ffmpegWasmBridge-selfcheck.mjs
+    ["tools", ".ub-"],                         // unboundBuiltin-selfcheck.mjs
+    ["", ".fsrclocks-"],                       // fsrPageClocks-selfcheck.mjs (v4824: was .fsrclocks-pre.html in the root)
+]);
+
+/** Remove stranded TRANSIENT_DIRS under `root`. Only safe while no gate is running -- callers are verify's
+ *  pre-flight and the start of a sweep. Returns the relative paths removed, so the caller can name them. */
+export function reclaimScratchDirs(root = ENG) {
+    const gone = [];
+    for (const [dir, prefix] of TRANSIENT_DIRS) {
+        let names = [];
+        try { names = fs.readdirSync(path.join(root, dir), { withFileTypes: true }); } catch { continue; }
+        for (const e of names) {
+            if (!e.isDirectory() || !e.name.startsWith(prefix) || e.name.length !== prefix.length + 6) continue;
+            try { fs.rmSync(path.join(root, dir, e.name), { recursive: true, force: true }); gone.push(dir ? dir + "/" + e.name : e.name); } catch {}
+        }
+    }
+    return gone;
+}
+
 export function enumerateGates(root = ENG) {
     const out = [];
     const skip = new Set(["node_modules", ".git", ".claude", "vendor"]);
@@ -5478,7 +14586,8 @@ export const SWEEP_V4297 = Object.freeze({
 // refusal, which is the only thing that makes the number real.
 // ---------------------------------------------------------------------------------------------------------
 if (process.argv[1] && import.meta.url === new URL("file://" + path.resolve(process.argv[1])).href) {
-    const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
+    const cli = parseOrExit("gateSweep", { values: { "--phase2": "path", "--timeout": "number", "--out": "path" } });
+    const arg = (k, d) => (k in cli.values ? cli.values[k] : d);
     const p1 = arg("--phase2");
     if (!p1) { console.log("usage: node tools/ship/gateSweep.mjs --phase2 <phase1.tsv> [--out f] [--timeout ms]"); process.exit(2); }
     const timeoutMs = Number(arg("--timeout", 300000));

@@ -108,6 +108,10 @@ console.log(`\n  ${pure} gates assume NOTHING outside their own arithmetic.\n`);
     // at v4258: a bound is satisfied more easily the looser it gets. So the set is NAMED and compared for
     // EQUALITY. A new browser gate must add itself here in the same commit, which is one line and a decision;
     // and a gate that quietly STOPS needing a context is news too, which a `<` could never report.
+    // v4778 -- 20 -> 22 at the rtx merge: qrBridge and webcodecsFramesToMp4 arrived without registering here.
+    // Both draw on a @napi-rs/canvas 2d context -- qrBridge decodes the returned PNG onto a fresh canvas to read
+    // its pixels, webcodecsFramesToMp4 paints the frames it hands the encoder -- and both SKIP BY NAME on a box
+    // without that optional dependency of ai-bridge/, so the context is assumed only where it exists.
     const GPU_GATES = Object.freeze([
         "fluid/multigridGPU-selfcheck.mjs", "physics/blobarium-selfcheck.mjs", "render/blobRecorder-selfcheck.mjs",
         "tools/roundhouse/magmapBenchVerdict-selfcheck.mjs", "tools/roundhouse/magmapDefault-selfcheck.mjs",
@@ -119,6 +123,7 @@ console.log(`\n  ${pure} gates assume NOTHING outside their own arithmetic.\n`);
         "tools/ship/orreryReached-selfcheck.mjs", "tools/ship/pageGround-selfcheck.mjs",
         "tools/ship/postChain-selfcheck.mjs", "tools/ship/verifiedPolygonIntersection-selfcheck.mjs",
         "tools/ship/voxtralBrowser-selfcheck.mjs",
+        "tools/ship/qrBridge-selfcheck.mjs", "tools/ship/webcodecsFramesToMp4-selfcheck.mjs",
     ]);
     const gpuNow = [...byGate.entries()].filter(([, h]) => h.includes("gpu")).map(([f]) => f).sort();
     const arrived = gpuNow.filter((g) => !GPU_GATES.includes(g));

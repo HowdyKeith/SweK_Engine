@@ -33,6 +33,14 @@ const files = treeFiles();
     ok("...and its own spellings really are absent from the sites", !filterSites().some((s) => s.file === SELF),
        filterSites().length + " sites, none from the census itself");
     ok("the tree walk finds the tree", files.length > 1000, files.length + " files");
+    // SABOTAGE (v4814): corpusFilters.mjs's memo made to call through (`const memo = (key, f) => f();`) -> 1 RED, this
+    // row; restored md5-identical.
+    // v4814: filterSites and treeFiles are computed once per process -- this gate asked for them eight times, 15,921
+    // reads that gateProfile --rig-slow measured at 5.4 s on Keith's rig. Same objects back, in a fresh array each time.
+    const s1 = filterSites(), s2 = filterSites(), t1 = treeFiles(), t2 = treeFiles();
+    ok("!! *** the census is computed once: a second ask returns the same site objects, in its own array ***",
+       s1 !== s2 && s1.length === s2.length && s1.every((x, i) => x === s2[i]) && t1 !== t2 && t1.join() === t2.join(),
+       "so one caller sorting its copy cannot reorder another's, and the tree is read once rather than per call");
 }
 
 // ---- 2. GROUPING IS BY WHAT THEY ADMIT, PROVEN ON FIXTURES WHOSE ANSWERS WERE WORKED OUT FIRST -------------------------

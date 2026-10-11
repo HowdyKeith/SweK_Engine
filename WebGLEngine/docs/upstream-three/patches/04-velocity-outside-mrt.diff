@@ -1,0 +1,86 @@
+diff --git a/src/nodes/accessors/VelocityNode.js b/src/nodes/accessors/VelocityNode.js
+index 373548b..0ed1b2e 100644
+--- a/src/nodes/accessors/VelocityNode.js
++++ b/src/nodes/accessors/VelocityNode.js
+@@ -36,6 +36,15 @@ class VelocityNode extends TempNode {
+ 
+ 		super( 'vec2' );
+ 
++		/**
++		 * This flag can be used for type testing.
++		 *
++		 * @type {boolean}
++		 * @readonly
++		 * @default true
++		 */
++		this.isVelocityNode = true;
++
+ 		/**
+ 		 * The current projection matrix.
+ 		 *
+diff --git a/src/nodes/core/NodeBuilder.js b/src/nodes/core/NodeBuilder.js
+index be00b81..9dad980 100644
+--- a/src/nodes/core/NodeBuilder.js
++++ b/src/nodes/core/NodeBuilder.js
+@@ -49,6 +49,46 @@ const typeFromArray = new Map( [
+ 	[ Float32Array, 'float' ]
+ ] );
+ 
++/**
++ * Whether a material's own node graph reads the velocity node -- velocity drawn as a
++ * fragment or color node, not through an MRT output -- in which case the previous
++ * positions instancing, skinning, batching and morphing keep must be built too.
++ *
++ * @private
++ * @param {?Material} material - The material.
++ * @return {boolean} Whether a velocity node is among its nodes.
++ */
++const _usesVelocity = ( material ) => {
++
++	if ( material === null || material.isNodeMaterial !== true ) return false;
++
++	const seen = new Set(), stack = [];
++
++	for ( const key in material ) {
++
++		const value = material[ key ];
++
++		if ( value !== null && typeof value === 'object' && value.isNode === true ) stack.push( value );
++
++	}
++
++	while ( stack.length > 0 ) {
++
++		const node = stack.pop();
++
++		if ( seen.has( node ) ) continue;
++		seen.add( node );
++
++		if ( node.isVelocityNode === true ) return true;
++
++		for ( const child of node.getChildren() ) stack.push( child );
++
++	}
++
++	return false;
++
++};
++
+ const _toFloat = ( value ) => {
+ 
+ 	if ( /e/g.test( value ) ) {
+@@ -3450,7 +3490,13 @@ class NodeBuilder {
+ 
+ 		const mrt = this.renderer.getMRT();
+ 
+-		return ( mrt && mrt.has( 'velocity' ) ) || getDataFromObject( this.object ).useVelocity === true;
++		if ( ( mrt && mrt.has( 'velocity' ) ) || getDataFromObject( this.object ).useVelocity === true ) return true;
++
++		// velocity drawn by the material itself, outside MRT: looked for once per build
++
++		if ( this._materialUsesVelocity === undefined ) this._materialUsesVelocity = _usesVelocity( this.material );
++
++		return this._materialUsesVelocity;
+ 
+ 	}
+ 

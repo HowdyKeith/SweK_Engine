@@ -30,6 +30,9 @@
 "use strict";
 import { SECONDS_PER_WORD } from "./captionClock.js";
 
+/** The key ai-presence-orb.html's species picker saves under, and this widget reads. One spelling, exported. */
+export const ORB_SPECIES_KEY = "swek.orbSpecies";
+
 const DPR_CAP = 2;
 const SIZE_CSS_PX = 44;   // matches ui/miniIconStack.js's ICON_W (34) plus a visible margin -- a presence orb reads smaller than its clickable footprint
 const RAIL_LEFT_PX = 44;  // ui/miniIconStack.js's own left rail offset (v1967 -- clears the left-edge lcars-minitabs)
@@ -61,13 +64,16 @@ export async function mountAiPresenceOrbWidget(opts = {}) {
         tslPath = "../vendor/three-webgpu/three.tsl.js",
         presentPath = "../render/aiPresenceOrbPresent.mjs",
         statePath = "../render/aiPresenceOrbState.mjs",
+        orbPath = "../render/aiPresenceOrbTsl.mjs",
+        species: speciesOpt = null,
     } = opts;
 
-    let THREE, TSL, makeAiPresenceOrbHdrPipeline, createPresenceState;
+    let THREE, TSL, makeAiPresenceOrbHdrPipeline, createPresenceState, ORB_SPECIES;
     try {
-        [THREE, TSL, { makeAiPresenceOrbHdrPipeline }, { createPresenceState }] = await Promise.all([
+        [THREE, TSL, { makeAiPresenceOrbHdrPipeline }, { createPresenceState }, { ORB_SPECIES }] = await Promise.all([
             import(/* @vite-ignore */ threePath), import(/* @vite-ignore */ tslPath),
             import(/* @vite-ignore */ presentPath), import(/* @vite-ignore */ statePath),
+            import(/* @vite-ignore */ orbPath),
         ]);
     } catch (e) { console.warn("[aiPresenceOrbWidget] module load failed, not mounting:", e && e.message); return null; }
 
@@ -111,7 +117,13 @@ export async function mountAiPresenceOrbWidget(opts = {}) {
         return null;
     }
 
-    const pipeline = makeAiPresenceOrbHdrPipeline(THREE, TSL, {});
+    // v4825 -- THE SAME ORB AS server.html's AVATAR PANEL. ai-presence-orb.html's species picker saves its choice in
+    // this browser under swek.orbSpecies; the widget reads it at mount (an explicit opts.species wins), refuses any
+    // name outside the eighteen, and draws still otherwise. Read once: a species is its own compiled shader, so a
+    // change made elsewhere arrives with the next page load rather than by rebuilding a live pipeline.
+    const stored = (() => { try { return window.localStorage.getItem(ORB_SPECIES_KEY); } catch (e) { return null; } })();
+    const species = [speciesOpt, stored, "still"].find((s) => ORB_SPECIES.includes(s));
+    const pipeline = makeAiPresenceOrbHdrPipeline(THREE, TSL, { species });
     const state = createPresenceState("idle");
 
     function resize() {
@@ -148,10 +160,9 @@ export async function mountAiPresenceOrbWidget(opts = {}) {
     // covers it), and "success" is scheduled far enough out to actually get screen time: an estimated speaking
     // duration for the reply, cancelled by ANY new real event in the meantime (clearSettle(), called at the top
     // of every handler here) so a stale timer from an old turn can never flip the orb out of context later.
-    window.addEventListener("engine:voiceReply", (e) => {
+    function replyFlow(text) {
         clearSettle();
         state.setState("responding");
-        const text = (e.detail && e.detail.text) || "";
         const words = text.trim() ? text.trim().split(/\s+/).filter(Boolean).length : 0;
         const holdS = Math.min(RESPONDING_HOLD_MAX_S, Math.max(RESPONDING_HOLD_MIN_S, words * SECONDS_PER_WORD));
         settleTimer = setTimeout(() => {
@@ -163,24 +174,38 @@ export async function mountAiPresenceOrbWidget(opts = {}) {
                 if (state.state === "success") state.setState("idle");
             }, SUCCESS_HOLD_MS);
         }, holdS * 1000);
-    });
+    }
+    window.addEventListener("engine:voiceReply", (e) => replyFlow((e.detail && e.detail.text) || ""));
     // the real signal ui/sttLayer.js's converseText() had NONE of before this round -- a failed /ai/chat call
     // (network error, ai.ok false, or an empty reply) left the orb sitting wherever it was, forever, with no
     // indication anything had gone wrong.
-    window.addEventListener("engine:voiceError", () => {
+    function errorFlow() {
         clearSettle();
         state.setState("error");
         settleTimer = setTimeout(() => {
             settleTimer = null;
             if (state.state === "error") state.setState("idle");
         }, ERROR_HOLD_MS);
+    }
+    window.addEventListener("engine:voiceError", errorFlow);
+    // *** v4831 -- THE SHIP'S COMPUTER'S TWO STAGES, WHICH THE PAGE CAN SEE NOW. *** ui/brainAsk.mjs reads
+    // POST /ai/brain/ask's stream and dispatches one engine:brainStage per stage: retrieval starting lights
+    // `searching`, generation starting lights `weaving` with the number of sources it is composing from, and
+    // the answer settles exactly as a voice reply does -- responding, then success, then idle. A retrieval-only
+    // answer (no LLM reachable) is still an answer: the passages are what the page shows.
+    window.addEventListener("engine:brainStage", (e) => {
+        const d = (e && e.detail) || {};
+        if (d.stage === "search-start") { clearSettle(); state.setState("searching"); }
+        else if (d.stage === "weave-start") { clearSettle(); state.setState("weaving", { sources: d.sources | 0 }); }
+        else if (d.stage === "done") replyFlow(d.answer || "");
+        else if (d.stage === "error") errorFlow();
     });
 
     const reducedMotion = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
-    let last = null, t0 = null, running = true, rafHandle = null;
+    let last = null, running = true, rafHandle = null;
     function frame(now) {
         if (!running) return;
-        if (t0 === null) { t0 = now; last = now; }
+        if (last === null) last = now;   // t0 went with the multiply: the clock is state.phase now, which starts at 0 of its own accord
         // a hidden tab does zero work -- not less, none, the same law ui/stateOrb.js's own header states and
         // measured before: still schedules the next frame so it resumes instantly when the tab returns.
         if (document.hidden) { rafHandle = requestAnimationFrame(frame); return; }
@@ -190,9 +215,48 @@ export async function mountAiPresenceOrbWidget(opts = {}) {
         if (!paused) state.tick(dt, {});
         const p = state.getParams();
         pipeline.setKnobs({
-            time: paused ? 0 : (now - t0) / 1000 * p.speed,
+            // *** THE CLOCK IS THE INTEGRAL OF SPEED, NOT ELAPSED TIME TIMES THE CURRENT SPEED -- v4650. ***
+            // render/aiPresenceOrbState.mjs has computed exactly that since it was written, every tick, by
+            // composite Simpson's rule, and its own header says why in as many words: "A state change can
+            // jump `speed` instantly; multiplying elapsed time by the CURRENT speed would then jump the
+            // animation's PHASE too (a visible pop)." getParams() has returned it as `phase` the whole time
+            // and this line multiplied instead -- so the mechanism was built, graded and thrown away at the
+            // one call that feeds a shader.
+            //
+            // MEASURED, because "a visible pop" undersells it: entering RESPONDING after sixty seconds of
+            // idle advanced the shader's clock 2.902 SECONDS IN ONE 16.7 ms FRAME, and the error is
+            // t * (speedNew - speedOld), so it grows without bound with session length -- 86.191 s after
+            // half an hour. `phase` advances at most speed * dt, which is 0.0242 s in that same frame.
+            //
+            // AND IT IS EXACTLY EQUAL TO THE OLD EXPRESSION WHENEVER SPEED HAS BEEN CONSTANT, since the
+            // integral of a constant from zero IS elapsed-time-times-that-constant. The fix is invisible
+            // except at the moment it matters, which is why no other gate's frames move.
+            //
+            // `paused` no longer zeroes it: reduced motion skips state.tick, so `phase` simply stops where it
+            // is. Snapping to 0 was itself a jump -- the whole animation rewound to its first frame the
+            // instant the preference turned on, and then jumped forward again when it turned off.
+            time: p.phase,
             glow: p.glow, depth: p.depth, hueShift: p.hueShift,
             presence: 0.5, clarity: 0.6, glintRate: 0.3, voice: p.voice,
+            // *** THE STATE AND THE CADENCE REACH THE SHADER NOW -- v4641. *** createPresenceState has tracked
+            // both since it was built (getParams returns `activity` and `state`), and this call dropped both
+            // on the floor because the shader had nowhere to put them: it read the raw `voice` at 44 sites and
+            // borrowed still's `glintRate` dial at 8 more. With mh_live wired, handing it a stateIndex of 0
+            // forever would pin the orb in IDLE -- it would never reach the LISTENING lift at all, which is
+            // the one state murmur gives the voice its full weight in.
+            // *** AND stateTau ARRIVES AT v4644, WITH THE FLASH IT DRIVES. *** mh_state turns (stateIndex,
+            // stateTau) into four windows; three of them are wired in the shader now -- `settled` on every
+            // interior and the pair the SUCCESS shell travels on -- so a stateTau pinned at 0 would hold the
+            // orb at the instant of arrival forever: full sweep at the heart, nothing travelling, and the
+            // settle never arriving at all.
+            activity: p.activity, stateIndex: p.stateIndex, stateTau: p.stateTau,   // v4831: the state module resolves a brain stage to the murmur state it renders as
+            // *** AND THE THREE SIGNAL INTEGRALS -- v4654. *** A species that modulates a local clock by a
+            // live signal cannot multiply the clock by the signal's CURRENT value without the phase jumping
+            // whenever the signal moves; the error is t * dSignal and has no ceiling. These carry the
+            // running integrals instead, in shader time, so the shader can build a secular phase that is
+            // exact. render/aiPresenceOrbState.mjs's own note has the factoring and the measurement.
+            paceInt: p.paceInt, voiceInt: p.voiceInt, driveInt: p.driveInt,
+            paceDriveInt: p.paceDriveInt, voiceDriveInt: p.voiceDriveInt, driveDriveInt: p.driveDriveInt, tempestEnergyInt: p.tempestEnergyInt, duetFlourishInt: p.duetFlourishInt, chorusBreathInt: p.chorusBreathInt, tempestSlot0Int: p.tempestSlot0Int,
             aspect: 1,   // the widget's own canvas is always square, unlike the standalone demo's full window
         });
         pipeline.render(renderer);
@@ -201,7 +265,7 @@ export async function mountAiPresenceOrbWidget(opts = {}) {
     rafHandle = requestAnimationFrame(frame);
 
     const handle = {
-        canvas, renderer, state, pipeline,
+        canvas, renderer, state, pipeline, species,
         setState: (name) => state.setState(name),
         getState: () => state.state,
         remove() {

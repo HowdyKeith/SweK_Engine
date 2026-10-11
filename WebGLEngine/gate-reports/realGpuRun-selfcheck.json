@@ -1,0 +1,74 @@
+{
+ "gate": "tools/ship/realGpuRun-selfcheck.mjs",
+ "at": "2026-10-02",
+ "tables": [
+  {
+   "title": "which renderer each flag set gets on this box",
+   "columns": [
+    "flags",
+    "WebGL2",
+    "WebGL2 renderer",
+    "WebGPU"
+   ],
+   "rows": [
+    [
+     "--use-gl=swiftshader",
+     "software",
+     "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+     "no adapter"
+    ],
+    [
+     "--use-angle=swiftshader",
+     "software",
+     "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+     "no adapter"
+    ],
+    [
+     "--use-angle=swiftshader --enable-unsafe-swiftshader",
+     "software",
+     "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+     "no adapter"
+    ],
+    [
+     "--use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader",
+     "software",
+     "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+     "no adapter"
+    ],
+    [
+     "(no flags)",
+     "software",
+     "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+     "no adapter"
+    ],
+    [
+     "--use-gl=swiftshader --enable-unsafe-webgpu",
+     "software",
+     "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+     "google / swiftshader"
+    ],
+    [
+     "--enable-unsafe-webgpu",
+     "software",
+     "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+     "google / swiftshader"
+    ],
+    [
+     "--enable-unsafe-webgpu --use-webgpu-adapter=swiftshader",
+     "software",
+     "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+     "google / swiftshader"
+    ],
+    [
+     "--use-angle=swiftshader --enable-unsafe-swiftshader --enable-unsafe-webgpu --use-webgpu-adapter=swiftshader",
+     "software",
+     "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+     "google / swiftshader"
+    ]
+   ],
+   "note": "the headless shell this box resolves; on a GPU box this table is the measurement a fix to the 72 needs"
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

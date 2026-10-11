@@ -30,6 +30,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "../ship/playwrightResolve.mjs";
+import { LAUNCH_ARGS } from "../ship/webgpuHarness.mjs";
 import { noComments } from "../ship/sourceScan.mjs";
 
 const require_ = createRequire(import.meta.url);
@@ -47,9 +48,10 @@ const CFG = { n: 21, span: 1.0, rho: 0.1, nR: 48, nT: 48 };
 
 const b = await chromium.launch({
     executablePath: HEADLESS_SHELL,
-    // The two flags that made the header's "impossible" possible. Named here so the next person can check the
-    // claim in one command instead of inheriting it.
-    args: ["--enable-unsafe-webgpu", "--enable-features=Vulkan,WebGPU"],
+    // The two flags that made the header's "impossible" possible, named here so the next person can check the
+    // claim in one command instead of inheriting it -- plus LAUNCH_ARGS' own win32-only --use-angle=d3d11
+    // (tools/ship/webgpuHarness.mjs), without which requestAdapter() came back null on that platform.
+    args: [...LAUNCH_ARGS, "--enable-features=Vulkan,WebGPU"],
 });
 const page = await (await b.newContext()).newPage();
 await page.route("**/*", (route) => {

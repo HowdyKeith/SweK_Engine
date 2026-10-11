@@ -1,0 +1,200 @@
+// WebGLEngine/tools/ship/boxTimings-selfcheck.mjs -- v4679
+//
+// Run: node tools/ship/boxTimings-selfcheck.mjs      (~0.18s -- MEASURED v4815, median of 166/181/206 alone; was ~3s)
+//
+// *** A RATCHET WITH NO REACHABLE CLEAR STATE IS NOT A CHECK. ***
+//
+// recordDrift's "sweep timings" row asked whether every gate has a reading in sweep-timings.json. That file is
+// host-claimed -- v4647 made it refuse a foreign write, rightly -- and its host is a cloud container that no
+// longer exists. The rig cannot claim it; a new container hashes differently. SO NO LIVE BOX COULD ADD AN
+// ENTRY, and every round that added a gate left the row red with no action that would clear it.
+//
+// The repair is not to loosen the row. It is that the row was asking a COVERAGE question ("has this gate ever
+// been timed") of a COST-scoped record ("what does it cost on the box that owns this file"). This file grades
+// that the two are kept apart, that a foreign reading answers the first and not the second, and that the
+// writer a round needs actually writes what it claims.
+"use strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import * as BT from "./boxTimings.mjs";
+import { boxId, canonicalId } from "./hostScale.mjs";
+import { ownerOf, RECORD_HANDOVERS } from "./quickSweep.mjs";
+
+let fails = 0;
+const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
+const report = (l) => console.log("  ----  " + l);
+console.log("boxTimings-selfcheck -- the cross-box fallback wrote a file nobody read\n");
+
+const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "boxtimings-"));
+fs.mkdirSync(path.join(TMP, "tools", "ship"), { recursive: true });
+const put = (rel, obj) => fs.writeFileSync(path.join(TMP, rel), JSON.stringify(obj, null, 1));
+const ME = "boxA", THEM = "boxB";
+
+// ---- 1. THE NAMES, AND WHY THE PER-BOX ONE IS PER BOX --------------------------------------------------------
+console.log("1. *** A FILENAME PER BOX IS v4647'S ARGUMENT ABOUT FIELDS, ONE LEVEL UP ***");
+{
+    ok("!! the per-box name carries the box id, so two machines cannot overwrite one another",
+        BT.FILES.perBox(ME) !== BT.FILES.perBox(THEM) &&
+        BT.FILES.perBox(ME).includes(ME) && /^tools\/ship\/sweep-timings\..+\.json$/.test(BT.FILES.perBox(ME)),
+        `${BT.FILES.perBox(ME)} vs ${BT.FILES.perBox(THEM)} -- v4647 kept two machines' runtimes out of one set ` +
+        "of FIELDS; this keeps them out of one FILE, which is the same argument and the reason the single " +
+        "`.local.json` name could only ever hold whichever box ran last");
+    ok("...and the shared and legacy names are distinct from it and from each other",
+        BT.FILES.shared !== BT.FILES.legacy && BT.FILES.legacy !== BT.FILES.perBox(ME) &&
+        /local\.json$/.test(BT.FILES.legacy),
+        `${BT.FILES.legacy} is still READ, so the rig's existing measurements are not orphaned by the rename`);
+}
+
+// ---- 2. COVERAGE READS EVERY RECORD; COST DOES NOT -----------------------------------------------------------
+console.log("\n2. *** THE TWO QUESTIONS, AND A CONTROL THAT SEPARATES THEM ***");
+{
+    put(BT.FILES.shared, { host: THEM, timings: { "a-selfcheck.mjs": 100, "b-selfcheck.mjs": 200 },
+                           at: { "a-selfcheck.mjs": "T", "b-selfcheck.mjs": "T" },
+                           kinds: { "a-selfcheck.mjs": "loaded", "b-selfcheck.mjs": "loaded" } });
+    put(BT.FILES.perBox(ME), { host: ME, timings: { "b-selfcheck.mjs": 55, "c-selfcheck.mjs": 70 },
+                               at: { "b-selfcheck.mjs": "U", "c-selfcheck.mjs": "U" },
+                               kinds: { "b-selfcheck.mjs": "alone", "c-selfcheck.mjs": "alone" } });
+    const c = BT.coverage(TMP, { id: ME });
+    report(`records ${c.records.length}; covered ${c.entries.size}; mine ${c.localCount}, foreign ${c.foreignCount}`);
+
+    ok("!! *** a gate timed on ANOTHER box counts as COVERED, which is what unstuck the ratchet ***",
+        c.covered("a-selfcheck.mjs") && c.entries.get("a-selfcheck.mjs").mine === false,
+        "'has this gate ever been timed' is answerable by any box's record. Reading only the host-claimed file " +
+        "made the row unclearable, because no live box can write that file at all");
+    ok("!! *** and the entry still says WHOSE reading it is, so COST is not silently answered by COVERAGE ***",
+        c.entries.get("a-selfcheck.mjs").host === THEM && c.entries.get("c-selfcheck.mjs").mine === true,
+        "a caller that needs the cost on THIS box can refuse a foreign row; one that needs coverage need not. " +
+        "Collapsing them into a bare boolean is the defect, not the fix");
+    ok("!! *** THIS BOX'S OWN READING WINS when both records hold the gate ***",
+        c.entries.get("b-selfcheck.mjs").ms === 55 && c.entries.get("b-selfcheck.mjs").mine === true,
+        "55 (alone, mine) over 200 (loaded, theirs) -- the shared file is first in the walk, so this is the " +
+        "precedence rule doing work rather than the read order deciding by accident");
+    ok("...and a gate in NO record is not covered, or the row above would pass on anything",
+        !c.covered("nothing-selfcheck.mjs"));
+
+    // THE CONTROL: with only the foreign record present, `mine` must be zero -- otherwise `localCount` is
+    // measuring the number of entries rather than the number measured here.
+    fs.unlinkSync(path.join(TMP, BT.FILES.perBox(ME)));
+    const only = BT.coverage(TMP, { id: ME });
+    ok("!! CONTROL: with no local record at all, NOTHING reads as locally measured",
+        only.localCount === 0 && only.foreignCount === 2 && only.covered("a-selfcheck.mjs"),
+        `${only.localCount} local of ${only.entries.size} -- still fully COVERED and zero of it measured here, ` +
+        "which is precisely the rig's situation and must not read as a clean bill for the budget");
+}
+
+// ---- 2b. THE PURE CORE, BECAUSE THE FIRST VERSION MADE A CHECK UNFIXTUREABLE -----------------------------------
+console.log("\n2b. *** coverageOf TAKES RECORDS RATHER THAN READING THEM, AND THAT IS NOT A STYLE CHOICE ***");
+{
+    // recordDrift's staleness check injects a timings record and asserts the check notices what is wrong with
+    // it. The first version of this round routed that check through a function that reads the REAL FILES, so
+    // the fixture could not reach it: TWO SABOTAGE ROWS WENT RED and the check became undriveable. A staleness
+    // check nothing can falsify is a worse defect than the unclearable ratchet this round set out to fix.
+    const handed = [{ file: "(injected)", kind: "shared", host: THEM,
+                      rec: { timings: { "x-selfcheck.mjs": 9 }, at: { "x-selfcheck.mjs": "T" },
+                             kinds: { "x-selfcheck.mjs": "loaded" } } }];
+    const c = BT.coverageOf(handed, { id: ME });
+    ok("!! *** coverageOf answers from the records it is HANDED and reads no file at all ***",
+        c.entries.size === 1 && c.covered("x-selfcheck.mjs") && !c.covered("a-selfcheck.mjs"),
+        "a-selfcheck.mjs is in the real fixtures on disk from section 2 and must NOT appear here. If it did, a " +
+        "fixture would be answering with the tree's state instead of its own");
+    ok("...and it still attributes the host, so the injected path is not a different question",
+        c.entries.get("x-selfcheck.mjs").host === THEM && c.entries.get("x-selfcheck.mjs").mine === false);
+    ok("!! CONTROL: handed NOTHING it reports nothing, rather than falling back to the tree",
+        (() => { const e = BT.coverageOf([], { id: ME }); return e.entries.size === 0 && e.localCount === 0; })(),
+        "an empty record set is a legitimate state -- a box with no records -- and reading the real files to " +
+        "fill the gap is precisely the fallback that broke the sabotages");
+}
+
+// ---- 3. THE LEGACY FILE IS READ, BECAUSE THE RIG ALREADY HAS ONE ----------------------------------------------
+console.log("\n3. *** THE FILE v4647 WROTE IS NOT ORPHANED BY THE RENAME ***");
+{
+    put(BT.FILES.legacy, { host: ME, timings: { "legacy-selfcheck.mjs": 42 },
+                           at: { "legacy-selfcheck.mjs": "T" }, kinds: { "legacy-selfcheck.mjs": "alone" } });
+    const c = BT.coverage(TMP, { id: ME });
+    ok("!! a reading in the old single-name file still counts, and is attributed to its host",
+        c.covered("legacy-selfcheck.mjs") && c.entries.get("legacy-selfcheck.mjs").mine === true &&
+        c.records.some((r) => r.kind === "legacy"),
+        "the rig has one of these with 1,409 readings in it. Renaming the target without reading the old name " +
+        "would have thrown those away on the round that finally started using them");
+    ok("...and the walk does not mistake the legacy file for a per-box one, which would double-count it",
+        c.records.filter((r) => r.file === BT.FILES.legacy).length === 1);
+}
+
+// ---- 4. THE WRITER, DRIVEN -- INCLUDING THE CAP ---------------------------------------------------------------
+console.log("\n4. *** recordLocal WRITES WHAT IT CLAIMS, AND A CAP KILL IS A FLOOR AND NOT A RUNTIME ***");
+{
+    const calls = [];
+    const fakeRun = (g) => { calls.push(g); return g.includes("slow") ? { signal: "SIGTERM" } : { status: 0 }; };
+    const r = BT.recordLocal(["fast-selfcheck.mjs", "slow-selfcheck.mjs"],
+                             { root: TMP, id: ME, run: fakeRun, now: "STAMP" });
+    const w = JSON.parse(fs.readFileSync(path.join(TMP, BT.FILES.perBox(ME)), "utf8"));
+    ok("!! *** it runs each gate and files a ms, a per-entry stamp, a kind and an exit code ***",
+        calls.length === 2 && w.timings["fast-selfcheck.mjs"] >= 0 && w.at["fast-selfcheck.mjs"] === "STAMP" &&
+        w.kinds["fast-selfcheck.mjs"] === "alone" && w.codes["fast-selfcheck.mjs"] === 0,
+        "all four, because recordDrift requires a timing AND its own stamp AND a kind -- a reading whose " +
+        "quantity is unknown is not a reading anybody can compare");
+    ok("!! *** a capped gate is `capped`, not `alone`, so a FLOOR is never read as a runtime ***",
+        w.kinds["slow-selfcheck.mjs"] === "capped" && w.codes["slow-selfcheck.mjs"] === null,
+        "and its code is null rather than 0: a gate that was killed did not pass, and recording 0 there would " +
+        "be the missing-measurement-as-clean-bill shape this tree keeps finding");
+    ok("...and it MERGES rather than replaces, so timing one gate does not erase the box's other readings",
+        w.timings["legacy-selfcheck.mjs"] === undefined && Object.keys(w.timings).length === 2 &&
+        BT.recordLocal(["third-selfcheck.mjs"], { root: TMP, id: ME, run: fakeRun, now: "S2" }).total === 3,
+        "three entries after a second call that named one gate");
+    ok("...and the written record claims its host, or coverage could not attribute it",
+        w.host === ME && /COVERAGE/.test(w.note) && /task #87/.test(w.note),
+        "the note says what the file is for AND what it is not for -- the budget still reads the shared file");
+}
+
+// ---- 5. THE LIVE TREE, AND WHAT IS HONESTLY STILL WRONG --------------------------------------------------------
+console.log("\n5. *** THE REAL RECORDS, AND THE HALF THIS ROUND DID NOT DO ***");
+{
+    const live = BT.coverage(BT.ENG);
+    report(`live: ${live.records.length} record(s), ${live.entries.size} gates covered, ` +
+        `${live.localCount} measured on this box (${live.thisBox}), ${live.foreignCount} elsewhere`);
+    // *** v4779 -- THIS ROW ASSERTED ONE BOX'S SITUATION AS THE DESIGN, AND WENT RED ON THE BOX THAT OWNS THE
+    // FILE. *** It read "the shared record is NOT this box's" -- true on the rig and on a new container, false on
+    // a container whose fingerprint is the owner's, which is what linux-x64-4c-16096mb-142c0d is: four cores and
+    // 16 GB hash alike. The design fact is the ATTRIBUTION: the shared record names a host, and this box's
+    // readings count as its own exactly when that host is this box -- whichever box this is.
+    // *** v4778 (main) -- THIS ROW SAID "NEITHER THE RIG NOR THIS CONTAINER CAN WRITE IT", AND AT v4778 THAT BECAME
+    // THE BLOCKER RATHER THAN THE SITUATION. *** The owner container retired, and three gates that read the
+    // rotation could no longer be satisfied by any box. Keith handed the record to the rig (quickSweep.mjs's
+    // RECORD_HANDOVERS). So the row now asks the question that decides whether anyone CAN write it: does the
+    // record's owner, after handovers, resolve to the box the last handover named? A sabotage that empties the
+    // handover list leaves the owner a retired container and turns this red.
+    // v4819 -- BOTH ROWS, BECAUSE THEY ASK DIFFERENT THINGS: who may WRITE the record next (the handovers), and whose
+    // stopwatch its readings are (the `host` it names). Ids read through canonicalId: the handovers name boxes in
+    // the megabyte form the other line kept, boxId() in v4796's gigabytes.
+    const shared = live.records.find((r) => r.kind === "shared");
+    const owner = shared ? ownerOf(shared.host) : null, last = RECORD_HANDOVERS[RECORD_HANDOVERS.length - 1];
+    ok("!! the shared record is present and its owner, after handovers, is a box that can still write it",
+        !!shared && !!last && owner === canonicalId(last.to),
+        `shared record names ${shared && shared.host}; its owner is ${owner}; this box is ${live.thisBox}` +
+        (owner === live.thisBox ? " and writes it" : ", so it writes its own file") + ". Coverage still reads " +
+        "every box's record, which is why it had to stop being asked of this one");
+    const sharedMine = !!shared && [...live.entries.values()].filter((e) => e.from === shared.file).every((e) => e.mine === (canonicalId(shared.host) === live.thisBox));
+    ok("!! ...and its readings count as this box's exactly when the record names this box -- whoever may write it next",
+        !!shared && typeof shared.host === "string" && shared.host.length > 0 && sharedMine,
+        shared ? `the record's readings are ${shared.host}'s; this box is ${live.thisBox} -- ` +
+            (canonicalId(shared.host) === live.thisBox ? "so they are this box's own" : "so they are a foreign box's") : "no shared record");
+    // v4800 -- TASK #87 DONE IN quickSweep ITSELF: the sweep chooses its gates by THIS box's record (ownTimings), the
+    // shared one where this box owns it or nobody does, else the local file this box writes. Not through this module:
+    // the per-box files recordLocal writes hold a handful of entries, and choosing by one would run every gate it lacks.
+    // v4778 (main): an IMPORT, not the word -- quickSweep's handover note cites this module's header in a comment.
+    {   const qs = fs.readFileSync(path.join(BT.ENG, "tools", "ship", "quickSweep.mjs"), "utf8");
+        ok("!! *** and the BUDGET reads this box's own record now -- quickSweep's ownTimings, not this module's per-box files ***",
+            /export function ownTimings\(/.test(qs) && /const prior = own\.rec;/.test(qs) && !/^\s*import[^;]*["']\.\/boxTimings\.mjs["']/m.test(qs),
+            "before v4800 gate SELECTION was computed from whichever box owned the shared record -- 91 of 1,409 over " +
+            "budget on the rig for that reason, ~100 at each verify of this session's box. tools/ship/quickSweep-selfcheck.mjs holds the choice"); }
+}
+
+try { fs.rmSync(TMP, { recursive: true, force: true }); } catch {}
+console.log("\nunchecked here: WHETHER A FOREIGN READING IS A GOOD ENOUGH ANSWER FOR ANYTHING BUT COVERAGE. It is " +
+    "not, and nothing here pretends otherwise -- the rig's own verify measured 91 of 1,409 gates over budget " +
+    "purely for being named by a faster box. v4800 (task #87) made the sweep choose by this box's own record " +
+    "when it has one; what it does NOT do is scale a foreign reading on a box's first sweep, which still chooses " +
+    "by the shared record and says so -- origin/claude/v4672-relative-budget's scale machinery is the place for that.");
+console.log(fails ? `\nboxTimings-selfcheck: ${fails} FAILED` : "\nboxTimings-selfcheck: all checks pass");
+process.exitCode = fails ? 1 : 0;

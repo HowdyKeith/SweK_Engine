@@ -1,0 +1,15 @@
+three.js (WebGPU build, 0.185.1) -- kept for the r185 drafts, not imported by the engine
+https://github.com/mrdoob/three.js
+author: three.js authors (a collective, not a person -- see LICENSE)
+
+Recorded at v4805. These are vendor/three-webgpu's files as they were from 2026-09-08 (its re-vendor from 0.178.0)
+until v4805 moved that directory to 0.186.1 -- moved here unchanged, so the r185 drafts in docs/upstream-three/ and
+their patches keep a build to run on. Source: the npm tarball three@0.185.1
+(https://registry.npmjs.org/three/-/three-0.185.1.tgz), README.md beside this file records the one edit.
+
+EVIDENCE:
+  - LICENSE is byte for byte vendor/three-webgpu/LICENSE: three's MIT grant, "Copyright © 2010-2026 three.js authors".
+  - three.webgpu.js has sha256 50e4013dd3903e8afb09a4829962dbf105488de7bd47f61308f44bd2e66b3340, which
+    tools/ship/threeUpstream-selfcheck.mjs holds as three's own `npm run build` of its r185 tag (recorded v4774).
+
+NOTE: the same upstream project as vendor/three and vendor/three-webgpu -- a third copy of one grant, at an older release.

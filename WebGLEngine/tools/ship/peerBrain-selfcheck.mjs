@@ -138,7 +138,7 @@ sec("6. IN THE BROWSER: race-brain.html's EXPORT/IMPORT/CLEAR BUTTONS, ROUND-TRI
             const f = document.createElement("iframe"); f.style.width = "1100px"; f.style.height = "760px"; f.src = "/race-brain.html"; document.body.appendChild(f);
             await new Promise((res) => { f.onload = res; });
             const doc = f.contentDocument, win = f.contentWindow, txt = (id) => (doc.getElementById(id) || {}).textContent || "";
-            const t1 = performance.now(); while (performance.now() - t1 < 150000 && !/a turret on each/.test(txt("tick")) && !/threw|HTTP/.test(txt("be") + txt("tick"))) { globalThis.__swekStep = "waiting: " + txt("tick").slice(0, 60); await new Promise((res) => setTimeout(res, 250)); }
+            const t1 = performance.now(); while (performance.now() - t1 < 150000 && !/a turret on each/.test(txt("tick")) && !/threw|HTTP/.test(txt("be") + txt("tick"))) { globalThis.__swekStep = "waiting: " + txt("tick").slice(0, 60); await new Promise((res) => setTimeout(res, 50)); }
             const booted = /a turret on each/.test(txt("tick"));
             if (!booted) return { booted, be: txt("be") };
 
@@ -155,10 +155,20 @@ sec("6. IN THE BROWSER: race-brain.html's EXPORT/IMPORT/CLEAR BUTTONS, ROUND-TRI
 
             // Import: feed the JUST-exported blob back in through the real file-input change event, no server round trip.
             const setFile = (inputId, file) => { const input = doc.getElementById(inputId), dt = new win.DataTransfer(); dt.items.add(file); input.files = dt.files; input.dispatchEvent(new win.Event("change", { bubbles: true })); };
+            // v4778 (2026-10-04): the two imports below used to sleep a fixed 300 ms each for the FileReader; they now
+            // wait (5 s bound) for the page's own answer -- the "peer" line changing. race-brain.html's change handler
+            // sets that line and, on success, rebuilds the race and its "tick" line in the SAME synchronous task
+            // (importBlobInto -> peerLine() then setupRace()), and on refusal sets it last with nothing after, so the
+            // moment it changes everything the rows read is already settled. Measured here over three runs: the good
+            // import settles in 171-218 ms (it rebuilds the race) and the refused one in 11-43 ms, so ~0.4 s of a
+            // ~3.5 s gate was sleeping -- and the good import had only ~80 ms of headroom inside its fixed 300 ms, which
+            // a box 2.5x slower than this one would not have. The boot poll above went 250 -> 50 ms likewise. A
+            // handler that never answers still falls through at the bound and the rows below go red on what it left.
+            const settles = async (from) => { const t = performance.now(); while (performance.now() - t < 5000 && txt("peer") === from) await new Promise((res) => setTimeout(res, 10)); };
             if (exportedBlob) {
                 const file = new win.File([JSON.stringify(exportedBlob)], "peer.json", { type: "application/json" });
                 setFile("importBrainFile", file);
-                await new Promise((res) => setTimeout(res, 300));
+                await settles(peerBefore);
             }
             const peerAfterGoodImport = txt("peer");
 
@@ -169,7 +179,7 @@ sec("6. IN THE BROWSER: race-brain.html's EXPORT/IMPORT/CLEAR BUTTONS, ROUND-TRI
             // already-loaded peer brain's actual effect on the race.
             const badFile = new win.File([JSON.stringify({ format: "not-a-brain" })], "bad.json", { type: "application/json" });
             setFile("importBrainFile", badFile);
-            await new Promise((res) => setTimeout(res, 300));
+            await settles(peerAfterGoodImport);
             const peerAfterBadImport = txt("peer"), tickAfterBadImport = txt("tick");
 
             // Clear must revert to the no-peer-brain state, in both the status line and the actual race.
@@ -183,7 +193,12 @@ sec("6. IN THE BROWSER: race-brain.html's EXPORT/IMPORT/CLEAR BUTTONS, ROUND-TRI
             const p = r.result;
             ok("!! Export brain triggered a real download: a JSON blob shaped like drivePolicy.mjs's own live export, 1396 weights", p.captured && p.exportedBlob && p.exportedBlob.format === PB.FORMAT && p.exportedBlob.policy === "drivePolicy" && p.exportedBlob.weightCount === D.WEIGHT_COUNT, JSON.stringify(p.exportedBlob));
             ok("before any import: the fourth car is named zero, not a peer brain", /zero/.test(p.peerBefore) || /no peer brain/.test(p.peerBefore), p.peerBefore);
-            ok("!! importing the JUST-exported blob through the real file input succeeds and the HUD says so", /peer brain/.test(p.peerAfterGoodImport) && !/refused|failed/.test(p.peerAfterGoodImport), p.peerAfterGoodImport);
+            // v4778 (2026-10-04, adversarial review): this row used to accept the page's untouched no-peer line too --
+            // "no peer brain loaded -- ..." contains "peer brain" and neither "refused" nor "failed". Proved on a scratch
+            // copy whose import wait returns at once (nothing loaded yet): this row stayed PASS on exactly that line. It
+            // now needs what peerLine() writes for a loaded brain, "peer brain <8-hex weightsHash>"; the same sabotage
+            // turns it red, and the real run's line ("peer brain 4990df10 -- male-cns E-PG ...") still passes.
+            ok("!! importing the JUST-exported blob through the real file input succeeds and the HUD says so", /^peer brain [0-9a-f]{8}\b/.test(p.peerAfterGoodImport) && !/refused|failed/.test(p.peerAfterGoodImport), p.peerAfterGoodImport);
             ok("!! ...and the race actually picks it up: the fourth car in the HUD's car list is named \"peer brain\"", /peer brain/.test(p.tickAfterGoodImport), p.tickAfterGoodImport.slice(0, 200));
             ok("!! a malformed import is refused, with the reason displayed", /refused/.test(p.peerAfterBadImport), p.peerAfterBadImport);
             ok("!! ...and the refused import does NOT silently drop the already-loaded peer brain from the actual race", /peer brain/.test(p.tickAfterBadImport), p.tickAfterBadImport.slice(0, 200));

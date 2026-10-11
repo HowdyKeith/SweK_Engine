@@ -1,0 +1,26 @@
+diff --git a/src/nodes/accessors/Instance.js b/src/nodes/accessors/Instance.js
+index 2723fa9..df3e544 100644
+--- a/src/nodes/accessors/Instance.js
++++ b/src/nodes/accessors/Instance.js
+@@ -1,6 +1,6 @@
+ 
+ import { vec3, mat4, Fn } from '../tsl/TSLBase.js';
+-import { OnAfterObjectUpdate, OnBeforeFrameUpdate } from '../utils/EventNode.js';
++import { OnAfterObjectUpdate, OnBeforeObjectUpdate } from '../utils/EventNode.js';
+ import { normalLocal, transformNormal } from './Normal.js';
+ import { positionLocal, positionPrevious } from './Position.js';
+ import { varyingProperty } from '../core/PropertyNode.js';
+@@ -172,10 +172,11 @@ export const instance = /*@__PURE__*/ Fn( ( [ matrices, colors = null ], builder
+ 
+ 	}
+ 
+-	// Synchronization of dynamic buffer updates per frame.
++	// Synchronization of dynamic buffer updates before each draw, and before its buffers are uploaded: once a frame, the
++	// second and third renders of a frame drew the first's matrices
+ 	if ( interleavedMatrix !== null || interleavedColor !== null ) {
+ 
+-		OnBeforeFrameUpdate( () => {
++		OnBeforeObjectUpdate( () => {
+ 
+ 			if ( interleavedMatrix !== null && interleavedMatrix.version !== matrices.version ) {
+ 

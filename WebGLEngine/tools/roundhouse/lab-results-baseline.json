@@ -1,8 +1,8 @@
 {
- "note": "v3186 -- FROZEN LAB RESULTS. Every gate in the lab checks a RELATIONSHIP (error < tol, ratio ~ 2, converges) and NOTHING CHECKED THE VALUES, so a number could drift on a refactor, a dependency bump or a float change and every gate would still pass. 26 of 27 devices are DETERMINISTIC (measured, replay-exact); lbm has no defaults() and its ABSENCE IS FROZEN so the day it grows one the gate says so. Comparison is EXACT: a difference is a FINDING, and a tolerance would hide the day a device stops being deterministic. Re-freeze DELIBERATELY after an intended change: SWEK_FREEZE_LAB_RESULTS=1 node tools/roundhouse/labResults-selfcheck.mjs  RE-FROZEN v3336: the previous capture was stamped v3186 -- 150 versions and 17 devices stale, and verify.mjs does not run this gate. IT WAS NOT RE-FROZEN BLIND: all 52 devices were compared against the v3186 values first and NOTHING HAD MOVED (moved 0, vanished 0, appeared 0), so this absorbs 17 NEW devices and no drift. A blanket re-freeze without that comparison would have been a record of whatever happened to be there.  v3340: ONE DEVICE ADDED (fieldnav) BY DELTA, NOT BY BLANKET RE-FREEZE. All 52 existing devices were compared first and NONE had moved (moved 0, vanished 0, appeared 0) despite the v3339 patches touching probeBind and instruments -- so their v3336 values stand untouched rather than being rewritten from a run they did not need. Rewriting them would have discarded the ratchet to add one row.  v3366: added by DELTA again -- only the devices absent from the baseline were captured; every existing row keeps its frozen value, so the ratchet is extended rather than discarded.  v3379: reaction added BY DELTA -- only the new device was captured; every existing row keeps its frozen value.  v3380: beam added BY DELTA -- only the new device captured.  v3381: pulsar added BY DELTA.  v3382: galaxy and geostats added, AND THE FIRST FULL RE-RUN OF EVERY FROZEN ROW SINCE v3336 -- five rounds had extended this baseline BY DELTA, which never re-runs the rows it protects. All 57 existing devices were captured in two chunks (twof 100s and kh 22s in one, the other 55 in the other) and compared BEFORE anything was written: MOVED 0, VANISHED 0, APPEARED 1. The one appearance is twof.dragOverLift, null at freeze time and 0.1262 now, WITH EVERY OTHER twof VALUE BIT-IDENTICAL -- so the physics did not move. THE CAUSE IS v3341, which fixed dominantFrequency(...).freq being read as an object: every frequency in twoFExperiment.mjs had been NaN since v2862, so the ratio was absent for a reason that no longer holds. liftSustained is STILL false, so the run remains DISQUALIFIED and the 2f question remains open -- what changed is that the negative is now a number from a bad run rather than no number at all. Absorbed DELIBERATELY with that reason, and the stale lbm-two-frequency instrument key was corrected in the same commit.  v3391: FULL RE-RUN AGAIN, second in a row -- v3382 argued a delta never re-runs the rows it protects, so this build re-ran all 59 existing devices in two chunks before writing. MOVED 0, VANISHED 0, APPEARED 1. The appearance is clocks.crossoverErrOrder = 0, added THIS round as the order statistic for the clocks planted error, and it reads zero because the baseline run plants nothing. Four new devices absorbed from the v3390 patch (nuclear, seismic, acoustics, em).  v3392: FULL RE-RUN, third in a row. All 63 devices captured in two chunks and compared BEFORE writing: MOVED 0, VANISHED 0, APPEARED 2 -- inspiral.ratePower and inspiral.a0Exponent, both added THIS round for the wrong-power-law plant, and the unplanted run reports 3 and 4 exactly as Peters does. kerr gained `planted` (boolean, so runRecord drops it) and its horizon values are UNCHANGED, which is the evidence that the plant is opt-in rather than always on. AND THE CAPTURE SCRIPT ITSELF FAILED SILENTLY FIRST: it still pointed at the previous rounds path, exited 1, and the comparison ran against STALE JSON and reported a comfortable moved 0. A COMPARISON IS ONLY AS GOOD AS THE FRESHNESS OF BOTH SIDES.  v3393: FULL RE-RUN, fourth in a row, and THE CAPTURE SCRIPT WAS REPOINTED AT THE CURRENT DIRECTORY FIRST -- v3392 ran it against a renamed path, got exit 1, and compared stale JSON to the baseline while reporting a comfortable moved 0. MOVED 0, VANISHED 0, APPEARED 0: pipe3d gained only `planted`, which is a boolean and dropped by runRecord, so the reader plant leaves every frozen number untouched -- which is the evidence that it is opt-in.",
+ "note": "v3186 -- FROZEN LAB RESULTS. Every gate in the lab checks a RELATIONSHIP (error < tol, ratio ~ 2, converges) and NOTHING CHECKED THE VALUES, so a number could drift on a refactor, a dependency bump or a float change and every gate would still pass. 26 of 27 devices are DETERMINISTIC (measured, replay-exact); lbm has no defaults() and its ABSENCE IS FROZEN so the day it grows one the gate says so. Comparison is EXACT: a difference is a FINDING, and a tolerance would hide the day a device stops being deterministic. Re-freeze DELIBERATELY after an intended change: SWEK_FREEZE_LAB_RESULTS=1 node tools/roundhouse/labResults-selfcheck.mjs  RE-FROZEN v3336: the previous capture was stamped v3186 -- 150 versions and 17 devices stale, and verify.mjs does not run this gate. IT WAS NOT RE-FROZEN BLIND: all 52 devices were compared against the v3186 values first and NOTHING HAD MOVED (moved 0, vanished 0, appeared 0), so this absorbs 17 NEW devices and no drift. A blanket re-freeze without that comparison would have been a record of whatever happened to be there.  v3340: ONE DEVICE ADDED (fieldnav) BY DELTA, NOT BY BLANKET RE-FREEZE. All 52 existing devices were compared first and NONE had moved (moved 0, vanished 0, appeared 0) despite the v3339 patches touching probeBind and instruments -- so their v3336 values stand untouched rather than being rewritten from a run they did not need. Rewriting them would have discarded the ratchet to add one row.  v3366: added by DELTA again -- only the devices absent from the baseline were captured; every existing row keeps its frozen value, so the ratchet is extended rather than discarded.  v3379: reaction added BY DELTA -- only the new device was captured; every existing row keeps its frozen value.  v3380: beam added BY DELTA -- only the new device captured.  v3381: pulsar added BY DELTA.  v3382: galaxy and geostats added, AND THE FIRST FULL RE-RUN OF EVERY FROZEN ROW SINCE v3336 -- five rounds had extended this baseline BY DELTA, which never re-runs the rows it protects. All 57 existing devices were captured in two chunks (twof 100s and kh 22s in one, the other 55 in the other) and compared BEFORE anything was written: MOVED 0, VANISHED 0, APPEARED 1. The one appearance is twof.dragOverLift, null at freeze time and 0.1262 now, WITH EVERY OTHER twof VALUE BIT-IDENTICAL -- so the physics did not move. THE CAUSE IS v3341, which fixed dominantFrequency(...).freq being read as an object: every frequency in twoFExperiment.mjs had been NaN since v2862, so the ratio was absent for a reason that no longer holds. liftSustained is STILL false, so the run remains DISQUALIFIED and the 2f question remains open -- what changed is that the negative is now a number from a bad run rather than no number at all. Absorbed DELIBERATELY with that reason, and the stale lbm-two-frequency instrument key was corrected in the same commit.  v3391: FULL RE-RUN AGAIN, second in a row -- v3382 argued a delta never re-runs the rows it protects, so this build re-ran all 59 existing devices in two chunks before writing. MOVED 0, VANISHED 0, APPEARED 1. The appearance is clocks.crossoverErrOrder = 0, added THIS round as the order statistic for the clocks planted error, and it reads zero because the baseline run plants nothing. Four new devices absorbed from the v3390 patch (nuclear, seismic, acoustics, em).  v3392: FULL RE-RUN, third in a row. All 63 devices captured in two chunks and compared BEFORE writing: MOVED 0, VANISHED 0, APPEARED 2 -- inspiral.ratePower and inspiral.a0Exponent, both added THIS round for the wrong-power-law plant, and the unplanted run reports 3 and 4 exactly as Peters does. kerr gained `planted` (boolean, so runRecord drops it) and its horizon values are UNCHANGED, which is the evidence that the plant is opt-in rather than always on. AND THE CAPTURE SCRIPT ITSELF FAILED SILENTLY FIRST: it still pointed at the previous rounds path, exited 1, and the comparison ran against STALE JSON and reported a comfortable moved 0. A COMPARISON IS ONLY AS GOOD AS THE FRESHNESS OF BOTH SIDES.  v3393: FULL RE-RUN, fourth in a row, and THE CAPTURE SCRIPT WAS REPOINTED AT THE CURRENT DIRECTORY FIRST -- v3392 ran it against a renamed path, got exit 1, and compared stale JSON to the baseline while reporting a comfortable moved 0. MOVED 0, VANISHED 0, APPEARED 0: pipe3d gained only `planted`, which is a boolean and dropped by runRecord, so the reader plant leaves every frozen number untouched -- which is the evidence that it is opt-in.  v4778 (rig run): capsuledepenetrate absorbed -- the rtx merge's device, 1 device and 5 pairs (floor, wall, corner, ramp, empty). Compared FIRST on Node v22.22.2: MOVED 0 on every default and every pair, VANISHED 0, the roster +1. And this file is now NODE 22'S: Keith's rig on Node v24.17.0 read 34 values moved that no code had touched, and Node v24.17.0 on Linux reproduces each to the last digit, so a second runtime has its own baseline beside this one (lab-results-baseline.node24.json), and the gate holds the two to the same shape.",
  "captured": "v3446",
- "deviceCount": 129,
- "observables": 1263,
+ "deviceCount": 130,
+ "observables": 1269,
  "devices": {
   "friction": {
    "mode": "critical",
@@ -2264,6 +2264,17 @@
     "kelvinAtD": 212.88207478908424,
     "warmthAtT": 0.015712180104003336,
     "roundTripErrFrac": 0
+   }
+  },
+  "capsuledepenetrate": {
+   "mode": "floor",
+   "outputs": {
+    "posX": 0,
+    "posY": -2.7755575615628914e-17,
+    "posZ": 0,
+    "grounded": 1,
+    "contacts": 4,
+    "pushDist": 0.09999999999999998
    }
   },
   "lbm": {
@@ -9365,8 +9376,59 @@
     "roomTravelFrac": 0.7856090052001669,
     "stylisedKelvinAtMax": 109396.17649967935
    }
+  },
+  "capsuledepenetrate/floor": {
+   "outputs": {
+    "posX": 0,
+    "posY": -2.7755575615628914e-17,
+    "posZ": 0,
+    "grounded": 1,
+    "contacts": 4,
+    "pushDist": 0.09999999999999998
+   }
+  },
+  "capsuledepenetrate/wall": {
+   "outputs": {
+    "posX": -0.4,
+    "posY": 1,
+    "posZ": 0,
+    "grounded": 0,
+    "contacts": 4,
+    "pushDist": 0.30000000000000004
+   }
+  },
+  "capsuledepenetrate/corner": {
+   "outputs": {
+    "posX": -0.4,
+    "posY": 1,
+    "posZ": -0.4,
+    "grounded": 0,
+    "contacts": 4,
+    "pushDist": 0.4242640687119286
+   }
+  },
+  "capsuledepenetrate/ramp": {
+   "outputs": {
+    "posX": 0,
+    "posY": 0.02141016151377558,
+    "posZ": 0.07009618943233425,
+    "grounded": 1,
+    "contacts": 4,
+    "pushDist": 0.14019237886466857
+   }
+  },
+  "capsuledepenetrate/empty": {
+   "outputs": {
+    "posX": 50,
+    "posY": 50,
+    "posZ": 50,
+    "grounded": 0,
+    "contacts": 0,
+    "pushDist": 0
+   }
   }
  },
- "pairCount": 485,
- "pairObservables": 4213
+ "pairCount": 490,
+ "pairObservables": 4243,
+ "node": "22"
 }

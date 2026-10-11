@@ -20,6 +20,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { NOT_IMPORTERS } from "./orreryFleetScan.mjs";
+// v4814: sections 1 and 3 walk the same 5,012 files; on the rig the two reads were 3.2 s of a 6.6 s wall
+// (gateProfile --rig-slow). Both now read through readOnce, so each file is read once per run.
+import { readOnce } from "./treeRead.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 let fails = 0;
@@ -97,7 +100,7 @@ console.log("\n2. *** EJECTA: how far each body's material spread into the tree 
         const p = path.join(d, e.name);
         if (e.isDirectory()) walk(p); else if (/\.(mjs|js|html)$/.test(e.name))
             files.push({ path: path.relative(ROOT, p).replace(/\\/g, "/"),
-                         source: codeOnly(fs.readFileSync(p, "utf8")) }); } };
+                         source: codeOnly(readOnce(p)) }); } };
     walk(ROOT);
     // *** THIS GATE EXCLUDES ITSELF, AND LEARNING WHY COST A WRONG BASELINE. *** Section 3's control fixture
     // contains the literal "../vendor/box3d/box3d.js", so the moment this file existed it became the 32nd
@@ -174,7 +177,7 @@ console.log("\n3. *** THE CITATION COUNT IS REFUSED, and the refusal is measured
     const walk = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) {
         if (/node_modules|^\.git$|^vendor$|GPU_Assets|demos_code/.test(e.name)) continue;
         const p = path.join(d, e.name);
-        if (e.isDirectory()) walk(p); else if (/\.(mjs|js|html)$/.test(e.name)) files.push(fs.readFileSync(p, "utf8")); } };
+        if (e.isDirectory()) walk(p); else if (/\.(mjs|js|html)$/.test(e.name)) files.push(readOnce(p)); } };
     walk(ROOT);
     const cites = (name) => { const re = new RegExp("\\b" + name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "i");
         return files.filter((s) => re.test(s)).length; };

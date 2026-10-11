@@ -19,8 +19,10 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { withheldFromMirror } from "./withheld.mjs";
 import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
+import { parseOrExit } from "./cliArgs.mjs";   // v4826 -- an option this tool does not know is refused, not read past (shipVerdict forwards its argv here verbatim, so a mistyped --versoin used to verify against NO version)
 
-function arg(name) { const i = process.argv.indexOf(name); return i >= 0 ? process.argv[i + 1] : null; }
+const CLI = parseOrExit("verify", { values: { "--version": "string", "--markers": "string", "--zip": "path", "--sweep-budget": "number" }, flags: ["--skip-qa"] });
+function arg(name) { return name in CLI.values ? CLI.values[name] : null; }
 const version = arg("--version");
 const markers = (arg("--markers") || "").split(",").map(s => s.trim()).filter(Boolean);
 const zipPath = arg("--zip");
@@ -61,6 +63,74 @@ if (version) {
     check(`version is not one origin/main already carries (main: ${pf.mainVersion || "unreadable"})`, pf.ok, pf.refusal || "");
   } catch (e) { console.log("[verify] NOTE  version preflight could not run: " + String(e.message).slice(0, 100)); }
 }
+
+// 1b. *** THE DRIFT PRE-FLIGHT, WHICH EXISTED AND HAD NO RUNNER. ***
+//
+// tools/ship/recordDrift.mjs answers, before the verify rather than after it, which hand-maintained records a
+// new module invalidates -- assertionShape's census, gateSweep's closings, the knowledge index, the instrument
+// registry, sweep-timings, runtimeGap's twelve capability rows. It works: on the round that added
+// tools/ship/fsrPage-selfcheck.mjs it named runtimeGap stale and listed the seven rows that moved.
+//
+// NOTHING CALLED IT. The tree imports that module twice -- from its own gate, and from runtimeGap-selfcheck
+// for the tree walk it also exports -- and its gate runs 4,997 ms against quickSweep's 3,000 ms budget, so the
+// ship-time sweep skips it. The expensive half was the gate; the check itself is 1,776 ms, which is why this
+// is a step rather than a plea to make the gate faster. tools/ship/recordReach-selfcheck.mjs has carried a red
+// row saying exactly this and it sat unread.
+//
+// It runs in-process rather than as a spawn so the cost is the check's and not a second node start.
+try {
+  // v4681 -- a killed run's in-tree scratch directories are reclaimed FIRST, because the drift pre-flight below
+  // counts source files and four stranded .mjs files were enough to take it red on the rig. Named, not silent.
+  const { reclaimScratchDirs } = await import("./gateSweep.mjs");
+  const reclaimed = reclaimScratchDirs();
+  if (reclaimed.length) console.log("[verify] NOTE  reclaimed " + reclaimed.length + " stranded gate scratch dir(s) a killed run left in the tree: " + reclaimed.join(", "));
+  const RD = await import("./recordDrift.mjs");
+  const { all, stale } = await RD.drift();
+  check("derived records a new module invalidates are up to date (the drift pre-flight)",
+        stale.length === 0,
+        stale.length ? stale.map((x) => (x.name || x.key || String(x)) + ": " + (x.detail || x.why || "")).join("; ").slice(0, 300)
+                     : "");
+  // v4778 -- ...and the pre-flight's own record, which its gate checks first (recordDrift-selfcheck: "the checks
+  // cover every re-derivable record the register counts") and which therefore went unchecked at ship time on the
+  // rig, where that gate reads 4,829 ms. `all` is already in hand, so this costs nothing; see recordReach.SHIP_STEPS.
+  // v4778 review -- and the record's OTHER re-derivable count with it, the duties it admits it does not discharge:
+  // OWES carries one clause per duty, so OWES = checks run + notChecked (9 = 7 + 2 today). recordDrift-selfcheck
+  // asks this too, and it is the half of the record a `checked`-only line would leave to a gate the rig cannot sweep.
+  const owed = Object.keys(RD.OWES).length;
+  check("the drift pre-flight ran every check its own record counts",
+        all.length === RD.DRIFT_AT_V4482.checked && owed === all.length + RD.DRIFT_AT_V4482.notChecked,
+        all.length + " checks run, DRIFT_AT_V4482 records " + RD.DRIFT_AT_V4482.checked + "; " + owed +
+        " OWES clauses against " + RD.DRIFT_AT_V4482.notChecked + " admitted not checked");
+  // ...and the other way a population moves without anybody editing anything: a gate killed mid-run leaves a
+  // file named like a gate. One of the two is `process.exit(3)`, so it reads as a NEW RED for a file that is
+  // in no commit -- measured at 1738 enumerated against 1737. Named rather than excluded; see TRANSIENT_FIXTURES.
+  const { TRANSIENT_FIXTURES } = await import("./gateSweep.mjs");
+  const left = TRANSIENT_FIXTURES.filter((f) => fs.existsSync(f));
+  check("no transient gate fixture was left on disk by a killed run", left.length === 0,
+        left.length ? left.join(", ") + " -- delete it; it enumerates as a gate and one of them exits 3" : "");
+// v4778 review -- a crash here FAILS now instead of printing a NOTE, for the reason 1c gives: this step is the
+// ship-time road recordReach.SHIP_STEPS credits with DRIFT_AT_V4482, REACH_AT_V4548 and PROBE_AT_V4536, and on
+// the rig (recordDrift-selfcheck 4,829 ms) the only one -- a NOTE would let verify pass with those records
+// counted as checked by a step that never ran.
+} catch (e) { check("the drift pre-flight could run at all", false, String((e && e.message) || e).slice(0, 120)); }
+
+// 1c. *** v4778 -- THE OTHER STALE-RECORD DETECTOR, GIVEN THE ROAD 1b GAVE recordDrift AT v4639. ***
+//
+// tools/ship/frozenRecords-selfcheck.mjs reads 5,230 ms on Keith's rig against quickSweep's 3,000 ms budget, and
+// since 9ed30746 the rig's readings decide what the sweep runs -- so at ship time on that box nothing compared
+// the census frozenRecords.mjs froze against the census the tree holds, and recordReach-selfcheck said "NO
+// ROAD". frozenRecords.stale() is that comparison without the gate's fixtures, git call or guardian search.
+// MEASURED here: 910 ms cold on its own, 3 ms after 1b's drift() in this process, because both take the same
+// census({ guardians: false }) and the module memoises it. A step that cannot run FAILS rather than noting:
+// it is the only ship-time road this detector has on the rig, and a road that crashes is not a road.
+try {
+  const FRM = await import("./frozenRecords.mjs");
+  const fr = FRM.stale();
+  check("frozen-record censuses are what the tree holds (frozenRecords' staleness check)",
+        fr.stale.length === 0,
+        fr.stale.length ? fr.stale.map((x) => x.name + ": " + x.detail).join("; ").slice(0, 300)
+                        : fr.rows.length + " readings, all current");
+} catch (e) { check("frozen-record censuses could be read at all", false, String((e && e.message) || e).slice(0, 120)); }
 
 // 1. version marker matches what we claim
 if (version) {
@@ -190,6 +260,22 @@ try {
 // v2493 -- the lockstep selfchecks EXISTED and were never gated, so they ran when someone remembered. That is how
 // a protocol that dies at 2% packet loss shipped for 200 versions: the tests that would have caught it were sound,
 // present, and optional. Every check that is not in the gate is a check that is not being run.
+// *** v4583 -- DECLARED, BECAUSE THIS FILE RUNS GATES NOTHING ELSE RUNS AND CHOSE ITS OWN LIMIT FOR THEM. ***
+//
+// tools/ship/runnerBudget-selfcheck.mjs had never seen this file: its scan wanted `spawn(process.execPath` or
+// `execFile(process.execPath`, and the call below is execFileSync destructured from a dynamic import, so the
+// ship's own gate runner sat outside the population that exists to ask exactly this. MEASURED at v4583, the
+// consequence is nil and is stated as nil: the three gates below cost 61, 127 and 112 ms against a 180,000 ms
+// cap. The declaration is owed anyway -- an undeclared number is not excused by being generous today.
+export const budgetIsOwn =
+    "the flat 180 s here (60 s for claimsGate) is a WALL-CLOCK GUARD on a handful of gates this file runs by name, " +
+    "not a budget derived from any of them. gateBudget.MEASURED has no entry for the three lockstep gates -- " +
+    "selfchecks.mjs leaves them to this runner precisely because they need their own result parsing -- so the " +
+    "table's per-gate numbers have nothing to say about them, and the general default it would otherwise grant " +
+    "(329,697 ms) is 1.8x this cap. Measured at v4583 they cost 61, 127 and 112 ms, so the guard is three orders " +
+    "of magnitude clear of the work; if that stops being true the honest move is to measure them into MEASURED " +
+    "and read it here, not to raise this number.";
+
 for (const [file, label] of [
   ["physics/box3d-lockstep-selfcheck.mjs", "lockstep session"],
   ["physics/box3d-lockstep-net-selfcheck.mjs", "lockstep transport"],
@@ -209,6 +295,27 @@ for (const [file, label] of [
     // dependency, a syntax error or a timeout all look like. NEVER RUN IS DISTINCT FROM PASS. Four sites shared
     // this shape and v2496 fixed one of them halfway.
     else check("net — " + label, false, "COULD NOT RUN: " + String(e.message).slice(0, 90));
+  }
+}
+
+// v4782 -- THE TWO ORPHAN RATCHETS, BY NAME, BECAUSE THE SWEEP COULD NOT SEE THEM. graveyard and referenceKind took
+// ~157 s and ~175 s, so the quick sweep never ran them and two merges landed over both unmeasured (v4781). They take
+// ~3 s each now (moduleRefs.basenameHits, and the directory test asked once per directory), but the sweep still picks
+// gates by the shared timing record -- whose owner may not be the box running this, and cannot be re-timed from one
+// that is not (task #87) -- so a fast gate can stay unselected for as long as that record is stale. Run here they
+// are seen every ship, whatever any record says. The exit code is the verdict, as for the lockstep gates above.
+for (const [file, label] of [
+  ["tools/ship/graveyard-selfcheck.mjs", "graveyard -- gate-only modules may not increase"],
+  ["tools/ship/referenceKind-selfcheck.mjs", "referenceKind -- no new orphan hidden by a mention"],
+]) {
+  try {
+    const { execFileSync } = await import("node:child_process");
+    execFileSync(process.execPath, [file], { encoding: "utf8", timeout: 180000 });
+    check("orphans — " + label, true, "exit 0");
+  } catch (e) {
+    const out = String(e.stdout || "");
+    const fail = (out.match(/^\s*FAIL\s.*$/m) || [""])[0].trim().slice(0, 140);
+    check("orphans — " + label, false, fail || "COULD NOT RUN: " + String(e.message).slice(0, 90));
   }
 }
 
@@ -495,7 +602,7 @@ if (zipPath) {
 // 8. QA GATE: the headless invariant suite (physics no-clip/finite/settle, shader shadows bit-identical to CPU,
 // vortex dipole) must all pass -- a regression that breaks physics or drifts a shader from its verified reference
 // cannot reach a release. Opt out only with --skip-qa (don't).
-if (process.argv.indexOf("--skip-qa") < 0) {
+if (!CLI.flags.has("--skip-qa")) {
   try {
     const { runQA } = await import("./qa-suite.mjs");
     const { results } = await runQA();
@@ -527,13 +634,71 @@ if (process.env.SWEK_QUICKSWEEP !== "0") {
     // thing somebody changes for a good reason somewhere else -- v4574 changed it to true for about ten
     // minutes before sweepCoverage-selfcheck showed why that was wrong -- and an argument at the call site
     // is a decision THIS file made, which the next person to arm something can see was considered here.
-    const r = await runQuickSweep({ budgetMs, skipUnchanged: false, onProgress: (d, t) => { if (d === t || d % 200 === 0) process.stderr.write(`[verify] quick sweep ${d}/${t}\n`); } });
+    // *** v4680 -- EVERY PROGRESS LINE CARRIES ITS CLOCK, AND PHASE 2 AND THE SLICE PRINT AT ALL. *** The rig's
+    // v4679 log stopped at "quick sweep 1413/1413" with no summary and no trailer, and could not say whether the
+    // run died a second after that line or forty minutes into the silent serial phase that follows it. Each
+    // serial gate is named BEFORE it runs, so a killed run's last line is the gate that was running and the
+    // `+Ns` beside it bounds when. stderr, like the phase-1 lines: stdout is where the verdict is read.
+    const t0Sweep = Date.now();
+    const clock = () => `+${Math.round((Date.now() - t0Sweep) / 1000)}s`;
+    const r = await runQuickSweep({ budgetMs, skipUnchanged: false,
+      onProgress: (d, t) => { if (d === t || d % 200 === 0) process.stderr.write(`[verify] quick sweep ${d}/${t}  ${clock()}\n`); },
+      onStage: (e) => {
+        if (e.stage === "alone" && !e.gate)
+          process.stderr.write(`[verify] phase 2: ${e.total} gate(s) re-run ALONE, serially -- ${e.red} red, ${e.total - e.red} over budget  ${clock()}\n`);
+        else if (e.stage === "alone") process.stderr.write(`[verify]   alone ${e.done}/${e.total}  ${clock()}  ${e.gate}\n`);
+        else if (e.stage === "slice" && !e.gate) process.stderr.write(`[verify] serial slice: up to ${e.sliceMs / 1000} s over ${e.total} owed gate(s)  ${clock()}\n`);
+        else if (e.stage === "slice") process.stderr.write(`[verify]   slice ${e.done}  ${clock()}  ${e.gate}\n`);
+        else if (e.stage === "write") process.stderr.write(`[verify] sweep done, recording timings  ${clock()}\n`);
+      } });
     console.log(`[verify] quick sweep: ${r.ran} of ${r.enumerated} gates under ${budgetMs} ms in ${(r.ms / 1000).toFixed(0)} s -- ${r.green} green, ` +
       `${r.knownRed.length} known red, ${r.newRed.length} NEW red, ${r.falseReds} false red, ${r.unmeasured.length} unmeasured, ${r.dropped.length} now over budget`);
     for (const k of r.knownRed) console.log(`[verify]   known red  ${k.gate}  (${k.record})`);
+    // *** v4647c -- THE FALSE REDS ARE NAMED HERE, BECAUSE A SECOND BOX REPORTED 143 AND COULD NAME NONE. ***
+    // Keith's gen-9 sweep read "143 false red" -- 11% of the swept population against the 7 of 46 redCensus
+    // measured on this box -- and the count was the whole of it. A gate that is red under -P and green alone
+    // is STARVED, and which gates starve is a fact about the runner that only this line can carry off the box.
+    // Worst ratio first: parallel time over serial time is how much the other workers cost that gate, and a
+    // ratio near 1 is a gate that was never slowed at all.
+    // *** WHOSE LIST THIS WAS. *** The membership comes from a record owned by one box; a second machine runs
+    // that list and finds part of it over budget locally. Saying so is the difference between "the sweep is
+    // green" meaning the same thing on two machines and meaning two different things in silence.
+    if (r.foreignTimings) console.log(`[verify]   NOTE: the membership list came from ${r.timingsHost}, not this ` +
+      `box (${r.box}). ${r.dropped.length} of the ${r.ran} gates it named are over the ${budgetMs} ms budget HERE, ` +
+      `which is this machine being slower rather than those gates growing. budgetMs is a total-cost threshold ` +
+      `and is deliberately not scaled per box -- a slower machine should run FEWER gates, not be given longer`);
+    if (r.falseRedSplit) console.log(`[verify]   false red  ${r.falseRedSplit.capped} were KILLED AT THE CAP and ` +
+      `${r.falseRedSplit.slowed} were genuinely slower -- a cap kill is the box refusing to run that many at once, ` +
+      `and its parallel figure is the killer's clock rather than a runtime`);
+    for (const f of (r.falseRedList || []).slice(0, 20))
+      console.log(`[verify]   false red  ` + (f.capped ? "CAPPED".padStart(7) : (String(f.ratio ?? "?") + "x").padStart(7)) +
+        `  ${f.gate}  ${f.parallelMs} ms loaded -> ${f.serialMs} ms alone`);
+    if ((r.falseRedList || []).length > 20)
+      console.log(`[verify]   false red  ... ${r.falseRedList.length - 20} more (quickSweep --json carries all of them)`);
     for (const d of r.dropped) console.log(`[verify]   over budget now  ${d}`);
+    // *** v4649 -- THE ROWS A NEW RED PRINTED, IN THIS LOG, RATHER THAN IN A SECOND RUN. ***
+    // quickSweep has carried each new red's FAIL lines since v4648 and nothing ever printed them, so every
+    // round so far has cost a separate failLines pass on the other box to find out what a red actually said.
+    // And for the seven that print NO failing row -- the Windows fail-fasts -- what travels is the last
+    // thing they printed before dying, which names the last row that ran.
+    for (const n of r.newRed) {
+        if (n.fail && n.fail.length) {
+            console.log(`[verify]   new red  ${n.gate}  exit ${n.code}`);
+            for (const l of n.fail) console.log(`[verify]      ${String(l).slice(0, 200)}`);
+        } else if (n.died && n.died.length) {
+            console.log(`[verify]   new red  ${n.gate}  exit ${n.code}  -- NO FAILING ROW: it died rather than found something. Last output before it went:`);
+            for (const l of n.died) console.log(`[verify]      ${String(l).slice(0, 200)}`);
+        } else {
+            console.log(`[verify]   new red  ${n.gate}  exit ${n.code}  -- no failing row and nothing on the tail either`);
+        }
+    }
     check("quick sweep: no gate outside the red register is red", r.newRed.length === 0,
       r.newRed.length ? "NEW RED: " + r.newRed.map((n) => n.gate + " exit " + n.code).join(", ") + " -- fix it or register it in redCensus.mjs with a reason" : `${r.ran} gates, ${r.knownRed.length} known reds on record`);
+    // v4692 -- a gate capped ALONE says where it was when the cap fell, as a red says where it died.
+    for (const c of r.capped || []) {
+        console.log(`[verify]   capped  ${c.gate}  killed at ${c.ms} ms alone -- last output before the cap:`);
+        for (const l of (c.last && c.last.length ? c.last : ["(nothing on the tail: it printed nothing before the cap)"])) console.log(`[verify]      ${String(l).slice(0, 200)}`);
+    }
     check("quick sweep: nothing timed out alone under the cap", r.unmeasured.length === 0, r.unmeasured.join(", ") || "");
   } catch (e) { check("quick sweep ran", false, "COULD NOT RUN: " + String(e && e.message).slice(0, 120)); }
 }

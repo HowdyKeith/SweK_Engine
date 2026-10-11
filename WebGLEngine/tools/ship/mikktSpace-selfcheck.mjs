@@ -72,7 +72,12 @@
 //    N=(1,0,0) fixture only ([1,0,0] is NOT perpendicular to itself, dot=1), green on the other two (a fixed
 //    [1,0,0] output is trivially perpendicular to any normal with zero x-component, which is exactly why a
 //    single fixture could not have caught this and three orthogonal ones, collectively, can).
+// H. (v4778 rig run) mikktRef.inputHashes keyed by the raw path.relative again, the `.split(P.sep).join("/")`
+//    removed -> 1 red, section 1's path.win32 row, naming exactly the three backslashed keys Keith's rig read
+//    as "3 changed, 3 unrecorded". The Linux row above it stays green, which is why the win32 row exists.
+//    Restored, md5 verified.
 import fs from "node:fs";
+import path from "node:path";
 import * as R from "../mesh/mikktRef.mjs";
 import { gateReport } from "./gateReport.mjs";
 import { computeTangents, bitangentFromTangent } from "../../physics/mesh/mikktSpace.mjs";
@@ -93,6 +98,16 @@ console.log("1. *** THE RECORD IS ONLY WORTH ITS INPUTS, SO ITS INPUTS ARE HASHE
     ok("!! the vendored mikktspace.c/.h and the harness are the ones the record was taken from",
         bad.length === 0 && missing.length === 0,
         `${Object.keys(REC.inputs).length} hashed inputs, ${bad.length} changed, ${missing.length} unrecorded. Pinned at ${REC.pin.slice(0, 12)}.`);
+
+    // *** v4778 RIG RUN: THE ROW ABOVE WAS RED ON WINDOWS WITH NOT ONE BYTE CHANGED. *** inputHashes keyed
+    // by the raw path.relative, so every key read "vendor\\mikktspace\\..." there and matched nothing
+    // recorded: "3 changed, 3 unrecorded". Asked here as Windows would ask it, so a Linux box sees it too.
+    const win = R.inputHashes(path.win32);
+    const winBad = Object.keys(REC.inputs).filter((f) => win[f] !== REC.inputs[f]);
+    ok("!! ...and the same hashes come out under Windows' separator, keyed exactly as the record is",
+        winBad.length === 0 && Object.keys(win).length === Object.keys(REC.inputs).length,
+        winBad.length ? `under path.win32 the keys read ${Object.keys(win).join(", ")} -- the rig's red`
+                      : `${Object.keys(win).length} of ${Object.keys(REC.inputs).length} keys match under path.win32`);
 
     const drift = Object.entries(REC.meshes).filter(([n, m]) => !R.FIXTURES[n] || R.meshHash(R.FIXTURES[n]()) !== m.meshHash);
     ok("!! and every fixture still generates the exact vertex/normal/uv/index bytes the reference was run on",

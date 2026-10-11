@@ -21,9 +21,9 @@
   }
  },
  "counts": {
-  "page": 471,
+  "page": 479,
   "demo": 49,
-  "builtin": 37
+  "builtin": 38
  },
  "entries": [
   {
@@ -1164,6 +1164,14 @@
   },
   {
    "kind": "page",
+   "id": "es-aircraft.html",
+   "display": "Es Aircraft",
+   "href": "/es-aircraft.html",
+   "section": "RTX",
+   "collision": false
+  },
+  {
+   "kind": "page",
    "id": "es-away-mission.html",
    "display": "Es Away Mission",
    "href": "/es-away-mission.html",
@@ -1180,10 +1188,18 @@
   },
   {
    "kind": "page",
+   "id": "es-box3d-6dof.html",
+   "display": "Es Box3d 6dof",
+   "href": "/es-box3d-6dof.html",
+   "section": "RTX",
+   "collision": false
+  },
+  {
+   "kind": "page",
    "id": "es-box3d-fly3d.html",
    "display": "Es Box3d Fly3d",
    "href": "/es-box3d-fly3d.html",
-   "section": "Game: Endless Sky",
+   "section": "Fruit Fly Brain",
    "collision": false
   },
   {
@@ -1444,6 +1460,14 @@
   },
   {
    "kind": "page",
+   "id": "fly-connectome.html",
+   "display": "Fly Connectome",
+   "href": "/fly-connectome.html",
+   "section": "Fruit Fly Brain",
+   "collision": false
+  },
+  {
+   "kind": "page",
    "id": "fog-of-war.html",
    "display": "Fog Of War",
    "href": "/fog-of-war.html",
@@ -1488,6 +1512,22 @@
    "display": "Frugon",
    "href": "/frugon.html",
    "section": "Physics Lab",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "fsr-three.html",
+   "display": "Fsr Three",
+   "href": "/fsr-three.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "fsr.html",
+   "display": "Fsr",
+   "href": "/fsr.html",
+   "section": null,
    "collision": false
   },
   {
@@ -1760,6 +1800,14 @@
    "display": "IndexPlus",
    "href": "/indexPlus.html",
    "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "install-fsr-caches.html",
+   "display": "Install Fsr Caches",
+   "href": "/install-fsr-caches.html",
+   "section": "Opt-in: somebody else's work",
    "collision": false
   },
   {
@@ -2631,7 +2679,7 @@
    "id": "race-brain.html",
    "display": "Race Brain",
    "href": "/race-brain.html",
-   "section": "Racing City",
+   "section": "Fruit Fly Brain",
    "collision": false
   },
   {
@@ -2647,6 +2695,14 @@
    "id": "race-crash.html",
    "display": "Race Crash",
    "href": "/race-crash.html",
+   "section": "Racing City",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "race-lockstep.html",
+   "display": "Race Lockstep",
+   "href": "/race-lockstep.html",
    "section": "Racing City",
    "collision": false
   },
@@ -2856,6 +2912,14 @@
    "display": "Rps",
    "href": "/rps.html",
    "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "rtx-viewer.html",
+   "display": "Rtx Viewer",
+   "href": "/rtx-viewer.html",
+   "section": "RTX",
    "collision": false
   },
   {
@@ -3351,7 +3415,7 @@
    "id": "three-probe.html",
    "display": "Three Probe",
    "href": "/three-probe.html",
-   "section": "System Tools",
+   "section": "Render TSL",
    "collision": false
   },
   {
@@ -4359,6 +4423,14 @@
    "id": "splat_walk",
    "display": "SPLAT WALK — Walking A Live Gaussian Splat Scene With Capsule Collision",
    "href": "/?go=splat_walk",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "splat_voxel_walk",
+   "display": "SPLAT VOXEL WALK — A Gaussian Splat Level Walked As A Voxel World, Its Capture Holes Counted",
+   "href": "/?go=splat_voxel_walk",
    "section": null,
    "collision": false
   },

@@ -49,7 +49,7 @@ import path from "node:path";
 import http from "node:http";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import { QUAD_VS, TRI_VS, DECAY_FS } from "../../gpu/VoxelMemoryGPU.js";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -97,7 +97,7 @@ if (skip) {
         '  return { count: +k.slice(0, i), site: k.slice(i + 1), calls: n };\n' +
         '}).sort((a, b) => b.calls - a.calls);\n' +
         '</script>';
-    const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+    const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
     const pg = await b.newPage();
     const errs = [];
     pg.on("pageerror", (e) => errs.push(String(e).slice(0, 160)));
@@ -317,7 +317,7 @@ else {
         rs.writeHead(200, { "content-type": "text/html" }); rs.end(HARNESS);
     }).listen(0);
     const port = srv.address().port;
-    const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+    const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
     const pg = await b.newPage();
     const errs = [];
     pg.on("pageerror", (e) => errs.push(String(e).slice(0, 250)));

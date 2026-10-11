@@ -26,6 +26,7 @@ import { availableAttacksFor, getAttackForKind, getAttackForKaiju, KAIJU_ATTACKS
 // centipedes) actually apply acid DoT / slow / disabled / pulled.
 import { applyEffect as applyStatusEffect } from "./statusEffects.js";
 import { Kaiju } from "./Kaiju.js";
+import { pickMin } from "../ui/pick.mjs";   // v4824 -- the target scans below
 import { PathPlanner } from "./PathPlanner.js";
 import { pickKindConfig, biomeWeightedKind } from "../world/kaijuKinds.js";
 import { expandStructures } from "../world/structureBuilder.js";
@@ -294,6 +295,26 @@ export class KaijuManager {
                             // ashore where the land rises above it. WATER_LEVEL = 8.
                             const target = Math.max(gy, 8);
                             k.position.y += (target - k.position.y) * Math.min(1, delta * 2.0);
+                        } else if (k._isPlayerDriven) {
+                            // *** v4560 -- THE DRIVEN BODY KEEPS THE DRIVE'S OWN ANSWER, AND v4554 IS THE
+                            // ROUND THAT MADE THAT SAFE. *** This line wrote y every frame for every walking
+                            // kaiju, the driven one included, and camera.js's _moveKaijuDrive had written it
+                            // a few milliseconds earlier in the same frame: two writers, one quantity, and
+                            // the drive's answer discarded on 300 of 300 frames.
+                            //
+                            // v4554 measured that guarding it here -- the one-line cleanup two writers
+                            // usually deserve -- DROPPED 56 OF 60 DRIVEN KAIJU OUT OF THE WORLD, because the
+                            // drive had no step-up (its only vertical path was fallBody, whose probe takes
+                            // no reach, so not one of 60 gained a single unit of height) and no horizontal
+                            // collision (28.03% of frames with the body inside solid rock). It recorded both
+                            // as what closing this would require and left the write in place.
+                            //
+                            // v4560 built both. Re-measured with this guard in: 0 of 60 lost, 20 of 60 gain
+                            // height under their own power, 0.00% of frames inside rock. The clamp is no
+                            // longer load-bearing for the driven body and holding it would now be the bug --
+                            // it teleports to _terrainTop, which is h + 1 and a voxel above the model's own
+                            // stand height, so keeping it put the body where the walk had not chosen to be:
+                            // frames-inside-rock went UP, 1.59% to 3.63%, once the drive started answering.
                         } else {
                             this._resolveGroundKaijuPosition(k, gy, delta);
                         }
@@ -523,15 +544,14 @@ export class KaijuManager {
         if (cam && cam.mode === "fp" && window.audioManager?.triggerDanger) {
             const now = performance.now();
             if (now - (this._lastDangerSting ?? -Infinity) > 8000) {
-                let nearest = Infinity;
-                for (const k of this.kaiju.values()) {
-                    if (!k.isAlive || !k.isAlive()) continue;
+                // v4824 -- ui/pick.mjs; with nothing alive the key is the bound, Infinity, as before
+                const nearest = pickMin(this.kaiju.values(), (k) => {
+                    if (!k.isAlive || !k.isAlive()) return null;
                     const dx = k.position.x - cam.position.x;
                     const dy = k.position.y - cam.position.y;
                     const dz = k.position.z - cam.position.z;
-                    const d2 = dx * dx + dy * dy + dz * dz;
-                    if (d2 < nearest) nearest = d2;
-                }
+                    return dx * dx + dy * dy + dz * dz;
+                }).key;
                 if (nearest < 25 * 25) {
                     window.audioManager.triggerDanger(2);
                     this._lastDangerSting = now;
@@ -1526,16 +1546,15 @@ export class KaijuManager {
         // normal civ/OGRE search if nothing in range.
         try {
             if (typeof window !== "undefined" && Array.isArray(window._extraRangedTargets) && window._extraRangedTargets.length) {
-                let nearest = null, bestD2 = range2;
-                for (const t of window._extraRangedTargets) {
-                    if (!t || typeof t.x !== "number") continue;
+                // v4824 -- ui/pick.mjs, same filter and exclusive range^2 bound
+                const pick = pickMin(window._extraRangedTargets, (t) => {
+                    if (!t || typeof t.x !== "number") return null;
                     const dx = t.x - k.position.x;
                     const dy = (t.y ?? 0) - k.position.y;
                     const dz = t.z - k.position.z;
-                    const d2 = dx*dx + dy*dy + dz*dz;
-                    if (d2 < bestD2) { bestD2 = d2; nearest = t; }
-                }
-                if (nearest) return nearest;
+                    return dx*dx + dy*dy + dz*dz;
+                }, range2);
+                if (pick.found) return pick.item;
             }
         } catch {}
 
@@ -1627,16 +1646,15 @@ export class KaijuManager {
         }
         // Else scan civilizations for nearest in range
         if (this.civManager?.getAll) {
-            let best = null, bestD2 = range2;
-            for (const c of this.civManager.getAll()) {
-                if (!c.center) continue;
-                if (c.id === k.allegiance) continue;     // patron civ — don't shoot
+            // v4824 -- ui/pick.mjs, same filters and exclusive range^2 bound
+            const best = pickMin(this.civManager.getAll(), (c) => {
+                if (!c.center) return null;
+                if (c.id === k.allegiance) return null;     // patron civ — don't shoot
                 const dx = c.center.x - k.position.x;
                 const dy = c.center.y - k.position.y;
                 const dz = c.center.z - k.position.z;
-                const d2 = dx * dx + dy * dy + dz * dz;
-                if (d2 < bestD2) { bestD2 = d2; best = c; }
-            }
+                return dx * dx + dy * dy + dz * dz;
+            }, range2).item;
             if (best) {
                 const orig = (d) => { best.energy = Math.max(0, (best.energy ?? 1) - d); };
                 return {

@@ -589,3 +589,79 @@ export const COMMIT_BELT_DRIFT_V4621 = Object.freeze({
     bodiesNow: 20,
     notClaimed: COMMIT_BELT_DRIFT_V4535.notClaimed,
 });
+
+// *** v4776 -- three MOVED AGAIN, AND THE COMMIT THAT MOVED IT COULD NOT HAVE RECORDED ITSELF. ***
+// ce276dff re-vendored vendor/three from r160 to 0.185.1 and re-baked orrery.json in the same commit, so its belt
+// in orrery.json already carried the new hash while this record, written at v4621, still ended at b5fccadb. It is
+// the case COMMIT_BELT_DRIFT_V4621's own entry for b5fccadb names -- a real vendoring commit, a sixth commit on the
+// body -- and orreryFleet-selfcheck was red on it from 2026-09-14 on every full clone, unseen because the gate is
+// over the ship-time budget. The v4621 record is not rewritten: it is a claim about v4621 and stays true about it.
+export const COMMIT_BELT_DRIFT_V4776 = Object.freeze({
+    ...COMMIT_BELT_DRIFT_V4621,
+    at: "v4776",
+    movedSince4475: Object.freeze({
+        ...COMMIT_BELT_DRIFT_V4621.movedSince4475,
+        three: Object.freeze({
+            recorded: COMMIT_BELT_DRIFT_V4621.movedSince4475.three.recorded,
+            now: Object.freeze(["ce276dff", ...COMMIT_BELT_DRIFT_V4621.movedSince4475.three.now]),
+            why: "\"Re-vendor vendor/three from r160 to 0.185.1\" (ce276dff) replaced the build and every vendored " +
+                 "jsm file from npm's three@0.185.1 tarball and added three.core.js and SkeletonUtils.js -- the " +
+                 "same kind of move as b5fccadb, so the body picks up a sixth commit",
+        }),
+    }),
+});
+
+// *** v4778 -- TWO BODIES ARRIVED THROUGH A MERGE, AND THE LINE THAT VENDORED THEM NEVER RE-BAKED. ***
+// The rtx line (claude/shader-porting-swek-ozgvb0) vendored vendor/male-cns and vendor/mikktspace and left
+// orrery.json and orrery-fleet.json as they were, so the merge at 888f776d carried two directories no record
+// held. Hashes read with `git log --format=%H -- WebGLEngine/vendor/<name>`, newest first, not off the gate's
+// failure text. Same rule as every record above: v4776's is a claim about v4776 and is not rewritten.
+export const COMMIT_BELT_DRIFT_V4778 = Object.freeze({
+    ...COMMIT_BELT_DRIFT_V4776,
+    at: "v4778",
+    arrivedSince4475: Object.freeze({
+        ...COMMIT_BELT_DRIFT_V4776.arrivedSince4475,
+        "male-cns": Object.freeze({ now: Object.freeze(["bb162233", "46cc1d5c"]),
+            why: "Janelia FlyEM's male-cns connectome, baked to two circuits for the fly-connectome demo: the " +
+                 "Giant Fiber Circuit at 46cc1d5c and the EPG compass at bb162233 -- data, not code, CC-BY-4.0 " +
+                 "as its PROVENANCE.md records the server declaring it" }),
+        mikktspace: Object.freeze({ now: Object.freeze(["9d6c904e"]),
+            why: "mmikk/MikkTSpace's two C files, vendored as a REFERENCE ORACLE for physics/mesh/mikktSpace.mjs " +
+                 "the way xatlas is for uvLscm -- compiled natively by tools/mesh/mikktRef.mjs, loaded by nothing " +
+                 "the engine ships" }),
+    }),
+    bodiesNow: 22,
+});
+
+// *** v4819 -- THE EXPORTED-FUNCTIONS LINE MOVED TWO BODIES AND ADDED ONE, AND NEVER RAN THIS GATE OVER IT. ***
+// orreryFleet-selfcheck is over the quick sweep's budget, so v4805 (vendor/three-webgpu to r186, its r185 files kept
+// in a new body, vendor/three-webgpu-r185) and v4807 (vendor/three to r186, and the three-webgpu README's line about
+// it) shipped with no record of either. Found at the merge with main, once the clone was unshallowed and the prefix
+// rows could be read at all. Hashes from `git log --format=%h --abbrev=8 -- WebGLEngine/vendor/<name>`, newest first.
+// v4778's record is a claim about v4778 and is not rewritten: this one spreads it.
+export const COMMIT_BELT_DRIFT_V4819 = Object.freeze({
+    ...COMMIT_BELT_DRIFT_V4778,
+    at: "v4819",
+    movedSince4475: Object.freeze({
+        ...COMMIT_BELT_DRIFT_V4778.movedSince4475,
+        three: Object.freeze({
+            recorded: COMMIT_BELT_DRIFT_V4778.movedSince4475.three.recorded,
+            now: Object.freeze(["31ab299b", ...COMMIT_BELT_DRIFT_V4778.movedSince4475.three.now]),
+            why: "\"v4807: the classic build follows -- vendor/three moves to r186\" (31ab299b) replaced build/three.module.js, " +
+                 "three.core.js and the jsm addons from npm's three@0.186.1, the same kind of move as ce276dff",
+        }),
+        "three-webgpu": Object.freeze({
+            recorded: COMMIT_BELT_DRIFT_V4778.movedSince4475["three-webgpu"].recorded,
+            now: Object.freeze(["31ab299b", "7462bbb6", ...COMMIT_BELT_DRIFT_V4778.movedSince4475["three-webgpu"].now]),
+            why: "\"v4805: the engine's three-webgpu moves to r186, measured first\" (7462bbb6) replaced the three WebGPU " +
+                 "build files from npm's three@0.186.1; v4807 (31ab299b) edited its README's line about the classic build",
+        }),
+    }),
+    arrivedSince4475: Object.freeze({
+        ...COMMIT_BELT_DRIFT_V4778.arrivedSince4475,
+        "three-webgpu-r185": Object.freeze({ now: Object.freeze(["7462bbb6"]),
+            why: "the r185 files vendor/three-webgpu held until v4805, moved here unchanged so the r185 drafts and their " +
+                 "patches in docs/upstream-three/ keep a build to run on -- nothing in the engine imports it" }),
+    }),
+    bodiesNow: 23,
+});

@@ -198,6 +198,36 @@ console.log("\n8. A 180-DEGREE STARTING ERROR CONVERGES AND REACHES FIRING RANGE
     ok("!! a ship started facing directly AWAY from its target turns, closes, and fires within 300 ticks (10s)", fired, `${ticks} ticks`);
 }
 
+// v4778 -- AUTOPILOT, the defaults table, was an export no gate named: every section above passes its own
+// thresholds, so a default could change and nothing here would move. These ask decide() with NO options and put
+// each threshold on either side of its edge, reading the edge from the table rather than restating it.
+// SABOTAGED at v4778 on a scratch copy of autopilot6dof.mjs, each restored: a standoff of 30 slipped into
+// decide()'s spec, thrustAngle scaled by 1.2, fireRange doubled -> 1 red each, by name; kd = 2*kp instead of
+// 2*sqrt(kp) -> 2 red (the torque row here and section 3's convergence).
+console.log("\n8b. THE DEFAULTS -- decide() ASKED NOTHING USES EXACTLY THE AUTOPILOT TABLE");
+{
+    const A = AP.AUTOPILOT, I = [2, 3, 1];
+    const yawed = (theta) => createBody({ mass: 5, I, pos: [0, 0, 0], q: [Math.cos(theta / 2), 0, Math.sin(theta / 2), 0] });
+    const d = (body, x) => AP.decide(body, { pos: [x, 0, 0] });
+    ok("!! thrust is AUTOPILOT.thrustForce facing a target past AUTOPILOT.standoff, and 0 just inside it",
+        d(yawed(0), A.standoff + 1).thrust === A.thrustForce && d(yawed(0), A.standoff - 1).thrust === 0,
+        `thrustForce ${A.thrustForce}, standoff ${A.standoff}`);
+    ok("!! thrust holds just inside AUTOPILOT.thrustAngle off-axis and cuts just outside it",
+        d(yawed(A.thrustAngle * 0.95), 10 * A.standoff).thrust === A.thrustForce && d(yawed(A.thrustAngle * 1.05), 10 * A.standoff).thrust === 0,
+        `thrustAngle ${A.thrustAngle} rad`);
+    ok("!! firing needs range under AUTOPILOT.fireRange and an error under AUTOPILOT.fireAngle, both read from the table",
+        d(yawed(0), A.fireRange - 1).firing && !d(yawed(0), A.fireRange + 1).firing &&
+        d(yawed(A.fireAngle * 0.95), A.fireRange / 2).firing && !d(yawed(A.fireAngle * 1.05), A.fireRange / 2).firing,
+        `fireRange ${A.fireRange}, fireAngle ${A.fireAngle} rad`);
+    const spun = createBody({ mass: 5, I, pos: [0, 0, 0], q: [Math.cos(0.3), 0.2, Math.sin(0.3), 0.1].map((v, _, a) => v / Math.hypot(...a)), w: [0.4, -0.2, 0.7] });
+    const tgt = { pos: [80, 25, -40] };
+    const dflt = AP.decide(spun, tgt).torqueBody, kpTable = AP.decide(spun, tgt, { kp: A.kp, kd: 2 * Math.sqrt(A.kp) }).torqueBody;
+    const kpOther = AP.decide(spun, tgt, { kp: A.kp + 1 }).torqueBody;
+    ok("!! the default torque is the PD law at AUTOPILOT.kp with kd = 2*sqrt(kp) -- bit for bit, on a spinning, yawed body",
+        dflt.every((v, i) => v === kpTable[i]) && dflt.some((v, i) => v !== kpOther[i]),
+        `[${dflt.map((v) => v.toFixed(4))}] -- and kp+1 moves it, so the comparison is not blind to the gain`);
+}
+
 console.log("\n9. THE FRONT DOOR");
 {
     const L = AP.reportLines();

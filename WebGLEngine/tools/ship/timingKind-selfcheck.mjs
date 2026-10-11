@@ -1,0 +1,510 @@
+/**
+ * MARKING THE COLUMN, AND FINDING EIGHT MORE OF THIS ARC'S OWN MISTAKES BY DOING IT.
+ *
+ * v4578 measured that sweep-timings.json's ms column holds two different quantities -- a LOADED parallel
+ * reading under the budget, an ALONE serial one at or over it, 1.93x apart -- with nothing marking which, and
+ * closed by naming the repair it did not do: a per-entry kind. This is that repair.
+ *
+ * *** quickSweep NOW RECORDS IT AT THE MOMENT IT WRITES THE NUMBER, which is the only place it is known for
+ * certain. *** `kinds[gate]` is `loaded`, `alone` or `capped`; the branch that chose the millisecond chooses
+ * the label in the same statement, so the two cannot drift apart. Every entry predating this round has the
+ * kind INFERRED from the branch rule instead, and `kindsInferred` names all 1,620 of them, because an
+ * inference dressed as an observation is the fault this arc has spent five rounds on.
+ *
+ * *** AND WRITING THE FIELD FORCED THE QUESTION FOR EVERY ENTRY, WHICH FOUND EIGHT MORE WRONG ONES -- ALL OF
+ * THEM THIS ARC'S. *** v4578 found nine and fixed nine. It looked only at what v4577 had written. Asking the
+ * question of every entry this arc has ever hand-written turns up eight more alone readings sitting in
+ * under-budget slots, from v4575, v4576, v4577 AND v4578 -- one per round, including the round that
+ * discovered the problem. FOUR OF THE EIGHT ARE THE ARC'S OWN GATES: timingRecords, timingLoad,
+ * timingSurvivors and timingSemantics, whose runtimes I recorded as alone readings every single round while
+ * writing about this exact defect. Seventeen wrong entries in total across five rounds.
+ *
+ * *** THE ENUMERATION ALSO HAD TWO FALSE MEMBERS AND THE MEASUREMENT CAUGHT THEM. *** reskin and winPathGuard
+ * were listed as arc-written and are not: v4577 corrected their gate-timings rows, not their sweep rows.
+ * reskin measured 0.56x of its recorded value at eight-wide, which is impossible for an alone reading and is
+ * exactly what a correct LOADED entry looks like. Ten became eight because the numbers disagreed with my list.
+ *
+ * *** AND THE PRE-FLIGHT NOW DEMANDS A KIND, which is what stops the class rather than fixing this instance
+ * of it. *** recordDrift has asked for a runtime and a capture stamp since v4408; it asks for a kind now too.
+ * A reading whose quantity is unknown is not a reading anybody can compare, and five rounds of this arc are
+ * the evidence.
+ */
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { KIND } from "./quickSweep.mjs";
+import { ledgerStamps, selectionKind, rotation } from "./sweepCoverage.mjs";
+
+const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+let fails = 0;
+const ok = (label, cond, detail) => { if (!cond) fails++; console.log(`  ${cond ? "PASS" : "FAIL"}  ${label}${detail ? "   " + detail : ""}`); };
+const report = (s) => console.log(`  ----  ${s}`);
+
+const S = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-timings.json"), "utf8"));
+const QS = fs.readFileSync(path.join(ENG, "tools", "ship", "quickSweep.mjs"), "utf8");
+
+console.log("timingKind-selfcheck -- the column says what its numbers are now\n");
+
+/** MEASURED at v4579, each at exactly eight concurrent, three rounds, two batches covering all eight. */
+export const WRONG_QUANTITY_V4579 = Object.freeze({
+    at: "v4579", concurrency: 8, rounds: 3,
+    runs: Object.freeze([
+        Object.freeze({ gate: "tools/ship/shaderCensus-selfcheck.mjs", wroteAlone: 1501, loaded8: 1529, round: "v4575" }),
+        Object.freeze({ gate: "tools/ship/spacesimStart-selfcheck.mjs", wroteAlone: 136, loaded8: 248, round: "v4575" }),
+        Object.freeze({ gate: "tools/roundhouse/reconQualityBind-selfcheck.mjs", wroteAlone: 2350, loaded8: 2542, round: "v4575" }),
+        Object.freeze({ gate: "tools/ship/timingRecords-selfcheck.mjs", wroteAlone: 63, loaded8: 147, round: "v4575" }),
+        Object.freeze({ gate: "tools/ship/hostScale-selfcheck.mjs", wroteAlone: 64, loaded8: 132, round: "v4576" }),
+        Object.freeze({ gate: "tools/ship/timingLoad-selfcheck.mjs", wroteAlone: 65, loaded8: 145, round: "v4576" }),
+        Object.freeze({ gate: "tools/ship/timingSurvivors-selfcheck.mjs", wroteAlone: 64, loaded8: 144, round: "v4577" }),
+        Object.freeze({ gate: "tools/ship/timingSemantics-selfcheck.mjs", wroteAlone: 64, loaded8: 145, round: "v4578" }),    ]),
+    falsePositives: Object.freeze(["tools/ship/reskin-selfcheck.mjs", "tools/ship/winPathGuard-selfcheck.mjs"]),
+});
+const R = WRONG_QUANTITY_V4579.runs;
+
+// -----------------------------------------------------------------------------------------------------------
+console.log("1. *** THE KIND IS WRITTEN WHERE IT IS KNOWN, IN THE STATEMENT THAT CHOOSES THE NUMBER ***");
+{
+    // *** v4582 -- THREE BECAME FOUR, AND THE FOURTH ANSWERS A DIFFERENT QUESTION FROM THE OTHER THREE. ***
+    // LOADED, ALONE and CAPPED all say under what conditions the number was taken. SKIPPED says the gate DECLINED
+    // TO RUN, so the number measures a refusal -- three entries were filed as ordinary loaded readings at 234,
+    // 164 and 175 ms while their gates printed "SKIPPED". The count is asserted, not just the spellings: a fifth
+    // member arriving unnoticed is how a reader comes to switch on a value it has never seen.
+    ok("quickSweep exports the four kinds a millisecond can be, so a reader asks by name instead of re-deriving the branch rule",
+        KIND.LOADED === "loaded" && KIND.ALONE === "alone" && KIND.CAPPED === "capped" &&
+        KIND.SKIPPED === "skipped" && Object.keys(KIND).length === 4,
+        JSON.stringify(KIND));
+    ok("*** and it assigns the kind in the same loop that assigns the millisecond, so the label cannot drift from the branch that chose it ***",
+        /kinds\[r\.gate\]\s*=/.test(QS) && /r\.serialMs\s*!=\s*null\s*\?\s*KIND\.ALONE\s*:\s*KIND\.LOADED/.test(QS),
+        "serialMs present means a serial re-run happened, which is an ALONE reading; absent means parallelMs, a LOADED one");
+    ok("  and a killed reading is a third thing rather than being forced into one of the two, because v4574 established it is the cap's clock and not the gate's",
+        /KIND\.CAPPED/.test(QS) && /124/.test(QS), "capped");
+    ok("  and the file carries the map",
+        S.kinds && typeof S.kinds === "object" && Object.keys(S.kinds).length > 1000,
+        `${Object.keys(S.kinds).length} entries have a kind`);
+}
+
+// -----------------------------------------------------------------------------------------------------------
+console.log("\n2. AN INFERENCE IS NAMED AS ONE, ALL 1,620 OF THEM");
+{
+    const inferred = new Set(S.kindsInferred || []);
+    const observed = Object.keys(S.kinds).filter((g) => !inferred.has(g));
+    report(`${Object.keys(S.kinds).length} kinds: ${inferred.size} inferred from the branch rule, ${observed.length} observed`);
+    const census = {};
+    for (const v of Object.values(S.kinds)) census[v] = (census[v] || 0) + 1;
+    report(`by kind: ${Object.entries(census).map(([k, n]) => `${k} ${n}`).join(", ")}`);
+    // *** v4637 -- `observed.length < 50` WAS THE SIZE OF ONE ROUND'S HAND-WORK, ASSERTED AS A PROPERTY. ***
+    // It was written when the only observations in the file came from this arc driving the writer over a
+    // handful of gates. A 1,287-gate rotation then swept the tree and observed 1,287 kinds, exactly as it is
+    // supposed to, and the row went red for the machinery working -- the same count-standing-in-for-a-property
+    // shape this arc has now found eight times.
+    //
+    // THE PROPERTY IS MEMBERSHIP, AND IT IS CHECKABLE BOTH WAYS. An entry is out of the list exactly when the
+    // run that took its millisecond recorded a kind beside it. The file names that run: `captured`. So every
+    // entry carrying the capture stamp must be observed, and every observed entry must either carry it or be
+    // one of the few this arc hand-measured and can name. Neither side depends on how many gates a sweep ran.
+    const swept = Object.keys(S.timings).filter((g) => (S.at || {})[g] === S.captured);
+    const sweptButInferred = swept.filter((g) => inferred.has(g));
+    const observedElsewhere = observed.filter((g) => (S.at || {})[g] !== S.captured);
+    // *** v4641 -- AND `observedElsewhere.length < 50` IS THE SAME DEFECT THE PARAGRAPH ABOVE SAYS IT FIXED. ***
+    // v4637 replaced `observed.length < 50` because a count had been standing in for a property; it wrote
+    // `observedElsewhere.length < 50` one line down -- THE SAME MAGIC FIFTY, ONE VARIABLE OVER. The row then
+    // went red for the ritual doing what the ritual says to do: step 3b rotates the over-budget pool, the
+    // rotation observes those gates' kinds and stamps them with its OWN time, the quick sweep that follows
+    // re-times only the under-budget gates, so every rotated gate becomes "observed with a different stamp".
+    // 42 gates rotated took the count from under fifty to fifty-one and the gate said the bookkeeping was
+    // wrong. It was not: the file was exactly right and the threshold was the size of a habit.
+    //
+    // THE PROPERTY IS MEMBERSHIP, AND THE COMMENT ABOVE ALREADY SAYS SO -- "or be one of the few this arc
+    // hand-measured AND CAN NAME". So they are named. An observed entry is legitimate when the run that took
+    // its millisecond watched it, and there are exactly two such runs: the quick sweep (S.captured) and the
+    // ROTATION, whose own ledger records every gate it re-timed. 48 of the 51 are in that ledger. The three
+    // that are not are named below, and a fourth arriving is a red -- which is what a threshold of fifty
+    // could never say, in either direction.
+    const ROT = (() => { try { return JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-rotation.json"), "utf8")); }
+                         catch { return null; } })();
+    const rotated = new Set((ROT && ROT.rotated || []).map((r) => r && r.gate).filter(Boolean));
+    // Measured at v4641, and each is an entry the rotation ledger does not carry: observed by a --gate run
+    // whose row a later merge folded away, or by this arc's own hand-driving of the writer before the
+    // rotation had a ledger at all. Named rather than counted, so growth is distinguishable from regression.
+    const HAND_OBSERVED_V4641 = Object.freeze([
+        "tools/ship/duplicateFiles-selfcheck.mjs",
+        "tools/ship/exitBanner-selfcheck.mjs",
+        "tools/ship/kernelReach-selfcheck.mjs",
+    ]);
+    // v4819 -- AND THE ENTRIES A MERGE CARRIED IN. The exported-functions line's own sweep timed these two under its record's
+    // capture; at the merge the record became main's, whose owner (142c0d) did not run them, and this box is foreign, so its
+    // verify cannot re-stamp them. They are accounted ONLY while their stamp predates the record's capture: the owner's next
+    // sweep stamps them `captured` and they leave this list's population on their own, as the arrival rule does.
+    // SABOTAGE (v4819): one name removed -> this row red, naming it.
+    const MERGED_IN_V4819 = Object.freeze([
+        "render/temporalTslCoverage-selfcheck.mjs",
+        "render/threeWorkarounds-selfcheck.mjs",
+    ]);
+    const carriedIn = (g) => MERGED_IN_V4819.includes(g) && Date.parse((S.at || {})[g] || "") < Date.parse(S.captured || "");
+    // SABOTAGE v4641: one of the three names removed, so a real entry falls out of the accounted set --
+    // 1 RED, by name, printing the gate it could not account for. The row it replaces would have passed
+    // that mutation at any count below fifty, which is the argument for the shape rather than for the list.
+    //
+    // *** v4688 -- A FOURTH ARRIVED, AND THEN A FIFTH, AND THE ANSWER IS NOT A LONGER LIST. *** Six entries
+    // came up unaccounted at once: five fsrPage gates and render/frameInterpGPU-selfcheck, added between
+    // v4681 and v4687. Naming them would have made the list nine and taught nothing, because THEY SHARE A
+    // PROPERTY AND IT IS STRUCTURAL:
+    //
+    //   every one is OVER THE BUDGET, so the quick sweep cannot stamp it -- step 3b re-times only the
+    //   under-budget gates and sends the rest to the rotation; and
+    //   every one arrived AFTER THE LAST ROTATION RAN, so the rotation has not had a turn at it yet.
+    //
+    // An over-budget gate arriving between two rotations therefore has NO legitimate observer: the sweep
+    // will not take its millisecond and the rotation has not yet. The round that adds it times it by hand,
+    // serially, which is the right quantity -- and this row called that "unaccounted" because its only
+    // notion of legitimacy was a list of three names taken one round in September.
+    //
+    // *** SO THE FOURTH CATEGORY IS A RULE, AND THE RULE IS SELF-CLEARING. *** An entry is accounted as an
+    // ARRIVAL when it is over budget, carries the `alone` kind a serial hand-timing produces, and its stamp
+    // is LATER than the rotation ledger's own. That last clause is what keeps this a ratchet rather than an
+    // amnesty: the moment a rotation runs, these six land in the ledger and stop qualifying here, and an
+    // over-budget `alone` entry that PREDATES the last rotation stays unaccounted -- because the rotation
+    // should have taken it and did not. A list would have had to be pruned by hand to say that; a rule says
+    // it for free, and says it about gates nobody has written yet.
+    // v4725: `poolAt`, not `at`. A --gate run moves `at` and selected nothing but the gates it named, so it
+    // cannot have passed an arrival over; only the last unfiltered pool pass could (sweepCoverage.ledgerStamps).
+    // v4816: `poolHorizon` over `poolAt`. A stalest-first pass of 80 over a pool of 349 cannot reach a FRESH
+    // entry, so "it ran after this entry" is not "it passed this entry over"; the horizon is how far it reached
+    // (sweepCoverage.ledgerStamps). A ledger written before the field existed reads poolAt, the v4725 rule.
+    const rotRef = (rot) => Date.parse((rot && (rot.poolHorizon || rot.poolAt || rot.at)) || "");
+    const rotAt = rotRef(ROT);
+    const stampOf = (g) => Date.parse((S.at || {})[g] || "");
+    const BUDGET = S.budgetMs;
+    // *** THE RULE IS A PURE FUNCTION OF FOUR NUMBERS, SO IT CAN BE DRIVEN WITH FIXTURES. *** Two of its three
+    // clauses have an EMPTY POPULATION in the live file -- there is no over-budget `alone` entry predating the
+    // rotation, and no under-budget one claiming to be an arrival -- so deleting either clause changes nothing
+    // here and a sabotage of it would score 0 RED against a rig that cannot reach it. That is the shape this
+    // arc has been caught by four times (v4686's nearerIsLess, v4687's t and its fill radius), and the answer
+    // each time was a case rather than a note. Here the cases are synthetic, because the entries they describe
+    // are ones the tree should never have: a positive control is how you test a guard whose population is zero.
+    const isArrival = (ms, kind, stamp, rot) =>
+        Number.isFinite(rot) && Number.isFinite(stamp) && stamp >= rot && ms > BUDGET && kind === "alone";
+    const arrivedSinceRotation = (g) => isArrival(S.timings[g], S.kinds[g], stampOf(g), rotAt);
+    // *** THE ACCOUNTING IS ALSO A FUNCTION, FOR THE REASON THE RULE IS. *** A sabotage replacing the live
+    // `unaccounted` with an empty array scored 0 RED: every control below graded the RULE, and none of them
+    // graded the SUBTRACTION that uses it, so the row asserting "0 unaccounted" was satisfied by a constant.
+    // That is this file's own lesson -- a count standing in for a property -- arriving in the check written
+    // to fix it. The split lets the fixture below drive the whole accounting, not just its predicate.
+    const accountFor = (entries, inLedger, named, arrival) => ({
+        unaccounted: entries.filter((g) => !inLedger(g) && !named(g) && !arrival(g)),
+        arrivals: entries.filter((g) => !inLedger(g) && !named(g) && arrival(g)),
+    });
+    const ACC = accountFor(observedElsewhere, (g) => rotated.has(g),
+                           (g) => HAND_OBSERVED_V4641.includes(g) || carriedIn(g), arrivedSinceRotation);
+    const unaccounted = ACC.unaccounted, arrivals = ACC.arrivals;
+    ok(`*** an entry's kind is INFERRED unless the run that took its millisecond watched it, and kindsInferred is exactly that set ***`,
+        inferred.size > 0 && observed.length > 0 && sweptButInferred.length === 0 &&
+        ROT !== null && rotated.size > 0 && unaccounted.length === 0,
+        `${swept.length} entries carry the capture stamp and ${sweptButInferred.length} of them are still called inferred; ` +
+        `${observedElsewhere.length} observed entries carry an earlier stamp -- ` +
+        `${observedElsewhere.filter((g) => rotated.has(g)).length} of them are in the rotation's own ledger, ` +
+        `${observedElsewhere.filter((g) => HAND_OBSERVED_V4641.includes(g) || carriedIn(g)).length} are the named hand-observed few or carried in by the v4819 merge, ` +
+        `${arrivals.length} are over-budget arrivals since the last rotation (${arrivals.join(", ") || "none"}), ` +
+        `and ${unaccounted.length} are unaccounted for` +
+        (unaccounted.length ? ": " + unaccounted.join(", ") : "") +
+        ". A COUNT here would go red for the rotation doing its job, which is exactly what it did at v4641.");
+    // ---- v4688'S SABOTAGE LOG, OVER THE ARRIVAL RULE AND THE ACCOUNTING --------------------------------
+    //
+    //   Z7  the NAMED list is allowed to absorb everything            -> 3 red
+    //   Z1  the rule drops the AFTER-the-rotation clause              -> 1 red
+    //   Z2  the rule drops the OVER-BUDGET clause                     -> 1 red
+    //   Z3  the rule drops the `alone` KIND clause                    -> 1 red
+    //   Z4  an unreadable ledger excuses every arrival, not none      -> 1 red
+    //   Z6  the accounting drops the arrival category entirely        -> 1 red
+    //   Z5  the live `unaccounted` is hardwired to []                 -> 0 RED, AND IT CANNOT BE OTHERWISE
+    //
+    // *** Z1 THROUGH Z4 REDDEN ONLY BECAUSE THE CONTROLS BELOW EXIST. *** Two of the rule's three clauses have
+    // an EMPTY POPULATION in the live file -- no over-budget `alone` entry predates the rotation, and no
+    // under-budget entry claims to be an arrival -- so deleting either changes no live answer. Against the
+    // tree alone all three sabotages would have scored 0 RED, and the rule would have read as three conditions
+    // while measuring as one. The fixtures are what make it three.
+    //
+    // *** Z5 IS A 0-RED WITH A CAUSE THAT IS NOT A FIXTURE GAP, AND IT IS WORTH STATING PLAINLY. *** Replacing
+    // the live subtraction with `[]` passes every row here, including the partition row -- because the true
+    // answer IS zero, so 55 + 3 + 6 + 0 adds up either way. WHEN A GATE'S CORRECT READING IS ZERO, NOTHING
+    // INSIDE THAT GATE CAN TELL A COMPUTED ZERO FROM A WRITTEN ONE. There is no second source of truth for
+    // the live number to hold it against, and inventing one would be writing the same subtraction twice. So
+    // the function is graded on a fixture where the answer is NOT zero, which is the part that can be tested,
+    // and this paragraph is the part that cannot. Unlike v4686's undefined-behaviour 0-RED, no future adapter
+    // or case turns this one red -- it goes red only when a real entry falls out of every category, which is
+    // the day the row is supposed to fire.
+
+    // ---- POSITIVE CONTROL FOR THE ACCOUNTING ITSELF ----------------------------------------------------
+    // *** THE ROW ABOVE SAYS "0 UNACCOUNTED", AND A CONSTANT SATISFIES THAT. *** Measured: replacing the live
+    // subtraction with an empty array passed every row in this file. So the accounting is driven here against
+    // a fixture where the right answer is NOT zero, which is the only way "zero" becomes a reading.
+    {
+        const F = ["in-ledger.mjs", "named.mjs", "a-real-arrival.mjs", "NOBODY-ACCOUNTS-FOR-THIS.mjs"];
+        const r = accountFor(F, (g) => g === "in-ledger.mjs", (g) => g === "named.mjs",
+                             (g) => g === "a-real-arrival.mjs");
+        ok("  CONTROL: the accounting REPORTS an entry no category claims -- 'zero unaccounted' is a reading, not a constant",
+           r.unaccounted.length === 1 && r.unaccounted[0] === "NOBODY-ACCOUNTS-FOR-THIS.mjs" && r.arrivals.length === 1,
+           `fixture of four: ${r.unaccounted.length} unaccounted (${r.unaccounted.join(", ")}), ${r.arrivals.length} arrival. ` +
+           "A sabotage hardwiring the live list to [] passed every other row in this file, which is a count " +
+           "standing in for a property -- the exact defect v4637 and v4641 each wrote a paragraph about here.");
+        ok("  CONTROL: ...and each of the three categories absorbs its own, so none of them is doing nothing",
+           accountFor(["x"], () => true, () => false, () => false).unaccounted.length === 0 &&
+           accountFor(["x"], () => false, () => true, () => false).unaccounted.length === 0 &&
+           accountFor(["x"], () => false, () => false, () => true).unaccounted.length === 0,
+           "ledger, named list and arrival rule each account for an entry the other two refuse");
+    }
+
+    // *** AND THE FOUR CATEGORIES MUST PARTITION THE SET, WHICH IS A DIFFERENT CLAIM FROM "NONE IS LEFT". ***
+    // Two categories both claiming one entry, or one silently dropping members, leaves "0 unaccounted" true
+    // and the arithmetic wrong. This adds up rather than subtracting.
+    ok("  ...and the four categories PARTITION the observed-elsewhere set, so nothing is double-counted or dropped",
+       observedElsewhere.filter((g) => rotated.has(g)).length +
+       observedElsewhere.filter((g) => !rotated.has(g) && (HAND_OBSERVED_V4641.includes(g) || carriedIn(g))).length +
+       arrivals.length + unaccounted.length === observedElsewhere.length,
+       `${observedElsewhere.filter((g) => rotated.has(g)).length} + ` +
+       `${observedElsewhere.filter((g) => !rotated.has(g) && (HAND_OBSERVED_V4641.includes(g) || carriedIn(g))).length} + ` +
+       `${arrivals.length} + ${unaccounted.length} against ${observedElsewhere.length}`);
+
+    // ---- POSITIVE CONTROLS FOR THE ARRIVAL RULE, one per clause ----------------------------------------
+    // Each fixture differs from a legitimate arrival in exactly ONE way and must be refused. Without these the
+    // rule reads as three conditions and measures as one, because only the budget clause has live members.
+    {
+        const R0 = Date.parse("2026-09-17T16:20:39.742Z"), after = Date.parse("2026-09-24T00:00:00.000Z");
+        const before = Date.parse("2026-09-10T00:00:00.000Z");
+        ok("  CONTROL: an over-budget `alone` entry stamped AFTER the last rotation IS an arrival",
+           isArrival(42056, "alone", after, R0) === true,
+           "the shape all six live members have: the sweep cannot stamp it and the rotation has not reached it");
+        ok("  CONTROL: ...but one stamped BEFORE the last rotation is NOT -- the rotation should have taken it",
+           isArrival(42056, "alone", before, R0) === false,
+           "this is what keeps the category self-clearing: when a rotation runs, today's six land in its ledger " +
+           "and an entry it passed over stops being excusable. NO LIVE ENTRY HAS THIS SHAPE, which is why it is a fixture.");
+        ok("  CONTROL: ...and an UNDER-budget entry is not, because the sweep could have stamped it and did not",
+           isArrival(BUDGET - 1, "alone", after, R0) === false,
+           `budget ${BUDGET} ms; under it, step 3b re-times the gate itself, so a hand reading is a choice rather than a necessity`);
+        ok("  CONTROL: ...and a `loaded` kind is not, because a parallel reading is the wrong quantity for an over-budget gate",
+           isArrival(42056, "loaded", after, R0) === false,
+           "v4578 measured the two kinds about 1.93x apart; an over-budget gate hand-timed under load is a number nobody should file");
+        ok("  CONTROL: ...and a missing rotation ledger refuses EVERY arrival rather than excusing all of them",
+           isArrival(42056, "alone", after, NaN) === false,
+           "an unreadable sweep-rotation.json must not turn this category into an amnesty -- the failure direction is the safe one");
+    }
+    // ---- v4725: A NAMED RE-TIMING IS NOT A ROTATION THAT PASSED ANYTHING OVER -------------------------------
+    // Re-timing sweepCoverage and registerDrift with --gate moved the ledger's `at` and turned 49 arrivals into
+    // "unaccounted" -- entries the run never had in its selection. The writer now keeps `poolAt` for the last
+    // unfiltered pool pass and this file reads it; these rows drive both ends with fixtures, because the live
+    // ledger holds exactly one history and cannot show a pool pass and a named one side by side.
+    //
+    // v4725 SABOTAGE LOG:  S1 reader reads `at` again -> 2 red (the live row: 49 unaccounted)
+    //   S2 every write moves poolAt -> 1   S3 a pool pass never moves it -> 1   S4 no backfill from `at` -> 1
+    //   S5 --band counts as a pool pass -> 1   S6 every run is a pool pass -> 1
+    {
+        const R0 = "2026-09-17T16:20:39.742Z", later = "2026-09-26T01:34:52.528Z";
+        const arrived = Date.parse("2026-09-24T00:00:00.000Z");
+        const named = ledgerStamps({ at: R0 }, later, "named");
+        ok("  v4725: a --gate/--band/--killed write moves `at` and carries `poolAt` forward from the ledger it replaces",
+           named.at === later && named.poolAt === R0 &&
+           ledgerStamps({ at: later, poolAt: R0 }, "2026-09-27T00:00:00.000Z", "named").poolAt === R0,
+           `named write at ${later}: poolAt ${named.poolAt}, so an arrival stamped between the two stays an arrival`);
+        ok("  v4725: ...an unfiltered pool pass moves both, so the ratchet still closes when a real rotation runs",
+           ledgerStamps({ at: R0, poolAt: R0 }, later, "pool").poolAt === later &&
+           isArrival(42056, "alone", arrived, rotRef(ledgerStamps({ at: R0 }, later, "pool"))) === false,
+           "after a pool pass the same arrival predates the rotation and is unaccounted again -- the v4688 ratchet, intact");
+        ok("  v4725: ...and the reader takes `poolAt` over `at`, falling back to `at` for a ledger written before it existed",
+           isArrival(42056, "alone", arrived, rotRef({ at: later, poolAt: R0 })) === true &&
+           rotRef({ at: R0 }) === Date.parse(R0) && Number.isNaN(rotRef(null)),
+           `live ledger: at ${(ROT && ROT.at) || "?"}, poolAt ${(ROT && ROT.poolAt) || "(absent)"}`);
+        ok("  v4725: ...and the CLI calls only an unfiltered run a pool pass: --gate, --band and --killed each are not",
+           selectionKind({}) === "pool" && selectionKind({ gate: "registerDrift" }) === "named" &&
+           selectionKind({ band: "3000-8000" }) === "named" && selectionKind({ killed: true }) === "named",
+           "--band filters the pool by recorded cost, so a gate outside the band was never in its selection either");
+    }
+
+    // ---- v4816: A POOL PASS REACHES ITS STALEST N, NOT EVERYTHING STAMPED BEFORE IT RAN --------------------
+    // The v4816 rotation (80 of 349, 2026-10-06T17:10) left tools/ship/fsrPage-selfcheck.mjs "unaccounted": the
+    // quick sweep had evicted it at 14:45 (3318 ms alone, two crossings), so it was the FRESHEST entry in the
+    // pool and the stalest-first pass could not have taken it. The rule read poolAt as "should have taken it".
+    // The ledger now carries `poolHorizon`, the stamp of the first pool entry the pass did NOT take; these rows
+    // drive the selection, the writer and the reader with fixtures, because the live ledger holds one history.
+    //
+    // v4816 SABOTAGE LOG:  H1 rotation() reports no horizon (always null) -> 3 red
+    //   H2 the horizon is the LAST TAKEN entry's stamp, not the first untaken one's -> 3 red
+    //   H3 a pool pass ignores the horizon and records its own stamp -> 2 red
+    //   H4 a named write drops the horizon (falls back to poolAt) -> 1 red
+    //   H5 the reader ignores poolHorizon (reads poolAt again) -> 1 red   H6 isArrival back to `>` -> 1 red
+    {
+        const t1 = "2026-10-01T00:00:00.000Z", t2 = "2026-10-02T00:00:00.000Z", t3 = "2026-10-03T00:00:00.000Z";
+        const FX = { at: { a: t1, b: t2, c: t3 }, timings: { a: 5000, b: 5000, c: 5000 } };
+        const C = { over: ["c", "a", "b"], killed: [] };
+        const two = rotation(C, FX, { slots: 2, budgetMs: 1e9 }), all = rotation(C, FX, { slots: 9, budgetMs: 1e9 });
+        ok("  v4816: rotation() reports the stamp of the first entry it did NOT take, and null when it took the pool",
+           two.picked.join() === "a,b" && two.horizon === t3 && all.horizon === null,
+           `slice of 2 over three stamps: took ${two.picked.join(",")}, horizon ${two.horizon}; slice of 9: horizon ${all.horizon}`);
+        const ran = "2026-10-04T00:00:00.000Z", named = "2026-10-05T00:00:00.000Z";
+        const pool = ledgerStamps({ at: t1, poolAt: t1 }, ran, "pool", two.horizon);
+        const whole = ledgerStamps({ at: t1, poolAt: t1 }, ran, "pool", all.horizon);
+        const after = ledgerStamps(pool, named, "named");
+        ok("  v4816: a pool pass records its horizon, one that took the whole pool records its own stamp, and a named write carries it",
+           pool.poolAt === ran && pool.poolHorizon === t3 && whole.poolHorizon === ran &&
+           after.poolAt === ran && after.poolHorizon === t3 &&
+           ledgerStamps({ at: t1, poolAt: t2 }, named, "named").poolHorizon === t2,
+           `pool pass at ${ran}: poolHorizon ${pool.poolHorizon}; whole-pool pass: ${whole.poolHorizon}; ` +
+           `named write after it: ${after.poolHorizon}; a pre-v4816 ledger carries its poolAt`);
+        const between = Date.parse("2026-10-03T12:00:00.000Z");
+        ok("  v4816: an entry stamped past the horizon but before the pass ran is still an arrival; one before the horizon is not",
+           isArrival(3318, "alone", between, rotRef(pool)) === true &&
+           isArrival(3318, "alone", Date.parse(t3), rotRef(pool)) === true &&
+           isArrival(3318, "alone", Date.parse(t2), rotRef(pool)) === false &&
+           isArrival(3318, "alone", between, rotRef(whole)) === false,
+           "the fsrPage shape: the pass ran after it and never had it in reach. The entry AT the horizon is the one " +
+           "the pass stopped before; an entry before it was taken or passed over, and a whole-pool pass closes the ratchet.");
+    }
+
+    // The inference must be exactly the branch rule, or it is a third thing pretending to be the first two.
+    //
+    // *** v4637 -- AND THE BRANCH RULE STOPPED ASKING WHETHER THE PROCESS FINISHED BY COMPARING A NUMBER TO
+    // THE CAP. *** `ms >= capMs` is a proxy, and it is the proxy KILLED_PASS_V4568's own note records getting
+    // wrong: "was this killed" answered by comparing a number to the cap instead of by the fact. `finished`
+    // IS the fact and has been in the file since v4568. The proxy calls a gate CAPPED whenever its runtime
+    // exceeds whatever cap the file was last swept at -- and after v4637 restored the killed pass's readings
+    // that is SIXTY-SEVEN entries, every one of them code 0 with `finished` true, gates that ran 20 s to 90 s
+    // to completion under a 90 s cap and are read as killed by a file whose cap now says 20,000. Where
+    // nothing observed whether the process finished, the cap comparison is still the only thing available.
+    const wrongInference = [...inferred].filter((g) => {
+        const ms = S.timings[g], code = S.codes[g] ?? 0, fin = (S.finished || {})[g];
+        const killed = fin === false || code === 124 || typeof code === "string";
+        const want = killed ? KIND.CAPPED
+                   : fin === undefined && ms >= S.capMs ? KIND.CAPPED
+                   : ms >= S.budgetMs || code !== 0 ? KIND.ALONE : KIND.LOADED;
+        return S.kinds[g] !== want;
+    });
+    ok("  and every inferred kind IS the branch rule applied to that entry, re-derived here rather than trusted",
+        wrongInference.length === 0,
+        wrongInference.length ? wrongInference.slice(0, 4).join(", ") : `${inferred.size} re-derived, all agreeing`);
+
+    // *** v4582 -- AND A SKIP CANNOT BE INFERRED AT ALL, WHICH IS WHY IT NEEDED A WRITER. ***
+    //
+    // The branch rule above reads a millisecond and an exit code. A skipping gate exits 0 in well under the
+    // budget, so the rule can only ever call it LOADED -- the three that were mislabelled sat at 164-234 ms with
+    // code 0 and looked exactly like fast passes. The evidence is the gate's own printed declaration, which
+    // quickSweep discarded with `stdio: "ignore"` until v4582 kept a bounded tail. SO NO ENTRY MAY CARRY SKIPPED
+    // BY INFERENCE: if one does, somebody has back-filled a label the data cannot support.
+    const skippedGates = Object.keys(S.kinds).filter((g) => S.kinds[g] === KIND.SKIPPED);
+    const inferredSkips = skippedGates.filter((g) => inferred.has(g));
+    ok(`*** all ${skippedGates.length} skipped entries are OBSERVED, never inferred -- the branch rule cannot produce this kind ***`,
+        skippedGates.length > 0 && inferredSkips.length === 0,
+        skippedGates.map((g) => `${g.split("/").pop()} ${S.timings[g]}ms code ${S.codes[g] ?? 0}`).join(", ") +
+        ". Each exits 0 under the budget, so ms-and-code says LOADED and only the gate's own output says otherwise." +
+        (inferredSkips.length ? " BACK-FILLED: " + inferredSkips.join(", ") : ""));
+    ok("  and the observed ones are NOT required to match it, which is the point of recording them separately",
+        observed.length > 0, `${observed.length} entries this arc measured directly`);
+}
+
+// -----------------------------------------------------------------------------------------------------------
+console.log("\n3. *** EIGHT MORE WRONG ENTRIES, ONE PER ROUND OF THIS ARC, INCLUDING THE ROUND THAT FOUND THE BUG ***");
+{
+    report(`${"gate".padEnd(34)}${"wrote".padStart(7)}${"8-wide".padStart(8)}${"load".padStart(7)}   written at`);
+    for (const x of R)
+        report(`${path.basename(x.gate).padEnd(34)}${String(x.wroteAlone).padStart(7)}${String(x.loaded8).padStart(8)}${(x.loaded8 / x.wroteAlone).toFixed(2).padStart(6)}x   ${x.round}`);
+    const rounds = [...new Set(R.map((x) => x.round))].sort();
+    ok(`*** ${R.length} entries held an alone reading in an under-budget slot, written across ${rounds.length} rounds -- ${rounds.join(", ")} -- so every round of this arc made the mistake including v4578, which is the round that diagnosed it ***`,
+        rounds.length === 4 && rounds.includes("v4578"),
+        `v4578 found nine and fixed nine, because it looked only at what v4577 wrote`);
+    const own = R.filter((x) => /timing(Records|Load|Survivors|Semantics)/.test(x.gate));
+    ok(`*** and ${own.length} of the ${R.length} are THIS ARC'S OWN GATES -- their runtimes were filed as alone readings every round while the files argued about exactly this ***`,
+        own.length === 4, own.map((x) => path.basename(x.gate)).join(", "));
+    // *** v4637 -- THIS ROW FORBADE THE ROTATION FROM DOING ITS JOB. *** It required these eight entries to
+    // still read the exact millisecond v4579 wrote AND to still carry LOADED. But a kind is a property of the
+    // RUN that took the number, and two ordinary things write an ALONE reading on purpose: a gate that exits
+    // non-zero gets a serial re-run, and sweepCoverage.rotation() re-times slow gates one at a time. Six of
+    // the eight now read ALONE from a rotation sweep -- five of them at code 1, which is a gate that was red
+    // when it was swept -- and the row called that a regression. The file is ENTITLED to move here.
+    //
+    // What stays frozen is what v4579 corrected and why: each of these held an ALONE reading in an
+    // under-budget slot, where the quantity the column wants is the LOADED one. That claim is about a round,
+    // so it is asserted from the table. What the file reads now is REPORTED, with the kind beside it, because
+    // a reader should be able to see the drift without the row pretending the drift is a fault.
+    report("what the file reads now: " + R.map((x) =>
+        `${path.basename(x.gate)} ${S.timings[x.gate]}ms ${S.kinds[x.gate]}${(S.codes[x.gate] ?? 0) !== 0 ? " code " + S.codes[x.gate] : ""}`).join(", "));
+    ok(`  and all ${R.length} were corrected AT v4579 from an alone reading to the eight-wide loaded one -- the table is the record of that round, not a requirement on every sweep since`,
+        R.every((x) => x.loaded8 > x.wroteAlone && x.wroteAlone < S.budgetMs),
+        `${R.filter((x) => S.kinds[x.gate] === KIND.LOADED).length} of ${R.length} still read LOADED; ` +
+        `${R.filter((x) => S.kinds[x.gate] === KIND.ALONE).length} read ALONE, which is what a serial re-run or a ` +
+        `rotation re-timing writes on purpose -- ${R.filter((x) => (S.codes[x.gate] ?? 0) !== 0).length} of those were red when swept`);
+    ok(`  and every one is under the ${S.budgetMs} ms budget, which is what makes an alone reading the wrong quantity there rather than merely a stale one`,
+        R.every((x) => x.loaded8 < S.budgetMs), `the largest is ${Math.max(...R.map((x) => x.loaded8))} ms`);
+}
+
+// -----------------------------------------------------------------------------------------------------------
+console.log("\n4. AND THE ENUMERATION HAD TWO FALSE MEMBERS THAT THE MEASUREMENT REFUSED");
+{
+    const FP = WRONG_QUANTITY_V4579.falsePositives;
+    report(`listed as arc-written and are not: ${FP.map((g) => path.basename(g)).join(", ")} -- v4577 corrected their gate-timings rows, not their sweep rows`);
+    report(`reskin measured 1494 ms at eight-wide against a recorded 2687, which is 0.56x -- impossible for an alone reading and ordinary for a LOADED one`);
+    // *** v4637 -- AND THE SAME CORRECTION HERE, FOR THE SAME REASON. *** Requiring these two to read LOADED
+    // forever is requiring that no rotation ever re-time them; both now carry an ALONE reading from the sweep
+    // that wrote this file, at code 0 and under budget. The finding is that v4579's MEASUREMENT refused them
+    // -- 1494 ms at eight-wide against a recorded 2687 cannot be an alone reading -- and that is a fact about
+    // the measurement, which is frozen here. Their current kind is reported.
+    ok("*** the list was ten and the numbers made it eight: a candidate measuring BELOW its recorded value at eight-wide cannot be holding an alone reading, so the record was already right ***",
+        FP.length === 2 && FP.every((g) => S.kinds[g] != null),
+        `${FP.map((g) => `${path.basename(g)} ${S.timings[g]}ms ${S.kinds[g]}`).join(", ")} -- neither was touched by v4579, ` +
+        "and a kind that has moved since is a later run recording what IT did, not this row's business");
+    ok("  and they are recorded rather than dropped, because a list corrected by measurement is worth more than a list that was right",
+        FP.every((g) => fs.existsSync(path.join(ENG, g))), `${FP.length} named`);
+}
+
+// -----------------------------------------------------------------------------------------------------------
+console.log("\n5. *** AND THE PRE-FLIGHT DEMANDS A KIND NOW, WHICH IS WHAT ENDS THE CLASS ***");
+{
+    const RD = fs.readFileSync(path.join(ENG, "tools", "ship", "recordDrift.mjs"), "utf8");
+    // *** v4680 -- THIS ROW WAS A REGEX OVER recordDrift.mjs, AND v4679 MOVED THE LOOKUP IT SPELLED. *** It
+    // matched `(rec.kinds || {})[g]`; v4679 sent coverage through tools/ship/boxTimings.mjs, which carries the
+    // kind as `e.kind` on a merged entry, and the obligation survived while the spelling did not -- so the row
+    // went red on a tree that still enforced exactly what it asks about. A text match reports whether a line
+    // is WRITTEN a certain way. Asked of the mechanism instead: drop one gate's kind from every record and the
+    // pre-flight must name that gate.
+    const RDM = await import("./recordDrift.mjs");
+    const BT = await import("./boxTimings.mjs");
+    const world = BT.records(ENG);
+    const g0 = Object.keys(S.kinds).find((g) => fs.existsSync(path.join(ENG, g)));
+    const noKind = world.map((r) => ({ ...r, rec: { ...r.rec,
+        kinds: Object.fromEntries(Object.entries(r.rec.kinds || {}).filter(([k]) => k !== g0)) } }));
+    const kRow = (await RDM.checks({ records: noKind, only: "sweep timings" })).find((c) => c.name === "sweep timings");
+    const cRow = (await RDM.checks({ records: world, only: "sweep timings" })).find((c) => c.name === "sweep timings");
+    ok("recordDrift's sweep-timings check requires a kind alongside the runtime and the stamp",
+        kRow.stale === true && kRow.detail.includes(g0) && cRow.stale === false,
+        `a gate with a runtime and a stamp but no kind (${g0}, removed from all ${world.length} records) is named as ` +
+        "missing, and the untouched records are clean -- a new gate owes the file a kind exactly as it owes a runtime and a capture stamp");
+    ok("  and it says so in its own detail line, so a reader of the pre-flight learns what the obligation is",
+        /a kind/.test(RD), "every gate has a timing, its own capture stamp and a kind");
+    ok(`*** which is the repair v4578 named and did not do: seventeen wrong entries across five rounds is what a column without a marked quantity costs, and this is the check that stops the eighteenth ***`,
+        Object.keys(S.kinds).length >= Object.keys(S.timings).length,
+        `${9 + R.length} wrong entries found and fixed at v4578 and v4579, from four rounds of writing them`);
+}
+
+// -----------------------------------------------------------------------------------------------------------
+console.log("\n6. CONTROLS");
+{
+    ok("the three kinds partition the file, so the census counts disjoint sets",
+        Object.values(S.kinds).every((v) => Object.values(KIND).includes(v)),
+        `${new Set(Object.values(S.kinds)).size} distinct values, all of them from KIND`);
+    ok("  and every timing has a kind, so the map is not a partial index nobody can rely on",
+        Object.keys(S.timings).every((g) => S.kinds[g]), `${Object.keys(S.timings).length} timings, ${Object.keys(S.kinds).length} kinds`);
+    ok("every gate in the frozen table exists and is in the file",
+        R.every((x) => fs.existsSync(path.join(ENG, x.gate)) && x.gate in S.timings), `${R.length} checked`);
+    ok("  and every one is slower at eight-wide than the alone reading it replaced, so the two are separate measurements",
+        R.every((x) => x.loaded8 > x.wroteAlone), `smallest margin ${Math.min(...R.map((x) => x.loaded8 / x.wroteAlone)).toFixed(2)}x`);
+    ok("the budget and cap come from the file rather than being restated here",
+        S.budgetMs === 3000 && S.capMs === 20000, `budget ${S.budgetMs}, cap ${S.capMs}`);
+}
+
+console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
+console.log("unchecked here: WHETHER THE 1,620 INFERENCES ARE RIGHT. They follow the branch rule, which is what " +
+    "quickSweep does, but nothing has run those gates to confirm the quantity -- and this round found eight " +
+    "entries where the rule's answer was wrong because a human had written the number. The inferred set is " +
+    "named so the question stays askable, and the honest position is that it is an inference over 1,620 " +
+    "entries with 19 observations beside it. Also unchecked: gate-timings.json, which has the same shape of " +
+    "problem waiting -- selfchecks.mjs writes it on a full run while the v3285 and v4575-v4579 additions were " +
+    "timed individually, and it has no kind field at all; and whether any READER of the ms column should now " +
+    "branch on kind, which is 71 references and a separate round.");
+process.exit(fails ? 1 : 0);

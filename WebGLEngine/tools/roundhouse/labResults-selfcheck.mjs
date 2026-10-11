@@ -82,7 +82,39 @@ function rollup(label, groups) {
 }
 const D = await import(pathToFileURL(path.join(HERE, "devices.mjs")).href);
 const L = await import(pathToFileURL(path.join(HERE, "labExport.mjs")).href);
-const BASE = path.join(HERE, "lab-results-baseline.json");
+// *** v4778 RIG RUN -- THE BASELINE IS A PROPERTY OF THE CODE AND THE JS ENGINE, AND IT NAMED ONLY THE CODE. ***
+// Keith's rig (Node v24.17.0) read 20 pair values and 14 default values MOVED and nothing in the tree had changed
+// them. Node v24.17.0 run here on Linux reproduces every one of them to the last digit -- whitedwarf/accretion.
+// radiusAtStart 3966.8233211416887 -> ...873, eccentric.worstAtE 0.22759966457696176 -> 0.22765988026144432 --
+// so it is V8's float library, not Windows and not a device going non-deterministic. Comparison stays EXACT (the
+// note below says why a tolerance would be the wrong repair); what changes is that each Node major is compared
+// against a baseline TAKEN ON THAT MAJOR. lab-results-baseline.json is Node 22's, the runtime every freeze
+// before v4778 ran on; any other major reads lab-results-baseline.node<major>.json. A runtime with no baseline of
+// its own is RED and says how to take one -- compared against Node 22's values meanwhile, so the drift is still
+// printed rather than hidden behind a missing file.
+// SABOTAGES, each run on Node v24.17.0 against the real file, restored and md5 verified:
+//   L1. one observable (capsuledepenetrate/floor posX) deleted from lab-results-baseline.node24.json -> 3 RED, the
+//       same-lab row first ("A DIFFERENT SHAPE"), then "APPEARED unannounced" and the corpus count.
+//   L2. baseFor() looks for the Node 24 baseline under a name that does not exist -> 3 RED: this runtime's row, and
+//       the 20 + 14 moved values Keith's rig printed, to the digit. That is the rig's state, reproduced.
+// *** RIG RUN 2 -- AND THE PLATFORM IS PART OF THE RUNTIME TOO. *** Node v24.15.0 on Keith's Windows rig, against the
+// Node 24 baseline taken on Linux: 2 values moved and nothing else -- blackbody's wienNuMax 2.8214393786846763 ->
+// 2.821439378159087 and the wienNuAgreeRel derived from it, at the default and at its spectrum pair. wienPeakMaximise is
+// a golden-section search on the flat top of x^3/(e^x - 1); near the maximum every comparison is decided by the last bits
+// of that function, so below about 1e-8 its answer IS the platform's rounding. So a runtime is (Node major, platform):
+// lab-results-baseline.json is Node 22 on Linux, .node<major>.json another major on Linux, .node<major>.<platform>.json
+// anywhere else. A runtime with no baseline of its own is compared against the nearest one (same major on Linux, else
+// Node 22's) and is red, as before.
+const NODE_MAJOR = process.versions.node.split(".")[0], PLATFORM = process.platform;
+const DEFAULT_NODE_MAJOR = "22", DEFAULT_PLATFORM = "linux";
+const baseFor = (major, platform = DEFAULT_PLATFORM) => path.join(HERE,
+    major === DEFAULT_NODE_MAJOR && platform === DEFAULT_PLATFORM ? "lab-results-baseline.json"
+    : `lab-results-baseline.node${major}${platform === DEFAULT_PLATFORM ? "" : "." + platform}.json`);
+const BASE_OWN = baseFor(NODE_MAJOR, PLATFORM);
+let hasOwnBase = fsMod.existsSync(BASE_OWN);
+const BASE = hasOwnBase ? BASE_OWN
+           : fsMod.existsSync(baseFor(NODE_MAJOR)) ? baseFor(NODE_MAJOR) : baseFor(DEFAULT_NODE_MAJOR);
+const runtimeOf = (b) => `Node ${b.node || DEFAULT_NODE_MAJOR} on ${b.platform || DEFAULT_PLATFORM}`;
 const base = JSON.parse(fsMod.readFileSync(BASE, "utf8"));
 
 // v3519 -- *** THIS RATCHET WATCHED ONE MODE PER DEVICE, AND 528 OBSERVABLES SOUNDED LIKE THE LAB. ***
@@ -123,15 +155,60 @@ for (const n of D.DEVICE_NAMES) {
 }
 
 if (process.env.SWEK_FREEZE_LAB_RESULTS === "1") {
+    base.node = NODE_MAJOR;
+    base.platform = PLATFORM;
     base.devices = now;
     base.pairs = pairs;
     base.deviceCount = D.DEVICE_NAMES.length;
     base.observables = Object.values(now).reduce((a, d) => a + Object.keys(d.outputs || {}).length, 0);
     base.pairCount = Object.keys(pairs).length;
     base.pairObservables = Object.values(pairs).reduce((a, d) => a + Object.keys(d.outputs || {}).length, 0);
-    fsMod.writeFileSync(BASE, JSON.stringify(base, null, 1));
+    fsMod.writeFileSync(BASE_OWN, JSON.stringify(base, null, 1));
+    hasOwnBase = true;   // the freeze just took this runtime's own; the rows below read it, not the one it was seeded from
     console.log("  ----  RE-FROZEN: " + base.deviceCount + " devices, " + base.observables + " observables; " +
                 base.pairCount + " device-mode pairs, " + base.pairObservables + " observables.");
+}
+
+// ---- 0. WHICH RUNTIME'S BASELINE, AND WHETHER THE RUNTIMES' BASELINES DESCRIBE THE SAME LAB (v4778) --------------
+{
+    ok("!! *** this runtime is compared against a baseline TAKEN ON IT ***",
+       hasOwnBase && (base.node || DEFAULT_NODE_MAJOR) === NODE_MAJOR && (base.platform || DEFAULT_PLATFORM) === PLATFORM,
+       hasOwnBase ? `Node ${process.versions.node} on ${PLATFORM} against ${path.basename(BASE)} (taken on ${runtimeOf(base)})`
+                  : `NO BASELINE WAS TAKEN ON NODE ${NODE_MAJOR} ON ${PLATFORM}: compared below against ${runtimeOf(base)}'s, whose ` +
+                    `last digits this runtime's float library does not reproduce. Take one deliberately -- run this gate ` +
+                    `once and read what moved, then SWEK_FREEZE_LAB_RESULTS=1 writes ${path.basename(BASE_OWN)}`);
+    // Two baselines may differ in VALUES -- that is what a second runtime is -- and in nothing else. A device, mode
+    // or observable present in one and not the other means one was frozen against different code, and then its
+    // exact comparison is protecting a lab that no longer exists.
+    const files = fsMod.readdirSync(HERE).filter((f) => /^lab-results-baseline(\.node\d+(\.[a-z0-9]+)?)?\.json$/.test(f)).sort();
+    const shape = (b) => {
+        const keys = [];
+        for (const [n, d] of Object.entries(b.devices || {})) keys.push("dev " + n + " " + Object.keys(d.outputs || {}).sort().join(","));
+        for (const [n, d] of Object.entries(b.pairs || {})) keys.push("pair " + n + " " + Object.keys(d.outputs || {}).sort().join(","));
+        return keys.sort();
+    };
+    const values = (b) => {
+        const m = new Map();
+        for (const [n, d] of Object.entries(b.devices || {})) for (const [k, v] of Object.entries(d.outputs || {})) m.set(n + "." + k, JSON.stringify(v));
+        for (const [n, d] of Object.entries(b.pairs || {})) for (const [k, v] of Object.entries(d.outputs || {})) m.set(n + ":" + k, JSON.stringify(v));
+        return m;
+    };
+    const all = files.map((f) => ({ f, b: JSON.parse(fsMod.readFileSync(path.join(HERE, f), "utf8")) }));
+    const ref = all.find((x) => x.f === "lab-results-baseline.json");
+    const refShape = ref ? shape(ref.b).join("\n") : "";
+    const refVals = ref ? values(ref.b) : new Map();
+    const report = all.filter((x) => x !== ref).map((x) => {
+        const v = values(x.b);
+        let differ = 0;
+        for (const [k, val] of v) if (refVals.get(k) !== val) differ++;
+        return { f: x.f, runtime: runtimeOf(x.b), same: shape(x.b).join("\n") === refShape, differ, of: v.size };
+    });
+    ok("!! ...and every runtime's baseline describes the SAME lab -- the same devices, modes and observables, differing only in values",
+       !!ref && report.every((r) => r.same),
+       `${files.length} baseline(s): ` + (report.length
+           ? report.map((r) => `${r.f} (${r.runtime}) ${r.same ? "same shape" : "A DIFFERENT SHAPE -- frozen against other code"}, ` +
+                               `${r.differ} of ${r.of} values differ from Node ${DEFAULT_NODE_MAJOR} on ${DEFAULT_PLATFORM}'s`).join("; ")
+           : "Node " + DEFAULT_NODE_MAJOR + " on " + DEFAULT_PLATFORM + "'s only"));
 }
 
 // ---- 0a. THE REPORTER ITSELF, DRIVEN RATHER THAN READ OUT OF THE SOURCE --------------------------------------------

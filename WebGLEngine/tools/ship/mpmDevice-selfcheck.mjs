@@ -90,7 +90,30 @@ console.log("\n1. THE STAGES, THE BINDINGS PER STAGE, AND THE NULL BACKEND'S DIS
     ok("*** four stages, four dispatches per step, on the null backend ***", STAGES.join() === "clear,p2g,grid,g2p" && disp === 12, `${disp} dispatches for 3 steps`);
     ok("  the bindings are per ENTRY POINT: clear binds P and acc, grid binds P, acc, gv -- twelve binds, not twenty", binds.length === 12 && binds.join() === "P,acc,P,parts,acc,flags,P,acc,gv,P,parts,gv", binds.join(","));
     const dev = codeOf(read("gfx/device.js"));
-    ok("gfx/device.js answers `used` over the functions reachable from the entry point", /_reachableCode\(code, entryPoints\)/.test(dev) && /classify\(d\.wgsl, \[d\.entryPoint \|\| "main"\](, d\.uses)?\)/.test(dev));
+    const spec = codeOf(read("render/wgslSpec.mjs"));
+    // *** v4645 -- THIS ROW GREPPED gfx/device.js FOR A FUNCTION THAT HAD MOVED TO render/wgslSpec.mjs. ***
+    // It required `_reachableCode(code, entryPoints)` in device.js. Commit fc62482a lifted that helper out of
+    // device.js into wgslSpec.mjs in one edit -- the same commit removed it from one file and added it to the
+    // other -- and the row has been red ever since, while THE PROPERTY IT NAMES STAYED TRUE THE WHOLE TIME.
+    // A refactor moved the code and left the assertion pointing at the old address: the recurring shape here
+    // is a claim about a live file that nothing re-derived when the file changed.
+    //
+    // The property is a CHAIN across two files, so it is asserted as one: device.js's classify takes
+    // entryPoints and hands them to usedNames as its third argument, and wgslSpec's usedNames answers `used`
+    // over _reachableCode(code, entryPoints) rather than over the whole text. Neither half means anything
+    // alone -- passing an entry point to a scanner that ignores it would satisfy the first, and a scanner
+    // nobody passes an entry point to would satisfy the second.
+    //
+    // AND THE ROW ABOVE IS THE BEHAVIOURAL PROOF OF THE SAME THING: twelve binds and not twenty, because
+    // clear's layout holds only what clear reaches. This row says WHERE that behaviour comes from, which is
+    // what makes a regression readable; it is not the evidence, and it should not be read as the evidence.
+    ok("`used` is answered over the functions reachable from the entry point -- device.js passes it, wgslSpec resolves it",
+        /classify\(d\.wgsl, \[d\.entryPoint \|\| "main"\](, d\.uses)?\)/.test(dev) &&
+        /usedNames\(wgsl, parseBindings\(wgsl\)[^;]*, entryPoints\)/.test(dev) &&
+        /_reachableCode\(code, entryPoints\)/.test(spec),
+        "device.js: classify(d.wgsl, [d.entryPoint || \"main\"], d.uses) -> usedNames(..., entryPoints); " +
+        "wgslSpec.mjs: usedNames computes _reachableCode(code, entryPoints). fc62482a moved the second half " +
+        "out of the first file and this row followed it rather than being deleted.");
     const page = codeOf(read("mpm-gpu-check.html"));
     // v4467 -- the page no longer builds bind groups at all: it runs the kernel through makeMpmDevice, whose per-stage
     // binding is the device's per-entry-point scan (the fix v4466 first applied to the page by hand).

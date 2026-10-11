@@ -57,9 +57,12 @@ const mk = (o) => async (u) => {
     ok("!! something listening that is NOT Ollama is not 'up'", wrong.up === false && /not Ollama's API/.test(wrong.why || ""),
        "a port answering is not the same as the right service answering");
     ok("an unreachable port explains itself", /nothing answered/.test((await isUp("http://x", { fetchImpl: mk("down") })).why || ""));
-    ok("a no-model-pinned fleet is still READY but says what that means", (() => {
-        return true;
-    })());
+    // *** v4651 -- A ROW THAT READ `(() => { return true; })()` WAS REMOVED FROM HERE. *** Its label claimed
+    // "a no-model-pinned fleet is still READY but says what that means" and its condition was the constant
+    // true, so it could not fail whatever readiness() did. The very next row makes that exact claim properly,
+    // against a real fleet with no pin, which is why the repair is a deletion and not a rewrite. Found by
+    // tools/ship/constantRows.mjs, the census that round added -- it was the one unambiguous defect among
+    // eleven candidates, the rest being language-contract rows paired with a row that uses their module.
     const nopin = await readiness({ fetchImpl: mk([{ name: "a" }, { name: "b" }]) });
     ok("...no pin means any model could be chosen, and it says so", nopin.verdict === READY.OK && /no model is pinned/.test(nopin.why),
        "silently passing would imply a determinism this configuration does not have");

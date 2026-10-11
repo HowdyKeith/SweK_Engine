@@ -127,7 +127,13 @@ export const DEVICE_CONTRACT = Object.freeze({
     // The failure is not graceful: webgpuBackend does createShaderModule({ code: d.shaders.wgsl }) with no
     // guard, so a GLSL-only pipeline reaches the GPU as `undefined` rather than as a refusal a caller can read.
     unguardedRead: "d.shaders.wgsl",
-    consumers: Object.freeze(["gfx-device.html", "nebula-device.html"]),
+    // v4778 -- 2 -> 3 at the rtx merge, and the first that is not a demo of the device itself: fly-connectome.html
+    // draws the male-cns circuit through requestDevice and one dual-language pipeline. Its gate,
+    // tools/ship/flyConnectomePage-selfcheck.mjs, arrived carrying a RETYPED copy of that pipeline in both
+    // languages and so read as a fourth consumer. That was repaired at the cause, as v4459 and v4688 did: the
+    // gate now reads the page's own shader text out of the page and hands it to the offscreen render, so it
+    // carries no shader, leaves this census, and grades the page's pipeline rather than a copy of it.
+    consumers: Object.freeze(["gfx-device.html", "nebula-device.html", "fly-connectome.html"]),
 });
 
 /**
@@ -201,8 +207,79 @@ export const PARITY_BASELINE = Object.freeze({
     // both languages) and its gate physics/render/specularProbeLit-selfcheck.mjs (a real WGSL compute dispatch of
     // the fragment logic plus a real GLSL vertex/fragment pair, counted per this file's own v4392 rule that a gate
     // embedding shader text is counted rather than exempted, not exempted as this gate exempts itself).
-    glslBearing: 158,
-    glslDirective: 140,  // raw WebGL2 -- the file writes its own version header
+    // *** v4688 -- wgslBearing 97 -> 106 and wgslOnly 74 -> 83, THE SAME NINE, AND ALL OF THEM THIS ARC'S. ***
+    // Named rather than counted, per v4470's rule that a baseline which stops naming its population stops
+    // describing the tree. Derived by listing the live wgslOnly set and asking git which of its members did
+    // not exist at the v4645 baseline commit, rather than by adding up eleven commit messages:
+    //   render/dilateWgsl.mjs, render/luminancePyramidWgsl.mjs, render/objectMotionWgsl.mjs,
+    //   render/opticalFlowWgsl.mjs, render/reactiveWgsl.mjs, render/visibilityWgsl.mjs,
+    //   render/flowReconcileWgsl.mjs, render/frameInterpWgsl.mjs, render/holeFillWgsl.mjs
+    // Every one is WGSL-ONLY, which is why the two rows move together by the same amount and `both`,
+    // glslBearing, glslDirective and glslFramework do not move at all -- the same signature v4645's ten had,
+    // for the same reason: a compute pass has no WebGL2 half, so its twin is JavaScript rather than GLSL.
+    //
+    // *** THE COUNT WAS ELEVEN BEFORE IT WAS NINE, AND THE TWO THAT LEFT ARE THE INTERESTING PART. ***
+    // render/frameInterpGPU-selfcheck.mjs and render/holeFillGPU-selfcheck.mjs were counted as WGSL-bearing
+    // because each CONTAINED a WGSL entry-point attribute: one in an inline NaN-probe kernel, one inside a
+    // REGEX WRITTEN TO COUNT THAT VERY ATTRIBUTE in another file. Being in this census put them in the
+    // gfx/device.js consumer row, which then read four consumers instead of two. v4278 hit exactly this and
+    // settled the rule -- a file grading a marker may not contain it anywhere, prose included -- and the fix
+    // is the same one: assemble the marker from pieces. So the consumer row is repaired at its CAUSE rather
+    // than by an exemption list, which is what v4278 tried first and then removed in the same round.
+    //
+    // SABOTAGE v4688: the baseline put back to its stale 74 -> 1 red. Each repaired gate made to spell a real
+    // WGSL marker again -> 3 red apiece, both of them: the file re-enters the census, wgslBearing and wgslOnly
+    // both move, and the gfx/device.js consumer row reads four consumers instead of two. THE FIRST ATTEMPT AT
+    // THAT MUTATION SCORED 0 RED AND WAS A NO-OP RATHER THAN A FINDING: it replaced the assembled marker with
+    // a bare at-sign, which matches none of WGSL_MARKS (the three stage attributes this file assembles at the
+    // top rather than spelling), so the text changed and the
+    // census did not. A mutation that fails to reintroduce the property under test measures nothing, and
+    // recording it as a 0-RED would have been a claim about a control that was never exercised.
+    //
+    // *** AND WRITING THE SENTENCE ABOVE SPELLED ALL THREE MARKERS OUT IN THIS FILE, WHICH TURNED SECTION 2'S
+    // LITERAL-MARKER ROW RED ON THE PROSE EXPLAINING WHY THEY MUST NOT APPEAR. *** Eleventh instance, and the
+    // second time in this one round -- the first was the pair of gates this note is about. v4278 recorded the
+    // same thing happening to it, in this same file, in the same shape: the rule is not "assemble the markers
+    // in code", it is that a file grading a marker may not contain it ANYWHERE, prose included. The list is
+    // referred to by name here instead.
+    //
+    // *** AND THE COUNT WAS ELEVEN ROUNDS STALE BECAUSE THIS GATE WAS RED, NOT BECAUSE NOBODY LOOKED. ***
+    // backendParity-selfcheck was one of six gates red outside the register from before v4686 through v4687.
+    // It named the drift every time it ran; a red gate's findings reach nobody, which is what a standing red
+    // actually costs and is recorded here because this file is where the cost landed.
+    // *** v4645 -- RE-DERIVED AT THE main MERGE: wgslBearing 87 -> 97 and wgslOnly 64 -> 74, THE SAME TEN. ***
+    // main's baseline was correct for main's tree, which is why v4642 could repair this gate there and why it
+    // goes red here: the merge brought ten WGSL-bearing files main does not have, every one of them this
+    // line's temporal/FSR arc, and every one WGSL-ONLY -- which is why the two rows move together by the same
+    // amount and `both`, glslBearing, glslDirective and glslFramework do not move at all. Named rather than
+    // counted, per v4470's rule that a baseline which stops naming its population stops describing the tree:
+    //   fx/fsr/fsrKernels.js, render/motionVectorsWgsl.mjs, render/ringFloorWgsl.mjs,
+    //   render/temporalAccumulateWgsl.mjs, render/temporalLockWgsl.mjs, render/temporalRejectWgsl.mjs,
+    //   render/temporalResolveWgsl.mjs, tools/ship/harnessLiveness-selfcheck.mjs,
+    //   tools/ship/kernelReach-selfcheck.mjs, tools/ship/temporalCorpus.mjs.
+    // The last three are GATES and a CORPUS bearing shader text, counted rather than exempted -- v4392's rule,
+    // which this file has now applied four times and which is most of the WGSL this tree owns.
+    //
+    // v4778 -- glslBearing 158 -> 161, glslDirective 140 -> 143, wgslBearing 106 -> 108, both 23 -> 24, glslOnly
+    // 135 -> 137, wgslOnly 83 -> 84 at the rtx merge. classify() run over the merged tree and over main's parent
+    // of the merge, and the two lists diffed by name -- not the rtx line's own history added up, which never
+    // re-took this record after it branched from main. Four files arrived (five language slots) and none left:
+    //   both (and so GLSL-directive and WGSL): fly-connectome.html -- its line-list pipeline in both languages
+    //     for gfx/device.js
+    //   GLSL-only, directive: ui/precisionProbe.mjs (the device precision probe, WebGL2 by design) and its gate
+    //     tools/ship/precisionProbe-selfcheck.mjs
+    //   WGSL-only: render/rtViewer.mjs, the path tracer's accumulate kernel and present pass -- the present
+    //     fragment reads a storage buffer directly, which WebGL2 has no form of, so there is no GLSL half
+    // A fifth, tools/ship/flyConnectomePage-selfcheck.mjs, arrived carrying a retyped copy of the page's pipeline
+    // and was taken OUT rather than counted -- see DEVICE_CONTRACT.consumers; it now draws with the page's text.
+    // glslFramework does not move: nothing that arrived leans on three.js to prepend the header.
+    // v4778 rig run 4 -- +1 GLSL, directive style, GLSL only: tools/ship/realGpuRun.mjs. Its --gl-flags probe compiles a
+    // bufferless gl_VertexID triangle and draws it, to ask whether a software-GL context DRAWS and not only names its
+    // renderer. A tool, not a shader module; counted per v4392's rule that embedded shader text is counted. Found by a
+    // census diff against 3677d747, the commit before it -- the only file that moved -- and missed for four commits,
+    // because this gate was not in that round's battery. Keith's rig run read it first: measured 162, recorded 161.
+    glslBearing: 162,
+    glslDirective: 144,  // raw WebGL2 -- the file writes its own version header
     glslFramework: 18,   // three.js prepends it: badTvPass, aquarellePass, grassField, solidTexture, atmosphere, ...
     // v4392 -- 57 -> 58, and the file is a GATE rather than a shipping module. tools/ship/shipyard-selfcheck.mjs
     // section 8 embeds a WGSL compute shader to run the four float32 encodings on a real device, so it bears WGSL
@@ -265,14 +342,14 @@ export const PARITY_BASELINE = Object.freeze({
     // which ships its GLSL and WGSL texts as exports so the three languages cannot drift apart by being
     // edited separately. It is WGSL-BEARING WITHOUT BEING A PAIR: it carries both shader texts but is not a
     // shader module, which is why wgslOnly moves with it and `both` does not.
-    wgslBearing: 87,
-    both: 23,            // +2 over the last-recorded 21: fae26dbf's specularProbeLit.mjs and specularProbeLit-selfcheck.mjs
-    glslOnly: 135,
-    wgslOnly: 64,
+    wgslBearing: 108,
+    both: 24,            // v4778: +1, fly-connectome.html (above); before that +2 for fae26dbf's specularProbeLit pair
+    glslOnly: 138,       // v4778 rig run 4: +1, tools/ship/realGpuRun.mjs (above)
+    wgslOnly: 84,
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.
     bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/fleetTsl.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs", "render/stereographic.mjs", "render/texelProbe.mjs", "render/litSphere.mjs", "render/tslWide.mjs", "render/zoomBlur.mjs", "render/asciiShape.mjs", "render/water2d.mjs", "render/probeLit.mjs", "physics/render/specularProbeLit.mjs", "physics/render/specularProbeLit-selfcheck.mjs"]),
-    bothPages: Object.freeze(["gfx-device.html", "nebula-device.html", "wormhole-jump.html"]),
+    bothPages: Object.freeze(["gfx-device.html", "nebula-device.html", "wormhole-jump.html", "fly-connectome.html"]),   // v4778: +fly-connectome.html
     wgslRawVsCode: Object.freeze({ raw: 54, code: 51 }),
 });
 
@@ -302,8 +379,10 @@ export const PORTED_PAIRS = Object.freeze([
                             "against the CPU model" }),
 ]);
 
-/** Walk a tree and classify every candidate file. Pure but for the two readers handed in. */
-export function census(root, { readdir, readFile, join, relative }) {
+/** Walk a tree and classify every candidate file. Pure but for the readers handed in -- and, since v4803, the test for which
+ *  files are source: `isSource`, handed in like the readers rather than spelled here, so this module stays free of node:fs
+ *  while the one definition of a source file (tools/ship/moduleRefs.mjs's SOURCE_EXT) is the one it applies. */
+export function census(root, { readdir, readFile, join, relative, isSource }) {
     const skip = new Set(["node_modules", ".git", "vendor"]);
     const out = { glsl: [], wgsl: [], both: [], none: 0, scanned: 0 };
     (function walk(dir) {
@@ -313,7 +392,7 @@ export function census(root, { readdir, readFile, join, relative }) {
             if (skip.has(e.name)) continue;
             const full = join(dir, e.name);
             if (e.isDirectory()) { walk(full); continue; }
-            if (!/\.(js|mjs|html)$/.test(e.name)) continue;
+            if (!isSource(e.name)) continue;
             let body = ""; try { body = readFile(full); } catch { continue; }
             out.scanned++;
             const rel = relative(root, full).split(/[\\/]/).join("/");

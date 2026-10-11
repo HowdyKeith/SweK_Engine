@@ -31,7 +31,67 @@ const RE_PATHNAME_ANY = new RegExp("new URL\\([^)]*import\\.meta\\.url\\s*\\)\\s
 // the drive-letter strip: a slice(1) or replace guarded on /^\/[A-Za-z]:/ -- percent-decoding is orthogonal.
 const RE_DRIVE_STRIP = /\^\\\/\[A-Za-z\]:/;
 // The OFFENCE is the comparison, not the fragment. Every sentence about this bug contains the fragment.
-const BAD_GUARD_RE = /import\.meta\.url\s*===\s*`file:\/\/\$\{process\.argv\[1\]\}`/;
+//
+// *** v4648 -- THIS MATCHED ONE SPELLING OF THREE, AND REPORTED "THE TREE IS CLEAN" WHILE EIGHT FILES
+// CARRIED IT. *** The old pattern required the BACKTICK form verbatim. Two others do the identical damage:
+//
+//   "file://" + process.argv[1]                 string concatenation  -- refreshReleases, releaseLedger, krbnEmit
+//   new URL(`file://${process.argv[1]}`).href   wrapped in a URL      -- treeRead, recordReach, detourScale, surfaceProbe
+//
+// The URL form is the nastier of the two, because it LOOKS careful. It is not: new URL() does not repair a
+// backslash path or a missing third slash, it just parses the broken string into a broken URL.
+//
+// FOUND BY KEITH RUNNING THE SHIP ON THE RIG, not by this gate. `node tools/ship/refreshReleases.mjs`
+// printed NOTHING -- no fetch, no write, no error, exit 0 -- because its whole CLI hangs off
+// `const RUN = ... === "file://" + process.argv[1]`, and on Windows that is permanently false. The one box
+// holding the token to refresh the release ledger is the one box where the tool silently does nothing.
+//
+// *** AND THIS FILE'S OWN HEADER ALREADY RECORDS THE LESSON IT THEN FAILED TO APPLY: *** item 3 says of the
+// basename form, "THE SAME BUG WEARING A DIFFERENT SPELLING, and this gate did not know about it for a
+// thousand versions." That was the second spelling. These are the third and fourth, and a zero from a
+// detector that reads one spelling is the count-standing-in-for-a-property shape, not an all-clear.
+// *** EVERY PATTERN CARRIES THE COMPARISON, AND THE FIRST DRAFT OF THIS WIDENING DID NOT. ***
+// This gate matches against noComments(), which KEEPS string bodies, and its own note explains why that is
+// still sound: "Prose quotes the fragment; only code writes `import.meta.url === ...`". My first two URL
+// patterns matched the FRAGMENT alone, so they immediately reported krbnVendor-selfcheck.mjs and
+// ddaPrecisionReport-selfcheck.mjs -- two gates whose evidence STRINGS quote this very bug. That is v3936's
+// trap in its fourth spelling, re-entered by the round widening the detector that exists to hold it.
+// `URLRHS` is therefore only ever used on the right-hand side of the comparison.
+const ARGV_URL = "(?:`file:" + "//\\$\\{\\s*process\\.argv\\[1\\]\\s*\\}`"      // `file://${argv[1]}`
+               + "|[\"']file:" + "//[\"']\\s*\\+\\s*process\\.argv\\[1\\])";       // "file://" + argv[1]
+const URLRHS = "(?:new URL\\(\\s*)?" + ARGV_URL;
+const BAD_GUARD_RES = Object.freeze([
+    new RegExp("import\\.meta\\.url\\s*===\\s*" + URLRHS),
+    new RegExp(URLRHS + "[^\\n]{0,24}===\\s*import\\.meta\\.url"),
+]);
+// *** AND THE COMPARISON ANCHOR IS NOT ENOUGH EITHER, WHICH THE RE-RUN MEASURED. ***
+// This gate's note says prose is excluded because "only code writes `import.meta.url === ...`". That was
+// true when it was written and is now false: krbnVendor-selfcheck.mjs and ddaPrecisionReport-selfcheck.mjs
+// both quote THE WHOLE COMPARISON inside an evidence string, recording this very bug. So the rule gets the
+// same two-stage treatment BAD_PATHNAME already has -- noComments as the cheap prefilter, codeOnly to
+// CONFIRM -- rather than a third round of trying to out-word the prose.
+//
+// codeOnly blanks string and template BODIES, measured on both forms:
+//   `import.meta.url === "file://" + process.argv[1]`        ->  import.meta.url === "" + process.argv[1]
+//   `import.meta.url === new URL(`file://${argv[1]}`).href`  ->  import.meta.url === new URL(``).href
+//   the prose above, in a string                             ->  ok("")
+// The argv reference survives the concat form and is destroyed in the template form, so the confirmations
+// are written to what is LEFT rather than to what was there. Comparing import.meta.url against a URL built
+// from ANY literal is the defect whatever the literal said -- the only correct right-hand side is
+// pathToFileURL(...).href -- so the second pattern loses nothing by not seeing the body.
+// *** AND THE FIRST DRAFT OF THESE THREE BROKE THE RULE THIS GATE ALREADY HAD. ***
+// Sabotage SC-3 reintroduced the ORIGINAL backtick spelling -- the one offence this file has always caught
+// -- and went ZERO RED. Under codeOnly that form is `import.meta.url === ``', comparing against a bare empty
+// literal, and all three confirmations demanded either a `+ process.argv[1]` or a `new URL(`. A widening
+// that drops the case it was widening FROM is worse than no widening, because the old coverage looked intact.
+// The shape to confirm is simply: import.meta.url compared against A LITERAL, wrapped in new URL() or not.
+// Only pathToFileURL(...).href is a correct right-hand side, so nothing legitimate lives in that space.
+const BAD_GUARD_CODE_RES = Object.freeze([
+    /import\.meta\.url\s*===\s*(?:new URL\(\s*)?["'`]{2}/,
+    /["'`]{2}\s*\+\s*process\.argv\[1\][^\n]{0,24}===\s*import\.meta\.url/,
+]);
+const BAD_GUARD_CODE = { test: (src) => BAD_GUARD_CODE_RES.some((re) => re.test(src)) };
+const BAD_GUARD_RE = { test: (src) => BAD_GUARD_RES.some((re) => re.test(src)) };
 // (3) THE BASENAME GUARD. Three patterns, because two different things can be wrong with it.
 //   - split("/") on argv[1] is unconditionally wrong: it is a PATH, and half the world spells paths with
 //     backslashes. There is no context in which this is the right split.
@@ -124,7 +184,12 @@ function walk(dir, hits, tally) {
             const said = RE_PATHNAME_ANY.test(s) || s.includes(BAD_PATHNAME);
             const c = said ? stripToCode(raw) : s;
             if (c.includes(BAD_PATHNAME)) hits.push(rel + "  [new URL(import.meta.url).pathname]");
-            if (BAD_GUARD_RE.test(s)) hits.push(rel + "  [file://${process.argv[1]} guard]");
+            // Prefilter on the text, CONFIRM in code -- see BAD_GUARD_CODE_RES above. noComments retains
+            // everything codeOnly retains, so a file whose text lacks the idiom cannot have it in its code,
+            // and the dear stripper is paid for only where it can change the answer.
+            if (BAD_GUARD_RE.test(s) && BAD_GUARD_CODE.test(said ? c : stripToCode(raw))) {
+                hits.push(rel + "  [file://${process.argv[1]} guard]");
+            }
             // *** v3937 -- AND THE REL-ARGUMENT FORM, WHICH THIS GATE'S OWN RULE COVERS AND ITS TEST DID NOT. ***
             // The header says the helper form is safe because "it has a rel argument AND STRIPS THE LEADING SLASH
             // ITSELF". Only the first half was ever checked: BAD_PATHNAME is the literal no-rel spelling, so

@@ -122,7 +122,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { referenceGraph } from "./moduleRefs.mjs";
+import { referenceGraph, SOURCE_EXT } from "./moduleRefs.mjs";
 import { REPORTING, ARTEFACT_TOOLS } from "./reportingTools.mjs";
 import { UNWIRED_REGISTRATION, isExplained } from "./unwiredRegister.mjs";
 import { noComments } from "./sourceScan.mjs";
@@ -162,7 +162,7 @@ function walk(root, keep) {
  * this same graph. ONE DERIVATION, READ TWICE.
  */
 function buildRefs() {
-    const all = walk(ENG, (e) => /\.(js|mjs|html)$/.test(e));
+    const all = walk(ENG, (e) => SOURCE_EXT.test(e));
     const text = new Map(all.map((f) => {
         try { return [f, fs.readFileSync(f, "utf8")]; } catch { return [f, ""]; }
     }));

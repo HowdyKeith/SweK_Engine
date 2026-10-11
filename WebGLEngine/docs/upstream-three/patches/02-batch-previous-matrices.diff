@@ -1,0 +1,92 @@
+diff --git a/src/nodes/accessors/Batch.js b/src/nodes/accessors/Batch.js
+index ab62e98..07803f3 100644
+--- a/src/nodes/accessors/Batch.js
++++ b/src/nodes/accessors/Batch.js
+@@ -1,12 +1,50 @@
+ 
+ import { normalLocal } from './Normal.js';
+-import { positionLocal } from './Position.js';
++import { positionLocal, positionPrevious } from './Position.js';
+ import { vec3, mat3, mat4, int, ivec2, float, Fn } from '../tsl/TSLBase.js';
+ import { textureLoad } from './TextureNode.js';
+ import { textureSize } from './TextureSizeNode.js';
+ import { tangentLocal } from './Tangent.js';
+ import { instanceIndex, drawIndex } from '../core/IndexNode.js';
+ import { varyingProperty } from '../core/PropertyNode.js';
++import { OnObjectUpdate } from '../utils/EventNode.js';
++import { DataTexture } from '../../textures/DataTexture.js';
++import { RGBAFormat, FloatType } from '../../constants.js';
++
++const _previousBatchMatrices = /*@__PURE__*/ new WeakMap();
++
++/**
++ * The batch's matrices as they were at its last draw, for motion vectors: a copy of its matrices
++ * texture, read by the same index. A batch that grows re-makes its matrices texture; the copy is
++ * then made again at the new size, the matrices of the last draw kept (the layout is linear, so
++ * they are its first entries).
++ *
++ * @private
++ * @param {BatchedMesh} batchMesh - The batched mesh.
++ * @return {{texture: DataTexture, last: Float32Array, source: DataTexture}}
++ */
++function getPreviousBatchMatrices( batchMesh ) {
++
++	const source = batchMesh._matricesTexture;
++	let data = _previousBatchMatrices.get( batchMesh );
++
++	if ( data === undefined || data.source !== source ) {
++
++		const last = new Float32Array( source.image.data );
++
++		if ( data !== undefined ) last.set( data.last.subarray( 0, Math.min( data.last.length, last.length ) ) );
++
++		const texture = new DataTexture( new Float32Array( last ), source.image.width, source.image.height, RGBAFormat, FloatType );
++		texture.needsUpdate = true;
++
++		data = { texture, last, source };
++		_previousBatchMatrices.set( batchMesh, data );
++
++	}
++
++	return data;
++
++}
+ 
+ /**
+  * TSL function that retrieves the batching color for a given instance ID from a colors texture.
+@@ -91,6 +129,35 @@ export const batch = /*@__PURE__*/ Fn( ( [ batchMesh ], builder ) => {
+ 
+ 	positionLocal.assign( batchingMatrix.mul( positionLocal ) );
+ 
++	if ( builder.needsPreviousData() ) {
++
++		// the instance's matrix at the last draw, from a copy of the matrices kept for it -- the last draw's are this draw's
++		// previous ones, and this draw's are kept for the next
++
++		const previous = getPreviousBatchMatrices( batchMesh );
++
++		OnObjectUpdate( ( { object } ) => {
++
++			const data = getPreviousBatchMatrices( object );
++
++			data.texture.image.data.set( data.last );
++			data.texture.needsUpdate = true;
++
++			data.last.set( object._matricesTexture.image.data );
++
++		} );
++
++		const previousBatchingMatrix = mat4(
++			textureLoad( previous.texture, ivec2( x, y ) ),
++			textureLoad( previous.texture, ivec2( x.add( 1 ), y ) ),
++			textureLoad( previous.texture, ivec2( x.add( 2 ), y ) ),
++			textureLoad( previous.texture, ivec2( x.add( 3 ), y ) )
++		);
++
++		positionPrevious.assign( previousBatchingMatrix.mul( positionPrevious ).xyz );
++
++	}
++
+ 	const transformedNormal = normalLocal.div( vec3( bm[ 0 ].dot( bm[ 0 ] ), bm[ 1 ].dot( bm[ 1 ] ), bm[ 2 ].dot( bm[ 2 ] ) ) );
+ 
+ 	const batchingNormal = bm.mul( transformedNormal ).xyz;

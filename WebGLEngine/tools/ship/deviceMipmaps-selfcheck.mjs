@@ -104,8 +104,14 @@ console.log("\n1. THE CHAIN IS A WORD ON THE DESCRIPTOR, THE LEVEL COUNT IS THE 
     ok("  and refuses rgba16float chains without EXT_color_buffer_float, by name", /EXT_color_buffer_float/.test(dev));
     ok("*** the WebGPU backend allocates every level and builds the chain with a blit pass per level on one submit ***", /mipLevelCount: levels/.test(dev) && /baseMipLevel: i - 1, mipLevelCount: 1/.test(dev) && /baseMipLevel: i, mipLevelCount: 1/.test(dev) && /rp\.draw\(3\); rp\.end\(\);/.test(dev));
     ok("  the blit samples with a linear CLAMPED sampler (the box filter at an even level's texel centre)", /mipSampler = gpu\.createSampler\(\{ magFilter: "linear", minFilter: "linear", addressModeU: "clamp-to-edge"/.test(dev));
-    ok("  and a chained texture's draw sampler filters between levels", /mipmapFilter: nearest \? "nearest" : "linear"/.test(dev) && /samplerFor\(!!nearest, mips\)/.test(dev));
-    ok("  the chain is rebuilt on update() on both backends", /if \(mipmaps\) buildMips\(t, format, levels\);/.test(dev) && /upload\(t, \{ flipY: d\.flipY, width: w, height: h, \.\.\.nd \}, d\.nearest, format, mipmaps\)/.test(dev));
+    // v4543 -- these two READ gfx/device.js's SOURCE, so they break on any rewrite of the lines they quote rather
+    // than on any change of behaviour: adding a wrap argument to samplerFor and a wrap field to update()'s upload
+    // turned both red while the mip chain went on working exactly as the behavioural rows above measure it. They are
+    // kept -- the wiring they prove is real and nothing else states it -- but matched on the STRUCTURE (the call
+    // takes nearest and mips; the update re-uploads with the same flags and rebuilds) rather than on an argument
+    // list that any later argument will break again.
+    ok("  and a chained texture's draw sampler filters between levels", /mipmapFilter: nearest \? "nearest" : "linear"/.test(dev) && /samplerFor\(!!nearest, mips[,)]/.test(dev));
+    ok("  the chain is rebuilt on update() on both backends", /if \(mipmaps\) buildMips\(t, format, levels\);/.test(dev) && /upload\(t, \{ flipY: d\.flipY,[^}]*width: w, height: h, \.\.\.nd \}, d\.nearest, format, mipmaps\)/.test(dev));
     // The CPU key, controlled before it grades anything.
     const ch = cpuChain(pattern(0), N, N);
     ok("CONTROL: the CPU chain of a 32x32 pattern has 6 levels ending at 1x1", ch.length === 6 && ch[5].w === 1 && ch[5].h === 1);

@@ -220,6 +220,7 @@ window.__esTacticsOutcome = (samples) => {
 import { buildUniverse, resolveLoadout, listGrudges, GRUDGE_TTL_MS, grudgeBlocs, readDesc, parseChar, CHAR } from "./ev/evData.js";
 import { ControlBits } from "./ev/controlbits.js";
 import { runEvChecks } from "./ev/evChecks.mjs";
+import { askBrain } from "./ui/brainAsk.mjs";   // v4831 -- the ship's computer's streamed ask; static, so the module census sees its one consumer
 import { voxelizeBall, exportVoxFromKinds } from "./tools/voxExporter.js";
 import { GalaxyMap } from "./ev/galaxyMap.js";
 import { SystemView } from "./ev/systemView.js";
@@ -1556,16 +1557,31 @@ async function indexCorpus() {
   $("indexStat").textContent = "indexed " + added + " passages";
   toast("Ship's computer indexed " + added + " passages");
 }
+// v4831 -- THE SHIP'S COMPUTER ASKS IN TWO STAGES THE PAGE CAN SEE, AND GETS A PRESENCE. ui/brainAsk.mjs streams
+// POST /ai/brain/ask (retrieve, then generate) and dispatches one engine:brainStage per stage; the presence orb is
+// mounted on the FIRST question rather than with the page, so a pilot who never asks pays nothing for its canvas.
+// It lights `searching` while the passages are pulled and `weaving` while the answer is composed from them, then
+// settles the way a voice reply does. The status line says which stage it is in for a pilot without the orb.
+let _orbMounting = null;
+function ensureComputerOrb() {
+  if (!_orbMounting) _orbMounting = import("./ui/aiPresenceOrbWidget.js")
+    .then((m) => m.mountAiPresenceOrbWidget())
+    .catch((e) => { console.warn("[ev] presence orb not mounted:", e && e.message); return null; });
+  return _orbMounting;
+}
 async function askComputer() {
   const q = ($("askInput").value || "").trim(); if (!q) return;
   const out = $("askAnswer"); out.innerHTML = '<span style="color:var(--dim)">thinking\u2026</span>';
-  try {
-    const r = await fetch("/ai/brain/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: q, k: 4 }) }).then((x) => x.json());
-    if (!r.ok) { out.textContent = "computer offline"; return; }
-    let html = r.answer ? `<div style="margin-bottom:6px">${escapeHtml(r.answer)}</div>` : '<div style="color:var(--warn);margin-bottom:6px">No LLM reached &mdash; here\'s what I found:</div>';
-    if (r.sources && r.sources.length) html += '<div style="color:var(--dim);font-size:10px">sources: ' + r.sources.map((s) => escapeHtml(String(s.id || "").replace(/^(planet|mission):/, ""))).join(", ") + '</div>';
-    out.innerHTML = html || '<span style="color:var(--dim)">nothing on record</span>';
-  } catch (e) { out.textContent = "couldn't reach the computer (need the :8787 server)"; }
+  ensureComputerOrb();
+  const r = await askBrain(q, { k: 4, dispatch: (d) => {
+    try { window.dispatchEvent(new CustomEvent("engine:brainStage", { detail: d })); } catch (e) {}
+    if (d.stage === "search-start") out.innerHTML = '<span style="color:var(--dim)">searching the record\u2026</span>';
+    else if (d.stage === "weave-start") out.innerHTML = '<span style="color:var(--dim)">composing from ' + (d.sources | 0) + ' source' + ((d.sources | 0) === 1 ? '' : 's') + '\u2026</span>';
+  } });
+  if (!r || !r.ok) { out.textContent = r && /unreachable/.test(r.why || "") ? "couldn't reach the computer (need the :8787 server)" : "computer offline"; return; }
+  let html = r.answer ? `<div style="margin-bottom:6px">${escapeHtml(r.answer)}</div>` : '<div style="color:var(--warn);margin-bottom:6px">No LLM reached &mdash; here\'s what I found:</div>';
+  if (r.sources && r.sources.length) html += '<div style="color:var(--dim);font-size:10px">sources: ' + r.sources.map((s) => escapeHtml(String(s.id || "").replace(/^(planet|mission):/, ""))).join(", ") + '</div>';
+  out.innerHTML = html || '<span style="color:var(--dim)">nothing on record</span>';
 }
 $("indexBtn").onclick = indexCorpus;
 $("askBtn").onclick = askComputer;

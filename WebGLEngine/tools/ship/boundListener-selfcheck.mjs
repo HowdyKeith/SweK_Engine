@@ -223,8 +223,10 @@ console.log("\n6b. whenDetached: the shape kaggleLab hand-rolled");
 // ---- 7. IN A REAL BROWSER ----------------------------------------------------------------------------------
 console.log("\n7. *** THE MEASUREMENT THAT MATTERS, IN A REAL DOM ***");
 {
-    const { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } = await import("./playwrightResolve.mjs");
-    const skip = browserSkipReason(require);
+    const { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } = await import("./playwrightResolve.mjs");
+    // v4778 rig: this handed browserSkipReason the require function -- where the CHROMIUM object goes, which is truthy, so it
+    // never refused and the next line launched null. The two facts are resolved and handed over as the function takes them.
+    const PW = resolvePlaywright(require), skip = browserSkipReason(PW.chromium, PW.from, HEADLESS_SHELL);
     if (skip) {
         console.log("  ----  SKIPPED, WITH A REASON: " + skip);
         console.log("        Sections 1-6 drive the same code with a fake target, so the LOGIC is gated either");
@@ -232,7 +234,7 @@ console.log("\n7. *** THE MEASUREMENT THAT MATTERS, IN A REAL DOM ***");
         console.log("        removal -- which is the half that would rot silently.");
     } else {
         const { chromium } = resolvePlaywright(require);
-        const browser = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const browser = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
         try {
             const page = await browser.newPage();
             const mod = fs.readFileSync(path.join(ROOT, "ui", "boundListener.mjs"), "utf8");

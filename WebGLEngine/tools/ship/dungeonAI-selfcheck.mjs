@@ -22,6 +22,9 @@
 "use strict";
 import { makeDungeonAI } from "../../simulation/DungeonAI.js";
 import { evaluateGuards } from "../../ui/guards.mjs";
+import { audit } from "../../ui/machine.mjs";
+import { AGGRO_MACHINE } from "../../simulation/DungeonAI.js";
+import fs from "node:fs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -190,6 +193,28 @@ console.log("\n5. THE AGGRO PRE-FILTER -- deliberately OUTSIDE DUNGEON_GUARDS, h
         "the hysteresis gap (10 to 18) is itself the point -- a monster does not re-sleep the instant it steps outside the wake radius");
 }
 
+console.log("\n5b. *** v4824 -- THE SAME GATE, NOW A DECLARED MACHINE: every write of m.aggroed goes through AGGRO_MACHINE ***");
+{
+    // SABOTAGED, each restored: provoke made to toggle (awake -> asleep) -> RED, row 3; the update() gate's "lose"
+    // swapped for null -> RED, section 5's last row and this section's last (it never sleeps); a bare `m.aggroed = false;` put back at the
+    // wall-follower's give-up -> RED, row 2 (the source census counts it).
+    const a = audit(AGGRO_MACHINE);
+    ok("!! AGGRO_MACHINE audits clean: both states reachable from asleep, neither a dead end",
+        a.ok && a.reachable.join() === "asleep,awake", JSON.stringify({ reachable: a.reachable, dead: a.dead }));
+    const src = fs.readFileSync(new URL("../../simulation/DungeonAI.js", import.meta.url), "utf8")
+        .split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n");
+    const writes = (src.match(/\baggroed\s*=(?!=)/g) || []).length;
+    ok("!! m.aggroed is written in exactly two places: the machine's own write-back, and add()'s initial false",
+        writes === 1 && /aggroed: false/.test(src), writes + " assignment(s) outside comments, plus the object-literal initial state");
+    const { ai, setPlayer } = harness();
+    ai.add("w", 100, 0, "brute"); const m = ai.monsters.get("w");
+    ai.aggro("w"); const first = m.aggroed; ai.aggro("w");
+    ok("!! a second force-wake on an AWAKE monster leaves it awake, as `m.aggroed = true` did -- provoke is not a toggle",
+        first === true && m.aggroed === true);
+    setPlayer(100, 30); ai.update(1 / 60);
+    ok("  ...and the shot-awake monster still sleeps past aggro*1.8 like any other", m.aggroed === false);
+}
+
 console.log("\n6. getHP IS READ ONLY WHERE THE ORIGINAL READ IT -- ctx.hpf's precompute is conditional, not unconditional");
 {
     const { ai, calls, setPlayer } = harness({ hp: { arch1: 0.9 } });
@@ -219,7 +244,6 @@ console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nunchecked here: wall collision and the wall-follower fallback inside _actFlee/_actChase (tools/ship/" +
     "dungeonWalls-selfcheck.mjs owns that, re-ran clean against this migration); the GPU-brain hook amendments' " +
     "OWN correctness (PATCH-B16/B17/B18/B22 -- these tests exercise the no-brain path only, the same way " +
-    "dungeonWalls-selfcheck.mjs's section 7 does, since node has no window); and the aggro pre-filter's own " +
-    "asleep/awake shape as a potential ui/machine.mjs FSM candidate, flagged but not acted on in this round's " +
-    "tools/ship/nextRounds.mjs writeup.");
+    "dungeonWalls-selfcheck.mjs's section 7 does, since node has no window). The aggro pre-filter flagged here " +
+    "at v4609 is migrated onto ui/machine.mjs at v4824 -- section 5b.");
 process.exit(fails ? 1 : 0);

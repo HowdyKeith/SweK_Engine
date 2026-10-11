@@ -8,6 +8,11 @@ import * as A from "/render/atmosphere.mjs";
 
 const P = A.EARTH;
 const gl = document.getElementById("c").getContext("webgl2", { antialias: false });
+// v4681 -- WHY a compile or link failed, not just its info log: the rig's v4680 run threw "Error: null" from
+// here, and WebGL returns null for an info log when the CONTEXT IS LOST. A lost context and a rejected shader
+// are different findings, so the message says which, and names the renderer read at load.
+const REN = (() => { try { const x = gl.getExtension("WEBGL_debug_renderer_info"); return String(x ? gl.getParameter(x.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)); } catch { return "unknown"; } })();
+const glWhy = (stage, log) => gl.isContextLost() ? `WEBGL CONTEXT LOST at ${stage} (renderer ${REN})` : `${stage} failed on ${REN}: ${log}`;
 const floatOK = !!gl.getExtension("EXT_color_buffer_float");
 gl.getExtension("OES_texture_float_linear");
 
@@ -23,11 +28,11 @@ function compile(fs) {
     for (const [type, src] of [[gl.VERTEX_SHADER, VERT], [gl.FRAGMENT_SHADER, fs]]) {
         const s = gl.createShader(type);
         gl.shaderSource(s, src); gl.compileShader(s);
-        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(glWhy("compile", gl.getShaderInfoLog(s)));
         gl.attachShader(p, s);
     }
     gl.linkProgram(p);
-    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(glWhy("link", gl.getProgramInfoLog(p)));
     return p;
 }
 

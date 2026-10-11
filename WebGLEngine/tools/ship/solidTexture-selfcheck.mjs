@@ -24,7 +24,7 @@ import path from "node:path";
 import http from "node:http";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import * as csg from "../../physics/mesh/meshCSG.mjs";
 import * as st from "../../render/solidTexture.mjs";
 import { snoise3 } from "../../shaders/ashimaNoise.mjs";
@@ -219,13 +219,38 @@ if (skip) {
     });
     await new Promise((r) => srv.listen(0, "127.0.0.1", r));
     const port = srv.address().port;
-    const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+    const GL = webglLaunchArgs();   // v4683: one place, and the rig can measure alternatives
+    console.log(`  ----  headless shell launched with [${GL.args.join(" ")}]${GL.overridden ? " (SWEK_GL_ARGS override)" : ""}`);
+    const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: GL.args });
     const pg = await b.newPage();
     const errs = [];
     pg.on("pageerror", (e) => errs.push(String(e).slice(0, 300)));
     await pg.goto("http://127.0.0.1:" + port + "/tools/ship/solidTextureHarness.html", { waitUntil: "load", timeout: 45000 });
     await pg.waitForFunction(() => window.__ready === true, { timeout: 30000 }).catch(() => {});
     const origin = [-1.5, -1.0, 0.25], du = [3.0, 0, 0], dv = [0, 2.0, 0];
+    // *** v4649 -- THE READBACK, ASKED FIRST. *** Keith's box reports 0 of 9216 points agreeing with either
+    // mirror here and a worst pixel gap of 173 of 255. Rounding does not do that; a readback that is not the
+    // bytes the shader wrote does. The probe below writes a pure function of the pixel address -- no noise,
+    // no float -- so every row after it is only worth reading if this one holds. Same probe as
+    // noisePrecision-selfcheck, same harness, one mode.
+    const probe = await pg.evaluate(() => window.__render([0, 0, 0], [1, 0, 0], [0, 1, 0], false, false, true), []);
+    {
+        let bad = 0, firstBad = null;
+        const n = probe.n;
+        for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+            const i = (y * n + x) * 4;
+            if (probe.px[i] !== x || probe.px[i + 1] !== y || probe.px[i + 2] !== 128) {
+                bad++;
+                if (!firstBad) firstBad = `(${x},${y}) read [${probe.px[i]},${probe.px[i + 1]},${probe.px[i + 2]}]`;
+            }
+        }
+        ok("!! *** the readback returns the exact bytes the shader wrote -- BEFORE any pixel is compared ***",
+            bad === 0,
+            bad === 0 ? `${n * n} pixels, byte for byte, with no noise in the path` :
+            `${bad} of ${n * n} pixels came back changed; first ${firstBad}. Every comparison below reads ` +
+            "these same bytes, so a colour-managed or dithered readback makes all of them disagree at once" +
+            ` [context ${probe.lost ? "LOST" : "live"}, glGetError ${probe.glErr}, renderer ${probe.renderer}]`);
+    }
     const got = await pg.evaluate(([o, u, v]) => window.__render(o, u, v, false, false), [origin, du, dv]);
     const raw = await pg.evaluate(([o, u, v]) => window.__render(o, u, v, false, true), [origin, du, dv]);
     const fsSrc = await pg.evaluate(() => window.__fs || "");

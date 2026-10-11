@@ -79,7 +79,17 @@ const SHELL_RE = new RegExp(EXECS + "\\(\\s*[\"'`]\\s*(" + POSIX_TOOLS.join("|")
 const SPEC_RE = new RegExp("import[^\"'`\\n]{0,40}from\\s*\"\\s*\\+\\s*JSON\\.stringify\\(\\s*path\\.");
 const GIT_RE = new RegExp(EXECS + "\\(\\s*[\"'`]git[\"'`]");
 const REL_RE = /path\.relative\(/g;
-const NORM_RE = new RegExp("toPosix|replace\\(/\\\\\\\\/g");
+// v4680 -- AND `split(path.sep).join("/")`, which normalises exactly as toPosix does and which this rule could
+// not see. The census moved 154 -> 159 callers with `normalised` flat at 54, which reads as five new
+// raw-separator sites; three of the arrivals are this line's own (exitBusy, deadlineLeak, declaredCost's gate)
+// and all three normalise, in this spelling. Recognising it moves `normalised` 54 -> 106 on the same 159
+// callers: fifty-two files move from `never` to `normalised`. *** CORRECTED AT v4681: I WROTE THAT ALL
+// FIFTY-TWO WERE "DOING IT CORRECTLY", AND AT LEAST TWO WERE NOT. *** The rule is FILE-level -- a file that
+// normalises ONE path counts as normalised -- and the rig's v4680 verify then found live separator bugs in two
+// files this idiom had just moved: glbTexture-selfcheck (an endsWith("/tools/...") exclusion) and
+// tools/ship/probe/record.mjs (startsWith("/")). What moved is the proxy's reading, not a count of correct files.
+// The census stays REPORTED, not asserted, for exactly this reason.
+const NORM_RE = new RegExp("toPosix|replace\\(/\\\\\\\\/g|split\\(path\\.sep\\)\\.join\\([\"'`]/[\"'`]\\)");
 
 /** Comment lines carry prose about these patterns; the code is what runs. */
 const codeOf = (src) => src.split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n");
@@ -129,6 +139,59 @@ export function scan({ files = null, read = (f) => fs.readFileSync(f, "utf8"), s
 }
 
 /** What the rig measured, kept verbatim, because a repair is only checkable against the failure it repairs. */
+/**
+ * *** v4647 -- THE raw-separator CLASS HAS A SHAPE THIS MODULE'S DETECTOR CANNOT SEE, AND A SECOND BOX FOUND
+ * BOTH LIVE INSTANCES WHILE THE SCAN REPORTED NOTHING. ***
+ *
+ * CLASSES already names it: "a path built by path.join or path.relative is compared against, or recorded
+ * beside, a stored '/' form -- true on the box it was written on and false on Windows". The DETECTOR counts
+ * files that call path.relative and asks whether the file mentions a normaliser ANYWHERE, which is a
+ * file-level proxy and is reported rather than asserted, deliberately, per the header.
+ *
+ * Keith's gen-9 run turned up two, in OPPOSITE directions:
+ *
+ *   gateSweep-selfcheck   the PRODUCER normalises (enumerateGates pushes toPosix) and the expectation was
+ *                         built with path.join. Cross-FILE: nothing in the gate's own text is wrong.
+ *   meshLine-selfcheck    the EXPECTATION is a posix literal table in the same file and the scan used a bare
+ *                         path.relative. Cross-FUNCTION, one file.
+ *
+ * *** A NARROW RULE WAS TRIED AND FALSIFIED RATHER THAN SHIPPED. *** The obvious detector is "a file that
+ * uses toPosix AND still builds an expectation with path.join" -- mixed spelling within one file. Measured
+ * against the ten known sites: NEITHER DEFECT USED toPosix BEFORE ITS FIX, so the rule separates nothing. It
+ * would have found 0 of 2 and is not in this file.
+ *
+ * WHAT THE CENSUS ACTUALLY SAYS, read producer by producer rather than by regex:
+ *   10 comparison sites in the gates spell an expectation with path.join
+ *    8 are CORRECT -- their producer is path.relative, also native, so both sides move together. A
+ *      find-and-replace to posix literals would have broken every one of them.
+ *    2 were defective, both found by running on Windows and neither by any static rule here.
+ *
+ * So the instrument for this class is A SECOND BOX, and that is the finding rather than a gap to be closed
+ * with a better regex. What a reader should take from it: path.join in a comparison is not a defect. A
+ * MISMATCH between the two sides is, and only the producer says which you have.
+ */
+export const SEPARATOR_SITES_AT_V4647 = Object.freeze({
+    at: "v4647", found: 10, correct: 8, defective: 2,
+    // v4824 -- sites ADDED since, each correct for the reason the header gives (both sides from the same native producer), named
+    // with that producer rather than folded into the v4647 figures, which stay what was found then.
+    addedCorrect: Object.freeze([
+        Object.freeze({ at: "v4824", gate: "tools/ship/releaseWorkflow-selfcheck.mjs",
+            why: "expects path.join(parent, name + \"_release\") inside outDirRefusal's message, which builds it with the same path.join" }),
+    ]),
+    defects: Object.freeze([
+        Object.freeze({ gate: "tools/ship/gateSweep-selfcheck.mjs", where: "cross-file",
+            saw: 'produced "real/z-selfcheck.mjs", expected path.join -> "real\\z-selfcheck.mjs" on win32' }),
+        Object.freeze({ gate: "tools/ship/meshLine-selfcheck.mjs", where: "cross-function",
+            saw: "NAMED keys are posix, the scan was a bare path.relative; five files in the table read as unexpected" }),
+    ]),
+    ruleTriedAndFalsified: "a file that uses toPosix AND builds an expectation with path.join -- 0 of 2, " +
+                           "because neither defect's file mentioned toPosix at all before its repair",
+    instrument: "a run on a Windows box; no static rule in this module found either",
+    // The census counts an INLINE comparison. Hoisting the expectation into a const hides it -- measured by
+    // sabotage, not assumed: reverting one repair's VALUE went 0 red and reverting its SHAPE went 3 red.
+    censusSeesShapeNotProperty: "`x === path.join(...)` is counted; `const E = path.join(...); x === E` is not",
+});
+
 export const POSIX_AT_V4485 = Object.freeze({
     at: "v4485",
     rig: "Windows, node v24.17.0, the v4477 archive unzipped at C:/Intel/SweK_Engine_v4477",
@@ -143,8 +206,8 @@ export const POSIX_AT_V4485 = Object.freeze({
             saw: "fatal: ambiguous argument 'HEAD~1': unknown revision" }),
     ]),
     // The separator population under ONE stated rule, so a later reading is comparable to this one.
-    separatorRule: "a file calling path.relative, against whether the file mentions toPosix or a backslash " +
-                   "replace anywhere in its code",
+    separatorRule: "a file calling path.relative, against whether the file mentions toPosix, a backslash " +
+                   "replace, or split(path.sep).join('/') anywhere in its code (the third idiom added at v4680)",
     // *** v4534 -- RE-TAKEN. *** The row above allows the callers count to move by 4 "within what the round
     // itself moved", and several rounds moved it: 128 -> 133, five arrivals, one past the band. The record was
     // taken at v4487 and the WGSL and racing arcs have landed since. Re-taken under the SAME rule stated two
@@ -162,7 +225,48 @@ export const POSIX_AT_V4485 = Object.freeze({
     // cannot inflate their own census, and that reads 138/188/41/97. A record taken under a different rule
     // from the one that checks it is a number nobody can re-derive -- which is the whole subject of
     // separatorRule beside it.
-    separator: Object.freeze({ callers: 138, calls: 188, normalised: 41, never: 97 }),
+    // v4637 -- RE-TAKEN AT THE main MERGE, under the SAME skip rule the gate compares against (this module and
+    // its own gate excluded, or the census inflates itself): 138/188/41/97 becomes 146/197/43/103. The merge
+    // brought 8 more callers and 9 more calls; 2 of the arrivals normalise and 6 do not. NOTHING WAS
+    // UN-NORMALISED -- normalised rose 41 -> 43 and never rose 97 -> 103, both monotonic, which is the half of
+    // the assertion that distinguishes a population growing from a repair coming undone. A fall in `normalised`
+    // would have meant somebody removed a toPosix() and that is the case this record exists to catch.
+    // v4649 -- RE-TAKEN, under the same skip rule again: 146/197/43/103 becomes 154/207/54/100. This round
+    // added eight callers and ten calls, and REPAIRED three: `never` FELL 103 -> 100 while `normalised`
+    // rose 43 -> 54, which is the direction this record exists to confirm. The three are reachedLicences
+    // (a walk whose allowance was keyed on forward slashes and matched nothing on Windows), the xbar
+    // plugin generator (path.join put backslashes inside a file:// URL destined for macOS), and
+    // fixtureLitter's own reclaim. The tolerance the gate compares by is +/- 4 callers; this round moved
+    // eight, which is why it went red rather than because anything was undone -- and re-taking rather
+    // than widening that tolerance is the point, since the tolerance is what catches a silent drift.
+    // v4680 -- RE-TAKEN UNDER A CHANGED RULE, which is why separatorRule above changed with it: 154/207/54/100
+    // becomes 159/216/106/53. The callers grew by five and the rule grew by one idiom, in one step, and the two
+    // are separable: under the OLD rule the same tree reads 159/216/54/105, so the population moved +5/+9 with
+    // nothing un-normalised, and the rule change alone moved 52 files from `never` to `normalised`.
+    // v4764 -- RE-TAKEN, under the SAME skip rule: 146/197/43/103 becomes 151/205/44/107. Five callers arrived since the
+    // merge -- among render/shaderRound-selfcheck.mjs, render/temporalLockGPU-selfcheck.mjs, tools/ship/constantRows.mjs,
+    // tools/ship/probe/hooks.mjs and tools/ship/runnerCallers.mjs, which reached 150, the band's edge, without a re-take -- and
+    // v4764's tools/ship/webgpuHarness.mjs, whose adapter log records a gate by its path relative to the engine root and
+    // normalises it (replace backslashes), took it past. NORMALISED ROSE 43 -> 44, that one; nothing was un-normalised.
+    // AT THE MERGE of the two re-takes above -- both taken from the same 146/197/43/103, so neither number is
+    // this tree's, and neither is "more right": each counted its own branch's arrivals. RE-TAKEN on the merged
+    // tree under v4680's rule and the gate's skip list: 166/227/113/53. Separable as before -- under the pre-v4680
+    // rule it reads 166/227/56/110, so v4764's webgpuHarness (normalising) and this side's five sit together and
+    // the idiom still accounts for 57 of `normalised`. Taken with every conflicted file keeping BOTH sides
+    // (temporalResolve-selfcheck, quickSweep, sweepCoverage-selfcheck from main; webgpuHarness from the other
+    // arc); a resolution that drops one of them moves this by one caller, and that is a re-take, not a widening.
+    // v4778 -- 166/227/113/53 -> 171/236/115/56 at the rtx merge, under the same rule and skip list, measured
+    // on the merged tree and on main just before it (888f776d^1) and the two diffed file by file. Main alone
+    // had already moved to 166/226/114/52: tools/ship/runnerCallers.mjs went from two raw calls to one
+    // normalising call in v4776's post-merge pass, a repair. The rtx line brought five callers and ten calls --
+    // tools/bakeConnectomeTopology.mjs (normalises), tools/bakeGfcTopology.mjs, tools/bakeGunnerTrace.mjs,
+    // tools/maleCnsBake.mjs and tools/mesh/mikktRef.mjs (do not). NOTHING WAS UN-NORMALISED; the five are one
+    // past the band's +/- 4, which is why this is a re-take and not a tolerance.
+    // v4826 -- 171/236/115/56 -> 176/245/120/56, under the same rule and skip list, taken with the gate's own scan. Measured on the committed tree just before this round's
+    // files (a worktree of HEAD): 175/244/120/55 -- the lockstep round and main's v4823-v4825 had already moved it +4/+8/+5/-1, inside the band's +/- 4. THIS round's
+    // part is one caller, one call and one `never`: tools/ship/flakeProbe.mjs builds the engine's own paths with path.join and never compares or records one with a
+    // separator in it. NOTHING WAS UN-NORMALISED. 176 is one past the band, which is why this is a re-take and not a tolerance.
+    separator: Object.freeze({ callers: 176, calls: 245, normalised: 120, never: 56 }),
     rulesTried: Object.freeze([53, 74, 90]),
     notClaimed: "that the 90 are defects. A relative path that is only printed is portable already; the ones " +
                 "that bite are compared against a stored form, and three static rules for 'compared against' " +

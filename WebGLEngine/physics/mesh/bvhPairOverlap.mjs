@@ -42,6 +42,9 @@
 // mesh's triangle buffer into the other's frame before building its MeshBVH.
 "use strict";
 
+// Only reportLines() builds a tree -- pairOverlap() itself takes two a caller already built.
+import { MeshBVH } from "../../mesh/meshBVH.mjs";
+
 function triBounds(tris, t, out) {
     const o = t * 9;
     let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
@@ -122,4 +125,41 @@ export function pairOverlap(bvhA, bvhB) {
         }
     }
     return pairs;
+}
+
+// ---- THE FRONT DOOR (v4778) ---------------------------------------------------------------------------------
+//
+// The v3327 split, grown at the rtx merge so instrument-bench.html can serve this module (physicsReach counted
+// it among six BVH-CSG modules with no door at all). The bench calls reportLines() with NO argument, so the
+// no-argument case IS a measurement: the gate's own three cube fixtures -- two unit cubes overlapping by half
+// a unit on every axis, two sharing the exact face x=1, and two a hundred units apart -- each walked by
+// pairOverlap() and by the plain all-pairs loop over the same per-triangle box test, so the page shows both
+// counts and how many of the 144 possible pairs the walk returned. A REPORT, NOT A VERDICT --
+// bvhPairOverlap-selfcheck.mjs is what exits nonzero, and it grades against a brute force of its own.
+export function reportLines() {
+    const cube = (ox, oy, oz) => {
+        const V = [[0,0,0],[1,0,0],[1,1,0],[0,1,0],[0,0,1],[1,0,1],[1,1,1],[0,1,1]].map(([x, y, z]) => [x + ox, y + oy, z + oz]);
+        const F = [[0,1,2],[0,2,3],[4,6,5],[4,7,6],[0,4,5],[0,5,1],[1,5,6],[1,6,2],[2,6,7],[2,7,3],[3,7,4],[3,4,0]];
+        return new Float64Array(F.flatMap((f) => f.flatMap((v) => V[v])));
+    };
+    const allPairs = (a, b) => {
+        const ba = new Float64Array(6), bb = new Float64Array(6);
+        let n = 0;
+        for (let i = 0; i < a.count; i++) {
+            triBounds(a.tris, i, ba);
+            for (let j = 0; j < b.count; j++) { triBounds(b.tris, j, bb); if (boxesOverlap(ba, bb)) n++; }
+        }
+        return n;
+    };
+    const out = ["[bvhPairOverlap] the dual-tree broad phase: which triangle pairs CAN intersect",
+                 "  subject  pairs of 12-triangle unit cubes, 144 possible pairs each; touching counts as overlapping"];
+    for (const [label, off] of [["overlapping by 0.5 on every axis", [0.5, 0.5, 0.5]],
+                                ["sharing the face x = 1", [1, 0, 0]],
+                                ["100 apart on every axis", [100, 100, 100]]]) {
+        const a = new MeshBVH(cube(0, 0, 0)), b = new MeshBVH(cube(...off));
+        out.push("    " + label.padEnd(36) + "walk " + String(pairOverlap(a, b).length).padStart(3) +
+                 "   all-pairs " + String(allPairs(a, b)).padStart(3));
+    }
+    out.push("  BROAD PHASE ONLY: a pair here means two boxes touch, not two triangles -- triTriIntersect.mjs decides that");
+    return out;
 }

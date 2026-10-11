@@ -51,12 +51,20 @@ export function fillKey(coverage, colour, fill) { return [colour[0] * fill[0] * 
 /**
  * The flat rasteriser model the Slug gates share (v4501, lifted from the fill gate's body so the melt gate can use it): a glyph's
  * quad placed orthographically at `origin` (baseline pixel, y down) at `size` px an em, its corners dilated half a pixel per axis
- * and snapped to 1/16 px, texcoords affine per triangle. Returns texAt(x, y) -> { tx, ty, fw } for a pixel centre inside the quad,
+ * and snapped to 1/`subpixel` px (default 16), texcoords affine per triangle. Returns texAt(x, y) -> { tx, ty, fw } for a pixel centre inside the quad,
  * null outside. fw is the 2 x 2 quad's |d/dx| + |d/dy| per axis, what the fragment's fwidth reads.
  */
-export function flatModel(bbox, size, origin) {
-    const s = size, [ox, oy] = origin, bb = bbox;
-    const C = [[bb.x0, bb.y0, -1, -1], [bb.x1, bb.y0, 1, -1], [bb.x1, bb.y1, 1, 1], [bb.x0, bb.y1, -1, 1]].map(([ex, ey, nx, ny]) => ({ sx: Math.round((ox + ex * s + 0.5 * nx) * 16) / 16, sy: Math.round((oy - (ey * s + 0.5 * ny)) * 16) / 16, tx: ex + 0.5 * nx / s, ty: ey + 0.5 * ny / s }));
+/*
+ * *** v4686 -- THE SNAP IS THE DEVICE'S, SO IT IS A PARAMETER. *** `subpixel` is the vertex snap grid per pixel. 16 (4 bits) is
+ * SwiftShader's and was hard-coded here; D3D11/D3D12 require 8 bits (256), which is what the rig's NVIDIA Pascal uses under both
+ * ANGLE-d3d11 WebGL2 and Dawn-D3D12 WebGPU -- and a 1/16 model graded against a 1/256 frame is off by up to 16 of 255 on edge
+ * pixels (116 of them, the rig's exact numbers, reproduced here by snapping at 1/256). SUBPIXEL_GRIDS is the set a conformant
+ * rasteriser may use in this tree's reach; gates grade against each and NAME the one the device fits.
+ */
+export const SUBPIXEL_GRIDS = Object.freeze([16, 256]);
+export function flatModel(bbox, size, origin, subpixel = 16) {
+    const s = size, [ox, oy] = origin, bb = bbox, q = subpixel;
+    const C = [[bb.x0, bb.y0, -1, -1], [bb.x1, bb.y0, 1, -1], [bb.x1, bb.y1, 1, 1], [bb.x0, bb.y1, -1, 1]].map(([ex, ey, nx, ny]) => ({ sx: Math.round((ox + ex * s + 0.5 * nx) * q) / q, sy: Math.round((oy - (ey * s + 0.5 * ny)) * q) / q, tx: ex + 0.5 * nx / s, ty: ey + 0.5 * ny / s }));
     return (x, y) => {
         for (const [a1, b1, c1] of [[0, 2, 3], [0, 1, 2]]) {
             const A = C[a1], B = C[b1], K = C[c1];
@@ -78,13 +86,17 @@ export function flatModel(bbox, size, origin) {
  */
 export function gradeFilled(pixels, W, H, texAt, coverageAt, fire, rect, colour, tol = 2) {
     let exact = 0, boundary = 0, unexplained = 0, worst = 0, lit = 0, tinted = 0;
+    // v4649 -- WHERE the worst pixel is. A single number cannot tell an anti-aliasing rule from a
+    // rasterisation difference, and a gate on another box has nothing else to send back.
+    let at = null;
     for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
         const t = texAt(i + 0.5, j + 0.5), o4 = (j * W + i) * 4;
         const cov = t ? coverageAt(t.tx, t.ty, t.fw) : 0;
         const fill = t ? sampleFill(fire.rgba, fire.w, fire.h, t.tx, t.ty, rect) : [0, 0, 0, 1], key = fillKey(cov, colour, fill);
         let d = 0; for (let c = 0; c < 3; c++) d = Math.max(d, Math.abs(pixels[o4 + c] - Math.round(key[c] * 255)));
         if (cov > 0.02) { lit++; if (pixels[o4] !== pixels[o4 + 2]) tinted++; }
-        if (d === 0) exact++; if (d > worst) worst = d;
+        if (d === 0) exact++;
+        if (d > worst) { worst = d; at = { i, j, cov, want: Math.round(key[0] * 255), got: pixels[o4] }; }
         if (d > tol) {
             const [u, v] = fillUv(t.tx, t.ty, rect), [x0, y0] = nearestTexel(u, v, fire.w, fire.h); let matched = false;
             for (const [ddx, ddy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
@@ -96,5 +108,5 @@ export function gradeFilled(pixels, W, H, texAt, coverageAt, fire, rect, colour,
             if (matched) boundary++; else unexplained++;
         }
     }
-    return { exact, boundary, unexplained, worst, lit, tinted };
+    return { exact, boundary, unexplained, worst, lit, tinted, at };
 }

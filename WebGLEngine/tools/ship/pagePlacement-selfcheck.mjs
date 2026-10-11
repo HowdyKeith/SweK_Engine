@@ -7,9 +7,26 @@
 // The first run proposed 21 pages for Box3D on the evidence of a typographic separator. The second, after the
 // entities were stripped, filed box3d-blobs.html under Sampling & Methods because a raw count rewards a word for
 // being COMMON. Both are the failure the score floor exists to prevent, committed by the thing that declares it.
+//
+// v4778 -- SECTION 4's EXAMPLE MOVED OFF "box3d", which four panels now hold (see the note there). SABOTAGE,
+// MEASURED on a scratch copy of the tree (pagePlacement.mjs and this gate copied, everything else linked; the tree
+// file never edited): panelProfiles' weight made the raw count (`n / spread.get(t)` -> `n`) -> exit=1, 2 red by
+// name: "box3d-blobs.html is filed by a word no other panel holds..." (weighted picks sampling on [physics]) and
+// "a panel-unique token [that RECURS in its panel] outweighs a spread one by more than an order of magnitude" (blob
+// 2.00 against physics 1.000). v4778 review: the bracketed words were added to the row name because a unique token
+// seen ONCE is 8x physics, not ten (the note in section 4 says so); re-run the same way under the new name, same
+// exit=1, same 2 red, same numbers.
+//
+// v4828 SABOTAGE LOG (section 8), each applied to tools/ship/pagePlacement.mjs, this gate run, the file restored:
+//   D  readJsonOrSay leaves the regenerating command out of its message       -> 1 red (the 'names the file, size, tail, error and command' row)
+//   E  readJsonOrSay leaves the size out                                       -> 2 red (that row, and the empty-file row: "( characters")
+//   And by hand on the real tree: page-index.json cut to its first 69,905 characters. pageIndex-selfcheck, pagePlacement-selfcheck and pagePlacements-selfcheck each print a FAIL row
+//   with the cause and exit 1 (they died on a bare `at JSON.parse` before); artefactWriters-selfcheck leaves the index whole.
 "use strict";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
+import { readJsonOrSay } from "./pagePlacement.mjs";
 import { SECTIONS, MAX_PER_PANEL, UNPLACED } from "./pageSections.mjs";
 import { tokens, inventory, capacity, panelProfiles, suggestFor, suggestAll, clusters,
          SCORE_FLOOR, reportLines, ENG } from "./pagePlacement.mjs";
@@ -20,7 +37,8 @@ const report = (l, n = "") => console.log(`  ----  ${l}${n ? "   " + n : ""}`);
 
 console.log("pagePlacement-selfcheck -- the placement gap, measured, and refused where the evidence is thin\n");
 
-const inv = inventory();
+// v4828 -- an index that will not parse is a row with its cause on it (the verdict shows the last three lines of a stack, and the cause is above them)
+let inv; try { inv = inventory(); } catch (e) { console.log("  FAIL  the page inventory can be read   " + e.message); console.log("\npagePlacement-selfcheck: 1 FAILED"); process.exit(1); }
 const cap = capacity(inv);
 
 // ---------------------------------------------------------------------------
@@ -111,22 +129,51 @@ console.log("\n4. *** AND A RAW COUNT REWARDS A WORD FOR BEING COMMON, WHICH IS 
     const r = suggestFor("box3d-blobs.html", inv, prof);
     report("box3d-blobs.html", r.suggestion ? (r.label + "  score " + r.score.toFixed(2) + "  [" + r.evidence.join(" ") + "]") : ("no suggestion: " + r.why));
 
-    ok("!! box3d-blobs.html goes to Box3D, and the unweighted version sent it to Sampling & Methods",
-        r.suggestion === "box3d",
-        "*** \"physics\" APPEARS IN FIVE PANELS AND SAYS NOTHING ABOUT WHICH ONE; \"box3d\" APPEARS IN ONE AND " +
-        "SAYS EVERYTHING. *** Two hits on the common word outscored one hit on the discriminating word and the " +
-        "wrong panel won. This survived the entity fix because \"physics\" is a REAL subject word -- just not a " +
-        "discriminating one, which a raw count cannot tell apart.");
-    ok("!! a panel-unique token outweighs a spread one by more than an order of magnitude",
-        (() => { const b = prof.get("box3d").bag;
-                 return b.get("box3d") > 10 * b.get("physics") && b.get("physics") > 0; })(),
-        "measured in the Box3D panel: box3d " + prof.get("box3d").bag.get("box3d").toFixed(2) + " against " +
-        "physics " + prof.get("box3d").bag.get("physics").toFixed(3) + ". *** THE FIRST VERSION OF THIS LINE " +
-        "ASSERTED box3d === 1 AND WENT RED, because the weight is (times the token appears in the panel) / " +
-        "(panels holding it) and box3d appears in TWO of the panel's pages. *** Pinning a literal that happens " +
-        "to be true today is the ratchet this lab keeps removing; the RELATIONSHIP is the claim, and it " +
-        "survives a page being added to the panel. And physics stays ABOVE ZERO: nothing is dropped, because a " +
-        "common word is still good for tie-breaking.");
+    // v4778 -- *** "box3d" STOPPED BEING THE DISCRIMINATING WORD, SO THIS SECTION'S EXAMPLE MOVED, NOT ITS CLAIM. ***
+    // The two rows below were written when "box3d" was this section's panel-unique token. It never quite was (the
+    // Endless Sky panel held it too, spread 2, weight 1.5), and v4778 spread it twice more: the RTX drawer took
+    // es-box3d-6dof.html (spread 3, weight 1.00 -- box3d-blobs.html then TIED Box3D and Blobs at 2.625 and was
+    // refused, the red), and Keith's "There can be duplicate links in folder buckets" put es-box3d-fly3d.html in
+    // Fruit Fly Brain as well (spread 4, weight 0.75). A word in four panels is the COMMON word this section is
+    // about, so pinning "box3d" here would have pinned the opposite of the argument. Measured today on the live
+    // panels: box3d-blobs.html ("Box3D Blobs (physics-driven lava)") goes to Blobs at 2.625 -- "lava", which only
+    // the Blobs panel holds, plus the panel naming itself -- over Box3D at 2.375; the RAW count still sends it to
+    // Sampling & Methods on physics=7, the original failure. So row one now asserts the relationship: the raw count
+    // picks Sampling, the weighted one does not, and it wins on a token NO OTHER PANEL HOLDS. Row two keeps its
+    // order of magnitude and takes its unique token from the panel row one lands in: "blob" (two of the Blobs
+    // panel's three pages, spread 1) 2.00 against physics 0.125, 16x. Said plainly, because it bounds the claim:
+    // a unique token seen ONCE scores 1 against physics' 1/8, which is 8x, not ten -- the margin comes from a
+    // unique word recurring in its panel, exactly as box3d's did (three pages) when this row was written.
+    const rawPick = (() => {
+        const tk = tokens("box3d-blobs.html", inv.pages.get("box3d-blobs.html") || "");
+        let best = null, bestN = -1;
+        for (const s of SECTIONS) {
+            let n = 0;
+            for (const f of s.pages) for (const t of tokens(f, inv.pages.get(f) || "")) if (tk.has(t)) n++;
+            if (n > bestN) { best = s.id; bestN = n; }
+        }
+        return { id: best, n: bestN };
+    })();
+    const panelsHolding = (t) => [...prof.values()].filter((p) => p.bag.has(t)).length;
+    const uniqueWin = r.suggestion ? r.evidence.filter((t) => panelsHolding(t) === 1) : [];
+    ok("!! box3d-blobs.html is filed by a word no other panel holds, and the unweighted version sent it to Sampling & Methods",
+        rawPick.id === "sampling" && !!r.suggestion && r.suggestion !== "sampling" && uniqueWin.length > 0,
+        "raw count picks " + rawPick.id + " (" + rawPick.n + " hits); weighted picks " + (r.suggestion || "nothing: " + r.why) +
+        " on [" + (r.evidence || []).join(" ") + "], panel-unique: [" + uniqueWin.join(" ") + "]. " +
+        "*** \"physics\" APPEARS IN " + panelsHolding("physics") + " PANELS AND SAYS NOTHING ABOUT WHICH ONE; A WORD IN ONE " +
+        "PANEL SAYS EVERYTHING. *** " + rawPick.n + " raw hits outscore the discriminating ones and the wrong panel wins. " +
+        "This survived the entity fix because \"physics\" is a REAL subject word -- just not a discriminating " +
+        "one, which a raw count cannot tell apart.");
+    const bl = prof.get("blobs").bag;
+    ok("!! a panel-unique token that RECURS in its panel outweighs a spread one by more than an order of magnitude",
+        panelsHolding("blob") === 1 && bl.get("blob") > 10 * bl.get("physics") && bl.get("physics") > 0,
+        "measured in the Blobs panel: blob " + (bl.get("blob") || 0).toFixed(2) + " (in " + panelsHolding("blob") +
+        " panel) against physics " + (bl.get("physics") || 0).toFixed(3) + " (in " + panelsHolding("physics") +
+        "). *** THE FIRST VERSION OF THIS LINE ASSERTED box3d === 1 AND WENT RED, because the weight is (times " +
+        "the token appears in the panel) / (panels holding it) and box3d appeared in TWO of the panel's pages. *** " +
+        "Pinning a literal that happens to be true today is the ratchet this lab keeps removing; the RELATIONSHIP " +
+        "is the claim, and it survives a page being added to the panel. And physics stays ABOVE ZERO: nothing is " +
+        "dropped, because a common word is still good for tie-breaking.");
     ok("!! ...and the floor moved WITH the weighting, because they are one decision",
         SCORE_FLOOR < 2,
         "weighted scores are smaller by construction. Leaving the floor at 2 would have quietly rejected the " +
@@ -188,6 +235,20 @@ console.log("\n6. THE TOOL WRITES NOTHING, WHICH IS THE DESIGN AND NOT A LIMITAT
 console.log("\n7. THE REPORT PRINTS AND THE SPLIT HOLDS");
 ok("the reporting tool produces a report", reportLines().length > 15,
     "v3327's split: a reporting tool prints, the gate beside it is what exits nonzero");
+
+console.log("\n8. v4828 -- A GENERATED INDEX THAT DOES NOT PARSE SAYS SO");
+{
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "swek-readjson-")), good = path.join(dir, "good.json"), torn = path.join(dir, "page-index.json"), empty = path.join(dir, "empty.json");
+    try {
+        fs.writeFileSync(good, '{"pages":[1]}\n'); fs.writeFileSync(torn, '{"count":2,"pages":[{"f":"a.html"},{"f":"b.ht'); fs.writeFileSync(empty, "");
+        const say = (f) => { try { readJsonOrSay(f, "node tools/ship/buildPageIndex.mjs"); return null; } catch (e) { return e.message; } };
+        const m = say(torn), e0 = say(empty);
+        ok("a whole index is returned as it is", readJsonOrSay(good, "x").pages[0] === 1);
+        ok("!! a torn one throws a message that NAMES the file, its size, its last bytes, the parse error and the command that regenerates it (the verdict shows the last three lines of a stack; the cause was above them)",
+           !!m && /page-index\.json is not valid JSON/.test(m) && /\(45 characters/.test(m) && /b\.ht/.test(m) && /Unexpected|Expected|JSON/.test(m) && /node tools\/ship\/buildPageIndex\.mjs/.test(m), m);
+        ok("...and an EMPTY file (a truncate with nothing yet written) is the same species and says so", !!e0 && /empty\.json is not valid JSON \(0 characters/.test(e0), e0);
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+}
 
 console.log(fails ? `\npagePlacement-selfcheck: ${fails} FAILED` : "\npagePlacement-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);

@@ -180,6 +180,21 @@ const REPO = path.resolve(ENG, "..");
     ok(/UNPAPERED/.test(report(sys)) && /streamed|reached/.test(report(sys).toLowerCase()), "and the report names them");
 }
 
+// 6b) v4778 -- *** A GRANT NO FILENAME SHOWS IS READ FROM THE REGISTER, AND ONLY WHEN ITS FILE IS THERE. ***
+// vendor/mikktspace (zlib, in mikktspace.h's header) and vendor/male-cns (CC-BY-4.0, the licence line of
+// PROVENANCE.md) arrived with the rtx line and read UNPAPERED to the filename search while
+// world/vendoredLicences.mjs declared both. The controls are the two ways this could paper too much.
+{
+    ok(licenceFor(["PROVENANCE.txt", "mikktspace.c", "mikktspace.h"], "mikktspace").path === "mikktspace.h",
+        "a body declared IN_HEADER is papered by the header the register names");
+    ok(licenceFor(["PROVENANCE.md", "giant-fiber-circuit.json"], "male-cns").path === "PROVENANCE.md",
+        "a body declared NAMED_OTHER is papered by the file the register names");
+    ok(!licenceFor(["PROVENANCE.txt", "mikktspace.c"], "mikktspace").found,
+        "CONTROL: a declaration whose named file is NOT in the body is not provenance");
+    ok(!licenceFor(["PROVENANCE.md", "a.js"], "not-in-the-register").found && !licenceFor(["PROVENANCE.txt", "mikktspace.h"]).found,
+        "CONTROL: an undeclared body with a PROVENANCE note stays UNPAPERED, and so does a declared one asked without its name");
+}
+
 // 7) THE SCANNER's own primitives.
 {
     ok(listFiles(path.join(ENG, "vendor", "grass")).length > 0, "listFiles finds files");

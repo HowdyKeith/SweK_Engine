@@ -204,11 +204,17 @@ function seam() {
     return { positions, normals, uvs, indices };
 }
 
-/** sha256 of everything the recorded figures actually depend on: the vendor drop and the harness that drives it. */
-export function inputHashes() {
+/**
+ * sha256 of everything the recorded figures actually depend on: the vendor drop and the harness that drives it.
+ * *** KEYED "a/b" ON EVERY PLATFORM. *** Until the v4778 rig run this keyed by the raw path.relative, which is
+ * "vendor\\mikktspace\\mikktspace.c" on Windows, so Keith's rig read "3 changed, 3 unrecorded" against a
+ * record whose bytes had not moved. xatlasRef.mjs's inputHashes already normalised; this one did not.
+ * `P` is the path module, so the gate can ask the question as Windows would (path.win32) on a Linux box.
+ */
+export function inputHashes(P = path) {
     const h = {};
     for (const f of [path.join(SRC, "mikktspace.c"), path.join(SRC, "mikktspace.h"), CLI])
-        h[path.relative(ENG, f)] = createHash("sha256").update(fs.readFileSync(f)).digest("hex").slice(0, 16);
+        h[P.relative(ENG, f).split(P.sep).join("/")] = createHash("sha256").update(fs.readFileSync(f)).digest("hex").slice(0, 16);
     return h;
 }
 

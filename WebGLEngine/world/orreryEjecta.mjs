@@ -106,9 +106,14 @@ export function substance(body) {
  * `vendor/<name>/`, which cannot fire on the bare word -- see the header on why the citation count was
  * refused.
  */
+// v4814: asked once per body over the same file list, so the files that mention "vendor" at all are found once and only
+// they are searched for each body's needle -- which contains "vendor/", so no other file could match. Same answer.
+const _vendorFiles = new WeakMap();
 export function ejectaOf(name, files) {
     const needle = "vendor/" + name + "/";
-    return files.filter((f) => f.source.includes(needle)).map((f) => f.path);
+    let v = _vendorFiles.get(files);
+    if (!v) { v = files.filter((f) => f.source.includes("vendor/")); _vendorFiles.set(files, v); }
+    return v.filter((f) => f.source.includes(needle)).map((f) => f.path);
 }
 
 /**
@@ -298,6 +303,11 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
     // substring anywhere, so the rule saw NO dependant at all: the same invisibility as path.join, one level up.
     "kenney-city": Object.freeze([
         "world/kenneyKit.mjs",
+        // v4778 -- the rtx line, merged: rtx-viewer.html fetches /vendor/kenney-city/models/pavement.glb as its
+        // default scene and its gate reads the same file off disk to trace it. Two genuine readers; that line
+        // never re-took this record, so the merge does.
+        "rtx-viewer.html",
+        "tools/ship/rtViewer-selfcheck.mjs",
     ]),
     "kenney-racing": Object.freeze([
         "world/kenneyKit.mjs",
@@ -336,6 +346,22 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "tools/roundhouse/magmapTaichiRun-selfcheck.mjs",
     ]),
     "three": Object.freeze([
+        // *** v4647p -- A FIXTURE, AND THE CENSUS CANNOT TELL IT FROM A REAL PATH DEPENDENCY. ***
+        // This gate holds `const POSIX = "WebGLEngine/vendor/three/three.module.js"` and its Windows twin as
+        // test data for the separator work at c00f2ec3. Nothing imports, loads or joins them; ejecting three
+        // would leave the strings naming a path that does not exist, which is already true of the Windows
+        // spelling on this box. By the meaning of this list -- what breaks if the body is ejected -- it does
+        // not belong here.
+        //
+        // IT IS LISTED ANYWAY, BECAUSE A DISCRIMINATOR WAS LOOKED FOR AND MEASURED NOT TO EXIST. A first
+        // draft added a `fixtureOnly()` rule: no import occurrence, no load occurrence, no path.join of the
+        // name. Run against physics/box3d/box3dLoader.js -- a real dependant that reaches its body through a
+        // runtime path -- it returned TRUE. The two are the same shape to importPosition: both classify as
+        // `path`, both have zero import and zero load occurrences. Telling them apart means knowing whether
+        // the constant is ever USED to reach the file, which a textual census cannot answer, so the rule was
+        // deleted rather than shipped wrong. The list is what the census MEASURES -- files naming a vendor
+        // path in a quoted specifier -- and this entry says where that differs from what it MEANS.
+        "tools/ship/treeRead-selfcheck.mjs",
         "ai-bridge/ensureThree.js",
         "ai-bridge/server.js",
         "aquarelle.html",
@@ -354,6 +380,10 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "cosmic-web.html",
         "es-box3d-3d.html",
         "es-box3d-fly3d.html",
+        // v4778 -- the rtx line, merged: its two 6DOF pages import three.module.js and OrbitControls through an
+        // importmap, the same shape as the es-box3d pages beside them. Two arrivals, none gone.
+        "es-aircraft.html",
+        "es-box3d-6dof.html",
         "ev/esShipModels.js",
         "ev/spriteHull.js",
         "eve.html",
@@ -450,6 +480,76 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         // test) -- so it is a dependant of each, correctly, rather than a sign one of the two rows is wrong.
         "tools/ship/webgpuHarness.mjs",
         "ui/aiPresenceOrbWidget.js",
+        // v4776 -- THE exported-functions-mesh LINE, MERGED: its FSR-on-three.js work (FSR1/2/3 as TSL nodes, frame
+        // generation, the flow and hole-fill stages, fsr-three.html) imports three.webgpu.js and three.tsl.js directly,
+        // like the TSL rows above. That line never re-took this record, so the merge does: 45 arrivals, none gone.
+        "fsr-three.html",
+        "fx/fsr/fsr3Hold-selfcheck.mjs",
+        "fx/fsr/fsr3Late-selfcheck.mjs",
+        "fx/fsr/fsr3LiveClock-selfcheck.mjs",
+        "fx/fsr/fsr3Pacing-selfcheck.mjs",
+        "fx/fsr/fsr3Tsl-selfcheck.mjs",
+        "fx/fsr/fsrFlicker-selfcheck.mjs",
+        "fx/fsr/fsrFlowCost-selfcheck.mjs",
+        "fx/fsr/fsrFlowGrid-selfcheck.mjs",
+        "fx/fsr/fsrFlowRetry-selfcheck.mjs",
+        "fx/fsr/fsrFlowSeed-selfcheck.mjs",
+        "fx/fsr/fsrFlowStill-selfcheck.mjs",
+        "fx/fsr/fsrFrameGen-selfcheck.mjs",
+        "fx/fsr/fsrFrameGenArc-selfcheck.mjs",
+        "fx/fsr/fsrFrameGenBackdrop-selfcheck.mjs",
+        "fx/fsr/fsrFrameGenFlow-selfcheck.mjs",
+        "fx/fsr/fsrFrameGenLayerCost-selfcheck.mjs",
+        "fx/fsr/fsrFrameGenParticles-selfcheck.mjs",
+        "fx/fsr/fsrFrameGenReach-selfcheck.mjs",
+        "fx/fsr/fsrFrameGenScene-selfcheck.mjs",
+        "fx/fsr/fsrFrameGenTranslucent-selfcheck.mjs",
+        "fx/fsr/fsrFrameGenUi-selfcheck.mjs",
+        "fx/fsr/fsrFrameGenWorld-selfcheck.mjs",
+        "fx/fsr/fsrTemporalHalf-selfcheck.mjs",
+        "fx/fsr/fsrTemporalHalfQuality-selfcheck.mjs",
+        "fx/fsr/fsrTemporalLockGhost-selfcheck.mjs",
+        "fx/fsr/fsrTemporalLocks-selfcheck.mjs",
+        "fx/fsr/fsrTemporalQuality-selfcheck.mjs",
+        "fx/fsr/fsrTemporalTsl-selfcheck.mjs",
+        "fx/fsr/fsrTsl-selfcheck.mjs",
+        "render/flowReconcileTsl-selfcheck.mjs",
+        "render/frameInterpTsl-selfcheck.mjs",
+        "render/holeFillTsl-selfcheck.mjs",
+        "render/opticalFlowTsl-selfcheck.mjs",
+        "render/reactiveTsl-selfcheck.mjs",
+        "render/temporalClipTsl-selfcheck.mjs",
+        "render/temporalLockTsl-selfcheck.mjs",
+        "render/temporalTsl-selfcheck.mjs",
+        "render/temporalTslCompute-selfcheck.mjs",
+        "render/temporalTslCoverage-selfcheck.mjs",
+        "render/temporalTslMany-selfcheck.mjs",
+        "render/temporalTslMeshes-selfcheck.mjs",
+        "render/temporalTslNodes-selfcheck.mjs",
+        "render/temporalTslZoo-selfcheck.mjs",
+        "render/translucentLayer-selfcheck.mjs",
+        // v4809 -- the engine's ways around r186's issues 17 and 18, held on both backends against three's own behaviour beside them.
+        "render/threeWorkarounds-selfcheck.mjs",
+        // v4778 (main) -- the rtx line, merged: the batched GPU capsule kernel's gate imports three.webgpu.js and
+        // three.tsl.js to run physics/character/capsuleCollideTsl.mjs, like the TSL rows above. One arrival.
+        "tools/ship/capsuleCollideTsl-selfcheck.mjs",
+        // the lock-sums round (main) -- render/temporalLockSumsTsl-selfcheck.mjs drives the sums' TSL port on both backends, the
+        // same import of three.webgpu.js and three.tsl.js as render/temporalLockTsl-selfcheck.mjs above. One arrival.
+        // v4819: git's merge filed these two under three-webgpu-r185, matching main's last line of this list against that
+        // list's only line (threePatch); orreryEjecta-selfcheck named both as GONE there and ARRIVED here.
+        "render/temporalLockSumsTsl-selfcheck.mjs",
+        // v4805 -- the engine moved to r186 and kept r185 beside it: threePatch.mjs applies the r185 patches to vendor/three-webgpu-r185
+        // now (its row below), and threeUpstream-selfcheck.mjs's section 6 runs the issues on this body's r186. One gone, one arrived.
+        "tools/ship/threeUpstream-selfcheck.mjs",
+    ]),
+    // v4805 -- r185's three files, kept unchanged for the r185 drafts when vendor/three-webgpu moved to r186. Nothing in the engine
+    // imports them: the patch applier reads them, and the upstream gates load them by a path they build.
+    "three-webgpu-r185": Object.freeze([
+        "tools/ship/threePatch.mjs",
+        // rig run 2 (main) -- threeUpstream-selfcheck's overlay section reads three.core.js through the overlay where a file
+        // symlink is refused, and compares it with the vendored copy: a real read of this body, by name. v4819: the copy it
+        // compares with is r185's since the merge, the build threePatch links into each patched slot since v4805.
+        "tools/ship/threeUpstream-selfcheck.mjs",
     ]),
     "wasm": Object.freeze([
         "ai-bridge/wasmDemoBridge.js",
@@ -465,6 +565,28 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
     // grade this tree's own unwrapper against the recorded numbers, which is why the record is hash-pinned.
     "xatlas": Object.freeze([
         "tools/mesh/xatlasRef.mjs",
+    ]),
+    // v4778 -- two bodies arrived with the rtx line and no entry, which importPosition-selfcheck's "every vendored
+    // body has an entry" row turned red on. Both lists are dependantsOf() over engineSources() at the merge, run,
+    // not typed. vendor/male-cns (Janelia's connectome circuits, baked JSON): 8 dependants; the substring rule
+    // sees 10, and the three it wrongly keeps (es-box3d-fly3d.html, race-brain.html, server.html) name the body
+    // inside a sentence -- a citation, a comment, a record -- while tools/bakeGfcTopology.mjs is a `joined`
+    // (path.join(ROOT, "vendor", "male-cns", ...)) the substring rule never saw.
+    "male-cns": Object.freeze([
+        "brain/gunnerPolicy-selfcheck.mjs",
+        "fly-connectome.html",
+        "tools/bakeGfcTopology.mjs",
+        "tools/maleCnsBake.mjs",
+        "tools/maleCnsLoader-selfcheck.mjs",
+        "tools/ship/drivePolicy-selfcheck.mjs",
+        "tools/ship/flyConnectomePage-selfcheck.mjs",
+        "tools/ship/pilotPolicy-selfcheck.mjs",
+    ]),
+    // vendor/mikktspace is xatlas's shape: a C reference oracle, compiled on demand by its one dependant to grade
+    // physics/mesh/mikktSpace.mjs. The substring rule sees NONE -- the path is built with path.join -- which is the
+    // v4410 case this record exists for, and the positional rule's `joined` kind is what finds it.
+    "mikktspace": Object.freeze([
+        "tools/mesh/mikktRef.mjs",
     ]),
 });
 

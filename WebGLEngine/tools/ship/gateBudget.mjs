@@ -98,7 +98,42 @@
 // two is kept as the basis, not averaged away. domScope stays in the general population rather than moving to
 // the MEASURED tail: it is one ordinary gate slower than the rest, not a fixture cost, and the default (3x this)
 // still grants everything under it comfortable room. The default moves 329.7s -> 500.0s with this line.
-export const SLOWEST_GENERAL = { gate: "tools/ship/domScope-selfcheck.mjs", ms: 166680 };
+//
+// *** v4815 -- RE-PINNED TO genGateMeasure, THE SAME WAY. *** The v4815 full suite run (1903 gates, complete) recorded
+// tools/ship/genGateMeasure-selfcheck.mjs at 174,853 ms, above domScope's 166,680, and gateBudget-selfcheck went red on
+// the same line. Timed a second time, alone: 217,392 ms, exit 0. The two disagree as domScope's did, and the LARGER is
+// the basis. The default moves 500.0 s -> 652.2 s with this line. (domScope's own reading in that run was below this.)
+export const SLOWEST_GENERAL = { gate: "tools/ship/genGateMeasure-selfcheck.mjs", ms: 217392 };
+
+// *** v4580 -- WHAT AN ENTRY IN gate-timings.json IS, WHICH UNTIL NOW NOTHING SAID. ***
+//
+// hostScale-selfcheck has asserted since v3936 that "an entry cannot say whether it is a TIME or a TRUNCATION",
+// and concluded that the fix "is not to detect truncation -- IT CANNOT BE DETECTED FROM HERE". The second half
+// was true of a READER and false of the PRODUCER, and the producer is tools/ship/selfchecks.mjs in this repo. It
+// knows exactly which of the three a run was -- it branches on all three -- and then wrote a bare number that
+// threw the distinction away. v4579 made the same repair on sweep-timings.json a round earlier.
+//
+// TWO MEMBERS, BOTH DECIDABLE. There is no TRUNCATED or SKIPPED member here, and their absence is the point: the
+// runner records neither, so a member no writer can write would be a label nobody could ever check. COMPLETE is
+// what the runner establishes -- exit 0, not a timeout, not a gate that declined to run. UNKNOWN is the reading
+// for the 1289 entries that predate this, and it is a statement about the RECORD rather than about the gate: it
+// means nobody wrote down what this number is, which is not the same as the number being wrong.
+export const TIMING_KIND = Object.freeze({
+    // ONE RUN TO COMPLETION BY THE SUITE RUNNER, AND THAT IS ALL IT CLAIMS: a single sample, taken with a cold
+    // module cache, in whatever state the box was in when the runner reached that gate. It is NOT a median and
+    // not a warm reading. *** v4580 MEASURED WHAT THAT COSTS: one entry in four written by the provenance pass
+    // disagreed with a median of three alone runs by more than 20%, and tools/ship/spacesimStart-selfcheck.mjs
+    // was 1486 ms against a 124 ms median -- 12x over, and its header had already recorded that this exact
+    // number was 10x over when the record last held it. *** A kind that says "completed" and nothing about how
+    // many samples is a better record than a bare integer and still not enough, so the two are named apart.
+    COMPLETE: "complete",
+    // A HAND-TAKEN MEDIAN OF THREE ALONE RUNS -- the procedure this tree's headers have used since v3285 and
+    // which `captured` describes for every cohort it names. Not written by any automatic pass: a human runs the
+    // gate three times with nothing else on the box and records the middle number. It earns a member because it
+    // is what the headers are compared against, and an entry holding it must not be read as a runner sample.
+    MEDIAN3: "median of 3 alone",
+    UNKNOWN: "unknown -- before v4580",
+});
 
 /** The factor selfchecks.mjs's own header already committed to. Kept as a named constant, not a multiplication. */
 export const HEADROOM = 3;
@@ -248,6 +283,23 @@ export const MEASURED_RUNS = Object.freeze({
         runs: Object.freeze([{ ms: 9114, code: 0 }, { ms: 9404, code: 0 }, { ms: 9009, code: 0 },
                              { ms: 11565, code: 0 }]),
     }),
+    // Run here at v4778, seven times one after another, `date +%s%3N` around the process (the first with %N),
+    // on a box other sessions were also using (load average 2.1 to 3.1). FOUR EXITED 0 AND ARE THE ROWS. The
+    // other three exited 1 at 65133, 65069 and 65007 ms on the gate's own real-time rows (the tick counter
+    // reached 28-31 in its window; fleet hp did not drop) and are NOT rows, because a failing run is not a
+    // completion -- though all seven landed within 126 ms of each other, the cost being the page's fixed waits.
+    // *** v4778, SAME ROUND -- THOSE FOUR ROWS (65078, 65051, 65022, 65041) ARE REPLACED, NOT APPENDED TO, BECAUSE
+    // THE GATE THEY TIMED IS GONE. *** Its 65 s was its fight window riding a 60 s ceiling every time (the window's
+    // target was unreachable inside one battle; the gate's own header has the cause). The window now follows one
+    // battle to its end, so the cost fell by twenty times; appending would have kept a 65 s basis for a 3.7 s gate,
+    // a budget no run of it can approach. Seven runs alone after the fix, `date +%s%3N` around the process, load
+    // average 1.9 to 2.3, ALL SEVEN EXIT 0 and all seven are the rows.
+    "tools/ship/rigidBody6dofPage-selfcheck.mjs": Object.freeze({
+        observedHere: true, at: "v4778 (after the fight-window fix)",
+        runs: Object.freeze([{ ms: 3235, code: 0 }, { ms: 3540, code: 0 }, { ms: 3700, code: 0 },
+                             { ms: 3225, code: 0 }, { ms: 3457, code: 0 }, { ms: 3288, code: 0 },
+                             { ms: 3375, code: 0 }]),
+    }),
 });
 
 /**
@@ -368,6 +420,13 @@ export const MEASURED = {
     // speeds on box3d, and opens two browsers (both backends with five read-backs each, then the page). Over the quick sweep's 3 s
     // budget by three times. THREE RUNS ALONE, ALL EXIT 0, the rows in MEASURED_RUNS.
     "tools/ship/crashDamage-selfcheck.mjs": slowestRun("tools/ship/crashDamage-selfcheck.mjs"),
+    // *** v4778 -- MEASURED AFTER ARRIVAL, NOT AT BIRTH. *** tools/ship/rigidBody6dofPage-selfcheck.mjs came in with the rtx merge
+    // with no evidence of its cost: it boots es-box3d-6dof.html in one browser and watches a fight in real time, so the quick
+    // sweep's 20 s kill takes it every time (a 124, which says nothing). FOUR RUNS ALONE THAT EXITED 0, the rows in MEASURED_RUNS.
+    // v4778 -- 65078 -> 3700 in the same round: the gate's fight window was fixed to follow one battle instead of riding a 60 s
+    // ceiling, and SEVEN RUNS ALONE, ALL EXIT 0, replaced the four (MEASURED_RUNS' comment says why replaced, not appended). Still
+    // over the quick sweep's 3 s budget, so the entry stays.
+    "tools/ship/rigidBody6dofPage-selfcheck.mjs": slowestRun("tools/ship/rigidBody6dofPage-selfcheck.mjs"),
     // *** v4173 -- MEASURED TO COMPLETION FOR THE FIRST TIME, WHICH UNRESOLVED'S OWN HEADER INSTRUCTS. ***
     // 1140363 ms, EXIT 0, all checks passing -- 87 devices, 306 modes, every one built. It had been listed
     // as "exceeded a 150s cap at v3924" ever since, on the 309 s DEFAULT.
@@ -417,14 +476,14 @@ export const MEASURED = {
     // census, it RUNS gates -- so it is measured here. Basis 140,941 ms, the run overlapping the last two minutes
     // of the knobLiveness stopwatch; the rig at 1.63x would be ~230 s, inside the 282 s this basis buys.
     "tools/ship/redCensus-selfcheck.mjs":            140941,
-    "tools/ship/orphanTriage-selfcheck.mjs":         431386,  // -> raised to observed 431386ms (basis was 297764)
-    "tools/ship/shaderRefs-selfcheck.mjs":           288017,
+    "tools/ship/orphanTriage-selfcheck.mjs":         10719,  // -> lowered to observed 10719ms at v4815 (basis was 431386); the full selfchecks.mjs run and the alone sweep readings agree
+    "tools/ship/shaderRefs-selfcheck.mjs":           55601,  // -> lowered to observed 55601ms at v4815 (basis was 288017); the full selfchecks.mjs run and the alone sweep readings agree
     "tools/ship/windTunnel-selfcheck.mjs":            63300,
     "simulation/lbm/inflow-selfcheck.mjs":           111804,
     "tools/ship/sheddingSpectrum-selfcheck.mjs":     120946,
-    "tools/roundhouse/thermalScaling-selfcheck.mjs": 232051,
+    "tools/roundhouse/thermalScaling-selfcheck.mjs": 65216,  // -> lowered to observed 65216ms at v4815 (basis was 232051); the full selfchecks.mjs run and the alone sweep readings agree
     "tools/roundhouse/labExport-selfcheck.mjs":      241111,
-    "tools/roundhouse/pipeFlowKey-selfcheck.mjs":    250473,
+    "tools/roundhouse/pipeFlowKey-selfcheck.mjs":    57322,  // -> lowered to observed 57322ms at v4815 (basis was 250473); the full selfchecks.mjs run and the alone sweep readings agree
     // *** v3941 -- MEASURED TO COMPLETION AT LAST, AND THE MEASUREMENT IS WHY IT COULD NEVER PASS. ***
     // valueMatch sat in UNRESOLVED on the 139.9s general default since v3924 ("exceeded a 150s cap; never
     // timed before that"). Stopwatch-timed on this box across three runs: 471s, 468s and 477s -- THREE AND A
@@ -453,7 +512,7 @@ export const MEASURED = {
     // MEDIAN is what is written down; the 2x tail headroom this table applies covers the rest.
     "tools/roundhouse/sensitivity-selfcheck.mjs":    272883,  // -> raised to observed 272883ms (basis was 225004)
     "tools/ship/labDevices-selfcheck.mjs":           253635,
-    "tools/roundhouse/rayleighOnset-selfcheck.mjs":  279845,
+    "tools/roundhouse/rayleighOnset-selfcheck.mjs":  85898,  // -> lowered to observed 85898ms at v4815 (basis was 279845); the full selfchecks.mjs run and the alone sweep readings agree
     // *** v3913 -- THE EIGHTEEN THAT HAD CREPT PAST THE GENERAL LINE, PLUS TWO MEASURED THIS ROUND. ***
     // Not one number here is invented: the seventeen below came straight out of gate-timings.json, which is the
     // record of what they ACTUALLY took in a full suite, and the three after them were stopwatch-timed on an
@@ -464,7 +523,7 @@ export const MEASURED = {
     "physics/thermal/stefan-selfcheck.mjs":               172981,  // -> raised to observed 172981ms (basis was 141746)
     "physics/sph/poolFixture-selfcheck.mjs":              140175,  // -> raised to observed 140175ms (basis was 119027)
     "tools/roundhouse/detectionMap-selfcheck.mjs":        127385,  // -> raised to observed 127385ms (basis was 99710)
-    "tools/roundhouse/compose-selfcheck.mjs":             131293,  // -> raised to observed 131293ms (basis was 109896)
+    "tools/roundhouse/compose-selfcheck.mjs":             131293,   // v4623-merge: raised to main's OBSERVED 131293 ms (was 131293 here; main raised the DUPLICATE key v4581 deleted)  // -> raised to observed 131293ms (basis was 109896)
     "simulation/lbm/settleCurve-selfcheck.mjs":           128116,  // -> raised to observed 128116ms (basis was 89237)
     // v4075 -- RE-MEASURED after a timeout on Keith's rig: 91924ms here against the 76003ms recorded in the
     // v3211 session. The table's own rule is that "a number with its measurement attached CAN BE
@@ -480,26 +539,26 @@ export const MEASURED = {
     // its own x2 budget on this run, so it was stale rather than wrong in kind -- the contended reading is kept
     // per this table's own convention (claimTrace, stability above: "for a BUDGET the observed worst is the
     // conservative choice").
-    "tools/ship/doorKinds-selfcheck.mjs":                  212608,
+    "tools/ship/doorKinds-selfcheck.mjs":                  11303,  // -> lowered to observed 11303ms at v4815 (basis was 212608); the full selfchecks.mjs run and the alone sweep readings agree
     "physics/astroparticle/jeans-selfcheck.mjs":           98899,
     "tools/render-qa/terminatorOracle-selfcheck.mjs":      91559,
     "tools/roundhouse/zeroRangeSweep-selfcheck.mjs":       70538,
     "tools/roundhouse/stabilityBind-selfcheck.mjs":        86618,
     // gate-timings.json now records 144,408ms, above the 108,706ms basis this carried. Raised to that
     // observation, per this table's own rule that the basis only ever grows from a re-measure.
-    "tools/ship/ddaPrecisionReport-selfcheck.mjs":         144408,
+    "tools/ship/ddaPrecisionReport-selfcheck.mjs":         29307,  // -> lowered to observed 29307ms at v4815 (basis was 144408); the full selfchecks.mjs run and the alone sweep readings agree
     "physics/sph/tiltPower-selfcheck.mjs":                 83248,  // -> raised to observed 83248ms (basis was 65440)
     "physics/sph/wideTilt-selfcheck.mjs":                  79442,  // -> raised to observed 79442ms (basis was 64162)
     "physics/mesh/weightScaling-selfcheck.mjs":            85072,
     "tools/ship/loopSearch-selfcheck.mjs":                 98059,
     // MEASURED AT v3913, stopwatch-timed, each run alone:
     // assumptionMap PASSES at 284s. It was the SLOWEST_GENERAL pin at 47729ms and had grown 6x underneath it.
-    "tools/roundhouse/assumptionMap-selfcheck.mjs":  423753,  // -> raised to observed 423753ms (basis was 333639)
+    "tools/roundhouse/assumptionMap-selfcheck.mjs":  423753,   // v4623-merge: raised to main's OBSERVED 423753 ms (was 423753 here; main raised the DUPLICATE key v4581 deleted)  // -> raised to observed 423753ms (basis was 333639)
     // *** census FAILS at 717s, AND THAT IS THE FINDING. *** It was reported as TIMEOUT, and a timeout is not a
     // failure -- but it is not a pass either, and here it was hiding a REAL RED for as long as the budget killed
     // it. A gate that cannot finish cannot tell you it is broken. The failure is not fixed here; it is now
     // VISIBLE, which is the prerequisite.
-    "tools/roundhouse/census-selfcheck.mjs":         1066533,  // -> raised to observed 1066533ms (basis was 761728)
+    "tools/roundhouse/census-selfcheck.mjs":         1066533,   // v4623-merge: raised to main's OBSERVED 1066533 ms (was 1066533 here; main raised the DUPLICATE key v4581 deleted)  // -> raised to observed 1066533ms (basis was 761728)
     // v3917 -- measured at 534s on the run that first made it pass: 66 declared mode plants, two builds each.
     "tools/roundhouse/plantDirection-selfcheck.mjs": 839022,
     // v3924 -- twoFBind was NEVER TIMED AND NEVER BUDGETED, so it silently took the 139.9s general default while
@@ -517,13 +576,39 @@ export const MEASURED = {
     // six minutes granted to gates that finish in forty milliseconds, and every future regression hidden under
     // it. OF THE 24 NEWLY-TIMED GATES ONLY THIS ONE IS OVER 46.6s; THE NEXT IS 23s. It is the slow tail, not the
     // population, and the tail is what MEASURED is for. Measured to completion, and it PASSES.
-    "physics/sph/materialKnobs-selfcheck.mjs":       207319,  // -> raised to observed 207319ms (basis was 179037)
-    // configContract PASSES at 78s here, against 74400 in the timings -- two independent runs agreeing within a
-    // few seconds. IT NEVER NEEDED A BIGGER BUDGET AT ALL: 78s fits inside the 143s default with room, so its
-    // TIMEOUT on the rig was not this gate being slow. Recorded anyway because it was over the general line, and
-    // the larger of the two readings is used -- a budget derived from the faster of two measurements is a budget
-    // that fails on the slower one.
-    "tools/roundhouse/configContract-selfcheck.mjs":  78000,
+    "physics/sph/materialKnobs-selfcheck.mjs":       207319,   // main: raised to an OBSERVED 207319 ms (basis was 179037)
+    // *** v4581 -- configContract IS GONE FROM THIS TABLE, AND ITS OWN ENTRY SAID SO FROM THE DAY IT ARRIVED. ***
+    //
+    // What stood here, verbatim: "configContract PASSES at 78s here, against 74400 in the timings -- two
+    // independent runs agreeing within a few seconds. IT NEVER NEEDED A BIGGER BUDGET AT ALL: 78s fits inside the
+    // 143s default with room, so its TIMEOUT on the rig was not this gate being slow. Recorded anyway because it
+    // was over the general line, and the larger of the two readings is used -- a budget derived from the faster of
+    // two measurements is a budget that fails on the slower one."
+    //
+    // Three things were true of that entry and only the last one is new.
+    //   (1) IT SAID IT WAS UNNECESSARY IN ITS OWN FIRST SENTENCE and was written anyway.
+    //   (2) It was the only one of the four DUPLICATED keys whose two values differed, 78000 here and 72509 in the
+    //       later cohort. The later one won silently, so THE SMALLER READING WAS IN FORCE -- the exact inversion
+    //       of the rule this note states. Nothing could see it: nothing parses this table.
+    //   (3) *** MEASURED AT v4581: 2997 / 2856 / 3473 ms, three runs alone on this box, every one exit 0 with all
+    //       checks passing and no skip. *** Both recorded readings are roughly TWENTY-FOUR TIMES the gate's cost.
+    //       gate-timings.json has said 4946 ms and sweep-timings.json 5769 ms for some time; hostScale-selfcheck
+    //       has REPORTED it as the worst under-record in the table ("0.068 of its measured runtime") and reporting
+    //       is where it stopped.
+    //
+    // AND THE TABLE'S CONSERVATIVE RULE POINTED THE WRONG WAY HERE. "Take the larger of two readings" is right
+    // when both are current and protects against a fast sample; against two stale readings it entrenches the
+    // staler one, so the accident of the duplicate was LESS wrong than the stated rule. That is not an argument
+    // for the accident -- it is why a rule needs a re-measure and not only a direction.
+    //
+    // Removed rather than corrected to 3473, and the direction is why: this table is the SLOW TAIL ("It is the
+    // slow tail, not the population, and the tail is what MEASURED is for"), and a 3 s gate is the population. On
+    // the default it gets 329,697 ms instead of 145,018 -- REMOVAL RAISES THE BUDGET, which is the safe direction.
+    // Correcting it in place to 3473 x 2 would have handed a gate observed at 5,769 ms under load a 6,946 ms
+    // budget, which is how a timeout gets manufactured out of a gate that is fine.
+    //
+    // The measurement is not thrown away with the entry: it is in gate-timings.json at 2997 ms carrying the
+    // `median of 3 alone` kind v4580 added, which is the record that exists to hold exactly this.
     // *** MEASURED AT v3904 BECAUSE A NEW CHECK TIMED OUT AND THE GATE TURNED OUT TO HAVE BEEN DYING ALL ALONG.
     // 1058s stopwatch-timed on an otherwise idle box, and IT PASSES -- all checks. A contended run earlier the
     // same hour gave 1085s; the SMALLER, cleaner number is recorded here and the larger one is written down
@@ -612,7 +697,7 @@ export const MEASURED = {
     // TOOL_CAP_OVERRIDE, 1500000ms -- roughly 2x the 744s measurement, this table's own MEASURED
     // convention), the WHOLE GATE now measures 1302s (21m42s) stopwatch, exit 0, all pass -- up from 555s
     // because it previously never waited long enough for knobLiveness to answer at all.
-    "tools/ship/toolFrontDoor-selfcheck.mjs":        1450142,
+    "tools/ship/toolFrontDoor-selfcheck.mjs":        409740,  // -> lowered to observed 409740ms at v4815 (basis was 1450142); the full selfchecks.mjs run and the alone sweep readings agree
 
     // ================================================================================================================
     // *** v3939 -- THE ROUNDHOUSE CENSUS CLUSTER, AND IT IS ONE DEVICE RATHER THAN FIVE GATES. ***
@@ -632,8 +717,18 @@ export const MEASURED = {
     // here instead. Keith has the number and the choice.
     //
     // MEASURED ON THIS BOX, wall-clock, each run to completion:
-    "tools/roundhouse/configContract-selfcheck.mjs":  72509,
-    "tools/roundhouse/compose-selfcheck.mjs":         131293,  // -> raised to observed 131293ms (basis was 109896)
+    //
+    // *** v4581 -- THIS COHORT RE-STATED FOUR KEYS THAT WERE ALREADY IN THIS TABLE, AND NOTHING NOTICED FOR
+    // HUNDREDS OF VERSIONS BECAUSE NOTHING PARSES IT. *** configContract, compose, assumptionMap and census each
+    // appeared twice in one object literal. A repeated key in an object literal is not an error: the later one
+    // silently wins. Three of the four re-stated the SAME number and were therefore harmless; configContract
+    // re-stated a DIFFERENT one -- 78000 above, 72509 here -- so one typed budget was being discarded with no
+    // trace, and the survivor was the SMALLER of the two. *** THE ENTRY 300 LINES UP STATES THE OPPOSITE RULE IN
+    // WORDS: *** "the larger of the two readings is used -- a budget derived from the faster of two measurements
+    // is a budget that fails on the slower one." The duplicate silently inverted the table's own rule.
+    //
+    // The four keys are removed from HERE rather than from above, because the earlier sites are the ones carrying
+    // the measurement notes. The notes below stay: they are about the numbers, not about the keys.
     // *** v4136 -- WHERE THIS 278s ACTUALLY GOES, because "either a longer budget or a smaller fixture" is a
     // choice nobody could make without it. Keith's rig TIMED OUT at 557s (this entry x2) with the progress log
     // ending on "80/129 (last: twof)". Timed per device on this box: 250.9s total, and TWOF ALONE IS 178.1s --
@@ -645,8 +740,10 @@ export const MEASURED = {
     // what gets classified, and the classification IS the verdict this gate exists to produce -- a round must
     // not move a verdict it is not about (this table's own rule, stated at the configContract entry above).
     // The measurement is recorded so the choice is informed; the choice is Keith's.
-    "tools/roundhouse/assumptionMap-selfcheck.mjs":  423753,  // -> raised to observed 423753ms (basis was 333639)
-    "tools/roundhouse/census-selfcheck.mjs":         1066533,  // -> raised to observed 1066533ms (basis was 761728)
+    //
+    // (v4581: the assumptionMap and census keys that stood here were two of the four duplicates described above.
+    // Their numbers were IDENTICAL to the earlier entries, so removing them changes nothing this table produces
+    // -- which is exactly why they survived. This prose is about assumptionMap's cost and stays where written.)
     // *** NOT GIVEN A BUDGET, AND SAYING SO IS THE POINT: corroborationCensus ran past 1500s and was KILLED
     // rather than finishing, so there is no completion time to double. An entry here would be a guess wearing a
     // measurement's clothes -- the one thing this table exists to refuse. It keeps the default budget and stays

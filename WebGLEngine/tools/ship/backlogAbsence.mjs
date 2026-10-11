@@ -1,0 +1,283 @@
+// WebGLEngine/tools/ship/backlogAbsence.mjs -- v4537
+//
+// *** THE INSTRUMENT FOR GRADING ABSENCE CLAIMS HAS BEEN RUN ON EXACTLY ONE CLAIM: ITS OWN. ***
+//
+// tools/ship/absenceScope.mjs was built at v4435 to grade a claim that says the tree does NOT have
+// something. It is careful work -- it separates OUT OF SCOPE from IN SCOPE AND MISSED from A DENIAL
+// COUNTED AS A PRESENCE, and it keeps its exclusions listed by name so one can be argued with rather than
+// added quietly. And `gradeClaim` is called from one file in this tree: absenceScope-selfcheck.mjs, on
+// absenceScope's own frozen BVH_AT_V4435 record, from the round that wrote it.
+//
+// Meanwhile tools/ship/nextRounds.mjs -- the standing list of what is deferred and why, the file whose
+// entries say things like "there is no edge-tint code in this tree" and "all four greps empty" -- imports
+// `node:url` and nothing else. The instrument and its subject have been in the same directory for a
+// hundred rounds and have never met. THAT IS A CHECK NOTHING REACHES, which is a defect species this tree
+// names often enough to have a phrase for.
+//
+// ---- WHAT POINTING IT AT THE BACKLOG FOUND, AND IT CONVICTS IN BOTH DIRECTIONS -------------------------
+//
+// The reason to wire this is NOT that the backlog lies. It is that two of the three claims graded here
+// SURVIVE a check that a plain grep would have failed them on, and the third does not survive at all:
+//
+//   HOLDS  gltf-conformance-fixtures, on the glTF accessor kind it says the parser does not support. A
+//          tree-wide grep for that token returns TWELVE code files and would read as a refutation. Every
+//          one is outside the single directory the claim's author actually wrote -- the same word names a
+//          matrix storage layout in math/solverFit.mjs and an unrelated field in ai/ComfyUIClient.js.
+//          Scoped as written: 0 in scope, 0 missed. The first draft of this module convicted it anyway, by
+//          running scan() tree-wide where gradeClaim() exists -- absenceScope's own item 1, committed
+//          inside the check written to apply it.
+//          *** v4778 -- NO LONGER HOLDS, AND IT SHOULD NOT. *** The rtx line CLOSED that entry by teaching
+//          gpu/GLBParser.js the accessor kind, so its row flipped to `built` at the merge -- the move the
+//          conductor-Fresnel rows made at v4538 for the same reason. 1 in scope and 18 out of scope,
+//          measured at the merge.
+//
+//   HOLDS  glb-export-conformance, on the reference validator it says the tree does not carry. 0 code.
+//
+//   FAILS  gpu-pathtracer-render-mode, which says this tree has NOTHING like a GPU path tracer as a
+//          rendering feature. SIXTEEN code files IN SCOPE AND MISSED on one term -- among them the voxel
+//          pass under render/, a WebGL2 fullscreen fragment shader stepping a ray per pixel through a 3D
+//          texture of the real generated world; its options module beside it; and the octree shader under
+//          physics/octree/, an acceleration structure encoded into a texture and descended in
+//          a fragment shader -- which is the very architecture that entry calls foreign to this tree. Not
+//          denials, not mentions, not out of scope. Sixteen files of the thing the claim says is not there.
+//
+// *** AT v4537 THAT ENTRY WAS NOT IN THIS TREE AND THE GATE COULD NOT READ IT. *** It lived on the branch
+// origin/claude/shader-porting-swek-ozgvb0 and was absent from origin/main and from here, so it was recorded
+// in this header as the finding that prompted the round and was NOT one of the graded rows below. A gate
+// that graded a file on another branch would be a gate whose subject can change without this tree moving.
+//
+// *** v4778 -- IT IS HERE NOW, AND CLOSED, SO IT IS GRADED. *** The sentence arrived at v4637 (the sentence
+// floor's note below records it), and the rtx merge brought that line's rewrite of the entry: CLOSED,
+// superseded by physics/render/rtPipeline.mjs's WebGPU ray-tracing pipeline and rtx-viewer.html, the old
+// grounds kept as history. The rewrite still did not say the grounds were false when written, so v4778 added
+// that to the entry, naming the voxel pass and the octree shader above. Its row below grades the corrected
+// entry -- `built`, on the name of the pipeline's hit stage -- and the CONTROL stays beside it, because a
+// row that asserts presence cannot also be the row this register is watched convicting.
+//
+// ---- WHY THE REGISTER IS A LIST, WHICH IS NORMALLY THIS TREE'S COMPLAINT --------------------------------
+//
+// v4482 built a pre-flight over five hand-maintained records and its own header conceded the flaw: "known
+// is a LIST rather than a DISCOVERY". The list was short and the next merge produced two more it could not
+// see. So a hand-listed register here needs an argument, and it has one plus a ratchet.
+//
+// The argument is absenceScope's own, and it is in that file at the top of gradeClaim: the TERM is a
+// person's job. No mechanism can read "there is no edge-tint code in this tree" and know which parameter
+// name from the literature to search for, or that one entry's accessor word means a file format and not a
+// matrix. A register that guessed terms would grade the wrong thing and report a number about its guessing.
+//
+// *** AND EVERY NEEDLE IS BUILT BY CONCATENATION, WHICH IS v4409'S RULE AND NOT A STYLE CHOICE. *** A
+// register that spells its own search terms becomes a file carrying every one of them, and absenceScope
+// reads string literals as code and comments as mentions. The first draft of this module spelt all six and
+// landed in ALL SIX of its own censuses -- it moved two of them from one denial to two, measured, before
+// it had graded anything. `frag` holds the pieces and termOf() joins them, and the prose above describes
+// the tokens rather than spelling them for the same reason. Sixth instance of this defect in this session.
+//
+// The ratchet is what stops the list going quietly stale: claimSentences() counts absence-shaped sentences
+// in nextRounds.mjs on every run, and the gate fails when that count RISES above the recorded figure
+// without the register growing to match. A new absence claim cannot arrive unnoticed. It can arrive
+// UNGRADED -- the gate names it and goes red -- which is the honest failure, because the alternative is a
+// register that silently covers a shrinking fraction of its subject.
+"use strict";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import * as AS from "./absenceScope.mjs";
+
+export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+
+/**
+ * The term-shaped absence claims nextRounds.mjs makes, with the scope each author actually wrote.
+ *
+ * `term` is the token to search for and is a JUDGEMENT, recorded here so it can be argued with. `searched`
+ * is the claim's own scope -- omit it for a claim about the whole tree. `exclude` names files that carry
+ * the token without being the thing, and every name on it is an argument somebody has to make out loud.
+ */
+export const CLAIMS = Object.freeze([
+    Object.freeze({
+        id: "gltf-conformance-fixtures", frag: Object.freeze(["spar", "se"]), searched: Object.freeze(["gpu"]),
+        expect: "built",
+        says: "the entry SAID that accessor kind had zero occurrences in the parser, and it is CLOSED -- the " +
+              "other line built it, so this row now asserts the code is THERE (v4778)",
+        why: "the scope is one directory and the term is a format feature. Tree-wide the token is mostly " +
+             "linear algebra, which is what makes the scope load-bearing rather than decorative. *** v4778 -- " +
+             "FLIPPED FROM absent TO built AT THE rtx MERGE, the move the conductor-Fresnel rows made at " +
+             "v4538. *** The rtx line closed the entry by teaching gpu/GLBParser.js the accessor kind, gated by " +
+             "tools/ship/gltfConformance-selfcheck.mjs. The scope still carries weight in THIS direction: 18 " +
+             "code files outside gpu/ carry the token, so graded tree-wide the row would read built with the " +
+             "parser's code deleted. It no longer carries weight in sabotage D's -- see the selfcheck's list.",
+    }),
+    Object.freeze({
+        id: "glb-export-conformance", frag: Object.freeze(["gltf-", "validator"]),
+        says: "the entry says a grep for the reference validator's package name returns nothing",
+        why: "a tool name, so the token is the claim -- there is no wider sense of it to confuse this with.",
+    }),
+    Object.freeze({
+        id: "spherical-gaussian-view-dependence", frag: Object.freeze(["Baked", "SDF"]),
+        says: "the entry says four named techniques are absent, all four greps empty",
+        why: "a published technique's proper name. THIS ENTRY ALREADY CARRIES A CORRECTION of its own sweep, " +
+             "which called view-dependent shading confirmed-absent when it was shipped and in a shader -- so " +
+             "the surviving literal half is exactly the half worth re-deriving each run.",
+    }),
+    Object.freeze({
+        id: "spherical-gaussian-view-dependence", frag: Object.freeze(["Mobile", "NeRF"]),
+        says: "(the same sentence's second name)",
+        why: "as above.",
+    }),
+    Object.freeze({
+        // the entry's OWN id spells the needle, so it is joined too -- see the concatenation note above
+        id: "f" + "82-tint-metal-fresnel", frag: Object.freeze(["F", "82"]), expect: "built",
+        says: "the entry SAID there is no edge-tint code in this tree, and it is CLOSED -- the other line " +
+              "built it, so this row now asserts the code is THERE",
+        why: "the parameter's name in the literature the entry cites; the spelling a code identifier would " +
+             "use is graded beside it, because a claim about a CONCEPT needs more than one token or it " +
+             "grades a spelling.",
+    }),
+    Object.freeze({
+        id: "f" + "82-tint-metal-fresnel", frag: Object.freeze(["edge", "Tint"]), expect: "built",
+        says: "(the same claim under the name a code identifier would use. *** v4637 -- THIS FLIPPED FROM " +
+              "absent TO built, AND THE PAIR'S WHOLE POINT IS WHAT FLIPPED IT. *** The pair existed to record " +
+              "that the concept arrived under ONE of its two names and not the other: this line built the term at " +
+              "v4584 without ever spelling the identifier. main built the same item INDEPENDENTLY at v4575 and " +
+              "DID spell it -- 0 occurrences in this line's physics/render/principled.mjs against 4 in main's " +
+              "-- so the merge is what brought the second name. The asymmetry the pair measured is gone, and " +
+              "it is gone because two rounds closed one backlog item without seeing each other and happened to " +
+              "choose different words for it.) The term itself is NOT spelled in this note: the needles in this register are substrings, so a register that names its own search term lands in the census it takes -- which the self-reference row caught on this very edit, one run after I wrote it.)",
+        why: "as above. The row is kept rather than deleted: a claim that has flipped is evidence about the " +
+             "tree, and a pair whose two halves now agree still says something a single row could not.",
+    }),
+    Object.freeze({
+        // v4778 -- the entry the header's FAILS row is about, graded now that it is in this tree. The needle is
+        // joined for the same reason as every other: the pipeline stage it names is not spelt in this file.
+        id: "gpu-pathtracer-render-mode", frag: Object.freeze(["closest", "Hit"]), expect: "built",
+        says: "the entry's grounds were that the tree had no GPU path tracer as a rendering feature, and it " +
+              "is CLOSED -- superseded by the rtx line's WebGPU ray-tracing pipeline and its live viewer, and " +
+              "corrected at v4778 to say so -- so this row asserts the pipeline's hit-stage code is THERE",
+        why: "the stage name the entry itself cites for that pipeline, from the Vulkan ray-tracing model it " +
+             "took its shape from: one code file tree-wide at the merge, physics/render/rtPipeline.mjs, and " +
+             "no scope because the entry's claim had none. This is the row the v4637 note on the sentence " +
+             "floor said registering the live entry would be. It is `built` and not `absent` because the " +
+             "entry now says what the tree has; the conviction stays with the CONTROL below.",
+    }),
+    // *** THE CONTROL, AND IT MUST FAIL. *** A register whose every row passes is a register that has never
+    // been seen to convict, and this one would otherwise be six acquittals. This row restates the claim that
+    // prompted the round -- the off-branch entry's "this tree has NOTHING like it as a rendering feature" --
+    // against a term this tree really carries, so the same code that acquits six claims is watched
+    // convicting a seventh. It is not a fixture inflating its own census: the files it finds are a shipped
+    // WebGL2 fragment-shader renderer and an octree shader that predate this module by hundreds of rounds.
+    // v4778: the entry is in this tree and graded above as `built`, and its text now cites this row's files as
+    // the reason its grounds were false. This row is unchanged in what it measures; only its name stopped
+    // calling the entry off-branch.
+    Object.freeze({
+        id: "CONTROL -- gpu-pathtracer-render-mode's original grounds, restated",
+        frag: Object.freeze(["ray", "march"]),
+        mustFail: true,
+        says: "that this tree has nothing resembling a marched-ray rendering feature",
+        why: "the round's own finding, kept as a row that goes red if it ever stops being findable.",
+    }),
+]);
+
+/** Grade one claim through absenceScope, and say plainly whether it survived. */
+export function termOf(claim) { return claim.frag.join(""); }
+
+export function grade(claim, { root = ENG } = {}) {
+    const g = AS.gradeClaim({
+        term: termOf(claim),
+        searched: claim.searched ? [...claim.searched] : null,
+        said: claim.said ? [...claim.said] : [],
+        exclude: claim.exclude ? [...claim.exclude] : [],
+    }, { root });
+    const missed = g.inScopeMissed || [];
+    const scoped = claim.searched ? (g.narrow && g.narrow.code) || [] : (g.wide && g.wide.code) || [];
+    const holds = scoped.length === 0 && missed.length === 0;
+    // *** A CLOSED ENTRY EXPECTS ITS ABSENCE CLAIM TO HAVE STOPPED HOLDING, AND THAT IS NOT A LOOPHOLE. ***
+    // Closing an item means BUILDING the thing it said was missing, so the claim in its `why` field is the
+    // record of why the round was raised rather than a live assertion. Grading it as though it were live
+    // convicts the tree for having done the work. Grading it in the OTHER DIRECTION is worth more than
+    // skipping it: it asserts the round actually landed, and it goes red if a closed item's code is ever
+    // deleted. So `expect` is "absent" for a live entry and "built" for a closed one.
+    const expect = claim.expect || "absent";
+    return {
+        id: claim.id, term: termOf(claim), mustFail: !!claim.mustFail, expect,
+        holds, asExpected: expect === "built" ? !holds : holds,
+        inScope: scoped.length, missed: missed.length,
+        outOfScope: (g.outOfScope || []).length,
+        denialsCounted: (g.denialsCounted || []).length,
+        files: [...new Set([...scoped, ...missed])].slice(0, 6),
+    };
+}
+
+export function gradeAll({ root = ENG } = {}) {
+    return CLAIMS.map((c) => grade(c, { root }));
+}
+
+/**
+ * Absence-shaped sentences in nextRounds.mjs -- the RATCHET's input, not a claim about how many claims exist.
+ *
+ * *** THIS COUNTS A SHAPE AND NOT A MEANING, AND SAYING SO IS THE POINT. *** Most of what it counts is not
+ * gradeable: "NOTHING IS WIRED" is about a caller, "nothing has complained about bandwidth" is about a want,
+ * and neither is a term a scanner can look for. The number is a TRIPWIRE on the file's absence-claim
+ * vocabulary, so a rising count forces somebody to look. Reading it as "the backlog makes N absence claims"
+ * would be a proxy reported as a fact, which is the defect this file exists to catch one level down.
+ */
+export function claimSentences({ root = ENG } = {}) {
+    const src = fs.readFileSync(path.join(root, "tools/ship/nextRounds.mjs"), "utf8");
+    const RX = /(nothing like|nothing in the tree|zero occurrences|confirmed[- ]absent|greps empty|no [a-z-]+ code in this tree|is no [a-z-]+ anywhere|returns nothing)/i;
+    let n = 0;
+    for (const s of src.split(/(?<=\.)\s+(?=[A-Z*])/)) if (RX.test(s)) n++;
+    return n;
+}
+
+/**
+ * *** RE-DERIVED BY tools/ship/backlogAbsence-selfcheck.mjs ON EVERY RUN. *** The graded figures are a
+ * reading of this tree at v4537; the sentence count is the ratchet's floor.
+ */
+export const BACKLOG_AT_V4537 = Object.freeze({
+    // v4778 -- 7/6/1 -> 8/7/1 at the rtx merge: gpu-pathtracer-render-mode registered as a `built` row now
+    // that the entry is in this tree, and gltf-conformance-fixtures flipped absent -> built because the rtx
+    // line closed it. Seven live rows, all as expected: three absences that hold, and four rows on three
+    // CLOSED entries whose absence is expected to be GONE (the conductor-Fresnel pair is two rows).
+    claims: 8,            // seven live backlog claims and one control that must convict
+    holding: 7,           // v4538: now "as expected" -- five absences that hold, one CLOSED entry whose
+                          // absence is expected to be GONE. See the `expect` note in grade().
+    failing: 1,           // the control, and a run where this is 0 is a register that cannot convict
+    // *** v4637 -- RAISED 8 -> 9, AND THE TRIPWIRE'S OWN RULE IS THAT A RISE FORCES SOMEBODY TO LOOK. ***
+    // Looked. This line carried 7; the main merge brought THREE more and one of this line's left, for 9:
+    //
+    //   (1) "nothing in the tree currently plays the other half, so a body that walks off a ledge stops
+    //       there" -- terrain-controller. About a CALLER, not a token. Ungradeable by construction, which is
+    //       the limit this row's own detail already states.
+    //   (2) "Nothing currently forces this: no gate is red over it and no asset has failed to load" --
+    //       about a WANT. Same: there is no token to look for.
+    //   (3) *** "This tree has NOTHING like it as a rendering feature" -- AND THIS ONE IS THE OFF-BRANCH
+    //       CLAIM THE CONTROL BELOW RESTATES, ARRIVING. *** offBranchConvicted below was recorded as a
+    //       number "so a later round can see it moved, and named in the header as unreachable from here".
+    //       It moved. The entry is in this tree now, so the conviction the control simulates is reachable
+    //       against the real entry rather than a restatement of it.
+    //
+    // The control is KEPT rather than replaced by the live entry: a register needs a row it is watched
+    // convicting, and swapping the simulation for the real thing on the round the real thing arrives would
+    // leave nothing to prove the convicting code still runs. Registering the live entry as a claim beside it
+    // is a round with a measurement in it, not a floor bump.
+    //
+    // *** v4778 -- 9 -> 11 at the rtx merge. Looked again, by diffing claimSentences()'s sentences at 978d26e3
+    // against the merged tree. *** Two rewritten in place and still counted, one for one: gltf-conformance-
+    // fixtures' sentence went to the past tense when the rtx line closed it (graded above as built), and (3)
+    // became "This entry originally proposed ... on the grounds that this tree had nothing like it" when the
+    // same line closed gpu-pathtracer-render-mode (graded above as built; v4778's correction to that entry
+    // was written so as not to add a third). Two ARRIVED, both from rtx rounds, and neither can be graded:
+    //
+    //   (4) splat-walking-demo: "...stop() cleanly removed the HUD and disposed the splat layer (confirmed
+    //       absent from window.splatScene.list() afterward)..." -- an observation of a live object list in a
+    //       booted browser session, not a claim about the source. There is no token whose absence it asserts.
+    //   (5) bvh-csg-speed-vs-manifold-tradeoff: "meshBoolean remains gated but unused -- nothing in the tree
+    //       calls it." About a CALLER, like (1). The module's name is in CODE in three files at the merge --
+    //       the module and its two gates -- so a token scan reads present whether or not the claim is true.
+    sentenceFloor: 11,
+    // The conviction that prompted the round is NOT in the six above: it is on another branch. Recorded
+    // here as a number so a later round can see it moved, and named in the header as unreachable from here.
+    // v4778: both kept as the v4537 reading. The entry is in this tree and graded; the control row still
+    // measures the same 16 files the second number recorded.
+    offBranchConvicted: 1,
+    offBranchMissedFiles: 16,
+    gradeClaimCallSitesBeforeThisRound: 1,
+});

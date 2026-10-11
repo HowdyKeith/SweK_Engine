@@ -26,7 +26,7 @@ import path from "node:path";
 import http from "node:http";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import { codeOnly, noComments } from "./sourceScan.mjs";   // v4075 -- noComments for the vramNote STRING LITERAL, which codeOnly would blank
 
 const require_ = createRequire(import.meta.url);
@@ -322,7 +322,7 @@ console.log("\n5. *** AND IT DOWNLOADS NOTHING -- WHICH IS THE WHOLE POINT ***")
         });
         await new Promise((r) => srv.listen(0, "127.0.0.1", r));
         const base = "http://127.0.0.1:" + srv.address().port;
-        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
         const pg = await b.newPage();
         const errs = [], weights = [];
         pg.on("pageerror", (e) => errs.push(String(e)));

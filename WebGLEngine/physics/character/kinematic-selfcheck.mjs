@@ -16,6 +16,15 @@
 //
 // THE SABOTAGE IS THE IMPORTANT ONE: raise the substep cap and a fast body walks clean through a wall. That
 // proves the substepping is load-bearing rather than decorative, which no amount of playing the game would.
+//
+// THE KINEMATIC-WIRING ROUND (section 13: stepCharacter's vertical velocity is fallBody.fallStep's). Sabotages:
+//   K1  the inline `v[1] += gravity * dt` put back                    3 RED (clamp, long fall, source)
+//   K2  fallStep called with terminal -Infinity, the clamp dropped    2 RED
+//   K3  the gravity default typed as -20 again, not GRAVITY           1 RED -- the value is right, the copy is the defect
+//   K4  a surface oracle handed to fallStep (a floor at 0)            1 RED -- 68 of 2,000 steps differ: fallStep
+//                                                                     must integrate and nothing else here
+// K1 leaves the bit-identity row GREEN, and must: below the clamp the two integrators ARE the same arithmetic,
+// which is the claim. What tells them apart is the clamp and the source.
 
 import { moveCharacter, stepCharacter, slideVector, overlapsSolid, overlappedVoxels, EPS } from "./kinematic.js";
 
@@ -237,7 +246,59 @@ const corner = (x, y, z) => y < 0 || x >= 4 || z >= 4;           // two walls me
 // 12. browser-safe
 {
     const src = (await import("node:fs")).readFileSync(new URL("./kinematic.js", import.meta.url), "utf8");
-    ok("kinematic.js imports nothing and uses no DOM", !/^\s*import\s/m.test(src) && !/\bwindow\.|\bdocument\./.test(src));
+    // the kinematic-wiring round: ONE import now, fallBody.mjs, for stepCharacter's integrator (section 13) -- and
+    // that module must itself import nothing, so the file stays as portable as it was
+    const fb = (await import("node:fs")).readFileSync(new URL("./fallBody.mjs", import.meta.url), "utf8");
+    const imports = src.match(/^\s*import\s[^;]*;/gm) || [];
+    ok("kinematic.js imports only ./fallBody.mjs, which imports nothing, and neither uses the DOM",
+        imports.length === 1 && /from "\.\/fallBody\.mjs"/.test(imports[0]) && !/^\s*import\s/m.test(fb) &&
+        !/\bwindow\.|\bdocument\./.test(src + fb), imports.map((l) => l.trim()).join(" "));
+}
+
+// 13. stepCharacter's VERTICAL VELOCITY IS fallBody.fallStep's (the kinematic-wiring round)
+// It was `v[1] += gravity * dt` with its own -20 and no terminal -- a fourth copy of the fall integrator. It calls
+// fallStep with no surface oracle now. Below the clamp that must change NOTHING, bit for bit; at the clamp it is
+// fallBody's -55; and the defaults are fallBody's symbols, not their values typed again.
+{
+    const { fallStep, GRAVITY, TERMINAL } = await import("./fallBody.mjs");
+    const before = ({ pos, half, velocity, isSolid, dt = 1 / 60, gravity = -20, stepHeight = 0, maxSubstep = 0.4 }) => {
+        const v = velocity.slice(); v[1] += gravity * dt;      // the integrator as it stood, verbatim
+        const r = moveCharacter({ pos, half, delta: [v[0] * dt, v[1] * dt, v[2] * dt], isSolid, stepHeight, maxSubstep });
+        for (const n of r.normals) { if (n[0] !== 0) v[0] = 0; if (n[1] !== 0) v[1] = 0; if (n[2] !== 0) v[2] = 0; }
+        return { ...r, velocity: v };
+    };
+    let seed = 2833; const rnd = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296);
+    const world = (x, y, z) => y < 0 || x >= 4 || (x === 1 && y === 2) || z <= -3;
+    let cases = 0, same = 0;
+    for (let i = 0; i < 2000; i++) {
+        const opts = { pos: [-1 + rnd() * 4, 0.9 + rnd() * 4, -2 + rnd() * 4], half: HALF, isSolid: world,
+                       velocity: [(rnd() - 0.5) * 12, (rnd() - 0.5) * 60, (rnd() - 0.5) * 12],
+                       dt: [1 / 60, 1 / 30, 0.1][i % 3], gravity: [-20, -18, -24][i % 3], stepHeight: [0, 1.1][i % 2] };
+        if (opts.velocity[1] + opts.gravity * opts.dt <= TERMINAL) continue;   // the clamp's own row is below
+        cases++;
+        const a = stepCharacter(opts), b = before(opts);
+        if (JSON.stringify([a.pos, a.velocity, a.normals, a.grounded]) === JSON.stringify([b.pos, b.velocity, b.normals, b.grounded])) same++;
+    }
+    ok("!! below the clamp the step is BIT-IDENTICAL to the integrator it replaced", cases > 1500 && same === cases,
+        `${same} of ${cases} random steps (positions, velocities up to 30, three dt, three gravities, step-up on and off) identical in position, velocity, normals and grounding`);
+    const air = () => false;
+    const at = stepCharacter({ pos: [0, 100, 0], half: HALF, velocity: [0, -54.9, 0], isSolid: air });
+    const open = stepCharacter({ pos: [0, 100, 0], half: HALF, velocity: [0, -54.9, 0], isSolid: air, terminal: -Infinity });
+    ok("!! and AT the clamp it is fallBody's: -54.9 m/s plus a frame of gravity stops at TERMINAL, -55",
+        at.velocity[1] === TERMINAL && TERMINAL === -55 && open.velocity[1] === -54.9 + GRAVITY / 60,
+        `clamped ${at.velocity[1]}; with terminal -Infinity, the old behaviour, ${open.velocity[1].toFixed(4)}`);
+    let pos = [0, 1000, 0], vel = [0, 0, 0], frames = 0;
+    for (; frames < 400 && vel[1] > TERMINAL; frames++) { const s = stepCharacter({ pos, half: HALF, velocity: vel, isSolid: air }); pos = s.pos; vel = s.velocity; }
+    const fb = fallStep({ pos: [0, 0, 0], vy: -3, surfaceUnder: () => null });
+    const st = stepCharacter({ pos: [0, 50, 0], half: HALF, velocity: [0, -3, 0], isSolid: air });
+    ok("!! a long fall with every default reaches TERMINAL and stays there; one frame's velocity equals fallStep's exactly",
+        vel[1] === TERMINAL && frames === Math.ceil(-TERMINAL / (-GRAVITY / 60)) && st.velocity[1] === fb.vy,
+        `terminal after ${frames} frames (${(frames / 60).toFixed(2)} s at ${GRAVITY}); -3 m/s after a frame: ${st.velocity[1]} both`);
+    // code only: this file's own comments quote the old line, and a comment is not an integrator
+    const src = (await import("node:fs")).readFileSync(new URL("./kinematic.js", import.meta.url), "utf8").replace(/\/\/[^\n]*/g, "");
+    ok("kinematic.js integrates no gravity of its own and its defaults are fallBody's SYMBOLS",
+        !/gravity\s*\*\s*dt/.test(src) && /gravity = GRAVITY, terminal = TERMINAL/.test(src) && /fallStep\(\{/.test(src),
+        "no `gravity * dt` left; `gravity = GRAVITY, terminal = TERMINAL` -- the number -20 is written once in the tree's character physics, in fallBody.mjs");
 }
 
 console.log("kinematic-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));

@@ -309,9 +309,28 @@ export function stepTerrain({
     const cos = Math.cos(maxSlopeDeg * Math.PI / 180) - 1e-12;
     const here = ground(pos[0], pos[2]);
     if (wl < 1e-12) {
-        return { pos: here ? [pos[0], here.y, pos[2]] : pos.slice(), moved: [0, 0, 0], movedH: 0,
-                 surfaceDist: 0, grounded: !!here, blocked: false, slid: false,
-                 normal: here ? here.n : null, slope: here ? slopeDeg(here.n) : null, substeps: 0, airborne: !here };
+        // *** STANDING STILL USED TO ACCEPT ANY HEIGHT THE ORACLE OFFERED, WITH NO STEP TEST AT ALL. *** The
+        // walking path below has one and has had one since the module shipped: `rise > stepHeight` refuses a
+        // wall, `rise < -snapDown` reports leaving the ground, and only what is left snaps. The zero-wish
+        // return skipped all of it and assigned `here.y` outright, so a body that was not moving could be
+        // relocated to any surface the oracle happened to name. Measured on a covered walkway -- floor at
+        // y = 0, roof at y = 5 -- a body standing at [12, 0, 10] came back at [12, 5, 10]: FIVE METRES UP,
+        // ONTO THE ROOF, HAVING ASKED FOR NOTHING. The same branch drops a body down an arbitrary cliff.
+        //
+        // The allowance is the walking path's, applied to the same quantity, because a rule that depends on
+        // whether the body happened to be moving is two rules. Settling is preserved: a body 0.3 above the
+        // floor with snapDown 0.5 still snaps to it, which is what the branch is FOR.
+        //
+        // *** OUT OF RANGE REPORTS AIRBORNE RATHER THAN MOVING, AND THAT IS THE HONEST OF THE TWO. *** The
+        // module owns no vertical velocity by design, so "the ground I can see is not one you could be on"
+        // is the caller's problem and saying so hands it over. A body really resting on a floor under a
+        // bridge is reported airborne and its caller's gravity does nothing, which is harmless; the
+        // alternative was a five-metre jump.
+        const rise = here ? here.y - pos[1] : 0;
+        const onIt = !!here && rise <= stepHeight && rise >= -snapDown;
+        return { pos: onIt ? [pos[0], here.y, pos[2]] : pos.slice(), moved: [0, 0, 0], movedH: 0,
+                 surfaceDist: 0, grounded: onIt, blocked: false, slid: false,
+                 normal: onIt ? here.n : null, slope: onIt ? slopeDeg(here.n) : null, substeps: 0, airborne: !onIt };
     }
     let dir = [wish[0] / wl, wish[1] / wl];
     // *** THE CONVENTION IS APPLIED HERE AND NOWHERE ELSE. *** SURFACE asks for `speed` along the ground, so

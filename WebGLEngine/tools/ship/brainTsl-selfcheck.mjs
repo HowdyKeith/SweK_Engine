@@ -30,12 +30,48 @@ import { buildAttackLayersDeep, ATK_FEATURES } from "../../brain/policy.js";
 // only, and that is what an import scan wants. The purity-shaped checks still use sourceScan's.
 import { codeOnly } from "./sourceScan.mjs";
 import { codeOnly as commentsOnly } from "./orreryFleetScan.mjs";
+import { adapterKey, verdict, describe, owedCount, coverage, compareFor, boundFrom,
+         readReadings, recordReading, mergeRecords, READINGS_PATH, SLACK } from "./adapterRecord.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
 const ok = (label, cond, detail) => { if (!cond) fails++; console.log(`  ${cond ? "PASS" : "FAIL"}  ${label}${detail ? "   " + detail : ""}`); };
 const report = (s) => console.log("  ----  " + s);
 const MLP = fs.readFileSync(path.join(ENG, "brain/mlp.js"), "utf8");
+// *** v4649 -- "BIT-IDENTICAL" WAS A PROPERTY OF A COMPILER THAT DOES NOT FUSE. ***
+// Sections 6 and 7 asserted zero differing cells between the generated pass, the shipped kernel and the f32
+// mirror. On SwiftShader that is true. On Keith's box 56 cells differ -- and WGSL permits a multiply-add to
+// be CONTRACTED into an fma, which rounds once instead of twice, so two kernels built from source text that
+// differs only in shape can legitimately produce different numbers on a driver that takes that freedom.
+// The disagreement is now EXPLAINED rather than tolerated: on the exactly-rounded activations every cell
+// must equal the unfused mirror or the fma one, both computed exactly here (for f32 operands one fround of
+// the double expression IS the fma result). No tolerance is introduced anywhere. How many cells a given
+// driver actually contracts is that adapter's own number, HELD or OWED.
+const DEVICE_AT_V4649 = Object.freeze({
+    "google/swiftshader": Object.freeze({ genVsShipped: 0, specifiedDiff: 0, sigmoidDiff: 1 }),
+});
+const GATE = "brainTsl";
+const VERDICTS = [];
+let AKEY_SEEN = null, RECORD_SEEN = null;
+/**
+ * Every cell of BOTH device kernels has to be one of the two mirrors: the unfused f32 one or its
+ * fma-contracted twin. Returns { unexplained, contracted } -- a cell that is neither mirror is not the
+ * compiler fusing a multiply-add, it is a number nobody can account for.
+ *
+ * A FUNCTION rather than a loop inside the device section, because on this box nothing contracts: gen, ship
+ * and cpu are identical everywhere, so deleting the fma twin changes NOTHING here and the row that rests on
+ * it cannot go red. Section 5b drives it on fixtures instead, both polarities, on any box.
+ */
+function explainCells(gen, ship, cpu, cpuF) {
+    let unexplained = 0, contracted = 0;
+    const mirror = (v, i) => Object.is(v, cpu[i]) || Object.is(v, cpuF[i]);
+    for (let i = 0; i < gen.length; i++) {
+        if (!mirror(gen[i], i) || !mirror(ship[i], i)) unexplained++;
+        else if (!Object.is(gen[i], cpu[i]) || !Object.is(ship[i], cpu[i])) contracted++;
+    }
+    return { unexplained, contracted };
+}
+
 const diffCount = (a, b) => { let d = 0, w = 0; for (let i = 0; i < a.length; i++) if (!Object.is(a[i], b[i])) { d++; w = Math.max(w, Math.abs(a[i] - b[i])); } return { d, w }; };
 
 // A deterministic fixture maker -- mulberry32, so the numbers are the same on every box and in the page.
@@ -178,6 +214,39 @@ console.log("\n5. THE SHELL, AND WHAT IT REFUSES");
 }
 
 // =============================================================================================================
+// =============================================================================================================
+console.log("\n5b. *** THE CONTRACTION EXPLANATION, DRIVEN ON FIXTURES -- BECAUSE THIS BOX NEVER CONTRACTS ***");
+{
+    // SwiftShader fuses nothing, so on this adapter gen, ship and the unfused mirror are identical in every
+    // cell and section 6's explanation row could not go red however it was broken. The logic is driven here
+    // instead, on a layer whose two mirrors genuinely differ, so the row is proven on any box and the device
+    // section is left to measure the device.
+    const L = fixture(11, 8, 4, 3, "none");
+    const lay = asLayer(L), xs = Float32Array.from(L.x);
+    const cpu = BT.mlpLayerCpu(lay, xs, L.batch);
+    const cpuF = BT.mlpLayerCpuFma(lay, xs, L.batch);
+    const moved = diffCount(cpu, cpuF).d;
+    ok("!! the two mirrors are DIFFERENT arithmetic, so the rows below are testing something",
+        moved > 0,
+        `${moved} of ${cpu.length} cells differ between the unfused mirror and the fma one. A fixture where ` +
+        "they agreed everywhere would make every row here vacuous, which is precisely the state this box's " +
+        "device leaves section 6 in");
+    ok("*** two kernels that each land on ONE OF THE TWO MIRRORS are fully explained ***",
+        explainCells(cpuF, cpu, cpu, cpuF).unexplained === 0 &&
+        explainCells(cpuF, cpu, cpu, cpuF).contracted > 0,
+        `one kernel fused, the other not: ${JSON.stringify(explainCells(cpuF, cpu, cpu, cpuF))}. That is the ` +
+        "state Keith's box reports as 56 differing cells, and it is a compiler taking a freedom the spec gives it");
+    ok("!! CONTROL: a cell that is NEITHER mirror is counted as unexplained",
+        (() => { const bad = Float32Array.from(cpuF); bad[0] = Math.fround(bad[0] + 1e-3);
+                 return explainCells(bad, cpu, cpu, cpuF).unexplained === 1; })(),
+        "a number that is not one of the two roundings is not a contraction -- it is a wrong answer, and the " +
+        "row in section 6 exists to catch exactly that rather than to wave the difference through");
+    ok("!! CONTROL: with the fma twin removed, the same fully-explained pair reads as unexplained",
+        explainCells(cpuF, cpu, cpu, cpu).unexplained > 0,
+        "the twin is what does the explaining; without it the check is the old bit-identical claim under a " +
+        "new name, and this row is what says the twin is load-bearing");
+}
+
 console.log("\n6. ON A REAL DEVICE: THE GENERATED PASS AGAINST THE SHIPPED KERNEL");
 {
     const skip = webgpuSkipReason();
@@ -190,31 +259,59 @@ console.log("\n6. ON A REAL DEVICE: THE GENERATED PASS AGAINST THE SHIPPED KERNE
         } else {
             const res = r.result;
             let genVsShipped = 0, specifiedDiff = 0, unspecified = null;
+            let unexplained = 0, specCells = 0, contracted = 0;
             CASES.forEach((c, n) => {
                 const gen = Float32Array.from(res.gen[n]), ship = Float32Array.from(res.shipped[n]);
                 const cpu = BT.mlpLayerCpu(asLayer(c.f), Float32Array.from(c.f.x), c.f.batch);
+                // The same layer with the compiler's one freedom taken. Exact, not approximate.
+                const cpuF = BT.mlpLayerCpuFma(asLayer(c.f), Float32Array.from(c.f.x), c.f.batch);
                 const vs = diffCount(gen, ship), vc = diffCount(gen, cpu);
                 genVsShipped += vs.d;
-                if (BT.actIsSpecified(c.f.act)) specifiedDiff += vc.d;
-                else unspecified = { tag: c.tag, ...vc, cells: gen.length };
+                if (BT.actIsSpecified(c.f.act)) {
+                    specifiedDiff += vc.d;
+                    specCells += gen.length;
+                    // Every cell of BOTH device kernels has to be one of the two mirrors. A cell that is
+                    // neither is not a contraction -- it is an unexplained number, and that is the red.
+                    const x = explainCells(gen, ship, cpu, cpuF);
+                    unexplained += x.unexplained; contracted += x.contracted;
+                } else unspecified = { tag: c.tag, ...vc, cells: gen.length };
                 report(`${c.tag.padEnd(44)} ${String(gen.length).padStart(4)} cells   vs shipped ${vs.d} ` +
                        `(worst ${vs.w.toExponential(2)})   vs cpu ${vc.d} (worst ${vc.w.toExponential(2)})`);
             });
             // COUNTED, NOT RESTATED: a detail line that prints "0 differing cells" beside its own FAIL is
             // decoration. Sabotage A caught exactly that here, the way it did in v4361's section 5.
-            ok("*** the generated pass is BIT-IDENTICAL to the shipped kernel, on every activation ***",
-                genVsShipped === 0,
-                `${genVsShipped} differing cells across ${CASES.length} layer shapes` +
-                (genVsShipped === 0 ? " -- not a tolerance, zero. Same device, same buffers, one written by " +
-                 "hand a thousand versions before the other was generated" : " -- the graph and the kernel " +
-                 "are computing different numbers"));
+            const ADAPTER = (res && res.adapterInfo) || null;
+            const RECORD = mergeRecords(DEVICE_AT_V4649, readReadings(GATE));
+            AKEY_SEEN = adapterKey(ADAPTER); RECORD_SEEN = RECORD;
+            const held = (name, measured, dir) => {
+                const v = verdict(RECORD, ADAPTER, measured, compareFor(name, dir));
+                VERDICTS.push({ ...v, name, dir });
+                return v;
+            };
+            // DURABLE on any adapter: on the exactly-rounded activations, every cell of BOTH device kernels
+            // is one of the two mirrors. That is the whole claim -- the two kernels compute the same
+            // arithmetic, and the only thing that can separate them is a contraction the spec allows.
+            ok("*** every cell of both device kernels is the f32 mirror or its fma-contracted twin -- nothing unexplained ***",
+                unexplained === 0,
+                `${unexplained} of ${specCells} cells match NEITHER mirror; ${contracted} were contracted. ` +
+                "A cell that is neither is not the compiler fusing a multiply-add, it is a number nobody " +
+                "can account for, and that is what this row is for");
+            const vGen = held("genVsShipped", genVsShipped, "max");
+            ok(`  ...and HOW MANY cells the two kernels differ in is this adapter's own number [${vGen.state}]`,
+                vGen.ok,
+                describe(vGen) + ` -- ${genVsShipped} differing cells across ${CASES.length} layer shapes. ` +
+                "SwiftShader fuses nothing and reads 0; a driver that fuses one kernel and not the other " +
+                "reads more, and the row above is what says those numbers are still the same arithmetic");
             // =====================================================================================================
             console.log("\n7. *** AND THE CLAIM SPLITS BY OPERATION CLASS, WHICH IS THE POINT ***");
-            ok("*** none and relu are bit-identical to the f32 CPU mirror too ***", specifiedDiff === 0,
+            const vSpec = held("specifiedDiff", specifiedDiff, "max");
+            ok(`*** none and relu are the f32 CPU mirror, up to the contraction and nothing else [${vSpec.state}] ***`,
+                vSpec.ok && unexplained === 0,
                 `${specifiedDiff} differing cells. +, * and max are exactly rounded in WGSL, so a Math.fround ` +
                 `mirror can reproduce the device and the claim is a bit claim`);
-            ok("*** sigmoid is NOT, and the gap is measured rather than hidden under a tolerance ***",
-                unspecified && unspecified.d > 0,
+            const vSig = held("sigmoidDiff", unspecified ? unspecified.d : 0, "min");
+            ok(`*** sigmoid is NOT, and the gap is measured rather than hidden under a tolerance [${vSig.state}] ***`,
+                vSig.ok,
                 unspecified ? `${unspecified.d} of ${unspecified.cells} cells differ, worst ` +
                     `${unspecified.w.toExponential(3)} -- exp() carries an ULP budget in WGSL rather than ` +
                     `correct rounding, so the device and Math.exp are both conformant and unequal`
@@ -257,6 +354,29 @@ console.log("\n6. ON A REAL DEVICE: THE GENERATED PASS AGAINST THE SHIPPED KERNE
 //      unspecified line reports "no unspecified-op case ran", and the kernel comparison loses its subject.
 //      The split is load-bearing rather than commentary: with it, two of the three activations carry a bit
 //      claim against a CPU mirror; without it, none of them can.
+// *** THE OWED POPULATION, AS A NUMBER. ***
+if (AKEY_SEEN) {
+    const c = owedCount(VERDICTS), cov = coverage(RECORD_SEEN);
+    report(`the record covers ${cov.count} adapter(s): ${cov.keys.join(", ")}`);
+    report(c.owed === 0
+        ? `adapter ${AKEY_SEEN}: all ${c.of} per-adapter reading(s) HELD against the record on file.`
+        : `adapter ${AKEY_SEEN}: ${c.owed} of ${c.of} per-adapter reading(s) OWED -- no reading on file for ` +
+          `this adapter, so those rows measured and reported rather than asserted. The universal row -- every ` +
+          `cell is one of the two mirrors -- still held. Re-run with --record ON THAT BOX to write them.`);
+    if (process.argv.includes("--record")) {
+        const owed = VERDICTS.filter((v) => v.state === "OWED" && Number.isFinite(v.measured));
+        if (!owed.length) { report(`--record: nothing OWED for ${AKEY_SEEN}.`); }
+        else {
+            const values = {};
+            for (const v of owed) values[v.name] = boundFrom(v.dir, v.measured);
+            const w = recordReading(GATE, AKEY_SEEN, values, { frozen: DEVICE_AT_V4649 });
+            const rel = path.relative(process.cwd(), READINGS_PATH).replace(/\\/g, "/");
+            report(w.wrote ? `--record: WROTE ${owed.length} reading(s) for ${AKEY_SEEN} at the ${SLACK}x slack convention. Commit it: git add ${rel}`
+                           : `--record: REFUSED -- ${w.why}`);
+        }
+    }
+}
+
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: whether a TSL-generated pass is worth SHIPPING into brain/mlp.js. It is not " +
     "faster and it is not shorter; what it is, is a second expression of the same kernel that a change to " +

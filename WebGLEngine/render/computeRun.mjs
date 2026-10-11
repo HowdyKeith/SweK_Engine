@@ -62,14 +62,21 @@ export async function runCompute(device, { code, entryPoint = "main", workgroups
 }
 
 /** The harnesses' one-buffer signature as a runCompute spec, by the kernel's own binding names. */
-export function corpusSpec({ code, entryPoint = "main", outCount, uniforms = null, workgroups = 1, inputs = null, outInit = null }) {
+// *** v4572 -- THE THIRD PLACE out-AT-0 AND uniform-AT-1 WAS BAKED IN. *** Both cross-backend harnesses
+// hard-coded it and so did this, which is the shape of a house style mistaken for a law: every corpus entry
+// happened to follow it, so nothing ever had to. The temporal arc's thirteen kernels put dst at bindings 1
+// to 4 and the uniform last, and adding them to the corpus turned this function's `at(0)` into a demand for
+// a buffer nobody supplies -- deviceCompute-selfcheck went red with twelve of them. The two options travel
+// with the entry now, defaulting to the old convention so every existing entry is untouched.
+export function corpusSpec({ code, entryPoint = "main", outCount, uniforms = null, workgroups = 1, inputs = null, outInit = null,
+                             outBinding = 0, uniformBinding = 1 }) {
     const decl = parseBindings(code).filter((b) => b.group === 0);
     const at = (i) => { const b = decl.find((x) => x.binding === i); if (!b) throw new Error(`computeRun: the kernel has no binding ${i}`); return b.name; };
-    const buffers = {};
-    buffers[at(0)] = outInit ? { data: WORDS(outInit).slice(0, Math.max(4, outCount * 4)) } : { size: Math.max(4, outCount * 4) };
-    if (uniforms) buffers[at(1)] = { data: uniforms instanceof Float32Array ? uniforms : Float32Array.from(uniforms), usage: "uniform" };
+    const out = at(outBinding), buffers = {};
+    buffers[out] = outInit ? { data: WORDS(outInit).slice(0, Math.max(4, outCount * 4)) } : { size: Math.max(4, outCount * 4) };
+    if (uniforms) buffers[at(uniformBinding)] = { data: uniforms instanceof Float32Array ? uniforms : Float32Array.from(uniforms), usage: "uniform" };
     for (const inp of inputs || []) buffers[at(inp.binding)] = { data: inp.data };
-    return { code, entryPoint, workgroups, buffers, read: [at(0)], outName: at(0), outCount };
+    return { code, entryPoint, workgroups, buffers, read: [out], outName: out, outCount };
 }
 
 /** Run a corpus entry's opts through the device; returns { ok, values: Float32Array } in the harnesses' shape. */

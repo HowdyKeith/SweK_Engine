@@ -16,7 +16,7 @@
 "use strict";
 
 import { MH_R, MH_ETA, MH_EXT, MH_TILT, MH_SCATTER_K, MH_SPREAD, MH_EXIT_CAP, MH_DRIFT_WOBBLE_CAP,
-         MH_AMP_CAP } from "./murmurKit.mjs";
+         MH_AMP_CAP, MH_SQRTPI } from "./murmurKit.mjs";
 
 /**
  * makeMurmurKitTsl(TSL) -> the kit's node builders.
@@ -92,6 +92,29 @@ export function makeMurmurKitTsl(TSL) {
         return TSL.vec4(env, uc, mhHash1(slot.add(1607.0), lane), dur);
     });
 
+    /**
+     * *** THE GESTURE CLOCK WITH THE SLOT INDEX SUPPLIED -- v4656. *** See render/murmurKit.mjs's
+     * mhFlourishPhase for the whole argument and the measurements. In one line: mh_flourish keys every hash
+     * on floor(t / SLOT), three species make SLOT a function of the live signals, and a divisor that moves
+     * makes that index JUMP -- which does not advance the gesture, it replaces it. The repair takes the
+     * integrated slot count instead, which is continuous and strictly increasing, so the index steps by one.
+     *
+     * slotLen is still taken: murmur's 0.9 s lead-in is an absolute duration rather than a fraction of the
+     * slot, and `dur` is returned in seconds because that is what its readers spend it as.
+     */
+    const mhFlourishPhase = Fn(([slotPhase, slotLen, lane]) => {
+        const SLOT = max(slotLen, float(1.0)).toVar();
+        const slot = floor(slotPhase).toVar();
+        const localPhase = slotPhase.sub(slot).toVar();
+        const startPhase = float(0.9).div(SLOT).add(float(0.28).mul(mhHash1(slot, lane))).toVar();
+        const durPhase = float(0.24).add(float(0.16).mul(mhHash1(slot.add(811.0), lane))).toVar();
+        const u = localPhase.sub(startPhase).div(durPhase).toVar();
+        const uc = clamp(u, 0.0, 1.0).toVar();
+        const sn = sin(float(Math.PI).mul(uc)).toVar();
+        const env = select(u.lessThanEqual(0.0).or(u.greaterThanEqual(1.0)), float(0.0), sn.mul(sn));
+        return TSL.vec4(env, uc, mhHash1(slot.add(1607.0), lane), SLOT.mul(durPhase));
+    });
+
     /** kit.ts's mh_spin: yaw about y then tilt about x. A rotation -- the CPU twin's gate asserts it preserves length. */
     const mhSpin = Fn(([p, ay, ax]) => {
         const ca = cos(ay).toVar(), sa = sin(ay).toVar();
@@ -100,11 +123,142 @@ export function makeMurmurKitTsl(TSL) {
         return vec3(q.x, cb.mul(q.y).sub(sb.mul(q.z)), sb.mul(q.y).add(cb.mul(q.z)));
     });
 
+    /**
+     * kit.ts's mh_roll: the THIRD rotation, in the xy plane about the view axis, applied BEFORE yaw and tilt.
+     * Without it "three ribbons at three yaws and three tilts came out as three horizontal swooshes stacked on
+     * each other, which is one swoosh". The CPU twin's gate asserts it preserves length, as mhSpin's does.
+     */
+    const mhRoll = Fn(([p, a]) => {
+        const c = cos(a).toVar(), s = sin(a).toVar();
+        return vec3(c.mul(p.x).sub(s.mul(p.y)), s.mul(p.x).add(c.mul(p.y)), p.z);
+    });
+
+    /**
+     * *** THE CLOSED-FORM TUBE: w * sqrt(pi) / sin(alpha) * exp(-perp^2 / w^2). *** The whole-ray integral of
+     * a gaussian tube crossed at angle alpha, and the reason arc and sol can draw a LINE where a march cannot
+     * draw one thinner than its own step. sinA is floored by the CALLER -- arc at 0.58, sol at 0.55, each for
+     * its own stated reason -- so nothing is floored here.
+     */
+    const mhTube = Fn(([w, sinA, perp2]) =>
+        w.mul(MH_SQRTPI).div(sinA).mul(exp(perp2.div(w.mul(w)).negate())));
+
+    /**
+     * *** THE LIVE SIGNALS, CONDITIONED ONCE -- the shader half of murmurKit.mjs's mhLive. ***
+     *
+     * A PLAIN JS CLOSURE AND NOT AN Fn, for the reason this file has hit three times now: Fn() compiles its
+     * body into a single callable node and cannot hand back a JS object of several nodes. Builders that
+     * return a SET are closures; only builders that return one node are Fn.
+     *
+     * The state weights are selects on a float index rather than an integer switch because the index arrives
+     * as a uniform: LISTENING is index 1, and THINKING and RESPONDING are 2 and 3, so `working` is the open
+     * interval (1.5, 3.5) and covers both. The half-unit windows are how murmur's own TS compares them and
+     * they are what makes an index of exactly 1.0 or 3.0 land unambiguously inside one.
+     *
+     * pow(0, 0.65) is 0 here and not a NaN: WGSL evaluates it as exp2(0.65 * log2(0)) = exp2(-inf) = 0, so a
+     * silent level gives a silent voice and no epsilon is needed to protect it. The CPU twin returns exactly
+     * 0 at the same input and murmurKit-selfcheck.mjs grades the pair at level 0 for that reason.
+     */
+    const mhLive = (level, activity, stateIndex) => {
+        const L = clamp(level, 0.0, 1.0).toVar();
+        const A = clamp(activity, 0.0, 1.0).toVar();
+        const idx = float(stateIndex).toVar();
+        const listening = select(idx.greaterThan(0.5).and(idx.lessThan(1.5)), float(1.0), float(0.0));
+        const working = select(idx.greaterThan(1.5).and(idx.lessThan(3.5)), float(1.0), float(0.0));
+        return {
+            voice: pow(L, float(0.65)).mul(float(0.55).add(listening.mul(1.00 - 0.55))),
+            pace: pow(A, float(0.85)).mul(float(0.60).add(working.mul(1.00 - 0.60))),
+        };
+    };
+
+    /**
+     * *** THE STATE READ -- the shader half of murmurKit.mjs's mhState. *** Four scalars, so a closure.
+     *
+     * SUCCESS (index 4) gives `complete`, `sweep` and `settled`; RESPONDING (index 3) gives `drive`; every
+     * other state gives four zeros, which is why the multiply-by-(1 + complete) form murmur uses everywhere
+     * is a no-op outside the flash instead of a thing each species has to guard.
+     *
+     * TSL's smoothstep IS the CPU twin's `ss` -- it clamps to 0..1 and returns u*u*(3-2u) -- so the pair here
+     * is the same curve written twice and not two curves that happen to be close. The one place to be careful
+     * is that `a` and `sweep` divide tau by DIFFERENT windows, 1.20 and 0.95: the ignition's travel finishes
+     * a quarter-second before its breath does, which is what stops the flash reading as a wipe.
+     */
+    const mhState = (stateIndex, stateTau) => {
+        const idx = float(stateIndex).toVar();
+        const tau = max(float(stateTau), 0.0).toVar();
+        const success = select(idx.greaterThan(3.5).and(idx.lessThan(4.5)), float(1.0), float(0.0)).toVar();
+        const responding = select(idx.greaterThan(2.5).and(idx.lessThan(3.5)), float(1.0), float(0.0)).toVar();
+        const a = clamp(tau.div(1.20), 0.0, 1.0).toVar();
+        const sw = clamp(tau.div(0.95), 0.0, 1.0).toVar();
+        return {
+            complete: smoothstep(float(0.0), float(0.30), a)
+                .mul(float(1.0).sub(smoothstep(float(0.36), float(1.0), a))).mul(success),
+            settled: smoothstep(float(0.30), float(1.05), a).mul(success),
+            sweep: smoothstep(float(0.0), float(1.0), sw).mul(success),
+            drive: smoothstep(float(0.0), float(0.55), tau).mul(responding),
+        };
+    };
+
+    /**
+     * *** THE IGNITION SHELL -- the shader half of murmurKit.mjs's mhIgnite. *** A gaussian ring at
+     * mix(lo, hi, sweep), which is how seven of the eighteen species run a SUCCESS along the marched ray.
+     * The species' own gain is NOT folded in; see the CPU twin's note for why nebula and tempest make that
+     * the load-bearing distinction.
+     */
+    const mhIgnite = Fn(([pLen, complete, sweep, lo, hi, width]) => {
+        const sr = pLen.sub(mix(lo, hi, sweep)).div(width).toVar();
+        return complete.mul(exp(sr.mul(sr).negate()));
+    });
+
+    /**
+     * *** THE RESPONDING LEAN: normalize(mix(wander, V, clamp(drive * k))). ***
+     *
+     * Three species spell this identically and the NORMALIZE is what the function exists to own: mixing two
+     * vectors does not give a unit vector even when both inputs are, so a port that dropped it would still
+     * point the right way while changing the SPEED along the path. `V` arrives already pre-normalized or not
+     * according to MH_DRIVE_HEADING's `pre`, which is murmur's per-species choice and is NOT cosmetic --
+     * none of its six heading vectors is a unit vector (sol's is 0.997046 long) and mixing toward a raw one
+     * is a different direction from mixing toward its unit version at every a strictly between 0 and 1.
+     */
+    const mhDriveHeading = Fn(([wander, V, drive, k]) => {
+        const a = clamp(drive.mul(k), 0.0, 1.0).toVar();
+        return normalize(mix(wander, V, a));
+    });
+
     /** kit.ts's mh_drift: eased angular travel, so an arc hurries and dawdles instead of spinning. */
     const mhDrift = Fn(([t, rate, wobble, lane]) => {
         const k = clamp(wobble, 0.0, MH_DRIFT_WOBBLE_CAP).toVar();
         const w2 = float(0.137).add(lane.mul(0.0413)).toVar();
         return rate.mul(t).add(k.mul(rate).div(w2).mul(sin(w2.mul(t).add(lane.mul(1.71)))));
+    });
+
+    /**
+     * *** THE SECULAR PHASE OF A SIGNAL-MODULATED RATE. *** See render/murmurKit.mjs's mhRatePhase for the
+     * factoring and the measurement: base * (t + a*P + b*V + c*D) is the EXACT integral of
+     * base * (1 + a*pace + b*voice + c*drive), and it reduces to murmur's own base * (1 + a*pace) * t
+     * wherever the signals are not moving -- which is why this divergence moves no recorded frame.
+     */
+    // Three coefficient-and-integral PAIRS, named generically because duet spends the middle one on its own
+    // gesture envelope rather than on voice -- see render/murmurKit.mjs's note.
+    const mhRatePhase = Fn(([base, t, kA, intA, kB, intB, kC, intC]) =>
+        base.mul(t.add(kA.mul(intA)).add(kB.mul(intB)).add(kC.mul(intC))));
+
+    /**
+     * The cross terms a PRODUCT rate needs. See render/murmurKit.mjs's mhCrossPhase for the expansion and
+     * the measurement: limn is the only species in murmur's roster whose rate is two modulated factors
+     * rather than one sum, and the integral of pace*drive is not the product of their integrals.
+     */
+    const mhCrossPhase = Fn(([base, kPaceDrive, paceDriveInt, kVoiceDrive, voiceDriveInt]) =>
+        base.mul(kPaceDrive.mul(paceDriveInt).add(kVoiceDrive.mul(voiceDriveInt))));
+
+    /**
+     * mh_drift with the secular term supplied rather than computed. The wobble keeps murmur's instantaneous
+     * rate as its amplitude on purpose -- that term is bounded by k*rate/w2 and does not accumulate, so the
+     * repair is confined to the half that grows without limit. Its CPU twin is mhDriftPhase.
+     */
+    const mhDriftPhase = Fn(([secular, rate, wobble, lane, t]) => {
+        const k = clamp(wobble, 0.0, MH_DRIFT_WOBBLE_CAP).toVar();
+        const w2 = float(0.137).add(lane.mul(0.0413)).toVar();
+        return secular.add(k.mul(rate).div(w2).mul(sin(w2.mul(t).add(lane.mul(1.71)))));
     });
 
     const mhBreath = Fn(([t, lane]) =>
@@ -248,8 +402,57 @@ export function makeMurmurKitTsl(TSL) {
     };
 
     /** Identity below the knee, an asymptotic compression above -- so a specular keeps its SHAPE, not a plateau. */
+    // v4829 -- mh_out's noise, kit.ts:316-317, in code values; see the CPU twin mhOutTri. fract(x) is x - floor(x),
+    // which is GLSL's own definition of it.
+    const mhOutTri = Fn(([pixel]) => {
+        const a = dot(pixel, vec2(0.06711056, 0.00583715)).toVar();
+        const b = float(52.9829189).mul(a.sub(floor(a))).toVar();
+        const n = b.sub(floor(b)).toVar();
+        return select(n.lessThan(0.5), sqrt(n.mul(2.0)).sub(1.0),
+                      float(1.0).sub(sqrt(max(float(0.0), float(2.0).sub(n.mul(2.0))))));
+    });
+    // mh_out on an ENCODED colour: + one code value of triangular dither, then the clamp mh_out ends with
+    const mhOutEncoded = (srgb, pixel) => clamp(srgb.add(mhOutTri(pixel).div(255.0)), 0.0, 1.0);
     const mhKnee = (x, knee) => select(x.lessThan(knee), x,
         knee.add(float(1.0).sub(knee).mul(float(1.0).sub(exp(x.sub(knee).div(max(float(1.0).sub(knee), float(1e-3))).negate())))));
+
+    /**
+     * *** mh_present's TAIL -- the shader half of murmurKit.mjs's mhPresentFinish. *** The full reasoning,
+     * murmur's three terms and their numbers, and how the sign of uvY was MEASURED rather than copied, are
+     * all in the CPU twin's doc comment; this is the same arithmetic on a node graph.
+     *
+     * NO BRANCH ON paper, matching the twin: murmur's `if (paper > 0.002)` is an early-out, both weights
+     * carry `paper` as a factor, and dropping it on both sides is what makes the pair agree exactly.
+     *
+     * RETURNS UN-CLAMPED LINEAR LIGHT, also matching mh_present, which hands its result to mh_out and lets
+     * THAT clamp after the encode. The shadow weight reaches 1.11 and the mix is allowed to overshoot.
+     */
+    const mhPresentFinish = (rgb, spec, contact, uvY, pal, inkLinear) =>
+        mhPresentKnee(mhPresentPaper(rgb, spec, contact, uvY, pal, inkLinear), pal.paper);
+
+    /** mh_present's tone knee, which MOVES with the ground: 0.90 on ink, 0.96 on paper. Per channel. */
+    const mhPresentKnee = (rgb, paper) => {
+        const knee = mix(float(0.90), float(0.96), paper).toVar();
+        return vec3(mhKnee(rgb.x, knee), mhKnee(rgb.y, knee), mhKnee(rgb.z, knee));
+    };
+
+    /**
+     * The two GROUND-DEPENDENT terms alone -- the catchlight and the contact shadow -- split from the knee
+     * because in this tree the two belong to different stages. render/aiPresenceOrbPresent.mjs already
+     * applies knee(x, 0.90) on the HDR path, quoting present.wgsl's own "the tone curve ... is written ONCE";
+     * the catchlight and shadow read `paper`, which nothing downstream of the species shader knows about.
+     * The CPU twin's doc comment carries the full reasoning and the gap this leaves.
+     */
+    const mhPresentPaper = (rgb, spec, contact, uvY, pal, inkLinear) => {
+        const paper = pal.paper;
+        const litLab = mhLchT(min(pal.s0.x.mul(1.06).add(0.05), float(1.02)), float(0.012), float(0.9)).toVar();
+        const lit = oklabToLinearT(litLab.x, litLab.y, litLab.z).toVar();
+        const kCatch = smoothstep(float(0.34), float(0.92), spec).mul(paper).toVar();
+        const afterLit = mix(rgb, lit, kCatch).toVar();
+        const below = smoothstep(float(-0.10), float(0.66), uvY.div(MH_R)).toVar();
+        const kShade = clamp(contact.mul(2.60), 0.0, 1.0).mul(float(0.06).add(below.mul(1.05))).mul(paper).toVar();
+        return mix(afterLit, inkLinear.mul(0.55), kShade);
+    };
 
     /** THE VALUE HIERARCHY AS ONE CURVE: the bottom 78% of energy into the rail's first 72%, the rest on the peak. */
     const mhTier = (e) => {
@@ -355,12 +558,156 @@ export function makeMurmurKitTsl(TSL) {
 
     const mhScatter = Fn(([arg, amp]) => amp.mul(exp(arg.mul(-MH_SCATTER_K))));
 
+    // ---- opal's lives and abyss's clocks -----------------------------------------------------------------
+    // *** THESE LIVE IN THE KIT FOR THE REASON limnArc AND cometFall DO: SO THERE IS A PAIR. *** They are
+    // species-specific arithmetic, not shared technique -- but the CPU twin in render/murmurKit.mjs is only
+    // worth having if something grades the shader against it, and a formula inlined in
+    // render/aiPresenceOrbTsl.mjs has nothing to grade. Written here, the kit gate's probe renders them and
+    // compares. v4632's sabotage sweep is what settled it: with opal's life inline in the species file,
+    // removing its floor, flattening its four periods into one and swapping sin squared for a bare sine ALL
+    // passed every row in the tree.
+
+    /**
+     * *** THE IGNITION's TRAVELLING GAUSSIAN -- v4659. *** See render/murmurKit.mjs's MH_IGNITE_AXIS: four
+     * species run the shell's arithmetic along a coordinate of their OWN rather than along |p|, and each
+     * one is that species' own gesture figure run on `sweep` and drawn a little tighter.
+     */
+    const mhIgniteAxis = Fn(([coord, complete, sweep, lo, hi, width, gain, flat]) => {
+        const r = coord.sub(mix(lo, hi, sweep)).div(width).toVar();
+        return complete.mul(flat.add(gain.mul(exp(r.mul(r).negate()))));
+    });
+
+    /**
+     * aura's ignition -- a von MISES in the angle, which wraps with no seam. See render/murmurKit.mjs's
+     * MH_IGNITE_LAP: aura.ts's own reason is that a seam "would be a dark notch running across all three
+     * ribbons at once", and exp(k*(cos x - 1)) is a function of cos alone and periodic by construction.
+     */
+    const mhIgniteLap = Fn(([ang, complete, sweep, flat, gain, k]) =>
+        complete.mul(flat.add(gain.mul(exp(k.mul(cos(ang.sub(sweep.mul(6.2831853))).sub(1.0)))))));
+
+    /** fathom's ignition -- a triangular window in the sweep around this shell's own turn, innermost first, so the flash travels OUTWARD -- see the CPU twin's note. */
+    const mhIgniteTurn = Fn(([turnIndex, complete, sweep, step, lead, edge, flat, gain]) => {
+        const w = float(1.0).sub(smoothstep(float(0.0), edge, abs(sweep.sub(turnIndex.mul(step)).sub(lead)))).toVar();
+        return complete.mul(flat.add(gain.mul(w)));
+    });
+
+    /**
+     * *** THE SUCCESS FLASH's SATURATION -- v4658. *** See render/murmurKit.mjs's MH_COMPLETE_LIFT: three
+     * species pull a per-figure LIFE toward full rather than scaling it, mix(life, target, complete * k),
+     * and chorus's target overshoots past 1 while opal's and sol's do not. A saturation closes the
+     * differences between figures; the interior factor beside the settle preserves them. Both are the flash.
+     */
+    const mhCompleteLift = Fn(([x, complete, k, over]) =>
+        mix(x, float(1.0).add(over.mul(complete)), complete.mul(k)));
+
+    /** ONE OF opal's FOUR LIVES. sin SQUARED for flat ends, on a floor of 0.16 -- nothing ever switches on. */
+    const mhOpalLife = Fn(([k, t]) => {
+        const per = float(14.3).add(k.mul(2.7));
+        const sn = sin(t.mul(6.2831853).div(per).add(k.mul(1.97))).toVar();
+        return float(0.16).add(sn.mul(sn).mul(0.84));
+    });
+
+    /**
+     * abyss's SLOT LENGTH in seconds. High rarity is rarer; voice, cadence, drive and the small mounts all
+     * shorten it.
+     *
+     * *** THIS TWIN CARRIED TWO OF murmur's FOUR SIGNAL TERMS UNTIL v4656, AND THE PROBE COULD NOT SEE IT. ***
+     * abyss.ts divides by (1 + 0.55*live.voice + 0.35*live.pace + 1.60*st.drive); this function took a single
+     * `voice` argument and divided by (1 + 0.55*voice). render/murmurKit.mjs's abyssSlot had all four from
+     * the start, so the CPU reference was AHEAD of the shader -- and the kit probe swept rarity and voice
+     * only, leaving the pair that was missing at the one value where its absence is invisible. Two arguments
+     * pinned at zero grade nothing, which is the third round running that this exact shape has been found.
+     */
+    const mhAbyssSlot = Fn(([rarity, voice, pace, drive, small]) =>
+        mix(float(9.0), float(26.0), clamp(rarity, 0.0, 1.0))
+            .div(float(1.0).add(voice.mul(0.55)).add(pace.mul(0.35)).add(drive.mul(1.60)))
+            .mul(mix(float(1.0), float(0.66), small)));
+
+    // ---- the surface: mh_key / mh_small / mh_surface -----------------------------------------------------
+    // *** ALL EIGHTEEN SPECIES CALL mh_surface AND THIS PORT APPROXIMATED IT UNTIL v4629. *** What stood in
+    // render/aiPresenceOrbTsl.mjs was a fresnel rim at a fixed exponent of 4.5, two lobes off a FIXED light
+    // direction this port chose, a per-species rim constant that matched murmur's roster on two species out of
+    // four, and NO CONTACT GLOW AT ALL. See render/murmurKit.mjs for what each term is and why.
+
+    /**
+     * THE CONTAINMENT: a safety net for the CONTACT GLOW, not the design of the edge. At reach 0.72 the fall
+     * runs from a uv radius of 0.36 to 0.49 while the body's worst case is 0.339, so it sits clear outside
+     * every hero's silhouette -- which is the whole point, since the glow is nonzero only out there.
+     */
+    const mhContainment = Fn(([uvLen, reach]) =>
+        float(1.0).sub(smoothstep(reach, reach.add(0.26), uvLen.mul(2.0))));
+
+    /** THE KEY LIGHT, AND IT MOVES. Up and to the LEFT -- screen y runs down, so both leads are negative. */
+    const mhKey = Fn(([t]) => {
+        const dr = t.mul(0.21).toVar();
+        return normalize(vec3(sin(dr).mul(0.055).sub(0.52),
+                              cos(dr.mul(0.83)).mul(0.045).sub(0.60),
+                              float(0.61)));
+    });
+
+    /** THE SIZE DIAL: 1 at 18 pt, 0 at 120 pt and above. Its real midpoint is 52 pt, not the 46 kit.ts says. */
+    const mhSmall = Fn(([w, h]) => float(1.0).sub(smoothstep(float(16.0), float(88.0), max(min(w, h), float(1.0)))));
+
+    /**
+     * THE SURFACE EVERY HERO SHARES. A JS closure, not an Fn, for the reason the colour rail is one: it takes
+     * a BODY (six nodes) and hands back THREE, and an Fn's parameter list carries single nodes, not sets.
+     *
+     * b: { m, P, N, Rd, rho, fres } as returned alongside mhBody. tilt: a vec2 in [-1,1]^2.
+     * Returns { rim, spec, glow } in the energy units mh_lit consumes.
+     */
+    const mhSurface = (b, t, small, inkRgb, tilt, rimKIn, specK, glowK) => {
+        const paper = mhPaper(inkRgb).toVar();
+        // The edge does more work on paper than on ink -- it is the whole silhouette of an object otherwise
+        // nearly the colour of the page. A third more of it, and no other term changes.
+        const rimK = rimKIn.mul(mix(float(1.0), float(1.32), paper)).toVar();
+
+        // THE BARELY COUNTER-MOVE: the catchlight shifts AGAINST the tilt, because the world stays put while
+        // the object turns. A fifth of what the interior does, and meant to be subliminal.
+        const H = normalize(mhKey(t).sub(vec3(tilt.x, tilt.y, float(0.0)).mul(MH_TILT * 0.20))
+                            .add(vec3(0.0, 0.0, 1.0))).toVar();
+        const nh = clamp(dot(b.N, H), 0.0, 1.0).toVar();
+        // Screen y runs down, so a normal pointing UP has negative y: this is the sky half of the sphere.
+        const sky = float(0.5).sub(clamp(b.N.y, -1.0, 1.0).mul(0.5)).toVar();
+        // SIZE-ADAPTIVE TIGHT LOBE: 96 at 120 pt, 16 at 18 pt, where a 96 highlight would be a third of a
+        // pixel and would flicker in and out as the body moved under it.
+        const tight = mix(float(96.0), float(16.0), small).toVar();
+        const spec = pow(nh, tight).add(pow(nh, float(4.0)).mul(0.09))
+            .mul(b.m).mul(specK).mul(mix(float(0.92), float(1.08), sky)).toVar();
+
+        // THE RIM IS NOT A RING: 55% everywhere plus 45% on the side AWAY from the key. That asymmetry
+        // FLATTENS on paper, where the rim stops being lighting and becomes the refracted edge of a clear
+        // sphere, which goes all the way round.
+        const nxy = normalize(vec2(b.N.x.add(1e-4), b.N.y.add(1e-4))).toVar();
+        const wrap0 = float(0.55).add(clamp(dot(nxy, normalize(vec2(0.42, 0.50))), 0.0, 1.0).mul(0.45)).toVar();
+        const wrap = mix(wrap0, float(0.88), paper).toVar();
+        // THE ENVIRONMENT, and the rule is that if you can see it, it is wrong: 14% on the rim, read off the
+        // normal. A VALUE gradient and not a colour one -- a second hue through a term nobody dialled would
+        // break the one-hue-family law from underneath -- and it INVERTS on paper.
+        const envRim = mix(mix(float(0.86), float(1.14), sky), mix(float(1.14), float(0.86), sky), paper).toVar();
+        const rim = pow(b.fres, mix(float(3.9), float(5.4), paper)).mul(b.m).mul(wrap).mul(rimK).mul(envRim).toVar();
+
+        // OUTSIDE ONLY: (1 - m) is zero under the silhouette and rises through it. It pools DOWNWARD, because
+        // its job is to stop the silhouette meeting the ink as a cut line, not to be a halo anybody notices.
+        const outr = b.rho.sub(b.Rd).div(0.13).toVar();
+        const pool = float(0.55).add(smoothstep(float(-0.25), float(0.85), b.P.y).mul(0.55)).toVar();
+        const glow = exp(outr.mul(outr).negate()).mul(float(1.0).sub(b.m)).mul(pool).mul(glowK).toVar();
+
+        return { rim, spec, glow };
+    };
+
     return {
-        MH_R, MH_ETA, MH_EXT, MH_TILT, MH_SCATTER_K, MH_EXIT_CAP,
-        mhHash, mhGrad3, mhNoise3, mhHash1, mhFlourish, mhBreath, mhDrift, mhSpin,
+        // *** MH_SPREAD IS IN THIS LIST BECAUSE IT HAS NOW GONE MISSING TWICE, THE SAME CONSTANT BOTH TIMES. ***
+        // v4627: mh_shade used it and this module never imported it, so the whole colour rail rendered black
+        // and the bisect cost most of a round. v4630: it WAS imported here but not handed back, so a species
+        // reading KIT.MH_SPREAD got undefined, multiplied a node by it, and three.js emitted WGSL containing
+        // the literal token `null` -- which the GPU rejected at pipeline creation rather than silently. Both
+        // times the value is one number that half the family's colour depends on and nothing owned it.
+        MH_R, MH_ETA, MH_EXT, MH_TILT, MH_SCATTER_K, MH_SPREAD, MH_EXIT_CAP,
+        mhHash, mhGrad3, mhNoise3, mhHash1, mhFlourish, mhFlourishPhase, mhBreath, mhDrift, mhSpin, mhRoll, mhTube, MH_SQRTPI, mhLive, mhState, mhIgnite, mhDriveHeading, mhRatePhase, mhCrossPhase, mhDriftPhase,
         mhRefract, mhLook, mhExit, mhHaze, mhMedium, mhInside, mhTransmit, mhScatter,
         mhDeform, mhBody, MH_AMP_CAP,
-        mhPaper, mhPalette, mhShade, mhKnee, mhTier, mhLit, mhLchT, labOfSrgb, srgbToLinearT, linearToOklabT, oklabToLinearT,
+        mhKey, mhSmall, mhSurface, mhContainment, mhOpalLife, mhAbyssSlot, mhCompleteLift, mhIgniteAxis, mhIgniteLap, mhIgniteTurn,
+        mhPaper, mhPalette, mhShade, mhOutTri, mhOutEncoded, mhKnee, mhTier, mhPresentFinish, mhPresentPaper, mhPresentKnee, mhLit, mhLchT, labOfSrgb, srgbToLinearT, linearToOklabT, oklabToLinearT,
         Loop,
     };
 }
@@ -377,12 +724,21 @@ export function makeMurmurKitTsl(TSL) {
  * wrong-shift error this kit's provenance note exists about.
  *
  * mode: "hash"  -> pixel (x,y) carries mhHash(x, y, 0) packed big-endian across RGBA.
- *       "noise" -> mhNoise3 over a fixed lattice, remapped to 0..1 in R (8-bit, so compared within quantisation).
+ *       "noiseBits" -> mhNoise3 over a fixed lattice, its f32 BITS packed big-endian across RGBA as the hash is
+ *                (v4690: it was a byte of the remapped value, and a byte comparison is a comparison of two roundings).
  *       "exit"  -> mhExit for a ray through the body, in R, scaled by 1/MH_EXIT_CAP.
+ *       "live"  -> mh_live's voice in R and pace in G, over signal (x) by state (y).
+ *       "state" -> mh_state's complete/sweep/settled/drive in RGBA, over tau (x) by state (y).
+ *       "ignite" -> the SUCCESS shell for three species in RGB, over |p| (x) by sweep (y).
+ *       "heading" -> the RESPONDING lean's mix, over drive (x) by wander angle (y), direction in RGB.
+ *       "drift"   -> the modulated clock: repaired phase (R), murmur's (G) and their gap (B), all mod 2pi.
+ *       "finishPaper" / "finishInk" / "finishGrey" -> mh_present's tail over specular (x) by height (y);
+ *                the grey case carries a light ground and a mid-grey page, which is where two of its
+ *                constants are observable at all.
  */
 export function makeMurmurKitProbeTsl(THREE, TSL, { mode = "hash", n = 16 } = {}) {
     const K = makeMurmurKitTsl(TSL);
-    const { Fn, float, vec2, vec3, vec4, uint, int, uv, floor, clamp, select, pow, max } = TSL;
+    const { Fn, float, vec2, vec3, vec4, uint, int, uv, floor, clamp, select, pow, max, cos, sin } = TSL;
 
     const main = Fn(() => {
         // Pixel indices from uv. floor(uv * n) is the cell, exactly as the CPU side enumerates it.
@@ -416,12 +772,295 @@ export function makeMurmurKitProbeTsl(THREE, TSL, { mode = "hash", n = 16 } = {}
             const enc = (v) => select(v.lessThanEqual(0.0031308), v.mul(12.92), pow(max(v, float(1e-6)), float(1 / 2.4)).mul(1.055).sub(0.055));
             return vec4(clamp(enc(lit.x), 0.0, 1.0), clamp(enc(lit.y), 0.0, 1.0), clamp(enc(lit.z), 0.0, 1.0), 1.0);
         }
-        if (mode === "noise") {
+        if (mode === "opalAbyss") {
+            // x carries opal's life for flash floor(px/4) over a 24 s span; y carries abyss's slot length over
+            // the rarity range at three voices. One frame, both species' clocks, graded against the f64 twin.
+            const k = TSL.floor(px.div(n).mul(4.0)).toVar();
+            const tt = py.div(n).mul(24.0).toVar();
+            const life = K.mhOpalLife(k, tt).toVar();
+            // G sweeps rarity against VOICE, B sweeps PACE against DRIVE at a held rarity, so all four of
+            // abyss's signal inputs move somewhere in this one frame. Two channels rather than one because
+            // the frame is two-dimensional and the function takes four signals: before v4656 the probe swept
+            // rarity and voice alone, and the two terms the shader was MISSING sat at zero in every pixel.
+            const slot = K.mhAbyssSlot(px.div(n), TSL.floor(py.div(n).mul(3.0)).mul(0.5),
+                                       float(0.0), float(0.0), float(0.0)).toVar();
+            const slotPD = K.mhAbyssSlot(float(0.6), float(0.0), px.div(n),
+                                         TSL.floor(py.div(n).mul(3.0)).mul(0.5), float(0.0)).toVar();
+            // *** AND THE ALPHA CHANNEL CARRIES THE SUCCESS FLASH's SATURATION -- v4658. *** x is the figure
+            // going in (0 to 1.5, so it spans BELOW and ABOVE the target) and y is `complete` (0 to 1).
+            // chorus's pair is the one probed because it is the only one whose target OVERSHOOTS, which is
+            // where a saturation and a gain part company most clearly -- and a sabotage that rewrote this
+            // Fn as x * (1 + complete * k) walked through every pixel row in the round, because a gain
+            // brightens too. The per-species constants are a source census; the FUNCTION is this.
+            const lift = K.mhCompleteLift(px.div(n).mul(1.5), py.div(n), float(0.90), float(0.45)).toVar();
+            return vec4(clamp(life, 0.0, 1.0), clamp(slot.div(32.0), 0.0, 1.0),
+                        clamp(slotPD.div(32.0), 0.0, 1.0), clamp(lift.div(2.0), 0.0, 1.0));
+        }
+        if (mode === "surface") {
+            // *** mh_surface OVER A WHOLE SPHERE, AGAINST THE CPU REFERENCE. *** The frame spans -1.2..1.2 in
+            // body units so the OUTSIDE of the silhouette is in shot: the contact glow lives entirely out
+            // there and a probe cropped to the body would grade it at zero everywhere and call that agreement.
+            //
+            // The body is built here the same way the species' analytic-sphere path builds it, and the gate's
+            // CPU side builds it identically -- so what this pair grades is mh_surface, not two different
+            // opinions about what a sphere is.
+            const bx = px.div(n).mul(2.4).sub(1.2).toVar();
+            const by = py.div(n).mul(2.4).sub(1.2).toVar();
+            const rho = TSL.length(vec2(bx, by)).toVar();
+            const bz = TSL.sqrt(max(float(1.0).sub(rho.mul(rho)), float(0.0))).toVar();
+            const Nb = vec3(bx, by, bz).toVar();
+            const f = float(0.018);
+            const bm = float(1.0).sub(TSL.smoothstep(float(1.0).sub(f), float(1.0).add(f), rho)).toVar();
+            const bodyS = { m: bm, P: Nb, N: Nb, Rd: float(1.0), rho, fres: float(1.0).sub(clamp(Nb.z, 0.0, 1.0)) };
+            // Knobs picked so all three channels are exercised at once and none saturates: still's own rim and
+            // specular, and a glow raised to 0.40 so the outside band is well clear of 8-bit quantisation.
+            const sf = K.mhSurface(bodyS, float(3.7), float(0.0), vec3(0x0A / 255, 0x0A / 255, 0x0B / 255),
+                                   vec2(0.35, -0.20), float(1.15), float(1.30), float(0.40));
+            // Each channel carries its own scale so none of the three clips: rim and spec reach about 1.3,
+            // the glow about 0.4. The gate divides by the same numbers.
+            return vec4(clamp(sf.rim.div(2.0), 0.0, 1.0), clamp(sf.spec.div(2.0), 0.0, 1.0),
+                        clamp(sf.glow.div(0.5), 0.0, 1.0), 1.0);
+        }
+        if (mode === "finishPaper" || mode === "finishInk" || mode === "finishGrey") {
+            // *** mh_present's TAIL OVER ITS WHOLE INPUT SQUARE, ON BOTH GROUNDS. *** x carries the SPECULAR
+            // 0..1.2 (past the catchlight's 0.92 upper edge, so the saturated end is in shot) and y carries
+            // the vertical position -1.2..1.2 in body units, which is what the shadow's `below` reads -- so
+            // one frame samples the catchlight along one axis and the shadow's pooling along the other.
+            //
+            // THE CONTACT IS HELD AT 0.5 RATHER THAN SWEPT, because clamp(contact * 2.60, 0, 1) saturates at
+            // 0.385 and a third axis would spend half the frame on a constant. The clamp itself is graded by
+            // the CPU rows instead. The incoming rgb is a mid grey, which is the one value that can move UP
+            // toward the catchlight and DOWN toward the shadow and show both.
+            //
+            // BOTH GROUNDS, because every term here except the knee is multiplied by `paper`: on ink this
+            // function is the knee and nothing else, and a probe that only ran on paper could not tell a
+            // correct ink path from one that had quietly applied the paper terms at half strength.
+            // *** AND A THIRD GROUND, BECAUSE TWO OF mh_present's CONSTANTS ARE INVISIBLE ON THE OTHER TWO. ***
+            // Found by sabotage, measured rather than assumed. (1) The catchlight's 1.06 gain is DEAD on the
+            // house paper: s0.L is 0.9701, so 0.9701 * 1.06 + 0.05 = 1.0782 and the 1.02 cap takes it -- the
+            // gain could be 1.12 or 1.5 and the frame would not move. On a LIGHT GREY ground s0.L is 0.8054,
+            // the sum is 0.9038, and the gain is live. (2) The shadow's 0.55 tint multiplies the INK colour,
+            // and the house ink is 0.00304 in linear light: 0.55 of it is 0.00167 against 0.75's 0.00228, a
+            // difference of 0.00061 where one 8-bit step is 0.00392. It cannot be seen on a near-black page
+            // by construction. This case gives it a MID-GREY ink so it can be.
+            const paperGround = mode === "finishPaper";
+            const greyCase = mode === "finishGrey";
+            const ink = greyCase ? vec3(0.45, 0.45, 0.45) : vec3(0x0A / 255, 0x0A / 255, 0x0B / 255);
+            const ground = greyCase ? vec3(0.75, 0.75, 0.75) : (paperGround ? vec3(0.97, 0.96, 0.94) : vec3(0x0A / 255, 0x0A / 255, 0x0B / 255));
+            const TONE = vec3(0x6C / 255, 0x63 / 255, 0xE8 / 255);
+            const pal = K.mhPalette(ground, TONE, TONE, float(0.0), float(1.0));
+            const spec = px.div(n).mul(1.2).toVar();
+            const uvY = py.div(n).mul(2.4).sub(1.2).mul(K.MH_R).toVar();
+            const inkLin = vec3(K.srgbToLinearT(ink.x), K.srgbToLinearT(ink.y), K.srgbToLinearT(ink.z));  // the page, not the ground
+            const outRgb = K.mhPresentFinish(vec3(0.5, 0.5, 0.5), spec, float(0.5), uvY, pal, inkLin).toVar();
+            // Scaled by a half so the catchlight's warm white (near 1.0 linear) and any overshoot below zero
+            // both sit inside the 0..1 an 8-bit channel can carry. The gate divides by the same number.
+            return vec4(clamp(outRgb.mul(0.5), 0.0, 1.0), 1.0);
+        }
+        if (mode === "drift") {
+            // *** THE MODULATED CLOCK, OVER *WHEN* THE SIGNAL MOVED BY *WHEN* WE LOOK. ***
+            //
+            // A first cut parameterised this by the pace INTEGRAL and derived an instantaneous pace as P/t
+            // -- the mean so far -- and the two expressions came out algebraically identical, because
+            // base*(1 + k*(P/t))*t IS base*(t + k*P). A probe on which the subject cannot differ from the
+            // thing it replaces measures nothing. The difference only exists when the instantaneous signal
+            // differs from its own mean, which is to say while the signal is MOVING.
+            //
+            // So x is t0, the moment a step from pace 0 to pace 1 lands, over 0..60 s, and y is t, when the
+            // frame is drawn, over 0..120 s. Then P = max(0, t - t0) exactly and the instantaneous pace is
+            // 0 or 1. R is the repaired phase mod 2*pi, G is murmur's mod 2*pi, and B is the GAP in radians
+            // scaled by 20 -- which is a linear ramp in t0 wherever t > t0, because the error is base*k*t0
+            // and nothing else. A port that computed the same thing twice would leave B flat at zero.
+            const t0 = px.div(n).mul(60.0).toVar();
+            const t = py.div(n).mul(120.0).toVar();
+            const base = float(0.34), kP = float(0.95), lane = float(1.0), wob = float(0.62);
+            const P = max(t.sub(t0), float(0.0)).toVar();
+            const paceNow = TSL.step(t0, t).toVar();          // 0 before the step, 1 after
+            const rateNow = base.mul(float(1.0).add(paceNow.mul(kP))
+                .add(paceNow.mul(0.31 * 0.5)).add(paceNow.mul(0.77 * 0.25))).toVar();
+            // *** ALL FOUR TERMS ARE EXERCISED, NOT JUST THE PACE ONE. *** A first cut passed 0 for the voice
+            // and drive coefficients and a sabotage deleted the drive term from the TSL twin without moving a
+            // pixel: a coefficient of zero grades nothing. The same step drives all three signals here, with
+            // three different coefficients, so each term has to be present AND carry its own number.
+            const sec = K.mhRatePhase(base, t, kP, P, float(0.31), P.mul(0.5), float(0.77), P.mul(0.25));
+            const mine = K.mhDriftPhase(sec, rateNow, wob, lane, t).toVar();
+            const theirs = K.mhDrift(t, rateNow, wob, lane).toVar();
+            const TAU = 6.283185307179586;
+            const wrap = (v) => v.div(TAU).sub(TSL.floor(v.div(TAU)));
+            return vec4(wrap(mine), wrap(theirs), clamp(theirs.sub(mine).div(20.0), 0.0, 1.0), 1.0);
+        }
+        if (mode === "heading") {
+            // *** THE RESPONDING LEAN'S MIX, OVER THE WHOLE RAMP BY A FULL TURN OF WANDER. *** x carries
+            // drive 0..1 and y carries the wander angle over a full 2*pi, so one frame is every gesture
+            // still can hash crossed with every point of the ramp. The three channels are the resulting
+            // DIRECTION's components mapped from -1..1 into 0..1, which an 8-bit UNORM carries exactly at
+            // the quantisation the gate compares at.
+            //
+            // THE TARGET IS still's RAW VECTOR AND NOT ITS UNIT VERSION, which is murmur's spelling for
+            // this species and the thing MH_DRIVE_HEADING's `pre` records. A probe that normalized it first
+            // would be grading the tidied formula rather than the shipped one.
+            const drive = px.div(n).toVar();
+            const ga = py.div(n).mul(6.2831853).toVar();
+            const wander = vec3(cos(ga), sin(ga.mul(1.3)).mul(0.42), sin(ga)).toVar();
+            const d = K.mhDriveHeading(wander, vec3(0.92, -0.18, 0.35), drive, float(1.0)).toVar();
+            return vec4(clamp(d.mul(0.5).add(0.5), 0.0, 1.0), 1.0);
+        }
+        if (mode === "ignite") {
+            // *** THE SHELL OVER THE WHOLE RAY BY THE WHOLE SWEEP. *** x carries |p| over 0..1.2 -- past the
+            // surface, so the ring's far end is in shot rather than cropped at the body -- and y carries the
+            // sweep 0..1, so one frame is the ring's entire journey from the heart to the surface.
+            //
+            // *** AND THE ALPHA CHANNEL READS THE SAME LATTICE A SECOND WAY, FOR `complete`. *** The first cut
+            // held complete at 1 in all three channels and reasoned that a pure multiplier did not need an
+            // axis of its own. A sabotage then deleted the multiplier from this function and walked through
+            // every row in the gate: the frame is IDENTICAL when complete is 1. So alpha re-reads x as |p|
+            // and y as COMPLETE, with the sweep PINNED at 0.5 -- pinned, and not read off the same y,
+            // because a port that spent `sweep` where `complete` belongs would pass a probe that confounded
+            // the two. complete reaches 0 EXACTLY at row 0, which is the state four of murmur's five are in.
+            //
+            // THREE SPECIES IN THREE CHANNELS, and they are the three that bracket the table: still has the
+            // shortest travel (hi 0.95) and the widest ring (0.26), duet the narrowest (0.22), and tempest
+            // the longest (hi 1.05) with the highest gain. A probe carrying one species could not tell a
+            // correct table from a constant.
+            const pLen = px.div(n).mul(1.2).toVar();
+            const sweep = py.div(n).toVar();
+            const one = float(1.0);
+            const r = K.mhIgnite(pLen, one, sweep, float(0.02), float(0.95), float(0.26));   // still
+            const g = K.mhIgnite(pLen, one, sweep, float(0.02), float(1.00), float(0.22));   // duet
+            const b = K.mhIgnite(pLen, one, sweep, float(0.02), float(1.05), float(0.24));   // tempest
+            const a = K.mhIgnite(pLen, py.div(n), float(0.5), float(0.02), float(0.95), float(0.26));  // still, complete on y
+            return vec4(clamp(r, 0.0, 1.0), clamp(g, 0.0, 1.0), clamp(b, 0.0, 1.0), clamp(a, 0.0, 1.0));
+        }
+        if (mode === "igniteAxis") {
+            // *** THE TRAVELLING GAUSSIAN OVER ITS WHOLE AXIS BY ITS WHOLE SWEEP -- v4659. *** x carries the
+            // species' own coordinate over -1.2 .. 2.4, which is the UNION of the four axes so no species'
+            // front is cropped, and y carries the sweep 0..1 -- so one frame is the front's entire journey
+            // along each of three axes at once, and the front's POSITION is what the CPU twin is graded on.
+            //
+            // THREE SPECIES IN THREE CHANNELS AND THEY BRACKET THE TABLE: flux is the widest front (0.38)
+            // travelling -1 to 1, prism the narrowest (0.26) travelling 0 to 2.1 -- a different range
+            // entirely, so a probe on one range could not tell a correct `hi` from a constant -- and helix
+            // is the only one with a FLAT term, which lifts its whole channel off the floor everywhere the
+            // gaussian does not reach.
+            //
+            // *** AND ALPHA READS THE LATTICE A SECOND WAY, FOR `complete`, WHICH IS v4644's LESSON. *** The
+            // three channels above hold complete at 1, so deleting the complete multiplier from this
+            // function would leave them IDENTICAL -- exactly the sabotage that walked through the shell's
+            // probe until it got an axis of its own. Alpha re-reads y as COMPLETE with the sweep PINNED at
+            // 0.5: pinned rather than shared, so a port spending sweep where complete belongs fails it.
+            const coord = px.div(n).mul(3.6).sub(1.2).toVar();
+            const sweep = py.div(n).toVar();
+            const one = float(1.0);
+            const r = K.mhIgniteAxis(coord, one, sweep, float(-1.0), float(1.0), float(0.38), float(1.70), float(0.00));
+            const g = K.mhIgniteAxis(coord, one, sweep, float(0.0), float(2.10), float(0.26), float(1.60), float(0.00));
+            const b = K.mhIgniteAxis(coord, one, sweep, float(-1.0), float(1.0), float(0.26), float(2.10), float(0.35));
+            // ...and alpha uses HELIX's constants, not flux's, BECAUSE HELIX IS THE ONE WITH A FLAT TERM.
+            // With flux's (flat 0) a twin that moved the flat term outside the complete multiply read the
+            // same as a correct one at every complete, and walked through. The flat term is exactly what a
+            // complete axis exists to grade: outside the multiply it lifts the figure in EVERY state.
+            const a = K.mhIgniteAxis(coord, py.div(n), float(0.5), float(-1.0), float(1.0), float(0.26), float(2.10), float(0.35));
+            return vec4(clamp(r.div(2.5), 0.0, 1.0), clamp(g.div(2.5), 0.0, 1.0),
+                        clamp(b.div(2.5), 0.0, 1.0), clamp(a.div(2.5), 0.0, 1.0));
+        }
+        if (mode === "igniteRound") {
+            // *** THE TWO IGNITION FIGURES THAT ARE NOT A GAUSSIAN ON AN AXIS -- v4660. *** The v4659 probe
+            // above grades four species that turned out to be one shape; these are two of the four that are
+            // not, and without a channel of their own their TSL halves were the only kit functions in the
+            // file with no compiled-shader twin behind them.
+            //
+            // R  aura's von Mises over the WHOLE circle: x is the angle -pi .. pi and y is the sweep. THE
+            //    LATTICE REACHES BOTH ENDS OF THE CIRCLE, so the seam the species is chosen for is INSIDE
+            //    the probe rather than beside it -- a gaussian substituted here tears at the first column.
+            // G  fathom's triangular window: x is floor(3 * x/n), which is the three turn indices and
+            //    nothing else, and y is the sweep. A window keyed on WHICH shell cannot be sampled on a
+            //    continuous axis, so this channel deliberately spends 16 columns on 3 values.
+            // B  the lap again with COMPLETE on y and the sweep PINNED at 0.5 -- v4644's lesson, the same
+            //    one alpha carries above: with complete held at 1 everywhere, deleting the complete multiply
+            //    changes no pixel and the sabotage walks. The lap has a FLAT term (0.18), so a twin that
+            //    lifted the flat outside the multiply is exactly what this channel is here to catch.
+            // A  fathom's turn with COMPLETE on y and the sweep pinned at 0.16, which is the window's own
+            //    lead -- so turn index 0 sits on its PEAK and the complete axis grades the figure where it
+            //    is largest rather than on its floor.
+            //
+            // THE CONSTANTS ARE WRITTEN OUT rather than imported from the kit's tables, so this probe is a
+            // second spelling and not a second reference to the first: a table edited on one side alone
+            // turns section 17 red instead of moving both halves together in silence.
+            // *** THE ANGLE SPANS -pi TO +pi INCLUSIVE -- div(n - 1), not div(n). *** Over n it stops one
+            // lattice step short of +pi, and the first and last columns then differ by the figure's own
+            // SLOPE across that step: 69 of 255 here, measured, which is not a seam and cannot be told
+            // from one. Inclusive, column 0 IS -pi and column n-1 IS +pi, so the join is two pixels the
+            // GPU itself produced and the periodicity is a reading rather than an argument.
+            const ang = px.div(n - 1).mul(6.2831853).sub(3.1415927).toVar();
+            const turnIx = TSL.floor(px.div(n).mul(3.0)).toVar();
+            const sweep = py.div(n).toVar();
+            const one = float(1.0);
+            const r = K.mhIgniteLap(ang, one, sweep, float(0.18), float(0.80), float(2.40));
+            const g = K.mhIgniteTurn(turnIx, one, sweep, float(0.33), float(0.16), float(0.42), float(0.50), float(2.40));
+            const b = K.mhIgniteLap(ang, py.div(n), float(0.5), float(0.18), float(0.80), float(2.40));
+            const a = K.mhIgniteTurn(turnIx, py.div(n), float(0.16), float(0.33), float(0.16), float(0.42), float(0.50), float(2.40));
+            // the lap peaks at flat + gain = 0.98 and needs no scale; the turn peaks at 2.90 and takes /3.
+            return vec4(clamp(r, 0.0, 1.0), clamp(g.div(3.0), 0.0, 1.0),
+                        clamp(b, 0.0, 1.0), clamp(a.div(3.0), 0.0, 1.0));
+        }
+        if (mode === "dither") {
+            // *** mh_out, THE KIT'S 41st FUNCTION -- v4829. ***
+            // R  mh_out on a flat grey of 128 code values, at the FRAGMENT'S OWN screen position -- the argument
+            //    the species shader hands it -- so this channel grades the pixel convention as well as the noise.
+            // G  the noise ALONE, (tri + 1) / 2, at the LATTICE's pixel centres -- the function apart from where
+            //    the shader says the pixel is, so a red on R alone says the convention and not the formula.
+            // B  mh_out on black: half the dither is negative and mh_out's clamp is what keeps it from wrapping.
+            const R = K.mhOutEncoded(vec3(128.0 / 255.0), TSL.screenCoordinate).x;
+            const G = K.mhOutTri(vec2(px.add(0.5), py.add(0.5))).add(1.0).mul(0.5);
+            const B = K.mhOutEncoded(vec3(0.0), TSL.screenCoordinate).z;
+            return vec4(R, clamp(G, 0.0, 1.0), B, float(1.0));
+        }
+        if (mode === "live") {
+            // *** mh_live OVER THE WHOLE INPUT SQUARE, AGAINST THE f64 TWIN. *** x is the raw signal 0..1 and
+            // y is the STATE, floor(y*5), so one frame carries all five of murmur's states rather than the one
+            // a point sample would have picked -- and the two weight windows are different (LISTENING alone
+            // for voice, THINKING and RESPONDING together for pace), so a frame that only saw idle would grade
+            // neither of them.
+            //
+            // x REACHES 0 EXACTLY, on purpose: pow(0, 0.65) is the one input where a WGSL exp2(log2(0)) could
+            // come back NaN instead of 0 on a driver that handles the -inf differently, and a probe whose
+            // lattice started at 1/16 would never ask.
+            const u = px.div(n).toVar();
+            const si = TSL.floor(py.div(n).mul(5.0)).toVar();
+            const lv = K.mhLive(u, u, si);
+            return vec4(clamp(lv.voice, 0.0, 1.0), clamp(lv.pace, 0.0, 1.0), 0.0, 1.0);
+        }
+        if (mode === "state") {
+            // *** mh_state, ALL FOUR OUTPUTS AT ONCE, ACROSS ALL FIVE STATES. *** x is tau over 0..1.4, which
+            // is past the end of SUCCESS's own 1.2 s window so the settled tail is in shot rather than cropped
+            // at the point it is still rising; y is the state index.
+            //
+            // THE THREE STATES THAT PRODUCE NOTHING ARE GRADED TOO, and they are the reason the y axis is here
+            // at all: every species multiplies its interior by (1 + complete), so `complete` being exactly zero
+            // in IDLE is the thing that keeps eighteen shaders from needing eighteen guards. A probe that only
+            // sampled SUCCESS would let a gating bug through as four rows of agreement.
+            const tau = px.div(n).mul(1.4).toVar();
+            const si = TSL.floor(py.div(n).mul(5.0)).toVar();
+            const st = K.mhState(si, tau);
+            return vec4(clamp(st.complete, 0.0, 1.0), clamp(st.sweep, 0.0, 1.0),
+                        clamp(st.settled, 0.0, 1.0), clamp(st.drive, 0.0, 1.0));
+        }
+        if (mode === "noiseBits") {
             // A lattice that deliberately straddles cell boundaries, where a wrong fade or a wrong gradient
             // shows up and a smooth interior would not.
+            //
+            // *** THE f32 ITSELF, NOT A ROUNDED BYTE OF IT -- v4690. *** Until now this wrote the noise remapped to
+            // 0..1 through an 8-bit channel, and the gate compared bytes. That is a comparison of two ROUNDINGS:
+            // on Keith's rig (NVIDIA, D3D12) the CPU's value at (5,5) sat at 129.5 of 255 and the GPU's f32,
+            // a hair below it, rounded the other way -- "1.00 of 255" from an error the byte could not show.
+            // The noise's bits are packed big-endian across RGBA exactly as the hash is, so the readback is
+            // lossless and the gate grades the shader's actual float against a stated error bound.
             const p = vec3(px.mul(0.37), py.mul(0.29), float(0.61));
-            const v = clamp(K.mhNoise3(p).mul(0.5).add(0.5), 0.0, 1.0);
-            return vec4(v, v, v, 1.0);
+            const h = TSL.floatBitsToUint(K.mhNoise3(p)).toVar();
+            const b0 = float(h.shiftRight(uint(24)).bitAnd(uint(255))).div(255.0);
+            const b1 = float(h.shiftRight(uint(16)).bitAnd(uint(255))).div(255.0);
+            const b2 = float(h.shiftRight(uint(8)).bitAnd(uint(255))).div(255.0);
+            const b3 = float(h.bitAnd(uint(255))).div(255.0);
+            return vec4(b0, b1, b2, b3);
         }
         // "exit": a ray entering the unit sphere at a known point and running along +z.
         const P = vec3(px.div(n).mul(1.6).sub(0.8), py.div(n).mul(1.6).sub(0.8), float(-0.5));

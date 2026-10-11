@@ -50,10 +50,18 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as B from "../../render/bloomFused.mjs";
 import { PROBE_WGSL, FRAGMENT_WGSL, packKnobs } from "../../render/badTvWgsl.mjs";
+import { temporalEntries } from "./temporalCorpus.mjs";   // v4572 -- the temporal arc's thirteen, fixtured there
 import * as PT from "../../physics/render/pathTracerWgsl.mjs";
 import * as GD from "../../render/gpuDriven.mjs";
 import { FIELD_FRAGMENT_WGSL } from "../../render/badTvWgsl.mjs";
 import { TERRAIN_WGSL, TERRAIN_PICK_WGSL } from "../../render/gpuTerrain.mjs";
+import { LUMA_PYRAMID_WGSL } from "../../render/luminancePyramidWgsl.mjs";
+import { OBJECT_MOTION_WGSL } from "../../render/objectMotionWgsl.mjs";
+import { DILATE_WGSL } from "../../render/dilateWgsl.mjs";
+import { RECONCILE_WGSL } from "../../render/flowReconcileWgsl.mjs";
+import { FILL_WGSL } from "../../render/holeFillWgsl.mjs";
+import { REACTIVE_WGSL } from "../../render/reactiveWgsl.mjs";
+import { VISIBILITY_WGSL } from "../../render/visibilityWgsl.mjs";
 import * as WO from "../../render/worleyWgsl.mjs";
 import { LIT_WGSL } from "../../render/litSphere.mjs";
 import { QUAD_WGSL } from "../../render/tslWide.mjs";
@@ -107,9 +115,11 @@ import * as RTP from "../../physics/render/rtPipeline.mjs";
 // native backend since v4576 with a clean one-buffer signature the corpus already knows how to drive, and
 // CAPTURED_PREFILTER_WGSL (new this round) compiles on both even though its numeric grading -- a texture input --
 // stays native-only until this corpus's browser-side runner grows the same `texture` binding headlessGpu.mjs did.
-import { BRDF_LUT_WGSL, PREFILTER_ENV_WGSL, packLutParams, packPrefilterCases, ENV_KIND } from "../../physics/render/splitSumWgsl.mjs";
+import { BRDF_LUT_WGSL, PREFILTER_ENV_WGSL, packLutParams, packPrefilterCases, ENV_KIND, F32_FLOOR_ABS as SPLITSUM_FLOOR } from "../../physics/render/splitSumWgsl.mjs";
+import { brdfLut } from "../../physics/render/splitSum.mjs";
 import { CAPTURED_PREFILTER_WGSL } from "../../physics/render/specularProbeCapture.mjs";
-import { F82_TINT_WGSL, packF82Params } from "../../physics/render/fresnelF82Wgsl.mjs";
+import { F82_TINT_WGSL, packF82Params, F32_FLOOR_ABS as F82_FLOOR } from "../../physics/render/fresnelF82Wgsl.mjs";
+import { f82Tint } from "../../physics/render/fresnelF82.mjs";
 const EMITTED_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "tsl-emitted.json");
 const EMITTED = fs.existsSync(EMITTED_PATH) ? JSON.parse(fs.readFileSync(EMITTED_PATH, "utf8")) : null;
 const EMITTED_PHYS_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "tsl-emitted-physics.json");
@@ -260,7 +270,176 @@ function slugDilateCase() {
 export function corpus() {
     const n = B.N, T = 0.7, rows = 32;
     const NPIX = PT.VIEW.w * PT.VIEW.h, ys = PT.grazeLadder();
+    // *** v4688 -- THREE FSR ENTRY POINTS, FIXTURED THE WAY tools/ship/temporalCorpus.mjs FIXTURES ITS ELEVEN. ***
+    // The uniform words are BIT-PACKED, not value-converted: both harnesses do `new Float32Array(uniforms)`,
+    // so a u32 field must travel as the float with the same bits. Passing a Uint32Array straight through
+    // converts 8 to 8.0 and the kernel reads 1090519040 -- measured, as an untouched read-back on both
+    // backends, which crossBackend refuses with "an empty read-back is not a measurement".
+    // And each entry supplies ONLY the bindings ITS OWN entry point declares: `base` never touches srcLum and
+    // `reduce` never touches srcRGBA, and binding one of them anyway makes the bind group miss the auto
+    // layout and the device rejects the run. Same rule v4686 learned in render/frameInterpGPU.mjs.
+    const packU = (u32s, f32s = []) => {
+        const b = new ArrayBuffer(Math.max(16, (u32s.length + f32s.length) * 4));
+        new Uint32Array(b, 0, u32s.length).set(u32s);
+        if (f32s.length) new Float32Array(b, u32s.length * 4, f32s.length).set(f32s);
+        return Array.from(new Float32Array(b));
+    };
+    const LP_W = 8, LP_H = 8;
+    const lpRGBA = new Float32Array(LP_W * LP_H * 4);
+    for (let i = 0; i < LP_W * LP_H; i++) {
+        lpRGBA[i * 4] = (i % 7) / 7; lpRGBA[i * 4 + 1] = (i % 11) / 11;
+        lpRGBA[i * 4 + 2] = (i % 13) / 13; lpRGBA[i * 4 + 3] = 1;
+    }
+    // `reduce` halves a parent into a child, and the CLAMP on an ODD extent is the part a mirror drops:
+    // 5x5 -> 3x3 reads the last row and column TWICE, which the kernel's own header says is deliberate.
+    const LR_PW = 5, LR_PH = 5, LR_W = 3, LR_H = 3;
+    const lrLum = new Float32Array(LR_PW * LR_PH);
+    for (let i = 0; i < lrLum.length; i++) lrLum[i] = (i * 37 % 101) / 101;
+    const OM_W = 8, OM_H = 8, OM_N = OM_W * OM_H, OM_COUNT = 2;
+    const omDepth = new Float32Array(OM_N), omIds = new Uint32Array(OM_N);
+    // ids run 0..OM_COUNT so SOME pixels are off the end of the table and take the REJECT path, which is the
+    // branch that must not clamp -- clamping hands a pixel the first object's motion, a well-formed vector
+    // for the wrong surface. invalidTo is a NON-ZERO sentinel so a rejected pixel is distinguishable from an
+    // untouched buffer; at 0 the two read identically and this entry would pass while writing nothing.
+    for (let i = 0; i < OM_N; i++) { omDepth[i] = 0.2 + 0.6 * ((i * 17) % 23) / 23; omIds[i] = i % (OM_COUNT + 1); }
+    const omMat = (k) => Float32Array.from([1, 0, 0, 0,  0, 1, 0, 0,  0, 0, 1, 0,  0.01 * k, 0.02 * k, 0, 1]);
+    const omInv = new Float32Array(16 * OM_COUNT), omPrev = new Float32Array(16 * OM_COUNT);
+    for (let k = 0; k < OM_COUNT; k++) { omInv.set(omMat(k + 1), k * 16); omPrev.set(omMat(-(k + 1)), k * 16); }
+
+    // ---- v4688'S SABOTAGE LOG, OVER THE EIGHT NEW ENTRIES ------------------------------------------------
+    //
+    //   C2  visibility's keys pushed back into the f32 NaN range  -> 2 red
+    //   C3  holeFill's uniform short again (10 words for 12)      -> 2 red
+    //   C4  reactive binds a name its entry point does not declare-> 2 red
+    //   H1  one EXCLUDED id renamed, so a producer falls out      -> 1 red (harnessLiveness)
+    //   H2  one CORPUS id renamed, same                          -> 1 red (harnessLiveness)
+    //   C1  dilate's fixture radius changed 1 -> 0                -> 0 RED, AND CORRECTLY SO
+    //   C5  packU value-converts instead of bit-packing           -> NOT RUNNABLE: IT HANGS THE DEVICE
+    //
+    // *** C1 IS A 0-RED THAT SHOULD NOT REDDEN, AND MIS-CHOOSING IT IS THE LESSON. *** Changing the dilation
+    // radius changes what the kernel computes -- and this gate asks whether TWO BACKENDS AGREE, not whether
+    // the answer is right. Both backends compute the same different thing, so agreement holds and the row is
+    // silent. That is the gate working: correctness of these kernels is held by their own CPU-twin gates
+    // (render/dilateGPU-selfcheck.mjs and the rest), and a corpus row that reddened on a value change would be
+    // measuring something it does not claim. The sabotages that DO bite here are the ones that break the RUN.
+    //
+    // *** C5 IS THE ONE WORTH THE MOST, AND IT IS NOT A RED AT ALL: IT IS A HANG. *** Making packU convert
+    // values instead of packing bits sends the kernels a dimension of 1090519040 where 8 was meant. They do
+    // not produce a wrong answer and they do not fail -- they loop, and crossBackend-selfcheck ran for the
+    // full 2400-second timeout without returning. So a uniform packed the wrong way is a DENIAL OF SERVICE in
+    // this corpus rather than a measurable difference, which is why the bit-packing is stated as a rule at the
+    // top of this block rather than left as a convention. The mutation is recorded as unrunnable rather than
+    // as a 0-RED, because it never produced a verdict either way -- a crash is not a verdict.
+
+    // ---- v4688 -- THE FIVE SINGLE-DISPATCH FSR KERNELS ---------------------------------------------------
+    // *** A READ_WRITE BINDING THAT IS NOT THE READ-BACK TARGET IS FED THROUGH `inputs` AND SIMPLY NOT READ. ***
+    // temporalCorpus.mjs's RING_PUSH_WGSL has done this since v4572 -- it has two read_write outputs and is in
+    // the corpus. The first draft of this round excluded seven FSR kernels on the stated ground that "the
+    // harness drives one output buffer", which that entry disproves and which was written without checking it.
+    // Five of the seven are single-dispatch and are here; the two that are NOT are in EXCLUDED, for a reason
+    // that survived the check.
+    const FW = 8, FH = 8, FN = FW * FH;
+    const ramp = (n, k) => { const a = new Float32Array(n); for (let i = 0; i < n; i++) a[i] = ((i * k) % 97) / 97; return a; };
+    const fDepth = ramp(FN, 13), fMotion = ramp(FN * 4, 7), fPrev = ramp(FN * 4, 11), fCur = ramp(FN * 4, 5);
+    const BW = 2, BH = 2, BLK = 4;
+    const fFlowIn = new Float32Array(BW * BH * 2);
+    for (let i = 0; i < BW * BH; i++) { fFlowIn[i * 2] = ((i * 3) % 5) - 2; fFlowIn[i * 2 + 1] = ((i * 7) % 5) - 2; }
+    const fHole = new Uint32Array(FN); for (let i = 0; i < FN; i++) fHole[i] = (i % 9 === 0) ? 1 : 0;
+    const fVec = new Float32Array(FN * 2);
+    for (let i = 0; i < FN; i++) { const h = fHole[i] === 1; fVec[i * 2] = h ? NaN : ((i % 5) - 2); fVec[i * 2 + 1] = h ? NaN : ((i % 3) - 1); }
+    const fZ = new Float32Array(FN); for (let i = 0; i < FN; i++) fZ[i] = fHole[i] ? Infinity : fDepth[i];
+    // visibility: two triangles over the grid, one of them BEHIND the eye so the reject branch fires
+    // *** THIS ENTRY IS SHAPED AROUND A LIMIT OF THE CORPUS ITSELF, AND THE LIMIT IS WORTH WRITING DOWN. ***
+    // The corpus compares read-backs AS f32, elementwise, with ===. VISIBILITY_WGSL's output is not a float:
+    // it is a PACKED INTEGER KEY, depth in the high bits and an object id in the low ones. So a key whose top
+    // bits are all ones reinterprets as a NaN, and NaN !== NaN makes two backends that wrote the IDENTICAL
+    // word compare as different. MEASURED, twice, at 32/64 identical with "max diff NaN at 0": first from the
+    // 0xffffffff sentinel in every pixel no triangle reached, and then -- after an oversized triangle covered
+    // them all -- from the keys themselves, because depth 0.5 maps to 0x7FFFFF00 and that IS a NaN.
+    //
+    // Both are fixture choices, not kernel defects, and the fixture is chosen to avoid them rather than the
+    // comparison loosened: the triangle covers the whole viewport so no slot keeps the sentinel, and z1 is 4
+    // rather than 1 so every key lands near 0x1FFFFF00, far below the f32 exponent ceiling. ANY FUTURE ENTRY
+    // WHOSE OUTPUT IS AN INTEGER KEY HAS THIS PROBLEM, and the general fix -- comparing by bits when an entry
+    // says its output is integral -- is a change to compare() and a round of its own.
+    const vPos = Float32Array.from([-3,-1,0.5,  1,-1,0.5,  1,3,0.5,   -1,-1,-2,  1,-1,-2,  0,1,-2]);
+    const vIdx = Uint32Array.from([0,1,2, 3,4,5]);
+    const vObj = Uint32Array.from([0, 1]);
+    const vMvp = Float32Array.from([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1,   1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
+
+
     return [
+        { id: "luminancePyramidWgsl.LUMA_PYRAMID_WGSL+base", from: "render/luminancePyramidWgsl.mjs",
+          why: "the RGBA-to-luma weighting the whole FSR2 chain agrees on -- 0.25/0.5/0.25, the Y of the YCoCg " +
+               "render/temporalReject.mjs clamps in. A backend weighting colour differently here would disagree " +
+               "with the pass that consumes it, and nothing else in this corpus reads that convention",
+          opts: { code: LUMA_PYRAMID_WGSL, entryPoint: "base", outCount: LP_W * LP_H,
+                  uniforms: packU([LP_W, LP_H, LP_W, LP_H]),
+                  workgroups: [Math.ceil(LP_W / 8), Math.ceil(LP_H / 8), 1],
+                  outBinding: 2, uniformBinding: 3, inputs: [{ binding: 0, data: lpRGBA }] } },
+        { id: "luminancePyramidWgsl.LUMA_PYRAMID_WGSL+reduce", from: "render/luminancePyramidWgsl.mjs",
+          why: "the 2x2 average with a CLAMPED odd extent, on a 5x5 parent -- the last row and column are read " +
+               "twice on purpose, and min() on u32 at the edge is where two backends would part if they parted",
+          opts: { code: LUMA_PYRAMID_WGSL, entryPoint: "reduce", outCount: LR_W * LR_H,
+                  uniforms: packU([LR_W, LR_H, LR_PW, LR_PH]),
+                  workgroups: [Math.ceil(LR_W / 8), Math.ceil(LR_H / 8), 1],
+                  outBinding: 2, uniformBinding: 3, inputs: [{ binding: 1, data: lrLum }] } },
+        { id: "objectMotionWgsl.OBJECT_MOTION_WGSL", from: "render/objectMotionWgsl.mjs",
+          why: "TWO mat4x4 TABLES read through `inputs`, which nothing else in this corpus does -- an unproject " +
+               "by one matrix and a reproject by another, so a backend disagreeing on matrix layout or on the " +
+               "perspective divide moves a whole pixel rather than a last-place bit; and a third of the pixels " +
+               "take the REJECT branch for an id off the end of the table, which must not clamp",
+          opts: { code: OBJECT_MOTION_WGSL, outCount: OM_N * 4,
+                  uniforms: packU([OM_W, OM_H, OM_COUNT], [-7777]),
+                  workgroups: [Math.ceil(OM_W / 8), Math.ceil(OM_H / 8), 1],
+                  outBinding: 4, uniformBinding: 5,
+                  inputs: [{ binding: 0, data: omDepth }, { binding: 1, data: omIds },
+                           { binding: 2, data: omInv }, { binding: 3, data: omPrev }] } },
+        { id: "dilateWgsl.DILATE_WGSL", from: "render/dilateWgsl.mjs",
+          why: "the STRICTLY-nearer tie rule, on content where most pixels tie -- `<` and `<=` differ on flat " +
+               "geometry and a `<=` mirror shifts the whole picture by a pixel while still measuring as " +
+               "'nearest depth wins'. Three read_write outputs, two of them fed through `inputs` and not read",
+          opts: { code: DILATE_WGSL, outCount: FN, uniforms: packU([FW, FH, 1, 1]),
+                  workgroups: [Math.ceil(FW / 8), Math.ceil(FH / 8), 1], outBinding: 2, uniformBinding: 5,
+                  inputs: [{ binding: 0, data: fDepth }, { binding: 1, data: fMotion },
+                           { binding: 3, data: new Float32Array(FN * 4) }, { binding: 4, data: new Int32Array(FN) }] } },
+        { id: "reactiveWgsl.REACTIVE_WGSL", from: "render/reactiveWgsl.mjs",
+          why: "the reactive mask's three declines -- a history compare, a depth compare and a motion compare, " +
+               "each of which may refuse, on a kernel whose refusals are the measurement. Binding 6 is NOT fed: " +
+               "the atomic stats buffer belongs to mainCounted and this entry drives main, and binding a name " +
+               "the entry point does not declare makes the bind group miss the auto layout and the device refuse",
+          opts: { code: REACTIVE_WGSL, outCount: FN, uniforms: packU([FW, FH, 1, 1], [0.1, 4, 1, 0]),
+                  workgroups: [Math.ceil(FW / 8), Math.ceil(FH / 8), 1], outBinding: 4, uniformBinding: 5,
+                  inputs: [{ binding: 0, data: fCur }, { binding: 1, data: fPrev }, { binding: 2, data: fMotion },
+                           { binding: 3, data: fDepth }] } },
+        { id: "flowReconcileWgsl.RECONCILE_WGSL", from: "render/flowReconcileWgsl.mjs",
+          why: "FSR3's reconciliation of two motion fields: three SAD comparisons per block picking a source, " +
+               "with a NaN carried in through the uniform because WGSL refuses a NaN constant at compile time",
+          opts: { code: RECONCILE_WGSL, outCount: BW * BH * 8,
+                  uniforms: packU([FW, FH, BW, BH, BLK, 1], [0.01, NaN]),
+                  workgroups: [Math.ceil(BW / 8), Math.ceil(BH / 8), 1], outBinding: 5, uniformBinding: 6,
+                  inputs: [{ binding: 0, data: fCur }, { binding: 1, data: fPrev }, { binding: 2, data: fMotion },
+                           { binding: 3, data: fDepth }, { binding: 4, data: fFlowIn },
+                           { binding: 7, data: new Uint32Array(8) }] } },
+        { id: "holeFillWgsl.FILL_WGSL", from: "render/holeFillWgsl.mjs",
+          why: "the disocclusion fill, with the DEPTH side rule -- it compares two depth buffers to decide which " +
+               "frame a hole's content is in, and abstains when neither answers. The vector field carries NaN " +
+               "in its holes, so this entry also drives a NaN through a bilinear-free gather",
+          opts: { code: FILL_WGSL, outCount: FN * 5,
+                  uniforms: packU([FW, FH, 4, 1, 1, 4, 0, 0], [0.5, 0, 0, 0]),
+                  workgroups: [Math.ceil(FW / 8), Math.ceil(FH / 8), 1], outBinding: 5, uniformBinding: 6,
+                  inputs: [{ binding: 0, data: fVec }, { binding: 1, data: fHole }, { binding: 2, data: fZ },
+                           { binding: 3, data: fPrev.slice(0, FN) }, { binding: 4, data: fDepth },
+                           { binding: 7, data: new Uint32Array(8) }] } },
+        { id: "visibilityWgsl.VISIBILITY_WGSL", from: "render/visibilityWgsl.mjs",
+          why: "a triangle rasteriser whose per-pixel depth contest is an atomicMin over a PACKED KEY, so the " +
+               "winner is decided by integer ordering of a float -- and one of its two triangles is behind the " +
+               "eye, which must be REJECTED and counted rather than clipped",
+          opts: { code: VISIBILITY_WGSL, outCount: FN, uniforms: packU([FW, FH, 2, 0], [0, 4, 0, 0]),
+                  workgroups: [1, 1, 1], outBinding: 4, uniformBinding: 5,
+                  outInit: new Uint32Array(FN).fill(0xffffffff),
+                  inputs: [{ binding: 0, data: vPos }, { binding: 1, data: vIdx }, { binding: 2, data: vObj },
+                           { binding: 3, data: vMvp }, { binding: 6, data: new Uint32Array(4) }] } },
         { id: "bloomFused.fusedWgsl", from: "render/bloomFused.mjs",
           why: "var<workgroup> plus workgroupBarrier() -- shared memory and a sync point, which an LCG has none of",
           opts: { code: B.fusedWgsl(), outCount: n * n * 3, uniforms: [T, 0, 0, 0],
@@ -642,7 +821,12 @@ export function corpus() {
         // case set drifting would show up as ONE gate disagreeing with itself, not two silently diverging.
         { id: "splitSumWgsl.BRDF_LUT_WGSL", from: "physics/render/splitSumWgsl.mjs",
           why: "the split-sum BRDF table, one thread per (mu, alpha) cell -- Hammersley, a GGX half-vector sample and height-correlated G2, over 256 cells; graded against splitSum.mjs's f64 table by splitSumWgsl-selfcheck.mjs on the native backend, here for the second backend's compiler AND numbers",
-          opts: { code: BRDF_LUT_WGSL, outCount: 16 * 16 * 2, uniforms: Array.from(packLutParams(16, 16, 512)), workgroups: [2, 2, 1] } },
+          opts: { code: BRDF_LUT_WGSL, outCount: 16 * 16 * 2, uniforms: Array.from(packLutParams(16, 16, 512)), workgroups: [2, 2, 1] },
+          // v4814: the f64 answer this entry's own gate grades against, and that gate's floor -- read, not retyped.
+          // deviceCompute-selfcheck uses it ONLY on a hardware adapter, where two Dawn builds may round differently.
+          f64: { gate: "physics/render/splitSumWgsl-selfcheck.mjs", tol: SPLITSUM_FLOOR,
+                 expected: () => { const c = brdfLut({ K: 16, R: 16, samples: 512 }); const o = [];
+                                   for (let k = 0; k < 256; k++) o.push(c.A[k], c.B[k]); return o; } } },
         { id: "splitSumWgsl.PREFILTER_ENV_WGSL", from: "physics/render/splitSumWgsl.mjs",
           why: "the prefiltered environment over three analytic test patterns (uniform/gradient/spot) x four roughness levels x three directions -- the tangent frame and the NoL-weighted GGX convolution, graded against splitSum.prefilterEnv() by splitSumWgsl-selfcheck.mjs on the native backend",
           opts: (() => {
@@ -660,7 +844,10 @@ export function corpus() {
         // it shipped, which is what v4472's own note above says the nine-kernel and two-kernel gaps were not.
         { id: "fresnelF82Wgsl.F82_TINT_WGSL", from: "physics/render/fresnelF82Wgsl.mjs",
           why: "the F82-tint correction to Schlick's Fresnel, one thread per sampled angle -- graded against fresnelF82.mjs's f64 reference by fresnelF82Wgsl-selfcheck.mjs on the native backend, here for the second backend's compiler AND numbers",
-          opts: { code: F82_TINT_WGSL, outCount: 33, uniforms: Array.from(packF82Params(0.5, 0.9, 33)), workgroups: [1, 1, 1] } },
+          opts: { code: F82_TINT_WGSL, outCount: 33, uniforms: Array.from(packF82Params(0.5, 0.9, 33)), workgroups: [1, 1, 1] },
+          // v4814: see the BRDF table's entry -- the f64 curve fresnelF82Wgsl-selfcheck grades against, and its floor
+          f64: { gate: "physics/render/fresnelF82Wgsl-selfcheck.mjs", tol: F82_FLOOR,
+                 expected: () => Array.from({ length: 33 }, (_, i) => f82Tint(i / 32, 0.5, 0.9)) } },
         // *** v4295 -- THE TEXTURE ENTRIES, WHICH THE CORPUS HAD NONE OF. *** Seven shaders and 41,656 floats
         // of agreement, all of it through storage BUFFERS, while the only shader that writes a storage TEXTURE
         // was excluded for want of a native path. That was the worst place to have no evidence: v4287 measured
@@ -678,11 +865,35 @@ export function corpus() {
                "about what an out-of-range value becomes, which is a correctness decision and not a rounding one",
           opts: { code: B.fusedWgslToTexture({ format: B.STORAGE_FORMATS.clipping }), n,
                   format: B.STORAGE_FORMATS.clipping, uniforms: [T, 0, 0, 0], workgroups: (n / B.TILE) * (n / B.TILE) } },
+        // *** v4572 -- THE TEMPORAL ARC'S THIRTEEN, WHICH v4571 MADE VISIBLE AND THIS ROUND ANSWERS. ***
+        // They live in their own module because each needs a fixture rather than a uniform vector, and
+        // because their bindings are read out of the kernels instead of restated -- see temporalCorpus.mjs
+        // on why thirteen hand-copied binding tables was not an option once v4572 measured what a wrong
+        // one costs. Eleven are dispatched; LUMA_WGSL and YCOCG_WGSL are function fragments with no entry
+        // point and are compiled inside a shell that calls them.
+        ...temporalEntries(),
     ];
 }
 
 /** Shaders the tree runs that this corpus cannot, each with the reason it cannot rather than a shrug. */
 export const EXCLUDED = Object.freeze([
+    // ---- v4688 -- THE TWO FSR KERNELS THAT ARE CHAINS RATHER THAN DISPATCHES ---------------------------
+    //
+    // *** THE FIRST DRAFT OF THIS LIST HAD SEVEN ENTRIES AND SIX OF THE REASONS WERE FALSE. *** It excluded
+    // every FSR kernel declaring two or more read_write buffers, on the stated ground that this corpus drives
+    // one output buffer. tools/ship/temporalCorpus.mjs has disproved that since v4572: RING_PUSH_WGSL has two
+    // read_write outputs and is in the corpus, because a read_write binding that is NOT the read-back target
+    // is fed through `inputs` and simply not read. Five of those seven are now corpus entries and agree
+    // bit-for-bit on both backends. The reason was written before it was checked, which is the failure this
+    // whole list exists to prevent -- "excluded with a reason" is worth nothing if the reason is a guess.
+    //
+    // These two are excluded because they are ALGORITHMS SPANNING DISPATCHES, and one dispatch of one entry
+    // point does not grade them. That reason was checked: both runners issue several dispatches with
+    // submission boundaries between them, and the boundary is the thing under test.
+    Object.freeze({ id: "frameInterpWgsl.INTERP_WGSL", kind: "ordered multi-dispatch chain, graded against a CPU twin",
+                    why: "FOUR entry points and TWO atomic buffers, and the ORDER IS THE ALGORITHM: splatDepth settles which depth wins each pixel, splatOwner settles which block at that depth claims it, gather warps. Merged or reordered, splatOwner reads a key splatDepth is still writing -- the race the construction exists to remove -- so a single dispatch of any one of them grades nothing. render/frameInterpGPU-selfcheck.mjs runs the chain against interpolateFrameCPU on nine cases, and since v4687 runs all three device runners against interpolateFrameCPU({ fill })" }),
+    Object.freeze({ id: "opticalFlowWgsl.OPTICAL_FLOW_WGSL", kind: "ordered multi-dispatch chain, graded against a CPU twin",
+                    why: "a coarse-to-fine pyramid search dispatched ONCE PER LEVEL, each level seeded by the level above it. One dispatch grades one level of an algorithm whose answer is the chain, and a corpus entry for it would report agreement about a partial result. render/opticalFlowGPU-selfcheck.mjs runs the whole pyramid against opticalFlowCPU" }),
     // v4526 MERGE -- four lit VARIANTS this branch's rounds left unaccounted (crossBackend is over the quick sweep's budget,
     // so the census that names them had not run since v4514): each is litSphere's generator with an `extra` mode, so the
     // shader text is litSphere's, which the corpus grades; the variant is a mode and not a module (backendParity's v4520 rule).
@@ -830,6 +1041,21 @@ export function census({ roots = ["render", "physics/render", "physics/xpbd", "p
             const re = /export\s+(?:function|const)\s+(\w*(?:Wgsl|WGSL)\w*)\b/g;
             let m;
             while ((m = re.exec(src))) found.push({ symbol: m[1], file: rel.replace(/\\/g, "/"), kind: "export" });
+            // *** v4571 -- AND THE THIRD TIME THIS CENSUS COULD NOT SEE A PRODUCER, FOR THE THIRD REASON. ***
+            // v4464's was a root outside the scan; v4472's was a file type with no export to match; this one is
+            // a SPELLING. The regex above reads a DECLARATION -- `export const X` -- and the whole temporal arc
+            // (v4552-v4570) declares its kernels privately and re-exports them at the foot of the file as
+            // `export { A, B, C }`. MEASURED at v4571: 95 producers seen by the declaration form, TWELVE
+            // invisible to it -- MOTION_WGSL, ACCUMULATE_WGSL, RING_PUSH_WGSL, SHADING_SHIFT_WGSL, RIDGE_WGSL,
+            // FIELD_RIDGE_WGSL, COHERENT_RIDGE_WGSL, LUMA_WGSL, DISOCCLUSION_WGSL, RECTIFY_WGSL, YCOCG_WGSL and
+            // RESOLVE_WGSL -- 11% of the tree's WGSL producers outside a census whose entire purpose is to
+            // notice absences. RING_FLOOR_WGSL was visible only because it happens to use the other spelling,
+            // which is why crossBackend named one kernel of an arc that had added thirteen.
+            const reList = /export\s*\{([^}]*)\}/g;
+            while ((m = reList.exec(src))) for (const part of m[1].split(",")) {
+                const name = part.trim().split(/\s+as\s+/).pop().trim();
+                if (/Wgsl|WGSL/.test(name)) found.push({ symbol: name, file: rel.replace(/\\/g, "/"), kind: "export" });
+            }
         }
     };
     for (const r of roots) walk(r);
@@ -877,6 +1103,17 @@ export async function compare(entry, runBrowser, runNative, runBrowserTex = null
                  browserOk: b.ok, nativeOk: a.ok,
                  errors: [...(b.errors || []), ...(a.errors || [])] };
     if (!b.ok || !a.ok) return { id: entry.id, ok: false, reason: b.reason || a.reason || "run failed" };
+    // *** v4572 -- AND A RUN THAT WROTE NOTHING IS NOT A COMPARISON. *** Both harnesses now fill the
+    // read-back with LIVENESS_SENTINEL when the entry supplies no outInit, and report `wroteNothing` when
+    // every word of it survives. Without this the loop below scores two untouched buffers as
+    // { same: n, identical: true } -- MEASURED at v4572 on a kernel bound so that it wrote to a buffer
+    // nobody reads: eight of eight identical, no error on either side, and "no divergence" reported for a
+    // result neither backend produced. Agreement between two silences is the cheapest pass there is.
+    if (b.wroteNothing || a.wroteNothing)
+        return { id: entry.id, ok: false, wroteNothing: true,
+                 reason: "the read-back is untouched on " +
+                         (b.wroteNothing && a.wroteNothing ? "BOTH backends" : b.wroteNothing ? "the browser" : "the native") +
+                         " -- this entry's out buffer is not where its kernel writes, so there is nothing to compare" };
     let same = 0, maxAbs = 0, firstDiff = -1;
     for (let i = 0; i < b.values.length; i++) {
         if (b.values[i] === a.values[i]) same++;

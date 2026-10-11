@@ -10,7 +10,7 @@
 // case where WebAssembly is switched off, and checking this tree against that case found a real defect that
 // has nothing to do with polyfills.
 import { probeWasm, wasmUsable, wasmUnavailableReason, explainWasmFailure, _resetWasmProbe } from "../../engine/wasmSupport.mjs";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import { codeOnly, noComments, proseHas } from "./sourceScan.mjs";
 import fs from "node:fs";
 import http from "node:http";
@@ -32,7 +32,13 @@ console.log("1. *** THE ITEM SAID '82 FILES TOUCH WASM'. THAT WAS THE LOOSEST RE
             if (e.name === "node_modules" || e.name === ".git" || (dir === ROOT && e.name === "vendor")) continue;
             const p = path.join(dir, e.name);
             if (e.isDirectory()) walk(p, out);
-            else if (/\.(js|mjs|html)$/.test(e.name)) out.push(p);
+            // v4667 -- .cjs ADDED. The walk had three extensions and CommonJS was not one of them, so an
+            // entire module system was invisible to a census that claims to count "files that touch wasm".
+            // It cost nothing until v4663 wrote tools/ship/wasmExitHook.cjs -- which wraps ALL FIVE
+            // WebAssembly doors and is the most aggressive caller in the tree -- and the census scored it
+            // zero. A filter narrower than the claim is the same defect as a count standing in for a
+            // property: the number stayed plausible precisely because the omission was invisible.
+            else if (/\.(js|mjs|cjs|html)$/.test(e.name)) out.push(p);
         }
         return out;
     };
@@ -61,7 +67,18 @@ console.log("1. *** THE ITEM SAID '82 FILES TOUCH WASM'. THAT WAS THE LOOSEST RE
         // codeOnly() blanks strings AND comments, which is right for asking "is this a code shape at all".
         const code = codeOnly(raw).replace(/<!--[\s\S]*?-->/g, " ");
         if (/\.wasm|WebAssembly\./.test(raw.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^\s*\/\/.*$/gm, " ").replace(/<!--[\s\S]*?-->/g, " "))) inCode++;
-        if (/WebAssembly\.(instantiate|compile|Module|Instance|validate)/.test(code)) callsApi++;
+        // v4667 -- *** AND THE CALLER COUNT WAS MATCHING A SPELLING, NOT A CALL. *** wasmExitHook.cjs does
+        // `const W = WebAssembly;` once and then wraps W.instantiate, W.compile, W.instantiateStreaming,
+        // W.compileStreaming and new W.Module -- five doors, and `WebAssembly.` followed by a method name
+        // appears nowhere in its code. Adding .cjs to the walk above would have made it VISIBLE and still
+        // counted it as a non-caller. The alias rule below is deliberately the narrowest thing that closes
+        // the one shape that exists: a binding of the global to an identifier, in code, in the same file.
+        // Anything cleverer (a parameter, a property, a dynamic lookup) is still missed, and that is stated
+        // in the unchecked note at the foot rather than implied to be handled.
+        const al = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*WebAssembly\b/.exec(code);
+        const API = al ? new RegExp("(?:WebAssembly|\\b" + al[1] + ")\\.(instantiate|compile|Module|Instance|validate)")
+                       : /WebAssembly\.(instantiate|compile|Module|Instance|validate)/;
+        if (API.test(code)) callsApi++;
         // *** codeOnly() BLANKS STRING LITERALS, AND THE THING BEING LOOKED FOR IS A STRING: THE IMPORT
         // SPECIFIER "../../engine/wasmSupport.mjs". *** This read 1 instead of 2 until it was switched to
         // noComments(), which strips comments and keeps content -- the same mistake v4223 made and named.
@@ -78,18 +95,50 @@ console.log("1. *** THE ITEM SAID '82 FILES TOUCH WASM'. THAT WAS THE LOOSEST RE
     // freeze are this round's own (ai-bridge/ffmpegWasmBridge.js, render/ffmpegWasmExport.mjs, its gate, the
     // rewritten ai-bridge/ensureThree.js, and ui/canvasRecorder.js's exportH264 addition); the rest arrived
     // from other rounds on the same branch. callsApi and probes did not move.
-    ok("!! 118 files mention .wasm or the WebAssembly API -- the item's number, and it is the loose one",
-        mentions === 118, `${mentions} mention it`);
-    ok("!! ...but 24 of those are comments and prose only; 94 mention it in live code",
-        inCode === 94, `${inCode} in code, ${mentions - inCode} comment-only`);
+    // v4642 -- RE-TAKEN 118 -> 119, AND THE RE-TAKE IS THE THIRD (82 -> 113 -> 118 -> 119). The one that moved
+    // is a COMMENT-ONLY mention, somewhere in the nineteen rounds v4623-v4641 shipped: comment-only went
+    // 24 -> 25 and `inCode` did not move at all, staying at 94. That split is the whole reason this gate
+    // measures both -- the loose number is prose-sensitive by construction, and a round that writes a sentence
+    // containing ".wasm" moves it without touching a byte of wasm handling. The two numbers the round's claims
+    // rest on, inCode (94) and callsApi (12), are frozen where they were.
+    // v4667 -- RE-TAKEN 119 -> 121, AND THIS ONE IS NOT PROSE DRIFT. Two files arrived, both of them this
+    // session's own wasm/libuv teardown machinery: tools/ship/wasmTeardown.mjs (+1 mention, +1 inCode) and
+    // tools/ship/wasmExitHook.cjs, which was not counted at all until .cjs joined the walk above (+1
+    // mention, +1 inCode, +1 callsApi via the alias rule). comment-only did NOT move, staying at 25, which
+    // is the split this gate exists to show: the loose number moved because wasm handling was WRITTEN, not
+    // because a sentence containing ".wasm" was.
+    // v4776 -- RE-TAKEN 121 -> 122 AT THE MERGE, AND IT IS CODE, NOT PROSE. tools/ship/pageShot.mjs arrived from the
+    // exported-functions line (v4739/v4766): a static server for headless page shots whose MIME table maps ".wasm"
+    // to "application/wasm" -- the type instantiateStreaming refuses to compile without. +1 mention, +1 inCode;
+    // comment-only stayed at 25 and callsApi and probes did not move, so the split says what it should.
+    // v4778 rig run -- RE-TAKEN 122 -> 123, AND THIS ONE IS PROSE. physics/mesh/mikktSpace.mjs arrived with the rtx
+    // line's merge: its header explains why the npm port's ~41 KB .wasm build does not fit how this engine serves pages,
+    // and it hand-ports the C instead. +1 mention, 0 inCode; comment-only 25 -> 26, which is what the split is for.
+    ok("!! 123 files mention .wasm or the WebAssembly API -- the item's number, and it is the loose one",
+        mentions === 123, `${mentions} mention it`);
+    // *** AND THIS ROW'S TITLE CARRIED A NUMBER ITS ASSERTION DOES NOT CHECK. *** It said "24 of those are
+    // comments" while asserting only `inCode === 94`, so when comment-only went to 25 the row kept passing and
+    // kept saying 24 -- a title reporting a moving quantity as a fixed one, beside a detail line printing the
+    // true value. Both halves are asserted now, so the title cannot drift away from the check underneath it.
+    ok("!! ...but 26 of those are comments and prose only; 97 mention it in live code",
+        inCode === 97 && mentions - inCode === 26, `${inCode} in code, ${mentions - inCode} comment-only`);
     // *** AND MY OWN GREP GAVE 12, WHICH WAS WRONG, FOR THE FOURTH TIME IN THIS CLASS. *** A raw search for
     // /WebAssembly\./ matched wasm-demo.html, where the text is a SENTENCE -- "executed by the bridge's own
     // Node WebAssembly. No Docker" -- and the full stop matched the escaped dot. Same shape as the licence
     // scan that missed UNLICENSE and the /RANSAC/ that matched "transaction". codeOnly() blanks comments and
     // strings, so it counts calls rather than prose, and the honest number at v4229 was ELEVEN; a twelfth real
     // caller (tools/crossarch-box3d.mjs and its gate, among others added since) has since arrived.
-    ok("!! ...and TWELVE actually call the WebAssembly API, most of them Node-side gates and tools",
-        callsApi === 12, `${callsApi} call WebAssembly.instantiate/compile/Module/Instance`);
+    ok("!! ...and THIRTEEN actually call the WebAssembly API, most of them Node-side gates and tools",
+        callsApi === 13, `${callsApi} call WebAssembly.instantiate/compile/Module/Instance`);
+    // The thirteenth is the one the count could not see TWICE OVER -- wrong extension, then wrong spelling.
+    // Asserting the shape directly, so that a future simplification of the alias rule fails here rather
+    // than quietly returning the caller count to twelve.
+    ok("!! *** an ALIASED caller is counted: `const W = WebAssembly` then W.instantiate ***",
+        (() => { const c = codeOnly("const W = WebAssembly;\nconst m = await W.instantiate(bytes);\n");
+                 const a = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*WebAssembly\b/.exec(c);
+                 return !!a && new RegExp("(?:WebAssembly|\\b" + a[1] + ")\\.(instantiate|compile)").test(c); })(),
+        "wasmExitHook.cjs is the live instance, and a plain /WebAssembly\\./ scan reads it as touching wasm " +
+        "nowhere while it wraps every door the runtime has");
     ok("!! *** AND BEFORE THIS ROUND, ZERO OF ANY OF THEM ASKED WHETHER WebAssembly EXISTS ***",
         probes >= 2, `${probes} now consult a probe (box3dLoader, joltLoader and ffmpegWasmExport); it was 0`);
 
@@ -181,7 +230,7 @@ console.log("\n5. *** THE MEASUREMENT THE ROUND IS BUILT ON: A REAL BROWSER WITH
         });
         await new Promise((r) => server.listen(0, "127.0.0.1", r));
         const port = server.address().port;
-        const browser = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const browser = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
         try {
             const askLoaders = async (killWasm) => {
                 const page = await browser.newPage();
@@ -246,6 +295,11 @@ console.log("      real fallback, and it had one before this round.");
 console.log("      AND ONLY TWO LOADERS WERE WIRED. The other nine API callers are Node-side gates and tools,");
 console.log("      where WebAssembly is always present and a probe would be ceremony. That is a judgement, not");
 console.log("      a measurement: if one of them is ever run somewhere hostile it will need the same treatment.");
+console.log("      AND THE CALLER COUNT STILL MATCHES SPELLINGS, JUST TWO MORE OF THEM. v4667 added .cjs to the");
+console.log("      walk and one alias shape -- `const W = WebAssembly` in the same file -- because that is what");
+console.log("      wasmExitHook.cjs does. A caller that takes the global as a PARAMETER, reads it off a");
+console.log("      property, or looks it up by name at runtime is still counted as touching wasm nowhere. The");
+console.log("      honest reading of 13 is a FLOOR on the callers, not a census of them.");
 
 console.log("\nwasmSupport-selfcheck: " + (fails ? fails + " FAILED" : "all checks pass"));
 process.exit(fails ? 1 : 0);

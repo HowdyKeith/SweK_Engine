@@ -844,9 +844,11 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
                     pass.storage("accumBuf", accumBuf);
                     pass.draw(3, 1);
                 }, { offscreen: true, read: true });
-                const expected = [];
-                for (let i = 0; i < w * h; i++) expected.push(Math.round(Math.min(1, Math.max(0, accum[i*3])) * 255), 255, 0, 255);
-                out.present = { px: Array.from(frame.pixels), expected, w, h };
+                // v4778: the clamped red INPUT goes out, not a pre-rounded expectation -- the check below applies the
+                // conversion's own rule (exact everywhere except an exact .5 tie), which needs the unrounded value
+                const r01 = [];
+                for (let i = 0; i < w * h; i++) r01.push(Math.min(1, Math.max(0, accum[i*3])));
+                out.present = { px: Array.from(frame.pixels), r01, w, h, fmt: frame.format };
             }
 
             // ---- 4. a fabricated cube through makeRtSession -- gfx/device.js's NAME-based bindByName, first use ----
@@ -1150,9 +1152,50 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
 
     console.log("\n3. presentWgsl -- A DISTINCT-PER-PIXEL FRAME, PIXEL FOR PIXEL");
     say(`4x2, values include 1.5 and -0.3 to exercise the clamp`);
-    ok("!! every pixel matches Math.round(clamp(accum.r,0,1)*255), g=255 (1.5 clamped), b=0 (-0.3 clamped), a=255",
-        present.px.length === present.expected.length && present.px.every((v, i) => v === present.expected[i]),
-        JSON.stringify(present.px) + " vs " + JSON.stringify(present.expected));
+    // *** v4778 -- MATH.ROUND WAS THE WRONG REFERENCE AT EXACTLY ONE PIXEL, AND KEITH'S RIG FOUND IT. *** The red ramp is
+    // i/8, so pixel 4 is 0.5 and 0.5*255 = 127.5 -- an exact tie, exact in float32 too. Math.round breaks ties UP (128);
+    // the rig's adapter (win32, real GPU, an 8-bit unorm canvas format) wrote 127, and SwiftShader here writes 128. Nothing
+    // in this pipeline rounds in WGSL: presentWgsl returns a clamped f32 and the float->unorm8 step is the fixed-function
+    // write into the colour attachment. What that step must do, read from the specs themselves on 2026-10-04:
+    //   WebGPU "process color attachments" only says "Set the value of attachment ... to color"; WGSL's 8unorm inverse
+    //   channel transfer function is max(0, min(1, T)) -- clamping, no rounding rule at all (and that table is the
+    //   storage-texel one; for an attachment write WGSL says nothing more).
+    //   Vulkan, "Conversion From Floating-Point to Normalized Fixed-Point": convertFloatToUint "returns one of the two
+    //   unsigned binary integer values ... closest to" f*(2^b-1); round to nearest is a SHOULD; an exact integer MUST
+    //   come back as itself. Read alone that allows EITHER neighbour for any non-integer, not only at a tie.
+    //   D3D11.3 functional spec 3.2.3.6 FLOAT -> UNORM: c*(2^n-1) + 0.5, truncated, with a 0.6 ULP tolerance on the
+    //   integer side -- so a value within 0.6 of an integer may map to it. At a .5 tie BOTH neighbours are 0.5 away and
+    //   both are legal; every other value in this fixture (fractions .125/.25/.375 off an integer) is >= 0.625 from
+    //   the far neighbour, so under D3D (the rig's backend family) and Vulkan's SHOULD it has ONE answer, the nearest.
+    //   (v4778 review: the row stays exact off the tie -- stricter than Vulkan's MUST, as asked; an adapter that
+    //   truncates would go red here on a non-tie pixel and that is a finding to read, not a tolerance to widen.)
+    // So the row is now what those say: nearest, exactly, wherever nearest is one integer; either neighbour at an exact
+    // .5 tie and nowhere else. The fixture keeps its tie on purpose (it is the interesting pixel), the row requires at
+    // least one tie so it cannot silently lose it, and it says which way this adapter broke it. 127 is the ODD
+    // neighbour, so the rig is not ties-to-even either; 128 is both half-up and ties-to-even, so SwiftShader's 128 does
+    // not tell those two apart. Measured at v4778 on this box (SwiftShader, bgra8unorm), the gate edited, run, and
+    // restored byte for byte (cmp) each time:
+    //   the rig's own pixels injected (px4 red = 127)                 -> exit=0, reports "px4 127.5 -> 127 (down, odd)"
+    //   px5 red read as 160 -- ONE off, away from any tie (159.375)    -> exit=1, "px5 r*255=159.375 got [160,...], legal r 159"
+    //   px4 red read as 129 -- one past the tie's two neighbours       -> exit=1, "px4 r*255=127.5 got [129,...], legal r 127 or 128"
+    //   the fixture moved off its tie ((i + 0.004)/8)                  -> exit=1, "the fixture lost its tie"
+    const presentRow = (P) => {
+        const ties = [], wrong = [];
+        for (let i = 0; i < P.w * P.h; i++) {
+            const x = Math.fround(Math.fround(P.r01[i]) * 255), lo = Math.floor(x), got = P.px[i * 4];
+            const tie = x - lo === 0.5, legal = tie ? [lo, lo + 1] : [Math.round(x)];
+            if (tie) ties.push({ i, x, got, way: got === lo ? "down" : got === lo + 1 ? "up" : "to neither neighbour" });
+            if (!legal.includes(got) || P.px[i * 4 + 1] !== 255 || P.px[i * 4 + 2] !== 0 || P.px[i * 4 + 3] !== 255)
+                wrong.push(`px${i} r*255=${x} got [${P.px.slice(i * 4, i * 4 + 4).join(",")}], legal r ${legal.join(" or ")}`);
+        }
+        return { ties, wrong, pass: P.px.length === P.w * P.h * 4 && wrong.length === 0 && ties.length >= 1 };
+    };
+    const pr = presentRow(present);
+    const tieSay = pr.ties.map((t) => `px${t.i} ${t.x} -> ${t.got} (${t.way}, ${t.got % 2 ? "odd" : "even"})`).join("; ");
+    say(`attachment format ${present.fmt}; ${pr.ties.length} exact .5 tie(s): ${tieSay || "none"}`);
+    ok(`!! every pixel is clamp(accum.r,0,1)*255 rounded to nearest -- exact wherever nearest is one integer, either neighbour only at an exact .5 tie (${pr.ties.length} here: ${tieSay || "none"}), g=255 (1.5 clamped), b=0 (-0.3 clamped), a=255`,
+        pr.pass,
+        (pr.wrong.length ? pr.wrong.join("; ") + " | " : "") + (pr.ties.length ? "" : "the fixture lost its tie | ") + JSON.stringify(present.px));
 
     console.log("\n4. A FABRICATED CUBE THROUGH makeRtSession -- device.compute()/device.pipeline() BOUND BY NAME");
     say(`bounds radius ${cube.boundsRadius.toFixed(4)} (expect sqrt(3)=${Math.sqrt(3).toFixed(4)}), ${cube.frameCount} frames accumulated`);

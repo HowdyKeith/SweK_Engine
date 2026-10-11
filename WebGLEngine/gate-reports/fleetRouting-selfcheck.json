@@ -1,0 +1,77 @@
+{
+ "gate": "tools/ship/fleetRouting-selfcheck.mjs",
+ "at": "2026-09-15",
+ "tables": [
+  {
+   "title": "the registry's own solve times decide who takes the work",
+   "columns": [
+    "peer",
+    "solve ms (ewma)",
+    "requests taken",
+    "kinds"
+   ],
+   "rows": [
+    [
+     "gate-fast",
+     20,
+     5,
+     {
+      "train": 5
+     }
+    ],
+    [
+     "gate-slow",
+     80,
+     1,
+     {
+      "train": 1
+     }
+    ]
+   ],
+   "note": "six identical train requests over two registered brains whose only difference is a reported solve time of 20 ms against 80 ms"
+  },
+  {
+   "title": "every routed episode against a direct drivePolicy.episode of the same candidate and seed",
+   "columns": [
+    "peer",
+    "seed",
+    "score",
+    "ms",
+    "equals a direct episode"
+   ],
+   "rows": [
+    [
+     "fast",
+     1,
+     48.31303390753206,
+     73,
+     true
+    ],
+    [
+     "slow",
+     2,
+     47.818289225214265,
+     59,
+     true
+    ],
+    [
+     "fast",
+     1,
+     13.50139302308746,
+     43,
+     true
+    ],
+    [
+     "fast",
+     2,
+     43.672636731853444,
+     43,
+     true
+    ]
+   ],
+   "note": "routing must not change a result: the score AND the fingerprint have to match the unrouted call, and the fingerprint is compared but is not a number to table"
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

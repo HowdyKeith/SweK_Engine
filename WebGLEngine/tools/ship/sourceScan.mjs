@@ -122,38 +122,80 @@ export function regexBody(src, i) {
 
 /** Source with comments, string/template literals, and regex literal BODIES blanked out (delimiters and flags
  *  kept, as with a string's quotes), line structure preserved. */
+// *** v4814 -- THE SAME ANSWER WITHOUT LOOKING BACK. *** This built `out` a character at a time with += and asked
+// regexAllowedHere(out) at every `/` -- which indexes into `out`, and indexing a string built by += makes V8 flatten
+// it first: every `/` in code cost a copy of everything emitted so far. Profiled at v4814 on absenceScope-selfcheck,
+// codeOnly + regexAllowedHere were 1.4 s of its 3.0 s, and the same lexer serves every comment-stripping gate in the
+// tree. regexAllowedHere reads only the LAST non-whitespace character emitted and, when that ends an identifier, the
+// identifier run ending there; both are now tracked as the text is emitted, and the text is kept in chunks and joined
+// once. The decision is regexAllowedHere's own rule, unchanged and still exported for its other caller. PROVEN, not
+// argued: old and new codeOnly were run over every .js/.mjs/.cjs/.html file in the tree and agreed on every byte.
+const WS_HI = /\s/;
+const isWs = (code, ch) => code === 32 || (code >= 9 && code <= 13) || (code > 127 && WS_HI.test(ch));
+const isIdent = (code) => (code >= 97 && code <= 122) || (code >= 65 && code <= 90) || (code >= 48 && code <= 57) || code === 95 || code === 36;
 export function codeOnly(src) {
-    let out = "";
+    const parts = [];
     let i = 0;
     const n = src.length;
     let mode = null;      // null | "line" | "block" | "'" | '"' | "`"
+    // regexAllowedHere's inputs, kept current: the last non-whitespace character emitted, whether the character
+    // emitted immediately before now continues an identifier, and the identifier run ending at that last character
+    let last = -1, inWord = false, word = "";
+    // Only a chunk's END can change those three, so it is read from the end: the trailing whitespace, the last
+    // non-whitespace character, and -- when that ends an identifier -- the run back to its start, continuing the
+    // previous chunk's word only when the run reaches this chunk's first character.
+    const note = (t) => {
+        let j = t.length - 1;
+        while (j >= 0 && isWs(t.charCodeAt(j), t[j])) j--;
+        if (j < 0) { if (t.length) inWord = false; return; }
+        const code = t.charCodeAt(j);
+        last = code;
+        if (isIdent(code)) {
+            let k = j;
+            while (k >= 0 && isIdent(t.charCodeAt(k))) k--;
+            const run = t.slice(k + 1, j + 1);
+            word = k < 0 && inWord ? word + run : run;
+        } else word = "";
+        inWord = j === t.length - 1 && isIdent(code);
+    };
+    const emit = (t) => { parts.push(t); note(t); };
+    const allowed = () => {
+        if (last < 0) return true;
+        if (isIdent(last)) return /^[0-9]/.test(word) ? false : REGEX_ALLOWED_KEYWORDS.has(word);
+        if (last === 41 || last === 93) return false;     // ")" "]"
+        if (last === 60) return false;                     // "<" -- see regexAllowedHere
+        return true;
+    };
     while (i < n) {
         const c = src[i], d = src[i + 1];
         if (mode === null) {
             if (c === "/" && d === "/") { mode = "line"; i += 2; continue; }
             if (c === "/" && d === "*") { mode = "block"; i += 2; continue; }
-            if (c === "'" || c === '"' || c === "`") { mode = c; out += c; i++; continue; }
-            if (c === "/" && regexAllowedHere(out)) {
+            if (c === "'" || c === '"' || c === "`") { mode = c; emit(c); i++; continue; }
+            if (c === "/" && allowed()) {
                 const r = regexBody(src, i);
                 if (r) {
                     // BLANKED LIKE A STRING'S CONTENT: keep the opening "/", the closing "/", and any flags --
                     // drop the pattern between them. "/" + (closing "/" through end of flags) does exactly that.
-                    out += "/" + src.slice(r.closeAt, r.end);
+                    emit("/" + src.slice(r.closeAt, r.end));
                     i = r.end;
                     continue;
                 }
             }
-            out += c; i++; continue;
+            // a run of plain code up to the next character that could change mode, emitted as one chunk
+            let j = i + 1;
+            while (j < n) { const k = src.charCodeAt(j); if (k === 47 || k === 39 || k === 34 || k === 96) break; j++; }
+            emit(src.slice(i, j)); i = j; continue;
         }
-        if (mode === "line") { if (c === "\n") { mode = null; out += "\n"; } i++; continue; }
-        if (mode === "block") { if (c === "*" && d === "/") { mode = null; i += 2; continue; } if (c === "\n") out += "\n"; i++; continue; }
+        if (mode === "line") { if (c === "\n") { mode = null; emit("\n"); } i++; continue; }
+        if (mode === "block") { if (c === "*" && d === "/") { mode = null; i += 2; continue; } if (c === "\n") emit("\n"); i++; continue; }
         // inside a string literal
         if (c === "\\") { i += 2; continue; }
-        if (c === mode) { out += c; mode = null; i++; continue; }
-        if (c === "\n") out += "\n";
+        if (c === mode) { emit(c); mode = null; i++; continue; }
+        if (c === "\n") emit("\n");
         i++;
     }
-    return out;
+    return parts.join("");
 }
 
 /** true when the pattern appears in actual code rather than in a comment or a string. */

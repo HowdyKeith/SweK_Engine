@@ -255,7 +255,8 @@ const grid = controlGrid({ sigmas: [...DY, ...OTHER], angles: ANG });
     ok("the sweep totals its own coercion rather than leaving it to be rediscovered",
         z.coercion.points === 5 && z.coercion.coerced === 2 && z.coercion.collapsedRanges === 1,
         JSON.stringify(z.coercion) + ". Two of five points were coerced and the five requested values built four " +
-        "distinct configurations. Across the full device table the figures are 5612 of 17759 coerced");
+        "distinct configurations. Across the full device table the figures are " + COERCION_CENSUS_V4477.coerced +
+        " of " + COERCION_CENSUS_V4477.sweptPoints + " coerced (the record; the census row below re-derives it)");
     // effectiveSigma is what the control PREDICTS at. Predicting at the request while measuring at the clamp
     // is the entire false-mechanism story, so the clamp is asserted here rather than assumed from splatBind.
     ok("!! effectiveSigma reports the clamp, which is the value the false mechanism came from mis-reading",
@@ -275,9 +276,13 @@ const grid = controlGrid({ sigmas: [...DY, ...OTHER], angles: ANG });
         census.collapsedRanges === COERCION_CENSUS_V4477.collapsedRanges &&
         census.knobDropped === COERCION_CENSUS_V4477.knobDropped &&
         census.coerced / census.sweptPoints > 0.3,
-        JSON.stringify(census) + " against the record. 5612 of 17759 points -- 31.6% -- are labelled with a " +
-        "configuration the device did not use, and 1225 knob-ranges build fewer configurations than they " +
-        "request. A number in a round note that the gate cannot re-derive is a number nobody will check again");
+        // v4778 -- the counts in this sentence were v4477's (5612 of 17759, 1225) typed as prose and had been
+        // stale since v4486; they are read from the census now, so a re-take cannot leave them behind again.
+        JSON.stringify(census) + " against the record. " + census.coerced + " of " + census.sweptPoints +
+        " points -- " + (100 * census.coerced / census.sweptPoints).toFixed(1) + "% -- are labelled with a " +
+        "configuration the device did not use, and " + census.collapsedRanges + " knob-ranges build fewer " +
+        "configurations than they request. A number in a round note that the gate cannot re-derive is a number " +
+        "nobody will check again");
     ok("...and splat's sigma is NOT among the collapsed ranges, which is why this survived a full sweep",
         COERCION_CENSUS_V4477.splatSigmaCollapsesUnderKnobRange === false &&
         new Set([0.01, 0.025, 0.05, 0.1, 0.2, 0.4, 1].map(effectiveSigma)).size === 7,
@@ -296,12 +301,17 @@ const grid = controlGrid({ sigmas: [...DY, ...OTHER], angles: ANG });
         CONTROL_CLAIM.replaces.includes("airy") && CONTROL_CLAIM.replaces.includes("cured"),
         "optics.airy.airyRingErrFrac was cured at v2931 on purpose. It is not coming back and should not. What " +
         "was owed was A control, not THAT control");
-    ok("one control, one device, one knob -- the sweep's power over the other 85 device/modes is still unproven",
+    // v4778 -- the name said "the other 85 device/modes", a figure typed at v4477. It matches v2898's 86
+    // device/modes less splat.integral (the header of zeroRangeSweep.mjs), though the v4477 commit does not
+    // say so. deviceModeTable() lists 490 device/modes today, 485 at 978d26e3 before the rtx merge
+    // (capsuledepenetrate's floor, wall, corner, ramp and empty are the 5). The claim does not depend on the
+    // count, so it is dropped from the name rather than replaced by one this row does not re-derive.
+    ok("one control, one device, one knob -- the sweep's power over every other device/mode is still unproven",
         CONTROL.device === "splat" && CONTROL.knob === "sigma",
         "arm 7 certifies that zeroRangeSweep detects an exact zero in splat.integral when one is present and " +
         "declines when it is not. It does NOT establish that the sweep would find a zero in kerr, wolff or " +
         "percolation -- a second control elsewhere is a round of its own");
-    console.log("  NOTE   the 5612 mislabelled points are FIXED IN THE RECORDING and not in the ranges: knobRange");
+    console.log("  NOTE   the " + COERCION_CENSUS_V4477.coerced + " mislabelled points are FIXED IN THE RECORDING and not in the ranges: knobRange");
     console.log("         still generates values past every clamp, so the sweep still spends about a third of its");
     console.log("         builds re-measuring configurations it has already visited. Making the range clamp-aware");
     console.log("         would change what the sweep covers, which is a different question from what it reports.");

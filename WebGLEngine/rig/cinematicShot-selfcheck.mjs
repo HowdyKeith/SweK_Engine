@@ -558,7 +558,7 @@ console.log("\n6. *** THE PAGE ACTUALLY FLIES IT, AND THE CAMERA THREE RENDERS F
             rs.writeHead(200, { "Content-Type": ct }); rs.end(fs.readFileSync(full));
         });
         await new Promise((r) => srv.listen(0, "127.0.0.1", r));
-        const browser = await rr.chromium.launch({ executablePath: pw.HEADLESS_SHELL, args: ["--use-gl=swiftshader", "--enable-webgl"] });
+        const browser = await rr.chromium.launch({ executablePath: pw.HEADLESS_SHELL, args: [...pw.webglLaunchArgs().args, "--enable-webgl"] });
         try {
             const pg = await browser.newPage();
             const errs = [];

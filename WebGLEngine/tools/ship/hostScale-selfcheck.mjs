@@ -15,7 +15,10 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { hostScale, scaled, recordRun, SCALE_FLOOR, SCALE_CEILING } from "./hostScale.mjs";
+import { hostScale, scaled, recordRun, boxId, hostFacts, canonicalId, SCALE_FLOOR, SCALE_CEILING } from "./hostScale.mjs";
+import { timingsTarget, LOCAL_TIMINGS, DEFAULTS, RECORD_HANDOVERS, ownerOf } from "./quickSweep.mjs";
+import { ENG as ROOT } from "./gateSweep.mjs";
+import { noComments } from "./sourceScan.mjs";
 import { MEASURED, budgetFor } from "./gateBudget.mjs";
 
 import { fileURLToPath } from "node:url";
@@ -168,12 +171,49 @@ say("reference for " + GATE.split("/").pop() + ": MEASURED " + REF + "ms, budget
     // happens to be low today.
     const raw = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "gate-timings.json"), "utf8"));
     const entries = Object.entries(raw.timings);
-    ok("!! *** an entry cannot say whether it is a TIME or a TRUNCATION, which is why MEASURED is the denominator ***",
-       entries.length > 0 && entries.every(([, v]) => typeof v === "number"),
-       entries.length + " entries, every one a bare number. A gate killed at its budget records the moment it died "
-       + "and looks exactly like a gate that finished. DIVIDING BY THIS SAID THIS BOX RUNS AT 4.90x. The fix is not "
-       + "to detect truncation -- it cannot be detected from here -- but to divide by a table of numbers that were "
-       + "all obtained the same way.");
+    // *** v4580 -- THIS CONDITION PINNED A REPRESENTATION AND CLAIMED A PROPERTY, AND THE TWO CAME APART. ***
+    //
+    // It asserted `entries.every(([, v]) => typeof v === "number")` under the sentence "an entry cannot say
+    // whether it is a TIME or a TRUNCATION". Those are different statements. sweep-timings.json ALSO holds
+    // nothing but bare numbers in its `timings`, and since v4579 every one of its entries says exactly which of
+    // three quantities it is -- the saying rides in a sibling `kinds` map. So this row was satisfied by a file
+    // that refutes its own sentence, and it would have stayed green straight through the repair.
+    //
+    // AND THE SENTENCE'S SECOND HALF WAS WRONG IN A WAY THAT COST 644 VERSIONS. "The fix is not to detect
+    // truncation -- IT CANNOT BE DETECTED FROM HERE." True of a reader, and this is a reader. But the PRODUCER --
+    // tools/ship/selfchecks.mjs -- branches on completed, killed, and declined-to-run by name, and threw the
+    // distinction away one line later by writing an integer. v4580 stamps it at that line. The generalisation
+    // from "from here" to "at all" is what stopped anyone looking.
+    //
+    // WHAT IS PINNED NOW IS THE PROPERTY: how many entries carry no provenance. It is >0 today, and THIS ROW IS
+    // BUILT TO GO RED THE DAY IT REACHES ZERO -- which is the day this module should reconsider its denominator
+    // rather than the day somebody edits a comment.
+    const unprovenanced = entries.filter(([k]) => !((raw.kinds || {})[k])).length;
+    ok("!! *** entries that cannot say whether they are a TIME or a TRUNCATION, which is why MEASURED is the denominator ***",
+       unprovenanced > 0,
+       unprovenanced + " of " + entries.length + " entries carry no kind, no box and no stamp. For each of those a "
+       + "gate killed at its budget records the moment it died and looks exactly like a gate that finished. "
+       + "DIVIDING BY THIS SAID THIS BOX RUNS AT 4.90x. And when this count reaches zero this row goes red on "
+       + "purpose, because the reason will have expired. v4580 made the producer record it; it cannot be "
+       + "recovered for the rest."
+       // *** v4581 -- AND THE REASON v4580 GAVE FOR PREFERRING MEASURED WAS NOT CHECKED, AND IS WRONG. ***
+       // This detail read "The denominator stays MEASURED because its numbers were all obtained the same way".
+       // I wrote that sentence here one round ago and did not measure it. 50 of gateBudget.MEASURED's 62 entries
+       // have no MEASURED_RUNS row at all, so for most of the table nothing says how the number was obtained --
+       // and three of the twelve that do say `observedHere: false`. The same fault this row exists to name,
+       // asserted about the table offered as the cure, inside the gate that names it.
+       //
+       // THE CONCLUSION SURVIVES ON A DIFFERENT AND SMALLER REASON, measured at v4581: MEASURED's numbers agree
+       // with the independent records for 43 of the 50 entries those records cover, none is LOWER than observed,
+       // and after configContract's removal no entry is more than about 3x high. gate-timings has 397 entries
+       // that cannot say what they are. Curated-and-mostly-checked beats unprovenanced-at-scale; "all obtained
+       // the same way" was a claim about process that nobody had asked the table for.
+       + " (v4581: see tools/ship/budgetProvenance-selfcheck.mjs for what MEASURED can and cannot say.)");
+    ok("...and the repair exists on this file, so the impossibility claim is retired rather than restated",
+       Object.keys(raw.kinds || {}).length > 0 && Object.keys(raw.boxLegend || {}).length > 0,
+       "a kind map and a machine legend, written by tools/ship/selfchecks.mjs at the point of decision. The old "
+       + "form of this row asserted the absence was structural; it was only unrecoverable, which is a different "
+       + "thing and does not excuse leaving the producer silent.");
 
     // The truncation is REPORTED, not pinned. How many entries sit below their MEASURED value is a fact about
     // today's data; it will change every sweep, and a gate that failed when it improved would be a ratchet
@@ -249,6 +289,177 @@ say("reference for " + GATE.split("/").pop() + ": MEASURED " + REF + "ms, budget
        /host-timings\.local\.json/.test(gi),
        "gate-timings.json is the shipped REFERENCE and this is one box's comparison against it. Shipping the " +
        "comparison would be the same defect one level up: another machine's stopwatch, presented as a fact");
+}
+
+console.log("\n*** WHOSE STOPWATCH WROTE sweep-timings.json -- v4647 ***");
+{
+    // This module's own v4580 header says of gate-timings.json: "NOTHING IN IT SAYS WHICH MACHINE PRODUCED ANY
+    // OF THEM". sweep-timings.json had the same hole, in a file REWRITTEN EVERY RUN and COMMITTED, and it
+    // began biting the moment a second box ran the sweep for real: Keith's Windows rig could not `git pull`
+    // at all -- its verify run dirties that file and git refuses to overwrite it -- which blocked four pulls
+    // in one session. And had it ever committed, its readings would have landed in the SAME fields as this
+    // box's with nothing to tell them apart: his sweep puts 231 gates over the 3,000 ms budget and this one
+    // puts a handful, which is two machines disagreeing rather than a number moving.
+    const ME = boxId();
+    ok("boxId is stable within a run and shaped for a filename, not for quoting",
+       ME === boxId() && /^[a-z0-9]+-[a-z0-9]+-\d+c-\d+gb-[0-9a-f]{6}$/.test(ME), ME);
+    // v4796: one machine type reported 16095 MB in one session and 16096 MB in the next, and the megabyte id split it in two
+    const facts = hostFacts(), at = (mb) => boxId({ ...facts, totalMemMB: mb });
+    ok("!! the id survives a machine's megabyte drift and still tells machine types apart: 16095 and 16096 MB one id, 32 GB another",
+       at(16095) === at(16096) && at(16096) !== at(32678) && at(7908) !== at(16095), `${at(16095)} / ${at(16096)} / ${at(32678)} / ${at(7908)}`);
+    // SABOTAGES (v4796): the id back in megabytes -> 2 (this row and the shape above); memory dropped from the id -> 1, this row,
+    // 16 GB and 32 GB then one box. Rounding DOWN in place of to-nearest is equivalent at these sizes and was not counted.
+
+    // *** v4813 RIG RUN -- THESE THREE ARE THE v4647 RULE, SO THEY ARE ASKED WITHOUT THE LIVE HANDOVER TABLE. ***
+    // They passed the live RECORD_HANDOVERS by default, so "a box naming itself owns the record" quietly became
+    // "...unless this box once handed the record on" -- which is the rig since v4813's handback, and was the
+    // retired sandbox after v4778. The rig's clone verify of 042b3772 went red here on exactly that: correct
+    // behaviour (a box that handed the record on IS refused, see the handover rows below) graded by a fixture
+    // that was never about handovers. The handover rules have their own fixtures; these get an empty table.
+    // REPRODUCED v4813: a scratch handover from this box to another put this row red by name here, as on the rig;
+    // with `handovers: []` the same scratch tree is green. SABOTAGED v4813: timingsTarget's own-record branch made
+    // foreign -> this row red by name, restored.
+    const mine = timingsTarget({ host: ME }, { handovers: [] });
+    ok("!! *** the box that OWNS the record writes the shared file ***",
+       mine.file === DEFAULTS.timingsFile && mine.foreign === false, mine.why);
+    const fresh = timingsTarget({}, { handovers: [] });
+    ok("!! an UNCLAIMED record is adopted -- every record written before v4647 names no box",
+       fresh.file === DEFAULTS.timingsFile && fresh.foreign === false && fresh.host === ME, fresh.why);
+    const theirs = timingsTarget({ host: "win32-x64-16c-32000mb-abcdef" }, { handovers: [] });
+    ok("!! *** CONTROL: a DIFFERENT box writes its own file and NEVER the shared one ***",
+       theirs.file === LOCAL_TIMINGS && theirs.file !== DEFAULTS.timingsFile && theirs.foreign === true,
+       theirs.why);
+    ok("  ...and the refusal names BOTH boxes, because 'wrong machine' is not a thing anybody can act on",
+       theirs.why.includes("win32-x64-16c-32000mb-abcdef") && theirs.why.includes(ME));
+    // *** v4778 -- A HANDOVER MOVES THE RIGHT TO WRITE, AND NOTHING ELSE. *** The owner box retired with a container
+    // restart; RECORD_HANDOVERS says who writes next. Driven on fixed names, so the rows mean the same on every box.
+    // SABOTAGED at v4778: RECORD_HANDOVERS emptied -> the live-handover row here and boxTimings' owner row both red,
+    // by name; the first draft let a retired box that named itself keep writing, and the refused-owner row caught it.
+    {
+        const H = [{ at: "vX", from: "old-box", to: "new-box" }, { at: "vY", from: "new-box", to: "third-box" }];
+        const took = timingsTarget({ host: "old-box" }, { id: "new-box", handovers: H.slice(0, 1) });
+        const left = timingsTarget({ host: "old-box" }, { id: "old-box", handovers: H.slice(0, 1) });
+        const other = timingsTarget({ host: "old-box" }, { id: "stranger", handovers: H.slice(0, 1) });
+        const chain = timingsTarget({ host: "old-box" }, { id: "third-box", handovers: H });
+        const middle = timingsTarget({ host: "old-box" }, { id: "new-box", handovers: H });
+        ok("!! *** a HANDOVER lets the named box write the shared file, and says it was handed over ***",
+           took.file === DEFAULTS.timingsFile && !took.foreign && took.host === "new-box" && /handed/.test(took.why),
+           took.why);
+        ok("!! ...and the box that handed it on is REFUSED like any stranger -- two owners is the defect",
+           left.foreign && left.file === LOCAL_TIMINGS && other.foreign && other.why.includes("new-box"),
+           left.why);
+        ok("  ...and a chain is followed to its end, so a later handover appends rather than edits",
+           !chain.foreign && middle.foreign, `third-box ${chain.foreign ? "refused" : "owns"}, new-box ` +
+           `${middle.foreign ? "refused" : "owns"}`);
+        // v4818: a box can get the record BACK, and the walk must follow the rows in the order they were decided. The
+        // first ownerOf took the first row naming a box and stopped at a box it had seen, which on a-box -> b-box ->
+        // a-box answered b-box for a record b-box wrote -- the return handover ignored. SABOTAGED v4818: the old walk
+        // put back -> this row red by name.
+        {
+            const R = [{ at: "v1", from: "a-box", to: "b-box" }, { at: "v2", from: "b-box", to: "a-box" },
+                       { at: "v3", from: "a-box", to: "b-box" }];
+            ok("!! *** a record handed BACK goes to the box it was handed back to, in the order the rows were decided ***",
+               ownerOf("b-box", R.slice(0, 2)) === "a-box" && ownerOf("a-box", R.slice(0, 2)) === "a-box" &&
+               ownerOf("b-box", R) === "b-box" && ownerOf("a-box", R) === "b-box" && ownerOf("c-box", R) === "c-box",
+               `a->b->a: owner of a b-box record ${ownerOf("b-box", R.slice(0, 2))}; a->b->a->b: ${ownerOf("b-box", R)}`);
+            // a-box is handed the record TWICE here (v2 and v4), so the first row naming it and the last are different
+            const R4 = [...R, { at: "v4", from: "b-box", to: "a-box" }];
+            const back = timingsTarget({ host: "b-box" }, { id: "a-box", handovers: R4 });
+            ok("  ...and the writer names the handover that GAVE it the record, not the first one that ever named it",
+               !back.foreign && / at v4$/.test(back.why), back.why);
+            // SABOTAGED v4818: the old walk -> both rows red; the writer naming the first row (`find`) -> this one red.
+        }
+        // v4813: the record went back to a sandbox by a second dated row (Keith's decision -- see quickSweep's v4813
+        // note), so the v4778 row is asserted as history and the live owner as the END of the chain, which is the
+        // property the chain row above tests on fixtures. Pinning the rig here would have been the edit-in-place
+        // the handover table exists to forbid. SABOTAGED v4813: the v4813 row's `to` set to the rig's id -> red
+        // here by name (a handover to itself), restored.
+        const last = RECORD_HANDOVERS[RECORD_HANDOVERS.length - 1];
+        ok("!! *** the live handover names the retired sandbox and the rig, and was decided rather than assumed ***",
+           RECORD_HANDOVERS.length >= 1 && RECORD_HANDOVERS.every((h) => h.at && h.from && h.to && h.decidedBy &&
+               h.evidence && h.from !== h.to) &&
+           RECORD_HANDOVERS[0].from === "linux-x64-4c-16096mb-142c0d" && RECORD_HANDOVERS[0].to === "win32-x64-12c-32678mb-b70b27" &&
+           ownerOf("linux-x64-4c-16096mb-142c0d") === canonicalId(last.to),
+           RECORD_HANDOVERS.map((h) => `${h.at}: ${h.from} -> ${h.to} (${h.decidedBy})`).join("; "));
+        // v4819 -- THE TWO ID FORMS NAME ONE BOX. The handovers were written while boxId() carried megabytes; the line merged
+        // in at v4819 has carried whole gigabytes since v4796. canonicalId reads the old form as the new, so the owner chain
+        // and boxId() can be compared at all -- without it no box would own the record on either line's ids.
+        ok("!! *** an id in the megabyte form names the same box as the gigabyte form, and a gigabyte id is left alone ***",
+           canonicalId("linux-x64-4c-16095mb-142c0d") === "linux-x64-4c-16gb-142c0d" &&
+           canonicalId("linux-x64-4c-16096mb-142c0d") === canonicalId("linux-x64-4c-16095mb-142c0d") &&
+           canonicalId("win32-x64-12c-32678mb-b70b27") === "win32-x64-12c-32gb-b70b27" &&
+           canonicalId(boxId()) === boxId() && canonicalId("linux-x64-4c-16gb-420793") === "linux-x64-4c-16gb-420793" &&
+           ownerOf("linux-x64-4c-16095mb-420793", [{ at: "x", from: "linux-x64-4c-16gb-420793", to: "b-box" }]) === "b-box",
+           `16095mb-142c0d reads ${canonicalId("linux-x64-4c-16095mb-142c0d")}; the live owner reads ${ownerOf((() => { try { return JSON.parse(fs.readFileSync(path.join(ROOT, DEFAULTS.timingsFile), "utf8")).host; } catch { return null; } })())}`);
+    }
+    ok("  the local file follows this tree's existing per-machine convention rather than inventing one",
+       /\.local\.json$/.test(LOCAL_TIMINGS),
+       "host-timings.local.json, vba-archive.local.json, services.local.json -- and .gitignore carries it, so " +
+       "a second box's runtimes cannot travel and cannot block its pull");
+
+    // The live record, which is the thing that actually has to carry it.
+    let live = null;
+    try { live = JSON.parse(fs.readFileSync(path.join(ROOT, DEFAULTS.timingsFile), "utf8")); } catch {}
+    ok("!! *** and the SHIPPED record names its box, so a reading can be attributed at all ***",
+       !!live && typeof live.host === "string" && live.host.length > 0,
+       live ? `sweep-timings.json was written by ${live.host}` : "NO RECORD");
+    // *** AND EVERY WRITER IS CHECKED, NOT JUST THE FILE. *** A sabotage removed `host` from quickSweep's
+    // write and this gate stayed green: it reads the live file, which sweepRotation had already written with
+    // the field. That is the v4567 defect exactly -- a writer that spells its fields by hand drops one, the
+    // record gets smaller, and nothing looks wrong. THREE writers touch this record and all three are read
+    // here, from source, because a record with one honest writer and two silent ones is not attributable.
+    const writers = [["tools/ship/quickSweep.mjs", 1], ["tools/ship/sweepRotation.mjs", 2]];
+    const missing = [];
+    for (const [rel, n] of writers) {
+        let src = "";
+        try { src = fs.readFileSync(path.join(ROOT, rel), "utf8"); } catch { missing.push(rel + " (unreadable)"); continue; }
+        const writes = (src.match(/writeFileSync\([^)]*?(?:timingsFile|t\.file|target\.file)/g) || []).length;
+        const hosts = (src.match(/host: (?:target|t)\.host/g) || []).length;
+        if (writes < n || hosts < n) missing.push(`${rel}: ${writes} timings write(s), ${hosts} carrying host`);
+    }
+    ok("!! *** all THREE write sites stamp the host, checked in their source rather than in the file ***",
+       missing.length === 0,
+       missing.length ? "NOT STAMPED: " + missing.join(" | ")
+                      : "quickSweep 1 + sweepRotation 2. Reading the file alone cannot tell three writers " +
+                        "apart, and one of them dropping the field is exactly how v4567 turned every spawning " +
+                        "gate skippable while the count looked like success");
+
+    // *** AND WHOSE MEMBERSHIP LIST A SWEEP RAN IS REPORTED, WHICH IS THE OTHER HALF OF ONE BOX OWNING THE
+    // RECORD. *** budgetMs is deliberately NOT scaled per box -- budgetIsOwn calls it a claim about the
+    // sweep's TOTAL COST, so a slower machine should run FEWER gates rather than be granted a longer budget,
+    // and scaling it would defeat the threshold. That is right. What it leaves is a second machine running
+    // the FIRST machine's list: Keith's gen-9 sweep found 219 of 1,306 of them over budget there, 17%,
+    // against a handful here. Reported rather than corrected -- a foreign box has nowhere to write a
+    // corrected membership, and inventing one per box would make "the sweep is green" mean two different
+    // things on two machines. It no longer means them differently in silence.
+    // *** v4647o -- READ THROUGH noComments(), BECAUSE THE RAW MATCH WAS PROSE-MATCHING DEBT. ***
+    // tools/ship/gateQuality-selfcheck.mjs counts rows that test an English sentence against raw source:
+    // rewrap the comment and the row goes red while nothing has changed. It named this one as a NEW
+    // offender -- mine, written two rounds ago -- and it was right. The sentence being matched is a string
+    // in CODE, so stripping comments keeps it and removes the way it could be broken by reflowing prose.
+    const vSrc = noComments(fs.readFileSync(path.join(ROOT, "tools", "ship", "verify.mjs"), "utf8"));
+    ok("!! *** verify SAYS SO when the membership list came from another box, and names how many are over budget HERE ***",
+       /r\.foreignTimings/.test(vSrc) && /the membership list came from/.test(vSrc),
+       "a sweep that runs one machine's list on another and reports only a verdict is two claims wearing one word");
+    const qSrc = fs.readFileSync(path.join(ROOT, "tools", "ship", "quickSweep.mjs"), "utf8");
+    ok("  ...and 'foreign' is decided by the record's own host against this box, not by a flag somebody passes",
+       // v4819: the record's host read through canonicalId -- a record naming this box in v4796's megabyte form is not foreign
+       /foreignTimings = !!timingsHost && canonicalId\(timingsHost\) !== boxId\(\)/.test(qSrc),
+       "the same boxId the record is stamped with, so the two cannot disagree about which machine this is");
+    ok("!! CONTROL: the sweep does NOT scale its budget per box, and that is deliberate",
+       !/scaled\(/.test(qSrc),
+       "hostScale's scaled() grows a per-gate TIMEOUT on a slow machine, which is a different question. " +
+       "Growing a membership threshold would make the sweep take proportionally longer on the box least able " +
+       "to afford it -- the opposite of what the threshold is for");
+
+    // NOT a row: `ok(..., true)` is a control that cannot fail, and the first draft of this block had one
+    // here -- which is the exact thing ringFloorCost-selfcheck's section 4 says in so many words. A limit is
+    // reported; it is not asserted.
+    console.log("  ----  WHAT IS NOT CLAIMED: that the fifteen modules reading this record are host-aware. They " +
+                "are not. On a foreign box they read THIS box's timings, which is the gap hostScale exists to " +
+                "absorb by scaling a budget from what the local machine has actually done. What changed is only " +
+                "that a foreign box can no longer silently overwrite the shared record, and that the record says " +
+                "who wrote it. Making fifteen readers host-aware is its own round.");
 }
 
 console.log(failed ? "\nhostScale-selfcheck: " + failed + " FAILED" : "\nhostScale-selfcheck: all checks pass");

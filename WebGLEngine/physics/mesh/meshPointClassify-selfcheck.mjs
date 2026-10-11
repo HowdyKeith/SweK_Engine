@@ -72,7 +72,7 @@
 // Run: node physics/mesh/meshPointClassify-selfcheck.mjs
 "use strict";
 import { MeshBVH } from "../../mesh/meshBVH.mjs";
-import { rayAllHits, pointInMesh, DEFAULT_DIRS } from "./meshPointClassify.mjs";
+import { rayAllHits, pointInMesh, DEFAULT_DIRS, reportLines } from "./meshPointClassify.mjs";
 import { pairOverlap } from "./bvhPairOverlap.mjs";
 import { clipTriangleByTriPlane } from "./triClip.mjs";
 
@@ -343,6 +343,27 @@ function slabMesh(w) {
                 allMatch);
         }
     }
+}
+
+// v4778 -- THE FRONT DOOR. meshPointClassify.mjs grew a no-argument reportLines() at the rtx merge so instrument-bench.html
+// can serve it (physics/instruments.mjs, the BVH-CSG rows). A report is not a verdict, but an export no gate
+// names is what definitionGates counts, so this section reads the report's own hand-checkable numbers back.
+console.log("\nTHE FRONT DOOR");
+{
+    const L = reportLines();
+    // Five of the six labels contain "inside" or "outside" themselves, so the verdict is read from its own column
+    // (after the padded label) and the votes must be the unanimous ones for THAT verdict, not either unanimity.
+    const want = [["centre", "inside"], ["far outside", "outside"], ["just outside the +x face", "outside"],
+                  ["just inside the +x face", "inside"], ["outside near the origin corner", "outside"], ["inside near the origin corner", "inside"]];
+    const rows = want.map(([label]) => L.map((l) => l.trim().match(/^(.+?)\s{2,}(inside|outside)\s+votes (\d)-(\d)\s+agreement (\S+)$/))
+        .find((m) => m && m[1] === label));
+    ok("reportLines classifies the six hand-placed points as the box says, each 5-0 with agreement 1",
+        /meshPointClassify/.test(L[0]) && rows.every((m, i) => m && m[2] === want[i][1] &&
+            (m[2] === "inside" ? m[3] === "5" && m[4] === "0" : m[3] === "0" && m[4] === "5") && m[5] === "1"),
+        rows.map((m) => m ? m[1] + " " + m[2] + " " + m[3] + "-" + m[4] : "MISSING").join(" | "));
+    ok("...and shows the reason welding exists: 2 raw hits (bare parity OUTSIDE), 1 welded crossing (inside)",
+        L.some((l) => /raw hits 2 \(bare parity: OUTSIDE\)\s+welded crossings 1 \(inside\)/.test(l)));
+    ok("...and no report line stringifies a missing field as the literal word \"undefined\"", L.every((l) => !/\bundefined\b/.test(l)));
 }
 
 console.log(`meshPointClassify-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

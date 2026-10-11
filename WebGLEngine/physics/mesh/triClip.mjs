@@ -179,3 +179,37 @@ export function clipTriangleByTriPlane(tris, tri, planeTris, planeTri) {
     if (plane === null) return { status: "degenerate" };
     return clipTriangleByPlane(tris, tri, plane.n, plane.d);
 }
+
+// ---- THE FRONT DOOR (v4778) ---------------------------------------------------------------------------------
+//
+// The v3327 split, grown at the rtx merge so instrument-bench.html can serve this module (physicsReach counted
+// it among six BVH-CSG modules with no door at all). The bench calls reportLines() with NO argument, so the
+// no-argument case IS a measurement: the gate's own hand-derived clip, the triangle (0,0,0),(4,0,0),(0,4,0) of
+// area 8 cut by the plane x=1, whose pieces are checkable by hand -- 4.5 in front, 3.5 behind. The winding is
+// read against the original's own normal, which is the oracle round 3's gate needed to catch an inverted
+// fan that area conservation alone passed. A REPORT, NOT A VERDICT -- triClip-selfcheck.mjs exits nonzero.
+export function reportLines() {
+    const T = (...v) => new Float64Array(v.flat());
+    const area2 = (t) => {   // twice the signed area along +z, which is where every triangle here lies
+        const [a, b, c] = t;
+        return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+    };
+    const tri = T([0, 0, 0], [4, 0, 0], [0, 4, 0]);
+    const r = clipTriangleByPlane(tri, 0, [1, 0, 0], -1);
+    const out = ["[triClip] one triangle split by one plane, winding kept",
+                 "  subject  (0,0,0),(4,0,0),(0,4,0), area 8, against the plane x = 1 (front is x > 1)",
+                 "  status   " + r.status];
+    if (r.status === "clipped") {
+        const fa = r.front.reduce((s, t) => s + area2(t) / 2, 0), ba = r.back.reduce((s, t) => s + area2(t) / 2, 0);
+        const flipped = [...r.front, ...r.back].filter((t) => area2(t) <= 0).length;
+        out.push("  front    " + r.front.length + " triangle(s), area " + fa + "   (by hand: 4.5)");
+        out.push("  back     " + r.back.length + " triangle(s), area " + ba + "   (by hand: 3.5)");
+        out.push("  sum      " + (fa + ba) + " of 8;  pieces wound against the original: " + flipped);
+    }
+    const scaled = clipTriangleByPlane(tri, 0, [1e6, 0, 0], -1e6);
+    out.push("  the same plane written with a normal 1e6 long: " +
+             (JSON.stringify(scaled) === JSON.stringify(r) ? "an identical result" : "A DIFFERENT RESULT"));
+    out.push("  a vertex within 1e-9 of the plane: " + clipTriangleByPlane(T([1 + 5e-10, 0, 0], [4, 0, 0], [0, 4, 0]), 0, [1, 0, 0], -1).status +
+             " -- reported, not resolved, as triTriIntersect.mjs does");
+    return out;
+}

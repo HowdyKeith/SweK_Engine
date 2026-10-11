@@ -1,0 +1,135 @@
+{
+ "gate": "render/temporalTslCoverage-selfcheck.mjs",
+ "at": "2026-09-29",
+ "tables": [
+  {
+   "title": "the field's pixels against three's colour pass",
+   "columns": [
+    "backend",
+    "case",
+    "field moves",
+    "three draws",
+    "both"
+   ],
+   "rows": [
+    [
+     "webgpu",
+     "spriteCut",
+     406,
+     406,
+     406
+    ],
+    [
+     "webgpu",
+     "meshCut",
+     406,
+     406,
+     406
+    ],
+    [
+     "webgpu",
+     "back",
+     576,
+     576,
+     576
+    ],
+    [
+     "webgl2",
+     "spriteCut",
+     406,
+     406,
+     406
+    ],
+    [
+     "webgl2",
+     "meshCut",
+     406,
+     406,
+     406
+    ],
+    [
+     "webgl2",
+     "back",
+     576,
+     576,
+     576
+    ]
+   ],
+   "note": "Before v4779 the cut-outs moved 812 pixels (the clear half too) and the back face none."
+  },
+  {
+   "title": "the field against its reference",
+   "columns": [
+    "backend",
+    "case",
+    "worst px",
+    "moving pixels"
+   ],
+   "rows": [
+    [
+     "webgpu",
+     "hidden",
+     0,
+     146
+    ],
+    [
+     "webgpu",
+     "hiddenBatch",
+     0.00000764428116888113,
+     146
+    ],
+    [
+     "webgpu",
+     "culled",
+     0,
+     132
+    ],
+    [
+     "webgpu",
+     "grown",
+     0.00000764428116888113,
+     138
+    ],
+    [
+     "webgpu",
+     "repacked",
+     0.00000764428116888113,
+     126
+    ],
+    [
+     "webgl2",
+     "hidden",
+     0,
+     146
+    ],
+    [
+     "webgl2",
+     "hiddenBatch",
+     0.000009548656651735681,
+     146
+    ],
+    [
+     "webgl2",
+     "culled",
+     0,
+     132
+    ],
+    [
+     "webgl2",
+     "grown",
+     0.000009548656651735681,
+     138
+    ],
+    [
+     "webgl2",
+     "repacked",
+     0.000009548656651735681,
+     126
+    ]
+   ],
+   "note": "Before v4779 the hidden plain mesh was 4.72 px off, the box entering view read no motion, and the grown batch was refused."
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

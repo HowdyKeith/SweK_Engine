@@ -64,12 +64,19 @@
 // into convex polygons. This file partitions into MAXIMAL RECTANGLES instead -- a monotone row sweep, which
 // Recast also ships as rcBuildRegionsMonotone -- and rectangles are convex already, so no contour tracing
 // and no convex merge is needed. That is a smaller mesh stage, and the reason it is enough was MEASURED
-// before it was built rather than assumed: on the obstacle fixture the sweep produces NINE polygons for
-// 251,685 cells, and the funnel over them lands on the analytic optimum to 0.00 m at r = 0. Path quality
-// comes from the PORTALS BEING REAL EDGES, not from the polygons being few or from their being contours.
-// What the missing stages would buy is polygon count on curved and diagonal boundaries, where a row sweep
-// makes a staircase of thin rectangles; that costs memory and A* nodes, and it is measured in the gate
-// rather than guessed at here.
+// before it was built rather than assumed: on the obstacle fixture the sweep produces FIVE polygons for
+// 257,725 cells at r = 0, and the funnel over them lands on the analytic optimum. Path quality comes from
+// the PORTALS BEING REAL EDGES, not from the polygons being few or from their being contours.
+//
+// *** THOSE TWO NUMBERS READ "NINE POLYGONS FOR 251,685 CELLS" UNTIL v4536 AND NEITHER HAD EVER BEEN TRUE. ***
+// They sat under this header's own claim that everything in it is re-derived on each run, which nothing was
+// doing. Both are re-measured by the gate now, and what the missing stages would buy has been measured too --
+// it is NOT what this paragraph used to say. On a 45-degree boundary the sweep emits 737 polygons, and that
+// is the PROVEN MINIMUM for the mask rather than a staircase artefact: Lipski/Ohtsuki gives 738 reflex
+// corners - 0 independent chords + 1 - 2 holes = 737, and a union of axis-aligned unit cells is convex only
+// when it is a rectangle, so nothing that stays on the lattice can do better. The prize is not A* nodes
+// either: planPath holds between 1 and 2 ms from 737 polygons to 11,242. What polygon count costs is the
+// ADJACENCY BUILD, quadratically. See nav/partitionScore.mjs, which re-derives all of it.
 "use strict";
 
 import { triarea2, funnel, pathLength, crossesAllPortals } from "./funnel.mjs";
@@ -300,7 +307,25 @@ export function buildNavmesh(hm, {
         const i = az * stride + ax, j = bz * stride + bx;
         return { f: (C.conn[i] >> d) & 1, b: (C.conn[j] >> ((d + 2) % 4)) & 1 };
     };
-    for (let i = 0; i < rects.length; i++) for (let j = i + 1; j < rects.length; j++) {
+    // *** v4824 -- THE PAIRS ARE FOUND, NOT ENUMERATED. *** This loop visited every (i, j) and kept the ones whose
+    // rectangles share an edge: v4536 measured it at 1,064 ms of a 1,152 ms build at 11,242 polygons. A pair with
+    // a non-empty shared edge always has a cell of one directly above or right of a boundary cell of the other,
+    // so an owner grid and a walk along each rectangle's top and right sides finds exactly those pairs; every
+    // pair it skips is one the old body rejected (no touch, or a corner touch with hi < lo). They are visited in
+    // the old (i, j) order, so adj -- and every portal list and path built from it -- is byte-identical.
+    const owner = new Int32Array(stride * rows).fill(-1);
+    for (let r = 0; r < rects.length; r++) {
+        const R = rects[r];
+        for (let z = R.z0; z <= R.z1; z++) owner.fill(r, z * stride + R.x0, z * stride + R.x1 + 1);
+    }
+    const near = rects.map(() => new Set());
+    const touch = (r, o) => { if (o >= 0 && o !== r) near[Math.min(r, o)].add(Math.max(r, o)); };
+    for (let r = 0; r < rects.length; r++) {
+        const R = rects[r];
+        if (R.z1 + 1 < rows) for (let x = R.x0; x <= R.x1; x++) touch(r, owner[(R.z1 + 1) * stride + x]);
+        if (R.x1 + 1 < stride) for (let z = R.z0; z <= R.z1; z++) touch(r, owner[z * stride + R.x1 + 1]);
+    }
+    for (let i = 0; i < rects.length; i++) for (const j of [...near[i]].sort((a, b) => a - b)) {
         const A = rects[i], B = rects[j];
         let axis = -1, lo = 0, hi = -1, line = 0, aFirst = false;
         if (A.z1 + 1 === B.z0 || B.z1 + 1 === A.z0) {
@@ -355,12 +380,22 @@ export function buildNavmesh(hm, {
 }
 
 /** A* over polygon adjacency, entering each polygon at the midpoint of the portal that reached it. */
-export function corridor(mesh, s, g) {
+export function corridor(mesh, s, g, { entry = "nearest" } = {}) {
     const si = mesh.polyAt(s.x, s.z), gi = mesh.polyAt(g.x, g.z);
     if (si < 0 || gi < 0) return null;
     if (si === gi) return { chain: [], si, gi };
-    const mid = (seg) => ({ x: (seg[0].x + seg[1].x) / 2, z: (seg[0].z + seg[1].z) / 2 });
     const D = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+    // *** THE ENTRY POINT IS THE NEAREST POINT ON THE PORTAL, NOT ITS MIDPOINT, AND THAT IS THE COST MODEL. ***
+    // See the header note on backlog item "navmesh-recast" piece (2).
+    const enter = entry === "midpoint"
+        ? (seg) => ({ x: (seg[0].x + seg[1].x) / 2, z: (seg[0].z + seg[1].z) / 2 })
+        : (seg, from) => {
+            const ax = seg[0].x, az = seg[0].z, dx = seg[1].x - ax, dz = seg[1].z - az;
+            const L2 = dx * dx + dz * dz;
+            if (L2 === 0) return { x: ax, z: az };
+            const t = Math.max(0, Math.min(1, ((from.x - ax) * dx + (from.z - az) * dz) / L2));
+            return { x: ax + dx * t, z: az + dz * t };
+        };
     const gS = new Map([[si, 0]]), prev = new Map(), pt = new Map([[si, s]]);
     const open = [[0, si]], done = new Set();
     while (open.length) {
@@ -371,7 +406,7 @@ export function corridor(mesh, s, g) {
         if (i === gi) break;
         for (const e of mesh.adj[i]) {
             if (done.has(e.to)) continue;
-            const m = mid(e.seg), ng = gS.get(i) + D(pt.get(i), m);
+            const from = pt.get(i), m = enter(e.seg, from), ng = gS.get(i) + D(from, m);
             if (gS.has(e.to) && gS.get(e.to) <= ng) continue;
             gS.set(e.to, ng); prev.set(e.to, { from: i, seg: e.seg, dir: e.dir }); pt.set(e.to, m);
             open.push([ng + D(m, g), e.to]);
@@ -435,8 +470,8 @@ export function orientPortal(seg, dir) {
 }
 
 /** Plan a path: A* over polygons, then the funnel. Returns null when the agent does not fit. */
-export function planPath(mesh, s, g) {
-    const c = corridor(mesh, s, g);
+export function planPath(mesh, s, g, opts = {}) {
+    const c = corridor(mesh, s, g, opts);
     if (!c) return null;
     const portals = portalsFor(mesh, s, g, c.chain);
     const points = funnel(portals);

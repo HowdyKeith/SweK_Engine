@@ -32,6 +32,10 @@ import os from "node:os";
 import path from "node:path";
 import * as GS from "./gateSweep.mjs";
 import * as RC from "./redCensus.mjs";
+import { toPosix } from "./posixAssumption.mjs";
+import { fileURLToPath } from "node:url";
+import { ENG as ENG_ROOT } from "./gateSweep.mjs";
+import { falseRedsOf, falseRedSplit } from "./quickSweep.mjs";
 
 let fails = 0;
 const ok = (c, name, detail) => {
@@ -69,9 +73,53 @@ sec("1. THE POPULATION IS ENUMERATED FROM THE TREE, NOT FROM A LIST SOMEBODY TYP
             fs.writeFileSync(path.join(tmp, rel), "");
         }
         const found = GS.enumerateGates(tmp);
-        ok(found.length === 1 && found[0] === path.join("real", "z-selfcheck.mjs"),
+        // *** v4647b -- THE EXPECTATION WAS BUILT WITH path.join AND THE PRODUCER NORMALISES TO POSIX. ***
+        // enumerateGates pushes toPosix(path.relative(root, full)), deliberately, so its output is
+        // "real/z-selfcheck.mjs" on every platform. This row compared that against path.join("real", ...),
+        // which is "real\\z-selfcheck.mjs" on win32 -- so the row was red on Keith's box while the walk was
+        // doing exactly the right thing. FOURTH SIGHTING of the separator family in this session, after
+        // v4646 fixed three and found SKIP_AGREE.recordDrift leaking 117 vendor files on win32.
+        //
+        // *** AND THE DETAIL STRING PRINTED THE CORRECT ANSWER WHILE THE ROW SAID IT WAS WRONG. *** His
+        // output read `found ["real/z-selfcheck.mjs"] out of six planted files` -- one file, the right one,
+        // forward slashes -- and it was filed as "the walk descends into node_modules on Windows". Reading a
+        // FAIL line is not a diagnosis; this is the second consecutive round that mistake was made.
+        const EXPECTED = "real/z-selfcheck.mjs";   // the producer's own spelling, not this platform's
+        ok(found.length === 1 && found[0] === EXPECTED,
            "*** planted under node_modules, .claude and vendor, and the walk descends into NONE of them ***",
-           `found ${JSON.stringify(found)} out of six planted files`);
+           `found ${JSON.stringify(found)} out of six planted files, against ${JSON.stringify(EXPECTED)}`);
+        // The contract itself, asserted rather than assumed, so the expectation above cannot drift from the
+        // producer again: a separator is part of what enumerateGates PROMISES, not an accident of the box.
+        ok(found.every((r) => !r.includes("\\")) && found.every((r) => r === toPosix(r)),
+           "!! *** and enumerateGates PROMISES posix separators, on every platform -- that is why the row above does not use path.join ***",
+           `${JSON.stringify(found)} -- two boxes comparing swept paths need one spelling, and the walk is where it is chosen`);
+        // *** AND BOTH HALVES ARE DRIVEN WITH win32 SHAPES, BECAUSE THIS BOX CANNOT PRODUCE ONE. ***
+        // Three sabotages on the repair above went 0 RED here -- the expectation put back to path.join, the
+        // producer's toPosix removed, and meshLine's boundary un-normalised -- for the honest reason that on
+        // posix path.join and toPosix are both the identity. A separator defect is INVISIBLE on this box,
+        // which is exactly why these two rows were only ever red on Keith's. dxcResolve-selfcheck reaches its
+        // win32 branch from here by injection; this reaches it with literals.
+        ok(EXPECTED === "real/z-selfcheck.mjs" && EXPECTED !== path.win32.join("real", "z-selfcheck.mjs"),
+           "!! *** the expectation is separator-STABLE: it is what the producer spells, and NOT what this platform's join would build on win32 ***",
+           `${JSON.stringify(EXPECTED)} against path.win32.join = ${JSON.stringify(path.win32.join("real", "z-selfcheck.mjs"))} ` +
+           `-- the old row compared the producer's posix output against THIS, which is why it passed here and failed there`);
+        ok(toPosix(path.win32.join("real", "z-selfcheck.mjs")) === EXPECTED,
+           "  ...and toPosix really converts a win32 spelling, so the producer's promise is one this box can check",
+           "the contract row above is only worth anything if the normaliser is exercised on the shape it exists for");
+        // The producer's own source, because on posix its normalisation cannot be observed from its output.
+        // A fourth sabotage -- putting EXPECTED back to path.join -- survives every row above, because on
+        // posix path.join IS the literal. What distinguishes them is not a value but a SPELLING, so the
+        // spelling is what gets checked. Same reason the producer's seam is read from source below.
+        const mySrc = fs.readFileSync(fileURLToPath(import.meta.url), "utf8");
+        ok(/const EXPECTED = "real\/z-selfcheck\.mjs";/.test(mySrc) &&
+           !/const EXPECTED = path\.join\(/.test(mySrc),
+           "!! *** and EXPECTED is a LITERAL in this file's source, not a path.join -- the difference is invisible in its VALUE here ***",
+           "path.join('real','z-selfcheck.mjs') on posix returns exactly the literal, so no comparison of values " +
+           "can tell the repaired row from the broken one. Only the source can");
+        const gsSrc = fs.readFileSync(path.join(ENG_ROOT, "tools", "ship", "gateSweep.mjs"), "utf8");
+        ok(/out\.push\(toPosix\(path\.relative\(/.test(gsSrc),
+           "!! *** and enumerateGates NORMALISES AT ITS PUSH SITE, read from source -- removing it is a no-op here ***",
+           "deleting the toPosix changes nothing any row on this box can see, so the seam is asserted where it lives");
         ok(!found.some((r) => r.endsWith("notes.mjs") || r.endsWith("-selfcheck.js")),
            "and a near-miss name is not a gate either", "notes.mjs and d-selfcheck.js were both refused");
     } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
@@ -384,6 +432,102 @@ sec("7. THE v4297 RECORD RECONCILES, NAMES ITS REGRESSIONS, AND EVERY NAME STILL
                              c.redOnArrival.every((r) => c.added.includes(r.gate) && typeof r.why === "string" && r.why.length > 40)),
        "...the second closing's reds are named with why (red on arrival, red on origin/main too), and its count adds up",
        `${S2.green} green, ${S2.red} red of ${S2.swept}: ` + S2.redOnArrival.map((r) => r.gate.split("/").pop() + " -- " + r.why).join("; "));
+    // *** v4688 -- `elsewhere`: THE SLOT THIS LEDGER DID NOT HAVE, AND WHOSE ABSENCE COST SIX STANDING REDS. ***
+    // The invariant above is about a round's OWN gates: added.length === swept, and every redOnArrival entry
+    // must name a gate in `added`. So a round that reddens or repairs a gate somewhere ELSE has nowhere in the
+    // ledger to say so, and closes clean by declaring swept: 0 with an empty redOnArrival -- internally
+    // consistent and silent. tools/ship/runnerCallers-selfcheck.mjs wrote that diagnosis at v4676, after
+    // render/opticalFlowGPU.mjs reddened it on arrival and stayed red through two rounds; nothing acted on it,
+    // and v4688 then found SIX gates red outside the register, none of them caused by the round that found them.
+    //
+    // The field is optional, because 297 closings predate it. Where it exists it is GRADED: every entry names a
+    // gate file that EXISTS, that is NOT in the same closing's `added` (that is what redOnArrival is for), with
+    // `was` and `now` drawn from red/green and a `why` long enough to be a reason rather than a label.
+    // *** THE GRADER IS A PURE FUNCTION OF (closings, exists), FOR THE REASON timingKind's ARRIVAL RULE IS. ***
+    // Two of its clauses have an EMPTY ADVERSARIAL POPULATION in the live ledger: no entry names a gate that is
+    // also in its closing's `added`, and the set is not empty. Deleting either clause changes no live answer, so
+    // both sabotages score 0 RED against the tree alone -- measured, both of them. The fixtures below are what
+    // make those clauses mean anything, and `exists` is injected so a fixture need not put files on disk.
+    const gradeElsewhere = (cs, exists) => {
+        const withElsewhere = cs.filter((c) => Array.isArray(c.elsewhere) && c.elsewhere.length > 0);
+        const bad = [];
+        for (const c of withElsewhere)
+            for (const e of c.elsewhere) {
+                if (!e || typeof e.gate !== "string") { bad.push(`${c.at}: an entry with no gate`); continue; }
+                if (!exists(e.gate)) bad.push(`${c.at}: ${e.gate} does not exist`);
+                if ((c.added || []).includes(e.gate)) bad.push(`${c.at}: ${e.gate} is in added -- that is redOnArrival's job`);
+                if (!["red", "green"].includes(e.was) || !["red", "green"].includes(e.now))
+                    bad.push(`${c.at}: ${e.gate} was/now must be red or green, got ${JSON.stringify(e.was)}/${JSON.stringify(e.now)}`);
+                if (typeof e.why !== "string" || e.why.length <= 40) bad.push(`${c.at}: ${e.gate} has no reason`);
+            }
+        return { bad, n: withElsewhere.reduce((k, c) => k + c.elsewhere.length, 0), closings: withElsewhere.length };
+    };
+    {
+        const live = gradeElsewhere(closings, (g) => fs.existsSync(path.join(GS.ENG, g)));
+        const bad = live.bad, n = live.n, withElsewhere = { length: live.closings };
+        // ---- FIXTURE CONTROLS, one per clause, because two clauses have no live members to break ----
+        const OK = { at: "vTEST", added: [], elsewhere: [{ gate: "a-selfcheck.mjs", was: "red", now: "green", why: "x".repeat(41) }] };
+        const yes = () => true;
+        const g1 = gradeElsewhere([OK], yes);
+        const g2 = gradeElsewhere([{ ...OK, elsewhere: [{ ...OK.elsewhere[0], gate: "missing-selfcheck.mjs" }] }], (x) => x !== "missing-selfcheck.mjs");
+        const g3 = gradeElsewhere([{ ...OK, added: ["a-selfcheck.mjs"] }], yes);
+        const g4 = gradeElsewhere([{ ...OK, elsewhere: [{ ...OK.elsewhere[0], was: "amber" }] }], yes);
+        const g5 = gradeElsewhere([{ ...OK, elsewhere: [{ ...OK.elsewhere[0], why: "too short" }] }], yes);
+        const g6 = gradeElsewhere([{ ...OK, elsewhere: [{ was: "red", now: "green", why: "x".repeat(41) }] }], yes);
+        ok(g1.bad.length === 0 && g1.n === 1, "  CONTROL: a well-formed `elsewhere` entry is accepted",
+           "otherwise every row below reports its own strictness rather than the ledger's shape");
+        ok(g2.bad.length === 1 && /does not exist/.test(g2.bad[0]),
+           "  CONTROL: a gate that is not on disk is refused", g2.bad.join("; "));
+        ok(g3.bad.length === 1 && /is in added/.test(g3.bad[0]),
+           "  CONTROL: a gate in the closing's OWN `added` is refused -- that is redOnArrival's job, and NO LIVE ENTRY HAS THIS SHAPE",
+           g3.bad.join("; ") + ". Removing this clause reddens nothing against the live ledger, which is why it is a fixture.");
+        ok(g4.bad.length === 1 && /must be red or green/.test(g4.bad[0]),
+           "  CONTROL: a verdict outside red/green is refused", g4.bad.join("; "));
+        ok(g5.bad.length === 1 && /has no reason/.test(g5.bad[0]),
+           "  CONTROL: a `why` short enough to be a label rather than a reason is refused", g5.bad.join("; "));
+        ok(g6.bad.length === 1 && /no gate/.test(g6.bad[0]),
+           "  CONTROL: an entry with no gate at all is refused", g6.bad.join("; "));
+        ok(gradeElsewhere([], yes).n === 0 && gradeElsewhere([{ at: "vTEST", added: [], elsewhere: [] }], yes).n === 0,
+           "  CONTROL: an EMPTY set counts zero, which is what the live row's `n > 0` clause refuses",
+           "a grader that reported nothing over an empty ledger and a row that accepted that would be a check " +
+           "over nothing -- and the live n > 0 is the only thing standing between those two facts");
+        // *** THIS HELPER IS CONDITION-FIRST, AND THE FIRST DRAFT OF THIS ROW WAS NAME-FIRST. *** It printed
+        // "PASS  true" -- the label sat in the condition slot, where a non-empty string is always truthy -- so
+        // the row could not fail and all five of its sabotages scored 0 RED. tools/ship/assertionShape.mjs
+        // censuses exactly this: 91 gates in the tree take the condition first and 1646 take the name, and a
+        // line pasted between the two families always passes. Caught by reading the output, because a row that
+        // cannot fail says PASS in precisely the voice of one that works.
+        ok(bad.length === 0 && n > 0,
+           "*** a closing may record a gate it reddened or repaired ELSEWHERE, and every such entry is graded ***",
+           bad.length ? bad.join("; ")
+                      : `${n} entr${n === 1 ? "y" : "ies"} across ${withElsewhere.length} closing(s), every gate on disk, ` +
+                        "none of them the closing's own arrival, each with a verdict and a reason. THE FIELD IS " +
+                        "OPTIONAL because 297 closings predate it, so this row measures the ones that use it -- and " +
+                        "n > 0 is part of the claim, because a check over an empty set is a check that cannot fail.");
+        // ---- v4688'S SABOTAGE LOG, OVER THE `elsewhere` GRADER --------------------------------------------
+        //
+        //   F7  the no-gate clause dropped                        -> 1 red
+        //   F6  the gate-exists clause dropped                    -> 1 red
+        //   F5  the own-`added` clause dropped                    -> 1 red
+        //   F2  the `why`-length clause dropped                   -> 1 red
+        //   F1  a live entry names a gate not on disk             -> 1 red
+        //   F3  a live entry's verdict set to "amber"             -> 1 red
+        //   F4  the live row's `n > 0` removed                    -> 0 RED, AND IT CANNOT BE OTHERWISE TODAY
+        //
+        // *** F5 AND F6 REDDEN ONLY BECAUSE THE FIXTURES ABOVE EXIST. *** Against the live ledger alone, no
+        // entry names a gate that is also in its closing's `added` and none names a missing file, so deleting
+        // either clause changes no live answer -- both scored 0 RED before the controls were written, measured.
+        // THE FIRST DRAFT OF THIS ROW WAS WORSE THAN THAT: it was written name-first for a CONDITION-FIRST
+        // helper, printed "PASS  true", and could not fail at all -- all five of its sabotages scored 0 RED
+        // and the row looked exactly like one that worked.
+        //
+        // *** F4 IS THE SECOND 0-RED IN THIS ROUND OF A CLASS THAT IS NOT A FIXTURE GAP. *** `n > 0` stops this
+        // row going vacuous on a FUTURE ledger where no closing uses the field; with six live entries, removing
+        // it changes nothing. Its adversarial population is a tree that does not exist yet, so no fixture can
+        // make the LIVE clause bite -- the control above grades the grader's zero instead. The same shape as
+        // timingKind-selfcheck's hardwired-[] mutation: when a gate's correct reading is a value the mutation
+        // also produces, nothing inside the gate can tell the two apart.
+    }
     ok(SS.green === SS.swept && SS.red === 0 && SS.regressions === 0,
        "...and none of them is red, so nothing has regressed since v4297 either",
        `${SS.green} green of ${SS.swept}, ${SS.falseReds} false red and ${SS.unmeasuredAtCap} unmeasured at ` +
@@ -514,6 +658,203 @@ sec("7. THE v4297 RECORD RECONCILES, NAMES ITS REGRESSIONS, AND EVERY NAME STILL
        "pass over a walker that never applied it");
     ok(!fs.existsSync(planted), "...and this check does not leave a gate behind either",
        "gateActivity's own rule: a gate that leaves a gate behind grows the population it measures");
+}
+
+console.log("\n*** THE FALSE REDS ARE ROWS IN BOTH MODULES NOW, NOT A COUNT IN ONE OF THEM -- v4647c ***");
+{
+    // finalize() has kept the full list since it was written; quickSweep -- the one verify actually runs --
+    // took `.length` and binned the rows. So Keith's gen-9 sweep could report 143 FALSE RED, 11% of its swept
+    // population against the 7 of 46 measured on this box, AND NAME NOT ONE. One concept, two modules, and
+    // the module that mattered was the one throwing the evidence away.
+    //
+    // Driven on a fixture because the live tree produces a false red only under contention nobody can summon
+    // on demand: an empty list is what the mapping returns when it is broken AND when the box is quiet.
+    const rows = [
+        { gate: "starved.mjs",  verdict: GS.VERDICT.GREEN, from: "serial",   parallelMs: 9000, serialMs: 900 },
+        { gate: "mild.mjs",     verdict: GS.VERDICT.GREEN, from: "serial",   parallelMs: 1200, serialMs: 1000 },
+        { gate: "cleanly.mjs",  verdict: GS.VERDICT.GREEN, from: "parallel", parallelMs: 100,  serialMs: 100 },
+        { gate: "reallyRed.mjs",verdict: GS.VERDICT.RED,   from: "serial",   parallelMs: 500,  serialMs: 480 },
+    ];
+    const got = falseRedsOf(rows, new Map([["starved.mjs", { code: 1 }]]));
+    ok(got.length === 2 && got[0].gate === "starved.mjs" && got[1].gate === "mild.mjs",
+       "!! *** quickSweep NAMES its false reds, worst starvation first -- a population nobody can list is not a finding ***",
+       `${got.map((f) => f.gate + " " + f.ratio + "x").join(", ")} -- ordered by parallel/serial, which is what the other workers cost each gate`);
+    ok(got[0].ratio === 10 && got[0].parallelMs === 9000 && got[0].serialMs === 900 && got[0].parallelCode === 1,
+       "  ...and each row carries BOTH timings and the parallel exit, so the starvation claim can be re-read later",
+       "the same thing gateSweep's own falseRedList row asserts -- one shape, two modules");
+    ok(!got.some((f) => f.gate === "cleanly.mjs") && !got.some((f) => f.gate === "reallyRed.mjs"),
+       "!! CONTROL: a gate green in PARALLEL is not a false red, and one that is red ALONE is really red",
+       "a mapping that took every green, or every serial row, would report the whole sweep as starvation");
+    // *** A CAPPED RUN GETS NO RATIO, BECAUSE THE CAP IS NOT A RUNTIME -- quickSweep's own budgetIsOwn says
+    // so and v4647c broke it one round after writing this. *** Keith's gen-9 output is the fixture: nineteen
+    // of the twenty worst "starved" gates had a parallel figure of 20,123-23,704 ms against a 20,000 ms cap.
+    // They were KILLED. Dividing the killer's clock by a real serial time ranked the FASTEST gates as the
+    // most starved, and put the one genuine slowdown sixteenth.
+    const real = [
+        { gate: "webgpuProbe.mjs", verdict: GS.VERDICT.GREEN, from: "serial", parallelMs: 20124, serialMs: 1263, parallelTimedOut: true },
+        { gate: "splatSort.mjs",   verdict: GS.VERDICT.GREEN, from: "serial", parallelMs: 11566, serialMs: 1715, parallelTimedOut: false },
+        { gate: "barely.mjs",      verdict: GS.VERDICT.GREEN, from: "serial", parallelMs: 1200,  serialMs: 1000, parallelTimedOut: false },
+    ];
+    const fr = falseRedsOf(real);
+    ok(fr[0].gate === "webgpuProbe.mjs" && fr[0].capped === true && fr[0].ratio === null,
+       "!! *** a gate KILLED at the cap carries NO ratio -- the cap's clock is never divided by a measurement ***",
+       `20124 ms against a 20000 ms cap is the killer's clock. The old ratio said 15.93x, which is just ` +
+       `20000/1263 and ranks the FASTEST gate as the most starved`);
+    ok(fr[1].gate === "splatSort.mjs" && fr[1].capped === false && fr[1].ratio === 6.74,
+       "  ...while a gate that really WAS slowed keeps its ratio, and it is a measurement of two runtimes",
+       "11566 ms loaded against 1715 ms alone -- both real readings, so the quotient means something");
+    const sp = falseRedSplit(fr);
+    ok(sp.capped === 1 && sp.slowed === 2 && sp.of === 3,
+       "!! *** and the two populations are COUNTED APART, because they have different causes ***",
+       "a gate slowed 6x is fighting for CPU; a gate killed at 20 s while finishing in 2 s alone is a box " +
+       "that cannot run that many at once. One number for both answers neither");
+
+    // The two modules must agree, or a reader comparing two boxes is comparing two rules.
+    const viaFinalize = GS.finalize(rows.map((r) => ({
+        gate: r.gate,
+        parallel: { code: r.from === "serial" ? 1 : 0, ms: r.parallelMs, timedOut: false },
+        serial: { code: r.verdict === GS.VERDICT.RED ? 1 : 0, ms: r.serialMs, timedOut: false },
+    }))).falseReds.map((f) => f.gate).sort();
+    ok(viaFinalize.join(",") === got.map((f) => f.gate).sort().join(","),
+       "!! *** and finalize() SELECTS THE SAME GATES from the same runs -- one rule, not two spellings of it ***",
+       `finalize: ${viaFinalize.join(", ")} | quickSweep: ${got.map((f) => f.gate).sort().join(", ")}`);
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// *** v4647i -- AN EXIT CODE THE OS PRODUCED IS NOT A VERDICT THE GATE PRODUCED ***
+// ---------------------------------------------------------------------------------------------------------
+// Keith's gen-9 sweep filed three gates as NEW RED at `exit 3221226505` -- 0xC0000409, Windows fail-fast --
+// in the same list as thirty-odd gates that exited 1 because they had FOUND something. All three pass on
+// this box in under 350 ms and print no `^  FAIL` line at all, because the process was killed before it
+// could print one. classify() returned RED for both, identically.
+{
+    const kind = (c, o) => { try { return GS.exitKind(c, o); } catch (e) { return "THREW: " + (e && e.message); } };
+    ok(kind(1) === GS.EXIT_KIND.FINDING && kind(0) === GS.EXIT_KIND.PASS,
+       "!! an ordinary exit status is a finding, and zero is a pass",
+       "exit 1 is a gate that ran and disagreed -- the only kind worth reading a FAIL line for");
+    ok(kind(3221226505) === GS.EXIT_KIND.OS_KILL &&
+       /STATUS_STACK_BUFFER_OVERRUN/.test(GS.exitName(3221226505) || ""),
+       "!! *** 3221226505 is an OS KILL and is named, where it used to read as `exit 3221226505` ***",
+       GS.exitName(3221226505) + " -- the exact code three gates returned on gen-9");
+    ok(kind(999999) === GS.EXIT_KIND.OS_KILL && /0xF423F/.test(GS.exitName(999999) || ""),
+       "!! ...and an UNRECOGNISED code above 255 is still an os-kill, with a hex rendering",
+       "decided by RANGE, not by a list of six: POSIX masks an exit status to 8 bits and every gate in this " +
+       "tree exits 0 or 1, so nothing here chose a code that large. Reading it as a finding is the conflation");
+    ok(kind(255) === GS.EXIT_KIND.FINDING,
+       "CONTROL: 255 is still a finding, so the rule is a boundary and not 'anything unusual'",
+       "without this the row above passes on a classifier that calls every non-zero code a crash");
+    ok(kind(124) === GS.EXIT_KIND.TIMEOUT && kind(1, { timedOut: true }) === GS.EXIT_KIND.TIMEOUT,
+       "a signal kill is a TIMEOUT, not an os-kill", "124 is this sweep's own stand-in for a signal (runOneAsync)");
+    // v4647p -- OS_KILL_CODES was the one export of this round that no gate NAMED, which definitionGates
+    // counts. Named here by being GRADED: the table's keys must agree with the rule that reads them, and
+    // every value must say what the code is rather than repeat the number.
+    ok(Object.keys(GS.OS_KILL_CODES).every((c) => GS.exitKind(Number(c)) === GS.EXIT_KIND.OS_KILL) &&
+       Object.entries(GS.OS_KILL_CODES).every(([c, v]) => /^STATUS_[A-Z_]+ \(0x[0-9A-F]+\)$/.test(v) && !v.includes(c)),
+       "!! every code in the table classifies as an os-kill, and every name is a NAME rather than the number again",
+       `${Object.keys(GS.OS_KILL_CODES).length} codes, each rendered "STATUS_... (0x...)". A table whose ` +
+       "entries disagreed with the rule that reads it would be a second spelling of one convention");
+    ok(GS.exitName(1) === null && GS.exitName(0) === null,
+       "CONTROL: an ordinary status gets no name", "a name offered for every code carries no information");
+
+    // classify() itself: the verdict must NOT soften, and the kind must arrive.
+    const c = GS.classify({ code: 1, timedOut: false }, { code: 3221226505, timedOut: false });
+    ok(c.verdict === GS.VERDICT.RED,
+       "!! *** a crashed gate is STILL RED -- the ship must still fail ***",
+       "softening this would be the opposite of the point: a gate the OS killed did not pass");
+    ok(c.kind === GS.EXIT_KIND.OS_KILL && /no FAIL line to read/.test(c.note),
+       "!! ...and the note says there is no FAIL line to look for",
+       c.note);
+    const f = GS.classify({ code: 1, timedOut: false }, { code: 1, timedOut: false });
+    ok(f.verdict === GS.VERDICT.RED && f.kind === GS.EXIT_KIND.FINDING && f.note === "confirmed",
+       "CONTROL: an ordinary red is unchanged, note and all",
+       "every existing consumer reads `verdict`; `kind` is additive and must not disturb them");
+}
+
+// ---------------------------------------------------------------------------------------------------------
+sec("THE TWO EXPORTS NO GATE NAMED, CLOSED BY ASSERTION (v4647q)");
+// ---------------------------------------------------------------------------------------------------------
+// definitionGates counts an exported symbol no gate mentions, and two of this module's were on that list:
+// repairsAgainst and runOnce. runOnce is the one that matters -- it is the shape BOTH sweep phases record,
+// so every timing in the tree comes out of it, and nothing graded it. Closed BY ASSERTION rather than by
+// mention: each row calls the function and grades the answer.
+{
+    // repairsAgainst is regressionsAgainst run the other way, and the direction that rots a register into
+    // fiction: a gate red on the register and green now is an entry that will never fire again. The pair
+    // must be EXACT opposites over the same inputs, or one of them is describing a different question.
+    const was = ["b-selfcheck.mjs", "a-selfcheck.mjs", "c-selfcheck.mjs"];
+    const now = ["c-selfcheck.mjs", "d-selfcheck.mjs"];
+    ok(GS.repairsAgainst(was, now).join(",") === "a-selfcheck.mjs,b-selfcheck.mjs",
+       "!! *** repairsAgainst names the gates the register still calls red and the tree calls green ***",
+       `[${GS.repairsAgainst(was, now).join(", ")}] -- sorted, so two boxes print the same list. These are ` +
+       `the entries that rot a register into fiction: a row nothing can fail is a row nobody re-reads`);
+    ok(GS.regressionsAgainst(was, now).join(",") === "d-selfcheck.mjs",
+       "...and regressionsAgainst over the SAME two inputs names the other direction, and only it",
+       `[${GS.regressionsAgainst(was, now).join(", ")}]. c is red in both and belongs to neither list`);
+    ok(GS.repairsAgainst(was, was).length === 0 && GS.regressionsAgainst(was, was).length === 0,
+       "CONTROL: a register that matches the tree produces neither list",
+       "without this both rows above would pass on a function that returned its first argument");
+
+    // runOnce: the shape phase 1 and phase 2 both record, so every millisecond in sweep-timings.json came
+    // out of here. The fixtures are written OUTSIDE the tree and under names enumerateGates does not match,
+    // because a gate that plants a *-selfcheck.mjs file grows the population it measures -- the v4639 race.
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "runonce-"));
+    try {
+        const green = path.join(tmp, "green.mjs"), red = path.join(tmp, "red.mjs"), hang = path.join(tmp, "hang.mjs");
+        fs.writeFileSync(green, "process.exit(0);\n");
+        fs.writeFileSync(red, "console.log('  FAIL  x');\nprocess.exit(1);\n");
+        fs.writeFileSync(hang, "setTimeout(() => {}, 60000);\n");
+
+        const g = GS.runOnce(green, { timeoutMs: 30000 });
+        ok(g.code === 0 && g.timedOut === false && typeof g.ms === "number" && g.ms > 0,
+           "!! *** runOnce returns { code, ms, timedOut } for a gate that passes, and the ms is a real reading ***",
+           `code ${g.code}, ${g.ms} ms. Every number in sweep-timings.json came out of this function and no ` +
+           `gate named it until now`);
+
+        const r = GS.runOnce(red, { timeoutMs: 30000 });
+        ok(r.code === 1 && r.timedOut === false,
+           "!! ...and a FINDING comes back as its exit code rather than as a throw",
+           `code ${r.code}. execFileSync throws on a non-zero exit; a sweep that let that escape would stop ` +
+           `at the first red gate instead of recording it and going on`);
+
+        // A bounded hang, not an unbounded one: a harness that can hang is not a verdict.
+        const h = GS.runOnce(hang, { timeoutMs: 700 });
+        ok(h.timedOut === true,
+           "!! *** a gate that outlives its timeout is marked timedOut, not filed as a measurement ***",
+           `code ${h.code}, ${h.ms} ms against a 700 ms bound. v4574: a reading the killer produced is the ` +
+           `killer's clock and not the gate's runtime, and timedOut is the fact every downstream kind rests on`);
+        ok(g.timedOut === false && r.timedOut === false,
+           "CONTROL: neither gate that finished is marked timedOut",
+           "a flag that is true of everything says nothing about the one case it exists for");
+    } finally {
+        fs.rmSync(tmp, { recursive: true, force: true });
+    }
+}
+
+// ---- v4681 -- THE IN-TREE SCRATCH A KILLED RUN STRANDS, RECLAIMED BY NAME -------------------------------------
+{
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "gatesweep-scratch-"));
+    try {
+        fs.mkdirSync(path.join(root, "tools", "ship", ".sabotage-orbpresent-a1B2c3"), { recursive: true });
+        fs.writeFileSync(path.join(root, "tools", "ship", ".sabotage-orbpresent-a1B2c3", "aiPresenceOrbPresent.mjs"), "export {};\n");
+        fs.mkdirSync(path.join(root, "tools", ".ub-Zz9Yy8"), { recursive: true });
+        fs.mkdirSync(path.join(root, ".fsrclocks-Qw3Er4"), { recursive: true });   // v4824: the engine ROOT's own prefix
+        fs.writeFileSync(path.join(root, ".fsrclocks-Qw3Er4", "pre.html"), "<html></html>\n");
+        // a decoy that must SURVIVE: same prefix, not a mkdtemp name (wrong length), so it is not ours to delete
+        fs.mkdirSync(path.join(root, "tools", "ship", ".sabotage-orbpresent-keepme-please"), { recursive: true });
+        const gone = GS.reclaimScratchDirs(root).sort();
+        ok(gone.join(",") === ".fsrclocks-Qw3Er4,tools/.ub-Zz9Yy8,tools/ship/.sabotage-orbpresent-a1B2c3" &&
+            fs.existsSync(path.join(root, "tools", "ship", ".sabotage-orbpresent-keepme-please")),
+            "!! *** reclaimScratchDirs removes the stranded mkdtemp directories, and only those ***",
+            `removed [${gone.join(", ")}]; the same-prefix decoy that is not a mkdtemp name survives -- the rig held two ` +
+            "stranded .sabotage-orbpresent directories whose four .mjs files took the census to 4318");
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+    const makers = { ".sabotage-orbpresent-": "tools/ship/aiPresenceOrbPresent-selfcheck.mjs",
+                     ".ffwasm-gate-": "tools/ship/ffmpegWasmBridge-selfcheck.mjs", ".ub-": "tools/ship/unboundBuiltin-selfcheck.mjs",
+                     ".fsrclocks-": "tools/ship/fsrPageClocks-selfcheck.mjs" };   // v4824: was a bare root file, stranded by a cap kill
+    ok(GS.TRANSIENT_DIRS.length === 4 && GS.TRANSIENT_DIRS.every(([, p]) =>
+            makers[p] && fs.readFileSync(path.join(ENG_ROOT, makers[p]), "utf8").includes(JSON.stringify(p))),
+        "...and TRANSIENT_DIRS is the four in-tree mkdtemp prefixes, SPELLED, each one a name a gate really creates",
+        GS.TRANSIENT_DIRS.map(([d, p]) => d + "/" + p + "*").join(", "));
 }
 
 console.log(fails === 0 ? "\nALL GREEN" : `\n${fails} FAILED`);

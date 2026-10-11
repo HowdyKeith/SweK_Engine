@@ -37,7 +37,7 @@
 // A CHECK NOT IN THE GATE IS NOT BEING RUN, and until today there was no check at all: A PAGE COULD BE BORN
 // INVISIBLE AND NOTHING ANYWHERE WOULD NOTICE.
 import fs from "node:fs";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 /**
@@ -79,7 +79,7 @@ export function reachReport(root) {
     return { total: all.length, linked: linked.size, excused: excused.length, invisible, staleExcuse };
 }
 
-if (typeof process !== "undefined" && import.meta.url === "file://" + process.argv[1]) {
+if (typeof process !== "undefined" && import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const r = reachReport(path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."));
     console.log("pages: " + r.total + "  linked: " + r.linked + "  excused: " + r.excused + "  INVISIBLE: " + r.invisible.length);
     for (const p of r.invisible) console.log("  " + p);

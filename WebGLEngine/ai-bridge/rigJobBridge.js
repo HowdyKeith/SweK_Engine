@@ -91,6 +91,20 @@ const JOBS = [
         minutes: 25,
         settles: "Whether drag oscillates at twice the lift frequency. The boundary condition is no longer the blocker (v2835's inlet holds to ~0.1%); what is needed is a wide enough channel at high enough Reynolds to hold a limit cycle. Buying Reynolds costs domain AREA quadratically, which is why this is a rig job and not a longer sandbox run.",
     },
+    {
+        // v4776 -- doorKinds found world/traderGraphGithub.mjs with a CLI and no door at the merge: its command lived
+        // only in prose. It needs api.github.com, which the sandbox cannot reach and the rig can -- this registry's
+        // shape exactly (a run on the machine that can do it, settling a question). NOT a lattice run: network-bound,
+        // not CPU-bound, and `minutes` is an upper bound for a token-less pass that the rate limit may split in two.
+        id: "trader-github",
+        label: "Trader graph: the GitHub layer (fork parents, contributors by login)",
+        script: "tools/rig/run-trader-github.mjs",
+        minutes: 2,
+        settles: "WHO CROSSED BETWEEN THE 35 REPOSITORIES BY ACCOUNT, not by self-declared git identity -- the " +
+                 "third key traderGraph.mjs says it lacks. Writes world/trader-graph-github.json for " +
+                 "traderGraph-selfcheck to grade. NEEDS A BOX THAT REACHES api.github.com. Without GITHUB_TOKEN " +
+                 "GitHub allows 60 requests an hour and a full pass needs more; the module resumes, so run it again.",
+    },
 ];
 
 const R = { running: null, log: "", exit: null, startedAt: 0, finishedAt: 0, quick: false, state: "idle" };

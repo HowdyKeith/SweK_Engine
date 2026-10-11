@@ -88,12 +88,16 @@ export function probeRecording(isSupported) {
  * NOTE: a canvas that does not change emits NO FRAMES -- captureStream is driven by paints, not by the clock.
  * A recorder that returns 0 bytes on a still blob is not broken; it is being told nothing happened.
  */
-export async function recordCanvas(canvas, ms = 4000, fps = 30) {
+export async function recordCanvas(canvas, ms = 4000, fps = 30, { tvSafe = false } = {}) {
+    // v4778 rig run 9: `tvSafe` records the H.264 MP4 a TV plays, where this browser offers one, instead of the WebM the
+    // preference order picks. Keith's rig's browser does (isTypeSupported avc1 true) and this box's does not; the H.264
+    // route was rig-pending until a box could take it. Asked for and not offered, it refuses rather than hand back WebM.
     const probe = probeRecording();
-    if (!probe.best) throw new Error("recordCanvas: MediaRecorder supports nothing here");
+    const pick = tvSafe ? probe.tvSafe : probe.best;
+    if (!pick) throw new Error(tvSafe ? "recordCanvas: this browser offers no H.264 MP4 to record" : "recordCanvas: MediaRecorder supports nothing here");
     const stream = canvas.captureStream(fps);
     const chunks = [];
-    const rec = new MediaRecorder(stream, { mimeType: probe.best.mime });
+    const rec = new MediaRecorder(stream, { mimeType: pick.mime });
     rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
     const stopped = new Promise((r) => { rec.onstop = r; });
     rec.start();
@@ -101,14 +105,14 @@ export async function recordCanvas(canvas, ms = 4000, fps = 30) {
     rec.stop();
     await stopped;
     return {
-        blob: new Blob(chunks, { type: probe.best.mime }),
-        container: probe.best.container,
-        codec: probe.best.codec,
-        playsOnTv: playsOnTv(probe.best),
+        blob: new Blob(chunks, { type: pick.mime }),
+        container: pick.container,
+        codec: pick.codec,
+        playsOnTv: playsOnTv(pick),
         // What to actually do with it, said plainly rather than discovered.
-        note: playsOnTv(probe.best)
+        note: playsOnTv(pick)
             ? "H.264/MP4 -- hand it straight to media_player.play_media"
-            : "This is " + probe.best.codec + " in " + probe.best.container +
+            : "This is " + pick.codec + " in " + pick.container +
               ". A TV will not play it. Transcode to H.264 on Galaxina (ffmpeg -i in.webm -c:v libx264 out.mp4), THEN serve it.",
     };
 }

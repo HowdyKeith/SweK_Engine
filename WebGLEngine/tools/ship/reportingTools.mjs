@@ -198,6 +198,9 @@ export const REPORTING = [
       blurb: "Which of the lab's binds DECLARE a planted error -- a knob swapped for a plausible wrong one, so a gate can be asked what it would have caught rather than only whether it is green today. *** THE UNDECLARED LIST IS THE USEFUL HALF: it is the set of devices whose green tells you nothing about their detection power, printed by name so somebody can pick one. *** Read through codeOnly(), so a bind that only DISCUSSES the convention is not counted as following it. This page runs the DECLARED census, which is an UPPER BOUND -- `--verify` turns every knob at every mode and reports which actually move an observable, and v3081's lens is why that difference is not academic."  },
     { rel: "tools/ship/roundTripCensus.mjs", label: "Round-trip controls",
       blurb: "Controls populated from a fetched value AND read back into a request body -- where a failed load lets the next save write a browser default as though somebody chose it. Occurrences and distinct controls are different numbers and both are printed." },
+    // the rtPipeline cache: run alone it reports, --promote is the one write and is never run by a door
+    { rel: "physics/render/rtCpuCache.mjs", label: "rtPipeline f64 reference cache",
+      blurb: "Which renderer and which math this box has, and how many of rtPipeline-selfcheck's f64 reference means the committed file and this box's local file hold for that pair. The key is the inputs, a hash of the CPU oracle's whole static closure, and a fingerprint of V8's Math; every gate run recomputes an eighth of what it serves and must match bit for bit. --promote folds this box's means into the committed file." },
 ];
 
 /**

@@ -58,12 +58,19 @@ export const CORPUS_AT_V4583 = Object.freeze({
     // The other drift-checked fields (partiallyRead, accessorsUnread, headerOnly,
     // filesWithAccessorsLackingBufferView, filesNeedingExternalResource, filesWithUninterpretedExtension)
     // held.
-    files: 33,
+    // v4778 -- files 33 -> 34, accessorsTotal 651 -> 653 at the rtx merge: gpu/fixtures/SimpleSparseAccessor.glb
+    // arrived with the rtx line (ac4ae60e, the GLBParser.js sparse-decoding fixture; licence and source in
+    // gpu/fixtures/PROVENANCE.md), 2 accessors, both read. It is the FIRST file on disk that carries NONE of
+    // the previously-unruled kinds -- no material, image, texture, sampler, skin or animation -- so
+    // filesCarryingSomethingPreviouslyUnruled held at 33 and the headline's "every one of them" stopped being
+    // true. It is named in filesCarryingNothingPreviouslyUnruled below rather than hidden by a loosened row.
+    // It is also the first sparse accessor on disk, which section 8 now grades as a real subject.
+    files: 34,
     // Warnings standing on disk, by code. Zero was the previous claim and it was a claim about the rules,
     // not about the tree -- see the note on the section 1 row.
     warningsByCode: Object.freeze({ IMAGE_EXTERNAL_URI: 28 }),
     // Files graded on fewer accessors than they declare, and how many accessor(s) went unread in total.
-    partiallyRead: 2, accessorsUnread: 107, accessorsTotal: 651,
+    partiallyRead: 2, accessorsUnread: 107, accessorsTotal: 653,
     // Of those two, ONE would still read nothing from a complete copy of the file: every accessor in
     // gpu/fixtures/ABeautifulGame-draco.header.glb declares no bufferView, because KHR_draco_mesh_compression
     // holds the geometry. The other is header-only and reverses when the release zip is unpacked.
@@ -76,8 +83,15 @@ export const CORPUS_AT_V4583 = Object.freeze({
     uninterpretedExtensions: Object.freeze({ KHR_texture_transform: 28, KHR_materials_transmission: 2, KHR_materials_volume: 2 }),
     // How many files carry each kind that had NO rule at all before v4583. This is the denominator the
     // v4550 headline was missing: the answer is not "RobotExpressive", it is 31 of 31.
-    filesCarrying: Object.freeze({ skins: 1, animations: 1, images: 30, textures: 30, samplers: 31, materials: 31 }),
+    // v4778 -- images 30 -> 31, textures 30 -> 31, materials 31 -> 33, re-taken because this row was NOT
+    // drift-checked and had gone stale at v4622: the two GLBs that re-take added carry these kinds, and the
+    // re-take moved `files` but not this. The rtx merge's SimpleSparseAccessor.glb moved none of them. It is
+    // drift-checked from v4778 on, so it cannot sit stale a second time.
+    filesCarrying: Object.freeze({ skins: 1, animations: 1, images: 31, textures: 31, samplers: 31, materials: 33 }),
     filesCarryingSomethingPreviouslyUnruled: 33,
+    // v4778 -- the files that carry NONE of those kinds, by path. Empty until the rtx merge; the headline row
+    // requires this list, not a count, so the next such file is a red row that names itself.
+    filesCarryingNothingPreviouslyUnruled: Object.freeze(["gpu/fixtures/SimpleSparseAccessor.glb"]),
 });
 
 let fails = 0;
@@ -106,7 +120,7 @@ function glbsOnDisk() {
  */
 function corpusCensus() {
     const KINDS = ["skins", "animations", "images", "textures", "samplers", "materials"];
-    const c = { files: 0, partial: 0, unread: 0, tot: 0, hdr: 0, noView: 0, ext: 0, uninterp: 0, carrying: 0, byKind: {} };
+    const c = { files: 0, partial: 0, unread: 0, tot: 0, hdr: 0, noView: 0, ext: 0, uninterp: 0, carrying: 0, byKind: {}, carryingNothing: [] };
     for (const k of KINDS) c.byKind[k] = 0;
     for (const f of glbsOnDisk()) {
         const r = GC.validate(fs.readFileSync(f));
@@ -119,7 +133,7 @@ function corpusCensus() {
         if (sc.extensionsUninterpreted.length) c.uninterp++;
         let any = false;
         for (const k of KINDS) if (r.stats[k]) { c.byKind[k]++; any = true; }
-        if (any) c.carrying++;
+        if (any) c.carrying++; else c.carryingNothing.push(path.relative(ENG, f).split(path.sep).join("/"));
     }
     return c;
 }
@@ -168,7 +182,7 @@ const codesOf = (bytes, opts) => GC.validate(bytes, opts).issues.map((x) => x.co
 const has = (bytes, code, opts) => codesOf(bytes, opts).includes(code);
 
 // =============================================================================================================
-console.log("1. *** BOTH OF THIS TREE'S WRITERS, AND ALL 31 GLBs ON DISK, ARE SPEC-CLEAN ***");
+console.log("1. *** BOTH OF THIS TREE'S WRITERS, AND EVERY GLB ON DISK, ARE SPEC-CLEAN ***");
 {
     const rGood = GC.validate(GOOD);
     ok("!! writeSceneGlb's output has zero errors and zero warnings",
@@ -186,7 +200,9 @@ console.log("1. *** BOTH OF THIS TREE'S WRITERS, AND ALL 31 GLBs ON DISK, ARE SP
     const hdr = rows.filter(({ r }) => r.stats.headerOnly);
     say(`${glbs.length} GLBs on disk: ${rows.length - bad.length - warned.length} clean, ${warned.length} with warnings, ` +
         `${bad.length} with errors, ${hdr.length} header-only fixtures`);
-    ok("!! *** NO GLB IN THIS TREE VIOLATES A SPEC MUST -- 29 kit models, RobotExpressive, and both fixtures ***",
+    // v4778 -- the name listed the v4550 corpus ("29 kit models, RobotExpressive, and both fixtures") and had
+    // been wrong since v4622's two arrivals; the count is in the line above, read from the disk.
+    ok("!! *** NO GLB IN THIS TREE VIOLATES A SPEC MUST ***",
         glbs.length >= 20 && bad.length === 0,
         bad.length ? bad.map(({ f, r }) => path.basename(f) + ": " + GC.errorsOf(r)[0].code).join(", ")
                    : `A NULL RESULT, and section 2 is what makes it one worth having. The kits are Kenney ` +
@@ -496,17 +512,33 @@ console.log("\n6. *** WHAT A CLEAN VERDICT RESTS ON, CARRIED BY THE VERDICT ITSE
 
     // The corpus record, reconciled field by field against a fresh read of the files.
     const live = corpusCensus();
+    // "filesCarrying.<kind>" reads the per-kind record; drift-checked from v4778 (see the note on the record).
+    const recOf = (k) => (k.startsWith("filesCarrying.") ? CORPUS_AT_V4583.filesCarrying[k.slice(14)] : CORPUS_AT_V4583[k]);
     const drift = Object.entries({
         files: live.files, partiallyRead: live.partial, accessorsUnread: live.unread, accessorsTotal: live.tot,
         headerOnly: live.hdr, filesWithAccessorsLackingBufferView: live.noView,
         filesNeedingExternalResource: live.ext, filesWithUninterpretedExtension: live.uninterp,
         filesCarryingSomethingPreviouslyUnruled: live.carrying,
-    }).filter(([k, v]) => CORPUS_AT_V4583[k] !== v);
-    ok("!! *** THE DENOMINATOR THE v4550 HEADLINE WAS MISSING: 31 OF 31 FILES CARRY SOMETHING IT HAD NO RULE FOR ***",
-        drift.length === 0 && live.carrying === live.files,
-        drift.length ? drift.map(([k, v]) => `${k}: record ${CORPUS_AT_V4583[k]}, live ${v}`).join("; ")
+        ...Object.fromEntries(Object.entries(live.byKind).map(([k, v]) => ["filesCarrying." + k, v])),
+    }).filter(([k, v]) => recOf(k) !== v);
+    // *** v4778 -- THIS ROW SAID "31 OF 31" AND REQUIRED carrying === files, AND THE RTX MERGE MADE THAT FALSE
+    // HONESTLY: *** gpu/fixtures/SimpleSparseAccessor.glb has no material, image, texture, sampler, skin or
+    // animation at all. The v4583 finding -- the old headline's exemption covered the whole corpus it was
+    // written about -- stands; what changed is that the corpus is no longer only that. So the row now requires
+    // carrying + the NAMED exceptions === files, with the exceptions compared as a list of paths, and its
+    // name reads from the record rather than carrying a number that goes stale.
+    const recNothing = CORPUS_AT_V4583.filesCarryingNothingPreviouslyUnruled;
+    const nothingMatches = live.carryingNothing.length === recNothing.length &&
+        live.carryingNothing.every((f, i) => f === recNothing[i]);
+    ok(`!! *** THE DENOMINATOR THE v4550 HEADLINE WAS MISSING: ${CORPUS_AT_V4583.filesCarryingSomethingPreviouslyUnruled} ` +
+       `OF ${CORPUS_AT_V4583.files} FILES CARRY SOMETHING IT HAD NO RULE FOR, AND THE REST ARE NAMED ***`,
+        drift.length === 0 && nothingMatches && live.carrying + live.carryingNothing.length === live.files,
+        drift.length || !nothingMatches
+        ? [...drift.map(([k, v]) => `${k}: record ${recOf(k)}, live ${v}`),
+           ...(nothingMatches ? [] : [`carrying none of the kinds: record [${recNothing.join(", ")}], live [${live.carryingNothing.join(", ")}]`])].join("; ")
         : `${live.carrying} of ${live.files} files carry images, textures, samplers, materials, skins or ` +
-          `animations -- every one of them. ${live.unread} of ${live.tot} accessors go unread across ` +
+          `animations; the other ${live.carryingNothing.length} (${live.carryingNothing.join(", ")}) carry ` +
+          `none, and are named in the record. ${live.unread} of ${live.tot} accessors go unread across ` +
           `${live.partial} files, ${live.ext} files need ${CORPUS_AT_V4583.externalResource} served beside ` +
           `them, and ${live.uninterp} declare an extension no rule interprets. "31 clean" was a true ` +
           `sentence about a subset nobody had counted.`);
@@ -616,9 +648,17 @@ console.log("\n7. *** THE RULES ADDED AT v4583, BROKEN ONE AT A TIME ON FILES TH
 }
 
 // =============================================================================================================
-console.log("\n8. *** SPARSE ACCESSORS: ZERO ON DISK, SO THE FIXTURE IS BUILT AND THE NULL RESULT IS STATED ***");
+console.log("\n8. *** SPARSE ACCESSORS: A BUILT FIXTURE FOR EVERY RULE, AND THE ONE REAL FILE ON DISK GRADED BESIDE IT ***");
 {
-    // *** NOT ONE OF THE 31 GLBs IN THIS TREE USES A SPARSE ACCESSOR. *** That is why the sparse rules are
+    // *** v4778 -- THE NULL RESULT BELOW ENDED AT THE RTX MERGE. *** gpu/fixtures/SimpleSparseAccessor.glb
+    // (the Khronos sample, CC-BY-4.0, see gpu/fixtures/PROVENANCE.md) arrived for GLBParser.js's own sparse
+    // decoding, and it is the first file on disk with a sparse accessor: the bufferView-present-AND-sparse
+    // shape, 3 of 14 POSITION elements overridden. The rows after the built fixture's now grade every sparse
+    // file the corpus holds, with the same control as the fixture -- drop the sparse block, keep the bounds,
+    // and the bounds must be caught. The 8 rule cases stay on the built fixture: the real file is VALID, so
+    // it can prove the override is applied but cannot by itself prove a single rule fires.
+    //
+    // At v4583: NOT ONE OF THE 31 GLBs IN THIS TREE USED A SPARSE ACCESSOR. That is why the sparse rules are
     // written from the spec and proved here against a fixture assembled on top of a REAL writeSceneGlb export
     // rather than against the corpus: a rule with no subject anywhere in the tree is exactly the rule that
     // will be wrong the first time somebody imports a file that has one, and sparse is the opening item of
@@ -683,6 +723,29 @@ console.log("\n8. *** SPARSE ACCESSORS: ZERO ON DISK, SO THE FIXTURE IS BUILT AN
         `${GC.errorsOf(noSub).map((x) => x.code).join(", ")} -- the bounds describe data that is only there ` +
         `because of the sparse block, so dropping it makes them wrong.`);
 
+    // Every GLB on disk that really carries a sparse accessor, found by reading its JSON rather than listed.
+    const realSparse = glbsOnDisk().filter((f) => {
+        let s; try { s = GC.splitGlb(fs.readFileSync(f)); } catch { return false; }
+        return !!(s && s.json && (s.json.accessors || []).some((a) => a.sparse));
+    });
+    const realRel = realSparse.map((f) => path.relative(ENG, f).split(path.sep).join("/"));
+    const realRows = realSparse.map((f) => {
+        const bytes = fs.readFileSync(f);
+        const errs = GC.errorsOf(GC.validate(bytes));
+        // The control, on the real file: strip every sparse block, keep every declared bound.
+        const stripped = codesOf(repack(bytes, (j) => { for (const a of j.accessors || []) delete a.sparse; }));
+        return { f, errs, caught: stripped.some((c) => c === "ACCESSOR_MIN_MISMATCH" || c === "ACCESSOR_MAX_MISMATCH"), stripped };
+    });
+    say(`${realSparse.length} of ${glbsOnDisk().length} GLBs on disk carry a sparse accessor` +
+        (realRel.length ? `: ${realRel.join(", ")}` : ""));
+    ok("!! *** EVERY REAL SPARSE FILE ON DISK IS CLEAN, AND STRIPPING ITS SPARSE BLOCK UNDER THE SAME BOUNDS IS CAUGHT ***",
+        realRows.every((r) => r.errs.length === 0 && r.caught),
+        realRows.length === 0
+        ? "no GLB on disk carries a sparse accessor -- the built fixture above is the only subject, as it was at v4583"
+        : realRows.map((r) => `${path.basename(r.f)}: ${r.errs.length ? "ERRORS " + r.errs.map((x) => x.code).join(", ")
+            : "clean"}; stripped -> ${[...new Set(r.stripped)].join(", ") || "nothing (NOT caught)"}`).join("; ") +
+          ` -- a file this tree did not write, read through the same override the fixture proves.`);
+
     const sparseCases = [
         ["ACCESSOR_SPARSE_COUNT", "a sparse block overriding zero elements", (j, { ai }) => { j.accessors[ai].sparse.count = 0; }],
         ["ACCESSOR_SPARSE_COUNT_OUT_OF_RANGE", "more overrides than the accessor has elements", (j, { ai }) => { j.accessors[ai].sparse.count = 99; }],
@@ -700,12 +763,14 @@ console.log("\n8. *** SPARSE ACCESSORS: ZERO ON DISK, SO THE FIXTURE IS BUILT AN
         if (!hit) sMissed.push(code);
         ok((hit ? "   " : "!! ") + code + " -- " + what, hit, hit ? "" : "produced: " + [...new Set(codes)].join(", "));
     }
-    ok("!! *** ALL " + sparseCases.length + " SPARSE RULES FIRE, ON A FEATURE NO FILE IN THIS TREE USES ***",
+    ok("!! *** ALL " + sparseCases.length + " SPARSE RULES FIRE, EACH BROKEN ALONE ON THE BUILT FIXTURE ***",
         sMissed.length === 0,
         sMissed.length ? "missed: " + sMissed.join(", ")
-        : `${sparseCases.length} rules with zero subjects in the corpus, each broken alone against a built ` +
-          `fixture. A NULL RESULT on disk is recorded as one: 0 of ${CORPUS_AT_V4583.files} files carries a ` +
-          `sparse accessor, so nothing here was measured against this tree's own habits.`);
+        : `${sparseCases.length} rules, each broken alone against a built fixture. ${realSparse.length} of ` +
+          `${glbsOnDisk().length} files on disk carry a sparse accessor` +
+          (realSparse.length ? ` (${realRel.join(", ")}), graded clean above; the rules themselves are ` +
+            `still proved only on the fixture, since a valid file breaks none of them.`
+          : `, so nothing here was measured against this tree's own habits.`));
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +

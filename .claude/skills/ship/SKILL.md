@@ -119,6 +119,19 @@ with a reason; never widen the register to get green. `SWEK_QUICKSWEEP=0` skips 
 not a way to ship. The timings file is rewritten by the run and ships with the round (`git add -A WebGLEngine`
 covers it). Gates OVER the budget are still only covered by the full two-phase sweep.
 
+## 4b. Grade the record the verdict WROTE, before the rig is asked
+
+    node -e 'const fs=require("fs");import("./tools/ship/gateSweep.mjs").then(m=>{const pat=/sweep-timings|quickSweep\.mjs|sweepCoverage\.mjs|sweepRotation\.mjs|recordReach\.mjs|declaredCost\.mjs|budgetExile\.mjs|redCensus\.mjs|timingsTarget|readTimings|capReading|gate-timings/;console.log(m.enumerateGates().filter(g=>{try{return pat.test(fs.readFileSync(g,"utf8"))}catch{return false}}).join("\n"))})' > /tmp/readers.txt
+    while read g; do timeout 900 node "$g" >/dev/null 2>&1 || echo "RED $g"; done < /tmp/readers.txt
+
+*** THE VERDICT RUNS ITS GATES AGAINST THE RECORD FROM BEFORE ITS OWN SWEEP, AND THEN REWRITES THE RECORD. *** The
+rig grades the record you COMMIT -- the rewritten one -- so a gate that reads the timing record can be green in the
+sandbox's verdict and red on the rig's. v4815 shipped a SHIP verdict whose own write turned sweepCoverage red, and
+Keith's rig found it: the sandbox had never run that gate against what it committed. After a SHIP, commit the record,
+run every gate that reads it (about 84; most are over the budget, so the next quick sweep would not see them either),
+and only then hand the rig the command. A red here is fixed before the rig is asked, like any other. Gates that only
+match the pattern in a comment (labResults, at ~15 min) can be read and set aside rather than waited on.
+
 ## 5. Commit and push (from the REPO ROOT, one level above WebGLEngine)
 
     git add -A WebGLEngine docs/CHANGELOG.md

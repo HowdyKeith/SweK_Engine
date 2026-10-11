@@ -17,6 +17,7 @@ import { textureVerdict, needsKtx2, BASISU_EXT, OUTCOME, BUDGET, STREAMED } from
 import { extensionsOf } from "../../gpu/glbPeek.mjs";
 import { MAGIC, JSON_CHUNK } from "../export/voxelGlb.mjs";
 import { noComments } from "./sourceScan.mjs";
+import { SOURCE_EXT } from "./moduleRefs.mjs";   // v4798 -- one definition of a source file, not a regex spelled by hand
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -354,14 +355,15 @@ function sourcesNaming(needle) {
             if (/node_modules|^\.git$|^vendor$|GPU_Assets/.test(e.name)) continue;
             const p = path.join(d, e.name);
             if (e.isDirectory()) { walk(p); continue; }
-            if (!/\.(js|mjs|html)$/.test(e.name)) continue;
+            if (!SOURCE_EXT.test(e.name)) continue;
             if (p.includes("glbTexture")) continue;   // a scan must not count the scanner -- orreryFleetScan's rule
             // nextRounds.mjs is the standing backlog log: its "how"/"why" fields are PROSE ABOUT THE TREE, held
             // as string literals rather than // comments, so noComments() below cannot strip them. Its v4499
             // entry on ensureThree.js quotes GLTFLoader's public API -- "setDRACOLoader/setKTX2Loader/..." --
             // while explaining a diff, and a raw scan reads that quote as a caller. Same fault the v4266 comment
             // fix exists for, one syntax further from a comment: a round's own prose becoming evidence against it.
-            if (p.endsWith("/tools/ship/nextRounds.mjs")) continue;
+            // v4681: compared on the posix relative path -- endsWith("/tools/...") never matched a Windows path.
+            if (path.relative(ROOT, p).split(path.sep).join("/") === "tools/ship/nextRounds.mjs") continue;
             const raw = fs.readFileSync(p, "utf8");
             if (!raw.includes(needle)) continue;
             // *** COMMENTS ARE STRIPPED, BECAUSE THIS ROUND'S OWN CHANGELOG NOTE BROKE THIS CHECK. *** The

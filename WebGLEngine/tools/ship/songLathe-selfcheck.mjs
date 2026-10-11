@@ -62,7 +62,12 @@ console.log("1. THE GAP: THE JUDGE EXISTS, THE SCULPTOR EXISTS, AND NOTHING HAS 
     // blanks comments only, which is the one an import scan needs.
     const importers = listSources(ENG).filter(
         (f) => /from\s+["'][^"']*mesh\/lathe\.mjs["']/.test(commentsOnly(readFileSync(f, "utf8"))));
-    const rel = importers.map((f) => path.relative(ENG, f)).sort();
+    // *** NORMALISED AT THE BOUNDARY: path.relative RETURNS THE HOST'S SEPARATOR AND EVERY COMPARISON
+    // BELOW IS A FORWARD-SLASH LITERAL. *** On posix that is invisible; on Windows the literals match
+    // nothing and the partition collapses silently. Measured on Keith's rig at v4645, roughDiffuse-selfcheck's own
+    // detail line read "6 consumer(s), 0 gate(s)" while LISTING two tools\\ship\\ gates among them. Same defect class as treeRead's /\\/vendor\\// at c00f2ec3; normalising where the path
+    // is produced fixes every comparison downstream at once rather than one literal at a time.
+    const rel = importers.map((f) => path.relative(ENG, f).replace(/\\/g, "/")).sort();
     const gateOnly = rel.every((r) => r.startsWith("tools/ship/") || r.startsWith("mesh/"));
     ok("...and every importer of it is a gate or another mesh module -- no page, no engine path",
        rel.length > 0 && gateOnly, rel.join(", "));

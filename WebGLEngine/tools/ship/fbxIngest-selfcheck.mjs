@@ -162,6 +162,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
+import { codeOnly, noComments } from "./sourceScan.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -173,13 +174,30 @@ const gpuAssetLoaderSrc = fs.readFileSync(path.join(ENG, "gpu/gpuAssetLoader.js"
 const fbxLoadSrc        = fs.readFileSync(path.join(ENG, "gpu/fbxLoad.js"), "utf8");
 const indexHtmlSrc      = fs.readFileSync(path.join(ENG, "index.html"), "utf8");
 
+// *** v4676 -- TWO ROWS BELOW ASSERTED "THE CODE DOES X" AGAINST RAW SOURCE, which is a gate that would pass
+// on a COMMENT SAYING IT SHOULD. commentFalsePass reported both as GENUINE.
+//
+// THEY NEED DIFFERENT VIEWS, AND PICKING codeOnly FOR BOTH WAS TRIED FIRST AND WAS WRONG. codeOnly blanks
+// TEMPLATE LITERALS along with comments -- deliberately, so that a claim about code cannot be satisfied by the
+// text of a shader -- and the URL this gate is about IS a template literal: `${this.basePath}${name}.fbx`.
+// Read through codeOnly that row went red against code that is perfectly correct. noComments() is the view
+// that fits: comments gone, literals kept.
+// And the section-2 "is documented" claims are ABOUT comments, so they read raw and prove the text is absent
+// from noComments (isHeader() there) -- which is what makes it a header rather than a string the code carries.
+const gpuAssetLoaderCode = noComments(gpuAssetLoaderSrc);
+const fbxLoadCode        = codeOnly(fbxLoadSrc);
+const fbxLoadNoComments  = noComments(fbxLoadSrc);
+
 // ---- 1. THE .fbx EXTENSION IS IN THE HEAD-PROBE CHAIN --------------------------------------------------------
 console.log("1. *** .fbx IS A REAL BRANCH IN _load()'S HEAD-PROBE CHAIN, NOT JUST A STRING SOMEWHERE ***");
 {
     ok("!! tryFbx is read from the per-asset format map, alongside tryGlb/tryObj",
         /const tryFbx\s*=\s*!fmt\s*\|\|\s*fmt\.fbx/.test(gpuAssetLoaderSrc));
     ok("!! _load() HEAD-probes `${this.basePath}${name}.fbx` and calls _loadFBX() on a 200",
-        /tryFbx[\s\S]{0,400}?\$\{this\.basePath\}\$\{name\}\.fbx[\s\S]{0,300}?this\._loadFBX\(name, fbxUrl\)/.test(gpuAssetLoaderSrc));
+        /tryFbx[\s\S]{0,400}?\$\{this\.basePath\}\$\{name\}\.fbx[\s\S]{0,300}?this\._loadFBX\(name, fbxUrl\)/.test(gpuAssetLoaderCode),
+        "v4676: read through noComments. The two [\\s\\S] spans are 400 and 300 characters wide, and on RAW " +
+        "source there are five comment lines inside the first window alone, any of which could have supplied " +
+        "the middle of this chain. NOT codeOnly: the URL is a template literal, which codeOnly blanks");
     ok("!! the probe sits BEFORE the legacy mesh.json folder fallback, mirroring .glb/.obj",
         gpuAssetLoaderSrc.indexOf("this._loadFBX(name, fbxUrl)") < gpuAssetLoaderSrc.indexOf("if (!tryFolder)"));
     ok("!! _loadFBX exists as a real method, not just referenced",
@@ -205,12 +223,22 @@ console.log("\n2. gpu/fbxLoad.js FOLLOWS THE SAME DEPENDENCY-INJECTION SHAPE AS 
     ok("!! normalizeFbxGroup uses ONLY duck-typing (.isMesh/.isSkinnedMesh/.isBone-shaped checks), no 'three' import",
         !/from ['"]three['"]/.test(fbxLoadSrc) &&
         /\.isMesh \|\| obj\.isSkinnedMesh/.test(fbxLoadSrc));
+    // The v1 scope-gap row ("SINGLE MESH ONLY", "NO TEXTURES, NO VERTEX COLORS") and the task #59
+    // "ANIMATION MAPPING" header row are retired: the v4 round closed those gaps and rewrote the header, so
+    // the rows below assert the header as it now stands. v4676's SPLIT is kept: a claim that something is
+    // DOCUMENTED reads the comments (present in raw source, ABSENT once comments are stripped), and a claim
+    // that a function exists reads the CODE -- a header naming mapFbxAnimations must not satisfy the latter.
+    const isHeader = (re) => re.test(fbxLoadSrc) && !re.test(fbxLoadNoComments);
     ok("!! v4's gap closures (multi-mesh/multi-material, embedded-texture, morph-target) are documented in",
-        /MULTI-MESH CONCAT \(v4\)/.test(fbxLoadSrc) && /EMBEDDED-TEXTURE EXTRACTION \(v4\)/.test(fbxLoadSrc) &&
-        /MORPH-TARGET \(DeformPercent\) TRACKS \(v4\)/.test(fbxLoadSrc),
-        "   the file's own header, GLBParser.js-header style");
+        isHeader(/MULTI-MESH CONCAT \(v4\)/) && isHeader(/EMBEDDED-TEXTURE EXTRACTION \(v4\)/) &&
+        isHeader(/MORPH-TARGET \(DeformPercent\) TRACKS \(v4\)/),
+        "   the file's own header, GLBParser.js-header style -- asserted of the comments, where it lives");
     ok("!! ...and what is STILL not covered after v4 is named plainly too, not silently folded in",
-        /STILL NOT COVERED/.test(fbxLoadSrc) && /mapFbxAnimations/.test(fbxLoadSrc));
+        isHeader(/STILL NOT COVERED/));
+    ok("!! ...and mapFbxAnimations is a real function, asserted of the CODE and not of the header naming it",
+        /mapFbxAnimations/.test(fbxLoadCode),
+        "the header sentence above contains the identifier, so the raw-source form of this check was passable " +
+        "by documentation alone");
 }
 
 // ---- 3. THE FIXTURE, THROUGH THE REAL PIPELINE, IN A REAL BROWSER ----------------------------------------------

@@ -58,6 +58,8 @@ import { runInEngineOrigin, webgpuSkipReason } from "../../tools/ship/webgpuHarn
 import { buildSampleWgsl, packSampleParams, meanOf, mirrorLimit, estimateEmulated,
          MODE, FAULT, REPAIR } from "./microfacetSampleWgsl.mjs";
 import { lobeWgsl, FAULT as LOBE_FAULT } from "./microfacetWgsl.mjs";
+import { adapterKey, verdict, describe, owedCount, coverage, compareFor, boundFrom,
+         readReadings, recordReading, mergeRecords, READINGS_PATH, SLACK } from "../../tools/ship/adapterRecord.mjs";
 import { sampleHalfVector, bounceWeight, bsdfEval, sampleDirPdf, misWeight, furnaceIntegral }
     from "./microfacet.mjs";
 
@@ -136,6 +138,27 @@ ok("*** the cancellation microfacet.mjs asserts in a comment is COMPUTED here, b
 const skip = webgpuSkipReason();
 if (skip) ok("a device is reachable", false, `SKIP: ${skip} -- a skip counts as a failure here; the whole round is the device`);
 const R = skip ? null : await run();
+// *** v4649 -- SECTION 6 ASSERTED ONE ADAPTER'S ROUNDING RATE AS A LAW. *** "the rate is the SAME at f64"
+// demanded the device's share of non-exact MIS sums sit within 5 points of f64's. SwiftShader reads 12.6%
+// against f64's 10.8%; Keith's box reads 23.1% against the same 10.8% and went red. The f64 number is a CPU
+// measurement and is identical on both boxes -- THAT is what makes the non-exactness algebraic rather than a
+// device artifact, and it is the part of the argument worth asserting everywhere. How far a given adapter's
+// f32 division departs from it is that adapter's own number.
+const DEVICE_AT_V4649 = Object.freeze({
+    // Measured here: 516 of 4096 non-exact on the device against 441 at f64 -- a gap of 1.8 points. The 0.05
+    // bound is the one this file has always carried, kept rather than tightened to the slack convention.
+    "google/swiftshader": Object.freeze({ misBad: 258, misGap: 0.05 }),
+});
+const GATE = "microfacetSampleWgsl";
+const VERDICTS = [];
+const ADAPTER = R ? R.adapter : null;
+const AKEY = adapterKey(ADAPTER);
+const RECORD = mergeRecords(DEVICE_AT_V4649, readReadings(GATE));
+const held = (name, measured, dir) => {
+    const v = verdict(RECORD, ADAPTER, measured, compareFor(name, dir));
+    VERDICTS.push({ ...v, name, dir });
+    return v;
+};
 
 if (R) {
     const idn = (key, tag = "clean") => {
@@ -259,11 +282,25 @@ if (R) {
         if (misWeight(pa / 7.3, pb / 11.7) + misWeight(pb / 11.7, pa / 7.3) !== 1) bad64++;
     }
     report(`p/(p+q) + q/(p+q) over ${MIS_PAIRS} pairs: ${bad} not exactly 1 on the device, ${bad64} not exactly 1 at f64`);
-    ok("*** the weights sum to 1 to within one ULP and NOT exactly, which \"one BY CONSTRUCTION\" does not say ***",
-        bad > 0 && worst <= 1.2e-7,
+    // DURABLE on any adapter: whatever its division does, the sum stays inside one ULP of 1.
+    ok("*** the weights sum to 1 to within one ULP, on any adapter ***",
+        worst <= 1.2e-7,
         `worst departure ${worst.toExponential(3)} = ${(worst / Math.pow(2, -23)).toFixed(1)} ULP of 1. The property is algebra; floating point rounds two quotients and adds them, and the sum misses by a bit`);
-    ok("!! and the rate is the SAME at f64, so this is not a precision question and the port changes nothing about it",
-        Math.abs(bad / MIS_PAIRS - bad64 / MIS_PAIRS) < 0.05,
+    // DURABLE, and it is the whole argument: the non-exactness is there AT f64 TOO, on the CPU, so it is
+    // algebra and not the device's precision. That number is the same on every box because no device touches
+    // it -- which is exactly why it, and not the agreement between two rates, is what gets asserted.
+    ok("*** and it is NOT a precision question: f64 does it too, on the CPU, on every box ***",
+        bad64 > 0,
+        `${bad64} of ${MIS_PAIRS} pairs do not sum to exactly 1 at DOUBLE precision. p/(p+q) + q/(p+q) is 1 by ` +
+        "algebra and not by arithmetic; a round that reported only the f32 number would have called this a " +
+        "shader defect");
+    const misGap = Math.abs(bad / MIS_PAIRS - bad64 / MIS_PAIRS);
+    const vBad = held("misBad", bad, "min");
+    ok(`  ...and HOW MANY of them the DEVICE rounds off is this adapter's own number [${vBad.state}]`,
+        vBad.ok, describe(vBad));
+    const vGap = held("misGap", misGap, "max");
+    ok(`  ...and how far its rate sits from f64's is this adapter's own number [${vGap.state}]`,
+        vGap.ok,
         `${(bad / MIS_PAIRS * 100).toFixed(1)}% on the device against ${(bad64 / MIS_PAIRS * 100).toFixed(1)}% at f64. A round that reported only the f32 number would have blamed the hardware for arithmetic that does the same thing everywhere -- which is the mirror image of v4408, where the model was right about f32 and wrong about the transcendental`);
     ok("  and no pair returns a weight outside [0, 1], which is what would actually break an estimator",
         Array.from({ length: MIS_PAIRS }, (_, k) => v[k * 3 + 2]).every((s) => s >= 0 && s <= 1 + 1.2e-7),
@@ -334,6 +371,8 @@ async function run() {
         try {
             if (!navigator.gpu) throw new Error("no navigator.gpu in this page");
             const adapter = await navigator.gpu.requestAdapter(); if (!adapter) throw new Error("no adapter");
+            try { const i = adapter.info || {}; out.adapter = { vendor: i.vendor || null, architecture: i.architecture || null }; }
+            catch { out.adapter = null; }
             const dev = await adapter.requestDevice();
             for (const [tag, src] of Object.entries(a.shaders)) {
                 const m = dev.createShaderModule({ code: src });
@@ -366,6 +405,33 @@ async function run() {
         r.ok ? (r.result && r.result.error) || ((r.result && r.result.compileErrors || []).join("; ") || "sampleHalfVector, sampleDirPdf, bsdfEval, bounceWeight, misWeight; three modes, two shader texts") : (r.reason || (r.pageErrors || []).join("; ")));
     if (!r.ok || !r.result || r.result.error || (r.result.compileErrors || []).length) return null;
     return r.result;
+}
+
+// *** THE OWED POPULATION, AS A NUMBER. ***
+if (R) {
+    const c = owedCount(VERDICTS), cov = coverage(RECORD);
+    report(`the record covers ${cov.count} adapter(s): ${cov.keys.join(", ")}`);
+    report(c.owed === 0
+        ? `adapter ${AKEY}: all ${c.of} per-adapter reading(s) HELD against the record on file.`
+        : `adapter ${AKEY}: ${c.owed} of ${c.of} per-adapter reading(s) OWED -- no reading on file for this ` +
+          `adapter, so those rows measured and reported rather than asserted. Every universal row above still ` +
+          `held. Re-run with --record ON THAT BOX to write them; do not type them in from this output.`);
+    if (process.argv.includes("--record")) {
+        const owed = VERDICTS.filter((v) => v.state === "OWED" && Number.isFinite(v.measured));
+        if (!owed.length) {
+            report(`--record: nothing OWED for ${AKEY} -- every reading is already HELD, and --record never touches one.`);
+        } else {
+            const values = {};
+            for (const v of owed) values[v.name] = boundFrom(v.dir, v.measured);
+            const r = recordReading(GATE, AKEY, values, { frozen: DEVICE_AT_V4649 });
+            const rel = path.relative(process.cwd(), READINGS_PATH).replace(/\\/g, "/");
+            report(r.wrote
+                ? `--record: WROTE ${owed.length} reading(s) for ${AKEY} at the ${SLACK}x slack convention -- ` +
+                  `${owed.map((v) => `${v.name} ${v.measured.toPrecision(4)} -> ${String(boundFrom(v.dir, v.measured))} (${v.dir})`).join(", ")}. ` +
+                  `Commit it: git add ${rel}`
+                : `--record: REFUSED -- ${r.why}`);
+        }
+    }
 }
 
 console.log(fails ? `\n${fails} FAILURE(S)` : "\nALL GREEN");

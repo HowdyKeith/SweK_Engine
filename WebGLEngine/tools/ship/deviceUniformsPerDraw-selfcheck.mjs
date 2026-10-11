@@ -25,7 +25,8 @@
 "use strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
+// rig run 10: launched with PARITY_ARGS -- the two backends held to one picture must be on one rasteriser (tools/ship/webgpuHarness.mjs)
+import { runInEngineOrigin, webgpuSkipReason, PARITY_ARGS } from "./webgpuHarness.mjs";
 import fs from "node:fs";
 import { nullBackend } from "../../gfx/device.js";
 import { parseFont } from "../../text/slugFont.js";
@@ -63,7 +64,7 @@ sec("2. THE BROWSER, BOTH BACKENDS: one batch drawn four times at four offsets i
     if (skip) { console.log(`  SKIP  ${skip}`); report("*** NOT A PASS. ***"); fails++; }
     else {
         const ROWS = QUADS.map((q) => Array.from(rowsAt(q)));
-        const r = await runInEngineOrigin({ engineRoot: ENG, args: { W, H, TEXT, CHARS, SIZE, ROWS }, script: `async (a) => {
+        const r = await runInEngineOrigin({ launchArgs: PARITY_ARGS, engineRoot: ENG, args: { W, H, TEXT, CHARS, SIZE, ROWS }, script: `async (a) => {
             const { requestDevice } = await import("/gfx/device.js");
             const { parseFont } = await import("/text/slugFont.js");
             const M = await import("/render/slugDevice.mjs");

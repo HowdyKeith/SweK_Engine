@@ -14,10 +14,16 @@
 // a mitigation nobody has watched fail is not known to be doing anything.
 "use strict";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import * as HG from "./headlessGpu.mjs";
-import { runWgslCompute, webgpuSkipReason } from "./webgpuHarness.mjs";
+// rig run 10: launched with PARITY_ARGS -- the two backends held to one picture must be on one rasteriser (tools/ship/webgpuHarness.mjs)
+import { runWgslCompute, webgpuSkipReason, PARITY_ARGS } from "./webgpuHarness.mjs";
+// v4647 -- the adapter's nature is READ, not asserted: this file said "a software rasteriser on both
+// sides" in two places, unconditionally, and on Keith's Intel gen-9 through D3D12 both of those are
+// false. The list lives in ONE place and is gated there (localModelProbe-selfcheck), so it is imported
+// rather than copied.
+import { SOFTWARE_HINTS } from "../../ui/localModelProbe.js";
 import { lcgWgsl, lcgUniforms, lcgStatesCpu, lcgValuesCpu, unpackState, bracketsF64 }
     from "../../physics/render/pathTracerWgsl.mjs";
 
@@ -89,6 +95,7 @@ const tNative0 = Date.now();
 const native = await HG.runWgslComputeNative({ code: CODE, outCount: OUT, uniforms: UNI, workgroups: WG });
 const tNative = Date.now() - tNative0;
 let browser = null, tBrowser = 0;
+let SOFT = null, ADAPTER_NAME = "(unread)";
 {
     ok(native.ok, "the native backend runs", native.ok
         ? `${native.adapter.vendor}/${native.adapter.architecture} -- ${native.adapter.description}`
@@ -98,7 +105,7 @@ let browser = null, tBrowser = 0;
     if (!native.ok || bSkip) { console.log("\nFAIL -- " + (++fails) + " check(s)"); process.exit(1); }
 
     const t0 = Date.now();
-    browser = await runWgslCompute({ code: CODE, outCount: OUT, uniforms: UNI, workgroups: WG });
+    browser = await runWgslCompute({ launchArgs: PARITY_ARGS, code: CODE, outCount: OUT, uniforms: UNI, workgroups: WG });
     tBrowser = Date.now() - t0;
     ok(browser.ok, "the browser backend runs", browser.ok ? `${browser.adapter?.vendor}/${browser.adapter?.architecture}` : browser.reason);
 
@@ -106,6 +113,11 @@ let browser = null, tBrowser = 0;
        native.adapter.architecture === browser.adapter?.architecture,
        "*** both report the SAME ADAPTER -- it is one rasteriser reached two ways ***",
        `${native.adapter.vendor}/${native.adapter.architecture}`);
+
+    // Read ONCE, from the adapter both backends agreed on, and used by the timing note and the closing line.
+    ADAPTER_NAME = `${native.adapter.vendor}/${native.adapter.architecture}`;
+    SOFT = SOFTWARE_HINTS.test([native.adapter.vendor, native.adapter.architecture,
+                                native.adapter.device, native.adapter.description].filter(Boolean).join(" "));
 
     let same = 0, firstDiff = -1;
     for (let i = 0; i < OUT; i++) {
@@ -140,6 +152,31 @@ sec("3. AND THE COMPARISON CAN FAIL, SO SECTION 2 IS A MEASUREMENT");
     ok(brackets === N, "and every value still brackets the f64 answer, which is the WGSL contract", `${brackets} of ${N}`);
 }
 
+// *** v4814 -- SECTION 4'S THREE CHILDREN RUN AT ONCE; 4b'S TWO STILL RUN ONE AFTER THE OTHER, AND THAT WAS MEASURED. ***
+// tools/ship/gateProfile.mjs --rig-slow put this gate at 8.7 s on Keith's Windows rig, 6.2 s of it inside spawnSync --
+// five GPU device starts in series. Section 4's three (a device held at exit, the same with exitCleanly, the harness)
+// do not depend on timing, so they overlap. 4b's per-call control DOES: it crashes only if V8 finalizes a Dawn instance
+// in the middle of a later call, and load moves that. Measured here (4 cores), the per-call probe exited 0 -- a red --
+// in 0 of 20 runs alone, 0 of 25 beside the shared probe, and 8 of 50 five at a time. So 4b stays serial, as it was.
+// *** AND THAT CONTROL WAS ALREADY LOAD-SENSITIVE BEFORE THIS CHANGE, WHICH IS A FINDING, NOT A FIX. *** Three copies of
+// the whole gate at once, ten rounds: the v4813 code went red 3 of 30 and this code 4 of 30, every red that row. Alone
+// it is 0 of 20, and the quick sweep re-runs a red alone before it counts it, so a ship does not see it; a full
+// sweep's 8-wide phase can. The assertions are unchanged; a child reaped at its cap has status null with the signal
+// set, which every row below already treats as not-zero, as spawnSync's did.
+function spawnChild(args, { timeout, env = process.env }) {
+    return new Promise((resolve) => {
+        // spawn's own timeout sends SIGTERM at the cap, as spawnSync's did; the outcome is whatever "close" reports.
+        const ch = spawn(process.execPath, args, { env, stdio: ["ignore", "pipe", "pipe"], timeout, killSignal: "SIGTERM" });
+        let stdout = "", stderr = "";
+        ch.stdout.setEncoding("utf8").on("data", (d) => { stdout += d; });
+        ch.stderr.setEncoding("utf8").on("data", (d) => { stderr += d; });
+        ch.on("close", (status, signal) => resolve({ status, signal, stdout, stderr }));
+        ch.on("error", (e) => resolve({ status: null, signal: null, stdout, stderr: stderr + String(e) }));
+    });
+}
+const texinProbe = (perCall) => spawnChild(["--expose-gc", path.join(HERE, "textureInProbe.mjs")], { timeout: 10000,
+    env: { ...process.env, SWEK_TEXIN_MODE: "order-gc", ...(perCall ? { SWEK_GPU_INSTANCE_PER_CALL: "1" } : {}) } });
+
 // ---------------------------------------------------------------------------------------------------------
 sec("4. THE EXIT HAZARD IS REAL, AND ITS EXACT CONDITION IS SPAWNED RATHER THAN ASSERTED");
 // ---------------------------------------------------------------------------------------------------------
@@ -169,12 +206,19 @@ sec("4. THE EXIT HAZARD IS REAL, AND ITS EXACT CONDITION IS SPAWNED RATHER THAN 
         const r = await HG.runWgslComputeNative({ code: ${JSON.stringify(CODE)}, outCount: 3,
             uniforms: new Float32Array(64), workgroups: 1 });
         console.log("WORK_OK:" + r.ok);`;
-    const run = (body, tail) => spawnSync(process.execPath, ["--input-type=module", "-e", body + "\n" + tail],
-                                          { encoding: "utf8", timeout: 180000 });
+    const run = (body, tail, timeout = 180000) => spawnChild(["--input-type=module", "-e", body + "\n" + tail], { timeout });
 
-    const held = run(holds, "/* exit naturally, still holding the device */");
-    const heldClean = run(holds, "HG.exitCleanly(0);");
-    const local = run(harness, "/* exit naturally; the harness released its device */");
+    // *** v4814 -- THE CHILD THAT HOLDS ITS DEVICE SOMETIMES HANGS INSTEAD OF CRASHING, AND ALWAYS COULD. *** Measured
+    // here, that child alone: 1 of 8 run one after another and 1 of 40 run five at a time slept in Dawn's exit path
+    // past a 15 s cap; the rest died by SIGABRT or SIGSEGV in under 0.6 s. Under the old 180 s cap that was a 3-minute
+    // run of this gate now and then, which the quick sweep's 20 s alone-cap reads as a red. A hang is the hazard too --
+    // the row asserts "does not exit 0", and a child reaped at its cap has status null -- so this one child gets 10 s:
+    // room for a GPU device start under load, and the WORK_OK row still requires its work to have finished first.
+    const [held, heldClean, local] = await Promise.all([
+        run(holds, "/* exit naturally, still holding the device */", 10000),
+        run(holds, "HG.exitCleanly(0);"),
+        run(harness, "/* exit naturally; the harness released its device */"),
+    ]);
 
     ok(/WORK_OK:true/.test(held.stdout), "the child holding a device COMPLETES ITS WORK",
        "which is the whole trap: the numbers are right and the process still dies");
@@ -183,7 +227,7 @@ sec("4. THE EXIT HAZARD IS REAL, AND ITS EXACT CONDITION IS SPAWNED RATHER THAN 
     // reason having nothing to do with what it is testing. The claim that matters is that it does NOT exit 0.
     ok(held.status !== 0,
        "*** and a REACHABLE DEVICE at exit CRASHES the process, after a correct result ***",
-       `status=${held.status} signal=${held.signal} -- the signal varies (SIGABRT and SIGSEGV both seen); the non-zero exit does not`);
+       `status=${held.status} signal=${held.signal}${held.error && held.error.code === "ETIMEDOUT" ? " (hung; killed at 10 s)" : ""} -- the ending varies (SIGABRT, SIGSEGV and a hang all seen); the not-clean exit does not`);
     ok(/WORK_OK:true/.test(heldClean.stdout) && heldClean.status === 0,
        "*** exitCleanly() ends that same shape with status 0 ***",
        `status=${heldClean.status} signal=${heldClean.signal}`);
@@ -200,6 +244,44 @@ sec("4. THE EXIT HAZARD IS REAL, AND ITS EXACT CONDITION IS SPAWNED RATHER THAN 
 }
 
 // ---------------------------------------------------------------------------------------------------------
+sec("4b. ONE DAWN INSTANCE PER PROCESS, BECAUSE A FINALIZED ONE KILLED THE NEXT CALL -- v4691");
+// ---------------------------------------------------------------------------------------------------------
+{
+    // bloomFusedTexture-selfcheck exited 0xC0000005 on Keith's rig every run, in its fifth native call. Each call
+    // used to create a Dawn instance and drop it; V8 finalizing those in the middle of a later call's read-back
+    // is the crash, and tools/ship/textureInProbe.mjs reproduces it here by forcing the collection after each of
+    // that gate's calls. The probe runs twice: as the harness is (one shared instance), and with
+    // SWEK_GPU_INSTANCE_PER_CALL=1 restoring the per-call instance, which must crash -- a fix nobody has watched
+    // the absence of fail is not known to do anything. Only a non-zero exit is asserted for the control: SIGSEGV
+    // and SIGABRT both occur, as they do for EXIT_HAZARD, and a hang killed at the 10 s cap reads as one too. Each
+    // child takes under a second here; the cap keeps a hang inside the sweep's 20 s alone-cap.
+    // One after the other, and after section 4's children have exited -- see spawnChild above for the measurement.
+    const lastMark = (r) => (String(r.stderr || "").match(/^@@ .*$/gm) || ["(no marker)"]).pop().slice(3);
+    // *** v4815 -- THE CONTROL GETS UP TO THREE ATTEMPTS; THE SHARED ARM STILL GETS ONE. *** The per-call crash is a V8
+    // finalizer landing in the middle of a later call's read-back, and load moves when finalizers run. Measured here (4
+    // cores), the per-call probe exited 0 in 0 of 20 runs alone but 8 of 24 with four other probes beside it, and the
+    // whole gate, three copies at once, went red on this row 3 of 30 (v4813 code) and 4 of 30 (v4814). A fourth draft --
+    // the probe's five calls repeated three times in one child -- cut 8 of 24 to 3 of 24 and doubled the shared arm's
+    // time, so it was dropped. The claim this row carries is "per-call instances crash this sequence and the shared one
+    // does not", and that needs ONE crash, so a run that exits 0 is retried, at most twice. A retry only ever happens
+    // when the first exits 0, so the usual cost is unchanged. The shared arm is NOT retried: one crash there is red.
+    // SABOTAGE (v4815): SWEK_GPU_INSTANCE_PER_CALL removed from the control's env, so every attempt runs the shared
+    // instance -> 1 RED, this row, "3 attempt(s), every one exited 0"; restored md5-identical.
+    const shared = await texinProbe(false);
+    const attempts = [];
+    for (let k = 0; k < 3; k++) { const r = await texinProbe(true); attempts.push(r); if (r.status !== 0) break; }
+    const perCall = attempts[attempts.length - 1];
+    ok(shared.status === 0 && /all calls returned/.test(lastMark(shared)),
+       "*** the gate's five calls with a forced collection after each COMPLETE, on the shared instance ***",
+       `status=${shared.status} signal=${shared.signal}; last step: ${lastMark(shared)}`);
+    ok(perCall.status !== 0,
+       "*** and the SAME run with an instance per call CRASHES, so the shared instance is the fix and not luck ***",
+       perCall.status !== 0
+           ? `attempt ${attempts.length} of at most 3: status=${perCall.status} signal=${perCall.signal}; last step: ${lastMark(perCall)}`
+           : `${attempts.length} attempt(s), every one exited 0 -- the per-call path no longer crashes, so the shared instance is not shown to be the fix`);
+}
+
+// ---------------------------------------------------------------------------------------------------------
 sec("5. NOW THE TIMING, WHICH IS OVERHEAD AND NOT GPU WORK");
 // ---------------------------------------------------------------------------------------------------------
 {
@@ -207,7 +289,8 @@ sec("5. NOW THE TIMING, WHICH IS OVERHEAD AND NOT GPU WORK");
        `${tNative} ms native vs ${tBrowser} ms browser`);
     ok(HG.MEASURED.whatIsTimed.includes("not GPU work"),
        "and the record says plainly that this is HARNESS overhead",
-       "the adapter is a software rasteriser on both sides, so a GPU timing here would mean nothing");
+       `the adapter is ${SOFT ? "a software rasteriser" : "real silicon (" + ADAPTER_NAME + ")"} on both sides, so this number is harness overhead either way -- ` +
+       `on a software adapter a GPU timing would mean nothing, and on real silicon it would be a driver's number rather than this harness's`);
     ok(Math.min(...HG.MEASURED.chromiumPerCallMs) > Math.max(...HG.MEASURED.nativeColdProcessMs),
        "the recorded ranges do not overlap: the slowest native cold process beats the fastest browser call",
        `browser ${Math.min(...HG.MEASURED.chromiumPerCallMs)}-${Math.max(...HG.MEASURED.chromiumPerCallMs)} ms, ` +
@@ -263,10 +346,74 @@ sec("6. WHAT IS NOT SOLVED IS SAID IN THE MODULE, NOT ONLY HERE");
 //
 // A found the diagnosis working, B found that the worst version of this bug kills the instrument, and C found
 // a brittle assertion in the gate itself. None went 0 RED.
+// ================================================================================================
+// *** v4573 -- THE TEXTURE PATH'S ARITHMETIC, WHICH THIS GATE HAS SHIPPED AND NEVER NAMED. ***
+//
+// definitionGates' census found these four exports unmentioned by any gate that imports this module:
+// BYTES_PER_TEXEL, paddedBytesPerRow, halfToDouble and ICD_ROOT. They are not obscure -- they are the
+// arithmetic that turns a read-back texture into numbers, and v4572's closing listed the texture path as the
+// thing it could not check. A wrong bytes-per-row shears the image by a few texels per row, which reads as a
+// shader defect; a wrong half decode reads as a backend divergence. Both are decided here, in eight lines of
+// integer and bit arithmetic that nothing has ever exercised.
+sec("9. THE TEXTURE READ-BACK ARITHMETIC");
+{
+    // BYTES_PER_TEXEL is four channels times the channel width, and saying it that way is the check: the
+    // table is derivable, so a typo in it disagrees with its own definition rather than merely looking odd.
+    ok(HG.BYTES_PER_TEXEL.rgba8unorm === 4 * 1 && HG.BYTES_PER_TEXEL.rgba16float === 4 * 2,
+        "BYTES_PER_TEXEL is four channels times the channel width, not a remembered pair of numbers",
+        `rgba8unorm ${HG.BYTES_PER_TEXEL.rgba8unorm} = 4x1, rgba16float ${HG.BYTES_PER_TEXEL.rgba16float} = 4x2`);
+    // WebGPU requires every copyTextureToBuffer row to start on a 256-byte boundary. The padding is where a
+    // reader shears an image, so the key is the alignment itself plus the smallest row that already meets it.
+    const P = (n, f) => HG.paddedBytesPerRow(n, f);
+    ok([[64, "rgba8unorm", 256], [40, "rgba8unorm", 256], [40, "rgba16float", 512],
+        [32, "rgba16float", 256], [1, "rgba8unorm", 256]].every(([n, f, want]) => P(n, f) === want),
+        "paddedBytesPerRow rounds UP to the 256-byte boundary copyTextureToBuffer requires",
+        `40x rgba8unorm: 160 raw -> ${P(40, "rgba8unorm")}; 40x rgba16float: 320 raw -> ${P(40, "rgba16float")}`);
+    ok([[64, "rgba8unorm"], [32, "rgba16float"]].every(([n, f]) => P(n, f) === n * HG.BYTES_PER_TEXEL[f]),
+        "  and a row that is ALREADY aligned is returned unpadded, so the function is not simply a constant",
+        `64x rgba8unorm and 32x rgba16float are both exactly 256`);
+    // The unknown-format fallback is 4 bytes, and it is invisible at any n where 4 and 8 pad to the same
+    // multiple -- 64 is exactly that n, which is why the distinction is taken at 40.
+    ok(P(40, "nope") === P(40, "rgba8unorm") && P(40, "nope") !== P(40, "rgba16float"),
+        "  and an unknown format falls back to four bytes a texel, checked at a width where four and eight DIFFER",
+        `40: unknown ${P(40, "nope")}, rgba8unorm ${P(40, "rgba8unorm")}, rgba16float ${P(40, "rgba16float")}`);
+    // *** THE HALF DECODE, KEYED ON ITS OWN MANTISSA RATHER THAN ON A PICKED TOLERANCE. *** rgba16float has
+    // ten mantissa bits, so a round trip through it can lose at most one part in 2^11. MEASURED over 2000
+    // values: 4.685e-4 against that bound of 4.883e-4 -- under it, and close enough to it that a decode
+    // reading the exponent one bit wrong could not hide there.
+    let worst = 0, at = 0;
+    for (let i = 0; i < 2000; i++) {
+        const v = (i - 1000) / 137;
+        if (v === 0) continue;
+        const e = Math.abs(HG.halfToDouble(HG.doubleToHalf(v)) - v) / Math.abs(v);
+        if (e > worst) { worst = e; at = v; }
+    }
+    ok(worst < Math.pow(2, -11),
+        "*** halfToDouble inverts doubleToHalf to within the format's OWN mantissa, 2^-11, over 2000 values ***",
+        `worst ${worst.toExponential(3)} at ${at.toFixed(4)}, bound ${Math.pow(2, -11).toExponential(3)}`);
+    ok(HG.halfToDouble(HG.doubleToHalf(0.5)) === 0.5 && HG.halfToDouble(HG.doubleToHalf(-0.5)) === -0.5,
+        "  and it is EXACT for a value the format represents, sign included -- so the bound above is the format's and not the decoder's slack",
+        "0.5 and -0.5 round trip bit for bit");
+    // The three branches an exponent field can take. A decoder that dropped the denormal case would pass
+    // every row above, because the sweep never reaches 2^-14.
+    ok(HG.halfToDouble(1) === Math.pow(2, -14) * (1 / 1024) &&
+       HG.halfToDouble(0x7c00) === Infinity && Number.isNaN(HG.halfToDouble(0x7e00)),
+        "  and all three exponent branches are reached: the denormal at e=0, infinity at e=31 m=0, NaN at e=31 m!=0",
+        `denormal ${HG.halfToDouble(1).toExponential(3)}, ${HG.halfToDouble(0x7c00)}, NaN ${Number.isNaN(HG.halfToDouble(0x7e00))}`);
+    // ICD_ROOT decides where the Vulkan ICD is looked for. It reads an env var with a fallback, and the
+    // fallback is the container's real path -- so the check is the PRECEDENCE, which is the part that breaks.
+    ok(HG.ICD_ROOT === (process.env.PLAYWRIGHT_BROWSERS_PATH || "/opt/pw-browsers"),
+        "ICD_ROOT takes PLAYWRIGHT_BROWSERS_PATH when the environment sets it and falls back to the image's path",
+        `${HG.ICD_ROOT}${process.env.PLAYWRIGHT_BROWSERS_PATH ? " (from the environment)" : " (the fallback)"}`);
+    ok(HG.ICD_LEAF === path.join("chrome-linux", "vk_swiftshader_icd.json"),
+        "  and ICD_LEAF is the path under it that findVulkanIcds joins, named here beside the root it is joined to",
+        HG.ICD_LEAF);
+}
+
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("unchecked here: ANY GPU WORTH THE NAME. Both backends land on the same software rasteriser, so " +
-    "nothing above says how Dawn behaves on real hardware, where the driver -- not the harness -- decides the " +
-    "numbers. Also unchecked: every WGSL gate in the tree still calls the browser harness; this round builds " +
+console.log(`unchecked here: ${SOFT ? "ANY GPU WORTH THE NAME. Both backends land on the same SOFTWARE rasteriser (" + ADAPTER_NAME + "), so nothing above says how Dawn behaves on real hardware, where the driver -- not the harness -- decides the numbers."
+                                : "HOW THIS COMPARES TO A SOFTWARE RASTERISER. Both backends land on REAL SILICON here (" + ADAPTER_NAME + "), which is the case the first sixteen rounds of this file never saw; what is now unread is the software side it was written against."} ` +
+    "Also unchecked: every WGSL gate in the tree still calls the browser harness; this round builds " +
     "the second backend and proves it agrees, and moving the callers over is a separate change with its own " +
     "risk. And WebGL2 is untouched: the GLSL gates need a browser and still launch one.");
 HG.exitCleanly(fails ? 1 : 0);

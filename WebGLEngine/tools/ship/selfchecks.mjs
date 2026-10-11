@@ -21,9 +21,14 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseOrExit, refusalLines } from "./cliArgs.mjs";   // v4826 -- an option this tool does not know is refused, not read past
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-const VERBOSE = process.argv.includes("--verbose");
+// v4826 -- the options, parsed once and strictly. `--affected` takes the changed files as bare words after it; bare words anywhere else are refused.
+const SPEC = { values: { "--timeout": "number", "--budget": "number" }, flags: ["--verbose", "--affected", "--select-only", "--count-only"], positional: true };
+const CLI = parseOrExit("selfchecks", SPEC);
+if (CLI.rest.length && !CLI.flags.has("--affected")) { for (const l of refusalLines("selfchecks", [`unexpected argument "${CLI.rest[0]}" -- bare words are changed files, and only --affected takes them`], SPEC)) console.error(l); process.exit(2); }
+const VERBOSE = CLI.flags.has("--verbose");
 // 60s, from measurement, not taste. The slowest real check is brain/rl/dock-hazard-selfcheck.mjs at ~19.4s
 // standalone, with occlusion-bptt at ~18.2s and bz-pilot at ~17.7s behind it. A 30s budget looked generous and
 // was not: all four of the slow ones passed standalone and TIMED OUT inside verify.mjs, where the machine is
@@ -34,7 +39,7 @@ const VERBOSE = process.argv.includes("--verbose");
 // for needing 63s to 280s. windTunnel missed by THREE SECONDS. The rule did not change -- nobody re-applied it.
 // tools/ship/gateBudget.mjs holds the measurement each number comes from, so this can be contradicted rather
 // than trusted. --timeout still overrides everything, for a caller who knows better than the table.
-const OVERRIDE = process.argv.includes("--timeout") ? parseInt(process.argv[process.argv.indexOf("--timeout") + 1], 10) : 0;
+const OVERRIDE = CLI.values["--timeout"] ? Math.trunc(CLI.values["--timeout"]) : 0;
 
 // v3584 -- DECLARED HERE, NOT BESIDE writeTimings. The flush call sits inside the run loop, ABOVE the
 // function's own definition, and a `const` in a temporal dead zone throws ReferenceError on first use --
@@ -49,7 +54,10 @@ const WRITE_EVERY = 25;
 // Whichever trigger comes first wins.
 const WRITE_EVERY_MS = 20000;
 let lastWriteAt = Date.now(), lastWriteCount = 0;
-const { budgetFor, budgetReason, DEFAULT_BUDGET_MS } = await import("./gateBudget.mjs");
+const { budgetFor, budgetReason, DEFAULT_BUDGET_MS, TIMING_KIND } = await import("./gateBudget.mjs");
+// v4580 -- already in the graph (gateBudget imports it), so the provenance stamp costs no new module.
+const { boxId, hostFacts } = await import("./hostScale.mjs");
+const BOX = boxId();
 const TIMEOUT = OVERRIDE || DEFAULT_BUDGET_MS;
 
 // Already run individually by verify.mjs, with their own result parsing. Running them twice would double the ship
@@ -88,7 +96,17 @@ function walk(dir, out = []) {
         let st;
         try { st = fs.statSync(p); } catch { continue; }
         if (st.isDirectory()) walk(p, out);
-        else if (/selfcheck.*\.mjs$/.test(f)) out.push(path.relative(ROOT, p));
+        // *** v4584 -- A TRANSIENT FIXTURE IS NOT A GATE, AND THIS WALK HAS BEEN RUNNING THEM. ***
+        //
+        // Four gates plant a `__`-prefixed *-selfcheck.mjs on disk for the seconds they run: rigProgress's
+        // __rigprogress-fixture, gateActivity's __routeProbe, gateMutation's __mutation-decoy and
+        // __mutation-crash. v4409 found this race and closed it at gateSweep.mjs's enumerateGates, because a
+        // discovered fixture gets RUN and rigProgress's is built to exit 1 -- "a NEW RED outside every register.
+        // It is a race, so it fails a ship at random and never reproduces alone, which is the worst shape a
+        // ship-time check can have." v4580 closed it at treeRead.mjs. NOBODY CLOSED IT HERE, in the runner that
+        // actually runs the suite. MEASURED at v4584: planting one fixture took this walk from 1,634 files to
+        // 1,635 AND the selection from 23 gates to 24, so it was discovered and scheduled, not merely seen.
+        else if (/selfcheck.*\.mjs$/.test(f) && !f.startsWith("__")) out.push(path.relative(ROOT, p));
     }
     return out;
 }
@@ -113,9 +131,8 @@ let all = walk(ROOT).sort();
 // HONEST LIMIT, PRINTED EVERY TIME: this selects among the SELFCHECKS ONLY. verify.mjs -- physicsSuite, the
 // claims gate, the page parse -- is not decomposable this way and is what catches every mutation in tools/mutate.
 // So --affected is a FAST PRE-FILTER, never a replacement for a ship.
-if (process.argv.includes("--affected")) {
-    const i = process.argv.indexOf("--affected");
-    const changed = process.argv.slice(i + 1).filter((a) => !a.startsWith("--"));
+if (CLI.flags.has("--affected")) {
+    const changed = CLI.rest;
     if (!changed.length) {
         console.log("[selfchecks] --affected needs at least one changed file. Refusing to run a filtered set on an empty filter -- 0 of 0 passing is a pass that means nothing.");
         process.exit(2);
@@ -174,12 +191,35 @@ if (process.argv.includes("--affected")) {
     // IT EXITS 3, NOT 0. A flag that runs no checks and returns success is the identical shape to the two
     // silent green lights this round exists to close, and it would be a worse one for being deliberate.
     // Three means "a selection, not a verdict", and nothing can mistake it for a ship.
-    if (process.argv.includes("--select-only")) {
+    if (CLI.flags.has("--select-only")) {
         console.log("[selfchecks] --select-only: NOTHING WAS RUN. The list above is a plan, not a result.");
         process.exit(3);
     }
 }
 let toRun = all.filter((f) => f !== SELF && !ALREADY_GATED.has(f) && !SKIP.has(f));
+// *** v4580 -- THE POPULATION THIS RUN IS ALLOWED TO CLAIM. ***
+//
+// writeTimings(complete) is called with a literal `true` at the end of the run, and `complete` was read by every
+// reader as "this record covers the suite". IT MEANS "THE RUN REACHED ITS LAST GATE", and for a --budget pass
+// those are different sentences: measured here, `--budget 240` ran 953 of 1630 gates and wrote complete: true.
+// That is precisely the danger v3584's own note named -- "a partial measurement wearing a complete one's name" --
+// arriving through the filter that was added one round after the note.
+//
+// --affected was protected by refusing to write at all. --budget was not protected, because the protection was
+// spelled as a check for one flag rather than as a question about the population.
+const UNFILTERED_COUNT = toRun.length;
+
+// *** v4584 -- COUNT THE POPULATION AND WRITE NOTHING, BECAUSE A GATE ASKED THIS BY RUNNING THE SUITE. ***
+//
+// tools/ship/walkerParity-selfcheck.mjs needs the number this walk returns -- it is the one walker with no
+// exported walk, so the only way to ask it was `--budget 1`, twice per run. THAT WRITES: writeTimings only
+// refuses for --affected, so a gate reporting on the timing record was REWRITING IT on every invocation, which is
+// exactly the unprotected-filter finding v4580 recorded one file over, committed by the round that cited it.
+// --count-only prints the walk's population and exits before anything is spawned or written.
+if (CLI.flags.has("--count-only")) {
+    console.log("[selfchecks] population " + UNFILTERED_COUNT + " runnable of " + all.length + " discovered");
+    process.exit(0);
+}
 
 // v3285 -- *** --budget <seconds>: A WALL-CLOCK CAP, COMPOSED WITH --affected RATHER THAN RIVALLING IT. ***
 // --affected answers "which gates can this change reach"; --budget answers "and which of those fit in the time
@@ -190,9 +230,8 @@ let toRun = all.filter((f) => f !== SELF && !ALREADY_GATED.has(f) && !SKIP.has(f
 // drops gates the change CAN REACH prints a warning naming them. A fast green run that skipped the gate for the
 // thing you edited is the failure this flag could otherwise manufacture, and it is the reason missedReachable
 // is printed rather than merely computed.
-if (process.argv.includes("--budget")) {
-    const bi = process.argv.indexOf("--budget");
-    const secs = parseFloat(process.argv[bi + 1]);
+if ("--budget" in CLI.values) {
+    const secs = CLI.values["--budget"];
     if (!Number.isFinite(secs) || secs <= 0) {
         console.log("[selfchecks] --budget needs a positive number of seconds.");
         process.exit(2);
@@ -202,9 +241,7 @@ if (process.argv.includes("--budget")) {
     // that match nothing orders every gate as unreachable, so the "gates the change can reach were dropped
     // for time" warning -- the one thing keeping --budget honest -- could never fire.
     const { normaliseChanged: normPlan } = await import("./changedPaths.mjs");
-    const changedForPlan = process.argv.includes("--affected")
-        ? normPlan(process.argv.slice(process.argv.indexOf("--affected") + 1).filter((a) => !a.startsWith("--"))).resolved
-        : [];
+    const changedForPlan = CLI.flags.has("--affected") ? normPlan(CLI.rest).resolved : [];
     let ledger = null;
     try { ledger = JSON.parse(fs.readFileSync(path.join(ROOT, "tools", "roundhouse", "perf-ledger.json"), "utf8")); } catch {}
     const relOf = (f) => path.relative(ROOT, f).replace(/\\/g, "/");
@@ -233,6 +270,19 @@ const slow = [];
 // than against itself. gateBudget-selfcheck's first version compared the derivation to its own definition and
 // could never fail; a derivation is only checkable against an INDEPENDENT measurement, and this is it.
 const observedMs = {};
+// *** v4580 -- AND WHAT EACH OF THOSE NUMBERS IS, WRITTEN WHERE IT IS STILL KNOWN. ***
+//
+// The loop below decides, for every gate, between three outcomes: it completed and exited 0, it was killed at
+// its budget, or it declined to run. Two of the three are already excluded from observedMs -- and the exclusion
+// was the whole repair, which left the surviving entries as bare numbers indistinguishable from the entries
+// written before the exclusions existed. hostScale-selfcheck reads the file and asserts, correctly, that no
+// entry can say which it is; it then concludes truncation "cannot be detected from here", and HERE IS WHERE IT
+// CAN. These three maps travel beside the timings so no existing reader changes: a kind, the box that produced
+// it, and a per-entry stamp, in place of one `coverage.at` standing for 1289 entries captured across two
+// machines and a thousand versions.
+const observedKind = {};
+const observedBox = {};
+const observedAt = {};
 
 // *** v3941 -- A GATE THAT DECLINED TO RUN IS NOT A MEASUREMENT OF THAT GATE. ***
 //
@@ -265,7 +315,15 @@ for (const f of toRun) {
         if (declinedToRun) skipped.push(f.replace(/\\/g, "/"));
         // NOT RECORDED, and deliberately not recorded as zero either: an absent entry and an entry saying
         // "0ms" are different claims, and gateBudget already knows how to treat a gate it has never seen.
-        else observedMs[f.replace(/\\/g, "/")] = ms;
+        else {
+            const key = f.replace(/\\/g, "/");
+            observedMs[key] = ms;
+            // COMPLETE is earned on this line and nowhere else: past the execFileSync without throwing means
+            // exit 0, and the skip branch above has already taken the gates that declined to run.
+            observedKind[key] = TIMING_KIND.COMPLETE;
+            observedBox[key] = BOX;
+            observedAt[key] = new Date().toISOString().slice(0, 19) + "Z";
+        }
         // v3584 -- flush so a run that dies leaves what it measured. >= rather than an exact modulo: gates
         // that FAIL are not recorded, so the count skips values and `% 25 === 0` can step straight over its
         // own trigger and never fire again.
@@ -335,23 +393,40 @@ for (const f of toRun) {
 // DIFFERENT POPULATION, and merging it would silently overwrite a slow gate's real number with whatever a
 // filtered pass happened to see.
 function writeTimings(complete) {
-    if (process.argv.includes("--affected")) return;
+    if (CLI.flags.has("--affected")) return;
     const n = Object.keys(observedMs).length;
     if (!n) return;
     try {
         const prev = JSON.parse(fs.readFileSync(TIMINGS_PATH, "utf8"));
         // MERGE rather than replace: a partial run must not delete the timings of gates it never reached.
         const merged = { ...(prev.timings || {}), ...observedMs };
+        // v4580 -- the three provenance maps merge on exactly the same rule as the timings, so an entry and its
+        // kind can never come from different runs. THE LEGEND IS ACCUMULATED, NEVER REPLACED: a second machine's
+        // entry must not delete the first machine's description of itself, or the ids stop decoding.
+        const kinds = { ...(prev.kinds || {}), ...observedKind };
+        const boxes = { ...(prev.boxes || {}), ...observedBox };
+        const at = { ...(prev.at || {}), ...observedAt };
+        const boxLegend = { ...(prev.boxLegend || {}), [BOX]: hostFacts() };
         fs.writeFileSync(TIMINGS_PATH, JSON.stringify({
             ...prev,
             captured: prev.captured,
             coverage: { complete, timedThisRun: n, totalInRecord: Object.keys(merged).length,
-                        at: new Date().toISOString().slice(0, 19) + "Z" },
+                        at: new Date().toISOString().slice(0, 19) + "Z",
+                        // *** SAID AS A COUNT, BECAUSE AN UNPROVENANCED ENTRY IS THE THING BEING RETIRED. ***
+                        // `complete` above is about THIS RUN's coverage of the suite; this is about the RECORD's
+                        // coverage of itself, and the two were conflated for 1289 entries.
+                        unprovenanced: Object.keys(merged).filter((g) => !kinds[g]).length },
             timings: Object.fromEntries(Object.entries(merged).sort()),
+            kinds: Object.fromEntries(Object.entries(kinds).sort()),
+            boxes: Object.fromEntries(Object.entries(boxes).sort()),
+            at: Object.fromEntries(Object.entries(at).sort()),
+            boxLegend,
         }, null, 1) + "\n");
     } catch { /* the record is evidence, not a dependency: a failure to write must never fail a suite */ }
 }
-writeTimings(true);
+// `complete` is now DERIVED from the population rather than asserted by the call site: the run reached its end,
+// AND it was allowed to see every runnable gate. A --budget pass reaching its last selected gate writes false.
+writeTimings(toRun.length === UNFILTERED_COUNT);
 
 const secs = ((Date.now() - t0) / 1000).toFixed(1);
 console.log("");

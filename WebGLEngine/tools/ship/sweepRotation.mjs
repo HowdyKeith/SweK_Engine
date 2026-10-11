@@ -16,23 +16,35 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { enumerateGates } from "./gateSweep.mjs";
-import { ENG, census, rotation, readFile, backfillStamps, BUDGET_MS, CAP_MS } from "./sweepCoverage.mjs";
+import { ENG, census, rotation, readFile, backfillStamps, BUDGET_MS, CAP_MS, ledgerStamps, selectionKind } from "./sweepCoverage.mjs";
 import { runGate } from "./redCensus.mjs";
+import { costOf } from "./declaredCost.mjs";
+// v4647 -- whose stopwatch. A box that does not own the record writes its own file rather than
+// overwriting one produced on different silicon. See quickSweep.timingsTarget.
+import { timingsTarget, KIND, reclaimStrandedFixtures } from "./quickSweep.mjs";
+import { parseArgs, refusalLines } from "./cliArgs.mjs";
 
 export function runSlice(picked, { capMs = CAP_MS, onProgress = null } = {}) {
     const rows = [];
     for (let i = 0; i < picked.length; i++) {
         const g = picked[i];
         const t0 = Date.now();
-        let code = 1;
-        try { code = runGate(g, { timeoutMs: capMs }).code; } catch { code = 1; }
+        let code = 1, skipped = false, failRows = [];
+        // v4647k -- `skipped` comes from the SAME run that produced the millisecond, exactly as the sweep's
+        // `serialSkipped ?? parallelSkipped` mirrors `serialMs ?? parallelMs`. A label taken from another
+        // run is the drift kindsInferred exists to prevent.
+        try { const r = runGate(g, { timeoutMs: capMs }); code = r.code; skipped = !!r.skipped; failRows = r.failRows || []; } catch { code = 1; }
         const ms = Date.now() - t0;
+        // v4815 -- a run killed at the cap runs no cleanup, and the NEXT gate here would meet what it left: the 2026-10-06
+        // full rotation killed orreryReached between its control's two writes and left orrery-reached.json bent on disk.
+        // quickSweep reclaims at this point (v4692); the rotation did not.
+        if (code !== 0) { const gone = reclaimStrandedFixtures(); if (gone.length) console.log(`[rotation] reclaimed after ${g}: ${gone.join(", ")}`); }
         // *** v4568 -- WHETHER THE PROCESS FINISHED IS RECORDED, NOT INFERRED FROM THE NUMBER. ***
         // The whole defect in the killed bucket is that "at or over the cap" was read as "no verdict", so a
         // gate that ran to completion in 50 s and a gate cut off at 20 s were the same entry. runGate returns
         // "timeout/signal" as its code for a kill, which is the fact itself rather than a threshold test on
         // the clock -- a gate finishing 3 ms under the cap is finished, and a slow box does not change that.
-        rows.push({ gate: g, ms, code, finished: code !== "timeout/signal" });
+        rows.push({ gate: g, ms, code, finished: code !== "timeout/signal", skipped, failRows });
         if (onProgress) onProgress(i + 1, picked.length, rows[rows.length - 1]);
     }
     return rows;
@@ -46,7 +58,16 @@ export function runSlice(picked, { capMs = CAP_MS, onProgress = null } = {}) {
 // `finished` on the row is the fact itself and is preferred wherever it is present.
 export function classifyRows(rows, { budgetMs = BUDGET_MS, priorMs = {}, capMs = CAP_MS } = {}) {
     const cut = (r) => (r.finished === undefined ? r.ms >= capMs : !r.finished);
-    const returnees = rows.filter((r) => r.ms <= budgetMs && !cut(r));
+    // *** v4647p -- `code === 0` WAS NOT IN HERE, SO A GATE THAT FAILED FAST WAS A "RETURNEE". ***
+    // Found by writing this module's first gate: a row exiting 1 in 800 ms landed in BOTH `returnees` and
+    // `reds`, and the command line prints the first as "now UNDER budget" with its before-and-after. 800 ms
+    // is how long the gate took to FAIL; it is not a cost, and a gate that does not pass is not rejoining
+    // the ship-time sweep on the strength of how quickly it failed.
+    //
+    // THE SAME DEFECT, THE SAME WORDS, TWO ROUNDS AGO: sweepCoverage's `measuredUnder` filtered on time and
+    // ignored `code`, and four rows survived a restore as LOST because of it. A count standing in for a
+    // property is this session's most-met species and it was sitting in the sibling function.
+    const returnees = rows.filter((r) => r.ms <= budgetMs && r.code === 0 && !cut(r));
     const reds = rows.filter((r) => r.code !== 0 && !cut(r));
     const killed = rows.filter(cut);
     const slower = rows.filter((r) => priorMs[r.gate] != null && r.ms > priorMs[r.gate] * 1.5);
@@ -69,6 +90,105 @@ export function classifyRows(rows, { budgetMs = BUDGET_MS, priorMs = {}, capMs =
  * timings file still describe THE SAME RUN: same ms, same code. A gate re-timed since carries a different
  * reading and is left alone, because the ledger no longer knows anything about its current state.
  */
+/**
+ * *** v4647j -- NINETY-EIGHT GATES ARE OUTSIDE THE SHIP-TIME SWEEP ON A NUMBER NOTHING HAS EVER DATED. ***
+ *
+ * tools/ship/sweepCoverage-selfcheck.mjs has been FIVE RED on clean HEAD for weeks, and it was right every
+ * time. Its returnee rows say the rotation's readings were lost and that the entries now carry the
+ * pre-v4408 stamp -- "the fingerprint of a file that was REPLACED rather than updated". Measured:
+ *
+ *   98 gates sit over the 3,000 ms budget in `timings` and under it in `serial`
+ *   98 of 98 carry at[g] === "unknown -- before v4408"      <- no run ever dated the membership number
+ *   98 of 98 are in sweep-rotation.json, all rotated 2026-09-09
+ *   the ledger reading and the LATER serial-slice reading agree: median 0.91x, 83 of 98 within 20%
+ *
+ * So the 2026-09-09 rotation measured them alone and wrote `timings` and `at`; that write was lost when the
+ * file was replaced; the ledger kept it; a later serial slice re-measured them into `serial` and confirmed
+ * it. Only the membership field still holds the original undated number, which is 1.5x to 5x larger.
+ *
+ * SECOND TIME THIS SESSION A RECORD-CHECKING GATE WAS RIGHT AND WAS FILED AS BROKEN (recordDrift was the
+ * first). Five red rows, five weeks, one real fault underneath all of them.
+ *
+ * *** THIS IS NOT A MEMBERSHIP CHANGE. *** quickSweep.costOf()'s own contract says "timings[] remains the
+ * membership number it always was", and that stands. What is restored is the membership number itself, from
+ * a measurement that exists twice -- and the stamp written is `serialAt`, the date of the run that actually
+ * took the surviving reading, never today's and never the ledger's. A number written by something other
+ * than the thing that measured it, carrying a stamp it did not earn, is the 2026-09-03 fault this file is
+ * built around; restoring one by hand-editing the JSON would have been that fault exactly.
+ *
+ * REFUSES rather than guesses. A row whose two independent readings disagree by more than `band` is left
+ * alone and NAMED: one of the two is wrong and this function cannot say which.
+ */
+// *** v4818 -- A BOX THAT MAY NOT WRITE THE RECORD MAY NOT WRITE THE LEDGER EITHER. *** The timings went to the
+// foreign box's .local.json and the ledger went to the SHARED file regardless, so the ledger held readings the record
+// did not: PR #12's box committed a temporalLockSumsTsl row (16,176 ms) that sweep-timings.json never had, and the
+// v4818 rotation itself, run on a box the record did not name, rewrote all forty rows and moved poolAt before it was
+// caught and reverted. The ledger records what the RECORD was given, so it follows the record's owner.
+export const LEDGER_FILE = path.join("tools", "ship", "sweep-rotation.json");
+export const LOCAL_LEDGER = path.join("tools", "ship", "sweep-rotation.local.json");
+export const ledgerFile = (target) => (target && target.foreign ? LOCAL_LEDGER : LEDGER_FILE);
+
+export const CORROBORATION_BAND = 0.2;
+export const UNDATED = "unknown -- before v4408";
+
+export function restoreLost(file, ledger, { budgetMs = BUDGET_MS, band = CORROBORATION_BAND } = {}) {
+    // *** IT PRODUCES ROWS AND HANDS THEM TO mergeTimings, AND THAT IS A MEASURED CORRECTION. ***
+    // The first draft wrote `timings` and `at` by hand. timingKind-selfcheck went red -- 83 entries claiming
+    // a LOADED kind while holding a serial number. So it also wrote `kinds` and `contended`. Then
+    // skipReading-selfcheck went red -- placementRender at 45 ms carrying code 124, a killer's clock's exit
+    // status against a runtime. FOUR MAPS, THREE ROUNDS OF WHACK-A-MOLE, and the sweep's own writer has
+    // warned about this shape three times already: "a writer that spells its fields by hand is a list that
+    // has to be maintained in step with every reader of the file".
+    //
+    // mergeTimings is that list, in one place, and it already writes all nine maps plus kindsInferred. A
+    // restored reading IS a row: a gate, a serial ms, its exit code, and finished. So the restore decides
+    // WHICH gates and mergeTimings decides what a row means -- one writer, and the next map somebody adds
+    // arrives here for free.
+    const timings = file.timings || {}, at = file.at || {};
+    const serial = file.serial || {}, serialAt = file.serialAt || {};
+    const led = new Map((ledger.rotated || []).map((r) => [r.gate, r]));
+    const rows = [], refused = [], unwitnessed = [], restored = [];
+    for (const [gate, row] of led) {
+        const now = timings[gate];
+        if (now == null || now <= budgetMs) continue;              // already in the sweep; nothing lost
+        if (String(at[gate] || UNDATED) !== UNDATED) continue;     // a DATED reading is an observation, not a loss
+        // *** A CAP OR A SKIP IS NOT A STALE RUNTIME -- IT IS NO RUNTIME AT ALL, AND THERE IS NOTHING TO
+        // RESTORE. *** The first draft restored over both, and tools/ship/placementRender-selfcheck.mjs came
+        // out of it holding 45 ms with kind ALONE. It runs in 52-54 ms and PRINTS
+        // "placementRender-selfcheck: skipped (jsdom absent)" -- so the number is right and the kind is a
+        // lie, and neither this function nor mergeTimings can write KIND.SKIPPED, because only the sweep
+        // reads a gate's OUTPUT and only output says a gate declined. tools/ship/skipReading-selfcheck.mjs
+        // went red naming it, and it was right.
+        //
+        // budgetIsOwn already says what a cap reading is: "a reading it produces is the cap's clock rather
+        // than a runtime, and is NEVER COMPARED AGAINST A MEASUREMENT". A gate whose membership number is a
+        // cap has never been measured, so it needs a RUN -- `--gate` -- and not a restore. This function
+        // restores STALE RUNTIMES, which is a smaller and honest claim.
+        const priorKind = (file.kinds || {})[gate];
+        if (priorKind === KIND.CAPPED || priorKind === KIND.SKIPPED) {
+            refused.push({ gate, ledger: row.ms, serial: serial[gate] ?? null, ratio: null, why: `prior reading is a ${priorKind}, not a runtime` });
+            continue;
+        }
+        // A gate the rotation found RED is not a membership candidate, whatever its clock said.
+        if (row.code !== 0) { refused.push({ gate, ledger: row.ms, serial: serial[gate] ?? null, ratio: null, why: "not green" }); continue; }
+        const s = serial[gate];
+        // One reading is an assertion; two independent ones days apart are evidence. Without the second, the
+        // ledger alone does not get to move a membership number -- it is the file that was already replaced.
+        if (s == null || !serialAt[gate]) { unwitnessed.push(gate); continue; }
+        const ratio = s / row.ms;
+        if (!(ratio > 1 - band && ratio < 1 + band)) { refused.push({ gate, ledger: row.ms, serial: s, ratio: +ratio.toFixed(2) }); continue; }
+        if (s > budgetMs) { refused.push({ gate, ledger: row.ms, serial: s, ratio: +ratio.toFixed(2), why: "over budget" }); continue; }
+        rows.push({ gate, ms: s, code: 0, finished: true, stamp: serialAt[gate] });
+        restored.push({ gate, from: now, to: s, at: serialAt[gate], ledger: row.ms, ratio: +ratio.toFixed(2) });
+    }
+    // *** ONE ROW AT A TIME, EACH UNDER ITS OWN STAMP. *** mergeTimings takes one stamp for a whole pass,
+    // which is right for a pass; these readings come from different serial slices days apart, and giving
+    // them all one date would be the 2026-09-03 fault -- a stamp the reading did not earn.
+    let merged = file;
+    for (const r of rows) merged = mergeTimings(merged, [r], r.stamp).merged;
+    return { merged, restored, refused, unwitnessed };
+}
+
 export function rebuildFinished(file, ledger) {
     const timings = file.timings || {}, codes = file.codes || {};
     const finished = { ...(file.finished || {}) };
@@ -82,20 +202,136 @@ export function rebuildFinished(file, ledger) {
     return { finished, rebuilt, skipped };
 }
 
+/**
+ * Fold this pass's readings into sweep-timings.json's maps. PURE, and exported, so the claim below can be
+ * driven on a fixture rather than only by running eighty gates for five minutes.
+ *
+ * *** v4556 -- THIS PASS TAKES THE EXACT MEASUREMENT `serial` EXISTS TO HOLD AND FILED IT NOWHERE. ***
+ * The header at the top of this file says "SERIAL ON PURPOSE. The budget is a serial number", and every
+ * reading here is uncontended by construction -- and the merge wrote `timings`, `codes`, `at` and
+ * `finished`, never `serial`. So quickSweep.costOf(), the accessor v4562 built to tell the two measurements
+ * apart, answered `source: "parallel"` for 210 OF THE 237 ROTATION READINGS ON FILE: it labelled the
+ * trustworthy number as the contended one, across the whole exiled pool -- which is the population this
+ * pass exists to serve, and the only population nothing else ever measures alone (quickSweep's serial slice
+ * draws from `sel.run`, and an over-budget gate is by definition not in it).
+ *
+ * The reading now goes in BOTH fields, with `contended: false` saying the copy in `timings` is not a
+ * sample. Writing it to `serial` alone would have been wrong in the other direction: `timings` is still the
+ * membership number every consumer reads, and a rotation that stopped updating it would stop returning
+ * gates to the sweep, which is the whole point of the pass.
+ */
+/**
+ * *** v4640 -- THIS IS THE SECOND WRITER OF sweep-timings.json AND IT WAS WRITING A PARTIAL TUPLE. ***
+ *
+ * Seven maps went out and two did not: `kinds` and `capAt`. So every gate this rotation timed got a
+ * millisecond with NO KIND -- which is exactly the state v4579 built `kinds` to end, in its own words "a ms
+ * without one is two quantities" -- and no record of the cap it ran under, which is the field v4637 added
+ * because one file holds rows from runs with different caps and the rotation is the run most likely to use a
+ * different one (`--cap-s`, 90 s in killed mode against quickSweep's 20).
+ *
+ * FOUND BY THE PRE-FLIGHT REFUSING TO GO GREEN. v4639 gave tools/ship/recordDrift.mjs a runner; adding one
+ * gate this round left it reporting `sweep timings` stale after the rotation had just written that gate's
+ * row, because the row was missing the kind the pre-flight asks for. The instrument worked.
+ *
+ * THE FILE'S OWN HISTORY IS THE PRECEDENT: quickSweep.mjs records that v4568 added `finished`, wrote it into
+ * a local in its loop, left it out of the object it actually persisted, and "the first full sweep after the
+ * killed pass silently deleted 140 rows of it". A writer that spells its fields by hand is a list that has to
+ * be maintained in step with every reader, and this is that same list, one process over.
+ *
+ * The kind is not inferred here: a rotation row is ALWAYS a serial re-run, so it is ALONE when it finished
+ * and CAPPED when it did not, and both are known at the moment of writing rather than derived later from
+ * which side of a budget the number fell on.
+ */
+export function mergeTimings(file, rows, stamp, capMs = null) {
+    const timings = { ...(file.timings || {}) }, codes = { ...(file.codes || {}) }, at = { ...(file.at || {}) };
+    const finished = { ...(file.finished || {}) };
+    const serial = { ...(file.serial || {}) }, serialAt = { ...(file.serialAt || {}) };
+    // The rotation's readings are serial too, and are the CLEANEST in the file -- taken alone, deliberately,
+    // rather than at the tail of a 1,398-gate sweep. A ring the rotation did not feed would record only the
+    // noisiest half of the evidence. See quickSweep's SERIAL_RING note for why it is three.
+    const serialRing = { ...(file.serialRing || {}) };
+    const contended = { ...(file.contended || {}) };
+    const kinds = { ...(file.kinds || {}) }, capAt = { ...(file.capAt || {}) };
+    const inferred = new Set(file.kindsInferred || []);
+    const priorMs = {};
+    for (const r of rows) {
+        priorMs[r.gate] = (file.timings || {})[r.gate];
+        timings[r.gate] = r.ms; codes[r.gate] = r.code; at[r.gate] = stamp;
+        serial[r.gate] = r.ms; serialAt[r.gate] = stamp; contended[r.gate] = false;
+        serialRing[r.gate] = (serialRing[r.gate] || []).concat(r.ms).slice(-3);
+        // Recorded either way: a gate that STOPS finishing must lose its verdict, not keep an old true.
+        finished[r.gate] = !!r.finished;
+        // OBSERVED, not inferred -- so the entry leaves kindsInferred, which is what watching it means.
+        // *** v4647k -- A SKIP IS NOT A RUNTIME, AND THIS WRITER USED TO HAVE NO WORD FOR ONE. ***
+        // The rule is quickSweep's, character for character: a declaration beats everything, because a gate
+        // that declined did not run and its millisecond is the cost of declining. Without this the rotation
+        // filed placementRender at 56 ms `alone` -- and that entry is why v4647j could not close
+        // sweepCoverage's last three rows.
+        kinds[r.gate] = r.skipped ? "skipped" : r.finished ? "alone" : "capped";
+        inferred.delete(r.gate);
+        if (capMs != null) capAt[r.gate] = capMs;
+    }
+    backfillStamps(timings, at);
+    return { merged: { ...file, timings, codes, at, capAt, finished, serial, serialAt, serialRing, contended, kinds,
+                       kindsInferred: [...inferred].sort() }, priorMs };
+}
+
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
-    const arg = (n, d) => { const i = process.argv.indexOf(n); return i >= 0 ? process.argv[i + 1] : d; };
-    const budgetMs = Number(arg("--budget-s", 180)) * 1000;
-    const slots = Number(arg("--slots", 24));
+    // *** v4647g -- THIS IS THE TOOL MY TYPO RAN. *** I meant one gate and typed `--gates`, which is
+    // failLines' and recordInputs' spelling of a LIST. The old `indexOf` arg reader matched nothing,
+    // returned null, and the ROTATION RAN -- 21 gates instead of the one asked for -- and recorded eulerGpu
+    // at the 20,000 ms cap, a cap reading filed as a runtime, which budgetIsOwn forty lines into quickSweep
+    // says must never happen. The two spellings are NOT unified (a list and one gate are different asks);
+    // `--gates` is now refused here and told that this tool's option is `--gate`, which nearestOption gives
+    // for an edit distance of one.
+    //
+    // This file WRITES sweep-timings.json, so an argument it misreads becomes a number the tree carries.
+    const CLI = Object.freeze({
+        values: Object.freeze({ "--budget-s": "number", "--slots": "number", "--gate": "path",
+                                "--cap-s": "number", "--band": "string" }),
+        flags: Object.freeze(["--rebuild-finished", "--restore-lost", "--write", "--killed"]),
+    });
+    const cli = parseArgs(process.argv.slice(2), CLI);
+    if (cli.errors.length) { for (const l of refusalLines("rotation", cli.errors, CLI)) console.error(l); process.exit(2); }
+    const arg = (n, d) => (n in cli.values ? cli.values[n] : d);
+    const budgetMs = arg("--budget-s", 180) * 1000;
+    const slots = arg("--slots", 24);
     const file = readFile();
-    if (process.argv.includes("--rebuild-finished")) {
+    if (cli.flags.has("--restore-lost")) {
+        const led = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-rotation.json"), "utf8"));
+        const { merged, restored, refused, unwitnessed } = restoreLost(file, led);
+        console.log(`[rotation] --restore-lost: ${restored.length} membership number(s) restored from a reading ` +
+            `that exists TWICE -- the 2026-09-09 ledger and a later serial slice -- against ${refused.length} refused ` +
+            `and ${unwitnessed.length} with no second witness`);
+        for (const r of restored.slice(0, 10))
+            console.log(`[rotation]   + ${r.gate}  ${r.from} -> ${r.to} ms  @${String(r.at).slice(0, 16)}  (ledger ${r.ledger}, ratio ${r.ratio})`);
+        if (restored.length > 10) console.log(`[rotation]   ... ${restored.length - 10} more`);
+        const disagreed = refused.filter((x) => !x.why);
+        console.log(`[rotation]   ${refused.length - disagreed.length} refused because BOTH readings are over budget ` +
+            `(correctly outside the sweep), ${disagreed.length} because the two readings disagree by more than ` +
+            `${Math.round(CORROBORATION_BAND * 100)}% and this cannot say which is wrong`);
+        for (const x of disagreed.slice(0, 6))
+            console.log(`[rotation]   ? ${x.gate}  ledger ${x.ledger} vs serial ${x.serial} (${x.ratio}x) -- re-time it with --gate`);
+        if (cli.flags.has("--write")) {
+            const t = timingsTarget(file);
+            if (t.foreign) console.log(`[rotation] NOT writing sweep-timings.json: ${t.why}`);
+            fs.writeFileSync(path.join(ENG, t.file),
+                JSON.stringify({ ...merged, host: t.host }, null, 1) + "\n");
+            console.log(`[rotation] wrote ${t.file}`);
+        } else console.log("[rotation] dry run -- pass --write to record");
+        process.exit(0);
+    }
+    if (cli.flags.has("--rebuild-finished")) {
         const led = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-rotation.json"), "utf8"));
         const { finished, rebuilt, skipped } = rebuildFinished(file, led);
         console.log(`[rotation] --rebuild-finished: ${rebuilt} row(s) restored from this file's own ledger, ` +
             `${skipped} skipped because the timings no longer describe the run the ledger recorded`);
-        if (process.argv.includes("--write")) {
-            fs.writeFileSync(path.join(ENG, "tools", "ship", "sweep-timings.json"),
-                JSON.stringify({ ...file, finished }, null, 1) + "\n");
-            console.log("[rotation] wrote sweep-timings.json");
+        if (cli.flags.has("--write")) {
+            const t = timingsTarget(file);
+            if (t.foreign) console.log(`[rotation] NOT writing sweep-timings.json: ${t.why}`);
+            fs.writeFileSync(path.join(ENG, t.file),
+                JSON.stringify({ ...file, host: t.host, finished }, null, 1) + "\n");
+            console.log(`[rotation] wrote ${t.file}`);
         } else console.log("[rotation] dry run -- pass --write to record");
         process.exit(0);
     }
@@ -121,8 +357,8 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     // sweep, behind a door with no handle", because rotation() walked c.over and c.killed is a different
     // bucket. Re-running them AT the cap they died on can only reproduce the death, so this mode takes its
     // own, larger cap. Everything else is the same slice runner, classifier, writer and per-entry stamp.
-    const killedMode = process.argv.includes("--killed");
-    const capMs = Number(arg("--cap-s", killedMode ? 90 : CAP_MS / 1000)) * 1000;
+    const killedMode = cli.flags.has("--killed");
+    const capMs = arg("--cap-s", killedMode ? 90 : CAP_MS / 1000) * 1000;
     const band = arg("--band", null);   // "3000-8000", in the units the timings file uses
     const inBand = (g) => {
         if (!band) return true;
@@ -131,11 +367,43 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         return ms != null && ms > lo && ms <= hi;
     };
     const pickOpts = { slots, budgetMs, filter: inBand, includeKilled: killedMode };
+    // *** v4666 -- --killed PICKS BY WHAT A GATE IS EXPECTED TO COST, AND REFUSES THE ONES THIS CAP CANNOT
+    // REACH. *** It took c.killed.slice(0, slots) -- the census's own order, which is alphabetical and knows
+    // nothing about cost -- so a run at a 90 s cap would spend 90 s on tools/roundhouse/khConvergence and
+    // kill it again while a gate declaring 62 s sat further down the list unattempted. This mode's own note
+    // four lines up already says why that is wasted: "re-running them AT the cap they died on can only
+    // reproduce the death". It had no number to act on. tools/ship/declaredCost.mjs supplies one: 271 gates
+    // in this tree open with `// Run: node <gate>   (~616s)` and nothing had ever read one.
+    //
+    // CHEAPEST FIRST, and a gate whose DECLARED cost exceeds this cap is NAMED AND SKIPPED with the cap that
+    // would reach it -- which is a measurement being used, not a gate being hidden: it stays in c.killed and
+    // `--cap-s` takes it whenever somebody is willing to spend that.
+    const declaredTooBig = [];
+    const killedPool = (() => {
+        const rows = c.killed.map((g) => ({ g, cost: costOf(g, ENG, file) }));
+        for (const r of rows) if (r.cost.from === "declared" && r.cost.ms > capMs) declaredTooBig.push(r);
+        const reachable = rows.filter((r) => !(r.cost.from === "declared" && r.cost.ms > capMs));
+        // A gate with no cost at all sorts last: it is not known to be expensive, and it is not known to be
+        // cheap either, so it goes after everything that has a number.
+        reachable.sort((a, b) => (a.cost.ms ?? Infinity) - (b.cost.ms ?? Infinity));
+        return reachable.map((r) => r.g);
+    })();
     const picked = only ? gates.filter((g) => g.includes(only))
-                        : killedMode ? c.killed.slice(0, slots)
+                        : killedMode ? killedPool.slice(0, slots)
                         : rotation(c, file, pickOpts).picked;
-    if (killedMode) console.log(`[rotation] --killed: ${c.killed.length} gate(s) have hit the cap, taking ` +
-        `${picked.length} at a ${capMs / 1000} s cap. ${(c.noVerdict || []).length} of them have NO VERDICT AT ALL.`);
+    const poolHorizon = only || killedMode ? null : rotation(c, file, pickOpts).horizon;
+    if (killedMode) {
+        console.log(`[rotation] --killed: ${c.killed.length} gate(s) have hit the cap, taking ` +
+            `${picked.length} at a ${capMs / 1000} s cap, CHEAPEST EXPECTED FIRST. ` +
+            `${(c.noVerdict || []).length} of them have NO VERDICT AT ALL.`);
+        if (declaredTooBig.length) {
+            console.log(`[rotation]   ${declaredTooBig.length} SKIPPED -- their own headers declare more than ` +
+                `this ${capMs / 1000} s cap, so running them here can only reproduce the death:`);
+            for (const r of declaredTooBig.sort((a, b) => b.cost.ms - a.cost.ms).slice(0, 8))
+                console.log(`[rotation]     ~${Math.round(r.cost.ms / 1000)}s declared   ${r.g}   ` +
+                    `(--cap-s ${Math.ceil(r.cost.ms / 1000 * 1.2)} would reach it)`);
+        }
+    }
     if (only && !picked.length) { console.error("[rotation] --gate " + only + " matched no gate"); process.exit(2); }
     if (only) console.log(`[rotation] --gate ${only}: ${picked.length} gate(s), selection by name rather than by staleness`);
     else if (killedMode) { /* its own line is printed above; the over-budget pool is not this run's subject */ }
@@ -149,7 +417,12 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const k = classifyRows(rows, { priorMs: file.timings || {}, capMs });
     console.log(`[rotation] ran ${rows.length}: ${k.returnees.length} now UNDER budget, ${k.reds.length} red, ${k.killed.length} hit the cap, ${k.slower.length} materially slower`);
     for (const r of k.returnees) console.log(`[rotation]   returnee  ${r.gate}  ${(file.timings || {})[r.gate]} -> ${r.ms} ms`);
-    for (const r of k.reds) console.log(`[rotation]   RED       ${r.gate}  exit ${r.code} in ${r.ms} ms`);
+    for (const r of k.reds) {
+        console.log(`[rotation]   RED       ${r.gate}  exit ${r.code} in ${r.ms} ms`);
+        // v4831 -- the rows that made it red, from the run that was red: a one-off red is otherwise unexplainable afterwards
+        for (const f of (r.failRows || [])) console.log(`[rotation]             ${f.trim()}`);
+        if (r.failRows && !r.failRows.length) console.log(`[rotation]             (no FAIL row printed -- the gate exited ${r.code} without one)`);
+    }
     if (killedMode) {
         const fin = rows.filter((r) => r.finished);
         console.log(`[rotation] ${fin.length} of ${rows.length} FINISHED and now have a verdict ` +
@@ -157,17 +430,13 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
             `${rows.length - fin.length} did not finish even at ${capMs / 1000} s`);
         for (const r of fin.filter((x) => x.ms < CAP_MS)) console.log(`[rotation]   under the old cap  ${r.gate}  ${r.ms} ms exit ${r.code}`);
     }
-    if (process.argv.includes("--write")) {
+    if (cli.flags.has("--write")) {
         const stamp = new Date().toISOString();
-        const timings = { ...(file.timings || {}) }, codes = { ...(file.codes || {}) }, at = { ...(file.at || {}) };
-        const priorMs = {};
-        const finished = { ...(file.finished || {}) };
-        for (const r of rows) { priorMs[r.gate] = (file.timings || {})[r.gate]; timings[r.gate] = r.ms; codes[r.gate] = r.code; at[r.gate] = stamp;
-            // Recorded either way: a gate that STOPS finishing must lose its verdict, not keep an old true.
-            finished[r.gate] = !!r.finished; }
-        backfillStamps(timings, at);
-        fs.writeFileSync(path.join(ENG, "tools", "ship", "sweep-timings.json"),
-            JSON.stringify({ ...file, timings, codes, at, finished }, null, 1) + "\n");
+        const { merged: mergedTimings, priorMs } = mergeTimings(file, rows, stamp, capMs);
+        const target = timingsTarget(file);
+        if (target.foreign) console.log(`[rotation] NOT writing sweep-timings.json: ${target.why}`);
+        fs.writeFileSync(path.join(ENG, target.file),
+            JSON.stringify({ ...mergedTimings, host: target.host }, null, 1) + "\n");
         // Its OWN file: quickSweep builds a fresh object each write and erased this ledger the first time it ran.
         // *** v4535 -- MERGED BY GATE, NOT REPLACED WHOLESALE. *** ROTATION_LOST_V4461 records that this ledger
         // "holds only the last run", and said so as a limitation it had to work around. A one-gate --write then
@@ -188,23 +457,30 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         // quotes it. A legacy row is backfilled with the ledger's PREVIOUS date, which is its real
         // provenance, before the file-level one moves.
         let priorLedger = {};
-        let priorAt = null;
+        let priorAt = null, prevLedger = null;
         try {
             const prev = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-rotation.json"), "utf8"));
+            prevLedger = prev;
             priorAt = prev.at || null;
             for (const r of prev.rotated || []) priorLedger[r.gate] = r.at ? r : { ...r, at: priorAt };
         } catch {}
         for (const r of rows) priorLedger[r.gate] = { gate: r.gate, ms: r.ms, code: r.code, priorMs: priorMs[r.gate], at: stamp };
         const merged = Object.values(priorLedger).sort((a, b) => a.gate < b.gate ? -1 : a.gate > b.gate ? 1 : 0);
-        fs.writeFileSync(path.join(ENG, "tools", "ship", "sweep-rotation.json"), JSON.stringify({
+        const ledgerOut = ledgerFile(target);
+        if (target.foreign) console.log(`[rotation] NOT writing the shared ledger either -- ${ledgerOut} instead`);
+        fs.writeFileSync(path.join(ENG, ledgerOut), JSON.stringify({
             generatedFrom: "tools/ship/sweepRotation.mjs",
             note: "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. " +
                   "Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. " +
                   "MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that " +
-                  "measured that row, and a row survives until its own gate is re-timed.",
-            at: stamp, budgetMs: BUDGET_MS, lastRun: rows.length, rotated: merged,
+                  "measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is " +
+                  "the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it. " +
+                  "`poolHorizon` (v4816) is the stamp of the first pool entry that run did NOT take: it reached " +
+                  "every entry stamped earlier and none stamped at or after it.",
+            ...ledgerStamps(prevLedger, stamp, selectionKind({ gate: only, band, killed: killedMode }), poolHorizon),
+            budgetMs: BUDGET_MS, lastRun: rows.length, rotated: merged,
         }, null, 1) + "\n");
-        console.log(`[rotation] wrote ${rows.length} entries with at=${stamp}`);
+        console.log(`[rotation] wrote ${rows.length} entries with at=${stamp} to ${target.file}`);
     } else console.log("[rotation] dry run -- pass --write to record");
     process.exit(k.reds.length ? 1 : 0);
 }

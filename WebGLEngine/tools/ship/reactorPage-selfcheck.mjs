@@ -24,7 +24,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { codeOnly, noComments } from "./sourceScan.mjs";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import { KEEPIN_U235, GEN_LWR, totalBeta, fromDollars, dominantRoot } from "../../physics/nuclear/kinetics.mjs";
 
 const require_ = createRequire(import.meta.url);
@@ -112,7 +112,7 @@ console.log("\n4. *** THE REAL BROWSER: SOURCE TEXT CANNOT TELL A RUNNING REACTO
         report("live half SKIPPED -- " + skip);
         report("*** THAT IS A SKIP AND NOT A PASS: sections 1-3 read source, and source cannot show the sim runs");
     } else {
-        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
         const ctx = await b.newContext();
         const pg = await ctx.newPage();
         const errs = [];

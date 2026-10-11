@@ -33,7 +33,9 @@ const say = (m) => console.log("  ----  " + m);
     // v4426 -- emitted, not only printed: gateReport-selfcheck's rule since v4399, a gate that argues in
     // numbers and emits nothing writes its evidence to a terminal that closes.
     REPORT.table("a fire eating a finite substrate", ["step", "t (s)", "front x", "active cells"],
-        r.front.map((x, i) => [String(i + 1), ((i + 1) * r.dt).toFixed(1), String(x), String(r.active[i])]).slice(0, 24),
+        // v4558: every cell here was a STRING -- String(i+1), toFixed(1) -- so all 96 values in this table
+        // were renderings of numbers, which is the one thing gateReport's header says a report must not hold.
+        r.front.map((x, i) => [i + 1, (i + 1) * r.dt, x, r.active[i]]).slice(0, 24),
         `Went out at step ${r.wentOutAt}, ash ${r.ash}, fuel left ${r.fuelLeft}. The going-out is the item: a fire on a finite substrate must stop.`);
 
     ok("!! *** it CONSUMES its fuel -- every cell is ash ***", r.consumesFuel && r.ash === r.n && r.fuelLeft === 0,

@@ -249,8 +249,29 @@ export function verdictFor(fwd, consumers) {
     return { verdict: VERDICT.REDIRECTED, consumer: c, why: "the callee uses || and a DIFFERENT number, so the mutation that actually runs is " + fwd.value + " -> " + c.value + ", not " + fwd.value + " -> 0" };
 }
 
-/** Every edge in the tree, verdict attached, sorted so the row order is a property of the tree not the walk. */
-export function scan(root = ENG) {
+/**
+ * Every edge in the tree, verdict attached, sorted so the row order is a property of the tree not the walk.
+ * *** `from` AND `to` ARE "a/b" ON EVERY PLATFORM (v4778 rig run). *** They were the raw path.relative, which
+ * reads "physics\\box3dLockstep.js" on Windows, so every frozen edge and every named pair in the gate
+ * matched nothing there: Keith's rig read "0 edge(s) held, MISSING: shipHalf@physics/box3dLockstep.js, ...".
+ * `P` is the path module, so the gate can scan as Windows would (path.win32) on a Linux box. The walk is the
+ * expensive part and does not depend on `P`, so it is done once per root and only the keying is per call --
+ * the gate's second scan under path.win32 costs the keying and nothing else.
+ */
+export function scan(root = ENG, P = path) {
+    const raw = walkEdges(root);
+    const rel = (x) => P.relative(root, x).split(P.sep).join("/");
+    const rows = raw.edges.map(({ fAbs, tAbs, ...r }) => ({ ...r, from: rel(fAbs), to: rel(tAbs) }))
+        .map((r) => ({ key: r.key, from: r.from, fromLine: r.fromLine, fromOp: r.fromOp, fromValue: r.fromValue,
+                       callee: r.callee, to: r.to, toLine: r.toLine, toOp: r.toOp, toValue: r.toValue,
+                       verdict: r.verdict, why: r.why, zeroDies: r.zeroDies }));
+    rows.sort((a, b) => (a.from + a.key).localeCompare(b.from + b.key) || a.fromLine - b.fromLine);
+    return { rows, files: raw.files, namedConstantDefaults: raw.named, naiveNamePairs: raw.naive };
+}
+
+const WALKED = new Map();
+function walkEdges(root) {
+    if (WALKED.has(root)) return WALKED.get(root);
     const files = sourceFiles(root);
     const { code, text } = readTree(files);
     const consumersByFile = new Map();
@@ -258,26 +279,24 @@ export function scan(root = ENG) {
         if (!consumersByFile.has(f)) consumersByFile.set(f, consumingSites(f, code));
         return consumersByFile.get(f);
     };
-    const rows = [], seen = new Set();
+    const edges = [], seen = new Set();
     for (const f of files) {
         for (const fwd of forwardingSites(f, code, text)) {
             const consumers = consumersFor(fwd.target).filter((c) => c.key === fwd.key);
             if (!consumers.length) continue;
             const v = verdictFor(fwd, consumers);
-            const from = path.relative(root, f), to = path.relative(root, fwd.target);
-            const id = `${from}:${fwd.line}:${fwd.key}:${to}`;
+            const id = `${f}:${fwd.line}:${fwd.key}:${fwd.target}`;
             if (seen.has(id)) continue;
             seen.add(id);
-            rows.push({
-                key: fwd.key, from, fromLine: fwd.line, fromOp: fwd.op, fromValue: fwd.value,
-                callee: fwd.callee, to, toLine: v.consumer ? v.consumer.line : null,
+            edges.push({
+                key: fwd.key, fAbs: f, fromLine: fwd.line, fromOp: fwd.op, fromValue: fwd.value,
+                callee: fwd.callee, tAbs: fwd.target, toLine: v.consumer ? v.consumer.line : null,
                 toOp: v.consumer ? v.consumer.op : null, toValue: v.consumer ? v.consumer.value : null,
                 verdict: v.verdict, why: v.why,
                 zeroDies: v.consumer ? zeroDiesAt(fwd.op, v.consumer.op, fwd.value) : null,
             });
         }
     }
-    rows.sort((a, b) => (a.from + a.key).localeCompare(b.from + b.key) || a.fromLine - b.fromLine);
     let named = 0;
     const byName = new Map();
     for (const f of files) {
@@ -295,7 +314,9 @@ export function scan(root = ENG) {
         const distinct = new Set(sites);
         if (distinct.size > 1) naive += sites.length * (distinct.size - 1);
     }
-    return { rows, files: files.length, namedConstantDefaults: named, naiveNamePairs: naive };
+    const out = { edges, files: files.length, named, naive };
+    WALKED.set(root, out);
+    return out;
 }
 
 /** Counts DERIVED from the rows. v4387's lesson: a total typed beside the rows it totals drifts away from them. */

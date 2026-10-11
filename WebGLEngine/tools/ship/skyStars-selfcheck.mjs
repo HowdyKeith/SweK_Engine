@@ -17,6 +17,11 @@ let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const say = (m) => console.log("  ----  " + m);
 const f = Math.fround;
+// *** v4558 -- THE TWO TABLES BELOW USED TO DIE WITH THE TERMINAL. *** gateReport-selfcheck's ratchet names
+// every gate that prints rows of numbers and emits nothing a second reader can open, and this was one of
+// five arrivals it had caught. The numbers go out AS NUMBERS -- storing "0.131%" as text would make the
+// reader parse a rendering of a number back into a number, which is the indirection that module exists to
+// refuse. Nothing here changes a verdict; the terminal is still the primary surface.
 const skySrc = fs.readFileSync(path.join(ENG, "render/skyRenderer.js"), "utf8");
 /** The engine's own settings, read off main.js rather than typed here. */
 const DENSITIES = [...fs.readFileSync(path.join(ENG, "main.js"), "utf8")
@@ -270,5 +275,6 @@ console.log("  ----  a float32 emulation whose constants are read OUT of that te
 console.log("  ----  NOR THAT THE NEW SKY LOOKS BETTER. It is a different sky and a brighter one -- at density");
 console.log("  ----  0.6 the engine now draws the 0.300% of cells it asks for instead of 0.131%, and each star");
 console.log("  ----  reaches full brightness instead of 0.60. Nobody had a reference to prefer the old one by.");
+REPORT.write();
 if (fails) { console.log("\n[skyStars-selfcheck] FAILED " + fails); process.exit(1); }
 console.log("\n[skyStars-selfcheck] all passed");

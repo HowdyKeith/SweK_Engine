@@ -89,12 +89,16 @@ console.log("\n2. EVERY VERDICT IS RE-DERIVED FROM THE RECORD'S NUMBERS AND THE 
         console.log(`     ${String(t.row.speedGain).padEnd(5)} noLap ${t.noLap ? "y" : "n"}  overLap ` +
                     `${t.overLap ? "y" : "n"}  off ${(100 * t.offRate).toFixed(2)}%  ->  ` +
                     `${t.shouldPass ? "accept" : "refuse"}   record: ${t.row.verdict}`);
-    REPORT.table("the eight speed-gain candidates, re-adjudicated from the record's own numbers",
-        ["speed gain", "no lap", "over lap bound", "off-asphalt %", "verdict"],
-        table.map((t) => [t.row.speedGain, t.noLap, t.overLap, 100 * t.offRate, t.shouldPass ? "accept" : "refuse"]),
-        "re-derived from MEASURED_V4527's rows against LAP_BOUND and OFF_BOUND as raceKnob.mjs exports them " +
-        "today, not read off the stored verdict strings.");
-    REPORT.write();
+    // *** v4558 -- THE ADJUDICATION TABLE USED TO DIE WITH THE TERMINAL. *** gateReport-selfcheck's ratchet
+    // names every gate that prints rows of numbers and emits nothing a second reader can open; this was one
+    // of five arrivals. The rates go out as NUMBERS and the verdicts as the strings they are.
+    REPORT.table("each candidate against the bounds the record cites",
+                 ["speed gain", "no lap", "over lap bound", "worst off-road rate", "over off bound",
+                  "rule says", "record says"],
+                 table.map((t) => [t.row.speedGain, t.noLap, t.overLap, t.offRate, t.overOff,
+                                   t.shouldPass ? "accept" : "refuse", t.row.verdict]),
+                 `LAP_BOUND ${R.LAP_BOUND} s, OFF_BOUND ${R.OFF_BOUND} of ${M.samples} wheel samples, both ` +
+                 "read from the module rather than typed here");
     ok("!! *** accepted EXACTLY when no bound is broken, refused exactly when one is ***",
        table.every((t) => t.shouldPass === (t.row.verdict === "accepted")),
        `LAP_BOUND ${R.LAP_BOUND} s, OFF_BOUND ${100 * R.OFF_BOUND}% of ${M.samples} wheel samples. Raise ` +
@@ -154,5 +158,6 @@ console.log("  ----  is why that gate is 33 s and outside the sweep. What is hel
 console.log("  ----  consistent with itself and with LAP_BOUND, OFF_BOUND, KEY_SECONDS and CANDIDATES as this");
 console.log("  ----  module exports them TODAY -- so a change to a bound cannot leave the record's stated");
 console.log("  ----  reasons behind without anything saying so.");
+REPORT.write();
 if (fails) { console.log("\n[raceKnob-selfcheck] FAILED " + fails); process.exit(1); }
 console.log("\n[raceKnob-selfcheck] all passed");

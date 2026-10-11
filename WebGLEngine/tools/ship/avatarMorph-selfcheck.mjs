@@ -1,6 +1,7 @@
 // WebGLEngine/tools/ship/avatarMorph-selfcheck.mjs -- v4112
 //
-// Run: node tools/ship/avatarMorph-selfcheck.mjs   (~0.2s; no browser, no GPU, no camera)
+// Run: node tools/ship/avatarMorph-selfcheck.mjs   (~0.105s MEASURED at v4580, median of 102/105/108 alone on
+//   this box, superseding a stated ~0.2s that carried no measurement at all; no browser, no GPU, no camera)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // GATES the chain that puts a named expression on the 3D avatar's face:

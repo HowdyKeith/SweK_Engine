@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/benchBridge-selfcheck.mjs -- v2805
 //
-// Run: node tools/ship/benchBridge-selfcheck.mjs   (~8.4s — MEASURED v3941, was ~20s; it runs a real mesh benchmark through the bridge)
+// Run: node tools/ship/benchBridge-selfcheck.mjs   (~14.6s — re-measured v4804: 10.3 s-11.0 s alone, 20.2 s the sweep's serial median; it read ~8.4s — MEASURED v3941, was ~20s; it runs a real mesh benchmark through the bridge)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // GATES ai-bridge/benchBridge.js + benchmarks.html -- the front door for the two measurement tools that were

@@ -89,12 +89,14 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
+// rig run 12 (option a): the two-backend launches take PARITY_ARGS, and rows that hold a backend to a model of SwiftShader's
+// rasterisation go through softwareClaims -- asserted on software, reported on a GPU (tools/ship/webgpuHarness.mjs)
+import { runInEngineOrigin, webgpuSkipReason, PARITY_ARGS, softwareClaims } from "./webgpuHarness.mjs";
 import http from "node:http";
 import { createRequire } from "node:module";
-import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import { validateWgsl } from "../../render/wgslSpec.mjs";
-import { varyingSemantics, transplantIntoShell, vertexDisplacement } from "../../render/tslSource.mjs";
+import { varyingSemantics, transplantIntoShell, vertexDisplacement, stampThreeRevision } from "../../render/tslSource.mjs";
 import { lyapunovLookShell, heidlerSpriteShell, heidlerSpriteHand, spriteAtlasShell, spriteSampledShell, spriteSampledHand, inkLookShell, inkHand } from "../../render/fleetTsl.mjs";
 import { RACES, SPRITE_WGSL, SPRITE_VERTEX_GLSL, INK_WGSL, INK_VERTEX_GLSL } from "../../render/fleets.mjs";
 
@@ -127,7 +129,7 @@ const skip = webgpuSkipReason();
 if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
 else {
     const CHAOS = RACES.findIndex((x) => x.name === "Chaos");
-    const r = await runInEngineOrigin({ engineRoot: ENG, args: { N: 192, CHAOS }, script: `async (a) => {
+    const r = await runInEngineOrigin({ launchArgs: PARITY_ARGS, engineRoot: ENG, args: { N: 192, CHAOS }, script: `async (a) => {
         const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
         const P = await import("/render/fleetTsl.mjs"); const S = await import("/render/tslSource.mjs"); const G = await import("/render/gpuDriven.mjs"); const F = await import("/render/fleets.mjs"); const { requestDevice } = await import("/gfx/device.js");
         const em = {};
@@ -157,13 +159,17 @@ else {
     ok("the harness ran both backends", r.ok && r.result && r.result.webgpu && r.result.webgl2 && !r.result.webgpu.error && !r.result.webgl2.error, r.ok ? JSON.stringify([r.result.webgpu && r.result.webgpu.error, r.result.webgl2 && r.result.webgl2.error]) : (r.reason || (r.pageErrors || []).join("; ")));
     if (r.ok && r.result.webgpu && !r.result.webgpu.error && !r.result.webgl2.error) {
         const R = r.result;
-        // v4554 -- the literal nodeVaryingN numbers are three's own internal node-id counter, not a stability
-        // guarantee (measured: r178 said nodeVarying3/4/5, r185 says nodeVarying4/5/6 for this same graph) -- the
-        // claim is what each varying MEANS, which lines 325 and 522 below already check by value for this reason.
-        ok("three's vertex stage carried three varyings and said what each is: uv, normal, color", JSON.stringify(Object.values(R.sem)) === JSON.stringify(["uv", "normal", "color"]), JSON.stringify(R.sem));
+        // v4541: this named the three varyings nodeVarying3/4/5, and r184 numbers them 4/5/6 -- three's counter, not
+        // a fact about the graph. What IS a fact about the graph is that the vertex carries three varyings, in that
+        // order, and that this file read what each one is; the names are three's to choose and are asserted only to
+        // be three's own generated form. (The fixture rows above still pin r178's numbers, because a fixture is a
+        // recorded text and its numbers are part of what it records.)
+        ok("three's vertex stage carried three varyings and said what each is: uv, normal, color -- in that order, under whatever numbers three's counter is on", Object.values(R.sem).join() === "uv,normal,color" && Object.keys(R.sem).every((k) => /^nodeVarying\d+$/.test(k)), JSON.stringify(R.sem));
+        const SW = softwareClaims(ok, r);
         for (const b of ["webgpu", "webgl2"]) { const o = R[b];
-            ok(`*** ${b}: the Chaos race drawn by the pipeline three GENERATED is the hand-written Chaos race on EVERY pixel (${o.same} of ${o.total}, worst 0), lit and among the other races ***`, o.backend === b && o.same === o.total && o.worst === 0 && o.lit > 500 && o.errs.length === 0, `${o.same}/${o.total}, worst ${o.worst}, ${o.lit} lit; errors ${o.errs.length}`);
+            SW(`*** ${b}: the Chaos race drawn by the pipeline three GENERATED is the hand-written Chaos race on EVERY pixel (${o.same} of ${o.total}, worst 0), lit and among the other races ***`, o.backend === b && o.same === o.total && o.worst === 0 && o.lit > 500 && o.errs.length === 0, `${o.same}/${o.total}, worst ${o.worst}, ${o.lit} lit; errors ${o.errs.length}`);
             ok(`  ${b}: the pick still names the Chaos ships (the pick pipeline is the fleet's own)`, o.chaosHits > 200, `${o.chaosHits} pixels name Chaos`); }
+        SW.held(2);
         // *** v4566 -- MERGED, NOT REPLACED, FOR THE REASON SECTIONS 5 TO 8 ARE ALREADY MERGED. ***
         // This section wrote the whole file and sections 5-8 then merged their keys back into what it left, so the
         // file's contents were "section 1, plus whichever later sections reached their own write THIS RUN". That is
@@ -182,7 +188,7 @@ else {
         // writer paid for -- inside one process instead of across two. The repair is the one that file took: merge
         // by key, so a section that did not run this time keeps what it wrote last time.
         const prior = fs.existsSync(EMITTED) ? JSON.parse(fs.readFileSync(EMITTED, "utf8")) : {};
-        fs.writeFileSync(EMITTED, JSON.stringify({ ...prior, generatedFrom: "tools/ship/tslRace-selfcheck.mjs", at: "v4322", three: "0.178.0", note: "the Lyapunov look as three's node builders emitted it from render/physicsTsl.mjs makeLyapunovLookTsl, and as render/tslSource.mjs transplanted it into the look's own shell; rewritten by tools/ship/tslRace-selfcheck.mjs on every run, MERGED BY KEY (v4566) so a section that does not reach its write keeps its last reading instead of losing it", ...R.emitted, transplanted: R.transplanted }, null, 1));
+        fs.writeFileSync(EMITTED, JSON.stringify(stampThreeRevision({ ...prior, generatedFrom: "tools/ship/tslRace-selfcheck.mjs", at: "v4322", note: "the Lyapunov look as three's node builders emitted it from render/physicsTsl.mjs makeLyapunovLookTsl, and as render/tslSource.mjs transplanted it into the look's own shell; rewritten by tools/ship/tslRace-selfcheck.mjs on every run, MERGED BY KEY (v4566) so a section that does not reach its write keeps its last reading instead of losing it", ...R.emitted, transplanted: R.transplanted }), null, 1));
         ok("the emitted and transplanted look is written to tools/ship/tsl-emitted-race.json for the WGSL corpus", fs.existsSync(EMITTED));
         // The merge is the fix, so it is the thing asserted: the keys the LATER sections own must survive this write.
         // (On the very first run of a fresh tree there are none, which is why the row states what it found.)
@@ -203,11 +209,18 @@ else {
     await new Promise((r) => srv.listen(0, "127.0.0.1", r));
     // the page PRESENTS to a canvas, which loses a WebGPU device on this headless shell (measured at v4319 and again here), so the page
     // is loaded on the WebGL2 route as every other page gate loads its page: three's WebGL backend emits GLSL, and the swap is graded there
-    const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+    const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
     const pg = await br.newPage({ viewport: { width: 640, height: 480 } }); const errs = []; pg.on("pageerror", (e) => errs.push(String(e).slice(0, 200)));
     await pg.goto(`http://127.0.0.1:${srv.address().port}/?tsl=1&history=0`, { waitUntil: "load" }); await pg.waitForTimeout(6000);
     const st = await pg.evaluate(() => ({ route: document.getElementById("route").textContent, tsl: window.__universe && window.__universe.tslLook, races: document.getElementById("races").textContent }));
-    const chaosPixels = await pg.evaluate(async (CH) => { try { const pk = await window.__lifeScene.pickPicture(); let n = 0; for (const h of pk.hits) if (h && h.fleet === CH) n++; return n; } catch (e) { return "pick failed: " + e.message; } }, RACES.findIndex((x) => x.name === "Chaos"));
+    // v4822 -- THE PICK IS TAKEN UP TO SIX TIMES, 1.5 s APART, AND THE ROW IS THE FIRST ONE THAT NAMES A CHAOS SHIP. The page's Chaos fleet is ONE to THREE pixels of a
+    // 640x480 pick (measured: 30 picks across six page loads read 0-3, five of them 0 -- the fleets move, and a ship that is a pixel across is sometimes between pixels), so a
+    // single pick at 6 s was a coin that landed tails about one run in eight on main and oftener under load. The claim is "the pick pipeline still names Chaos", not "it names
+    // it at an instant"; a pick pipeline that never names Chaos is six zeros and still red (sabotage Q).
+    const chaosIdx = RACES.findIndex((x) => x.name === "Chaos"), pickSeries = [];
+    const pickOnce = () => pg.evaluate(async (CH) => { try { const pk = await window.__lifeScene.pickPicture(); let n = 0; for (const h of pk.hits) if (h && h.fleet === CH) n++; return n; } catch (e) { return "pick failed: " + e.message; } }, chaosIdx);
+    let chaosPixels = await pickOnce(); pickSeries.push(chaosPixels);
+    for (let k = 0; k < 5 && !(chaosPixels > 0); k++) { await pg.waitForTimeout(1500); chaosPixels = await pickOnce(); pickSeries.push(chaosPixels); }
     // v4327 -- the same page with &soft=1: the Glyph race's look sampled through the shell's sampler instead of fetched
     const pg2 = await br.newPage({ viewport: { width: 640, height: 480 } }); const errs2 = []; pg2.on("pageerror", (e) => errs2.push(String(e).slice(0, 200)));
     await pg2.goto(`http://127.0.0.1:${srv.address().port}/?tsl=1&soft=1&history=0`, { waitUntil: "load" }); await pg2.waitForTimeout(6000);
@@ -216,7 +229,7 @@ else {
     ok("*** the page says the Chaos look is GENERATED (a TSL graph, three's language for the backend it is on) and records that the fleet's pipeline IS the generated descriptor ***", !!(st.tsl && st.tsl.language) && st.tsl.applied === true && /GENERATED/.test(st.route), st.route);
     ok("  the language emitted is the device's backend's (WGSL on WebGPU, GLSL on WebGL2)", st.tsl && ((/webgpu/.test(st.route) && st.tsl.language === "wgsl") || (/webgl2/.test(st.route) && st.tsl.language === "glsl")), st.tsl && st.tsl.language);
     ok("  the page threw nothing", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
-    ok("  and the identity picture still names Chaos ships (the pick pipeline is the fleet's own; the generated one only paints)", chaosPixels > 0, `${chaosPixels} pixels name Chaos`);
+    ok("  and the identity picture still names Chaos ships (the pick pipeline is the fleet's own; the generated one only paints)", chaosPixels > 0, `${chaosPixels} pixels name Chaos (picks: ${pickSeries.join(", ")})`);
     // v4325 -- the same page, the SECOND shell: the Pixel race's sprite quad painted by the lightning graph
     ok("*** the page also draws the Glyph race's OWN shipped look from a graph, the atlas crossing into the shell it binds ***", !!(st.tsl && st.tsl.atlas) && st.tsl.atlas.applied === true && st.tsl.atlas.textures.join() === "atlas" && st.tsl.atlas.shell === "sprite (atlas)", st.tsl && JSON.stringify(st.tsl.atlas));
     // v4329 -- THE FRONT DOOR OFFERS WHAT THIS SECTION PROVES. The variants above are QUERY STRINGS, which the
@@ -250,7 +263,7 @@ console.log("\n4. THE VERTEX STAGE (v4324): a graph that MOVES the hull -- three
 if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
 else {
     const CHAOS = RACES.findIndex((x) => x.name === "Chaos");
-    const r = await runInEngineOrigin({ engineRoot: ENG, args: { N: 192, CHAOS, AMP: 0.12 }, script: `async (a) => {
+    const r = await runInEngineOrigin({ launchArgs: PARITY_ARGS, engineRoot: ENG, args: { N: 192, CHAOS, AMP: 0.12 }, script: `async (a) => {
         const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
         const P = await import("/render/fleetTsl.mjs"); const S = await import("/render/tslSource.mjs"); const G = await import("/render/gpuDriven.mjs"); const F = await import("/render/fleets.mjs"); const { requestDevice } = await import("/gfx/device.js");
         const em = {};
@@ -284,9 +297,11 @@ else {
     if (r.ok && r.result.webgpu && !r.result.webgpu.error && !r.result.webgl2.error) {
         const R = r.result;
         ok("three put the position node in the VERTEX stage as one statement on positionLocal, and the transplant took it", R.statement && R.statement.length === 1 && /object\.amp/.test(R.statement[0]) && R.webgpu.displaced && R.webgl2.displaced, R.statement && R.statement[0]);
+        const SW = softwareClaims(ok, r);
         for (const b of ["webgpu", "webgl2"]) { const o = R[b];
             ok(`*** ${b}: the Chaos race BREATHING by the generated vertex stage is the hand-written twin's picture on EVERY pixel (${o.same} of ${o.total}, worst 0), and it moved (${o.moved} pixels differ from the still race) ***`, o.backend === b && o.twinHasHand && o.same === o.total && o.worst === 0 && o.moved > 500 && o.errs.length === 0, `${o.same}/${o.total}, worst ${o.worst}, ${o.moved} moved; errors ${o.errs.length}`);
-            ok(`  ${b}: with amp 0 the generated vertex stage draws the still race exactly (the displacement is the only difference)`, o.stillSame === o.total, `${o.stillSame}/${o.total}`); }
+            SW(`  ${b}: with amp 0 the generated vertex stage draws the still race exactly (the displacement is the only difference)`, o.stillSame === o.total, `${o.stillSame}/${o.total}`); }
+        SW.held(2);
     }
 }
 
@@ -612,6 +627,22 @@ else {
 //   Q  the ?tsl=1&soft=1 link in server.html's Render TSL panel replaced with the plain page -> exit=1, 1 red, by name. A mode of a
 //      page that no link reaches is reachable only by somebody who already knows it exists, which is the whole of pageReach's case.
 //   (P and R are in tools/ship/tslPhysics-selfcheck.mjs and tools/ship/pageSections-selfcheck.mjs, the gates that own those claims.)
+// MEASURED at v4541 (the host-shell path under r184). Applied to render/tslSource.mjs, this gate run, red count
+// read, source and emitted json restored and md5-verified. Baseline 0 red.
+//   Y  the host-shell transplant carrying no declarations -> 5 red: r184 moved three's temporaries out of the entry
+//      point, and without them every generated pipeline is refused at encode time on both backends. Third path, same
+//      change; transplantFragment got it at v4540 and transplantCompute in this round.
+//   AA varyingSemantics' WGSL filter removed -> 4 red, every row that reads what the vertex carries. three writes its
+//      clip-space position into the SAME struct as the varyings; r178 spelled that member `Vertex` and this file
+//      skipped it BY NAME, r184 spells it `builtinClipSpace` and it came through as a fourth varying carrying
+//      "VERTEX_v_modelViewProjection". The filter is structural now -- a varying is a member the vertex's own return
+//      struct declares at an @location, the clip-space one is @builtin(position) -- and the name test is gone.
+//   MEASURED at v4822 (the pick row, made robust):
+//   Q  render/gpuDriven.mjs pickPicture(): every hit decoded as null (the pick names nothing) -> exit=1, 11 red: the page's "identity picture still names Chaos ships"
+//      with picks 0, 0, 0, 0, 0, 0 (six zeros are still red, so the retry reads a pipeline that is working late and not one that is not working), and the ten per-backend
+//      pick rows of sections 2, 4, 5 and 6 (Chaos, Pixel, Krbn on webgpu and webgl2). Unsabotaged, eight runs in a row were green, two of them needing the second pick.
+//   FINDING (v4822): the row failed in about one run in eight on main with no change of mine in it, because the page's Chaos fleet is 1 to 3 pixels of the pick.
+//   No 0-RED.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the LOOK_KNOBS baked into the TSL Loop where the WGSL reads them at run time (the fleet binds the same numbers, " +
     "so the pictures agree; a page turning the knobs would need a new graph); a MIPPED or anisotropic sample (the device makes one sampler per filter mode, repeat " +

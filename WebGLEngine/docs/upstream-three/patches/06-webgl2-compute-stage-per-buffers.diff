@@ -1,0 +1,65 @@
+diff --git a/src/renderers/common/Pipelines.js b/src/renderers/common/Pipelines.js
+index 9275f9f..7440913 100644
+--- a/src/renderers/common/Pipelines.js
++++ b/src/renderers/common/Pipelines.js
+@@ -106,14 +106,17 @@ class Pipelines extends DataMap {
+ 
+ 			// programmable stage
+ 
+-			let stageCompute = this.programs.compute.get( nodeBuilderState.computeShader );
++			const stageKey = this._getComputeStageKey( nodeBuilderState );
++
++			let stageCompute = this.programs.compute.get( stageKey );
+ 
+ 			if ( stageCompute === undefined ) {
+ 
+ 				if ( previousPipeline && previousPipeline.computeProgram.usedTimes === 0 ) this._releaseProgram( previousPipeline.computeProgram );
+ 
+ 				stageCompute = new ProgrammableStage( nodeBuilderState.computeShader, 'compute', computeNode.name, nodeBuilderState.transforms, nodeBuilderState.nodeAttributes );
+-				this.programs.compute.set( nodeBuilderState.computeShader, stageCompute );
++				stageCompute.cacheKey = stageKey;
++				this.programs.compute.set( stageKey, stageCompute );
+ 
+ 				backend.createProgram( stageCompute );
+ 				this.info.createProgram( stageCompute );
+@@ -419,6 +422,31 @@ class Pipelines extends DataMap {
+ 
+ 	}
+ 
++	/**
++	 * Returns the key a compute stage is cached by. Stages that bind buffers
++	 * by transform feedback (WebGL 2) carry the attributes they read and write,
++	 * so two compute nodes that compile to the same code but use different
++	 * buffers need different stages. Other stages are shared by code.
++	 *
++	 * @private
++	 * @param {NodeBuilderState} nodeBuilderState - The compute node's builder state.
++	 * @return {string} The cache key.
++	 */
++	_getComputeStageKey( nodeBuilderState ) {
++
++		const { computeShader, transforms, nodeAttributes } = nodeBuilderState;
++
++		if ( ! transforms || transforms.length === 0 ) return computeShader;
++
++		const ids = [];
++
++		for ( const transform of transforms ) ids.push( transform.attributeNode.id );
++		for ( const nodeAttribute of nodeAttributes ) ids.push( nodeAttribute.node.id );
++
++		return computeShader + '\n// ' + ids.join( ',' );
++
++	}
++
+ 	/**
+ 	 * Computes a cache key representing a render pipeline.
+ 	 *
+@@ -454,7 +482,7 @@ class Pipelines extends DataMap {
+ 	 */
+ 	_releaseProgram( program ) {
+ 
+-		const code = program.code;
++		const code = program.cacheKey !== undefined ? program.cacheKey : program.code;
+ 		const stage = program.stage;
+ 
+ 		this.programs[ stage ].delete( code );

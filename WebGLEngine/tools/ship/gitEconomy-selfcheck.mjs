@@ -51,7 +51,7 @@ import path from "node:path";
 import http from "node:http";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import { makeGitEconomy, marketsOf, goodOf, GOODS, reprice, PRICE_FLOOR, PRICE_CEIL, BASE, RECIPES, DEFAULTS } from "../../world/gitEconomy.mjs";
 import { buildOrrery } from "../../world/orrery.mjs";
 import { traders } from "../../world/traderGraph.mjs";
@@ -227,14 +227,15 @@ console.log("\n2. A HUNDRED DAYS OF LIFE, ACCOUNTED FOR TO THE UNIT");
 console.log("\n3. THE PAGE: LIFE ON, THE LOG MOVES, AND THE POINTER NAMES A TRADER OR A BODY");
 {
     const pw = resolvePlaywright(createRequire(import.meta.url));
-    if (!pw || !fs.existsSync(HEADLESS_SHELL)) { console.log("  SKIP  no browser"); fails++; }
+    // v4778 rig: `!pw` is never true -- resolvePlaywright returns an object; the field is pw.chromium
+    if (!pw.chromium || !fs.existsSync(HEADLESS_SHELL)) { console.log("  SKIP  no browser -- " + (browserSkipReason(pw.chromium, pw.from, HEADLESS_SHELL) || "no headless shell")); fails++; }
     else {
         const MIME = { ".js": "text/javascript", ".mjs": "text/javascript", ".html": "text/html", ".json": "application/json" };
         const srv = http.createServer((q, s2) => { const u = decodeURIComponent(String(q.url).split("?")[0]); const f = path.join(ENG, u === "/" ? "orrery-gpu.html" : u);
             if (!f.startsWith(ENG) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { s2.writeHead(404); return s2.end("no"); }
             s2.writeHead(200, { "Content-Type": MIME[path.extname(f)] || "application/octet-stream" }); s2.end(fs.readFileSync(f)); });
         await new Promise((r) => srv.listen(0, "127.0.0.1", r));
-        const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
         const pg = await br.newPage({ viewport: { width: 800, height: 600 } }); const errs = []; pg.on("pageerror", (e) => errs.push(String(e).slice(0, 200)));
         await pg.goto(`http://127.0.0.1:${srv.address().port}/`, { waitUntil: "load" }); await pg.waitForTimeout(2500);
         const log1 = await pg.evaluate(() => document.getElementById("trade").textContent); await pg.waitForTimeout(2500);

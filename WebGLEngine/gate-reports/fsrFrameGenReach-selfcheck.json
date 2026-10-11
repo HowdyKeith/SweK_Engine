@@ -1,0 +1,95 @@
+{
+ "gate": "fx/fsr/fsrFrameGenReach-selfcheck.mjs",
+ "at": "2026-09-29",
+ "tables": [
+  {
+   "title": "the fill's radius alone against reaching 16: dB and pixels left black",
+   "columns": [
+    "case",
+    "vectors dB",
+    "vectors black",
+    "vectors reaching 16 dB",
+    "...black",
+    "flow dB",
+    "flow black",
+    "flow reaching 16 dB",
+    "...black"
+   ],
+   "rows": [
+    [
+     "wideSlow",
+     36.98277509856036,
+     0,
+     36.98277509856036,
+     0,
+     28.248934711125674,
+     81,
+     36.15232772637079,
+     0
+    ],
+    [
+     "scroll13",
+     22.885117019303713,
+     274,
+     27.825301056035848,
+     0,
+     23.020037247369544,
+     333,
+     31.374043338706787,
+     0
+    ],
+    [
+     "wide13",
+     22.286080476266804,
+     274,
+     27.797786543185858,
+     0,
+     20.814716341641525,
+     489,
+     31.054516642335553,
+     0
+    ],
+    [
+     "pan24",
+     15.19938841528748,
+     1721,
+     20.685253954427125,
+     164,
+     15.663565173063734,
+     1288,
+     19.148635952333052,
+     0
+    ]
+   ],
+   "note": null
+  },
+  {
+   "title": "the fill's time, the median of five, this device's ms",
+   "columns": [
+    "holes",
+    "radius alone ms",
+    "reaching 16 ms"
+   ],
+   "rows": [
+    [
+     "none",
+     4.7000000001862645,
+     5.300000000279397
+    ],
+    [
+     "a tenth",
+     58.700000000186265,
+     78.89999999990687
+    ],
+    [
+     "all",
+     109.1999999997206,
+     "not timed"
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

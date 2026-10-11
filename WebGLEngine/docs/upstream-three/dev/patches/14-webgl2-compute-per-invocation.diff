@@ -1,0 +1,95 @@
+diff --git a/src/renderers/webgl-fallback/WebGLBackend.js b/src/renderers/webgl-fallback/WebGLBackend.js
+index 4f109bf..6d63d74 100644
+--- a/src/renderers/webgl-fallback/WebGLBackend.js
++++ b/src/renderers/webgl-fallback/WebGLBackend.js
+@@ -940,7 +940,9 @@ class WebGLBackend extends Backend {
+ 
+ 		const { programGPU, transformBuffers, attributes } = this.get( pipeline );
+ 
+-		const vaoGPU = this.vertexArrayUtils.getVAO( pipeline, attributes );
++		// a compute reads every buffer once per invocation, whatever the buffer's class
++
++		const vaoGPU = this.vertexArrayUtils.getVAO( pipeline, attributes, true );
+ 
+ 		state.setVertexState( vaoGPU );
+ 
+@@ -969,15 +971,10 @@ class WebGLBackend extends Backend {
+ 
+ 		}
+ 
+-		if ( attributes[ 0 ].isStorageInstancedBufferAttribute ) {
+-
+-			gl.drawArraysInstanced( gl.POINTS, 0, 1, count );
+-
+-		} else {
+-
+-			gl.drawArrays( gl.POINTS, 0, count );
++		// one point, an instance per invocation: every attribute steps once per instance (see WebGLVertexArrayUtils), and
++		// instanceIndex is gl_InstanceID whichever class the first buffer is
+ 
+-		}
++		gl.drawArraysInstanced( gl.POINTS, 0, 1, count );
+ 
+ 		gl.endTransformFeedback();
+ 		gl.bindTransformFeedback( gl.TRANSFORM_FEEDBACK, null );
+diff --git a/src/renderers/webgl-fallback/utils/WebGLVertexArrayUtils.js b/src/renderers/webgl-fallback/utils/WebGLVertexArrayUtils.js
+index 46bf163..60fcbf7 100644
+--- a/src/renderers/webgl-fallback/utils/WebGLVertexArrayUtils.js
++++ b/src/renderers/webgl-fallback/utils/WebGLVertexArrayUtils.js
+@@ -38,9 +38,10 @@ class WebGLVertexArrayUtils {
+ 	 *
+ 	 * @param {RenderObject|ComputePipeline} owner - The render object or compute pipeline using the VAO.
+ 	 * @param {Array<BufferAttribute>} attributes - An array of buffer attributes.
++	 * @param {boolean} [perInvocation=false] - Whether every attribute steps once per instance, as a compute reads them.
+ 	 * @return {WebGLVertexArrayObject} The VAO.
+ 	 */
+-	getVAO( owner, attributes ) {
++	getVAO( owner, attributes, perInvocation = false ) {
+ 
+ 		const backend = this.backend;
+ 		const ownerData = backend.get( owner );
+@@ -69,6 +70,10 @@ class WebGLVertexArrayUtils {
+ 
+ 		}
+ 
++		// a compute's VAO steps every attribute per instance, so it is not shared with a draw's
++
++		if ( perInvocation === true ) key += ':compute';
++
+ 		// get cache entry
+ 
+ 		let entry = this.cache.get( key );
+@@ -97,7 +102,7 @@ class WebGLVertexArrayUtils {
+ 
+ 		if ( vaoGPU === undefined ) {
+ 
+-			vaoGPU = this._createVAO( attributes );
++			vaoGPU = this._createVAO( attributes, perInvocation );
+ 
+ 			entry.vaos.set( variant, vaoGPU );
+ 
+@@ -210,9 +215,10 @@ class WebGLVertexArrayUtils {
+ 	 *
+ 	 * @private
+ 	 * @param {Array<BufferAttribute>} attributes - An array of buffer attributes.
++	 * @param {boolean} [perInvocation=false] - Whether every attribute steps once per instance, as a compute reads them.
+ 	 * @return {WebGLVertexArrayObject} The VAO.
+ 	 */
+-	_createVAO( attributes ) {
++	_createVAO( attributes, perInvocation = false ) {
+ 
+ 		const { gl, state } = this.backend;
+ 
+@@ -252,7 +258,11 @@ class WebGLVertexArrayUtils {
+ 
+ 			}
+ 
+-			if ( attribute.isInstancedBufferAttribute && ! attribute.isInterleavedBufferAttribute ) {
++			if ( perInvocation === true ) {
++
++				gl.vertexAttribDivisor( i, 1 );
++
++			} else if ( attribute.isInstancedBufferAttribute && ! attribute.isInterleavedBufferAttribute ) {
+ 
+ 				gl.vertexAttribDivisor( i, attribute.meshPerAttribute );
+ 

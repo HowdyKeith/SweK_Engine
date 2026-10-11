@@ -34,6 +34,7 @@
 "use strict";
 const fs = require("fs");
 const path = require("path");
+const os = require("os");   // v4676b -- the resolver probe is written to the OS temp dir, never into the clone
 const net = require("net");
 const http = require("http");
 const { spawn } = require("child_process");
@@ -47,7 +48,8 @@ const isMac = process.platform === "darwin";
 // One run at a time. Two clones into the same parent would race on the same `.tmp` directory, and two verifies
 // would halve each other on a box that is also serving this page.
 const R = {
-    phase: "idle",          // idle | cloning | verifying | done
+    phase: "idle",          // idle | cloning | provisioning | verifying | publishing | done
+    provision: null,        // v4676 -- the last run's provisioning result, so status() can show it
     startedAt: 0, finishedAt: 0,
     log: "",
     clone: null,            // the cloneEngineSource result
@@ -68,12 +70,16 @@ function status() {
     return {
         ok: true,
         phase: R.phase,
-        running: R.phase === "cloning" || R.phase === "verifying" || R.phase === "publishing",
+        running: R.phase === "cloning" || R.phase === "provisioning" || R.phase === "verifying" || R.phase === "publishing",
         startedAt: R.startedAt, finishedAt: R.finishedAt,
         clone: R.clone ? { version: R.clone.version, path: R.clone.path, repo: R.clone.repo,
                            auth: R.clone.auth, tokenRejected: !!R.clone.tokenRejected } : null,
         verified: R.verified,
         verifyExit: R.verifyExit,
+        // v4676b -- REPORTED, because a field written and never read is a field nobody can act on. Its own
+        // comment said status() shows it while status() did not, which is prose describing a guard that is
+        // not there -- the species this session has now found five times.
+        provision: R.provision,
         error: R.error,
         publish: R.publish,
         launched: R.launched,
@@ -98,7 +104,9 @@ function status() {
  */
 function canPublish(st) {
     const s = st || R;
-    if (s.phase === "cloning" || s.phase === "verifying") return { ok: false, why: "the chain is still running" };
+    // v4676 -- "provisioning" joins the two, for the reason this file's v4451 note gives about publish:
+    // a phase that no guard names is a window in which the guard is not there.
+    if (s.phase === "cloning" || s.phase === "provisioning" || s.phase === "verifying") return { ok: false, why: "the chain is still running" };
     // v4451 -- and while a publish is in flight, which was admissible until this round: publish() set no phase
     // at all, so a second press during the upload passed every precondition the first one had.
     if (s.phase === "publishing") return { ok: false, why: "a publish is already in flight" };
@@ -118,29 +126,220 @@ function _versionInTree(root) {
     } catch { return ""; }
 }
 
+// *** v4583 -- THIS RUNS THE WHOLE GATE SUITE WITH NO TIME LIMIT AT ALL, AND THAT IS DELIBERATE NOW. ***
+//
+// _spawnIn spawns tools/ship/verify.mjs inside a freshly cloned tree -- every gate in that tree, under this
+// process. It carries no timeout and never did. tools/ship/runnerBudget-selfcheck.mjs admitted this file into its
+// candidate set only because of an unrelated `timeout: 1500` on an HTTP health probe, then excluded it again for
+// not containing the string "-selfcheck": it spawns the SUITE RUNNER, one level of indirection past that proxy.
+// So the absence was never a decision anybody made; it was invisible from both sides.
+//
+// IT STAYS ABSENT, AND THE REASON IS THE ONE ship.mjs GOT WRONG. A cap here would kill a verify mid-run, and a
+// killed child's buffered stdout never flushes -- ship.mjs's v3936 note records exactly that, a 923-second ritual
+// against a 900-second cap reporting "selfchecks said NO:" with nothing after the colon. This chain's whole job is
+// to say whether a FETCHED tree is green, on a machine nobody has characterised, where gateBudget.MEASURED's tail
+// sums to 266 minutes. A WRONG CAP HERE TURNS A SLOW CLONE INTO A RED VERDICT, which is the one outcome this
+// bridge must never invent. The operator can stop it; the code will not guess.
+const budgetIsOwn =
+    "no time limit, on purpose. This spawns tools/ship/verify.mjs over a freshly cloned tree -- every gate in it " +
+    "-- on a machine whose speed nobody has measured, where gateBudget.MEASURED's tail alone sums to 266 minutes. " +
+    "A cap would kill the verify mid-run and report an unreadable verdict (ship.mjs's v3936 note: a killed child's " +
+    "buffered stdout never flushes), turning a slow clone into a RED tree. That is the exact failure this chain " +
+    "exists to prevent, so the decision is to run to completion and let the operator stop it.";
+
 /** Spawn a node script inside a given tree's WebGLEngine and resolve with its exit code. */
-function _spawnIn(cwd, args, label) {
+function _spawnIn(cwd, args, label) { return _spawnCmd(process.execPath, args, cwd, label); }
+
+/**
+ * v4676 -- the same streaming spawn, with the BINARY as a parameter, so provisioning reports into this
+ * chain's log exactly as the verify does. _spawnIn kept its name and signature and is now one line.
+ */
+function _spawnCmd(cmd, args, cwd, label, extra) {
     return new Promise((resolve) => {
-        let child;
+        let child, settled = false, timer = null;
+        const done = (v) => { if (settled) return; settled = true; if (timer) clearTimeout(timer); resolve(v); };
         try {
-            child = spawn(process.execPath, args, { cwd, windowsHide: true });
+            child = spawn(cmd, args, Object.assign({ cwd, windowsHide: true }, extra || {}));
         } catch (e) {
             push("[" + label + "] spawn failed: " + ((e && e.message) || e) + "\n");
-            return resolve({ code: -1, spawnError: String((e && e.message) || e) });
+            return done({ code: -1, spawnError: String((e && e.message) || e) });
         }
-        child.on("error", (e) => { push("[" + label + "] error: " + ((e && e.message) || e) + "\n"); });
+        // *** v4676b -- "error" RESOLVES, AND UNTIL THIS ROUND IT ONLY LOGGED. ***
+        // node emits "error" and NOT "exit" when the binary does not exist, so a promise that settles only on
+        // "exit" NEVER SETTLES for ENOENT. Measured: a spawn of a missing binary fires error(ENOENT) and the
+        // promise is still pending three seconds later. That was harmless while this helper only ever ran
+        // process.execPath, which is by definition present -- v4676 pointed it at `npm`, which is not, and
+        // turned a latent shape into a live hang that would pin the chain in "provisioning" with every guard
+        // closed until the bridge was restarted. Found by an adversarial review of v4676's own diff.
+        child.on("error", (e) => {
+            push("[" + label + "] error: " + ((e && e.message) || e) + "\n");
+            done({ code: -1, spawnError: String((e && e.message) || e) });
+        });
         if (child.stdout) child.stdout.on("data", push);
         if (child.stderr) child.stderr.on("data", push);
-        child.on("exit", (code) => resolve({ code }));
+        let timedOut = false;
+        child.on("exit", (code) => done(timedOut ? { code, timedOut: true, killed: true } : { code }));
+        // A timeout is right HERE and wrong for the verify -- see budgetIsOwn above. This one bounds a
+        // download, not a test suite: a stalled npm otherwise holds canPublish() closed indefinitely, and
+        // "the release button never came back" is not a diagnosis anybody can act on.
+        //
+        // *** AND THE KILL IS RE-CHECKED, BECAUSE THE FIRST SPELLING OF IT WAS NOT. ***
+        // v4676's first version was `try { child.kill(); } catch {} done({ timedOut: true })` -- signal sent,
+        // result never looked at, which is boundaryLint's KILL_NOT_VERIFIED exactly. kill() SENDS a signal; it
+        // does not mean the child is gone. On Windows child.kill() is TerminateProcess against the npm
+        // launcher, and npm's own child tree can outlive it. A stalled `npm install` left running holds the
+        // cache lock, so the NEXT provisioning attempt fails too -- with a different error, on a different
+        // run, pointing nowhere near here. So: signal, wait, escalate, wait, and REPORT WHICH HAPPENED.
+        // `killed: false` in the result is the chain saying a process was left behind rather than assuming not.
+        const ms = extra && extra.timeoutMs;
+        const GRACE_MS = 5000;
+        if (ms) timer = setTimeout(() => {
+            timedOut = true;
+            push("[" + label + "] no output path left: killing after " + Math.round(ms / 1000) + " s\n");
+            try { child.kill(); } catch {}
+            // The exit listener above settles this promise the moment the child actually dies, and stamps
+            // killed:true when it does. These two only run if it does NOT.
+            const escalate = setTimeout(() => {
+                push("[" + label + "] still alive " + (GRACE_MS / 1000) + " s after the signal -- SIGKILL\n");
+                try { child.kill("SIGKILL"); } catch {}
+                const giveUp = setTimeout(() => {
+                    push("[" + label + "] pid " + child.pid + " SURVIVED SIGKILL AND IS STILL RUNNING. The " +
+                         "next provisioning attempt may fail on a lock this process is holding.\n");
+                    done({ code: -1, timedOut: true, killed: false });
+                }, GRACE_MS);
+                if (giveUp.unref) giveUp.unref();
+            }, GRACE_MS);
+            if (escalate.unref) escalate.unref();
+        }, ms);
     });
 }
 
+// ---- v4676: PROVISION THE CLONE, BECAUSE THE SAFE ROUTE COULD NOT PASS WITHOUT IT --------------------
+//
+// *** MEASURED ON THE RIG AT v4667: the provisioned working checkout reported 26 NEW red and a FRESH CLONE
+// reported 121, and 116 of the 121 reach the browser harness. *** node_modules is gitignored, playwright is
+// a dependency of WebGLEngine/tools/render-qa, and cloneEngineSource runs `git clone --depth 1` and stops.
+// So every browser gate in the clone failed on "playwright is not installed here", the verdict was RED, and
+// `Publish the verified clone` refuses on a red verdict -- THE SAFE PUBLISH ROUTE COULD NEVER GO GREEN. That
+// is a sufficient explanation for the number this repo's own ship skill calls out: 3 of 261 versions were
+// ever published. The route was not slow or fiddly; it was unpassable, and nothing said so because the 116
+// reds look exactly like 116 broken gates.
+//
+// It lives HERE rather than in cloneEngineSource on purpose: the panel's "Get newer source" button clones
+// without verifying and should not pay for a browser download, while this chain cannot do its job without
+// one. Same reason the phase exists -- see below.
+const QA_REL = ["tools", "render-qa"];
+/**
+ * Where npm puts the package. NOT a claim about what the resolver checks FIRST -- v4676's comment here said
+ * "the resolver's first candidate" and that was simply false: PLAYWRIGHT_PATHS tries the bare specifiers
+ * "playwright" and "playwright-core" ahead of it, so the tree-local path is THIRD. The order does not matter
+ * to this file any more, because the post-install question is no longer asked of a path at all -- see
+ * _askTheResolver below. This is kept only as the cheap pre-test for "is there anything to skip".
+ */
+function _provisionedAt(cloneEngine) { return path.join(cloneEngine, QA_REL[0], QA_REL[1], "node_modules", "playwright"); }
+
+/**
+ * *** ASK THE CONSUMER'S QUESTION, IN THE CONSUMER'S OWN WORDS. ***
+ *
+ * The first version of this check tested that a directory existed. That proves the npm PACKAGE landed and
+ * says nothing about the BROWSER -- and `playwright install chromium` is a postinstall script, so an
+ * --ignore-scripts install, a script that fails, or a proxy that blocks the CDN all leave the package there
+ * and no chromium anywhere. The verify would then produce the same ~116 reds this round exists to stop, with
+ * provisioning reporting success.
+ *
+ * So the clone's OWN tools/ship/playwrightResolve.mjs is run, in the clone, and asked for its skip reason --
+ * the identical call every browser gate makes. If it has nothing to say, the gates will not either. That
+ * also ends the coupling problem outright: no path in this file has to track that file's candidate list.
+ */
+function _askTheResolver(cloneEngine) {
+    return new Promise((resolve) => {
+        // The probe lives in the OS temp dir, never in the clone: a provisioning step that leaves a file
+        // behind in the tree it is about to grade has changed the thing it is measuring.
+        let probe = "";
+        try {
+            probe = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "swek-probe-")), "probe.mjs");
+            fs.writeFileSync(probe,
+                'import { pathToFileURL } from "node:url";\n' +
+                'import path from "node:path";\n' +
+                'const eng = process.argv[2];\n' +
+                'const m = await import(pathToFileURL(path.join(eng, "tools", "ship", "playwrightResolve.mjs")).href);\n' +
+                'const r = m.resolvePlaywright();\n' +
+                'process.stdout.write(JSON.stringify({ reason: m.browserSkipReason(r.chromium, r.from) || "", from: r.from || "" }));\n');
+        } catch (e) { return resolve({ ok: false, reason: "could not write the resolver probe: " + ((e && e.message) || e) }); }
+
+        let out = "";
+        const child = spawn(process.execPath, [probe, cloneEngine], { cwd: cloneEngine, windowsHide: true });
+        let settled = false, deadline = null;
+        // *** v4678 -- THE DEADLINE TIMER IS CLEARED, AND NOT CLEARING IT COST SIXTY SECONDS PER CALL. ***
+            // v4676 wrote `setTimeout(() => fin(...), 60000)` with the handle thrown away. fin() is once-only,
+            // so the late fire was HARMLESS -- and the timer still held the event loop open for the full sixty
+            // seconds after the probe had already answered. In the bridge, a long-running server, that is
+            // invisible. In a short-lived process it is the whole runtime:
+            // tools/ship/cloneProvision-selfcheck.mjs did its work in 7.1 s and took 60.1 s to exit, and the
+            // 53 s of dead time was found only by asking why the gate DECLARED 200 ms. A correct verdict, a
+            // correct cleanup, and a minute of wall clock that no row could see.
+        const fin = (v) => { if (settled) return; settled = true;
+            if (deadline) clearTimeout(deadline);
+            try { fs.rmSync(path.dirname(probe), { recursive: true, force: true }); } catch {}
+            resolve(v); };
+        child.on("error", (e) => fin({ ok: false, reason: "could not run the resolver probe: " + ((e && e.message) || e) }));
+        if (child.stdout) child.stdout.on("data", (d) => { out += String(d); });
+        // stderr is drained too: a probe that writes more than a pipe buffer to a stream NOBODY READS blocks on
+        // the write and never reaches its exit, which would turn this deadline into the only way out.
+        if (child.stderr) child.stderr.on("data", () => {});
+        child.on("exit", () => {
+            let j = null; try { j = JSON.parse(out.trim()); } catch {}
+            if (!j) return fin({ ok: false, reason: "the resolver probe printed nothing readable" });
+            return fin(j.reason ? { ok: false, reason: j.reason } : { ok: true, from: j.from });
+        });
+        deadline = setTimeout(() => fin({ ok: false, reason: "the resolver probe did not answer in 60 s" }), 60000);
+        // AND unref'd as well as cleared -- belt and braces, because clearing depends on fin() being reached
+        // and unref'ing does not. An unref'd deadline still fires while the loop is alive for any other reason,
+        // which is every case this deadline exists for.
+        if (deadline.unref) deadline.unref();
+    });
+}
+
+// The runner is injectable for the reason versionPreflight's readers are: every branch below has to be
+// drivable without a network, and a branch nothing can reach is a branch nobody has checked. `run` defaults
+// to the real streaming spawn; the gate hands it a stub and asserts WHICH branch was taken -- including the
+// one where it must not be called at all.
+async function _provision(cloneEngine, { run = _spawnCmd } = {}) {
+    const qa = path.join(cloneEngine, QA_REL[0], QA_REL[1]);
+    if (!fs.existsSync(path.join(qa, "package.json")))
+        return { ok: false, reason: "the clone has no " + QA_REL.join("/") + "/package.json -- is it the engine repo?" };
+    if (fs.existsSync(_provisionedAt(cloneEngine))) return { ok: true, already: true, ms: 0 };
+
+    // npm is npm.cmd on Windows and needs a shell to be found; this is the SIXTH spelling of that fact in
+    // this tree (codegraphBridge, devBrowserBridge, webtorrentBridge, renderQaBridge, autoInstall are the
+    // others) and it is filed rather than refactored here, because a six-site change does not belong in the
+    // round that unblocks the publish. The args are LITERAL CONSTANTS and the directory travels as `cwd`
+    // rather than inside a command string, so shell:true adds no interpolation for anything to ride in on.
+    const isWin = process.platform === "win32";
+    const t0 = Date.now();
+    const r = await run(isWin ? "npm.cmd" : "npm", ["install", "--no-audit", "--no-fund"],
+                        qa, "provision", Object.assign({ timeoutMs: 30 * 60 * 1000 }, isWin ? { shell: true } : {}));
+    const ms = Date.now() - t0;
+    if (r.code !== 0)
+        return { ok: false, ms, reason: "npm install " + (r.timedOut ? "was still running after 30 minutes and was killed"
+                 : r.spawnError ? "could not start: " + r.spawnError : "exited " + r.code) +
+                 " -- is npm on PATH for the account running this server?" };
+    // *** EXIT 0 IS NOT THE QUESTION. *** The question is the one the resolver asks, so it is asked here:
+    // a postinstall that half-ran, a registry that served an empty tree, or a download killed midway can all
+    // leave a zero behind. v4676's own round note records the same lesson from the other side -- a gate that
+    // exits 1 having printed no row.
+    const asked = await _askTheResolver(cloneEngine);
+    if (!asked.ok)
+        return { ok: false, ms, reason: "npm install exited 0 and the clone's OWN resolver still refuses: " + asked.reason };
+    return { ok: true, ms, from: asked.from };
+}
+
 async function start({ repo, ref } = {}) {
-    if (R.phase === "cloning" || R.phase === "verifying")
+    if (R.phase === "cloning" || R.phase === "provisioning" || R.phase === "verifying")
         return { ok: false, error: "busy", message: "a chain run is already " + R.phase };
 
     R.phase = "cloning"; R.startedAt = Date.now(); R.finishedAt = 0;
-    R.log = ""; R.clone = null; R.verified = null; R.verifyExit = null; R.error = ""; R.publish = null;
+    R.log = ""; R.clone = null; R.verified = null; R.verifyExit = null; R.error = ""; R.publish = null; R.provision = null;
     push("[chain] clone -> verify. Publishing is a SEPARATE press and needs a green verify.\n");
 
     let gh = null;
@@ -171,6 +370,26 @@ async function start({ repo, ref } = {}) {
         push("[chain] " + R.error + "\n");
         return { ok: false, error: R.error };
     }
+    // ---- provision, BEFORE the verify and as its own phase -------------------------------------------
+    R.phase = "provisioning";
+    push("\n[chain] provisioning the clone (npm install in " + QA_REL.join("/") + "; pulls Chromium, one-time)\n");
+    const prov = await _provision(cloneEngine);
+    R.provision = prov;
+    if (!prov.ok) {
+        // *** REFUSING IS THE POINT. *** Running the verify anyway would spend an hour producing ~116 reds
+        // that say nothing about the code, and a reader would take them for 116 broken gates -- which is
+        // exactly what happened at v4667 before anybody knew the clone was bare. An unprovisioned tree
+        // cannot answer the question this chain asks, so it says so instead of answering it wrongly.
+        R.phase = "done"; R.finishedAt = Date.now(); R.verified = false;
+        R.error = "could not provision the clone: " + prov.reason +
+                  "  -- refusing to verify a tree whose browser gates cannot run, because the red verdict " +
+                  "would describe the missing install and read as broken code.";
+        push("[chain] " + R.error + "\n");
+        return { ok: false, error: R.error };
+    }
+    push("[chain] " + (prov.already ? "already provisioned -- nothing downloaded" :
+                       "provisioned in " + Math.round(prov.ms / 1000) + " s") + "\n");
+
     R.phase = "verifying";
     push("\n[chain] verifying the CLONE at " + cloneEngine + "\n");
     push("[chain] (this grades what was fetched, not the tree serving this page)\n\n");
@@ -454,8 +673,14 @@ function handle(req, res, sendJson) {
  * DERIVED FROM R.phase, not a second flag: updatePause-selfcheck's own rule is that the answer comes from the
  * runner's OWN state, because "a second flag would one day disagree with the thing it describes".
  */
-function running() { return R.phase === "cloning" || R.phase === "verifying" || R.phase === "publishing"; }
+function running() { return R.phase === "cloning" || R.phase === "provisioning" || R.phase === "verifying" || R.phase === "publishing"; }
 function busyWhat() { return running() ? "the source chain (" + R.phase + ")" : null; }
 
 module.exports = { status, start, publish, launch, canPublish, owns, handle, running, busyWhat, PREFIX, ENGINE_ROOT,
-    _launchGuard, _freePort, _waitHealthy };
+    _launchGuard, _freePort, _waitHealthy, budgetIsOwn,
+    // v4676 -- exported so tools/ship/cloneProvision-selfcheck.mjs can DRIVE every branch rather than
+    // grep for one. QA_REL and _provisionedAt travel with it because the gate holds this file and
+    // playwrightResolve.mjs to the same path.
+    // _spawnCmd is exported for the same reason: the timeout's kill escalation is a PATH, and a path nobody
+    // drives is a paragraph. The gate runs it against a child that ignores SIGTERM.
+    _provision, _provisionedAt, QA_REL, _spawnCmd };

@@ -19,6 +19,28 @@
 // real peer list corrupted. Measured directly on this box: the file already held four real LAN/tailnet peer
 // URLs before this gate ever ran.
 //
+// *** v4778 (2026-10-04) -- THOSE "FOUR REAL PEERS" WERE WHERE TWO THIRDS OF THIS GATE'S TIME WENT, AND THEY
+// WERE NOT REAL: THEY ARE ai-bridge/discoveryTrust-selfcheck.mjs's TEST ADDRESSES. *** That gate drives the
+// real assetSync.addPeer() against the real ~/.voxelbridge/sync-peers.json with 192.168.11.9, 10.0.0.5,
+// 172.16.4.4, 100.64.3.4 and 172.16.0.1 and never removes them; this box's file holds exactly those five now
+// (it held four when the line above was written, and gained 10.0.0.5 at 11:50:57 today while other agents ran
+// gates). So the BRIDGES NOW RUN UNDER A SCRATCH HOME AND THE REAL FILE IS NEVER WRITTEN AT ALL. Keith's rig killed this
+// gate at the quick sweep's cap (20,286 ms alone, last line "...genuinely holds both", i.e. inside Find peer
+// brains); this box measured 15.0-18.6 s alone over five runs. Timestamped here: bridge A up at 0.8 s, B at
+// 1.4 s, then GET /brain/fleet took 5,009 ms (1,461 -> 6,470) and the page's Find peer brains click 5,538 ms
+// (9,943 -> 15,481) -- each one exactly _peerJSON's 5,000 ms per-peer timeout, because /brain/fleet fans out
+// to EVERY saved peer and waits for all of them, and none of those addresses answers from a sandbox or a test
+// rig. That is the route behaving as written (a dead peer costs one timeout); it is not what this gate
+// measures, and it made the gate's run time a function of whatever else had written that file. Spawning both bridges with HOME/USERPROFILE pointed at a fresh mkdtemp directory (os.homedir() reads
+// HOME on POSIX and USERPROFILE on Windows; every ai-bridge config path is built from os.homedir()) gives
+// them a peer file this gate wholly owns: section 2 seeds it with the one 127.0.0.2 test peer, so /brain/fleet
+// still goes through the real _announcePeers() -> assetSync.loadPeers() -> second HTTP hop, just without five
+// dead addresses to time out on. It also closes the hole the SIGINT handler below admits it cannot: a SIGKILL --
+// which is exactly what the quick sweep's cap sends -- can no longer leave the user's real peer list holding
+// the test entry, because nothing here writes that file any more. The byte-for-byte row on the REAL file
+// stays, now asserting it was never touched (and if HOME isolation ever silently failed, bridge A would read
+// the real file, not the seeded one, and the fleet row would go red for want of bridge B).
+//
 // WHY 127.0.0.2, NOT 127.0.0.1, FOR THE TEST PEER: assetSync.js's _isOwnHost() rejects the exact strings
 // "127.0.0.1"/"localhost"/"::1"/every real NIC address as "self, not a peer" -- but its self-check is a literal
 // string match, not a 127.0.0.0/8 range check, while _isLanPeerUrl()'s OWN later branch explicitly allows the
@@ -45,8 +67,16 @@ import * as PB from "../../brain/peerBrain.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BRIDGE = path.join(ROOT, "ai-bridge", "server.js");
-const PEERS_FILE = path.join(os.homedir(), ".voxelbridge", "sync-peers.json");
+// v4778: the REAL user peer file, read only -- see the header. Each bridge gets its own scratch home (two
+// bridges are two boxes, and two fresh processes creating one config dir at once is a race nobody needs);
+// PEERS_FILE is bridge A's, the one /brain/fleet on A reads.
+const REAL_PEERS_FILE = path.join(os.homedir(), ".voxelbridge", "sync-peers.json");
+const SCRATCH = fs.mkdtempSync(path.join(os.tmpdir(), "peerBrainFleet-home-"));
+const HOME_A = path.join(SCRATCH, "a"), HOME_B = path.join(SCRATCH, "b");
+const PEERS_FILE = path.join(HOME_A, ".voxelbridge", "sync-peers.json");
 const PORT_A = 17781, PORT_B = 17782;
+const children = new Set();   // every spawned bridge, from the moment it is spawned, for the cleanup paths below
+const removeScratch = () => { try { fs.rmSync(SCRATCH, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch {} };
 
 let fails = 0;
 const ok = (label, cond, detail) => { if (!cond) fails++; console.log(`  ${cond ? "PASS" : "FAIL"}  ${label}${detail ? "   " + detail : ""}`); };
@@ -56,8 +86,10 @@ const sec = (s) => console.log("\n" + s);
 console.log("peerBrainFleet-selfcheck -- ai-bridge/server.js's peer-brain routes, against real running bridge processes\n");
 
 /** Start ai-bridge/server.js as a real child process on `port`, resolving once /health answers. */
-async function startBridge(port) {
-    const cp = spawn(process.execPath, [BRIDGE], { cwd: path.dirname(BRIDGE), env: { ...process.env, PORT: String(port) }, stdio: ["ignore", "pipe", "pipe"] });
+async function startBridge(port, home) {
+    fs.mkdirSync(home, { recursive: true });
+    const cp = spawn(process.execPath, [BRIDGE], { cwd: path.dirname(BRIDGE), env: { ...process.env, PORT: String(port), HOME: home, USERPROFILE: home }, stdio: ["ignore", "pipe", "pipe"] });
+    children.add(cp);
     let out = "";
     cp.stdout.on("data", (d) => { out += d; });
     cp.stderr.on("data", (d) => { out += d; });
@@ -70,12 +102,13 @@ async function startBridge(port) {
     const deadline = Date.now() + 15000;
     while (Date.now() < deadline) {
         try { const r = await fetch(`http://127.0.0.1:${port}/health`, { signal: AbortSignal.timeout(2000) }); if (r.ok) { const j = await r.json(); if (j.ok) return { cp, out: () => out }; } } catch {}
-        await new Promise((res) => setTimeout(res, 250));
+        // v4778: 50 ms, was 250 -- a refused connect fails in well under a millisecond, and the bridge answers
+        // /health ~550-660 ms after spawn here, so a 250 ms poll threw away up to a quarter second per bridge.
+        await new Promise((res) => setTimeout(res, 50));
     }
     try { cp.kill("SIGKILL"); } catch {}
     throw new Error(`bridge on port ${port} did not answer /health within 15 s -- output: ${out.slice(-500)}`);
 }
-function stopBridge(b) { try { b.cp.kill("SIGKILL"); } catch {} }
 
 // !! SIGINT/SIGTERM cleanup -- found missing by adversarial review, which reproduced real, permanent damage from
 // its absence: a plain Ctrl-C (SIGINT) during section 2's peers-file-modified window skipped this file's
@@ -87,21 +120,31 @@ function stopBridge(b) { try { b.cp.kill("SIGKILL"); } catch {} }
 // it. The review's SIGKILL repro is real and is an accepted, structural limit of this approach, not a bug left
 // unfixed; SIGINT/SIGTERM (an impatient Ctrl-C, a CI runner's graceful-shutdown signal) are the realistic cases
 // this can and does now cover.
+// v4778: since the bridges run under a scratch home (header), there is no real file left to restore on any
+// signal, SIGKILL included -- the handlers now kill every spawned child (tracked from spawn, not from /health,
+// so one still booting is not orphaned) and remove the scratch home.
 let bridgeA = null, bridgeB = null;
-let peersCleanup = null;   // set only while section 2 has the real peers file in a modified state; see there
 function emergencyCleanup(signal) {
-    try { if (peersCleanup) { fs.writeFileSync(peersCleanup.path, peersCleanup.backup === null ? "" : peersCleanup.backup); if (peersCleanup.backup === null) { try { fs.unlinkSync(peersCleanup.path); } catch {} } console.error(`\n[${signal}] restored ${peersCleanup.path} before exiting`); } } catch (e) { console.error(`[${signal}] FAILED to restore ${peersCleanup && peersCleanup.path}: ${e.message} -- check it by hand`); }
-    if (bridgeA) stopBridge(bridgeA);
-    if (bridgeB) stopBridge(bridgeB);
+    for (const cp of children) { try { cp.kill("SIGKILL"); } catch {} }
+    removeScratch();
+    console.error(`\n[${signal}] killed ${children.size} bridge(s) and removed ${SCRATCH} before exiting`);
     process.exit(130);
 }
 process.on("SIGINT", () => emergencyCleanup("SIGINT"));
 process.on("SIGTERM", () => emergencyCleanup("SIGTERM"));
 
+// v4778: the real user peer file's bytes before any bridge is spawned -- section 2's byte-for-byte row compares
+// against this (null when the file does not exist).
+const realPeersAtStart = fs.existsSync(REAL_PEERS_FILE) ? fs.readFileSync(REAL_PEERS_FILE, "utf8") : null;
+
 try {
     sec("1. /brain/publish + /brain/mine, ON A REAL RUNNING BRIDGE, OVER REAL LOOPBACK HTTP");
+    // v4778: bridge B boots alongside A instead of after section 1 (each takes ~550-660 ms to answer /health
+    // here, and they never waited on each other for anything); section 2 awaits it where it used to start it.
+    const bridgeBStarting = startBridge(PORT_B, HOME_B);
+    bridgeBStarting.catch(() => {});   // its failure is reported where section 2 awaits it, not as an unhandled rejection
     {
-        bridgeA = await startBridge(PORT_A);
+        bridgeA = await startBridge(PORT_A, HOME_A);
         report(`bridge A up on :${PORT_A}`);
         const base = `http://127.0.0.1:${PORT_A}`;
         const handWeights = D.handWeights();
@@ -127,9 +170,10 @@ try {
         let peersBackup = null;
         try {
             peersBackup = fs.existsSync(PEERS_FILE) ? fs.readFileSync(PEERS_FILE, "utf8") : null;
-            report(peersBackup ? `backed up the real ${PEERS_FILE} (${JSON.parse(peersBackup).peers?.length || 0} real peer(s) in it)` : `${PEERS_FILE} does not exist yet -- nothing to back up, will remove what this test creates`);
+            report(peersBackup ? `backed up bridge A's scratch ${PEERS_FILE} (${JSON.parse(peersBackup).peers?.length || 0} peer(s) in it)` : `bridge A's scratch ${PEERS_FILE} does not exist yet -- will remove what this test creates`);
+            report(realPeersAtStart ? `the real ${REAL_PEERS_FILE} (${(() => { try { return JSON.parse(realPeersAtStart).peers?.length || 0; } catch { return "?"; } })()} real peer(s)) is read, never written -- see the header (v4778)` : `${REAL_PEERS_FILE} does not exist -- and this gate will not create it`);
 
-            bridgeB = await startBridge(PORT_B);
+            bridgeB = await bridgeBStarting;
             report(`bridge B up on :${PORT_B}`);
             const gunnerHand = GP.handWeights();
             const gblob = PB.exportBrain(PB.describePolicy("gunnerPolicy", GP), gunnerHand, { score: 13, by: "bridge-B", citation: "male-cns GFC" });
@@ -141,7 +185,6 @@ try {
             const existing = peersBackup ? JSON.parse(peersBackup) : { peers: [] };
             const testPeerUrl = `http://127.0.0.2:${PORT_B}`;
             fs.mkdirSync(path.dirname(PEERS_FILE), { recursive: true });
-            peersCleanup = { path: PEERS_FILE, backup: peersBackup };   // the file is about to be modified -- see emergencyCleanup above
             fs.writeFileSync(PEERS_FILE, JSON.stringify({ ...existing, peers: [...(existing.peers || []), testPeerUrl] }, null, 2));
 
             const fleet = await fetch(`http://127.0.0.1:${PORT_A}/brain/fleet`).then((r) => r.json());
@@ -153,9 +196,12 @@ try {
         } finally {
             if (peersBackup !== null) { fs.writeFileSync(PEERS_FILE, peersBackup); report(`restored ${PEERS_FILE} to its original bytes`); }
             else { try { fs.unlinkSync(PEERS_FILE); } catch {} report(`removed the test-created ${PEERS_FILE} (none existed before this gate)`); }
-            peersCleanup = null;   // restored -- emergencyCleanup no longer needs to touch this file
-            const after = fs.existsSync(PEERS_FILE) ? fs.readFileSync(PEERS_FILE, "utf8") : null;
-            ok("!! the real peer config is EXACTLY as this gate found it, verified byte-for-byte after restoring", after === peersBackup);
+            const afterScratch = fs.existsSync(PEERS_FILE) ? fs.readFileSync(PEERS_FILE, "utf8") : null;
+            ok("bridge A's scratch peer file is back as section 2 found it", afterScratch === peersBackup);
+            // v4778: was a byte-for-byte check of the file this section wrote and restored, back when that was the
+            // user's real one; it now reads the REAL file this gate no longer writes, against its bytes at start.
+            const after = fs.existsSync(REAL_PEERS_FILE) ? fs.readFileSync(REAL_PEERS_FILE, "utf8") : null;
+            ok("!! the real peer config is EXACTLY as this gate found it, verified byte-for-byte after section 2", after === realPeersAtStart);
         }
     }
 
@@ -211,8 +257,10 @@ try {
         }
     }
 } finally {
-    if (bridgeA) stopBridge(bridgeA);
-    if (bridgeB) stopBridge(bridgeB);
+    // A, B, and B even if section 1 threw before it was awaited; wait (bounded) for them to actually exit so
+    // Windows has released their handles in the scratch home before it is removed.
+    await Promise.race([Promise.all([...children].map((cp) => new Promise((res) => { if (cp.exitCode !== null || cp.signalCode !== null) return res(); cp.once("exit", res); try { cp.kill("SIGKILL"); } catch { res(); } }))), new Promise((res) => setTimeout(res, 3000))]);
+    removeScratch();
 }
 
 console.log("\n" + (fails ? `${fails} FAILED` : "all checks pass"));

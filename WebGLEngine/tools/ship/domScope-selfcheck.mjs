@@ -45,7 +45,7 @@
 "use strict";
 import { fileURLToPath } from "node:url";
 import * as S from "../../engine/domScope.mjs";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import { RAF_SHIM } from "./deterministicRaf.mjs";
 import { createRequire } from "node:module";
 import fs from "node:fs";
@@ -136,7 +136,7 @@ if (skip) {
     report("*** A SKIP, NOT A PASS. Sections 1-3 check the rule; only the real page can say what is actually " +
            "animating on it, and that is the half #60 has been waiting four rounds for.");
 } else {
-    const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+    const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
     const pg = await b.newPage({ viewport: { width: 1280, height: 800 } });
     const errs = [];
     pg.on("pageerror", (e) => errs.push(String(e).slice(0, 140)));

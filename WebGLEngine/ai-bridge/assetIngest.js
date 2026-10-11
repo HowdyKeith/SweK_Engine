@@ -202,8 +202,9 @@ function _extractZip(zipPath, destDir) {
   try { cp.execFileSync("powershell", ["-NoProfile", "-NonInteractive", "-Command",
         "Expand-Archive -LiteralPath '" + zipPath.replace(/'/g, "''") + "' -DestinationPath '" + destDir.replace(/'/g, "''") + "' -Force"],
         { stdio: "ignore", timeout: 240000 }); return true; } catch {}
-  // unzip (mac/linux)
-  try { cp.execFileSync("unzip", ["-o", "-q", zipPath, "-d", destDir], { stdio: "ignore", timeout: 180000 }); return true; } catch {}
+  // unzip (mac/linux) -- v4778: asked rather than assumed, as the comment always said; Windows has no unzip,
+  // and the tar and PowerShell arms above are the ones that answer there.
+  if (process.platform !== "win32") try { cp.execFileSync("unzip", ["-o", "-q", zipPath, "-d", destDir], { stdio: "ignore", timeout: 180000 }); return true; } catch {}
   return false;
 }
 function _walkModels(dir, out) {

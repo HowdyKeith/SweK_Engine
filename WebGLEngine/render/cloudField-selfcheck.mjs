@@ -172,7 +172,7 @@ console.log("\n5. *** THE PLANET PAGE DRAWS THEM, AND THE ARRIVAL REALLY FLIES T
             rs.writeHead(200, { "Content-Type": ct }); rs.end(fs.readFileSync(f));
         });
         await new Promise((x) => srv.listen(0, "127.0.0.1", x));
-        const b = await rr.chromium.launch({ executablePath: pw.HEADLESS_SHELL, args: ["--use-gl=swiftshader", "--enable-webgl"] });
+        const b = await rr.chromium.launch({ executablePath: pw.HEADLESS_SHELL, args: [...pw.webglLaunchArgs().args, "--enable-webgl"] });
         try {
             const pg = await b.newPage();
             const errs = [];

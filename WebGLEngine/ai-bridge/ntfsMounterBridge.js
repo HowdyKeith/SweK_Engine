@@ -273,6 +273,31 @@ function commandFilePath() { return path.join(SRC_DIR, "Mount NTFS Disk.command"
 function shellQuote(s) { return "'" + String(s == null ? "" : s).replace(/'/g, "'\\''") + "'"; }
 
 /**
+ * *** THE LINE THAT ECHOES THE VOLUME NAME, BUILT HERE SO IT CAN BE DRIVEN THROUGH A REAL SHELL. ***
+ *
+ * v4649. The launcher used to interpolate shellQuote's output INSIDE a double-quoted echo:
+ *
+ *     echo " You picked 'DISK NAME' in SweK -- choose that one from the menu below."
+ *
+ * Single quotes are ORDINARY CHARACTERS inside double quotes, and command substitution still expands there.
+ * So a volume named `$(...)` executed when the launcher was double-clicked, and shellQuote -- which is
+ * correct for its own job -- was doing nothing at all in that position. The gate that was supposed to catch
+ * this drove the payload "'; touch ... #", which cannot fire inside double quotes on any platform, so the
+ * row wearing the words SABOTAGE and PWNED had never once been able to go red. It was found by sabotaging
+ * it and measuring zero.
+ *
+ * The name now goes into a variable as a single-quoted literal -- where nothing expands -- and is printed
+ * with printf %s, which never re-scans its argument. Exported so ntfsMounter-selfcheck can run this exact
+ * text through bash on any box rather than an invented imitation of it.
+ */
+function pickedLines(volumeName) {
+    if (!volumeName) return "";
+    return "_swek_picked=" + shellQuote(volumeName) + "\n" +
+           "echo\n" +
+           "printf ' You picked %s in SweK -- choose that one from the menu below.\\n' \"$_swek_picked\"";
+}
+
+/**
  * Generate the double-clickable launcher. `volumeName` is optional and PURELY INFORMATIONAL -- it is echoed so
  * the person knows which entry they picked in SweK, never used to drive the selection, which is what keeps the
  * stale-index problem from coming back in a new place.
@@ -308,8 +333,7 @@ echo "================================================================"
 echo
 echo " Script:  \$(pwd)/ntfsmounter"
 echo "          (zavierferodova/Mac-NTFS-Mounter, run unmodified)"
-${picked ? `echo
-echo " You picked ${picked} in SweK -- choose that one from the menu below."` : ""}
+${pickedLines(volumeName)}
 echo
 if ! command -v ntfs-3g >/dev/null 2>&1; then
     echo " ERROR: ntfs-3g is not on this launcher's PATH."
@@ -427,5 +451,5 @@ async function mount(name) {
 }
 
 module.exports = { install, installStatus, status, listVolumes, mount,
-                   commandFilePath, writeCommandFile, openCommandFile, shellQuote,
+                   commandFilePath, writeCommandFile, openCommandFile, shellQuote, pickedLines,
                    UPSTREAM, MAINTENANCE, REFUSED, REPO, PINNED_COMMIT, SRC_DIR, IS_MAC };

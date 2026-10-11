@@ -27,10 +27,19 @@ const h = (s) => crypto.createHash("sha256").update(s).digest("hex").slice(0, 16
 
 // ---- 1. THE SEAM IS THE SHIPPED COMPUTATION, AND THE REFACTOR MOVED NOTHING --------------------------------------
 {
+    // v4680 -- WAS A RAW toString() OF r.ratio/r.perStep, WHICH HASHES THE LAST BIT OF A TRANSCENDENTAL
+    // FUNCTION AND NOT JUST THE LOGIC. Measured: identical on Node 22.22.2 and DIFFERENT on Node 24.15.0 --
+    // same source, same OS, only the V8 build changed, and shmRun's closed-form update touches Math.cos/
+    // Math.sin/Math.exp, whose last-ULP rounding is not a spec-guaranteed constant across engine versions.
+    // A hash avalanches on that one bit, so this row was never testing "did the shipped path move", it was
+    // testing "does this box's V8 round transcendentals the same way v3604's did" -- a different, unintended
+    // claim. Rounded to the same fixed precision reportLines() already uses for these two fields two screens
+    // down (toExponential(6)), which absorbs last-ULP engine noise while still catching a real logic change
+    // (any refactor that actually moves the computation moves it by far more than 1e-6 relative).
     const rows = [];
     for (const k of KINDS) for (const dt of [0.05, 0.1, 0.5, 1.0, 1.9, 2.1, 5, 50]) {
         const r = shmRun(k, { dt, steps: 400 });
-        rows.push(k + "|" + dt + "|" + r.ratio + "|" + r.perStep + "|" + r.blewUp + "|" + r.steps);
+        rows.push(k + "|" + dt + "|" + r.ratio.toExponential(6) + "|" + r.perStep.toExponential(6) + "|" + r.blewUp + "|" + r.steps);
     }
     ok("!! the SHIPPED shmRun path is bit-identical to the pristine v3604 extract",
        h(rows.join("\n")) === MEASURED_V3605.shippedPathHashes.shmRun,

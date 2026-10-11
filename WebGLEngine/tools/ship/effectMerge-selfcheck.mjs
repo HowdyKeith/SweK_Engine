@@ -13,7 +13,7 @@ import path from "node:path";
 import http from "node:http";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import * as EM from "../../render/effectMerge.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -116,13 +116,22 @@ console.log("\n4. *** THE GLSL, ACTUALLY RUN -- merged against chained on a real
             rs.writeHead(200, { "content-type": "text/html" }); rs.end(HARNESS);
         }).listen(0);
         const port = srv.address().port;
-        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
         const pg = await b.newPage();
-        const errs = [];
+        const errs = [], said = [];
         pg.on("pageerror", (e) => errs.push(String(e).slice(0, 200)));
+        // rig run 9: what the browser SAID -- its warnings and errors -- kept for the THREW rows below
+        pg.on("console", (m) => { if (m.type() === "error" || m.type() === "warning") said.push(m.text().slice(0, 160)); });
         await pg.goto("http://127.0.0.1:" + port + "/", { waitUntil: "networkidle" });
         ok("!! the harness loaded and made a WebGL2 context", errs.length === 0 && await pg.evaluate(() => !!window.__gl),
             errs.join(" | "));
+        // *** v4778 RIG RUN 9 -- WHY A COMPILE "THREW null" ON KEITH'S RIG. *** Every run there, both programs: the info log a
+        // compile returns is null, which is what a LOST context returns. realGpuRun --gl-flags drew a triangle under the same
+        // --use-gl=swiftshader on the same box, so the context is not dead on arrival; something in this gate's work loses it.
+        // Measured, not guessed: the context-lost event's own message, isContextLost() at the failure, and the console.
+        await pg.evaluate(() => { const c = window.__gl && window.__gl.canvas; if (c) c.addEventListener("webglcontextlost", (e) => { window.__lost = e.statusMessage || "no message"; }); });
+        const why = async () => { try { const w = await pg.evaluate(() => ({ lost: window.__gl ? window.__gl.isContextLost() : null, event: window.__lost || null }));
+            return `isContextLost ${w.lost}; contextlost event: ${w.event || "none"}; the browser said: ${said.slice(-3).join(" | ") || "nothing"}`; } catch (e) { return "and the page could not be asked: " + String(e).slice(0, 80); } };
 
         const CHAIN = [TEAR, GRADE, VIG];
         const KNOBS = { tear: { amount: 0.07 }, grade: { exposure: 1.35 }, vig: { k: 0.55 } };
@@ -133,7 +142,7 @@ console.log("\n4. *** THE GLSL, ACTUALLY RUN -- merged against chained on a real
         // but it says nothing about which line broke, so the error is caught and named here.
         const guard = async (label, fn) => {
             try { return await fn(); }
-            catch (e) { ok("!! " + label, false, "THREW: " + String(e).replace(/\s+/g, " ").slice(0, 220)); return null; }
+            catch (e) { ok("!! " + label, false, "THREW: " + String(e).replace(/\s+/g, " ").slice(0, 220)); console.log("  ----  " + await why()); return null; }
         };
 
         // (a) merged vs a chain whose intermediates are FLOAT -- these should agree to rounding
@@ -245,7 +254,7 @@ console.log("\n5. *** THE REAL PAGE, THROUGH THE TREE'S OWN RECORDER -- what the
             '    quad: draws.filter(c => Number(c.args[2]) === 6).length,\n' +
             '    redundant: redundantStateSets(h).slice(0, 6).map(r => r.op + " x" + r.count) };\n' +
             '});\n</script>';
-        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
         const pg = await b.newPage();
         const errs = [];
         pg.on("pageerror", (e) => errs.push(String(e).slice(0, 160)));

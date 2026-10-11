@@ -1,0 +1,17 @@
+{
+ "gates": {
+  "microfacetWgsl": {
+   "intel/gen-9": {
+    "worstGap": 3.1040195805890594e-7,
+    "builtinLow": 0.021736452600308875,
+    "hostRatio": 865.669446302766,
+    "mirrorGap": 1.579951525165768e-7,
+    "laneSame": 9.5,
+    "cosAbsMin": 0.000029611281427421865,
+    "oneMinusC2Min": 0.5,
+    "coarseFall": 13.076684862740457,
+    "at": "2026-09-20T12:27:43.945Z"
+   }
+  }
+ }
+}

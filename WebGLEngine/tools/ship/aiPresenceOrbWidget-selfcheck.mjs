@@ -16,7 +16,7 @@
 // selfcheck.mjs itself uses for the shader.
 "use strict";
 import { SECURE_HOST } from "./webgpuHarness.mjs";
-import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
@@ -32,7 +32,7 @@ const sec = (s) => console.log("\n" + s);
 async function runInEngineOrigin({ engineRoot, script, args = null, reducedMotion = null }) {
     if (!fs.existsSync(HEADLESS_SHELL)) return { ok: false, skipped: true, reason: "no headless shell", result: null, pageErrors: [] };
     const pw = resolvePlaywright();
-    if (!pw) return { ok: false, skipped: true, reason: "playwright not resolvable", result: null, pageErrors: [] };
+    if (!pw.chromium) return { ok: false, skipped: true, reason: browserSkipReason(pw.chromium, pw.from, HEADLESS_SHELL), result: null, pageErrors: [] };
     const root = path.resolve(engineRoot);
     const MIME = { ".js": "text/javascript", ".mjs": "text/javascript", ".html": "text/html" };
     const srv = http.createServer((q, s) => {
@@ -46,7 +46,7 @@ async function runInEngineOrigin({ engineRoot, script, args = null, reducedMotio
     await new Promise((r) => srv.listen(0, SECURE_HOST, r));
     let browser = null;
     try {
-        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader", "--enable-unsafe-webgpu"] });
+        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args, "--enable-unsafe-webgpu"] });
         const page = await browser.newPage();
         if (reducedMotion) await page.emulateMedia({ reducedMotion });
         const pageErrors = [];
@@ -172,6 +172,34 @@ async function main() {
                r5.result.glowStable, `glow readings: stable=${r5.result.glowStable}`);
             ok("!! and a real pixel is still drawn (a frozen frame, not a blank transparent one)",
                r5.result.centrePixel[3] > 200, `centre rgba=${JSON.stringify(r5.result.centrePixel)}`);
+        }
+    }
+
+    sec("5b. *** v4825 -- THE SAME ORB AS THE AVATAR PANEL: the species the picker saved, refused if it is not one of eighteen ***");
+    {
+        // SABOTAGED, each restored: the widget's read of the saved species removed -> RED (comet mounts still);
+        // the ORB_SPECIES check removed -> RED (a bogus name reaches the builder, which throws, and nothing mounts).
+        const SPECIES_SCRIPT = `async ({ forceWebGL }) => {
+            const { mountAiPresenceOrbWidget, ORB_SPECIES_KEY } = await import("/ui/aiPresenceOrbWidget.js");
+            const out = { key: ORB_SPECIES_KEY };
+            for (const [label, saved, opt] of [["saved", "comet", null], ["bogus", "nonsense", null], ["explicit", "comet", "prism"]]) {
+                localStorage.setItem(ORB_SPECIES_KEY, saved);
+                const h = await mountAiPresenceOrbWidget(opt ? { forceWebGL, species: opt } : { forceWebGL });
+                out[label] = h ? h.species : null;
+                if (h) h.remove();
+            }
+            localStorage.removeItem(ORB_SPECIES_KEY);
+            return out;
+        }`;
+        const r6 = await runInEngineOrigin({ engineRoot: ENG, script: SPECIES_SCRIPT, args: { forceWebGL: true } });
+        const pageSrc = fs.readFileSync(path.join(ENG, "ai-presence-orb.html"), "utf8");
+        if (!r6.ok || !r6.result) ok("!! species harness ran", false, r6.reason || "no result");
+        else {
+            const R6 = r6.result;
+            ok("!! *** a saved species mounts that species; a bogus one falls back to still; an explicit option wins ***",
+               R6.saved === "comet" && R6.bogus === "still" && R6.explicit === "prism", JSON.stringify(R6));
+            ok("  ...and the page's picker saves under the very key the widget reads",
+               new RegExp(`const SPECIES_KEY = "${R6.key.replace(".", "\\.")}"`).test(pageSrc), `key ${R6.key}`);
         }
     }
 
