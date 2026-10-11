@@ -197,6 +197,25 @@ node tools/denoiseBuildProbe.mjs --browser-only --out denoise-build-probe-chrome
 ```
 
 
+### Round 17: two questions, one probe (pre-registration section 59)
+
+The branch `claude/denoiser-round17` asks two things in one probe:
+- **(2) the tile idea once more,** with its weights read where they are used, timed at real sizes;
+- **(3) the fast kernel written two other ways:** reading four tile channels at a time, and a block's taps and channels
+  written out with its weights at constant offsets.
+
+Every shape adds the same numbers in the same order. On each GPU:
+
+```
+git fetch origin claude/denoiser-round17
+git checkout -B claude/denoiser-round17 FETCH_HEAD
+cd WebGLEngine
+node tools/denoiseBuildProbe.mjs --out denoise-build-probe-r17.json
+```
+
+Each shape builds once in its own process, stopped at 3 minutes, and is timed at 64, 256 and 1024 square, natively and then
+in Chrome. Send back `denoise-build-probe-r17.json`. Section 59 fixes, before it runs, which shapes earn a full run.
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and

@@ -323,6 +323,160 @@ export function packFastUniforms({ H, W, layer }) {
     return f;
 }
 
+// ---- THE FAST KERNEL, TWO OTHER WAYS (the denoiser arc, round 17: pre-registration section 59) --------------------------
+//
+// Round 16's pixel-tiled kernel did not build under FXC, and was not faster in Chrome (sections 57-58). These are the fast
+// kernel itself -- a thread one pixel and FAST_GROUP channels, the same bindings and dispatch -- written two other ways, each
+// of which leaves every cell's order as it was:
+//   reads: "vec4"  the tile holds each pixel's block of CB channels as CB / 4 vec4s, so a thread reads four channels from
+//                  workgroup memory in one load, then adds them one lane at a time, ci ascending -- a quarter of the loads;
+//   unroll: true   within a block of CB channels, the taps and channels are written out, and the weights are packed BLOCK
+//                  BY BLOCK (packFastAltUniforms: F.w[block][tap, channel, vec4]), so a weight's index within its block is
+//                  a constant -- no channel loop, no per-read index arithmetic, no bound clamp but the block's. A tap
+//                  outside the image is skipped by an `if` around it, as the fast kernel skips it with `continue`. The loop
+//                  over blocks stays a loop: writing out all four of a 32-channel layer's blocks (2,304 multiply-adds a
+//                  thread) crashed SwiftShader's pipeline build, here, where one block (576) builds.
+// *** NOT ONE CELL'S ORDER MOVES. *** Each accumulator adds b, then block by block, ky, kx (in bounds), ci -- conv2dCpu's
+// order -- so either way, and both, are held to the same twin, cell for cell, at zero.
+const FAST_READS = Object.freeze(["f32", "vec4"]);
+/**
+ * The fast kernel's other ways' shape for a layer and { reads, unroll }: the fast kernel's, but with unroll the uniform
+ * block holds whole blocks of CB channels (the last padded with zero weights), block-major.
+ */
+export function fastAltShape({ Cin, Cout, k }, { reads = "f32", unroll = false } = {}) {
+    const F = fastShape({ Cin, Cout, k }), blocks = Math.ceil(Cin / CB), perBlock = k * k * CB * F.C4;
+    const bytes = unroll ? 16 + 16 * F.C4 + 16 * blocks * perBlock : F.bytes;
+    return { ...F, reads, unroll, blocks, perBlock, bytes, fits: F.fits && FAST_READS.includes(reads) && bytes <= UNIFORM_MAX };
+}
+/** The fast kernel written another way (entry k_conv_fast_alt): { reads: "f32" | "vec4", unroll: false | true }. */
+export function conv2dFastAltWgsl({ Cin, Cout, k, act = "none" }, { reads = "f32", unroll = false } = {}) {
+    const S = fastAltShape({ Cin, Cout, k }, { reads, unroll });
+    if (!S.fits) throw new Error(`conv2d: the fast kernel's other ways hold reads ${FAST_READS.join(" or ")} and a layer whose weights fit one ${UNIFORM_MAX}-byte uniform binding -- got reads ${reads}, ${S.bytes} bytes for ${Cin} -> ${Cout}, k ${k}${unroll ? " written out" : ""}`);
+    const R = (k - 1) / 2, HW = TILE + k - 1, G = S.g4, js = Array.from({ length: G }, (_, j) => j), lanes = ["x", "y", "z", "w"];
+    const v4 = reads === "vec4", Q = CB / 4, partial = Cin % CB !== 0, full = Math.floor(Cin / CB), tail = Cin - full * CB;
+    // the tile load: f32 as the fast kernel's (pixel t, channel cj at t nb + cj); vec4 as Q vec4s a pixel, lanes past nb zero
+    const load = (c0, nb, guard) => v4
+        ? `for (var i = lid.y * ${TILE}u + lid.x; i < ${HW * HW * Q}u; i = i + ${TILE * TILE}u) {
+            let q = i % ${Q}u; let t = i / ${Q}u; let sx = ox + i32(t % ${HW}u); let sy = oy + i32(t / ${HW}u);
+            var v = vec4<f32>(0.0);
+            if (sx >= 0 && sx < i32(F.W) && sy >= 0 && sy < i32(F.H)) {
+                let o = (u32(sy) * F.W + u32(sx)) * ${Cin}u + ${c0} + 4u * q;
+                ${lanes.map((l, n) => (guard ? `if (4u * q + ${n}u < ${nb}) { v.${l} = X[o + ${n}u]; }` : `v.${l} = X[o + ${n}u];`)).join(" ")}
+            }
+            T[i] = v;
+        }`
+        : `for (var i = lid.y * ${TILE}u + lid.x; i < ${HW * HW}u * ${nb}; i = i + ${TILE * TILE}u) {
+            let cj = i % ${nb}; let t = i / ${nb}; let sx = ox + i32(t % ${HW}u); let sy = oy + i32(t / ${HW}u);
+            var v = 0.0;
+            if (sx >= 0 && sx < i32(F.W) && sy >= 0 && sy < i32(F.H)) { v = X[(u32(sy) * F.W + u32(sx)) * ${Cin}u + ${c0} + cj]; }
+            T[i] = v;
+        }`;
+    // one channel's adds into every accumulator, from x, in the order j -- each lane a cell of its own
+    const adds = (x, w) => js.map((j) => `a${j} = a${j} + ${x} * ${w(j)};`).join(" ");
+    let body;
+    if (!unroll) {
+        // the fast kernel's loops; vec4 reads take a block's channels Q vec4s at a time, lane by lane
+        const inner = v4
+            ? Array.from({ length: Q }, (_, q) => `{ let x4 = T[to + ${q}u];\n                        ` +
+                lanes.map((l, n) => { const ci = 4 * q + n, a = `let w = wb + ${ci}u * ${S.C4}u; ${adds(`x4.${l}`, (j) => `F.w[w + ${j}u]`)}`;
+                    return partial ? `if (${ci}u < nb) { ${a} }` : `{ ${a} }`; }).join("\n                        ") + " }").join("\n                    ")
+            : `for (var cj = 0u; cj < nb; cj = cj + 1u) {
+                        let x = T[to + cj]; let w = wb + cj * ${S.C4}u;
+                        ${adds("x", (j) => `F.w[w + ${j}u]`)}
+                    }`;
+        body = `    for (var c0 = 0u; c0 < ${Cin}u; c0 = c0 + ${CB}u) {
+        let nb = min(${CB}u, ${Cin}u - c0);
+        ${load("c0", "nb", partial)}
+        workgroupBarrier();
+        if (inside) {
+            for (var ky = 0u; ky < ${k}u; ky = ky + 1u) {
+                let sy = i32(py) + i32(ky) - ${R};
+                if (sy < 0 || sy >= i32(F.H)) { continue; }
+                for (var kx = 0u; kx < ${k}u; kx = kx + 1u) {
+                    let sx = i32(px) + i32(kx) - ${R};
+                    if (sx < 0 || sx >= i32(F.W)) { continue; }
+                    let to = ((lid.y + ky) * ${HW}u + lid.x + kx) * ${v4 ? `${Q}u` : "nb"};
+                    let wb = ((ky * ${k}u + kx) * ${Cin}u + c0) * ${S.C4}u + g * ${G}u;
+                    ${inner}
+                }
+            }
+        }
+        workgroupBarrier();
+    }`;
+    } else {
+        // one block written out: its taps and nb channels are constants; the block (b) and the pixel's base in the tile are not
+        const wAt = (tap, cj, j) => { const c = (tap * CB + cj) * S.C4 + j; return S.groups === 1 ? `F.w[b][${c}u]` : `F.w[b][g * ${G}u + ${c}u]`; };
+        const taps = (nb) => Array.from({ length: k }, (_, ky) => `{ let sy = i32(py) ${ky >= R ? "+ " + (ky - R) : "- " + (R - ky)};
+            if (sy >= 0 && sy < i32(F.H)) {
+` + Array.from({ length: k }, (_, kx) => {
+                const tap = ky * k + kx, off = (ky * HW + kx) * (v4 ? Q : nb);
+                const chans = v4
+                    ? Array.from({ length: Math.ceil(nb / 4) }, (_, q) => `{ let x4 = T[tb + ${off + q}u]; ` +
+                        lanes.slice(0, Math.min(4, nb - 4 * q)).map((l, n) => adds(`x4.${l}`, (j) => wAt(tap, 4 * q + n, j))).join(" ") + " }").join("\n                    ")
+                    : Array.from({ length: nb }, (_, cj) => `{ let x = T[tb + ${off + cj}u]; ${adds("x", (j) => wAt(tap, cj, j))} }`).join("\n                    ");
+                return `                if (px + ${kx}u >= ${R}u && px + ${kx}u < F.W + ${R}u) {
+                    ${chans}
+                }`;
+            }).join("\n") + `
+            } }`).join("\n            ");
+        const block = (c0, nb, guard) => `        ${load(c0, `${nb}u`, guard)}
+        workgroupBarrier();
+        if (inside) {
+            let tb = (lid.y * ${HW}u + lid.x) * ${v4 ? Q : nb}u;
+            ${taps(nb)}
+        }
+        workgroupBarrier();`;
+        body = (full ? `    for (var b = 0u; b < ${full}u; b = b + 1u) {
+        let c0 = b * ${CB}u;
+${block("c0", CB, false)}
+    }
+` : "") + (tail ? `    { // the last block: channels ${full * CB}-${Cin - 1}
+        let b = ${full}u;
+${block(`${full * CB}u`, tail, true)}
+    }
+` : "");
+    }
+    const wDecl = unroll ? `array<array<vec4<f32>, ${S.perBlock}>, ${S.blocks}>` : `array<vec4<f32>, ${k * k * Cin * S.C4}>`;
+    return `
+struct FP { H: u32, W: u32, pad0: u32, pad1: u32, b: array<vec4<f32>, ${S.C4}>, w: ${wDecl} };
+@group(0) @binding(0) var<storage, read_write> Y: array<f32>;   // H x W x ${Cout}
+@group(0) @binding(1) var<uniform> F: FP;                        // packFastAltUniforms
+@group(0) @binding(2) var<storage, read>       X: array<f32>;   // H x W x ${Cin}
+var<workgroup> T: array<${v4 ? "vec4<f32>" : "f32"}, ${HW * HW * (v4 ? Q : CB)}>;
+@compute @workgroup_size(${TILE}, ${TILE}, 1)
+fn k_conv_fast_alt(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>,
+                   @builtin(workgroup_id) wid: vec3<u32>) {
+    let ox = i32(wid.x * ${TILE}u) - ${R}; let oy = i32(wid.y * ${TILE}u) - ${R};
+    let px = gid.x; let py = gid.y; let g = wid.z;
+    let inside = px < F.W && py < F.H;
+    ${js.map((j) => `var a${j} = F.b[g * ${G}u + ${j}u];`).join("\n    ")}
+${body}
+    if (!inside) { return; }
+    let o = (py * F.W + px) * ${Cout}u; let c = g * ${G * 4}u;
+    ${js.map((j) => (act === "relu" ? `a${j} = max(a${j}, vec4<f32>(0.0));\n    ` : "") +
+        lanes.map((l, n) => `if (c + ${4 * j + n}u < ${Cout}u) { Y[o + c + ${4 * j + n}u] = a${j}.${l}; }`).join(" ")).join("\n    ")}
+}
+`;
+}
+/**
+ * The other ways' uniform block: without unroll, packFastUniforms' own; with it, H and W, the bias, then the weights block by
+ * block -- weight (co, ky, kx, ci) at vec4 b perBlock + ((ky k + kx) CB + cj) C4 + co / 4, lane co % 4, for ci = b CB + cj,
+ * the last block's channels past Cin zero. Refuses what the kernel cannot hold, by name.
+ */
+export function packFastAltUniforms({ H, W, layer }, opts = {}) {
+    const { Cin, Cout, k } = layer, S = fastAltShape(layer, opts);
+    if (!S.fits) throw new Error(`conv2d: the fast kernel's other ways cannot hold ${Cin} -> ${Cout}, k ${k}: ${S.bytes} bytes`);
+    if (!S.unroll) return packFastUniforms({ H, W, layer });
+    const buf = new ArrayBuffer(S.bytes), u = new Uint32Array(buf), f = new Float32Array(buf), w0 = 4 + 4 * S.C4;
+    u[0] = H; u[1] = W;
+    for (let co = 0; co < Cout; co++) f[4 + co] = layer.b[co];
+    for (let co = 0; co < Cout; co++) for (let ky = 0; ky < k; ky++) for (let kx = 0; kx < k; kx++) for (let ci = 0; ci < Cin; ci++) {
+        const b = Math.floor(ci / CB), cj = ci % CB;
+        f[w0 + 4 * (b * S.perBlock + ((ky * k + kx) * CB + cj) * S.C4) + co] = layer.W[((co * k + ky) * k + kx) * Cin + ci];
+    }
+    return f;
+}
+
 // ---- THE HEAD KERNEL (the denoiser arc, round 14: pre-registration section 43) ------------------------------------
 //
 // Section 42: the fast kernel's 81-logit head ran 1,900 times slower natively (node-webgpu, D3D12) than in Chrome, on the
@@ -400,23 +554,29 @@ export function packHeadUniforms({ H, W, layer }) {
 //   "zero"  no guarded branch: every pixel adds every tap of an in-image row, and a tap outside the image adds the zero the
 //           tile holds there. Adding a zero product is the skip except in the SIGN of a zero (sabotage P7), which `===`
 //           does not see and WGSL lets an implementation ignore -- so it is held to the same twin, cell for cell.
-const TILE_PX = Object.freeze([1, 2, 4]), TILE_EDGE = Object.freeze(["skip", "zero"]);
+// *** THE WEIGHTS, TWO WAYS (section 59). *** Section 58 found FXC compiling each weight read of this kernel into a scan of the
+// whole weight array, where it reads the fast kernel's as one indexed operand. The one difference in how they are written:
+// here each weight read is stored once and used for every pixel; there it is used where it is read. `weights` names which:
+//   "hoist"  (sections 54-58) -- let w<j> = F.w[...], then one multiply-add a pixel;
+//   "inline" every pixel's multiply-add reads F.w[...] itself, as the fast kernel's does. The same weights, the same adds in
+//            the same order -- the same cells.
+const TILE_PX = Object.freeze([1, 2, 4]), TILE_EDGE = Object.freeze(["skip", "zero"]), TILE_WEIGHTS = Object.freeze(["hoist", "inline"]);
 /**
  * The pixel-tiled kernel's shape for a layer and a configuration { px, g4 }: G4 vec4s a pixel keeps (at most the layer's
  * own), groups of them across z, C4 vec4s of padded output channels, the uniform block's bytes, the tile's width and
  * height with its halo, its workgroup bytes, and whether the device's default limits hold it.
  */
-export function tileShape({ Cin, Cout, k }, { px = 2, g4 = FAST_GROUP / 4, edge = "skip" } = {}) {
+export function tileShape({ Cin, Cout, k }, { px = 2, g4 = FAST_GROUP / 4, edge = "skip", weights = "hoist" } = {}) {
     const c4 = Math.ceil(Cout / 4), G = Math.min(g4, c4), groups = Math.ceil(c4 / G), C4 = groups * G;
     const bytes = 16 + 16 * C4 + 16 * k * k * Cin * C4, TW = TILE * px + k - 1, TH = TILE + k - 1, wgBytes = TW * TH * CB * 4;
-    return { px, g4: G, groups, C4, bytes, TW, TH, wgBytes, edge,
-             fits: k % 2 === 1 && TILE_PX.includes(px) && TILE_EDGE.includes(edge) && g4 >= 1 && bytes <= UNIFORM_MAX && wgBytes <= WORKGROUP_MAX };
+    return { px, g4: G, groups, C4, bytes, TW, TH, wgBytes, edge, weights,
+             fits: k % 2 === 1 && TILE_PX.includes(px) && TILE_EDGE.includes(edge) && TILE_WEIGHTS.includes(weights) && g4 >= 1 && bytes <= UNIFORM_MAX && wgBytes <= WORKGROUP_MAX };
 }
 
 /** The pixel-tiled kernel (entry k_conv_tile), generated for one layer and one { px, g4 }. */
 export function conv2dTileWgsl({ Cin, Cout, k, act = "none" }, cfg = {}) {
     const S = tileShape({ Cin, Cout, k }, cfg);
-    if (!S.fits) throw new Error(`conv2d: the pixel-tiled kernel holds an odd k, px in ${TILE_PX.join("/")}, edge ${TILE_EDGE.join(" or ")}, weights in one ${UNIFORM_MAX}-byte uniform binding and a tile in ${WORKGROUP_MAX} bytes -- got ${Cin} -> ${Cout}, k ${k}, px ${cfg.px}, ${S.bytes} + ${S.wgBytes} bytes`);
+    if (!S.fits) throw new Error(`conv2d: the pixel-tiled kernel holds an odd k, px in ${TILE_PX.join("/")}, edge ${TILE_EDGE.join(" or ")}, weights ${TILE_WEIGHTS.join(" or ")}, its weights in one ${UNIFORM_MAX}-byte uniform binding and a tile in ${WORKGROUP_MAX} bytes -- got ${Cin} -> ${Cout}, k ${k}, px ${cfg.px}, ${S.bytes} + ${S.wgBytes} bytes`);
     const R = (k - 1) / 2, G = S.g4, P = S.px, js = Array.from({ length: G }, (_, j) => j), ps = Array.from({ length: P }, (_, p) => p), skip = S.edge === "skip";
     const lanes = ["x", "y", "z", "w"], a = (p, j) => `a${p}_${j}`;
     return `
@@ -453,7 +613,8 @@ fn k_conv_tile(@builtin(local_invocation_id) lid: vec3<u32>, @builtin(workgroup_
                         for (var cj = 0u; cj < nb; cj = cj + 1u) {
                             ${ps.map((p) => `let v${p} = T[t${p} + cj];`).join(" ")}
                             let w = wb + cj * ${S.C4}u;
-                            ${js.map((j) => `let w${j} = F.w[w + ${j}u]; ` + ps.map((p) => `${a(p, j)} = ${a(p, j)} + v${p} * w${j};`).join(" ")).join("\n                            ")}
+                            ${js.map((j) => (S.weights === "inline" ? ps.map((p) => `${a(p, j)} = ${a(p, j)} + v${p} * F.w[w + ${j}u];`).join(" ")
+                                : `let w${j} = F.w[w + ${j}u]; ` + ps.map((p) => `${a(p, j)} = ${a(p, j)} + v${p} * w${j};`).join(" "))).join("\n                            ")}
                         }
                     }${skip ? ` else {
                         for (var cj = 0u; cj < nb; cj = cj + 1u) {

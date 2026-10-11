@@ -3454,3 +3454,82 @@ wrote a few subtractions.
 - In Chrome, where nothing stops the build, it was slower than the fast kernel at the one size measured.
 - So a round that returns to the tile kernel would first need its Chrome speed at the ladder's real sizes. The probe times
   only one 64 x 64 pass.
+
+## 59. ROUND 17 -- TWO QUESTIONS, ONE PROBE: FIXED BEFORE IT RUNS ON EITHER GPU
+
+**Why this round.** Section 58 left two questions, and Keith asked for both to be tried:
+- **(2) Is the tile idea worth one more look?**
+  - In section 58's dumps, every tile shape stored each weight read in a local, and FXC compiled each read into a scan of
+    the whole weight array.
+  - Does the tile kernel build under FXC when every pixel's multiply-add reads its weight itself, as the fast kernel's
+    does?
+  - And is any tile shape faster than the fast kernel in Chrome at a real size, not only at 64 x 64?
+- **(3) Is the fast kernel itself faster written another way,** with every cell's order unchanged?
+
+**What changes. Built and piloted here first, on SwiftShader only.**
+- **`brain/conv2d.mjs`: `conv2dFastAltWgsl(layer, { reads, unroll })`,** with `fastAltShape` and `packFastAltUniforms`.
+  It is the fast kernel's thread, bindings and dispatch, written two other ways:
+  - **`reads: "vec4"`:** the tile holds a pixel's block of 8 channels as 2 vec4s, so a thread reads four channels in one
+    load, then adds them a lane at a time, ci ascending.
+  - **`unroll: true`:** within a block of 8 channels, every tap and channel is written out. The weights are packed block
+    by block, so every weight read is `F.w[b][constant]`. Only the block index is clamped, and a weight read needs no
+    loop counter and no index arithmetic of its own.
+    - A tap outside the image is skipped by an `if`, as the fast kernel skips it with `continue`.
+    - The loop over blocks stays a loop. Writing out all four of a 32-channel layer's blocks, 2,304 multiply-adds a thread,
+      crashed SwiftShader's pipeline build here. One block, 576, builds.
+- **`conv2dTileWgsl`'s `weights: "inline"`:** every pixel reads its weight where it uses it. "hoist" stays the default,
+  byte for byte.
+- **Every cell's order is unchanged:** b, then block by block, ky, kx (in bounds), ci. So every new shape is held to the
+  twin, cell for cell. On SwiftShader every case was exact, and the fast kernel's bits:
+  - 10 -> 32, 19 -> 11 (two whole blocks and a last of three), 13 -> 6, and 32 -> 81 in three groups;
+  - each written out or not, f32 or vec4.
+- **`render/denoiseCompile.mjs`:**
+  - `BUILD_PROBE_R17`, seven shapes on round 13's 32 -> 32 layer:
+    - the fast kernel;
+    - vec4, written out, and both;
+    - the tile kernel at 2 x 8 and 4 x 4 with edge zero and inline weights;
+    - 1 x 8 with edge skip and inline weights, which is section 57's stopped 1 x 8 with its weights inline.
+  - `measureSizes`, which builds a shape once and times it at each size, judging it at 64 x 64.
+- **`tools/denoiseBuildProbe.mjs`:** `--probe r17` (the default) at `--sizes 64,256,1024`, natively, each shape in its own
+  process stopped at 180 s, then in Chrome. `--probe r16` is section 56's.
+- **The gates:**
+  - `brain/conv2d-selfcheck.mjs` holds every new shape to the twin. On a D3D12 adapter its rows stand aside until this
+    probe shows FXC builds them.
+  - The corpus entry is compile-only.
+  - Sabotages Q1-Q5: four red as built; Q4 0 red, as P7 was.
+- **The pilot:** every shape built and was exact natively and in Chromium, at 64 and 128. Those times are a CPU's, and no
+  threshold below was read from them.
+
+**What the probe may choose, fixed now.**
+- **A shape qualifies** when all three of these hold on both GPUs:
+  1. **It builds natively within 60 s.** The gates build a kernel several times; the fast kernel took 3.5 and 5.0 s.
+  2. **It is exact at 64 x 64,** natively and in Chrome.
+  3. **At 1024 x 1024 in Chrome, its pass is at least 1.10 times as fast as the fast kernel's in the same probe,** on the
+     device's clock.
+- **The ranking.** The shapes that qualify are ranked by the smaller of their two GPUs' Chrome ratios at 1024. A tie goes
+  to the later shape in the list.
+- **Then a full run decides.**
+  - At most the top two become round 17's sets: r15 with every hidden layer on the shape, or on the fast kernel where
+    the shape does not fit.
+  - They are built, gated and measured here (K0 (a)).
+  - Then one `realGpuRun --only denoise` on each GPU decides by section 54's rules, unchanged: K0, K1 against r12, the
+    page rule over r15 and the round-17 sets, and the default rule over every GPU and path.
+- **If no shape qualifies,** round 17 ends. The page and the default stay "r15".
+- **Reported, deciding nothing:**
+  - every native build time and DXBC size;
+  - the 256 x 256 ratios;
+  - the native ratios at 1024. The default rule needs those in the full run, not here.
+
+**On the rig.**
+- **One run per GPU** of `node tools/denoiseBuildProbe.mjs --out denoise-build-probe-r17.json` on
+  `claude/denoiser-round17`.
+- **Each report is committed byte for byte** before it is read.
+
+**Before a full run builds a new kernel natively,** section 56's instrument mending lands:
+- a gate the runner stops is reported as stopped, with its last lines;
+- a native build past a time limit is a named red row.
+
+**Not in this round.**
+- Kernels that reorder a cell's sum.
+- Lower precision or subgroups.
+- A third way of writing a kernel chosen after this probe's results: that is a later round.

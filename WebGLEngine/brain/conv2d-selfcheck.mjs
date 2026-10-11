@@ -6,8 +6,8 @@
 // here: TILE, K_MAX, CB, COUT_MAX, conv2dForward, conv2dCpu, conv2dCpuFma, conv2dBackward, conv2dWgsl,
 // conv2dTiledWgsl, packProbeUniforms, probeFixture, probeCpu, keyCpu, PROBES -- round 13's (section 39): FAST_GROUP,
 // UNIFORM_MAX, fastShape, conv2dFastWgsl, packFastUniforms -- round 14's (section 43): headShape, conv2dHeadWgsl,
-// packHeadUniforms, planarToChannelsLast -- and round 16's (section 54): tileShape, conv2dTileWgsl, packTileUniforms,
-// tileWorkgroups.
+// packHeadUniforms, planarToChannelsLast -- round 16's (section 54): tileShape, conv2dTileWgsl, packTileUniforms,
+// tileWorkgroups -- and round 17's (section 59): fastAltShape, conv2dFastAltWgsl, packFastAltUniforms.
 //
 // What it holds: the twin to the f64 reference within f32 rounding; the identity kernel exact through every pass;
 // a 1x1 convolution BIT-IDENTICAL to the GPU Brain's dense layer (render/brainTsl.mjs's mlpLayerCpu), so the dense
@@ -59,6 +59,16 @@
 //   section 57, against the D3D12 stand-aside:
 //   Z2  every adapter read as D3D12                                             1 RED (the stand-aside row) -- the tile kernel's device
 //       rows all say SKIP, as they would on a D3D12 box; only the row holding the detector to D3D12 alone sees that it is wrong
+//   section 59, against round 17's kernels (restored, md5 verified):
+//   Q1  a vec4's four lanes added last-first                                    7 RED -- every vec4 case, written out or not; the
+//       reversal fuses some cells by accident (698 of 12,768 at 10 -> 32), and the rows read them as unexplained bits
+//   Q2  a written-out block's weights read from the next block                  6 RED (every written-out one-group case, and the code
+//       row; the 81-channel head's offsets are run-time, and it passes)
+//   Q3  the block packer files channel cj + 1 where cj belongs                  8 RED (the layout row, every written-out case, the key)
+//   Q4  a written-out tap's column guard removed                                0 RED, as P7 was: the tile holds zero outside the image,
+//       so the tap adds a zero product -- the skip but for the sign of a zero
+//   Q5  the tile kernel's inline weights: pixel 1 reads the next vec4           1 RED (the two-pixel case; the one-pixel case has no
+//       pixel 1)
 //
 // *** S5 WAS EXPECTED TO GO ZERO RED AND DID NOT. *** A missing barrier is a race, and races hide on a device that
 // runs a workgroup's threads one after another. SwiftShader does run them in order -- which is exactly why it is
@@ -73,7 +83,8 @@ const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
 const C = await imp("brain/conv2d.mjs");
 const { TILE, K_MAX, CB, COUT_MAX, conv2dForward, conv2dCpu, conv2dCpuFma, conv2dBackward, conv2dWgsl, conv2dTiledWgsl,
         packProbeUniforms, probeFixture, probeCpu, keyCpu, PROBES, FAST_GROUP, UNIFORM_MAX, fastShape, conv2dFastWgsl, packFastUniforms,
-        headShape, conv2dHeadWgsl, packHeadUniforms, planarToChannelsLast, tileShape, conv2dTileWgsl, packTileUniforms, tileWorkgroups } = C;
+        headShape, conv2dHeadWgsl, packHeadUniforms, planarToChannelsLast, tileShape, conv2dTileWgsl, packTileUniforms, tileWorkgroups,
+        fastAltShape, conv2dFastAltWgsl, packFastAltUniforms } = C;
 const { mlpLayerCpu } = await imp("render/brainTsl.mjs");
 const H = await imp("tools/ship/headlessGpu.mjs");
 
@@ -83,6 +94,9 @@ const H = await imp("tools/ship/headlessGpu.mjs");
 // and its device rows on any other backend (SwiftShader, Vulkan, Metal), still hold.
 const fxcAdapter = (ad) => /\bD3D12\b/i.test(ad?.description || "");
 const FXC_SKIP = "the pixel-tiled kernel is not built natively on a D3D12 adapter: node-webgpu's FXC did not finish it in 3 minutes on either GPU (section 57)";
+// section 59: round 17's kernels -- the fast kernel's other ways, the tile kernel's inline weights -- stand aside there too until
+// the probe shows FXC builds them; the probe builds each under a cap, so no gate has to find out by waiting
+const FXC_SKIP_R17 = "round 17's kernels are not built natively on a D3D12 adapter until tools/denoiseBuildProbe.mjs shows FXC builds them (section 59)";
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const t0 = Date.now();
@@ -270,6 +284,34 @@ console.log("\n5c. THE PIXEL-TILED KERNEL'S SHAPE AND UNIFORM BLOCK, ON THE CPU 
         !fxcAdapter({ description: "Vulkan driver" }) && !fxcAdapter({ description: "Metal driver on macOS" }) && !fxcAdapter(null));
 }
 
+console.log("\n5d. THE FAST KERNEL'S OTHER WAYS, AND THE TILE KERNEL'S INLINE WEIGHTS, ON THE CPU (round 17)");
+{
+    // without unroll the block is packFastUniforms' own; with it, block by block -- every weight read back where it lands for
+    // 19 -> 11, two whole blocks and a last of three, the padding (channels past Cin, lanes past Cout) zero
+    const F = probeFixture({ H: 5, W: 6, Cin: 19, Cout: 11, k: 3, act: "none", seed: 29 }), L = F.layer, S = fastAltShape(L, { unroll: true });
+    const f = packFastAltUniforms({ H: 5, W: 6, layer: L }, { unroll: true }), u = new Uint32Array(f.buffer), w0 = 4 + 4 * S.C4;
+    let misplaced = 0, nonzero = 0, placed = 0;
+    for (let co = 0; co < 11; co++) { if (f[4 + co] !== L.b[co]) misplaced++;
+        for (let t = 0; t < 9; t++) for (let ci = 0; ci < 19; ci++) { const at = w0 + 4 * (Math.floor(ci / CB) * S.perBlock + (t * CB + ci % CB) * S.C4) + co; placed++;
+            if (f[at] !== L.W[(co * 9 + t) * 19 + ci]) misplaced++; } }
+    for (let i = w0; i < f.length; i++) if (f[i] !== 0) nonzero++;
+    const flat = packFastAltUniforms({ H: 5, W: 6, layer: L }, { reads: "vec4" });
+    ok(`!! round 17: written out, the uniform block holds the weights block by block -- ${S.blocks} blocks of ${S.perBlock} vec4s for 19 -> 11, the last block's channels past Cin zero; without unroll it is packFastUniforms' own, bit for bit`,
+        misplaced === 0 && nonzero === placed - [...L.W].filter((v) => v === 0).length && S.blocks === 3 && S.perBlock === 9 * CB * S.C4 && f.length * 4 === S.bytes &&
+        u[0] === 5 && u[1] === 6 && same(Array.from(flat), Array.from(packFastUniforms({ H: 5, W: 6, layer: L }))),
+        `${misplaced} misplaced, ${nonzero} nonzero of ${placed} placed, ${S.bytes} bytes`);
+    const L32 = { Cin: 32, Cout: 32, k: 3, act: "relu" }, cv = conv2dFastAltWgsl(L32, { reads: "vec4" }), cu = conv2dFastAltWgsl(L32, { unroll: true }), cb = conv2dFastAltWgsl(L32, { reads: "vec4", unroll: true });
+    const refuse = (fn) => { try { fn(); return null; } catch (e) { return e.message; } };
+    ok("  their code: vec4 reads a pixel's 8 channels as 2 vec4s; written out, no channel loop and every weight at a constant offset in its block (F.w[b][...]), 576 multiply-adds a block; an unknown reads is refused",
+        /var<workgroup> T: array<vec4<f32>, 200>/.test(cv) && /let x4 = T\[to \+ 1u\]/.test(cv) && !/for \(var cj/.test(cu) && (cu.match(/F\.w\[b\]\[\d+u\]/g) || []).length === 576 &&
+        !/F\.w\[w/.test(cu) && (cb.match(/let x4 = T\[tb \+ \d+u\]/g) || []).length === 18 && /reads f32 or vec4/.test(refuse(() => conv2dFastAltWgsl(L32, { reads: "f16" })) || "") &&
+        !fastAltShape({ Cin: 64, Cout: 32, k: 3 }, { unroll: true }).fits);
+    const ti = conv2dTileWgsl(L32, { px: 2, g4: 8, edge: "zero", weights: "inline" }), th = conv2dTileWgsl(L32, { px: 2, g4: 8, edge: "zero" });
+    ok("  the tile kernel's weights \"inline\": no weight held in a let, each pixel's multiply-add reading F.w itself -- \"hoist\" the default, as sections 54-58 ran it",
+        !/let w0 = F\.w/.test(ti) && (ti.match(/v1 \* F\.w\[w \+ \du\]/g) || []).length === 8 && /let w0 = F\.w/.test(th) &&
+        th === conv2dTileWgsl(L32, { px: 2, g4: 8, edge: "zero", weights: "hoist" }) && /weights hoist or inline/.test(refuse(() => conv2dTileWgsl(L32, { weights: "both" })) || ""));
+}
+
 console.log("\n6. *** EVERY KERNEL ON THE DEVICE, CELL FOR CELL AGAINST THE TWIN ***");
 const skip = H.headlessGpuSkipReason ? H.headlessGpuSkipReason() : null;
 if (skip) console.log("  SKIP  " + skip);
@@ -376,6 +418,41 @@ else {
         }
         ok("  the identity key on the device, 9 x 21: the pixel-tiled kernel returns its input bit for bit at 2 and at 4 pixels a thread, edge skip and edge zero", out.every(Boolean), out.join(", "));
     }
+    }
+    // round 17 (section 59): the fast kernel's other ways, against the twin and the fast kernel's own bits on the same case --
+    // a partial last block (10 -> 32), two whole blocks and a last of three (19 -> 11), a head in three groups (its weights'
+    // offsets then run-time), and 32 -> 32 written out with vec4 reads; then the tile kernel's inline weights
+    if (fxcAdapter(adapter)) console.log(`  SKIP  round 17's device cases: ${FXC_SKIP_R17}`);
+    else {
+        const alt = (a, o) => { const F = probeFixture(a); return H.runWgslComputeNative({ code: conv2dFastAltWgsl(a, o), entryPoint: "k_conv_fast_alt", outCount: a.H * a.W * a.Cout,
+            uniforms: packFastAltUniforms({ H: a.H, W: a.W, layer: F.layer }, o), workgroups: [Math.ceil(a.W / TILE), Math.ceil(a.H / TILE), fastAltShape(a, o).groups], inputs: [{ binding: 2, data: F.x }] }); };
+        for (const [a, opts] of [[{ H: 21, W: 19, Cin: 10, Cout: 32, k: 3, act: "relu", seed: 41 }, [{ reads: "f32" }, { reads: "vec4" }, { unroll: true }, { reads: "vec4", unroll: true }]],
+                                 [{ H: 11, W: 7, Cin: 19, Cout: 11, k: 3, act: "none", seed: 53 }, [{ reads: "vec4" }, { unroll: true }, { reads: "vec4", unroll: true }]],
+                                 [{ H: 9, W: 17, Cin: 32, Cout: 81, k: 1, act: "none", seed: 47 }, [{ reads: "vec4" }, { reads: "vec4", unroll: true }]],
+                                 [{ H: 19, W: 13, Cin: 32, Cout: 32, k: 3, act: "relu", seed: 43 }, [{ reads: "vec4", unroll: true }]]]) {
+            const rf = await fast(a), jf = rf.ok ? judge(rf, a) : null;
+            for (const o of opts) {
+                const r = await alt(a, o), j = r.ok ? judge(r, a) : null;
+                ok(`!! round 17: the fast kernel ${o.reads === "vec4" ? "reading vec4s" : "reading f32s"}${o.unroll ? ", written out" : ""}, ${a.H} x ${a.W}, ${a.Cin} -> ${a.Cout}, k ${a.k}: every cell explained -- and where neither fused, the fast kernel's own bits`,
+                    r.ok && rf.ok && j.unexplained === 0 && (j.fused || jf.fused || same(Array.from(r.values), Array.from(rf.values))),
+                    r.ok && rf.ok ? `${j.fused} fused, fast ${jf.fused} fused of ${j.n}` : (r.reason || rf.reason) + " " + (r.errors || []).join("; "));
+            }
+        }
+        const tile = (a, cfg) => { const F = probeFixture(a); return H.runWgslComputeNative({ code: conv2dTileWgsl(a, cfg), entryPoint: "k_conv_tile", outCount: a.H * a.W * a.Cout,
+            uniforms: packTileUniforms({ H: a.H, W: a.W, layer: F.layer }, cfg), workgroups: tileWorkgroups(a.H, a.W, a, cfg), inputs: [{ binding: 2, data: F.x }] }); };
+        for (const [a, cfg] of [[{ H: 21, W: 19, Cin: 10, Cout: 32, k: 3, act: "relu", seed: 41 }, { px: 2, g4: 8, edge: "zero" }], [{ H: 11, W: 37, Cin: 13, Cout: 11, k: 3, act: "none", seed: 53 }, { px: 1, g4: 8, edge: "skip" }]]) {
+            const [ri, rh] = [await tile(a, { ...cfg, weights: "inline" }), await tile(a, cfg)], ji = ri.ok ? judge(ri, a) : null, jh = rh.ok ? judge(rh, a) : null;
+            ok(`!! round 17: the tile kernel's inline weights, ${a.H} x ${a.W}, ${a.Cin} -> ${a.Cout}, ${cfg.px} px, edge ${cfg.edge}: every cell explained -- and where neither fused, its hoisted weights' bits`,
+                ri.ok && rh.ok && ji.unexplained === 0 && (ji.fused || jh.fused || same(Array.from(ri.values), Array.from(rh.values))),
+                ri.ok && rh.ok ? `inline ${ji.fused} fused, hoist ${jh.fused} fused of ${ji.n}` : (ri.reason || rh.reason) + " " + (ri.errors || []).join("; "));
+        }
+        const K = keyCpu({ H: 9, W: 21, C: 5 }), out = [];
+        for (const o of [{ reads: "vec4" }, { unroll: true }, { reads: "vec4", unroll: true }]) {
+            const kt = await H.runWgslComputeNative({ code: conv2dFastAltWgsl(K.layer, o), entryPoint: "k_conv_fast_alt", outCount: K.x.length, uniforms: packFastAltUniforms({ H: K.H, W: K.W, layer: K.layer }, o),
+                workgroups: [Math.ceil(K.W / TILE), Math.ceil(K.H / TILE), 1], inputs: [{ binding: 2, data: K.x }] });
+            out.push(kt.ok && K.x.every((v, i) => Math.fround(kt.values[i]) === v));
+        }
+        ok("  the identity key on the device, 9 x 21, five channels (one partial block): the fast kernel's other ways return their input bit for bit", out.every(Boolean), out.join(", "));
     }
     {
         const K1 = keyCpu({ k: 1, C: 5 }), n = K1.H * K1.W, ka1 = { H: K1.H, W: K1.W, Cin: K1.layer.Cin, Cout: K1.layer.Cout, k: 1, act: "none" };

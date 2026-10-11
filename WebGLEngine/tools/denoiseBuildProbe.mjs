@@ -1,6 +1,11 @@
 // WebGLEngine/tools/denoiseBuildProbe.mjs -- the denoiser arc, section 56: which kernel shapes FXC can build
 //
-// Run:  node tools/denoiseBuildProbe.mjs [--out <file>] [--cap <seconds>] [--native-only | --browser-only]
+// Run:  node tools/denoiseBuildProbe.mjs [--probe r17|r16] [--sizes 64,256,1024] [--out <file>] [--cap <seconds>]
+//                                          [--native-only | --browser-only]
+//
+// --probe r17 (the default; section 59): round 17's shapes, render/denoiseCompile.mjs's BUILD_PROBE_R17, each built ONCE and
+// timed at every size in --sizes (default 64, 256 and 1024), held to the twin at 64 x 64. --probe r16 is section 56's list,
+// BUILD_PROBE, at 64 x 64 alone, as it ran then.
 //
 // Round 16's first rig runs stopped every denoiser gate at realGpuRun's 30-minute cap, on both GPUs, in each gate's native
 // part (section 56): node-webgpu's FXC never finished the pixel-tiled kernel's pipeline. This builds and runs each kernel
@@ -10,10 +15,10 @@
 //   - then in Chrome, from the engine's origin, on the browser's own adapter (its D3D12 compiler is DXC), the same list,
 //     each raced against the same cap -- launched with realGpuRun's hardware flags (section 57: without them, on Windows,
 //     the harness asks Chrome for SwiftShader, and the first probes' Chrome rows were SwiftShader's).
-// Per shape: whether it built, the build's wall-clock time, one pass on the device's clock, and whether every cell is the
-// twin's or the fused mirror's -- render/denoiseCompile.mjs's measure() -- and, natively, what Dawn's shader dump says FXC
-// made of it. The report is rewritten after every shape, so a run stopped part way keeps what it measured.
-// It decides nothing: section 56 fixes what its results may choose. It exports nothing.
+// Per shape: whether it built, the build's wall-clock time, a pass on the device's clock at each size, and whether every cell
+// at 64 x 64 is the twin's or the fused mirror's -- render/denoiseCompile.mjs's measureSizes() -- and, natively, what Dawn's
+// shader dump says FXC made of it. The report is rewritten after every shape, so a run stopped part way keeps what it measured.
+// It decides nothing itself: sections 56 and 59 fix what each probe's results may choose. It exports nothing.
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -24,8 +29,14 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SELF = fileURLToPath(import.meta.url);
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
-const { BUILD_PROBE, jobFor, measure, dumpStats } = await imp("render/denoiseCompile.mjs");
+const { BUILD_PROBE, BUILD_PROBE_R17, jobFor, measureSizes, dumpStats } = await imp("render/denoiseCompile.mjs");
 const args = process.argv.slice(2), arg = (k) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : null; };
+const PROBES = { r16: BUILD_PROBE, r17: BUILD_PROBE_R17 }, PROBE = arg("--probe") || "r17";
+if (!PROBES[PROBE]) { console.log(`[denoiseBuildProbe] no probe "${PROBE}" -- the probes are ${Object.keys(PROBES).join(", ")}`); process.exit(2); }
+const SHAPES = PROBES[PROBE], SIZES = (arg("--sizes") || (PROBE === "r16" ? "64" : "64,256,1024")).split(",").map(Number);
+if (!SIZES.length || SIZES.some((n) => !(n >= 8 && n % 8 === 0)) || SIZES[0] !== 64) { console.log("[denoiseBuildProbe] --sizes are multiples of 8, the first 64 (where each shape is held to the twin)"); process.exit(2); }
+// a device that can hold the largest size's buffers: a 32-channel layer at 1024 x 1024 is 128 MiB a buffer
+const limitsOf = (a) => ({ maxStorageBufferBindingSize: a.limits.maxStorageBufferBindingSize, maxBufferSize: a.limits.maxBufferSize });
 
 // ---- THE CHILD: one shape, node-webgpu's default adapter, Dawn's shader dump on stdout -----------------------------
 if (args.includes("--child")) {
@@ -35,9 +46,9 @@ if (args.includes("--child")) {
     try {
         H.configureVulkanIcd();
         const { mod } = H.resolveWebgpu(), gpu = mod.create(["enable-dawn-features=dump_shaders"]);
-        const v = BUILD_PROBE.find((x) => x.id === id), a = await gpu.requestAdapter(), info = a.info || {};
-        const dev = await a.requestDevice({ requiredFeatures: a.features.has("timestamp-query") ? ["timestamp-query"] : [] });
-        try { result = { ...(await measure(dev, jobFor(v))), adapter: [info.vendor, info.architecture, info.description].filter(Boolean).join(" / ") }; }
+        const v = SHAPES.find((x) => x.id === id), a = await gpu.requestAdapter(), info = a.info || {};
+        const dev = await a.requestDevice({ requiredFeatures: a.features.has("timestamp-query") ? ["timestamp-query"] : [], requiredLimits: limitsOf(a) });
+        try { result = { ...(await measureSizes(dev, v, SIZES)), adapter: [info.vendor, info.architecture, info.description].filter(Boolean).join(" / ") }; }
         finally { dev.destroy(); }
     } catch (e) { result = { built: false, reason: String(e && e.message || e).slice(0, 300) }; }
     // the result goes to a file first: on Windows a write to a pipe may still be queued when the process ends (section 45)
@@ -50,20 +61,21 @@ if (args.includes("--child")) {
 const OUT = path.resolve(arg("--out") || "denoise-build-probe.json"), CAP_S = Number(arg("--cap") || 180);
 const git = spawnSync("git", ["log", "-1", "--format=%h %cs %s"], { cwd: ENG, encoding: "utf8" });
 const report = { at: new Date().toISOString(), platform: `${process.platform} ${os.release()} ${os.arch()}`, node: process.version,
-                 commit: git.status === 0 ? git.stdout.trim().slice(0, 120) : null, capSeconds: CAP_S, native: [], browser: null };
+                 commit: git.status === 0 ? git.stdout.trim().slice(0, 120) : null, probe: PROBE, sizes: SIZES, capSeconds: CAP_S, native: [], browser: null };
 const save = () => fs.writeFileSync(OUT, JSON.stringify(report, null, 1) + "\n");
-const line = (where, id, r) => console.log(`  ${where}  ${id.padEnd(16)} ` + (r.stopped ? `STOPPED at the ${CAP_S} s cap -- not built` :
-    r.built ? `built in ${(r.buildMs / 1000).toFixed(1)} s; pass ${r.passMs.toFixed(3)} ms (${r.clock} clock); ${r.exact ? "exact" : "NOT EXACT"} -- ${r.detail}` +
-              (r.dump ? `; dump: ${r.dump.compiler}, ${r.dump.lines} lines, ${r.dump.loops} loops` : "") : `NOT BUILT -- ${r.reason}`));
-console.log(`[denoiseBuildProbe] ${report.commit}; each shape stopped at ${CAP_S} s; the report is ${OUT}`);
+const line = (where, id, r) => console.log(`  ${where}  ${id.padEnd(20)} ` + (r.stopped ? `STOPPED at the ${CAP_S} s cap -- not built` :
+    r.built ? `built in ${(r.buildMs / 1000).toFixed(1)} s; ${r.exact ? "exact" : "NOT EXACT"} at 64 x 64` + (r.dump ? `; dump: ${r.dump.compiler}, ${r.dump.lines} lines, ${r.dump.loops} loops` : "") +
+              r.sizes.map((x) => `\n      ${String(x.N).padStart(4)} x ${String(x.N).padEnd(4)} ${x.passMs.toFixed(3)} ms a pass (${x.clock} clock, ${x.passes} passes)` + (x.exact === null ? "" : ` -- ${x.detail}`)).join("")
+            : `NOT BUILT -- ${r.reason}`));
+console.log(`[denoiseBuildProbe] probe ${PROBE} at ${SIZES.join(", ")}; ${report.commit}; each shape stopped at ${CAP_S} s; the report is ${OUT}`);
 
 if (!args.includes("--browser-only")) {
     console.log("native (node-webgpu; on Windows, D3D12 through FXC), one process a shape:");
-    for (const v of BUILD_PROBE) {
+    for (const v of SHAPES) {
         const resFile = path.join(os.tmpdir(), `swek-denoise-probe-${process.pid}-${v.id}.json`);
         try { fs.unlinkSync(resFile); } catch {}
         const t0 = Date.now();
-        const r = spawnSync(process.execPath, [SELF, "--child", v.id, "--result", resFile], { cwd: ENG, encoding: "utf8", timeout: CAP_S * 1000, maxBuffer: 1 << 29 });
+        const r = spawnSync(process.execPath, [SELF, "--child", v.id, "--result", resFile, "--probe", PROBE, "--sizes", SIZES.join(",")], { cwd: ENG, encoding: "utf8", timeout: CAP_S * 1000, maxBuffer: 1 << 29 });
         let got = null; try { got = JSON.parse(fs.readFileSync(resFile, "utf8")); fs.unlinkSync(resFile); } catch {}
         const at = (r.stdout || "").lastIndexOf("@@RESULT ");
         if (!got && at >= 0) try { got = JSON.parse((r.stdout.slice(at + 9).split("\n")[0] || "").trim()); } catch {}
@@ -72,7 +84,7 @@ if (!args.includes("--browser-only")) {
         try { fs.writeFileSync(dumpFile, r.stdout || ""); } catch {}
         const res = got ? { ...got, dump: dumpStats(r.stdout || "", jobFor(v).entry) }
                         : { built: false, stopped, reason: stopped ? `stopped at the ${CAP_S} s cap` : `no result (exit ${r.status}): ${(r.stderr || "").split("\n").slice(-3).join(" ").slice(0, 200)}` };
-        report.native.push({ id: v.id, what: v.what, cfg: v.cfg || null, seconds: (Date.now() - t0) / 1000, dumpFile, ...res });
+        report.native.push({ id: v.id, what: v.what, cfg: v.cfg || v.opts || null, seconds: (Date.now() - t0) / 1000, dumpFile, ...res });
         save(); line("native ", v.id, res);
     }
 }
@@ -85,16 +97,17 @@ if (!args.includes("--native-only")) {
     // SWEK_LAUNCH_ARGS says otherwise. The report names the adapter Chrome gave, and the flags.
     const launchArgs = runLaunchArgs();
     report.browserLaunchArgs = launchArgs;
-    const r = await runInEngineOrigin({ engineRoot: ENG, launchArgs, timeoutMs: (CAP_S * BUILD_PROBE.length + 120) * 1000, args: { cap: CAP_S * 1000 }, script: `async (a) => {
+    const r = await runInEngineOrigin({ engineRoot: ENG, launchArgs, timeoutMs: (CAP_S * SHAPES.length + 120) * 1000, args: { cap: CAP_S * 1000, probe: PROBE, sizes: SIZES }, script: `async (a) => {
         const C = await import("/render/denoiseCompile.mjs"), out = [];
         if (!navigator.gpu) return { error: "no navigator.gpu" };
         let adapter = null;
-        for (const v of C.BUILD_PROBE) {
+        for (const v of (a.probe === "r16" ? C.BUILD_PROBE : C.BUILD_PROBE_R17)) {
             const ad = await navigator.gpu.requestAdapter(); if (!ad) return { error: "no adapter", out };
             const i = ad.info || {}; adapter = adapter || [i.vendor, i.architecture, i.description].filter(Boolean).join(" / ");
-            const dev = await ad.requestDevice({ requiredFeatures: ad.features.has("timestamp-query") ? ["timestamp-query"] : [] });
+            const dev = await ad.requestDevice({ requiredFeatures: ad.features.has("timestamp-query") ? ["timestamp-query"] : [],
+                                                  requiredLimits: { maxStorageBufferBindingSize: ad.limits.maxStorageBufferBindingSize, maxBufferSize: ad.limits.maxBufferSize } });
             let timer; const cap = new Promise((res) => { timer = setTimeout(() => res({ built: false, stopped: true }), a.cap); });
-            let res; try { res = await Promise.race([C.measure(dev, C.jobFor(v)), cap]); } catch (e) { res = { built: false, reason: String(e && e.message || e).slice(0, 200) }; }
+            let res; try { res = await Promise.race([C.measureSizes(dev, v, a.sizes), cap]); } catch (e) { res = { built: false, reason: String(e && e.message || e).slice(0, 200) }; }
             clearTimeout(timer);
             out.push({ id: v.id, ...res });
             if (!res.stopped) dev.destroy();

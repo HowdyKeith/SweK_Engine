@@ -833,6 +833,12 @@ export function corpus() {
         { id: "conv2d.conv2dTileWgsl", from: "brain/conv2d.mjs", compileOnly: true,
           why: "the fast kernel's convolution with two pixels a thread: each uniform weight read feeds both, a per-pixel bound test beside an all-inside branch -- compile-only, as FXC never built its pipeline (section 57); its arithmetic is held by brain/conv2d-selfcheck.mjs off D3D12",
           opts: (() => { const P = CONV.PROBES[4], a = P.args; return { code: P.code(a), entryPoint: P.entryPoint, compileOnly: true, outCount: 0 }; })() },
+        // the denoiser arc, round 17 (section 59): the fast kernel written two other ways, held to the twin by
+        // brain/conv2d-selfcheck.mjs. COMPILE-ONLY, as the tile kernel is: a native run of this corpus on a D3D12 adapter would
+        // build it through FXC before tools/denoiseBuildProbe.mjs has shown that FXC can
+        { id: "conv2d.conv2dFastAltWgsl", from: "brain/conv2d.mjs", compileOnly: true,
+          why: "the fast kernel with its tile read four channels at a time and a block's taps and channels written out, its weights block by block at constant offsets -- compile-only until the build probe shows FXC builds it (section 59)",
+          opts: { code: CONV.conv2dFastAltWgsl({ Cin: 32, Cout: 32, k: 3, act: "relu" }, { reads: "vec4", unroll: true }), entryPoint: "k_conv_fast_alt", compileOnly: true, outCount: 0 } },
         // the denoiser arc, round 15 (section 46): the head and the kernel apply as one pass -- two uniform blocks, the
         // apply's and the head's, which the one-uniform harness signature cannot bind, so compile-only here; its image is
         // held to the twin's by render/denoiseDevice-selfcheck.mjs and render/denoiseCompile-selfcheck.mjs, natively and in

@@ -70,7 +70,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SELF = fileURLToPath(import.meta.url);
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
-const { VARIANTS, BUILD_PROBE, jobFor, measure, dumpStats } = await imp("render/denoiseCompile.mjs");
+const { VARIANTS, BUILD_PROBE, BUILD_PROBE_R17, jobFor, measure, dumpStats } = await imp("render/denoiseCompile.mjs");
 
 // ---- THE CHILD: one kernel, one compiler, one process ----------------------------------------------------------
 // *** THE RESULT GOES TO A FILE. *** On the GTX 1080 (section 45) every native child exited 0 with its shader dump on
@@ -159,6 +159,13 @@ console.log("1. THE INSTRUMENT, ON THE CPU");
         new Set(P.map((v) => v.id)).size === P.length && P.every((v) => { const j = jobFor(v); return typeof j.code === "string" && j.out > 0 && j.wg.length === 3; }) &&
         P.filter((v) => v.cfg).every((v) => guarded(v) === (v.cfg.edge === "skip")) && P[0].kind === "fast" && P.slice(-2).map((v) => v.id).join() === "tile2-skip-32,tile4-skip-32",
         P.map((v) => v.id).join(", "));
+    // section 59: round 17's shapes -- each with a job at 64 x 64, judged, and at 1024, not judged (its twin is held at 64);
+    // the fast kernel first, as the baseline every other is timed against
+    const P17 = BUILD_PROBE_R17, j64 = P17.map((v) => jobFor(v)), j1k = P17.map((v) => jobFor(v, { N: 1024 }));
+    ok(`  round 17's ${P17.length} shapes (section 59) each have a job at 64 x 64, judged, and at 1024 x 1024, whose twin is not computed: the fast kernel first`,
+        new Set(P17.map((v) => v.id)).size === P17.length && P17[0].kind === "fast" && j64.every((j) => typeof j.judge === "function" && j.out === 64 * 64 * 32) &&
+        j1k.every((j, i) => j.judge === null && j.out === 1024 * 1024 * 32 && j.code === j64[i].code && j.wg[1] === 128),
+        P17.map((v) => v.id).join(", "));
 }
 
 const skip = H.headlessGpuSkipReason ? H.headlessGpuSkipReason() : null;
