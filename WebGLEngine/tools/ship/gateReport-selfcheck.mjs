@@ -32,6 +32,7 @@ import { noComments } from "./sourceScan.mjs";
 import { runInEngineOrigin } from "./webgpuHarness.mjs";
 import * as AW from "./artefactWriters.mjs";
 import { gateReport, reports, arguesInNumbers, renderedNumbers, REPORT_DIR, enabled, TABLE_ATTR, tableSelector } from "./gateReport.mjs";
+import { RED_AT_V4279 } from "./redCensus.mjs";
 
 const SELF_REPORT = gateReport("tools/ship/gateReport-selfcheck.mjs");
 let probeResult = null;
@@ -611,6 +612,21 @@ const onDisk = reports();
         const table = audit && (audit.tables || []).find((t) => t.title.startsWith("the standing reds"));
         say(`the register panel shows ${reg.length} row(s); the report holds ${table ? table.rows.length : 0}`);
 
+        // *** v4834 -- THE REGISTER IS EMPTY, AND THREE ROWS BELOW WERE PASSING ON A REPORT THAT SAID 27. ***
+        // v4826 repaired the last standing red and froze RED_AT_V4279 at zero; registerDrift's report was not re-taken
+        // until v4834, so the panel kept drawing 27 entries nobody had any more and these rows kept grading them. The
+        // rows need entries to grade rendering, so with none they do not run -- and the one thing that CAN be held is
+        // that all three sides agree on nothing: the register, the report, the panel. A register entry re-arms them.
+        // SABOTAGED (v4834): a ghost row added to the report while the register is empty -> 1 red, this row. And the
+        // empty-cell rule in gateReport.table() reverted with realGpuRun's report re-taken -> 1 red, the to-the-digit row, 2 missing.
+        if (RED_AT_V4279.length === 0) {
+            ok("!! *** the register is EMPTY and every side says so: the module, the report, the panel ***",
+               !!table && table.rows.length === 0 && reg.length === 0,
+               `RED_AT_V4279 ${RED_AT_V4279.length}, the report ${table ? table.rows.length : "absent"}, the panel ${reg.length}. ` +
+               "A stale report would show the panel drawing entries the register no longer holds -- which it did, 27 of them, until v4834");
+            say("NOT GRADED: whether a standing red is rendered whole, with the run's line, under the width cap -- there is none to render. " +
+                "Those three rows run again the moment the register holds an entry.");
+        } else {
         ok("!! *** the standing reds are RENDERED BY A PAGE, not merely declared in a module ***",
            !!table && reg.length === table.rows.length && reg.length > 20,
            `${reg.length} entries on screen against ${table ? table.rows.length : 0} in the report. THE CHECK ` +
@@ -644,7 +660,7 @@ const onDisk = reports();
            "of 58px and a table 1459px tall inside a 640px panel -- a wall, not something to scan. After: 632px " +
            "and every row one line. A GATE CANNOT SAY WHETHER A TABLE READS WELL and this one does not try; it " +
            "holds the property that made it unreadable");
-
+        }
     }
 }
 

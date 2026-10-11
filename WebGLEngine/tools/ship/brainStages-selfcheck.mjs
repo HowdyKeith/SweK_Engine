@@ -32,6 +32,7 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { askBrain } from "../../ui/brainAsk.mjs";
 import * as ST from "../../render/aiPresenceOrbState.mjs";
+import { gateReport } from "./gateReport.mjs";
 
 const require_ = createRequire(import.meta.url);
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -39,6 +40,8 @@ const rag = require_(path.join(ENG, "ai-bridge", "ragBridge.js"));
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const say = (m) => console.log("  ----  " + m);
+// v4834: the two tables below were printed and died with the terminal; gateReport-selfcheck named this gate as an arrival that argues in numbers.
+const REPORT = gateReport("tools/ship/brainStages-selfcheck.mjs");
 const sec = (t) => console.log("\n" + t);
 
 console.log("brainStages-selfcheck -- the ship's computer's two stages, and the orb states that ride them\n");
@@ -174,6 +177,13 @@ sec("3. *** THE TWO STATES: rows that render AS murmur states, and a weave that 
           re = slope("responding", "driveInt"), we = slope("weaving", "driveInt"), id = slope("idle", "tempestEnergyInt");
     say(`tempest energy per unit tempo: thinking ${th.v.toFixed(6)}, searching ${se.v.toFixed(6)}, idle ${id.v.toFixed(6)}; ` +
         `drive per unit tempo: responding ${re.v.toFixed(6)}, weaving ${we.v.toFixed(6)}; indices ${th.si}/${se.si}/${re.si}/${we.si}`);
+    REPORT.table("each state's integral per unit of tempo, and the shader row it renders as",
+        ["state", "integral", "per unit of tempo", "shader row"],
+        [["thinking", "tempestEnergyInt", th.v, th.si], ["searching", "tempestEnergyInt", se.v, se.si], ["idle", "tempestEnergyInt", id.v, ST.shaderIndexOf("idle")],
+         ["responding", "driveInt", re.v, re.si], ["weaving", "driveInt", we.v, we.si]]);
+    REPORT.table("weaving's glow by the number of sources it composes from",
+        ["sources", "glow", "against the row"], [0, 3, 6, 12].map((n) => [n, g(n), g(n) / base]));
+    REPORT.write();
     ok("!! *** the host integrates a brain stage as the state it renders as -- searching's storm is thinking's, weaving's drive is responding's ***",
         se.si === 2 && we.si === 3 && Math.abs(se.v - th.v) < 1e-9 && se.v > id.v + 0.5 && Math.abs(we.v - re.v) < 1e-9 && we.v > 0,
         "tempest.ts lifts its energy by 0.65 in THINKING, read off the state index; a host that tested the NAME would have " +

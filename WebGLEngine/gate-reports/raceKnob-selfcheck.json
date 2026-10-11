@@ -1,75 +1,93 @@
 {
  "gate": "physics/raceKnob-selfcheck.mjs",
- "at": "2026-09-12",
+ "at": "2026-10-11",
  "tables": [
   {
-   "title": "the eight speed-gain candidates, re-adjudicated from the record's own numbers",
+   "title": "each candidate against the bounds the record cites",
    "columns": [
     "speed gain",
     "no lap",
     "over lap bound",
-    "off-asphalt %",
-    "verdict"
+    "worst off-road rate",
+    "over off bound",
+    "rule says",
+    "record says"
    ],
    "rows": [
     [
      0.15,
      true,
      false,
-     9.560185185185185,
-     "refuse"
+     0.09560185185185185,
+     true,
+     "refuse",
+     "refused: off the road, no lap on seed 3"
     ],
     [
      0.3,
      false,
      false,
-     6.25462962962963,
-     "refuse"
+     0.0625462962962963,
+     true,
+     "refuse",
+     "refused: 6.3% off-asphalt on seed 3"
     ],
     [
      0.5,
      false,
      false,
-     0.32407407407407407,
-     "accept"
+     0.0032407407407407406,
+     false,
+     "accept",
+     "accepted"
     ],
     [
      0.8,
      false,
      false,
      0,
-     "accept"
+     false,
+     "accept",
+     "accepted"
     ],
     [
      1.2,
      false,
      false,
      0,
-     "accept"
+     false,
+     "accept",
+     "accepted"
     ],
     [
      2,
      false,
      true,
      0,
-     "refuse"
+     false,
+     "refuse",
+     "refused: over the lap bound on seed 2"
     ],
     [
      4,
      true,
      false,
      0,
-     "refuse"
+     false,
+     "refuse",
+     "refused: no lap"
     ],
     [
      8,
      true,
      false,
      0,
-     "refuse"
+     false,
+     "refuse",
+     "refused: no lap"
     ]
    ],
-   "note": "re-derived from MEASURED_V4527's rows against LAP_BOUND and OFF_BOUND as raceKnob.mjs exports them today, not read off the stored verdict strings."
+   "note": "LAP_BOUND 80 s, OFF_BOUND 0.01 of 21600 wheel samples, both read from the module rather than typed here"
   }
  ],
  "notes": [],

@@ -1,6 +1,6 @@
 {
  "gate": "tools/ship/skyStars-selfcheck.mjs",
- "at": "2026-09-12",
+ "at": "2026-10-11",
  "tables": [
   {
    "title": "brightest star before and after the density-knob fix, at every density main.js uses",
