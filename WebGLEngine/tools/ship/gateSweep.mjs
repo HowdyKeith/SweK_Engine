@@ -8892,6 +8892,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The CLIs refuse an unknown option (cliArgs) and the peer's transport is a row of its own. Thirteen sabotages red by name, " +
                  "logged in the two headers. NOT CLOSED: the pair has run over loopback and in one browser, not between two machines.",
     }),
+    // v4839 -- NO new gate file -- the sandbox judges as a fresh clone would: the gitignored local record ignored, uncommitted gate edits seen.
+    since530: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.
+        at: "v4839", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/recordDrift-selfcheck.mjs (a gate timed only in the gitignored sweep-timings.local.json is a hole, on a tree built for it; and the answer equals the one with no local file)",
+            "tools/ship/reportFresh-selfcheck.mjs (section 3: a gate the working tree changed is judged by file time -- fixtures, a real repository, and the live tree)",
+        ]),
+        verdict: "*** TWO WAYS THE SANDBOX'S VERDICT DISAGREED WITH THE RIG'S, AND BOTH WERE THE SANDBOX SEEING MORE THAN A CLONE DOES. *** " +
+                 "v4834 passed here and stopped the rig's clone-verify at the drift pre-flight, because reportFresh-selfcheck's only reading " +
+                 "lived in this box's gitignored sweep-timings.local.json and recordDrift's coverage read the union of every record. It reads " +
+                 "only the records a clone will hold now (boxTimings.records({committed:true})). And reportFresh read git log alone, so it " +
+                 "caught my own v4834 edit to gateReport-selfcheck one commit late: a gate the working tree changed is now judged by file " +
+                 "time, which also closes the same-day hole for every edit made here. lagBudget back to 3, as owed. Seven sabotages red by " +
+                 "name, one of them live on the real tree. NOT CLOSED: a same-day edit committed ELSEWHERE is still invisible to a date.",
+    }),
     // v4838 -- since529: main's v4837 took since528 on the same day. NO new gate file -- the shared timing record handed to this box, and declaredCost's v4820 ratchet paid.
     since529: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened four.
