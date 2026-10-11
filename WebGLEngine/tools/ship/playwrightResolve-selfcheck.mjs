@@ -32,7 +32,7 @@
 "use strict";
 import { shellRoots, resolveHeadlessShell, SHELL_LEAVES, SHELL_DIR, HEADLESS_SHELL,
          HEADLESS_SHELL_TRIED, PLAYWRIGHT_PATHS, browserSkipReason, askPlaywright, globalNpmPaths, siblingCopies,
-         resolvePlaywright, SHELL_DIR_SAMPLES } from "./playwrightResolve.mjs";
+         resolvePlaywright, SHELL_DIR_SAMPLES, DXC_LEAVES, resolveDxcDir, launchEnv, dxcAdvice } from "./playwrightResolve.mjs";
 import fs from "node:fs";
 import { treePaths } from "./treeRead.mjs";
 import path from "node:path";
@@ -274,6 +274,37 @@ console.log("\n4c. the refusal that kept 96 gates from ever running on the rig")
         "the 96 call sites pass HEADLESS_SHELL to executablePath unchanged; what moved is what it holds");
     ok("...and the refusal still fires when there is genuinely nothing, so it did not become a rubber stamp",
         browserSkipReason(null, "", "") !== "" && /playwright/.test(browserSkipReason(null, "", "")));
+}
+
+// ---- 4d. *** v4832 -- THE DXC HALF OF THE RESOLVER, WHICH NO ROW OF THIS GATE HAD NAMED *** ---------------------
+// resolveDxcDir, launchEnv and dxcAdvice arrived after definitionGates' tree-wide census was frozen and were the three of
+// its seven new unnamed symbols that live here. tools/ship/dxcResolve-selfcheck.mjs reads them on this box's own install;
+// these rows hold the CONTRACT on a layout this box does not have, the way section 1 holds the shell's.
+console.log("\n4d. the DXC directory, the PATH route kept dead, and the advice that names the fix where the symptom is seen");
+{
+    // two builds under one root: the NEWER one carries no dxcompiler.dll (Chrome 156's chrome-win64 bundle carries it, the
+    // headless shell's does not), so a resolver that stopped at the newest build directory, or at the first leaf, misses it
+    const root = path.join(path.sep, "pw"), newer = "chromium" + "_headless_shell-1300", older = "chromium" + "-1200";
+    const want = path.join(root, older, DXC_LEAVES[0]);
+    const io = fakeFs([want, path.join(root, newer, "chrome-headless-shell-win64", "chrome-headless-shell.exe")]);
+    const r = resolveDxcDir({ env: { PLAYWRIGHT_BROWSERS_PATH: root }, home: "", ...io });
+    say(`resolveDxcDir: ${r.dir || "(none)"} after ${r.tried.length} tried`);
+    ok("!! resolveDxcDir returns the DIRECTORY holding dxcompiler.dll, found past a newer build that lacks it",
+        r.dir === path.dirname(want) && r.from === want && r.tried[r.tried.length - 1] === want,
+        "sabotage: return the first candidate without exists() and this names a file the box does not have");
+    ok("...and it looks newest build first, every leaf of a build before the next build",
+        r.tried.length === DXC_LEAVES.length + 1 && r.tried.slice(0, DXC_LEAVES.length).every((q, i) => q === path.join(root, newer, DXC_LEAVES[i])),
+        r.tried.map((q) => path.relative(root, q)).join(", "));
+    const none = resolveDxcDir({ env: {}, home: "", exists: () => false, readdir: () => { throw new Error("ENOENT"); } });
+    ok("!! with nothing installed it returns an empty dir and an empty tried list -- never a guessed path",
+        none.dir === "" && none.from === "" && Array.isArray(none.tried) && none.tried.length === 0);
+    ok("!! launchEnv stays undefined: the PATH route was measured NOT to load dxcompiler.dll on the rig (v4646), so no env is handed to a launch",
+        launchEnv() === undefined && launchEnv.length === 0);
+    const dawn = "DynamicLib.Open: dxcompiler.dll Windows Error: 87";
+    const adv = dxcAdvice(dawn), advArr = dxcAdvice(["shader compile failed", null, dawn]);
+    ok("!! dxcAdvice names the one measured fix when Dawn's DXC fault appears, in a reason string or among page errors",
+        /node tools\/ship\/ensureDxc\.mjs --write/.test(adv) && advArr === adv && dxcAdvice("dxil.dll missing") === adv);
+    ok("...and adds nothing to a failure that is not that fault", dxcAdvice("expected 3, got 4") === "" && dxcAdvice(["", null]) === "" && dxcAdvice(undefined) === "");
 }
 
 // ---- 5. THIS BOX, REPORTED RATHER THAN ASSERTED ----------------------------------------------------------------

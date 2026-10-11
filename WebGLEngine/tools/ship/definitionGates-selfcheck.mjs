@@ -296,8 +296,13 @@ const cov = definitionCoverage(ENG);
     // and readTimings, sourceScan's regexAllowedHere, buildingTopple's blockMesh) and SEVEN arrived unnamed
     // (gunnerPolicy's createRace, playwrightResolve's resolveDxcDir, launchEnv and dxcAdvice, quickSweep's ownerOf and
     // deathTail, buildingTopple's demolitionScript). 358 keeps the eleven paid; the seven stay counted debt, not forgiven.
-    // SABOTAGE, restored: one new unnamed `export function` added to the adapter-record module (the one tools/ship/adapterRecord-selfcheck.mjs gates) -> RED, "GREW to 359".
-    const BASELINE_WIDE = 358;   // v4060: 290, v4062: 209, post-v4297-sweep: 332, post-v4622-merge: 349, post-v4645-merge: 362, v4832: 358 -- ratchets down, never up
+    // AND THEN THE SEVEN WERE NAMED, SAME ROUND, BY KEITH'S CALL: each in a row of its own gate that EXERCISES it and was
+    // sabotage-confirmed red -- createRace stepped on its own propose() to raceWithGunners's fingerprint; resolveDxcDir past a
+    // newer build without the DLL, launchEnv held undefined, dxcAdvice on Dawn's message and off it; ownerOf on a chain that
+    // hands the record back, deathTail on a crash tail; demolitionScript's shot cadence, its two drops and their determinism
+    // driven tick by tick with no race. 351 is the census with all eighteen accounted for.
+    // SABOTAGE, restored: one new unnamed `export function` added to the adapter-record module (the one tools/ship/adapterRecord-selfcheck.mjs gates) -> RED, "GREW to 352".
+    const BASELINE_WIDE = 351;   // v4060: 290, v4062: 209, post-v4297-sweep: 332, post-v4622-merge: 349, post-v4645-merge: 362, v4832: 351 -- ratchets down, never up
     const wide = definitionCoverage(ENG, "");
     ok("!! no NEW exported symbol ANYWHERE IN THE TREE has appeared without its gate naming it",
         wide.ungated.length <= BASELINE_WIDE,
@@ -341,8 +346,10 @@ const cov = definitionCoverage(ENG);
     // v4831 named the last six, each in a row that EXERCISES it rather than mentions it (probeHalfWrite read back on both
     // backends, READINGS_PATH opened by its default reader, CLI_SPEC parsing, the three software-GL flag lists checked
     // against the rig runs that settled them). 696 is what the census reads with the 13 named and the 7 kept.
-    // SABOTAGE, restored: one new unnamed `export const` added to the adapter-record module (the one tools/ship/adapterRecord-selfcheck.mjs gates) -> RED, "GREW to 697".
-    const BASELINE_SHAPES = 696;   // v4535: 582, post-v4297-sweep: 639, post-v4622-merge: 678, post-v4645-merge: 703, v4831: 696 -- ratchets down, never up
+    // v4832 -- 696 -> 686, carried by the naming above: the seven narrow symbols, two constants their new rows name in passing
+    // (playwrightResolve's DXC_LEAVES, quickSweep's RECORD_HANDOVERS), and shipVerdict's CATCHABLE (see BASELINE_OWNED).
+    // SABOTAGE, restored: one new unnamed `export const` added to the adapter-record module (the one tools/ship/adapterRecord-selfcheck.mjs gates) -> RED, "GREW to 687".
+    const BASELINE_SHAPES = 686;   // v4535: 582, post-v4297-sweep: 639, post-v4622-merge: 678, post-v4645-merge: 703, v4831: 696, v4832: 686 -- ratchets down, never up
     const shapesWide = definitionCoverage(ENG, "", { shapes: "all" });
     const shapesPhys = definitionCoverage(ENG, "physics", { shapes: "all" });
     ok("!! *** no NEW exported symbol OF ANY SHAPE has appeared without its gate naming it ***",
@@ -392,7 +399,16 @@ const cov = definitionCoverage(ENG);
     // nearestTexel in render/temporalLock.mjs and BYTES_PER_TEXEL, paddedBytesPerRow, halfToDouble and
     // ICD_ROOT in tools/ship/headlessGpu.mjs, every one of them this arc's own debt and every one now keyed
     // rather than merely mentioned. The pin is set at the ENDING number, so the five cannot be spent twice.
-    const BASELINE_OWNED = 533;   // v4573: 475, post-v4645-merge: 533 -- tree-wide, all shapes, any importing gate -- ratchets down, never up
+    // *** v4832 -- RATCHETED DOWN, 533 -> 516. *** It read 519 at v4831 with nothing holding the 14 of slack. Measured against the
+    // freeze (590050b5): SEVENTEEN symbols came to be named by an importing gate (gunnerPolicy's evaluate and HIDDEN, fsr's
+    // RCAS_EPS, meshCSG's and pathTracerGpu's EPS, five of rtPipeline's constants, gateSweep's repairsAgainst and runOnce,
+    // posixAssumption's sources, sourceScan's regexAllowedHere, treeRead's textOf and reportLines, buildingTopple's blockMesh)
+    // and THREE arrived unnamed by any importing gate: gunnerPolicy's createRace and quickSweep's deathTail (named this round
+    // for the narrow census, above) and shipVerdict's CATCHABLE, the signal list main() registers its handlers over, which
+    // shipVerdict-selfcheck now names in a row holding the list's contents (dropping SIGBREAK from it -> red). 516 is the
+    // count with the seventeen kept and the three named.
+    // SABOTAGE, restored: one new unnamed `export function` added to the adapter-record module -> RED here too, "GREW to 517".
+    const BASELINE_OWNED = 516;   // v4573: 475, post-v4645-merge: 533, v4832: 516 -- tree-wide, all shapes, any importing gate -- ratchets down, never up
     const owners = gateIndex(ENG);
     const owned = definitionCoverage(ENG, "", { shapes: "all", owners });
     ok("!! *** no NEW exported symbol is unmentioned by EVERY gate that imports its module ***",

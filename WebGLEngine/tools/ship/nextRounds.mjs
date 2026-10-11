@@ -789,6 +789,15 @@ export const NEXT_ROUNDS = [
         upstream: "Nothing -- every module is in the tree.",
     },
     {
+        id: "definition-gates-slack",
+        blocker: "CLOSED",
+        closed: "CLOSED at v4832: the tree-wide narrow ratchet 362 -> 351, all-shapes 696 -> 686, owned 533 -> 516. The seven narrow symbols that arrived unnamed after the freeze were each named in a row of their own gate that exercises them (createRace stepped on its own propose() to raceWithGunners's fingerprint; resolveDxcDir, launchEnv and dxcAdvice on a layout this box lacks; ownerOf on a chain that hands the record back, deathTail on a crash tail; demolitionScript driven tick by tick with no race), and shipVerdict's CATCHABLE, the owned census's one new arrival, in a row holding the list's contents. Nine sabotages, all red.",
+        what: "tools/ship/definitionGates-selfcheck.mjs read 358 against BASELINE_WIDE 362 and 519 against BASELINE_OWNED 533 after v4831 -- slack nothing held, so that many new unnamed symbols could arrive silently. Measured against the freeze (590050b5) rather than assumed: the narrow census had paid eleven and taken seven new; the owned census had paid seventeen and taken three.",
+        how: "Ratchet to the measured count first (362 -> 358), then name the new arrivals and ratchet again to what that leaves. Each pin's comment lists what was paid and what arrived, so the next round reads the history rather than re-deriving it.",
+        why: "A frozen number above the count is an amnesty for the difference; taking the slack where it stands is the ratchet doing its job. Naming the arrivals instead of keeping them as counted debt is the same choice Keith made for the thirteen at v4831.",
+        upstream: "Nothing -- every module is in the tree.",
+    },
+    {
         id: "procedural-entity-naming",
         blocker: "OPEN",
         what: "This tree procedurally generates planets (world/procPlanet.js), cities (world/CityGen.js) and buildings, but names none of them individually -- procPlanet.js's `name` field is a BIOME/TYPE label ('terran', 'desert', 'gas', 'molten'), not a per-instance name, and grepping the tree for nameGen/generateName/randomName/markov outside multiplayer/remotePlayers.js and two unrelated geostats files turns up nothing.",

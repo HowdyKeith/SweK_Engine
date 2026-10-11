@@ -407,6 +407,43 @@ sec("6. THE PAGE: race-crash.html in its own browser, ramming on load with the d
     }
 }
 
+// ---------------------------------------------------------------------------------------------------------------------------------
+sec("7. v4832 -- THE SCRIPTED DEMOLITION, ON ITS OWN: the script the lockstep gates race through, with no race, no cars and no random");
+// demolitionScript was reached only inside raceWithGunners's city option (raceTurret, raceLockstep), where a wrong tick shows up as a
+// fingerprint and nothing says which of its four promises moved. definitionGates' tree-wide census found it among the seven symbols
+// that arrived unnamed after its freeze. Driven here tick by tick on section 4's city, with at/every off their defaults.
+{
+    const AT = 5, EVERY = 3;
+    const run = () => quiet(() => {
+        const g = make(), t = BT.toppleWorld(g, {}), script = BT.demolitionScript(g, { at: AT, every: EVERY }), shells = [], shots = [], drops = [];
+        let blockAt = null;
+        for (let tk = 0; tk < 200; tk++) {
+            const n = g.impacts.length, ns = shells.length;
+            script(tk, { shells, cityCtx: g });
+            if (g.impacts.length > n) shots.push(tk);
+            if (shells.length > ns) { const s = shells[shells.length - 1], b = t.bodies[0]; drops.push({ tk, ammo: s.ammo, vy: s.vy, owner: s.owner, overX: s.x === b.pose.pos[0] && s.z === b.pose.pos[2], above: s.y - (b.pose.pos[1] + b.half[1]) }); }
+            g.phys.step(C.CAR.dt, 4); BT.stepTopple(t, tk + 1);
+            if (blockAt === null && t.bodies[0]) blockAt = tk;
+        }
+        let big = 0; g.rects.forEach((r, k) => { if (r.w * r.d * r.h > g.rects[big].w * g.rects[big].d * g.rects[big].h) big = k; });
+        const rb = g.rects[big], target = g.city.buildingAt(rb.x + 0.5, rb.z + 0.5);
+        const others = g.rects.filter((r, k) => k !== big).filter((r) => { const b = g.city.buildingAt(r.x + 0.5, r.z + 0.5); return b && b.state === "toppled"; }).length;
+        return { shots, drops, blockAt, state: target && target.state, others, last: g.impacts[g.impacts.length - 1], sig: JSON.stringify({ shots, drops, blockAt }) };
+    });
+    const R = run(), R2 = run();
+    report(`shots at ${R.shots.join(", ")}; block at ${R.blockAt}; drops ${R.drops.map((d) => d.ammo + "@" + d.tk).join(", ")}`);
+    ok("!! demolitionScript shells the BIGGEST building's ground floor from tick `at`, one every `every` ticks, and stops once it has toppled",
+        R.shots.length > 0 && R.shots[0] === AT && R.shots.every((tk, k) => tk === AT + k * EVERY) && R.state === "toppled" && R.last.toppled === true && R.others === 0,
+        `shots ${R.shots.join(", ")}, target ${R.state}, ${R.others} other building(s) toppled`);
+    ok("!! then it drops exactly two shells onto the block it became: a spark 10 ticks after the block appears and a cataclysm 4 after that",
+        R.blockAt !== null && R.drops.length === 2 && R.drops[0].ammo === "spark" && R.drops[0].tk === R.blockAt + 10 && R.drops[1].ammo === "cataclysm" && R.drops[1].tk === R.blockAt + 14,
+        R.drops.map((d) => `${d.ammo}@${d.tk}`).join(", ") + ` with the block at ${R.blockAt}`);
+    ok("...each straight down from 6 m over the block's top, at the block's own x and z, owned by car 0",
+        R.drops.every((d) => d.overX && Math.abs(d.above - 6) < 1e-9 && d.vy === -30 && d.owner === 0));
+    ok("!! and the whole schedule is the same on a second run -- no random anywhere, so two peers racing through it agree",
+        R2.sig === R.sig, R2.sig === R.sig ? "" : `${R.sig} against ${R2.sig}`);
+}
+
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nall checks pass");
 console.log("unchecked here: the block's bounding box stands in for its exact centre of mass; a block leaning on the road or on a neighbour is left leaning; cascade damage to neighbours from the fall; the page on WebGPU (the presented device is lost on this harness, v4589).");
 // v4663 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's

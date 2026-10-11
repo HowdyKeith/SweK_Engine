@@ -202,6 +202,25 @@ console.log("\n6. THE RACE WITH GUNNERS: LOCKSTEP, DETERMINISTIC, REPLAYED FROM 
     ok("!! the race is deterministic per seed: the same fingerprint, order and tallies twice", R2.fingerprint === R.fingerprint && R2.order.join() === R.order.join() && R2.results.every((q, i) => q.hits === R.results[i].hits && q.drops === R.results[i].drops && q.burned === R.results[i].burned));
     const rp = G.replayGunners(worldFrom, R);
     ok("!! the replay from the log alone -- no policies -- reaches the same fingerprint with the same hits, drops and burn ticks", rp.fingerprint === R.fingerprint && rp.results.every((q, i) => q.hits === R.results[i].hits && q.laps === R.results[i].laps && q.drops === R.results[i].drops && q.burned === R.results[i].burned));
+    // v4832 -- createRace, the stepper raceWithGunners is a for-loop over, driven the way brain/raceLockstep.mjs drives it: each tick
+    // propose() asks the policies for every car's raw commands, and step() takes those commands back as the wire would hand them. It
+    // was the one symbol of this module definitionGates' tree-wide census found unnamed; reached only through raceWithGunners and the
+    // lockstep gates, a propose() that drifted from what step(null) does would show there as a fingerprint and say nothing about why.
+    {
+        const race = G.createRace(worldFrom, drivers, gunners, { seed: 1, seconds: 20, fleet });
+        let shapeOk = true, runningOk = true, last = null;
+        for (let t = 0; t < race.ticks; t++) {
+            const cmds = race.propose();
+            shapeOk = shapeOk && cmds.length === 3 && cmds.every((c, i) => c.car === i && ["throttle", "steer", "brake", "yaw", "pitch", "fire", "drop", "ignite"].every((k) => k in c));
+            last = race.step(cmds);
+            runningOk = runningOk && last.tick === t && race.tick === t + 1 && race.fingerprint === (last.hash >>> 0).toString(16).padStart(8, "0");
+        }
+        const F = race.finish();
+        ok("!! createRace stepped on its own propose() commands -- the lockstep's path -- reaches raceWithGunners's fingerprint, order and tallies",
+            shapeOk && runningOk && F.fingerprint === R.fingerprint && F.order.join() === R.order.join() && F.log.length === R.ticks &&
+            F.results.every((q, i) => q.hits === R.results[i].hits && q.drops === R.results[i].drops && q.burned === R.results[i].burned),
+            `${F.fingerprint} against ${R.fingerprint}; propose() ${shapeOk ? "one command per car in the wire's eight fields" : "MALFORMED"}, running fingerprint ${runningOk ? "matches every tick's hash" : "DRIFTED"}`);
+    }
     // a hit is an IMPULSE on the target's chassis, applied before the world steps: a still target nudged by one shell
     {
         const world = worldFrom(), C = await import("../physics/raceCar.mjs"), T = await import("../world/raceTrack.mjs");

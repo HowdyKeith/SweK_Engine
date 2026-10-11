@@ -179,6 +179,14 @@ console.log("\n6. a run ended from outside says so where it can -- and the silen
     ok("the interrupted trailer names the signal, what it means, the clock, and NO VERDICT",
         /interrupted by SIGHUP after 3 s/.test(pure) && /console window was closed/.test(pure) && /DO NOT SHIP -- NO VERDICT/.test(pure),
         pure.trim().split("\n").join(" | "));
+    // v4832 -- CATCHABLE is the list main() registers its handlers over, and the one export of shipVerdict.mjs no importing gate
+    // named (definitionGates' owned census). An empty list was the v4680 sabotage above; this row holds the list's contents: the
+    // four endings the header says CAN be caught, each with its own meaning in the trailer, and none of the uncatchable ones.
+    const meanings = SV.CATCHABLE.map((sig) => (SV.interruptedTrailer(sig, 1000).match(/\(([^)]*)\) before verify/) || [])[1]);
+    ok("!! CATCHABLE is exactly SIGINT, SIGHUP, SIGBREAK and SIGTERM, each trailer naming its own cause -- and no SIGKILL, which no handler sees",
+        SV.CATCHABLE.slice().sort().join() === "SIGBREAK,SIGHUP,SIGINT,SIGTERM" && Object.isFrozen(SV.CATCHABLE) &&
+        meanings.every((m) => m && m !== "a signal") && new Set(meanings).size === 4 && !SV.CATCHABLE.includes("SIGKILL"),
+        SV.CATCHABLE.map((sig, i) => `${sig}: ${meanings[i]}`).join("; "));
     if (process.platform !== "win32") {
         const hup = await drive("SIGHUP");
         ok("!! *** a LIVE run sent SIGHUP -- what a closed console window delivers on Windows -- prints the NO VERDICT trailer ***",

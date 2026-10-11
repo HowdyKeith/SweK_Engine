@@ -1012,6 +1012,33 @@ sec("8h. WHAT A KILLED GATE LEAVES IS GONE BEFORE THE NEXT GATE RUNS (v4692)");
     for (const d of [tmp, root]) try { fs.rmSync(d, { recursive: true, force: true }); } catch {}
 }
 
+console.log("\n7. *** WHOSE RECORD IT IS, AND WHAT A GATE THAT DIED SILENTLY SAID LAST (v4832) ***");
+// ownerOf and deathTail were two of the seven symbols definitionGates' tree-wide census found arriving unnamed after its
+// freeze. Both were reached only through readRecord and the capped-gate report; these rows hold each one's own contract.
+{
+    const A = "linux-x64-4c-16095mb-aaaaaa", B = "win32-x64-12c-32678mb-bbbbbb", Cx = "linux-x64-4c-16gb-cccccc";
+    const rows = [{ from: A, to: B }, { from: B, to: Cx }, { from: Cx, to: "linux-x64-4c-16gb-aaaaaa" }];
+    ok(Q.ownerOf(A, rows) === "linux-x64-4c-16gb-aaaaaa",
+        "!! ownerOf applies the rows IN ORDER, so a chain that hands the record BACK to a box that held it ends at that box",
+        `A -> B -> C -> A reads ${Q.ownerOf(A, rows)}`);
+    ok(Q.ownerOf(B, rows) === "linux-x64-4c-16gb-aaaaaa" && Q.ownerOf("linux-x64-4c-16gb-aaaaaa", rows) === "linux-x64-4c-16gb-aaaaaa",
+        "...a record whose host is mid-chain follows only the rows after it was that host's, and A in either memory form is the same box");
+    ok(Q.ownerOf("linux-x64-4c-16384mb-dddddd", rows) === "linux-x64-4c-16gb-dddddd" && Q.ownerOf(A, []) === "linux-x64-4c-16gb-aaaaaa",
+        "!! a box no row names owns its own record, returned in the canonical gigabyte form boxId() compares against");
+    const H = Q.RECORD_HANDOVERS;
+    ok(Q.ownerOf(H[0].from) === Q.ownerOf(H[H.length - 1].to) && H.every((x, i) => i === 0 || Q.ownerOf(x.from, []) === Q.ownerOf(H[0].from, H.slice(0, i))),
+        "...and the shipped table is ONE chain: each row hands over from the box that owned the record when it was decided",
+        `${H.length} rows, owner now ${Q.ownerOf(H[0].from)}`);
+    const tail = ["  PASS  the first row", "", "  FAIL  a failing row is not a death line", "  PASS  row two", "   ",
+                  "  PASS  row three\r", "x".repeat(260)].join("\n");
+    const dt = Q.deathTail(tail);
+    ok(dt.length === 3 && dt[0] === "  PASS  row two" && dt[1] === "  PASS  row three" && dt[2] === "x".repeat(200),
+        "!! deathTail keeps the LAST three printed lines, drops blanks and FAIL rows, strips the CR, and cuts each at 200 chars",
+        JSON.stringify(dt.map((l) => l.slice(0, 24))));
+    ok(Q.deathTail(tail, { max: 1 }).length === 1 && Q.deathTail("").length === 0 && Q.deathTail(null).length === 0,
+        "...max bounds it, and an empty or missing tail is an empty list, never a throw");
+}
+
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the gates over the budget THE ROTATION HAS NOT REACHED YET. v4408 answered the older " +
     "version of this line -- that a regression in a 40-second gate is found by the full sweep and by nothing at " +
