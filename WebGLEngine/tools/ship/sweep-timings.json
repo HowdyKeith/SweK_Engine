@@ -1427,7 +1427,7 @@
   "tools/ship/markerSingleSource-selfcheck.mjs": 2325,
   "tools/ship/mechanical-selfcheck.mjs": 1750,
   "tools/ship/meijerG-selfcheck.mjs": 278,
-  "tools/ship/meshBVH-selfcheck.mjs": 2312,
+  "tools/ship/meshBVH-selfcheck.mjs": 2551,
   "tools/ship/meshLine-selfcheck.mjs": 2174,
   "tools/ship/meshPerf-selfcheck.mjs": 3507,
   "tools/ship/mesostructure-selfcheck.mjs": 501,
@@ -3378,7 +3378,7 @@
   "tools/ship/markerSingleSource-selfcheck.mjs": 0,
   "tools/ship/mechanical-selfcheck.mjs": 0,
   "tools/ship/meijerG-selfcheck.mjs": 0,
-  "tools/ship/meshBVH-selfcheck.mjs": 1,
+  "tools/ship/meshBVH-selfcheck.mjs": 0,
   "tools/ship/meshLine-selfcheck.mjs": 0,
   "tools/ship/meshPerf-selfcheck.mjs": 0,
   "tools/ship/mesostructure-selfcheck.mjs": 0,
@@ -5329,7 +5329,7 @@
   "tools/ship/markerSingleSource-selfcheck.mjs": "2026-10-11T17:36:07.904Z",
   "tools/ship/mechanical-selfcheck.mjs": "2026-10-11T17:36:07.904Z",
   "tools/ship/meijerG-selfcheck.mjs": "2026-10-11T17:36:07.904Z",
-  "tools/ship/meshBVH-selfcheck.mjs": "2026-10-11T17:36:07.904Z",
+  "tools/ship/meshBVH-selfcheck.mjs": "2026-10-11T17:54:16.459Z",
   "tools/ship/meshLine-selfcheck.mjs": "2026-10-11T17:36:07.904Z",
   "tools/ship/meshPerf-selfcheck.mjs": "2026-10-11T00:08:01.399Z",
   "tools/ship/mesostructure-selfcheck.mjs": "2026-10-11T17:36:07.904Z",
@@ -11134,7 +11134,7 @@
   "tools/ship/macSession-selfcheck.mjs": 2764,
   "tools/ship/markerSingleSource-selfcheck.mjs": 2325,
   "tools/ship/meijerG-selfcheck.mjs": 80,
-  "tools/ship/meshBVH-selfcheck.mjs": 2312,
+  "tools/ship/meshBVH-selfcheck.mjs": 2551,
   "tools/ship/meshLine-selfcheck.mjs": 2174,
   "tools/ship/meshPerf-selfcheck.mjs": 3507,
   "tools/ship/mesostructure-selfcheck.mjs": 99,
@@ -12975,7 +12975,7 @@
   "tools/ship/macSession-selfcheck.mjs": "2026-10-11T17:35:52.775Z",
   "tools/ship/markerSingleSource-selfcheck.mjs": "2026-10-11T17:35:52.775Z",
   "tools/ship/meijerG-selfcheck.mjs": "2026-10-07T16:31:28.157Z",
-  "tools/ship/meshBVH-selfcheck.mjs": "2026-10-11T17:35:52.775Z",
+  "tools/ship/meshBVH-selfcheck.mjs": "2026-10-11T17:54:16.459Z",
   "tools/ship/meshLine-selfcheck.mjs": "2026-10-11T17:35:52.775Z",
   "tools/ship/meshPerf-selfcheck.mjs": "2026-10-11T00:08:01.399Z",
   "tools/ship/mesostructure-selfcheck.mjs": "2026-10-07T16:31:28.157Z",
@@ -14622,9 +14622,9 @@
    2764
   ],
   "tools/ship/meshBVH-selfcheck.mjs": [
-   1956,
    2196,
-   2312
+   2312,
+   2551
   ],
   "tools/ship/mpmDevice-selfcheck.mjs": [
    2055,

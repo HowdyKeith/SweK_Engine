@@ -8894,13 +8894,15 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     }),
     // v4838 -- NO new gate file -- the shared timing record handed to this box, and declaredCost's v4820 ratchet paid.
     since528: Object.freeze({
-        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened four.
         at: "v4838", swept: 0, green: 0, red: 0,
         added: Object.freeze([]),
         redOnArrival: Object.freeze([]),
         widened: Object.freeze([
             "tools/ship/declaredCost-selfcheck.mjs (the rotted-header ratchet 2 -> 0, on a machine with no readings of its own and on this one)",
             "tools/ship/capReading-selfcheck.mjs (gateSelection's move from its loaded 67,823 ms named, with three confirming quiet runs)",
+            "tools/ship/meshBVH-selfcheck.mjs (the speedup rows take the fastest of several runs: 1 of 12 red under load before, 0 of 24 after)",
+            "tools/ship/avatarServerViews-selfcheck.mjs (waits up to 15 s for the robot's box it asserts, after its fixed 2.4 s)",
         ]),
         verdict: "*** THE RECORD'S OWNER WAS A HOST NO SESSION HAD RUN ON FOR FIVE ROUNDS, SO A DEBT THAT ONLY THE OWNER COULD PAY STOOD SINCE v4820. *** " +
                  "Keith handed the shared timing record to linux-x64-4c-16gb-420793 (RECORD_HANDOVERS, v4838), and sweepRotation --gate " +
@@ -8908,7 +8910,8 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "loaded 69 s no longer the only reading (capReading names the move, with three quiet runs); statedRuntime 0.7 s against ~1.6s, the one header that was wrong -- its cost is the arrivals " +
                  "it re-runs, and today it has none -- re-written to ~0.8s. The ratchet stands at 0. The first sweep this box wrote as owner " +
                  "filed webcodecsFramesToMp4 skipped (ai-bridge's @napi-rs optionals absent here, present on 142c0d); installed, and " +
-                 "the session-start hook now installs them. NOT CLOSED: a restart onto the other host strands the record again, one dated row away.",
+                 "the session-start hook now installs them. Step 4b found meshBVH (one ~4 ms timing) and avatarServerViews (a fixed sleep) " +
+                 "red under load, both repaired. NOT CLOSED: a restart onto the other host strands the record again, one dated row away.",
     }),
     // v4836 -- NO new gate file -- the sixteen three.js drafts moved to dev 11738a9.
     since527: Object.freeze({
