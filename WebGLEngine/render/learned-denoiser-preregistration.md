@@ -2981,3 +2981,43 @@ gate was red on its dump row only: the `use_dxc` dumps were still empty.
 
 **Still open:** A1. A compile-gate run at a commit with section 49's fix (5385886d or later on `claude/denoiser-round14`,
 or 5b66968f or later here) would test it.
+
+## 52. MEASUREMENT A1 ON THE INTEL: UNDER `use_dxc`, NODE-WEBGPU 0.6.0 STILL COMPILES WITH FXC
+
+**What arrived.** `realGpuRun --only denoiseCompile` at 62d5e318 on the Intel, committed byte for byte at d3aab6a3 as
+`render/denoise-rig-compile-intel-gen9.json`.
+- This is the first compile-gate run with section 49's one-entry Dawn flags.
+- The gate was **green**: every kernel built and exact, natively under both modes and in Chrome. Every native dump
+  named its compiler.
+- The 1080's run of the same is still to come.
+
+**The `use_dxc` run compiled with FXC.**
+- DXC's two DLLs were found in Chrome 154's directory and copied to `dist/win32-x64`. That is `dawn.node`'s own
+  directory, checked here against the package. They were removed again afterwards.
+- Even so, all eight `use_dxc` dumps say DXBC, and match FXC's line for line (the fast head: 9,785 lines).
+- The times agree. Natively the fast head took 353 s to build and 1,330 ms a pass under `use_dxc`, and 386 s and
+  1,471 ms as shipped. In Chrome it took 0.448 ms.
+- **By section 43's own words** ("if that run's dump says DXBC ... A1 is untested there"), **A1 is untested on the
+  Intel**. This time the dump says why.
+
+**Why, as far as the binary shows.** Read from the strings in the shipped `win32-x64/dawn.node`, not from Dawn's source,
+so it is an inference, not a test.
+- The build contains the `use_dxc` toggle, its description and Dawn's DXC compile path. The description reads: "Use DXC
+  instead of FXC for compiling HLSL when both dxcompiler.dll and dxil.dll is available."
+- It contains no reference to `dxcompiler.dll` or `dxil.dll` outside that description, and no `DxcCreateInstance`.
+- The one compiler it names for loading is `d3dcompiler_47.dll`, with `D3DCompile` and `D3DDisassemble`.
+- So in this build DXC is never "available", and the toggle can never take effect, wherever the DLLs sit.
+
+**What follows.**
+- **Section 43 named "node on DXC by default" as a possible next round. With node-webgpu 0.6.0 it is not a matter of
+  copying two DLLs:** it would need a Dawn built to load DXC.
+- **The native failure that started this question is fixed anyway, by the kernels, not the compiler.**
+  - Round 14's head kernel took 1.376 ms natively under FXC, against the direct head's 4.391.
+  - Round 15's fused pass took 0.393 ms.
+  - Against these, the fast head's 1,471 ms.
+- **The compile gate keeps its `use_dxc` mode.** A future package that does load DXC will show DXIL in its dump, and A1
+  becomes testable then.
+- **A2 and A3 again on the Intel:**
+  - the head kernel took 1.376 ms against 4.391;
+  - the fast 3 x 3 took 15.8 times longer to build than the tiled kernel;
+  - `k_head_apply` took 18.4 s to build natively and 3.1 s in Chrome.
