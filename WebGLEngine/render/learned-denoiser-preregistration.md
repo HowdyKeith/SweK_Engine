@@ -3172,3 +3172,44 @@ It must hold in each of:
 - Reusing the hidden layers' buffers (ping-pong).
 - A third pixel configuration chosen after either GPU's run. A configuration the rig suggests is a later round, fixed
   before it runs.
+
+## 55. ROUND 16 -- REPORTED HERE: K0 (a), r16a AND r16b ON THE 24 TEST IMAGES
+
+`node tools/denoiseDevice.mjs --measure-r16a --cache <dir>` and `--measure-r16b --cache <dir>` ran at 4b8e9d92, the
+commit that carries section 54 and the pixel-tiled kernel. They ran side by side:
+
+| Set | Run | Ended |
+|---|---|---|
+| r16a | 545 s | 04:22:05Z |
+| r16b | 599 s | 04:22:59Z |
+
+- **The outputs, unedited,** are `render/denoise-results-r16a.json` and `render/denoise-results-r16b.json`. Both were
+  committed at 242a7e1c before either was read.
+- **Each cache served all 24 test images** (hits 24, misses 0). Each was hard-linked from round 12's measurement cache.
+- **The kernels:** on every image the four hidden layers ran on the pixel-tiled kernel, tile2 for r16a and tile4 for
+  r16b. The head and the kernel apply ran as one pass, `k_head_apply`.
+
+**K0 (a) holds for both sets.**
+
+| Criterion | r16a | r16b |
+|---|---|---|
+| D0, the shipped file is the harvest's network | its f64 relMSE equals round 11's seed 1 on all 24 images, bit for bit | the same |
+| D1, the hidden layers | 12,582,912 conv cells, every one the twin's: none fused, none unexplained | the same |
+| D2, the head and kernel pass | worst 4.9e-7 against `kernelApplyCpu` on the twin's logits or the fused mirror's (bound 1e-5); against the twin's alone 6.4e-7, against the mirror's alone 7.6e-7 | the same, to the digit |
+| D3, the verdict on the device | relMSE within 3.8e-7 of the f64 network's on every image (bound 1e-4); the primary filter beaten on 12 of 12 images of R and 12 of 12 of C, the same images as on the CPU | the same |
+
+- **E: on all 24 images, each set's device relMSE equals section 47's (r15's), bit for bit.** It therefore equals rounds
+  12-14's too. D2 and D3 are section 47's to the digit.
+  - That is what an unchanged order predicts. On SwiftShader nothing fuses, so every hidden cell is the twin's in both
+    sets, and in r15 too.
+  - The images are therefore the same bits.
+- **Reported, not a criterion.** A 64 x 64 image took a median of 417 ms (364-596) with r16a and 418 ms (306-524) with
+  r16b, read-back included, against r15's 399 in section 47.
+  - The two ran at the same time on one CPU, and r15 ran alone.
+  - This is SwiftShader, and no evidence for K1 or G1-G4.
+
+**Still open:**
+- K0 (b) and (c) for r16a and r16b, K1, G1-G4 and the two rules, on Keith's two GPUs.
+- That is one run each of `node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise-r16.json` on
+  `claude/denoiser-round16`.
+- Until section 54's rules move them, the page and the default stay "r15" (section 50).
