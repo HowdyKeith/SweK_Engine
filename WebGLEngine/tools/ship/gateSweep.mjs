@@ -8892,6 +8892,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The CLIs refuse an unknown option (cliArgs) and the peer's transport is a row of its own. Thirteen sabotages red by name, " +
                  "logged in the two headers. NOT CLOSED: the pair has run over loopback and in one browser, not between two machines.",
     }),
+    // v4836 -- NO new gate file -- the sixteen three.js drafts moved to dev 11738a9.
+    since527: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4836", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (section 6: the sixteen stack in slot order -- no context line is a line an earlier patch removes, import lines apart)",
+        ]),
+        verdict: "*** NOTHING THREE MERGED IN 107 COMMITS FIXES ANY OF THE SIXTEEN, AND THREE PATCHES HAD TO BE MADE AGAIN FOR THREE REASONS. *** " +
+                 "On dev 11738a9 every reproduction prints what it printed on 576b084 -- r186, dev, its own patch, all sixteen. 04 and 06 " +
+                 "no longer applied (#34854, #34821); 16 applied and no longer built (#34871 added the import it adds). Three's unit tests " +
+                 "(1894 now, #34918) and e2e give the same outcomes on both builds. The new row holds the property a three-line context " +
+                 "broke: 10 applying after 04. NOT CLOSED: the consolidated TSL unit tests skip, headless here, what needs a GPU backend.",
+    }),
     // v4835 -- ONE new gate file: tools/ship/afterVerdict-selfcheck.mjs (the ship ritual's step 4b as a command).
     since526: Object.freeze({
         at: "v4835", swept: 1, green: 1, red: 0,

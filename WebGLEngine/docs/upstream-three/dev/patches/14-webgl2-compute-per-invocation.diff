@@ -1,5 +1,5 @@
 diff --git a/src/renderers/webgl-fallback/WebGLBackend.js b/src/renderers/webgl-fallback/WebGLBackend.js
-index 4f109bf..6d63d74 100644
+index 53026c2..fe5d4d1 100644
 --- a/src/renderers/webgl-fallback/WebGLBackend.js
 +++ b/src/renderers/webgl-fallback/WebGLBackend.js
 @@ -940,7 +940,9 @@ class WebGLBackend extends Backend {

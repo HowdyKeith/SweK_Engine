@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "b3c8f7e3a653fdf588d0e60be8cc6807fa904554",
+ "head": "5c0068595d5b96ad1d9136f90a5e1952440f11a2",
  "bodies": {
   "box3d": [
    {
@@ -721,8 +721,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3535207,
-    "sha": "b3c8f7e3a653fdf588d0e60be8cc6807fa904554"
+    "bytes": 3537518,
+    "sha": "5c0068595d5b96ad1d9136f90a5e1952440f11a2"
    },
    {
     "path": "mpm3d.html",
@@ -1218,7 +1218,7 @@
    },
    {
     "path": "tools/ship/threeUpstream-selfcheck.mjs",
-    "bytes": 66317,
+    "bytes": 68423,
     "sha": "6b7e4579f4006952a2a688062ad9035f7c4311c2"
    },
    {
@@ -1280,12 +1280,12 @@
   "three-webgpu-r185": [
    {
     "path": "tools/ship/threePatch.mjs",
-    "bytes": 21193,
+    "bytes": 21567,
     "sha": "108bd2aed5dd03dc7d8f85be07230b46c8225bee"
    },
    {
     "path": "tools/ship/threeUpstream-selfcheck.mjs",
-    "bytes": 66317,
+    "bytes": 68423,
     "sha": "6b7e4579f4006952a2a688062ad9035f7c4311c2"
    }
   ],

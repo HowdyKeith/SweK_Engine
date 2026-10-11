@@ -142,7 +142,10 @@ export const RECORD = path.join(DEV_DIR, "record.json");
 /** three's dev branch where the patches were made and measured, and the release the reproductions import. */
 // export const DEV_COMMIT = "1ea31f304854ee3c85df39fdb3eaec584bba6d9b";   // 2 October 2026, v4799-v4810
 // v4811 -- dev on 4 October 2026: twelve commits on, every patch applies unchanged, and the record was taken again here.
-export const DEV_COMMIT = "576b084aff43ec5bb79911befb1d51be178cb7ed";
+// export const DEV_COMMIT = "576b084aff43ec5bb79911befb1d51be178cb7ed";   // 4 October 2026, v4811-v4835
+// v4836: dev moved 107 commits; 04 and 06 no longer applied (#34854 removed the useVelocity flag 04 tested beside, #34821 moved the release of a
+// cached compute stage) and were made again on it; every patch is re-made there so its index lines name dev's own blobs.
+export const DEV_COMMIT = "11738a9d55e502fb484cefffcea3a66dc44e9fe9";
 export const RELEASE = "0.186.1";
 export const IMPORT_LINE = 'import * as THREE from "three"; import * as T from "three/tsl";';
 

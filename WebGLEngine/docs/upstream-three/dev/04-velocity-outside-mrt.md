@@ -8,9 +8,9 @@ Three's `velocity` node drawn by the material itself -- `material.fragmentNode =
 
 **Expected:** `drawn` equal to `plain`.
 
-**Cause.** Skinning, instancing, batching and morphing build the previous position only when `builder.needsPreviousData()` (`src/nodes/core/NodeBuilder.js`), which is true when the renderer's MRT has a `velocity` output or the object is flagged `useVelocity` -- not when the material draws `velocity` itself. The previous point is then the geometry as it stands, without the bone: 1.871 px is the bone's distance from the origin at the third frame (x = 0.1), where one frame's motion is 5.612.
+**Cause.** Skinning, instancing, batching and morphing build the previous position only when `builder.needsPreviousData()` (`src/nodes/core/NodeBuilder.js`), which is true when the renderer's MRT has a `velocity` output -- not when the material draws `velocity` itself. The previous point is then the geometry as it stands, without the bone: 1.871 px is the bone's distance from the origin at the third frame (x = 0.1), where one frame's motion is 5.612.
 
-**Fix.** The patch makes `needsPreviousData()` also look through the material's own nodes for a `VelocityNode`, once per build. Against `dev` at 576b084; I can open it as a pull request:
+**Fix.** The patch makes `needsPreviousData()` also look through the material's own nodes for a `VelocityNode`, once per build. Against `dev` at 11738a9; I can open it as a pull request:
 
 <details><summary>Patch</summary>
 
@@ -36,10 +36,10 @@ index 515a70c..ebf7f0d 100644
  		 * An optional projection matrix that overrides the camera's projection matrix.
  		 *
 diff --git a/src/nodes/core/NodeBuilder.js b/src/nodes/core/NodeBuilder.js
-index de53c08..d4f41a0 100644
+index a536db4..4cbaa4e 100644
 --- a/src/nodes/core/NodeBuilder.js
 +++ b/src/nodes/core/NodeBuilder.js
-@@ -48,6 +48,46 @@ const typeFromArray = new Map( [
+@@ -46,6 +46,46 @@ const typeFromArray = new Map( [
  	[ Float32Array, 'float' ]
  ] );
  
@@ -86,12 +86,12 @@ index de53c08..d4f41a0 100644
  const _toFloat = ( value ) => {
  
  	if ( /e/g.test( value ) ) {
-@@ -3572,7 +3612,13 @@ class NodeBuilder {
+@@ -3535,7 +3575,13 @@ class NodeBuilder {
  
  		const mrt = this.renderer.getMRT();
  
--		return ( mrt && mrt.has( 'velocity' ) ) || ( this.object !== null && getDataFromObject( this.object ).useVelocity === true );
-+		if ( ( mrt && mrt.has( 'velocity' ) ) || ( this.object !== null && getDataFromObject( this.object ).useVelocity === true ) ) return true;
+-		return ( mrt !== null && mrt.has( 'velocity' ) );
++		if ( mrt !== null && mrt.has( 'velocity' ) ) return true;
 +
 +		// velocity drawn by the material itself, outside MRT: looked for once per build
 +
@@ -169,7 +169,7 @@ report({ webgpu: await run(false), webgl2: await run(true) });
 
 ### Screenshots
 
-What the page prints, the same on r186 and on `dev` at 576b084 (headless Chromium 141, SwiftShader):
+What the page prints, the same on r186 and on `dev` at 11738a9 (headless Chromium 141, SwiftShader):
 
 <!-- observed:begin -->
 plain 5.612, drawn 1.871, mrt 5.612, mrtSameFrame 0.000 (px, both backends)

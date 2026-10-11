@@ -1,5 +1,5 @@
 diff --git a/src/nodes/accessors/Batch.js b/src/nodes/accessors/Batch.js
-index f0b2e65..dcf6370 100644
+index 8a58e25..389749d 100644
 --- a/src/nodes/accessors/Batch.js
 +++ b/src/nodes/accessors/Batch.js
 @@ -81,11 +81,24 @@ function getPreviousNode( batchMesh, id ) {
