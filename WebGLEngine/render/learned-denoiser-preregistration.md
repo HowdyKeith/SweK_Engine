@@ -3021,3 +3021,33 @@ so it is an inference, not a test.
   - the head kernel took 1.376 ms against 4.391;
   - the fast 3 x 3 took 15.8 times longer to build than the tiled kernel;
   - `k_head_apply` took 18.4 s to build natively and 3.1 s in Chrome.
+
+## 53. MEASUREMENT A1 ON THE GTX 1080: THE SAME -- FXC UNDER `use_dxc`, SO A1 IS UNTESTED ON BOTH GPUS
+
+**What arrived.** `realGpuRun --only denoiseCompile` at 67094ee8 on the 1080, with section 49's one-entry Dawn flags.
+It is committed byte for byte at bc0379dd as `render/denoise-rig-compile-gtx1080-run2.json`, beside the 1080's first
+compile-only run.
+
+**What it says.**
+- The gate was **green**.
+- DXC's DLLs came from Playwright's chromium-1243 and were placed beside `dawn.node`.
+- All eight `use_dxc` dumps say DXBC and match FXC's line for line.
+- The fast head took 146 s to build and 22.872 ms a pass under `use_dxc`, against 151 s and 22.544 ms as shipped, and
+  0.072 ms in Chrome.
+
+**The verdict.**
+- **A1 is untested on both GPUs.** Each GPU's dump says DXBC, which section 43 makes untested. Section 52's reading of
+  the shipped `dawn.node` explains why, the same on both: that build has no DXC loader.
+- **A2 is supported again on the 1080:** the head kernel took 0.131 ms against the direct head's 0.393.
+- **A3 is not supported on the 1080 again:** the fast 3 x 3 took 9.23 times longer to build than the tiled kernel,
+  under the bound of 10. With section 49's 9.84, that makes two 1080 readings under the bound, against four Intel
+  readings over it, from 13.9 to 19.0.
+- **`k_head_apply` on the 1080:** 8.7 s to build natively and 1.3 s in Chrome. Its pass on the probe took 0.131 ms
+  natively and 0.072 ms in Chrome.
+
+**Measurement A is now complete on both GPUs:**
+- A1 is untested, and cannot be tested with node-webgpu 0.6.0;
+- A2 is supported on both;
+- A3 is supported on the Intel and not on the 1080.
+
+None of it decides anything (section 43). The page and the default stay "r15" (section 50).
