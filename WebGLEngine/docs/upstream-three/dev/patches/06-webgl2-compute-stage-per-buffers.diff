@@ -1,8 +1,8 @@
 diff --git a/src/renderers/common/Pipelines.js b/src/renderers/common/Pipelines.js
-index 78237db..6c421b9 100644
+index 8865c9b..1643923 100644
 --- a/src/renderers/common/Pipelines.js
 +++ b/src/renderers/common/Pipelines.js
-@@ -107,14 +107,17 @@ class Pipelines extends DataMap {
+@@ -107,12 +107,15 @@ class Pipelines extends DataMap {
  
  			// programmable stage
  
@@ -13,8 +13,6 @@ index 78237db..6c421b9 100644
  
  			if ( stageCompute === undefined ) {
  
- 				if ( previousPipeline && previousPipeline.computeProgram.usedTimes === 0 ) this._releaseProgram( previousPipeline.computeProgram );
- 
  				stageCompute = new ProgrammableStage( nodeBuilderState.computeShader, 'compute', computeNode.name, nodeBuilderState.transforms, nodeBuilderState.nodeAttributes );
 -				this.programs.compute.set( nodeBuilderState.computeShader, stageCompute );
 +				stageCompute.cacheKey = stageKey;
@@ -22,7 +20,7 @@ index 78237db..6c421b9 100644
  
  				backend.createProgram( stageCompute );
  				this.info.createProgram( stageCompute );
-@@ -421,6 +424,31 @@ class Pipelines extends DataMap {
+@@ -430,6 +433,31 @@ class Pipelines extends DataMap {
  
  	}
  
@@ -54,7 +52,7 @@ index 78237db..6c421b9 100644
  	/**
  	 * Computes a cache key representing a render pipeline.
  	 *
-@@ -458,7 +486,7 @@ class Pipelines extends DataMap {
+@@ -467,7 +495,7 @@ class Pipelines extends DataMap {
  	 */
  	_releaseProgram( program ) {
  

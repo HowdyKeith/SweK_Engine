@@ -1,7 +1,7 @@
 {
  "host": "linux-x64-4c-16gb-420793",
  "note": "THIS BOX'S OWN gate runtimes, written by tools/ship/boxTimings.mjs. The shared sweep-timings.json is host-claimed and a foreign box cannot write it (v4647, and that refusal is right); this is how a box records what IT measured without overwriting another machine's numbers. `kinds` says which quantity each ms is, as in the shared record: `alone` is an uncontended serial reading, `capped` is a FLOOR and not a runtime. Read for COVERAGE -- has this gate ever been timed -- and NOT for the ship-time budget, which still reads the shared file. See task #87. `serialRing` holds the last three alone readings; recordReach's margin row reads it on a box that does not own the shared record, because that row asks what a gate costs HERE and nothing here can refresh another box's ring.",
- "captured": "2026-10-11T12:13:20.714Z",
+ "captured": "2026-10-11T15:03:13.843Z",
  "timings": {
   "tools/ship/cloneProvision-selfcheck.mjs": 7171,
   "tools/ship/exitBusy-selfcheck.mjs": 15284,
@@ -24,10 +24,11 @@
   "tools/ship/murmurParity-selfcheck.mjs": 168,
   "tools/ship/publishHygiene-selfcheck.mjs": 204,
   "tools/ship/brainStages-selfcheck.mjs": 1147,
+  "tools/ship/reportFresh-selfcheck.mjs": 676,
+  "tools/ship/afterVerdict-selfcheck.mjs": 4724,
   "tools/ship/poolWatch-selfcheck.mjs": 240,
   "tools/ship/sysLagReading-selfcheck.mjs": 584,
-  "tools/ship/train6dofPilot-selfcheck.mjs": 18288,
-  "tools/ship/reportFresh-selfcheck.mjs": 533
+  "tools/ship/train6dofPilot-selfcheck.mjs": 18288
  },
  "at": {
   "tools/ship/cloneProvision-selfcheck.mjs": "2026-09-25T03:35:16.858Z",
@@ -51,10 +52,11 @@
   "tools/ship/murmurParity-selfcheck.mjs": "2026-10-10T22:41:16.149Z",
   "tools/ship/publishHygiene-selfcheck.mjs": "2026-10-11T04:12:13.137Z",
   "tools/ship/brainStages-selfcheck.mjs": "2026-10-11T04:43:04.285Z",
+  "tools/ship/reportFresh-selfcheck.mjs": "2026-10-11T15:03:13.843Z",
+  "tools/ship/afterVerdict-selfcheck.mjs": "2026-10-11T15:03:13.843Z",
   "tools/ship/poolWatch-selfcheck.mjs": "2026-10-11T11:26:37.395Z",
   "tools/ship/sysLagReading-selfcheck.mjs": "2026-10-11T11:26:37.395Z",
-  "tools/ship/train6dofPilot-selfcheck.mjs": "2026-10-11T11:26:37.395Z",
-  "tools/ship/reportFresh-selfcheck.mjs": "2026-10-11T12:13:20.714Z"
+  "tools/ship/train6dofPilot-selfcheck.mjs": "2026-10-11T11:26:37.395Z"
  },
  "kinds": {
   "tools/ship/cloneProvision-selfcheck.mjs": "alone",
@@ -78,10 +80,11 @@
   "tools/ship/murmurParity-selfcheck.mjs": "alone",
   "tools/ship/publishHygiene-selfcheck.mjs": "alone",
   "tools/ship/brainStages-selfcheck.mjs": "alone",
+  "tools/ship/reportFresh-selfcheck.mjs": "alone",
+  "tools/ship/afterVerdict-selfcheck.mjs": "alone",
   "tools/ship/poolWatch-selfcheck.mjs": "alone",
   "tools/ship/sysLagReading-selfcheck.mjs": "alone",
-  "tools/ship/train6dofPilot-selfcheck.mjs": "alone",
-  "tools/ship/reportFresh-selfcheck.mjs": "alone"
+  "tools/ship/train6dofPilot-selfcheck.mjs": "alone"
  },
  "codes": {
   "tools/ship/cloneProvision-selfcheck.mjs": 0,
@@ -105,10 +108,11 @@
   "tools/ship/murmurParity-selfcheck.mjs": 0,
   "tools/ship/publishHygiene-selfcheck.mjs": 0,
   "tools/ship/brainStages-selfcheck.mjs": 0,
+  "tools/ship/reportFresh-selfcheck.mjs": 0,
+  "tools/ship/afterVerdict-selfcheck.mjs": 0,
   "tools/ship/poolWatch-selfcheck.mjs": 0,
   "tools/ship/sysLagReading-selfcheck.mjs": 0,
-  "tools/ship/train6dofPilot-selfcheck.mjs": 0,
-  "tools/ship/reportFresh-selfcheck.mjs": 0
+  "tools/ship/train6dofPilot-selfcheck.mjs": 0
  },
  "serialRing": {
   "tools/ship/frozenRecords-selfcheck.mjs": [
@@ -196,6 +200,16 @@
    1154,
    1147
   ],
+  "tools/ship/reportFresh-selfcheck.mjs": [
+   698,
+   762,
+   676
+  ],
+  "tools/ship/afterVerdict-selfcheck.mjs": [
+   4845,
+   5149,
+   4724
+  ],
   "tools/ship/poolWatch-selfcheck.mjs": [
    256,
    266,
@@ -210,11 +224,6 @@
    18691,
    19391,
    18288
-  ],
-  "tools/ship/reportFresh-selfcheck.mjs": [
-   553,
-   489,
-   533
   ]
  }
 }

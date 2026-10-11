@@ -1,5 +1,5 @@
 diff --git a/src/renderers/webgl-fallback/nodes/GLSLNodeBuilder.js b/src/renderers/webgl-fallback/nodes/GLSLNodeBuilder.js
-index 73ea390..4592b4b 100644
+index d894d31..a06b6c2 100644
 --- a/src/renderers/webgl-fallback/nodes/GLSLNodeBuilder.js
 +++ b/src/renderers/webgl-fallback/nodes/GLSLNodeBuilder.js
 @@ -1313,6 +1313,11 @@ ${ flowData.code }

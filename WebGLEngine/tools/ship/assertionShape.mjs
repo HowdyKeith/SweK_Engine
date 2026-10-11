@@ -896,10 +896,11 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4827 -- 1937 -> 1939 for brain/roster-selfcheck.mjs and brain/racePlay-selfcheck.mjs. usesOk, definesOk and nameFirst each by two; the rest hold (the drift row named exactly these four).
     // v4830 -- 1940 -> 1942 for brain/pilotRoster-selfcheck.mjs and brain/pilot6dofPolicy-selfcheck.mjs, over v4829's murmurParity-selfcheck.mjs (1939 -> 1940). usesOk, definesOk and nameFirst each by two; the rest hold (the drift row named exactly these four).
     // v4831 -- 1942 -> 1944 for tools/ship/publishHygiene-selfcheck.mjs and tools/ship/brainStages-selfcheck.mjs. usesOk, definesOk and nameFirst each by two; the rest hold (the drift row named exactly these four).
-    // v4834 -- 1944 -> 1945 for tools/ship/reportFresh-selfcheck.mjs, on main. usesOk, definesOk and nameFirst each by one.
-    // v4835 -- 1945 -> 1948 for this round's tools/ship/poolWatch-selfcheck.mjs, tools/ship/sysLagReading-selfcheck.mjs and tools/ship/train6dofPilot-selfcheck.mjs (v4832 and v4833 added no gate file). usesOk, definesOk and nameFirst each by three more; the rest hold (the drift row named exactly these four).
-    gates: 1948, usesOk: 1927, definesOk: 1919, importsOk: 0,
-    distinctDefinitions: 42, nameFirst: 1819, condFirst: 97, unknownSignature: 11,
+    // v4834 -- 1944 -> 1945 for tools/ship/reportFresh-selfcheck.mjs. usesOk, definesOk and nameFirst each by one; the rest hold (the drift row named exactly these four).
+    // v4835 -- 1945 -> 1946 for tools/ship/afterVerdict-selfcheck.mjs, on main. usesOk, definesOk and nameFirst each by one.
+    // v4837 -- 1946 -> 1949 for this round's tools/ship/poolWatch-selfcheck.mjs, tools/ship/sysLagReading-selfcheck.mjs and tools/ship/train6dofPilot-selfcheck.mjs (v4836 added no gate file). usesOk, definesOk and nameFirst each by three more; the rest hold (the drift row named exactly these four).
+    gates: 1949, usesOk: 1928, definesOk: 1920, importsOk: 0,
+    distinctDefinitions: 42, nameFirst: 1820, condFirst: 97, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

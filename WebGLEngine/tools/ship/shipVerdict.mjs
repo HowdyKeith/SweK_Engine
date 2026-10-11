@@ -28,6 +28,7 @@ import { execFileSync, spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
 import { ensureDxc, describe as describeDxc } from "./ensureDxc.mjs";
+import { plan as afterVerdictPlan } from "./afterVerdict.mjs";
 
 // Anchored at line start and followed by a space -- the shape git writes. An unanchored match would trip on
 // prose about conflict markers and on any file that mentions one mid-line; this round's changelog is such a
@@ -180,6 +181,17 @@ export function chosenPreflight({ verifyPath = null, preflight } = {}) {
     return verifyPath ? null : readiness;
 }
 
+// *** v4836 -- AFTER A SHIP, THE VERDICT NAMES STEP 4b, BECAUSE THE RITUAL'S NEXT STEP WAS ONLY IN A MARKDOWN FILE. ***
+// tools/ship/afterVerdict.mjs (v4835) runs what no ship-time step ran against the record this verdict just wrote; until it is
+// run the rig should not be asked. A SHIP line alone reads as "done". So a real verify's SHIP is preceded by one line naming the
+// command and how many gates it holds -- read off afterVerdict's own plan, so the count cannot drift from the step. A stand-in
+// verify gets none unless one is passed, as with the readiness check.
+export function chosenNextStep({ verifyPath = null, nextStep } = {}) {
+    if (nextStep !== undefined) return nextStep;
+    return verifyPath ? null : () => `[ship] next, before the rig is asked: node tools/ship/afterVerdict.mjs -- ${afterVerdictPlan().length} gates no ` +
+        "ship-time step ran against the record this verdict wrote (the ship skill's step 4b)";
+}
+
 export function notReadyTrailer(items) {
     return [
         ...items.map((n) => `[ship]   not ready  ${n.what}`),
@@ -191,7 +203,7 @@ export function notReadyTrailer(items) {
 
 // `verifyPath` is injectable so shipVerdict-selfcheck can drive THIS function, signals included, against a
 // stand-in verify rather than a twenty-minute sweep. The CLI below passes the real one.
-export async function main({ eng, argv = [], verifyPath = null, preflight = undefined, out = (m) => console.log(m), exit = (c) => process.exit(c) }) {
+export async function main({ eng, argv = [], verifyPath = null, preflight = undefined, nextStep = undefined, out = (m) => console.log(m), exit = (c) => process.exit(c) }) {
     const root = path.resolve(eng, "..");
     const t0 = Date.now();
     let child = null;
@@ -224,6 +236,8 @@ export async function main({ eng, argv = [], verifyPath = null, preflight = unde
     out("");
     out(`[ship] verify exit=${verify.code}  conflicts=${conflicts.hits.length}/${conflicts.scanned} files  after ${Math.round((Date.now() - t0) / 1000)} s`);
     for (const h of conflicts.hits) out(`[ship]   conflict  ${h.file}  line(s) ${h.marks.map((m) => m.line).join(", ")}`);
+    const next = d.ship ? chosenNextStep({ verifyPath, nextStep }) : null;
+    if (next) { try { out(next()); } catch (e) { out("[ship] next: node tools/ship/afterVerdict.mjs (its plan could not be read: " + String(e && e.message).slice(0, 80) + ")"); } }
     out(`[ship] ${d.ship ? "SHIP" : "DO NOT SHIP"} -- ${d.reason}`);
     exit(d.ship ? 0 : 1);
     return d;

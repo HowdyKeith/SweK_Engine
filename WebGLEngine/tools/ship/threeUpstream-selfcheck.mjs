@@ -372,6 +372,29 @@ console.log(`\n6. ON r186 AND dev: the issues ready to paste, held to tools/ship
     ok(`  the README states them as e2e.json does`, !!e2e && devIndex.includes(`${e2e.unit.tests} tests, ${e2e.unit.passed} passed, ${e2e.unit.todo} todo, ${e2e.unit.failed} failed`) &&
         devIndex.includes(`${e2e.webgpu.examples} WebGPU examples, ${e2e.webgpu.passed} passed and the same ${e2e.webgpu.failed}`) && devIndex.includes(`${e2e.webgl2.passed} passed and the same ${e2e.webgl2.failed} failed`) &&
         devIndex.includes(`${e2e.webgpu.screenshotsIdentical} of the ${e2e.webgpu.examples} screenshots`) && devIndex.includes("(e2e.json)"));
+    // v4836: *** THE SIXTEEN STACK IN SLOT ORDER, AND THE THING THAT BROKE IT WAS A CONTEXT LINE. *** Made again on 11738a9 with
+    // git's three lines of context, 10's hunk reached `return ( mrt !== null && mrt.has( 'velocity' ) );` -- the line 04 replaces --
+    // and threePatch.mjs's all-sixteen build stopped: "patch 10 does not apply on top of 03 ... 09". 10 keeps two lines again. Held
+    // here on the texts alone: in slot order, no patch's context names a line an earlier patch removes, an import line apart (those
+    // threePatch.mjs merges, 08 and 16's in Instance.js). SABOTAGED: 10's hunk given that line as context again -> 3 red: this row by
+    // name, and the record's freshness and 10's issue (its embedded patch), which any edit to a patch reddens.
+    {
+        const removed = new Map(), clash = [];
+        for (const s of SLOTS) {
+            if (!patches[s]) continue;
+            let file = null; const ctx = [], rem = [];
+            for (const l of fs.readFileSync(path.join(DEV_DIR, "patches", patches[s]), "utf8").split("\n")) {
+                if (l.startsWith("+++ ")) { file = l.slice(4).replace(/^b\//, ""); continue; }
+                if (l.startsWith("--- ") || l.startsWith("diff ") || l.startsWith("index ") || l.startsWith("@@")) continue;
+                if (l.startsWith(" ") && l.trim()) ctx.push([file, l.slice(1)]);
+                else if (l.startsWith("-")) rem.push([file, l.slice(1)]);
+            }
+            for (const [f, l] of ctx) for (const r of removed.get(f) || []) if (r.line === l && !/^\s*import\s/.test(l)) clash.push(`${s}'s context in ${f} is a line ${r.slot} removes: ${l.trim()}`);
+            for (const [f, l] of rem) { if (!removed.has(f)) removed.set(f, []); removed.get(f).push({ slot: s, line: l }); }
+        }
+        ok(`!! *** the ${SLOTS.length} patches stack in slot order: no context line is a line an earlier patch removes (import lines apart) ***`,
+            clash.length === 0, clash.length ? clash.join("; ") : "so the all-sixteen build needs no three-way merge but the import line threePatch.mjs merges");
+    }
     // v4812: *** THE PULL REQUESTS, ONE PER ISSUE, READY TO PASTE. *** docs/upstream-three/dev/pr/ holds the text of each: its title in
     // three's "Component: What changed." form, the branch and the commands that make it from the issue's own patch, and a body in three's
     // pull request template (`Related issue`, `**Description**`). Held here: one per issue and no other, each naming its own issue and

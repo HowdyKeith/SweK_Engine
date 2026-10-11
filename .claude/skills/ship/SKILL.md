@@ -133,18 +133,24 @@ with a reason; never widen the register to get green. `SWEK_QUICKSWEEP=0` skips 
 not a way to ship. The timings file is rewritten by the run and ships with the round (`git add -A WebGLEngine`
 covers it). Gates OVER the budget are still only covered by the full two-phase sweep.
 
-## 4b. Grade the record the verdict WROTE, before the rig is asked
+## 4b. Grade what no ship-time step ran, before the rig is asked
 
-    node -e 'const fs=require("fs");import("./tools/ship/gateSweep.mjs").then(m=>{const pat=/sweep-timings|quickSweep\.mjs|sweepCoverage\.mjs|sweepRotation\.mjs|recordReach\.mjs|declaredCost\.mjs|budgetExile\.mjs|redCensus\.mjs|timingsTarget|readTimings|capReading|gate-timings/;console.log(m.enumerateGates().filter(g=>{try{return pat.test(fs.readFileSync(g,"utf8"))}catch{return false}}).join("\n"))})' > /tmp/readers.txt
-    while read g; do timeout 900 node "$g" >/dev/null 2>&1 || echo "RED $g"; done < /tmp/readers.txt
+    node tools/ship/afterVerdict.mjs; echo "exit=$?"      # --list prints the plan and runs nothing
 
 *** THE VERDICT RUNS ITS GATES AGAINST THE RECORD FROM BEFORE ITS OWN SWEEP, AND THEN REWRITES THE RECORD. *** The
 rig grades the record you COMMIT -- the rewritten one -- so a gate that reads the timing record can be green in the
 sandbox's verdict and red on the rig's. v4815 shipped a SHIP verdict whose own write turned sweepCoverage red, and
 Keith's rig found it: the sandbox had never run that gate against what it committed. After a SHIP, commit the record,
-run every gate that reads it (about 84; most are over the budget, so the next quick sweep would not see them either),
-and only then hand the rig the command. A red here is fixed before the rig is asked, like any other. Gates that only
-match the pattern in a comment (labResults, at ~15 min) can be read and set aside rather than waited on.
+run this step, and only then hand the rig the command. A red here is fixed before the rig is asked, like any other.
+
+*** AND THE SWEEP NEVER RUNS A GATE OVER ITS 3,000 ms LINE, EVEN WHEN THAT GATE IS A RECORD'S ONLY GUARD. *** v4819
+shipped two such gates red past a SHIP verdict -- orreryFleet-selfcheck (the commit belt, 20.9 s) and
+universeWire-selfcheck (the key drift, 5.4 s), both moved by the merge's re-vendors. Since v4835 this step is one
+command (tools/ship/afterVerdict.mjs) that runs, alone and serially, every gate whose CODE reads the timing record
+(the pattern this step used to carry as a one-liner, now held in that file) together with recordReach's `blockers`,
+the gates that are a frozen record's only guard and over the line. A mention in a comment selects nothing, so
+labResults' fifteen minutes are no longer on the list. It exits 1 on any red, names each one and why it was run, and
+writes nothing.
 
 ## 5. Commit and push (from the REPO ROOT, one level above WebGLEngine)
 

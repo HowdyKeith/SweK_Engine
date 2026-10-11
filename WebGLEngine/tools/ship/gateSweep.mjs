@@ -8892,10 +8892,10 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The CLIs refuse an unknown option (cliArgs) and the peer's transport is a row of its own. Thirteen sabotages red by name, " +
                  "logged in the two headers. NOT CLOSED: the pair has run over loopback and in one browser, not between two machines.",
     }),
-    // v4835 -- since526, not since524 or since525: the shipVerdict readiness round and the stale-reports round took them on main in the same days. THREE new gate files: tools/ship/poolWatch-selfcheck.mjs (what the quick sweep does not run, and a recorded red in it failing the ship), tools/ship/sysLagReading-selfcheck.mjs (the two rig readings as one
-    // command each, and the two backlog entries held to the code) and tools/ship/train6dofPilot-selfcheck.mjs (the tool that trains and ships the space-battle pilot). Built as v4832 while main shipped its own v4832, v4833 and v4834.
-    since526: Object.freeze({
-        at: "v4835", swept: 3, green: 3, red: 0,
+    // v4837 -- since528, not since524..since527: four other rounds took them on main in the same days. THREE new gate files: tools/ship/poolWatch-selfcheck.mjs (what the quick sweep does not run, and a recorded red in it failing the ship), tools/ship/sysLagReading-selfcheck.mjs (the two rig readings as one
+    // command each, and the two backlog entries held to the code) and tools/ship/train6dofPilot-selfcheck.mjs (the tool that trains and ships the space-battle pilot). Built as v4832 while main shipped its own v4832 to v4836.
+    since528: Object.freeze({
+        at: "v4837", swept: 3, green: 3, red: 0,
         added: Object.freeze([
             "tools/ship/poolWatch-selfcheck.mjs",
             "tools/ship/sysLagReading-selfcheck.mjs",
@@ -8910,6 +8910,38 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "champion choice (on the first recipe the train-best run was also the held-out-best), the trainer that accepts a worse child (a gentle search rarely finds a clearly worse one) and the pool-watch wiring row (it matched " +
                  "a file name verify.mjs's own comment spells). Each is fixed and re-sabotaged. NOT CLOSED: the rotation does not record input sets as it runs the over-budget pool (444 of 449 have none), so a pool reading's age is " +
                  "said and not closed; and the lag and device readings need the rig.",
+    }),
+    // v4836 -- NO new gate file -- the sixteen three.js drafts moved to dev 11738a9.
+    since527: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4836", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (section 6: the sixteen stack in slot order -- no context line is a line an earlier patch removes, import lines apart)",
+            "tools/ship/shipVerdict-selfcheck.mjs (section 8: after a SHIP the verdict names step 4b with afterVerdict's plan count; the verdict line stays last)",
+        ]),
+        verdict: "*** NOTHING THREE MERGED IN 107 COMMITS FIXES ANY OF THE SIXTEEN, AND THREE PATCHES HAD TO BE MADE AGAIN FOR THREE REASONS. *** " +
+                 "On dev 11738a9 every reproduction prints what it printed on 576b084 -- r186, dev, its own patch, all sixteen. 04 and 06 " +
+                 "no longer applied (#34854, #34821); 16 applied and no longer built (#34871 added the import it adds). Three's unit tests " +
+                 "(1894 now, #34918) and e2e give the same outcomes on both builds. The new row holds the property a three-line context " +
+                 "broke: 10 applying after 04. NOT CLOSED: the consolidated TSL unit tests skip, headless here, what needs a GPU backend.",
+    }),
+    // v4835 -- ONE new gate file: tools/ship/afterVerdict-selfcheck.mjs (the ship ritual's step 4b as a command).
+    since526: Object.freeze({
+        at: "v4835", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/afterVerdict-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/sweepRotation-selfcheck.mjs (a write on a box that does not own the record merges into that box's own file)",
+            "tools/ship/cliArgs-selfcheck.mjs (afterVerdict.mjs refuses an unknown option)",
+            "gfx/frontDoor-selfcheck.mjs (ui/publishCommands.mjs named as an arrival: red since v4831 with nothing running it)",
+        ]),
+        verdict: "*** STEP 4b WAS A REGEX IN A MARKDOWN FILE AND IT ASKED ONE OF TWO QUESTIONS. *** tools/ship/afterVerdict.mjs runs, alone, " +
+                 "every gate whose CODE reads the timing record (85 by the old pattern, 41 of them only in comments, labResults' and " +
+                 "claimTrace's minutes among them) and recordReach's blockers, the gates that are a record's only guard and over " +
+                 "the sweep's line. Its first run found frontDoor-selfcheck red since v4831 (ui/publishCommands.mjs unnamed), and " +
+                 "building it found sweepRotation dropping a foreign box's earlier local readings on every write. Both repaired.",
     }),
     // v4834 -- ONE new gate file: tools/ship/reportFresh-selfcheck.mjs (no report older than the last commit to its own gate).
     since525: Object.freeze({
