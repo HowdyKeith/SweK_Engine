@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "983629c8cb6c5953b2608ec23b6409454f8cd470",
+ "head": "135a8763b045600aa0eb8b23d239df5cf8846f77",
  "bodies": {
   "box3d": [
    {
@@ -46,7 +46,7 @@
    },
    {
     "path": "physics/box3dFingerprint-selfcheck.mjs",
-    "bytes": 4795,
+    "bytes": 5167,
     "sha": "66db97c45b5286d98d1c018506effca552f05a23"
    },
    {
@@ -721,8 +721,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3554494,
-    "sha": "eeab48050ee83b5571396b77468c24ebb64e4a33"
+    "bytes": 3557044,
+    "sha": "7ebd9b569d2ba931aab7c675d8b3966612c5f672"
    },
    {
     "path": "mpm3d.html",

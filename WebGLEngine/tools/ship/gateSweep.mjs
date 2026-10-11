@@ -8892,6 +8892,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The CLIs refuse an unknown option (cliArgs) and the peer's transport is a row of its own. Thirteen sabotages red by name, " +
                  "logged in the two headers. NOT CLOSED: the pair has run over loopback and in one browser, not between two machines.",
     }),
+    // v4840 -- NO new gate file -- the computed door to wasm, censused; five gates it found converted.
+    since531: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4840", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/wasmTeardown-selfcheck.mjs (section 7: every gate reaching a computed door to a wasm compiler leaves without exit() or was measured under the hook; fixtures for the door rule)",
+        ]),
+        verdict: "*** THE DOOR THE RIG FOUND AT v4832, CENSUSED, AND IT HAD FIVE MORE MEMBERS NOBODY HAD MET. *** wasmTeardown.mjs's " +
+                 "wasmCompilers / wasmDoors / doorReach name every script that compiles wasm (vendor/ included), every module that loads " +
+                 "one through createRequire or a computed import(), and every gate reaching one: 21, 8, 58. Fourteen of the 58 call " +
+                 "process.exit() outside v4663's measured census; under the hook five had the crash shape -- racePlay, box3dFingerprint, " +
+                 "gunnerTraceDemo, backendRotation, peerBrain, all green, all exit 0 -- and now set process.exitCode; the nine others " +
+                 "exit before any wasm or never call exit, and are recorded. Five sabotages red by name. NOT CLOSED: a door the rule " +
+                 "cannot name (a glue file chosen at run time with no literal for it anywhere) is still the rig's to find.",
+    }),
     // v4839 -- NO new gate file -- the sandbox judges as a fresh clone would: the gitignored local record ignored, uncommitted gate edits seen.
     since530: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened three.

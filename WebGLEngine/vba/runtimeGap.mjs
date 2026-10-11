@@ -1170,8 +1170,10 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4837 -- ES modules 4323 -> 4331, closures 4169 -> 4177, async/await 1735 -> 1739, Promises 417 -> 419, fetch/XHR 251 -> 252: the five tools, their three gates and the 6DOF page's shipped-pilot fetch; sysLagReading.mjs calls fetch (251 -> 252).
     // v4838 -- performance.now 245 -> 246: tools/ship/meshBVH-selfcheck.mjs times its speedup rows on it now (the fastest of
     // several runs, step 4b's repair); the other rows hold.
+    // v4840 -- WebAssembly 24 -> 26: tools/ship/wasmTeardown.mjs (the census's compiler pattern) and wasmTeardown-selfcheck.mjs
+    // (section 7's fixture glue) now name the API; neither compiles anything. The other rows hold.
     esModules: 4331, closures: 4177, asyncAwait: 1739, typedArrays: 1274, promises: 419,
-    fetchXhr: 252, performanceNow: 246, raf: 127, webgl: 200, webgpu: 57, threads: 25, wasm: 24,
+    fetchXhr: 252, performanceNow: 246, raf: 127, webgl: 200, webgpu: 57, threads: 25, wasm: 26,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.
