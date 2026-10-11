@@ -1,11 +1,15 @@
 // WebGLEngine/tools/ship/declaredCost-selfcheck.mjs -- v4666
 //
-// Run: node tools/ship/declaredCost-selfcheck.mjs   (~0.6s MEASURED v4666)
+// Run: node tools/ship/declaredCost-selfcheck.mjs   (~1.3s -- re-measured v4832, the cost note below; it read ~0.6s MEASURED v4666)
 //
 // *** THE GATE FOR A CENSUS WHOSE POPULATION INCLUDES THIS FILE'S OWN THIRD LINE. *** declaredCost reads the
 // `// Run: node <gate>   (~Ns)` header that 271 gates carry, and the line above is one of them -- so the
 // population is excluded by IDENTITY rather than by name, which is the convention checkerCensus set when it
 // counted itself.
+//
+// COST (v4832): 1,250 / 1,307 / 1,275 ms alone on 420793 with that round's every-box row, 1,136-1,154 ms without it, 979-1,187 ms
+// in the shared ring. Kept off the Run: line on purpose: buildKnowledgeIndex takes a gate's purpose from the first long header
+// line that is not the Run: line, and a two-line Run: header indexed this gate by its timing note (review of v4832).
 //
 // SABOTAGES, RESULTS BY NAME:
 //   A. the unit is ignored and every declaration reads as seconds   -> RED (2 rows). "~0.2s" and "~200ms"
@@ -22,6 +26,9 @@
 //   G4. this box's one reading not pooled with its kin's             -> RED (2 rows)
 //   G5. the row's source not recorded                                -> RED (1 row)
 //   G6. timings handed in, and the box files read anyway             -> RED (1 row)
+//   v4832, section 5 -- the ratchet read as every box with a ring in the tree:
+//   H.  statedRuntime's header put to ~0.45s                            -> RED (1 row; the row before it stayed green)
+//   H2. 142c0d's ring at 10x for three gates 420793 reads itself, on 420793 -> RED (1 row; the row before it stayed green)
 //
 // *** AND F WAS RESTORED BY HAND AFTER `git checkout --` DID NOTHING, which is worth one line: this file was
 // UNTRACKED when it was sabotaged, so the restore silently succeeded and changed nothing, and the gate went
@@ -223,6 +230,32 @@ console.log("\n5. *** THE LIVE CENSUS, RATCHETED ***");
         `and ${c.rotted.length} on this machine, against a frozen ${ROTTED_AT_V4820} (v4819 froze 0, this machine's count only; 39 on main at v4814; 138 at v4666 against loaded readings). Each one is a gate whose header claims a ` +
         "cost more than 2x from what the record measured, both having finished. Paying it down means " +
         "running each gate and re-writing its line, which is a pass and not an edit");
+    // *** v4832 -- AND AS EVERY BOX THAT HAS A RING IN THE TREE, BECAUSE THE TWO SANDBOX MACHINES TAKE TURNS. *** The row above
+    // holds the box running it and a box with no readings. A box whose own ring disagrees with both is judged only when a
+    // session lands on it -- and sessions land on 142c0d and 420793 by turns (census's v4810 note). Found by review of a draft
+    // of this round, written on 142c0d before main's v4820 landed: in that draft's records (both re-timed by the draft and not
+    // carried here) statedRuntime's header re-measured to ~0.45s agreed with 142c0d's ring and the shared one, and read 1
+    // rotted as 420793, whose ring held 1,472-1,521 ms. So every box the tree has a ring for is read here, by whichever box
+    // ships, and each is held to ITS OWN frozen count -- 0 for both at v4832. Review of the first version of this row: it held
+    // them to the no-readings ceiling of 2, so the draft's 1-and-1 was green. 17 headers sit within one repeat spread (1.64x)
+    // of the line in every view, all judged on the shared record, the same in all three, so a crossing there reddens the row
+    // above as well; none of the near-line rows comes from a box's own ring.
+    // SABOTAGE (v4832): statedRuntime's header put to ~0.45s, the draft's value -> this row red alone, 142c0d 1 and 420793 1
+    // against 0; the row above stayed green (2 with no readings, 1 here, against 2). Restored by copy.
+    // SABOTAGE (v4832), run on 420793: 142c0d's ring for three gates 420793 has its own readings of (threeWorkarounds,
+    // commentFalsePass, coverageTriage) put at 10x their headers -> this row red alone, 142c0d 3; the row above stayed green.
+    // Three gates 420793 had NO readings of turned both rows red instead: a box with one reading or none borrows its same-type
+    // sibling's, so there the sibling's ring IS this box's view. Restored by copy.
+    const ROTTED_AS_EACH_RING_BOX_AT_V4832 = 0;
+    const ringIds = fs.readdirSync(path.join(ENG, "tools", "ship"))
+        .map((f) => /^sweep-timings\.(.+-[0-9a-f]{6})\.json$/.exec(f)).filter(Boolean).map((m) => m[1]);
+    const views = ringIds.map((id) => ({ id, rotted: census(ENG, null, { exclude: (g) => g === SELF_REL, id }).rotted }));
+    const over = views.filter((v) => v.rotted.length > ROTTED_AS_EACH_RING_BOX_AT_V4832);
+    ok("*** ...and every box that has a ring in the tree reads its own frozen count, not only the one running this ***",
+        ringIds.length >= 1 && over.length === 0 && ROTTED_AS_EACH_RING_BOX_AT_V4832 <= ROTTED_AT_V4820,
+        views.map((v) => `${v.id} ${v.rotted.length}`).join(", ") + ` against a frozen ${ROTTED_AS_EACH_RING_BOX_AT_V4832} each` +
+        (over.length ? ": " + over.flatMap((v) => v.rotted.map((r) => `as ${v.id}, ${r.gate.split("/").pop()} ${r.declaredMs}/${r.recordedMs} ms from ${r.from}`)).join("; ") : "") +
+        ". A box reads its own ring first, so a header agreeing with one box's ring can be rotted on another's");
     ok("  ...and the population it is measured over is not empty and not everything",
         c.declaring > 100 && c.declaring < c.gates && c.missing > 0,
         `${c.declaring} of ${c.gates} declare. A ratchet over a population of zero passes forever, and one ` +
