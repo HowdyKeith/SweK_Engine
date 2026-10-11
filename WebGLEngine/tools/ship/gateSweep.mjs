@@ -8892,6 +8892,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The CLIs refuse an unknown option (cliArgs) and the peer's transport is a row of its own. Thirteen sabotages red by name, " +
                  "logged in the two headers. NOT CLOSED: the pair has run over loopback and in one browser, not between two machines.",
     }),
+    // v4834 -- ONE new gate file: tools/ship/reportFresh-selfcheck.mjs (no report older than the last commit to its own gate).
+    since525: Object.freeze({
+        at: "v4834", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/reportFresh-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/gateReport-selfcheck.mjs (an empty standing-reds register is held on all three sides; the three rendering rows run only when there is an entry)",
+            "tools/ship/brainStages-selfcheck.mjs, tools/ship/murmurParity-selfcheck.mjs (their printed tables are reports now)",
+            "physics/render/conductorFresnel-selfcheck.mjs (one emission of its table, not two under one title)",
+        ]),
+        verdict: "*** 71 REPORTS WERE STALE, AND FOUR ROWS OF gateReport-selfcheck WERE PASSING ON THEM. *** The 55 taken from one " +
+                 "side at the v4819 merge were re-run: 20 printed different tables, each reproduced exactly on a second run. 16 " +
+                 "more were older than their gate's last commit. Re-taken, registerDrift's report holds 0 standing reds (v4826 " +
+                 "emptied the register) where the stale one held 27 that three rendering rows kept grading; a realGpuRun cell came " +
+                 "back empty; conductorFresnel emitted one table twice. reportFresh-selfcheck holds the line from git, skipping a " +
+                 "shallow clone's boundary. NOT CLOSED: the resolution is a day.",
+    }),
     // v4833 -- NO new gate file -- shipVerdict asks whether the box can run the browser gates before it runs verify.
     since524: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.

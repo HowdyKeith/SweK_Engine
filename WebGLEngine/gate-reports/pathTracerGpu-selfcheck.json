@@ -1,6 +1,6 @@
 {
  "gate": "physics/render/pathTracerGpu-selfcheck.mjs",
- "at": "2026-09-03",
+ "at": "2026-10-11",
  "tables": [
   {
    "title": "CPU against GPU, clean and with a planted fault",
