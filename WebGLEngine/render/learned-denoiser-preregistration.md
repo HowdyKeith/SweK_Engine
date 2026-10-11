@@ -3783,3 +3783,40 @@ gate's "names no adapter" row becomes a row holding the verdict's table.
 - A default change, or any native use of r18t or r18u on D3D12.
 - Measuring other browsers, platforms or GPUs. They run r15.
 - A third kernel, or a set chosen after the rig's run. That is a later round.
+
+## 62. ROUND 18 -- REPORTED HERE: K0 (a), r18t AND r18u ON THE 24 TEST IMAGES
+
+`node tools/denoiseDevice.mjs --measure-r18t` and `--measure-r18u` ran here on SwiftShader, one after the other, with no
+cache, so each rendered the 24 test images itself.
+
+| Set | Run | Started at |
+|---|---|---|
+| r18t | 1,308 s | 9b33f2c2, the commit carrying section 61 |
+| r18u | 1,737 s | 9b33f2c2. Its first run was stopped with the job that ran it, before it wrote anything, and it was run again. |
+
+- **The outputs, unedited,** are `render/denoise-results-r18t.json` (committed at 4479d3b6) and
+  `render/denoise-results-r18u.json` (e73991e4). Each was committed before it was read.
+- **The kernels:** on every image the four hidden layers ran on the set's kernel, `tile_inline` for r18t and
+  `fast_unroll` for r18u. The head and the kernel apply ran as one pass, `k_head_apply`.
+
+**K0 (a) holds for both sets.**
+
+| Criterion | r18t | r18u |
+|---|---|---|
+| D0, the shipped file is the harvest's network | its f64 relMSE equals round 11's seed 1 on all 24 images, bit for bit | the same |
+| D1, the hidden layers | 12,582,912 conv cells, every one the twin's: none fused, none unexplained | the same |
+| D2, the head and kernel pass | worst 4.9e-7 against `kernelApplyCpu` on the twin's logits or the fused mirror's (bound 1e-5); against the twin's alone 6.4e-7, against the mirror's alone 7.6e-7 | the same, to the digit |
+| D3, the verdict on the device | relMSE within 3.8e-7 of the f64 network's on every image (bound 1e-4); the primary filter beaten on 12 of 12 images of R and 12 of 12 of C, the same images as on the CPU | the same |
+
+- **On all 24 images, each set's device relMSE equals r15's (section 47), bit for bit.** That is what an unchanged
+  order predicts. On SwiftShader nothing fuses, so every hidden cell is the twin's in r15, r18t and r18u alike.
+- **Reported, not a criterion.** A 64 x 64 image took a median of 279 ms (241-360) with r18t and 956 ms (816-1,152) with
+  r18u, read-back included, against r15's 399 in section 47. This is SwiftShader, a CPU's time, and no evidence for the
+  page rule.
+
+**Still open:**
+- K0 (c), K1 and section 61's page rule on Keith's two GPUs, and the native clock rows there.
+- That is one run each of `node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise-r18.json` on
+  `claude/denoiser-round18`.
+- Until section 61's rule fills it, `PAGE_KERNELS_BY_ADAPTER` is empty. The page runs "r15" everywhere, and so does the
+  default.
