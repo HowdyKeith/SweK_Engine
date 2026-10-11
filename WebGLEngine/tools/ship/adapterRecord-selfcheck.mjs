@@ -9,7 +9,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { treePaths } from "./treeRead.mjs";
 import { adapterKey, verdict, describe, coverage, owedCount,
-         compareFor, boundFrom, SLACK, readReadings, recordReading, mergeRecords } from "./adapterRecord.mjs";
+         compareFor, boundFrom, SLACK, readReadings, recordReading, mergeRecords, READINGS_PATH } from "./adapterRecord.mjs";
 
 let fails = 0;
 const ok = (n, c, d = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${n}${d ? "   " + d : ""}`); };
@@ -203,6 +203,25 @@ console.log("\n6. *** THE POPULATION, COUNTED RATHER THAN REMEMBERED ***");
                 `produced them. That is the POPULATION of task #60 taken from the tree rather than from memory -- ` +
                 `not its debt: a parity or shape claim needs no record, and only a run on a second adapter can ` +
                 `say which of them assert a magnitude.`);
+}
+
+// *** v4831 -- READINGS_PATH: the record every device gate reads by default, and the one this file never named. ***
+// tools/ship/definitionGates-selfcheck.mjs counts a definition as looked at when its own gate names it; this constant
+// was spent by three microfacet gates and named here by nobody. The row holds what it is FOR: it is the file
+// in tools/ship/ that readReadings opens when a gate passes no `file`, and every adapter reading in it is what that
+// default call returns. SABOTAGE, restored: READINGS_PATH pointed at "adapter-readings.local.json" -> RED (untracked,
+// and the default reads nothing).
+{
+    const rel = path.relative(path.resolve(path.dirname(new URL(import.meta.url).pathname), "..", ".."), READINGS_PATH).replace(/\\/g, "/");
+    let rec = null; try { rec = JSON.parse(fs.readFileSync(READINGS_PATH, "utf8")); } catch {}
+    const gates = rec && rec.gates ? Object.keys(rec.gates) : [];
+    const same = gates.every((g) => JSON.stringify(readReadings(g)) === JSON.stringify(rec.gates[g]) &&
+                                    JSON.stringify(readReadings(g, { file: READINGS_PATH })) === JSON.stringify(rec.gates[g]));
+    const tracked = gates.length > 0 && rel === "tools/ship/adapter-readings.json";
+    console.log((tracked && same ? "  PASS  " : "  FAIL  ") + "!! READINGS_PATH is tools/ship/adapter-readings.json, the record readReadings opens by default   " +
+        `${rel}: ${gates.length} gate(s) recorded (${gates.join(", ")}), and readReadings with no file returns each one's readings ` +
+        `${same ? "exactly" : "DIFFERENTLY"} -- the record a second adapter's run lands in, so it has to be the file that ships`);
+    if (!(tracked && same)) fails++;
 }
 
 console.log(`\nadapterRecord-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);

@@ -44,7 +44,8 @@ import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { startRelay } from "./lockstepRelay.mjs";
+import { startRelay, CLI_SPEC } from "./lockstepRelay.mjs";
+import { parseArgs } from "./cliArgs.mjs";   // v4831: CLI_SPEC's row
 import { connect, wsTransport } from "./miniWs.mjs";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 import { initNode, mod } from "../../physics/box3d/box3dNode.mjs";
@@ -191,6 +192,21 @@ sec("5. THE ENGINE IS PART OF THE PROTOCOL: a peer announcing another engine hal
     const [a, b] = await Promise.all([peerProc("p5", "A"), peerProc("p5", "B", ["--engine-id", "someone-elses-box3d"])]);
     report(`A: ${a.json && a.json.reason}`);
     ok("!! both exit 1 having stepped nothing, and the reason names the other engine", a.code === 1 && b.code === 1 && a.json.halted && b.json.halted && a.json.tick === 0 && b.json.tick === 0 && /someone-elses-box3d/.test(a.json.reason + b.json.reason), `ticks ${a.json && a.json.tick}/${b.json && b.json.tick}`);
+}
+
+// *** v4831 -- CLI_SPEC, THE RELAY'S COMMAND LINE, HELD BY THE GATE NAMED FOR ITS MODULE. *** The relay reads exactly two
+// options and refuses everything else (tools/ship/cliArgs.mjs); tools/ship/definitionGates-selfcheck.mjs counts the spec
+// as looked at only when this gate names it. The row parses with it: both options read as their types, and a misspelt
+// one is an error naming it rather than a silently ignored token -- the relay on the wrong port and nobody told.
+// SABOTAGE, restored: "--port" dropped from CLI_SPEC.values -> RED.
+{
+    const good = parseArgs(["--port", "9137", "--host", "127.0.0.1"], CLI_SPEC);
+    const bad = parseArgs(["--prot", "9137"], CLI_SPEC);
+    ok("!! the relay's CLI_SPEC reads --port as a number and --host as a string, and refuses a misspelt option by name",
+       Object.keys(CLI_SPEC.values).sort().join(",") === "--host,--port" && CLI_SPEC.flags.length === 0 &&
+       good.errors.length === 0 && good.values["--port"] === 9137 && good.values["--host"] === "127.0.0.1" &&
+       bad.errors.length > 0 && bad.errors.some((e) => /--prot/.test(e)),
+       `good: ${JSON.stringify(good.values)}; misspelt: ${bad.errors.join("; ")}`);
 }
 
 await relay.close();

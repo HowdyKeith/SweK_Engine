@@ -11,7 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { gateList, categorize, parseRows, verdict, runGates, runLaunchArgs, probeSoftwareGl, softwareGlLines, TREE_SOFTWARE_GL,
-         probeNativeAdapters, nativeAdapterLines } from "./realGpuRun.mjs";
+         probeNativeAdapters, nativeAdapterLines, RETIRED_SOFTWARE_GL, TREE_SOFTWARE_WEBGPU, SOFTWARE_GL_CANDIDATES } from "./realGpuRun.mjs";
 import { webgpuSkipReason, launchArgsFor, hardwareArgsFor, parityArgsFor, HARDWARE_ARGS, softwareClaims } from "./webgpuHarness.mjs";
 import { gateReport } from "./gateReport.mjs";
 const GR = gateReport("tools/ship/realGpuRun-selfcheck.mjs");
@@ -240,6 +240,27 @@ console.log("\n5. RIG RUN 9: WHICH ADAPTER node-webgpu HANDS OUT, PER WAY OF ASK
     console.log("\n  ----  gate report: " + (w.written ? "written to " + w.file : w.why) +
                 ` -- ${w.doc.tables.length} tables, ${w.doc.tables.reduce((n, t) => n + t.rows.length * t.columns.length, 0)} cells`);
 }
+// *** v4831 -- THE THREE FLAG LISTS THE SOFTWARE-GL PROBE IS BUILT ON, NAMED BY THE GATE NAMED FOR THEIR MODULE. ***
+// tools/ship/definitionGates-selfcheck.mjs counted RETIRED_SOFTWARE_GL, TREE_SOFTWARE_WEBGPU and SOFTWARE_GL_CANDIDATES as
+// definitions nobody had looked at: probeSoftwareGl spends them and no gate named them. The row holds the three facts the
+// rig runs settled (see the module's note on rig run 10): the tree's WebGPU launch is its GL launch plus exactly one flag;
+// the retired spelling is NOT in the tree's launch any more but stays a candidate, so the table keeps saying why it went;
+// and the candidate table probeSoftwareGl defaults to starts with the tree's own spelling, holds no set twice, and every
+// set is frozen. SABOTAGE, restored: "--use-gl=swiftshader" added back to TREE_SOFTWARE_WEBGPU -> RED.
+{
+    const key = (a) => a.join(" ");
+    const keys = SOFTWARE_GL_CANDIDATES.map(key);
+    const probeSrc = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "realGpuRun.mjs"), "utf8");
+    ok("!! the software-GL candidates: the tree's WebGPU launch is its GL launch plus --enable-unsafe-webgpu, the retired flag is out of both and still a candidate, the tree's spelling is tried first",
+       key(TREE_SOFTWARE_WEBGPU) === key([...TREE_SOFTWARE_GL, "--enable-unsafe-webgpu"]) &&
+       RETIRED_SOFTWARE_GL.length === 1 && RETIRED_SOFTWARE_GL[0] === "--use-gl=swiftshader" &&
+       !TREE_SOFTWARE_GL.includes(RETIRED_SOFTWARE_GL[0]) && !TREE_SOFTWARE_WEBGPU.includes(RETIRED_SOFTWARE_GL[0]) &&
+       keys[0] === key(TREE_SOFTWARE_GL) && keys.includes(key(RETIRED_SOFTWARE_GL)) && keys.includes(key(TREE_SOFTWARE_WEBGPU)) &&
+       new Set(keys).size === keys.length && SOFTWARE_GL_CANDIDATES.every((a) => Object.isFrozen(a)) &&
+       /export async function probeSoftwareGl\(sets = SOFTWARE_GL_CANDIDATES,/.test(probeSrc),
+       `${SOFTWARE_GL_CANDIDATES.length} candidates, first [${keys[0]}]; tree WebGPU [${key(TREE_SOFTWARE_WEBGPU)}]; retired [${key(RETIRED_SOFTWARE_GL)}]`);
+}
+
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: a real GPU -- the run exists for one and this box has none; the whole run, 8 min 25 s on SwiftShader, " +
     "measured once and too long for a gate -- two gates here; and which Linux flags reach which GPU, which the doc offers as a first try, not a finding.");
