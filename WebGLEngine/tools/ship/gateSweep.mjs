@@ -8906,8 +8906,9 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "Keith handed the shared timing record to linux-x64-4c-16gb-420793 (RECORD_HANDOVERS, v4838), and sweepRotation --gate " +
                  "re-timed declaredCost's two rotted headers into it: gateSelection 12.5-14.4 s alone over five runs against its ~14s, its " +
                  "loaded 69 s no longer the only reading (capReading names the move, with three quiet runs); statedRuntime 0.7 s against ~1.6s, the one header that was wrong -- its cost is the arrivals " +
-                 "it re-runs, and today it has none -- re-written to ~0.8s. The ratchet stands at 0. NOT CLOSED: a restart onto the other " +
-                 "host strands the record again, one dated row away.",
+                 "it re-runs, and today it has none -- re-written to ~0.8s. The ratchet stands at 0. The first sweep this box wrote as owner " +
+                 "filed webcodecsFramesToMp4 skipped (ai-bridge's @napi-rs optionals absent here, present on 142c0d); installed, and " +
+                 "the session-start hook now installs them. NOT CLOSED: a restart onto the other host strands the record again, one dated row away.",
     }),
     // v4836 -- NO new gate file -- the sixteen three.js drafts moved to dev 11738a9.
     since527: Object.freeze({
