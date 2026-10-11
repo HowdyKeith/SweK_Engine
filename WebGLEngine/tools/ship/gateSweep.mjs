@@ -8892,6 +8892,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The CLIs refuse an unknown option (cliArgs) and the peer's transport is a row of its own. Thirteen sabotages red by name, " +
                  "logged in the two headers. NOT CLOSED: the pair has run over loopback and in one browser, not between two machines.",
     }),
+    // v4830 -- since521, not since520: the murmur parity round took since520 on main in the same days. TWO new gate files: brain/pilotRoster-selfcheck.mjs (who flies each side of the plane dogfight, and the Load Pilots panel on es-box3d-fly3d.html) and
+    // brain/pilot6dofPolicy-selfcheck.mjs (a learned pilot with the PD autopilot's contract, and the same panel on es-box3d-6dof.html).
+    since521: Object.freeze({
+        at: "v4830", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "brain/pilotRoster-selfcheck.mjs",
+            "brain/pilot6dofPolicy-selfcheck.mjs",
+        ]),
+        widened: Object.freeze([
+            "tools/ship/pilotPolicy-selfcheck.mjs (unchanged and re-run: duel() now takes a weight vector as the opponent, and the existing rows hold the string opponents to what they were)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE GATE FOUND A DEFECT IN ITS OWN PAGE BEFORE THE SABOTAGE DID, AND A SABOTAGE THAT WENT 0 RED WAS A CRASH. *** The first run of the plane-page gate failed one row: the shipped pilot was never " +
+                 "offered, because the selects were built once at load, before the shipped file had arrived; pilotLine() now rebuilds them whenever availability changes. In the 6DOF gate, the sabotage that " +
+                 "made the zero pilot call the hand pilot (which calls the zero pilot) recursed to a stack overflow and exited 1 with no FAIL row: a crash that looks like a catch. Re-done as a " +
+                 "real breakage, it is three red. And the closing-speed feature has no weight in the hand brain, so nothing read it until a row was added for its sign and size. Twenty-one sabotages " +
+                 "for the plane gate, sixteen for the 6DOF gate. NOT CLOSED: no 6DOF brain has been trained or shipped, so the 'shipped' and 'imported' choices are not on that page.",
+    }),
     // v4829 -- ONE new gate file: tools/ship/murmurParity-selfcheck.mjs (the full read of murmur-web at 1c23b99, every difference it found held
     // against the murmur line it transcribes).
     since520: Object.freeze({

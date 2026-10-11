@@ -366,7 +366,12 @@ export const STILL_OVER_AT_V4815 = Object.freeze({
         Object.freeze({ gate: "tools/roundhouse/sweepBudget-selfcheck.mjs", recordedWas: 5526, hereMs: 3270,
             serialMs: Object.freeze([3353, 3086, 3214]),
             why: "2,545 ms in the record before the host change, 3,353 / 3,086 / 3,214 alone on the 2.80 GHz host; the " +
-                 "file is untouched since v4361, so as at v4565 the move is the box and not the gate" }),
+                 "file is untouched since v4361, so as at v4565 the move is the box and not the gate",
+            // v4829 -- RETURNED, BY THE RULE THIS ROLL WAS WRITTEN WITH: the record is on the 2.10 GHz host again and sweepBudget reads
+            // 2,328 / 2,503 / 2,462 ms alone, quiet, under the bar and back in the sweep. Found by step 4b: the row below still demanded
+            // justifiedOver of every entry, as the v4813 row did before v4818 -- the retirement path had a branch there and none here.
+            // Kept as history with the readings that retired it.
+            returned: Object.freeze({ at: "v4829", aloneMs: 2462, serialMs: Object.freeze([2328, 2503, 2462]) }) }),
     ]),
 });
 
