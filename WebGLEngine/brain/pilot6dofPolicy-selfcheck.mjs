@@ -33,6 +33,19 @@
 //   P  es-box3d-6dof.html: offers a Brain panel choice the page does not have              1 red (seven choices, not six)
 //   Q  es-box3d-6dof.html: team A is handed no pilot                                       1 red (the page's hand-against-zero fight)
 //   R  pilotRoster.mjs: the resolved scripted team ignores the name it is given            1 red (the PD autopilot is named as such, on the page and in the roster row)
+//   v4832 -- TRAINING, THE SHIPPED PILOT, AND THE PAGE'S SHIPPED / IMPORTED CHOICES. Eleven more, each applied, the gate run, the file restored (md5-identical):
+//   S  pilot6dofPolicy.mjs: the score leaves out the win bonus                            2 red (the exact-reward row; the file's `by` no longer reproduces)
+//   T  pilot6dofPolicy.mjs: tempo's sign flipped                                          3 red (the tempo row, the `by` row, and the fixed-point row: it changes every score)
+//   U  pilot6dofPolicy.mjs: a child moves ALL the weights, not 1..maxK                    3 red (the sparse-child row, the maxK row, the prune-fixpoint row)
+//   V  pilot6dofPolicy.mjs: train accepts a worse child. *** FIRST TRY WENT 0 RED: a search of 1-4 weights at sigma 0.3 rarely finds a clearly worse child in 20 iterations, so nothing was
+//      ever accepted that should not have been. The row now runs a DESTRUCTIVE search (sigma 3, up to 12 weights) where most children are worse. *** 1 red
+//   W  pilot6dofPolicy.mjs: prune never reverts a weight                                  2 red
+//   X  pilot6dofPolicy.mjs: prune makes one pass and stops (no fixed point)               1 red (the idempotence row: pruning the output again moves 4 more; the SHIPPED file alone would not
+//      have caught it, because it is already pruned to a fixed point)
+//   Y  es-box3d-6dof.html: 'shipped' is never offered                                     2 red
+//   Z  es-box3d-6dof.html: an imported brain is accepted without the policy check         1 red (the refusal row: a plane pilot's file with no weights is imported)
+//   AA es-box3d-6dof.html: Clear imported does nothing                                    1 red
+//   AB es-box3d-6dof.html: the cached pilot ignores what has become available              2 red (the saved-choice-survives-reload row: it stays the hand pilot it fell back to)
 //   FIRST RUN OF THE GATE: one red, and it was my claim and not the code: the hand brain tracks the PD autopilot to 1.13% at small errors, not the 1% the header said -- the tanh's first-order
 //   saturation (tanh(0.15) is 0.9926 of 0.15, at one radian of error; the angular-velocity term adds the rest). The bound is 2% now and says why.
 "use strict";
@@ -46,6 +59,8 @@ import * as AP from "./autopilot6dof.mjs";
 import * as R from "./pilotRoster.mjs";
 import * as RB from "../physics/mechanics/rigidBody6dof.mjs";
 import * as Topo from "./gfcTopology.mjs";
+import * as PB from "./peerBrain.mjs";
+import { weightsHash } from "./drivePolicy.mjs";
 import { runInEngineOrigin, webgpuSkipReason } from "../tools/ship/webgpuHarness.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -195,12 +210,28 @@ sec("5. THE PAGE: es-box3d-6dof.html in its own browser");
             out.hz = await observe(40000);
             choose("pilotA", "zero"); choose("pilotB", "hand"); byId("startFight").click();
             out.zh = await observe(40000);
+            // v4832 -- THE SHIPPED PILOT AND AN IMPORTED ONE
+            await waitFor(() => S.roster.shipped || S.roster.shippedError, 30000);
+            out.shipped = { loaded: !!S.roster.shipped, error: S.roster.shippedError, choices: S.roster.choices, line: byId("pilotLine").textContent };
+            const blob = await (await fetch("/brain/pilot6dofWeightsDefault.json")).json();
+            choose("pilotA", "shipped"); choose("pilotB", "zero"); byId("startFight").click();
+            out.shippedFight = { A: S.roster.lineup.A.id, label: S.roster.lineup.A.label, ships: S.roster.lineup.A.weights.length, sameWeights: S.roster.lineup.A.weights.every((w) => w === S.roster.shipped), obs: await observe(40000) };
+            out.bad = { ok: S.roster.importBlob({ format: "swek-brain-v1", policy: "pilotPolicy", weights: [] }), line: byId("pilotLine").textContent, importedStill: !!S.roster.imported };
+            out.imp = { ok: S.roster.importBlob(blob), choices: S.roster.choices, imported: !!S.roster.imported };
+            choose("pilotA", "imported"); byId("startFight").click(); out.impLineup = { A: S.roster.lineup.A.id, label: S.roster.lineup.A.label, same: S.roster.lineup.A.weights.every((w) => w === S.roster.imported) };
+            byId("clearPilot").click(); out.cleared = { labels: Array.from(byId("pilotA").options).map((o) => o.textContent), imported: !!S.roster.imported, selectKept: byId("pilotA").value, lineupA: S.roster.lineup.A.id, problems: S.roster.lineup.problems || S.roster.lineup.A.problems };
             S.roster.setSpecs({ A: "noise10", B: "noise05" }); byId("startFight").click(); out.noise = { A: S.roster.lineup.A.label, B: S.roster.lineup.B.label, distinct: new Set(S.roster.lineup.A.weights.map((w) => w.slice(0, 40).join())).size };
             out.tallyCleared = S.state().wins.A + S.state().wins.B === 0;
             out.persisted = JSON.stringify(S.roster.specs);
             P.f.remove();
             const Q = await boot(); out.reload = [Q.d.getElementById("pilotA").value, Q.d.getElementById("pilotB").value];
             Q.d.getElementById("rosterReset").click(); out.afterReset = [Q.d.getElementById("pilotA").value, Q.d.getElementById("pilotB").value];
+            // v4832 -- a choice of "shipped" SAVED in the browser is made before the file has arrived on the next load: it must become the shipped pilot when the file does, not stay the hand pilot it fell back to
+            Q.w.__sixdof.roster.setSpecs({ A: "shipped", B: "scripted" }); Q.f.remove();
+            const R2 = await boot(); await waitFor(() => R2.w.__sixdof.roster.shipped, 30000);
+            await waitFor(() => R2.w.__sixdof.roster.lineup.A && R2.w.__sixdof.roster.lineup.A.id === "shipped", 5000);
+            out.shippedReload = { A: R2.w.__sixdof.roster.lineup.A && R2.w.__sixdof.roster.lineup.A.id, label: R2.w.__sixdof.roster.lineup.A && R2.w.__sixdof.roster.lineup.A.label, selected: R2.d.getElementById("pilotA").value };
+            R2.w.__sixdof.roster.setSpecs({ A: "auto", B: "auto" });
             return out;
         }` });
         ok("the harness booted es-box3d-6dof.html and drove the panel", r.ok && r.result && r.result.booted, r.ok ? "" : String(r.reason || r.error || (r.pageErrors || []).join(" | ")).slice(0, 300));
@@ -213,6 +244,68 @@ sec("5. THE PAGE: es-box3d-6dof.html in its own browser");
             ok("!! ...and swapped, team A (zero) is the one hurt, motionless and not spinning, and team B (hand) is moving", p.zh.aHurt && !p.zh.bHurt && p.zh.bMoved && !p.zh.aMoved && !p.zh.aSpun, JSON.stringify(p.zh));
             ok("'hand + noise' gives each ship of its team its own pilot (three distinct), and Start Fight clears the tally", /noise 0.1/.test(p.noise.A) && /noise 0.05/.test(p.noise.B) && p.noise.distinct === 3 && p.tallyCleared, `${p.noise.A} against ${p.noise.B}`);
             ok("!! the choices survive a reload (noise on both sides), and Default pilots puts both selects back on 'default for this team'", p.reload.join() === "noise10,noise05" && p.afterReset.join() === "auto,auto", `${p.reload.join()} then ${p.afterReset.join()}`);
+            ok("!! a SAVED choice of the shipped pilot survives the next load: it is made before the file has arrived, falls back to the hand pilot for a moment, and becomes the shipped pilot when the file lands", p.shippedReload.A === "shipped" && p.shippedReload.selected === "shipped" && /shipped pilot/.test(p.shippedReload.label), JSON.stringify(p.shippedReload));
+            const sh = p.shipped;
+            ok("!! the shipped pilot LOADS and is offered: the file arrives, 'shipped' is in the select, and the line names its hash and held-out score", sh.loaded && !sh.error && sh.choices.includes("shipped") && !sh.choices.includes("imported") && /shipped pilot [0-9a-f]{8}: held-out score/.test(sh.line), JSON.stringify(sh).slice(0, 260));
+            ok("!! choosing it flies it: team A is the shipped pilot, all three ships on the very weights the file carries, and the fight shows it (a SHIPPED team moves and deals damage; a ZERO team holds still and is hurt)", p.shippedFight.A === "shipped" && /shipped pilot/.test(p.shippedFight.label) && p.shippedFight.ships === 3 && p.shippedFight.sameWeights && p.shippedFight.obs.bHurt && p.shippedFight.obs.aMoved && !p.shippedFight.obs.bMoved, JSON.stringify(p.shippedFight));
+            ok("!! a brain for another policy is REFUSED with a reason on the page and nothing is imported", p.bad.ok === false && /import refused/.test(p.bad.line) && p.bad.importedStill === false, p.bad.line);
+            ok("!! a good file is imported: 'imported' joins the select, and choosing it flies those weights on every ship", p.imp.ok && p.imp.imported && p.imp.choices.includes("imported") && p.impLineup.A === "imported" && p.impLineup.same, JSON.stringify(p.impLineup));
+            ok("!! Clear imported takes it away: the choice is no longer offered (a team that had picked it keeps a labelled 'not available here' entry), and that team is told so by name and flies the hand pilot rather than nothing", !p.cleared.imported && p.cleared.labels.some((l) => /imported.*not available here/.test(l)) && !p.cleared.labels.some((l) => /^imported pilot brain$/.test(l)) && p.cleared.lineupA === "hand" && /imported/.test(JSON.stringify(p.cleared.problems)), JSON.stringify(p.cleared));
+        }
+    }
+}
+
+// ---- 6. TRAINING, AND THE PILOT THIS PAGE SHIPS -----------------------------------------------------------------------------------------------------
+sec("6. TRAINING (v4832) and the shipped pilot: brain/pilot6dofWeightsDefault.json");
+{
+    const hand = P6.handWeights(), zero = P6.zeroWeights();
+    ok("the reward is a frozen record of six terms, and a decisive WIN (the opponent dead, you not) is paid on top of the kill because a mutual kill is most of what the hand pilot gets", Object.isFrozen(P6.REWARD) && ["hit", "waste", "damageTaken", "kill", "win", "tempo"].every((k) => Number.isFinite(P6.REWARD[k])) && P6.REWARD.win > 0, JSON.stringify(P6.REWARD));
+    const all = [...P6.TRAIN_SEEDS, ...P6.HELD_OUT_SEEDS, ...P6.AUDIT_SEEDS];
+    ok("the train, held-out and audit seeds are three disjoint sets (12, 8, 20): nothing graded was trained on", new Set(all).size === all.length && P6.TRAIN_SEEDS.length === 12 && P6.HELD_OUT_SEEDS.length === 8 && P6.AUDIT_SEEDS.length === 20, `${all.length} seeds, ${new Set(all).size} distinct`);
+    const dd = P6.duel("hand", "autopilot", { seed: 1 }), dz = P6.duel("hand", "zero", { seed: 1 });
+    ok("a mutual kill (the hand pilot against the autopilot it IS) is not a win, and a kill that costs nothing is: hand v autopilot seed 1 both dead, win false; hand v zero win true", dd.aDead && dd.bDead && dd.win === false && dz.win === true && !dz.aDead && dz.bDead, `mutual: ${dd.aDead}/${dd.bDead}/${dd.win}; v zero: ${dz.win}`);
+    const expect = (r) => r.hits * P6.REWARD.hit - r.shotsFired * P6.REWARD.waste - r.hitsTaken * P6.SHOT_DAMAGE * P6.REWARD.damageTaken + (r.bDead ? P6.REWARD.kill : 0) + (r.win ? P6.REWARD.win : 0) + r.tempo * P6.REWARD.tempo;
+    ok("the duel's score is exactly the reward applied to its own tally (hits, shots, damage, kill, win, tempo), for a mutual kill and for a win", Math.abs(dd.score - expect(dd)) < 1e-9 && Math.abs(dz.score - expect(dz)) < 1e-9, `${dd.score.toFixed(3)} and ${dz.score.toFixed(3)}`);
+    ok("tempo is zero when the two sides fight identically (hand against the autopilot it is) and positive when A's hits land first", dd.tempo === 0 && P6.duel(P6.handWeights(), "autopilot", { seed: 1 }).tempo === 0, String(dd.tempo));
+    const ev = P6.evaluate(hand, [1, 2, 3]);
+    ok("evaluate is the mean duel score with wins, losses and draws that add up to the seeds it was given", Math.abs(ev.score - ev.runs.reduce((a, r) => a + r.score, 0) / 3) < 1e-9 && ev.wins + ev.losses + ev.draws === 3 && ev.runs.length === 3, P6.describeEval(ev));
+    const mk = (seed) => { let a = seed >>> 0; return () => { a = (Math.imul(a, 1664525) + 1013904223) >>> 0; return a / 4294967296; }; };
+    const before = Float32Array.from(hand), child = P6.mutate(hand, 0.3, mk(5), 4), diffs = Array.from(child).filter((v, i) => v !== hand[i]).length;
+    ok("a child moves between one and four weights (it is SPARSE: moving all 930 accepted nothing in 100 iterations), and the parent is untouched", diffs >= 1 && diffs <= 4 && same(hand, before), `${diffs} weights moved`);
+    ok("...with maxK 1 exactly one, and the same generator gives the same child", Array.from(P6.mutate(hand, 0.3, mk(9), 1)).filter((v, i) => v !== hand[i]).length === 1 && same(P6.mutate(hand, 0.3, mk(5), 4), child));
+    // sigma 3 and up to twelve weights a child: a destructive search, so most children are clearly WORSE and a trainer that accepted them would show
+    const t1 = P6.train({ seed: 3, iters: 20, sigma: 3, maxK: 12, trainSeeds: [1, 2, 3] }), t2 = P6.train({ seed: 3, iters: 20, sigma: 3, maxK: 12, trainSeeds: [1, 2, 3] });
+    ok("train is deterministic for a seed, never ends below the hand pilot's own score on the seeds it trained on (even when most children are worse), and its history only rises", same(t1.weights, t2.weights) && t1.trainScore >= P6.evaluate(hand, [1, 2, 3]).score - 1e-9 && t1.history.every((h, i, a) => !i || h.score >= a[i - 1].score - 1e-9) && t1.improved + t1.neutral <= 20, `train ${t1.trainScore.toFixed(2)}, ${t1.improved} improvements, ${t1.neutral} neutral`);
+    const drift = Float32Array.from(hand); for (const i of [3, 77, 301, 640, 905]) drift[i] += 0.4;
+    const pr = P6.prune(drift, { trainSeeds: [1, 2, 3, 4] });
+    ok("prune puts back weights that carry nothing: a hand pilot with five dead weights nudged comes back with fewer weights moved than it went in with, and no lower a score", pr.moved === 5 && pr.kept < 5 && pr.trainScore >= P6.evaluate(drift, [1, 2, 3, 4]).score - 1e-9 && same(drift, Float32Array.from(drift)), `${pr.moved} moved, ${pr.kept} kept`);
+    const raw = P6.train({ seed: 2001, iters: 60, trainSeeds: [1, 2, 3, 4] }).weights, p1 = P6.prune(raw, { trainSeeds: [1, 2, 3, 4] }), p2 = P6.prune(p1.weights, { trainSeeds: [1, 2, 3, 4] });
+    ok("prune goes round until a pass reverts nothing: pruning its own output again changes nothing, and it never ends with more weights moved than it began with", p2.kept === p2.moved && same(p1.weights, p2.weights) && p1.kept <= p1.moved && p1.passes >= 2, `${p1.moved} moved -> ${p1.kept} kept in ${p1.passes} passes; again: ${p2.moved} -> ${p2.kept}`);
+    ok("...and the input is not modified, and pruning the hand pilot itself moves nothing", pr.weights !== drift && drift[3] === Math.fround(hand[3] + 0.4) && P6.prune(hand, { trainSeeds: [1] }).moved === 0);
+
+    // the file the page ships
+    const file = path.join(ENG, "brain", "pilot6dofWeightsDefault.json"), exists = fs.existsSync(file);
+    ok("the shipped pilot's file exists", exists, file);
+    if (exists) {
+        const blob = JSON.parse(fs.readFileSync(file, "utf8")), imp = PB.importBrain(PB.describePolicy("pilot6dofPolicy", P6), blob), w = imp.ok ? imp.weights : null;
+        ok("it is a swek-brain-v1 file for THIS policy: 930 finite weights, imported by the same code the page uses; the plane pilot's descriptor refuses it by name", imp.ok && blob.weightCount === 930 && PB.importBrain(PB.describePolicy("pilotPolicy", PP), blob).ok === false && /pilot6dofPolicy/.test(PB.importBrain(PB.describePolicy("pilotPolicy", PP), blob).reason), imp.ok ? `hash ${weightsHash(w)}` : imp.reason);
+        if (w) {
+            const diffN = Array.from(w).filter((v, i) => Math.abs(v - hand[i]) > 1e-6).length, claimed = /(\d+) of the 930 weights differ/.exec(blob.by || "");
+            const held = P6.evaluate(w, P6.HELD_OUT_SEEDS), aud = P6.evaluate(w, P6.AUDIT_SEEDS), handAud = P6.evaluate(hand, P6.AUDIT_SEEDS), handHeld = P6.evaluate(hand, P6.HELD_OUT_SEEDS);
+            ok("!! what the file SAYS about itself is what the code gets: its `by` quotes the held-out and audit results and the count of weights that differ from the hand pilot, and a fresh run reproduces all three", blob.by.includes(P6.describeEval(held)) && blob.by.includes(P6.describeEval(aud)) && claimed && Number(claimed[1]) === diffN && blob.score === Number(held.score.toFixed(3)), `held-out ${P6.describeEval(held)}; audit ${P6.describeEval(aud)}; ${diffN} weights differ`);
+            ok("!! IT BEATS THE PILOT IT REPLACES where it was never trained: on the 20 audit seeds more wins than losses AND a higher score than the hand pilot, and the same on the 8 held-out seeds", aud.wins - aud.losses > handAud.wins - handAud.losses && aud.score > handAud.score && held.wins - held.losses >= handHeld.wins - handHeld.losses && held.score > handHeld.score, `audit ${P6.describeEval(aud)} vs hand ${P6.describeEval(handAud)}; held-out ${P6.describeEval(held)} vs hand ${P6.describeEval(handHeld)}`);
+            const tempos = P6.AUDIT_SEEDS.map((seed) => P6.duel(w, "autopilot", { seed }).tempo);
+            const handTempos = P6.AUDIT_SEEDS.map((seed) => P6.duel(hand, "autopilot", { seed }).tempo);
+            ok("tempo says it too: on EVERY audit seed the shipped pilot's hits land earlier than the autopilot's (a positive tempo); the hand pilot's are level on at least 18 of 20 (it is the same controller: the other two are the spawn jitter favouring B) and never ahead", tempos.every((t) => t > 0) && handTempos.filter((t) => t === 0).length >= 18 && handTempos.every((t) => t <= 0), `shipped: mean ${(tempos.reduce((a, b) => a + b, 0) / tempos.length).toFixed(2)} s, min ${Math.min(...tempos).toFixed(2)} s; hand: ${handTempos.filter((t) => t === 0).length} of 20 level`);
+            const asB = P6.AUDIT_SEEDS.map((seed) => P6.duel("autopilot", w, { seed })), bWins = asB.filter((r) => r.aDead && !r.bDead).length, bLoss = asB.filter((r) => r.bDead && !r.aDead).length;
+            ok("!! ...from the OTHER SIDE too: flying as team B against the autopilot on the audit seeds it wins more than it loses (the result is the pilot's, not a side's)", bWins > bLoss, `${bWins} wins, ${bLoss} losses of ${asB.length}`);
+            ok("it is a smaller thing than it looks: the file differs from the PD autopilot in fewer than a fifth of the weights (the rest went back; prune's header has why)", diffN > 0 && diffN < 186, `${diffN} of 930`);
+            // WHAT CHANGED, as a printed fact for the round note (not a row: a retrain would move it, and the note would have to be rewritten with it)
+            const REC0 = P6.FEATURES * P6.HIDDEN + P6.HIDDEN, OUT0 = REC0 + P6.REC_EDGES, dec = [];
+            for (let i = OUT0; i < OUT0 + P6.HIDDEN * P6.OUTPUTS + P6.OUTPUTS; i++) if (Math.abs(w[i] - hand[i]) > 1e-6) dec.push(i < OUT0 + P6.HIDDEN * P6.OUTPUTS ? P6.OUTPUT_NAMES[Math.floor((i - OUT0) / P6.HIDDEN)] : P6.OUTPUT_NAMES[i - OUT0 - P6.HIDDEN * P6.OUTPUTS] + " bias");
+            report(`the ${diffN} weights that differ from the PD autopilot: ${Array.from(w).filter((v, i) => i < P6.FEATURES * P6.HIDDEN && Math.abs(v - hand[i]) > 1e-6).length} in the encoder, ${Array.from(w).filter((v, i) => i >= P6.FEATURES * P6.HIDDEN && i < REC0 && Math.abs(v - hand[i]) > 1e-6).length} biases, ${Array.from(w).filter((v, i) => i >= REC0 && i < OUT0 && Math.abs(v - hand[i]) > 1e-6).length} in the recurrent core, ${dec.length} in the output layer -- the output-layer ones reach: ${[...new Set(dec)].join(", ")} (thrust and firing ${dec.some((d) => /thrust|firing/.test(d)) ? "ARE" : "are NOT"} among them)`);
+            const again = P6.prune(w, { trainSeeds: P6.TRAIN_SEEDS });
+            ok("pruning the shipped pilot again reverts nothing (it is already at a fixed point: every weight left is one the score needs)", again.kept === again.moved && again.passes === 1, `${again.moved} moved, ${again.kept} kept, ${again.passes} pass(es)`);
         }
     }
 }
