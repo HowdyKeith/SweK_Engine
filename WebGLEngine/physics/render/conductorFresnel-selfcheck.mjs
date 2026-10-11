@@ -160,19 +160,9 @@ console.log();
 for (const l of reportLines()) console.log(l);
 console.log();
 
-{
-    // The same rows reportLines() prints, kept as numbers rather than a pre-formatted string -- so a second
-    // reader gets the values reportLines() rendered, not a re-tokenising of its text.
-    const rows = [];
-    for (const [name, m] of Object.entries(METALS)) for (let ch = 0; ch < 3; ch++) {
-        const r = compareModels(m.eta[ch], m.kappa[ch]);
-        rows.push([`${name} ${"RGB"[ch]}`, r.schlickMax, r.f82Max, r.ratio, r.dipDepth]);
-    }
-    REPORT.table("worst absolute error against the exact conductor curve, over 2001 angles",
-        ["metal channel", "Schlick max", "F82-tint max", "ratio", "dip below F0"], rows,
-        "the same computation reportLines() prints to the terminal, kept as numbers rather than text.");
-    REPORT.write();
-}
+// v4834 -- a second emission of the table below stood here, arrived from the other line at a merge with the same
+// title and five of its thirteen columns; gateReport-selfcheck's identity row found two tables wearing one
+// (gate, title) once the report was re-taken. The fuller one is kept.
 console.log("  ----  WHAT THIS DOES NOT CLAIM");
 console.log("  ----  THAT THE METAL CONSTANTS ARE RIGHT. n and k here are the widely-circulated RGB samples of");
 console.log("  ----  measured spectra, and three numbers are not a spectrum. Section 5 is deliberately a sweep");

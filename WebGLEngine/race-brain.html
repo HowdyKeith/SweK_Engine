@@ -23,6 +23,10 @@
   .carWin { display:flex; flex-direction:column; gap:2px; }
   .carView { background:#000; border:1px solid #2a3a30; cursor:pointer; display:block; max-width:100%; }
   .viewLabel { color:#5f7aa0; font-size:10px; max-width:240px; line-height:1.3; }
+  #roster { padding:2px 14px 6px; } #roster summary { cursor:pointer; color:#f6a623; letter-spacing:.08em; }
+  #rosterTable { border-collapse:collapse; margin:4px 0; } #rosterTable th { text-align:left; color:#5f7aa0; font-weight:normal; padding:0 10px 2px 0; } #rosterTable td { padding:1px 10px 1px 0; }
+  #rosterTable select { background:#0c140f; color:#9fb2d4; border:1px solid #2a3a30; font:inherit; max-width:290px; }
+  .chip { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:6px; vertical-align:-1px; } #rosterHelp { color:#5f7aa0; font-size:10px; max-width:900px; margin-top:3px; line-height:1.4; } #rosterNote { color:#7fb069; }
   #fleetList { display:flex; flex-direction:column; gap:2px; margin:2px 0; }
   .fleetRow { display:flex; align-items:center; gap:6px; }
   .fleetRow button { font-size:11px; }
@@ -32,10 +36,16 @@
 <div id="hud">
   <div id="cap">Race brain on the GPU: the driving policy trained in idle time, brains racing brains on box3d</div>
   <div id="be">requesting a device&hellip;</div>
-  <div id="sub">seed <input id="seed" type="number" value="1" min="1"> &middot; <button id="train">Train in idle time</button> <button id="stopTrain" disabled>Stop</button> &middot; <button id="race">Race</button> &middot; <button id="forget">Forget the stored brain</button>
+  <div id="sub">seed <input id="seed" type="number" value="1" min="1"> &middot; <button id="train">Train in idle time</button> <button id="stopTrain" disabled>Stop</button> &middot; <button id="forget">Forget the stored brain</button>
     &middot; <a href="?webgl=1">force WebGL2</a><br>
     <span id="tick">loading the racing kit and box3d&hellip;</span><br><span id="brain">no stored brain: the hand policy drives</span> <button id="exportBrain">Export brain</button> <button id="publishBrain">Publish to the fleet</button><br><span id="gun">turrets: the hand gunner on every car (v4588, task 77); it drops oil on a pursuer and lights it under them (v4590, task 79)</span> <button id="trainGun">Train the gunner in idle time</button> <button id="stopGun" disabled>Stop</button> <button id="forgetGun">Forget the stored gunner</button> <button id="exportGun">Export gunner</button> <button id="publishGun">Publish to the fleet</button><br><span id="peer">no peer brain loaded -- the fourth car (purple) drives the zero policy</span> <button id="importBrainBtn">Import a peer's brain</button> <button id="clearPeer" disabled>Clear peer brain</button> <input id="importBrainFile" type="file" accept="application/json" style="display:none"><br><span id="peerGun">no peer gunner loaded -- car 0's turret uses the hand gunner (or the stored one)</span> <button id="importGunBtn">Import a peer's gunner</button> <button id="clearPeerGun" disabled>Clear peer gunner</button> <input id="importGunFile" type="file" accept="application/json" style="display:none"><br><button id="findPeers">Find peer brains on the fleet</button> <span id="fleetStatus"></span><div id="fleetList"></div><br><span id="racing"></span><br><button id="labReplay">Replay the lab's accepted driver</button> <span id="lab">the Physics Lab's race scene stores the driver its adjudicator accepted; this plays that log back, not real time</span> &middot; drag to orbit, wheel to dolly</div>
 </div>
+<details id="roster" open>
+  <summary>Load Racers &mdash; who drives each car, who works each turret</summary>
+  <table id="rosterTable"><thead><tr><th>car</th><th>driver</th><th>turret gunner</th></tr></thead><tbody id="rosterRows"></tbody></table>
+  <button id="race">Start Race</button> <button id="rosterReset">Default lineup</button> <span id="rosterNote"></span>
+  <div id="rosterHelp">Every driver is the same network, wired like a fly's compass circuit, and every gunner the same network over its Giant Fiber circuit; a choice here picks which WEIGHTS run it: hand-set, zero (does nothing), noise on either, the one trained in idle time, or one imported from a peer. A choice that needs something not loaded yet is not offered. Choices stay in this browser; Start Race builds the lineup.</div>
+</details>
 <div id="raceRow">
   <canvas id="c"></canvas>
   <div id="viewsCol">
@@ -50,17 +60,21 @@ import * as G from "./render/gpuDriven.mjs";
 import * as L from "./render/litSphere.mjs";
 import { loadKit, kitScene, imageToColormap } from "./world/kenneyKit.mjs";
 import { generateTrack, tilePlacements, trackWorld, describeTrack, checkpoints } from "./world/raceTrack.mjs";
-import { trackSurface, createCar, stepCars, carPose, lapTracker, truckPlacement, addBuildings, foldHash, clampInput, CAR } from "./physics/raceCar.mjs";
+import { trackSurface, createCar, stepCars, carPose, lapTracker, truckPlacement, buildingBox, foldHash, clampInput, CAR } from "./physics/raceCar.mjs";
 import * as D from "./brain/drivePolicy.mjs";
 import * as GP from "./brain/gunnerPolicy.mjs";
 import * as PB from "./brain/peerBrain.mjs";
+import * as R from "./brain/roster.mjs";
 import * as U from "./physics/turret.mjs";
 import { turretFleets, placeTurrets, slickFleets, placeSlicks, pickupFleets, placePickups, TURRET_DRAW, SLICK_DRAW } from "./render/raceTurret.mjs";
 import * as S from "./physics/slick.mjs";
 import * as A from "./physics/spellAmmo.mjs";
 import * as CV from "./render/carViews.mjs";
-import { miniWorld, meshWorld, SUN } from "./render/voxelDevice.mjs";
-import { CityGen } from "./world/CityGen.js";
+import { SUN } from "./render/voxelDevice.mjs";
+import { CityGen, cityHash } from "./world/CityGen.js";
+import * as CD from "./world/crashDamage.mjs";
+import { VoxelDebrisSystem } from "./world/voxelDebrisSystem.js";
+import * as BT from "./world/buildingTopple.mjs";
 import { box3d } from "./physics/box3d/box3dLoader.js";
 import { worldFromModule } from "./render/slugTicker.mjs";
 
@@ -69,7 +83,7 @@ const fail = (m) => { beEl.innerHTML = '<span class="bad">' + m + "</span>"; };
 const $ = (id) => document.getElementById(id);
 const KEY = "swek.driveBrain.v1", GUN_KEY = "swek.gunnerBrain.v1", FILES = ["vehicle-truck-red.glb", "vehicle-truck-green.glb", "vehicle-truck-yellow.glb", "vehicle-truck-purple.glb"];
 let device, scene = null, kit = null, physMod = null, worldFrom = null, store = null, trainer = null, training = false, fleet = "00000000";
-let phys = null, cars = [], drivers = [], trackers = [], surface = null, placements = [], packed = null, hash = 0x811c9dc5, ticks = 0, names = [];
+let phys = null, cars = [], drivers = [], trackers = [], surface = null, placements = [], trucks = [], sceneBuilds = 0, hash = 0x811c9dc5, ticks = 0, names = [];
 let replayRec = null;   // v4527: the lab's accepted driver's log, played back tick for tick with no policy
 // v4588 -- the turret copilot (task 77): a turret on every car, a gunner policy in each (the stored gunner on car 0, the hand
 // gunner elsewhere), shells stepped and tested in the same lockstep tick, hits as impulses on the chassis they land on
@@ -79,6 +93,20 @@ let turrets = [], gunners = [], shells = [], turretBase = 0, gunStore = null, gu
 // of the hand gunner) when loaded, independently of each other; car 0's own gunner is unaffected (stored or hand).
 const DRIVE_DESC = PB.describePolicy("drivePolicy", D), GUNNER_DESC = PB.describePolicy("gunnerPolicy", GP);
 let peerBrain = null, peerBrainMeta = null, peerGunnerBrain = null, peerGunnerMeta = null;
+// v4827 -- the "Load Racers" panel (brain/roster.mjs): which brain DRIVES each car and which works each TURRET, chosen per car, then Start Race. `specs` is the choice
+// (ids, kept in this browser), `library` the brains imported this session (any of them can be given to any car), `roster` what the last race was built from.
+// Every choice is a set of WEIGHTS for the same fly-wired driver or gunner network -- see brain/roster.mjs's header for what that does and does not cover.
+const ROSTER_KEY = "swek.raceRoster.v1";
+let library = { drive: [], gun: [] }, specs = loadSpecs(), roster = null, slotOf = [], rosterSig = "";
+function loadSpecs() {
+  try { return R.sanitizeSpecs(JSON.parse(localStorage.getItem(ROSTER_KEY) || "null")).map((s) => ({ driver: /^lib:/.test(s.driver) ? R.AUTO : s.driver, gunner: /^lib:/.test(s.gunner) ? R.AUTO : s.gunner })); }
+  catch { return R.defaultSpecs(); }
+}
+// v4680 -- buildings as a third thing a shell can hit, not only the ground and other cars: `buildings` is each rect's box
+// (physics/raceCar.mjs's buildingBox(), the same one CD.buildingColliders() gave box3d). v4822 -- `cityCtx` (world/
+// crashDamage.mjs's crashWorld(), the same context race-crash.html's car crashes damage) replaces the flat damage tally
+// a shell used to leave a building with the real one: hit points, crumble, a topple that parks the collider.
+let buildings = [], cityCtx = null, debris = null, debrisBase = 0, blockBase = 0, gpuBusy = false;   // debris: the cubes a shell's carve bursts, visual only (no hash, no body)
 // v4590 -- the oil slick and the Doom Fire (task 79): the gunner's drop and ignite outputs land on physics/slick.mjs's patches; the
 // wheels run on the WRAPPED surface (oil cuts the grip, fire is hot road) and the slick state is folded into the fingerprint
 let slicks = null, slickSurf = null, slickBase = 0;
@@ -94,6 +122,7 @@ const readBytes = async (p) => { const r = await fetch("/" + p); if (!r.ok) thro
 const readImage = async (p) => { const r = await fetch("/" + p); if (!r.ok) throw new Error(`${p}: HTTP ${r.status}`); const bmp = await createImageBitmap(await r.blob(), { colorSpaceConversion: "none", premultiplyAlpha: "none" }); const oc = new OffscreenCanvas(bmp.width, bmp.height), ctx = oc.getContext("2d"); ctx.drawImage(bmp, 0, 0); return imageToColormap(ctx.getImageData(0, 0, bmp.width, bmp.height)); };
 
 function brainLine() {
+  renderRoster();   // a stored brain that has just been accepted becomes a choice
   const cur = store.current(), rep = trainer ? trainer.report() : null;
   $("brain").textContent = (cur ? `stored brain ${cur.hash}: held-out score ${cur.score.toFixed(1)}` : "no stored brain: the hand policy drives") +
     (rep ? ` -- ${rep.attempts} attempts, ${rep.accepted} accepted, best audit ${rep.bestAuditEver.toFixed(1)} at attempt ${rep.bestAuditAt}, held audit ${rep.heldAudit == null ? "-" : rep.heldAudit.toFixed(1)}, regret ${rep.regret == null ? "-" : rep.regret.toFixed(2)}` : "") + ` -- fleet ${fleet}`;
@@ -109,6 +138,28 @@ function peerGunLine() {
   $("peerGun").textContent = peerGunnerBrain ? `peer gunner ${D.weightsHash(peerGunnerBrain)}` + (peerGunnerMeta && peerGunnerMeta.score != null ? `: their held-out score ${peerGunnerMeta.score}` : "") + (peerGunnerMeta && peerGunnerMeta.by ? ` (from ${peerGunnerMeta.by})` : "") + " -- manning the fourth car's turret" : "no peer gunner loaded -- car 0's turret uses the hand gunner (or the stored one)";
   $("clearPeerGun").disabled = !peerGunnerBrain;
 }
+
+// ---- v4827 the Load Racers panel --------------------------------------------------------------------------------------------
+const CHIP = ["#e0524d", "#5fbf6a", "#e6c84a", "#9a6fd6"];
+function rosterCtx() { const cur = store && store.current(), gcur = gunStore && gunStore.current(); return { stored: cur ? cur.weights : null, storedGun: gcur ? gcur.weights : null, library }; }
+function rosterNote(lines, problems) { const el = $("rosterNote"); if (el) el.innerHTML = lines.map((l) => l.replace(/&/g, "&amp;").replace(/</g, "&lt;")).join(" &middot; ") + (problems && problems.length ? ' <span class="bad">' + problems.map((x) => x.replace(/&/g, "&amp;").replace(/</g, "&lt;")).join("; ") + "</span>" : ""); }
+/** Rebuild the selects when what can be chosen has changed (a brain trained or imported); leave them alone otherwise, so an open dropdown is not pulled away during training. */
+function renderRoster(force = false) {
+  if (!store || !gunStore) return;
+  const ctx = rosterCtx(), ch = R.choices(ctx), sig = JSON.stringify([!!ctx.stored, !!ctx.storedGun, library.drive.map((e) => e.id), library.gun.map((e) => e.id)]);
+  if (!force && sig === rosterSig && $("rosterRows").children.length) return;
+  rosterSig = sig;
+  const rows = $("rosterRows"); rows.textContent = "";
+  const sel = (id, opts, value, onChange) => { const s = document.createElement("select"); s.id = id; for (const o of opts) { const e = document.createElement("option"); e.value = o.id; e.textContent = o.label; s.appendChild(e); } s.value = opts.some((o) => o.id === value) ? value : R.AUTO; s.addEventListener("change", () => onChange(s.value)); return s; };
+  for (let i = 0; i < R.SLOTS; i++) {
+    const tr = document.createElement("tr"), name = document.createElement("td"), d = document.createElement("td"), g = document.createElement("td");
+    name.innerHTML = `<span class="chip" style="background:${CHIP[i]}"></span>${i + 1}. ${R.SLOT_COLOURS[i]}`;
+    d.appendChild(sel("drv" + i, ch.driver, specs[i].driver, (v) => { specs[i].driver = v; saveSpecs(); }));
+    g.appendChild(sel("gun" + i, ch.gunner, specs[i].gunner, (v) => { specs[i].gunner = v; saveSpecs(); }));
+    tr.append(name, d, g); rows.appendChild(tr);
+  }
+}
+function saveSpecs() { try { localStorage.setItem(ROSTER_KEY, JSON.stringify(specs)); } catch {} }
 
 /** Trigger a browser download of a JSON blob under `name`. */
 function downloadJSON(name, obj) {
@@ -130,45 +181,79 @@ function readJSONFile(file) {
 function importBlobInto(policyKind, blob) {
   const r = PB.importBrain(policyKind === "drivePolicy" ? DRIVE_DESC : GUNNER_DESC, blob);
   if (r.ok) {
+    const kind = policyKind === "drivePolicy" ? "drive" : "gun", hash = D.weightsHash(r.weights), id = "lib:" + kind + "-" + hash;
+    if (!library[kind].some((e) => e.id === id)) library[kind].push({ id, label: hash + (r.meta && r.meta.score != null ? ` (score ${r.meta.score})` : "") + (r.meta && r.meta.by ? ` from ${r.meta.by}` : ""), weights: r.weights });
     if (policyKind === "drivePolicy") { peerBrain = r.weights; peerBrainMeta = r.meta; peerLine(); }
     else { peerGunnerBrain = r.weights; peerGunnerMeta = r.meta; peerGunLine(); }
-    setupRace();
+    renderRoster(); setupRace();
   }
   return r;
+}
+
+// v4822 -- the world is drawn from the editable chunk slots (world/crashDamage.mjs's worldFleet), not baked once: a shell that
+// carves a building (shellInto, through turretTick) is on the picture the frame it lands. A chunk that outgrows its slot repacks
+// the world into something bigger than the vertex buffer this scene was built with; the proxy flags it (state.outgrown) rather
+// than write past the end, and frame() answers by building the scene again from the repacked state.
+function buildScene() {
+  if (scene && scene.destroy) scene.destroy();
+  const wf = CD.worldFleet(cityCtx.state, { light: SUN });
+  const df = CD.debrisFleet({ light: SUN });
+  debrisBase = placements.length + trucks.length + wf.records.length / 4;             // the first debris cube's record: after the kit's placements and the world
+  const bf = BT.kitFleets(cityCtx.topple, { light: SUN });
+  blockBase = debrisBase + df.records.length / 4;                                     // the first falling block's record: after the debris
+  turretBase = blockBase + bf.length;                                                 // the first dome's record: after the blocks
+  slickBase = turretBase + 2 * cars.length + TURRET_DRAW.maxShells;                  // the first slick record: after the domes, barrels and shells
+  pickupBase = slickBase + SLICK_DRAW.maxPatches + SLICK_DRAW.maxCells;              // the first pickup record: after the slicks and the fire cells
+  scene = kitScene(device, kit, [...placements, ...trucks], G, L, { light: SUN, dynamic: true, extraFleets: [wf, df, ...bf, ...turretFleets(cars.length, U.TURRET.barrel, L, { light: SUN }), ...slickFleets(L, { light: SUN }), ...pickupFleets(L, { light: SUN })] });
+  wf.install(scene); BT.bindKit(cityCtx.topple, scene); sceneBuilds++;   // a block already in the air is written into the new scene's buffers
 }
 
 function setupRace() {
   const t0 = performance.now();
   const track = generateTrack({ seed: Math.max(1, +$("seed").value | 0) });
   placements = tilePlacements(track);
-  const world = miniWorld(), { rects } = trackWorld(track, world, CityGen); packed = meshWorld(world);
+  cityCtx = CD.crashWorld(track, CityGen, {}, CD.ROOMY);   // slots with room for a crater: a shell does not repack the world on its first hit
+  debris = cityCtx.debris = new VoxelDebrisSystem();         // every blast on this city (shellInto) bursts cubes into it; frame() draws them
   surface = trackSurface(track);
   if (phys) phys.destroy();
-  phys = worldFrom(); addBuildings(phys, rects);
-  const cur = store.current(), rng = (() => { let a = 99; return () => { a = (Math.imul(a, 1664525) + 1013904223) >>> 0; return a / 4294967296; }; })();
-  let brains = cur ? [cur.weights, D.handWeights(), D.perturb(cur.weights, 0.05, rng), peerBrain || D.zeroWeights()] : [D.handWeights(), D.perturb(D.handWeights(), 0.05, rng), D.perturb(D.handWeights(), 0.1, rng), peerBrain || D.zeroWeights()];
-  names = cur ? ["stored brain", "hand", "stored + noise", peerBrain ? "peer brain" : "zero"] : ["hand", "hand + noise 0.05", "hand + noise 0.1", peerBrain ? "peer brain" : "zero"];
-  if (replayRec) { brains = [Float32Array.from(replayRec.weights)]; names = [`the lab's accepted driver (speedGain ${replayRec.knob.speedGain}, replayed from its log)`]; }
+  phys = worldFrom(); CD.buildingColliders(cityCtx, phys);
+  BT.toppleWorld(cityCtx, { debris });   // a building at zero hit points falls over as a box3d body on what is left of its ground floor, then shatters (race-crash.html's, v4591)
+  buildings = cityCtx.rects.map((r) => buildingBox(r));
+  const cur = store.current(), gcur = gunStore.current(), rng = (() => { let a = 99; return () => { a = (Math.imul(a, 1664525) + 1013904223) >>> 0; return a / 4294967296; }; })();
+  // v4827 -- the lineup is the panel's (brain/roster.mjs); every slot on "default for this car" is exactly the lineup this page raced before the panel
+  const rctx = () => ({ D, GP, stored: cur ? cur.weights : null, storedGun: gcur ? gcur.weights : null, library, rng });
+  roster = R.resolveRoster(specs, rctx());
+  const rosterProblems = roster.problems.slice();
+  if (!roster.cars.length) roster = R.resolveRoster(R.defaultSpecs(), rctx());   // a race needs a car: the default lineup, and the note says why
+  let brains = roster.cars.map((c) => c.driver.weights);
+  names = roster.cars.map((c) => c.driver.label); slotOf = roster.cars.map((c) => c.slot);
+  if (replayRec) { brains = [Float32Array.from(replayRec.weights)]; names = [`the lab's accepted driver (speedGain ${replayRec.knob.speedGain}, replayed from its log)`]; slotOf = [0]; }
   const cp = checkpoints(track)[0];
   cars = brains.map((w, i) => createCar(phys, { x: cp.x + 5 - 4 * i, z: cp.z, yaw: Math.PI / 2 }));
   drivers = brains.map((w, i) => D.policyDriver(w, surface, cars[i])); trackers = cars.map(() => lapTracker(surface));
-  const gcur = gunStore.current(), peerSlot = brains.length - 1;
   turrets = cars.map(() => U.createTurret()); shells = [];
-  gunnerWeights = cars.map((c, i) => (gcur && i === 0 ? gcur.weights : (i === peerSlot && peerGunnerBrain) ? peerGunnerBrain : GP.handWeights())); driverWeights = brains;
+  gunnerWeights = replayRec ? [gcur ? gcur.weights : peerGunnerBrain || GP.handWeights()] : roster.cars.map((c) => c.gunner.weights); driverWeights = brains;
+  rosterNote(replayRec ? ["the lab's replay: one car, no turret policy"] : R.describe(roster), rosterProblems);
   gunners = gunnerWeights.map((w) => GP.gunnerFor(w));
   slicks = S.createSlicks(); slickSurf = S.slickSurface(surface, slicks);
   pickups = A.pickupField(surface, { seed: Math.max(1, +$("seed").value | 0) }); turrets.forEach((tr) => { tr.ammo = A.createAmmo(); });
   setupViews(cars.length);
   hash = 0x811c9dc5; ticks = 0; acc = 0;
-  const trucks = cars.map((c, i) => ({ file: FILES[i], ...truckPlacement(carPose(phys, c)) }));
-  if (scene && scene.destroy) scene.destroy();
-  const worldFleet = { name: "world", mesh: packed.mesh, pipeline: L.litPipelineDesc({ cull: "none" }), bind: L.litBind(SUN), records: Float32Array.from([0, 0, 0, 1]), extras: new Float32Array(4) };
-  turretBase = placements.length + trucks.length + worldFleet.records.length / 4;   // the first dome's record: after the kit's placements and the world
-  slickBase = turretBase + 2 * cars.length + TURRET_DRAW.maxShells;                  // the first slick record: after the domes, barrels and shells
-  pickupBase = slickBase + SLICK_DRAW.maxPatches + SLICK_DRAW.maxCells;              // the first pickup record: after the slicks and the fire cells
-  scene = kitScene(device, kit, [...placements, ...trucks], G, L, { light: SUN, dynamic: true, extraFleets: [worldFleet, ...turretFleets(cars.length, U.TURRET.barrel, L, { light: SUN }), ...slickFleets(L, { light: SUN }), ...pickupFleets(L, { light: SUN })] });
+  trucks = cars.map((c, i) => ({ file: FILES[slotOf[i]], ...truckPlacement(carPose(phys, c)) }));
+  buildScene();
   gunLine();
-  $("tick").textContent = `${describeTrack(track)}; ${rects.length} buildings; ${cars.length} cars: ${names.join(", ")} (red, green, yellow, purple), a turret on each; built in ${(performance.now() - t0).toFixed(0)} ms on ${scene.path}`;
+  $("tick").textContent = `${describeTrack(track)}; ${cityCtx.rects.length} buildings; ${cars.length} cars: ${names.join(", ")} (red, green, yellow, purple), a turret on each; built in ${(performance.now() - t0).toFixed(0)} ms on ${scene.path}`;
+}
+
+// v4822 -- ?shell=N, the way race-crash.html has ?ram=1 and ?demolish=1: N shells of the biggest spell (CD.barrage) into the building
+// nearest the lead car, through the same CD.shellInto the turrets use, so a gate (or a person) can see a crater without waiting for
+// a gunner to put a wall between itself and a rival. Runs once on load, after the first setupRace(); it is not part of any race.
+function probeShells(n) {
+  if (!(n > 0) || !cityCtx) return;
+  const lead = carPose(phys, cars[0]).pos; let best = -1, bd = Infinity;
+  cityCtx.rects.forEach((r, i) => { const b = cityCtx.city.buildingAt(r.x + 0.5, r.z + 0.5); if (!b || b.state === "toppled") return; const d = Math.hypot(r.x + r.w / 2 - lead[0], r.z + r.d / 2 - lead[2]); if (d < bd) { bd = d; best = i; } });
+  if (best < 0) return;
+  CD.barrage(cityCtx, best, { shells: n, from: [lead[0], lead[2]] });
 }
 
 function stepRace() {
@@ -177,11 +262,13 @@ function stepRace() {
   const inputs = replayRec ? (replayRec.log[ticks] || cars.map(() => ({ throttle: 0, steer: 0, brake: 1 }))) : cars.map((c, i) => clampInput(drivers[i](poses[i])));
   // the lab's replay carries no gun log and its fingerprint has no turret in it: the turrets stay idle while it plays
   const cmds = replayRec ? cars.map(() => ({ yaw: 0, pitch: 0, fire: 0, drop: 0, ignite: 0 })) : cars.map((c, i) => { const j = GP.nearestOther(i, poses); return U.clampGun(gunners[i](poses[i], turrets[i], j === null ? null : { pose: poses[j] }, GP.pursuerInfo(i, poses, slicks))); });
-  GP.turretTick(phys, cars, turrets, shells, poses, cmds, ticks, U.TURRET, replayRec ? null : slicks, replayRec ? null : pickups);
+  GP.turretTick(phys, cars, turrets, shells, poses, cmds, ticks, U.TURRET, replayRec ? null : slicks, replayRec ? null : pickups, replayRec ? null : buildings, replayRec ? null : cityCtx);
   const slowed = replayRec ? inputs : inputs.map((u, i) => ({ ...u, throttle: u.throttle * A.throttleFactor(turrets[i], ticks) }));   // a frostbitten car drives at half throttle
   const rs = stepCars(phys, cars, replayRec ? surface : slickSurf, slowed, CAR.dt);   // the lab's record was driven on the bare track
+  BT.stepTopple(cityCtx.topple);   // the falling blocks' poses read back after the world stepped; one that has fallen and rests shatters into rubble and cubes
   rs.forEach((r, i) => trackers[i].update(r.pose));
-  hash = foldHash(hash, phys.stateHash()); if (!replayRec) { hash = U.turretHash(hash, turrets, shells, foldHash); hash = S.slickHash(hash, slicks, foldHash); hash = A.ammoHash(hash, turrets, foldHash); hash = A.pickupHash(hash, pickups, foldHash); } ticks++;
+  if (debris) debris.update(CAR.dt);   // sim time, so a paused page holds its cubes; visual only -- nothing below reads them
+  hash = foldHash(hash, phys.stateHash()); if (!replayRec) { hash = U.turretHash(hash, turrets, shells, foldHash); hash = S.slickHash(hash, slicks, foldHash); hash = A.ammoHash(hash, turrets, foldHash); hash = A.pickupHash(hash, pickups, foldHash); hash = cityHash(hash, cityCtx.city, foldHash); hash = BT.toppleHash(hash, cityCtx.topple, foldHash); } ticks++;
   if (replayRec && ticks === replayRec.ticks) { const fp = (hash >>> 0).toString(16).padStart(8, "0"); $("lab").textContent = `played back ${ticks} ticks: fingerprint ${fp} ${fp === replayRec.fingerprint ? "= the record's" : "DIFFERS from the record's " + replayRec.fingerprint} (offline replay ${replayRec.offline})`; }
 }
 
@@ -200,8 +287,16 @@ function setupViews(n) {
     v.label.textContent = CV.windowLabel(i, names[i] || "car", v.view);
   }
 }
+// v4822 -- A WINDOW READBACK THAT NEVER SETTLES MUST NOT FREEZE THE WINDOWS FOR EVER. refreshViews holds viewBusy for the length of a readback; a scene
+// built again (a repack) destroys the one a readback was issued on, and a device that neither answers nor rejects that read left viewBusy true for the
+// rest of the page's life -- every window frozen on its last picture, no error, no note (measured on the ship harness's WebGPU: 1,201 page frames in 20 s
+// and not one more window read). The wait is bounded; a timeout is a failed read like any other, uncounted when the scene was built again under it.
+const READBACK_MS = 5000;
+const settleWithin = (p, ms) => new Promise((resolve, reject) => { const t = setTimeout(() => reject(new Error("the readback did not settle in " + ms + " ms")), ms); p.then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(e); }); });
+
 async function refreshViews(poses) {
   if (viewBusy || !scene) return; viewBusy = true;
+  const era = sceneBuilds;
   try {
     for (let i = 0; i < views.length && i < poses.length; i++) {
       const v = views[i];
@@ -215,13 +310,14 @@ async function refreshViews(poses) {
       if (viewFailures >= 3) continue;   // the 3D windows are off after three failed readbacks; the brain windows above stay live
       const cam = CV.cameraFor(v.view, poses[i], turrets[i], G, { aspect: v.canvas.width / v.canvas.height });
       // scene.frame returns the frame handle whose .pixels is the readback promise (the gates await it the same way)
-      const fr = scene.frame({ ...cam, clear: CV.VIEW_DRAW.clear, target: v.target, read: true }), r = fr && fr.pixels ? await fr.pixels : null;
+      const fr = scene.frame({ ...cam, clear: CV.VIEW_DRAW.clear, target: v.target, read: true }), r = fr && fr.pixels ? await settleWithin(fr.pixels, READBACK_MS) : null;
       if (r && r.pixels && r.width) v.ctx.putImageData(new ImageData(new Uint8ClampedArray(r.pixels.buffer, r.pixels.byteOffset, r.pixels.length), r.width, r.height), 0, 0);
     }
   } catch (e) {
     // a readback that fails three times is not retried every four frames: the windows say so and the brain view stays live.
     // (Measured on the ship harness: its WebGPU loses a PRESENTED canvas device at the first frame, so there the 3D
     // windows go dark on WebGPU and work on ?webgl=1; on a real browser both backends read back.)
+    if (era !== sceneBuilds) return;   // the scene was rebuilt under this readback (a repack): the old one's buffers are gone, not the device
     viewFailures++; const msg = "view windows off: the device could not read a window back (" + (e && e.message ? e.message : e).slice(0, 90) + ")";
     $("viewsNote").textContent = msg; if (viewFailures >= 3) for (const v of views) if (v.view !== "brain") v.label.textContent = msg + " -- click for the brain view";
   }
@@ -229,6 +325,7 @@ async function refreshViews(poses) {
 }
 
 function gunLine() {
+  renderRoster();
   const cur = gunStore.current(), rep = gunTrainer ? gunTrainer.report() : null;
   $("gun").textContent = (cur ? `stored gunner ${cur.hash}: held-out duel score ${cur.score.toFixed(2)} (on car 0; the hand gunner on the rest)` : "turrets: the hand gunner on every car (v4588, task 77); it drops oil on a pursuer and lights it under them (v4590, task 79)") +
     (rep ? ` -- ${rep.attempts} attempts, ${rep.accepted} accepted, best held-out ${rep.best.toFixed(2)}` : "") + (shells.length ? ` -- ${shells.length} shell${shells.length === 1 ? "" : "s"} in the air` : "") +
@@ -266,8 +363,11 @@ function idleTrain(deadline) {
 }
 
 async function main() {
-  const forceGl = new URLSearchParams(location.search).get("webgl") === "1";
-  try { device = await requestDevice(cvs, forceGl ? { backend: "webgl2" } : { prefer: "webgpu" }); }
+  const q = new URLSearchParams(location.search), forceGl = q.get("webgl") === "1";
+  // ?offscreen=1 is a gate's hook, not a view: on WebGPU the device renders into its own texture and never presents the canvas (gfx/device.js
+  // Level 11 -- the build box loses a presented WebGPU canvas at the first frame), so the main view stays empty and the live page can be read
+  // back on the backend the real rig runs. The 3D car windows are readbacks of their own targets and draw either way.
+  try { device = await requestDevice(cvs, forceGl ? { backend: "webgl2" } : q.get("offscreen") === "1" ? { backend: "webgpu", offscreen: true } : { prefer: "webgpu" }); }
   catch (e) { return fail("requestDevice threw: " + e.message); }
   beEl.textContent = `device: ${device.backend}`;
   try {
@@ -280,7 +380,9 @@ async function main() {
   gunStore = GP.gunnerStore({ persist: (o) => { try { localStorage.setItem(GUN_KEY, JSON.stringify(o)); } catch {} }, restore: () => { try { const j = JSON.parse(localStorage.getItem(GUN_KEY) || "null"); return j && j.weights ? { ...j, weights: Float32Array.from(j.weights) } : null; } catch { return null; } } });
   GP.setModule(physMod);   // the shell-speed knob's adjudicator can run in this page
   store = D.driveStore({ persist: (o) => { try { localStorage.setItem(KEY, JSON.stringify(o)); } catch {} }, restore: () => { try { const j = JSON.parse(localStorage.getItem(KEY) || "null"); return j && j.weights ? { ...j, weights: Float32Array.from(j.weights) } : null; } catch { return null; } } });
-  brainLine(); peerLine(); peerGunLine(); setupRace();
+  renderRoster(true);
+  $("rosterReset").addEventListener("click", () => { specs = R.defaultSpecs(); saveSpecs(); renderRoster(true); });
+  brainLine(); peerLine(); peerGunLine(); setupRace(); probeShells(+new URLSearchParams(location.search).get("shell") || 0);
   $("seed").addEventListener("change", () => { replayRec = null; setupRace(); }); $("race").addEventListener("click", () => { replayRec = null; setupRace(); });
   $("labReplay").addEventListener("click", async () => {
     $("lab").textContent = "fetching the lab's accepted replay...";
@@ -309,7 +411,7 @@ async function main() {
     const r = importBlobInto("drivePolicy", blob);
     if (!r.ok) $("peer").textContent = "import refused: " + r.reason;
   });
-  $("clearPeer").addEventListener("click", () => { peerBrain = null; peerBrainMeta = null; peerLine(); setupRace(); });
+  $("clearPeer").addEventListener("click", () => { peerBrain = null; peerBrainMeta = null; library.drive = []; peerLine(); renderRoster(); setupRace(); });
   $("publishBrain").addEventListener("click", async () => {
     const cur = store.current(), w = cur ? cur.weights : D.handWeights();
     const blob = PB.exportBrain(DRIVE_DESC, w, { score: cur ? cur.score : null, citation: "male-cns E-PG compass circuit (Janelia FlyEM, vendor/male-cns/PROVENANCE.md)" });
@@ -345,7 +447,7 @@ async function main() {
     const r = importBlobInto("gunnerPolicy", blob);
     if (!r.ok) $("peerGun").textContent = "import refused: " + r.reason;
   });
-  $("clearPeerGun").addEventListener("click", () => { peerGunnerBrain = null; peerGunnerMeta = null; peerGunLine(); setupRace(); });
+  $("clearPeerGun").addEventListener("click", () => { peerGunnerBrain = null; peerGunnerMeta = null; library.gun = []; peerGunLine(); renderRoster(); setupRace(); });
   $("publishGun").addEventListener("click", async () => {
     const cur = gunStore.current(), w = cur ? cur.weights : GP.handWeights();
     const blob = PB.exportBrain(GUNNER_DESC, w, { score: cur ? cur.score : null, citation: "male-cns Giant Fiber Circuit (Janelia FlyEM, vendor/male-cns/PROVENANCE.md)" });
@@ -385,19 +487,35 @@ function frame(t) {
   if (!scene || !phys) return;
   const dt = Math.min(0.1, (t - (lastT || t)) / 1000); lastT = t; acc += dt; let n = 0;
   while (acc >= CAR.dt && n < 4) { stepRace(); acc -= CAR.dt; n++; }
+  if (cityCtx.state.outgrown) buildScene();
   const poses = cars.map((c) => carPose(phys, c));
   poses.forEach((p, i) => { const tp = truckPlacement(p), k = placements.length + i; scene.kitRecords.set([tp.pos[0], tp.pos[1], tp.pos[2], 1], k * 4); scene.kitExtras.set(tp.quat, k * 4); });
+  CD.placeDebris(scene, debrisBase, debris); BT.placeBlocks(scene, blockBase, cityCtx.topple);
   placeTurrets(scene, turretBase, poses, turrets, shells);
   if (slicks) placeSlicks(scene, slickBase, slicks);
   if (pickups) placePickups(scene, pickupBase, pickups, ticks);
   const order = trackers.map((tk, i) => ({ i, laps: tk.laps, hit: tk.hit })).sort((a, b) => (b.laps - a.laps) || (b.hit - a.hit));
-  $("racing").textContent = training ? $("racing").textContent : `${(ticks * CAR.dt).toFixed(1)} s: ` + order.map((o, k) => `${k + 1}. ${names[o.i]} (${o.laps} laps, ${o.hit} checkpoints, ${turrets[o.i].hits} hits of ${turrets[o.i].shots}, ${turrets[o.i].drops || 0} slicks, burned ${((turrets[o.i].burned || 0) * CAR.dt).toFixed(1)} s, ${turrets[o.i].ammo ? turrets[o.i].ammo.loaded + (Number.isFinite(turrets[o.i].ammo.count) ? " x" + turrets[o.i].ammo.count : "") : "spark"} loaded, dealt ${(turrets[o.i].damageDealt || 0).toFixed(0)} took ${(turrets[o.i].damageTaken || 0).toFixed(0)})`).join("  ") + ` -- fingerprint ${(hash >>> 0).toString(16).padStart(8, "0")}`;
+  const bHits = cityCtx.impacts.length, bDmg = cityCtx.city.buildings.reduce((s, b) => s + (b.maxHp - b.hp), 0);
+  $("racing").textContent = training ? $("racing").textContent : `${(ticks * CAR.dt).toFixed(1)} s: ` + order.map((o, k) => `${k + 1}. ${names[o.i]} (${o.laps} laps, ${o.hit} checkpoints, ${turrets[o.i].hits} hits of ${turrets[o.i].shots}, ${turrets[o.i].drops || 0} slicks, burned ${((turrets[o.i].burned || 0) * CAR.dt).toFixed(1)} s, ${turrets[o.i].ammo ? turrets[o.i].ammo.loaded + (Number.isFinite(turrets[o.i].ammo.count) ? " x" + turrets[o.i].ammo.count : "") : "spark"} loaded, dealt ${(turrets[o.i].damageDealt || 0).toFixed(0)} took ${(turrets[o.i].damageTaken || 0).toFixed(0)})`).join("  ") + `  -- buildings: ${bHits} hit${bHits === 1 ? "" : "s"}, ${bDmg.toFixed(0)} damage of ${buildings.length}${debris.particles.length ? `, ${debris.particles.length} debris flying` : ""}${cityCtx.topple.fallen ? `, ${cityCtx.topple.fallen} fell over as bodies` + (cityCtx.topple.shattered ? ` (${cityCtx.topple.shattered} shattered)` : "") : ""}${cityCtx.topple.chipped ? `, ${cityCtx.topple.chipped} block voxels chipped off by shells` : ""}${cityCtx.state.rebuilds ? `, ${cityCtx.state.rebuilds} repack${cityCtx.state.rebuilds === 1 ? "" : "s"}` : ""}` + ` -- fingerprint ${(hash >>> 0).toString(16).padStart(8, "0")}`;
   const lead = poses[order[0].i]; centre = [lead.pos[0], 0, lead.pos[2]];
   const eye = [centre[0] + dist * Math.sin(yaw) * Math.cos(pitch), centre[1] + dist * Math.sin(pitch), centre[2] + dist * Math.cos(yaw) * Math.cos(pitch)];
   camNow = { viewProj: G.multiply(G.perspective(0.9, w / h, 0.5, 2000), G.lookAt(eye, centre)), eye };
-  scene.frame({ ...camNow, clear: [0.03, 0.05, 0.08, 1] });
+  // v4822 -- BACKPRESSURE: WebGPU's queue has none of its own. A page that submits a frame per animation frame to a GPU that draws slower than that
+  // (the ship harness's software one: 2,700 frames in 45 s) piles frames up in the queue without bound, and every window readback -- which resolves only
+  // when the queue has drained to its own submission -- waits behind a deeper one each time: measured 0.3 s, 0.9, 2.5, 4.1, 6.5 s over 33 s, until the
+  // windows seemed hung. The main view is drawn only when the last one it submitted has finished; the race and the records go on at the clock's pace.
+  if (!gpuBusy) {
+    scene.frame({ ...camNow, clear: [0.03, 0.05, 0.08, 1] });
+    const q = device.backend === "webgpu" && device.gpu && device.gpu.queue;
+    if (q && q.onSubmittedWorkDone) { gpuBusy = true; q.onSubmittedWorkDone().then(() => { gpuBusy = false; }, () => { gpuBusy = false; }); }
+  }
   if (++viewFrame % CV.VIEW_DRAW.refreshEvery === 0) refreshViews(poses);
 }
+
+// read-only handles for the gates, the way brain-maze.html keeps window.__maze: tools/ship/raceTurret-selfcheck.mjs reads the live
+// scene and the city's state off the page to hold that a repack rebuilt the scene and left the world fleet installed, and reads it back
+// through a render target of its own (the page's presented canvas is redrawn by its own frame loop between a gate's frame and its readback)
+window.__raceBrain = { get device() { return device; }, get scene() { return scene; }, get cityCtx() { return cityCtx; }, get sceneBuilds() { return sceneBuilds; }, get views() { return views; }, get debris() { return debris; }, get debrisBase() { return debrisBase; }, get blockBase() { return blockBase; }, get phys() { return phys; }, get viewBusy() { return viewBusy; }, get viewFrame() { return viewFrame; }, get shells() { return shells; }, get roster() { return roster; }, get trucks() { return trucks; }, get specs() { return specs; }, get library() { return library; }, get names() { return names; }, setSpecs(s) { specs = R.sanitizeSpecs(s); saveSpecs(); renderRoster(true); }, startRace() { replayRec = null; setupRace(); } };
 
 main();
 </script>

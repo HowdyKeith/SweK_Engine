@@ -19,6 +19,7 @@
 import { generateKaijuName } from "../world/kaijuNames.js";
 import { pickKindConfig }     from "../world/kaijuKinds.js";
 import { defineMachine, applyEvent } from "../ui/machine.mjs";
+import { pickMax } from "../ui/pick.mjs";   // v4824 -- the flee pick
 
 const ENGAGE_RANGE         = 6;
 const CIV_HIT_BASE         = 0.10;
@@ -576,17 +577,18 @@ export class Kaiju {
         // the stock random pick, byte-for-byte.
         const sample = (typeof window !== "undefined") ? window.sampleBrainThreat : null;
         if (sample) {
-            let best = null, bestScore = -Infinity;
-            for (let i = 0; i < 12; i++) {
+            // v4824 -- ui/pick.mjs's pickMax over the 12 ring points; sample() and Math.random() are still called
+            // once per point, in the same order, so the draw sequence -- and the pick -- is unchanged
+            const ring = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((i) => {
                 const a = (i / 12) * Math.PI * 2;
-                const cx = this.position.x + Math.cos(a) * 60;
-                const cz = this.position.z + Math.sin(a) * 60;
-                const s = sample(cx, cz);
+                return { x: this.position.x + Math.cos(a) * 60, z: this.position.z + Math.sin(a) * 60 };
+            });
+            const pick = pickMax(ring, (c) => {
+                const s = sample(c.x, c.z);
                 // out-of-window candidates read as "unknown, probably fine"
-                const score = (s == null ? 500 : s) + Math.random() * 2;   // jitter breaks ties
-                if (score > bestScore) { bestScore = score; best = { x: cx, z: cz }; }
-            }
-            if (best) return best;
+                return (s == null ? 500 : s) + Math.random() * 2;   // jitter breaks ties
+            });
+            if (pick.found) return pick.item;
         }
         // Default: back-track 60 units in a random angled direction
         const angle = Math.random() * Math.PI * 2;

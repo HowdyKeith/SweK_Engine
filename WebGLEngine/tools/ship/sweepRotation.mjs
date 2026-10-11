@@ -22,6 +22,7 @@ import { costOf } from "./declaredCost.mjs";
 // v4647 -- whose stopwatch. A box that does not own the record writes its own file rather than
 // overwriting one produced on different silicon. See quickSweep.timingsTarget.
 import { timingsTarget, KIND, reclaimStrandedFixtures } from "./quickSweep.mjs";
+import { canonicalId } from "./hostScale.mjs";
 import { parseArgs, refusalLines } from "./cliArgs.mjs";
 
 export function runSlice(picked, { capMs = CAP_MS, onProgress = null } = {}) {
@@ -29,11 +30,11 @@ export function runSlice(picked, { capMs = CAP_MS, onProgress = null } = {}) {
     for (let i = 0; i < picked.length; i++) {
         const g = picked[i];
         const t0 = Date.now();
-        let code = 1, skipped = false;
+        let code = 1, skipped = false, failRows = [];
         // v4647k -- `skipped` comes from the SAME run that produced the millisecond, exactly as the sweep's
         // `serialSkipped ?? parallelSkipped` mirrors `serialMs ?? parallelMs`. A label taken from another
         // run is the drift kindsInferred exists to prevent.
-        try { const r = runGate(g, { timeoutMs: capMs }); code = r.code; skipped = !!r.skipped; } catch { code = 1; }
+        try { const r = runGate(g, { timeoutMs: capMs }); code = r.code; skipped = !!r.skipped; failRows = r.failRows || []; } catch { code = 1; }
         const ms = Date.now() - t0;
         // v4815 -- a run killed at the cap runs no cleanup, and the NEXT gate here would meet what it left: the 2026-10-06
         // full rotation killed orreryReached between its control's two writes and left orrery-reached.json bent on disk.
@@ -44,7 +45,7 @@ export function runSlice(picked, { capMs = CAP_MS, onProgress = null } = {}) {
         // gate that ran to completion in 50 s and a gate cut off at 20 s were the same entry. runGate returns
         // "timeout/signal" as its code for a kill, which is the fact itself rather than a threshold test on
         // the clock -- a gate finishing 3 ms under the cap is finished, and a slow box does not change that.
-        rows.push({ gate: g, ms, code, finished: code !== "timeout/signal", skipped });
+        rows.push({ gate: g, ms, code, finished: code !== "timeout/signal", skipped, failRows });
         if (onProgress) onProgress(i + 1, picked.length, rows[rows.length - 1]);
     }
     return rows;
@@ -242,6 +243,23 @@ export function rebuildFinished(file, ledger) {
  * and CAPPED when it did not, and both are known at the moment of writing rather than derived later from
  * which side of a budget the number fell on.
  */
+/**
+ * *** v4835 -- ON A BOX THAT DOES NOT OWN THE RECORD, A WRITE MERGES INTO ITS OWN FILE, NOT INTO A FRESH COPY OF THE SHARED ONE. ***
+ * The rows below were merged into `file` -- the SHARED record as read -- and written to the target, which on a foreign box
+ * is sweep-timings.local.json. So each foreign write was the shared record plus this run's rows, and every reading the
+ * local file held before was dropped. Found by running it twice at v4835: `--gate afterVerdict-selfcheck --write` then
+ * `--gate reportFresh-selfcheck --write`, and the second write erased the first's reading -- recordDrift and timingKind then
+ * named the erased gate as owing the record a runtime. The base is now the local file when it exists and names this box.
+ */
+export function writeBase(file, target, { root = ENG, read = (f) => fs.readFileSync(path.join(root, f), "utf8") } = {}) {
+    if (!target.foreign) return { base: file, from: "the shared record" };
+    let loc = null;
+    try { loc = JSON.parse(read(target.file)); } catch { return { base: file, from: "the shared record (no local file yet)" }; }
+    return loc && canonicalId(loc.host) === canonicalId(target.host)
+        ? { base: loc, from: target.file }
+        : { base: file, from: "the shared record (the local file names another box)" };
+}
+
 export function mergeTimings(file, rows, stamp, capMs = null) {
     const timings = { ...(file.timings || {}) }, codes = { ...(file.codes || {}) }, at = { ...(file.at || {}) };
     const finished = { ...(file.finished || {}) };
@@ -417,7 +435,12 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const k = classifyRows(rows, { priorMs: file.timings || {}, capMs });
     console.log(`[rotation] ran ${rows.length}: ${k.returnees.length} now UNDER budget, ${k.reds.length} red, ${k.killed.length} hit the cap, ${k.slower.length} materially slower`);
     for (const r of k.returnees) console.log(`[rotation]   returnee  ${r.gate}  ${(file.timings || {})[r.gate]} -> ${r.ms} ms`);
-    for (const r of k.reds) console.log(`[rotation]   RED       ${r.gate}  exit ${r.code} in ${r.ms} ms`);
+    for (const r of k.reds) {
+        console.log(`[rotation]   RED       ${r.gate}  exit ${r.code} in ${r.ms} ms`);
+        // v4831 -- the rows that made it red, from the run that was red: a one-off red is otherwise unexplainable afterwards
+        for (const f of (r.failRows || [])) console.log(`[rotation]             ${f.trim()}`);
+        if (r.failRows && !r.failRows.length) console.log(`[rotation]             (no FAIL row printed -- the gate exited ${r.code} without one)`);
+    }
     if (killedMode) {
         const fin = rows.filter((r) => r.finished);
         console.log(`[rotation] ${fin.length} of ${rows.length} FINISHED and now have a verdict ` +
@@ -427,8 +450,9 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     }
     if (cli.flags.has("--write")) {
         const stamp = new Date().toISOString();
-        const { merged: mergedTimings, priorMs } = mergeTimings(file, rows, stamp, capMs);
         const target = timingsTarget(file);
+        const { base } = writeBase(file, target);
+        const { merged: mergedTimings, priorMs } = mergeTimings(base, rows, stamp, capMs);
         if (target.foreign) console.log(`[rotation] NOT writing sweep-timings.json: ${target.why}`);
         fs.writeFileSync(path.join(ENG, target.file),
             JSON.stringify({ ...mergedTimings, host: target.host }, null, 1) + "\n");

@@ -31,6 +31,8 @@
 // Target return shape matches _findRangedTarget contract:
 //   { x, y, z, ref, _type: "kaiju", name, applyDamage(d) }
 
+import { pickMin } from "../ui/pick.mjs";
+
 const FACTION_KEYWORDS = {
     sky:    ["lightning", "cloud", "thunder", "sky", "winged", "storm"],
     hell:   ["fire", "flame", "demon", "hell", "lava", "magma", "infernal", "spawn"],
@@ -87,23 +89,23 @@ export function makeKaijuRivalry() {
         const myFaction = factionOf(k.kind);
         if (myFaction === "unknown") return null;
         const range2 = range * range;
-        let best = null, bestD2 = range2;
         const kx = k.position?.x ?? 0;
         const ky = k.position?.y ?? 0;
         const kz = k.position?.z ?? 0;
-        for (const other of allKaiju) {
-            if (other === k) continue;
-            if (!other.position) continue;
-            if (other.state === "dying" || !other.isAlive?.()) continue;
-            if ((other.tier ?? 0) < 1) continue;
-            if (!_areRivals(myFaction, factionOf(other.kind))) continue;
+        // v4824 -- ui/pick.mjs: the same filters, key, exclusive range^2 bound and first-wins tie as the loop it replaces
+        const pick = pickMin(allKaiju, (other) => {
+            if (other === k) return null;
+            if (!other.position) return null;
+            if (other.state === "dying" || !other.isAlive?.()) return null;
+            if ((other.tier ?? 0) < 1) return null;
+            if (!_areRivals(myFaction, factionOf(other.kind))) return null;
             const dx = other.position.x - kx;
             const dy = other.position.y - ky;
             const dz = other.position.z - kz;
-            const d2 = dx * dx + dy * dy + dz * dz;
-            if (d2 < bestD2) { bestD2 = d2; best = other; }
-        }
-        if (!best) return null;
+            return dx * dx + dy * dy + dz * dz;
+        }, range2);
+        if (!pick.found) return null;
+        const best = pick.item;
         return {
             x: best.position.x,
             y: best.position.y,

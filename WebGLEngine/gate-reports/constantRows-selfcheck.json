@@ -1,6 +1,6 @@
 {
  "gate": "tools/ship/constantRows-selfcheck.mjs",
- "at": "2026-10-02",
+ "at": "2026-10-11",
  "tables": [
   {
    "title": "the obvious predicate against this file's",
@@ -12,13 +12,13 @@
    "rows": [
     [
      "loose",
-     25001,
-     32164
+     25557,
+     32790
     ],
     [
      "this file's rows",
      11,
-     32388
+     33014
     ]
    ],
    "note": null

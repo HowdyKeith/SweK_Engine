@@ -7,6 +7,8 @@
 // a button. This grades the rule that decides whether the successor should start it, and the interesting half
 // is the refusals -- "no" has FOUR different causes and a bare false would make "the user stopped it deliberately"
 // indistinguishable from "the flag is three days old".
+// v4824: section 4 reads the record after a 20 ms settle -- a successor's read, not a same-millisecond one (Windows' mtime
+// led Date.now() by 1 ms in the v4823 rig verify). The negative-age refusal in kpopHandoff.js is unchanged.
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
@@ -78,6 +80,11 @@ console.log("\n4. THE RECORD ROUND-TRIPS, AND IT IS ONE-SHOT");
         "them would be the two-things-one-label defect, and the rule branches differently on each. ***");
 
     K.recordBeforeHandoff(true);
+    // v4824 -- read it as a SUCCESSOR does, after the write has settled, not in the same millisecond. On Windows the
+    // file's mtime comes from a different clock than Date.now() and led it by 1 ms in a rig verify at v4823 ("age -1ms").
+    // The module keeps a negative age as the clock-skew signal it is (see kpopHandoff.js's v4004 note), so the gate
+    // waits the 20 ms a real reboot dwarfs rather than the module learning to forgive a future timestamp.
+    { const until = Date.now() + 20; while (Date.now() < until) { /* spin: no timers in this synchronous section */ } }
     const yes = K.readHandoffRecord();
     ok("a true record round-trips with an age", yes.wasAlive === true && yes.flagAgeMs >= 0, "age " + yes.flagAgeMs + "ms");
     K.recordBeforeHandoff(false);

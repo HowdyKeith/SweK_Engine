@@ -21,6 +21,21 @@
 //   FINDING, in the first draft of this gate: the hash row's extra fire command was placed at tick 77, inside the reload from
 //   the shot at tick 60, where the mount refuses it and the hash does not move -- the gate's own sabotage reached no branch.
 //   It fires at tick 50 now, and a second row holds that the refused one changes nothing, which is the reload working.
+//   F  v4680, buildings' own hit test given HIT_SAMPLES as its loop bound instead of the earlier-of-the-two-lists `hitK`
+//      (stepShells's guard against a farther list overwriting a nearer hit)  -> 0 red on the first three rows written for
+//      buildings (a wall in the path, no wall, an off-axis wall): none of them puts a car and a wall inside the SAME sampled
+//      segment, so the guard the sabotage removes is never exercised -- a 0-red sabotage, the same shape sabotage C's own
+//      note above describes. The fourth row was ADDED for this sabotage, a synthetic shell with a one-step span deliberately
+//      forced past both a near car and a far wall in a single stepShells call; it reddens on the sabotage (wall reported hit,
+//      car not) and passes clean restored.
+//   H  v4822, stepShells never looking at `blocks`                           -> 4 red: the lying block, the sideways pair, the null slot, the
+//      near block against a far building (the near-car and near-building rows pass: a list that is never read reaches nothing).
+//   I  v4822, the blocks loop bounded by HIT_SAMPLES instead of `hitK`        -> 2 red: the near car and the near building both lose to the far block.
+//   J  v4822, the blocks' hit test given the identity quat (the pose's rotation dropped)  -> 3 red: the lying block, the sideways pair and the null slot (its hit has to land on the rotated box too).
+//   G  v4822, the `if (!bd) continue;` guard over a null buildings[] slot removed -- NOT a red row: an uncaught
+//      TypeError ("Cannot read properties of null (reading 'half')") at the exact line the guard used to cover, the gate
+//      exiting on a stack trace rather than printing FAIL, which is the "it died rather than found something" shape this
+//      tree's own sweep has separately had to tell apart from a real red. Measured before writing the row, not assumed.
 "use strict";
 import * as U from "./turret.mjs";
 import * as B from "./ballistics.mjs";
@@ -107,6 +122,49 @@ console.log("\n4. THE SHELL FLIES AND THE SWEPT HIT TEST SEES IT");
     let endpointOnly = false, sweptHit = false, k = 0;
     while (shP.length && k < 600) { const s0 = shP[0], s1 = B.stepShell(s0, DT, { gravity: U.TURRET.gravity }); if (U.insideBox([s1.x, s1.y, s1.z], plate, thin, U.TURRET.shellRadius)) endpointOnly = true; if (U.stepShells(shP, [{ index: 1, pose: plate, half: thin }], DT, { groundY: 0 }).length) sweptHit = true; k++; }
     ok("!! the hit test is SWEPT: a 4 cm plate is hit by the sampled segment where an end-of-tick point test steps over it", sweptHit && !endpointOnly, `swept ${sweptHit}, endpoint-only ${endpointOnly}`);
+    // v4680 -- A BUILDING IS THE THIRD THING A SHELL CAN MEET, WITH NO OWNER TO EXEMPT IT. physics/raceCar.mjs's
+    // buildingBox() gives a { pos, quat, half } shape that IS a target already, minus the `index`/owner check -- stepShells
+    // takes an optional `buildings` list and reports which of `target`/`building` it hit by which field is present.
+    const wall = { pos: [0, 1, 10], quat: [0, 0, 0, 1], half: [2, 3, 2] };
+    const carAt20 = () => [{ index: 1, pose: still([0, 1, 20]), half: HALF }];
+    const aimed = (targetPos) => { const tg = U.createTurret(), sol = U.aimSolution(pose, tg, targetPos, [0, 0, 0]); tg.yaw = sol.yaw; tg.pitch = sol.pitch; const sh = []; U.fireShell(sh, pose, tg, 0, 0); return sh; };
+    const flyB = (shells, buildings) => { let ev = [], k = 0; while (shells.length && k < 600) { ev = ev.concat(U.stepShells(shells, carAt20(), DT, { groundY: 0, buildings })); k++; } return ev; };
+    const blocked = flyB(aimed([0, 1, 20]), [wall]);
+    ok("!! a wall directly in the aimed path is hit instead of the car behind it: a building event, no target field", blocked.length === 1 && blocked[0].building === 0 && blocked[0].target === undefined, JSON.stringify(blocked));
+    const clear = flyB(aimed([0, 1, 20]), undefined);
+    ok("...the identical aimed shot with no buildings reaches the car exactly as it did before this option existed", clear.length === 1 && clear[0].target === 1 && clear[0].building === undefined, JSON.stringify(clear));
+    const offAxis = { pos: [8, 1, 10], quat: [0, 0, 0, 1], half: [1, 3, 1] };
+    const missed = flyB(aimed([0, 1, 20]), [offAxis]);
+    ok("a wall off the line of fire never intercepts a clean shot", missed.length === 1 && missed[0].target === 1);
+    // v4822 -- a building this round already toppled (world/crashDamage.mjs's shellInto) is a null slot, not a removed one:
+    // the caller keeps every index the fixed rect it always named, so a shell must skip a falsy entry rather than read
+    // `.half` off of one.
+    const gone = flyB(aimed([0, 1, 20]), [null]);
+    ok("!! a null slot -- a building this round already toppled -- is skipped, not dereferenced: the shot reaches the car behind it", gone.length === 1 && gone[0].target === 1 && gone[0].building === undefined, JSON.stringify(gone));
+    // the race, forced into one tick: a synthetic shell whose one step spans 16 m, past a car at z=8 AND a wall at z=16 --
+    // ordinary per-tick geometry (a ~0.47 m step) cannot put both inside one segment without the boxes already overlapping,
+    // so this is built directly rather than fired and flown, to prove the EARLIER sample wins regardless of which list (cars
+    // checked first, buildings second) would otherwise have reported the farther one.
+    const raceShell = { x: 0, y: 1, z: 0, vx: 0, vy: 0, vz: 64, t: 0, owner: 0, ammo: "spark" };
+    const raceEv = U.stepShells([raceShell], [{ index: 1, pose: still([0, 1, 8]), half: HALF }], 0.25, { groundY: -1e9, buildings: [{ pos: [0, 1, 16], quat: [0, 0, 0, 1], half: [2, 3, 2] }] });
+    ok("!! forced into one step spanning both a near car and a far wall, the nearer car is hit and the wall is not", raceEv.length === 1 && raceEv[0].target === 1 && raceEv[0].building === undefined, JSON.stringify(raceEv));
+    // v4822 -- A FALLING BLOCK IS THE FOURTH THING A SHELL CAN MEET (world/buildingTopple.mjs: the building a shell brought down is a box3d body
+    // now, in a pose that is rotated once it tips). stepShells takes `blocks` { pos, quat, half } and reports { block: slot } -- hit where the
+    // block LIES, so the rows put a box on its side (a quarter turn about z turns half [3, 1, 2] into a world box 1 wide, 3 tall, 2 deep)
+    // and fire a straight synthetic shell through the height that only the rotated box covers.
+    const qz90 = [0, 0, Math.SQRT1_2, Math.SQRT1_2], flat = { pos: [0, 1, 10], quat: qz90, half: [3, 1, 2] }, upright = { ...flat, quat: [0, 0, 0, 1] };
+    const aimAt = (y, x = 0) => ({ x, y, z: 0, vx: 0, vy: 0, vz: 64, t: 0, owner: 0, ammo: "spark" });
+    const through = (shell, opts, targets = []) => U.stepShells([shell], targets, 0.25, { groundY: -1e9, ...opts });
+    const lying = through(aimAt(3.2), { blocks: [flat] }), standing = through(aimAt(3.2), { blocks: [upright] }), sideStep = through(aimAt(1, 2), { blocks: [flat] }), sideHit = through(aimAt(1, 2), { blocks: [upright] });
+    ok("!! a block lying on its side is hit where it LIES: a shell at height 3.2 meets the rotated box (a block event, no target and no building field), the same box upright is passed over", lying.length === 1 && lying[0].block === 0 && lying[0].target === undefined && lying[0].building === undefined && standing.length === 0, JSON.stringify(lying));
+    ok("...and the other way round: a shell 2 m to the side passes the rotated box (1 wide) and hits the upright one (6 wide)", sideStep.length === 0 && sideHit.length === 1 && sideHit[0].block === 0, `${sideStep.length} / ${sideHit.length}`);
+    ok("a null block slot -- an empty one -- is skipped, not dereferenced; the block after it keeps its slot number", through(aimAt(3.2), { blocks: [null, flat] }).map((e) => e.block).join() === "1");
+    const carNear = through(aimAt(1), { blocks: [{ pos: [0, 1, 16], quat: [0, 0, 0, 1], half: [2, 3, 2] }] }, [{ index: 1, pose: still([0, 1, 8]), half: HALF }]);
+    ok("!! forced into one step spanning a near car and a far block, the nearer car is hit and the block is not", carNear.length === 1 && carNear[0].target === 1 && carNear[0].block === undefined, JSON.stringify(carNear));
+    const blockNear = through(aimAt(1), { blocks: [{ pos: [0, 1, 8], quat: [0, 0, 0, 1], half: [2, 3, 2] }], buildings: [{ pos: [0, 1, 16], quat: [0, 0, 0, 1], half: [2, 3, 2] }] });
+    ok("...and a near block against a far building: the block, and only the block", blockNear.length === 1 && blockNear[0].block === 0 && blockNear[0].building === undefined, JSON.stringify(blockNear));
+    const buildNear = through(aimAt(1), { blocks: [{ pos: [0, 1, 16], quat: [0, 0, 0, 1], half: [2, 3, 2] }], buildings: [{ pos: [0, 1, 8], quat: [0, 0, 0, 1], half: [2, 3, 2] }] });
+    ok("...a near building against a far block: the building", buildNear.length === 1 && buildNear[0].building === 0 && buildNear[0].block === undefined, JSON.stringify(buildNear));
 }
 console.log("\n5. THE LOCKSTEP HASH");
 {

@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/importHealth-selfcheck.mjs -- v4451
 //
-// Run: node tools/ship/importHealth-selfcheck.mjs   (~200 ms, no network, no browser)
+// Run: node tools/ship/importHealth-selfcheck.mjs   (~1.4s — re-measured v4804: 1.3 s-1.5 s alone, 1.3 s the sweep's serial median; it read ~200 ms, no network, no browser)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // *** A GATE THAT CANNOT LOAD IS A GATE THAT CHECKS NOTHING, AND ONE OF THEM DID THAT FOR TWENTY-ONE ROUNDS. ***

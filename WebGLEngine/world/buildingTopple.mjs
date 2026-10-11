@@ -13,7 +13,9 @@
 // static STUBS (the support, rebar and all: the hinge), over a static slab at the road. No impulse is invented: gravity and
 // box3d's contact solver decide. A block whose centre hangs past the stubs' edge tips over that edge and lands lying on its
 // side (measured headless: a 4 x 10 x 4 block on a far-quarter stub is flat in 3.1 s, up.y 0.00, its centre 3.9 m past the
-// face it fell toward); a block whose centre is still over its stubs stands on what is left, and says so. The car the block
+// face it fell toward); a block whose centre is still over its stubs stands on what is left, and says so. A tall block that tips and
+// comes to rest LEANING (a 7 x 7 x 11 building on one column of ground floor: up.y 0.97, held between its stub and the road) has fallen as far as
+// it will, and settles like a fallen one (TOPPLE.leanUp, v4822); one still within 2.6 degrees of upright stays a body. The car the block
 // falls toward is a body too: it is pressed, not passed through.
 //
 // THEN IT TURNS INTO DEBRIS. When the body comes to rest (or after TOPPLE.rest.maxAge), its voxels are carried through its
@@ -23,10 +25,15 @@
 // drawn as the block: its voxels meshed once (render/voxelDevice.mjs's mesher on a mini world) into a fleet reserved in the
 // crash scene, in the lit pipeline's quat mode, with the body's transform per frame -- so the windows fall with the wall.
 //
+// v4826 -- A CHIPPED BLOCK IS A SMALLER BODY. A shell that chips a falling block (shellOnBlock) used to take its voxels and leave its box3d body the box it
+// fell as, so a block shot down to a third of its stone still weighed and collided as the whole. refitBlock makes the body again from the voxels left: their
+// mass, a box at their tight bounds, the same place in the world, the old linear and angular motion carried over. Not a full rigid-body model -- the centre of
+// mass is the new box's centre and the inertia a uniform box's (`comOffset` on the refit event is the gap, in metres), and box3d cannot destroy a body, so a
+// block is made again at most TOPPLE.rebuild.maxPerBlock times and a shot past that is counted (`capped`), not hidden.
 // Deterministic: the block, the stubs and the fall are box3d state, and the rubble is a pure function of the final pose.
 "use strict";
 import { looseFragments, massProperties } from "../physics/voxel/fracture.js";
-import { CRASH, footprint } from "./crashDamage.mjs";
+import { CRASH, footprint, shellInto, blastRadius } from "./crashDamage.mjs";
 import { syncDirty } from "../render/voxelDamage.mjs";
 import { miniWorld, meshWorld } from "../render/voxelDevice.mjs";
 import { rotateQ, bodyLitPipelineDesc } from "../render/voxelBodies.mjs";
@@ -42,6 +49,12 @@ export const TOPPLE = Object.freeze({
     meshCap: 12000,               // vertices reserved per block fleet (a 6 x 12 x 6 building with facades meshes to a few thousand)
     rest: Object.freeze({ speed: 0.05, ticks: 30, minAge: 60, maxAge: 12 * 60 }),   // at rest: under `speed` for `ticks` in a row after minAge, or maxAge
     fallenUp: 0.5,                // a block whose up vector's y is under this has fallen; one above it stands on what is left, and stays a body
+    breakFraction: 0.25,          // a block shot down to this share of the voxels it fell with comes apart where it is (v4822)
+    leanUp: 0.999,                // ...unless it is tilted past this (2.6 degrees) and at rest: a lean-to on its stub and the road (measured 0.986 and 0.97), settles like a fallen one; a standing block reads 1.0000
+    dt: 1 / 60,                   // the sim's tick, for the angular velocity a refit carries over (read off two consecutive poses: the wasm shim has no getter for it)
+    bodyLimit: 4096,              // box3d's body slots (swk_body_box's MAX_BODIES): a refit asks for one and has none to spare near the end, so it is declined and COUNTED, not thrown from the middle of a race
+    bodyReserve: 64,              // slots kept for what a fall itself needs (stubs, the next building's block)
+    rebuild: Object.freeze({ massShare: 0.1, maxPerBlock: 8 }),   // v4826: a chipped block's body is made again once its mass has moved this share, or its tight box has shrunk by a voxel; at most this many times (box3d has no body destroy: each costs a slot of 4,096)
     rubbleId: 7,                  // MaterialRegistry's RUBBLE
     debrisEvery: 3,               // one debris burst per this many voxels of a shattering block (the pool is capped at 400)
     park: Object.freeze([0, -500, 0]),
@@ -160,7 +173,8 @@ export function beginTopple(t, b, fromDirection = null, rect = null) {
     if (t.bodies.length >= t.spec.maxBodies) shatter(t, t.bodies[0]);
     let slot = t.slots.indexOf(null); if (slot < 0) slot = 0;
     const rec = { building: i, body, stubs: stubBodies, stubRects: stubs, local, centre: block.centre, half: block.half, radius: Math.hypot(block.half[0], block.half[1], block.half[2]), mass: block.mass, count: block.count, exact: block.exact,
-                  born: t.tick, restTicks: 0, slot, pose: { pos: block.centre.slice(), quat: [0, 0, 0, 1] }, over, dropped: block.dropped, fallen: false, from: fromDirection, mesh: null };
+                  born: t.tick, restTicks: 0, slot, pose: { pos: block.centre.slice(), quat: [0, 0, 0, 1] }, over, dropped: block.dropped, fallen: false, from: fromDirection, mesh: null,
+                  count0: block.count, sig: localSig(local), chipped: 0, rebuilds: 0, prevQuat: [0, 0, 0, 1] };
     t.bodies.push(rec); t.slots[slot] = rec; t.fallen++;
     t.events.push({ kind: block.dropped ? "drop" : "topple", building: i, voxels: block.count, mass: block.mass, loose: block.others.length, stubs: stubs.length, support: stubs.reduce((a, s) => a + (s.x1 - s.x0) * (s.z1 - s.z0), 0) / (rect.w * rect.d), over, chunks: sync.chunks.length });
     if (t.onBlock) { rec.mesh = blockMesh(rec); t.onBlock(slot, rec.mesh); }
@@ -174,12 +188,15 @@ export function stepTopple(t, tick = t.tick + 1) {
     t.tick = tick; if (!t.bodies.length) return [];
     const xf = t.g.phys.readTransforms(), vel = t.g.phys.readVelocities(), out = [];
     for (const rec of t.bodies.slice()) {
-        const o = rec.body * 7; rec.pose = { pos: [xf[o], xf[o + 1], xf[o + 2]], quat: [xf[o + 3], xf[o + 4], xf[o + 5], xf[o + 6]] };
+        const o = rec.body * 7; rec.prevQuat = rec.pose.quat; rec.pose = { pos: [xf[o], xf[o + 1], xf[o + 2]], quat: [xf[o + 3], xf[o + 4], xf[o + 5], xf[o + 6]] };
         const sp = Math.hypot(vel[rec.body * 3], vel[rec.body * 3 + 1], vel[rec.body * 3 + 2]), age = tick - rec.born;
         rec.restTicks = sp < t.spec.rest.speed ? rec.restTicks + 1 : 0; rec.speed = sp; rec.up = quatUp(rec.pose.quat); rec.fallen = rec.up[1] < t.spec.fallenUp;
-        // a block that stands on what is left STAYS a body (the car can still push it over); one that has fallen over, or dropped with
+        // v4822 -- a block that tipped and came to rest LEANING (a tall building on one column of ground floor: 0.97 up, held between its stub and
+        // the road) is not standing on what is left; it has fallen as far as it will. A block still within leanUp of upright stays a body.
+        rec.leaning = !rec.fallen && !rec.dropped && rec.up[1] < t.spec.leanUp;
+        // a block that stands on what is left STAYS a body (the car can still push it over); one that has fallen over, leans at rest, or dropped with
         // nothing under it (a pancake), shatters once it rests -- or at maxAge, or off the world
-        const settled = (rec.fallen || rec.dropped) && ((age >= t.spec.rest.minAge && rec.restTicks >= t.spec.rest.ticks) || age >= t.spec.rest.maxAge);
+        const settled = (rec.fallen || rec.dropped || rec.leaning) && ((age >= t.spec.rest.minAge && rec.restTicks >= t.spec.rest.ticks) || age >= t.spec.rest.maxAge);
         if (settled || rec.pose.pos[1] < CRASH.groundY - 5) { shatter(t, rec); out.push(rec); }
     }
     return out;
@@ -234,12 +251,179 @@ export function sceneExtras(t, G, L, { light = SUN, cap = TOPPLE.meshCap } = {})
     };
 }
 
+/** A 32-bit signature of a block's voxels (where each is, to half a metre, and what it is): the lockstep fold for chips, which no box3d state carries. */
+export function localSig(local) {
+    let h = 0x811c9dc5;
+    for (const l of local) { h ^= (Math.round(l[0] * 2) & 0xff) | ((Math.round(l[1] * 2) & 0xff) << 8) | ((Math.round(l[2] * 2) & 0xff) << 16) | ((l[3] & 0xff) << 24); h = Math.imul(h, 0x01000193); }
+    return h >>> 0;
+}
+
+/** Fold the falling blocks into a lockstep fingerprint: per slot its voxel count and signature (what has been chipped off), and the totals. */
+export function toppleHash(h, t, fold) {
+    for (let k = 0; k < t.spec.maxBodies; k++) { const r = t.slots[k]; h = fold(h, r ? r.count : 0); h = fold(h, r ? r.sig | 0 : 0); h = fold(h, r ? Math.round(r.mass) : 0); }
+    return fold(fold(fold(fold(h, t.shellHits || 0), t.chipped || 0), t.rebuilt || 0), t.shattered);
+}
+
+const qConj = (q) => [-q[0], -q[1], -q[2], q[3]];
+const qMul = (a, b) => [a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1], a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0], a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3], a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2]];
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+
+/** World-frame angular velocity from two orientations one tick apart (the shim reads linear velocity and nothing else): the rotation between them over dt. */
+export function angularVelocity(qPrev, qNow, dt) {
+    let d = qMul(qNow, qConj(qPrev)); if (d[3] < 0) d = d.map((v) => -v);
+    const s = Math.hypot(d[0], d[1], d[2]); if (s < 1e-9) return [0, 0, 0];
+    const ang = 2 * Math.atan2(s, d[3]) / dt; return [d[0] / s * ang, d[1] / s * ang, d[2] / s * ang];
+}
+
+/**
+ * v4826 -- HONEST CHIPPED PHYSICS. v4822 chipped a block's VOXELS and left its BODY the box it fell as: a block shot down to a third of its voxels still
+ * collided as if whole and weighed what it fell with. The body is made again now, from what is left: a box of the TIGHT BOUNDS of the remaining voxels
+ * (so the collider shrinks where the block does), with their mass (density x count, as the block was made), at the same place in the world -- the
+ * new box's centre is the old pose carried through the offset between the two boxes' centres -- with the old body's linear velocity moved to the new
+ * centre (v + w x r) and its angular velocity put back by an angular impulse through the new box's inertia, w estimated from the last two poses.
+ * `local` is re-based so its origin is the new body's centre, which is what blockMesh and the chip test already assume. The old body is parked.
+ * What it still is not: the box3d centre of mass is the new box's centre, not the voxels' (`comOffset` on the event is the distance, in metres), and
+ * the inertia is a uniform box's of the same mass. Rebuilt when the tight box has shrunk or the mass has moved TOPPLE.rebuild.massShare, at most
+ * TOPPLE.rebuild.maxPerBlock times a block (the shim cannot destroy a body: each costs one of 4,096). Returns the event, or null when nothing was rebuilt.
+ */
+export function refitBlock(t, rec) {
+    const spec = t.spec, phys = t.g.phys, L = rec.local; if (!L.length) return null;
+    const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+    for (const l of L) for (let a = 0; a < 3; a++) { if (l[a] - 0.5 < lo[a]) lo[a] = l[a] - 0.5; if (l[a] + 0.5 > hi[a]) hi[a] = l[a] + 0.5; }
+    const half = [(hi[0] - lo[0]) / 2, (hi[1] - lo[1]) / 2, (hi[2] - lo[2]) / 2], d = [(hi[0] + lo[0]) / 2, (hi[1] + lo[1]) / 2, (hi[2] + lo[2]) / 2], mass = L.length * spec.density;
+    const shrunk = half.some((h, a) => Math.abs(h - rec.half[a]) > 1e-6), massMoved = Math.abs(mass - rec.mass) / rec.mass >= spec.rebuild.massShare;
+    if (!(shrunk || massMoved)) return null;
+    if (rec.rebuilds >= spec.rebuild.maxPerBlock || (phys.bodyCount && phys.bodyCount() >= spec.bodyLimit - spec.bodyReserve)) { rec.capped = (rec.capped || 0) + 1; t.refitCapped = (t.refitCapped || 0) + 1; return null; }   // said, not silent: the voxels came off and the body could not follow
+    // the pose is the record's: a shell is resolved BEFORE the tick's world step and stepTopple reads AFTER it, so rec.pose is box3d's state right now; the velocity is read
+    const vel = phys.readVelocities(), vo = rec.body * 3, pos = rec.pose.pos.slice(), quat = rec.pose.quat.slice(), v = [vel[vo], vel[vo + 1], vel[vo + 2]];
+    const w = angularVelocity(rec.prevQuat || quat, quat, spec.dt), r = rotateQ(quat, d), wr = cross(w, r);
+    const pos2 = [pos[0] + r[0], pos[1] + r[1], pos[2] + r[2]], v2 = [v[0] + wr[0], v[1] + wr[1], v[2] + wr[2]];
+    const body = phys.addBox({ type: "dynamic", pos: pos2, half, density: mass / (8 * half[0] * half[1] * half[2]) });
+    phys.setFriction(body, spec.friction); phys.setTransform(body, pos2, quat); phys.setVelocity(body, v2);
+    if (phys.angularImpulse && (w[0] || w[1] || w[2])) {
+        const wl = rotateQ(qConj(quat), w), k = mass / 3, Lw = rotateQ(quat, [k * (half[1] * half[1] + half[2] * half[2]) * wl[0], k * (half[0] * half[0] + half[2] * half[2]) * wl[1], k * (half[0] * half[0] + half[1] * half[1]) * wl[2]]);
+        phys.angularImpulse(body, Lw);
+    }
+    phys.setType(rec.body, "static"); phys.setTransform(rec.body, spec.park.slice());
+    const was = { half: rec.half, mass: rec.mass, body: rec.body };
+    rec.local = L.map((l) => [l[0] - d[0], l[1] - d[1], l[2] - d[2], l[3]]); rec.sig = localSig(rec.local);
+    rec.body = body; rec.half = half; rec.radius = Math.hypot(half[0], half[1], half[2]); rec.mass = mass; rec.pose = { pos: pos2, quat }; rec.prevQuat = quat; rec.restTicks = 0; rec.rebuilds++;
+    t.rebuilt = (t.rebuilt || 0) + 1;
+    let cx = 0, cy = 0, cz = 0; for (const l of rec.local) { cx += l[0]; cy += l[1]; cz += l[2]; }
+    const comOffset = Math.hypot(cx, cy, cz) / rec.local.length;
+    const ev = { kind: "refit", building: rec.building, body, from: was.body, voxels: rec.count, mass, massWas: was.mass, half: half.slice(), halfWas: was.half.slice(), comOffset: +comOffset.toFixed(3), omega: Math.hypot(w[0], w[1], w[2]) };
+    t.events.push(ev); return ev;
+}
+
+/**
+ * v4822 -- a shell met a falling block (physics/turret.mjs's stepShells `block` hit, brain/gunnerPolicy.mjs's turretTick): THE BLOCK IS CHIPPED.
+ * The hit point goes into the block's own frame (the inverse of its pose, so a block lying on its side is chipped where it is hit and not where
+ * its upright box was), every voxel within the blast radius comes off, any piece the chip cuts loose from the largest remainder comes off with it
+ * (a rigid body has no floating islands: they burst), the mesh is made again and written into the reserved buffer, and the block's hit points
+ * are the voxels it has left. Below TOPPLE.breakFraction of what it fell with (or under minVoxels) it comes apart where it is, through the same
+ * shatter a block at rest takes. Cubes burst from each voxel that came off, in its colour. v4826: the body follows -- refitBlock below makes the box3d
+ * body again from the voxels left (tight collider, their mass). The shell's momentum as a linear
+ * impulse is the caller's `world.impulse`, as for a car. No scoreboard credit: a block is what a building became, and shooting rubble is not a
+ * score. Returns { rec, removed, loose, left, hp, shattered } or null (an empty slot).
+ */
+export function shellOnBlock(t, slot, point, radius = 1.2) {
+    const rec = t.slots[slot]; if (!rec) return null;
+    t.shellHits = (t.shellHits || 0) + 1;
+    const { pos, quat } = rec.pose, pl = rotateQ([-quat[0], -quat[1], -quat[2], quat[3]], [point[0] - pos[0], point[1] - pos[1], point[2] - pos[2]]), r2 = radius * radius;
+    const hit = [], keep = [];
+    for (const l of rec.local) { const dx = l[0] - pl[0], dy = l[1] - pl[1], dz = l[2] - pl[2]; (dx * dx + dy * dy + dz * dz <= r2 ? hit : keep).push(l); }
+    // the largest connected piece of what is left stays the block; the rest is cut loose
+    let main = keep, loose = [];
+    if (hit.length && keep.length) {
+        const ref = keep[0], key = (l) => (Math.round(l[0] - ref[0]) + 512) * 1048576 + (Math.round(l[1] - ref[1]) + 512) * 1024 + (Math.round(l[2] - ref[2]) + 512);
+        const at = new Map(); keep.forEach((l, k) => at.set(key(l), k));
+        const seen = new Uint8Array(keep.length), comps = [];
+        for (let k = 0; k < keep.length; k++) {
+            if (seen[k]) continue;
+            const comp = [], stack = [k]; seen[k] = 1;
+            while (stack.length) {
+                const c = stack.pop(), l = keep[c]; comp.push(c);
+                for (const [dx, dy, dz] of [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]) {
+                    const n = at.get(key([l[0] + dx, l[1] + dy, l[2] + dz])); if (n !== undefined && !seen[n]) { seen[n] = 1; stack.push(n); }
+                }
+            }
+            comps.push(comp);
+        }
+        let best = 0; comps.forEach((c, k) => { if (c.length > comps[best].length) best = k; });
+        main = comps[best].sort((a, b) => a - b).map((k) => keep[k]);
+        const inMain = new Set(comps[best]); loose = keep.filter((_, k) => !inMain.has(k));
+    }
+    const gone = hit.concat(loose);
+    if (gone.length) {
+        rec.local = main; rec.count = main.length; rec.sig = localSig(main); rec.chipped += gone.length; t.chipped = (t.chipped || 0) + gone.length;
+        if (t.debris) for (let k = 0; k < gone.length && k < 40; k++) { const w = rotateQ(quat, [gone[k][0], gone[k][1], gone[k][2]]); t.debris.spawn(Math.floor(pos[0] + w[0]), Math.floor(pos[1] + w[1]), Math.floor(pos[2] + w[2]), gone[k][3]); }
+        if (rec.count >= Math.max(t.spec.minVoxels, rec.count0 * t.spec.breakFraction)) refitBlock(t, rec);   // v4826: the body follows the voxels (a block about to shatter is not worth a body)
+        if (rec.count > 0) { rec.mesh = blockMesh(rec); if (t.onBlock) t.onBlock(slot, rec.mesh); }
+    } else if (t.debris && rec.local.length) t.debris.spawn(Math.floor(point[0]), Math.floor(point[1]), Math.floor(point[2]), rec.local[0][3]);   // sparks on a hole: the box is hit, no voxel is
+    const shattered = rec.count < Math.max(t.spec.minVoxels, rec.count0 * t.spec.breakFraction);
+    if (shattered) shatter(t, rec);
+    return { rec, removed: hit.length, loose: loose.length, left: rec.count, hp: rec.count / rec.count0, shattered };
+}
+
+/**
+ * v4822 -- A SCRIPTED DEMOLITION, for a gate that holds one runtime's fall to another's (node's box3d against the browser's, the same wasm in two
+ * JS engines -- the nearest this tree gets to two machines in lockstep): cataclysm shells into the ground floor of the biggest building from tick
+ * `at`, one every `every` ticks, until CityGen topples it (the support collapse shellInto already has), then one spark shell dropped from above
+ * onto the block it became. No random anywhere: the positions are the rect's, the damage stream CityGen's own seeded one. Returns script(t, ctx)
+ * for raceWithGunners's `city` option; ctx = { shells, cityCtx }.
+ */
+export function demolitionScript(g, { at = 40, every = 3 } = {}) {
+    let i = 0; g.rects.forEach((r, k) => { if (r.w * r.d * r.h > g.rects[i].w * g.rects[i].d * g.rects[i].h) i = k; });
+    const r = g.rects[i], gy = CRASH.groundY + 1.5, radius = blastRadius(40), shots = [];
+    for (let x = r.x + 0.5; x < r.x + r.w; x += 3) for (let z = r.z + 0.5; z < r.z + r.d; z += 3) shots.push([x, gy, z]);
+    let k = 0, dropped = false, heavy = false, seen = null;
+    return (t, ctx) => {
+        const b = g.city.buildingAt(r.x + 0.5, r.z + 0.5);
+        if (b && b.state !== "toppled" && k < shots.length && t >= at && (t - at) % every === 0) shellInto(g, i, shots[k++], radius, { x: 1, z: 0 });
+        const blk = g.topple && g.topple.bodies[0];
+        if (blk && seen === null) seen = t;
+        if (blk && !dropped && t >= seen + 10) { const p = blk.pose.pos; ctx.shells.push({ x: p[0], y: p[1] + blk.half[1] + 6, z: p[2], vx: 0, vy: -30, vz: 0, t: 0, owner: 0, ammo: "spark" }); dropped = true; }
+        // v4826: and a cataclysm a few ticks behind it, onto the shortened block: a bite big enough that the body is made again (refitBlock) while the block is still falling
+        if (blk && dropped && !heavy && t >= seen + 14) { const p = blk.pose.pos; ctx.shells.push({ x: p[0], y: p[1] + blk.half[1] + 6, z: p[2], vx: 0, vy: -30, vz: 0, t: 0, owner: 0, ammo: "cataclysm" }); heavy = true; }
+    };
+}
+
+// ---- the same blocks in a kitScene (v4822: race-brain.html's scene is the kit's, with extra fleets, not crashScene's) ----------------
+/** kitScene's extraFleets for the block slots: a fleet per slot named block0.., a reserved mesh, one record parked until a block takes it. */
+export function kitFleets(t, { light = SUN, cap = TOPPLE.meshCap } = {}) {
+    const park = t.spec.park;
+    return Array.from({ length: t.spec.maxBodies }, (_, k) => ({ name: "block" + k, mesh: reservedMesh(cap), pipeline: bodyLitPipelineDesc(), bind: litBind(light), records: new Float32Array([park[0], park[1], park[2], 1]), extras: new Float32Array([0, 0, 0, 1]) }));
+}
+
+/** This frame's block poses into a dynamic kit scene; `base` is the record index of the first block fleet. */
+export function placeBlocks(scene, base, t) {
+    const R = scene.kitRecords, E = scene.kitExtras, park = t.spec.park;
+    for (let k = 0; k < t.spec.maxBodies; k++) {
+        const r = t.slots[k], o = (base + k) * 4;
+        if (r) { R.set([r.pose.pos[0], r.pose.pos[1], r.pose.pos[2], r.radius], o); E.set(r.pose.quat, o); }
+        else { R.set([park[0], park[1], park[2], 1], o); E.set([0, 0, 0, 1], o); }
+    }
+}
+
+/**
+ * Bind the topple to a built kit scene: a falling block's mesh goes into its slot's reserved vertex buffer. A scene built AGAIN
+ * (race-brain.html rebuilds on a repack) has empty buffers, so every block already in the air is written into the new one.
+ */
+export function bindKit(t, scene) {
+    const fleetOf = (slot) => scene.fleets.find((q) => q.name === "block" + slot);
+    t.onBlock = (slot, mesh) => { const f = fleetOf(slot); if (!f || !f.vbuf) throw new Error(`buildingTopple: the scene has no reserved fleet block${slot}`); f.vbuf.write(mesh.data, 0); };
+    t.onFree = null;
+    for (const r of t.bodies) { if (!r.mesh) r.mesh = blockMesh(r); t.onBlock(r.slot, r.mesh); }
+    return t;
+}
+
 /** Bind the topple to a built crash scene: a falling block's mesh goes into its slot's reserved vertex buffer. `base` is the first block fleet's index. */
 export function bindScene(t, sc, base = sc.extrasBase) {
     const scene = sc.scene || sc;   // crashScene's result, or the gpuDriven scene itself
     t.onBlock = (slot, mesh) => { const f = scene.fleets[base + slot]; if (!f || !f.vbuf) throw new Error(`buildingTopple: no reserved fleet at ${base + slot} for slot ${slot}`); f.vbuf.write(mesh.data, 0); };
     t.onFree = null;
-    for (const r of t.bodies) if (!r.mesh) { r.mesh = blockMesh(r); t.onBlock(r.slot, r.mesh); }
+    // a scene built AGAIN (race-crash.html and race-brain.html rebuild on a repack) has empty buffers: every block in the air is written, mesh made or not
+    for (const r of t.bodies) { if (!r.mesh) r.mesh = blockMesh(r); t.onBlock(r.slot, r.mesh); }
     return t;
 }
 

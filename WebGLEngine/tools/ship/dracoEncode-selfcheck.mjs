@@ -229,4 +229,19 @@ console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "(EncodePointCloudToDracoBuffer exists in the vendored module and is untouched here); and Draco's own " +
     "compression ratio on a mesh with real (non-planar, non-axis-aligned) geometry, which a synthetic grid " +
     "cannot speak to as directly as a real voxelized asset would.");
-process.exit(fails ? 1 : 0);
+// *** v4832 -- process.exitCode, NOT process.exit(). THE RIG CRASHED HERE, AND ONLY WHEN SECTION 4 SKIPPED. ***
+// Keith's clone-verify of v4819, node v24.15.0 on win32, after this gate's own scoreline:
+//   Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\win\async.c, line 76   (exit 3221226505)
+// It is v4663's teardown race (tools/ship/wasmTeardown.mjs): sections 0-3 and 5 compile and run the vendored
+// Emscripten encoder, 418,831 bytes of wasm, and process.exit() then tore the platform down under V8's
+// background work. v4663's screen never reached this gate because dracoEncode.mjs loads its glue through
+// createRequire with a computed path, which no import walk follows -- the same blind spot that screen named
+// for box3dNode.mjs's dynamic import -- and v4677's sample read it QUIET, because a run that HAS a browser
+// spends seconds in section 4 between the encoder's first use and this line. MEASURED on the sandbox with
+// tools/ship/exitBusy.mjs, first 300 ms window at this line against the second:
+//   browser present (section 4 runs)     2.8 / 0.6 / 0.3 ms        -- quiet
+//   section 4 skipped, as on the rig     7.7 / 6.1 / 6.8 / 4.9 / 5.3 ms, second window 0.2-0.3 -- a burst, 4 of 5 over exitBusy's 5 ms floor
+// So the crash needed BOTH a Windows teardown and a clone with no Playwright, which is the clone the rig had.
+// Linux carries no such assertion, so this is the repair and not a reproduction; the rig's next clone-verify
+// is the instrument for the fact. tools/ship/wasmTeardown-selfcheck.mjs section 6 holds the conversion.
+process.exitCode = fails ? 1 : 0;

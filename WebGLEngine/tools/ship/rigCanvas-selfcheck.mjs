@@ -16,6 +16,7 @@ import path from "node:path";
 import http from "node:http";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
+import { stableWrite } from "./stableWrite.mjs";   // v4826 -- the record is rewritten only when its counts change (it was stamped `written: now` on every run)
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 import { resolvePlaywright, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 
@@ -56,8 +57,8 @@ else {
         ok("  the two backends agree per colour within edge pixels", worst <= 600, `largest difference ${worst}`);
         ok("  two-phase occlusion ran on WebGPU", W.phase2Ran === true);
         hist = W.hist;
-        const file = { from: "the sandbox's WebGPU backend, offscreen (SwiftShader), v4300", scene: "gridScene 16x16, three LODs, camera [0,0,6], two-phase Hi-Z, 256x256", hist: W.hist, webgl2: L.hist, counts: W.counts, tolerance: 600, written: new Date().toISOString() };
-        fs.writeFileSync(EXPECTED, JSON.stringify(file, null, 1));
+        const body = { from: "the sandbox's WebGPU backend, offscreen (SwiftShader), v4300", scene: "gridScene 16x16, three LODs, camera [0,0,6], two-phase Hi-Z, 256x256", hist: W.hist, webgl2: L.hist, counts: W.counts, tolerance: 600 };
+        stableWrite(EXPECTED, (stamp) => ({ ...body, written: stamp }), { stampName: "written", stampValue: new Date().toISOString() });
         ok("  and tools/ship/rig-expected.json is written for the rig to compare against", fs.existsSync(EXPECTED), `${keys.length} colours, ${Object.values(W.hist).reduce((a, b) => a + b, 0)} pixels`);
     }
 }

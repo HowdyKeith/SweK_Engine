@@ -239,18 +239,34 @@ export const KEY_DRIFT_V4460 = Object.freeze({
                    "unpapered, and that state reaches nothing: forcing both back to unpapered leaves 1719b169",
             control: "on today's tree, dropping both bodies gives 37739d8c -- exactly the previous key -- and " +
                      "dropping male-cns alone gives daf22678, mikktspace alone 43eeee4b" }),
+        // *** v4819 -- TWO MOVES ON THE EXPORTED-FUNCTIONS LINE, FOUND AT ITS MERGE WITH MAIN. *** That line moved vendor/three-webgpu
+        // to r186 at v4805 (its r185 files kept as a new body) and vendor/three to r186 at v4807, re-baking orrery.json each time --
+        // and never ran this gate, which is over the sweep's budget, so the key it owed was never re-baked. Measured on the merged
+        // tree, each move by itself against main's orrery.json (whose key is 1719b169), not read off a diff.
+        Object.freeze({ version: "v4807", commit: "31ab299b", hash: "35e84789", file: "orrery.json",
+            field: "files", bodiesTouched: 2,
+            cause: "three-webgpu (v4805, 7462bbb6) and three (v4807, 31ab299b) re-vendored from 0.185.1 to 0.186.1: the same 24 and 6 files at new sizes, so " +
+                   "their cargo at max(1, bytes/4096) per file moved -- v4416's mechanism again, on two bodies. Their " +
+                   "top-level `bytes` moved too and reaches nothing: putting both back leaves 35e84789",
+            control: "on today's tree with three-webgpu-r185 dropped, putting both bodies' `files` back to main's gives " +
+                     "1719b169 -- exactly the previous key -- and three's alone gives 7436f85d, three-webgpu's alone 058ed485" }),
+        Object.freeze({ version: "v4805", commit: "7462bbb6", hash: "bcb7d3bc", file: "orrery.json",
+            field: "bodies", bodiesTouched: 1,
+            cause: "vendor/three-webgpu-r185, the r185 build kept for the r185 drafts and their patches, is a new BODY with " +
+                   "its own orbit, stock and prices -- v4504's field, for one body. Nothing in the engine imports it",
+            control: "on today's tree, dropping three-webgpu-r185 alone gives 35e84789, the key of the move above" }),
     ]),
-    current: "1719b169",
+    current: "bcb7d3bc",
     // *** MEASURED AND NEGATIVE, AND IT CORRECTS MY OWN FIRST WRITING OF THE ENTRY ABOVE. *** The re-bake's
     // diff moved TWO fields on 16 bodies each, `arrived` and `sha`, and I wrote "arrived + sha" into this
     // record straight off that diff -- the exact mistake bytesDoNotReachTheEconomy exists to record, made
     // again in the same file four moves later. `sha` reaches NOTHING: each of the 18 bodies' sha set to
     // forty zeros in turn, one at a time, and the hash never moved. A DIFF NAMES WHAT CHANGED, NOT WHAT
     // COUNTED, and the only way to tell them apart is to run it.
-    shaDoesNotReachTheEconomy: Object.freeze({ bodiesTried: 22, movedTheHash: 0,
+    shaDoesNotReachTheEconomy: Object.freeze({ bodiesTried: 23, movedTheHash: 0,
         note: "against `arrived`, the same probe on the same 22 bodies: 22 of 22 moved the hash. 18 at " +
               "v4534; xatlas made it 19 at v4560; draco-encoder made it 20 at v4535; male-cns and mikktspace " +
-              "made it 22 at v4778, and the probe is re-run rather than the count adjusted" }),
+              "made it 22 at v4778; three-webgpu-r185 made it 23 at v4819, and the probe is re-run rather than the count adjusted" }),
     // WHY THE 2026-09-07 DRIFT SHIPPED ANYWAY, read from tools/ship/sweep-timings.json rather than argued:
     // the gate is over the ship-time budget, so quickSweep does not run it, so its recorded verdict is a
     // snapshot of a tree that no longer exists. The RELATION (gate slower than budget) is asserted live in
@@ -264,10 +280,10 @@ export const KEY_DRIFT_V4460 = Object.freeze({
     }),
     // MEASURED AND NEGATIVE, kept because it is what corrected this record: `bytes` (and so `radius`) do not
     // reach the economy. 964 bytes added to each of the 15 bodies in turn, one at a time: the hash never moved.
-    bytesDoNotReachTheEconomy: Object.freeze({ bodiesTried: 22, movedTheHash: 0,
+    bytesDoNotReachTheEconomy: Object.freeze({ bodiesTried: 23, movedTheHash: 0,
         note: "radiusFor(bytes) sets a body's drawn size and nothing the economy integrates. 15 at v4460; " +
               "every arrival since (kenney-city/-racing, morphicons, xatlas, draco-encoder, and at v4778 " +
-              "male-cns and mikktspace) also defines `bytes`, so re-run against today's 22 bodies rather " +
+              "male-cns and mikktspace, and at v4819 three-webgpu-r185) also defines `bytes`, so re-run against today's 23 bodies rather " +
               "than left at the old count" }),
     staleFor: 42,             // shipped changelog entries strictly after v4416 up to v4459, COUNTED not subtracted
     // The gate reads the file and compares. Writing is behind --write, and the default mode is asserted to

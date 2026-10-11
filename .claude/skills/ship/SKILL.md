@@ -97,6 +97,15 @@ again; it costs a file read.
 A step nobody is asked for happens when somebody remembers -- step 7 is the tree's measurement of what
 remembering is worth, at 1.1% over 261 rounds. This step is written down for that reason.
 
+## 3c. What a NEW gate or a NEW command-line tool owes (v4833 -- the first verdict of that round said DO NOT SHIP four ways)
+
+- **A tool with exports needs a caller that is not a gate**, or the orphan census (graveyard 188, referenceKind 333) goes up and the verdict goes red. Split it: a library the gate holds (`tools/ship/x.mjs`) and
+  an export-free command that imports it (`tools/ship/takeX.mjs`, the way `lagBlameWatch.mjs` has no exports on purpose). Name the library after its gate, or definitionGates calls its exports unnamed.
+- **On a box that does not own the shared timing record** (the rotation or verdict prints `NOT writing sweep-timings.json: the record belongs to ...`), a new gate is in no record and the drift pre-flight,
+  recordDrift and timingKind go red together. Before the verdict: `node tools/ship/boxTimings.mjs --record <gate>,<gate>` writes this box's tracked per-box record. The sweep also runs far more gates alone on such a
+  box (362 at v4833, a 25-minute verdict): that is the box being foreign, not a regression.
+- **`[verify] pool (...)` lines** say what the quick sweep did NOT run (the over-budget gates). A recorded red there that no register names fails the ship (tools/ship/poolWatch.mjs); fix it, never register it.
+
 ## 4. Verify
 
     node tools/ship/shipVerdict.mjs --version vNNNN --markers "SweK Dictate,/dictate/type"; echo "exit=$?"
@@ -111,6 +120,11 @@ EITHER direction is NO VERDICT -- not a pass. If you run verify directly instead
 The PASS count is environment-conditional (SwiftShader, Playwright, WASM
 availability) and is NOT a number to assert or compare between boxes.
 
+Since v4833 it first asks whether this box can run the browser gates at all -- Playwright resolving, a browser on
+disk, and on Windows dxcompiler.dll beside the headless shell -- and if not, prints `[ship] DO NOT SHIP -- NOT RUN`
+with the one command that fixes it (`cd tools/render-qa && npm install --no-audit --no-fund`, or
+`node tools/ship/ensureDxc.mjs --write`) instead of fifteen minutes of sweep and a hundred reds that are one fact.
+
 Since v4303 verify runs the QUICK SWEEP (`tools/ship/quickSweep.mjs`): every gate under the budget in
 `tools/ship/sweep-timings.json` (default 3000 ms), 8-way parallel with reds re-run alone, reconciled against
 the red register. A KNOWN red is listed; a NEW red -- one no register names -- fails the ship. Expect it to
@@ -119,18 +133,24 @@ with a reason; never widen the register to get green. `SWEK_QUICKSWEEP=0` skips 
 not a way to ship. The timings file is rewritten by the run and ships with the round (`git add -A WebGLEngine`
 covers it). Gates OVER the budget are still only covered by the full two-phase sweep.
 
-## 4b. Grade the record the verdict WROTE, before the rig is asked
+## 4b. Grade what no ship-time step ran, before the rig is asked
 
-    node -e 'const fs=require("fs");import("./tools/ship/gateSweep.mjs").then(m=>{const pat=/sweep-timings|quickSweep\.mjs|sweepCoverage\.mjs|sweepRotation\.mjs|recordReach\.mjs|declaredCost\.mjs|budgetExile\.mjs|redCensus\.mjs|timingsTarget|readTimings|capReading|gate-timings/;console.log(m.enumerateGates().filter(g=>{try{return pat.test(fs.readFileSync(g,"utf8"))}catch{return false}}).join("\n"))})' > /tmp/readers.txt
-    while read g; do timeout 900 node "$g" >/dev/null 2>&1 || echo "RED $g"; done < /tmp/readers.txt
+    node tools/ship/afterVerdict.mjs; echo "exit=$?"      # --list prints the plan and runs nothing
 
 *** THE VERDICT RUNS ITS GATES AGAINST THE RECORD FROM BEFORE ITS OWN SWEEP, AND THEN REWRITES THE RECORD. *** The
 rig grades the record you COMMIT -- the rewritten one -- so a gate that reads the timing record can be green in the
 sandbox's verdict and red on the rig's. v4815 shipped a SHIP verdict whose own write turned sweepCoverage red, and
 Keith's rig found it: the sandbox had never run that gate against what it committed. After a SHIP, commit the record,
-run every gate that reads it (about 84; most are over the budget, so the next quick sweep would not see them either),
-and only then hand the rig the command. A red here is fixed before the rig is asked, like any other. Gates that only
-match the pattern in a comment (labResults, at ~15 min) can be read and set aside rather than waited on.
+run this step, and only then hand the rig the command. A red here is fixed before the rig is asked, like any other.
+
+*** AND THE SWEEP NEVER RUNS A GATE OVER ITS 3,000 ms LINE, EVEN WHEN THAT GATE IS A RECORD'S ONLY GUARD. *** v4819
+shipped two such gates red past a SHIP verdict -- orreryFleet-selfcheck (the commit belt, 20.9 s) and
+universeWire-selfcheck (the key drift, 5.4 s), both moved by the merge's re-vendors. Since v4835 this step is one
+command (tools/ship/afterVerdict.mjs) that runs, alone and serially, every gate whose CODE reads the timing record
+(the pattern this step used to carry as a one-liner, now held in that file) together with recordReach's `blockers`,
+the gates that are a frozen record's only guard and over the line. A mention in a comment selects nothing, so
+labResults' fifteen minutes are no longer on the list. It exits 1 on any red, names each one and why it was run, and
+writes nothing.
 
 ## 5. Commit and push (from the REPO ROOT, one level above WebGLEngine)
 

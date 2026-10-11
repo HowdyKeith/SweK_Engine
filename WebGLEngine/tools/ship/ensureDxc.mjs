@@ -4,7 +4,7 @@
 //
 // *** PUT dxil.dll WHERE THE LOADER ACTUALLY LOOKS, WHICH IS THE ONE THING MEASURED TO WORK. ***
 //
-// Dawn's D3D12 backend loads dxil.dll and dxcompiler.dll. Playwright's chrome-headless-shell-win64 bundle
+// Dawn's D3D12 backend loads dxcompiler.dll (and, before Chrome 156, dxil.dll). Playwright's chrome-headless-shell-win64 bundle
 // ships neither; the full chrome-win64 bundle of the SAME Chrome for Testing build ships both. The tree
 // prefers the shell on purpose (playwrightResolve.mjs's v4486 note: 96 gates were calibrated against it), so
 // on Windows every browser-side requestDevice dies with "DynamicLib.Open: dxil.dll Windows Error: 87".
@@ -28,6 +28,11 @@ import { pathToFileURL } from "node:url";
 import { resolveDxcDir, HEADLESS_SHELL } from "./playwrightResolve.mjs";
 
 export const DXC_FILES = Object.freeze(["dxil.dll", "dxcompiler.dll"]);
+// *** v4821 -- ONLY dxcompiler.dll IS REQUIRED; dxil.dll IS COPIED WHEN THE SOURCE BUNDLE HAS ONE. *** Chrome 156's
+// full bundle ships dxcompiler.dll alone (see DXC_LEAVES in playwrightResolve.mjs), and its Dawn asks for nothing
+// else -- the rig's error named dxcompiler.dll. Requiring both made the remedy refuse on every box with that build.
+// Older bundles carry both and still get both: the copy follows the source, it does not invent a pair.
+export const DXC_REQUIRED = Object.freeze(["dxcompiler.dll"]);
 
 /**
  * What would be done, or was. Pure enough to gate: every filesystem touch is injectable, and `write` false
@@ -39,19 +44,23 @@ export function ensureDxc({ platform = process.platform, shell = undefined, writ
     if (platform !== "win32") return { needed: false, why: `${platform} does not load DXC -- Vulkan and Metal have no dxil.dll`, copied: [] };
     if (!bin) return { needed: false, why: "no headless shell resolved, so there is nothing to put them beside", copied: [] };
     const dest = path.dirname(bin);
-    const missing = DXC_FILES.filter((f) => !exists(path.join(dest, f)));
-    if (!missing.length) return { needed: false, why: `already present beside the binary in ${dest}`, copied: [], dest };
+    const there = (f) => exists(path.join(dest, f));
+    const present = `already present beside the binary in ${dest}`;
     const { dir: src } = resolveDxcDir({ exists, ...rest });
     if (!src) {
-        return { needed: true, ok: false, dest, missing,
-                 why: "no bundle on this box carries dxil.dll -- a `playwright install chromium` (the FULL browser, " +
+        if (DXC_REQUIRED.every(there)) return { needed: false, why: present, copied: [], dest };
+        return { needed: true, ok: false, dest, missing: DXC_REQUIRED.filter((f) => !there(f)),
+                 why: "no bundle on this box carries dxcompiler.dll -- a `playwright install chromium` (the FULL browser, " +
                       "not only the headless shell) is what puts one there", copied: [] };
     }
-    const have = missing.filter((f) => exists(path.join(src, f)));
-    if (have.length !== missing.length) {
-        return { needed: true, ok: false, dest, src, missing,
-                 why: `found ${src} but it does not carry ${missing.filter((f) => !have.includes(f)).join(", ")}`, copied: [] };
+    const lacking = DXC_REQUIRED.filter((f) => !exists(path.join(src, f)));
+    if (lacking.length) {
+        return { needed: true, ok: false, dest, src, missing: lacking,
+                 why: `found ${src} but it does not carry ${lacking.join(", ")}`, copied: [] };
     }
+    // what the source carries and the shell's directory does not: the required file always, dxil.dll when it exists
+    const missing = DXC_FILES.filter((f) => !there(f) && exists(path.join(src, f)));
+    if (!missing.length) return { needed: false, why: present, copied: [], dest };
     if (!write) return { needed: true, ok: true, dryRun: true, dest, src, missing, copied: [] };
     const copied = [];
     for (const f of missing) { copy(path.join(src, f), path.join(dest, f)); copied.push(f); }

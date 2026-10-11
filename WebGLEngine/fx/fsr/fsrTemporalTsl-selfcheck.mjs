@@ -26,6 +26,7 @@ import { makeLumaState, pushLuma, shadingShiftCPU, lockCandidatesFromRing, newLo
 import { jitterPhaseCount, jitterSequence } from "../../render/jitter.mjs";
 import { rcasCPU } from "./fsr.js";
 import * as FT from "./fsrTemporalTsl.mjs";
+import { HALF_PROBE_VALUES, halfRuleOf } from "../../text/slugAtlas.js";   // v4831: probeHalfWrite's row
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -49,7 +50,7 @@ console.log("\n2. ON THE DEVICE: the chain, 40 frames, against fsr.html's order 
 const skip = webgpuSkipReason();
 if (skip) { console.log(`  SKIP  ${skip}`); console.log("  ----  *** NOT A PASS. *** Section 1 is static."); fails++; }
 else {
-    const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 300000, args: { RW, DW, N, ALPHA, SHARP }, script: `async (a) => {
+    const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 300000, args: { RW, DW, N, ALPHA, SHARP, PROBE: [...HALF_PROBE_VALUES] }, script: `async (a) => {
         const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
         const FT = await import("/fx/fsr/fsrTemporalTsl.mjs"); const TC = await import("/render/temporalClipTsl.mjs"); const TT = await import("/render/temporalTsl.mjs");
         const out = {};
@@ -60,6 +61,8 @@ else {
                 const o = { frames: [] };
                 // the lock-sums round: the device's own texture limit, and the ring refused one row past it, built at it
                 const b = renderer.backend; o.limit = FT.maxTexture2D(renderer);
+                // v4831 -- this module's half-write probe, asked here too: its gate is the one named for it
+                try { o.halfWords = Array.from(await FT.probeHalfWrite(THREE, T, renderer, a.PROBE)); } catch (e) { o.halfWords = String(e && e.message || e); }
                 o.limitDirect = b.device ? b.device.limits.maxTextureDimension2D : b.gl.getParameter(b.gl.MAX_TEXTURE_SIZE);
                 const at = (dh, lock) => { try { const f = FT.makeFsrTemporal(THREE, T, renderer, { renderWidth: 4, renderHeight: Math.ceil(dh / 2), displayWidth: 8, displayHeight: dh, ratio: 2, threshold: 0.01, lock, lockFrom: null }); f.dispose(); return null; } catch (e) { return String(e.message); } };
                 o.refusedPast = at(o.limit / 16 + 1, "ring"); o.builtAt = at(o.limit / 16, "ring"); o.sumsPast = at(o.limit / 16 + 1, "sums");
@@ -118,6 +121,19 @@ else {
         const up = (px, n) => { if (mode === "webgpu") return new Float32Array(px); const f = []; for (let y = n - 1; y >= 0; y--) f.push(...px.slice(y * n * 4, (y + 1) * n * 4)); return new Float32Array(f); };
         const ch = (a4) => { const x = new Float32Array(a4.length / 4); for (let i = 0; i < x.length; i++) x[i] = a4[i * 4]; return x; };
         const worst = (a, b, n, c = 3) => { let w = 0; for (let i = 0; i < n; i++) for (let j = 0; j < c; j++) { const d = Math.abs(a[i * (c === 1 ? 1 : 4) + j] - b[i * (c === 1 ? 1 : 4) + j]); if (!(d <= w)) w = d; } return w; };
+        // *** v4831 -- probeHalfWrite, NAMED BY THE GATE NAMED FOR ITS MODULE. *** fx/fsr/fsrTemporalHalf-selfcheck.mjs and
+        // fsrTemporalHalfQuality-selfcheck.mjs spend it -- they ask each backend how it writes binary16 before holding anything
+        // to a mirror that rounds -- but tools/ship/definitionGates-selfcheck.mjs counts a definition as looked at only when
+        // ITS OWN gate names it. So it is called here as well and graded the way they grade it: the words it reads back
+        // classify as one of the two rules a device may follow (rtne: SwiftShader; rtz: Direct3D on the rig), with the three
+        // exact controls written as themselves. SABOTAGE, restored: probeHalfWrite returning the words of a FloatType target
+        // (no half write at all) -> RED on both backends.
+        {
+            const hw = o.halfWords, cls = Array.isArray(hw) ? halfRuleOf(hw) : { rule: "other", why: String(hw) };
+            ok(`[${mode}] probeHalfWrite reads back ${HALF_PROBE_VALUES.length} binary16 words that classify as a rule a device may follow`,
+               Array.isArray(hw) && hw.length === HALF_PROBE_VALUES.length && (cls.rule === "rtne" || cls.rule === "rtz"),
+               `${cls.rule}: ${cls.why}; words ${Array.isArray(hw) ? hw.join(",") : hw}`);
+        }
         ok(`[${mode}] the driver reads the device's own 2D texture limit, ${o.limit}, as the backend states it -- and REFUSES a 2x ring one row of slices past it, naming the size, the limit and the sums`,
            o.limit > 0 && o.limit === o.limitDirect && o.refusedPast !== null && /past this device's/.test(o.refusedPast) && /"sums"/.test(o.refusedPast) && o.builtAt === null && o.sumsPast === null,
            `past: ${o.refusedPast}; at the limit: ${o.builtAt === null ? "built" : o.builtAt}; the sums one past it: ${o.sumsPast === null ? "built" : o.sumsPast}`);

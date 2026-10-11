@@ -837,20 +837,23 @@ sec("THE TWO EXPORTS NO GATE NAMED, CLOSED BY ASSERTION (v4647q)");
         fs.mkdirSync(path.join(root, "tools", "ship", ".sabotage-orbpresent-a1B2c3"), { recursive: true });
         fs.writeFileSync(path.join(root, "tools", "ship", ".sabotage-orbpresent-a1B2c3", "aiPresenceOrbPresent.mjs"), "export {};\n");
         fs.mkdirSync(path.join(root, "tools", ".ub-Zz9Yy8"), { recursive: true });
+        fs.mkdirSync(path.join(root, ".fsrclocks-Qw3Er4"), { recursive: true });   // v4824: the engine ROOT's own prefix
+        fs.writeFileSync(path.join(root, ".fsrclocks-Qw3Er4", "pre.html"), "<html></html>\n");
         // a decoy that must SURVIVE: same prefix, not a mkdtemp name (wrong length), so it is not ours to delete
         fs.mkdirSync(path.join(root, "tools", "ship", ".sabotage-orbpresent-keepme-please"), { recursive: true });
         const gone = GS.reclaimScratchDirs(root).sort();
-        ok(gone.join(",") === "tools/.ub-Zz9Yy8,tools/ship/.sabotage-orbpresent-a1B2c3" &&
+        ok(gone.join(",") === ".fsrclocks-Qw3Er4,tools/.ub-Zz9Yy8,tools/ship/.sabotage-orbpresent-a1B2c3" &&
             fs.existsSync(path.join(root, "tools", "ship", ".sabotage-orbpresent-keepme-please")),
             "!! *** reclaimScratchDirs removes the stranded mkdtemp directories, and only those ***",
             `removed [${gone.join(", ")}]; the same-prefix decoy that is not a mkdtemp name survives -- the rig held two ` +
             "stranded .sabotage-orbpresent directories whose four .mjs files took the census to 4318");
     } finally { fs.rmSync(root, { recursive: true, force: true }); }
     const makers = { ".sabotage-orbpresent-": "tools/ship/aiPresenceOrbPresent-selfcheck.mjs",
-                     ".ffwasm-gate-": "tools/ship/ffmpegWasmBridge-selfcheck.mjs", ".ub-": "tools/ship/unboundBuiltin-selfcheck.mjs" };
-    ok(GS.TRANSIENT_DIRS.length === 3 && GS.TRANSIENT_DIRS.every(([, p]) =>
+                     ".ffwasm-gate-": "tools/ship/ffmpegWasmBridge-selfcheck.mjs", ".ub-": "tools/ship/unboundBuiltin-selfcheck.mjs",
+                     ".fsrclocks-": "tools/ship/fsrPageClocks-selfcheck.mjs" };   // v4824: was a bare root file, stranded by a cap kill
+    ok(GS.TRANSIENT_DIRS.length === 4 && GS.TRANSIENT_DIRS.every(([, p]) =>
             makers[p] && fs.readFileSync(path.join(ENG_ROOT, makers[p]), "utf8").includes(JSON.stringify(p))),
-        "...and TRANSIENT_DIRS is the three in-tree mkdtemp prefixes, SPELLED, each one a name a gate really creates",
+        "...and TRANSIENT_DIRS is the four in-tree mkdtemp prefixes, SPELLED, each one a name a gate really creates",
         GS.TRANSIENT_DIRS.map(([d, p]) => d + "/" + p + "*").join(", "));
 }
 

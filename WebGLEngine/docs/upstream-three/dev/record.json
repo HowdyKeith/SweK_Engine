@@ -1,0 +1,1163 @@
+{
+ "devCommit": "11738a9d55e502fb484cefffcea3a66dc44e9fe9",
+ "release": "0.186.1",
+ "releaseFiles": {
+  "three.core.js": "9edde002b066a9a05676a6127f67735b62baf399bdea529f2f7e31657da769e6",
+  "three.tsl.js": "6e6b92d8ce467818944f73815a96abadc6392fb34de577d479a23810b6aeeed0",
+  "three.webgpu.js": "15cfce5c653541704fd9a3463c39d3e8b854bb6265ccd854d7cfe74090625cc6"
+ },
+ "releaseEdit": "three.tsl.js's one import of 'three/webgpu' pointed at './three.webgpu.js' (the page has no import map); nothing else",
+ "builds": {
+  "all": "c0a910e711c07deb6f309a6bc664990c8e476a18fbaa66b54fd4398ecd567f06",
+  "dev": "1fa30f36cba5c4867659afb23285b0e96615845532dda7930289014811f665fe",
+  "p03": "1fa30f36cba5c4867659afb23285b0e96615845532dda7930289014811f665fe",
+  "p04": "611abaef87ced6d98572f249e020dfb44953a021a6c85f070444e3c1f6e67bdc",
+  "p05": "9ef5e13f583716f4503a936781156a6ea3f4331dbac9df0eb836c3dec3e7c015",
+  "p06": "dd0658802b2b9cc6dad362628964de5b69f079a4529c13873cd7f51992e2abdd",
+  "p07": "1fa30f36cba5c4867659afb23285b0e96615845532dda7930289014811f665fe",
+  "p08": "1fa30f36cba5c4867659afb23285b0e96615845532dda7930289014811f665fe",
+  "p09": "3173656fe339fd1b46fae8360672fb36907a924d4a4277bfef5db3d89a5b532a",
+  "p10": "4b018fabbbaea2990cb0c7f4d1d0c62e3f904f5f72e0e283af727c14de61fa81",
+  "p11": "1a6fedbfc2c83e23d178e8a56bc6b84f479e0bb1f7e061bd25e19630d842dc21",
+  "p12": "1fa30f36cba5c4867659afb23285b0e96615845532dda7930289014811f665fe",
+  "p13": "1fa30f36cba5c4867659afb23285b0e96615845532dda7930289014811f665fe",
+  "p14": "522f9f6a36b20a8d20205f8df28056e71707e4ad005fcb71c44f214d73d529db",
+  "p15": "1fa30f36cba5c4867659afb23285b0e96615845532dda7930289014811f665fe",
+  "p16": "b997a2030dcb1bb1cd09ed259b71343fa4677e089d27f60dc5b7405f03610f93",
+  "p17": "c899cc151e7a8cf620cf8e40042642c1cc775738b4524174b96771df9012cda9",
+  "p18": "d8a621214e13c67ae3474477164e327fb9229f2a0530b9272e8f5cb474986224",
+  "r186": "15cfce5c653541704fd9a3463c39d3e8b854bb6265ccd854d7cfe74090625cc6"
+ },
+ "browser": "headless Chromium, SwiftShader (tools/ship/webgpuHarness.mjs)",
+ "patches": {
+  "10": "f5428fbc4fe2f7b0accc87282e6da96390fb5de1483ba29828251f3db3a54e60",
+  "11": "dda9c9f76b92aaf6bc9390bad10ac825093f73ffc5a5b2e9c5328e9d8664afa8",
+  "12": "3c3987270a9344da9e45979029517c608ab39b5563d54071d93a0ff4448c1988",
+  "13": "0ac6bd9b08d2e253527e49750ce4ee6863d23ae38437c7c3892d64c74e96b016",
+  "14": "92d678b2da1c6592c4c23a793d07d8a47681856f6ef5af754b7570a31b9e0498",
+  "15": "61509552ca3a39f38969459b45675390f58b7e8090dc5e769217824b53c72458",
+  "16": "3cc452d6d8a4ce237964514f0870f4b99ce6f5781f5ad885999648f5a521ac8a",
+  "17": "c05f5d6c6402e65f5a4f4f7e644c02a1a2635b72538c34a55ef103c7411713b0",
+  "18": "2e03918edaa8cdd3298a70f57ed64a5b6d24d222d1ba497c94a2fa230a1c3eda",
+  "03": "7907879533d9b4071c495cd8521218fa7a05a3cb903a411e1d4656e3f938e36b",
+  "04": "8514035d16d73716613345b82470d45c255288ea2d1a89db511dfb6118824063",
+  "05": "549c955536325a1d1749671be585c1678cb7c4bc8b5aebd2bdd98a9154d707fe",
+  "06": "2ef784247c2b5518df8966fbc5568be9ccafd1e4ba52f6c0359f81de3eb5f137",
+  "07": "e2a4642926ef099b786a5caa8ef1486f031607dab88670f4f48961ed41df021e",
+  "08": "20215992179a7d25712952ae970b98d0c5737aada0c3d1cb9f52ad79b106081c",
+  "09": "46652654b0a44ae62678a5d71669d7de755a3ed6b7abb3e3c85f7f547cb7b04e"
+ },
+ "code": {
+  "10": "10d3dbaab28c164a55cb5fac8e8ffe00df25cd752b3ec1cb32dce2e34e2830ee",
+  "11": "a98643529d5056905af41e79ec85c753c36ad73137d8e4aba43dc914a1e45b68",
+  "12": "c95a98f6847cf2dfb76699b58620a0e508a38b6c86429b5c5bc47c7e02676933",
+  "13": "d293aa8997c0b7d9cddf758e23b252a51ce3743c6cc659efb9773cdebb672af7",
+  "14": "98c18afa805cefba2c1b50c17161e0924dafcf37363580b3e27abee03c498a64",
+  "15": "f6ec405cc26a8694dfbc290d7275135677e93e7ba1dfa8db68229eb243796605",
+  "16": "9216c55e269711550a40969be94eee0c766482e56d04b3eb0b214eba93d95248",
+  "17": "de3d549a7f4a6295363df62eb05f4fb7f224cb3c3e681a11932ba7dc19291ce5",
+  "18": "414015515080df88970dc8ff1351793e645e9a05a2e78adfaf1762dbd78e5432",
+  "03": "ed747ca7257b078ba882273d921589ae24369e57e8c0256622951fd4ce472d16",
+  "04": "2fc5a4796d64196654969b9e90289cbe715ab2fcdd8a6c6fbe843dccdbaa4118",
+  "05": "e9490f2082dbe2b851ec6d49557adaa32edf9d642b5f35117281622c0cdb0033",
+  "06": "469ed1b1cd26f0eb7e6db7d4931154cf835a6a730d52798bd918af7676167456",
+  "07": "bc9b05c4e967602e50dcabeb150f56164e9430c2a4ff5332d677fe7248a03b10",
+  "08": "efec8420da6109ac71e54911d4db512dfad45803a0b464cf6350aa74f7dbf367",
+  "09": "dbf5163b1ad771b1c214acce6cbe7b6adebbe40d80812a22d742550453e814cb"
+ },
+ "merged": [
+  {
+   "build": "all",
+   "patch": "16",
+   "file": "src/nodes/accessors/Instance.js",
+   "line": "import { OnAfterObjectUpdate, OnBeforeObjectUpdate } from '../utils/EventNode.js';"
+  }
+ ],
+ "bases": {
+  "10": {
+   "src/nodes/core/NodeBuilder.js": "a536db4c6da2281174e138b25d56d8393c8d9013"
+  },
+  "11": {
+   "src/renderers/webgl-fallback/nodes/GLSLNodeBuilder.js": "d894d31e0d45542fa1508ff14008318f8ecffb46"
+  },
+  "12": {
+   "src/nodes/accessors/BufferAttributeNode.js": "b80504a92a15ed1d326ee164371086fde477c088",
+   "src/nodes/accessors/StorageBufferNode.js": "e7ca04d3ddabc626d5d649aaef01c4e29c014b29"
+  },
+  "13": {
+   "src/nodes/accessors/Morph.js": "e9b9319658097bf84e6cbae587a657038a9e685a"
+  },
+  "14": {
+   "src/renderers/webgl-fallback/WebGLBackend.js": "53026c2f3aea72a1ca0bc8aadc490294e4f7b52f",
+   "src/renderers/webgl-fallback/utils/WebGLVertexArrayUtils.js": "46bf16396719a255c11a6a6a79d544ffa331d29c"
+  },
+  "15": {
+   "src/nodes/accessors/Batch.js": "8a58e251b83a291f45786e9c4219dfc94210d89b"
+  },
+  "16": {
+   "src/nodes/accessors/Instance.js": "2723fa918f28e286b33fdc9e4627c1d8c23b6a9c",
+   "src/renderers/common/Backend.js": "0d5986dd3d26daf1db33b388b864fc976a944327",
+   "src/renderers/common/Renderer.js": "a2b9939b71589e3b3d3f71d9f8c3f9b12a9b04df",
+   "src/renderers/webgl-fallback/WebGLBackend.js": "53026c2f3aea72a1ca0bc8aadc490294e4f7b52f",
+   "src/renderers/webgpu/WebGPUBackend.js": "e2e52ef01dd8c0ebd1c1f34d1065ef2ebfebcfaa"
+  },
+  "17": {
+   "src/renderers/common/Bindings.js": "5350ae3f3afc66d4757516ba46d1bd7bb194af9e"
+  },
+  "18": {
+   "src/renderers/webgl-fallback/utils/WebGLState.js": "915c6ceb79f274ab8d5775ba83a089acb33a21b7"
+  },
+  "03": {
+   "src/nodes/accessors/Morph.js": "e9b9319658097bf84e6cbae587a657038a9e685a"
+  },
+  "04": {
+   "src/nodes/accessors/VelocityNode.js": "515a70c0fa70b39ad599ec133c838d521a6a96a9",
+   "src/nodes/core/NodeBuilder.js": "a536db4c6da2281174e138b25d56d8393c8d9013"
+  },
+  "05": {
+   "src/materials/nodes/SpriteNodeMaterial.js": "e03f2c26cd29492c8c6729ddbcf36ffa6b63ddc0"
+  },
+  "06": {
+   "src/renderers/common/Pipelines.js": "8865c9b3e6fcd0edcef5ba6fdbb2afb86d167a4b"
+  },
+  "07": {
+   "src/nodes/accessors/Skinning.js": "437e0c02c98c3847c8fd7b0198b3fd443a6467ef"
+  },
+  "08": {
+   "src/nodes/accessors/Instance.js": "2723fa918f28e286b33fdc9e4627c1d8c23b6a9c"
+  },
+  "09": {
+   "src/renderers/common/RenderObject.js": "39f0e8aed8236aad967cc12cfdf772da12f96fab"
+  }
+ },
+ "results": {
+  "10": {
+   "r186": {
+    "webgpu": {
+     "noMRT": 0.5,
+     "velocityMRT": 0
+    },
+    "webgl2": {
+     "noMRT": 0.5,
+     "velocityMRT": 0.5
+    }
+   },
+   "dev": {
+    "webgpu": {
+     "noMRT": 0.5,
+     "velocityMRT": 0
+    },
+    "webgl2": {
+     "noMRT": 0.5,
+     "velocityMRT": 0.5
+    }
+   },
+   "all": {
+    "webgpu": {
+     "noMRT": 0.5,
+     "velocityMRT": 0.5
+    },
+    "webgl2": {
+     "noMRT": 0.5,
+     "velocityMRT": 0.5
+    }
+   },
+   "patched": {
+    "webgpu": {
+     "noMRT": 0.5,
+     "velocityMRT": 0.5
+    },
+    "webgl2": {
+     "noMRT": 0.5,
+     "velocityMRT": 0.5
+    }
+   }
+  },
+  "11": {
+   "r186": {
+    "webgpu": {
+     "storageBuffer": 8,
+     "instancedArray": 8
+    },
+    "webgl2": {
+     "storageBuffer": 1,
+     "instancedArray": 8
+    }
+   },
+   "dev": {
+    "webgpu": {
+     "storageBuffer": 8,
+     "instancedArray": 8
+    },
+    "webgl2": {
+     "storageBuffer": 1,
+     "instancedArray": 8
+    }
+   },
+   "all": {
+    "webgpu": {
+     "storageBuffer": 8,
+     "instancedArray": 8
+    },
+    "webgl2": {
+     "storageBuffer": 8,
+     "instancedArray": 8
+    }
+   },
+   "patched": {
+    "webgpu": {
+     "storageBuffer": 8,
+     "instancedArray": 8
+    },
+    "webgl2": {
+     "storageBuffer": 8,
+     "instancedArray": 8
+    }
+   }
+  },
+  "12": {
+   "r186": {
+    "webgpu": {
+     "withCount": "1 2 3 4 5 6",
+     "withoutCount": "1 2 3 4 5 6"
+    },
+    "webgl2": {
+     "withCount": "1 2 3 4 5 6",
+     "withoutCount": "0 0 0 0 0 0"
+    }
+   },
+   "dev": {
+    "webgpu": {
+     "withCount": "1 2 3 4 5 6",
+     "withoutCount": "1 2 3 4 5 6"
+    },
+    "webgl2": {
+     "withCount": "1 2 3 4 5 6",
+     "withoutCount": "0 0 0 0 0 0"
+    }
+   },
+   "all": {
+    "webgpu": {
+     "withCount": "1 2 3 4 5 6",
+     "withoutCount": "1 2 3 4 5 6"
+    },
+    "webgl2": {
+     "withCount": "1 2 3 4 5 6",
+     "withoutCount": "1 2 3 4 5 6"
+    }
+   },
+   "patched": {
+    "webgpu": {
+     "withCount": "1 2 3 4 5 6",
+     "withoutCount": "1 2 3 4 5 6"
+    },
+    "webgl2": {
+     "withCount": "1 2 3 4 5 6",
+     "withoutCount": "1 2 3 4 5 6"
+    }
+   }
+  },
+  "13": {
+   "r186": {
+    "webgpu": {
+     "relative": "16.0/12 0.0/12",
+     "absolute": "throws: Cannot read properties of undefined (reading 'reduce')",
+     "relative+mesh": "throws: Cannot set properties of null (setting '0')",
+     "absolute+mesh": "throws: Cannot set properties of null (setting '0')"
+    },
+    "webgl2": {
+     "relative": "16.0/12 0.0/12",
+     "absolute": "throws: Cannot read properties of undefined (reading 'reduce')",
+     "relative+mesh": "throws: Cannot set properties of null (setting '0')",
+     "absolute+mesh": "throws: Cannot set properties of null (setting '0')"
+    }
+   },
+   "dev": {
+    "webgpu": {
+     "relative": "16.0/12 0.0/12",
+     "absolute": "throws: Cannot read properties of undefined (reading 'reduce')",
+     "relative+mesh": "throws: Cannot set properties of null (setting '0')",
+     "absolute+mesh": "throws: Cannot set properties of null (setting '0')"
+    },
+    "webgl2": {
+     "relative": "16.0/12 0.0/12",
+     "absolute": "throws: Cannot read properties of undefined (reading 'reduce')",
+     "relative+mesh": "throws: Cannot set properties of null (setting '0')",
+     "absolute+mesh": "throws: Cannot set properties of null (setting '0')"
+    }
+   },
+   "all": {
+    "webgpu": {
+     "relative": "16.0/12 0.0/12",
+     "absolute": "16.0/12 0.0/12",
+     "relative+mesh": "16.0/12 0.0/12",
+     "absolute+mesh": "16.0/12 0.0/12"
+    },
+    "webgl2": {
+     "relative": "16.0/12 0.0/12",
+     "absolute": "16.0/12 0.0/12",
+     "relative+mesh": "16.0/12 0.0/12",
+     "absolute+mesh": "16.0/12 0.0/12"
+    }
+   },
+   "patched": {
+    "webgpu": {
+     "relative": "16.0/12 0.0/12",
+     "absolute": "16.0/12 0.0/12",
+     "relative+mesh": "16.0/12 0.0/12",
+     "absolute+mesh": "16.0/12 0.0/12"
+    },
+    "webgl2": {
+     "relative": "16.0/12 0.0/12",
+     "absolute": "16.0/12 0.0/12",
+     "relative+mesh": "16.0/12 0.0/12",
+     "absolute+mesh": "16.0/12 0.0/12"
+    }
+   }
+  },
+  "14": {
+   "r186": {
+    "webgpu": {
+     "instancedIntoPlain": "1 2 3 4 5 6",
+     "plainIntoInstanced": "1 2 3 4 5 6"
+    },
+    "webgl2": {
+     "instancedIntoPlain": "1 1 1 1 1 1",
+     "plainIntoInstanced": "1 1 1 1 1 1"
+    }
+   },
+   "dev": {
+    "webgpu": {
+     "instancedIntoPlain": "1 2 3 4 5 6",
+     "plainIntoInstanced": "1 2 3 4 5 6"
+    },
+    "webgl2": {
+     "instancedIntoPlain": "1 1 1 1 1 1",
+     "plainIntoInstanced": "1 1 1 1 1 1"
+    }
+   },
+   "all": {
+    "webgpu": {
+     "instancedIntoPlain": "1 2 3 4 5 6",
+     "plainIntoInstanced": "1 2 3 4 5 6"
+    },
+    "webgl2": {
+     "instancedIntoPlain": "1 2 3 4 5 6",
+     "plainIntoInstanced": "1 2 3 4 5 6"
+    }
+   },
+   "patched": {
+    "webgpu": {
+     "instancedIntoPlain": "1 2 3 4 5 6",
+     "plainIntoInstanced": "1 2 3 4 5 6"
+    },
+    "webgl2": {
+     "instancedIntoPlain": "1 2 3 4 5 6",
+     "plainIntoInstanced": "1 2 3 4 5 6"
+    }
+   }
+  },
+  "15": {
+   "r186": {
+    "webgpu": {
+     "plain": "5.612",
+     "atGrowth": "throws RangeError: offset is out of bounds",
+     "after": "throws RangeError: offset is out of bounds",
+     "firstFrame": "7.482"
+    },
+    "webgl2": {
+     "plain": "5.612",
+     "atGrowth": "throws RangeError: offset is out of bounds",
+     "after": "throws RangeError: offset is out of bounds",
+     "firstFrame": "7.482"
+    }
+   },
+   "dev": {
+    "webgpu": {
+     "plain": "5.612",
+     "atGrowth": "throws RangeError: offset is out of bounds",
+     "after": "throws RangeError: offset is out of bounds",
+     "firstFrame": "7.482"
+    },
+    "webgl2": {
+     "plain": "5.612",
+     "atGrowth": "throws RangeError: offset is out of bounds",
+     "after": "throws RangeError: offset is out of bounds",
+     "firstFrame": "7.482"
+    }
+   },
+   "all": {
+    "webgpu": {
+     "plain": "5.612",
+     "atGrowth": "5.612",
+     "after": "5.612",
+     "firstFrame": "0.000"
+    },
+    "webgl2": {
+     "plain": "5.612",
+     "atGrowth": "5.612",
+     "after": "5.612",
+     "firstFrame": "0.000"
+    }
+   },
+   "patched": {
+    "webgpu": {
+     "plain": "5.612",
+     "atGrowth": "5.612",
+     "after": "5.612",
+     "firstFrame": "0.000"
+    },
+    "webgl2": {
+     "plain": "5.612",
+     "atGrowth": "5.612",
+     "after": "5.612",
+     "firstFrame": "0.000"
+    }
+   }
+  },
+  "16": {
+   "r186": {
+    "webgpu": {
+     "plain": "5.612",
+     "storageCPU": "5.612",
+     "storageCompute": "1.496"
+    }
+   },
+   "dev": {
+    "webgpu": {
+     "plain": "5.612",
+     "storageCPU": "5.612",
+     "storageCompute": "1.496"
+    }
+   },
+   "all": {
+    "webgpu": {
+     "plain": "5.612",
+     "storageCPU": "5.612",
+     "storageCompute": "5.612"
+    }
+   },
+   "patched": {
+    "webgpu": {
+     "plain": "5.612",
+     "storageCPU": "5.612",
+     "storageCompute": "5.612"
+    }
+   }
+  },
+  "17": {
+   "r186": {
+    "webgpu": {
+     "wallMoved": 4,
+     "lensMoved": 0
+    },
+    "webgl2": {
+     "wallMoved": 4,
+     "lensMoved": 0
+    }
+   },
+   "dev": {
+    "webgpu": {
+     "wallMoved": 4,
+     "lensMoved": 0
+    },
+    "webgl2": {
+     "wallMoved": 4,
+     "lensMoved": 0
+    }
+   },
+   "all": {
+    "webgpu": {
+     "wallMoved": 4,
+     "lensMoved": 8
+    },
+    "webgl2": {
+     "wallMoved": 4,
+     "lensMoved": 8
+    }
+   },
+   "patched": {
+    "webgpu": {
+     "wallMoved": 4,
+     "lensMoved": 8
+    },
+    "webgl2": {
+     "wallMoved": 4,
+     "lensMoved": 8
+    }
+   }
+  },
+  "18": {
+   "r186": {
+    "webgpu": {
+     "wallMoved": 4,
+     "lensMoved": 8
+    },
+    "webgl2": {
+     "wallMoved": 4,
+     "lensMoved": 0
+    }
+   },
+   "dev": {
+    "webgpu": {
+     "wallMoved": 4,
+     "lensMoved": 8
+    },
+    "webgl2": {
+     "wallMoved": 4,
+     "lensMoved": 0
+    }
+   },
+   "all": {
+    "webgpu": {
+     "wallMoved": 4,
+     "lensMoved": 8
+    },
+    "webgl2": {
+     "wallMoved": 4,
+     "lensMoved": 8
+    }
+   },
+   "patched": {
+    "webgpu": {
+     "wallMoved": 4,
+     "lensMoved": 8
+    },
+    "webgl2": {
+     "wallMoved": 4,
+     "lensMoved": 8
+    }
+   }
+  },
+  "03": {
+   "r186": {
+    "webgpu": {
+     "plain": 5.612,
+     "morphed": 1.871
+    },
+    "webgl2": {
+     "plain": 5.612,
+     "morphed": 1.871
+    }
+   },
+   "dev": {
+    "webgpu": {
+     "plain": 5.612,
+     "morphed": 1.871
+    },
+    "webgl2": {
+     "plain": 5.612,
+     "morphed": 1.871
+    }
+   },
+   "all": {
+    "webgpu": {
+     "plain": 5.612,
+     "morphed": 5.612
+    },
+    "webgl2": {
+     "plain": 5.612,
+     "morphed": 5.612
+    }
+   },
+   "patched": {
+    "webgpu": {
+     "plain": 5.612,
+     "morphed": 5.612
+    },
+    "webgl2": {
+     "plain": 5.612,
+     "morphed": 5.612
+    }
+   }
+  },
+  "04": {
+   "r186": {
+    "webgpu": {
+     "plain": 5.612,
+     "drawn": 1.871,
+     "mrt": 5.612,
+     "mrtSameFrame": 0
+    },
+    "webgl2": {
+     "plain": 5.612,
+     "drawn": 1.871,
+     "mrt": 5.612,
+     "mrtSameFrame": 0
+    }
+   },
+   "dev": {
+    "webgpu": {
+     "plain": 5.612,
+     "drawn": 1.871,
+     "mrt": 5.612,
+     "mrtSameFrame": 0
+    },
+    "webgl2": {
+     "plain": 5.612,
+     "drawn": 1.871,
+     "mrt": 5.612,
+     "mrtSameFrame": 0
+    }
+   },
+   "all": {
+    "webgpu": {
+     "plain": 5.612,
+     "drawn": 5.612,
+     "mrt": 5.612,
+     "mrtSameFrame": 5.612
+    },
+    "webgl2": {
+     "plain": 5.612,
+     "drawn": 5.612,
+     "mrt": 5.612,
+     "mrtSameFrame": 5.612
+    }
+   },
+   "patched": {
+    "webgpu": {
+     "plain": 5.612,
+     "drawn": 5.612,
+     "mrt": 5.612,
+     "mrtSameFrame": 0
+    },
+    "webgl2": {
+     "plain": 5.612,
+     "drawn": 5.612,
+     "mrt": 5.612,
+     "mrtSameFrame": 0
+    }
+   }
+  },
+  "05": {
+   "r186": {
+    "webgpu": {
+     "offCentre": 38.5,
+     "centredAfter": 38.5,
+     "centredUnlike": 31.5
+    },
+    "webgl2": {
+     "offCentre": 38.5,
+     "centredAfter": 38.5,
+     "centredUnlike": 31.5
+    }
+   },
+   "dev": {
+    "webgpu": {
+     "offCentre": 38.5,
+     "centredAfter": 38.5,
+     "centredUnlike": 31.5
+    },
+    "webgl2": {
+     "offCentre": 38.5,
+     "centredAfter": 38.5,
+     "centredUnlike": 31.5
+    }
+   },
+   "all": {
+    "webgpu": {
+     "offCentre": 38.5,
+     "centredAfter": 31.5,
+     "centredUnlike": 31.5
+    },
+    "webgl2": {
+     "offCentre": 38.5,
+     "centredAfter": 31.5,
+     "centredUnlike": 31.5
+    }
+   },
+   "patched": {
+    "webgpu": {
+     "offCentre": 38.5,
+     "centredAfter": 31.5,
+     "centredUnlike": 31.5
+    },
+    "webgl2": {
+     "offCentre": 38.5,
+     "centredAfter": 31.5,
+     "centredUnlike": 31.5
+    }
+   }
+  },
+  "06": {
+   "r186": {
+    "webgpu": {
+     "moved": [
+      true,
+      true
+     ]
+    },
+    "webgl2": {
+     "moved": [
+      true,
+      false
+     ]
+    }
+   },
+   "dev": {
+    "webgpu": {
+     "moved": [
+      true,
+      true
+     ]
+    },
+    "webgl2": {
+     "moved": [
+      true,
+      false
+     ]
+    }
+   },
+   "all": {
+    "webgpu": {
+     "moved": [
+      true,
+      true
+     ]
+    },
+    "webgl2": {
+     "moved": [
+      true,
+      true
+     ]
+    }
+   },
+   "patched": {
+    "webgpu": {
+     "moved": [
+      true,
+      true
+     ]
+    },
+    "webgl2": {
+     "moved": [
+      true,
+      true
+     ]
+    }
+   }
+  },
+  "07": {
+   "r186": {
+    "webgpu": {
+     "plain": [
+      142,
+      142
+     ],
+     "skinned": [
+      0,
+      142
+     ],
+     "skinnedUpdated": [
+      142,
+      142
+     ],
+     "sameFrame": true
+    },
+    "webgl2": {
+     "plain": [
+      142,
+      142
+     ],
+     "skinned": [
+      0,
+      142
+     ],
+     "skinnedUpdated": [
+      142,
+      142
+     ],
+     "sameFrame": true
+    }
+   },
+   "dev": {
+    "webgpu": {
+     "plain": [
+      142,
+      142
+     ],
+     "skinned": [
+      0,
+      142
+     ],
+     "skinnedUpdated": [
+      142,
+      142
+     ],
+     "sameFrame": true
+    },
+    "webgl2": {
+     "plain": [
+      142,
+      142
+     ],
+     "skinned": [
+      0,
+      142
+     ],
+     "skinnedUpdated": [
+      142,
+      142
+     ],
+     "sameFrame": true
+    }
+   },
+   "all": {
+    "webgpu": {
+     "plain": [
+      142,
+      142
+     ],
+     "skinned": [
+      142,
+      142
+     ],
+     "skinnedUpdated": [
+      142,
+      142
+     ],
+     "sameFrame": true
+    },
+    "webgl2": {
+     "plain": [
+      142,
+      142
+     ],
+     "skinned": [
+      142,
+      142
+     ],
+     "skinnedUpdated": [
+      142,
+      142
+     ],
+     "sameFrame": true
+    }
+   },
+   "patched": {
+    "webgpu": {
+     "plain": [
+      142,
+      142
+     ],
+     "skinned": [
+      142,
+      142
+     ],
+     "skinnedUpdated": [
+      142,
+      142
+     ],
+     "sameFrame": true
+    },
+    "webgl2": {
+     "plain": [
+      142,
+      142
+     ],
+     "skinned": [
+      142,
+      142
+     ],
+     "skinnedUpdated": [
+      142,
+      142
+     ],
+     "sameFrame": true
+    }
+   }
+  },
+  "08": {
+   "r186": {
+    "webgpu": {
+     "one": [
+      142,
+      144,
+      142
+     ],
+     "many": [
+      0,
+      0,
+      142
+     ],
+     "manyDynamic": [
+      142,
+      144,
+      142
+     ],
+     "sameFrame": true
+    },
+    "webgl2": {
+     "one": [
+      142,
+      144,
+      142
+     ],
+     "many": [
+      0,
+      0,
+      142
+     ],
+     "manyDynamic": [
+      142,
+      144,
+      142
+     ],
+     "sameFrame": true
+    }
+   },
+   "dev": {
+    "webgpu": {
+     "one": [
+      142,
+      144,
+      142
+     ],
+     "many": [
+      0,
+      0,
+      142
+     ],
+     "manyDynamic": [
+      142,
+      144,
+      142
+     ],
+     "sameFrame": true
+    },
+    "webgl2": {
+     "one": [
+      142,
+      144,
+      142
+     ],
+     "many": [
+      0,
+      0,
+      142
+     ],
+     "manyDynamic": [
+      142,
+      144,
+      142
+     ],
+     "sameFrame": true
+    }
+   },
+   "all": {
+    "webgpu": {
+     "one": [
+      142,
+      144,
+      142
+     ],
+     "many": [
+      142,
+      144,
+      142
+     ],
+     "manyDynamic": [
+      142,
+      144,
+      142
+     ],
+     "sameFrame": true
+    },
+    "webgl2": {
+     "one": [
+      142,
+      144,
+      142
+     ],
+     "many": [
+      142,
+      144,
+      142
+     ],
+     "manyDynamic": [
+      142,
+      144,
+      142
+     ],
+     "sameFrame": true
+    }
+   },
+   "patched": {
+    "webgpu": {
+     "one": [
+      142,
+      144,
+      142
+     ],
+     "many": [
+      142,
+      144,
+      142
+     ],
+     "manyDynamic": [
+      142,
+      144,
+      142
+     ],
+     "sameFrame": true
+    },
+    "webgl2": {
+     "one": [
+      142,
+      144,
+      142
+     ],
+     "many": [
+      142,
+      144,
+      142
+     ],
+     "manyDynamic": [
+      142,
+      144,
+      142
+     ],
+     "sameFrame": true
+    }
+   }
+  },
+  "09": {
+   "r186": {
+    "webgpu": {
+     "grown": [
+      22.4,
+      28,
+      28,
+      28,
+      28
+     ],
+     "grownMaterialUpdated": [
+      22.4,
+      28,
+      33,
+      39,
+      44.5
+     ]
+    },
+    "webgl2": {
+     "grown": [
+      22.4,
+      28,
+      28,
+      28,
+      28
+     ],
+     "grownMaterialUpdated": [
+      22.4,
+      28,
+      33,
+      39,
+      44.5
+     ]
+    }
+   },
+   "dev": {
+    "webgpu": {
+     "grown": [
+      22.4,
+      28,
+      28,
+      28,
+      28
+     ],
+     "grownMaterialUpdated": [
+      22.4,
+      28,
+      33,
+      39,
+      44.5
+     ]
+    },
+    "webgl2": {
+     "grown": [
+      22.4,
+      28,
+      28,
+      28,
+      28
+     ],
+     "grownMaterialUpdated": [
+      22.4,
+      28,
+      33,
+      39,
+      44.5
+     ]
+    }
+   },
+   "all": {
+    "webgpu": {
+     "grown": [
+      22.4,
+      28,
+      33,
+      39,
+      44.5
+     ],
+     "grownMaterialUpdated": [
+      22.4,
+      28,
+      33,
+      39,
+      44.5
+     ]
+    },
+    "webgl2": {
+     "grown": [
+      22.4,
+      28,
+      33,
+      39,
+      44.5
+     ],
+     "grownMaterialUpdated": [
+      22.4,
+      28,
+      33,
+      39,
+      44.5
+     ]
+    }
+   },
+   "patched": {
+    "webgpu": {
+     "grown": [
+      22.4,
+      28,
+      33,
+      39,
+      44.5
+     ],
+     "grownMaterialUpdated": [
+      22.4,
+      28,
+      33,
+      39,
+      44.5
+     ]
+    },
+    "webgl2": {
+     "grown": [
+      22.4,
+      28,
+      33,
+      39,
+      44.5
+     ],
+     "grownMaterialUpdated": [
+      22.4,
+      28,
+      33,
+      39,
+      44.5
+     ]
+    }
+   }
+  }
+ }
+}

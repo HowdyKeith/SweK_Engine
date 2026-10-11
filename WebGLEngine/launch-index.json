@@ -2708,6 +2708,14 @@
   },
   {
    "kind": "page",
+   "id": "race-lockstep.html",
+   "display": "Race Lockstep",
+   "href": "/race-lockstep.html",
+   "section": "Racing City",
+   "collision": false
+  },
+  {
+   "kind": "page",
    "id": "race-replay.html",
    "display": "Race Replay",
    "href": "/race-replay.html",

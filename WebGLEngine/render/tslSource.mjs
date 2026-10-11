@@ -997,7 +997,9 @@ const GLSL_UNIFORM_BLOCK = /uniform (?:fragment_object|object) \{([\s\S]*?)\};/;
 /** three's NodeBuilderState for one mesh: the whole of what getShaderAsync keeps two strings out of. */
 export async function nodeBuilderStateFor(renderer, { scene, camera, mesh }) {
     await renderer.compileAsync(scene, camera);
-    const renderList = renderer._renderLists.get(scene, camera);
+    // v4805: r186's render lists are keyed by the renderer's lighting too, and three's own getShaderAsync passes it -- without it the
+    // list has no lightsNode and every case read "Cannot read properties of undefined (reading 'getNode')"
+    const renderList = renderer._renderLists.get(scene, camera, renderer.lighting);
     const ctx = renderer._renderContexts.get(renderer._renderTarget, renderer._mrt);
     const material = scene.overrideMaterial || mesh.material;
     const ro = renderer._objects.get(mesh, material, scene, camera, renderList.lightsNode, ctx, ctx.clippingContext);

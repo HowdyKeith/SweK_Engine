@@ -307,7 +307,25 @@ export function buildNavmesh(hm, {
         const i = az * stride + ax, j = bz * stride + bx;
         return { f: (C.conn[i] >> d) & 1, b: (C.conn[j] >> ((d + 2) % 4)) & 1 };
     };
-    for (let i = 0; i < rects.length; i++) for (let j = i + 1; j < rects.length; j++) {
+    // *** v4824 -- THE PAIRS ARE FOUND, NOT ENUMERATED. *** This loop visited every (i, j) and kept the ones whose
+    // rectangles share an edge: v4536 measured it at 1,064 ms of a 1,152 ms build at 11,242 polygons. A pair with
+    // a non-empty shared edge always has a cell of one directly above or right of a boundary cell of the other,
+    // so an owner grid and a walk along each rectangle's top and right sides finds exactly those pairs; every
+    // pair it skips is one the old body rejected (no touch, or a corner touch with hi < lo). They are visited in
+    // the old (i, j) order, so adj -- and every portal list and path built from it -- is byte-identical.
+    const owner = new Int32Array(stride * rows).fill(-1);
+    for (let r = 0; r < rects.length; r++) {
+        const R = rects[r];
+        for (let z = R.z0; z <= R.z1; z++) owner.fill(r, z * stride + R.x0, z * stride + R.x1 + 1);
+    }
+    const near = rects.map(() => new Set());
+    const touch = (r, o) => { if (o >= 0 && o !== r) near[Math.min(r, o)].add(Math.max(r, o)); };
+    for (let r = 0; r < rects.length; r++) {
+        const R = rects[r];
+        if (R.z1 + 1 < rows) for (let x = R.x0; x <= R.x1; x++) touch(r, owner[(R.z1 + 1) * stride + x]);
+        if (R.x1 + 1 < stride) for (let z = R.z0; z <= R.z1; z++) touch(r, owner[z * stride + R.x1 + 1]);
+    }
+    for (let i = 0; i < rects.length; i++) for (const j of [...near[i]].sort((a, b) => a - b)) {
         const A = rects[i], B = rects[j];
         let axis = -1, lo = 0, hi = -1, line = 0, aFirst = false;
         if (A.z1 + 1 === B.z0 || B.z1 + 1 === A.z0) {

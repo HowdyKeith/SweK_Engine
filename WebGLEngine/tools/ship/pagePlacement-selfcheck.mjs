@@ -16,9 +16,17 @@
 // 2.00 against physics 1.000). v4778 review: the bracketed words were added to the row name because a unique token
 // seen ONCE is 8x physics, not ten (the note in section 4 says so); re-run the same way under the new name, same
 // exit=1, same 2 red, same numbers.
+//
+// v4828 SABOTAGE LOG (section 8), each applied to tools/ship/pagePlacement.mjs, this gate run, the file restored:
+//   D  readJsonOrSay leaves the regenerating command out of its message       -> 1 red (the 'names the file, size, tail, error and command' row)
+//   E  readJsonOrSay leaves the size out                                       -> 2 red (that row, and the empty-file row: "( characters")
+//   And by hand on the real tree: page-index.json cut to its first 69,905 characters. pageIndex-selfcheck, pagePlacement-selfcheck and pagePlacements-selfcheck each print a FAIL row
+//   with the cause and exit 1 (they died on a bare `at JSON.parse` before); artefactWriters-selfcheck leaves the index whole.
 "use strict";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
+import { readJsonOrSay } from "./pagePlacement.mjs";
 import { SECTIONS, MAX_PER_PANEL, UNPLACED } from "./pageSections.mjs";
 import { tokens, inventory, capacity, panelProfiles, suggestFor, suggestAll, clusters,
          SCORE_FLOOR, reportLines, ENG } from "./pagePlacement.mjs";
@@ -29,7 +37,8 @@ const report = (l, n = "") => console.log(`  ----  ${l}${n ? "   " + n : ""}`);
 
 console.log("pagePlacement-selfcheck -- the placement gap, measured, and refused where the evidence is thin\n");
 
-const inv = inventory();
+// v4828 -- an index that will not parse is a row with its cause on it (the verdict shows the last three lines of a stack, and the cause is above them)
+let inv; try { inv = inventory(); } catch (e) { console.log("  FAIL  the page inventory can be read   " + e.message); console.log("\npagePlacement-selfcheck: 1 FAILED"); process.exit(1); }
 const cap = capacity(inv);
 
 // ---------------------------------------------------------------------------
@@ -226,6 +235,20 @@ console.log("\n6. THE TOOL WRITES NOTHING, WHICH IS THE DESIGN AND NOT A LIMITAT
 console.log("\n7. THE REPORT PRINTS AND THE SPLIT HOLDS");
 ok("the reporting tool produces a report", reportLines().length > 15,
     "v3327's split: a reporting tool prints, the gate beside it is what exits nonzero");
+
+console.log("\n8. v4828 -- A GENERATED INDEX THAT DOES NOT PARSE SAYS SO");
+{
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "swek-readjson-")), good = path.join(dir, "good.json"), torn = path.join(dir, "page-index.json"), empty = path.join(dir, "empty.json");
+    try {
+        fs.writeFileSync(good, '{"pages":[1]}\n'); fs.writeFileSync(torn, '{"count":2,"pages":[{"f":"a.html"},{"f":"b.ht'); fs.writeFileSync(empty, "");
+        const say = (f) => { try { readJsonOrSay(f, "node tools/ship/buildPageIndex.mjs"); return null; } catch (e) { return e.message; } };
+        const m = say(torn), e0 = say(empty);
+        ok("a whole index is returned as it is", readJsonOrSay(good, "x").pages[0] === 1);
+        ok("!! a torn one throws a message that NAMES the file, its size, its last bytes, the parse error and the command that regenerates it (the verdict shows the last three lines of a stack; the cause was above them)",
+           !!m && /page-index\.json is not valid JSON/.test(m) && /\(45 characters/.test(m) && /b\.ht/.test(m) && /Unexpected|Expected|JSON/.test(m) && /node tools\/ship\/buildPageIndex\.mjs/.test(m), m);
+        ok("...and an EMPTY file (a truncate with nothing yet written) is the same species and says so", !!e0 && /empty\.json is not valid JSON \(0 characters/.test(e0), e0);
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+}
 
 console.log(fails ? `\npagePlacement-selfcheck: ${fails} FAILED` : "\npagePlacement-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);

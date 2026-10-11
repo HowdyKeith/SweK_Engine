@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/exitBusy-selfcheck.mjs -- v4677
 //
-// Run: node tools/ship/exitBusy-selfcheck.mjs      (~11.6s -- MEASURED at v4680 beside a running verify; ~16s before, when section 2 measured the real wiringClaims in the real tree)
+// Run: node tools/ship/exitBusy-selfcheck.mjs      (~5.5s — re-measured v4804: 5.5 s-5.9 s alone, 5.2 s the sweep's serial median; it read ~11.6s -- MEASURED at v4680 beside a running verify; ~16s before, when section 2 measured the real wiringClaims in the real tree)
 //
 // *** THE FIRST INSTRUMENT THIS ROUND BUILT MEASURED ZERO, AND THE ROW THAT SAYS SO IS THE POINT OF THIS FILE. ***
 //

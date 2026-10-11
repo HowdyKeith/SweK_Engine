@@ -1,0 +1,49 @@
+diff --git a/src/nodes/accessors/BufferAttributeNode.js b/src/nodes/accessors/BufferAttributeNode.js
+index b80504a..30d93a3 100644
+--- a/src/nodes/accessors/BufferAttributeNode.js
++++ b/src/nodes/accessors/BufferAttributeNode.js
+@@ -173,14 +173,14 @@ class BufferAttributeNode extends InputNode {
+ 
+ 			if ( bufferData === undefined ) {
+ 
+-				bufferData = {
+-					node: this
+-				};
++				bufferData = {};
+ 
+ 				builder.globalCache.setData( this.value, bufferData );
+ 
+ 			}
+ 
++			if ( bufferData.node === undefined ) bufferData.node = this;
++
+ 			id = bufferData.node.id;
+ 
+ 		} else {
+diff --git a/src/nodes/accessors/StorageBufferNode.js b/src/nodes/accessors/StorageBufferNode.js
+index e7ca04d..166446b 100644
+--- a/src/nodes/accessors/StorageBufferNode.js
++++ b/src/nodes/accessors/StorageBufferNode.js
+@@ -176,15 +176,18 @@ class StorageBufferNode extends BufferNode {
+ 
+ 			if ( bufferData === undefined ) {
+ 
+-				bufferData = {
+-					node: this
+-				};
++				bufferData = {};
+ 
+ 				builder.globalCache.setData( this.value, bufferData );
+ 
+ 			}
+ 
+-			id = bufferData.node.id;
++			// a BufferAttributeNode of the same buffer shares its hash through this entry too -- as it does on WebGL 2, where
++			// this node reads its buffer through one -- so each keeps a slot of its own, or the two nodes get one hash
++
++			if ( bufferData.storageNode === undefined ) bufferData.storageNode = this;
++
++			id = bufferData.storageNode.id;
+ 
+ 		} else {
+ 

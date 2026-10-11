@@ -10,8 +10,16 @@
 // writers, and a claim about blindness has to be SHOWN. registerResidue's own regex is re-run here over the
 // two files and returns nothing, beside a positive control where it returns the right answer -- so "blind" is
 // a reading of the same instrument rather than my description of it.
+//
+// v4828 SABOTAGE LOG (section 5b), each applied to the file named, this gate run, the file restored:
+//   A  tools/ship/buildPageIndex.mjs: the index written on every run, not only when it changed       -> 1 red (the bytes-and-mtime row)
+//   B  tools/ship/artefactWriters.mjs: idempotent() puts a torn record back (damage detection off)  -> 1 red (the torn-record row: the fixture is left cut off mid-value)
+//   C  tools/ship/artefactWriters.mjs: idempotent() puts nothing back                                -> 2 red (this gate's own v4685 row, and the 'whole record IS put back' row)
+//   NOT CAUGHT, said plainly: putting back bytes that are ALREADY identical. The fixture's regenerator rewrites the file itself, so no mtime survives to read, and a row that compared
+//   them would be asserting on the regenerator. The code does not do it; nothing here would notice if it did.
 import fs from "node:fs";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 import { ARTEFACT_TOOLS } from "./reportingTools.mjs";
 import { mutateFile, restoreMutation, armExitSweep } from "./fixtureLitter.mjs";
 import { ENGINE, SELF, writesArtefact, writers, census, idempotent, mainBlock, pagesReading, MEASURED_V3609, reportLines } from "./artefactWriters.mjs";
@@ -132,6 +140,33 @@ const SHIPPED_DETECTOR = /export const OUT\s*=\s*["']([^"']+)["']/;
        "tree cannot go stale that way -- a SWEEP declaring alwaysWrites would fail the check above");
     ok("and the flagged rows still carry --write", ARTEFACT_TOOLS.filter((t) => (t.args || []).includes("--write")).length + always.length === ARTEFACT_TOOLS.length,
        ARTEFACT_TOOLS.length + " rows, every one accounted for");
+}
+
+// ---- 5b. v4828 -- A DAMAGED RECORD IS NOT PUT BACK, AND A TOOL RUN TO MEASURE IDEMPOTENCE DOES NOT REWRITE WHAT HAS NOT CHANGED ----------------------------------
+//
+// The rig's v4826 verify (2,260 s, 66 gates cut at the 20 s cap) ended with page-index.json unparseable for the three gates that read it, having been whole at the start. This gate is
+// the one thing in the sweep that runs the page-index writer in place, twice, and then writes back "what it found" from bytes it read BEFORE -- so a torn read would have been
+// written back faithfully. Nothing in the rig's log says that happened; these rows hold the two ways it could.
+{
+    const tmp = path.join(ENGINE, "tools", "__healfixture__"), art = path.join(ENGINE, "fixture-heal.json"), rel = "tools/__healfixture__/regen.mjs";
+    fs.mkdirSync(tmp, { recursive: true });
+    try {
+        fs.writeFileSync(path.join(ENGINE, rel), 'import fs from "node:fs";\nfs.writeFileSync("fixture-heal.json", JSON.stringify({ whole: true }) + "\\n");\n');
+        fs.writeFileSync(art, '{"whole":tr');   // a record torn when this gate finds it
+        const r1 = idempotent(rel, "/fixture-heal.json"), t1 = fs.readFileSync(art, "utf8");
+        ok("!! A TORN RECORD IS NOT PUT BACK: found cut off mid-value, it is left as the regenerator wrote it (whole), and the result says it healed it", r1.ok && r1.healed === true && t1 === '{"whole":true}\n', JSON.stringify(t1));
+        fs.writeFileSync(art, '{"mine":1}\n');   // a whole record that the regenerator would change
+        const r2 = idempotent(rel, "/fixture-heal.json"), t2 = fs.readFileSync(art, "utf8");
+        ok("...while a WHOLE record the regenerator would change IS put back, as before (the v4685 rule stands)", r2.ok && r2.healed === false && t2 === '{"mine":1}\n', JSON.stringify(t2));
+        fs.rmSync(art, { force: true });
+        const r3 = idempotent(rel, "/fixture-heal.json");
+        ok("...and an artefact that did not exist is removed again after the measurement", r3.ok && !fs.existsSync(art));
+    } finally { fs.rmSync(tmp, { recursive: true, force: true }); fs.rmSync(art, { force: true }); }
+    const pi = path.join(ENGINE, "page-index.json"), b0 = fs.readFileSync(pi), m0 = fs.statSync(pi).mtimeMs;
+    try { execFileSync(process.execPath, [path.join(ENGINE, "tools", "ship", "buildPageIndex.mjs")], { cwd: ENGINE, stdio: "ignore" }); } finally { /* below */ }
+    const b1 = fs.readFileSync(pi), m1 = fs.statSync(pi).mtimeMs, same = b1.equals(b0);
+    if (!same) fs.writeFileSync(pi, b0);   // a stale index is the next row's finding; this gate does not leave the tracked file rewritten either way
+    ok("!! buildPageIndex run in place on an index that has not changed leaves its BYTES and its MTIME alone (a rewrite of identical bytes is a window a reader can fall into)", same && m1 === m0, same ? `mtime ${m0} -> ${m1}` : "the shipped page-index.json was STALE: the tool rewrote it (put back here)");
 }
 
 // ---- 6. WHAT IS NOT CLAIMED, AND THE ANTIDOTE ---------------------------------------------------------------------------

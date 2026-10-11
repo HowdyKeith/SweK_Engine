@@ -229,9 +229,13 @@ console.log("\n*** THE raw-separator SITES, RE-DERIVED -- AND THE RULE THAT DID 
                            .filter((f) => toPosix(path.relative(ENG, f)) !== HERE);
     const hits = gates.filter((f) => SITE.test(fs.readFileSync(f, "utf8")))
                       .map((f) => toPosix(path.relative(ENG, f)));
-    ok("!! *** the surviving path.join comparison sites are the 8 this record calls CORRECT ***",
-       hits.length === SEP.correct,
-       `${hits.length} site(s) today against ${SEP.correct} recorded correct, of ${SEP.found} found at v4647. ` +
+    // v4824 -- plus the sites the record has ADDED since, each named with its gate: the count must match AND every named one must be a hit,
+    // so a later site cannot be absorbed into the total without being written down. SABOTAGED, restored: the v4824 entry removed (RED: 9 vs 8).
+    const added = SEP.addedCorrect || [];
+    ok("!! *** the surviving path.join comparison sites are the 8 this record calls CORRECT, plus the ones it has added since by name ***",
+       hits.length === SEP.correct + added.length && added.every((a) => hits.includes(a.gate)),
+       `${hits.length} site(s) today against ${SEP.correct} recorded correct at v4647 plus ${added.length} added since ` +
+       `(${added.map((a) => a.at + " " + a.gate).join(", ") || "none"}), of ${SEP.found} found at v4647. ` +
        `The two defects no longer match because their expectations are posix literals now`);
     // *** WHAT THIS REGEX CANNOT SEE, FOUND BY SABOTAGING IT. *** Reverting gateSweep's EXPECTED to a
     // path.join went 0 RED, because the repair moved the expectation into a NAMED CONST and `const x =

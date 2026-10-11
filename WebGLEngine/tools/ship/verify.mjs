@@ -19,8 +19,10 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { withheldFromMirror } from "./withheld.mjs";
 import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
+import { parseOrExit } from "./cliArgs.mjs";   // v4826 -- an option this tool does not know is refused, not read past (shipVerdict forwards its argv here verbatim, so a mistyped --versoin used to verify against NO version)
 
-function arg(name) { const i = process.argv.indexOf(name); return i >= 0 ? process.argv[i + 1] : null; }
+const CLI = parseOrExit("verify", { values: { "--version": "string", "--markers": "string", "--zip": "path", "--sweep-budget": "number" }, flags: ["--skip-qa"] });
+function arg(name) { return name in CLI.values ? CLI.values[name] : null; }
 const version = arg("--version");
 const markers = (arg("--markers") || "").split(",").map(s => s.trim()).filter(Boolean);
 const zipPath = arg("--zip");
@@ -293,6 +295,27 @@ for (const [file, label] of [
     // dependency, a syntax error or a timeout all look like. NEVER RUN IS DISTINCT FROM PASS. Four sites shared
     // this shape and v2496 fixed one of them halfway.
     else check("net — " + label, false, "COULD NOT RUN: " + String(e.message).slice(0, 90));
+  }
+}
+
+// v4782 -- THE TWO ORPHAN RATCHETS, BY NAME, BECAUSE THE SWEEP COULD NOT SEE THEM. graveyard and referenceKind took
+// ~157 s and ~175 s, so the quick sweep never ran them and two merges landed over both unmeasured (v4781). They take
+// ~3 s each now (moduleRefs.basenameHits, and the directory test asked once per directory), but the sweep still picks
+// gates by the shared timing record -- whose owner may not be the box running this, and cannot be re-timed from one
+// that is not (task #87) -- so a fast gate can stay unselected for as long as that record is stale. Run here they
+// are seen every ship, whatever any record says. The exit code is the verdict, as for the lockstep gates above.
+for (const [file, label] of [
+  ["tools/ship/graveyard-selfcheck.mjs", "graveyard -- gate-only modules may not increase"],
+  ["tools/ship/referenceKind-selfcheck.mjs", "referenceKind -- no new orphan hidden by a mention"],
+]) {
+  try {
+    const { execFileSync } = await import("node:child_process");
+    execFileSync(process.execPath, [file], { encoding: "utf8", timeout: 180000 });
+    check("orphans — " + label, true, "exit 0");
+  } catch (e) {
+    const out = String(e.stdout || "");
+    const fail = (out.match(/^\s*FAIL\s.*$/m) || [""])[0].trim().slice(0, 140);
+    check("orphans — " + label, false, fail || "COULD NOT RUN: " + String(e.message).slice(0, 90));
   }
 }
 
@@ -579,7 +602,7 @@ if (zipPath) {
 // 8. QA GATE: the headless invariant suite (physics no-clip/finite/settle, shader shadows bit-identical to CPU,
 // vortex dipole) must all pass -- a regression that breaks physics or drifts a shader from its verified reference
 // cannot reach a release. Opt out only with --skip-qa (don't).
-if (process.argv.indexOf("--skip-qa") < 0) {
+if (!CLI.flags.has("--skip-qa")) {
   try {
     const { runQA } = await import("./qa-suite.mjs");
     const { results } = await runQA();
@@ -677,6 +700,21 @@ if (process.env.SWEK_QUICKSWEEP !== "0") {
         for (const l of (c.last && c.last.length ? c.last : ["(nothing on the tail: it printed nothing before the cap)"])) console.log(`[verify]      ${String(l).slice(0, 200)}`);
     }
     check("quick sweep: nothing timed out alone under the cap", r.unmeasured.length === 0, r.unmeasured.join(", ") || "");
+    // *** v4832 -- WHAT THE SWEEP DID NOT RUN IS STATED, AND A RECORDED RED IN IT FAILS THE SHIP. *** The sweep skips the gates over budget (449 at v4831) and the rotation re-times 80 a ship, so a red in that pool
+    // was visible only to whoever read the rotation's log: gfx/frontDoor-selfcheck.mjs sat red for at least three ships. tools/ship/poolWatch.mjs reads the record the sweep just wrote -- the shared one, and this
+    // box's own when it is a foreign box (quickSweep's timingsTarget) -- and prints what is in the pool; an exit the register does not name fails here, with the command that re-runs the gate alone.
+    {
+        const PW = await import("./poolWatch.mjs"), { enumerateGates } = await import("./gateSweep.mjs"), { redRegister, LOCAL_TIMINGS } = await import("./quickSweep.mjs");
+        const here = path.dirname(fileURLToPath(import.meta.url)), gatesNow = enumerateGates(path.resolve(here, "..", "..")), register = redRegister(), bad = [];
+        for (const [label, file] of [["shared record", "sweep-timings.json"], ["this box's record", path.basename(LOCAL_TIMINGS)]]) {
+            let rec = null; try { rec = JSON.parse(fs.readFileSync(path.join(here, file), "utf8")); } catch { continue; }
+            const pc = PW.census(rec, { enumerated: gatesNow, register });
+            console.log(`[verify] pool (${label}): ${PW.describe(pc)}`);
+            for (const u of pc.unregisteredRed) { console.log(`[verify]   recorded red  ${PW.advice(u)}`); bad.push(u.gate); }
+            for (const g of pc.capped.slice(0, 5)) console.log(`[verify]   capped (no verdict)  ${g}`);
+        }
+        check("quick sweep: no skipped gate carries a recorded red that no register names", bad.length === 0, bad.length ? "RECORDED RED, NOT RUN BY THIS SWEEP: " + bad.join(", ") : "none");
+    }
   } catch (e) { check("quick sweep ran", false, "COULD NOT RUN: " + String(e && e.message).slice(0, 120)); }
 }
 

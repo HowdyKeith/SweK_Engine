@@ -475,6 +475,7 @@ console.log("\n15. STEP 2: THE RIGGED .glb ITSELF, LOADED BACK INDEPENDENTLY AND
     const rev = revOf("three.core.js") || revOf("three.module.js");
     const prov = fs.existsSync(path.join(T3, "PROVENANCE.txt")) ? fs.readFileSync(path.join(T3, "PROVENANCE.txt"), "utf8") : "";
     const provRev = (/RE-VENDORED[^\n]*->\s*0\.(\d+)\.\d+/.exec(prov) || [])[1];
+    // v4807: 0.185.1 -> 0.186.1, the exporter among the seven files that changed; SABOTAGE: PROVENANCE's newest line naming 0.185.1 -> 1.
     ok("!! GLTFExporter is vendored, from the SAME three revision already in the tree",
        fs.existsSync(path.join(T3, "jsm", "exporters", "GLTFExporter.js")) && !!rev &&
        provRev === rev && /jsm\/exporters\/GLTFExporter\.js/.test(prov) &&

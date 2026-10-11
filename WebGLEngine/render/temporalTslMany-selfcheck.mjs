@@ -123,15 +123,17 @@ else {
         ok(`  [${mode}] ...and through toward stages at t = 0.3, each instance on its arc: ${row(o.towardCase)}`, same(o.towardCase));
         ok(`  [${mode}] and nothing was logged as an error while they drew: ${o.errors.length ? o.errors.join(" | ") : "none"}`, o.errors.length === 0);
         const cf = o.colourFit, co = o.colourOver;
-        ok(`  [${mode}] THREE'S OWN colour pass, three renders into one target in one browser frame, the instance at x = +1, 0, -1: with ${cf.N} instances all three are drawn (${cf.cols.slice().reverse().join(", ")} pixels); with ${co.N} the third draws the second's matrices (${co.cols.slice().reverse().join(", ")})`,
-           cf.sameFrame && co.sameFrame && cf.cols.every((c) => c > 50) && co.cols[2] > 50 && co.cols[1] > 50 && co.cols[0] === 0,
-           "past the limit three's own matrices are an interleaved attribute whose version it syncs once a browser frame for each program (OnFrameUpdate), AFTER the draw's upload check: a render uploads what the last one synced, so the second render of a frame is right and the third draws the second's matrices -- held as three's behaviour. When three changes it, this row goes red");
+        ok(`  [${mode}] THREE'S OWN colour pass, three renders into one target in one browser frame, the instance at x = +1, 0, -1: with ${cf.N} instances all three are drawn (${cf.cols.slice().reverse().join(", ")} pixels); with ${co.N} the second and third draw the first's matrices (${co.cols.slice().reverse().join(", ")}: the centre holds only the first box's spill, ${cf.cols[1] - co.cols[1]} pixels short)`,
+           cf.sameFrame && co.sameFrame && cf.cols.every((c) => c > 50) && co.cols[2] > 50 && co.cols[1] < 50 && co.cols[0] === 0,
+           "past the limit three's own matrices are an interleaved attribute. r185 synced its version once a browser frame (OnFrameUpdate), after the draw's upload check, so the second render was right and the third drew the second's matrices; r186 (v4805) syncs it before a frame's first render (OnBeforeFrameUpdate), so the second and the third draw the first's -- docs/upstream-three/dev/08's symptom, held as three's behaviour. When three changes it, this row goes red");
         ok(`  [${mode}] ...so the stage stepped three times in one browser frame follows three's matrices: its field is the separate meshes' to ${e(o.unpacedFit.w)} px at ${o.unpacedFit.N} instances, and ${o.unpacedOver.w.toFixed(2)} px off at ${o.unpacedOver.N}`,
            o.unpacedFit.w < 1e-4 && o.unpacedOver.w > 1, "graded above one browser frame a step, as an application renders");
         ok(`  [${mode}] the stage's dispose() frees the textures it made for its histories: the renderer counts ${o.textures.before} textures before the stage, ${o.textures.during} while it draws, ${o.textures.after} after`,
            o.textures.during > o.textures.before && o.textures.after === o.textures.before);
     }
 }
+// ---- v4805 SABOTAGE LOG ----------------------------------------------------------------------------------------
+// T1 the colour-pass row held to r185's symptom (the second render right, the third the second's) -> 2, both backends.
 // ---- v4772 SABOTAGE LOG ----------------------------------------------------------------------------------------
 // Against render/temporalTsl.mjs, here and in render/temporalTsl-selfcheck.mjs: M1 the previous matrices a uniform buffer again
 // -> 8, 0 (that gate draws three instances); M2 a row not a whole number of matrices wide -> 8, 0 -- and 0 here too until the

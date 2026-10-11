@@ -718,7 +718,8 @@ export function abyssSlot(rarity, voice = 0, pace = 0, drive = 0, small = 0) {
 export const MH_SLOT_SIGNAL = Object.freeze({
     still:   Object.freeze({ pace: 0.30, voice: 0.00, drive: 1.70 }),
     abyss:   Object.freeze({ pace: 0.35, voice: 0.55, drive: 1.60 }),
-    tempest: Object.freeze({ pace: 0.00, voice: 1.30 * 0.85, drive: 0.00 }),
+    // v4825 -- tempest's entry is gone: it encoded energy as 0.85 * voice, which tempest.ts never wrote. Its slot
+    // count integrates the host's tempestEnergyInt now -- see MH_MIST_LIVE.
 });
 
 /**
@@ -927,8 +928,12 @@ export const MH_SETTLED_COMET_HEAD = 0.25;
  * droplet in SUCCESS. A missing key cannot be deleted by a tidying pass the way a ternary can, and a census
  * row can ask which key is missing and why, which is what tools/ship/murmurLive-selfcheck.mjs now does.
  */
+// v4825 -- AND limn IS THE SECOND MISSING KEY. limn.ts carries its settle on the RIM line, beside the rim's own
+// (1 + 1.6 * complete) -- `rimE = ... * (1.0 + 1.6 * st.complete) * (1.0 + 0.30 * st.settled) + ringClose` -- and its
+// interior line has a complete factor (0.90) and NO settle at all. Until v4825 this port put both of the rim's
+// factors on the interior; buildLimn now spends them on its rim, and the interior line carries limn's own 0.90.
 export const MH_SETTLED_INTERIOR = Object.freeze(Object.fromEntries(
-    Object.entries(MH_SETTLED).filter(([k]) => k !== "droplet")));
+    Object.entries(MH_SETTLED).filter(([k]) => k !== "droplet" && k !== "limn")));
 
 /**
  * *** THE OTHER HALF OF THE SUCCESS FLASH: IT BRIGHTENS WHAT IS ALREADY THERE -- v4658. ***
@@ -951,7 +956,120 @@ export const MH_SETTLED_INTERIOR = Object.freeze(Object.fromEntries(
  * as "these species were considered and given nothing", which is false -- they spend their flash elsewhere.
  */
 export const MH_COMPLETE_INTERIOR = Object.freeze({
-    limn: 1.60, arc: 0.90, aura: 0.45, flux: 0.75,
+    limn: 0.90, arc: 0.90, aura: 0.45, flux: 0.75,
+});
+/**
+ * *** v4825 -- limn's ENTRY ABOVE WAS ITS RIM'S NUMBER, AND THE RIM'S NUMBERS ARE HERE NOW. *** limn.ts:
+ *
+ *     interior = acc.x * 3.00 * b.m * mh_transmit(b.fres) * (1.0 + 0.9 * st.complete);              line 173
+ *     ringClose = st.complete * band * 1.20;                                                       line 126
+ *     rimE = rimlight * arc * (1.70 + 1.15 * live.voice) * mix(1.0, 1.15, small)
+ *            * (1.0 + 1.6 * st.complete) * (1.0 + 0.30 * st.settled) + ringClose;                  lines 132-134
+ *     e = interior + rimE + sf.rim + sf.spec + sf.glow;
+ *
+ * The census rule that put 1.60 in MH_COMPLETE_INTERIOR -- "the complete factor on the line that carries the
+ * settle" -- read limn's RIM line as its interior, because the rim is the line with the settle on it. The port
+ * then folded the rim INTO the interior's density, so the interior's own line multiplied rim and interior alike
+ * by the rim's two factors and by b.m * mh_transmit, which murmur never applies to limn's rim at all. The three
+ * numbers below are the rim's; the interior's 0.90 is MH_COMPLETE_INTERIOR.limn.
+ */
+export const MH_LIMN_RIM = Object.freeze({ complete: 1.6, settled: 0.30, ringClose: 1.20 });
+
+/**
+ * *** v4825 -- opal's LIVE TERMS, ALL THREE ABSENT UNTIL NOW. *** opal.ts at 1c23b99:
+ *
+ *     drift = (0.055 + 0.075 * driftK) * (1.0 + 0.75 * live.pace + 0.95 * st.drive);            line 67
+ *     life  = mix(life, 0.30 + 0.70 * max(sin(6.2831853 * t / 5.2 - fk * 1.4), 0.0), st.drive);  line 95
+ *     c     = mix(c, c * 0.55 + vec3(0.42, -0.10, 0.18) * sin(6.2831853 * t / 5.2 - fk * 1.4), st.drive);
+ *
+ * "Responding brightens them in sequence along the procession axis" and "under drive they all lean the same way:
+ * a procession, not a swarm." The drift is a RATE spent as drift * t, so it goes through mhRatePhase -- the
+ * integrated form, which is murmur's own expression at a held signal and no teleport while one moves. The
+ * procession pulse runs at a FIXED 5.2 s period, so it is not a rate and is transcribed as written.
+ */
+/**
+ * *** v4825 -- geode's AND fathom's SPINS: A RATE MIXED BY DRIVE INTO ANOTHER RATE. *** At 1c23b99:
+ *
+ *     geode.ts:62-64   sp = 1 + 0.80 * live.pace + 1.00 * st.drive
+ *                      ay = mix(mh_drift(t, 0.088 * sp, 0.48, 2.0), t * 0.30 * sp, st.drive * 0.7)
+ *                      ax = mix(0.34 + 0.22 * sin(t * 0.041), 0.30, st.drive * 0.7)
+ *     fathom.ts:81-84  sp = 1 + 0.85 * live.pace + 1.10 * st.drive
+ *                      a1 = mix(mh_drift(t, -0.062 * sp, 0.50, 2.0), a0, st.drive * 0.7)    (a2 likewise, 0.108)
+ *
+ * Both mix two GROWING phases by drive, so murmur's spelling teleports by t * (difference) on every change of
+ * drive, and this port carried neither. The secular part integrates exactly: with A = r1 and B = m * (r0 - r1),
+ *
+ *     integral of (A + B d)(1 + kp p + kd d) dt = A t + A kp P + (A kd + B) D + B kp PD + B kd DD
+ *
+ * which needs one integral the host did not keep -- DD, drive squared (render/aiPresenceOrbState.mjs). The
+ * wobbles keep murmur's instantaneous amplitudes, weighted by the same mix. At a held signal this is murmur's
+ * own expression to the last term; it differs only while drive or pace is moving, which is where murmur's is wrong.
+ */
+/**
+ * *** v4829 -- EACH SPECIES' OWN KNOB DEFAULTS, AS murmur's styles.ts:35-52 WRITES THEM. *** The port kept ONE default per
+ * knob NAME, so every species shared spread 0.4 -- murmur gives still 0.2, droplet, comet and arc 0.3, opal 0.7, and
+ * flux, duet, prism and helix 0.6 -- and the two species that share a name (opal's and abyss's `drift`) shared a value
+ * murmur gives them separately (0.4 and 0.5). murmur's four knobs are positional (c0..c3); the keys below are the
+ * PORT's names for them in each builder (tempest's storm/churn/flicker are mist's density/fold/glint, prism's drift is
+ * swing, arc's arcLength/corePin are bow/pin, sol's coronaSize/prominence are corona/prom, aura's ribbons is ribbon,
+ * duet's separation/sizeRatio are sep/ratio, chorus's breatheDepth is breath, helix's strandGlow is strand, geode's
+ * facets/glimmer/depthCrystal are facet/glim/stone). A caller's own knobs still win -- these are defaults only.
+ */
+export const MH_STYLE_DEFAULTS = Object.freeze({
+    still:   Object.freeze({ glintRate: 0.3, clarity: 0.6, presence: 0.5, spread: 0.2 }),
+    droplet: Object.freeze({ wobble: 0.5, tension: 0.5, sheen: 0.5, spread: 0.3 }),
+    nebula:  Object.freeze({ density: 0.5, fold: 0.5, glint: 0.4, spread: 0.4 }),
+    prism:   Object.freeze({ beams: 0.4, split: 0.5, swing: 0.5, spread: 0.6 }),
+    limn:    Object.freeze({ rimWidth: 0.4, travel: 0.5, innerHint: 0.3, spread: 0.4 }),
+    duet:    Object.freeze({ sep: 0.5, orbit: 0.5, ratio: 0.5, spread: 0.6 }),
+    fathom:  Object.freeze({ layers: 0.5, parallax: 0.5, murk: 0.4, spread: 0.4 }),
+    arc:     Object.freeze({ bow: 0.5, sway: 0.5, pin: 0.5, spread: 0.3 }),
+    opal:    Object.freeze({ flashes: 0.5, drift: 0.4, softness: 0.6, spread: 0.7 }),
+    comet:   Object.freeze({ orbitTilt: 0.5, trail: 0.5, pointSize: 0.4, spread: 0.3 }),
+    flux:    Object.freeze({ stream: 0.5, bend: 0.5, height: 0.5, spread: 0.6 }),
+    tempest: Object.freeze({ density: 0.5, fold: 0.5, glint: 0.3, spread: 0.5 }),
+    helix:   Object.freeze({ turns: 0.5, rise: 0.4, strand: 0.5, spread: 0.6 }),
+    geode:   Object.freeze({ facet: 0.5, glim: 0.4, stone: 0.5, spread: 0.5 }),
+    sol:     Object.freeze({ corona: 0.5, prom: 0.5, simmer: 0.4, spread: 0.4 }),
+    abyss:   Object.freeze({ creatures: 0.4, rarity: 0.6, drift: 0.5, spread: 0.4 }),
+    chorus:  Object.freeze({ voices: 0.5, sync: 0.5, breath: 0.4, spread: 0.5 }),
+    aura:    Object.freeze({ ribbon: 0.5, swirl: 0.5, depth3d: 0.5, spread: 0.5 }),
+});
+
+export const MH_SPIN_DRIVE = Object.freeze({
+    geode:  Object.freeze({ kp: 0.80, kd: 1.00, m: 0.7, target: 0.30, axTarget: 0.30 }),
+    fathom: Object.freeze({ kp: 0.85, kd: 1.10, m: 0.7 }),
+});
+
+/**
+ * *** v4825 -- THE MIST PAIR'S LIVE TERMS, AND tempest's ENERGY WAS THE WRONG SIGNAL ALTOGETHER. *** At 1c23b99:
+ *
+ *     tempest.ts:53-54  think = (stateIndex > 1.5 && stateIndex < 2.5) ? 1.0 : 0.0;
+ *                       energy = clamp(0.85 * live.pace + 0.65 * think + 0.55 * st.drive, 0.0, 1.6);
+ *     tempest.ts:65-67  fold * (1 + 0.85 * energy);  dr = mh_drift(...) * (1 + 0.95 * energy);  adv = V * (st.drive * 0.50 * t)
+ *     tempest.ts:73-75  rate = 1 / (1 + 1.30 * energy);  slots mix(2.9, 5.2, small) * rate and mix(4.3, 7.4, small) * rate
+ *     tempest.ts:91     warp offset vec3(0, dr * 0.65, dr)
+ *     nebula.ts:66-72   fold * (1 + 0.75 * live.pace);  dr = mh_drift(...) * (1 + 0.65 * pace + 0.35 * voice + 0.90 * drive);
+ *                       adv = V * (st.drive * 0.42 * t);  warp offset vec3(0, dr * 0.70, dr)
+ *
+ * This port had tempest's energy as clamp(0.85 * live.voice, 0, 1.6) -- tempest.ts line 101's (1 + 0.85 * live.voice)
+ * read as line 54, at a time when, its own comment said, voice was the only live input the port could honour.
+ * "THINKING IS THIS SPECIES' HOME STATE" and "a storm that rises while the assistant thinks is the whole concept":
+ * the storm did not rise at all. energy is CLAMPED, so its integral is not a sum of the shared ones; the host
+ * integrates it as tempestEnergyInt (render/aiPresenceOrbState.mjs), and every rate tempest spends it on reads that.
+ * The advections are integrated too -- V * k * D, the exact continuation of V * k * drive * t -- which is what
+ * MH_DRIVE_HEADING's `wired: false` was waiting for. And the warp's dr coefficient is 0.65 for tempest, not 0.70.
+ */
+export const MH_MIST_LIVE = Object.freeze({
+    nebula:  Object.freeze({ foldPace: 0.75, drPace: 0.65, drVoice: 0.35, drDrive: 0.90, warpDr: 0.70 }),
+    tempest: Object.freeze({ ePace: 0.85, eThink: 0.65, eDrive: 0.55, eCap: 1.6, foldE: 0.85, drE: 0.95,
+                             slotE: 1.30, warpDr: 0.65 }),
+});
+
+export const MH_OPAL_DRIVE = Object.freeze({
+    pace: 0.75, drive: 0.95,
+    procPeriod: 5.2, procLag: 1.4, procFloor: 0.30, procAmp: 0.70,
+    leanKeep: 0.55, lean: Object.freeze([0.42, -0.10, 0.18]),
 });
 
 /**
@@ -979,6 +1097,40 @@ export const MH_COMPLETE_LIFT = Object.freeze({
 
 /** sol's SECOND complete, on the core's brightness rather than a figure -- sol.ts line 91. */
 export const MH_COMPLETE_SOL_CORE = 0.55;
+
+/**
+ * *** v4825 -- THE SINGLES: SEVEN FLASH FACTORS, EACH ONE LINE OF ITS OWN SPECIES' FILE, AND NONE SHARING A SHAPE. ***
+ * Read off krispuckett/murmur-web's src/shaders/<species>.ts at 1c23b99, line by line:
+ *
+ *     still.ts:80     gBright = fl.x * (0.90 + 0.95 * live.voice) * (1.0 + 0.85 * st.complete)      the glint
+ *     comet.ts:111    headBright = (1.0 + 1.30 * live.voice) * (1.0 + 2.2 * st.complete) * ...       the head
+ *     droplet.ts:156  heart = (...) * vis * (1.0 + 0.26 * st.complete)                                the heart
+ *     duet.ts:77      r = ... * (1.0 - 0.62 * st.complete)          the ONE SHRINK: success closes the pair in
+ *     duet.ts:120     flare = 1.0 + 1.15 * st.complete             on both bodies' energy
+ *     chorus.ts:66    sync = clamp(syncK * 0.75 + 0.85 * st.drive + 0.55 * st.complete, 0, 1)        alignment
+ *     prism.ts:159    beams = (e0 + e1 + e2) * bright * run * (1 + pulse) * (1.0 + 1.10 * st.complete)
+ *
+ * Each is EXACTLY a no-op at complete = 0 (a factor of 1, or an added 0), so no resting frame can move. A table
+ * and not a formula, because the backlog note that named them was right: "none of them shares a shape with
+ * another". limn's two (its ring, 1.20, and its own interior, 0.90) are NOT here: since v4825 the 0.90 is
+ * MH_COMPLETE_INTERIOR.limn and the ring is MH_LIMN_RIM.ringClose, after the rim was split from the interior.
+ */
+/**
+ * *** v4825 -- still's GLINT HAD NO VOICE, AND THE REPAIR MOVES ITS RESTING FRAME. *** still.ts:80:
+ *     gBright = fl.x * (0.90 + 0.95 * live.voice) * (1.0 + 0.85 * st.complete)
+ * This port multiplied the glint by fl.x alone, so at rest (voice 0) it was 1/0.90 of murmur's and speech never
+ * brightened it -- the one hero whose whole brief is "one slow internal glint" did not answer the voice in it.
+ */
+export const MH_STILL_GLINT = Object.freeze({ base: 0.90, voice: 0.95 });
+
+export const MH_COMPLETE_SINGLES = Object.freeze({
+    still:   Object.freeze({ glint: 0.85 }),
+    comet:   Object.freeze({ head: 2.2 }),
+    droplet: Object.freeze({ heart: 0.26 }),
+    duet:    Object.freeze({ shrink: 0.62, flare: 1.15 }),
+    chorus:  Object.freeze({ sync: 0.55 }),
+    prism:   Object.freeze({ beams: 1.10 }),
+});
 
 /**
  * The saturation itself, so the three callers share one spelling and there is a pair to grade. `over` is
@@ -1191,8 +1343,9 @@ export const MH_DRIVE_HEADING = Object.freeze({
     abyss:   Object.freeze({ v: Object.freeze([0.90, -0.22, 0.37]), k: 0.80, pre: false, wired: true }),
     sol:     Object.freeze({ v: Object.freeze([0.86, -0.32, 0.39]), k: 0.70, pre: true,  wired: true }),
     droplet: Object.freeze({ v: Object.freeze([0.92,  0.20, 0.34]), k: 0.30, pre: true,  wired: true }),
-    nebula:  Object.freeze({ v: Object.freeze([0.86,  0.24, -0.45]), k: 0.42, pre: false, wired: false }),
-    tempest: Object.freeze({ v: Object.freeze([0.88,  0.20, -0.43]), k: 0.50, pre: false, wired: false }),
+    // v4825 -- wired, INTEGRATED: V * k * driveInt, the exact continuation of murmur's V * (drive * k * t)
+    nebula:  Object.freeze({ v: Object.freeze([0.86,  0.24, -0.45]), k: 0.42, pre: false, wired: true }),
+    tempest: Object.freeze({ v: Object.freeze([0.88,  0.20, -0.43]), k: 0.50, pre: false, wired: true }),
 });
 
 /**
@@ -1319,11 +1472,11 @@ export const MH_SHAPE = Object.freeze({
  */
 export const MH_MIST = Object.freeze({
     nebula: Object.freeze({ scale: 2.20, warp: 1.30, small: 0.58, foldB: 0.30, foldK: 0.70,
-                            drB: 0.052, drK: 0.055, drLane: 2.0, dLo: -0.20, dHi: 0.30,
+                            drB: 0.052, drK: 0.055, drLane: 2.0, drWob: 0.45, dLo: -0.20, dHi: 0.30,
                             gLo: 0.30, gK: 0.95, gFar: 0.88, absorb: 3.10, emitB: 0.62, emitK: 0.85,
                             gain: 3.30, voiceE: 0.75 }),
     tempest: Object.freeze({ scale: 2.55, warp: 1.45, small: 0.55, foldB: 0.42, foldK: 0.80,
-                             drB: 0.070, drK: 0.075, drLane: 3.0, dLo: -0.12, dHi: 0.46,
+                             drB: 0.070, drK: 0.075, drLane: 3.0, drWob: 0.42, dLo: -0.12, dHi: 0.46,
                              gLo: 0.26, gK: 0.72, gFar: 0.90, absorb: 3.60, emitB: 0.58, emitK: 0.72,
                              gain: 6.20, voiceE: 0.85 }),
 });
@@ -1427,7 +1580,7 @@ export const MH_ARC = Object.freeze({
     // times the light at the same coefficient -- it stopped being a glow around a thread and became a wide
     // band with a thread inside it."
     haloK: 0.09,
-    shimCycles: 4.2, shimPace: 0.55, runFreq: 4.2, runRate: 2.4,
+    shimCycles: 4.2, shimPace: 0.55, shimDrive: 0.75, runFreq: 4.2, runRate: 2.4,   // v4829: shimDrive -- arc.ts:104
     sepIn: 0.16, sepOut: 0.44,
     medB: 0.055, medS: 0.030, medAbsorb: 2.00, medGain: 3.40,
     // THE GAIN, AND IT IS 35.0 BECAUSE A CLOSED FORM RETURNS A LENGTH. See mhTube's note: a march returns a
@@ -1521,6 +1674,8 @@ export const MH_AURA = Object.freeze({
     // raised voice and were deaf to how busy the exchange was -- on the one species whose brief is depth
     // through motion.
     rateB: 0.17, rateK: 0.24, rateVoice: 0.85, ratePace: 0.45, rateDrive: 1.05,
+    // v4829 -- aura.ts:116-126: responding pulls the tilts halfway toward a common one; the rolls do not align
+    alignK: 0.5, alignYaw: 0.30, alignTilt: 0.34,
     rateLane: Object.freeze([1.00, 0.83, 1.17]),
     driftWob: Object.freeze([0.40, 0.52, 0.34]), driftPhase: Object.freeze([0.0, 2.1, 4.3]),
     ampB: 0.098, ampK: 0.130, ampVoice: 0.55, ampSmall: 0.78,
@@ -1581,7 +1736,8 @@ export const MH_AURA = Object.freeze({
 export const MH_FLUX = Object.freeze({
     yawRate: 0.047, yawWob: 0.50, yawLane: 2.0,
     tiltB: 0.16, tiltAmp: 0.10, tiltRate: 0.033,
-    flowB: 0.26, flowK: 0.34, flowWob: 0.45, flowLane: 4.0, flowPace: 0.70,
+    flowB: 0.26, flowK: 0.34, flowWob: 0.45, flowLane: 4.0, flowPace: 0.70, flowDrive: 0.95,   // v4829 -- flux.ts:78
+    aySteer: 0.42, ayDrive: 0.6, brightDrive: 0.35,   // v4829 -- flux.ts:74 (mix(drift, 0.42, drive * 0.6)) and :87
     bendB: 0.30, bendK: 0.42, bendPace: 0.45, bendSmall: 0.50,
     wB: 0.105, wK: 0.030, wSmall: 2.00,
     // THE REACH ABOVE THE FOOT. hi runs 0.42 -> 0.88 of the body, which is what `height` buys.
@@ -1625,7 +1781,7 @@ export const MH_FLUX = Object.freeze({
 export const MH_DUET = Object.freeze({
     leanB: 0.62, leanAmp: 0.20, leanRate: 0.037,
     precRate: 0.064, precWob: 0.45, precLane: 2.0,
-    rNear: 0.30, rFar: 0.50, rSmall: 1.36,
+    rNear: 0.30, rFar: 0.50, rSmall: 1.36, sepPace: 0.14,   // v4829 -- duet.ts:76's (1 - 0.14 * live.pace)
     rateB: 0.40, rateK: 0.55, orbitWob: 0.40, orbitLane: 3.0,
     braidDrive: 0.16, braidFlourish: 0.06, braidRate: 3.0,
     wAB: 0.145, wAK: 0.030, wASmall: 1.50, ratioLo: 0.52, ratioHi: 1.0, ratioSmall: 0.65,
@@ -1682,6 +1838,10 @@ export const MH_CHORUS = Object.freeze({
     radB: 0.082, radK: 0.038, radSmall: 1.75,
     brightB: 0.70, brightK: 0.55,
     syncK: 0.75, perB: 8.4, perPace: 2.2 * 0.6,
+    // v4825 -- chorus.ts:66: sync = clamp(syncK * 0.75 + 0.85 * st.drive + 0.55 * st.complete, 0, 1). The drive
+    // term is the species' "whole gesture" -- responding pulls the seven voices most of the way into alignment --
+    // and the v4653-v4657 drive rounds wired chorus's heading, narrowing and rates without reaching this line.
+    syncDrive: 0.85,
     breatheB: 0.30, breatheK: 0.45, breatheSmall: 1.35,
     // The phase ladder sync closes: voice k sits at k * 0.897 of a full turn at sync 0, and at 0 at sync 1.
     phaseStep: 0.897,
@@ -1749,7 +1909,7 @@ export const MH_PRISM = Object.freeze({
     wGrowB: 0.040, wGrowK: 0.035,
     alphaIn: Object.freeze([0.12, 0.46]), alphaOut: Object.freeze([1.60, 2.35]),
     thirdIn: 0.30, thirdOut: 0.72,
-    brightB: 0.76, brightVoice: 0.65,
+    brightB: 0.76, brightVoice: 0.65, brightDrive: 0.55,   // v4829 -- prism.ts:96
     shimCycles: 5.4, shimK: 0.55, runFreq: 5.4, runRate: 2.6,
     pulseFrom: 2.0, pulseW: 0.28, pulseAmp: 1.05,
     scatterAmp: 0.16, beamGain: 0.95,
@@ -1812,7 +1972,8 @@ export const MH_HELIX = Object.freeze({
 
 /** tempest's lightning: the two lane seeds, their slot lengths, and the radius its depth mask kills at. */
 export const MH_TEMPEST_BOLT = Object.freeze({
-    lanes: Object.freeze([Object.freeze({ seed: 21.0, slot: 2.9 }), Object.freeze({ seed: 27.0, slot: 4.3 })]),
+    // v4825 -- slotSmall: tempest.ts:74-75 spell each slot mix(slot, slotSmall, small); this table carried the first only
+    lanes: Object.freeze([Object.freeze({ seed: 21.0, slot: 2.9, slotSmall: 5.2 }), Object.freeze({ seed: 27.0, slot: 4.3, slotSmall: 7.4 })]),
     maskIn: 0.35, maskOut: 0.62,
 });
 
@@ -2042,9 +2203,9 @@ export function mhShade(p, t, hue = 0) {
  * past the body, bottom-over-top light: limn 1.426, still 1.074, abyss 1.015. All above 1, so +y in this
  * file's body coordinates IS the image bottom and the caller passes uvY unnegated, exactly as murmur spells it.
  *
- * WHAT THIS IS NOT: mh_out. The triangular-PDF interleaved-gradient dither is still unported, so the
- * quantisation this compresses into is still the raw one. Named here rather than implied by the function's
- * name, which is why it is mhPresentFinish and not mhPresent.
+ * WHAT THIS IS NOT: mh_out, which is mhOut below (v4829) and is spent by the shader's direct path after the
+ * encode, where murmur spends it. Named here rather than implied by the function's name, which is why it is
+ * mhPresentFinish and not mhPresent.
  */
 export function mhPresentFinish(rgb, spec, contact, uvY, pal, inkLinear) {
     return mhPresentKnee(mhPresentPaper(rgb, spec, contact, uvY, pal, inkLinear), pal.paper);
@@ -2099,6 +2260,24 @@ export function mhPresentPaper(rgb, spec, contact, uvY, pal, inkLinear) {
     const kShade = Math.min(1, Math.max(0, contact * 2.60)) * (0.06 + 1.05 * below) * paper;
     const shade = [inkLinear[0] * 0.55, inkLinear[1] * 0.55, inkLinear[2] * 0.55];
     return [out[0] + (shade[0] - out[0]) * kShade, out[1] + (shade[1] - out[1]) * kShade, out[2] + (shade[2] - out[2]) * kShade];
+}
+
+/**
+ * *** mh_out -- THE LAST THING EVERY FIELD DOES, AND THE 41st OF THE KIT'S 41 FUNCTIONS (v4829). *** kit.ts:311-321:
+ * "One code value of triangular-PDF interleaved-gradient dither, in the encoded space where the quantization
+ * actually happens. Triangular rather than uniform because uniform dither leaves a faint texture of its own in
+ * flat areas; triangular does not." `pixel` is murmur's position * pixelScale -- DEVICE pixels, y down, centres
+ * at .5 -- which is WebGPU's fragment position exactly. Returns the ENCODED colour, clamped, as mh_out does.
+ * mhOutTri is the noise alone, in code values (-1..1), exported because a gate predicts bytes from it.
+ */
+export function mhOutTri(px, py) {
+    const fract = (x) => x - Math.floor(x);
+    const n = fract(52.9829189 * fract(px * 0.06711056 + py * 0.00583715));
+    return n < 0.5 ? (Math.sqrt(2.0 * n) - 1.0) : (1.0 - Math.sqrt(Math.max(0.0, 2.0 - 2.0 * n)));
+}
+export function mhOut(linearRgb, px, py) {
+    const tri = mhOutTri(px, py) / 255;
+    return linearRgb.map((c) => Math.min(1, Math.max(0, linearToSrgb(c) + tri)));
 }
 
 /** kit.ts's knee: identity below it, an asymptotic compression above, so a specular keeps its shape. */

@@ -9,7 +9,7 @@
 // nothing at all without --write.
 "use strict";
 import path from "node:path";
-import { ensureDxc, describe, DXC_FILES } from "./ensureDxc.mjs";
+import { ensureDxc, describe, DXC_FILES, DXC_REQUIRED } from "./ensureDxc.mjs";
 import { SHELL_DIR_SAMPLES } from "./playwrightResolve.mjs";
 
 let fails = 0;
@@ -71,12 +71,30 @@ console.log("\n2. THE REFUSALS, WHICH ARE WHAT KEEP THIS FROM WRITING SOMEWHERE 
     const c = mk();
     const partial = ensureDxc({ platform: "win32", shell: SHELL_BIN, write: true, ...c.inj,
                                 exists: (p) => p === SHELL_BIN || p === path.join(FULL_DIR, "dxil.dll") });
-    ok("!! CONTROL: a source bundle missing ONE of the two is refused whole -- half a toolchain is not a fix",
+    ok("!! CONTROL: a source with dxil.dll and no dxcompiler.dll is refused whole -- half a toolchain is not a fix",
        partial.ok === false && c.copies.length === 0 && /dxcompiler\.dll/.test(partial.why), describe(partial));
     const d = mk(DXC_FILES.map((f) => path.join(SHELL_DIR, f)));
     ok("!! CONTROL: a box that already has them is left alone",
        !ensureDxc({ platform: "win32", shell: SHELL_BIN, write: true, ...d.inj }).needed && d.copies.length === 0,
        "idempotent, so it can be run without thinking about it");
+}
+
+console.log("\n3. *** v4821 -- CHROME 156: THE FULL BUNDLE SHIPS dxcompiler.dll AND NO dxil.dll ***");
+{
+    // The Chrome for Testing 156.0.8078.4 layout, read from the archive's central directory. The v4646 version of
+    // this tool required both files, so on this layout it refused with "no bundle carries dxil.dll" while the rig's
+    // four PARITY_ARGS gates died on dxcompiler.dll -- the remedy the harness names could not run.
+    const set = new Set([SHELL_BIN, path.join(FULL_DIR, "dxcompiler.dll")]), copies = [];
+    const inj = { env: ENV, home: "/nohome", exists: (p) => set.has(p),
+                  readdir: (r) => (r === ROOT ? [...SHELL_DIR_SAMPLES] : (() => { throw new Error("ENOENT"); })()),
+                  copy: (a, b) => { copies.push([a, b]); set.add(b); } };
+    const run = ensureDxc({ platform: "win32", shell: SHELL_BIN, write: true, ...inj });
+    ok("!! *** it copies dxcompiler.dll ALONE, beside the binary, and calls that done ***",
+       run.ok === true && run.copied.join() === DXC_REQUIRED.join() && copies.length === 1 &&
+       path.basename(copies[0][1]) === "dxcompiler.dll" && path.dirname(copies[0][1]) === SHELL_DIR, describe(run));
+    const again = ensureDxc({ platform: "win32", shell: SHELL_BIN, write: true, ...inj });
+    ok("!! *** ...and the next run is satisfied -- the absent dxil.dll is not owed forever ***",
+       !again.needed && copies.length === 1, describe(again));
 }
 
 console.log(`\nensureDxc-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);

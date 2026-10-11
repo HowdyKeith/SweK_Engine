@@ -882,6 +882,23 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // usesOk, definesOk and nameFirst each by two; the rest hold (the gate's own drift row named exactly these four).
     // the splat-collision round -- 1929 -> 1930 for tools/ship/splatVoxelWorld-selfcheck.mjs. usesOk, definesOk and
     // nameFirst each by one; the rest hold (the gate's own drift row named exactly these four).
+    // v4779 -- 1880 -> 1881 for render/temporalTslCoverage-selfcheck.mjs -- the motion field where three draws: cut-outs, back faces, hidden, culled, grown.
+    // v4809 -- 1881 -> 1882 for render/threeWorkarounds-selfcheck.mjs -- the engine's two ways around r186's issues 17 and 18, held on both backends.
+    // v4819 -- AT THE MERGE OF THE TWO LINES, RE-DERIVED BY RUNNING census() OVER THE MERGED TREE: main's 1930 plus the
+    // exported-functions line's two gates since the v4777 split (render/temporalTslCoverage-selfcheck.mjs, render/threeWorkarounds-
+    // selfcheck.mjs) -- gates, usesOk, definesOk and nameFirst each by two; the other five rows hold (the gate's drift row named these four).
+    // the lockstep round (v4822) -- main's 1932 -> 1934 for brain/raceLockstep-selfcheck.mjs and tools/ship/lockstepRelay-selfcheck.mjs. usesOk, definesOk and
+    // nameFirst each by two; the rest hold (the gate's own drift row named exactly these four).
+    // v4824 -- 1934 -> 1935 for ui/pick-selfcheck.mjs, the npc audit's target-scoring utility held to the hand-written loop. usesOk,
+    // definesOk and nameFirst each by one; the rest hold (the gate's own drift row named exactly these four).
+    // v4826 -- 1935 -> 1937 for tools/ship/flakeProbe-selfcheck.mjs and tools/ship/stableWrite-selfcheck.mjs. usesOk, definesOk and nameFirst each by two; the rest hold
+    // (the gate's own drift row named exactly these four).
+    // v4827 -- 1937 -> 1939 for brain/roster-selfcheck.mjs and brain/racePlay-selfcheck.mjs. usesOk, definesOk and nameFirst each by two; the rest hold (the drift row named exactly these four).
+    // v4830 -- 1940 -> 1942 for brain/pilotRoster-selfcheck.mjs and brain/pilot6dofPolicy-selfcheck.mjs, over v4829's murmurParity-selfcheck.mjs (1939 -> 1940). usesOk, definesOk and nameFirst each by two; the rest hold (the drift row named exactly these four).
+    // v4831 -- 1942 -> 1944 for tools/ship/publishHygiene-selfcheck.mjs and tools/ship/brainStages-selfcheck.mjs. usesOk, definesOk and nameFirst each by two; the rest hold (the drift row named exactly these four).
+    // v4834 -- 1944 -> 1945 for tools/ship/reportFresh-selfcheck.mjs. usesOk, definesOk and nameFirst each by one; the rest hold (the drift row named exactly these four).
+    // v4835 -- 1945 -> 1946 for tools/ship/afterVerdict-selfcheck.mjs, on main. usesOk, definesOk and nameFirst each by one.
+    // v4837 -- 1946 -> 1949 for this round's tools/ship/poolWatch-selfcheck.mjs, tools/ship/sysLagReading-selfcheck.mjs and tools/ship/train6dofPilot-selfcheck.mjs (v4836 added no gate file). usesOk, definesOk and nameFirst each by three more; the rest hold (the drift row named exactly these four).
     // the denoiser arc, round 1 -- 1930 -> 1931 for brain/conv2d-selfcheck.mjs. usesOk, definesOk and nameFirst each by
     // one; the rest hold (the gate's own drift row named exactly these four).
     // the denoiser arc, round 2 -- 1931 -> 1937 for the six gates of render/denoiseScenes, denoiseFilter, denoiseStats,
@@ -898,8 +915,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // each by one; the rest hold (the gate's own drift row named exactly these four).
     // the denoiser arc, round 12 again -- 1942 -> 1943 for render/denoiseTiming-selfcheck.mjs, the rig's timing; the same four.
     // the denoiser arc, round 14 -- 1943 -> 1944 for render/denoiseCompile-selfcheck.mjs, where the native time goes; the same four.
-    gates: 1944, usesOk: 1923, definesOk: 1915, importsOk: 0,
-    distinctDefinitions: 42, nameFirst: 1815, condFirst: 97, unknownSignature: 11,
+    // v4838 -- THE DENOISER ARC'S MERGE: main's 1949 plus the arc's fourteen gates since the v4818 split, RE-DERIVED BY RUNNING census() OVER THE MERGED TREE:
+    // gates, usesOk, definesOk and nameFirst each by fourteen (1949 -> 1963, 1928 -> 1942, 1920 -> 1934, 1820 -> 1834); the other rows hold.
+    gates: 1963, usesOk: 1942, definesOk: 1934, importsOk: 0,
+    distinctDefinitions: 42, nameFirst: 1834, condFirst: 97, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

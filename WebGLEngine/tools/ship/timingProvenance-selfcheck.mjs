@@ -401,7 +401,7 @@ console.log("\n7. THE SKIP GUARD PROTECTS THE WRITER AND NOT THE RECORD");
 // ---------------------------------------------------------------------------
 console.log("\n8. TWO FILTERS, ONE OF WHICH WRITES");
 {
-    const affectedRefuses = /if \(process\.argv\.includes\("--affected"\)\) return;/.test(SELFCHECKS);
+    const affectedRefuses = /if \((?:process\.argv\.includes\("--affected"\)|CLI\.flags\.has\("--affected"\))\) return;/.test(SELFCHECKS);   // v4826: selfchecks.mjs parses its argv once (cliArgs) and reads the flag from CLI
     const budgetFilters = /--budget: running " \+ toRun\.length/.test(SELFCHECKS);
     ok("*** --affected writes nothing and --budget writes freely, though both are filters ***",
         affectedRefuses && budgetFilters,

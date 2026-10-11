@@ -73,12 +73,22 @@ try {
         "git", ["show", PRE_REF], { cwd: ENG, encoding: "utf8", maxBuffer: 64 << 20 });
 } catch (e) { preWhy = String(e.message).slice(0, 160); }
 
-const TMP = path.join(ENG, ".fsrclocks-pre.html");
-if (preSrc) fs.writeFileSync(TMP, preSrc);
+// v4824 -- THE PRE-CHANGE PAGE GOES IN A DOT-PREFIXED SCRATCH DIRECTORY, NOT BESIDE THE PAGES. It was written as
+// .fsrclocks-pre.html in the engine root and removed in a `finally`; the rig's v4823 verify killed this gate at the
+// 20 s cap, the `finally` never ran, and pageReach, pageIndex, launchIndex and shipRitual went red on a page in no
+// commit. Tree walkers skip dot-directories and gateSweep's TRANSIENT_DIRS reclaims this prefix at verify's
+// pre-flight -- the convention aiPresenceOrbPresent, ffmpegWasmBridge and unboundBuiltin already follow. The page
+// moves one directory down, so a <base href="/"> keeps every relative URL resolving where it did.
+// SABOTAGED at v4824, restored: the <base> dropped -- RED BY NAME, "the page at startFrame 0 reproduces the pre-change
+// page EXACTLY", because the old page's relative imports then resolve inside the scratch directory and it never runs.
+const TMPDIR = fs.mkdtempSync(path.join(ENG, ".fsrclocks-"));
+const TMP = path.join(TMPDIR, "pre.html");
+const PRE_URL = "/" + path.basename(TMPDIR) + "/pre.html";
+if (preSrc) fs.writeFileSync(TMP, /<head[^>]*>/i.test(preSrc) ? preSrc.replace(/<head[^>]*>/i, (h) => h + '<base href="/">') : '<base href="/">' + preSrc);
 try {
 
 const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 1800000,
-  args: { K, AGES, UPTO, PRE_UPTO, hasPre: !!preSrc }, script: `async (a) => {
+  args: { K, AGES, UPTO, PRE_UPTO, PRE_URL, hasPre: !!preSrc }, script: `async (a) => {
     const drive = async (page, startFrame, upto) => {
         const ifr = document.createElement("iframe");
         ifr.style.width = "1200px"; ifr.style.height = "900px"; ifr.src = page;
@@ -129,7 +139,7 @@ const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 1800000,
         return { rows, startSeen };
     };
     const A = await drive("/fsr.html", 0, a.UPTO);
-    const B = a.hasPre ? await drive("/.fsrclocks-pre.html", null, a.PRE_UPTO) : null;
+    const B = a.hasPre ? await drive(a.PRE_URL, null, a.PRE_UPTO) : null;
     const C = await drive("/fsr.html", a.K, a.AGES);
     return { A, B, C };
 }` });
@@ -228,7 +238,7 @@ if (!r.ok) {
        "the depths the crossover counts are jitter-free by design.");
 }
 
-} finally { try { fs.unlinkSync(TMP); } catch {} }
+} finally { try { fs.rmSync(TMPDIR, { recursive: true, force: true }); } catch {} }
 }
 
 REPORT.write();

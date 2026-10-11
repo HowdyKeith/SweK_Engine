@@ -1,6 +1,6 @@
 {
  "gate": "tools/ship/murmurGesture-selfcheck.mjs",
- "at": "2026-10-02",
+ "at": "2026-10-11",
  "tables": [
   {
    "title": "gesture slots: murmur against the repair",
@@ -19,13 +19,13 @@
     [
      "tempest",
      1673,
-     16,
-     21,
-     0.9950179439614929,
-     1,
+     24,
+     41,
+     0.9911164764850225,
+     0,
      0,
      1,
-     0.03991768024239065
+     0.425467775717467
     ],
     [
      "abyss",

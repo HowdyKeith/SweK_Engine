@@ -58,12 +58,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { SOURCES } from "./fireColour.mjs";
+import { SOURCE_EXT } from "../tools/ship/moduleRefs.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 /** Directories a colour census has no business walking. vendor is somebody else's palette. */
 const SKIP = new Set(["node_modules", ".git", "vendor", "GPU_Assets"]);
-const CODE = /\.(js|mjs|html)$/;
+const CODE = SOURCE_EXT;
 
 export function walk(dir = ENG, out = []) {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {

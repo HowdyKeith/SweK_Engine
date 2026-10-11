@@ -32,7 +32,14 @@ console.log("\n1. THE VENDORED BUILD: the vendored WebGPU build and TSL, beside 
     const rev = (webgpu.match(/REVISION = '(\d+)'/) || webgpu.match(/const REVISION = '(\d+)'/) || [null, null])[1] || (fs.readFileSync(path.join(V, "three.core.js"), "utf8").match(/REVISION = '(\d+)'/) || [])[1];
     // v4556 -- re-vendored to three@0.185.1 (tools/ship/three-probe.json settled the pin question rig-side); the
     // r160 module stays for main.js and every three.js page regardless of which WebGPU build sits beside it.
-    ok(`the build is r185 (the README names 0.185.1), not r160 -- the r160 module stays for main.js and every three.js page`, rev === "185" && /0\.185\.1/.test(readme) && fs.existsSync(path.join(ENG, "vendor/three/three.module.js")), `revision ${rev}`);
+    // v4805 -- 0.185.1 -> 0.186.1; the README still tells 0.185.1's history, so it is its HEADING that must name the build
+    ok(`the build is r186 (the README's heading names 0.186.1), and the classic module stays beside it for main.js and every three.js page`, rev === "186" && /^# three\.js 0\.186\.1 /.test(readme) && fs.existsSync(path.join(ENG, "vendor/three/three.module.js")), `revision ${rev}`);
+    // v4807 -- vendor/three, the classic build main.js and every page import, moved to 0.186.1 too: the two copies of THREE never meet in
+    // one page, but a round that moves one and not the other leaves the tree on two releases, which is how 0.178 sat beside r160 for months
+    const classicRev = (fs.readFileSync(path.join(ENG, "vendor/three/three.core.js"), "utf8").match(/REVISION = '(\d+)'/) || [])[1];
+    const classicProv = fs.readFileSync(path.join(ENG, "vendor/three/PROVENANCE.txt"), "utf8");
+    ok(`the classic build (vendor/three) is the same release, revision ${classicRev}, and its PROVENANCE's newest re-vendor names 0.${rev}`,
+        classicRev === rev && (/RE-VENDORED[^\n]*->\s*0\.(\d+)\.\d+/.exec(classicProv) || [])[1] === rev, `vendor/three ${classicRev}, vendor/three-webgpu ${rev}`);
     ok("*** the ONE edit: three.tsl.js imports './three.webgpu.js' instead of the bare 'three/webgpu', and the README says so ***", /from '\.\/three\.webgpu\.js'/.test(tsl) && !/from 'three\/webgpu'/.test(tsl) && /ONE EDIT/.test(readme));
     ok("  three.webgpu.js imports its core by relative path as shipped (no edit)", /from '\.\/three\.core\.js'/.test(webgpu));
     ok("  the licence is three.js's MIT", /MIT License/.test(fs.readFileSync(path.join(V, "LICENSE"), "utf8")) && /three\.js authors/.test(fs.readFileSync(path.join(V, "LICENSE"), "utf8")));
@@ -97,7 +104,7 @@ else {
     ok("the harness ran both backends", r.ok && r.result && r.result.webgpu && r.result.webgl2 && !r.result.webgpu.error && !r.result.webgl2.error, r.ok ? JSON.stringify([r.result && r.result.webgpu && r.result.webgpu.error, r.result && r.result.webgl2 && r.result.webgl2.error]) : (r.reason || (r.pageErrors || []).join("; ")));
     if (r.ok && r.result.webgpu && r.result.webgl2) {
         const R = r.result;
-        ok(`three ${R.revision} loads with ${R.tslExports} TSL exports`, R.revision === "185" && R.tslExports > 400);
+        ok(`three ${R.revision} loads with ${R.tslExports} TSL exports`, R.revision === "186" && R.tslExports > 400);   // v4805: 186, 682 exports (185 had 638)
         // *** v4681 -- BLUE IS 0.5, AND 0.5 x 255 = 127.5 IS AN EXACT TIE. *** Float-to-UNORM8 conversion of a value
         // that is not exactly representable may return EITHER nearest integer (Vulkan, "Conversion from
         // Floating-Point to Normalized Fixed-Point"; D3D likewise allows the rounding tolerance). MEASURED: SwiftShader
@@ -134,7 +141,7 @@ else {
             const paddedAllOk = rows && rows.length === 32 && rows.every((p, y) =>
                 p[2] === rows[0][2] && tieOk(p[2]) && p[3] === 255 && (y === 0 || p[1] < rows[y - 1][1]));   // one device, one answer to the tie, on every row   // G strictly falls row over row -- a real, unbroken gradient
             const ok32 = !!c && c.errs === 0 && c.byteLen === 8064 && naiveRow0Ok && naiveRow1IsZero && paddedAllOk;
-            ok("CONTROL: three@0.185.1's WebGPU readback at 32 px (a 128-byte row, not 256-aligned) raises no error, returns a 256-byte-per-row PADDED buffer (8064 bytes, not 4096) -- a width-strided read misreads every odd row as zero, and the SAME bytes at the true stride are a perfect gradient: not corruption, a stride the naive read does not know to expect",
+            ok("CONTROL: three@0.186.1's (and 0.185.1's) WebGPU readback at 32 px (a 128-byte row, not 256-aligned) raises no error, returns a 256-byte-per-row PADDED buffer (8064 bytes, not 4096) -- a width-strided read misreads every odd row as zero, and the SAME bytes at the true stride are a perfect gradient: not corruption, a stride the naive read does not know to expect",
                 ok32, c ? `errs ${c.errs}, byteLen ${c.byteLen}; naive row0 ${c.naiveRow0 && c.naiveRow0.join(",")} row1 ${c.naiveRow1 && c.naiveRow1.join(",")}; padded rows all-ok ${paddedAllOk}` : "no control ran");
         }
     }
@@ -218,6 +225,9 @@ else {
     }
 }
 
+// v4807 SABOTAGE: vendor/three/three.core.js's REVISION 185 -> 1 (the same-release row: vendor/three 185, vendor/three-webgpu 186).
+// v4805 SABOTAGE: vendor/three-webgpu/README.md's heading naming 0.185.1 again -> 1 (the build row: the README tells 0.185.1's
+// history, so only its heading may name the build).
 // SABOTAGE LOG -- applied, gate run, exit code read, restored. MEASURED at v4319.
 //   A  select's arguments swapped (the simplex corner choice inverted) -> exit=1, 4 red: on both backends the TSL picture parts
 //      from the device pass on 768 of 4,096 pixels and from the model on the same -- noise that still looks like noise, caught

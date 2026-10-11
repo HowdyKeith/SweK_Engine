@@ -198,7 +198,13 @@ const overInSomeReading = (x) => [x.hereMs, x.recordedWas, x.overMs, x.v4476Ms, 
 // retirement path the old clause existed for is kept and sharpened: if a live CONTENDED sample says the
 // gate is under budget under load too, it is fast everywhere and falls off the roll -- which is a fact
 // about the gate rather than about which run was most recent.
+// v4782 -- THE MEDIAN OF THE RING, NOT THE LAST READING. headlessGpu's alone readings ran 2,770 / 2,722 / 11,890 /
+// 2,659 across four sweeps, and this read only the newest: the "12 OF THE 22" row was red on the record one pass
+// wrote and green on the next, nothing about any gate having changed. quickSweep keeps the last three serial
+// readings for exactly this reason (its SERIAL_RING note, v4648: "one sample was standing in for a property").
 const aloneMs = (g, F = FILE) => {
+    const ring = ((F.serialRing || {})[g] || []).filter((n) => typeof n === "number" && n > 0);
+    if (ring.length >= 2) { const a = ring.slice().sort((x, y) => x - y); return a[(a.length - 1) >> 1]; }
     const s = (F.serial || {})[g];
     if (typeof s === "number") return s;
     return (F.contended || {})[g] === false ? (F.timings || {})[g] : null;
@@ -498,7 +504,11 @@ console.log("\n7. *** THE MIRROR standingReds NEVER HAD: A ZERO IS AS OLD AS THE
     // v4529: a returnee can go back OVER on a later box (meshLine, 2,929 at v4476, 3,154 here), and the property holds the
     // same way crossBackend's did -- named, with a reason and a live reading that is genuinely over
     const stillOverNamed = (g) => {
+        // v4800: and a returnee genuinely over on the box that owned the record then (RETURNED_AT_V4800). SABOTAGES: the
+        // record not consulted -> 1 red (the first verify of the re-hosted record found it so); its reason emptied -> 1;
+        // its readings put under budget -> 1. And the share row: compared against afterPct instead -> 1.
         const row = V76.stillOver.find((x) => x.gate === g) || V29.stillOver.find((x) => x.gate === g) ||
+                    SC.RETURNED_AT_V4800.stillOver.find((x) => x.gate === g) ||      // v4800, the other line
                     SC.STILL_OVER_AT_V4813.stillOver.find((x) => x.gate === g) ||   // v4813
                     SC.STILL_OVER_AT_V4815.stillOver.find((x) => x.gate === g) ||   // v4815: the host change
                     SC.STILL_OVER_AT_V4818.stillOver.find((x) => x.gate === g);     // v4818: and back
@@ -1560,9 +1570,12 @@ console.log("\n*** v4647m -- THE VERDICT MUST NOT DEPEND ON WHICH RUN HAPPENED L
     // v4815: the same roll for the host change. SABOTAGE: headlessGpu's entry given readings none of which is over
     // (serialMs [2400, 2500, 2600], hereMs 2500, recordedWas 2900) -> 2 red by name, this row and the 12-of-22 row,
     // which consults the roll; restored md5-identical.
-    ok("!! *** the v4815 still-over roll names only returnees genuinely over on the new host, each justified live ***",
-       SC.STILL_OVER_AT_V4815.stillOver.length > 0 && SC.STILL_OVER_AT_V4815.stillOver.every((x) => justifiedOver(x)),
-       SC.STILL_OVER_AT_V4815.stillOver.map((x) => `${x.gate.split("/").pop()} alone ${aloneMs(x.gate)} ms, ` +
+    // v4829: the v4813 row's rule, for this roll too -- an entry is justified over live, OR carries `returned` and is cheap alone, in the sweep, and retired on readings under the bar.
+    // sweepBudget retired at v4829 (2,328 / 2,503 / 2,462 alone) and this row went red at step 4b because it still demanded justifiedOver of every entry.
+    // SABOTAGE v4829: sweepBudget's returned.aloneMs set to 3,500 -> this row red by name; headlessGpu's entry given readings none of which is over -> this row red; both restored.
+    ok("!! *** the v4815 still-over roll names only returnees genuinely over on the new host, each justified live -- or returned, live ***",
+       SC.STILL_OVER_AT_V4815.stillOver.length > 0 && SC.STILL_OVER_AT_V4815.stillOver.every((x) => rollEntryHolds(x)) && SC.STILL_OVER_AT_V4815.stillOver.some((x) => x.returned) && SC.STILL_OVER_AT_V4815.stillOver.some((x) => !x.returned),
+       SC.STILL_OVER_AT_V4815.stillOver.map((x) => `${x.gate.split("/").pop()} ${x.returned ? "RETURNED " + x.returned.at + ", " : ""}alone ${aloneMs(x.gate)} ms, ` +
            `${inSweep(x.gate) ? "in" : "out of"} the sweep`).join("; "));
 
     // v4818: and back. SABOTAGE: orreryEjecta's entry given readings none of which is over (serialMs [2700, 2800,

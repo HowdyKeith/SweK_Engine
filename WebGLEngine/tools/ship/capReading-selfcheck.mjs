@@ -232,15 +232,19 @@ export const LET_FINISH_V4573 = Object.freeze({
         // v4776 -- the merge's --killed rotation let two more of the seventeen finish, both faster than the table. The
         // first confirming runs read 20-30 s and corroborated nothing: two orphaned redAction-selfcheck trees were
         // loading the box to 26 on four cores. With them killed, three runs each on a quiet box:
-        Object.freeze({ gate: "tools/ship/loopTrace-selfcheck.mjs", table: 15880, now: 13503,
-            runs: Object.freeze([13690, 13736, 13585]),
-            why: "15,880 at the cap pass; 13,503 filed by the v4776 rotation; 13,585-13,736 across three quiet runs, " +
-                 "median 1.4% from the filed reading. The gate got faster; the table is kept as what it cost then.",
+        // v4828 -- RE-TAKEN for both below: this round's rotation filed readings 10% and 19% above the v4776 runs (this box reads these two gates slower than the one that took them), so the runs
+        // are three fresh ones on a quiet box, each filed by `sweepRotation --gate g --cap-s 300 --write` as it was taken, and the v4776 minutes are kept as `earlierRuns`.
+        Object.freeze({ gate: "tools/ship/loopTrace-selfcheck.mjs", table: 15880, now: 15336,
+            runs: Object.freeze([15891, 15164, 15336]),
+            earlierRuns: Object.freeze([Object.freeze([13690, 13736, 13585])]),
+            why: "15,880 at the cap pass; 13,503 filed by the v4776 rotation (13,585-13,736 across three quiet runs); 15,164-15,891 across three quiet runs at v4828, the alone reading filed 15,336 -- " +
+                 "the median. The same gate, the same cost to within the box: 13.6 s on one machine and 15.3 s on another is noise in the table, not drift in the gate.",
         }),
-        Object.freeze({ gate: "physics/render/transmission-selfcheck.mjs", table: 21060, now: 18797,
-            runs: Object.freeze([18214, 18848, 18115]),
-            why: "21,060 at the cap pass; 18,797 filed by the v4776 rotation; 18,115-18,848 across three quiet runs, " +
-                 "median 3.1% from the filed reading. Moved, confirmed, and the historical number kept.",
+        Object.freeze({ gate: "physics/render/transmission-selfcheck.mjs", table: 21060, now: 20105,
+            runs: Object.freeze([20905, 19161, 20105]),
+            earlierRuns: Object.freeze([Object.freeze([18214, 18848, 18115])]),
+            why: "21,060 at the cap pass; 18,797 filed by the v4776 rotation (18,115-18,848 across three quiet runs); 19,161-20,905 across three quiet runs at v4828, the alone reading filed 20,105 -- " +
+                 "the median. Moved with the box, confirmed, and the historical number kept.",
         }),
     ]);
     // A roll entry earns its exemption only if its own runs corroborate the FILED reading -- otherwise

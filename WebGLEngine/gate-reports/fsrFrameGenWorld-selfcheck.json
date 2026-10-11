@@ -1,6 +1,6 @@
 {
  "gate": "fx/fsr/fsrFrameGenWorld-selfcheck.mjs",
- "at": "2026-10-02",
+ "at": "2026-10-11",
  "tables": [
   {
    "title": "a still surface judged on screen against in the world",
@@ -28,15 +28,15 @@
     ],
     [
      "shadowTexturedPan",
-     36.29249561622072,
-     38.659265566202365,
+     36.69089133290299,
+     39.10675711602949,
      15570,
      16384
     ],
     [
      "shadowPlainPan",
-     34.20568676923795,
-     34.6731001263234,
+     34.39153673599915,
+     34.96825322292489,
      15570,
      16384
     ],

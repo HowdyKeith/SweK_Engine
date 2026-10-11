@@ -112,6 +112,12 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
     // MAX_TEXTURE_SIZE WebGL2 allows -- read by the instance's index as the batch's are; filled in update(), before the draw's
     // textures are uploaded. Every InstancedMesh is drawn by a program of its own (three keys it by the mesh's uuid), so the
     // texture built into it is the mesh's.
+    // v4805: *** r186 FIXED THREE'S OWN PREVIOUS INSTANCE MATRIX AND A BATCH'S positionPrevious (#34100, #34101, #34107) -- AND THESE
+    // RECORDS STAY. *** three builds them only where needsPreviousData() -- a velocity MRT, or an object its own VelocityNode marked --
+    // and this pass is neither: an override material, docs/upstream-three/dev/04's path. Measured on r186 with three's positionPrevious
+    // in place of these records on the plain paths (no toward, no compute, no per-instance morph): a batch 32.7 px off, the r185 error
+    // to the tenth, and instances 40.8 px at 1024 and past it (render/temporalTslZoo-selfcheck.mjs, temporalTslMany-selfcheck.mjs).
+    // And toward, compute-written matrices and per-instance morphs need them whatever three keeps.
     // every texture the node makes -- instances', batches' and morph targets' -- freed by disposeHistory() with the stage
     const made = new Set(), keep = (tex) => { made.add(tex); return tex; };
     const instances = new WeakMap(), MATS_A_ROW = 512;
@@ -128,7 +134,13 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
         const w = TSL.int(TSL.textureSize(TSL.textureLoad(tex), 0).x), j = TSL.int(i).mul(4), x = j.mod(w), y = j.div(w);
         return TSL.mat4(TSL.textureLoad(tex, TSL.ivec2(x, y)), TSL.textureLoad(tex, TSL.ivec2(x.add(1), y)), TSL.textureLoad(tex, TSL.ivec2(x.add(2), y)), TSL.textureLoad(tex, TSL.ivec2(x.add(3), y)));
     };
-    const instanceBefore = (object) => matrixIn(instanceRecord(object).tex, TSL.instanceIndex);
+    // v4783: *** MATRICES A COMPUTE PASS WRITES ARE NOT IN THE ARRAY THIS KEEPS. *** A StorageInstancedBufferAttribute that a
+    // kernel fills on the GPU leaves instanceMatrix.array where the application last set it on the CPU, so the record above
+    // kept the first matrices for ever: 7.48 px wrong on boxes a kernel moved. Their previous matrices have to be kept on the
+    // GPU, before the pass that moves them -- mesh.userData.previousInstanceMatrix, a storage node of the same count and mat4
+    // type (makePreviousCopy(THREE, TSL, storage(attr, "mat4", n), n, "mat4") keeps one), read here by the instance's index.
+    const gpuBefore = (object) => { const u = object.userData && object.userData.previousInstanceMatrix; return u && u.isNode ? u : null; };
+    const instanceBefore = (object) => { const g = gpuBefore(object); return g ? g.element(TSL.instanceIndex) : matrixIn(instanceRecord(object).tex, TSL.instanceIndex); };
     // under `toward`, each instance's previous matrix is ITS pose at t between its last draw and this one, as the mesh's is
     const ia = toward ? new THREE.Matrix4() : null, ib = toward ? new THREE.Matrix4() : null, it = toward ? new THREE.Matrix4() : null;
     const instancesBefore = (object, r) => {
@@ -147,7 +159,6 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
         if (!r) { const last = Float32Array.from(src.image.data), cur = Float32Array.from(last);
             const tex = keep(new THREE.DataTexture(cur, src.image.width, src.image.height, THREE.RGBAFormat, THREE.FloatType)); tex.needsUpdate = true;
             r = { src, last, cur, tex }; batches.set(object, r); }
-        else if (r.src !== src) throw new Error(`render/temporalTsl: ${object.name ? JSON.stringify(object.name) : "a BatchedMesh"} re-made its matrices texture (its instance count grew past it) -- the stage's history of it is at the old size; make a new stage`);
         return r;
     };
     const batchBefore = (object, r) => {
@@ -240,8 +251,17 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
             r = { n, last, cur, frame: -1 }; skins.set(sk, r); }
         return r;
     };
+    // v4785: three keeps a geometry's targets as the layers of one array texture, and a renderer allows so many layers --
+    // 256 and 2048 on this adapter's WebGPU and WebGL2. Past that WebGPU draws nothing, and WebGL2 draws the mesh UNMORPHED
+    // without a word; a field carrying the morph would then describe a surface nobody drew. So past the renderer's own limit,
+    // read from it at the first build, the stage morphs nothing either.
+    let maxLayers = Infinity;
+    const layerLimit = (renderer) => { const b = renderer && renderer.backend;
+        if (b && b.gl && typeof b.gl.getParameter === "function") return b.gl.getParameter(b.gl.MAX_ARRAY_TEXTURE_LAYERS);
+        if (b && b.device && b.device.limits) return b.device.limits.maxTextureArrayLayers;
+        return Infinity; };
     const hasMorph = (object) => !!(object && object.geometry && object.geometry.morphAttributes && object.geometry.morphAttributes.position &&
-        object.geometry.morphAttributes.position.length > 0 && object.morphTargetInfluences);
+        object.geometry.morphAttributes.position.length > 0 && object.morphTargetInfluences && object.geometry.morphAttributes.position.length <= maxLayers);
     const morphRecord = (object) => {
         let r = morphs.get(object);
         // the influences as vec4s, each in .x: a uniform array's elements must be 16 bytes apart, and an array of f32 is not
@@ -278,14 +298,55 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
         for (let i = 0; i < r.n; i++) r.cur[i * 4] = toward ? r.last[i] + toward.t * (object.morphTargetInfluences[i] - r.last[i]) : r.last[i];
     };
     // the geometry's point as it was: morphed by the previous influences, then skinned by the previous bone matrices
+    // v4785: *** A LOOP IN THE SHADER, NOT ONE UNROLLED IN JAVASCRIPT. *** The sum over targets was written out a target at a
+    // time, one texture read each, and past a few hundred targets the vertex stage did not survive it: the field read NO
+    // motion -- WebGPU from 150 targets, WebGL2 from 256, where three itself morphs to 256 and 2048 on this adapter. As a TSL
+    // Loop it is one read in a loop whatever the count (render/temporalTslMeshes-selfcheck.mjs, section 3).
+    const sumTargets = (tex, W, count, n, weight) => {
+        const acc = TSL.vec3(0.0).toVar(), sum = TSL.float(0.0).toVar();
+        TSL.Loop(n, ({ i }) => {
+            const w = weight(i), idx = TSL.int(TSL.vertexIndex).add(TSL.int(i).mul(count));
+            acc.addAssign(TSL.textureLoad(tex, TSL.ivec2(idx.mod(W), idx.div(W))).xyz.mul(w)); sum.addAssign(w);
+        });
+        return { acc, sum };
+    };
     const morphedBefore = (object, pos) => {
         const g = object.geometry, r = morphRecord(object), { tex, W, count, n } = morphTargets(g);
-        const at = (t) => { const idx = TSL.int(TSL.vertexIndex).add(t * count); return TSL.textureLoad(tex, TSL.ivec2(idx.mod(W), idx.div(W))).xyz; };
-        let sum = null, acc = null;
         const node = perDraw("vec4", n).node;
-        for (let t = 0; t < n; t++) { const w = node.element(t).x, term = at(t).mul(w); acc = acc ? acc.add(term) : term; sum = sum ? sum.add(w) : w; }
-        // relative targets are displacements; absolute ones are positions, the base weighted by what the influences leave
-        return g.morphTargetsRelative ? pos.add(acc) : pos.mul(TSL.float(1.0).sub(sum)).add(acc);
+        return TSL.Fn(() => {
+            const { acc, sum } = sumTargets(tex, W, count, n, (i) => node.element(i).x);
+            // relative targets are displacements; absolute ones are positions, the base weighted by what the influences leave
+            return g.morphTargetsRelative ? pos.add(acc) : pos.mul(TSL.float(1.0).sub(sum)).add(acc);
+        })();
+    };
+    // v4784: *** AN INSTANCED MESH'S MORPHS WERE NOT IN ITS PREVIOUS POINT AT ALL. *** The instanced branch took the bare
+    // geometry through the previous instance matrix, so a morphing herd read 1.39 to 1.67 px wrong. Its point as it was: the
+    // geometry morphed as three morphs it, then the previous instance matrix. Per instance -- three's own test, count > 1 and a
+    // morphTexture -- each instance's influences at the last draw, from a copy of that texture the stage keeps (row = instance,
+    // texel 1 + t = target t; texel 0, the base, three's node does not read). Otherwise the mesh's own influences, as a mesh's.
+    const instMorphs = new WeakMap();
+    const perInstanceMorph = (object) => !!(object && object.isInstancedMesh && object.count > 1 && object.morphTexture && object.geometry &&
+        object.geometry.morphAttributes && object.geometry.morphAttributes.position && object.geometry.morphAttributes.position.length > 0 &&
+        object.geometry.morphAttributes.position.length <= maxLayers);
+    const instMorphRecord = (object) => {
+        let r = instMorphs.get(object); const src = object.morphTexture;
+        if (!r || r.src !== src) { const { width: W, height: H, data } = src.image, last = Float32Array.from(data), cur = Float32Array.from(data);
+            const tex = keep(new THREE.DataTexture(cur, W, H, THREE.RedFormat, THREE.FloatType)); tex.needsUpdate = true;
+            r = { src, last, cur, tex }; instMorphs.set(object, r); }
+        return r;
+    };
+    const stepInstMorph = (object, r) => {
+        const now = r.src.image.data;
+        if (!toward) r.cur.set(r.last); else for (let i = 0; i < r.cur.length; i++) r.cur[i] = r.last[i] + toward.t * (now[i] - r.last[i]);
+        r.tex.needsUpdate = true;
+    };
+    const instanceMorphedBefore = (object, pos) => {
+        if (perInstanceMorph(object)) {
+            const g = object.geometry, r = instMorphRecord(object), { tex, W, count, n } = morphTargets(g);
+            // three multiplies by the MESH's base -- 1 for relative targets; absolute ones over per-instance influences throw in r185
+            return TSL.Fn(() => pos.add(sumTargets(tex, W, count, n, (i) => TSL.textureLoad(r.tex, TSL.ivec2(TSL.int(i).add(1), TSL.int(TSL.instanceIndex))).x).acc))();
+        }
+        return hasMorph(object) ? morphedBefore(object, pos) : pos;
     };
     const skinnedBefore = (object, pos) => {
         const m = perDraw("mat4", object.skeleton.bones.length).node, bind = bindU, bindInv = bindInvU;
@@ -293,8 +354,31 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
         const s = m.element(si.x).mul(v).mul(sw.x).add(m.element(si.y).mul(v).mul(sw.y)).add(m.element(si.z).mul(v).mul(sw.z)).add(m.element(si.w).mul(v).mul(sw.w));
         return bindInv.mul(s).xyz;
     };
+    // v4776: the objects this pass drew, so the ones it did not -- hidden, or culled -- keep their present pose (endPass)
+    const drawn = new Set();
     class MotionNode extends THREE.VelocityNode {
         constructor() { super(); this.nodeType = "vec4"; }
+        /**
+         * v4776: *** A BATCH THAT GROWS IS FOLLOWED, NOT REFUSED. *** setInstanceCount past its matrices texture re-makes it; the
+         * batch's history is made again at the new size, the last draw's matrices kept -- the layout is linear, so they are its
+         * first entries. True if it grew: the stage then has the material that draws it rebuilt, as three needs its own to be.
+         */
+        regrow(object) {
+            const r = batches.get(object); if (!r || r.src === object._matricesTexture) return false;
+            batches.delete(object); const n = batchRecord(object), k = Math.min(r.last.length, n.last.length);
+            n.last.set(r.last.subarray(0, k)); n.cur.set(n.last); n.tex.needsUpdate = true; return true;
+        }
+        /**
+         * v4776: *** AN OBJECT THE PASS DID NOT DRAW KEEPS ITS PRESENT POSE AS ITS LAST. *** Hidden, or outside the frustum, it had
+         * kept the pose it was last DRAWN at, so when it was drawn again its motion was everything since -- every frame it spent
+         * away. Now it is the last frame's, as a batch's hidden instance's already was.
+         */
+        endPass(scene) {
+            scene.traverse((o) => { if (drawn.has(o) || !(o.isMesh || o.isSprite || o.isPoints || o.isLine)) return;
+                if (o.isSkinnedMesh) o.skeleton.update();
+                o.updateMatrixWorld(); this.updateAfter({ object: o }); });
+            drawn.clear();
+        }
         /** v4761: a sprite's clip position as the stage draws it -- its sprite material's vertexNode. */
         spriteVertex() { return TSL.Fn((_, builder) => spriteClip(builder))(); }
         /** v4772: frees every texture the node made for the histories it keeps; the stage's dispose() calls it. */
@@ -305,30 +389,34 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
         }
         // per object, BEFORE it is drawn: its matrix from the last time THIS pass drew it
         update({ object, renderId }) {
+            drawn.add(object);
             let m = prev.get(object);
             if (!m) { m = object.matrixWorld.clone(); prev.set(object, m); }
             this.previousModelWorldMatrix.value.copy(toward ? poseAt(THREE, m, object.matrixWorld, toward.t, scratch) : m);
             // an instanced mesh's texture is marked for upload here, and uploaded with this draw's other bindings
-            if (object.isInstancedMesh) instancesBefore(object, instanceRecord(object));
+            if (object.isInstancedMesh && !gpuBefore(object)) instancesBefore(object, instanceRecord(object));
             if (object.isBatchedMesh) batchBefore(object, batchRecord(object));
             if (object.isSprite) { const now = object.material.rotation, was = rotations.has(object) ? rotations.get(object) : now; rotPrev.value = toward ? was + toward.t * (now - was) : was; }
             // three's renderId is its render call's -- frameId is its animation loop's, and several passes fall in one of those
             if (object.isSkinnedMesh) { const r = skinRecord(object); stepSkin(object, r, renderId); perDraw("mat4", r.n).arr.set(r.cur);
                 bindU.value.copy(object.bindMatrix); bindInvU.value.copy(object.bindMatrixInverse); }
             if (hasMorph(object)) { const r = morphRecord(object); stepMorph(object, r); perDraw("vec4", r.n).arr.set(r.cur); }
+            if (perInstanceMorph(object)) stepInstMorph(object, instMorphRecord(object));
             if (object.isSprite) centreU.value.copy(object.center);
             if (toward) towardU.value = toward.t;
         }
         updateAfter({ object }) {
             const m = prev.get(object);
             if (m) m.copy(object.matrixWorld); else prev.set(object, object.matrixWorld.clone());
-            if (object.isInstancedMesh) { const r = instanceRecord(object); r.last.set(object.instanceMatrix.array.subarray(0, r.n * 16)); }
+            if (object.isInstancedMesh && !gpuBefore(object)) { const r = instanceRecord(object); r.last.set(object.instanceMatrix.array.subarray(0, r.n * 16)); }
             if (object.isBatchedMesh) { const r = batchRecord(object); r.last.set(r.src.image.data); }
             if (object.isSprite) rotations.set(object, object.material.rotation);
             if (object.isSkinnedMesh) skinRecord(object).last.set(object.skeleton.boneMatrices);
             if (hasMorph(object)) { const r = morphRecord(object); for (let i = 0; i < r.n; i++) r.last[i] = object.morphTargetInfluences[i]; }
+            if (perInstanceMorph(object)) { const r = instMorphRecord(object); r.last.set(r.src.image.data); }
         }
         setup(builder) {
+            if (maxLayers === Infinity && builder && builder.renderer) maxLayers = layerLimit(builder.renderer);
             let cur = cameraProjectionMatrix.mul(modelViewMatrix).mul(positionLocal), was = null;
             // an instanced mesh's previous point: its geometry through ITS previous instance matrix, evaluated per vertex
             const object = builder && builder.object;
@@ -357,11 +445,11 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
                 // v4770: where the application's is a function, of the point the stage keeps -- instanced, skinned or morphed
                 const own = Array.isArray(object.material) ? null : object.material, fn = own && own.userData && typeof own.userData.previousPositionNode === "function";
                 let kept = null;
-                if (fn && object.isInstancedMesh) kept = instanceBefore(object).mul(vec4(TSL.positionGeometry, 1.0)).xyz;
+                if (fn && object.isInstancedMesh) kept = instanceBefore(object).mul(vec4(instanceMorphedBefore(object, TSL.positionGeometry), 1.0)).xyz;
                 else if (fn && (object.isSkinnedMesh || hasMorph(object))) { let q = TSL.positionGeometry; if (hasMorph(object)) q = morphedBefore(object, q); if (object.isSkinnedMesh) q = skinnedBefore(object, q); kept = q; }
                 before = TSL.varying(TSL.vec3(previousOf(own, builder.material.positionNode, kept)));
             }
-            else if (object && object.isInstancedMesh) before = TSL.varying(instanceBefore(object).mul(vec4(TSL.positionGeometry, 1.0))).xyz;
+            else if (object && object.isInstancedMesh) before = TSL.varying(instanceBefore(object).mul(vec4(instanceMorphedBefore(object, TSL.positionGeometry), 1.0))).xyz;
             else if (object && (object.isSkinnedMesh || hasMorph(object))) {
                 // v4757: the geometry's point morphed by the previous influences, then skinned by the previous bone matrices
                 let p = TSL.positionGeometry;
@@ -462,6 +550,10 @@ export function makeMotionStage(THREE, TSL, { w, h, gl, type = null, toward = fa
     // v4762: a positionNode over instancing, skinning or morphs replaces the local position the stage's histories build -- only
     // the application can say where such a point was
     const placedOver = (o) => {
+        // v4783: a toward stage interpolates each instance's pose on the arc, on the CPU; matrices kept on the GPU have no such
+        // path here, and a chord between two matrices is not a pose -- refused by name rather than drawn wrong
+        if (toward && o.isInstancedMesh && o.userData && o.userData.previousInstanceMatrix)
+            throw new Error(`render/temporalTsl: ${o.name ? JSON.stringify(o.name) : "an InstancedMesh"} keeps its previous matrices on the GPU (userData.previousInstanceMatrix), and a toward stage interpolates instance poses on the CPU -- draw it through an ordinary stage`);
         const m = o.material; if (!m || Array.isArray(m) || !m.positionNode) return;
         const p = m.userData && m.userData.previousPositionNode, name = o.name ? JSON.stringify(o.name) : "a " + o.type;
         // v4770: a function of the kept point is the stage's to apply, and it keeps no point for a batch
@@ -470,6 +562,27 @@ export function makeMotionStage(THREE, TSL, { w, h, gl, type = null, toward = fa
         if (o.isInstancedMesh || o.isSkinnedMesh || o.isBatchedMesh || (o.morphTargetInfluences && o.morphTargetInfluences.length))
             throw new Error(`render/temporalTsl: ${name}'s material sets positionNode over its ${o.isInstancedMesh ? "instances" : o.isSkinnedMesh ? "skin" : o.isBatchedMesh ? "batch" : "morphs"} -- give material.userData.previousPositionNode: the whole local position as it was, or (v4770) a function of the point as the stage keeps it`);
     };
+    // v4776: *** A MATERIAL THAT CUTS -- AN ALPHA TEST OR HASH -- DISCARDS WHAT THE COLOUR PASS DISCARDS, AND ONE THAT SHOWS ITS
+    // BACK SHOWS IT. *** The motion node as a fragmentNode skips three's diffuse setup, and with it the test: the field covered
+    // the clear half of a cut-out as well (812 pixels where three draws 406). And the override draws front faces only -- three
+    // copies a material's alpha test onto an override, not its side. Such a mesh is drawn with a material of the stage's that
+    // carries the motion node as its OUTPUT: three's diffuse setup runs first -- map, alpha map, colour, opacity, the test --
+    // and discards as the colour pass does; the side, displacement and position node are the object's
+    const cuts = (m) => !!m && !Array.isArray(m) && (m.alphaTest > 0 || !!m.alphaHash || !!(m.alphaTestNode && m.alphaTestNode.isNode));
+    const alphaFrom = (m, src) => { m.map = src.map || null; m.alphaMap = src.alphaMap || null; if (src.color && m.color) m.color.copy(src.color);
+        m.opacity = src.opacity; m.alphaTest = src.alphaTest || 0; m.alphaHash = !!src.alphaHash;
+        m.colorNode = src.colorNode || null; m.opacityNode = src.opacityNode || null; m.alphaTestNode = src.alphaTestNode || null; };
+    const ownMats = new Map();
+    const needsOwn = (m) => cuts(m) || (!!m && !Array.isArray(m) && m.side !== undefined && m.side !== THREE.FrontSide);
+    const ownMaterial = (o) => {
+        const src = o.material; let m = ownMats.get(src);
+        if (!m) { m = new THREE.MeshBasicNodeMaterial(); m.outputNode = motionNode; m.blending = THREE.NoBlending; m.transparent = false;
+            m.depthTest = true; m.depthWrite = true; m.allowOverride = false; ownMats.set(src, m); }
+        alphaFrom(m, src); m.side = src.side;
+        m.displacementMap = src.displacementMap || null; m.displacementScale = src.displacementScale ?? 1; m.displacementBias = src.displacementBias ?? 0;
+        m.positionNode = src.positionNode || null; m.userData.previousPositionNode = (src.userData && src.userData.previousPositionNode) || null;
+        return m;
+    };
     const spriteMaterial = (o) => {
         const src = o.material, name = o.name ? JSON.stringify(o.name) : "a Sprite";
         if (!src || Array.isArray(src) || !(src.isSpriteNodeMaterial || src.isSpriteMaterial))
@@ -477,8 +590,11 @@ export function makeMotionStage(THREE, TSL, { w, h, gl, type = null, toward = fa
         // v4770: a points material (sized in pixels) and a rotation node are followed now -- see pointCorner and rotWas
         let m = spriteMats.get(src);
         if (!m) { m = src.isPointsNodeMaterial ? new THREE.PointsNodeMaterial({ sizeAttenuation: src.sizeAttenuation }) : new THREE.SpriteNodeMaterial({ sizeAttenuation: src.sizeAttenuation });
-            m.fragmentNode = motionNode; m.blending = THREE.NoBlending; if (src.isPointsNodeMaterial) m.alphaToCoverage = false;
+            // v4776: a sprite that cuts carries the motion node as its output, so three's test discards what it discards
+            if (cuts(src)) m.outputNode = motionNode; else m.fragmentNode = motionNode;
+            m.blending = THREE.NoBlending; if (src.isPointsNodeMaterial) m.alphaToCoverage = false;
             m.transparent = false; m.depthTest = true; m.depthWrite = true; m.allowOverride = false; m.vertexNode = motionNode.spriteVertex(); spriteMats.set(src, m); }
+        if (cuts(src)) alphaFrom(m, src);
         m.rotation = src.rotation; m.side = src.side; m.positionNode = src.positionNode || null; m.scaleNode = src.scaleNode || null; m.rotationNode = src.rotationNode || null;
         if (src.isPointsNodeMaterial) { m.size = src.size; m.sizeNode = src.sizeNode || null; }
         m.userData.previousPositionNode = (src.userData && src.userData.previousPositionNode) || null;
@@ -512,8 +628,12 @@ export function makeMotionStage(THREE, TSL, { w, h, gl, type = null, toward = fa
             // renderer's clear colour is left as the caller set it
             const swapped = [];
             try {
-                scene.traverse((o) => { if (o.isSprite) { const m = spriteMaterial(o); swapped.push([o, o.material]); o.material = m; } else placedOver(o); });
+                scene.traverse((o) => {
+                    if (o.isBatchedMesh && motionNode.regrow(o)) override.needsUpdate = true;
+                    if (o.isSprite) { const m = spriteMaterial(o); swapped.push([o, o.material]); o.material = m; }
+                    else { placedOver(o); if (o.isMesh && needsOwn(o.material)) { const m = ownMaterial(o); swapped.push([o, o.material]); o.material = m; } } });
                 renderer.setRenderTarget(surface); await renderer.renderAsync(scene, camera);
+                motionNode.endPass(scene);
             } finally { for (const [o, m] of swapped) o.material = m; scene.overrideMaterial = prevOverride; scene.background = prevBg; }
             renderer.setRenderTarget(motion); await renderer.renderAsync(qM.scene, ortho);
             renderer.setRenderTarget(depth); await renderer.renderAsync(qD.scene, ortho);
@@ -522,7 +642,7 @@ export function makeMotionStage(THREE, TSL, { w, h, gl, type = null, toward = fa
             prevP.copy(camera.projectionMatrix); prevV.copy(camera.matrixWorldInverse);
             frames++;
         },
-        dispose() { surface.dispose(); motion.dispose(); depth.dispose(); override.dispose(); motionNode.disposeHistory(); for (const m of spriteMats.values()) m.dispose(); qM.material.dispose(); qD.material.dispose(); if (qC) { cameraT.dispose(); qC.material.dispose(); } },
+        dispose() { surface.dispose(); motion.dispose(); depth.dispose(); override.dispose(); motionNode.disposeHistory(); for (const m of spriteMats.values()) m.dispose(); for (const m of ownMats.values()) m.dispose(); qM.material.dispose(); qD.material.dispose(); if (qC) { cameraT.dispose(); qC.material.dispose(); } },
     };
 }
 

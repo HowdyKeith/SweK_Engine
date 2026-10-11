@@ -19,6 +19,24 @@
 
 import { WallFollower, dirToward } from "./wallFollow.mjs";   // v4187 -- a hand on the wall when the path is gone
 import { evaluateGuards } from "../ui/guards.mjs";
+import { defineMachine, applyEvent } from "../ui/machine.mjs";
+
+// v4824 -- THE AGGRO GATE IS A TWO-STATE MACHINE WITH HYSTERESIS, AND NOW IT IS DECLARED AS ONE. *** The v4609
+// writeup below named it the real ui/machine.mjs candidate in this file and left it hand-rolled: three writers of
+// m.aggroed in three places (the distance-and-sight test in update(), the force-wake aggro(), the wall-follower
+// giving up). They are now four named events on one declared machine, and m.aggroed stays the stored state because
+// main.js and two gates read it as a boolean. Behaviour is unchanged, transition for transition: a PROVOKE on an
+// awake monster is not handled there and leaves it awake, exactly as `m.aggroed = true` did; a GIVE_UP on a sleeping
+// one is not handled there and leaves it asleep, exactly as `m.aggroed = false` did.
+export const AGGRO_MACHINE = defineMachine({
+    initial: "asleep",
+    states: {
+        asleep: { on: { spot: "awake", provoke: "awake" }, note: "player within spec.aggro AND in sight, or forced awake (shot)" },
+        awake:  { on: { lose: "asleep", giveUp: "asleep" }, note: "player beyond spec.aggro * 1.8, or the wall-follower proved a closed loop" },
+    },
+});
+const aggroState = (m) => (m.aggroed ? "awake" : "asleep");
+function aggroEvent(m, event) { m.aggroed = applyEvent(AGGRO_MACHINE, aggroState(m), event) === "awake"; }
 
 const KINDS = {
     chaser: { aggro: 14, speed: 3.6, atkR: 1.7, dmg: 6,  cool: 0.8, flees: true },
@@ -90,7 +108,7 @@ export function makeDungeonAI(opts) {
         return true;
     }
     function canSee(id) { const m = mon.get(id); const p = getPlayer && getPlayer(); if (!m || !p) return false; return hasLOS(m.x, m.z, p.x, p.z); }
-    function aggro(id) { const m = mon.get(id); if (m) m.aggroed = true; }   // force-wake (e.g. when shot)
+    function aggro(id) { const m = mon.get(id); if (m) aggroEvent(m, "provoke"); }   // force-wake (e.g. when shot)
     function slow(id, secs) { const m = mon.get(id); if (m) m._slowT = Math.max(m._slowT || 0, secs); }   // v1428 — ice slow
 
     // v4609 -- the flee/melee/ranged-shoot/ranged-hold/chase priority chain below is migrated onto
@@ -105,7 +123,8 @@ export function makeDungeonAI(opts) {
     // take once it does, and it is itself a small history-dependent 2-state machine (asleep/awake, with
     // hysteresis — wakes at spec.aggro, sleeps at spec.aggro*1.8) rather than a fresh-every-call classification
     // — a real ui/machine.mjs candidate in its own right, flagged in this round's tools/ship/nextRounds.mjs
-    // writeup and NOT migrated here. Folding it into DUNGEON_GUARDS as a sixth "asleep" guard would have been
+    // writeup and NOT migrated here. (v4824: it is now AGGRO_MACHINE, at the top of this file -- still outside
+    // DUNGEON_GUARDS, for the reason the next sentence gives.) Folding it into DUNGEON_GUARDS as a sixth "asleep" guard would have been
     // the CSBot.js mistake in reverse: gluing a genuinely different shape onto a utility built for a different
     // one because they happen to sit next to each other in the same function.
     //
@@ -228,7 +247,7 @@ export function makeDungeonAI(opts) {
                     // Walled in on all four sides, or the follower PROVED it is going in circles -- the
                     // right-hand rule's known limit, a detached pillar. Losing the player is a better
                     // answer than orbiting a column forever.
-                    m.step = null; m.follow = null; m.aggroed = false;
+                    m.step = null; m.follow = null; aggroEvent(m, "giveUp");
                     return;
                 }
             }
@@ -284,12 +303,12 @@ export function makeDungeonAI(opts) {
             // aggro gate — wake only when the player is near AND in line-of-sight (no
             // sensing through walls); once provoked, chase around corners until they flee far.
             // v4609 -- deliberately kept OUTSIDE DUNGEON_GUARDS; see that const's own header for why.
-            if (!m.aggroed) {
-                if (dist <= m.spec.aggro && hasLOS(m.x, m.z, p.x, p.z)) m.aggroed = true;
-                else continue;
-            } else if (dist > m.spec.aggro * 1.8) {
-                m.aggroed = false; continue;
-            }
+            // v4824 -- the same two branches, as events on AGGRO_MACHINE; hasLOS is still only asked of a sleeping
+            // monster already in range, and a monster that sleeps this tick still skips the rest of it.
+            aggroEvent(m, !m.aggroed
+                ? (dist <= m.spec.aggro && hasLOS(m.x, m.z, p.x, p.z) ? "spot" : null)
+                : (dist > m.spec.aggro * 1.8 ? "lose" : null));
+            if (!m.aggroed) continue;
 
             // v4609 -- ctx for DUNGEON_GUARDS. hpf/seen/shootCool's decrement are prepared here, once, exactly
             // where the original computed them inline -- see DUNGEON_GUARDS's own header for why they moved
@@ -308,7 +327,7 @@ export function makeDungeonAI(opts) {
     // publisher can list ranged monsters in the brain roster.
     // DUNGEON_GUARDS is exposed for tools/ship/dungeonAI-selfcheck.mjs -- see the const's own header for why
     // it cannot be a module-level export the way SpaceSuit.js's ATMOSPHERE_GUARDS was.
-    const api = { add, remove, clear, update, count, aggro, slow, canSee, monsters: mon, KINDS, DUNGEON_GUARDS };
+    const api = { add, remove, clear, update, count, aggro, slow, canSee, monsters: mon, KINDS, DUNGEON_GUARDS, AGGRO_MACHINE };
     if (typeof window !== "undefined") window._dungeonAI = api;
     return api;
 }

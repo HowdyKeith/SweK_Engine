@@ -225,6 +225,21 @@ export function verdictClasses(c, { codes = {} } = {}) {
  * conclusion -- and the only reason it could be caught is that every entry carried its gate name and its
  * numbers, so eight claims could be re-run in ninety seconds.
  */
+// *** v4800 -- A RETURNEE GENUINELY OVER ON THE BOX THAT NOW OWNS THE RECORD. *** headlessGpu was put back in the sweep
+// at v4461 on readings from the box that owned sweep-timings.json then (2,722 / 2,659 alone). v4800 re-hosted the record to
+// linux-x64-4c-16gb-420793, and here it reads 3,304 / 3,240 / 3,242 alone, one after another, its ring 2,743 / 3,369 /
+// 3,138 -- over, not oscillating: cheap on one machine type and not on this one. Named, as meshLine was at v4529, rather
+// than moved: the record says which box it is over on.
+export const RETURNED_AT_V4800 = Object.freeze({
+    at: "v4800",
+    stillOver: Object.freeze([
+        Object.freeze({ gate: "tools/ship/headlessGpu-selfcheck.mjs", recordedWas: 4518, hereMs: 3242,
+            serialMs: Object.freeze([3304, 3240, 3242]),
+            why: "returned at v4461 on 2,722 / 2,659 alone on the box that owned the record then; on " +
+                 "linux-x64-4c-16gb-420793, which owns it since v4800, three runs back to back read 3,304 / " +
+                 "3,240 / 3,242 and the sweep's ring 2,743 / 3,369 / 3,138 -- over alone, on this machine type" }),
+    ]),
+});
 export const RETURNED_AT_V4529 = Object.freeze({
     at: "v4529",
     // *** v4536 -- meshLine WAS RETIRED THIS MORNING AND IS BACK BY THE EVENING, WHICH IS THE ENTRY. *** Its
@@ -351,7 +366,12 @@ export const STILL_OVER_AT_V4815 = Object.freeze({
         Object.freeze({ gate: "tools/roundhouse/sweepBudget-selfcheck.mjs", recordedWas: 5526, hereMs: 3270,
             serialMs: Object.freeze([3353, 3086, 3214]),
             why: "2,545 ms in the record before the host change, 3,353 / 3,086 / 3,214 alone on the 2.80 GHz host; the " +
-                 "file is untouched since v4361, so as at v4565 the move is the box and not the gate" }),
+                 "file is untouched since v4361, so as at v4565 the move is the box and not the gate",
+            // v4829 -- RETURNED, BY THE RULE THIS ROLL WAS WRITTEN WITH: the record is on the 2.10 GHz host again and sweepBudget reads
+            // 2,328 / 2,503 / 2,462 ms alone, quiet, under the bar and back in the sweep. Found by step 4b: the row below still demanded
+            // justifiedOver of every entry, as the v4813 row did before v4818 -- the retirement path had a branch there and none here.
+            // Kept as history with the readings that retired it.
+            returned: Object.freeze({ at: "v4829", aloneMs: 2462, serialMs: Object.freeze([2328, 2503, 2462]) }) }),
     ]),
 });
 

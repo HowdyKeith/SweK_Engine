@@ -1,6 +1,6 @@
 {
  "gate": "tools/ship/gateReport-selfcheck.mjs",
- "at": "2026-09-03",
+ "at": "2026-10-11",
  "tables": [
   {
    "title": "the population that argues in numbers",
@@ -11,15 +11,15 @@
    "rows": [
     [
      "gate files",
-     1436
+     1946
     ],
     [
      "argue in numbers",
-     73
+     155
     ],
     [
      "emit a report",
-     5
+     90
     ],
     [
      "argue and do not",

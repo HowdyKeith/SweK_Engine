@@ -104,7 +104,7 @@ export const VENDORED = Object.freeze([
     { path: "vendor/taichi-js", kind: KIND.THIRD_PARTY, spdx: "MIT",       grant: GRANT.LICENCE_FILE, file: "LICENSE" },
     { path: "vendor/three",     kind: KIND.THIRD_PARTY, spdx: "MIT",       grant: GRANT.LICENCE_FILE, file: "LICENSE" },
     { path: "vendor/three-webgpu", kind: KIND.THIRD_PARTY, spdx: "MIT",    grant: GRANT.LICENCE_FILE, file: "LICENSE",
-      upstream: "https://registry.npmjs.org/three/-/three-0.185.1.tgz", pin: "three@0.185.1",
+      upstream: "https://registry.npmjs.org/three/-/three-0.186.1.tgz", pin: "three@0.186.1",
       note: "*** VENDORED AT v4319 AND UNDECLARED UNTIL v4371 -- FIFTY ROUNDS RED AND NOBODY SAW IT. *** The " +
             "TSL build (three.webgpu.js, three.core.js, three.tsl.js) beside r160, with three's own MIT LICENSE " +
             "copied in the same commit, so nothing was ever unpapered on disk; what was missing was the RECORD, " +
@@ -114,7 +114,15 @@ export const VENDORED = Object.freeze([
             "*** RE-VENDORED 2026-09-08, 0.178.0 -> 0.185.1: *** tools/ship/three-probe.json settled the question " +
             "vendor/three-webgpu/README.md's history section describes -- the 0.185 refusal at v4319 was one " +
             "build box's WebGPU implementation lagging the spec, not a fact about the fleet. Same pin shape, " +
-            "same one-line edit, same grant." },
+            "same one-line edit, same grant. *** v4805: 0.185.1 -> 0.186.1, *** the same three files and edit again, the " +
+            "LICENSE byte for byte the same; the 0.185.1 files moved, unchanged, to vendor/three-webgpu-r185." },
+    { path: "vendor/three-webgpu-r185", kind: KIND.THIRD_PARTY, spdx: "MIT", grant: GRANT.LICENCE_FILE, file: "LICENSE",
+      upstream: "https://registry.npmjs.org/three/-/three-0.185.1.tgz", pin: "three@0.185.1",
+      note: "*** KEPT, NOT IMPORTED BY THE ENGINE. *** vendor/three-webgpu's files from 2026-09-08 until v4805, moved here " +
+            "unchanged when that directory went to 0.186.1, so the r185 drafts in docs/upstream-three/ and their patches " +
+            "still have the build they are written against: tools/ship/threePatch.mjs applies the patches to it, and " +
+            "threeUpstream-selfcheck.mjs and threeUpstreamPaths-selfcheck.mjs run it. The same blobs git already held, so " +
+            "the copy adds nothing to the repository; three's own MIT LICENSE beside it, as for the other two copies." },
     { path: "vendor/wasm",      kind: KIND.FIRST_PARTY, spdx: null,        grant: GRANT.NONE,         file: null,
       note: "*** OURS, NOT SOMEBODY ELSE'S. *** sha256.wasm and graphlayout.wasm are AssemblyScript output " +
             "from sha256.ts and graphlayout.ts in the same directory. A filename census calls this unpapered; " +

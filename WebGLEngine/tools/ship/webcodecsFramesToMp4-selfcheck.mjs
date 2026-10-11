@@ -114,6 +114,17 @@ try { requireAiBridge.resolve("@napi-rs/webcodecs"); haveWebcodecs = true; } cat
 // pass whether or not ffmpeg is installed -- a check any box without `which` satisfies. The platform branch is
 // the tree's own idiom for this probe (ai-bridge/go2rtcBridge.js, brainProcess.js, watchSkillBridge.js).
 const FIND_BIN = process.platform === "win32" ? "where" : "which";
+// v4821 -- *** A BOX WITH ffmpeg ON ITS PATH IS NOT A FAILURE OF THIS CODE, AND FIVE ROWS SAID IT WAS. *** The
+// sandbox image gained ffmpeg (apt, 2026-10-03), and the moment ai-bridge's optional packages were installed this
+// gate stopped skipping and went 5 red: two rows asserted the BOX has no ffmpeg, and section 10's three rows needed
+// the spawn to fail, which only an absent binary did. Section 10 now points exportBridge's own FFMPEG override at a
+// path that cannot exist, so the unchanged-shape rows are asserted on every box; the two box rows are asserted
+// where ffmpeg is absent (the rig) and REPORTED, not asserted, where it is present -- with what that leaves unchecked.
+// Sabotaged on a box WITH ffmpeg: exportBridge's "ffmpeg spawn failed: " renamed -> 4 RED (the verbatim-source row and
+// all three section-10 rows, by name); restored.
+const FFMPEG_HERE = "  ----  NOT ASSERTED: ffmpeg IS on this box's PATH, so whether section 2's decode needs nothing outside " +
+    "@napi-rs/webcodecs is not shown here -- a box without ffmpeg (the rig) asserts it";
+const NO_SUCH_FFMPEG = path.join(os.tmpdir(), "swek-no-such-dir-" + process.pid, "ffmpeg");
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -159,9 +170,10 @@ console.log("scratch frame directory:", scratchRoot, "\n");
 
     let noFfmpeg = false;
     try { execFileSync(FIND_BIN, ["ffmpeg"], { stdio: "ignore" }); } catch { noFfmpeg = true; }
-    ok("!! confirming the file header's own claim still holds: no external ffmpeg binary on this box " +
+    if (noFfmpeg) ok("!! confirming the file header's own claim still holds: no external ffmpeg binary on this box " +
         "(so section 2's decode-verification is exercising @napi-rs/webcodecs' OWN bundled decoder, not shelling out)",
-        noFfmpeg, noFfmpeg ? "`" + FIND_BIN + " ffmpeg` exit != 0, as expected" : "ffmpeg IS present -- the file header's claim is stale, note this in the report");
+        true, "`" + FIND_BIN + " ffmpeg` exit != 0, as expected");
+    else console.log(FFMPEG_HERE);
 }
 
 // ---- 2. A REAL ANIMATED FRAME SEQUENCE -> A REAL MP4, VERIFIED FROM MULTIPLE INDEPENDENT ANGLES -------
@@ -441,8 +453,11 @@ const EB = requireAiBridge(path.join(ENG, "ai-bridge", "exportBridge.js"));
     console.log("\n10. DEFAULT (ffmpeg) PATH SAFETY -- PROVING NO BEHAVIOR CHANGE, NOT A SUCCESSFUL RUN (NO ffmpeg BINARY HERE)");
     let noFfmpeg = false;
     try { execFileSync(FIND_BIN, ["ffmpeg"], { stdio: "ignore" }); } catch { noFfmpeg = true; }
-    ok("!! confirmed: no external ffmpeg binary on this box (so this section proves ABSENCE OF A BEHAVIOR CHANGE, not a completed ffmpeg run -- that is not honestly demonstrable here)",
-        noFfmpeg, noFfmpeg ? "`" + FIND_BIN + " ffmpeg` exit != 0, as expected" : "ffmpeg IS present on this box -- rerun by hand to also confirm a REAL successful ffmpeg encode still works");
+    if (noFfmpeg) ok("!! confirmed: no external ffmpeg binary on this box (so this section proves ABSENCE OF A BEHAVIOR CHANGE, not a completed ffmpeg run -- that is not honestly demonstrable here)",
+        true, "`" + FIND_BIN + " ffmpeg` exit != 0, as expected");
+    else console.log("  ----  ffmpeg IS present on this box -- the rows below spawn through FFMPEG=" + NO_SUCH_FFMPEG + " so the spawn still fails; a REAL ffmpeg encode is not checked here");
+    const savedFfmpeg = process.env.FFMPEG;
+    process.env.FFMPEG = NO_SUCH_FFMPEG;
 
     const shapes = [
         { label: "no backend field at all (opts={fps:30})", opts: { fps: 30 } },
@@ -457,6 +472,7 @@ const EB = requireAiBridge(path.join(ENG, "ai-bridge", "exportBridge.js"));
             threw instanceof Error && /^ffmpeg spawn failed: /.test(threw.message),
             threw ? threw.constructor.name + " | " + threw.message : "did not reject at all (unexpected)");
     }
+    if (savedFfmpeg === undefined) delete process.env.FFMPEG; else process.env.FFMPEG = savedFfmpeg;
 }
 
 // ---- 11. THE WEBCODECS BACKEND, END TO END, THROUGH THE REAL exportBridge.js framesToMp4() ---------------

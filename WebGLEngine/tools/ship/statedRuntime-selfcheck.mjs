@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/statedRuntime-selfcheck.mjs
 //
-// Run: node tools/ship/statedRuntime-selfcheck.mjs   (~176ms MEASURED, median of 153/188/176 at v4171 --
+// Run: node tools/ship/statedRuntime-selfcheck.mjs   (~1.6s — re-measured v4804: 1.6 s-1.6 s alone, 1.5 s the sweep's serial median; it read ~176 ms MEASURED, median of 153/188/176 at v4171 --
 //   superseding a stated ~2s that ALSO said MEASURED, and which this file caught in ITSELF the moment it
 //   first had a recorded time to compare against. It had none until v4171, so the one gate whose whole
 //   job is comparing stated runtimes to measured ones had never been able to run that comparison on its
@@ -69,7 +69,13 @@ const observed = JSON.parse(fs.readFileSync(TIMINGS, "utf8"));
 const timings = observed.timings;
 const drifted = [];
 let stated = 0, joined = 0;
+// v4804 -- THIS FILE IS OUT OF ITS OWN POPULATION BY IDENTITY, as declaredCost-selfcheck's is. Its header was re-measured
+// (176 ms -> ~1.6s) against a record still at 176, which made it a candidate -- and confirming a candidate means RUNNING it,
+// so the gate ran itself, which ran itself, until the 4,000 ms cap killed the chain and "ran 4008 ms" was filed as a drift.
+// SABOTAGE (v4804): the exclusion removed -> 1 red, "ran 4008 ms" -- the cap, filed as a drift.
+const SELF = path.relative(ROOT, fileURLToPath(import.meta.url)).replace(/\\/g, "/");
 for (const g of gateFiles().map((p) => path.relative(ROOT, p).replace(/\\/g, "/"))) {
+    if (g === SELF) continue;
     let src; try { src = fs.readFileSync(path.join(ROOT, g), "utf8"); } catch { continue; }
     const m = src.match(RX);
     if (!m) continue;

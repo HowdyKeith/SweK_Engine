@@ -23,15 +23,22 @@ ok("!! *** the CJS bridge really can reach the ESM tool -- driven, not asserted 
 
 // ---- THE HAPPY PATH, against real patch zips ---------------------------------------------------------------
 const UP = "/mnt/user-data/uploads";
+// v4781 -- THE FIXTURE IS THE ZIPS, NOT THE FOLDER. A claude.ai container can provide /mnt/user-data/uploads EMPTY,
+// and this read "the folder exists" as "Keith's patch zips are here": three reds on a scan that correctly found
+// nothing. Whether there is anything to scan is read off the folder's own listing, NOT off the scanner -- a broken
+// scanner returning ok with no rows must still fail where zips exist, so the scanner cannot excuse itself.
 // v4778 -- AN EMPTY UPLOADS FOLDER IS THE FIXTURE ABSENT, NOT A FAILED SCAN. A sandbox restart produced
 // /mnt/user-data/uploads with nothing in it, and the three happy-path rows below went red on "0 patch-shaped zips"
 // -- rows about stated and unstated patches, asked of a folder holding neither. The bridge's own answer for that
 // case is ok:true with a note naming the folder, so the scan RAN and said so; that is asserted, and the rows that
 // need zips wait for a folder that has them, the same as when it is absent.
+// v4819 (the merge of both lines' fixes): the empty branch is taken only where the folder's own listing holds no .zip, so
+// the scanner's answer decides nothing about whether there was anything to find.
+const zipsHere = (() => { try { return fs.readdirSync(UP).some((f) => /\.zip$/i.test(f)); } catch { return false; } })();
 const upScan = fs.existsSync(UP) ? await bridge.patchScan(UP) : null;
-if (upScan && upScan.ok === true && upScan.rows.length === 0) {
+if (upScan && !zipsHere) {
     ok("an uploads folder holding no patch-shaped zip is SCANNED and SAYS SO, rather than coming back silently empty",
-        typeof upScan.note === "string" && upScan.note.includes(UP), upScan.note || "no note");
+        upScan.ok === true && upScan.rows.length === 0 && typeof upScan.note === "string" && upScan.note.includes(UP), upScan.note || "no note");
     say("uploads directory present but empty of patch zips; the happy path is exercised where the zips live");
 } else if (upScan) {
     // v3937 -- THE FOLDER IS AN ARGUMENT NOW, NOT A CONFIG WRITE. This called setConfig and never restored it,
@@ -58,7 +65,7 @@ if (upScan && upScan.ok === true && upScan.rows.length === 0) {
     ok("...and the tree version comes from the tree", /^v\d+$/.test(String(r.tree)),
         "a caller supplying both sides of a comparison is the shape that lets a mismatch be argued away");
 } else {
-    say("uploads directory absent; the happy path is exercised where the zips live. SAID OUT LOUD rather than " +
+    say((fs.existsSync(UP) ? "uploads directory holds no .zip" : "uploads directory absent") + "; the happy path is exercised where the zips live. SAID OUT LOUD rather than " +
         "skipped, because a check that vanishes with its fixture reads exactly like one that passed");
 }
 

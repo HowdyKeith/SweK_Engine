@@ -20,7 +20,7 @@
 // and the clearest to verify. The other 17 are not attempted; see tools/ship/nextRounds.mjs's closing note.
 "use strict";
 
-import { mhLive, mhState, mhFlourish, MH_DUET } from "./murmurKit.mjs";
+import { mhLive, mhState, mhFlourish, MH_DUET, MH_MIST_LIVE, MH_CHORUS, MH_TEMPEST_BOLT } from "./murmurKit.mjs";
 
 // ---------------------------------------------------------------------------------------------------------
 // OKLAB. Bjoern Ottosson's perceptual colour space (public domain description; used here for its published
@@ -99,6 +99,50 @@ export const STATE_NAMES = Object.freeze(Object.keys(STATES));
  * is the correct reading and not a fallback: an error is neither a listener nor a worker.
  */
 export const STATE_INDEX = Object.freeze(Object.fromEntries(STATE_NAMES.map((n, i) => [n, i])));
+
+// ---------------------------------------------------------------------------------------------------------
+// *** v4831 -- TWO STATES murmur DOES NOT HAVE, FOR TWO MOMENTS THE PAGE CAN NOW SEE. ***
+//
+// Jakubantalik/thinking-orbs (MIT) names nine states; murmur's six cover five of them, and its `searching`
+// (a retrieval moment) and `weaving` (synthesising several sources) had nothing to light up DURING until
+// ai-bridge/ragBridge.js began streaming its two stages (POST /ai/brain/ask with stream:true). The other two
+// thinking-orbs names, `connecting` and `shaping`, still have no observable moment in this tree and are not
+// rows here: an unwired state is decoration, the reason success and error waited for converseText's outcome.
+//
+// THEY ARE NOT ROWS 6 AND 7 OF THE TABLE ABOVE, AND THAT IS THE DESIGN. STATE_INDEX is what the shader reads,
+// and murmur's windows are statements about its order -- an index past 5 sits outside all of them and would
+// draw a brain stage exactly as it draws an ERROR. So each row names the murmur state it renders AS
+// (shaderIndexOf), and differs from it only in the host multipliers murmur's own table is made of:
+//   searching AS thinking   -- the churn window, so tempest's storm rises for retrieval as it does for thought;
+//                              faster than thinking, a cooler hue, no entry envelope (thinking's wake already
+//                              fired, or the search arrives inside it);
+//   weaving   AS responding -- murmur's DRIVE window, whose whole sentence is "things travel together, in
+//                              formation" (aura.ts), which is what composing from several sources looks like;
+//                              its glow and depth gain with how MANY sources came back, the one number the
+//                              retrieval stage hands over (WEAVE_GAIN at WEAVE_CAP or more, none at zero).
+// These numbers are this port's own, not murmur's -- there is no murmur line to quote for a state it lacks.
+// ---------------------------------------------------------------------------------------------------------
+export const BRAIN_STATES = Object.freeze({
+    searching: Object.freeze({ speed: 1.35, glow: 1.15, depth: 1.20, hueShift: 0.18,  entry: null, as: "thinking" }),
+    weaving:   Object.freeze({ speed: 1.20, glow: 1.20, depth: 1.30, hueShift: 0.08,  entry: null, as: "responding" }),
+});
+export const WEAVE_CAP = 6, WEAVE_GAIN = 0.25;
+/** every state setState accepts: murmur's six, then the brain stages */
+export const ALL_STATE_NAMES = Object.freeze([...STATE_NAMES, ...Object.keys(BRAIN_STATES)]);
+const rowOf = (name) => STATES[name] || BRAIN_STATES[name] || null;
+/** the index the SHADER is handed for a state: murmur's own for its six, the rendered-as state's for the rest */
+export function shaderIndexOf(name) {
+    if (name in STATE_INDEX) return STATE_INDEX[name];
+    const b = BRAIN_STATES[name];
+    return b ? STATE_INDEX[b.as] : undefined;
+}
+/** weaving's multiplier rows, gained by the source count; every other state's row unchanged */
+export function stateParams(name, { sources = 0 } = {}) {
+    const r = rowOf(name);
+    if (!r || name !== "weaving") return r;
+    const w = 1 + WEAVE_GAIN * Math.min(Math.max(0, sources | 0), WEAVE_CAP) / WEAVE_CAP;
+    return Object.freeze({ ...r, glow: r.glow * w, depth: r.depth * w });
+}
 
 const TRANSITION_DURATION = 0.6;   // seconds, crossfade between two states' params
 
@@ -198,9 +242,10 @@ export function integrateTempo(speedFn, t0, t1, steps = 32) {
 // ui/stateOrb.js's dotsAt() is separated from its own drawOrb().
 // ---------------------------------------------------------------------------------------------------------
 export function createPresenceState(initial = "idle") {
-    if (!STATES[initial]) throw new Error(`createPresenceState: unknown state "${initial}"`);
+    if (!rowOf(initial)) throw new Error(`createPresenceState: unknown state "${initial}"`);
     let cur = initial, prev = null, transitionT = TRANSITION_DURATION;  // already-settled: no crossfade running
-    let entryT = 0, entryName = STATES[initial].entry;
+    let entryT = 0, entryName = rowOf(initial).entry;
+    let sources = 0, prevSources = 0;   // v4831 -- weaving's source count, for cur and for the state it is crossfading from
     let phase = 0;
     const voice = new SignalEnvelope(0), activity = new SignalEnvelope(0);
 
@@ -246,7 +291,8 @@ export function createPresenceState(initial = "idle") {
     // exactly what that note said it would; what the note did not say is that it was worth it. MEASURED:
     // murmur's spelling advances limn's travel 68.3121 rad in ONE 1/60 s frame after half an hour of running
     // -- nearly eleven whole turns -- against a flat 0.056582.
-    let paceDriveInt = 0, voiceDriveInt = 0;
+    let paceDriveInt = 0, voiceDriveInt = 0, driveDriveInt = 0;   // v4825: drive squared, for geode and fathom
+    let tempestEnergyInt = 0;   // v4825: tempest.ts:54's clamped energy -- see MH_MIST_LIVE
 
     // *** THE GESTURE INTEGRAL, for duet -- AND THE RECORD THAT SAID IT COULD NOT EXIST WAS WRONG. ***
     // duet.ts: rate = (0.40 + 0.55*orbitK) * (1 + 0.55*live.pace + 0.90*st.drive + 0.85*fl.x), where fl is
@@ -266,21 +312,36 @@ export function createPresenceState(initial = "idle") {
     // integral" and calling it one would invite exactly that mistake.
     let duetFlourishInt = 0;
 
-    function paramsAt(name) { return STATES[name]; }
+    // *** v4829 -- TWO CLOCKS WHOSE RATE IS NOT A SUM, SO NEITHER IS ASSEMBLED FROM THE INTEGRALS ABOVE. ***
+    // chorus.ts:67/104: the breath is sin(2 pi t / per) with per = 8.4 - 2.2 * (pace * 0.6) -- a RECIPROCAL of a
+    // signal, so its phase is the integral of 1 / per and not anything linear in paceInt. Spelled raw, a busier
+    // exchange moved all seven breaths by t * d(1/per) at once.
+    // tempest.ts:74 with kit.ts's mh_flourish: lane 0's slot is 2.9 / (1 + 1.30 E), FLOORED at 1 s by mh_flourish's
+    // max(slotLen, 1.0) -- and at full energy 2.9 / 3.08 = 0.94 s, so the floor bites. Its slot COUNT is therefore
+    // the integral of min(1 + 1.30 E, 2.9) / 2.9, which tempestEnergyInt (the integral of E alone) cannot give;
+    // lane 1's 4.3 s never reaches the floor and keeps reading tempestEnergyInt. 2.9 is the 120 pt slot -- the
+    // shader's small mix is 0 at this port's one mount, which is the same reason MH_TEMPEST_BOLT's slotSmall is
+    // inert here.
+    let chorusBreathInt = 0, tempestSlot0Int = 0;
+
+    function paramsAt(name, n = sources) { return stateParams(name, { sources: n }); }
     function blendedParams() {
         if (transitionT >= TRANSITION_DURATION || !prev) return paramsAt(cur);
         const t = smoothstep01(transitionT / TRANSITION_DURATION);
-        const a = paramsAt(prev), b = paramsAt(cur);
+        const a = paramsAt(prev, prevSources), b = paramsAt(cur);
         return { speed: a.speed + (b.speed - a.speed) * t, glow: a.glow + (b.glow - a.glow) * t,
                  depth: a.depth + (b.depth - a.depth) * t, hueShift: a.hueShift + (b.hueShift - a.hueShift) * t };
     }
 
     return {
-        setState(name) {
-            if (!STATES[name]) throw new Error(`createPresenceState.setState: unknown state "${name}"`);
-            if (name === cur) return;
-            prev = cur; cur = name; transitionT = 0;
-            entryName = STATES[name].entry; entryT = 0;
+        setState(name, opts = {}) {
+            if (!rowOf(name)) throw new Error(`createPresenceState.setState: unknown state "${name}"`);
+            // v4831 -- weaving carries how many sources it is composing from; a later count on the same state
+            // updates the gain without restarting the state (no new entry, no crossfade)
+            const n = name === "weaving" ? Math.max(0, (opts.sources | 0)) : 0;
+            if (name === cur) { sources = n; return; }
+            prev = cur; prevSources = sources; cur = name; sources = n; transitionT = 0;
+            entryName = rowOf(name).entry; entryT = 0;
         },
         tick(dt, live = {}) {
             if (dt < 0) throw new Error("createPresenceState.tick: dt must be >= 0");
@@ -294,7 +355,7 @@ export function createPresenceState(initial = "idle") {
             // The conditioned signals as the shader will see them this frame, accumulated against dPhase --
             // see the note on the declarations. entryT has already advanced, which is what the shader's own
             // stateTau will carry, so the two read the same point of the ramp.
-            const si = STATE_INDEX[cur];
+            const si = shaderIndexOf(cur);   // v4831 -- a brain stage integrates as the murmur state it renders as
             const lv = mhLive(voice.value, activity.value, si);
             const stn = mhState(si, entryT);
             paceInt += lv.pace * dPhase;
@@ -305,8 +366,21 @@ export function createPresenceState(initial = "idle") {
             // average of a product.
             paceDriveInt += lv.pace * stn.drive * dPhase;
             voiceDriveInt += lv.voice * stn.drive * dPhase;
+            // v4825 -- drive SQUARED: geode and fathom mix a drive-scaled rate by drive again, so their secular
+            // term carries d * d, whose integral is not driveInt squared for the same reason as the two above.
+            driveDriveInt += stn.drive * stn.drive * dPhase;
+            // v4825 -- tempest's ENERGY, clamped, so it is integrated here rather than assembled from the sums
+            // above: clamp(0.85 * pace + 0.65 * think + 0.55 * drive, 0, 1.6), think = THINKING, the storm's home state.
+            const ME = MH_MIST_LIVE.tempest;
+            tempestEnergyInt += Math.min(ME.eCap, Math.max(0, ME.ePace * lv.pace + ME.eThink * (si === STATE_INDEX.thinking ? 1 : 0)
+                + ME.eDrive * stn.drive)) * dPhase;
             // duet's gesture envelope, at the phase the shader will be handed this frame.
             duetFlourishInt += mhFlourish(phase, MH_DUET.flourishSlot, MH_DUET.flourishDur).env * dPhase;
+            // v4829 -- chorus's breath and tempest's floored lane 0; see their note above
+            chorusBreathInt += dPhase / (MH_CHORUS.perB - MH_CHORUS.perPace * lv.pace);
+            const E0 = Math.min(ME.eCap, Math.max(0, ME.ePace * lv.pace + ME.eThink * (si === STATE_INDEX.thinking ? 1 : 0)
+                + ME.eDrive * stn.drive));
+            tempestSlot0Int += Math.min(1 + ME.slotE * E0, MH_TEMPEST_BOLT.lanes[0].slot) * dPhase;
         },
         getParams() {
             const p = blendedParams();
@@ -322,9 +396,12 @@ export function createPresenceState(initial = "idle") {
                      // drift, and the SUCCESS flash and the swell envelope have to agree about when the
                      // arrival happened or the orb breathes at one moment and ignites at another.
                      phase, voice: voice.value, activity: activity.value, state: cur, stateTau: entryT,
+                     // v4831 -- what the shader is handed; differs from STATE_INDEX[state] only for a brain stage
+                     stateIndex: shaderIndexOf(cur), sources,
                      // The three signal integrals, in shader time. A species that modulates a clock reads
                      // these instead of multiplying the clock by the instantaneous signal.
-                     paceInt, voiceInt, driveInt, paceDriveInt, voiceDriveInt, duetFlourishInt };
+                     paceInt, voiceInt, driveInt, paceDriveInt, voiceDriveInt, driveDriveInt, tempestEnergyInt, duetFlourishInt,
+                     chorusBreathInt, tempestSlot0Int };
         },
         get state() { return cur; },
     };

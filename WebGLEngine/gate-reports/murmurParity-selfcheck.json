@@ -1,0 +1,68 @@
+{
+ "gate": "tools/ship/murmurParity-selfcheck.mjs",
+ "at": "2026-10-11",
+ "tables": [
+  {
+   "title": "murmur's eight shapes, each found in the port or not",
+   "columns": [
+    "murmur's line",
+    "in the port"
+   ],
+   "rows": [
+    [
+     "limn.ts:73 phi0 += st.sweep * 6.2831853 -- the ignition TRAVELS a lap",
+     "in"
+    ],
+    [
+     "limn.ts:116-117 (b.rho - b.Rd * 0.965) / bw, band * b.m -- the deformed limb, masked",
+     "in"
+    ],
+    [
+     "comet.ts:73 r0 = mix(0.54, 0.66, small) * (1.0 - 0.24 * live.pace) -- pace, not voice",
+     "in"
+    ],
+    [
+     "comet.ts:214-215 e = interior + headE + ...; hueMix over interior + 0.7 rim -- the head joins BESIDE",
+     "in"
+    ],
+    [
+     "sol.ts:182 halo = 0.10 * ((wl * 3.19) * SQRTPI / sinA) * exp(-pp / (wl * wl * 10.2))",
+     "in"
+    ],
+    [
+     "sol.ts:112 if (fl.x > 0.002 && k == int(fl.z * 2.999)) lift = max(lift, fl.x)",
+     "in"
+    ],
+    [
+     "sol.ts:135 if (bestS <= 0.0 || bestS >= L) continue; -- the COARSE winner's range",
+     "in"
+    ],
+    [
+     "helix.ts:143 acc.x += medE -- BEFORE the hue divides by it",
+     "in"
+    ]
+   ],
+   "note": null
+  },
+  {
+   "title": "sol's halo: e-folding distance, murmur's against the old spelling",
+   "columns": [
+    "wl",
+    "murmur",
+    "old spelling",
+    "old / murmur"
+   ],
+   "rows": [
+    [
+     0.03,
+     0.09581231653602786,
+     0.3056412897499288,
+     3.1899999999999995
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

@@ -122,6 +122,130 @@ else {
     }
 }
 
+// ---- 2. v4784: AN INSTANCED MESH WITH MORPH TARGETS ---------------------------------------------------------------
+// The stage's instanced branch took the BARE geometry through the previous instance matrix, so a morphing herd carried its
+// morph as motion, 1.39 to 1.67 px here. Held, both backends, against plain meshes doing the same: influences per instance
+// (setMorphAt -- three's own test is count > 1 and a morphTexture) and the mesh's own, relative and absolute; and through a
+// toward stage. What three itself cannot draw is the last row: per-instance influences over ABSOLUTE targets, or alongside a
+// mesh-level morphTargetInfluences, throw in r185 on both backends.
+console.log("\n2. ON THE DEVICE: an InstancedMesh with morph targets, per instance and shared");
+if (!skip) {
+    const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 300000, args: { D: 64, N: 4 }, script: `async (a) => {
+    const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
+    const TT = await import("/render/temporalTsl.mjs"); const out = {};
+    for (const mode of ["webgpu", "webgl2"]) { try {
+        const { D, N } = a, canvas = document.createElement("canvas"); canvas.width = 8; canvas.height = 8;
+        const renderer = new THREE.WebGPURenderer({ canvas, forceWebGL: mode === "webgl2", antialias: false }); await renderer.init();
+        const gl = TT.glClip(THREE, renderer), rd = async (t) => Array.from(await renderer.readRenderTargetPixelsAsync(t, 0, 0, D, D));
+        const cam = new THREE.PerspectiveCamera(40, 1, 0.1, 50); cam.position.set(0, 0, 5); cam.lookAt(0, 0, 0); cam.updateMatrixWorld();
+        const mkGeo = (relative) => { const g = new THREE.BoxGeometry(0.6, 0.6, 0.6), p = g.attributes.position, A = [], B = [];
+            for (let v = 0; v < p.count; v++) { const x = p.getX(v), y = p.getY(v), z = p.getZ(v);
+                A.push(relative ? 0.5 * x : 1.5 * x, relative ? 0 : y, relative ? 0 : z); B.push(relative ? 0 : x, relative ? 0.6 * y : 1.6 * y, relative ? 0 : z); }
+            g.morphAttributes.position = [new THREE.Float32BufferAttribute(A, 3), new THREE.Float32BufferAttribute(B, 3)]; g.morphTargetsRelative = relative; return g; };
+        const M = new THREE.Matrix4();
+        const at = (i, k) => M.makeTranslation(-1.2 + (i % 2) * 2.4 + 0.2 * k * (i - 1.5), -0.8 + Math.floor(i / 2) * 1.6 + 0.1 * k, 0);
+        const infl = (i, k) => [Math.min(1, 0.15 * k * (i + 1)), Math.min(1, 0.1 * k * (4 - i))];
+        const fieldOf = async (scene, step, toward) => { const st = TT.makeMotionStage(THREE, T, { w: D, h: D, gl, toward: !!toward });
+            for (const k of [0, 1, 2]) { step(k); await st.render(renderer, scene, cam, toward ? 0.5 : undefined); } const m = await rd(st.motion); st.dispose(); return m; };
+        const cmp = (F, R) => { let w = 0, moving = 0; for (let i = 0; i < D * D; i++) { const ma = Math.hypot(F[i*4], F[i*4+1]) * D, mb = Math.hypot(R[i*4], R[i*4+1]) * D;
+            if (ma > 0.01 || mb > 0.01) { moving++; w = Math.max(w, Math.hypot(F[i*4] - R[i*4], F[i*4+1] - R[i*4+1]) * D); } } return { w, moving }; };
+        const o = {};
+        for (const [name, relative, perInstance, toward] of [["perInstance", true, true, false], ["sharedRelative", true, false, false], ["sharedAbsolute", false, false, false], ["perInstanceToward", true, true, true]]) {
+            const geo = mkGeo(relative), im = new THREE.InstancedMesh(geo, new THREE.MeshBasicNodeMaterial(), N); im.frustumCulled = false;
+            if (!perInstance) im.morphTargetInfluences = [0, 0];
+            const sc = new THREE.Scene(); sc.add(im); const dummy = new THREE.Mesh(geo);
+            const plain = Array.from({ length: N }, () => new THREE.Mesh(geo, new THREE.MeshBasicNodeMaterial())), ps = new THREE.Scene(); for (const p of plain) ps.add(p);
+            const F = await fieldOf(sc, (k) => { for (let i = 0; i < N; i++) { im.setMatrixAt(i, at(i, k));
+                    if (perInstance) { dummy.morphTargetInfluences.splice(0, 2, ...infl(i, k)); im.setMorphAt(i, dummy); } }
+                im.instanceMatrix.needsUpdate = true; if (perInstance) im.morphTexture.needsUpdate = true; else im.morphTargetInfluences.splice(0, 2, ...infl(0, k)); }, toward);
+            const R = await fieldOf(ps, (k) => plain.forEach((p, i) => { at(i, k).decompose(p.position, p.quaternion, p.scale); p.morphTargetInfluences.splice(0, 2, ...infl(perInstance ? i : 0, k)); p.updateMatrixWorld(); }), toward);
+            o[name] = cmp(F, R);
+        }
+        // three's own: which of these it can draw at all
+        o.three = {};
+        for (const [name, relative, arr] of [["perInstanceAbsolute", false, false], ["perInstanceWithMeshInfluences", true, true]]) {
+            try { const geo = mkGeo(relative), im = new THREE.InstancedMesh(geo, new THREE.MeshBasicNodeMaterial(), 2); if (arr) im.morphTargetInfluences = [0, 0];
+                const d = new THREE.Mesh(geo); d.morphTargetInfluences[0] = 0.5; im.setMorphAt(0, d); im.setMorphAt(1, d);
+                const sc = new THREE.Scene(); sc.add(im); const t = new THREE.RenderTarget(16, 16); renderer.setRenderTarget(t); await renderer.renderAsync(sc, cam); renderer.setRenderTarget(null); t.dispose(); o.three[name] = "drawn"; }
+            catch (e) { renderer.setRenderTarget(null); o.three[name] = String(e && e.message || e).slice(0, 70); } }
+        out[mode] = o; renderer.dispose();
+    } catch (e) { out[mode] = { err: String(e && e.stack || e).slice(0, 400) }; } }
+    return out; }` });
+    ok("the harness ran the instanced morphs on both backends", r.ok && r.result && !r.result.webgpu.err && !r.result.webgl2.err,
+       r.ok ? `webgpu ${r.result.webgpu.err || "ok"}; webgl2 ${r.result.webgl2.err || "ok"}` : (r.reason || (r.pageErrors || []).join("; ")));
+    if (r.ok && r.result && !r.result.webgpu.err && !r.result.webgl2.err) {
+        for (const mode of ["webgpu", "webgl2"]) {
+            const o = r.result[mode], e = (x) => x.toExponential(2);
+            ok(`*** [${mode}] an InstancedMesh's PER-INSTANCE morphs carry their motion: ${e(o.perInstance.w)} px against plain meshes over ${o.perInstance.moving} pixels -- it was 1.67 px off ***`,
+               o.perInstance.w < 1e-3 && o.perInstance.moving > 300, "each instance's influences at the last draw, from the stage's copy of three's morphTexture");
+            ok(`*** [${mode}] ...and the MESH's own influences over instances, relative ${e(o.sharedRelative.w)} and absolute ${e(o.sharedAbsolute.w)} px ***`,
+               o.sharedRelative.w < 1e-3 && o.sharedAbsolute.w < 1e-3 && o.sharedRelative.moving > 300 && o.sharedAbsolute.moving > 300, "it was 1.39 px off: the instanced branch never morphed");
+            ok(`  [${mode}] ...and through a toward stage at t = 0.5, each instance's influences on the line from the last draw's: ${e(o.perInstanceToward.w)} px`,
+               o.perInstanceToward.w < 1e-3 && o.perInstanceToward.moving > 300, "against plain meshes through the same stage");
+        }
+        const tg = r.result.webgpu.three, tw = r.result.webgl2.three;
+        ok(`three's own: per-instance influences over absolute targets, or beside a mesh-level morphTargetInfluences, are NOT drawn -- webgpu ${JSON.stringify(tg)}; webgl2 ${JSON.stringify(tw)}`,
+           [tg, tw].every((x) => x.perInstanceAbsolute !== "drawn" && x.perInstanceWithMeshInfluences !== "drawn"),
+           "r185's morph node updates the MESH's influences on every draw whatever the shader reads; when three draws these this row goes red and the stage can be held to them");
+    }
+}
+
+// ---- 3. v4785: MORPH TARGETS IN THE HUNDREDS AND THOUSANDS ---------------------------------------------------------
+// The stage summed the targets one unrolled texture read each, and past a few hundred the vertex stage did not survive it:
+// NO motion read from 150 targets on WebGPU and 256 on WebGL2 while three morphed to its own limit. And three's own limit is
+// the renderer's array-texture layers (read here from the renderer, never assumed): past it WebGPU draws nothing and WebGL2
+// draws the mesh UNMORPHED without a word. Held: at 1, 200, L and L + 1 targets the field is a one-target reference's where
+// three morphs, and still where three does not -- the field describes what three drew.
+console.log("\n3. ON THE DEVICE: hundreds and thousands of morph targets, to the renderer's own limit and one past it");
+if (!skip) {
+    const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 400000, args: { D: 48 }, script: `async (a) => {
+    const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
+    const TT = await import("/render/temporalTsl.mjs"); const out = {};
+    for (const mode of ["webgpu", "webgl2"]) { try {
+        const D = a.D, canvas = document.createElement("canvas"); canvas.width = 8; canvas.height = 8;
+        const renderer = new THREE.WebGPURenderer({ canvas, forceWebGL: mode === "webgl2", antialias: false }); await renderer.init();
+        const b = renderer.backend, L = b.gl ? b.gl.getParameter(b.gl.MAX_ARRAY_TEXTURE_LAYERS) : b.device.limits.maxTextureArrayLayers;
+        const gl = TT.glClip(THREE, renderer), rd = async (t) => Array.from(await renderer.readRenderTargetPixelsAsync(t, 0, 0, D, D));
+        const cam = new THREE.PerspectiveCamera(40, 1, 0.1, 50); cam.position.set(0, 0, 5); cam.lookAt(0, 0, 0); cam.updateMatrixWorld();
+        const cover = async (sc) => { const t = new THREE.RenderTarget(D, D, { type: THREE.FloatType }); renderer.setRenderTarget(t); await renderer.renderAsync(sc, cam); const c = await rd(t); t.dispose(); renderer.setRenderTarget(null); let n = 0; for (let i = 0; i < D * D; i++) if (c[i*4+3] > 0.5) n++; return n; };
+        const field = async (sc, step) => { const st = TT.makeMotionStage(THREE, T, { w: D, h: D, gl }); try { for (const k of [0, 1, 2]) { step(k); await st.render(renderer, sc, cam); } return await rd(st.motion); } finally { st.dispose(); } };
+        const quad = (n) => { const g = new THREE.PlaneGeometry(1, 1), c = g.attributes.position.count, targets = [];
+            for (let t = 0; t < n; t++) targets.push(new THREE.Float32BufferAttribute(new Float32Array(c * 3).map((_, i) => (t === n - 1 && i % 3 === 0) ? 0.6 : 0), 3));
+            g.morphAttributes.position = targets; g.morphTargetsRelative = true; const m = new THREE.Mesh(g, new THREE.MeshBasicNodeMaterial()); const sc = new THREE.Scene(); sc.add(m); return { m, sc }; };
+        const ref = quad(1), R = await field(ref.sc, (k) => { ref.m.morphTargetInfluences[0] = 0.3 * k; });
+        const o = { L, cases: {} };
+        for (const n of [1, 200, L, L + 1]) {
+            const q = quad(n), still = await cover(q.sc); q.m.morphTargetInfluences[n - 1] = 0.6; const moved = await cover(q.sc); q.m.morphTargetInfluences[n - 1] = 0;
+            const F = await field(q.sc, (k) => { q.m.morphTargetInfluences[n - 1] = 0.3 * k; });
+            let w = 0, mv = 0; for (let i = 0; i < D * D; i++) { if (Math.hypot(F[i*4], F[i*4+1]) * D > 0.01) mv++; w = Math.max(w, Math.hypot(F[i*4] - R[i*4], F[i*4+1] - R[i*4+1]) * D); }
+            o.cases[n] = { drawn: still, morphed: moved !== still, moving: mv, offRef: w };
+        }
+        out[mode] = o; renderer.dispose();
+    } catch (e) { out[mode] = { err: String(e && e.stack || e).slice(0, 400) }; } }
+    return out; }` });
+    ok("the harness ran the target counts on both backends", r.ok && r.result && !r.result.webgpu.err && !r.result.webgl2.err,
+       r.ok ? `webgpu ${r.result.webgpu.err || "ok"}; webgl2 ${r.result.webgl2.err || "ok"}` : (r.reason || (r.pageErrors || []).join("; ")));
+    if (r.ok && r.result && !r.result.webgpu.err && !r.result.webgl2.err) {
+        for (const mode of ["webgpu", "webgl2"]) {
+            const { L, cases } = r.result[mode], c = (n) => cases[n], e = (x) => x.toExponential(2);
+            ok(`*** [${mode}] where three morphs, the field IS a one-target quad's: 1, 200 and ${L} targets ${e(c(1).offRef)}, ${e(c(200).offRef)}, ${e(c(L).offRef)} px ***`,
+               [1, 200, L].every((n) => c(n).drawn > 100 && c(n).morphed && c(n).offRef < 1e-3 && c(n).moving > 100),
+               "the sum over targets is a loop in the shader; unrolled (as before v4785) the field read no motion from 150 targets on webgpu and from 256 on webgl2");
+            const x = c(L + 1);
+            ok(`*** [${mode}] one target past this renderer's ${L} layers three ${x.drawn === 0 ? "draws NOTHING" : x.morphed ? "still morphs" : "draws the mesh UNMORPHED"} -- and the field moves on ${x.moving} pixels ***`,
+               (x.drawn === 0 || !x.morphed) && x.moving === 0,
+               "the field describes what three drew: past the renderer's array-texture limit, read from the renderer, the stage morphs nothing either");
+        }
+    }
+}
+
+// ---- v4785 SABOTAGE LOG, against render/temporalTsl.mjs ---------------------------------------------------------
+// L1 the sum over targets unrolled again -> 3; L2 the renderer's layer limit never read -> 2; L3 the limit off by one
+// (< not <=) -> 3. Three, none green.
+// ---- v4784 SABOTAGE LOG, against render/temporalTsl.mjs ---------------------------------------------------------
+// I1 the instanced branch left unmorphed (as it was) -> 7; I2 each instance's weights read from texel t, the base column, not
+// t + 1 -> 5; I3 the copy of the morphTexture never stepped -> 5; I4 the last draw's weights never kept -> 5; I5 no lerp under
+// toward -> 3. Five, none green.
 // ---- v4757 SABOTAGE LOG ----------------------------------------------------------------------------------------
 // Against render/temporalTsl.mjs, each against this gate (both backends):
 //   K1 the skeleton not updated before the draw       -> 6    K6 absolute targets read as relative            -> 2

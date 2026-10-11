@@ -31,6 +31,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { boxId } from "./hostScale.mjs";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { parseOrExit } from "./cliArgs.mjs";   // v4826 -- an option this tool does not know is refused, not read past
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 // *** v4647b -- ONE PATH AND TWO BOXES WAS THE WHOLE DEFECT THE PREVIOUS ROUND FIXED, REBUILT HERE. ***
@@ -209,9 +210,9 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     // FAIL_LINE from THIS file, and a module still evaluating a top-level await can never finish linking that
     // cycle ("unsettled top-level await"). Returning from evaluation first lets the import resolve.
     (async () => {
-        const arg = (n, d) => { const i = process.argv.indexOf(n); return i >= 0 ? process.argv[i + 1] : d; };
-        const from = arg("--from", null), gatesArg = arg("--gates", null);
-        const timeoutMs = Number(arg("--timeout-s", 120)) * 1000;
+        const cli = parseOrExit("failLines", { values: { "--from": "path", "--gates": "string", "--timeout-s": "number" }, flags: ["--as-sweep", "--write"] });
+        const from = cli.values["--from"] || null, gatesArg = cli.values["--gates"] || null;
+        const timeoutMs = (cli.values["--timeout-s"] || 120) * 1000;
         let gates = [];
         if (from) {
             let text = "";
@@ -229,7 +230,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         // rig's v4694 verify capped deletionHarness at 20 s where this tool read 3.5 s, and the difference between the two
         // was how the gate was started. With SWEK_SWEEP_DETACHED=1 the sweep's pre-v4695 Windows launch is used, so one
         // box can read both and the cause is measured rather than inferred.
-        const asSweep = process.argv.includes("--as-sweep");
+        const asSweep = cli.flags.has("--as-sweep");
         const Q = asSweep ? await import("./quickSweep.mjs") : null;
         if (asSweep) console.log(`[failLines] launched as the sweep launches: ${JSON.stringify(Q.sweepLaunch())}`);
         const sweepRow = async (g) => {
@@ -252,7 +253,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         if (from) { try { sweptAtMs = fs.statSync(path.isAbsolute(from) ? from : path.join(ENG, from)).mtimeMs; } catch {} }
         const headAtMs = stampNow.committedAt ? Date.parse(stampNow.committedAt) : null;
         console.log(describe(rows, { sweptAtMs, headAtMs, headCommit: stampNow.commit }));
-        if (process.argv.includes("--write")) {
+        if (cli.flags.has("--write")) {
             const stamp = stampNow;
             const REPO = path.resolve(ENG, "..");
             const out = path.join(REPO, captureFile());

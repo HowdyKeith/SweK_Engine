@@ -223,15 +223,22 @@ console.log("\n5. AND EVERY STALE ENTRY IS CORRECTED, WHICH IS WHY SECTION 3 REA
         // So the row asserts what it can -- every entry the sweep CAN reach has moved off its stale value and
         // carries a fresh stamp -- and REPORTS the ones it cannot, with the reason. Asserting movement for an
         // entry no mechanism will ever move is asserting that somebody edits a file by hand.
+        // *** v4804 -- THE STAMP IS THE EVIDENCE; THE VALUE WAS ITS PROXY, AND A PROXY CAN COLLIDE. *** dockSystem's stale
+        // reading was 73 ms, and the box that now owns the record re-swept it at exactly 73 ms, freshly stamped -- red on a
+        // millisecond. A fresh stamp says the entry was re-measured; equal to the old number is then a coincidence a fast
+        // gate can land on, reported below rather than failed. An entry still on the pre-v4408 stamp is what fails.
+        // SABOTAGE (v4804): ui/dockSystem's entry put back on the pre-v4408 stamp, under budget -> 1 red.
         sFixed.every((x) => {
             const stamped = (S.at || {})[x.gate] !== UNKNOWN_AT;
             const reachable = S.timings[x.gate] <= (S.budgetMs || 3000);
-            return (S.timings[x.gate] !== x.sweepWas && stamped) || !reachable;
+            return stamped || !reachable;
         }),
         sFixed.map((x) => {
-            const unreached = S.timings[x.gate] > (S.budgetMs || 3000) && (S.at || {})[x.gate] === UNKNOWN_AT;
+            const stamped = (S.at || {})[x.gate] !== UNKNOWN_AT;
+            const unreached = S.timings[x.gate] > (S.budgetMs || 3000) && !stamped;
             return `${path.basename(x.gate)} ${x.sweepWas}->${S.timings[x.gate]}` +
-                   (unreached ? " [OVER BUDGET, never re-swept -- one of 259 of 316 still on the pre-v4408 stamp]" : "");
+                   (unreached ? " [OVER BUDGET, never re-swept -- one of 259 of 316 still on the pre-v4408 stamp]" : "") +
+                   (stamped && S.timings[x.gate] === x.sweepWas ? " [re-swept, and read its old value again]" : "");
         }).join(", "));
     // *** v4580 -- THE GATE-TIMINGS HALF OF THIS ASKED A LIVE FILE A QUESTION ABOUT A PAST ROUND, AND A LATER
     // ROUND ANSWERED NO. *** "Left alone" was true of v4577's edit and is false of the file today, because

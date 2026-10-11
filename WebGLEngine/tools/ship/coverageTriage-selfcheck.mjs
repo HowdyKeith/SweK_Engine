@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/coverageTriage-selfcheck.mjs — v3410
 //
-// Run: node tools/ship/coverageTriage-selfcheck.mjs   (~4.2s — MEASURED individually)
+// Run: node tools/ship/coverageTriage-selfcheck.mjs   (~1.4s -- MEASURED v4819 at the merge, median of 1438/1261/1651 alone; was ~4.2s)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // gateReach reported "63.3% of physics modules reachable from a gate" and was careful to call it A DENOMINATOR,

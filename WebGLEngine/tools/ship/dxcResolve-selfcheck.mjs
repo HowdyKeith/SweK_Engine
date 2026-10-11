@@ -30,7 +30,7 @@ const ENV = { PLAYWRIGHT_BROWSERS_PATH: ROOT };
 // playwrightResolve-selfcheck's re-spellers list, correctly: a fixture copy is still a second spelling.
 const [FULL_BUNDLE, SHELL_BUNDLE] = SHELL_DIR_SAMPLES;
 const SHELL_BIN = path.join(ROOT, SHELL_BUNDLE, "chrome-headless-shell-win64", "chrome-headless-shell.exe");
-const FULL_DXIL = path.join(ROOT, FULL_BUNDLE, "chrome-win64", "dxil.dll");
+const FULL_DXIL = path.join(ROOT, FULL_BUNDLE, "chrome-win64", "dxcompiler.dll");   // v4821: the key, since Chrome 156 dropped dxil.dll
 const tree = new Set([SHELL_BIN, FULL_DXIL]);
 const fs_ = {
     exists: (p) => tree.has(p),
@@ -43,13 +43,18 @@ console.log("dxcResolve-selfcheck -- dxil.dll for Dawn, found rather than copied
 console.log("1. THE DIRECTORY IS FOUND WHERE THE BUNDLES ACTUALLY PUT IT");
 {
     const r = resolveDxcDir(inj);
-    ok("!! *** dxil.dll is found in the FULL browser bundle, which is the one that ships it ***",
+    ok("!! *** dxcompiler.dll is found in the FULL browser bundle, which is the one that ships it ***",
        r.dir === path.dirname(FULL_DXIL), `${r.dir || "(none)"} from ${r.from || "(none)"}`);
     ok("  and the leaf list covers the layouts a Chrome-for-Testing bundle uses",
        DXC_LEAVES.length >= 3 && DXC_LEAVES.some((l) => l.includes("chrome-win64")),
        DXC_LEAVES.join(", "));
+    // v4821: a bundle with dxil.dll and no dxcompiler.dll is not a source -- the key is the file every generation ships
+    const DXIL_ONLY = new Set([SHELL_BIN, path.join(path.dirname(FULL_DXIL), "dxil.dll")]);
+    const dxilOnly = resolveDxcDir({ ...inj, exists: (p) => DXIL_ONLY.has(p) });
+    ok("!! CONTROL: dxil.dll alone does not make a source -- Chrome 156 ships dxcompiler.dll without it, never the reverse",
+       dxilOnly.dir === "", dxilOnly.dir || "(none, correctly)");
     const none = resolveDxcDir({ ...inj, exists: () => false });
-    ok("!! CONTROL: with dxil.dll nowhere, it returns NOTHING and says what it tried",
+    ok("!! CONTROL: with dxcompiler.dll nowhere, it returns NOTHING and says what it tried",
        none.dir === "" && none.tried.length > 0,
        `${none.tried.length} path(s) tried, none present -- an empty answer that names its search beats a guess`);
 }

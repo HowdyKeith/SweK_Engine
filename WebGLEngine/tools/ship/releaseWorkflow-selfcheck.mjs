@@ -255,5 +255,33 @@ const code = raw.split(/\r?\n/).filter((l) => !/^\s*#/.test(l)).join("\n");
         "gating it behind a platform test would leave the defect one packer-swap away from returning");
 }
 
+// v4824 -- THE CLI REFUSES AN OUTPUT FOLDER THE PACKER WOULD NOT HONOUR, BEFORE IT BUILDS. On the rig at v4823,
+// `--out ..\release` from WebGLEngine resolved inside C:\SweK_src; makeInstallable swapped it, silently, for the
+// project's parent -- the drive root -- and died on EPERM. SABOTAGES, each restored: outDirRefusal's inside-test
+// dropped (RED: rows 1 and 4); the drive-root test dropped (RED: row 2); packRelease's call to it removed (RED: row 4).
+console.log("\n*** v4824 -- packRelease REFUSES A FOLDER IT WOULD NOT USE ***");
+{
+    const { execFileSync } = await import("node:child_process");
+    const pk = require_(path.join(ENG, "ai-bridge", "packagerBridge.js"));
+    const proj = path.resolve(os.tmpdir(), "swek_proj_fixture");
+    const inside = pk.outDirRefusal(path.join(proj, "release"), { projectRoot: proj, external: "" });
+    ok("!! a chosen folder INSIDE the project is refused, and the refusal names a folder outside it",
+        !!inside && /INSIDE the project/.test(inside) && inside.includes(path.join(path.resolve(proj, ".."), "swek_proj_fixture_release")), inside || "(accepted)");
+    const top = path.parse(proj).root + "SweK_src";
+    const driveRoot = pk.outDirRefusal("", { projectRoot: top, external: "" });
+    ok("!! ...and with no --out, a project at the top of a drive is refused rather than written to the drive root",
+        !!driveRoot && /root of a drive/.test(driveRoot), driveRoot || "(accepted)");
+    ok("  ...while a folder outside the project, and a default that is not a drive root, are accepted",
+        pk.outDirRefusal(path.resolve(proj, "..", "elsewhere"), { projectRoot: proj, external: "" }) === null &&
+        pk.outDirRefusal("", { projectRoot: proj, external: "" }) === null);
+    let code = 0, err = "";
+    try { execFileSync(process.execPath, [path.join(ENG, "tools", "ship", "packRelease.mjs"), "--out", path.join(ENG, "release_fixture")],
+                       { cwd: ENG, stdio: ["ignore", "pipe", "pipe"], timeout: 60000 }); }
+    catch (e) { code = e.status; err = String(e.stderr || ""); }
+    ok("!! *** and the CLI exits 1 with that refusal BEFORE building anything ***",
+        code === 1 && /REFUSED: --out .* is INSIDE the project/.test(err) && !fs.existsSync(path.join(ENG, "release_fixture")),
+        "exit " + code + ": " + err.trim().slice(0, 160));
+}
+
 console.log(fails ? `\nreleaseWorkflow-selfcheck: ${fails} FAILED` : "\nreleaseWorkflow-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);

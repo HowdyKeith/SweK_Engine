@@ -15,7 +15,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { hostScale, scaled, recordRun, boxId, hostFacts, SCALE_FLOOR, SCALE_CEILING } from "./hostScale.mjs";
+import { hostScale, scaled, recordRun, boxId, hostFacts, canonicalId, SCALE_FLOOR, SCALE_CEILING } from "./hostScale.mjs";
 import { timingsTarget, LOCAL_TIMINGS, DEFAULTS, RECORD_HANDOVERS, ownerOf } from "./quickSweep.mjs";
 import { ENG as ROOT } from "./gateSweep.mjs";
 import { noComments } from "./sourceScan.mjs";
@@ -302,7 +302,13 @@ console.log("\n*** WHOSE STOPWATCH WROTE sweep-timings.json -- v4647 ***");
     // puts a handful, which is two machines disagreeing rather than a number moving.
     const ME = boxId();
     ok("boxId is stable within a run and shaped for a filename, not for quoting",
-       ME === boxId() && /^[a-z0-9]+-[a-z0-9]+-\d+c-\d+mb-[0-9a-f]{6}$/.test(ME), ME);
+       ME === boxId() && /^[a-z0-9]+-[a-z0-9]+-\d+c-\d+gb-[0-9a-f]{6}$/.test(ME), ME);
+    // v4796: one machine type reported 16095 MB in one session and 16096 MB in the next, and the megabyte id split it in two
+    const facts = hostFacts(), at = (mb) => boxId({ ...facts, totalMemMB: mb });
+    ok("!! the id survives a machine's megabyte drift and still tells machine types apart: 16095 and 16096 MB one id, 32 GB another",
+       at(16095) === at(16096) && at(16096) !== at(32678) && at(7908) !== at(16095), `${at(16095)} / ${at(16096)} / ${at(32678)} / ${at(7908)}`);
+    // SABOTAGES (v4796): the id back in megabytes -> 2 (this row and the shape above); memory dropped from the id -> 1, this row,
+    // 16 GB and 32 GB then one box. Rounding DOWN in place of to-nearest is equivalent at these sizes and was not counted.
 
     // *** v4813 RIG RUN -- THESE THREE ARE THE v4647 RULE, SO THEY ARE ASKED WITHOUT THE LIVE HANDOVER TABLE. ***
     // They passed the live RECORD_HANDOVERS by default, so "a box naming itself owns the record" quietly became
@@ -373,8 +379,18 @@ console.log("\n*** WHOSE STOPWATCH WROTE sweep-timings.json -- v4647 ***");
            RECORD_HANDOVERS.length >= 1 && RECORD_HANDOVERS.every((h) => h.at && h.from && h.to && h.decidedBy &&
                h.evidence && h.from !== h.to) &&
            RECORD_HANDOVERS[0].from === "linux-x64-4c-16096mb-142c0d" && RECORD_HANDOVERS[0].to === "win32-x64-12c-32678mb-b70b27" &&
-           ownerOf("linux-x64-4c-16096mb-142c0d") === last.to,
+           ownerOf("linux-x64-4c-16096mb-142c0d") === canonicalId(last.to),
            RECORD_HANDOVERS.map((h) => `${h.at}: ${h.from} -> ${h.to} (${h.decidedBy})`).join("; "));
+        // v4819 -- THE TWO ID FORMS NAME ONE BOX. The handovers were written while boxId() carried megabytes; the line merged
+        // in at v4819 has carried whole gigabytes since v4796. canonicalId reads the old form as the new, so the owner chain
+        // and boxId() can be compared at all -- without it no box would own the record on either line's ids.
+        ok("!! *** an id in the megabyte form names the same box as the gigabyte form, and a gigabyte id is left alone ***",
+           canonicalId("linux-x64-4c-16095mb-142c0d") === "linux-x64-4c-16gb-142c0d" &&
+           canonicalId("linux-x64-4c-16096mb-142c0d") === canonicalId("linux-x64-4c-16095mb-142c0d") &&
+           canonicalId("win32-x64-12c-32678mb-b70b27") === "win32-x64-12c-32gb-b70b27" &&
+           canonicalId(boxId()) === boxId() && canonicalId("linux-x64-4c-16gb-420793") === "linux-x64-4c-16gb-420793" &&
+           ownerOf("linux-x64-4c-16095mb-420793", [{ at: "x", from: "linux-x64-4c-16gb-420793", to: "b-box" }]) === "b-box",
+           `16095mb-142c0d reads ${canonicalId("linux-x64-4c-16095mb-142c0d")}; the live owner reads ${ownerOf((() => { try { return JSON.parse(fs.readFileSync(path.join(ROOT, DEFAULTS.timingsFile), "utf8")).host; } catch { return null; } })())}`);
     }
     ok("  the local file follows this tree's existing per-machine convention rather than inventing one",
        /\.local\.json$/.test(LOCAL_TIMINGS),
@@ -427,7 +443,8 @@ console.log("\n*** WHOSE STOPWATCH WROTE sweep-timings.json -- v4647 ***");
        "a sweep that runs one machine's list on another and reports only a verdict is two claims wearing one word");
     const qSrc = fs.readFileSync(path.join(ROOT, "tools", "ship", "quickSweep.mjs"), "utf8");
     ok("  ...and 'foreign' is decided by the record's own host against this box, not by a flag somebody passes",
-       /foreignTimings = !!timingsHost && timingsHost !== boxId\(\)/.test(qSrc),
+       // v4819: the record's host read through canonicalId -- a record naming this box in v4796's megabyte form is not foreign
+       /foreignTimings = !!timingsHost && canonicalId\(timingsHost\) !== boxId\(\)/.test(qSrc),
        "the same boxId the record is stamped with, so the two cannot disagree about which machine this is");
     ok("!! CONTROL: the sweep does NOT scale its budget per box, and that is deliberate",
        !/scaled\(/.test(qSrc),

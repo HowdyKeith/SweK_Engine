@@ -82,8 +82,13 @@ Patches 02 and 03 build their previous positions under the same test, so they me
 `mrtSameFrame` is another matter, and the patch leaves it: a skeleton's previous bone matrices step once per `frameId`
 (`src/nodes/accessors/Skinning.js`), and `frameId` advances once per browser frame of the renderer's animation loop, not once
 per render. A second render in the same frame reads the previous bones as the current ones. A plain mesh, measured the same way,
-reads its motion (`plain`). Whether a skeleton should step per render is the maintainers' call; a post-process that renders the
-scene more than once a frame, or an application rendering outside `setAnimationLoop`, meets it.
+reads its motion (`plain`). A post-process that renders the scene more than once a frame, or an application rendering outside
+`setAnimationLoop`, meets it. It is [07](07-skinned-pose-once-a-frame.md)'s subject, and patch 07 steps the bones once per
+render; with it applied as well -- here, all nine patches together -- the reproduction prints:
+
+<!-- together:begin -->
+plain 5.612, drawn 5.612, mrt 5.612, mrtSameFrame 5.612 (px, both backends)
+<!-- together:end -->
 
 ## A patch
 

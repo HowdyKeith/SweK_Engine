@@ -30,6 +30,8 @@ const report = (s) => console.log(`  ----  ${s}`);
 // RE-VENDORED at 0.185.1 (backlog "vendor-three-r160-stale", tools/ship/nextRounds.mjs) -- digests below
 // updated to match; zstddec.module.js's is UNCHANGED because that file is byte-identical between r160 and
 // 0.185.1 upstream (re-confirmed directly, not assumed), so its digest carries over rather than moving.
+// v4807: vendor/three moved to 0.186.1, and all six of these are byte-identical between 0.185.1 and 0.186.1 (compared against
+// the tarball file by file), so not one digest moves -- which is the claim this table makes, now about a second release.
 const VENDORED = {
     "vendor/three/jsm/loaders/KTX2Loader.js":            "3a3233ce3409443076d3414b78832e1405fcfac5ecb34d367365fd0781127d6c",
     "vendor/three/jsm/utils/WorkerPool.js":              "5ac7095fd566bc9ae48376055fd66edf27cb9ebbf9e1269dc206bfd4933ae9eb",
@@ -61,7 +63,7 @@ const FIX = {
 console.log("gltfKtx2-selfcheck -- the transcoder, and when it is fetched\n");
 
 // =============================================================================================================
-console.log("1. *** EVERY VENDORED FILE IS PRESENT AND BYTE-IDENTICAL TO UPSTREAM 0.185.1 ***");
+console.log("1. *** EVERY VENDORED FILE IS PRESENT AND BYTE-IDENTICAL TO UPSTREAM 0.186.1 ***");
 {
     const missing = Object.keys(VENDORED).filter((f) => !fs.existsSync(path.join(ROOT, f)));
     ok("*** all six files the loader needs are here ***", missing.length === 0,
@@ -77,6 +79,38 @@ console.log("1. *** EVERY VENDORED FILE IS PRESENT AND BYTE-IDENTICAL TO UPSTREA
                      : "six sha256 digests, re-derived from disk. KTX2Loader.js keeps its bare `from 'three'` " +
                        "and its relative '../utils/' and '../libs/' imports, which is why the layout mirrors upstream");
 
+    // v4807 -- *** AND THE OTHER FOURTEEN, SO A HALF-DONE RE-VENDOR CANNOT HIDE. *** vendor/three moved to 0.186.1 and seven of its
+    // files changed; nothing held those seven to the release's bytes, so a GLTFLoader.js left at 0.185.1 beside an r186 core would have
+    // passed every gate. Each digest is the npm tarball's file, compared before it was written here. three.core.js is the same bytes as
+    // vendor/three-webgpu/three.core.js: the two builds share one core, which threeUpstream-selfcheck's section 6 holds to the record.
+    const REST = {
+        "vendor/three/three.core.js": "9edde002b066a9a05676a6127f67735b62baf399bdea529f2f7e31657da769e6",
+        "vendor/three/three.module.js": "9052042d676cb0fdc1ddfefe193053f34b7ac0513a616fdac4535d49987812ea",
+        "vendor/three/jsm/controls/OrbitControls.js": "3d79d07ecb686b4e5d93232eedab255331c1beef711e13164eaa1f68655a5f2b",
+        "vendor/three/jsm/exporters/GLTFExporter.js": "d766b04f233fa8bc72bfaebacaac5ecb832c30ca3695ce8d84bbb7dccccdc842",
+        "vendor/three/jsm/loaders/FBXLoader.js": "7fb8586158a2cf98477b2ee40a82ebec10a81040c70369bb177043375c355322",
+        "vendor/three/jsm/loaders/GLTFLoader.js": "131c0f78c01d19368ae495caa65b3adaa10487810a36a05bb5901b769a35ac16",
+        "vendor/three/jsm/utils/BufferGeometryUtils.js": "9fb63427ce6641fa14fd0baff9cc4d1b5f9c3d85fd084bf2e90e803c44ec1797",
+        "vendor/three/jsm/utils/SkeletonUtils.js": "b1632a703206c3d830de9fcbe515696770d04b71a15ee6b50afa6d2c3298c86f",
+        "vendor/three/jsm/libs/fflate.module.js": "209a4412eb48ce609edb4391992a792ffcc3983d30ee7e2b0b89a8c470f3cd8a",
+        "vendor/three/jsm/libs/meshopt_decoder.module.js": "d428e73a000057c6c94bfcedc3412d0c2dc14ca8800e88553aab05113ad2bf19",
+        "vendor/three/jsm/libs/basis/README.md": "a578df416c1e0852e9c36a1cf91b4d28d91a251294f87ce610a3bc7ca4df15e0",
+        "vendor/three/jsm/curves/NURBSCurve.js": "bef2607618a7778455e71a1f0bd206951c382d313e2e245808cc7d3533d60fb6",
+        "vendor/three/jsm/curves/NURBSUtils.js": "c6bd7c4137d585098923f189687898ea3e8762ea3ecbe255d749a56353894379",
+        "vendor/three/jsm/math/ColorSpaces.js": "cc35c01c793cd17ccded7bc8142abffd3ce0d60dd6de8d5d216983bd05aee262",
+    };
+    const digest = (f) => { try { return crypto.createHash("sha256").update(fs.readFileSync(path.join(ROOT, f))).digest("hex"); } catch { return null; } };
+    const restWrong = Object.entries(REST).filter(([f, want]) => digest(f) !== want);
+    // every file under vendor/three is in one of the two tables, or is this tree's own paperwork or code
+    const OWN = new Set(["vendor/three/PROVENANCE.txt", "vendor/three/LICENSE", "vendor/three/jsm/libs/meshoptGltf.js", "vendor/three/jsm/libs/basis/PROVENANCE.txt"]);
+    const walk = (d) => fs.readdirSync(path.join(ROOT, d), { withFileTypes: true }).flatMap((e) => e.isDirectory() ? walk(d + "/" + e.name) : [d + "/" + e.name]);
+    const untabled = walk("vendor/three").filter((f) => !(f in VENDORED) && !(f in REST) && !OWN.has(f));
+    ok(`!! *** the other ${Object.keys(REST).length} upstream files are 0.186.1's too, byte for byte, and nothing under vendor/three is in neither table ***`,
+        restWrong.length === 0 && untabled.length === 0,
+        restWrong.length ? "DIFFER: " + restWrong.map(([f]) => f).join(", ") : untabled.length ? "UNTABLED: " + untabled.join(", ") :
+        `three.core.js is vendor/three-webgpu's own core: ${digest("vendor/three/three.core.js") === digest("vendor/three-webgpu/three.core.js")}`);
+
+    // v4807 SABOTAGES: GLTFLoader.js left at 0.185.1 -> 1 (DIFFER, naming it); a stray file under vendor/three/jsm -> 1 (UNTABLED).
     // *** THE ATTRIBUTION IS NOT IN THE FILES, AND THE RECORD SAYS SO RATHER THAN IMPLYING IT IS. ***
     const bt = fs.readFileSync(path.join(ROOT, "vendor/three/jsm/libs/basis/basis_transcoder.js"), "utf8");
     const wasm = fs.readFileSync(path.join(ROOT, "vendor/three/jsm/libs/basis/basis_transcoder.wasm"));

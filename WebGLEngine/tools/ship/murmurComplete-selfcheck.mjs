@@ -27,6 +27,14 @@
 // so at the peak they arrive together and the differences between them close. A gain preserves every
 // difference and multiplies them; a saturation destroys them. Both are the flash, and a port that used one
 // spelling for all six would be wrong about six species in two different directions.
+// v4825 SABOTAGE, restored: opal's procession mix handed a zero weight in place of DRIVE (RED: the saturations row).
+// v4829 -- sol's core row reads the LIMB (0.22 to 0.30 of the frame): with u_depth no longer multiplying every
+// interior, the disc sits at the rail's top in murmur and here alike, and read x1.01 with its gain and x1.002
+// without. The limb reads x1.211 with it and x1.039 without. The saturation census reads sol's gesture-lifted
+// liftG, and the beside-the-interior row reads besideE, which carries comet's head as well as limn's rim now.
+// SABOTAGE, restored: COMPLETE.mul(MH_COMPLETE_SOL_CORE) typed COMPLETE.mul(0.0) -> RED (the core row and the
+// saturations census). comet's head put back into its density stays GREEN here -- this gate's row is limn's --
+// and goes RED in murmurParity-selfcheck, which holds comet's.
 "use strict";
 
 import fs from "node:fs";
@@ -133,15 +141,19 @@ sec("3. *** THE CENSUS: WHO SPENDS complete, AND THE RULE THAT DECIDES WHICH TAB
     // four species in the table. The two are applied at ONE site for all eighteen, so the check is that the
     // site carries both and that the complete table is a strict SUBSET of the settled one.
     const bothApplied = /\.mul\(compF\)\.mul\(settleF\)/.test(src);
-    const subset = Object.keys(IN).every((s) => s in K.MH_SETTLED_INTERIOR);
-    ok("!! *** THE FLASH's FACTOR AND THE SETTLE's ARE APPLIED AT ONE SITE, and the four are a SUBSET of the seventeen ***",
-        bothApplied && subset && Object.keys(IN).length === 4,
-        `the interior is density * m * transmit * compF * settleF, and every species in ` +
-        `MH_COMPLETE_INTERIOR (${Object.keys(IN).join(", ")}) is also in MH_SETTLED_INTERIOR. THE SUBSET IS ` +
-        `THE RULE MADE CHECKABLE: a species earns a complete factor here only because murmur writes it on ` +
-        `the same line as the settled factor, so a species that has no settled factor on that line cannot ` +
-        `have a complete one either. droplet is the one species outside MH_SETTLED_INTERIOR and it is ` +
-        `correctly outside this table too.`);
+    // *** v4825 -- THE RULE WAS WRONG ABOUT ONE SPECIES, AND IT WAS THE ONE THE TABLE SAID 1.60 FOR. *** It read
+    // "a species earns a complete factor here only because murmur writes it on the same line as the settled
+    // factor". limn.ts's INTERIOR line (173) carries (1 + 0.9 * complete) and no settle; its settle is on the RIM
+    // line (133) beside the rim's own (1 + 1.6 * complete). The rule picked the rim line, the port then folded the
+    // rim into the interior, and both errors agreed with each other. The rule now reads murmur's INTERIOR line:
+    // three species carry both factors there, and limn carries the complete alone.
+    const subset = Object.keys(IN).filter((s) => s !== "limn").every((s) => s in K.MH_SETTLED_INTERIOR);
+    ok("!! *** THE FLASH's FACTOR AND THE SETTLE's ARE APPLIED AT ONE SITE; limn's interior carries the flash and no settle ***",
+        bothApplied && subset && Object.keys(IN).length === 4 && IN.limn === 0.90 && !("limn" in K.MH_SETTLED_INTERIOR),
+        `the interior is density * m * transmit * compF * settleF. ${Object.keys(IN).filter((s) => s !== "limn").join(", ")} ` +
+        `carry both factors on murmur's interior line; limn's interior line carries (1 + ${IN.limn} * complete) ` +
+        `and no settle, which is limn.ts:173, and limn's settle and its 1.6 live on its rim (MH_LIMN_RIM). ` +
+        `droplet is outside both tables, settling on its coreBright.`);
 
     // A MISSING KEY AND NOT A ZERO -- v4644's lesson, restated because the same sabotage exists here.
     ok("!! ...and the fourteen species without one are a MISSING KEY, read with ?? 0.0 at the site",
@@ -155,8 +167,10 @@ sec("3. *** THE CENSUS: WHO SPENDS complete, AND THE RULE THAT DECIDES WHICH TAB
         `exploited when droplet's exclusion was a ternary.`);
 
     // The three saturation sites, named, because each is inside a different species' loop.
-    const sites = [["opal", /KIT\.mhCompleteLift\(KIT\.mhOpalLife\(/],
-                   ["sol", /KIT\.mhCompleteLift\(sn\.mul\(sn\), COMPLETE,/],
+    // v4825: opal's life is the RESPONDING mix murmur writes -- mix(life, procession, drive) -- and the lift
+    // saturates THAT, so the site reads the lift around the mix and not around the bare mhOpalLife.
+    const sites = [["opal", /KIT\.mhCompleteLift\(\s*mix\(KIT\.mhOpalLife\([^)]*\), uniforms\.time\), float\(OD\.procFloor\)\.add\(max\(proc, 0\.0\)\.mul\(OD\.procAmp\)\), DRIVE\)/],
+                   ["sol", /KIT\.mhCompleteLift\(liftG, COMPLETE,/],   // v4829: the gesture-lifted sn^2, sol.ts:112
                    ["chorus", /KIT\.mhCompleteLift\(\s*life\.add\(select\(/]];
     const found = sites.filter(([, re]) => re.test(raw)).map(([s]) => s);
     ok("!! *** ALL THREE SATURATIONS ARE WIRED, EACH ON THE FIGURE ITS OWN FILE NAMES ***",
@@ -180,7 +194,8 @@ sec("4. *** AND IT REACHES PIXELS: four species that did not move a byte at the 
     // SATURATED -- measured at 2.0937 against 2.0916 across the flash, a ratio of 0.999 -- so its 0.55 core
     // gain cannot show: the pixels are already at the top of the range. A sabotage that deleted that gain
     // walked through this section reading x1.05, because the lift on the prominences carried the row on its
-    // own. At glow 0.25 the same core reads x2.56. A frame where the subject is clipped is not a measurement
+    // own. At glow 0.25 the core read x2.56 until v4829 (a depth double count kept it dim; the row below
+    // now reads the limb, and says why). A frame where the subject is clipped is not a measurement
     // of the subject, and "it still moved" is not evidence about which term moved it.
     const KN = (s) => (s === "sol" ? { glow: 0.25, depth: 0.5 } : {});
     const FR = [];
@@ -214,24 +229,32 @@ sec("4. *** AND IT REACHES PIXELS: four species that did not move a byte at the 
 
         // *** sol's CORE, ON ITS OWN, because sol carries BOTH shapes and the interior row cannot separate
         // them. *** Its prominences saturate and its core takes a 0.55 gain; a reading of the whole interior
-        // is their sum, and deleting the gain left that sum moving. The core is the inner 0.16 of the frame.
+        // is their sum, and deleting the gain left that sum moving.
+        // *** v4829 -- READ ON THE LIMB, NOT THE DISC. *** Until v4825 the core was the inner 0.16 of the frame
+        // and read x2.56 -- but only because the port multiplied every interior by u_depth AS WELL AS spending
+        // it in mh_palette, so this frame's depth 0.5 halved the core and kept it off the top of the rail.
+        // murmur spends depth only in the palette. With that double count gone the disc's coreBright (1.20 and
+        // up, sol.ts:90) sits at the rail's top in murmur and in the port alike, and the inner disc reads x1.01
+        // with the gain and x1.002 without it -- a clipped subject, which is no measurement. The gain is still
+        // VISIBLE where disc's own smoothstep takes the core below the top: the limb, 0.22 to 0.30 of the frame.
+        // MEASURED: x1.211 there with the gain, x1.039 with COMPLETE.mul(MH_COMPLETE_SOL_CORE) typed
+        // COMPLETE.mul(0.0) -- the floor sits between them.
         const solOff = run.frames[SPEC.indexOf("sol") * 2], solOn = run.frames[SPEC.indexOf("sol") * 2 + 1];
-        const coreMean = (px) => { let a = 0, n = 0;
+        const limbMean = (px) => { let a = 0, n = 0;
             for (let y = 0; y < N3; y++) for (let x = 0; x < N3; x++) {
-                const dx = (x + 0.5) / N3 * 2 - 1, dy = (y + 0.5) / N3 * 2 - 1;
-                if (Math.hypot(dx, dy) > 0.16) continue;
+                const r = Math.hypot((x + 0.5) / N3 * 2 - 1, (y + 0.5) / N3 * 2 - 1);
+                if (r < 0.22 || r >= 0.30) continue;
                 a += light(px, x, y); n++;
             }
             return a / n; };
-        const cLo = coreMean(solOff), cHi = coreMean(solOn);
-        say(`sol's core alone (inner 0.16 of the frame, glow 0.25): ${cLo.toFixed(4)} -> ${cHi.toFixed(4)}  (x${(cHi / cLo).toFixed(3)})`);
-        ok("!! *** sol's CORE TAKES ITS OWN 0.55 GAIN, measured apart from the prominences that saturate ***",
-            cHi / cLo > 2.0,
-            `the inner disc goes x${(cHi / cLo).toFixed(3)} across the flash where the whole interior goes ` +
-            `x${(R.find((r) => r.s === "sol").hi / R.find((r) => r.s === "sol").lo).toFixed(3)}. TWO SHAPES ` +
-            `IN ONE SPECIES AND THE ROW HAS TO SEPARATE THEM: sol.ts gives the core a GAIN on its brightness ` +
-            `and the prominences a SATURATION on their lives, and a reading of the interior is their sum. ` +
-            `Deleting the gain left that sum moving and this gate green, which is why the core has a row.`);
+        const cLo = limbMean(solOff), cHi = limbMean(solOn);
+        say(`sol's limb alone (0.22 to 0.30 of the frame, glow 0.25): ${cLo.toFixed(4)} -> ${cHi.toFixed(4)}  (x${(cHi / cLo).toFixed(3)})`);
+        ok("!! *** sol's CORE TAKES ITS OWN 0.55 GAIN, read on the limb where the disc is below the rail's top ***",
+            cHi / cLo > 1.12,
+            `the limb goes x${(cHi / cLo).toFixed(3)} across the flash (x1.039 measured with the gain deleted). ` +
+            `TWO SHAPES IN ONE SPECIES AND THE ROW HAS TO SEPARATE THEM: sol.ts gives the core a GAIN on its ` +
+            `brightness and the prominences a SATURATION on their lives, and a reading of the interior is their ` +
+            `sum. The inner disc is at the top of the rail in murmur too, so the gain is read where disc falls off.`);
 
         // *** A ROW ABOUT THE DARK STAYING DARK WAS WRITTEN HERE AND DELETED, AND THE MEASUREMENT IS WHY. ***
         // kit.ts's own reason for a multiply rather than an overlay is that it "brightens exactly what is
@@ -260,6 +283,78 @@ sec("4. *** AND IT REACHES PIXELS: four species that did not move a byte at the 
     }
 }
 
+// =============================================================================================================
+sec("5. *** v4825 -- THE SINGLES: SEVEN FLASH FACTORS, EACH READ ONCE, IN ITS OWN SPECIES, AT murmur's NUMBER ***");
+{
+    // The numbers are murmur's, read off krispuckett/murmur-web src/shaders/<species>.ts at 1c23b99 and written
+    // here with the line each came from, so a change to the kit's table has to disagree with a quotation to pass.
+    // SABOTAGED, each restored: duet's flare read in buildStill instead -> RED (wrong builder); prism's 1.10 typed
+    // as 1.01 in the kit -> RED (value); comet's head factor deleted -> RED (read 0 times, and the pixel row).
+    const MURMUR = {
+        "still.glint":   ["still.ts:80",    0.85],
+        "comet.head":    ["comet.ts:111",   2.2],
+        "droplet.heart": ["droplet.ts:156", 0.26],
+        "duet.shrink":   ["duet.ts:77",     0.62],
+        "duet.flare":    ["duet.ts:120",    1.15],
+        "chorus.sync":   ["chorus.ts:66",   0.55],
+        "prism.beams":   ["prism.ts:159",   1.10],
+    };
+    const orb = codeOnly(fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbTsl.mjs"), "utf8"));
+    const BUILDER = { still: "Still", comet: "Comet", droplet: "Droplet", duet: "Duet", chorus: "Chorus", prism: "Prism" };
+    const bodyOf = (b) => { const i = orb.indexOf(`const build${b} = () => {`); if (i < 0) return "";
+        const j = orb.indexOf("const build", i + 20); return orb.slice(i, j < 0 ? orb.length : j); };
+    const bad = [];
+    for (const [key, [where, want]] of Object.entries(MURMUR)) {
+        const [spc, k] = key.split(".");
+        const got = K.MH_COMPLETE_SINGLES?.[spc]?.[k];
+        const ref = `MH_COMPLETE_SINGLES.${spc}.${k}`;
+        const total = orb.split(ref).length - 1, inOwn = bodyOf(BUILDER[spc]).split(ref).length - 1;
+        if (got !== want || total !== 1 || inOwn !== 1) bad.push(`${key}: kit ${got} vs ${where} ${want}, read ${total}x, ${inOwn}x in build${BUILDER[spc]}`);
+    }
+    const tableKeys = Object.entries(K.MH_COMPLETE_SINGLES || {}).flatMap(([s2, o]) => Object.keys(o).map((k) => s2 + "." + k));
+    ok("!! *** each of the seven is murmur's number, read exactly once, inside its own species' builder ***",
+        bad.length === 0 && tableKeys.length === 7 && tableKeys.every((k) => k in MURMUR),
+        bad.length ? bad.join("; ") : `${tableKeys.length} singles: ` + Object.entries(MURMUR).map(([k, [w]]) => `${k} (${w})`).join(", "));
+    // *** v4825 -- limn's TWO, AND THE TWO GAPS RECORDED BESIDE THEM, CLOSED. *** limn's are not singles:
+    // its 0.90 is MH_COMPLETE_INTERIOR.limn on the shared interior line, and its rim's 1.6 / 0.30 / ringClose 1.20
+    // are MH_LIMN_RIM, spent in buildLimn on a rim that joins the pixel BESIDE the interior (limn.ts: e = interior
+    // + rimE + ...). still's glint takes still.ts:80's (0.90 + 0.95 * live.voice); chorus's sync takes chorus.ts:66's
+    // 0.85 * st.drive. SABOTAGED, each restored: limn's rim put back into its density -> RED; still's 0.95 typed
+    // 0.59 -> RED; chorus's drive term deleted -> RED.
+    const limnBody = bodyOf("Limn"), stillBody = bodyOf("Still"), chorusBody = bodyOf("Chorus");
+    const R = K.MH_LIMN_RIM || {};
+    const limnOk = R.complete === 1.6 && R.settled === 0.30 && R.ringClose === 1.20 && K.MH_COMPLETE_INTERIOR.limn === 0.90 &&
+        /const limnDensity = accL\.mul\(3\.0\);/.test(limnBody) &&
+        // the species name is a STRING, which codeOnly blanks -- so this one line is read from the raw source
+        /species === "limn" \? SP\.rimE : species === "comet" \? SP\.headE\.mul\(surfB\.m\) : float\(0\.0\)/.test(fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbTsl.mjs"), "utf8")) &&
+        /interior\.add\(besideE\)\.add\(sf\.rim\)/.test(orb);
+    ok("!! *** limn: the rim carries 1.6, 0.30 and ringClose 1.20 and joins BESIDE an interior carrying 0.90 -- limn.ts:126-173 ***",
+        limnOk, `MH_LIMN_RIM ${JSON.stringify(R)}, interior ${K.MH_COMPLETE_INTERIOR.limn}; density is accL alone and the rim is added at railE and eTotal`);
+    const G = K.MH_STILL_GLINT || {};
+    ok("!! *** still's glint answers the voice: (0.90 + 0.95 * live.voice) -- still.ts:80 ***",
+        G.base === 0.90 && G.voice === 0.95 && (stillBody.split("MH_STILL_GLINT.voice").length - 1) === 1,
+        `MH_STILL_GLINT ${JSON.stringify(G)}, read in buildStill`);
+    ok("!! *** chorus's sync leans with RESPONDING: + 0.85 * st.drive -- chorus.ts:66 ***",
+        K.MH_CHORUS.syncDrive === 0.85 && /DRIVE\.mul\(CH\.syncDrive\)/.test(chorusBody),
+        `MH_CHORUS.syncDrive ${K.MH_CHORUS.syncDrive}, read in buildChorus inside the sync clamp`);
+
+    // ONE OF THE SEVEN IN PIXELS: comet, whose head was its whole flash and was missing. At SUCCESS tau 0.20 the
+    // settle is still exactly 0, so what comet gains over its own tau-0 frame is the flash: the head's
+    // (1 + 2.2 * complete) and the trail filling behind it.
+    const pair = await renderSpecies([sp("comet", 0, undefined, { stateIndex: SUCCESS, stateTau: 0 }),
+                                      sp("comet", 0, undefined, { stateIndex: SUCCESS, stateTau: 0.20 })]);
+    if (!pair.ok) ok("!! comet's head flash renders", false, pair.reason || pair.skipped || "no frames");
+    else {
+        const [a, b] = pair.frames; let sumA = 0, sumB = 0;
+        for (let y = 0; y < N3; y++) for (let x = 0; x < N3; x++) { sumA += light(a, x, y); sumB += light(b, x, y); }
+        const st = K.mhState(SUCCESS, 0.20);
+        ok("!! *** comet's HEAD FLASHES NOW: early in SUCCESS, with settled still 0, its frame gains a fifth of its light ***",
+            st.settled === 0 && st.complete > 0.5 && sumB > sumA * 1.20,
+            `complete ${st.complete.toFixed(3)}, settled ${st.settled}; total linear light ${sumA.toFixed(1)} -> ` +
+            `${sumB.toFixed(1)} (x${(sumB / sumA).toFixed(3)}).`);
+    }
+}
+
 REPORT.write();
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nWHAT THIS GATE IS FOR: the half of the SUCCESS flash that is not the travelling shell. kit.ts says the " +
@@ -272,11 +367,13 @@ console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "leaves the dark dark. Inside the silhouette these four frames have NO pixel at or below 6 of 255, so " +
     "the obvious row read a worst rise of 0.0 from a population of zero and would have passed forever while " +
     "measuring the paper behind the orb. The claim is graded as the arithmetic it is." +
-    "\nWHAT IS NOT CLAIMED: the eight per-species ignition FIGURES that are still missing -- comet, fathom, " +
-    "geode, arc, aura, flux, prism and helix each spend complete on a gaussian of their own (arc on its " +
-    "filament, aura on a von Mises that follows the sweep round its ribbons, geode on a flat lit += 0.70) " +
-    "and none is the one shape MH_IGNITE holds. Also not claimed: still's glint brightness, comet's head, " +
-    "droplet's 0.26, limn's ring and second interior, duet's flare and its one SHRINK, chorus's sync, " +
-    "prism's 1.10, fathom's per-shell weight. Counted in murmur's own sources st.complete appears 47 times; " +
-    "this round takes 8 of them and the census in tools/ship/murmurLive-selfcheck.mjs holds the total.");
+    "\nWHAT IS NOT CLAIMED HERE, AND WHERE IT IS: the eight per-species ignition FIGURES -- arc, flux, prism " +
+    "and helix's travelling fronts (v4659, tools/ship/murmurIgniteAxis-selfcheck.mjs), aura's von Mises, " +
+    "fathom's per-shell window, geode's flat lift and comet's trail decay (v4660, murmurIgniteFour) -- are " +
+    "graded in their own gates, not this one. The SINGLES are section 5, limn's ring and second interior " +
+    "included since v4825 split its rim from its interior. (v4829: this sentence said the eight figures were " +
+    "still missing and that limn's two waited on that split -- both closed rounds earlier, and a closing that " +
+    "under-claims sends the next reader to build what is already there.) murmur's eighteen shaders at 1c23b99 " +
+    "spell st.complete 48 times; the port's 24 COMPLETE readers are those sites collapsed onto shared shapes, " +
+    "and tools/ship/murmurLive-selfcheck.mjs holds that count.");
 process.exit(fails ? 1 : 0);

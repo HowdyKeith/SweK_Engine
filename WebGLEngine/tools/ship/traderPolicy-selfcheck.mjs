@@ -9,7 +9,9 @@
 // information, same days), and that the verdict is reported as measured rather than assumed.
 "use strict";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
+import { stableWrite } from "./stableWrite.mjs";
 import { fileURLToPath } from "node:url";
 import { buildOrrery } from "../../world/orrery.mjs";
 import { makeGitEconomy, GOODS } from "../../world/gitEconomy.mjs";
@@ -53,11 +55,18 @@ export function reproducible(x) {
     return x;
 }
 
-/** Write an artifact that says WHEN ITS SHAPE WAS FIXED and WHEN ITS NUMBERS WERE TAKEN -- different facts. */
-function writeArtifact(rel, shapeAt, body) {
-    const doc = { shapeAt, measuredAt: ENGINE_VERSION, ...reproducible(body) };
-    fs.writeFileSync(path.join(ENG, rel), JSON.stringify(doc, null, 1) + "\n");
-    return doc;
+/**
+ * v4826 -- THE VERSION THESE NUMBERS LAST *CHANGED* AT. `measuredAt` (v4534) was stamped with the running engine's version on EVERY run, so the first run of
+ * this gate in a new version rewrote both files to say so -- one line each, nothing else -- and a ship's gates, run after `git add`, dirtied the tree behind
+ * the staging (v4822's step 4b did exactly that). It was the very defect this file's header says it removed: a field that moves with something other than the
+ * content. The stamp now moves only when the content does (tools/ship/stableWrite.mjs, the one definition): a run that reproduces the numbers leaves the file
+ * BYTE-IDENTICAL and untouched, and a run that changes them stamps the version it ran under. A file written before this (it carries `measuredAt`) hands its
+ * stamp over as `changedAt`: the last version a run restamped it, an upper bound on when the numbers last moved, and the one honest thing the old field knew.
+ */
+/** Write an artifact that says WHEN ITS SHAPE WAS FIXED and WHEN ITS NUMBERS LAST CHANGED -- different facts. An identical file is not written at all. */
+function writeArtifact(rel, shapeAt, body, { root = ENG, version = ENGINE_VERSION } = {}) {
+    const content = reproducible(body);
+    return stableWrite(path.join(root, rel), (stamp) => ({ shapeAt, changedAt: stamp, ...content }), { stampName: "changedAt", stampValue: version, legacy: ["measuredAt"], newline: true }).doc;
 }
 import * as P from "../../world/traderPolicy.mjs";
 import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
@@ -150,11 +159,25 @@ console.log("\n4. v4534 -- THE ARTIFACTS THIS GATE WRITES: REPRODUCIBLE, STAMPED
 
     // *** THE MEASURED-AT IS DERIVED FROM main.js, SO IT CANNOT GO STALE THE WAY THE OLD ONE DID. *** The
     // frozen "v4314"/"v4316" said 218 rounds ago while carrying numbers from minutes ago.
-    ok("!! *** each artifact says when its SHAPE was fixed and when its NUMBERS were taken -- two facts ***",
-       !!ENGINE_VERSION && docs.every((d, i) => d.measuredAt === ENGINE_VERSION && /^v\d+$/.test(d.shapeAt) && d.shapeAt !== d.measuredAt),
-       `shapeAt ${docs.map((d) => d.shapeAt).join(", ")} against measuredAt ${ENGINE_VERSION || "(main.js unreadable)"}` +
+    ok("!! *** each artifact says when its SHAPE was fixed and when its NUMBERS LAST CHANGED -- two facts, the second moving only when the numbers do (v4826) ***",
+       !!ENGINE_VERSION && docs.every((d) => /^v\d+$/.test(d.changedAt) && Number(d.changedAt.slice(1)) <= Number(ENGINE_VERSION.slice(1)) && /^v\d+$/.test(d.shapeAt) && d.shapeAt !== d.changedAt && d.measuredAt === undefined),
+       `shapeAt ${docs.map((d) => d.shapeAt).join(", ")}, numbers last changed at ${docs.map((d) => d.changedAt).join(", ")}, engine ${ENGINE_VERSION || "(main.js unreadable)"}` +
        (ENGINE_VERSION ? ` -- ${docs.map((d) => Number(ENGINE_VERSION.slice(1)) - Number(String(d.shapeAt).slice(1))).join(" and ")} rounds of drift ` : " -- ") +
        "that a single frozen `version` field was reporting as none.");
+
+    // v4826 -- A LATER VERSION RE-RUNNING THE SAME NUMBERS LEAVES THE TREE CLEAN. Driven through writeArtifact in a temp root, with the version injected.
+    {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), "swek-trader-")), rel = "a.json", f = path.join(root, rel), body = { days: 60, greedy: 39204.5, runs: [{ name: "x", ratio: 1.5, ms: 4001 }] };
+        const w1 = writeArtifact(rel, "v4314", body, { root, version: "v4900" }); fs.utimesSync(f, new Date("2020-01-01"), new Date("2020-01-01"));
+        const bytes1 = fs.readFileSync(f, "utf8"), w2 = writeArtifact(rel, "v4314", { ...body, runs: [{ name: "x", ratio: 1.5, ms: 9999 }] }, { root, version: "v4901" });
+        ok("!! the SAME numbers re-run under a LATER version leave the file byte-identical, untouched (its mtime did not move), and still say the version they last changed at -- the tree is clean after a gate runs", w1.changedAt === "v4900" && w2.changedAt === "v4900" && fs.readFileSync(f, "utf8") === bytes1 && fs.statSync(f).mtime.getUTCFullYear() === 2020, `changedAt ${w1.changedAt} -> ${w2.changedAt}, mtime ${fs.statSync(f).mtime.toISOString().slice(0, 10)}`);
+        const w3 = writeArtifact(rel, "v4314", { ...body, greedy: 40000 }, { root, version: "v4902" });
+        ok("...and DIFFERENT numbers are stamped with the version that changed them, and written", w3.changedAt === "v4902" && JSON.parse(fs.readFileSync(f, "utf8")).greedy === 40000 && fs.statSync(f).mtime.getUTCFullYear() !== 2020);
+        fs.writeFileSync(f, JSON.stringify({ shapeAt: "v4314", measuredAt: "v4819", ...body, runs: [{ name: "x", ratio: 1.5 }] }, null, 1) + "\n");
+        const w4 = writeArtifact(rel, "v4314", body, { root, version: "v4903" }), w5 = writeArtifact(rel, "v4314", body, { root, version: "v4904" });
+        ok("a file written before this change (it carries `measuredAt: v4819`) hands that stamp over as `changedAt` once, drops the old field, and is stable from then on", w4.changedAt === "v4819" && w4.measuredAt === undefined && w5.changedAt === "v4819" && JSON.parse(fs.readFileSync(f, "utf8")).measuredAt === undefined, `changedAt ${w4.changedAt}, then ${w5.changedAt}`);
+        fs.rmSync(root, { recursive: true, force: true });
+    }
 
     // *** REPRODUCIBILITY, ASSERTED BY MECHANISM. *** The bytes are re-derived from the values in hand and
     // compared with what is on disk. A volatile field anywhere in either document fails HERE rather than
@@ -201,7 +224,7 @@ console.log("\n4. v4534 -- THE ARTIFACTS THIS GATE WRITES: REPRODUCIBLE, STAMPED
     // and sabotage EE went 0 RED twice: a non-vacuity control built on a parallel implementation cannot see a
     // defect in the implementation under test. Two copies of a rule is this tree's oldest finding, committed
     // here inside the control written to prevent exactly this.
-    const readers = [];
+    const readers = [], namesOnly = [], NAMES_ONLY = new Set(["tools/ship/recordShape.mjs"]);
     let scanned = 0;
     const skip = /^(node_modules|vendor|\.git|deleted|dist|build)$/;
     const SELF = path.join(ENG, "tools/ship/traderPolicy-selfcheck.mjs");
@@ -216,6 +239,9 @@ console.log("\n4. v4534 -- THE ARTIFACTS THIS GATE WRITES: REPRODUCIBLE, STAMPED
             let src; try { src = fs.readFileSync(f, "utf8"); } catch { continue; }
             if (!/trader-policy(-spread)?\.json/.test(src)) continue;
             if (f === SELF) continue;                       // the writer names its own outputs
+            // v4826 -- a REGISTRY THAT NAMES A FILE IS NOT A READER OF IT. tools/ship/recordShape.mjs lists the two artifacts in DROPPED_ON_PURPOSE (the `measuredAt` -> `changedAt`
+            // rename needed a door in its ratchet) and a path in an exemption is not an audience. Named, counted and held to "only in those entries" below.
+            if (NAMES_ONLY.has(path.relative(ENG, f).split(path.sep).join("/"))) { namesOnly.push(path.relative(ENG, f)); continue; }
             readers.push(path.relative(ENG, f));
         }
     };
@@ -226,6 +252,9 @@ console.log("\n4. v4534 -- THE ARTIFACTS THIS GATE WRITES: REPRODUCIBLE, STAMPED
        scanned > 500 && canFind,
        `${scanned} .mjs/.js/.html files visited by the same walk that collects the readers, and the predicate ` +
        "matches this file's own mentions. A zero from a scan that read nothing is not a zero.");
+    ok("...and the one registry the scan lets pass names the artifacts ONLY inside DROPPED_ON_PURPOSE entries (a line that starts `{ record:`), never in code that reads them",
+       namesOnly.length === 1 && fs.readFileSync(path.join(ENG, namesOnly[0]), "utf8").split("\n").filter((l) => /trader-policy(-spread)?\.json/.test(l)).every((l) => /^\s*\{ record: "tools\/ship\/trader-policy(-spread)?\.json", field: "top:measuredAt", round: "v4826"/.test(l)),
+       namesOnly.join(", "));
     ok("!! the number of readers is DERIVED from the tree, not asserted in a sentence",
        readers.length === 0,
        readers.length ? "readers: " + readers.join(", ") + " -- the artifacts have an audience now, and this " +
@@ -244,6 +273,15 @@ console.log("\n4. v4534 -- THE ARTIFACTS THIS GATE WRITES: REPRODUCIBLE, STAMPED
 //   ED. measuredAt is hard-coded rather than read         -> 2 RED
 //   EE. the reader scan skips the tree and reports zero   -> *** 0 RED, 0 RED, THEN 2 RED ***
 //   EF. the reader scan counts the writer itself          -> 2 RED
+//
+// ---- *** v4826 -- THE STAMP MOVES ONLY WITH THE NUMBERS (tools/ship/stableWrite.mjs), AND THE READER SCAN LETS ONE REGISTRY PASS ***
+//
+//   N1. a real reader of the artifact added to tools/ship/recordShape.mjs       -> 1 RED: the names-only row (a line that is not a DROPPED_ON_PURPOSE entry).
+//   N2. the names-only allowance removed                                         -> 2 RED: the names-only row and the readers row (recordShape.mjs counted as a reader).
+//   (the writer going back to a stamp of its own is stableWrite-selfcheck's G: 1 RED there; the rows here that drive writeArtifact in a temp root are its section 1 again,
+//   through this gate's own function.)
+// FINDING: the reader scan was a ZERO assertion over every .mjs/.js/.html in the tree, and the first file to NAME the artifacts for a good reason -- the recordShape ratchet's
+// exemption for the renamed field -- made it red. The over-budget gates its edits could reach were run at v4826 for exactly this: nothing had run this one since the rename.
 //
 // *** EA WENT 0 RED BECAUSE THE CHECK AND THE STRIPPER READ THE SAME LIST. *** Deleting "ms" from
 // VOLATILE_FIELDS put the wall clock back in the file AND stopped the row looking for it -- a control built

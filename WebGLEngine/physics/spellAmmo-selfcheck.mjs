@@ -18,6 +18,11 @@
 //   E. the slow is never applied                                           -> 1 red: the frostbite row
 //   F. the hit reads the wrong row (ember for everything)                   -> 9 red: every hit row, the race, the duel's unchanged score
 //   G. the splash reaches only the car hit                                 -> 1 red: the quake splash row
+//   v4680 gave this file a section 6 on applyBuildingHit(), createBuildingState() and buildingHash() -- a flat per-building
+//   damage/hits tally with no other effect. v4822 deleted all three: a shell against a building now goes through the same
+//   voxel city a car crash damages (world/crashDamage.mjs's shellInto, wired in brain/gunnerPolicy.mjs's turretTick), so
+//   this file has no building-specific code left to gate. That wiring's own coverage, sabotage log entry included, moved to
+//   brain/gunnerPolicy-selfcheck.mjs, the file whose function actually changed.
 // The gate's first run was red on the plain-shell pickup: the endless magazine (count Infinity) swallowed a pickup of spark, and the
 // design said a pickup is a magazine; a pickup of the plain spell is a finite one now (x10) that gives way to the endless one at zero.
 "use strict";

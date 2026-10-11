@@ -294,6 +294,8 @@ else {
     }
 }
 
+// v4805 SABOTAGE: render/tslSource.mjs's render list looked up without renderer.lighting, as before r186 -> 1 (every case's state
+// unreachable: "Cannot read properties of undefined (reading 'getNode')").
 // SABOTAGE LOG -- applied, gate run, exit code read, restored. MEASURED at v4320.
 //   A  the `object.` rewrite dropped (three's struct name left in the body) -> exit=1, 3 red: the CPU fixture line, and on WebGPU the
 //      generated WGSL no longer compiles, so the device draws the clear (1 of 4,096 pixels agree) and the blackbody finds nothing.

@@ -1,0 +1,42 @@
+{
+ "at": "v4836",
+ "devCommit": "11738a9d55e502fb484cefffcea3a66dc44e9fe9",
+ "builds": {
+  "dev": "1fa30f36cba5c4867659afb23285b0e96615845532dda7930289014811f665fe",
+  "all": "c0a910e711c07deb6f309a6bc664990c8e476a18fbaa66b54fd4398ecd567f06"
+ },
+ "run": "three dev at devCommit with its examples; node test/e2e/puppeteer-local.js --webgpu (../e2e/puppeteer-local.diff applied to dev's runner, unchanged since 576b084), and again with E2E_NO_WEBGPU=1 for the WebGL 2 backend; build/ made by three rollup, plain and with all sixteen patches in order; 16 merged into 08s import line as threePatch.mjs merges it",
+ "unit": {
+  "tests": 1894,
+  "passed": 1893,
+  "todo": 1,
+  "failed": 0,
+  "sameOnBoth": true,
+  "note": "1525 at v4811; #34918 consolidated the TSL unit tests. Those print that no WebGPU or WebGL backend is available in headless Chromium here and skip the tests that need one -- skipped inside the suite, not counted as skips"
+ },
+ "webgpu": {
+  "examples": 202,
+  "passed": 191,
+  "failed": 11,
+  "samePerExample": true,
+  "screenshotsIdentical": 200,
+  "varyingOnOneBuild": {
+   "webgpu_compute_rasterizer": "a different image on each of three runs of each build",
+   "webgpu_gaussian_splat": "a different image on each of three runs of each build"
+  }
+ },
+ "webgl2": {
+  "examples": 202,
+  "passed": 148,
+  "failed": 54,
+  "samePerExample": true,
+  "screenshotsIdentical": 200,
+  "varyingOnOneBuild": {
+   "webgpu_upscaling_fsr1": "a different image on each run of either build (so on r185 at v4795)",
+   "webgpu_upscaling_taau": "a different image on each run of either build (so on r185 at v4795)"
+  },
+  "sameThisRun": {
+   "webgpu_loader_gltf_transmission": "the same bytes on both builds at v4811 and again at v4836; five different images over eight runs of one build on r185 at v4795, so not counted on as fixed"
+  }
+ }
+}

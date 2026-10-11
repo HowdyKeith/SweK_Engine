@@ -206,7 +206,7 @@ console.log("\n6. THE FOUR SURFACES READ THIS AND NOT EACH OTHER");
 console.log("\n7. *** NOTHING IS UNREACHABLE: THE REMAINDER GETS ALPHABETICAL HOLDING PANELS ***");
 {
     const P = await import("./pagePlacement.mjs");
-    const inv = P.inventory();
+    let inv; try { inv = P.inventory(); } catch (e) { console.log("  FAIL  the page inventory can be read   " + e.message); process.exit(1); }   // v4828: the cause on a row, not a stack
     const rem = unclaimed(resolve(), inv.pages.keys());
     const b = alphaBuckets(rem);
     report("unclaimed pages / buckets", rem.length + " / " + b.length);

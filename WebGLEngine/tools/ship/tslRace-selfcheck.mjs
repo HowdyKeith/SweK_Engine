@@ -213,7 +213,14 @@ else {
     const pg = await br.newPage({ viewport: { width: 640, height: 480 } }); const errs = []; pg.on("pageerror", (e) => errs.push(String(e).slice(0, 200)));
     await pg.goto(`http://127.0.0.1:${srv.address().port}/?tsl=1&history=0`, { waitUntil: "load" }); await pg.waitForTimeout(6000);
     const st = await pg.evaluate(() => ({ route: document.getElementById("route").textContent, tsl: window.__universe && window.__universe.tslLook, races: document.getElementById("races").textContent }));
-    const chaosPixels = await pg.evaluate(async (CH) => { try { const pk = await window.__lifeScene.pickPicture(); let n = 0; for (const h of pk.hits) if (h && h.fleet === CH) n++; return n; } catch (e) { return "pick failed: " + e.message; } }, RACES.findIndex((x) => x.name === "Chaos"));
+    // v4822 -- THE PICK IS TAKEN UP TO SIX TIMES, 1.5 s APART, AND THE ROW IS THE FIRST ONE THAT NAMES A CHAOS SHIP. The page's Chaos fleet is ONE to THREE pixels of a
+    // 640x480 pick (measured: 30 picks across six page loads read 0-3, five of them 0 -- the fleets move, and a ship that is a pixel across is sometimes between pixels), so a
+    // single pick at 6 s was a coin that landed tails about one run in eight on main and oftener under load. The claim is "the pick pipeline still names Chaos", not "it names
+    // it at an instant"; a pick pipeline that never names Chaos is six zeros and still red (sabotage Q).
+    const chaosIdx = RACES.findIndex((x) => x.name === "Chaos"), pickSeries = [];
+    const pickOnce = () => pg.evaluate(async (CH) => { try { const pk = await window.__lifeScene.pickPicture(); let n = 0; for (const h of pk.hits) if (h && h.fleet === CH) n++; return n; } catch (e) { return "pick failed: " + e.message; } }, chaosIdx);
+    let chaosPixels = await pickOnce(); pickSeries.push(chaosPixels);
+    for (let k = 0; k < 5 && !(chaosPixels > 0); k++) { await pg.waitForTimeout(1500); chaosPixels = await pickOnce(); pickSeries.push(chaosPixels); }
     // v4327 -- the same page with &soft=1: the Glyph race's look sampled through the shell's sampler instead of fetched
     const pg2 = await br.newPage({ viewport: { width: 640, height: 480 } }); const errs2 = []; pg2.on("pageerror", (e) => errs2.push(String(e).slice(0, 200)));
     await pg2.goto(`http://127.0.0.1:${srv.address().port}/?tsl=1&soft=1&history=0`, { waitUntil: "load" }); await pg2.waitForTimeout(6000);
@@ -222,7 +229,7 @@ else {
     ok("*** the page says the Chaos look is GENERATED (a TSL graph, three's language for the backend it is on) and records that the fleet's pipeline IS the generated descriptor ***", !!(st.tsl && st.tsl.language) && st.tsl.applied === true && /GENERATED/.test(st.route), st.route);
     ok("  the language emitted is the device's backend's (WGSL on WebGPU, GLSL on WebGL2)", st.tsl && ((/webgpu/.test(st.route) && st.tsl.language === "wgsl") || (/webgl2/.test(st.route) && st.tsl.language === "glsl")), st.tsl && st.tsl.language);
     ok("  the page threw nothing", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
-    ok("  and the identity picture still names Chaos ships (the pick pipeline is the fleet's own; the generated one only paints)", chaosPixels > 0, `${chaosPixels} pixels name Chaos`);
+    ok("  and the identity picture still names Chaos ships (the pick pipeline is the fleet's own; the generated one only paints)", chaosPixels > 0, `${chaosPixels} pixels name Chaos (picks: ${pickSeries.join(", ")})`);
     // v4325 -- the same page, the SECOND shell: the Pixel race's sprite quad painted by the lightning graph
     ok("*** the page also draws the Glyph race's OWN shipped look from a graph, the atlas crossing into the shell it binds ***", !!(st.tsl && st.tsl.atlas) && st.tsl.atlas.applied === true && st.tsl.atlas.textures.join() === "atlas" && st.tsl.atlas.shell === "sprite (atlas)", st.tsl && JSON.stringify(st.tsl.atlas));
     // v4329 -- THE FRONT DOOR OFFERS WHAT THIS SECTION PROVES. The variants above are QUERY STRINGS, which the
@@ -630,6 +637,11 @@ else {
 //      skipped it BY NAME, r184 spells it `builtinClipSpace` and it came through as a fourth varying carrying
 //      "VERTEX_v_modelViewProjection". The filter is structural now -- a varying is a member the vertex's own return
 //      struct declares at an @location, the clip-space one is @builtin(position) -- and the name test is gone.
+//   MEASURED at v4822 (the pick row, made robust):
+//   Q  render/gpuDriven.mjs pickPicture(): every hit decoded as null (the pick names nothing) -> exit=1, 11 red: the page's "identity picture still names Chaos ships"
+//      with picks 0, 0, 0, 0, 0, 0 (six zeros are still red, so the retry reads a pipeline that is working late and not one that is not working), and the ten per-backend
+//      pick rows of sections 2, 4, 5 and 6 (Chaos, Pixel, Krbn on webgpu and webgl2). Unsabotaged, eight runs in a row were green, two of them needing the second pick.
+//   FINDING (v4822): the row failed in about one run in eight on main with no change of mine in it, because the page's Chaos fleet is 1 to 3 pixels of the pick.
 //   No 0-RED.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the LOOK_KNOBS baked into the TSL Loop where the WGSL reads them at run time (the fleet binds the same numbers, " +

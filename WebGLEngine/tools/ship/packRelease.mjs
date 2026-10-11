@@ -18,20 +18,21 @@
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseOrExit } from "./cliArgs.mjs";
 
 const require_ = createRequire(import.meta.url);
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const packager = require_(path.join(ENG, "ai-bridge", "packagerBridge.js"));
 
-const arg = (name) => {
-    const i = process.argv.indexOf("--" + name);
-    return i >= 0 && process.argv[i + 1] && !process.argv[i + 1].startsWith("--") ? process.argv[i + 1] : "";
-};
-
-const out = arg("out");
-const prefix = arg("prefix") || "SweK_Engine";
+const cli = parseOrExit("packRelease", { values: { "--out": "path", "--prefix": "string" } });   // v4826: was a reader that gave "" for a missing value and ignored an option it did not know
+const out = cli.values["--out"] || "";
+const prefix = cli.values["--prefix"] || "SweK_Engine";
 
 console.log("[packRelease] the release zip, built by the same packer the GitHub panel's button calls");
+
+// v4824 -- refuse a folder the packer would not honour, BEFORE building: see packagerBridge's outDirRefusal
+const refused = packager.outDirRefusal(out);
+if (refused) { console.error("[packRelease] REFUSED: " + refused); process.exit(1); }
 
 // The version is READ, not accepted: printing it before the build means a mislabeled tag is visible in the log
 // above the artifact rather than discovered by whoever downloads it.

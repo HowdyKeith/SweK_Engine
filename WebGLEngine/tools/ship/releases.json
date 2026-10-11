@@ -1,7 +1,7 @@
 {
   "generatedFrom": "tools/ship/refreshReleases.mjs",
   "note": "WHAT IS ACTUALLY PUBLISHED ON THE RELEASES PAGE -- the record the offline gate reads, refreshed from the GitHub API by tools/ship/refreshReleases.mjs rather than believed. THE FLEET DOWNLOADS releases/latest, so this file is the only thing in the tree that knows what the fleet will actually run.",
-  "refreshedAt": "2026-10-07T22:14:09.700Z",
+  "refreshedAt": "2026-10-11T20:49:44.750Z",
   "source": "GET /repos/HowdyKeith/SweK_Engine/releases (per_page=100)",
   "baseline": {
     "throughVersion": 4660,
@@ -22,6 +22,58 @@
     ]
   },
   "releases": [
+    {
+      "tag": "v4837",
+      "publishedAt": "2026-10-11T20:49:31Z"
+    },
+    {
+      "tag": "v4836",
+      "publishedAt": "2026-10-11T16:29:46Z"
+    },
+    {
+      "tag": "v4831",
+      "publishedAt": "2026-10-11T05:59:36Z"
+    },
+    {
+      "tag": "v4830",
+      "publishedAt": "2026-10-11T02:58:30Z"
+    },
+    {
+      "tag": "v4829",
+      "publishedAt": "2026-10-10T23:52:30Z"
+    },
+    {
+      "tag": "v4828",
+      "publishedAt": "2026-10-10T22:21:26Z"
+    },
+    {
+      "tag": "v4826",
+      "publishedAt": "2026-10-10T20:59:32Z"
+    },
+    {
+      "tag": "v4825",
+      "publishedAt": "2026-10-10T04:33:48Z"
+    },
+    {
+      "tag": "v4824",
+      "publishedAt": "2026-10-10T02:47:48Z"
+    },
+    {
+      "tag": "v4823",
+      "publishedAt": "2026-10-09T21:43:46Z"
+    },
+    {
+      "tag": "v4822",
+      "publishedAt": "2026-10-09T13:40:43Z"
+    },
+    {
+      "tag": "v4821",
+      "publishedAt": "2026-10-08T23:15:41Z"
+    },
+    {
+      "tag": "v4820",
+      "publishedAt": "2026-10-08T14:37:21Z"
+    },
     {
       "tag": "v4818",
       "publishedAt": "2026-10-07T22:02:10Z"
@@ -192,12 +244,12 @@
     }
   ],
   "ratchet": {
-    "minReleases": 42,
-    "minLatest": 4818,
+    "minReleases": 55,
+    "minLatest": 4837,
     "note": "A RELEASE THE FLEET WAS ALREADY RUNNING MUST NOT VANISH. Found by sabotage 2: deleting the newest row moved the reported lag from 10 to 148 and turned NOTHING red, because the lag is reported rather than asserted. These two numbers may only RISE, and refreshReleases raises them when it writes. A release deleted upstream -- or a ledger truncated by a bad merge -- now fails here instead of quietly telling the fleet to run something older."
   },
   "lagBudget": {
-    "maxVersionsBehind": 3,
-    "why": "*** HOW FAR THE FLEET MAY FALL BEHIND MAIN BEFORE THE SHIP STOPS. *** v4449's rule was a hard zero -- the previous version must be released -- which is correct when the ship and the publish happen on one machine and impossible when they do not. Rounds are built where there are no credentials to publish; the rig publishes later, by hand. So the previous version was unreleased at EVERY ship and the gate went red three rounds running (v4450, v4451, v4452), each answered by raising the baseline. THREE RAISES IN THREE ROUNDS IS A RULE THAT HAS BEEN SWITCHED OFF POLITELY. Three is the number of rounds that may sit on main unpublished before this refuses, chosen so a normal run of work is not interrupted and a real backlog still is: the failure this whole mechanism exists for was 3 releases across 261 versions, which is 87 times this budget. *** A BASELINE RAISE CANNOT MOVE THIS. *** The baseline forgives versions already gone by; this bounds the next ones, and if one edit could do both the escape hatch would swallow the rule again one level up. Raising THIS number is a separate decision, in a separate field, with its own paragraph owed."
+    "maxVersionsBehind": 5,
+    "why": "*** HOW FAR THE FLEET MAY FALL BEHIND MAIN BEFORE THE SHIP STOPS. *** v4449's rule was a hard zero -- the previous version must be released -- which is correct when the ship and the publish happen on one machine and impossible when they do not. Rounds are built where there are no credentials to publish; the rig publishes later, by hand. So the previous version was unreleased at EVERY ship and the gate went red three rounds running (v4450, v4451, v4452), each answered by raising the baseline. THREE RAISES IN THREE ROUNDS IS A RULE THAT HAS BEEN SWITCHED OFF POLITELY. Three is the number of rounds that may sit on main unpublished before this refuses, chosen so a normal run of work is not interrupted and a real backlog still is: the failure this whole mechanism exists for was 3 releases across 261 versions, which is 87 times this budget. *** A BASELINE RAISE CANNOT MOVE THIS. *** The baseline forgives versions already gone by; this bounds the next ones, and if one edit could do both the escape hatch would swallow the rule again one level up. Raising THIS number is a separate decision, in a separate field, with its own paragraph owed. *** v4836 -- RAISED FROM 3 TO 5, ONCE, ON KEITH'S DECISION, AND OWED BACK. *** The rig's clone-verify of v4834 stopped at the drift pre-flight: tools/ship/reportFresh-selfcheck.mjs, added at v4834, had a reading only in the sandbox's gitignored sweep-timings.local.json (that box does not own the shared record), so no fresh clone could verify v4834, and verify refuses any OLDER tree as a downgrade. The fix (the readings in the sandbox's committed per-box record) could reach main only past this budget: main then runs v4832-v4836 ahead of the releases page. Publishing v4836 clears it; the next round sets this back to 3."
   }
 }

@@ -325,7 +325,16 @@ const cov = definitionCoverage(ENG);
     // any shape tree-wide are unmentioned today, against the 582 this was last frozen at.
     // RE-BASELINED at v4642 with the two above. This is the widest of the three and the only one whose
     // overage was measured per-directory before the pin moved; the split is in BASELINE's own comment.
-    const BASELINE_SHAPES = 703;   // v4535: 582, post-v4297-sweep: 639, post-v4622-merge: 678, post-v4645-merge: 703 -- ratchets down, never up
+    // *** v4831 -- RATCHETED DOWN, 703 -> 696, AND THE ROUND THAT DID IT DID NOT RAISE IT FIRST. *** This row was red on main
+    // at 709 (it is over the quick sweep's budget, so no ship saw it; v4829's rotation returned it). Measured by calling
+    // definitionCoverage() and dating each file against the freeze (590050b5): SIX FILES ADDED SINCE CARRIED 13 UNNAMED
+    // SYMBOLS while older debt shrank by 7. Keith chose naming them over re-baselining to 709, which would have forgiven
+    // the 13 and spent the 7 already paid. v4830 named seven (brain/roster-selfcheck.mjs, brain/racePlay-selfcheck.mjs);
+    // v4831 named the last six, each in a row that EXERCISES it rather than mentions it (probeHalfWrite read back on both
+    // backends, READINGS_PATH opened by its default reader, CLI_SPEC parsing, the three software-GL flag lists checked
+    // against the rig runs that settled them). 696 is what the census reads with the 13 named and the 7 kept.
+    // SABOTAGE, restored: one new unnamed `export const` added to the adapter-record module (the one tools/ship/adapterRecord-selfcheck.mjs gates) -> RED, "GREW to 697".
+    const BASELINE_SHAPES = 696;   // v4535: 582, post-v4297-sweep: 639, post-v4622-merge: 678, post-v4645-merge: 703, v4831: 696 -- ratchets down, never up
     const shapesWide = definitionCoverage(ENG, "", { shapes: "all" });
     const shapesPhys = definitionCoverage(ENG, "physics", { shapes: "all" });
     ok("!! *** no NEW exported symbol OF ANY SHAPE has appeared without its gate naming it ***",

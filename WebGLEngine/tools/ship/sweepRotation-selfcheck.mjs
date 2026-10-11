@@ -23,7 +23,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { runSlice, classifyRows, restoreLost, rebuildFinished, mergeTimings,
+import { runSlice, classifyRows, restoreLost, rebuildFinished, mergeTimings, writeBase,
          CORROBORATION_BAND, UNDATED, ledgerFile, LEDGER_FILE, LOCAL_LEDGER } from "./sweepRotation.mjs";
 import { BUDGET_MS } from "./sweepCoverage.mjs";
 import { KIND } from "./quickSweep.mjs";
@@ -149,6 +149,26 @@ sec("5. THE EXPORT SURFACE IS COVERED, WHICH IS WHY THIS FILE EXISTS");
        "rows that matter are about what the WRITER records, not about the spawner");
 }
 
+// *** v4835 -- A FOREIGN WRITE MERGES INTO THIS BOX'S OWN FILE. *** Two one-gate --write runs on a box that does not own the
+// shared record: the second erased the first's reading, because each merged into a fresh copy of the shared record.
+// SABOTAGED: writeBase returning the shared record always -> 1 red (the first row below).
+{
+    console.log("\nv4835. a write on a box that does not own the record keeps that box's earlier readings");
+    const shared = { host: "linux-x64-4c-16gb-142c0d", timings: { "a-selfcheck.mjs": 100 } };
+    const mine = { host: "linux-x64-4c-16gb-420793", timings: { "a-selfcheck.mjs": 100, "b-selfcheck.mjs": 648 } };
+    const foreign = { file: "tools/ship/sweep-timings.local.json", host: "linux-x64-4c-16gb-420793", foreign: true };
+    const w = writeBase(shared, foreign, { read: () => JSON.stringify(mine) });
+    const merged = mergeTimings(w.base, [{ gate: "c-selfcheck.mjs", ms: 4473, code: 0, kind: KIND.ALONE, finished: true }], "2026-10-11T00:00:00Z").merged;
+    ok("!! *** the local file is the base, so b's earlier reading survives a write that timed only c ***",
+        w.from === foreign.file && merged.timings["b-selfcheck.mjs"] === 648 && merged.timings["c-selfcheck.mjs"] === 4473,
+        `merged from ${w.from}: b ${merged.timings["b-selfcheck.mjs"]}, c ${merged.timings["c-selfcheck.mjs"]}`);
+    ok("...a local file that names ANOTHER box is not this box's, and the shared record is the base",
+        writeBase(shared, foreign, { read: () => JSON.stringify({ ...mine, host: "linux-x64-4c-16gb-aaaaaa" }) }).base === shared);
+    ok("...no local file yet: the shared record, as before", writeBase(shared, foreign, { read: () => { throw new Error("ENOENT"); } }).base === shared);
+    ok("...and the owner's write is untouched: its base is the shared record it owns",
+        writeBase(shared, { file: "tools/ship/sweep-timings.json", host: shared.host, foreign: false }, { read: () => JSON.stringify(mine) }).base === shared);
+}
+
 console.log(fails ? `\nsweepRotation-selfcheck: ${fails} FAILED` : "\nsweepRotation-selfcheck: all checks pass");
 // ---------------------------------------------------------------------------------------------------------
 console.log("\nTHE SERIAL RING: THE LAST THREE READINGS, BECAUSE ONE WAS STANDING IN FOR A PROPERTY (v4648)");
@@ -185,6 +205,26 @@ console.log("\nTHE SERIAL RING: THE LAST THREE READINGS, BECAUSE ONE WAS STANDIN
        !/writeFileSync\(path\.join\(ENG, "tools", "ship", "sweep-rotation\.json"\)/.test(src) &&
        gi.includes("WebGLEngine/tools/ship/sweep-rotation.local.json"),
        "PR #12's box and the v4818 rotation each wrote the shared ledger from a box the record refused");
+}
+
+console.log("\n*** v4824 -- THE CAP IS A KILL THE GATE CANNOT REFUSE ***");
+{
+    // runSlice's millisecond is the wall clock around redCensus.runGate, so a gate that survives the cap's signal
+    // writes ITS OWN runtime into the record as though it were the cap's. A browser gate does exactly that with
+    // SIGTERM (playwright-core's handler closes browsers and does not exit): fsrFrameGenBackdrop was filed at
+    // 311,726 ms beside a 20,000 ms cap at v4821. The stand-in below traps SIGTERM and would run 8 s; written to the
+    // OS temp directory, never into the tree, because a planted -selfcheck file is something four gates refuse.
+    // SABOTAGED: runGate's killSignal removed -> RED here, the slice reading 8,045 ms against a 1,500 ms cap when measured; restored.
+    const os = await import("node:os");
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "swek-rotation-cap-"));
+    const stub = path.join(dir, "trapsSigterm.mjs");
+    fs.writeFileSync(stub, 'process.on("SIGTERM", () => {}); setTimeout(() => process.exit(0), 8000);\n');
+    try {
+        const [row] = runSlice([stub], { capMs: 600 });
+        ok("!! *** a gate that catches SIGTERM is still stopped AT the cap, and recorded as killed ***",
+            row.code === "timeout/signal" && row.finished === false && row.ms < 600 + 1400,
+            `${row.ms} ms against a 600 ms cap, code ${row.code}`);
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
 
 console.log("\nunchecked here: runSlice and the command line, both of which spawn gates. The CLI's argument " +

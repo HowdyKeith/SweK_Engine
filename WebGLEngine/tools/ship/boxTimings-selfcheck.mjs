@@ -18,7 +18,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import * as BT from "./boxTimings.mjs";
-import { boxId } from "./hostScale.mjs";
+import { boxId, canonicalId } from "./hostScale.mjs";
 import { ownerOf, RECORD_HANDOVERS } from "./quickSweep.mjs";
 
 let fails = 0;
@@ -153,33 +153,48 @@ console.log("\n5. *** THE REAL RECORDS, AND THE HALF THIS ROUND DID NOT DO ***")
     const live = BT.coverage(BT.ENG);
     report(`live: ${live.records.length} record(s), ${live.entries.size} gates covered, ` +
         `${live.localCount} measured on this box (${live.thisBox}), ${live.foreignCount} elsewhere`);
-    // *** v4778 -- THIS ROW SAID "NEITHER THE RIG NOR THIS CONTAINER CAN WRITE IT", AND AT v4778 THAT BECAME
+    // *** v4779 -- THIS ROW ASSERTED ONE BOX'S SITUATION AS THE DESIGN, AND WENT RED ON THE BOX THAT OWNS THE
+    // FILE. *** It read "the shared record is NOT this box's" -- true on the rig and on a new container, false on
+    // a container whose fingerprint is the owner's, which is what linux-x64-4c-16096mb-142c0d is: four cores and
+    // 16 GB hash alike. The design fact is the ATTRIBUTION: the shared record names a host, and this box's
+    // readings count as its own exactly when that host is this box -- whichever box this is.
+    // *** v4778 (main) -- THIS ROW SAID "NEITHER THE RIG NOR THIS CONTAINER CAN WRITE IT", AND AT v4778 THAT BECAME
     // THE BLOCKER RATHER THAN THE SITUATION. *** The owner container retired, and three gates that read the
     // rotation could no longer be satisfied by any box. Keith handed the record to the rig (quickSweep.mjs's
     // RECORD_HANDOVERS). So the row now asks the question that decides whether anyone CAN write it: does the
     // record's owner, after handovers, resolve to the box the last handover named? A sabotage that empties the
     // handover list leaves the owner a retired container and turns this red.
+    // v4819 -- BOTH ROWS, BECAUSE THEY ASK DIFFERENT THINGS: who may WRITE the record next (the handovers), and whose
+    // stopwatch its readings are (the `host` it names). Ids read through canonicalId: the handovers name boxes in
+    // the megabyte form the other line kept, boxId() in v4796's gigabytes.
     const shared = live.records.find((r) => r.kind === "shared");
     const owner = shared ? ownerOf(shared.host) : null, last = RECORD_HANDOVERS[RECORD_HANDOVERS.length - 1];
     ok("!! the shared record is present and its owner, after handovers, is a box that can still write it",
-        !!shared && !!last && owner === last.to,
+        !!shared && !!last && owner === canonicalId(last.to),
         `shared record names ${shared && shared.host}; its owner is ${owner}; this box is ${live.thisBox}` +
         (owner === live.thisBox ? " and writes it" : ", so it writes its own file") + ". Coverage still reads " +
         "every box's record, which is why it had to stop being asked of this one");
-    ok("!! *** and the BUDGET still reads the shared file alone -- stated, not quietly fixed ***",
-        /costOf/.test(fs.readFileSync(path.join(BT.ENG, "tools", "ship", "quickSweep.mjs"), "utf8")) &&
-        // v4778: an IMPORT, not the word -- quickSweep's handover note cites this module's header in a comment
-        !/^\s*import[^;]*["']\.\/boxTimings\.mjs["']/m.test(fs.readFileSync(path.join(BT.ENG, "tools", "ship", "quickSweep.mjs"), "utf8")),
-        "quickSweep does not import this module. On the rig that means gate SELECTION is still computed from a " +
-        "foreign box's numbers -- 91 of 1,409 read over budget there for that reason. Task #87, and it changes " +
-        "which gates run, so it is not smuggled into a round about a staleness row");
+    const sharedMine = !!shared && [...live.entries.values()].filter((e) => e.from === shared.file).every((e) => e.mine === (canonicalId(shared.host) === live.thisBox));
+    ok("!! ...and its readings count as this box's exactly when the record names this box -- whoever may write it next",
+        !!shared && typeof shared.host === "string" && shared.host.length > 0 && sharedMine,
+        shared ? `the record's readings are ${shared.host}'s; this box is ${live.thisBox} -- ` +
+            (canonicalId(shared.host) === live.thisBox ? "so they are this box's own" : "so they are a foreign box's") : "no shared record");
+    // v4800 -- TASK #87 DONE IN quickSweep ITSELF: the sweep chooses its gates by THIS box's record (ownTimings), the
+    // shared one where this box owns it or nobody does, else the local file this box writes. Not through this module:
+    // the per-box files recordLocal writes hold a handful of entries, and choosing by one would run every gate it lacks.
+    // v4778 (main): an IMPORT, not the word -- quickSweep's handover note cites this module's header in a comment.
+    {   const qs = fs.readFileSync(path.join(BT.ENG, "tools", "ship", "quickSweep.mjs"), "utf8");
+        ok("!! *** and the BUDGET reads this box's own record now -- quickSweep's ownTimings, not this module's per-box files ***",
+            /export function ownTimings\(/.test(qs) && /const prior = own\.rec;/.test(qs) && !/^\s*import[^;]*["']\.\/boxTimings\.mjs["']/m.test(qs),
+            "before v4800 gate SELECTION was computed from whichever box owned the shared record -- 91 of 1,409 over " +
+            "budget on the rig for that reason, ~100 at each verify of this session's box. tools/ship/quickSweep-selfcheck.mjs holds the choice"); }
 }
 
 try { fs.rmSync(TMP, { recursive: true, force: true }); } catch {}
 console.log("\nunchecked here: WHETHER A FOREIGN READING IS A GOOD ENOUGH ANSWER FOR ANYTHING BUT COVERAGE. It is " +
     "not, and nothing here pretends otherwise -- the rig's own verify measured 91 of 1,409 gates over budget " +
-    "purely for being named by a faster box. What would settle it is the cost half reading per-box records and " +
-    "scaling or refusing, which is task #87 and belongs with origin/claude/v4672-relative-budget's scale " +
-    "machinery rather than beside a second copy of it.");
+    "purely for being named by a faster box. v4800 (task #87) made the sweep choose by this box's own record " +
+    "when it has one; what it does NOT do is scale a foreign reading on a box's first sweep, which still chooses " +
+    "by the shared record and says so -- origin/claude/v4672-relative-budget's scale machinery is the place for that.");
 console.log(fails ? `\nboxTimings-selfcheck: ${fails} FAILED` : "\nboxTimings-selfcheck: all checks pass");
 process.exitCode = fails ? 1 : 0;

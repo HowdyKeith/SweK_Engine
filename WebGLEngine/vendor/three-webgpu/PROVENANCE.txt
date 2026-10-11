@@ -9,6 +9,11 @@ RE-VENDORED 2026-09-08: 0.178.0 -> 0.185.1, after tools/ship/three-probe.json se
 README.md's own history section describes -- the earlier pin was one build box's WebGPU implementation
 lagging the spec, not a fact about the fleet. Same three files, same one-line edit, same LICENSE grant.
 
+RE-VENDORED v4805: 0.185.1 -> 0.186.1 (https://registry.npmjs.org/three/-/three-0.186.1.tgz). Same three
+files, same one-line edit, same LICENSE grant (byte for byte the 0.185.1 one). The 0.185.1 files moved, unchanged, to
+vendor/three-webgpu-r185, for the r185 drafts in docs/upstream-three/. No rig has measured 0.186.1 yet: README.md
+beside this file says what that reopens.
+
 EVIDENCE:
   - LICENSE reads "Copyright © 2010-2026 three.js authors" -- the same grant as vendor/three, year
     advanced by the re-vendor.

@@ -592,6 +592,21 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // the rtPipeline cache round -- 4588 -> 4589 for physics/render/rtCpuCache.mjs.
     // the lock-sums round -- 4589 -> 4593 for render/temporalLockSums.mjs, render/temporalLockSumsTsl.mjs and their two gates.
     // the splat-collision round -- 4593 -> 4595 for world/splatVoxelWorld.mjs and tools/ship/splatVoxelWorld-selfcheck.mjs.
+    // v4779 -- 4495 -> 4496 for render/temporalTslCoverage-selfcheck.mjs.
+    // v4799 -- no file added; asyncAwait 1667 -> 1668, tools/ship/threePatch.mjs running the dev issues' pages (its command, folded in).
+    // v4809 -- 4496 -> 4498 for render/threeWorkarounds.mjs and its gate.
+    // v4819 -- 4595 -> 4598 at the merge of the two lines: the exported-functions line's three files since the split --
+    // render/temporalTslCoverage-selfcheck.mjs, render/threeWorkarounds.mjs and its gate. Re-derived over the merged tree.
+    // the lockstep round (v4822) -- main's 4598 -> 4605 for brain/raceLockstep.mjs, brain/raceLockstepPeer.mjs, brain/raceLockstep-selfcheck.mjs, tools/ship/miniWs.mjs,
+    // tools/ship/lockstepRelay.mjs, tools/ship/lockstepPeer.mjs and tools/ship/lockstepRelay-selfcheck.mjs.
+    // v4824 -- 4605 -> 4607 for ui/pick.mjs and ui/pick-selfcheck.mjs.
+    // v4826 -- 4607 -> 4612 for tools/ship/flakeProbe.mjs, flakeCompare.mjs, stableWrite.mjs and the two gates beside them (flakeProbe-selfcheck, stableWrite-selfcheck).
+    // v4827 -- 4612 -> 4616 for brain/roster.mjs, brain/racePlay.mjs, race-lockstep.html and the two gates beside the modules (roster-selfcheck, racePlay-selfcheck); race-brain.html grew a panel.
+    // v4830 -- 4617 -> 4621 for brain/pilotRoster.mjs, brain/pilot6dofPolicy.mjs and the two gates beside them (pilotRoster-selfcheck, pilot6dofPolicy-selfcheck), over v4829's murmurParity-selfcheck.mjs (4616 -> 4617); the fly3d and 6DOF pages grew a panel each.
+    // v4831 -- 4621 -> 4625 for ui/publishCommands.mjs, ui/brainAsk.mjs and their two gates (publishHygiene-selfcheck, brainStages-selfcheck).
+    // v4834 -- 4625 -> 4626 for tools/ship/reportFresh-selfcheck.mjs.
+    // v4835 -- 4626 -> 4628 for tools/ship/afterVerdict.mjs and its gate (on main).
+    // v4837 -- 4628 -> 4636 for tools/ship/poolWatch.mjs, sysLagReading.mjs, takeLagReading.mjs, train6dofPilot.mjs, trainPilot6dof.mjs and their three gates (poolWatch-selfcheck, sysLagReading-selfcheck, train6dofPilot-selfcheck); verify.mjs, deviceOwed.mjs and the 6DOF page grew.
     // the denoiser arc, round 1 -- 4595 -> 4597 for brain/conv2d.mjs and brain/conv2d-selfcheck.mjs.
     // the denoiser arc, round 2 -- 4597 -> 4610: six modules, six gates, tools/denoiseStudy.mjs.
     // the denoiser arc, round 4 -- 4610 -> 4612 for render/denoiseTemporal.mjs and its gate.
@@ -603,7 +618,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // the denoiser arc, round 12 again -- 4621 -> 4622 for render/denoiseTiming-selfcheck.mjs.
     // the denoiser arc, round 14 -- 4622 -> 4624 for render/denoiseCompile.mjs and its gate.
     // the denoiser arc, section 56 -- 4624 -> 4625 for tools/denoiseBuildProbe.mjs.
-    files: 4625,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
+    // v4838 -- THE DENOISER ARC'S MERGE: RE-DERIVED over the merged tree: main's 4636 plus the arc's 30 files since the v4818 split.
+    files: 4666,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
     // (v4691 note, carried)                               // v4691 -- RE-DERIVED: tools/ship/textureInProbe.mjs arrived, one ES module with a closure and top-level await -- four rows moved (files, ES modules, closures, async/await) and eight held.
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
@@ -1136,6 +1152,34 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // the splat-collision round -- world/splatVoxelWorld.mjs and its gate: files 4593 -> 4595, ES modules 4288 -> 4290,
     // closures 4138 -> 4140, typed arrays 1267 -> 1269 (the fine shell and the walker grid; the gate's loader-shaped
     // clouds), async/await 1715 -> 1716 (the gate awaits its imports); nothing else moved. main.js's new demo moves none.
+    // v4779 -- render/temporalTslCoverage-selfcheck.mjs: one ES module with closures, await, typed arrays, and forceWebGL -- five rows moved by one, seven held.
+    // v4809 -- render/threeWorkarounds.mjs and its gate: two ES modules, two with await, two naming WebGL (isWebGLBackend, forceWebGL); the gate alone has closures and a typed array.
+    // v4791 -- tools/ship/threeUpstream-selfcheck.mjs now asks navigator.gpu for an adapter itself (raw WebGPU, no three): webgpu 55 -> 56.
+    // v4819 -- the merge's figures, re-derived: six rows moved, six held, each traced to the exported-functions line's own notes.
+    // The three files above: ES modules +3, closures +2, async/await +3, typed arrays +2, WebGL +3 (forceWebGL, isWebGLBackend)
+    // -- v4779's and v4809's rows. And two edits to existing files: async/await +1, tools/ship/threePatch.mjs running the dev
+    // issues' pages (v4799); WebGPU +1, tools/ship/threeUpstream-selfcheck.mjs asking navigator.gpu for an adapter (v4791).
+    // the editable-world round -- tools/ship/raceTurret-selfcheck.mjs stubs the page's requestAnimationFrame to stop its frame loop,
+    // so the picture it reads back is a function of the world alone, and the file now names the word: requestAnimationFrame
+    // 126 -> 127; nothing else moved.
+    // the lockstep round (seven files): ES modules 4290 -> 4297, closures 4140 -> 4147, async/await 1716 -> 1721 (the peer runner, the CLI, the relay and two gates await),
+    // Promises 405 -> 410 (miniWs.connect, the gate's peerProc and its staggered start and the --serve pair, the CLI's transport); typed arrays hold at 1269 (Buffers are not typed arrays here).
+    // v4822 -- AT THE MERGE OF THIS ROUND ONTO main's v4821, re-derived over the merged tree: main's own figures plus this round's seven files (ES modules +7, closures +7,
+    // async/await +5, Promises +5, and requestAnimationFrame 126 -> 127 for tools/ship/raceTurret-selfcheck.mjs stubbing the page's frame loop); typed arrays hold.
+    // v4822 -- async/await 1725 -> 1726 at the ship's own re-take: the relay gate gained section 1b (wsTransport over the relay, the CLIs' refusals), whose awaits and
+    // spawn-wrapping promise are one async/await beyond the figure taken before it; wsTransport itself MOVED from tools/ship/lockstepPeer.mjs to tools/ship/miniWs.mjs (no net change there).
+    // v4824 -- ui/pick.mjs and its gate: ES modules +2, closures +1, async/await +2 -- the deltas runtimeGap-selfcheck's own drift
+    // row reported for those two files; the other rows hold.
+    // v4826 -- the probe round's five files: ES modules +5, closures as values +4, async/await +1 (the two gates' spawn wrappers; the probe's own runGate is spawnSync, so it
+    // adds none), Promises +2 (the same two wrappers); the other rows hold.
+    // v4827 -- ES modules 4307 -> 4311, closures 4154 -> 4158, async/await 1729 -> 1731, Promises 412 -> 414, performance.now 241 -> 243: the five new files and the panel's page code.
+    // v4830 -- ES modules 4312 -> 4316, closures 4159 -> 4163, async/await 1731 -> 1733, typed arrays 1271 -> 1274, Promises 414 -> 416, performance.now 243 -> 245: the four new files and the two panels' page code, over v4829's murmurParity-selfcheck.mjs (4311 -> 4312, 4158 -> 4159).
+    // v4831 -- ES modules 4316 -> 4320, closures 4163 -> 4166, async/await 1733 -> 1735, Promises 416 -> 417: the two modules and their
+    // gates; the other rows hold. fetch/XHR holds at 251: brainAsk.mjs calls an injected fetchImpl, and the gate's own fetch went (see
+    // tools/ship/brainStages-selfcheck.mjs on gateAxioms).
+    // v4834 -- ES modules 4320 -> 4321, closures 4166 -> 4167: tools/ship/reportFresh-selfcheck.mjs; the other rows hold.
+    // v4835 -- ES modules 4321 -> 4323, closures 4167 -> 4169: tools/ship/afterVerdict.mjs and its gate (on main); the other rows hold.
+    // v4837 -- ES modules 4323 -> 4331, closures 4169 -> 4177, async/await 1735 -> 1739, Promises 417 -> 419, fetch/XHR 251 -> 252: the five tools, their three gates and the 6DOF page's shipped-pilot fetch; sysLagReading.mjs calls fetch (251 -> 252).
     // the denoiser arc, round 1 -- brain/conv2d.mjs and its gate: files 4595 -> 4597, ES modules 4290 -> 4292, closures
     // 4140 -> 4142, typed arrays 1269 -> 1271 (the layer's buffers; the gate's fixtures), async/await 1716 -> 1717 (the
     // gate awaits its imports and the device); nothing else moved.
@@ -1170,8 +1214,11 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // the denoiser arc, section 56 -- tools/denoiseBuildProbe.mjs: files 4624 -> 4625, ES modules 4319 -> 4320, closures
     // 4168 -> 4169, async/await 1733 -> 1734, Promises 409 -> 410 (its Chrome half races each build against the cap), and
     // WebGPU 60 -> 61 (each shape asks for its own adapter and device); the other six rows held.
-    esModules: 4320, closures: 4169, asyncAwait: 1734, typedArrays: 1292, promises: 410,
-    fetchXhr: 251, performanceNow: 243, raf: 126, webgl: 197, webgpu: 61, threads: 26, wasm: 24,
+    // v4838 -- THE DENOISER ARC'S MERGE: RE-DERIVED over the merged tree: files 4636 -> 4666, ES modules
+    // 4331 -> 4361, closures 4177 -> 4206, async/await 1739 -> 1757, typed arrays 1274 -> 1297, Promises 419 -> 424, performance.now
+    // 245 -> 247, WebGPU 57 -> 62, threads 25 -> 26; fetch/XHR, rAF, WebGL and WebAssembly hold.
+    esModules: 4361, closures: 4206, asyncAwait: 1757, typedArrays: 1297, promises: 424,
+    fetchXhr: 252, performanceNow: 247, raf: 127, webgl: 200, webgpu: 62, threads: 26, wasm: 24,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.

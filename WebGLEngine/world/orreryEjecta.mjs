@@ -522,21 +522,34 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "render/temporalLockTsl-selfcheck.mjs",
         "render/temporalTsl-selfcheck.mjs",
         "render/temporalTslCompute-selfcheck.mjs",
+        "render/temporalTslCoverage-selfcheck.mjs",
         "render/temporalTslMany-selfcheck.mjs",
         "render/temporalTslMeshes-selfcheck.mjs",
         "render/temporalTslNodes-selfcheck.mjs",
         "render/temporalTslZoo-selfcheck.mjs",
         "render/translucentLayer-selfcheck.mjs",
-        "tools/ship/threePatch.mjs",
-        // v4778 -- the rtx line, merged: the batched GPU capsule kernel's gate imports three.webgpu.js and
+        // v4809 -- the engine's ways around r186's issues 17 and 18, held on both backends against three's own behaviour beside them.
+        "render/threeWorkarounds-selfcheck.mjs",
+        // v4778 (main) -- the rtx line, merged: the batched GPU capsule kernel's gate imports three.webgpu.js and
         // three.tsl.js to run physics/character/capsuleCollideTsl.mjs, like the TSL rows above. One arrival.
         "tools/ship/capsuleCollideTsl-selfcheck.mjs",
-        // rig run 2 -- threeUpstream-selfcheck's section 4 reads three.core.js through the overlay where a file symlink
-        // is refused, and compares it with the vendored copy: a real read of this body, by name.
-        "tools/ship/threeUpstream-selfcheck.mjs",
-        // the lock-sums round -- render/temporalLockSumsTsl-selfcheck.mjs drives the sums' TSL port on both backends, the
+        // the lock-sums round (main) -- render/temporalLockSumsTsl-selfcheck.mjs drives the sums' TSL port on both backends, the
         // same import of three.webgpu.js and three.tsl.js as render/temporalLockTsl-selfcheck.mjs above. One arrival.
+        // v4819: git's merge filed these two under three-webgpu-r185, matching main's last line of this list against that
+        // list's only line (threePatch); orreryEjecta-selfcheck named both as GONE there and ARRIVED here.
         "render/temporalLockSumsTsl-selfcheck.mjs",
+        // v4805 -- the engine moved to r186 and kept r185 beside it: threePatch.mjs applies the r185 patches to vendor/three-webgpu-r185
+        // now (its row below), and threeUpstream-selfcheck.mjs's section 6 runs the issues on this body's r186. One gone, one arrived.
+        "tools/ship/threeUpstream-selfcheck.mjs",
+    ]),
+    // v4805 -- r185's three files, kept unchanged for the r185 drafts when vendor/three-webgpu moved to r186. Nothing in the engine
+    // imports them: the patch applier reads them, and the upstream gates load them by a path they build.
+    "three-webgpu-r185": Object.freeze([
+        "tools/ship/threePatch.mjs",
+        // rig run 2 (main) -- threeUpstream-selfcheck's overlay section reads three.core.js through the overlay where a file
+        // symlink is refused, and compares it with the vendored copy: a real read of this body, by name. v4819: the copy it
+        // compares with is r185's since the merge, the build threePatch links into each patched slot since v4805.
+        "tools/ship/threeUpstream-selfcheck.mjs",
     ]),
     "wasm": Object.freeze([
         "ai-bridge/wasmDemoBridge.js",

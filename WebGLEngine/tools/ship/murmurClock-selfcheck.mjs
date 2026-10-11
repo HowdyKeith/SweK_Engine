@@ -20,6 +20,9 @@
 // and the shader needs the three running integrals, not the history. render/aiPresenceOrbState.mjs
 // accumulates them in SHADER time -- against the tempo integral, not wall seconds -- because a species' rate
 // is per second of the clock it is handed.
+// v4825 SABOTAGES, restored: geode's spin put back on a bare t * 0.30 (RED: the ten-clock census row);
+// spinPhase's B sign flipped to m*(r1 - r0) (RED: section 3b); the host's driveDriveInt accumulating drive
+// rather than drive squared (RED: the eight-integrals row).
 "use strict";
 
 import fs from "node:fs";
@@ -261,16 +264,22 @@ sec("3. *** WHICH CLOCKS ARE REPAIRED, AND THE TWO THAT ARE NOT -- each with the
     const repaired = [], plainDrift = [];
     for (let k = 0; k < marks.length - 1; k++) {
         const blk = lines.slice(marks[k][0], marks[k + 1][0]).join("\n");
-        if (/KIT\.mhDriftPhase\(/.test(blk)) repaired.push(marks[k][1]);
+        // v4825: a builder is also repaired when it reaches the integrated clock through one of the two shared
+        // helpers -- ratePhase (opal's flash drift, a bare rate * t with no wobble to hand mhDriftPhase) or
+        // spinPhase (geode's and fathom's spins, whose drive MIX is integrated inside the helper).
+        if (/KIT\.mhDriftPhase\(|\bratePhase\(|\bspinPhase\(/.test(blk)) repaired.push(marks[k][1]);
         for (const call of modulatedDrifts(blk)) plainDrift.push(`${marks[k][1]}:${call.slice(0, 44)}`);
     }
     say(`species whose clocks use the integrated phase: ${repaired.join(", ")}`);
     say(`modulated rates still on murmur's rate * t: ${plainDrift.length ? plainDrift.join(", ") : "(none)"}`);
 
-    const WANT = ["aura", "comet", "limn", "flux", "helix", "mist", "duet"].sort();
-    ok("!! *** ALL SEVEN MODULATED CLOCKS IN THIS FILE ARE REPAIRED, AND THERE IS NOTHING LEFT TO NAME ***",
+    // v4825: opal, fathom and geode join -- the three clocks that were recorded against the st.drive entry as
+    // "spells a bare rate * t" (opal's drift, geode's mix target) or carried no live term at all (fathom's spin).
+    const WANT = ["aura", "comet", "limn", "flux", "helix", "mist", "duet", "opal", "fathom", "geode"].sort();
+    ok("!! *** ALL TEN MODULATED CLOCKS IN THIS FILE ARE REPAIRED, AND THERE IS NOTHING LEFT TO NAME ***",
         repaired.slice().sort().join(",") === WANT.join(",") && plainDrift.length === 0,
-        `${repaired.join(", ")} build their secular phase with mhRatePhase and hand it to mhDriftPhase, and ` +
+        `${repaired.join(", ")} build their secular phase with mhRatePhase (directly, or through the ratePhase ` +
+        `and spinPhase helpers) and, where murmur's clock has a wobble, hand it to mhDriftPhase, and ` +
         `no plain mh_drift anywhere in the file reads a live signal in its rate OR its output. THE CENSUS ` +
         `SAID "(none)" AT v4654 WHILE mist AND flux WERE STILL TELEPORTING -- it inspected only the rate ` +
         `argument, and only when that argument was a bare identifier, so a drift whose OUTPUT is scaled ` +
@@ -358,15 +367,72 @@ sec("3. *** WHICH CLOCKS ARE REPAIRED, AND THE TWO THAT ARE NOT -- each with the
     // The uniforms have to arrive, or the integrals are three numbers nobody sends.
     const W = codeOnly(fs.readFileSync(path.join(ENG, "ui", "aiPresenceOrbWidget.js"), "utf8"));
     const H = codeOnly(fs.readFileSync(path.join(ENG, "ai-presence-orb.html"), "utf8"));
-    const feeds = (s) => ["paceInt", "voiceInt", "driveInt", "paceDriveInt", "voiceDriveInt", "duetFlourishInt"]
-        .every((n) => new RegExp(n + ":\\s*p\\." + n).test(s));
-    ok("!! *** BOTH CONSUMERS SEND ALL SIX INTEGRALS -- a correct integral nothing feeds to a shader is the defect ***",
-        feeds(W) && feeds(H) && /paceInt \+= lv\.pace \* dPhase/.test(fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbState.mjs"), "utf8")),
-        `ui/aiPresenceOrbWidget.js and ai-presence-orb.html both pass all six -- the three conditioned signals ` +
-        `from v4654 and limn's two cross products and duet's gesture from v4657 -- and the ` +
+    // v4825: eight -- drive squared (the spin mix's B * kd term, geode and fathom) and tempest's clamped energy
+    const feeds = (s) => ["paceInt", "voiceInt", "driveInt", "paceDriveInt", "voiceDriveInt", "driveDriveInt",
+        "tempestEnergyInt", "duetFlourishInt"].every((n) => new RegExp(n + ":\\s*p\\." + n).test(s));
+    const hostSrc = fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbState.mjs"), "utf8");
+    ok("!! *** BOTH CONSUMERS SEND ALL EIGHT INTEGRALS -- a correct integral nothing feeds to a shader is the defect ***",
+        feeds(W) && feeds(H) && /paceInt \+= lv\.pace \* dPhase/.test(hostSrc) &&
+        /driveDriveInt \+= stn\.drive \* stn\.drive \* dPhase/.test(hostSrc) &&
+        /driveDriveInt: st\.drive \* st\.drive \* time/.test(FRsrc) &&
+        /tempestEnergyInt: Math\.min\(1\.6, Math\.max\(0, 0\.85 \* lv\.pace \+ 0\.65 \* \(si === 2 \? 1 : 0\) \+ 0\.55 \* st\.drive\)\) \* time/.test(FRsrc),
+        `ui/aiPresenceOrbWidget.js and ai-presence-orb.html both pass all eight -- the three conditioned signals ` +
+        `from v4654, limn's two cross products and duet's gesture from v4657, and v4825's drive squared and ` +
+        `tempest's clamped energy, which sp() derives as drive*drive*time and clamp(energy)*time -- and the ` +
         `state module accumulates them against dPhase rather than dt. THIS ROW IS THE LESSON OF v4650 APPLIED ` +
         `BEFORE THE FACT: there, a correct integrator was computed every tick for sixty-two rounds and thrown ` +
         `away at the one call that fed a shader, and the gate that proved the FUNCTION right could not see it.`);
+}
+
+// =============================================================================================================
+sec("3b. *** v4825: THE SPIN MIX -- murmur's mix(drift(t, r1*sp), target, m*drive), INTEGRATED, IS murmur's AT A HELD SIGNAL ***");
+{
+    // geode.ts:63 and fathom.ts:83-84 MIX two growing phases by drive: a drift at r1*sp pulled toward a target
+    // at r0*sp (geode's straight t*0.30*sp, fathom's own outer shell a0). Mixing two growing phases by an
+    // instantaneous weight is the teleport in its purest form -- w * (r0 - r1) * sp * t jumps by t * dw. The
+    // port's spinPhase integrates it: with A = r1 and B = m*(r0 - r1), the secular half is
+    //     A*t + A*kp*P + (A*kd + B)*D + B*kp*PD + B*kd*DD
+    // (P, D, PD, DD the integrals of pace, drive, pace*drive and drive^2), and the two wobbles keep murmur's
+    // instantaneous amplitudes weighted (1 - w) and w. The STRUCTURE is read out of the shader; the identity
+    // is then checked with that structure against murmur's own expression, written here from the two .ts files.
+    const src = codeOnly(fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbTsl.mjs"), "utf8"));
+    const shape = /const A = r1, B = m \* \(r0 - r1\);/.test(src) &&
+        /const secular = uniforms\.time\.mul\(A\)\.add\(uniforms\.paceInt\.mul\(A \* kp\)\)\.add\(uniforms\.driveInt\.mul\(A \* kd \+ B\)\)\s*\.add\(uniforms\.paceDriveInt\.mul\(B \* kp\)\)\.add\(uniforms\.driveDriveInt\.mul\(B \* kd\)\);/.test(src) &&
+        /const w = DRIVE\.mul\(m\);/.test(src);
+    const port = (C, t, pace, drive, P, D, PD, DD) => {
+        const A = C.r1, B = C.m * (C.r0 - C.r1), sp = 1 + C.kp * pace + C.kd * drive, w = C.m * drive;
+        const sec = A * t + A * C.kp * P + (A * C.kd + B) * D + B * C.kp * PD + B * C.kd * DD;
+        let wob = K.mhDriftPhase(0, sp * C.r1, C.w1, C.l1, t) * (1 - w);
+        if (C.w0 != null) wob += K.mhDriftPhase(0, sp * C.r0, C.w0, C.l0, t) * w;
+        return sec + wob;
+    };
+    const murmur = (C, t, pace, drive) => {
+        const sp = 1 + C.kp * pace + C.kd * drive, w = C.m * drive;
+        const target = C.w0 != null ? K.mhDrift(t, C.r0 * sp, C.w0, C.l0) : t * C.r0 * sp;
+        return K.mhDrift(t, C.r1 * sp, C.w1, C.l1) * (1 - w) + target * w;
+    };
+    const SG = K.MH_SPIN_DRIVE.geode, SF = K.MH_SPIN_DRIVE.fathom;
+    const SUBJ = [   // murmur's numbers, from geode.ts:62-63 and fathom.ts:82-84
+        { n: "geode",     r1: 0.088,  w1: 0.48, l1: 2.0, r0: 0.30,  kp: 0.80, kd: 1.00, m: 0.7 },
+        { n: "fathom a1", r1: -0.062, w1: 0.50, l1: 2.0, r0: 0.085, w0: 0.45, l0: 1.0, kp: 0.85, kd: 1.10, m: 0.7 },
+        { n: "fathom a2", r1: 0.108,  w1: 0.40, l1: 3.0, r0: 0.085, w0: 0.45, l0: 1.0, kp: 0.85, kd: 1.10, m: 0.7 },
+    ];
+    let worst = 0, n = 0;
+    for (const C of SUBJ) for (const pace of [0, 0.4, 1]) for (const drive of [0, 0.5, 1]) for (const t of [1, 60, 3600]) {
+        const d = Math.abs(port(C, t, pace, drive, pace * t, drive * t, pace * drive * t, drive * drive * t) - murmur(C, t, pace, drive));
+        worst = Math.max(worst, d / Math.max(1, Math.abs(murmur(C, t, pace, drive)))); n++;
+    }
+    // ...and NOT two spellings of one thing: an hour of idle, then drive at 1 for one frame
+    const C0 = SUBJ[0], jumpM = Math.abs(murmur(C0, 3600, 0, 1) - murmur(C0, 3600, 0, 0));
+    const jumpP = Math.abs(port(C0, 3600, 0, 1, 0, 1 / 60, 0, 1 / 60) - port(C0, 3600, 0, 0, 0, 0, 0, 0));
+    ok("!! *** spinPhase IS murmur's SPIN MIX AT EVERY HELD SIGNAL, AND DOES NOT JUMP WHEN DRIVE DOES ***",
+        shape && worst < 1e-12 && jumpM > 100 && jumpP < 1 &&
+        SG.kp === 0.80 && SG.kd === 1.00 && SG.m === 0.7 && SG.target === 0.30 && SF.kp === 0.85 && SF.kd === 1.10 && SF.m === 0.7,
+        `the shader's secular sum and mix weight ${shape ? "found" : "NOT FOUND"}; worst relative difference ` +
+        `${worst.toExponential(2)} against geode.ts's and fathom.ts's own expressions over ${n} held points ` +
+        `out to an hour. After an hour of idle, drive stepping to 1 moves murmur's geode spin ` +
+        `${jumpM.toFixed(1)} rad in one frame and this port's ${jumpP.toFixed(3)} -- the wobble's own ` +
+        `bounded amplitude, plus one frame of travel. MH_SPIN_DRIVE is checked against the same literals.`);
 }
 
 // =============================================================================================================

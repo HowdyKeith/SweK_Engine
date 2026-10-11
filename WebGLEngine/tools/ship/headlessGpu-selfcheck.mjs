@@ -227,7 +227,7 @@ sec("4. THE EXIT HAZARD IS REAL, AND ITS EXACT CONDITION IS SPAWNED RATHER THAN 
     // reason having nothing to do with what it is testing. The claim that matters is that it does NOT exit 0.
     ok(held.status !== 0,
        "*** and a REACHABLE DEVICE at exit CRASHES the process, after a correct result ***",
-       `status=${held.status} signal=${held.signal} -- the signal varies (SIGABRT and SIGSEGV both seen); the non-zero exit does not`);
+       `status=${held.status} signal=${held.signal}${held.error && held.error.code === "ETIMEDOUT" ? " (hung; killed at 10 s)" : ""} -- the ending varies (SIGABRT, SIGSEGV and a hang all seen); the not-clean exit does not`);
     ok(/WORK_OK:true/.test(heldClean.stdout) && heldClean.status === 0,
        "*** exitCleanly() ends that same shape with status 0 ***",
        `status=${heldClean.status} signal=${heldClean.signal}`);

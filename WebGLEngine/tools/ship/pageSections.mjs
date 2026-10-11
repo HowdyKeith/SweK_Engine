@@ -630,7 +630,7 @@ export const SECTIONS = [
     { id: "racing", tab: "racing", label: "Racing City", note: "Kenney's kits, the grid track, the car on box3d, and the brains that will drive it",
       // v4590 -- building-lab.html JOINS, from registerResidue's second (judgement) pass: a seeded building
       // grammar is exactly "the destructible buildings" this drawer's own note already names as a coming round.
-      pages: ["kenney-kit.html", "race-track.html", "race-car.html", "race-brain.html", "race-replay.html", "race-terrain.html", "race-crash.html",
+      pages: ["kenney-kit.html", "race-track.html", "race-car.html", "race-brain.html", "race-replay.html", "race-terrain.html", "race-crash.html", "race-lockstep.html",
               "building-lab.html"] },
 
     // v4590 -- NEW DRAWER, FROM registerResidue's RESIDUE SWEEP. Eight pages -- slug-curved, slug-device,
