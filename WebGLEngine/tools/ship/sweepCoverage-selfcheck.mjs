@@ -1548,9 +1548,17 @@ console.log("\n*** v4647m -- THE VERDICT MUST NOT DEPEND ON WHICH RUN HAPPENED L
     // still-over one to the old one; the fixtures below drive both, so neither branch passes on an empty population.
     // SABOTAGED v4818: rollEntryHolds made to refuse every entry -> 2 red, this row and the fixture row, by name; the
     // returned branch made to accept unconditionally -> the fixture row red (returned + dear). Both restored.
-    const rollEntryHolds = (x, F = FILE) => x.returned
-        ? (aloneMs(x.gate, F) ?? Infinity) < SC.BUDGET_MS && inSweep(x.gate, F) && x.returned.aloneMs < SC.BUDGET_MS
-        : overInSomeReading(x) && typeof x.why === "string" && x.why.length > 40 && (stillGenuinelyOver(x, F) || oscillates(x, F));
+    // v4839: and an entry that went BACK over when the record moved host again carries `back` (its readings and its loaded
+    // side), which supersedes `returned` -- the latest host move decides. sweepBudget: returned at v4829 on 142c0d, back at
+    // v4839 on 420793. Judged as a still-over entry with back's loaded reading, so a straddler is held either way: over alone,
+    // or cheap alone and over loaded. SABOTAGED v4839: `back` removed -> this row red by name (the step-4b red that found it);
+    // `returned` allowed to win over `back` -> 2 red, the v4815 row and the fixture row below; restored by copy.
+    const rollEntryHolds = (x, F = FILE) => {
+        if (x.returned && !x.back)
+            return (aloneMs(x.gate, F) ?? Infinity) < SC.BUDGET_MS && inSweep(x.gate, F) && x.returned.aloneMs < SC.BUDGET_MS;
+        const live = x.back ? { ...x, loadedMs: x.back.loadedMs } : x;
+        return overInSomeReading(live) && typeof x.why === "string" && x.why.length > 40 && (stillGenuinelyOver(live, F) || oscillates(live, F));
+    };
     ok("!! *** the v4813 still-over roll holds only gates that left the oscillator roll, each justified live -- or returned, live ***",
        SC.STILL_OVER_AT_V4813.stillOver.length > 0 &&
        SC.STILL_OVER_AT_V4813.stillOver.every((x) => rollEntryHolds(x) && !SC.RETURNED_AT_V4529.stillOver.some((y) => y.gate === x.gate)),
@@ -1561,10 +1569,13 @@ console.log("\n*** v4647m -- THE VERDICT MUST NOT DEPEND ON WHICH RUN HAPPENED L
         const cheap = { timings: { fx: 1600 }, serial: { fx: 1600 }, contended: { fx: false } };
         const dear  = { timings: { fx: 9000 }, serial: { fx: 3600 }, contended: { fx: false } };
         const R = { ...E, returned: { at: "vX", aloneMs: 1600 } };
-        ok("  ...and a RETURNED entry must be cheap alone and back in the sweep, a still-over one must be over or oscillating",
+        const B = { ...R, back: { at: "vY", loadedMs: 7000 } }, Bflat = { ...R, back: { at: "vY", loadedMs: 2000 } };
+        ok("  ...and a RETURNED entry must be cheap alone and back in the sweep, a still-over one must be over or oscillating -- and one BACK over is still-over again",
            rollEntryHolds(R, cheap) === true && rollEntryHolds(R, dear) === false &&
-           rollEntryHolds(E, dear) === true && rollEntryHolds({ ...E, loadedMs: 2000 }, cheap) === false,
-           "fixture: returned+cheap holds, returned+dear does not; still-over+dear holds, still-over+cheap-everywhere does not");
+           rollEntryHolds(E, dear) === true && rollEntryHolds({ ...E, loadedMs: 2000 }, cheap) === false &&
+           rollEntryHolds(B, dear) === true && rollEntryHolds(B, cheap) === true && rollEntryHolds(Bflat, cheap) === false,
+           "fixture: returned+cheap holds, returned+dear does not; still-over+dear holds, still-over+cheap-everywhere does not; " +
+           "back+dear holds, back+cheap-alone-but-loaded-over holds (a straddler), back with nothing over does not");
     }
 
     // v4815: the same roll for the host change. SABOTAGE: headlessGpu's entry given readings none of which is over
@@ -1575,7 +1586,7 @@ console.log("\n*** v4647m -- THE VERDICT MUST NOT DEPEND ON WHICH RUN HAPPENED L
     // SABOTAGE v4829: sweepBudget's returned.aloneMs set to 3,500 -> this row red by name; headlessGpu's entry given readings none of which is over -> this row red; both restored.
     ok("!! *** the v4815 still-over roll names only returnees genuinely over on the new host, each justified live -- or returned, live ***",
        SC.STILL_OVER_AT_V4815.stillOver.length > 0 && SC.STILL_OVER_AT_V4815.stillOver.every((x) => rollEntryHolds(x)) && SC.STILL_OVER_AT_V4815.stillOver.some((x) => x.returned) && SC.STILL_OVER_AT_V4815.stillOver.some((x) => !x.returned),
-       SC.STILL_OVER_AT_V4815.stillOver.map((x) => `${x.gate.split("/").pop()} ${x.returned ? "RETURNED " + x.returned.at + ", " : ""}alone ${aloneMs(x.gate)} ms, ` +
+       SC.STILL_OVER_AT_V4815.stillOver.map((x) => `${x.gate.split("/").pop()} ${x.back ? "RETURNED " + x.returned.at + ", BACK OVER " + x.back.at + " (" + x.back.loadedMs + " ms loaded), " : x.returned ? "RETURNED " + x.returned.at + ", " : ""}alone ${aloneMs(x.gate)} ms, ` +
            `${inSweep(x.gate) ? "in" : "out of"} the sweep`).join("; "));
 
     // v4818: and back. SABOTAGE: orreryEjecta's entry given readings none of which is over (serialMs [2700, 2800,

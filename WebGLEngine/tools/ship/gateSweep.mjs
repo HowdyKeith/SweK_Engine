@@ -8894,13 +8894,14 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     }),
     // v4839 -- NO new gate file -- the sandbox judges as a fresh clone would: the gitignored local record ignored, uncommitted gate edits seen.
     since530: Object.freeze({
-        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened three.
         at: "v4839", swept: 0, green: 0, red: 0,
         added: Object.freeze([]),
         redOnArrival: Object.freeze([]),
         widened: Object.freeze([
             "tools/ship/recordDrift-selfcheck.mjs (a gate timed only in the gitignored sweep-timings.local.json is a hole, on a tree built for it; and the answer equals the one with no local file)",
             "tools/ship/reportFresh-selfcheck.mjs (section 3: a gate the working tree changed is judged by file time -- fixtures, a real repository, and the live tree)",
+            "tools/ship/sweepCoverage-selfcheck.mjs (a roll entry BACK over after a later host move is held as still-over again; step 4b found sweepBudget straddling here)",
         ]),
         verdict: "*** TWO WAYS THE SANDBOX'S VERDICT DISAGREED WITH THE RIG'S, AND BOTH WERE THE SANDBOX SEEING MORE THAN A CLONE DOES. *** " +
                  "v4834 passed here and stopped the rig's clone-verify at the drift pre-flight, because reportFresh-selfcheck's only reading " +
