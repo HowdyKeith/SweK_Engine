@@ -8892,6 +8892,25 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The CLIs refuse an unknown option (cliArgs) and the peer's transport is a row of its own. Thirteen sabotages red by name, " +
                  "logged in the two headers. NOT CLOSED: the pair has run over loopback and in one browser, not between two machines.",
     }),
+    // v4832 -- NO new gate file -- dracoEncode-selfcheck exits by process.exitCode (the rig's v4819 clone-verify crashed it on libuv's
+    // UV_HANDLE_CLOSING assert), and wasmTeardown-selfcheck section 6 holds the conversion and measures the member live under the hook.
+    // Built as a local v4829 while main shipped its own v4829-v4831, so it ships as v4832; the local commit was never pushed.
+    since523: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.
+        at: "v4832", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/wasmTeardown-selfcheck.mjs (section 6: the member the rig found through createRequire -- converted, compiles 418,831 bytes, leaves without process.exit(); sabotages H-K)",
+            "tools/ship/dracoEncode-selfcheck.mjs (process.exitCode, not process.exit(), with the exitBusy readings at its exit line)",
+        ]),
+        verdict: "*** THE RIG'S CRASH NEEDED A WINDOWS TEARDOWN AND A CLONE WITH NO BROWSER, AND THE SANDBOX HAS NEITHER. *** " +
+                 "dracoEncode-selfcheck compiles the vendored Emscripten encoder and ended in process.exit(). v4663's screen never " +
+                 "reached it (createRequire with a computed path) and v4677's sample would read it QUIET: with a browser, section 4 " +
+                 "spends seconds between the encoder and the exit line. With section 4 skipped, as on the rig, exitBusy reads a burst " +
+                 "at that line (4.9-7.7 ms against 0.2-0.3, 4 of 5 over the floor). Converted; held by four sabotages. NOT CLOSED: " +
+                 "the crash itself is Windows-only, so the rig's next clone-verify is the instrument for the fact.",
+    }),
     // v4831 -- TWO new gate files: tools/ship/publishHygiene-selfcheck.mjs (what a release can carry, and the publish commands the GitHub
     // panel prints) and tools/ship/brainStages-selfcheck.mjs (the ship's computer's two stages on the wire, and the orb states on them).
     since522: Object.freeze({
