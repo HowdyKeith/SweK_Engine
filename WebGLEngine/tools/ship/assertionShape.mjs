@@ -896,8 +896,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4827 -- 1937 -> 1939 for brain/roster-selfcheck.mjs and brain/racePlay-selfcheck.mjs. usesOk, definesOk and nameFirst each by two; the rest hold (the drift row named exactly these four).
     // v4830 -- 1940 -> 1942 for brain/pilotRoster-selfcheck.mjs and brain/pilot6dofPolicy-selfcheck.mjs, over v4829's murmurParity-selfcheck.mjs (1939 -> 1940). usesOk, definesOk and nameFirst each by two; the rest hold (the drift row named exactly these four).
     // v4831 -- 1942 -> 1944 for tools/ship/publishHygiene-selfcheck.mjs and tools/ship/brainStages-selfcheck.mjs. usesOk, definesOk and nameFirst each by two; the rest hold (the drift row named exactly these four).
-    gates: 1944, usesOk: 1923, definesOk: 1915, importsOk: 0,
-    distinctDefinitions: 42, nameFirst: 1815, condFirst: 97, unknownSignature: 11,
+    // BVH-CSG round 9 (branch claude/shader-porting-swek-ozgvb0, at its merge onto main's v4831) -- 1944 -> 1945 for
+    // physics/mesh/triArrangement-selfcheck.mjs. usesOk, definesOk and nameFirst each by one; the rest hold (census() over the merged tree).
+    gates: 1945, usesOk: 1924, definesOk: 1916, importsOk: 0,
+    distinctDefinitions: 42, nameFirst: 1816, condFirst: 97, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

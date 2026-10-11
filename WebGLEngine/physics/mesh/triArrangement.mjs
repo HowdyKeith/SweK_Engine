@@ -381,3 +381,41 @@ function validate(V, live, segs, C2) {
     }
     return null;
 }
+
+// ---- THE FRONT DOOR (round 9, on v4778's BVH-CSG pattern) -------------------------------------------------------
+//
+// v4778 gave the six BVH-CSG modules before this one a no-argument reportLines() that runs their own gate's
+// hand-checkable fixtures, so instrument-bench.html can serve them (physics/instruments.mjs). This is the same
+// split: the gate's own right triangle A = (0,0,0),(10,0,0),(0,10,0), area 50, against closed prisms over axis-aligned
+// squares, whose face areas need no code. A REPORT, NOT A VERDICT -- triArrangement-selfcheck.mjs is what exits nonzero.
+export function reportLines() {
+    const buf = (tris) => new Float64Array(tris.flat(2));
+    const prism = (x0, y0, x1, y1) => {
+        const c = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]], T = [];
+        for (let i = 0; i < 4; i++) {
+            const [ax, ay] = c[i], [bx, by] = c[(i + 1) % 4];
+            T.push([[ax, ay, -1], [bx, by, -1], [bx, by, 1]], [[ax, ay, -1], [bx, by, 1], [ax, ay, 1]]);
+        }
+        T.push([[x0, y0, -1], [x1, y1, -1], [x1, y0, -1]], [[x0, y0, -1], [x0, y1, -1], [x1, y1, -1]]);
+        T.push([[x0, y0, 1], [x1, y0, 1], [x1, y1, 1]], [[x0, y0, 1], [x1, y1, 1], [x0, y1, 1]]);
+        return T;
+    };
+    const A = buf([[[0, 0, 0], [10, 0, 0], [0, 10, 0]]]);
+    const fmt = (a) => a >= 1e-3 ? String(+a.toFixed(9)) : a.toExponential(3);
+    const out = ["[triArrangement] one triangle of A cut along the segments where mesh B actually crosses it",
+                 "  A = (0,0,0),(10,0,0),(0,10,0), area 50; B = closed prisms over squares, z from -1 to 1:"];
+    for (const [label, T, hand] of [
+        ["a 1x1 square hole, [2,3]^2", prism(2, 2, 3, 3), "1, 49"],
+        ["nested squares, [1,4]^2 around [2,3]^2", [...prism(1, 1, 4, 4), ...prism(2, 2, 3, 3)], "1, 8, 41"],
+        ["a square across A's edge x=0, [-1,1]x[4,5]", prism(-1, 4, 1, 5), "1, 49"],
+        ["a square 2e-7 across, at (2,2)", prism(2, 2, 2 + 2e-7, 2 + 2e-7), "4e-14 and the rest"],
+    ]) {
+        const r = arrangeTriangle(A, 0, buf(T), T.map((_, i) => i));
+        out.push("    " + label.padEnd(44) + (r.ok ? "faces " + r.faces.map((f) => f.area).sort((x, y) => x - y).map(fmt).join(", ") +
+                 "   by hand " + hand + "   (" + r.segments + " segments)" : "REFUSED: " + r.reason));
+    }
+    const flat = arrangeTriangle(A, 0, buf([[[1, 1, 0], [3, 1, 0], [1, 3, 0]]]), [0]);
+    out.push("    " + "a B-triangle lying in A's own plane".padEnd(44) + (flat.ok ? "ACCEPTED" : "refused: " + flat.reason));
+    out.push("  It never computes a vertex, and a refusal sends the triangle back to meshBoolean.mjs's plane-cut path");
+    return out;
+}

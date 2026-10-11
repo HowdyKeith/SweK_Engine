@@ -8892,6 +8892,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The CLIs refuse an unknown option (cliArgs) and the peer's transport is a row of its own. Thirteen sabotages red by name, " +
                  "logged in the two headers. NOT CLOSED: the pair has run over loopback and in one browser, not between two machines.",
     }),
+    // BVH-CSG round 9, at its merge onto main's v4831 -- ONE new gate file: physics/mesh/triArrangement-selfcheck.mjs, the per-triangle
+    // arrangement meshBoolean.mjs now tries first. The round is a branch round and wears no version, so `at` names the merge it closed at.
+    since523: Object.freeze({
+        at: "v4831+bvh-csg-round-9", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "physics/mesh/triArrangement-selfcheck.mjs",
+        ]),
+        widened: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** SEGMENT-BOUNDED CUTTING: ONE TRIANGLE OF A CUT ALONG THE SEGMENTS WHERE B ACTUALLY CROSSES IT, NOT ALONG B's PLANES. *** " +
+                 "Faces need no code to check: a 1x1 square hole in the right triangle (0,0,0),(10,0,0),(0,10,0) gives exactly 1 and 49, nested " +
+                 "squares 1, 8 and 41, every output vertex bit-identical to a corner or a triTriIntersect endpoint; a square 2e-7 across keeps " +
+                 "its 4e-14 face (the round's lost first build dropped it); a crossing within TOL of A's edge closes against it and leaves a " +
+                 "2.75e-9 strip, measured. Four real-workload audits classify every output triangle on its own and find 0 that disagree with " +
+                 "their face. 30 checks. 21 sabotages in 22 runs against the rebuilt module: red by name except a control, three named " +
+                 "backstops, and classifying a face by its first triangle -- 0 red until a unit check was added for it, then red on the re-run.",
+    }),
     // v4831 -- TWO new gate files: tools/ship/publishHygiene-selfcheck.mjs (what a release can carry, and the publish commands the GitHub
     // panel prints) and tools/ship/brainStages-selfcheck.mjs (the ship's computer's two stages on the wire, and the orb states on them).
     since522: Object.freeze({

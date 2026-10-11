@@ -48,7 +48,7 @@
 //   N18 pointInMeshOpts not passed for arranged faces -> 0 / 1 / 0 (the same fixture)
 "use strict";
 
-import { arrangeTriangle, ARRANGE_TOL } from "./triArrangement.mjs";
+import { arrangeTriangle, ARRANGE_TOL, reportLines } from "./triArrangement.mjs";
 import { triTriIntersect } from "./triTriIntersect.mjs";
 import { pairOverlap } from "./bvhPairOverlap.mjs";
 import { groupCandidatesByTriA } from "./triFragmentAccumulate.mjs";
@@ -341,6 +341,24 @@ console.log("\n4. *** THE SNAP TOLERANCE IS A REAL TOLERANCE, NOT A HOPE ***");
         under.ok && under.faces.length === 2, under.ok ? "faces " + under.faces.length : "refused: " + under.reason);
     ok("   ...and a crack of 30 TOL is NOT merged -- the arrangement refuses rather than guessing",
         !over.ok, over.ok ? "accepted with " + over.faces.length + " faces" : "refused: " + over.reason);
+}
+
+// THE FRONT DOOR. triArrangement.mjs has a no-argument reportLines() on v4778's BVH-CSG pattern, so instrument-bench.html
+// can serve it (physics/instruments.mjs, row "tri-arrangement"). A report is not a verdict, but an export no gate names is
+// what definitionGates counts, so this section reads the report's own hand-checkable numbers back.
+console.log("\nTHE FRONT DOOR");
+{
+    const L = reportLines();
+    const faces = (re) => { const l = L.find((x) => re.test(x)); const m = l && l.match(/faces ([-+0-9.e]+(?:, [-+0-9.e]+)*)/); return m ? m[1].split(", ").map(Number) : null; };
+    const same = (got, want) => got && got.length === want.length && got.every((g, i) => Math.abs(g - want[i]) <= 1e-9 * Math.max(1, want[i]));
+    const tiny = faces(/2e-7 across/);
+    ok("reportLines prints the hand-derived faces: 1 and 49, the nested 1, 8 and 41, and 1 and 49 across A's edge",
+        /triArrangement/.test(L[0]) && same(faces(/1x1 square hole/), [1, 49]) && same(faces(/nested squares/), [1, 8, 41]) &&
+        same(faces(/across A's edge/), [1, 49]), L.slice(2, 5).map((l) => l.trim().replace(/\s{2,}/g, " ")).join(" | "));
+    ok("...the 2e-7 square's own face at 4e-14, and the coplanar triangle REFUSED",
+        tiny && Math.abs(tiny[0] - 4e-14) < 1e-6 * 4e-14 && L.some((l) => /own plane\s+refused: coplanar$/.test(l)),
+        (tiny ? "tiny face " + tiny[0] : "UNPARSED") + "; " + (L.find((l) => /own plane/.test(l)) || "").trim());
+    ok("...and no report line stringifies a missing field as the literal word \"undefined\"", L.every((l) => !/\bundefined\b/.test(l)));
 }
 
 console.log(`\ntriArrangement-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);
