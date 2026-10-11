@@ -3379,3 +3379,78 @@ Every shape that built was exact: every cell the twin's, none fused.
   `-tile2-zero-10.txt`) are where to look.
 - Section 56's instrument mending: reporting a stopped gate with its last lines, and a time limit on native builds. It is
   carried to the next round that builds a new kernel natively.
+
+## 58. ROUND 16 -- REPORTED: CHROME BUILDS EVERY TILE SHAPE AND RUNS NONE FASTER; WHAT FXC DOES WITH THEIR WEIGHTS
+
+Round 16 is closed (section 57). This section reports measurements that decide nothing.
+
+**What arrived.**
+- **The probe's Chrome half on each GPU** (`--browser-only`, at 497e743f, with `realGpuRun`'s hardware flags):
+  - `render/denoise-probe-r16-chrome-gtx1080.json` reports the adapter "nvidia / pascal";
+  - `render/denoise-probe-r16-chrome-intel-gen9.json` reports "intel / gen-9".
+- **Dawn's shader dumps** of the two tile shapes FXC built at 10 inputs in section 57's probes, from each GPU, under
+  `render/denoise-probe-dumps/`. The Intel's 2 x 8 dump holds only the WGSL, because that build was stopped.
+- All of it is committed byte for byte at e910f3f1.
+
+**Chrome, through DXC, on the GPUs.**
+- **Every shape built,** in 95-356 ms on the 1080 and 281-679 ms on the Intel.
+- **Every shape was exact:** every cell the twin's, none fused.
+- **One 64 x 64 pass on the device's clock.** Each tile shape is shown against the fast kernel at 32 -> 32:
+
+| Shape | GTX 1080 | Intel gen-9 |
+|---|---|---|
+| fast kernel, 32 -> 32 | 0.103 ms | 1.092 ms |
+| 2 x 8, edge zero | 0.138 ms, 1.34 x slower | 1.260 ms, 1.15 x slower |
+| 4 x 4, edge zero | 0.189 ms, 1.83 x | 1.569 ms, 1.44 x |
+| 2 x 4, edge zero | 0.218 ms, 2.11 x | 1.668 ms, 1.53 x |
+| 1 x 8, edge skip | 0.410 ms, 3.96 x | 1.291 ms, 1.18 x |
+| 2 x 4, edge skip | 0.438 ms, 4.24 x | 1.534 ms, 1.41 x |
+| 2 x 8, edge skip (r16a's) | 0.589 ms, 5.69 x | 1.431 ms, 1.31 x |
+| 4 x 4, edge skip (r16b's) | 0.686 ms, 6.63 x | 2.127 ms, 1.95 x |
+
+- **No tile shape at 32 inputs was faster than the fast kernel on either GPU.**
+  - Edge zero was faster than edge skip in five of the six pairs.
+  - On the 1080 the gap was large: 0.138 against 0.589 ms at 2 x 8.
+- **The 10-input shapes are not comparable to the fast kernel.** They do 10/32 of the fast kernel's work, and ran in 0.106
+  and 0.186 ms on the 1080 and 0.480 and 0.526 ms on the Intel.
+- **This is one small size.** At 64 x 64, most tile shapes launch half the fast kernel's workgroups, so on the 1080 these
+  passes are partly a measure of how full the GPU is.
+- **But the two shapes with the fast kernel's workgroup count were slower too:**
+  - 2 x 4 edge zero: 2.11 and 1.53 times;
+  - 1 x 8 edge skip: 3.96 and 1.18 times.
+- **Whether a tile shape overtakes the fast kernel at 256 x 256 or 1080p is not measured.**
+
+**FXC's code, from the dumps.** Both GPUs' dumps of the 4 x 4 shape have the same structure. They differ only in how Tint
+wrote a few subtractions.
+- **FXC unrolled nothing.** The kernel's six loops are all kept: the workgroup-memory zeroing, the input blocks, the
+  tile load, ky, kx and the channel loop.
+- **It declared 259 temporary registers (4 x 4) and 258 (2 x 8).** The fast kernel needs 42.
+- **The cause is how it compiles a weight read.** The fast kernel reads a weight as one indexed operand,
+  `CB0[1][r1.x + 0]`; its whole DXBC holds 11 `and` or `or` instructions. In the tile shapes, every weight read in the
+  channel loop became a scan of the weight array:
+  - compare the index with an element's position (`ieq`);
+  - mask that element (`and`);
+  - merge it into the result (`or`).
+- **That comes to close to 500 steps a read:**
+
+| Shape | Weight reads per channel step | `and` | `or` | `ieq` |
+|---|---|---|---|---|
+| 4 x 4 | 4 | 1,979 | 1,974 | 507 |
+| 2 x 8 | 8 | 3,857 | 3,848 | 984 |
+
+- **That explains the native passes in section 57,** 40 to 260 times the fast kernel's. With 32 inputs the weight array
+  is 3.2 times as long, 2,304 vec4s against 720. That is consistent with FXC never finishing those builds. This is
+  inferred, not shown.
+- **What makes FXC do this is inferred, not shown.**
+  - In every tile shape's HLSL, each weight read is first stored in a local, Tint's `float4 v_82 = asfloat(v_2[...])`,
+    and then used for several pixels.
+  - In the 1 x 8 shape it is stored and used once, and that shape was stopped too.
+  - The fast kernel uses each read directly inside its multiply-add.
+  - A tile kernel that reads every weight inline would test this.
+
+**What this leaves for a later round. Nothing here is pre-registered.**
+- Natively, the tile kernel as written cannot be used on D3D12 (section 57). An inline-weight version might build. That
+  is untested.
+- In Chrome, where nothing stops the build, it was slower than the fast kernel at the one size measured.
+- So a round that returns to the tile kernel would first need its Chrome speed at the ladder's real sizes. The probe times
+  only one 64 x 64 pass.
