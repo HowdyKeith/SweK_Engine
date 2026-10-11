@@ -8892,6 +8892,22 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The CLIs refuse an unknown option (cliArgs) and the peer's transport is a row of its own. Thirteen sabotages red by name, " +
                  "logged in the two headers. NOT CLOSED: the pair has run over loopback and in one browser, not between two machines.",
     }),
+    // v4841 -- NO new gate file -- three's GPU-native TSL unit tests run, on both backends, for the sixteen drafts.
+    since532: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4841", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (three's GPU-native TSL unit tests ran on WebGPU and on the WebGL 2 backend, none skipped; every unit failure named with its reason, the same on both builds)",
+        ]),
+        verdict: "*** v4836'S UNIT FIGURE COUNTED 338 TESTS THAT NEVER RAN, AND THEY WERE THE ONES NEAREST THE PATCHES. *** #34918 made three's " +
+                 "TSL unit tests GPU-native: each runs on a WebGPU and a WebGL 2 renderer and passes as SKIPPED when it gets neither, which " +
+                 "headless Chromium here never gave it. Three's unit runner with the e2e runner's SwiftShader flags and swizzle workaround " +
+                 "(kept as docs/upstream-three/e2e/puppeteer-unit-local.diff) runs all 338 -- 169 per backend -- on dev and with all sixteen: " +
+                 "1891 passed, 1 todo, 2 failed on both, the same two, dev's own on this device. e2e.json, the README and the sixteen pull " +
+                 "request texts say so. Three sabotages red by name. NOT CLOSED: why textureBarrier's read-back is wrong on SwiftShader.",
+    }),
     // v4840 -- ONE new gate file: tools/ship/wasmDoors-selfcheck.mjs (the computed door to wasm, censused; five gates it found converted).
     since531: Object.freeze({
         at: "v4840", swept: 1, green: 1, red: 0,

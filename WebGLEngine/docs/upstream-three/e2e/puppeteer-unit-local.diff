@@ -1,0 +1,76 @@
+--- a/test/unit/puppeteer.unit.js
++++ b/test/unit/puppeteer.unit-local.js
+@@ -53,13 +53,16 @@
+ 
+ 	( async () => {
+ 
++		// LOCAL: SwiftShader's Vulkan and ANGLE, the set test/e2e/puppeteer-local.js presents WebGPU and WebGL 2 with on this box.
++		// The upstream flags rely on lavapipe (VK_DRIVER_FILES below), which this box does not have, and headless Chromium then
++		// gives the GPU-native TSL tests neither backend: gpu-test-utils logs both unavailable and passes them as SKIPPED.
+ 		const flags = [
+ 			'--hide-scrollbars',
+ 			'--enable-unsafe-webgpu',
+ 			'--enable-features=Vulkan',
+-			'--disable-vulkan-surface',
+-			'--ignore-gpu-blocklist',
+-			'--disable-gpu-driver-bug-workarounds',
++			'--use-vulkan=swiftshader',
++			'--use-angle=swiftshader',
++			'--disable-gpu-watchdog',
+ 			'--no-sandbox'
+ 		];
+ 
+@@ -85,7 +88,7 @@
+ 		browser = await puppeteer.launch( {
+ 			headless: testMode === 'headless',
+ 			args: flags,
+-			env: { ...process.env, VK_DRIVER_FILES: '/usr/share/vulkan/icd.d/lvp_icd.x86_64.json' },
++			env: { ...process.env },
+ 			defaultViewport: null,
+ 			handleSIGINT: false,
+ 			protocolTimeout: 0,
+@@ -115,11 +118,17 @@
+ 		await page.evaluateOnNewDocument( () => {
+ 
+ 			window._QUnitFailures = [];
++			// LOCAL: tests carrying a backend suffix (gpu-test-utils' declareTest), and every test that passed only as SKIPPED
++			window._QUnitGpu = { webgpu: 0, webgl: 0, skipped: 0 };
+ 
+ 			const install = () => {
+ 
+ 				window.QUnit.on( 'testEnd', ( test ) => {
+ 
++					const m = / \[(webgpu|webgl)\]$/.exec( test.name );
++					if ( m ) window._QUnitGpu[ m[ 1 ] ] ++;
++					if ( ( test.assertions || [] ).some( ( a ) => /^SKIPPED:/.test( a.message || '' ) ) ) window._QUnitGpu.skipped ++;
++
+ 					if ( test.status === 'failed' ) {
+ 
+ 						window._QUnitFailures.push( {
+@@ -154,6 +163,11 @@
+ 
+ 		} );
+ 
++		// LOCAL: the e2e runner's swizzle workaround (docs/upstream-three/e2e/puppeteer-local.diff), the same line: this sandbox's
++		// Chromium rejects three's string `swizzle` on every texture view, and a current browser ignores the field
++		await page.evaluateOnNewDocument( `if ( typeof GPUTexture !== 'undefined' ) { const orig = GPUTexture.prototype.createView;
++			GPUTexture.prototype.createView = function ( d ) { if ( d && typeof d === 'object' && typeof d.swizzle === 'string' ) { const { swizzle, ...rest } = d; return orig.call( this, rest ); } return orig.call( this, d ); }; }` );
++
+ 		const testUrl = `http://localhost:${port}/test/unit/${testPage}`;
+ 
+ 		// Load the test page
+@@ -178,12 +192,14 @@
+ 		} );
+ 
+ 		const failures = await page.evaluate( () => window._QUnitFailures );
++		const gpu = await page.evaluate( () => window._QUnitGpu );
+ 
+ 		white( `1..${stats.total}` );
+ 		green( `# pass ${stats.passed}` );
+ 		yellow( `# skip ${stats.skipped}` );
+ 		cyan( `# todo ${stats.todo}` );
+ 		red( `# fail ${stats.failed}` );
++		cyan( `# gpu suffixed webgpu ${gpu.webgpu} webgl ${gpu.webgl}, SKIPPED for want of a backend ${gpu.skipped}` );
+ 
+ 		for ( const failure of failures ) {
+ 
