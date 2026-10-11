@@ -8892,14 +8892,14 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The CLIs refuse an unknown option (cliArgs) and the peer's transport is a row of its own. Thirteen sabotages red by name, " +
                  "logged in the two headers. NOT CLOSED: the pair has run over loopback and in one browser, not between two machines.",
     }),
-    // v4840 -- NO new gate file -- the computed door to wasm, censused; five gates it found converted.
+    // v4840 -- ONE new gate file: tools/ship/wasmDoors-selfcheck.mjs (the computed door to wasm, censused; five gates it found converted).
     since531: Object.freeze({
-        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
-        at: "v4840", swept: 0, green: 0, red: 0,
-        added: Object.freeze([]),
+        at: "v4840", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/wasmDoors-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
         widened: Object.freeze([
-            "tools/ship/wasmTeardown-selfcheck.mjs (section 7: every gate reaching a computed door to a wasm compiler leaves without exit() or was measured under the hook; fixtures for the door rule)",
+            "tools/ship/wasmTeardown-selfcheck.mjs (section 7: DOORS_AT_V4840 held cheaply -- no new exit, the five converted stay converted; the census moved to wasmDoors-selfcheck at step 4b)",
+            "tools/ship/dracoEncode-selfcheck.mjs (the same holding row, where the sweep runs it: the guardian recordReach needed for DOORS_AT_V4840)",
         ]),
         verdict: "*** THE DOOR THE RIG FOUND AT v4832, CENSUSED, AND IT HAD FIVE MORE MEMBERS NOBODY HAD MET. *** The teardown module's " +
                  "wasmCompilers / wasmDoors / doorReach name every script that compiles wasm (vendor/ included), every module that loads " +

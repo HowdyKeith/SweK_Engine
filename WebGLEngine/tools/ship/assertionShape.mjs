@@ -899,8 +899,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4834 -- 1944 -> 1945 for tools/ship/reportFresh-selfcheck.mjs. usesOk, definesOk and nameFirst each by one; the rest hold (the drift row named exactly these four).
     // v4835 -- 1945 -> 1946 for tools/ship/afterVerdict-selfcheck.mjs, on main. usesOk, definesOk and nameFirst each by one.
     // v4837 -- 1946 -> 1949 for this round's tools/ship/poolWatch-selfcheck.mjs, tools/ship/sysLagReading-selfcheck.mjs and tools/ship/train6dofPilot-selfcheck.mjs (v4836 added no gate file). usesOk, definesOk and nameFirst each by three more; the rest hold (the drift row named exactly these four).
-    gates: 1949, usesOk: 1928, definesOk: 1920, importsOk: 0,
-    distinctDefinitions: 42, nameFirst: 1820, condFirst: 97, unknownSignature: 11,
+    // v4840 -- 1949 -> 1950 for tools/ship/wasmDoors-selfcheck.mjs (the computed-door census, split out of wasmTeardown-selfcheck at
+    // step 4b). usesOk, definesOk and nameFirst each by one; the rest hold.
+    gates: 1950, usesOk: 1929, definesOk: 1921, importsOk: 0,
+    distinctDefinitions: 42, nameFirst: 1821, condFirst: 97, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

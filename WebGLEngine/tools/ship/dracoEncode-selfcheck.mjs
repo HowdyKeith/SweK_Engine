@@ -14,6 +14,9 @@ import { encodeDracoMesh, writeDracoGlb, DRACO_EXT } from "../export/dracoEncode
 import { peekGlb, needsDraco, MAX_JSON } from "../../gpu/glbPeek.mjs";
 import { weld } from "../export/weldVertices.mjs";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
+import { DOORS_AT_V4840, exitCallCount } from "./wasmTeardown.mjs";
+import { codeOnly } from "./sourceScan.mjs";
+import fs from "node:fs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -219,6 +222,24 @@ console.log("\n5. THE SAVING A VOXEL EXPORT ACTUALLY GETS -- MEASURED, NOT ASSUM
         bytes.length + " compressed against " + plainBytes + " raw (positions+normals+indices as FLOAT/uint32) " +
         "-- " + (100 * (1 - bytes.length / plainBytes)).toFixed(1) + "% smaller, on " + (w.after) + " vertices / " +
         (w.indices.length / 3) + " triangles");
+}
+
+// v4840 -- AND THE DOOR THIS GATE CAME THROUGH, HELD WHERE THE SWEEP RUNS IT. This gate's crash on the rig (v4832) led to
+// tools/ship/wasmTeardown.mjs's computed-door census, which found five more gates with the same shape and converted them
+// (DOORS_AT_V4840). The census lives in tools/ship/wasmDoors-selfcheck.mjs and costs ~3 s; wasmTeardown-selfcheck holds the
+// record too and sits at the sweep's line on this host. recordReach-selfcheck needs a guardian the ritual actually runs, and
+// this one is 0.7 s: the frozen population, re-read with no census -- each member exists, no new exit, the five still converted.
+// SABOTAGES (v4840): box3dFingerprint's terminal process.exit() put back -> this row red by name; one member (roster) removed
+// from DOORS_AT_V4840 -> this row red (13 against 14 measured).
+{
+    const ENGINE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+    const read = (g) => { try { return fs.readFileSync(path.join(ENGINE, g), "utf8"); } catch { return null; } };
+    const bad = DOORS_AT_V4840.members.filter((m) => { const src = read(m.gate); if (src === null) return true;
+        const code = codeOnly(src); return exitCallCount(code) > m.exitCalls || (m.exitAfterWasmBefore && !/process\.exitCode\s*=\s*fails/.test(code)); });
+    ok("!! *** the gates this one's door led to still hold: DOORS_AT_V4840's members exist, gain no exit, and the five converted stay converted ***",
+        DOORS_AT_V4840.members.length === DOORS_AT_V4840.measured && bad.length === 0,
+        bad.length ? bad.map((m) => m.gate).join(", ") + " -- re-run tools/ship/wasmDoors-selfcheck.mjs"
+                   : `${DOORS_AT_V4840.measured} members, ${DOORS_AT_V4840.crashShapeBefore} converted`);
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +

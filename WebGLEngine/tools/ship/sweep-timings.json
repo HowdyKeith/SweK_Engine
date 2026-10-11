@@ -1266,7 +1266,7 @@
   "tools/ship/domToTexture-selfcheck.mjs": 3165,
   "tools/ship/doorKinds-selfcheck.mjs": 90106,
   "tools/ship/downloadScan-selfcheck.mjs": 1705,
-  "tools/ship/dracoEncode-selfcheck.mjs": 2121,
+  "tools/ship/dracoEncode-selfcheck.mjs": 822,
   "tools/ship/dracoWeld-selfcheck.mjs": 347,
   "tools/ship/drawIntent-selfcheck.mjs": 661,
   "tools/ship/driveEnv-selfcheck.mjs": 46448,
@@ -2077,7 +2077,8 @@
   "tools/ship/reportFresh-selfcheck.mjs": 2246,
   "tools/ship/poolWatch-selfcheck.mjs": 335,
   "tools/ship/sysLagReading-selfcheck.mjs": 1496,
-  "tools/ship/train6dofPilot-selfcheck.mjs": 17072
+  "tools/ship/train6dofPilot-selfcheck.mjs": 17072,
+  "tools/ship/wasmDoors-selfcheck.mjs": 2930
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -4031,7 +4032,8 @@
   "tools/ship/reportFresh-selfcheck.mjs": 0,
   "tools/ship/poolWatch-selfcheck.mjs": 0,
   "tools/ship/sysLagReading-selfcheck.mjs": 0,
-  "tools/ship/train6dofPilot-selfcheck.mjs": 0
+  "tools/ship/train6dofPilot-selfcheck.mjs": 0,
+  "tools/ship/wasmDoors-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-10-11T20:52:24.337Z",
@@ -5174,7 +5176,7 @@
   "tools/ship/domToTexture-selfcheck.mjs": "2026-10-10T22:54:28.625Z",
   "tools/ship/doorKinds-selfcheck.mjs": "2026-09-09T17:59:42.840Z",
   "tools/ship/downloadScan-selfcheck.mjs": "2026-10-11T20:52:24.337Z",
-  "tools/ship/dracoEncode-selfcheck.mjs": "2026-10-11T20:52:24.337Z",
+  "tools/ship/dracoEncode-selfcheck.mjs": "2026-10-11T21:05:51.934Z",
   "tools/ship/dracoWeld-selfcheck.mjs": "2026-10-11T20:52:24.337Z",
   "tools/ship/drawIntent-selfcheck.mjs": "2026-10-11T20:52:24.337Z",
   "tools/ship/driveEnv-selfcheck.mjs": "2026-09-09T17:59:42.840Z",
@@ -5985,7 +5987,8 @@
   "tools/ship/reportFresh-selfcheck.mjs": "2026-10-11T20:52:24.337Z",
   "tools/ship/poolWatch-selfcheck.mjs": "2026-10-11T20:52:24.337Z",
   "tools/ship/sysLagReading-selfcheck.mjs": "2026-10-11T20:52:24.337Z",
-  "tools/ship/train6dofPilot-selfcheck.mjs": "2026-10-11T19:00:00.629Z"
+  "tools/ship/train6dofPilot-selfcheck.mjs": "2026-10-11T19:00:00.629Z",
+  "tools/ship/wasmDoors-selfcheck.mjs": "2026-10-11T21:05:50.878Z"
  },
  "capAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 20000,
@@ -7913,7 +7916,8 @@
   "tools/ship/reportFresh-selfcheck.mjs": 20000,
   "tools/ship/poolWatch-selfcheck.mjs": 20000,
   "tools/ship/sysLagReading-selfcheck.mjs": 20000,
-  "tools/ship/train6dofPilot-selfcheck.mjs": 20000
+  "tools/ship/train6dofPilot-selfcheck.mjs": 20000,
+  "tools/ship/wasmDoors-selfcheck.mjs": 20000
  },
  "finished": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": true,
@@ -9861,7 +9865,8 @@
   "tools/ship/reportFresh-selfcheck.mjs": true,
   "tools/ship/poolWatch-selfcheck.mjs": true,
   "tools/ship/sysLagReading-selfcheck.mjs": true,
-  "tools/ship/train6dofPilot-selfcheck.mjs": true
+  "tools/ship/train6dofPilot-selfcheck.mjs": true,
+  "tools/ship/wasmDoors-selfcheck.mjs": true
  },
  "crossings": {
   "tools/ship/engineSceneBot-selfcheck.mjs": 2,
@@ -11036,7 +11041,7 @@
   "tools/ship/domDisintegrate-selfcheck.mjs": 567,
   "tools/ship/domToTexture-selfcheck.mjs": 3165,
   "tools/ship/downloadScan-selfcheck.mjs": 538,
-  "tools/ship/dracoEncode-selfcheck.mjs": 701,
+  "tools/ship/dracoEncode-selfcheck.mjs": 822,
   "tools/ship/dracoWeld-selfcheck.mjs": 98,
   "tools/ship/drawIntent-selfcheck.mjs": 262,
   "tools/ship/dropletMask-selfcheck.mjs": 107,
@@ -11922,7 +11927,8 @@
   "tools/ship/reportFresh-selfcheck.mjs": 647,
   "tools/ship/train6dofPilot-selfcheck.mjs": 17072,
   "tools/ship/poolWatch-selfcheck.mjs": 165,
-  "tools/ship/sysLagReading-selfcheck.mjs": 455
+  "tools/ship/sysLagReading-selfcheck.mjs": 455,
+  "tools/ship/wasmDoors-selfcheck.mjs": 2930
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-10-11T19:30:37.023Z",
@@ -12880,7 +12886,7 @@
   "tools/ship/domDisintegrate-selfcheck.mjs": "2026-10-10T15:44:21.256Z",
   "tools/ship/domToTexture-selfcheck.mjs": "2026-10-10T22:54:28.625Z",
   "tools/ship/downloadScan-selfcheck.mjs": "2026-10-11T17:17:59.708Z",
-  "tools/ship/dracoEncode-selfcheck.mjs": "2026-10-10T15:44:21.256Z",
+  "tools/ship/dracoEncode-selfcheck.mjs": "2026-10-11T21:05:51.934Z",
   "tools/ship/dracoWeld-selfcheck.mjs": "2026-10-11T00:23:55.543Z",
   "tools/ship/drawIntent-selfcheck.mjs": "2026-10-11T18:59:45.014Z",
   "tools/ship/dropletMask-selfcheck.mjs": "2026-10-11T18:59:45.014Z",
@@ -13766,7 +13772,8 @@
   "tools/ship/reportFresh-selfcheck.mjs": "2026-10-11T16:57:18.149Z",
   "tools/ship/train6dofPilot-selfcheck.mjs": "2026-10-11T18:59:45.014Z",
   "tools/ship/poolWatch-selfcheck.mjs": "2026-10-11T18:31:13.061Z",
-  "tools/ship/sysLagReading-selfcheck.mjs": "2026-10-11T18:31:13.061Z"
+  "tools/ship/sysLagReading-selfcheck.mjs": "2026-10-11T18:31:13.061Z",
+  "tools/ship/wasmDoors-selfcheck.mjs": "2026-10-11T21:05:50.878Z"
  },
  "serialRing": {
   "tools/ship/frozenRecords-selfcheck.mjs": [
@@ -19670,9 +19677,9 @@
    706
   ],
   "tools/ship/dracoEncode-selfcheck.mjs": [
-   667,
    806,
-   701
+   701,
+   822
   ],
   "tools/ship/frameRecorder-selfcheck.mjs": [
    1430,
@@ -22809,6 +22816,10 @@
   ],
   "tools/ship/sysLagReading-selfcheck.mjs": [
    455
+  ],
+  "tools/ship/wasmDoors-selfcheck.mjs": [
+   2954,
+   2930
   ]
  },
  "contended": {
@@ -24286,7 +24297,7 @@
   "tools/ship/capReading-selfcheck.mjs": true,
   "tools/ship/csBomb-selfcheck.mjs": true,
   "tools/ship/csRoundManager-selfcheck.mjs": true,
-  "tools/ship/dracoEncode-selfcheck.mjs": true,
+  "tools/ship/dracoEncode-selfcheck.mjs": false,
   "tools/ship/dungeonAI-selfcheck.mjs": true,
   "tools/ship/fbxIngest-selfcheck.mjs": false,
   "tools/ship/frameRecorder-selfcheck.mjs": true,
@@ -24653,7 +24664,8 @@
   "tools/ship/reportFresh-selfcheck.mjs": true,
   "tools/ship/poolWatch-selfcheck.mjs": true,
   "tools/ship/sysLagReading-selfcheck.mjs": true,
-  "tools/ship/train6dofPilot-selfcheck.mjs": false
+  "tools/ship/train6dofPilot-selfcheck.mjs": false,
+  "tools/ship/wasmDoors-selfcheck.mjs": false
  },
  "kinds": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "loaded",
@@ -25796,7 +25808,7 @@
   "tools/ship/domToTexture-selfcheck.mjs": "alone",
   "tools/ship/doorKinds-selfcheck.mjs": "capped",
   "tools/ship/downloadScan-selfcheck.mjs": "loaded",
-  "tools/ship/dracoEncode-selfcheck.mjs": "loaded",
+  "tools/ship/dracoEncode-selfcheck.mjs": "alone",
   "tools/ship/dracoWeld-selfcheck.mjs": "loaded",
   "tools/ship/drawIntent-selfcheck.mjs": "loaded",
   "tools/ship/driveEnv-selfcheck.mjs": "alone",
@@ -26607,6 +26619,7 @@
   "tools/ship/reportFresh-selfcheck.mjs": "loaded",
   "tools/ship/poolWatch-selfcheck.mjs": "loaded",
   "tools/ship/sysLagReading-selfcheck.mjs": "loaded",
-  "tools/ship/train6dofPilot-selfcheck.mjs": "alone"
+  "tools/ship/train6dofPilot-selfcheck.mjs": "alone",
+  "tools/ship/wasmDoors-selfcheck.mjs": "alone"
  }
 }

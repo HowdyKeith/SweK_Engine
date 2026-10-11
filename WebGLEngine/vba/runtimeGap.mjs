@@ -607,7 +607,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4834 -- 4625 -> 4626 for tools/ship/reportFresh-selfcheck.mjs.
     // v4835 -- 4626 -> 4628 for tools/ship/afterVerdict.mjs and its gate (on main).
     // v4837 -- 4628 -> 4636 for tools/ship/poolWatch.mjs, sysLagReading.mjs, takeLagReading.mjs, train6dofPilot.mjs, trainPilot6dof.mjs and their three gates (poolWatch-selfcheck, sysLagReading-selfcheck, train6dofPilot-selfcheck); verify.mjs, deviceOwed.mjs and the 6DOF page grew.
-    files: 4636,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
+    // v4840 -- files 4636 -> 4637: tools/ship/wasmDoors-selfcheck.mjs.
+    files: 4637,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
     // (v4691 note, carried)                               // v4691 -- RE-DERIVED: tools/ship/textureInProbe.mjs arrived, one ES module with a closure and top-level await -- four rows moved (files, ES modules, closures, async/await) and eight held.
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
@@ -1172,7 +1173,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // several runs, step 4b's repair); the other rows hold.
     // v4840 -- WebAssembly 24 -> 26: tools/ship/wasmTeardown.mjs (the census's compiler pattern) and wasmTeardown-selfcheck.mjs
     // (section 7's fixture glue) now name the API; neither compiles anything. The other rows hold.
-    esModules: 4331, closures: 4177, asyncAwait: 1739, typedArrays: 1274, promises: 419,
+    // v4840 -- and at step 4b, ES modules 4331 -> 4332, closures 4177 -> 4178, async/await 1739 -> 1740: tools/ship/wasmDoors-selfcheck.mjs.
+    esModules: 4332, closures: 4178, asyncAwait: 1740, typedArrays: 1274, promises: 419,
     fetchXhr: 252, performanceNow: 246, raf: 127, webgl: 200, webgpu: 57, threads: 25, wasm: 26,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

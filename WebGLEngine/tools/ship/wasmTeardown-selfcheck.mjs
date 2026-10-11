@@ -26,7 +26,8 @@
 //      (skillbookDoor, 48,643 bytes)
 //   K. the live subject is a converted box3d gate on the same lexer bytes    -> RED (1 row, compiles)
 //      (contactOverlay) -- the byte floor is what tells the encoder from the lexer
-// v4840, section 7 (the computed door, censused; five members converted):
+// v4840, section 7 (the computed door, censused; five members converted) -- these rows moved to tools/ship/wasmDoors-selfcheck.mjs
+// at v4840's step 4b, with their sabotages; section 7 here is now one cheap row over DOORS_AT_V4840 (see it):
 //   L. box3dFingerprint-selfcheck's terminal process.exit() put back          -> RED (3 rows: accounted, converted, live)
 //   M. a bare file name names a compiler without its folder beside it        -> RED (1 row, the door fixture). The first
 //      run of M read 2: section 1's idle control went red at 3.4 ms, the row this header already calls load-sensitive;
@@ -461,73 +462,24 @@ console.log("\n6. *** v4832 -- THE RIG FOUND A WASM COMPILER BOTH SCREENS MISSED
         "present 2.8 / 0.6 / 0.3 ms (QUIET); section 4 skipped as on the rig 7.7 / 6.1 / 6.8 / 4.9 / 5.3 ms, second " +
         "window 0.2-0.3 (a BURST, 4 of 5 over the 5 ms floor). ONE BOX, Linux, where the assert does not exist.");
     report("v4832 said: another gate reaching wasm through createRequire or a computed import is not screened, and a census " +
-        "of the door is not built. v4840 built it -- section 7 -- and it found five such gates the rig had not reached yet.");
+        "of the door is not built. v4840 built it -- tools/ship/wasmDoors-selfcheck.mjs -- and it found five such gates the rig had not reached yet.");
 }
 
-console.log("\n7. *** v4840 -- THE COMPUTED DOOR, CENSUSED: EVERY GATE THAT REACHES A WASM COMPILER THROUGH ONE, ACCOUNTED FOR ***");
+console.log("\n7. *** v4840 -- THE COMPUTED-DOOR POPULATION, HELD CHEAPLY: the census itself is tools/ship/wasmDoors-selfcheck.mjs ***");
 {
-    // Section 6 ended "a census of the door ... is not built. The rig's clone-verify found every member after v4663, and it is
-    // still the instrument." Built at v4840 (tools/ship/wasmTeardown.mjs: wasmCompilers, wasmDoors, doorReach) and it found five
-    // members the rig had not reached yet -- green gates, exit 0, each compiling box3d's glue and then calling process.exit().
-    const read = (g) => fs.readFileSync(path.join(ENG, g), "utf8");
-    const left = (g) => exitCallCount(codeOnly(read(g)));
-    const t0 = Date.now();
-    const { compilers, doors } = WT.wasmDoors();
-    const reach = WT.doorReach(doors);
-    report(`${compilers.length} wasm compilers (vendor/ included), ${doors.length} computed doors to them, ${reach.size} gates reaching one -- ` +
-        `${Date.now() - t0} ms, candidates found by git grep (the same doors and the same reach as reading every file, compared at v4840)`);
-    const door = (m) => doors.find((d) => d.module === m);
-    // The glue paths are BUILT FROM PARTS, as orreryFleet-selfcheck builds its needle: spelled whole, they made this gate a
-    // "satellite" of box3d and of the Draco encoder in the orrery's importer scan (box3d 27 against a baseline of 26 on the first
-    // run), and the tree's rule is that the fix is not an exclusion entry -- this file names the glues, it does not load them.
-    const glueOf = (body, file) => "vendor/" + body + "/" + file;
-    ok("!! the census finds the door the rig found and the one v4663 named, each to the glue it loads",
-        !!door("tools/export/dracoEncode.mjs") && door("tools/export/dracoEncode.mjs").glue.includes(glueOf("draco-encoder", "draco_encoder_nodejs.js")) &&
-        !!door("physics/box3d/box3dNode.mjs") && door("physics/box3d/box3dNode.mjs").glue.includes(glueOf("box3d", "box3d.js")) &&
-        reach.has("tools/ship/dracoEncode-selfcheck.mjs"),
-        doors.map((d) => `${d.module} -> ${d.glue.join(", ")}`).join("; "));
-    const recorded = new Map([...WASM_AT_V4663.compilers.map((c) => [c.gate, c.exitCalls]), ...WT.DOORS_AT_V4840.members.map((c) => [c.gate, c.exitCalls])]);
-    const unexplained = [...reach].filter(([g]) => left(g) > 0 && !(recorded.has(g) && left(g) <= recorded.get(g)));
-    ok("!! *** every gate reaching a computed door to wasm leaves without process.exit(), or was measured under the hook and its bail-outs counted ***",
-        unexplained.length === 0 && reach.size >= WT.DOORS_AT_V4840.reach,
-        unexplained.length
-            ? unexplained.map(([g, d]) => `${g} (via ${d}): ${left(g)} process.exit() call(s) and no measurement -- run it under the hook ` +
-                `(WT.measureExit) and convert its exit, or record its bail-outs in DOORS_AT_V4840`).join("; ")
-            : `${reach.size} gates: ${[...reach].filter(([g]) => left(g) === 0).length} with no exit in code, the rest measured (v4663's census, DOORS_AT_V4840)`);
-    const converted = WT.DOORS_AT_V4840.members.filter((m) => m.exitAfterWasmBefore);
-    ok("!! ...and the five it found with the crash shape are converted: their terminal exits are gone and the verdict travels by exitCode",
-        converted.length === WT.DOORS_AT_V4840.crashShapeBefore &&
-        converted.every((m) => left(m.gate) <= m.exitCalls && /process\.exitCode\s*=\s*fails/.test(codeOnly(read(m.gate)))),
-        converted.map((m) => `${m.gate.split("/").pop()}: ${left(m.gate)} exit call(s) left (${m.exitCalls} recorded, a bail-out before wasm where 1)`).join("; "));
-    const L = measureExit("physics/box3dFingerprint-selfcheck.mjs");
-    ok("*** and one of them, under the hook now, compiles wasm and leaves without exit() ***",
-        L.ok && L.wasmCalls > 0 && !L.exitCalled && !L.exitAfterWasm,
-        L.ok ? `${L.wasmCalls} wasm compile(s), process.exit() ${L.exitCalled ? "CALLED" : "not called"}, exit code ${L.code}` : "no marker -- UNKNOWN, not green");
-
-    // THE RULES, ON A TREE BUILT FOR THEM. resolveSpec asks the file system, so the fixture is real files in a temp directory.
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "wasmDoors-"));
-    try {
-        const put = (rel, text) => { const p = path.join(tmp, rel); fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, text); return { path: p, text }; };
-        const glue = put("vendor/glue/glue.js", "WebAssembly.instantiate(bytes);");
-        const qidx = put("vendor/q/dist/index.js", "WebAssembly.compile(bytes);");
-        const files = [
-            put("a/door.mjs", 'import { createRequire } from "node:module"; const P = path.resolve(HERE, "..", "vendor", "glue", "glue.js"); createRequire(import.meta.url)(P);'),
-            put("a/literal.mjs", 'import g from "../vendor/glue/glue.js"; const m = await import(name);'),
-            put("a/generic.mjs", 'const m = await import(p); const f = "index.js", d = "dist";'),
-            put("a/bare.mjs", 'const m = await import(p); const f = "glue.js";'),
-            put("a/tail.mjs", 'const m = await import(pathToFileURL(join(dir, "q/dist/index.js")).href);'),
-            put("a/mid.mjs", 'import { x } from "./door.mjs"; export const y = x;'),
-            put("g/far-selfcheck.mjs", 'import { y } from "../a/mid.mjs"; console.log(y);'),
-            put("g/none-selfcheck.mjs", 'import g from "../a/literal.mjs";'),
-        ];
-        const fx = WT.wasmDoors({ root: tmp, files, compilers: [glue.path, qidx.path] });
-        const names = fx.doors.map((d) => d.module).sort().join(", ");
-        ok("!! *** on fixtures: a computed load naming the glue with its folder is a door, and so is a path tail; a literal import, a bare index.js and a bare name without its folder are not ***",
-            names === "a/door.mjs, a/tail.mjs", `doors: ${names || "none"} (expected a/door.mjs, a/tail.mjs)`);
-        const fr = WT.doorReach(fx.doors, { root: tmp, files, gates: ["g/far-selfcheck.mjs", "g/none-selfcheck.mjs"] });
-        ok("  ...and a gate two imports from a door reaches it, while one importing only the literal loader does not",
-            fr.get("g/far-selfcheck.mjs") === "a/door.mjs" && !fr.has("g/none-selfcheck.mjs"), JSON.stringify([...fr]));
-    } finally { try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {} }
+    // The census costs about 2.6 s and put this gate past the sweep's line at v4840's step 4b, which left WASM_AT_V4663 and
+    // DOORS_AT_V4840 with no guardian the ritual runs (recordReach-selfcheck, 51 unchecked against 50). It moved to its own gate;
+    // this row holds the frozen population with no census at all -- each member still exists, carries no more exit calls in code
+    // than were recorded, and each of the five converted still hands its verdict to exitCode. SABOTAGE (v4840): box3dFingerprint's
+    // terminal process.exit() put back -> this row red by name (and wasmDoors-selfcheck's three); one member removed from the record
+    // -> this row red (13 against 14). The SWEEP's guardian of DOORS_AT_V4840 is dracoEncode-selfcheck's identical row, at 0.7 s.
+    const read = (g) => { try { return fs.readFileSync(path.join(ENG, g), "utf8"); } catch { return null; } };
+    const bad = WT.DOORS_AT_V4840.members.filter((m) => { const src = read(m.gate); if (src === null) return true;
+        const code = codeOnly(src); return exitCallCount(code) > m.exitCalls || (m.exitAfterWasmBefore && !/process\.exitCode\s*=\s*fails/.test(code)); });
+    ok("!! *** every gate in DOORS_AT_V4840 holds what was measured: no new exit, and the five converted still converted ***",
+        WT.DOORS_AT_V4840.members.length === WT.DOORS_AT_V4840.measured && bad.length === 0,
+        bad.length ? bad.map((m) => `${m.gate}: ${read(m.gate) === null ? "MISSING" : exitCallCount(codeOnly(read(m.gate))) + " exit call(s) against " + m.exitCalls + " recorded" + (m.exitAfterWasmBefore ? ", or its exitCode line gone" : "")}`).join("; ")
+                   : `${WT.DOORS_AT_V4840.measured} members, ${WT.DOORS_AT_V4840.crashShapeBefore} converted -- re-run tools/ship/wasmDoors-selfcheck.mjs for the census`);
 }
 
 console.log(fails ? `\nwasmTeardown-selfcheck: ${fails} FAILED` : "\nwasmTeardown-selfcheck: all checks pass");
