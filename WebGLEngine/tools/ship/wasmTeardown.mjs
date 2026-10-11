@@ -58,6 +58,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import os from "node:os";
 import { spawnSync } from "node:child_process";
+import { treeFiles } from "./treeRead.mjs";
+import { noComments } from "./sourceScan.mjs";
+import { resolveSpec } from "./affected.mjs";
+import { gateFiles } from "./staleness.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const ENG = path.resolve(HERE, "..", "..");
@@ -244,3 +248,92 @@ export const WASM_AT_V4663 = Object.freeze({
         { gate: "world/buildingTopple-selfcheck.mjs", exitCalls: 1, wasmBytes: 48643 },
     ].map(Object.freeze)),
 });
+
+/**
+ * *** v4840 -- THE DOOR NEITHER SCREEN WALKED, CENSUSED BEFORE THE RIG WALKS IT. ***
+ *
+ * v4663 screened the gates that could REACH WebAssembly.instantiate by import; v4677 sampled by exitBusy. The rig found
+ * tools/ship/dracoEncode-selfcheck.mjs through neither (v4832): tools/export/dracoEncode.mjs loads its Emscripten glue with
+ * createRequire and a computed path, and no import graph follows that. This names that door statically, from the target:
+ *
+ *   COMPILERS -- every script in the tree, vendor/ included (the glue lives there and treeFiles skips it), whose code
+ *                calls WebAssembly.instantiate / compile (or their Streaming forms).
+ *   DOORS     -- a module that loads code through a computed specifier (createRequire, or an import() of anything but a
+ *                string literal) AND names a compiler: a literal path tail of it ("dist/draco_encoder_nodejs.js"), or its
+ *                bare file name beside a literal naming its folder ("box3d.js" with "box3d"). A bare "index.js" names
+ *                nothing. A LITERAL import or require of the same file is not a door: every import graph follows those.
+ *   REACH     -- the gates that import a door, at any depth, by a reverse walk of the tree's literal imports (and a door
+ *                that is itself a gate).
+ *
+ * Measured at v4840: 21 compilers (119 vendor scripts read), 7 doors -- box3d's glue behind physics/box3d/box3dNode.mjs,
+ * ai-bridge/server.js, tools/roundhouse/backendRotation.mjs and three gates that load it themselves, and the Draco
+ * encoder behind tools/export/dracoEncode.mjs -- and 58 gates reaching one. Every input is injectable, so the rules are
+ * driven on fixtures as well as on the tree.
+ */
+const COMPILES = /WebAssembly\.(?:instantiate|compile)(?:Streaming)?\s*\(/;
+const COMPUTED_LOADER = /createRequire\s*\(|\bimport\s*\(\s*(?!["'`][^"'`]*["'`]\s*\))/;
+const relOf = (root, p) => path.relative(root, p).replace(/\\/g, "/");
+
+/** Every script that compiles wasm: [abs path]. vendor/ is walked here because treeFiles skips it by design. */
+export function wasmCompilers({ root = ENG, files = null, vendor = null } = {}) {
+    const out = [];
+    const vend = vendor || (() => { const acc = [];
+        (function walk(d) { let es = []; try { es = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
+            for (const e of es) { const p = path.join(d, e.name);
+                if (e.isDirectory()) { if (e.name !== "node_modules") walk(p); } else if (/\.(c?js|mjs)$/.test(e.name)) acc.push(p); } })(path.join(root, "vendor"));
+        return acc.map((p) => { try { return { path: p, text: fs.readFileSync(p, "utf8") }; } catch { return { path: p, text: "" }; } }); })();
+    for (const f of vend) if (COMPILES.test(f.text)) out.push(f.path);
+    for (const f of (files || treeFiles(root))) if (/\.(c?js|mjs)$/.test(f.path) && COMPILES.test(f.text) && COMPILES.test(noComments(f.text))) out.push(f.path);
+    return out;
+}
+
+/** Modules that load a compiler through a computed specifier: [{ module, glue: [rel] }]. */
+export function wasmDoors({ root = ENG, files = null, compilers = null } = {}) {
+    const fl = (files || treeFiles(root)).filter((f) => /\.(c?js|mjs)$/.test(f.path));
+    const comp = compilers || wasmCompilers({ root, files: fl });
+    const byBase = new Map();
+    for (const p of comp) { const b = path.basename(p); if (!byBase.has(b)) byBase.set(b, []); byBase.get(b).push(p); }
+    const doors = [];
+    for (const f of fl) {
+        if (![...byBase.keys()].some((b) => f.text.includes(b))) continue;        // cheap: no compiler's name, no door
+        const c = noComments(f.text);
+        if (!COMPUTED_LOADER.test(c)) continue;
+        const lits = new Set([...c.matchAll(/["'`]([^"'`\s]+)["'`]/g)].map((m) => m[1]));
+        const glue = new Set();
+        for (const lit of lits) {
+            if (!/\.(c?js|mjs)$/.test(lit)) continue;
+            const b = path.basename(lit);
+            if (new RegExp(`(?:\\bfrom|\\bimport\\s*\\(|\\brequire\\s*\\()\\s*["']${lit.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["']`).test(c)) continue;   // literal: graphs follow it
+            for (const p of byBase.get(b) || []) {
+                const r = relOf(root, p);
+                const named = lit.includes("/") ? r.endsWith(lit.replace(/^(\.\.?\/)+/, "")) : lits.has(path.basename(path.dirname(p)));
+                if (named) glue.add(r);
+            }
+        }
+        if (glue.size) doors.push({ module: relOf(root, f.path), glue: [...glue].sort() });
+    }
+    return { compilers: comp.map((p) => relOf(root, p)), doors };
+}
+
+/** The gates that reach a door: Map(gate rel -> door rel). Literal imports only, walked in reverse from each door. */
+export function doorReach(doors, { root = ENG, files = null, gates = null } = {}) {
+    const fl = (files || treeFiles(root)).filter((f) => /\.(c?js|mjs)$/.test(f.path));
+    const SPEC = [/\bfrom\s+["']([^"']+)["']/g, /\bimport\s*\(\s*["']([^"']+)["']\s*\)/g, /\brequire\(\s*["']([^"']+)["']\s*\)/g, /^\s*import\s+["']([^"']+)["']/gm];
+    const rev = new Map();
+    for (const f of fl) for (const rx of SPEC) for (const m of f.text.matchAll(rx)) {
+        const s = m[1]; if (!s.startsWith("./") && !s.startsWith("../")) continue;
+        const r = resolveSpec(f.path, s); if (!r) continue;
+        if (!rev.has(r)) rev.set(r, new Set()); rev.get(r).add(f.path);
+    }
+    const isGate = new Set((gates || gateFiles(root)).map((p) => path.resolve(root, p)));
+    const reach = new Map();
+    for (const d of doors) {
+        const start = path.join(root, d.module), seen = new Set([start]), stack = [start];
+        while (stack.length) {
+            const cur = stack.pop();
+            if (isGate.has(cur) && !reach.has(relOf(root, cur))) reach.set(relOf(root, cur), d.module);
+            for (const up of rev.get(cur) || []) if (!seen.has(up)) { seen.add(up); stack.push(up); }
+        }
+    }
+    return reach;
+}
