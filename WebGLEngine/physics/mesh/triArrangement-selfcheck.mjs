@@ -17,25 +17,35 @@
 //     pointInMesh() against B, must agree with its face's classification (one point per face, taken from the
 //     face's largest triangle). A face that B crossed would split its triangles between the two answers.
 //
-// SABOTAGE LOG. *** NOT YET RE-RUN ON THE REBUILT MODULE. *** The first version of triArrangement.mjs was lost
-// uncommitted (the container was reclaimed) and rebuilt against this gate; the entries below were measured on that
-// first version and are kept, until the rebuild's own run replaces them, as the record of what this gate caught --
-// not as a claim about the rebuild. Reds as THIS gate / meshBoolean-selfcheck / meshBooleanBlast-selfcheck, each
-// applied to the real file, restored in a `finally`, the restore verified by md5sum:
-//   A1  snap disabled for segment endpoints (corners only) -> 13 / 0 / 4
-//   A2  hole given to the LARGEST containing face -> 2 / 0 / 0 (1c, the nested case built for it)
-//   A3  face walk turns the wrong way -> 6 / 0 / 5
-//   A4  crossing check removed -> 1 / 0 / 0 (2c)
-//   A5  dangling check disabled -> 2 / 0 / 0 (2d, and section 4's 30-TOL crack)
-//   A6  clockwise triangle emitted instead of refused -> 0 / 0 / 0. The first log said the check never fires; a
-//       round-9 review measured it firing on rounding-noise slivers, and 0 red only because the next line dropped
-//       them as slivers anyway. The sliver drop now runs first (see the module).
-//   A7  meshBoolean reusing one face's classification for every face of a triangle -> 0 / 8 / 10
+// SABOTAGE LOG -- RUN ON THE REBUILT MODULE. (The first build's log, measured on code lost uncommitted, is superseded;
+// where the two differ it is said.) Each applied to the real file, THIS gate / meshBoolean-selfcheck /
+// meshBooleanBlast-selfcheck run, the file restored in a `finally` and the restore verified by md5sum:
+//   A1  snap disabled for segment endpoints (corners only) -> 19 / 4 / 3 (every shared midpoint a T-junction)
+//   A2  hole given to the LARGEST containing face -> 2 / 0 / 0 (1c, refused at 'triangulation area'; 1f)
+//   A3  face walk turns the wrong way -> 10 / 4 / 5
+//   A4  crossing check removed -> 1 / 0 / 0 (2c: still refused, one check later, at 'triangulation area')
+//   A5  dangling check disabled -> 1 / 0 / 0 (2d; section 4's 30-TOL crack is then refused by a later check, and that
+//       check accepts any refusal -- the first build's log had it red here too)
+//   A6  a clockwise non-sliver triangle emitted instead of refused -> 0 / 0 / 0, EXPECTED: the only clockwise triangles
+//       ever measured are rounding-noise slivers, which the sliver rule drops first; no fixture builds another.
+//   A7  meshBoolean reusing one face's classification for every face of a triangle -> 0 / 11 / 12
 //   A8  coplanar/degenerate candidates ignored instead of refused -> 2 / 7 / 0
-//   A9  segments along triA's boundary kept -> 0 / 0 / 0. The first log called the skip unreachable; a review reached
-//       it within TOL with no degeneracy at all (1h is that fixture now).
-//   A10 (control) grid minimum of two cells -> 0 / 0 / 0, as a correctness-neutral change must.
-//   A11 the exception guard removed -> 1 / 0 / 0 (2g, added after a first run went 0 red).
+//   A9  segments along triA's boundary kept -> 2 / 0 / 1 (1h, the near-edge fixture built for it)
+//   A10 (control) validation grid minimum of two cells -> 0 / 0 / 0, as a correctness-neutral change must
+//   A11 the exception guard removed -> 1 / 0 / 0 (2g)
+//   F1  the reviews' sliver fix reverted (drop anything under 1e-14 of triA) -> 2 / 2 / 0 (1g; the rod, the needle)
+//   F2  the orientation refusal moved back before the sliver drop -> 0 / 1 / 0 (section 15's zero-refusal sweep)
+//   F3  cycle area back to the plain shoelace from triA's corner -> 2 / 0 / 0 (1g's 2e-8 square)
+//   F4  the zero-area-cycle refusal removed -> 0 / 0 / 0: no fixture builds a cycle of exactly zero area (a backstop)
+//   F5  face-area check back to 'faces sum to triA' -> 0 / 0 / 1 (section 8's chain: refusals over sub-TOL strips)
+//   F6  vertices no segment touches kept in the graph -> 1 / 0 / 1 (2h)
+//   F7  the faces-tile-the-walked-boundary check removed -> 0 / 0 / 0: every walk the fixtures build tiles its boundary,
+//       and the crossing and hole faults above are refused at 'triangulation area' first -- a backstop, said so
+//   N4  a face classified at its FIRST triangle, not its largest -> 0 / 0 / 0 on the rebuild (5 blast reds on the first
+//       build; the rebuild's first triangles agree on all 8,581 multi-triangle faces of four twelve-blast chains), so
+//       the choice was extracted as faceSamplePoint() and unit-tested -> re-run 0 / 1 / 0
+//   N7  ambiguity dropped for arranged faces -> 0 / 1 / 0 (meshBoolean-selfcheck section 15's dirs:[] fixture)
+//   N18 pointInMeshOpts not passed for arranged faces -> 0 / 1 / 0 (the same fixture)
 "use strict";
 
 import { arrangeTriangle, ARRANGE_TOL } from "./triArrangement.mjs";

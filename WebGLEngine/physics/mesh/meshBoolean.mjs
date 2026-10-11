@@ -261,6 +261,20 @@ function centroid(tri) {
         (tri[0][2] + tri[1][2] + tri[2][2]) / 3,
     ];
 }
+/**
+ * The point an arranged face is classified by: the centroid of its LARGEST triangle. Any interior point of a face
+ * speaks for all of it in exact arithmetic (no face has B crossing its interior); in floating point a sliver's
+ * centroid can sit within rounding of B's surface, and the largest triangle's centroid is as far from the face's
+ * boundary as this cheaply gets. Exported so the choice is tested directly (meshBoolean-selfcheck.mjs section 15).
+ * @param {{tris:{tri:number[][], area:number}[]}} face  a face from triArrangement.mjs, with at least one triangle
+ * @returns {number[]}
+ */
+export function faceSamplePoint(face) {
+    let big = face.tris[0];
+    for (const ft of face.tris) if (ft.area > big.area) big = ft;
+    return centroid(big.tri);
+}
+
 // Swap two vertices: negates the winding/normal. Matches meshCSG.mjs's own `p.vs.reverse()` convention for a
 // 3-vertex ring (reversing [a,b,c] gives [c,b,a], the same cyclic orientation flip as this swap).
 function flipWinding(tri) { return [tri[0], tri[2], tri[1]]; }
@@ -327,20 +341,19 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
             if (arr.ok) {
                 arrangedTriangles++;
                 // ONE classification per FACE: no face has B crossing its interior (triArrangement.mjs's header),
-                // so any interior point speaks for all of it -- the centroid of its largest triangle, which lies
-                // strictly inside that triangle and so strictly inside the face. THAT IS EXACT-ARITHMETIC
-                // REASONING, and the choice of triangle is not cosmetic: a round-9 review classified by
-                // face.tris[0] instead and five meshBooleanBlast-selfcheck.mjs checks went red (chain volume off
-                // by 1.15e-2). On the twelve-blast chain 1 of 8,251 faces holds a 2.5e-12 sliver whose own
-                // centroid classifies the OTHER way (agreement 0.6): a centroid within rounding of B's surface can
-                // go either way. The largest triangle's centroid is as far from the face's boundary as this cheaply
-                // gets; it is not a guaranteed margin, and a face that is all sliver has no good point.
+                // so any interior point speaks for all of it -- faceSamplePoint(), the centroid of its largest
+                // triangle. THAT IS EXACT-ARITHMETIC REASONING. On round 9's first build (lost uncommitted, see
+                // tools/ship/nextRounds.mjs) a review classified by face.tris[0] instead and five
+                // meshBooleanBlast-selfcheck.mjs checks went red: on the twelve-blast chain 1 of 8,251 faces held a
+                // 2.5e-12 sliver first whose centroid classified the OTHER way (agreement 0.6). On the rebuild the
+                // same mutation is 0 red in every gate and agrees with the largest triangle on all 8,581 multi-
+                // triangle faces of four twelve-blast chains -- Earcut's first triangle differs with where a cycle
+                // starts -- so the choice is a margin no workload here exercises, kept and unit-tested for that.
+                // It is not a guaranteed margin either: a face that is all sliver has no good point.
                 for (const face of arr.faces) {
                     if (face.tris.length === 0) continue;
                     arrangementFaces++;
-                    let big = face.tris[0];
-                    for (const ft of face.tris) if (ft.area > big.area) big = ft;
-                    const c = centroid(big.tri);
+                    const c = faceSamplePoint(face);
                     const cls = pointInMesh(bvhOther, c[0], c[1], c[2], opts.pointInMeshOpts);
                     classifications++;
                     const ambiguous = cls.agreement < agreementThreshold;

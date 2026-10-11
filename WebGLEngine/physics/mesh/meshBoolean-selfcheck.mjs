@@ -123,7 +123,7 @@ import { MeshBVH } from "../../mesh/meshBVH.mjs";
 import { pairOverlap } from "./bvhPairOverlap.mjs";
 import { groupCandidatesByTriA, accumulateFragments } from "./triFragmentAccumulate.mjs";
 import { pointInMesh } from "./meshPointClassify.mjs";
-import { classifyMeshAgainstOther, assembleBoolean, meshBoolean, MESH_BOOLEAN_MAX_FRAGMENTS } from "./meshBoolean.mjs";
+import { classifyMeshAgainstOther, assembleBoolean, meshBoolean, MESH_BOOLEAN_MAX_FRAGMENTS, faceSamplePoint } from "./meshBoolean.mjs";
 import * as M from "./meshCSG.mjs";
 
 let fails = 0;
@@ -787,6 +787,14 @@ console.log("\n15. *** ROUND 9: THE ARRANGEMENT IS THE DEFAULT; THE PLANE-CUT PA
     const keys = Object.keys(reasons);
     ok("!! flush / shared-face contacts are refused as coplanar or degenerate -- never arranged -- and nothing else is refused",
         keys.length > 0 && keys.every((k) => k === "coplanar" || k === "degenerate"), JSON.stringify(reasons));
+
+    // WHICH POINT SPEAKS FOR A FACE. A sliver listed first must not be the one sampled: on round 9's first build that
+    // choice turned five blast checks red; on the rebuild no workload reaches it (classifying by the first triangle
+    // agrees on all 8,581 multi-triangle faces of four twelve-blast chains), so it is pinned here, directly.
+    const sliverFirst = { tris: [{ tri: [[0, 0, 0], [1, 1e-12, 0], [2, 0, 0]], area: 1e-12 }, { tri: [[0, 0, 0], [2, 0, 0], [1, 3, 0]], area: 3 }] };
+    const sp = faceSamplePoint(sliverFirst);
+    ok("!! a face is classified at its LARGEST triangle's centroid, not at a sliver listed first",
+        close(sp[0], 1, 1e-12) && close(sp[1], 1, 1e-12) && sp[2] === 0, "sample point " + JSON.stringify(sp) + " (largest's centroid (1, 1, 0))");
 }
 
 console.log(`\nmeshBoolean-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);
