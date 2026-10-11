@@ -65,7 +65,7 @@
 import * as THREE from "./vendor/three-webgpu/three.webgpu.js";
 import * as TSL from "./vendor/three-webgpu/three.tsl.js";
 import { makeAiPresenceOrbHdrPipeline } from "./render/aiPresenceOrbPresent.mjs";
-import { createPresenceState, STATE_NAMES, STATE_INDEX } from "./render/aiPresenceOrbState.mjs";
+import { createPresenceState, ALL_STATE_NAMES } from "./render/aiPresenceOrbState.mjs";   // v4831: murmur's six and the two brain stages
 import { ORB_SPECIES } from "./render/aiPresenceOrbTsl.mjs";
 
 const say = (s, bad) => { const el = document.getElementById("route"); el.innerHTML = s; el.style.color = bad ? "#f08080" : ""; };
@@ -108,10 +108,10 @@ const state = createPresenceState("idle");
 
 const stateButtons = document.getElementById("stateButtons");
 const buttons = {};
-for (const name of STATE_NAMES) {
+for (const name of ALL_STATE_NAMES) {
     const b = document.createElement("button");
     b.textContent = name;
-    b.addEventListener("click", () => state.setState(name));
+    b.addEventListener("click", () => state.setState(name, name === "weaving" ? { sources: 4 } : {}));   // v4831: weaving with a demo count of sources
     stateButtons.appendChild(b);
     buttons[name] = b;
 }
@@ -158,7 +158,7 @@ function frame(now) {
         // so the demo's state buttons changed the speed and the glow and left the shader pinned in IDLE --
         // the voice slider ran at murmur's resting weight in every state, and the SUCCESS flash and the
         // RESPONDING lean could not be seen here at all. Both consumers pass the same set now.
-        activity: p.activity, stateIndex: STATE_INDEX[p.state], stateTau: p.stateTau,
+        activity: p.activity, stateIndex: p.stateIndex, stateTau: p.stateTau,   // v4831: resolved by the state module
         aspect: cv.width / cv.height,
     });
     for (const [name, b] of Object.entries(buttons)) b.classList.toggle("active", name === p.state);

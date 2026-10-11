@@ -68,9 +68,9 @@ export async function mountAiPresenceOrbWidget(opts = {}) {
         species: speciesOpt = null,
     } = opts;
 
-    let THREE, TSL, makeAiPresenceOrbHdrPipeline, createPresenceState, STATE_INDEX, ORB_SPECIES;
+    let THREE, TSL, makeAiPresenceOrbHdrPipeline, createPresenceState, ORB_SPECIES;
     try {
-        [THREE, TSL, { makeAiPresenceOrbHdrPipeline }, { createPresenceState, STATE_INDEX }, { ORB_SPECIES }] = await Promise.all([
+        [THREE, TSL, { makeAiPresenceOrbHdrPipeline }, { createPresenceState }, { ORB_SPECIES }] = await Promise.all([
             import(/* @vite-ignore */ threePath), import(/* @vite-ignore */ tslPath),
             import(/* @vite-ignore */ presentPath), import(/* @vite-ignore */ statePath),
             import(/* @vite-ignore */ orbPath),
@@ -160,10 +160,9 @@ export async function mountAiPresenceOrbWidget(opts = {}) {
     // covers it), and "success" is scheduled far enough out to actually get screen time: an estimated speaking
     // duration for the reply, cancelled by ANY new real event in the meantime (clearSettle(), called at the top
     // of every handler here) so a stale timer from an old turn can never flip the orb out of context later.
-    window.addEventListener("engine:voiceReply", (e) => {
+    function replyFlow(text) {
         clearSettle();
         state.setState("responding");
-        const text = (e.detail && e.detail.text) || "";
         const words = text.trim() ? text.trim().split(/\s+/).filter(Boolean).length : 0;
         const holdS = Math.min(RESPONDING_HOLD_MAX_S, Math.max(RESPONDING_HOLD_MIN_S, words * SECONDS_PER_WORD));
         settleTimer = setTimeout(() => {
@@ -175,17 +174,31 @@ export async function mountAiPresenceOrbWidget(opts = {}) {
                 if (state.state === "success") state.setState("idle");
             }, SUCCESS_HOLD_MS);
         }, holdS * 1000);
-    });
+    }
+    window.addEventListener("engine:voiceReply", (e) => replyFlow((e.detail && e.detail.text) || ""));
     // the real signal ui/sttLayer.js's converseText() had NONE of before this round -- a failed /ai/chat call
     // (network error, ai.ok false, or an empty reply) left the orb sitting wherever it was, forever, with no
     // indication anything had gone wrong.
-    window.addEventListener("engine:voiceError", () => {
+    function errorFlow() {
         clearSettle();
         state.setState("error");
         settleTimer = setTimeout(() => {
             settleTimer = null;
             if (state.state === "error") state.setState("idle");
         }, ERROR_HOLD_MS);
+    }
+    window.addEventListener("engine:voiceError", errorFlow);
+    // *** v4831 -- THE SHIP'S COMPUTER'S TWO STAGES, WHICH THE PAGE CAN SEE NOW. *** ui/brainAsk.mjs reads
+    // POST /ai/brain/ask's stream and dispatches one engine:brainStage per stage: retrieval starting lights
+    // `searching`, generation starting lights `weaving` with the number of sources it is composing from, and
+    // the answer settles exactly as a voice reply does -- responding, then success, then idle. A retrieval-only
+    // answer (no LLM reachable) is still an answer: the passages are what the page shows.
+    window.addEventListener("engine:brainStage", (e) => {
+        const d = (e && e.detail) || {};
+        if (d.stage === "search-start") { clearSettle(); state.setState("searching"); }
+        else if (d.stage === "weave-start") { clearSettle(); state.setState("weaving", { sources: d.sources | 0 }); }
+        else if (d.stage === "done") replyFlow(d.answer || "");
+        else if (d.stage === "error") errorFlow();
     });
 
     const reducedMotion = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -236,7 +249,7 @@ export async function mountAiPresenceOrbWidget(opts = {}) {
             // interior and the pair the SUCCESS shell travels on -- so a stateTau pinned at 0 would hold the
             // orb at the instant of arrival forever: full sweep at the heart, nothing travelling, and the
             // settle never arriving at all.
-            activity: p.activity, stateIndex: STATE_INDEX[p.state], stateTau: p.stateTau,
+            activity: p.activity, stateIndex: p.stateIndex, stateTau: p.stateTau,   // v4831: the state module resolves a brain stage to the murmur state it renders as
             // *** AND THE THREE SIGNAL INTEGRALS -- v4654. *** A species that modulates a local clock by a
             // live signal cannot multiply the clock by the signal's CURRENT value without the phase jumping
             // whenever the signal moves; the error is t * dSignal and has no ceiling. These carry the

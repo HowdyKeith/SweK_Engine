@@ -29,6 +29,10 @@
 // three seconds. Two of murmur's numbers that were simply absent. Added in the integrated form, because
 // adding them as murmur spells them would have shipped a new teleport on the same afternoon as the repair.
 //
+// v4831 -- the host's THINKING term reads the state index the shader is handed (si === STATE_INDEX.thinking), not the
+// name, because the brain stage `searching` renders AS thinking and must storm like it; the energy row's host spelling
+// follows. SABOTAGE, restored: the host's term put back on cur === "thinking" -> RED (and brainStages-selfcheck's
+// integral row with it).
 // v4829 -- flux's stream takes flux.ts:78's 0.95 * st.drive, so the deaf row moves flux's driveInt sweep from the
 // deaf half to the hearing half. SABOTAGE, restored: MH_FLUX.flowDrive typed 0 in the mhRatePhase call -> RED.
 // v4825 -- tempest's subject became tempest.ts's own energy (pace, thinking, drive; clamped) and the scaled-
@@ -209,7 +213,7 @@ sec("3. *** tempest's ENERGY IS INTEGRATED AS ONE CLAMPED SIGNAL, AND THE CLAMP'
     const src = codeOnly(fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbTsl.mjs"), "utf8"));
     const host = codeOnly(fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbState.mjs"), "utf8"));
     const shaderE = /const energy = species === ""\s*\?\s*clamp\(PACE\.mul\(MT\.ePace\)\.add\(THINK\.mul\(MT\.eThink\)\)\.add\(DRIVE\.mul\(MT\.eDrive\)\), 0\.0, MT\.eCap\)/.test(src);
-    const hostE = /tempestEnergyInt \+= Math\.min\(ME\.eCap, Math\.max\(0, ME\.ePace \* lv\.pace \+ ME\.eThink \* \(cur === "" \? 1 : 0\)\s*\+ ME\.eDrive \* stn\.drive\)\) \* dPhase/.test(host);
+    const hostE = /tempestEnergyInt \+= Math\.min\(ME\.eCap, Math\.max\(0, ME\.ePace \* lv\.pace \+ ME\.eThink \* \(si === STATE_INDEX\.thinking \? 1 : 0\)\s*\+ ME\.eDrive \* stn\.drive\)\) \* dPhase/.test(host);
     const ML = K.MH_MIST_LIVE.tempest;
     ok("!! *** THE SHADER AND THE HOST SPELL THE SAME CLAMPED ENERGY, OUT OF THE SAME TABLE, AND THE TABLE IS tempest.ts's ***",
         shaderE && hostE && ML.ePace === 0.85 && ML.eThink === 0.65 && ML.eDrive === 0.55 && ML.eCap === 1.6 && ML.drE === 0.95,

@@ -193,9 +193,19 @@ console.log("\n8. THE RELEASE BUTTON IS REACHABLE FROM THE OPS PAGE, AND IT IS T
     ok("*** and swekOverlay is EXPOSED, which is the whole reason the button was dead on the first try ***",
        /window\.swekOverlay = swekOverlay/.test(server),
        "it is defined inside an IIFE; a MODULE cannot see a function-scoped name, so the host got a warning and opened nothing");
+    // v4831 -- ONE IMPORT NOW, AND IT TRAVELS WITH THE PANEL: ui/publishCommands.mjs, the export text as a pure function a
+    // gate can walk, sits beside it in ui/. The property this row protects is that nothing comes from the HOST, so an
+    // import is allowed exactly when it is a sibling in ui/ that exists -- the panel still moves with its folder.
+    // SABOTAGE, restored: a bare `import "../main.js";` added to the panel -> RED (it went GREEN against the first draft
+    // of the scan, which only matched the `from` form; that is why the scan reads both).
+    // both forms: `import x from "..."` and the bare side-effect `import "..."` -- the first draft read only the first,
+    // and the sabotage below (a bare import of main.js) walked straight past it
+    const imps = [...panel.matchAll(/^import\s+(?:[^;"]*?\s+from\s+)?"([^"]+)";/mg)].map((m) => m[1]);
     ok("...and the panel still declares itself host-agnostic, which is what lets it travel",
-       /the Dock provides the minitab/.test(panel) && !/^import /m.test(panel),
-       "ui/githubPanel.js has NO imports and no globals -- only its drawer comes from the host");
+       /the Dock provides the minitab/.test(panel) &&
+       imps.every((m) => /^\.\/[\w.-]+\.m?js$/.test(m) && fs.existsSync(path.join(ENGROOT, "ui", m.slice(2)))),
+       `ui/githubPanel.js imports: ${imps.length ? imps.join(", ") : "nothing"} (each must be an existing sibling in ui/); ` +
+       "no globals -- only its drawer comes from the host");
     report("*** DRIVEN IN A REAL BROWSER, NOT INFERRED FROM THE SOURCE ***", "server.html was served and loaded in " +
            "Chromium, the GitHub tab clicked, the button clicked: the overlay opened, #ghPanelRoot was inside it, " +
            "all six tabs rendered and the release button read back verbatim. THE FIRST RUN FAILED -- typeof " +
