@@ -3533,3 +3533,117 @@ wrote a few subtractions.
 - Kernels that reorder a cell's sum.
 - Lower precision or subgroups.
 - A third way of writing a kernel chosen after this probe's results: that is a later round.
+
+## 60. ROUND 17 -- THE VERDICT: NO SHAPE QUALIFIES; THE PAGE AND THE DEFAULT STAY "r15"
+
+**What arrived.**
+- **Both GPUs' probe reports:** `node tools/denoiseBuildProbe.mjs` at 254436e5 (probe r17, sizes 64, 256 and 1024, the
+  180 s cap), natively and then in Chrome with `realGpuRun`'s hardware flags (`--enable-unsafe-webgpu --use-angle=d3d11`):
+  - `render/denoise-probe-r17-intel-gen9.json`: natively "intel / gen-9 / D3D12 driver version 31.0.101.2137", in Chrome
+    "intel / gen-9";
+  - `render/denoise-probe-r17-gtx1080.json`: natively "nvidia / pascal / D3D12 driver version 32.0.15.8180", in Chrome
+    "nvidia / pascal".
+- Both are committed byte for byte at 50fd55b8, before this section.
+- Keith also sent another AI assistant's reading of the 1080's report. It is not a measurement and is not committed. It is
+  weighed at the end of this section.
+
+**Section 59's three conditions, shape by shape.** The baseline is the fast kernel in the same probe:
+- natively it built in 5.16 s (Intel) and 3.45 s (1080);
+- in Chrome at 1024 x 1024 its pass took 300.70 ms (Intel) and 9.059 ms (1080).
+
+| Shape | 1. Native build within 60 s (Intel / 1080) | 2. Exact at 64 x 64 (natively / Chrome) | 3. Chrome at 1024 against the fast kernel (Intel / 1080) |
+|---|---|---|---|
+| fast, vec4 reads | 30.2 s / 17.8 s: yes | yes / yes | 1.46 x / **0.82 x: no** |
+| fast, written out | **crashed / crashed** | not run / yes | 2.11 x / 0.57 x |
+| fast, vec4 and written out | **crashed / crashed** | not run / yes | 1.47 x / 0.61 x |
+| tile 2 x 8, edge zero, inline | **stopped at 180 s / stopped** | not run / yes | 1.14 x / 1.17 x |
+| tile 4 x 4, edge zero, inline | **stopped / stopped** | not run / yes | 0.74 x / 0.97 x |
+| tile 1 x 8, edge skip, inline | **stopped / stopped** | not run / yes | 0.98 x / 1.04 x |
+
+- **No shape qualifies.**
+  - The vec4 shape is the only one FXC built in time on both GPUs, and in Chrome at 1024 it was slower than the fast
+    kernel on the 1080.
+  - The 2 x 8 tile shape is the only one that passed the third condition on both GPUs. FXC built it on neither.
+- **By section 59, round 17 ends. The page and the default stay "r15".** No set is added, and there is no full run. The
+  instrument mending that section 59 required before a full run builds a new kernel natively is not needed this round.
+
+**The native failures.**
+- **Both written-out shapes crashed natively on both GPUs.** The child process ended with no result and nothing on stderr:
+  - on the 1080, after 24.7 and 23.3 s, exit 3221225477 (0xC0000005, an access violation);
+  - on the Intel, after 64.1 and 52.6 s, exit 3221226505 (0xC0000409, a fail-fast).
+- **Where they crashed is not shown.** It could be FXC, the driver's compiler or Dawn. Dawn's dump of each run stayed in
+  Keith's temp folder. It would show whether FXC returned its DXBC before the crash. It decides nothing.
+- **Chrome built both in 1.2 to 4.4 s, and both were exact.** So the WGSL is valid and every cell's order is right. Only
+  the native path cannot take it.
+- **The written-out shapes write out one block of 8 channels:** 576 multiply-adds a thread. In section 59's pilot,
+  SwiftShader built that and crashed on all four blocks. FXC crashed on the one block.
+- **All three inline-weight tile shapes stopped at 180 s on both GPUs.** That includes the 1 x 8 shape, where each weight is
+  read once.
+  - Section 58's inferred trigger is refuted. FXC does not finish the tile kernel even when each multiply-add reads its own
+    weight, as the fast kernel's does.
+  - What stops it is not shown. A stopped build leaves no DXBC to read.
+
+**Reported, deciding nothing.**
+- **Native builds:**
+  - the fast kernel: 5.16 / 3.45 s, 537 lines of DXBC, 6 loops;
+  - vec4 reads: 30.2 / 17.8 s, 690 lines, 5 loops;
+  - neither declares an indexable temporary.
+- **Native ratios at 1024:** vec4 reads were 0.72 x on the Intel and 0.86 x on the 1080. So vec4 was slower natively too.
+- **The 256 x 256 ratios,** against the fast kernel:
+
+| Shape | Chrome, Intel | Chrome, 1080 | Natively, Intel | Natively, 1080 |
+|---|---|---|---|---|
+| vec4 reads | 1.23 x | 1.12 x | 0.98 x | 0.79 x |
+| written out | 1.44 x | 0.49 x | crashed | crashed |
+| vec4 and written out | 0.75 x | 0.74 x | crashed | crashed |
+| tile 2 x 8, inline | 0.72 x | 1.26 x | stopped | stopped |
+| tile 4 x 4, inline | 0.51 x | 1.01 x | stopped | stopped |
+| tile 1 x 8, inline | 0.82 x | 1.17 x | stopped | stopped |
+
+- **In Chrome, which way of writing the kernel is faster depends on the GPU.**
+  - At 1024, written out was 2.11 x on the Intel and 0.57 x on the 1080. vec4 reads were 1.46 x and 0.82 x.
+  - Every tile shape did better on the 1080 than on the Intel: 1 x 8 was 0.98 x on the Intel and 1.04 x on the 1080,
+    4 x 4 0.74 x and 0.97 x.
+  - Only the 2 x 8 tile shape was faster on both GPUs at 1024: 1.14 x and 1.17 x.
+- **64 x 64 does not rank the shapes.** Their order there differs from their order at 1024 on both GPUs. For example, vec4
+  reads in Chrome on the Intel were 0.90 x at 64 x 64 and 1.46 x at 1024. Section 58's single 64 x 64 pass could not have
+  settled the tile question.
+
+**The native device clock ticks in 65.536 µs.**
+- **Every native pass time in both reports is a whole number of 65,536 ns.** On the 1080 at 64 x 64, the fast kernel's
+  pass is 2 ticks and the vec4 shape's is 1. None of the 42 Chrome times is a whole number of ticks.
+- **This fits Dawn's timestamp quantization being on in node-webgpu.** node-webgpu 0.6.0's binary names a
+  `timestamp_quantization` toggle. That it is the cause is inferred: the engine neither sets nor reads it.
+- **At 1024, every native pass is at least 136 ticks,** so a tick is under 1% and the ratios above stand.
+- **At 64 x 64 on the 1080, a native pass is one or two ticks.** The vec4 shape's 2 x there is one tick against two, and
+  means nothing.
+- **`denoiseDevice`'s `gpu` time is one span a repetition,** from the first pass's start to the last pass's end. So its
+  error is at most one tick a repetition, not one a pass. Whether that mattered at the ladder's smallest sizes in earlier
+  rounds' native rows is not checked here.
+- **Section 59's rule read only Chrome's times,** so none of this changes round 17.
+
+**The other assistant's advice, weighed against the record.**
+- **"Force DXC with `DAWN_FEATURES_ENABLE=use_dxc`, or `dawnToggles` in `requestDevice`."**
+  - Sections 52 and 53 ran node-webgpu 0.6.0 with `use_dxc` on both GPUs, passed as node-webgpu takes Dawn's flags
+    (`create(["enable-dawn-features=..."])`, as this probe passes `dump_shaders`). Both dumps still said FXC: that
+    build loads no DXC.
+  - node-webgpu's README puts Dawn's options in `create([...])`. Neither it nor the engine reads
+    `DAWN_FEATURES_ENABLE` or a `dawnToggles` field. Not tried again.
+- **"Unroll partially, a bounded chunk inside a normal loop."** That is what was built. The loop over blocks stays a loop,
+  and one block of 8 channels is written out inside it. FXC crashed on that.
+- **"vec4 is about 2 x faster; keep it as the production candidate."**
+  - That 2 x is one clock tick against two.
+  - At 256 and 1024, vec4 reads were slower natively on the 1080 (0.79 x, 0.86 x), and slower in Chrome at 1024 (0.82 x).
+- **"FXC is an old 32-bit fxc.exe."** Dawn loads the D3D compiler as a library into the node process, which is x64 on both
+  rigs.
+- **The exit code for both rigs.** It quotes 3221225477, the 1080's. The Intel's is 3221226505.
+
+**What this leaves for a later round. Nothing here is pre-registered.**
+- **Natively on D3D12,** the fast kernel as written is still the only hidden-layer kernel that is both built in time and not
+  slower.
+- **A page-only set.** In Chrome, the 2 x 8 tile shape with inline weights was 1.14 and 1.17 x the fast kernel at 1024.
+  Section 54's default rule covers every GPU and path, so a set used only in the page would need a rule of its own,
+  fixed before it runs.
+- **A kernel chosen by adapter in the page.** Writing the block out was 2.11 x on the Intel in Chrome and 0.57 x on the
+  1080. No round has let the page choose a kernel by vendor.
+- **A finer native clock.** Turning off the quantization natively would be an instrument change. It needs its own gate.

@@ -216,6 +216,10 @@ node tools/denoiseBuildProbe.mjs --out denoise-build-probe-r17.json
 Each shape builds once in its own process, stopped at 3 minutes, and is timed at 64, 256 and 1024 square, natively and then
 in Chrome. Send back `denoise-build-probe-r17.json`. Section 59 fixes, before it runs, which shapes earn a full run.
 
+**The outcome (section 60).** No shape qualified, so round 17 ends and the page and the default stay r15. Natively, both
+written-out shapes crashed on both GPUs and all three tile shapes stopped at 3 minutes. The vec4 shape built, but in Chrome
+at 1024 square it was slower than the fast kernel on the 1080. There is nothing more to run on this branch.
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and
