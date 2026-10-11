@@ -9,6 +9,9 @@
 // gate is section 43's measurement A: for each kernel the denoiser runs, its pipeline's build time, its pass time at 64 x 64,
 // and whether its output is exact, under each native compiler it can find and in the browser. It also counts, from Dawn's
 // own shader dump, what each compiler made of each kernel.
+// Round 15 (section 46) adds an eighth: k_head_apply, the head and the kernel apply in one pass, run on
+// render/denoiseCompile.mjs's order probe -- a head whose products are exact and whose sums are not, so its image is
+// within APPLY_TOL of the twin's only if the head added in the twin's order.
 //
 // Each native measurement is its own process: one kernel, one adapter, one device, one compiler -- Dawn's dump goes to
 // stdout, so a process apiece keeps each kernel's dump its own, and a compile that never finishes is killed, not waited on.
@@ -31,6 +34,14 @@
 //       shader follows the kernel's, and reading it gave every kernel the same stats -- the first draft did exactly this)
 //   H1-A3 also run against render/denoiseDevice-selfcheck.mjs, and H1-H2 against brain/conv2d-selfcheck.mjs; all
 //   restored, md5 verified.
+//   round 15, against k_head_apply on the order probe (each also against render/denoiseDevice-selfcheck.mjs):
+//   R1  its head sums its channels last-first                                   2 RED (native and browser: the probe's 1.28e-1)
+//   R2  it weighs taps across the emitter mask                                  2 RED
+//   R3  it reads each tap's colour one column right                             2 RED
+//   R4  its barrier removed                                                     2 RED
+//   R5  its softmax without the largest logit subtracted                        2 RED (the probe's logits overflow exp)
+//   R8  the probe's weights not exact products (j/7)                            0 RED HERE, as it must be: SwiftShader never fuses, so
+//       twin and mirror cannot part on it; render/denoiseDevice-selfcheck.mjs's probe-is-a-probe row is red, 1
 //   after the GTX 1080's run (section 45), against the two fixes it called for:
 //   X1  the child reports nothing -- the 1080's Windows loss, replayed          1 RED (the every-child-reported row; before it, this
 //       read green, each silent child counted as a kernel that "said why" -- exactly the 1080's report)
@@ -194,7 +205,7 @@ console.log("\n3. THE BROWSER: denoise.html's \"Time each kernel\", in Chromium,
     else {
         let out = null; try { out = JSON.parse(r.result?.json || "null"); } catch {}
         ok("!! the page built and timed every kernel on its own device, showed the table, and said how many were exact -- no page error",
-            r.ok && !!out && out.length === VARIANTS.length && r.result.shown && !r.pageErrors.length && /of 7 kernels built and exact/.test(r.result.status),
+            r.ok && !!out && out.length === VARIANTS.length && r.result.shown && !r.pageErrors.length && new RegExp(`of ${VARIANTS.length} kernels built and exact`).test(r.result.status),
             r.ok ? (r.result?.status || "").slice(0, 160) : r.reason);
         if (out) for (const o of out) rows.push({ path: "browser", compiler: "Chrome's", id: o.id, result: o.result });
     }

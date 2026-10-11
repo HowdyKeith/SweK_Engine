@@ -84,8 +84,9 @@
     renders a scene the network was trained or tested on. On the device the network runs as WebGPU compute
     (render/denoiseDevice.mjs); without WebGPU it runs on the CPU, and the caption says which.</p>
   <p class="note">Timing: each size runs on its own device, and the kernel sets take turns on it -- round 12's
-    (brain/conv2d.mjs's tiled and direct kernels), round 13's fast kernel, and round 14's (the fast kernel, a head kernel
-    of its own and a faster kernel apply). Every set adds every number in the same order.
+    (brain/conv2d.mjs's tiled and direct kernels), round 13's fast kernel, round 14's (the fast kernel, a head kernel
+    of its own and a faster kernel apply), and round 15's (the fast kernel, then the head and the kernel apply as one
+    pass, its logits never stored). Every set adds every number in the same order.
     A few untimed passes come first, then timed ones. "ms a pass" is the median on the device's clock, from timestamp
     queries (a browser may round them to 0.1 ms), or submit to the queue's done where the device has none -- the network
     and its kernel, no upload and no read-back. Each set stops before a size whose pass would take it over 1.5 s, so
@@ -183,7 +184,8 @@ $("time").onclick = async () => {
         if (!navigator.gpu) { $("timeStatus").textContent = "no WebGPU in this browser: nothing to time"; return; }
         await loadNet();
         $("timeStatus").textContent = "timing..."; await frame();
-        const r = await timingLadder(net, () => navigator.gpu.requestAdapter());
+        // four sets take turns (round 15), so the ladder gets 300 s rather than the default 120
+        const r = await timingLadder(net, () => navigator.gpu.requestAdapter(), { totalMs: 300000 });
         const tb = $("timeTable").querySelector("tbody"), td = (t, left) => `<td style="padding:2px 10px;text-align:${left ? "left" : "right"}">${t}</td>`;
         const A = r.sets[0], rest = r.sets.slice(1), last = r.sets[r.sets.length - 1];
         const ms = (x) => (x.skipped ? `<span style="color:#7e9a92">skipped: ${x.reason}</span>` : (x.gpu ? x.gpu.median : x.wall.median).toFixed(2));

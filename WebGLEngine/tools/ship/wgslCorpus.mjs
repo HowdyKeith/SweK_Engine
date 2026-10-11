@@ -97,7 +97,7 @@ import * as LG from "../../physics/chaos/logisticWgsl.mjs";
 import * as MLP from "../../brain/mlp.js";
 // the denoiser arc, round 1 -- the convolution layer the path-tracer denoiser is built from
 import * as CONV from "../../brain/conv2d.mjs";
-import { kernelApplyWgsl, kernelApplyFastWgsl, packApplyUniforms } from "../../render/denoiseDevice.mjs";
+import { kernelApplyWgsl, kernelApplyFastWgsl, kernelHeadApplyWgsl, packApplyUniforms } from "../../render/denoiseDevice.mjs";
 import { FLOWFIELD_WGSL } from "../../brain/flowfield.js";
 import { buildClothConstraints } from "../../physics/xpbd/clothMesh.js";
 import { colorConstraints as xpbdColors } from "../../physics/xpbd/xpbd.js";
@@ -827,6 +827,13 @@ export function corpus() {
         { id: "conv2d.conv2dHeadWgsl", from: "brain/conv2d.mjs",
           why: "a 1 x 1 convolution with no tile and no barrier, a thread per pixel and vec4 of outputs, weights in a uniform block, written planar: the head that round 13's fast kernel ran 1,900 times slower natively than in Chrome",
           opts: (() => { const P = CONV.PROBES[3], a = P.args; return { code: P.code(a), entryPoint: P.entryPoint, outCount: P.outCount(a), uniforms: P.pack(a), workgroups: P.workgroups(a), inputs: P.inputs(a) }; })() },
+        // the denoiser arc, round 15 (section 46): the head and the kernel apply as one pass -- two uniform blocks, the
+        // apply's and the head's, which the one-uniform harness signature cannot bind, so compile-only here; its image is
+        // held to the twin's by render/denoiseDevice-selfcheck.mjs and render/denoiseCompile-selfcheck.mjs, natively and in
+        // Chromium, and its head's order by render/denoiseCompile.mjs's order probe
+        { id: "denoiseDevice.kernelHeadApplyWgsl", from: "render/denoiseDevice.mjs", compileOnly: true,
+          why: "the 81-logit head and the kernel apply in one pass: 21 named vec4 accumulators, 81 taps unrolled so each logit is a named lane, a halo in workgroup memory behind one barrier -- the logits never stored",
+          opts: { code: kernelHeadApplyWgsl({ Cin: 32, Cout: 81, k: 1 }), entryPoint: "k_head_apply", compileOnly: true, outCount: 0 } },
         { id: "flowfield.FLOWFIELD_WGSL", from: "brain/flowfield.js", compileOnly: true,
           why: "the flow-field solver: cost, relax (ping-pong), tally (atomics) and flow in one module with an explicit seven-binding layout -- outside the one-buffer signature; brain/tools/flowfield-selfcheck.mjs holds the solver to its CPU twin",
           opts: { code: FLOWFIELD_WGSL, entryPoint: "k_relax", compileOnly: true, outCount: 0 } },

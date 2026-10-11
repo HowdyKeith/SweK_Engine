@@ -31,14 +31,17 @@
 //           it cannot hold falls back to its r12 kernel
 //   "r14"   round 14 (section 43): r13's fast kernel for the hidden layers; the LAST layer, when it is 1 x 1, on
 //           brain/conv2d.mjs's head kernel, which writes its logits planar; and k_apply_fast, which reads them so
-// The page runs PAGE_KERNELS and every other caller DEFAULT_KERNELS. Section 43's rules, read off both GPUs (section 49),
-// put the page on r13 and the default on r14.
+//   "r15"   round 15 (section 46): r13's fast kernel for the hidden layers; the LAST layer, when it is the 1 x 1 head of
+//           81 logits, and the kernel apply in ONE pass, k_head_apply below -- the logits never stored
+// The page runs PAGE_KERNELS and every other caller DEFAULT_KERNELS. Section 43's rules, read off both GPUs' round-14 runs
+// (section 49), put the page on r13 and the default on r14; section 46's, read off their round-15 runs (section 50), put
+// both on r15 -- the later run's decision stands.
 // Every set adds every cell in the same order, so all are held to the same twin, cell for cell. The pass runs DEFAULT_KERNELS
 // unless told otherwise; section 39's outcome rule, read off the rig, is what may change it. The timing ladder times
 // both, taking turns on one device.
 "use strict";
 import { conv2dWgsl, conv2dTiledWgsl, conv2dFastWgsl, conv2dHeadWgsl, packProbeUniforms, packFastUniforms, packHeadUniforms, fastShape, headShape,
-         planarToChannelsLast, conv2dCpu, TILE, K_MAX, COUT_MAX } from "../brain/conv2d.mjs";
+         planarToChannelsLast, conv2dCpu, conv2dCpuFma, TILE, K_MAX, COUT_MAX } from "../brain/conv2d.mjs";
 import { KERNEL_RADIUS, KERNEL_TAPS, headOf } from "./denoiseNet.mjs";
 import { ALBEDO_FLOOR, strideOf } from "./denoiseScenes.mjs";
 import { maskChannelOf } from "./denoiseMask.mjs";
@@ -166,6 +169,92 @@ fn k_apply_fast(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(local_in
 /** The fast kernel apply (entry k_apply_fast): k_apply's bindings, the logits at 2 PLANAR (81 planes of H x W). */
 export function kernelApplyFastWgsl() { return DECL_APPLY.replace(`H x W x ${KERNEL_TAPS}, the head's logits`, `PLANAR: ${KERNEL_TAPS} planes of H x W, the head's logits`) + BODY_APPLY_FAST; }
 
+// ---- k_head_apply (round 15, section 46) ---------------------------------------------------------------------------
+// Round 14 wrote the 81 logits to storage (k_head) and read them back three times (k_apply_fast's three loops). At 1080p
+// that buffer is 672 MB, the largest the pass allocates, and it is written once and read three times a frame. This is
+// the head and the kernel apply in one pass, the logits never leaving the thread:
+//   - each pixel's 81 logits are 21 named vec4 accumulators, each lane one cell, added b then ci in order -- k_head's sum,
+//     so conv2dCpu's (or the fused mirror's);
+//   - the 81 taps are unrolled, so a tap's logit is a NAMED lane (a9.y), never an index into a private array -- which a
+//     compiler would put in memory, the thing round 14's dump counts as an indexable temp;
+//   - which taps are weighed (inside the image, on the pixel's side of the mask) is decided once, as k_apply_fast decides
+//     it, into three words of bits; then k_apply_fast's three sums, in its order, over the same halo in workgroup memory.
+// No cell is stored, so no cell can be judged on its own: the image is judged, against kernelApplyCpu on the twin's logits
+// and on the fused mirror's, from the device's own input to the head (judgeHeadApply).
+/** The fused head and kernel apply (entry k_head_apply), generated for a 1 x 1 head of KERNEL_TAPS logits. */
+export function kernelHeadApplyWgsl({ Cin, Cout, k, act = "none" }) {
+    const S = headShape({ Cin, Cout, k });
+    if (Cout !== KERNEL_TAPS || !S.fits) throw new Error(`denoiseDevice: the fused head holds a 1 x 1 layer of ${KERNEL_TAPS} logits whose weights fit one uniform binding, got ${Cin} -> ${Cout}, k ${k}, ${S.bytes} bytes`);
+    const G = S.C4, js = Array.from({ length: G }, (_, j) => j), lanes = ["x", "y", "z", "w"], taps = Array.from({ length: KERNEL_TAPS }, (_, t) => t);
+    const lg = (t) => `a${t >> 2}.${lanes[t & 3]}`, on = (t) => `(ok${t >> 5} & ${(1 << (t & 31)) >>> 0}u) != 0u`;
+    const halo = (t) => `S[(lid.y + ${Math.floor(t / D)}u) * ${HALO_A}u + lid.x + ${t % D}u]`;
+    const off = (d) => (d - KERNEL_RADIUS < 0 ? ` - ${KERNEL_RADIUS - d}` : d - KERNEL_RADIUS > 0 ? ` + ${d - KERNEL_RADIUS}` : "");
+    return `
+struct AP { H: u32, W: u32, C: u32, mc: u32, floor: f32, pad0: u32, pad1: u32, pad2: u32 };
+struct HP { H: u32, W: u32, pad0: u32, pad1: u32, b: array<vec4<f32>, ${G}>, w: array<vec4<f32>, ${Cin * G}> };
+@group(0) @binding(0) var<storage, read_write> Y: array<f32>;   // H x W x 3
+@group(0) @binding(1) var<uniform> P: AP;                        // packApplyUniforms
+@group(0) @binding(2) var<uniform> F: HP;                        // packHeadUniforms: the head's bias and weights
+@group(0) @binding(3) var<storage, read>       A: array<f32>;   // H x W x ${Cin}, the head's input, channels last
+@group(0) @binding(4) var<storage, read>       X: array<f32>;   // H x W x C, the network's input
+var<workgroup> S: array<vec4<f32>, ${HALO_A * HALO_A}>;   // the tile's halo: r, g, b, mask
+@compute @workgroup_size(${TILE}, ${TILE})
+fn k_head_apply(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>,
+                @builtin(workgroup_id) wid: vec3<u32>) {
+    let ox = i32(wid.x * ${TILE}u) - ${KERNEL_RADIUS}; let oy = i32(wid.y * ${TILE}u) - ${KERNEL_RADIUS};
+    for (var i = lid.y * ${TILE}u + lid.x; i < ${HALO_A * HALO_A}u; i = i + ${TILE * TILE}u) {
+        let sx = ox + i32(i % ${HALO_A}u); let sy = oy + i32(i / ${HALO_A}u);
+        var v = vec4<f32>(0.0);
+        if (sx >= 0 && sx < i32(P.W) && sy >= 0 && sy < i32(P.H)) {
+            let q = (u32(sy) * P.W + u32(sx)) * P.C;
+            v = vec4<f32>(X[q], X[q + 1u], X[q + 2u], select(0.0, X[q + P.mc], P.mc != ${NO_MASK}u));
+        }
+        S[i] = v;
+    }
+    workgroupBarrier();
+    let px = i32(gid.x); let py = i32(gid.y);
+    if (gid.x >= P.W || gid.y >= P.H) { return; }
+    let p = gid.y * P.W + gid.x;
+    // the head: ${KERNEL_TAPS} logits as ${G} vec4s, each lane one cell, b then ci in order
+    ${js.map((j) => `var a${j} = F.b[${j}u];`).join("\n    ")}
+    let xo = p * ${Cin}u;
+    for (var ci = 0u; ci < ${Cin}u; ci = ci + 1u) {
+        let v = A[xo + ci]; let w = ci * ${G}u;
+        ${js.map((j) => `a${j} = a${j} + v * F.w[w + ${j}u];`).join("\n        ")}
+    }
+    ${act === "relu" ? js.map((j) => `a${j} = max(a${j}, vec4<f32>(0.0));`).join("\n    ") : ""}
+    // the taps the kernel weighs: inside the image and, with a mask, on the pixel's own side of it -- k_apply_fast's test
+    let own = S[(lid.y + ${KERNEL_RADIUS}u) * ${HALO_A}u + lid.x + ${KERNEL_RADIUS}u].w;
+    let free = P.mc == ${NO_MASK}u;
+    var ok0 = 0u; var ok1 = 0u; var ok2 = 0u;
+    ${taps.map((t) => { const dy = Math.floor(t / D), dx = t % D;
+        return `if (py${off(dy)} >= 0 && py${off(dy)} < i32(P.H) && px${off(dx)} >= 0 && px${off(dx)} < i32(P.W) && (free || ${halo(t)}.w == own)) { ok${t >> 5} = ok${t >> 5} | ${(1 << (t & 31)) >>> 0}u; }`; }).join("\n    ")}
+    var m = 0.0; var have = false;
+    ${taps.map((t) => `if (${on(t)}) { let l = ${lg(t)}; if (!have || l > m) { m = l; have = true; } }`).join("\n    ")}
+    var sum = 0.0;
+    ${taps.map((t) => `if (${on(t)}) { sum = sum + exp(${lg(t)} - m); }`).join("\n    ")}
+    var r = 0.0; var g = 0.0; var b = 0.0;
+    ${taps.map((t) => `if (${on(t)}) { let wt = exp(${lg(t)} - m) / sum; if (wt != 0.0) { let s = ${halo(t)}; r = r + wt * s.x; g = g + wt * s.y; b = b + wt * s.z; } }`).join("\n    ")}
+    let o = p * P.C;
+    Y[p * 3u] = r * max(X[o + 3u], P.floor); Y[p * 3u + 1u] = g * max(X[o + 4u], P.floor); Y[p * 3u + 2u] = b * max(X[o + 5u], P.floor);
+}
+`;
+}
+
+/**
+ * The fused pass judged (section 46): its image against kernelApplyCpu on the head's twin logits and on its fused mirror's,
+ * both from `input`, the device's own input to the head. A value passes within APPLY_TOL of either -- a compiler that
+ * contracts the head's adds gives the mirror's logits, one that does not gives the twin's. { worst, twin, mirror }: the
+ * worst of the nearer, and the worst against each.
+ */
+export function judgeHeadApply(x, input, L, y, H, W) {
+    const tw = kernelApplyCpu(x, conv2dCpu(input, H, W, L), H, W), fm = kernelApplyCpu(x, conv2dCpuFma(input, H, W, L), H, W);
+    const rel = (a, b) => Math.abs(a - b) / (Math.abs(b) + 1e-30);
+    let worst = 0, twin = 0, mirror = 0;
+    for (let c = 0; c < tw.length; c++) { const a = rel(y[c], tw[c]), b = rel(y[c], fm[c]); twin = Math.max(twin, a); mirror = Math.max(mirror, b); worst = Math.max(worst, Math.min(a, b)); }
+    return { worst, twin, mirror };
+}
+
 /** The apply uniform block: H, W, C, the mask channel (none: 0xffffffff) as u32 bits, the albedo floor as an f32. */
 export function packApplyUniforms({ H, W, C }) {
     const b = new ArrayBuffer(32), u = new Uint32Array(b), f = new Float32Array(b), mc = maskChannelOf(C);
@@ -201,26 +290,31 @@ export function kernelApplyCpu(x, logits, H, W) {
     return y;
 }
 
-/** The kernel sets a pass can run on: round 12's, round 13's fast kernel (section 39), and round 14's (section 43). */
-export const KERNEL_SETS = Object.freeze(["r12", "r13", "r14"]);
-/** The set a pass runs unless told otherwise: r14, by section 43's outcome rule on both GPUs (section 49). */
-export const DEFAULT_KERNELS = "r14";
-/** The set denoise.html runs: r13, by section 43's page rule on both GPUs (section 49) -- 6.45 x against r14's 6.33. */
-export const PAGE_KERNELS = "r13";
+/** The kernel sets a pass can run on: round 12's, round 13's fast kernel (section 39), round 14's (section 43), round 15's (section 46). */
+export const KERNEL_SETS = Object.freeze(["r12", "r13", "r14", "r15"]);
+/** The set a pass runs unless told otherwise: r15, by section 46's default rule on both GPUs (section 50) -- 9.25 x against r14's 6.33. */
+export const DEFAULT_KERNELS = "r15";
+/** The set denoise.html runs: r15, by section 46's page rule on both GPUs (section 50) -- 9.25 x against r13's 6.49 and r14's 6.33. */
+export const PAGE_KERNELS = "r15";
 
 /**
  * The kernel a layer runs on in a set. r12: tiled when the tiled kernel can hold it, direct otherwise (the 81-logit
  * head). r13: the fast kernel when its uniform block and tile fit the device's default limits, else the layer's r12 kernel.
  * r14: r13's, except that the LAST layer (`last`), when it is 1 x 1 and fits, runs the head kernel and writes planar --
- * only the last, because only k_apply_fast reads a planar layer.
+ * only the last, because only k_apply_fast reads a planar layer. r15: r13's, except that the last layer, when it is the 1 x 1
+ * head of KERNEL_TAPS logits and fits, runs with the kernel apply as one pass, k_head_apply.
  */
 export const kernelFor = (L, set = DEFAULT_KERNELS, last = false) => {
     if (!KERNEL_SETS.includes(set)) throw new Error(`denoiseDevice: no kernel set "${set}" -- the sets are ${KERNEL_SETS.join(", ")}`);
     if (set === "r14" && last && headShape(L).fits) return "head";
+    if (set === "r15" && last && L.Cout === KERNEL_TAPS && headShape(L).fits) return "head_apply";
     return set !== "r12" && fastShape(L).fits ? "fast" : L.k <= K_MAX && L.Cout <= COUT_MAX ? "tiled" : "direct";
 };
-/** The kernel apply a set runs: k_apply_fast when the set's last layer is planar (the head kernel), k_apply otherwise. */
-export const applyFor = (layers) => (layers[layers.length - 1].kernel === "head" ? "apply_fast" : "apply");
+/**
+ * The kernel apply a set runs: k_apply_fast when the set's last layer is planar (the head kernel), "head_apply" when the
+ * last layer IS the apply (k_head_apply -- no pass of its own), k_apply otherwise.
+ */
+export const applyFor = (layers) => { const k = layers[layers.length - 1].kernel; return k === "head" ? "apply_fast" : k === "head_apply" ? "head_apply" : "apply"; };
 
 /** A network's layers as the device takes them: f32 weights and biases, each layer's kernel in `set` named. */
 export function deviceLayers(net, set = DEFAULT_KERNELS) {
@@ -258,8 +352,9 @@ export async function createDeviceDenoiser(dev, net, { H, W, C, kernels = DEFAUL
     if (used.has("tiled")) await build("tiled", conv2dTiledWgsl(), "k_conv_tiled");
     for (const [i, L] of layers.entries()) if (L.kernel === "fast") await build("fast" + i, conv2dFastWgsl(L), "k_conv_fast");
     for (const [i, L] of layers.entries()) if (L.kernel === "head") await build("head" + i, conv2dHeadWgsl(L), "k_head");
+    for (const [i, L] of layers.entries()) if (L.kernel === "head_apply") await build("head_apply" + i, kernelHeadApplyWgsl(L), "k_head_apply");
     const apply = applyFor(layers);
-    await build("apply", apply === "apply_fast" ? kernelApplyFastWgsl() : kernelApplyWgsl(), apply === "apply_fast" ? "k_apply_fast" : "k_apply");
+    if (apply !== "head_apply") await build("apply", apply === "apply_fast" ? kernelApplyFastWgsl() : kernelApplyWgsl(), apply === "apply_fast" ? "k_apply_fast" : "k_apply");
     if (errors.length) throw new Error("denoiseDevice: WGSL did not compile: " + errors.join("; "));
     const owned = [];
     const buffer = (bytes, usage, data = null) => {
@@ -270,10 +365,20 @@ export async function createDeviceDenoiser(dev, net, { H, W, C, kernels = DEFAUL
     };
     const S = BU.STORAGE | BU.COPY_DST | BU.COPY_SRC;
     const xBuf = buffer(H * W * C * 4, S);
-    const outs = layers.map((L) => buffer(H * W * L.Cout * 4, S));
+    // a fused last layer (k_head_apply) writes the image, so its logits get no buffer -- the one round 15 removes
+    const outs = layers.map((L) => (L.kernel === "head_apply" ? null : buffer(H * W * L.Cout * 4, S)));
     const yBuf = buffer(H * W * 3 * 4, S);
     const groups = [Math.ceil(W / TILE), Math.ceil(H / TILE)];
+    const applyUni = buffer(32, BU.UNIFORM | BU.COPY_DST, packApplyUniforms({ H, W, C }));
     const steps = layers.map((L, i) => {
+        if (L.kernel === "head_apply") {
+            // the head and the kernel apply in one pass: the head's weights in their uniform block, the image out
+            const p = pipe["head_apply" + i], uni = packHeadUniforms({ H, W, layer: L });
+            return { p, wg: [...groups, 1], bind: dev.createBindGroup({ layout: p.getBindGroupLayout(0), entries: [
+                { binding: 0, resource: { buffer: yBuf } }, { binding: 1, resource: { buffer: applyUni } },
+                { binding: 2, resource: { buffer: buffer(uni.byteLength, BU.UNIFORM | BU.COPY_DST, uni) } },
+                { binding: 3, resource: { buffer: i ? outs[i - 1] : xBuf } }, { binding: 4, resource: { buffer: xBuf } }] }) };
+        }
         if (L.kernel === "head") {
             // the head kernel: a thread per pixel and vec4 of outputs, written planar for k_apply_fast
             const p = pipe["head" + i], uni = packHeadUniforms({ H, W, layer: L });
@@ -294,8 +399,7 @@ export async function createDeviceDenoiser(dev, net, { H, W, C, kernels = DEFAUL
             { binding: 0, resource: { buffer: outs[i] } }, { binding: 1, resource: { buffer: uni } }, { binding: 2, resource: { buffer: i ? outs[i - 1] : xBuf } },
             { binding: 3, resource: { buffer: buffer(L.W.length * 4, BU.STORAGE | BU.COPY_DST, L.W) } }, { binding: 4, resource: { buffer: buffer(L.b.length * 4, BU.STORAGE | BU.COPY_DST, L.b) } }] }) };
     });
-    const applyUni = buffer(32, BU.UNIFORM | BU.COPY_DST, packApplyUniforms({ H, W, C }));
-    steps.push({ p: pipe.apply, wg: [...groups, 1], bind: dev.createBindGroup({ layout: pipe.apply.getBindGroupLayout(0), entries: [
+    if (apply !== "head_apply") steps.push({ p: pipe.apply, wg: [...groups, 1], bind: dev.createBindGroup({ layout: pipe.apply.getBindGroupLayout(0), entries: [
         { binding: 0, resource: { buffer: yBuf } }, { binding: 1, resource: { buffer: applyUni } }, { binding: 2, resource: { buffer: outs[outs.length - 1] } },
         { binding: 3, resource: { buffer: xBuf } }] }) });
     const readBack = async (src, n) => {
@@ -317,8 +421,9 @@ export async function createDeviceDenoiser(dev, net, { H, W, C, kernels = DEFAUL
             dev.queue.submit([enc.finish()]);
             const y = await readBack(yBuf, H * W * 3);
             const ms = (globalThis.performance ?? Date).now() - t0;
-            // every layer read back channels last, as the twin computes it: a planar layer (the head kernel's) is transposed
-            const acts = keep ? await Promise.all(layers.map(async (L, i) => { const v = await readBack(outs[i], H * W * L.Cout);
+            // every layer read back channels last, as the twin computes it: a planar layer (the head kernel's) is transposed,
+            // and a fused one (k_head_apply's) has no output but the image -- null, judged through it (judgeHeadApply)
+            const acts = keep ? await Promise.all(layers.map(async (L, i) => { if (!outs[i]) return null; const v = await readBack(outs[i], H * W * L.Cout);
                 return L.kernel === "head" ? planarToChannelsLast(v, H * W, L.Cout) : v; })) : null;
             return { y, acts, ms };
         },
@@ -367,7 +472,8 @@ export async function createDeviceDenoiser(dev, net, { H, W, C, kernels = DEFAUL
                 }
             } finally { qs?.destroy(); resolved?.destroy(); read?.destroy(); probe.destroy(); }
             return { wall, elapsed, gpu: ts ? gpu : null, perPass: ts ? perPass : null, timestamps: ts,
-                     passes: [...layers.map((L, i) => `layer ${i} (${L.kernel}, ${L.Cin} -> ${L.Cout})`), `kernel (${apply})`] };
+                     passes: [...layers.map((L, i) => (L.kernel === "head_apply" ? `layer ${i} and kernel (head_apply, ${L.Cin} -> ${L.Cout} -> 3)` : `layer ${i} (${L.kernel}, ${L.Cin} -> ${L.Cout})`)),
+                              ...(apply === "head_apply" ? [] : [`kernel (${apply})`])] };
         },
         destroy() { for (const b of owned) b.destroy(); owned.length = 0; },
     };
@@ -405,6 +511,12 @@ export function decodeNet(data) {
 export const TIMING_SIZES = Object.freeze([[64, 64], [128, 128], [256, 256], [512, 512], [1024, 1024], [1920, 1080]].map((s) => Object.freeze(s)));
 /** The largest buffer a pass at H x W needs, in bytes -- the widest layer's output (the head's 81 logits). */
 export const largestBuffer = (net, H, W) => H * W * Math.max(...net.layers.map((L) => L.Cout), net.layers[0].Cin) * 4;
+/**
+ * The storage a pass at H x W allocates in a kernel set, in bytes: the input, every layer's output but a fused last one
+ * (r15's k_head_apply keeps its logits in the thread), and the image -- uniform blocks left out. Round 15 reports it.
+ */
+export const passBytes = (net, H, W, set = DEFAULT_KERNELS) => H * W * 4 *
+    (net.layers[0].Cin + deviceLayers(net, set).reduce((a, L) => a + (L.kernel === "head_apply" ? 0 : L.Cout), 0) + 3);
 /** A deterministic input of C channels: irradiance, albedo, normals and a two-valued mask, in the network's ranges. */
 export function timingInput(H, W, C = 10, seed = 1) {
     let s = seed >>> 0; const u = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
