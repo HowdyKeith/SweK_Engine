@@ -3213,3 +3213,92 @@ commit that carries section 54 and the pixel-tiled kernel. They ran side by side
 - That is one run each of `node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise-r16.json` on
   `claude/denoiser-round16`.
 - Until section 54's rules move them, the page and the default stay "r15" (section 50).
+
+## 56. ROUND 16 ON THE RIG: EVERY GATE STOPPED AT 30 MINUTES ON BOTH GPUS -- NO VERDICT, AND A BUILD PROBE FIXED BEFORE IT RUNS
+
+**What arrived.** One `realGpuRun --only denoise` report from each GPU, both at 362bd22d. They are committed byte for
+byte at f857fd46:
+- `render/denoise-rig-r16-gtx1080.json`;
+- `render/denoise-rig-r16-intel-gen9.json`.
+
+**What they say.**
+- **All three denoiser gates were stopped at `realGpuRun`'s 30-minute cap on both GPUs:** compile, exact and timing,
+  1,800 s each.
+- **They are empty.** No gate printed a failing row or a measurement, except the compile gate's opening line naming
+  the D3D12 compilers.
+- **No adapter was logged.** These gates log one only when they open Chrome, or, in the timing gate, when the native
+  ladder ends. So every gate was still in its native, node-webgpu part when it was stopped. The verdict line's "NO
+  ADAPTER WAS SEEN" means that, not a missing GPU.
+- **By section 54, a stopped gate reaches no verdict on its path. Nothing is decided by these runs.** The page and the
+  default stay "r15" (section 50). Rerunning the same commit would end the same way, so it is not rerun.
+
+**Where it stopped.**
+- **The compile gate builds each kernel in its own process, capped at 15 minutes.**
+  - Its first eight kernels built in about 3 minutes on the 1080 in round 15.
+  - Its ninth is `r16a-tile2-3x3`, this round's kernel. So on the 1080, node-webgpu did not build the pixel-tiled
+    kernel's pipeline in 15 minutes. It builds the fast kernel's in 3.7 s.
+  - Everything else in the three gates that was new in round 16 builds the same kernel natively.
+- **The stopped kernel's dump file, from the 1080, holds only Dawn's WGSL.** It is cut off at 8,192 bytes plus 81
+  carriage returns: the child's output was block-buffered, and the rest was lost when the process was killed.
+- **Dawn writes the generated HLSL and FXC's DXBC in one message, after the compile.** The fast kernel's dump from the
+  same run shows that order.
+- **So the dump cannot say whether Tint's HLSL step or FXC never finished.** Either way the pipeline was not built.
+- **The fast kernel's dump does show what FXC is handed, and how:**
+  - plain HLSL loops, with no unroll attributes;
+  - compile flags `D3DCOMPILE_OPTIMIZATION_LEVEL0` and `D3DCOMPILE_IEEE_STRICTNESS`;
+  - out came 537 lines of DXBC, with its six loops kept as loops and 42 temporaries.
+
+**Two suspects.** The pixel-tiled kernel differs from the fast kernel in two ways:
+- **the guarded copy:** a second copy of the channel loop for the image's edge, inside which each pixel's accumulators
+  are updated under its own `if`;
+- **the accumulators:** twice as many, 16 vec4s against 8.
+
+**A kernel without the guarded copy: `edge: "zero"`.** `conv2dTileWgsl(layer, { px, g4, edge })` now takes `edge`.
+- **"skip" is section 54's kernel, and the default.** Its WGSL is unchanged byte for byte: the generator gives the same
+  text as at 362bd22d for every configuration tried.
+- **"zero" adds every tap of an in-image row.** A tap outside the image adds the zero the tile holds there.
+  - Adding a zero product is the skip except in the sign of a zero (sabotage P7).
+  - `===` does not see the sign of a zero, and WGSL lets an implementation ignore it.
+  - So "zero" is held to the same twin, cell for cell.
+- **Piloted here, on SwiftShader only:**
+  - every cell of every case was the twin's, and the edge-skip kernel's bits, with none differing even in the sign of a
+    zero;
+  - sabotage Z1, the tile's load no longer zeroing the taps left and right of the image, turns every edge-zero case red
+    and no edge-skip case.
+
+**The probe: `node tools/denoiseBuildProbe.mjs`.** It runs ten kernel shapes from `render/denoiseCompile.mjs`'s
+`BUILD_PROBE`, each on round 13's layer at 64 x 64.
+- **Natively, each in its own process, stopped at 180 s.** A shape the compiler cannot finish costs 180 s, not a run.
+- **Then in Chrome,** each raced against the same 180 s.
+- **Per shape:** whether it built, the build's time, one pass on the device's clock, whether every cell is the twin's
+  or the fused mirror's, and the size of FXC's output.
+- **The shapes, in order:**
+  1. the fast kernel, the baseline;
+  2. the candidates, all edge zero:
+     - r16a's 2 pixels x 8 vec4s and r16b's 4 x 4 at 32 -> 32;
+     - 2 x 4, the fast kernel's accumulator count;
+     - r16a's and r16b's again on the first layer's 10 -> 32;
+  3. the diagnostics, all edge skip: 1 pixel x 8 vec4s and 2 x 4, the guarded copy at the fast kernel's accumulator
+     count;
+  4. last, r16a's and r16b's kernels as section 54 shipped them.
+- **On SwiftShader, here,** all ten built in 0.7-2.9 s, natively and in Chromium, and every one was exact. These are a
+  CPU's times.
+
+**What the probe's results may choose, fixed now, before it runs on either GPU.** The decisions are made separately for
+r16a's configuration (2 pixels x 8 vec4s) and r16b's (4 x 4).
+- **A shape "builds"** when, natively on both GPUs, it builds within the 180 s cap and is exact.
+- **Section 54's kernel (edge skip) stays** if it builds.
+- **Otherwise edge zero replaces it in that set,** if edge zero builds at both 32 -> 32 and 10 -> 32.
+- **Otherwise that set leaves round 16:**
+  - it is taken out of `TIMED_SETS` and out of section 54's rules;
+  - what the probe shows goes to a later round, fixed before it runs.
+- **Choosing nothing:** the diagnostic shapes (2 x 4 at either edge, and 1 x 8 at edge skip) and every Chrome row. They
+  say what the compiler chokes on and whether Chrome's compiler shares it.
+- **Then a fresh run decides.**
+  - Any set whose kernel changes has its K0 (a) measured again here.
+  - Both GPUs then run `realGpuRun --only denoise` again, at a commit carrying the choice.
+  - Section 54's K0, K1, page and default rules decide from that run, unchanged.
+
+**Before round 16 runs in full again, the instrument is mended so this cannot cost 90 silent minutes twice:**
+- a gate the runner stops is reported as stopped, with the last lines it printed;
+- a pipeline that does not build within a time limit becomes a named red row, not a hang.

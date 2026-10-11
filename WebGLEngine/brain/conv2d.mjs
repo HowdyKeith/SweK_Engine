@@ -394,24 +394,30 @@ export function packHeadUniforms({ H, W, layer }) {
 // *** NOT ONE CELL'S ORDER MOVES. *** Each accumulator still adds b, then block by block, ky, kx, ci, and skips a tap
 // outside the image for ITS pixel alone -- one branch for a tap all PX pixels may take, a guarded one at the image's
 // edge. So it is held to conv2dCpu, or the fused mirror, cell for cell, at zero, like every kernel before it.
-const TILE_PX = Object.freeze([1, 2, 4]);
+// *** THE EDGE, TWO WAYS (section 56). *** On both GPUs' rigs, node-webgpu's FXC did not finish building this kernel in 15
+// minutes, where it builds the fast kernel in seconds. `edge` names how a tap outside the image is handled:
+//   "skip"  (section 54's kernel) -- the guarded branch above: the tap is skipped for each pixel it falls outside;
+//   "zero"  no guarded branch: every pixel adds every tap of an in-image row, and a tap outside the image adds the zero the
+//           tile holds there. Adding a zero product is the skip except in the SIGN of a zero (sabotage P7), which `===`
+//           does not see and WGSL lets an implementation ignore -- so it is held to the same twin, cell for cell.
+const TILE_PX = Object.freeze([1, 2, 4]), TILE_EDGE = Object.freeze(["skip", "zero"]);
 /**
  * The pixel-tiled kernel's shape for a layer and a configuration { px, g4 }: G4 vec4s a pixel keeps (at most the layer's
  * own), groups of them across z, C4 vec4s of padded output channels, the uniform block's bytes, the tile's width and
  * height with its halo, its workgroup bytes, and whether the device's default limits hold it.
  */
-export function tileShape({ Cin, Cout, k }, { px = 2, g4 = FAST_GROUP / 4 } = {}) {
+export function tileShape({ Cin, Cout, k }, { px = 2, g4 = FAST_GROUP / 4, edge = "skip" } = {}) {
     const c4 = Math.ceil(Cout / 4), G = Math.min(g4, c4), groups = Math.ceil(c4 / G), C4 = groups * G;
     const bytes = 16 + 16 * C4 + 16 * k * k * Cin * C4, TW = TILE * px + k - 1, TH = TILE + k - 1, wgBytes = TW * TH * CB * 4;
-    return { px, g4: G, groups, C4, bytes, TW, TH, wgBytes,
-             fits: k % 2 === 1 && TILE_PX.includes(px) && g4 >= 1 && bytes <= UNIFORM_MAX && wgBytes <= WORKGROUP_MAX };
+    return { px, g4: G, groups, C4, bytes, TW, TH, wgBytes, edge,
+             fits: k % 2 === 1 && TILE_PX.includes(px) && TILE_EDGE.includes(edge) && g4 >= 1 && bytes <= UNIFORM_MAX && wgBytes <= WORKGROUP_MAX };
 }
 
 /** The pixel-tiled kernel (entry k_conv_tile), generated for one layer and one { px, g4 }. */
 export function conv2dTileWgsl({ Cin, Cout, k, act = "none" }, cfg = {}) {
     const S = tileShape({ Cin, Cout, k }, cfg);
-    if (!S.fits) throw new Error(`conv2d: the pixel-tiled kernel holds an odd k, px in ${TILE_PX.join("/")}, weights in one ${UNIFORM_MAX}-byte uniform binding and a tile in ${WORKGROUP_MAX} bytes -- got ${Cin} -> ${Cout}, k ${k}, px ${cfg.px}, ${S.bytes} + ${S.wgBytes} bytes`);
-    const R = (k - 1) / 2, G = S.g4, P = S.px, js = Array.from({ length: G }, (_, j) => j), ps = Array.from({ length: P }, (_, p) => p);
+    if (!S.fits) throw new Error(`conv2d: the pixel-tiled kernel holds an odd k, px in ${TILE_PX.join("/")}, edge ${TILE_EDGE.join(" or ")}, weights in one ${UNIFORM_MAX}-byte uniform binding and a tile in ${WORKGROUP_MAX} bytes -- got ${Cin} -> ${Cout}, k ${k}, px ${cfg.px}, ${S.bytes} + ${S.wgBytes} bytes`);
+    const R = (k - 1) / 2, G = S.g4, P = S.px, js = Array.from({ length: G }, (_, j) => j), ps = Array.from({ length: P }, (_, p) => p), skip = S.edge === "skip";
     const lanes = ["x", "y", "z", "w"], a = (p, j) => `a${p}_${j}`;
     return `
 struct FP { H: u32, W: u32, pad0: u32, pad1: u32, b: array<vec4<f32>, ${S.C4}>, w: array<vec4<f32>, ${k * k * Cin * S.C4}> };
@@ -440,21 +446,21 @@ fn k_conv_tile(@builtin(local_invocation_id) lid: vec3<u32>, @builtin(workgroup_
                 let sy = i32(py) + i32(ky) - ${R};
                 if (sy < 0 || sy >= i32(F.H)) { continue; }
                 for (var kx = 0u; kx < ${k}u; kx = kx + 1u) {
-                    // a tap inside the image for pixel p, and where pixel p reads it in the tile
-                    ${ps.map((p) => `let s${p} = i32(x${p}) + i32(kx) - ${R}; let o${p} = s${p} >= 0 && s${p} < i32(F.W); let t${p} = ((lid.y + ky) * ${S.TW}u + ${p * TILE}u + lid.x + kx) * nb;`).join("\n                    ")}
+                    ${skip ? "// a tap inside the image for pixel p, and where pixel p reads it in the tile" : "// where pixel p reads the tap in the tile: zero there when it is outside the image"}
+                    ${ps.map((p) => (skip ? `let s${p} = i32(x${p}) + i32(kx) - ${R}; let o${p} = s${p} >= 0 && s${p} < i32(F.W); ` : "") + `let t${p} = ((lid.y + ky) * ${S.TW}u + ${p * TILE}u + lid.x + kx) * nb;`).join("\n                    ")}
                     let wb = ((ky * ${k}u + kx) * ${Cin}u + c0) * ${S.C4}u + g * ${G}u;
-                    if (${ps.map((p) => `o${p}`).join(" && ")}) {
+                    ${skip ? `if (${ps.map((p) => `o${p}`).join(" && ")}) {` : "{"}
                         for (var cj = 0u; cj < nb; cj = cj + 1u) {
                             ${ps.map((p) => `let v${p} = T[t${p} + cj];`).join(" ")}
                             let w = wb + cj * ${S.C4}u;
                             ${js.map((j) => `let w${j} = F.w[w + ${j}u]; ` + ps.map((p) => `${a(p, j)} = ${a(p, j)} + v${p} * w${j};`).join(" ")).join("\n                            ")}
                         }
-                    } else {
+                    }${skip ? ` else {
                         for (var cj = 0u; cj < nb; cj = cj + 1u) {
                             let w = wb + cj * ${S.C4}u;
                             ${ps.map((p) => `if (o${p}) { let v = T[t${p} + cj]; ` + js.map((j) => `${a(p, j)} = ${a(p, j)} + v * F.w[w + ${j}u];`).join(" ") + " }").join("\n                            ")}
                         }
-                    }
+                    }` : ""}
                 }
             }
         }

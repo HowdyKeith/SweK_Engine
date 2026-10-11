@@ -27,6 +27,32 @@ export const VARIANTS = Object.freeze([
     { id: "r16b-tile4-3x3", what: "the pixel-tiled kernel, 4 pixels x 16 channels a thread, 32 -> 32 at 3 x 3", kind: "tile4", L: () => conv(32, 32, 3, "relu", 11) },
 ].map((v) => Object.freeze(v)));
 
+// ---- THE BUILD PROBE (section 56) -------------------------------------------------------------------------------------
+// Round 16's first rig runs (section 56) stopped every denoiser gate at realGpuRun's 30-minute cap on both GPUs, each in
+// its native part: node-webgpu's FXC did not finish the pixel-tiled kernel's pipeline in the compile gate's 15 minutes, where
+// it builds the fast kernel in seconds. The kernel differs from the fast one in two ways that could be what FXC chokes on --
+// a second, guarded copy of the channel loop for the image's edge, whose accumulators are updated under a per-pixel `if`,
+// and twice the accumulators -- so these shapes take them apart, each on round 13's layer at 64 x 64:
+//   - the fast kernel, the baseline FXC builds in seconds;
+//   - the candidates: the tile kernel with edge "zero" (no guarded copy), at r16a's and r16b's configurations, at 2 x 4
+//     vec4s (the fast kernel's accumulator count), and on the first layer's 10 inputs;
+//   - the diagnostics: edge "skip" (section 54's) at 1 pixel x 8 vec4s and 2 x 4 -- the guarded copy at the fast kernel's
+//     accumulator count -- then r16a's and r16b's own, which section 56 expects to be stopped.
+// tools/denoiseBuildProbe.mjs runs each in its own process under a cap, natively, and the same list in Chrome.
+const tileProbe = (id, what, cfg, Cin = 32) => ({ id, what, kind: "tile", cfg: Object.freeze(cfg), L: () => conv(Cin, 32, 3, "relu", 11) });
+export const BUILD_PROBE = Object.freeze([
+    { id: "fast-32", what: "the fast kernel, 32 -> 32 at 3 x 3: the baseline", kind: "fast", L: () => conv(32, 32, 3, "relu", 11) },
+    tileProbe("tile2-zero-32", "2 pixels x 8 vec4s, edge zero, 32 -> 32", { px: 2, g4: 8, edge: "zero" }),
+    tileProbe("tile4-zero-32", "4 pixels x 4 vec4s, edge zero, 32 -> 32", { px: 4, g4: 4, edge: "zero" }),
+    tileProbe("tile2g4-zero-32", "2 pixels x 4 vec4s (the fast kernel's accumulator count), edge zero, 32 -> 32", { px: 2, g4: 4, edge: "zero" }),
+    tileProbe("tile2-zero-10", "2 pixels x 8 vec4s, edge zero, the first layer's 10 -> 32", { px: 2, g4: 8, edge: "zero" }, 10),
+    tileProbe("tile4-zero-10", "4 pixels x 4 vec4s, edge zero, the first layer's 10 -> 32", { px: 4, g4: 4, edge: "zero" }, 10),
+    tileProbe("tile1-skip-32", "1 pixel x 8 vec4s, edge skip: the guarded copy at the fast kernel's accumulator count", { px: 1, g4: 8, edge: "skip" }),
+    tileProbe("tile2g4-skip-32", "2 pixels x 4 vec4s, edge skip", { px: 2, g4: 4, edge: "skip" }),
+    tileProbe("tile2-skip-32", "r16a's kernel as section 54 shipped it: 2 pixels x 8 vec4s, edge skip", { px: 2, g4: 8, edge: "skip" }),
+    tileProbe("tile4-skip-32", "r16b's kernel as section 54 shipped it: 4 pixels x 4 vec4s, edge skip", { px: 4, g4: 4, edge: "skip" }),
+].map((v) => Object.freeze(v)));
+
 // ---- THE ORDER PROBE (round 15, section 46) -------------------------------------------------------------------------
 // k_head_apply stores no logit, so its head's cells cannot be judged one by one -- only the image can. This head makes
 // the ORDER of its adds visible in the image, and nothing else: every input is 1 + i/64 (7 significant bits) and every
@@ -80,7 +106,7 @@ export function jobFor(v) {
     const F = v.L(), L = F.layer, tw = Cv.conv2dCpu(F.x, N, N, L), fm = Cv.conv2dCpuFma(F.x, N, N, L);
     const judge = (y) => { let plain = 0, fused = 0, un = 0; for (let i = 0; i < tw.length; i++) { const c = Math.fround(y[i]); if (c === tw[i]) plain++; else if (c === fm[i]) fused++; else un++; }
                            return { ok: un === 0, detail: `${plain} plain, ${fused} fused, ${un} unexplained` }; };
-    if (v.kind in D.TILE_CONFIGS) { const cfg = D.TILE_CONFIGS[v.kind];
+    if (v.kind in D.TILE_CONFIGS || v.kind === "tile") { const cfg = v.kind === "tile" ? v.cfg : D.TILE_CONFIGS[v.kind];
         return { code: Cv.conv2dTileWgsl(L, cfg), entry: "k_conv_tile", uniforms: Cv.packTileUniforms({ H: N, W: N, layer: L }, cfg),
                  inputs: [{ binding: 2, data: F.x }], wg: Cv.tileWorkgroups(N, N, L, cfg), out: n * L.Cout, judge }; }
     if (v.kind === "fast") return { code: Cv.conv2dFastWgsl(L), entry: "k_conv_fast", uniforms: Cv.packFastUniforms({ H: N, W: N, layer: L }),

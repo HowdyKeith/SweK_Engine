@@ -69,7 +69,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SELF = fileURLToPath(import.meta.url);
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
-const { VARIANTS, jobFor, measure, dumpStats } = await imp("render/denoiseCompile.mjs");
+const { VARIANTS, BUILD_PROBE, jobFor, measure, dumpStats } = await imp("render/denoiseCompile.mjs");
 
 // ---- THE CHILD: one kernel, one compiler, one process ----------------------------------------------------------
 // *** THE RESULT GOES TO A FILE. *** On the GTX 1080 (section 45) every native child exited 0 with its shader dump on
@@ -151,6 +151,13 @@ console.log("1. THE INSTRUMENT, ON THE CPU");
         `section 49: two entries left every use_dxc dump empty, on both GPUs -- got ${JSON.stringify(df)}`);
     let jobsOk = true; for (const v of VARIANTS) { const j = jobFor(v); jobsOk &&= typeof j.code === "string" && j.out > 0 && j.wg.length === 3; }
     ok(`  every kernel has a job: ${VARIANTS.map((v) => v.id).join(", ")}`, jobsOk);
+    // section 56: tools/denoiseBuildProbe.mjs's shapes -- ids unique, a job each, the candidates without the guarded copy of the
+    // channel loop and the diagnostics with it, r16a's and r16b's own last
+    const P = BUILD_PROBE, guarded = (v) => /if \(o0/.test(jobFor(v).code);
+    ok(`  the build probe's ${P.length} shapes (section 56) each have a job; edge zero has no guarded copy and edge skip has one; section 54's two kernels come last`,
+        new Set(P.map((v) => v.id)).size === P.length && P.every((v) => { const j = jobFor(v); return typeof j.code === "string" && j.out > 0 && j.wg.length === 3; }) &&
+        P.filter((v) => v.cfg).every((v) => guarded(v) === (v.cfg.edge === "skip")) && P[0].kind === "fast" && P.slice(-2).map((v) => v.id).join() === "tile2-skip-32,tile4-skip-32",
+        P.map((v) => v.id).join(", "));
 }
 
 const skip = H.headlessGpuSkipReason ? H.headlessGpuSkipReason() : null;

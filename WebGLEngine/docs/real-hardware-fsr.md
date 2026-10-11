@@ -174,6 +174,19 @@ node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise-r16.json
 
 Send the JSON back. Section 54 fixes, before any GPU runs the new kernel, what its numbers decide.
 
+**What happened (section 56).** On both GPUs every gate was stopped at the 30-minute cap, before it printed anything:
+node-webgpu never finished building the new kernel. Before round 16 is run again, a short probe builds ten shapes of
+the kernel, each in its own process and stopped at 3 minutes, natively and then in Chrome. On each GPU, on the same branch:
+
+```
+git fetch origin claude/denoiser-round16
+git checkout -B claude/denoiser-round16 FETCH_HEAD
+node tools/denoiseBuildProbe.mjs --out denoise-build-probe.json
+```
+
+It prints one line a shape as it goes, and takes at most about half an hour. Send `denoise-build-probe.json` back.
+Section 56 fixes, before it runs, what its results may choose.
+
 
 ## Send back
 

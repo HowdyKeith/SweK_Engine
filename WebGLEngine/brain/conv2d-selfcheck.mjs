@@ -53,6 +53,9 @@
 //       holds zero outside the image, so the tap adds a zero product, which is the skip except in the sign of a zero --
 //       which `===` does not see, and which WGSL lets an implementation ignore. The guard stays because the twin skips
 //       (the header's "skipping and adding a zero"), and no row holds it
+//   section 56, against edge "zero" (render/denoiseCompile-selfcheck.mjs alongside; restored, md5 verified):
+//   Z1  the tile's load stops zeroing taps left and right of the image          4 RED -- every edge-zero case, and no edge-skip one:
+//       edge zero adds what the tile holds outside the image, so its exactness IS the zero fill; edge skip never reads it
 //
 // *** S5 WAS EXPECTED TO GO ZERO RED AND DID NOT. *** A missing barrier is a race, and races hide on a device that
 // runs a workgroup's threads one after another. SwiftShader does run them in order -- which is exactly why it is
@@ -247,6 +250,12 @@ console.log("\n5c. THE PIXEL-TILED KERNEL'S SHAPE AND UNIFORM BLOCK, ON THE CPU 
         /fn k_conv_tile/.test(code) && (code.match(/@binding\(/g) || []).length === 3 && /var a1_7 = /.test(code) && !/var a2_0 = /.test(code) && !/var a1_8 = /.test(code) &&
         /var a3_3 = /.test(code4) && !/var a3_4 = /.test(code4) && !/var a4_0 = /.test(code4) && (code.match(/let w7 = F\.w\[w \+ 7u\];/g) || []).length === 1 &&
         /max\(a1_7, vec4<f32>\(0\.0\)\)/.test(code) && !/max\(a/.test(code4));
+    // section 56: edge "zero" drops the guarded copy of the channel loop; "skip" is the default and section 54's kernel
+    const zero = conv2dTileWgsl({ Cin: 32, Cout: 32, k: 3, act: "relu" }, { ...T2, edge: "zero" }), rEdge = refuse(() => conv2dTileWgsl({ Cin: 4, Cout: 4, k: 3 }, { px: 2, g4: 1, edge: "clamp" }));
+    ok("  edge \"zero\" (section 56): one channel loop a tap and no per-pixel bound test -- the tile's zero stands in for the skip; \"skip\" is the default, and any other edge is refused by name",
+        (zero.match(/for \(var cj/g) || []).length === 1 && (code.match(/for \(var cj/g) || []).length === 2 && !/o0/.test(zero) && /if \(o0 && o1\)/.test(code) &&
+        conv2dTileWgsl({ Cin: 32, Cout: 32, k: 3, act: "relu" }, T2) === conv2dTileWgsl({ Cin: 32, Cout: 32, k: 3, act: "relu" }, { ...T2, edge: "skip" }) &&
+        tileShape({ Cin: 32, Cout: 32, k: 3 }, { ...T2, edge: "zero" }).fits && /edge skip or zero/.test(rEdge || ""));
 }
 
 console.log("\n6. *** EVERY KERNEL ON THE DEVICE, CELL FOR CELL AGAINST THE TWIN ***");
@@ -332,14 +341,24 @@ else {
                 rt.ok && rf.ok ? `tile ${jt.fused} fused, fast ${jf.fused} fused of ${jt.n}` : (rt.reason || rf.reason) + " " + (rt.errors || []).join("; "));
         }
     }
+    // section 56: edge "zero" -- every tap of an in-image row added, the tile's zero outside the image -- on the same odd
+    // sizes, against the twin, and against edge "skip"'s bits where neither fused: adding a zero product is the skip but
+    // for the sign of a zero, which no `===` sees
+    for (const [a, cfg] of [[{ H: 21, W: 19, Cin: 10, Cout: 32, k: 3, act: "relu", seed: 41 }, { px: 2, g4: 8 }], [{ H: 19, W: 13, Cin: 32, Cout: 32, k: 3, act: "relu", seed: 43 }, { px: 4, g4: 4 }],
+                            [{ H: 11, W: 37, Cin: 13, Cout: 11, k: 3, act: "none", seed: 53 }, { px: 2, g4: 2 }], [{ H: 5, W: 3, Cin: 19, Cout: 6, k: 3, act: "relu", seed: 3 }, { px: 4, g4: 4 }]]) {
+        const [rz, rs] = [await tile(a, { ...cfg, edge: "zero" }), await tile(a, cfg)], jz = rz.ok ? judge(rz, a) : null, js = rs.ok ? judge(rs, a) : null;
+        ok(`!! edge zero, ${a.H} x ${a.W}, ${a.Cin} -> ${a.Cout}, ${cfg.px} px x ${tileShape(a, cfg).g4} vec4s: every cell explained -- and where neither fused, edge skip's own bits`,
+            rz.ok && rs.ok && jz.unexplained === 0 && (jz.fused || js.fused || Array.from(rz.values).every((v, i) => v === rs.values[i])),
+            rz.ok && rs.ok ? `zero ${jz.fused} fused, skip ${js.fused} fused of ${jz.n}` : (rz.reason || rs.reason) + " " + (rz.errors || []).join("; "));
+    }
     {
         const K = keyCpu({ H: 9, W: 21, C: 5 }), out = [];
-        for (const cfg of [{ px: 2, g4: 8 }, { px: 4, g4: 4 }]) {
+        for (const cfg of [{ px: 2, g4: 8 }, { px: 4, g4: 4 }, { px: 2, g4: 8, edge: "zero" }, { px: 4, g4: 4, edge: "zero" }]) {
             const kt = await H.runWgslComputeNative({ code: conv2dTileWgsl(K.layer, cfg), entryPoint: "k_conv_tile", outCount: K.x.length, uniforms: packTileUniforms({ H: K.H, W: K.W, layer: K.layer }, cfg),
                 workgroups: tileWorkgroups(K.H, K.W, K.layer, cfg), inputs: [{ binding: 2, data: K.x }] });
             out.push(kt.ok && K.x.every((v, i) => Math.fround(kt.values[i]) === v));
         }
-        ok("  the identity key on the device, 9 x 21: the pixel-tiled kernel returns its input bit for bit at 2 and at 4 pixels a thread", out.every(Boolean), out.join(", "));
+        ok("  the identity key on the device, 9 x 21: the pixel-tiled kernel returns its input bit for bit at 2 and at 4 pixels a thread, edge skip and edge zero", out.every(Boolean), out.join(", "));
     }
     {
         const K1 = keyCpu({ k: 1, C: 5 }), n = K1.H * K1.W, ka1 = { H: K1.H, W: K1.W, Cin: K1.layer.Cin, Cout: K1.layer.Cout, k: 1, act: "none" };
