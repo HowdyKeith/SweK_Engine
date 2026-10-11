@@ -1,5 +1,5 @@
 {
- "host": "linux-x64-4c-16gb-142c0d",
+ "host": "linux-x64-4c-16gb-420793",
  "note": "OBSERVED at the last quickSweep run: ms per gate (serial where a serial re-run happened) and exit code. *** `kinds` (v4579) SAYS WHICH QUANTITY EACH MS IS: `loaded` is a parallel reading taken with `workers` gates running at once, `alone` is a serial re-run, `capped` is the SIGKILL cap and not a runtime at all. The two real kinds sit about 1.93x apart (v4578), so comparing a ms against anything without knowing its kind is comparing two different quantities -- which is how nine entries came to hold the wrong one. *** Rewritten every run; used only to choose which gates are under the ship-time budget. Not a claim about the tree -- the register is. `at` is PER ENTRY (v4408): the capture that actually observed that gate. `captured` is this run's stamp and applies ONLY to entries whose `at` equals it -- the rest were not run and say so. `crossings` (v4536) counts CONSECUTIVE sweeps on which a gate came in over budget, and it takes two to evict: one crossing is a reading from one hour, and this box moves 12-36% between hours on unchanged code. A gate that comes back under loses its count entirely. `serial` (v4562) is the UNCONTENDED cost -- from a phase-2 run or from this sweep's rotating slice -- while `timings` is a sample taken while seven other gates fought for the box and runs a MEDIAN 2.41x above it. Ask costOf(), not timings[], for what a gate costs. `contended` (v4556) says WHICH of the two `timings[g]` is: true for a parallel sample, false for a serial reading filed there -- by a red re-run, a budget confirm, or sweepRotation. A ratio taken without it divides 164 measurements by themselves. Ask contentionPairs() for the population a contention ratio may be taken over.",
  "kindsInferred": [
   "brain/rl/dock-hazard-selfcheck.mjs",
@@ -97,7 +97,6 @@
   "tools/ship/floors-selfcheck.mjs",
   "tools/ship/galaxyProfile-selfcheck.mjs",
   "tools/ship/gateReach-selfcheck.mjs",
-  "tools/ship/gateSelection-selfcheck.mjs",
   "tools/ship/glbConformance-selfcheck.mjs",
   "tools/ship/gpuUniverse-selfcheck.mjs",
   "tools/ship/labDevices-selfcheck.mjs",
@@ -1331,7 +1330,7 @@
   "tools/ship/gateQuality-selfcheck.mjs": 1664,
   "tools/ship/gateReach-selfcheck.mjs": 20157,
   "tools/ship/gateReport-selfcheck.mjs": 15559,
-  "tools/ship/gateSelection-selfcheck.mjs": 69346,
+  "tools/ship/gateSelection-selfcheck.mjs": 13997,
   "tools/ship/gateSweep-selfcheck.mjs": 1826,
   "tools/ship/gateWalk-selfcheck.mjs": 682,
   "tools/ship/gatesBridge-selfcheck.mjs": 887,
@@ -1714,7 +1713,7 @@
   "tools/ship/staleness-selfcheck.mjs": 2059,
   "tools/ship/starField-selfcheck.mjs": 665,
   "tools/ship/stateOrb-selfcheck.mjs": 1483,
-  "tools/ship/statedRuntime-selfcheck.mjs": 1133,
+  "tools/ship/statedRuntime-selfcheck.mjs": 688,
   "tools/ship/stealthRace-selfcheck.mjs": 2225,
   "tools/ship/steamdeckLaunch-selfcheck.mjs": 1761,
   "tools/ship/steamdeckPeer-selfcheck.mjs": 1691,
@@ -5225,7 +5224,7 @@
   "tools/ship/gateQuality-selfcheck.mjs": "2026-10-11T00:24:10.613Z",
   "tools/ship/gateReach-selfcheck.mjs": "unknown -- before v4408",
   "tools/ship/gateReport-selfcheck.mjs": "2026-10-10T15:18:45.013Z",
-  "tools/ship/gateSelection-selfcheck.mjs": "2026-09-09T23:00:39.847Z",
+  "tools/ship/gateSelection-selfcheck.mjs": "2026-10-11T16:37:38.844Z",
   "tools/ship/gateSweep-selfcheck.mjs": "2026-10-11T00:24:10.613Z",
   "tools/ship/gateWalk-selfcheck.mjs": "2026-10-11T00:24:10.613Z",
   "tools/ship/gatesBridge-selfcheck.mjs": "2026-10-11T00:24:10.613Z",
@@ -5608,7 +5607,7 @@
   "tools/ship/staleness-selfcheck.mjs": "2026-10-11T00:24:10.613Z",
   "tools/ship/starField-selfcheck.mjs": "2026-10-11T00:24:10.613Z",
   "tools/ship/stateOrb-selfcheck.mjs": "2026-10-11T00:24:10.613Z",
-  "tools/ship/statedRuntime-selfcheck.mjs": "2026-10-11T00:24:10.613Z",
+  "tools/ship/statedRuntime-selfcheck.mjs": "2026-10-11T16:37:09.954Z",
   "tools/ship/stealthRace-selfcheck.mjs": "2026-10-11T00:24:10.613Z",
   "tools/ship/steamdeckLaunch-selfcheck.mjs": "2026-10-11T00:24:10.613Z",
   "tools/ship/steamdeckPeer-selfcheck.mjs": "2026-10-11T00:24:10.613Z",
@@ -7885,7 +7884,8 @@
   "brain/racePlay-selfcheck.mjs": 300000,
   "brain/pilotRoster-selfcheck.mjs": 300000,
   "brain/pilot6dofPolicy-selfcheck.mjs": 300000,
-  "tools/ship/murmurParity-selfcheck.mjs": 20000
+  "tools/ship/murmurParity-selfcheck.mjs": 20000,
+  "tools/ship/gateSelection-selfcheck.mjs": 120000
  },
  "finished": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": true,
@@ -11309,7 +11309,7 @@
   "tools/ship/staleness-selfcheck.mjs": 884,
   "tools/ship/starField-selfcheck.mjs": 275,
   "tools/ship/stateOrb-selfcheck.mjs": 585,
-  "tools/ship/statedRuntime-selfcheck.mjs": 1928,
+  "tools/ship/statedRuntime-selfcheck.mjs": 688,
   "tools/ship/stealthRace-selfcheck.mjs": 1054,
   "tools/ship/steamdeckLaunch-selfcheck.mjs": 5818,
   "tools/ship/steamdeckPeer-selfcheck.mjs": 810,
@@ -11812,7 +11812,8 @@
   "brain/racePlay-selfcheck.mjs": 18732,
   "brain/pilotRoster-selfcheck.mjs": 22674,
   "brain/pilot6dofPolicy-selfcheck.mjs": 5802,
-  "tools/ship/murmurParity-selfcheck.mjs": 124
+  "tools/ship/murmurParity-selfcheck.mjs": 124,
+  "tools/ship/gateSelection-selfcheck.mjs": 13997
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-10-07T13:02:00.256Z",
@@ -13145,7 +13146,7 @@
   "tools/ship/staleness-selfcheck.mjs": "2026-10-10T16:50:34.728Z",
   "tools/ship/starField-selfcheck.mjs": "2026-10-06T22:35:20.737Z",
   "tools/ship/stateOrb-selfcheck.mjs": "2026-10-08T15:27:40.204Z",
-  "tools/ship/statedRuntime-selfcheck.mjs": "2026-10-10T22:54:28.625Z",
+  "tools/ship/statedRuntime-selfcheck.mjs": "2026-10-11T16:37:09.954Z",
   "tools/ship/stealthRace-selfcheck.mjs": "2026-10-11T00:23:55.543Z",
   "tools/ship/steamdeckLaunch-selfcheck.mjs": "2026-10-08T15:09:56.486Z",
   "tools/ship/steamdeckPeer-selfcheck.mjs": "2026-10-10T16:35:09.445Z",
@@ -13648,7 +13649,8 @@
   "brain/racePlay-selfcheck.mjs": "2026-10-10T22:59:19.129Z",
   "brain/pilotRoster-selfcheck.mjs": "2026-10-10T22:58:55.934Z",
   "brain/pilot6dofPolicy-selfcheck.mjs": "2026-10-10T22:59:25.114Z",
-  "tools/ship/murmurParity-selfcheck.mjs": "2026-10-11T00:23:55.543Z"
+  "tools/ship/murmurParity-selfcheck.mjs": "2026-10-11T00:23:55.543Z",
+  "tools/ship/gateSelection-selfcheck.mjs": "2026-10-11T16:37:38.844Z"
  },
  "serialRing": {
   "tools/ship/frozenRecords-selfcheck.mjs": [
@@ -14822,9 +14824,9 @@
    1399
   ],
   "tools/ship/statedRuntime-selfcheck.mjs": [
-   8651,
-   8956,
-   1928
+   1377,
+   696,
+   688
   ],
   "tools/ship/stereographic-selfcheck.mjs": [
    2099,
@@ -22620,6 +22622,10 @@
   ],
   "tools/ship/murmurParity-selfcheck.mjs": [
    124
+  ],
+  "tools/ship/gateSelection-selfcheck.mjs": [
+   14413,
+   13997
   ]
  },
  "contended": {
@@ -23911,7 +23917,7 @@
   "tools/ship/staleness-selfcheck.mjs": true,
   "tools/ship/starField-selfcheck.mjs": true,
   "tools/ship/stateOrb-selfcheck.mjs": true,
-  "tools/ship/statedRuntime-selfcheck.mjs": true,
+  "tools/ship/statedRuntime-selfcheck.mjs": false,
   "tools/ship/stealthRace-selfcheck.mjs": true,
   "tools/ship/steamdeckLaunch-selfcheck.mjs": true,
   "tools/ship/steamdeckPeer-selfcheck.mjs": true,
@@ -24456,7 +24462,8 @@
   "brain/racePlay-selfcheck.mjs": false,
   "brain/pilotRoster-selfcheck.mjs": false,
   "brain/pilot6dofPolicy-selfcheck.mjs": false,
-  "tools/ship/murmurParity-selfcheck.mjs": true
+  "tools/ship/murmurParity-selfcheck.mjs": true,
+  "tools/ship/gateSelection-selfcheck.mjs": false
  },
  "kinds": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "loaded",
@@ -26046,7 +26053,7 @@
   "tools/ship/staleness-selfcheck.mjs": "loaded",
   "tools/ship/starField-selfcheck.mjs": "loaded",
   "tools/ship/stateOrb-selfcheck.mjs": "loaded",
-  "tools/ship/statedRuntime-selfcheck.mjs": "loaded",
+  "tools/ship/statedRuntime-selfcheck.mjs": "alone",
   "tools/ship/stealthRace-selfcheck.mjs": "loaded",
   "tools/ship/steamdeckLaunch-selfcheck.mjs": "loaded",
   "tools/ship/steamdeckPeer-selfcheck.mjs": "loaded",

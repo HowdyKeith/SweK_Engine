@@ -320,6 +320,18 @@ export const RECORD_HANDOVERS = Object.freeze([
         evidence: "boxId() read linux-x64-4c-16095mb-142c0d (Xeon @ 2.10GHz) at the v4818 rotation, which wrote 40 " +
                   "readings to sweep-timings.local.json and refused the shared record; that local file was deleted and " +
                   "the ledger it moved was restored. 142c0d held the record from v4813 to v4815." }),
+    // v4837 -- TO 420793 AGAIN, AND THIS TIME THE COST OF NOT HANDING IT OVER HAD COME DUE. The container has run on the
+    // 2.80GHz host since before v4832, so for five rounds every reading taken here went to .local.json or a per-box file:
+    // v4834's reportFresh reading reached the rig only through sweep-timings.<box>.json, and declaredCost's v4820 ratchet
+    // (statedRuntime and gateSelection, "paid when the record's owner re-times those two") had no owner present to pay
+    // it. Keith answered the ownership question with this box. A sandbox restart onto the other host is again one row.
+    Object.freeze({ at: "v4837", from: "linux-x64-4c-16gb-142c0d", to: "linux-x64-4c-16gb-420793",
+        decidedBy: "Keith",
+        evidence: "Keith's answer \"This box (420793)\" to the record-owner question on 2026-10-11. boxId() reads " +
+                  "linux-x64-4c-16gb-420793 (Intel Xeon @ 2.80GHz) at v4837; the shared record still named 142c0d " +
+                  "(@ 2.10GHz), last written 2026-10-11T00:24Z, and every write here since v4832 went to " +
+                  "sweep-timings.local.json or sweep-timings.linux-x64-4c-16gb-420793.json. 420793 held the record " +
+                  "from v4815 to v4818." }),
 ]);
 
 /** The box that may write a record whose `host` reads `host`, after following every handover. */

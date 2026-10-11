@@ -1,6 +1,8 @@
 // WebGLEngine/tools/ship/statedRuntime-selfcheck.mjs
 //
-// Run: node tools/ship/statedRuntime-selfcheck.mjs   (~1.6s — re-measured v4804: 1.6 s-1.6 s alone, 1.5 s the sweep's serial median; it read ~176 ms MEASURED, median of 153/188/176 at v4171 --
+// Run: node tools/ship/statedRuntime-selfcheck.mjs   (~0.8s — re-measured v4837 on the record's owner box: 558-627 ms alone (boxTimings, 3 runs), 688-1,377 ms
+//   in the rotation (median 696), with no arrival to re-run; each arrival it re-runs costs up to two runs of 4 s, which is why it read
+//   1.5 s here at v4820 and 8.6 s in the shared ring at v4815. It read ~1.6s at v4804, and ~176 ms MEASURED, median of 153/188/176 at v4171 --
 //   superseding a stated ~2s that ALSO said MEASURED, and which this file caught in ITSELF the moment it
 //   first had a recorded time to compare against. It had none until v4171, so the one gate whose whole
 //   job is comparing stated runtimes to measured ones had never been able to run that comparison on its
