@@ -8892,10 +8892,10 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The CLIs refuse an unknown option (cliArgs) and the peer's transport is a row of its own. Thirteen sabotages red by name, " +
                  "logged in the two headers. NOT CLOSED: the pair has run over loopback and in one browser, not between two machines.",
     }),
-    // v4833 -- THREE new gate files: tools/ship/poolWatch-selfcheck.mjs (what the quick sweep does not run, and a recorded red in it failing the ship), tools/ship/sysLagReading-selfcheck.mjs (the two rig readings as one
-    // command each, and the two backlog entries held to the code) and tools/ship/train6dofPilot-selfcheck.mjs (the tool that trains and ships the space-battle pilot). Built as v4832 while main shipped its own v4832.
-    since524: Object.freeze({
-        at: "v4833", swept: 3, green: 3, red: 0,
+    // v4834 -- since525, not since524: the shipVerdict readiness round took since524 on main in the same days. THREE new gate files: tools/ship/poolWatch-selfcheck.mjs (what the quick sweep does not run, and a recorded red in it failing the ship), tools/ship/sysLagReading-selfcheck.mjs (the two rig readings as one
+    // command each, and the two backlog entries held to the code) and tools/ship/train6dofPilot-selfcheck.mjs (the tool that trains and ships the space-battle pilot). Built as v4832 while main shipped its own v4832 and v4833.
+    since525: Object.freeze({
+        at: "v4834", swept: 3, green: 3, red: 0,
         added: Object.freeze([
             "tools/ship/poolWatch-selfcheck.mjs",
             "tools/ship/sysLagReading-selfcheck.mjs",
@@ -8910,6 +8910,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "champion choice (on the first recipe the train-best run was also the held-out-best), the trainer that accepts a worse child (a gentle search rarely finds a clearly worse one) and the pool-watch wiring row (it matched " +
                  "a file name verify.mjs's own comment spells). Each is fixed and re-sabotaged. NOT CLOSED: the rotation does not record input sets as it runs the over-budget pool (444 of 449 have none), so a pool reading's age is " +
                  "said and not closed; and the lag and device readings need the rig.",
+    }),
+    // v4833 -- NO new gate file -- shipVerdict asks whether the box can run the browser gates before it runs verify.
+    since524: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4833", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/shipVerdict-selfcheck.mjs (section 7: no Playwright, no browser on disk, and dxcompiler.dll missing beside a Windows shell each refuse before verify with the one command; sabotages A-E)",
+        ]),
+        verdict: "*** 103 OF THE RIG'S 104 v4819 REDS WERE ONE FACT, PRINTED ONCE PER GATE AFTER 898 s. *** shipVerdict.readiness() asks the " +
+                 "tree's own resolvers (playwrightResolve, ensureDxc) first and refuses with DO NOT SHIP -- NOT RUN, naming " +
+                 "`npm install` in tools/render-qa or `ensureDxc.mjs --write`, without starting verify. It fixes nothing itself. A stand-in " +
+                 "verify gets no readiness check, so the selfcheck's earlier drivers are unchanged. NOT CLOSED: on the rig, a clone " +
+                 "whose playwright resolves from a SIBLING copy reads as ready, which is what the sweep would use too.",
     }),
     // v4832 -- NO new gate file -- dracoEncode-selfcheck exits by process.exitCode (the rig's v4819 clone-verify crashed it on libuv's
     // UV_HANDLE_CLOSING assert), and wasmTeardown-selfcheck section 6 holds the conversion and measures the member live under the hook.

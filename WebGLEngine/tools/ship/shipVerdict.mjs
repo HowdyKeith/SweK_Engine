@@ -25,6 +25,9 @@ import { fileURLToPath } from "node:url";
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync, spawn } from "node:child_process";
+import { createRequire } from "node:module";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { ensureDxc, describe as describeDxc } from "./ensureDxc.mjs";
 
 // Anchored at line start and followed by a space -- the shape git writes. An unanchored match would trip on
 // prose about conflict markers and on any file that mentions one mid-line; this round's changelog is such a
@@ -143,13 +146,63 @@ export function interruptedTrailer(sig, ms, conflicts = null) {
     ].join("\n");
 }
 
+// *** v4833 -- A BOX THAT CANNOT RUN THE BROWSER GATES IS TOLD SO BEFORE THE SWEEP, NOT BY IT. ***
+//
+// Keith's clone-verify of v4819 ran 898 s and ended DO NOT SHIP on 104 new reds. 103 were ONE fact about the box:
+// the hand-typed clone route had no `npm install` in tools/render-qa, so Playwright did not resolve. verify printed
+// that fact once per gate, each copy with its fix at the end of a skip line, and no register names those reds, so
+// the run could not have passed. v4826's verify went DO NOT SHIP on four more that were one fact too: a fresh
+// install's Chrome folder with no dxcompiler.dll beside the headless shell, which tools/ship/ensureDxc.mjs exists
+// to put there. Both facts are knowable in milliseconds from the tree's own resolvers, so the verdict asks them
+// first and refuses WITHOUT running verify, naming the one command. It does not fix anything itself: ensureDxc's
+// header keeps copying into a browser cache a person's decision, and a npm install is a download.
+//
+// Each entry is { what } -- one line, the fact and the command. An empty list is "ready". Every input is injectable
+// so shipVerdict-selfcheck can drive the branches a box with Playwright and Linux never reaches.
+export function readiness({ resolve = () => resolvePlaywright(createRequire(import.meta.url)), shell = HEADLESS_SHELL,
+                            skipReason = browserSkipReason, dxc = () => ensureDxc({ write: false }) } = {}) {
+    const { chromium, from } = resolve();
+    const why = skipReason(chromium, from, shell);
+    if (why) return [{ what: "the browser gates cannot run here: " + why + (/to fix:/.test(why) ? "" :
+        " -- to fix: cd tools/render-qa && npx playwright install chromium chromium-headless-shell") }];
+    const d = dxc();
+    if (d && d.needed) return [{ what: "the WebGPU browser gates will die on requestDevice (dxcompiler.dll is not beside " +
+        "the headless shell in " + d.dest + ") -- " + (d.ok ? "to fix: node tools/ship/ensureDxc.mjs --write, once per " +
+        "`playwright install` that makes a new browser folder" : describeDxc(d)) }];
+    return [];
+}
+
+// Which readiness check a run gets. The REAL verify gets the real one; a stand-in verify (the selfcheck's drivers)
+// needs no browser, so it gets none unless one is passed. A function rather than a default parameter, so the
+// selfcheck can hold the choice without running a real verify to see it.
+export function chosenPreflight({ verifyPath = null, preflight } = {}) {
+    if (preflight !== undefined) return preflight;
+    return verifyPath ? null : readiness;
+}
+
+export function notReadyTrailer(items) {
+    return [
+        ...items.map((n) => `[ship]   not ready  ${n.what}`),
+        "",
+        `[ship] verify exit=none  not run -- ${items.length} fact(s) about this box above would turn every gate that needs it red`,
+        "[ship] DO NOT SHIP -- NOT RUN: this box is not ready to verify; fix what is named above and run this again",
+    ].join("\n");
+}
+
 // `verifyPath` is injectable so shipVerdict-selfcheck can drive THIS function, signals included, against a
 // stand-in verify rather than a twenty-minute sweep. The CLI below passes the real one.
-export async function main({ eng, argv = [], verifyPath = null, out = (m) => console.log(m), exit = (c) => process.exit(c) }) {
+export async function main({ eng, argv = [], verifyPath = null, preflight = undefined, out = (m) => console.log(m), exit = (c) => process.exit(c) }) {
     const root = path.resolve(eng, "..");
     const t0 = Date.now();
     let child = null;
     out(`[ship] shipVerdict pid ${process.pid} started ${new Date(t0).toISOString()}  node ${process.version} ${process.platform}`);
+    const pf = chosenPreflight({ verifyPath, preflight });
+    const notReady = pf ? pf() : [];
+    if (notReady.length) {
+        out(notReadyTrailer(notReady));
+        exit(1);
+        return { ship: false, notRun: true, reason: "NOT RUN: " + notReady.map((n) => n.what).join("; ") };
+    }
     for (const sig of CATCHABLE) {
         try {
             process.on(sig, () => {
