@@ -2938,3 +2938,46 @@ natively, and 8.05, 9.98 and 9.25 in the browser.
 
 **Still open.** A1 is untested on both GPUs (section 49). With the Dawn flags fixed, one more run of the compile gate on
 either GPU would test it, though it decides nothing.
+
+## 51. ROUNDS 14 AND 15 -- THE INTEL'S SECOND RUNS: THE SAME DECISIONS
+
+**What arrived.** Keith ran both rounds on the Intel again, on request. Both reports are committed byte for byte beside
+the first runs:
+
+| Round | Commit run | File | Committed at |
+|---|---|---|---|
+| 14 | 1a8eae2c (with section 45's fixes) | `render/denoise-rig-r14-intel-gen9-run2.json` | d4d49e4f |
+| 15 | 1c6f8cf2 | `render/denoise-rig-r15-intel-gen9-run2.json` | ed3815f8 |
+
+Neither commit carries section 49's Dawn-flags fix, so neither can test A1. Sections 49 and 50 were read off the first
+runs, as sections 43 and 46 fixed. These repeats check them and decide nothing.
+
+**Every gate verdict repeats.** The exact gates were green (42 s and 192 s), and so were the timing gates. Each compile
+gate was red on its dump row only: the `use_dxc` dumps were still empty.
+
+**Every decision repeats.** Each rule was re-run with the second run in place of the first.
+
+| Round | Rule | First run | Second run |
+|---|---|---|---|
+| 14 | page: r13 against r14, on the smaller GPU | 6.45 against 6.33 x: r13 | 6.58 against 6.02 x: r13 |
+| 14 | default: K1 for r14 on every GPU and path | holds: r14 | holds: r14 (6.59 x native, 6.02 x browser) |
+| 15 | page: r13, r14, r15, on the smaller GPU | 6.49, 6.33, 9.25 x: r15 | 6.47, 6.24, 9.59 x: r15 |
+| 15 | default: r14, r15, across every GPU and path | 6.33, 9.25 x: r15 | 6.24, 9.59 x: r15 |
+
+**What the second runs add.**
+- **The Intel's native half of measurement A was recorded on round 14's own commit this time.** Section 45's
+  result-file fix worked there.
+  - Under FXC, the fast 3 x 3 took 13.9 times longer to build than the tiled kernel (19.0 in round 15's repeat), so A3
+    is supported again.
+  - The head kernel took 1.376 ms against the direct head's 4.325, so A2 is supported again.
+- **The fast head under `use_dxc`** took 414 s to build and 1,345 ms a pass, against FXC's 359 s and 1,252 ms. As
+  before, that is FXC-like, but with no dump it is not A1.
+- **F1 on the Intel:** r15's merged pass was 6.87 times faster than r14's two in the browser at 1024 x 1024, and 10.40
+  times natively.
+- **F2 on the Intel:** the whole pass was 1.49 times faster in the browser and 2.05 times natively.
+- **The box was busier for some of it, and the paired ratios held.** In round 14's repeat, r12's 64 x 64 pass in the
+  browser took 44.2 ms against 30.0, and r14's native 1024 x 1024 took 1,807 ms against 1,090. The sets take turns on
+  one device (section 39), and that is why the ratios barely moved.
+
+**Still open:** A1. A compile-gate run at a commit with section 49's fix (5385886d or later on `claude/denoiser-round14`,
+or 5b66968f or later here) would test it.
