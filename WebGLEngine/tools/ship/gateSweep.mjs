@@ -8892,8 +8892,8 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The CLIs refuse an unknown option (cliArgs) and the peer's transport is a row of its own. Thirteen sabotages red by name, " +
                  "logged in the two headers. NOT CLOSED: the pair has run over loopback and in one browser, not between two machines.",
     }),
-    // v4838 -- NO new gate file -- the shared timing record handed to this box, and declaredCost's v4820 ratchet paid.
-    since528: Object.freeze({
+    // v4838 -- since529: main's v4837 took since528 on the same day. NO new gate file -- the shared timing record handed to this box, and declaredCost's v4820 ratchet paid.
+    since529: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened four.
         at: "v4838", swept: 0, green: 0, red: 0,
         added: Object.freeze([]),
@@ -8912,6 +8912,25 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "filed webcodecsFramesToMp4 skipped (ai-bridge's @napi-rs optionals absent here, present on 142c0d); installed, and " +
                  "the session-start hook now installs them. Step 4b found meshBVH (one ~4 ms timing) and avatarServerViews (a fixed sleep) " +
                  "red under load, both repaired. NOT CLOSED: a restart onto the other host strands the record again, one dated row away.",
+    }),
+    // v4837 -- since528, not since524..since527: four other rounds took them on main in the same days. THREE new gate files: tools/ship/poolWatch-selfcheck.mjs (what the quick sweep does not run, and a recorded red in it failing the ship), tools/ship/sysLagReading-selfcheck.mjs (the two rig readings as one
+    // command each, and the two backlog entries held to the code) and tools/ship/train6dofPilot-selfcheck.mjs (the tool that trains and ships the space-battle pilot). Built as v4832 while main shipped its own v4832 to v4836.
+    since528: Object.freeze({
+        at: "v4837", swept: 3, green: 3, red: 0,
+        added: Object.freeze([
+            "tools/ship/poolWatch-selfcheck.mjs",
+            "tools/ship/sysLagReading-selfcheck.mjs",
+            "tools/ship/train6dofPilot-selfcheck.mjs",
+        ]),
+        widened: Object.freeze([
+            "brain/pilot6dofPolicy-selfcheck.mjs (section 6: the reward, the seeds, the trainer, prune to a fixed point, the shipped file held to what it says about itself; the page's shipped and imported choices; ten more sabotages)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE FIRST SEARCH FOR THE SPACE-BATTLE PILOT TRAINED TO 8.62 AND HELD OUT AT 6.79, BELOW THE PILOT IT WAS TO REPLACE. *** It had learned the spawn jitter of its twelve seeds; the held-out and audit seeds exist for " +
+                 "that, and the tool picks its champion on the held-out ones only and reads the audit once. Three sabotages went 0 red on the first try, each for the same reason -- the row never reached the branch it guards: the " +
+                 "champion choice (on the first recipe the train-best run was also the held-out-best), the trainer that accepts a worse child (a gentle search rarely finds a clearly worse one) and the pool-watch wiring row (it matched " +
+                 "a file name verify.mjs's own comment spells). Each is fixed and re-sabotaged. NOT CLOSED: the rotation does not record input sets as it runs the over-budget pool (444 of 449 have none), so a pool reading's age is " +
+                 "said and not closed; and the lag and device readings need the rig.",
     }),
     // v4836 -- NO new gate file -- the sixteen three.js drafts moved to dev 11738a9.
     since527: Object.freeze({

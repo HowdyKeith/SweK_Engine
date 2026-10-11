@@ -90,12 +90,19 @@ export function audit({ rendered = new Set(), dir = null } = {}) {
     return { rows, owed: rows.filter((r) => r.state === "VERDICT-OWED"), receivedKinds: [...seen] };
 }
 
-export function owedLines(a) {
+export function owedLines(a, { port = null } = {}) {
     const out = [];
     if (!a.owed.length) return ["every page that owes a measurement has one on file"];
     out.push(`${a.owed.length} page(s) OWE A DEVICE VERDICT -- rendering them again cannot settle this:`);
     for (const r of a.owed) out.push(`  ${r.page}  (needs a "${r.kind}" submission)  -- ${r.what}`);
     out.push(`  received kinds so far: ${a.receivedKinds.length ? a.receivedKinds.join(", ") : "NONE"}`);
+    // v4832 -- with a port, the sheet to work from: the address of each page and the two clicks. The report goes to the hub (/android/submit) and lands in tools/roundhouse, which receivedKinds reads.
+    if (port != null) {
+        out.push("", `  TO CLOSE THEM, on a machine with a GPU, with the engine running on port ${port}: open each address, press "Run bench", then "Submit measurement to fleet ledger".`);
+        for (const r of a.owed) if (r.exists) out.push(`    http://127.0.0.1:${port}/${r.page}`);
+        for (const r of a.owed) if (!r.exists) out.push(`    ${r.page}  is not in this tree -- nothing to open`);
+        out.push("  Then run this command again: a page's line disappears once its report is on file. Commit tools/roundhouse to hand the reports back.");
+    }
     return out;
 }
 
@@ -104,5 +111,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     // v3342 -- NAME ITSELF. The front-door gate requires it and the requirement is right: two reports sharing
     // a terminal are unattributable otherwise. Missing since this file shipped one patch ago.
     console.log("[deviceOwed] which bench pages owe a verdict -- tools/render-qa/deviceOwed.mjs");
-    for (const l of owedLines(a)) console.log(l);
+    const pi = process.argv.indexOf("--port"), port = pi > 0 ? Number(process.argv[pi + 1]) : null;
+    if (pi > 0 && !(Number.isInteger(port) && port > 0 && port < 65536)) { console.error("deviceOwed: --port needs a port number, got " + JSON.stringify(process.argv[pi + 1])); process.exit(2); }
+    for (const l of owedLines(a, { port })) console.log(l);
 }
