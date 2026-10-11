@@ -152,6 +152,10 @@ the gates that are a frozen record's only guard and over the line. A mention in 
 labResults' fifteen minutes are no longer on the list. It exits 1 on any red, names each one and why it was run, and
 writes nothing.
 
+*** A SHALLOW CLONE CANNOT GRADE TWO OF THESE GATES (v4838). *** The route the tree prints clones `--depth 1`. `orreryFleet-selfcheck` reads git history and `budgetExile-selfcheck` runs it live, so on such a clone
+both read RED whatever the tree holds (measured on v4837: both exit 1 shallow, both exit 0 after `git fetch --unshallow`). `afterVerdict` now says `NOT GRADED` for them and exits 3 -- run `git fetch --unshallow` and
+the command again; do not treat either as a defect in the round, and do not treat exit 3 as a pass.
+
 ## 5. Commit and push (from the REPO ROOT, one level above WebGLEngine)
 
     git add -A WebGLEngine docs/CHANGELOG.md

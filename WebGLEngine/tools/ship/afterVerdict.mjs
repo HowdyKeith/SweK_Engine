@@ -1,4 +1,4 @@
-// WebGLEngine/tools/ship/afterVerdict.mjs -- v4835
+// WebGLEngine/tools/ship/afterVerdict.mjs -- v4835 (v4838: a shallow clone is reported NOT GRADED for the two gates that read history)
 //
 // Run: node tools/ship/afterVerdict.mjs [--list] [--timeout-s 900]
 //
@@ -65,11 +65,35 @@ export function plan({ gates = null, read, r = null } = {}) {
     return [...why.keys()].sort().map((g) => ({ gate: g, why: why.get(g) }));
 }
 
-/** Run each gate alone and serially. `run` is injectable so the gate can drive a red and a timeout cheaply. */
-export function runAll(list, { timeoutMs = 900000, cwd = ENG, out = (m) => console.log(m),
+// *** v4838 -- TWO GATES READ GIT HISTORY, AND THE PUBLISH ROUTE THE TREE PRINTS CLONES --depth 1. *** Keith's rig ran this command on the v4837 clone and got two REDs after an ALL GREEN verdict:
+// orreryFleet-selfcheck (29 s) and budgetExile-selfcheck (317 s). Neither was a defect in v4837. Reproduced here in a depth-1 clone of the same commit: orreryFleet-selfcheck names "0 commits" for
+// the recorded prefixes and reads "1 of 1 commits touch vendor/"; budgetExile-selfcheck runs the 17 gates of v4425's census live and one of them is orreryFleet-selfcheck, so it reads the same history
+// through it. Deepened with `git fetch --unshallow` (2,400 commits), both pass, unchanged. The verdict does not see it because the quick sweep skips both (over its line).
+// So a shallow clone cannot grade these two, and the command now says that instead of printing a red: they are NOT GRADED, the exit code is 3 (not 0, not 1), and the line names the one command that fixes it.
+export const NEEDS_HISTORY = Object.freeze({
+    "tools/ship/orreryFleet-selfcheck.mjs": "measures which commit last touched each vendored body with `git log`; a depth-1 clone holds one commit",
+    "tools/ship/budgetExile-selfcheck.mjs": "runs the 17 gates of v4425's census live, and orreryFleet-selfcheck is one of them (measured: red shallow, green deepened)",
+});
+
+/** Is the repository at `cwd` a shallow clone? `run` is injectable so the gate can drive both answers. */
+export function isShallow({ cwd = ENG, run = (args) => spawnSync("git", args, { cwd, encoding: "utf8", timeout: 20000 }) } = {}) {
+    const r = run(["rev-parse", "--is-shallow-repository"]);
+    return !!r && r.status === 0 && String(r.stdout).trim() === "true";
+}
+
+/** What the run came to: reds beat everything (1); gates that could not be graded come next (3) so a shallow clone is never read as a pass; otherwise 0. */
+export function outcome({ reds = [], ungraded = [], total = 0 } = {}) {
+    if (reds.length) return { code: 1, line: `${reds.length} RED -- fix before the rig is asked` + (ungraded.length ? `; ${ungraded.length} more NOT GRADED (shallow clone)` : "") };
+    if (ungraded.length) return { code: 3, line: `${total - ungraded.length} green, ${ungraded.length} NOT GRADED: this clone is shallow (depth 1) and ${ungraded.map((u) => u.gate).join(", ")} read git history. Run: git fetch --unshallow   and then this command again` };
+    return { code: 0, line: "all " + total + " green" };
+}
+
+/** Run each gate alone and serially. `run` is injectable so the gate can drive a red and a timeout cheaply. When `shallow`, the NEEDS_HISTORY gates are not run: they are pushed onto `ungraded` (if given). */
+export function runAll(list, { timeoutMs = 900000, cwd = ENG, out = (m) => console.log(m), shallow = false, ungraded = [],
                                run = (g) => spawnSync(process.execPath, [g], { cwd, timeout: timeoutMs, stdio: "ignore" }) } = {}) {
     const reds = [];
     for (const [i, p] of list.entries()) {
+        if (shallow && NEEDS_HISTORY[p.gate]) { ungraded.push({ gate: p.gate, why: NEEDS_HISTORY[p.gate] }); out(`  SKIP  ${i + 1}/${list.length}  ${p.gate}  -- needs git history; this clone is shallow (git fetch --unshallow)`); continue; }
         const t0 = Date.now();
         const r = run(p.gate);
         const ms = Date.now() - t0;
@@ -83,14 +107,15 @@ export function runAll(list, { timeoutMs = 900000, cwd = ENG, out = (m) => conso
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const cli = parseOrExit("afterVerdict", { values: { "--timeout-s": "number" }, flags: ["--list"] });
     const timeoutMs = (cli.values["--timeout-s"] || 900) * 1000;
-    const p = plan();
+    const p = plan(), shallow = isShallow();
     const readers = p.filter((x) => x.why.some((w) => w.startsWith("reads"))).length;
     const guards = p.filter((x) => x.why.some((w) => w.startsWith("the only guard"))).length;
     console.log(`[afterVerdict] ${p.length} gates: ${readers} read the timing record, ${guards} are a frozen record's only guard and over the sweep's line`);
-    if (cli.flags.has("--list")) { for (const x of p) console.log(`  ${x.gate}  -- ${x.why.join("; ")}`); }
+    if (shallow) console.log(`[afterVerdict] this is a SHALLOW clone: ${Object.keys(NEEDS_HISTORY).join(" and ")} read git history and will be reported NOT GRADED, not run`);
+    if (cli.flags.has("--list")) { for (const x of p) console.log(`  ${x.gate}  -- ${x.why.join("; ")}` + (shallow && NEEDS_HISTORY[x.gate] ? "  [needs history]" : "")); }
     else {
-        const reds = runAll(p, { timeoutMs });
-        console.log(`[afterVerdict] ${reds.length ? reds.length + " RED -- fix before the rig is asked" : "all " + p.length + " green"}`);
-        process.exitCode = reds.length ? 1 : 0;
+        const ungraded = [], reds = runAll(p, { timeoutMs, shallow, ungraded }), o = outcome({ reds, ungraded, total: p.length });
+        console.log(`[afterVerdict] ${o.line}`);
+        process.exitCode = o.code;
     }
 }

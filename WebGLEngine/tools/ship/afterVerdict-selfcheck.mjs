@@ -24,12 +24,21 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import * as AV from "./afterVerdict.mjs";
 import { reach } from "./recordReach.mjs";
+import { enumerateGates } from "./gateSweep.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const ROOT = path.resolve(ENG, "..");
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const say = (m) => console.log("  ----  " + m);
+// v4838 -- SECTION 5 (a shallow clone cannot grade the two gates that read git history). Six sabotages, each applied to tools/ship/afterVerdict.mjs, the gate run, the file restored (md5-identical):
+//   A  the shallow skip never fires (`false &&`)                          -> 1 RED (the not-run / not-red / named row)
+//   B  ungraded gates exit 0, which would read as a pass                   -> 1 RED (the exit-3 row)
+//   C  isShallow trusts stdout without the exit status. *** FIRST TRY WENT 0 RED: the "failed command" fixture printed nothing, so the check was never needed. The fixture is now a failed command that STILL printed "true". *** -> 1 RED
+//   D  a red no longer outranks the ungraded count (exit 1 -> 0 when ungraded) -> 1 RED
+//   E  a history gate misspelled in NEEDS_HISTORY (not a real gate)         -> 1 RED (the real-gates row)
+//   F  the command line never passes `shallow` on to runAll                  -> 1 RED (the wiring row)
+// MEASURED, NOT ARGUED: on a depth-1 clone of the v4837 commit orreryFleet-selfcheck and budgetExile-selfcheck both exit 1; after `git fetch --unshallow` (2,400 commits) both exit 0. Keith's rig saw exactly these two.
 console.log("afterVerdict-selfcheck -- step 4b is a command, and it runs what no ship-time step ran\n");
 
 console.log("1. the pattern moved out of the skill rather than being copied");
@@ -103,6 +112,36 @@ console.log("\n4. a red is named and the run says so; a timeout is a red");
     ok("--list prints the plan and runs nothing", l.status === 0 && /\[afterVerdict\] \d+ gates:/.test(l.stdout), (l.stdout || "").split("\n")[0]);
     const b = cli(["--lst"]);
     ok("...and a mistyped option is refused with exit 2 and the nearest spelling", b.status === 2 && /did you mean --list/.test(b.stderr), (b.stderr || "").split("\n")[0]);
+}
+
+console.log("\n5. a shallow clone cannot grade the two gates that read git history, and says so (v4838)");
+{
+    const names = Object.keys(AV.NEEDS_HISTORY), all = new Set(enumerateGates().map((g) => g.split(path.sep).join("/")));
+    ok("!! *** the history gates are real gates in this tree, each with a stated reason, and orreryFleet-selfcheck really runs `git log` ***",
+        names.length === 2 && names.every((g) => all.has(g) && AV.NEEDS_HISTORY[g].length > 20) &&
+        /execFileSync\("git", \["log"/.test(fs.readFileSync(path.join(ENG, "tools", "ship", "orreryFleet-selfcheck.mjs"), "utf8")), names.join(", "));
+    // a real shallow clone of a real two-commit repository, and the original: the answer is read from git, not typed
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "av-shallow-")), git = (cwd, ...a) => spawnSync("git", a, { cwd, encoding: "utf8" });
+    git(tmp, "init", "-q", "src"); const src = path.join(tmp, "src");
+    git(src, "config", "user.email", "t@t"); git(src, "config", "user.name", "t");
+    for (const n of [1, 2]) { fs.writeFileSync(path.join(src, "f.txt"), String(n)); git(src, "add", "-A"); git(src, "commit", "-q", "-m", "c" + n); }
+    git(tmp, "clone", "-q", "--depth", "1", "file://" + src, "shallow");
+    ok("!! isShallow() reads git: a depth-1 clone is shallow, its source is not, and a directory that is no repository is not", AV.isShallow({ cwd: path.join(tmp, "shallow") }) === true && AV.isShallow({ cwd: src }) === false && AV.isShallow({ cwd: os.tmpdir() }) === false);
+    fs.rmSync(tmp, { recursive: true, force: true });
+    ok('...and its injected answers: "true" is shallow; "false", a failed command that still printed "true", and no answer are not', AV.isShallow({ run: () => ({ status: 0, stdout: "true\n" }) }) && !AV.isShallow({ run: () => ({ status: 0, stdout: "false\n" }) }) && !AV.isShallow({ run: () => ({ status: 128, stdout: "true\n" }) }) && !AV.isShallow({ run: () => ({ status: null, stdout: "" }) }));
+    const calls = [], lines = [], fake = (g) => { calls.push(g); return { status: g.includes("fail") ? 1 : 0 }; };
+    const [H1, H2] = names, plan5 = [{ gate: "x/pass-selfcheck.mjs", why: ["f"] }, { gate: H1, why: ["f"] }, { gate: "x/fail-selfcheck.mjs", why: ["f"] }, { gate: H2, why: ["f"] }];
+    const ungraded = [], reds = AV.runAll(plan5, { shallow: true, ungraded, run: fake, out: (m) => lines.push(m) });
+    ok("!! *** on a shallow clone the two history gates are NOT RUN and are NOT reds -- they are ungraded, named, with the command that fixes it; the other gates run and a real red is still a red ***",
+        !calls.includes(H1) && !calls.includes(H2) && calls.length === 2 && ungraded.map((u) => u.gate).join() === names.join() && reds.length === 1 && reds[0].gate === "x/fail-selfcheck.mjs" &&
+        lines.filter((l) => /SKIP/.test(l) && /git fetch --unshallow/.test(l)).length === 2, lines.join(" | ").slice(0, 300));
+    calls.length = 0; const reds2 = AV.runAll(plan5, { shallow: false, ungraded: [], run: fake, out: () => {} });
+    ok("...and on a full clone the same plan runs ALL FOUR gates (the skip is the shallow clone's, never a standing exemption)", calls.length === 4 && calls.includes(H1) && calls.includes(H2) && reds2.length === 1);
+    const o0 = AV.outcome({ reds: [], ungraded: [], total: 57 }), o1 = AV.outcome({ reds: [{ gate: "a" }], ungraded: [{ gate: H1 }], total: 57 }), o3 = AV.outcome({ reds: [], ungraded: [{ gate: H1 }, { gate: H2 }], total: 57 });
+    ok("!! *** a run with ungraded gates exits 3 -- not 0 (that would read as a pass) and not 1 (that would read as a defect in the tree) ***; a red outranks it with 1; a clean run is 0",
+        o0.code === 0 && /all 57 green/.test(o0.line) && o1.code === 1 && /1 RED/.test(o1.line) && /1 more NOT GRADED/.test(o1.line) && o3.code === 3 && /55 green, 2 NOT GRADED/.test(o3.line) && /git fetch --unshallow/.test(o3.line), `${o0.code} / ${o1.code} / ${o3.code}: ${o3.line.slice(0, 120)}`);
+    const avSrc = fs.readFileSync(path.join(ENG, "tools", "ship", "afterVerdict.mjs"), "utf8");
+    ok("...and the command line is wired to all of it: it asks isShallow(), hands the answer to runAll, and exits with outcome()'s code", /isShallow\(\)/.test(avSrc) && /runAll\(p, \{ timeoutMs, shallow, ungraded \}\)/.test(avSrc) && /process\.exitCode = o\.code/.test(avSrc));
 }
 
 console.log(fails ? `\nafterVerdict-selfcheck: ${fails} FAILED` : "\nafterVerdict-selfcheck: all checks pass");
