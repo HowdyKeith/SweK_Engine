@@ -220,6 +220,7 @@ window.__esTacticsOutcome = (samples) => {
 import { buildUniverse, resolveLoadout, listGrudges, GRUDGE_TTL_MS, grudgeBlocs, readDesc, parseChar, CHAR } from "./ev/evData.js";
 import { ControlBits } from "./ev/controlbits.js";
 import { runEvChecks } from "./ev/evChecks.mjs";
+import { askBrain } from "./ui/brainAsk.mjs";   // v4831 -- the ship's computer's streamed ask; static, so the module census sees its one consumer
 import { voxelizeBall, exportVoxFromKinds } from "./tools/voxExporter.js";
 import { GalaxyMap } from "./ev/galaxyMap.js";
 import { SystemView } from "./ev/systemView.js";
@@ -1572,7 +1573,6 @@ async function askComputer() {
   const q = ($("askInput").value || "").trim(); if (!q) return;
   const out = $("askAnswer"); out.innerHTML = '<span style="color:var(--dim)">thinking\u2026</span>';
   ensureComputerOrb();
-  const { askBrain } = await import("./ui/brainAsk.mjs");
   const r = await askBrain(q, { k: 4, dispatch: (d) => {
     try { window.dispatchEvent(new CustomEvent("engine:brainStage", { detail: d })); } catch (e) {}
     if (d.stage === "search-start") out.innerHTML = '<span style="color:var(--dim)">searching the record\u2026</span>';

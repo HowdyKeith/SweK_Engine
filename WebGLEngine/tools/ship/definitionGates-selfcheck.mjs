@@ -333,7 +333,7 @@ const cov = definitionCoverage(ENG);
     // v4831 named the last six, each in a row that EXERCISES it rather than mentions it (probeHalfWrite read back on both
     // backends, READINGS_PATH opened by its default reader, CLI_SPEC parsing, the three software-GL flag lists checked
     // against the rig runs that settled them). 696 is what the census reads with the 13 named and the 7 kept.
-    // SABOTAGE, restored: one new unnamed `export const` added to tools/ship/adapterRecord.mjs -> RED, "GREW to 697".
+    // SABOTAGE, restored: one new unnamed `export const` added to the adapter-record module (the one tools/ship/adapterRecord-selfcheck.mjs gates) -> RED, "GREW to 697".
     const BASELINE_SHAPES = 696;   // v4535: 582, post-v4297-sweep: 639, post-v4622-merge: 678, post-v4645-merge: 703, v4831: 696 -- ratchets down, never up
     const shapesWide = definitionCoverage(ENG, "", { shapes: "all" });
     const shapesPhys = definitionCoverage(ENG, "physics", { shapes: "all" });

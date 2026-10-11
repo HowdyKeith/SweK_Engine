@@ -7,6 +7,7 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { treePaths } from "./treeRead.mjs";
 import { adapterKey, verdict, describe, coverage, owedCount,
          compareFor, boundFrom, SLACK, readReadings, recordReading, mergeRecords, READINGS_PATH } from "./adapterRecord.mjs";
@@ -212,7 +213,8 @@ console.log("\n6. *** THE POPULATION, COUNTED RATHER THAN REMEMBERED ***");
 // default call returns. SABOTAGE, restored: READINGS_PATH pointed at "adapter-readings.local.json" -> RED (untracked,
 // and the default reads nothing).
 {
-    const rel = path.relative(path.resolve(path.dirname(new URL(import.meta.url).pathname), "..", ".."), READINGS_PATH).replace(/\\/g, "/");
+    // fileURLToPath, not new URL(...).pathname: on Windows the latter is "/C:/..." and is no path at all (tools/ship/winPathGuard-selfcheck.mjs)
+    const rel = path.relative(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".."), READINGS_PATH).replace(/\\/g, "/");
     let rec = null; try { rec = JSON.parse(fs.readFileSync(READINGS_PATH, "utf8")); } catch {}
     const gates = rec && rec.gates ? Object.keys(rec.gates) : [];
     const same = gates.every((g) => JSON.stringify(readReadings(g)) === JSON.stringify(rec.gates[g]) &&

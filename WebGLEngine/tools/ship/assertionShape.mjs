@@ -895,8 +895,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // (the gate's own drift row named exactly these four).
     // v4827 -- 1937 -> 1939 for brain/roster-selfcheck.mjs and brain/racePlay-selfcheck.mjs. usesOk, definesOk and nameFirst each by two; the rest hold (the drift row named exactly these four).
     // v4830 -- 1940 -> 1942 for brain/pilotRoster-selfcheck.mjs and brain/pilot6dofPolicy-selfcheck.mjs, over v4829's murmurParity-selfcheck.mjs (1939 -> 1940). usesOk, definesOk and nameFirst each by two; the rest hold (the drift row named exactly these four).
-    gates: 1942, usesOk: 1921, definesOk: 1913, importsOk: 0,
-    distinctDefinitions: 42, nameFirst: 1813, condFirst: 97, unknownSignature: 11,
+    // v4831 -- 1942 -> 1944 for tools/ship/publishHygiene-selfcheck.mjs and tools/ship/brainStages-selfcheck.mjs. usesOk, definesOk and nameFirst each by two; the rest hold (the drift row named exactly these four).
+    gates: 1944, usesOk: 1923, definesOk: 1915, importsOk: 0,
+    distinctDefinitions: 42, nameFirst: 1815, condFirst: 97, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

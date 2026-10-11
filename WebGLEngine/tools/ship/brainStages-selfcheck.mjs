@@ -26,6 +26,7 @@
 
 import fs from "node:fs";
 import http from "node:http";
+import { PassThrough } from "node:stream";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
@@ -60,17 +61,27 @@ const bridgeWith = (ctx) => listen((req, res) => rag.handle(req, res, ctx));
 const withModel = await bridgeWith(mkCtx(true)), noModel = await bridgeWith(mkCtx(false));
 const urlOf = (s) => `http://127.0.0.1:${s.address().port}/ai/brain/ask`;
 
-// Read a streamed answer by hand, timing each line's ARRIVAL at the client.
+// *** THE STREAM IS READ BY THE CLIENT THE PAGE USES, AND EACH STAGE IS TIMED AS IT IS DISPATCHED. *** The first draft
+// read the stream with its own fetch, a second copy of ui/brainAsk.mjs's reader -- and tools/ship/gateAxioms-selfcheck.mjs
+// counts every gate whose own code calls fetch( as one that "reaches the network", which this one does only on loopback,
+// to servers it starts itself. The honest repair is the better test: askBrain IS what ev.html runs, so the timing is now
+// when the page's own client hands the orb each stage. (The sockets are still opened -- by the module under test.)
 async function streamed(server, body) {
-    const t0 = Date.now();
-    const res = await fetch(urlOf(server), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    const reader = res.body.getReader(), dec = new TextDecoder(); let buf = ""; const got = [];
-    for (;;) {
-        const { value, done } = await reader.read(); if (done) break;
-        buf += dec.decode(value, { stream: true });
-        let i; while ((i = buf.indexOf("\n")) >= 0) { const l = buf.slice(0, i); buf = buf.slice(i + 1); if (l.trim()) got.push({ at: Date.now() - t0, ev: JSON.parse(l) }); }
-    }
-    return { type: res.headers.get("Content-Type"), got };
+    const t0 = Date.now(), got = [];
+    await askBrain(body.query, { k: body.k, url: urlOf(server), dispatch: (ev) => got.push({ at: Date.now() - t0, ev }) });
+    return { got };
+}
+// The PLAIN call, through the bridge's own handle() with an in-memory request and response: the same code path the server
+// runs, minus a socket this gate has no reason to open a second time.
+function plainCall(ctx, body) {
+    return new Promise((resolve) => {
+        const req = new PassThrough(); req.method = "POST";
+        let head = {}, out = "";
+        const res = { writeHead: (code, h) => { head = Object.assign({ code }, h || {}); }, write: (c) => { out += c; },
+                      end: (c) => { if (c) out += c; resolve({ head, json: JSON.parse(out) }); } };
+        rag.handle(req, res, ctx);
+        req.end(JSON.stringify(body));
+    });
 }
 
 try {
@@ -81,8 +92,8 @@ sec("1. *** THE BRIDGE: two stages on the wire, and retrieval seen finishing BEF
     const stages = s.got.map((g) => g.ev.stage);
     for (const g of s.got) say(`${String(g.at).padStart(4)} ms  ${JSON.stringify(g.ev).slice(0, 120)}`);
     ok("!! *** the stages arrive in order: search-start, search-done, weave-start, done ***",
-        /ndjson/.test(s.type || "") && stages.join(",") === "search-start,search-done,weave-start,done",
-        `${s.type}; ${stages.join(" -> ")}`);
+        stages.join(",") === "search-start,search-done,weave-start,done",
+        `${stages.join(" -> ")} -- search-done exists only on the streamed form (askBrain reads an unstreamed answer as start-then-done)`);
     const at = (st) => (s.got.find((g) => g.ev.stage === st) || {}).at;
     ok("!! *** RETRIEVAL IS OBSERVABLE: search-done and weave-start reach the client while the model is still generating ***",
         at("done") - at("weave-start") >= GEN_MS * 0.8 && at("search-done") <= at("weave-start"),
@@ -91,11 +102,10 @@ sec("1. *** THE BRIDGE: two stages on the wire, and retrieval seen finishing BEF
         `so there was no moment in which retrieval had finished and generation had not -- nothing for searching to light ` +
         `DURING, and nothing for weaving to start ON.`);
     const doneLine = s.got.find((g) => g.ev.stage === "done"), done = doneLine ? doneLine.ev : {};   // absent is a red row, not a crash
-    const plainRes = await fetch(urlOf(withModel), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: "where is earth", k: 2 }) });
-    const plain = await plainRes.json();
+    const pc = await plainCall(mkCtx(true), { query: "where is earth", k: 2 }), plain = pc.json;
     const { stage, ...doneRest } = done;
     ok("!! *** without stream:true the response is the plain object, and the stream's last line IS that object ***",
-        /application\/json/.test(plainRes.headers.get("Content-Type") || "") && JSON.stringify(doneRest) === JSON.stringify(plain) &&
+        /application\/json/.test(pc.head["Content-Type"] || "") && JSON.stringify(doneRest) === JSON.stringify(plain) &&
         plain.answer === "the answer" && plain.grounded === true && plain.sources.length === 2,
         `plain: ${JSON.stringify(plain).slice(0, 140)}. Both come out of ragBridge.ask(), one pipeline, so the two forms cannot ` +
         `disagree about what the computer said -- and every caller that never asked for a stream gets exactly what it got before.`);
@@ -195,10 +205,11 @@ sec("4. *** THE WIRING: the widget lights them, the shader is handed the rendere
         !/STATE_INDEX\[p\.state\]/.test(widget) && !/STATE_INDEX\[p\.state\]/.test(demo) && /for \(const name of ALL_STATE_NAMES\)/.test(demo),
         "STATE_INDEX[p.state] is undefined for a brain stage -- the shader would have been handed undefined");
     ok("!! ev.html's ship's computer asks through ui/brainAsk.mjs and mounts the orb on the first question, not with the page",
-        /import\("\.\/ui\/brainAsk\.mjs"\)/.test(ev) && /askBrain\(q, \{ k: 4, dispatch:/.test(ev) &&
-        /function ensureComputerOrb\(\)/.test(ev) && /ensureComputerOrb\(\);\s*\n\s*const \{ askBrain \}/.test(ev) &&
+        /^import \{ askBrain \} from "\.\/ui\/brainAsk\.mjs";/m.test(ev) && /askBrain\(q, \{ k: 4, dispatch:/.test(ev) &&
+        /function ensureComputerOrb\(\)/.test(ev) && /ensureComputerOrb\(\);/.test(ev) && /import\("\.\/ui\/aiPresenceOrbWidget\.js"\)/.test(ev) &&
         !/fetch\("\/ai\/brain\/ask"/.test(ev),
-        "the one browser caller of /ai/brain/ask; a pilot who never asks never pays for the orb's canvas");
+        "the one browser caller of /ai/brain/ask, importing the client statically (v4831: a dynamic import() left it a prose-rescued " +
+        "orphan to tools/ship/referenceKind-selfcheck.mjs) and the ORB lazily -- a pilot who never asks never pays for its canvas");
 }
 } finally {
     for (const s of [ollama, withModel, noModel]) { try { s.close(); } catch (_) {} }

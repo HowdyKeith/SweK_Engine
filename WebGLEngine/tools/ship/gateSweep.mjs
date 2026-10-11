@@ -8892,6 +8892,25 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The CLIs refuse an unknown option (cliArgs) and the peer's transport is a row of its own. Thirteen sabotages red by name, " +
                  "logged in the two headers. NOT CLOSED: the pair has run over loopback and in one browser, not between two machines.",
     }),
+    // v4831 -- TWO new gate files: tools/ship/publishHygiene-selfcheck.mjs (what a release can carry, and the publish commands the GitHub
+    // panel prints) and tools/ship/brainStages-selfcheck.mjs (the ship's computer's two stages on the wire, and the orb states on them).
+    since522: Object.freeze({
+        at: "v4831", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "tools/ship/publishHygiene-selfcheck.mjs",
+            "tools/ship/brainStages-selfcheck.mjs",
+        ]),
+        widened: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THREE CLONES OF THE ENGINE WERE ONE PACK AWAY FROM A PUBLIC RELEASE, AND THE TEXT THAT PUT THEM THERE HAD NO GATE. *** The " +
+                 "GitHub panel's exported publish commands cloned to \"../\" from WebGLEngine/ -- inside the project -- and packed to a folder the " +
+                 "packer refuses. They are ui/publishCommands.mjs now, walked like a shell by publishHygiene (clone beside the project, pack beside " +
+                 "both, gh handed the zip the packer wrote, pushd/popd back), and the packer skips a clone and the rig's Tasker state by name. The " +
+                 "three published zips were downloaded and checked: none carried either. brainStages drives ai-bridge/ragBridge.js over real HTTP " +
+                 "against a stand-in model that takes 300 ms: retrieval is now seen finishing ~300 ms before the answer, which the single fetch it " +
+                 "replaces could never show -- so the presence orb's searching (rendered as thinking) and weaving (as responding, brighter with " +
+                 "more sources) have a moment to light up during. Seven sabotages each, red by name.",
+    }),
     // v4830 -- since521, not since520: the murmur parity round took since520 on main in the same days. TWO new gate files: brain/pilotRoster-selfcheck.mjs (who flies each side of the plane dogfight, and the Load Pilots panel on es-box3d-fly3d.html) and
     // brain/pilot6dofPolicy-selfcheck.mjs (a learned pilot with the PD autopilot's contract, and the same panel on es-box3d-6dof.html).
     since521: Object.freeze({
