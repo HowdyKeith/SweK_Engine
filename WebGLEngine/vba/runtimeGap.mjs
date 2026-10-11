@@ -1166,8 +1166,10 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // tools/ship/brainStages-selfcheck.mjs on gateAxioms).
     // v4834 -- ES modules 4320 -> 4321, closures 4166 -> 4167: tools/ship/reportFresh-selfcheck.mjs; the other rows hold.
     // v4835 -- ES modules 4321 -> 4323, closures 4167 -> 4169: tools/ship/afterVerdict.mjs and its gate; the other rows hold.
+    // v4838 -- performance.now 245 -> 246: tools/ship/meshBVH-selfcheck.mjs times its speedup rows on it now (the fastest of
+    // several runs, step 4b's repair); the other rows hold.
     esModules: 4323, closures: 4169, asyncAwait: 1735, typedArrays: 1274, promises: 417,
-    fetchXhr: 251, performanceNow: 245, raf: 127, webgl: 200, webgpu: 57, threads: 25, wasm: 24,
+    fetchXhr: 251, performanceNow: 246, raf: 127, webgl: 200, webgpu: 57, threads: 25, wasm: 24,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.
