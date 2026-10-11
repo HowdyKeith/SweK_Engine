@@ -18,6 +18,7 @@
 //   F  verify.mjs: the call to poolWatch removed                        -> RED (the wiring row). FIRST TRY WENT 0 RED: the row matched /poolWatch\.mjs/, and verify.mjs's own comment spells that name; it now matches the import() call itself
 //   G  the committed record given an unregistered exit 1 on an over-budget gate -> RED (the live row, naming the gate and the command that re-runs it)
 //   H  describe(): the unregistered count left out                      -> RED (the one-line row)
+//   I  AGE_BUCKETS: the month window 30 -> 31 days                      -> 1 RED (the AGE_BUCKETS row)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -58,6 +59,7 @@ ok("a gate the tree no longer enumerates is ignored even when the record carries
 ok("the age census buckets each reading: 2 h and 3 d and 10 d and 100 d -> a day, a week, a month, older; the oldest is d at 100 days",
     c.ages["within a day"] === 1 && c.ages["within a week"] === 1 && c.ages["within a month"] === 1 && c.ages.older === 1 && c.ages["no date"] === 0 && c.oldest && c.oldest.gate === "d-selfcheck.mjs" && c.oldest.days === 100,
     J(c.ages) + " oldest " + J(c.oldest));
+ok("AGE_BUCKETS are the three windows the census counts, narrowest first (a day, a week, a month), and each is a key of the census' own age table", Object.isFrozen(PW.AGE_BUCKETS) && PW.AGE_BUCKETS.length === 3 && PW.AGE_BUCKETS.every(([name, ms], i, a) => name in c.ages && (!i || ms > a[i - 1][1])) && PW.AGE_BUCKETS[0][1] === D && PW.AGE_BUCKETS[2][1] === 30 * D, PW.AGE_BUCKETS.map((b) => b[0]).join(", "));
 const undated = PW.census({ budgetMs: 3000, timings: { "g-selfcheck.mjs": 9000 }, codes: { "g-selfcheck.mjs": 0 }, at: {} }, { now: NOW });
 ok("a reading with no date is counted as such, not given an age it does not have", undated.ages["no date"] === 1 && undated.oldest === null);
 ok("with no `enumerated` list the whole record is the pool (a caller that cannot name the live gates is not silently narrowed)", PW.census(rec, { now: NOW }).pool.includes("f-selfcheck.mjs"));

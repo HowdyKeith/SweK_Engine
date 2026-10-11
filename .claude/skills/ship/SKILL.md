@@ -97,6 +97,15 @@ again; it costs a file read.
 A step nobody is asked for happens when somebody remembers -- step 7 is the tree's measurement of what
 remembering is worth, at 1.1% over 261 rounds. This step is written down for that reason.
 
+## 3c. What a NEW gate or a NEW command-line tool owes (v4833 -- the first verdict of that round said DO NOT SHIP four ways)
+
+- **A tool with exports needs a caller that is not a gate**, or the orphan census (graveyard 188, referenceKind 333) goes up and the verdict goes red. Split it: a library the gate holds (`tools/ship/x.mjs`) and
+  an export-free command that imports it (`tools/ship/takeX.mjs`, the way `lagBlameWatch.mjs` has no exports on purpose). Name the library after its gate, or definitionGates calls its exports unnamed.
+- **On a box that does not own the shared timing record** (the rotation or verdict prints `NOT writing sweep-timings.json: the record belongs to ...`), a new gate is in no record and the drift pre-flight,
+  recordDrift and timingKind go red together. Before the verdict: `node tools/ship/boxTimings.mjs --record <gate>,<gate>` writes this box's tracked per-box record. The sweep also runs far more gates alone on such a
+  box (362 at v4833, a 25-minute verdict): that is the box being foreign, not a regression.
+- **`[verify] pool (...)` lines** say what the quick sweep did NOT run (the over-budget gates). A recorded red there that no register names fails the ship (tools/ship/poolWatch.mjs); fix it, never register it.
+
 ## 4. Verify
 
     node tools/ship/shipVerdict.mjs --version vNNNN --markers "SweK Dictate,/dictate/type"; echo "exit=$?"

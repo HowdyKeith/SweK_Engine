@@ -8892,6 +8892,25 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The CLIs refuse an unknown option (cliArgs) and the peer's transport is a row of its own. Thirteen sabotages red by name, " +
                  "logged in the two headers. NOT CLOSED: the pair has run over loopback and in one browser, not between two machines.",
     }),
+    // v4833 -- THREE new gate files: tools/ship/poolWatch-selfcheck.mjs (what the quick sweep does not run, and a recorded red in it failing the ship), tools/ship/sysLagReading-selfcheck.mjs (the two rig readings as one
+    // command each, and the two backlog entries held to the code) and tools/ship/train6dofPilot-selfcheck.mjs (the tool that trains and ships the space-battle pilot). Built as v4832 while main shipped its own v4832.
+    since524: Object.freeze({
+        at: "v4833", swept: 3, green: 3, red: 0,
+        added: Object.freeze([
+            "tools/ship/poolWatch-selfcheck.mjs",
+            "tools/ship/sysLagReading-selfcheck.mjs",
+            "tools/ship/train6dofPilot-selfcheck.mjs",
+        ]),
+        widened: Object.freeze([
+            "brain/pilot6dofPolicy-selfcheck.mjs (section 6: the reward, the seeds, the trainer, prune to a fixed point, the shipped file held to what it says about itself; the page's shipped and imported choices; ten more sabotages)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE FIRST SEARCH FOR THE SPACE-BATTLE PILOT TRAINED TO 8.62 AND HELD OUT AT 6.79, BELOW THE PILOT IT WAS TO REPLACE. *** It had learned the spawn jitter of its twelve seeds; the held-out and audit seeds exist for " +
+                 "that, and the tool picks its champion on the held-out ones only and reads the audit once. Three sabotages went 0 red on the first try, each for the same reason -- the row never reached the branch it guards: the " +
+                 "champion choice (on the first recipe the train-best run was also the held-out-best), the trainer that accepts a worse child (a gentle search rarely finds a clearly worse one) and the pool-watch wiring row (it matched " +
+                 "a file name verify.mjs's own comment spells). Each is fixed and re-sabotaged. NOT CLOSED: the rotation does not record input sets as it runs the over-budget pool (444 of 449 have none), so a pool reading's age is " +
+                 "said and not closed; and the lag and device readings need the rig.",
+    }),
     // v4832 -- NO new gate file -- dracoEncode-selfcheck exits by process.exitCode (the rig's v4819 clone-verify crashed it on libuv's
     // UV_HANDLE_CLOSING assert), and wasmTeardown-selfcheck section 6 holds the conversion and measures the member live under the hook.
     // Built as a local v4829 while main shipped its own v4829-v4831, so it ships as v4832; the local commit was never pushed.

@@ -1,11 +1,11 @@
-// WebGLEngine/tools/ship/lagReading.mjs -- v4832
+// WebGLEngine/tools/ship/sysLagReading.mjs -- v4833 (the library; the command is tools/ship/takeLagReading.mjs)
 //
 // THE ONE READING THE LAG QUESTION HAS BEEN WAITING FOR, TAKEN WITH ONE COMMAND. tools/ship/nextRounds.mjs' `sys-lag-reading` has said since v3317 that the steady ~22% periodic cost on Keith's rig is unowned
 // and that "only a reading tells us which callback owns it". The reading is four GETs against the running engine after a few minutes of uptime; this tool waits for the uptime, takes all four, saves them
 // whole, and prints the part worth pasting back:
 //
-//     node tools\ship\lagReading.mjs [port]            default port 8787; waits for 300 s of engine uptime
-//     node tools\ship\lagReading.mjs 8787 --min-uptime-s 600 --out C:\temp\lag.json
+//     node tools\ship\takeLagReading.mjs [port]            default port 8787; waits for 300 s of engine uptime
+//     node tools\ship\takeLagReading.mjs 8787 --min-uptime-s 600 --out C:\temp\lag.json
 //
 //   GET /health        uptimeSec -- so "a few minutes" is checked, not assumed
 //   GET /sys/lag       the event loop's blocked intervals: cumulative blocked ms, the worst, and the 25 worst events as (atMs since boot, lagMs). NOT the callbacks.
@@ -20,10 +20,7 @@
 // out. The duty cycle is blockedMsTotal over uptime and undercounts once truncated. Nothing here names a callback by inference: the owner is whatever /sys/blame lists, and an empty list is a finding too (it
 // means no setInterval callback ran 250 ms in one tick -- the cost is in something that is not an interval).
 "use strict";
-import fs from "node:fs";
 import os from "node:os";
-import path from "node:path";
-import { pathToFileURL } from "node:url";
 
 export const ENDPOINTS = Object.freeze({ health: "/health", lag: "/sys/lag", blame: "/sys/blame", slow: "/sys/slow", lagblame: "/sys/lagblame" });
 export const DEFAULT_PORT = 8787, DEFAULT_MIN_UPTIME_S = 300;
@@ -56,7 +53,7 @@ export function analyse({ health = null, lag = null, blame = null, slow = null }
 
 /** The block to paste back: short, and every number in it is one the reading carries. */
 export function summaryLines(a, { host = os.hostname(), port = DEFAULT_PORT } = {}) {
-    const out = [`[lagReading] ${host}:${port}  uptime ${a.uptimeSec == null ? "?" : a.uptimeSec + " s"}`];
+    const out = [`[sysLagReading] ${host}:${port}  uptime ${a.uptimeSec == null ? "?" : a.uptimeSec + " s"}`];
     out.push(`  blocked ${a.blockedMsTotal == null ? "?" : (a.blockedMsTotal / 1000).toFixed(1) + " s"} in total` +
         (a.dutyCycle == null ? "" : ` = ${(a.dutyCycle * 100).toFixed(1)}% of uptime`) + `, worst single block ${a.worstMs == null ? "?" : a.worstMs + " ms"}`);
     if (a.period) out.push(`  the worst events are ${a.period.periodic ? "PERIODIC" : "not clearly periodic"}: median gap ${(a.period.medianGapMs / 1000).toFixed(1)} s, ${a.period.withinFifteenPct} of ${a.period.of} gaps within 15% of it`);
@@ -97,23 +94,4 @@ export async function takeReading({ port = DEFAULT_PORT, minUptimeS = DEFAULT_MI
     const [lag, blame, slow, lagblame] = await Promise.all([ENDPOINTS.lag, ENDPOINTS.blame, ENDPOINTS.slow, ENDPOINTS.lagblame].map((r) => getJson(base, r, fetchImpl)));
     const reading = { format: "swek-lag-reading-v1", at: new Date(now()).toISOString(), host: os.hostname(), port, health, lag, blame, slow, lagblame };
     return { reading, analysis: analyse({ health, lag, blame, slow }) };
-}
-
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-    const argv = process.argv.slice(2), opts = { port: DEFAULT_PORT, minUptimeS: DEFAULT_MIN_UPTIME_S, out: null };
-    try {
-        for (let i = 0; i < argv.length; i++) {
-            const a = argv[i];
-            if (/^\d+$/.test(a)) opts.port = Number(a);
-            else if (a === "--min-uptime-s" || a === "--out") { const v = argv[++i]; if (v == null) throw new Error(a + " needs a value"); if (a === "--out") opts.out = v; else { opts.minUptimeS = Number(v); if (!Number.isFinite(opts.minUptimeS) || opts.minUptimeS < 0) throw new Error("--min-uptime-s needs a number, got " + JSON.stringify(v)); } }
-            else throw new Error(`unknown argument ${JSON.stringify(a)} (usage: lagReading.mjs [port] [--min-uptime-s N] [--out file])`);
-        }
-    } catch (e) { console.error("lagReading: " + e.message); process.exit(2); }
-    const r = await takeReading({ port: opts.port, minUptimeS: opts.minUptimeS, log: (m) => console.log(m) });
-    if (r.error) { console.error("lagReading: " + r.error); process.exit(1); }
-    const file = opts.out || path.join(os.tmpdir(), `swek-lag-reading-${r.reading.at.replace(/[:.]/g, "-")}.json`);
-    fs.writeFileSync(file, JSON.stringify(r.reading, null, 1));
-    console.log("");
-    for (const l of summaryLines(r.analysis, { port: opts.port })) console.log(l);
-    console.log(`\n  the whole reading is saved at ${file} -- paste the block above, or send that file.`);
 }

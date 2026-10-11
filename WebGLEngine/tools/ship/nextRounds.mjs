@@ -100,7 +100,7 @@ export const NEXT_ROUNDS = [
         id: "device-verdicts",
         blocker: "HARDWARE",
         // v4832 -- CORRECTED: this said "Four pages owe a report ... Received kinds: NONE". A swek-magmap-bench report has been on file since 2026-08-26 (tools/roundhouse/magmap-bench.json, from a Mac running
-        // Chrome), so three owe. rigKit-selfcheck holds this entry to deviceOwed.audit() so it cannot go on advertising a closed item.
+        // Chrome), so three owe. sysLagReading-selfcheck holds this entry to deviceOwed.audit() so it cannot go on advertising a closed item.
         what: "Three pages owe a report from real hardware: hmc-bench, ising-bench, consistency-fleet. (magmap-bench is not among them: its report has been on file since 2026-08-26.)",
         how: "On a machine with a GPU, with the engine running: `node tools/render-qa/deviceOwed.mjs --port 8787` prints each owed page's address and the two clicks (Run bench, then Submit measurement to fleet ledger); run it again afterwards and a page's line disappears once its report is on file. Commit tools/roundhouse to hand the reports back.",
         why: "The ising kernel in particular is graded at ZERO tolerance -- bit-exact or rejected -- so there is no partial credit and no way to infer the answer from here. Received kinds are listed by deviceOwed.mjs itself.",
@@ -110,7 +110,7 @@ export const NEXT_ROUNDS = [
         blocker: "HARDWARE",
         // v4832 -- CORRECTED: this said `GET /sys/lag` "names each blocking callback by its REGISTRATION site". It does not: /sys/lag carries durations only (atMs, lagMs); the registration-site table is /sys/blame.
         what: "One reading of the engine's lag endpoints on Keith's rig after a few minutes of uptime: /sys/lag (how much, when), /sys/blame (WHICH setInterval callbacks, by registration site), /sys/slow (which routes).",
-        how: "`node tools\\ship\\lagReading.mjs 8787` while the engine runs: it waits for 300 s of uptime, takes all four GETs, saves them whole and prints the block to paste back.",
+        how: "`node tools\\ship\\takeLagReading.mjs 8787` while the engine runs: it waits for 300 s of uptime, takes all four GETs, saves them whole and prints the block to paste back.",
         why: "v3317 re-read the v3278 samples and found the duty cycle FALLS to ~22% and plateaus rather than growing without bound -- so there are two problems, a startup burst and a steady periodic cost, and only a reading tells us which callback owns the second.",
     },
     {

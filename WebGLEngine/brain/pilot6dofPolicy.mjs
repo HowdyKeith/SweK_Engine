@@ -187,7 +187,7 @@ export function mutate(w, sigma, rng, maxK = 4) {
  * (1+1)-ES from the hand weights on the duel against the PD autopilot, judged on the mean score over `trainSeeds`. Deterministic for a seed. Returns { weights, trainScore, history, iters, improved, neutral }.
  *
  * MEASURED, NOT GUESSED: perturbing ALL 930 weights (perturb(), pilotPolicy's mutation) accepted nothing in 100 iterations at sigma 0.05 -- the hand weights are ~30 nonzero entries in a sea of zeros and a
- * dense perturbation pushes noise through the whole recurrent core, so almost every child is worse. Moving one to four weights at a time found 15 improvements in 600 iterations from the same start. A child
+ * dense perturbation pushes noise through the whole recurrent core, so almost every child is worse. Moving one to four weights at a time found 7 improvements in 300 iterations from the same start and the same reward. A child
  * that scores EXACTLY what the parent did replaces it (a plateau is most of this landscape: a mutual kill scores the same however the shots were timed, until tempo is in the score), and is counted apart
  * from a real improvement.
  */

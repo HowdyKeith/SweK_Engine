@@ -18,6 +18,7 @@
 //   F  blobOf(): the count of weights that differ left out of `by`              -> 1 RED (the blob row)
 //   G  CLI: --write writes even when the champion does not qualify              -> 1 RED (the CLI row)
 //   H  run(): the pruning step skipped                                          -> 1 RED (the pruned row)
+//   I  RECIPE: 1500 iterations -> 1400                                          -> 2 RED (the recorded-recipe row, the RECIPE row)
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -39,6 +40,7 @@ const throws = (fn) => { try { fn(); return null; } catch (e) { return e.message
 sec("1. the argument parser");
 const d0 = T.parseArgs([]);
 ok("no arguments is the recorded recipe: 5 runs x 1500 iterations, seed 2000, sigma 0.3, 1-4 weights a child, no write", d0.runs === 5 && d0.iters === 1500 && d0.seed === 2000 && d0.sigma === 0.3 && d0.maxK === 4 && d0.write === false && d0.out === T.DEFAULT_OUT, JSON.stringify({ ...d0, out: path.basename(d0.out) }));
+ok("RECIPE is that recorded recipe, frozen, and parseArgs() starts from it", Object.isFrozen(T.RECIPE) && ["runs", "iters", "seed", "sigma", "maxK"].every((k) => d0[k] === T.RECIPE[k]) && T.RECIPE.runs === 5 && T.RECIPE.iters === 1500, JSON.stringify(T.RECIPE));
 const d1 = T.parseArgs(["--runs", "3", "--iters", "50", "--write", "--out", "x.json", "--quiet"]);
 ok("every option is read: --runs, --iters, --seed, --sigma, --out, --write, --quiet", d1.runs === 3 && d1.iters === 50 && d1.write && d1.quiet && d1.out === "x.json" && T.parseArgs(["--seed", "9", "--sigma", "0.1"]).seed === 9 && T.parseArgs(["--sigma", "0.1"]).sigma === 0.1);
 const e1 = throws(() => T.parseArgs(["--bogus"])), e2 = throws(() => T.parseArgs(["--runs"])), e3 = throws(() => T.parseArgs(["--runs", "many"])), e4 = throws(() => T.parseArgs(["stray"]));
@@ -81,7 +83,7 @@ ok("the plane pilot's importer refuses it by name (a blob of one policy cannot b
 ok("`by` records the recipe, the champion's seed and the count of weights that differ from the hand pilot, and quotes the held-out and audit it was graded on", /seed \d+ of 5 runs/.test(blob.by) && /97 of the 930 weights differ/.test(blob.by) && blob.by.includes(P.describeEval(R(9.9, 5, 0))) && blob.by.includes(P.describeEval(R(11.0, 20, 0))) && blob.score === 9.9, blob.by.slice(0, 160));
 
 sec("5. the command line writes only what qualifies");
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "t6-")), out = path.join(tmp, "p.json"), tool = path.join(ENG, "tools", "ship", "train6dofPilot.mjs");
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "t6-")), out = path.join(tmp, "p.json"), tool = path.join(ENG, "tools", "ship", "trainPilot6dof.mjs");
 const shipped = path.join(ENG, "brain", "pilot6dofWeightsDefault.json"), mtime0 = fs.existsSync(shipped) ? fs.statSync(shipped).mtimeMs : null;
 const run1 = spawnSync(process.execPath, [tool, "--runs", "1", "--iters", "5", "--quiet", "--out", out], { encoding: "utf8", timeout: 120000 });
 ok("without --write nothing is written (neither the --out file nor the shipped one)", run1.status === 0 && !fs.existsSync(out) && (mtime0 === null || fs.statSync(shipped).mtimeMs === mtime0), `exit ${run1.status}`);

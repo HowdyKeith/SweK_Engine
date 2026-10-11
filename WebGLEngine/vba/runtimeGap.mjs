@@ -604,7 +604,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4827 -- 4612 -> 4616 for brain/roster.mjs, brain/racePlay.mjs, race-lockstep.html and the two gates beside the modules (roster-selfcheck, racePlay-selfcheck); race-brain.html grew a panel.
     // v4830 -- 4617 -> 4621 for brain/pilotRoster.mjs, brain/pilot6dofPolicy.mjs and the two gates beside them (pilotRoster-selfcheck, pilot6dofPolicy-selfcheck), over v4829's murmurParity-selfcheck.mjs (4616 -> 4617); the fly3d and 6DOF pages grew a panel each.
     // v4831 -- 4621 -> 4625 for ui/publishCommands.mjs, ui/brainAsk.mjs and their two gates (publishHygiene-selfcheck, brainStages-selfcheck).
-    files: 4625,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
+    // v4833 -- 4625 -> 4633 for tools/ship/poolWatch.mjs, sysLagReading.mjs, takeLagReading.mjs, train6dofPilot.mjs, trainPilot6dof.mjs and their three gates (poolWatch-selfcheck, sysLagReading-selfcheck, train6dofPilot-selfcheck); verify.mjs, deviceOwed.mjs and the 6DOF page grew.
+    files: 4633,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
     // (v4691 note, carried)                               // v4691 -- RE-DERIVED: tools/ship/textureInProbe.mjs arrived, one ES module with a closure and top-level await -- four rows moved (files, ES modules, closures, async/await) and eight held.
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
@@ -1162,8 +1163,9 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4831 -- ES modules 4316 -> 4320, closures 4163 -> 4166, async/await 1733 -> 1735, Promises 416 -> 417: the two modules and their
     // gates; the other rows hold. fetch/XHR holds at 251: brainAsk.mjs calls an injected fetchImpl, and the gate's own fetch went (see
     // tools/ship/brainStages-selfcheck.mjs on gateAxioms).
-    esModules: 4320, closures: 4166, asyncAwait: 1735, typedArrays: 1274, promises: 417,
-    fetchXhr: 251, performanceNow: 245, raf: 127, webgl: 200, webgpu: 57, threads: 25, wasm: 24,
+    // v4833 -- ES modules 4320 -> 4328, closures 4166 -> 4174, async/await 1735 -> 1739, Promises 417 -> 419, fetch/XHR 251 -> 252: the five tools, their three gates and the 6DOF page's shipped-pilot fetch; sysLagReading.mjs calls fetch (251 -> 252).
+    esModules: 4328, closures: 4174, asyncAwait: 1739, typedArrays: 1274, promises: 419,
+    fetchXhr: 252, performanceNow: 245, raf: 127, webgl: 200, webgpu: 57, threads: 25, wasm: 24,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.

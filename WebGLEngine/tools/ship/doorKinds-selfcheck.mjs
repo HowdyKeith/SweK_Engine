@@ -124,10 +124,14 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
     // default like orreryBake beside it) and LEFT the owed list; verifyLicenceTexts.mjs and wgslDeviceLimits.mjs
     // ARRIVED on it, each for the reason physics/backend-qa-check.mjs is already there -- a real, stated
     // environmental need (live network egress; a WebGPU-capable browser) rather than debt. 1 at v3610 -> 3 here.
-    ok("...leaving exactly THREE genuinely owed, each needing something this box does not have",
-       Object.keys(MEASURED_V3608.genuinelyOwed).length === 3,
+    // v4833 -- 3 -> 4, rewritten rather than widened: tools/ship/threePatch.mjs ARRIVED on the list. It had been UNEXPLAINED (this gate red on main, unseen: it is over the quick sweep's budget) since the
+    // tool joined the cliOnly bucket; its own header says what it needs -- "what the gate cannot carry -- a three checkout at DEV_COMMIT and r186's package" -- the same kind of environmental need as the
+    // network one two entries above, so it is owed, not refused.
+    ok("...leaving exactly FOUR genuinely owed, each needing something this box does not have",
+       Object.keys(MEASURED_V3608.genuinelyOwed).length === 4 && "tools/ship/threePatch.mjs" in MEASURED_V3608.genuinelyOwed,
        "physics/backend-qa-check.mjs needs a rig where box3d's WASM builds; verifyLicenceTexts.mjs needs live " +
-       "network egress to GitHub; wgslDeviceLimits.mjs needs a WebGPU-capable browser -- none of the three is a " +
+       "network egress to GitHub; wgslDeviceLimits.mjs needs a WebGPU-capable browser; threePatch.mjs needs a " +
+       "three.js checkout at its pinned commit and three@0.186.1 unpacked -- none of the four is a " +
        "door this box can build, whatever box eventually runs them can");
 }
 

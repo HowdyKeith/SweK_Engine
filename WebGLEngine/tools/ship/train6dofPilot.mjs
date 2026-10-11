@@ -1,19 +1,18 @@
-// WebGLEngine/tools/ship/train6dofPilot.mjs -- v4832
+// WebGLEngine/tools/ship/train6dofPilot.mjs -- v4833 (the library; the command is tools/ship/trainPilot6dof.mjs)
 //
 // TRAIN THE SPACE-BATTLE PILOT AND SAY WHAT IT DID. Several independent searches (brain/pilot6dofPolicy.mjs's train(): a sparse-mutation (1+1)-ES from the hand weights, which are the PD autopilot written
 // through the network), each on the TRAIN seeds; the one that scores best on the HELD-OUT seeds is the champion; and the AUDIT seeds -- which no search and no choice ever saw -- grade the champion against
 // the hand pilot once. A pilot is written only if it beats the hand pilot on the held-out seeds AND on the audit seeds (score, and wins minus losses). If none does, nothing is written and the output says so:
 // "no learned pilot beat the PD autopilot" is a result, and the page then has no shipped choice rather than one that is not better.
 //
-//   node tools/ship/train6dofPilot.mjs                          # 5 runs x 1500 iterations, report only
-//   node tools/ship/train6dofPilot.mjs --runs 3 --iters 800     # smaller
-//   node tools/ship/train6dofPilot.mjs --write [--out <file>]   # write brain/pilot6dofWeightsDefault.json when the champion qualifies
+//   node tools/ship/trainPilot6dof.mjs                          # 5 runs x 1500 iterations, report only
+//   node tools/ship/trainPilot6dof.mjs --runs 3 --iters 800     # smaller
+//   node tools/ship/trainPilot6dof.mjs --write [--out <file>]   # write brain/pilot6dofWeightsDefault.json when the champion qualifies
 //
 // Deterministic: the same options give the same weights to the bit (the duel, the seeds and the search's generator are all seeded).
 "use strict";
-import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import * as P from "../../brain/pilot6dofPolicy.mjs";
 import * as PB from "../../brain/peerBrain.mjs";
 import { weightsHash } from "../../brain/drivePolicy.mjs";
@@ -74,14 +73,4 @@ export function blobOf(result, opts) {
     const by = `sparse-mutation (1+1)-ES from the hand weights, seed ${c.seed} of ${opts.runs} runs (${opts.seed}..${opts.seed + opts.runs - 1}), sigma ${opts.sigma}, 1-${opts.maxK} weights per child, ${opts.iters} iterations over the train seeds [${P.TRAIN_SEEDS.join(",")}], then pruned: ${c.kept} of the 930 weights differ from the hand pilot (the PD autopilot through the network); ` +
         `champion picked on held-out [${P.HELD_OUT_SEEDS.join(",")}]; vs the PD autopilot: held-out ${cmp(c.heldOut)}, audit [${P.AUDIT_SEEDS[0]}..${P.AUDIT_SEEDS[P.AUDIT_SEEDS.length - 1]}] ${cmp(c.audit)}; the hand pilot scores ${result.hand.audit.score.toFixed(2)} on the same audit`;
     return PB.exportBrain(desc, c.weights, { score: Number(c.heldOut.score.toFixed(3)), by, citation: "male-cns Giant Fiber Circuit (Janelia FlyEM, vendor/male-cns/PROVENANCE.md)" });
-}
-
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-    let opts; try { opts = parseArgs(process.argv.slice(2)); } catch (e) { console.error("train6dofPilot: " + e.message); process.exit(2); }
-    const result = run(opts, opts.quiet ? () => {} : (m) => console.log(m));
-    if (opts.write) {
-        if (!result.verdict.ok) { console.log("not written: " + result.verdict.reasons.join("; ")); process.exit(1); }
-        const blob = blobOf(result, opts); fs.writeFileSync(opts.out, JSON.stringify(blob) + "\n");
-        console.log(`wrote ${opts.out}: ${blob.weightCount} weights, hash ${weightsHash(result.champion.weights)}`);
-    }
 }

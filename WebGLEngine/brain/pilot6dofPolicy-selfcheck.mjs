@@ -33,7 +33,7 @@
 //   P  es-box3d-6dof.html: offers a Brain panel choice the page does not have              1 red (seven choices, not six)
 //   Q  es-box3d-6dof.html: team A is handed no pilot                                       1 red (the page's hand-against-zero fight)
 //   R  pilotRoster.mjs: the resolved scripted team ignores the name it is given            1 red (the PD autopilot is named as such, on the page and in the roster row)
-//   v4832 -- TRAINING, THE SHIPPED PILOT, AND THE PAGE'S SHIPPED / IMPORTED CHOICES. Eleven more, each applied, the gate run, the file restored (md5-identical):
+//   v4832 -- TRAINING, THE SHIPPED PILOT, AND THE PAGE'S SHIPPED / IMPORTED CHOICES. Ten more, each applied, the gate run, the file restored (md5-identical):
 //   S  pilot6dofPolicy.mjs: the score leaves out the win bonus                            2 red (the exact-reward row; the file's `by` no longer reproduces)
 //   T  pilot6dofPolicy.mjs: tempo's sign flipped                                          3 red (the tempo row, the `by` row, and the fixed-point row: it changes every score)
 //   U  pilot6dofPolicy.mjs: a child moves ALL the weights, not 1..maxK                    3 red (the sparse-child row, the maxK row, the prune-fixpoint row)
