@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it. `poolHorizon` (v4816) is the stamp of the first pool entry that run did NOT take: it reached every entry stamped earlier and none stamped at or after it.",
- "at": "2026-10-11T21:05:51.934Z",
+ "at": "2026-10-11T22:00:09.833Z",
  "poolAt": "2026-10-11T00:08:01.399Z",
  "poolHorizon": "2026-10-06T17:10:46.473Z",
  "budgetMs": 3000,
@@ -852,6 +852,13 @@
    "code": 0,
    "priorMs": 1159,
    "at": "2026-09-20T12:34:24.367Z"
+  },
+  {
+   "gate": "physics/render/microsurfaceWalk-selfcheck.mjs",
+   "ms": 2498,
+   "code": 0,
+   "priorMs": 2711,
+   "at": "2026-10-11T21:59:50.915Z"
   },
   {
    "gate": "physics/render/misWgsl-selfcheck.mjs",
@@ -3547,10 +3554,10 @@
   },
   {
    "gate": "tools/ship/importPosition-selfcheck.mjs",
-   "ms": 2874,
+   "ms": 2883,
    "code": 0,
-   "priorMs": 3034,
-   "at": "2026-10-05T19:00:43.697Z"
+   "priorMs": 2763,
+   "at": "2026-10-11T21:59:59.816Z"
   },
   {
    "gate": "tools/ship/inputChain-selfcheck.mjs",
@@ -3992,10 +3999,10 @@
   },
   {
    "gate": "tools/ship/orreryEjecta-selfcheck.mjs",
-   "ms": 2958,
+   "ms": 3146,
    "code": 0,
-   "priorMs": 3042,
-   "at": "2026-10-06T14:12:45.423Z"
+   "priorMs": 3013,
+   "at": "2026-10-11T22:00:09.833Z"
   },
   {
    "gate": "tools/ship/orreryFleet-selfcheck.mjs",

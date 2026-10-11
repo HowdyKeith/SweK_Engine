@@ -508,7 +508,7 @@
   "physics/render/microfacetSampleWgsl-selfcheck.mjs": 2525,
   "physics/render/microfacetVndf-selfcheck.mjs": 3761,
   "physics/render/microfacetWgsl-selfcheck.mjs": 1504,
-  "physics/render/microsurfaceWalk-selfcheck.mjs": 3007,
+  "physics/render/microsurfaceWalk-selfcheck.mjs": 2498,
   "physics/render/misWgsl-selfcheck.mjs": 3127,
   "physics/render/msDirect-selfcheck.mjs": 10066,
   "physics/render/multiScatter-selfcheck.mjs": 2314,
@@ -1375,7 +1375,7 @@
   "tools/ship/img2three-selfcheck.mjs": 3457,
   "tools/ship/importClosure-selfcheck.mjs": 1164,
   "tools/ship/importHealth-selfcheck.mjs": 2013,
-  "tools/ship/importPosition-selfcheck.mjs": 3210,
+  "tools/ship/importPosition-selfcheck.mjs": 2883,
   "tools/ship/inlineHelpers-selfcheck.mjs": 691,
   "tools/ship/inputChain-selfcheck.mjs": 2770,
   "tools/ship/inputSets-selfcheck.mjs": 3790,
@@ -1474,7 +1474,7 @@
   "tools/ship/orphanTriage-selfcheck.mjs": 90102,
   "tools/ship/orrery-selfcheck.mjs": 6312,
   "tools/ship/orreryAuthor-selfcheck.mjs": 3025,
-  "tools/ship/orreryEjecta-selfcheck.mjs": 3142,
+  "tools/ship/orreryEjecta-selfcheck.mjs": 3146,
   "tools/ship/orreryFleet-selfcheck.mjs": 20866,
   "tools/ship/orreryPost-selfcheck.mjs": 10614,
   "tools/ship/orreryPromotion-selfcheck.mjs": 231,
@@ -4418,7 +4418,7 @@
   "physics/render/microfacetSampleWgsl-selfcheck.mjs": "2026-10-11T21:48:56.312Z",
   "physics/render/microfacetVndf-selfcheck.mjs": "2026-10-11T17:18:15.158Z",
   "physics/render/microfacetWgsl-selfcheck.mjs": "2026-10-11T21:48:56.312Z",
-  "physics/render/microsurfaceWalk-selfcheck.mjs": "2026-10-11T21:21:01.514Z",
+  "physics/render/microsurfaceWalk-selfcheck.mjs": "2026-10-11T21:59:50.915Z",
   "physics/render/misWgsl-selfcheck.mjs": "2026-10-11T00:08:01.399Z",
   "physics/render/msDirect-selfcheck.mjs": "2026-10-07T12:49:00.811Z",
   "physics/render/multiScatter-selfcheck.mjs": "2026-10-11T21:48:56.312Z",
@@ -5285,7 +5285,7 @@
   "tools/ship/img2three-selfcheck.mjs": "2026-10-11T00:08:01.399Z",
   "tools/ship/importClosure-selfcheck.mjs": "2026-10-11T21:48:56.312Z",
   "tools/ship/importHealth-selfcheck.mjs": "2026-10-11T21:48:56.312Z",
-  "tools/ship/importPosition-selfcheck.mjs": "2026-10-11T21:48:56.312Z",
+  "tools/ship/importPosition-selfcheck.mjs": "2026-10-11T21:59:59.816Z",
   "tools/ship/inlineHelpers-selfcheck.mjs": "2026-10-11T21:48:56.312Z",
   "tools/ship/inputChain-selfcheck.mjs": "2026-10-11T21:48:56.312Z",
   "tools/ship/inputSets-selfcheck.mjs": "2026-10-10T22:54:28.625Z",
@@ -5384,7 +5384,7 @@
   "tools/ship/orphanTriage-selfcheck.mjs": "2026-09-09T17:59:42.840Z",
   "tools/ship/orrery-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/orreryAuthor-selfcheck.mjs": "2026-10-11T17:36:07.904Z",
-  "tools/ship/orreryEjecta-selfcheck.mjs": "2026-10-07T13:57:25.505Z",
+  "tools/ship/orreryEjecta-selfcheck.mjs": "2026-10-11T22:00:09.833Z",
   "tools/ship/orreryFleet-selfcheck.mjs": "2026-10-06T00:32:14.241Z",
   "tools/ship/orreryPost-selfcheck.mjs": "2026-10-08T14:51:12.816Z",
   "tools/ship/orreryPromotion-selfcheck.mjs": "2026-10-11T21:48:56.312Z",
@@ -10444,7 +10444,7 @@
   "physics/render/microfacetSampleWgsl-selfcheck.mjs": 2525,
   "physics/render/microfacetVndf-selfcheck.mjs": 3761,
   "physics/render/microfacetWgsl-selfcheck.mjs": 1504,
-  "physics/render/microsurfaceWalk-selfcheck.mjs": 3007,
+  "physics/render/microsurfaceWalk-selfcheck.mjs": 2498,
   "physics/render/misWgsl-selfcheck.mjs": 3127,
   "physics/render/multiScatter-selfcheck.mjs": 2314,
   "physics/render/nee-selfcheck.mjs": 543,
@@ -11134,7 +11134,7 @@
   "tools/ship/ik-selfcheck.mjs": 68,
   "tools/ship/importClosure-selfcheck.mjs": 1164,
   "tools/ship/importHealth-selfcheck.mjs": 2013,
-  "tools/ship/importPosition-selfcheck.mjs": 3210,
+  "tools/ship/importPosition-selfcheck.mjs": 2883,
   "tools/ship/inlineHelpers-selfcheck.mjs": 204,
   "tools/ship/inputChain-selfcheck.mjs": 677,
   "tools/ship/inputSets-selfcheck.mjs": 3790,
@@ -11213,7 +11213,7 @@
   "tools/ship/orbitCamera-selfcheck.mjs": 68,
   "tools/ship/orphanResidue-selfcheck.mjs": 70,
   "tools/ship/orreryAuthor-selfcheck.mjs": 3025,
-  "tools/ship/orreryEjecta-selfcheck.mjs": 3142,
+  "tools/ship/orreryEjecta-selfcheck.mjs": 3146,
   "tools/ship/orreryPost-selfcheck.mjs": 10614,
   "tools/ship/orreryPromotion-selfcheck.mjs": 104,
   "tools/ship/orreryUniverse-selfcheck.mjs": 94,
@@ -12289,7 +12289,7 @@
   "physics/render/microfacetSampleWgsl-selfcheck.mjs": "2026-10-11T21:48:41.202Z",
   "physics/render/microfacetVndf-selfcheck.mjs": "2026-10-11T17:17:59.708Z",
   "physics/render/microfacetWgsl-selfcheck.mjs": "2026-10-11T21:48:41.202Z",
-  "physics/render/microsurfaceWalk-selfcheck.mjs": "2026-10-11T21:20:46.177Z",
+  "physics/render/microsurfaceWalk-selfcheck.mjs": "2026-10-11T21:59:50.915Z",
   "physics/render/misWgsl-selfcheck.mjs": "2026-10-11T00:08:01.399Z",
   "physics/render/multiScatter-selfcheck.mjs": "2026-10-11T21:48:41.202Z",
   "physics/render/nee-selfcheck.mjs": "2026-10-11T21:20:46.177Z",
@@ -12979,7 +12979,7 @@
   "tools/ship/ik-selfcheck.mjs": "2026-10-11T19:30:37.023Z",
   "tools/ship/importClosure-selfcheck.mjs": "2026-10-11T21:48:41.202Z",
   "tools/ship/importHealth-selfcheck.mjs": "2026-10-11T21:48:41.202Z",
-  "tools/ship/importPosition-selfcheck.mjs": "2026-10-11T21:48:41.202Z",
+  "tools/ship/importPosition-selfcheck.mjs": "2026-10-11T21:59:59.816Z",
   "tools/ship/inlineHelpers-selfcheck.mjs": "2026-10-11T19:30:37.023Z",
   "tools/ship/inputChain-selfcheck.mjs": "2026-10-10T16:50:34.728Z",
   "tools/ship/inputSets-selfcheck.mjs": "2026-10-10T22:54:28.625Z",
@@ -13058,7 +13058,7 @@
   "tools/ship/orbitCamera-selfcheck.mjs": "2026-10-11T19:58:24.059Z",
   "tools/ship/orphanResidue-selfcheck.mjs": "2026-10-11T19:58:24.059Z",
   "tools/ship/orreryAuthor-selfcheck.mjs": "2026-10-11T17:35:52.775Z",
-  "tools/ship/orreryEjecta-selfcheck.mjs": "2026-10-07T13:57:10.398Z",
+  "tools/ship/orreryEjecta-selfcheck.mjs": "2026-10-11T22:00:09.833Z",
   "tools/ship/orreryPost-selfcheck.mjs": "2026-10-08T14:51:12.816Z",
   "tools/ship/orreryPromotion-selfcheck.mjs": "2026-10-11T19:15:34.556Z",
   "tools/ship/orreryUniverse-selfcheck.mjs": "2026-10-11T19:58:24.059Z",
@@ -14145,9 +14145,9 @@
    3761
   ],
   "physics/render/microsurfaceWalk-selfcheck.mjs": [
-   2918,
-   3153,
-   3007
+   2631,
+   2711,
+   2498
   ],
   "physics/render/multiScatter-selfcheck.mjs": [
    1957,
@@ -14635,9 +14635,9 @@
    1164
   ],
   "tools/ship/importPosition-selfcheck.mjs": [
-   2731,
-   2780,
-   3210
+   2671,
+   2763,
+   2883
   ],
   "tools/ship/inputSets-selfcheck.mjs": [
    3439,
@@ -14820,9 +14820,9 @@
    3025
   ],
   "tools/ship/orreryEjecta-selfcheck.mjs": [
-   2797,
-   3209,
-   3142
+   3229,
+   3013,
+   3146
   ],
   "tools/ship/pageSections-selfcheck.mjs": [
    1525,
