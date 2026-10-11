@@ -8901,7 +8901,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         widened: Object.freeze([
             "tools/ship/wasmTeardown-selfcheck.mjs (section 7: every gate reaching a computed door to a wasm compiler leaves without exit() or was measured under the hook; fixtures for the door rule)",
         ]),
-        verdict: "*** THE DOOR THE RIG FOUND AT v4832, CENSUSED, AND IT HAD FIVE MORE MEMBERS NOBODY HAD MET. *** wasmTeardown.mjs's " +
+        verdict: "*** THE DOOR THE RIG FOUND AT v4832, CENSUSED, AND IT HAD FIVE MORE MEMBERS NOBODY HAD MET. *** The teardown module's " +
                  "wasmCompilers / wasmDoors / doorReach name every script that compiles wasm (vendor/ included), every module that loads " +
                  "one through createRequire or a computed import(), and every gate reaching one: 21, 8, 58. Fourteen of the 58 call " +
                  "process.exit() outside v4663's measured census; under the hook five had the crash shape -- racePlay, box3dFingerprint, " +
