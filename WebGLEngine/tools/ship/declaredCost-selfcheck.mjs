@@ -215,20 +215,20 @@ console.log("\n5. *** THE LIVE CENSUS, RATCHETED ***");
     // those two (a sweepRotation --gate on 142c0d, or a handover). SABOTAGE (v4820): gateReport's header back to ~7.5s
     // -> 1 red, 3 against 2 with no readings of its own.
     const ROTTED_AT_V4820 = 2;
-    // *** v4837 -- 2 -> 0, PAID ON THE OWNER'S BOX, AS v4820 SAID IT WOULD BE. *** Keith handed the record to this box
-    // (quickSweep's RECORD_HANDOVERS, v4837), and sweepRotation --gate re-timed both into the shared record: gateSelection
-    // 13,997-14,413 ms alone against its ~14s (its loaded 69,346 ms no longer the only reading), statedRuntime 688-1,377 ms
+    // *** v4838 -- 2 -> 0, PAID ON THE OWNER'S BOX, AS v4820 SAID IT WOULD BE. *** Keith handed the record to this box
+    // (quickSweep's RECORD_HANDOVERS, v4838), and sweepRotation --gate re-timed both into the shared record: gateSelection
+    // 12,538-14,413 ms alone over five runs against its ~14s (its loaded 69,346 ms no longer the only reading; capReading names the move), statedRuntime 688-1,377 ms
     // against ~1.6s -- the ONE header that was wrong, because that gate's cost is the arrivals it re-runs, and it had none.
-    // Its line is re-written to ~0.8s beside the readings. SABOTAGES (v4837): statedRuntime's header back to ~1.6s -> this
+    // Its line is re-written to ~0.8s beside the readings. SABOTAGES (v4838): statedRuntime's header back to ~1.6s -> this
     // row red, 1 against 0 with no readings of its own (1,600/696 ms from the shared record) and 1 on this machine; the
     // handover row's decidedBy emptied -> hostScale-selfcheck's "decided rather than assumed" row red by name.
-    const ROTTED_AT_V4837 = 0;
+    const ROTTED_AT_V4838 = 0;
     const cNone = census(ENG, null, { exclude: (g) => g === SELF_REL, id: "none-x64-0c-0gb-000000" });
     ok("*** no NEW header has rotted: the count ratchets down, never up -- on a machine with no readings of its own, and on this one ***",
-        cNone.rotted.length <= ROTTED_AT_V4837 && c.rotted.length <= ROTTED_AT_V4837 &&
-        ROTTED_AT_V4837 <= ROTTED_AT_V4820 && ROTTED_AT_V4820 <= ROTTED_AT_V4814 && ROTTED_AT_V4814 < ROTTED_AT_V4666,
+        cNone.rotted.length <= ROTTED_AT_V4838 && c.rotted.length <= ROTTED_AT_V4838 &&
+        ROTTED_AT_V4838 <= ROTTED_AT_V4820 && ROTTED_AT_V4820 <= ROTTED_AT_V4814 && ROTTED_AT_V4814 < ROTTED_AT_V4666,
         `${cNone.rotted.length} with no readings of its own (${cNone.rotted.map((r) => `${r.gate.split("/").pop()} ${r.declaredMs}/${r.recordedMs} ms from ${r.from}`).join("; ") || "none"}) ` +
-        `and ${c.rotted.length} on this machine, against a frozen ${ROTTED_AT_V4837} (2 at v4820 with no readings of its own; v4819 froze 0, this machine's count only; 39 on main at v4814; 138 at v4666 against loaded readings). Each one is a gate whose header claims a ` +
+        `and ${c.rotted.length} on this machine, against a frozen ${ROTTED_AT_V4838} (2 at v4820 with no readings of its own; v4819 froze 0, this machine's count only; 39 on main at v4814; 138 at v4666 against loaded readings). Each one is a gate whose header claims a ` +
         "cost more than 2x from what the record measured, both having finished. Paying it down means " +
         "running each gate and re-writing its line, which is a pass and not an edit");
     ok("  ...and the population it is measured over is not empty and not everything",

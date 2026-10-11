@@ -8892,19 +8892,20 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The CLIs refuse an unknown option (cliArgs) and the peer's transport is a row of its own. Thirteen sabotages red by name, " +
                  "logged in the two headers. NOT CLOSED: the pair has run over loopback and in one browser, not between two machines.",
     }),
-    // v4837 -- NO new gate file -- the shared timing record handed to this box, and declaredCost's v4820 ratchet paid.
+    // v4838 -- NO new gate file -- the shared timing record handed to this box, and declaredCost's v4820 ratchet paid.
     since528: Object.freeze({
-        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
-        at: "v4837", swept: 0, green: 0, red: 0,
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.
+        at: "v4838", swept: 0, green: 0, red: 0,
         added: Object.freeze([]),
         redOnArrival: Object.freeze([]),
         widened: Object.freeze([
             "tools/ship/declaredCost-selfcheck.mjs (the rotted-header ratchet 2 -> 0, on a machine with no readings of its own and on this one)",
+            "tools/ship/capReading-selfcheck.mjs (gateSelection's move from its loaded 67,823 ms named, with three confirming quiet runs)",
         ]),
         verdict: "*** THE RECORD'S OWNER WAS A HOST NO SESSION HAD RUN ON FOR FIVE ROUNDS, SO A DEBT THAT ONLY THE OWNER COULD PAY STOOD SINCE v4820. *** " +
-                 "Keith handed the shared timing record to linux-x64-4c-16gb-420793 (RECORD_HANDOVERS, v4837), and sweepRotation --gate " +
-                 "re-timed declaredCost's two rotted headers into it: gateSelection 14.0-14.4 s alone against its ~14s, its loaded 69 s no " +
-                 "longer the only reading; statedRuntime 0.7 s against ~1.6s, the one header that was wrong -- its cost is the arrivals " +
+                 "Keith handed the shared timing record to linux-x64-4c-16gb-420793 (RECORD_HANDOVERS, v4838), and sweepRotation --gate " +
+                 "re-timed declaredCost's two rotted headers into it: gateSelection 12.5-14.4 s alone over five runs against its ~14s, its " +
+                 "loaded 69 s no longer the only reading (capReading names the move, with three quiet runs); statedRuntime 0.7 s against ~1.6s, the one header that was wrong -- its cost is the arrivals " +
                  "it re-runs, and today it has none -- re-written to ~0.8s. The ratchet stands at 0. NOT CLOSED: a restart onto the other " +
                  "host strands the record again, one dated row away.",
     }),
