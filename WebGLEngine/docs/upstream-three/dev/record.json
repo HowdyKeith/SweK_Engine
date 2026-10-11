@@ -1,5 +1,5 @@
 {
- "devCommit": "576b084aff43ec5bb79911befb1d51be178cb7ed",
+ "devCommit": "11738a9d55e502fb484cefffcea3a66dc44e9fe9",
  "release": "0.186.1",
  "releaseFiles": {
   "three.core.js": "9edde002b066a9a05676a6127f67735b62baf399bdea529f2f7e31657da769e6",
@@ -8,44 +8,44 @@
  },
  "releaseEdit": "three.tsl.js's one import of 'three/webgpu' pointed at './three.webgpu.js' (the page has no import map); nothing else",
  "builds": {
-  "all": "404bd19f6deed30ed62175b0e44ac8ff7e7fef868638a935b030f278693960ea",
-  "dev": "029ad444d81066e47905cc9b96ef68f4a6fd8f59672125e15b5c979c6775d954",
-  "p03": "029ad444d81066e47905cc9b96ef68f4a6fd8f59672125e15b5c979c6775d954",
-  "p04": "7400b8c2304a0b873d1f7bd529b5758a3d97354acd325b9ecc096c177db2afe6",
-  "p05": "a623307715ef7d3aa06e36b9328f40cce416f3ecaa77a6ec699d5cc5806362c9",
-  "p06": "15a8f711602cd908376af70a087d2130a722f40c5ee2adc05f71afae77dda038",
-  "p07": "029ad444d81066e47905cc9b96ef68f4a6fd8f59672125e15b5c979c6775d954",
-  "p08": "029ad444d81066e47905cc9b96ef68f4a6fd8f59672125e15b5c979c6775d954",
-  "p09": "6dd32be58230a0d3194b6fa758604db1f834caa0e0c57db04247f764f6bba390",
-  "p10": "537a9facb83693013cc9aca6282c5bffea7b89816c84935bbdebeb1154865f35",
-  "p11": "6e224c8a0539ac5b8b3a3769654526a91aeca754dd1eb71fbe22df70cd63b9d7",
-  "p12": "029ad444d81066e47905cc9b96ef68f4a6fd8f59672125e15b5c979c6775d954",
-  "p13": "029ad444d81066e47905cc9b96ef68f4a6fd8f59672125e15b5c979c6775d954",
-  "p14": "aae948375e159ec5b521d98942a584ac0a4b1b4ab9318d52261078a30d7576ba",
-  "p15": "029ad444d81066e47905cc9b96ef68f4a6fd8f59672125e15b5c979c6775d954",
-  "p16": "e83d5130be7ef2a71eab4089ce3e954ed6a5ebc5479457a247a529f169c0d401",
-  "p17": "ba11ee700f3f6bd81781048977a5fc5741d31e87830966a6c66757d2d1b06c27",
-  "p18": "43d96490559644725e158b2fb7dc6343ce305427621279d9f24ad5c8c3f1bc21",
+  "all": "c0a910e711c07deb6f309a6bc664990c8e476a18fbaa66b54fd4398ecd567f06",
+  "dev": "1fa30f36cba5c4867659afb23285b0e96615845532dda7930289014811f665fe",
+  "p03": "1fa30f36cba5c4867659afb23285b0e96615845532dda7930289014811f665fe",
+  "p04": "611abaef87ced6d98572f249e020dfb44953a021a6c85f070444e3c1f6e67bdc",
+  "p05": "9ef5e13f583716f4503a936781156a6ea3f4331dbac9df0eb836c3dec3e7c015",
+  "p06": "dd0658802b2b9cc6dad362628964de5b69f079a4529c13873cd7f51992e2abdd",
+  "p07": "1fa30f36cba5c4867659afb23285b0e96615845532dda7930289014811f665fe",
+  "p08": "1fa30f36cba5c4867659afb23285b0e96615845532dda7930289014811f665fe",
+  "p09": "3173656fe339fd1b46fae8360672fb36907a924d4a4277bfef5db3d89a5b532a",
+  "p10": "4b018fabbbaea2990cb0c7f4d1d0c62e3f904f5f72e0e283af727c14de61fa81",
+  "p11": "1a6fedbfc2c83e23d178e8a56bc6b84f479e0bb1f7e061bd25e19630d842dc21",
+  "p12": "1fa30f36cba5c4867659afb23285b0e96615845532dda7930289014811f665fe",
+  "p13": "1fa30f36cba5c4867659afb23285b0e96615845532dda7930289014811f665fe",
+  "p14": "522f9f6a36b20a8d20205f8df28056e71707e4ad005fcb71c44f214d73d529db",
+  "p15": "1fa30f36cba5c4867659afb23285b0e96615845532dda7930289014811f665fe",
+  "p16": "b997a2030dcb1bb1cd09ed259b71343fa4677e089d27f60dc5b7405f03610f93",
+  "p17": "c899cc151e7a8cf620cf8e40042642c1cc775738b4524174b96771df9012cda9",
+  "p18": "d8a621214e13c67ae3474477164e327fb9229f2a0530b9272e8f5cb474986224",
   "r186": "15cfce5c653541704fd9a3463c39d3e8b854bb6265ccd854d7cfe74090625cc6"
  },
  "browser": "headless Chromium, SwiftShader (tools/ship/webgpuHarness.mjs)",
  "patches": {
-  "10": "30e6ade615cc3bcdec752a3a6f54472a026447cda82d7dc2ab1cc46ed171fd83",
-  "11": "39a416340ee577fd5b11109eb84848504e4e3415153413efd6b946e689f38a53",
+  "10": "f5428fbc4fe2f7b0accc87282e6da96390fb5de1483ba29828251f3db3a54e60",
+  "11": "dda9c9f76b92aaf6bc9390bad10ac825093f73ffc5a5b2e9c5328e9d8664afa8",
   "12": "3c3987270a9344da9e45979029517c608ab39b5563d54071d93a0ff4448c1988",
   "13": "0ac6bd9b08d2e253527e49750ce4ee6863d23ae38437c7c3892d64c74e96b016",
-  "14": "3884cd1a7bb7658f791a94ca4dc9c1a2b2185e5f95ab350b480a4e47727b8456",
-  "15": "71ff2566af7ad8d6443045f3f52c0c3ece2ed7a81353aa83589d158a6dedf6c2",
-  "16": "5a5c87e5a3df87ffa77f3ed1e990d6956f341906c490f46d7f8c265ab752414e",
+  "14": "92d678b2da1c6592c4c23a793d07d8a47681856f6ef5af754b7570a31b9e0498",
+  "15": "61509552ca3a39f38969459b45675390f58b7e8090dc5e769217824b53c72458",
+  "16": "3cc452d6d8a4ce237964514f0870f4b99ce6f5781f5ad885999648f5a521ac8a",
   "17": "c05f5d6c6402e65f5a4f4f7e644c02a1a2635b72538c34a55ef103c7411713b0",
-  "18": "ce62a01838dad1abec7162570e5431d6d1347a9e0038d1594b16cad9b04d6b69",
+  "18": "2e03918edaa8cdd3298a70f57ed64a5b6d24d222d1ba497c94a2fa230a1c3eda",
   "03": "7907879533d9b4071c495cd8521218fa7a05a3cb903a411e1d4656e3f938e36b",
-  "04": "20d14b397fc4fdac6879efcd1199a36b63c75e53a148e2ff845a4f63d27794d4",
+  "04": "8514035d16d73716613345b82470d45c255288ea2d1a89db511dfb6118824063",
   "05": "549c955536325a1d1749671be585c1678cb7c4bc8b5aebd2bdd98a9154d707fe",
-  "06": "e2911d3201b46bcc619dac45b644b2ec9fd7345518ce5b5b324beaa592ecfe9d",
+  "06": "2ef784247c2b5518df8966fbc5568be9ccafd1e4ba52f6c0359f81de3eb5f137",
   "07": "e2a4642926ef099b786a5caa8ef1486f031607dab88670f4f48961ed41df021e",
   "08": "20215992179a7d25712952ae970b98d0c5737aada0c3d1cb9f52ad79b106081c",
-  "09": "879f16cbf513bfd028e4af70f2946f1b352c1dd10f629b23b76fa6d272318a91"
+  "09": "46652654b0a44ae62678a5d71669d7de755a3ed6b7abb3e3c85f7f547cb7b04e"
  },
  "code": {
   "10": "10d3dbaab28c164a55cb5fac8e8ffe00df25cd752b3ec1cb32dce2e34e2830ee",
@@ -75,10 +75,10 @@
  ],
  "bases": {
   "10": {
-   "src/nodes/core/NodeBuilder.js": "de53c08b96e1848bb4a6c171d228007e7b5410b4"
+   "src/nodes/core/NodeBuilder.js": "a536db4c6da2281174e138b25d56d8393c8d9013"
   },
   "11": {
-   "src/renderers/webgl-fallback/nodes/GLSLNodeBuilder.js": "73ea390b8d8dfc4e5d1dbc2d1ed438525b6af9f6"
+   "src/renderers/webgl-fallback/nodes/GLSLNodeBuilder.js": "d894d31e0d45542fa1508ff14008318f8ecffb46"
   },
   "12": {
    "src/nodes/accessors/BufferAttributeNode.js": "b80504a92a15ed1d326ee164371086fde477c088",
@@ -88,37 +88,37 @@
    "src/nodes/accessors/Morph.js": "e9b9319658097bf84e6cbae587a657038a9e685a"
   },
   "14": {
-   "src/renderers/webgl-fallback/WebGLBackend.js": "4f109bf83a233c2b4489acbac3fbfa7918e425ea",
+   "src/renderers/webgl-fallback/WebGLBackend.js": "53026c2f3aea72a1ca0bc8aadc490294e4f7b52f",
    "src/renderers/webgl-fallback/utils/WebGLVertexArrayUtils.js": "46bf16396719a255c11a6a6a79d544ffa331d29c"
   },
   "15": {
-   "src/nodes/accessors/Batch.js": "f0b2e65caa03e5f7207817a2bc6f7edefc47d3c4"
+   "src/nodes/accessors/Batch.js": "8a58e251b83a291f45786e9c4219dfc94210d89b"
   },
   "16": {
    "src/nodes/accessors/Instance.js": "2723fa918f28e286b33fdc9e4627c1d8c23b6a9c",
-   "src/renderers/common/Backend.js": "6b31fbdf8b3ab34dc9537554fb7bf21a4ba9dd3d",
-   "src/renderers/common/Renderer.js": "74fa89f5b1dd8f23203abcb7936b395425d86ec0",
-   "src/renderers/webgl-fallback/WebGLBackend.js": "4f109bf83a233c2b4489acbac3fbfa7918e425ea",
-   "src/renderers/webgpu/WebGPUBackend.js": "afedea91e3b4a9767192cdc8d73355edd21e6684"
+   "src/renderers/common/Backend.js": "0d5986dd3d26daf1db33b388b864fc976a944327",
+   "src/renderers/common/Renderer.js": "a2b9939b71589e3b3d3f71d9f8c3f9b12a9b04df",
+   "src/renderers/webgl-fallback/WebGLBackend.js": "53026c2f3aea72a1ca0bc8aadc490294e4f7b52f",
+   "src/renderers/webgpu/WebGPUBackend.js": "e2e52ef01dd8c0ebd1c1f34d1065ef2ebfebcfaa"
   },
   "17": {
    "src/renderers/common/Bindings.js": "5350ae3f3afc66d4757516ba46d1bd7bb194af9e"
   },
   "18": {
-   "src/renderers/webgl-fallback/utils/WebGLState.js": "60d8e400f7a3581d69c6b40e84c996749868b6d8"
+   "src/renderers/webgl-fallback/utils/WebGLState.js": "915c6ceb79f274ab8d5775ba83a089acb33a21b7"
   },
   "03": {
    "src/nodes/accessors/Morph.js": "e9b9319658097bf84e6cbae587a657038a9e685a"
   },
   "04": {
    "src/nodes/accessors/VelocityNode.js": "515a70c0fa70b39ad599ec133c838d521a6a96a9",
-   "src/nodes/core/NodeBuilder.js": "de53c08b96e1848bb4a6c171d228007e7b5410b4"
+   "src/nodes/core/NodeBuilder.js": "a536db4c6da2281174e138b25d56d8393c8d9013"
   },
   "05": {
    "src/materials/nodes/SpriteNodeMaterial.js": "e03f2c26cd29492c8c6729ddbcf36ffa6b63ddc0"
   },
   "06": {
-   "src/renderers/common/Pipelines.js": "78237dbaabc96328b82b3d9d5876f123393eabcd"
+   "src/renderers/common/Pipelines.js": "8865c9b3e6fcd0edcef5ba6fdbb2afb86d167a4b"
   },
   "07": {
    "src/nodes/accessors/Skinning.js": "437e0c02c98c3847c8fd7b0198b3fd443a6467ef"
@@ -127,7 +127,7 @@
    "src/nodes/accessors/Instance.js": "2723fa918f28e286b33fdc9e4627c1d8c23b6a9c"
   },
   "09": {
-   "src/renderers/common/RenderObject.js": "f03f388135c37e259ac8c980a3d1833dcefde0c6"
+   "src/renderers/common/RenderObject.js": "39f0e8aed8236aad967cc12cfdf772da12f96fab"
   }
  },
  "results": {

@@ -901,8 +901,11 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // physics/mesh/triArrangement-selfcheck.mjs. usesOk, definesOk and nameFirst each by one; the rest hold (census() over the merged tree).
     // RE-DERIVED at this branch's merge of main's v4834 -- 1946: both lines' 1945 counted one new gate each (reportFresh on main,
     // triArrangement here), so census() over the merged tree reads 1946; usesOk, definesOk and nameFirst likewise one above either side.
-    gates: 1946, usesOk: 1925, definesOk: 1917, importsOk: 0,
-    distinctDefinitions: 42, nameFirst: 1817, condFirst: 97, unknownSignature: 11,
+    // v4835 -- 1945 -> 1946 for tools/ship/afterVerdict-selfcheck.mjs, on main. usesOk, definesOk and nameFirst each by one.
+    // v4837 -- 1946 -> 1949 for this round's tools/ship/poolWatch-selfcheck.mjs, tools/ship/sysLagReading-selfcheck.mjs and tools/ship/train6dofPilot-selfcheck.mjs (v4836 added no gate file). usesOk, definesOk and nameFirst each by three more; the rest hold (the drift row named exactly these four).
+    // RE-DERIVED at this branch's merge of main's v4837 -- 1950: main's 1949 plus triArrangement-selfcheck.mjs (census() over the merged tree).
+    gates: 1950, usesOk: 1929, definesOk: 1921, importsOk: 0,
+    distinctDefinitions: 42, nameFirst: 1821, condFirst: 97, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

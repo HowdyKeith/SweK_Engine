@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "a89c3a5cc39a4ecbc240595808658fc2e7bdbfde",
+ "head": "fb0d8aa8971db1b2b15d6931ec1f5e8e32507661",
  "bodies": {
   "box3d": [
    {
@@ -611,7 +611,7 @@
    },
    {
     "path": "es-box3d-6dof.html",
-    "bytes": 25107,
+    "bytes": 28644,
     "sha": "0a8d63e83bc4aee7219b4c3a4add85802a356421"
    },
    {
@@ -721,7 +721,7 @@
    },
    {
     "path": "main.js",
-    "bytes": 3531996,
+    "bytes": 3546414,
     "sha": "b3c8f7e3a653fdf588d0e60be8cc6807fa904554"
    },
    {
@@ -742,7 +742,7 @@
    {
     "path": "physics/mesh/triArrangement.mjs",
     "bytes": 32584,
-    "sha": "31bfe13784e49185b9253a1645525e25dbc58aea"
+    "sha": "fb0d8aa8971db1b2b15d6931ec1f5e8e32507661"
    },
    {
     "path": "pipboy-models.html",
@@ -1223,7 +1223,7 @@
    },
    {
     "path": "tools/ship/threeUpstream-selfcheck.mjs",
-    "bytes": 66317,
+    "bytes": 68423,
     "sha": "6b7e4579f4006952a2a688062ad9035f7c4311c2"
    },
    {
@@ -1285,12 +1285,12 @@
   "three-webgpu-r185": [
    {
     "path": "tools/ship/threePatch.mjs",
-    "bytes": 21193,
+    "bytes": 21567,
     "sha": "108bd2aed5dd03dc7d8f85be07230b46c8225bee"
    },
    {
     "path": "tools/ship/threeUpstream-selfcheck.mjs",
-    "bytes": 66317,
+    "bytes": 68423,
     "sha": "6b7e4579f4006952a2a688062ad9035f7c4311c2"
    }
   ],

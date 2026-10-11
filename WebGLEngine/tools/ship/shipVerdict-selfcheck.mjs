@@ -275,6 +275,27 @@ console.log("\n7. v4833 -- a box that cannot run the browser gates is refused BE
     say(`THIS BOX: ${here.length ? "NOT READY -- " + here.map((n) => n.what).join(" | ") : "ready (Playwright resolves, a browser is on disk, and DXC is " + (process.platform === "win32" ? "beside the shell" : "not needed off Windows") + ")"}`);
 }
 
+console.log("\n8. v4836 -- after a SHIP, the verdict names step 4b; the verdict line stays last");
+{
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "shipverdict-next-"));
+    try {
+        const green = path.join(dir, "verify-green.mjs");
+        fs.writeFileSync(green, 'console.log("[verify] ALL GREEN");\n');
+        const run = async (opts) => { const lines = []; let code = null;
+            await SV.main({ eng: ENG, verifyPath: green, preflight: () => [], out: (m) => lines.push(...String(m).split("\n")), exit: (c) => { code = c; }, ...opts });
+            for (const sig of SV.CATCHABLE) process.removeAllListeners(sig);
+            const t = lines.filter((l) => l.trim()); return { t, code }; };
+        const a = await run({ nextStep: () => "[ship] next, before the rig is asked: node tools/ship/afterVerdict.mjs -- FIXTURE" });
+        ok("!! *** a SHIP names afterVerdict.mjs on the line before the verdict, and the verdict is still the LAST line ***",
+            a.code === 0 && /^\[ship\] SHIP /.test(a.t[a.t.length - 1]) && /afterVerdict\.mjs/.test(a.t[a.t.length - 2] || ""),
+            `exit ${a.code}; last two: ${JSON.stringify(a.t.slice(-2))}`);
+        const real = SV.chosenNextStep({ verifyPath: null });
+        ok("...the real verify's line carries afterVerdict's own plan count, so the number cannot drift from the step",
+            typeof real === "function" && /afterVerdict\.mjs -- \d+ gates/.test(real()) && SV.chosenNextStep({ verifyPath: "x.mjs" }) === null,
+            typeof real === "function" ? real().slice(0, 120) : "no next step for the real verify");
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+}
+
 say("WHAT THIS DOES NOT CLAIM. That a round cannot be pushed unverified -- nothing in a repository can stop a " +
     "person from typing `git push`. What it does is make the unverified push LEAVE A MARK the next gate run " +
     "finds, on origin/main and not merely here, and remove the incentive that produced this one by making the " +

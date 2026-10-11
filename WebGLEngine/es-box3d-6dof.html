@@ -43,6 +43,8 @@
     <tr><td style="padding:2px 10px 2px 0;color:#d0b08f;">team B</td><td><select id="pilotB" style="background:#0c1424;color:#b9d4ff;border:1px solid #2f486c;font:inherit;max-width:260px;"></select></td></tr>
   </tbody></table>
   <div style="display:flex;gap:6px;margin-bottom:6px;"><button id="startFight">Start Fight</button><button id="rosterReset">Default pilots</button></div>
+  <div style="display:flex;gap:6px;margin-bottom:6px;align-items:center;"><button id="importPilotBtn">Import pilot</button><input id="importPilotFile" type="file" accept="application/json" style="display:none;"><button id="clearPilot" disabled>Clear imported</button></div>
+  <div id="pilotLine" style="color:#8fb6d0;margin-bottom:4px;"></div>
   <div id="rosterNote" style="color:#7fb069;margin-bottom:4px;"></div>
   <div style="color:#5f7590;line-height:1.4;">Every brain pilot is the same network, wired like a fly's Giant Fiber circuit, with the PD autopilot's own contract (a torque about each axis, thrust, fire); a choice picks which WEIGHTS fly it. The PD autopilot is not a brain. No 6DOF brain has been trained or shipped yet, so there is nothing to import. Start Fight resets the battle and the tally.</div>
 </div>
@@ -62,6 +64,8 @@ import * as AP from "/brain/autopilot6dof.mjs";
 import * as FA from "/brain/fleetAssign.mjs";
 import * as P6 from "/brain/pilot6dofPolicy.mjs";   // v4829 -- a learned pilot with the autopilot's own contract
 import * as PR from "/brain/pilotRoster.mjs";          // v4829 -- who flies each side: the PD autopilot, or a brain on one of several weight sets
+import * as PB from "/brain/peerBrain.mjs";            // v4832 -- the portable brain format the shipped pilot and an imported one travel in (the plane page's own)
+import { weightsHash } from "/brain/drivePolicy.mjs";
 
 // ---- combat constants (game balance, not gated -- matching es-box3d-fly3d.html's own SHOT constants) ----
 const HALF = [1.6, 0.7, 0.7];              // ship OBB half-extents; nose (local +X) is the long axis
@@ -287,15 +291,19 @@ function frame() {
   requestAnimationFrame(frame);
 }
 // ---- v4829 -- LOAD PILOTS: brain/pilotRoster.mjs behind two selects ------------------------------------------------------------------------------------------------------------
-// `specs` is the choice per team (ids, kept in this browser); a team's pilot function is rebuilt when its choice or the fleet changes. "default for this team" is the PD autopilot for both: this page has
-// no Brain pilot toggle and no shipped brain, so the roster's context holds neither.
+// `specs` is the choice per team (ids, kept in this browser); a team's pilot function is rebuilt when its choice, the fleet, or what is available changes. "default for this team" is the PD autopilot for both: this page has
+// no Brain pilot toggle, so the roster's "brain" is not offered; "shipped" and "imported" are, once the shipped pilot has loaded / one has been imported (v4832).
 const ROSTER_KEY = "swek.sixdofRoster.v1", ROSTER_NAMES = { scriptedLabel: "PD autopilot (autopilot6dof.mjs)", scriptedName: "PD autopilot" };
 let specs = (() => { try { return PR.sanitizeSpecs(JSON.parse(localStorage.getItem(ROSTER_KEY) || "null")); } catch { return PR.defaultSpecs(); } })();
 let lineup = {}; const pilotCache = {};
-const rosterCtx = () => ({ PP: P6, shipped: null, imported: null, brainPilotOn: false, ...ROSTER_NAMES });
+// v4832 -- TWO MORE SOURCES OF WEIGHTS: the pilot this demo ships (brain/pilot6dofWeightsDefault.json, trained by tools/ship/train6dofPilot.mjs, fetched once at load) and one imported from a file. `avail` counts changes to what is
+// held, so the cached pilot functions are rebuilt when a source arrives or is cleared.
+const DESC = PB.describePolicy("pilot6dofPolicy", P6);
+let shippedW = null, shippedMeta = null, shippedErr = null, importedW = null, importedMeta = null, importErr = null, avail = 0;
+const rosterCtx = () => ({ PP: P6, shipped: shippedW, imported: importedW, brainPilotOn: false, ...ROSTER_NAMES });
 function saveSpecs() { try { localStorage.setItem(ROSTER_KEY, JSON.stringify(specs)); } catch {} }
 function pilotAi(team) {
-  const fleet = team === "A" ? A : B, key = specs[team] + "|" + fleet.length;
+  const fleet = team === "A" ? A : B, key = specs[team] + "|" + fleet.length + "|" + avail;
   let c = pilotCache[team];
   if (!c || c.key !== key) {
     const r = PR.resolveTeam(team, specs[team], rosterCtx(), fleet.length);
@@ -310,7 +318,7 @@ function rosterNote() {
   el.textContent = PR.describe(lineup, A.length) + (probs.length ? "  --  " + probs.join("; ") : "");
 }
 function renderRoster() {
-  const ch = PR.choices({ shipped: false, imported: false, brainPanel: false, scriptedLabel: ROSTER_NAMES.scriptedLabel });
+  const ch = PR.choices({ shipped: !!shippedW, imported: !!importedW, brainPanel: false, scriptedLabel: ROSTER_NAMES.scriptedLabel });
   for (const t of PR.TEAMS) {
     const sel = document.getElementById("pilot" + t), keep = specs[t];
     sel.textContent = "";
@@ -325,6 +333,32 @@ document.getElementById("rosterBtn").onclick = () => { const p = document.getEle
 document.getElementById("startFight").onclick = () => { startFight(); };
 document.getElementById("rosterReset").onclick = () => { specs = PR.defaultSpecs(); saveSpecs(); renderRoster(); };
 renderRoster();
+function pilotLine() {
+  const el = document.getElementById("pilotLine"); if (!el) return;
+  const one = (label, w, meta) => w ? `${label} ${weightsHash(w)}` + (meta && meta.score != null ? `: held-out score ${meta.score}` : "") : null;
+  const parts = [one("shipped pilot", shippedW, shippedMeta), one("imported pilot", importedW, importedMeta)].filter(Boolean);
+  el.textContent = (parts.length ? parts.join("  |  ") : shippedErr ? `the shipped pilot did not load (${shippedErr})` : "loading the shipped pilot ...") + (importErr ? `  --  import refused: ${importErr}` : "");
+  document.getElementById("clearPilot").disabled = !importedW;
+}
+function availChanged() { avail++; renderRoster(); pilotLine(); if (lineup.A) { pilotAi("A"); pilotAi("B"); } }
+// the shipped pilot: a swek-brain-v1 file like the plane page's; a missing or malformed one is SAID (shippedErr), and the roster simply does not offer "shipped"
+fetch("/brain/pilot6dofWeightsDefault.json").then((r) => r.json()).then((blob) => {
+  const r = PB.importBrain(DESC, blob);
+  if (r.ok) { shippedW = r.weights; shippedMeta = r.meta; } else shippedErr = r.reason;
+  availChanged();
+}).catch((e) => { shippedErr = "could not fetch it (" + (e && e.message) + ")"; availChanged(); });
+function importBlob(blob) {
+  const r = PB.importBrain(DESC, blob);
+  if (r.ok) { importedW = r.weights; importedMeta = r.meta; importErr = null; } else importErr = r.reason;
+  availChanged(); return r.ok;
+}
+document.getElementById("importPilotBtn").onclick = () => document.getElementById("importPilotFile").click();
+document.getElementById("importPilotFile").addEventListener("change", async (e) => {
+  const f = e.target.files && e.target.files[0]; e.target.value = ""; if (!f) return;
+  try { importBlob(JSON.parse(await f.text())); } catch (err) { importErr = "not a readable JSON file (" + (err && err.message) + ")"; availChanged(); }
+});
+document.getElementById("clearPilot").onclick = () => { importedW = null; importedMeta = null; importErr = null; availChanged(); };
+pilotLine();
 document.getElementById("resetBtn").onclick = () => newBattle();
 addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
 
@@ -341,7 +375,9 @@ window.__sixdof = {
   },
   newBattle,
   // v4829 -- the roster, for brain/pilot6dofPolicy-selfcheck.mjs's page rows
-  roster: { get specs() { return specs; }, setSpecs(x) { specs = PR.sanitizeSpecs(x); saveSpecs(); renderRoster(); }, startFight, get lineup() { return lineup; }, pilotAi },
+  roster: { get specs() { return specs; }, setSpecs(x) { specs = PR.sanitizeSpecs(x); saveSpecs(); renderRoster(); }, startFight, get lineup() { return lineup; }, pilotAi,
+    // v4832 -- the shipped and the imported pilot, for the gate's page rows
+    get shipped() { return shippedW; }, get shippedError() { return shippedErr; }, get imported() { return importedW; }, importBlob, get choices() { return [...document.getElementById("pilotA").options].map((o) => o.value); } },
   get fleets() { return { A, B }; },
 };
 

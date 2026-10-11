@@ -22,6 +22,7 @@ import { costOf } from "./declaredCost.mjs";
 // v4647 -- whose stopwatch. A box that does not own the record writes its own file rather than
 // overwriting one produced on different silicon. See quickSweep.timingsTarget.
 import { timingsTarget, KIND, reclaimStrandedFixtures } from "./quickSweep.mjs";
+import { canonicalId } from "./hostScale.mjs";
 import { parseArgs, refusalLines } from "./cliArgs.mjs";
 
 export function runSlice(picked, { capMs = CAP_MS, onProgress = null } = {}) {
@@ -242,6 +243,23 @@ export function rebuildFinished(file, ledger) {
  * and CAPPED when it did not, and both are known at the moment of writing rather than derived later from
  * which side of a budget the number fell on.
  */
+/**
+ * *** v4835 -- ON A BOX THAT DOES NOT OWN THE RECORD, A WRITE MERGES INTO ITS OWN FILE, NOT INTO A FRESH COPY OF THE SHARED ONE. ***
+ * The rows below were merged into `file` -- the SHARED record as read -- and written to the target, which on a foreign box
+ * is sweep-timings.local.json. So each foreign write was the shared record plus this run's rows, and every reading the
+ * local file held before was dropped. Found by running it twice at v4835: `--gate afterVerdict-selfcheck --write` then
+ * `--gate reportFresh-selfcheck --write`, and the second write erased the first's reading -- recordDrift and timingKind then
+ * named the erased gate as owing the record a runtime. The base is now the local file when it exists and names this box.
+ */
+export function writeBase(file, target, { root = ENG, read = (f) => fs.readFileSync(path.join(root, f), "utf8") } = {}) {
+    if (!target.foreign) return { base: file, from: "the shared record" };
+    let loc = null;
+    try { loc = JSON.parse(read(target.file)); } catch { return { base: file, from: "the shared record (no local file yet)" }; }
+    return loc && canonicalId(loc.host) === canonicalId(target.host)
+        ? { base: loc, from: target.file }
+        : { base: file, from: "the shared record (the local file names another box)" };
+}
+
 export function mergeTimings(file, rows, stamp, capMs = null) {
     const timings = { ...(file.timings || {}) }, codes = { ...(file.codes || {}) }, at = { ...(file.at || {}) };
     const finished = { ...(file.finished || {}) };
@@ -432,8 +450,9 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     }
     if (cli.flags.has("--write")) {
         const stamp = new Date().toISOString();
-        const { merged: mergedTimings, priorMs } = mergeTimings(file, rows, stamp, capMs);
         const target = timingsTarget(file);
+        const { base } = writeBase(file, target);
+        const { merged: mergedTimings, priorMs } = mergeTimings(base, rows, stamp, capMs);
         if (target.foreign) console.log(`[rotation] NOT writing sweep-timings.json: ${target.why}`);
         fs.writeFileSync(path.join(ENG, target.file),
             JSON.stringify({ ...mergedTimings, host: target.host }, null, 1) + "\n");

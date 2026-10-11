@@ -33,6 +33,6 @@ On the WebGL backend, a compute whose first buffer is a plain storage buffer rea
 
 A compute's `instanceIndex` (and `invocationLocalIndex`) reads `gl_InstanceID + gl_VertexID`: in a compute drawn as points the instance is 0, in one drawn instanced the vertex is.
 
-Tested with the issue's reproduction, headless Chromium with SwiftShader, on WebGPU and on the WebGL 2 backend: `storageBuffer` reads 1 on WebGL 2 on `dev` and 8 with this patch, as `instancedArray` does and as WebGPU does on both. `npm run lint` is clean with this patch. With this patch and the fifteen others I am filing applied together on `dev`, the unit tests give what `dev` gives (1524 passed, 1 todo, 0 failed), and every e2e example's outcome is the same as on `dev`, on WebGPU and on the WebGL 2 backend.
+Tested with the issue's reproduction, headless Chromium with SwiftShader, on WebGPU and on the WebGL 2 backend: `storageBuffer` reads 1 on WebGL 2 on `dev` and 8 with this patch, as `instancedArray` does and as WebGPU does on both. `npm run lint` is clean with this patch. With this patch and the fifteen others I am filing applied together on `dev`, the unit tests give what `dev` gives (1893 passed, 1 todo, 0 failed), and every e2e example's outcome is the same as on `dev`, on WebGPU and on the WebGL 2 backend.
 
 #<issue number of 14> (a compute reading a buffer whose class differs from its first's) has its own patch, which draws every compute instanced and fixes this issue as well. If that one is preferred, this PR can be closed.

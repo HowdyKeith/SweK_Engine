@@ -607,7 +607,10 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // BVH-CSG round 9, at its merge onto main's v4831 -- RE-TAKEN: 4625 -> 4627 for physics/mesh/triArrangement.mjs and its gate.
     // v4834 -- 4625 -> 4626 for tools/ship/reportFresh-selfcheck.mjs.
     // RE-DERIVED at this branch's merge of main's v4834: 4628 -- main's 4626 (reportFresh) plus this branch's two (triArrangement and its gate).
-    files: 4628,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
+    // v4835 -- 4626 -> 4628 for tools/ship/afterVerdict.mjs and its gate (on main).
+    // v4837 -- 4628 -> 4636 for tools/ship/poolWatch.mjs, sysLagReading.mjs, takeLagReading.mjs, train6dofPilot.mjs, trainPilot6dof.mjs and their three gates (poolWatch-selfcheck, sysLagReading-selfcheck, train6dofPilot-selfcheck); verify.mjs, deviceOwed.mjs and the 6DOF page grew.
+    // RE-DERIVED at this branch's merge of main's v4837: 4638 -- main's 4636 plus round 9's two files (triArrangement and its gate).
+    files: 4638,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
     // (v4691 note, carried)                               // v4691 -- RE-DERIVED: tools/ship/textureInProbe.mjs arrived, one ES module with a closure and top-level await -- four rows moved (files, ES modules, closures, async/await) and eight held.
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
@@ -1170,8 +1173,11 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // module, Float64Array in the gate); the other rows hold -- neither file awaits, fetches or times anything.
     // v4834 -- ES modules 4320 -> 4321, closures 4166 -> 4167: tools/ship/reportFresh-selfcheck.mjs; the other rows hold.
     // RE-DERIVED at this branch's merge of main's v4834: ES modules 4323, closures 4169, typed arrays 1276 -- main's v4834 rows plus round 9's two files.
-    esModules: 4323, closures: 4169, asyncAwait: 1735, typedArrays: 1276, promises: 417,
-    fetchXhr: 251, performanceNow: 245, raf: 127, webgl: 200, webgpu: 57, threads: 25, wasm: 24,
+    // v4835 -- ES modules 4321 -> 4323, closures 4167 -> 4169: tools/ship/afterVerdict.mjs and its gate (on main); the other rows hold.
+    // v4837 -- ES modules 4323 -> 4331, closures 4169 -> 4177, async/await 1735 -> 1739, Promises 417 -> 419, fetch/XHR 251 -> 252: the five tools, their three gates and the 6DOF page's shipped-pilot fetch; sysLagReading.mjs calls fetch (251 -> 252).
+    // RE-DERIVED at this branch's merge of main's v4837: ES modules 4333, closures 4179, typed arrays 1276 -- main's v4837 rows plus round 9's two files.
+    esModules: 4333, closures: 4179, asyncAwait: 1739, typedArrays: 1276, promises: 419,
+    fetchXhr: 252, performanceNow: 245, raf: 127, webgl: 200, webgpu: 57, threads: 25, wasm: 24,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.
