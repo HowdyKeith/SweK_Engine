@@ -525,7 +525,7 @@ console.log("\n11. *** THE A-VS-B SEAM DOES NOT COINCIDE, MEASURED AS A NAMED, N
     // point a plane cut invented. On this fixture that makes A's and B's cut boundaries meet everywhere within
     // watertight()'s 1e-6 quantum: measured 0/114 (22 A-side cut vertices, all 22 matched), against the plane-cut
     // path's 29/117 below. THAT IS THIS FIXTURE, NOT A GUARANTEE: triTriIntersect(a, b) and (b, a) are separate
-    // float computations of the same crossing, and the twelve-blast chain still has 1,133 raw unmatched edges on
+    // float computations of the same crossing, and the twelve-blast chain still has 1,143 raw unmatched edges on
     // this path (meshBooleanBlast-selfcheck.mjs section 8). Pinned at zero because zero is what it measures.
     const r = meshBoolean(PRIMARY.bufA, PRIMARY.bvhA, PRIMARY.bufB, PRIMARY.bvhB, "subtract");
     const wt = M.watertight(wrapAsPolys(r.tris));
@@ -840,7 +840,7 @@ console.log("unchecked here, named honestly: only `subtract` is required to pass
     "(section 11) came from triFragmentAccumulate.mjs's own independent-representative-plane design; since round " +
     "9 the DEFAULT path cuts along triTriIntersect()'s own segments instead, and the primary fixture measures " +
     "0 unmatched edges on it -- but each side still computes its crossing separately (triTriIntersect(a, b) and " +
-    "(b, a)), nothing shares one boundary into both meshes, and the twelve-blast chain keeps 1,133 raw unmatched " +
+    "(b, a)), nothing shares one boundary into both meshes, and the twelve-blast chain keeps 1,143 raw unmatched " +
     "edges (meshBooleanBlast-selfcheck.mjs section 8). The plane-cut path, which still runs for every triangle " +
     "the arrangement refuses, keeps its 29/117 baseline, gated as non-regression, not correctness. True edge-" +
     "exact watertightness still needs a meshCSG.mjs-style snap/merge/weld subsystem or one shared boundary per " +

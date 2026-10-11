@@ -14,7 +14,10 @@
 // inside the triangle (no crossings, no T-junctions, no loose ends); walk its faces; give each closed curve
 // floating inside a face to that face as a hole; triangulate each face with its holes (Earcut, through the
 // vendored three.js). The caller classifies ONE point per face: no face has B crossing its interior, because
-// every place B crosses this triangle is a segment, and every segment is a face boundary.
+// every place B crosses this triangle is a segment, and every segment is a face boundary -- TO WITHIN TOL: a crossing
+// shorter than TOL collapses to a point and is dropped, so B can cross a face by less than that (bounded by TOL x
+// perimeter; a review measured -9.1e-11 on a cube whose top face held a 0.9e-9 needle before thin triangles were
+// refused, 4.8e-12 after).
 //
 // IT NEVER COMPUTES A VERTEX. Every output vertex is one of triA's three corners or an endpoint triTriIntersect()
 // returned, bit for bit (triArrangement-selfcheck.mjs checks it). Snapping MERGES two endpoints into one of them;
@@ -25,13 +28,20 @@
 // IT REFUSES RATHER THAN GUESSES. A refusal sends the triangle back to the plane-cut path (meshBoolean.mjs), which
 // was gated for every case refused here; a WRONG acceptance is the only real failure, and the gate's defence
 // against it is hand-derived faces, bit-exact provenance, and per-triangle classification audits on real
-// workloads. Refused: a degenerate triA; any candidate triTriIntersect() calls "coplanar" or "degenerate" (flush
+// workloads. Refused: a degenerate triA, or one no higher than 4 TOL; any candidate triTriIntersect() calls "coplanar" or "degenerate" (flush
 // faces, shared edges -- the contacts the plane-cut path's own gates exist for); an endpoint outside triA by more
 // than TOL; two segments crossing; an endpoint within TOL of another segment it does not end on (T-junction);
 // collinear overlap; an interior vertex of odd degree (a curve with a loose end -- B is not closed there); a face
 // walk that does not close; a component with other than one outer cycle; a cycle of exactly zero area; a hole
 // with no face to sit in; a triangulation that turns clockwise or loses area; faces that do not tile the boundary
-// walked; a boundary further from triA than TOL allows. Any exception is a refusal too, never an abort.
+// walked; a boundary further from triA than TOL allows (those last two are assertions no input reaches -- see where
+// they are made). Any exception is a refusal too, never an abort.
+//
+// COST, MEASURED BY THE REVIEW AND NAMED RATHER THAN FIXED: one triangle holding a dense curve stays superlinear.
+// 200 long slabs beside an 8000-gon took 15 s before the validation grid was changed and 2.8 s after (18.8 million
+// tests where the curve packs ~400 segments into each of a few dozen cells); Earcut is superlinear on a face holding a
+// big hole -- 4.5 s of 5.8 s for a 14000-gon -- and on thousands of holes (3,160 squares, 2.2 s). The blast workloads
+// are far from this (n=128: 1.3 s for the whole boolean), but a mesh far denser than its partner can reach it.
 //
 // TOLERANCE: ARRANGE_TOL is ABSOLUTE (1e-9), like every other tolerance in this pipeline (triTriIntersect's EPS,
 // triClip's, pointInMesh's). Snapping merges endpoints closer than TOL; "on an edge" means within TOL of it.
@@ -102,11 +112,12 @@ function pointInPoly(p, poly) {
  * @param {number} triA                       triangle index into trisA
  * @param {Float64Array|Float32Array} trisB
  * @param {Iterable<number>} candidateTriBs   B-triangle indices whose boxes overlap triA's (any superset is fine)
- * @returns {{ok:true, faces:{tris:{tri:number[][], area:number}[], area:number}[], segments:number} |
+ * @returns {{ok:true, faces:{tris:{tri:number[][], area:number}[], area:number}[], segments:number, validationTests:number} |
  *           {ok:false, reason:string}}
  *   faces: a partition of triA. face.area is the face's net area (holes removed); each output triangle carries its
  *     own area, wound with triA, and its vertices are triA's corners or triTriIntersect() endpoints, bit for bit.
  *     A face can have no triangles only if every one was a TOL-sliver. segments: interior segments kept.
+ *     validationTests: vertex-segment and segment-segment tests the validation grid made (its work, for gates).
  *   On refusal, reason names the check; the caller should fall back to the plane-cut path.
  */
 export function arrangeTriangle(trisA, triA, trisB, candidateTriBs) {
@@ -122,6 +133,15 @@ function arrangeUnguarded(trisA, triA, trisB, candidateTriBs) {
     const nLen = Math.hypot(n[0], n[1], n[2]), e1Len = Math.hypot(e1[0], e1[1], e1[2]);
     const triArea = nLen / 2;
     if (!(triArea > 0) || !Number.isFinite(triArea) || !(e1Len > 0)) return refuse("degenerate triA");
+    // A TRIANGLE NARROWER THAN A FEW TOL CANNOT HOLD A CROSSING THE SNAP CAN RESOLVE. Every point in it is within TOL of
+    // two edges, so a crossing's ends are both classified onto edges and the crossing is skipped as boundary: a round-9
+    // review built a triangle 1.5e-9 wide with B over a fifth of it and got ONE face and no segments, and a cube whose
+    // top face held a 0.9e-9 needle came back 9.1e-11 short with 11 unmatched edges, where the plane-cut path was exact.
+    {
+        const l1 = Math.hypot(C[2][0] - C[1][0], C[2][1] - C[1][1], C[2][2] - C[1][2]);
+        const l2 = Math.hypot(C[0][0] - C[2][0], C[0][1] - C[2][1], C[0][2] - C[2][2]);
+        if (2 * triArea / Math.max(e1Len, l1, l2) <= 4 * TOL) return refuse("thin triA");
+    }
 
     // 2D frame in triA's plane: u along edge 0, v = n x u, so triA is counter-clockwise (positive area).
     const u = [e1[0] / e1Len, e1[1] / e1Len, e1[2] / e1Len];
@@ -190,7 +210,7 @@ function arrangeUnguarded(trisA, triA, trisB, candidateTriBs) {
         segs.push([a, b]);
     }
     if (segs.length === 0) {
-        return { ok: true, faces: [{ tris: [{ tri: [C[0], C[1], C[2]], area: triArea }], area: triArea }], segments: 0 };
+        return { ok: true, faces: [{ tris: [{ tri: [C[0], C[1], C[2]], area: triArea }], area: triArea }], segments: 0, validationTests: 0, validationVisits: 0 };
     }
 
     // ---- the graph: vertices that carry a segment, plus the corners ---------------------------------------------
@@ -204,7 +224,8 @@ function arrangeUnguarded(trisA, triA, trisB, candidateTriBs) {
 
     // ---- validation: crossings, T-junctions, collinear overlap, on a uniform grid over triA ---------------------
     // Geometry before degree: a curve ending ON another one has a loose end too, and "T-junction" says why.
-    const bad = validate(V, live, segs, C2);
+    const work = { tests: 0, visits: 0 };
+    const bad = validate(V, live, segs, C2, work);
     if (bad) return refuse(bad);
     // An interior vertex of odd degree is a curve with a loose end: B is not closed there.
     for (let i = 0; i < V.length; i++) if (V[i].corner < 0 && V[i].edge < 0 && (deg[i] & 1)) return refuse("dangling");
@@ -265,13 +286,18 @@ function arrangeUnguarded(trisA, triA, trisB, candidateTriBs) {
     if (!negByComp.has(mainComp)) return refuse("outer face");
 
     // ---- holes: each floating outline goes to the SMALLEST face of another component that contains it ---------
-    for (const f of bounded) { f.holes = []; f.poly = f.vs.map((i) => V[i].p2); }
+    for (const f of bounded) {
+        f.holes = []; f.poly = f.vs.map((i) => V[i].p2);
+        f.box = [Infinity, Infinity, -Infinity, -Infinity];
+        for (const q of f.poly) { if (q[0] < f.box[0]) f.box[0] = q[0]; if (q[1] < f.box[1]) f.box[1] = q[1]; if (q[0] > f.box[2]) f.box[2] = q[0]; if (q[1] > f.box[3]) f.box[3] = q[1]; }
+    }
     for (const [comp, [h]] of negByComp) {
         if (comp === mainComp) continue;
         const p = V[h.vs[0]].p2;
         let best = null;
         for (const f of bounded) {
             if (f.comp === h.comp) continue;
+            if (p[0] < f.box[0] || p[0] > f.box[2] || p[1] < f.box[1] || p[1] > f.box[3]) continue;
             if ((!best || f.area < best.area) && pointInPoly(p, f.poly)) best = f;
         }
         if (!best) return refuse("orphan hole");
@@ -316,34 +342,63 @@ function arrangeUnguarded(trisA, triA, trisB, candidateTriBs) {
         if (!(Math.abs(sum - faceArea) <= 1e-9 * triArea)) return refuse("triangulation area");
         faces.push({ tris: ts, area: faceArea });
     }
-    // The faces must tile the boundary the walk actually went round -- which is NOT exactly triA: an endpoint
-    // within TOL of an edge counts as on it but is never moved (no new vertices), so the boundary can sit up to
-    // TOL inside triA's edges. Comparing the faces with triA itself refused 7 healthy triangles of the twelve-
-    // blast chain (endpoints 1e-10..5e-10 inside an edge of triangles of area 0.002-0.04: strips of 1e-11..1e-10,
-    // over 1e-9 of those areas). So the two questions are asked separately: do the faces tile the walked
-    // boundary (a broken walk or a lost hole fails this), and is that boundary within the tolerance of triA.
+    // TWO BACKSTOPS, AND WHAT THEY CAN AND CANNOT SEE -- corrected after a round-9 review measured them. The first
+    // version compared the faces with triA itself, and refused 7 healthy triangles of the twelve-blast chain: an
+    // endpoint within TOL of an edge counts as on it but is never moved, so the walked boundary can sit up to TOL
+    // inside triA (strips of 1e-11..1e-10 on triangles of area 0.002-0.04). So the question was split in two -- and
+    // the comment here then claimed the first half catches "a broken walk or a lost hole". IT CANNOT CATCH A BROKEN
+    // WALK: every walk that pairs each edge with its twin gives cycles whose signed areas sum to zero per component, so
+    // the faces equal the walked boundary for ANY such walk (measured: 4.3e-16 of triA over 300 random cases, 2.8e-16
+    // with the walk reversed). What it does guard is the hole bookkeeping -- a hole assigned twice or silently dropped
+    // breaks the sum -- and the code refuses an unassigned hole earlier ("orphan hole"), so no input reaches it. The
+    // second half cannot fire either: addPoint refuses anything outside triA by more than TOL, which bounds the strip.
+    // Both stay as assertions of those two facts; a broken walk is caught by "outer face" and "triangulation area".
     const outerArea = -negByComp.get(mainComp)[0].area, perimeter = E[0].len + E[1].len + E[2].len;
     if (!(Math.abs(facesTotal - outerArea) <= 1e-9 * triArea)) return refuse("face area sum");
     if (!(Math.abs(triArea - outerArea) <= TOL * perimeter + 1e-9 * triArea)) return refuse("boundary strip");
-    return { ok: true, faces, segments: segs.length };
+    return { ok: true, faces, segments: segs.length, validationTests: work.tests, validationVisits: work.visits };
 }
 
 // Crossings, T-junctions and collinear overlap among the kept segments, tested only between segments and vertices
-// that share a cell of a uniform grid over triA (each segment registered in every cell its box, padded by TOL,
-// touches; each vertex in the one cell holding it). Returns a refusal reason, or null.
-function validate(V, live, segs, C2) {
-    let x0 = Math.min(C2[0][0], C2[1][0], C2[2][0]) - 2 * TOL, x1 = Math.max(C2[0][0], C2[1][0], C2[2][0]) + 2 * TOL;
-    let y0 = Math.min(C2[0][1], C2[1][1], C2[2][1]) - 2 * TOL, y1 = Math.max(C2[0][1], C2[1][1], C2[2][1]) + 2 * TOL;
-    const G = Math.max(1, Math.min(256, Math.ceil(Math.sqrt(segs.length))));
+// that share a cell of a uniform grid over triA. Returns a refusal reason, or null; work.tests counts the tests made.
+//
+// A segment is registered in the cells it PASSES THROUGH, column strip by column strip, padded by TOL -- not in every
+// cell of its bounding box, and pairs are de-duplicated by a per-segment marker rather than a Set of pairs. A round-9
+// review measured the first version on 200 long diagonal slabs beside an 8000-gon: each slab's box covered the whole
+// grid, so every slab met every polygon segment in every cell -- 15 s for ONE triangle, 13 s of it here -- and at 400
+// slabs and a 16000-gon the pair Set overflowed ("Set maximum size exceeded", refused, 47 s spent first). The grid is
+// also finer (2 sqrt(n) a side rather than sqrt(n)), because a dense curve concentrates its segments in a few cells.
+//
+// Why a point within TOL of a segment is still found: it lies within TOL of some point q of the segment, so q's x is
+// within TOL of the point's column and q's y lies between the segment's y at that column's edges widened by TOL; the
+// registration covers exactly that range, widened by TOL again. Two segments that cross share the crossing point's cell.
+function validate(V, live, segs, C2, work) {
+    const x0 = Math.min(C2[0][0], C2[1][0], C2[2][0]) - 2 * TOL, x1 = Math.max(C2[0][0], C2[1][0], C2[2][0]) + 2 * TOL;
+    const y0 = Math.min(C2[0][1], C2[1][1], C2[2][1]) - 2 * TOL, y1 = Math.max(C2[0][1], C2[1][1], C2[2][1]) + 2 * TOL;
+    const G = Math.max(1, Math.min(1024, Math.ceil(2 * Math.sqrt(segs.length))));
+    const cw = (x1 - x0) / G;
     const ix = (x) => { const k = Math.floor((x - x0) / (x1 - x0) * G); return k < 0 ? 0 : k >= G ? G - 1 : k; };
     const iy = (y) => { const k = Math.floor((y - y0) / (y1 - y0) * G); return k < 0 ? 0 : k >= G ? G - 1 : k; };
-    const segCells = new Map(), vertCells = new Map();
+    const segCells = new Map(), vertCells = new Map(), cellsOf = new Array(segs.length);
     const push = (m, k, v) => { const l = m.get(k); if (l) l.push(v); else m.set(k, [v]); };
     segs.forEach(([a, b], s) => {
-        const pa = V[a].p2, pb = V[b].p2;
-        const i0 = ix(Math.min(pa[0], pb[0]) - TOL), i1 = ix(Math.max(pa[0], pb[0]) + TOL);
-        const j0 = iy(Math.min(pa[1], pb[1]) - TOL), j1 = iy(Math.max(pa[1], pb[1]) + TOL);
-        for (let ci = i0; ci <= i1; ci++) for (let cj = j0; cj <= j1; cj++) push(segCells, ci * G + cj, s);
+        const pa = V[a].p2, pb = V[b].p2, dx = pb[0] - pa[0], dy = pb[1] - pa[1];
+        const lo = Math.min(pa[0], pb[0]) - TOL, hi = Math.max(pa[0], pb[0]) + TOL;
+        const cells = [];
+        for (let ci = ix(lo), c1 = ix(hi); ci <= c1; ci++) {
+            // The clamped first and last columns reach past the grid, so they are unbounded on their outer side.
+            const xa = Math.max(lo, ci === 0 ? -Infinity : x0 + ci * cw - TOL);
+            const xb = Math.min(hi, ci === G - 1 ? Infinity : x0 + (ci + 1) * cw + TOL);
+            let ya, yb;
+            if (dx === 0) { ya = Math.min(pa[1], pb[1]); yb = Math.max(pa[1], pb[1]); }
+            else {
+                const ta = Math.min(1, Math.max(0, (xa - pa[0]) / dx)), tb = Math.min(1, Math.max(0, (xb - pa[0]) / dx));
+                ya = pa[1] + ta * dy; yb = pa[1] + tb * dy;
+                if (ya > yb) { const t = ya; ya = yb; yb = t; }
+            }
+            for (let cj = iy(ya - TOL), d1 = iy(yb + TOL); cj <= d1; cj++) { const k = ci * G + cj; push(segCells, k, s); cells.push(k); }
+        }
+        cellsOf[s] = cells;
     });
     for (const i of live) push(vertCells, ix(V[i].p2[0]) * G + iy(V[i].p2[1]), i);
 
@@ -355,17 +410,21 @@ function validate(V, live, segs, C2) {
         for (const p of vl) for (const s of sl) {
             const [s0, s1] = segs[s];
             if (p === s0 || p === s1) continue;
+            work.tests++;
             if (pointSegDist(V[p].p2, V[s0].p2, V[s1].p2).d <= TOL) return "T-junction";
         }
     }
-    // Segment pairs: a proper crossing, or two segments leaving a shared vertex along one line.
-    const tested = new Set();
-    for (const sl of segCells.values()) {
-        for (let x = 0; x < sl.length; x++) for (let y = x + 1; y < sl.length; y++) {
-            const s = Math.min(sl[x], sl[y]), t = Math.max(sl[x], sl[y]), key = s * segs.length + t;
-            if (tested.has(key)) continue;
-            tested.add(key);
-            const [a, b] = segs[s], [c, d] = segs[t];
+    // Segment pairs: a proper crossing, or two segments leaving a shared vertex along one line. mark[t] === s says the
+    // pair (s, t) was already tested from another cell the two share.
+    const mark = new Int32Array(segs.length).fill(-1);
+    for (let s = 0; s < segs.length; s++) {
+        const [a, b] = segs[s];
+        for (const k of cellsOf[s]) for (const t of segCells.get(k)) {
+            work.visits++;
+            if (t <= s || mark[t] === s) continue;
+            mark[t] = s;
+            work.tests++;
+            const [c, d] = segs[t];
             const shared = a === c || a === d ? a : b === c || b === d ? b : -1;
             if (shared < 0) {
                 const pa = V[a].p2, pb = V[b].p2, pc = V[c].p2, pd = V[d].p2;

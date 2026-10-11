@@ -17,33 +17,42 @@
 //     pointInMesh() against B, must agree with its face's classification (one point per face, taken from the
 //     face's largest triangle). A face that B crossed would split its triangles between the two answers.
 //
-// SABOTAGE LOG -- RUN ON THE REBUILT MODULE. (The first build's log, measured on code lost uncommitted, is superseded;
-// where the two differ it is said.) Each applied to the real file, THIS gate / meshBoolean-selfcheck /
+// SABOTAGE LOG -- RUN ON THE REBUILT MODULE, AND RE-RUN WHOLE AFTER THE REVIEW OF THE REBUILD CHANGED IT (validation grid,
+// thin-triA refusal, hole box precheck, and new fixtures 1c' and 2i). These are the re-run's numbers; the first run's
+// differed only where checks added since -- 1c', 2i, and both gates' front-door sections from the v4831 merge -- add reds. Each applied to the real file, THIS gate / meshBoolean-selfcheck /
 // meshBooleanBlast-selfcheck run, the file restored in a `finally` and the restore verified by md5sum:
-//   A1  snap disabled for segment endpoints (corners only) -> 19 / 4 / 3 (every shared midpoint a T-junction)
-//   A2  hole given to the LARGEST containing face -> 2 / 0 / 0 (1c, refused at 'triangulation area'; 1f)
-//   A3  face walk turns the wrong way -> 10 / 4 / 5
+//   A1  snap disabled for segment endpoints (corners only) -> 23 / 4 / 3 (every shared midpoint a T-junction)
+//   A2  hole given to the LARGEST containing face -> 4 / 0 / 0 (1c and 1c', refused at 'triangulation area'; 1f)
+//   A3  face walk turns the wrong way -> 12 / 4 / 5
 //   A4  crossing check removed -> 1 / 0 / 0 (2c: still refused, one check later, at 'triangulation area')
-//   A5  dangling check disabled -> 1 / 0 / 0 (2d; section 4's 30-TOL crack is then refused by a later check, and that
-//       check accepts any refusal -- the first build's log had it red here too)
+//   A5  dangling check disabled -> 1 / 0 / 0 (2d; section 4's 30-TOL crack is refused by a later check, which it accepts)
 //   A6  a clockwise non-sliver triangle emitted instead of refused -> 0 / 0 / 0, EXPECTED: the only clockwise triangles
 //       ever measured are rounding-noise slivers, which the sliver rule drops first; no fixture builds another.
-//   A7  meshBoolean reusing one face's classification for every face of a triangle -> 0 / 11 / 12
-//   A8  coplanar/degenerate candidates ignored instead of refused -> 2 / 7 / 0
+//   A7  meshBoolean reusing one face's classification for every face of a triangle -> 0 / 12 / 12
+//   A8  coplanar/degenerate candidates ignored instead of refused -> 3 / 7 / 0
 //   A9  segments along triA's boundary kept -> 2 / 0 / 1 (1h, the near-edge fixture built for it)
 //   A10 (control) validation grid minimum of two cells -> 0 / 0 / 0, as a correctness-neutral change must
 //   A11 the exception guard removed -> 1 / 0 / 0 (2g)
 //   F1  the reviews' sliver fix reverted (drop anything under 1e-14 of triA) -> 2 / 2 / 0 (1g; the rod, the needle)
 //   F2  the orientation refusal moved back before the sliver drop -> 0 / 1 / 0 (section 15's zero-refusal sweep)
-//   F3  cycle area back to the plain shoelace from triA's corner -> 2 / 0 / 0 (1g's 2e-8 square)
+//   F3  cycle area back to the plain shoelace from triA's corner -> 3 / 0 / 0 (1g's 2e-8 square; the front door's)
 //   F4  the zero-area-cycle refusal removed -> 0 / 0 / 0: no fixture builds a cycle of exactly zero area (a backstop)
 //   F5  face-area check back to 'faces sum to triA' -> 0 / 0 / 1 (section 8's chain: refusals over sub-TOL strips)
 //   F6  vertices no segment touches kept in the graph -> 1 / 0 / 1 (2h)
-//   F7  the faces-tile-the-walked-boundary check removed -> 0 / 0 / 0: every walk the fixtures build tiles its boundary,
-//       and the crossing and hole faults above are refused at 'triangulation area' first -- a backstop, said so
-//   N4  a face classified at its FIRST triangle, not its largest -> 0 / 0 / 0 on the rebuild (5 blast reds on the first
-//       build; the rebuild's first triangles agree on all 8,581 multi-triangle faces of four twelve-blast chains), so
-//       the choice was extracted as faceSamplePoint() and unit-tested -> re-run 0 / 1 / 0
+//   F7  the faces-tile-the-walked-boundary check removed -> 0 / 0 / 0, and it CANNOT be otherwise: the review showed it
+//       is an identity for any walk that pairs every edge (see the module); it guards hole bookkeeping, not the walk
+//   R1  hole given to the FIRST containing face, not the smallest -> 1 / 0 / 0 (1c', refused at 'triangulation area')
+//   R2  R1 with the triangulation-area refusal removed too -> 1 / 0 / 0 (1c' -- WRONG faces 0.25, 4, 4.75, 41). The
+//       review's construction: before 1c' this pair went 0 / 0 / 0 while three nested squares came back 2.25 over
+//   R3  T-junction check removed -> 1 / 0 / 0 (2e)
+//   R4  collinear-overlap check removed -> 0 / 0 / 0, EXPECTED: an overlap from a shared vertex puts the shorter
+//       segment's far end on the longer one, which the T-junction check refuses first
+//   R5  thin-triA refusal removed -> 1 / 0 / 0 (2i)
+//   R6  validation grid back to bounding-box registration -> 1 / 0 / 0 (2i's visit count)
+//   R7  hole assignment's box precheck removed -> 0 / 0 / 0, EXPECTED: it only skips ray casts that would say no
+//   N4  a face classified at its FIRST triangle, not its largest -> 0 / 1 / 0 (meshBoolean-selfcheck's faceSamplePoint
+//       unit check; 0 / 0 / 0 before that check existed -- the rebuild's first triangles agree on all 8,581 multi-
+//       triangle faces of four twelve-blast chains)
 //   N7  ambiguity dropped for arranged faces -> 0 / 1 / 0 (meshBoolean-selfcheck section 15's dirs:[] fixture)
 //   N18 pointInMeshOpts not passed for arranged faces -> 0 / 1 / 0 (the same fixture)
 "use strict";
@@ -128,6 +137,15 @@ console.log("\n1. *** HAND-DERIVED FACES ***");
     ok("1c. nested holes go to their INNERMOST containing face: faces 1, 8, 41",
         c.r.ok && c.r.faces.length === 3 && close(faceAreas(c.r)[0], 1) && close(faceAreas(c.r)[1], 8) && close(faceAreas(c.r)[2], 41),
         c.r.ok ? JSON.stringify(faceAreas(c.r)) : "refused: " + c.r.reason);
+
+    // 1c'. THREE DEEP. A round-9 review gave each hole to the FIRST face containing it instead of the smallest, and
+    // with the triangulation-area check also off, every gate stayed green while three nested squares came back with
+    // 2.25 too much area and 7.25 of it classified the wrong way: no fixture nested deeper than two. [1,4]^2 around
+    // [1.5,3.5]^2 around [2.5,3]^2: faces 0.25, 4 - 0.25 = 3.75, 9 - 4 = 5 and 50 - 9 = 41.
+    const c3 = arrange([...prism(1, 1, 4, 4), ...prism(1.5, 1.5, 3.5, 3.5), ...prism(2.5, 2.5, 3, 3)]);
+    ok("1c'. three nested squares: every hole to its innermost face -- faces 0.25, 3.75, 5, 41",
+        c3.r.ok && c3.r.faces.length === 4 && [0.25, 3.75, 5, 41].every((want, i) => close(faceAreas(c3.r)[i], want)),
+        c3.r.ok ? JSON.stringify(faceAreas(c3.r)) : "refused: " + c3.r.reason);
 
     // 1d. two disjoint holes: [1,2]^2 and [4,5]x[1,2]. Faces 1, 1, 48.
     const d = arrange([...prism(1, 1, 2, 2), ...prism(4, 1, 5, 2)]);
@@ -261,6 +279,32 @@ console.log("\n2. *** THE REFUSALS A FIXTURE CAN REACH, EACH ON THE CASE THAT CA
     ok("2h. ...and a sub-TOL tetra beside its foot leaves the answer bit-identical: its stray edge vertices bound nothing",
         archAlone.ok && orphanRuns.every((q) => q.ok && JSON.stringify(faceAreas(q)) === JSON.stringify(faceAreas(archAlone)) && q.segments === archAlone.segments),
         orphanRuns.map((q) => q.ok ? JSON.stringify(faceAreas(q)) : "refused " + q.reason).join(" ") + " (first version: (1.1e-9, 0.9e-9) refused as 'outer face')");
+}
+
+// =============================================================================================================
+console.log("\n2i. *** A TRIANGLE TOO THIN FOR THE SNAP, AND THE GRID'S WORK ***");
+{
+    // 2i. A triangle 1.5e-9 high: every point in it is within TOL of two edges, so a crossing's ends were both put on
+    // edges and skipped -- a review got ONE face and no segments with B over a fifth of it. Now refused.
+    const thin = mkBuf([[[0, 0, 0], [10, 0, 0], [10, 1.5e-9, 0]]]);
+    const P = prism(4, -1, 6, 1), r = arrangeTriangle(thin, 0, mkBuf(P), all(P));
+    ok("2i. a triangle no higher than 4 TOL is refused as 'thin triA'", !r.ok && r.reason === "thin triA", r.ok ? "ACCEPTED, " + r.faces.length + " faces" : r.reason);
+    // The validation grid registers a segment in the cells it passes through, not every cell of its box. A review's 200
+    // long diagonal slabs beside an 8000-gon took 15 s in one triangle with box registration; this smaller copy (60 slabs,
+    // an 800-gon) measured 426,734 visits to cell lists against 5,660,908 with box registration.
+    const slabs = [];
+    const ring = (cx, cy, rad, n) => Array.from({ length: n }, (_, i) => [cx + rad * Math.cos(2 * Math.PI * i / n), cy + rad * Math.sin(2 * Math.PI * i / n)]);
+    const sides = (poly) => poly.flatMap(([ax, ay], i) => { const [bx, by] = poly[(i + 1) % poly.length]; return [[[ax, ay, -1], [bx, by, -1], [bx, by, 1]], [[ax, ay, -1], [bx, by, 1], [ax, ay, 1]]]; });
+    for (let i = 0; i < 60; i++) {
+        const u = 0.6 + 5.4 * i / 60, w = 5.4 / 60 / 3, d = 1 / Math.SQRT2, L = 20;
+        slabs.push(...sides([[u * d - L * d, u * d + L * d], [u * d + L * d, u * d - L * d], [(u + w) * d + L * d, (u + w) * d - L * d], [(u + w) * d - L * d, (u + w) * d + L * d]]));
+    }
+    slabs.push(...sides(ring(0.2, 0.2, 0.12, 800)));
+    const g = arrangeTriangle(A, 0, mkBuf(slabs), all(slabs));
+    const cover = g.ok ? g.faces.reduce((acc, f) => acc + f.area, 0) : 0;
+    ok("2i. 60 long slabs beside an 800-gon: arranged, faces cover A, and the grid visits under 1.5 million cell entries",
+        g.ok && Math.abs(cover - AREA_A) < 1e-9 && g.validationVisits < 1.5e6,
+        g.ok ? g.faces.length + " faces, " + g.validationVisits + " visits, " + g.validationTests + " tests (box registration: 5,660,908 visits)" : "refused: " + g.reason);
 }
 
 // =============================================================================================================

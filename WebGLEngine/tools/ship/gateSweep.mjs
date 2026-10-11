@@ -8908,8 +8908,8 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "squares 1, 8 and 41, every output vertex bit-identical to a corner or a triTriIntersect endpoint; a square 2e-7 across keeps " +
                  "its 4e-14 face (the round's lost first build dropped it); a crossing within TOL of A's edge closes against it and leaves a " +
                  "2.75e-9 strip, measured. Four real-workload audits classify every output triangle on its own and find 0 that disagree with " +
-                 "their face. 30 checks. 21 sabotages in 22 runs against the rebuilt module: red by name except a control, three named " +
-                 "backstops, and classifying a face by its first triangle -- 0 red until a unit check was added for it, then red on the re-run.",
+                 "their face. 33 checks after the review of the rebuild (a three-deep nest, a too-thin triangle, the validation grid's work). " +
+                 "28 sabotages on the reviewed module: red by name except a control, four backstops and a speed-up, each said why.",
     }),
     // v4834 -- ONE new gate file: tools/ship/reportFresh-selfcheck.mjs (no report older than the last commit to its own gate).
     since525: Object.freeze({
