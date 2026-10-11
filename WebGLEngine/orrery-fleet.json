@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "50f48e19141b018aab8b984701d0f1155e71a0a1",
+ "head": "d579f71709b07e5985acc164a33f685aad44e463",
  "bodies": {
   "box3d": [
    {
@@ -156,7 +156,7 @@
    {
     "path": "tools/ship/dracoEncode-selfcheck.mjs",
     "bytes": 18170,
-    "sha": "9c1d4e76e2de04a03dd8b50fba410a7d4bb2d237"
+    "sha": "d579f71709b07e5985acc164a33f685aad44e463"
    }
   ],
   "fonts": [
@@ -721,8 +721,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3526956,
-    "sha": "e2781eda9a0a36a74d1a526eebaa4753f65cbec0"
+    "bytes": 3529460,
+    "sha": "d579f71709b07e5985acc164a33f685aad44e463"
    },
    {
     "path": "mpm3d.html",
@@ -827,7 +827,7 @@
    {
     "path": "tools/ship/dracoEncode-selfcheck.mjs",
     "bytes": 18170,
-    "sha": "9c1d4e76e2de04a03dd8b50fba410a7d4bb2d237"
+    "sha": "d579f71709b07e5985acc164a33f685aad44e463"
    },
    {
     "path": "tools/ship/dracoWeld-selfcheck.mjs",

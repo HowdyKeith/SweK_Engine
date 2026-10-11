@@ -33,6 +33,12 @@
 //     code too -- the child dies a moment after the driver; it is polled for 2 s now). Restored.
 //   * v4680: registered the handlers over an empty list -> the SIGHUP, child and SIGINT rows went red, three by
 //     name; the SIGKILL control stayed green, as it must. Restored.
+//   * v4833, section 7 (a box not ready to verify is refused before verify runs), five, each red by name:
+//     A. readiness() ignores the Playwright resolver                  -> 2 (no Playwright; no browser on disk)
+//     B. readiness() ignores ensureDxc                               -> 2 (the DLL missing; no bundle carries it)
+//     C. main() runs verify although readiness answered              -> 1 (verify NEVER STARTED)
+//     D. the real verify gets no readiness check                     -> 1 (the choice row)
+//     E. the --write command is named where ensureDxc said CANNOT    -> 1 (the CANNOT row)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -197,6 +203,76 @@ console.log("\n6. a run ended from outside says so where it can -- and the silen
         kill.sent && !/\[ship\] (verify exit|DO NOT SHIP|SHIP)/.test(kill.out) && kill.out.includes("[ship] shipVerdict pid"),
         `exit=${kill.code} signal=${kill.signal} -- taskkill /F, End task, a job-object kill or a power loss; the start line is there, the trailer is not`);
     try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
+}
+
+console.log("\n7. v4833 -- a box that cannot run the browser gates is refused BEFORE verify, with the one command");
+// Keith's v4819 clone-verify: 898 s, 104 new reds, 103 of them "playwright is not installed here" once per gate. v4826's:
+// four reds that were dxcompiler.dll missing beside a fresh headless shell. Both are facts about the box that the tree's
+// own resolvers answer in milliseconds; readiness() asks them, and main() refuses on any answer without running verify.
+{
+    const { browserSkipReason, SHELL_DIR_SAMPLES, SHELL_LEAVES, DXC_LEAVES } = await import("./playwrightResolve.mjs");
+    const { ensureDxc } = await import("./ensureDxc.mjs");
+    const noDxc = () => ({ needed: false });
+    const none = SV.readiness({ resolve: () => ({ chromium: null, from: "" }), shell: "", skipReason: browserSkipReason, dxc: noDxc });
+    ok("!! *** no Playwright: ONE line, naming tools/render-qa's npm install -- not one red per browser gate ***",
+        none.length === 1 && /tools[\\/]render-qa/.test(none[0].what) && /npm install/.test(none[0].what),
+        none.length ? none[0].what.slice(0, 160) + "..." : "readiness said ready with no Playwright at all");
+    const noShell = SV.readiness({ resolve: () => ({ chromium: {}, from: "playwright" }), shell: "", skipReason: browserSkipReason, dxc: noDxc });
+    ok("...Playwright but no browser on disk: the install that fetches one is named",
+        noShell.length === 1 && /npx playwright install chromium chromium-headless-shell/.test(noShell[0].what),
+        noShell.length ? noShell[0].what.slice(-110) : "readiness said ready with no browser binary");
+    // ensureDxc itself, driven on a fixture Windows box: Playwright's root holds a full browser carrying dxcompiler.dll
+    // and a headless shell that does not -- the state a fresh `playwright install` leaves (v4828's four reds).
+    // The folder and leaf names come from the resolver's own exports: playwrightResolve-selfcheck refuses a browser path
+    // spelt by hand anywhere else, and this fixture was its first catch (v4833's verdict).
+    const ROOTPW = path.join(path.sep, "pw");
+    const [FULL_DIR, SHELL_DIR] = SHELL_DIR_SAMPLES;
+    const FULL = path.join(ROOTPW, FULL_DIR, DXC_LEAVES.find((l) => l.startsWith("chrome-win64")));
+    const shellExe = path.join(ROOTPW, SHELL_DIR, SHELL_LEAVES.find((l) => l.startsWith("chrome-headless-shell-win64")));
+    const fixDxc = (has) => () => ensureDxc({ platform: "win32", shell: shellExe, env: { PLAYWRIGHT_BROWSERS_PATH: ROOTPW }, home: path.join(path.sep, "nohome"),
+        exists: (q) => has.includes(q), readdir: (r) => { if (r === ROOTPW) return [FULL_DIR, SHELL_DIR]; throw new Error("no " + r); } });
+    const ready = () => ({ chromium: {}, from: "playwright" }), shellOk = () => "";
+    const dxcDry = SV.readiness({ resolve: ready, shell: shellExe, skipReason: shellOk, dxc: fixDxc([FULL]) });
+    ok("!! *** a fresh Windows browser folder without dxcompiler.dll: ensureDxc --write is named, before 15 minutes of sweep ***",
+        dxcDry.length === 1 && /ensureDxc\.mjs --write/.test(dxcDry[0].what) && /dxcompiler\.dll/.test(dxcDry[0].what),
+        dxcDry.length ? dxcDry[0].what.slice(0, 170) + "..." : "readiness said ready with the DLL missing beside the shell");
+    const dxcNone = SV.readiness({ resolve: ready, shell: shellExe, skipReason: shellOk, dxc: fixDxc([]) });
+    ok("...and when no bundle on the box carries it, the reason ensureDxc gives is passed on rather than a command that cannot work",
+        dxcNone.length === 1 && /CANNOT/.test(dxcNone[0].what) && !/ensureDxc\.mjs --write/.test(dxcNone[0].what),
+        dxcNone.length ? dxcNone[0].what.slice(-120) : "readiness said ready");
+    const dxcThere = SV.readiness({ resolve: ready, shell: shellExe, skipReason: shellOk,
+        dxc: fixDxc([FULL, path.join(path.dirname(shellExe), "dxcompiler.dll")]) });
+    ok("CONTROL: the DLL already beside the shell, and Playwright resolved -- ready, no entries",
+        dxcThere.length === 0, JSON.stringify(dxcThere).slice(0, 160));
+
+    // main() itself: a stand-in verify that leaves a mark if it is ever started.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "shipverdict-ready-"));
+    try {
+        const mark = path.join(dir, "verify-ran");
+        const standIn = path.join(dir, "verify-standin.mjs");
+        fs.writeFileSync(standIn, `import fs from "node:fs";\nfs.writeFileSync(${JSON.stringify(mark)}, "ran");\n`);
+        const lines = []; let code = null;
+        const d = await SV.main({ eng: ENG, verifyPath: standIn, preflight: () => [{ what: "the browser gates cannot run here: FIXTURE" }],
+                                  out: (m) => lines.push(m), exit: (c) => { code = c; } });
+        const text = lines.join("\n");
+        ok("!! *** not ready: verify is NEVER STARTED, the exit is 1, and the last line says DO NOT SHIP -- NOT RUN ***",
+            !fs.existsSync(mark) && code === 1 && d && d.notRun === true &&
+            /\[ship\] DO NOT SHIP -- NOT RUN/.test(text.trim().split("\n").slice(-1)[0]) && text.includes("FIXTURE"),
+            `verify ${fs.existsSync(mark) ? "RAN" : "not started"}, exit ${code}, last line ${JSON.stringify(text.trim().split("\n").slice(-1)[0])}`);
+        lines.length = 0; code = null;
+        await SV.main({ eng: ENG, verifyPath: standIn, preflight: () => [], out: (m) => lines.push(m), exit: (c) => { code = c; } });
+        // main() registered its signal handlers on THIS process on the way through; they would swallow a Ctrl+C here.
+        for (const sig of SV.CATCHABLE) process.removeAllListeners(sig);
+        ok("CONTROL: ready -- the same stand-in IS started, so the row above is about the refusal and not a stand-in that never runs",
+            fs.existsSync(mark) && code !== null, `verify ${fs.existsSync(mark) ? "ran" : "NOT STARTED"}, exit ${code}`);
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+
+    ok("the REAL verify gets the real readiness check; a stand-in gets none unless one is passed",
+        SV.chosenPreflight({ verifyPath: null }) === SV.readiness && SV.chosenPreflight({ verifyPath: "x.mjs" }) === null &&
+        typeof SV.chosenPreflight({ verifyPath: "x.mjs", preflight: () => [] }) === "function",
+        "so sections 4 and 6, which drive main() against stand-ins, are unchanged on a box without Playwright");
+    const here = SV.readiness();
+    say(`THIS BOX: ${here.length ? "NOT READY -- " + here.map((n) => n.what).join(" | ") : "ready (Playwright resolves, a browser is on disk, and DXC is " + (process.platform === "win32" ? "beside the shell" : "not needed off Windows") + ")"}`);
 }
 
 say("WHAT THIS DOES NOT CLAIM. That a round cannot be pushed unverified -- nothing in a repository can stop a " +

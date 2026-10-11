@@ -8892,6 +8892,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The CLIs refuse an unknown option (cliArgs) and the peer's transport is a row of its own. Thirteen sabotages red by name, " +
                  "logged in the two headers. NOT CLOSED: the pair has run over loopback and in one browser, not between two machines.",
     }),
+    // v4833 -- NO new gate file -- shipVerdict asks whether the box can run the browser gates before it runs verify.
+    since524: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4833", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/shipVerdict-selfcheck.mjs (section 7: no Playwright, no browser on disk, and dxcompiler.dll missing beside a Windows shell each refuse before verify with the one command; sabotages A-E)",
+        ]),
+        verdict: "*** 103 OF THE RIG'S 104 v4819 REDS WERE ONE FACT, PRINTED ONCE PER GATE AFTER 898 s. *** shipVerdict.readiness() asks the " +
+                 "tree's own resolvers (playwrightResolve, ensureDxc) first and refuses with DO NOT SHIP -- NOT RUN, naming " +
+                 "`npm install` in tools/render-qa or `ensureDxc.mjs --write`, without starting verify. It fixes nothing itself. A stand-in " +
+                 "verify gets no readiness check, so the selfcheck's earlier drivers are unchanged. NOT CLOSED: on the rig, a clone " +
+                 "whose playwright resolves from a SIBLING copy reads as ready, which is what the sweep would use too.",
+    }),
     // v4832 -- NO new gate file -- dracoEncode-selfcheck exits by process.exitCode (the rig's v4819 clone-verify crashed it on libuv's
     // UV_HANDLE_CLOSING assert), and wasmTeardown-selfcheck section 6 holds the conversion and measures the member live under the hook.
     // Built as a local v4829 while main shipped its own v4829-v4831, so it ships as v4832; the local commit was never pushed.

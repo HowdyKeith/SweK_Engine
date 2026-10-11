@@ -111,6 +111,11 @@ EITHER direction is NO VERDICT -- not a pass. If you run verify directly instead
 The PASS count is environment-conditional (SwiftShader, Playwright, WASM
 availability) and is NOT a number to assert or compare between boxes.
 
+Since v4833 it first asks whether this box can run the browser gates at all -- Playwright resolving, a browser on
+disk, and on Windows dxcompiler.dll beside the headless shell -- and if not, prints `[ship] DO NOT SHIP -- NOT RUN`
+with the one command that fixes it (`cd tools/render-qa && npm install --no-audit --no-fund`, or
+`node tools/ship/ensureDxc.mjs --write`) instead of fifteen minutes of sweep and a hundred reds that are one fact.
+
 Since v4303 verify runs the QUICK SWEEP (`tools/ship/quickSweep.mjs`): every gate under the budget in
 `tools/ship/sweep-timings.json` (default 3000 ms), 8-way parallel with reds re-run alone, reconciled against
 the red register. A KNOWN red is listed; a NEW red -- one no register names -- fails the ship. Expect it to
