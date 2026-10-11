@@ -1,48 +1,54 @@
 {
  "gate": "tools/ship/exactHash-selfcheck.mjs",
- "at": "2026-09-12",
+ "at": "2026-10-11",
  "tables": [
   {
-   "title": "the five single-implementation sin-hash sites",
+   "title": "the five sites the record names, and which language each carries the idiom in",
    "columns": [
-    "file",
-    "sites",
+    "path",
+    "on disk",
+    "live sin-hash sites",
     "GLSL",
     "WGSL"
    ],
    "rows": [
     [
      "atmosphere/AtmosphereSystem.js",
+     true,
      1,
      true,
      false
     ],
     [
      "demos_code/ant_colony.js",
+     true,
      1,
      true,
      false
     ],
     [
      "demos_code/slime_mold.js",
+     true,
      1,
      true,
      false
     ],
     [
      "render/CloudVolume.js",
+     true,
      1,
      true,
      false
     ],
     [
      "render/voxelrenderer.js",
+     true,
      4,
      true,
      false
     ]
    ],
-   "note": "the sites SHADER_SINHASH_V4578.continuous names, none of which has a second-language twin to disagree with."
+   "note": "sites counted on non-comment lines; a missing file is a row rather than a throw"
   }
  ],
  "notes": [],

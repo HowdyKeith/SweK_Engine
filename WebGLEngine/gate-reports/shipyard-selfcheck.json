@@ -1,6 +1,6 @@
 {
  "gate": "tools/ship/shipyard-selfcheck.mjs",
- "at": "2026-09-03",
+ "at": "2026-10-11",
  "tables": [
   {
    "title": "stored float32 error after 2,000 rigid motions",

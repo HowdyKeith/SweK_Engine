@@ -8892,9 +8892,11 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The CLIs refuse an unknown option (cliArgs) and the peer's transport is a row of its own. Thirteen sabotages red by name, " +
                  "logged in the two headers. NOT CLOSED: the pair has run over loopback and in one browser, not between two machines.",
     }),
+    // RENUMBERED since523 -> since526 at this branch's second merge of main (v4834): main's v4832-v4834 took since523..since525 in the
+    // same days, and in an object literal the later key silently wins (gateSweep-selfcheck's duplicate row). Ordinals only need to be distinct.
     // BVH-CSG round 9, at its merge onto main's v4831 -- ONE new gate file: physics/mesh/triArrangement-selfcheck.mjs, the per-triangle
     // arrangement meshBoolean.mjs now tries first. The round is a branch round and wears no version, so `at` names the merge it closed at.
-    since523: Object.freeze({
+    since526: Object.freeze({
         at: "v4831+bvh-csg-round-9", swept: 1, green: 1, red: 0,
         added: Object.freeze([
             "physics/mesh/triArrangement-selfcheck.mjs",
@@ -8908,6 +8910,57 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "2.75e-9 strip, measured. Four real-workload audits classify every output triangle on its own and find 0 that disagree with " +
                  "their face. 30 checks. 21 sabotages in 22 runs against the rebuilt module: red by name except a control, three named " +
                  "backstops, and classifying a face by its first triangle -- 0 red until a unit check was added for it, then red on the re-run.",
+    }),
+    // v4834 -- ONE new gate file: tools/ship/reportFresh-selfcheck.mjs (no report older than the last commit to its own gate).
+    since525: Object.freeze({
+        at: "v4834", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/reportFresh-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/gateReport-selfcheck.mjs (an empty standing-reds register is held on all three sides; the three rendering rows run only when there is an entry)",
+            "tools/ship/brainStages-selfcheck.mjs, tools/ship/murmurParity-selfcheck.mjs (their printed tables are reports now)",
+            "physics/render/conductorFresnel-selfcheck.mjs (one emission of its table, not two under one title)",
+        ]),
+        verdict: "*** 71 REPORTS WERE STALE, AND FOUR ROWS OF gateReport-selfcheck WERE PASSING ON THEM. *** The 55 taken from one " +
+                 "side at the v4819 merge were re-run: 20 printed different tables, each reproduced exactly on a second run. 16 " +
+                 "more were older than their gate's last commit. Re-taken, registerDrift's report holds 0 standing reds (v4826 " +
+                 "emptied the register) where the stale one held 27 that three rendering rows kept grading; a realGpuRun cell came " +
+                 "back empty; conductorFresnel emitted one table twice. reportFresh-selfcheck holds the line from git, skipping a " +
+                 "shallow clone's boundary. NOT CLOSED: the resolution is a day.",
+    }),
+    // v4833 -- NO new gate file -- shipVerdict asks whether the box can run the browser gates before it runs verify.
+    since524: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4833", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/shipVerdict-selfcheck.mjs (section 7: no Playwright, no browser on disk, and dxcompiler.dll missing beside a Windows shell each refuse before verify with the one command; sabotages A-E)",
+        ]),
+        verdict: "*** 103 OF THE RIG'S 104 v4819 REDS WERE ONE FACT, PRINTED ONCE PER GATE AFTER 898 s. *** shipVerdict.readiness() asks the " +
+                 "tree's own resolvers (playwrightResolve, ensureDxc) first and refuses with DO NOT SHIP -- NOT RUN, naming " +
+                 "`npm install` in tools/render-qa or `ensureDxc.mjs --write`, without starting verify. It fixes nothing itself. A stand-in " +
+                 "verify gets no readiness check, so the selfcheck's earlier drivers are unchanged. NOT CLOSED: on the rig, a clone " +
+                 "whose playwright resolves from a SIBLING copy reads as ready, which is what the sweep would use too.",
+    }),
+    // v4832 -- NO new gate file -- dracoEncode-selfcheck exits by process.exitCode (the rig's v4819 clone-verify crashed it on libuv's
+    // UV_HANDLE_CLOSING assert), and wasmTeardown-selfcheck section 6 holds the conversion and measures the member live under the hook.
+    // Built as a local v4829 while main shipped its own v4829-v4831, so it ships as v4832; the local commit was never pushed.
+    since523: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.
+        at: "v4832", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/wasmTeardown-selfcheck.mjs (section 6: the member the rig found through createRequire -- converted, compiles 418,831 bytes, leaves without process.exit(); sabotages H-K)",
+            "tools/ship/dracoEncode-selfcheck.mjs (process.exitCode, not process.exit(), with the exitBusy readings at its exit line)",
+        ]),
+        verdict: "*** THE RIG'S CRASH NEEDED A WINDOWS TEARDOWN AND A CLONE WITH NO BROWSER, AND THE SANDBOX HAS NEITHER. *** " +
+                 "dracoEncode-selfcheck compiles the vendored Emscripten encoder and ended in process.exit(). v4663's screen never " +
+                 "reached it (createRequire with a computed path) and v4677's sample would read it QUIET: with a browser, section 4 " +
+                 "spends seconds between the encoder and the exit line. With section 4 skipped, as on the rig, exitBusy reads a burst " +
+                 "at that line (4.9-7.7 ms against 0.2-0.3, 4 of 5 over the floor). Converted; held by four sabotages. NOT CLOSED: " +
+                 "the crash itself is Windows-only, so the rig's next clone-verify is the instrument for the fact.",
     }),
     // v4831 -- TWO new gate files: tools/ship/publishHygiene-selfcheck.mjs (what a release can carry, and the publish commands the GitHub
     // panel prints) and tools/ship/brainStages-selfcheck.mjs (the ship's computer's two stages on the wire, and the orb states on them).

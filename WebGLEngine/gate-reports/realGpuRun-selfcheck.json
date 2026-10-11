@@ -1,6 +1,6 @@
 {
  "gate": "tools/ship/realGpuRun-selfcheck.mjs",
- "at": "2026-10-02",
+ "at": "2026-10-11",
  "tables": [
   {
    "title": "which renderer each flag set gets on this box",
@@ -8,62 +8,114 @@
     "flags",
     "WebGL2",
     "WebGL2 renderer",
+    "draws",
     "WebGPU"
    ],
    "rows": [
     [
+     "--use-angle=swiftshader --enable-unsafe-swiftshader",
+     "software",
+     "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+     "draws",
+     "no adapter"
+    ],
+    [
      "--use-gl=swiftshader",
      "software",
      "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+     "draws",
      "no adapter"
     ],
     [
      "--use-angle=swiftshader",
      "software",
      "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
-     "no adapter"
-    ],
-    [
-     "--use-angle=swiftshader --enable-unsafe-swiftshader",
-     "software",
-     "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+     "draws",
      "no adapter"
     ],
     [
      "--use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader",
      "software",
      "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+     "draws",
      "no adapter"
     ],
     [
      "(no flags)",
      "software",
      "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+     "draws",
      "no adapter"
+    ],
+    [
+     "--use-angle=swiftshader --enable-unsafe-swiftshader --enable-unsafe-webgpu",
+     "software",
+     "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+     "draws",
+     "google / swiftshader"
     ],
     [
      "--use-gl=swiftshader --enable-unsafe-webgpu",
      "software",
      "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+     "draws",
      "google / swiftshader"
     ],
     [
      "--enable-unsafe-webgpu",
      "software",
      "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+     "draws",
      "google / swiftshader"
     ],
     [
      "--enable-unsafe-webgpu --use-webgpu-adapter=swiftshader",
      "software",
      "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+     "draws",
      "google / swiftshader"
     ],
     [
      "--use-angle=swiftshader --enable-unsafe-swiftshader --enable-unsafe-webgpu --use-webgpu-adapter=swiftshader",
      "software",
      "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+     "draws",
      "google / swiftshader"
+    ],
+    [
+     "--use-angle=swiftshader --enable-unsafe-swiftshader --enable-unsafe-webgpu --use-webgpu-adapter=swiftshader --enable-features=Vulkan --use-vulkan=swiftshader",
+     "software",
+     "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+     "draws",
+     "google / swiftshader"
+    ],
+    [
+     "--use-angle=swiftshader --enable-unsafe-swiftshader --enable-unsafe-webgpu --use-webgpu-adapter=swiftshader --ignore-gpu-blocklist",
+     "software",
+     "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+     "draws",
+     "google / swiftshader"
+    ],
+    [
+     "--use-angle=swiftshader-webgl --enable-unsafe-webgpu --use-webgpu-adapter=swiftshader",
+     "software",
+     "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+     "draws",
+     "google / swiftshader"
+    ],
+    [
+     "--use-angle=vulkan --use-vulkan=swiftshader --enable-features=Vulkan --enable-unsafe-webgpu --use-webgpu-adapter=swiftshader",
+     "software",
+     "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+     "draws",
+     "google / swiftshader"
+    ],
+    [
+     "--use-angle=d3d11-warp --enable-unsafe-webgpu --use-webgpu-adapter=swiftshader",
+     "none",
+     "none",
+     "none",
+     "no adapter"
     ]
    ],
    "note": "the headless shell this box resolves; on a GPU box this table is the measurement a fix to the 72 needs"
