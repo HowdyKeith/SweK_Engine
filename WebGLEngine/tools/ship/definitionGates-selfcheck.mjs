@@ -289,7 +289,15 @@ const cov = definitionCoverage(ENG);
     // already refuses to widen the physics sweep over. A merge that adds 62 gates and their modules grows a
     // tree-wide count by construction; it is a re-baseline occasion and not a regression, and the narrow
     // number keeping its meaning is how you can tell the two apart.
-    const BASELINE_WIDE = 362;   // v4060: 290, v4062: 209, post-v4297-sweep: 332, post-v4622-merge: 349, post-v4645-merge: 362 -- ratchets down, never up
+    // *** v4832 -- RATCHETED DOWN, 362 -> 358, THE SLACK TAKEN WHERE IT STOOD. *** The census read 358 against the frozen
+    // 362, and four of slack is four new unnamed symbols this row would have let in silently. Measured against the freeze
+    // (590050b5) rather than assumed: ELEVEN were named since (frozenRecords' clearScanCache and readSites, gateSweep's
+    // repairsAgainst and runOnce, hostScale's hostFacts and boxId, posixAssumption's sources, quickSweep's contentionPairs
+    // and readTimings, sourceScan's regexAllowedHere, buildingTopple's blockMesh) and SEVEN arrived unnamed
+    // (gunnerPolicy's createRace, playwrightResolve's resolveDxcDir, launchEnv and dxcAdvice, quickSweep's ownerOf and
+    // deathTail, buildingTopple's demolitionScript). 358 keeps the eleven paid; the seven stay counted debt, not forgiven.
+    // SABOTAGE, restored: one new unnamed `export function` added to the adapter-record module (the one tools/ship/adapterRecord-selfcheck.mjs gates) -> RED, "GREW to 359".
+    const BASELINE_WIDE = 358;   // v4060: 290, v4062: 209, post-v4297-sweep: 332, post-v4622-merge: 349, post-v4645-merge: 362, v4832: 358 -- ratchets down, never up
     const wide = definitionCoverage(ENG, "");
     ok("!! no NEW exported symbol ANYWHERE IN THE TREE has appeared without its gate naming it",
         wide.ungated.length <= BASELINE_WIDE,
