@@ -4,8 +4,9 @@
 //
 // GATES brain/conv2d.mjs -- the convolution layer the path-tracer denoiser is built from. Its exports, each named
 // here: TILE, K_MAX, CB, COUT_MAX, conv2dForward, conv2dCpu, conv2dCpuFma, conv2dBackward, conv2dWgsl,
-// conv2dTiledWgsl, packProbeUniforms, probeFixture, probeCpu, keyCpu, PROBES -- and round 13's (section 39): FAST_GROUP,
-// UNIFORM_MAX, fastShape, conv2dFastWgsl, packFastUniforms.
+// conv2dTiledWgsl, packProbeUniforms, probeFixture, probeCpu, keyCpu, PROBES -- round 13's (section 39): FAST_GROUP,
+// UNIFORM_MAX, fastShape, conv2dFastWgsl, packFastUniforms -- and round 14's (section 43): headShape, conv2dHeadWgsl,
+// packHeadUniforms, planarToChannelsLast.
 //
 // What it holds: the twin to the f64 reference within f32 rounding; the identity kernel exact through every pass;
 // a 1x1 convolution BIT-IDENTICAL to the GPU Brain's dense layer (render/brainTsl.mjs's mlpLayerCpu), so the dense
@@ -32,6 +33,12 @@
 //   F3  the bias packed one float late                                          6 RED (the layout row, and every device case)
 //   F4  the second barrier removed                                              5 RED (deterministic here, as S5 was)
 //   F5  the padding channels written past Cout                                  3 RED (the head, the 11-channel case, the key)
+//   round 14, against the head kernel and its packer:
+//   H1  the head kernel sums its channels last-first                           4 RED (the manifest case: 217 unexplained; and the
+//       three device cases)
+//   H2  the head kernel writes channels last, not planar                       5 RED (the manifest case, the three device cases, the key)
+//   H3  packHeadUniforms puts the bias one float late                          5 RED (the layout row, the manifest case, the three
+//       device cases)
 //
 // *** S5 WAS EXPECTED TO GO ZERO RED AND DID NOT. *** A missing barrier is a race, and races hide on a device that
 // runs a workgroup's threads one after another. SwiftShader does run them in order -- which is exactly why it is
@@ -45,7 +52,8 @@ const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
 const C = await imp("brain/conv2d.mjs");
 const { TILE, K_MAX, CB, COUT_MAX, conv2dForward, conv2dCpu, conv2dCpuFma, conv2dBackward, conv2dWgsl, conv2dTiledWgsl,
-        packProbeUniforms, probeFixture, probeCpu, keyCpu, PROBES, FAST_GROUP, UNIFORM_MAX, fastShape, conv2dFastWgsl, packFastUniforms } = C;
+        packProbeUniforms, probeFixture, probeCpu, keyCpu, PROBES, FAST_GROUP, UNIFORM_MAX, fastShape, conv2dFastWgsl, packFastUniforms,
+        headShape, conv2dHeadWgsl, packHeadUniforms, planarToChannelsLast } = C;
 const { mlpLayerCpu } = await imp("render/brainTsl.mjs");
 const H = await imp("tools/ship/headlessGpu.mjs");
 
@@ -171,7 +179,28 @@ console.log("\n5. THE FAST KERNEL'S UNIFORM BLOCK, ON THE CPU (round 13)");
         /max\(a0, vec4<f32>\(0\.0\)\)/.test(code) && !/max\(a0/.test(conv2dFastWgsl({ Cin: 32, Cout: 32, k: 3, act: "none" })));
 }
 
-console.log("\n6. *** ALL THREE KERNELS ON THE DEVICE, CELL FOR CELL AGAINST THE TWIN ***");
+console.log("\n5b. THE HEAD KERNEL'S UNIFORM BLOCK AND ITS PLANAR OUTPUT, ON THE CPU (round 14)");
+{
+    // weight (co, ci) at float 4 + 4 C4 + ci 4 C4 + co, the bias of co at 4 + co, every one read back for 32 -> 81
+    const F = probeFixture({ H: 3, W: 4, Cin: 32, Cout: 81, k: 1, act: "none", seed: 21 }), L = F.layer, S = headShape(L);
+    const f = packHeadUniforms({ H: 3, W: 4, layer: L }), u = new Uint32Array(f.buffer), w0 = 4 + 4 * S.C4;
+    let misplaced = 0, padding = 0;
+    for (let co = 0; co < 81; co++) { if (f[4 + co] !== L.b[co]) misplaced++; for (let ci = 0; ci < 32; ci++) if (f[w0 + ci * 4 * S.C4 + co] !== L.W[co * 32 + ci]) misplaced++; }
+    for (let c = 81; c < 4 * S.C4; c++) { if (f[4 + c] !== 0) padding++; for (let ci = 0; ci < 32; ci++) if (f[w0 + ci * 4 * S.C4 + c] !== 0) padding++; }
+    ok(`!! the head kernel's block is laid out as its header says: H, W, ${S.C4} vec4s of bias, ${32 * S.C4} of weights for the 32 -> 81 head -- every one where the kernel reads it, the padding zero`,
+        u[0] === 3 && u[1] === 4 && S.C4 === 21 && misplaced === 0 && padding === 0 && f.length * 4 === S.bytes, `${misplaced} misplaced, ${padding} nonzero padding, ${S.bytes} bytes`);
+    const y = Float32Array.from({ length: 12 * 5 }, (_, i) => i), cl = planarToChannelsLast(y, 12, 5);
+    ok("  planar to channels last: plane c, pixel p lands at p x Cout + c", cl[0] === 0 && cl[1] === 12 && cl[5] === 1 && cl[5 * 11 + 4] === 4 * 12 + 11);
+    let refused = null; try { conv2dHeadWgsl({ Cin: 32, Cout: 81, k: 3 }); } catch (e) { refused = e.message; }
+    let refusedP = null; try { packHeadUniforms({ H: 2, W: 2, layer: { Cin: 64, Cout: 512, k: 1, W: new Float32Array(64 * 512), b: new Float32Array(512) } }); } catch (e) { refusedP = e.message; }
+    ok("  the head kernel holds 1 x 1 layers whose weights fit one uniform binding, and refuses the rest by name -- a 3 x 3 layer, and 64 -> 512",
+        !headShape({ Cin: 32, Cout: 81, k: 3 }).fits && /1 x 1 layer/.test(refused || "") && /1 x 1 layer/.test(refusedP || "") && headShape({ Cin: 32, Cout: 81, k: 1 }).fits);
+    const code = conv2dHeadWgsl({ Cin: 32, Cout: 81, k: 1, act: "none" });
+    ok("  it is generated for its layer: one entry, three bindings, no workgroup memory and no barrier -- section 42's slow layer had both",
+        /fn k_head/.test(code) && (code.match(/@binding\(/g) || []).length === 3 && !/var<workgroup>/.test(code) && !/workgroupBarrier/.test(code));
+}
+
+console.log("\n6. *** ALL FOUR KERNELS ON THE DEVICE, CELL FOR CELL AGAINST THE TWIN ***");
 const skip = H.headlessGpuSkipReason ? H.headlessGpuSkipReason() : null;
 if (skip) console.log("  SKIP  " + skip);
 else {
@@ -193,11 +222,13 @@ else {
         const a = P.args, t = Date.now(), r = await H.runWgslComputeNative({ code: P.code(a), entryPoint: P.entryPoint, outCount: P.outCount(a), uniforms: P.pack(a),
             workgroups: P.workgroups(a), inputs: P.inputs(a) });
         adapter = adapter || r.adapter;
-        const j = r.ok ? judge(r, P.args) : null;
+        // the head kernel writes planar: transposed back, it is judged as every other kernel is
+        const planar = P.entryPoint === "k_head", n = a.H * a.W;
+        const j = r.ok ? judge(planar ? { ...r, values: planarToChannelsLast(r.values, n, a.Cout) } : r, P.args) : null;
         ok(`!! ${P.id} (the manifest's own case, ${P.args.H} x ${P.args.W}, ${P.args.Cin} -> ${P.args.Cout}): every cell the twin's or the fused mirror's`,
             r.ok && j.unexplained === 0, r.ok ? `${j.n - j.fused} plain, ${j.fused} fused, ${j.unexplained} unexplained, ${Date.now() - t} ms` : r.reason + " " + (r.errors || []).join("; "));
         ok(`  ...and the manifest entry is the kernel's: tol ${P.tol}, cpu is probeCpu, ${P.workgroups(P.args).join(" x ")} workgroups`,
-            P.tol === 0 && same(P.cpu(P.args), probeCpu(P.args)) && P.outCount(P.args) === P.args.H * P.args.W * P.args.Cout);
+            P.tol === 0 && same(planar ? Array.from(planarToChannelsLast(P.cpu(a), n, a.Cout)) : P.cpu(a), Array.from(probeCpu(a))) && P.outCount(a) === a.H * a.W * a.Cout);
     }
     // off the manifest: odd sizes, three channel blocks, k = 1, and the identity key
     for (const a of [{ H: 19, W: 13, Cin: 19, Cout: 11, k: 3, act: "relu", seed: 31 }, { H: 9, W: 17, Cin: 6, Cout: COUT_MAX, k: 1, act: "none", seed: 2 }]) {
@@ -220,6 +251,26 @@ else {
            ` -- and where neither fused, the ${tiled ? "tiled" : "direct"} kernel's own bits`,
             rf.ok && ro.ok && jf.unexplained === 0 && (jf.fused || jo.fused || same(Array.from(rf.values), Array.from(ro.values))),
             rf.ok && ro.ok ? `fast ${jf.fused} fused, ${tiled ? "tiled" : "direct"} ${jo.fused} fused of ${jf.n}` : (rf.reason || ro.reason) + " " + (rf.errors || []).join("; "));
+    }
+    // round 14: the head kernel at the shapes it runs at -- the large network's 32 -> 81 head and the small one's -- on
+    // odd sizes, judged channels last, against the direct kernel on the same case
+    const head = (a) => { const F = probeFixture(a); return H.runWgslComputeNative({ code: conv2dHeadWgsl(a), entryPoint: "k_head", outCount: a.H * a.W * a.Cout,
+        uniforms: packHeadUniforms({ H: a.H, W: a.W, layer: F.layer }), workgroups: [Math.ceil(a.H * a.W / 64), headShape(a).C4, 1], inputs: [{ binding: 2, data: F.x }] }); };
+    for (const a of [{ H: 21, W: 19, Cin: 32, Cout: 81, k: 1, act: "none", seed: 61 }, { H: 13, W: 11, Cin: 16, Cout: 81, k: 1, act: "none", seed: 67 },
+                     { H: 9, W: 7, Cin: 19, Cout: 6, k: 1, act: "relu", seed: 71 }]) {
+        const [rh, rd] = [await head(a), await run(conv2dWgsl(), "k_conv", a)];
+        const n = a.H * a.W, cl = rh.ok ? planarToChannelsLast(rh.values, n, a.Cout) : null;
+        const jh = rh.ok ? judge({ ...rh, values: cl }, a) : null, jd = rd.ok ? judge(rd, a) : null;
+        ok(`!! the head kernel, ${a.H} x ${a.W}, ${a.Cin} -> ${a.Cout} at 1 x 1, planar out: every cell explained -- and where neither fused, the direct kernel's own bits`,
+            rh.ok && rd.ok && jh.unexplained === 0 && (jh.fused || jd.fused || same(Array.from(cl), Array.from(rd.values).map(Math.fround))),
+            rh.ok && rd.ok ? `head ${jh.fused} fused, direct ${jd.fused} fused of ${jh.n}` : (rh.reason || rd.reason) + " " + (rh.errors || []).join("; "));
+    }
+    {
+        const K1 = keyCpu({ k: 1, C: 5 }), n = K1.H * K1.W, ka1 = { H: K1.H, W: K1.W, Cin: K1.layer.Cin, Cout: K1.layer.Cout, k: 1, act: "none" };
+        const kh = await H.runWgslComputeNative({ code: conv2dHeadWgsl(ka1), entryPoint: "k_head", outCount: K1.x.length, uniforms: packHeadUniforms({ H: K1.H, W: K1.W, layer: K1.layer }),
+            workgroups: [Math.ceil(n / 64), headShape(ka1).C4, 1], inputs: [{ binding: 2, data: K1.x }] });
+        const back = kh.ok ? planarToChannelsLast(kh.values, n, 5) : null;
+        ok("  the 1 x 1 identity key through the head kernel: its input back, bit for bit, once read channels last", kh.ok && K1.x.every((v, i) => back[i] === v));
     }
     const K = keyCpu(), ka = { H: K.H, W: K.W, Cin: K.layer.Cin, Cout: K.layer.Cout, k: K.layer.k, act: "none" };
     {

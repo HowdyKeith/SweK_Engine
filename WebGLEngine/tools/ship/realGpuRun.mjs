@@ -35,9 +35,10 @@ const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..
 export function gateList(root = ENG) {
     const pick = (dir, re) => (fs.existsSync(path.join(root, dir)) ? fs.readdirSync(path.join(root, dir)).filter((f) => re.test(f)).map((f) => `${dir}/${f}`) : []);
     // the denoiser arc's device round: its exact gate (the network on the device, cell for cell) and its timing gate
-    // (what a pass costs, 64 x 64 up to a 1080p frame -- render/learned-denoiser-preregistration.md section 37)
+    // (what a pass costs, 64 x 64 up to a 1080p frame -- render/learned-denoiser-preregistration.md section 37); round 14
+    // adds its compile gate (each kernel's build and pass time under each native compiler and in the browser, section 43)
     return [...pick("fx/fsr", /-selfcheck\.mjs$/), ...pick("render", /Tsl.*-selfcheck\.mjs$/), ...pick("render", /^translucentLayer-selfcheck\.mjs$/),
-            ...pick("render", /^denoise(Device|Timing)-selfcheck\.mjs$/)].sort();
+            ...pick("render", /^denoise(Device|Timing|Compile)-selfcheck\.mjs$/)].sort();
 }
 
 /**
@@ -83,6 +84,13 @@ export function runLaunchArgs(env = process.env, platform = process.platform) {
     return env.SWEK_LAUNCH_ARGS ? env.SWEK_LAUNCH_ARGS.split(/\s+/).filter(Boolean) : hardwareArgsFor(platform);
 }
 
+/**
+ * How long one gate may run before it is stopped. *** DENOISER ROUND 13 -- 600 s WAS NEARLY HIT. *** On the rig's Intel
+ * gen-9 the denoiser's exact gate took 498 s (section 42): node-webgpu builds D3D12 pipelines through FXC, which took
+ * minutes per fast-kernel pipeline. A gate stopped at the cap reads as a failure with no rows, so the cap is set well clear.
+ */
+export const GATE_TIMEOUT_MS = 1800000;
+
 export function runGates({ root = ENG, only = null, log = console.log, launchArgs = runLaunchArgs() } = {}) {
     const gates = gateList(root).filter((g) => !only || g.includes(only));
     const logFile = path.join(os.tmpdir(), `swek-adapters-${process.pid}-${Date.now()}.jsonl`);
@@ -92,7 +100,7 @@ export function runGates({ root = ENG, only = null, log = console.log, launchArg
                      commit: git.status === 0 ? git.stdout.trim().slice(0, 120) : null, only, launchArgs, gates: [], adapters: [] };
     for (const g of gates) {
         const t0 = Date.now();
-        const r = spawnSync(process.execPath, [g], { cwd: root, encoding: "utf8", timeout: 600000,
+        const r = spawnSync(process.execPath, [g], { cwd: root, encoding: "utf8", timeout: GATE_TIMEOUT_MS,
                                                     env: { ...process.env, SWEK_ADAPTER_LOG: logFile, SWEK_LAUNCH_ARGS: launchArgs.join(" ") } });
         const ms = Date.now() - t0, rows = parseRows(r.stdout || "");
         const seen = fs.existsSync(logFile) ? fs.readFileSync(logFile, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)).filter((x) => x.gate === g) : [];

@@ -7,6 +7,8 @@
 //           -> render/denoise-results-r12.json
 //       node tools/denoiseDevice.mjs --measure-r13 [--cache <dir>]
 //           section 39's K0 (a): the same measurement on round 13's fast kernel set -> render/denoise-results-r13.json
+//       node tools/denoiseDevice.mjs --measure-r14 [--cache <dir>]
+//           section 43's K0 (a): the same on round 14's set (fast kernel, head kernel, k_apply_fast) -> render/denoise-results-r14.json
 //
 // The device pass is render/denoiseDevice.mjs (gated by render/denoiseDevice-selfcheck.mjs); this file only runs it on
 // the images section 35 names and writes what it finds. *** IT NEVER OVERWRITES EITHER FILE. *** Each is committed as
@@ -30,8 +32,10 @@ import * as GPU from "./ship/headlessGpu.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const NET_FILE = "render/denoise-net-r11.json", RESULTS_R12 = "render/denoise-results-r12.json", RESULTS_R13 = "render/denoise-results-r13.json";
-// each measurement, by flag: the kernel set it runs the device pass on, and the file it writes (sections 35 and 39)
-const MEASURES = { "--measure-r12": { kernels: "r12", results: RESULTS_R12 }, "--measure-r13": { kernels: "r13", results: RESULTS_R13 } };
+const RESULTS_R14 = "render/denoise-results-r14.json";
+// each measurement, by flag: the kernel set it runs the device pass on, and the file it writes (sections 35, 39 and 43)
+const MEASURES = { "--measure-r12": { kernels: "r12", results: RESULTS_R12 }, "--measure-r13": { kernels: "r13", results: RESULTS_R13 },
+                   "--measure-r14": { kernels: "r14", results: RESULTS_R14 } };
 const measure = Object.keys(MEASURES).find((k) => process.argv.includes(k));
 // section 35's bound for D3: the device's relMSE on an image within this relative distance of the f64 network's
 const D3_REL = 1e-4;
@@ -115,7 +119,7 @@ if (args.includes("--export-r11")) {
     console.log(`[denoiseDevice] wrote ${RESULTS}`);
     GPU.exitCleanly(0);
 } else {
-    console.log("usage: node tools/denoiseDevice.mjs --export-r11 --cache <dir> --key <record> | --measure-r12 [--cache <dir>] | --measure-r13 [--cache <dir>]" +
-                "   (see render/learned-denoiser-preregistration.md, sections 35 and 39)");
+    console.log("usage: node tools/denoiseDevice.mjs --export-r11 --cache <dir> --key <record> | --measure-r12 [--cache <dir>] | --measure-r13 [--cache <dir>] | --measure-r14 [--cache <dir>]" +
+                "   (see render/learned-denoiser-preregistration.md, sections 35, 39 and 43)");
     process.exit(2);
 }

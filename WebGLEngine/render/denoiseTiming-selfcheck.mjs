@@ -36,6 +36,9 @@
 //   F7  the sets never swap order between rounds                                  2 RED (the turns row, native and page)
 //   F8  the speedup read off the wall clock where the device's exists             2 RED
 //   F9  every set's denoiser built on the first set's kernels                     2 RED
+//   round 14, against the three-set ladder:
+//   S1  the r14 set never runs the head kernel                                    2 RED (different-kernels, native and page)
+//   S2  the r14 set reads its planar logits with k_apply                          2 RED (the same two rows: the kinds name the apply)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -53,6 +56,7 @@ const say = (m) => console.log("  ----  " + m);
 const t0 = Date.now();
 const net = decodeNet(JSON.parse(fs.readFileSync(path.join(ENG, "render/denoise-net-r11.json"), "utf8")).net);
 const CAP = 1500, QUANTUM = 0.2;   // the ladder's cap a pass, ms; a browser rounds timestamps to 0.1 ms, so nesting gets two quanta
+const NATIVE_SETS = ["r12", "r14"];   // the native ladder's sets (section 43); the page's are KERNEL_SETS, all three
 
 // what any ladder must be, wherever it ran: returns the rows that were measured
 function holds(label, r) {
@@ -93,30 +97,36 @@ function report(label, r) {
             (convMs ? `; conv ${(x.H * x.W * 2 * MACS.reduce((a, b) => a + b, 0) / (convMs / 1000) / 1e9).toFixed(1)} GFLOP/s` : "") +
             (x.perPass ? `; ${x.perPass.map((q) => q.name.replace(/ \(.*\)/, "") + " " + q.ms.toFixed(3)).join(", ")}` : ""));
     }
-    for (const q of r.speedup) if (q.measured) say(`${label}: ${r.sets.at(-1)} against ${r.sets[0]} at ${q.W} x ${q.H}: ${q.ratio.toFixed(2)} x as fast, on the ${q.clock === "device" ? "device's clock" : "wall clock"}`);
+    for (const [B, qs] of Object.entries(r.speedup)) for (const q of qs) if (q.measured)
+        say(`${label}: ${B} against ${r.sets[0]} at ${q.W} x ${q.H}: ${q.ratio.toFixed(2)} x as fast, on the ${q.clock === "device" ? "device's clock" : "wall clock"}`);
 }
 // what a PAIRED ladder must be, wherever it ran (section 39): both sets, each held as a ladder, taking turns in the stated
 // order on one device, different kernels, and a speedup that is the ratio of the two medians on the clock it names
-function pairedHolds(label, r) {
-    for (const s of KERNEL_SETS) holds(`${label} ${s}`, r ? { adapter: r.adapter, rows: r.rows[s], invisible: r.invisible[s] } : null);
-    const both = r ? r.rows[KERNEL_SETS[0]].map((a, i) => [a, r.rows[KERNEL_SETS[1]][i]]).filter(([a, b]) => !a.skipped && !b.skipped) : [];
-    const turns = [...KERNEL_SETS, ...[...KERNEL_SETS].reverse(), ...KERNEL_SETS].join();
-    ok(`!! ${label}: both sets measured at the first size, on one device, taking turns -- ${turns.replace(/,/g, " ")} -- each set's passes pooled across the rounds`,
-        !!r && r.sets.join() === KERNEL_SETS.join() && both.length >= 1 && !r.rows[KERNEL_SETS[0]][0].skipped && !r.rows[KERNEL_SETS[1]][0].skipped &&
+function pairedHolds(label, r, want = KERNEL_SETS) {
+    for (const s of want) holds(`${label} ${s}`, r ? { adapter: r.adapter, rows: r.rows[s], invisible: r.invisible[s] } : null);
+    const A = want[0], others = want.slice(1);
+    const turns = [...want, ...[...want].reverse(), ...want].join();
+    // the sizes every set measured: there the sets took turns on one device, in the stated order
+    const all = r ? r.rows[A].map((a, i) => want.map((s) => r.rows[s][i])).filter((xs) => xs.every((x) => !x.skipped)) : [];
+    ok(`!! ${label}: every set (${want.join(", ")}) measured at the first size, on one device, taking turns -- ${turns.replace(/,/g, " ")} -- each set's passes pooled across the rounds`,
+        !!r && r.sets.join() === want.join() && all.length >= 1 && want.every((s) => !r.rows[s][0].skipped) &&
         // one shared turn order (compared by value: the page's ladder arrives as JSON)
-        both.every(([a, b]) => a.order.join() === turns && b.order.join() === a.order.join() && a.wall.n >= 3 && b.wall.n >= 3),
-        both.length ? `${both.length} size(s) paired; ${both[0][0].wall.n} and ${both[0][1].wall.n} passes at the first` : "none paired");
-    ok(`  ${label}: and they are different kernels -- r12's layers tiled and direct, r13's all fast`,
-        !!r && both.every(([a, b]) => a.passes.slice(0, 5).map((n) => /\((\w+),/.exec(n)[1]).join() === "tiled,tiled,tiled,tiled,direct" &&
-                                         b.passes.slice(0, 5).every((n) => /\(fast,/.test(n))));
-    const right = !!r && r.speedup.length === r.rows[KERNEL_SETS[0]].length && r.speedup.every((q, i) => {
-        const a = r.rows[KERNEL_SETS[0]][i], b = r.rows[KERNEL_SETS[1]][i];
+        all.every((xs) => xs.every((x) => x.order.join() === turns && x.wall.n >= 3)),
+        all.length ? `${all.length} size(s) with every set; ${all[0].map((x) => x.wall.n).join(", ")} passes at the first` : "none with every set");
+    // what each set's layers run on, read off the pass names the ladder printed
+    const kinds = { r12: "tiled,tiled,tiled,tiled,direct|apply", r13: "fast,fast,fast,fast,fast|apply", r14: "fast,fast,fast,fast,head|apply_fast" };
+    const kindOf = (x) => x.passes.slice(0, 5).map((n) => /\((\w+),/.exec(n)[1]).join() + "|" + /\((\w+)\)$/.exec(x.passes[5])[1];
+    ok(`  ${label}: and they are different kernels -- ${want.map((s) => `${s} ${kinds[s]}`).join("; ")}`,
+        !!r && want.every((s) => r.rows[s].filter((x) => !x.skipped).every((x) => kindOf(x) === kinds[s])),
+        r ? want.map((s) => { const x = r.rows[s].find((y) => !y.skipped); return `${s}: ${x ? kindOf(x) : "none"}`; }).join("; ") : "");
+    const right = !!r && others.every((B) => r.speedup[B] && r.speedup[B].length === r.rows[A].length && r.speedup[B].every((q, i) => {
+        const a = r.rows[A][i], b = r.rows[B][i];
         if (a.skipped || b.skipped) return q.measured === false;
         const dev = !!(a.gpu && b.gpu);
         return q.measured && q.clock === (dev ? "device" : "wall") && q.ratio === (dev ? a.gpu.median / b.gpu.median : a.wall.median / b.wall.median) && q.ratio > 0;
-    });
-    ok(`!! ${label}: the speedup at every size both measured is r12's median over r13's, on the device's clock where both have one -- section 39's K1, read off the rig`, right,
-        r ? r.speedup.filter((q) => q.measured).map((q) => `${q.W} x ${q.H} ${q.ratio.toFixed(2)} x (${q.clock})`).join(", ") : "");
+    }));
+    ok(`!! ${label}: each set's speedup at every size it and ${A} measured is ${A}'s median over its own, on the device's clock where both have one -- section 43's K1, read off the rig`, right,
+        r ? others.map((B) => `${B}: ` + (r.speedup[B] || []).filter((q) => q.measured).map((q) => `${q.W} x ${q.H} ${q.ratio.toFixed(2)} x`).join(", ")).join("; ") : "");
 }
 
 console.log("1. THE LADDER'S ARITHMETIC");
@@ -144,7 +154,9 @@ else {
     try {
         H.configureVulkanIcd();
         const { mod } = H.resolveWebgpu(), gpu = mod.create([]);
-        r = await timingLadder(net, () => gpu.requestAdapter(), { capMs: CAP, warmup: 1, minReps: 3, budgetMs: 1500 });
+        // round 14 (section 43): natively r12 against r14 -- r13's native failure is section 42's finding, and each native
+        // fast pipeline costs minutes to build under the D3D12 compiler node-webgpu ships -- with a 600 s ladder budget
+        r = await timingLadder(net, () => gpu.requestAdapter(), { sets: NATIVE_SETS, capMs: CAP, warmup: 1, minReps: 3, budgetMs: 1500, totalMs: 600000 });
         // the rig's report names every adapter a gate ran on; this one is not reached through the browser harness, so it says itself
         if (process.env.SWEK_ADAPTER_LOG) {
             const [vendor, architecture, description] = r.adapter.name.split(" / ");
@@ -153,7 +165,7 @@ else {
         }
     } catch (e) { err = String(e && e.message || e); }
     if (err) ok("!! the native ladder ran", false, err.slice(0, 200));
-    else { pairedHolds("native", r); report("native", r); }
+    else { pairedHolds("native", r, NATIVE_SETS); report("native", r); }
 }
 
 console.log("\n3. THE PAGE: denoise.html's \"Time the network\", in Chromium (on the rig, the browser's GPU)");
