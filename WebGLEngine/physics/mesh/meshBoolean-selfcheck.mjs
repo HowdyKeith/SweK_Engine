@@ -417,8 +417,10 @@ console.log("\n8. *** REUSING meshCSG-selfcheck.mjs's OWN 8 DEGENERATE-CONTACT F
     // earlier triangle's true value, instead of OR-accumulating) would pass silently. Force it true directly
     // via a deliberately tiny maxFragments on the primary fixture and confirm meshBoolean() surfaces it.
     {
+        // Round 9: the fragment cap belongs to the plane-cut path -- the arrangement default never caps -- so
+        // every capped check in this block pins that path with arrangement:false.
         const { bufA, bvhA, bufB, bvhB } = PRIMARY;
-        const rCapped = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract", { accOpts: { maxFragments: 3 } });
+        const rCapped = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract", { arrangement: false, accOpts: { maxFragments: 3 } });
         ok("!! stats.capped correctly reports true when accOpts.maxFragments is forced tiny (exercises the true/nonzero propagation path, not just false)",
             rCapped.stats.a.capped === true || rCapped.stats.b.capped === true,
             "statsA.capped=" + rCapped.stats.a.capped + " statsB.capped=" + rCapped.stats.b.capped);
@@ -426,7 +428,7 @@ console.log("\n8. *** REUSING meshCSG-selfcheck.mjs's OWN 8 DEGENERATE-CONTACT F
         // 0.74% on meshCSG's own blast fixture), so meshBoolean() now surfaces it at the TOP LEVEL rather than
         // leaving it in stats.a/stats.b where round 6 left it. Both directions checked: true when forced, false
         // on the same fixture at the default cap.
-        const rDefault = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract");
+        const rDefault = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract", { arrangement: false });
         ok("!! round 7: the top-level `capped` is true when either side capped, and false at the default cap",
             rCapped.capped === true && rDefault.capped === false &&
             rCapped.capped === (rCapped.stats.a.capped || rCapped.stats.b.capped),
@@ -439,7 +441,7 @@ console.log("\n8. *** REUSING meshCSG-selfcheck.mjs's OWN 8 DEGENERATE-CONTACT F
         const blobBuf = M.toTriangleBuffer(M.jaggedBlob([0, 0, 0], 1.0, 8, 12345));
         const wallBuf = M.toTriangleBuffer(M.boxPolys([0, 0, 0], [4, 3, 0.3]));
         const rB = meshBoolean(blobBuf, new MeshBVH(blobBuf), wallBuf, new MeshBVH(wallBuf), "union",
-            { accOpts: { gateByIntersection: false, maxFragments: 256 } });
+            { arrangement: false, accOpts: { gateByIntersection: false, maxFragments: 256 } });
         ok("!! round 7: the top-level `capped` is true when ONLY side B capped",
             rB.stats.a.capped === false && rB.stats.b.capped === true && rB.capped === true,
             "stats.a.capped=" + rB.stats.a.capped + " stats.b.capped=" + rB.stats.b.capped + " capped=" + rB.capped);
@@ -516,27 +518,42 @@ console.log("\n11. *** THE A-VS-B SEAM DOES NOT COINCIDE, MEASURED AS A NAMED, N
         if (best < 1e-6) matched++;
     }
     const matchRate = aCutVerts.length ? matched / aCutVerts.length : 1;
-    console.log("  ..... A cut verts=" + aCutVerts.length + " B cut verts=" + bCutVerts.length +
-        " matched-within-1e-6=" + matched + " (" + (matchRate*100).toFixed(1) + "%) -- measured baseline, not a correctness claim");
+    console.log("  ..... default path (round 9 arrangement): A cut verts=" + aCutVerts.length + " B cut verts=" + bCutVerts.length +
+        " matched-within-1e-6=" + matched + " (" + (matchRate*100).toFixed(1) + "%) -- measured, not a correctness claim");
+    // ROUND 9: the default path now cuts each triangle along the ACTUAL intersection segments (triArrangement.mjs),
+    // and a face's vertices are only triA's own corners and triTriIntersect()'s own segment endpoints -- never a
+    // point a plane cut invented. On this fixture that makes A's and B's cut boundaries meet everywhere within
+    // watertight()'s 1e-6 quantum: measured 0/114 (22 A-side cut vertices, all 22 matched), against the plane-cut
+    // path's 29/117 below. THAT IS THIS FIXTURE, NOT A GUARANTEE: triTriIntersect(a, b) and (b, a) are separate
+    // float computations of the same crossing, and the twelve-blast chain still has 1,133 raw unmatched edges on
+    // this path (meshBooleanBlast-selfcheck.mjs section 8). Pinned at zero because zero is what it measures.
     const r = meshBoolean(PRIMARY.bufA, PRIMARY.bvhA, PRIMARY.bufB, PRIMARY.bvhB, "subtract");
     const wt = M.watertight(wrapAsPolys(r.tris));
-    // ROUND 7 RE-BASELINE, NOT A LOOSENING: meshBoolean() now gates accumulation by actual intersection by
-    // default (see triFragmentAccumulate.mjs's own ROUND 7 paragraph). The same fixture measured 37/189
+    ok("!! ROUND 9 DEFAULT (arrangement): the primary fixture's subtract has NO unmatched edge",
+        wt.unmatched === 0 && r.stats.a.arrangedTriangles + r.stats.b.arrangedTriangles > 0,
+        "unmatched=" + wt.unmatched + "/" + wt.edges + " arranged a=" + r.stats.a.arrangedTriangles +
+        " b=" + r.stats.b.arrangedTriangles + " (measured 0/114 at round 9)");
+    const rp = meshBoolean(PRIMARY.bufA, PRIMARY.bvhA, PRIMARY.bufB, PRIMARY.bvhB, "subtract", { arrangement: false });
+    const wtp = M.watertight(wrapAsPolys(rp.tris));
+    // ROUND 7 RE-BASELINE, NOT A LOOSENING -- kept since round 9 as the PLANE-CUT path's own reproduction, which
+    // is what runs wherever the arrangement refuses a triangle. Round 7 gated accumulation by actual intersection
+    // (see triFragmentAccumulate.mjs's own ROUND 7 paragraph). The same fixture measured 37/189
     // unmatched with 104 A-side cut vertices (17.3% coinciding with a B-side one) under round 6's ungated path;
     // gated it measured 32/120 with 36 A-side cut vertices (47.2%), and 29/117 with 33 (48.5%) once round 7's
     // review added the per-plane group pre-filter (a group missing the whole triangle no longer splits it). The
-    // ceiling is TIGHTENED from 45 to 35 for the default path, and round 6's ungated number is kept as its own
+    // ceiling was TIGHTENED from 45 to 35 for the gated path, and round 6's ungated number is kept as its own
     // reproduction so the comparison stays in the gate rather than only in this comment. (An adversarial review
     // noted the gated unmatched RATIO is worse -- 29/117 is 25% against 37/189's 20% -- the count and the mesh
     // are smaller, the fraction of seam edges is not; stated here rather than letting "improved" stand alone.)
-    ok("!! watertight() unmatched-edge count on the primary fixture stays within the measured baseline (non-regression, not zero-crack)",
-        wt.unmatched <= 35, "unmatched=" + wt.unmatched + "/" + wt.edges + " (gated default, measured 29/117 at round 7)");
+    ok("!! plane-cut path: watertight() unmatched-edge count on the primary fixture stays within the measured baseline (non-regression, not zero-crack)",
+        wtp.unmatched <= 35 && rp.stats.a.arrangedTriangles + rp.stats.b.arrangedTriangles === 0,
+        "unmatched=" + wtp.unmatched + "/" + wtp.edges + " (gated plane-cut path, measured 29/117 at rounds 7-9)");
     const r6 = meshBoolean(PRIMARY.bufA, PRIMARY.bvhA, PRIMARY.bufB, PRIMARY.bvhB, "subtract",
-        { accOpts: { gateByIntersection: false } });
+        { arrangement: false, accOpts: { gateByIntersection: false } });
     const wt6 = M.watertight(wrapAsPolys(r6.tris));
     ok("   ...and round 6's ungated path, kept reachable by option, still measures its own round-6 baseline",
-        wt6.unmatched <= 45 && wt6.edges > wt.edges && r6.triCount > r.triCount,
-        "ungated unmatched=" + wt6.unmatched + "/" + wt6.edges + " tris=" + r6.triCount + " vs gated tris=" + r.triCount +
+        wt6.unmatched <= 45 && wt6.edges > wtp.edges && r6.triCount > rp.triCount,
+        "ungated unmatched=" + wt6.unmatched + "/" + wt6.edges + " tris=" + r6.triCount + " vs gated tris=" + rp.triCount +
         " (round 6 measured 37/189)");
 }
 
@@ -617,32 +634,159 @@ console.log("\n14. *** ROUND 7 REVIEW FIXES: THE PLANE-DEDUP ROOF, AND accOpts T
         T.forEach((t, i) => { for (let v = 0; v < 3; v++) for (let c = 0; c < 3; c++) buf[i * 9 + v * 3 + c] = t[v][c]; });
         return buf;
     }
-    let worst = 0, worstUngated = 0, detail = [];
+    // Round 9: three arms, each pinned by option -- the arrangement (the default, which never merges planes: it
+    // cuts along each B triangle's own segment), the gated plane-cut path, and round 6's ungated one. Before
+    // round 9's review the second and third arms ran with the default, so the fix this section guards was being
+    // checked on the arrangement instead of on the plane path it lives in.
+    let worstArr = 0, worst = 0, worstUngated = 0, arranged = 0, detail = [];
     for (const z0 of [0, 5]) for (const s of [2e-5, 1e-5, 1e-6]) {
         const bufB = roofPrism(s, z0);
         const bufA = M.toTriangleBuffer(M.boxPolys([0, 0, z0], [1, 60, 0.5]));
         const bA = new MeshBVH(bufA), bB = new MeshBVH(bufB);
         const exact = 2 * (60 + s * 3600);
-        const g = M.volume(wrapAsPolys(meshBoolean(bufA, bA, bufB, bB, "subtract").tris)) - exact;
+        const rd = meshBoolean(bufA, bA, bufB, bB, "subtract");
+        const d = M.volume(wrapAsPolys(rd.tris)) - exact;
+        arranged += rd.stats.a.arrangedTriangles + rd.stats.b.arrangedTriangles;
+        const g = M.volume(wrapAsPolys(meshBoolean(bufA, bA, bufB, bB, "subtract", { arrangement: false }).tris)) - exact;
         const u = M.volume(wrapAsPolys(meshBoolean(bufA, bA, bufB, bB, "subtract",
-            { accOpts: { gateByIntersection: false, maxFragments: 256 } }).tris)) - exact;
-        worst = Math.max(worst, Math.abs(g)); worstUngated = Math.max(worstUngated, Math.abs(u));
+            { arrangement: false, accOpts: { gateByIntersection: false, maxFragments: 256 } }).tris)) - exact;
+        worstArr = Math.max(worstArr, Math.abs(d)); worst = Math.max(worst, Math.abs(g)); worstUngated = Math.max(worstUngated, Math.abs(u));
         detail.push("z0=" + z0 + ",s=" + s + ":" + g.toExponential(1));
     }
-    ok("!! shallow roof ridge (dihedral 4e-6..4e-5 rad) subtracted from a box: exact on every slope and centring",
+    ok("!! shallow roof ridge (dihedral 4e-6..4e-5 rad) subtracted from a box: exact on every slope and centring, plane-cut paths",
         worst < 1e-9 && worstUngated < 1e-9,
         "worst |err| gated " + worst.toExponential(2) + ", round-6 path " + worstUngated.toExponential(2) +
         " (before the fix: 0.048 / 0.024 / 0.0024 on both) -- " + detail.join(" "));
+    ok("!! ...and on the round-9 arrangement default, which arranged triangles on every case",
+        worstArr < 1e-9 && arranged >= 6 * 12,
+        "worst |err| " + worstArr.toExponential(2) + ", triangles arranged " + arranged + " (measured 12 per case)");
 
     // {maxFragments: undefined} used to spread over the default and fall through to triFragmentAccumulate's own
     // 256; {gateByIntersection: undefined} used to turn the gate off. Both must now leave the defaults alone.
     const { bufA, bvhA, bufB, bvhB } = PRIMARY;
-    const d0 = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract");
-    const dU = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract", { accOpts: { gateByIntersection: undefined, maxFragments: null } });
+    const d0 = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract", { arrangement: false });
+    const dU = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract", { arrangement: false, accOpts: { gateByIntersection: undefined, maxFragments: null } });
     ok("!! accOpts keys that are present but undefined/null do NOT override meshBoolean's defaults",
         dU.triCount === d0.triCount && dU.stats.a.gateTested === d0.stats.a.gateTested && dU.stats.a.gateTested > 0,
         "default tris=" + d0.triCount + " gateTested=" + d0.stats.a.gateTested + "; with undefined/null keys tris=" +
         dU.triCount + " gateTested=" + dU.stats.a.gateTested);
+}
+
+// =============================================================================================================
+console.log("\n15. *** ROUND 9: THE ARRANGEMENT IS THE DEFAULT; THE PLANE-CUT PATH IS ITS FALLBACK ***");
+{
+    // Every volume above is now computed through triArrangement.mjs where it accepts a triangle. Here, the same
+    // fixtures both ways: the random general-position sweep (section 9's generator re-run) must agree to float
+    // noise, and the degenerate-contact fixtures -- flush faces, shared edges -- must be REFUSED (coplanar or
+    // degenerate), never arranged, so the plane-cut path's gated handling of them is what runs.
+    const Apolys = M.boxPolys([0, 0, 0], [1, 1, 1]);
+    const bufA = M.toTriangleBuffer(Apolys), bvhA = new MeshBVH(bufA);
+    let s = 17; const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+    let worst = 0, arranged = 0, faces = 0;
+    const sweepRefusals = {};
+    for (let i = 0; i < 30; i++) {
+        const c = [rnd() * 2 - 1, rnd() * 2 - 1, rnd() * 2 - 1], h = [0.2 + rnd(), 0.2 + rnd(), 0.2 + rnd()];
+        const bufB = M.toTriangleBuffer(M.boxPolys(c, h)), bvhB = new MeshBVH(bufB);
+        for (const op of ["subtract", "union", "intersect"]) {
+            const ar = meshBoolean(bufA, bvhA, bufB, bvhB, op), pl = meshBoolean(bufA, bvhA, bufB, bvhB, op, { arrangement: false });
+            worst = Math.max(worst, Math.abs(M.volume(wrapAsPolys(ar.tris)) - M.volume(wrapAsPolys(pl.tris))));
+            for (const st of [ar.stats.a, ar.stats.b]) {
+                arranged += st.arrangedTriangles; faces += st.arrangementFaces;
+                for (const [k, v] of Object.entries(st.arrangementRefusals)) sweepRefusals[k] = (sweepRefusals[k] || 0) + v;
+            }
+        }
+    }
+    ok("!! 30 random box pairs x 3 ops: arrangement and plane-cut path give the same volume to float noise",
+        worst < 1e-12 && arranged > 0, "worst |dV| " + worst.toExponential(2) + ", triangles arranged " + arranged);
+    // The volume agreement above holds whether or not the arrangement runs -- a refused triangle goes to the
+    // plane-cut path and still gets the right answer. So it could not see the first version refusing 3 general-
+    // position triangles as "triangulation orientation" (rounding-noise slivers; see triArrangement.mjs). These
+    // fixtures are in general position: nothing may be refused, and triangles must really be split into faces.
+    ok("!! ...and the arrangement REFUSED NOTHING on them, and split triangles into more than one face each on average",
+        Object.keys(sweepRefusals).length === 0 && faces > arranged,
+        "refusals " + JSON.stringify(sweepRefusals) + ", faces " + faces + " from " + arranged +
+        " arranged triangles (measured {} and 2190 from 1008 at round 9)");
+
+    // TINY FEATURES -- A FACE IS NOT A SLIVER FOR BEING SMALL. The first version dropped any triangle under 1e-14
+    // of triA's area. Two reviewers each found it dropping REAL faces: a rod 2e-7 wide intersected with a box lost
+    // its whole end cap, and a needle 3e-7 wide lost both caps -- open holes, volumes 17% and 33% short measured
+    // about their own axes. Volumes here are taken about a point on the solid's axis: vol() about the world origin
+    // sums determinants of coordinates ~5 units out, whose rounding (~1e-14 per triangle) is larger than these
+    // solids' own errors, and an OPEN mesh's volume depends on that origin besides.
+    const volAbout = (buf, o) => {
+        let v = 0;
+        for (let i = 0; i < buf.length; i += 9) {
+            const a = [buf[i] - o[0], buf[i + 1] - o[1], buf[i + 2] - o[2]], b = [buf[i + 3] - o[0], buf[i + 4] - o[1], buf[i + 5] - o[2]];
+            const q = [buf[i + 6] - o[0], buf[i + 7] - o[1], buf[i + 8] - o[2]];
+            v += a[0] * (b[1] * q[2] - b[2] * q[1]) - a[1] * (b[0] * q[2] - b[2] * q[0]) + a[2] * (b[0] * q[1] - b[1] * q[0]);
+        }
+        return v / 6;
+    };
+    {
+        // Rod: A = [-1,1]^3, B = a 2e-7-square rod along z over [-0.5,1.5]. A n B = 4s^2 x 1.5 = 6e-14 by hand, and
+        // its end cap is A's own top face (z = 1 exactly), area 4s^2 = 4e-14.
+        const sr = 1e-7, cen = [0.3137, -0.2718, 0.5];
+        const bufR = M.toTriangleBuffer(M.boxPolys(cen, [sr, sr, 1]));
+        const r = meshBoolean(bufA, bvhA, bufR, new MeshBVH(bufR), "intersect");
+        const relV = (volAbout(r.tris, [cen[0], cen[1], 0.25]) - 6 * sr * sr) / (6 * sr * sr);
+        let cap = 0, capTris = 0;
+        for (let i = 0; i < r.tris.length; i += 9) if (r.tris[i + 2] === 1 && r.tris[i + 5] === 1 && r.tris[i + 8] === 1) {
+            cap += ((r.tris[i + 3] - r.tris[i]) * (r.tris[i + 7] - r.tris[i + 1]) - (r.tris[i + 4] - r.tris[i + 1]) * (r.tris[i + 6] - r.tris[i])) / 2;
+            capTris++;
+        }
+        const relCap = (cap - 4 * sr * sr) / (4 * sr * sr);
+        ok("!! a box intersected with a 2e-7-wide rod keeps its end cap and its volume (arrangement default)",
+            Math.abs(relV) < 1e-8 && Math.abs(relCap) < 1e-8 && r.stats.a.arrangedTriangles > 0,
+            "volume rel err " + relV.toExponential(2) + ", cap " + capTris + " triangles, area rel err " + relCap.toExponential(2) +
+            ", A triangles arranged " + r.stats.a.arrangedTriangles + " (first version: cap 0 triangles, volume -1.67e-1)");
+    }
+    {
+        // Needle: a quadrilateral prism 3e-7 across, through the top and bottom of a 10-unit box. Exact A n B is
+        // the quad's shoelace area times the box's height 10.
+        const w = 3e-7, c = [1.234567, -0.7654321];
+        const poly = [[c[0], c[1]], [c[0] + w, c[1] + 0.1 * w], [c[0] + 0.9 * w, c[1] + w], [c[0] - 0.05 * w, c[1] + 0.8 * w]];
+        const T = [];
+        for (let i = 0; i < 4; i++) {
+            const [ax, ay] = poly[i], [bx, by] = poly[(i + 1) % 4];
+            T.push([[ax, ay, -7.3], [bx, by, -7.3], [bx, by, 7.1]], [[ax, ay, -7.3], [bx, by, 7.1], [ax, ay, 7.1]]);
+        }
+        for (let i = 1; i < 3; i++) {
+            T.push([[poly[0][0], poly[0][1], -7.3], [poly[i + 1][0], poly[i + 1][1], -7.3], [poly[i][0], poly[i][1], -7.3]]);
+            T.push([[poly[0][0], poly[0][1], 7.1], [poly[i][0], poly[i][1], 7.1], [poly[i + 1][0], poly[i + 1][1], 7.1]]);
+        }
+        const bufN = new Float64Array(T.length * 9);
+        T.forEach((t, i) => { for (let v = 0; v < 3; v++) for (let k = 0; k < 3; k++) bufN[i * 9 + v * 3 + k] = t[v][k]; });
+        const bufX = M.toTriangleBuffer(M.boxPolys([0, 0, 0], [5, 5, 5]));
+        let a2 = 0;
+        for (let i = 0; i < 4; i++) { const p = poly[i], q = poly[(i + 1) % 4]; a2 += (p[0] - c[0]) * (q[1] - c[1]) - (q[0] - c[0]) * (p[1] - c[1]); }
+        const exact = a2 / 2 * 10;
+        const r = meshBoolean(bufX, new MeshBVH(bufX), bufN, new MeshBVH(bufN), "intersect");
+        const rel = (volAbout(r.tris, [c[0], c[1], 0]) - exact) / exact;
+        ok("!! a 3e-7-wide needle through a box keeps both caps: intersect volume exact to 1e-8 relative (arrangement default)",
+            Math.abs(rel) < 1e-8 && r.stats.a.arrangedTriangles > 0,
+            "rel err " + rel.toExponential(2) + " of " + exact.toExponential(4) + ", A triangles arranged " +
+            r.stats.a.arrangedTriangles + " (measured 2.2e-11; plane-cut path 3.9e-10; first version -3.33e-1)");
+    }
+    {
+        // AMBIGUITY REACHES EVERY TRIANGLE OF A FACE. With no rays, pointInMesh() reports agreement 0, so every
+        // classification is ambiguous and so must every output triangle be. A review mutated the face path to
+        // drop the flag, and separately to ignore opts.pointInMeshOpts there: both went 0 red in every gate.
+        const { bufA: pA, bvhA: pbA, bufB: pB, bvhB: pbB } = PRIMARY;
+        const r = meshBoolean(pA, pbA, pB, pbB, "subtract", { pointInMeshOpts: { dirs: [] } });
+        ok("!! pointInMeshOpts reaches the arrangement's per-face classification, and its ambiguity reaches every face triangle",
+            r.triCount > 0 && r.ambiguousTriIndices.length === r.triCount && r.stats.a.arrangementFaces > 0,
+            "ambiguous " + r.ambiguousTriIndices.length + " of " + r.triCount + " output triangles, A faces " + r.stats.a.arrangementFaces);
+    }
+    const W = M.boxPolys([0, 0, 0], [2, 1.5, 0.3]), bufW = M.toTriangleBuffer(W), bvhW = new MeshBVH(bufW);
+    const reasons = {};
+    for (const [c, h] of [[[2, 0, 0], [0.5, 0.5, 0.3]], [[0, 0, 0.55], [0.5, 0.5, 0.25]], [[0, 0, 0], [2, 1.5, 0.3]], [[0, 0, 0], [0.5, 0.5, 0.3]]]) {
+        const bufC = M.toTriangleBuffer(M.boxPolys(c, h));
+        const r = meshBoolean(bufW, bvhW, bufC, new MeshBVH(bufC), "subtract");
+        for (const side of [r.stats.a, r.stats.b]) for (const [k, v] of Object.entries(side.arrangementRefusals)) reasons[k] = (reasons[k] || 0) + v;
+    }
+    const keys = Object.keys(reasons);
+    ok("!! flush / shared-face contacts are refused as coplanar or degenerate -- never arranged -- and nothing else is refused",
+        keys.length > 0 && keys.every((k) => k === "coplanar" || k === "degenerate"), JSON.stringify(reasons));
 }
 
 console.log(`\nmeshBoolean-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);
@@ -669,11 +813,14 @@ console.log("unchecked here, named honestly: only `subtract` is required to pass
     "triangles get classified directly -- correctly flagged ambiguous by pointInMesh, but the keep-ambiguous " +
     "policy has no size awareness, so a kept whole face-sized triangle distorts volume proportional to its " +
     "own area. The A-vs-B SEAM NON-COINCIDENCE gap " +
-    "(section 11) is inherited from triFragmentAccumulate.mjs's own independent-representative-plane design, " +
-    "not introduced here, and is gated as a non-regression baseline, not a correctness claim -- true edge-exact " +
-    "watertightness needs either a meshCSG.mjs-style snap/merge/weld subsystem or a redesign computing each " +
-    "tri-tri boundary once (round 2's triTriIntersect.mjs) and sharing it symmetrically into both meshes' own " +
-    "fragment sets, neither attempted this round. Every ROUND 4/5 residual risk this file's own header " +
+    "(section 11) came from triFragmentAccumulate.mjs's own independent-representative-plane design; since round " +
+    "9 the DEFAULT path cuts along triTriIntersect()'s own segments instead, and the primary fixture measures " +
+    "0 unmatched edges on it -- but each side still computes its crossing separately (triTriIntersect(a, b) and " +
+    "(b, a)), nothing shares one boundary into both meshes, and the twelve-blast chain keeps 1,133 raw unmatched " +
+    "edges (meshBooleanBlast-selfcheck.mjs section 8). The plane-cut path, which still runs for every triangle " +
+    "the arrangement refuses, keeps its 29/117 baseline, gated as non-regression, not correctness. True edge-" +
+    "exact watertightness still needs a meshCSG.mjs-style snap/merge/weld subsystem or one shared boundary per " +
+    "tri-tri pair; neither is built. Every ROUND 4/5 residual risk this file's own header " +
     "inherits (meshPointClassify's ~1e-9 thin-feature weld risk; triFragmentAccumulate's near-duplicate-plane " +
     "sliver cascade and maxFragments starvation) applies unchanged here and is not re-gated in this file -- see " +
     "those files' own gates. Non-box, non-axis-aligned fixtures are not covered. Performance at realistic " +

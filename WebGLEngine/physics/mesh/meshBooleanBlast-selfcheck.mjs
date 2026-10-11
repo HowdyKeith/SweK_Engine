@@ -61,6 +61,15 @@
 // I2 and I3 crash this gate (exit 1) rather than name a red.
 // A PROCESS MISTAKE, DISCLOSED: the first runner had no `finally`; S1 timed out on this gate and the crash left
 // triFragmentAccumulate.mjs sabotaged on disk. Caught by an md5 check before anything else ran; restored.
+//
+// ROUND 9: meshBoolean's DEFAULT is now segment-bounded cutting (physics/mesh/triArrangement.mjs), with the plane-cut
+// path as its fallback. So sections 2-6 -- which call meshBoolean() with no options -- now measure the ARRANGEMENT
+// against the BSP, the 1000x reference and the membership oracle; sections 1 and 7, which are about the plane-cut
+// path's own history (round 6's cap, round 7's gate, round 8's index), pin it with arrangement:false; section 8 puts
+// the two paths side by side. An adversarial review of round 9 found section 1 still LABELLED "default" after the
+// pin, and section 5's comments quoting round 7's settle numbers for a solid the arrangement now builds -- both fixed.
+// Round 9's sabotages (A1-A11 and the review-fix reverts) are logged in triArrangement-selfcheck.mjs's header with
+// their reds in this gate.
 "use strict";
 
 import * as M from "./meshCSG.mjs";
@@ -109,22 +118,27 @@ function bspChain(S) {
     }
     return { polys: P, vols, ms };
 }
-function boolChain(S, shots = SHOTS) {
+function boolChain(S, shots = SHOTS, opts) {
     let buf = M.toTriangleBuffer(WALL(S)); const vols = []; let ms = 0, capped = false, amb = 0, unresolved = 0;
+    let classifications = 0, arranged = 0; const refusals = {};
     for (let k = 1; k <= shots; k++) {
         const t = now();
-        const r = boolSubtract(buf, BLOB(k, S));
+        const r = boolSubtract(buf, BLOB(k, S), opts);
         ms += now() - t;
         buf = r.tris; vols.push(volBuf(buf));
         capped = capped || r.stats.a.capped || r.stats.b.capped;
         amb += r.ambiguousTriIndices.length;
         unresolved += r.stats.a.unresolvedCount + r.stats.b.unresolvedCount;
+        for (const st of [r.stats.a, r.stats.b]) {
+            classifications += st.classifications; arranged += st.arrangedTriangles;
+            for (const [why, n] of Object.entries(st.arrangementRefusals)) refusals[why] = (refusals[why] || 0) + n;
+        }
     }
-    return { buf, vols, ms, capped, amb, unresolved };
+    return { buf, vols, ms, capped, amb, unresolved, classifications, arranged, refusals };
 }
 
 // =============================================================================================================
-console.log("\n1. *** ONE BLAST: ROUND 6 WAS WRONG HERE, ROUND 7 IS EXACT, AND WHY ***");
+console.log("\n1. *** ONE BLAST, PLANE-CUT PATH: ROUND 6 WAS WRONG HERE, ROUND 7 IS EXACT, AND WHY ***");
 {
     const A = WALL(), B = SINGLE_BLOB();
     let t = now(); const bsp = M.subtract(A, B); const bspMs = now() - t;
@@ -132,9 +146,11 @@ console.log("\n1. *** ONE BLAST: ROUND 6 WAS WRONG HERE, ROUND 7 IS EXACT, AND W
     const bufA = M.toTriangleBuffer(A), bufB = M.toTriangleBuffer(B);
     const bvhA = new MeshBVH(bufA), bvhB = new MeshBVH(bufB);
 
-    t = now(); const g = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract"); const gMs = now() - t;
+    // Round 9: this section is the PLANE-CUT path's history (round 6's cap, round 7's gate), so every call pins
+    // it -- the default is now the arrangement, which section 8 checks against the same BSP volume directly.
+    t = now(); const g = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract", { arrangement: false }); const gMs = now() - t;
     const gVol = volBuf(g.tris);
-    ok("!! *** DEFAULT (GATED) meshBoolean MATCHES THE BSP VOLUME ON meshCSG's OWN SINGLE-BLAST FIXTURE ***",
+    ok("!! *** GATED PLANE-CUT meshBoolean (round 7's default) MATCHES THE BSP VOLUME ON meshCSG's OWN SINGLE-BLAST FIXTURE ***",
         Math.abs(gVol - oracle) < 1e-9 && !g.stats.a.capped && !g.stats.b.capped,
         "volume " + gVol + " vs BSP " + oracle + " (diff " + (gVol - oracle).toExponential(2) + "), capped=" +
         g.stats.a.capped + "/" + g.stats.b.capped);
@@ -145,7 +161,7 @@ console.log("\n1. *** ONE BLAST: ROUND 6 WAS WRONG HERE, ROUND 7 IS EXACT, AND W
     // Round 6's path exactly: ungated AND triFragmentAccumulate.mjs's own default cap of 256 (meshBoolean's own
     // default cap is now MESH_BOOLEAN_MAX_FRAGMENTS -- the first draft of this check passed only
     // gateByIntersection:false, silently got the new cap, and went red for reproducing nothing).
-    const r6 = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract", { accOpts: { gateByIntersection: false, maxFragments: 256 } });
+    const r6 = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract", { arrangement: false, accOpts: { gateByIntersection: false, maxFragments: 256 } });
     const r6Vol = volBuf(r6.tris);
     ok("!! *** ROUND 6's UNGATED PATH, REPRODUCED: HITS THE DEFAULT CAP AND COMES BACK MATERIALLY WRONG ***",
         r6.stats.a.capped === true && Math.abs(r6Vol - oracle) > 0.1,
@@ -153,7 +169,7 @@ console.log("\n1. *** ONE BLAST: ROUND 6 WAS WRONG HERE, ROUND 7 IS EXACT, AND W
         (r6Vol - oracle).toFixed(4) + " (" + (100 * (r6Vol - oracle) / oracle).toFixed(2) + "%), measured 0.2012 at round 7");
 
     t = now();
-    const r6u = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract", { accOpts: { gateByIntersection: false, maxFragments: 1e6 } });
+    const r6u = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract", { arrangement: false, accOpts: { gateByIntersection: false, maxFragments: 1e6 } });
     const r6uMs = now() - t;
     const r6uVol = volBuf(r6u.tris);
     ok("!! ...and UNCAPPED it is exact but manufactures the full plane arrangement -- over 20x the triangles",
@@ -163,7 +179,7 @@ console.log("\n1. *** ONE BLAST: ROUND 6 WAS WRONG HERE, ROUND 7 IS EXACT, AND W
     const bspTris = M.toTriangles(bsp).length;
     ok("   gated meshBoolean emits fewer triangles than the BSP for the same blast",
         g.triCount < bspTris, "gated " + g.triCount + " vs BSP " + bsp.length + " polygons = " + bspTris + " triangles");
-    info("timings (printed, not asserted): BSP subtract " + bspMs.toFixed(1) + " ms; gated meshBoolean " + gMs.toFixed(1) +
+    info("timings (printed, not asserted): BSP subtract " + bspMs.toFixed(1) + " ms; gated plane-cut meshBoolean " + gMs.toFixed(1) +
          " ms; ungated uncapped " + r6uMs.toFixed(1) + " ms");
 }
 
@@ -263,16 +279,18 @@ console.log("\n5. *** THE MANIFOLD HALF OF THE QUESTION: AFTER meshCSG's OWN set
     ok("!! *** meshBoolean's twelve-blast wall, through meshCSG's own settle(), is WATERTIGHT: zero unmatched edges ***",
         wg.ok && wg.unmatched === 0, "unmatched " + wg.unmatched + " of " + wg.edges + " (raw, before settle: " +
         rawG.unmatched + " -- T-junctions, which settle's merge + weld together close; the weld alone does not)");
-    // settle() DOES move meshBoolean's solid, by 2.9e-8 (1.4e-9 relative), and all of it is mergeCoplanar()'s --
-    // traced step by step at round 7: snap 4.4e-11, merge 2.88e-8, weld +0. The first draft asserted 1e-9 and
-    // went red. The bound here is meshCSG-selfcheck.mjs section 5's OWN settle-volume contract (1e-6), applied
-    // to both inputs alike, and the merge is load-bearing for the watertight claim above: weld alone, with no
-    // merge, leaves 4 unmatched edges -- printed below, measured live.
+    // settle() moves meshBoolean's solid. At round 7 (the plane-cut path, still reproduced in section 8) by 2.9e-8,
+    // all of it mergeCoplanar()'s -- traced step by step: snap 4.4e-11, merge 2.88e-8, weld +0; the first draft
+    // asserted 1e-9 and went red. Since round 9 the default path builds this solid, and settle moves it by
+    // -6.7e-11 (rebuild's measurement). The bound here is meshCSG-selfcheck.mjs section 5's OWN settle-volume
+    // contract (1e-6), applied to both inputs alike, and the merge is still load-bearing for the watertight claim
+    // above: weld alone, with no merge, leaves unmatched edges -- 4 at round 7, 3 on the default path since round
+    // 9 -- printed below, measured live. (A round-9 review found these comments still quoting round 7's numbers.)
     const dv = M.volume(sg.polys) - G1.vols[SHOTS - 1];
     ok("   ...and settle moved its solid by less than meshCSG's own settle contract (1e-6)", Math.abs(dv) < 1e-6,
         "moved " + dv.toExponential(2) + " (" + M.volume(sg.polys) + " vs " + G1.vols[SHOTS - 1] + ")");
     const weldOnly = M.watertight(M.weldTJunctions(M.snapVertices(polysFromBuf(G1.buf), { tol: 1e-9 }).polys).polys);
-    info("weld WITHOUT settle's coplanar merge leaves " + weldOnly.unmatched + " unmatched edges (measured 4 at round 7) -- " +
+    info("weld WITHOUT settle's coplanar merge leaves " + weldOnly.unmatched + " unmatched edges (4 at round 7, 3 since round 9) -- " +
          "the zero above needs settle() whole");
     info("MEASURED, not asserted here (meshCSG-selfcheck.mjs section 5 asserts it, as 'cause unknown'): the BSP's own " +
          "twelve-blast wall through the SAME settle() keeps " + wb.unmatched + " unmatched edges of " + wb.edges +
@@ -316,8 +334,9 @@ console.log("\n7. *** ROUND 8: THE SPATIAL INDEX CHANGES WHO IS ASKED, NOT WHAT 
     // buffer, compared float by float, and the index's work against the plain loop's scan.
     const A = M.toTriangleBuffer(WALL()), B = M.toTriangleBuffer(M.jaggedBlob([0, 0, 0], 1.0, 16, 12345));
     const bA = new MeshBVH(A), bB = new MeshBVH(B);
-    let t = now(); const ix = meshBoolean(A, bA, B, bB, "subtract"); const ixMs = now() - t;
-    t = now(); const pl = meshBoolean(A, bA, B, bB, "subtract", { accOpts: { spatialIndex: false } }); const plMs = now() - t;
+    // Round 9: the index lives in the plane-cut path; both runs pin it (the default would arrange these triangles).
+    let t = now(); const ix = meshBoolean(A, bA, B, bB, "subtract", { arrangement: false }); const ixMs = now() - t;
+    t = now(); const pl = meshBoolean(A, bA, B, bB, "subtract", { arrangement: false, accOpts: { spatialIndex: false } }); const plMs = now() - t;
     let same = ix.tris.length === pl.tris.length;
     for (let i = 0; same && i < ix.tris.length; i++) if (ix.tris[i] !== pl.tris[i]) same = false;
     ok("!! indexed and plain-loop meshBoolean produce the SAME output buffer, float for float (subdiv-16 blast)",
@@ -337,14 +356,72 @@ console.log("\n7. *** ROUND 8: THE SPATIAL INDEX CHANGES WHO IS ASKED, NOT WHAT 
          "triFragmentAccumulate.mjs's ROUND 8 paragraph for why neither is the whole scaling fix");
 }
 
+// =============================================================================================================
+console.log("\n8. *** ROUND 9: SEGMENT-BOUNDED CUTTING (THE DEFAULT) AGAINST THE PLANE-CUT PATH IT REPLACES ***");
+{
+    // One blast at two densities, then the twelve-blast chain, each both ways. The volumes must agree. The
+    // arrangement must refuse NOTHING here: a refused triangle silently goes back to the plane-cut path and still
+    // gets the right volume, so agreement alone cannot see the arrangement stop working. And it must do what it
+    // was built for -- far fewer classifications, and fewer output triangles.
+    const sumRefusals = (into, r) => { for (const st of [r.stats.a, r.stats.b]) for (const [why, n] of Object.entries(st.arrangementRefusals)) into[why] = (into[why] || 0) + n; };
+    const cls = (r) => r.stats.a.classifications + r.stats.b.classifications;
+    let worstSingle = 0, fewer = true, arrangedSingle = 0, defaultVol8 = NaN;
+    const singleRefusals = {}, rows = [];
+    for (const sub of [8, 32]) {
+        const A = M.toTriangleBuffer(WALL()), B = M.toTriangleBuffer(M.jaggedBlob([0, 0, 0], 1.0, sub, 12345));
+        const bA = new MeshBVH(A), bB = new MeshBVH(B);
+        let t = now(); const ar = meshBoolean(A, bA, B, bB, "subtract"); const arMs = now() - t;
+        t = now(); const pl = meshBoolean(A, bA, B, bB, "subtract", { arrangement: false }); const plMs = now() - t;
+        const va = volBuf(ar.tris);
+        if (sub === 8) defaultVol8 = va;
+        worstSingle = Math.max(worstSingle, Math.abs(va - volBuf(pl.tris)));
+        sumRefusals(singleRefusals, ar);
+        arrangedSingle += ar.stats.a.arrangedTriangles + ar.stats.b.arrangedTriangles;
+        if (!(cls(ar) * 2 < cls(pl) && ar.triCount < pl.triCount)) fewer = false;
+        rows.push("subdiv " + sub + ": classifications " + cls(ar) + " vs " + cls(pl) + ", triangles " + ar.triCount + " vs " +
+                  pl.triCount + ", " + arMs.toFixed(0) + " vs " + plMs.toFixed(0) + " ms");
+    }
+    ok("!! one blast at subdiv 8 and 32: arrangement and plane-cut path agree to 1e-12, nothing refused, under half the classifications",
+        worstSingle < 1e-12 && Object.keys(singleRefusals).length === 0 && arrangedSingle > 0 && fewer,
+        "worst |dV| " + worstSingle.toExponential(2) + ", refusals " + JSON.stringify(singleRefusals) + "; " + rows.join("; ") +
+        " (measured 330 vs 952 and 4,749 vs 12,824 classifications)");
+    // Section 1 checks the PLANE-CUT path against the BSP; the review asked for the default to be checked against
+    // it directly too, not only through the chain's agreement.
+    const oracle = M.volume(M.settle(M.subtract(WALL(), SINGLE_BLOB())).polys);
+    ok("!! *** DEFAULT (ARRANGEMENT) meshBoolean MATCHES THE BSP VOLUME ON meshCSG's OWN SINGLE-BLAST FIXTURE ***",
+        Math.abs(defaultVol8 - oracle) < 1e-9, "volume " + defaultVol8 + " vs BSP " + oracle + " (diff " + (defaultVol8 - oracle).toExponential(2) + ")");
+
+    // The chain: G1 (section 2) is the default path; the plane-cut path's own chain beside it.
+    const P1 = boolChain(1, SHOTS, { arrangement: false });
+    let worstChain = 0;
+    for (let k = 0; k < SHOTS; k++) worstChain = Math.max(worstChain, Math.abs(G1.vols[k] - P1.vols[k]));
+    ok("!! twelve chained blasts: the arrangement refused NOTHING, and every shot's volume matches the plane-cut chain to 1e-9",
+        Object.keys(G1.refusals).length === 0 && G1.arranged > 0 && worstChain < 1e-9,
+        "refusals " + JSON.stringify(G1.refusals) + ", " + G1.arranged + " triangles arranged, worst |dV| " + worstChain.toExponential(2) +
+        " (the rebuild's first run refused 7 here as 'face area sum' -- sub-TOL boundary strips -- see triArrangement.mjs)");
+    const rawA = M.watertight(polysFromBuf(G1.buf)), rawP = M.watertight(polysFromBuf(P1.buf));
+    ok("!! ...with fewer output triangles, under two-thirds the classifications, and under a quarter the raw unmatched edges",
+        G1.buf.length < P1.buf.length && G1.classifications * 1.5 < P1.classifications && rawA.unmatched * 4 < rawP.unmatched,
+        "triangles " + G1.buf.length / 9 + " vs " + P1.buf.length / 9 + ", classifications " + G1.classifications + " vs " +
+        P1.classifications + ", raw unmatched " + rawA.unmatched + "/" + rawA.edges + " vs " + rawP.unmatched + "/" + rawP.edges);
+    const sA = M.settle(polysFromBuf(G1.buf)), sP = M.settle(polysFromBuf(P1.buf));
+    const shiftA = M.volume(sA.polys) - G1.vols[SHOTS - 1], shiftP = M.volume(sP.polys) - P1.vols[SHOTS - 1];
+    ok("!! ...and settle() closes both, moving the arrangement's solid far less than the plane-cut path's",
+        M.watertight(sA.polys).unmatched === 0 && M.watertight(sP.polys).unmatched === 0 && Math.abs(shiftA) * 100 < Math.abs(shiftP),
+        "settle shift " + shiftA.toExponential(2) + " vs " + shiftP.toExponential(2) + " (measured -6.7e-11 vs 2.88e-8)");
+    info("timings (printed, not asserted): twelve-blast chain " + G1.ms.toFixed(0) + " ms default vs " + P1.ms.toFixed(0) +
+         " ms plane-cut. The scaling sweep (wall minus jaggedBlob subdiv n, one blast) is in meshBoolean.mjs's ROUND 9 paragraph");
+}
+
 console.log(`\nmeshBooleanBlast-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);
 console.log("unchecked here, named honestly: ONE workload family (a box wall, 224-triangle jagged blobs, subtract " +
     "only) -- the round-7 integration review ran union/intersect on wall-vs-blob and blob-vs-blob by hand (12 of 12 " +
-    "within 7.7e-11 of their own 1000x runs) but no gate does; THIS WORKLOAD FLATTERS meshBoolean ON SPEED: the same " +
-    "review measured it 7x slower than the BSP at a 16,128-triangle blob and 7.1 minutes, capped, at 65,024; round 8 " +
-    "(box precondition + spatial index) took subdiv 64 from 10.7 s to 7.1 s against the BSP's 1.7 s, but fragment count " +
-    "and per-fragment classification still scale badly and n=128 still caps (see triFragmentAccumulate.mjs), so " +
-    "'faster than the BSP' holds for inputs this size, not in general; the watertight win in section 5 is over meshCSG's current EPS and at 1x only; meshBoolean's " +
+    "within 7.7e-11 of their own 1000x runs) but no gate does; ON SPEED, round 7's review measured the plane-cut path 7x " +
+    "slower than the BSP at a 16,128-triangle blob and capped at 65,024, and round 8 only trimmed that; ROUND 9's " +
+    "arrangement default is about 4-9x FASTER than the BSP from subdiv 48 to 128 in warm runs (2x as a cold first run " +
+    "at 48; n=128 1.3 s vs 10.9 s, exact where the plane-cut path takes 137 s, caps and is 6.6e-3 wrong) -- but those " +
+    "are the sweep in meshBoolean.mjs's header, measured outside this gate on ONE workload family, and any triangle the " +
+    "arrangement refuses still pays the plane-cut path's cost; the watertight win in section 5 is over meshCSG's current EPS and at 1x only; meshBoolean's " +
     "raw output is NOT watertight without meshCSG's settle() and this round adds no weld of its own; each shot rebuilds " +
     "both BVHs from scratch; below ~1e-4 scale meshBoolean is wrong too (its own absolute tolerances); the touching-" +
     "contact, degenerate-operand, near-flush-tilt and near-identical-rotated-operand gaps meshBoolean.mjs's header " +

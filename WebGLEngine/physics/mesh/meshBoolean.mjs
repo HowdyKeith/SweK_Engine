@@ -221,11 +221,30 @@
 //   boxes with one face tilted 1e-10..3e-9 rad about an edge, intersected, return -0.12 against a true ~1e-10
 //   (the touching-contact family above, but with genuinely overlapping faces); a blob minus the same blob
 //   rotated by 1e-12..1e-6 returns up to -1.43 with non-closed output.
+//
+// *** ROUND 9: SEGMENT-BOUNDED CUTTING IS THE DEFAULT. *** classifyMeshAgainstOther() now hands every triangle with
+// candidates to physics/mesh/triArrangement.mjs first: the planar arrangement of B's ACTUAL intersection segments
+// inside the triangle (not B's infinite planes), faces triangulated by Earcut, and ONE pointInMesh() per face -- the
+// centroid of its largest triangle. The plane-cut path (rounds 5-8) runs only for triangles the arrangement refuses
+// (coplanar or degenerate contact, crossing or dangling segments, anything that fails its own checks), so every
+// degenerate-contact case the plane-cut path's gates hold still runs through the code that was gated for it.
+// opts.arrangement:false restores round 8 exactly.
+// Measured (wall minus jaggedBlob subdiv n, one blast, sequential runs on one machine; arrangement / round 8 / BSP):
+// n=32 0.055 / 0.63 / 0.19 s, n=48 0.16 / 2.2 / 0.59-0.71 s (0.29 s as a cold process's first run), n=64 0.25 / 7.1 /
+// 1.4 s, n=96 0.62 / 43 / 4.4 s, n=128 1.3 / 137 s CAPPED AND 6.6e-3 WRONG / 10.9 s. Against a 1000x-scale reference
+// (on which the arrangement and the BSP agree to 3e-14) the arrangement is within 2e-14 relative at every size; the
+// BSP is 4e-9 to 5.6e-7 off (its EPS=1e-5). On the twelve-blast chain: 4,465 vs 6,534 output triangles, 29,747 vs
+// 55,191 classifications, raw unmatched edges 1,143 vs 7,982, and settle() moves the solid by -6.7e-11 vs 2.9e-8. So
+// the (a) SCALING item above is answered on this workload; (b) and (c) are not -- the arrangement's TOL is absolute
+// too, and the touching-contact family still goes to the plane-cut path unchanged. Nor is the output watertight
+// without settle(): A's and B's sides each compute their crossing points separately (triTriIntersect(a, b) and
+// (b, a)), so they meet only to rounding.
 "use strict";
 
 import { pairOverlap } from "./bvhPairOverlap.mjs";
 import { groupCandidatesByTriA, accumulateFragments } from "./triFragmentAccumulate.mjs";
 import { pointInMesh } from "./meshPointClassify.mjs";
+import { arrangeTriangle } from "./triArrangement.mjs";
 
 function readTri(tris, t) {
     const o = t * 9;
@@ -255,12 +274,16 @@ function flipWinding(tri) { return [tri[0], tri[2], tri[1]]; }
  * @param {import("../../mesh/meshBVH.mjs").MeshBVH} bvhSelf  built over trisSelf
  * @param {Float64Array|Float32Array} trisOther
  * @param {import("../../mesh/meshBVH.mjs").MeshBVH} bvhOther  built over trisOther
- * @param {{accOpts?:object, pointInMeshOpts?:object, agreementThreshold?:number}} [opts]
+ * @param {{accOpts?:object, pointInMeshOpts?:object, agreementThreshold?:number, arrangement?:boolean}} [opts]
+ *   arrangement: round 9 -- false skips triArrangement.mjs and uses the plane-cut path for every triangle.
  *   accOpts defaults to {gateByIntersection:true, maxFragments:MESH_BOOLEAN_MAX_FRAGMENTS} since round 7 --
  *   NOT triFragmentAccumulate.mjs's own defaults; defined caller keys override, undefined/null ones do not.
  * @returns {{fragments:{tri:number[][], inside:boolean, ambiguous:boolean}[], stats:{triCount:number,
  *   emptyCandidateShortcuts:number, accumulatedFragments:number, capped:boolean, unresolvedCount:number,
- *   gateSkipped:number, gateTested:number, examined:number}}}
+ *   gateSkipped:number, gateTested:number, examined:number, arrangedTriangles:number, arrangementFaces:number,
+ *   arrangementRefusals:Object<string,number>, classifications:number}}}
+ *   The plane-cut counters (accumulatedFragments, capped, gate*, examined) count only triangles the arrangement
+ *   refused (or all, with arrangement:false); classifications counts every pointInMesh() call.
  */
 export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther, opts = {}) {
     const agreementThreshold = opts.agreementThreshold ?? 1;
@@ -280,6 +303,12 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
     const accOpts = { gateByIntersection: true, maxFragments: MESH_BOOLEAN_MAX_FRAGMENTS };
     for (const [k, v] of Object.entries(opts.accOpts || {})) if (v !== undefined && v !== null) accOpts[k] = v;
 
+    // Round 9: segment-bounded cutting first (physics/mesh/triArrangement.mjs), the plane-cut path only for
+    // triangles it refuses. opts.arrangement:false gives round 8's behaviour exactly.
+    const useArrangement = opts.arrangement !== false;
+    let arrangedTriangles = 0, arrangementFaces = 0, classifications = 0;
+    const arrangementRefusals = {};
+
     for (let t = 0; t < triCount; t++) {
         const cands = byTri.get(t);
         if (!cands || cands.length === 0) {
@@ -289,8 +318,37 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
             const tri = readTri(trisSelf, t);
             const c = centroid(tri);
             const cls = pointInMesh(bvhOther, c[0], c[1], c[2], opts.pointInMeshOpts);
+            classifications++;
             fragments.push({ tri, inside: cls.inside, ambiguous: cls.agreement < agreementThreshold });
             continue;
+        }
+        if (useArrangement) {
+            const arr = arrangeTriangle(trisSelf, t, trisOther, cands);
+            if (arr.ok) {
+                arrangedTriangles++;
+                // ONE classification per FACE: no face has B crossing its interior (triArrangement.mjs's header),
+                // so any interior point speaks for all of it -- the centroid of its largest triangle, which lies
+                // strictly inside that triangle and so strictly inside the face. THAT IS EXACT-ARITHMETIC
+                // REASONING, and the choice of triangle is not cosmetic: a round-9 review classified by
+                // face.tris[0] instead and five meshBooleanBlast-selfcheck.mjs checks went red (chain volume off
+                // by 1.15e-2). On the twelve-blast chain 1 of 8,251 faces holds a 2.5e-12 sliver whose own
+                // centroid classifies the OTHER way (agreement 0.6): a centroid within rounding of B's surface can
+                // go either way. The largest triangle's centroid is as far from the face's boundary as this cheaply
+                // gets; it is not a guaranteed margin, and a face that is all sliver has no good point.
+                for (const face of arr.faces) {
+                    if (face.tris.length === 0) continue;
+                    arrangementFaces++;
+                    let big = face.tris[0];
+                    for (const ft of face.tris) if (ft.area > big.area) big = ft;
+                    const c = centroid(big.tri);
+                    const cls = pointInMesh(bvhOther, c[0], c[1], c[2], opts.pointInMeshOpts);
+                    classifications++;
+                    const ambiguous = cls.agreement < agreementThreshold;
+                    for (const ft of face.tris) fragments.push({ tri: ft.tri, inside: cls.inside, ambiguous });
+                }
+                continue;
+            }
+            arrangementRefusals[arr.reason] = (arrangementRefusals[arr.reason] || 0) + 1;
         }
         const acc = accumulateFragments(trisSelf, t, trisOther, cands, accOpts);
         if (acc.capped) capped = true;
@@ -303,11 +361,13 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
             const c = centroid(frag.tri);
             const cls = pointInMesh(bvhOther, c[0], c[1], c[2], opts.pointInMeshOpts);
             const ambiguous = !!frag.lowConfidence || cls.agreement < agreementThreshold;
+            classifications++;
             fragments.push({ tri: frag.tri, inside: cls.inside, ambiguous });
         }
     }
     return { fragments, stats: { triCount, emptyCandidateShortcuts, accumulatedFragments, capped, unresolvedCount,
-                                 gateSkipped, gateTested, examined } };
+                                 gateSkipped, gateTested, examined, arrangedTriangles, arrangementFaces,
+                                 arrangementRefusals, classifications } };
 }
 
 // The keep-rule table -- see this file's own header for the boundary-of-the-result derivation and its
@@ -381,7 +441,7 @@ export function assembleBoolean(classifiedA, classifiedB, op) {
  * @param {Float64Array|Float32Array} trisB
  * @param {import("../../mesh/meshBVH.mjs").MeshBVH} bvhB
  * @param {"union"|"subtract"|"intersect"} op
- * @param {{accOpts?:object, pointInMeshOpts?:object, agreementThreshold?:number}} [opts]
+ * @param {{accOpts?:object, pointInMeshOpts?:object, agreementThreshold?:number, arrangement?:boolean}} [opts]
  * @returns {{tris:Float64Array, triCount:number, ambiguousTriIndices:number[], capped:boolean,
  *   stats:{a:object,b:object}}}
  *   tris: flat 9-floats-per-triangle buffer, the same layout mesh/meshBVH.mjs's MeshBVH constructor takes.
