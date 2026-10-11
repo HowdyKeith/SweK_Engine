@@ -12,8 +12,9 @@
 // Round 15 (section 46) adds an eighth: k_head_apply, the head and the kernel apply in one pass, run on
 // render/denoiseCompile.mjs's order probe -- a head whose products are exact and whose sums are not, so its image is
 // within APPLY_TOL of the twin's only if the head added in the twin's order.
-// Round 16 (section 54) adds a ninth and a tenth: the pixel-tiled kernel on round 13's 32 -> 32 layer at r16a's and r16b's
-// configurations, 2 pixels x 32 channels a thread and 4 x 16 -- its native build and pass beside the fast kernel's.
+// Round 16 (section 54) added a ninth and a tenth, the pixel-tiled kernel at r16a's and r16b's configurations; on both GPUs
+// FXC never finished building them, and the gate was stopped at realGpuRun's cap (section 56). Section 57 took them out of
+// VARIANTS; tools/denoiseBuildProbe.mjs builds them, each in its own process under a cap.
 //
 // Each native measurement is its own process: one kernel, one adapter, one device, one compiler -- Dawn's dump goes to
 // stdout, so a process apiece keeps each kernel's dump its own, and a compile that never finishes is killed, not waited on.
@@ -51,7 +52,7 @@
 //   Both restored, md5 verified.
 //   after both GPUs' use_dxc runs came back with empty dumps (section 49):
 //   D1  the child's Dawn features in two entries again                          1 RED (the one-entry row). Restored, md5 verified.
-//   round 16, against the pixel-tiled kernel (brain/conv2d-selfcheck.mjs's P1-P4, P6, P7):
+//   round 16, against the pixel-tiled kernel while its two variants were in VARIANTS (brain/conv2d-selfcheck.mjs's P1-P4, P6, P7):
 //   P1  a block's channels summed last-first                                    2 RED (native and browser, both variants)
 //   P2  pixel p reads pixel 0's window                                          2 RED
 //   P3  the second barrier removed                                              2 RED

@@ -56,6 +56,9 @@
 //   section 56, against edge "zero" (render/denoiseCompile-selfcheck.mjs alongside; restored, md5 verified):
 //   Z1  the tile's load stops zeroing taps left and right of the image          4 RED -- every edge-zero case, and no edge-skip one:
 //       edge zero adds what the tile holds outside the image, so its exactness IS the zero fill; edge skip never reads it
+//   section 57, against the D3D12 stand-aside:
+//   Z2  every adapter read as D3D12                                             1 RED (the stand-aside row) -- the tile kernel's device
+//       rows all say SKIP, as they would on a D3D12 box; only the row holding the detector to D3D12 alone sees that it is wrong
 //
 // *** S5 WAS EXPECTED TO GO ZERO RED AND DID NOT. *** A missing barrier is a race, and races hide on a device that
 // runs a workgroup's threads one after another. SwiftShader does run them in order -- which is exactly why it is
@@ -74,6 +77,12 @@ const { TILE, K_MAX, CB, COUT_MAX, conv2dForward, conv2dCpu, conv2dCpuFma, conv2
 const { mlpLayerCpu } = await imp("render/brainTsl.mjs");
 const H = await imp("tools/ship/headlessGpu.mjs");
 
+// *** SECTION 57: THE PIXEL-TILED KERNEL IS NOT BUILT NATIVELY ON A D3D12 ADAPTER. *** node-webgpu compiles D3D12 pipelines with
+// FXC, which did not build it at 32 -> 32 within 3 minutes on either of Keith's GPUs (section 56's probe), and stopped every
+// denoiser gate that tried at realGpuRun's 30-minute cap. On such an adapter its device rows say SKIP and why; its CPU rows,
+// and its device rows on any other backend (SwiftShader, Vulkan, Metal), still hold.
+const fxcAdapter = (ad) => /\bD3D12\b/i.test(ad?.description || "");
+const FXC_SKIP = "the pixel-tiled kernel is not built natively on a D3D12 adapter: node-webgpu's FXC did not finish it in 3 minutes on either GPU (section 57)";
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const t0 = Date.now();
@@ -256,6 +265,9 @@ console.log("\n5c. THE PIXEL-TILED KERNEL'S SHAPE AND UNIFORM BLOCK, ON THE CPU 
         (zero.match(/for \(var cj/g) || []).length === 1 && (code.match(/for \(var cj/g) || []).length === 2 && !/o0/.test(zero) && /if \(o0 && o1\)/.test(code) &&
         conv2dTileWgsl({ Cin: 32, Cout: 32, k: 3, act: "relu" }, T2) === conv2dTileWgsl({ Cin: 32, Cout: 32, k: 3, act: "relu" }, { ...T2, edge: "skip" }) &&
         tileShape({ Cin: 32, Cout: 32, k: 3 }, { ...T2, edge: "zero" }).fits && /edge skip or zero/.test(rEdge || ""));
+    ok("  section 57: the tile kernel's device rows stand aside on a D3D12 adapter (node-webgpu's FXC) and on no other -- Vulkan, SwiftShader, Metal",
+        fxcAdapter({ description: "D3D12 driver version 32.0.15.8180" }) && !fxcAdapter({ description: "SwiftShader driver 5.0.0" }) &&
+        !fxcAdapter({ description: "Vulkan driver" }) && !fxcAdapter({ description: "Metal driver on macOS" }) && !fxcAdapter(null));
 }
 
 console.log("\n6. *** EVERY KERNEL ON THE DEVICE, CELL FOR CELL AGAINST THE TWIN ***");
@@ -276,6 +288,8 @@ else {
     };
     let adapter = null;
     for (const P of PROBES) {
+        // section 57: the tile kernel's manifest case is last, so the adapter is known before it
+        if (P.entryPoint === "k_conv_tile" && fxcAdapter(adapter)) { console.log(`  SKIP  ${P.id}: ${FXC_SKIP}`); continue; }
         // each entry run through its own packer, inputs and dispatch -- the manifest is what a lab-wide runner would use
         const a = P.args, t = Date.now(), r = await H.runWgslComputeNative({ code: P.code(a), entryPoint: P.entryPoint, outCount: P.outCount(a), uniforms: P.pack(a),
             workgroups: P.workgroups(a), inputs: P.inputs(a) });
@@ -323,6 +337,8 @@ else {
             rh.ok && rd.ok && jh.unexplained === 0 && (jh.fused || jd.fused || same(Array.from(cl), Array.from(rd.values).map(Math.fround))),
             rh.ok && rd.ok ? `head ${jh.fused} fused, direct ${jd.fused} fused of ${jh.n}` : (rh.reason || rd.reason) + " " + (rh.errors || []).join("; "));
     }
+    if (fxcAdapter(adapter)) console.log(`  SKIP  the pixel-tiled kernel's device cases, edge zero's and its identity key: ${FXC_SKIP}`);
+    else {
     // round 16: the pixel-tiled kernel at both configurations and a third -- the denoiser's 10 -> 32 and 32 -> 32 at 3 x 3 on
     // odd sizes, a wide image of 13 -> 11 (several strips, the last partial), a 1 x 1 head in z groups, a 5 x 3 image
     // narrower than one strip -- against the twin, and against the fast kernel's bits on the same case where neither fused
@@ -359,6 +375,7 @@ else {
             out.push(kt.ok && K.x.every((v, i) => Math.fround(kt.values[i]) === v));
         }
         ok("  the identity key on the device, 9 x 21: the pixel-tiled kernel returns its input bit for bit at 2 and at 4 pixels a thread, edge skip and edge zero", out.every(Boolean), out.join(", "));
+    }
     }
     {
         const K1 = keyCpu({ k: 1, C: 5 }), n = K1.H * K1.W, ka1 = { H: K1.H, W: K1.W, Cin: K1.layer.Cin, Cout: K1.layer.Cout, k: 1, act: "none" };

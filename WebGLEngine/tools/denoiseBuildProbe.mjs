@@ -8,7 +8,8 @@
 //   - natively, each in its OWN PROCESS, stopped at --cap seconds (default 180) -- a shape FXC cannot finish costs the cap,
 //     not the run. A stopped shape says so; nothing of it is lost but its build;
 //   - then in Chrome, from the engine's origin, on the browser's own adapter (its D3D12 compiler is DXC), the same list,
-//     each raced against the same cap.
+//     each raced against the same cap -- launched with realGpuRun's hardware flags (section 57: without them, on Windows,
+//     the harness asks Chrome for SwiftShader, and the first probes' Chrome rows were SwiftShader's).
 // Per shape: whether it built, the build's wall-clock time, one pass on the device's clock, and whether every cell is the
 // twin's or the fused mirror's -- render/denoiseCompile.mjs's measure() -- and, natively, what Dawn's shader dump says FXC
 // made of it. The report is rewritten after every shape, so a run stopped part way keeps what it measured.
@@ -78,8 +79,13 @@ if (!args.includes("--browser-only")) {
 
 if (!args.includes("--native-only")) {
     console.log("browser (Chrome from the engine's origin; on Windows, D3D12 through DXC):");
-    const { runInEngineOrigin } = await imp("tools/ship/webgpuHarness.mjs");
-    const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: (CAP_S * BUILD_PROBE.length + 120) * 1000, args: { cap: CAP_S * 1000 }, script: `async (a) => {
+    const { runInEngineOrigin } = await imp("tools/ship/webgpuHarness.mjs"), { runLaunchArgs } = await imp("tools/ship/realGpuRun.mjs");
+    // *** SECTION 57: THE FIRST PROBES' CHROME RAN ON SWIFTSHADER. *** The harness's default flags on win32 ask for the SwiftShader
+    // adapter (webgpuHarness.mjs LAUNCH_ARGS); realGpuRun hands its gates the hardware flags, and so does this, unless
+    // SWEK_LAUNCH_ARGS says otherwise. The report names the adapter Chrome gave, and the flags.
+    const launchArgs = runLaunchArgs();
+    report.browserLaunchArgs = launchArgs;
+    const r = await runInEngineOrigin({ engineRoot: ENG, launchArgs, timeoutMs: (CAP_S * BUILD_PROBE.length + 120) * 1000, args: { cap: CAP_S * 1000 }, script: `async (a) => {
         const C = await import("/render/denoiseCompile.mjs"), out = [];
         if (!navigator.gpu) return { error: "no navigator.gpu" };
         let adapter = null;

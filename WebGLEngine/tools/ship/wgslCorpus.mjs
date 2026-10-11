@@ -827,11 +827,12 @@ export function corpus() {
         { id: "conv2d.conv2dHeadWgsl", from: "brain/conv2d.mjs",
           why: "a 1 x 1 convolution with no tile and no barrier, a thread per pixel and vec4 of outputs, weights in a uniform block, written planar: the head that round 13's fast kernel ran 1,900 times slower natively than in Chrome",
           opts: (() => { const P = CONV.PROBES[3], a = P.args; return { code: P.code(a), entryPoint: P.entryPoint, outCount: P.outCount(a), uniforms: P.pack(a), workgroups: P.workgroups(a), inputs: P.inputs(a) }; })() },
-        // the denoiser arc, round 16 (section 54): the pixel-tiled kernel, held to the twin by brain/conv2d-selfcheck.mjs
-        // and render/denoiseDevice-selfcheck.mjs; here, both backends must give the same bytes
-        { id: "conv2d.conv2dTileWgsl", from: "brain/conv2d.mjs",
-          why: "the fast kernel's convolution with two pixels a thread: each uniform weight read feeds both, a per-pixel bound test beside an all-inside branch, the order every copy of the layer shares -- so both backends must give the same bytes",
-          opts: (() => { const P = CONV.PROBES[4], a = P.args; return { code: P.code(a), entryPoint: P.entryPoint, outCount: P.outCount(a), uniforms: P.pack(a), workgroups: P.workgroups(a), inputs: P.inputs(a) }; })() },
+        // the denoiser arc, round 16 (section 54): the pixel-tiled kernel, held to the twin by brain/conv2d-selfcheck.mjs.
+        // COMPILE-ONLY SINCE SECTION 57: a pipeline is never built from it here, because node-webgpu's FXC did not finish one
+        // in 3 minutes on either of Keith's GPUs, and a native run of this corpus on a D3D12 adapter would wait for it
+        { id: "conv2d.conv2dTileWgsl", from: "brain/conv2d.mjs", compileOnly: true,
+          why: "the fast kernel's convolution with two pixels a thread: each uniform weight read feeds both, a per-pixel bound test beside an all-inside branch -- compile-only, as FXC never built its pipeline (section 57); its arithmetic is held by brain/conv2d-selfcheck.mjs off D3D12",
+          opts: (() => { const P = CONV.PROBES[4], a = P.args; return { code: P.code(a), entryPoint: P.entryPoint, compileOnly: true, outCount: 0 }; })() },
         // the denoiser arc, round 15 (section 46): the head and the kernel apply as one pass -- two uniform blocks, the
         // apply's and the head's, which the one-uniform harness signature cannot bind, so compile-only here; its image is
         // held to the twin's by render/denoiseDevice-selfcheck.mjs and render/denoiseCompile-selfcheck.mjs, natively and in

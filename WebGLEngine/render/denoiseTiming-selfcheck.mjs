@@ -15,8 +15,8 @@
 // clock it names. Not asserted: its size.
 // Round 15 (section 46): four sets on the page, and r12, r14 and r15 natively; r15's head and kernel are one pass, so the
 // ladder also prints that pass against r14's two, and each set's buffers at each size.
-// Round 16 (section 54): r12, r15, r16a and r16b on both ladders (TIMED_SETS); each r16 set's whole pass and its four
-// hidden layers are printed against r15's at every size both measured -- section 54's reported figure, held to nothing.
+// Round 16 (section 54) put r12, r15, r16a and r16b on both ladders (TIMED_SETS). Section 57 withdrew r16a and r16b --
+// node-webgpu's FXC never built their kernel on either GPU -- so both ladders now time r12 and r15.
 //
 // *** WHAT IS ASSERTED IS THE TIMER, NOT THE TIME. *** On any device: the first size is measured; every time is a finite
 // positive number; the device's clock, where it has one, nests inside the wall clock and each layer's span inside the
@@ -48,7 +48,7 @@
 //   R6  the r15 set never fuses its head                                          3 RED (different-kernels, native and page; passBytes)
 //   R7  passBytes counts the fused layer's logits                                 1 RED
 //   R10 applyFor gives the fused set a separate k_apply                           2 RED (neither ladder builds)
-//   round 16, against the ladders of TIMED_SETS (also against render/denoiseDevice-selfcheck.mjs):
+//   round 16, against the ladders of TIMED_SETS while r16a and r16b were on them (also against render/denoiseDevice-selfcheck.mjs):
 //   P5  the r16a set never picks the pixel-tiled kernel                         2 RED (different-kernels, native and page)
 "use strict";
 import fs from "node:fs";
@@ -67,7 +67,7 @@ const say = (m) => console.log("  ----  " + m);
 const t0 = Date.now();
 const net = decodeNet(JSON.parse(fs.readFileSync(path.join(ENG, "render/denoise-net-r11.json"), "utf8")).net);
 const CAP = 1500, QUANTUM = 0.2;   // the ladder's cap a pass, ms; a browser rounds timestamps to 0.1 ms, so nesting gets two quanta
-const NATIVE_SETS = TIMED_SETS;   // round 16 (section 54): both ladders time r12, r15, r16a and r16b -- sections 43 and 46 timed r12, r14, r15 natively
+const NATIVE_SETS = TIMED_SETS;   // both ladders time TIMED_SETS, r12 and r15 (section 57) -- sections 43 and 46 timed r12, r14, r15 natively
 
 // what any ladder must be, wherever it ran: returns the rows that were measured
 function holds(label, r) {
@@ -118,15 +118,6 @@ function report(label, r) {
         const two = a.perPass[4].ms + a.perPass[5].ms, one = b.perPass[4].ms;
         say(`${label}: r15's head and kernel in one pass at ${b.W} x ${b.H}: ${one.toFixed(3)} ms, against r14's head ${a.perPass[4].ms.toFixed(3)} + k_apply_fast ${a.perPass[5].ms.toFixed(3)} = ${two.toFixed(3)} ms -- ${(two / one).toFixed(2)} x`);
     });
-    // round 16 (section 54): each r16 set against r15, the whole pass and the four hidden layers, on the device's clock
-    for (const B of ["r16a", "r16b"]) if (r.rows[B] && r.rows.r15) r.rows[B].forEach((b, i) => {
-        const a = r.rows.r15[i];
-        if (a.skipped || b.skipped) return;
-        const whole = a.gpu && b.gpu ? a.gpu.median / b.gpu.median : a.wall.median / b.wall.median;
-        const hid = (x) => x.perPass ? x.perPass.slice(0, 4).reduce((t, q) => t + q.ms, 0) : null, ha = hid(a), hb = hid(b);
-        say(`${label}: ${B} against r15 at ${b.W} x ${b.H}: the pass ${whole.toFixed(2)} x as fast on the ${a.gpu && b.gpu ? "device's clock" : "wall clock"}` +
-            (ha && hb ? `; the four hidden layers ${hb.toFixed(3)} ms against ${ha.toFixed(3)} -- ${(ha / hb).toFixed(2)} x` : "; no per-pass times"));
-    });
     for (const [B, qs] of Object.entries(r.speedup)) for (const q of qs) if (q.measured)
         say(`${label}: ${B} against ${r.sets[0]} at ${q.W} x ${q.H}: ${q.ratio.toFixed(2)} x as fast, on the ${q.clock === "device" ? "device's clock" : "wall clock"}`);
 }
@@ -145,8 +136,8 @@ function pairedHolds(label, r, want = KERNEL_SETS) {
         all.length ? `${all.length} size(s) with every set; ${all[0].map((x) => x.wall.n).join(", ")} passes at the first` : "none with every set");
     // what each set's layers run on, read off the pass names the ladder printed
     const kinds = { r12: "tiled,tiled,tiled,tiled,direct|apply", r13: "fast,fast,fast,fast,fast|apply", r14: "fast,fast,fast,fast,head|apply_fast",
-                    r15: "fast,fast,fast,fast,head_apply|head_apply", r16a: "tile2,tile2,tile2,tile2,head_apply|head_apply", r16b: "tile4,tile4,tile4,tile4,head_apply|head_apply" };
-    // the apply is the sixth pass, or -- r15 and r16, whose head and kernel are one pass -- the fifth's
+                    r15: "fast,fast,fast,fast,head_apply|head_apply" };
+    // the apply is the sixth pass, or -- r15, whose head and kernel are one pass -- the fifth's
     const kindOf = (x) => x.passes.slice(0, 5).map((n) => /\((\w+),/.exec(n)[1]).join() + "|" + (x.passes[5] ? /\((\w+)\)$/.exec(x.passes[5])[1] : /\((\w+),/.exec(x.passes[4])[1]);
     ok(`  ${label}: and they are different kernels -- ${want.map((s) => `${s} ${kinds[s]}`).join("; ")}`,
         !!r && want.every((s) => r.rows[s].filter((x) => !x.skipped).every((x) => kindOf(x) === kinds[s])),
@@ -172,11 +163,10 @@ console.log("1. THE LADDER'S ARITHMETIC");
     const px = 1920 * 1080;
     ok("  round 15: a pass's buffers are the input, every layer's output and the image -- and r15 allocates no logits, 81 channels a pixel fewer than r14",
         passBytes(net, 1080, 1920, "r14") === px * 4 * (10 + 4 * 32 + 81 + 3) && passBytes(net, 1080, 1920, "r15") === passBytes(net, 1080, 1920, "r14") - px * 81 * 4 &&
-        passBytes(net, 1080, 1920, "r12") === passBytes(net, 1080, 1920, "r14") &&
-        passBytes(net, 1080, 1920, "r16a") === passBytes(net, 1080, 1920, "r15") && passBytes(net, 1080, 1920, "r16b") === passBytes(net, 1080, 1920, "r15"),
-        `at 1080p: r14 ${(passBytes(net, 1080, 1920, "r14") / 2 ** 20).toFixed(0)} MiB, r15 ${(passBytes(net, 1080, 1920, "r15") / 2 ** 20).toFixed(0)} MiB -- r16a and r16b r15's: the tile changes no buffer`);
-    ok("  round 16: both ladders time r12, r15 and its two candidates, r16a and r16b -- r12 first, the reference every speedup is read against",
-        TIMED_SETS.join() === "r12,r15,r16a,r16b" && NATIVE_SETS === TIMED_SETS && TIMED_SETS.every((s) => KERNEL_SETS.includes(s)));
+        passBytes(net, 1080, 1920, "r12") === passBytes(net, 1080, 1920, "r14"),
+        `at 1080p: r14 ${(passBytes(net, 1080, 1920, "r14") / 2 ** 20).toFixed(0)} MiB, r15 ${(passBytes(net, 1080, 1920, "r15") / 2 ** 20).toFixed(0)} MiB`);
+    ok("  both ladders time r12 and r15 -- r12 first, the reference every speedup is read against; round 16's two candidates left with section 57",
+        TIMED_SETS.join() === "r12,r15" && NATIVE_SETS === TIMED_SETS && TIMED_SETS.every((s) => KERNEL_SETS.includes(s)));
     const a = timingInput(8, 16), b = timingInput(8, 16);
     ok("  the input is the same every time, in the network's ranges, with both sides of a mask",
         a.every((v, i) => v === b[i]) && a.length === 8 * 16 * 10 && new Set(Array.from({ length: 128 }, (_, p) => a[p * 10 + 9])).size === 2);
@@ -196,7 +186,7 @@ else {
         const { mod } = H.resolveWebgpu(), gpu = mod.create([]);
         // round 14 (section 43): natively r12 against r14 -- r13's native failure is section 42's finding, and each native
         // fast pipeline costs minutes to build under the D3D12 compiler node-webgpu ships -- with a 600 s ladder budget;
-        // round 15 (section 46) adds r15, whose hidden layers are r14's; round 16 (section 54) times r12, r15, r16a and r16b
+        // round 15 (section 46) adds r15, whose hidden layers are r14's; since section 57, r12 and r15 (TIMED_SETS)
         r = await timingLadder(net, () => gpu.requestAdapter(), { sets: NATIVE_SETS, capMs: CAP, warmup: 1, minReps: 3, budgetMs: 1500, totalMs: 600000 });
         // the rig's report names every adapter a gate ran on; this one is not reached through the browser harness, so it says itself
         if (process.env.SWEK_ADAPTER_LOG) {

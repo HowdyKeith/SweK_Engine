@@ -33,9 +33,9 @@
 //           brain/conv2d.mjs's head kernel, which writes its logits planar; and k_apply_fast, which reads them so
 //   "r15"   round 15 (section 46): r13's fast kernel for the hidden layers; the LAST layer, when it is the 1 x 1 head of
 //           81 logits, and the kernel apply in ONE pass, k_head_apply below -- the logits never stored
-//   "r16a"  round 16 (section 54): r15's k_head_apply for the last layer; every other layer on brain/conv2d.mjs's
-//           PIXEL-TILED kernel, a thread 2 pixels x 32 channels ("tile2"), when it fits, else the fast kernel
-//   "r16b"  the same, a thread 4 pixels x 16 channels, the 32 channels in two z groups ("tile4")
+// Round 16 (section 54) added "r16a" and "r16b": r15 with every hidden layer on brain/conv2d.mjs's pixel-tiled kernel. Section
+// 57 withdrew both, by section 56's rule: node-webgpu's FXC did not build that kernel at 32 -> 32 within 3 minutes on either
+// GPU, at either edge, so no gate could run them natively there. The kernel stays in brain/conv2d.mjs; no set uses it.
 // The page runs PAGE_KERNELS and every other caller DEFAULT_KERNELS. Section 43's rules, read off both GPUs' round-14 runs
 // (section 49), put the page on r13 and the default on r14; section 46's, read off their round-15 runs (section 50), put
 // both on r15 -- the later run's decision stands.
@@ -44,7 +44,7 @@
 // the sets it is handed, taking turns on one device.
 "use strict";
 import { conv2dWgsl, conv2dTiledWgsl, conv2dFastWgsl, conv2dHeadWgsl, packProbeUniforms, packFastUniforms, packHeadUniforms, fastShape, headShape,
-         conv2dTileWgsl, packTileUniforms, tileShape, tileWorkgroups, planarToChannelsLast, conv2dCpu, conv2dCpuFma, TILE, K_MAX, COUT_MAX } from "../brain/conv2d.mjs";
+         planarToChannelsLast, conv2dCpu, conv2dCpuFma, TILE, K_MAX, COUT_MAX } from "../brain/conv2d.mjs";
 import { KERNEL_RADIUS, KERNEL_TAPS, headOf } from "./denoiseNet.mjs";
 import { ALBEDO_FLOOR, strideOf } from "./denoiseScenes.mjs";
 import { maskChannelOf } from "./denoiseMask.mjs";
@@ -293,17 +293,14 @@ export function kernelApplyCpu(x, logits, H, W) {
     return y;
 }
 
-/** The kernel sets a pass can run on: round 12's, round 13's fast kernel (section 39), round 14's (section 43), round 15's (section 46), round 16's two (section 54). */
-export const KERNEL_SETS = Object.freeze(["r12", "r13", "r14", "r15", "r16a", "r16b"]);
-/** Round 16's pixel-tiled configurations (brain/conv2d.mjs tileShape): pixels a thread computes, vec4s of channels it keeps for each. */
-export const TILE_CONFIGS = Object.freeze({ tile2: Object.freeze({ px: 2, g4: 8 }), tile4: Object.freeze({ px: 4, g4: 4 }) });
-/** The pixel-tiled configuration each round-16 set runs its other layers on. */
-export const TILE_SETS = Object.freeze({ r16a: "tile2", r16b: "tile4" });
+/** The kernel sets a pass can run on: round 12's, round 13's fast kernel (section 39), round 14's (section 43), round 15's (section 46). */
+export const KERNEL_SETS = Object.freeze(["r12", "r13", "r14", "r15"]);
 /**
- * The sets round 16's ladders time, natively and on the page (section 54): r12, the reference every speedup is read against;
- * r15, the default the round must beat; and its two candidates. r13 and r14 are decided (sections 49 and 50) and left out.
+ * The sets the ladders time, natively and on the page: r12, the reference every speedup is read against, and r15, the default
+ * and the page's (section 50). Section 54 added round 16's two candidates; section 57 withdrew them. r13 and r14 are decided
+ * (sections 49 and 50) and left out.
  */
-export const TIMED_SETS = Object.freeze(["r12", "r15", "r16a", "r16b"]);
+export const TIMED_SETS = Object.freeze(["r12", "r15"]);
 /** The set a pass runs unless told otherwise: r15, by section 46's default rule on both GPUs (section 50) -- 9.25 x against r14's 6.33. */
 export const DEFAULT_KERNELS = "r15";
 /** The set denoise.html runs: r15, by section 46's page rule on both GPUs (section 50) -- 9.25 x against r13's 6.49 and r14's 6.33. */
@@ -314,14 +311,12 @@ export const PAGE_KERNELS = "r15";
  * head). r13: the fast kernel when its uniform block and tile fit the device's default limits, else the layer's r12 kernel.
  * r14: r13's, except that the LAST layer (`last`), when it is 1 x 1 and fits, runs the head kernel and writes planar --
  * only the last, because only k_apply_fast reads a planar layer. r15: r13's, except that the last layer, when it is the 1 x 1
- * head of KERNEL_TAPS logits and fits, runs with the kernel apply as one pass, k_head_apply. r16a and r16b: r15's last layer;
- * every other layer on the pixel-tiled kernel in the set's TILE_SETS configuration when it fits, else r15's kernel for it.
+ * head of KERNEL_TAPS logits and fits, runs with the kernel apply as one pass, k_head_apply.
  */
 export const kernelFor = (L, set = DEFAULT_KERNELS, last = false) => {
     if (!KERNEL_SETS.includes(set)) throw new Error(`denoiseDevice: no kernel set "${set}" -- the sets are ${KERNEL_SETS.join(", ")}`);
     if (set === "r14" && last && headShape(L).fits) return "head";
-    if ((set === "r15" || set in TILE_SETS) && last && L.Cout === KERNEL_TAPS && headShape(L).fits) return "head_apply";
-    if (set in TILE_SETS && tileShape(L, TILE_CONFIGS[TILE_SETS[set]]).fits) return TILE_SETS[set];
+    if (set === "r15" && last && L.Cout === KERNEL_TAPS && headShape(L).fits) return "head_apply";
     return set !== "r12" && fastShape(L).fits ? "fast" : L.k <= K_MAX && L.Cout <= COUT_MAX ? "tiled" : "direct";
 };
 /**
@@ -365,7 +360,6 @@ export async function createDeviceDenoiser(dev, net, { H, W, C, kernels = DEFAUL
     if (used.has("direct")) await build("direct", conv2dWgsl(), "k_conv");
     if (used.has("tiled")) await build("tiled", conv2dTiledWgsl(), "k_conv_tiled");
     for (const [i, L] of layers.entries()) if (L.kernel === "fast") await build("fast" + i, conv2dFastWgsl(L), "k_conv_fast");
-    for (const [i, L] of layers.entries()) if (L.kernel in TILE_CONFIGS) await build(L.kernel + i, conv2dTileWgsl(L, TILE_CONFIGS[L.kernel]), "k_conv_tile");
     for (const [i, L] of layers.entries()) if (L.kernel === "head") await build("head" + i, conv2dHeadWgsl(L), "k_head");
     for (const [i, L] of layers.entries()) if (L.kernel === "head_apply") await build("head_apply" + i, kernelHeadApplyWgsl(L), "k_head_apply");
     const apply = applyFor(layers);
@@ -405,13 +399,6 @@ export async function createDeviceDenoiser(dev, net, { H, W, C, kernels = DEFAUL
             // the fast kernel: its weights and bias in the uniform block, the image alone at binding 2, a z group per FAST_GROUP channels
             const p = pipe["fast" + i], uni = packFastUniforms({ H, W, layer: L });
             return { p, wg: [...groups, fastShape(L).groups], bind: dev.createBindGroup({ layout: p.getBindGroupLayout(0), entries: [
-                { binding: 0, resource: { buffer: outs[i] } }, { binding: 1, resource: { buffer: buffer(uni.byteLength, BU.UNIFORM | BU.COPY_DST, uni) } },
-                { binding: 2, resource: { buffer: i ? outs[i - 1] : xBuf } }] }) };
-        }
-        if (L.kernel in TILE_CONFIGS) {
-            // the pixel-tiled kernel: the fast kernel's bindings, a workgroup per TILE px x TILE pixels, a z group per g4 vec4s
-            const cfg = TILE_CONFIGS[L.kernel], p = pipe[L.kernel + i], uni = packTileUniforms({ H, W, layer: L }, cfg);
-            return { p, wg: tileWorkgroups(H, W, L, cfg), bind: dev.createBindGroup({ layout: p.getBindGroupLayout(0), entries: [
                 { binding: 0, resource: { buffer: outs[i] } }, { binding: 1, resource: { buffer: buffer(uni.byteLength, BU.UNIFORM | BU.COPY_DST, uni) } },
                 { binding: 2, resource: { buffer: i ? outs[i - 1] : xBuf } }] }) };
         }

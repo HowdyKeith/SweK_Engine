@@ -3302,3 +3302,80 @@ r16a's configuration (2 pixels x 8 vec4s) and r16b's (4 x 4).
 **Before round 16 runs in full again, the instrument is mended so this cannot cost 90 silent minutes twice:**
 - a gate the runner stops is reported as stopped, with the last lines it printed;
 - a pipeline that does not build within a time limit becomes a named red row, not a hang.
+
+## 57. ROUND 16 -- THE VERDICT: FXC BUILDS NO TILE SHAPE AT 32 INPUTS ON EITHER GPU; BY SECTION 56 BOTH SETS LEAVE THE ROUND
+
+**What arrived.** One run of `node tools/denoiseBuildProbe.mjs` on each GPU, both at 7698a4cf. They are committed byte for
+byte at ba3361db:
+- `render/denoise-probe-r16-gtx1080.json`;
+- `render/denoise-probe-r16-intel-gen9.json`.
+
+**Natively: each shape in its own process, through node-webgpu's FXC, stopped at 180 s.**
+
+| Shape | GTX 1080 | Intel gen-9 |
+|---|---|---|
+| fast kernel, 32 -> 32 (the baseline) | built in 3.5 s; 537 DXBC lines; pass 0.131 ms | built in 5.0 s; 537 lines; pass 0.786 ms |
+| 2 px x 8 vec4s, edge zero, 32 -> 32 | stopped | stopped |
+| 4 x 4, edge zero, 32 -> 32 | stopped | stopped |
+| 2 x 4, edge zero, 32 -> 32 | stopped | stopped |
+| 2 x 8, edge zero, 10 -> 32 | built in 144.8 s; 9,527 lines; pass 19.99 ms | stopped |
+| 4 x 4, edge zero, 10 -> 32 | built in 37.7 s; 5,335 lines; pass 5.31 ms | built in 149.9 s; 5,335 lines; pass 206.4 ms |
+| 1 x 8, edge skip, 32 -> 32 | stopped | stopped |
+| 2 x 4, edge skip, 32 -> 32 | stopped | stopped |
+| 2 x 8, edge skip (r16a's), 32 -> 32 | stopped | stopped |
+| 4 x 4, edge skip (r16b's), 32 -> 32 | stopped | stopped |
+
+Every shape that built was exact: every cell the twin's, none fused.
+
+**Section 56's rule, applied.**
+- **r16a's configuration (2 x 8).** Edge skip did not build on either GPU. Edge zero did not build at 32 -> 32 on either
+  GPU. **r16a leaves round 16.**
+- **r16b's configuration (4 x 4).** Edge skip did not build on either GPU. Edge zero built at 10 -> 32 on both, but not
+  at 32 -> 32 on either. **r16b leaves round 16.**
+- **So section 54's rules have no candidate.** The page and the default stay "r15" (section 50). **Round 16 is closed
+  with no change to either.**
+
+**What the diagnostic shapes say. They choose nothing.**
+- **Neither suspect is the cause on its own.**
+  - With one pixel, the fast kernel's accumulator count and the guarded copy (1 x 8, edge skip), it was stopped.
+  - Without the guarded copy, at the fast kernel's accumulator count (2 x 4, edge zero), it was stopped too.
+  - So what FXC chokes on is something every tile shape shares and the fast kernel does not.
+- **The cost depends on the number of inputs, and the fast kernel's does not.**
+  - At 10 inputs, two edge-zero shapes built; at 32, no tile shape did.
+  - The two that built made 10 to 18 times the fast kernel's DXBC. The fast kernel's stays at 537 lines with its loops
+    kept.
+  - That points to FXC expanding the input-block loop for the tile kernel, as it does not for the fast kernel. This is
+    not shown: the dumps of the two built shapes would show it.
+- **The FXC-built tile kernels are far slower natively, not only slow to build.**
+  - On 10 inputs, a third of the fast kernel's work, they ran 40 to 150 times slower on the 1080 (5.31 and 19.99 ms
+    against 0.131 ms).
+  - On the Intel, 4 x 4 at 10 inputs ran 260 times slower (206.4 ms against 0.786 ms).
+  - So even a tile shape FXC builds is no use natively as written.
+
+**The probe's Chrome half ran on SwiftShader, not on either GPU.**
+- Both reports name the Chrome adapter "google / swiftshader".
+- On Windows the browser harness's default flags ask for the SwiftShader adapter. `realGpuRun` hands its gates the hardware
+  flags; the probe did not.
+- So the Chrome rows say nothing about Chrome's D3D12 compiler, DXC, and section 56 gave them nothing to choose.
+- The probe now launches Chrome with `realGpuRun`'s hardware flags and records them in its report.
+
+**Carried out at this commit.**
+- **`render/denoiseDevice.mjs`:** `KERNEL_SETS` is r12-r15 again, and `TIMED_SETS` is r12 and r15. The tile plumbing is
+  gone from `kernelFor` and `createDeviceDenoiser`.
+- **The gates:** the device gate's r16 rows, the timing gate's r16 lines and kinds, and the compile gate's two tile
+  variants are removed. Each gate's round-16 sabotage log stays, marked as history.
+- **`tools/denoiseDevice.mjs`:** `--measure-r16a` and `--measure-r16b` are removed. Their results, section 55's, stay
+  committed.
+- **`brain/conv2d.mjs` keeps the tile kernel and its edge option.**
+  - `brain/conv2d-selfcheck.mjs` holds them on any adapter but D3D12, and on a D3D12 adapter says SKIP and why. Left as
+    they were, its tile rows would have stopped a full Windows run as the denoiser gates were stopped.
+  - The WGSL corpus's tile entry is compile-only, for the same reason.
+  - `tools/denoiseBuildProbe.mjs` keeps its ten shapes, each under its cap.
+
+**Not decided here; a later round's to fix before it runs.**
+- Whether Chrome's DXC builds the tile kernel and runs it faster than the fast kernel. This could make a page-only set.
+  The probe's Chrome half, now on the GPU, measures it: `node tools/denoiseBuildProbe.mjs --browser-only`.
+- A tile kernel FXC can build. The two built shapes' dumps (`%TEMP%\swek-denoise-probe-dump-tile4-zero-10.txt` and
+  `-tile2-zero-10.txt`) are where to look.
+- Section 56's instrument mending: reporting a stopped gate with its last lines, and a time limit on native builds. It is
+  carried to the next round that builds a new kernel natively.

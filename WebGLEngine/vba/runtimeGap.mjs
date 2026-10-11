@@ -602,7 +602,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // denoise.html and render/denoise-net-r11.json are not .js or .mjs and are not counted.
     // the denoiser arc, round 12 again -- 4621 -> 4622 for render/denoiseTiming-selfcheck.mjs.
     // the denoiser arc, round 14 -- 4622 -> 4624 for render/denoiseCompile.mjs and its gate.
-    files: 4624,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
+    // the denoiser arc, section 56 -- 4624 -> 4625 for tools/denoiseBuildProbe.mjs.
+    files: 4625,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
     // (v4691 note, carried)                               // v4691 -- RE-DERIVED: tools/ship/textureInProbe.mjs arrived, one ES module with a closure and top-level await -- four rows moved (files, ES modules, closures, async/await) and eight held.
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
@@ -1166,8 +1167,11 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // closures 4166 -> 4168, async/await 1731 -> 1733, typed arrays 1291 -> 1292 (the kernel apply's planar logits),
     // Promises 408 -> 409 (its page script's waits), performance.now 241 -> 243 (a pipeline's build and a pass, timed in
     // both), and WebGPU 59 -> 60 (each kernel asks for its own adapter and device).
-    esModules: 4319, closures: 4168, asyncAwait: 1733, typedArrays: 1292, promises: 409,
-    fetchXhr: 251, performanceNow: 243, raf: 126, webgl: 197, webgpu: 60, threads: 26, wasm: 24,
+    // the denoiser arc, section 56 -- tools/denoiseBuildProbe.mjs: files 4624 -> 4625, ES modules 4319 -> 4320, closures
+    // 4168 -> 4169, async/await 1733 -> 1734, Promises 409 -> 410 (its Chrome half races each build against the cap), and
+    // WebGPU 60 -> 61 (each shape asks for its own adapter and device); the other six rows held.
+    esModules: 4320, closures: 4169, asyncAwait: 1734, typedArrays: 1292, promises: 410,
+    fetchXhr: 251, performanceNow: 243, raf: 126, webgl: 197, webgpu: 61, threads: 26, wasm: 24,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.

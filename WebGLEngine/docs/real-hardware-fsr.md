@@ -187,6 +187,15 @@ node tools/denoiseBuildProbe.mjs --out denoise-build-probe.json
 It prints one line a shape as it goes, and takes at most about half an hour. Send `denoise-build-probe.json` back.
 Section 56 fixes, before it runs, what its results may choose.
 
+**The outcome (section 57).** No tile shape built at 32 inputs within 3 minutes on either GPU, so by section 56 both round-16
+sets left the round, and the page and the default stay r15. The denoiser gates no longer build the tile kernel natively, so
+`node tools/ship/realGpuRun.mjs --only denoise` runs as it did in round 15. To see whether Chrome builds and runs the tile
+kernel on your GPU -- the first probes' Chrome half ran on SwiftShader by mistake -- run, on the same branch:
+
+```
+node tools/denoiseBuildProbe.mjs --browser-only --out denoise-build-probe-chrome.json
+```
+
 
 ## Send back
 
