@@ -780,6 +780,14 @@ export const NEXT_ROUNDS = [
     },
     // ---- v4562: closing out the skeeto sweep -- a small, verified naming gap rather than another design idea.
     {
+        id: "definition-gates-thirteen",
+        blocker: "OPEN",
+        what: "tools/ship/definitionGates-selfcheck.mjs is red on main: its all-shapes ratchet reads 709 exported symbols no name-matched gate names, against BASELINE_SHAPES 703 (frozen post-v4645-merge, 590050b5). It is over the quick sweep's budget, so no ship saw it; v4829's rotation returned it. Measured at v4831 by calling the gate's own definitionCoverage() and dating each file: SIX FILES ADDED SINCE THE FREEZE CARRY 13 UNNAMED SYMBOLS, while older debt shrank by 7 -- net +6. brain/roster.mjs (SLOTS, SLOT_COLOURS, NOISE_05, NOISE_10), brain/racePlay.mjs (summarise, PEERS, DEFAULT_SECONDS), tools/ship/realGpuRun.mjs (RETIRED_SOFTWARE_GL, TREE_SOFTWARE_WEBGPU, SOFTWARE_GL_CANDIDATES), tools/ship/lockstepRelay.mjs (CLI_SPEC), tools/ship/adapterRecord.mjs (READINGS_PATH), fx/fsr/fsrTemporalTsl.mjs (probeHalfWrite).",
+        how: "Either each of those modules' own gate (brain/roster-selfcheck.mjs, brain/racePlay-selfcheck.mjs, tools/ship/realGpuRun-selfcheck.mjs, tools/ship/lockstepRelay-selfcheck.mjs, tools/ship/adapterRecord-selfcheck.mjs, fx/fsr/fsrTemporalTsl-selfcheck.mjs) grows a row that EXERCISES the symbol -- not a mention, which the gate's own physics row calls lowering the number without changing coverage -- or BASELINE_SHAPES is re-baselined to 709 with the paragraph the file asks for.",
+        why: "Re-baselining is Keith's call and the file records the last three times it was made; v4831 did not take it. Most of the thirteen are constants (slot tables, peer counts, a CLI spec, software-renderer flag lists) whose gates use them without naming them, so the honest rows are short. They belong to the racing, FSR and real-GPU lines, which other sessions are working.",
+        upstream: "Nothing -- every module is in the tree.",
+    },
+    {
         id: "procedural-entity-naming",
         blocker: "OPEN",
         what: "This tree procedurally generates planets (world/procPlanet.js), cities (world/CityGen.js) and buildings, but names none of them individually -- procPlanet.js's `name` field is a BIOME/TYPE label ('terran', 'desert', 'gas', 'molten'), not a per-instance name, and grepping the tree for nameGen/generateName/randomName/markov outside multiplayer/remotePlayers.js and two unrelated geostats files turns up nothing.",

@@ -1700,7 +1700,12 @@ export function runGate(rel, { timeoutMs = 120000 } = {}) {
     if (r.error) return { red: true, code: "timeout/signal", skipped: false };
     if (r.signal) return { red: true, code: "timeout/signal", skipped: false };
     const tail = String((r.stdout || "") + (r.stderr || "")).slice(-4096);
-    return { red: r.status !== 0, code: r.status, skipped: r.status === 0 && SKIP_LINE.test(tail) };
+    // v4831 -- AND A RED SAYS WHICH ROW, because the caller cannot ask afterwards. The 2026-10-10 rotation returned
+    // headlessGpu red once, exit 1 in a normal 5 s, and nineteen re-runs -- direct, under flakeProbe and through this very
+    // function -- were all green: the one run that knew why had its output discarded here. The FAIL rows are kept, first
+    // five, each cut to 300 characters; a gate that died without printing one says so with an empty list.
+    const failRows = r.status === 0 ? [] : String(r.stdout || "").split("\n").filter((l) => l.startsWith("  FAIL")).slice(0, 5).map((l) => l.slice(0, 300));
+    return { red: r.status !== 0, code: r.status, skipped: r.status === 0 && SKIP_LINE.test(tail), failRows };
 }
 
 /** Total cost of re-verifying the whole census, in ms, from the recorded per-gate times. */

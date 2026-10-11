@@ -3973,7 +3973,8 @@
 // every GitHub action -- INCLUDING "Release current engine", the one that makes auto-update possible at all --
 // was reachable from index.html and NOT from server.html, which is the page operations actually happen on.
 //
-// server.html now hosts THE SAME MODULE, not a copy. ui/githubPanel.js has no imports and no globals and says in
+// server.html now hosts THE SAME MODULE, not a copy. ui/githubPanel.js has no globals and one import (v4831: ui/publishCommands.mjs,
+// the export text as a pure function, beside it in ui/), and says in
 // its own header that the Dock merely provides the minitab and drawer, so the panel TRAVELS and only its host
 // changes. All six tabs -- Publish, Account, Repos, Releases, Issues, Code -- arrive for free and cannot drift,
 // because there is nothing to drift from. A SECOND GITHUB PANEL WRITTEN FOR THIS PAGE WOULD BE THE SECOND COPY

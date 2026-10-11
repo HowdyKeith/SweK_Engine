@@ -153,3 +153,11 @@ WebGLEngine/ai-bridge/bun.lock
 
 # v4527 -- the lab-scene-run route stores the accepted driver's replay here at run time (see physics/raceKnob.mjs)
 WebGLEngine/tools/roundhouse/lab-replays/
+
+# v4831 -- two things that kept appearing in the rig's `git status` and must never reach a commit or a release:
+# a clone of this repo made INSIDE it (the GitHub panel's exported publish commands used to put
+# "<repo>_<ver>_clone" there; ai-bridge/packagerBridge.js's _skipDir keeps one out of a zip either way), and
+# the Tasker R2 state ai-bridge/server.js persists beside its AutoRemote config (also in the packer's SKIP_FILES).
+/*_clone/
+.*_clone.tmp/
+WebGLEngine/ai-bridge/tasker-state.json

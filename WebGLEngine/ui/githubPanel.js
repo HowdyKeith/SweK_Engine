@@ -4,6 +4,8 @@
 // (list/publish/delete), issues (list/create/close), commits + branches, and files
 // (get/commit). Talks to the /github/* bridge routes. Self-contained (no dock system).
 
+import { publishCommands } from "./publishCommands.mjs";   // v4831
+
 export function mountGithubPanel() {
     if (document.getElementById("ghPanelRoot")) return;
 
@@ -362,49 +364,20 @@ export function mountGithubPanel() {
             // The generator is a pure function of state that exists by the time anyone can click these buttons
             // (repo(), brSel, tag, notes, dr, pr are all declared further down this same closure, before the
             // panel is ever shown) -- same pattern chainSync/chainPoll already use above.
+            // v4831 -- the lines are ui/publishCommands.mjs's, a pure function a gate walks path by path. This text used to
+            // clone INSIDE the project (its "../" was the project root, since steps 5 and 6 run from WebGLEngine/) and to pack
+            // into the clone's own tree, which the packer refuses; see that module's header.
             const exportCommands = async () => {
                 let er = repo();
                 if (!er) { try { const s0 = await api("config"); er = ((s0 && s0.engineRepo) || "").trim(); } catch {} }
-                if (!er) er = "owner/repo";
-                const branch = (typeof brSel !== "undefined" && brSel.value) || "";
-                const ver = (tag.value || "").trim() || "vNNNN";
-                const cloneDir = "../" + er.split("/").pop() + "_" + ver + "_clone";
-                const relNotes = (notes.value || "").trim() || ("Engine build " + ver);
-                const flags = [];
-                if (typeof dr !== "undefined" && dr.checked) flags.push("--draft");
-                if (typeof pr !== "undefined" && pr.checked) flags.push("--prerelease");
-                return [
-                    "# ---- step 3: clone the repo beside this one, and verify THE CLONE -------------------",
-                    "git clone --depth 1" + (branch ? " --branch " + branch : "") + " https://github.com/" + er + ".git " + cloneDir,
-                    "cd " + cloneDir + "/WebGLEngine",
-                    // v4776 -- the provisioning step the chain runs (sourceChainBridge._provision) and this export left out:
-                    // a fresh clone has no Playwright, so without it every browser gate is red for the missing install --
-                    // 110 of them on Keith's rig the first time these commands were followed by hand.
-                    "cd tools/render-qa && npm install --no-audit --no-fund && cd ../..",
-                    "node tools/ship/shipVerdict.mjs --version " + ver + " --markers \"SweK Dictate,/dictate/type\"",
-                    "# must print: [ship] SHIP  --  stop here and do not publish if it does not",
-                    "",
-                    "# ---- step 4: publish the tree that just passed (needs `gh auth login` once) ----------",
-                    "node tools/ship/packRelease.mjs --out ..",
-                    "gh release create " + ver + " ../" + er.split("/").pop() + "_" + ver + ".zip --repo " + er +
-                        " --title " + ver + " --notes " + JSON.stringify(relNotes) + (flags.length ? " " + flags.join(" ") : ""),
-                    "",
-                    "# ---- steps 5 + 6: record the release and ask whether the fleet runs what is built -----",
-                    "# back in the tree that is normally serving this panel, once it is free to run again:",
-                    "node tools/ship/refreshReleases.mjs --write",
-                    "node tools/ship/releaseLedger-selfcheck.mjs",
-                    "",
-                    "# ---- shortcuts (each skips a step above; same warning applies) ------------------------",
-                    "# ⚡ Release current engine  =  step 4 alone, tagging + zipping THIS tree as-is:",
-                    "node tools/ship/packRelease.mjs --out .. && gh release create " + ver + " ../" + er.split("/").pop() +
-                        "_" + ver + ".zip --repo " + er + " --title " + ver + " --notes " + JSON.stringify(relNotes),
-                    "# ⬇ Get newer source  =  step 3's clone alone, no verify:",
-                    "git clone --depth 1" + (branch ? " --branch " + branch : "") + " https://github.com/" + er + ".git " + cloneDir,
-                    "",
-                    "# No credentials are printed here. `gh release create` uses your own `gh auth login` session;",
-                    "# a token-based curl equivalent exists but is deliberately not generated, since a token pasted",
-                    "# into a command a terminal keeps in history is a token that outlives the terminal.",
-                ].join("\n");
+                return publishCommands({
+                    repo: er,
+                    branch: (typeof brSel !== "undefined" && brSel.value) || "",
+                    ver: (tag.value || "").trim(),
+                    notes: (notes.value || "").trim(),
+                    draft: typeof dr !== "undefined" && dr.checked,
+                    prerelease: typeof pr !== "undefined" && pr.checked,
+                }).join("\n");
             };
             exportBtn.onclick = async () => {
                 const show = exportBox.style.display === "none";

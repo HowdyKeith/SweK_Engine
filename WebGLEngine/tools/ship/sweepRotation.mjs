@@ -29,11 +29,11 @@ export function runSlice(picked, { capMs = CAP_MS, onProgress = null } = {}) {
     for (let i = 0; i < picked.length; i++) {
         const g = picked[i];
         const t0 = Date.now();
-        let code = 1, skipped = false;
+        let code = 1, skipped = false, failRows = [];
         // v4647k -- `skipped` comes from the SAME run that produced the millisecond, exactly as the sweep's
         // `serialSkipped ?? parallelSkipped` mirrors `serialMs ?? parallelMs`. A label taken from another
         // run is the drift kindsInferred exists to prevent.
-        try { const r = runGate(g, { timeoutMs: capMs }); code = r.code; skipped = !!r.skipped; } catch { code = 1; }
+        try { const r = runGate(g, { timeoutMs: capMs }); code = r.code; skipped = !!r.skipped; failRows = r.failRows || []; } catch { code = 1; }
         const ms = Date.now() - t0;
         // v4815 -- a run killed at the cap runs no cleanup, and the NEXT gate here would meet what it left: the 2026-10-06
         // full rotation killed orreryReached between its control's two writes and left orrery-reached.json bent on disk.
@@ -44,7 +44,7 @@ export function runSlice(picked, { capMs = CAP_MS, onProgress = null } = {}) {
         // gate that ran to completion in 50 s and a gate cut off at 20 s were the same entry. runGate returns
         // "timeout/signal" as its code for a kill, which is the fact itself rather than a threshold test on
         // the clock -- a gate finishing 3 ms under the cap is finished, and a slow box does not change that.
-        rows.push({ gate: g, ms, code, finished: code !== "timeout/signal", skipped });
+        rows.push({ gate: g, ms, code, finished: code !== "timeout/signal", skipped, failRows });
         if (onProgress) onProgress(i + 1, picked.length, rows[rows.length - 1]);
     }
     return rows;
@@ -417,7 +417,12 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const k = classifyRows(rows, { priorMs: file.timings || {}, capMs });
     console.log(`[rotation] ran ${rows.length}: ${k.returnees.length} now UNDER budget, ${k.reds.length} red, ${k.killed.length} hit the cap, ${k.slower.length} materially slower`);
     for (const r of k.returnees) console.log(`[rotation]   returnee  ${r.gate}  ${(file.timings || {})[r.gate]} -> ${r.ms} ms`);
-    for (const r of k.reds) console.log(`[rotation]   RED       ${r.gate}  exit ${r.code} in ${r.ms} ms`);
+    for (const r of k.reds) {
+        console.log(`[rotation]   RED       ${r.gate}  exit ${r.code} in ${r.ms} ms`);
+        // v4831 -- the rows that made it red, from the run that was red: a one-off red is otherwise unexplainable afterwards
+        for (const f of (r.failRows || [])) console.log(`[rotation]             ${f.trim()}`);
+        if (r.failRows && !r.failRows.length) console.log(`[rotation]             (no FAIL row printed -- the gate exited ${r.code} without one)`);
+    }
     if (killedMode) {
         const fin = rows.filter((r) => r.finished);
         console.log(`[rotation] ${fin.length} of ${rows.length} FINISHED and now have a verdict ` +

@@ -32,7 +32,10 @@ function progress() { return Object.assign({ ok: true }, _prog); }
 const BLOCKED = ["bat", "cmd", "ps1", "vbs", "vbe", "wsf", "wsh", "hta", "lnk", "exe", "dll", "scr", "com", "msi", "js", "mjs", "jse", "sct", "shb", "wsc"];
 const BLOCKED_SET = new Set(BLOCKED);
 const SKIP_DIRS = new Set(["node_modules", ".git", "__pycache__", "asset_library", "tts-out", "doc-out", ".kpop-wav"]);
-const SKIP_FILES = new Set([".DS_Store", "Thumbs.db", "gmail.json", "github.json", "tts.json", "stt.json", "wled.json", "rgb.config.json", "discord-voice.json", "camera.json", "twitch-eventsub.json", "gen-queue.json", "processes.json", "clip-queue.json", "fallout.json", "starfield.json", "toasts.json", "uitars.json", "use_bun.flag"]);
+const SKIP_FILES = new Set([".DS_Store", "Thumbs.db", "gmail.json", "github.json", "tts.json", "stt.json", "wled.json", "rgb.config.json", "discord-voice.json", "camera.json", "twitch-eventsub.json", "gen-queue.json", "processes.json", "clip-queue.json", "fallout.json", "starfield.json", "toasts.json", "uitars.json", "use_bun.flag",
+    // v4831 -- the Tasker R2 state ai-bridge/server.js persists (config + macro registry, beside an AutoRemote key it reads
+    // from config). Per-box state like its neighbours here, untracked, and sitting on Keith's rig the day v4828 was packed.
+    "tasker-state.json"]);
 // v4778 -- THE FSR CACHES LEAVE THE ZIP, AND THE LIST OF THEM IS READ, NOT TYPED. Keith: "put the FSR frame
 // caches in its own repo folder, and access /install from there if the user chooses." Twelve harvested data files
 // (frame*-cache.json.gz, the genGate fold caches -- 300 MB of a 333 MB release zip, measured) moved into WebGLEngine/fsr-caches/,
@@ -49,6 +52,20 @@ function _fsrCacheBlobs() {
     } catch { return new Set(); }
 }
 const FSR_CACHE_BLOBS = _fsrCacheBlobs();
+// *** v4831 -- A CLONE OF THIS PROJECT IS NEVER PART OF IT. *** The GitHub panel's exported publish commands cloned
+// the repo to "../<repo>_<ver>_clone" while the steps beside them run from WebGLEngine/ -- which puts the clone INSIDE the
+// project, and Keith's rig held three of them (v4826, v4827, v4828) the day v4828 was packed. _copyTree walks the whole
+// project root, so a pack from that folder would have nested three full copies of the engine in the release. The panel's
+// commands no longer put a clone there (ui/publishCommands.mjs); this is the rule that holds whoever made the folder:
+// the exported "_clone" suffix and githubBridge's own ".<prefix>_clone.tmp" staging directory, by name, at any depth.
+// No tracked directory matches either (tools/ship/publishHygiene-selfcheck.mjs checks the tree).
+function _skipDir(name) {
+    if (SKIP_DIRS.has(name) || name.startsWith("EngineProject_GmailSafe_")) return true;
+    if (/_clone$/i.test(name)) return true;
+    if (/^\..*_clone\.tmp$/i.test(name)) return true;
+    return false;
+}
+
 // pattern-based skips: per-run state that may hold names/emails
 function _skipFile(name) {
     if (SKIP_FILES.has(name)) return true;
@@ -104,7 +121,7 @@ function _copyTree(src, dest) {
         let ents; try { ents = fs.readdirSync(s, { withFileTypes: true }); } catch { return; }
         for (const e of ents) {
             if (e.isDirectory()) {
-                if (SKIP_DIRS.has(e.name) || e.name.startsWith("EngineProject_GmailSafe_")) continue;
+                if (_skipDir(e.name)) continue;
                 walk(path.join(s, e.name), path.join(d, e.name));
             } else if (e.isFile()) {
                 if (_skipFile(e.name)) continue;
@@ -583,4 +600,4 @@ async function selfZipCandidate({ dlDir, liveVersion } = {}) {
 // did: a gate that can only reach this file's behaviour through a full makeInstallable() run over the whole
 // real tree is a slow gate that also cannot target one edge case (an empty file, a non-ASCII name, a file
 // deflate doesn't shrink) without hoping the real tree happens to contain one today.
-module.exports = { makeGmailSafe, makeGmailSafeFromZip, makeInstallable, outDirRefusal, selfZipCandidate, progress, engineVersion, externalAssetsDir, PROJECT_ROOT, SKIP_DIRS, SKIP_FILES, FSR_CACHE_BLOBS, _skipFile, normalizeZipSeparators, _zip, _crc32 };
+module.exports = { makeGmailSafe, makeGmailSafeFromZip, makeInstallable, outDirRefusal, selfZipCandidate, progress, engineVersion, externalAssetsDir, PROJECT_ROOT, SKIP_DIRS, SKIP_FILES, FSR_CACHE_BLOBS, _skipFile, _skipDir, _copyTree, normalizeZipSeparators, _zip, _crc32 };
