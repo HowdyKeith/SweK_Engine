@@ -87,6 +87,9 @@ const { TILE, K_MAX, CB, COUT_MAX, conv2dForward, conv2dCpu, conv2dCpuFma, conv2
         fastAltShape, conv2dFastAltWgsl, packFastAltUniforms } = C;
 const { mlpLayerCpu } = await imp("render/brainTsl.mjs");
 const H = await imp("tools/ship/headlessGpu.mjs");
+// v4838: the device cases as a report table (tools/ship/gateReport.mjs) -- the counts every PASS line prints, kept past the terminal
+const { gateReport } = await imp("tools/ship/gateReport.mjs");
+const REPORT = gateReport("brain/conv2d-selfcheck.mjs"), CASES = [];
 
 // *** SECTION 57: THE PIXEL-TILED KERNEL IS NOT BUILT NATIVELY ON A D3D12 ADAPTER. *** node-webgpu compiles D3D12 pipelines with
 // FXC, which did not build it at 32 -> 32 within 3 minutes on either of Keith's GPUs (section 56's probe), and stopped every
@@ -339,6 +342,7 @@ else {
         // the head kernel writes planar: transposed back, it is judged as every other kernel is
         const planar = P.entryPoint === "k_head", n = a.H * a.W;
         const j = r.ok ? judge(planar ? { ...r, values: planarToChannelsLast(r.values, n, a.Cout) } : r, P.args) : null;
+        if (j) CASES.push([P.id, P.args.H, P.args.W, P.args.Cin, P.args.Cout, j.n - j.fused, j.fused, j.unexplained]);
         ok(`!! ${P.id} (the manifest's own case, ${P.args.H} x ${P.args.W}, ${P.args.Cin} -> ${P.args.Cout}): every cell the twin's or the fused mirror's`,
             r.ok && j.unexplained === 0, r.ok ? `${j.n - j.fused} plain, ${j.fused} fused, ${j.unexplained} unexplained, ${Date.now() - t} ms` : r.reason + " " + (r.errors || []).join("; "));
         ok(`  ...and the manifest entry is the kernel's: tol ${P.tol}, cpu is probeCpu, ${P.workgroups(P.args).join(" x ")} workgroups`,
@@ -481,4 +485,8 @@ console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date
     "are a JIT's and not a GPU's; render/denoiseTiming-selfcheck.mjs times the denoiser's kernel sets " +
     "side by side, and a GPU's figures come from the rig (section 39's K1). Nor is there a device BACKWARD pass yet: training starts on the CPU, against " +
     "conv2dBackward, and moves to the device when a measurement says the CPU is the wall.");
+if (CASES.length) REPORT.table("the manifest's kernels on the device: each cell the f32 twin's (plain), the fused mirror's, or unexplained",
+    ["kernel", "H", "W", "Cin", "Cout", "plain", "fused", "unexplained"], CASES);
+else REPORT.skip("the device cases", "no WebGPU device here");
+REPORT.write();
 H.exitCleanly ? H.exitCleanly(fails ? 1 : 0) : process.exit(fails ? 1 : 0);

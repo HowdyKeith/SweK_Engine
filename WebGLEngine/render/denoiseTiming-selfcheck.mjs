@@ -74,6 +74,9 @@ const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
 const { TIMING_SIZES, largestBuffer, passBytes, timingInput, summarize, adapterOf, timingLadder, decodeNet, KERNEL_SETS, TIMED_SETS, BROWSER_ONLY_SETS, nativeSetsFor } = await imp("render/denoiseDevice.mjs");
 const H = await imp("tools/ship/headlessGpu.mjs");
 const { runInEngineOrigin } = await imp("tools/ship/webgpuHarness.mjs");
+// v4838: each ladder as a report table (tools/ship/gateReport.mjs) -- the "----" lines the rig carries back, kept past the terminal
+const { gateReport } = await imp("tools/ship/gateReport.mjs");
+const REPORT = gateReport("render/denoiseTiming-selfcheck.mjs");
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -117,6 +120,14 @@ const MACS = net.layers.map((L) => L.Cin * L.Cout * L.k * L.k);
 function report(label, r) {
     if (!r) return;
     say(`${label}: adapter ${r.adapter.name}${r.adapter.software ? " -- SOFTWARE: these are a CPU's times, not a GPU's" : " (hardware)"}`);
+    REPORT.table(`${label}: ms a pass by kernel set and size, on ${r.adapter.name}${r.adapter.software ? " (software: a CPU's times)" : ""}`,
+        ["set", "W", "H", "wall median ms", "device median ms", "passes", "Mpx/s"],
+        r.sets.flatMap((s) => r.rows[s].filter((x) => !x.skipped).map((x) => [s, x.W, x.H, x.wall.median, x.gpu ? x.gpu.median : null, x.wall.n, x.mpxPerS])));
+    if (r.rows.r15) {
+        const vs = r.sets.filter((s) => /^r18/.test(s)).flatMap((B) => r.rows[B].map((b, i) => [B, b, r.rows.r15[i]]).filter(([, b, a]) => !a.skipped && !b.skipped)
+            .map(([B, b, a]) => [B, b.W, b.H, a.gpu && b.gpu ? a.gpu.median / b.gpu.median : a.wall.median / b.wall.median, a.gpu && b.gpu ? "device" : "wall"]));
+        if (vs.length) REPORT.table(`${label}: each round-18 set against r15 -- r15's median over the set's (section 61)`, ["set", "W", "H", "x as fast as r15", "clock"], vs);
+    }
     for (const s of r.sets) for (const x of r.rows[s]) {
         if (x.skipped) { say(`${label} ${s}: ${x.W} x ${x.H} skipped -- ${x.reason}`); continue; }
         // a set whose head is fused with the kernel (r15) has no pass that is the head alone: its GFLOP/s is the hidden layers'
@@ -276,4 +287,5 @@ console.log("\n3. THE PAGE: denoise.html's \"Time the network\", in Chromium (on
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
     "\nnot closed here: any number. What a pass costs is printed above and asserted nowhere -- on SwiftShader it is a CPU's, and " +
     "on a GPU it is what tools/ship/realGpuRun.mjs carries back.");
+REPORT.write();
 H.exitCleanly ? H.exitCleanly(fails ? 1 : 0) : process.exit(fails ? 1 : 0);

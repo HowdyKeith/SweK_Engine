@@ -320,6 +320,15 @@ export const RECORD_HANDOVERS = Object.freeze([
         evidence: "boxId() read linux-x64-4c-16095mb-142c0d (Xeon @ 2.10GHz) at the v4818 rotation, which wrote 40 " +
                   "readings to sweep-timings.local.json and refused the shared record; that local file was deleted and " +
                   "the ledger it moved was restored. 142c0d held the record from v4813 to v4815." }),
+    // v4838 -- TO 420793 AGAIN, FOR THE DENOISER ARC'S MERGE. This session ran on the 2.80GHz host (md5 420793) while the
+    // record named 142c0d, so every sweep and rotation here wrote only .local.json -- and budgetEvidence went red on the
+    // merged tree: twelve gates absent from the record (the arc's five heavy device gates, main's seven newest) against
+    // its limit of eight, which only the owner's sweep can clear. Keith chose the handover over registering the red.
+    Object.freeze({ at: "v4838", from: "linux-x64-4c-16gb-142c0d", to: "linux-x64-4c-16gb-420793",
+        decidedBy: "Keith",
+        evidence: "boxId() read linux-x64-4c-16gb-420793 throughout the v4838 merge; its rotation (47 readings) and its first " +
+                  "verify's sweep went to sweep-timings.local.json and refused the shared record. Those local files were " +
+                  "deleted at the handover, as at v4818. 420793 held the record from v4815 to v4818." }),
 ]);
 
 /** The box that may write a record whose `host` reads `host`, after following every handover. */

@@ -8125,9 +8125,11 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "inside, on fsr-three.html's scene, neutral (-0.010 to +0.014 dB over six cases), the still picture " +
                  "within 2e-5 and its mask never firing -- section 4 of the device gate holds that.",
     }),
+    // v4838 -- RENUMBERED since481..since496 -> since529..since544 at the denoiser arc's merge: the arc's sixteen closings took
+    // since481..since496 on its branch while main took the same ordinals (to since528) in the same days -- forward, as v4819 did.
     // the denoiser arc, round 14 -- WHERE THE NATIVE TIME GOES, A RULE FOR THE PAGE, AND k_apply.
-    since496: Object.freeze({
-        at: "the denoiser arc, round 14 (unshipped)", swept: 1, green: 1, red: 0,
+    since544: Object.freeze({
+        at: "the denoiser arc, round 14 (shipped in v4838)", swept: 1, green: 1, red: 0,
         added: Object.freeze(["render/denoiseCompile-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
         widened: Object.freeze(["brain/conv2d-selfcheck.mjs (the head kernel: its uniform block, planar output, three device cases and a 1 x 1 key)",
@@ -8146,8 +8148,8 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "its own pre-registered rule (section 43).",
     }),
     // the denoiser arc, round 12 -- A GPU'S TIME, FOR THE RIG.
-    since495: Object.freeze({
-        at: "the denoiser arc, round 12, the rig's timing (unshipped)", swept: 1, green: 1, red: 0,
+    since543: Object.freeze({
+        at: "the denoiser arc, round 12, the rig's timing (shipped in v4838)", swept: 1, green: 1, red: 0,
         added: Object.freeze(["render/denoiseTiming-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
         widened: Object.freeze(["tools/ship/realGpuRun-selfcheck.mjs (the run covers the denoiser's two gates; the timing gate is timing, the device gate exact)"]),
@@ -8161,8 +8163,8 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "sabotage goes red in seconds. 8 sabotages, all red.",
     }),
     // the denoiser arc, round 12 -- THE NETWORK ON THE DEVICE, BEFORE IT RUNS ON ANY TEST IMAGE.
-    since494: Object.freeze({
-        at: "the denoiser arc, round 12 (unshipped)", swept: 1, green: 1, red: 0,
+    since542: Object.freeze({
+        at: "the denoiser arc, round 12 (shipped in v4838)", swept: 1, green: 1, red: 0,
         added: Object.freeze(["render/denoiseDevice-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
         widened: Object.freeze([]),
@@ -8179,9 +8181,9 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "the shipped network runs on any of round 11's test images.",
     }),
     // the denoiser arc, round 11 -- THE DEPLOYMENT ROUND, BEFORE ANY OF ITS TEST SCENES EXIST.
-    since493: Object.freeze({
+    since541: Object.freeze({
         // swept 0: the ledger's invariant is added.length === swept, and this round added no gate -- it widened two.
-        at: "the denoiser arc, round 11 (unshipped)", swept: 0, green: 0, red: 0,
+        at: "the denoiser arc, round 11 (shipped in v4838)", swept: 0, green: 0, red: 0,
         added: Object.freeze([]),
         redOnArrival: Object.freeze([]),
         widened: Object.freeze(["render/denoiseScenes-selfcheck.mjs (SPLITS_R11: rounds 7 and 10's training scenes together, each as its own family; C5 over eleven rounds)",
@@ -8199,9 +8201,9 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "one of them the runner as the harvest ran), and --secondary-r11 runs the secondary into its own file.",
     }),
     // the denoiser arc, round 10 -- TRAINED ON FAMILY C, BEFORE ANY OF ITS TEST SCENES EXIST.
-    since492: Object.freeze({
+    since540: Object.freeze({
         // swept 0: the ledger's invariant is added.length === swept, and this round added no gate -- it widened three.
-        at: "the denoiser arc, round 10 (unshipped)", swept: 0, green: 0, red: 0,
+        at: "the denoiser arc, round 10 (shipped in v4838)", swept: 0, green: 0, red: 0,
         added: Object.freeze([]),
         redOnArrival: Object.freeze([]),
         widened: Object.freeze(["render/denoiseScenes-selfcheck.mjs (SPLITS_R10: trained on C, H2 on R; C5 over ten rounds)",
@@ -8218,8 +8220,8 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "comparison, re-run against the parallel one and still red.",
     }),
     // the denoiser arc, round 9 -- THE LARGER NETWORK, TRAINED LONGER, TESTED BY SIZE AS WELL AS COUNT.
-    since491: Object.freeze({
-        at: "the denoiser arc, round 9 (unshipped)", swept: 1, green: 1, red: 0,
+    since539: Object.freeze({
+        at: "the denoiser arc, round 9 (shipped in v4838)", swept: 1, green: 1, red: 0,
         added: Object.freeze(["render/denoisePool-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
         widened: Object.freeze(["render/denoiseNet-selfcheck.mjs (the large network: a 9 x 9 field, 33,329 parameters; a longer run's first steps ARE the shorter run)",
@@ -8238,9 +8240,9 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "networks from the middle of a batch.",
     }),
     // the denoiser arc, round 8 -- C1 ON THE TRAINING IMAGES, BEFORE ANY OF ITS TEST SCENES EXIST.
-    since490: Object.freeze({
+    since538: Object.freeze({
         // swept 0: the ledger's invariant is added.length === swept, and this round added no gate -- it widened three.
-        at: "the denoiser arc, round 8 (unshipped)", swept: 0, green: 0, red: 0,
+        at: "the denoiser arc, round 8 (shipped in v4838)", swept: 0, green: 0, red: 0,
         added: Object.freeze([]),
         redOnArrival: Object.freeze([]),
         widened: Object.freeze(["render/denoiseStats-selfcheck.mjs (trainSanity, verdict({ c1Train }), round 7's case now reported)",
@@ -8255,8 +8257,8 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "should. 12 sabotages, all red.",
     }),
     // the denoiser arc, round 7 -- THE HARVEST, RESUMABLE.
-    since489: Object.freeze({
-        at: "the denoiser arc, round 7 (unshipped)", swept: 1, green: 1, red: 0,
+    since537: Object.freeze({
+        at: "the denoiser arc, round 7 (shipped in v4838)", swept: 1, green: 1, red: 0,
         added: Object.freeze(["render/denoiseCache-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
         widened: Object.freeze([]),
@@ -8271,9 +8273,9 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "refused by a second line, and red with both removed.",
     }),
     // the denoiser arc, round 7 -- THE RANDOMIZED FAMILY, BEFORE ANY OF ITS TEST SCENES EXIST.
-    since488: Object.freeze({
+    since536: Object.freeze({
         // swept 0: the ledger's invariant is added.length === swept, and this round added no gate -- it widened four.
-        at: "the denoiser arc, round 7 (unshipped)", swept: 0, green: 0, red: 0,
+        at: "the denoiser arc, round 7 (shipped in v4838)", swept: 0, green: 0, red: 0,
         added: Object.freeze([]),
         redOnArrival: Object.freeze([]),
         widened: Object.freeze(["render/denoiseScenes-selfcheck.mjs (family R over 300 scenes, none of C's signature; C pinned to its pre-R fingerprint; SPLITS_R7)",
@@ -8291,8 +8293,8 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "stayed green until that guard existed.",
     }),
     // the denoiser arc, round 6 -- THE EMITTER MASK, BEFORE ANY OF ITS TEST SCENES EXIST.
-    since487: Object.freeze({
-        at: "the denoiser arc, round 6 (unshipped)", swept: 1, green: 1, red: 0,
+    since535: Object.freeze({
+        at: "the denoiser arc, round 6 (shipped in v4838)", swept: 1, green: 1, red: 0,
         added: Object.freeze(["render/denoiseMask-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
         widened: Object.freeze(["render/denoiseScenes-selfcheck.mjs (SPLITS_R6, C5 over six rounds)",
@@ -8307,9 +8309,9 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "mask changes nothing, bit for bit, in either method; no weight crosses the mask. 9 sabotages, all red.",
     }),
     // the denoiser arc, round 5 -- THE THIRD FAMILY, BEFORE ANY OF ITS TEST SCENES EXIST.
-    since486: Object.freeze({
+    since534: Object.freeze({
         // swept 0: the ledger's invariant is added.length === swept, and this round added no gate -- it widened two.
-        at: "the denoiser arc, round 5 (unshipped)", swept: 0, green: 0, red: 0,
+        at: "the denoiser arc, round 5 (shipped in v4838)", swept: 0, green: 0, red: 0,
         added: Object.freeze([]),
         redOnArrival: Object.freeze([]),
         widened: Object.freeze(["render/denoiseScenes-selfcheck.mjs (family C over 300 scenes; A and B pinned to their pre-C fingerprint; SPLITS_R5, familyOf)",
@@ -8324,8 +8326,8 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "until its miniature was caught.",
     }),
     // the denoiser arc, round 4 -- THE TEMPORAL ROUND, BEFORE ANY OF ITS TEST SCENES EXIST.
-    since485: Object.freeze({
-        at: "the denoiser arc, round 4 (unshipped)", swept: 1, green: 1, red: 0,
+    since533: Object.freeze({
+        at: "the denoiser arc, round 4 (shipped in v4838)", swept: 1, green: 1, red: 0,
         added: Object.freeze(["render/denoiseTemporal-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
         widened: Object.freeze(["render/denoiseScenes-selfcheck.mjs (strideOf; SPLITS_R4, C5 over four rounds)",
@@ -8345,9 +8347,9 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "finite secondaries).",
     }),
     // the denoiser arc, round 3 -- THE KERNEL-PREDICTING HEAD, BEFORE ANY OF ITS TEST SCENES EXIST.
-    since484: Object.freeze({
+    since532: Object.freeze({
         // swept 0: the ledger's invariant is added.length === swept, and this round added no gate -- it widened five.
-        at: "the denoiser arc, round 3 (unshipped)", swept: 0, green: 0, red: 0,
+        at: "the denoiser arc, round 3 (shipped in v4838)", swept: 0, green: 0, red: 0,
         added: Object.freeze([]),
         redOnArrival: Object.freeze([]),
         widened: Object.freeze(["brain/convNet-selfcheck.mjs (a layer names its own width; a shape naming none draws what it drew)",
@@ -8365,9 +8367,9 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "9 sabotages, all red.",
     }),
     // the denoiser arc, the re-run's amendment -- C0, THE ZERO-LAST INIT AND NEW TEST SCENES, BEFORE ANY OF THEM EXIST.
-    since483: Object.freeze({
+    since531: Object.freeze({
         // swept 0: the ledger's invariant is added.length === swept, and this round added no gate -- it widened four.
-        at: "the denoiser arc, re-run amendment (unshipped)", swept: 0, green: 0, red: 0,
+        at: "the denoiser arc, re-run amendment (shipped in v4838)", swept: 0, green: 0, red: 0,
         added: Object.freeze([]),
         redOnArrival: Object.freeze([]),
         widened: Object.freeze(["render/denoiseScenes-selfcheck.mjs (SPLITS_R2: new test seeds, refused, C5 over both rounds)",
@@ -8385,8 +8387,8 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "10 sabotages, all red; S8 crashed the gate until its row caught the throw.",
     }),
     // the denoiser arc, round 2 -- THE PRE-REGISTERED STUDY AS CODE, BEFORE ANY DATA.
-    since482: Object.freeze({
-        at: "the denoiser arc, round 2 (unshipped)", swept: 6, green: 6, red: 0,
+    since530: Object.freeze({
+        at: "the denoiser arc, round 2 (shipped in v4838)", swept: 6, green: 6, red: 0,
         added: Object.freeze(["render/denoiseScenes-selfcheck.mjs", "render/denoiseFilter-selfcheck.mjs", "render/denoiseStats-selfcheck.mjs",
                               "brain/convNet-selfcheck.mjs", "render/denoiseNet-selfcheck.mjs", "render/denoiseStudy-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -8405,8 +8407,8 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     }),
     // the denoiser arc, round 1 -- A CONVOLUTION LAYER, CPU AND DEVICE: brain/conv2d.mjs. (since480 is the splat-collision
     // round's, on its own open branch; this slot is numbered past it so the two cannot collide when both land.)
-    since481: Object.freeze({
-        at: "the denoiser arc, round 1 (unshipped)", swept: 1, green: 1, red: 0,
+    since529: Object.freeze({
+        at: "the denoiser arc, round 1 (shipped in v4838)", swept: 1, green: 1, red: 0,
         added: Object.freeze(["brain/conv2d-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
         widened: Object.freeze([]),

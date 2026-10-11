@@ -139,8 +139,12 @@ const WGSL_FILES = [...walk(ENG)].filter((f) => f.endsWith(".wgsl")).sort();
     // so a new site is a decision someone wrote down and not a drift.
     // SABOTAGES: W1 the timing device also asking maxComputeInvocationsPerWorkgroup -> 1 red, this row ("1 site(s) that do
     // or may"); W2 the denoiser left out of STORAGE_LIMIT_SITES -> 1 red, this row ("UNNAMED: render/denoiseDevice.mjs").
-    // Both restored, md5 verified.
-    const STORAGE_LIMIT_SITES = ["render/denoiseDevice.mjs"];
+    // Both restored, md5 verified. W3 (v4838): the build probe left out of STORAGE_LIMIT_SITES -> 1 red, this row ("UNNAMED:
+    // tools/denoiseBuildProbe.mjs"). Restored, md5 verified.
+    // v4838 -- and tools/denoiseBuildProbe.mjs (the denoiser arc, round 17): its devices hold a 32-channel layer at 1024 x
+    // 1024, storage limits only. Its first form passed them through a helper, which this row read as "may" and went red on
+    // at the arc's merge; the object is spelled out now, and the site named.
+    const STORAGE_LIMIT_SITES = ["render/denoiseDevice.mjs", "tools/denoiseBuildProbe.mjs"];
     const WORKGROUP_LIMIT = /maxComputeInvocationsPerWorkgroup|maxComputeWorkgroupSize[XYZ]|maxComputeWorkgroupStorageSize|maxComputeWorkgroupsPerDimension/;
     let workgroupRaises = 0; const storageSites = [];
     for (const f of walk(ENG)) {

@@ -106,11 +106,15 @@ import { relMSE } from "/render/denoiseStats.mjs";
 import { denoise } from "/render/denoiseNet.mjs";
 import { decodeNet, createDeviceDenoiser, timingLadder, TIMED_SETS, PAGE_KERNELS_BY_ADAPTER, pageAdapterKey, pageKernelsFor } from "/render/denoiseDevice.mjs";
 import { VARIANTS, jobFor, measure } from "/render/denoiseCompile.mjs";
+import { describeWebGPU, showOriginBanner } from "/ui/webgpuProbe.mjs";
 
 const $ = (id) => document.getElementById(id);
 const status = (s) => { $("status").textContent = s; };
 const frame = () => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
 const N = 64;
+// why navigator.gpu is absent, asked of ui/webgpuProbe.mjs: an insecure origin (a LAN address over http) withholds it from
+// a browser that has it, and only that case has something to say beyond the absence itself
+const noGpu = () => { const p = describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location }); if (p.reason !== "insecure-origin") return "no WebGPU here"; showOriginBanner(p); return p.message; };
 
 // display only: Reinhard, then the sRGB curve
 function show(id, rgb) {
@@ -138,7 +142,7 @@ async function setup() {
     if (!shipped) { status("loading the network..."); await loadNet(); }
     if (denoiser || deviceNote) return;
     try {
-        if (!navigator.gpu) throw new Error("no WebGPU in this browser");
+        if (!navigator.gpu) throw new Error(noGpu());
         const adapter = await navigator.gpu.requestAdapter();
         if (!adapter) throw new Error("no WebGPU adapter");
         device = await adapter.requestDevice();
@@ -187,7 +191,7 @@ $("go").onclick = async () => {
 $("time").onclick = async () => {
     $("time").disabled = true;
     try {
-        if (!navigator.gpu) { $("timeStatus").textContent = "no WebGPU in this browser: nothing to time"; return; }
+        if (!navigator.gpu) { $("timeStatus").textContent = noGpu() + ": nothing to time"; return; }
         await loadNet();
         $("timeStatus").textContent = "timing..."; await frame();
         // four sets take turns (round 18: r12, r15 and its two candidates), so the ladder gets 300 s rather than the default 120;
@@ -218,7 +222,7 @@ $("time").onclick = async () => {
 $("kernels").onclick = async () => {
     $("kernels").disabled = true;
     try {
-        if (!navigator.gpu) { $("kernelsStatus").textContent = "no WebGPU in this browser: nothing to time"; return; }
+        if (!navigator.gpu) { $("kernelsStatus").textContent = noGpu() + ": nothing to time"; return; }
         const out = [];
         for (const v of VARIANTS) {
             $("kernelsStatus").textContent = `building and timing ${v.id}...`; await frame();
@@ -241,5 +245,6 @@ $("kernels").onclick = async () => {
     finally { $("kernels").disabled = false; }
 };
 </script>
+<script type="module" src="/ui/originNotice.js"></script>
 </body>
 </html>

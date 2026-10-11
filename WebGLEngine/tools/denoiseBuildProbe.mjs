@@ -35,8 +35,6 @@ const PROBES = { r16: BUILD_PROBE, r17: BUILD_PROBE_R17 }, PROBE = arg("--probe"
 if (!PROBES[PROBE]) { console.log(`[denoiseBuildProbe] no probe "${PROBE}" -- the probes are ${Object.keys(PROBES).join(", ")}`); process.exit(2); }
 const SHAPES = PROBES[PROBE], SIZES = (arg("--sizes") || (PROBE === "r16" ? "64" : "64,256,1024")).split(",").map(Number);
 if (!SIZES.length || SIZES.some((n) => !(n >= 8 && n % 8 === 0)) || SIZES[0] !== 64) { console.log("[denoiseBuildProbe] --sizes are multiples of 8, the first 64 (where each shape is held to the twin)"); process.exit(2); }
-// a device that can hold the largest size's buffers: a 32-channel layer at 1024 x 1024 is 128 MiB a buffer
-const limitsOf = (a) => ({ maxStorageBufferBindingSize: a.limits.maxStorageBufferBindingSize, maxBufferSize: a.limits.maxBufferSize });
 
 // ---- THE CHILD: one shape, node-webgpu's default adapter, Dawn's shader dump on stdout -----------------------------
 if (args.includes("--child")) {
@@ -48,7 +46,9 @@ if (args.includes("--child")) {
         // section 61: the device's clock unrounded -- round 17's native times were all whole multiples of 65,536 ns (section 60)
         const { mod } = H.resolveWebgpu(), gpu = mod.create(["enable-dawn-features=dump_shaders", H.FINE_CLOCK_FLAG]);
         const v = SHAPES.find((x) => x.id === id), a = await gpu.requestAdapter(), info = a.info || {};
-        const dev = await a.requestDevice({ requiredFeatures: a.features.has("timestamp-query") ? ["timestamp-query"] : [], requiredLimits: limitsOf(a) });
+        const dev = await a.requestDevice({ requiredFeatures: a.features.has("timestamp-query") ? ["timestamp-query"] : [], // a device that can hold the largest size's buffers (a 32-channel layer at 1024 x 1024 is 128 MiB a buffer): storage
+        // limits only, spelled out so tools/ship/wgslSpec-selfcheck.mjs can read that no workgroup limit is raised
+        requiredLimits: { maxStorageBufferBindingSize: a.limits.maxStorageBufferBindingSize, maxBufferSize: a.limits.maxBufferSize } });
         try { result = { ...(await measureSizes(dev, v, SIZES)), adapter: [info.vendor, info.architecture, info.description].filter(Boolean).join(" / ") }; }
         finally { dev.destroy(); }
     } catch (e) { result = { built: false, reason: String(e && e.message || e).slice(0, 300) }; }

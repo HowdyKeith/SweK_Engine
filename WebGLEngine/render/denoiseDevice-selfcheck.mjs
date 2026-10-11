@@ -152,6 +152,10 @@ const { seededRandom } = await imp("brain/convNet.mjs");
 const { ALBEDO_FLOOR } = await imp("render/denoiseScenes.mjs");
 const H = await imp("tools/ship/headlessGpu.mjs");
 const { runInEngineOrigin } = await imp("tools/ship/webgpuHarness.mjs");
+// v4838: K0 for every set on every path as a report table (tools/ship/gateReport.mjs), the counts the PASS lines print
+const { gateReport } = await imp("tools/ship/gateReport.mjs");
+const REPORT = gateReport("render/denoiseDevice-selfcheck.mjs"), K0ROWS = [];
+const k0row = (where, set, J, worst) => K0ROWS.push([where, set, J.reduce((a, j) => a + j.plain, 0), J.reduce((a, j) => a + j.fused, 0), J.reduce((a, j) => a + j.unexplained, 0), worst]);
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -313,6 +317,7 @@ else try {
     ok(`!! *** every cell of every layer, on the device, is the twin's or the fused mirror's, given the device's own input to that layer -- the head of ${KERNEL_TAPS} on the direct kernel among them ***`,
         J.every((j) => j.unexplained === 0) && J[4].kernel === "direct", J.map((j) => `${j.kernel} ${j.plain}+${j.fused}f`).join(", "));
     const tw = kernelApplyCpu(x, r.acts[4], HH, WW), wa = worstRel(r.y, tw);
+    k0row("native", "r12", J, wa);
     ok(`!! the kernel on the device is its twin within APPLY_TOL ${APPLY_TOL} on every value -- exp and division are not correctly rounded in WGSL, so it is held to a bound, not to bits`,
         wa <= APPLY_TOL, `worst relative ${wa.toExponential(2)}, ${(APPLY_TOL / Math.max(wa, 1e-30)).toFixed(0)} x inside`);
     const ref = denoise(net, x, HH, WW).y, wf = worstRel(r.y, ref, 1e-12);
@@ -320,6 +325,7 @@ else try {
     // round 14: the r14 set, the same network and image -- section 43's K0, natively (r13's is section 42's)
     const r14 = await job(net, x, HH, WW, 10, "r14"), J14 = judge(net, x, HH, WW, r14.acts, "r14");
     const w14 = worstRel(r14.y, kernelApplyCpu(x, r14.acts[4], HH, WW));
+    k0row("native", "r14", J14, w14);
     ok(`!! *** K0 natively: the r14 set -- the fast kernel, the head kernel's planar logits (read back and judged channels last), and k_apply_fast -- every cell the twin's or the fused mirror's, given the device's own input; the kernel within APPLY_TOL ***`,
         J14.every((j) => j.unexplained === 0) && J14.map((j) => j.kernel).join() === "fast,fast,fast,fast,head" && w14 <= APPLY_TOL && worstRel(r14.y, ref, 1e-12) < 1e-5,
         J14.map((j) => `${j.kernel} ${j.plain}+${j.fused}f`).join(", ") + `; kernel ${w14.toExponential(2)}`);
@@ -329,6 +335,7 @@ else try {
     // round 15: the r15 set, the same network and image -- section 46's K0, natively
     const r15 = await job(net, x, HH, WW, 10, "r15"), J15 = judge(net, x, HH, WW, r15.acts, "r15"), L15 = deviceLayers(net, "r15");
     const j15 = judgeHeadApply(x, r15.acts[3], L15[4], r15.y, HH, WW);
+    k0row("native", "r15", J15, j15.worst);
     ok(`!! *** K0 natively: the r15 set -- the fast kernel's hidden layers every cell the twin's or the fused mirror's, and k_head_apply's image within APPLY_TOL of kernelApplyCpu on the twin's logits or the fused mirror's, from the device's own input to the head ***`,
         J15.slice(0, 4).every((j) => j.unexplained === 0) && J15.map((j) => j.kernel).join() === "fast,fast,fast,fast,head_apply" && r15.acts[4] === null &&
         j15.worst <= APPLY_TOL && worstRel(r15.y, ref, 1e-12) < 1e-5,
@@ -343,6 +350,7 @@ else try {
         if (!native18.includes(set)) { console.log(`  SKIP  K0 natively for ${set}: a browser-only set on a D3D12 adapter -- node-webgpu's FXC does not build its kernel (section 60); section 5 holds it in the browser`); continue; }
         const r18 = await job(net, x, HH, WW, 10, set), J18 = judge(net, x, HH, WW, r18.acts, set), L18 = deviceLayers(net, set), k = R18_KERNELS[set].kernel;
         const j18 = judgeHeadApply(x, r18.acts[3], L18[4], r18.y, HH, WW);
+        k0row("native", set, J18, j18.worst);
         ok(`!! *** K0 natively: the ${set} set -- its hidden layers (${k}) every cell the twin's or the fused mirror's, given the device's own input; k_head_apply's image within APPLY_TOL ***`,
             J18.slice(0, 4).every((j) => j.unexplained === 0) && J18.map((j) => j.kernel).join() === `${k},${k},${k},${k},head_apply` && r18.acts[4] === null &&
             j18.worst <= APPLY_TOL && worstRel(r18.y, ref, 1e-12) < 1e-5,
@@ -490,6 +498,7 @@ console.log("\n5. EVERY KERNEL SET IN THE BROWSER, CELL FOR CELL (rounds 13-15 a
     if (r.skipped) console.log("  SKIP  " + r.reason);
     else {
         const O = (r.result && r.result.out) || {}, line = (s) => O[s] ? O[s].layers.map((j) => `${j.kernel} ${j.plain}+${j.fused}f${j.unexplained ? "+" + j.unexplained + "?" : ""}`).join(", ") : "not run";
+        for (const s of KERNEL_SETS) if (O[s]) k0row("browser", s, O[s].layers, O[s].worst);
         for (const s of KERNEL_SETS)
             ok(`!! ${s !== "r12" ? "*** K0 in the browser: " : ""}the ${s} set in the browser's own device, every cell the twin's or the fused mirror's, the kernel within APPLY_TOL${s !== "r12" ? " ***" : ""}`,
                 r.ok && !r.pageErrors.length && !!O[s] && O[s].layers.length === 5 && O[s].layers.every((j) => j.unexplained === 0) && O[s].worst <= APPLY_TOL &&
@@ -502,4 +511,8 @@ console.log("\n5. EVERY KERNEL SET IN THE BROWSER, CELL FOR CELL (rounds 13-15 a
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
     "\nnot closed here: the shipped network itself, on the images it was measured on. `node tools/denoiseDevice.mjs --measure-r12` is " +
     "section 35's one command, and no gate runs it; rounds 13-15's and 18's are `--measure-r13`, `--measure-r14`, `--measure-r15`, `--measure-r18t` and `--measure-r18u` (K0 (a)).");
+if (K0ROWS.length) REPORT.table("K0 on a 21 x 19 image of the large network: each set's conv cells (the twin's, the fused mirror's, unexplained) and its kernel's worst relative error (APPLY_TOL 1e-5)",
+    ["path", "set", "plain cells", "fused cells", "unexplained", "worst kernel error"], K0ROWS);
+else REPORT.skip("K0 on a device", "no WebGPU device here");
+REPORT.write();
 H.exitCleanly ? H.exitCleanly(fails ? 1 : 0) : process.exit(fails ? 1 : 0);
