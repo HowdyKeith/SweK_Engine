@@ -9191,8 +9191,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The CLIs refuse an unknown option (cliArgs) and the peer's transport is a row of its own. Thirteen sabotages red by name, " +
                  "logged in the two headers. NOT CLOSED: the pair has run over loopback and in one browser, not between two machines.",
     }),
+    // v4842 -- NO new gate file -- main's v4838 (the denoiser arc) merged with this line's v4838-v4841. *** AND FOUR OF THIS
+    // LINE'S CLOSINGS COLLIDED: both lines wrote since529-since532, main for the arc's rounds 1-9 and this line for v4838-v4841,
+    // so the merged literal declared each twice and the later -- this line's -- won silently, taking eight of the arc's gates
+    // out of the surplus arithmetic. The duplicate-key row above named all four; this line's became since545-since548. ***
+    since549: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and the merge added no gate of its own.
+        at: "v4842", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        verdict: "Main's v4838 (the learned denoiser, eighteen rounds and fourteen gates) merged with this line's v4838-v4841. The v4838 " +
+                 "LABEL itself collided: main released it for the denoiser, this line had spent it on the timing-record handover, so v4842 " +
+                 "names the merged tree and both v4838 entries stay in the changelog and the markers. Both lines handed the record to " +
+                 "420793 on the same day, Keith deciding both; one RECORD_HANDOVERS row carries both evidences, since a second row from " +
+                 "142c0d could never apply. Both lines' shared timing records were written by 420793, so per gate the later reading " +
+                 "stands. The assertionShape and runtimeGap censuses were re-derived over the merged tree, not summed.",
+    }),
     // v4841 -- NO new gate file -- three's GPU-native TSL unit tests run, on both backends, for the sixteen drafts.
-    since532: Object.freeze({
+    since548: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
         at: "v4841", swept: 0, green: 0, red: 0,
         added: Object.freeze([]),
@@ -9208,7 +9224,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "request texts say so. Three sabotages red by name. NOT CLOSED: why textureBarrier's read-back is wrong on SwiftShader.",
     }),
     // v4840 -- ONE new gate file: tools/ship/wasmDoors-selfcheck.mjs (the computed door to wasm, censused; five gates it found converted).
-    since531: Object.freeze({
+    since547: Object.freeze({
         at: "v4840", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/wasmDoors-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -9225,7 +9241,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "cannot name (a glue file chosen at run time with no literal for it anywhere) is still the rig's to find.",
     }),
     // v4839 -- NO new gate file -- the sandbox judges as a fresh clone would: the gitignored local record ignored, uncommitted gate edits seen.
-    since530: Object.freeze({
+    since546: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened three.
         at: "v4839", swept: 0, green: 0, red: 0,
         added: Object.freeze([]),
@@ -9244,7 +9260,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "name, one of them live on the real tree. NOT CLOSED: a same-day edit committed ELSEWHERE is still invisible to a date.",
     }),
     // v4838 -- since529: main's v4837 took since528 on the same day. NO new gate file -- the shared timing record handed to this box, and declaredCost's v4820 ratchet paid.
-    since529: Object.freeze({
+    since545: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened four.
         at: "v4838", swept: 0, green: 0, red: 0,
         added: Object.freeze([]),
