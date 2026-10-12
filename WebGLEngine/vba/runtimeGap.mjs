@@ -1231,7 +1231,10 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // through a BigUint64Array) and WebAssembly 26 -> 27 (tools/ship/wasmTeardown-selfcheck.mjs's section 8 fixture names the API in
     // code; it named it only in a comment before). Neither compiles nor allocates on a GPU. The fixture's glue was first written with
     // a fetch() inside its string and moved fetch/XHR 252 -> 253 -- a gate that fetches nothing -- so the fixture was changed, not the row.
-    esModules: 4370, closures: 4215, asyncAwait: 1761, typedArrays: 1300, promises: 426,
+    // v4846 -- no file added; async/await 1761 -> 1762: tools/ship/afterVerdict-selfcheck.mjs awaits a dynamic import of
+    // sourceScan for its new section 3b. (sourceScan-selfcheck's new fixture first moved workers/threads 26 -> 25 by closing a
+    // block comment this census's regex strips across strings; the fixture was rebuilt so the row holds, not the row moved.)
+    esModules: 4370, closures: 4215, asyncAwait: 1762, typedArrays: 1300, promises: 426,
     fetchXhr: 252, performanceNow: 250, raf: 127, webgl: 200, webgpu: 62, threads: 26, wasm: 27,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

@@ -276,7 +276,9 @@ console.log("\n10. v4846 -- a template ends after its own closing backtick, thro
     const T = [
         ["a template in an expression", "`x ${f(`<t ${k}=\"`)} y`;", "`x ${f(`<t ${k}=\"`)} y`"],
         ["a regex with a quote in an expression", "`p ${s.replace(/\"/g, '\\\"')} q`;", "`p ${s.replace(/\"/g, '\\\"')} q`"],
-        ["a brace in a string and a comment in an expression", "`a ${ \"}\" + /* } */ b } c`; z", "`a ${ \"}\" + /* } */ b } c`"],
+        // the block comment is built by concatenation: vba/runtimeGap.mjs strips block comments by regex across strings, and a literal
+        // close here swallowed an earlier fixture's text and moved its workers/threads row (26 -> 25) at v4846's pre-flight
+        ["a brace in a string and a comment in an expression", "`a ${ \"}\" + /" + "* } *" + "/ b } c`; z", "`a ${ \"}\" + /" + "* } *" + "/ b } c`"],
         ["an escaped backtick and a plain dollar", "`a \\` $ {b} ${c}`;", "`a \\` $ {b} ${c}`"],
     ];
     const bad = T.filter(([, src, want]) => src.slice(0, templateEnd(src, 0)) !== want);
