@@ -54,6 +54,11 @@
 //     O. readiness() refusing whatever is not "present"                         -> 2 (the NO ORIGIN row; the NOT A REPO row)
 //     P. originMainState without its .git test                                  -> 1 (NOT A REPO: the zip read as "no-origin")
 //     Q. readiness()'s default probe asking the CLI's own tree, not `eng`       -> 2 (the ABSENT row; the both-named row)
+//   v4847 (section 11, the declared limit; step 4b found shipVerdict SILENT in runnerBudget-selfcheck):
+//     R. the git probes' limit moved to 30 s, budgetIsOwn left saying 15        -> 1 (the declaration row)
+//     S. budgetIsOwn removed                                                   -> 1 here and 1 in runnerBudget-selfcheck.
+//        *** FIRST TRY WAS NO SABOTAGE: the cut stopped at a ';' inside the declaration's own text and left a file that
+//        does not parse -- 0 rows red, exit 1, a SyntaxError. Re-cut to the end of the string. ***
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -461,6 +466,20 @@ console.log("\n10. v4846 -- a clone without origin/main: scanRef says ABSENT by 
         ok("NOT A REPO: a release zip's tree (no .git) is not refused",
             zipState === "not-a-repo" && zip.length === 0, `state ${zipState}; ${JSON.stringify(zip).slice(0, 140)}`);
     } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+}
+
+// ---- 11. v4847 -- THE LIMIT THIS FILE PICKS IS DECLARED, AND THE DECLARATION IS THE CODE'S -----------------------
+// v4846's git probes made shipVerdict a runner that PICKS a limit (timeout: 15000), and tools/ship/runnerBudget-selfcheck.mjs
+// counted it silent: the step-4b run of v4847 found it. budgetIsOwn says why; this row holds it to the code, so the reason
+// cannot outlive the number it explains.
+{
+    const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "shipVerdict.mjs"), "utf8")
+        .split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n");
+    const picked = [...src.matchAll(/timeout:\s*(\d+)/g)].map((m) => Number(m[1]));
+    ok("!! budgetIsOwn names the one limit shipVerdict picks -- 15 s, on git probes and not on gates -- and the code picks no other",
+        typeof SV.budgetIsOwn === "string" && /15 s/.test(SV.budgetIsOwn) && /not gates/.test(SV.budgetIsOwn) &&
+        picked.length > 0 && picked.every((ms) => ms === 15000),
+        `picked ${JSON.stringify(picked)}; ${String(SV.budgetIsOwn).slice(0, 80)}`);
 }
 
 say("WHAT THIS DOES NOT CLAIM. That a round cannot be pushed unverified -- nothing in a repository can stop a " +

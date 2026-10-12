@@ -68,6 +68,14 @@ export function scanTracked(root, files = null) {
     return { scanned: list.length, hits };
 }
 
+// v4847 -- the one limit this file PICKS, declared as tools/ship/runnerBudget-selfcheck.mjs asks of every runner: shipVerdict
+// spawns verify.mjs unbounded (verify's sweep reads gateBudget's table itself), and since v4846 it also asks git two
+// questions by exit status, each under 15 s. Those are local `rev-parse --verify` and `remote get-url` calls, not gates,
+// so the table has nothing to say about them; the limit only stops a wedged git from holding the pre-flight.
+export const budgetIsOwn =
+    "the only limit shipVerdict chooses is 15 s on its two local git probes (rev-parse --verify, remote get-url), which are " +
+    "not gates; verify.mjs, the one gate runner it spawns, runs unbounded and its sweep reads gateBudget's table";
+
 // v4846 -- git's exit status, or null when git could not be started at all (no git on the box, no such folder). The two
 // questions below are asked by STATUS because git's wording differs by subcommand and the status does not: v4402's skip
 // matched "unknown revision", which is what `git log` says, and `git grep` says "unable to resolve revision".
