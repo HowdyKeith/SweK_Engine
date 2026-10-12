@@ -289,7 +289,7 @@ const cov = definitionCoverage(ENG);
     // already refuses to widen the physics sweep over. A merge that adds 62 gates and their modules grows a
     // tree-wide count by construction; it is a re-baseline occasion and not a regression, and the narrow
     // number keeping its meaning is how you can tell the two apart.
-    // *** v4832 -- RATCHETED DOWN, 362 -> 358, THE SLACK TAKEN WHERE IT STOOD. *** The census read 358 against the frozen
+    // *** v4845 -- RATCHETED DOWN, 362 -> 358, THE SLACK TAKEN WHERE IT STOOD. *** The census read 358 against the frozen
     // 362, and four of slack is four new unnamed symbols this row would have let in silently. Measured against the freeze
     // (590050b5) rather than assumed: ELEVEN were named since (frozenRecords' clearScanCache and readSites, gateSweep's
     // repairsAgainst and runOnce, hostScale's hostFacts and boxId, posixAssumption's sources, quickSweep's contentionPairs
@@ -301,8 +301,16 @@ const cov = definitionCoverage(ENG);
     // newer build without the DLL, launchEnv held undefined, dxcAdvice on Dawn's message and off it; ownerOf on a chain that
     // hands the record back, deathTail on a crash tail; demolitionScript's shot cadence, its two drops and their determinism
     // driven tick by tick with no race. 351 is the census with all eighteen accounted for.
+    // *** AND main's v4832-v4844, MERGED BEFORE THIS SHIPPED, BROUGHT ELEVEN MORE AND PAID NONE. *** main itself read 364 here
+    // against its own 362 -- red, unseen, because this gate is over the quick sweep's line (as at v4831). Named the same way, each
+    // in its own gate and sabotage-confirmed: denoiseCompile's headApplyProbe (its products exact in f32), buildJob, runJob and
+    // measureSizes (on a stand-in device: the error by line, the clocks, three timed passes, one build for every size);
+    // denoiseDevice's passBytes (against what createDeviceDenoiser really allocates -- which found r12 keeps its 133,316 B of
+    // weights in storage, beside passBytes' per-pixel count) and TIMED_SETS (every set a pass or the page can run is timed);
+    // gateReport's staleReports, shipVerdict's notReadyTrailer, wasmTeardown's wasmCompilers and doorReach on fixtures, and
+    // headlessGpu's FINE_CLOCK_FLAG (every native timing child builds its device with it). 351 again, with all twenty-nine named.
     // SABOTAGE, restored: one new unnamed `export function` added to the adapter-record module (the one tools/ship/adapterRecord-selfcheck.mjs gates) -> RED, "GREW to 352".
-    const BASELINE_WIDE = 351;   // v4060: 290, v4062: 209, post-v4297-sweep: 332, post-v4622-merge: 349, post-v4645-merge: 362, v4832: 351 -- ratchets down, never up
+    const BASELINE_WIDE = 351;   // v4060: 290, v4062: 209, post-v4297-sweep: 332, post-v4622-merge: 349, post-v4645-merge: 362, v4845: 351 -- ratchets down, never up
     const wide = definitionCoverage(ENG, "");
     ok("!! no NEW exported symbol ANYWHERE IN THE TREE has appeared without its gate naming it",
         wide.ungated.length <= BASELINE_WIDE,
@@ -346,10 +354,12 @@ const cov = definitionCoverage(ENG);
     // v4831 named the last six, each in a row that EXERCISES it rather than mentions it (probeHalfWrite read back on both
     // backends, READINGS_PATH opened by its default reader, CLI_SPEC parsing, the three software-GL flag lists checked
     // against the rig runs that settled them). 696 is what the census reads with the 13 named and the 7 kept.
-    // v4832 -- 696 -> 686, carried by the naming above: the seven narrow symbols, two constants their new rows name in passing
-    // (playwrightResolve's DXC_LEAVES, quickSweep's RECORD_HANDOVERS), and shipVerdict's CATCHABLE (see BASELINE_OWNED).
+    // v4845 -- 696 -> 686, carried by the naming above: the seven narrow symbols, two constants their new rows name in passing
+    // (playwrightResolve's DXC_LEAVES, quickSweep's RECORD_HANDOVERS), and shipVerdict's CATCHABLE (see BASELINE_OWNED). main's
+    // v4832-v4844 then brought eleven (the narrow six, denoiseCompile's buildJob, runJob and measureSizes, denoiseDevice's
+    // TIMED_SETS, headlessGpu's FINE_CLOCK_FLAG), all named above: 686 holds through the merge.
     // SABOTAGE, restored: one new unnamed `export const` added to the adapter-record module (the one tools/ship/adapterRecord-selfcheck.mjs gates) -> RED, "GREW to 687".
-    const BASELINE_SHAPES = 686;   // v4535: 582, post-v4297-sweep: 639, post-v4622-merge: 678, post-v4645-merge: 703, v4831: 696, v4832: 686 -- ratchets down, never up
+    const BASELINE_SHAPES = 686;   // v4535: 582, post-v4297-sweep: 639, post-v4622-merge: 678, post-v4645-merge: 703, v4831: 696, v4845: 686 -- ratchets down, never up
     const shapesWide = definitionCoverage(ENG, "", { shapes: "all" });
     const shapesPhys = definitionCoverage(ENG, "physics", { shapes: "all" });
     ok("!! *** no NEW exported symbol OF ANY SHAPE has appeared without its gate naming it ***",
@@ -399,16 +409,17 @@ const cov = definitionCoverage(ENG);
     // nearestTexel in render/temporalLock.mjs and BYTES_PER_TEXEL, paddedBytesPerRow, halfToDouble and
     // ICD_ROOT in tools/ship/headlessGpu.mjs, every one of them this arc's own debt and every one now keyed
     // rather than merely mentioned. The pin is set at the ENDING number, so the five cannot be spent twice.
-    // *** v4832 -- RATCHETED DOWN, 533 -> 516. *** It read 519 at v4831 with nothing holding the 14 of slack. Measured against the
+    // *** v4845 -- RATCHETED DOWN, 533 -> 514. *** It read 519 at v4831 with nothing holding the 14 of slack. Measured against the
     // freeze (590050b5): SEVENTEEN symbols came to be named by an importing gate (gunnerPolicy's evaluate and HIDDEN, fsr's
     // RCAS_EPS, meshCSG's and pathTracerGpu's EPS, five of rtPipeline's constants, gateSweep's repairsAgainst and runOnce,
     // posixAssumption's sources, sourceScan's regexAllowedHere, treeRead's textOf and reportLines, buildingTopple's blockMesh)
     // and THREE arrived unnamed by any importing gate: gunnerPolicy's createRace and quickSweep's deathTail (named this round
     // for the narrow census, above) and shipVerdict's CATCHABLE, the signal list main() registers its handlers over, which
     // shipVerdict-selfcheck now names in a row holding the list's contents (dropping SIGBREAK from it -> red). 516 is the
-    // count with the seventeen kept and the three named.
-    // SABOTAGE, restored: one new unnamed `export function` added to the adapter-record module -> RED here too, "GREW to 517".
-    const BASELINE_OWNED = 516;   // v4573: 475, post-v4645-merge: 533, v4832: 516 -- tree-wide, all shapes, any importing gate -- ratchets down, never up
+    // count with the seventeen kept and the three named. main's v4832-v4844 brought nine more here and the merge paid two
+    // (gunnerPolicy's TRAIN_SEEDS and HELD_OUT_SEEDS, now named by an importing gate); naming the nine left 514.
+    // SABOTAGE, restored: one new unnamed `export function` added to the adapter-record module -> RED here too, "GREW to 515".
+    const BASELINE_OWNED = 514;   // v4573: 475, post-v4645-merge: 533, v4845: 514 -- tree-wide, all shapes, any importing gate -- ratchets down, never up
     const owners = gateIndex(ENG);
     const owned = definitionCoverage(ENG, "", { shapes: "all", owners });
     ok("!! *** no NEW exported symbol is unmentioned by EVERY gate that imports its module ***",

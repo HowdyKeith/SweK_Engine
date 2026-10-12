@@ -92,7 +92,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SELF = fileURLToPath(import.meta.url);
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
-const { VARIANTS, BUILD_PROBE, BUILD_PROBE_R17, jobFor, measure, dumpStats, dawnFlags, nativeModes } = await imp("render/denoiseCompile.mjs");
+const { VARIANTS, BUILD_PROBE, BUILD_PROBE_R17, jobFor, measure, dumpStats, dawnFlags, nativeModes, headApplyProbe, buildJob, runJob, measureSizes } = await imp("render/denoiseCompile.mjs");
 
 // ---- THE CHILD: one kernel, one compiler, one process ----------------------------------------------------------
 // *** THE RESULT GOES TO A FILE. *** On the GTX 1080 (section 45) every native child exited 0 with its shader dump on
@@ -185,6 +185,52 @@ console.log("1. THE INSTRUMENT, ON THE CPU");
         new Set(P17.map((v) => v.id)).size === P17.length && P17[0].kind === "fast" && j64.every((j) => typeof j.judge === "function" && j.out === 64 * 64 * 32) &&
         j1k.every((j, i) => j.judge === null && j.out === 1024 * 1024 * 32 && j.code === j64[i].code && j.wg[1] === 128),
         P17.map((v) => v.id).join(", "));
+}
+
+// v4845 -- four symbols definitionGates' census found no row of this gate naming. headApplyProbe is used by render/denoiseDevice-selfcheck.mjs;
+// buildJob and runJob only inside the native children (through measure), and measureSizes only by tools/denoiseBuildProbe.mjs, no gate at all.
+// The three device functions are driven here on a STAND-IN device -- the calls they make, not a GPU's numbers -- so their contracts hold on
+// every box, and the native children below stay the measurement.
+console.log("\n1b. THE PROBE'S ARITHMETIC, AND THE BUILD-AND-TIME CONTRACT ON A STAND-IN DEVICE");
+{
+    const P = headApplyProbe(), Q = headApplyProbe(), f = Math.fround;
+    let exact = true; const aw = new Set(P.A), ww = new Set(P.L.W);
+    for (const a of aw) for (const w of ww) if (f(a * w) !== a * w) { exact = false; break; }
+    ok("!! headApplyProbe's every activation-by-weight product is exact in f32 -- so a fused multiply-add rounds as a multiply then an add, and only the ORDER of the sums can move a logit",
+        exact && P.L.Cin === 32 && P.L.Cout === 81 && P.L.k === 1 && P.L.act === "none" && [...ww].every((w) => Math.abs(w - 8192) <= 0.5) &&
+        [...aw].every((a) => a >= 1 && a < 2) && P.A.every((v, i) => v === Q.A[i]) && P.L.W.every((v, i) => v === Q.L.W[i]),
+        `${aw.size} activations x ${ww.size} weights, every product exact; the same probe twice`);
+    // the stand-in: records what is asked of it; its clock reads 2 ms between a pass's two timestamps. The wall clock handed in
+    // steps 5 ms a reading, so a 10 ms budget is spent by the third timed pass -- three, the floor, as on a fast GPU
+    const stand = ({ ts = true, compileErr = null, pipeErr = null } = {}) => {
+        const log = { modules: 0, dispatches: 0, made: 0, destroyed: 0 };
+        const mk = (d) => { log.made++; const b = { size: d.size, data: new ArrayBuffer(d.size), mapAsync: async () => {}, getMappedRange: () => b.data, unmap() {}, destroy() { log.destroyed++; } }; return b; };
+        const dev = { log, features: new Set(ts ? ["timestamp-query"] : []),
+            createShaderModule: () => { log.modules++; return { getCompilationInfo: async () => ({ messages: compileErr ? [{ type: "error", lineNum: 3, linePos: 7, message: compileErr }] : [] }) }; },
+            createComputePipelineAsync: async () => { if (pipeErr) throw new Error(pipeErr); return { getBindGroupLayout: () => ({}) }; },
+            createBuffer: mk, createBindGroup: () => ({}), createQuerySet: () => ({ destroy() {} }),
+            createCommandEncoder: () => ({ beginComputePass: () => ({ setPipeline() {}, setBindGroup() {}, dispatchWorkgroups() { log.dispatches++; }, end() {} }),
+                resolveQuerySet() {}, copyBufferToBuffer(src, so, dst) { if (dst.size === 16) new BigUint64Array(dst.data).set([1000n, 2001000n]); }, finish: () => ({}) }),
+            queue: { writeBuffer() {}, submit() {}, onSubmittedWorkDone: async () => {} } };
+        return dev;
+    };
+    let t = 0; const tick = () => (t += 5);
+    const v17 = BUILD_PROBE_R17[0], job = jobFor(v17);
+    const bad = await buildJob(stand({ compileErr: "bad token" }), job), boom = await buildJob(stand({ pipeErr: "boom" }), job), good = await buildJob(stand(), job, { now: tick });
+    ok("!! buildJob reports a WGSL error by line and column, a pipeline failure by its message, and a build's wall time from the clock it is given",
+        bad.built === false && bad.reason === "WGSL did not compile: 3:7 bad token" && boom.built === false && boom.reason === "pipeline: boom" && good.built === true && good.buildMs === 5,
+        [bad.reason, boom.reason, "buildMs " + good.buildMs].join("; "));
+    let seen = null; const judged = { ...job, judge: (y) => { seen = y; return { ok: false, detail: "a stand-in's zeros" }; } };
+    const dv = stand(), r = await runJob(dv, good.pipe, judged, { budgetMs: 10, now: tick });
+    const dw = stand({ ts: false }), w = await runJob(dw, good.pipe, { ...job, judge: null }, { budgetMs: 10, now: tick });
+    ok("!! runJob: one untimed pass then three timed, on the device's clock where it has timestamps and the wall's where not; the output read back whole and judged; every buffer it made destroyed",
+        r.passMs === 2 && r.passes === 3 && r.clock === "device" && dv.log.dispatches === 4 && seen instanceof Float32Array && seen.length === job.out && r.exact === false &&
+        w.clock === "wall" && w.passMs === 5 && w.exact === null && dv.log.made === dv.log.destroyed && dw.log.made === dw.log.destroyed,
+        `device ${r.passMs} ms x ${r.passes}, wall ${w.passMs} ms; ${dv.log.made} buffers made, ${dv.log.destroyed} destroyed`);
+    const dm = stand(), m = await measureSizes(dm, v17, [64, 128], { budgetMs: 10, now: tick });
+    ok("!! measureSizes builds the kernel ONCE and times it at every size, judging only where the twin is held (64 x 64)",
+        m.built === true && dm.log.modules === 1 && m.sizes.map((s) => s.N).join() === "64,128" && m.sizes[0].exact !== null && m.sizes[1].exact === null && m.exact === m.sizes[0].exact,
+        `${dm.log.modules} module for ${m.sizes.length} sizes; judged ${m.sizes.map((s) => s.exact === null ? "-" : s.exact).join(", ")}`);
 }
 
 // section 64: a SWEK_WEBGPU this box cannot load is a red, not a skip -- as a skip the gate passed and realGpuRun's report kept

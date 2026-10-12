@@ -195,7 +195,7 @@ console.log("\n6. a run ended from outside says so where it can -- and the silen
     ok("the interrupted trailer names the signal, what it means, the clock, and NO VERDICT",
         /interrupted by SIGHUP after 3 s/.test(pure) && /console window was closed/.test(pure) && /DO NOT SHIP -- NO VERDICT/.test(pure),
         pure.trim().split("\n").join(" | "));
-    // v4832 -- CATCHABLE is the list main() registers its handlers over, and the one export of shipVerdict.mjs no importing gate
+    // v4845 -- CATCHABLE is the list main() registers its handlers over, and the one export of shipVerdict.mjs no importing gate
     // named (definitionGates' owned census). An empty list was the v4680 sabotage above; this row holds the list's contents: the
     // four endings the header says CAN be caught, each with its own meaning in the trailer, and none of the uncatchable ones.
     const meanings = SV.CATCHABLE.map((sig) => (SV.interruptedTrailer(sig, 1000).match(/\(([^)]*)\) before verify/) || [])[1]);
@@ -203,6 +203,13 @@ console.log("\n6. a run ended from outside says so where it can -- and the silen
         SV.CATCHABLE.slice().sort().join() === "SIGBREAK,SIGHUP,SIGINT,SIGTERM" && Object.isFrozen(SV.CATCHABLE) &&
         meanings.every((m) => m && m !== "a signal") && new Set(meanings).size === 4 && !SV.CATCHABLE.includes("SIGKILL"),
         SV.CATCHABLE.map((sig, i) => `${sig}: ${meanings[i]}`).join("; "));
+    // v4845 -- notReadyTrailer, the readiness check's refusal (section 7 drives it live through main); its own shape held here:
+    // every unready fact on its own line, the count, and a verdict line that cannot be read as a run
+    const nr = SV.notReadyTrailer([{ what: "no playwright in tools/render-qa" }, { what: "no Vulkan driver" }]).split("\n");
+    ok("!! notReadyTrailer names each unready fact on its own line, counts them, and ends DO NOT SHIP -- NOT RUN, with no exit status a reader could take for verify's",
+        nr[0] === "[ship]   not ready  no playwright in tools/render-qa" && nr[1] === "[ship]   not ready  no Vulkan driver" &&
+        /verify exit=none {2}not run -- 2 fact\(s\)/.test(nr[3]) && /^\[ship\] DO NOT SHIP -- NOT RUN:/.test(nr.at(-1)) && !nr.some((l) => /exit=\d/.test(l)),
+        nr.filter(Boolean).join(" | "));
     if (process.platform !== "win32") {
         const hup = await drive("SIGHUP");
         ok("!! *** a LIVE run sent SIGHUP -- what a closed console window delivers on Windows -- prints the NO VERDICT trailer ***",

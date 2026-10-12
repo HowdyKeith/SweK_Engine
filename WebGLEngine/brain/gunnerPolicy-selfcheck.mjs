@@ -202,7 +202,7 @@ console.log("\n6. THE RACE WITH GUNNERS: LOCKSTEP, DETERMINISTIC, REPLAYED FROM 
     ok("!! the race is deterministic per seed: the same fingerprint, order and tallies twice", R2.fingerprint === R.fingerprint && R2.order.join() === R.order.join() && R2.results.every((q, i) => q.hits === R.results[i].hits && q.drops === R.results[i].drops && q.burned === R.results[i].burned));
     const rp = G.replayGunners(worldFrom, R);
     ok("!! the replay from the log alone -- no policies -- reaches the same fingerprint with the same hits, drops and burn ticks", rp.fingerprint === R.fingerprint && rp.results.every((q, i) => q.hits === R.results[i].hits && q.laps === R.results[i].laps && q.drops === R.results[i].drops && q.burned === R.results[i].burned));
-    // v4832 -- createRace, the stepper raceWithGunners is a for-loop over, driven the way brain/raceLockstep.mjs drives it: each tick
+    // v4845 -- createRace, the stepper raceWithGunners is a for-loop over, driven the way brain/raceLockstep.mjs drives it: each tick
     // propose() asks the policies for every car's raw commands, and step() takes those commands back as the wire would hand them. It
     // was the one symbol of this module definitionGates' tree-wide census found unnamed; reached only through raceWithGunners and the
     // lockstep gates, a propose() that drifted from what step(null) does would show there as a fingerprint and say nothing about why.

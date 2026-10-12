@@ -482,6 +482,30 @@ console.log("\n7. *** v4840 -- THE COMPUTED-DOOR POPULATION, HELD CHEAPLY: the c
                    : `${WT.DOORS_AT_V4840.measured} members, ${WT.DOORS_AT_V4840.crashShapeBefore} converted -- re-run tools/ship/wasmDoors-selfcheck.mjs for the census`);
 }
 
+console.log("\n8. v4845 -- WHAT COUNTS AS A COMPILER, AND WHAT REACHES A DOOR, ON FIXTURES");
+// wasmCompilers and doorReach are the census's two ends; tools/ship/wasmDoors-selfcheck.mjs runs it, and definitionGates' census found
+// neither named by a row of this, their module's own gate. Small fixtures, a few milliseconds -- this gate sits near the sweep's line.
+{
+    const comp = WT.wasmCompilers({ root: ENG, files: [
+        { path: "/f/a.mjs", text: "export async function go(b) { return WebAssembly.instantiate(b); }" },
+        { path: "/f/b.mjs", text: "// WebAssembly.instantiate(bytes) appears only in this comment\nexport const x = 1;" },
+        { path: "/f/c.mjs", text: 'export const fixture = "WebAssembly.compile(bytes)";' },
+        { path: "/f/d.json", text: "WebAssembly.compile(x)" }],
+        vendor: [{ path: "/f/vendor/glue.js", text: "var m = WebAssembly.instantiateStreaming(fetch(u));" }, { path: "/f/vendor/plain.js", text: "var x = 1;" }] });
+    ok("!! wasmCompilers: a script whose CODE calls the API, and vendored glue that does; not a comment, not a string, not a non-script",
+        comp.join() === "/f/vendor/glue.js,/f/a.mjs", comp.join(", ") || "none");
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "doorReach-"));
+    try {
+        const put = (rel, text) => { const p = path.join(tmp, rel); fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, text); return { path: p, text }; };
+        const files = [put("lib/door.mjs", "export const d = 1;"), put("lib/mid.mjs", 'import { d } from "./door.mjs"; export const m = d;'),
+                       put("g/far-selfcheck.mjs", 'import { m } from "../lib/mid.mjs";'), put("g/side-selfcheck.mjs", 'const p = "../lib/door.mjs"; await import(p);'),
+                       put("g/none-selfcheck.mjs", "export {};")];
+        const reach = WT.doorReach([{ module: "lib/door.mjs", glue: [] }], { root: tmp, files, gates: ["g/far-selfcheck.mjs", "g/side-selfcheck.mjs", "g/none-selfcheck.mjs"] });
+        ok("!! doorReach: a gate two literal imports from a door reaches it; one that names the door only in a computed import, or not at all, does not",
+            reach.get("g/far-selfcheck.mjs") === "lib/door.mjs" && !reach.has("g/side-selfcheck.mjs") && !reach.has("g/none-selfcheck.mjs"), JSON.stringify([...reach]));
+    } finally { try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {} }
+}
+
 console.log(fails ? `\nwasmTeardown-selfcheck: ${fails} FAILED` : "\nwasmTeardown-selfcheck: all checks pass");
 console.log("\nunchecked here: THE CRASH ITSELF. unix/async.c's uv_async_send has no UV_HANDLE_CLOSING " +
     "assertion, so the identical teardown is silent on this platform and no row below can go red for the " +

@@ -177,7 +177,7 @@ export const SEPARATOR_SITES_AT_V4647 = Object.freeze({
     addedCorrect: Object.freeze([
         Object.freeze({ at: "v4824", gate: "tools/ship/releaseWorkflow-selfcheck.mjs",
             why: "expects path.join(parent, name + \"_release\") inside outDirRefusal's message, which builds it with the same path.join" }),
-        Object.freeze({ at: "v4832", gate: "tools/ship/playwrightResolve-selfcheck.mjs",
+        Object.freeze({ at: "v4845", gate: "tools/ship/playwrightResolve-selfcheck.mjs",
             why: "expects path.join(root, build, DXC_LEAVES[i]) in resolveDxcDir's tried list, which builds each entry with the same path.join over the same leaves" }),
     ]),
     defects: Object.freeze([

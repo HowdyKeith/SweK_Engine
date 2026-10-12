@@ -276,7 +276,7 @@ console.log("\n4c. the refusal that kept 96 gates from ever running on the rig")
         browserSkipReason(null, "", "") !== "" && /playwright/.test(browserSkipReason(null, "", "")));
 }
 
-// ---- 4d. *** v4832 -- THE DXC HALF OF THE RESOLVER, WHICH NO ROW OF THIS GATE HAD NAMED *** ---------------------
+// ---- 4d. *** v4845 -- THE DXC HALF OF THE RESOLVER, WHICH NO ROW OF THIS GATE HAD NAMED *** ---------------------
 // resolveDxcDir, launchEnv and dxcAdvice arrived after definitionGates' tree-wide census was frozen and were the three of
 // its seven new unnamed symbols that live here. tools/ship/dxcResolve-selfcheck.mjs reads them on this box's own install;
 // these rows hold the CONTRACT on a layout this box does not have, the way section 1 holds the shell's.

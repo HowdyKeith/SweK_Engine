@@ -1012,7 +1012,7 @@ sec("8h. WHAT A KILLED GATE LEAVES IS GONE BEFORE THE NEXT GATE RUNS (v4692)");
     for (const d of [tmp, root]) try { fs.rmSync(d, { recursive: true, force: true }); } catch {}
 }
 
-console.log("\n7. *** WHOSE RECORD IT IS, AND WHAT A GATE THAT DIED SILENTLY SAID LAST (v4832) ***");
+console.log("\n7. *** WHOSE RECORD IT IS, AND WHAT A GATE THAT DIED SILENTLY SAID LAST (v4845) ***");
 // ownerOf and deathTail were two of the seven symbols definitionGates' tree-wide census found arriving unnamed after its
 // freeze. Both were reached only through readRecord and the capped-gate report; these rows hold each one's own contract.
 {

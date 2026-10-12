@@ -408,7 +408,7 @@ sec("6. THE PAGE: race-crash.html in its own browser, ramming on load with the d
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------
-sec("7. v4832 -- THE SCRIPTED DEMOLITION, ON ITS OWN: the script the lockstep gates race through, with no race, no cars and no random");
+sec("7. v4845 -- THE SCRIPTED DEMOLITION, ON ITS OWN: the script the lockstep gates race through, with no race, no cars and no random");
 // demolitionScript was reached only inside raceWithGunners's city option (raceTurret, raceLockstep), where a wrong tick shows up as a
 // fingerprint and nothing says which of its four promises moved. definitionGates' tree-wide census found it among the seven symbols
 // that arrived unnamed after its freeze. Driven here tick by tick on section 4's city, with at/every off their defaults.

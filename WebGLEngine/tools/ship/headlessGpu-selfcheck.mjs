@@ -381,6 +381,20 @@ sec("6. WHAT IS NOT SOLVED IS SAID IN THE MODULE, NOT ONLY HERE");
 // thing it could not check. A wrong bytes-per-row shears the image by a few texels per row, which reads as a
 // shader defect; a wrong half decode reads as a backend divergence. Both are decided here, in eight lines of
 // integer and bit arithmetic that nothing has ever exercised.
+sec("8b. v4845 -- THE FINE CLOCK: ONE SPELLING, AND EVERY NATIVE CHILD THAT TIMES PASSES IT");
+{
+    // FINE_CLOCK_FLAG was the one export of this module no row here named (definitionGates' census). Dawn rounds every timestamp to a whole
+    // 65,536 ns unless the device is made with it (render/denoiseTiming-selfcheck.mjs reads the grid). What can drift is the WIRING: a timing
+    // child that builds its own flag list times on the rounded clock and every number it reports is a multiple of the quantum.
+    const ENGR = path.resolve(HERE, "..", ".."), read = (r) => fs.readFileSync(path.join(ENGR, r), "utf8");
+    const children = ["render/denoiseTiming-selfcheck.mjs", "render/denoiseCompile-selfcheck.mjs", "tools/denoiseBuildProbe.mjs"];
+    const passes = children.map((r) => [r, [...read(r).matchAll(/\bmod\.create\(([^\n]*)/g)].map((m) => m[1])]);
+    ok(HG.FINE_CLOCK_FLAG === "disable-dawn-features=timestamp_quantization" &&
+        passes.every(([, calls]) => calls.length === 1 && /FINE_CLOCK_FLAG/.test(calls[0]) && !/timestamp_quantization/.test(calls[0])),
+        "!! FINE_CLOCK_FLAG is Dawn's disable entry for timestamp_quantization, and every native child that times builds its device with it -- by name, not a hand-typed copy",
+        passes.map(([r, c]) => `${path.basename(r)}: create(${(c[0] || "NONE").slice(0, 48)}`).join("; "));
+}
+
 sec("9. THE TEXTURE READ-BACK ARITHMETIC");
 {
     // BYTES_PER_TEXEL is four channels times the channel width, and saying it that way is the check: the

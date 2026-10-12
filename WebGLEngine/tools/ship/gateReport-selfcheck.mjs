@@ -31,7 +31,7 @@ import { gateFiles } from "./staleness.mjs";
 import { noComments } from "./sourceScan.mjs";
 import { runInEngineOrigin } from "./webgpuHarness.mjs";
 import * as AW from "./artefactWriters.mjs";
-import { gateReport, reports, arguesInNumbers, renderedNumbers, REPORT_DIR, enabled, TABLE_ATTR, tableSelector } from "./gateReport.mjs";
+import { gateReport, reports, arguesInNumbers, renderedNumbers, REPORT_DIR, enabled, TABLE_ATTR, tableSelector, staleReports } from "./gateReport.mjs";
 import { RED_AT_V4279 } from "./redCensus.mjs";
 
 const SELF_REPORT = gateReport("tools/ship/gateReport-selfcheck.mjs");
@@ -725,6 +725,26 @@ console.log();
 console.log("  ----  WHAT THIS DOES NOT CLAIM. That 66 gates are worth wiring: the ratchet says the number may not");
 console.log("  ----  rise, not that it must fall fast, and a ratchet nobody can pay down is what this tree calls a");
 console.log("  ----  list of grievances -- the answer is that each wiring is one line in a gate that already has");
+// v4845 -- staleReports is the instrument of reportFresh-selfcheck, and the one export of this module no row here named (the definitionGates
+// census). Its three rules, on injected history so no row depends on this checkout: a COMMIT after the date of its report makes it stale;
+// an UNCOMMITTED edit makes it stale when the gate file is newer than the report file; in a shallow clone a gate with no dated commit
+// is unjudged rather than fresh.
+{
+    const R = (n, at) => ({ file: "r/" + n + ".json", gate: "g/" + n + "-selfcheck.mjs", at });
+    const reps = [R("a", "2026-10-01"), R("b", "2026-10-05"), R("c", "2026-10-05"), R("d", "2026-10-05")];
+    const log = "@s1 2026-10-07\ng/a-selfcheck.mjs\nother/file.mjs\n\n@s2 2026-10-03\ng/b-selfcheck.mjs\ng/a-selfcheck.mjs\n";
+    const times = { "g/c-selfcheck.mjs": 2000, "r/c.json": 1000, "g/d-selfcheck.mjs": 500, "r/d.json": 1000 };
+    const io = { reports: reps, log, dirty: ["g/c-selfcheck.mjs", "g/d-selfcheck.mjs"], mtime: (f) => times[f] ?? null };
+    const full = staleReports({ ...io, boundary: [] }), shallow = staleReports({ ...io, boundary: ["s2"] });
+    const names = (x) => x.stale.map((r) => r.file + "@" + r.edited.slice(0, 11)).join(", ");
+    ok("!! staleReports: a commit after the date of its report is stale, an older one is not; an uncommitted edit newer than its report is stale, an older one is not",
+        full.reports === 4 && full.judged === 4 && full.dirty === 2 && names(full) === "r/c.json@uncommitted, r/a.json@2026-10-07",
+        names(full));
+    ok("  ...and in a shallow clone a gate whose only commit is past the boundary is UNJUDGED, not fresh -- the working-tree edits are judged anyway",
+        shallow.unjudged === 1 && shallow.judged === 3 && names(shallow) === "r/c.json@uncommitted, r/a.json@2026-10-07",
+        `unjudged ${shallow.unjudged}, stale ${names(shallow)}`);
+}
+
 console.log("  ----  the table. That a report is CORRECT: it holds what the gate computed, and whether the gate was");
 console.log("  ----  right is the gate's own business. And that the reports stay current -- they carry the date they");
 console.log("  ----  were measured and nothing re-emits them on a ship, which is the next thing to decide.");

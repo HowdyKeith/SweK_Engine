@@ -144,7 +144,7 @@ const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
 const { APPLY_TOL, kernelApplyWgsl, packApplyUniforms, kernelApplyCpu, kernelFor, deviceLayers, denoiseTwin, createDeviceDenoiser, encodeNet, decodeNet,
         KERNEL_SETS, DEFAULT_KERNELS, PAGE_KERNELS, applyFor, kernelApplyFastWgsl, kernelHeadApplyWgsl, judgeHeadApply,
-        R18_KERNELS, BROWSER_ONLY_SETS, isD3D12Native, nativeSetsFor, PAGE_KERNELS_BY_ADAPTER, pageAdapterKey, pageKernelsFor } = await imp("render/denoiseDevice.mjs");
+        R18_KERNELS, BROWSER_ONLY_SETS, isD3D12Native, nativeSetsFor, PAGE_KERNELS_BY_ADAPTER, pageAdapterKey, pageKernelsFor, passBytes, TIMED_SETS } = await imp("render/denoiseDevice.mjs");
 const CMP = await imp("render/denoiseCompile.mjs");
 const { makeDenoiser, denoise, KERNEL_TAPS, shapeFor, paramCount } = await imp("render/denoiseNet.mjs");
 const { conv2dCpu, conv2dCpuFma, COUT_MAX, tileShape, fastAltShape, conv2dTileWgsl, conv2dFastAltWgsl } = await imp("brain/conv2d.mjs");
@@ -282,6 +282,12 @@ console.log("\n2. THE SHIPPED NETWORK'S ENCODING");
     ok("  a layer whose weights do not fill its shape is refused, not zero-padded", /layer 4 holds/.test(refused || ""));
     const shape = shapeFor("kernel", 10, "large");
     ok("  the large network's shape is section 28's, with the mask's tenth channel", shape.map((s) => s.slice(0, 2).join(">")).join() === "10>32,32>32,32>32,32>32,32>81");
+    // v4845 -- TIMED_SETS was one of the symbols definitionGates' census found no row of this gate naming. render/denoiseTiming-selfcheck.mjs
+    // holds its order; this holds what it is FOR: every set a pass or the page can run is on the ladders, so no default ships untimed.
+    const runnable = [DEFAULT_KERNELS, PAGE_KERNELS, ...Object.values(PAGE_KERNELS_BY_ADAPTER)];
+    ok("!! every set a pass or the page can choose -- the default, the page's, and each adapter's measured pick -- is one the ladders time, with r12 first as the reference",
+        runnable.every((s) => TIMED_SETS.includes(s)) && TIMED_SETS[0] === "r12" && TIMED_SETS.every((s) => KERNEL_SETS.includes(s)) && Object.isFrozen(TIMED_SETS),
+        `timed ${TIMED_SETS.join(", ")}; runnable ${[...new Set(runnable)].join(", ")}`);
 }
 
 console.log("\n3. *** THE WHOLE PASS ON THE DEVICE (Dawn) ***");
@@ -312,6 +318,22 @@ else try {
         return { kernel: L.kernel, plain, fused, unexplained };
     });
     const net = makeDenoiser(3, "he", "kernel", 10, "large"), x = synth(HH, WW, 10, 7);
+    // v4845 -- passBytes is what round 15 REPORTS a pass allocating; held here to what createDeviceDenoiser actually asks the device
+    // for: every STORAGE buffer it creates, summed, for an unfused set (r12) and the fused one (r15, whose head keeps its logits).
+    // MEASURED, the first time this row ran: r12 allocated 487,628 B against passBytes' 354,312 and r15 exactly its 225,036. The
+    // difference is 133,316 B = 33,329 parameters x 4 -- r12 keeps the network's weights in storage buffers and r15 does not. So
+    // passBytes is the PER-PIXEL storage (input, layer outputs, image), the part that grows with the frame; the weights are a
+    // constant beside it on the sets that store them. The row holds both, so neither half can move unseen.
+    {
+        const allocated = async (set) => { const adapter = await gpu.requestAdapter(), dev = await adapter.requestDevice(); let sum = 0;
+            const real = dev.createBuffer.bind(dev); dev.createBuffer = (d) => { if (d.usage & 0x80) sum += d.size; return real(d); };
+            try { const D = await createDeviceDenoiser(dev, net, { H: HH, W: WW, C: 10, kernels: set }); D.destroy(); return sum; } finally { dev.destroy(); } };
+        const a12 = await allocated("r12"), a15 = await allocated("r15");
+        const wb = paramCount(net) * 4;
+        ok("!! passBytes is the per-pixel storage the device denoiser really allocates: r15 exactly, r12 plus its weights (which r12 alone keeps in storage) -- and the 81 logits a pixel are the difference",
+            a12 === passBytes(net, HH, WW, "r12") + wb && a15 === passBytes(net, HH, WW, "r15") && a12 - wb - a15 === HH * WW * 81 * 4,
+            `r12 ${a12} B allocated = passBytes ${passBytes(net, HH, WW, "r12")} + weights ${wb}; r15 ${a15} against ${passBytes(net, HH, WW, "r15")}`);
+    }
     const r = await job(net, x, HH, WW, 10);
     const J = judge(net, x, HH, WW, r.acts);
     ok(`!! *** every cell of every layer, on the device, is the twin's or the fused mirror's, given the device's own input to that layer -- the head of ${KERNEL_TAPS} on the direct kernel among them ***`,
