@@ -156,18 +156,21 @@ export function templateEnd(src, i) {
     }
     return src.length;
 }
-// after "${": the index after the "}" that closes the expression
+// after "${": the index after the "}" that closes the expression. A regex literal is skipped whole (`${s.replace(/"/g, "")}`
+// is the common shape, and its quote is not a string), decided by the same regexAllowedHere rule the strippers use, over
+// the expression's code so far with each string, template and regex kept as an empty placeholder of its own kind.
 function _exprEnd(src, j) {
-    let depth = 0;
+    let depth = 0, seen = "";
     while (j < src.length) {
         const c = src[j], d = src[j + 1];
-        if (c === "`") { j = templateEnd(src, j); continue; }
-        if (c === "'" || c === '"') { let k = j + 1; while (k < src.length && src[k] !== c && src[k] !== "\n") k += src[k] === "\\" ? 2 : 1; j = k + 1; continue; }
+        if (c === "`") { j = templateEnd(src, j); seen += "``"; continue; }
+        if (c === "'" || c === '"') { let k = j + 1; while (k < src.length && src[k] !== c && src[k] !== "\n") k += src[k] === "\\" ? 2 : 1; j = k + 1; seen += c + c; continue; }
         if (c === "/" && d === "/") { const k = src.indexOf("\n", j); j = k < 0 ? src.length : k; continue; }
         if (c === "/" && d === "*") { const k = src.indexOf("*/", j + 2); j = k < 0 ? src.length : k + 2; continue; }
+        if (c === "/" && regexAllowedHere(seen)) { const r = regexBody(src, j); if (r) { j = r.end; seen += "/r/"; continue; } }
         if (c === "{") depth++;
         else if (c === "}") { if (depth === 0) return j + 1; depth--; }
-        j++;
+        seen += c; j++;
     }
     return src.length;
 }

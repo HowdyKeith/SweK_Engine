@@ -19,7 +19,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { codeOnly, noComments, prose, codeHas, proseHas, regexAllowedHere, regexBody } from "./sourceScan.mjs";
+import { codeOnly, noComments, prose, codeHas, proseHas, regexAllowedHere, regexBody, templateEnd } from "./sourceScan.mjs";
 
 let fails = 0;
 const ok = (name, cond, detail) => {
@@ -186,7 +186,12 @@ console.log("sourceScan-selfcheck -- the two strippers 101 files depend on, driv
     // THE TREE-WIDE CLAIM, MEASURED RATHER THAN TAKEN ON FAITH: line count preserved end-to-end is what a
     // desync looks like breaking (codeOnly stops emitting real newlines once stuck in a phantom string/comment
     // that never closes). A mismatch anywhere means something still desyncs.
-    let mismatched = 0, filesChecked = 0;
+    // v4846 -- AND A SECOND MEASURE, BECAUSE THIS ONE MISSED A DESYNC FOR AS LONG AS NESTED TEMPLATES EXISTED. A template inside
+    // another's ${...} "closed" the outer one early and the next quote opened a string that ran on -- but string mode emits its
+    // newlines, so every line count held and the row above stayed green over five files. codeOnly blanks a string to its two
+    // quotes and a ' or " string cannot cross a line, so every line of its output must hold an EVEN number of each: an odd
+    // line is a line read from inside a phantom string. Before templateEnd the tree held 5 such files; it holds 0.
+    let mismatched = 0, filesChecked = 0; const oddQuote = [];
     (function walk(d) {
         for (const e of fs.readdirSync(d, { withFileTypes: true })) {
             if (/node_modules|\.git/.test(e.name)) continue;
@@ -196,11 +201,15 @@ console.log("sourceScan-selfcheck -- the two strippers 101 files depend on, driv
             filesChecked++;
             const src = fs.readFileSync(p, "utf8");
             const rawLines = src.split("\n").length;
-            if (codeOnly(src).split("\n").length !== rawLines || noComments(src).split("\n").length !== rawLines) mismatched++;
+            const co = codeOnly(src);
+            if (co.split("\n").length !== rawLines || noComments(src).split("\n").length !== rawLines) mismatched++;
+            if (co.split("\n").some((l) => (l.split('"').length - 1) % 2 || (l.split("'").length - 1) % 2)) oddQuote.push(path.relative(ENG, p));
         }
     })(ENG);
     say("files checked for a line-count desync: " + filesChecked + "   mismatched: " + mismatched);
     ok("!! *** ZERO files desync tree-wide, down from 180 measured before this fix ***", mismatched === 0);
+    ok("!! *** and ZERO files leave a line inside a phantom string: every line of codeOnly's output holds an even number of each quote (v4846: 5 before templateEnd) ***",
+        oddQuote.length === 0, oddQuote.length ? "ODD: " + oddQuote.slice(0, 8).join(", ") : filesChecked + " files");
 }
 
 // *** v4814 -- codeOnly STOPPED LOOKING BACK, SO IT IS HELD TO THE ALGORITHM THAT DID. *** It used to call
@@ -219,7 +228,10 @@ console.log("\n9. codeOnly against the look-back algorithm it replaced (v4814)")
             if (mode === null) {
                 if (c === "/" && d === "/") { mode = "line"; i += 2; continue; }
                 if (c === "/" && d === "*") { mode = "block"; i += 2; continue; }
-                if (c === "'" || c === '"' || c === "`") { mode = c; out += c; i++; continue; }
+                // v4846: a template ends where templateEnd says (nested ${...} templates included) in both -- this reference pins the
+                // REGEX rule, and a template's extent is section 10's subject, not a second opinion to diverge on
+                if (c === "`") { const e = templateEnd(src, i), b = src.slice(i + 1, e); out += "`" + b.replace(/[^\n]/g, "") + (src[e - 1] === "`" && e > i + 1 ? "`" : ""); i = e; continue; }
+                if (c === "'" || c === '"') { mode = c; out += c; i++; continue; }
                 if (c === "/" && regexAllowedHere(out)) { const r = regexBody(src, i); if (r) { out += "/" + src.slice(r.closeAt, r.end); i = r.end; continue; } }
                 out += c; i++; continue;
             }
@@ -251,6 +263,32 @@ console.log("\n9. codeOnly against the look-back algorithm it replaced (v4814)")
     const treeBad = picked.filter((f) => { const t = fs.readFileSync(f, "utf8"); return codeOnly(t) !== reference(t); });
     ok("!! ...and on a slice of the tree: every 40th source file, compared byte for byte",
        picked.length > 50 && treeBad.length === 0, `${picked.length} files` + (treeBad.length ? `, DIFFER: ${treeBad.slice(0, 3).map((f) => path.relative(ENG, f)).join(", ")}` : ", all equal"));
+}
+
+// SABOTAGED v4846, each against tools/ship/sourceScan.mjs, the gate run, restored:
+//   S1 templateEnd ignores ${...} (the old plain-backtick reading)  -> 2 RED: the shapes row, the phantom-string row
+//   S2 no regex literal inside an expression                       -> 2 RED: the shapes row, the phantom-string row
+//   S3 noComments back to a plain backtick                         -> 1 RED: the comment-is-a-comment row
+console.log("\n10. v4846 -- a template ends after its own closing backtick, through nested ${...} templates");
+{
+    // The shapes found in the tree, each its own fixture: a template inside an expression (gateReport-selfcheck's), a regex
+    // with a quote inside an expression (ai-bridge/server.js's), a comment and a string with a brace inside an expression.
+    const T = [
+        ["a template in an expression", "`x ${f(`<t ${k}=\"`)} y`;", "`x ${f(`<t ${k}=\"`)} y`"],
+        ["a regex with a quote in an expression", "`p ${s.replace(/\"/g, '\\\"')} q`;", "`p ${s.replace(/\"/g, '\\\"')} q`"],
+        ["a brace in a string and a comment in an expression", "`a ${ \"}\" + /* } */ b } c`; z", "`a ${ \"}\" + /* } */ b } c`"],
+        ["an escaped backtick and a plain dollar", "`a \\` $ {b} ${c}`;", "`a \\` $ {b} ${c}`"],
+    ];
+    const bad = T.filter(([, src, want]) => src.slice(0, templateEnd(src, 0)) !== want);
+    ok("!! templateEnd stops after the template's own closing backtick in every shape the tree holds",
+        bad.length === 0, bad.length ? "WRONG: " + bad.map(([n, src]) => n + " -> " + JSON.stringify(src.slice(0, templateEnd(src, 0)))).join("; ") : T.map(([n]) => n).join("; "));
+    ok("...and an unterminated template runs to the end of the text rather than past it", templateEnd("`never closed ${x", 0) === "`never closed ${x".length);
+    // the defect itself, as gateReport-selfcheck.mjs carried it: a comment after a nested template, and code after that
+    const fx = "ok(`${src.includes(`<table ${k}=\"`)}`);\n// the gate calls process.exit() nowhere\nconst after = 1;\n";
+    ok("!! *** after a nested template a comment is a comment and code is code -- in noComments AND codeOnly ***",
+        !noComments(fx).includes("process.exit") && noComments(fx).includes("const after") && noComments(fx).includes("<table ${k}") &&
+        !codeOnly(fx).includes("process.exit") && codeOnly(fx).includes("const after") && !codeOnly(fx).includes("<table"),
+        JSON.stringify(codeOnly(fx)));
 }
 
 if (fails) { console.log("\nsourceScan-selfcheck: " + fails + " FAILURES"); process.exit(1); }
