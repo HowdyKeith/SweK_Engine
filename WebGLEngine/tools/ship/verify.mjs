@@ -57,10 +57,14 @@ function check(label, ok, detail) {
 // mechanism; this is the mechanism. An unreadable main reports and stands aside rather than blocking a ship.
 if (version) {
   try {
-    const { preflight } = await import("./versionPreflight.mjs");
+    const { preflight, FETCH_MAIN } = await import("./versionPreflight.mjs");
     const pf = preflight(version);
-    if (pf.freshness && pf.freshness.stale) console.log("[verify] NOTE  origin/main is behind the remote -- git fetch origin main");
-    check(`version is not one origin/main already carries (main: ${pf.mainVersion || "unreadable"})`, pf.ok, pf.refusal || "");
+    // v4847 -- the refspec fetch, not `git fetch origin main`: in a --branch clone the bare form moves FETCH_HEAD only
+    if (pf.freshness && pf.freshness.stale) console.log("[verify] NOTE  origin/main is behind the remote -- " + FETCH_MAIN);
+    // v4847 -- and an unreadable main SAYS WHY on this row: the rig's branch clone printed "main: unreadable" and nothing
+    // else, while the preflight's note held the reason and the fetch that cures it
+    check(`version is not one origin/main already carries (main: ${pf.mainVersion || "unreadable"})`, pf.ok,
+          pf.refusal || (!pf.mainVersion && pf.note ? pf.note : ""));
   } catch (e) { console.log("[verify] NOTE  version preflight could not run: " + String(e.message).slice(0, 100)); }
 }
 
@@ -343,18 +347,19 @@ for (const [file, label] of [
 try {
   const { execFileSync } = await import("node:child_process");
   const out = execFileSync(process.execPath, ["tools/ship/claimsGate.mjs", "--file", "predictions.html"],
-                           { encoding: "utf8", timeout: 60000, stdio: ["ignore", "pipe", "ignore"] });
+                           { encoding: "utf8", timeout: 60000, stdio: ["ignore", "pipe", "pipe"] });
   const m = out.match(/claimsGate: (\d+) claims \(([^)]+)\), every one falsifiable/);
   check("every claim the engine makes could be proven wrong", !!m, m ? m[1] + " claims: " + m[2] : out.trim().slice(0, 70));
 } catch (e) {
   // exits 1 on an unfalsifiable claim, on a verdict with no evidence, AND on parsing zero claims -- because a
   // claims gate that silently finds nothing to check is theatre with a green light on it.
-  const out = String((e && e.stdout) || "");
-  const n = out.match(/(\d+) PROBLEMS/);
-  const first = out.split("\n").filter((l) => l.startsWith("      "))[0];
-  check("every claim the engine makes could be proven wrong", false,
-        n ? n[1] + " problem(s), first: " + (first || "?").trim().slice(0, 58)
-          : "claimsGate could not run: " + String(e.message).slice(0, 55));
+  // v4846 -- and two of its exit-1 verdicts (no page, zero claims) are said on STDERR, which this row used to ignore,
+  // so it reported "could not run" for a gate that ran and refused. stderr is piped above and claimsGate's own
+  // failedRunDetail reads both streams (claimsGate-selfcheck section 8 runs the real child down every path).
+  let detail;
+  try { detail = (await import("./claimsGate.mjs")).failedRunDetail(e); }
+  catch (ie) { detail = "claimsGate's verdict could not be read: " + String(ie && ie.message).slice(0, 45); }
+  check("every claim the engine makes could be proven wrong", false, detail);
 }
 
 try {

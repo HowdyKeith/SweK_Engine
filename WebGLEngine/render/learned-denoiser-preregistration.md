@@ -4068,7 +4068,7 @@ files are committed byte for byte at 821ec075, before this section:
 - The compile gate was **green** on both: 442 s on the Intel, 198 s on the 1080.
 - **The 1080's report says "NO ADAPTER WAS SEEN -- this is not a hardware run". That is false.** Its native half ran on
   the 1080, on the device's clock. `realGpuRun` took adapter names only from the browser half, and Chrome did not run on
-  that box. This round fixes the report (section 66).
+  that box. Round 19 names native adapters in the report; that change is not in this version.
 
 **P1 and P2.**
 
@@ -4091,8 +4091,8 @@ files are committed byte for byte at 821ec075, before this section:
   from one package, with no DLL copied.
 - **Every other kernel in the probe built and was exact under DXC too:** all 7 of round 17's shapes on both GPUs, each
   within 2.4 s.
-- **By section 64, C1 and C2 hold on both GPUs, so a round 19 may do its three things.** Section 66 fixes them before the
-  rig runs anything.
+- **By section 64, C1 and C2 hold on both GPUs, so a round 19 may do its three things.** Round 19's own section fixes
+  them before the rig runs anything.
 
 **Reported, deciding nothing.**
 - **DXC is not faster everywhere.** Leaving out the fast head, FXC's pass was the faster for 5 of the other 7 kernels on the
@@ -4111,8 +4111,8 @@ files are committed byte for byte at 821ec075, before this section:
 
   - **r15's own two kernels run slower under DXC on the Intel:** the fast 3 x 3 took 1.012 ms against FXC's 0.745, and the
     fused head and apply 0.448 against 0.363. On the 1080 both run faster under DXC.
-  - So moving the pin could slow r15 itself natively on the Intel. Section 66's rule reads r15 under both compilers for
-    that reason.
+  - So moving the pin could slow r15 itself natively on the Intel. Any rule that moves a native default has to read r15
+    under both compilers for that reason.
 - **DXC builds far faster.** Under FXC the fast 3 x 3 took 6.8 s to build on the Intel and 3.6 s on the 1080, against
   0.11 and 0.09 s under DXC. The fused head and apply took 16.4 and 9.0 s, against 1.6 and 1.1 s.
 - **"As shipped" built slower than "use_dxc" on the Intel**, for the same DXIL: 472 against 53 ms for r12-tiled-3x3, 3,885

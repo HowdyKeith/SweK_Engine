@@ -17,6 +17,15 @@
 // clean, main.js's 3,230,253 bytes round-tripping byte-identical) -- this gate covers the edge cases that real
 // run did not organically exercise: a non-ASCII filename, an empty file, a file deflate does not shrink, and a
 // corrupted archive that the verification here must actually catch, not wave through.
+//
+// v4847 -- section 5: a run that does not finish leaves nothing at outZip (the v4844 release asset was a half-written
+// archive). SABOTAGES, each restored after (reds counted with grep -c '^  FAIL'):
+//   Z1. the pre-fix _zip put back (straight to outZip, no cleanup)  -> 1 RED: "NOTHING is left at the path" (154 bytes left).
+//       *** FIRST TRY WENT 0 RED: it pointed `partial` at outZip and kept the cleanup, which deletes the half-written file
+//       anyway -- a different writer, not the one that shipped v4844. The sabotage is the old code, not a variant of the new. ***
+//   Z2. _zip's failure path keeps the .partial (no drop())           -> 1 RED: "nor a .partial beside it"
+//   Z3. _zipTreeReal leaves the stream open on failure               -> 0 RED HERE: Linux unlinks an open file. The close is
+//       for Windows, where it would not; this box cannot see it, and says so
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -151,6 +160,28 @@ console.log("\n4. PROGRESS -- GET /package/progress's shape after a completed zi
     ok("!! progress() reports the zip step complete: pct 100, done === total",
         p.step === "zip" && p.pct === 100 && p.done === p.total && p.total === 5,
         JSON.stringify(p));
+}
+
+console.log("\n5. v4847 -- A RUN THAT DOES NOT FINISH LEAVES NOTHING AT THE PATH IT WOULD HAVE PUBLISHED");
+// v4844's release asset was a half-written archive: a file could not be read 534 entries in, packRelease said FAILED
+// and exited 1, and the command pasted after it uploaded what _zip had left at its final path -- no central directory,
+// no end record. _zip now writes "<outZip>.partial" and renames it only when the archive is whole.
+{
+    const failZip = outZip.replace(/\.zip$/, "-fail.zip");
+    let n = 0;
+    const third = (f) => { if (++n === 3) { const e = new Error("EBUSY: resource busy or locked, open '" + f + "'"); e.code = "EBUSY"; throw e; } return fs.readFileSync(f); };
+    const r = await PB._zip(fixDir, failZip, { readFile: third });
+    ok("!! a reader that fails on the THIRD file: _zip reports the failure in the reader's own words",
+        r.ok === false && /EBUSY/.test(r.error || ""), JSON.stringify(r).slice(0, 120));
+    ok("!! *** and NOTHING is left at the path a caller would publish -- not even a truncated archive ***",
+        !fs.existsSync(failZip), fs.existsSync(failZip) ? fs.statSync(failZip).size + " bytes left at " + failZip : "");
+    ok("!! nor a .partial beside it", !fs.existsSync(failZip + ".partial"));
+    const good = await PB._zip(fixDir, failZip);
+    const b = fs.existsSync(failZip) ? fs.readFileSync(failZip) : Buffer.alloc(0);
+    ok("!! the same tree with the real reader is WHOLE: its last 22 bytes are the end record, counting every file",
+        good.ok && b.length >= 22 && b.readUInt32LE(b.length - 22) === 0x06054b50 && b.readUInt16LE(b.length - 12) === 5 &&
+        !fs.existsSync(failZip + ".partial"), b.length + " bytes");
+    try { fs.rmSync(failZip, { force: true }); } catch {}
 }
 
 try { fs.rmSync(fixDir, { recursive: true, force: true }); } catch {}

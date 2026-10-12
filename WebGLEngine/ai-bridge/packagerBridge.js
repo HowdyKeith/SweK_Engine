@@ -259,9 +259,9 @@ function _listFilesForZip(dir) {
 // entry later. `offset` is where THIS entry starts in the output file -- tracked by the caller as a running
 // sum of bytes it has asked to be written, not queried from the stream, because writes here are strictly
 // sequential and nothing else touches this file concurrently.
-function _zipEntry(ws, absPath, zipName, offset) {
+function _zipEntry(ws, absPath, zipName, offset, readFile = fs.readFileSync) {
     return new Promise((resolve, reject) => {
-        let raw; try { raw = fs.readFileSync(absPath); } catch (e) { return reject(e); }
+        let raw; try { raw = readFile(absPath); } catch (e) { return reject(e); }
         const crc = _crc32(raw);
         let method = 8, data;
         try { data = zlib.deflateRawSync(raw, { level: 9 }); } catch { data = null; }
@@ -321,20 +321,26 @@ function _zipCentralDirectory(entries) {
 // to roughly every 5% (never every file -- a ~6,000-file tree would drown that log in lines nobody reads),
 // reaches that second caller for free: it costs one more line in a log the panel already shows, not a second
 // progress mechanism to build and keep in sync with this one.
-async function _zipTreeReal(srcFolder, outZip) {
+async function _zipTreeReal(srcFolder, outZip, { readFile = fs.readFileSync } = {}) {
     const files = _listFilesForZip(srcFolder);
     const rootName = path.basename(srcFolder);
     const totalBytes = files.reduce((s, f) => s + f.size, 0) || 1;
-    let doneBytes = 0, lastPctLogged = -1;
     _prog = { step: "zip", label: STEP_LABELS.zip, ts: Date.now(), done: 0, total: files.length, pct: 0 };
 
     const ws = fs.createWriteStream(outZip);
+    // v4847: a failure CLOSES the file before it is handed back, so _zip can remove it -- on Windows an open handle
+    // makes the unlink fail, and the half-written archive would stay exactly where v4844's did
+    try { return await _zipStream(ws, files, rootName, totalBytes, readFile); }
+    catch (e) { if (!ws.closed) await new Promise((res) => { ws.once("close", res); ws.destroy(); }); throw e; }
+}
+async function _zipStream(ws, files, rootName, totalBytes, readFile) {
+    let doneBytes = 0, lastPctLogged = -1;
     const entries = [];
     let offset = 0;
     for (let i = 0; i < files.length; i++) {
         const f = files[i];
         const zipName = rootName + "/" + f.rel;
-        const rec = await _zipEntry(ws, f.abs, zipName, offset);
+        const rec = await _zipEntry(ws, f.abs, zipName, offset, readFile);
         offset += rec.bytesWritten;
         entries.push(rec);
         doneBytes += f.size;
@@ -367,15 +373,27 @@ async function _zipTreeReal(srcFolder, outZip) {
     return { ok: true, entries: entries.length };
 }
 
-function _zip(srcFolder, outZip) {
-    return _zipTreeReal(srcFolder, outZip).then((z) => {
-        if (!z.ok) return z;
+// v4847 -- *** THE ARCHIVE IS WRITTEN BESIDE ITS NAME AND TAKES THE NAME ONLY WHEN IT IS WHOLE. *** _zip used to write
+// straight to outZip, so a file that could not be read halfway through left a half-written archive at the very path the
+// caller would publish -- and v4844 was published that way: packRelease printed FAILED and exited 1, the next command
+// pasted after it uploaded C:\SweK_Engine_release\SweK_Engine_v4844.zip, 3,416,100 bytes, 534 local entries ending at
+// an entry boundary, no central directory and no end record. Now the bytes go to "<outZip>.partial", the central
+// directory, end record and normalisation all happen there, and only then is it renamed to outZip. On ANY failure the
+// partial file is removed, so nothing is ever left at outZip by a run that did not finish. `opts.readFile` is the
+// per-file reader, for tools/ship/zipWriter-selfcheck.mjs's failure fixture; every caller passes none.
+function _zip(srcFolder, outZip, opts = {}) {
+    const partial = outZip + ".partial";
+    const drop = () => { try { fs.rmSync(partial, { force: true }); } catch {} };
+    drop();
+    return _zipTreeReal(srcFolder, partial, opts).then((z) => {
+        if (!z.ok) { drop(); return z; }
         // EVERY archive is still normalised, unconditionally -- see the v4607 header above for why this call
         // has to stay even though this writer's own names are already forward-slash.
-        const norm = normalizeZipSeparators(outZip);
-        if (!norm.ok) return { ok: false, error: "packed, but the archive could not be normalised: " + norm.error };
+        const norm = normalizeZipSeparators(partial);
+        if (!norm.ok) { drop(); return { ok: false, error: "packed, but the archive could not be normalised: " + norm.error }; }
+        fs.renameSync(partial, outZip);
         return { ok: true, entries: norm.entries, separatorsFixed: norm.bytesFixed };
-    }).catch((e) => ({ ok: false, error: String((e && e.message) || e) }));
+    }).catch((e) => { drop(); return { ok: false, error: String((e && e.message) || e) }; });
 }
 
 function _unzip(srcZip, destDir) {

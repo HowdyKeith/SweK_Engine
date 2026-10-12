@@ -44,6 +44,8 @@
 //   9. the BEHIND note's cure put back to `git fetch origin main`
 //                                            -> 1 RED: the stale-ref row -- the same FETCH_HEAD-only fetch as 8, in the one note
 //                                               the first pass of v4846 left naming it
+//  10. verify.mjs's row back to printing only refusals, and its stale NOTE back to `git fetch origin main`
+//                                            -> 1 RED each (run separately): the wiring row in section 6
 //
 // Run: node tools/ship/versionPreflight-selfcheck.mjs   (exit 0 all-pass, 1 on any fail)
 
@@ -459,6 +461,12 @@ const against = (main) => (v) => preflight(v, {
     const v = fs.readFileSync(path.join(HERE, "verify.mjs"), "utf8");
     ok(/versionPreflight\.mjs"/.test(v) && /preflight\s*\(/.test(v),
        "*** verify.mjs CALLS the preflight -- otherwise the rule is written down twice and enforced zero times ***");
+    // v4847 -- and SAYS what the preflight found: the rig's branch clone printed "main: unreadable" with the reason and the
+    // cure held in pf.note, unprinted; and its stale-ref NOTE named the bare fetch that moves FETCH_HEAD only
+    const row = v.slice(v.indexOf("preflight(version)"), v.indexOf("version preflight could not run"));
+    ok(/behind the remote -- " \+ FETCH_MAIN/.test(row) && /pf\.note/.test(row) && !/git fetch origin main"/.test(row),
+       "!! verify.mjs's preflight row prints the note when main is unreadable, and the refspec fetch when it is behind",
+       /pf\.note/.test(row) ? (/FETCH_MAIN/.test(row) ? "" : "the stale NOTE names no FETCH_MAIN") : "pf.note is never printed");
 }
 
 if (fail) { console.error(`\nversionPreflight-selfcheck: ${pass} pass, ${fail} FAIL`); process.exit(1); }
