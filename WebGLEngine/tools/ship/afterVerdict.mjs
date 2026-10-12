@@ -76,7 +76,7 @@ export const NEEDS_HISTORY = Object.freeze({
 });
 
 /** Is the repository at `cwd` a shallow clone? `run` is injectable so the gate can drive both answers. */
-export function isShallow({ cwd = ENG, run = (args) => spawnSync("git", args, { cwd, encoding: "utf8", timeout: 20000 }) } = {}) {
+export function isShallow({ cwd = ENG, probeMs = 20000, run = (args) => spawnSync("git", args, { cwd, encoding: "utf8", timeout: probeMs }) } = {}) {   // probeMs: a git call's limit, NOT a gate budget -- a parameter, as runAll's timeoutMs is, so tools/ship/runnerBudget-selfcheck.mjs does not read this runner as one that picks a gate limit of its own
     const r = run(["rev-parse", "--is-shallow-repository"]);
     return !!r && r.status === 0 && String(r.stdout).trim() === "true";
 }

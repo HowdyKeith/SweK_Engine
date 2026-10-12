@@ -39,6 +39,10 @@
 //   U  es-aircraft.html: Start Patrol does not respawn                                       3 red (the laps no longer start from the same place: the hand-squadron row, the zero-squadron row and the shipped-patrol row)
 //   V  pilotAircraftWeightsDefault.json: the file misquotes its held-out score               1 red (the `by` row)
 //   W  pilotAircraftWeightsDefault.json: one shipped weight changed                          2 red (the `by` row and the fixed-point row)
+//   X  pilotAircraftPolicy.mjs: stepWithEngine's engine force off-axis (z 0.5)               2 red (the stepWithEngine-is-the-page's-step row; the file's `by`)
+//   Y  pilotAircraftPolicy.mjs: HEADING is +Y                                               5 red (the HEADING/SECONDS row and four rows that fly toward it)
+//   Z  pilotAircraftPolicy.mjs: SECONDS is 25                                               4 red (the same row, the unstable-flight row, the file's `by`, ...)
+//      X-Z were added at the end: definitionGates-selfcheck counted HEADING, SECONDS and stepWithEngine among the exports no gate named, so the gate now asserts each (with the page's own composition restated for stepWithEngine).
 // A NOTE ON G, H AND THE SERIAL RUN: the sabotages that make a search blow up (B, F, G) take three to four minutes each instead of one, because the gate's own train/prune rows then fly unstable aircraft for the whole 30 s.
 // FOUND BEFORE THE SABOTAGES, BY THE GATE: my own comment in pilotAircraftPolicy.mjs said no angle repeats across the train, held-out and audit sets. 90 degrees does (a seeded axis in training, the vertical in the audit); the
 // comment and the row now say so. The sets were not changed, because the audit had already been read for the champion.
@@ -53,6 +57,8 @@ import * as P6 from "./pilot6dofPolicy.mjs";
 import * as AP from "./autopilotAircraft.mjs";
 import * as R from "./pilotRoster.mjs";
 import * as RB from "../physics/mechanics/rigidBody6dof.mjs";
+import * as AC from "../physics/mechanics/aircraftAssembly.mjs";
+import { relativeAirflow, applySurfaceForce } from "../physics/mechanics/aeroSurface.mjs";
 import * as Topo from "./gfcTopology.mjs";
 import * as PB from "./peerBrain.mjs";
 import { weightsHash } from "./drivePolicy.mjs";
@@ -142,6 +148,18 @@ sec("4. THE FLIGHT: the page's constants, the score, the zero pilot");
         num(/const ENGINE_THRUST = ([\d.]+)/) === PA.ENGINE_THRUST && num(/const CRUISE_SPEED = ([\d.]+)/) === PA.CRUISE_SPEED && num(/const N_HEADINGS = (\d+)/) === PA.N_HEADINGS && num(/LEG_SECONDS = (\d+)/) === PA.LEG_SECONDS && PA.DT === 1 / 30,
         `mass ${num(/const AIRCRAFT_MASS = ([\d.]+)/)}, thrust ${num(/const ENGINE_THRUST = ([\d.]+)/)}`);
     ok("the page's patrol headings are the module's: ten, evenly spaced about the vertical", J(PA.PATROL_HEADINGS.map((h) => h.map((v) => +v.toFixed(6)))) === J(Array.from({ length: 10 }, (_, i) => [Math.cos(i / 10 * 2 * Math.PI), Math.sin(i / 10 * 2 * Math.PI), 0].map((v) => +v.toFixed(6)))) && /Math\.cos\(a\), Math\.sin\(a\), 0/.test(src));
+    // stepWithEngine IS the page's composition, restated here step for step from aircraftAssembly's and aeroSurface's own primitives (es-aircraft.html's stepAircraftWithEngine), and compared to the bit
+    {
+        const aircraft = AC.createAircraft(), body = STATES[7].body, controls = { pitch: 0.3, roll: -0.2, yaw: 0.1 };
+        const defl = AC.mixControls(aircraft, controls), flow = relativeAirflow(body), acc = AC.createAccumulator();
+        for (const name of Object.keys(aircraft.surfaces)) applySurfaceForce(acc, flow, AC.withDeflection(aircraft.surfaces[name], defl[name]));
+        AC.applyForceAtPoint(acc, [PA.ENGINE_THRUST, 0, 0], PA.ENGINE_MOUNT);
+        const want = AC.step(body, acc, PA.DT), got = PA.stepWithEngine(aircraft, body, controls, PA.DT);
+        ok("!! stepWithEngine() is the page's step: the same surfaces, the same engine force at the same mount, one integration -- the new state agrees with a restatement from the primitives to the bit, and the page's source makes the same calls in the same order",
+            [...want.pos, ...want.vel, ...want.q, ...want.w].every((v, i) => Object.is(v, [...got.pos, ...got.vel, ...got.q, ...got.w][i])) && /AC\.mixControls\(aircraft, controls\)[\s\S]*relativeAirflow\(state\)[\s\S]*applySurfaceForce\(acc, flow, live\)[\s\S]*AC\.applyForceAtPoint\(acc, \[ENGINE_THRUST, 0, 0\], ENGINE_MOUNT\)[\s\S]*return AC\.step\(state, acc, dt\)/.test(src),
+            `pos ${got.pos.map((v) => v.toFixed(4)).join(",")}`);
+    }
+    ok("a flight is SECONDS (30) long at the page's 30 Hz, and flies at the held heading HEADING (+X, the nose's own direction at the start) unless told otherwise", PA.SECONDS === 30 && PA.DT === 1 / 30 && J(PA.HEADING) === "[1,0,0]" && Object.isFrozen(PA.HEADING) && PA.fly("hand", PA.scenario(3, 20)).fingerprint === PA.fly("hand", PA.scenario(3, 20), { seconds: PA.SECONDS, desired: PA.HEADING }).fingerprint && PA.fly("hand", PA.scenario(3, 20), { seconds: 5 }).fingerprint !== PA.fly("hand", PA.scenario(3, 20)).fingerprint);
     const f = PA.fly("hand", PA.scenario(3, 90));
     ok("!! the score is exactly what it says: half the mean cosine plus half the final one, minus 5 for a flight that went non-finite or spun past 20 rad/s", Math.abs(f.score - (0.5 * f.mean + 0.5 * f.final - (f.bad ? 5 : 0))) < 1e-12 && f.bad === false && f.finite);
     const DEC0 = PA.FEATURES * PA.HIDDEN + PA.HIDDEN + PA.REC_EDGES, spin = PA.fly(Float32Array.from(PA.handWeights(), (v, i) => v * (i >= DEC0 ? -3 : 1)), PA.scenario(3, 120));

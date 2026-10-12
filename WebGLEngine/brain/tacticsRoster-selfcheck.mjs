@@ -59,6 +59,9 @@
 //   S  flight-gpu.html: Start Fight does not rebuild the battle                              *** FIRST TRY WENT 0 RED: the row looked at a fleet at full health, and between the last battle and the click nothing had hurt anyone, so an old battle passed for a
 //      fresh one. The page now steps three seconds first and the row demands the battle clock back at 0 and a NEW fleet *** -> 1 red
 //   T  flight-gpu.html: side A flies side B's weights                                        3 red
+//   U  tacticsPanel.mjs: the import key renamed (swek.tacticsRoster.imp)                     2 red (the stored-under-the-named-keys row, both pages)
+//   V  tacticsRoster.mjs: TEAMS not frozen                                                   1 red (the TEAMS/AUTO/autoChoice row)
+//      U-V were added at the end: definitionGates-selfcheck counted TEAMS, AUTO, autoChoice, STORE_KEY and IMPORT_KEY among the exports no gate named; the gate now asserts each.
 // FOUND BY THE GATE, NOT BY A SABOTAGE: flight-gpu.html cannot be driven by waiting. Its software WebGPU device is lost a few seconds after boot in this harness ("GPU device lost: A valid external
 // Instance reference no longer exists") and the page does what it was built to -- redirects to the 2D page after 4 s -- so a row that waited for a real fight on it read another page. Both pages now expose a
 // synchronous step(n) the gate uses as its clock, and the gate has a row that the page stayed on itself.
@@ -67,6 +70,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as R from "./tacticsRoster.mjs";
+import { STORE_KEY, IMPORT_KEY } from "../ui/tacticsPanel.mjs";   // importing it in node touches no DOM: the DOM is only touched by mountTacticsPanel()
 import { DEFAULT_W, applyBrainWeights, decide } from "../ev/esTactics.js";
 import { PRESETS as ARENA, runBattle, runSeries } from "../ev/tools/es-arena.mjs";
 import { runInEngineOrigin, webgpuSkipReason } from "../tools/ship/webgpuHarness.mjs";
@@ -116,6 +120,7 @@ sec("2. THE DEFAULT IS THE OLD PAGE");
     const oldA = applyBrainWeights({ wWeak: 0, wFocus: 0, wThreat: 0, wPlayer: 0, wClose: 1 }, DEFAULT_W), oldB = { ...DEFAULT_W };   // the two constants flight-gpu.html and es-box3d.html carried (kept here as the oracle)
     const r = R.resolveRoster(R.defaultSpecs(), {});
     ok("!! 'default for this side' on A is exactly the old W_A (scatter) and on B exactly the old W_B (the hand weights), key for key, and says nothing was wrong", J(r.A.weights) === J(oldA) && J(r.B.weights) === J(oldB) && r.A.id === "scatter" && r.B.id === "hand" && r.problems.length === 0, `${r.A.id} / ${r.B.id}`);
+    ok("the two sides and the word for 'default' are what the panel and the saved specs speak: TEAMS is [A, B] and frozen, AUTO is 'auto', and autoChoice() is scatter for A and the hand weights for B -- the same two constants the pages carried", Object.isFrozen(R.TEAMS) && J(R.TEAMS) === '["A","B"]' && R.AUTO === "auto" && R.autoChoice("A") === "scatter" && R.autoChoice("B") === "hand" && R.defaultSpecs().A === R.AUTO && R.defaultSpecs().B === R.AUTO);
     ok("auto resolves the same whether spelt 'auto', undefined or null, and a missing spec object is the default lineup", J(R.resolveTeam("A", undefined, {}).weights) === J(oldA) && J(R.resolveTeam("B", null, {}).weights) === J(oldB) && J(R.resolveRoster(undefined, {}).A.weights) === J(oldA));
     ok("the panel's first choice says what the default is (A scatter, B hand)", /A scatter, B hand/.test(R.choices({})[0].label) && R.choices({})[0].id === "auto");
     for (const f of ["flight-gpu.html", "es-box3d.html"]) {
@@ -189,7 +194,7 @@ sec("5. THE PAGES: es-box3d.html and flight-gpu.html, each in its own browser");
     if (skip) { console.log(`  SKIP  ${skip}`); console.log("  *** NOT A PASS. ***"); fails++; }
     else {
         const oldA = applyBrainWeights({ wWeak: 0, wFocus: 0, wThreat: 0, wPlayer: 0, wClose: 1 }, DEFAULT_W), oldB = { ...DEFAULT_W };
-        const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 400000, args: { oldA: strip(oldA), oldB: strip(oldB), pages: ["/es-box3d.html", "/flight-gpu.html"] }, script: `async (args) => {
+        const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 400000, args: { oldA: strip(oldA), oldB: strip(oldB), storeKey: STORE_KEY, importKey: IMPORT_KEY, pages: ["/es-box3d.html", "/flight-gpu.html"] }, script: `async (args) => {
             const waitFor = async (fn, ms) => { const t = performance.now(); while (performance.now() - t < ms) { try { if (fn()) return true; } catch (e) {} await new Promise((r) => setTimeout(r, 100)); } return false; };
             const boot = async (page) => {
                 const f = document.createElement("iframe"); f.style.cssText = "width:900px;height:600px;border:0"; f.src = page; document.body.appendChild(f);
@@ -238,7 +243,7 @@ sec("5. THE PAGES: es-box3d.html and flight-gpu.html, each in its own browser");
                 out.impFight = { A: R_.committed.A.id, wClose: R_.weights("A").wClose, B: R_.committed.B.id };
                 out.stayed = P.f.contentWindow.location.pathname === page;   // flight-gpu.html redirects to the 2D page if the WebGPU device is lost; a redirect mid-test would make every row above a row about another page
                 // 6. the choices (and the import) survive a reload
-                out.saved = JSON.stringify(R_.specs);
+                out.saved = JSON.stringify(R_.specs); out.stored = { specs: localStorage.getItem(args.storeKey), imp: localStorage.getItem(args.importKey) };
                 P.f.remove(); const Q = await boot(page); const U = Q.w.__tacticsFight, qd = Q.d;
                 out.reload = { A: qd.getElementById("tacticsA").value, B: qd.getElementById("tacticsB").value, committed: [U.roster.committed.A.id, U.roster.committed.B.id], imported: U.roster.imported && U.roster.imported.wClose };
                 qd.getElementById("tacticsReset").click(); out.afterReset = [qd.getElementById("tacticsA").value, qd.getElementById("tacticsB").value];
@@ -274,6 +279,7 @@ sec("5. THE PAGES: es-box3d.html and flight-gpu.html, each in its own browser");
             ok(`!! ${page}: a real SKITTISH side breaks off once it is hurt, and a STUBBORN side facing it does not (the real preset vectors, through the page's own sim)`, p.real.aFlee && !p.real.bFlee, J(p.real));
             ok(`!! ${page}: an import that is not JSON is refused by name and not offered; a good one is offered, a wClose of 7 is held to 4 and the correction is said, and Clear import appears`, /import refused: not JSON/.test(p.refused.note) && !p.refused.offered && p.imported.offered && p.imported.clamped === 4 && /held to 4/.test(p.imported.note) && p.imported.clearShown, `${p.refused.note.split("\n").pop().slice(0, 80)} | ${p.imported.note.split("\n").pop().slice(0, 100)}`);
             ok(`${page}: an imported vector flies the side it is given to (A imported, B brawler after Start Fight)`, p.impFight.A === "imported" && p.impFight.wClose === 4 && p.impFight.B === "brawler", J(p.impFight));
+            ok(`!! ${page}: the choices and the import are kept in this browser under the panel's two named keys (${STORE_KEY} holds the specs, ${IMPORT_KEY} the eight numbers of the import, held to range)`, STORE_KEY === "swek.tacticsRoster.v1" && IMPORT_KEY === "swek.tacticsRoster.imported.v1" && p.stored && J(JSON.parse(p.stored.specs)) === '{"A":"imported","B":"brawler"}' && p.stored.imp && (() => { const w = JSON.parse(p.stored.imp); return J(Object.keys(w)) === J(R.KEYS) && w.wClose === 4; })(), p.stored ? p.stored.specs : "nothing stored");
             ok(`!! ${page}: the choices and the import survive a reload (imported on A, brawler on B are what a fresh page shows AND fights), Default tactics puts both selects back on 'default', and Clear import removes the vector and the choice offering it`, p.reload.A === "imported" && p.reload.B === "brawler" && J(p.reload.committed) === '["imported","brawler"]' && p.reload.imported === 4 && J(p.afterReset) === '["auto","auto"]' && p.afterClear.imported === null && !p.afterClear.offered, J({ reload: p.reload, afterReset: p.afterReset, afterClear: p.afterClear }));
         }
         if (r.ok && r.result && r.result.served) {
