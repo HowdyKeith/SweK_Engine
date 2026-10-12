@@ -491,7 +491,7 @@ console.log("\n8. v4845 -- WHAT COUNTS AS A COMPILER, AND WHAT REACHES A DOOR, O
         { path: "/f/b.mjs", text: "// WebAssembly.instantiate(bytes) appears only in this comment\nexport const x = 1;" },
         { path: "/f/c.mjs", text: 'export const fixture = "WebAssembly.compile(bytes)";' },
         { path: "/f/d.json", text: "WebAssembly.compile(x)" }],
-        vendor: [{ path: "/f/vendor/glue.js", text: "var m = WebAssembly.instantiateStreaming(fetch(u));" }, { path: "/f/vendor/plain.js", text: "var x = 1;" }] });
+        vendor: [{ path: "/f/vendor/glue.js", text: "var m = WebAssembly.instantiateStreaming(resp);" }, { path: "/f/vendor/plain.js", text: "var x = 1;" }] });
     ok("!! wasmCompilers: a script whose CODE calls the API, and vendored glue that does; not a comment, not a string, not a non-script",
         comp.join() === "/f/vendor/glue.js,/f/a.mjs", comp.join(", ") || "none");
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "doorReach-"));

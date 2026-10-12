@@ -1227,8 +1227,12 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4842 -- MAIN'S v4838 (THE DENOISER ARC) MERGED WITH THIS LINE'S v4838-v4841: RE-DERIVED over the merged tree.
     // v4843 -- the Endless-Sky tactics roster (brain/tacticsRoster.mjs, ui/tacticsPanel.mjs, its gate), the aircraft pilot (brain/pilotAircraftPolicy.mjs, its gate, tools/ship/trainAircraftPilot.mjs, its gate, tools/ship/trainPilotAircraft.mjs)
     // and a merge that brought the rest: files 4667 -> 4675, ES modules 4362 -> 4370, closures 4207 -> 4215, async/await 1758 -> 1761, typed arrays 1297 -> 1299, Promises 424 -> 426, performance.now 248 -> 250. RE-DERIVED, not incremented.
-    esModules: 4370, closures: 4215, asyncAwait: 1761, typedArrays: 1299, promises: 426,
-    fetchXhr: 252, performanceNow: 250, raf: 127, webgl: 200, webgpu: 62, threads: 26, wasm: 26,
+    // v4845 -- no file added; typed arrays 1299 -> 1300 (render/denoiseCompile-selfcheck.mjs's stand-in device reads its timestamps
+    // through a BigUint64Array) and WebAssembly 26 -> 27 (tools/ship/wasmTeardown-selfcheck.mjs's section 8 fixture names the API in
+    // code; it named it only in a comment before). Neither compiles nor allocates on a GPU. The fixture's glue was first written with
+    // a fetch() inside its string and moved fetch/XHR 252 -> 253 -- a gate that fetches nothing -- so the fixture was changed, not the row.
+    esModules: 4370, closures: 4215, asyncAwait: 1761, typedArrays: 1300, promises: 426,
+    fetchXhr: 252, performanceNow: 250, raf: 127, webgl: 200, webgpu: 62, threads: 26, wasm: 27,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.

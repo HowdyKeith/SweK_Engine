@@ -1,6 +1,6 @@
 {
  "gate": "render/denoiseDevice-selfcheck.mjs",
- "at": "2026-10-11",
+ "at": "2026-10-12",
  "tables": [
   {
    "title": "K0 on a 21 x 19 image of the large network: each set's conv cells (the twin's, the fused mirror's, unexplained) and its kernel's worst relative error (APPLY_TOL 1e-5)",

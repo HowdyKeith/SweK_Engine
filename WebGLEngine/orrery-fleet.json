@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "3c816704c76e45b1af3ece614dd5e2ca54197dec",
+ "head": "caf901a66f7fbb39120fe93ab294af676736a7cb",
  "bodies": {
   "box3d": [
    {
@@ -442,8 +442,8 @@
   "male-cns": [
    {
     "path": "brain/gunnerPolicy-selfcheck.mjs",
-    "bytes": 38832,
-    "sha": "a18b77a38bc9a6556b8aae6c388bbd7ea9d8a089"
+    "bytes": 40686,
+    "sha": "caf901a66f7fbb39120fe93ab294af676736a7cb"
    },
    {
     "path": "fly-connectome.html",
@@ -721,8 +721,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3572960,
-    "sha": "2c076c3cb1fd68b554cfd3275502ef08a2ccc64d"
+    "bytes": 3575696,
+    "sha": "2e09c6c93d0f2cff380003674eef0eca57aa08d9"
    },
    {
     "path": "mpm3d.html",
