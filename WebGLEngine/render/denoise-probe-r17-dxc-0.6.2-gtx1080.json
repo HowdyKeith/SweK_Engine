@@ -1,0 +1,353 @@
+{
+ "at": "2026-10-12T15:36:07.951Z",
+ "platform": "win32 10.0.22631 x64",
+ "node": "v24.15.0",
+ "commit": "b4adf47 2026-10-12 Merge remote-tracking branch 'origin/main' into claude/code-review-nr3a0i",
+ "probe": "r17",
+ "sizes": [
+  64,
+  256,
+  1024
+ ],
+ "capSeconds": 180,
+ "nodeWebgpu": {
+  "version": "0.6.2",
+  "from": "C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-webgpu-0.6.2\\node_modules\\webgpu\\index.js",
+  "refused": null,
+  "dxcBeside": true,
+  "dxc": "on"
+ },
+ "native": [
+  {
+   "id": "fast-32",
+   "what": "the fast kernel, 32 -> 32 at 3 x 3: the baseline",
+   "cfg": null,
+   "seconds": 2.125,
+   "dumpFile": "C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-denoise-probe-dump-fast-32.txt",
+   "built": true,
+   "buildMs": 90.47609999999997,
+   "exact": true,
+   "sizes": [
+    {
+     "N": 64,
+     "passMs": 0.101376,
+     "passes": 30,
+     "clock": "device",
+     "exact": true,
+     "detail": "131072 plain, 0 fused, 0 unexplained"
+    },
+    {
+     "N": 256,
+     "passMs": 0.679936,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    },
+    {
+     "N": 1024,
+     "passMs": 9.074688,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    }
+   ],
+   "adapter": "nvidia / pascal / D3D12 driver version 32.0.15.8180",
+   "dump": {
+    "compiler": "DXC (DXIL)",
+    "lines": 1339,
+    "loops": 0,
+    "indexableTemps": 0,
+    "barriers": 4
+   }
+  },
+  {
+   "id": "fast-vec4-32",
+   "what": "the fast kernel, its tile read four channels at a time",
+   "cfg": {
+    "reads": "vec4"
+   },
+   "seconds": 2.303,
+   "dumpFile": "C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-denoise-probe-dump-fast-vec4-32.txt",
+   "built": true,
+   "buildMs": 296.93790000000007,
+   "exact": true,
+   "sizes": [
+    {
+     "N": 64,
+     "passMs": 0.073728,
+     "passes": 30,
+     "clock": "device",
+     "exact": true,
+     "detail": "131072 plain, 0 fused, 0 unexplained"
+    },
+    {
+     "N": 256,
+     "passMs": 0.613376,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    },
+    {
+     "N": 1024,
+     "passMs": 10.917888,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    }
+   ],
+   "adapter": "nvidia / pascal / D3D12 driver version 32.0.15.8180",
+   "dump": {
+    "compiler": "DXC (DXIL)",
+    "lines": 2545,
+    "loops": 0,
+    "indexableTemps": 0,
+    "barriers": 4
+   }
+  },
+  {
+   "id": "fast-unroll-32",
+   "what": "the fast kernel, a block's taps and channels written out, its weights at constant offsets",
+   "cfg": {
+    "unroll": true
+   },
+   "seconds": 3.505,
+   "dumpFile": "C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-denoise-probe-dump-fast-unroll-32.txt",
+   "built": true,
+   "buildMs": 1346.5404,
+   "exact": true,
+   "sizes": [
+    {
+     "N": 64,
+     "passMs": 0.120832,
+     "passes": 30,
+     "clock": "device",
+     "exact": true,
+     "detail": "131072 plain, 0 fused, 0 unexplained"
+    },
+    {
+     "N": 256,
+     "passMs": 0.954368,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    },
+    {
+     "N": 1024,
+     "passMs": 15.650816,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    }
+   ],
+   "adapter": "nvidia / pascal / D3D12 driver version 32.0.15.8180",
+   "dump": {
+    "compiler": "DXC (DXIL)",
+    "lines": 12506,
+    "loops": 0,
+    "indexableTemps": 0,
+    "barriers": 4
+   }
+  },
+  {
+   "id": "fast-vec4-unroll-32",
+   "what": "the fast kernel, both",
+   "cfg": {
+    "reads": "vec4",
+    "unroll": true
+   },
+   "seconds": 3.573,
+   "dumpFile": "C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-denoise-probe-dump-fast-vec4-unroll-32.txt",
+   "built": true,
+   "buildMs": 1413.8225000000002,
+   "exact": true,
+   "sizes": [
+    {
+     "N": 64,
+     "passMs": 0.115712,
+     "passes": 30,
+     "clock": "device",
+     "exact": true,
+     "detail": "131072 plain, 0 fused, 0 unexplained"
+    },
+    {
+     "N": 256,
+     "passMs": 0.913408,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    },
+    {
+     "N": 1024,
+     "passMs": 14.88896,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    }
+   ],
+   "adapter": "nvidia / pascal / D3D12 driver version 32.0.15.8180",
+   "dump": {
+    "compiler": "DXC (DXIL)",
+    "lines": 12636,
+    "loops": 0,
+    "indexableTemps": 0,
+    "barriers": 4
+   }
+  },
+  {
+   "id": "tile2-zero-inline-32",
+   "what": "2 pixels x 8 vec4s, edge zero, weights read where they are used",
+   "cfg": {
+    "px": 2,
+    "g4": 8,
+    "edge": "zero",
+    "weights": "inline"
+   },
+   "seconds": 2.128,
+   "dumpFile": "C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-denoise-probe-dump-tile2-zero-inline-32.txt",
+   "built": true,
+   "buildMs": 249.99440000000004,
+   "exact": true,
+   "sizes": [
+    {
+     "N": 64,
+     "passMs": 0.118784,
+     "passes": 30,
+     "clock": "device",
+     "exact": true,
+     "detail": "131072 plain, 0 fused, 0 unexplained"
+    },
+    {
+     "N": 256,
+     "passMs": 0.54272,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    },
+    {
+     "N": 1024,
+     "passMs": 7.9872,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    }
+   ],
+   "adapter": "nvidia / pascal / D3D12 driver version 32.0.15.8180",
+   "dump": {
+    "compiler": "DXC (DXIL)",
+    "lines": 2029,
+    "loops": 0,
+    "indexableTemps": 0,
+    "barriers": 4
+   }
+  },
+  {
+   "id": "tile4-zero-inline-32",
+   "what": "4 pixels x 4 vec4s, edge zero, weights read where they are used",
+   "cfg": {
+    "px": 4,
+    "g4": 4,
+    "edge": "zero",
+    "weights": "inline"
+   },
+   "seconds": 2.175,
+   "dumpFile": "C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-denoise-probe-dump-tile4-zero-inline-32.txt",
+   "built": true,
+   "buildMs": 242.40300000000002,
+   "exact": true,
+   "sizes": [
+    {
+     "N": 64,
+     "passMs": 0.121856,
+     "passes": 30,
+     "clock": "device",
+     "exact": true,
+     "detail": "131072 plain, 0 fused, 0 unexplained"
+    },
+    {
+     "N": 256,
+     "passMs": 0.668672,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    },
+    {
+     "N": 1024,
+     "passMs": 9.578496,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    }
+   ],
+   "adapter": "nvidia / pascal / D3D12 driver version 32.0.15.8180",
+   "dump": {
+    "compiler": "DXC (DXIL)",
+    "lines": 1952,
+    "loops": 0,
+    "indexableTemps": 0,
+    "barriers": 4
+   }
+  },
+  {
+   "id": "tile1-skip-inline-32",
+   "what": "1 pixel x 8 vec4s, edge skip, weights read where they are used -- section 57's stopped 1 x 8, its weights inline",
+   "cfg": {
+    "px": 1,
+    "g4": 8,
+    "edge": "skip",
+    "weights": "inline"
+   },
+   "seconds": 2.011,
+   "dumpFile": "C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-denoise-probe-dump-tile1-skip-inline-32.txt",
+   "built": true,
+   "buildMs": 159.86540000000008,
+   "exact": true,
+   "sizes": [
+    {
+     "N": 64,
+     "passMs": 0.090112,
+     "passes": 30,
+     "clock": "device",
+     "exact": true,
+     "detail": "131072 plain, 0 fused, 0 unexplained"
+    },
+    {
+     "N": 256,
+     "passMs": 0.579584,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    },
+    {
+     "N": 1024,
+     "passMs": 8.932352,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    }
+   ],
+   "adapter": "nvidia / pascal / D3D12 driver version 32.0.15.8180",
+   "dump": {
+    "compiler": "DXC (DXIL)",
+    "lines": 1345,
+    "loops": 0,
+    "indexableTemps": 0,
+    "barriers": 4
+   }
+  }
+ ],
+ "browser": null
+}
