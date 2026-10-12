@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it. `poolHorizon` (v4816) is the stamp of the first pool entry that run did NOT take: it reached every entry stamped earlier and none stamped at or after it.",
- "at": "2026-10-11T22:00:09.833Z",
+ "at": "2026-10-11T22:08:40.495Z",
  "poolAt": "2026-10-11T00:08:01.399Z",
  "poolHorizon": "2026-10-06T17:10:46.473Z",
  "budgetMs": 3000,
@@ -93,17 +93,17 @@
   },
   {
    "gate": "brain/pilotRoster-selfcheck.mjs",
-   "ms": 22674,
+   "ms": 31155,
    "code": 0,
-   "priorMs": 24249,
-   "at": "2026-10-10T22:58:55.934Z"
+   "priorMs": 22674,
+   "at": "2026-10-11T22:08:19.991Z"
   },
   {
    "gate": "brain/racePlay-selfcheck.mjs",
-   "ms": 18732,
+   "ms": 20282,
    "code": 0,
-   "priorMs": 19015,
-   "at": "2026-10-10T22:59:19.129Z"
+   "priorMs": 18732,
+   "at": "2026-10-11T22:08:40.495Z"
   },
   {
    "gate": "brain/rl/dock-hazard-selfcheck.mjs",
@@ -5092,6 +5092,85 @@
    "code": 0,
    "priorMs": 20014,
    "at": "2026-09-09T17:59:42.840Z"
+  },
+  {
+   "gate": "brain/conv2d-selfcheck.mjs",
+   "ms": 71150,
+   "code": 0,
+   "priorMs": 2161,
+   "at": "2026-10-11T22:02:14.390Z"
+  },
+  {
+   "gate": "brain/convNet-selfcheck.mjs",
+   "ms": 177,
+   "code": 0,
+   "priorMs": 133,
+   "at": "2026-10-08T02:06:24.786Z"
+  },
+  {
+   "gate": "render/denoiseCompile-selfcheck.mjs",
+   "ms": 41017,
+   "code": 0,
+   "at": "2026-10-11T22:07:48.609Z"
+  },
+  {
+   "gate": "render/denoiseDevice-selfcheck.mjs",
+   "ms": 134870,
+   "code": 0,
+   "at": "2026-10-11T22:04:29.477Z"
+  },
+  {
+   "gate": "render/denoiseFilter-selfcheck.mjs",
+   "ms": 266,
+   "code": 0,
+   "priorMs": 257,
+   "at": "2026-10-08T05:57:48.973Z"
+  },
+  {
+   "gate": "render/denoiseMask-selfcheck.mjs",
+   "ms": 2292,
+   "code": 0,
+   "at": "2026-10-08T05:57:45.005Z"
+  },
+  {
+   "gate": "render/denoiseNet-selfcheck.mjs",
+   "ms": 2568,
+   "code": 0,
+   "priorMs": 2108,
+   "at": "2026-10-08T05:57:51.718Z"
+  },
+  {
+   "gate": "render/denoiseScenes-selfcheck.mjs",
+   "ms": 147,
+   "code": 0,
+   "priorMs": 138,
+   "at": "2026-10-08T05:57:45.359Z"
+  },
+  {
+   "gate": "render/denoiseStats-selfcheck.mjs",
+   "ms": 52,
+   "code": 0,
+   "priorMs": 46,
+   "at": "2026-10-08T02:06:19.023Z"
+  },
+  {
+   "gate": "render/denoiseStudy-selfcheck.mjs",
+   "ms": 2240,
+   "code": 0,
+   "priorMs": 2952,
+   "at": "2026-10-08T06:05:26.399Z"
+  },
+  {
+   "gate": "render/denoiseTemporal-selfcheck.mjs",
+   "ms": 1834,
+   "code": 0,
+   "at": "2026-10-08T02:06:18.427Z"
+  },
+  {
+   "gate": "render/denoiseTiming-selfcheck.mjs",
+   "ms": 157656,
+   "code": 0,
+   "at": "2026-10-11T22:07:07.355Z"
   }
  ]
 }

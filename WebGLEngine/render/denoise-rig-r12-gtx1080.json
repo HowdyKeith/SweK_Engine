@@ -1,0 +1,72 @@
+{
+ "at": "2026-10-10T02:39:36.846Z",
+ "platform": "win32 10.0.22631 x64",
+ "node": "v24.15.0",
+ "commit": "1a9926d1 2026-10-10 Denoiser arc, round 12: section 38 -- the first GPU, an Intel gen-9",
+ "only": "denoise",
+ "launchArgs": [
+  "--enable-unsafe-webgpu",
+  "--use-angle=d3d11"
+ ],
+ "gates": [
+  {
+   "gate": "render/denoiseDevice-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 8757,
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": []
+  },
+  {
+   "gate": "render/denoiseTiming-selfcheck.mjs",
+   "category": "timing",
+   "ok": true,
+   "ms": 24829,
+   "adapters": [
+    "nvidia pascal D3D12 driver version 32.0.15.8180",
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "native: adapter nvidia / pascal / D3D12 driver version 32.0.15.8180 (hardware)",
+    "native: 64 x 64: 4.554 ms a pass (10th-90th 4.474-5.137, 30 passes); on the device's clock 4.260 ms; 0.899 Mpx/s; layer 0 0.393, layer 1 1.114, layer 2 1.114, layer 3 1.114, layer 4 0.393, kernel 0.131",
+    "native: 128 x 128: 9.341 ms a pass (10th-90th 8.885-9.680, 30 passes); on the device's clock 8.913 ms; 1.754 Mpx/s; layer 0 0.524, layer 1 1.442, layer 2 1.442, layer 3 1.442, layer 4 3.080, kernel 0.786",
+    "native: 256 x 256: 61.134 ms a pass (10th-90th 60.966-63.516, 24 passes); on the device's clock 60.686 ms; 1.072 Mpx/s; layer 0 1.704, layer 1 4.784, layer 2 4.784, layer 3 4.784, layer 4 39.584, kernel 4.719",
+    "native: 512 x 512: 240.518 ms a pass (10th-90th 238.518-259.894, 7 passes); on the device's clock 239.862 ms; 1.090 Mpx/s; layer 0 6.554, layer 1 18.940, layer 2 19.005, layer 3 19.005, layer 4 156.303, kernel 19.399",
+    "native: 1024 x 1024: 978.526 ms a pass (10th-90th 976.591-979.406, 3 passes); on the device's clock 978.125 ms; 1.072 Mpx/s; layer 0 25.559, layer 1 75.432, layer 2 75.497, layer 3 74.383, layer 4 649.921, kernel 76.808",
+    "native: 1920 x 1080 skipped -- predicted 1935 ms a pass, over the 1500 ms cap",
+    "page: adapter nvidia / pascal (hardware)",
+    "page: 64 x 64: 5.700 ms a pass (10th-90th 5.300-6.300, 30 passes); on the device's clock 4.626 ms; 0.719 Mpx/s; layer 0 0.433, layer 1 1.238, layer 2 1.238, layer 3 1.238, layer 4 0.396, kernel 0.079",
+    "page: 128 x 128: 9.700 ms a pass (10th-90th 9.100-10.200, 30 passes); on the device's clock 8.320 ms; 1.689 Mpx/s; layer 0 0.599, layer 1 1.511, layer 2 1.511, layer 3 1.512, layer 4 2.592, kernel 0.510",
+    "page: 256 x 256: 61.100 ms a pass (10th-90th 60.100-62.100, 30 passes); on the device's clock 59.680 ms; 1.073 Mpx/s; layer 0 1.781, layer 1 4.972, layer 2 4.979, layer 3 5.061, layer 4 39.693, kernel 2.774",
+    "page: 512 x 512: 235.500 ms a pass (10th-90th 232.600-237.600, 9 passes); on the device's clock 234.523 ms; 1.113 Mpx/s; layer 0 7.083, layer 1 20.099, layer 2 20.282, layer 3 19.943, layer 4 155.765, kernel 10.373",
+    "page: 1024 x 1024: 948.600 ms a pass (10th-90th 946.800-950.600, 3 passes); on the device's clock 947.053 ms; 1.105 Mpx/s; layer 0 27.915, layer 1 76.602, layer 2 77.383, layer 3 77.548, layer 4 650.077, kernel 37.285",
+    "page: 1920 x 1080 skipped -- predicted 1877 ms a pass, over the 1500 ms cap"
+   ]
+  }
+ ],
+ "adapters": [
+  {
+   "name": "nvidia pascal",
+   "software": false,
+   "launchArgs": [
+    "--enable-unsafe-webgpu",
+    "--use-angle=d3d11"
+   ]
+  },
+  {
+   "name": "nvidia pascal D3D12 driver version 32.0.15.8180",
+   "software": false,
+   "launchArgs": [
+    "node-webgpu (native)"
+   ]
+  }
+ ],
+ "verdict": "a real-hardware run on nvidia pascal; nvidia pascal D3D12 driver version 32.0.15.8180",
+ "summary": "exact 1/1, quality 0/0, timing 1/1"
+}

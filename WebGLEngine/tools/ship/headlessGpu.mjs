@@ -183,6 +183,15 @@ export function resolveWebgpu(requireFn) {
 }
 
 /**
+ * The flag that gives a native device an unrounded clock (the denoiser arc, section 61). Dawn rounds every timestamp query
+ * down to a whole 65,536 ns unless its device toggle timestamp_quantization is off. Measured on SwiftShader here: every
+ * timestamp's low 16 bits zero by default, and not with this flag. Round 17's native times were all whole multiples of
+ * 65,536 ns on both of the rig's GPUs (section 60). Chrome launched with --enable-unsafe-webgpu does not round. A caller that
+ * times passes on the device's clock hands this to mod.create(); a caller that does not leaves Dawn's default.
+ */
+export const FINE_CLOCK_FLAG = "disable-dawn-features=timestamp_quantization";
+
+/**
  * Why a caller cannot run, or null when it can. Two independent facts reported on their own evidence rather
  * than collapsed into one guess -- browserSkipReason's rule, for the same reason it exists there.
  *

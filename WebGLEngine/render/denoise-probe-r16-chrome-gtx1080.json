@@ -1,0 +1,120 @@
+{
+ "at": "2026-10-11T14:31:26.481Z",
+ "platform": "win32 10.0.22631 x64",
+ "node": "v24.15.0",
+ "commit": "497e743f 2026-10-11 Denoiser arc, section 57 -- round 16 closed: FXC builds no tile shape at 32 inputs on either GPU, so",
+ "capSeconds": 180,
+ "native": [],
+ "browser": {
+  "ok": true,
+  "pageErrors": [],
+  "adapter": "nvidia / pascal",
+  "error": null,
+  "rows": [
+   {
+    "id": "fast-32",
+    "built": true,
+    "buildMs": 94.69999998807907,
+    "passMs": 0.103424,
+    "passes": 30,
+    "clock": "device",
+    "exact": true,
+    "detail": "131072 plain, 0 fused, 0 unexplained"
+   },
+   {
+    "id": "tile2-zero-32",
+    "built": true,
+    "buildMs": 255.09999999403954,
+    "passMs": 0.13824,
+    "passes": 30,
+    "clock": "device",
+    "exact": true,
+    "detail": "131072 plain, 0 fused, 0 unexplained"
+   },
+   {
+    "id": "tile4-zero-32",
+    "built": true,
+    "buildMs": 326.09999999403954,
+    "passMs": 0.18944,
+    "passes": 30,
+    "clock": "device",
+    "exact": true,
+    "detail": "131072 plain, 0 fused, 0 unexplained"
+   },
+   {
+    "id": "tile2g4-zero-32",
+    "built": true,
+    "buildMs": 164.5,
+    "passMs": 0.218112,
+    "passes": 30,
+    "clock": "device",
+    "exact": true,
+    "detail": "131072 plain, 0 fused, 0 unexplained"
+   },
+   {
+    "id": "tile2-zero-10",
+    "built": true,
+    "buildMs": 271,
+    "passMs": 0.106496,
+    "passes": 30,
+    "clock": "device",
+    "exact": true,
+    "detail": "131072 plain, 0 fused, 0 unexplained"
+   },
+   {
+    "id": "tile4-zero-10",
+    "built": true,
+    "buildMs": 272.30000001192093,
+    "passMs": 0.186368,
+    "passes": 30,
+    "clock": "device",
+    "exact": true,
+    "detail": "131072 plain, 0 fused, 0 unexplained"
+   },
+   {
+    "id": "tile1-skip-32",
+    "built": true,
+    "buildMs": 175.2000000178814,
+    "passMs": 0.4096,
+    "passes": 30,
+    "clock": "device",
+    "exact": true,
+    "detail": "131072 plain, 0 fused, 0 unexplained"
+   },
+   {
+    "id": "tile2g4-skip-32",
+    "built": true,
+    "buildMs": 196.40000000596046,
+    "passMs": 0.438272,
+    "passes": 30,
+    "clock": "device",
+    "exact": true,
+    "detail": "131072 plain, 0 fused, 0 unexplained"
+   },
+   {
+    "id": "tile2-skip-32",
+    "built": true,
+    "buildMs": 325.5,
+    "passMs": 0.5888,
+    "passes": 30,
+    "clock": "device",
+    "exact": true,
+    "detail": "131072 plain, 0 fused, 0 unexplained"
+   },
+   {
+    "id": "tile4-skip-32",
+    "built": true,
+    "buildMs": 356.2000000178814,
+    "passMs": 0.68608,
+    "passes": 30,
+    "clock": "device",
+    "exact": true,
+    "detail": "131072 plain, 0 fused, 0 unexplained"
+   }
+  ]
+ },
+ "browserLaunchArgs": [
+  "--enable-unsafe-webgpu",
+  "--use-angle=d3d11"
+ ]
+}

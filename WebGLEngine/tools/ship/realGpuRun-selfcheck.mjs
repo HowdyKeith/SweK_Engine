@@ -8,10 +8,12 @@
 // the one a real-hardware run turns around. SWEK_LAUNCH_ARGS reaches the browser, as the doc tells a Linux GPU owner to use it.
 "use strict";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { gateList, categorize, parseRows, verdict, runGates, runLaunchArgs, probeSoftwareGl, softwareGlLines, TREE_SOFTWARE_GL,
-         probeNativeAdapters, nativeAdapterLines, RETIRED_SOFTWARE_GL, TREE_SOFTWARE_WEBGPU, SOFTWARE_GL_CANDIDATES } from "./realGpuRun.mjs";
+         probeNativeAdapters, nativeAdapterLines, GATE_TIMEOUT_MS, RETIRED_SOFTWARE_GL, TREE_SOFTWARE_WEBGPU, SOFTWARE_GL_CANDIDATES } from "./realGpuRun.mjs";
 import { webgpuSkipReason, launchArgsFor, hardwareArgsFor, parityArgsFor, HARDWARE_ARGS, softwareClaims } from "./webgpuHarness.mjs";
 import { gateReport } from "./gateReport.mjs";
 const GR = gateReport("tools/ship/realGpuRun-selfcheck.mjs");
@@ -24,13 +26,17 @@ console.log("\n1. WHAT THE RUN COVERS, AND HOW IT SORTS IT");
 const gates = gateList(ENG);
 const fsr = fs.readdirSync(path.join(ENG, "fx/fsr")).filter((f) => f.endsWith("-selfcheck.mjs")).length;
 const tsl = fs.readdirSync(path.join(ENG, "render")).filter((f) => /Tsl.*-selfcheck\.mjs$/.test(f)).length;
-ok(`every fx/fsr gate (${fsr}), every render/*Tsl* gate (${tsl}) and the translucent layer's: ${gates.length} gates`,
-   gates.length === fsr + tsl + 1 && gates.includes("render/translucentLayer-selfcheck.mjs") && gates.includes("render/temporalTslCompute-selfcheck.mjs"));
+ok(`every fx/fsr gate (${fsr}), every render/*Tsl* gate (${tsl}), the translucent layer's and the denoiser's three: ${gates.length} gates`,
+   gates.length === fsr + tsl + 4 && gates.includes("render/translucentLayer-selfcheck.mjs") && gates.includes("render/temporalTslCompute-selfcheck.mjs") &&
+   gates.includes("render/denoiseDevice-selfcheck.mjs") && gates.includes("render/denoiseTiming-selfcheck.mjs") && gates.includes("render/denoiseCompile-selfcheck.mjs"));
+ok(`  ...and each may run ${GATE_TIMEOUT_MS / 60000} minutes -- the rig's Intel took 498 s over one denoiser gate when the cap was 600 s (section 42)`,
+   GATE_TIMEOUT_MS >= 3 * 498000);
 const kinds = Object.fromEntries(gates.map((g) => [g, categorize(fs.readFileSync(path.join(ENG, g), "utf8"))]));
 const of = (k) => gates.filter((g) => kinds[g] === k);
 ok(`sorted by the doc's rule -- a clock read is timing, a dB grade quality, the rest exact: timing ${of("timing").length} (${of("timing").map((g) => path.basename(g, "-selfcheck.mjs")).join(", ")}), quality ${of("quality").length}, exact ${of("exact").length}`,
    kinds["fx/fsr/fsr3LiveClock-selfcheck.mjs"] === "timing" && kinds["fx/fsr/fsrFlowCost-selfcheck.mjs"] === "timing" && kinds["fx/fsr/fsrFrameGen-selfcheck.mjs"] === "quality" &&
-   kinds["render/opticalFlowTsl-selfcheck.mjs"] === "exact" && kinds["render/temporalTslZoo-selfcheck.mjs"] === "exact");
+   kinds["render/opticalFlowTsl-selfcheck.mjs"] === "exact" && kinds["render/temporalTslZoo-selfcheck.mjs"] === "exact" &&
+   kinds["render/denoiseTiming-selfcheck.mjs"] === "timing" && kinds["render/denoiseDevice-selfcheck.mjs"] === "exact" && kinds["render/denoiseCompile-selfcheck.mjs"] === "timing");
 ok("  ...and the rule on text: a clock is timing even beside dB, dB is quality, neither is exact",
    categorize("const t = performance.now(); // 3 dB") === "timing" && categorize("Math.log10(1 / mse)") === "quality" && categorize("same vector at every block") === "exact");
 const rows = parseRows("\n1. X\n  PASS  a\n  FAIL  *** b wrong ***   detail\n  ----  belt8: 12.3 dB\n\nFAIL -- 1 check(s)\n");
@@ -39,6 +45,20 @@ ok(`the tree's row format read: a failing row and not the summary, a measured li
 ok("the verdict leads with a software adapter, and names a hardware one",
    /NOT A REAL-HARDWARE RUN/.test(verdict({ adapters: [{ name: "google swiftshader", software: true }] })) && /NO ADAPTER/.test(verdict({ adapters: [] })) &&
    verdict({ adapters: [{ name: "nvidia ampere", software: false }] }) === "a real-hardware run on nvidia ampere");
+{   // *** denoiser round 12, on the rig: `--only denoise` on a checkout without those gates ran none, read "NO ADAPTER WAS
+    // SEEN" and exited 0. *** The CLI itself, asked for a gate no checkout has: it must say so, name the commit, and exit 1.
+    const tmp = path.join(os.tmpdir(), `swek-realgpu-empty-${process.pid}.json`);
+    const r = spawnSync(process.execPath, ["tools/ship/realGpuRun.mjs", "--only", "no-such-gate-anywhere", "--out", tmp], { cwd: ENG, encoding: "utf8", timeout: 60000 });
+    const rep = fs.existsSync(tmp) ? JSON.parse(fs.readFileSync(tmp, "utf8")) : null;
+    try { fs.unlinkSync(tmp); } catch {}
+    const head = spawnSync("git", ["log", "-1", "--format=%h"], { cwd: ENG, encoding: "utf8" }).stdout.trim();
+    ok(`!! *** an --only that matches no gate is said first and exits non-zero: exit ${r.status}, "${(rep && rep.verdict || "").slice(0, 90)}..." ***`,
+       r.status === 1 && !!rep && rep.gates.length === 0 && rep.only === "no-such-gate-anywhere" &&
+       /^\*\*\* NO GATE MATCHED --only "no-such-gate-anywhere": NOTHING RAN/.test(rep.verdict) && /NO GATE MATCHED/.test(r.stdout || "") && !/NO ADAPTER/.test(r.stdout || ""),
+       (r.stderr || "").split("\n")[0].slice(0, 120));
+    ok(`  ...and the report and the log name the checkout's commit: "${rep && rep.commit}"`,
+       !!rep && !!head && String(rep.commit).startsWith(head + " ") && rep.verdict.includes(`(${head} `) && (r.stdout || "").includes("on " + rep.commit));
+}
 
 console.log("\n2. ON THIS BOX: a run of two gates, and what it says it ran on");
 const skip = webgpuSkipReason();
@@ -235,6 +255,12 @@ console.log("\n5. RIG RUN 9: WHICH ADAPTER node-webgpu HANDS OUT, PER WAY OF ASK
 // runGates not handing SWEK_LAUNCH_ARGS to the child -> 1 red, the plumbing row ("launched with --enable-unsafe-webgpu").
 // That row's first draft passed under R8: on Linux HARDWARE_ARGS is LAUNCH_ARGS, so it now hands the run a third set. All
 // four restored, md5 verified.
+// DENOISER ROUND 12, ON THE RIG (an --only that matched nothing read "NO ADAPTER WAS SEEN" and exited 0). Against
+// tools/ship/realGpuRun.mjs: E1 the CLI's exit code back to every-gate-ok, which an empty list satisfies -> 1 red, the
+// empty-selection row ("exit 0"); E2 the empty-selection verdict removed -> 2 red, both rows ("NO ADAPTER WAS SEEN"); E3 the
+// commit not recorded -> 1 red, the commit row ("null"). All three restored, md5 verified.
+// DENOISER ROUND 14 (section 42: the Intel took 498 s over one gate against a 600 s cap). Against tools/ship/realGpuRun.mjs: T1
+// GATE_TIMEOUT_MS back to 600000 -> 1 red, the cap row. Restored, md5 verified.
 {
     const w = GR.write();
     console.log("\n  ----  gate report: " + (w.written ? "written to " + w.file : w.why) +

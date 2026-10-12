@@ -1,0 +1,60 @@
+info:
+// Dumped WGSL:
+
+struct FP { H: u32, W: u32, pad0: u32, pad1: u32, b: array<vec4<f32>, 8>, w: array<vec4<f32>, 720> };
+@group(0) @binding(0) var<storage, read_write> Y: array<f32>;   // H x W x 32
+@group(0) @binding(1) var<uniform> F: FP;                        // packTileUniforms
+@group(0) @binding(2) var<storage, read>       X: array<f32>;   // H x W x 10
+var<workgroup> T: array<f32, 1440>;
+@compute @workgroup_size(8, 8, 1)
+fn k_conv_tile(@builtin(local_invocation_id) lid: vec3<u32>, @builtin(workgroup_id) wid: vec3<u32>) {
+    let ox = i32(wid.x * 16u) - 1; let oy = i32(wid.y * 8u) - 1;
+    let py = wid.y * 8u + lid.y; let g = wid.z;
+    // pixel p of this thread: column p * 8 + lid.x of the tile
+    let x0 = wid.x * 16u + 0u + lid.x; let x1 = wid.x * 16u + 8u + lid.x;
+    var a0_0 = F.b[g * 8u + 0u]; var a0_1 = F.b[g * 8u + 1u]; var a0_2 = F.b[g * 8u + 2u]; var a0_3 = F.b[g * 8u + 3u]; var a0_4 = F.b[g * 8u + 4u]; var a0_5 = F.b[g * 8u + 5u]; var a0_6 = F.b[g * 8u + 6u]; var a0_7 = F.b[g * 8u + 7u];
+    var a1_0 = F.b[g * 8u + 0u]; var a1_1 = F.b[g * 8u + 1u]; var a1_2 = F.b[g * 8u + 2u]; var a1_3 = F.b[g * 8u + 3u]; var a1_4 = F.b[g * 8u + 4u]; var a1_5 = F.b[g * 8u + 5u]; var a1_6 = F.b[g * 8u + 6u]; var a1_7 = F.b[g * 8u + 7u];
+    for (var c0 = 0u; c0 < 10u; c0 = c0 + 8u) {
+        let nb = min(8u, 10u - c0);
+        for (var i = lid.y * 8u + lid.x; i < 180u * nb; i = i + 64u) {
+            let cj = i % nb; let t = i / nb; let sx = ox + i32(t % 18u); let sy = oy + i32(t / 18u);
+            var v = 0.0;
+            if (sx >= 0 && sx < i32(F.W) && sy >= 0 && sy < i32(F.H)) { v = X[(u32(sy) * F.W + u32(sx)) * 10u + c0 + cj]; }
+            T[i] = v;
+        }
+        workgroupBarrier();
+        if (py < F.H) {
+            for (var ky = 0u; ky < 3u; ky = ky + 1u) {
+                let sy = i32(py) + i32(ky) - 1;
+                if (sy < 0 || sy >= i32(F.H)) { continue; }
+                for (var kx = 0u; kx < 3u; kx = kx + 1u) {
+                    // where pixel p reads the tap in the tile: zero there when it is outside the image
+                    let t0 = ((lid.y + ky) * 18u + 0u + lid.x + kx) * nb;
+                    let t1 = ((lid.y + ky) * 18u + 8u + lid.x + kx) * nb;
+                    let wb = ((ky * 3u + kx) * 10u + c0) * 8u + g * 8u;
+                    {
+                        for (var cj = 0u; cj < nb; cj = cj + 1u) {
+                            let v0 = T[t0 + cj]; let v1 = T[t1 + cj];
+                            let w = wb + cj * 8u;
+                            let w0 = F.w[w + 0u]; a0_0 = a0_0 + v0 * w0; a1_0 = a1_0 + v1 * w0;
+                            let w1 = F.w[w + 1u]; a0_1 = a0_1 + v0 * w1; a1_1 = a1_1 + v1 * w1;
+                            let w2 = F.w[w + 2u]; a0_2 = a0_2 + v0 * w2; a1_2 = a1_2 + v1 * w2;
+                            let w3 = F.w[w + 3u]; a0_3 = a0_3 + v0 * w3; a1_3 = a1_3 + v1 * w3;
+                            let w4 = F.w[w + 4u]; a0_4 = a0_4 + v0 * w4; a1_4 = a1_4 + v1 * w4;
+                            let w5 = F.w[w + 5u]; a0_5 = a0_5 + v0 * w5; a1_5 = a1_5 + v1 * w5;
+                            let w6 = F.w[w + 6u]; a0_6 = a0_6 + v0 * w6; a1_6 = a1_6 + v1 * w6;
+                            let w7 = F.w[w + 7u]; a0_7 = a0_7 + v0 * w7; a1_7 = a1_7 + v1 * w7;
+                        }
+                    }
+                }
+            }
+        }
+        workgroupBarrier();
+    }
+    if (py >= F.H) { return; }
+    let c = g * 32u;
+    if (x0 < F.W) {
+        let o = (py * F.W + x0) * 32u;
+        a0_0 = max(a0_0, vec4<f32>(0.0)); if (c + 0u < 32u) { Y[o + c + 0u] = a0_0.x; } if (c + 1u < 32u) { Y[o + c + 1u] = a0_0.y; } if (c + 2u < 32u) { Y[o + c + 2u] = a0_0.z; } if (c + 3u < 32u) { Y[o + c + 3u] = a0_0.w; }
+        a0_1 = max(a0_1, vec4<f32>(0.0)); if (c + 4u < 32u) { Y[o + c + 4u] = a0_1.x; } if (c + 5u < 32u) { Y[o + c + 5u] = a0_1.y; } if (c + 6u < 32u) { Y[o + c + 6u] = a0_1.z; } if (c + 7u < 32u) { Y[o + c + 7u] = a0_1.w; }
+        a0_2 = max(a0_2, vec4<f32>(0.0)); if (c + 8u < 32u) { Y[o + c + 8u] = a0_2.x; } if (c + 9u < 32u) { Y[o + c + 9u] = a0_2.y; } if
