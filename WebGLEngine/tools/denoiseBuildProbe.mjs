@@ -53,7 +53,8 @@ if (args.includes("--child")) {
         H.configureVulkanIcd();
         // section 61: the device's clock unrounded -- round 17's native times were all whole multiples of 65,536 ns (section 60)
         // section 64: one entry per key -- the fine clock's disable entry and --dxc off's merged, as the compile gate's children
-        const { mod } = H.resolveWebgpu(), gpu = mod.create(dawnFlags([...DXC_FLAGS, H.FINE_CLOCK_FLAG]));
+        const W = H.resolveWebgpu(); if (W.refused) throw new Error(W.refused);
+        const gpu = W.mod.create(dawnFlags([...DXC_FLAGS, H.FINE_CLOCK_FLAG]));
         const v = SHAPES.find((x) => x.id === id), a = await gpu.requestAdapter(), info = a.info || {};
         const dev = await a.requestDevice({ requiredFeatures: a.features.has("timestamp-query") ? ["timestamp-query"] : [], // a device that can hold the largest size's buffers (a 32-channel layer at 1024 x 1024 is 128 MiB a buffer): storage
         // limits only, spelled out so tools/ship/wgslSpec-selfcheck.mjs can read that no workgroup limit is raised

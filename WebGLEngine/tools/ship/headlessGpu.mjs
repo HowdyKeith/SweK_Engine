@@ -184,7 +184,10 @@ export const WEBGPU_ENV = "SWEK_WEBGPU";
 export function resolveWebgpu(requireFn, env = process.env) {
     const req = requireFn || createRequire(import.meta.url);
     if (env[WEBGPU_ENV]) {
-        const m = path.join(path.resolve(env[WEBGPU_ENV]), "index.js");
+        // an absolute path only: a relative one resolves against each process's own working directory, and the denoiser's
+        // children run from the engine root -- so a parent and its children could load two packages (review of section 64)
+        if (!path.isAbsolute(env[WEBGPU_ENV])) return { mod: null, from: "", refused: `${WEBGPU_ENV}=${env[WEBGPU_ENV]} is not an absolute path; give the package directory in full` };
+        const m = path.join(env[WEBGPU_ENV], "index.js");
         try { const mod = req(m); if (mod && typeof mod.create === "function") return { mod, from: m }; } catch { /* refused below */ }
         return { mod: null, from: "", refused: `${WEBGPU_ENV}=${env[WEBGPU_ENV]} holds no node-webgpu package (tried ${m}); unset it to use the list` };
     }

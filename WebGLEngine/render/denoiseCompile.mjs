@@ -256,19 +256,18 @@ export function dawnFlags(flags = []) {
 }
 
 /**
- * Which native compiler runs a box can make, from what it has (round 19's probe, section 64).
+ * Which native compiler runs a box can make, from what its node-webgpu package is (round 19's probe, section 64).
  *   - "as shipped": always -- Dawn's own choice, which the dump names.
- *   - node-webgpu 0.6.2 ships dxcompiler.dll beside dawn.node (`dxcBeside`), and its Dawn loads it: "use_dxc" asks for DXC
- *     and "use_dxc off" forbids it, so FXC and DXC are timed from ONE package and A1 (section 43) can be read off a single
- *     run. Nothing is copied: the package's own compiler is the one measured, and a DLL from elsewhere is not mixed in.
- *   - an older package with no compiler of its own, on a box that keeps DXC's two DLLs elsewhere (`dxcDir`, findDxc): the
- *     section 43 run, its DLLs copied beside dawn.node for that run alone (0.6.0's Dawn never loaded them -- sections 52-53).
+ *   - node-webgpu 0.6.2 ships dxcompiler.dll beside dawn.node (`dxcBeside`) and was built with DAWN_USE_BUILT_DXC: "use_dxc"
+ *     asks for DXC and "use_dxc off" forbids it, so FXC and DXC are timed from ONE package and A1 (section 43) is read off a
+ *     single run. Nothing is copied: the package's own compiler is the one measured.
+ *   - a package with no DXC of its own (0.6.0, 0.6.1): as shipped alone. Their Dawn was built without DXC and FORCES use_dxc
+ *     off, whatever DLLs are put beside it, so section 43's copied-DLL run was always FXC under another name -- which is why
+ *     sections 52-53 read DXBC (section 64, from Dawn's source at each package's revision). That run is retired.
  *   - not D3D12: as shipped alone (the native backend compiles to SPIR-V).
  */
-export function nativeModes({ win = false, dawnDir = null, dxcBeside = false, dxcDir = null } = {}) {
+export function nativeModes({ win = false, dawnDir = null, dxcBeside = false } = {}) {
     const modes = [{ name: "as shipped", flags: [] }];
-    if (!win || !dawnDir) return modes;
-    if (dxcBeside) return [...modes, { name: "use_dxc", flags: ["enable-dawn-features=use_dxc"] }, { name: "use_dxc off", flags: ["disable-dawn-features=use_dxc"] }];
-    if (dxcDir) return [...modes, { name: "use_dxc", flags: ["enable-dawn-features=use_dxc"], dxc: dxcDir }];
-    return modes;
+    if (!win || !dawnDir || !dxcBeside) return modes;
+    return [...modes, { name: "use_dxc", flags: ["enable-dawn-features=use_dxc"] }, { name: "use_dxc off", flags: ["disable-dawn-features=use_dxc"] }];
 }
