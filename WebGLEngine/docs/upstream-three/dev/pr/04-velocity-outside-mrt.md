@@ -29,8 +29,8 @@ Related issue: #<issue number>
 
 **Description**
 
-A material that draws `velocity` itself (as its `colorNode`, outside an MRT) gets no previous position for skinning, instancing, batching or morphing: `needsPreviousData()` looks only at the renderer's MRT and the object's `useVelocity` flag.
+A material that draws `velocity` itself (as its `colorNode`, outside an MRT) gets no previous position for skinning, instancing, batching or morphing: `needsPreviousData()` looks only at the renderer's MRT.
 
 `needsPreviousData()` now also looks through the material's own nodes for a `VelocityNode`, once per build.
 
-Tested with the issue's reproduction, headless Chromium with SwiftShader, on WebGPU and on the WebGL 2 backend: `drawn` reads 1.871 px on `dev` and 5.612 with this patch, as `mrt` (the same mesh through the MRT) does on both. `npm run lint` is clean with this patch. With this patch and the fifteen others I am filing applied together on `dev`, the unit tests give what `dev` gives (1524 passed, 1 todo, 0 failed), and every e2e example's outcome is the same as on `dev`, on WebGPU and on the WebGL 2 backend.
+Tested with the issue's reproduction, headless Chromium with SwiftShader, on WebGPU and on the WebGL 2 backend: `drawn` reads 1.871 px on `dev` and 5.612 with this patch, as `mrt` (the same mesh through the MRT) does on both. `npm run lint` is clean with this patch. With this patch and the fifteen others I am filing applied together on `dev`, the unit tests give what `dev` gives (1891 passed, 1 todo, 2 failed), the GPU-native TSL tests included -- 169 on WebGPU and 169 on the WebGL 2 backend, run headless under SwiftShader; the two failures are `dev`'s own on that device, the same on both -- and every e2e example's outcome is the same as on `dev`, on WebGPU and on the WebGL 2 backend.

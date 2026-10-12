@@ -896,8 +896,32 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4827 -- 1937 -> 1939 for brain/roster-selfcheck.mjs and brain/racePlay-selfcheck.mjs. usesOk, definesOk and nameFirst each by two; the rest hold (the drift row named exactly these four).
     // v4830 -- 1940 -> 1942 for brain/pilotRoster-selfcheck.mjs and brain/pilot6dofPolicy-selfcheck.mjs, over v4829's murmurParity-selfcheck.mjs (1939 -> 1940). usesOk, definesOk and nameFirst each by two; the rest hold (the drift row named exactly these four).
     // v4831 -- 1942 -> 1944 for tools/ship/publishHygiene-selfcheck.mjs and tools/ship/brainStages-selfcheck.mjs. usesOk, definesOk and nameFirst each by two; the rest hold (the drift row named exactly these four).
-    gates: 1944, usesOk: 1923, definesOk: 1915, importsOk: 0,
-    distinctDefinitions: 42, nameFirst: 1815, condFirst: 97, unknownSignature: 11,
+    // v4834 -- 1944 -> 1945 for tools/ship/reportFresh-selfcheck.mjs. usesOk, definesOk and nameFirst each by one; the rest hold (the drift row named exactly these four).
+    // v4835 -- 1945 -> 1946 for tools/ship/afterVerdict-selfcheck.mjs, on main. usesOk, definesOk and nameFirst each by one.
+    // v4837 -- 1946 -> 1949 for this round's tools/ship/poolWatch-selfcheck.mjs, tools/ship/sysLagReading-selfcheck.mjs and tools/ship/train6dofPilot-selfcheck.mjs (v4836 added no gate file). usesOk, definesOk and nameFirst each by three more; the rest hold (the drift row named exactly these four).
+    // the denoiser arc, round 1 -- 1930 -> 1931 for brain/conv2d-selfcheck.mjs. usesOk, definesOk and nameFirst each by
+    // one; the rest hold (the gate's own drift row named exactly these four).
+    // the denoiser arc, round 2 -- 1931 -> 1937 for the six gates of render/denoiseScenes, denoiseFilter, denoiseStats,
+    // denoiseNet, denoiseStudy and brain/convNet. usesOk, definesOk and nameFirst each by six; the rest hold.
+    // the denoiser arc, round 4 -- 1937 -> 1938 for render/denoiseTemporal-selfcheck.mjs. usesOk, definesOk and nameFirst
+    // each by one; the rest hold (the gate's own drift row named exactly these four).
+    // the denoiser arc, round 6 -- 1938 -> 1939 for render/denoiseMask-selfcheck.mjs. usesOk, definesOk and nameFirst each
+    // by one; the rest hold (the gate's own drift row named exactly these four).
+    // the denoiser arc, round 7 -- 1939 -> 1940 for render/denoiseCache-selfcheck.mjs. usesOk, definesOk and nameFirst each
+    // by one; the rest hold (the gate's own drift row named exactly these four).
+    // the denoiser arc, round 9 -- 1940 -> 1941 for render/denoisePool-selfcheck.mjs. usesOk, definesOk and nameFirst each
+    // by one; the rest hold (the gate's own drift row named exactly these four).
+    // the denoiser arc, round 12 -- 1941 -> 1942 for render/denoiseDevice-selfcheck.mjs. usesOk, definesOk and nameFirst
+    // each by one; the rest hold (the gate's own drift row named exactly these four).
+    // the denoiser arc, round 12 again -- 1942 -> 1943 for render/denoiseTiming-selfcheck.mjs, the rig's timing; the same four.
+    // the denoiser arc, round 14 -- 1943 -> 1944 for render/denoiseCompile-selfcheck.mjs, where the native time goes; the same four.
+    // v4838 -- THE DENOISER ARC'S MERGE: main's 1949 plus the arc's fourteen gates since the v4818 split, RE-DERIVED BY RUNNING census() OVER THE MERGED TREE:
+    // gates, usesOk, definesOk and nameFirst each by fourteen (1949 -> 1963, 1928 -> 1942, 1920 -> 1934, 1820 -> 1834); the other rows hold.
+    // v4840 -- and this line's wasmDoors-selfcheck.mjs (the computed-door census, split out of wasmTeardown-selfcheck at step 4b):
+    // gates, usesOk, definesOk and nameFirst each by one more.
+    // v4842 -- MAIN'S v4838 (THE DENOISER ARC) MERGED WITH THIS LINE'S v4838-v4841: RE-DERIVED by census() over the merged tree.
+    gates: 1967, usesOk: 1946, definesOk: 1938, importsOk: 0,
+    distinctDefinitions: 42, nameFirst: 1838, condFirst: 97, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

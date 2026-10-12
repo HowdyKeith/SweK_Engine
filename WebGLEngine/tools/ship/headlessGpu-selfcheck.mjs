@@ -13,6 +13,8 @@
 // a PASS on a process that died. That is checked by SPAWNING BOTH SHAPES and reading both exit codes, because
 // a mitigation nobody has watched fail is not known to be doing anything.
 "use strict";
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -86,6 +88,30 @@ sec("1. THE DRIVER IS DISCOVERED, NOT HARDCODED -- AND IT COMES OUT OF THE BROWS
     ok(HG.WEBGPU_PATHS.length > 1 && HG.WEBGPU_PATHS[0] === "webgpu",
        "the resolver is a LIST tried in order, per playwrightResolve.mjs's rule",
        "three gates each grew their own guess once and two went stale on the same box");
+    // round 19's probe (the denoiser arc, section 64): SWEK_WEBGPU runs another package from one console, and a name that does
+    // not resolve is REFUSED -- a run that asked for 0.6.2 and measured the global 0.6.0 would file one package's numbers
+    // under the other's name. Driven with this box's own package, whatever its version, and with an empty directory.
+    // SABOTAGES (round 19's probe, each restored by copy): the refusal replaced by a fall-through to the list -> this row red
+    // alone; a relative path accepted -> this row red alone; webgpuPackage back to path.dirname(from) -> the next row red alone. The first draft of both rows passed their
+    // NAME as the condition -- this file's ok() takes the condition first -- and printed "PASS true" whatever they held.
+    const here = HG.webgpuPackage(HG.resolveWebgpu().from);
+    const viaEnv = here ? HG.resolveWebgpu(undefined, { [HG.WEBGPU_ENV]: here.dir }) : { from: "" };
+    const emptyDir = fs.mkdtempSync(path.join(os.tmpdir(), "swek-webgpu-none-"));
+    const bad = HG.resolveWebgpu(undefined, { [HG.WEBGPU_ENV]: emptyDir });
+    ok(!!here && !!viaEnv.mod && path.normalize(viaEnv.from) === path.join(here.dir, "index.js") &&
+       bad.mod === null && bad.from === "" && /holds no node-webgpu package/.test(bad.refused || "") &&
+       HG.headlessGpuSkipReason(undefined, { [HG.WEBGPU_ENV]: emptyDir }) === bad.refused &&
+       /not an absolute path/.test(HG.resolveWebgpu(undefined, { [HG.WEBGPU_ENV]: "node_modules/webgpu" }).refused || ""),
+       "SWEK_WEBGPU names a package directory and is tried first; one that holds no package, or is not absolute, is REFUSED, not passed over to the list",
+       `${here ? "node-webgpu " + here.version + " at " + here.dir : "no package here"}; an empty directory: ${bad.refused || "NOT refused"}`);
+    try { fs.rmSync(emptyDir, { recursive: true, force: true }); } catch {}
+    const fakeReq = { resolve: (m) => (m === "webgpu" ? path.join("/pk", "node_modules", "webgpu", "index.js") : null) };
+    const fp = HG.webgpuPackage("webgpu", fakeReq, { platform: "win32", arch: "x64", read: () => JSON.stringify({ name: "webgpu", version: "0.6.2" }),
+                                                     exists: (f) => f === path.join("/pk", "node_modules", "webgpu", "dist", "win32-x64", "dxcompiler.dll") });
+    ok(!!fp && fp.dir === path.join("/pk", "node_modules", "webgpu") && fp.dawnDir === path.join("/pk", "node_modules", "webgpu", "dist", "win32-x64") &&
+       fp.version === "0.6.2" && fp.dxcBeside === true && HG.webgpuPackage("", fakeReq) === null,
+       "webgpuPackage resolves `from` to a FILE: the bare specifier's dawn.node directory is the package's, not \".\" -- with its version, and whether DXC ships beside it",
+       fp ? `${fp.dawnDir}, ${fp.version}, DXC beside: ${fp.dxcBeside}` : "null");
 }
 
 // ---------------------------------------------------------------------------------------------------------

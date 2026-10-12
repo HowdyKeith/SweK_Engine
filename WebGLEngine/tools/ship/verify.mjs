@@ -700,6 +700,21 @@ if (process.env.SWEK_QUICKSWEEP !== "0") {
         for (const l of (c.last && c.last.length ? c.last : ["(nothing on the tail: it printed nothing before the cap)"])) console.log(`[verify]      ${String(l).slice(0, 200)}`);
     }
     check("quick sweep: nothing timed out alone under the cap", r.unmeasured.length === 0, r.unmeasured.join(", ") || "");
+    // *** v4832 -- WHAT THE SWEEP DID NOT RUN IS STATED, AND A RECORDED RED IN IT FAILS THE SHIP. *** The sweep skips the gates over budget (449 at v4831) and the rotation re-times 80 a ship, so a red in that pool
+    // was visible only to whoever read the rotation's log: gfx/frontDoor-selfcheck.mjs sat red for at least three ships. tools/ship/poolWatch.mjs reads the record the sweep just wrote -- the shared one, and this
+    // box's own when it is a foreign box (quickSweep's timingsTarget) -- and prints what is in the pool; an exit the register does not name fails here, with the command that re-runs the gate alone.
+    {
+        const PW = await import("./poolWatch.mjs"), { enumerateGates } = await import("./gateSweep.mjs"), { redRegister, LOCAL_TIMINGS } = await import("./quickSweep.mjs");
+        const here = path.dirname(fileURLToPath(import.meta.url)), gatesNow = enumerateGates(path.resolve(here, "..", "..")), register = redRegister(), bad = [];
+        for (const [label, file] of [["shared record", "sweep-timings.json"], ["this box's record", path.basename(LOCAL_TIMINGS)]]) {
+            let rec = null; try { rec = JSON.parse(fs.readFileSync(path.join(here, file), "utf8")); } catch { continue; }
+            const pc = PW.census(rec, { enumerated: gatesNow, register });
+            console.log(`[verify] pool (${label}): ${PW.describe(pc)}`);
+            for (const u of pc.unregisteredRed) { console.log(`[verify]   recorded red  ${PW.advice(u)}`); bad.push(u.gate); }
+            for (const g of pc.capped.slice(0, 5)) console.log(`[verify]   capped (no verdict)  ${g}`);
+        }
+        check("quick sweep: no skipped gate carries a recorded red that no register names", bad.length === 0, bad.length ? "RECORDED RED, NOT RUN BY THIS SWEEP: " + bad.join(", ") : "none");
+    }
   } catch (e) { check("quick sweep ran", false, "COULD NOT RUN: " + String(e && e.message).slice(0, 120)); }
 }
 

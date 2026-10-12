@@ -17,6 +17,26 @@
 //   E. the repaired fixture reports exit code 0 instead of 1                 -> RED (1 row)
 //   F. the drain deadline drops to 50 ms, so the pool can never go quiet     -> RED (1 row)
 //   G. gateReport loses the `else` this round gave it                        -> RED (1 row)
+// v4832, section 6 (dracoEncode, the member the rig found through createRequire):
+//   H. dracoEncode-selfcheck's terminal process.exit() is put back            -> RED (2 rows: converted, live)
+//   I. its process.exitCode line is deleted, so it sets no verdict at all     -> RED (1 row, converted). The
+//      FIRST run of I read 2: section 1's burn row also went red at 1.2 ms, under the load of the runs around
+//      it, and a re-run of I read the 1 row by name. Three clean runs after: 0, 0, 0.
+//   J. the live subject is a gate that compiles only node's own lexer        -> RED (1 row, compiles)
+//      (skillbookDoor, 48,643 bytes)
+//   K. the live subject is a converted box3d gate on the same lexer bytes    -> RED (1 row, compiles)
+//      (contactOverlay) -- the byte floor is what tells the encoder from the lexer
+// v4840, section 7 (the computed door, censused; five members converted) -- these rows moved to tools/ship/wasmDoors-selfcheck.mjs
+// at v4840's step 4b, with their sabotages; section 7 here is now one cheap row over DOORS_AT_V4840 (see it):
+//   L. box3dFingerprint-selfcheck's terminal process.exit() put back          -> RED (3 rows: accounted, converted, live)
+//   M. a bare file name names a compiler without its folder beside it        -> RED (1 row, the door fixture). The first
+//      run of M read 2: section 1's idle control went red at 3.4 ms, the row this header already calls load-sensitive;
+//      the re-run of M read the 1 row by name.
+//   N. a LITERAL import of the glue no longer excluded from doors             -> RED (2 rows: the door fixture, and the
+//      reach fixture, whose literal-only gate now reaches a "door")
+//   O. the reverse walk stops at a door's direct importers                    -> RED (2 rows: the live census, 58 gates no
+//      longer reached, and the depth-two fixture)
+//   P. one measured member (roster) removed from DOORS_AT_V4840              -> RED (1 row, naming it and the command)
 //
 // *** B IS ZERO AND CANNOT BE OTHERWISE, WHICH IS A LIMIT OF THE METHOD RATHER THAN A GAP. *** It replaces an
 // assertion with a tautology, and running a gate cannot detect that its own row was deleted. It is recorded
@@ -401,6 +421,65 @@ console.log("\n5. *** v4676 -- THE RIG ANSWERED, AND THE POPULATION WAS DRAWN BY
             `${(stillExit.length / floor).toFixed(0)}. AFTER: 145 to 333, a factor of 2.3, from a sample whose ` +
             "seed, cap, holes and disproven first instrument are all in exit-busy-census.json.");
     }
+}
+
+// -----------------------------------------------------------------------------------------------------------
+console.log("\n6. *** v4832 -- THE RIG FOUND A WASM COMPILER BOTH SCREENS MISSED, THROUGH A DOOR NEITHER FOLLOWS ***");
+{
+    // Keith's clone-verify of v4819 (node v24.15.0, win32): tools/ship/dracoEncode-selfcheck.mjs printed its
+    // scoreline and died on `!(handle->flags & UV_HANDLE_CLOSING)`, src\win\async.c line 76, exit 3221226505.
+    // It compiles the vendored Emscripten Draco encoder and is in neither census above:
+    //   v4663 screened the gates that could REACH WebAssembly.instantiate by import, and box3d's importers.
+    //         tools/export/dracoEncode.mjs loads vendor/draco-encoder/draco_encoder_nodejs.js through
+    //         createRequire with a COMPUTED path -- the blind spot v4663 named for box3dNode.mjs's dynamic import.
+    //   v4677 sampled by exitBusy, and with a browser present this gate reads QUIET at its exit line: section 4
+    //         spends seconds in the page between the encoder's first use and the last line. With section 4
+    //         SKIPPED -- the rig's clone had no Playwright -- the same line reads BUSY.
+    // So the crash needed a Windows teardown AND a clone with no browser. The member is measured LIVE under the
+    // hook below, as section 4 measures its own, because the property is what the process did, not its source.
+    const DRACO = "tools/ship/dracoEncode-selfcheck.mjs";
+    const dSrc = fs.readFileSync(path.join(ENG, DRACO), "utf8");
+    const left = exitCallCount(codeOnly(dSrc));
+    ok("!! *** the gate the rig found is converted: no process.exit() left in code, and the verdict is set ***",
+        left === 0 && /process\.exitCode\s*=\s*fails/.test(codeOnly(dSrc)),
+        `${DRACO}: ${left} process.exit() call(s) left in code; ` +
+        (WASM_AT_V4663.compilers.some((c) => c.gate === DRACO) ? "it is in the v4663 census" :
+            `absent from the ${WASM_AT_V4663.compilers.length} compilers v4663 measured, which is how it shipped unconverted`));
+
+    const m = measureExit(DRACO);
+    report(`${DRACO} under the hook: marker ${m.ok ? "written" : "MISSING"}, exit ${m.code}, ` +
+           `${m.wasmCalls} wasm compile(s), ${m.wasmBytes} bytes${m.how ? " via " + m.how.join(", ") : ""}, ` +
+           `process.exit() ${m.exitCalled ? "called" : "not called"}`);
+    ok("*** it really does compile wasm -- through createRequire, the door neither screen walked ***",
+        m.ok && m.wasmCalls > 0 && m.wasmBytes > 100000,
+        m.ok ? `${m.wasmCalls} compiled, ${m.wasmBytes} bytes: the Emscripten encoder, not node's own 48,643-byte lexer`
+             : "no marker was written -- the run is UNKNOWN, not green");
+    ok("*** and it leaves WITHOUT calling process.exit() with that module behind it ***",
+        m.ok && !m.exitAfterWasm,
+        m.exitAfterWasm ? "process.exit() was called after wasm was compiled -- the rig's crash shape, live"
+                        : "the verdict travels through process.exitCode, as in the 48 and the 22 before it");
+    report("MEASURED at v4832 with tools/ship/exitBusy.mjs at the gate's exit line, first 300 ms window: browser " +
+        "present 2.8 / 0.6 / 0.3 ms (QUIET); section 4 skipped as on the rig 7.7 / 6.1 / 6.8 / 4.9 / 5.3 ms, second " +
+        "window 0.2-0.3 (a BURST, 4 of 5 over the 5 ms floor). ONE BOX, Linux, where the assert does not exist.");
+    report("v4832 said: another gate reaching wasm through createRequire or a computed import is not screened, and a census " +
+        "of the door is not built. v4840 built it -- tools/ship/wasmDoors-selfcheck.mjs -- and it found five such gates the rig had not reached yet.");
+}
+
+console.log("\n7. *** v4840 -- THE COMPUTED-DOOR POPULATION, HELD CHEAPLY: the census itself is tools/ship/wasmDoors-selfcheck.mjs ***");
+{
+    // The census costs about 2.6 s and put this gate past the sweep's line at v4840's step 4b, which left WASM_AT_V4663 and
+    // DOORS_AT_V4840 with no guardian the ritual runs (recordReach-selfcheck, 51 unchecked against 50). It moved to its own gate;
+    // this row holds the frozen population with no census at all -- each member still exists, carries no more exit calls in code
+    // than were recorded, and each of the five converted still hands its verdict to exitCode. SABOTAGE (v4840): box3dFingerprint's
+    // terminal process.exit() put back -> this row red by name (and wasmDoors-selfcheck's three); one member removed from the record
+    // -> this row red (13 against 14). The SWEEP's guardian of DOORS_AT_V4840 is dracoEncode-selfcheck's identical row, at 0.7 s.
+    const read = (g) => { try { return fs.readFileSync(path.join(ENG, g), "utf8"); } catch { return null; } };
+    const bad = WT.DOORS_AT_V4840.members.filter((m) => { const src = read(m.gate); if (src === null) return true;
+        const code = codeOnly(src); return exitCallCount(code) > m.exitCalls || (m.exitAfterWasmBefore && !/process\.exitCode\s*=\s*fails/.test(code)); });
+    ok("!! *** every gate in DOORS_AT_V4840 holds what was measured: no new exit, and the five converted still converted ***",
+        WT.DOORS_AT_V4840.members.length === WT.DOORS_AT_V4840.measured && bad.length === 0,
+        bad.length ? bad.map((m) => `${m.gate}: ${read(m.gate) === null ? "MISSING" : exitCallCount(codeOnly(read(m.gate))) + " exit call(s) against " + m.exitCalls + " recorded" + (m.exitAfterWasmBefore ? ", or its exitCode line gone" : "")}`).join("; ")
+                   : `${WT.DOORS_AT_V4840.measured} members, ${WT.DOORS_AT_V4840.crashShapeBefore} converted -- re-run tools/ship/wasmDoors-selfcheck.mjs for the census`);
 }
 
 console.log(fails ? `\nwasmTeardown-selfcheck: ${fails} FAILED` : "\nwasmTeardown-selfcheck: all checks pass");

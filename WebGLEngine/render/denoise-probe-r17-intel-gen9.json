@@ -1,0 +1,411 @@
+{
+ "at": "2026-10-11T15:33:25.713Z",
+ "platform": "win32 10.0.22631 x64",
+ "node": "v24.17.0",
+ "commit": "254436e5 2026-10-11 Denoiser arc, round 17: the fast kernel two other ways and the tile kernel's inline weights -- one p",
+ "probe": "r17",
+ "sizes": [
+  64,
+  256,
+  1024
+ ],
+ "capSeconds": 180,
+ "native": [
+  {
+   "id": "fast-32",
+   "what": "the fast kernel, 32 -> 32 at 3 x 3: the baseline",
+   "cfg": null,
+   "seconds": 9.384,
+   "dumpFile": "C:\\Users\\Keith\\AppData\\Local\\Temp\\swek-denoise-probe-dump-fast-32.txt",
+   "built": true,
+   "buildMs": 5155.3189,
+   "exact": true,
+   "sizes": [
+    {
+     "N": 64,
+     "passMs": 0.786432,
+     "passes": 30,
+     "clock": "device",
+     "exact": true,
+     "detail": "131072 plain, 0 fused, 0 unexplained"
+    },
+    {
+     "N": 256,
+     "passMs": 10.289152,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    },
+    {
+     "N": 1024,
+     "passMs": 166.13376,
+     "passes": 9,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    }
+   ],
+   "adapter": "intel / gen-9 / D3D12 driver version 31.0.101.2137",
+   "dump": {
+    "compiler": "FXC (DXBC)",
+    "lines": 537,
+    "loops": 6,
+    "indexableTemps": 0,
+    "barriers": 3
+   }
+  },
+  {
+   "id": "fast-vec4-32",
+   "what": "the fast kernel, its tile read four channels at a time",
+   "cfg": {
+    "reads": "vec4"
+   },
+   "seconds": 34.794,
+   "dumpFile": "C:\\Users\\Keith\\AppData\\Local\\Temp\\swek-denoise-probe-dump-fast-vec4-32.txt",
+   "built": true,
+   "buildMs": 30218.151700000002,
+   "exact": true,
+   "sizes": [
+    {
+     "N": 64,
+     "passMs": 1.048576,
+     "passes": 30,
+     "clock": "device",
+     "exact": true,
+     "detail": "131072 plain, 0 fused, 0 unexplained"
+    },
+    {
+     "N": 256,
+     "passMs": 10.48576,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    },
+    {
+     "N": 1024,
+     "passMs": 230.03136,
+     "passes": 7,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    }
+   ],
+   "adapter": "intel / gen-9 / D3D12 driver version 31.0.101.2137",
+   "dump": {
+    "compiler": "FXC (DXBC)",
+    "lines": 690,
+    "loops": 5,
+    "indexableTemps": 0,
+    "barriers": 3
+   }
+  },
+  {
+   "id": "fast-unroll-32",
+   "what": "the fast kernel, a block's taps and channels written out, its weights at constant offsets",
+   "cfg": {
+    "unroll": true
+   },
+   "seconds": 64.115,
+   "dumpFile": "C:\\Users\\Keith\\AppData\\Local\\Temp\\swek-denoise-probe-dump-fast-unroll-32.txt",
+   "built": false,
+   "stopped": false,
+   "reason": "no result (exit 3221226505): "
+  },
+  {
+   "id": "fast-vec4-unroll-32",
+   "what": "the fast kernel, both",
+   "cfg": {
+    "reads": "vec4",
+    "unroll": true
+   },
+   "seconds": 52.62,
+   "dumpFile": "C:\\Users\\Keith\\AppData\\Local\\Temp\\swek-denoise-probe-dump-fast-vec4-unroll-32.txt",
+   "built": false,
+   "stopped": false,
+   "reason": "no result (exit 3221226505): "
+  },
+  {
+   "id": "tile2-zero-inline-32",
+   "what": "2 pixels x 8 vec4s, edge zero, weights read where they are used",
+   "cfg": {
+    "px": 2,
+    "g4": 8,
+    "edge": "zero",
+    "weights": "inline"
+   },
+   "seconds": 180.191,
+   "dumpFile": "C:\\Users\\Keith\\AppData\\Local\\Temp\\swek-denoise-probe-dump-tile2-zero-inline-32.txt",
+   "built": false,
+   "stopped": true,
+   "reason": "stopped at the 180 s cap"
+  },
+  {
+   "id": "tile4-zero-inline-32",
+   "what": "4 pixels x 4 vec4s, edge zero, weights read where they are used",
+   "cfg": {
+    "px": 4,
+    "g4": 4,
+    "edge": "zero",
+    "weights": "inline"
+   },
+   "seconds": 180.188,
+   "dumpFile": "C:\\Users\\Keith\\AppData\\Local\\Temp\\swek-denoise-probe-dump-tile4-zero-inline-32.txt",
+   "built": false,
+   "stopped": true,
+   "reason": "stopped at the 180 s cap"
+  },
+  {
+   "id": "tile1-skip-inline-32",
+   "what": "1 pixel x 8 vec4s, edge skip, weights read where they are used -- section 57's stopped 1 x 8, its weights inline",
+   "cfg": {
+    "px": 1,
+    "g4": 8,
+    "edge": "skip",
+    "weights": "inline"
+   },
+   "seconds": 180.12,
+   "dumpFile": "C:\\Users\\Keith\\AppData\\Local\\Temp\\swek-denoise-probe-dump-tile1-skip-inline-32.txt",
+   "built": false,
+   "stopped": true,
+   "reason": "stopped at the 180 s cap"
+  }
+ ],
+ "browser": {
+  "ok": true,
+  "pageErrors": [],
+  "adapter": "intel / gen-9",
+  "error": null,
+  "rows": [
+   {
+    "id": "fast-32",
+    "built": true,
+    "buildMs": 609.5,
+    "exact": true,
+    "sizes": [
+     {
+      "N": 64,
+      "passMs": 1.0394,
+      "passes": 30,
+      "clock": "device",
+      "exact": true,
+      "detail": "131072 plain, 0 fused, 0 unexplained"
+     },
+     {
+      "N": 256,
+      "passMs": 12.512638,
+      "passes": 30,
+      "clock": "device",
+      "exact": null,
+      "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+     },
+     {
+      "N": 1024,
+      "passMs": 300.703135,
+      "passes": 6,
+      "clock": "device",
+      "exact": null,
+      "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+     }
+    ]
+   },
+   {
+    "id": "fast-vec4-32",
+    "built": true,
+    "buildMs": 998.9000000059605,
+    "exact": true,
+    "sizes": [
+     {
+      "N": 64,
+      "passMs": 1.154315,
+      "passes": 30,
+      "clock": "device",
+      "exact": true,
+      "detail": "131072 plain, 0 fused, 0 unexplained"
+     },
+     {
+      "N": 256,
+      "passMs": 10.189674,
+      "passes": 30,
+      "clock": "device",
+      "exact": null,
+      "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+     },
+     {
+      "N": 1024,
+      "passMs": 205.951782,
+      "passes": 8,
+      "clock": "device",
+      "exact": null,
+      "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+     }
+    ]
+   },
+   {
+    "id": "fast-unroll-32",
+    "built": true,
+    "buildMs": 2055.5,
+    "exact": true,
+    "sizes": [
+     {
+      "N": 64,
+      "passMs": 0.604158,
+      "passes": 30,
+      "clock": "device",
+      "exact": true,
+      "detail": "131072 plain, 0 fused, 0 unexplained"
+     },
+     {
+      "N": 256,
+      "passMs": 8.661448,
+      "passes": 30,
+      "clock": "device",
+      "exact": null,
+      "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+     },
+     {
+      "N": 1024,
+      "passMs": 142.696104,
+      "passes": 11,
+      "clock": "device",
+      "exact": null,
+      "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+     }
+    ]
+   },
+   {
+    "id": "fast-vec4-unroll-32",
+    "built": true,
+    "buildMs": 4379.100000008941,
+    "exact": true,
+    "sizes": [
+     {
+      "N": 64,
+      "passMs": 0.681572,
+      "passes": 30,
+      "clock": "device",
+      "exact": true,
+      "detail": "131072 plain, 0 fused, 0 unexplained"
+     },
+     {
+      "N": 256,
+      "passMs": 16.580824,
+      "passes": 30,
+      "clock": "device",
+      "exact": null,
+      "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+     },
+     {
+      "N": 1024,
+      "passMs": 204.314307,
+      "passes": 8,
+      "clock": "device",
+      "exact": null,
+      "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+     }
+    ]
+   },
+   {
+    "id": "tile2-zero-inline-32",
+    "built": true,
+    "buildMs": 402.20000000298023,
+    "exact": true,
+    "sizes": [
+     {
+      "N": 64,
+      "passMs": 1.271064,
+      "passes": 30,
+      "clock": "device",
+      "exact": true,
+      "detail": "131072 plain, 0 fused, 0 unexplained"
+     },
+     {
+      "N": 256,
+      "passMs": 17.374228,
+      "passes": 30,
+      "clock": "device",
+      "exact": null,
+      "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+     },
+     {
+      "N": 1024,
+      "passMs": 263.006474,
+      "passes": 6,
+      "clock": "device",
+      "exact": null,
+      "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+     }
+    ]
+   },
+   {
+    "id": "tile4-zero-inline-32",
+    "built": true,
+    "buildMs": 318,
+    "exact": true,
+    "sizes": [
+     {
+      "N": 64,
+      "passMs": 1.327729,
+      "passes": 30,
+      "clock": "device",
+      "exact": true,
+      "detail": "131072 plain, 0 fused, 0 unexplained"
+     },
+     {
+      "N": 256,
+      "passMs": 24.529783,
+      "passes": 30,
+      "clock": "device",
+      "exact": null,
+      "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+     },
+     {
+      "N": 1024,
+      "passMs": 404.980839,
+      "passes": 4,
+      "clock": "device",
+      "exact": null,
+      "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+     }
+    ]
+   },
+   {
+    "id": "tile1-skip-inline-32",
+    "built": true,
+    "buildMs": 270,
+    "exact": true,
+    "sizes": [
+     {
+      "N": 64,
+      "passMs": 1.07615,
+      "passes": 30,
+      "clock": "device",
+      "exact": true,
+      "detail": "131072 plain, 0 fused, 0 unexplained"
+     },
+     {
+      "N": 256,
+      "passMs": 15.275011,
+      "passes": 30,
+      "clock": "device",
+      "exact": null,
+      "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+     },
+     {
+      "N": 1024,
+      "passMs": 307.768941,
+      "passes": 5,
+      "clock": "device",
+      "exact": null,
+      "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+     }
+    ]
+   }
+  ]
+ },
+ "browserLaunchArgs": [
+  "--enable-unsafe-webgpu",
+  "--use-angle=d3d11"
+ ]
+}

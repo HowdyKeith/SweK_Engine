@@ -14,6 +14,9 @@ import { encodeDracoMesh, writeDracoGlb, DRACO_EXT } from "../export/dracoEncode
 import { peekGlb, needsDraco, MAX_JSON } from "../../gpu/glbPeek.mjs";
 import { weld } from "../export/weldVertices.mjs";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
+import { DOORS_AT_V4840, exitCallCount } from "./wasmTeardown.mjs";
+import { codeOnly } from "./sourceScan.mjs";
+import fs from "node:fs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -221,6 +224,24 @@ console.log("\n5. THE SAVING A VOXEL EXPORT ACTUALLY GETS -- MEASURED, NOT ASSUM
         (w.indices.length / 3) + " triangles");
 }
 
+// v4840 -- AND THE DOOR THIS GATE CAME THROUGH, HELD WHERE THE SWEEP RUNS IT. This gate's crash on the rig (v4832) led to
+// tools/ship/wasmTeardown.mjs's computed-door census, which found five more gates with the same shape and converted them
+// (DOORS_AT_V4840). The census lives in tools/ship/wasmDoors-selfcheck.mjs and costs ~3 s; wasmTeardown-selfcheck holds the
+// record too and sits at the sweep's line on this host. recordReach-selfcheck needs a guardian the ritual actually runs, and
+// this one is 0.7 s: the frozen population, re-read with no census -- each member exists, no new exit, the five still converted.
+// SABOTAGES (v4840): box3dFingerprint's terminal process.exit() put back -> this row red by name; one member (roster) removed
+// from DOORS_AT_V4840 -> this row red (13 against 14 measured).
+{
+    const ENGINE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+    const read = (g) => { try { return fs.readFileSync(path.join(ENGINE, g), "utf8"); } catch { return null; } };
+    const bad = DOORS_AT_V4840.members.filter((m) => { const src = read(m.gate); if (src === null) return true;
+        const code = codeOnly(src); return exitCallCount(code) > m.exitCalls || (m.exitAfterWasmBefore && !/process\.exitCode\s*=\s*fails/.test(code)); });
+    ok("!! *** the gates this one's door led to still hold: DOORS_AT_V4840's members exist, gain no exit, and the five converted stay converted ***",
+        DOORS_AT_V4840.members.length === DOORS_AT_V4840.measured && bad.length === 0,
+        bad.length ? bad.map((m) => m.gate).join(", ") + " -- re-run tools/ship/wasmDoors-selfcheck.mjs"
+                   : `${DOORS_AT_V4840.measured} members, ${DOORS_AT_V4840.crashShapeBefore} converted`);
+}
+
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nunchecked here: whether tools/export/voxelGlb.mjs's own writeGlb should gain a draco option directly " +
     "(kept as a separate async writer instead -- see this file's own header and dracoEncode.mjs's, on the " +
@@ -229,4 +250,19 @@ console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "(EncodePointCloudToDracoBuffer exists in the vendored module and is untouched here); and Draco's own " +
     "compression ratio on a mesh with real (non-planar, non-axis-aligned) geometry, which a synthetic grid " +
     "cannot speak to as directly as a real voxelized asset would.");
-process.exit(fails ? 1 : 0);
+// *** v4832 -- process.exitCode, NOT process.exit(). THE RIG CRASHED HERE, AND ONLY WHEN SECTION 4 SKIPPED. ***
+// Keith's clone-verify of v4819, node v24.15.0 on win32, after this gate's own scoreline:
+//   Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\win\async.c, line 76   (exit 3221226505)
+// It is v4663's teardown race (tools/ship/wasmTeardown.mjs): sections 0-3 and 5 compile and run the vendored
+// Emscripten encoder, 418,831 bytes of wasm, and process.exit() then tore the platform down under V8's
+// background work. v4663's screen never reached this gate because dracoEncode.mjs loads its glue through
+// createRequire with a computed path, which no import walk follows -- the same blind spot that screen named
+// for box3dNode.mjs's dynamic import -- and v4677's sample read it QUIET, because a run that HAS a browser
+// spends seconds in section 4 between the encoder's first use and this line. MEASURED on the sandbox with
+// tools/ship/exitBusy.mjs, first 300 ms window at this line against the second:
+//   browser present (section 4 runs)     2.8 / 0.6 / 0.3 ms        -- quiet
+//   section 4 skipped, as on the rig     7.7 / 6.1 / 6.8 / 4.9 / 5.3 ms, second window 0.2-0.3 -- a burst, 4 of 5 over exitBusy's 5 ms floor
+// So the crash needed BOTH a Windows teardown and a clone with no Playwright, which is the clone the rig had.
+// Linux carries no such assertion, so this is the repair and not a reproduction; the rig's next clone-verify
+// is the instrument for the fact. tools/ship/wasmTeardown-selfcheck.mjs section 6 holds the conversion.
+process.exitCode = fails ? 1 : 0;

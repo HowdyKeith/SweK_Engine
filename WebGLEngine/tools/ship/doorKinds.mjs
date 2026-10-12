@@ -289,6 +289,13 @@ export const MEASURED_V3608 = {
             "source and diff it byte for byte (its own header: 'needs a network, which a gate must never need; " +
             "exits 2 if it cannot reach GitHub'). This sandbox's egress proxy blocks the sources it would fetch; " +
             "it runs where a real network reaches GitHub, which this environment is not.",
+        // v4833 -- *** THIS GATE WAS RED ON main WITH threePatch.mjs UNEXPLAINED, AND NOBODY SAW IT: it is over the quick sweep's budget (~150 s) and the rotation had not come round to it. ***
+        // Found by reading the skipped pool while building tools/ship/poolWatch.mjs (the same class), and explained from the tool's own header (line 132: "It needs what the gate cannot carry -- a three
+        // checkout at DEV_COMMIT and r186's package"), not guessed: it patches and restores a checkout of three.js's src/, so it cannot run without one.
+        "tools/ship/threePatch.mjs": "needs a three.js checkout at the pinned DEV_COMMIT and three@0.186.1 unpacked (its own " +
+            "header: 'what the gate cannot carry'); it applies each upstream patch to that checkout's src/, builds, and " +
+            "restores it, so there is nothing to run it against in this tree. It is run by hand when the drafts in " +
+            "docs/upstream-three/ are re-checked against a newer dev commit (v4811 did, and recorded the result).",
         "tools/ship/wgslDeviceLimits.mjs": "needs a WebGPU-capable browser to read the real device limits it " +
             "diffs against render/wgslSpec.mjs's DEFAULT_LIMITS (its own header: 'a gate that needs a GPU is a " +
             "gate that silently passes on every box without one'). LIMITS_PROVENANCE records that the headless " +

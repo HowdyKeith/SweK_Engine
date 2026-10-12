@@ -1,7 +1,8 @@
 {
- "built": "2026-09-29",
+ "built": "2026-10-12",
  "reports": [
   "backendRouting-selfcheck.json",
+  "brainStages-selfcheck.json",
   "bssrdfSample-selfcheck.json",
   "budgetProvenance-selfcheck.json",
   "chunk-selfcheck.json",
@@ -9,6 +10,9 @@
   "closingCoverage-selfcheck.json",
   "conductorFresnel-selfcheck.json",
   "constantRows-selfcheck.json",
+  "conv2d-selfcheck.json",
+  "denoiseDevice-selfcheck.json",
+  "denoiseTiming-selfcheck.json",
   "detourScale-selfcheck.json",
   "dielectricWalk-selfcheck.json",
   "exactHash-selfcheck.json",
@@ -66,6 +70,7 @@
   "murmurGesture-selfcheck.json",
   "murmurIgniteAxis-selfcheck.json",
   "murmurIgniteFour-selfcheck.json",
+  "murmurParity-selfcheck.json",
   "murmurTempo-selfcheck.json",
   "opticalFlow-selfcheck.json",
   "pageFxOverlay-selfcheck.json",

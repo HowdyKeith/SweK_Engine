@@ -384,6 +384,17 @@ console.log("\n5. *** THE REAL BROWSER: NO PILL OVER THE HEAD, NO CAMERA IN THE 
         await pg.waitForTimeout(600);
         await pg.selectOption("#host", "face-mirror.html");
         await pg.waitForTimeout(2400);   // the embed block dynamic-imports three modules before the robot exists
+        // v4838 -- AND THEN FOR THE ROBOT ITSELF, BECAUSE 2.4 s IS A GUESS ABOUT HOW FAST THOSE IMPORTS ARE. Twice in one
+        // afternoon this gate read "robot 0x0" inside budgetExile-selfcheck's serial re-runs (the ship's step 4b, then a re-run
+        // beside another gate) and 120x180 every time on its own -- 0 of 4 under six busy loops, and the next budgetExile run
+        // green. The row asserts a real box; this waits up to 15 s for one, so a slow import is not a red and a robot that
+        // never mounts still is. SABOTAGE (v4838): the width read from a missing element -> this row red by name, "robot 0x180",
+        // after the full 15 s wait; restored by copy.
+        await pg.waitForFunction(() => {
+            const d = document.getElementById("view") && document.getElementById("view").contentDocument;
+            const r = d && d.getElementById("robot-host");
+            return !!r && r.getBoundingClientRect().width > 0;
+        }, null, { timeout: 15000 }).catch(() => {});
         const face = await pg.evaluate(() => {
             const f = document.getElementById("view"), d = f && f.contentDocument;
             if (!d) return null;

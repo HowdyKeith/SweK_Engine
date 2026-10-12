@@ -60,6 +60,18 @@
   <b style="color:#2fd6b0">&#9992; Real aerodynamic flight</b>
   <span id="stat"></span>
   <button id="resetBtn" title="respawn the patrol now">&#8635; Reset patrol</button>
+  <button id="rosterBtn" title="Load Pilots (v4839): choose who flies the squadron -- the PD heading-hold autopilot this page has always flown, or a brain (hand weights, zero, noise, the pilot this page ships, one you imported) -- then Start Patrol. Every brain is the same fly-wired network; a choice is a choice of weights. The hand brain IS the autopilot, written through the network.">&#9992; Load Pilots</button>
+</div>
+<div id="rosterPanel" style="position:fixed;top:40px;left:10px;z-index:3;display:none;background:#0a1220;border:1px solid #2f486c;border-radius:8px;padding:10px;max-width:430px;box-shadow:0 8px 30px #000a;color:#b9d4ff;">
+  <div style="margin-bottom:6px;color:#f6a623;letter-spacing:.08em;">LOAD PILOTS</div>
+  <table style="border-collapse:collapse;margin-bottom:6px;"><tbody>
+    <tr><td style="padding:2px 10px 2px 0;color:#8fb6d0;">squadron</td><td><select id="pilotSquad" style="background:#0c1424;color:#b9d4ff;border:1px solid #2f486c;font:inherit;max-width:300px;"></select></td></tr>
+  </tbody></table>
+  <div style="display:flex;gap:6px;margin-bottom:6px;"><button id="startPatrol">Start Patrol</button><button id="rosterReset">Default pilots</button></div>
+  <div style="display:flex;gap:6px;margin-bottom:6px;align-items:center;"><button id="importPilotBtn">Import pilot</button><input id="importPilotFile" type="file" accept="application/json" style="display:none;"><button id="clearPilot" disabled>Clear imported</button></div>
+  <div id="pilotLine" style="color:#8fb6d0;margin-bottom:4px;"></div>
+  <div id="rosterNote" style="color:#7fb069;margin-bottom:4px;"></div>
+  <div style="color:#5f7590;line-height:1.4;">Every brain pilot is the same network, wired like a fly's Giant Fiber circuit, with the autopilot's own contract (pitch, roll and yaw commands from the pointing error, the angular rates and the bank); a choice picks which WEIGHTS fly it. The PD autopilot is not a brain, and the hand weights are that autopilot written through the network (they fly the same patrol). A choice applies at once, mid-flight; Start Patrol also respawns the squadron. 'hand + noise' gives every aircraft its own perturbed pilot.</div>
 </div>
 <div id="hint">closed-form lift/drag, not a kinematic flight model &mdash; drag to orbit, scroll to zoom</div>
 
@@ -73,6 +85,10 @@ import * as RB from "/physics/mechanics/rigidBody6dof.mjs";
 import * as AC from "/physics/mechanics/aircraftAssembly.mjs";
 import { relativeAirflow, applySurfaceForce } from "/physics/mechanics/aeroSurface.mjs";
 import * as AP from "/brain/autopilotAircraft.mjs";
+import * as PA from "/brain/pilotAircraftPolicy.mjs";   // v4839 -- a learned pilot with the autopilot's own contract
+import * as PR from "/brain/pilotRoster.mjs";            // v4839 -- who flies the squadron: the PD autopilot, or a brain on one of several weight sets
+import * as PB from "/brain/peerBrain.mjs";              // v4839 -- the portable brain format the shipped pilot and an imported one travel in
+import { weightsHash } from "/brain/drivePolicy.mjs";
 
 // ---- flight constants (page-level game balance, not gated -- matching es-box3d-6dof.html's own PAGE_AUTOPILOT
 // and ENGINE_MOUNT notes) ----
@@ -193,11 +209,13 @@ function newPatrol() { clearFleet(fleet); tick = 0; fleet = spawnFleet(); }
 newPatrol();
 
 function stepFleet(dt) {
-  for (const s of fleet) {
+  const pilots = squadPilots();
+  for (let i = 0; i < fleet.length; i++) {
+    const s = fleet[i];
     const scheduleTick = tick + s.phaseTicks;
     if (scheduleTick > 0 && scheduleTick % LEG_TICKS === 0) s.headingIdx = (s.headingIdx + 1) % HEADINGS.length;
     const desiredForward = HEADINGS[s.headingIdx];
-    const d = AP.decide(s.body, desiredForward);
+    const d = pilots[Math.min(i, pilots.length - 1)](s.body, desiredForward);
     s.body = stepAircraftWithEngine(s.aircraft, s.body, d.controls, dt);
     s.lastFacingCos = d.facingCos;
   }
@@ -222,6 +240,68 @@ function frame() {
     `${N_AIRCRAFT} aircraft  ·  tick ${tick}  ·  lead: heading#${lead.headingIdx}/${N_HEADINGS}  facing ${lead.lastFacingCos.toFixed(3)}  speed ${Math.hypot(...lead.body.vel).toFixed(1)} m/s`;
   requestAnimationFrame(frame);
 }
+// ---- v4839 -- LOAD PILOTS: brain/pilotRoster.mjs behind one select (the squadron is one team of three aircraft) -----------------------------------------------------------------
+// "default for this team" is the PD heading-hold autopilot (AP.decide) this page always flew, so a page nobody touched flies the patrol it flew before the panel. A pilot function is rebuilt when the choice or
+// what is available changes -- not every frame. The hand weights are that autopilot written through the network and fly the same patrol; "shipped" is the pilot trained for this page.
+const ROSTER_KEY = "swek.aircraftRoster.v1", ROSTER_NAMES = { scriptedLabel: "PD heading-hold autopilot (autopilotAircraft.mjs)", scriptedName: "PD heading-hold autopilot" };
+let spec = (() => { try { return PR.sanitizeSpecs(JSON.parse(localStorage.getItem(ROSTER_KEY) || "null")).A; } catch { return PR.AUTO; } })();
+const DESC = PB.describePolicy("pilotAircraftPolicy", PA);
+let shippedW = null, shippedMeta = null, shippedErr = null, importedW = null, importedMeta = null, importErr = null, avail = 0;
+const rosterCtx = () => ({ PP: PA, shipped: shippedW, imported: importedW, brainPilotOn: false, ...ROSTER_NAMES });
+function saveSpec() { try { localStorage.setItem(ROSTER_KEY, JSON.stringify({ A: spec, B: PR.AUTO })); } catch {} }
+let squad = null, squadKey = "", pilotFns = [];
+function squadPilots() {
+  const key = spec + "|" + avail;
+  if (squad && squadKey === key) return pilotFns;
+  squad = PR.resolveTeam("A", spec, rosterCtx(), N_AIRCRAFT); squadKey = key;
+  const made = new Map(), fnFor = (w) => { let f = made.get(w); if (!f) made.set(w, f = PA.pilotFor(w)); return f; };
+  pilotFns = Array.from({ length: N_AIRCRAFT }, (_, i) => squad.scripted ? AP.decide : fnFor(squad.weights[Math.min(i, squad.weights.length - 1)]));
+  rosterNote(); return pilotFns;
+}
+function rosterNote() {
+  const el = document.getElementById("rosterNote"); if (!el || !squad) return;
+  el.textContent = `${squad.label}${squad.scripted ? "" : ` (${N_AIRCRAFT} aircraft)`}` + (squad.problems.length ? "  --  " + squad.problems.join("; ") : "");
+}
+function renderRoster() {
+  const ch = PR.choices({ shipped: !!shippedW, imported: !!importedW, brainPanel: false, scriptedLabel: ROSTER_NAMES.scriptedLabel });
+  const sel = document.getElementById("pilotSquad"), keep = spec;
+  sel.textContent = "";
+  for (const c of ch) { const o = document.createElement("option"); o.value = c.id; o.textContent = c.label; sel.appendChild(o); }
+  if (!ch.some((c) => c.id === keep)) { const o = document.createElement("option"); o.value = keep; o.textContent = keep + " (not available here)"; sel.appendChild(o); }
+  sel.value = keep;
+  sel.onchange = () => { spec = sel.value; saveSpec(); squadPilots(); };
+}
+function startPatrol() { newPatrol(); squadPilots(); return true; }
+document.getElementById("rosterBtn").onclick = () => { const p = document.getElementById("rosterPanel"); p.style.display = p.style.display === "none" ? "block" : "none"; renderRoster(); };
+document.getElementById("startPatrol").onclick = () => { startPatrol(); };
+document.getElementById("rosterReset").onclick = () => { spec = PR.AUTO; saveSpec(); renderRoster(); squadPilots(); };
+function pilotLine() {
+  const el = document.getElementById("pilotLine"); if (!el) return;
+  const one = (label, w, meta) => w ? `${label} ${weightsHash(w)}` + (meta && meta.score != null ? `: held-out score ${meta.score}` : "") : null;
+  const parts = [one("shipped pilot", shippedW, shippedMeta), one("imported pilot", importedW, importedMeta)].filter(Boolean);
+  el.textContent = (parts.length ? parts.join("  |  ") : shippedErr ? `the shipped pilot did not load (${shippedErr})` : "loading the shipped pilot ...") + (importErr ? `  --  import refused: ${importErr}` : "");
+  document.getElementById("clearPilot").disabled = !importedW;
+}
+function availChanged() { avail++; renderRoster(); pilotLine(); squadPilots(); }
+// the shipped pilot: a swek-brain-v1 file like the plane and space-battle pages'; a missing or malformed one is SAID (shippedErr), and the roster simply does not offer "shipped"
+fetch("/brain/pilotAircraftWeightsDefault.json").then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }).then((blob) => {
+  const r = PB.importBrain(DESC, blob);
+  if (r.ok) { shippedW = r.weights; shippedMeta = r.meta; } else shippedErr = r.reason;
+  availChanged();
+}).catch((e) => { shippedErr = "could not fetch it (" + (e && e.message) + ")"; availChanged(); });
+function importBlob(blob) {
+  const r = PB.importBrain(DESC, blob);
+  if (r.ok) { importedW = r.weights; importedMeta = r.meta; importErr = null; } else importErr = r.reason;
+  availChanged(); return r.ok;
+}
+document.getElementById("importPilotBtn").onclick = () => document.getElementById("importPilotFile").click();
+document.getElementById("importPilotFile").addEventListener("change", async (e) => {
+  const f = e.target.files && e.target.files[0]; e.target.value = ""; if (!f) return;
+  try { importBlob(JSON.parse(await f.text())); } catch (err) { importErr = "not a readable JSON file (" + (err && err.message) + ")"; availChanged(); }
+});
+document.getElementById("clearPilot").onclick = () => { importedW = null; importedMeta = null; importErr = null; availChanged(); };
+renderRoster(); pilotLine(); squadPilots();
+
 document.getElementById("resetBtn").onclick = () => newPatrol();
 addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
 
@@ -235,6 +315,10 @@ window.__aircraftDemo = {
     };
   },
   newPatrol,
+  step(n = 1) { for (let i = 0; i < n; i++) stepFleet(1 / 30); syncScene(); },   // v4839 -- advance the patrol without waiting for frames (the gate's clock)
+  // v4839 -- the roster, for brain/pilotAircraftPolicy-selfcheck.mjs's page rows
+  roster: { get spec() { return spec; }, setSpec(x) { spec = PR.sanitizeSpecs({ A: x }).A; saveSpec(); renderRoster(); squadPilots(); }, startPatrol, get squad() { return squadPilots() && squad; }, pilots: squadPilots,
+    get shipped() { return shippedW; }, get shippedError() { return shippedErr; }, get imported() { return importedW; }, importBlob, get choices() { return [...document.getElementById("pilotSquad").options].map((o) => o.value); } },
 };
 
 requestAnimationFrame(frame);

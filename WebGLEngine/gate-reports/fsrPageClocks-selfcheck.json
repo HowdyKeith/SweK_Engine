@@ -1,6 +1,6 @@
 {
  "gate": "tools/ship/fsrPageClocks-selfcheck.mjs",
- "at": "2026-09-29",
+ "at": "2026-10-11",
  "tables": [
   {
    "title": "the same scene time at two history ages: what the scene fixes and what the history does",

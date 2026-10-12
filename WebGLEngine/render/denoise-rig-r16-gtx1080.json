@@ -1,0 +1,48 @@
+{
+ "at": "2026-10-11T04:51:29.354Z",
+ "platform": "win32 10.0.22631 x64",
+ "node": "v24.15.0",
+ "commit": "362bd22d 2026-10-11 Denoiser arc, section 55 -- K0 (a) holds for r16a and r16b: every hidden cell the twin's, every imag",
+ "only": "denoise",
+ "launchArgs": [
+  "--enable-unsafe-webgpu",
+  "--use-angle=d3d11"
+ ],
+ "gates": [
+  {
+   "gate": "render/denoiseCompile-selfcheck.mjs",
+   "category": "timing",
+   "ok": false,
+   "ms": 1799968,
+   "adapters": [],
+   "software": null,
+   "fails": [],
+   "measured": [
+    "native compilers: D3D12; DXC's DLLs found in C:\\Users\\howdy\\AppData\\Local\\ms-playwright\\chromium-1243\\chrome-win64"
+   ]
+  },
+  {
+   "gate": "render/denoiseDevice-selfcheck.mjs",
+   "category": "exact",
+   "ok": false,
+   "ms": 1800178,
+   "adapters": [],
+   "software": null,
+   "fails": [],
+   "measured": []
+  },
+  {
+   "gate": "render/denoiseTiming-selfcheck.mjs",
+   "category": "timing",
+   "ok": false,
+   "ms": 1800143,
+   "adapters": [],
+   "software": null,
+   "fails": [],
+   "measured": []
+  }
+ ],
+ "adapters": [],
+ "verdict": "*** NO ADAPTER WAS SEEN: no gate reached a device -- this is not a hardware run ***",
+ "summary": "exact 0/1, quality 0/0, timing 0/2"
+}

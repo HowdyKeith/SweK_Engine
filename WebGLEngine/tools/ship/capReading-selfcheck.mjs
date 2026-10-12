@@ -246,6 +246,17 @@ export const LET_FINISH_V4573 = Object.freeze({
             why: "21,060 at the cap pass; 18,797 filed by the v4776 rotation (18,115-18,848 across three quiet runs); 19,161-20,905 across three quiet runs at v4828, the alone reading filed 20,105 -- " +
                  "the median. Moved with the box, confirmed, and the historical number kept.",
         }),
+        // v4838 -- the record's new owner re-timed gateSelection, whose only reading had been the loaded one this table took
+        // (declaredCost's v4820 ratchet named it). Two alone runs straight after the handover read 14,413 / 13,997; three more
+        // on a quiet box, each filed by `sweepRotation --gate g --cap-s 300 --write` as it was taken, read 12,538 / 12,865 /
+        // 12,753. The table's 67,823 was contention, not the gate.
+        Object.freeze({ gate: "tools/ship/gateSelection-selfcheck.mjs", table: 67823, now: 12753,
+            runs: Object.freeze([12538, 12865, 12753]),
+            earlierRuns: Object.freeze([Object.freeze([14413, 13997])]),
+            why: "67,823 at the cap pass, a LOADED reading (a 2026-09-09 sweep filed 69,346 the same way, and it stood as the gate's " +
+                 "only reading until v4838); 13,997-14,413 alone straight after v4838's handover, and 12,538-12,865 across three " +
+                 "quiet runs, the alone reading filed 12,753 -- the median. Its header's ~14s was right all along.",
+        }),
     ]);
     // A roll entry earns its exemption only if its own runs corroborate the FILED reading -- otherwise
     // "named in the record" would be a way to excuse any number at all, which is the exemption-list shape

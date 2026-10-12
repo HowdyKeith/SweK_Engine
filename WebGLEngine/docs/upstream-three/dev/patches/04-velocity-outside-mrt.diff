@@ -19,10 +19,10 @@ index 515a70c..ebf7f0d 100644
  		 * An optional projection matrix that overrides the camera's projection matrix.
  		 *
 diff --git a/src/nodes/core/NodeBuilder.js b/src/nodes/core/NodeBuilder.js
-index de53c08..d4f41a0 100644
+index a536db4..4cbaa4e 100644
 --- a/src/nodes/core/NodeBuilder.js
 +++ b/src/nodes/core/NodeBuilder.js
-@@ -48,6 +48,46 @@ const typeFromArray = new Map( [
+@@ -46,6 +46,46 @@ const typeFromArray = new Map( [
  	[ Float32Array, 'float' ]
  ] );
  
@@ -69,12 +69,12 @@ index de53c08..d4f41a0 100644
  const _toFloat = ( value ) => {
  
  	if ( /e/g.test( value ) ) {
-@@ -3572,7 +3612,13 @@ class NodeBuilder {
+@@ -3535,7 +3575,13 @@ class NodeBuilder {
  
  		const mrt = this.renderer.getMRT();
  
--		return ( mrt && mrt.has( 'velocity' ) ) || ( this.object !== null && getDataFromObject( this.object ).useVelocity === true );
-+		if ( ( mrt && mrt.has( 'velocity' ) ) || ( this.object !== null && getDataFromObject( this.object ).useVelocity === true ) ) return true;
+-		return ( mrt !== null && mrt.has( 'velocity' ) );
++		if ( mrt !== null && mrt.has( 'velocity' ) ) return true;
 +
 +		// velocity drawn by the material itself, outside MRT: looked for once per build
 +

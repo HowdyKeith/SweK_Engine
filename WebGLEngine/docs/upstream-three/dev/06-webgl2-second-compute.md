@@ -10,16 +10,16 @@ With `forceWebGL: true`, two particle systems -- each its own `instancedArray` p
 
 **Cause.** `Pipelines.getForCompute()` (`src/renderers/common/Pipelines.js`) caches the compute stage by its shader code. On WebGL 2 the two systems' kernels compile to the same GLSL, so the second compute node gets the first's stage -- and the stage carries the buffers it binds by transform feedback (`transforms`, `nodeAttributes`), which `WebGLBackend.createComputePipeline()` binds: the second dispatch reads and writes the first system's buffers. On WebGPU the two kernels compile to different WGSL, so each has its own stage.
 
-**Fix.** The patch keys a compute stage by its code and, on the WebGL backend, by the buffers it binds as well; a released stage is dropped from the cache by the key it was cached by. Against `dev` at 576b084; I can open it as a pull request:
+**Fix.** The patch keys a compute stage by its code and, on the WebGL backend, by the buffers it binds as well; a released stage is dropped from the cache by the key it was cached by. Against `dev` at 11738a9; I can open it as a pull request:
 
 <details><summary>Patch</summary>
 
 ```diff
 diff --git a/src/renderers/common/Pipelines.js b/src/renderers/common/Pipelines.js
-index 78237db..6c421b9 100644
+index 8865c9b..1643923 100644
 --- a/src/renderers/common/Pipelines.js
 +++ b/src/renderers/common/Pipelines.js
-@@ -107,14 +107,17 @@ class Pipelines extends DataMap {
+@@ -107,12 +107,15 @@ class Pipelines extends DataMap {
  
  			// programmable stage
  
@@ -30,8 +30,6 @@ index 78237db..6c421b9 100644
  
  			if ( stageCompute === undefined ) {
  
- 				if ( previousPipeline && previousPipeline.computeProgram.usedTimes === 0 ) this._releaseProgram( previousPipeline.computeProgram );
- 
  				stageCompute = new ProgrammableStage( nodeBuilderState.computeShader, 'compute', computeNode.name, nodeBuilderState.transforms, nodeBuilderState.nodeAttributes );
 -				this.programs.compute.set( nodeBuilderState.computeShader, stageCompute );
 +				stageCompute.cacheKey = stageKey;
@@ -39,7 +37,7 @@ index 78237db..6c421b9 100644
  
  				backend.createProgram( stageCompute );
  				this.info.createProgram( stageCompute );
-@@ -421,6 +424,31 @@ class Pipelines extends DataMap {
+@@ -430,6 +433,31 @@ class Pipelines extends DataMap {
  
  	}
  
@@ -71,7 +69,7 @@ index 78237db..6c421b9 100644
  	/**
  	 * Computes a cache key representing a render pipeline.
  	 *
-@@ -458,7 +486,7 @@ class Pipelines extends DataMap {
+@@ -467,7 +495,7 @@ class Pipelines extends DataMap {
  	 */
  	_releaseProgram( program ) {
  
@@ -123,7 +121,7 @@ report({ webgpu: await run(false), webgl2: await run(true) });
 
 ### Screenshots
 
-What the page prints, the same on r186 and on `dev` at 576b084 (headless Chromium 141, SwiftShader):
+What the page prints, the same on r186 and on `dev` at 11738a9 (headless Chromium 141, SwiftShader):
 
 <!-- observed:begin -->
 webgpu moved [true, true]; webgl2 moved [true, false]

@@ -35,7 +35,8 @@
 <script type="module">
 import { spawnEnemies, stepAI, applyDamage } from "/ev/combat.js";
 import { headingVector } from "/ev/flightModel.js";
-import { DEFAULT_W, decide as tacticsDecide, applyBrainWeights } from "/ev/esTactics.js";
+import { decide as tacticsDecide } from "/ev/esTactics.js";
+import { mountTacticsPanel } from "/ui/tacticsPanel.mjs";   // v4839 -- Load Tactics: brain/tacticsRoster.mjs behind two selects (the sim below reads roster.weights("A"|"B"))
 import { createESBox3D } from "/physics/esBox3d.js";
 import { box3d } from "/physics/box3d/box3dLoader.js";
 import { planarFallbackWorld } from "/physics/planarFallbackWorld.js";
@@ -50,8 +51,6 @@ const CLASSES = [
 ];
 const SHOT = { speed: 1050, life: 1.7, dmgShield: 14, dmgArmor: 12, cooldownMs: 360 };
 const HIT_RADIUS = 90;
-const W_A = applyBrainWeights({ wWeak: 0, wFocus: 0, wThreat: 0, wPlayer: 0, wClose: 1 }, DEFAULT_W);   // scatter
-const W_B = { ...DEFAULT_W };                                                                             // hand
 
 function makeRng(seed) { let s = (seed >>> 0) || 1; return () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; }; }
 function makeFleet(team, center, count, rng) {
@@ -115,17 +114,25 @@ function newBattle() {
   for (const e of A.concat(B)) e._bx = esbx.add(e, e.stats);
   shots = []; t = 0;
 }
+// v4839 -- LOAD TACTICS: which weights pick each side's targets (brain/tacticsRoster.mjs behind two selects). The default is what this page always ran: A scatter, B the hand weights. Start Fight commits the choice,
+// clears the tally and rebuilds the battle.
+const roster = mountTacticsPanel({ hud: document.getElementById("hud"), onStart() { wins.A = 0; wins.B = 0; newBattle(); } });
+window.__tacticsFight = { roster, get A() { return A; }, get B() { return B; }, get wins() { return wins; }, get ready() { return A.length > 0; }, get t() { return t; }, step(n = 1) { for (let i = 0; i < n; i++) stepSim(); } };   // step(): advance the sim without waiting for frames (the gate's clock)
 
-function frame() {
+function stepSim() {
   const dt = 1 / 30, nowMs = t * 1000;
   const liveA = A.some((e) => !e.dead), liveB = B.some((e) => !e.dead);
   if (!liveA || !liveB) { if (liveA) wins.A++; else if (liveB) wins.B++; newBattle(); }
   else {
-    const sA = sideDriveShots(A, snapshot(B), W_A, esbx, dt, nowMs);
-    const sB = sideDriveShots(B, snapshot(A), W_B, esbx, dt, nowMs);
+    const sA = sideDriveShots(A, snapshot(B), roster.weights("A"), esbx, dt, nowMs);
+    const sB = sideDriveShots(B, snapshot(A), roster.weights("B"), esbx, dt, nowMs);
     esbx.step(dt); esbx.sync();                       // one shared step -> ships collide
     shots = advanceShots(shots.concat(sA, sB), A.concat(B), dt); t += dt;
   }
+}
+
+function frame() {
+  stepSim();
 
   ctx.clearRect(0, 0, W, H);
   ctx.fillStyle = "#0a1626"; for (const sh of shots) { ctx.fillRect(toX(sh.x) - 1, toY(sh.y) - 1, 2, 2); }

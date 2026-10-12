@@ -1,5 +1,5 @@
 diff --git a/src/renderers/webgl-fallback/utils/WebGLState.js b/src/renderers/webgl-fallback/utils/WebGLState.js
-index 60d8e40..d7fffe9 100644
+index 915c6ce..c9948b1 100644
 --- a/src/renderers/webgl-fallback/utils/WebGLState.js
 +++ b/src/renderers/webgl-fallback/utils/WebGLState.js
 @@ -1121,19 +1121,20 @@ class WebGLState {

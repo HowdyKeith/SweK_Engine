@@ -1,0 +1,110 @@
+{
+ "gate": "render/denoiseDevice-selfcheck.mjs",
+ "at": "2026-10-11",
+ "tables": [
+  {
+   "title": "K0 on a 21 x 19 image of the large network: each set's conv cells (the twin's, the fused mirror's, unexplained) and its kernel's worst relative error (APPLY_TOL 1e-5)",
+   "columns": [
+    "path",
+    "set",
+    "plain cells",
+    "fused cells",
+    "unexplained",
+    "worst kernel error"
+   ],
+   "rows": [
+    [
+     "native",
+     "r12",
+     83391,
+     0,
+     0,
+     3.709822712766309e-7
+    ],
+    [
+     "native",
+     "r14",
+     83391,
+     0,
+     0,
+     3.709822712766309e-7
+    ],
+    [
+     "native",
+     "r15",
+     51072,
+     0,
+     0,
+     3.595338535728272e-7
+    ],
+    [
+     "native",
+     "r18t",
+     51072,
+     0,
+     0,
+     3.595338535728272e-7
+    ],
+    [
+     "native",
+     "r18u",
+     51072,
+     0,
+     0,
+     3.595338535728272e-7
+    ],
+    [
+     "browser",
+     "r12",
+     83391,
+     0,
+     0,
+     4.498323868297624e-7
+    ],
+    [
+     "browser",
+     "r13",
+     83391,
+     0,
+     0,
+     4.498323868297624e-7
+    ],
+    [
+     "browser",
+     "r14",
+     83391,
+     0,
+     0,
+     4.498323868297624e-7
+    ],
+    [
+     "browser",
+     "r15",
+     51072,
+     0,
+     0,
+     3.803470495671128e-7
+    ],
+    [
+     "browser",
+     "r18t",
+     51072,
+     0,
+     0,
+     3.803470495671128e-7
+    ],
+    [
+     "browser",
+     "r18u",
+     51072,
+     0,
+     0,
+     3.803470495671128e-7
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}
