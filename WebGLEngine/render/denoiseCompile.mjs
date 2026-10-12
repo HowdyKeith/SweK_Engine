@@ -244,9 +244,11 @@ export function dumpStats(text, entry) {
  * probe (section 64) adds a run with use_dxc DISABLED, and the child's device already carries a disable entry --
  * headlessGpu's FINE_CLOCK_FLAG -- so the disable key is merged the same way, or the clock flag would silently erase it.
  * Moved here from render/denoiseCompile-selfcheck.mjs so tools/denoiseBuildProbe.mjs builds its children's flags with it too.
+ * Round 19 (section 66): `dump: false` merges the same way without dump_shaders, for a TIMED device -- the timing gate's FXC
+ * ladder, whose compiler the compile gate's "use_dxc off" dumps already name in the same run, and whose stdout must stay small.
  */
-export function dawnFlags(flags = []) {
-    const keys = ["enable-dawn-features=", "disable-dawn-features="], merged = new Map([[keys[0], ["dump_shaders"]], [keys[1], []]]), rest = [];
+export function dawnFlags(flags = [], { dump = true } = {}) {
+    const keys = ["enable-dawn-features=", "disable-dawn-features="], merged = new Map([[keys[0], dump ? ["dump_shaders"] : []], [keys[1], []]]), rest = [];
     for (const f of flags) {
         const k = keys.find((x) => f.startsWith(x));
         if (!k) { rest.push(f); continue; }
