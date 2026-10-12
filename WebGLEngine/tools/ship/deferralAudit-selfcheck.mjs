@@ -1,6 +1,7 @@
 // WebGLEngine/tools/ship/deferralAudit-selfcheck.mjs — v3313
 //
-// Run: node tools/ship/deferralAudit-selfcheck.mjs   (~0.2s — MEASURED individually)
+// Run: node tools/ship/deferralAudit-selfcheck.mjs   (~0.4s — re-measured v4839 on the timing record's owner box: 406-424 ms alone over three runs,
+//   379-408 in the shared ring; it read ~0.2s MEASURED individually at v3313, on another box)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // A DEFERRED NOTE THAT HAS BEEN SATISFIED IS WORSE THAN ONE THAT HAS NOT. It advertises open work that is

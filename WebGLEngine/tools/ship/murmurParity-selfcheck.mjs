@@ -41,11 +41,14 @@ import { fileURLToPath } from "node:url";
 import * as K from "../../render/murmurKit.mjs";
 import { createPresenceState } from "../../render/aiPresenceOrbState.mjs";
 import { codeOnly } from "./sourceScan.mjs";
+import { gateReport } from "./gateReport.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const say = (m) => console.log("  ----  " + m);
+// v4834: the shapes and the halo's width were printed and died with the terminal; gateReport-selfcheck named this gate as an arrival that argues in numbers.
+const REPORT = gateReport("tools/ship/murmurParity-selfcheck.mjs");
 const sec = (t) => console.log("\n" + t);
 
 console.log("murmurParity-selfcheck -- the full read of murmur-web, held line by line\n");
@@ -213,6 +216,10 @@ sec("3. *** THE SHAPES: limn's lap and band, comet's head and radius, sol's halo
     const oldHalo = (pp) => Math.exp(-(pp / 10.2) / ((wl * 3.19) * (wl * 3.19)));
     const widen = eFold(oldHalo) / eFold(murmurHalo);
     say(`sol's halo e-folds at ${eFold(murmurHalo).toFixed(4)} in murmur and did at ${eFold(oldHalo).toFixed(4)} -- x${widen.toFixed(3)}`);
+    REPORT.table("murmur's eight shapes, each found in the port or not", ["murmur's line", "in the port"], rows.map(([line, pass]) => [line, pass ? "in" : "OUT"]));
+    REPORT.table("sol's halo: e-folding distance, murmur's against the old spelling", ["wl", "murmur", "old spelling", "old / murmur"],
+        [[wl, eFold(murmurHalo), eFold(oldHalo), widen]]);
+    REPORT.write();
     ok("!! *** ALL EIGHT SHAPES ARE murmur's, AND sol's HALO IS ITS OWN WIDTH AGAIN ***",
         rows.every(([, p]) => p) && Math.abs(widen - 3.19) < 0.01,
         `${rows.filter(([, p]) => p).length} of ${rows.length}. THE HALO WAS ${widen.toFixed(2)} TIMES TOO WIDE: ` +

@@ -1,17 +1,34 @@
 {
- "at": "v4811",
- "devCommit": "576b084aff43ec5bb79911befb1d51be178cb7ed",
+ "at": "v4836",
+ "devCommit": "11738a9d55e502fb484cefffcea3a66dc44e9fe9",
  "builds": {
-  "dev": "029ad444d81066e47905cc9b96ef68f4a6fd8f59672125e15b5c979c6775d954",
-  "all": "404bd19f6deed30ed62175b0e44ac8ff7e7fef868638a935b030f278693960ea"
+  "dev": "1fa30f36cba5c4867659afb23285b0e96615845532dda7930289014811f665fe",
+  "all": "c0a910e711c07deb6f309a6bc664990c8e476a18fbaa66b54fd4398ecd567f06"
  },
- "run": "three dev at devCommit with its examples; node test/e2e/puppeteer-local.js --webgpu (../e2e/puppeteer-local.diff applied to dev runner), and again with E2E_NO_WEBGPU=1 for the WebGL 2 backend; build/ made by three rollup, plain and with all sixteen patches in order; 16 merged into 08s import line as threePatch.mjs merges it",
+ "run": "three dev at devCommit with its examples; node test/e2e/puppeteer-local.js --webgpu (../e2e/puppeteer-local.diff applied to dev's runner, unchanged since 576b084), and again with E2E_NO_WEBGPU=1 for the WebGL 2 backend; build/ made by three rollup, plain and with all sixteen patches in order; 16 merged into 08s import line as threePatch.mjs merges it",
  "unit": {
-  "tests": 1525,
-  "passed": 1524,
+  "tests": 1894,
+  "passed": 1891,
   "todo": 1,
-  "failed": 0,
-  "sameOnBoth": true
+  "failed": 2,
+  "sameOnBoth": true,
+  "gpu": {
+   "webgpu": 169,
+   "webgl": 169,
+   "skippedForBackend": 0
+  },
+  "failedOnBoth": [
+   {
+    "test": "Nodes > TSL > barriers > textureBarrier: a workgroup-mate's storage-texture write is visible after the barrier",
+    "why": "on this box's SwiftShader Vulkan the four texels read back after textureBarrier() do not sum to 10; the same on dev and with all sixteen -- dev's own test failing on this device, not investigated further"
+   },
+   {
+    "test": "Nodes > TSL > math library > mod(): integer truncated vs. float floored semantics diverge on negative operands [webgl]",
+    "why": "on the WebGL 2 backend (ANGLE over SwiftShader) integer % of negative operands comes back floored, 1 and -1 where the test expects -2 and 2; GLSL ES leaves % undefined for negative operands. The same on dev and with all sixteen"
+   }
+  ],
+  "runner": "test/unit/puppeteer.unit-local.js (../e2e/puppeteer-unit-local.diff): three's puppeteer.unit.js with the e2e runner's SwiftShader Vulkan and ANGLE flags in place of lavapipe, and its swizzle workaround",
+  "note": "v4811: 1525 tests. v4836: 1894 (#34918 consolidated the TSL unit tests), 1893 passed, 1 todo, 0 failed -- but with no WebGPU or WebGL backend in headless Chromium here, gpu-test-utils passed its 338 GPU-native tests as SKIPPED, so the patches to the node renderers were not exercised. v4841: with SwiftShader under both backends the 169 WebGPU and 169 WebGL 2 tests run, none skipped; 2 fail, the same 2 on both builds."
  },
  "webgpu": {
   "examples": 202,
@@ -35,7 +52,7 @@
    "webgpu_upscaling_taau": "a different image on each run of either build (so on r185 at v4795)"
   },
   "sameThisRun": {
-   "webgpu_loader_gltf_transmission": "the same bytes on both builds at v4811; five different images over eight runs of one build on r185 at v4795, so not counted on as fixed"
+   "webgpu_loader_gltf_transmission": "the same bytes on both builds at v4811 and again at v4836; five different images over eight runs of one build on r185 at v4795, so not counted on as fixed"
   }
  }
 }

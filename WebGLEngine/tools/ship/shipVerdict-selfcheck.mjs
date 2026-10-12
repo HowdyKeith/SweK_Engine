@@ -33,11 +33,17 @@
 //     code too -- the child dies a moment after the driver; it is polled for 2 s now). Restored.
 //   * v4680: registered the handlers over an empty list -> the SIGHUP, child and SIGINT rows went red, three by
 //     name; the SIGKILL control stayed green, as it must. Restored.
+//   * v4833, section 7 (a box not ready to verify is refused before verify runs), five, each red by name:
+//     A. readiness() ignores the Playwright resolver                  -> 2 (no Playwright; no browser on disk)
+//     B. readiness() ignores ensureDxc                               -> 2 (the DLL missing; no bundle carries it)
+//     C. main() runs verify although readiness answered              -> 1 (verify NEVER STARTED)
+//     D. the real verify gets no readiness check                     -> 1 (the choice row)
+//     E. the --write command is named where ensureDxc said CANNOT    -> 1 (the CANNOT row)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { spawn, spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import * as SV from "./shipVerdict.mjs";
 import { gateReport } from "./gateReport.mjs";
@@ -199,163 +205,95 @@ console.log("\n6. a run ended from outside says so where it can -- and the silen
     try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
 }
 
-console.log("\n7. v4832 -- a tree that cannot launch a browser is refused before verify runs, and the last line says what to type");
-// The rig's v4819 verify ran in a hand-typed, unprovisioned clone and came back after the whole sweep with 104 NEW reds, 103 of
-// them one missing playwright. Driven against a stand-in verify that leaves a file behind when it runs, so "verify was not run"
-// is read off the disk and not off the message that claims it. The conflict scan is stubbed: a first draft let two drives read
-// all 6,772 tracked files each, and this gate measured 25.6 s against its ~12.7s header -- past declaredCost's 2x line.
-// main() is driven IN THIS PROCESS here, and it registers handlers for every catchable signal whose `exit` is these drives'
-// stub -- so each drive's listeners are removed after it, or this gate would ignore Ctrl+C for the rest of its run.
-// SABOTAGES (v4832, each restored by copy):
-//   * main()'s pre-flight block skipped                          -> 7 red: the three refusal rows, the cannot-run control
-//     (its report line is printed by that block), the CLI-route row, the real-CLI row and the mid-pre-flight SIGHUP row
-//     (its driver's pre-flight never announces itself); the empty-pre-flight control stayed green
-//   * provisioning() asks THIS file's resolver instead of eng's   -> the "asks the tree's resolver" row and the CLI-route row
-//   * the pre-flight applied to a stand-in verify as well         -> the default-route row went red alone
-//   * main() reads `preflight` alone, dropping the default        -> 2 red, the CLI-route row and the real-CLI row (review: every
-//     row before them passes an explicit pre-flight, so this mutation was green on all of them)
-//   * fixCommand back to the reason's "cd <render-qa> && ..."    -> the command row went red alone
-//   * the CLI line itself passes `preflight: null`                -> the real-CLI row went red alone: main() was refusing, the
-//     command was not (review: the earlier rows call main() directly and never run that line)
-//   * the CLI line takes its tree from process.cwd()               -> the real-CLI row went red alone, run from outside the stub
-//     (review: run from inside it, the row could not tell the two apart)
-//   * the REAL playwrightResolve's browserSkipReason renamed      -> the real-resolver row went red alone, "pr.browserSkipReason
-//     is not a function"; every other row uses a stub that copies the API, so it was green on all of them
-//   CONTROL, not a sabotage: the CLI line passing the real verify.mjs explicitly still refuses -- the pre-flight keys on the
-//     tree's own verify.mjs, not on the argument being absent (review found that version green on every row, refusing nothing)
-//   * the listeners left in place after each drive                -> the listener row went red alone
-//   * the pre-flight moved back above the handler registration    -> the mid-pre-flight SIGHUP row went red alone: exit null,
-//     signal SIGHUP, and the last line the driver printed was its own "[preflight] waiting"
+console.log("\n7. v4833 -- a box that cannot run the browser gates is refused BEFORE verify, with the one command");
+// Keith's v4819 clone-verify: 898 s, 104 new reds, 103 of them "playwright is not installed here" once per gate. v4826's:
+// four reds that were dxcompiler.dll missing beside a fresh headless shell. Both are facts about the box that the tree's
+// own resolvers answer in milliseconds; readiness() asks them, and main() refuses on any answer without running verify.
 {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "shipverdict-pre-"));
-    const ran = path.join(dir, "ran");
-    const standIn = path.join(dir, "verify-standin.mjs");
-    fs.writeFileSync(standIn, `import fs from "node:fs";\nfs.writeFileSync(${JSON.stringify(ran)}, "1");\nconsole.log("[verify] ALL GREEN");\n`);
-    const noScan = () => ({ scanned: 0, hits: [] });
-    const listening = () => SV.CATCHABLE.map((sig) => process.listeners(sig));
-    const before = listening();
-    const settle = () => SV.CATCHABLE.forEach((sig, i) => {
-        for (const l of process.listeners(sig)) if (!before[i].includes(l)) process.removeListener(sig, l);
-    });
-    const drive = async (opts) => {
-        const lines = []; let code = null;
-        try { fs.rmSync(ran, { force: true }); } catch {}
-        try {
-            const d = await SV.main({ eng: ENG, verifyPath: standIn, scan: noScan, out: (m) => lines.push(m), exit: (c) => { code = c; }, ...opts });
-            return { d, code, lines, ran: fs.existsSync(ran) };
-        } finally { settle(); }
-    };
-    const FIX = SV.fixCommand("/x", { playwright: false, shell: true });
-    const no = await drive({ preflight: async () => ({ why: "playwright is not installed here -- tried: playwright (a headless shell at /s IS present) -- to fix: cd /x/tools/render-qa && npm install --ignore-scripts", fix: FIX }) });
-    ok("*** a pre-flight that names a missing browser refuses: exit 1, and the stand-in verify never ran ***",
-        no.code === 1 && !no.ran && no.d && no.d.ship === false, `exit=${no.code} ran=${no.ran}`);
-    const last = no.lines[no.lines.length - 1] || "";
-    ok("...and the LAST line is the verdict, naming NOT PROVISIONED and the command that fixes it",
-        last.startsWith("[ship] DO NOT SHIP -- NOT PROVISIONED") && last.includes(`to fix: ${FIX}, then run this again`), last);
-    ok("...and the full reason is printed above it, so the tried list survives for a box whose layout is new -- without its cd",
-        no.lines.some((l) => l.startsWith("[ship] NOT PROVISIONED: playwright is not installed here") && !l.includes("cd /x")), `${no.lines.length} line(s)`);
-    const yes = await drive({ preflight: async () => "" });
-    ok("!! CONTROL: an empty pre-flight runs verify exactly as before, to its SHIP",
-        yes.code === 0 && yes.ran && yes.d.ship === true, `exit=${yes.code} ran=${yes.ran}`);
-    const thrown = await drive({ preflight: async () => { throw new Error("resolver module missing"); } });
-    ok("!! CONTROL: a pre-flight that cannot run is reported and verify runs anyway -- it saves a sweep, it never blocks one",
-        thrown.ran && thrown.code === 0 && thrown.lines.some((l) => l.includes("pre-flight could not run")), `exit=${thrown.code} ran=${thrown.ran}`);
-    ok("...and the drives leave no signal handler behind: each one main() added is removed, so this gate still stops on Ctrl+C",
-        SV.CATCHABLE.every((sig, i) => process.listeners(sig).length === before[i].length),
-        SV.CATCHABLE.map((sig, i) => `${sig} ${before[i].length}->${process.listeners(sig).length}`).join(", "));
-    ok("...and the default asks only for the real verify, and not when the quick sweep is switched off; a given one is used as given",
-        SV.preflightFor({ verifyPath: null, env: {} }) === SV.provisioning && SV.preflightFor({ verifyPath: standIn, env: {} }) === null &&
-        SV.preflightFor({ verifyPath: null, env: { SWEK_QUICKSWEEP: "0" } }) === null &&
-        SV.preflightFor({ eng: ENG, verifyPath: path.join(ENG, "tools", "ship", "verify.mjs"), env: {} }) === SV.provisioning &&
-        SV.preflightFor({ verifyPath: standIn, preflight: SV.provisioning, env: { SWEK_QUICKSWEEP: "0" } }) === SV.provisioning,
-        "the tree's own verify.mjs named explicitly is still the real one; section 6's drivers pass a stand-in and no pre-flight, " +
-        "so they run whatever this box has installed; SWEK_QUICKSWEEP=0 " +
-        "skips the sweep every browser gate runs in, so there is nothing for a missing browser to fail");
-    // The command must work as typed from wherever the console is: no cd, the directory named once and quoted, and the browser
-    // fetched only where it is missing (render-qa's postinstall is `playwright install chromium chromium-headless-shell`).
-    const W = "C:\\SweK clone\\WebGLEngine", rqa = path.join(W, "tools", "render-qa");
-    const cmds = [[false, true], [false, false], [true, false]].map(([playwright, shell]) => SV.fixCommand(W, { playwright, shell }));
-    ok("...and the command names render-qa by --prefix, quoted, never by cd -- so the next line, run this again, works as typed",
-        cmds.every((c) => c.startsWith("npm install ") && c.endsWith(`--prefix "${rqa}"`) && !/\bcd\b/.test(c)) &&
-        cmds[0].includes("--ignore-scripts") && !cmds[1].includes("--ignore-scripts") && !cmds[2].includes("--ignore-scripts"),
-        cmds.join(" | "));
-    const plain = SV.unprovisionedLines("no browser here"), built = SV.unprovisionedLines({ why: "no browser -- to fix: cd x && y", fix: "z" });
-    ok("...and unprovisionedLines takes a plain reason as well as provisioning's { why, fix }, and ends on the verdict either way",
-        plain.length === 4 && plain[0] === "[ship] NOT PROVISIONED: no browser here" && /^\[ship\] DO NOT SHIP -- NOT PROVISIONED.*verify was not run$/.test(plain[3]) &&
-        built[0] === "[ship] NOT PROVISIONED: no browser" && built[3].endsWith("-- to fix: z, then run this again"),
-        `${plain[3]} | ${built[3]}`);
-    // provisioning() must ask THE TREE BEING VERIFIED, not the copy of the resolver beside this file: a stub tree whose resolver
-    // finds nothing has to come back with that tree's reason.
-    const stubEng = path.join(dir, "eng"), stubShip = path.join(stubEng, "tools", "ship");
-    fs.mkdirSync(stubShip, { recursive: true });
-    fs.writeFileSync(path.join(stubShip, "playwrightResolve.mjs"),
-        'export function resolvePlaywright() { return { chromium: null, from: "" }; }\n' +
-        'export function browserSkipReason(c) { return c ? "" : "stub tree: no playwright -- to fix: cd stub && npm install"; }\n');
-    const stubWhy = await SV.provisioning(stubEng);
-    ok("...and provisioning() asks the resolver of the tree it is handed, not the one beside this file",
-        stubWhy && stubWhy.why === "stub tree: no playwright -- to fix: cd stub && npm install" &&
-        stubWhy.fix === SV.fixCommand(stubEng, { playwright: false, shell: false }), JSON.stringify(stubWhy));
-    // *** AND THE ROUTE THE CLI TAKES, END TO END. *** Review of the first draft: every row above passes an explicit pre-flight or
-    // calls preflightFor directly, so main() could drop the default -- the one thing the rig's typed command depends on -- with
-    // every row green. Here main() gets the stub tree, no verifyPath and no pre-flight, exactly as the CLI calls it; the stub's
-    // verify.mjs leaves its own file if it is ever run.
-    const stubRan = path.join(dir, "stub-ran");
-    fs.writeFileSync(path.join(stubShip, "verify.mjs"), `import fs from "node:fs";\nfs.writeFileSync(${JSON.stringify(stubRan)}, "1");\nconsole.log("[verify] ALL GREEN");\n`);
-    const cliLines = []; let cliCode = null;
-    try { await SV.main({ eng: stubEng, env: {}, scan: noScan, out: (m) => cliLines.push(m), exit: (c) => { cliCode = c; } }); } finally { settle(); }
-    ok("*** ...and main() called as the CLI calls it -- no verifyPath, no pre-flight -- refuses the unprovisioned tree before its verify runs ***",
-        cliCode === 1 && !fs.existsSync(stubRan) && (cliLines[cliLines.length - 1] || "").startsWith("[ship] DO NOT SHIP -- NOT PROVISIONED"),
-        `exit=${cliCode} verify ran=${fs.existsSync(stubRan)}; ${cliLines[cliLines.length - 1] || "(no lines)"}`);
-    // *** AND THE CLI LINE ITSELF. *** The row above calls main() as the CLI does; this one RUNS the CLI: shipVerdict.mjs copied
-    // into the stub tree finds that tree by its own location, as it does on the rig, so its resolver and its verify are the stub's.
-    // It imports nothing but node's own modules, which is what lets the copy run there. Run from OUTSIDE the stub tree: review
-    // found that with the stub as its cwd, a CLI that took its tree from the cwd instead of its own location passed this row.
-    fs.copyFileSync(path.join(ENG, "tools", "ship", "shipVerdict.mjs"), path.join(stubShip, "shipVerdict.mjs"));
-    const cliEnv = { ...process.env }; delete cliEnv.SWEK_QUICKSWEEP;
-    const real = spawnSync(process.execPath, [path.join(stubShip, "shipVerdict.mjs"), "--version", "v0"], { cwd: dir, env: cliEnv, encoding: "utf8", timeout: 60000 });
-    const realLast = String(real.stdout || "").trim().split("\n").pop() || "";
-    ok("*** ...and the command itself, run in that tree, refuses it: exit 1, its verify never ran, and the last line says what to type ***",
-        real.status === 1 && !fs.existsSync(stubRan) && realLast.startsWith("[ship] DO NOT SHIP -- NOT PROVISIONED") && realLast.includes("npm install"),
-        `exit=${real.status} verify ran=${fs.existsSync(stubRan)}; ${realLast}`);
-    // *** AND THE REAL RESOLVER, AS provisioning() CALLS IT. *** Every row above hands main() a pre-flight or a stub resolver that
-    // copies the API rather than reading it. provisioning() reaches this tree's playwrightResolve.mjs by a computed import that no
-    // static import check can see, and a pre-flight that throws is reported and verify runs anyway -- so a drift in that API
-    // would put the rig back on the 104-red sweep with every row green (review of v4832). Asked here of this tree's own resolver,
-    // and checked against what the resolver says when asked directly.
-    let realPre, realThrew = "";
-    try { realPre = await SV.provisioning(ENG); } catch (e) { realThrew = String(e && e.message); }
-    let direct = null;
+    const { browserSkipReason, SHELL_DIR_SAMPLES, SHELL_LEAVES, DXC_LEAVES } = await import("./playwrightResolve.mjs");
+    const { ensureDxc } = await import("./ensureDxc.mjs");
+    const noDxc = () => ({ needed: false });
+    const none = SV.readiness({ resolve: () => ({ chromium: null, from: "" }), shell: "", skipReason: browserSkipReason, dxc: noDxc });
+    ok("!! *** no Playwright: ONE line, naming tools/render-qa's npm install -- not one red per browser gate ***",
+        none.length === 1 && /tools[\\/]render-qa/.test(none[0].what) && /npm install/.test(none[0].what),
+        none.length ? none[0].what.slice(0, 160) + "..." : "readiness said ready with no Playwright at all");
+    const noShell = SV.readiness({ resolve: () => ({ chromium: {}, from: "playwright" }), shell: "", skipReason: browserSkipReason, dxc: noDxc });
+    ok("...Playwright but no browser on disk: the install that fetches one is named",
+        noShell.length === 1 && /npx playwright install chromium chromium-headless-shell/.test(noShell[0].what),
+        noShell.length ? noShell[0].what.slice(-110) : "readiness said ready with no browser binary");
+    // ensureDxc itself, driven on a fixture Windows box: Playwright's root holds a full browser carrying dxcompiler.dll
+    // and a headless shell that does not -- the state a fresh `playwright install` leaves (v4828's four reds).
+    // The folder and leaf names come from the resolver's own exports: playwrightResolve-selfcheck refuses a browser path
+    // spelt by hand anywhere else, and this fixture was its first catch (v4833's verdict).
+    const ROOTPW = path.join(path.sep, "pw");
+    const [FULL_DIR, SHELL_DIR] = SHELL_DIR_SAMPLES;
+    const FULL = path.join(ROOTPW, FULL_DIR, DXC_LEAVES.find((l) => l.startsWith("chrome-win64")));
+    const shellExe = path.join(ROOTPW, SHELL_DIR, SHELL_LEAVES.find((l) => l.startsWith("chrome-headless-shell-win64")));
+    const fixDxc = (has) => () => ensureDxc({ platform: "win32", shell: shellExe, env: { PLAYWRIGHT_BROWSERS_PATH: ROOTPW }, home: path.join(path.sep, "nohome"),
+        exists: (q) => has.includes(q), readdir: (r) => { if (r === ROOTPW) return [FULL_DIR, SHELL_DIR]; throw new Error("no " + r); } });
+    const ready = () => ({ chromium: {}, from: "playwright" }), shellOk = () => "";
+    const dxcDry = SV.readiness({ resolve: ready, shell: shellExe, skipReason: shellOk, dxc: fixDxc([FULL]) });
+    ok("!! *** a fresh Windows browser folder without dxcompiler.dll: ensureDxc --write is named, before 15 minutes of sweep ***",
+        dxcDry.length === 1 && /ensureDxc\.mjs --write/.test(dxcDry[0].what) && /dxcompiler\.dll/.test(dxcDry[0].what),
+        dxcDry.length ? dxcDry[0].what.slice(0, 170) + "..." : "readiness said ready with the DLL missing beside the shell");
+    const dxcNone = SV.readiness({ resolve: ready, shell: shellExe, skipReason: shellOk, dxc: fixDxc([]) });
+    ok("...and when no bundle on the box carries it, the reason ensureDxc gives is passed on rather than a command that cannot work",
+        dxcNone.length === 1 && /CANNOT/.test(dxcNone[0].what) && !/ensureDxc\.mjs --write/.test(dxcNone[0].what),
+        dxcNone.length ? dxcNone[0].what.slice(-120) : "readiness said ready");
+    const dxcThere = SV.readiness({ resolve: ready, shell: shellExe, skipReason: shellOk,
+        dxc: fixDxc([FULL, path.join(path.dirname(shellExe), "dxcompiler.dll")]) });
+    ok("CONTROL: the DLL already beside the shell, and Playwright resolved -- ready, no entries",
+        dxcThere.length === 0, JSON.stringify(dxcThere).slice(0, 160));
+
+    // main() itself: a stand-in verify that leaves a mark if it is ever started.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "shipverdict-ready-"));
     try {
-        const PR = await import(pathToFileURL(path.join(ENG, "tools", "ship", "playwrightResolve.mjs")).href);
-        const asked = PR.resolvePlaywright(); direct = PR.browserSkipReason(asked.chromium, asked.from) || "";
-    } catch (e) { realThrew = realThrew || "asked directly: " + String(e && e.message); }
-    ok("!! *** ...and provisioning() runs against this tree's REAL resolver without throwing, and agrees with it asked directly ***",
-        !realThrew && direct !== null && (direct === "" ? realPre === "" : !!realPre && realPre.why === direct && /^npm install /.test(realPre.fix)),
-        realThrew ? `THREW: ${realThrew}` : (direct === "" ? "this box resolves a browser, and provisioning() returned \"\"" :
-            `this box does not: ${String(realPre && realPre.fix)}`));
-    // *** AND A SIGNAL DURING THE PRE-FLIGHT STILL LEAVES THE TRAILER. *** Review of this round: the first version asked the
-    // resolver BEFORE registering section 6's handlers, so a SIGHUP in that window (537-681 ms, measured) ended the process with
-    // the start line and nothing else -- the shape section 6's control row says means only an uncatchable kill. Driven live,
-    // in a child, like section 6: the pre-flight announces itself and waits, and is sent a real SIGHUP while it waits.
-    if (process.platform !== "win32") {
-        const drv = path.join(dir, "pre-driver.mjs");
-        fs.writeFileSync(drv, `import { main } from ${JSON.stringify(pathToFileURL(path.join(ENG, "tools", "ship", "shipVerdict.mjs")).href)};\n` +
-            `await main({ eng: ${JSON.stringify(ENG)}, verifyPath: ${JSON.stringify(standIn)}, scan: () => ({ scanned: 0, hits: [] }),\n` +
-            `  preflight: async () => { console.log("[preflight] waiting"); await new Promise((r) => setTimeout(r, 20000)); return ""; } });\n`);
-        const mid = await new Promise((resolve) => {
-            const p = spawn(process.execPath, [drv], { stdio: ["ignore", "pipe", "pipe"] });
-            let o = "", sent = false;
-            const t = setTimeout(() => { try { p.kill("SIGKILL"); } catch {} }, 15000);
-            p.stdout.on("data", (b) => { o += b; if (!sent && o.includes("[preflight] waiting")) { sent = true; p.kill("SIGHUP"); } });
-            p.on("close", (code, signal) => { clearTimeout(t); resolve({ code, signal, o, sent }); });
-        });
-        ok("!! *** a SIGHUP while the pre-flight is still asking leaves the trailer, exit 1 -- the handlers are in before it runs ***",
-            mid.sent && mid.code === 1 && /interrupted by SIGHUP/.test(mid.o) && /\[ship\] DO NOT SHIP -- NO VERDICT/.test(mid.o),
-            `sent=${mid.sent} exit=${mid.code} signal=${mid.signal}; ${mid.o.trim().split("\n").pop()}`);
-    } else {
-        say("the mid-pre-flight SIGHUP row is driven on POSIX, for section 6's reason: child.kill(sig) is TerminateProcess on win32");
-    }
-    try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
+        const mark = path.join(dir, "verify-ran");
+        const standIn = path.join(dir, "verify-standin.mjs");
+        fs.writeFileSync(standIn, `import fs from "node:fs";\nfs.writeFileSync(${JSON.stringify(mark)}, "ran");\n`);
+        const lines = []; let code = null;
+        const d = await SV.main({ eng: ENG, verifyPath: standIn, preflight: () => [{ what: "the browser gates cannot run here: FIXTURE" }],
+                                  out: (m) => lines.push(m), exit: (c) => { code = c; } });
+        const text = lines.join("\n");
+        ok("!! *** not ready: verify is NEVER STARTED, the exit is 1, and the last line says DO NOT SHIP -- NOT RUN ***",
+            !fs.existsSync(mark) && code === 1 && d && d.notRun === true &&
+            /\[ship\] DO NOT SHIP -- NOT RUN/.test(text.trim().split("\n").slice(-1)[0]) && text.includes("FIXTURE"),
+            `verify ${fs.existsSync(mark) ? "RAN" : "not started"}, exit ${code}, last line ${JSON.stringify(text.trim().split("\n").slice(-1)[0])}`);
+        lines.length = 0; code = null;
+        await SV.main({ eng: ENG, verifyPath: standIn, preflight: () => [], out: (m) => lines.push(m), exit: (c) => { code = c; } });
+        // main() registered its signal handlers on THIS process on the way through; they would swallow a Ctrl+C here.
+        for (const sig of SV.CATCHABLE) process.removeAllListeners(sig);
+        ok("CONTROL: ready -- the same stand-in IS started, so the row above is about the refusal and not a stand-in that never runs",
+            fs.existsSync(mark) && code !== null, `verify ${fs.existsSync(mark) ? "ran" : "NOT STARTED"}, exit ${code}`);
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+
+    ok("the REAL verify gets the real readiness check; a stand-in gets none unless one is passed",
+        SV.chosenPreflight({ verifyPath: null }) === SV.readiness && SV.chosenPreflight({ verifyPath: "x.mjs" }) === null &&
+        typeof SV.chosenPreflight({ verifyPath: "x.mjs", preflight: () => [] }) === "function",
+        "so sections 4 and 6, which drive main() against stand-ins, are unchanged on a box without Playwright");
+    const here = SV.readiness();
+    say(`THIS BOX: ${here.length ? "NOT READY -- " + here.map((n) => n.what).join(" | ") : "ready (Playwright resolves, a browser is on disk, and DXC is " + (process.platform === "win32" ? "beside the shell" : "not needed off Windows") + ")"}`);
+}
+
+console.log("\n8. v4836 -- after a SHIP, the verdict names step 4b; the verdict line stays last");
+{
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "shipverdict-next-"));
+    try {
+        const green = path.join(dir, "verify-green.mjs");
+        fs.writeFileSync(green, 'console.log("[verify] ALL GREEN");\n');
+        const run = async (opts) => { const lines = []; let code = null;
+            await SV.main({ eng: ENG, verifyPath: green, preflight: () => [], out: (m) => lines.push(...String(m).split("\n")), exit: (c) => { code = c; }, ...opts });
+            for (const sig of SV.CATCHABLE) process.removeAllListeners(sig);
+            const t = lines.filter((l) => l.trim()); return { t, code }; };
+        const a = await run({ nextStep: () => "[ship] next, before the rig is asked: node tools/ship/afterVerdict.mjs -- FIXTURE" });
+        ok("!! *** a SHIP names afterVerdict.mjs on the line before the verdict, and the verdict is still the LAST line ***",
+            a.code === 0 && /^\[ship\] SHIP /.test(a.t[a.t.length - 1]) && /afterVerdict\.mjs/.test(a.t[a.t.length - 2] || ""),
+            `exit ${a.code}; last two: ${JSON.stringify(a.t.slice(-2))}`);
+        const real = SV.chosenNextStep({ verifyPath: null });
+        ok("...the real verify's line carries afterVerdict's own plan count, so the number cannot drift from the step",
+            typeof real === "function" && /afterVerdict\.mjs -- \d+ gates/.test(real()) && SV.chosenNextStep({ verifyPath: "x.mjs" }) === null,
+            typeof real === "function" ? real().slice(0, 120) : "no next step for the real verify");
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
 
 say("WHAT THIS DOES NOT CLAIM. That a round cannot be pushed unverified -- nothing in a repository can stop a " +

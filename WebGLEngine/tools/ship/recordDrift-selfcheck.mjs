@@ -250,6 +250,36 @@ console.log("\n2. handed a stale record, each check names it");
         // the control came out masked -- this box's own local timings file already held the gate -- so every other record
         // gives the gate up before the two that matter are added.
     }
+    // *** v4839 -- THE QUESTION A CLONE WILL BE ASKED, ANSWERED FROM WHAT A CLONE WILL HOLD. *** v4834 shipped
+    // reportFresh-selfcheck with one reading, in this box's gitignored sweep-timings.local.json. Coverage read the
+    // union, this row passed here, and the rig's clone-verify stopped on that gate at the drift pre-flight. Shown on a
+    // tree built for it, because the rule is about a file being PRESENT and the live tree cannot be told to hold one:
+    // the real committed records, the gate taken out of every one of them, and a local file that times it.
+    {   const os = await import("node:os"), tmp = fs.mkdtempSync(path.join(os.tmpdir(), "recordDrift-local-"));
+        try {
+            fs.mkdirSync(path.join(tmp, "tools", "ship"), { recursive: true });
+            const strip = (rec) => { const o = { ...rec };
+                for (const k of ["timings", "at", "kinds", "codes"]) if (o[k]) o[k] = Object.fromEntries(Object.entries(o[k]).filter(([g]) => g !== rel));
+                return o; };
+            for (const r of BT.records(ENG, { committed: true })) fs.writeFileSync(path.join(tmp, r.file), JSON.stringify(strip(r.rec)));
+            const now = new Date().toISOString(), local = path.join(tmp, BT.FILES.legacy);
+            fs.writeFileSync(local, JSON.stringify({ host: "fixture-this-box", timings: { [rel]: 1 }, at: { [rel]: now }, kinds: { [rel]: "alone" }, codes: { [rel]: 0 } }));
+            const row = async () => (await checks({ only: "sweep timings", recordRoot: tmp })).find((c) => c.name === "sweep timings");
+            const withLocal = await row();
+            const union = BT.coverageOf(BT.records(tmp)).entries.get(rel);
+            ok("!! *** a gate timed ONLY in the gitignored local file is a hole, as it is on every clone of this tree ***",
+                withLocal.stale === true && withLocal.detail.split(", ").includes(rel),
+                `${rel}: ${withLocal.stale ? "named missing" : "COVERED"} with ${path.basename(BT.FILES.legacy)} present -- ` +
+                `the union of every file would read it ${union ? "covered from " + path.basename(union.from || "?") : "missing"}, which is how v4834 passed here`);
+            fs.rmSync(local);
+            const clone = await row();
+            ok("  ...and the answer is the one the same tree gives with no local file at all, which is what the rig's clone holds",
+                clone.stale === withLocal.stale && clone.detail === withLocal.detail, `without the file: ${clone.stale ? "stale" : "clean"}, same detail: ${clone.detail === withLocal.detail}`);
+            // SABOTAGES (v4839): boxTimings.records ignores `committed` -> both rows red, by name (the gate COVERED with the
+            // file present, so the two answers differ); recordDrift's live coverage read through the union again
+            // (BT.coverage(recordRoot) without committed) -> the same two rows red. Both restored by copy.
+        } finally { try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {} }
+    }
 }
 
 {

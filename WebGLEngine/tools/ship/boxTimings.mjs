@@ -68,7 +68,11 @@ export const FILES = Object.freeze({
 });
 
 /** Every timings record present in the tree, shared first, each carrying the host that wrote it. */
-export function records(root = ENG) {
+// v4839 -- `committed: true` leaves out FILES.legacy, the one record .gitignore carries: the records a FRESH CLONE has.
+// v4834 shipped a gate whose only reading was in this box's sweep-timings.local.json; recordDrift's coverage read the
+// union and passed here, and the rig's clone -- which has no such file -- stopped at the drift pre-flight. A question a
+// clone will be asked is answered from what the clone will hold.
+export function records(root = ENG, { committed = false } = {}) {
     const out = [];
     const push = (rel, kind) => {
         try {
@@ -77,7 +81,7 @@ export function records(root = ENG) {
         } catch { /* absent or unreadable: a box with no record simply has none, which is not an error */ }
     };
     push(FILES.shared, "shared");
-    push(FILES.legacy, "legacy");
+    if (!committed) push(FILES.legacy, "legacy");
     let names = [];
     try { names = fs.readdirSync(path.join(root, "tools", "ship")); } catch {}
     for (const n of names.sort()) {
@@ -92,8 +96,8 @@ export function records(root = ENG) {
  * `mine` is per entry, so a caller can tell a local measurement from a foreign one WITHOUT being forced to
  * pick -- the distinction v4647's refusal is about, kept rather than collapsed into one number.
  */
-export function coverage(root = ENG, { id = boxId() } = {}) {
-    return coverageOf(records(root), { id });
+export function coverage(root = ENG, { id = boxId(), committed = false } = {}) {
+    return coverageOf(records(root, { committed }), { id });
 }
 
 /**

@@ -1,9 +1,9 @@
 {
  "gate": "tools/ship/runtimeGap-selfcheck.mjs",
- "at": "2026-09-07",
+ "at": "2026-10-11",
  "tables": [
   {
-   "title": "what 4012 runtime source files actually use",
+   "title": "what 4625 runtime source files actually use",
    "columns": [
     "capability",
     "files",
@@ -12,62 +12,62 @@
    "rows": [
     [
      "ES modules",
-     "3720",
-     "92.7%"
+     "4320",
+     "93.4%"
     ],
     [
      "closures as values",
-     "3598",
-     "89.7%"
+     "4166",
+     "90.1%"
     ],
     [
      "async/await",
-     "1413",
-     "35.2%"
+     "1735",
+     "37.5%"
     ],
     [
      "typed arrays",
-     "788",
-     "19.6%"
+     "1274",
+     "27.5%"
     ],
     [
      "Promises",
-     "343",
-     "8.5%"
+     "417",
+     "9.0%"
     ],
     [
      "fetch/XHR",
-     "243",
-     "6.1%"
+     "251",
+     "5.4%"
     ],
     [
      "performance.now",
-     "220",
-     "5.5%"
+     "245",
+     "5.3%"
     ],
     [
      "WebGL",
-     "154",
-     "3.8%"
+     "200",
+     "4.3%"
     ],
     [
      "requestAnimationFrame",
-     "116",
-     "2.9%"
+     "127",
+     "2.7%"
     ],
     [
      "WebGPU",
-     "48",
+     "57",
      "1.2%"
     ],
     [
-     "WebAssembly",
-     "23",
-     "0.6%"
+     "workers/threads",
+     "25",
+     "0.5%"
     ],
     [
-     "workers/threads",
-     "22",
+     "WebAssembly",
+     "24",
      "0.5%"
     ]
    ],

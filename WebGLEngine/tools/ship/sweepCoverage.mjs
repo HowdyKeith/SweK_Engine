@@ -371,7 +371,14 @@ export const STILL_OVER_AT_V4815 = Object.freeze({
             // 2,328 / 2,503 / 2,462 ms alone, quiet, under the bar and back in the sweep. Found by step 4b: the row below still demanded
             // justifiedOver of every entry, as the v4813 row did before v4818 -- the retirement path had a branch there and none here.
             // Kept as history with the readings that retired it.
-            returned: Object.freeze({ at: "v4829", aloneMs: 2462, serialMs: Object.freeze([2328, 2503, 2462]) }) }),
+            returned: Object.freeze({ at: "v4829", aloneMs: 2462, serialMs: Object.freeze([2328, 2503, 2462]) }),
+            // v4839 -- AND OVER AGAIN, BECAUSE THE RECORD CAME BACK TO THIS HOST (quickSweep's v4838 handover, 142c0d -> 420793).
+            // The v4839 SHIP verdict read it 6,655 ms loaded and 3,009 alone ("over budget now"); the record's ring holds
+            // 2,895 / 3,028 / 3,009 and three quiet runs by hand read 2,954 / 2,813 / 2,889 -- a straddler on this host, as v4815
+            // found it, and under the bar on the other. `back` supersedes `returned`: the latest host move decides which property
+            // the entry is held to. Found by step 4b, as the v4829 retirement was.
+            back: Object.freeze({ at: "v4839", box: "linux-x64-4c-16gb-420793", loadedMs: 6655,
+                serialMs: Object.freeze([2895, 3028, 3009]), quietMs: Object.freeze([2954, 2813, 2889]) }) }),
     ]),
 });
 

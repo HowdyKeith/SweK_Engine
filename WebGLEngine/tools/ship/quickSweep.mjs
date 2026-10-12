@@ -320,6 +320,24 @@ export const RECORD_HANDOVERS = Object.freeze([
         evidence: "boxId() read linux-x64-4c-16095mb-142c0d (Xeon @ 2.10GHz) at the v4818 rotation, which wrote 40 " +
                   "readings to sweep-timings.local.json and refused the shared record; that local file was deleted and " +
                   "the ledger it moved was restored. 142c0d held the record from v4813 to v4815." }),
+    // v4838 -- TO 420793 AGAIN, DECIDED TWICE ON THE SAME DAY BY TWO SESSIONS, AND ONE ROW BECAUSE IT IS ONE HANDOVER. The
+    // container has run on the 2.80GHz host since before v4832, so for five rounds every reading taken here went to
+    // .local.json or a per-box file: v4834's reportFresh reading reached the rig only through sweep-timings.<box>.json,
+    // and declaredCost's v4820 ratchet (statedRuntime and gateSelection, "paid when the record's owner re-times those
+    // two") had no owner present to pay it. Keith answered the ownership question with this box. Main's denoiser arc
+    // reached the same answer on its own merge: budgetEvidence went red on twelve gates absent from the record, which
+    // only the owner's sweep can clear, and Keith chose the handover over registering the red. Both lines wrote this
+    // row as v4838 (the label itself collided; see the v4842 changelog), and the v4842 merge keeps ONE: a second row
+    // from 142c0d would never apply, since ownerOf's ordered walk has already moved the record to 420793.
+    Object.freeze({ at: "v4838", from: "linux-x64-4c-16gb-142c0d", to: "linux-x64-4c-16gb-420793",
+        decidedBy: "Keith",
+        evidence: "Keith's answer \"This box (420793)\" to the record-owner question on 2026-10-11. boxId() reads " +
+                  "linux-x64-4c-16gb-420793 (Intel Xeon @ 2.80GHz) at v4838; the shared record still named 142c0d " +
+                  "(@ 2.10GHz), last written 2026-10-11T00:24Z, and every write here since v4832 went to " +
+                  "sweep-timings.local.json or sweep-timings.linux-x64-4c-16gb-420793.json. The denoiser arc's merge " +
+                  "read the same boxId() throughout; its rotation (47 readings) and first verify's sweep went to " +
+                  "sweep-timings.local.json and refused the shared record, and those local files were deleted at the " +
+                  "handover, as at v4818. 420793 held the record from v4815 to v4818." }),
 ]);
 
 /** The box that may write a record whose `host` reads `host`, after following every handover. */

@@ -1,6 +1,6 @@
 {
  "gate": "physics/xpbd/rigidCouple-selfcheck.mjs",
- "at": "2026-09-03",
+ "at": "2026-10-11",
  "tables": [
   {
    "title": "box3d's own mass properties against the solid-box formula",

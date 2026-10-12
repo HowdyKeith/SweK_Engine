@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "50f48e19141b018aab8b984701d0f1155e71a0a1",
+ "head": "ef2f3b3a5fef9891714d9264e0654c920bc834dc",
  "bodies": {
   "box3d": [
    {
@@ -46,8 +46,8 @@
    },
    {
     "path": "physics/box3dFingerprint-selfcheck.mjs",
-    "bytes": 4795,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "bytes": 5167,
+    "sha": "d4f8d60ebd6655ca02fc70d9aa749bf9546efd16"
    },
    {
     "path": "physics/box3dMathImports-selfcheck.mjs",
@@ -155,8 +155,8 @@
    },
    {
     "path": "tools/ship/dracoEncode-selfcheck.mjs",
-    "bytes": 16580,
-    "sha": "9c1d4e76e2de04a03dd8b50fba410a7d4bb2d237"
+    "bytes": 20053,
+    "sha": "151fafaa150d29e205bfddd5e9551273f3be3129"
    }
   ],
   "fonts": [
@@ -340,7 +340,7 @@
    },
    {
     "path": "server.html",
-    "bytes": 882516,
+    "bytes": 885471,
     "sha": "76256d926c6ad9f7e790b879fb94bd256dc1c108"
    },
    {
@@ -601,8 +601,8 @@
    },
    {
     "path": "es-aircraft.html",
-    "bytes": 16263,
-    "sha": "3d467420bb8c3fa9596e5f68e82356141589db34"
+    "bytes": 25020,
+    "sha": "5ff856fb3f5611941c35fe069f2a21881af5256a"
    },
    {
     "path": "es-box3d-3d.html",
@@ -611,8 +611,8 @@
    },
    {
     "path": "es-box3d-6dof.html",
-    "bytes": 25107,
-    "sha": "0a8d63e83bc4aee7219b4c3a4add85802a356421"
+    "bytes": 28644,
+    "sha": "8e4a085b38e0a622011b62efae00eb1781773823"
    },
    {
     "path": "es-box3d-fly3d.html",
@@ -721,8 +721,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3527419,
-    "sha": "e2781eda9a0a36a74d1a526eebaa4753f65cbec0"
+    "bytes": 3570456,
+    "sha": "6479bb1349f59a7fa37d4b6366218febc55bc4d3"
    },
    {
     "path": "mpm3d.html",
@@ -766,7 +766,7 @@
    },
    {
     "path": "server.html",
-    "bytes": 882516,
+    "bytes": 885471,
     "sha": "76256d926c6ad9f7e790b879fb94bd256dc1c108"
    },
    {
@@ -826,8 +826,8 @@
    },
    {
     "path": "tools/ship/dracoEncode-selfcheck.mjs",
-    "bytes": 16580,
-    "sha": "9c1d4e76e2de04a03dd8b50fba410a7d4bb2d237"
+    "bytes": 20053,
+    "sha": "151fafaa150d29e205bfddd5e9551273f3be3129"
    },
    {
     "path": "tools/ship/dracoWeld-selfcheck.mjs",
@@ -1218,8 +1218,8 @@
    },
    {
     "path": "tools/ship/threeUpstream-selfcheck.mjs",
-    "bytes": 66317,
-    "sha": "6b7e4579f4006952a2a688062ad9035f7c4311c2"
+    "bytes": 70568,
+    "sha": "996ab64ee3312555095f05ed13a6c0004c8f4d7e"
    },
    {
     "path": "tools/ship/tsl-selfcheck.mjs",
@@ -1280,13 +1280,13 @@
   "three-webgpu-r185": [
    {
     "path": "tools/ship/threePatch.mjs",
-    "bytes": 21193,
-    "sha": "108bd2aed5dd03dc7d8f85be07230b46c8225bee"
+    "bytes": 21567,
+    "sha": "aff5ba3934aa930e51f9f8631108e51f72c7f4aa"
    },
    {
     "path": "tools/ship/threeUpstream-selfcheck.mjs",
-    "bytes": 66317,
-    "sha": "6b7e4579f4006952a2a688062ad9035f7c4311c2"
+    "bytes": 70568,
+    "sha": "996ab64ee3312555095f05ed13a6c0004c8f4d7e"
    }
   ],
   "wasm": [

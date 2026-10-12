@@ -35,6 +35,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -86,7 +87,9 @@ export function gateReport(gateRelPath) {
             // FSR gates' tables hold such rows. renderedNumbers() already exempts exactly these two names.
             // A null -- a statistic not computed, such as a rank correlation over a constant -- is stored as
             // "none" for the same reason: an empty cell is a value the page cannot show.
-            rows = rows.map((r) => r.map((v) => (v == null ? "none" : typeof v === "number" && !Number.isFinite(v) ? String(v) : v)));
+            // v4834: and an EMPTY STRING is the same absence -- realGpuRun's renderer column came back "" for two flag sets on
+            // the sandbox, and gateReport-selfcheck's to-the-digit row counted 2 values the page could not show.
+            rows = rows.map((r) => r.map((v) => (v == null || v === "" ? "none" : typeof v === "number" && !Number.isFinite(v) ? String(v) : v)));
             tables.push({ title, columns, rows, note });
             return this;
         },
@@ -180,4 +183,76 @@ export function arguesInNumbers(src, strip = (s) => s) {
                   /\.forEach\([^)]*=>\s*(console\.log|say\()/.test(code) ||
                   /\.map\([^)]*=>\s*`[^`]*\$\{/.test(code);
     return loops && FORMATTER.test(code);
+}
+
+/**
+ * *** v4834 -- A REPORT OLDER THAN ITS GATE IS THE STALE MAP THIS MODULE SAYS IS WORSE THAN NONE. ***
+ *
+ * At the v4819 merge 55 reports conflicted and this branch's copy of each was taken whole, against gates main had
+ * edited; nothing could say which were now wrong. Re-run at v4834: 20 of the 55 printed different tables -- every one
+ * reproducible run to run, so stale and not noisy -- and 16 more reports, outside the merge, were older than the last
+ * commit to their own gate. This names that population from git: a report whose `at` is EARLIER than the last commit
+ * to its gate. The resolution is a day (`at` is a date), so a gate edited the same day as its report is not seen --
+ * a floor, not a census.
+ *
+ * *** A SHALLOW CLONE'S BOUNDARY IS NOT AN EDIT. *** In a `git clone --depth N` the oldest fetched commit appears to
+ * add every file, so its date would make every untouched report look stale -- the rig's depth-1 clone-verify most of
+ * all. Commits listed in the repository's `shallow` file are skipped, and a gate whose only commit is the boundary is
+ * UNJUDGED, not stale: counted and reported, never flagged.
+ *
+ * `log` is git's `--format=@%H %cs --name-only` text over the gates and `boundary` the shallow commits; both are
+ * injectable so the gate can drive a boundary and an edit without a repository built for the purpose.
+ *
+ * *** v4839 -- AND AN EDIT NOT YET COMMITTED, WHICH git log CANNOT SEE AND A DATE CANNOT ORDER. *** At v4834 this caught
+ * my own edit to gateReport-selfcheck only after it was committed -- by then on main, a round late. A gate changed in the
+ * working tree (`git diff --name-only HEAD`, plus untracked files) is judged by file times instead: its report is stale
+ * when the report file was last written BEFORE the gate file was. Both times are this box's, from this checkout, which is
+ * exactly where they mean something; a fresh clone has no such gates and the rule says nothing there. It also closes the
+ * same-day hole above for every edit made here, because the verdict that ships an edit runs before its commit.
+ * `dirty` (paths relative to root) and `mtime` (path -> ms) are injectable for the same reason `log` is.
+ */
+export function staleReports({ root = ENG, reports = null, log = null, boundary = null, dirty = null, mtime = null } = {}) {
+    const dir = path.join(root, REPORT_DIR);
+    const reps = reports || fs.readdirSync(dir).filter((f) => f.endsWith(".json") && f !== "index.json").map((f) => {
+        try { const j = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8")); return { file: `${REPORT_DIR}/${f}`, gate: j.gate, at: j.at }; }
+        catch { return { file: `${REPORT_DIR}/${f}`, gate: null, at: null }; }
+    }).filter((r) => r.gate);
+    let text = log, shallow = boundary, changed = dirty;
+    const git = (...a) => execFileSync("git", a, { cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+    if (text == null || shallow == null) {
+        // Bounded by the oldest report's date and filtered here rather than by 88 pathspecs: 0.57 s against 4.8 s, measured.
+        // A gate with no commit since then cannot have been edited after its report, so it is FRESH, not unjudged --
+        // unless the clone is shallow, where an absent date is an absence of history.
+        const since = reps.map((r) => r.at).filter(Boolean).sort()[0];
+        if (text == null) text = git("log", ...(since ? ["--since=" + since] : []), "--format=@%H %cs", "--name-only", "--relative");
+        if (shallow == null) { try { shallow = fs.readFileSync(git("rev-parse", "--git-path", "shallow").trim(), "utf8").split(/\s+/).filter(Boolean); } catch { shallow = []; } }
+    }
+    const skip = new Set(shallow), last = new Map();
+    let day = null;
+    for (const line of text.split("\n")) {
+        if (line.startsWith("@")) { const [sha, d] = line.slice(1).split(" "); day = skip.has(sha) ? null : d; continue; }
+        const f = line.trim();
+        if (f && day && !last.has(f)) last.set(f, day);      // newest first: the first date seen is the last edit
+    }
+    const gates = new Set(reps.map((r) => r.gate));
+    for (const f of [...last.keys()]) if (!gates.has(f)) last.delete(f);
+    // v4839: the working tree's own edits, judged by file time. An unreadable git or a missing file judges nothing here.
+    if (changed == null) {
+        try { changed = git("diff", "--name-only", "HEAD", "--relative").split("\n")
+                  .concat(git("ls-files", "--others", "--exclude-standard").split("\n")).map((x) => x.trim()).filter(Boolean); }
+        catch { changed = []; }
+    }
+    const timeOf = mtime || ((f) => { try { return fs.statSync(path.join(root, f)).mtimeMs; } catch { return null; } });
+    const inTree = new Set(changed), uncommitted = [];
+    for (const r of reps) {
+        if (!inTree.has(r.gate)) continue;
+        const g = timeOf(r.gate), p = timeOf(r.file);
+        if (g != null && p != null && p < g) uncommitted.push({ ...r, edited: `uncommitted, ${new Date(g).toISOString().slice(0, 16)}Z` });
+    }
+    const judged = reps.filter((r) => r.at && (last.has(r.gate) || shallow.length === 0 || inTree.has(r.gate)));
+    const byDate = judged.filter((r) => last.has(r.gate) && last.get(r.gate) > r.at).map((r) => ({ ...r, edited: last.get(r.gate) }));
+    const seen = new Set(uncommitted.map((r) => r.file));
+    return { reports: reps.length, judged: judged.length, unjudged: reps.length - judged.length,
+             dirty: reps.filter((r) => inTree.has(r.gate)).length,
+             stale: uncommitted.concat(byDate.filter((r) => !seen.has(r.file))) };
 }

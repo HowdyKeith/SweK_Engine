@@ -10,7 +10,7 @@ An `InstancedMesh` whose `instanceMatrix` is a `StorageInstancedBufferAttribute`
 
 **Cause.** `instance()` (`src/nodes/accessors/Instance.js`) keeps the previous matrices as a copy of the attribute's CPU array, refreshed after each draw: `previousInstanceMatrix.array.set( matrices.array )` in an `OnAfterObjectUpdate`. A compute pass writes the GPU buffer and never the CPU array, so the copy holds the matrices as they were created -- the instance's previous position is wherever its first matrices put it, every frame. 1.496 px is that position's distance from where the instance is.
 
-**Fix.** The patch keeps a storage matrix's previous matrices on the GPU. Before each draw, a copy of the last draw's matrices becomes the previous matrices and the matrices as they are now become the last draw's -- two buffer-to-buffer copies, ordered after the compute and before the draw. It adds `renderer.copyBufferToBuffer( src, dst )` for that (WebGPU `copyBufferToBuffer`, WebGL 2 `copyBufferSubData`), which creates each buffer, and uploads it if its CPU data changed, before copying. Non-storage matrices keep the CPU copy as before. It edits the same import line of `Instance.js` as the third-render issue's patch ("InstancedMesh past the uniform buffer"); applied together, that line imports `OnAfterObjectUpdate, OnBeforeObjectUpdate`. Against `dev` at 576b084; I can open it as a pull request:
+**Fix.** The patch keeps a storage matrix's previous matrices on the GPU. Before each draw, a copy of the last draw's matrices becomes the previous matrices and the matrices as they are now become the last draw's -- two buffer-to-buffer copies, ordered after the compute and before the draw. It adds `renderer.copyBufferToBuffer( src, dst )` for that (WebGPU `copyBufferToBuffer`, WebGL 2 `copyBufferSubData`), which creates each buffer, and uploads it if its CPU data changed, before copying. Non-storage matrices keep the CPU copy as before. It edits the same import line of `Instance.js` as the third-render issue's patch ("InstancedMesh past the uniform buffer"); applied together, that line imports `OnAfterObjectUpdate, OnBeforeObjectUpdate`. Against `dev` at 11738a9; I can open it as a pull request:
 
 <details><summary>Patch</summary>
 
@@ -83,7 +83,7 @@ index 2723fa9..fbfe9b8 100644
  		const previousInstanceMatrixNode = getPreviousInstance( instancedMesh, matrices, builder );
  		positionPrevious.assign( previousInstanceMatrixNode.mul( positionPrevious ).xyz );
 diff --git a/src/renderers/common/Backend.js b/src/renderers/common/Backend.js
-index 6b31fbd..c6b9be0 100644
+index 0d5986d..ce9e16c 100644
 --- a/src/renderers/common/Backend.js
 +++ b/src/renderers/common/Backend.js
 @@ -373,6 +373,16 @@ class Backend {
@@ -104,18 +104,10 @@ index 6b31fbd..c6b9be0 100644
  	 * Copies data of the given source texture to the given destination texture.
  	 *
 diff --git a/src/renderers/common/Renderer.js b/src/renderers/common/Renderer.js
-index 74fa89f..0f8825c 100644
+index a2b9939..4ffac89 100644
 --- a/src/renderers/common/Renderer.js
 +++ b/src/renderers/common/Renderer.js
-@@ -1,6 +1,7 @@
- import Animation from './Animation.js';
- import RenderObjects from './RenderObjects.js';
- import Attributes from './Attributes.js';
-+import { AttributeType } from './Constants.js';
- import Geometries from './Geometries.js';
- import Info from './Info.js';
- import Pipelines from './Pipelines.js';
-@@ -3250,6 +3251,23 @@ class Renderer {
+@@ -3253,6 +3253,23 @@ class Renderer {
  
  	}
  
@@ -140,7 +132,7 @@ index 74fa89f..0f8825c 100644
  	 * Copies data of the given source texture into a destination texture.
  	 *
 diff --git a/src/renderers/webgl-fallback/WebGLBackend.js b/src/renderers/webgl-fallback/WebGLBackend.js
-index 4f109bf..05a851c 100644
+index 53026c2..5330259 100644
 --- a/src/renderers/webgl-fallback/WebGLBackend.js
 +++ b/src/renderers/webgl-fallback/WebGLBackend.js
 @@ -2200,6 +2200,28 @@ class WebGLBackend extends Backend {
@@ -173,10 +165,10 @@ index 4f109bf..05a851c 100644
  	 * Copies data of the given source texture to the given destination texture.
  	 *
 diff --git a/src/renderers/webgpu/WebGPUBackend.js b/src/renderers/webgpu/WebGPUBackend.js
-index afedea9..d13cced 100644
+index e2e52ef..f2b64b5 100644
 --- a/src/renderers/webgpu/WebGPUBackend.js
 +++ b/src/renderers/webgpu/WebGPUBackend.js
-@@ -2969,6 +2969,26 @@ class WebGPUBackend extends Backend {
+@@ -2984,6 +2984,26 @@ class WebGPUBackend extends Backend {
  
  	}
  
@@ -266,7 +258,7 @@ report({ webgpu: await run(false) });
 
 ### Screenshots
 
-What the page prints, the same on r186 and on `dev` at 576b084 (headless Chromium 141, SwiftShader):
+What the page prints, the same on r186 and on `dev` at 11738a9 (headless Chromium 141, SwiftShader):
 
 <!-- observed:begin -->
 plain 5.612, storageCPU 5.612, storageCompute 1.496 -- the instance's mean x velocity in pixels (WebGPU)

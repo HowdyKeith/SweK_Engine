@@ -1,0 +1,137 @@
+{
+ "at": "2026-10-10T22:36:29.295Z",
+ "platform": "win32 10.0.22631 x64",
+ "node": "v24.17.0",
+ "commit": "b617a22b 2026-10-10 Denoiser arc, round 14: the GTX 1080's rig report, unedited",
+ "only": "denoise",
+ "launchArgs": [
+  "--enable-unsafe-webgpu",
+  "--use-angle=d3d11"
+ ],
+ "gates": [
+  {
+   "gate": "render/denoiseCompile-selfcheck.mjs",
+   "category": "timing",
+   "ok": false,
+   "ms": 821092,
+   "adapters": [
+    "intel gen-9"
+   ],
+   "software": false,
+   "fails": [
+    "FAIL    DXC is found only where BOTH its DLLs are: the shell's directory here, not a Chrome with dxil.dll alone",
+    "FAIL    on D3D12 every native run's dump names its compiler -- DXBC is FXC, DXIL is DXC   as shipped/r12-tiled-3x3: FXC (DXBC); as shipped/r13-fast-3x3: FXC (DXBC); as shipped/r12-direct-head: FXC (DXBC); as shipped/r13-fast-head: FXC (DXBC); as shipped/r14-head: FXC (DXBC); as shipped/r12-apply: FXC (DXBC); as shipped/r14-apply-fast: FXC (DXBC); use_dxc/r12-tiled-3x3: unknown (no dump);"
+   ],
+   "measured": [
+    "native compilers: D3D12; DXC's DLLs found in C:\\Program Files\\Google\\Chrome\\Application\\154.0.8037.99",
+    "native / as shipped: r12-tiled-3x3: NOT BUILT -- no result (exit 0): ; dump: FXC (DXBC), 363 lines, 9 loops, 37 indexable-temp lines, 3 barriers",
+    "native / as shipped: r13-fast-3x3: NOT BUILT -- no result (exit 0): ; dump: FXC (DXBC), 537 lines, 6 loops, 0 indexable-temp lines, 3 barriers",
+    "native / as shipped: r12-direct-head: NOT BUILT -- no result (exit 0): ; dump: FXC (DXBC), 217 lines, 5 loops, 0 indexable-temp lines, 0 barriers",
+    "native / as shipped: r13-fast-head: NOT BUILT -- no result (exit 0): ; dump: FXC (DXBC), 9785 lines, 6 loops, 0 indexable-temp lines, 3 barriers",
+    "native / as shipped: r14-head: NOT BUILT -- no result (exit 0): ; dump: FXC (DXBC), 97 lines, 1 loops, 0 indexable-temp lines, 0 barriers",
+    "native / as shipped: r12-apply: NOT BUILT -- no result (exit 0): ; dump: FXC (DXBC), 299 lines, 3 loops, 85 indexable-temp lines, 0 barriers",
+    "native / as shipped: r14-apply-fast: NOT BUILT -- no result (exit 0): ; dump: FXC (DXBC), 324 lines, 5 loops, 0 indexable-temp lines, 2 barriers",
+    "native / use_dxc: r12-tiled-3x3: build 389 ms, pass 7.602 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: unknown (no dump), 1 lines, 0 loops, 0 indexable-temp lines, 0 barriers",
+    "native / use_dxc: r13-fast-3x3: build 6402 ms, pass 0.786 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: unknown (no dump), 1 lines, 0 loops, 0 indexable-temp lines, 0 barriers",
+    "native / use_dxc: r12-direct-head: build 207 ms, pass 4.391 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: unknown (no dump), 1 lines, 0 loops, 0 indexable-temp lines, 0 barriers",
+    "native / use_dxc: r13-fast-head: build 355298 ms, pass 1260.519 ms (device clock, 3 passes), 331776 plain, 0 fused, 0 unexplained; dump: unknown (no dump), 1 lines, 0 loops, 0 indexable-temp lines, 0 barriers",
+    "native / use_dxc: r14-head: build 111 ms, pass 1.376 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: unknown (no dump), 1 lines, 0 loops, 0 indexable-temp lines, 0 barriers",
+    "native / use_dxc: r12-apply: build 537 ms, pass 1.049 ms (device clock, 30 passes), worst 4.59e-7 (APPLY_TOL 0.00001); dump: unknown (no dump), 1 lines, 0 loops, 0 indexable-temp lines, 0 barriers",
+    "native / use_dxc: r14-apply-fast: build 687 ms, pass 0.393 ms (device clock, 30 passes), worst 4.59e-7 (APPLY_TOL 0.00001); dump: unknown (no dump), 1 lines, 0 loops, 0 indexable-temp lines, 0 barriers",
+    "browser / Chrome's: r12-tiled-3x3: build 523 ms, pass 7.769 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained",
+    "browser / Chrome's: r13-fast-3x3: build 219 ms, pass 1.300 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained",
+    "browser / Chrome's: r12-direct-head: build 48 ms, pass 4.426 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained",
+    "browser / Chrome's: r13-fast-head: build 499 ms, pass 0.585 ms (device clock, 30 passes), 110430 plain, 221346 fused, 0 unexplained",
+    "browser / Chrome's: r14-head: build 42 ms, pass 1.345 ms (device clock, 30 passes), 110430 plain, 221346 fused, 0 unexplained",
+    "browser / Chrome's: r12-apply: build 297 ms, pass 1.128 ms (device clock, 30 passes), worst 4.59e-7 (APPLY_TOL 0.00001)",
+    "browser / Chrome's: r14-apply-fast: build 752 ms, pass 0.418 ms (device clock, 30 passes), worst 4.59e-7 (APPLY_TOL 0.00001)"
+   ]
+  },
+  {
+   "gate": "render/denoiseDevice-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 46117,
+   "adapters": [
+    "intel gen-9"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": []
+  },
+  {
+   "gate": "render/denoiseTiming-selfcheck.mjs",
+   "category": "timing",
+   "ok": true,
+   "ms": 190921,
+   "adapters": [
+    "intel gen-9 D3D12 driver version 31.0.101.2137",
+    "intel gen-9"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "native: adapter intel / gen-9 / D3D12 driver version 31.0.101.2137 (hardware)",
+    "native r12: 64 x 64: 30.532 ms a pass (10th-90th 30.242-31.970, 30 passes); on the device's clock 29.819 ms; 0.134 Mpx/s; conv 9.5 GFLOP/s; layer 0 2.294, layer 1 7.340, layer 2 7.274, layer 3 7.274, layer 4 4.391, kernel 1.049",
+    "native r12: 128 x 128: 120.477 ms a pass (10th-90th 119.465-125.366, 14 passes); on the device's clock 119.276 ms; 0.136 Mpx/s; conv 9.4 GFLOP/s; layer 0 8.847, layer 1 29.491, layer 2 29.622, layer 3 29.557, layer 4 17.498, kernel 4.063",
+    "native r12: 256 x 256: 459.216 ms a pass (10th-90th 457.240-465.312, 6 passes); on the device's clock 457.638 ms; 0.143 Mpx/s; conv 9.9 GFLOP/s; layer 0 32.702, layer 1 112.656, layer 2 112.525, layer 3 112.919, layer 4 68.682, kernel 16.450",
+    "native r12: 512 x 512 skipped -- predicted 1837 ms a pass, over the 1500 ms cap",
+    "native r12: 1024 x 1024 skipped -- predicted 7348 ms a pass, over the 1500 ms cap",
+    "native r12: 1920 x 1080 skipped -- predicted 14532 ms a pass, over the 1500 ms cap",
+    "native r14: 64 x 64: 5.192 ms a pass (10th-90th 5.109-5.521, 30 passes); on the device's clock 4.588 ms; 0.789 Mpx/s; conv 65.7 GFLOP/s; layer 0 0.393, layer 1 0.852, layer 2 0.786, layer 3 0.786, layer 4 1.311, kernel 0.393",
+    "native r14: 128 x 128: 17.664 ms a pass (10th-90th 17.388-18.602, 30 passes); on the device's clock 17.039 ms; 0.928 Mpx/s; conv 71.1 GFLOP/s; layer 0 1.180, layer 1 3.015, layer 2 2.884, layer 3 2.818, layer 4 5.374, kernel 1.704",
+    "native r14: 256 x 256: 67.409 ms a pass (10th-90th 66.795-70.991, 23 passes); on the device's clock 66.716 ms; 0.972 Mpx/s; conv 70.9 GFLOP/s; layer 0 4.129, layer 1 11.665, layer 2 10.945, layer 3 10.551, layer 4 23.921, kernel 5.374",
+    "native r14: 512 x 512: 272.564 ms a pass (10th-90th 268.434-275.178, 6 passes); on the device's clock 271.909 ms; 0.962 Mpx/s; conv 70.6 GFLOP/s; layer 0 16.122, layer 1 45.875, layer 2 43.254, layer 3 41.419, layer 4 99.222, kernel 24.510",
+    "native r14: 1024 x 1024: 1090.681 ms a pass (10th-90th 1072.525-1160.690, 3 passes); on the device's clock 1089.929 ms; 0.961 Mpx/s; conv 70.8 GFLOP/s; layer 0 62.783, layer 1 185.401, layer 2 171.180, layer 3 165.741, layer 4 395.313, kernel 104.792",
+    "native r14: 1920 x 1080 skipped -- predicted 2157 ms a pass, over the 1500 ms cap",
+    "native: r14 against r12 at 64 x 64: 6.50 x as fast, on the device's clock",
+    "native: r14 against r12 at 128 x 128: 7.00 x as fast, on the device's clock",
+    "native: r14 against r12 at 256 x 256: 6.86 x as fast, on the device's clock",
+    "page: adapter intel / gen-9 (hardware)",
+    "page r12: 64 x 64: 33.000 ms a pass (10th-90th 32.100-34.000, 30 passes); on the device's clock 29.966 ms; 0.124 Mpx/s; conv 9.5 GFLOP/s; layer 0 2.357, layer 1 7.294, layer 2 7.295, layer 3 7.286, layer 4 4.355, kernel 1.144",
+    "page r12: 128 x 128: 141.200 ms a pass (10th-90th 126.100-144.700, 16 passes); on the device's clock 137.973 ms; 0.116 Mpx/s; conv 8.2 GFLOP/s; layer 0 10.259, layer 1 34.021, layer 2 34.002, layer 3 34.022, layer 4 20.205, kernel 5.291",
+    "page r12: 256 x 256: 535.200 ms a pass (10th-90th 526.000-544.400, 6 passes); on the device's clock 531.307 ms; 0.122 Mpx/s; conv 8.5 GFLOP/s; layer 0 37.881, layer 1 130.307, layer 2 132.802, layer 3 130.100, layer 4 78.961, kernel 21.343",
+    "page r12: 512 x 512 skipped -- predicted 2144 ms a pass, over the 1500 ms cap",
+    "page r12: 1024 x 1024 skipped -- predicted 8578 ms a pass, over the 1500 ms cap",
+    "page r12: 1920 x 1080 skipped -- predicted 16963 ms a pass, over the 1500 ms cap",
+    "page r13: 64 x 64: 7.900 ms a pass (10th-90th 7.100-8.700, 30 passes); on the device's clock 5.261 ms; 0.518 Mpx/s; conv 66.5 GFLOP/s; layer 0 0.433, layer 1 1.071, layer 2 1.055, layer 3 1.069, layer 4 0.451, kernel 1.155",
+    "page r13: 128 x 128: 24.300 ms a pass (10th-90th 23.300-25.100, 30 passes); on the device's clock 21.452 ms; 0.674 Mpx/s; conv 67.6 GFLOP/s; layer 0 1.390, layer 1 4.157, layer 2 4.205, layer 3 4.213, layer 4 2.098, kernel 5.318",
+    "page r13: 256 x 256: 85.100 ms a pass (10th-90th 82.200-89.900, 24 passes); on the device's clock 82.361 ms; 0.770 Mpx/s; conv 73.0 GFLOP/s; layer 0 5.161, layer 1 15.077, layer 2 15.203, layer 3 15.249, layer 4 8.815, kernel 22.546",
+    "page r13: 512 x 512: 337.100 ms a pass (10th-90th 328.400-364.300, 7 passes); on the device's clock 333.667 ms; 0.778 Mpx/s; conv 73.2 GFLOP/s; layer 0 20.472, layer 1 60.861, layer 2 59.025, layer 3 62.448, layer 4 34.394, kernel 96.209",
+    "page r13: 1024 x 1024: 1304.900 ms a pass (10th-90th 1291.200-1440.800, 3 passes); on the device's clock 1302.137 ms; 0.804 Mpx/s; conv 75.2 GFLOP/s; layer 0 79.998, layer 1 229.325, layer 2 241.480, layer 3 231.740, layer 4 140.755, kernel 386.915",
+    "page r13: 1920 x 1080 skipped -- predicted 2582 ms a pass, over the 1500 ms cap",
+    "page r14: 64 x 64: 7.500 ms a pass (10th-90th 6.500-8.100, 30 passes); on the device's clock 5.278 ms; 0.546 Mpx/s; conv 55.6 GFLOP/s; layer 0 0.426, layer 1 1.052, layer 2 1.043, layer 3 1.055, layer 4 1.305, kernel 0.376",
+    "page r14: 128 x 128: 24.400 ms a pass (10th-90th 23.700-25.000, 30 passes); on the device's clock 21.853 ms; 0.671 Mpx/s; conv 54.8 GFLOP/s; layer 0 1.378, layer 1 4.102, layer 2 4.120, layer 3 4.183, layer 4 6.026, kernel 1.958",
+    "page r14: 256 x 256: 86.700 ms a pass (10th-90th 85.600-89.100, 24 passes); on the device's clock 83.957 ms; 0.756 Mpx/s; conv 56.2 GFLOP/s; layer 0 4.988, layer 1 15.218, layer 2 15.231, layer 3 15.191, layer 4 26.613, kernel 6.610",
+    "page r14: 512 x 512: 341.900 ms a pass (10th-90th 329.500-364.900, 6 passes); on the device's clock 339.227 ms; 0.767 Mpx/s; conv 55.3 GFLOP/s; layer 0 19.699, layer 1 59.008, layer 2 61.539, layer 3 61.991, layer 4 111.824, kernel 26.489",
+    "page r14: 1024 x 1024: 1379.700 ms a pass (10th-90th 1350.200-1450.100, 3 passes); on the device's clock 1376.543 ms; 0.760 Mpx/s; conv 55.5 GFLOP/s; layer 0 77.949, layer 1 235.448, layer 2 244.464, layer 3 244.610, layer 4 448.092, kernel 127.618",
+    "page r14: 1920 x 1080 skipped -- predicted 2731 ms a pass, over the 1500 ms cap",
+    "page: r13 against r12 at 64 x 64: 5.70 x as fast, on the device's clock",
+    "page: r13 against r12 at 128 x 128: 6.43 x as fast, on the device's clock",
+    "page: r13 against r12 at 256 x 256: 6.45 x as fast, on the device's clock",
+    "page: r14 against r12 at 64 x 64: 5.68 x as fast, on the device's clock",
+    "page: r14 against r12 at 128 x 128: 6.31 x as fast, on the device's clock",
+    "page: r14 against r12 at 256 x 256: 6.33 x as fast, on the device's clock"
+   ]
+  }
+ ],
+ "adapters": [
+  {
+   "name": "intel gen-9",
+   "software": false,
+   "launchArgs": [
+    "--enable-unsafe-webgpu",
+    "--use-angle=d3d11"
+   ]
+  },
+  {
+   "name": "intel gen-9 D3D12 driver version 31.0.101.2137",
+   "software": false,
+   "launchArgs": [
+    "node-webgpu (native)"
+   ]
+  }
+ ],
+ "verdict": "a real-hardware run on intel gen-9; intel gen-9 D3D12 driver version 31.0.101.2137",
+ "summary": "exact 1/1, quality 0/0, timing 1/2"
+}

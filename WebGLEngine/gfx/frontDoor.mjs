@@ -342,6 +342,10 @@ export const REACH_ARRIVALS_SINCE_V4407 = Object.freeze([
         why: "984157d3: the target-scoring utility the npc audit's third cluster needed; simulation/Kaiju.js, KaijuManager.js, KaijuRivalry.js and OgreScenario.js import it" }),
     Object.freeze({ module: "world/splatVoxelWorld.mjs",
         why: "1c8785b0 (splat collision): a splat cloud as a voxel world the walker stands in; main.js imports it directly" }),
+    // v4835 -- found by tools/ship/afterVerdict.mjs's first run: frontDoor-selfcheck (3.8 s) is the only guard of this record and
+    // over the sweep's line, so no ship-time step had run it since v4831 brought the module in.
+    Object.freeze({ module: "ui/publishCommands.mjs",
+        why: "a9acb8c3 (v4831, publish hygiene): the printed commands that publish, one definition; ui/githubPanel.js imports it" }),
 ]);
 export const REACH_LOST_SINCE_V4407 = Object.freeze([]);
 

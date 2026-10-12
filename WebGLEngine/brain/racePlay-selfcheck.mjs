@@ -301,4 +301,7 @@ sec("5. THE PAGE: race-lockstep.html in a real browser");
 }
 
 console.log(fails ? `\nracePlay-selfcheck: ${fails} FAILED` : "\nracePlay-selfcheck: all checks pass");
-process.exit(fails ? 1 : 0);
+// v4840 -- the verdict travels through exitCode, not process.exit(): this gate compiles wasm (box3d's glue, reached through a
+// computed path) and an exit with that module behind it is the Windows teardown assert the rig met in dracoEncode-selfcheck
+// at v4832. Found by wasmTeardown's door census and measured under tools/ship/wasmExitHook.cjs before the change.
+process.exitCode = fails ? 1 : 0;

@@ -8125,6 +8125,305 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "inside, on fsr-three.html's scene, neutral (-0.010 to +0.014 dB over six cases), the still picture " +
                  "within 2e-5 and its mask never firing -- section 4 of the device gate holds that.",
     }),
+    // v4838 -- RENUMBERED since481..since496 -> since529..since544 at the denoiser arc's merge: the arc's sixteen closings took
+    // since481..since496 on its branch while main took the same ordinals (to since528) in the same days -- forward, as v4819 did.
+    // the denoiser arc, round 14 -- WHERE THE NATIVE TIME GOES, A RULE FOR THE PAGE, AND k_apply.
+    since544: Object.freeze({
+        at: "the denoiser arc, round 14 (shipped in v4838)", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/denoiseCompile-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["brain/conv2d-selfcheck.mjs (the head kernel: its uniform block, planar output, three device cases and a 1 x 1 key)",
+                                "render/denoiseDevice-selfcheck.mjs (the r14 set natively, all three sets in the browser, k_apply_fast handed logits plus 100)",
+                                "render/denoiseTiming-selfcheck.mjs (three sets in turns in the page, r12 and r14 natively)",
+                                "tools/ship/realGpuRun-selfcheck.mjs (the compile gate in the run, timing; a 30-minute cap a gate)",
+                                "tools/ship/crossBackend-selfcheck.mjs (the head kernel and k_apply_fast, the same bytes on both backends)"]),
+        verdict: "*** NODE-WEBGPU SHIPS FXC AND NOT DXC. *** Round 13's fast head ran 1,900 times slower natively than in " +
+                 "Chrome on the same WGSL, and its pipelines took minutes to build; the Windows package carries d3dcompiler_47.dll " +
+                 "and neither of DXC's two DLLs, without which Dawn's use_dxc does nothing, and Chrome ships DXC. " +
+                 "render/denoiseCompile-selfcheck.mjs times seven kernels' builds and passes natively, a process apiece, as " +
+                 "shipped and under use_dxc with DXC's DLLs copied beside dawn.node where the box has them, and in Chrome through " +
+                 "denoise.html's new \"Time each kernel\"; Dawn's own shader dump names the compiler each run really used and " +
+                 "what it made. The r14 set: the fast kernel, a head kernel with no tile and no barrier writing its logits planar, " +
+                 "and k_apply_fast reading them coalesced from a halo in workgroup memory -- all exact here. PAGE_KERNELS gets " +
+                 "its own pre-registered rule (section 43).",
+    }),
+    // the denoiser arc, round 12 -- A GPU'S TIME, FOR THE RIG.
+    since543: Object.freeze({
+        at: "the denoiser arc, round 12, the rig's timing (shipped in v4838)", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/denoiseTiming-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/realGpuRun-selfcheck.mjs (the run covers the denoiser's two gates; the timing gate is timing, the device gate exact)"]),
+        verdict: "*** EVERY TIME THE DENOISER HAD PRINTED WAS SWIFTSHADER'S. *** Section 37: render/denoiseDevice.mjs times one " +
+                 "pass of round 11's network on a ladder of sizes, 64 x 64 up to a 1080p frame -- wall clock, and the device's own " +
+                 "clock pass by pass from timestamp queries where offered -- natively and through denoise.html's new \"Time the " +
+                 "network\", and tools/ship/realGpuRun.mjs now runs both denoiser gates, so `--only denoise` on the rig carries a " +
+                 "GPU's numbers back. The timer is asserted, never the time. The first sabotage, a wall clock read without " +
+                 "awaiting the queue, ran the gate 900 s: the ladder trusted the clock it measured and climbed into minutes. It " +
+                 "now spends its budget in a guard read-back that cannot land early, under a 60 s ladder budget, and the " +
+                 "sabotage goes red in seconds. 8 sabotages, all red.",
+    }),
+    // the denoiser arc, round 12 -- THE NETWORK ON THE DEVICE, BEFORE IT RUNS ON ANY TEST IMAGE.
+    since542: Object.freeze({
+        at: "the denoiser arc, round 12 (shipped in v4838)", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/denoiseDevice-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** ROUND 11'S NETWORK, ON THE DEVICE, BESIDE THE PATH TRACER. *** render/denoiseDevice.mjs runs the large " +
+                 "kernel network on any GPUDevice: the four hidden layers on brain/conv2d.mjs's tiled kernel, the 81-logit " +
+                 "head on its DIRECT kernel -- COUT_MAX was only ever the tiled kernel's limit, so the head needed neither " +
+                 "the widening nor the split section 15 expected -- and a new k_apply for the masked softmax and the weighted " +
+                 "irradiance. On Dawn every conv cell is the twin's given the device's own input to that layer, and k_apply " +
+                 "is its twin within 1e-5 (WGSL's exp and division are not correctly rounded). denoise.html, beside the Path " +
+                 "Tracer on the front door, renders only families R and C, says so above everything, refuses a dataset " +
+                 "seed, and checks its own device output against the f64 network; the gate drives it in Chromium. 11 " +
+                 "sabotages, all red; the softmax's missing max only after a row handed it logits plus 100. A Dawn device " +
+                 "reused after a busy second crashed or hung, so every job takes its own. Section 35 fixes D0-D3 before " +
+                 "the shipped network runs on any of round 11's test images.",
+    }),
+    // the denoiser arc, round 11 -- THE DEPLOYMENT ROUND, BEFORE ANY OF ITS TEST SCENES EXIST.
+    since541: Object.freeze({
+        // swept 0: the ledger's invariant is added.length === swept, and this round added no gate -- it widened two.
+        at: "the denoiser arc, round 11 (shipped in v4838)", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/denoiseScenes-selfcheck.mjs (SPLITS_R11: rounds 7 and 10's training scenes together, each as its own family; C5 over eleven rounds)",
+                                "render/denoiseStudy-selfcheck.mjs (ROUND11; a miniature with each family's own training, every new statistic recomputed from the tables; " +
+                                "section 13, the runner hands the study every option a round names)"]),
+        verdict: "*** ONE NETWORK FOR EVERYTHING IT WILL SEE. *** Ten rounds found the network beating the filter wherever " +
+                 "it was trained and nowhere else, in either direction. Section 32 stops asking it to transfer: round 10's " +
+                 "large network, unchanged, trained once on round 7's 96 scenes of R and round 10's 96 of C together, and " +
+                 "tested on new scenes of both -- H1 on R, H2 on C. Both supported meets section 9's rule for the device " +
+                 "without claiming transfer, and says nothing about a family it was not trained on. Secondary: each family's " +
+                 "own filter and networks, trained alone on the same scenes, on the same test images, and the one network " +
+                 "against each family's own filter. 10 sabotages, all red. The harvest then ran WITHOUT that secondary: the " +
+                 "runner passed options one by one and compareTrainSplits was not among them, and no gate ran the runner. " +
+                 "It now passes a round whole, held for every round (section 13 of the study's gate; 5 more sabotages, " +
+                 "one of them the runner as the harvest ran), and --secondary-r11 runs the secondary into its own file.",
+    }),
+    // the denoiser arc, round 10 -- TRAINED ON FAMILY C, BEFORE ANY OF ITS TEST SCENES EXIST.
+    since540: Object.freeze({
+        // swept 0: the ledger's invariant is added.length === swept, and this round added no gate -- it widened three.
+        at: "the denoiser arc, round 10 (shipped in v4838)", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/denoiseScenes-selfcheck.mjs (SPLITS_R10: trained on C, H2 on R; C5 over ten rounds)",
+                                "render/denoiseStudy-selfcheck.mjs (ROUND10)",
+                                "render/denoisePool-selfcheck.mjs (the other training's networks side by side; three trainings resumed part-way in workers)",
+                                "render/denoiseNet-selfcheck.mjs (a training stopped and resumed IS the unbroken one)",
+                                "brain/convNet-selfcheck.mjs (the stream's position, restored)"]),
+        verdict: "*** TRAINED ON THE FAMILY IT NEVER BEAT THE FILTER ON. *** Nine rounds found the network winning where it " +
+                 "was trained and never on family C, which it was never trained on. Section 30 trains round 9's large " +
+                 "network, unchanged, on 96 scenes of C, tests on new scenes of C (H1) and of R (H2), and trains round 9's " +
+                 "R network beside it as the comparison on the same images -- C unseen, or C hard. This box trains at 1.4 s " +
+                 "a step, so a batch of four can outlast a background run: each training now keeps its whole state every " +
+                 "250 steps and resumes from it, bit for bit. 13 sabotages, all red; R10, written in round 5 for the serial " +
+                 "comparison, re-run against the parallel one and still red.",
+    }),
+    // the denoiser arc, round 9 -- THE LARGER NETWORK, TRAINED LONGER, TESTED BY SIZE AS WELL AS COUNT.
+    since539: Object.freeze({
+        at: "the denoiser arc, round 9 (shipped in v4838)", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/denoisePool-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/denoiseNet-selfcheck.mjs (the large network: a 9 x 9 field, 33,329 parameters; a longer run's first steps ARE the shorter run)",
+                                "render/denoiseStats-selfcheck.mjs (the exact sign-flip test: equal effects reduce to the sign test bit for bit)",
+                                "render/denoiseStudy-selfcheck.mjs (ROUND9)", "render/denoiseScenes-selfcheck.mjs (SPLITS_R9, C5 over nine rounds)",
+                                "render/denoiseCache-selfcheck.mjs (cachedMany)",
+                                "tools/ship/runtimeGap-selfcheck.mjs (the headline row asserts its name -- bottom two in both censuses -- not a two-file closeness proxy)"]),
+        verdict: "*** TWO DELIBERATE CHANGES, AND THE MACHINERY TO AFFORD ONE OF THEM. *** Section 28 trains a kernel network " +
+                 "four times the size -- four 3 x 3 layers of 32, a receptive field of exactly the 9 x 9 window it weighs -- " +
+                 "for three times the steps, and tests the hypotheses with the exact sign-flip test of the mean effect, so " +
+                 "each image counts by how much it was won or lost. Applied to every earlier round's file it changes no " +
+                 "verdict (round 8's H1: 0.052 against 0.025). Seven large trainings at about 1.1 hours each would not fit " +
+                 "the background limit one after another, so render/denoisePool.mjs trains them side by side in worker " +
+                 "threads, bit for bit the serial networks -- held on synthetic jobs and on a whole miniature study whose " +
+                 "workers trained only what a half-filled cache lacked. 16 sabotages red; P4 only once the cache held " +
+                 "networks from the middle of a batch.",
+    }),
+    // the denoiser arc, round 8 -- C1 ON THE TRAINING IMAGES, BEFORE ANY OF ITS TEST SCENES EXIST.
+    since538: Object.freeze({
+        // swept 0: the ledger's invariant is added.length === swept, and this round added no gate -- it widened three.
+        at: "the denoiser arc, round 8 (shipped in v4838)", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/denoiseStats-selfcheck.mjs (trainSanity, verdict({ c1Train }), round 7's case now reported)",
+                                "render/denoiseStudy-selfcheck.mjs (ROUND8; a failed training C1 stops before the real test seeds; a passing one is the verdict's C1)",
+                                "render/denoiseScenes-selfcheck.mjs (SPLITS_R8, C5 over eight rounds)"]),
+        verdict: "*** A SANITY CHECK THAT CAN NO LONGER SPEND A TEST SET. *** Control C1 stopped rounds 5 and 7, both times " +
+                 "because the hand-written filter lost to the noisy input on test images, never because the pipeline was " +
+                 "broken. Section 26 decides C1 on the 96 TRAINING images, right after C0 and before any test scene is " +
+                 "rendered: both methods must beat the noisy input on 11 in 12 of them (88). On the test sets the counts are " +
+                 "reported, never tested. Round 7's design otherwise, on new test scenes (24000 R, 25000 C). Measured " +
+                 "from round 7's cache before pre-registering: filter 94, network 96 -- it will hold, as a sanity check " +
+                 "should. 12 sabotages, all red.",
+    }),
+    // the denoiser arc, round 7 -- THE HARVEST, RESUMABLE.
+    since537: Object.freeze({
+        at: "the denoiser arc, round 7 (shipped in v4838)", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/denoiseCache-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** A HARVEST LONGER THAN ONE BACKGROUND RUN, RESUMED BIT FOR BIT. *** Round 7's harvest needs about 2.1 " +
+                 "hours on a slow box and a background run is stopped at 2: the first was stopped after \"measured\", in the " +
+                 "secondaries, before its results file was written, so nothing was read. render/denoiseCache.mjs keeps each " +
+                 "rendered scene, tuned filter and trained network in a directory keyed by everything it depends on -- every " +
+                 "input bit, every option, --harvest -- stamped with the round, the commit and the code's diff; the same " +
+                 "command again resumes. Gated on a miniature shaped like round 7: stopped after training and resumed, it " +
+                 "gives the uninterrupted run's verdict, tables, filter and secondaries bit for bit; control C4's second " +
+                 "training is its own record (one ulp in it turns determinism off). 12 sabotages, 11 red; the twelfth is " +
+                 "refused by a second line, and red with both removed.",
+    }),
+    // the denoiser arc, round 7 -- THE RANDOMIZED FAMILY, BEFORE ANY OF ITS TEST SCENES EXIST.
+    since536: Object.freeze({
+        // swept 0: the ledger's invariant is added.length === swept, and this round added no gate -- it widened four.
+        at: "the denoiser arc, round 7 (shipped in v4838)", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/denoiseScenes-selfcheck.mjs (family R over 300 scenes, none of C's signature; C pinned to its pre-R fingerprint; SPLITS_R7)",
+                                "render/denoiseStudy-selfcheck.mjs (ROUND7)",
+                                "render/denoiseMask-selfcheck.mjs (a comparison training split under the mask is rendered with it)",
+                                "render/denoiseNet-selfcheck.mjs (a network refuses an input of another width)"]),
+        verdict: "*** TRAIN ON A BROAD RANDOMIZED DISTRIBUTION, TEST ON THE FAMILY TWO ROUNDS COULD NOT REACH. *** Section 23 " +
+                 "replaces round 6's 24 scenes of A and B with 96 scenes of family R -- materials, lights, skies and camera " +
+                 "drawn per scene from a menu that covers A and B but never C's rough diffuse, dielectric, coloured lights " +
+                 "or near-black sky -- and tests on held-out R (H1) and family C (H2), mask on. R's lights are drawn as " +
+                 "POWER over A-B-C's span after a first draft came out four times as bright as A, and its metals cut to one " +
+                 "in three after they dominated the noise. Building it found a silent defect: the comparison training split " +
+                 "was rendered without the mask, and a 9-channel network read the 10-channel test images at the wrong stride " +
+                 "and returned FINITE errors -- denoise() now refuses an input of another width. 8 sabotages, all red; M8 " +
+                 "stayed green until that guard existed.",
+    }),
+    // the denoiser arc, round 6 -- THE EMITTER MASK, BEFORE ANY OF ITS TEST SCENES EXIST.
+    since535: Object.freeze({
+        at: "the denoiser arc, round 6 (shipped in v4838)", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/denoiseMask-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/denoiseScenes-selfcheck.mjs (SPLITS_R6, C5 over six rounds)",
+                                "render/denoiseStudy-selfcheck.mjs (ROUND6)"]),
+        verdict: "*** BOTH METHODS ARE TOLD WHERE THE LIGHTS ARE, AND NEITHER MAY AVERAGE ACROSS THEM. *** Round 5 stopped " +
+                 "because the filter, tuned on A+B, smeared family C's coloured emitters into its near-black sky. Section " +
+                 "21 adds an emitter mask to both methods with one hard rule: no pixel is averaged with a neighbour whose " +
+                 "mask differs. The mask is the emitter's COVERAGE of each pixel from an 8 x 8 grid of rays, not a centre " +
+                 "ray's 0/1: measured outside every split, a 0/1 mask still let the rim pixels -- centre ray off the " +
+                 "emitter, samples on it -- smear into the sky (0.24 against a noisy 0.021), and coverage brought the same " +
+                 "frame to 0.0072. Gated: coverage sums to an emitter's analytic projected area within 0.4%; an all-zero " +
+                 "mask changes nothing, bit for bit, in either method; no weight crosses the mask. 9 sabotages, all red.",
+    }),
+    // the denoiser arc, round 5 -- THE THIRD FAMILY, BEFORE ANY OF ITS TEST SCENES EXIST.
+    since534: Object.freeze({
+        // swept 0: the ledger's invariant is added.length === swept, and this round added no gate -- it widened two.
+        at: "the denoiser arc, round 5 (shipped in v4838)", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/denoiseScenes-selfcheck.mjs (family C over 300 scenes; A and B pinned to their pre-C fingerprint; SPLITS_R5, familyOf)",
+                                "render/denoiseStudy-selfcheck.mjs (ROUND5; a mixed split renders each seed as its own family; the other-training comparison)"]),
+        verdict: "*** TRAIN ON TWO FAMILIES, TEST ON A THIRD NOBODY TRAINED ON. *** Rounds 3 and 4 won in-family and lost " +
+                 "on the family they never saw. Section 19 trains round 3's kernel network on 12 scenes of A and 12 of B -- " +
+                 "the same 24, more variety -- and tests it on held-out A+B (H1) and on family C (H2): rough-diffuse and " +
+                 "glossy-dielectric spheres, two coloured emitters, a near-black sky, none of it in A or B. Family C has its " +
+                 "own code path; a fingerprint of 80 A and B scenes recorded before C existed holds to the last digit. " +
+                 "C's emitter strength was set on scenes outside every split so its mean radiance sits near A's and B's -- " +
+                 "dark scenes would have been easy under relMSE's 0.01 offset. 8 sabotages, all red; R9 crashed the gate " +
+                 "until its miniature was caught.",
+    }),
+    // the denoiser arc, round 4 -- THE TEMPORAL ROUND, BEFORE ANY OF ITS TEST SCENES EXIST.
+    since533: Object.freeze({
+        at: "the denoiser arc, round 4 (shipped in v4838)", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/denoiseTemporal-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/denoiseScenes-selfcheck.mjs (strideOf; SPLITS_R4, C5 over four rounds)",
+                                "render/denoiseStats-selfcheck.mjs (C6: historyFit and the verdict that stops on it)",
+                                "render/denoiseFilter-selfcheck.mjs (a 13-channel input filters as its first nine channels)",
+                                "render/denoiseNet-selfcheck.mjs (shapeFor, cropAt and the trainer at stride 13)",
+                                "render/denoiseStudy-selfcheck.mjs (ROUND4, stopBeforeTests on C6)"]),
+        verdict: "*** THE HISTORY IS SHARED, SO THE QUESTION IS WHAT EACH METHOD DOES WITH IT. *** Section 17: each scene " +
+                 "becomes 8 frames orbiting its look point and arriving at its own eye, so the measured frame is the image " +
+                 "rounds 1-3 measured. render/denoiseTemporal.mjs reprojects each pixel's first hit into the previous " +
+                 "camera -- the inverse of pixelRay, checked against the forward ray to 2e-15 -- keeps the bilinear taps " +
+                 "that saw the same object at the same place facing the same way, and carries a running average forward; " +
+                 "a stationary camera gives the exact mean of 8 frames. The filter and round 3's kernel network (13 input " +
+                 "channels) both read that accumulation. C6 checks the history beats one frame on the TRAINING images and " +
+                 "stops the run before the tests if not. New test scenes from 9000 and 10000. 29 sabotages across six " +
+                 "gates, all red -- three only after rows were written for them (the object test alone, the seed count, " +
+                 "finite secondaries).",
+    }),
+    // the denoiser arc, round 3 -- THE KERNEL-PREDICTING HEAD, BEFORE ANY OF ITS TEST SCENES EXIST.
+    since532: Object.freeze({
+        // swept 0: the ledger's invariant is added.length === swept, and this round added no gate -- it widened five.
+        at: "the denoiser arc, round 3 (shipped in v4838)", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["brain/convNet-selfcheck.mjs (a layer names its own width; a shape naming none draws what it drew)",
+                                "render/denoiseNet-selfcheck.mjs (the kernel head: box at zero-last, a distribution, one-hot copies, softmax gradient)",
+                                "render/denoiseScenes-selfcheck.mjs (SPLITS_R3: new test seeds, refused, C5 over three rounds)",
+                                "render/denoiseStudy-selfcheck.mjs (ROUND3, the residual comparison beside it, C0 guarding seed 7000)"]),
+        verdict: "*** THE NETWORK PREDICTS THE FILTER'S WEIGHTS INSTEAD OF A CORRECTION. *** Section 14 found the residual " +
+                 "network denoises but loses to the joint bilateral filter, by more across families. Section 15 changes " +
+                 "one thing: a 1 x 1 head to 81 logits whose softmax weights the noisy irradiance over the filter's 9 x 9 " +
+                 "window -- an average of real samples, as the filter's is, 7,329 parameters against 6,387. Gated: an " +
+                 "untrained head is the box mean to 1e-16 (corners over their 25 taps), the weights are a distribution, a " +
+                 "dominant logit copies its tap, and the gradient through the softmax matches central differences to " +
+                 "1.8e-6. New test scenes from 7000 and 8000; round 2's residual network rides beside it as a secondary, " +
+                 "never tested. A training-split pilot (0.141 vs the filter's 0.192) only confirmed C0 can pass. " +
+                 "9 sabotages, all red.",
+    }),
+    // the denoiser arc, the re-run's amendment -- C0, THE ZERO-LAST INIT AND NEW TEST SCENES, BEFORE ANY OF THEM EXIST.
+    since531: Object.freeze({
+        // swept 0: the ledger's invariant is added.length === swept, and this round added no gate -- it widened four.
+        at: "the denoiser arc, re-run amendment (shipped in v4838)", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/denoiseScenes-selfcheck.mjs (SPLITS_R2: new test seeds, refused, C5 over both rounds)",
+                                "render/denoiseStats-selfcheck.mjs (C0: trainFit and the verdict that stops on it)",
+                                "render/denoiseNet-selfcheck.mjs (the zero-last init: round 1's draws, an identity at step 0)",
+                                "render/denoiseStudy-selfcheck.mjs (C0 stops the run before a test scene is rendered)"]),
+        verdict: "*** A FAILED FIT CANNOT SPEND A TEST SET AGAIN. *** The harvest (section 12) came back not reported: " +
+                 "control C1 fired because every network stayed the identity, and the diagnosis, on the training split " +
+                 "only, traced it to the He-initialised last layer of the residual (1.00x the noisy error at three " +
+                 "learning rates; 0.18x with that layer started at zero). Section 13 amends three things before the " +
+                 "re-run renders anything: the last layer starts at zero from the same draws, control C0 checks the " +
+                 "training fit (<= 0.8x for every seed) and STOPS the run before the test scenes are rendered -- the " +
+                 "gate proves it by putting the real re-run test seeds behind the stop with harvest off -- and T1/T2 " +
+                 "come from 5000 and 6000, ranges nothing has touched. A harvest's results file is never overwritten. " +
+                 "10 sabotages, all red; S8 crashed the gate until its row caught the throw.",
+    }),
+    // the denoiser arc, round 2 -- THE PRE-REGISTERED STUDY AS CODE, BEFORE ANY DATA.
+    since530: Object.freeze({
+        at: "the denoiser arc, round 2 (shipped in v4838)", swept: 6, green: 6, red: 0,
+        added: Object.freeze(["render/denoiseScenes-selfcheck.mjs", "render/denoiseFilter-selfcheck.mjs", "render/denoiseStats-selfcheck.mjs",
+                              "brain/convNet-selfcheck.mjs", "render/denoiseNet-selfcheck.mjs", "render/denoiseStudy-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["brain/conv2d-selfcheck.mjs (the backward pass reads relu's mask from a kept forward output -- same gradients, bit for bit)"]),
+        verdict: "*** EVERYTHING THE MEASUREMENT NEEDS, AND NOT ONE DATASET IMAGE. *** render/learned-denoiser-preregistration.md " +
+                 "sections 3-8 as code, each gated on synthetic data only: the two scene families on disjoint seed ranges " +
+                 "with first-hit guides and the demodulated 9-channel input; the joint bilateral filter and its train-only " +
+                 "grid tuner; a generic conv stack with seeded He init, backward to finite differences (5.6e-9) and Adam to " +
+                 "the textbook update; the pre-registered 6,387-parameter residual network, its relMSE gradient to 1.9e-7, " +
+                 "and ONE SEED TWICE IS ONE NETWORK, bit for bit -- the v4698 defect, planted as Math.random batch order, " +
+                 "goes red; the exact sign test, Holm and every verdict the controls can return, planted; and the whole " +
+                 "study as one pipeline, run end to end on a miniature seeded outside the splits. renderImages() REFUSES " +
+                 "every dataset seed without { harvest: true }, and the runner on the real splits is refused at its first " +
+                 "scene. 19 sabotages, all red; one (remodulate without the floor) only after a row was written for it. " +
+                 "Section 11 of the pre-registration closes ten gaps the code found, before any data.",
+    }),
+    // the denoiser arc, round 1 -- A CONVOLUTION LAYER, CPU AND DEVICE: brain/conv2d.mjs. (since480 is the splat-collision
+    // round's, on its own open branch; this slot is numbered past it so the two cannot collide when both land.)
+    since529: Object.freeze({
+        at: "the denoiser arc, round 1 (shipped in v4838)", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["brain/conv2d-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** THE TREE HAD NO CONVOLUTION, AND A DENOISER IS MADE OF NOTHING ELSE. *** brain/conv2d.mjs is a 2-D " +
+                 "convolution layer, channels last as the path tracer returns a frame: an f64 reference forward and " +
+                 "backward pass (held to central finite differences, worst 5e-10 over 573 parameters, with and without " +
+                 "relu), the f32 twin in the kernels' own order, the fused mirror, and two WGSL kernels -- direct, and " +
+                 "tiled through workgroup memory -- every cell the twin's on Dawn and byte-identical across backends. A " +
+                 "1x1 convolution is bit-identical to the GPU Brain's dense layer (render/brainTsl.mjs's mlpLayerCpu), so " +
+                 "no separate tiled matmul was built. The input channels are summed in blocks of 8 everywhere because " +
+                 "SwiftShader's pipeline build took 3,149 ms for an all-channels tile and 324 for an 8-channel one -- " +
+                 "measured, and the order made one order in every copy. 9 sabotages, all red; the missing barrier was " +
+                 "expected to hide on a serial device and was caught BECAUSE the device is serial. Committed with " +
+                 "render/learned-denoiser-preregistration.md, written before any dataset image, network or error exists.",
+    }),
     // the splat-collision round -- A SPLAT SCENE AS A VOXEL WORLD THE WALKER STANDS IN: world/splatVoxelWorld.mjs.
     // v4819 -- RENUMBERED since480 -> since514 at the merge of the two lines: both reached for since476..since480 in the same days,
     // and in an object literal the later key silently wins (gateSweep-selfcheck's duplicate row, v4394). Ordinals only need to be distinct.
@@ -8891,6 +9190,217 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "the same race differ (the policies are asked for each tick when a peer's pump reaches it); a pair and its log never do. " +
                  "The CLIs refuse an unknown option (cliArgs) and the peer's transport is a row of its own. Thirteen sabotages red by name, " +
                  "logged in the two headers. NOT CLOSED: the pair has run over loopback and in one browser, not between two machines.",
+    }),
+    // v4843 -- since550, above the other line's since549. THREE new gate files: brain/tacticsRoster-selfcheck.mjs (the Endless-Sky fight's Load Tactics panel on flight-gpu.html and es-box3d.html, and what the arena says about its eight presets),
+    // brain/pilotAircraftPolicy-selfcheck.mjs (the aircraft's learned pilot, its shipped file and the Load Pilots panel on es-aircraft.html) and tools/ship/trainAircraftPilot-selfcheck.mjs (the tool that trains and ships it).
+    since550: Object.freeze({
+        at: "v4843", swept: 3, green: 3, red: 0,
+        added: Object.freeze([
+            "brain/tacticsRoster-selfcheck.mjs",
+            "brain/pilotAircraftPolicy-selfcheck.mjs",
+            "tools/ship/trainAircraftPilot-selfcheck.mjs",
+        ]),
+        widened: Object.freeze([
+            "tools/ship/afterVerdict-selfcheck.mjs (section 5: a real depth-1 clone as the fixture, the two history gates NOT GRADED with exit 3, and six sabotages)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE ENDLESS-SKY FIGHT HAS NEVER BEEN AN EVEN MATCH: side A's 'scatter' takes 59% of its battles against side B's hand weights over both sides, 64% against the whole field of eight presets. *** The tactics gate holds the " +
+                 "three directions that survive a retune of the sim (scatter over hand, stubborn over skittish, skittish last) rather than the table, and the pages through a synchronous step(n) because flight-gpu.html's software WebGPU device is lost a few " +
+                 "seconds after boot in this harness and the page redirects to the 2D view as built. The aircraft pilot holds a heading at 0.912 held-out and 0.868 audit against the PD controller's 0.722 and 0.713, 0.989 against 0.831 on the page's " +
+                 "patrol. Four sabotages went 0 red on the first try -- an import gate that only imported valid vectors, a Start Fight row that looked at an unhurt fleet, an equivalent mutant (the sanitiser refuses null on its own) and, in the aircraft gate, a " +
+                 "claim of mine that no angle repeats across the training sets when 90 degrees does -- each fixed and re-sabotaged. NOT CLOSED: no picture of either panel on a real screen, the served-policy path has only met a stub of the bridge, and " +
+                 "the rig readings are still owed.",
+    }),
+    // v4842 -- NO new gate file -- main's v4838 (the denoiser arc) merged with this line's v4838-v4841. *** AND FOUR OF THIS
+    // LINE'S CLOSINGS COLLIDED: both lines wrote since529-since532, main for the arc's rounds 1-9 and this line for v4838-v4841,
+    // so the merged literal declared each twice and the later -- this line's -- won silently, taking eight of the arc's gates
+    // out of the surplus arithmetic. The duplicate-key row above named all four; this line's became since545-since548. ***
+    since549: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and the merge added no gate of its own.
+        at: "v4842", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        verdict: "Main's v4838 (the learned denoiser, eighteen rounds and fourteen gates) merged with this line's v4838-v4841. The v4838 " +
+                 "LABEL itself collided: main released it for the denoiser, this line had spent it on the timing-record handover, so v4842 " +
+                 "names the merged tree and both v4838 entries stay in the changelog and the markers. Both lines handed the record to " +
+                 "420793 on the same day, Keith deciding both; one RECORD_HANDOVERS row carries both evidences, since a second row from " +
+                 "142c0d could never apply. Both lines' shared timing records were written by 420793, so per gate the later reading " +
+                 "stands. The assertionShape and runtimeGap censuses were re-derived over the merged tree, not summed.",
+    }),
+    // v4841 -- NO new gate file -- three's GPU-native TSL unit tests run, on both backends, for the sixteen drafts.
+    since548: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4841", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (three's GPU-native TSL unit tests ran on WebGPU and on the WebGL 2 backend, none skipped; every unit failure named with its reason, the same on both builds)",
+        ]),
+        verdict: "*** v4836'S UNIT FIGURE COUNTED 338 TESTS THAT NEVER RAN, AND THEY WERE THE ONES NEAREST THE PATCHES. *** #34918 made three's " +
+                 "TSL unit tests GPU-native: each runs on a WebGPU and a WebGL 2 renderer and passes as SKIPPED when it gets neither, which " +
+                 "headless Chromium here never gave it. Three's unit runner with the e2e runner's SwiftShader flags and swizzle workaround " +
+                 "(kept as docs/upstream-three/e2e/puppeteer-unit-local.diff) runs all 338 -- 169 per backend -- on dev and with all sixteen: " +
+                 "1891 passed, 1 todo, 2 failed on both, the same two, dev's own on this device. e2e.json, the README and the sixteen pull " +
+                 "request texts say so. Three sabotages red by name. NOT CLOSED: why textureBarrier's read-back is wrong on SwiftShader.",
+    }),
+    // v4840 -- ONE new gate file: tools/ship/wasmDoors-selfcheck.mjs (the computed door to wasm, censused; five gates it found converted).
+    since547: Object.freeze({
+        at: "v4840", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/wasmDoors-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/wasmTeardown-selfcheck.mjs (section 7: DOORS_AT_V4840 held cheaply -- no new exit, the five converted stay converted; the census moved to wasmDoors-selfcheck at step 4b)",
+            "tools/ship/dracoEncode-selfcheck.mjs (the same holding row, where the sweep runs it: the guardian recordReach needed for DOORS_AT_V4840)",
+        ]),
+        verdict: "*** THE DOOR THE RIG FOUND AT v4832, CENSUSED, AND IT HAD FIVE MORE MEMBERS NOBODY HAD MET. *** The teardown module's " +
+                 "wasmCompilers / wasmDoors / doorReach name every script that compiles wasm (vendor/ included), every module that loads " +
+                 "one through createRequire or a computed import(), and every gate reaching one: 21, 8, 58. Fourteen of the 58 call " +
+                 "process.exit() outside v4663's measured census; under the hook five had the crash shape -- racePlay, box3dFingerprint, " +
+                 "gunnerTraceDemo, backendRotation, peerBrain, all green, all exit 0 -- and now set process.exitCode; the nine others " +
+                 "exit before any wasm or never call exit, and are recorded. Five sabotages red by name. NOT CLOSED: a door the rule " +
+                 "cannot name (a glue file chosen at run time with no literal for it anywhere) is still the rig's to find.",
+    }),
+    // v4839 -- NO new gate file -- the sandbox judges as a fresh clone would: the gitignored local record ignored, uncommitted gate edits seen.
+    since546: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened three.
+        at: "v4839", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/recordDrift-selfcheck.mjs (a gate timed only in the gitignored sweep-timings.local.json is a hole, on a tree built for it; and the answer equals the one with no local file)",
+            "tools/ship/reportFresh-selfcheck.mjs (section 3: a gate the working tree changed is judged by file time -- fixtures, a real repository, and the live tree)",
+            "tools/ship/sweepCoverage-selfcheck.mjs (a roll entry BACK over after a later host move is held as still-over again; step 4b found sweepBudget straddling here)",
+        ]),
+        verdict: "*** TWO WAYS THE SANDBOX'S VERDICT DISAGREED WITH THE RIG'S, AND BOTH WERE THE SANDBOX SEEING MORE THAN A CLONE DOES. *** " +
+                 "v4834 passed here and stopped the rig's clone-verify at the drift pre-flight, because reportFresh-selfcheck's only reading " +
+                 "lived in this box's gitignored sweep-timings.local.json and recordDrift's coverage read the union of every record. It reads " +
+                 "only the records a clone will hold now (boxTimings.records({committed:true})). And reportFresh read git log alone, so it " +
+                 "caught my own v4834 edit to gateReport-selfcheck one commit late: a gate the working tree changed is now judged by file " +
+                 "time, which also closes the same-day hole for every edit made here. lagBudget back to 3, as owed. Seven sabotages red by " +
+                 "name, one of them live on the real tree. NOT CLOSED: a same-day edit committed ELSEWHERE is still invisible to a date.",
+    }),
+    // v4838 -- since529: main's v4837 took since528 on the same day. NO new gate file -- the shared timing record handed to this box, and declaredCost's v4820 ratchet paid.
+    since545: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened four.
+        at: "v4838", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/declaredCost-selfcheck.mjs (the rotted-header ratchet 2 -> 0, on a machine with no readings of its own and on this one)",
+            "tools/ship/capReading-selfcheck.mjs (gateSelection's move from its loaded 67,823 ms named, with three confirming quiet runs)",
+            "tools/ship/meshBVH-selfcheck.mjs (the speedup rows take the fastest of several runs: 1 of 12 red under load before, 0 of 24 after)",
+            "tools/ship/avatarServerViews-selfcheck.mjs (waits up to 15 s for the robot's box it asserts, after its fixed 2.4 s)",
+        ]),
+        verdict: "*** THE RECORD'S OWNER WAS A HOST NO SESSION HAD RUN ON FOR FIVE ROUNDS, SO A DEBT THAT ONLY THE OWNER COULD PAY STOOD SINCE v4820. *** " +
+                 "Keith handed the shared timing record to linux-x64-4c-16gb-420793 (RECORD_HANDOVERS, v4838), and sweepRotation --gate " +
+                 "re-timed declaredCost's two rotted headers into it: gateSelection 12.5-14.4 s alone over five runs against its ~14s, its " +
+                 "loaded 69 s no longer the only reading (capReading names the move, with three quiet runs); statedRuntime 0.7 s against ~1.6s, the one header that was wrong -- its cost is the arrivals " +
+                 "it re-runs, and today it has none -- re-written to ~0.8s. The ratchet stands at 0. The first sweep this box wrote as owner " +
+                 "filed webcodecsFramesToMp4 skipped (ai-bridge's @napi-rs optionals absent here, present on 142c0d); installed, and " +
+                 "the session-start hook now installs them. Step 4b found meshBVH (one ~4 ms timing) and avatarServerViews (a fixed sleep) " +
+                 "red under load, both repaired. NOT CLOSED: a restart onto the other host strands the record again, one dated row away.",
+    }),
+    // v4837 -- since528, not since524..since527: four other rounds took them on main in the same days. THREE new gate files: tools/ship/poolWatch-selfcheck.mjs (what the quick sweep does not run, and a recorded red in it failing the ship), tools/ship/sysLagReading-selfcheck.mjs (the two rig readings as one
+    // command each, and the two backlog entries held to the code) and tools/ship/train6dofPilot-selfcheck.mjs (the tool that trains and ships the space-battle pilot). Built as v4832 while main shipped its own v4832 to v4836.
+    since528: Object.freeze({
+        at: "v4837", swept: 3, green: 3, red: 0,
+        added: Object.freeze([
+            "tools/ship/poolWatch-selfcheck.mjs",
+            "tools/ship/sysLagReading-selfcheck.mjs",
+            "tools/ship/train6dofPilot-selfcheck.mjs",
+        ]),
+        widened: Object.freeze([
+            "brain/pilot6dofPolicy-selfcheck.mjs (section 6: the reward, the seeds, the trainer, prune to a fixed point, the shipped file held to what it says about itself; the page's shipped and imported choices; ten more sabotages)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE FIRST SEARCH FOR THE SPACE-BATTLE PILOT TRAINED TO 8.62 AND HELD OUT AT 6.79, BELOW THE PILOT IT WAS TO REPLACE. *** It had learned the spawn jitter of its twelve seeds; the held-out and audit seeds exist for " +
+                 "that, and the tool picks its champion on the held-out ones only and reads the audit once. Three sabotages went 0 red on the first try, each for the same reason -- the row never reached the branch it guards: the " +
+                 "champion choice (on the first recipe the train-best run was also the held-out-best), the trainer that accepts a worse child (a gentle search rarely finds a clearly worse one) and the pool-watch wiring row (it matched " +
+                 "a file name verify.mjs's own comment spells). Each is fixed and re-sabotaged. NOT CLOSED: the rotation does not record input sets as it runs the over-budget pool (444 of 449 have none), so a pool reading's age is " +
+                 "said and not closed; and the lag and device readings need the rig.",
+    }),
+    // v4836 -- NO new gate file -- the sixteen three.js drafts moved to dev 11738a9.
+    since527: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4836", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (section 6: the sixteen stack in slot order -- no context line is a line an earlier patch removes, import lines apart)",
+            "tools/ship/shipVerdict-selfcheck.mjs (section 8: after a SHIP the verdict names step 4b with afterVerdict's plan count; the verdict line stays last)",
+        ]),
+        verdict: "*** NOTHING THREE MERGED IN 107 COMMITS FIXES ANY OF THE SIXTEEN, AND THREE PATCHES HAD TO BE MADE AGAIN FOR THREE REASONS. *** " +
+                 "On dev 11738a9 every reproduction prints what it printed on 576b084 -- r186, dev, its own patch, all sixteen. 04 and 06 " +
+                 "no longer applied (#34854, #34821); 16 applied and no longer built (#34871 added the import it adds). Three's unit tests " +
+                 "(1894 now, #34918) and e2e give the same outcomes on both builds. The new row holds the property a three-line context " +
+                 "broke: 10 applying after 04. NOT CLOSED: the consolidated TSL unit tests skip, headless here, what needs a GPU backend.",
+    }),
+    // v4835 -- ONE new gate file: tools/ship/afterVerdict-selfcheck.mjs (the ship ritual's step 4b as a command).
+    since526: Object.freeze({
+        at: "v4835", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/afterVerdict-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/sweepRotation-selfcheck.mjs (a write on a box that does not own the record merges into that box's own file)",
+            "tools/ship/cliArgs-selfcheck.mjs (afterVerdict.mjs refuses an unknown option)",
+            "gfx/frontDoor-selfcheck.mjs (ui/publishCommands.mjs named as an arrival: red since v4831 with nothing running it)",
+        ]),
+        verdict: "*** STEP 4b WAS A REGEX IN A MARKDOWN FILE AND IT ASKED ONE OF TWO QUESTIONS. *** tools/ship/afterVerdict.mjs runs, alone, " +
+                 "every gate whose CODE reads the timing record (85 by the old pattern, 41 of them only in comments, labResults' and " +
+                 "claimTrace's minutes among them) and recordReach's blockers, the gates that are a record's only guard and over " +
+                 "the sweep's line. Its first run found frontDoor-selfcheck red since v4831 (ui/publishCommands.mjs unnamed), and " +
+                 "building it found sweepRotation dropping a foreign box's earlier local readings on every write. Both repaired.",
+    }),
+    // v4834 -- ONE new gate file: tools/ship/reportFresh-selfcheck.mjs (no report older than the last commit to its own gate).
+    since525: Object.freeze({
+        at: "v4834", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/reportFresh-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/gateReport-selfcheck.mjs (an empty standing-reds register is held on all three sides; the three rendering rows run only when there is an entry)",
+            "tools/ship/brainStages-selfcheck.mjs, tools/ship/murmurParity-selfcheck.mjs (their printed tables are reports now)",
+            "physics/render/conductorFresnel-selfcheck.mjs (one emission of its table, not two under one title)",
+        ]),
+        verdict: "*** 71 REPORTS WERE STALE, AND FOUR ROWS OF gateReport-selfcheck WERE PASSING ON THEM. *** The 55 taken from one " +
+                 "side at the v4819 merge were re-run: 20 printed different tables, each reproduced exactly on a second run. 16 " +
+                 "more were older than their gate's last commit. Re-taken, registerDrift's report holds 0 standing reds (v4826 " +
+                 "emptied the register) where the stale one held 27 that three rendering rows kept grading; a realGpuRun cell came " +
+                 "back empty; conductorFresnel emitted one table twice. reportFresh-selfcheck holds the line from git, skipping a " +
+                 "shallow clone's boundary. NOT CLOSED: the resolution is a day.",
+    }),
+    // v4833 -- NO new gate file -- shipVerdict asks whether the box can run the browser gates before it runs verify.
+    since524: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4833", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/shipVerdict-selfcheck.mjs (section 7: no Playwright, no browser on disk, and dxcompiler.dll missing beside a Windows shell each refuse before verify with the one command; sabotages A-E)",
+        ]),
+        verdict: "*** 103 OF THE RIG'S 104 v4819 REDS WERE ONE FACT, PRINTED ONCE PER GATE AFTER 898 s. *** shipVerdict.readiness() asks the " +
+                 "tree's own resolvers (playwrightResolve, ensureDxc) first and refuses with DO NOT SHIP -- NOT RUN, naming " +
+                 "`npm install` in tools/render-qa or `ensureDxc.mjs --write`, without starting verify. It fixes nothing itself. A stand-in " +
+                 "verify gets no readiness check, so the selfcheck's earlier drivers are unchanged. NOT CLOSED: on the rig, a clone " +
+                 "whose playwright resolves from a SIBLING copy reads as ready, which is what the sweep would use too.",
+    }),
+    // v4832 -- NO new gate file -- dracoEncode-selfcheck exits by process.exitCode (the rig's v4819 clone-verify crashed it on libuv's
+    // UV_HANDLE_CLOSING assert), and wasmTeardown-selfcheck section 6 holds the conversion and measures the member live under the hook.
+    // Built as a local v4829 while main shipped its own v4829-v4831, so it ships as v4832; the local commit was never pushed.
+    since523: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.
+        at: "v4832", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/wasmTeardown-selfcheck.mjs (section 6: the member the rig found through createRequire -- converted, compiles 418,831 bytes, leaves without process.exit(); sabotages H-K)",
+            "tools/ship/dracoEncode-selfcheck.mjs (process.exitCode, not process.exit(), with the exitBusy readings at its exit line)",
+        ]),
+        verdict: "*** THE RIG'S CRASH NEEDED A WINDOWS TEARDOWN AND A CLONE WITH NO BROWSER, AND THE SANDBOX HAS NEITHER. *** " +
+                 "dracoEncode-selfcheck compiles the vendored Emscripten encoder and ended in process.exit(). v4663's screen never " +
+                 "reached it (createRequire with a computed path) and v4677's sample would read it QUIET: with a browser, section 4 " +
+                 "spends seconds between the encoder and the exit line. With section 4 skipped, as on the rig, exitBusy reads a burst " +
+                 "at that line (4.9-7.7 ms against 0.2-0.3, 4 of 5 over the floor). Converted; held by four sabotages. NOT CLOSED: " +
+                 "the crash itself is Windows-only, so the rig's next clone-verify is the instrument for the fact.",
     }),
     // v4831 -- TWO new gate files: tools/ship/publishHygiene-selfcheck.mjs (what a release can carry, and the publish commands the GitHub
     // panel prints) and tools/ship/brainStages-selfcheck.mjs (the ship's computer's two stages on the wire, and the orb states on them).

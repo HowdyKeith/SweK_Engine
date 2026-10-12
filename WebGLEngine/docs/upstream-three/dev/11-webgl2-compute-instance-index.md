@@ -10,13 +10,13 @@ On the WebGL 2 backend, a compute whose output is a `StorageBufferAttribute` rea
 
 **Cause.** The WebGL backend runs a compute as a transform-feedback draw of points (`WebGLBackend.compute()` in `src/renderers/webgl-fallback/WebGLBackend.js`): `drawArraysInstanced( POINTS, 0, 1, count )` when its first buffer is a `StorageInstancedBufferAttribute`, otherwise `drawArrays( POINTS, 0, count )`. `GLSLNodeBuilder.getInstanceIndex()` always returns `gl_InstanceID`, which a draw that is not instanced holds at 0, so every read indexed by it reads element 0. The writes are transform-feedback outputs, one per point, so they land in the right places with the wrong values.
 
-**Fix.** The patch reads a compute's `instanceIndex` (and `invocationLocalIndex`) as `gl_InstanceID + gl_VertexID`: in a compute drawn as points the instance is 0, in one drawn instanced the vertex is. Against `dev` at 576b084; I can open it as a pull request:
+**Fix.** The patch reads a compute's `instanceIndex` (and `invocationLocalIndex`) as `gl_InstanceID + gl_VertexID`: in a compute drawn as points the instance is 0, in one drawn instanced the vertex is. Against `dev` at 11738a9; I can open it as a pull request:
 
 <details><summary>Patch</summary>
 
 ```diff
 diff --git a/src/renderers/webgl-fallback/nodes/GLSLNodeBuilder.js b/src/renderers/webgl-fallback/nodes/GLSLNodeBuilder.js
-index 73ea390..4592b4b 100644
+index d894d31..a06b6c2 100644
 --- a/src/renderers/webgl-fallback/nodes/GLSLNodeBuilder.js
 +++ b/src/renderers/webgl-fallback/nodes/GLSLNodeBuilder.js
 @@ -1313,6 +1313,11 @@ ${ flowData.code }
@@ -90,7 +90,7 @@ report({ webgpu: await run(false), webgl2: await run(true) });
 
 ### Screenshots
 
-What the page prints, the same on r186 and on `dev` at 576b084 (headless Chromium 141, SwiftShader):
+What the page prints, the same on r186 and on `dev` at 11738a9 (headless Chromium 141, SwiftShader):
 
 <!-- observed:begin -->
 webgpu: storageBuffer 8, instancedArray 8; webgl2: storageBuffer 1, instancedArray 8 -- the distinct points the compute wrote, of a box's 8 corners

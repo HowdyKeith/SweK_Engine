@@ -1,6 +1,6 @@
 {
  "gate": "physics/backendRouting-selfcheck.mjs",
- "at": "2026-09-03",
+ "at": "2026-10-11",
  "tables": [
   {
    "title": "which backend each request reaches, and what that engine's own world says",

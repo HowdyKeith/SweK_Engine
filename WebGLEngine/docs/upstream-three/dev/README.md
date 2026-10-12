@@ -3,15 +3,20 @@
 The drafts one directory up hold three r185, the release this engine vendored until v4805. Three's Bug Report form asks for the latest
 release and a live example, and three takes pull requests against `dev`; so each issue here is written in the form's own
 fields, its reproduction imports three's latest release, **r186** (`0.186.1`), and its patch is rebased onto `dev` at
-`576b084aff43ec5bb79911befb1d51be178cb7ed` (4 October 2026). Every reproduction prints the same on r186 and on that `dev`
+`11738a9d55e502fb484cefffcea3a66dc44e9fe9` (10 October 2026). Every reproduction prints the same on r186 and on that `dev`
 commit -- headless Chromium 141, SwiftShader, on WebGPU and on the WebGL 2 backend.
 
-Re-checked at v4811 against that commit, twelve commits past `1ea31f3` (2 October), where the drafts were first rebased: none of
-the sixteen was fixed meanwhile -- every reproduction prints, on `dev` and with its patch and with all sixteen, exactly what it
-printed on `1ea31f3`. Two patches (09 and 16) met code that had moved -- `RenderObject.js`, `Renderer.js` and `WebGPUBackend.js` --
-and were made again on `576b084`: the same lines added and removed, their hunks seven lines further down. 10 was left as it was,
-its context still two lines: made again with three's usual three, it no longer applies after 04. Three's unit and e2e tests were run again on the new `dev`
-([`e2e.json`](e2e.json)).
+Re-checked at v4836 against that commit, 107 commits past `576b084` (4 October), where v4811 had re-checked them: none of the
+sixteen was fixed meanwhile -- every reproduction prints, on r186, on `dev`, with its own patch and with all sixteen, exactly what it
+printed on `576b084`. Three patches had to be made again, and each for a different reason. 04 no longer applied: #34854 took the
+object's `useVelocity` flag out of the very line it edits, so `needsPreviousData()` now reads the MRT alone and 04 adds its check
+after that (its draft no longer mentions the flag). 06 no longer applied: #34821 moved where a cached stage's program is released;
+the patch lands on the new structure unchanged in substance, and its `_releaseProgram` still drops a stage by the key it was cached
+by. 16 still applied and no longer BUILT: #34871 added the same `AttributeType` import to `Renderer.js`, so the patch's own copy made
+two, which rollup refuses -- found by threePatch.mjs's build of 16 alone; the patch no longer adds it. Every other patch was made
+again on `11738a9` so its index lines name dev's own blobs, and 10 keeps its two lines of context, which is what lets it apply after
+04. Each of the sixteen applies alone, builds, and is clean under `npm run lint`. Three's unit and e2e tests were run again on the new
+`dev` ([`e2e.json`](e2e.json)). Before that, at v4811: twelve commits past `1ea31f3`, 09 and 16 made again on `576b084`, nothing fixed.
 
 `tools/ship/threePatch.mjs` (v4799) runs each reproduction, beside a three checkout, on r186 as npm ships it, on `dev` built by
 three's own rollup, on `dev` with the issue's patch alone, and on `dev` with all sixteen in order, and writes what each page
@@ -93,9 +98,15 @@ grown with its material updated throws on `dev`: that is issue 15.
 Run in the `dev` checkout, on `dev` and on `dev` with all sixteen patches in order, each built by three's rollup -- the same
 bytes `record.json` names:
 
-- Unit tests (`test/unit`, headless Chromium, QUnit served locally): 1525 tests, 1524 passed, 1 todo, 0 failed, on both builds.
+- Unit tests (`test/unit`, headless Chromium with SwiftShader under WebGPU and under the WebGL 2 backend, QUnit served locally,
+  the runner as `../e2e/puppeteer-unit-local.diff`): 1894 tests, 1891 passed, 1 todo, 2 failed, on both builds -- and the GPU-native
+  TSL tests run, 169 on WebGPU and 169 on the WebGL 2 backend, none skipped. The two that fail are `dev`'s own and fail on `dev` here
+  the same way: textureBarrier's read-back sum on SwiftShader's Vulkan, and integer `mod()` of negative operands on the WebGL 2 backend
+  (`e2e.json` gives each reason). (v4836 read 1893 passed and 0 failed, but headless Chromium gave the TSL tests no backend there and
+  they passed as skipped -- a patch to the node renderers was not exercised by them until this run.)
 - e2e ([`e2e.json`](e2e.json), the runner as `../e2e/puppeteer-local.diff`): 202 WebGPU examples, 191 passed and the same 11
   failed on both builds; on the WebGL 2 backend, 148 passed and the same 54 failed on both. 200 of the 202 screenshots are the
   same bytes on WebGPU and 200 on WebGL 2; the others vary between runs of one build (`e2e.json` names each). Re-run at v4811 on
   `576b084`: the outcomes are those of `1ea31f3`, example for example, three new unit tests pass on both builds, and the WebGL 2
-  `webgpu_loader_gltf_transmission`, which drew five different images over eight runs on r185, happened to match.
+  `webgpu_loader_gltf_transmission`, which drew five different images over eight runs on r185, happened to match. Re-run at v4836 on `11738a9`: the same counts and the same outcomes on both builds, example for example, the same
+  two varying screenshots per backend, and `webgpu_loader_gltf_transmission` matched again.

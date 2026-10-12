@@ -760,7 +760,8 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4800 -- RE-TAKEN 150 -> 151 with `excluding`, for RETURNED_AT_V4800 (no field on its own lines).
     // v4819 -- 155 -> 156 at the merge, fields unmoved: RETURNED_AT_V4800 (the exported-functions line, no field on its own lines).
     // v4819 -- 156 / 73 / 400 -> 157 / 74 / 401: COMMIT_BELT_DRIFT_V4819 in world/orreryFleet.mjs (one field on its own line, bodiesNow).
-    currentIncludingModule: Object.freeze({ records: 157, withFields: 74, fields: 401 }),
+    // v4840 -- 157 / 74 / 401 -> 158 / 75 / 402: DOORS_AT_V4840 in tools/ship/wasmTeardown.mjs (one field on its own line, reach).
+    currentIncludingModule: Object.freeze({ records: 158, withFields: 75, fields: 402 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -977,7 +978,8 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4819 -- 154 / 71 / 380 -> 155 / 72 / 381: COMMIT_BELT_DRIFT_V4819 in world/orreryFleet.mjs, the exported-functions line's two
     // moved bodies and one arrival recorded at the merge. It spreads v4778's record and carries ONE numeric field on its own lines,
     // bodiesNow: 23, so all three move by one -- the shape of v4778's own arrival.
-    excluding: Object.freeze({ records: 155, withFields: 72, fields: 381 }),
+    // v4840 -- 155 / 72 / 381 -> 156 / 73 / 382: DOORS_AT_V4840 (tools/ship/wasmTeardown.mjs), read off census() excluding this module.
+    excluding: Object.freeze({ records: 156, withFields: 73, fields: 382 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,
