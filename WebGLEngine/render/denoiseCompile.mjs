@@ -236,3 +236,38 @@ export function dumpStats(text, entry) {
              barriers: lines.filter((l) => /sync_g|sync_t|OpControlBarrier|barrier/.test(l)).length };
 }
 
+
+/**
+ * A native child's Dawn flags: ONE enable-dawn-features entry, dump_shaders first, and ONE disable-dawn-features entry,
+ * every feature asked for joined to its own. Section 49: dawn.node keeps the LAST of two entries with the same key, so the
+ * use_dxc run's second enable entry dropped dump_shaders and every use_dxc dump came back empty, on both GPUs. Round 19's
+ * probe (section 64) adds a run with use_dxc DISABLED, and the child's device already carries a disable entry --
+ * headlessGpu's FINE_CLOCK_FLAG -- so the disable key is merged the same way, or the clock flag would silently erase it.
+ * Moved here from render/denoiseCompile-selfcheck.mjs so tools/denoiseBuildProbe.mjs builds its children's flags with it too.
+ */
+export function dawnFlags(flags = []) {
+    const keys = ["enable-dawn-features=", "disable-dawn-features="], merged = new Map([[keys[0], ["dump_shaders"]], [keys[1], []]]), rest = [];
+    for (const f of flags) {
+        const k = keys.find((x) => f.startsWith(x));
+        if (!k) { rest.push(f); continue; }
+        for (const x of f.slice(k.length).split(",").filter(Boolean)) if (!merged.get(k).includes(x)) merged.get(k).push(x);
+    }
+    return [...keys.filter((k) => merged.get(k).length).map((k) => k + merged.get(k).join(",")), ...rest];
+}
+
+/**
+ * Which native compiler runs a box can make, from what its node-webgpu package is (round 19's probe, section 64).
+ *   - "as shipped": always -- Dawn's own choice, which the dump names.
+ *   - node-webgpu 0.6.2 ships dxcompiler.dll beside dawn.node (`dxcBeside`) and was built with DAWN_USE_BUILT_DXC: "use_dxc"
+ *     asks for DXC and "use_dxc off" forbids it, so FXC and DXC are timed from ONE package and A1 (section 43) is read off a
+ *     single run. Nothing is copied: the package's own compiler is the one measured.
+ *   - a package with no DXC of its own (0.6.0, 0.6.1): as shipped alone. Their Dawn was built without DXC and FORCES use_dxc
+ *     off, whatever DLLs are put beside it, so section 43's copied-DLL run was always FXC under another name -- which is why
+ *     sections 52-53 read DXBC (section 64, from Dawn's source at each package's revision). That run is retired.
+ *   - not D3D12: as shipped alone (the native backend compiles to SPIR-V).
+ */
+export function nativeModes({ win = false, dawnDir = null, dxcBeside = false } = {}) {
+    const modes = [{ name: "as shipped", flags: [] }];
+    if (!win || !dawnDir || !dxcBeside) return modes;
+    return [...modes, { name: "use_dxc", flags: ["enable-dawn-features=use_dxc"] }, { name: "use_dxc off", flags: ["disable-dawn-features=use_dxc"] }];
+}

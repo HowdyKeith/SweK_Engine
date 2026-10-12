@@ -296,11 +296,18 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
         for (const l of nativeAdapterLines(native)) console.log("  " + l);
         process.exit(0);
     }
+    // round 19's probe (the denoiser arc, section 64): a SWEK_WEBGPU this box cannot load is refused HERE, before any gate runs.
+    // Each native gate would otherwise print SKIP and pass, and the report would read as a green real-hardware run with no
+    // native row in it -- found by review, with a failed npm install and a `set` line ending in a space.
+    const HG = await import("./headlessGpu.mjs"), W = HG.resolveWebgpu();
+    if (W.refused) { console.error(`realGpuRun: ${W.refused}`); process.exit(2); }
+    const WP = HG.webgpuPackage(W.from);
     const arg = (k) => cli.values[k] ?? null;
     const out = path.resolve(arg("--out") || path.join(process.cwd(), "real-gpu-run.json"));
     console.log(`\nthe FSR, frame-generation and denoiser gates, with the harness logging each call's adapter (${process.platform})`);
     const report = runGates({ only: arg("--only") });
-    console.log(`  on ${report.commit || "a checkout git could not name"}`);
+    report.nodeWebgpu = { version: WP ? WP.version : null, from: W.from || null, chosenBy: process.env[HG.WEBGPU_ENV] ? HG.WEBGPU_ENV : "the resolver's list" };
+    console.log(`  on ${report.commit || "a checkout git could not name"}; node-webgpu ${report.nodeWebgpu.version || "unresolved"} (${report.nodeWebgpu.chosenBy})`);
     fs.writeFileSync(out, JSON.stringify(report, null, 1));
     console.log(`\n${report.verdict}\n${report.summary}  --  the report: ${out}`);
     // a run of no gates is not a green one

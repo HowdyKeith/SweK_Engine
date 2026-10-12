@@ -59,6 +59,19 @@ ok("the verdict leads with a software adapter, and names a hardware one",
     ok(`  ...and the report and the log name the checkout's commit: "${rep && rep.commit}"`,
        !!rep && !!head && String(rep.commit).startsWith(head + " ") && rep.verdict.includes(`(${head} `) && (r.stdout || "").includes("on " + rep.commit));
 }
+{   // round 19's probe (the denoiser arc, section 64): a SWEK_WEBGPU this box cannot load stops the run BEFORE any gate. As a
+    // skip, each native gate passed and the report read as a green real-hardware run with no native row in it (review of
+    // section 64: a failed npm install, or a `set` line ending in a space). An absolute path that holds nothing, and a relative one.
+    // SABOTAGE (round 19's probe): the refusal taken out of the CLI -> this row red alone (the gate ran, exit 1, and wrote a report).
+    const tmp = path.join(os.tmpdir(), `swek-realgpu-refused-${process.pid}.json`);
+    const run = (v) => spawnSync(process.execPath, ["tools/ship/realGpuRun.mjs", "--only", "denoiseCompile", "--out", tmp],
+                                 { cwd: ENG, encoding: "utf8", timeout: 600000, env: { ...process.env, SWEK_WEBGPU: v } });
+    const abs = run(path.join(os.tmpdir(), "swek-no-such-webgpu")), rel = run("no-such-webgpu");
+    const wrote = fs.existsSync(tmp); try { fs.unlinkSync(tmp); } catch {}
+    ok(`!! *** a SWEK_WEBGPU this box cannot load stops the run before any gate: exit ${abs.status} and ${rel.status}, no report written ***`,
+       abs.status === 2 && rel.status === 2 && !wrote && /holds no node-webgpu package/.test(abs.stderr || "") && /not an absolute path/.test(rel.stderr || ""),
+       `${(abs.stderr || "").trim().slice(0, 110)} | ${(rel.stderr || "").trim().slice(0, 90)}`);
+}
 
 console.log("\n2. ON THIS BOX: a run of two gates, and what it says it ran on");
 const skip = webgpuSkipReason();

@@ -241,6 +241,32 @@ Send back `real-gpu-denoise-r18.json`. Section 61 fixes, before it runs, which s
 r18t on the GTX 1080 (1.09 x at 1080p). Every other GPU, platform and browser, and everything native, stays on r15. The
 native clock is unrounded on both GPUs. There is nothing more to run on this branch.
 
+### Round 19's probe: node-webgpu 0.6.2 and DXC (pre-registration section 64)
+
+node-webgpu 0.6.2 is the first version to ship Microsoft's newer shader compiler, `dxcompiler.dll`, beside `dawn.node`,
+with a Dawn built to prefer it. The tree stays pinned to 0.6.0. The probe runs 0.6.2 for one console, through
+`SWEK_WEBGPU`, and leaves your global install alone. On each GPU, in the verified clone, from a command prompt:
+
+```
+cd WebGLEngine
+npm install --no-audit --no-fund --prefix "%TEMP%\swek-webgpu-0.6.2" webgpu@0.6.2
+set SWEK_WEBGPU=%TEMP%\swek-webgpu-0.6.2\node_modules\webgpu
+node tools/ship/realGpuRun.mjs --only denoiseCompile --out real-gpu-denoise-dxc-0.6.2.json
+node tools/denoiseBuildProbe.mjs --native-only --dxc on --out denoise-build-probe-dxc-0.6.2.json
+set SWEK_WEBGPU=
+```
+
+- **If `npm install` fails, stop there.** `realGpuRun` refuses to start when `SWEK_WEBGPU` names nothing it can load,
+  and says why.
+- **The compile gate's first native line should name node-webgpu 0.6.2.** It runs each kernel three ways: as shipped,
+  under `use_dxc`, and with `use_dxc` off. One line per way says how many kernels built and what their dumps say: DXIL is
+  DXC, DXBC is FXC.
+- **The build probe builds round 17's seven shapes under DXC.** FXC built two of them, crashed on two and stopped on
+  three (section 60). r18t's kernel is one it stopped on, and r18u's one it crashed on.
+- **Expect it to take a while on the Intel.** The "use_dxc off" runs are FXC, which took minutes there in rounds 13 to 15.
+- **Send back both JSON files, and the dumps.** The compile gate's dumps are `%TEMP%\swek-denoise-dump-0.6.2-*.txt`.
+  The build probe's report names its own. Section 64 fixes, before it runs, what they decide.
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and
