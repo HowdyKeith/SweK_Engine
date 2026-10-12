@@ -24,7 +24,7 @@
 import { fileURLToPath } from "node:url";
 import fs from "node:fs";
 import path from "node:path";
-import { execFileSync, spawn } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
 import { ensureDxc, describe as describeDxc } from "./ensureDxc.mjs";
@@ -68,16 +68,35 @@ export function scanTracked(root, files = null) {
     return { scanned: list.length, hits };
 }
 
+// v4846 -- git's exit status, or null when git could not be started at all (no git on the box, no such folder). The two
+// questions below are asked by STATUS because git's wording differs by subcommand and the status does not: v4402's skip
+// matched "unknown revision", which is what `git log` says, and `git grep` says "unable to resolve revision".
+function gitStatus(cwd, args) {
+    try { return spawnSync("git", args, { cwd, stdio: "ignore", timeout: 15000 }).status; } catch { return null; }
+}
+
 // A ref, not the working tree: v4404's tree was clean by the time anybody looked, and what shipped was not.
+//
+// v4846 -- *** A REF THIS CLONE DOES NOT HAVE IS DECIDED BY GIT'S EXIT STATUS, NOT BY ITS WORDS. *** A ref git could not
+// resolve came back as { ok:false, why: e.message }, and the selfcheck excused it only when the message matched
+// /unknown revision|not a valid object|ambiguous argument/ -- while git grep says "fatal: unable to resolve revision:
+// origin/main". So a `--depth 1 --branch` clone, which never had origin/main, was red on a fact about the clone. `rev-parse
+// --verify --quiet` exits 1, silently, for exactly "no such commit" and 128 for anything else (not a repository, a broken
+// one), so `absent` is that 1 and nothing wider; every other failure still reaches git grep and keeps its message.
 export function scanRef(root, ref) {
+    if (gitStatus(root, ["rev-parse", "--verify", "--quiet", ref + "^{commit}"]) === 1)
+        return { ref, ok: false, absent: true, why: `${ref} is not in this clone`, hits: [] };
     let out;
     try {
+        // v4846 -- stderr piped: git's "fatal:" belongs in `why`, not loose on the stderr of the gate that asked
         out = execFileSync("git", ["grep", "-c", "-E", "^(<{7}|>{7}|\\|{7}) ", ref, "--", "."],
-                           { cwd: root, maxBuffer: 32 << 20 }).toString("utf8");
+                           { cwd: root, maxBuffer: 32 << 20, stdio: ["ignore", "pipe", "pipe"] }).toString("utf8");
     } catch (e) {
-        // git grep exits 1 for "no matches", which is the clean answer, and 128 for a ref it cannot resolve.
+        // git grep exits 1 for "no matches", which is the clean answer, and 128 for what it cannot do -- a ref that is not
+        // here never reaches it (rev-parse above), so 128 now means a repository git cannot open or a ref it cannot read.
         if (e && e.status === 1) return { ref, ok: true, hits: [] };
-        return { ref, ok: false, why: String(e && e.message).slice(0, 120), hits: [] };
+        const said = String((e && e.stderr) || "").trim().split("\n")[0];
+        return { ref, ok: false, why: (said || String(e && e.message)).slice(0, 120), hits: [] };
     }
     const hits = out.split("\n").filter(Boolean).map((l) => {
         const i = l.lastIndexOf(":");
@@ -166,18 +185,49 @@ export function interruptedTrailer(sig, ms, conflicts = null) {
 // without /d (review of the same pre-flight drafted on another line). fixCommand's --prefix is the same from any folder and
 // drive; --ignore-scripts only where the browser is already on disk, as browserSkipReason has advised since v4778. A
 // Playwright with no browser gets the plain install, whose postinstall is `playwright install chromium chromium-headless-shell`.
+//
+// v4846 -- `mainRef` is the fourth probe: the rig spent a full verify on a `--depth 1 --branch` clone with no origin/main, and
+// verify's version preflight and the release-lag budget both read that ref. See originMainState below.
 export function readiness({ resolve = () => resolvePlaywright(createRequire(import.meta.url)), shell = HEADLESS_SHELL,
                             skipReason = browserSkipReason, dxc = () => ensureDxc({ write: false }), eng = ENG_HERE,
-                            exists = fs.existsSync } = {}) {
+                            exists = fs.existsSync, mainRef = () => originMainState(eng) } = {}) {
+    const out = [];
     const { chromium, from } = resolve();
     const why = skipReason(chromium, from, shell);
-    if (why) return [{ what: "the browser gates cannot run here: " + why.replace(/ -- to fix: .*$/, "") +
-        " -- to fix: " + fixCommand(eng, { playwright: !!chromium, shell: !!shell && exists(shell) }) }];
-    const d = dxc();
-    if (d && d.needed) return [{ what: "the WebGPU browser gates will die on requestDevice (dxcompiler.dll is not beside " +
-        "the headless shell in " + d.dest + ") -- " + (d.ok ? "to fix: node tools/ship/ensureDxc.mjs --write, once per " +
-        "`playwright install` that makes a new browser folder" : describeDxc(d)) }];
-    return [];
+    if (why) out.push({ what: "the browser gates cannot run here: " + why.replace(/ -- to fix: .*$/, "") +
+        " -- to fix: " + fixCommand(eng, { playwright: !!chromium, shell: !!shell && exists(shell) }) });
+    else {
+        // DXC only once a browser is there: ensureDxc looks beside the headless shell, so with none it has nothing to say.
+        const d = dxc();
+        if (d && d.needed) out.push({ what: "the WebGPU browser gates will die on requestDevice (dxcompiler.dll is not beside " +
+            "the headless shell in " + d.dest + ") -- " + (d.ok ? "to fix: node tools/ship/ensureDxc.mjs --write, once per " +
+            "`playwright install` that makes a new browser folder" : describeDxc(d)) });
+    }
+    // v4846 -- ORDER: AFTER the browser and DXC checks, and NOT short-circuited by them. It is a separate fact -- a missing
+    // browser says nothing about the refs, nor the reverse -- so a box with both gets both in the one refusal instead of one
+    // per run; and after, because the browser line is the one that turns every browser gate red and is the one to meet first,
+    // where this one turns two of verify's checks. Two local git calls (milliseconds), so asking unconditionally costs nothing.
+    if (mainRef() === "absent") out.push({ what: "origin/main is not in this clone, so verify cannot compare this version or " +
+        "the release lag with main -- to fix: git fetch --depth 1 origin main:refs/remotes/origin/main" });
+    return out;
+}
+
+// v4846 -- whether the engine's tree has the origin/main verify reads. One of five answers, and only "absent" is refused:
+//   "not-a-repo"  no .git beside the engine -- a release zip, which has no remote and no ref a fetch could bring
+//   "no-origin"   a checkout with no 'origin' remote (a local copy, a hand-made fork) -- nothing a fetch could name
+//   "present"     refs/remotes/origin/main resolves to a commit
+//   "absent"      an origin remote and no origin/main: the `--depth 1 --branch` clone the rig verified in full for nothing
+//   "unknown"     git could not be started, or rev-parse failed for another reason -- not a fact to refuse on
+// The .git test is the tree's own, not git's walk upward: a release zip unpacked inside some other repository is still a zip.
+// By exit status, as scanRef: `remote get-url` exits nonzero (2, or 128 on an older git) for no such remote.
+export function originMainState(eng = ENG_HERE, { exists = fs.existsSync, git = gitStatus } = {}) {
+    const root = path.resolve(eng, "..");
+    if (!exists(path.join(root, ".git"))) return "not-a-repo";
+    const remote = git(root, ["remote", "get-url", "origin"]);
+    if (remote === null) return "unknown";
+    if (remote !== 0) return "no-origin";
+    const has = git(root, ["rev-parse", "--verify", "--quiet", "refs/remotes/origin/main^{commit}"]);
+    return has === 0 ? "present" : has === 1 ? "absent" : "unknown";
 }
 
 export function fixCommand(eng, { playwright, shell }) {

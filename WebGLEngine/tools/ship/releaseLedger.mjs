@@ -86,6 +86,11 @@ export function shippedVersions(root = ROOT) {
  * read -- no git, no remote ref, a fresh checkout -- this returns the working tree's list, which is a SUPERSET
  * (it holds main's rounds plus any unmerged ones). A gate that cannot see main therefore over-reports debt and
  * says which it did; the failure mode of a missing tool is a stricter check, not a quieter one.
+ *
+ * v4846 -- *** A SUPERSET IS STRICTER FOR `owed` AND LOOSER FOR "IS THE TREE ON MAIN", and until this round the
+ * second question was asked of it too. *** The working tree's list always holds the tree's own version, so a
+ * caller that asks it "is treeN on main?" always hears yes. ledgerState() now treats `degraded` as "unknown"
+ * there and holds the budget; any new caller of this list must do the same.
  */
 // *** THE READER IS INJECTABLE, AND TWO SABOTAGES ARE WHY. *** Swapping this function's answer for the
 // working tree's went ZERO RED twice, because at the moment it was tested the branch and main were IDENTICAL
@@ -190,7 +195,36 @@ export function ledgerState({ root = ROOT, eng = ENG, file = LEDGER, readMain = 
     // republishing v4460 adds nothing -- it is the catch-up the budget wants. A working tree bumped to v4461
     // is about to push main one further, which is exactly what the budget bounds. Same number, same list,
     // asked only of the party that can make the gap worse.
-    const addsToMain = !!(treeN && !onMain.versions.includes(treeN));
+    //
+    // *** v4846 -- A MAIN THAT COULD NOT BE READ IS NOT A MAIN THAT HOLDS THE TREE, AND THE FALLBACK SAID IT
+    // WAS. *** When origin/main is unreadable, mainVersions() hands back the WORKING TREE's changelog -- and the
+    // working tree's changelog ALWAYS carries the tree's own new heading, because the bump and the entry land
+    // in one commit. So `includes(treeN)` was true by construction, addsToMain came out false, the budget was
+    // switched off, and the gate printed "ALREADY ON MAIN ... a republish, not a ship" about a tree it had not
+    // compared with main at all. Measured in a --depth 1 --branch clone, with a fixture ledger five versions
+    // behind against a budget of three: withinBudget TRUE -- and releaseLedger-selfcheck's v4846 fixture reads
+    // exactly that with this line reverted (5 owed of 3, withinBudget=true). The fallback's own promise is
+    // "STRICTER, NEVER LOOSER", and it was looser on the one flag that decides whether the budget binds. The
+    // superset is still the right list for `owed` -- over-reporting debt is the stricter direction -- but it
+    // cannot answer "is this tree already on main", because it is the tree. Unknown is not yes, so a degraded
+    // read BINDS.
+    // The republish exemption is untouched where it is real: `Clone -> verify` clones main, so origin/main is
+    // there to read, the read is not degraded, and a clone of main holding its own version still adds nothing.
+    const addsToMain = !!(treeN && (onMain.degraded || !onMain.versions.includes(treeN)));
+    // The reason is built HERE, beside the flag it explains, so the gate cannot print a sentence the arithmetic
+    // did not earn -- which is how "ALREADY ON MAIN" came to be printed over a main nobody had read.
+    // It branches on addsToMain FIRST, so the republish sentence can only ever be printed over the flag that
+    // earns it: if the line above regresses, the text regresses with it and says the false thing out loud.
+    const budgetWhy = !treeN
+        ? "the tree states no ENGINE_VERSION, so there is nothing to compare with main"
+        : !addsToMain
+            ? "ENGINE_VERSION " + tree + " is ALREADY ON MAIN, so this tree adds nothing and can only reduce " +
+              "the lag -- it is a republish, not a ship"
+            : onMain.degraded
+                ? "origin/main could NOT be read (" + onMain.why + "), so whether " + tree + " is already on main " +
+                  "is UNKNOWN, and unknown is not yes -- the budget is HELD. The working tree's changelog stood in " +
+                  "for main's, and it always carries this tree's own heading, so it cannot answer that question"
+                : "tree " + tree + " is NOT on main -- shipping it pushes main one further, so the budget binds";
     return {
         tree, treeN, latest, latestTag: latest ? "v" + latest : "",
         behind: treeN && latest ? treeN - latest : null,
@@ -207,7 +241,7 @@ export function ledgerState({ root = ROOT, eng = ENG, file = LEDGER, readMain = 
         // NOT ASSERTED when this tree adds nothing to main -- and `budgetBinds` says so out loud, so the gate
         // can print WHY it is not complaining rather than printing nothing. A check that quietly stops
         // checking is the thing this file has caught three times.
-        budgetBinds: addsToMain,
+        budgetBinds: addsToMain, budgetWhy,
         withinBudget: !budgetStated ? false : (!addsToMain || owed.length <= budget),
         refreshedAt: led && led.refreshedAt || "",
         // The headline Keith's sentence is about: does releases/latest equal what the tree builds?
