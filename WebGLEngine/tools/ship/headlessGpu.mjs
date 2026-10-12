@@ -172,14 +172,43 @@ export function configureVulkanIcd(root) {
     return { path: found[0], chosen: true, found };
 }
 
+/**
+ * Round 19's probe (the denoiser arc, section 64) -- ONE CONSOLE CAN RUN ANOTHER node-webgpu. SWEK_WEBGPU names a package
+ * directory (the one holding its package.json and index.js), tried BEFORE the list, so the rig can time a newer package beside
+ * the pinned one without replacing its global install. A name that does not resolve is refused, never passed over: a run
+ * that asked for 0.6.2 and quietly measured the global 0.6.0 would put one package's numbers under the other's name.
+ */
+export const WEBGPU_ENV = "SWEK_WEBGPU";
+
 /** Resolve node-webgpu the way the tree resolves playwright: a list, in order, and report which one answered. */
-export function resolveWebgpu(requireFn) {
+export function resolveWebgpu(requireFn, env = process.env) {
     const req = requireFn || createRequire(import.meta.url);
+    if (env[WEBGPU_ENV]) {
+        const m = path.join(path.resolve(env[WEBGPU_ENV]), "index.js");
+        try { const mod = req(m); if (mod && typeof mod.create === "function") return { mod, from: m }; } catch { /* refused below */ }
+        return { mod: null, from: "", refused: `${WEBGPU_ENV}=${env[WEBGPU_ENV]} holds no node-webgpu package (tried ${m}); unset it to use the list` };
+    }
     for (const m of WEBGPU_PATHS) {
         try { const mod = req(m); if (mod && typeof mod.create === "function") return { mod, from: m }; }
         catch { /* next */ }
     }
     return { mod: null, from: "" };
+}
+
+/**
+ * The package `from` resolved to (resolveWebgpu's `from`): its directory, its version, the directory dawn.node sits in for
+ * this platform, and whether a DXC ships beside it. Resolved to a FILE first: section 52's gate took dawn.node's directory as
+ * path.dirname(from), which for the bare specifier "webgpu" is "." -- right only where the global install answered.
+ * node-webgpu 0.6.2 is the first to ship dxcompiler.dll beside its win32 dawn.node, with a Dawn that loads it (section 64).
+ */
+export function webgpuPackage(from, requireFn, { platform = process.platform, arch = process.arch, exists = fs.existsSync, read = (f) => fs.readFileSync(f, "utf8") } = {}) {
+    if (!from) return null;
+    const req = requireFn || createRequire(import.meta.url);
+    let file; try { file = req.resolve(from); } catch { return null; }
+    const dir = path.dirname(file);
+    let version = null; try { const j = JSON.parse(read(path.join(dir, "package.json"))); if (j.name === "webgpu") version = j.version; } catch {}
+    const dawnDir = path.join(dir, "dist", `${platform}-${arch}`);
+    return { dir, version, dawnDir, dxcBeside: exists(path.join(dawnDir, "dxcompiler.dll")) };
 }
 
 /**
@@ -205,8 +234,9 @@ export const FINE_CLOCK_FLAG = "disable-dawn-features=timestamp_quantization";
  * does not have. The refusal is now Linux-only; win32 and darwin trust node-webgpu's own default adapter
  * selection rather than second-guessing it with a Linux-shaped check.
  */
-export function headlessGpuSkipReason(requireFn) {
-    const { mod } = resolveWebgpu(requireFn);
+export function headlessGpuSkipReason(requireFn, env = process.env) {
+    const { mod, refused } = resolveWebgpu(requireFn, env);
+    if (refused) return refused;
     if (!mod) {
         const icds = process.platform === "linux" ? findVulkanIcdsAnyRoot() : [];
         if (icds.length) return "node-webgpu is not installed here -- `npm i -g webgpu` (a Vulkan ICD IS present at " + icds[0] + ")";

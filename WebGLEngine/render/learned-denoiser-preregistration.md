@@ -3925,3 +3925,97 @@ cache, so each rendered the 24 test images itself.
 - **The page's own 64 x 64 image is where r18t is slower on the 1080.** A rule read at the page's working size would choose
   differently there.
 - **Natively nothing changed.** The default stays r15, and FXC still builds neither round-18 set.
+
+## 64. ROUND 19'S PROBE -- NODE-WEBGPU 0.6.2 SHIPS DXC AND A DAWN THAT LOADS IT: WHAT THE RIG'S DUMP DECIDES, FIXED BEFORE IT RUNS
+
+**Why now.** Sections 52 and 53 left A1 untested on both GPUs because node-webgpu 0.6.0's Dawn never loads DXC. Two
+releases have shipped since: 0.6.1 on 2026-09-12 and 0.6.2 on 2026-10-02. If either loads DXC, the native gates could
+build r18t's and r18u's kernels, which FXC stopped on or crashed on (section 60), and `DEFAULT_KERNELS` could leave
+"r15". Keith asked for the cheap probe first: install, read the binary, rerun the `use_dxc` check, read the dump.
+
+**What was read here, by section 52's method.** Each version's `dist/win32-x64/dawn.node` came from `npm pack`, and its
+strings were read. Nothing was run on Windows, so this is an inference, as section 52's was.
+
+| | 0.6.0 | 0.6.1 | 0.6.2 |
+|---|---|---|---|
+| `dawn.node` | 11,883,520 bytes | 11,816,448 | 12,177,408 |
+| `use_dxc`'s description | "when both dxcompiler.dll and dxil.dll is available" | "when dxcompiler.dll is available" | the same as 0.6.1 |
+| `dxcompiler.dll` named outside that description | no | no | **yes** |
+| `DxcCreateInstance` | no | no | **yes** |
+| "DXC create library / compiler / validator" | no | no | **yes** |
+| Dawn's DXC compile path (`CompileShaderDXC`) | yes | yes | yes |
+| `d3dcompiler_47.dll` (FXC) | yes | yes | yes |
+| DXC beside `dawn.node` in the package | no | no | **`dxcompiler.dll` 1.9.0.5517, no `dxil.dll`** |
+
+- **0.6.0 and 0.6.1 have no DXC loader.** Both carry the compile path and nothing that creates a compiler for it. 0.6.1
+  dropped `dxil.dll` from the toggle's description and still never loads `dxcompiler.dll`. 0.6.1 is a no.
+- **0.6.2 has one, and ships the DLL.** Its `index.js` says so: "win32 needs its matching d3dcompiler_47.dll and
+  dxcompiler.dll beside it". The DLL is DirectX Compiler 1.9.0.5517 (9757d44fa), with its licence files. There is no
+  `dxil.dll`, which matches what Chrome 156 ships (v4821).
+- **0.6.2 changes one other thing:** its `index.js` wraps `GPUDevice.destroy()` to unmap every live buffer.
+
+**Here, on SwiftShader, 0.6.2 runs the denoiser exactly.** Linked into a scratch checkout of main at effe0c8c:
+
+| Gate | 0.6.2 | 0.6.0 |
+|---|---|---|
+| `brain/conv2d-selfcheck.mjs` | green, 107 s | green, 94 s |
+| `render/denoiseDevice-selfcheck.mjs` | green, 196 s | green, 177 s |
+| `render/denoiseCompile-selfcheck.mjs` | green, 50 s; 8 of 8 kernels built and exact natively | green, 52 s; 8 of 8 kernels built and exact natively |
+
+- **The build probe too.** `tools/denoiseBuildProbe.mjs --native-only --dxc on --sizes 64` ran through `SWEK_WEBGPU` on
+  0.6.2 and built all 7 of round 17's shapes, each exact at 64 x 64. That includes r18t's kernel (1.4 s) and r18u's
+  (7.0 s).
+- **None of this says anything about D3D12.** The native backend here compiles to SPIR-V, so the toggle does nothing.
+
+**What changes in the tree.** The pin stays 0.6.0: `tools/ship/headlessGpu.mjs`'s `LICENCES` and the session-start hook.
+- **`SWEK_WEBGPU=<package directory>`** makes `resolveWebgpu` use that package instead of its list, for one console.
+  A name that does not resolve is refused, never passed over. Otherwise a run that asked for 0.6.2 could quietly measure
+  the global 0.6.0.
+- **`webgpuPackage(from)`** returns the package's directory, version and `dawn.node` directory, and whether DXC ships
+  beside it. It resolves `from` to a file. Section 52's gate took `path.dirname(from)`, which for the bare specifier
+  "webgpu" is ".".
+- **The compile gate's native modes** come from `nativeModes` in `render/denoiseCompile.mjs`:
+  - Where DXC ships beside `dawn.node`, three modes run from the package alone, with nothing copied: "as shipped" (Dawn's
+    choice), "use_dxc" (DXC asked for) and "use_dxc off" (DXC forbidden).
+  - An older package keeps section 43's two modes, with DXC's DLLs copied in when the box has them.
+  - The gate's first line names the package's version and where it came from.
+- **`dawnFlags` merges disable entries as it merged enable ones** (section 49). "use_dxc off" is a disable entry, and the
+  child's device already carries one, the fine clock. Unmerged, Dawn would keep the clock's entry and drop DXC's.
+- **`tools/denoiseBuildProbe.mjs --dxc on|off`** asks Dawn for DXC natively, or forbids it, through the same flags. Its
+  report records the package and what was asked.
+
+**The rig run.** On each GPU, in the verified clone:
+
+```
+cd WebGLEngine
+npm install --no-audit --no-fund --prefix "%TEMP%\swek-webgpu-0.6.2" webgpu@0.6.2
+set SWEK_WEBGPU=%TEMP%\swek-webgpu-0.6.2\node_modules\webgpu
+node tools/ship/realGpuRun.mjs --only denoiseCompile --out real-gpu-denoise-dxc-0.6.2.json
+node tools/denoiseBuildProbe.mjs --native-only --dxc on --out denoise-build-probe-dxc-0.6.2.json
+set SWEK_WEBGPU=
+```
+
+**What it decides, fixed now.**
+- **C1, the load.** On a GPU, 0.6.2 loads DXC natively if every "use_dxc" dump from the compile gate says DXIL. If any says
+  DXBC, 0.6.2 is a no there, as 0.6.0 was in sections 52 and 53.
+- **A1, at last testable.** Where C1 holds, A1 (section 43) is read off the same run, from one package: the fast head's pass
+  under "use_dxc" against "use_dxc off". It is supported at 10 x or more. If "use_dxc off" also says DXIL, there is no
+  FXC run to compare against, and A1 stays untested.
+- **Dawn's own choice.** The "as shipped" dumps say which compiler Dawn picks by default when DXC ships beside it. This is
+  reported, and decides nothing.
+- **C2, the shapes.** Where C1 holds, `denoiseBuildProbe --dxc on` must build r18t's kernel (`tile2-zero-inline-32`) and
+  r18u's (`fast-unroll-32`), each within its 180 s cap, exact at 64 x 64, with a dump that says DXIL.
+- **What follows.**
+  - **If C1 and C2 hold on both GPUs,** a round 19 may do three things. It may move the pin to 0.6.2, once a whole native
+    sweep, here and on the rig, shows nothing else moves. It may let the native gates build r18t and r18u on D3D12 when
+    the run's compiler is DXC. And it may time them natively against r15. `DEFAULT_KERNELS` leaves "r15" only by a rule
+    that round fixes before its run, as section 61 fixed the page's.
+  - **If C1 holds and C2 fails,** the pin may still move for A1's sake. That round decides it.
+  - **If C1 fails on both GPUs,** round 19 ends here. 0.6.2 is a quick no, as 0.6.0 was.
+- **Nothing in this probe moves** `PAGE_KERNELS`, `PAGE_KERNELS_BY_ADAPTER`, `DEFAULT_KERNELS`, the native sets or the pin.
+
+**Unchecked here.**
+- Everything on D3D12. The loader is inferred from strings, as section 52's absence was, and only the rig's dump decides.
+- Whether Dawn uses DXC 1.9 without `dxil.dll`. The toggle's description says it needs only `dxcompiler.dll`, and the dump
+  will say.
+- 0.6.1 was not run anywhere. Its strings say no.

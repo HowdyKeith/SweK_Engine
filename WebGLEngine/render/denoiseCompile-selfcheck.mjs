@@ -19,6 +19,11 @@
 // Dawn otherwise rounds every timestamp down to a whole 65,536 ns, as every native time in round 17's probes was -- and a row
 // holds that the native passes are not all on that grid. Round 18's two page sets add no variant: their kernels are round 17's
 // probe shapes, which FXC does not build (section 60).
+// Round 19's probe (section 64): node-webgpu 0.6.2 is the first to ship dxcompiler.dll beside dawn.node, with a Dawn that
+// loads it. Where a package does, the native modes are render/denoiseCompile.mjs's nativeModes -- as shipped, use_dxc and
+// use_dxc off, from the package alone, nothing copied -- so FXC and DXC are timed from one package and section 43's A1 can
+// be read off one run. An older package keeps the two modes sections 52-53 ran. SWEK_WEBGPU picks the package for a console
+// (tools/ship/headlessGpu.mjs), and the first native line names its version.
 //
 // Each native measurement is its own process: one kernel, one adapter, one device, one compiler -- Dawn's dump goes to
 // stdout, so a process apiece keeps each kernel's dump its own, and a compile that never finishes is killed, not waited on.
@@ -67,6 +72,14 @@
 //   round 18, against the native children's clock:
 //   U10 the child's device made without FINE_CLOCK_FLAG                         1 RED (the clock row: 8 of 8 native passes on the
 //       65,536 ns grid). Restored, md5 verified.
+//   round 19's probe (section 64), against render/denoiseCompile.mjs's dawnFlags and nativeModes. Each restored by copy:
+//   W3  dawnFlags merges the enable key only                                     1 RED (the disabled-features row)
+//   W4  no "use_dxc off" mode where DXC ships beside dawn.node                   1 RED (the 0.6.2 row)
+//   W5  a DXC found elsewhere copied in over the package's own                   1 RED (the 0.6.2 row)
+//   W6  the older package's copied-DLL use_dxc run dropped                       1 RED (the 0.6.0 row)
+//   Not caught here: the child's create() reverting to [...dawnFlags(flags), FINE_CLOCK_FLAG], two disable entries. Linux runs
+//   "as shipped" alone, which has none of its own; on D3D12 the "use_dxc off" dumps would say DXIL, and section 64 reads that
+//   as A1 untested rather than as this gate's red.
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -77,7 +90,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SELF = fileURLToPath(import.meta.url);
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
-const { VARIANTS, BUILD_PROBE, BUILD_PROBE_R17, jobFor, measure, dumpStats } = await imp("render/denoiseCompile.mjs");
+const { VARIANTS, BUILD_PROBE, BUILD_PROBE_R17, jobFor, measure, dumpStats, dawnFlags, nativeModes } = await imp("render/denoiseCompile.mjs");
 
 // ---- THE CHILD: one kernel, one compiler, one process ----------------------------------------------------------
 // *** THE RESULT GOES TO A FILE. *** On the GTX 1080 (section 45) every native child exited 0 with its shader dump on
@@ -90,8 +103,9 @@ if (process.argv.includes("--child")) {
     let result;
     try {
         H.configureVulkanIcd();
-        // section 61: the device's clock unrounded, beside whatever Dawn features the run asks for
-        const { mod } = H.resolveWebgpu(), gpu = mod.create([...dawnFlags(flags), H.FINE_CLOCK_FLAG]);
+        // section 61: the device's clock unrounded, beside whatever Dawn features the run asks for -- merged into the run's own
+        // disable entry (section 64: a second disable entry would erase "use_dxc off" the way section 49's erased dump_shaders)
+        const { mod } = H.resolveWebgpu(), gpu = mod.create(dawnFlags([...flags, H.FINE_CLOCK_FLAG]));
         const v = VARIANTS.find((x) => x.id === vid), a = await gpu.requestAdapter();
         const dev = await a.requestDevice({ requiredFeatures: a.features.has("timestamp-query") ? ["timestamp-query"] : [] });
         try { result = await measure(dev, jobFor(v)); } finally { dev.destroy(); }
@@ -109,15 +123,8 @@ const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "
 const say = (m) => console.log("  ----  " + m);
 const now = () => performance.now(), t0 = now(), BUDGET_MS = 1500000, CHILD_MS = 900000;
 
-/**
- * The child's Dawn flags: ONE enable-dawn-features entry, dump_shaders first, every other feature asked for joined to it.
- * Section 49: dawn.node keeps the LAST of two such entries, so the use_dxc run's second entry dropped dump_shaders and
- * every use_dxc dump came back empty, on both GPUs -- reproduced here with allow_unsafe_apis.
- */
-export function dawnFlags(flags = []) {
-    const key = "enable-dawn-features=", asked = flags.filter((f) => f.startsWith(key)).flatMap((f) => f.slice(key.length).split(",")).filter(Boolean);
-    return [key + ["dump_shaders", ...asked.filter((f) => f !== "dump_shaders")].join(","), ...flags.filter((f) => !f.startsWith(key))];
-}
+// The child's Dawn flags are render/denoiseCompile.mjs's dawnFlags (moved there in section 64, for tools/denoiseBuildProbe.mjs):
+// one entry per key, so Dawn -- which keeps the LAST of two entries with the same key (section 49) -- drops nothing.
 
 /**
  * Where this box keeps DXC's two DLLs, if anywhere: a directory holding both dxcompiler.dll and dxil.dll -- the headless
@@ -158,6 +165,23 @@ console.log("1. THE INSTRUMENT, ON THE CPU");
     ok("  the child asks Dawn for its features in ONE entry -- dump_shaders with use_dxc, not two entries of which Dawn keeps the last",
         df.length === 1 && df[0] === "enable-dawn-features=dump_shaders,use_dxc" && dawnFlags([]).join() === "enable-dawn-features=dump_shaders",
         `section 49: two entries left every use_dxc dump empty, on both GPUs -- got ${JSON.stringify(df)}`);
+    // section 64: "use_dxc off" is a disable entry, and the child's device already has one (the fine clock) -- the two merged,
+    // or Dawn keeps the clock's and the run that was meant to forbid DXC would let Dawn choose
+    const dd = dawnFlags(["disable-dawn-features=use_dxc", H.FINE_CLOCK_FLAG]);
+    ok("  ...and its DISABLED features in one entry too -- \"use_dxc off\" and the fine clock together, so neither erases the other",
+        dd.length === 2 && dd[0] === "enable-dawn-features=dump_shaders" && dd[1] === "disable-dawn-features=use_dxc,timestamp_quantization",
+        `got ${JSON.stringify(dd)}`);
+    // section 64: which compiler runs a box makes, from what it has
+    const names = (o) => nativeModes(o).map((m) => m.name + (m.dxc ? "@" + m.dxc : "")).join(" | ");
+    const m062 = nativeModes({ win: true, dawnDir: "C:/nw/dist/win32-x64", dxcBeside: true, dxcDir: "C:/pw/chromium-1243/chrome-win" });
+    ok("  node-webgpu 0.6.2 on D3D12 (dxcompiler.dll beside dawn.node): as shipped, use_dxc and use_dxc off, from the package alone -- nothing copied, not even a DXC found elsewhere",
+        names({ win: true, dawnDir: "C:/nw/dist/win32-x64", dxcBeside: true, dxcDir: "C:/pw/chromium-1243/chrome-win" }) === "as shipped | use_dxc | use_dxc off" &&
+        m062.every((m) => !m.dxc) && m062[2].flags.join() === "disable-dawn-features=use_dxc",
+        names({ win: true, dawnDir: "C:/nw/dist/win32-x64", dxcBeside: true, dxcDir: "C:/pw/chromium-1243/chrome-win" }));
+    ok("  ...0.6.0 (no compiler of its own) where the box keeps DXC's DLLs: as shipped, and use_dxc with them copied in, as sections 52-53 ran; with none, as shipped alone; not D3D12, as shipped alone",
+        names({ win: true, dawnDir: "C:/nw/dist/win32-x64", dxcDir: "C:/pw/chromium-1243/chrome-win" }) === "as shipped | use_dxc@C:/pw/chromium-1243/chrome-win" &&
+        names({ win: true, dawnDir: "C:/nw/dist/win32-x64" }) === "as shipped" && names({ win: false, dawnDir: "/nw/dist/linux-x64", dxcBeside: true }) === "as shipped",
+        [names({ win: true, dawnDir: "C:/nw/dist/win32-x64", dxcDir: "C:/pw/c" }), names({ win: true, dawnDir: "C:/nw/dist/win32-x64" }), names({ win: false, dawnDir: "/nw", dxcBeside: true })].join("  /  "));
     let jobsOk = true; for (const v of VARIANTS) { const j = jobFor(v); jobsOk &&= typeof j.code === "string" && j.out > 0 && j.wg.length === 3; }
     ok(`  every kernel has a job: ${VARIANTS.map((v) => v.id).join(", ")}`, jobsOk);
     // section 56: tools/denoiseBuildProbe.mjs's shapes -- ids unique, a job each, the candidates without the guarded copy of the
@@ -181,14 +205,18 @@ const rows = [];   // { path, compiler, id, result }
 console.log("\n2. NATIVE: each kernel in its own process, under each compiler this box has");
 if (skip) console.log("  SKIP  " + skip);
 else {
-    const win = process.platform === "win32", { resolveWebgpu } = H, from = resolveWebgpu().from;
-    const dawnDir = from ? path.join(path.dirname(from), "dist", `${process.platform}-${process.arch}`) : null;
+    const win = process.platform === "win32", from = H.resolveWebgpu().from;
+    // section 64: dawn.node's directory from the package the resolver answered with, resolved to a file -- section 52's
+    // path.dirname(from) was "." whenever the bare specifier answered -- and whether that package ships its own DXC
+    const pkg = H.webgpuPackage(from), dawnDir = pkg ? pkg.dawnDir : null, dxcBeside = win && !!(pkg && pkg.dxcBeside);
     let shell = null, roots = []; try { const PR = await imp("tools/ship/playwrightResolve.mjs"); shell = PR.HEADLESS_SHELL; roots = PR.shellRoots(); } catch {}
-    const dxcDir = win ? findDxc({ shell, roots }) : null;
-    const modes = [{ name: "as shipped", flags: [] }];
-    if (dxcDir && dawnDir) modes.push({ name: "use_dxc", flags: ["enable-dawn-features=use_dxc"], dxc: dxcDir });
-    say(`native compilers: ${win ? "D3D12" : "not D3D12 (" + process.platform + ": the native backend here compiles to SPIR-V)"}; ` +
-        `DXC's DLLs ${dxcDir ? "found in " + dxcDir : win ? "not found on this box -- the use_dxc run is skipped, and section 43's A1 is untested here" : "not applicable"}`);
+    const dxcDir = win && !dxcBeside ? findDxc({ shell, roots }) : null;
+    const modes = nativeModes({ win, dawnDir, dxcBeside, dxcDir });
+    say(`node-webgpu ${pkg && pkg.version ? pkg.version : "(version unread)"} from ${from}${process.env[H.WEBGPU_ENV] ? " (" + H.WEBGPU_ENV + ")" : ""}; native compilers: ` +
+        `${win ? "D3D12" : "not D3D12 (" + process.platform + ": the native backend here compiles to SPIR-V)"}; ` +
+        `DXC ${dxcBeside ? "ships beside dawn.node -- runs as shipped, use_dxc and use_dxc off, from the package alone" :
+              dxcDir ? "'s DLLs found in " + dxcDir : win ? "not found on this box -- the use_dxc run is skipped, and section 43's A1 is untested here" : "not applicable"}; ` +
+        `modes: ${modes.map((m) => m.name).join(", ")}`);
     const placed = [], everPlaced = [];
     for (const m of modes) {
         if (m.dxc) for (const f of ["dxcompiler.dll", "dxil.dll"]) { const to = path.join(dawnDir, f); if (!fs.existsSync(to)) { fs.copyFileSync(path.join(m.dxc, f), to); placed.push(to); everPlaced.push(to); } }

@@ -236,3 +236,39 @@ export function dumpStats(text, entry) {
              barriers: lines.filter((l) => /sync_g|sync_t|OpControlBarrier|barrier/.test(l)).length };
 }
 
+
+/**
+ * A native child's Dawn flags: ONE enable-dawn-features entry, dump_shaders first, and ONE disable-dawn-features entry,
+ * every feature asked for joined to its own. Section 49: dawn.node keeps the LAST of two entries with the same key, so the
+ * use_dxc run's second enable entry dropped dump_shaders and every use_dxc dump came back empty, on both GPUs. Round 19's
+ * probe (section 64) adds a run with use_dxc DISABLED, and the child's device already carries a disable entry --
+ * headlessGpu's FINE_CLOCK_FLAG -- so the disable key is merged the same way, or the clock flag would silently erase it.
+ * Moved here from render/denoiseCompile-selfcheck.mjs so tools/denoiseBuildProbe.mjs builds its children's flags with it too.
+ */
+export function dawnFlags(flags = []) {
+    const keys = ["enable-dawn-features=", "disable-dawn-features="], merged = new Map([[keys[0], ["dump_shaders"]], [keys[1], []]]), rest = [];
+    for (const f of flags) {
+        const k = keys.find((x) => f.startsWith(x));
+        if (!k) { rest.push(f); continue; }
+        for (const x of f.slice(k.length).split(",").filter(Boolean)) if (!merged.get(k).includes(x)) merged.get(k).push(x);
+    }
+    return [...keys.filter((k) => merged.get(k).length).map((k) => k + merged.get(k).join(",")), ...rest];
+}
+
+/**
+ * Which native compiler runs a box can make, from what it has (round 19's probe, section 64).
+ *   - "as shipped": always -- Dawn's own choice, which the dump names.
+ *   - node-webgpu 0.6.2 ships dxcompiler.dll beside dawn.node (`dxcBeside`), and its Dawn loads it: "use_dxc" asks for DXC
+ *     and "use_dxc off" forbids it, so FXC and DXC are timed from ONE package and A1 (section 43) can be read off a single
+ *     run. Nothing is copied: the package's own compiler is the one measured, and a DLL from elsewhere is not mixed in.
+ *   - an older package with no compiler of its own, on a box that keeps DXC's two DLLs elsewhere (`dxcDir`, findDxc): the
+ *     section 43 run, its DLLs copied beside dawn.node for that run alone (0.6.0's Dawn never loaded them -- sections 52-53).
+ *   - not D3D12: as shipped alone (the native backend compiles to SPIR-V).
+ */
+export function nativeModes({ win = false, dawnDir = null, dxcBeside = false, dxcDir = null } = {}) {
+    const modes = [{ name: "as shipped", flags: [] }];
+    if (!win || !dawnDir) return modes;
+    if (dxcBeside) return [...modes, { name: "use_dxc", flags: ["enable-dawn-features=use_dxc"] }, { name: "use_dxc off", flags: ["disable-dawn-features=use_dxc"] }];
+    if (dxcDir) return [...modes, { name: "use_dxc", flags: ["enable-dawn-features=use_dxc"], dxc: dxcDir }];
+    return modes;
+}

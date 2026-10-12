@@ -241,6 +241,29 @@ Send back `real-gpu-denoise-r18.json`. Section 61 fixes, before it runs, which s
 r18t on the GTX 1080 (1.09 x at 1080p). Every other GPU, platform and browser, and everything native, stays on r15. The
 native clock is unrounded on both GPUs. There is nothing more to run on this branch.
 
+### Round 19's probe: node-webgpu 0.6.2 and DXC (pre-registration section 64)
+
+node-webgpu 0.6.2 is the first version to ship Microsoft's newer shader compiler, `dxcompiler.dll`, beside `dawn.node`,
+with a Dawn that loads it. The tree stays pinned to 0.6.0. The probe runs 0.6.2 for one console, through `SWEK_WEBGPU`,
+and leaves your global install alone. On each GPU, in the verified clone, from a command prompt:
+
+```
+cd WebGLEngine
+npm install --no-audit --no-fund --prefix "%TEMP%\swek-webgpu-0.6.2" webgpu@0.6.2
+set SWEK_WEBGPU=%TEMP%\swek-webgpu-0.6.2\node_modules\webgpu
+node tools/ship/realGpuRun.mjs --only denoiseCompile --out real-gpu-denoise-dxc-0.6.2.json
+node tools/denoiseBuildProbe.mjs --native-only --dxc on --out denoise-build-probe-dxc-0.6.2.json
+set SWEK_WEBGPU=
+```
+
+- **The compile gate's first native line should name node-webgpu 0.6.2.** It runs each kernel three ways: as shipped,
+  under `use_dxc`, and with `use_dxc` off. Each run's dump says which compiler really ran: DXIL is DXC, DXBC is FXC.
+- **The build probe builds round 17's shapes under DXC.** Those are the shapes FXC stopped on or crashed on, r18t's and
+  r18u's kernels among them.
+- **Expect it to take a while on the Intel.** Each FXC run there took minutes in rounds 13 to 15.
+- **Send back both JSON files.** Send the dump files they name under your temp folder too. Section 64 fixes, before it
+  runs, what they decide.
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and
