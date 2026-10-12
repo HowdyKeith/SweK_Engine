@@ -9191,6 +9191,26 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The CLIs refuse an unknown option (cliArgs) and the peer's transport is a row of its own. Thirteen sabotages red by name, " +
                  "logged in the two headers. NOT CLOSED: the pair has run over loopback and in one browser, not between two machines.",
     }),
+    // v4843 -- since550, above the other line's since549. THREE new gate files: brain/tacticsRoster-selfcheck.mjs (the Endless-Sky fight's Load Tactics panel on flight-gpu.html and es-box3d.html, and what the arena says about its eight presets),
+    // brain/pilotAircraftPolicy-selfcheck.mjs (the aircraft's learned pilot, its shipped file and the Load Pilots panel on es-aircraft.html) and tools/ship/trainAircraftPilot-selfcheck.mjs (the tool that trains and ships it).
+    since550: Object.freeze({
+        at: "v4843", swept: 3, green: 3, red: 0,
+        added: Object.freeze([
+            "brain/tacticsRoster-selfcheck.mjs",
+            "brain/pilotAircraftPolicy-selfcheck.mjs",
+            "tools/ship/trainAircraftPilot-selfcheck.mjs",
+        ]),
+        widened: Object.freeze([
+            "tools/ship/afterVerdict-selfcheck.mjs (section 5: a real depth-1 clone as the fixture, the two history gates NOT GRADED with exit 3, and six sabotages)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE ENDLESS-SKY FIGHT HAS NEVER BEEN AN EVEN MATCH: side A's 'scatter' takes 59% of its battles against side B's hand weights over both sides, 64% against the whole field of eight presets. *** The tactics gate holds the " +
+                 "three directions that survive a retune of the sim (scatter over hand, stubborn over skittish, skittish last) rather than the table, and the pages through a synchronous step(n) because flight-gpu.html's software WebGPU device is lost a few " +
+                 "seconds after boot in this harness and the page redirects to the 2D view as built. The aircraft pilot holds a heading at 0.912 held-out and 0.868 audit against the PD controller's 0.722 and 0.713, 0.989 against 0.831 on the page's " +
+                 "patrol. Four sabotages went 0 red on the first try -- an import gate that only imported valid vectors, a Start Fight row that looked at an unhurt fleet, an equivalent mutant (the sanitiser refuses null on its own) and, in the aircraft gate, a " +
+                 "claim of mine that no angle repeats across the training sets when 90 degrees does -- each fixed and re-sabotaged. NOT CLOSED: no picture of either panel on a real screen, the served-policy path has only met a stub of the bridge, and " +
+                 "the rig readings are still owed.",
+    }),
     // v4842 -- NO new gate file -- main's v4838 (the denoiser arc) merged with this line's v4838-v4841. *** AND FOUR OF THIS
     // LINE'S CLOSINGS COLLIDED: both lines wrote since529-since532, main for the arc's rounds 1-9 and this line for v4838-v4841,
     // so the merged literal declared each twice and the later -- this line's -- won silently, taking eight of the arc's gates

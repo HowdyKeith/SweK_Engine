@@ -920,8 +920,8 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4840 -- and this line's wasmDoors-selfcheck.mjs (the computed-door census, split out of wasmTeardown-selfcheck at step 4b):
     // gates, usesOk, definesOk and nameFirst each by one more.
     // v4842 -- MAIN'S v4838 (THE DENOISER ARC) MERGED WITH THIS LINE'S v4838-v4841: RE-DERIVED by census() over the merged tree.
-    gates: 1964, usesOk: 1943, definesOk: 1935, importsOk: 0,
-    distinctDefinitions: 42, nameFirst: 1835, condFirst: 97, unknownSignature: 11,
+    gates: 1967, usesOk: 1946, definesOk: 1938, importsOk: 0,
+    distinctDefinitions: 42, nameFirst: 1838, condFirst: 97, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

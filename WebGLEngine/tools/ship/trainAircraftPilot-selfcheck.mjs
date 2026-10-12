@@ -9,7 +9,20 @@
 // seconds -- deterministic to the bit, champion picked on held-out, audit untouched by the selection -- the blob it writes (right format, round-trips through the importer the page uses, quotes the numbers it was
 // graded on), and the command line (it writes nothing without --write and nothing when the champion does not qualify).
 //
-// SABOTAGES (each broken in place, the gate run, the file restored and diffed). FILLED IN BELOW AS RUN.
+// SABOTAGES, v4843, twelve (each broken in place, the gate run, the file restored; run in scratch checkouts three at a time). Reds are rows (`grep -c '^  FAIL'`).
+//   A  parseArgs: an unknown option read past                                   2 red (the refusal row; the unknown-option command line, which now fails on the NEXT thing it reads instead of naming the option)
+//   B  qualifies: the audit-score clause dropped                                2 red (the audit-score row; the worse-in-every-way row, 4 reasons not 5)
+//   C  qualifies: strict > loosened to >= on the held-out score                 1 red (the equal-is-not-better row)
+//   D  run(): the champion picked on TRAIN score, not held-out                  2 red (the champion-is-the-best-held-out row and the train-best-is-not-the-champion row; the seed-3010 recipe exists for this one)
+//   E  run(): the audit evaluated on the train scenarios                        1 red (the audit row)
+//   F  blobOf(): the count of weights that differ left out of `by`              1 red (the blob row)
+//   G  CLI: --write writes even when the champion does not qualify              1 red (the CLI row)
+//   H  run(): the pruning step skipped                                          1 red (the pruned row). THE ROW WAS TIGHTENED BEFORE THIS RUN, NOT AFTER: as first written it asked only that no run end with MORE weights differing than it
+//      moved, which a skipped prune satisfies trivially (kept = moved); it now also asks that at least one run end with FEWER. Reasoned from the 6dof trainer's own log, not observed as a 0-red.
+//   I  RECIPE: 600 iterations -> 500                                            1 red (the recorded-recipe row)
+//   J  qualifies: the patrol clause dropped                                     2 red (the patrol row; the worse-in-every-way row)
+//   K  qualifies: the unstable clause dropped                                   2 red (the unstable row; the worse-in-every-way row)
+//   L  qualifies: better > worse loosened to >=                                 1 red (the as-many-worse-as-better row)
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -59,7 +72,7 @@ ok("the same recipe gives the same champion to the bit (same weights hash, same 
 ok("the champion is the run with the best HELD-OUT score, and the runs are listed best-first", a.runs.every((r, i, arr) => !i || arr[i - 1].heldOut.score >= r.heldOut.score) && a.champion.seed === a.runs[0].seed && a.champion.heldOut.score === a.runs[0].heldOut.score, a.runs.map((r) => `${r.seed}: train ${r.train.toFixed(3)} held-out ${r.heldOut.score.toFixed(3)}`).join(" | "));
 const audit = A.evaluate(a.champion.weights, A.AUDIT_SET);
 ok("the audit is the champion's score on the AUDIT scenarios, read once after the choice, the hand pilot's is on the same scenarios, and the patrol is the champion's own patrol", a.champion.audit.score === audit.score && a.hand.audit.score === A.evaluate(A.handWeights(), A.AUDIT_SET).score && a.champion.patrol.mean === A.patrol(a.champion.weights).mean && a.hand.patrol.mean === A.patrol(A.handWeights()).mean, A.describeEval(a.champion.audit));
-ok("every run is PRUNED: no run ends with more weights differing from the hand pilot than its search moved, and the log says so", a.runs.every((r) => Number.isInteger(r.kept) && Number.isInteger(r.moved) && r.kept <= r.moved) && lines.some((l) => /pruned \d+ moved weights to \d+/.test(l)), a.runs.map((r) => `${r.moved} -> ${r.kept}`).join(", "));
+ok("every run is PRUNED: no run ends with more weights differing from the hand pilot than its search moved, at least one ends with FEWER (the search drifts weights that carry nothing, and the prune puts them back), and the log says so", a.runs.every((r) => Number.isInteger(r.kept) && Number.isInteger(r.moved) && r.kept <= r.moved) && a.runs.some((r) => r.moved > 0 && r.kept < r.moved) && lines.some((l) => /pruned \d+ moved weights to \d+/.test(l)), a.runs.map((r) => `${r.moved} -> ${r.kept}`).join(", "));
 ok("the log says what it did: the PD controller's scores, one line a run, the champion 'picked on held-out', and a verdict line", lines.length === 1 + recipe.runs + 2 && /PD controller/.test(lines[0]) && lines.some((l) => /picked on held-out/.test(l)) && /QUALIFIES|DOES NOT QUALIFY/.test(lines[lines.length - 1]), `${lines.length} lines`);
 
 // a recipe chosen BECAUSE the run that scores best on the train scenarios is not the run that scores best on the held-out ones (3012 trains to 0.764 and holds out at 0.715; 3010 trains to 0.757 and holds out at 0.723):

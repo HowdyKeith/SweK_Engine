@@ -14,7 +14,34 @@
 // choice survives a reload (including a saved 'shipped' made before the file arrives). Section 6, TRAINING and the pilot this page ships: the score, the three disjoint scenario sets, the sparse child, the
 // train/prune invariants, and the SHIPPED FILE -- its `by` reproduced, beating the PD controller where it was never trained, and not worse on the page's own patrol.
 //
-// SABOTAGE LOG -- v4839. Each applied to the file named, the gate run, the file restored. Reds are rows (`grep -c '^  FAIL'`). FILLED IN BELOW AS RUN.
+// SABOTAGE LOG -- v4843, twenty-three, each applied to the file named, the gate run, the file restored (cmp-identical). Reds are rows (`grep -c '^  FAIL'`).
+//   A  pilotAircraftPolicy.mjs: the hand weights' pitch damping halved                       6 red (the controls-are-decide()'s row, the closed-loop and patrol rows, the hand squadron on the page, the file's `by`, the fixed-point row)
+//   B  pilotAircraftPolicy.mjs: forward() no longer clamps to [-1, 1]                        9 red (the forward row, the controls row, closed loop, patrol, the unstable-flight row, the page's hand squadron, ...)
+//   C  pilotAircraftPolicy.mjs: the bank error is not wrapped to (-pi, pi]                   3 red (the controls-are-decide()'s row on the states with a large bank, the file's `by`, the fixed-point row; the closed-loop rows do NOT see it -- no flight there banks past pi)
+//   D  pilotAircraftPolicy.mjs: upZ's sign flipped                                           3 red (the twelve-features row, the file's `by`, the fixed-point row: the hand weights give upZ no weight, so only the features row and the shipped file read it)
+//   E  pilotAircraftPolicy.mjs: the airspeed feature scaled by 20, not 30                    3 red (the twelve-features row, the file's `by`, the fixed-point row; same reason as D)
+//   F  pilotAircraftPolicy.mjs: the unstable-flight penalty dropped from the score           1 red (the unstable-flight-is-charged-5 row)
+//   G  pilotAircraftPolicy.mjs: a child moves EVERY weight                                   2 red (the sparse-child row, the maxK row)
+//   H  pilotAircraftPolicy.mjs: train() accepts a worse child as 'neutral'                   *** FIRST TRY WENT 0 RED: the sabotaged branch kept the old best SCORE while returning the worse child's weights, so the row's three clauses (deterministic, not below the hand
+//      pilot's score, history only rises) all read the unchanged score. The row now also demands that the weights train() RETURNS score what it says they do *** -> 1 red
+//   I  pilotAircraftPolicy.mjs: prune() makes one pass and stops                             1 red (the idempotence row: pruning its own output again moves more)
+//   J  pilotAircraftPolicy.mjs: the zero pilot has a yaw bias                                8 red (the zero-pilot-commands-nothing row, forward(), the controls row, closed loop, patrol, the page's hand squadron, ...)
+//   K  pilotAircraftPolicy.mjs: an audit start repeats a train start (yaw 36)                1 red (the disjoint-sets row)
+//   L  pilotAircraftPolicy.mjs: the patrol never changes heading                             1 red (the file's `by` quotes a patrol it no longer reproduces)
+//   M  pilotAircraftPolicy.mjs: the module's thrust drifts from the page's (55)              2 red (the constants-are-the-page's row and the file's `by`)
+//   N  es-aircraft.html: the page's thrust drifts from the module's (55)                     1 red (the constants row)
+//   O  es-aircraft.html: the patrol ignores the roster (always AP.decide)                    2 red (the zero squadron turns, the shipped pilot does not fly better)
+//   P  es-aircraft.html: every aircraft flies the first pilot's function                     1 red (!! 'hand + noise' gives each aircraft its own pilot: the function count, 3 against 1)
+//   Q  es-aircraft.html: 'shipped' is never offered                                          2 red
+//   R  es-aircraft.html: the choice is not saved                                             2 red (the reload row, the saved-shipped row)
+//   S  es-aircraft.html: an import without the policy check                                  1 red (the refusal row)
+//   T  es-aircraft.html: Clear imported does nothing                                         1 red
+//   U  es-aircraft.html: Start Patrol does not respawn                                       3 red (the laps no longer start from the same place: the hand-squadron row, the zero-squadron row and the shipped-patrol row)
+//   V  pilotAircraftWeightsDefault.json: the file misquotes its held-out score               1 red (the `by` row)
+//   W  pilotAircraftWeightsDefault.json: one shipped weight changed                          2 red (the `by` row and the fixed-point row)
+// A NOTE ON G, H AND THE SERIAL RUN: the sabotages that make a search blow up (B, F, G) take three to four minutes each instead of one, because the gate's own train/prune rows then fly unstable aircraft for the whole 30 s.
+// FOUND BEFORE THE SABOTAGES, BY THE GATE: my own comment in pilotAircraftPolicy.mjs said no angle repeats across the train, held-out and audit sets. 90 degrees does (a seeded axis in training, the vertical in the audit); the
+// comment and the row now say so. The sets were not changed, because the audit had already been read for the champion.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -231,8 +258,8 @@ sec("6. TRAINING and the pilot this page ships: brain/pilotAircraftWeightsDefaul
     ok("...with maxK 1 exactly one, and the same generator gives the same child", Array.from(PA.mutate(hand, 0.3, mkRng(9), 1)).filter((v, i) => v !== hand[i]).length === 1 && same(PA.mutate(hand, 0.3, mkRng(5), 4), child));
     // sigma 3 and up to twelve weights a child: a destructive search, so most children are clearly WORSE and a trainer that accepted them would show
     const small = PA.TRAIN_SET.slice(0, 3), t1 = PA.train({ seed: 3, iters: 20, sigma: 3, maxK: 12, trainSet: small }), t2 = PA.train({ seed: 3, iters: 20, sigma: 3, maxK: 12, trainSet: small });
-    ok("train is deterministic for a seed, never ends below the hand pilot's own score on the starts it trained on (even when most children are worse), and its history only rises",
-        same(t1.weights, t2.weights) && t1.trainScore >= PA.evaluate(hand, small).score - 1e-9 && t1.history.every((h, i, a) => !i || h.score >= a[i - 1].score - 1e-9) && t1.improved + t1.neutral <= 20, `train ${t1.trainScore.toFixed(3)}, ${t1.improved} improvements, ${t1.neutral} neutral`);
+    ok("train is deterministic for a seed, never ends below the hand pilot's own score on the starts it trained on (even when most children are worse), the weights it RETURNS score exactly what it says they do (a trainer that keeps a worse child but reports the best score it saw would pass every other clause), and its history only rises",
+        same(t1.weights, t2.weights) && t1.trainScore >= PA.evaluate(hand, small).score - 1e-9 && Math.abs(PA.evaluate(t1.weights, small).score - t1.trainScore) < 1e-6 && t1.history.every((h, i, a) => !i || h.score >= a[i - 1].score - 1e-9) && t1.improved + t1.neutral <= 20, `train ${t1.trainScore.toFixed(3)}, ${t1.improved} improvements, ${t1.neutral} neutral`);
     const drift = Float32Array.from(hand); for (const i of [3, 77, 301, 640, 805]) drift[i] += 0.4;
     const pr = PA.prune(drift, { trainSet: small });
     ok("prune puts back weights that carry nothing: a hand pilot with five weights nudged comes back with fewer moved than it went in with, and no lower a score", pr.moved === 5 && pr.kept < 5 && pr.trainScore >= PA.evaluate(drift, small).score - 1e-9 && pr.weights !== drift, `${pr.moved} moved, ${pr.kept} kept`);
