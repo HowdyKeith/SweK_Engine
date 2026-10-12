@@ -37,6 +37,9 @@
 //   T  pilotRoster.mjs: choices() ignores ctx.brainPanel === false (the 6DOF page has no Brain panel)   1 red (the no-Brain-panel row)
 //   U  pilotRoster.mjs: choices() ignores ctx.scriptedLabel                                       1 red (same row)
 //   V  pilotRoster.mjs: resolveTeam() ignores ctx.scriptedName                                    1 red (same row). T-V were added for brain/pilot6dofPolicy-selfcheck.mjs's page and are graded here.
+//   v4847 -- THE LEAGUE CHOICE (section 2's three new rows), two sabotages in a scratch checkout:
+//   AA pilotRoster.mjs: 'league' offered when none is held                                       5 red (the not-offered row and the rows that count the choices a page holds)
+//   AB pilotRoster.mjs: 'league' resolves to the shipped pilot's weights                           1 red (the flies-THAT-vector row)
 "use strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -94,6 +97,13 @@ sec("2. EVERY CHOICE THE PANEL CAN OFFER");
     ok("a source the page does not hold is NOT OFFERED: no shipped pilot and no imported one before they exist", !bare.some((c) => c.id === "shipped" || c.id === "imported") && bare.some((c) => c.id === "hand") && bare.some((c) => c.id === "scripted") && bare.length === 7, bare.map((c) => c.id).join(","));
     const ghost = R.resolveRoster({ A: "imported", B: "no-such-pilot" }, ctxOf(), N);
     ok("!! a choice nothing holds (a saved 'imported' when none is held, an unknown id) falls back to the hand pilot AND IS REPORTED BY NAME -- never a silent substitute, never a throw", ghost.problems.length === 2 && /team A.*"imported"/.test(ghost.problems[0]) && /team B.*"no-such-pilot"/.test(ghost.problems[1]) && !ghost.A.scripted && ghost.A.weights.every((w) => same(w, PP.handWeights())), ghost.problems[0]);
+    {   // v4847 -- the league-trained pilot: a fourth source of weights, offered only when held
+        const leagueW = PP.perturb(PP.handWeights(), 0.2, (() => { let a = 47; return () => { a = (Math.imul(a, 1664525) + 1013904223) >>> 0; return a / 4294967296; }; })());
+        const all3 = R.choices({ shipped: true, league: true, imported: true }).map((c) => c.id), lg = R.resolveTeam("B", "league", ctxOf({ shipped: shippedW, league: leagueW }), 3), noLg = R.resolveRoster({ A: "league", B: "shipped" }, ctxOf({ shipped: shippedW }), 3);
+        ok("!! 'league' is offered only when the page holds the league-trained pilot, sits between 'shipped' and 'imported', and a page that holds none offers the same choices it did before", all3.indexOf("league") === all3.indexOf("shipped") + 1 && all3.indexOf("imported") === all3.indexOf("league") + 1 && !R.choices({ shipped: true, imported: true }).some((c) => c.id === "league") && R.choices({ shipped: true, league: true }).length === R.choices({ shipped: true, imported: true }).length, all3.join(","));
+        ok("!! choosing it flies THAT vector on every ship (the league weights themselves, not the shipped pilot's and not a copy that drifts), under its own label; a saved 'league' on a page that does not hold one falls back to the hand pilot BY NAME", lg.id === "league" && lg.weights.length === 3 && lg.weights.every((w) => w === leagueW) && /league-trained/.test(lg.label) && lg.problems.length === 0 && noLg.problems.length === 1 && /team A.*"league"/.test(noLg.problems[0]) && noLg.A.weights.every((w) => same(w, PP.handWeights())) && noLg.B.weights.every((w) => w === shippedW), lg.label);
+        ok("the Brain panel's pilot ignores it (the imported one, else the shipped default, else the hand weights: the league pilot is a choice made in the roster, not a new default)", R.resolveTeam("A", "brain", ctxOf({ shipped: shippedW, league: leagueW }), 2).weights[0] === shippedW);
+    }
     const brainOrder = [R.resolveTeam("A", "brain", ctxOf({ imported: importedW, shipped: shippedW }), 2), R.resolveTeam("A", "brain", ctxOf({ shipped: shippedW }), 2), R.resolveTeam("A", "brain", ctxOf(), 2)];
     ok("the Brain panel's pilot is the imported one, else the shipped default, else the hand weights (what Brain pilot has always flown), and each is the vector itself, not a copy that drifts", brainOrder[0].weights[0] === importedW && brainOrder[1].weights[0] === shippedW && same(brainOrder[2].weights[0], PP.handWeights()));
     const n6 = R.resolveTeam("A", "noise10", ctxOf(), 6), n4 = R.resolveTeam("A", "noise10", ctxOf(), 4), nB = R.resolveTeam("B", "noise10", ctxOf(), 6);

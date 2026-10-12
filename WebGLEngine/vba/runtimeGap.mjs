@@ -621,7 +621,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4838 -- THE DENOISER ARC'S MERGE: RE-DERIVED over the merged tree: main's 4636 plus the arc's 30 files since the v4818 split.
     // v4840 -- files 4636 -> 4637: tools/ship/wasmDoors-selfcheck.mjs.
     // v4842 -- main's v4838 merged with this line's v4838-v4841: RE-DERIVED over the merged tree.
-    files: 4675,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
+    files: 4678,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
     // (v4691 note, carried)                               // v4691 -- RE-DERIVED: tools/ship/textureInProbe.mjs arrived, one ES module with a closure and top-level await -- four rows moved (files, ES modules, closures, async/await) and eight held.
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
@@ -1231,7 +1231,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // through a BigUint64Array) and WebAssembly 26 -> 27 (tools/ship/wasmTeardown-selfcheck.mjs's section 8 fixture names the API in
     // code; it named it only in a comment before). Neither compiles nor allocates on a GPU. The fixture's glue was first written with
     // a fetch() inside its string and moved fetch/XHR 252 -> 253 -- a gate that fetches nothing -- so the fixture was changed, not the row.
-    esModules: 4370, closures: 4215, asyncAwait: 1761, typedArrays: 1300, promises: 426,
+    // v4846 -- the 6DOF league (tools/ship/train6dofLeague.mjs, trainLeague6dof.mjs, its gate): files 4675 -> 4678, ES modules 4370 -> 4373, closures 4215 -> 4218, async/await 1761 -> 1762 (trainLeague6dof's Promise.all over its worker processes), typed arrays 1300 -> 1302, Promises 426 -> 427. RE-DERIVED, not incremented.
+    esModules: 4373, closures: 4218, asyncAwait: 1762, typedArrays: 1302, promises: 427,
     fetchXhr: 252, performanceNow: 250, raf: 127, webgl: 200, webgpu: 62, threads: 26, wasm: 27,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

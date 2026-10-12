@@ -61,6 +61,9 @@ try {
     const t0 = Date.now();
     await page.goto(`http://127.0.0.1:${port}/index.html`, { waitUntil: "domcontentloaded", timeout: 60000 });
     await page.waitForTimeout(6000);
+    // *** A FIXED SIX SECONDS IS A GUESS ABOUT THE BOOT, NOT A CONDITION. *** The rotation ran this gate serially at v4846 and it read "no botManager" once, then passed three times alone: the page had not built the bot manager yet
+    // when the six seconds ran out. Wait for the thing itself (bounded, so a page that never builds one still fails by name below, with the error the row prints). Probed: with the six-second delay taken to 0 the wait alone passes (7263 ms); with the delay at 0 and the wait removed the gate exits 1.
+    await page.waitForFunction(() => !!(window.fpsShooter && window.fpsShooter.botManager), null, { timeout: 40000 }).catch(() => {});
     bootMs = Date.now() - t0;
     R = await page.evaluate(async () => {
         const bm = window.fpsShooter && window.fpsShooter.botManager;

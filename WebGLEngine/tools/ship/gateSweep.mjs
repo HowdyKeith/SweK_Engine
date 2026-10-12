@@ -9191,6 +9191,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The CLIs refuse an unknown option (cliArgs) and the peer's transport is a row of its own. Thirteen sabotages red by name, " +
                  "logged in the two headers. NOT CLOSED: the pair has run over loopback and in one browser, not between two machines.",
     }),
+    // v4846 -- since551. ONE new gate file: tools/ship/train6dofLeague-selfcheck.mjs (the tool that trains the space-battle pilot against itself and the PD autopilot from both sides), plus sections 7-8 of brain/pilot6dofPolicy-selfcheck.mjs
+    // (both sides of a duel, the league evaluator, the league pilot's file) and three rows of brain/pilotRoster-selfcheck.mjs (the 'league' choice).
+    since551: Object.freeze({
+        at: "v4846", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/train6dofLeague-selfcheck.mjs",
+        ]),
+        widened: Object.freeze([
+            "brain/pilot6dofPolicy-selfcheck.mjs (section 7: scoreB, the league evaluator, the first-side advantage as a measurement, 152 disjoint seeds; section 8: the league pilot's file held to its `by`, the trainer's own rule, each side, a fixed point; the page's league rows)",
+            "brain/pilotRoster-selfcheck.mjs (the 'league' choice: offered only when held, between 'shipped' and 'imported', flies that vector, the Brain panel ignores it)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE 8-2-10 REPORTED AT v4837 FOR THE SHIPPED PILOT AGAINST A COPY OF ITSELF WAS THE SIDE, NOT THE PILOT: *** side A acts first, so a pilot judged from one side is judged on the side. The league trainer plays every game from both sides, " +
+                 "starts from the shipped pilot, trains on 48 seeds (twelve overfit), picks on 24 held-out and grades once on 40 nothing had read: the champion leads the shipped pilot 42-3 over 80 games (the shipped pilot against itself is 18-18) and still loses nothing to the " +
+                 "PD autopilot. Thirty-one sabotages, every one red on its first run, three of the catching rows added before the first run because the sabotage plan showed the draft could not see them. NOT CLOSED: the duel has no ship-ship collisions " +
+                 "so the page's three-a-side fight is not what was measured, and the pilot has only met two styles (the PD autopilot and its own ancestor).",
+    }),
     // v4843 -- since550, above the other line's since549. THREE new gate files: brain/tacticsRoster-selfcheck.mjs (the Endless-Sky fight's Load Tactics panel on flight-gpu.html and es-box3d.html, and what the arena says about its eight presets),
     // brain/pilotAircraftPolicy-selfcheck.mjs (the aircraft's learned pilot, its shipped file and the Load Pilots panel on es-aircraft.html) and tools/ship/trainAircraftPilot-selfcheck.mjs (the tool that trains and ships it).
     since550: Object.freeze({
