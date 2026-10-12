@@ -123,6 +123,30 @@ export function gateIndex(root) {
     return gates;
 }
 
+// *** v4846 -- THE SAME FILES WERE READ AND PARSED ELEVEN TIMES PER RUN, AND THAT IS WHAT KEPT THIS GATE OUT OF THE SWEEP. ***
+// This gate calls definitionCoverage about a dozen times over the same tree (physics and tree-wide, narrow and all shapes,
+// owned and not) and each call re-read and re-parsed every module and gate. It was timed at 3,100 ms against the quick
+// sweep's 3,000 ms line, so NO ship-time step ran it -- and main went red here twice unseen, at v4831 (709 against 703)
+// and before v4845 (364 against 362), each found only when a later round happened to run it by hand. The reads and the
+// declaration parse are now cached per path for the life of the process; the census itself is computed fresh on every
+// call, so each caller still gets its own object. Nothing this gate runs writes a file it later reads.
+const _textMemo = new Map(), _declMemo = new Map(), _gateMemo = new Map();
+const _textOf = (p) => { if (!_textMemo.has(p)) { let t = null; try { t = fs.readFileSync(p, "utf8"); } catch {} _textMemo.set(p, t); } return _textMemo.get(p); };
+const _gateOf = (gate) => { if (!_gateMemo.has(gate)) { const g = fs.existsSync(gate) ? _textOf(gate) : null;
+    _gateMemo.set(gate, g == null ? null : { src: g, body: g.replace(/^import[\s\S]*?from[^\n]*\n/gm, "").replace(/^\s*\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "") }); }
+    return _gateMemo.get(gate); };
+// and the owned census asked EVERY gate whether it imports the module, once per unnamed symbol (43% of the run, profiled):
+// the importers of each module are indexed once per gateIndex() list instead -- the same gates, found by lookup.
+const _importersMemo = new WeakMap();
+const _importersOf = (owners, p) => {
+    if (!_importersMemo.has(owners)) { const ix = new Map();
+        for (const g of owners) for (const imp of g.imports) { if (!ix.has(imp)) ix.set(imp, []); ix.get(imp).push(g); }
+        _importersMemo.set(owners, ix); }
+    const ix = _importersMemo.get(owners), a = ix.get(p) || [], b = ix.get(p.replace(/\.(js|mjs)$/, "")) || [];
+    return b.length ? [...new Set([...a, ...b])] : a;
+};
+const _declsOf = (p, src, shapes) => { const k = shapes + "|" + p; if (!_declMemo.has(k)) _declMemo.set(k, exportedDefinitions(src, { shapes })); return _declMemo.get(k); };
+
 /** Exported one-line definitions, and whether the module's own gate names them. */
 export function definitionCoverage(root, sub = "physics", { shapes = "narrow", owners = null } = {}) {
     // v4573 -- `owners` is a gateIndex(). Supplying it widens WHICH GATE may name a definition; leaving it
@@ -136,24 +160,23 @@ export function definitionCoverage(root, sub = "physics", { shapes = "narrow", o
             if (e.isDirectory()) { if (!/^(node_modules|vendor|\.git|\.venv)$/.test(e.name)) walk(p); continue; }
             if (!/\.(js|mjs)$/.test(e.name) || /selfcheck/.test(e.name)) continue;
             const gate = p.replace(/\.(js|mjs)$/, "-selfcheck.mjs");
-            if (!fs.existsSync(gate)) continue;          // ungated modules are gradedCoverage's business, not this
+            const G = _gateOf(gate);
+            if (!G) continue;          // ungated modules are gradedCoverage's business, not this
             out.gatedModules++;
-            let src, gsrc;
-            try { src = fs.readFileSync(p, "utf8"); gsrc = fs.readFileSync(gate, "utf8"); } catch { continue; }
+            const src = _textOf(p), gsrc = G.src;
+            if (src == null) continue;
             // v3321b: TWO TIERS, because "named" was too weak and the weakness is measurable. Strip the import
             // block and the comments -- what remains is code the gate actually RUNS. A definition named only in
             // an import is not being exercised by this file, though it may still be reached indirectly through
             // another function, which is why importOnly is REPORTED rather than failed.
-            const body = gsrc.replace(/^import[\s\S]*?from[^\n]*\n/gm, "")
-                             .replace(/^\s*\/\/.*$/gm, "")
-                             .replace(/\/\*[\s\S]*?\*\//g, "");
+            const body = G.body;
             // v3322: EXPORTED FUNCTIONS TOO. The first sweep looked only at `export const NAME = (` and found
             // 67 definitions with 3 gaps. Extending it to `export function` finds 541 more, of which 40 are
             // never named by their own gate -- and planting errors in four of those showed all four passing
             // silently. The narrow pattern was not wrong, it was just narrow.
             // v4535: the shapes read are a PARAMETER now (see exportedDefinitions above). The default is the
             // two forms this census has always read, so every frozen number below is unmoved.
-            const decls = exportedDefinitions(src, { shapes });
+            const decls = _declsOf(p, src, shapes);
             for (const m of decls) {
                 out.total++;
                 out.byKind[m.kind] = (out.byKind[m.kind] || 0) + 1;
@@ -163,8 +186,7 @@ export function definitionCoverage(root, sub = "physics", { shapes = "narrow", o
                 // Not named by the gate that shares its name. Under the widened rule, ask whether any gate
                 // that IMPORTS this module names it in its body; record those separately so the split between
                 // "the detector could not see it" and "nothing has looked at it" stays visible.
-                const byOwner = owners && owners.some((g) =>
-                    (g.imports.has(p) || g.imports.has(p.replace(/\.(js|mjs)$/, ""))) && re.test(g.body));
+                const byOwner = owners && _importersOf(owners, p).some((g) => re.test(g.body));
                 if (byOwner) out.rescued.push(rel); else out.ungated.push(rel);
             }
         }

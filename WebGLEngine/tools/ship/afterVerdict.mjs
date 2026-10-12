@@ -31,7 +31,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { enumerateGates } from "./gateSweep.mjs";
-import { reach } from "./recordReach.mjs";
+import { reach, readTimings } from "./recordReach.mjs";
 import { noComments } from "./sourceScan.mjs";
 import { parseOrExit } from "./cliArgs.mjs";
 
@@ -55,13 +55,37 @@ export function recordGuardians(r = null) {
     return (R.blockers || []).map((b) => ({ gate: rel(b.gate), ms: b.ms, records: [...b.records] }));
 }
 
-/** Both lists, joined, each gate with why it is on the plan. Sorted by path so two boxes print the same order. */
-export function plan({ gates = null, read, r = null } = {}) {
+// *** v4846 -- A THIRD KIND: A TREE-WIDE COUNT THAT A MERGE MOVES. *** definitionGates-selfcheck freezes how many exported
+// symbols no gate names, over the whole tree. main went red there twice with nobody seeing it -- 709 against 703 before v4831,
+// 364 against 362 before v4845 -- because the gate sat a hundred milliseconds over the sweep's line and its numbers are not
+// a frozen RECORD (an exported Object.freeze) that recordReach could find, so neither list above held it. A merge is
+// exactly what moves such a count: it brings modules the census has not seen. These are the gates that hold one, each with
+// the constant (or file) its number lives in; afterVerdict-selfcheck finds each named in the gate's code. Over the sweep's
+// line (or never timed) a gate goes on the plan; under it the sweep already runs it and it is left off.
+export const TREE_RATCHETS = Object.freeze([
+    Object.freeze({ gate: "tools/ship/definitionGates-selfcheck.mjs", holds: Object.freeze(["BASELINE_WIDE", "BASELINE_SHAPES", "BASELINE_OWNED"]) }),
+    Object.freeze({ gate: "tools/ship/referenceKind-selfcheck.mjs", holds: Object.freeze(["RESCUED_CEILING"]) }),
+    Object.freeze({ gate: "tools/ship/graveyard-selfcheck.mjs", holds: Object.freeze(["ORPHAN_UTIL_BASELINE"]) }),
+    Object.freeze({ gate: "tools/ship/unknownNotDefault-selfcheck.mjs", holds: Object.freeze(["BASELINE"]) }),
+    Object.freeze({ gate: "tools/ship/orphanScan-selfcheck.mjs", holds: Object.freeze(["orphan-baseline.json"]) }),
+]);
+
+/** The TREE_RATCHETS the quick sweep does not run: over its line in the record, or never timed. */
+export function treeRatchets({ timings = null } = {}) {
+    const t = timings || readTimings(ENG), budget = t.budgetMs ?? 3000;
+    return TREE_RATCHETS.filter((x) => !(t.timings?.[x.gate] <= budget))
+        .map((x) => ({ gate: x.gate, holds: [...x.holds], ms: t.timings?.[x.gate] ?? null }));
+}
+
+/** All three lists, joined, each gate with why it is on the plan. Sorted by path so two boxes print the same order. */
+export function plan({ gates = null, read, r = null, timings = null } = {}) {
     const why = new Map();
     const add = (g, w) => { if (!why.has(g)) why.set(g, []); why.get(g).push(w); };
     for (const g of timingReaders({ gates, read })) add(g, "reads the timing record the verdict rewrote");
     for (const b of recordGuardians(r)) add(b.gate, "the only guard of " + b.records.join(", ") +
         " and over the sweep's line (" + (b.ms == null ? "never timed" : b.ms + " ms") + ")");
+    for (const x of treeRatchets({ timings })) add(x.gate, "holds a tree-wide count a merge moves (" + x.holds.join(", ") +
+        ") and is over the sweep's line (" + (x.ms == null ? "never timed" : x.ms + " ms") + ")");
     return [...why.keys()].sort().map((g) => ({ gate: g, why: why.get(g) }));
 }
 

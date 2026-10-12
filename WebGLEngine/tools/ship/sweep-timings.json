@@ -1358,7 +1358,7 @@
   "tools/ship/decisionIndex-selfcheck.mjs": 600,
   "tools/ship/declaredCost-selfcheck.mjs": 2709,
   "tools/ship/deferralAudit-selfcheck.mjs": 729,
-  "tools/ship/definitionGates-selfcheck.mjs": 3100,
+  "tools/ship/definitionGates-selfcheck.mjs": 1219,
   "tools/ship/deletionArchive-selfcheck.mjs": 215,
   "tools/ship/deletionHarness-selfcheck.mjs": 2273,
   "tools/ship/deliveredAssets-selfcheck.mjs": 262,
@@ -5302,7 +5302,7 @@
   "tools/ship/decisionIndex-selfcheck.mjs": "2026-10-12T17:00:49.486Z",
   "tools/ship/declaredCost-selfcheck.mjs": "2026-10-12T17:00:49.486Z",
   "tools/ship/deferralAudit-selfcheck.mjs": "2026-10-12T17:00:49.486Z",
-  "tools/ship/definitionGates-selfcheck.mjs": "2026-10-10T22:58:29.878Z",
+  "tools/ship/definitionGates-selfcheck.mjs": "2026-10-12T18:42:58.485Z",
   "tools/ship/deletionArchive-selfcheck.mjs": "2026-10-12T17:00:49.486Z",
   "tools/ship/deletionHarness-selfcheck.mjs": "2026-10-12T17:00:49.486Z",
   "tools/ship/deliveredAssets-selfcheck.mjs": "2026-10-12T17:00:49.486Z",
@@ -7264,7 +7264,7 @@
   "tools/ship/decisionIndex-selfcheck.mjs": 20000,
   "tools/ship/declaredCost-selfcheck.mjs": 20000,
   "tools/ship/deferralAudit-selfcheck.mjs": 20000,
-  "tools/ship/definitionGates-selfcheck.mjs": 300000,
+  "tools/ship/definitionGates-selfcheck.mjs": 20000,
   "tools/ship/deletionArchive-selfcheck.mjs": 20000,
   "tools/ship/deletionHarness-selfcheck.mjs": 20000,
   "tools/ship/deliveredAssets-selfcheck.mjs": 20000,
@@ -11322,7 +11322,7 @@
   "tools/ship/decisionIndex-selfcheck.mjs": 284,
   "tools/ship/declaredCost-selfcheck.mjs": 1371,
   "tools/ship/deferralAudit-selfcheck.mjs": 406,
-  "tools/ship/definitionGates-selfcheck.mjs": 3100,
+  "tools/ship/definitionGates-selfcheck.mjs": 1219,
   "tools/ship/deletionArchive-selfcheck.mjs": 97,
   "tools/ship/deletionHarness-selfcheck.mjs": 2273,
   "tools/ship/deliveredAssets-selfcheck.mjs": 109,
@@ -13184,7 +13184,7 @@
   "tools/ship/decisionIndex-selfcheck.mjs": "2026-10-11T18:59:45.014Z",
   "tools/ship/declaredCost-selfcheck.mjs": "2026-10-12T16:42:11.305Z",
   "tools/ship/deferralAudit-selfcheck.mjs": "2026-10-11T18:59:45.014Z",
-  "tools/ship/definitionGates-selfcheck.mjs": "2026-10-10T22:58:29.878Z",
+  "tools/ship/definitionGates-selfcheck.mjs": "2026-10-12T18:42:58.485Z",
   "tools/ship/deletionArchive-selfcheck.mjs": "2026-10-11T18:59:45.014Z",
   "tools/ship/deletionHarness-selfcheck.mjs": "2026-10-12T17:00:33.903Z",
   "tools/ship/deliveredAssets-selfcheck.mjs": "2026-10-11T19:15:34.556Z",
@@ -19609,9 +19609,9 @@
    406
   ],
   "tools/ship/definitionGates-selfcheck.mjs": [
-   3273,
    2477,
-   3100
+   3100,
+   1219
   ],
   "tools/ship/deletionArchive-selfcheck.mjs": [
    85,

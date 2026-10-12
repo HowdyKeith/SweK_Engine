@@ -133,6 +133,45 @@ export function regexBody(src, i) {
 const WS_HI = /\s/;
 const isWs = (code, ch) => code === 32 || (code >= 9 && code <= 13) || (code > 127 && WS_HI.test(ch));
 const isIdent = (code) => (code >= 97 && code <= 122) || (code >= 65 && code <= 90) || (code >= 48 && code <= 57) || code === 95 || code === 36;
+/**
+ * *** v4846 -- WHERE A TEMPLATE LITERAL REALLY ENDS: AFTER ITS CLOSING BACKTICK, NOT AT THE NEXT ONE. ***
+ * Both strippers below took every backtick as a plain open or close, so a template nested inside another's ${...}
+ * -- `${src.includes(`<table ${k}="`)}` -- "closed" the outer one at the inner backtick, the quote after it opened a
+ * string that never closed, and from there to the end of the file comment-or-code was decided by quote PARITY. Found in
+ * tools/ship/gateReport-selfcheck.mjs, where three apostrophes in a new comment flipped a later comment's
+ * "process.exit()" into code and turned wasmTeardown red over a file that calls no exit at all; codeOnly in the same
+ * state dropped real code as string content. Five of the tree's 4,668 scripts carried the shape at v4846. This walks
+ * the template with its ${...} expressions: an expression is code, so a string, a comment or another template inside it
+ * is skipped as one, and braces count only there. `src[i]` must be the opening backtick. Returns the index after the
+ * closing one, or src.length when the template never closes.
+ */
+export function templateEnd(src, i) {
+    let j = i + 1;
+    while (j < src.length) {
+        const c = src[j];
+        if (c === "\\") { j += 2; continue; }
+        if (c === "`") return j + 1;
+        if (c === "$" && src[j + 1] === "{") { j = _exprEnd(src, j + 2); continue; }
+        j++;
+    }
+    return src.length;
+}
+// after "${": the index after the "}" that closes the expression
+function _exprEnd(src, j) {
+    let depth = 0;
+    while (j < src.length) {
+        const c = src[j], d = src[j + 1];
+        if (c === "`") { j = templateEnd(src, j); continue; }
+        if (c === "'" || c === '"') { let k = j + 1; while (k < src.length && src[k] !== c && src[k] !== "\n") k += src[k] === "\\" ? 2 : 1; j = k + 1; continue; }
+        if (c === "/" && d === "/") { const k = src.indexOf("\n", j); j = k < 0 ? src.length : k; continue; }
+        if (c === "/" && d === "*") { const k = src.indexOf("*/", j + 2); j = k < 0 ? src.length : k + 2; continue; }
+        if (c === "{") depth++;
+        else if (c === "}") { if (depth === 0) return j + 1; depth--; }
+        j++;
+    }
+    return src.length;
+}
+
 export function codeOnly(src) {
     const parts = [];
     let i = 0;
@@ -171,7 +210,10 @@ export function codeOnly(src) {
         if (mode === null) {
             if (c === "/" && d === "/") { mode = "line"; i += 2; continue; }
             if (c === "/" && d === "*") { mode = "block"; i += 2; continue; }
-            if (c === "'" || c === '"' || c === "`") { mode = c; emit(c); i++; continue; }
+            // v4846: a template is blanked whole, its true end found by templateEnd (nested ${...} templates included)
+            if (c === "`") { const e = templateEnd(src, i), body = src.slice(i + 1, e);
+                emit("`" + body.replace(/[^\n]/g, "") + (e <= n && src[e - 1] === "`" && e > i + 1 ? "`" : "")); i = e; continue; }
+            if (c === "'" || c === '"') { mode = c; emit(c); i++; continue; }
             if (c === "/" && allowed()) {
                 const r = regexBody(src, i);
                 if (r) {
@@ -243,7 +285,9 @@ export function noComments(src) {
         if (mode === null) {
             if (c === "/" && d === "/") { mode = "line"; i += 2; continue; }
             if (c === "/" && d === "*") { mode = "block"; i += 2; continue; }
-            if (c === "'" || c === '"' || c === "`") { mode = c; out += c; i++; continue; }
+            // v4846: a template is kept whole, verbatim as before, to its true end (see templateEnd)
+            if (c === "`") { const e = templateEnd(src, i); out += src.slice(i, e); i = e; continue; }
+            if (c === "'" || c === '"') { mode = c; out += c; i++; continue; }
             if (c === "/" && regexAllowedHere(out)) {
                 const r = regexBody(src, i);
                 // KEPT VERBATIM, unlike codeOnly: this function only strips comments, never content -- a

@@ -16,6 +16,10 @@
 //   R. a run with no exit status (killed) counts as passing       -> 1 (the red/timeout row)
 //   T. the pattern loses one alternative (gate-timings)           -> 1 (the character-for-character row)
 //   U. step 4b goes back to a hand-typed one-liner                -> 2 (names the command; carries no copy)
+// v4846 -- SECTION 6 (TREE_RATCHETS, the third kind). Sabotages, each applied to tools/ship/afterVerdict.mjs, the gate run, restored:
+//   V  plan() never adds treeRatchets                                     -> RED (over the line it is on the plan)
+//   W  treeRatchets keeps a gate UNDER the line too                       -> RED (under the line it is left off)
+//   X  a holds name misspelled (BASELINE_WIDEN)                           -> RED (each named in the gate's code)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -95,6 +99,24 @@ console.log("\n3. the plan holds the two gates v4819 shipped red past its verdic
         !f2 || !f2.why.some((x) => x.startsWith("the only guard")), f2 ? f2.why.join("; ") : "not on the plan");
     const cost = p.reduce((s, x) => s + (T.timings[x.gate] || 0), 0);
     say(`the step on this tree: ${p.length} gates, ${(cost / 60000).toFixed(1)} minutes by the shared record's newest readings`);
+}
+
+console.log("\n3b. v4846 -- a tree-wide count a merge moves is graded whenever the sweep does not run its gate");
+{
+    const { noComments } = await import("./sourceScan.mjs");
+    const missing = AV.TREE_RATCHETS.flatMap((x) => { let c = ""; try { c = noComments(fs.readFileSync(path.join(ENG, x.gate), "utf8")); } catch { return [x.gate + " (no such gate)"]; }
+        return x.holds.filter((h) => !new RegExp((/\.json$/.test(h) ? "" : "\\b(?:const|let)\\s+") + h.replace(/\./g, "\\.") + (/\.json$/.test(h) ? "" : "\\s*=\\s*\\d")).test(c)).map((h) => x.gate + ": " + h); });
+    ok("!! every TREE_RATCHETS gate exists and freezes the number it is listed for -- a constant declared in its code, or the file it reads",
+        missing.length === 0, missing.length ? "NOT FOUND: " + missing.join(", ") : AV.TREE_RATCHETS.map((x) => path.basename(x.gate, "-selfcheck.mjs") + " " + x.holds.join("/")).join("; "));
+    const T = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-timings.json"), "utf8"));
+    const DG = "tools/ship/definitionGates-selfcheck.mjs", world = (ms) => ({ ...T, timings: { ...T.timings, [DG]: ms } });
+    const over = AV.plan({ r: reach(), timings: world(3100) }).find((x) => x.gate === DG), under = AV.plan({ r: reach(), timings: world(1200) }).find((x) => x.gate === DG);
+    ok("!! *** definitionGates at 3,100 ms -- where it sat while main went red on it twice -- is on the plan, as a tree-wide count; at 1,200 ms the sweep runs it and the plan leaves it off ***",
+        !!over && over.why.some((w) => /tree-wide count a merge moves/.test(w)) && !under,
+        over ? over.why.join("; ").slice(0, 160) : "absent at 3,100 ms");
+    const live = AV.plan({ r: reach() }), off = AV.TREE_RATCHETS.filter((x) => !(T.timings[x.gate] <= (T.budgetMs ?? 3000)) && !live.find((p) => p.gate === x.gate));
+    ok("...and on this tree every one is either under the sweep's line or on the plan -- none is run by nothing",
+        off.length === 0, AV.TREE_RATCHETS.map((x) => `${path.basename(x.gate, "-selfcheck.mjs")} ${T.timings[x.gate] ?? "untimed"} ms ${live.find((p) => p.gate === x.gate) ? "planned" : "swept"}`).join(", "));
 }
 
 console.log("\n4. a red is named and the run says so; a timeout is a red");
