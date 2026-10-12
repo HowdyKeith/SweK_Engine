@@ -41,14 +41,10 @@
 //           they are used -- round 17's tile2-zero-inline, 1.14 and 1.17 x the fast kernel in Chrome at 1024 (section 60)
 //   "r18u"  r15 with every hidden layer on the fast kernel with a block of 8 channels written out -- round 17's
 //           fast-unroll, 2.11 x on the Intel in Chrome, 0.57 x on the 1080 (section 60)
-// node-webgpu's FXC builds neither (section 60: it stopped on the first, crashed on the second), so they are FXC_UNBUILT_SETS:
-// no gate builds them natively on a D3D12 adapter whose compiler is FXC (nativeSetsFor). The page runs
+// node-webgpu's FXC builds neither (section 60: it stopped on the first, crashed on the second), so they are BROWSER_ONLY_SETS:
+// no gate builds them natively on a D3D12 adapter (nativeSetsFor), and the default rule cannot choose them. The page runs
 // pageKernelsFor(its adapter): PAGE_KERNELS_BY_ADAPTER's set for a measured adapter, PAGE_KERNELS for any other. Section 63
 // filled the table: r18u on the Intel gen-9, r18t on the GTX 1080, in Chrome on Windows.
-// Round 19 (section 66): node-webgpu 0.6.2 compiles with DXC, and built both sets' kernels in seconds, exact, on both of the
-// rig's GPUs (section 65). So a native run whose compiler is DXC builds and times them too, and NATIVE_KERNELS_BY_ADAPTER --
-// empty until section 66's rule is read off the rig -- may name one per native adapter, for a DXC run only. Every FXC run,
-// and every adapter the table does not name, keeps DEFAULT_KERNELS.
 // The page runs PAGE_KERNELS and every other caller DEFAULT_KERNELS. Section 43's rules, read off both GPUs' round-14 runs
 // (section 49), put the page on r13 and the default on r14; section 46's, read off their round-15 runs (section 50), put
 // both on r15 -- the later run's decision stands.
@@ -317,24 +313,15 @@ export const R18_KERNELS = Object.freeze({
     r18t: Object.freeze({ kernel: "tile_inline", cfg: Object.freeze({ px: 2, g4: 8, edge: "zero", weights: "inline" }) }),
     r18u: Object.freeze({ kernel: "fast_unroll", cfg: Object.freeze({ reads: "f32", unroll: true }) }),
 });
-/**
- * The sets no gate builds natively on a D3D12 adapter whose compiler is FXC: node-webgpu 0.6.0's FXC stopped on r18t's kernel
- * and crashed on r18u's (section 60). Round 18 called them browser-only; 0.6.2's DXC built both natively (section 65).
- */
-export const FXC_UNBUILT_SETS = Object.freeze(["r18t", "r18u"]);
-/** A NATIVE adapter (node-webgpu's) that compiles through D3D12: its description names the backend, never the compiler (section 66). */
+/** The sets no gate builds natively on a D3D12 adapter: node-webgpu's FXC stopped on r18t's kernel and crashed on r18u's (section 60). */
+export const BROWSER_ONLY_SETS = Object.freeze(["r18t", "r18u"]);
+/** A NATIVE adapter (node-webgpu's) that compiles through D3D12 -- on the rig, FXC: its description names the backend. */
 export const isD3D12Native = (adapter) => /\bD3D12\b/i.test(adapter?.info?.description || "");
-/** A native run's compiler is DXC: as tools/ship/headlessGpu.mjs's nativeCompiler names it ("DXC"), or a dump read it ("DXC (DXIL)"). Anything else, or none, is not. */
-export const isDxcCompiler = (compiler) => /^DXC\b/.test(compiler || "");
-/**
- * `sets` as a native ladder or gate may build them on `adapter`, whose run compiles with `compiler`: on a D3D12 adapter whose
- * compiler is not DXC, without FXC_UNBUILT_SETS -- no compiler named counts as FXC, the safe side. Never for a browser's adapter.
- */
-export const nativeSetsFor = (adapter, sets, { compiler = null } = {}) =>
-    (isD3D12Native(adapter) && !isDxcCompiler(compiler) ? sets.filter((s) => !FXC_UNBUILT_SETS.includes(s)) : [...sets]);
+/** `sets` as a native ladder or gate may build them on `adapter`: on a D3D12 adapter, without BROWSER_ONLY_SETS. Never for a browser's adapter. */
+export const nativeSetsFor = (adapter, sets) => (isD3D12Native(adapter) ? sets.filter((s) => !BROWSER_ONLY_SETS.includes(s)) : [...sets]);
 /**
  * The sets the ladders time: r12, the reference every speedup is read against; r15, the default and the page's (section 50);
- * and round 18's two (section 61) -- on the page always, natively where nativeSetsFor allows (since section 66, a DXC run on D3D12 too). Section 54 added round 16's two
+ * and round 18's two (section 61) -- on the page always, natively where nativeSetsFor allows. Section 54 added round 16's two
  * candidates and section 57 withdrew them; r13 and r14 are decided (sections 49 and 50) and left out.
  */
 export const TIMED_SETS = Object.freeze(["r12", "r15", "r18t", "r18u"]);
@@ -357,17 +344,6 @@ export const PAGE_KERNELS_BY_ADAPTER = Object.freeze({ "Windows/intel/gen-9": "r
 export const pageAdapterKey = (info, uaData) => (uaData && uaData.platform && info && info.vendor ? `${uaData.platform}/${info.vendor}/${info.architecture || ""}` : null);
 /** The set denoise.html runs for an adapter's key: PAGE_KERNELS_BY_ADAPTER's, else PAGE_KERNELS. */
 export const pageKernelsFor = (key, table = PAGE_KERNELS_BY_ADAPTER) => (key && Object.hasOwn(table, key) ? table[key] : PAGE_KERNELS);
-/**
- * Round 19: the set a NATIVE run takes by default on an adapter section 66's rule measured, by nativeAdapterKey -- for a run
- * whose compiler is DXC only, since FXC builds neither round-18 set (section 60). Empty until section 66's rule is read off
- * both GPUs' round-19 runs; until then, and on every other adapter and every FXC run, nativeKernelsFor gives DEFAULT_KERNELS.
- */
-export const NATIVE_KERNELS_BY_ADAPTER = Object.freeze({});
-/** A native adapter's key: "<platform>/<vendor>/<architecture>", the platform Node's (process.platform), so "win32/nvidia/pascal". */
-export const nativeAdapterKey = (info, platform) => (platform && info && info.vendor ? `${platform}/${info.vendor}/${info.architecture || ""}` : null);
-/** The set a native run takes for its adapter's key under `compiler`: NATIVE_KERNELS_BY_ADAPTER's when the compiler is DXC, else DEFAULT_KERNELS. */
-export const nativeKernelsFor = (key, compiler, table = NATIVE_KERNELS_BY_ADAPTER) =>
-    (isDxcCompiler(compiler) && key && Object.hasOwn(table, key) ? table[key] : DEFAULT_KERNELS);
 
 /**
  * The kernel a layer runs on in a set. r12: tiled when the tiled kernel can hold it, direct otherwise (the 81-logit
