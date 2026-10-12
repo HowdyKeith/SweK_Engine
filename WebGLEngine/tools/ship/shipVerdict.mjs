@@ -160,12 +160,19 @@ export function interruptedTrailer(sig, ms, conflicts = null) {
 //
 // Each entry is { what } -- one line, the fact and the command. An empty list is "ready". Every input is injectable
 // so shipVerdict-selfcheck can drive the branches a box with Playwright and Linux never reaches.
+//
+// v4844 -- THE COMMAND IS BUILT FROM THE TWO FACTS, NOT LIFTED OUT OF THE REASON'S PROSE. That prose says "cd <render-qa> &&
+// npm install", which leaves the console in render-qa so "run this again" fails as typed, and does not change drive in cmd.exe
+// without /d (review of the same pre-flight drafted on another line). fixCommand's --prefix is the same from any folder and
+// drive; --ignore-scripts only where the browser is already on disk, as browserSkipReason has advised since v4778. A
+// Playwright with no browser gets the plain install, whose postinstall is `playwright install chromium chromium-headless-shell`.
 export function readiness({ resolve = () => resolvePlaywright(createRequire(import.meta.url)), shell = HEADLESS_SHELL,
-                            skipReason = browserSkipReason, dxc = () => ensureDxc({ write: false }) } = {}) {
+                            skipReason = browserSkipReason, dxc = () => ensureDxc({ write: false }), eng = ENG_HERE,
+                            exists = fs.existsSync } = {}) {
     const { chromium, from } = resolve();
     const why = skipReason(chromium, from, shell);
-    if (why) return [{ what: "the browser gates cannot run here: " + why + (/to fix:/.test(why) ? "" :
-        " -- to fix: cd tools/render-qa && npx playwright install chromium chromium-headless-shell") }];
+    if (why) return [{ what: "the browser gates cannot run here: " + why.replace(/ -- to fix: .*$/, "") +
+        " -- to fix: " + fixCommand(eng, { playwright: !!chromium, shell: !!shell && exists(shell) }) }];
     const d = dxc();
     if (d && d.needed) return [{ what: "the WebGPU browser gates will die on requestDevice (dxcompiler.dll is not beside " +
         "the headless shell in " + d.dest + ") -- " + (d.ok ? "to fix: node tools/ship/ensureDxc.mjs --write, once per " +
@@ -173,12 +180,26 @@ export function readiness({ resolve = () => resolvePlaywright(createRequire(impo
     return [];
 }
 
+export function fixCommand(eng, { playwright, shell }) {
+    return `npm install --no-audit --no-fund${shell && !playwright ? " --ignore-scripts" : ""} --prefix "${path.join(eng, "tools", "render-qa")}"`;
+}
+
+// The engine root this file sits in: the CLI's tree.
+const ENG_HERE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+
+// Whether a run's verify is the tree's own. v4844: the choices below keyed on verifyPath being absent, so passing the real
+// verify.mjs explicitly -- one edit to the CLI line -- turned the readiness check off with every row green (review).
+export function isRealVerify({ eng = ENG_HERE, verifyPath = null } = {}) {
+    return !verifyPath || path.resolve(verifyPath) === path.resolve(eng, "tools", "ship", "verify.mjs");
+}
+
 // Which readiness check a run gets. The REAL verify gets the real one; a stand-in verify (the selfcheck's drivers)
 // needs no browser, so it gets none unless one is passed. A function rather than a default parameter, so the
-// selfcheck can hold the choice without running a real verify to see it.
-export function chosenPreflight({ verifyPath = null, preflight } = {}) {
+// selfcheck can hold the choice without running a real verify to see it. v4844: nor does SWEK_QUICKSWEEP=0, which
+// skips the quick sweep every browser gate runs in (verify.mjs, v4303) -- refusing it named facts nothing would use.
+export function chosenPreflight({ eng = ENG_HERE, verifyPath = null, preflight, env = process.env } = {}) {
     if (preflight !== undefined) return preflight;
-    return verifyPath ? null : readiness;
+    return isRealVerify({ eng, verifyPath }) && env.SWEK_QUICKSWEEP !== "0" ? readiness : null;
 }
 
 // *** v4836 -- AFTER A SHIP, THE VERDICT NAMES STEP 4b, BECAUSE THE RITUAL'S NEXT STEP WAS ONLY IN A MARKDOWN FILE. ***
@@ -186,9 +207,9 @@ export function chosenPreflight({ verifyPath = null, preflight } = {}) {
 // run the rig should not be asked. A SHIP line alone reads as "done". So a real verify's SHIP is preceded by one line naming the
 // command and how many gates it holds -- read off afterVerdict's own plan, so the count cannot drift from the step. A stand-in
 // verify gets none unless one is passed, as with the readiness check.
-export function chosenNextStep({ verifyPath = null, nextStep } = {}) {
+export function chosenNextStep({ eng = ENG_HERE, verifyPath = null, nextStep } = {}) {
     if (nextStep !== undefined) return nextStep;
-    return verifyPath ? null : () => `[ship] next, before the rig is asked: node tools/ship/afterVerdict.mjs -- ${afterVerdictPlan().length} gates no ` +
+    return !isRealVerify({ eng, verifyPath }) ? null : () => `[ship] next, before the rig is asked: node tools/ship/afterVerdict.mjs -- ${afterVerdictPlan().length} gates no ` +
         "ship-time step ran against the record this verdict wrote (the ship skill's step 4b)";
 }
 
@@ -202,19 +223,15 @@ export function notReadyTrailer(items) {
 }
 
 // `verifyPath` is injectable so shipVerdict-selfcheck can drive THIS function, signals included, against a
-// stand-in verify rather than a twenty-minute sweep. The CLI below passes the real one.
-export async function main({ eng, argv = [], verifyPath = null, preflight = undefined, nextStep = undefined, out = (m) => console.log(m), exit = (c) => process.exit(c) }) {
+// stand-in verify rather than a twenty-minute sweep. The CLI below passes none, so the tree's own verify.mjs runs and the
+// readiness check comes first; shipVerdict-selfcheck section 9 runs that CLI line itself from a stub tree. `preflight`,
+// `nextStep`, `env` and `scan` likewise (v4844: the in-process drives each read all 6,800 tracked files without `scan`).
+export async function main({ eng, argv = [], verifyPath = null, preflight = undefined, nextStep = undefined, env = process.env, scan = scanTracked,
+                             out = (m) => console.log(m), exit = (c) => process.exit(c) }) {
     const root = path.resolve(eng, "..");
     const t0 = Date.now();
     let child = null;
     out(`[ship] shipVerdict pid ${process.pid} started ${new Date(t0).toISOString()}  node ${process.version} ${process.platform}`);
-    const pf = chosenPreflight({ verifyPath, preflight });
-    const notReady = pf ? pf() : [];
-    if (notReady.length) {
-        out(notReadyTrailer(notReady));
-        exit(1);
-        return { ship: false, notRun: true, reason: "NOT RUN: " + notReady.map((n) => n.what).join("; ") };
-    }
     for (const sig of CATCHABLE) {
         try {
             process.on(sig, () => {
@@ -229,14 +246,24 @@ export async function main({ eng, argv = [], verifyPath = null, preflight = unde
             });
         } catch {}   // SIGBREAK exists only on Windows; registering it elsewhere is harmless, but never let it throw
     }
+    // v4844 -- the readiness check runs AFTER the handlers are in. It resolves Playwright and scans the browser roots (half a
+    // second here), and with no listener a Ctrl+C or a closed console in that window ended the process with no trailer -- which
+    // the v4680 note above defines as a kill nothing can catch. With them in, the signal waits for it and the trailer prints.
+    const pf = chosenPreflight({ eng, verifyPath, preflight, env });
+    const notReady = pf ? await pf() : [];
+    if (notReady.length) {
+        out(notReadyTrailer(notReady));
+        exit(1);
+        return { ship: false, notRun: true, reason: "NOT RUN: " + notReady.map((n) => n.what).join("; ") };
+    }
     const verify = await runProcess(process.execPath, [verifyPath || path.join(eng, "tools", "ship", "verify.mjs"), ...argv],
                                     { cwd: eng, echo: true, onChild: (p) => { child = p; } });
-    const conflicts = scanTracked(root);
+    const conflicts = scan(root);
     const d = decide({ verify, conflicts });
     out("");
     out(`[ship] verify exit=${verify.code}  conflicts=${conflicts.hits.length}/${conflicts.scanned} files  after ${Math.round((Date.now() - t0) / 1000)} s`);
     for (const h of conflicts.hits) out(`[ship]   conflict  ${h.file}  line(s) ${h.marks.map((m) => m.line).join(", ")}`);
-    const next = d.ship ? chosenNextStep({ verifyPath, nextStep }) : null;
+    const next = d.ship ? chosenNextStep({ eng, verifyPath, nextStep }) : null;
     if (next) { try { out(next()); } catch (e) { out("[ship] next: node tools/ship/afterVerdict.mjs (its plan could not be read: " + String(e && e.message).slice(0, 80) + ")"); } }
     out(`[ship] ${d.ship ? "SHIP" : "DO NOT SHIP"} -- ${d.reason}`);
     exit(d.ship ? 0 : 1);
