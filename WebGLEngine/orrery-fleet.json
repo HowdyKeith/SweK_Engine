@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "ba11fde77d76870ba94793c963e20740a189b18b",
+ "head": "83ca0b7f33a2b4df84dd677a12bc21f6a4ff6d02",
  "bodies": {
   "box3d": [
    {
@@ -46,8 +46,8 @@
    },
    {
     "path": "physics/box3dFingerprint-selfcheck.mjs",
-    "bytes": 4795,
-    "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+    "bytes": 5167,
+    "sha": "d4f8d60ebd6655ca02fc70d9aa749bf9546efd16"
    },
    {
     "path": "physics/box3dMathImports-selfcheck.mjs",
@@ -155,8 +155,8 @@
    },
    {
     "path": "tools/ship/dracoEncode-selfcheck.mjs",
-    "bytes": 18170,
-    "sha": "d579f71709b07e5985acc164a33f685aad44e463"
+    "bytes": 20053,
+    "sha": "151fafaa150d29e205bfddd5e9551273f3be3129"
    }
   ],
   "fonts": [
@@ -340,7 +340,7 @@
    },
    {
     "path": "server.html",
-    "bytes": 882516,
+    "bytes": 885471,
     "sha": "76256d926c6ad9f7e790b879fb94bd256dc1c108"
    },
    {
@@ -721,8 +721,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3546414,
-    "sha": "818cddb584f9d735d154bdf4951a07abfa82700d"
+    "bytes": 3565729,
+    "sha": "cb94b0ab694ab3f39bd0eb4c82dc2ece1a802947"
    },
    {
     "path": "mpm3d.html",
@@ -766,7 +766,7 @@
    },
    {
     "path": "server.html",
-    "bytes": 882516,
+    "bytes": 885471,
     "sha": "76256d926c6ad9f7e790b879fb94bd256dc1c108"
    },
    {
@@ -826,8 +826,8 @@
    },
    {
     "path": "tools/ship/dracoEncode-selfcheck.mjs",
-    "bytes": 18170,
-    "sha": "d579f71709b07e5985acc164a33f685aad44e463"
+    "bytes": 20053,
+    "sha": "151fafaa150d29e205bfddd5e9551273f3be3129"
    },
    {
     "path": "tools/ship/dracoWeld-selfcheck.mjs",
@@ -1218,8 +1218,8 @@
    },
    {
     "path": "tools/ship/threeUpstream-selfcheck.mjs",
-    "bytes": 68423,
-    "sha": "aff5ba3934aa930e51f9f8631108e51f72c7f4aa"
+    "bytes": 70568,
+    "sha": "996ab64ee3312555095f05ed13a6c0004c8f4d7e"
    },
    {
     "path": "tools/ship/tsl-selfcheck.mjs",
@@ -1285,8 +1285,8 @@
    },
    {
     "path": "tools/ship/threeUpstream-selfcheck.mjs",
-    "bytes": 68423,
-    "sha": "aff5ba3934aa930e51f9f8631108e51f72c7f4aa"
+    "bytes": 70568,
+    "sha": "996ab64ee3312555095f05ed13a6c0004c8f4d7e"
    }
   ],
   "wasm": [

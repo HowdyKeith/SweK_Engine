@@ -365,10 +365,26 @@ console.log(`\n6. ON r186 AND dev: the issues ready to paste, held to tools/ship
     // three's own unit and e2e tests on dev and on dev with every patch, run in the checkout: the record adds up, names the two
     // builds the issues' record names, and the README states it
     const E2E = path.join(DEV_DIR, "e2e.json"), e2e = fs.existsSync(E2E) ? JSON.parse(fs.readFileSync(E2E, "utf8")) : null;
+    // v4841: a unit record adds up, and every failure in it is named, with its reason, and the same on both builds
+    const unitHolds = (u) => !!u && u.passed + u.todo + u.failed === u.tests && u.sameOnBoth === true && Array.isArray(u.failedOnBoth) &&
+        u.failedOnBoth.length === u.failed && u.failedOnBoth.every((f) => !!f.test && typeof f.why === "string" && f.why.length > 40);
     const adds = (x) => !!x && x.examples > 0 && x.passed + x.failed === x.examples && x.samePerExample === true && x.screenshotsIdentical + Object.keys(x.varyingOnOneBuild || {}).length === x.examples;
     ok(`*** three's tests on dev and with all ${SLOTS.length}: unit ${e2e && e2e.unit.passed} passed and ${e2e && e2e.unit.failed} failed on both; e2e ${e2e && e2e.webgpu.passed} of ${e2e && e2e.webgpu.examples} on WebGPU and ${e2e && e2e.webgl2.passed} on WebGL 2, the same on both builds ***`,
-        !!e2e && !!rec && e2e.devCommit === DEV_COMMIT && e2e.builds.dev === rec.builds.dev && e2e.builds.all === rec.builds.all && e2e.unit.failed === 0 && e2e.unit.sameOnBoth === true && adds(e2e.webgpu) && adds(e2e.webgl2),
+        !!e2e && !!rec && e2e.devCommit === DEV_COMMIT && e2e.builds.dev === rec.builds.dev && e2e.builds.all === rec.builds.all && unitHolds(e2e.unit) && adds(e2e.webgpu) && adds(e2e.webgl2),
         "taken on the builds the record names; a patch changed since makes both stale");
+    // v4841 -- *** AND THE UNIT FIGURES SPEAK FOR THE NODE RENDERERS NOW, BECAUSE THE GPU TESTS RAN. *** #34918 consolidated three's TSL
+    // unit tests into GPU-native ones (gpu-test-utils): each runs on a WebGPU and a WebGL 2 renderer and, when init() finds no backend,
+    // passes as "SKIPPED". Headless Chromium here gave them none, so v4836's "1893 passed, 0 failed" counted 338 tests that never ran --
+    // and those are the tests nearest the code the patches change. Run with the e2e runner's SwiftShader flags (the runner as
+    // ../e2e/puppeteer-unit-local.diff), all 338 run; two fail, dev's own on this device and the same on both builds, each named with
+    // its reason. SABOTAGES (v4841, restored by copy, each 1 red by name): gpu.skippedForBackend set to 338 -> this row; one failure
+    // dropped from failedOnBoth -> the record row above (the count no longer matches the names); the runner diff removed -> this row.
+    ok("!! *** three's GPU-native TSL unit tests RAN, on WebGPU and on the WebGL 2 backend, none passed as skipped -- with the runner kept as a diff, and the README saying so ***",
+        !!e2e && !!e2e.unit.gpu && e2e.unit.gpu.webgpu > 0 && e2e.unit.gpu.webgl > 0 && e2e.unit.gpu.skippedForBackend === 0 &&
+        fs.existsSync(path.join(DIR, "e2e", "puppeteer-unit-local.diff")) &&
+        devIndex.includes(`${e2e.unit.gpu.webgpu} on WebGPU and ${e2e.unit.gpu.webgl} on the WebGL 2 backend, none skipped`),
+        e2e && e2e.unit.gpu ? `${e2e.unit.gpu.webgpu} on WebGPU, ${e2e.unit.gpu.webgl} on WebGL 2, ${e2e.unit.gpu.skippedForBackend} skipped for want of a backend; ` +
+            `failing on both builds: ${(e2e.unit.failedOnBoth || []).map((f) => f.test.split(" > ").pop().slice(0, 40)).join("; ")}` : "no gpu figures in e2e.json");
     ok(`  the README states them as e2e.json does`, !!e2e && devIndex.includes(`${e2e.unit.tests} tests, ${e2e.unit.passed} passed, ${e2e.unit.todo} todo, ${e2e.unit.failed} failed`) &&
         devIndex.includes(`${e2e.webgpu.examples} WebGPU examples, ${e2e.webgpu.passed} passed and the same ${e2e.webgpu.failed}`) && devIndex.includes(`${e2e.webgl2.passed} passed and the same ${e2e.webgl2.failed} failed`) &&
         devIndex.includes(`${e2e.webgpu.screenshotsIdentical} of the ${e2e.webgpu.examples} screenshots`) && devIndex.includes("(e2e.json)"));

@@ -1,0 +1,63 @@
+{
+ "at": "2026-10-11T01:14:28.965Z",
+ "platform": "win32 10.0.22631 x64",
+ "node": "v24.17.0",
+ "commit": "62d5e318 2026-10-11 Denoiser arc, section 50 -- round 15's verdict: K0 and K1 hold on both GPUs; by section 46 the page ",
+ "only": "denoiseCompile",
+ "launchArgs": [
+  "--enable-unsafe-webgpu",
+  "--use-angle=d3d11"
+ ],
+ "gates": [
+  {
+   "gate": "render/denoiseCompile-selfcheck.mjs",
+   "category": "timing",
+   "ok": true,
+   "ms": 860497,
+   "adapters": [
+    "intel gen-9"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "native compilers: D3D12; DXC's DLLs found in C:\\Program Files\\Google\\Chrome\\Application\\154.0.8037.99",
+    "native / as shipped: r12-tiled-3x3: build 548 ms, pass 7.668 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 363 lines, 9 loops, 37 indexable-temp lines, 3 barriers",
+    "native / as shipped: r13-fast-3x3: build 8638 ms, pass 0.786 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 537 lines, 6 loops, 0 indexable-temp lines, 3 barriers",
+    "native / as shipped: r12-direct-head: build 215 ms, pass 4.391 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 217 lines, 5 loops, 0 indexable-temp lines, 0 barriers",
+    "native / as shipped: r13-fast-head: build 385881 ms, pass 1470.693 ms (device clock, 3 passes), 331776 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 9785 lines, 6 loops, 0 indexable-temp lines, 3 barriers",
+    "native / as shipped: r14-head: build 116 ms, pass 1.376 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 97 lines, 1 loops, 0 indexable-temp lines, 0 barriers",
+    "native / as shipped: r12-apply: build 96 ms, pass 1.114 ms (device clock, 30 passes), worst 4.59e-7 (APPLY_TOL 0.00001); dump: FXC (DXBC), 299 lines, 3 loops, 85 indexable-temp lines, 0 barriers",
+    "native / as shipped: r14-apply-fast: build 165 ms, pass 0.393 ms (device clock, 30 passes), worst 4.59e-7 (APPLY_TOL 0.00001); dump: FXC (DXBC), 324 lines, 5 loops, 0 indexable-temp lines, 2 barriers",
+    "native / as shipped: r15-head-apply: build 18447 ms, pass 0.393 ms (device clock, 30 passes), worst 5.45e-7 against the twin's logits, which are the fused mirror's here (APPLY_TOL 0.00001); dump: FXC (DXBC), 4954 lines, 3 loops, 0 indexable-temp lines, 2 barriers",
+    "native / use_dxc: r12-tiled-3x3: build 581 ms, pass 7.340 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 363 lines, 9 loops, 37 indexable-temp lines, 3 barriers",
+    "native / use_dxc: r13-fast-3x3: build 7646 ms, pass 0.786 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 537 lines, 6 loops, 0 indexable-temp lines, 3 barriers",
+    "native / use_dxc: r12-direct-head: build 219 ms, pass 4.456 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 217 lines, 5 loops, 0 indexable-temp lines, 0 barriers",
+    "native / use_dxc: r13-fast-head: build 353116 ms, pass 1329.922 ms (device clock, 3 passes), 331776 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 9785 lines, 6 loops, 0 indexable-temp lines, 3 barriers",
+    "native / use_dxc: r14-head: build 108 ms, pass 1.311 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 97 lines, 1 loops, 0 indexable-temp lines, 0 barriers",
+    "native / use_dxc: r12-apply: build 73 ms, pass 1.114 ms (device clock, 30 passes), worst 4.59e-7 (APPLY_TOL 0.00001); dump: FXC (DXBC), 299 lines, 3 loops, 85 indexable-temp lines, 0 barriers",
+    "native / use_dxc: r14-apply-fast: build 162 ms, pass 0.393 ms (device clock, 30 passes), worst 4.59e-7 (APPLY_TOL 0.00001); dump: FXC (DXBC), 324 lines, 5 loops, 0 indexable-temp lines, 2 barriers",
+    "native / use_dxc: r15-head-apply: build 17222 ms, pass 0.393 ms (device clock, 30 passes), worst 5.45e-7 against the twin's logits, which are the fused mirror's here (APPLY_TOL 0.00001); dump: FXC (DXBC), 4954 lines, 3 loops, 0 indexable-temp lines, 2 barriers",
+    "browser / Chrome's: r12-tiled-3x3: build 409 ms, pass 7.298 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained",
+    "browser / Chrome's: r13-fast-3x3: build 124 ms, pass 1.052 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained",
+    "browser / Chrome's: r12-direct-head: build 41 ms, pass 4.372 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained",
+    "browser / Chrome's: r13-fast-head: build 96 ms, pass 0.448 ms (device clock, 30 passes), 110430 plain, 221346 fused, 0 unexplained",
+    "browser / Chrome's: r14-head: build 21 ms, pass 1.328 ms (device clock, 30 passes), 110430 plain, 221346 fused, 0 unexplained",
+    "browser / Chrome's: r12-apply: build 61 ms, pass 1.198 ms (device clock, 30 passes), worst 4.59e-7 (APPLY_TOL 0.00001)",
+    "browser / Chrome's: r14-apply-fast: build 54 ms, pass 0.411 ms (device clock, 30 passes), worst 4.59e-7 (APPLY_TOL 0.00001)",
+    "browser / Chrome's: r15-head-apply: build 3105 ms, pass 0.493 ms (device clock, 30 passes), worst 5.45e-7 against the twin's logits, which are the fused mirror's here (APPLY_TOL 0.00001)"
+   ]
+  }
+ ],
+ "adapters": [
+  {
+   "name": "intel gen-9",
+   "software": false,
+   "launchArgs": [
+    "--enable-unsafe-webgpu",
+    "--use-angle=d3d11"
+   ]
+  }
+ ],
+ "verdict": "a real-hardware run on intel gen-9",
+ "summary": "exact 0/0, quality 0/0, timing 1/1"
+}

@@ -1,0 +1,74 @@
+{
+ "gate": "brain/conv2d-selfcheck.mjs",
+ "at": "2026-10-11",
+ "tables": [
+  {
+   "title": "the manifest's kernels on the device: each cell the f32 twin's (plain), the fused mirror's, or unexplained",
+   "columns": [
+    "kernel",
+    "H",
+    "W",
+    "Cin",
+    "Cout",
+    "plain",
+    "fused",
+    "unexplained"
+   ],
+   "rows": [
+    [
+     "conv2d.conv2dWgsl",
+     12,
+     10,
+     13,
+     4,
+     480,
+     0,
+     0
+    ],
+    [
+     "conv2d.conv2dTiledWgsl",
+     12,
+     10,
+     13,
+     4,
+     480,
+     0,
+     0
+    ],
+    [
+     "conv2d.conv2dFastWgsl",
+     12,
+     10,
+     13,
+     4,
+     480,
+     0,
+     0
+    ],
+    [
+     "conv2d.conv2dHeadWgsl",
+     12,
+     10,
+     13,
+     7,
+     840,
+     0,
+     0
+    ],
+    [
+     "conv2d.conv2dTileWgsl",
+     12,
+     10,
+     13,
+     4,
+     480,
+     0,
+     0
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

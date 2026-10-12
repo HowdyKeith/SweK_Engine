@@ -95,6 +95,9 @@ import { MPM_WGSL } from "../../physics/mpm/gpuKernel.mjs";
 import * as LG from "../../physics/chaos/logisticWgsl.mjs";
 // v4470 -- the brain's kernels, exported at last
 import * as MLP from "../../brain/mlp.js";
+// the denoiser arc, round 1 -- the convolution layer the path-tracer denoiser is built from
+import * as CONV from "../../brain/conv2d.mjs";
+import { kernelApplyWgsl, kernelApplyFastWgsl, kernelHeadApplyWgsl, packApplyUniforms } from "../../render/denoiseDevice.mjs";
 import { FLOWFIELD_WGSL } from "../../brain/flowfield.js";
 import { buildClothConstraints } from "../../physics/xpbd/clothMesh.js";
 import { colorConstraints as xpbdColors } from "../../physics/xpbd/xpbd.js";
@@ -781,6 +784,68 @@ export function corpus() {
         { id: "mlp.mlpLayerWgsl", from: "brain/mlp.js",
           why: "the brain's batched MLP layer: a row-per-thread matmul with fused bias and relu, the kernel brain/brain.js and blobBrain.js run every tick -- graded here for the first time without regexing its source",
           opts: (() => { const P = MLP.PROBES[0], a = P.args; return { code: P.code(a), entryPoint: P.entryPoint, outCount: P.outCount(a), uniforms: P.pack(a), workgroups: P.workgroups(a), inputs: P.inputs(a) }; })() },
+        // the denoiser arc, round 1 -- a 2-D convolution, direct and tiled, held to brain/conv2d.mjs's twin by
+        // brain/conv2d-selfcheck.mjs; here, both backends must give the same bytes
+        { id: "conv2d.conv2dWgsl", from: "brain/conv2d.mjs",
+          why: "the denoiser's convolution read straight from storage: a 3x3 window over 13 channels in two blocks, the canonical summation order every copy of the layer shares, with borders on every side of a 12x10 image",
+          opts: (() => { const P = CONV.PROBES[0], a = P.args; return { code: P.code(a), entryPoint: P.entryPoint, outCount: P.outCount(a), uniforms: P.pack(a), workgroups: P.workgroups(a), inputs: P.inputs(a) }; })() },
+        { id: "conv2d.conv2dTiledWgsl", from: "brain/conv2d.mjs",
+          why: "the same convolution out of workgroup memory -- a halo'd tile loaded per channel block between two barriers -- the first kernel in the corpus whose correctness depends on workgroupBarrier ordering",
+          opts: (() => { const P = CONV.PROBES[1], a = P.args; return { code: P.code(a), entryPoint: P.entryPoint, outCount: P.outCount(a), uniforms: P.pack(a), workgroups: P.workgroups(a), inputs: P.inputs(a) }; })() },
+        // the denoiser arc, round 13 -- the fast kernel: generated per layer, its weights in the uniform block
+        { id: "conv2d.conv2dFastWgsl", from: "brain/conv2d.mjs",
+          why: "the same convolution generated for its layer -- weights and bias as vec4s in one uniform block, eight named vec4 accumulators, the tap and channel outer -- in the order every copy of the layer shares, so both backends must give the same bytes",
+          opts: (() => { const P = CONV.PROBES[2], a = P.args; return { code: P.code(a), entryPoint: P.entryPoint, outCount: P.outCount(a), uniforms: P.pack(a), workgroups: P.workgroups(a), inputs: P.inputs(a) }; })() },
+        // the denoiser arc, round 12 -- the kernel-predicting network's kernel, held to its twin (kernelApplyCpu) within
+        // APPLY_TOL by render/denoiseDevice-selfcheck.mjs; here, both backends must give the same bytes
+        { id: "denoiseDevice.kernelApplyWgsl", from: "render/denoiseDevice.mjs",
+          why: "the denoiser's per-pixel softmax over 81 taps -- exp, a division, a max -- masked by an emitter channel and the image's borders, then a weighted sum re-modulated by the albedo: the corpus's first kernel whose arithmetic is mostly transcendental",
+          opts: (() => {
+              const H = 7, W = 6, C = 10, T = 81;
+              let s = 12345; const u = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+              const x = new Float32Array(H * W * C), L = new Float32Array(H * W * T);
+              for (let p = 0; p < H * W; p++) { for (let c = 0; c < 9; c++) x[p * C + c] = Math.fround(c < 6 ? u() * 2 : u() * 2 - 1); x[p * C + 9] = p % W < 2 ? 1 : 0; }
+              for (let i = 0; i < L.length; i++) L[i] = Math.fround(u() * 16 - 8);
+              return { code: kernelApplyWgsl(), entryPoint: "k_apply", outCount: H * W * 3, uniforms: packApplyUniforms({ H, W, C }), workgroups: [1, 1],
+                       inputs: [{ binding: 2, data: L }, { binding: 3, data: x }] };
+          })() },
+        // the denoiser arc, round 14 -- the same kernel apply with its logits planar and its window from workgroup memory,
+        // and the head kernel that writes those logits; each held to its twin by render/denoiseDevice-selfcheck.mjs and
+        // brain/conv2d-selfcheck.mjs, and here to both backends' bytes
+        { id: "denoiseDevice.kernelApplyFastWgsl", from: "render/denoiseDevice.mjs",
+          why: "k_apply with its 81 logits read planar and a 16 x 16 halo of colour and mask loaded into workgroup memory behind a barrier, the exponential computed twice rather than stored: the same sums as k_apply, from different places",
+          opts: (() => {
+              const H = 7, W = 6, C = 10, T = 81, n = H * W;
+              let s = 12345; const u = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+              const x = new Float32Array(n * C), L = new Float32Array(n * T), P = new Float32Array(n * T);
+              for (let p = 0; p < n; p++) { for (let c = 0; c < 9; c++) x[p * C + c] = Math.fround(c < 6 ? u() * 2 : u() * 2 - 1); x[p * C + 9] = p % W < 2 ? 1 : 0; }
+              for (let i = 0; i < L.length; i++) L[i] = Math.fround(u() * 16 - 8);
+              for (let p = 0; p < n; p++) for (let t = 0; t < T; t++) P[t * n + p] = L[p * T + t];
+              return { code: kernelApplyFastWgsl(), entryPoint: "k_apply_fast", outCount: n * 3, uniforms: packApplyUniforms({ H, W, C }), workgroups: [1, 1],
+                       inputs: [{ binding: 2, data: P }, { binding: 3, data: x }] };
+          })() },
+        { id: "conv2d.conv2dHeadWgsl", from: "brain/conv2d.mjs",
+          why: "a 1 x 1 convolution with no tile and no barrier, a thread per pixel and vec4 of outputs, weights in a uniform block, written planar: the head that round 13's fast kernel ran 1,900 times slower natively than in Chrome",
+          opts: (() => { const P = CONV.PROBES[3], a = P.args; return { code: P.code(a), entryPoint: P.entryPoint, outCount: P.outCount(a), uniforms: P.pack(a), workgroups: P.workgroups(a), inputs: P.inputs(a) }; })() },
+        // the denoiser arc, round 16 (section 54): the pixel-tiled kernel, held to the twin by brain/conv2d-selfcheck.mjs.
+        // COMPILE-ONLY SINCE SECTION 57: a pipeline is never built from it here, because node-webgpu's FXC did not finish one
+        // in 3 minutes on either of Keith's GPUs, and a native run of this corpus on a D3D12 adapter would wait for it
+        { id: "conv2d.conv2dTileWgsl", from: "brain/conv2d.mjs", compileOnly: true,
+          why: "the fast kernel's convolution with two pixels a thread: each uniform weight read feeds both, a per-pixel bound test beside an all-inside branch -- compile-only, as FXC never built its pipeline (section 57); its arithmetic is held by brain/conv2d-selfcheck.mjs off D3D12",
+          opts: (() => { const P = CONV.PROBES[4], a = P.args; return { code: P.code(a), entryPoint: P.entryPoint, compileOnly: true, outCount: 0 }; })() },
+        // the denoiser arc, round 17 (section 59): the fast kernel written two other ways, held to the twin by
+        // brain/conv2d-selfcheck.mjs. COMPILE-ONLY, as the tile kernel is: a native run of this corpus on a D3D12 adapter would
+        // build it through FXC before tools/denoiseBuildProbe.mjs has shown that FXC can
+        { id: "conv2d.conv2dFastAltWgsl", from: "brain/conv2d.mjs", compileOnly: true,
+          why: "the fast kernel with its tile read four channels at a time and a block's taps and channels written out, its weights block by block at constant offsets -- compile-only until the build probe shows FXC builds it (section 59)",
+          opts: { code: CONV.conv2dFastAltWgsl({ Cin: 32, Cout: 32, k: 3, act: "relu" }, { reads: "vec4", unroll: true }), entryPoint: "k_conv_fast_alt", compileOnly: true, outCount: 0 } },
+        // the denoiser arc, round 15 (section 46): the head and the kernel apply as one pass -- two uniform blocks, the
+        // apply's and the head's, which the one-uniform harness signature cannot bind, so compile-only here; its image is
+        // held to the twin's by render/denoiseDevice-selfcheck.mjs and render/denoiseCompile-selfcheck.mjs, natively and in
+        // Chromium, and its head's order by render/denoiseCompile.mjs's order probe
+        { id: "denoiseDevice.kernelHeadApplyWgsl", from: "render/denoiseDevice.mjs", compileOnly: true,
+          why: "the 81-logit head and the kernel apply in one pass: 21 named vec4 accumulators, 81 taps unrolled so each logit is a named lane, a halo in workgroup memory behind one barrier -- the logits never stored",
+          opts: { code: kernelHeadApplyWgsl({ Cin: 32, Cout: 81, k: 1 }), entryPoint: "k_head_apply", compileOnly: true, outCount: 0 } },
         { id: "flowfield.FLOWFIELD_WGSL", from: "brain/flowfield.js", compileOnly: true,
           why: "the flow-field solver: cost, relax (ping-pong), tally (atomics) and flow in one module with an explicit seven-binding layout -- outside the one-buffer signature; brain/tools/flowfield-selfcheck.mjs holds the solver to its CPU twin",
           opts: { code: FLOWFIELD_WGSL, entryPoint: "k_relax", compileOnly: true, outCount: 0 } },

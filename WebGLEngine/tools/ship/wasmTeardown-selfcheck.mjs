@@ -26,6 +26,17 @@
 //      (skillbookDoor, 48,643 bytes)
 //   K. the live subject is a converted box3d gate on the same lexer bytes    -> RED (1 row, compiles)
 //      (contactOverlay) -- the byte floor is what tells the encoder from the lexer
+// v4840, section 7 (the computed door, censused; five members converted) -- these rows moved to tools/ship/wasmDoors-selfcheck.mjs
+// at v4840's step 4b, with their sabotages; section 7 here is now one cheap row over DOORS_AT_V4840 (see it):
+//   L. box3dFingerprint-selfcheck's terminal process.exit() put back          -> RED (3 rows: accounted, converted, live)
+//   M. a bare file name names a compiler without its folder beside it        -> RED (1 row, the door fixture). The first
+//      run of M read 2: section 1's idle control went red at 3.4 ms, the row this header already calls load-sensitive;
+//      the re-run of M read the 1 row by name.
+//   N. a LITERAL import of the glue no longer excluded from doors             -> RED (2 rows: the door fixture, and the
+//      reach fixture, whose literal-only gate now reaches a "door")
+//   O. the reverse walk stops at a door's direct importers                    -> RED (2 rows: the live census, 58 gates no
+//      longer reached, and the depth-two fixture)
+//   P. one measured member (roster) removed from DOORS_AT_V4840              -> RED (1 row, naming it and the command)
 //
 // *** B IS ZERO AND CANNOT BE OTHERWISE, WHICH IS A LIMIT OF THE METHOD RATHER THAN A GAP. *** It replaces an
 // assertion with a tautology, and running a gate cannot detect that its own row was deleted. It is recorded
@@ -450,10 +461,25 @@ console.log("\n6. *** v4832 -- THE RIG FOUND A WASM COMPILER BOTH SCREENS MISSED
     report("MEASURED at v4832 with tools/ship/exitBusy.mjs at the gate's exit line, first 300 ms window: browser " +
         "present 2.8 / 0.6 / 0.3 ms (QUIET); section 4 skipped as on the rig 7.7 / 6.1 / 6.8 / 4.9 / 5.3 ms, second " +
         "window 0.2-0.3 (a BURST, 4 of 5 over the 5 ms floor). ONE BOX, Linux, where the assert does not exist.");
-    report("WHAT THIS DOES NOT SCREEN: another gate reaching wasm through createRequire or a computed import. One " +
-        "such module exists today (tools/export/dracoEncode.mjs) and this gate is its only importer; a census of " +
-        "the door costs a read of every source file (909 ms here) and is not built. The rig's clone-verify found " +
-        "every member after v4663, and it is still the instrument.");
+    report("v4832 said: another gate reaching wasm through createRequire or a computed import is not screened, and a census " +
+        "of the door is not built. v4840 built it -- tools/ship/wasmDoors-selfcheck.mjs -- and it found five such gates the rig had not reached yet.");
+}
+
+console.log("\n7. *** v4840 -- THE COMPUTED-DOOR POPULATION, HELD CHEAPLY: the census itself is tools/ship/wasmDoors-selfcheck.mjs ***");
+{
+    // The census costs about 2.6 s and put this gate past the sweep's line at v4840's step 4b, which left WASM_AT_V4663 and
+    // DOORS_AT_V4840 with no guardian the ritual runs (recordReach-selfcheck, 51 unchecked against 50). It moved to its own gate;
+    // this row holds the frozen population with no census at all -- each member still exists, carries no more exit calls in code
+    // than were recorded, and each of the five converted still hands its verdict to exitCode. SABOTAGE (v4840): box3dFingerprint's
+    // terminal process.exit() put back -> this row red by name (and wasmDoors-selfcheck's three); one member removed from the record
+    // -> this row red (13 against 14). The SWEEP's guardian of DOORS_AT_V4840 is dracoEncode-selfcheck's identical row, at 0.7 s.
+    const read = (g) => { try { return fs.readFileSync(path.join(ENG, g), "utf8"); } catch { return null; } };
+    const bad = WT.DOORS_AT_V4840.members.filter((m) => { const src = read(m.gate); if (src === null) return true;
+        const code = codeOnly(src); return exitCallCount(code) > m.exitCalls || (m.exitAfterWasmBefore && !/process\.exitCode\s*=\s*fails/.test(code)); });
+    ok("!! *** every gate in DOORS_AT_V4840 holds what was measured: no new exit, and the five converted still converted ***",
+        WT.DOORS_AT_V4840.members.length === WT.DOORS_AT_V4840.measured && bad.length === 0,
+        bad.length ? bad.map((m) => `${m.gate}: ${read(m.gate) === null ? "MISSING" : exitCallCount(codeOnly(read(m.gate))) + " exit call(s) against " + m.exitCalls + " recorded" + (m.exitAfterWasmBefore ? ", or its exitCode line gone" : "")}`).join("; ")
+                   : `${WT.DOORS_AT_V4840.measured} members, ${WT.DOORS_AT_V4840.crashShapeBefore} converted -- re-run tools/ship/wasmDoors-selfcheck.mjs for the census`);
 }
 
 console.log(fails ? `\nwasmTeardown-selfcheck: ${fails} FAILED` : "\nwasmTeardown-selfcheck: all checks pass");

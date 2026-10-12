@@ -137,4 +137,7 @@ console.log("\n5. THE FRONT DOOR, AND NOTHING IN THE BACKEND OR THE CONTRACT IS 
 }
 
 console.log(fails ? `\nbackendRotation-selfcheck: ${fails} FAILED` : "\nbackendRotation-selfcheck: all checks pass");
-process.exit(fails ? 1 : 0);
+// v4840 -- the verdict travels through exitCode, not process.exit(): this gate compiles wasm (box3d's glue, reached through a
+// computed path) and an exit with that module behind it is the Windows teardown assert the rig met in dracoEncode-selfcheck
+// at v4832. Found by wasmTeardown's door census and measured under tools/ship/wasmExitHook.cjs before the change.
+process.exitCode = fails ? 1 : 0;

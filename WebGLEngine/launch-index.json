@@ -988,6 +988,14 @@
   },
   {
    "kind": "page",
+   "id": "denoise.html",
+   "display": "Denoise",
+   "href": "/denoise.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
    "id": "destructible.html",
    "display": "Destructible",
    "href": "/destructible.html",

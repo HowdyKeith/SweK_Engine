@@ -57,7 +57,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import os from "node:os";
-import { spawnSync } from "node:child_process";
+import { spawnSync, execFileSync } from "node:child_process";
+import { treeFiles, SKIP } from "./treeRead.mjs";
+import { noComments, codeOnly } from "./sourceScan.mjs";
+import { resolveSpec } from "./affected.mjs";
+import { gateFiles } from "./staleness.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const ENG = path.resolve(HERE, "..", "..");
@@ -242,5 +246,172 @@ export const WASM_AT_V4663 = Object.freeze({
         { gate: "tools/ship/slugTicker-selfcheck.mjs", exitCalls: 0, wasmBytes: 48643 },
         { gate: "tools/ship/voxelBodies-selfcheck.mjs", exitCalls: 0, wasmBytes: 48643 },
         { gate: "world/buildingTopple-selfcheck.mjs", exitCalls: 1, wasmBytes: 48643 },
+    ].map(Object.freeze)),
+});
+
+/**
+ * *** v4840 -- THE DOOR NEITHER SCREEN WALKED, CENSUSED BEFORE THE RIG WALKS IT. ***
+ *
+ * v4663 screened the gates that could REACH WebAssembly.instantiate by import; v4677 sampled by exitBusy. The rig found
+ * tools/ship/dracoEncode-selfcheck.mjs through neither (v4832): tools/export/dracoEncode.mjs loads its Emscripten glue with
+ * createRequire and a computed path, and no import graph follows that. This names that door statically, from the target:
+ *
+ *   COMPILERS -- every script in the tree, vendor/ included (the glue lives there and treeFiles skips it), whose code
+ *                calls WebAssembly.instantiate / compile (or their Streaming forms).
+ *   DOORS     -- a module that loads code through a computed specifier (createRequire, or an import() of anything but a
+ *                string literal) AND names a compiler: a literal path tail of it ("dist/draco_encoder_nodejs.js"), or its
+ *                bare file name beside a literal naming its folder ("box3d.js" with "box3d"). A bare "index.js" names
+ *                nothing. A LITERAL import or require of the same file is not a door: every import graph follows those.
+ *   REACH     -- the gates that import a door, at any depth, by a reverse walk of the tree's literal imports (and a door
+ *                that is itself a gate).
+ *
+ * Measured at v4840: 21 compilers, 8 doors -- box3d's glue behind physics/box3d/box3dNode.mjs, ai-bridge/server.js,
+ * tools/roundhouse/backendRotation.mjs and three gates that load it themselves, the Draco encoder behind
+ * tools/export/dracoEncode.mjs, and wasmTeardown-selfcheck itself, which names both glues in its assertions and loads box3d
+ * in-process -- and 58 gates reaching one. Live, candidates come from git grep (about 2.6 s here, against 4.3 s reading every
+ * file, with the same doors and reach); every input is injectable, so the rules are driven on fixtures as well.
+ */
+const COMPILES = /WebAssembly\.(?:instantiate|compile)(?:Streaming)?\s*\(/;
+const GENERIC = /^(?:index|main)\.(?:c?js|mjs)$/;
+const COMPUTED_LOADER = /createRequire\s*\(|\bimport\s*\(\s*(?!["'`][^"'`]*["'`]\s*\))/;
+const relOf = (root, p) => path.relative(root, p).replace(/\\/g, "/");
+// Live only: the files under `root` (tracked or untracked, .gitignore honoured, treeRead's SKIP applied unless `vendor`) whose text
+// contains one of `needles` (fixed strings, or one pattern with `regex`). git grep reads the tree in ~0.1 s where reading every
+// file's text took 3.4 s; null when git is not there, and the caller reads everything instead.
+function grepFiles(root, needles, { regex = false, vendor = false } = {}) {
+    if (!needles.length) return [];
+    try {
+        const out = execFileSync("git", ["grep", "-l", "--untracked", regex ? "-E" : "-F", ...needles.flatMap((n) => ["-e", n]),
+            "--", "*.js", "*.mjs", "*.cjs"], { cwd: root, encoding: "utf8", maxBuffer: 64 << 20, stdio: ["ignore", "pipe", "ignore"] });
+        return out.split("\n").filter(Boolean).map((r) => path.join(root, r)).filter((p) => vendor ? !/node_modules/.test(p) : !SKIP.test(p));
+    } catch (e) { return e.status === 1 ? [] : null; }
+}
+const textOf = (p) => { try { return fs.readFileSync(p, "utf8"); } catch { return ""; } };
+
+/** Every script that compiles wasm: [abs path]. vendor/ is walked here because treeFiles skips it by design. */
+export function wasmCompilers({ root = ENG, files = null, vendor = null } = {}) {
+    if (!files && !vendor) {
+        const hits = grepFiles(root, ["WebAssembly\\.(instantiate|compile)"], { regex: true, vendor: true });
+        // a tree file compiles wasm when its CODE calls the API -- strings out too, or a gate whose fixture text names the call becomes
+        // a "compiler" and every module naming that gate a "door" (v4840's own section 7 did exactly that on its first run)
+        if (hits) return hits.filter((p) => /[\\/]vendor[\\/]/.test(p) ? COMPILES.test(textOf(p)) : COMPILES.test(codeOnly(textOf(p))));
+    }
+    const out = [];
+    const vend = vendor || (() => { const acc = [];
+        (function walk(d) { let es = []; try { es = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
+            for (const e of es) { const p = path.join(d, e.name);
+                if (e.isDirectory()) { if (e.name !== "node_modules") walk(p); } else if (/\.(c?js|mjs)$/.test(e.name)) acc.push(p); } })(path.join(root, "vendor"));
+        return acc.map((p) => { try { return { path: p, text: fs.readFileSync(p, "utf8") }; } catch { return { path: p, text: "" }; } }); })();
+    for (const f of vend) if (COMPILES.test(f.text)) out.push(f.path);
+    for (const f of (files || treeFiles(root))) if (/\.(c?js|mjs)$/.test(f.path) && COMPILES.test(f.text) && COMPILES.test(codeOnly(f.text))) out.push(f.path);
+    return out;
+}
+
+/** Modules that load a compiler through a computed specifier: [{ module, glue: [rel] }]. */
+export function wasmDoors({ root = ENG, files = null, compilers = null } = {}) {
+    const comp = compilers || wasmCompilers({ root, files });
+    // a GENERIC file name (index.js, main.mjs) names a file only with its folder in the same literal: "dist/index.js"
+    const needle = (p) => GENERIC.test(path.basename(p)) ? path.basename(path.dirname(p)) + "/" + path.basename(p) : path.basename(p);
+    const live = !files && grepFiles(root, [...new Set(comp.map(needle))]);
+    const fl = (live ? live.map((p) => ({ path: p, text: textOf(p) })) : (files || treeFiles(root))).filter((f) => /\.(c?js|mjs)$/.test(f.path));
+    const byBase = new Map();
+    for (const p of comp) { const b = path.basename(p); if (!byBase.has(b)) byBase.set(b, []); byBase.get(b).push(p); }
+    const doors = [];
+    for (const f of fl) {
+        if (![...byBase.keys()].some((b) => f.text.includes(b))) continue;        // cheap: no compiler's name, no door
+        if (!COMPUTED_LOADER.test(f.text)) continue;                               // cheap: no computed loader in the raw text either
+        const c = noComments(f.text);
+        if (!COMPUTED_LOADER.test(c)) continue;
+        const lits = new Set([...c.matchAll(/["'`]([^"'`\s]+)["'`]/g)].map((m) => m[1]));
+        // every specifier this file imports or requires LITERALLY, in one pass -- a regex per literal over a 3.5 MB main.js was 3 s
+        const literalSpecs = new Set([...c.matchAll(/(?:\bfrom|\bimport\s*\(|\brequire\s*\()\s*["']([^"']+)["']/g)].map((m) => m[1]));
+        const glue = new Set();
+        for (const lit of lits) {
+            if (!/\.(c?js|mjs)$/.test(lit)) continue;
+            const b = path.basename(lit);
+            if (literalSpecs.has(lit)) continue;   // literal: graphs follow it
+            for (const p of byBase.get(b) || []) {
+                const r = relOf(root, p);
+                const named = lit.includes("/") ? r.endsWith(lit.replace(/^(\.\.?\/)+/, ""))
+                            : !GENERIC.test(b) && lits.has(path.basename(path.dirname(p)));
+                if (named) glue.add(r);
+            }
+        }
+        if (glue.size) doors.push({ module: relOf(root, f.path), glue: [...glue].sort() });
+    }
+    return { compilers: comp.map((p) => relOf(root, p)), doors };
+}
+
+/** The gates that reach a door: Map(gate rel -> door rel). Literal imports only, walked in reverse from each door. */
+export function doorReach(doors, { root = ENG, files = null, gates = null } = {}) {
+    const SPEC = [/\bfrom\s+["']([^"']+)["']/g, /\bimport\s*\(\s*["']([^"']+)["']\s*\)/g, /\brequire\(\s*["']([^"']+)["']\s*\)/g, /^\s*import\s+["']([^"']+)["']/gm];
+    const importsOf = (p, text) => { const out = new Set();
+        for (const rx of SPEC) for (const m of text.matchAll(rx)) { const s = m[1]; if (!s.startsWith("./") && !s.startsWith("../")) continue;
+            const r = resolveSpec(p, s); if (r) out.add(r); }
+        return out; };
+    const rev = new Map();
+    const link = (from, to) => { if (!rev.has(to)) rev.set(to, new Set()); rev.get(to).add(from); };
+    if (files) {
+        for (const f of files.filter((x) => /\.(c?js|mjs)$/.test(x.path))) for (const r of importsOf(f.path, f.text)) link(f.path, r);
+    } else {
+        // live: breadth-first from the doors, asking git which files name each module, then confirming the import by resolving it.
+        // The same edges the full index finds for these modules, without reading the files that cannot hold one.
+        const seen = new Set(), frontier = doors.map((d) => path.join(root, d.module));
+        let ok = true;
+        while (frontier.length && ok) {
+            const batch = frontier.splice(0).filter((m) => !seen.has(m)); batch.forEach((m) => seen.add(m));
+            if (!batch.length) break;
+            const names = [...new Set(batch.map((m) => path.basename(m).replace(/\.(c?js|mjs)$/, "")))];
+            const cands = grepFiles(root, names);
+            if (!cands) { ok = false; break; }
+            for (const c of cands) { const imp = importsOf(c, textOf(c));
+                for (const m of batch) if (imp.has(m)) { link(c, m); if (!seen.has(c)) frontier.push(c); } }
+        }
+        if (!ok) return doorReach(doors, { root, files: treeFiles(root), gates });
+    }
+    const isGate = new Set((gates || gateFiles(root)).map((p) => path.resolve(root, p)));
+    const reach = new Map();
+    for (const d of doors) {
+        const start = path.join(root, d.module), seen = new Set([start]), stack = [start];
+        while (stack.length) {
+            const cur = stack.pop();
+            if (isGate.has(cur) && !reach.has(relOf(root, cur))) reach.set(relOf(root, cur), d.module);
+            for (const up of rev.get(cur) || []) if (!seen.has(up)) { seen.add(up); stack.push(up); }
+        }
+    }
+    return reach;
+}
+
+/**
+ * *** v4840 -- WHAT THE CENSUS FOUND, MEASURED UNDER THE HOOK BEFORE ANYTHING WAS CHANGED. ***
+ *
+ * Of the 58 gates reaching a door, 44 have no process.exit() in their code or are v4663 members within their recorded
+ * bail-out count. The other 14 were run under tools/ship/wasmExitHook.cjs on this box. FIVE had the crash shape --
+ * wasm compiled, then process.exit() -- every one green, every one exiting 0, and each a Windows clone-verify away from
+ * the assert dracoEncode-selfcheck met at v4832: racePlay, box3dFingerprint, gunnerTraceDemo, backendRotation and
+ * peerBrain. All five now set process.exitCode; re-measured, none calls exit and none ran longer than before (no handle
+ * held the process open). The other NINE compile no wasm on the path that exits (fingerprintBridge, raceKnob,
+ * wheelJoint, observableCompare, mpmDruckerBind, jointDrive) or compile it and never call exit (raceLockstep, roster,
+ * lockstepRelay): their exit calls are bail-outs, kept as v4663 kept its own, with the count recorded so a new one is seen.
+ * `exitCalls` is the count left in each comment-stripped source after the round; `wasmCalls` what the hook counted.
+ */
+export const DOORS_AT_V4840 = Object.freeze({
+    at: "v4840",
+    reach: 58, measured: 14, crashShapeBefore: 5,
+    members: Object.freeze([
+        { gate: "ai-bridge/fingerprintBridge-selfcheck.mjs", door: "physics/box3d/box3dNode.mjs", wasmCalls: 0, exitAfterWasmBefore: false, exitCalls: 1 },
+        { gate: "brain/raceLockstep-selfcheck.mjs", door: "brain/raceLockstep-selfcheck.mjs", wasmCalls: 13, exitAfterWasmBefore: false, exitCalls: 1 },
+        { gate: "brain/racePlay-selfcheck.mjs", door: "brain/racePlay-selfcheck.mjs", wasmCalls: 11, exitAfterWasmBefore: true, exitCalls: 1 },   // converted
+        { gate: "brain/roster-selfcheck.mjs", door: "physics/box3d/box3dNode.mjs", wasmCalls: 3, exitAfterWasmBefore: false, exitCalls: 1 },
+        { gate: "physics/box3dFingerprint-selfcheck.mjs", door: "physics/box3dFingerprint-selfcheck.mjs", wasmCalls: 3, exitAfterWasmBefore: true, exitCalls: 0 },   // converted
+        { gate: "physics/raceKnob-selfcheck.mjs", door: "physics/box3d/box3dNode.mjs", wasmCalls: 0, exitAfterWasmBefore: false, exitCalls: 1 },
+        { gate: "physics/wheelJoint-selfcheck.mjs", door: "physics/box3d/box3dNode.mjs", wasmCalls: 0, exitAfterWasmBefore: false, exitCalls: 1 },
+        { gate: "tools/fingerprint/observableCompare-selfcheck.mjs", door: "physics/box3d/box3dNode.mjs", wasmCalls: 0, exitAfterWasmBefore: false, exitCalls: 1 },
+        { gate: "tools/gunnerTraceDemo-selfcheck.mjs", door: "physics/box3d/box3dNode.mjs", wasmCalls: 2, exitAfterWasmBefore: true, exitCalls: 0 },   // converted
+        { gate: "tools/roundhouse/backendRotation-selfcheck.mjs", door: "tools/roundhouse/backendRotation.mjs", wasmCalls: 7, exitAfterWasmBefore: true, exitCalls: 0 },   // converted
+        { gate: "tools/roundhouse/mpmDruckerBind-selfcheck.mjs", door: "physics/box3d/box3dNode.mjs", wasmCalls: 0, exitAfterWasmBefore: false, exitCalls: 1 },
+        { gate: "tools/ship/jointDrive-selfcheck.mjs", door: "physics/box3d/box3dNode.mjs", wasmCalls: 0, exitAfterWasmBefore: false, exitCalls: 1 },
+        { gate: "tools/ship/lockstepRelay-selfcheck.mjs", door: "physics/box3d/box3dNode.mjs", wasmCalls: 3, exitAfterWasmBefore: false, exitCalls: 1 },
+        { gate: "tools/ship/peerBrain-selfcheck.mjs", door: "physics/box3d/box3dNode.mjs", wasmCalls: 3, exitAfterWasmBefore: true, exitCalls: 0 },   // converted
     ].map(Object.freeze)),
 });

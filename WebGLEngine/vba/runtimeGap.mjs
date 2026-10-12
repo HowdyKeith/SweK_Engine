@@ -607,7 +607,21 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4834 -- 4625 -> 4626 for tools/ship/reportFresh-selfcheck.mjs.
     // v4835 -- 4626 -> 4628 for tools/ship/afterVerdict.mjs and its gate (on main).
     // v4837 -- 4628 -> 4636 for tools/ship/poolWatch.mjs, sysLagReading.mjs, takeLagReading.mjs, train6dofPilot.mjs, trainPilot6dof.mjs and their three gates (poolWatch-selfcheck, sysLagReading-selfcheck, train6dofPilot-selfcheck); verify.mjs, deviceOwed.mjs and the 6DOF page grew.
-    files: 4636,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
+    // the denoiser arc, round 1 -- 4595 -> 4597 for brain/conv2d.mjs and brain/conv2d-selfcheck.mjs.
+    // the denoiser arc, round 2 -- 4597 -> 4610: six modules, six gates, tools/denoiseStudy.mjs.
+    // the denoiser arc, round 4 -- 4610 -> 4612 for render/denoiseTemporal.mjs and its gate.
+    // the denoiser arc, round 6 -- 4612 -> 4614 for render/denoiseMask.mjs and its gate.
+    // the denoiser arc, round 7 -- 4614 -> 4616 for render/denoiseCache.mjs and its gate.
+    // the denoiser arc, round 9 -- 4616 -> 4618 for render/denoisePool.mjs and its gate.
+    // the denoiser arc, round 12 -- 4618 -> 4621 for render/denoiseDevice.mjs, its gate and tools/denoiseDevice.mjs;
+    // denoise.html and render/denoise-net-r11.json are not .js or .mjs and are not counted.
+    // the denoiser arc, round 12 again -- 4621 -> 4622 for render/denoiseTiming-selfcheck.mjs.
+    // the denoiser arc, round 14 -- 4622 -> 4624 for render/denoiseCompile.mjs and its gate.
+    // the denoiser arc, section 56 -- 4624 -> 4625 for tools/denoiseBuildProbe.mjs.
+    // v4838 -- THE DENOISER ARC'S MERGE: RE-DERIVED over the merged tree: main's 4636 plus the arc's 30 files since the v4818 split.
+    // v4840 -- files 4636 -> 4637: tools/ship/wasmDoors-selfcheck.mjs.
+    // v4842 -- main's v4838 merged with this line's v4838-v4841: RE-DERIVED over the merged tree.
+    files: 4667,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
     // (v4691 note, carried)                               // v4691 -- RE-DERIVED: tools/ship/textureInProbe.mjs arrived, one ES module with a closure and top-level await -- four rows moved (files, ES modules, closures, async/await) and eight held.
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
@@ -1168,8 +1182,51 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4834 -- ES modules 4320 -> 4321, closures 4166 -> 4167: tools/ship/reportFresh-selfcheck.mjs; the other rows hold.
     // v4835 -- ES modules 4321 -> 4323, closures 4167 -> 4169: tools/ship/afterVerdict.mjs and its gate (on main); the other rows hold.
     // v4837 -- ES modules 4323 -> 4331, closures 4169 -> 4177, async/await 1735 -> 1739, Promises 417 -> 419, fetch/XHR 251 -> 252: the five tools, their three gates and the 6DOF page's shipped-pilot fetch; sysLagReading.mjs calls fetch (251 -> 252).
-    esModules: 4331, closures: 4177, asyncAwait: 1739, typedArrays: 1274, promises: 419,
-    fetchXhr: 252, performanceNow: 245, raf: 127, webgl: 200, webgpu: 57, threads: 25, wasm: 24,
+    // the denoiser arc, round 1 -- brain/conv2d.mjs and its gate: files 4595 -> 4597, ES modules 4290 -> 4292, closures
+    // 4140 -> 4142, typed arrays 1269 -> 1271 (the layer's buffers; the gate's fixtures), async/await 1716 -> 1717 (the
+    // gate awaits its imports and the device); nothing else moved.
+    // the denoiser arc, round 2 -- six modules, six gates and the study's CLI: files 4597 -> 4610, ES modules 4292 -> 4305,
+    // closures 4142 -> 4154, async/await 1717 -> 1723 (the six gates await their imports), typed arrays 1271 -> 1280 (the
+    // images, weights and moments); nothing else moved.
+    // the denoiser arc, round 4 -- render/denoiseTemporal.mjs and its gate: files 4610 -> 4612, ES modules 4305 -> 4307,
+    // closures 4154 -> 4156, async/await 1723 -> 1724 (the gate awaits its imports), typed arrays 1280 -> 1282 (the
+    // frames, hits, taps and history); nothing else moved.
+    // the denoiser arc, round 6 -- render/denoiseMask.mjs and its gate: files 4612 -> 4614, ES modules 4307 -> 4309,
+    // closures 4156 -> 4158, async/await 1724 -> 1725 (the gate awaits its imports), typed arrays 1282 -> 1284 (the
+    // coverage and the masked input); nothing else moved.
+    // the denoiser arc, round 7 -- render/denoiseCache.mjs and its gate: files 4614 -> 4616, ES modules 4309 -> 4311,
+    // closures 4158 -> 4160, async/await 1725 -> 1726 (the gate awaits its imports), typed arrays 1284 -> 1286 (the
+    // records' arrays and the key's words); nothing else moved.
+    // the denoiser arc, round 9 -- render/denoisePool.mjs and its gate: files 4616 -> 4618, ES modules 4311 -> 4313,
+    // closures 4160 -> 4162, async/await 1726 -> 1727 (the gate awaits its imports), typed arrays 1286 -> 1288 (the
+    // flags and the networks' weights), and THREADS 25 -> 26: the pool trains networks in worker_threads, a real use.
+    // The gate's headline row held the claim (threads second from the bottom) and its closeness proxy did not; see there.
+    // the denoiser arc, round 12 -- render/denoiseDevice.mjs, its gate and tools/denoiseDevice.mjs: files 4618 -> 4621, ES
+    // modules 4313 -> 4316, closures 4162 -> 4165, async/await 1727 -> 1730, typed arrays 1288 -> 1291 (the weights, the
+    // read-backs), Promises 405 -> 407 (the read-backs gathered; the page-session script's waits), performance.now 241 ->
+    // 242 (a pass's time), and WebGPU 56 -> 58: the module drives a GPUDevice and its gate asks Dawn and Chromium for one.
+    // and again, for the rig's timing: render/denoiseTiming-selfcheck.mjs -- files 4621 -> 4622, ES modules 4316 -> 4317,
+    // closures 4165 -> 4166, async/await 1730 -> 1731, Promises 407 -> 408 (its page script's waits), WebGPU 58 -> 59 (it
+    // asks Dawn and Chromium for adapters) -- and performance.now 242 -> 241: render/denoiseDevice-selfcheck.mjs's page
+    // script now waits on Date, a deadline and not a measurement, so tools/ship/realGpuRun.mjs reads that gate as exact.
+    // the denoiser arc, round 14 -- render/denoiseCompile.mjs and its gate: files 4622 -> 4624, ES modules 4317 -> 4319,
+    // closures 4166 -> 4168, async/await 1731 -> 1733, typed arrays 1291 -> 1292 (the kernel apply's planar logits),
+    // Promises 408 -> 409 (its page script's waits), performance.now 241 -> 243 (a pipeline's build and a pass, timed in
+    // both), and WebGPU 59 -> 60 (each kernel asks for its own adapter and device).
+    // the denoiser arc, section 56 -- tools/denoiseBuildProbe.mjs: files 4624 -> 4625, ES modules 4319 -> 4320, closures
+    // 4168 -> 4169, async/await 1733 -> 1734, Promises 409 -> 410 (its Chrome half races each build against the cap), and
+    // WebGPU 60 -> 61 (each shape asks for its own adapter and device); the other six rows held.
+    // v4838 -- THE DENOISER ARC'S MERGE: RE-DERIVED over the merged tree: files 4636 -> 4666, ES modules
+    // 4331 -> 4361, closures 4177 -> 4206, async/await 1739 -> 1757, typed arrays 1274 -> 1297, Promises 419 -> 424, performance.now
+    // 245 -> 247, WebGPU 57 -> 62, threads 25 -> 26; fetch/XHR, rAF, WebGL and WebAssembly hold.
+    // v4838 -- performance.now 245 -> 246: tools/ship/meshBVH-selfcheck.mjs times its speedup rows on it now (the fastest of
+    // several runs, step 4b's repair); the other rows hold.
+    // v4840 -- WebAssembly 24 -> 26: tools/ship/wasmTeardown.mjs (the census's compiler pattern) and wasmTeardown-selfcheck.mjs
+    // (section 7's fixture glue) now name the API; neither compiles anything. The other rows hold.
+    // v4840 -- and at step 4b, ES modules 4331 -> 4332, closures 4177 -> 4178, async/await 1739 -> 1740: tools/ship/wasmDoors-selfcheck.mjs.
+    // v4842 -- MAIN'S v4838 (THE DENOISER ARC) MERGED WITH THIS LINE'S v4838-v4841: RE-DERIVED over the merged tree.
+    esModules: 4362, closures: 4207, asyncAwait: 1758, typedArrays: 1297, promises: 424,
+    fetchXhr: 252, performanceNow: 248, raf: 127, webgl: 200, webgpu: 62, threads: 26, wasm: 26,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.

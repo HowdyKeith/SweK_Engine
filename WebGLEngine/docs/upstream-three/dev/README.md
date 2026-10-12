@@ -98,9 +98,12 @@ grown with its material updated throws on `dev`: that is issue 15.
 Run in the `dev` checkout, on `dev` and on `dev` with all sixteen patches in order, each built by three's rollup -- the same
 bytes `record.json` names:
 
-- Unit tests (`test/unit`, headless Chromium, QUnit served locally): 1894 tests, 1893 passed, 1 todo, 0 failed, on both builds.
-  (1525 at v4811: #34918 consolidated the TSL unit tests, and those skip, inside the suite, the tests that need a WebGPU or WebGL
-  backend headless Chromium does not give them here -- so a patch to the node renderers is not exercised by them on this box.)
+- Unit tests (`test/unit`, headless Chromium with SwiftShader under WebGPU and under the WebGL 2 backend, QUnit served locally,
+  the runner as `../e2e/puppeteer-unit-local.diff`): 1894 tests, 1891 passed, 1 todo, 2 failed, on both builds -- and the GPU-native
+  TSL tests run, 169 on WebGPU and 169 on the WebGL 2 backend, none skipped. The two that fail are `dev`'s own and fail on `dev` here
+  the same way: textureBarrier's read-back sum on SwiftShader's Vulkan, and integer `mod()` of negative operands on the WebGL 2 backend
+  (`e2e.json` gives each reason). (v4836 read 1893 passed and 0 failed, but headless Chromium gave the TSL tests no backend there and
+  they passed as skipped -- a patch to the node renderers was not exercised by them until this run.)
 - e2e ([`e2e.json`](e2e.json), the runner as `../e2e/puppeteer-local.diff`): 202 WebGPU examples, 191 passed and the same 11
   failed on both builds; on the WebGL 2 backend, 148 passed and the same 54 failed on both. 200 of the 202 screenshots are the
   same bytes on WebGPU and 200 on WebGL 2; the others vary between runs of one build (`e2e.json` names each). Re-run at v4811 on

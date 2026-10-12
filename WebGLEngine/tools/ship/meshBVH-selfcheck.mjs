@@ -278,13 +278,20 @@ console.log("\n7. the occlusion query: any hit, early out, and the same verdict"
 // ---- 8. AND IT IS FASTER -----------------------------------------------------------------------------------
 console.log("\n8. the point of the exercise, measured rather than assumed");
 {
+    // v4838 -- THE FASTEST OF SEVERAL RUNS OF EACH LOOP, NOT ONE. The ratio was one wall-clock sample of a ~4 ms loop, so a
+    // 13 ms deschedule inside it read 2.6x against the 3x line: the shipping verdict of v4838 filed this gate exit 1 in its
+    // alone pass, and on a box running six busy loops on four cores 1 of 12 runs went red the same way (4,000 triangles:
+    // brute 44 ms, bvh 17 ms). The minimum is the reading a scheduler cannot inflate, as statedRuntime's minRun takes it.
+    // After: 0 of 24 under the same load. performance.now(), because a minimum of whole milliseconds is mostly rounding.
+    // SABOTAGE (v4838): the bvh loop walking every triangle instead -> both rows red by name, 1.0x and 1.1x; restored by copy.
+    const best = (f, k) => { let m = Infinity; for (let i = 0; i < k; i++) { const t = performance.now(); f(); m = Math.min(m, performance.now() - t); } return m; };
     for (const n of [4000, 20000]) {
         const tris = lumpyMesh(n, 7), rays = rayBattery(3, 300);
         const t0 = Date.now(); const bvh = new MeshBVH(tris); const build = Date.now() - t0;
-        let tb = Date.now(); for (const r of rays) bruteFirst(tris, ...r); tb = Date.now() - tb;
-        let tv = Date.now(); for (const r of rays) bvh.raycastFirst(...r); tv = Date.now() - tv;
-        const x = tb / Math.max(tv, 1);
-        console.log(`  ${String(n).padStart(5)} triangles: build ${build}ms, ${rays.length} rays -- brute ${tb}ms, bvh ${tv}ms = ${x.toFixed(1)}x`);
+        const tb = best(() => { for (const r of rays) bruteFirst(tris, ...r); }, 3);
+        const tv = best(() => { for (const r of rays) bvh.raycastFirst(...r); }, 5);
+        const x = tb / Math.max(tv, 0.1);
+        console.log(`  ${String(n).padStart(5)} triangles: build ${build}ms, ${rays.length} rays -- brute ${tb.toFixed(1)}ms, bvh ${tv.toFixed(1)}ms = ${x.toFixed(1)}x  (fastest of 3 and of 5)`);
         ok(`!! ${n} triangles: at least 3x faster than walking them all`, x >= 3, `${x.toFixed(1)}x`);
     }
 }

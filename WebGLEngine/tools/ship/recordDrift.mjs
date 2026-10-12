@@ -158,7 +158,7 @@ const once = (fn, make) => {
  * also MORE PRECISE than it was: a fixture that breaks the timings file should not be able to pass or fail
  * on the assertion census, and until now it could.
  */
-export async function checks({ load = null, timings = null, records = null, only = null } = {}) {
+export async function checks({ load = null, timings = null, records = null, only = null, recordRoot = ENG } = {}) {
     const mod = load || ((p) => import(p));
     const out = [];
     const wanted = (n) => !only || (Array.isArray(only) ? only.includes(n) : only === n);
@@ -372,12 +372,17 @@ export async function checks({ load = null, timings = null, records = null, only
         // sweep-timings.local.json a foreign box's own sweep writes does exactly that, so the gate went red on
         // this box the first time a local verify wrote one -- and the rig has had one all along. A fixture must
         // be able to state the WHOLE world, so `records` injects every record at once and wins over `timings`.
+        // *** v4839 -- AND ONLY THE RECORDS A CLONE WILL HOLD. *** v4834's reportFresh-selfcheck had one reading, in this
+        // box's gitignored sweep-timings.local.json; the union read it, this row passed, the round shipped, and the rig's
+        // clone-verify stopped right here on the same gate. `committed` leaves that file out, so this box answers the
+        // question the way every clone of what it pushes will. `recordRoot` exists so recordDrift-selfcheck can show it on a
+        // tree it builds: the rule is about a file being present, and the live tree cannot be made to hold one on demand.
         const cov = records
             ? BT.coverageOf(records)
             : timings
             ? BT.coverageOf([{ file: BT.FILES.shared, kind: "shared", host: timings.host || null, rec: timings },
-                             ...BT.records(ENG).filter((r) => r.kind !== "shared")])
-            : BT.coverage(ENG);
+                             ...BT.records(recordRoot, { committed: true }).filter((r) => r.kind !== "shared")])
+            : BT.coverage(recordRoot, { committed: true });
         // v4778 -- the relative names are keyed on the memoised gateFiles ARRAY, so they are mapped once per
         // walk rather than 1,925 path.relative calls on each of this gate's six timings calls.
         const missing = once(gateFiles, () => gateFiles.map((p) => path.relative(ENG, p).replace(/\\/g, "/")))

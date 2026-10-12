@@ -40,6 +40,19 @@ if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
   exit 0
 fi
 
+# v4838 -- A SECOND THING, BECAUSE THE SANDBOX OWNS THE TIMING RECORD AGAIN. ai-bridge/ declares @napi-rs/canvas and
+# @napi-rs/webcodecs as optionalDependencies, and a container that lacks them declines webcodecsFramesToMp4-selfcheck
+# whole (and sections of qrBridge and gateAxioms). The 2.10GHz host had them and recorded the gate at 756 ms; the
+# 2.80GHz host did not, so its first sweep as owner filed the gate `skipped` and skipReading-selfcheck went red on a
+# fifth skipper. The record's owner should run what the previous owner ran. Same rule as below: warm path first,
+# synchronous, and --no-save so package.json is never touched (package-lock.json is gitignored).
+AIB="${CLAUDE_PROJECT_DIR:-$PWD}/WebGLEngine/ai-bridge"
+if [ -d "$AIB" ] && ! (cd "$AIB" && node -e 'require.resolve("@napi-rs/canvas"); require.resolve("@napi-rs/webcodecs")') >/dev/null 2>&1; then
+  echo "[session-start] installing ai-bridge's @napi-rs/canvas and @napi-rs/webcodecs (optionalDependencies the record's gates use)"
+  (cd "$AIB" && npm install --no-save --no-audit --no-fund @napi-rs/canvas@^1.0.9 @napi-rs/webcodecs@^1.4.1) \
+    || echo "[session-start] ai-bridge optional install failed -- webcodecsFramesToMp4-selfcheck will SKIP, and say why"
+fi
+
 # The warm path: synchronous, instant, no race. Nothing below this line runs on a cached container.
 if node -e 'require("/opt/node22/lib/node_modules/webgpu")' >/dev/null 2>&1; then
   echo "[session-start] node-webgpu already present -- nothing to install"

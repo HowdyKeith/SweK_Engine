@@ -202,16 +202,24 @@ export function arguesInNumbers(src, strip = (s) => s) {
  *
  * `log` is git's `--format=@%H %cs --name-only` text over the gates and `boundary` the shallow commits; both are
  * injectable so the gate can drive a boundary and an edit without a repository built for the purpose.
+ *
+ * *** v4839 -- AND AN EDIT NOT YET COMMITTED, WHICH git log CANNOT SEE AND A DATE CANNOT ORDER. *** At v4834 this caught
+ * my own edit to gateReport-selfcheck only after it was committed -- by then on main, a round late. A gate changed in the
+ * working tree (`git diff --name-only HEAD`, plus untracked files) is judged by file times instead: its report is stale
+ * when the report file was last written BEFORE the gate file was. Both times are this box's, from this checkout, which is
+ * exactly where they mean something; a fresh clone has no such gates and the rule says nothing there. It also closes the
+ * same-day hole above for every edit made here, because the verdict that ships an edit runs before its commit.
+ * `dirty` (paths relative to root) and `mtime` (path -> ms) are injectable for the same reason `log` is.
  */
-export function staleReports({ root = ENG, reports = null, log = null, boundary = null } = {}) {
+export function staleReports({ root = ENG, reports = null, log = null, boundary = null, dirty = null, mtime = null } = {}) {
     const dir = path.join(root, REPORT_DIR);
     const reps = reports || fs.readdirSync(dir).filter((f) => f.endsWith(".json") && f !== "index.json").map((f) => {
         try { const j = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8")); return { file: `${REPORT_DIR}/${f}`, gate: j.gate, at: j.at }; }
         catch { return { file: `${REPORT_DIR}/${f}`, gate: null, at: null }; }
     }).filter((r) => r.gate);
-    let text = log, shallow = boundary;
+    let text = log, shallow = boundary, changed = dirty;
+    const git = (...a) => execFileSync("git", a, { cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
     if (text == null || shallow == null) {
-        const git = (...a) => execFileSync("git", a, { cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
         // Bounded by the oldest report's date and filtered here rather than by 88 pathspecs: 0.57 s against 4.8 s, measured.
         // A gate with no commit since then cannot have been edited after its report, so it is FRESH, not unjudged --
         // unless the clone is shallow, where an absent date is an absence of history.
@@ -228,7 +236,23 @@ export function staleReports({ root = ENG, reports = null, log = null, boundary 
     }
     const gates = new Set(reps.map((r) => r.gate));
     for (const f of [...last.keys()]) if (!gates.has(f)) last.delete(f);
-    const judged = reps.filter((r) => r.at && (last.has(r.gate) || shallow.length === 0));
+    // v4839: the working tree's own edits, judged by file time. An unreadable git or a missing file judges nothing here.
+    if (changed == null) {
+        try { changed = git("diff", "--name-only", "HEAD", "--relative").split("\n")
+                  .concat(git("ls-files", "--others", "--exclude-standard").split("\n")).map((x) => x.trim()).filter(Boolean); }
+        catch { changed = []; }
+    }
+    const timeOf = mtime || ((f) => { try { return fs.statSync(path.join(root, f)).mtimeMs; } catch { return null; } });
+    const inTree = new Set(changed), uncommitted = [];
+    for (const r of reps) {
+        if (!inTree.has(r.gate)) continue;
+        const g = timeOf(r.gate), p = timeOf(r.file);
+        if (g != null && p != null && p < g) uncommitted.push({ ...r, edited: `uncommitted, ${new Date(g).toISOString().slice(0, 16)}Z` });
+    }
+    const judged = reps.filter((r) => r.at && (last.has(r.gate) || shallow.length === 0 || inTree.has(r.gate)));
+    const byDate = judged.filter((r) => last.has(r.gate) && last.get(r.gate) > r.at).map((r) => ({ ...r, edited: last.get(r.gate) }));
+    const seen = new Set(uncommitted.map((r) => r.file));
     return { reports: reps.length, judged: judged.length, unjudged: reps.length - judged.length,
-             stale: judged.filter((r) => last.has(r.gate) && last.get(r.gate) > r.at).map((r) => ({ ...r, edited: last.get(r.gate) })) };
+             dirty: reps.filter((r) => inTree.has(r.gate)).length,
+             stale: uncommitted.concat(byDate.filter((r) => !seen.has(r.file))) };
 }
