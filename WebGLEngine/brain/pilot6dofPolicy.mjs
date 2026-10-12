@@ -132,7 +132,7 @@ export function duel(a = "autopilot", b = "autopilot", { seed = 1, seconds = 30 
     const pa = pilotOf(a), pb = pilotOf(b), rng = makeRng(seed), I = RB.boxInertia({ m: SHIP_MASS, hx: HALF[0], hy: HALF[1], hz: HALF[2] });
     const mk = (id, team, x, q) => ({ id, team, hp: HP_MAX, cool: 0, dead: false, body: RB.createBody({ mass: SHIP_MASS, I, pos: [x, (rng() - 0.5) * 4, (rng() - 0.5) * 18], q, vel: [0, 0, 0], w: [0, 0, 0] }) });
     const A = mk("A#0", "A", -SPAWN_X, [1, 0, 0, 0]), B = mk("B#0", "B", SPAWN_X, [0, 0, 1, 0]), dt = 1 / 30, steps = Math.round(seconds / dt);
-    let shots = [], h = 0x811c9dc5, t = 0; const tally = { hits: 0, shotsFired: 0, hitsTaken: 0 };
+    let shots = [], h = 0x811c9dc5, t = 0, bShots = 0; const tally = { hits: 0, shotsFired: 0, hitsTaken: 0 };
     const landed = [], taken = [];   // the tick of each hit A landed and each hit A took: the dense signal a mutual kill hides (see REWARD.tempo)
     for (; t < steps && !A.dead && !B.dead; t++) {
         const nowMs = t * dt * 1000;
@@ -140,7 +140,7 @@ export function duel(a = "autopilot", b = "autopilot", { seed = 1, seconds = 30 
             const d = p(s.body, { pos: foe.body.pos, vel: foe.body.vel }, { weaponSpeed: RBW.WEAPON.speed, ...PAGE_AUTOPILOT });
             const acc = RB.createAccumulator(); RB.applyForceAtPoint(acc, [d.thrust, 0, 0], ENGINE_MOUNT); acc.torque = d.torqueBody;
             s.body = RB.step(s.body, acc, dt);
-            if (d.firing && nowMs >= s.cool) { s.cool = nowMs + RBW.WEAPON.cooldownMs; shots.push(RBW.fireProjectile(s.body, { ownerId: s.id, team: s.team })); if (s === A) tally.shotsFired++; }
+            if (d.firing && nowMs >= s.cool) { s.cool = nowMs + RBW.WEAPON.cooldownMs; shots.push(RBW.fireProjectile(s.body, { ownerId: s.id, team: s.team })); if (s === A) tally.shotsFired++; else bShots++; }
         }
         const targets = [A, B].filter((s) => !s.dead).map((s) => ({ id: s.id, team: s.team, body: s.body, half: HALF }));
         const { alive, events } = RBW.stepShots(shots, targets, dt); shots = alive;
@@ -151,7 +151,10 @@ export function duel(a = "autopilot", b = "autopilot", { seed = 1, seconds = 30 
     // tempo: how many seconds sooner A's first `paired` hits landed than B's did (positive = A is ahead in the exchange), over the hits both sides made
     let tempo = 0; for (let i = 0; i < paired; i++) tempo += (taken[i] - landed[i]) * dt; if (paired) tempo /= paired;
     const score = tally.hits * REWARD.hit - tally.shotsFired * REWARD.waste - tally.hitsTaken * SHOT_DAMAGE * REWARD.damageTaken + (B.dead ? REWARD.kill : 0) + (win ? REWARD.win : 0) + tempo * REWARD.tempo;
-    return { ...tally, aHp: A.hp, bHp: B.hp, aDead: A.dead, bDead: B.dead, win, tempo, score, ticks: t, seed, fingerprint: (h >>> 0).toString(16).padStart(8, "0") };
+    // v4847 -- THE SAME FIGHT FROM B'S SIDE: B's hits are A's hits taken, A's are B's, a win is A dead and B not, and the tempo reads the other way round. Added so a pilot can be scored on either side of one duel
+    // without a second, separately-maintained reward (the gate holds scoreB to REWARD applied to this tally).
+    const winB = A.dead && !B.dead, scoreB = tally.hitsTaken * REWARD.hit - bShots * REWARD.waste - tally.hits * SHOT_DAMAGE * REWARD.damageTaken + (A.dead ? REWARD.kill : 0) + (winB ? REWARD.win : 0) - tempo * REWARD.tempo;
+    return { ...tally, aHp: A.hp, bHp: B.hp, aDead: A.dead, bDead: B.dead, win, winB, bShotsFired: bShots, scoreB, tempo, score, ticks: t, seed, fingerprint: (h >>> 0).toString(16).padStart(8, "0") };
 }
 
 // ---- TRAINING (v4832) -----------------------------------------------------------------------------------------------------------
@@ -163,12 +166,36 @@ export function duel(a = "autopilot", b = "autopilot", { seed = 1, seconds = 30 
 // opponent dead and you not) is worth REWARD.win on top of the kill. It is NOT a death penalty -- that is the term pilotPolicy leaves out on purpose.
 export const REWARD = Object.freeze({ hit: 1, waste: 0.02, damageTaken: 0.01, kill: 3, win: 2, tempo: 1 });
 export const TRAIN_SEEDS = Object.freeze([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]), HELD_OUT_SEEDS = Object.freeze([21, 22, 23, 24, 25, 26, 27, 28]), AUDIT_SEEDS = Object.freeze([41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60]);
+// v4847 -- THE LEAGUE'S THREE SEED SETS (tools/ship/train6dofLeague.mjs). A league search is judged on the pilot it starts from, so the seeds it trains on, picks a champion on and is finally graded on must be ones that pilot's
+// own verdict (AUDIT_SEEDS, read once at v4837) and this round's exploration never read. 48 to train on (the first league probe with twelve improved its train score and made its held-out result WORSE: it had learned
+// the twelve), 24 to choose a champion on, 40 to grade it on once. The 40 are the second set: the first, 101-120, was read once by a probe that was never going to ship, which spends it.
+export const LEAGUE_TRAIN_SEEDS = Object.freeze(Array.from({ length: 48 }, (_, i) => 201 + i));
+export const LEAGUE_HELD_OUT_SEEDS = Object.freeze(Array.from({ length: 24 }, (_, i) => 301 + i));
+export const LEAGUE_AUDIT_SEEDS = Object.freeze(Array.from({ length: 40 }, (_, i) => 401 + i));
 
 /** The pilot `w` against `opts.opponent` (default: the PD autopilot) over `seeds`: { score (the mean), wins, losses, draws, hits, hitsTaken, runs }. A draw is both ships dead, or neither. */
 export function evaluate(w, seeds, { opponent = "autopilot", seconds = 30 } = {}) {
+    if (Array.isArray(opponent)) return evaluateLeague(w, seeds, opponent, seconds);
     const runs = seeds.map((seed) => duel(w, opponent, { seed, seconds }));
     const wins = runs.filter((r) => r.win).length, losses = runs.filter((r) => r.aDead && !r.bDead).length;
     return { score: runs.reduce((a, r) => a + r.score, 0) / runs.length, wins, losses, draws: runs.length - wins - losses, hits: runs.reduce((a, r) => a + r.hits, 0), hitsTaken: runs.reduce((a, r) => a + r.hitsTaken, 0), runs };
+}
+
+/**
+ * THE LEAGUE (v4847): `opponent` an ARRAY of opponents, each played on every seed FROM BOTH SIDES. The duel is not symmetric -- side A acts first in a tick, and a pilot against a copy of itself wins 8, loses 2 and draws 10 of 20
+ * from side A (measured at v4847 on the audit seeds) -- so a pilot judged from one side is judged partly on which side it was given, and a pilot trained from one side can learn the side. Each run is written from THE PILOT'S
+ * point of view whichever side it flew, with the same fields a single-opponent run has: `aDead` is the pilot dead, `bDead` the opponent, `win` the pilot's win; plus `side` ("A" or "B"), `opp` (the opponent's index) and `seed`.
+ * score, wins, losses, draws, hits and hitsTaken are over all of them, so train() and prune() run on a league unchanged.
+ */
+function evaluateLeague(w, seeds, opponents, seconds) {
+    const runs = [];
+    opponents.forEach((opp, oi) => seeds.forEach((seed) => {
+        const a = duel(w, opp, { seed, seconds }), b = duel(opp, w, { seed, seconds });
+        runs.push({ side: "A", opp: oi, seed, score: a.score, win: a.win, aDead: a.aDead, bDead: a.bDead, hits: a.hits, hitsTaken: a.hitsTaken, shotsFired: a.shotsFired, tempo: a.tempo });
+        runs.push({ side: "B", opp: oi, seed, score: b.scoreB, win: b.winB, aDead: b.bDead, bDead: b.aDead, hits: b.hitsTaken, hitsTaken: b.hits, shotsFired: b.bShotsFired, tempo: -b.tempo });
+    }));
+    const wins = runs.filter((r) => r.win).length, losses = runs.filter((r) => r.aDead && !r.bDead).length;
+    return { score: runs.reduce((x, r) => x + r.score, 0) / runs.length, wins, losses, draws: runs.length - wins - losses, hits: runs.reduce((x, r) => x + r.hits, 0), hitsTaken: runs.reduce((x, r) => x + r.hitsTaken, 0), runs };
 }
 
 /** One line for an evaluate() result: "9.93 (W5/L0/D3, hits 48, taken 32)". The shipped file's `by` quotes it, and the gate recomputes it. */

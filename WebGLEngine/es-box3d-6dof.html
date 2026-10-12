@@ -299,8 +299,8 @@ let lineup = {}; const pilotCache = {};
 // v4832 -- TWO MORE SOURCES OF WEIGHTS: the pilot this demo ships (brain/pilot6dofWeightsDefault.json, trained by tools/ship/train6dofPilot.mjs, fetched once at load) and one imported from a file. `avail` counts changes to what is
 // held, so the cached pilot functions are rebuilt when a source arrives or is cleared.
 const DESC = PB.describePolicy("pilot6dofPolicy", P6);
-let shippedW = null, shippedMeta = null, shippedErr = null, importedW = null, importedMeta = null, importErr = null, avail = 0;
-const rosterCtx = () => ({ PP: P6, shipped: shippedW, imported: importedW, brainPilotOn: false, ...ROSTER_NAMES });
+let shippedW = null, shippedMeta = null, shippedErr = null, leagueW = null, leagueMeta = null, leagueErr = null, importedW = null, importedMeta = null, importErr = null, avail = 0;
+const rosterCtx = () => ({ PP: P6, shipped: shippedW, league: leagueW, imported: importedW, brainPilotOn: false, ...ROSTER_NAMES });
 function saveSpecs() { try { localStorage.setItem(ROSTER_KEY, JSON.stringify(specs)); } catch {} }
 function pilotAi(team) {
   const fleet = team === "A" ? A : B, key = specs[team] + "|" + fleet.length + "|" + avail;
@@ -318,7 +318,7 @@ function rosterNote() {
   el.textContent = PR.describe(lineup, A.length) + (probs.length ? "  --  " + probs.join("; ") : "");
 }
 function renderRoster() {
-  const ch = PR.choices({ shipped: !!shippedW, imported: !!importedW, brainPanel: false, scriptedLabel: ROSTER_NAMES.scriptedLabel });
+  const ch = PR.choices({ shipped: !!shippedW, league: !!leagueW, imported: !!importedW, brainPanel: false, scriptedLabel: ROSTER_NAMES.scriptedLabel });
   for (const t of PR.TEAMS) {
     const sel = document.getElementById("pilot" + t), keep = specs[t];
     sel.textContent = "";
@@ -336,8 +336,8 @@ renderRoster();
 function pilotLine() {
   const el = document.getElementById("pilotLine"); if (!el) return;
   const one = (label, w, meta) => w ? `${label} ${weightsHash(w)}` + (meta && meta.score != null ? `: held-out score ${meta.score}` : "") : null;
-  const parts = [one("shipped pilot", shippedW, shippedMeta), one("imported pilot", importedW, importedMeta)].filter(Boolean);
-  el.textContent = (parts.length ? parts.join("  |  ") : shippedErr ? `the shipped pilot did not load (${shippedErr})` : "loading the shipped pilot ...") + (importErr ? `  --  import refused: ${importErr}` : "");
+  const parts = [one("shipped pilot", shippedW, shippedMeta), one("league pilot", leagueW, leagueMeta), one("imported pilot", importedW, importedMeta)].filter(Boolean);
+  el.textContent = (parts.length ? parts.join("  |  ") : shippedErr ? `the shipped pilot did not load (${shippedErr})` : "loading the shipped pilot ...") + (leagueErr && shippedW ? `  --  the league pilot did not load (${leagueErr})` : "") + (importErr ? `  --  import refused: ${importErr}` : "");
   document.getElementById("clearPilot").disabled = !importedW;
 }
 function availChanged() { avail++; renderRoster(); pilotLine(); if (lineup.A) { pilotAi("A"); pilotAi("B"); } }
@@ -347,6 +347,13 @@ fetch("/brain/pilot6dofWeightsDefault.json").then((r) => r.json()).then((blob) =
   if (r.ok) { shippedW = r.weights; shippedMeta = r.meta; } else shippedErr = r.reason;
   availChanged();
 }).catch((e) => { shippedErr = "could not fetch it (" + (e && e.message) + ")"; availChanged(); });
+// v4847 -- the second generation: brain/pilot6dofWeightsLeague.json, the shipped pilot trained against itself and the PD autopilot (tools/ship/trainLeague6dof.mjs). Same format, same importer; a missing or malformed file is SAID (leagueErr)
+// and "league" is simply not offered.
+fetch("/brain/pilot6dofWeightsLeague.json").then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }).then((blob) => {
+  const r = PB.importBrain(DESC, blob);
+  if (r.ok) { leagueW = r.weights; leagueMeta = r.meta; } else leagueErr = r.reason;
+  availChanged();
+}).catch((e) => { leagueErr = "could not fetch it (" + (e && e.message) + ")"; availChanged(); });
 function importBlob(blob) {
   const r = PB.importBrain(DESC, blob);
   if (r.ok) { importedW = r.weights; importedMeta = r.meta; importErr = null; } else importErr = r.reason;
@@ -377,7 +384,7 @@ window.__sixdof = {
   // v4829 -- the roster, for brain/pilot6dofPolicy-selfcheck.mjs's page rows
   roster: { get specs() { return specs; }, setSpecs(x) { specs = PR.sanitizeSpecs(x); saveSpecs(); renderRoster(); }, startFight, get lineup() { return lineup; }, pilotAi,
     // v4832 -- the shipped and the imported pilot, for the gate's page rows
-    get shipped() { return shippedW; }, get shippedError() { return shippedErr; }, get imported() { return importedW; }, importBlob, get choices() { return [...document.getElementById("pilotA").options].map((o) => o.value); } },
+    get shipped() { return shippedW; }, get shippedError() { return shippedErr; }, get league() { return leagueW; }, get leagueError() { return leagueErr; }, get imported() { return importedW; }, importBlob, get choices() { return [...document.getElementById("pilotA").options].map((o) => o.value); } },
   get fleets() { return { A, B }; },
 };
 

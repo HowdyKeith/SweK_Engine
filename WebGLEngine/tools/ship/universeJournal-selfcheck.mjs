@@ -77,8 +77,12 @@ console.log("\n2. TIME IS GIT TIME: markets open on their vendoring day, haulers
     const opensOf = Object.fromEntries(h.markets.map((m) => [m.id, m.opens || 0]));
     ok("  a market's opening day is git's date for its body, in whole days from the epoch", h.markets.every((m) => m.opens === Math.round((new Date(m.body.arrived + "T00:00:00Z") - new Date(dated[0] + "T00:00:00Z")) / 86400000)), h.markets.map((m) => `${m.name}:${m.opens}`).join(" "));
     ok("  on day 0 only the day-0 markets are open, and only their haulers plus the contributors are in the sky", h.openMarkets() === h.markets.filter((m) => m.opens === 0).length && h.joinedShips() === 0, `${h.openMarkets()} open before the first step`);
+    // *** THE WINDOW IS THE CALENDAR'S OWN SPAN, NOT A NUMBER THAT WAS ONCE ENOUGH. *** This row stepped a fixed 40 days and asserted every market open at the end; the calendar then grew a 45-day body (three-webgpu-r185 opens
+    // on day 45), so the row read 22 of 30 markets at day 40 and went red with nothing wrong in the journal -- and sat over the quick-sweep budget, where no ship-time step saw it until the rotation did. The days are
+    // now the last opening day plus a margin, so the next vendored body moves the window instead of the verdict.
+    const lastOpen = Math.max(0, ...h.markets.map((m) => m.opens || 0)), WINDOW = 4 * (lastOpen + 8);
     let monotone = true, prevOpen = 0, prevJoined = 0, early = 0; const days = [];
-    for (let i = 0; i < 4 * 40; i++) { h.step(0.25); const o = h.openMarkets(), j = h.joinedShips(); if (o < prevOpen || j < prevJoined) monotone = false; prevOpen = o; prevJoined = j;
+    for (let i = 0; i < WINDOW; i++) { h.step(0.25); const o = h.openMarkets(), j = h.joinedShips(); if (o < prevOpen || j < prevJoined) monotone = false; prevOpen = o; prevJoined = j;
         if (i % 16 === 15) days.push(`${h.date}:${o}/${j}`); }
     ok("*** markets open and ships join in git's order, never fewer, and every market is open by the last arrival ***", monotone && h.openMarkets() === h.markets.length && h.joinedShips() === h.ships.length, days.join(" "));
     for (const s of h.ships) for (const e of s.log) { const m = h.markets.find((x) => x.name === e.at); if (m && e.tick * 0.25 < opensOf[m.id]) early++; }
@@ -87,7 +91,7 @@ console.log("\n2. TIME IS GIT TIME: markets open on their vendoring day, haulers
     ok("  a hauler joins on its own body's day, at an open market", !!hauler && hauler.joined && h.events.some((e) => e.startsWith(`${hauler.name} joins`) && e.endsWith(`on day ${hauler.joins}`)), hauler ? h.events.find((e) => e.startsWith(`${hauler.name} joins`)) : "no dated hauler");
     const acc = h.accounting();
     ok("  and the books close across the openings (a market that opens brings its stock and treasury with it, counted from day 0)", acc.tonsConserved && acc.creditsOk, `${acc.total} t, credits ok ${acc.creditsOk}`);
-    const h2 = fresh(7, { history: true }); for (let i = 0; i < 4 * 40; i++) h2.step(0.25);
+    const h2 = fresh(7, { history: true }); for (let i = 0; i < WINDOW; i++) h2.step(0.25);
     ok("  two histories from one seed are one history", h2.hash() === h.hash(), h.hash());
     const lg = h.log(); const r = replayEconomy((seed) => fresh(seed, { history: true }), lg);
     ok("  and a history replays from its log", r.matches === true);
