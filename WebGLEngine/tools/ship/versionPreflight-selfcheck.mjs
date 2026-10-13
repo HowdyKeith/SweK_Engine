@@ -55,7 +55,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { preflight, versionNumber, engineVersionOf, mainVersion, ordinalsOf, mainOrdinals, refOrdinals, highWater, ENG,
-         refFreshness, gitRunner, FETCH_MAIN } from "./versionPreflight.mjs";
+         refFreshness, gitRunner, FETCH_MAIN, ABSENT_REASON } from "./versionPreflight.mjs";
 
 let pass = 0, fail = 0;
 const ok = (c, m, d) => { if (c) pass++; else { fail++; console.error("  FAIL  " + m + (d ? "   " + d : "")); } };
@@ -394,6 +394,9 @@ const against = (main) => (v) => preflight(v, {
            "the fixture is the rig's shape: a --depth 1 --branch clone holds origin/feature and NO origin/main", refs.join(", "));
 
         const v = mainVersion({ run });
+        // v4850: the sentence is ONE constant, ABSENT_REASON, and mainVersion hands back exactly it (definitionGates found it unnamed)
+        // SABOTAGED v4850: mainVersion's absent branch returning its own copy of the sentence -> this row RED; restored.
+        ok(v.reason === ABSENT_REASON && ABSENT_REASON.endsWith(FETCH_MAIN), "...and that reason is ABSENT_REASON itself, ending in the one fetch command", ABSENT_REASON);
         ok(v.version === null && v.absent === true && /origin\/main is not in this clone/.test(v.reason || "") && (v.reason || "").includes(FETCH_MAIN),
            "!! *** mainVersion in a branch clone says origin/main is NOT IN THIS CLONE and names the fetch -- not \"FAILED: Command failed\" ***",
            v.reason);

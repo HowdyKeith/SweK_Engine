@@ -331,8 +331,11 @@ const cov = definitionCoverage(ENG);
     // weights in storage, beside passBytes' per-pixel count) and TIMED_SETS (every set a pass or the page can run is timed);
     // gateReport's staleReports, shipVerdict's notReadyTrailer, wasmTeardown's wasmCompilers and doorReach on fixtures, and
     // headlessGpu's FINE_CLOCK_FLAG (every native timing child builds its device with it). 351 again, with all twenty-nine named.
-    // SABOTAGE, restored: one new unnamed `export function` added to the adapter-record module (the one tools/ship/adapterRecord-selfcheck.mjs gates) -> RED, "GREW to 352".
-    const BASELINE_WIDE = 351;   // v4060: 290, v4062: 209, post-v4297-sweep: 332, post-v4622-merge: 349, post-v4645-merge: 362, v4845: 351 -- ratchets down, never up
+    // SABOTAGE, restored: one new unnamed `export function` added to the adapter-record module (the one tools/ship/adapterRecord-selfcheck.mjs gates) -> RED, "GREW to 351".
+    // v4850 -- 351 -> 350: main's v4847-v4849 named versionPreflight's refFreshness and brought seven new definitions of other shapes
+    // (tacticsTrain's FORMAT, POLICY_ID, PHYSICS, COUNT, MAX_SECONDS, STEP; versionPreflight's ABSENT_REASON) -- named here the same
+    // way, each in its own gate, sabotage-confirmed. The census itself caught them: this gate is inside the sweep since v4846.
+    const BASELINE_WIDE = 350;   // v4060: 290, v4062: 209, post-v4297-sweep: 332, post-v4622-merge: 349, post-v4645-merge: 362, v4845: 351, v4850: 350 -- ratchets down, never up
     const wide = definitionCoverage(ENG, "");
     ok("!! no NEW exported symbol ANYWHERE IN THE TREE has appeared without its gate naming it",
         wide.ungated.length <= BASELINE_WIDE,
@@ -380,8 +383,8 @@ const cov = definitionCoverage(ENG);
     // (playwrightResolve's DXC_LEAVES, quickSweep's RECORD_HANDOVERS), and shipVerdict's CATCHABLE (see BASELINE_OWNED). main's
     // v4832-v4844 then brought eleven (the narrow six, denoiseCompile's buildJob, runJob and measureSizes, denoiseDevice's
     // TIMED_SETS, headlessGpu's FINE_CLOCK_FLAG), all named above: 686 holds through the merge.
-    // SABOTAGE, restored: one new unnamed `export const` added to the adapter-record module (the one tools/ship/adapterRecord-selfcheck.mjs gates) -> RED, "GREW to 687".
-    const BASELINE_SHAPES = 686;   // v4535: 582, post-v4297-sweep: 639, post-v4622-merge: 678, post-v4645-merge: 703, v4831: 696, v4845: 686 -- ratchets down, never up
+    // SABOTAGE, restored: one new unnamed `export const` added to the adapter-record module (the one tools/ship/adapterRecord-selfcheck.mjs gates) -> RED, "GREW to 686".
+    const BASELINE_SHAPES = 685;   // v4535: 582, post-v4297-sweep: 639, post-v4622-merge: 678, post-v4645-merge: 703, v4831: 696, v4845: 686, v4850: 685 (see BASELINE_WIDE) -- ratchets down, never up
     const shapesWide = definitionCoverage(ENG, "", { shapes: "all" });
     const shapesPhys = definitionCoverage(ENG, "physics", { shapes: "all" });
     ok("!! *** no NEW exported symbol OF ANY SHAPE has appeared without its gate naming it ***",
@@ -440,8 +443,8 @@ const cov = definitionCoverage(ENG);
     // shipVerdict-selfcheck now names in a row holding the list's contents (dropping SIGBREAK from it -> red). 516 is the
     // count with the seventeen kept and the three named. main's v4832-v4844 brought nine more here and the merge paid two
     // (gunnerPolicy's TRAIN_SEEDS and HELD_OUT_SEEDS, now named by an importing gate); naming the nine left 514.
-    // SABOTAGE, restored: one new unnamed `export function` added to the adapter-record module -> RED here too, "GREW to 515".
-    const BASELINE_OWNED = 514;   // v4573: 475, post-v4645-merge: 533, v4845: 514 -- tree-wide, all shapes, any importing gate -- ratchets down, never up
+    // SABOTAGE, restored: one new unnamed `export function` added to the adapter-record module -> RED here too, "GREW to 514".
+    const BASELINE_OWNED = 513;   // v4573: 475, post-v4645-merge: 533, v4845: 514, v4850: 513 (see BASELINE_WIDE) -- tree-wide, all shapes, any importing gate -- ratchets down, never up
     const owners = gateIndex(ENG);
     const owned = definitionCoverage(ENG, "", { shapes: "all", owners });
     ok("!! *** no NEW exported symbol is unmentioned by EVERY gate that imports its module ***",

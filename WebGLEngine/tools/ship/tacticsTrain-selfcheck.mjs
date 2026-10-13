@@ -65,6 +65,18 @@ const J = (x) => JSON.stringify(x);
 const mkRng = (seed) => { let a = seed >>> 0; return () => { a = (Math.imul(a, 1664525) + 1013904223) >>> 0; return a / 4294967296; }; };
 
 sec("1. the argument parser and the constants");
+// v4850 -- six constants this gate never named (definitionGates' census, at the v4849 merge): what the shipped file must carry
+// (FORMAT, POLICY_ID), the battle every fitness reading is taken in (PHYSICS, COUNT, MAX_SECONDS, as the file's own `by` cites
+// them), and STEP, which must move exactly the six numbers the arena can see -- a step on wPlayer or fleeHyst would train a
+// number no battle reads. SABOTAGED v4850: COUNT 6 -> 5 -> this row RED by name (the shipped `by` still says 6); restored.
+{
+    const shipped = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "brain", "tacticsWeightsTrained.json"), "utf8"));
+    ok("!! the shipped file carries FORMAT and POLICY_ID, its `by` cites the battle the constants define (PHYSICS substrate, COUNT a side, MAX_SECONDS cap), and STEP moves exactly the TRAIN_KEYS",
+        shipped.format === T.FORMAT && shipped.policy === T.POLICY_ID && shipped.by.includes(`on the ${T.PHYSICS} substrate`) &&
+        shipped.by.includes(`${T.COUNT} ships a side`) && shipped.by.includes(`${T.MAX_SECONDS} s cap`) &&
+        J(Object.keys(T.STEP).sort()) === J([...T.TRAIN_KEYS].sort()) && T.TRAIN_KEYS.every((k) => T.STEP[k] > 0) && Object.isFrozen(T.STEP),
+        `${T.FORMAT} / ${T.POLICY_ID}; ${T.PHYSICS}, ${T.COUNT} a side, ${T.MAX_SECONDS} s; STEP over ${Object.keys(T.STEP).join(", ")}`);
+}
 const d0 = T.parseArgs([]);
 ok("no arguments is the recorded recipe: 4 runs x 300 iterations, seed 6000, 24 train seeds, one worker, no write, the shipped file as the output", d0.runs === 4 && d0.iters === 300 && d0.seed === 6000 && d0.train === 24 && d0.workers === 1 && d0.one === null && d0.write === false && d0.out === T.DEFAULT_OUT && path.basename(T.DEFAULT_OUT) === "tacticsWeightsTrained.json" && Object.isFrozen(T.RECIPE), J({ ...d0, out: path.basename(d0.out) }));
 const d1 = T.parseArgs(["--runs", "3", "--iters", "5", "--train", "4", "--workers", "2", "--seed", "9", "--write", "--out", "x.json", "--quiet"]);
