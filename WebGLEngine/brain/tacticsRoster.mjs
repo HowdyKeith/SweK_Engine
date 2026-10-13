@@ -91,17 +91,18 @@ export function parseImport(text) {
     return sanitizeWeights(j);
 }
 
-/** What can be chosen RIGHT NOW. ctx: { served, imported } -- whether the page holds a Brain-served vector and an imported one. A source the page does not hold is not offered. */
+/** What can be chosen RIGHT NOW. ctx: { served, imported, trained } -- whether the page holds a Brain-served vector, an imported one and the arena-trained one (v4849). A source the page does not hold is not offered. */
 export function choices(ctx = {}) {
     const out = [{ id: AUTO, label: "default for this side (A scatter, B hand)" }];
     for (const p of PRESETS) out.push({ id: p.id, label: p.label });
     if (ctx.served) out.push({ id: "served", label: "served by the GPU Brain (learned from outcomes)" });
+    if (ctx.trained) out.push({ id: "trained", label: "trained in the arena (fitted against all eight presets)" });   // v4849 -- brain/tacticsWeightsTrained.json, tools/ship/trainTactics.mjs
     if (ctx.imported) out.push({ id: "imported", label: "imported weights" });
     return out;
 }
 
 /**
- * Resolve one side. ctx: { served, imported }. Returns { team, id, label, weights, problems }. An id nothing holds falls back to the side's DEFAULT AND SAYS SO in `problems`; it never
+ * Resolve one side. ctx: { served, imported, trained }. Returns { team, id, label, weights, problems }. An id nothing holds falls back to the side's DEFAULT AND SAYS SO in `problems`; it never
  * throws and never silently substitutes. A served or imported vector that fails sanitizing falls back the same way.
  */
 export function resolveTeam(team, spec, ctx = {}) {
@@ -110,6 +111,7 @@ export function resolveTeam(team, spec, ctx = {}) {
     const preset = PRESETS.find((p) => p.id === id);
     if (preset) { weights = preset.build(); label = preset.id; }
     else if (id === "served" && ctx.served) { const s = sanitizeWeights(ctx.served); if (s.weights) { weights = s.weights; label = "served by the GPU Brain"; } problems.push(...s.problems.map((m) => `served: ${m}`)); }
+    else if (id === "trained" && ctx.trained) { const s = sanitizeWeights(ctx.trained); if (s.weights) { weights = s.weights; label = "trained in the arena"; } problems.push(...s.problems.map((m) => `trained: ${m}`)); }
     else if (id === "imported" && ctx.imported) { const s = sanitizeWeights(ctx.imported); if (s.weights) { weights = s.weights; label = "imported weights"; } problems.push(...s.problems.map((m) => `imported: ${m}`)); }
     if (!weights) {
         const fallback = autoChoice(team);

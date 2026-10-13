@@ -9191,6 +9191,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The CLIs refuse an unknown option (cliArgs) and the peer's transport is a row of its own. Thirteen sabotages red by name, " +
                  "logged in the two headers. NOT CLOSED: the pair has run over loopback and in one browser, not between two machines.",
     }),
+    // v4849 -- since553. ONE new gate file: tools/ship/tacticsTrain-selfcheck.mjs (the tool that fits the Endless-Sky tactics weights in the arena and the file it wrote, held to its own `by` on recomputed numbers), plus the 'trained' rows of
+    // brain/tacticsRoster-selfcheck.mjs (the choice, the panel's format check, both pages, a saved choice surviving a reload).
+    since553: Object.freeze({
+        at: "v4849", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/tacticsTrain-selfcheck.mjs",
+        ]),
+        widened: Object.freeze([
+            "brain/tacticsRoster-selfcheck.mjs (section 3: 'trained' offered only when held, between 'served' and 'imported', flies that vector sanitised, falls back by name; section 5: the panel takes the trained file only from a swek-tactics-v1 answer to its own url, both pages offer it and fly it, a saved choice is what a reload fights)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** A FITTED TACTICS VECTOR HAS THE BETTER OF ALL EIGHT PRESETS: *** 54-22 over the incumbent scatter on 80 audit battles it had never seen, 73.1% against the other seven where scatter has 64.3%, and the narrowest lead (stubborn) is 44-35. TWO OF THE EIGHT NUMBERS CANNOT BE TRAINED HERE: wPlayer " +
+                 "(nothing in the arena is a player) and fleeHyst (nothing repairs a ship, so none recovers across the bar; 0 of 144 battles differed), the second found by a row written to claim the opposite after a full run had spent 300 iterations moving it. The first run's audit seeds are spent (two runs read them while the design was corrected), " +
+                 "the shipped file was graded on a third set, and the champion is the same to the hash. Twenty-nine sabotages red by name, two of them first at 0 red. NOT CLOSED: other fleets and sizes, a style outside the eight presets, the WASM world, the rig.",
+    }),
     // v4848 -- since552. ONE new gate file: brain/shipCollision6dof-selfcheck.mjs (the page's collision function moved into a module and held to its v4846 text bit for bit; the duel with collisions off held to twenty frozen v4846 fingerprints; the
     // ram accounting exact; a ship that spins itself to NaN lost and not simulated on), plus section 9-10 of brain/pilot6dofPolicy-selfcheck.mjs, section 7 of tools/ship/train6dofLeague-selfcheck.mjs and three rows of brain/pilotRoster-selfcheck.mjs.
     since552: Object.freeze({
