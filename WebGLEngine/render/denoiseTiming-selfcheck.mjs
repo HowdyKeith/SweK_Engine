@@ -75,6 +75,11 @@
 //   U9  the native ladder's device made without FINE_CLOCK_FLAG                 1 RED (the clock row: 165 of 165 device times on
 //       the 65,536 ns grid -- section 60's finding, made on SwiftShader)
 //   U13 the page's timing report without its adapter's key                      1 RED (the key row)
+// v4851 -- ROUND 19'S ROWS, SABOTAGED. Each in this file, the gate run, restored byte-identical:
+//   S6  the FXC child's flags as two disable entries                     -> RED: "the FXC child's device flags are ONE disable entry"
+//   S7  the unpaired ratio read at the SMALLEST common size              -> RED: "read at the largest size BOTH ladders measured"
+//   S8  every "rXX against r15" line tagged section 61                   -> RED: "each ... line is r15's median over the set's"
+//   S9  nativePlan reading the compiler without the device's flags       -> RED: "a native run's plan is read off its package WITH ITS DEVICE'S FLAGS"
 "use strict";
 import fs from "node:fs";
 import os from "node:os";

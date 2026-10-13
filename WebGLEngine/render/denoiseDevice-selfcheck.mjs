@@ -148,6 +148,12 @@
 //   V6  the page refuses the table's set for an adapter the table names         0 RED HERE -- this box's adapter (SwiftShader) is not
 //       in the table, so the page row checks the miss path; on either rig GPU the same row checks the table's set
 //   V7  the table names a third adapter (this box's)                            1 RED (the verdict row)
+// v4851 -- ROUND 19'S ROWS, SABOTAGED. Each against render/denoiseDevice.mjs, the gate run, restored byte-identical:
+//   S1  nativeSetsFor drops r18t and r18u on D3D12 even under DXC        -> RED: "DXC builds both"
+//   S2  nativeSetsFor keeps them under FXC                               -> RED: "FXC builds neither round-18 set"
+//   S3  isDxcCompiler matches "dxc" in any case                          -> RED: "isDxcCompiler is DXC as the package names it"
+//   S4  NATIVE_KERNELS_BY_ADAPTER ships an entry before the rule is read -> RED: "NATIVE_KERNELS_BY_ADAPTER is frozen and EMPTY"
+//   S5  nativeKernelsFor reads the table without asking the compiler    -> RED: "nativeKernelsFor gives a table's set"
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
