@@ -4444,3 +4444,67 @@ above, and each reason re-derived from `nativePick` on the adapter and compiler 
 - **Sabotages (v4853):** the Intel's DXC prediction changed to r15; the 1080's DXC reason changed in the rig file; the Intel's
   DXC pass moved to 2e-4 in the rig file; the version test reading 0.6.1 as DXC-capable. Each 1 red, by name, restored
   byte-identical.
+
+## 69. ROUND 21 -- MOVING THE PIN TO node-webgpu 0.6.2: THE WHOLE NATIVE SWEEP, HERE AND ON BOTH GPUS; FIXED BEFORE THE RIG RUNS IT
+
+**Why this round.** Section 64 named the condition for moving the pin: a whole native sweep on 0.6.2, here and on the rig,
+green and exact. Sections 65-68 ran the denoiser's native gates on 0.6.2 and nothing else. The pin is the whole tree's: every
+gate that makes a node-webgpu device moves from FXC to DXC on D3D12 with it. Until it moves, sections 67 and 68 apply only
+on a console with `SWEK_WEBGPU` set.
+
+**What the pin is.** Two places name 0.6.0: `.claude/hooks/session-start.sh` (`npm install -g webgpu@0.6.0`, the
+sandbox's install) and `tools/ship/headlessGpu.mjs`'s `LICENCES.nodeWebgpu`. On the rig it is whatever `npm install -g`
+last put there -- section 68 found 0.6.1 on the Intel.
+
+**What changes now. Built and run here first.**
+- **`tools/ship/realGpuRun.mjs --native`** runs the whole native sweep: `nativeGateList` reads every gate's code (comments
+  and strings stripped by `sourceScan.mjs`'s `codeOnly`) for headlessGpu's loader or one of its two compute runners, imported
+  or called. 26 gates here. A call-only first draft found 22: four gates import a runner under another name.
+- **Its browser flags are the gates' own,** as a verify runs them, unless `SWEK_LAUNCH_ARGS` names some. An FSR run hands
+  every gate the hardware flags. Here that would redden SwiftShader-measured rows under both packages alike -- the 1080's
+  old in-app run read 27 reds that way -- and bury the one thing this sweep asks.
+- **`nativeSweepCompare(pinned, candidate)`** is the rule below, as code, held on fixtures in `realGpuRun-selfcheck.mjs`.
+
+**The rule, fixed now.** The pin moves to 0.6.2 when all three hold:
+- **H, here:** `realGpuRun --native` with `SWEK_WEBGPU` naming 0.6.2, against the same on the pin, at one commit: every
+  gate holds by `nativeSweepCompare`.
+- **I, on the Intel gen-9** and **N, on the GTX 1080:** the same pair of runs on each GPU, at one commit, with the pin as
+  installed (0.6.0: the Intel first runs `npm install -g webgpu@0.6.0`) and with 0.6.2. Every gate holds.
+- **A gate holds** when it is green under 0.6.2, or red under both packages with the same failing rows, compared by label
+  (a row's text before its detail, whose numbers move run to run). That second case is a red 0.6.2 did not bring. It does
+  not block the pin; it is named, and is its own work.
+- **A gate fails the rule** when it is red under 0.6.2 and green under 0.6.0 (a regression), red under both with different
+  rows (changed), or in one report and not the other. A gate stopped at `realGpuRun`'s 30-minute cap is a red with no rows.
+- **"Exact" is each gate's own.** Section 64 said "exact, not the same": DXC's shaders are not FXC's bytes. Every exact row in
+  the sweep already says what exactness it asks -- a twin cell for cell, a fused mirror, an f32 floor -- and keeps asking it.
+- **"Section 64's wording, refined."** It said "green". Read literally, a gate red on the pin as well would block the pin
+  forever for a reason that is not the pin's. The refinement is fixed here, before any rig run.
+
+**Predictions, fixed now, deciding nothing.**
+- **Q1, here: every gate holds.** The pilot below is H.
+- **Q2, the 1080, and Q3, the Intel: every gate holds.** For the denoiser's gates, sections 65 and 67 already ran them on
+  0.6.2, green on both GPUs. The other 22 have never run on D3D12 under DXC. The risk is rows that demand a CPU twin's bits:
+  DXC may contract a multiply-add FXC kept apart. The denoiser's rows allow the fused mirror; whether the other 22's rows do
+  is not read here, and those rows are where a regression would show.
+- **Q4, reported, deciding nothing:** the denoiser's native timings. Section 67's P3 measured r15 about 7 % slower under DXC
+  than FXC on both GPUs.
+
+**What moving the pin does, once the rule holds.** The session-start hook installs 0.6.2 and `LICENCES.nodeWebgpu` says
+0.6.2; the rig runs `npm install -g webgpu@0.6.2`. On win32, every native D3D12 gate compiles with DXC, and `nativePick`
+gives the Intel r18u by default (section 67). The gates that time FXC keep doing so through their own flags (`use_dxc`
+disabled). 0.6.2 carries Microsoft's DXC beside `dawn.node`; the verdict round reads its licence. The tree vendors nothing.
+
+**On the rig.** On each GPU, in the verified clone, from a command prompt:
+```
+cd WebGLEngine
+npm install -g webgpu@0.6.0
+node tools/ship/realGpuRun.mjs --native --out native-sweep-0.6.0.json
+set SWEK_WEBGPU=%TEMP%\swek-webgpu-0.6.2\node_modules\webgpu
+node tools/ship/realGpuRun.mjs --native --out native-sweep-0.6.2.json
+set SWEK_WEBGPU=
+```
+Send back both JSON files from each GPU.
+
+**The pilot here.** PILOT_PENDING
+
+**Not in this round.** Moving the pin. That is the verdict round's, once H, I and N are read.
