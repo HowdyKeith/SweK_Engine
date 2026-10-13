@@ -4050,3 +4050,91 @@ set SWEK_WEBGPU=
 - Everything on D3D12. The loader is read from the strings and Dawn's source, and only the rig's dumps decide.
 - Whether the rig's drivers accept DXIL checked by DXC's own validator, with no `dxil.dll`. Chrome 156 runs that way.
 - 0.6.1 was not run anywhere. Its build says no.
+
+## 65. ROUND 19'S PROBE -- THE VERDICT: 0.6.2 LOADS DXC ON BOTH GPUS, A1 IS SUPPORTED, AND BOTH ROUND-18 KERNELS BUILD NATIVELY
+
+**What arrived.** On each GPU, through `SWEK_WEBGPU` naming node-webgpu 0.6.2, the two commands section 64 fixed. All four
+files are committed byte for byte at 821ec075, before this section:
+
+| GPU | `realGpuRun --only denoiseCompile` | `denoiseBuildProbe --native-only --dxc on` |
+|---|---|---|
+| Intel gen-9 | `render/denoise-rig-compile-dxc-0.6.2-intel-gen9.json` | `render/denoise-probe-r17-dxc-0.6.2-intel-gen9.json` |
+| GTX 1080 | `render/denoise-rig-compile-dxc-0.6.2-gtx1080.json` | `render/denoise-probe-r17-dxc-0.6.2-gtx1080.json` |
+
+- The Intel ran at 3f034b60 and the 1080 at b4adf472. They hold the same code: 3f034b60 is v4844's release record, and
+  changes only `tools/ship/releases.json`.
+- The build probe names each device: "intel / gen-9 / D3D12 driver version 31.0.101.2137" and "nvidia / pascal / D3D12
+  driver version 32.0.15.8180". These are section 63's adapters, on the same drivers.
+- The compile gate was **green** on both: 442 s on the Intel, 198 s on the 1080.
+- **The 1080's report says "NO ADAPTER WAS SEEN -- this is not a hardware run". That is false.** Its native half ran on
+  the 1080, on the device's clock. `realGpuRun` took adapter names only from the browser half, and Chrome did not run on
+  that box. Round 19 names native adapters in the report; that change is not in this version.
+
+**P1 and P2.**
+
+| Prediction | Intel gen-9 | GTX 1080 |
+|---|---|---|
+| **P1:** "as shipped" compiles with DXC, and its dumps match "use_dxc"'s | **true**: 8 of 8 DXIL, each the same number of lines as under "use_dxc" | **true**: the same |
+| **P2:** "use_dxc off" compiles with FXC, at FXC's times from sections 52 and 53 | **true**: 8 of 8 DXBC. The fast head took 367 s to build and 1,283 ms a pass, against section 52's 353 to 386 s and 1,330 to 1,471 ms | **true**: 8 of 8 DXBC. 160 s and 22.6 ms, against section 53's 146 to 151 s and 22.5 to 22.9 ms |
+
+- **So the consequence section 64 named holds:** moving the pin to 0.6.2 moves every native D3D12 gate from FXC to DXC.
+
+**What it decides, read as section 64 fixed it.**
+
+| Condition | Intel gen-9 | GTX 1080 |
+|---|---|---|
+| **C1:** every kernel builds under "use_dxc", and every dump says DXIL | **holds**: 8 of 8 | **holds**: 8 of 8 |
+| **A1:** the fast head's pass under "use_dxc" against "use_dxc off", supported at 10 x or more | **supported: 2,024 x** (0.634 against 1,283.473 ms) | **supported: 404 x** (0.056 against 22.637 ms) |
+| **C2:** r18t's kernel (`tile2-zero-inline-32`) and r18u's (`fast-unroll-32`) build within 180 s, exact at 64 x 64, with a DXIL dump | **holds**: 1.0 s and 2.3 s to build | **holds**: 0.25 s and 1.35 s |
+
+- **A1 was untested on both GPUs until now** (sections 52 and 53): 0.6.0's Dawn could not load DXC. It is supported on both,
+  from one package, with no DLL copied.
+- **Every other kernel in the probe built and was exact under DXC too:** all 7 of round 17's shapes on both GPUs, each
+  within 2.4 s.
+- **By section 64, C1 and C2 hold on both GPUs, so a round 19 may do its three things.** Round 19's own section fixes
+  them before the rig runs anything.
+
+**Reported, deciding nothing.**
+- **DXC is not faster everywhere.** Leaving out the fast head, FXC's pass was the faster for 5 of the other 7 kernels on the
+  Intel and 4 of 7 on the 1080. FXC's time over DXC's, from the compile gate (above 1 means DXC is faster):
+
+| Kernel | Intel gen-9 | GTX 1080 |
+|---|---|---|
+| r12-tiled-3x3 | 1.00 | 0.78 |
+| r13-fast-3x3 | **0.74** | 1.33 |
+| r12-direct-head | 1.00 | 0.81 |
+| r13-fast-head | **2,024** | **404** |
+| r14-head | 1.03 | 0.76 |
+| r12-apply | 0.93 | 1.43 |
+| r14-apply-fast | 0.95 | 0.80 |
+| r15-head-apply | **0.81** | **2.02** |
+
+  - **r15's own two kernels run slower under DXC on the Intel:** the fast 3 x 3 took 1.012 ms against FXC's 0.745, and the
+    fused head and apply 0.448 against 0.363. On the 1080 both run faster under DXC.
+  - So moving the pin could slow r15 itself natively on the Intel. Any rule that moves a native default has to read r15
+    under both compilers for that reason.
+- **DXC builds far faster.** Under FXC the fast 3 x 3 took 6.8 s to build on the Intel and 3.6 s on the 1080, against
+  0.11 and 0.09 s under DXC. The fused head and apply took 16.4 and 9.0 s, against 1.6 and 1.1 s.
+- **"As shipped" built slower than "use_dxc" on the Intel**, for the same DXIL: 472 against 53 ms for r12-tiled-3x3, 3,885
+  against 1,636 ms for r15-head-apply. "As shipped" runs first. The cause is not shown. On the 1080 the two modes built
+  within 10 ms of each other, and r15-head-apply within 24.
+- **Natively under DXC, round 17's shapes rank as they did in Chrome.** The pass's speed over the fast kernel's at 1024 x
+  1024, on the device's clock:
+
+| Shape | Chrome, round 17 (section 60) | Native DXC, this probe |
+|---|---|---|
+| r18t's (`tile2-zero-inline-32`), Intel | 1.14 x | 1.18 x |
+| r18u's (`fast-unroll-32`), Intel | 2.11 x | 1.85 x |
+| r18t's, GTX 1080 | 1.17 x | 1.14 x |
+| r18u's, GTX 1080 | 0.57 x | 0.58 x |
+
+  This is section 63's split, natively: r18u wins on the Intel and r18t on the 1080.
+- **Every kernel was exact under all three modes on both GPUs.** The applies' worst errors were 4.59e-7 and 5.45e-7 on the
+  Intel and 4.56e-7 and 6.26e-7 on the 1080, against `APPLY_TOL` 1e-5. On the Intel under DXC, 221,346 of the fast head's
+  331,776 outputs matched the twin's fused-multiply-add rounding and the rest its plain rounding; none was unexplained.
+
+**Unchecked here.**
+- The dumps were read by the compile gate on the rig. Only its lines came back, not the dump files.
+- Why "as shipped" built slower than "use_dxc" on the Intel.
+- Whether a D3D12 adapter below shader model 6.0 would fall back to FXC with 0.6.2. Dawn's source says it would; neither
+  rig GPU is one.

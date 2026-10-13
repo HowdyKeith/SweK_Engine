@@ -92,6 +92,27 @@
 // *** AND A NOTE ON HOW TWO OF THOSE ZEROS LOOKED LIKE ZEROS: *** the sabotage runs counted lines matching
 // "^  FAIL", and a gate that CRASHES prints none of them. One "0 red" in this session was a syntax error in
 // the sabotage itself, read as a gate that failed to notice. Sabotages are graded on the EXIT CODE here.
+//
+// ---- v4846: A MAIN THAT COULD NOT BE READ HOLDS THE BUDGET ------------------------------------------------
+// When origin/main is unreadable the module falls back to the WORKING TREE's changelog, which always holds the
+// tree's own new heading -- so addsToMain came out false, the budget stopped binding, and section 2 printed
+// "ALREADY ON MAIN ... a republish, not a ship" in a --depth 1 --branch clone that had never seen main. The
+// fallback was stricter for `owed` and looser for the one flag that decides whether `owed` is asserted at
+// all. Fixed in releaseLedger.mjs: degraded -> addsToMain true, and the printed reason (budgetWhy, built in
+// the module beside the flag) says main could not be read and the budget is held.
+//
+//   SABOTAGE LOG (v4846): applied to tools/ship/releaseLedger.mjs one at a time, graded on EXIT CODES and on
+//   "^  FAIL" rows by name, restored md5-identical (b4ee91b831b58757d58fc0b07653b23a). 4 mutations, 4 caught.
+//     1. the one line reverted -- addsToMain = !!(treeN && !onMain.versions.includes(treeN)) -> exit=1, 3 red:
+//        the degraded row ("5 owed of 3 is refused") reads addsToMain=false, withinBudget=TRUE -- the defect
+//        as measured, reproduced in the fixture; the reason row reads "ALREADY ON MAIN" over a stand-in list;
+//        the within-budget row reads binds=false.
+//     2. budgetWhy's degraded branch dropped (a degraded read falls through to "NOT on main") -> exit=1, 1 red:
+//        the reason row alone. The flag was right and the sentence was not, and only that row reads it.
+//     3. exemption swallowed -- addsToMain = !!treeN, the budget binds on every tree -> exit=1, 1 red: the
+//        republish row. A fix that held the budget everywhere would re-lock v4453's Clone -> verify deadlock.
+//     4. a degraded read always refuses (withinBudget false whenever onMain.degraded) -> exit=1, 1 red: the
+//        within-budget row. Held is not refused; a branch clone that kept up with publishing must still ship.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -179,11 +200,15 @@ console.log("\n2. *** THE LAG BUDGET: MAIN MAY RUN AHEAD OF THE RELEASES PAGE, B
     // exceeded the budget, the gate that exists to force a publish LOCKED THE PUBLISH THAT WOULD CLEAR IT --
     // found at 7 of 3 with the fleet fourteen versions back. The budget now binds only on a tree that would
     // ADD a version to main; a clone republishing what main already holds is the catch-up it wants.
+    // v4846 -- the sentence comes from the module (S.budgetWhy), built beside the flag it explains. This line
+    // used to say "ALREADY ON MAIN" in its own words whenever the budget did not bind, and it said so over a
+    // main nobody had read: a degraded read handed back the working tree's list, which always holds the tree.
     if (!S.budgetBinds) report("the budget is NOT asserted on this tree, and here is why",
-        "ENGINE_VERSION " + S.tree + " is ALREADY ON MAIN, so this tree adds nothing and can only reduce the " +
-        "lag -- it is a republish, not a ship. The count is still printed below and is still " + S.owed.length +
+        S.budgetWhy + ". The count is still printed below and is still " + S.owed.length +
         " of " + S.budget + ". A CHECK THAT QUIETLY STOPS CHECKING IS THE DEFECT THIS FILE HAS CAUGHT THREE " +
         "TIMES, so it says which question it declined and what the answer would have been.");
+    else if (S.owedDegraded) report("the budget IS asserted on this tree although main could not be read, and here is why",
+        S.budgetWhy + ".");
     ok("!! *** main runs no more than the budget ahead of the releases page ***",
         S.withinBudget,
         !S.budgetStated
@@ -200,9 +225,7 @@ console.log("\n2. *** THE LAG BUDGET: MAIN MAY RUN AHEAD OF THE RELEASES PAGE, B
                   "; the rule binds from v" + (S.floor + 1) + " forward");
     ok("!! ...and it binds on the party that can make the gap WORSE, which is checked and not assumed",
         typeof S.addsToMain === "boolean" && S.budgetBinds === S.addsToMain,
-        "addsToMain=" + S.addsToMain + " (tree " + S.tree + (S.addsToMain ? " is NOT on main -- shipping it " +
-        "pushes main one further, so the budget binds)" : " is already on main -- publishing it only reduces " +
-        "the lag, so the budget does not)") + ". DERIVED FROM MAIN'S OWN VERSION LIST, not a flag: a flag for " +
+        "addsToMain=" + S.addsToMain + " (" + S.budgetWhy + "). DERIVED FROM MAIN'S OWN VERSION LIST, not a flag: a flag for " +
         "'this is a republish' is a flag somebody sets to get past the gate");
 
     // *** THE QUESTION IS ABOUT MAIN, WHICH IS WHAT THE RULE ALWAYS SAID AND NOT WHAT IT MEASURED. ***
@@ -317,6 +340,72 @@ console.log("\n2. *** THE LAG BUDGET: MAIN MAY RUN AHEAD OF THE RELEASES PAGE, B
             "reader threw: degraded=" + viaTree.owedDegraded + ", source=" + viaTree.owedSource + ", counted " +
             viaTree.mainCount + ". The working tree's list is a SUPERSET of main's, so a missing tool makes " +
             "this OVER-report debt -- stricter, never quieter, and it says which it did");
+    }
+
+    // *** v4846 -- A MAIN THAT COULD NOT BE READ HOLDS THE BUDGET, AND THE ROW ABOVE COULD NOT SEE THAT IT DID NOT. ***
+    // "Stricter, never quieter" was true of `owed` and false of `addsToMain`. The degraded list is the WORKING
+    // TREE's changelog, and the working tree's changelog always holds the tree's own new heading -- so "is the
+    // tree on main?" was answered yes by construction, the budget stopped binding, and the gate printed
+    // "ALREADY ON MAIN ... a republish, not a ship" in a --depth 1 --branch clone that had never seen main. The
+    // row above only asked WHICH LIST was used, which was right all along; the defect was in the next question.
+    //
+    // So the fixture is a whole tiny tree under os.tmpdir(): a main.js at v5005 (with a commented line above it,
+    // like the real one) and a changelog carrying v5005's own heading over five shipped, unreleased versions --
+    // exactly what a branch clone of a round holds. Same tree, same ledger floor, four readers of main.
+    {
+        const tmpD = fs.mkdtempSync(path.join(os.tmpdir(), "swek-ledger-deg-"));
+        try {
+            const eng = path.join(tmpD, "WebGLEngine");
+            fs.mkdirSync(path.join(tmpD, "docs"), { recursive: true });
+            fs.mkdirSync(eng, { recursive: true });
+            fs.writeFileSync(path.join(eng, "main.js"),
+                '// const ENGINE_VERSION = "v5004";   // history\nconst ENGINE_VERSION = "v5005";\n');
+            const treeLog = [5005, 5004, 5003, 5002, 5001, 5000].map((v) => "## v" + v + " -- r\n").join("\n");
+            fs.writeFileSync(path.join(tmpD, "docs", "CHANGELOG.md"), treeLog);
+            const at = (published, readMain) => {
+                const f = path.join(tmpD, "led-" + published.length + ".json");
+                fs.writeFileSync(f, JSON.stringify({
+                    baseline: { throughVersion: 4999, raisedAt: "vTEST", raisedWhy: "x".repeat(220), note: "y".repeat(140) },
+                    lagBudget: { maxVersionsBehind: 3, why: "z".repeat(220) },   // 3 ON PURPOSE: 5 owed must exceed it
+                    releases: published.map((t) => ({ tag: t })),
+                }));
+                return ledgerState({ root: tmpD, eng, file: f, readMain });
+            };
+            const noMain = () => { throw new Error("fatal: invalid object name 'origin/main'"); };
+            const degOver = at(["v4999"], noMain);              // the clone that was measured: 5 owed of 3
+            const degEmpty = at(["v4999"], () => "");            // the OTHER degraded route: main parsed to zero
+            const degWithin = at(["v4999", "v5002"], noMain);   // v5002 published: v5003, v5004 owed, 2 of 3
+            const repub = at(["v4999"], () => treeLog);          // main READ, and it holds v5005: a republish
+            ok("!! *** v4846 -- a main that could NOT be read HOLDS the budget: 5 owed of 3 is refused, not waved through ***",
+                degOver.treeN === 5005 && degOver.owedDegraded === true && degOver.owed.join(",") === "5004,5003,5002,5001,5000" &&
+                degOver.addsToMain === true && degOver.budgetBinds === true && degOver.withinBudget === false &&
+                degEmpty.owedDegraded === true && degEmpty.addsToMain === true && degEmpty.withinBudget === false,
+                "reader threw: degraded=" + degOver.owedDegraded + ", owed [" + degOver.owed.join(",") + "] against " +
+                degOver.budget + ", addsToMain=" + degOver.addsToMain + ", withinBudget=" + degOver.withinBudget +
+                "; reader returned nothing: addsToMain=" + degEmpty.addsToMain + ", withinBudget=" + degEmpty.withinBudget +
+                ". The stand-in list is the tree's own changelog and always holds v5005, so `includes(treeN)` cannot " +
+                "tell a republish from a ship -- UNKNOWN IS NOT YES, and before v4846 this fixture read withinBudget TRUE");
+            ok("!! ...and the reason it prints says main could NOT be read and the budget is held -- never 'ALREADY ON MAIN'",
+                [degOver, degEmpty, degWithin].every((s) => !/ALREADY ON MAIN/.test(s.budgetWhy) &&
+                    /origin\/main could NOT be read/.test(s.budgetWhy) && /budget is HELD/.test(s.budgetWhy)),
+                "degraded reason: \"" + degOver.budgetWhy.slice(0, 150) + "...\". The republish sentence is reserved " +
+                "for a main that was READ and holds the tree; printed over a stand-in list it is a false statement " +
+                "about the one thing the gate was asked");
+            ok("!! ...and a degraded read WITHIN the budget still passes: held is not the same as refused",
+                degWithin.owedDegraded === true && degWithin.budgetBinds === true &&
+                degWithin.owed.join(",") === "5004,5003" && degWithin.withinBudget === true,
+                "v5002 published, so v5000-v5002 are superseded and [" + degWithin.owed.join(",") + "] are owed, " +
+                degWithin.owed.length + " of " + degWithin.budget + ": binds=" + degWithin.budgetBinds + ", within=" +
+                degWithin.withinBudget + ". A branch clone that has kept up with its publishing ships as before");
+            ok("!! ...and the republish exemption still holds where main WAS read and holds the version (Clone -> verify)",
+                repub.owedDegraded === false && repub.owedSource === "origin/main" && repub.addsToMain === false &&
+                repub.budgetBinds === false && repub.withinBudget === true && repub.owed.length === 5 &&
+                /ALREADY ON MAIN/.test(repub.budgetWhy),
+                "main read, holding v5005: degraded=" + repub.owedDegraded + ", addsToMain=" + repub.addsToMain +
+                ", withinBudget=" + repub.withinBudget + " with " + repub.owed.length + " of " + repub.budget + " owed. " +
+                "`Clone -> verify` clones main, so its read is NOT degraded and the v4453 deadlock stays closed -- the " +
+                "fix holds the budget only where the question could not be asked");
+        } finally { fs.rmSync(tmpD, { recursive: true, force: true }); }
     }
 
     ok("!! ...and the budget is NOT part of the baseline, so a write-off cannot widen it",

@@ -30,7 +30,7 @@ export function sanitizeSpecs(raw) {
 }
 
 /**
- * What can be chosen RIGHT NOW. ctx: { shipped, imported } -- whether this page holds the shipped default pilot and an imported one. A source that needs something the page
+ * What can be chosen RIGHT NOW. ctx: { shipped, league, close, imported } -- whether this page holds the shipped default pilot, the league-trained one (v4846), the close-quarters one (v4848) and an imported one. A source that needs something the page
  * does not hold is not offered. "brain" is the Brain panel's own pilot: the imported one, else the shipped default, else the hand weights (what Brain pilot has always flown).
  */
 export function choices(ctx) {
@@ -38,6 +38,8 @@ export function choices(ctx) {
     const out = [{ id: AUTO, label: "default for this team" }, { id: SCRIPTED, label: ctx.scriptedLabel || "scripted AI (stepAI3d)" }];
     if (ctx.brainPanel !== false) out.push({ id: "brain", label: "the Brain panel's pilot" });
     if (ctx.shipped) out.push({ id: "shipped", label: "shipped pilot brain" });
+    if (ctx.league) out.push({ id: "league", label: "league-trained pilot brain" });   // v4846 -- the second generation: the shipped pilot, trained against itself and the PD autopilot (es-box3d-6dof.html)
+    if (ctx.close) out.push({ id: "close", label: "close-quarters pilot brain (trained with collisions on)" });   // v4848 -- the shipped pilot trained in standoff AND joust starts, with the page's own ram damage
     if (ctx.imported) out.push({ id: "imported", label: "imported pilot brain" });
     out.push({ id: "hand", label: "hand weights" }, { id: "noise05", label: "hand + noise 0.05 (each ship its own)" }, { id: "noise10", label: "hand + noise 0.1 (each ship its own)" }, { id: "zero", label: "zero (never turns, thrusts or fires)" });
     return out;
@@ -50,7 +52,7 @@ export const autoChoice = (team, ctx) => (team === "A" && ctx.brainPilotOn ? "br
 function brainWeights(ctx) { return ctx.imported || ctx.shipped || ctx.PP.handWeights(); }
 
 /**
- * Resolve one team. ctx: { PP, shipped, imported, brainPilotOn }; n = ships on the team. Returns { team, id, label, scripted, weights (one vector per ship, or null when scripted), problems }.
+ * Resolve one team. ctx: { PP, shipped, league, close, imported, brainPilotOn }; n = ships on the team. Returns { team, id, label, scripted, weights (one vector per ship, or null when scripted), problems }.
  * An id nothing holds falls back to the hand weights AND SAYS SO in `problems`; it never throws and never silently substitutes.
  */
 export function resolveTeam(team, spec, ctx, n) {
@@ -61,6 +63,8 @@ export function resolveTeam(team, spec, ctx, n) {
     if (id === SCRIPTED) r = { id, label: ctx.scriptedName || "scripted AI", scripted: true, weights: null };
     else if (id === "brain") r = same(brainWeights(ctx), ctx.imported ? "imported pilot brain" : ctx.shipped ? "shipped pilot brain" : "hand weights");
     else if (id === "shipped" && ctx.shipped) r = same(ctx.shipped, "shipped pilot brain");
+    else if (id === "league" && ctx.league) r = same(ctx.league, "league-trained pilot brain");
+    else if (id === "close" && ctx.close) r = same(ctx.close, "close-quarters pilot brain");
     else if (id === "imported" && ctx.imported) r = same(ctx.imported, "imported pilot brain");
     else if (id === "hand") r = same(PP.handWeights(), "hand weights");
     else if (id === "zero") r = same(PP.zeroWeights(), "zero pilot");

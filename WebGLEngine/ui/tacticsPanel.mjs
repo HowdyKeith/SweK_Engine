@@ -1,4 +1,4 @@
-// WebGLEngine/ui/tacticsPanel.mjs -- v4839
+// WebGLEngine/ui/tacticsPanel.mjs -- v4839 (v4849: the 'trained' choice)
 //
 // THE "LOAD TACTICS" PANEL, ONCE, FOR BOTH PAGES THAT RUN THE ENDLESS-SKY FIGHT (flight-gpu.html and es-box3d.html -- the same sim, two views). brain/tacticsRoster.mjs decides what the choices are and
 // what weights each resolves to; this is the DOM around it: a button in the HUD, a panel with one select per side, Start Fight, Default tactics, Import weights, a line saying what each side is and
@@ -28,12 +28,12 @@ const writeStore = (storage, key, v) => { try { if (v == null) storage.removeIte
 export function mountTacticsPanel(opts = {}) {
     const doc = opts.doc || document, win = opts.win || globalThis, hud = opts.hud || doc.body, onStart = opts.onStart || (() => {});
     const storage = opts.storage || (() => { try { return win.localStorage; } catch { return null; } })() || { getItem: () => null, setItem() {}, removeItem() {} };
-    const fetchImpl = opts.fetchImpl === undefined ? win.fetch && win.fetch.bind(win) : opts.fetchImpl, servedUrl = opts.servedUrl || "/ai/brain/tactics";
+    const fetchImpl = opts.fetchImpl === undefined ? win.fetch && win.fetch.bind(win) : opts.fetchImpl, servedUrl = opts.servedUrl || "/ai/brain/tactics", trainedUrl = opts.trainedUrl || "/brain/tacticsWeightsTrained.json";
 
     let specs = R.sanitizeSpecs(readStore(storage, STORE_KEY));
     let imported = (() => { const s = R.sanitizeWeights(readStore(storage, IMPORT_KEY)); return s.weights; })();
-    let served = null, servedSamples = 0, importNote = "";
-    const ctx = () => ({ served, imported });
+    let served = null, servedSamples = 0, importNote = "", trained = null;
+    const ctx = () => ({ served, imported, trained });
     let pending = R.resolveRoster(specs, ctx()), committed = pending, battleNo = 0;
 
     const el = (tag, css, text) => { const e = doc.createElement(tag); if (css) e.style.cssText = css; if (text != null) e.textContent = text; return e; };
@@ -61,7 +61,7 @@ export function mountTacticsPanel(opts = {}) {
     const note = el("div", "color:#7fb069;margin-bottom:4px;white-space:pre-wrap;"); note.id = "tacticsNote"; panel.appendChild(note);
     panel.appendChild(el("div", "color:#5f7aa0;line-height:1.4;", "A side's tactics are eight numbers -- five that weigh a target (nearness, how hurt it is, how dangerous, whether it is the player, whether it was the last target) and three that decide when to break off. " +
         "They are NOT the fly-wired network the dogfight and space-battle pilots run on; every ship here is flown by the same stepAI, and a choice only changes whom it shoots and when it runs. " +
-        "A choice takes effect at Start Fight, which clears the tally. 'Served' appears only when the GPU Brain has learned enough from outcomes to be trusted; an import is read from a JSON object of the eight keys (or {weights:{...}}), anything out of range is held to its range and said so."));
+        "A choice takes effect at Start Fight, which clears the tally. 'Served' appears only when the GPU Brain has learned enough from outcomes to be trusted; 'trained' is the vector fitted in the arena (box3d, six ships a side, against all eight presets from both sides) and shipped as brain/tacticsWeightsTrained.json -- still eight numbers, and it was fitted in that arena, not on your fleet; an import is read from a JSON object of the eight keys (or {weights:{...}}), anything out of range is held to its range and said so."));
     doc.body.appendChild(panel);
 
     // the pending lineup differs from the committed one if any side's id or any of its eight numbers does (two resolves are never the same object)
@@ -74,6 +74,7 @@ export function mountTacticsPanel(opts = {}) {
         const probs = [...committed.problems, ...(isPending ? pending.problems : []), ...(importNote ? [importNote] : [])];
         if (probs.length) lines.push(probs.join("; "));
         if (served) lines.push(`served: the GPU Brain's policy from ${servedSamples} recorded outcomes is offered`);
+        if (trained) lines.push("trained: the vector fitted in the arena against the eight presets (tools/ship/trainTactics.mjs) is offered");
         note.textContent = lines.join("\n");
     }
     function renderSelects() {
@@ -126,12 +127,24 @@ export function mountTacticsPanel(opts = {}) {
         return false;
     })();
 
+    // v4849 -- the vector fitted in the arena (tools/ship/trainTactics.mjs): a swek-tactics-v1 file the page ships. ONLY a file that says it is one is taken (a stub or a server answering every URL with the served policy is not a trained file);
+    // a missing, malformed or out-of-format answer offers nothing and says nothing, like the served policy.
+    const trainedReady = (async () => {
+        if (!fetchImpl) return false;
+        try {
+            const r = await fetchImpl(trainedUrl, { cache: "no-store" }); if (!r || !r.ok) return false;
+            const j = await r.json();
+            if (j && j.format === "swek-tactics-v1" && j.weights) { const s = R.sanitizeWeights(j.weights); if (s.weights) { trained = s.weights; renderSelects(); repend(); if (!battleNo && (specs.A === "trained" || specs.B === "trained")) commit(); return true; } }   // a SAVED choice of it, made before the file arrived, is what a reload fights (nothing has been started yet, so nothing is rebuilt)
+        } catch { /* no file: the other choices stand */ }
+        return false;
+    })();
+
     return {
         /** The committed weight vector for a side: what the fight hands to decide(). Stable between Start Fights (the same object), so a page may keep it. */
         weights(team) { return committed[team].weights; },
         get committed() { return committed; }, get pending() { return pending; }, get specs() { return specs; }, get battleNo() { return battleNo; },
-        choices: () => R.choices(ctx()), setSpecs, start, importText, setImported, ready: servedReady,
-        get imported() { return imported; }, get served() { return served; },
+        choices: () => R.choices(ctx()), setSpecs, start, importText, setImported, ready: servedReady, trainedReady,
+        get imported() { return imported; }, get served() { return served; }, get trained() { return trained; },
         panel, button: btn, selects, note,
     };
 }

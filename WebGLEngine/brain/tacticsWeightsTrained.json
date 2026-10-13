@@ -1,0 +1,17 @@
+{
+ "format": "swek-tactics-v1",
+ "policy": "esTactics",
+ "weights": {
+  "wClose": 0.629,
+  "wWeak": -0.122,
+  "wThreat": 0.29,
+  "wPlayer": 0.35,
+  "wFocus": -0.041,
+  "fleeHealth": 0.017,
+  "fleeOdds": 0.55,
+  "fleeHyst": 0.12
+ },
+ "score": 0.782,
+ "by": "fitted in ev/tools/es-arena.mjs on the box3d substrate (ships collide), 6 ships a side, 60 s cap, against all eight presets from both sides: (1+1)-ES over the six numbers the arena can see, seed 6002 of 4 searches (6000..6003) from the preset 'hand', 300 iterations over 24 train seeds [30001..212138], pruned toward its start (5 of the 6 numbers differ from it); wPlayer and fleeHyst are not trained (nothing in the arena is a player, and nothing repairs a ship) and keep the hand values 0.35 and 0.12 whatever the start preset's own are; champion picked on the held-out field score [40001..222138]; incumbent 'scatter' (best preset on the held-out seeds); audit seeds [60001..368842], 80 battles a preset: 54 won, 22 lost, 4 drawn against 'scatter'; share against the other seven presets 73.1% (the incumbent's 64.3%); against each preset: scatter 54-22, hand 53-19, brawler 52-25, sharp 59-16, focus 58-13, threat 62-16, stubborn 44-35, skittish 64-9",
+ "citation": "ev/esTactics.js (eight numbers scored by a dot product -- not the fly-wired network the pilots run on)"
+}

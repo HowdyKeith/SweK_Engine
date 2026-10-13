@@ -65,6 +65,13 @@
 // FOUND BY THE GATE, NOT BY A SABOTAGE: flight-gpu.html cannot be driven by waiting. Its software WebGPU device is lost a few seconds after boot in this harness ("GPU device lost: A valid external
 // Instance reference no longer exists") and the page does what it was built to -- redirects to the 2D page after 4 s -- so a row that waited for a real fight on it read another page. Both pages now expose a
 // synchronous step(n) the gate uses as its clock, and the gate has a row that the page stayed on itself.
+//
+// v4849 -- THE TRAINED CHOICE (section 3's two rows, section 5's panel and page rows), five sabotages in a scratch checkout:
+//   R1 tacticsRoster.mjs: 'trained' offered when none is held                                          4 red (the offered-only-when-held row, the bare-page rows)
+//   R2 tacticsRoster.mjs: a trained vector used as it arrived, not sanitised                          1 red (the flies-THAT-vector-and-is-sanitised row: a wClose of 9 must fly as 4)
+//   R3 tacticsPanel.mjs: ANY answer taken as the trained file (the format check dropped)               1 red (a server answering every url with the served policy must offer 'served' and no 'trained')
+//   R4 tacticsPanel.mjs: a saved choice of 'trained' not committed when the file arrives               2 red (a reload must FIGHT the saved choice, on both pages)
+//   R5 tacticsPanel.mjs: the wrong url for the trained file                                            6 red (the offered rows on both pages, the saved-choice rows, the panel rows)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -137,6 +144,12 @@ sec("3. EVERY CHOICE");
     const held = { served: { wClose: 0.5, wWeak: 0.5, wThreat: 0.5, wPlayer: 0.5, wFocus: 0.5, fleeHealth: 0.2, fleeOdds: 0.4, fleeHyst: 0.1 }, imported: { wClose: 2, wWeak: 0, wThreat: 1, wPlayer: 0, wFocus: 0, fleeHealth: 0.1, fleeOdds: 0.3, fleeHyst: 0.05 } };
     const ids = (ctx) => R.choices(ctx).map((c) => c.id);
     ok("a bare page offers 'auto' and the eight presets, nine in all; served and imported are offered only when held", J(ids({})) === J(["auto", ...R.PRESET_IDS]) && J(ids({ served: held.served })) === J(["auto", ...R.PRESET_IDS, "served"]) && J(ids(held)) === J(["auto", ...R.PRESET_IDS, "served", "imported"]) && J(ids({ imported: held.imported })).endsWith('"imported"]'));
+    {   // v4849 -- the arena-trained vector: a third held source, offered only when held, between 'served' and 'imported'
+        const trainedV = { wClose: 1.23, wWeak: -0.54, wThreat: 0, wPlayer: 0.35, wFocus: -0.16, fleeHealth: 0.12, fleeOdds: 0.49, fleeHyst: 0.15 }, all3 = { ...held, trained: trainedV };
+        ok("!! 'trained' is offered only when the page holds it, between 'served' and 'imported', and a page that holds none offers the same choices it did before", J(ids({ trained: trainedV })) === J(["auto", ...R.PRESET_IDS, "trained"]) && J(ids(all3)) === J(["auto", ...R.PRESET_IDS, "served", "trained", "imported"]) && J(ids(held)) === J(["auto", ...R.PRESET_IDS, "served", "imported"]) && J(ids({})) === J(["auto", ...R.PRESET_IDS]));
+        const tr = R.resolveTeam("B", "trained", all3), none = R.resolveTeam("A", "trained", {}), raw = R.resolveTeam("A", "trained", { trained: { wClose: 9, wWeak: 0.5 } });
+        ok("!! choosing it flies THAT vector (not a preset's, not the served one), under its own label; a saved 'trained' on a page that holds none falls back to the side's default BY NAME; a trained vector reaches the fight SANITISED like every other (a wClose of 9 flies as 4, the keys it did not give from the hand weights, the note prefixed 'trained:')", tr.id === "trained" && J(strip(tr.weights)) === J(trainedV) && tr.label === "trained in the arena" && tr.problems.length === 0 && none.id === "scatter" && /not available/.test(none.problems[0]) && raw.id === "trained" && raw.weights.wClose === 4 && raw.weights.wWeak === 0.5 && raw.weights.fleeHealth === DEFAULT_W.fleeHealth && raw.problems.some((p) => /^trained: wClose 9 is outside/.test(p)), J(strip(raw.weights)));
+    }
     ok("every id offered resolves to a full vector of eight finite numbers, with no problem, under the label it was offered by", R.choices(held).every((c) => { const r = R.resolveTeam("A", c.id, held); return r.problems.length === 0 && R.KEYS.every((k) => Number.isFinite(r.weights[k])) && r.weights !== null; }));
     ok("served and imported resolve to the vectors held (not a preset's)", J(strip(R.resolveTeam("A", "served", held).weights)) === J(held.served) && J(strip(R.resolveTeam("B", "imported", held).weights)) === J(held.imported));
     const raw = { imported: { wClose: 9, wWeak: 0 }, served: { wClose: -9, wFocus: 0.5, bogus: 1 } };
@@ -194,7 +207,7 @@ sec("5. THE PAGES: es-box3d.html and flight-gpu.html, each in its own browser");
     if (skip) { console.log(`  SKIP  ${skip}`); console.log("  *** NOT A PASS. ***"); fails++; }
     else {
         const oldA = applyBrainWeights({ wWeak: 0, wFocus: 0, wThreat: 0, wPlayer: 0, wClose: 1 }, DEFAULT_W), oldB = { ...DEFAULT_W };
-        const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 400000, args: { oldA: strip(oldA), oldB: strip(oldB), storeKey: STORE_KEY, importKey: IMPORT_KEY, pages: ["/es-box3d.html", "/flight-gpu.html"] }, script: `async (args) => {
+        const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 400000, args: { oldA: strip(oldA), oldB: strip(oldB), storeKey: STORE_KEY, importKey: IMPORT_KEY, trainedFile: JSON.parse(fs.readFileSync(path.join(ENG, "brain", "tacticsWeightsTrained.json"), "utf8")), pages: ["/es-box3d.html", "/flight-gpu.html"] }, script: `async (args) => {
             const waitFor = async (fn, ms) => { const t = performance.now(); while (performance.now() - t < ms) { try { if (fn()) return true; } catch (e) {} await new Promise((r) => setTimeout(r, 100)); } return false; };
             const boot = async (page) => {
                 const f = document.createElement("iframe"); f.style.cssText = "width:900px;height:600px;border:0"; f.src = page; document.body.appendChild(f);
@@ -248,7 +261,16 @@ sec("5. THE PAGES: es-box3d.html and flight-gpu.html, each in its own browser");
                 out.reload = { A: qd.getElementById("tacticsA").value, B: qd.getElementById("tacticsB").value, committed: [U.roster.committed.A.id, U.roster.committed.B.id], imported: U.roster.imported && U.roster.imported.wClose };
                 qd.getElementById("tacticsReset").click(); out.afterReset = [qd.getElementById("tacticsA").value, qd.getElementById("tacticsB").value];
                 qd.getElementById("tacticsImportClear").click(); out.afterClear = { imported: U.roster.imported, offered: Array.from(qd.getElementById("tacticsA").options).map((o) => o.value).includes("imported") };
-                Q.f.remove(); try { localStorage.clear(); } catch (e) {}
+                // v4849 -- the TRAINED vector: the page fetches /brain/tacticsWeightsTrained.json itself; it is offered, flies the very eight numbers the file carries, and a SAVED choice of it is what a reload fights
+                const sel = (id, v) => { const x = qd.getElementById(id); x.value = v; x.dispatchEvent(new Q.w.Event("change", { bubbles: true })); };
+                await waitFor(() => U.roster.trained, 30000);
+                const tf = args.trainedFile;   // read in node and handed in: a fetch() written into this gate would be one more file in the runtime census that does a fetch, for a gate that fetches nothing
+                sel("tacticsA", "trained"); sel("tacticsB", "hand"); qd.getElementById("tacticsStart").click();
+                out.trainedFight = { held: !!U.roster.trained, offered: Array.from(qd.getElementById("tacticsA").options).map((o) => o.value), A: U.roster.committed.A.id, label: U.roster.committed.A.label, same: JSON.stringify(strip(U.roster.weights("A"))) === JSON.stringify(strip(tf.weights)), B: U.roster.committed.B.id, note: qd.getElementById("tacticsNote").textContent, format: tf.format };
+                U.roster.setSpecs({ A: "trained", B: "brawler" }); Q.f.remove();
+                const Z = await boot(page); const V = Z.w.__tacticsFight; await waitFor(() => V.roster.trained && V.roster.committed.A.id === "trained", 30000);
+                out.trainedReload = { A: Z.d.getElementById("tacticsA").value, committed: V.roster.committed.A.id, same: !!V.roster.trained && JSON.stringify(strip(V.roster.weights("A"))) === JSON.stringify(strip(tf.weights)), B: V.roster.committed.B.id };
+                Z.f.remove(); try { localStorage.clear(); } catch (e) {}
             }
             // 7. the GPU Brain's served policy is offered only when the bridge returns trained weights
             const M = await import("/ui/tacticsPanel.mjs"); const sv = {};
@@ -261,6 +283,17 @@ sec("5. THE PAGES: es-box3d.html and flight-gpu.html, each in its own browser");
             sv.trained = trained.choices().map((c) => c.id).includes("served"); sv.untrained = untrained.choices().map((c) => c.id).includes("served"); sv.missing = missing.choices().map((c) => c.id).includes("served"); sv.broken = broken.choices().map((c) => c.id).includes("served"); sv.garbage = garbage.choices().map((c) => c.id).includes("served");
             trained.setSpecs({ A: "served", B: "hand" }); trained.start(); sv.servedFlies = { id: trained.committed.A.id, wClose: trained.weights("A").wClose, note: trained.note.textContent };
             all.served = sv;
+            // v4849 -- the TRAINED file: taken only from a swek-tactics-v1 answer to ITS url; a server that answers every url with the served policy (or a stub that does) offers no trained choice
+            const tv = { wClose: 1.23, wWeak: -0.54, wThreat: 0, wPlayer: 0.35, wFocus: -0.16, fleeHealth: 0.12, fleeOdds: 0.49, fleeHyst: 0.15 }, tr = {};
+            const byUrl = (map) => async (url) => (url in map ? { ok: true, json: async () => map[url] } : { ok: false, status: 404, json: async () => ({}) });
+            const T_URL = "/brain/tacticsWeightsTrained.json", S_URL = "/ai/brain/tactics";
+            const good = await mk(byUrl({ [T_URL]: { format: "swek-tactics-v1", weights: tv } })), echoes = await mk(async () => ({ ok: true, json: async () => ({ ok: true, weights: tv, samples: 50 }) }));
+            const wrongFormat = await mk(byUrl({ [T_URL]: { format: "something-else", weights: tv } })), noFile = await mk(byUrl({})), junk = await mk(byUrl({ [T_URL]: { format: "swek-tactics-v1", weights: { hello: 1 } } }));
+            await good.trainedReady; await echoes.trainedReady;
+            const has = (api) => api.choices().map((c) => c.id).includes("trained");
+            tr.good = has(good); tr.echoes = has(echoes); tr.echoesServed = echoes.choices().map((c) => c.id).includes("served"); tr.wrongFormat = has(wrongFormat); tr.noFile = has(noFile); tr.junk = has(junk);
+            good.setSpecs({ A: "trained", B: "hand" }); good.start(); tr.flies = { id: good.committed.A.id, same: JSON.stringify(strip(good.weights("A"))) === JSON.stringify(strip(tv)), note: good.note.textContent };
+            all.trainedPanel = tr;
             return all;
         }` });
         ok("the harness booted the pages and drove the panel", r.ok && r.result, r.ok ? "" : String(r.reason || r.error || (r.pageErrors || []).join(" | ")).slice(0, 300));
@@ -270,7 +303,7 @@ sec("5. THE PAGES: es-box3d.html and flight-gpu.html, each in its own browser");
             const p = r.result[page]; if (!p) { ok(`${page}: no result`, false); continue; }
             ok(`${page}: booted (a battle is built), and the page stayed on itself for the whole run (no GPU-device-lost redirect)`, p.booted && !p.error && p.stayed !== false, p.error || (p.stayed === false ? "the page navigated away mid-run -- the rows below are NOT about this page" : ""));
             if (!p.booted) continue;
-            ok(`!! ${page}: the panel is there -- a Tactics button, a select for each side and Start Fight; both sides are on 'default', the nine choices a bare page holds are offered (no served, no imported)`, p.btn && J(p.defaults) === '["auto","auto"]' && J(p.opts) === J(["auto", ...R.PRESET_IDS]), p.opts.join());
+            ok(`!! ${page}: the panel is there -- a Tactics button, a select for each side and Start Fight; both sides are on 'default', the nine choices a bare page holds are offered (no served, no imported)`, p.btn && J(p.defaults) === '["auto","auto"]' && J(p.opts.filter((o) => o !== "trained")) === J(["auto", ...R.PRESET_IDS]), p.opts.join());   // 'trained' arrives by fetch and may or may not be there when the select is first read: it has rows of its own below
             ok(`!! ${page}: the default lineup is the OLD page -- A scatter, B the hand weights, key for key -- with six ships a side`, J(p.def.ids) === '["scatter","hand"]' && p.def.wA && p.def.wB && J(p.def.ships) === "[6,6]", J(p.def));
             ok(`!! ${page}: a choice made in a select is PENDING until Start Fight: the committed lineup and the weights the sim reads are still scatter/hand, the pending one is stubborn/skittish and the note says so`, p.pending.committedA === "scatter" && p.pending.committedB === "hand" && p.pending.pendingA === "stubborn" && p.pending.pendingB === "skittish" && p.pending.simWeightA && /pending/.test(p.pending.note), J(p.pending).slice(0, 200));
             ok(`${page}: the sim asks the roster for BOTH sides' weights as it runs`, p.simReads.A && p.simReads.B);
@@ -281,6 +314,16 @@ sec("5. THE PAGES: es-box3d.html and flight-gpu.html, each in its own browser");
             ok(`${page}: an imported vector flies the side it is given to (A imported, B brawler after Start Fight)`, p.impFight.A === "imported" && p.impFight.wClose === 4 && p.impFight.B === "brawler", J(p.impFight));
             ok(`!! ${page}: the choices and the import are kept in this browser under the panel's two named keys (${STORE_KEY} holds the specs, ${IMPORT_KEY} the eight numbers of the import, held to range)`, STORE_KEY === "swek.tacticsRoster.v1" && IMPORT_KEY === "swek.tacticsRoster.imported.v1" && p.stored && J(JSON.parse(p.stored.specs)) === '{"A":"imported","B":"brawler"}' && p.stored.imp && (() => { const w = JSON.parse(p.stored.imp); return J(Object.keys(w)) === J(R.KEYS) && w.wClose === 4; })(), p.stored ? p.stored.specs : "nothing stored");
             ok(`!! ${page}: the choices and the import survive a reload (imported on A, brawler on B are what a fresh page shows AND fights), Default tactics puts both selects back on 'default', and Clear import removes the vector and the choice offering it`, p.reload.A === "imported" && p.reload.B === "brawler" && J(p.reload.committed) === '["imported","brawler"]' && p.reload.imported === 4 && J(p.afterReset) === '["auto","auto"]' && p.afterClear.imported === null && !p.afterClear.offered, J({ reload: p.reload, afterReset: p.afterReset, afterClear: p.afterClear }));
+        }
+        if (r.ok && r.result) for (const page of ["/es-box3d.html", "/flight-gpu.html"]) {
+            const p = r.result[page]; if (!p || !p.booted || !p.trainedFight) continue;
+            ok(`!! ${page}: the TRAINED vector LOADS and is offered (the file says it is a swek-tactics-v1 file), after 'served'/the presets and before 'imported', and choosing it flies the very eight numbers the file carries, named as trained in the note`, p.trainedFight.held && p.trainedFight.format === "swek-tactics-v1" && p.trainedFight.offered.includes("trained") && p.trainedFight.offered.indexOf("trained") === R.PRESET_IDS.length + 1 && p.trainedFight.A === "trained" && p.trainedFight.same && p.trainedFight.B === "hand" && /trained: the vector fitted in the arena/.test(p.trainedFight.note), J({ ...p.trainedFight, note: undefined }).slice(0, 200));
+            ok(`!! ${page}: a SAVED choice of the trained vector is what a reload FIGHTS: made before the file has arrived it is the side's default for a moment, and when the file lands the select shows 'trained' AND the committed lineup is trained (the very numbers), not a stale default`, p.trainedReload.A === "trained" && p.trainedReload.committed === "trained" && p.trainedReload.same && p.trainedReload.B === "brawler", J(p.trainedReload));
+        }
+        if (r.ok && r.result && r.result.trainedPanel) {
+            const t = r.result.trainedPanel;
+            ok("!! the panel takes a TRAINED vector only from a swek-tactics-v1 answer to its own url: offered for that; NOT for a server that answers every url with the served policy (which is offered as 'served' and nothing else), a file of another format, a missing file or a file with no usable weight", t.good === true && t.echoes === false && t.echoesServed === true && t.wrongFormat === false && t.noFile === false && t.junk === false, J(t));
+            ok("...and a side set to it flies it: the committed lineup is trained, the eight numbers are the file's, and the note says the arena-fitted vector is offered", t.flies.id === "trained" && t.flies.same && /trained: the vector fitted in the arena/.test(t.flies.note), J(t.flies).slice(0, 200));
         }
         if (r.ok && r.result && r.result.served) {
             const s = r.result.served;

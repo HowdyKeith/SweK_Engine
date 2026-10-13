@@ -621,7 +621,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4838 -- THE DENOISER ARC'S MERGE: RE-DERIVED over the merged tree: main's 4636 plus the arc's 30 files since the v4818 split.
     // v4840 -- files 4636 -> 4637: tools/ship/wasmDoors-selfcheck.mjs.
     // v4842 -- main's v4838 merged with this line's v4838-v4841: RE-DERIVED over the merged tree.
-    files: 4675,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
+    files: 4684,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
     // (v4691 note, carried)                               // v4691 -- RE-DERIVED: tools/ship/textureInProbe.mjs arrived, one ES module with a closure and top-level await -- four rows moved (files, ES modules, closures, async/await) and eight held.
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
@@ -1231,10 +1231,10 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // through a BigUint64Array) and WebAssembly 26 -> 27 (tools/ship/wasmTeardown-selfcheck.mjs's section 8 fixture names the API in
     // code; it named it only in a comment before). Neither compiles nor allocates on a GPU. The fixture's glue was first written with
     // a fetch() inside its string and moved fetch/XHR 252 -> 253 -- a gate that fetches nothing -- so the fixture was changed, not the row.
-    // v4846 -- no file added; async/await 1761 -> 1762: tools/ship/afterVerdict-selfcheck.mjs awaits a dynamic import of
-    // sourceScan for its new section 3b. (sourceScan-selfcheck's new fixture first moved workers/threads 26 -> 25 by closing a
-    // block comment this census's regex strips across strings; the fixture was rebuilt so the row holds, not the row moved.)
-    esModules: 4370, closures: 4215, asyncAwait: 1762, typedArrays: 1300, promises: 426,
+    // v4846 -- the 6DOF league (tools/ship/train6dofLeague.mjs, trainLeague6dof.mjs, its gate): files 4675 -> 4678, ES modules 4370 -> 4373, closures 4215 -> 4218, async/await 1761 -> 1762 (trainLeague6dof's Promise.all over its worker processes), typed arrays 1300 -> 1302, Promises 426 -> 427. RE-DERIVED, not incremented.
+    // v4848 -- ship collisions for the 6DOF duel (brain/shipCollision6dof.mjs, its gate, tools/ship/ramBaseline6dof.mjs): files 4678 -> 4681, ES modules 4373 -> 4376, closures 4218 -> 4221, typed arrays 1302 -> 1303 (the spin-out fixture's Float32Array of weights); async/await and promises hold.
+    // v4849 -- the tactics trainer (tools/ship/tacticsTrain.mjs, trainTactics.mjs, its gate): files 4681 -> 4684, ES modules 4376 -> 4379, closures 4221 -> 4224, async/await 1762 -> 1763 and Promises 427 -> 428 (trainTactics's Promise.all over its worker processes, as trainLeague6dof's); fetch/XHR holds at 252 because the roster gate's page script is HANDED the trained file and does not fetch it.
+    esModules: 4379, closures: 4224, asyncAwait: 1763, typedArrays: 1303, promises: 428,
     fetchXhr: 252, performanceNow: 250, raf: 127, webgl: 200, webgpu: 62, threads: 26, wasm: 27,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

@@ -250,8 +250,11 @@ const code = raw.split(/\r?\n/).filter((l) => !/^\s*#/.test(l)).join("\n");
 
     const pb = fs.readFileSync(path.join(ENG, "ai-bridge", "packagerBridge.js"), "utf8");
     const pbCode = pb.split(/\r?\n/).filter((l) => !/^\s*\/\//.test(l)).join("\n");
+    // v4847: _zip writes "<outZip>.partial" and renames it to outZip only once the archive is whole (zipWriter-selfcheck
+    // section 5), so the call normalises `partial` -- the same archive, before it takes its name. Either name passes; a
+    // platform test in front of the call still fails, which is what this row is for.
     ok("!! and _zip calls it on EVERY archive, not only the Windows one",
-        /normalizeZipSeparators\(outZip\)/.test(pbCode) && !/win32[\s\S]{0,80}normalizeZipSeparators/.test(pbCode),
+        /normalizeZipSeparators\((outZip|partial)\)/.test(pbCode) && !/win32[\s\S]{0,80}normalizeZipSeparators/.test(pbCode),
         "gating it behind a platform test would leave the defect one packer-swap away from returning");
 }
 

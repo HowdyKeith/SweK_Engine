@@ -267,6 +267,10 @@ set SWEK_WEBGPU=
 - **Send back both JSON files, and the dumps.** The compile gate's dumps are `%TEMP%\swek-denoise-dump-0.6.2-*.txt`.
   The build probe's report names its own. Section 64 fixes, before it runs, what they decide.
 
+**The outcome (section 65).** On both GPUs 0.6.2 compiled with DXC as shipped, built every kernel exact, and built r18t's
+and r18u's kernels in seconds. The fast head ran 2,024 times faster under DXC than under FXC on the Intel, and 404 times on
+the 1080. The pin stays 0.6.0. Round 19's own command comes with its round.
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and

@@ -133,6 +133,31 @@ export function judge(claims) {
 
 const state = (c) => (c.state === "broken" ? "BROKEN" : "settled");
 
+// v4846 -- WHAT verify.mjs's CLAIMS ROW SAYS WHEN THIS CLI EXITS NON-ZERO. The row ran this with stderr IGNORED
+// and read only stdout for a PROBLEMS count, so the two verdicts the CLI below writes to console.error -- no page,
+// and zero claims parsed -- reached the gate as "claimsGate could not run: Command failed: <argv>". THIS DID RUN.
+// It refused, in words, and the row threw the words away and called the refusal a launch failure. So the row
+// pipes stderr and asks here, in claimsGate-selfcheck's reach (verify.mjs runs on import; no gate can load it):
+//   a PROBLEMS verdict on stdout        -> the count and the first problem, as before
+//   anything on stderr                  -> claimsGate's OWN first line; a crash's Error line if it never spoke
+//   neither, but some stdout            -> it ended without a verdict (a timeout), with the error's message
+//   nothing at all                      -> the only case that is a launch failure, and the only use of e.message
+// `err` is what execFileSync throws (stdout/stderr/message); a Buffer reads as its text.
+export function failedRunDetail(err) {
+    const out = String((err && err.stdout) || "");
+    const said = String((err && err.stderr) || "").split("\n").map((l) => l.trim()).filter(Boolean);
+    const n = out.match(/(\d+) PROBLEMS/);
+    if (n) {
+        const first = out.split("\n").filter((l) => l.startsWith("      "))[0];
+        return n[1] + " problem(s), first: " + (first || "?").trim().slice(0, 58);
+    }
+    const own = said.find((l) => /^\[?claimsGate\b/.test(l));
+    if (own) return own.slice(0, 110);
+    if (said.length) return "claimsGate crashed: " + (said.find((l) => /^\w*Error\b/.test(l)) || said[0]).slice(0, 90);
+    return (out.trim() ? "claimsGate ended without a verdict: " : "claimsGate could not run: ") +
+           String(err && err.message).slice(0, 55);
+}
+
 // ---- CLI ---------------------------------------------------------------------------------------------------
 if (process.argv[1] && process.argv[1].endsWith("claimsGate.mjs")) {
     const cli = parseOrExit("claimsGate", { values: { "--file": "path" } });

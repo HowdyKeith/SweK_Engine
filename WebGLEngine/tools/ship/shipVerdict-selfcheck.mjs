@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/shipVerdict-selfcheck.mjs
 //
-// Run: node tools/ship/shipVerdict-selfcheck.mjs   (~17s -- re-measured v4844: 17.2 / 17.3 s alone, warm, with sections 7 and 8's in-process drives on a stub scan; 30.6 s on the real one, as v4833-v4836 ran them; it read ~12.7s at v4804 -- then: 13.1 s alone (median of three; one run read 65.7 s), 12.3 s the sweep's serial median; it read ~4.9s -- MEASURED at v4680; was ~0.83s before section 6's live drivers)
+// Run: node tools/ship/shipVerdict-selfcheck.mjs   (~17s -- v4846: section 10's temp repo adds ~0.2 s, measured alone 191-207 ms over three runs, about thirty git calls; re-measured v4844: 17.2 / 17.3 s alone, warm, with sections 7 and 8's in-process drives on a stub scan; 30.6 s on the real one, as v4833-v4836 ran them; it read ~12.7s at v4804 -- then: 13.1 s alone (median of three; one run read 65.7 s), 12.3 s the sweep's serial median; it read ~4.9s -- MEASURED at v4680; was ~0.83s before section 6's live drivers)
 //
 // v4405 -- *** THE ROUND BEFORE THIS ONE SHIPPED A CONFLICT MARKER ONTO main, PAST A VERIFY THAT SAID
 // "DO NOT SHIP". ***
@@ -46,6 +46,19 @@
 //     I. isRealVerify back to "no verifyPath"                         -> 1 (the choice row)
 //     J. the CLI line passes preflight: null                          -> 1 (the CLI row)
 //     and the in-process drives given the real scan again: no row, the cost -- 30.6 s against 17.2, past twice the old header
+//   * v4846, sections 2 and 10 (a --depth 1 --branch clone with no origin/main, built as a real temp repo), each red by name:
+//     K. scanRef without its rev-parse absence check (git grep's failure again) -> 2 (the ABSENT row; the skip row)
+//     L. scanRef's absence widened to any nonzero rev-parse status             -> 1 (the CONTROL row: an unopenable checkout read as absent)
+//     M. section 2's skip back to the v4402 message match on ref.why           -> 1 (the skip row: git grep says "unable to resolve revision")
+//     N. readiness() without the origin/main refusal                            -> 2 (the ABSENT row; the both-named row)
+//     O. readiness() refusing whatever is not "present"                         -> 2 (the NO ORIGIN row; the NOT A REPO row)
+//     P. originMainState without its .git test                                  -> 1 (NOT A REPO: the zip read as "no-origin")
+//     Q. readiness()'s default probe asking the CLI's own tree, not `eng`       -> 2 (the ABSENT row; the both-named row)
+//   v4847 (section 11, the declared limit; step 4b found shipVerdict SILENT in runnerBudget-selfcheck):
+//     R. the git probes' limit moved to 30 s, budgetIsOwn left saying 15        -> 1 (the declaration row)
+//     S. budgetIsOwn removed                                                   -> 1 here and 1 in runnerBudget-selfcheck.
+//        *** FIRST TRY WAS NO SABOTAGE: the cut stopped at a ';' inside the declaration's own text and left a file that
+//        does not parse -- 0 rows red, exit 1, a SyntaxError. Re-cut to the end of the string. ***
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -80,15 +93,20 @@ console.log("\n1. the detector sees all three marker shapes, and only at line st
 
 console.log("\n2. no tracked file carries one -- here or on origin/main");
 const scan = SV.scanTracked(ROOT);
+// Narrowed on purpose (v4402): the ONLY thing that excuses section 2's origin/main row is the ref being absent, because an
+// absence read as a skip is an absence read as a pass, and that is what this whole round is about.
+// v4846 -- and "absent" is scanRef's flag, decided by git's exit status, NEVER a match on its message: this was
+// /unknown revision|not a valid object|ambiguous argument/ on ref.why, and git grep words a missing ref "unable to resolve
+// revision", so a --depth 1 --branch clone with no origin/main was red here. A function, so section 10 can hand it a real
+// absent clone's answer -- on a box that HAS origin/main (this one, usually) section 2 never reaches it.
+const onlySkip = (ref) => ref.ok === false && ref.absent === true;
 {
     ok("!! *** the working tree is clean of conflict markers ***", scan.hits.length === 0,
         scan.hits.length ? scan.hits.map((h) => h.file + ":" + h.marks.map((x) => x.line).join("/")).join(", ")
                          : `${scan.scanned} tracked files read in full -- no allowance list, no ceiling`);
     const ref = SV.scanRef(ROOT, "origin/main");
     if (!ref.ok) {
-        // Narrowed on purpose (v4402): the ONLY thing that excuses this row is the ref being absent, because an
-        // absence read as a skip is an absence read as a pass, and that is what this whole round is about.
-        ok("origin/main could not be read, and that is the only skip allowed here", /unknown revision|not a valid object|ambiguous argument/i.test(ref.why || ""),
+        ok("origin/main is not in this clone, and that is the only skip allowed here", onlySkip(ref),
             "SKIPPED: " + ref.why);
     } else {
         // A ROUND CANNOT SHIP THE REPAIR OF main IF THE GATE THAT DEMANDS main BE CLEAN IS RED UNTIL IT LANDS.
@@ -238,11 +256,14 @@ console.log("\n7. v4833 -- a box that cannot run the browser gates is refused BE
     const { browserSkipReason, SHELL_DIR_SAMPLES, SHELL_LEAVES, DXC_LEAVES } = await import("./playwrightResolve.mjs");
     const { ensureDxc } = await import("./ensureDxc.mjs");
     const noDxc = () => ({ needed: false });
-    const none = SV.readiness({ resolve: () => ({ chromium: null, from: "" }), shell: "", skipReason: browserSkipReason, dxc: noDxc });
+    // v4846 -- readiness() also asks whether origin/main is in this clone; these rows are about the browser, so they say it is,
+    // and a --depth 1 --branch clone (the rig's) does not turn them red on a second fact. Section 10 drives that probe for real.
+    const hasMain = () => "present";
+    const none = SV.readiness({ resolve: () => ({ chromium: null, from: "" }), shell: "", skipReason: browserSkipReason, dxc: noDxc, mainRef: hasMain });
     ok("!! *** no Playwright: ONE line, naming tools/render-qa's npm install -- not one red per browser gate ***",
         none.length === 1 && /tools[\\/]render-qa/.test(none[0].what) && /npm install/.test(none[0].what),
         none.length ? none[0].what.slice(0, 160) + "..." : "readiness said ready with no Playwright at all");
-    const noShell = SV.readiness({ resolve: () => ({ chromium: {}, from: "playwright" }), shell: "", skipReason: browserSkipReason, dxc: noDxc });
+    const noShell = SV.readiness({ resolve: () => ({ chromium: {}, from: "playwright" }), shell: "", skipReason: browserSkipReason, dxc: noDxc, mainRef: hasMain });
     // v4844: render-qa's own install, by --prefix -- its postinstall is `playwright install chromium chromium-headless-shell`
     ok("...Playwright but no browser on disk: the install that fetches one is named, by --prefix, with its postinstall",
         noShell.length === 1 && /npm install --no-audit --no-fund --prefix "[^"]*render-qa"/.test(noShell[0].what) &&
@@ -259,16 +280,16 @@ console.log("\n7. v4833 -- a box that cannot run the browser gates is refused BE
     const fixDxc = (has) => () => ensureDxc({ platform: "win32", shell: shellExe, env: { PLAYWRIGHT_BROWSERS_PATH: ROOTPW }, home: path.join(path.sep, "nohome"),
         exists: (q) => has.includes(q), readdir: (r) => { if (r === ROOTPW) return [FULL_DIR, SHELL_DIR]; throw new Error("no " + r); } });
     const ready = () => ({ chromium: {}, from: "playwright" }), shellOk = () => "";
-    const dxcDry = SV.readiness({ resolve: ready, shell: shellExe, skipReason: shellOk, dxc: fixDxc([FULL]) });
+    const dxcDry = SV.readiness({ resolve: ready, shell: shellExe, skipReason: shellOk, dxc: fixDxc([FULL]), mainRef: hasMain });
     ok("!! *** a fresh Windows browser folder without dxcompiler.dll: ensureDxc --write is named, before 15 minutes of sweep ***",
         dxcDry.length === 1 && /ensureDxc\.mjs --write/.test(dxcDry[0].what) && /dxcompiler\.dll/.test(dxcDry[0].what),
         dxcDry.length ? dxcDry[0].what.slice(0, 170) + "..." : "readiness said ready with the DLL missing beside the shell");
-    const dxcNone = SV.readiness({ resolve: ready, shell: shellExe, skipReason: shellOk, dxc: fixDxc([]) });
+    const dxcNone = SV.readiness({ resolve: ready, shell: shellExe, skipReason: shellOk, dxc: fixDxc([]), mainRef: hasMain });
     ok("...and when no bundle on the box carries it, the reason ensureDxc gives is passed on rather than a command that cannot work",
         dxcNone.length === 1 && /CANNOT/.test(dxcNone[0].what) && !/ensureDxc\.mjs --write/.test(dxcNone[0].what),
         dxcNone.length ? dxcNone[0].what.slice(-120) : "readiness said ready");
     const dxcThere = SV.readiness({ resolve: ready, shell: shellExe, skipReason: shellOk,
-        dxc: fixDxc([FULL, path.join(path.dirname(shellExe), "dxcompiler.dll")]) });
+        dxc: fixDxc([FULL, path.join(path.dirname(shellExe), "dxcompiler.dll")]), mainRef: hasMain });
     ok("CONTROL: the DLL already beside the shell, and Playwright resolved -- ready, no entries",
         dxcThere.length === 0, JSON.stringify(dxcThere).slice(0, 160));
 
@@ -302,7 +323,7 @@ console.log("\n7. v4833 -- a box that cannot run the browser gates is refused BE
         "so sections 4 and 6, which drive main() against stand-ins, are unchanged on a box without Playwright; SWEK_QUICKSWEEP=0 skips " +
         "the sweep every browser gate runs in (v4844: refusing it named facts nothing would use)");
     const here = SV.readiness();
-    say(`THIS BOX: ${here.length ? "NOT READY -- " + here.map((n) => n.what).join(" | ") : "ready (Playwright resolves, a browser is on disk, and DXC is " + (process.platform === "win32" ? "beside the shell" : "not needed off Windows") + ")"}`);
+    say(`THIS BOX: ${here.length ? "NOT READY -- " + here.map((n) => n.what).join(" | ") : "ready (Playwright resolves, a browser is on disk, DXC is " + (process.platform === "win32" ? "beside the shell" : "not needed off Windows") + ", and origin/main reads " + SV.originMainState() + ")"}`);
 }
 
 console.log("\n8. v4836 -- after a SHIP, the verdict names step 4b; the verdict line stays last");
@@ -376,6 +397,89 @@ console.log("\n9. v4844 -- the command the refusal names works as typed, the CLI
                 `sent=${mid.sent} exit=${mid.code} signal=${mid.signal}; ${mid.o.trim().split("\n").pop()}`);
         } else say("the mid-check SIGHUP row is driven on POSIX, for section 6's reason: child.kill(sig) is TerminateProcess on win32");
     } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+}
+
+console.log("\n10. v4846 -- a clone without origin/main: scanRef says ABSENT by git's exit status, and the readiness check refuses it with the fetch");
+// The rig's v4845 run was a `git clone --depth 1 --branch <line>`: an origin remote, origin/<line>, and no origin/main. Section 2
+// went red on it (git grep words a missing ref "unable to resolve revision", which v4402's message match did not know), and
+// verify ran its full 27 minutes before its version preflight and release-lag budget met the same absence. Driven on a REAL
+// temp repo built to that shape, because the point is what git itself answers -- a stub of git would hold the old match too.
+{
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "shipverdict-main-"));
+    // Nothing in the env may aim these calls at another repository (a hook's GIT_DIR would point every one at the real tree),
+    // and no hook, signing key or identity of this box's may decide whether the fixture commit is made.
+    const genv = { ...process.env };
+    for (const k of ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR"]) delete genv[k];
+    const git = (cwd, ...args) => spawnSync("git", ["-c", "user.name=selfcheck", "-c", "user.email=selfcheck@localhost", "-c", "commit.gpgsign=false",
+        "-c", "core.hooksPath=" + path.join(dir, "no-hooks"), ...args], { cwd, env: genv, encoding: "utf8" });
+    try {
+        const clone = path.join(dir, "clone"), cloneEng = path.join(clone, "WebGLEngine");
+        const zipEng = path.join(dir, "zip", "WebGLEngine"), lost = path.join(dir, "lost");
+        fs.mkdirSync(cloneEng, { recursive: true }); fs.mkdirSync(zipEng, { recursive: true }); fs.mkdirSync(lost);
+        // One committed file with a marker at line start, so the control row proves a ref that IS here still reads its hits.
+        fs.writeFileSync(path.join(cloneEng, "marked.txt"), "<<<<<<< fixture\n");
+        git(clone, "init", "-q"); git(clone, "add", "-A"); git(clone, "commit", "-q", "-m", "fixture");
+        git(clone, "remote", "add", "origin", "https://example.invalid/never-fetched.git");
+        git(clone, "update-ref", "refs/remotes/origin/line", "HEAD");
+        // A checkout git cannot open: its .git names a folder that is not there (a worktree whose repository moved). Its .git
+        // also stops git walking up past it, so this answer cannot come from whatever repository the temp folder sits in.
+        fs.writeFileSync(path.join(lost, ".git"), "gitdir: " + path.join(dir, "moved-away") + "\n");
+        const built = git(clone, "rev-parse", "--verify", "--quiet", "refs/remotes/origin/line^{commit}").status === 0;
+        const grepSays = String(git(clone, "grep", "-c", "x", "origin/main", "--", ".").stderr || "").trim().split("\n")[0];
+
+        const absentRef = SV.scanRef(clone, "origin/main");
+        ok("!! *** a clone with an origin remote and no origin/main: scanRef says ABSENT, from git's exit status, and reads no hits ***",
+            built && absentRef.ok === false && absentRef.absent === true && absentRef.why === "origin/main is not in this clone" && absentRef.hits.length === 0,
+            `${built ? "" : "FIXTURE NOT BUILT -- "}${JSON.stringify(absentRef)}; git grep itself says ${JSON.stringify(grepSays)}`);
+        const OLD = /unknown revision|not a valid object|ambiguous argument/i;
+        ok("!! *** ...and section 2's one allowed skip takes that answer -- keyed on `absent`, never on git's message ***",
+            onlySkip(absentRef),
+            `v4402's message match on what git grep says here ${OLD.test(grepSays) ? "would match too" : "would NOT match -- the red the rig's clone carried"}`);
+        const lineRef = SV.scanRef(clone, "origin/line"), lostRef = SV.scanRef(lost, "origin/main");
+        ok("CONTROL: a ref the clone HAS still reads its marker, and a checkout git cannot open is NOT absent -- that stays red in section 2",
+            lineRef.ok === true && lineRef.absent !== true && lineRef.hits.length === 1 && lineRef.hits[0].count === 1 &&
+            lostRef.ok === false && lostRef.absent !== true && !onlySkip(lostRef),
+            `origin/line: ${lineRef.hits.map((h) => h.file + " x" + h.count).join(", ") || "no hits"}; unopenable: ${String(lostRef.why).split("\n")[0].slice(0, 80)}`);
+
+        // readiness() itself, with its DEFAULT origin/main probe and the browser said ready, on each of the four shapes of tree.
+        const ready = () => ({ chromium: {}, from: "playwright" }), shellOk = () => "", noDxc = () => ({ needed: false });
+        const ask = (eng) => SV.readiness({ resolve: ready, shell: "", skipReason: shellOk, dxc: noDxc, eng });
+        const FETCH = "-- to fix: git fetch --depth 1 origin main:refs/remotes/origin/main";
+        const absent = ask(cloneEng);
+        ok("!! *** ABSENT: the readiness check refuses before verify, in one line naming the fetch that brings origin/main ***",
+            SV.originMainState(cloneEng) === "absent" && absent.length === 1 && absent[0].what.startsWith("origin/main is not in this clone") &&
+            absent[0].what.endsWith(FETCH),
+            absent.map((n) => n.what).join(" | ") || "readiness said ready on a clone with no origin/main");
+        const both = SV.readiness({ resolve: () => ({ chromium: null, from: "" }), shell: "", skipReason: () => "FIXTURE no playwright", dxc: noDxc, eng: cloneEng });
+        ok("...and with the browser missing too, the ONE refusal names both, the browser's first -- the order readiness() gives and why",
+            both.length === 2 && /^the browser gates cannot run here: FIXTURE/.test(both[0].what) && both[1].what.endsWith(FETCH),
+            both.map((n) => n.what.slice(0, 60)).join(" | "));
+        git(clone, "update-ref", "refs/remotes/origin/main", "HEAD");
+        const present = ask(cloneEng);
+        ok("CONTROL: PRESENT -- the same clone once origin/main exists is not refused",
+            SV.originMainState(cloneEng) === "present" && present.length === 0, JSON.stringify(present).slice(0, 160));
+        git(clone, "remote", "remove", "origin");
+        const noOrigin = ask(cloneEng), noOriginState = SV.originMainState(cloneEng);
+        ok("NO ORIGIN: a checkout with no 'origin' remote (and so no origin/main) is not refused -- there is nothing a fetch could name",
+            noOriginState === "no-origin" && noOrigin.length === 0, `state ${noOriginState}; ${JSON.stringify(noOrigin).slice(0, 140)}`);
+        const zip = ask(zipEng), zipState = SV.originMainState(zipEng);
+        ok("NOT A REPO: a release zip's tree (no .git) is not refused",
+            zipState === "not-a-repo" && zip.length === 0, `state ${zipState}; ${JSON.stringify(zip).slice(0, 140)}`);
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+}
+
+// ---- 11. v4847 -- THE LIMIT THIS FILE PICKS IS DECLARED, AND THE DECLARATION IS THE CODE'S -----------------------
+// v4846's git probes made shipVerdict a runner that PICKS a limit (timeout: 15000), and tools/ship/runnerBudget-selfcheck.mjs
+// counted it silent: the step-4b run of v4847 found it. budgetIsOwn says why; this row holds it to the code, so the reason
+// cannot outlive the number it explains.
+{
+    const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "shipVerdict.mjs"), "utf8")
+        .split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n");
+    const picked = [...src.matchAll(/timeout:\s*(\d+)/g)].map((m) => Number(m[1]));
+    ok("!! budgetIsOwn names the one limit shipVerdict picks -- 15 s, on git probes and not on gates -- and the code picks no other",
+        typeof SV.budgetIsOwn === "string" && /15 s/.test(SV.budgetIsOwn) && /not gates/.test(SV.budgetIsOwn) &&
+        picked.length > 0 && picked.every((ms) => ms === 15000),
+        `picked ${JSON.stringify(picked)}; ${String(SV.budgetIsOwn).slice(0, 80)}`);
 }
 
 say("WHAT THIS DOES NOT CLAIM. That a round cannot be pushed unverified -- nothing in a repository can stop a " +

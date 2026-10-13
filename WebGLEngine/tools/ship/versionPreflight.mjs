@@ -51,6 +51,53 @@ export function engineVersionOf(text) {
     return m ? m[1] : null;
 }
 
+// ====================================================================================================
+// *** v4846 -- WHETHER origin/main EXISTS IS A QUESTION FOR GIT'S EXIT STATUS, AND THIS FILE ASKED ITS WORDS. ***
+// mainVersion and mainOrdinals decided "no such ref" by testing the thrown message against
+// /unknown revision|does not exist|ambiguous argument/ -- while their own exec IGNORED STDERR, so the message
+// never carried a word git said; it was always "Command failed: git show ...". And git's wording for this case
+// is none of the three anyway: it is "fatal: invalid object name 'origin/main'." Measured on the rig in a
+// `git clone --depth 1 --branch <feature>` clone, which fetches its own branch and nothing else: the reason
+// came back "reading origin/main's main.js FAILED: Command failed: git show origin/main:WebGLEngine/main.js"
+// and section 5 of the gate went red. refFreshness folded the same missing LOCAL ref into "could not compare
+// against the remote (offline, or no origin)", which names the network for a fault that is in the clone.
+//
+// So absence is ASKED first, of the one command whose exit status answers it: rev-parse --verify --quiet exits
+// 1 for a name that does not resolve, silently. Any other failure (128 is git's die(): no repository, a broken
+// one) is a different fact and is reported in git's own first stderr line, never as a ref to go and fetch.
+// And when the ref IS there and the read still fails, stderr is now piped so the reason is git's sentence.
+// ====================================================================================================
+
+/** The command that puts origin/main into a clone that lacks it -- named in every reason that says so. */
+export const FETCH_MAIN = "git fetch --depth 1 origin main:refs/remotes/origin/main";
+export const ABSENT_REASON = "origin/main is not in this clone (a --branch or --single-branch clone fetches only its own branch) -- run: " + FETCH_MAIN;
+
+/** The git runner the readers below default to: stderr PIPED, so a failure carries git's own sentence. */
+export function gitRunner(cwd = REPO, extra = {}) {
+    return (args) => execFileSync("git", args, { cwd, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"], ...extra });
+}
+
+// git's own first stderr line out of a thrown failure; the error's first line only when git said nothing
+// (ENOBUFS, a spawn that never started, an injected hook that threw a plain Error).
+function gitLine(e) {
+    const said = String((e && e.stderr) || "").split(/\r?\n/).map((l) => l.trim()).find(Boolean);
+    return (said || String((e && e.message) || e).split("\n")[0]).slice(0, 160);
+}
+
+/**
+ * Is refs/remotes/origin/main in this clone? Decided by EXIT STATUS: { present: true, sha } when the probe
+ * exits 0, { present: false, absent: true } when it exits 1, and { present: false, absent: false, reason }
+ * for anything else. An injected run hook reports a failed command the way execFileSync does -- by throwing
+ * an error that carries .status (and .stderr) -- so a fixture that answers every call still reads as present.
+ */
+export function originMainRef(exec) {
+    try { return { present: true, sha: String(exec(["rev-parse", "--verify", "--quiet", "refs/remotes/origin/main^{commit}"]) || "").trim() }; }
+    catch (e) {
+        if (e && e.status === 1) return { present: false, absent: true };
+        return { present: false, absent: false, reason: "git could not be asked whether origin/main exists: " + gitLine(e) };
+    }
+}
+
 /** The whole of origin/main's main.js, so a same-number case can ask whether the BYTES differ too. */
 export function mainSource({ run = null } = {}) {
     const exec = run || ((args) => execFileSync("git", args, { cwd: REPO, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"] }));
@@ -65,30 +112,45 @@ export function mainVersion({ run = null } = {}) {
     // ASIDE ON EVERY RUN AND SAID SO IN WORDS THAT SOUNDED FINE -- the same fault as a skip naming a cause that
     // is not true, committed inside the file written to stop a rule going unenforced. The buffer is raised, and
     // a read that fails now reports WHY rather than being folded into "no main".
-    const exec = run || ((args) => execFileSync("git", args, { cwd: REPO, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"] }));
+    // v4846 -- and WHY is git's own sentence: absence is asked of the probe's exit status first, and a present
+    // ref whose read still fails reports the first line git wrote to stderr, which is now piped rather than
+    // ignored. (The message regex this replaced never matched: it read a message git's words were not in.)
+    const exec = run || gitRunner();
+    const ref = originMainRef(exec);
+    if (!ref.present) return { version: null, absent: ref.absent, reason: ref.absent ? ABSENT_REASON : ref.reason };
     let text;
     try { text = exec(["show", "origin/main:WebGLEngine/main.js"]); }
-    catch (e) {
-        const msg = String((e && e.message) || e);
-        return { version: null, reason: /unknown revision|does not exist|ambiguous argument/i.test(msg)
-            ? "origin/main is not readable here (no such ref, or not a clone with a remote)"
-            : "reading origin/main's main.js FAILED: " + msg.split("\n")[0].slice(0, 120) };
-    }
+    catch (e) { return { version: null, absent: false, reason: "reading origin/main's main.js FAILED: " + gitLine(e) }; }
     const v = engineVersionOf(text);
-    return v ? { version: v, reason: null }
-             : { version: null, reason: "origin/main's main.js carries no ENGINE_VERSION line this could parse" };
+    return v ? { version: v, absent: false, reason: null }
+             : { version: null, absent: false, reason: "origin/main's main.js carries no ENGINE_VERSION line this could parse" };
 }
 
 /** How stale the local origin/main ref is, as a fact rather than an action. */
 export function refFreshness({ run = null } = {}) {
-    const exec = run || ((args) => execFileSync("git", args, { cwd: REPO, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }));
-    try {
-        const local = exec(["rev-parse", "origin/main"]).trim();
-        const remote = (exec(["ls-remote", "origin", "refs/heads/main"]).trim().split(/\s+/)[0] || "");
-        if (!remote) return { known: false, stale: null, note: "the remote did not answer; the check below used the ref as it stands" };
-        return { known: true, stale: local !== remote, local, remote,
-                 note: local === remote ? "origin/main is current" : "origin/main is BEHIND the remote -- run: git fetch origin main" };
-    } catch { return { known: false, stale: null, note: "could not compare against the remote (offline, or no origin)" }; }
+    // v4846 -- SPLIT, because one catch named the network for every failure. A clone with no LOCAL origin/main
+    // has nothing to compare, and the cure is a fetch into that ref (named); a remote that cannot be reached is
+    // a different fact with a different cure, reported in git's own words. `cause` says which, so a caller can
+    // branch on it rather than on prose: "absent", "git", "unreachable", "no-remote-main".
+    const exec = run || gitRunner();
+    const ref = originMainRef(exec);
+    if (!ref.present) {
+        return { known: false, stale: null, cause: ref.absent ? "absent" : "git",
+                 note: ref.absent ? ABSENT_REASON + " -- there is no local ref to compare with the remote" : ref.reason };
+    }
+    let remote;
+    try { remote = (String(exec(["ls-remote", "origin", "refs/heads/main"]) || "").trim().split(/\s+/)[0] || ""); }
+    catch (e) {
+        return { known: false, stale: null, cause: "unreachable",
+                 note: "the remote could not be reached (offline, or no origin remote): " + gitLine(e) +
+                       " -- the check below used the local origin/main as it stands" };
+    }
+    if (!remote) return { known: false, stale: null, cause: "no-remote-main", note: "the remote answered but carries no refs/heads/main; the check below used the ref as it stands" };
+    const local = ref.sha;
+    return { known: true, stale: local !== remote, local, remote,
+             // v4846: the fetch NAMED, as ABSENT_REASON names it -- in a --branch clone a bare `git fetch origin main` moves
+             // only FETCH_HEAD, and the ref this compares stays where it was
+             note: local === remote ? "origin/main is current" : "origin/main is BEHIND the remote -- run: " + FETCH_MAIN };
 }
 
 // ====================================================================================================
@@ -181,20 +243,18 @@ export function highWater(opts = {}) {
 
 /** The ordinals origin/main's changelog has spent, or null with a reason. */
 export function mainOrdinals({ run = null } = {}) {
-    const exec = run || ((args) => execFileSync("git", args, { cwd: REPO, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"] }));
+    // Same shape as mainVersion's: an unreadable main is a normal tree to work in and is NOT a refusal,
+    // but the reason is reported rather than folded into silence.
+    // v4846 -- and the same cure: absence from the probe's exit status, a failed read in git's own words.
+    const exec = run || gitRunner();
+    const ref = originMainRef(exec);
+    if (!ref.present) return { ordinals: null, titles: null, absent: ref.absent, reason: ref.absent ? ABSENT_REASON : ref.reason };
     let text;
     try { text = exec(["show", "origin/main:docs/CHANGELOG.md"]); }
-    catch (e) {
-        const msg = String((e && e.message) || e);
-        // Same shape as mainVersion's: an unreadable main is a normal tree to work in and is NOT a refusal,
-        // but the reason is reported rather than folded into silence.
-        return { ordinals: null, titles: null, reason: /unknown revision|does not exist|ambiguous argument/i.test(msg)
-            ? "origin/main is not readable here (no such ref, or not a clone with a remote)"
-            : "reading origin/main's changelog FAILED: " + msg.split("\n")[0].slice(0, 120) };
-    }
+    catch (e) { return { ordinals: null, titles: null, absent: false, reason: "reading origin/main's changelog FAILED: " + gitLine(e) }; }
     const { ordinals, titles } = ordinalsOf(text);
-    return ordinals.length ? { ordinals, titles, reason: null }
-                           : { ordinals: null, titles: null, reason: "origin/main's changelog has no `## vNNNN` heading this could parse" };
+    return ordinals.length ? { ordinals, titles, absent: false, reason: null }
+                           : { ordinals: null, titles: null, absent: false, reason: "origin/main's changelog has no `## vNNNN` heading this could parse" };
 }
 
 /**

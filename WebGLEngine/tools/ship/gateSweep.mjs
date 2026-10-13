@@ -9191,6 +9191,55 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The CLIs refuse an unknown option (cliArgs) and the peer's transport is a row of its own. Thirteen sabotages red by name, " +
                  "logged in the two headers. NOT CLOSED: the pair has run over loopback and in one browser, not between two machines.",
     }),
+    // v4849 -- since553. ONE new gate file: tools/ship/tacticsTrain-selfcheck.mjs (the tool that fits the Endless-Sky tactics weights in the arena and the file it wrote, held to its own `by` on recomputed numbers), plus the 'trained' rows of
+    // brain/tacticsRoster-selfcheck.mjs (the choice, the panel's format check, both pages, a saved choice surviving a reload).
+    since553: Object.freeze({
+        at: "v4849", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/tacticsTrain-selfcheck.mjs",
+        ]),
+        widened: Object.freeze([
+            "brain/tacticsRoster-selfcheck.mjs (section 3: 'trained' offered only when held, between 'served' and 'imported', flies that vector sanitised, falls back by name; section 5: the panel takes the trained file only from a swek-tactics-v1 answer to its own url, both pages offer it and fly it, a saved choice is what a reload fights)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** A FITTED TACTICS VECTOR HAS THE BETTER OF ALL EIGHT PRESETS: *** 54-22 over the incumbent scatter on 80 audit battles it had never seen, 73.1% against the other seven where scatter has 64.3%, and the narrowest lead (stubborn) is 44-35. TWO OF THE EIGHT NUMBERS CANNOT BE TRAINED HERE: wPlayer " +
+                 "(nothing in the arena is a player) and fleeHyst (nothing repairs a ship, so none recovers across the bar; 0 of 144 battles differed), the second found by a row written to claim the opposite after a full run had spent 300 iterations moving it. The first run's audit seeds are spent (two runs read them while the design was corrected), " +
+                 "the shipped file was graded on a third set, and the champion is the same to the hash. Twenty-nine sabotages red by name, two of them first at 0 red. NOT CLOSED: other fleets and sizes, a style outside the eight presets, the WASM world, the rig.",
+    }),
+    // v4848 -- since552. ONE new gate file: brain/shipCollision6dof-selfcheck.mjs (the page's collision function moved into a module and held to its v4846 text bit for bit; the duel with collisions off held to twenty frozen v4846 fingerprints; the
+    // ram accounting exact; a ship that spins itself to NaN lost and not simulated on), plus section 9-10 of brain/pilot6dofPolicy-selfcheck.mjs, section 7 of tools/ship/train6dofLeague-selfcheck.mjs and three rows of brain/pilotRoster-selfcheck.mjs.
+    since552: Object.freeze({
+        at: "v4848", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "brain/shipCollision6dof-selfcheck.mjs",
+        ]),
+        widened: Object.freeze([
+            "brain/pilot6dofPolicy-selfcheck.mjs (section 9: scenarios, collisions and the ram penalty reach evaluate/train/prune, 304 disjoint seeds; section 10: the close-quarters pilot's file held to its `by`, the trainer's rule, each side in each start; the page's close rows; the six-choices row no longer races the fetches)",
+            "tools/ship/train6dofLeague-selfcheck.mjs (section 7: the three profiles, the floor that scales with the starts, no start behind, careful's ram floor, a close search end to end, --workers carries the profile)",
+            "brain/pilotRoster-selfcheck.mjs (the 'close' choice: offered only when held, after 'league', flies that vector, the Brain panel ignores it)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE 42-3 REPORTED AT v4846 WAS TRUE OF A START IN WHICH NO TWO SHIPS EVER TOUCH: *** in 400 standoff games with collisions on there was not one contact, and the v4846 league pilot loses all 80 jousts to the PD autopilot. The close-quarters pilot beats the shipped one 106-12 over 160 games in both starts " +
+                 "and does not ram less (534 hit points against 439). Careful, trained with a cost on rams, did not qualify, and the likely reason is physics (the contacts come 1.2-1.6 s in, the ship moves about 1.5 m sideways in that time). Two training runs died on a NaN a spinning pilot produces; the page's path had the same hole. " +
+                 "Forty-seven sabotages red by name, four of them first at 0 red. NOT CLOSED: whether a pilot can choose not to ram (the joust cannot ask it); the page's three-a-side fight; the rig.",
+    }),
+    // v4846 -- since551. ONE new gate file: tools/ship/train6dofLeague-selfcheck.mjs (the tool that trains the space-battle pilot against itself and the PD autopilot from both sides), plus sections 7-8 of brain/pilot6dofPolicy-selfcheck.mjs
+    // (both sides of a duel, the league evaluator, the league pilot's file) and three rows of brain/pilotRoster-selfcheck.mjs (the 'league' choice).
+    since551: Object.freeze({
+        at: "v4846", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/train6dofLeague-selfcheck.mjs",
+        ]),
+        widened: Object.freeze([
+            "brain/pilot6dofPolicy-selfcheck.mjs (section 7: scoreB, the league evaluator, the first-side advantage as a measurement, 152 disjoint seeds; section 8: the league pilot's file held to its `by`, the trainer's own rule, each side, a fixed point; the page's league rows)",
+            "brain/pilotRoster-selfcheck.mjs (the 'league' choice: offered only when held, between 'shipped' and 'imported', flies that vector, the Brain panel ignores it)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE 8-2-10 REPORTED AT v4837 FOR THE SHIPPED PILOT AGAINST A COPY OF ITSELF WAS THE SIDE, NOT THE PILOT: *** side A acts first, so a pilot judged from one side is judged on the side. The league trainer plays every game from both sides, " +
+                 "starts from the shipped pilot, trains on 48 seeds (twelve overfit), picks on 24 held-out and grades once on 40 nothing had read: the champion leads the shipped pilot 42-3 over 80 games (the shipped pilot against itself is 18-18) and still loses nothing to the " +
+                 "PD autopilot. Thirty-one sabotages, every one red on its first run, three of the catching rows added before the first run because the sabotage plan showed the draft could not see them. NOT CLOSED: the duel has no ship-ship collisions " +
+                 "so the page's three-a-side fight is not what was measured, and the pilot has only met two styles (the PD autopilot and its own ancestor).",
+    }),
     // v4843 -- since550, above the other line's since549. THREE new gate files: brain/tacticsRoster-selfcheck.mjs (the Endless-Sky fight's Load Tactics panel on flight-gpu.html and es-box3d.html, and what the arena says about its eight presets),
     // brain/pilotAircraftPolicy-selfcheck.mjs (the aircraft's learned pilot, its shipped file and the Load Pilots panel on es-aircraft.html) and tools/ship/trainAircraftPilot-selfcheck.mjs (the tool that trains and ships it).
     since550: Object.freeze({

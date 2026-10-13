@@ -1,0 +1,60 @@
+{
+ "at": "2026-10-12T15:32:50.139Z",
+ "platform": "win32 10.0.22631 x64",
+ "node": "v24.15.0",
+ "commit": "b4adf47 2026-10-12 Merge remote-tracking branch 'origin/main' into claude/code-review-nr3a0i",
+ "only": "denoiseCompile",
+ "launchArgs": [
+  "--enable-unsafe-webgpu",
+  "--use-angle=d3d11"
+ ],
+ "gates": [
+  {
+   "gate": "render/denoiseCompile-selfcheck.mjs",
+   "category": "timing",
+   "ok": true,
+   "ms": 197521,
+   "adapters": [],
+   "software": null,
+   "fails": [],
+   "measured": [
+    "node-webgpu 0.6.2 from C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-webgpu-0.6.2\\node_modules\\webgpu\\index.js (SWEK_WEBGPU); native compilers: D3D12; DXC ships beside dawn.node -- runs as shipped, use_dxc and use_dxc off, from the package alone; modes: as shipped, use_dxc, use_dxc off",
+    "native / as shipped in all: 8 of 8 built; dumps: 8 DXC (DXIL); dumps at C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-denoise-dump-0.6.2-as_shipped-*.txt",
+    "native / use_dxc in all: 8 of 8 built; dumps: 8 DXC (DXIL); dumps at C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-denoise-dump-0.6.2-use_dxc-*.txt",
+    "native / use_dxc off in all: 8 of 8 built; dumps: 8 FXC (DXBC); dumps at C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-denoise-dump-0.6.2-use_dxc_off-*.txt",
+    "native / as shipped: r12-tiled-3x3: build 46 ms, pass 1.389 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 612 lines, 0 loops, 0 indexable-temp lines, 4 barriers",
+    "native / as shipped: r13-fast-3x3: build 93 ms, pass 0.101 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 1339 lines, 0 loops, 0 indexable-temp lines, 4 barriers",
+    "native / as shipped: r12-direct-head: build 29 ms, pass 0.421 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 358 lines, 0 loops, 0 indexable-temp lines, 0 barriers",
+    "native / as shipped: r13-fast-head: build 87 ms, pass 0.056 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 1173 lines, 0 loops, 0 indexable-temp lines, 4 barriers",
+    "native / as shipped: r14-head: build 19 ms, pass 0.128 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 249 lines, 0 loops, 0 indexable-temp lines, 0 barriers",
+    "native / as shipped: r12-apply: build 50 ms, pass 0.088 ms (device clock, 30 passes), worst 4.56e-7 (APPLY_TOL 0.00001); dump: DXC (DXIL), 576 lines, 0 loops, 0 indexable-temp lines, 0 barriers",
+    "native / as shipped: r14-apply-fast: build 50 ms, pass 0.088 ms (device clock, 30 passes), worst 4.56e-7 (APPLY_TOL 0.00001); dump: DXC (DXIL), 566 lines, 0 loops, 0 indexable-temp lines, 3 barriers",
+    "native / as shipped: r15-head-apply: build 1169 ms, pass 0.051 ms (device clock, 30 passes), worst 6.26e-7 against the twin's logits, which are the fused mirror's here (APPLY_TOL 0.00001); dump: DXC (DXIL), 8910 lines, 0 loops, 0 indexable-temp lines, 3 barriers",
+    "native / use_dxc: r12-tiled-3x3: build 56 ms, pass 1.390 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 612 lines, 0 loops, 0 indexable-temp lines, 4 barriers",
+    "native / use_dxc: r13-fast-3x3: build 87 ms, pass 0.103 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 1339 lines, 0 loops, 0 indexable-temp lines, 4 barriers",
+    "native / use_dxc: r12-direct-head: build 31 ms, pass 0.431 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 358 lines, 0 loops, 0 indexable-temp lines, 0 barriers",
+    "native / use_dxc: r13-fast-head: build 94 ms, pass 0.056 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 1173 lines, 0 loops, 0 indexable-temp lines, 4 barriers",
+    "native / use_dxc: r14-head: build 23 ms, pass 0.127 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 249 lines, 0 loops, 0 indexable-temp lines, 0 barriers",
+    "native / use_dxc: r12-apply: build 44 ms, pass 0.088 ms (device clock, 30 passes), worst 4.56e-7 (APPLY_TOL 0.00001); dump: DXC (DXIL), 576 lines, 0 loops, 0 indexable-temp lines, 0 barriers",
+    "native / use_dxc: r14-apply-fast: build 49 ms, pass 0.089 ms (device clock, 30 passes), worst 4.56e-7 (APPLY_TOL 0.00001); dump: DXC (DXIL), 566 lines, 0 loops, 0 indexable-temp lines, 3 barriers",
+    "native / use_dxc: r15-head-apply: build 1145 ms, pass 0.051 ms (device clock, 30 passes), worst 6.26e-7 against the twin's logits, which are the fused mirror's here (APPLY_TOL 0.00001); dump: DXC (DXIL), 8910 lines, 0 loops, 0 indexable-temp lines, 3 barriers",
+    "native / use_dxc off: r12-tiled-3x3: build 394 ms, pass 1.089 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 363 lines, 9 loops, 37 indexable-temp lines, 3 barriers",
+    "native / use_dxc off: r13-fast-3x3: build 3619 ms, pass 0.137 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 537 lines, 6 loops, 0 indexable-temp lines, 3 barriers",
+    "native / use_dxc off: r12-direct-head: build 207 ms, pass 0.348 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 217 lines, 5 loops, 0 indexable-temp lines, 0 barriers",
+    "native / use_dxc off: r13-fast-head: build 159524 ms, pass 22.637 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 9785 lines, 6 loops, 0 indexable-temp lines, 3 barriers",
+    "native / use_dxc off: r14-head: build 111 ms, pass 0.096 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 97 lines, 1 loops, 0 indexable-temp lines, 0 barriers",
+    "native / use_dxc off: r12-apply: build 72 ms, pass 0.126 ms (device clock, 30 passes), worst 4.56e-7 (APPLY_TOL 0.00001); dump: FXC (DXBC), 299 lines, 3 loops, 85 indexable-temp lines, 0 barriers",
+    "native / use_dxc off: r14-apply-fast: build 163 ms, pass 0.071 ms (device clock, 30 passes), worst 4.56e-7 (APPLY_TOL 0.00001); dump: FXC (DXBC), 324 lines, 5 loops, 0 indexable-temp lines, 2 barriers",
+    "native / use_dxc off: r15-head-apply: build 9004 ms, pass 0.103 ms (device clock, 30 passes), worst 6.26e-7 against the twin's logits, which are the fused mirror's here (APPLY_TOL 0.00001); dump: FXC (DXBC), 4954 lines, 3 loops, 0 indexable-temp lines, 2 barriers"
+   ]
+  }
+ ],
+ "adapters": [],
+ "verdict": "*** NO ADAPTER WAS SEEN: no gate reached a device -- this is not a hardware run ***",
+ "summary": "exact 0/0, quality 0/0, timing 1/1",
+ "nodeWebgpu": {
+  "version": "0.6.2",
+  "from": "C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-webgpu-0.6.2\\node_modules\\webgpu\\index.js",
+  "chosenBy": "SWEK_WEBGPU"
+ }
+}

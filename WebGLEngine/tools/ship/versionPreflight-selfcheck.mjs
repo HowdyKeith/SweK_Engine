@@ -26,13 +26,36 @@
 //   2. treat an unreadable main as version 0 -> RED: a guess where a report belongs
 //   3. drop the maxBuffer                    -> RED: section 5, the fault that shipped in the first draft
 // Three sabotages, three caught.
+// v4846 -- SECTION 5d (a --depth 1 --branch clone with no origin/main, driven against real git), each restored md5-identical:
+//   4. originMainRef classifies by the old message regex instead of the probe's exit status
+//                                            -> 4 RED: the mainVersion, mainOrdinals and refFreshness "NOT IN THIS CLONE"
+//                                               rows and the preflight-note row -- all four "git could not be asked: Command failed"
+//   5. mainVersion's pre-fix body put back (no probe; the show's own message against the old regex)
+//                                            -> 4 RED: the mainVersion absent row, the preflight note, the no-repository row, and
+//                                               the PRESENT-ref-read-fails row, which it now misreads AS absence ("does not exist")
+//   6. gitRunner ignores stderr again        -> 3 RED: present-ref-read-fails, UNREACHABLE remote, no-repository -- each lost
+//                                               git's sentence and said "Command failed" instead
+//   7. refFreshness's pre-fix single catch   -> 2 RED: the missing-LOCAL-ref row and the UNREACHABLE-remote row, both back to
+//                                               "could not compare against the remote (offline, or no origin)"
+//   8. FETCH_MAIN without its :refs/remotes/origin/main destination
+//                                            -> 3 RED: the three after-the-fetch rows -- a single-branch clone fetches a bare
+//                                               "main" into FETCH_HEAD only, so the named cure must carry the refspec
+// Five more, five caught.
+//   9. the BEHIND note's cure put back to `git fetch origin main`
+//                                            -> 1 RED: the stale-ref row -- the same FETCH_HEAD-only fetch as 8, in the one note
+//                                               the first pass of v4846 left naming it
+//  10. verify.mjs's row back to printing only refusals, and its stale NOTE back to `git fetch origin main`
+//                                            -> 1 RED each (run separately): the wiring row in section 6
 //
 // Run: node tools/ship/versionPreflight-selfcheck.mjs   (exit 0 all-pass, 1 on any fail)
 
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { preflight, versionNumber, engineVersionOf, mainVersion, ordinalsOf, mainOrdinals, refOrdinals, highWater, ENG } from "./versionPreflight.mjs";
+import { preflight, versionNumber, engineVersionOf, mainVersion, ordinalsOf, mainOrdinals, refOrdinals, highWater, ENG,
+         refFreshness, gitRunner, FETCH_MAIN } from "./versionPreflight.mjs";
 
 let pass = 0, fail = 0;
 const ok = (c, m, d) => { if (c) pass++; else { fail++; console.error("  FAIL  " + m + (d ? "   " + d : "")); } };
@@ -164,7 +187,9 @@ const against = (main) => (v) => preflight(v, {
     } else {
         // No origin/main here is legitimate; a BUFFER failure reported as a missing ref is not.
         ok(!/ENOBUFS|maxBuffer/i.test(r.reason), "*** a buffer failure is never reported as a missing ref ***", r.reason);
-        ok(/not readable here|no ENGINE_VERSION/.test(r.reason), "and the reason given is one that is true of this tree", r.reason);
+        // v4846 -- the absent wording is "not in this clone" now, decided by exit status (section 5d). The old
+        // "not readable here" could never be produced in a branch clone, which is how this row went red on the rig.
+        ok(/not in this clone|git could not be asked|no ENGINE_VERSION/.test(r.reason), "and the reason given is one that is true of this tree", r.reason);
     }
 }
 
@@ -329,12 +354,119 @@ const against = (main) => (v) => preflight(v, {
        "a changelog with no headings yields no ordinals rather than a zero", "a zero would read as a spent seat");
 }
 
+// 5d) *** v4846 -- A BRANCH CLONE HAS NO origin/main, AND THE CLASSIFIER READ A MESSAGE git'S WORDS WERE NOT IN. ***
+//     The readers decided "no such ref" by matching /unknown revision|does not exist|ambiguous argument/
+//     against a message whose stderr had been IGNORED, and git's real sentence for the case is "fatal:
+//     invalid object name 'origin/main'." anyway. On the rig, in a --depth 1 --branch clone, that came back as
+//     "reading origin/main's main.js FAILED: Command failed: git show ..." and section 5 went red. Driven here
+//     against REAL git rather than a stub, because the fault was in what git says and where it says it: a tiny
+//     repository whose main carries WebGLEngine/main.js and docs/CHANGELOG.md, cloned the rig's way so the
+//     clone holds origin/feature and nothing else, and the readers called through their run hook in it.
+//     Measured end to end as well, once, outside this gate: in a --no-local --depth 1 --branch clone of this
+//     repository the pre-fix files gave 55 pass / 1 FAIL (section 5, the rig's exact "Command failed" line),
+//     and the fixed files gave all 67 pass, the command line printing the fetch it names.
+{
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "vpf-branchclone-"));
+    // GIT_* stripped (a gate run from a hook inherits GIT_DIR and friends, which would aim every command below
+    // at the real repository), discovery fenced at the temp root so "no repository" means none, and the C
+    // locale so git's sentences are the English ones the rows read.
+    const env = { ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^GIT_/.test(k))),
+                  GIT_CEILING_DIRECTORIES: path.dirname(tmp), LC_ALL: "C", LANGUAGE: "" };
+    const git = (cwd, ...a) => execFileSync("git", a, { cwd, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+    const who = ["-c", "user.name=fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false"];
+    const src = path.join(tmp, "src"), clone = path.join(tmp, "clone");
+    try {
+        fs.mkdirSync(path.join(src, "WebGLEngine"), { recursive: true });
+        fs.mkdirSync(path.join(src, "docs"));
+        fs.writeFileSync(path.join(src, "WebGLEngine", "main.js"), "export const ENGINE_VERSION = \"v4321\";   // the fixture main's build\n");
+        fs.writeFileSync(path.join(src, "docs", "CHANGELOG.md"), "# changelog\n\n## v4321 -- the fixture main's newest round\n");
+        git(src, "init", "-q");
+        git(src, "symbolic-ref", "HEAD", "refs/heads/main");          // not -b main: that needs git 2.28
+        git(src, "add", "-A");
+        git(src, ...who, "commit", "-q", "--no-verify", "-m", "main");
+        git(src, "branch", "feature");
+        // --no-local, because a clone from a plain path IGNORES --depth; this is the transport the rig's clone used
+        git(tmp, "clone", "-q", "--no-local", "--depth", "1", "--single-branch", "--branch", "feature", src, clone);
+        const run = gitRunner(clone, { env });
+
+        const refs = git(clone, "for-each-ref", "--format=%(refname)", "refs/remotes").split(/\s+/).filter(Boolean);
+        ok(refs.includes("refs/remotes/origin/feature") && !refs.includes("refs/remotes/origin/main"),
+           "the fixture is the rig's shape: a --depth 1 --branch clone holds origin/feature and NO origin/main", refs.join(", "));
+
+        const v = mainVersion({ run });
+        ok(v.version === null && v.absent === true && /origin\/main is not in this clone/.test(v.reason || "") && (v.reason || "").includes(FETCH_MAIN),
+           "!! *** mainVersion in a branch clone says origin/main is NOT IN THIS CLONE and names the fetch -- not \"FAILED: Command failed\" ***",
+           v.reason);
+        const o = mainOrdinals({ run });
+        ok(o.ordinals === null && o.absent === true && /origin\/main is not in this clone/.test(o.reason || "") && (o.reason || "").includes(FETCH_MAIN),
+           "!! *** ...and mainOrdinals says the same, with the same command ***", o.reason);
+        const f = refFreshness({ run });
+        ok(f.known === false && f.cause === "absent" && /not in this clone/.test(f.note) && f.note.includes(FETCH_MAIN) && !/offline|could not be reached/.test(f.note),
+           "!! *** refFreshness reports the missing LOCAL ref as that, with the fetch -- not as an offline remote ***", f.note);
+        const pf = preflight("v4322", { ...SEALED, run });
+        ok(pf.ok === true && (pf.note || "").includes(FETCH_MAIN),
+           "...and the preflight's own note -- what `node tools/ship/versionPreflight.mjs` prints -- carries the command", (pf.note || "").slice(0, 120));
+
+        // THE COMMAND THE REASON NAMES IS THE CURE, run exactly as written: "git" split off, the rest handed to git.
+        git(clone, ...FETCH_MAIN.split(/\s+/).slice(1));
+        const v2 = mainVersion({ run }), o2 = mainOrdinals({ run }), f2 = refFreshness({ run });
+        ok(v2.version === "v4321" && v2.reason === null,
+           "!! *** ...and after running exactly that command, the same call READS v4321 ***", v2.reason || v2.version);
+        ok(o2.ordinals && o2.ordinals[0] === 4321 && o2.reason === null, "...and mainOrdinals reads the changelog's v4321", o2.reason || "");
+        ok(f2.known === true && f2.stale === false, "...and refFreshness compares it with the remote and finds it current", f2.note);
+
+        // A PRESENT ref whose read fails is git's sentence, never "absent". origin/main is pointed at a commit
+        // of the empty tree, so the PATH is what is missing -- and git's words for that include "does not
+        // exist", which the old regex would have read as a missing REF had stderr ever reached it. (The clone's
+        // working copy is removed first: with the file on disk git says "exists on disk, but not in" instead,
+        // measured, and that sentence would not exercise the misreading this row is here for.)
+        const emptyTree = execFileSync("git", ["mktree"], { cwd: clone, env, input: "", encoding: "utf8" }).trim();
+        git(clone, "update-ref", "refs/remotes/origin/main", git(clone, ...who, "commit-tree", emptyTree, "-m", "empty").trim());
+        fs.rmSync(path.join(clone, "WebGLEngine", "main.js"));
+        const v3 = mainVersion({ run });
+        ok(v3.version === null && v3.absent === false && /^reading origin\/main's main\.js FAILED: fatal: path 'WebGLEngine\/main\.js' does not exist/i.test(v3.reason || "") &&
+           !(v3.reason || "").includes(FETCH_MAIN),
+           "!! *** a PRESENT origin/main whose read fails reports git's own stderr line -- not \"Command failed\", and not absence ***", v3.reason);
+
+        // and the other half of refFreshness's split: the local ref is there, the remote is not
+        git(clone, "remote", "set-url", "origin", path.join(tmp, "no-such-remote"));
+        const f3 = refFreshness({ run });
+        ok(f3.known === false && f3.cause === "unreachable" && /could not be reached/.test(f3.note) && /no-such-remote/.test(f3.note) && !/not in this clone/.test(f3.note),
+           "!! *** an UNREACHABLE remote is reported as that, in git's words naming it -- not as a missing local ref ***", f3.note);
+
+        // and a directory that is no repository at all: git dies with 128, which is not the probe's quiet 1
+        const nr = mainVersion({ run: gitRunner(tmp, { env }) });
+        ok(nr.absent === false && /git could not be asked/.test(nr.reason || "") && /not a git repository/i.test(nr.reason || "") && !(nr.reason || "").includes(FETCH_MAIN),
+           "...and a directory that is NO repository is reported as that, never as a ref to go and fetch", nr.reason);
+    } catch (e) {
+        ok(false, "the branch-clone fixture could be built and driven", String((e && e.stderr) || (e && e.message) || e).split("\n")[0]);
+    } finally {
+        try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}
+    }
+}
+
+// 5e) v4846 -- A STALE ref NAMES THE SAME CURE AS AN ABSENT ONE. In a --branch clone `git fetch origin main` moves FETCH_HEAD
+//     only, so a note that said "BEHIND -- run: git fetch origin main" sent the reader to a command that leaves the ref behind.
+{
+    const run = (args) => args[0] === "rev-parse" ? "1111111111111111111111111111111111111111\n"
+                        : args[0] === "ls-remote" ? "2222222222222222222222222222222222222222\trefs/heads/main\n" : "";
+    const f = refFreshness({ run });
+    ok(f.known === true && f.stale === true && /BEHIND/.test(f.note) && f.note.includes(FETCH_MAIN),
+       "!! a BEHIND ref names the refspec fetch, the one that moves refs/remotes/origin/main in any clone", f.note);
+}
+
 // 6) IT IS WIRED INTO THE RITUAL, as a call rather than a mention.
 {
     const HERE = path.dirname(fileURLToPath(import.meta.url));
     const v = fs.readFileSync(path.join(HERE, "verify.mjs"), "utf8");
     ok(/versionPreflight\.mjs"/.test(v) && /preflight\s*\(/.test(v),
        "*** verify.mjs CALLS the preflight -- otherwise the rule is written down twice and enforced zero times ***");
+    // v4847 -- and SAYS what the preflight found: the rig's branch clone printed "main: unreadable" with the reason and the
+    // cure held in pf.note, unprinted; and its stale-ref NOTE named the bare fetch that moves FETCH_HEAD only
+    const row = v.slice(v.indexOf("preflight(version)"), v.indexOf("version preflight could not run"));
+    ok(/behind the remote -- " \+ FETCH_MAIN/.test(row) && /pf\.note/.test(row) && !/git fetch origin main"/.test(row),
+       "!! verify.mjs's preflight row prints the note when main is unreadable, and the refspec fetch when it is behind",
+       /pf\.note/.test(row) ? (/FETCH_MAIN/.test(row) ? "" : "the stale NOTE names no FETCH_MAIN") : "pf.note is never printed");
 }
 
 if (fail) { console.error(`\nversionPreflight-selfcheck: ${pass} pass, ${fail} FAIL`); process.exit(1); }
