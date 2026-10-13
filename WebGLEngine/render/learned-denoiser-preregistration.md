@@ -4138,3 +4138,110 @@ files are committed byte for byte at 821ec075, before this section:
 - Why "as shipped" built slower than "use_dxc" on the Intel.
 - Whether a D3D12 adapter below shader model 6.0 would fall back to FXC with 0.6.2. Dawn's source says it would; neither
   rig GPU is one.
+
+## 66. ROUND 19 -- A NATIVE RUN THAT COMPILES WITH DXC BUILDS AND TIMES r18t AND r18u, AND A NATIVE TABLE BY ADAPTER: FIXED BEFORE THE RIG RUNS IT
+
+**Why this round.** Section 65 read section 64's conditions off both GPUs: C1 and C2 hold on both. So a round 19 may do
+the three things section 64 named. This round does two of them and fixes the rule for the third's consequence:
+- **The native gates build r18t and r18u on D3D12 when the run's compiler is DXC.**
+- **They time them natively against r15**, under DXC and, in the same run, against r15 under FXC.
+- **The pin stays 0.6.0.** Moving it needs a whole native sweep on 0.6.2, green and exact, here and on the rig (section 64).
+  That is a round of its own. Until then a DXC run is a console with `SWEK_WEBGPU` naming 0.6.2.
+- **`DEFAULT_KERNELS` leaves "r15" only by the rule below,** fixed now, before the rig runs anything.
+
+**What changes. Built and piloted here first, on SwiftShader only.**
+- **The compiler, read off the package.** No adapter can say which compiler runs: on 0.6.2 the description is "D3D12
+  driver version ..." under either. Only Dawn's shader dump says, and only a child process can read it (section 52).
+  - `tools/ship/headlessGpu.mjs`'s `nativeCompiler` gives "DXC" on win32 for a package that ships `dxcompiler.dll` beside
+    `dawn.node` and is 0.6.2 or later, unless the device's flags disable `use_dxc`. Any other win32 package gives "FXC";
+    0.6.0 and 0.6.1 force `use_dxc` off whatever DLL sits there (section 64). Off win32 it gives none.
+  - **The compile gate holds that prediction to the dump in the same run.** Its "as shipped" children dump every kernel,
+    and a row is red unless the dumps say DXIL exactly when the package said DXC. That row is condition 0 below. It is
+    what would catch an adapter below shader model 6.0, where Dawn forces FXC; neither rig GPU is one.
+- **`render/denoiseDevice.mjs`.**
+  - `BROWSER_ONLY_SETS` is renamed `FXC_UNBUILT_SETS`. Round 18 called r18t and r18u browser-only; section 65 built both
+    natively.
+  - `nativeSetsFor(adapter, sets, { compiler })` leaves them out only on a D3D12 adapter whose compiler is not DXC. No
+    compiler named counts as FXC, the safe side, so every call that names none behaves as before.
+  - `NATIVE_KERNELS_BY_ADAPTER` is new and empty. `nativeAdapterKey` makes "win32/<vendor>/<architecture>", and
+    `nativeKernelsFor` gives the table's set for a DXC run on a named adapter, and `DEFAULT_KERNELS` otherwise.
+- **The exact gate** builds r18t and r18u natively wherever `nativeSetsFor` allows. That is K0 (b) on the rig, untested
+  since section 61. A refused `SWEK_WEBGPU` is red there now, not a skip.
+- **The timing gate.**
+  - Its native ladder times all four of `TIMED_SETS` under DXC, and prints the adapter's key for the table.
+  - **A second native ladder, r12 and r15 under FXC,** runs in its own process from the same package, with `use_dxc`
+    disabled and the fine clock in one merged entry (section 49). A device's compiler is fixed when it is created, so the
+    two ladders cannot take turns on one device. Their ratio is unpaired, and its line says so.
+  - The native "against r15" lines are tagged section 66. The page's stay section 61's.
+- **The compile gate** adds r18t's and r18u's hidden-layer kernels as native variants, built only in a mode whose compiler
+  is DXC and whose eight base kernels all dumped DXIL. Under FXC they stand aside and are not counted as unbuilt.
+- **`brain/conv2d-selfcheck.mjs`** runs round 17's native rows under DXC. Round 16's shapes still stand aside on every D3D12
+  adapter: the rig's DXC probe ran round 17's shapes only.
+- **`tools/ship/realGpuRun.mjs`** names native adapters (section 65's 1080 report said "NO ADAPTER WAS SEEN"), keeps each
+  gate's SKIP lines, and records the package's `dxcBeside` and predicted compiler.
+- **Pending: the pilot.** The gates that carry these changes are not finished at this commit; their SwiftShader figures
+  are added here when they land, and no threshold below is read from them.
+
+**What exactness means for r18t and r18u natively.** Section 61's, unchanged: the same twin, cell for cell, with a fused
+multiply-add allowed where the twin explains it.
+
+**The rule, fixed now: `NATIVE_KERNELS_BY_ADAPTER`.** It is read off each GPU's round-19 run, `realGpuRun --only
+denoise` with `SWEK_WEBGPU` naming node-webgpu 0.6.2.
+- **A set (r18t or r18u) qualifies natively on a GPU** when all five hold there:
+  0. **The run's compiler is DXC.** The compile gate's row holding the package's prediction to the "as shipped" dumps is
+     green, and the prediction is DXC.
+  1. **K0 (b):** the set's native rows in the exact gate are green on that GPU.
+  2. **K1 against r12 natively under DXC:** section 39's rule. At least 2 times at the largest size both measured, and at
+     least 1 time at every size both measured. The native ladder prints it as "native: rXX against r12".
+  3. **At least 1.05 times as fast as r15 under DXC.** At the largest size where the set and r15 were both measured on
+     the native ladder, r15's median over the set's, on the device's clock. It prints as "native: rXX against r15".
+  4. **At least 1.05 times as fast as r15 under FXC.** At the largest size where the set (on the DXC ladder) and r15 (on
+     the FXC ladder) were both measured, r15's median over the set's, on the device's clock. It prints as "native: rXX
+     against r15 under FXC ... unpaired".
+- **That GPU's entry.** The key is the one the timing gate printed for that GPU. The set is the qualifying one with the
+  larger ratio in 3. A tie goes to the later set, r18u. If neither qualifies, or the run did not reach the native ladder,
+  or the report carries no key, the GPU gets no entry.
+- **`DEFAULT_KERNELS` stays "r15"** for every FXC run, every adapter the table does not name, and every platform but
+  win32. **The table applies to a DXC run only.** Until the pin moves, that is a console with `SWEK_WEBGPU` naming 0.6.2.
+- **Why condition 4.** Section 65 measured r15's own kernels running slower under DXC on the Intel. A native caller that
+  moves to 0.6.2 changes its compiler as well as its set, so the set has to beat what that caller runs today, r15 under
+  FXC, and not only r15 under DXC.
+- **Why it accepts an unpaired ratio.** Section 39's turn-taking cannot span two processes, and the compiler cannot change
+  inside one. The rule reads the ratio as it is, and the line says so.
+- **The threshold is section 61's, 1.05,** set knowing section 65's probe.
+- **A gate stopped by `realGpuRun`'s 30-minute cap reaches no verdict on its path.** A condition that needs it cannot hold.
+
+**Predictions, fixed now, deciding nothing.** They assume the native DXC passes run as Chrome's did in round 18 (section 65
+found native DXC's kernel ratios within 0.26 of Chrome's), and they take r15 under FXC from round 18's native rows on 0.6.0
+(section 63's run):
+
+| Set, GPU | Against r15 under DXC | Against r15 under FXC | Qualifies |
+|---|---|---|---|
+| r18u, Intel | 1.52 x at 1024 (Chrome: 978.9 ms against 642.5) | 1.41 x (907.5 against 642.5) | **yes** |
+| r18t, Intel | 1.03 x | 0.95 x | no |
+| r18t, GTX 1080 | 1.09 x at 1920 x 1080 (82.6 against 75.9) | **1.04 x (78.8 against 75.9)** | no, by condition 4 |
+| r18u, GTX 1080 | 0.66 x | 0.63 x | no |
+
+- **P1:** the Intel's entry is r18u.
+- **P2:** the 1080 gets no entry. r18t clears r15 under DXC but not r15 under FXC: natively on 0.6.0 the 1080's r15 ran
+  faster than Chrome's.
+- **P3:** r15 itself runs slower under DXC than under FXC on both GPUs at their largest common size.
+
+**Reported, deciding nothing.**
+- Each GPU's native ladders, size by size, under both compilers, and r15 under DXC against r15 under FXC.
+- The compile gate's kernel-level line: r18t's and r18u's hidden kernels against r15's at 64 x 64, under DXC.
+
+**After the rule is read.** The verdict round fills `NATIVE_KERNELS_BY_ADAPTER`. It changes no FXC run, so nothing on the
+pinned 0.6.0 moves. Whether the pin moves is the next round's question, fixed before its run, and it needs the whole native
+sweep on 0.6.2 first.
+
+**On the rig.** On each GPU, in the verified clone, through `SWEK_WEBGPU` as in section 64:
+`node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise-r19.json`. Expect the Intel's FXC ladder to take
+minutes: FXC builds the fused head in 16 s there, at every size.
+
+**Sabotages.** Pending, with the gates. Each new row is broken on purpose, seen red by name, and logged here.
+
+**Not in this round.**
+- Moving the pin, or any change to an FXC run.
+- `PAGE_KERNELS` and `PAGE_KERNELS_BY_ADAPTER`: the page's sets are section 63's, and Chrome's compiler did not change.
+- Round 16's shapes natively on D3D12.

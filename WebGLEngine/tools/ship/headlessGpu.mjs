@@ -88,6 +88,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
 import { shellRoots } from "./playwrightResolve.mjs";
 
 // v4615 -- *** THIS LIST WAS ONE SANDBOX'S OWN GLOBAL-INSTALL PATHS, AND IT NEVER MATCHED ANYTHING ELSE. ***
@@ -222,6 +223,55 @@ export function webgpuPackage(from, requireFn, { platform = process.platform, ar
  * times passes on the device's clock hands this to mod.create(); a caller that does not leaves Dawn's default.
  */
 export const FINE_CLOCK_FLAG = "disable-dawn-features=timestamp_quantization";
+
+/** "0.6.2" >= "0.6.2": a version this cannot read as three numbers is not at least anything -- the safe side, FXC, below. */
+export const versionAtLeast = (v, min) => {
+    const a = String(v || "").split("."), b = String(min).split(".").map(Number);
+    if (a.length !== 3 || !a.every((x) => /^\d+$/.test(x))) return false;
+    for (let i = 0; i < 3; i++) if (Number(a[i]) !== b[i]) return Number(a[i]) > b[i];
+    return true;
+};
+
+/**
+ * Round 19 (the denoiser arc, section 66) -- THE COMPILER A NATIVE RUN ON WINDOWS WILL USE, READ OFF THE PACKAGE. The adapter cannot
+ * say: on 0.6.2 its description is "D3D12 driver version ..." under either compiler. Only Dawn's shader dump says what ran, and
+ * only a child process can read it (section 52), so the gates that choose which sets to build natively ask this, and the
+ * compile gate -- which reads every child's dump -- holds this prediction to the dump in the same run. "DXC" needs win32, a
+ * package that ships dxcompiler.dll beside dawn.node AND is 0.6.2 or later (0.6.0's and 0.6.1's Dawn forces use_dxc off,
+ * whatever DLL sits there -- section 64), and no flag that disables use_dxc. Any other win32 package is "FXC". Off win32 there
+ * is no D3D compiler: null. Not caught here: an adapter below shader model 6.0, where Dawn forces FXC; neither rig GPU is one,
+ * and the compile gate's dump row is what would say so.
+ */
+export function nativeCompiler({ pkg = null, platform = process.platform, flags = [] } = {}) {
+    if (platform !== "win32") return null;
+    const off = flags.some((f) => /^disable-dawn-features=/.test(f) && f.slice(f.indexOf("=") + 1).split(",").includes("use_dxc"));
+    return pkg && pkg.dxcBeside && versionAtLeast(pkg.version, "0.6.2") && !off ? "DXC" : "FXC";
+}
+
+/**
+ * Round 19 (section 66) -- A NATIVE GATE NAMES ITS ADAPTER WHERE tools/ship/realGpuRun.mjs READS ADAPTERS. realGpuRun takes adapter
+ * names only from the SWEK_ADAPTER_LOG records, which the browser harness and denoiseTiming's native ladder wrote, so the
+ * GTX 1080's 0.6.2 compile run -- whose native half ran on the GPU's own clock -- reported "NO ADAPTER WAS SEEN" because
+ * Chrome did not run on that box (section 65). This prints the adapter as a measured ("----") line, which realGpuRun keeps,
+ * and appends the record the harness writes, keyed by the gate's path relative to the engine root. `software` is the
+ * adapter's own fallback flag where Dawn gives one, else the name -- an explicit boolean, because realGpuRun calls a record
+ * without one software.
+ */
+export function noteNativeAdapter(adapter, { gate = process.argv[1] || "", compiler = null, env = process.env, append = fs.appendFileSync, say = console.log, hints = /swiftshader|llvmpipe|softwarerasterizer|microsoft basic render|lavapipe|warp/i } = {}) {
+    const i = adapter?.info || {}, name = [i.vendor, i.architecture, i.description].filter(Boolean).join(" / ") || "unnamed";
+    const fallback = adapter && "isFallbackAdapter" in adapter ? adapter.isFallbackAdapter === true : (i.isFallbackAdapter === true);
+    const software = fallback || hints.test(name);
+    say(`  ----  native adapter: ${name} (${software ? "SOFTWARE" : "hardware"})` + (compiler ? `; compiler, from the package: ${compiler}` : ""));
+    if (env.SWEK_ADAPTER_LOG) {
+        const eng = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+        try {
+            append(env.SWEK_ADAPTER_LOG, JSON.stringify({ gate: path.relative(eng, path.resolve(gate)).replace(/\\/g, "/"),
+                adapter: { vendor: i.vendor || null, architecture: i.architecture || null, description: i.description || null },
+                software, launchArgs: ["node-webgpu (native)"] }) + "\n");
+        } catch { /* the line above is the record a reader sees; the log is realGpuRun's convenience */ }
+    }
+    return { name, software };
+}
 
 /**
  * Why a caller cannot run, or null when it can. Two independent facts reported on their own evidence rather

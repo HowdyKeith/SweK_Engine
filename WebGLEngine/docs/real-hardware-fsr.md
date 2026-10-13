@@ -269,7 +269,27 @@ set SWEK_WEBGPU=
 
 **The outcome (section 65).** On both GPUs 0.6.2 compiled with DXC as shipped, built every kernel exact, and built r18t's
 and r18u's kernels in seconds. The fast head ran 2,024 times faster under DXC than under FXC on the Intel, and 404 times on
-the 1080. The pin stays 0.6.0. Round 19's own command comes with its round.
+the 1080. The pin stays 0.6.0; round 19 below runs 0.6.2 the same way.
+
+### Round 19: r18t and r18u natively under DXC, and a native table by adapter (pre-registration section 66)
+
+Round 19 lets the native gates build and time r18t and r18u when the run compiles with DXC, and times r15 under FXC in the
+same run, in a process of its own. Its rule may give each GPU a native set, for runs that compile with DXC only. The tree
+stays pinned to 0.6.0, so this runs 0.6.2 for one console, as the probe did. On each GPU, in the verified clone of v4849:
+
+```
+cd WebGLEngine
+npm install --no-audit --no-fund --prefix "%TEMP%\swek-webgpu-0.6.2" webgpu@0.6.2
+set SWEK_WEBGPU=%TEMP%\swek-webgpu-0.6.2\node_modules\webgpu
+node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise-r19.json
+set SWEK_WEBGPU=
+```
+
+- **The `npm install` line changes nothing** if the probe's install is still there.
+- **The first native lines name the adapter** and say the compiler, from the package, is DXC.
+- **Expect the Intel to take a while.** The timing gate's FXC ladder builds r15's fused pass in about 16 s there, at every
+  size.
+- **Send back `real-gpu-denoise-r19.json`.** Section 66 fixes, before it runs, which set each GPU's native runs take.
 
 ## Send back
 
