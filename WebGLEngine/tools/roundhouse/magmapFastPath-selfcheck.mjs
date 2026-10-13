@@ -87,15 +87,23 @@ const N = 21, SPAN = 1, RHO = 0.1, NR = 48;
 // ---- 4. THE PUBLIC ENTRY POINT GOT THE SPEEDUP, NOT JUST THE INNER FUNCTION -------------------------------------------
 {
     const cfg = { n: N, span: SPAN, rho: RHO, table, nR: NR };
-    for (let i = 0; i < N * N; i++) referenceCell(i, cfg);          // warm
-    const t0 = process.hrtime.bigint();
-    for (let i = 0; i < N * N; i++) referenceCell(i, cfg);
-    const ms = Number(process.hrtime.bigint() - t0) / 1e6;
+    // *** v4846 -- AGAINST THE GENERAL PATH IN THE SAME PROCESS, NOT AGAINST 40 ms ON WHATEVER BOX THIS IS. *** The row said it
+    // checks that the fast path is REACHED and not the machine, then compared to a wall-clock constant: Keith's rig (win32, 8
+    // cores, 8 GB) read 44.5 ms inside the 8-way sweep and failed the ship on it, while this box reads 11. What tells "reached"
+    // from "not reached" on any hardware is the A/B the gate already owns: referenceCell against the general path
+    // (contractFma: true), the same 441 cells, best of three each, interleaved so a burst of load hits both. Measured 7.3x
+    // apart; the row asks for 2x, which no load spread here comes near and a fast path that is not taken cannot meet.
+    // SABOTAGED v4846: referenceCell routed through contractFma (the general path) -> this row RED by name; restored.
+    const general = (i) => cellMag(cellOffset(i, N, SPAN).u0, RHO, table, { precision: "f64", contractFma: true, nR: NR });
+    const time = (fn) => { const t0 = process.hrtime.bigint(); for (let i = 0; i < N * N; i++) fn(i); return Number(process.hrtime.bigint() - t0) / 1e6; };
+    for (let i = 0; i < N * N; i++) { referenceCell(i, cfg); general(i); }          // warm both
+    let fastMs = Infinity, slowMs = Infinity;
+    for (let r = 0; r < 3; r++) { fastMs = Math.min(fastMs, time((i) => referenceCell(i, cfg))); slowMs = Math.min(slowMs, time(general)); }
     ok("referenceCell -- what the phone page and every gate actually call -- runs the fast path",
-        ms < 40,
-        "full 441-cell reference in " + ms.toFixed(1) + "ms (was ~75ms before this round, measured on the same " +
-        "box). The threshold is deliberately loose because this gate runs on unknown hardware; it is checking " +
-        "that the fast path is REACHED, not benchmarking the machine");
+        fastMs * 2 < slowMs,
+        "full 441-cell reference in " + fastMs.toFixed(1) + " ms against " + slowMs.toFixed(1) + " ms for the general path, " +
+        (slowMs / fastMs).toFixed(1) + "x (7.3x when measured; the row asks for 2x). Same process, same cells, best of three each, " +
+        "so the ratio says whether the fast path is REACHED on any machine -- the time alone said how fast the machine was");
 }
 
 console.log();
