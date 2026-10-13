@@ -14,8 +14,8 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { gateList, categorize, parseRows, verdict, runGates, runLaunchArgs, probeSoftwareGl, softwareGlLines, TREE_SOFTWARE_GL,
          probeNativeAdapters, nativeAdapterLines, GATE_TIMEOUT_MS, RETIRED_SOFTWARE_GL, TREE_SOFTWARE_WEBGPU, SOFTWARE_GL_CANDIDATES,
-         NATIVE_LAUNCH, readAdapterLog, gateEntry, addAdapters, nodeWebgpuRecord,   // v4851, section 66: these five
-         NATIVE_USE, nativeGateList, nativeLaunchArgs, nativeSweepCompare } from "./realGpuRun.mjs";   // v4853, section 69: these four
+         NATIVE_LAUNCH, readAdapterLog, gateEntry, addAdapters, nodeWebgpuRecord,
+         NATIVE_USE, nativeGateList, nativeLaunchArgs, nativeSweepCompare } from "./realGpuRun.mjs";   // v4851, section 66: NATIVE_LAUNCH..nodeWebgpuRecord; v4853, section 69: the last four
 import { noteNativeAdapter } from "./headlessGpu.mjs";
 import { webgpuSkipReason, launchArgsFor, hardwareArgsFor, parityArgsFor, HARDWARE_ARGS, softwareClaims } from "./webgpuHarness.mjs";
 import { gateReport } from "./gateReport.mjs";

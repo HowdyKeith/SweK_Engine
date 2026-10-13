@@ -216,7 +216,9 @@ export function runGates({ root = ENG, only = null, native = false, log = consol
     const logFile = path.join(os.tmpdir(), `swek-adapters-${process.pid}-${Date.now()}.jsonl`);
     // the checkout's commit, so a report says which tree it ran -- the rig's empty run came from a checkout behind the branch
     const git = spawnSync("git", ["log", "-1", "--format=%h %cs %s"], { cwd: root, encoding: "utf8" });
-    const report = { at: new Date().toISOString(), platform: `${process.platform} ${os.release()} ${os.arch()}`, node: process.version,
+    // v4853 -- generatedFrom: a report names gate files by basename, and tools/ship/recordProvenance-selfcheck.mjs asks every such record
+    // to say which tool wrote it -- at the writer, since a key added to a written file alone is gone at the next run
+    const report = { generatedFrom: "tools/ship/realGpuRun.mjs", at: new Date().toISOString(), platform: `${process.platform} ${os.release()} ${os.arch()}`, node: process.version,
                      commit: git.status === 0 ? git.stdout.trim().slice(0, 120) : null, only, native, launchArgs, gates: [], adapters: [] };
     for (const g of gates) {
         const t0 = Date.now();

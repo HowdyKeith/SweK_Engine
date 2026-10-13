@@ -268,7 +268,11 @@ export const POSIX_AT_V4485 = Object.freeze({
     // files (a worktree of HEAD): 175/244/120/55 -- the lockstep round and main's v4823-v4825 had already moved it +4/+8/+5/-1, inside the band's +/- 4. THIS round's
     // part is one caller, one call and one `never`: tools/ship/flakeProbe.mjs builds the engine's own paths with path.join and never compares or records one with a
     // separator in it. NOTHING WAS UN-NORMALISED. 176 is one past the band, which is why this is a re-take and not a tolerance.
-    separator: Object.freeze({ callers: 176, calls: 245, normalised: 120, never: 56 }),
+    // v4853 -- 176/245/120/56 -> 181/254/126/55, under the same rule and skip list, taken with the gate's own scan, the callers diffed file by file against
+    // v4826's tree (653e4703). Five new callers, EVERY ONE NORMALISING: tools/ship/afterVerdict.mjs (v4835), tools/ship/wasmTeardown.mjs (v4840),
+    // tools/ship/adapterRecord-selfcheck.mjs (the definitionGates naming), tools/ship/headlessGpu.mjs (round 19's core) -- four, inside the band -- and
+    // THIS round's tools/ship/realGpuRun.mjs (nativeGateList's relative paths), the fifth, one past it. NOTHING WAS UN-NORMALISED: a re-take, not a tolerance.
+    separator: Object.freeze({ callers: 181, calls: 254, normalised: 126, never: 55 }),
     rulesTried: Object.freeze([53, 74, 90]),
     notClaimed: "that the 90 are defects. A relative path that is only printed is portable already; the ones " +
                 "that bite are compared against a stored form, and three static rules for 'compared against' " +
