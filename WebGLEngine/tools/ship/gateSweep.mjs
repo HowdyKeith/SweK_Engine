@@ -9191,11 +9191,12 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The CLIs refuse an unknown option (cliArgs) and the peer's transport is a row of its own. Thirteen sabotages red by name, " +
                  "logged in the two headers. NOT CLOSED: the pair has run over loopback and in one browser, not between two machines.",
     }),
-    // v4853 -- since554 (the highest on any branch at the time was since553, read across every remote ref after a full fetch). ONE new
+    // v4854 -- since554 (the highest on any branch at the time was since553, read across every remote ref after a full fetch; the
+    // round was first numbered v4853, which another branch spent minutes after a full fetch had shown it free). ONE new
     // gate file: tools/ship/threeTextureBarrier-selfcheck.mjs (three's own textureBarrier test before and after a one-line diff, on the
     // adapter it runs on).
     since554: Object.freeze({
-        at: "v4853", swept: 1, green: 1, red: 0,
+        at: "v4854", swept: 1, green: 1, red: 0,
         added: Object.freeze([
             "tools/ship/threeTextureBarrier-selfcheck.mjs",
         ]),

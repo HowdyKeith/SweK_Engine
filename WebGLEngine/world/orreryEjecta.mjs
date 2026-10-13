@@ -541,7 +541,7 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         // v4805 -- the engine moved to r186 and kept r185 beside it: threePatch.mjs applies the r185 patches to vendor/three-webgpu-r185
         // now (its row below), and threeUpstream-selfcheck.mjs's section 6 runs the issues on this body's r186. One gone, one arrived.
         "tools/ship/threeUpstream-selfcheck.mjs",
-        // v4853 -- three's own textureBarrier unit test, run before and after its one-line diff through this body's r186
+        // v4854 -- three's own textureBarrier unit test, run before and after its one-line diff through this body's r186
         // (the page imports three.webgpu.js and three.tsl.js, as threeUpstream does). One arrival.
         "tools/ship/threeTextureBarrier-selfcheck.mjs",
     ]),
