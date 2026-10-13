@@ -1,5 +1,5 @@
 {
- "host": "linux-x64-4c-16gb-420793",
+ "host": "linux-x64-4c-16gb-142c0d",
  "note": "OBSERVED at the last quickSweep run: ms per gate (serial where a serial re-run happened) and exit code. *** `kinds` (v4579) SAYS WHICH QUANTITY EACH MS IS: `loaded` is a parallel reading taken with `workers` gates running at once, `alone` is a serial re-run, `capped` is the SIGKILL cap and not a runtime at all. The two real kinds sit about 1.93x apart (v4578), so comparing a ms against anything without knowing its kind is comparing two different quantities -- which is how nine entries came to hold the wrong one. *** Rewritten every run; used only to choose which gates are under the ship-time budget. Not a claim about the tree -- the register is. `at` is PER ENTRY (v4408): the capture that actually observed that gate. `captured` is this run's stamp and applies ONLY to entries whose `at` equals it -- the rest were not run and say so. `crossings` (v4536) counts CONSECUTIVE sweeps on which a gate came in over budget, and it takes two to evict: one crossing is a reading from one hour, and this box moves 12-36% between hours on unchanged code. A gate that comes back under loses its count entirely. `serial` (v4562) is the UNCONTENDED cost -- from a phase-2 run or from this sweep's rotating slice -- while `timings` is a sample taken while seven other gates fought for the box and runs a MEDIAN 2.41x above it. Ask costOf(), not timings[], for what a gate costs. `contended` (v4556) says WHICH of the two `timings[g]` is: true for a parallel sample, false for a serial reading filed there -- by a red re-run, a budget confirm, or sweepRotation. A ratio taken without it divides 164 measurements by themselves. Ask contentionPairs() for the population a contention ratio may be taken over.",
  "kindsInferred": [
   "brain/rl/dock-hazard-selfcheck.mjs",
@@ -2097,7 +2097,8 @@
   "brain/tacticsRoster-selfcheck.mjs": 51059,
   "tools/ship/trainAircraftPilot-selfcheck.mjs": 74554,
   "tools/ship/train6dofLeague-selfcheck.mjs": 127938,
-  "brain/shipCollision6dof-selfcheck.mjs": 1299
+  "brain/shipCollision6dof-selfcheck.mjs": 1299,
+  "tools/ship/tacticsTrain-selfcheck.mjs": 383240
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -4071,7 +4072,8 @@
   "brain/tacticsRoster-selfcheck.mjs": 0,
   "tools/ship/trainAircraftPilot-selfcheck.mjs": 0,
   "tools/ship/train6dofLeague-selfcheck.mjs": 0,
-  "brain/shipCollision6dof-selfcheck.mjs": 0
+  "brain/shipCollision6dof-selfcheck.mjs": 0,
+  "tools/ship/tacticsTrain-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-10-13T02:08:26.726Z",
@@ -6045,7 +6047,8 @@
   "brain/tacticsRoster-selfcheck.mjs": "2026-10-12T03:35:18.353Z",
   "tools/ship/trainAircraftPilot-selfcheck.mjs": "2026-10-12T03:37:36.224Z",
   "tools/ship/train6dofLeague-selfcheck.mjs": "2026-10-13T01:18:48.855Z",
-  "brain/shipCollision6dof-selfcheck.mjs": "2026-10-13T02:08:26.726Z"
+  "brain/shipCollision6dof-selfcheck.mjs": "2026-10-13T02:08:26.726Z",
+  "tools/ship/tacticsTrain-selfcheck.mjs": "2026-10-13T13:08:55.529Z"
  },
  "capAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 20000,
@@ -7993,7 +7996,8 @@
   "brain/tacticsRoster-selfcheck.mjs": 300000,
   "tools/ship/trainAircraftPilot-selfcheck.mjs": 300000,
   "tools/ship/train6dofLeague-selfcheck.mjs": 300000,
-  "brain/shipCollision6dof-selfcheck.mjs": 20000
+  "brain/shipCollision6dof-selfcheck.mjs": 20000,
+  "tools/ship/tacticsTrain-selfcheck.mjs": 1800000
  },
  "finished": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": true,
@@ -9961,7 +9965,8 @@
   "brain/tacticsRoster-selfcheck.mjs": true,
   "tools/ship/trainAircraftPilot-selfcheck.mjs": true,
   "tools/ship/train6dofLeague-selfcheck.mjs": true,
-  "brain/shipCollision6dof-selfcheck.mjs": true
+  "brain/shipCollision6dof-selfcheck.mjs": true,
+  "tools/ship/tacticsTrain-selfcheck.mjs": true
  },
  "crossings": {
   "brain/gunnerPolicy-selfcheck.mjs": 2,
@@ -12036,7 +12041,8 @@
   "brain/tacticsRoster-selfcheck.mjs": 20038,
   "tools/ship/trainAircraftPilot-selfcheck.mjs": 20025,
   "tools/ship/train6dofLeague-selfcheck.mjs": 127938,
-  "brain/shipCollision6dof-selfcheck.mjs": 1299
+  "brain/shipCollision6dof-selfcheck.mjs": 1299,
+  "tools/ship/tacticsTrain-selfcheck.mjs": 383240
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-10-13T01:52:26.168Z",
@@ -13900,7 +13906,8 @@
   "brain/tacticsRoster-selfcheck.mjs": "2026-10-12T04:04:00.329Z",
   "tools/ship/trainAircraftPilot-selfcheck.mjs": "2026-10-12T04:04:00.329Z",
   "tools/ship/train6dofLeague-selfcheck.mjs": "2026-10-13T01:18:48.855Z",
-  "brain/shipCollision6dof-selfcheck.mjs": "2026-10-13T02:08:11.630Z"
+  "brain/shipCollision6dof-selfcheck.mjs": "2026-10-13T02:08:11.630Z",
+  "tools/ship/tacticsTrain-selfcheck.mjs": "2026-10-13T13:08:55.529Z"
  },
  "serialRing": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": [
@@ -23115,6 +23122,9 @@
    1298,
    1262,
    1299
+  ],
+  "tools/ship/tacticsTrain-selfcheck.mjs": [
+   383240
   ]
  },
  "contended": {
@@ -24979,7 +24989,8 @@
   "brain/tacticsRoster-selfcheck.mjs": false,
   "tools/ship/trainAircraftPilot-selfcheck.mjs": false,
   "tools/ship/train6dofLeague-selfcheck.mjs": false,
-  "brain/shipCollision6dof-selfcheck.mjs": false
+  "brain/shipCollision6dof-selfcheck.mjs": false,
+  "tools/ship/tacticsTrain-selfcheck.mjs": false
  },
  "kinds": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "loaded",
@@ -26953,6 +26964,7 @@
   "brain/tacticsRoster-selfcheck.mjs": "alone",
   "tools/ship/trainAircraftPilot-selfcheck.mjs": "alone",
   "tools/ship/train6dofLeague-selfcheck.mjs": "alone",
-  "brain/shipCollision6dof-selfcheck.mjs": "alone"
+  "brain/shipCollision6dof-selfcheck.mjs": "alone",
+  "tools/ship/tacticsTrain-selfcheck.mjs": "alone"
  }
 }
