@@ -922,8 +922,11 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4842 -- MAIN'S v4838 (THE DENOISER ARC) MERGED WITH THIS LINE'S v4838-v4841: RE-DERIVED by census() over the merged tree.
     // v4848 -- brain/shipCollision6dof-selfcheck.mjs: gates, usesOk, definesOk and nameFirst each by one more (1968 -> 1969, 1947 -> 1948, 1939 -> 1940, 1839 -> 1840); nothing else moved.
     // v4849 -- tools/ship/tacticsTrain-selfcheck.mjs: gates, usesOk, definesOk and nameFirst each by one more (1969 -> 1970, 1948 -> 1949, 1940 -> 1941, 1840 -> 1841); nothing else moved.
+    // v4851 -- render/denoiseDevice-selfcheck.mjs's ok() now RETURNS its verdict (round 19 collects each set's K0 rows to say
+    // whether every one was green, section 66's condition 1), a new spelling of the same definition: distinctDefinitions 42 -> 43;
+    // nothing else moved.
     gates: 1970, usesOk: 1949, definesOk: 1941, importsOk: 0,
-    distinctDefinitions: 42, nameFirst: 1841, condFirst: 97, unknownSignature: 11,
+    distinctDefinitions: 43, nameFirst: 1841, condFirst: 97, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
