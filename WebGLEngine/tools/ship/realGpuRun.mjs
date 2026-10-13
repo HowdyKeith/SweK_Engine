@@ -10,6 +10,7 @@
 // not a real-hardware run, whatever machine it was on. docs/real-hardware-fsr.md says how to run it and what to send back.
 //
 //   node tools/ship/realGpuRun.mjs [--out FILE] [--only SUBSTRING]
+//   node tools/ship/realGpuRun.mjs --native [--out FILE] [--only SUBSTRING]   (v4853, section 69: every gate that makes a node-webgpu device)
 //   SWEK_LAUNCH_ARGS="--enable-unsafe-webgpu --enable-features=Vulkan" node tools/ship/realGpuRun.mjs   (the browser's flags)
 //
 // Each gate is one of three kinds, by what it measures (categorize, below, and the doc):
@@ -31,6 +32,9 @@ import { SOFTWARE_HINTS } from "../../ui/localModelProbe.js";
 // v4851 (section 66): static, unlike probeNativeAdapters' lazy import -- headlessGpu.mjs imports only playwrightResolve.mjs,
 // which this file already loads, and the report's predicted compiler must be the very rule the native gates choose sets by
 import { nativeCompiler, WEBGPU_ENV } from "./headlessGpu.mjs";
+// v4853 (section 69): the native sweep's gate list is found by reading code, through the tree's one gate walker and its comment stripper
+import { gateFiles } from "./staleness.mjs";
+import { codeOnly } from "./sourceScan.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -42,6 +46,23 @@ export function gateList(root = ENG) {
     // adds its compile gate (each kernel's build and pass time under each native compiler and in the browser, section 43)
     return [...pick("fx/fsr", /-selfcheck\.mjs$/), ...pick("render", /Tsl.*-selfcheck\.mjs$/), ...pick("render", /^translucentLayer-selfcheck\.mjs$/),
             ...pick("render", /^denoise(Device|Timing|Compile)-selfcheck\.mjs$/)].sort();
+}
+
+/**
+ * A native device made by node-webgpu: headlessGpu's loader or one of its two compute runners, USED IN CODE -- imported or called,
+ * not named in a comment or a string. Not "called": four gates import a runner under another name (`runWgslComputeNative as
+ * runWgslCompute`), so a call never spells it, and a call-only rule found 22 of the 26.
+ */
+export const NATIVE_USE = /\b(?:resolveWebgpu|runWgslComputeNative|runWgslComputeToTextureNative)\b/;
+/**
+ * v4853 -- section 69, THE WHOLE NATIVE SWEEP: every gate whose own code makes a node-webgpu device (NATIVE_USE), relative to
+ * the engine root, sorted. Derived, not listed: a gate that starts making a native device joins the sweep without an edit here.
+ * One hop only -- a gate reaching node-webgpu through a module that calls it is not found, and none does today (the modules that
+ * call it are the denoiser's two CLIs, the rt pipeline and the probe capture, each of whose gates calls it too).
+ */
+export function nativeGateList(root = ENG, { files = null, read = (f) => fs.readFileSync(f, "utf8") } = {}) {
+    const all = files || gateFiles(root);
+    return all.filter((f) => NATIVE_USE.test(codeOnly(read(f)))).map((f) => path.relative(root, f).split(path.sep).join("/")).sort();
 }
 
 /**
@@ -154,13 +175,13 @@ export function runLaunchArgs(env = process.env, platform = process.platform) {
  */
 export const GATE_TIMEOUT_MS = 1800000;
 
-export function runGates({ root = ENG, only = null, log = console.log, launchArgs = runLaunchArgs() } = {}) {
-    const gates = gateList(root).filter((g) => !only || g.includes(only));
+export function runGates({ root = ENG, only = null, native = false, log = console.log, launchArgs = runLaunchArgs() } = {}) {
+    const gates = (native ? nativeGateList(root) : gateList(root)).filter((g) => !only || g.includes(only));
     const logFile = path.join(os.tmpdir(), `swek-adapters-${process.pid}-${Date.now()}.jsonl`);
     // the checkout's commit, so a report says which tree it ran -- the rig's empty run came from a checkout behind the branch
     const git = spawnSync("git", ["log", "-1", "--format=%h %cs %s"], { cwd: root, encoding: "utf8" });
     const report = { at: new Date().toISOString(), platform: `${process.platform} ${os.release()} ${os.arch()}`, node: process.version,
-                     commit: git.status === 0 ? git.stdout.trim().slice(0, 120) : null, only, launchArgs, gates: [], adapters: [] };
+                     commit: git.status === 0 ? git.stdout.trim().slice(0, 120) : null, only, native, launchArgs, gates: [], adapters: [] };
     for (const g of gates) {
         const t0 = Date.now();
         const r = spawnSync(process.execPath, [g], { cwd: root, encoding: "utf8", timeout: GATE_TIMEOUT_MS,
@@ -345,7 +366,7 @@ export function softwareGlLines(probe) {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
     // v4776 -- parsed by cliArgs.mjs rather than read off argv: `--onyl fsr` used to run EVERY gate and say nothing,
     // which on a real GPU is the longest run this tool makes. A mistyped option is refused with a did-you-mean.
-    const CLI = { values: { "--out": "path", "--only": "string" }, flags: ["--gl-flags"] };
+    const CLI = { values: { "--out": "path", "--only": "string" }, flags: ["--gl-flags", "--native"] };
     const cli = parseArgs(process.argv.slice(2), CLI);
     if (cli.errors.length) { for (const l of refusalLines("realGpuRun", cli.errors, CLI)) console.error(l); process.exit(2); }
     if (cli.flags.has("--gl-flags")) {
@@ -365,8 +386,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const WP = HG.webgpuPackage(W.from);
     const arg = (k) => cli.values[k] ?? null;
     const out = path.resolve(arg("--out") || path.join(process.cwd(), "real-gpu-run.json"));
-    console.log(`\nthe FSR, frame-generation and denoiser gates, with the harness logging each call's adapter (${process.platform})`);
-    const report = runGates({ only: arg("--only") });
+    const native = cli.flags.has("--native");
+    console.log(native ? `\nthe whole native sweep: every gate that makes a node-webgpu device (section 69), on this package (${process.platform})`
+                       : `\nthe FSR, frame-generation and denoiser gates, with the harness logging each call's adapter (${process.platform})`);
+    const report = runGates({ only: arg("--only"), native });
     // v4851 (section 66): and its dxcompiler.dll and predicted compiler, beside the version
     report.nodeWebgpu = nodeWebgpuRecord({ from: W.from, pkg: WP });
     const NW = report.nodeWebgpu;

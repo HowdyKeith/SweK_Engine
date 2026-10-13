@@ -14,7 +14,8 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { gateList, categorize, parseRows, verdict, runGates, runLaunchArgs, probeSoftwareGl, softwareGlLines, TREE_SOFTWARE_GL,
          probeNativeAdapters, nativeAdapterLines, GATE_TIMEOUT_MS, RETIRED_SOFTWARE_GL, TREE_SOFTWARE_WEBGPU, SOFTWARE_GL_CANDIDATES,
-         NATIVE_LAUNCH, readAdapterLog, gateEntry, addAdapters, nodeWebgpuRecord } from "./realGpuRun.mjs";   // v4851, section 66: the last five
+         NATIVE_LAUNCH, readAdapterLog, gateEntry, addAdapters, nodeWebgpuRecord,   // v4851, section 66: these five
+         NATIVE_USE, nativeGateList } from "./realGpuRun.mjs";   // v4853, section 69: these two
 import { noteNativeAdapter } from "./headlessGpu.mjs";
 import { webgpuSkipReason, launchArgsFor, hardwareArgsFor, parityArgsFor, HARDWARE_ARGS, softwareClaims } from "./webgpuHarness.mjs";
 import { gateReport } from "./gateReport.mjs";
@@ -395,6 +396,30 @@ console.log("\n6. ROUND 19 (section 66, v4851): NATIVE ADAPTERS NAMED, EACH GATE
        new Set(keys).size === keys.length && SOFTWARE_GL_CANDIDATES.every((a) => Object.isFrozen(a)) &&
        /export async function probeSoftwareGl\(sets = SOFTWARE_GL_CANDIDATES,/.test(probeSrc),
        `${SOFTWARE_GL_CANDIDATES.length} candidates, first [${keys[0]}]; tree WebGPU [${key(TREE_SOFTWARE_WEBGPU)}]; retired [${key(RETIRED_SOFTWARE_GL)}]`);
+}
+
+console.log("\n7. SECTION 69 (v4853): THE WHOLE NATIVE SWEEP -- EVERY GATE THAT MAKES A node-webgpu DEVICE, FOUND BY READING CODE");
+{
+    // a fixture tree: a call, an import under another name (four real gates do this), a comment and a string -- only the first two count
+    const F = { "/r/a/one-selfcheck.mjs": "const W = H.resolveWebgpu();\n", "/r/b/two-selfcheck.mjs": "import { runWgslComputeNative as run } from \"./headlessGpu.mjs\";\nawait run({});\n",
+                "/r/c/three-selfcheck.mjs": "// runWgslComputeNative( is what the others use\nconst x = 1;\n", "/r/d/four-selfcheck.mjs": "const s = \"runWgslComputeToTextureNative(\";\n" };
+    const got = nativeGateList("/r", { files: Object.keys(F), read: (f) => F[f] });
+    ok("!! section 69: a gate is native when its CODE uses headlessGpu's loader or a compute runner -- called, or imported under another name -- and not when a comment or a string names one",
+       got.join() === "a/one-selfcheck.mjs,b/two-selfcheck.mjs", JSON.stringify(got));
+    const tree = nativeGateList(), must = ["render/denoiseDevice-selfcheck.mjs", "render/denoiseTiming-selfcheck.mjs", "render/denoiseCompile-selfcheck.mjs", "brain/conv2d-selfcheck.mjs",
+        "tools/ship/deviceCompute-selfcheck.mjs", "tools/ship/badTvWgsl-selfcheck.mjs", "tools/ship/bloomFusedTexture-selfcheck.mjs"];
+    console.log(`  ----  the whole native sweep here: ${tree.length} gates`);
+    ok("!! section 69: the tree's native sweep holds the denoiser's three device gates, conv2d, the compute gates, and the gates that import a runner under another name -- and not this gate, which names them only in strings",
+       must.every((g) => tree.includes(g)) && !tree.includes("tools/ship/realGpuRun-selfcheck.mjs") && tree.every((g) => NATIVE_USE.test(fs.readFileSync(path.join(ENG, g), "utf8"))) &&
+       JSON.stringify(tree) === JSON.stringify([...tree].sort()), `${tree.length}: ${must.filter((g) => !tree.includes(g)).join(", ") || "all named present"}`);
+    // the CLI's --native: an --only that matches no native gate still says so, exits 1, and marks its report as the native sweep
+    const tmp = path.join(os.tmpdir(), `swek-realgpu-native-${process.pid}.json`);
+    const r = spawnSync(process.execPath, ["tools/ship/realGpuRun.mjs", "--native", "--only", "no-such-gate-anywhere", "--out", tmp], { cwd: ENG, encoding: "utf8", timeout: 60000 });
+    const rep = fs.existsSync(tmp) ? JSON.parse(fs.readFileSync(tmp, "utf8")) : null;
+    try { fs.unlinkSync(tmp); } catch {}
+    ok("  section 69: realGpuRun --native is accepted, says it is the native sweep, and its report carries native: true and the package it ran on",
+       r.status === 1 && !!rep && rep.native === true && rep.gates.length === 0 && /the whole native sweep/.test(r.stdout || "") && !!rep.nodeWebgpu && "version" in rep.nodeWebgpu,
+       `exit ${r.status}; native ${rep && rep.native}; ${(r.stderr || "").split("\n")[0].slice(0, 100)}`);
 }
 
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
