@@ -394,5 +394,22 @@ console.log("\nTHE CLONE PARENT IS NOT CREATED WHEN IT IS ALREADY THERE (found o
        "distinction available, and the refusal carries the path rather than a sentence grepped out of the source");
 }
 
+console.log("\nA REJECTED TOKEN IS A STATUS CODE GIT PRINTS AS ONE, NOT A NUMBER IN ITS PROGRESS (v4851)");
+{
+    // The anonymous retry keys on this. A bare 401|403 matched "Receiving objects: 4013" and reported a good token as REJECTED.
+    // SABOTAGED v4851: the old bare alternation put back -> this row RED by name (three counts read as auth failures); restored.
+    const { _authFailed } = require_(path.join(ENG, "ai-bridge", "githubBridge.js"));
+    const auth = ["fatal: Authentication failed for 'https://github.com/x/y.git/'", "remote: Invalid username or password.",
+                  "fatal: could not read Username for 'https://github.com': terminal prompts disabled",
+                  "error: RPC failed; HTTP 403 curl 22 The requested URL returned error: 403",
+                  "fatal: unable to access 'https://github.com/x/y.git/': The requested URL returned error: 401", "HTTP/2 403"];
+    const notAuth = ["Receiving objects:  40% (4013/10032), 4.01 MiB", "fatal: early EOF after 40312 bytes", "error: object 4031a9c2 is corrupt",
+                     "fatal: repository 'https://github.com/x/y.git/' not found", "", null];
+    const missed = auth.filter((t) => !_authFailed(t)), falseAlarm = notAuth.filter((t) => _authFailed(t));
+    ok("!! a rejected token is recognised from every way git and curl say so, and never from a count, a byte total or a hash that holds 401 or 403",
+        missed.length === 0 && falseAlarm.length === 0,
+        missed.length || falseAlarm.length ? `missed ${JSON.stringify(missed)}; false alarm ${JSON.stringify(falseAlarm)}` : `${auth.length} rejections, ${notAuth.length} non-rejections`);
+}
+
 console.log(fails ? `\ncloneSource-selfcheck: ${fails} FAILED` : "\ncloneSource-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);

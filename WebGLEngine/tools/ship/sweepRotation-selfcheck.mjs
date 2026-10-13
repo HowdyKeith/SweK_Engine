@@ -57,6 +57,17 @@ sec("1. mergeTimings WRITES EVERY MAP, WHICH IS THE THING TWO ROUNDS FOUND DEFEC
        "an inference dressed as an observation is the fault kindsInferred exists to name");
     ok("...and priorMs reports what was there before, so a caller can say what moved",
        priorMs.g === 9000, `${priorMs.g} -> ${merged.timings.g}`);
+    // v4851 -- the rotation's solo reading ends probation as the sweep's own does: under the line and finished clears the count;
+    // over the line, capped, or skipped leaves it for the sweep. SABOTAGED v4851: the clearing line removed -> this row RED by
+    // name (p1 still on probation after a 900 ms reading); restored.
+    {
+        const f = { budgetMs: 3000, timings: {}, crossings: { p1: 1, p2: 1, p3: 1, p4: 1, other: 1 } };
+        const rows = [{ gate: "p1", ms: 900, code: 0, finished: true }, { gate: "p2", ms: 4200, code: 0, finished: true },
+                      { gate: "p3", ms: 20000, code: "timeout/signal", finished: false }, { gate: "p4", ms: 40, code: 0, finished: true, skipped: true }];
+        const c = mergeTimings(f, rows, "2026-10-13T00:00:00.000Z").merged.crossings;
+        ok("!! a finished solo reading under the budget ENDS a gate's probation; over the budget, capped or skipped leaves it, and gates not read are untouched",
+            !("p1" in c) && c.p2 === 1 && c.p3 === 1 && c.p4 === 1 && c.other === 1 && f.crossings.p1 === 1, JSON.stringify(c));
+    }
     ok("!! CONTROL: the input is not mutated -- the caller spreads it and would write the change twice",
        JSON.stringify(before) === snapshot, "a half-mutated input is a record carrying one reading under two stamps");
 

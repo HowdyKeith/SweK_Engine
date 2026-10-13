@@ -534,10 +534,9 @@ async function _cloneEngineSourceInner({ repo, ref, targetDir, prefix } = {}) {
     // an expired PAT is refusing to do something that needs no permission at all. So an auth failure retries
     // WITHOUT the header, and the reply says which path worked, because "it cloned" and "your token is dead"
     // are both things you want to know and only one of them is obvious afterwards.
-    const AUTH_FAIL = /could not read Username|Authentication failed|invalid username or password|401|403/i;
     let cl = tk ? await _run("git", args, { env: authedEnv() }) : await _run("git", args, { env: baseEnv() });
     let usedAnon = !tk, tokenRejected = false;
-    if (!cl.ok && tk && AUTH_FAIL.test(cl.err || "")) {
+    if (!cl.ok && tk && _authFailed(cl.err)) {
         tokenRejected = true;
         try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}   // a failed clone leaves a partial dir
         cl = await _run("git", args, { env: baseEnv() });
@@ -1161,4 +1160,11 @@ async function _tracked(what, fn) {
 function busy() { return _ghBusy > 0; }
 function busyWhat() { return _ghBusy > 0 ? _ghWhat : null; }
 
-module.exports = { _ensureCloneParent, busy, busyWhat, ledgerRefresh, ledgerCheck, _apiErrorText, _errorDetail, repoShapeError, _parseEngineVersion, _versionInTree, cloneEngineSource, previewFolder, publishFolder, setConfig, status, listRepos, repoPreview, latestRelease, versionCheck, denoVersionCheck, createRelease, uploadAsset, publishVersion, publishEngineBuild, fetchEngineBuild, engineVersion, whoami, rateLimit, createRepo, updateRepo, deleteRepo, listReleases, deleteRelease, listIssues, createIssue, closeIssue, listCommits, listBranches, listSourceBranches, getFile, putFile, peerConfig, setPeerConfig, addMonitorRepo, removeMonitorRepo, peerRepos, updates, markUpdatesSeen , pagesFor, checkPages, pagesUrl};
+// v4851 -- WHAT COUNTS AS A REJECTED TOKEN. The pattern took a bare "401|403" anywhere in git's stderr, so a clone that failed for any
+// other reason while its progress said "Receiving objects: 4013" or "40312 bytes" was reported as a REJECTED token and retried
+// anonymously -- the false alarm held back from round 19. A status code counts only where git or curl prints one as a status:
+// "The requested URL returned error: 403", "HTTP 401", "HTTP/2 403". cloneSource-selfcheck holds both sides.
+const AUTH_FAIL = /could not read Username|Authentication failed|invalid username or password|(?:returned error|HTTP(?:\/[\d.]+)?)[: ]+40[13]\b/i;
+function _authFailed(err) { return AUTH_FAIL.test(String(err || "")); }
+
+module.exports = { _authFailed, _ensureCloneParent, busy, busyWhat, ledgerRefresh, ledgerCheck, _apiErrorText, _errorDetail, repoShapeError, _parseEngineVersion, _versionInTree, cloneEngineSource, previewFolder, publishFolder, setConfig, status, listRepos, repoPreview, latestRelease, versionCheck, denoVersionCheck, createRelease, uploadAsset, publishVersion, publishEngineBuild, fetchEngineBuild, engineVersion, whoami, rateLimit, createRepo, updateRepo, deleteRepo, listReleases, deleteRelease, listIssues, createIssue, closeIssue, listCommits, listBranches, listSourceBranches, getFile, putFile, peerConfig, setPeerConfig, addMonitorRepo, removeMonitorRepo, peerRepos, updates, markUpdatesSeen , pagesFor, checkPages, pagesUrl};

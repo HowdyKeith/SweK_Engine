@@ -745,6 +745,27 @@ console.log("  ----  list of grievances -- the answer is that each wiring is one
         `unjudged ${shallow.unjudged}, stale ${names(shallow)}`);
 }
 
+// v4851 -- THE LIVE SHALLOW READ, IN A REAL DEPTH-1 CLONE, FROM A PROCESS STANDING ELSEWHERE. The rows above inject `boundary`;
+// this one lets staleReports read git itself, as the rig's Clone -> verify does. Its gate's only commit is the clone's boundary,
+// so the report is UNJUDGED -- and before v4851 the shallow file was read relative to this process, not the clone, so the read
+// failed, the clone counted as whole, and the report read STALE. SABOTAGED v4851: the path.resolve(root, ...) removed -> this row
+// RED by name (judged 1, stale 1); restored.
+{
+    const { execFileSync } = await import("node:child_process"), os = await import("node:os");
+    const tmp = fs.mkdtempSync(path.join(os.default.tmpdir(), "shallowrep-")), src = path.join(tmp, "src"), clone = path.join(tmp, "clone");
+    const g = (cwd, ...a) => execFileSync("git", a, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"],
+        env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t", GIT_COMMITTER_DATE: "2026-10-12T00:00:00Z", GIT_AUTHOR_DATE: "2026-10-12T00:00:00Z" } });
+    try {
+        fs.mkdirSync(path.join(src, "g"), { recursive: true }); g(src, "init", "-q");
+        fs.writeFileSync(path.join(src, "g", "a-selfcheck.mjs"), "1\n"); g(src, "add", "."); g(src, "commit", "-qm", "one");
+        fs.writeFileSync(path.join(src, "g", "a-selfcheck.mjs"), "2\n"); g(src, "commit", "-qam", "two");
+        g(tmp, "clone", "-q", "--depth", "1", "file://" + src, clone);
+        const r = staleReports({ root: clone, reports: [{ file: "r/a.json", gate: "g/a-selfcheck.mjs", at: "2026-10-01" }], dirty: [] });
+        ok("!! *** in a real depth-1 clone read from another directory, a gate whose only commit is the boundary leaves its report UNJUDGED, not stale ***",
+            r.unjudged === 1 && r.judged === 0 && r.stale.length === 0, `judged ${r.judged}, unjudged ${r.unjudged}, stale ${r.stale.length}; this process in ${process.cwd()}, the clone in ${clone}`);
+    } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+}
+
 console.log("  ----  the table. That a report is CORRECT: it holds what the gate computed, and whether the gate was");
 console.log("  ----  right is the gate's own business. And that the reports stay current -- they carry the date they");
 console.log("  ----  were measured and nothing re-emits them on a ship, which is the next thing to decide.");

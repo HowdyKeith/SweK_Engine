@@ -225,7 +225,10 @@ export function staleReports({ root = ENG, reports = null, log = null, boundary 
         // unless the clone is shallow, where an absent date is an absence of history.
         const since = reps.map((r) => r.at).filter(Boolean).sort()[0];
         if (text == null) text = git("log", ...(since ? ["--since=" + since] : []), "--format=@%H %cs", "--name-only", "--relative");
-        if (shallow == null) { try { shallow = fs.readFileSync(git("rev-parse", "--git-path", "shallow").trim(), "utf8").split(/\s+/).filter(Boolean); } catch { shallow = []; } }
+        // v4851 -- RESOLVED AGAINST root. `git rev-parse --git-path` answers relative to the directory git ran in (root), and
+        // readFileSync read it relative to THIS process's directory: from anywhere but root the read failed, the catch below
+        // said "not shallow", and a depth-1 clone's boundary commit was read as every report's last edit -- each one stale.
+        if (shallow == null) { try { shallow = fs.readFileSync(path.resolve(root, git("rev-parse", "--git-path", "shallow").trim()), "utf8").split(/\s+/).filter(Boolean); } catch { shallow = []; } }
     }
     const skip = new Set(shallow), last = new Map();
     let day = null;

@@ -271,6 +271,12 @@ export function mergeTimings(file, rows, stamp, capMs = null) {
     const contended = { ...(file.contended || {}) };
     const kinds = { ...(file.kinds || {}) }, capAt = { ...(file.capAt || {}) };
     const inferred = new Set(file.kindsInferred || []);
+    // v4851 -- A SOLO READING UNDER THE LINE ENDS PROBATION, AS THE SWEEP'S OWN DOES. quickSweep's countCrossings drops a gate's
+    // count the moment a reading comes back under budget; this writer filed the rotation's reading -- the cleanest in the file --
+    // and left the count alone, so a gate re-timed at 900 ms stayed on probation until some later sweep happened to clear it.
+    // Only a FINISHED, unskipped reading at or under the budget clears it; an over-budget or capped reading leaves the count to
+    // the sweep, which is the only writer that counts consecutive crossings.
+    const crossings = { ...(file.crossings || {}) }, budgetMs = file.budgetMs ?? 3000;
     const priorMs = {};
     for (const r of rows) {
         priorMs[r.gate] = (file.timings || {})[r.gate];
@@ -288,9 +294,10 @@ export function mergeTimings(file, rows, stamp, capMs = null) {
         kinds[r.gate] = r.skipped ? "skipped" : r.finished ? "alone" : "capped";
         inferred.delete(r.gate);
         if (capMs != null) capAt[r.gate] = capMs;
+        if (r.finished && !r.skipped && r.ms <= budgetMs) delete crossings[r.gate];
     }
     backfillStamps(timings, at);
-    return { merged: { ...file, timings, codes, at, capAt, finished, serial, serialAt, serialRing, contended, kinds,
+    return { merged: { ...file, timings, codes, at, capAt, finished, serial, serialAt, serialRing, contended, kinds, crossings,
                        kindsInferred: [...inferred].sort() }, priorMs };
 }
 
