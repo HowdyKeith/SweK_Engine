@@ -925,8 +925,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4851 -- render/denoiseDevice-selfcheck.mjs's ok() now RETURNS its verdict (round 19 collects each set's K0 rows to say
     // whether every one was green, section 66's condition 1), a new spelling of the same definition: distinctDefinitions 42 -> 43;
     // nothing else moved.
-    gates: 1970, usesOk: 1949, definesOk: 1941, importsOk: 0,
-    distinctDefinitions: 43, nameFirst: 1841, condFirst: 97, unknownSignature: 11,
+    // v4853 -- tools/ship/threeTextureBarrier-selfcheck.mjs: gates, usesOk, definesOk and nameFirst each by one more (1970 -> 1971,
+    // 1949 -> 1950, 1941 -> 1942, 1841 -> 1842); the rest hold.
+    gates: 1971, usesOk: 1950, definesOk: 1942, importsOk: 0,
+    distinctDefinitions: 43, nameFirst: 1842, condFirst: 97, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

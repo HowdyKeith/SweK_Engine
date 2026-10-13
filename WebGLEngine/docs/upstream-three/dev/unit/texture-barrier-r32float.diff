@@ -1,0 +1,30 @@
+diff --git a/test/unit/src/nodes/tsl/GPUBarriers.tests.js b/test/unit/src/nodes/tsl/GPUBarriers.tests.js
+index e6d758a..3fdf91a 100644
+--- a/test/unit/src/nodes/tsl/GPUBarriers.tests.js
++++ b/test/unit/src/nodes/tsl/GPUBarriers.tests.js
+@@ -5,7 +5,7 @@ import {
+ 	textureStore, storageTexture,
+ 	uvec2, vec4, uint, float
+ } from 'three/tsl';
+-import { StorageTexture, FloatType } from 'three/webgpu';
++import { StorageTexture, FloatType, RedFormat } from 'three/webgpu';
+ import { rawComputeTest, readUintBuffer } from './gpu-raw-test-utils.js';
+ 
+ // Coverage for the two barrier variants BarrierNode.js declares beyond
+@@ -73,10 +73,15 @@ export default QUnit.module( 'Nodes', () => {
+ 				// a workgroup, the texture analogue of storageBarrier() for
+ 				// buffers. `FloatType` avoids the default rgba8unorm storage
+ 				// format's quantization, so the round-tripped values below can
+-				// be compared exactly rather than with a tolerance.
++				// be compared exactly rather than with a tolerance. `RedFormat`
++				// makes it r32float: core WebGPU allows `read_write` storage
++				// access only on r32float, r32sint and r32uint. rgba32float needs
++				// the optional 'texture-formats-tier2' feature, and without it the
++				// pipeline fails validation and the kernel never runs.
+ 				const width = 4;
+ 				const storageTex = new StorageTexture( width, 1 );
+ 				storageTex.type = FloatType;
++				storageTex.format = RedFormat;
+ 
+ 				const output = instancedArray( 1, 'float' );
+ 

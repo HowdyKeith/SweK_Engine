@@ -9191,6 +9191,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The CLIs refuse an unknown option (cliArgs) and the peer's transport is a row of its own. Thirteen sabotages red by name, " +
                  "logged in the two headers. NOT CLOSED: the pair has run over loopback and in one browser, not between two machines.",
     }),
+    // v4853 -- since554 (the highest on any branch at the time was since553, read across every remote ref after a full fetch). ONE new
+    // gate file: tools/ship/threeTextureBarrier-selfcheck.mjs (three's own textureBarrier test before and after a one-line diff, on the
+    // adapter it runs on).
+    since554: Object.freeze({
+        at: "v4853", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/threeTextureBarrier-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THREE'S textureBarrier UNIT TEST FAILED ON SWIFTSHADER AND THE BARRIER NEVER RAN. *** Its StorageTexture is FloatType with " +
+                 "the default RGBAFormat -- rgba32float -- accessed read_write, which core WebGPU allows only on r32float, r32sint and r32uint; " +
+                 "rgba32float needs 'texture-formats-tier2', SwiftShader does not offer it, the bind group layout fails validation and the " +
+                 "sum reads 0. One line, storageTex.format = RedFormat, and three's own test passes on the same device; dev with that diff " +
+                 "alone: 1892 passed, 1 todo, 1 failed (the WebGL 2 mod() test, dev's own), 169 + 169 GPU tests, none skipped; lint clean. The " +
+                 "gate runs three's file through the vendored r186 and grades on the adapter's own features, so a tier2 GPU stays green. Eight " +
+                 "sabotages red by name. NOT CLOSED: on SwiftShader the test passes with the barrier deleted too -- it shows the barrier runs, " +
+                 "not that it orders. The draft is Keith's to file.",
+    }),
     // v4849 -- since553. ONE new gate file: tools/ship/tacticsTrain-selfcheck.mjs (the tool that fits the Endless-Sky tactics weights in the arena and the file it wrote, held to its own `by` on recomputed numbers), plus the 'trained' rows of
     // brain/tacticsRoster-selfcheck.mjs (the choice, the panel's format check, both pages, a saved choice surviving a reload).
     since553: Object.freeze({
