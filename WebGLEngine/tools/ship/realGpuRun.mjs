@@ -28,6 +28,9 @@ import { createRequire } from "node:module";
 import http from "node:http";
 import { resolvePlaywright, HEADLESS_SHELL, WEBGL_DEFAULT_ARGS } from "./playwrightResolve.mjs";
 import { SOFTWARE_HINTS } from "../../ui/localModelProbe.js";
+// v4851 (section 66): static, unlike probeNativeAdapters' lazy import -- headlessGpu.mjs imports only playwrightResolve.mjs,
+// which this file already loads, and the report's predicted compiler must be the very rule the native gates choose sets by
+import { nativeCompiler, WEBGPU_ENV } from "./headlessGpu.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -51,12 +54,72 @@ export function categorize(src) {
     return "exact";
 }
 
-/** A gate's printed rows: its failing ones, its measured lines ("----"), and its verdict. */
+/**
+ * A gate's printed rows: its failing ones, its measured lines ("----"), its SKIP lines, and its verdict. *** v4851 (section 66)
+ * -- THE SKIPS ARE KEPT. *** Round 19's native gates stand rows aside by rule (r18t and r18u under FXC, round 16's shapes on
+ * every D3D12 adapter), and a skip passes: a report of fails and measured lines alone cannot tell a rig run whose native rows
+ * ran from one whose rows all stood aside, and the reason each gives is what the verdict round reads. Kept with "SKIP".
+ */
 export function parseRows(stdout) {
     const lines = String(stdout).split("\n");
     return { fails: lines.filter((l) => /^\s*FAIL\s/.test(l) && !/^\s*FAIL --/.test(l)).map((l) => l.trim().slice(0, 400)),
              measured: lines.filter((l) => /^\s*----\s/.test(l)).map((l) => l.trim().replace(/^----\s+/, "").slice(0, 400)),
+             skips: lines.filter((l) => /^\s*SKIP\s/.test(l)).map((l) => l.trim().slice(0, 400)),
              green: lines.some((l) => /^ALL GREEN|all (checks )?pass/.test(l.trim())) };
+}
+
+/**
+ * *** v4851 (section 66) -- A NATIVE ADAPTER IS AN ADAPTER. *** Section 65's GTX 1080 report read "NO ADAPTER WAS SEEN" over a
+ * compile gate whose native half ran on the 1080's own clock: names came only from the browser harness's records, and Chrome
+ * did not run on that box. headlessGpu.mjs's noteNativeAdapter now writes the same record to SWEK_ADAPTER_LOG, marked by this
+ * launch entry, with an explicit `software` boolean. Read here exactly as the harness's, and labelled "(native)" wherever a
+ * name is printed, so a report says which half reached the GPU.
+ */
+export const NATIVE_LAUNCH = "node-webgpu (native)";
+const adapterLabel = (a) => (a.native ? `${a.name} (native)` : a.name);
+
+/**
+ * One gate's records out of the SWEK_ADAPTER_LOG text: `names` (every call's, "none" for one that reached no device) and the
+ * named adapters, one per label. A record with no adapter is NOT an adapter: a browser call that got none beside a native
+ * device that ran would otherwise be listed as "none", software -- section 65's false headline turned the other way. A named
+ * record whose `software` is not exactly false stays software, the safe side: only a writer that says hardware is believed.
+ */
+export function readAdapterLog(text, gate) {
+    const recs = String(text || "").split("\n").filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } })
+        .filter((x) => x && x.gate === gate)
+        .map((x) => ({ name: x.adapter ? [x.adapter.vendor, x.adapter.architecture, x.adapter.description].filter(Boolean).join(" ") || "unnamed" : "none",
+                       software: x.software, launchArgs: x.launchArgs, native: Array.isArray(x.launchArgs) && x.launchArgs.includes(NATIVE_LAUNCH) }));
+    const adapters = [];
+    for (const r of recs) if (r.name !== "none" && !adapters.some((a) => adapterLabel(a) === adapterLabel(r))) adapters.push(r);
+    return { names: [...new Set(recs.map(adapterLabel))], adapters };
+}
+
+/** A gate's report entry from what its run left: its source (for its kind), its exit, its time, its stdout and the adapter log. */
+export function gateEntry({ gate, src, status, ms, stdout = "", logText = "" }) {
+    const rows = parseRows(stdout), seen = readAdapterLog(logText, gate);
+    return { entry: { gate, category: categorize(src), ok: status === 0, ms, adapters: seen.names,
+                      software: seen.adapters.length ? seen.adapters.some((x) => x.software !== false) : null,
+                      fails: rows.fails, measured: rows.measured, skips: rows.skips },
+             adapters: seen.adapters };
+}
+
+/** The run's adapter list, one per label: the browser's and the native half's reading of one GPU are two lines, not one. */
+export function addAdapters(list, adapters) {
+    for (const x of adapters) if (!list.some((a) => adapterLabel(a) === adapterLabel(x)))
+        list.push({ name: x.name, software: x.software, launchArgs: x.launchArgs, native: x.native });
+    return list;
+}
+
+/**
+ * *** v4851 (section 66) -- WHICH PACKAGE, AND WHICH COMPILER IT PREDICTS. *** A DXC run is a console with SWEK_WEBGPU naming
+ * 0.6.2 until the pin moves, so the report records the package the gates loaded (webgpuPackage's dir and version), whether
+ * dxcompiler.dll sits beside its dawn.node, and nativeCompiler's prediction for it with no flags -- the "as shipped" compiler,
+ * which condition 0 holds to the compile gate's dumps. Null off win32 (no D3D compiler), and null with no package (no
+ * native run to predict for), where nativeCompiler alone would say FXC.
+ */
+export function nodeWebgpuRecord({ from = null, pkg = null, platform = process.platform, env = process.env } = {}) {
+    return { version: pkg ? pkg.version : null, from: from || null, dir: pkg ? pkg.dir : null, dxcBeside: pkg ? pkg.dxcBeside : null,
+             compiler: pkg ? nativeCompiler({ pkg, platform }) : null, chosenBy: env[WEBGPU_ENV] ? WEBGPU_ENV : "the resolver's list" };
 }
 
 /**
@@ -71,8 +134,8 @@ export function verdict(report) {
         return `*** NO GATE MATCHED${report.only ? ` --only "${report.only}"` : ""}: NOTHING RAN -- this checkout (${report.commit ? report.commit.split(" ").slice(0, 2).join(" ") : "commit unknown"}) has no such gate; ` +
                "is it on the branch that added it? ***";
     if (!ads.length) return "*** NO ADAPTER WAS SEEN: no gate reached a device -- this is not a hardware run ***";
-    if (ads.some((a) => a.software !== false)) return `*** SOFTWARE ADAPTER (${ads.filter((a) => a.software !== false).map((a) => a.name).join("; ")}): THIS IS NOT A REAL-HARDWARE RUN -- its times are a CPU's ***`;
-    return `a real-hardware run on ${ads.map((a) => a.name).join("; ")}`;
+    if (ads.some((a) => a.software !== false)) return `*** SOFTWARE ADAPTER (${ads.filter((a) => a.software !== false).map(adapterLabel).join("; ")}): THIS IS NOT A REAL-HARDWARE RUN -- its times are a CPU's ***`;
+    return `a real-hardware run on ${ads.map(adapterLabel).join("; ")}`;
 }
 
 /**
@@ -102,15 +165,13 @@ export function runGates({ root = ENG, only = null, log = console.log, launchArg
         const t0 = Date.now();
         const r = spawnSync(process.execPath, [g], { cwd: root, encoding: "utf8", timeout: GATE_TIMEOUT_MS,
                                                     env: { ...process.env, SWEK_ADAPTER_LOG: logFile, SWEK_LAUNCH_ARGS: launchArgs.join(" ") } });
-        const ms = Date.now() - t0, rows = parseRows(r.stdout || "");
-        const seen = fs.existsSync(logFile) ? fs.readFileSync(logFile, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)).filter((x) => x.gate === g) : [];
-        const names = [...new Set(seen.map((x) => (x.adapter ? [x.adapter.vendor, x.adapter.architecture, x.adapter.description].filter(Boolean).join(" ") || "unnamed" : "none")))];
-        const entry = { gate: g, category: categorize(fs.readFileSync(path.join(root, g), "utf8")), ok: r.status === 0, ms, adapters: names,
-                        software: seen.length ? seen.some((x) => x.software !== false) : null, fails: rows.fails, measured: rows.measured };
+        // v4851 (section 66): the entry and its adapters are gateEntry's, a pure function the gate drives with fixtures
+        const { entry, adapters } = gateEntry({ gate: g, src: fs.readFileSync(path.join(root, g), "utf8"), status: r.status, ms: Date.now() - t0,
+                                                stdout: r.stdout || "", logText: fs.existsSync(logFile) ? fs.readFileSync(logFile, "utf8") : "" });
         report.gates.push(entry);
-        for (const x of seen) { const name = x.adapter ? [x.adapter.vendor, x.adapter.architecture, x.adapter.description].filter(Boolean).join(" ") || "unnamed" : "none";
-            if (!report.adapters.some((a) => a.name === name)) report.adapters.push({ name, software: x.software, launchArgs: x.launchArgs }); }
-        log(`  ${entry.ok ? "PASS" : "FAIL"}  ${g}  [${entry.category}]  ${(ms / 1000).toFixed(1)} s  on ${names.join(", ") || "no adapter"}`);
+        addAdapters(report.adapters, adapters);
+        log(`  ${entry.ok ? "PASS" : "FAIL"}  ${g}  [${entry.category}]  ${(entry.ms / 1000).toFixed(1)} s  on ${entry.adapters.join(", ") || "no adapter"}` +
+            (entry.skips.length ? `  (${entry.skips.length} SKIP)` : ""));
     }
     try { fs.unlinkSync(logFile); } catch {}
     report.verdict = verdict(report);
@@ -306,8 +367,12 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const out = path.resolve(arg("--out") || path.join(process.cwd(), "real-gpu-run.json"));
     console.log(`\nthe FSR, frame-generation and denoiser gates, with the harness logging each call's adapter (${process.platform})`);
     const report = runGates({ only: arg("--only") });
-    report.nodeWebgpu = { version: WP ? WP.version : null, from: W.from || null, chosenBy: process.env[HG.WEBGPU_ENV] ? HG.WEBGPU_ENV : "the resolver's list" };
-    console.log(`  on ${report.commit || "a checkout git could not name"}; node-webgpu ${report.nodeWebgpu.version || "unresolved"} (${report.nodeWebgpu.chosenBy})`);
+    // v4851 (section 66): and its dxcompiler.dll and predicted compiler, beside the version
+    report.nodeWebgpu = nodeWebgpuRecord({ from: W.from, pkg: WP });
+    const NW = report.nodeWebgpu;
+    console.log(`  on ${report.commit || "a checkout git could not name"}; node-webgpu ${NW.version || "unresolved"} (${NW.chosenBy})` +
+                `${NW.dir ? " at " + NW.dir : ""}; dxcompiler.dll beside dawn.node: ${NW.dxcBeside === null ? "-" : NW.dxcBeside ? "yes" : "no"}` +
+                `; predicted compiler: ${NW.compiler || (WP ? "none (not win32)" : "none (no package)")}`);
     fs.writeFileSync(out, JSON.stringify(report, null, 1));
     console.log(`\n${report.verdict}\n${report.summary}  --  the report: ${out}`);
     // a run of no gates is not a green one

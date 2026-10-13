@@ -26,6 +26,12 @@
 // use_dxc off, so the copied-DLL run sections 52-53 made was FXC under another name, and it is retired. SWEK_WEBGPU picks the
 // package for a console (tools/ship/headlessGpu.mjs); one it cannot load is a red here, not a skip; the first native line
 // names the package's version, and every dump file carries it.
+// Round 19 (section 66, v4851): the package's predicted compiler (tools/ship/headlessGpu.mjs's nativeCompiler, each mode's flags)
+// is held to the "as shipped" children's dumps in the same run -- DXIL exactly when the package said DXC, condition 0 of the
+// rule NATIVE_KERNELS_BY_ADAPTER is read by (render/denoiseCompile.mjs's compilerMatchesDumps). Off win32 that row says it
+// tested nothing D3D. r18t's and r18u's hidden-layer kernels (DXC_VARIANTS) build only in a mode whose compiler is DXC and
+// whose eight base kernels all dumped DXIL (dxcVariantsBuild); elsewhere they stand aside, uncounted. Off win32 a pilot builds
+// them once as shipped, so their plumbing is not first run on the rig.
 //
 // Each native measurement is its own process: one kernel, one adapter, one device, one compiler -- Dawn's dump goes to
 // stdout, so a process apiece keeps each kernel's dump its own, and a compile that never finishes is killed, not waited on.
@@ -92,7 +98,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SELF = fileURLToPath(import.meta.url);
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
-const { VARIANTS, BUILD_PROBE, BUILD_PROBE_R17, jobFor, measure, dumpStats, dawnFlags, nativeModes, headApplyProbe, buildJob, runJob, measureSizes } = await imp("render/denoiseCompile.mjs");
+const { VARIANTS, BUILD_PROBE, BUILD_PROBE_R17, jobFor, measure, dumpStats, dawnFlags, nativeModes, headApplyProbe, buildJob, runJob, measureSizes,
+        DXC_VARIANTS, compilerMatchesDumps, dxcVariantsBuild } = await imp("render/denoiseCompile.mjs");
 
 // ---- THE CHILD: one kernel, one compiler, one process ----------------------------------------------------------
 // *** THE RESULT GOES TO A FILE. *** On the GTX 1080 (section 45) every native child exited 0 with its shader dump on
@@ -109,7 +116,9 @@ if (process.argv.includes("--child")) {
         // disable entry (section 64: a second disable entry would erase "use_dxc off" the way section 49's erased dump_shaders)
         const W = H.resolveWebgpu(); if (W.refused) throw new Error(W.refused);
         const gpu = W.mod.create(dawnFlags([...flags, H.FINE_CLOCK_FLAG]));
-        const v = VARIANTS.find((x) => x.id === vid), a = await gpu.requestAdapter();
+        // section 66 (v4851): a child may be one of r18t's or r18u's hidden kernels too -- the parent spawns them only where
+        // dxcVariantsBuild says so (or as the off-win32 pilot), so finding one here builds nothing the parent did not ask for
+        const v = [...VARIANTS, ...DXC_VARIANTS].find((x) => x.id === vid), a = await gpu.requestAdapter();
         const dev = await a.requestDevice({ requiredFeatures: a.features.has("timestamp-query") ? ["timestamp-query"] : [] });
         try { result = await measure(dev, jobFor(v)); } finally { dev.destroy(); }
     } catch (e) { result = { built: false, reason: String(e && e.message || e).slice(0, 300) }; }
@@ -185,6 +194,42 @@ console.log("1. THE INSTRUMENT, ON THE CPU");
         new Set(P17.map((v) => v.id)).size === P17.length && P17[0].kind === "fast" && j64.every((j) => typeof j.judge === "function" && j.out === 64 * 64 * 32) &&
         j1k.every((j, i) => j.judge === null && j.out === 1024 * 1024 * 32 && j.code === j64[i].code && j.wg[1] === 128),
         P17.map((v) => v.id).join(", "));
+    // section 66 (v4851): r18t's and r18u's hidden-layer kernels -- each with a job at 64 x 64, judged, and its WGSL exactly what
+    // render/denoiseDevice.mjs builds for the layer in that set (kernelFor names the kernel; R18_KERNELS gives its cfg), on the
+    // same layer r15 runs on r13-fast-3x3, so the kernel-level line below compares one layer on three kernels. dxcOnly, both
+    // SABOTAGED v4851: r18t's cfg px 2 -> 4 in DXC_VARIANTS -> RED by name (and nothing else); restored.
+    const DD = await imp("render/denoiseDevice.mjs"), CV = await imp("brain/conv2d.mjs"), base = VARIANTS.find((v) => v.id === "r13-fast-3x3");
+    const hidden = DXC_VARIANTS.map((v) => { const j = jobFor(v), L = v.L(64).layer, set = v.id.slice(0, 4), cfg = DD.R18_KERNELS[set]?.cfg;
+        const want = DD.kernelFor(L, set) === "tile_inline" ? CV.conv2dTileWgsl(L, cfg) : DD.kernelFor(L, set) === "fast_unroll" ? CV.conv2dFastAltWgsl(L, cfg) : null;
+        return { id: v.id, set, ok: v.dxcOnly === true && typeof j.judge === "function" && j.out === 64 * 64 * 32 && j.wg.length === 3 && want !== null && j.code === want &&
+                                    DD.kernelFor(L, "r15") === "fast" && L.Cin === base.L(64).layer.Cin && L.k === base.L(64).layer.k && L.Cout === base.L(64).layer.Cout }; });
+    ok(`  section 66: r18t's and r18u's hidden-layer kernels each have a job at 64 x 64, judged, dxcOnly, their WGSL the device's own for that set (R18_KERNELS) -- on r13-fast-3x3's layer, r15's hidden kernel`,
+        hidden.length === 2 && hidden.map((h) => h.set).join() === "r18t,r18u" && hidden.every((h) => h.ok) && !VARIANTS.some((v) => v.dxcOnly) && VARIANTS.length === 8,
+        hidden.map((h) => `${h.id}: ${h.ok ? "the device's kernel" : "NOT the device's kernel"}`).join("; "));
+    // section 66's condition 0, on fixtures every box runs: the package's prediction held to the dumps. "unknown (no dump)" is
+    // never DXIL -- 0.6.2's Dawn fails device creation when DXC will not load and dumps nothing, which is the prediction failing
+    // SABOTAGED v4851: compilerMatchesDumps's DXC case with `dxil > 0` for `dxil === cs.length` -> RED by name (this row); restored.
+    // SABOTAGED v4851: its FXC case without `dxil === 0` -> RED by name (this row); restored.
+    const X = "DXC (DXIL)", B = "FXC (DXBC)", U = "unknown (no dump)", S = "SPIR-V (no D3D compiler)", eight = (c) => Array(8).fill(c);
+    const cm = [
+        ["DXC, every dump DXIL", "DXC", eight(X), true], ["DXC, one dump DXBC", "DXC", [...eight(X).slice(1), B], false],
+        ["DXC, one child with no dump", "DXC", [...eight(X).slice(1), U], false], ["DXC, no dump at all", "DXC", eight(U), false], ["DXC, no children", "DXC", [], false],
+        ["FXC, one dump DXIL", "FXC", [...eight(B).slice(1), X], false], ["FXC, every dump DXBC", "FXC", eight(B), true], ["FXC, no D3D dump at all", "FXC", eight(U), false],
+        ["none (off win32), SPIR-V dumps", null, eight(S), true], ["none (off win32), a DXIL dump", null, [...eight(S).slice(1), X], false],
+    ].map(([n, p, cs, want]) => { const r = compilerMatchesDumps(p, cs); return { n, want, got: r.ok, d3d: r.d3d }; });
+    ok("!! section 66's condition 0 on fixtures: the dumps say DXIL exactly when the package said DXC -- DXC needs every dump DXIL (a child with no dump is not), FXC no DXIL and some DXBC; off win32 no D3D dump, and no D3D evidence claimed",
+        cm.every((c) => c.got === c.want) && cm.every((c) => c.d3d === (c.n.startsWith("none") ? false : true)),
+        cm.map((c) => `${c.n}: ${c.got ? "agree" : "red"}${c.got === c.want ? "" : " (WRONG)"}`).join("; "));
+    // ...and the hidden kernels build only where that holds over the eight base kernels: DXC predicted and all eight DXIL
+    // SABOTAGED v4851: dxcVariantsBuild without the all-DXIL check (prediction alone) -> RED by name (this row); restored.
+    const vb = [
+        ["DXC, eight DXIL", "DXC", eight(X), true], ["DXC, seven DXIL and one DXBC", "DXC", [...eight(X).slice(1), B], false],
+        ["DXC, seven DXIL and one with no dump", "DXC", [...eight(X).slice(1), U], false], ["DXC, only seven dumps", "DXC", eight(X).slice(1), false],
+        ["FXC, eight DXIL", "FXC", eight(X), false], ["FXC, eight DXBC", "FXC", eight(B), false], ["none (off win32)", null, eight(S), false],
+    ].map(([n, p, cs, want]) => { const r = dxcVariantsBuild(p, cs); return { n, want, got: r.build, why: r.why }; });
+    ok("!! section 66: r18t's and r18u's hidden kernels build only in a mode whose compiler is DXC and whose eight base kernels all dumped DXIL -- under FXC, or off win32, they stand aside",
+        vb.every((c) => c.got === c.want) && vb.every((c) => typeof c.why === "string" && c.why.length > 0),
+        vb.map((c) => `${c.n}: ${c.got ? "build" : "stand aside"}${c.got === c.want ? "" : " (WRONG)"}`).join("; "));
 }
 
 // v4845 -- four symbols definitionGates' census found no row of this gate naming. headApplyProbe is used by render/denoiseDevice-selfcheck.mjs;
@@ -238,6 +283,7 @@ console.log("\n1b. THE PROBE'S ARITHMETIC, AND THE BUILD-AND-TIME CONTRACT ON A 
 const W0 = H.resolveWebgpu();
 const skip = W0.refused ? null : H.headlessGpuSkipReason();
 const rows = [];   // { path, compiler, id, result }
+const dxcBuiltModes = new Set();   // section 66 (v4851): the native modes that built DXC_VARIANTS, so section 4 counts them there and only there
 console.log("\n2. NATIVE: each kernel in its own process, under each compiler this box has");
 if (W0.refused) ok(`!! ${H.WEBGPU_ENV} names a node-webgpu package this box can load -- a refused one is a red here, never a skip`, false, W0.refused);
 else if (skip) console.log("  SKIP  " + skip);
@@ -252,23 +298,41 @@ else {
         `DXC ${dxcBeside ? "ships beside dawn.node -- runs as shipped, use_dxc and use_dxc off, from the package alone" :
               win ? "none of its own -- a Dawn built without DXC forces use_dxc off (section 64), so this package runs as shipped alone and section 43's A1 is untested here" : "not applicable"}; ` +
         `modes: ${modes.map((m) => m.name).join(", ")}`);
+    // one child: one kernel, one mode's flags, its result and its dump. `into` is where the row goes -- section 66's off-win32
+    // pilot keeps its own list, so its two kernels are never counted in a mode's group
+    const child = (m, v, into = rows, tag = "native") => {
+        if (now() - t0 > BUDGET_MS) { into.push({ path: tag, compiler: m.name, id: v.id, result: { built: false, reason: `the gate's ${BUDGET_MS / 1000} s budget is spent` } }); return; }
+        const resFile = path.join(os.tmpdir(), `swek-denoise-result-${process.pid}-${m.name.replace(/\W+/g, "_")}-${v.id}.json`);
+        try { fs.unlinkSync(resFile); } catch {}
+        const r = spawnSync(process.execPath, [SELF, "--result", resFile, "--child", v.id, ...m.flags], { cwd: ENG, encoding: "utf8", timeout: CHILD_MS, maxBuffer: 1 << 29 });
+        // the file first; stdout's line only as a fallback, found anywhere -- a dump that ends without a newline
+        // puts it mid-line
+        let got = null; try { got = JSON.parse(fs.readFileSync(resFile, "utf8")); fs.unlinkSync(resFile); } catch {}
+        const at = (r.stdout || "").lastIndexOf("@@RESULT ");
+        if (!got && at >= 0) try { got = JSON.parse((r.stdout.slice(at + 9).split("\n")[0] || "").trim()); } catch {}
+        const result = got || { built: false, noResult: !r.error, reason: r.error ? `the process was stopped: ${r.error.code || r.error.message}` : `no result (exit ${r.status}): ${(r.stderr || "").split("\n").slice(-3).join(" ").slice(0, 200)}` };
+        const st = dumpStats(r.stdout, jobFor(v).entry);
+        const dumpFile = path.join(os.tmpdir(), `swek-denoise-dump-${ver}-${tag === "native" ? "" : tag + "-"}${m.name.replace(/\W+/g, "_")}-${v.id}.txt`);
+        try { fs.writeFileSync(dumpFile, r.stdout || ""); } catch {}
+        into.push({ path: tag, compiler: m.name, id: v.id, result: { ...result, dump: st, dumpFile } });
+    };
+    // section 66 (v4851): the kernel-level line -- r15's hidden kernel (r13-fast-3x3) over r18t's and r18u's, at 64 x 64, from
+    // one mode's children. Reported, deciding nothing: NATIVE_KERNELS_BY_ADAPTER is read off the timing gate's ladders
+    const hiddenLine = (rs, label) => {
+        const pm = (id) => { const x = rs.find((y) => y.id === id); return x && x.result.built && x.result.passMs > 0 ? x.result.passMs : null; }, r15 = pm("r13-fast-3x3");
+        say(`${label}: at 64 x 64, r15's hidden kernel (r13-fast-3x3) over ` + DXC_VARIANTS.map((v) => `${v.id.slice(0, 4)}'s (${v.id}): ` +
+            (r15 && pm(v.id) ? `${(r15 / pm(v.id)).toFixed(3)} x (${r15.toFixed(3)} ms against ${pm(v.id).toFixed(3)} ms)` : "not measured")).join("; ") + " -- deciding nothing");
+    };
+    const predictedBy = {};   // each mode's predicted compiler (nativeCompiler, that mode's flags)
     for (const m of modes) {
-        for (const v of VARIANTS) {
-            if (now() - t0 > BUDGET_MS) { rows.push({ path: "native", compiler: m.name, id: v.id, result: { built: false, reason: `the gate's ${BUDGET_MS / 1000} s budget is spent` } }); continue; }
-            const resFile = path.join(os.tmpdir(), `swek-denoise-result-${process.pid}-${m.name.replace(/\W+/g, "_")}-${v.id}.json`);
-            try { fs.unlinkSync(resFile); } catch {}
-            const r = spawnSync(process.execPath, [SELF, "--result", resFile, "--child", v.id, ...m.flags], { cwd: ENG, encoding: "utf8", timeout: CHILD_MS, maxBuffer: 1 << 29 });
-            // the file first; stdout's line only as a fallback, found anywhere -- a dump that ends without a newline
-            // puts it mid-line
-            let got = null; try { got = JSON.parse(fs.readFileSync(resFile, "utf8")); fs.unlinkSync(resFile); } catch {}
-            const at = (r.stdout || "").lastIndexOf("@@RESULT ");
-            if (!got && at >= 0) try { got = JSON.parse((r.stdout.slice(at + 9).split("\n")[0] || "").trim()); } catch {}
-            const result = got || { built: false, noResult: !r.error, reason: r.error ? `the process was stopped: ${r.error.code || r.error.message}` : `no result (exit ${r.status}): ${(r.stderr || "").split("\n").slice(-3).join(" ").slice(0, 200)}` };
-            const st = dumpStats(r.stdout, jobFor(v).entry);
-            const dumpFile = path.join(os.tmpdir(), `swek-denoise-dump-${ver}-${m.name.replace(/\W+/g, "_")}-${v.id}.txt`);
-            try { fs.writeFileSync(dumpFile, r.stdout || ""); } catch {}
-            rows.push({ path: "native", compiler: m.name, id: v.id, result: { ...result, dump: st, dumpFile } });
-        }
+        for (const v of VARIANTS) child(m, v);
+        // section 66 (v4851): what the package predicts for THIS mode's flags -- "use_dxc off" is FXC on 0.6.2 -- and whether r18t's
+        // and r18u's hidden kernels build here: DXC predicted AND the eight base kernels' dumps all DXIL. Anywhere else they
+        // stand aside and are not counted as unbuilt: FXC stopped on one and crashed on the other (section 60)
+        const predicted = predictedBy[m.name] = H.nativeCompiler({ pkg, flags: m.flags });
+        const base = rows.filter((x) => x.path === "native" && x.compiler === m.name), go = dxcVariantsBuild(predicted, base.map((x) => x.result.dump.compiler));
+        if (go.build) { dxcBuiltModes.add(m.name); for (const v of DXC_VARIANTS) child(m, v); }
+        else console.log(`  SKIP  section 66: native / ${m.name}: r18t's and r18u's hidden kernels (${DXC_VARIANTS.map((v) => v.id).join(", ")}) stand aside, not counted as unbuilt -- ${go.why}`);
         // section 64: one line a mode, which C1 is read from -- how many built, what their dumps say, the first reason any did
         // not, and where the dumps are (realGpuRun's report keeps "----" lines, and named no dump file before this)
         const ms = rows.filter((x) => x.path === "native" && x.compiler === m.name), by = {};
@@ -276,7 +340,35 @@ else {
         const why = ms.find((x) => !x.result.built);
         say(`native / ${m.name} in all: ${ms.filter((x) => x.result.built).length} of ${ms.length} built; dumps: ${Object.entries(by).map(([c, n]) => `${n} ${c}`).join(", ")}` +
             (why ? `; first not built: ${why.id} -- ${String(why.result.reason).slice(0, 160)}` : "") +
+            `; compiler, from the package: ${predicted || "none (not win32)"}` +
             `; dumps at ${path.join(os.tmpdir(), `swek-denoise-dump-${ver}-${m.name.replace(/\W+/g, "_")}-*.txt`)}`);
+        if (go.build) hiddenLine(ms, `section 66, native / ${m.name} under DXC`);
+    }
+    // section 66's CONDITION 0 (v4851): the package's prediction for "as shipped" held to every "as shipped" child's dump in the
+    // same run -- DXIL exactly when the package said DXC. Red is what an adapter below shader model 6.0 would show (Dawn forces
+    // FXC there whatever the package ships), or a 0.6.2 whose DXC did not load. Off win32 the package predicts no D3D compiler and
+    // no dump here is D3D's: the row then says so and claims nothing about D3D -- condition 0 is the rig's to test.
+    // SABOTAGED v4851: the prediction made for platform "win32" here (FXC, beside SPIR-V dumps) -> RED by name; restored.
+    {
+        const shipped = modes.find((m) => m.name === "as shipped"), predicted = predictedBy[shipped.name];
+        const dumps = rows.filter((x) => x.path === "native" && x.compiler === shipped.name).map((x) => x.result.dump.compiler), cz = compilerMatchesDumps(predicted, dumps);
+        ok(cz.d3d ? `!! section 66's condition 0: the package said ${predicted} for "as shipped", and its ${dumps.length} children's dumps say DXIL exactly when it said DXC`
+                  : `!! section 66's condition 0, OFF WIN32: the package predicts no D3D compiler and none of the ${dumps.length} "as shipped" dumps names one -- NOT TESTED HERE, no dump on this box is D3D's`,
+            cz.ok, cz.detail);
+    }
+    // section 66 (v4851): THE PILOT, off win32 only. There is no D3D compiler here, so no mode above builds the hidden kernels, and
+    // without this the child's lookup of them, their builds and their twins would first run on the rig. Here they cannot meet FXC
+    // (section 60's reason for standing aside), so each is built once, as shipped, held exact -- in its own list, never a mode's
+    // group, and its line is SwiftShader's, not section 66's DXC line.
+    // SABOTAGED v4851: the child looking its kernel up in VARIANTS alone -> RED by name (this row: both "NOT BUILT"); restored.
+    if (predictedBy["as shipped"] == null && !win) {
+        const pilot = [];
+        for (const v of DXC_VARIANTS) child(modes[0], v, pilot, "pilot");
+        ok("!! section 66's pilot, off win32: r18t's and r18u's hidden kernels each built natively, as shipped, by a child that reported, and exact against the twin -- a plumbing check, no D3D compiler",
+            pilot.length === DXC_VARIANTS.length && pilot.every((x) => !x.result.noResult && x.result.built && x.result.exact === true &&
+                [x.result.buildMs, x.result.passMs].every((t) => Number.isFinite(t) && t > 0)),
+            pilot.map((x) => `${x.id}: ${x.result.built ? `${x.result.detail}, pass ${x.result.passMs.toFixed(3)} ms` : "NOT BUILT -- " + x.result.reason}`).join("; "));
+        hiddenLine([...rows.filter((x) => x.path === "native" && x.compiler === "as shipped"), ...pilot], "section 66's pilot, native / as shipped, NO D3D compiler (SwiftShader's figures, not section 66's line)");
     }
     // section 45: on the 1080 every child exited 0 and reported nothing, and the row below read each as a kernel that
     // "said why" -- an instrument failure counted as a measurement. A child that ends without a result is now red here.
@@ -318,8 +410,10 @@ if (rows.length) {
     const groups = [...new Set(rows.map((x) => `${x.path} / ${x.compiler}`))];
     for (const g of groups) {
         const gs = rows.filter((x) => `${x.path} / ${x.compiler}` === g);
+        // section 66 (v4851): a native mode that built r18t's and r18u's hidden kernels counts them; one where they stood aside
+        // does not -- standing aside is not "unbuilt", and the browser's list is VARIANTS alone
         ok(`!! ${g}: every kernel built or said why, and every one built is exact -- conv cells the twin's or the fused mirror's, the kernel apply within APPLY_TOL`,
-            gs.length === VARIANTS.length && gs.every((x) => x.result.built ? x.result.exact === true : !!x.result.reason),
+            gs.length === VARIANTS.length + (gs[0].path === "native" && dxcBuiltModes.has(gs[0].compiler) ? DXC_VARIANTS.length : 0) && gs.every((x) => x.result.built ? x.result.exact === true : !!x.result.reason),
             gs.filter((x) => !x.result.built || !x.result.exact).map((x) => `${x.id}: ${x.result.built ? x.result.detail : x.result.reason}`).join("; ") || `${gs.length} kernels, all exact`);
         ok(`  ${g}: every build and pass time finite and positive`,
             gs.filter((x) => x.result.built).every((x) => [x.result.buildMs, x.result.passMs].every((t) => Number.isFinite(t) && t > 0)));

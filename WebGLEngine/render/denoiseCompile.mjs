@@ -26,7 +26,56 @@ export const VARIANTS = Object.freeze([
     // never built either, and a native build that never ends stops this gate. BUILD_PROBE keeps both, under a cap
 ].map((v) => Object.freeze(v)));
 
-// ---- THE BUILD PROBE (section 56) -------------------------------------------------------------------------------------
+// ---- ROUND 19 (section 66, v4851): r18t's AND r18u's HIDDEN-LAYER KERNELS, NATIVE UNDER DXC ONLY ---------------------------
+// Each round-18 set runs every hidden layer on its R18_KERNELS kernel (render/denoiseDevice.mjs's kernelFor) and its last on
+// r15's k_head_apply, so what is new natively is the hidden layer alone -- round 13's 32 -> 32 layer, the one r15 runs on the
+// fast kernel (r13-fast-3x3 above), which is what makes the section's kernel-level line r15's against these at 64 x 64. Their
+// cfg is R18_KERNELS's own object, not a copy, so a set retuned in the device module is retuned here. A separate list, NOT
+// in VARIANTS: VARIANTS is the eight base kernels whose dumps decide whether these build, and denoise.html's "Time each kernel"
+// walks it (section 66 changes nothing on the page). `dxcOnly`: node-webgpu 0.6.0's FXC stopped on the first and crashed on the
+// second (section 60), so the compile gate builds them only in a mode whose compiler is DXC and whose eight base kernels all
+// dumped DXIL (dxcVariantsBuild); anywhere else they stand aside and are not counted as unbuilt.
+export const DXC_VARIANTS = Object.freeze([
+    { id: "r18t-tile-inline-3x3", what: "r18t's hidden-layer kernel: the pixel-tiled kernel at R18_KERNELS.r18t, 32 -> 32 at 3 x 3", kind: "tile", cfg: D.R18_KERNELS.r18t.cfg, dxcOnly: true, L: (n) => conv(32, 32, 3, "relu", 11, n) },
+    { id: "r18u-fast-unroll-3x3", what: "r18u's hidden-layer kernel: the fast kernel unrolled at R18_KERNELS.r18u, 32 -> 32 at 3 x 3", kind: "fastalt", opts: D.R18_KERNELS.r18u.cfg, dxcOnly: true, L: (n) => conv(32, 32, 3, "relu", 11, n) },
+].map((v) => Object.freeze(v)));
+
+/**
+ * Section 66's condition 0, as a pure function: does what the package predicted (tools/ship/headlessGpu.mjs's nativeCompiler
+ * -- "DXC", "FXC", or null off win32) agree with the compiler each child's dump names (dumpStats's `compiler`)? The rule is
+ * "the dumps say DXIL exactly when the package said DXC":
+ *   - "DXC": at least one dump, and EVERY one DXIL. A child with no dump ("unknown (no dump)") is not DXIL -- 0.6.2's Dawn
+ *     fails device creation when DXC will not load, with no dump at all, and that is the prediction failing, not agreeing.
+ *   - "FXC": no dump DXIL (or SPIR-V), and at least one DXBC -- a run with no D3D dump at all is no evidence FXC ran. A child
+ *     with no dump is not held against FXC: the rule's direction is DXIL-iff-DXC, and FXC's failures are section 60's to read.
+ *   - null (not win32): no D3D compiler was predicted, so no dump may name one; `d3d` is false -- there is NO D3D evidence here,
+ *     and a caller must not report this as condition 0 tested.
+ * { ok, d3d, detail }.
+ */
+export function compilerMatchesDumps(predicted, compilers) {
+    const cs = [...(compilers || [])], n = (re) => cs.filter((c) => re.test(c || "")).length;
+    const dxil = n(/^DXC \(DXIL\)$/), dxbc = n(/^FXC \(DXBC\)$/), spirv = n(/^SPIR-V/), none = cs.length - dxil - dxbc - spirv;
+    const tally = `${cs.length} dump(s): ${dxil} DXIL, ${dxbc} DXBC, ${spirv} SPIR-V, ${none} without a compiler`;
+    if (predicted === "DXC") return { ok: cs.length > 0 && dxil === cs.length, d3d: true, detail: `predicted DXC; ${tally}` };
+    if (predicted === "FXC") return { ok: dxbc > 0 && dxil === 0 && spirv === 0, d3d: true, detail: `predicted FXC; ${tally}` };
+    if (predicted == null) return { ok: dxil === 0 && dxbc === 0, d3d: false, detail: `predicted none (no D3D compiler off win32); ${tally}` };
+    return { ok: false, d3d: true, detail: `a prediction this does not know: ${JSON.stringify(predicted)}; ${tally}` };
+}
+
+/**
+ * Section 66: whether a mode builds DXC_VARIANTS -- its predicted compiler is DXC AND its eight base kernels (VARIANTS, one dump
+ * each) all dumped DXIL, which is compilerMatchesDumps's DXC case over exactly VARIANTS.length dumps. A prediction alone is not
+ * enough (an adapter below shader model 6.0 is forced to FXC whatever the package says), nor are DXIL dumps alone (a run the
+ * package called FXC that dumped DXIL is condition 0 red, not a licence). { build, why }.
+ */
+export function dxcVariantsBuild(predicted, baseCompilers) {
+    const m = compilerMatchesDumps(predicted, baseCompilers), cs = [...(baseCompilers || [])];
+    if (predicted !== "DXC") return { build: false, why: `the compiler is ${predicted || "no D3D compiler"}, not DXC` };
+    if (cs.length !== VARIANTS.length) return { build: false, why: `${cs.length} base dump(s), not the ${VARIANTS.length} base kernels' -- ${m.detail}` };
+    return m.ok ? { build: true, why: `DXC, and all ${cs.length} base kernels dumped DXIL` } : { build: false, why: `DXC predicted, but not every base kernel dumped DXIL -- ${m.detail}` };
+}
+
+// ---- THE BUILD PROBE (section 56)-------------------------------------------------------------------------------------
 // Round 16's first rig runs (section 56) stopped every denoiser gate at realGpuRun's 30-minute cap on both GPUs, each in
 // its native part: node-webgpu's FXC did not finish the pixel-tiled kernel's pipeline in the compile gate's 15 minutes, where
 // it builds the fast kernel in seconds. The kernel differs from the fast one in two ways that could be what FXC chokes on --

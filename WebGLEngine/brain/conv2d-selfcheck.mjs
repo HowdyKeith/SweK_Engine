@@ -75,6 +75,7 @@
 // caught: the first thread of the next block's load overwrites the tile before the later threads of this block
 // have read it, every time. On a real GPU the same defect would be intermittent; here it is deterministic.
 "use strict";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -99,7 +100,35 @@ const fxcAdapter = (ad) => /\bD3D12\b/i.test(ad?.description || "");
 const FXC_SKIP = "the pixel-tiled kernel is not built natively on a D3D12 adapter: node-webgpu's FXC did not finish it in 3 minutes on either GPU (section 57)";
 // section 59: round 17's kernels -- the fast kernel's other ways, the tile kernel's inline weights -- stand aside there too until
 // the probe shows FXC builds them; the probe builds each under a cap, so no gate has to find out by waiting
-const FXC_SKIP_R17 = "round 17's kernels are not built natively on a D3D12 adapter until tools/denoiseBuildProbe.mjs shows FXC builds them (section 59)";
+// v4851: section 60 read that probe -- 0.6.0's FXC stopped on r18t's kernel at 3 minutes and crashed on r18u's, on both GPUs
+const FXC_SKIP_R17 = "round 17's kernels are not built natively on a D3D12 adapter under FXC: node-webgpu 0.6.0's FXC stopped on r18t's kernel and crashed on r18u's on both GPUs (section 60)";
+// v4851 -- round 19 (section 66): ROUND 17'S DEVICE ROWS RUN ON A D3D12 ADAPTER WHEN THE RUN'S COMPILER IS DXC; ROUND 16'S STILL DO NOT.
+// node-webgpu 0.6.2 ships DXC, and on both of the rig's GPUs it built all 7 of round 17's shapes (BUILD_PROBE_R17), each exact, in
+// 2.4 s or less (section 65). That probe ran round 17's shapes only: round 16's (BUILD_PROBE -- the hoisted tile at every px, edge
+// skip and zero) were never built under DXC anywhere, so they stand aside on every D3D12 adapter, whatever the compiler. The
+// compiler is read off the package (tools/ship/headlessGpu.mjs's nativeCompiler) with the flags this gate's device is made with
+// -- runWgslComputeNative's instanceFor makes it through mod.create([]), Dawn as shipped, so NATIVE_FLAGS is empty -- because the
+// adapter cannot say: on 0.6.2 its description is "D3D12 driver version ..." under either compiler. The compile gate holds that
+// reading to Dawn's own dump in the same run. Anything but "DXC" -- FXC, none, unread -- counts as FXC, the safe side: a wrong
+// "FXC" costs rows, a wrong "DXC" stops the gate at realGpuRun's 30-minute cap (section 56). Off D3D12 nothing stands aside.
+const NATIVE_FLAGS = Object.freeze([]);
+const WPKG = H.webgpuPackage(H.resolveWebgpu().from);
+const COMPILER = H.nativeCompiler({ pkg: WPKG, platform: process.platform, flags: NATIVE_FLAGS });
+// null: the round's device rows run on this adapter under this compiler; else the SKIP line's reason, naming the compiler read.
+// Pure -- the adapter as runWgslComputeNative reports it ({ vendor, architecture, description }), the compiler as nativeCompiler
+// names it, the round as a number -- so section 5e holds every branch on the rig's own descriptions, on a box with no D3D12.
+function nativeStandAside(adapter, compiler, round) {
+    if (!fxcAdapter(adapter)) return null;
+    if (false && round === 17 && compiler === "DXC") return null;
+    const said = compiler === "DXC" || compiler === "FXC" ? compiler : `an unread compiler (${JSON.stringify(compiler ?? null)}), counted as FXC`;
+    if (round === 17) return `${FXC_SKIP_R17}; this run compiles with ${said}, and under DXC (node-webgpu 0.6.2) they run (section 66)`;
+    if (round === 16) return `${FXC_SKIP}; this run compiles with ${said}, and round 16's shapes stand aside under DXC too: the rig's DXC probe ran round 17's shapes only (section 66)`;
+    return `round ${round}'s kernels are not named by section 66 and stand aside on a D3D12 adapter under any compiler; this run compiles with ${said}`;
+}
+// round 17's inline-weight rows compare, where neither fused, with the tile kernel's hoisted weights -- round 16's shapes. Where
+// round 16 stands aside and round 17 runs (D3D12 under DXC) that comparator would build a round-16 shape on D3D12, so the fast
+// kernel's bits stand in: round 16's own rows hold the hoisted tile to exactly those bits wherever both run (sections 54-58)
+const r17Comparator = (adapter, compiler) => (nativeStandAside(adapter, compiler, 16) ? "fast" : "hoist");
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const t0 = Date.now();
@@ -315,6 +344,47 @@ console.log("\n5d. THE FAST KERNEL'S OTHER WAYS, AND THE TILE KERNEL'S INLINE WE
         th === conv2dTileWgsl(L32, { px: 2, g4: 8, edge: "zero", weights: "hoist" }) && /weights hoist or inline/.test(refuse(() => conv2dTileWgsl(L32, { weights: "both" })) || ""));
 }
 
+console.log("\n5e. WHICH ROUNDS' DEVICE ROWS STAND ASIDE, BY ADAPTER AND COMPILER, ON STUB ADAPTERS (round 19, section 66)");
+{
+    // v4851: this box has no D3D12, so every branch of nativeStandAside is held here, on the rig's own adapters as the build probe
+    // named them (section 65) and as runWgslComputeNative reports one -- the Intel's and the 1080's -- and on adapters that are not D3D12
+    const intel = { vendor: "intel", architecture: "gen-9", description: "D3D12 driver version 31.0.101.2137" };
+    const gtx = { vendor: "nvidia", architecture: "pascal", description: "D3D12 driver version 32.0.15.8180" };
+    const RIG = [intel, gtx], OFF = [{ vendor: "google", architecture: "swiftshader", description: "SwiftShader driver 5.0.0" }, { description: "Vulkan driver" },
+        { description: "Metal driver on macOS" }, { vendor: "intel", architecture: "gen-9" }, null];
+    // undefined and null a compiler not read; the rest names nativeCompiler never gives -- none of them is DXC
+    const NOT_DXC = ["FXC", undefined, null, "", "unknown (no dump)", "dxc", "DXCompiler"], said = (c) => (c === undefined ? "(none)" : JSON.stringify(c));
+    const runs = (a, c, r) => nativeStandAside(a, c, r) === null;
+    // SABOTAGED v4851: round 17 stands aside under DXC too (its DXC exemption dropped) -> RED by name (this row alone); restored.
+    // SABOTAGED v4851: round 16 runs under DXC as round 17 does -> RED by name (this row alone); restored.
+    // SABOTAGED v4851: r17Comparator always "hoist" (round 17's inline rows would build round 16's hoisted tile on D3D12) -> RED by name (this row alone); restored.
+    ok("!! round 19 (section 66): on a D3D12 adapter under DXC, round 17's device rows run and round 16's stand aside -- the rig's DXC probe ran round 17's shapes only -- and round 17's inline rows compare with the fast kernel, never building round 16's hoisted tile",
+        RIG.every((a) => runs(a, "DXC", 17) && /round 16's shapes stand aside under DXC too/.test(nativeStandAside(a, "DXC", 16) || "") &&
+            !runs(a, "DXC", undefined) && !runs(a, "DXC", "17") && r17Comparator(a, "DXC") === "fast"),
+        RIG.map((a) => `${a.vendor}: 17 ${runs(a, "DXC", 17) ? "runs" : "aside"}, 16 ${runs(a, "DXC", 16) ? "runs" : "aside"}, comparator ${r17Comparator(a, "DXC")}`).join("; "));
+    // SABOTAGED v4851: an unread compiler counted as DXC (compiler !== "FXC" in place of === "DXC") -> RED by name (this row alone); restored.
+    // SABOTAGED v4851: the SKIP line stops naming the compiler (said dropped from round 17's reason) -> RED by name (this row alone); restored.
+    ok("!! round 19 (section 66): on a D3D12 adapter under FXC, an unread compiler or none, both rounds stand aside and each SKIP line names the compiler read -- anything but \"DXC\" counts as FXC, the safe side",
+        RIG.every((a) => NOT_DXC.every((c) => [16, 17].every((r) => {
+            const why = nativeStandAside(a, c, r) || "";
+            return (c === "FXC" ? /this run compiles with FXC,/.test(why) : why.includes(`an unread compiler (${JSON.stringify(c ?? null)}), counted as FXC`)) && why.includes(`section ${r === 16 ? 57 : 60}`);
+        }))),
+        `the 1080 under ${NOT_DXC.map((c) => `${said(c)}: 16 ${runs(gtx, c, 16) ? "runs" : "aside"}, 17 ${runs(gtx, c, 17) ? "runs" : "aside"}`).join("; ")}`);
+    // SABOTAGED v4851: every adapter stands aside unless the compiler is DXC (the D3D12 test made compiler-only) -> RED by name (this row alone); restored.
+    ok("  round 19: off D3D12 -- SwiftShader, Vulkan, Metal, an adapter with no description, none -- both rounds run whatever compiler is named, and round 17's inline rows keep the hoisted tile as their comparator",
+        OFF.every((a) => [...NOT_DXC, "DXC"].every((c) => runs(a, c, 16) && runs(a, c, 17) && r17Comparator(a, c) === "hoist")),
+        `on SwiftShader under "FXC": 16 ${runs(OFF[0], "FXC", 16) ? "runs" : "aside"}, 17 ${runs(OFF[0], "FXC", 17) ? "runs" : "aside"}`);
+    // v4851: the compiler is only as good as the flags it is read with, and the device here is made inside headlessGpu, not in this
+    // file -- so this reads instanceFor's source: every instance it makes is mod.create([]), the flags NATIVE_FLAGS says (none)
+    // SABOTAGED v4851: NATIVE_FLAGS read as ["disable-dawn-features=use_dxc"] (a compiler read with flags the device is not made with) -> RED by name (this row alone); restored.
+    const hsrc = fs.readFileSync(path.join(ENG, "tools", "ship", "headlessGpu.mjs"), "utf8"), iI = hsrc.indexOf("function instanceFor(");
+    const inst = iI >= 0 ? hsrc.slice(iI, hsrc.indexOf("\n}", iI)) : "", made = inst.match(/mod\.create\(([^)]*)\)/g) || [];
+    ok("  round 19: the compiler is read with the flags this gate's device is made with -- runWgslComputeNative's instanceFor makes every instance with mod.create([]), so NATIVE_FLAGS is empty -- and it is none off win32",
+        made.length > 0 && made.every((m) => m === "mod.create([])") && Object.isFrozen(NATIVE_FLAGS) && NATIVE_FLAGS.length === 0 &&
+            COMPILER === H.nativeCompiler({ pkg: WPKG, platform: process.platform, flags: [] }) && (process.platform === "win32" ? ["DXC", "FXC"].includes(COMPILER) : COMPILER === null),
+        `instanceFor: ${made.join(", ") || "not found"}; NATIVE_FLAGS ${JSON.stringify(NATIVE_FLAGS)}; this run: ${COMPILER || `none on ${process.platform}`}, node-webgpu ${(WPKG && WPKG.version) || "(version unread)"}`);
+}
+
 console.log("\n6. *** EVERY KERNEL ON THE DEVICE, CELL FOR CELL AGAINST THE TWIN ***");
 const skip = H.headlessGpuSkipReason ? H.headlessGpuSkipReason() : null;
 if (skip) console.log("  SKIP  " + skip);
@@ -334,7 +404,9 @@ else {
     let adapter = null;
     for (const P of PROBES) {
         // section 57: the tile kernel's manifest case is last, so the adapter is known before it
-        if (P.entryPoint === "k_conv_tile" && fxcAdapter(adapter)) { console.log(`  SKIP  ${P.id}: ${FXC_SKIP}`); continue; }
+        // v4851 (section 66): round 16's shape -- it stands aside on D3D12 under DXC too
+        const asideP = P.entryPoint === "k_conv_tile" ? nativeStandAside(adapter, COMPILER, 16) : null;
+        if (asideP) { console.log(`  SKIP  ${P.id}: ${asideP}`); continue; }
         // each entry run through its own packer, inputs and dispatch -- the manifest is what a lab-wide runner would use
         const a = P.args, t = Date.now(), r = await H.runWgslComputeNative({ code: P.code(a), entryPoint: P.entryPoint, outCount: P.outCount(a), uniforms: P.pack(a),
             workgroups: P.workgroups(a), inputs: P.inputs(a) });
@@ -383,7 +455,8 @@ else {
             rh.ok && rd.ok && jh.unexplained === 0 && (jh.fused || jd.fused || same(Array.from(cl), Array.from(rd.values).map(Math.fround))),
             rh.ok && rd.ok ? `head ${jh.fused} fused, direct ${jd.fused} fused of ${jh.n}` : (rh.reason || rd.reason) + " " + (rh.errors || []).join("; "));
     }
-    if (fxcAdapter(adapter)) console.log(`  SKIP  the pixel-tiled kernel's device cases, edge zero's and its identity key: ${FXC_SKIP}`);
+    const aside16 = nativeStandAside(adapter, COMPILER, 16), aside17 = nativeStandAside(adapter, COMPILER, 17);
+    if (aside16) console.log(`  SKIP  the pixel-tiled kernel's device cases, edge zero's and its identity key: ${aside16}`);
     else {
     // round 16: the pixel-tiled kernel at both configurations and a third -- the denoiser's 10 -> 32 and 32 -> 32 at 3 x 3 on
     // odd sizes, a wide image of 13 -> 11 (several strips, the last partial), a 1 x 1 head in z groups, a 5 x 3 image
@@ -426,7 +499,8 @@ else {
     // round 17 (section 59): the fast kernel's other ways, against the twin and the fast kernel's own bits on the same case --
     // a partial last block (10 -> 32), two whole blocks and a last of three (19 -> 11), a head in three groups (its weights'
     // offsets then run-time), and 32 -> 32 written out with vec4 reads; then the tile kernel's inline weights
-    if (fxcAdapter(adapter)) console.log(`  SKIP  round 17's device cases: ${FXC_SKIP_R17}`);
+    // v4851 (section 66): on D3D12 these run when the run's compiler is DXC, and stand aside under FXC, naming it
+    if (aside17) console.log(`  SKIP  round 17's device cases: ${aside17}`);
     else {
         const alt = (a, o) => { const F = probeFixture(a); return H.runWgslComputeNative({ code: conv2dFastAltWgsl(a, o), entryPoint: "k_conv_fast_alt", outCount: a.H * a.W * a.Cout,
             uniforms: packFastAltUniforms({ H: a.H, W: a.W, layer: F.layer }, o), workgroups: [Math.ceil(a.W / TILE), Math.ceil(a.H / TILE), fastAltShape(a, o).groups], inputs: [{ binding: 2, data: F.x }] }); };
@@ -445,10 +519,14 @@ else {
         const tile = (a, cfg) => { const F = probeFixture(a); return H.runWgslComputeNative({ code: conv2dTileWgsl(a, cfg), entryPoint: "k_conv_tile", outCount: a.H * a.W * a.Cout,
             uniforms: packTileUniforms({ H: a.H, W: a.W, layer: F.layer }, cfg), workgroups: tileWorkgroups(a.H, a.W, a, cfg), inputs: [{ binding: 2, data: F.x }] }); };
         for (const [a, cfg] of [[{ H: 21, W: 19, Cin: 10, Cout: 32, k: 3, act: "relu", seed: 41 }, { px: 2, g4: 8, edge: "zero" }], [{ H: 11, W: 37, Cin: 13, Cout: 11, k: 3, act: "none", seed: 53 }, { px: 1, g4: 8, edge: "skip" }]]) {
-            const [ri, rh] = [await tile(a, { ...cfg, weights: "inline" }), await tile(a, cfg)], ji = ri.ok ? judge(ri, a) : null, jh = rh.ok ? judge(rh, a) : null;
-            ok(`!! round 17: the tile kernel's inline weights, ${a.H} x ${a.W}, ${a.Cin} -> ${a.Cout}, ${cfg.px} px, edge ${cfg.edge}: every cell explained -- and where neither fused, its hoisted weights' bits`,
+            // v4851 (section 66): the comparator is the hoisted tile -- round 16's shape -- except where round 16 stands aside and this
+            // runs (D3D12 under DXC): there the fast kernel's bits, so no round-16 shape is built on D3D12 (r17Comparator, held in 5e)
+            const hoist = r17Comparator(adapter, COMPILER) === "hoist";
+            const [ri, rh] = [await tile(a, { ...cfg, weights: "inline" }), hoist ? await tile(a, cfg) : await fast(a)], ji = ri.ok ? judge(ri, a) : null, jh = rh.ok ? judge(rh, a) : null;
+            ok(`!! round 17: the tile kernel's inline weights, ${a.H} x ${a.W}, ${a.Cin} -> ${a.Cout}, ${cfg.px} px, edge ${cfg.edge}: every cell explained -- and where neither fused, ` +
+               (hoist ? "its hoisted weights' bits" : "the fast kernel's own bits (round 16's hoisted tile stands aside here, section 66)"),
                 ri.ok && rh.ok && ji.unexplained === 0 && (ji.fused || jh.fused || same(Array.from(ri.values), Array.from(rh.values))),
-                ri.ok && rh.ok ? `inline ${ji.fused} fused, hoist ${jh.fused} fused of ${ji.n}` : (ri.reason || rh.reason) + " " + (ri.errors || []).join("; "));
+                ri.ok && rh.ok ? `inline ${ji.fused} fused, ${hoist ? "hoist" : "fast"} ${jh.fused} fused of ${ji.n}` : (ri.reason || rh.reason) + " " + (ri.errors || []).join("; "));
         }
         const K = keyCpu({ H: 9, W: 21, C: 5 }), out = [];
         for (const o of [{ reads: "vec4" }, { unroll: true }, { reads: "vec4", unroll: true }]) {
@@ -477,7 +555,7 @@ else {
     let refused = null; try { packProbeUniforms({ H: 4, W: 4, Cin: 4, Cout: COUT_MAX + 1, k: 3, tiled: true }); } catch (e) { refused = e.message; }
     let refusedK = null; try { packProbeUniforms({ H: 4, W: 4, Cin: 4, Cout: 4, k: K_MAX + 2, tiled: true }); } catch (e) { refusedK = e.message; }
     ok(`  the tiled kernel's limits are refused by name, not overrun: Cout > ${COUT_MAX}, k > ${K_MAX}`, /Cout/.test(refused || "") && /k <=/.test(refusedK || ""));
-    console.log(`  ....  adapter: ${adapter ? [adapter.vendor, adapter.architecture, adapter.description].filter(Boolean).join(" / ") : "?"}`);
+    console.log(`  ....  adapter: ${adapter ? [adapter.vendor, adapter.architecture, adapter.description].filter(Boolean).join(" / ") : "?"}; compiler, from the package: ${COMPILER || `none on ${process.platform}`} (node-webgpu ${(WPKG && WPKG.version) || "version unread"})`);
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
