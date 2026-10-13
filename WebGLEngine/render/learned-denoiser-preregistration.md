@@ -4279,3 +4279,86 @@ its row. 40 in all, none 0 red at the end:
 - Moving the pin, or any change to an FXC run.
 - `PAGE_KERNELS` and `PAGE_KERNELS_BY_ADAPTER`: the page's sets are section 63's, and Chrome's compiler did not change.
 - Round 16's shapes natively on D3D12.
+
+## 67. ROUND 19 -- THE VERDICT: A DXC RUN TAKES r18u NATIVELY ON THE INTEL, AND THE GTX 1080 STAYS ON r15
+
+**What arrived.**
+- **One `realGpuRun --only denoise` per GPU,** at 167ba144 (v4851's release), with `SWEK_WEBGPU` naming node-webgpu 0.6.2.
+  Committed byte for byte:
+  - `render/denoise-rig-r19-intel-gen9.json`: natively "intel / gen-9 / D3D12 driver version 31.0.101.2137", in Chrome
+    "intel / gen-9";
+  - `render/denoise-rig-r19-gtx1080.json`: natively "nvidia / pascal / D3D12 driver version 32.0.15.8180", in Chrome
+    "nvidia / pascal".
+- **Every gate was green on both GPUs,** none near the 30-minute cap. Both reports name the native adapter, labelled
+  native, beside Chrome's: section 65's "NO ADAPTER WAS SEEN" is gone.
+
+| Gate | Intel gen-9 | GTX 1080 |
+|---|---|---|
+| exact | 69 s | 41 s |
+| timing | 342 s | 248 s |
+| compile | 390 s | 215 s |
+
+**Section 66's five conditions, set by set.** The table below is no longer typed from the reports by hand:
+`render/denoiseDevice-selfcheck.mjs`'s `rule66Entries` is the rule as code, it reads both committed reports, and the gate
+holds `NATIVE_KERNELS_BY_ADAPTER` to what it derives. It prints these lines itself.
+
+| Condition | r18t, Intel | r18u, Intel | r18t, 1080 | r18u, 1080 |
+|---|---|---|---|---|
+| 0. The compiler is DXC | yes: 10 of 10 "as shipped" dumps DXIL, package said DXC | yes | yes: 10 of 10 DXIL | yes |
+| 1. K0 (b), native exact rows | 3 of 3 green | 3 of 3 green | 3 of 3 green | 3 of 3 green |
+| 2. K1 against r12 under DXC | 9.02 x at 256 (r12's largest) | 14.01 x at 256 | 24.99 x at 1080p | 15.17 x at 1080p |
+| 3. Against r15 under DXC | **0.951 x at 1024** | 1.590 x at 1024 | 1.076 x at 1080p | **0.653 x at 1080p** |
+| 4. Against r15 under FXC, unpaired | 0.881 x at 1024 | 1.474 x at 1024 | **0.996 x at 1080p** | 0.605 x at 1080p |
+| Qualifies | no, by 3 | **yes** | no, by 4 | no, by 3 |
+
+- **The largest common sizes.** On the Intel r15 reached 1024 under both compilers (1080p predicted 1953 ms, over the
+  1500 ms cap); r18u reached 1080p, so 3 and 4 are read at 1024. On the 1080 every set reached 1080p.
+- **So `NATIVE_KERNELS_BY_ADAPTER` is `{ "win32/intel/gen-9": "r18u" }`.** The key is the one the Intel's timing gate
+  printed. The 1080 gets no entry.
+- **`DEFAULT_KERNELS` stays "r15"** for every FXC run, every other adapter, and every platform but win32. Nothing on the
+  pinned 0.6.0 moves: its compiler is FXC.
+
+**The predictions, fixed in section 66.**
+
+| Set and GPU | Predicted under DXC | Measured | Predicted under FXC | Measured |
+|---|---|---|---|---|
+| r18u, Intel | 1.52 x | 1.590 x | 1.41 x | 1.474 x |
+| r18t, Intel | 1.03 x | 0.951 x | 0.95 x | 0.881 x |
+| r18t, GTX 1080 | 1.09 x | 1.076 x | 1.04 x | 0.996 x |
+| r18u, GTX 1080 | 0.66 x | 0.653 x | 0.63 x | 0.605 x |
+
+- **P1 is true.** The Intel's entry is r18u.
+- **P2 is true, and for the predicted reason.** r18t cleared r15 under DXC on the 1080 and fell short of r15 under FXC.
+  Section 66 predicted 1.04 x there; it measured 0.996 x.
+- **P3 is true on both GPUs.** r15's pass on the device's clock was slower under DXC: 985.9 ms against 913.7 ms on the
+  Intel at 1024, and 80.9 ms against 74.8 ms on the 1080 at 1080p. Condition 4 is what kept that from flattering a set.
+
+**Reported, deciding nothing.**
+- **The compile gate's kernel-level line at 64 x 64, under DXC.** On the Intel, r15's hidden kernel over r18t's was
+  1.063 x and over r18u's 1.760 x. On the 1080 both read 0.712 x -- at 64 x 64, where the network-level ratios are
+  also under 1 there (r18t 0.785 x, r18u 0.813 x).
+- **FXC on the fused head variant `r13-fast-head`** (the compile gate's "use_dxc off" mode): 313 s to build and 1208 ms a
+  pass on the Intel, 157 s and 22.8 ms on the 1080. Under DXC it builds in about 0.1 s (144 and 97 ms) and runs in 0.57 and 0.06 ms.
+  r15's own fused head (`r15-head-apply`) built in 14 s and 9 s under FXC and ran exact. r13 is not a set anything runs.
+- **r12 natively on the Intel** stops at 256 under both compilers: 512 is predicted at 2249 ms, over the cap.
+
+**What the table does today.** `nativeKernelsFor(key, compiler)` is the only reader, and nothing outside its gate calls it
+yet. A native caller that picks its set by adapter -- `tools/denoiseDevice.mjs` without `--kernels`, or the engine on a
+console -- is the next round's, and it only matters once the pin moves to 0.6.2, which needs the whole native sweep on
+0.6.2, green and exact, here and on the rig (section 64).
+
+**Sabotages (v4852).** Each against the row it names, the gate run, restored byte-identical (md5 verified):
+6 in all, each red by name:
+- **T1, the table:** the Intel's entry swapped to r18t -> 2 red (the verdict row, and `nativeKernelsFor`'s).
+- **T2, the table:** the 1080 given r18t as well -> 2 red (the same two).
+- **T3, the rule:** condition 4 dropped -> 3 red (the verdict, "the rule discriminates", the predictions). Without it the
+  1080 would have been given r18t, which is what condition 4 exists to stop.
+- **T4, the rule:** the key read off section 61's line -> 3 red (the same three).
+- **T5, the rule:** each ratio read at the SMALLEST size -> 2 red ("the rule discriminates", the predictions).
+- **T6, P3:** r15 under DXC against FXC read at the smallest common size -> 1 red (the predictions). At 64 x 64 the
+  Intel's r15 ran 4.705 ms under DXC and 4.713 under FXC: P3 holds at the size the rule names, not at every size.
+
+**Not in this round.**
+- Moving the pin, or any change to an FXC run.
+- A native caller reading `NATIVE_KERNELS_BY_ADAPTER`.
+- `PAGE_KERNELS_BY_ADAPTER`: section 63's, unchanged.

@@ -44,8 +44,9 @@
 // skip: as a skip, a DXC run with a mistyped path passed green with no native row. The native adapter, with that compiler, is
 // named where tools/ship/realGpuRun.mjs reads adapters, and one measured ("----") line says which round-18 sets' native rows ran
 // and whether every one was green -- section 66's condition (1), readable off the rig's report, which keeps only measured and
-// failing lines. NATIVE_KERNELS_BY_ADAPTER, a DXC run's native set by adapter, is empty until section 66's rule is read off the
-// rig, and DEFAULT_KERNELS stays r15. tools/denoiseDevice.mjs's --measure-r18t and --measure-r18u refuse, by name, a run whose
+// failing lines. NATIVE_KERNELS_BY_ADAPTER, a DXC run's native set by adapter, is section 66's rule read off the rig's two
+// round-19 reports (section 67, v4852: r18u on the Intel gen-9, nothing on the GTX 1080) -- derived here by rule66Entries from
+// the committed reports, not retyped -- and DEFAULT_KERNELS stays r15. tools/denoiseDevice.mjs's --measure-r18t and --measure-r18u refuse, by name, a run whose
 // compiler FXC_UNBUILT_SETS drops; no gate runs that CLI, so a row here reads its source.
 //
 // *** NOTHING HERE RENDERS A DATASET SEED. *** The images are synthetic; the networks are drawn from seeds here.
@@ -154,6 +155,16 @@
 //   S3  isDxcCompiler matches "dxc" in any case                          -> RED: "isDxcCompiler is DXC as the package names it"
 //   S4  NATIVE_KERNELS_BY_ADAPTER ships an entry before the rule is read -> RED: "NATIVE_KERNELS_BY_ADAPTER is frozen and EMPTY"
 //   S5  nativeKernelsFor reads the table without asking the compiler    -> RED: "nativeKernelsFor gives a table's set"
+//   (S4's row held the table EMPTY until the rule was read; v4852 read it, and the row now holds it frozen -- the verdict rows below
+//   hold what is in it.)
+// v4852 -- ROUND 19'S VERDICT (section 67), SABOTAGED. Each against the file named, the gate run, restored byte-identical (md5):
+//   T1  render/denoiseDevice.mjs: the Intel's entry swapped to r18t       -> 2 RED: the verdict row, "nativeKernelsFor gives a table's set"
+//   T2  render/denoiseDevice.mjs: the 1080 given r18t as well             -> 2 RED: the same two
+//   T3  rule66Entries without condition 4                                 -> 3 RED: the verdict, "the rule discriminates", the predictions
+//   T4  rule66Entries reading the key off section 61's line               -> 3 RED: the same three
+//   T5  sizeRatios' top taking the SMALLEST size                          -> 2 RED: "the rule discriminates", the predictions
+//   T6  r15DxcOverFxc reading the smallest common size                    -> 1 RED: the predictions (at 64 x 64 the Intel's r15
+//       ran 4.705 ms under DXC against 4.713 under FXC -- P3 holds only at the size the rule names)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -180,6 +191,46 @@ const k0row = (where, set, J, worst) => K0ROWS.push([where, set, J.reduce((a, j)
 let fails = 0;
 // v4849 -- it returns the row's result, so round 19's measured line can say which round-18 sets' native rows were green
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; return !!c; };
+
+// v4852 -- SECTION 66'S RULE, AS CODE, read off a realGpuRun --only denoise report (render/denoise-rig-r19-*.json). Per set (r18t,
+// r18u) it asks the five conditions in order and records the first that fails: 0 the run's compiler is DXC (the package said
+// DXC, the compile gate green, every "as shipped" dump DXIL); 1 K0 (b), the set's native rows in the exact gate all green;
+// 2 K1 against r12 under DXC (at least 2 x at the largest size both measured, at least 1 x at every one); 3 at least 1.05 x
+// r15 under DXC, and 4 at least 1.05 x r15 under FXC (unpaired), each at the largest size the report prints for it. The entry
+// is the qualifier with the larger condition-3 ratio, a tie to r18u; no key, or no qualifier, is no entry.
+const RULE66_SETS = ["r18t", "r18u"], RULE66_MIN = 1.05;
+const rigGate = (rep, name) => (rep.gates || []).find((g) => g.gate === `render/${name}-selfcheck.mjs`) || null;
+const rigLines = (g) => (g && g.measured) || [];
+const sizeRatios = (lines, head) => lines.map((l) => l.startsWith(head) && l.slice(head.length).match(/^(\d+) x (\d+): ([\d.]+) x as fast/))
+    .filter(Boolean).map((m) => ({ px: +m[1] * +m[2], size: `${m[1]} x ${m[2]}`, r: +m[3] })).sort((a, b) => a.px - b.px);
+function rule66Entries(rep) {
+    const comp = rigGate(rep, "denoiseCompile"), dev = rigGate(rep, "denoiseDevice"), tim = rigGate(rep, "denoiseTiming");
+    const T = rigLines(tim), keyLine = T.map((l) => l.match(/^native: this adapter's key for section 66's table: (\S+)$/)).find(Boolean);
+    const key = keyLine ? keyLine[1] : null;
+    const c0 = !!comp && comp.ok === true && !!rep.nodeWebgpu && rep.nodeWebgpu.compiler === "DXC" &&
+        rigLines(comp).some((l) => /^native \/ as shipped in all: (\d+) of \1 built; dumps: \1 DXC \(DXIL\); compiler, from the package: DXC;/.test(l));
+    const sets = RULE66_SETS.map((s) => {
+        const c1 = !!dev && dev.ok === true && rigLines(dev).some((l) => new RegExp(`\\b${s} green \\((\\d+) of \\1 native rows\\)`).test(l));
+        const k1 = sizeRatios(T, `native: ${s} against r12 at `), dxc = sizeRatios(T, `native: ${s} against r15 at `), fxc = sizeRatios(T, `native: ${s} against r15 under FXC at `);
+        const top = (a) => (a.length ? a[a.length - 1] : null);
+        const conds = [c0, c1, !!tim && tim.ok === true && k1.length > 0 && top(k1).r >= 2 && k1.every((x) => x.r >= 1),
+                       !!top(dxc) && top(dxc).r >= RULE66_MIN, !!top(fxc) && top(fxc).r >= RULE66_MIN];
+        const fail = conds.indexOf(false);
+        return { s, fail, c3: top(dxc), line: `${s} K1 ${top(k1) ? top(k1).r + " x at " + top(k1).size : "none"}, ${top(dxc) ? top(dxc).r + " x r15 under DXC at " + top(dxc).size : "no DXC ratio"}, ` +
+                 `${top(fxc) ? top(fxc).r + " x r15 under FXC at " + top(fxc).size : "no FXC ratio"}${fail < 0 ? ", qualifies" : `, fails condition ${fail}`}` };
+    });
+    const q = sets.filter((x) => x.fail < 0).sort((a, b) => a.c3.r - b.c3.r || RULE66_SETS.indexOf(a.s) - RULE66_SETS.indexOf(b.s));
+    return [{ key, entry: key && q.length ? q[q.length - 1].s : null, fail: Object.fromEntries(sets.map((x) => [x.s, x.fail])), lines: sets.map((x) => x.line) }];
+}
+// P3's reading: r15's pass on the device's clock under DXC (the native ladder) and under FXC (the FXC child), at the largest size both reached
+function r15DxcOverFxc(rep) {
+    const T = rigLines(rigGate(rep, "denoiseTiming")), at = (head) => new Map(T.map((l) => l.startsWith(head) && l.slice(head.length).match(/^(\d+ x \d+): .*?on the device's clock ([\d.]+) ms/))
+        .filter(Boolean).map((m) => [m[1], +m[2]]));
+    const dxc = at("native r15: "), fxc = at("native FXC r15: ");
+    const both = [...dxc.keys()].filter((k) => fxc.has(k)).sort((a, b) => a.split(" x ").reduce((p, v) => p * v, 1) - b.split(" x ").reduce((p, v) => p * v, 1));
+    const size = both[both.length - 1];
+    return size ? { size, dxc: dxc.get(size), fxc: fxc.get(size) } : null;
+}
 const t0 = Date.now();
 const worstRel = (a, b, eps = 1e-30) => { let w = 0; for (let i = 0; i < a.length; i++) w = Math.max(w, Math.abs(a[i] - b[i]) / (Math.abs(b[i]) + eps)); return w; };
 
@@ -272,11 +323,11 @@ console.log("1. THE KERNEL'S TWIN, ON THE CPU");
         ok("  round 19: isDxcCompiler is DXC as the package names it (\"DXC\") or a dump reads it (\"DXC (DXIL)\"), and nothing else -- not FXC, unknown, none, a lower-case name, a longer word, or DXC named second",
             DXC_SAID.every((c) => isDxcCompiler(c) === true) && notDxc.every((c) => isDxcCompiler(c) === false),
             `true for ${DXC_SAID.map(said).join(", ")}; false for ${notDxc.map(said).join(", ")}`);
-        // v4849 -- round 19 (section 66): the native set by adapter, for a DXC run only -- empty until the rule is read off both GPUs'
-        // round-19 runs (realGpuRun --only denoise, SWEK_WEBGPU naming node-webgpu 0.6.2), keyed as the timing gate prints it
+        // v4849 -- round 19 (section 66): the native set by adapter, for a DXC run only, keyed as the timing gate prints it.
+        // v4852 -- section 67 read the rule off both GPUs' round-19 runs; the verdict rows below derive the table from them.
         const nk = { "win32/nvidia/pascal": "r18t" }, keyN = nativeAdapterKey(d3n.info, "win32");
-        ok("!! round 19 (section 66): NATIVE_KERNELS_BY_ADAPTER is frozen and EMPTY until section 66's rule is read off the rig -- and a native adapter's key is Node's platform, its vendor and its architecture, none without a platform or a vendor",
-            Object.isFrozen(NATIVE_KERNELS_BY_ADAPTER) && Object.keys(NATIVE_KERNELS_BY_ADAPTER).length === 0 && keyN === "win32/nvidia/pascal" &&
+        ok("!! round 19 (section 66): NATIVE_KERNELS_BY_ADAPTER is frozen, and a native adapter's key is Node's platform, its vendor and its architecture, none without a platform or a vendor",
+            Object.isFrozen(NATIVE_KERNELS_BY_ADAPTER) && keyN === "win32/nvidia/pascal" &&
             nativeAdapterKey(d3d.info, "win32") === "win32/intel/gen-9" && nativeAdapterKey(vk.info, "linux") === "linux/google/swiftshader" && nativeAdapterKey({ vendor: "intel" }, "win32") === "win32/intel/" &&
             nativeAdapterKey(d3n.info, undefined) === null && nativeAdapterKey(d3n.info, "") === null && nativeAdapterKey({}, "win32") === null && nativeAdapterKey(null, "win32") === null,
             `${JSON.stringify(NATIVE_KERNELS_BY_ADAPTER)}; the 1080's key ${keyN}`);
@@ -284,8 +335,9 @@ console.log("1. THE KERNEL'S TWIN, ON THE CPU");
             DXC_SAID.every((c) => nativeKernelsFor(keyN, c, nk) === "r18t") && FXC_SAID.every((c) => nativeKernelsFor(keyN, c, nk) === DEFAULT_KERNELS) &&
             nativeKernelsFor("win32/intel/gen-9", "DXC", nk) === DEFAULT_KERNELS && nativeKernelsFor(null, "DXC", nk) === DEFAULT_KERNELS && nativeKernelsFor("constructor", "DXC", nk) === DEFAULT_KERNELS &&
             nativeKernelsFor(keyN, "DXC") === DEFAULT_KERNELS && nativeKernelsFor("constructor", "DXC") === DEFAULT_KERNELS &&
+            nativeKernelsFor("win32/intel/gen-9", "DXC") === "r18u" && FXC_SAID.every((c) => nativeKernelsFor("win32/intel/gen-9", c) === DEFAULT_KERNELS) &&
             DEFAULT_KERNELS === "r15" && nativeSetsFor(d3n, [DEFAULT_KERNELS], { compiler: "FXC" }).length === 1,
-            `a fixture table ${JSON.stringify(nk)}: ${[...DXC_SAID, "FXC", null].map((c) => `${said(c)} ${nativeKernelsFor(keyN, c, nk)}`).join(", ")}; the shipped table under "DXC": ${nativeKernelsFor(keyN, "DXC")}`);
+            `a fixture table ${JSON.stringify(nk)}: ${[...DXC_SAID, "FXC", null].map((c) => `${said(c)} ${nativeKernelsFor(keyN, c, nk)}`).join(", ")}; the shipped table under "DXC": the 1080 ${nativeKernelsFor(keyN, "DXC")}, the Intel ${nativeKernelsFor("win32/intel/gen-9", "DXC")}, the Intel under "FXC" ${nativeKernelsFor("win32/intel/gen-9", "FXC")}`);
         // v4849 -- round 19: tools/denoiseDevice.mjs's --measure-r18t and --measure-r18u built natively through mod.create([]) and never
         // asked the compiler: on a D3D12 adapter under FXC the build stops or crashes an image in (section 60). No gate runs that CLI
         // (section 35's measurements are one command each), so this reads its source: the compiler read with the flags its device
@@ -298,6 +350,37 @@ console.log("1. THE KERNEL'S TWIN, ON THE CPU");
             ok("  round 19: tools/denoiseDevice.mjs reads its run's compiler with its own device's flags, and refuses a set nativeSetsFor drops -- exit 2, one line naming SWEK_WEBGPU's remedy -- before any image is built",
                 iRead > 0 && iMake > iRead && iAsk > iMake && iBuild > iAsk && (cli.match(/\bmod\.create\(/g) || []).length === 1 && /GPU\.exitCleanly\(2\)/.test(refusal) && /GPU\.WEBGPU_ENV/.test(refusal),
                 `compiler read at ${iRead}, the device made at ${iMake}, the refusal at ${iAsk}, the first build at ${iBuild}`);
+        }
+        // v4852 -- ROUND 19'S VERDICT (section 67): section 66's rule, written as code and read off the two committed rig reports
+        // (render/denoise-rig-r19-*.json: realGpuRun --only denoise, SWEK_WEBGPU naming node-webgpu 0.6.2, at v4851's release commit).
+        // The table is DERIVED from them here, not retyped: a changed report, a changed rule or a changed table each turns a row red.
+        {
+            const rig = (f) => JSON.parse(fs.readFileSync(path.join(ENG, "render", f), "utf8"));
+            const R19 = { intel: rig("denoise-rig-r19-intel-gen9.json"), gtx1080: rig("denoise-rig-r19-gtx1080.json") };
+            const r66 = rule66Entries(R19.intel).concat(rule66Entries(R19.gtx1080));
+            const got = r66.filter((e) => e.entry).map((e) => [e.key, e.entry]);
+            for (const e of r66) console.log(`  ----  section 66 on ${e.key}: ${e.lines.join("; ")} -> ${e.entry || "no entry"}`);
+            ok("!! *** round 19's verdict (section 67): NATIVE_KERNELS_BY_ADAPTER is section 66's rule read off both GPUs' round-19 reports -- r18u for the Intel gen-9, nothing for the GTX 1080 -- and nothing else ***",
+                JSON.stringify(Object.entries(NATIVE_KERNELS_BY_ADAPTER).sort()) === JSON.stringify(got.sort()) && got.length === 1 && got[0][0] === "win32/intel/gen-9" && got[0][1] === "r18u" &&
+                r66.length === 2 && r66.every((e) => e.key) && Object.values(NATIVE_KERNELS_BY_ADAPTER).every((v) => TIMED_SETS.includes(v) && FXC_UNBUILT_SETS.includes(v)) && DEFAULT_KERNELS === "r15",
+                `${JSON.stringify(NATIVE_KERNELS_BY_ADAPTER)} against the rule's ${JSON.stringify(Object.fromEntries(got))}`);
+            // the rule DISCRIMINATES: the 1080's report with r18t's unpaired FXC ratio at its largest size moved over 1.05 gives r18t,
+            // the Intel's with r18u's FXC ratio moved under gives nothing, and a report with no key gives no entry
+            const lift = JSON.parse(JSON.stringify(R19.gtx1080)), drop = JSON.parse(JSON.stringify(R19.intel)), nokey = JSON.parse(JSON.stringify(R19.intel));
+            const edit = (rep, re, to) => { for (const g of rep.gates) g.measured = (g.measured || []).map((l) => (re.test(l) ? l.replace(/: [\d.]+ x as fast/, `: ${to} x as fast`) : l)); };
+            edit(lift, /^native: r18t against r15 under FXC at 1920 x 1080/, "1.060");
+            edit(drop, /^native: r18u against r15 under FXC at 1024 x 1024/, "1.040");
+            for (const g of nokey.gates) g.measured = (g.measured || []).filter((l) => !/key for section 66's table/.test(l));
+            const [eL] = rule66Entries(lift), [eD] = rule66Entries(drop), [eN] = rule66Entries(nokey);
+            ok("  ...and the rule discriminates: condition 4 alone moves the 1080 to r18t and the Intel to nothing, and a report with no key gets no entry",
+                eL.entry === "r18t" && eD.entry === null && eN.entry === null && eN.key === null,
+                `1080 with r18t at 1.060 x under FXC: ${eL.entry}; the Intel with r18u at 1.040 x under FXC: ${eD.entry}; no key: ${eN.entry}`);
+            // section 66's predictions, fixed before the run: P1 the Intel's entry is r18u; P2 the 1080 gets none; P3 r15 runs slower under DXC
+            // than under FXC on both GPUs at their largest common size
+            const p3 = [R19.intel, R19.gtx1080].map(r15DxcOverFxc);
+            ok("  section 66's predictions, read off the same reports: P1 (the Intel's entry is r18u), P2 (the 1080 gets none, by condition 4), P3 (r15 slower under DXC than FXC on both)",
+                r66[0].entry === "r18u" && r66[1].entry === null && r66[1].fail.r18t === 4 && r66[1].fail.r18u === 3 && r66[0].fail.r18t === 3 && r66[0].fail.r18u === -1 && p3.every((p) => p && p.dxc > p.fxc),
+                p3.map((p) => p ? `r15 at ${p.size}: ${p.dxc} ms under DXC, ${p.fxc} ms under FXC` : "unread").join("; "));
         }
         const tbl = { "Windows/intel/gen-9": "r18u" };
         ok("!! round 18: the page's key is platform, vendor and architecture -- none without a platform, as every browser but Chromium -- and pageKernelsFor gives the table's set for a key it names, PAGE_KERNELS for any other",

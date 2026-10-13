@@ -46,9 +46,9 @@
 // pageKernelsFor(its adapter): PAGE_KERNELS_BY_ADAPTER's set for a measured adapter, PAGE_KERNELS for any other. Section 63
 // filled the table: r18u on the Intel gen-9, r18t on the GTX 1080, in Chrome on Windows.
 // Round 19 (section 66): node-webgpu 0.6.2 compiles with DXC, and built both sets' kernels in seconds, exact, on both of the
-// rig's GPUs (section 65). So a native run whose compiler is DXC builds and times them too, and NATIVE_KERNELS_BY_ADAPTER --
-// empty until section 66's rule is read off the rig -- may name one per native adapter, for a DXC run only. Every FXC run,
-// and every adapter the table does not name, keeps DEFAULT_KERNELS.
+// rig's GPUs (section 65). So a native run whose compiler is DXC builds and times them too, and NATIVE_KERNELS_BY_ADAPTER
+// names one per native adapter, for a DXC run only: section 67 read section 66's rule off the rig -- r18u on the Intel gen-9,
+// nothing on the GTX 1080. Every FXC run, and every adapter the table does not name, keeps DEFAULT_KERNELS.
 // The page runs PAGE_KERNELS and every other caller DEFAULT_KERNELS. Section 43's rules, read off both GPUs' round-14 runs
 // (section 49), put the page on r13 and the default on r14; section 46's, read off their round-15 runs (section 50), put
 // both on r15 -- the later run's decision stands.
@@ -359,10 +359,13 @@ export const pageAdapterKey = (info, uaData) => (uaData && uaData.platform && in
 export const pageKernelsFor = (key, table = PAGE_KERNELS_BY_ADAPTER) => (key && Object.hasOwn(table, key) ? table[key] : PAGE_KERNELS);
 /**
  * Round 19: the set a NATIVE run takes by default on an adapter section 66's rule measured, by nativeAdapterKey -- for a run
- * whose compiler is DXC only, since FXC builds neither round-18 set (section 60). Empty until section 66's rule is read off
- * both GPUs' round-19 runs; until then, and on every other adapter and every FXC run, nativeKernelsFor gives DEFAULT_KERNELS.
+ * whose compiler is DXC only, since FXC builds neither round-18 set (section 60). Section 67 read the rule off both GPUs'
+ * round-19 runs (render/denoise-rig-r19-*.json, node-webgpu 0.6.2 through SWEK_WEBGPU): on the Intel gen-9, r18u's pass was
+ * 1.590 x r15's under DXC and 1.474 x r15's under FXC at 1024 x 1024, and r18t's 0.951 x; on the GTX 1080, r18t's was 1.076 x
+ * r15's under DXC at 1920 x 1080 but 0.996 x r15's under FXC (condition 4), and r18u's 0.653 x -- so the 1080 has no entry.
+ * Every FXC run, and every adapter the table does not name, gets DEFAULT_KERNELS from nativeKernelsFor.
  */
-export const NATIVE_KERNELS_BY_ADAPTER = Object.freeze({});
+export const NATIVE_KERNELS_BY_ADAPTER = Object.freeze({ "win32/intel/gen-9": "r18u" });
 /** A native adapter's key: "<platform>/<vendor>/<architecture>", the platform Node's (process.platform), so "win32/nvidia/pascal". */
 export const nativeAdapterKey = (info, platform) => (platform && info && info.vendor ? `${platform}/${info.vendor}/${info.architecture || ""}` : null);
 /** The set a native run takes for its adapter's key under `compiler`: NATIVE_KERNELS_BY_ADAPTER's when the compiler is DXC, else DEFAULT_KERNELS. */
