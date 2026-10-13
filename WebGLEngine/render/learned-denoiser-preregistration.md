@@ -4505,7 +4505,7 @@ set SWEK_WEBGPU=
 ```
 Send back both JSON files from each GPU.
 
-**The pilot here: H holds.** `realGpuRun --native` on 0.6.0 (the pin) and on 0.6.2, at one commit (694d8cd4), committed
+**The pilot here: H holds.** `realGpuRun --native` on 0.6.0 (the pin) and on 0.6.2, at one commit (9d5b2d43; first taken at 694d8cd4, re-run when the writer began stamping generatedFrom), committed
 as written: `tools/ship/native-sweep-r69-linux-0.6.0.json` and `-0.6.2.json`. On SwiftShader through Vulkan, the 26 gates are
 26 green under both packages: 0 regressions, 0 changed reds, 0 unpaired. `realGpuRun-selfcheck.mjs` holds the pair to the rule.
 - **A first pilot ran its two sweeps either side of a commit.** No gate's code changed between them, and the rule as written
