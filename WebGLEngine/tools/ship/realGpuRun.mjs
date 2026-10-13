@@ -175,7 +175,14 @@ export function runLaunchArgs(env = process.env, platform = process.platform) {
  */
 export const GATE_TIMEOUT_MS = 1800000;
 
-export function runGates({ root = ENG, only = null, native = false, log = console.log, launchArgs = runLaunchArgs() } = {}) {
+/**
+ * v4853 (section 69): the native sweep's browser flags are the GATES' OWN, as a verify runs them -- unless SWEK_LAUNCH_ARGS names
+ * some. The sweep asks one thing, whether moving the pin changes a gate; a real-hardware browser would change dozens of
+ * SwiftShader-measured rows on both packages alike (the 1080's old in-app run read 27 reds that way), and bury the answer.
+ */
+export function nativeLaunchArgs(env = process.env) { return env.SWEK_LAUNCH_ARGS ? env.SWEK_LAUNCH_ARGS.split(/\s+/).filter(Boolean) : null; }
+
+export function runGates({ root = ENG, only = null, native = false, log = console.log, launchArgs = native ? nativeLaunchArgs() : runLaunchArgs() } = {}) {
     const gates = (native ? nativeGateList(root) : gateList(root)).filter((g) => !only || g.includes(only));
     const logFile = path.join(os.tmpdir(), `swek-adapters-${process.pid}-${Date.now()}.jsonl`);
     // the checkout's commit, so a report says which tree it ran -- the rig's empty run came from a checkout behind the branch
@@ -185,7 +192,7 @@ export function runGates({ root = ENG, only = null, native = false, log = consol
     for (const g of gates) {
         const t0 = Date.now();
         const r = spawnSync(process.execPath, [g], { cwd: root, encoding: "utf8", timeout: GATE_TIMEOUT_MS,
-                                                    env: { ...process.env, SWEK_ADAPTER_LOG: logFile, SWEK_LAUNCH_ARGS: launchArgs.join(" ") } });
+                                                    env: { ...process.env, SWEK_ADAPTER_LOG: logFile, ...(launchArgs ? { SWEK_LAUNCH_ARGS: launchArgs.join(" ") } : {}) } });
         // v4851 (section 66): the entry and its adapters are gateEntry's, a pure function the gate drives with fixtures
         const { entry, adapters } = gateEntry({ gate: g, src: fs.readFileSync(path.join(root, g), "utf8"), status: r.status, ms: Date.now() - t0,
                                                 stdout: r.stdout || "", logText: fs.existsSync(logFile) ? fs.readFileSync(logFile, "utf8") : "" });

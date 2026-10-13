@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 import { gateList, categorize, parseRows, verdict, runGates, runLaunchArgs, probeSoftwareGl, softwareGlLines, TREE_SOFTWARE_GL,
          probeNativeAdapters, nativeAdapterLines, GATE_TIMEOUT_MS, RETIRED_SOFTWARE_GL, TREE_SOFTWARE_WEBGPU, SOFTWARE_GL_CANDIDATES,
          NATIVE_LAUNCH, readAdapterLog, gateEntry, addAdapters, nodeWebgpuRecord,   // v4851, section 66: these five
-         NATIVE_USE, nativeGateList } from "./realGpuRun.mjs";   // v4853, section 69: these two
+         NATIVE_USE, nativeGateList, nativeLaunchArgs } from "./realGpuRun.mjs";   // v4853, section 69: these three
 import { noteNativeAdapter } from "./headlessGpu.mjs";
 import { webgpuSkipReason, launchArgsFor, hardwareArgsFor, parityArgsFor, HARDWARE_ARGS, softwareClaims } from "./webgpuHarness.mjs";
 import { gateReport } from "./gateReport.mjs";
@@ -412,13 +412,20 @@ console.log("\n7. SECTION 69 (v4853): THE WHOLE NATIVE SWEEP -- EVERY GATE THAT 
     ok("!! section 69: the tree's native sweep holds the denoiser's three device gates, conv2d, the compute gates, and the gates that import a runner under another name -- and not this gate, which names them only in strings",
        must.every((g) => tree.includes(g)) && !tree.includes("tools/ship/realGpuRun-selfcheck.mjs") && tree.every((g) => NATIVE_USE.test(fs.readFileSync(path.join(ENG, g), "utf8"))) &&
        JSON.stringify(tree) === JSON.stringify([...tree].sort()), `${tree.length}: ${must.filter((g) => !tree.includes(g)).join(", ") || "all named present"}`);
+    // the native sweep hands the browser no flags of its own: the gates take theirs, as in a verify, so the only difference between
+    // two native sweeps is the package -- an FSR run's hardware flags would redden SwiftShader-measured rows on both packages alike
+    ok("!! section 69: the native sweep's browser flags are the gates' own unless SWEK_LAUNCH_ARGS names some -- never the hardware set an FSR run takes",
+       nativeLaunchArgs({}) === null && JSON.stringify(nativeLaunchArgs({ SWEK_LAUNCH_ARGS: " --a  --b " })) === '["--a","--b"]' &&
+       JSON.stringify(runLaunchArgs({}, "win32")) !== JSON.stringify(nativeLaunchArgs({})),
+       `unset: ${JSON.stringify(nativeLaunchArgs({}))}; an FSR run on win32 unset: ${JSON.stringify(runLaunchArgs({}, "win32"))}`);
     // the CLI's --native: an --only that matches no native gate still says so, exits 1, and marks its report as the native sweep
     const tmp = path.join(os.tmpdir(), `swek-realgpu-native-${process.pid}.json`);
-    const r = spawnSync(process.execPath, ["tools/ship/realGpuRun.mjs", "--native", "--only", "no-such-gate-anywhere", "--out", tmp], { cwd: ENG, encoding: "utf8", timeout: 60000 });
+    const { SWEK_LAUNCH_ARGS: _unset, ...envNoArgs } = process.env;
+    const r = spawnSync(process.execPath, ["tools/ship/realGpuRun.mjs", "--native", "--only", "no-such-gate-anywhere", "--out", tmp], { cwd: ENG, encoding: "utf8", timeout: 60000, env: envNoArgs });
     const rep = fs.existsSync(tmp) ? JSON.parse(fs.readFileSync(tmp, "utf8")) : null;
     try { fs.unlinkSync(tmp); } catch {}
-    ok("  section 69: realGpuRun --native is accepted, says it is the native sweep, and its report carries native: true and the package it ran on",
-       r.status === 1 && !!rep && rep.native === true && rep.gates.length === 0 && /the whole native sweep/.test(r.stdout || "") && !!rep.nodeWebgpu && "version" in rep.nodeWebgpu,
+    ok("  section 69: realGpuRun --native is accepted, says it is the native sweep, and its report carries native: true, the package it ran on, and no browser flags of its own",
+       r.status === 1 && !!rep && rep.native === true && rep.gates.length === 0 && /the whole native sweep/.test(r.stdout || "") && !!rep.nodeWebgpu && "version" in rep.nodeWebgpu && rep.launchArgs === null,
        `exit ${r.status}; native ${rep && rep.native}; ${(r.stderr || "").split("\n")[0].slice(0, 100)}`);
 }
 
