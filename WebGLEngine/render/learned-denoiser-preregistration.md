@@ -4179,8 +4179,19 @@ the three things section 64 named. This round does two of them and fixes the rul
   adapter: the rig's DXC probe ran round 17's shapes only.
 - **`tools/ship/realGpuRun.mjs`** names native adapters (section 65's 1080 report said "NO ADAPTER WAS SEEN"), keeps each
   gate's SKIP lines, and records the package's `dxcBeside` and predicted compiler.
-- **Pending: the pilot.** The gates that carry these changes are not finished at this commit; their SwiftShader figures
-  are added here when they land, and no threshold below is read from them.
+- **The pilot, on SwiftShader (v4851).** Every gate carrying these changes is green here; no threshold below is read from
+  these figures, which are a CPU's times and not a GPU's.
+  - The exact gate: K0 natively holds for r14, r15, r18t and r18u (linux has no D3D compiler, so `nativeSetsFor` builds all
+    four). The native adapter is named for realGpuRun: "google / swiftshader / SwiftShader driver 5.0.0 (SOFTWARE)".
+  - The timing gate's native ladder, at 64 x 64 against r12: r15 2.63 x, r18t 3.53 x, r18u 1.00 x; against r15, tagged
+    section 66: r18t 1.340 x, r18u 0.381 x. The key it prints is `linux/google/swiftshader`, and the compiler read off the
+    package is none (node-webgpu 0.6.0, linux). The FXC child stands aside here: only a win32 package that ships DXC has an
+    FXC to compare against.
+  - The compile gate: condition 0 off win32 is NOT TESTED -- the package predicts no D3D compiler and none of the eight
+    "as shipped" dumps names one. r18t's and r18u's hidden kernels stand aside in every native mode here (no DXC), and
+    are built once as shipped, outside any mode's count, so their child path has run before the rig runs it.
+  - conv2d: off D3D12 both rounds' native rows run as before; the DXC and FXC branches are held on stub adapters carrying
+    the rig's own descriptions.
 
 **What exactness means for r18t and r18u natively.** Section 61's, unchanged: the same twin, cell for cell, with a fused
 multiply-add allowed where the twin explains it.
@@ -4239,7 +4250,30 @@ sweep on 0.6.2 first.
 `node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise-r19.json`. Expect the Intel's FXC ladder to take
 minutes: FXC builds the fused head in 16 s there, at every size.
 
-**Sabotages.** Pending, with the gates. Each new row is broken on purpose, seen red by name, and logged here.
+**Sabotages (v4851).** Each new row was broken on purpose, seen red BY NAME, restored byte-identical, and is logged beside
+its row. 47 in all, none 0 red at the end:
+- **tools/ship/headlessGpu-selfcheck.mjs (3):** versionAtLeast comparing parts as strings; nativeCompiler missing use_dxc
+  inside a MERGED disable entry; noteNativeAdapter calling a record without isFallbackAdapter software.
+- **render/denoiseDevice-selfcheck.mjs (5), against render/denoiseDevice.mjs:** nativeSetsFor dropping the round-18 sets
+  under DXC; keeping them under FXC; isDxcCompiler matching any case; NATIVE_KERNELS_BY_ADAPTER shipping an entry;
+  nativeKernelsFor reading the table without the compiler.
+- **render/denoiseTiming-selfcheck.mjs (4):** the FXC child's flags as two disable entries; the unpaired ratio read at the
+  smallest common size; every "against r15" line tagged section 61; nativePlan reading the compiler without the device's
+  flags.
+- **render/denoiseCompile-selfcheck.mjs (8):** r18t's cfg changed; condition 0's DXC case satisfied by one DXIL dump; its FXC
+  case without "no DXIL"; a child with no dump counted as DXIL; the hidden kernels built on the prediction alone; the
+  prediction forced to win32 beside SPIR-V dumps; the child looking up its kernel in VARIANTS alone; section 4 counting the
+  hidden kernels in every mode.
+- **brain/conv2d-selfcheck.mjs (7):** round 17's DXC exemption dropped; round 16 run under DXC; the comparator always
+  hoisted; an unread compiler counted as DXC; round 17's SKIP line not naming the compiler; every adapter stood aside
+  without DXC; the gate's device flags disabling use_dxc.
+- **tools/ship/realGpuRun-selfcheck.mjs (13):** the native label removed; native records dropped; the native marker
+  misspelled; "none" listed as an adapter; a missing `software` read as false; adapters deduplicated by name; parseRows,
+  gateEntry or runGates dropping the SKIP lines (two first crashed the gate rather than reddening a row, and were redone);
+  the platform hard-coded to win32; dxcBeside always null; no package read as FXC; the CLI writing an old record.
+- **Found while building it:** conv2d's two inline-weight rows compared against the hoisted tile kernel, a round-16 shape,
+  so a DXC run would have built round 16 natively after all; where round 16 stands aside they compare against the fast
+  kernel's bits instead (forced on SwiftShader, green).
 
 **Not in this round.**
 - Moving the pin, or any change to an FXC run.
