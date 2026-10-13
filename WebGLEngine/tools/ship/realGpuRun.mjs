@@ -70,7 +70,8 @@ export function nativeGateList(root = ENG, { files = null, read = (f) => fs.read
  * holds when it is green under the candidate, or red under BOTH with the same failing rows (by label: a row's text before its
  * three-space detail, which carries numbers that move run to run) -- a red the candidate did not bring. It fails when it is red
  * under the candidate and green under the pin (a REGRESSION), red under both with different rows (CHANGED), or missing from
- * either report (UNPAIRED). `ok` needs every gate to hold, both reports to name the same gates, and each to say its package.
+ * either report (UNPAIRED). `ok` needs every gate to hold, both reports to name the same gates and the same commit, and each to
+ * say its package. (The first pilot here ran its two sweeps either side of a commit; the rule now refuses that pair.)
  */
 const rowLabel = (l) => String(l).replace(/^\s*FAIL\s+/, "").split("   ")[0].trim();
 export function nativeSweepCompare(pinned, candidate) {
@@ -86,8 +87,10 @@ export function nativeSweepCompare(pinned, candidate) {
     });
     const bad = rows.filter((r) => ["unpaired", "regression", "changed"].includes(r.kind));
     const pkg = (rep) => (rep && rep.nodeWebgpu && rep.nodeWebgpu.version) || null;
-    return { ok: names.length > 0 && bad.length === 0 && !!pkg(pinned) && !!pkg(candidate) && pkg(pinned) !== pkg(candidate),
-             pinned: pkg(pinned), candidate: pkg(candidate), rows, bad,
+    // one commit: a report's `commit` is "<hash> <date> <subject>", and two sweeps of different trees compare two trees, not two packages
+    const sha = (rep) => (rep && rep.commit ? String(rep.commit).split(" ")[0] : null), sameCommit = !!sha(pinned) && sha(pinned) === sha(candidate);
+    return { ok: names.length > 0 && bad.length === 0 && !!pkg(pinned) && !!pkg(candidate) && pkg(pinned) !== pkg(candidate) && sameCommit,
+             pinned: pkg(pinned), candidate: pkg(candidate), commit: sameCommit ? sha(pinned) : null, rows, bad,
              count: Object.fromEntries(["green", "fixed", "shared-red", "regression", "changed", "unpaired"].map((k) => [k, rows.filter((r) => r.kind === k).length])) };
 }
 

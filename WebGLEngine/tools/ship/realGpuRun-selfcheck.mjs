@@ -419,18 +419,19 @@ console.log("\n7. SECTION 69 (v4853): THE WHOLE NATIVE SWEEP -- EVERY GATE THAT 
        JSON.stringify(runLaunchArgs({}, "win32")) !== JSON.stringify(nativeLaunchArgs({})),
        `unset: ${JSON.stringify(nativeLaunchArgs({}))}; an FSR run on win32 unset: ${JSON.stringify(runLaunchArgs({}, "win32"))}`);
     // section 69's rule on fixtures: a pinned sweep and a candidate's, gate by gate
-    const sweep = (v, gates) => ({ nodeWebgpu: { version: v }, gates: gates.map(([gate, ok, fails = []]) => ({ gate, ok, fails })) });
+    const sweep = (v, gates, commit = "abc1234 2026-10-13 a commit") => ({ commit, nodeWebgpu: { version: v }, gates: gates.map(([gate, ok, fails = []]) => ({ gate, ok, fails })) });
     const P0 = sweep("0.6.0", [["g/a", true], ["g/b", false, ["FAIL  !! row x   worst 1.2e-3"]], ["g/c", false, ["FAIL  row y   3"]]]);
     const cmp = (gates, v = "0.6.2") => nativeSweepCompare(P0, sweep(v, gates));
     const held = cmp([["g/a", true], ["g/b", false, ["FAIL  !! row x   worst 9.9e-3"]], ["g/c", true]]);
     const regress = cmp([["g/a", false, ["FAIL  row z   1"]], ["g/b", false, ["FAIL  !! row x   1"]], ["g/c", true]]);
     const changed = cmp([["g/a", true], ["g/b", false, ["FAIL  !! row w   1"]], ["g/c", true]]);
     const unpaired = cmp([["g/a", true], ["g/b", false, ["FAIL  !! row x   1"]]]), samePkg = cmp([["g/a", true], ["g/b", true], ["g/c", true]], "0.6.0");
-    ok("!! section 69's rule: a gate holds green under the candidate, or red under BOTH with the same failing rows (whatever their numbers); a regression, a changed red, a gate missing from one sweep, or two sweeps of one package do not",
+    ok("!! section 69's rule: a gate holds green under the candidate, or red under BOTH with the same failing rows (whatever their numbers); a regression, a changed red, a gate missing from one sweep, two sweeps of one package, or of two commits, do not",
        held.ok && held.count.green === 1 && held.count["shared-red"] === 1 && held.count.fixed === 1 &&
        !regress.ok && regress.bad.map((r) => r.gate + ":" + r.kind).join() === "g/a:regression" &&
        !changed.ok && changed.bad.map((r) => r.gate + ":" + r.kind).join() === "g/b:changed" &&
-       !unpaired.ok && unpaired.bad.map((r) => r.gate + ":" + r.kind).join() === "g/c:unpaired" && !samePkg.ok && !nativeSweepCompare(P0, { gates: [] }).ok,
+       !unpaired.ok && unpaired.bad.map((r) => r.gate + ":" + r.kind).join() === "g/c:unpaired" && !samePkg.ok && !nativeSweepCompare(P0, { gates: [] }).ok &&
+       !nativeSweepCompare(P0, sweep("0.6.2", [["g/a", true], ["g/b", true], ["g/c", true]], "def5678 2026-10-13 another")).ok && held.commit === "abc1234",
        `held ${JSON.stringify(held.count)}; regression ${regress.bad.length}, changed ${changed.bad.length}, unpaired ${unpaired.bad.length}, same package ${samePkg.ok}`);
     // the CLI's --native: an --only that matches no native gate still says so, exits 1, and marks its report as the native sweep
     const tmp = path.join(os.tmpdir(), `swek-realgpu-native-${process.pid}.json`);
