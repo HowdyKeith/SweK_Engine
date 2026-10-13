@@ -17,6 +17,10 @@
 //           kernel with a block written out, then k_head_apply) -> render/denoise-results-r18t.json, -r18u.json; judged as r15 is.
 //           v4849 (round 19, section 66): refused, exit 2, on a D3D12 adapter whose run compiles with FXC, which builds neither
 //           set (section 60) -- SWEK_WEBGPU naming a node-webgpu 0.6.2 package runs them under its DXC
+//       node tools/denoiseDevice.mjs --which
+//           section 68's native caller, on this box: the adapter, the package and the compiler read off it, the adapter's key, and
+//           the set nativePick takes for them (section 67's NATIVE_KERNELS_BY_ADAPTER under DXC, DEFAULT_KERNELS otherwise) -- then
+//           that set built and run once on a synthetic 64 x 64 input, against the f64 network on the CPU. Writes nothing.
 //       (round 16's --measure-r16a and --measure-r16b wrote render/denoise-results-r16a.json and -r16b.json at 4b8e9d92,
 //       section 55; section 57 withdrew both sets, and their flags with them)
 //
@@ -37,7 +41,7 @@ import { SPLITS_R11 } from "../render/denoiseScenes.mjs";
 import { denoise } from "../render/denoiseNet.mjs";
 import { relMSE } from "../render/denoiseStats.mjs";
 import { conv2dCpu, conv2dCpuFma } from "../brain/conv2d.mjs";
-import { APPLY_TOL, kernelApplyCpu, judgeHeadApply, deviceLayers, createDeviceDenoiser, encodeNet, decodeNet, nativeSetsFor } from "../render/denoiseDevice.mjs";
+import { APPLY_TOL, kernelApplyCpu, judgeHeadApply, deviceLayers, createDeviceDenoiser, createNativeDenoiser, encodeNet, decodeNet, nativeSetsFor } from "../render/denoiseDevice.mjs";
 import * as GPU from "./ship/headlessGpu.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -69,6 +73,34 @@ if (args.includes("--export-r11")) {
         net: encodeNet(net),
     }) + "\n");
     console.log(`[denoiseDevice] wrote ${NET_FILE}`);
+} else if (args.includes("--which")) {
+    // v4852 -- round 20 (section 68): the native caller, run once. The compiler is read off the package with the flags the device
+    // is made with (none: Dawn as shipped), as the gates read it; the pick is render/denoiseDevice.mjs's nativePick.
+    GPU.configureVulkanIcd();
+    const W = GPU.resolveWebgpu(), FLAGS = [];
+    if (!W.mod) { console.log(`[denoiseDevice] --which needs a device: ${W.refused || "node-webgpu did not resolve"}`); process.exit(2); }
+    const pkg = GPU.webgpuPackage(W.from), compiler = GPU.nativeCompiler({ pkg, platform: process.platform, flags: FLAGS });
+    const gpu = W.mod.create([...FLAGS]), adapter = await gpu.requestAdapter();
+    if (!adapter) { console.log("[denoiseDevice] --which: node-webgpu gave no adapter"); GPU.exitCleanly(2); }
+    const info = adapter.info || {}, dev = await adapter.requestDevice();
+    console.log(`[denoiseDevice] --which: adapter ${[info.vendor, info.architecture, info.description].filter(Boolean).join(" / ") || "(unnamed)"}; ` +
+                `node-webgpu ${(pkg && pkg.version) || "(version unread)"} from ${W.from}; compiler ${compiler || `none on ${process.platform}`}`);
+    const net = decodeNet(JSON.parse(fs.readFileSync(path.join(ENG, NET_FILE), "utf8")).net), N = 64, C = 10;
+    // a fixed synthetic input: nine channels of smooth values and an emitter mask of zeros, so the pass is the same on every box
+    const x = new Float32Array(N * N * C);
+    for (let i = 0; i < N * N; i++) for (let c = 0; c < C - 1; c++) x[i * C + c] = 0.5 + 0.4 * Math.sin(0.37 * i + 1.3 * c);
+    let picked, out, worst = 0;
+    try {
+        picked = await createNativeDenoiser(adapter, dev, net, { H: N, W: N, C, compiler, platform: process.platform });
+        console.log(`[denoiseDevice] --which: key ${picked.key || "(none)"}; kernels ${picked.kernels} -- ${picked.why}`);
+        out = await picked.denoiser.run(x); picked.denoiser.destroy();
+    } finally { dev.destroy(); }
+    const y64 = denoise(net, x, N, N).y;
+    for (let c = 0; c < y64.length; c++) worst = Math.max(worst, Math.abs(out.y[c] - y64[c]) / (Math.abs(y64[c]) + 1e-6));
+    const finite = out.y.every(Number.isFinite);
+    console.log(`[denoiseDevice] --which: ${picked.kernels} built and ran one ${N} x ${N} pass in ${out.ms.toFixed(3)} ms; ` +
+                `worst relative difference from the f64 network on the CPU ${worst.toExponential(2)}${finite ? "" : "; NOT FINITE"}`);
+    GPU.exitCleanly(finite ? 0 : 1);
 } else if (measure) {
     const { kernels, results: RESULTS } = MEASURES[measure];
     refuseIfExists(RESULTS);
@@ -156,6 +188,6 @@ if (args.includes("--export-r11")) {
     GPU.exitCleanly(0);
 } else {
     console.log("usage: node tools/denoiseDevice.mjs --export-r11 --cache <dir> --key <record> | --measure-r12 [--cache <dir>] | --measure-r13 [--cache <dir>] | --measure-r14 [--cache <dir>]" +
-                " | --measure-r15 | --measure-r18t | --measure-r18u [--cache <dir>]   (see render/learned-denoiser-preregistration.md, sections 35, 39, 43, 46 and 61)");
+                " | --measure-r15 | --measure-r18t | --measure-r18u [--cache <dir>] | --which   (see render/learned-denoiser-preregistration.md, sections 35, 39, 43, 46, 61 and 68)");
     process.exit(2);
 }

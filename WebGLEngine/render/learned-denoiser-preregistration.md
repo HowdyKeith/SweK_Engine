@@ -4342,10 +4342,8 @@ holds `NATIVE_KERNELS_BY_ADAPTER` to what it derives. It prints these lines itse
   r15's own fused head (`r15-head-apply`) built in 14 s and 9 s under FXC and ran exact. r13 is not a set anything runs.
 - **r12 natively on the Intel** stops at 256 under both compilers: 512 is predicted at 2249 ms, over the cap.
 
-**What the table does today.** `nativeKernelsFor(key, compiler)` is the only reader, and nothing outside its gate calls it
-yet. A native caller that picks its set by adapter -- `tools/denoiseDevice.mjs` without `--kernels`, or the engine on a
-console -- is the next round's, and it only matters once the pin moves to 0.6.2, which needs the whole native sweep on
-0.6.2, green and exact, here and on the rig (section 64).
+**What the table does today.** `nativeKernelsFor(key, compiler)` was its only reader, and nothing outside its gate called
+it. Section 68 gives it a caller, in the same version.
 
 **Sabotages (v4852).** Each against the row it names, the gate run, restored byte-identical (md5 verified):
 6 in all, each red by name:
@@ -4360,5 +4358,67 @@ console -- is the next round's, and it only matters once the pin moves to 0.6.2,
 
 **Not in this round.**
 - Moving the pin, or any change to an FXC run.
-- A native caller reading `NATIVE_KERNELS_BY_ADAPTER`.
 - `PAGE_KERNELS_BY_ADAPTER`: section 63's, unchanged.
+
+## 68. ROUND 20 -- THE NATIVE CALLER: A RUN IN NODE PICKS ITS SET AS THE PAGE DOES, AND SAYS WHY; FIXED BEFORE THE RIG RUNS IT
+
+**Why this round.** Section 67 filled `NATIVE_KERNELS_BY_ADAPTER`, and nothing native read it. The page has picked its set by
+adapter since section 63 (`pageAdapterKey`, then `pageKernelsFor`, then `createDeviceDenoiser`). A native run had no such
+step: every native caller named its set or took `DEFAULT_KERNELS`.
+
+**What changes. Built and run here first, on SwiftShader.**
+- **`render/denoiseDevice.mjs`:**
+  - `nativePick(adapter, { compiler, platform })` gives `{ key, kernels, why }`. The key is `nativeAdapterKey`'s; the set is
+    `nativeKernelsFor`'s for that key and the run's compiler, which is read off the package with the device's flags
+    (`tools/ship/headlessGpu.mjs`'s `nativeCompiler`), because the adapter cannot say. `why` names which of four answers it
+    is: the table's set under DXC, a run that is not DXC, an adapter the table does not name, or no key.
+  - A table set is only ever given under DXC, which builds every set (`nativeSetsFor`), so no pick is a set FXC cannot
+    build. A first draft also fell back to `DEFAULT_KERNELS` when `nativeSetsFor` refused the pick; that branch could never
+    run, and was removed rather than kept as a check that checks nothing.
+  - `createNativeDenoiser(adapter, dev, net, { H, W, C, compiler, platform })` builds `createDeviceDenoiser` on that pick,
+    and hands the pick back beside the denoiser.
+- **`tools/denoiseDevice.mjs --which`** is the caller. It reads the package, the compiler and the adapter; prints the key, the
+  set and why; builds that set; runs one pass on a fixed synthetic 64 x 64 input; and prints the pass's time and its worst
+  relative difference from the f64 network on the CPU. It writes nothing. Its exit is 0 when the output is finite.
+- **`render/denoiseDevice-selfcheck.mjs`:**
+  - `nativePick` on the rig's two adapters, stubbed: the Intel under DXC takes r18u; the Intel under FXC or an unread
+    compiler, the 1080, an adapter off win32, and no adapter all take r15, each with its reason.
+  - `createNativeDenoiser` on this box's device, with a fixture table naming this adapter r18u under DXC: the denoiser it
+    hands back is built on r18u's kernels. This box picks r15 whatever a caller does, so without the fixture a builder that
+    ignored the pick would pass.
+  - `--which` run as a child, as the rig runs it: its key and set are the gate's own `nativePick` on this adapter, and its
+    pass is within 1e-4 of the f64 network.
+- **The pilot here:** key `linux/google/swiftshader`, no entry, r15; one pass in about 0.4 s; worst relative difference
+  1.05e-6.
+
+**The predictions, fixed now.** On each GPU, `node tools/denoiseDevice.mjs --which` run twice: once as installed
+(node-webgpu 0.6.0, the pin) and once with `SWEK_WEBGPU` naming 0.6.2.
+
+| GPU | node-webgpu | Compiler | Key | Set | Why |
+|---|---|---|---|---|---|
+| Intel gen-9 | 0.6.0 | FXC | `win32/intel/gen-9` | r15 | the entry is for a DXC run |
+| Intel gen-9 | 0.6.2 | DXC | `win32/intel/gen-9` | **r18u** | section 67's |
+| GTX 1080 | 0.6.0 | FXC | `win32/nvidia/pascal` | r15 | no entry |
+| GTX 1080 | 0.6.2 | DXC | `win32/nvidia/pascal` | r15 | no entry |
+
+- **Q1:** each of the four runs prints exactly that key, set and reason, and exits 0.
+- **Q2:** each pass is within 1e-4 of the f64 network.
+- **A run that differs is a finding, not a retry.** The likeliest causes are a compiler read wrongly off the package, or a
+  key the timing gate did not print.
+
+**On the rig.** On each GPU, in the verified clone:
+`node tools/denoiseDevice.mjs --which`; then `set SWEK_WEBGPU=%TEMP%\swek-webgpu-0.6.2\node_modules\webgpu`, the same
+command again, and `set SWEK_WEBGPU=`. Send back the six printed lines from each GPU.
+
+**Sabotages (v4852).** Six, against `render/denoiseDevice.mjs` and `tools/denoiseDevice.mjs`, each restored byte-identical:
+- **U1:** `nativePick` reading every run as DXC -> 1 red (the pick row).
+- **U2:** `nativePick` ignoring the table it is handed -> 1 red (the builder row).
+- **U3:** `createNativeDenoiser` building `DEFAULT_KERNELS` -> 1 red (the builder row).
+- **U4:** `nativePick` keyed with "win32" whatever the platform -> 1 red (the pick row).
+- **U5:** `createNativeDenoiser` building r15 when it picked r18u -> 1 red (the builder row).
+- **U6:** `--which` reading the compiler with `use_dxc` disabled -> **0 red here.** Linux has no D3D compiler, so the flags
+  change nothing on this box. On the rig, Q1 reads the compiler line: 0.6.2 would print FXC and take r15 on the Intel.
+
+**Not in this round.**
+- Moving the pin. A native caller on 0.6.0 compiles with FXC and takes r15 on every adapter, so nothing pinned changes.
+- Any caller other than `--which`. The engine has no native denoiser caller today.

@@ -165,17 +165,26 @@
 //   T5  sizeRatios' top taking the SMALLEST size                          -> 2 RED: "the rule discriminates", the predictions
 //   T6  r15DxcOverFxc reading the smallest common size                    -> 1 RED: the predictions (at 64 x 64 the Intel's r15
 //       ran 4.705 ms under DXC against 4.713 under FXC -- P3 holds only at the size the rule names)
+// v4852 -- ROUND 20'S CALLER (section 68), SABOTAGED. Each against the file named, the gate run, restored byte-identical (md5):
+//   U1  nativePick reading every run as DXC                               -> 1 RED: "nativePick takes section 67's set ..."
+//   U2  nativePick ignoring the table it is handed                        -> 1 RED: "createNativeDenoiser builds the set it picked"
+//   U3  createNativeDenoiser building DEFAULT_KERNELS                     -> 1 RED: the same row
+//   U4  nativePick keyed with "win32" whatever the platform               -> 1 RED: "nativePick takes section 67's set ..."
+//   U5  createNativeDenoiser building r15 when it picked r18u             -> 1 RED: "createNativeDenoiser builds the set it picked"
+//   U6  tools/denoiseDevice.mjs --which reading the compiler with use_dxc disabled -> 0 RED HERE: linux has no D3D compiler, so
+//       the flags change nothing on this box; on the rig, section 68's Q1 reads the compiler line, and 0.6.2 would print FXC
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { spawnSync } from "node:child_process";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
 const { APPLY_TOL, kernelApplyWgsl, packApplyUniforms, kernelApplyCpu, kernelFor, deviceLayers, denoiseTwin, createDeviceDenoiser, encodeNet, decodeNet,
         KERNEL_SETS, DEFAULT_KERNELS, PAGE_KERNELS, applyFor, kernelApplyFastWgsl, kernelHeadApplyWgsl, judgeHeadApply,
         R18_KERNELS, FXC_UNBUILT_SETS, isD3D12Native, nativeSetsFor, PAGE_KERNELS_BY_ADAPTER, pageAdapterKey, pageKernelsFor, passBytes, TIMED_SETS,
-        isDxcCompiler, NATIVE_KERNELS_BY_ADAPTER, nativeAdapterKey, nativeKernelsFor } = await imp("render/denoiseDevice.mjs");
+        isDxcCompiler, NATIVE_KERNELS_BY_ADAPTER, nativeAdapterKey, nativeKernelsFor, nativePick, createNativeDenoiser } = await imp("render/denoiseDevice.mjs");
 const CMP = await imp("render/denoiseCompile.mjs");
 const { makeDenoiser, denoise, KERNEL_TAPS, shapeFor, paramCount } = await imp("render/denoiseNet.mjs");
 const { conv2dCpu, conv2dCpuFma, COUT_MAX, tileShape, fastAltShape, conv2dTileWgsl, conv2dFastAltWgsl } = await imp("brain/conv2d.mjs");
@@ -338,12 +347,22 @@ console.log("1. THE KERNEL'S TWIN, ON THE CPU");
             nativeKernelsFor("win32/intel/gen-9", "DXC") === "r18u" && FXC_SAID.every((c) => nativeKernelsFor("win32/intel/gen-9", c) === DEFAULT_KERNELS) &&
             DEFAULT_KERNELS === "r15" && nativeSetsFor(d3n, [DEFAULT_KERNELS], { compiler: "FXC" }).length === 1,
             `a fixture table ${JSON.stringify(nk)}: ${[...DXC_SAID, "FXC", null].map((c) => `${said(c)} ${nativeKernelsFor(keyN, c, nk)}`).join(", ")}; the shipped table under "DXC": the 1080 ${nativeKernelsFor(keyN, "DXC")}, the Intel ${nativeKernelsFor("win32/intel/gen-9", "DXC")}, the Intel under "FXC" ${nativeKernelsFor("win32/intel/gen-9", "FXC")}`);
+        // v4852 -- round 20 (section 68): the native caller's pick, as denoise.html picks the page's -- on the rig's own adapters, stubbed
+        const pick = (a, c, plat = "win32", table) => nativePick(a, { compiler: c, platform: plat, ...(table ? { table } : {}) });
+        const pI = pick(d3d, "DXC"), pIF = pick(d3d, "FXC"), pIN = pick(d3d, null), pN = pick(d3n, "DXC"), pV = pick(vk, null, "linux"), p0 = pick(null, "DXC");
+        ok("!! round 20 (section 68): nativePick takes section 67's set for the Intel under DXC, and r15 for the Intel under FXC or an unread compiler, for the 1080, off win32 and with no adapter -- and says which",
+            pI.key === "win32/intel/gen-9" && pI.kernels === "r18u" && /^section 67's for win32\/intel\/gen-9/.test(pI.why) &&
+            [pIF, pIN].every((p) => p.kernels === DEFAULT_KERNELS && /entry is for a DXC run/.test(p.why)) && pN.kernels === DEFAULT_KERNELS && /^no entry for win32\/nvidia\/pascal/.test(pN.why) &&
+            pV.key === "linux/google/swiftshader" && pV.kernels === DEFAULT_KERNELS && p0.key === null && p0.kernels === DEFAULT_KERNELS && /^no key/.test(p0.why) &&
+            typeof createNativeDenoiser === "function",
+            [pI, pIF, pIN, pN, pV, p0].map((p) => `${p.key || "(no key)"} ${p.kernels}`).join("; "));
         // v4849 -- round 19: tools/denoiseDevice.mjs's --measure-r18t and --measure-r18u built natively through mod.create([]) and never
         // asked the compiler: on a D3D12 adapter under FXC the build stops or crashes an image in (section 60). No gate runs that CLI
         // (section 35's measurements are one command each), so this reads its source: the compiler read with the flags its device
         // is made with, and a set nativeSetsFor drops refused -- exit 2, naming SWEK_WEBGPU -- before any image is built
         {
-            const cli = fs.readFileSync(path.join(ENG, "tools", "denoiseDevice.mjs"), "utf8");
+            // v4852 -- the --measure branch only: --which (section 68) makes its own device and reads its own compiler before it
+            const cliAll = fs.readFileSync(path.join(ENG, "tools", "denoiseDevice.mjs"), "utf8"), cli = cliAll.slice(Math.max(0, cliAll.indexOf("} else if (measure) {")));
             const iRead = cli.search(/GPU\.nativeCompiler\(\{ pkg, platform: process\.platform, flags: FLAGS \}\)/), iMake = cli.indexOf("W.mod.create([...FLAGS])");
             const iAsk = cli.search(/if \(!nativeSetsFor\(\w+, \[kernels\], \{ compiler \}\)\.length\)/), iBuild = cli.indexOf("createDeviceDenoiser(dev,");
             const refusal = iAsk > 0 ? cli.slice(iAsk, cli.indexOf("\n    }", iAsk)) : "";
@@ -451,6 +470,9 @@ const W = H.resolveWebgpu(), FLAGS = Object.freeze([]), PKG = H.webgpuPackage(W.
 const COMPILER = H.nativeCompiler({ pkg: PKG, platform: process.platform, flags: FLAGS });
 const compilerSaid = `${COMPILER || `no D3D compiler on ${process.platform}`}, from node-webgpu ${(PKG && PKG.version) || "(version unread)"}`;
 const skip = W.refused ? null : H.headlessGpuSkipReason();
+// v4852 -- section 68: this box's own native pick, made on section 3's adapter (one Dawn instance per gate: a second, made late,
+// died on Dawn's futex error while this round was built) and read again by section 6's caller row
+let HERE_PICK = null;
 if (W.refused) ok(`!! round 19: ${H.WEBGPU_ENV} names a node-webgpu package this box can load -- a refused one is a red here, never a skip (a DXC run would pass with no native row)`, false, W.refused);
 else if (skip) console.log("  SKIP  " + skip);
 else try {
@@ -626,6 +648,21 @@ else try {
         FXC_UNBUILT_SETS.map((s) => (!native18.includes(s) ? `${s} not built natively (one of FXC_UNBUILT_SETS, under FXC)` :
             `${s} ${K18[s].length && K18[s].every(Boolean) ? "green" : "RED"} (${K18[s].filter(Boolean).length} of ${K18[s].length} native rows)`)).join("; "));
     let refusedC = null;
+    // v4852 -- round 20 (section 68): this box's native pick, and the builder held to it. This box picks r15 whatever a caller does,
+    // so a builder that ignored the pick would pass section 6's row; here the pick is forced off r15 through a fixture table naming
+    // this adapter's own key under DXC (which builds every set), and the denoiser handed back must be built on the set it picked.
+    HERE_PICK = nativePick(NATIVE, { compiler: COMPILER, platform: process.platform });
+    {
+        const ad = await gpu.requestAdapter(), dv = await ad.requestDevice();
+        try {
+            const fx = { [HERE_PICK.key]: "r18u" };
+            const got = await createNativeDenoiser(ad, dv, net, { H: 21, W: 19, C: 10, compiler: "DXC", platform: process.platform, table: fx });
+            const ks = got.denoiser.layers.map((L) => L.kernel).join(); got.denoiser.destroy();
+            ok("  round 20 (section 68): createNativeDenoiser builds the set it picked -- a fixture table naming this adapter r18u under DXC hands back an r18u denoiser",
+                got.kernels === "r18u" && got.key === HERE_PICK.key && ks === deviceLayers(net, "r18u").map((L) => L.kernel).join() && ks !== deviceLayers(net, DEFAULT_KERNELS).map((L) => L.kernel).join(),
+                `picked ${got.kernels} (${got.why}); built ${ks}`);
+        } finally { dv.destroy(); }
+    }
     try { const a = await gpu.requestAdapter(), dv = await a.requestDevice(); try { await createDeviceDenoiser(dv, net, { H: 4, W: 4, C: 9 }); } finally { dv.destroy(); } } catch (e) { refusedC = e.message; }
     ok("  a network handed an input of the wrong width is refused, not read at the wrong stride", /10 input channels was handed an input of 9/.test(refusedC || ""));
     console.log(`  ....  adapter: ${r.adapter}; one ${HH} x ${WW} pass ${r.ms.toFixed(0)} ms (SwiftShader's, a JIT's cost and not a GPU's)`);
@@ -711,6 +748,20 @@ console.log("\n5. EVERY KERNEL SET IN THE BROWSER, CELL FOR CELL (rounds 13-15 a
                                          r18t: "tile_inline,tile_inline,tile_inline,tile_inline,head_apply", r18u: "fast_unroll,fast_unroll,fast_unroll,fast_unroll,head_apply" }[s],
                 r.ok ? `${line(s)}; kernel ${O[s] ? O[s].worst.toExponential(2) : "-"}` + (r.result && r.result.error ? "; " + r.result.error : "") : r.reason);
     }
+}
+
+console.log("\n6. ROUND 20 (section 68): THE NATIVE CALLER, RUN AS THE RIG RUNS IT -- tools/denoiseDevice.mjs --which");
+// The CLI is createNativeDenoiser's one caller: it reads the compiler off the package as the gates do, takes nativePick's set, builds
+// it and runs one 64 x 64 pass against the f64 network. Run here as a child, as on the rig, so the caller -- not a copy of it -- is held.
+if (W.refused || skip) console.log("  SKIP  the native caller needs a device here: " + (W.refused || skip));
+else {
+    const r = spawnSync(process.execPath, [path.join(ENG, "tools", "denoiseDevice.mjs"), "--which"], { cwd: ENG, encoding: "utf8", timeout: 240000 });
+    const said = String(r.stdout || ""), m = said.match(/--which: key (\S+); kernels (\S+) -- (.*)/), ran = said.match(/--which: (\S+) built and ran one 64 x 64 pass in ([\d.]+) ms; worst relative difference from the f64 network on the CPU ([\d.e+-]+)/);
+    const want = HERE_PICK || { key: null, kernels: null };
+    console.log(`  ----  native caller here: ${m ? `key ${m[1]}, kernels ${m[2]} (${m[3]})` : "no pick line"}; ${ran ? `ran in ${ran[2]} ms, worst ${ran[3]}` : "no run line"}`);
+    ok("!! round 20 (section 68): the native caller picks what nativePick gives this adapter and this run's compiler, builds it, and runs one pass within 1e-4 of the f64 network",
+        r.status === 0 && !!m && !!ran && m[1] === (want.key || "(none)") && m[2] === want.kernels && ran[1] === want.kernels && +ran[3] <= 1e-4,
+        `exit ${r.status}; the gate's own pick ${want.key} ${want.kernels}` + (r.status ? "; " + String(r.stderr || said).trim().split("\n").slice(-2).join(" | ") : ""));
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +

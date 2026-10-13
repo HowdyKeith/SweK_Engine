@@ -371,6 +371,25 @@ export const nativeAdapterKey = (info, platform) => (platform && info && info.ve
 /** The set a native run takes for its adapter's key under `compiler`: NATIVE_KERNELS_BY_ADAPTER's when the compiler is DXC, else DEFAULT_KERNELS. */
 export const nativeKernelsFor = (key, compiler, table = NATIVE_KERNELS_BY_ADAPTER) =>
     (isDxcCompiler(compiler) && key && Object.hasOwn(table, key) ? table[key] : DEFAULT_KERNELS);
+/**
+ * Round 20 (section 68): the native caller's pick -- what denoise.html does with pageAdapterKey and pageKernelsFor, for a run in
+ * node. The key is the adapter's (nativeAdapterKey, with Node's platform); the set is nativeKernelsFor's for that key and the
+ * run's `compiler` (headlessGpu's nativeCompiler, read off the package with the device's flags -- the adapter cannot say). A table
+ * set is only ever given under DXC, which builds every set (nativeSetsFor), so no set FXC cannot build is ever picked. `why` says
+ * which of the four answers this is: the table's set, a run that is not DXC, an adapter the table does not name, or no key.
+ */
+export function nativePick(adapter, { compiler = null, platform = null, table = NATIVE_KERNELS_BY_ADAPTER } = {}) {
+    const key = nativeAdapterKey(adapter && adapter.info, platform), kernels = nativeKernelsFor(key, compiler, table);
+    const why = !key ? "no key -- DEFAULT_KERNELS" : !Object.hasOwn(table, key) ? `no entry for ${key} -- DEFAULT_KERNELS`
+              : !isDxcCompiler(compiler) ? `${key}'s entry is for a DXC run, and this run compiles with ${compiler || "an unread compiler"} -- DEFAULT_KERNELS`
+              : `section 67's for ${key}, under DXC`;
+    return { key, kernels, why };
+}
+/** A native denoiser on `dev` (made from `adapter`), on the set nativePick gives this adapter and compiler; the pick rides along. */
+export async function createNativeDenoiser(adapter, dev, net, { H, W, C, compiler = null, platform = null, table = NATIVE_KERNELS_BY_ADAPTER }) {
+    const pick = nativePick(adapter, { compiler, platform, table });
+    return { ...pick, denoiser: await createDeviceDenoiser(dev, net, { H, W, C, kernels: pick.kernels }) };
+}
 
 /**
  * The kernel a layer runs on in a set. r12: tiled when the tiled kernel can hold it, direct otherwise (the 81-logit

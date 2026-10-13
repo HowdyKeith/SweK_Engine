@@ -291,6 +291,26 @@ set SWEK_WEBGPU=
   size.
 - **Send back `real-gpu-denoise-r19.json`.** Section 66 fixes, before it runs, which set each GPU's native runs take.
 
+**The outcome (section 67).** The Intel gen-9's native runs under DXC take r18u; the GTX 1080 has no entry, because r18t beat
+r15 under DXC but not r15 under FXC. Both reports are committed as `render/denoise-rig-r19-*.json`.
+
+### Round 20: the native caller (pre-registration section 68)
+
+Round 20 gives section 67's table a caller: `tools/denoiseDevice.mjs --which` picks the set for this GPU and this package's
+compiler, builds it, and runs one small pass. It writes nothing. On each GPU, in the verified clone:
+
+```
+cd WebGLEngine
+node tools/denoiseDevice.mjs --which
+set SWEK_WEBGPU=%TEMP%\swek-webgpu-0.6.2\node_modules\webgpu
+node tools/denoiseDevice.mjs --which
+set SWEK_WEBGPU=
+```
+
+- **The first run is the pinned 0.6.0 (FXC); the second is 0.6.2 (DXC).** Each prints three lines.
+- **Section 68 predicts every line:** the Intel takes r15 under FXC and r18u under DXC; the 1080 takes r15 under both.
+- **Send back the six lines from each GPU.**
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and
