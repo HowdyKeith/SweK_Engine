@@ -57,8 +57,7 @@
 import * as THREE from "/vendor/three/three.module.js";
 import { OrbitControls } from "/vendor/three/jsm/controls/OrbitControls.js";
 import * as RB from "/physics/mechanics/rigidBody6dof.mjs";
-import * as RBC from "/physics/mechanics/rigidBody6dofCollision.mjs";
-import * as OM from "/physics/obbManifold.js";
+import * as SC from "/brain/shipCollision6dof.mjs";   // v4848 -- ship-ship collisions, shared with the headless duel (brain/pilot6dofPolicy.mjs)
 import * as RBW from "/physics/mechanics/rigidBody6dofWeapon.mjs";
 import * as AP from "/brain/autopilot6dof.mjs";
 import * as FA from "/brain/fleetAssign.mjs";
@@ -71,7 +70,7 @@ import { weightsHash } from "/brain/drivePolicy.mjs";
 const HALF = [1.6, 0.7, 0.7];              // ship OBB half-extents; nose (local +X) is the long axis
 const ENGINE_MOUNT = [-1.4, 0, 0];          // on-axis at the tail -- thrust alone induces no torque
 const SHIP_MASS = 8;
-const HP_MAX = 100, SHOT_DAMAGE = 18, RAM_DAMAGE_PER_IMPULSE = 0.3, RAM_DAMAGE_CAP = 25;
+const HP_MAX = 100, SHOT_DAMAGE = 18;   // ram damage (v4848): brain/shipCollision6dof.mjs's RAM_DAMAGE_PER_IMPULSE and RAM_DAMAGE_CAP
 const FLEET_SIZE = 3, SPAWN_X = 42, SPAWN_SPREAD = 18;
 const FACE_B = [0, 0, 1, 0];                // 180deg about Y -- forward (+X) becomes -X, facing team A
 // AUTOPILOT's own defaults (thrustForce 40, standoff 40) are tuned for the isolated convergence cases in
@@ -196,60 +195,42 @@ function stepFleet(mine, foes, assignment, dt, nowMs, pilot) {   // v4829 -- `pi
   }
 }
 
-function resolveCollisions(all) {
-  for (let i = 0; i < all.length; i++) {
-    if (all[i].dead) continue;
-    for (let j = i + 1; j < all.length; j++) {
-      const a = all[i], b = all[j];
-      if (b.dead) continue;
-      const c = RBC.checkContact(a.body, HALF, b.body, HALF);
-      if (!c.hit) continue;
-      // FULL CONTACT MANIFOLD (added this round, replacing the old single-approximate-point path): obbManifold()
-      // turns this SAT hit's own {normal, depth} into up to 4 real contact points via face clipping or edge-edge
-      // closest-point math (see physics/obbManifold.js's own header) -- resolveManifold() then sequences the
-      // SAME, already-proven resolveCollision() once per point, deepest-first (see rigidBody6dofCollision.mjs's
-      // own header for why that ordering and why conservation still holds exactly). Neither resolveCollision()
-      // nor positionalCorrection() changed AT ALL for this: a single-point manifold (edge/vertex/fallback
-      // contact) reduces to exactly the old per-tick behavior, proven bit-identical in that module's own gate.
-      const obbA = RBC.bodyOBB(a.body, HALF), obbB = RBC.bodyOBB(b.body, HALF);
-      const manifold = OM.obbManifold(obbA, obbB, c);
-      // friction:0.5 EXPLICIT, matching rigidBody6dofCollision.mjs's own default -- an adversarial review found
-      // this page previously inherited that default SILENTLY (no `friction` key at all), an unreviewed side
-      // effect of that module adding Coulomb friction rather than a considered choice for this page. Made
-      // deliberate here: ship hulls scraping past each other having SOME grip (not sliding frictionlessly) is
-      // the physically plausible choice for a ramming/glancing dogfight, and matches the value already proven
-      // in that module's own gate rather than introducing a second, untested friction coefficient.
-      const { totalImpulse: impulse, a: a2, b: b2 } = RBC.resolveManifold(a.body, b.body, manifold.points, { restitution: 0.35, friction: 0.5 });
-      // positional correction (position-only, split by inverse mass) keeps a colliding pair's own PENETRATION
-      // bounded -- measured directly before this page shipped: depth converges to (and stays pinned near) its
-      // own slop bound rather than growing without limit. THE ORIGINAL CAUSE OF SUSTAINED LIGHT CONTACT --
-      // brain/autopilot6dof.mjs had no allied deconfliction, so two same-team ships independently targeting the
-      // SAME nearest enemy would fly into and stay pressed against each other for several seconds, re-triggering
-      // this block every tick (measured: 171 straight ticks on one seed) -- is CLOSED as of the frame() call
-      // site above (brain/fleetAssign.mjs's assignTargets(), one pass per team per tick, guarantees no two
-      // ships on the same team ever share a target when fleet sizes are equal). This block itself still exists
-      // for the same reason it always did: ships can still physically brush past each other while pursuing
-      // DIFFERENT targets, or ram an enemy deliberately -- that is normal combat contact, not the coordination
-      // gap, and the physics still degrades gracefully under it either way (bounded depth, correct impulses
-      // every tick, no explosion, no clip-through).
-      // positional correction is applied ONCE per pair, at the manifold's own DEEPEST point -- not once per
-      // point (positionalCorrection() has no per-point capability; calling it 4x for a flush face-face hit would
-      // push the pair apart along the same direction up to 4x too far -- see physics/mechanics/
-      // rigidBody6dofCollision.mjs's own header on resolveManifold() for why).
-      const deepest = manifold.points.reduce((best, p) => (p.depth > best.depth ? p : best));
-      const { a: a3, b: b3 } = RBC.positionalCorrection(a2, b2, deepest);
-      a.body = a3; b.body = b3;
-      // damage is SUMMED across the whole manifold, then capped ONCE -- not per-point (a flush 4-point hit would
-      // otherwise deal up to 4x RAM_DAMAGE_CAP) and not maxed (that would discard real severity signal: a flush
-      // hit is genuinely a harder hit than a glancing edge-edge one). For a single-point manifold (edge/vertex/
-      // fallback) this is exactly the old per-tick damage, unchanged.
-      if (impulse > 0) {
-        const dmg = Math.min(RAM_DAMAGE_CAP, impulse * RAM_DAMAGE_PER_IMPULSE);
-        a.hp -= dmg; b.hp -= dmg;
-      }
-    }
-  }
-}
+// v4848 -- THE RESOLUTION ITSELF MOVED to brain/shipCollision6dof.mjs, so the headless duel that trains the pilots resolves the SAME collisions this page does. What follows are this page's own notes on it,
+// kept with the call they are about (the code they describe is the module's now; its gate holds the module to a verbatim copy of what stood here at v4846).
+// FULL CONTACT MANIFOLD (added this round, replacing the old single-approximate-point path): obbManifold()
+// turns this SAT hit's own {normal, depth} into up to 4 real contact points via face clipping or edge-edge
+// closest-point math (see physics/obbManifold.js's own header) -- resolveManifold() then sequences the
+// SAME, already-proven resolveCollision() once per point, deepest-first (see rigidBody6dofCollision.mjs's
+// own header for why that ordering and why conservation still holds exactly). Neither resolveCollision()
+// nor positionalCorrection() changed AT ALL for this: a single-point manifold (edge/vertex/fallback
+// contact) reduces to exactly the old per-tick behavior, proven bit-identical in that module's own gate.
+// friction:0.5 EXPLICIT, matching rigidBody6dofCollision.mjs's own default -- an adversarial review found
+// this page previously inherited that default SILENTLY (no `friction` key at all), an unreviewed side
+// effect of that module adding Coulomb friction rather than a considered choice for this page. Made
+// deliberate here: ship hulls scraping past each other having SOME grip (not sliding frictionlessly) is
+// the physically plausible choice for a ramming/glancing dogfight, and matches the value already proven
+// in that module's own gate rather than introducing a second, untested friction coefficient.
+// positional correction (position-only, split by inverse mass) keeps a colliding pair's own PENETRATION
+// bounded -- measured directly before this page shipped: depth converges to (and stays pinned near) its
+// own slop bound rather than growing without limit. THE ORIGINAL CAUSE OF SUSTAINED LIGHT CONTACT --
+// brain/autopilot6dof.mjs had no allied deconfliction, so two same-team ships independently targeting the
+// SAME nearest enemy would fly into and stay pressed against each other for several seconds, re-triggering
+// this block every tick (measured: 171 straight ticks on one seed) -- is CLOSED as of the frame() call
+// site above (brain/fleetAssign.mjs's assignTargets(), one pass per team per tick, guarantees no two
+// ships on the same team ever share a target when fleet sizes are equal). This block itself still exists
+// for the same reason it always did: ships can still physically brush past each other while pursuing
+// DIFFERENT targets, or ram an enemy deliberately -- that is normal combat contact, not the coordination
+// gap, and the physics still degrades gracefully under it either way (bounded depth, correct impulses
+// every tick, no explosion, no clip-through).
+// positional correction is applied ONCE per pair, at the manifold's own DEEPEST point -- not once per
+// point (positionalCorrection() has no per-point capability; calling it 4x for a flush face-face hit would
+// push the pair apart along the same direction up to 4x too far -- see physics/mechanics/
+// rigidBody6dofCollision.mjs's own header on resolveManifold() for why).
+// damage is SUMMED across the whole manifold, then capped ONCE -- not per-point (a flush 4-point hit would
+// otherwise deal up to 4x RAM_DAMAGE_CAP) and not maxed (that would discard real severity signal: a flush
+// hit is genuinely a harder hit than a glancing edge-edge one). For a single-point manifold (edge/vertex/
+// fallback) this is exactly the old per-tick damage, unchanged.
+const resolveCollisions = (all) => SC.resolveShipCollisions(all, HALF);
 
 function stepWeapons(all, dt) {
   const targets = all.filter((s) => !s.dead).map((s) => ({ id: s.id, team: s.team, body: s.body, half: HALF }));
@@ -299,8 +280,8 @@ let lineup = {}; const pilotCache = {};
 // v4832 -- TWO MORE SOURCES OF WEIGHTS: the pilot this demo ships (brain/pilot6dofWeightsDefault.json, trained by tools/ship/train6dofPilot.mjs, fetched once at load) and one imported from a file. `avail` counts changes to what is
 // held, so the cached pilot functions are rebuilt when a source arrives or is cleared.
 const DESC = PB.describePolicy("pilot6dofPolicy", P6);
-let shippedW = null, shippedMeta = null, shippedErr = null, leagueW = null, leagueMeta = null, leagueErr = null, importedW = null, importedMeta = null, importErr = null, avail = 0;
-const rosterCtx = () => ({ PP: P6, shipped: shippedW, league: leagueW, imported: importedW, brainPilotOn: false, ...ROSTER_NAMES });
+let shippedW = null, shippedMeta = null, shippedErr = null, leagueW = null, leagueMeta = null, leagueErr = null, closeW = null, closeMeta = null, closeErr = null, importedW = null, importedMeta = null, importErr = null, avail = 0;
+const rosterCtx = () => ({ PP: P6, shipped: shippedW, league: leagueW, close: closeW, imported: importedW, brainPilotOn: false, ...ROSTER_NAMES });
 function saveSpecs() { try { localStorage.setItem(ROSTER_KEY, JSON.stringify(specs)); } catch {} }
 function pilotAi(team) {
   const fleet = team === "A" ? A : B, key = specs[team] + "|" + fleet.length + "|" + avail;
@@ -318,7 +299,7 @@ function rosterNote() {
   el.textContent = PR.describe(lineup, A.length) + (probs.length ? "  --  " + probs.join("; ") : "");
 }
 function renderRoster() {
-  const ch = PR.choices({ shipped: !!shippedW, league: !!leagueW, imported: !!importedW, brainPanel: false, scriptedLabel: ROSTER_NAMES.scriptedLabel });
+  const ch = PR.choices({ shipped: !!shippedW, league: !!leagueW, close: !!closeW, imported: !!importedW, brainPanel: false, scriptedLabel: ROSTER_NAMES.scriptedLabel });
   for (const t of PR.TEAMS) {
     const sel = document.getElementById("pilot" + t), keep = specs[t];
     sel.textContent = "";
@@ -336,8 +317,8 @@ renderRoster();
 function pilotLine() {
   const el = document.getElementById("pilotLine"); if (!el) return;
   const one = (label, w, meta) => w ? `${label} ${weightsHash(w)}` + (meta && meta.score != null ? `: held-out score ${meta.score}` : "") : null;
-  const parts = [one("shipped pilot", shippedW, shippedMeta), one("league pilot", leagueW, leagueMeta), one("imported pilot", importedW, importedMeta)].filter(Boolean);
-  el.textContent = (parts.length ? parts.join("  |  ") : shippedErr ? `the shipped pilot did not load (${shippedErr})` : "loading the shipped pilot ...") + (leagueErr && shippedW ? `  --  the league pilot did not load (${leagueErr})` : "") + (importErr ? `  --  import refused: ${importErr}` : "");
+  const parts = [one("shipped pilot", shippedW, shippedMeta), one("league pilot", leagueW, leagueMeta), one("close-quarters pilot", closeW, closeMeta), one("imported pilot", importedW, importedMeta)].filter(Boolean);
+  el.textContent = (parts.length ? parts.join("  |  ") : shippedErr ? `the shipped pilot did not load (${shippedErr})` : "loading the shipped pilot ...") + (leagueErr && shippedW ? `  --  the league pilot did not load (${leagueErr})` : "") + (closeErr && shippedW ? `  --  the close-quarters pilot did not load (${closeErr})` : "") + (importErr ? `  --  import refused: ${importErr}` : "");
   document.getElementById("clearPilot").disabled = !importedW;
 }
 function availChanged() { avail++; renderRoster(); pilotLine(); if (lineup.A) { pilotAi("A"); pilotAi("B"); } }
@@ -347,13 +328,20 @@ fetch("/brain/pilot6dofWeightsDefault.json").then((r) => r.json()).then((blob) =
   if (r.ok) { shippedW = r.weights; shippedMeta = r.meta; } else shippedErr = r.reason;
   availChanged();
 }).catch((e) => { shippedErr = "could not fetch it (" + (e && e.message) + ")"; availChanged(); });
-// v4847 -- the second generation: brain/pilot6dofWeightsLeague.json, the shipped pilot trained against itself and the PD autopilot (tools/ship/trainLeague6dof.mjs). Same format, same importer; a missing or malformed file is SAID (leagueErr)
+// v4846 -- the second generation: brain/pilot6dofWeightsLeague.json, the shipped pilot trained against itself and the PD autopilot (tools/ship/trainLeague6dof.mjs). Same format, same importer; a missing or malformed file is SAID (leagueErr)
 // and "league" is simply not offered.
 fetch("/brain/pilot6dofWeightsLeague.json").then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }).then((blob) => {
   const r = PB.importBrain(DESC, blob);
   if (r.ok) { leagueW = r.weights; leagueMeta = r.meta; } else leagueErr = r.reason;
   availChanged();
 }).catch((e) => { leagueErr = "could not fetch it (" + (e && e.message) + ")"; availChanged(); });
+// v4848 -- the close-quarters pilot: brain/pilot6dofWeightsClose.json, the shipped pilot trained in BOTH starts (the standoff and the joust, 14-40 m apart and closing) with this page's own ram damage on (tools/ship/trainLeague6dof.mjs
+// --profile close). Same format, same importer; a missing or malformed file is SAID and the choice is simply not offered. (A 'careful' pilot, trained with a cost on rams, did not qualify at v4848 and is not offered: see train6dofLeague.mjs.)
+fetch("/brain/pilot6dofWeightsClose.json").then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }).then((blob) => {
+  const r = PB.importBrain(DESC, blob);
+  if (r.ok) { closeW = r.weights; closeMeta = r.meta; } else closeErr = r.reason;
+  availChanged();
+}).catch((e) => { closeErr = "could not fetch it (" + (e && e.message) + ")"; availChanged(); });
 function importBlob(blob) {
   const r = PB.importBrain(DESC, blob);
   if (r.ok) { importedW = r.weights; importedMeta = r.meta; importErr = null; } else importErr = r.reason;
@@ -384,7 +372,7 @@ window.__sixdof = {
   // v4829 -- the roster, for brain/pilot6dofPolicy-selfcheck.mjs's page rows
   roster: { get specs() { return specs; }, setSpecs(x) { specs = PR.sanitizeSpecs(x); saveSpecs(); renderRoster(); }, startFight, get lineup() { return lineup; }, pilotAi,
     // v4832 -- the shipped and the imported pilot, for the gate's page rows
-    get shipped() { return shippedW; }, get shippedError() { return shippedErr; }, get league() { return leagueW; }, get leagueError() { return leagueErr; }, get imported() { return importedW; }, importBlob, get choices() { return [...document.getElementById("pilotA").options].map((o) => o.value); } },
+    get shipped() { return shippedW; }, get shippedError() { return shippedErr; }, get league() { return leagueW; }, get leagueError() { return leagueErr; }, get close() { return closeW; }, get closeError() { return closeErr; }, get imported() { return importedW; }, importBlob, get choices() { return [...document.getElementById("pilotA").options].map((o) => o.value); } },
   get fleets() { return { A, B }; },
 };
 

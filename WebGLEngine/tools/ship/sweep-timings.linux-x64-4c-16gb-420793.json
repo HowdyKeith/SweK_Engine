@@ -1,7 +1,7 @@
 {
  "host": "linux-x64-4c-16gb-420793",
  "note": "THIS BOX'S OWN gate runtimes, written by tools/ship/boxTimings.mjs. The shared sweep-timings.json is host-claimed and a foreign box cannot write it (v4647, and that refusal is right); this is how a box records what IT measured without overwriting another machine's numbers. `kinds` says which quantity each ms is, as in the shared record: `alone` is an uncontended serial reading, `capped` is a FLOOR and not a runtime. Read for COVERAGE -- has this gate ever been timed -- and NOT for the ship-time budget, which still reads the shared file. See task #87. `serialRing` holds the last three alone readings; recordReach's margin row reads it on a box that does not own the shared record, because that row asks what a gate costs HERE and nothing here can refresh another box's ring.",
- "captured": "2026-10-12T21:22:12.880Z",
+ "captured": "2026-10-13T01:23:04.414Z",
  "timings": {
   "tools/ship/cloneProvision-selfcheck.mjs": 7171,
   "tools/ship/exitBusy-selfcheck.mjs": 15284,
@@ -32,7 +32,7 @@
   "brain/tacticsRoster-selfcheck.mjs": 50921,
   "brain/pilotAircraftPolicy-selfcheck.mjs": 63216,
   "tools/ship/trainAircraftPilot-selfcheck.mjs": 74576,
-  "tools/ship/train6dofLeague-selfcheck.mjs": 54682
+  "tools/ship/train6dofLeague-selfcheck.mjs": 131622
  },
  "at": {
   "tools/ship/cloneProvision-selfcheck.mjs": "2026-09-25T03:35:16.858Z",
@@ -64,7 +64,7 @@
   "brain/tacticsRoster-selfcheck.mjs": "2026-10-12T03:44:23.363Z",
   "brain/pilotAircraftPolicy-selfcheck.mjs": "2026-10-12T03:44:23.363Z",
   "tools/ship/trainAircraftPilot-selfcheck.mjs": "2026-10-12T03:44:23.363Z",
-  "tools/ship/train6dofLeague-selfcheck.mjs": "2026-10-12T21:22:12.880Z"
+  "tools/ship/train6dofLeague-selfcheck.mjs": "2026-10-13T01:23:04.414Z"
  },
  "kinds": {
   "tools/ship/cloneProvision-selfcheck.mjs": "alone",
@@ -257,9 +257,9 @@
    74576
   ],
   "tools/ship/train6dofLeague-selfcheck.mjs": [
-   53401,
-   53756,
-   54682
+   127848,
+   127615,
+   131622
   ]
  }
 }

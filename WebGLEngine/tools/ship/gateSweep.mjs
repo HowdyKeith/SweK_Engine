@@ -9191,6 +9191,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The CLIs refuse an unknown option (cliArgs) and the peer's transport is a row of its own. Thirteen sabotages red by name, " +
                  "logged in the two headers. NOT CLOSED: the pair has run over loopback and in one browser, not between two machines.",
     }),
+    // v4848 -- since552. ONE new gate file: brain/shipCollision6dof-selfcheck.mjs (the page's collision function moved into a module and held to its v4846 text bit for bit; the duel with collisions off held to twenty frozen v4846 fingerprints; the
+    // ram accounting exact; a ship that spins itself to NaN lost and not simulated on), plus section 9-10 of brain/pilot6dofPolicy-selfcheck.mjs, section 7 of tools/ship/train6dofLeague-selfcheck.mjs and three rows of brain/pilotRoster-selfcheck.mjs.
+    since552: Object.freeze({
+        at: "v4848", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "brain/shipCollision6dof-selfcheck.mjs",
+        ]),
+        widened: Object.freeze([
+            "brain/pilot6dofPolicy-selfcheck.mjs (section 9: scenarios, collisions and the ram penalty reach evaluate/train/prune, 304 disjoint seeds; section 10: the close-quarters pilot's file held to its `by`, the trainer's rule, each side in each start; the page's close rows; the six-choices row no longer races the fetches)",
+            "tools/ship/train6dofLeague-selfcheck.mjs (section 7: the three profiles, the floor that scales with the starts, no start behind, careful's ram floor, a close search end to end, --workers carries the profile)",
+            "brain/pilotRoster-selfcheck.mjs (the 'close' choice: offered only when held, after 'league', flies that vector, the Brain panel ignores it)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE 42-3 REPORTED AT v4846 WAS TRUE OF A START IN WHICH NO TWO SHIPS EVER TOUCH: *** in 400 standoff games with collisions on there was not one contact, and the v4846 league pilot loses all 80 jousts to the PD autopilot. The close-quarters pilot beats the shipped one 106-12 over 160 games in both starts " +
+                 "and does not ram less (534 hit points against 439). Careful, trained with a cost on rams, did not qualify, and the likely reason is physics (the contacts come 1.2-1.6 s in, the ship moves about 1.5 m sideways in that time). Two training runs died on a NaN a spinning pilot produces; the page's path had the same hole. " +
+                 "Forty-seven sabotages red by name, four of them first at 0 red. NOT CLOSED: whether a pilot can choose not to ram (the joust cannot ask it); the page's three-a-side fight; the rig.",
+    }),
     // v4846 -- since551. ONE new gate file: tools/ship/train6dofLeague-selfcheck.mjs (the tool that trains the space-battle pilot against itself and the PD autopilot from both sides), plus sections 7-8 of brain/pilot6dofPolicy-selfcheck.mjs
     // (both sides of a duel, the league evaluator, the league pilot's file) and three rows of brain/pilotRoster-selfcheck.mjs (the 'league' choice).
     since551: Object.freeze({

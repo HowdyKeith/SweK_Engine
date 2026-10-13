@@ -1,4 +1,4 @@
-// WebGLEngine/tools/ship/train6dofLeague-selfcheck.mjs -- v4847 (beside tools/ship/train6dofLeague.mjs)
+// WebGLEngine/tools/ship/train6dofLeague-selfcheck.mjs -- v4846 (beside tools/ship/train6dofLeague.mjs)
 //
 // Run: node tools/ship/train6dofLeague-selfcheck.mjs
 //
@@ -10,7 +10,7 @@
 // toward the shipped pilot; a search in its own process is the same search to the bit, and `--workers` gives the sequential answer; the blob it writes (right format, round-trips through the importer the page uses,
 // quotes the numbers it was graded on); and the command line (it writes nothing without --write and nothing when the champion does not qualify).
 //
-// SABOTAGES, v4847, eighteen (each broken in place, the gate run in a scratch checkout, the file restored; reds are rows, `grep -c '^  FAIL'`). NONE WENT 0 RED ON ITS FIRST RUN -- BUT THREE OF THE ROWS THAT CATCH THEM WERE
+// SABOTAGES, v4846, eighteen (each broken in place, the gate run in a scratch checkout, the file restored; reds are rows, `grep -c '^  FAIL'`). NONE WENT 0 RED ON ITS FIRST RUN -- BUT THREE OF THE ROWS THAT CATCH THEM WERE
 // ADDED AFTER THE FIRST DRAFT OF THIS GATE, BEFORE ANY SABOTAGE, BECAUSE WRITING THE SABOTAGE PLAN SHOWED THE DRAFT COULD NOT SEE THEM (reasoned, not observed as 0-reds): J (a search started from the PD autopilot instead
 // of the shipped pilot: nothing in a six-iteration run distinguishes the two, so a zero-iteration search must now return the shipped pilot to the bit), P (`--workers` ignored: the answer is the same, so the report must now show
 // the parent's per-search timing lines, which only child processes produce) and M (the ancestor's hash left out of `by`). The prune row was also given a second recipe, because on the smallest one every search ends AT the
@@ -33,6 +33,21 @@
 //   P  CLI: --workers ignored (always sequential)                               1 red (the `--workers` row)
 //   Q  parseArgs: --train out of range accepted                                 1 red (the --train row)
 //   R  finish(): the baseline is the shipped pilot against the PD autopilot, not against itself  2 red (the baseline-is-exactly-even row, the audit row)
+//
+// v4848 -- SECTION 7 (PROFILES), twelve sabotages in a scratch checkout:
+//   T1  train6dofLeague.mjs: `close` plays the standoff only                                          9 red (the profile table, duelOf, the floor, the per-start rule, the run and audit rows)
+//   T2  train6dofLeague.mjs: the lead floor not scaled by the number of starts                          1 red (the floor-at-its-edge row: 15 of 160 fails, 16 qualifies)
+//   T3  train6dofLeague.mjs: the no-start-behind rule dropped                                           1 red (the row where a 40-0 standoff hides a joust one game behind)
+//   T4  train6dofLeague.mjs: the ram floor ignored                                                      1 red (the ram-floor-at-its-edge row)
+//   T5  train6dofLeague.mjs: the ram floor compared with the whole mirror, not its fraction             1 red (the same row)
+//   T6  trainLeague6dof.mjs: --workers does not pass --profile to the child processes                   1 red (the parallel-close-equals-sequential-close row)
+//   T7  train6dofLeague.mjs: searchOne trains without the duel options                                  FIRST RUN 0 red -- a tiny close run was only checked for determinism, which a search that ignores its options also has. The row now builds the search
+//                                                                                                       by hand and holds searchOne to it, with a control that ends elsewhere without the options: 1 red
+//   T8  train6dofLeague.mjs: the held-out score read on the league's seeds, not the close ones          FIRST RUN 0 red -- the row counted 192 games, which 24 seeds of either set give. It now recomputes the score on [701..724] and requires the league seeds to say something else: 1 red
+//   T9  train6dofLeague.mjs: the file's `by` forgets both starts and the collisions                    1 red (the `by` row)
+//   T10 train6dofLeague.mjs: --profile ignored for the recipe (RECIPE for every profile)                1 red (the --profile row)
+//   T11 train6dofLeague.mjs: the log hides the per-start record                                         3 red (the log row, the `by` row, the champion-line row)
+//   T12 train6dofLeague.mjs: the mirror baseline played without the profile's duel options              1 red (the audit-is-the-champion-against-the-shipped-pilot row: the baseline must be the same games)
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -143,6 +158,55 @@ ok("with --write but a champion that does not lead the shipped pilot (3 iteratio
 const run3 = spawnSync(process.execPath, [tool, "--bogus"], { encoding: "utf8", timeout: 20000 });
 ok("an unknown option exits 2 before any training", run3.status === 2 && /unknown option/.test(run3.stderr), run3.stderr.trim().slice(0, 80));
 fs.rmSync(tmp, { recursive: true, force: true });
+
+sec("7. PROFILES (v4848): what the league is played in -- the standoff of v4846, or close quarters with collisions");
+{
+    const PR = T.PROFILES, C = PR.close, W = PR.careful, L = PR.league;
+    ok("three profiles, frozen: league is v4846's recipe and files, unchanged (standoff only, no collisions, no penalty, the league seed sets, RECIPE, the file the page already fetches)", Object.isFrozen(PR) && Object.keys(PR).join() === "league,close,careful" && L.recipe === T.RECIPE && L.out === T.DEFAULT_OUT && J(L.scenarios) === '["standoff"]' && !L.collisions && L.ramPenalty === 0 && L.ramFloor === null && L.seeds.train === P.LEAGUE_TRAIN_SEEDS && L.seeds.held === P.LEAGUE_HELD_OUT_SEEDS && L.seeds.audit === P.LEAGUE_AUDIT_SEEDS && L.autoSeeds === P.AUDIT_SEEDS);
+    ok("close plays BOTH starts with collisions on and no penalty; careful is close with a ram penalty of 0.05 a hit point and a ramFloor of half the shipped pilot's ram damage; both use the close-quarters seed sets, the audit against the PD autopilot included, and write their own files", C.collisions && W.collisions && J(C.scenarios) === '["standoff","joust"]' && J(W.scenarios) === J(C.scenarios) && C.ramPenalty === 0 && W.ramPenalty === 0.05 && C.ramFloor === null && W.ramFloor === 0.5 && C.seeds.train === P.CLOSE_TRAIN_SEEDS && W.seeds.audit === P.CLOSE_AUDIT_SEEDS && C.autoSeeds === P.CLOSE_AUDIT_SEEDS && path.basename(C.out) === "pilot6dofWeightsClose.json" && path.basename(W.out) === "pilot6dofWeightsCareful.json" && Object.values(PR).every((x) => Object.isFrozen(x) && Object.isFrozen(x.scenarios) && Object.isFrozen(x.recipe)), J({ close: C.recipe, careful: W.recipe }));
+    const dc = T.parseArgs(["--profile", "close"]), dw = T.parseArgs(["--profile", "careful"]), dl = T.parseArgs(["--profile", "league"]);
+    ok("--profile picks the recipe, the file and the seeds (close: 500 iterations on 32 seeds from seed 5000; careful: seed 5100), `league` is the default every earlier row measured, and an unknown profile is REFUSED by name", dc.profile === "close" && dc.iters === 500 && dc.train === 32 && dc.seed === 5000 && dc.out === C.out && dw.seed === 5100 && dw.out === W.out && dl.profile === "league" && J({ ...dl, workers: 0 }) === J({ ...d0, profile: "league", workers: 0 }) && /--profile must be one of league, close, careful, got "bogus"/.test(throws(() => T.parseArgs(["--profile", "bogus"]))) && dc.iters !== d0.iters);
+    ok("an explicit option still beats the profile's (a profile is defaults, not a cage), and --train is held to the profile's own seed set", T.parseArgs(["--profile", "close", "--iters", "7", "--seed", "9"]).iters === 7 && T.parseArgs(["--profile", "close", "--iters", "7", "--seed", "9"]).seed === 9 && /--train must be 1\.\.48/.test(throws(() => T.parseArgs(["--profile", "close", "--train", "49"]))));
+    ok("duelOf() is what the profile plays under: close = collisions + both starts, careful adds the penalty, league = the plain standoff", J(T.duelOf(C)) === '{"collisions":true,"ramPenalty":0,"scenarios":["standoff","joust"]}' && J(T.duelOf(W)) === '{"collisions":true,"ramPenalty":0.05,"scenarios":["standoff","joust"]}' && J(T.duelOf(L)) === '{"collisions":false,"ramPenalty":0,"scenarios":["standoff"]}');
+
+    // qualifies() under a profile, on made-up runs. A "run" is the record evaluateLeague() writes; each start has 40 games.
+    const mk = (scenario, wins, losses, ramHp, n = 40) => Array.from({ length: n }, (_, i) => ({ scenario, score: 8, win: i < wins, aDead: i >= wins && i < wins + losses, bDead: i < wins, hits: 6, hitsTaken: 3, rams: ramHp > 0 && i === 0 ? 1 : 0, ramHp: i === 0 ? ramHp : 0 }));
+    const res = (runs) => { const wins = runs.filter((r) => r.win).length, losses = runs.filter((r) => r.aDead && !r.bDead).length; return { score: 8.6, wins, losses, draws: runs.length - wins - losses, runs }; };
+    const base = (st, jo, ramHp) => res([...mk("standoff", st[0], st[1], 0), ...mk("joust", jo[0], jo[1], ramHp)]);
+    const goodC = { audit: { vsPrev: base([24, 8], [24, 8], 100), mirror: { ...base([16, 16], [16, 16], 400), score: 7.35 } }, heldOut: { vsPrev: R(8.1, 9, 3) }, auto: { champ: R(10.95, 39, 0), prev: R(11, 39, 0) } };
+    ok("a close champion leading the shipped pilot in BOTH starts, by far more than the floor (32 games over the 160, 16 a start), with the ram damage in its jousts well under half the shipped pilot's own, qualifies; the careful profile agrees", T.qualifies(goodC, C).ok && T.qualifies(goodC, W).ok, T.qualifies(goodC, W).reasons.join("; "));
+    // 24 wins and 16 losses (of 40, so 0 draws) is a lead of 8 in a start; 23-16 is 7: two starts at 8 make 16, one at 7 makes 15
+    const f15 = { ...goodC, audit: { ...goodC.audit, vsPrev: base([23, 16], [24, 16], 100) } }, f16 = { ...goodC, audit: { ...goodC.audit, vsPrev: base([24, 16], [24, 16], 100) } };
+    ok("THE FLOOR SCALES WITH THE STARTS AND IS HELD AT ITS EDGE: a lead of 15 over the 160 audit games fails on the lead alone under a two-start profile, 16 qualifies (the same 15 would not be a lead of 16 under league's floor of 8 per start)", !T.qualifies(f15, C).ok && T.qualifies(f15, C).reasons.length === 1 && /leads the shipped pilot by 15 games.*floor of 16/.test(T.qualifies(f15, C).reasons[0]) && T.qualifies(f16, C).ok, T.qualifies(f15, C).reasons.join("; "));
+    const behind = { ...goodC, audit: { ...goodC.audit, vsPrev: base([40, 0], [14, 15], 100) } }, qb = T.qualifies(behind, C);
+    ok("NO START MAY BE BEHIND THE SHIPPED PILOT: a champion that wins 40-0 in the standoff and is a game behind in the joust has the lead overall (and fails on the joust alone)", lead0(behind.audit.vsPrev) >= 16 && !qb.ok && qb.reasons.length === 1 && /audit, joust start: 14 won and 15 lost/.test(qb.reasons[0]), qb.reasons.join("; "));
+    const heavy = { ...goodC, audit: { ...goodC.audit, vsPrev: base([24, 8], [24, 8], 201) } }, edge = { ...goodC, audit: { ...goodC.audit, vsPrev: base([24, 8], [24, 8], 200) } };
+    ok("careful's RAM FLOOR is held at its edge: ram damage in the jousts of 201 hit points against a shipped-pilot mirror of 400 fails on that alone under careful (half of 400 is 200: 200 qualifies); close has no floor, and passes both", !T.qualifies(heavy, W).ok && T.qualifies(heavy, W).reasons.length === 1 && /joust: the champion's games against the shipped pilot cost 201 hit points to rams where the shipped pilot's against itself cost 400/.test(T.qualifies(heavy, W).reasons[0]) && T.qualifies(edge, W).ok && T.qualifies(heavy, C).ok && T.qualifies(edge, C).ok);
+    ok("under league (one start, no floor) the qualification is exactly v4846's: the same table, the same verdicts", T.qualifies(good).ok === T.qualifies(good, L).ok && T.qualifies(q1b0()).ok === false);
+    function lead0(r) { return r.wins - r.losses; }
+    function q1b0() { return { audit: { vsPrev: R(8.6, 25, 18), mirror: good.audit.mirror }, heldOut: good.heldOut, auto: good.auto }; }
+
+    // a close search end to end, on a recipe small enough to finish in seconds
+    const cr = { profile: "close", runs: 2, iters: 4, seed: 5000, sigma: 0.3, maxK: 4, train: 4 }, cl = [], c1 = T.run(cr, (m) => cl.push(m)), c2 = T.run(cr);
+    ok("a close run is deterministic to the bit, and the champion is picked on the CLOSE held-out seeds in both starts: its held-out league is 24 seeds x 2 opponents x 2 starts x 2 sides = " + c1.champion.held.runs.length + " games", weightsHash(c1.champion.weights) === weightsHash(c2.champion.weights) && c1.champion.held.runs.length === 192 && c1.champion.held.score === c2.champion.held.score && c1.champion.held.runs.filter((r) => r.scenario === "joust").length === 96);
+    const dopt = T.duelOf(C), pw = T.previousWeights();
+    const aud = P.evaluate(c1.champion.weights, P.CLOSE_AUDIT_SEEDS, { opponent: [pw], ...dopt }), mir = P.evaluate(pw, P.CLOSE_AUDIT_SEEDS, { opponent: [pw], ...dopt });
+    ok("!! the audit is the champion against the shipped pilot on the 40 CLOSE audit seeds, both sides, both starts (160 games), read once after the choice, under the profile's own duel; the baseline is the shipped pilot against itself in the same games and it is exactly even", c1.champion.audit.vsPrev.score === aud.score && aud.runs.length === 160 && c1.champion.audit.mirror.score === mir.score && mir.wins === mir.losses && mir.rams > 0, `${P.describeEval(mir)}, ${mir.rams} impacts in the mirror`);
+    const oppC = ["autopilot", pw], heldC = P.evaluate(c1.champion.weights, P.CLOSE_HELD_OUT_SEEDS, { opponent: oppC, ...dopt });
+    ok("!! the champion's held-out score is the league score on the CLOSE held-out seeds [701..724] under the profile's own duel (and is not what the league's seeds would have said)", c1.champion.held.score === heldC.score && c1.champion.held.score !== P.evaluate(c1.champion.weights, P.LEAGUE_HELD_OUT_SEEDS, { opponent: oppC, ...dopt }).score, `${heldC.score.toFixed(3)}`);
+    // a search IS train() then prune() under the profile's duel: held to that by building it by hand, with a control that shows the options change the search at this size (without them it ends elsewhere)
+    const tsd = P.CLOSE_TRAIN_SEEDS.slice(0, 4), SO = { profile: "close", runs: 1, iters: 20, seed: 5000, sigma: 0.3, maxK: 4, train: 4 }, srch = T.searchOne(SO, 0, pw);
+    const hand = (opts) => P.prune(P.train({ seed: 5000, iters: 20, sigma: 0.3, maxK: 4, start: pw, trainSeeds: tsd, opponent: oppC, ...opts }).weights, { toward: pw, trainSeeds: tsd, opponent: oppC, ...dopt });
+    ok("!! a search is train() then prune() UNDER THE PROFILE'S OWN DUEL: searchOne's weights are the hand-built search's to the bit, and a search built without the duel options ends at other weights (so the options reach the training and not only the pruning)", weightsHash(srch.weights) === weightsHash(hand(dopt).weights) && weightsHash(srch.weights) !== weightsHash(hand({}).weights), `${weightsHash(srch.weights)} vs without ${weightsHash(hand({}).weights)}`);
+    ok("the log reports each start separately and the rams (so a pilot that bought its lead with ramming cannot hide it): '" + (cl.find((l) => /standoff W/.test(l)) || "").slice(0, 60) + "...'", cl.some((l) => /standoff W\d+\/L\d+, rams 0 \(0 hp\); joust W\d+\/L\d+, rams \d+ \(\d+ hp\)/.test(l)) && cl.some((l) => /DOES NOT QUALIFY|QUALIFIES/.test(l)));
+    // the file a close or careful champion writes says what it was played in
+    const fakeC = { previous: c1.previous, previousHash: c1.previousHash, champion: { ...c1.champion, weights: pw, kept: 9, differsFromHand: 50, audit: { vsPrev: aud, mirror: mir, vsAuto: aud }, auto: { champ: c1.champion.auto.champ, prev: c1.champion.auto.prev } }, verdict: { ok: true, reasons: [] } };
+    const bc = T.blobOf(fakeC, { ...cr, profile: "close", runs: 4, iters: 500, seed: 5000, train: 32 }), bw = T.blobOf(fakeC, { ...cr, profile: "careful", runs: 4, iters: 500, seed: 5100, train: 32 }), bl = T.blobOf(fakeC, { ...recipe, runs: 4, iters: 800, seed: 4000, train: 48 });
+    ok("`by` of a close file names both starts, the collisions, the close seed ranges [601..632] [701..724] [801..840] and quotes each start's record; careful's adds the penalty; league's is v4846's, with none of that", /every game played in BOTH starts \(standoff and joust\) with ship-ship collisions on,/.test(bc.by) && !/charged per hit point/.test(bc.by) && /0\.05 of score charged per hit point lost to rams/.test(bw.by) && bc.by.includes("[601..632]") && bc.by.includes("[701..724]") && bc.by.includes("[801..840]") && /standoff W\d+\/L\d+/.test(bc.by) && /joust W\d+\/L\d+, rams \d+/.test(bc.by) && !/BOTH starts/.test(bl.by) && bl.by.includes("[401..440]"), bc.by.slice(0, 120));
+    const w2 = spawnSync(process.execPath, [path.join(ENG, "tools", "ship", "trainLeague6dof.mjs"), "--profile", "close", "--runs", "2", "--iters", "2", "--train", "2", "--seed", "5000", "--workers", "2"], { encoding: "utf8", timeout: 240000 }), s2 = spawnSync(process.execPath, [path.join(ENG, "tools", "ship", "trainLeague6dof.mjs"), "--profile", "close", "--runs", "2", "--iters", "2", "--train", "2", "--seed", "5000"], { encoding: "utf8", timeout: 240000 });
+    const keep2 = (x) => (x || "").split("\n").filter((l) => !/^  search \d+\/\d+ \(seed \d+\) done in/.test(l)).join("\n");
+    ok("!! `--workers 2` carries the profile into the child processes: a close run in two processes gives the sequential close report line for line (a child that forgot --profile would train the league recipe and the report would differ)", w2.status === 0 && s2.status === 0 && keep2(w2.stdout) === keep2(s2.stdout) && /joust W/.test(w2.stdout), `exit ${w2.status}/${s2.status}`);
+}
 
 console.log(fails ? `\ntrain6dofLeague-selfcheck: ${fails} FAILED` : "\ntrain6dofLeague-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);

@@ -1,4 +1,4 @@
-// WebGLEngine/tools/ship/trainLeague6dof.mjs -- v4847
+// WebGLEngine/tools/ship/trainLeague6dof.mjs -- v4846
 //
 // THE COMMAND for tools/ship/train6dofLeague.mjs (the library the gate holds): several searches started from the shipped space-battle pilot and scored against a league of the PD autopilot and that pilot, from both sides;
 // the champion picked on held-out seeds; the audit read once; a file written only when the champion leads the shipped pilot and has not regressed. Prints what it did.
@@ -28,7 +28,7 @@ if (opts.one != null) {
 let result;
 if (opts.workers > 1 && opts.runs > 1) {
     // each search in its own process (a search touches nothing the others do: its own seed, the shipped pilot read-only); finish() runs here once, on the weights they send back
-    const self = fileURLToPath(import.meta.url), passthrough = ["--iters", opts.iters, "--seed", opts.seed, "--sigma", opts.sigma, "--train", opts.train, "--runs", opts.runs].map(String);
+    const self = fileURLToPath(import.meta.url), passthrough = ["--profile", opts.profile, "--iters", opts.iters, "--seed", opts.seed, "--sigma", opts.sigma, "--train", opts.train, "--runs", opts.runs].map(String);
     const runOne = (k) => new Promise((resolve, reject) => {
         const t0 = Date.now(), child = spawn(process.execPath, [self, ...passthrough, "--one", String(k)], { stdio: ["ignore", "pipe", "inherit"] });
         let out = ""; child.stdout.on("data", (d) => { out += d; });

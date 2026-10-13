@@ -48,7 +48,7 @@
 //   AB es-box3d-6dof.html: the cached pilot ignores what has become available              2 red (the saved-choice-survives-reload row: it stays the hand pilot it fell back to)
 //   FIRST RUN OF THE GATE: one red, and it was my claim and not the code: the hand brain tracks the PD autopilot to 1.13% at small errors, not the 1% the header said -- the tanh's first-order
 //   saturation (tanh(0.15) is 0.9926 of 0.15, at one radian of error; the angular-velocity term adds the rest). The bound is 2% now and says why.
-//   v4847 -- THE LEAGUE (section 7: both sides, the league evaluator, the fresh seeds; section 8: the league pilot's file; the page's `league` choice). Eleven, each applied in a scratch checkout, the gate run, the file restored:
+//   v4846 -- THE LEAGUE (section 7: both sides, the league evaluator, the fresh seeds; section 8: the league pilot's file; the page's `league` choice). Eleven, each applied in a scratch checkout, the gate run, the file restored:
 //   S  pilot6dofPolicy.mjs: duel() scoreB leaves out the win bonus                               2 red (the scoreB-is-the-reward row; the file's `by`, which quotes numbers computed with it)
 //   T  pilot6dofPolicy.mjs: duel() scoreB's tempo sign not flipped                              2 red (the same row; the `by` row)
 //   U  pilot6dofPolicy.mjs: evaluateLeague() leaves side B's runs in A's point of view          5 red (the point-of-view rows, the mirror-symmetry row, the league file's rows)
@@ -61,6 +61,21 @@
 //   AD es-box3d-6dof.html: the pilots are not re-resolved when the league file arrives          2 red (the saved-league-survives-a-load row and the fight row)
 //   AE es-box3d-6dof.html: 'league' flies the shipped pilot's weights                           1 red (the league-fight row: the two generations must be two different vectors)
 //   (and in pilotRoster-selfcheck.mjs, the roster's own gate: AA 'league' offered when none is held, 5 red; AB 'league' resolves to the shipped pilot's weights, 1 red.)
+//   v4848 -- SECTION 9 (close quarters) AND 10 (the close pilot's file), eleven sabotages in a scratch checkout:
+//   Q1 pilot6dofPolicy.mjs: the league evaluator plays every game in the standoff, whatever the scenario   FIRST RUN 1 red (train's own-options row) -- the run records were only TAGGED with a scenario, so the count row could not see a start that
+//                                                                                                           was never played; the rows now check the closest approach of every game (joust < 40 m, standoff > 50 m): 2 red
+//   Q2 pilot6dofPolicy.mjs: train() drops `collisions`                                                    1 red (train scores its children under the options it is given)
+//   Q3 pilot6dofPolicy.mjs: prune() drops the ram penalty                                                 1 red (prune puts weights back under the same options)
+//   Q4 pilot6dofPolicy.mjs: the close held-out seeds overlap the close train seeds                         1 red (the disjoint-seed-sets row)
+//   Q5 pilot6dofPolicy.mjs: subset() ignores its predicate                                                1 red (the two starts partition the league)
+//   Q6 pilot6dofPolicy.mjs: the single-opponent path ignores the scenario                                 FIRST RUN 0 red -- the row counted six games and not which start each was played in; now it checks the closest approach: 1 red
+//   Q7 pilot6dofPolicy.mjs: train() drops `scenarios`                                                     1 red (train's own-options row)
+//   U1 pilot6dofWeightsClose.json: one weight changed (0.4712 -> 0.48)                                   1 red (the `by` row: the recomputed audit and weight counts no longer match what the file says; an ADDED weight is 3 red: the length and the page rows)
+//   U2 pilot6dofWeightsClose.json: `by` misquotes its joust record (W65 -> W64)                           1 red (the `by` row)
+//   U3 es-box3d-6dof.html: the close file is never fetched                                                2 red (the loads-and-is-offered row; the flies-it row)
+//   U4 es-box3d-6dof.html: 'close' flies the league pilot's weights                                       1 red (the flies-it row: the three generations must be three vectors)
+//   FOUND BEFORE THE SABOTAGES: the page-panel row demanded EXACTLY SIX choices and no 'shipped', which held only because the page's fetches had not finished when the select was read; with a training run on the same four cores the league
+//   pilot had arrived and the row went red with nothing wrong. A v4846 race, surfaced here. The six scripted choices are counted and the fetched pilots (shipped, league, close) have rows of their own.
 //   FOUND BEFORE THE SABOTAGES: the first league file stored the AUDIT score against the shipped pilot as its `score`, and the page prints a pilot's `score` as "held-out score" -- 8.873 under that label was wrong; the file's score is the
 //   held-out league score the champion was picked on (9.812), the trainer and this gate say so, and the file was regenerated from the same weights. And the first mirror row used the hand pilot (all draws: its symmetry holds vacuously).
 "use strict";
@@ -75,7 +90,7 @@ import * as R from "./pilotRoster.mjs";
 import * as RB from "../physics/mechanics/rigidBody6dof.mjs";
 import * as Topo from "./gfcTopology.mjs";
 import * as PB from "./peerBrain.mjs";
-import * as TL from "../tools/ship/train6dofLeague.mjs";   // v4847 -- the league trainer's own qualification rule, applied here to the file it wrote
+import * as TL from "../tools/ship/train6dofLeague.mjs";   // v4846 -- the league trainer's own qualification rule, applied here to the file it wrote
 import { weightsHash } from "./drivePolicy.mjs";
 import { runInEngineOrigin, webgpuSkipReason } from "../tools/ship/webgpuHarness.mjs";
 
@@ -86,6 +101,7 @@ const report = (m) => console.log("  ----  " + m);
 const sec = (t) => console.log("\n" + t);
 const mkRng = (seed) => { let a = seed >>> 0; return () => { a = (Math.imul(a, 1664525) + 1013904223) >>> 0; return a / 4294967296; }; };
 const same = (a, b) => a.length === b.length && a.every((v, i) => Object.is(v, b[i]));
+const ASYNC_PILOTS = ["shipped", "league", "close"];   // the roster choices that exist only once their file has been fetched
 
 // 60 seeded states of a ship against a target: any orientation, a small spin, the target 30-200 units away and moving, the ship moving a little
 const I = RB.boxInertia({ m: 8, hx: 1.6, hy: 0.7, hz: 0.7 });
@@ -232,11 +248,16 @@ sec("5. THE PAGE: es-box3d-6dof.html in its own browser");
             const blob = await (await fetch("/brain/pilot6dofWeightsDefault.json")).json();
             choose("pilotA", "shipped"); choose("pilotB", "zero"); byId("startFight").click();
             out.shippedFight = { A: S.roster.lineup.A.id, label: S.roster.lineup.A.label, ships: S.roster.lineup.A.weights.length, sameWeights: S.roster.lineup.A.weights.every((w) => w === S.roster.shipped), obs: await observe(40000) };
-            // v4847 -- THE LEAGUE PILOT: loads, is offered, flies the very weights the file carries on every ship of its team, against the shipped pilot on the other
+            // v4846 -- THE LEAGUE PILOT: loads, is offered, flies the very weights the file carries on every ship of its team, against the shipped pilot on the other
             await waitFor(() => S.roster.league || S.roster.leagueError, 30000);
             out.league = { loaded: !!S.roster.league, error: S.roster.leagueError, choices: S.roster.choices, line: byId("pilotLine").textContent };
             choose("pilotA", "league"); choose("pilotB", "shipped"); byId("startFight").click();
             out.leagueFight = { A: S.roster.lineup.A.id, B: S.roster.lineup.B.id, labelA: S.roster.lineup.A.label, ships: S.roster.lineup.A.weights.length, sameA: S.roster.lineup.A.weights.every((w) => w === S.roster.league), sameB: S.roster.lineup.B.weights.every((w) => w === S.roster.shipped), differ: S.roster.league !== S.roster.shipped, note: byId("rosterNote").textContent };
+            // v4848 -- THE CLOSE-QUARTERS PILOT: loads, is offered after the league pilot, and flies the very weights its file carries, against the league pilot on the other side
+            await waitFor(() => S.roster.close || S.roster.closeError, 30000);
+            out.closeQ = { close: !!S.roster.close, closeErr: S.roster.closeError, choices: S.roster.choices, line: byId("pilotLine").textContent };
+            choose("pilotA", "close"); choose("pilotB", "league"); byId("startFight").click();
+            out.closeFight = { A: S.roster.lineup.A.id, B: S.roster.lineup.B.id, labelA: S.roster.lineup.A.label, ships: S.roster.lineup.A.weights.length, sameA: S.roster.lineup.A.weights.every((w) => w === S.roster.close), sameB: S.roster.lineup.B.weights.every((w) => w === S.roster.league), distinct: new Set([S.roster.shipped, S.roster.league, S.roster.close]).size };
             out.bad = { ok: S.roster.importBlob({ format: "swek-brain-v1", policy: "pilotPolicy", weights: [] }), line: byId("pilotLine").textContent, importedStill: !!S.roster.imported };
             out.imp = { ok: S.roster.importBlob(blob), choices: S.roster.choices, imported: !!S.roster.imported };
             choose("pilotA", "imported"); byId("startFight").click(); out.impLineup = { A: S.roster.lineup.A.id, label: S.roster.lineup.A.label, same: S.roster.lineup.A.weights.every((w) => w === S.roster.imported) };
@@ -262,7 +283,9 @@ sec("5. THE PAGE: es-box3d-6dof.html in its own browser");
         ok("the harness booted es-box3d-6dof.html and drove the panel", r.ok && r.result && r.result.booted, r.ok ? "" : String(r.reason || r.error || (r.pageErrors || []).join(" | ")).slice(0, 300));
         if (r.ok && r.result && r.result.booted) {
             const p = r.result;
-            ok("!! the panel is there: a Load Pilots button opens it, a select for each team; both start on 'default for this team'; six choices (the PD autopilot, hand, zero, two noise levels, and default) and no 'Brain panel' choice, since this page has none", p.panelShown && p.defaults.join() === "auto,auto" && p.opts.length === 6 && !p.opts.includes("brain") && !p.opts.includes("imported") && !p.opts.includes("shipped"), p.opts.join(","));
+            ok("!! the panel is there: a Load Pilots button opens it, a select for each team; both start on 'default for this team'; six choices (the PD autopilot, hand, zero, two noise levels, and default) and no 'Brain panel' choice, since this page has none", p.panelShown && p.defaults.join() === "auto,auto" && p.opts.filter((o) => !ASYNC_PILOTS.includes(o)).length === 6 && !p.opts.includes("brain") && !p.opts.includes("imported"), p.opts.join(","));
+            // *** THE PILOTS THAT ARRIVE BY FETCH ARE NOT PART OF THIS ROW. *** It used to demand exactly six choices and no "shipped", which held only because the page's fetches had not finished when the select was read; under load (v4848: a
+            // training run on the same four cores) the league pilot had arrived and the row went red with nothing wrong. The six scripted choices are counted, and the fetched ones have rows of their own (the loads-and-is-offered rows).
             ok("!! the default lineup is the old page: the PD autopilot against the PD autopilot, named as such", p.lineup0.A === "scripted" && p.lineup0.B === "scripted" && p.lineup0.label === "PD autopilot" && /PD autopilot/.test(p.lineup0.note), p.lineup0.note);
             ok("!! a choice made in a select is the pilot that flies after Start Fight: team A hand, team B zero is the lineup, three ships a side", p.afterStart.A === "hand" && p.afterStart.B === "zero" && p.afterStart.ships === 3 && p.afterStart.alive === 6, JSON.stringify(p.afterStart));
             ok("!! a ZERO team holds still and takes the damage, a HAND team moves and deals it: team B is hurt and never moved or spun, team A is not hurt and did move", p.hz.bHurt && !p.hz.aHurt && p.hz.aMoved && !p.hz.bMoved && !p.hz.bSpun, JSON.stringify(p.hz));
@@ -276,6 +299,9 @@ sec("5. THE PAGE: es-box3d-6dof.html in its own browser");
             const lg = p.league;
             ok("!! the league pilot LOADS and is offered: the file arrives, 'league' is in the select between 'shipped' and the hand weights, and the line names its hash and its score against the shipped pilot", lg.loaded && !lg.error && lg.choices.includes("league") && lg.choices.indexOf("league") === lg.choices.indexOf("shipped") + 1 && /league pilot [0-9a-f]{8}: held-out score/.test(lg.line), JSON.stringify(lg).slice(0, 260));
             ok("!! choosing it flies it: team A is the league pilot on the very weights its file carries (all three ships), team B the shipped pilot on ITS, and they are two different vectors -- the two generations meet on the page", p.leagueFight.A === "league" && p.leagueFight.B === "shipped" && /league-trained/.test(p.leagueFight.labelA) && p.leagueFight.ships === 3 && p.leagueFight.sameA && p.leagueFight.sameB && p.leagueFight.differ && /league-trained pilot brain/.test(p.leagueFight.note) && /shipped pilot brain/.test(p.leagueFight.note), p.leagueFight.note);
+            const cq = p.closeQ;
+            ok("!! the close-quarters pilot LOADS and is offered: the file arrives, 'close' follows 'league' in the select, and the line names its hash and held-out score", cq.close && !cq.closeErr && cq.choices.indexOf("close") === cq.choices.indexOf("league") + 1 && /close-quarters pilot [0-9a-f]{8}: held-out score/.test(cq.line), JSON.stringify(cq).slice(0, 300));
+            ok("!! choosing it flies it: team A is the close-quarters pilot on the very weights its file carries (three ships), team B the league pilot on ITS, and the three generations are three different vectors", p.closeFight.A === "close" && p.closeFight.B === "league" && /close-quarters/.test(p.closeFight.labelA) && p.closeFight.ships === 3 && p.closeFight.sameA && p.closeFight.sameB && p.closeFight.distinct === 3, JSON.stringify(p.closeFight));
             ok("!! a SAVED choice of the league pilot survives the next load the way the shipped one does: made before its file has arrived, it falls back to the hand pilot for a moment and becomes the league pilot when the file lands", p.leagueReload.A === "league" && p.leagueReload.selected === "league" && /league-trained/.test(p.leagueReload.label), JSON.stringify(p.leagueReload));
             ok("!! a brain for another policy is REFUSED with a reason on the page and nothing is imported", p.bad.ok === false && /import refused/.test(p.bad.line) && p.bad.importedStill === false, p.bad.line);
             ok("!! a good file is imported: 'imported' joins the select, and choosing it flies those weights on every ship", p.imp.ok && p.imp.imported && p.imp.choices.includes("imported") && p.impLineup.A === "imported" && p.impLineup.same, JSON.stringify(p.impLineup));
@@ -339,8 +365,8 @@ sec("6. TRAINING (v4832) and the shipped pilot: brain/pilot6dofWeightsDefault.js
     }
 }
 
-// ---- 7. THE LEAGUE (v4847): THE SAME FIGHT FROM BOTH SIDES, AND A PILOT AGAINST ITS ANCESTOR -------------------------------------------------------
-sec("7. THE LEAGUE (v4847): both sides of every duel, a set of opponents, and seeds nothing has read");
+// ---- 7. THE LEAGUE (v4846): THE SAME FIGHT FROM BOTH SIDES, AND A PILOT AGAINST ITS ANCESTOR -------------------------------------------------------
+sec("7. THE LEAGUE (v4846): both sides of every duel, a set of opponents, and seeds nothing has read");
 {
     const hand = P6.handWeights(), zero = P6.zeroWeights();
     const dd = P6.duel("autopilot", "zero", { seed: 3 }), dz = P6.duel("zero", "autopilot", { seed: 3 });
@@ -365,7 +391,7 @@ sec("7. THE LEAGUE (v4847): both sides of every duel, a set of opponents, and se
 }
 
 // ---- 8. THE LEAGUE PILOT: brain/pilot6dofWeightsLeague.json ----------------------------------------------------------------------------------------
-sec("8. the league-trained pilot (v4847): brain/pilot6dofWeightsLeague.json");
+sec("8. the league-trained pilot (v4846): brain/pilot6dofWeightsLeague.json");
 {
     const load = (f) => { const blob = JSON.parse(fs.readFileSync(path.join(ENG, "brain", f), "utf8")), imp = PB.importBrain(PB.describePolicy("pilot6dofPolicy", P6), blob); return { blob, imp, w: imp.ok ? imp.weights : null }; };
     const L = load("pilot6dofWeightsLeague.json"), S = load("pilot6dofWeightsDefault.json"), hand = P6.handWeights();
@@ -388,6 +414,65 @@ sec("8. the league-trained pilot (v4847): brain/pilot6dofWeightsLeague.json");
         ok("it is a SMALL change to the shipped pilot, not a new one: fewer than a hundred of the 930 weights differ from it (the rest went back toward it; train6dofLeague.mjs prunes toward the shipped pilot)", diffPrev > 0 && diffPrev < 100, `${diffPrev} of 930`);
         const again = P6.prune(w, { toward: prev, trainSeeds: P6.LEAGUE_TRAIN_SEEDS, opponent: opp });
         ok("pruning the league pilot again, toward the shipped pilot and against the league it was trained on, reverts nothing (a fixed point: every weight left is one the score needs)", again.kept === again.moved && again.passes === 1, `${again.moved} moved, ${again.kept} kept, ${again.passes} pass(es)`);
+    }
+}
+
+// ---- 9. CLOSE QUARTERS (v4848): THE STARTS, THE EVALUATOR THAT PLAYS THEM, THE SEEDS NOTHING HAS READ ---------------------------------------------------------
+sec("9. CLOSE QUARTERS (v4848): scenarios, collisions and the ram penalty reach evaluate(), train() and prune()");
+{
+    const w = PB.importBrain(PB.describePolicy("pilot6dofPolicy", P6), JSON.parse(fs.readFileSync(path.join(ENG, "brain", "pilot6dofWeightsDefault.json"), "utf8"))).weights;
+    const seeds = [601, 602, 603];
+    const lg = P6.evaluate(w, seeds, { opponent: ["autopilot", w], collisions: true, scenarios: ["standoff", "joust"] });
+    ok("a league over two scenarios plays every opponent on every seed in every start from both sides: 3 seeds x 2 opponents x 2 starts x 2 sides = " + lg.runs.length + " games, each tagged with its start", lg.runs.length === 24 && lg.runs.filter((r) => r.scenario === "joust").length === 12 && lg.runs.filter((r) => r.scenario === "standoff").length === 12 && lg.runs.every((r) => r.scenario && typeof r.rams === "number" && typeof r.ramHp === "number" && Number.isFinite(r.minRange)) && lg.runs.every((r) => (r.scenario === "joust") === (r.minRange < 40) && (r.scenario === "standoff") === (r.minRange > 50)), "...and the start a run is tagged with is the start it was PLAYED in: the joust games never came further apart than 40 m, the standoff games never nearer than 50");
+    const jo = P6.subset(lg, (r) => r.scenario === "joust"), st = P6.subset(lg, (r) => r.scenario === "standoff");
+    ok("subset() is a tally over the runs that satisfy a predicate: the two starts partition the league (wins, losses, rams and ram damage add up to the whole)", jo.runs.length + st.runs.length === 24 && jo.wins + st.wins === lg.wins && jo.losses + st.losses === lg.losses && jo.rams + st.rams === lg.rams && Math.abs(jo.ramHp + st.ramHp - lg.ramHp) < 1e-9 && st.rams === 0, `joust ${P6.describeEval(jo)}, ${jo.rams} impacts; standoff ${P6.describeEval(st)}, ${st.rams}`);
+    const single = P6.evaluate(w, seeds, { opponent: "autopilot", collisions: true, scenarios: ["standoff", "joust"] });
+    ok("a single opponent over two starts is two games a seed (one in each start), from side A", single.runs.length === 6 && single.runs.slice(0, 3).every((r) => r.minRange > 50) && single.runs.slice(3).every((r) => r.minRange < 40) && single.rams === single.runs.reduce((a, r) => a + r.rams, 0), "standoff games first, joust games after, each played in its own start");
+    const defaults = P6.evaluate(w, seeds, { opponent: ["autopilot"] }), explicit = P6.evaluate(w, seeds, { opponent: ["autopilot"], collisions: false, ramPenalty: 0, scenarios: ["standoff"] });
+    ok("the defaults are the evaluation every earlier row measured: standoff, collisions off, no penalty -- the same score to the bit, and no rams", defaults.score === explicit.score && defaults.rams === 0 && defaults.ramHp === 0);
+    const tseeds = [601, 602], opt = { opponent: ["autopilot"], collisions: true, scenarios: ["joust"], ramPenalty: 0.05 };
+    const tr = P6.train({ seed: 3, iters: 4, trainSeeds: tseeds, start: w, ...opt }), re = P6.evaluate(tr.weights, tseeds, opt), wrong = P6.evaluate(tr.weights, tseeds, { opponent: ["autopilot"] });
+    ok("!! train() scores its children in the start, collisions and penalty it is given: the train score it reports IS the evaluation of its weights under those options (and is not the plain standoff's)", Math.abs(tr.trainScore - re.score) < 1e-9 && Math.abs(tr.trainScore - wrong.score) > 1e-6, `reported ${tr.trainScore.toFixed(4)}, re-evaluated ${re.score.toFixed(4)}, plain standoff ${wrong.score.toFixed(4)}`);
+    const pr = P6.prune(tr.weights, { toward: w, trainSeeds: tseeds, ...opt });
+    ok("...and prune() puts weights back under the same options (its score is the evaluation of its weights under them)", Math.abs(pr.trainScore - P6.evaluate(pr.weights, tseeds, opt).score) < 1e-9);
+    const sets = [P6.TRAIN_SEEDS, P6.HELD_OUT_SEEDS, P6.AUDIT_SEEDS, P6.LEAGUE_TRAIN_SEEDS, P6.LEAGUE_HELD_OUT_SEEDS, P6.LEAGUE_AUDIT_SEEDS, P6.CLOSE_TRAIN_SEEDS, P6.CLOSE_HELD_OUT_SEEDS, P6.CLOSE_AUDIT_SEEDS, P6.BASELINE_SEEDS], all = sets.flat();
+    ok("the close-quarters seed sets (48 train, 24 held-out, 40 audit) and the 40 baseline seeds are frozen and disjoint from each other and from the six sets before them: " + all.length + " seeds, " + new Set(all).size + " distinct", sets.every(Object.isFrozen) && all.length === 12 + 8 + 20 + 48 + 24 + 40 + 48 + 24 + 40 + 40 && new Set(all).size === all.length, "601-648 train, 701-724 held-out, 801-840 audit, 501-540 baseline");
+}
+
+// ---- 10. THE CLOSE-QUARTERS PILOTS: brain/pilot6dofWeightsClose.json and brain/pilot6dofWeightsCareful.json -----------------------------------------------------
+sec("10. the close-quarters pilots (v4848): what each file says about itself is what the code gets");
+{
+    const load = (f) => { const blob = JSON.parse(fs.readFileSync(path.join(ENG, "brain", f), "utf8")), imp = PB.importBrain(PB.describePolicy("pilot6dofPolicy", P6), blob); return { blob, imp, w: imp.ok ? imp.weights : null }; };
+    const S = load("pilot6dofWeightsDefault.json"), prev = S.w, startLine = (r, sc) => { const x = P6.subset(r, (y) => y.scenario === sc); return `${sc} W${x.wins}/L${x.losses}, rams ${x.rams} (${x.ramHp.toFixed(0)} hp)`; };
+    const hand = P6.handWeights(), loaded = {};
+    for (const [name, file, profile] of [["close", "pilot6dofWeightsClose.json", TL.PROFILES.close]]) {
+        const F = load(file), dopt = TL.duelOf(profile), Sd = profile.seeds; loaded[name] = F;
+        ok(`the ${name} pilot's file exists and is a swek-brain-v1 file for THIS policy: 930 finite weights, imported by the same code the page uses; the plane pilot's descriptor refuses it by name`, !!F.imp.ok && F.blob.weightCount === 930 && PB.importBrain(PB.describePolicy("pilotPolicy", PP), F.blob).ok === false, F.imp.ok ? `hash ${weightsHash(F.w)}` : F.imp.reason);
+        if (!F.w || !prev) continue;
+        const w = F.w, opp = ["autopilot", prev];
+        const audit = P6.evaluate(w, Sd.audit, { opponent: [prev], ...dopt }), mirror = P6.evaluate(prev, Sd.audit, { opponent: [prev], ...dopt });
+        const vsAuto = P6.evaluate(w, profile.autoSeeds, { opponent: ["autopilot"], ...dopt }), prevAuto = P6.evaluate(prev, profile.autoSeeds, { opponent: ["autopilot"], ...dopt });
+        const held = P6.evaluate(w, Sd.held, { opponent: [prev], ...dopt }), heldLeague = P6.evaluate(w, Sd.held, { opponent: opp, ...dopt });
+        const diffPrev = Array.from(w).filter((v, i) => Math.abs(v - prev[i]) > 1e-6).length, diffHand = Array.from(w).filter((v, i) => Math.abs(v - hand[i]) > 1e-6).length;
+        const claimed = /(\d+) of the 930 weights differ from it and (\d+) from the PD autopilot/.exec(F.blob.by || "");
+        ok(`!! the ${name} file's \`by\` is what the code gets: it names the shipped pilot BY HASH, says both starts, collisions${profile.ramPenalty ? " and the ram penalty" : ""}, quotes the audit against the shipped pilot start by start (wins, losses, impacts, hit points lost to rams), its mirror, the PD-autopilot comparison and the weight counts, and its score is the held-out league score`,
+            F.blob.by.includes(`from the shipped pilot ${weightsHash(prev)} `) && F.blob.by.includes("every game played in BOTH starts (standoff and joust) with ship-ship collisions on") && (!profile.ramPenalty || F.blob.by.includes(`${profile.ramPenalty} of score charged per hit point lost to rams`)) &&
+            F.blob.by.includes(P6.describeEval(audit)) && profile.scenarios.every((sc) => F.blob.by.includes(startLine(audit, sc))) && F.blob.by.includes(`against itself scores ${mirror.score.toFixed(2)} there`) && F.blob.by.includes(P6.describeEval(vsAuto)) && F.blob.by.includes(P6.describeEval(prevAuto)) &&
+            claimed && Number(claimed[1]) === diffPrev && Number(claimed[2]) === diffHand && F.blob.score === Number(heldLeague.score.toFixed(3)), `audit ${P6.describeEval(audit)}: ${profile.scenarios.map((sc) => startLine(audit, sc)).join("; ")}; ${diffPrev} differ from the shipped pilot`);
+        // the label is built here and not inside ok(...): a template literal nested in a template literal, with an apostrophe in it, defeats the condition extractor in tools/ship/constantRows.mjs (it read the rest of the file as one condition)
+        const qualLabel = "!! the " + name + " pilot BEATS THE SHIPPED PILOT in close quarters, and the trainer's OWN rule for this profile says so on numbers recomputed here (a lead of at least " + (TL.LEAD_FLOOR * profile.scenarios.length) + " over the 160 audit games, no start behind, a held-out lead, no regression against the PD autopilot" + (profile.ramFloor ? ", and the ram damage in its jousts at most " + profile.ramFloor + " of the shipped pilot's" : "") + ")";
+        ok(qualLabel, TL.qualifies({ audit: { vsPrev: audit, mirror }, heldOut: { vsPrev: held }, auto: { champ: vsAuto, prev: prevAuto } }, profile).ok, `audit ${P6.describeEval(audit)} against the shipped pilot's own ${P6.describeEval(mirror)}; held-out ${P6.describeEval(held)}`);
+        const side = (r, sd, sc) => { const x = r.runs.filter((q) => q.side === sd && q.scenario === sc); return { w: x.filter((q) => q.win).length, l: x.filter((q) => q.aDead && !q.bDead).length }; };
+        const cells = ["standoff", "joust"].flatMap((sc) => ["A", "B"].map((sd) => [sc, sd, side(audit, sd, sc)]));
+        ok(`!! ...from EACH SIDE in EACH START: it wins more than it loses against the shipped pilot as side A and as side B, in the standoff and in the joust (a lead that came from one side or one start would show as one cell and not the others)`, cells.every(([, , c]) => c.w > c.l), cells.map(([sc, sd, c]) => `${sc} ${sd} ${c.w}-${c.l}`).join(", "));
+        ok(`it is a modest change to the shipped pilot, not a new one: fewer than a hundred of the 930 weights differ from it`, diffPrev > 0 && diffPrev < 100, `${diffPrev} of 930`);
+    }
+    // WHAT THE CLOSE PILOT DOES AND DOES NOT DO ABOUT RAMMING, as numbers recomputed here, REPORTED and not asserted: it wins by shooting better in close quarters, and its ram damage is not lower than the shipped pilot's.
+    // A 'careful' pilot trained with a cost on every hit point lost to a ram (profile `careful`, penalty 0.05) did NOT qualify -- its best champion's joust games cost 509 hit points where the shipped pilot's mirror costs 439 --
+    // and the reason is physical, not a failure of the search (tools/ship/ramBaseline6dof.mjs and train6dofLeague.mjs's header): the contacts happen 1.2-1.6 s after the start, and a ship can move sideways about 1.5 m in that time.
+    if (loaded.close && loaded.close.w && prev) {
+        const jr = (w) => P6.evaluate(w, P6.CLOSE_AUDIT_SEEDS, { opponent: [prev], collisions: true, scenarios: ["joust"] }), cl = jr(loaded.close.w), sh = P6.evaluate(prev, P6.CLOSE_AUDIT_SEEDS, { opponent: [prev], collisions: true, scenarios: ["joust"] });
+        report(`rams in the 80 audit joust games against the shipped pilot: the shipped pilot's own mirror ${sh.rams} impacts / ${sh.ramHp.toFixed(0)} hp; the close pilot ${cl.rams} impacts / ${cl.ramHp.toFixed(0)} hp -- it wins by shooting better, not by avoiding`);
     }
 }
 
