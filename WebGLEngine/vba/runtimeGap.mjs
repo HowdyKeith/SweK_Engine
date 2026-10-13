@@ -1234,7 +1234,9 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4846 -- the 6DOF league (tools/ship/train6dofLeague.mjs, trainLeague6dof.mjs, its gate): files 4675 -> 4678, ES modules 4370 -> 4373, closures 4215 -> 4218, async/await 1761 -> 1762 (trainLeague6dof's Promise.all over its worker processes), typed arrays 1300 -> 1302, Promises 426 -> 427. RE-DERIVED, not incremented.
     // v4848 -- ship collisions for the 6DOF duel (brain/shipCollision6dof.mjs, its gate, tools/ship/ramBaseline6dof.mjs): files 4678 -> 4681, ES modules 4373 -> 4376, closures 4218 -> 4221, typed arrays 1302 -> 1303 (the spin-out fixture's Float32Array of weights); async/await and promises hold.
     // v4849 -- the tactics trainer (tools/ship/tacticsTrain.mjs, trainTactics.mjs, its gate): files 4681 -> 4684, ES modules 4376 -> 4379, closures 4221 -> 4224, async/await 1762 -> 1763 and Promises 427 -> 428 (trainTactics's Promise.all over its worker processes, as trainLeague6dof's); fetch/XHR holds at 252 because the roster gate's page script is HANDED the trained file and does not fetch it.
-    esModules: 4379, closures: 4224, asyncAwait: 1763, typedArrays: 1303, promises: 428,
+    // v4850 -- no file added; async/await 1763 -> 1764: tools/ship/afterVerdict-selfcheck.mjs awaits a dynamic import of
+    // sourceScan for its section 3b (the tree-wide ratchets, merged in from this line's v4846 round).
+    esModules: 4379, closures: 4224, asyncAwait: 1764, typedArrays: 1303, promises: 428,
     fetchXhr: 252, performanceNow: 250, raf: 127, webgl: 200, webgpu: 62, threads: 26, wasm: 27,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
