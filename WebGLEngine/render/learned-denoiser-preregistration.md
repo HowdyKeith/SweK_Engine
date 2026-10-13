@@ -4251,7 +4251,7 @@ sweep on 0.6.2 first.
 minutes: FXC builds the fused head in 16 s there, at every size.
 
 **Sabotages (v4851).** Each new row was broken on purpose, seen red BY NAME, restored byte-identical, and is logged beside
-its row. 47 in all, none 0 red at the end:
+its row. 40 in all, none 0 red at the end:
 - **tools/ship/headlessGpu-selfcheck.mjs (3):** versionAtLeast comparing parts as strings; nativeCompiler missing use_dxc
   inside a MERGED disable entry; noteNativeAdapter calling a record without isFallbackAdapter software.
 - **render/denoiseDevice-selfcheck.mjs (5), against render/denoiseDevice.mjs:** nativeSetsFor dropping the round-18 sets
