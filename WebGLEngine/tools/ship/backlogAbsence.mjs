@@ -148,7 +148,14 @@ export const CLAIMS = Object.freeze([
     Object.freeze({
         // v4778 -- the entry the header's FAILS row is about, graded now that it is in this tree. The needle is
         // joined for the same reason as every other: the pipeline stage it names is not spelt in this file.
-        id: "gpu-pathtracer-render-mode", frag: Object.freeze(["closest", "Hit"]), expect: "built",
+        // v4850 -- RE-POINTED, BECAUSE WHAT IT FOUND WAS A STRIPPER LEAK. The stage name above appears in rtPipeline.mjs only in
+        // a string (the STAGES row) and in the WGSL kernel, which lives in a template literal; sourceScan's codeOnly blanks both,
+        // as it must. It read as CODE until v4846 only because a template nested in another's ${...} "closed" the outer one
+        // early and leaked shader text into codeOnly's output -- with tools/ship/sourceScan.mjs's templateEnd fixed, the file
+        // read as a mention and this row went red over a pipeline that had not changed. The JavaScript the hit stage is
+        // dispatched through is the closest-hit shader table, exported by name; that is what the row now finds.
+        // SABOTAGED v4850: the needle pointed at a name that does not exist -> this row and the record row RED; restored.
+        id: "gpu-pathtracer-render-mode", frag: Object.freeze(["HIT_", "SHADERS"]), expect: "built",
         says: "the entry's grounds were that the tree had no GPU path tracer as a rendering feature, and it " +
               "is CLOSED -- superseded by the rtx line's WebGPU ray-tracing pipeline and its live viewer, and " +
               "corrected at v4778 to say so -- so this row asserts the pipeline's hit-stage code is THERE",

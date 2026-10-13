@@ -338,6 +338,17 @@ export const RECORD_HANDOVERS = Object.freeze([
                   "read the same boxId() throughout; its rotation (47 readings) and first verify's sweep went to " +
                   "sweep-timings.local.json and refused the shared record, and those local files were deleted at the " +
                   "handover, as at v4818. 420793 held the record from v4815 to v4818." }),
+    // v4850 -- AND BACK TO 142c0d, BECAUSE A GATE THE RIG CANNOT TIME HAD NOWHERE TO BE RECORDED. The container restarted onto
+    // the 2.10GHz host on 2026-10-13. tools/ship/tacticsTrain-selfcheck.mjs arrived at v4849 with no reading anywhere, so the
+    // rig's sweep ran it as unmeasured and killed it at the 20 s cap ("nothing timed out alone under the cap"); its 382 s
+    // reading here went to sweep-timings.local.json, which the rig never reads. Keith chose the handover again.
+    Object.freeze({ at: "v4850", from: "linux-x64-4c-16gb-420793", to: "linux-x64-4c-16gb-142c0d",
+        decidedBy: "Keith",
+        evidence: "Keith's answer \"Hand over to 142c0d\" to the record-owner question on 2026-10-13. boxId() reads " +
+                  "linux-x64-4c-16gb-142c0d after the restart; the shared record named 420793. The rotation that timed " +
+                  "tacticsTrain-selfcheck (382,243 ms, exit 0) wrote sweep-timings.local.json and refused the shared " +
+                  "record; that local file and its ledger were deleted at the handover, as at v4818 and v4838. " +
+                  "420793 held the record from v4838 to v4850." }),
 ]);
 
 /** The box that may write a record whose `host` reads `host`, after following every handover. */
