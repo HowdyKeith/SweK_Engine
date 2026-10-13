@@ -4422,3 +4422,25 @@ command again, and `set SWEK_WEBGPU=`. Send back the six printed lines from each
 **Not in this round.**
 - Moving the pin. A native caller on 0.6.0 compiles with FXC and takes r15 on every adapter, so nothing pinned changes.
 - Any caller other than `--which`. The engine has no native denoiser caller today.
+
+**The outcome (v4853).** Each GPU ran `--which` as installed and with 0.6.2, at v4852. The output is committed as received,
+`render/denoise-rig-r20-which.txt`, and `render/denoiseDevice-selfcheck.mjs` holds it: each run is parsed, held to the table
+above, and each reason re-derived from `nativePick` on the adapter and compiler the line itself names.
+
+| GPU | node-webgpu | Compiler | Set | Reason | Pass | Worst against the f64 network |
+|---|---|---|---|---|---|---|
+| Intel gen-9 | **0.6.1** | FXC | r15 | the entry is for a DXC run | 15.2 ms | 1.05e-6 |
+| Intel gen-9 | 0.6.2 | DXC | **r18u** | section 67's | 10.7 ms | 1.05e-6 |
+| GTX 1080 | 0.6.0 | FXC | r15 | no entry | 28.3 ms | 1.01e-6 |
+| GTX 1080 | 0.6.2 | DXC | r15 | no entry | 6.0 ms | 1.01e-6 |
+
+- **Q1 holds.** Every key, set, reason and compiler is the predicted one.
+- **Q2 holds.** The worst pass is 1.05e-6 from the f64 network.
+- **One thing the table did not foresee: the Intel's global install is 0.6.1, not the pinned 0.6.0.** It changes nothing
+  here -- 0.6.0 and 0.6.1 both force FXC (section 64) -- but it means the Intel's "as installed" runs, its verifies among
+  them, were not on the pin. The gate reads "before 0.6.2" for the as-installed row, not "0.6.0", and prints which package
+  each GPU had.
+- **The 1080's runs came from `C:\swek_src`,** a clone that has `--which`, so v4852 or later.
+- **Sabotages (v4853):** the Intel's DXC prediction changed to r15; the 1080's DXC reason changed in the rig file; the Intel's
+  DXC pass moved to 2e-4 in the rig file; the version test reading 0.6.1 as DXC-capable. Each 1 red, by name, restored
+  byte-identical.

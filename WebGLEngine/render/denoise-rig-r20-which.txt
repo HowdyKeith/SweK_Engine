@@ -1,0 +1,35 @@
+C:\SweK_pub\WebGLEngine>node tools/denoiseDevice.mjs --which
+[denoiseDevice] --which: adapter intel / gen-9 / D3D12 driver version 31.0.101.2137; node-webgpu 0.6.1 from C:\Users\Keith\AppData\Roaming\npm\node_modules\webgpu\index.js; compiler FXC
+[denoiseDevice] --which: key win32/intel/gen-9; kernels r15 -- win32/intel/gen-9's entry is for a DXC run, and this run compiles with FXC -- DEFAULT_KERNELS
+[denoiseDevice] --which: r15 built and ran one 64 x 64 pass in 15.212 ms; worst relative difference from the f64 network on the CPU 1.05e-6
+
+C:\SweK_pub\WebGLEngine>set SWEK_WEBGPU=%TEMP%\swek-webgpu-0.6.2\node_modules\webgpu
+
+C:\SweK_pub\WebGLEngine>node tools/denoiseDevice.mjs --which
+[denoiseDevice] --which: adapter intel / gen-9 / D3D12 driver version 31.0.101.2137; node-webgpu 0.6.2 from C:\Users\Keith\AppData\Local\Temp\swek-webgpu-0.6.2\node_modules\webgpu\index.js; compiler DXC
+[denoiseDevice] --which: key win32/intel/gen-9; kernels r18u -- section 67's for win32/intel/gen-9, under DXC
+[denoiseDevice] --which: r18u built and ran one 64 x 64 pass in 10.742 ms; worst relative difference from the f64 network on the CPU 1.05e-6
+
+C:\SweK_pub\WebGLEngine>set SWEK_WEBGPU=
+
+C:\SweK_pub\WebGLEngine>
+
+
+
+
+C:\swek_src\WebGLEngine>node tools/denoiseDevice.mjs --which
+[denoiseDevice] --which: adapter nvidia / pascal / D3D12 driver version 32.0.15.8180; node-webgpu 0.6.0 from C:\Users\howdy\AppData\Roaming\npm\node_modules\webgpu\index.js; compiler FXC
+[denoiseDevice] --which: key win32/nvidia/pascal; kernels r15 -- no entry for win32/nvidia/pascal -- DEFAULT_KERNELS
+[denoiseDevice] --which: r15 built and ran one 64 x 64 pass in 28.289 ms; worst relative difference from the f64 network on the CPU 1.01e-6
+
+C:\swek_src\WebGLEngine>set SWEK_WEBGPU=%TEMP%\swek-webgpu-0.6.2\node_modules\webgpu
+
+C:\swek_src\WebGLEngine>node tools/denoiseDevice.mjs --which
+[denoiseDevice] --which: adapter nvidia / pascal / D3D12 driver version 32.0.15.8180; node-webgpu 0.6.2 from C:\Users\howdy\AppData\Local\Temp\swek-webgpu-0.6.2\node_modules\webgpu\index.js; compiler DXC
+[denoiseDevice] --which: key win32/nvidia/pascal; kernels r15 -- no entry for win32/nvidia/pascal -- DEFAULT_KERNELS
+[denoiseDevice] --which: r15 built and ran one 64 x 64 pass in 6.007 ms; worst relative difference from the f64 network on the CPU 1.01e-6
+
+C:\swek_src\WebGLEngine>set SWEK_WEBGPU=
+
+C:\swek_src\WebGLEngine>
+

@@ -173,6 +173,11 @@
 //   U5  createNativeDenoiser building r15 when it picked r18u             -> 1 RED: "createNativeDenoiser builds the set it picked"
 //   U6  tools/denoiseDevice.mjs --which reading the compiler with use_dxc disabled -> 0 RED HERE: linux has no D3D compiler, so
 //       the flags change nothing on this box; on the rig, section 68's Q1 reads the compiler line, and 0.6.2 would print FXC
+// v4853 -- SECTION 68'S OUTCOME (render/denoise-rig-r20-which.txt), SABOTAGED. Each restored byte-identical (md5):
+//   W1  WHICH_PREDICTED: the Intel under DXC predicted r15                   -> 1 RED: "section 68's outcome"
+//   W2  the rig file: the 1080 under DXC given a reason nativePick does not  -> 1 RED: the same row
+//   W3  the rig file: the Intel's DXC pass 2e-4 from the f64 network         -> 1 RED: the same row
+//   W4  the version test reading 0.6.1 as DXC-capable                        -> 1 RED: the same row (the Intel's installed 0.6.1)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -231,6 +236,26 @@ function rule66Entries(rep) {
     const q = sets.filter((x) => x.fail < 0).sort((a, b) => a.c3.r - b.c3.r || RULE66_SETS.indexOf(a.s) - RULE66_SETS.indexOf(b.s));
     return [{ key, entry: key && q.length ? q[q.length - 1].s : null, fail: Object.fromEntries(sets.map((x) => [x.s, x.fail])), lines: sets.map((x) => x.line) }];
 }
+// v4852+ -- SECTION 68'S OUTCOME: tools/denoiseDevice.mjs --which, as the rig printed it (render/denoise-rig-r20-which.txt,
+// committed as received). Each run is three lines: the adapter, package and compiler; the key, set and reason; the pass.
+function parseWhich(text) {
+    const L = String(text).split(/\r?\n/).filter((l) => l.startsWith("[denoiseDevice] --which: ")).map((l) => l.slice(25)), runs = [];
+    for (let i = 0; i + 2 < L.length; i += 3) {
+        const a = L[i].match(/^adapter ([^/]+) \/ ([^/]+) \/ (.+?); node-webgpu (\S+) from (.+); compiler (\S+)$/);
+        const k = L[i + 1].match(/^key (\S+); kernels (\S+) -- (.+)$/);
+        const r = L[i + 2].match(/^(\S+) built and ran one 64 x 64 pass in ([\d.]+) ms; worst relative difference from the f64 network on the CPU ([\d.e+-]+)$/);
+        runs.push(a && k && r ? { vendor: a[1], architecture: a[2], description: a[3], version: a[4], compiler: a[6], key: k[1], kernels: k[2], why: k[3],
+                                  built: r[1], ms: +r[2], worst: +r[3] } : { bad: [L[i], L[i + 1], L[i + 2]] });
+    }
+    return runs;
+}
+// Section 68's table, fixed before the rig ran: per GPU, as installed (a package before 0.6.2, so FXC) and with 0.6.2 (DXC)
+const WHICH_PREDICTED = Object.freeze([
+    { vendor: "intel", dxc: false, key: "win32/intel/gen-9", kernels: "r15", why: /entry is for a DXC run/ },
+    { vendor: "intel", dxc: true, key: "win32/intel/gen-9", kernels: "r18u", why: /^section 67's for win32\/intel\/gen-9/ },
+    { vendor: "nvidia", dxc: false, key: "win32/nvidia/pascal", kernels: "r15", why: /^no entry for win32\/nvidia\/pascal/ },
+    { vendor: "nvidia", dxc: true, key: "win32/nvidia/pascal", kernels: "r15", why: /^no entry for win32\/nvidia\/pascal/ },
+]);
 // P3's reading: r15's pass on the device's clock under DXC (the native ladder) and under FXC (the FXC child), at the largest size both reached
 function r15DxcOverFxc(rep) {
     const T = rigLines(rigGate(rep, "denoiseTiming")), at = (head) => new Map(T.map((l) => l.startsWith(head) && l.slice(head.length).match(/^(\d+ x \d+): .*?on the device's clock ([\d.]+) ms/))
@@ -400,6 +425,22 @@ console.log("1. THE KERNEL'S TWIN, ON THE CPU");
             ok("  section 66's predictions, read off the same reports: P1 (the Intel's entry is r18u), P2 (the 1080 gets none, by condition 4), P3 (r15 slower under DXC than FXC on both)",
                 r66[0].entry === "r18u" && r66[1].entry === null && r66[1].fail.r18t === 4 && r66[1].fail.r18u === 3 && r66[0].fail.r18t === 3 && r66[0].fail.r18u === -1 && p3.every((p) => p && p.dxc > p.fxc),
                 p3.map((p) => p ? `r15 at ${p.size}: ${p.dxc} ms under DXC, ${p.fxc} ms under FXC` : "unread").join("; "));
+        }
+        // v4852+ -- SECTION 68'S OUTCOME (round 20): the rig's six --which lines per GPU, held to the table fixed before they ran, and
+        // each re-derived from nativePick on the adapter and compiler the line itself names -- so the rig's reasons are this code's
+        {
+            const runs = parseWhich(fs.readFileSync(path.join(ENG, "render", "denoise-rig-r20-which.txt"), "utf8"));
+            const held = WHICH_PREDICTED.map((w, i) => {
+                const r = runs[i] || {}, re = r.bad ? null : nativePick({ info: { vendor: r.vendor, architecture: r.architecture, description: r.description } }, { compiler: r.compiler, platform: "win32" });
+                const ok1 = !r.bad && r.vendor === w.vendor && r.compiler === (w.dxc ? "DXC" : "FXC") && H.versionAtLeast(r.version, "0.6.2") === w.dxc &&
+                    r.key === w.key && r.kernels === w.kernels && r.built === w.kernels && w.why.test(r.why) && r.worst <= 1e-4 &&
+                    re.key === r.key && re.kernels === r.kernels && re.why === r.why;
+                return { ok: ok1, line: r.bad ? `unparsed: ${r.bad.join(" | ")}` : `${r.vendor} ${r.version} ${r.compiler}: ${r.kernels}, ${r.worst}` };
+            });
+            ok("!! *** section 68's outcome: the rig's four --which runs are the four section 68 predicted -- key, set, reason and compiler -- each pass within 1e-4 of the f64 network, and each reason is nativePick's own on the adapter the line names ***",
+                runs.length === 4 && held.every((h) => h.ok), held.map((h) => (h.ok ? "" : "WRONG ") + h.line).join("; "));
+            const asInstalled = runs.filter((r, i) => !r.bad && !WHICH_PREDICTED[i].dxc).map((r) => `${r.vendor} ${r.version}`);
+            console.log(`  ----  section 68: the packages the rig had installed (the pin is 0.6.0): ${asInstalled.join(", ")}`);
         }
         const tbl = { "Windows/intel/gen-9": "r18u" };
         ok("!! round 18: the page's key is platform, vendor and architecture -- none without a platform, as every browser but Chromium -- and pageKernelsFor gives the table's set for a key it names, PAGE_KERNELS for any other",
