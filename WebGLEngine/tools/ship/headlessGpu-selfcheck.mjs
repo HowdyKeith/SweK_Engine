@@ -395,6 +395,40 @@ sec("8b. v4845 -- THE FINE CLOCK: ONE SPELLING, AND EVERY NATIVE CHILD THAT TIME
         passes.map(([r, c]) => `${path.basename(r)}: create(${(c[0] || "NONE").slice(0, 48)}`).join("; "));
 }
 
+sec("8c. v4851 -- ROUND 19'S CORE: THE COMPILER READ OFF THE PACKAGE, AND THE NATIVE ADAPTER NAMED WHERE realGpuRun READS IT");
+{
+    // Section 66 of render/learned-denoiser-preregistration.md: which compiler a native run on Windows will use cannot be read off
+    // the adapter ("D3D12 driver version ..." under either), so it is read off the package. These rows hold the three exports
+    // definitionGates found unnamed, on every box -- this one has no D3D12, so the win32 answers are driven with `platform`.
+    // SABOTAGED v4851: versionAtLeast comparing the parts as strings -> the first row RED by name ("0.6.10" read below "0.6.2");
+    // nativeCompiler ignoring a merged disable entry -> the second row RED by name; noteNativeAdapter calling a record without
+    // isFallbackAdapter software -> the third row RED by name; each restored.
+    const V = HG.versionAtLeast;
+    ok(V("0.6.2", "0.6.2") && V("0.6.10", "0.6.2") && V("1.0.0", "0.6.2") && !V("0.6.1", "0.6.2") && !V("0.6", "0.6.2") &&
+        !V("0.6.2-beta.1", "0.6.2") && !V(null, "0.6.2") && !V("", "0.6.2"),
+        "!! versionAtLeast reads three numbers and compares them AS numbers; anything else is not at least anything (the safe side, FXC)",
+        "0.6.10 >= 0.6.2, 0.6.1 < 0.6.2, and 0.6 / 0.6.2-beta.1 / null are not versions");
+    const W = (pkg, flags = []) => HG.nativeCompiler({ pkg, platform: "win32", flags });
+    const p062 = { version: "0.6.2", dxcBeside: true }, p061 = { version: "0.6.1", dxcBeside: true }, p062bare = { version: "0.6.2", dxcBeside: false };
+    const said = [W(p062), W(p062, ["disable-dawn-features=use_dxc"]), W(p062, ["disable-dawn-features=timestamp_quantization,use_dxc"]),
+                  W(p062, ["disable-dawn-features=timestamp_quantization"]), W(p062, ["enable-dawn-features=use_dxc"]), W(p061), W(p062bare), W(null),
+                  HG.nativeCompiler({ pkg: p062, platform: "linux" })];
+    ok(said.join() === "DXC,FXC,FXC,DXC,DXC,FXC,FXC,FXC,",
+        "!! nativeCompiler: DXC only for win32, 0.6.2 or later, dxcompiler.dll beside dawn.node, and use_dxc not disabled -- also inside a MERGED disable entry; off win32, none",
+        `0.6.2 ${said[0]}; use_dxc off ${said[1]}; merged with the fine clock ${said[2]}; fine clock alone ${said[3]}; 0.6.1 ${said[5]}; no DLL ${said[6]}; no package ${said[7]}; linux ${said[8]}`);
+    const lines = [], recs = [], env = { SWEK_ADAPTER_LOG: "/nowhere/log.jsonl" };
+    const sink = { env, say: (m) => lines.push(m), append: (f, t) => recs.push({ f, rec: JSON.parse(t) }) };
+    const hw = HG.noteNativeAdapter({ isFallbackAdapter: false, info: { vendor: "nvidia", architecture: "pascal", description: "D3D12 driver version 32.0.15.8180" } },
+        { ...sink, gate: path.join(HERE, "..", "..", "render", "denoiseTiming-selfcheck.mjs"), compiler: "DXC" });
+    const sw = HG.noteNativeAdapter({ info: { vendor: "google", architecture: "swiftshader", description: "Vulkan" } }, { ...sink, gate: "x" });
+    const quiet = HG.noteNativeAdapter({ info: { vendor: "intel", architecture: "gen-9" } }, { env: {}, say: () => {}, append: () => recs.push("WROTE") });
+    ok(hw.software === false && sw.software === true && quiet.software === false && /hardware\); compiler, from the package: DXC/.test(lines[0]) && /SOFTWARE/.test(lines[1]) &&
+        recs.length === 2 && recs[0].f === env.SWEK_ADAPTER_LOG && recs[0].rec.gate === "render/denoiseTiming-selfcheck.mjs" && recs[0].rec.software === false &&
+        recs[0].rec.launchArgs.join() === "node-webgpu (native)" && recs[0].rec.adapter.vendor === "nvidia",
+        "!! noteNativeAdapter names the adapter as a measured line with the package's compiler, and appends the record realGpuRun reads (gate relative, native, software an explicit boolean) -- only when a log is set",
+        lines.join(" | ").slice(0, 200));
+}
+
 sec("9. THE TEXTURE READ-BACK ARITHMETIC");
 {
     // BYTES_PER_TEXEL is four channels times the channel width, and saying it that way is the check: the
