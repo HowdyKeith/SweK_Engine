@@ -253,8 +253,8 @@ console.log("\n6. ROUND 19 (section 66, v4851): NATIVE ADAPTERS NAMED, EACH GATE
                         JSON.stringify({ gate: "render/other-selfcheck.mjs", adapter: { vendor: "google", architecture: "swiftshader" }, software: true, launchArgs: [] }) + "\n";
     const one = gateEntry({ gate: GATE, src: "timingLadder(", status: 0, ms: 5, stdout: "", logText: ONLY_NATIVE });
     const runAds = addAdapters([], one.adapters), said = verdict({ adapters: runAds });
-    // SABOTAGED v4851: adapterLabel returning the bare name (no "(native)") -> RED by name ("a real-hardware run on nvidia pascal D3D12 driver version 32.0.15.8180"); restored.
-    // SABOTAGED v4851: readAdapterLog dropping records whose launchArgs hold NATIVE_LAUNCH (the browser-only reading of section 65) -> RED by name ("*** NO ADAPTER WAS SEEN ..."); restored.
+    // SABOTAGED v4851: adapterLabel returning the bare name (no "(native)") -> RED by name ("a real-hardware run on nvidia pascal D3D12 driver version 32.0.15.8180"), with the next three rows: 4 red; restored, md5 verified.
+    // SABOTAGED v4851: readAdapterLog dropping records whose launchArgs hold NATIVE_LAUNCH (the browser-only reading of section 65) -> RED by name ("*** NO ADAPTER WAS SEEN ..."), with the next two rows: 3 red; restored, md5 verified.
     ok(`!! *** a log holding only a native record names that adapter, hardware and labelled native -- not NO ADAPTER WAS SEEN: "${said}" ***`,
        said === `a real-hardware run on ${PNAME} (native)` && one.entry.adapters.join("|") === `${PNAME} (native)` && one.entry.software === false &&
        runAds.length === 1 && runAds[0].native === true && runAds[0].software === false && NATIVE_LAUNCH === "node-webgpu (native)");
@@ -264,7 +264,7 @@ console.log("\n6. ROUND 19 (section 66, v4851): NATIVE ADAPTERS NAMED, EACH GATE
     noteNativeAdapter({ info: { vendor: "intel", architecture: "gen-9", description: "D3D12 driver version 31.0.101.2137" }, isFallbackAdapter: false },
                       { gate: path.join(ENG, "render/denoiseTiming-selfcheck.mjs"), env: { SWEK_ADAPTER_LOG: "(captured)" }, append: (f, l) => { buf += l; }, say: () => {} });
     const noted = readAdapterLog(buf, "render/denoiseTiming-selfcheck.mjs");
-    // SABOTAGED v4851: NATIVE_LAUNCH spelled "node-webgpu native" (no longer the launch entry noteNativeAdapter writes) -> RED by name, and the row above; restored.
+    // SABOTAGED v4851: NATIVE_LAUNCH spelled "node-webgpu native" (no longer the launch entry noteNativeAdapter writes) -> RED by name, with the row above and the row below: 3 red; restored, md5 verified.
     ok(`  ...and the record noteNativeAdapter writes reads back as a native hardware adapter: ${JSON.stringify(noted)}`,
        noted.adapters.length === 1 && noted.adapters[0].native === true && noted.adapters[0].software === false &&
        noted.names.join("|") === "intel gen-9 D3D12 driver version 31.0.101.2137 (native)" &&
@@ -274,8 +274,8 @@ console.log("\n6. ROUND 19 (section 66, v4851): NATIVE ADAPTERS NAMED, EACH GATE
     const mixed = gateEntry({ gate: GATE, src: "", status: 0, ms: 1, logText: line({ adapter: null, software: null, launchArgs: ["--enable-unsafe-webgpu"] }) + "\n" + ONLY_NATIVE });
     const unsaid = gateEntry({ gate: GATE, src: "", status: 0, ms: 1, logText: line({ adapter: P, launchArgs: ["node-webgpu (native)"] }) });
     const unsaidVerdict = verdict({ adapters: addAdapters([], unsaid.adapters) });
-    // SABOTAGED v4851: readAdapterLog listing the adapterless "none" record as an adapter -> RED by name ("*** SOFTWARE ADAPTER (none) ..."); restored.
-    // SABOTAGED v4851: readAdapterLog defaulting a missing software to false (x.software ?? false) -> RED by name (the unsaid record read as hardware); restored.
+    // SABOTAGED v4851: readAdapterLog listing the adapterless "none" record as an adapter -> RED by name ("*** SOFTWARE ADAPTER (none) ..."), 1 red; restored, md5 verified.
+    // SABOTAGED v4851: readAdapterLog defaulting a missing software to false (x.software ?? false) -> RED by name (the unsaid record read as hardware), 1 red; restored, md5 verified.
     ok(`  ...a browser call with no device is not an adapter, and a record that does not say hardware stays software: "${verdict({ adapters: addAdapters([], mixed.adapters) })}" | "${unsaidVerdict.slice(0, 40)}..."`,
        verdict({ adapters: addAdapters([], mixed.adapters) }) === `a real-hardware run on ${PNAME} (native)` && mixed.entry.adapters.join("|") === `none|${PNAME} (native)` &&
        mixed.entry.software === false && /^\*\*\* SOFTWARE ADAPTER \(nvidia pascal .* \(native\)\): THIS IS NOT A REAL-HARDWARE RUN/.test(unsaidVerdict) && unsaid.entry.software === true);
@@ -283,7 +283,7 @@ console.log("\n6. ROUND 19 (section 66, v4851): NATIVE ADAPTERS NAMED, EACH GATE
     // one GPU read by both halves is two lines: which half reached it is the point of the label
     const both = addAdapters([], [{ name: PNAME, software: false, launchArgs: ["--enable-unsafe-webgpu"], native: false }, { name: PNAME, software: false, launchArgs: ["node-webgpu (native)"], native: true }]);
     addAdapters(both, one.adapters);
-    // SABOTAGED v4851: addAdapters deduplicating by name instead of label -> RED by name (one line, the native half lost); restored.
+    // SABOTAGED v4851: addAdapters deduplicating by name instead of label -> RED by name (one line, the native half lost), 1 red; restored, md5 verified.
     ok(`  ...and one GPU seen by the browser and natively is two adapters, each once: ${both.map((a) => a.native ? "native" : "browser").join(", ")}`,
        both.length === 2 && both[0].native === false && both[1].native === true && verdict({ adapters: both }) === `a real-hardware run on ${PNAME}; ${PNAME} (native)`);
 
@@ -291,14 +291,16 @@ console.log("\n6. ROUND 19 (section 66, v4851): NATIVE ADAPTERS NAMED, EACH GATE
     const OUT = "\n1. NATIVE\n  PASS  r15 natively\n  SKIP  r18t natively: the compiler is FXC (section 66)\n  ----  native adapter: x (hardware)\n" +
                 "   SKIP  round 16 shapes on D3D12: the probe ran round 17 only\nALL GREEN\n";
     const pr = parseRows(OUT);
-    // SABOTAGED v4851: parseRows returning skips: [] -> RED by name ("[]"); restored.
+    // SABOTAGED v4851: parseRows returning skips: [] -> RED by name ("[]"), 1 red; restored, md5 verified.
     ok(`!! *** each gate keeps its SKIP lines, trimmed, beside its fails and measured lines: ${JSON.stringify(pr.skips)} ***`,
        Array.isArray(pr.skips) && pr.skips.length === 2 && pr.skips[0] === "SKIP  r18t natively: the compiler is FXC (section 66)" &&
        pr.skips[1] === "SKIP  round 16 shapes on D3D12: the probe ran round 17 only" && pr.fails.length === 0 && pr.measured.length === 1 && pr.green === true);
     const ge = gateEntry({ gate: GATE, src: "", status: 0, ms: 1, stdout: OUT, logText: ONLY_NATIVE });
     const runSrc = fs.readFileSync(path.join(ENG, "tools/ship/realGpuRun.mjs"), "utf8");
-    // SABOTAGED v4851: gateEntry leaving skips out of the entry -> RED by name; restored.
-    // SABOTAGED v4851: runGates pushing a hand-built entry again, not gateEntry's -> RED by name (the source half); restored.
+    // SABOTAGED v4851: gateEntry leaving skips out of the entry -> 0 red BY NAME, a finding: runGates (section 2) and this row
+    // read entry.skips.length and the gate died unnamed. Redone as gateEntry handing skips: [] -> RED by name ("carries them (0)"), 1 red; restored, md5 verified.
+    // SABOTAGED v4851: runGates pushing an entry with skips undefined -> 0 red BY NAME (section 2 died in runGates, unnamed), a finding;
+    // redone as runGates pushing its own copy, skips: [], in place of the entry gateEntry built -> RED by name (the source half), 1 red; restored, md5 verified.
     ok(`  ...and the report entry carries them (${ge.entry.skips.length}), built by gateEntry inside runGates, its adapters merged by addAdapters`,
        JSON.stringify(ge.entry.skips) === JSON.stringify(pr.skips) && /const \{ entry, adapters \} = gateEntry\(\{ gate: g,/.test(runSrc) &&
        /report\.gates\.push\(entry\);\s*addAdapters\(report\.adapters, adapters\);/.test(runSrc));
@@ -309,9 +311,9 @@ console.log("\n6. ROUND 19 (section 66, v4851): NATIVE ADAPTERS NAMED, EACH GATE
     const p060 = rec({ version: "0.6.0", dxcBeside: true, dir: "/pkgs/webgpu-060" }, "win32");
     const noDll = rec({ version: "0.6.2", dxcBeside: false, dir: "/pkgs/webgpu-062" }, "win32");
     const lin = rec({ version: "0.6.2", dxcBeside: true, dir: "/pkgs/webgpu-062" }, "linux"), none = rec(null, "win32");
-    // SABOTAGED v4851: nodeWebgpuRecord asking nativeCompiler for platform "win32" whatever the platform -> RED by name (linux "DXC"); restored.
-    // SABOTAGED v4851: dxcBeside left out of the record (always null) -> RED by name; restored.
-    // SABOTAGED v4851: compiler for no package taken from nativeCompiler alone ("FXC") -> RED by name; restored.
+    // SABOTAGED v4851: nodeWebgpuRecord asking nativeCompiler for platform "win32" whatever the platform -> RED by name (linux "DXC"), with the CLI row below: 2 red; restored, md5 verified.
+    // SABOTAGED v4851: dxcBeside left out of the record (always null) -> RED by name, 1 red; restored, md5 verified.
+    // SABOTAGED v4851: compiler for no package taken from nativeCompiler alone ("FXC") -> RED by name, 1 red; restored, md5 verified.
     ok(`!! *** the report records the package, its dxcBeside and its predicted compiler: 0.6.2+dll on win32 ${p062.compiler}, 0.6.0+dll ${p060.compiler}, 0.6.2 no dll ${noDll.compiler}, linux ${lin.compiler}, no package ${none.compiler} ***`,
        p062.compiler === "DXC" && p060.compiler === "FXC" && noDll.compiler === "FXC" && lin.compiler === null && none.compiler === null &&
        p062.version === "0.6.2" && p062.dxcBeside === true && p062.dir === "/pkgs/webgpu-062" && p062.from === "/pkgs/webgpu-x/index.js" &&
@@ -325,7 +327,7 @@ console.log("\n6. ROUND 19 (section 66, v4851): NATIVE ADAPTERS NAMED, EACH GATE
     try { fs.unlinkSync(tmp); } catch {}
     const nw = (rep && rep.nodeWebgpu) || {};
     const want = nw.version ? nodeWebgpuRecord({ from: nw.from, pkg: { version: nw.version, dxcBeside: nw.dxcBeside, dir: nw.dir } }).compiler : null;
-    // SABOTAGED v4851: the CLI back to the v4850 record (version, from, chosenBy only) -> RED by name; restored.
+    // SABOTAGED v4851: the CLI back to the v4850 record (version, from, chosenBy only) -> RED by name, 1 red; restored, md5 verified.
     ok(`  ...and the CLI writes it into the report and its log line: ${JSON.stringify(nw)}`,
        !!rep && "dxcBeside" in nw && "compiler" in nw && "dir" in nw && nw.compiler === want &&
        (process.platform === "win32" || nw.compiler === null) && /dxcompiler\.dll beside dawn\.node: .*; predicted compiler: /.test(r.stdout || ""),
