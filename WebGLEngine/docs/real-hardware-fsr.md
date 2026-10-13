@@ -311,6 +311,26 @@ set SWEK_WEBGPU=
 - **Section 68 predicts every line:** the Intel takes r15 under FXC and r18u under DXC; the 1080 takes r15 under both.
 - **Send back the six lines from each GPU.**
 
+**The outcome (section 68).** All four runs were the four predicted. The Intel's global node-webgpu was 0.6.1, not the pin.
+
+### Round 21: the whole native sweep, to move the pin to 0.6.2 (pre-registration section 69)
+
+Every gate that makes a node-webgpu device, once on the pin and once on 0.6.2, at one commit. The pin moves only if no gate is
+worse on 0.6.2 on either GPU. The first line puts the Intel back on the pin. On each GPU, in the verified clone:
+
+```
+cd WebGLEngine
+npm install -g webgpu@0.6.0
+node tools/ship/realGpuRun.mjs --native --out native-sweep-0.6.0.json
+set SWEK_WEBGPU=%TEMP%\swek-webgpu-0.6.2\node_modules\webgpu
+node tools/ship/realGpuRun.mjs --native --out native-sweep-0.6.2.json
+set SWEK_WEBGPU=
+```
+
+- **Don't commit between the two runs,** and run both from the same clone: the rule compares one commit's two sweeps.
+- **The browser runs as in a verify**, not on the GPU's hardware flags; only the package differs.
+- **Send back both JSON files from each GPU.**
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and

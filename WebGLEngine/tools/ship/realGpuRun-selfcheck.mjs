@@ -398,6 +398,14 @@ console.log("\n6. ROUND 19 (section 66, v4851): NATIVE ADAPTERS NAMED, EACH GATE
        `${SOFTWARE_GL_CANDIDATES.length} candidates, first [${keys[0]}]; tree WebGPU [${key(TREE_SOFTWARE_WEBGPU)}]; retired [${key(RETIRED_SOFTWARE_GL)}]`);
 }
 
+// v4853 -- SECTION 69, SABOTAGED. Each against tools/ship/realGpuRun.mjs, this gate run, restored byte-identical (md5):
+//   X1  NATIVE_USE call-only, so a runner imported under another name is missed -> 2 RED: the fixture row, the tree row
+//   X2  nativeGateList reading comments and strings                            -> 2 RED: the same two (this gate, which names
+//       the runners only in strings, joins the sweep)
+//   X3  the native sweep taking an FSR run's hardware flags                    -> 2 RED: the flags row, the CLI row
+//   X4  a red under both packages holding whatever its rows                    -> 1 RED: the rule's fixture row
+//   X5  a regression read as a held gate                                       -> 1 RED: the same row
+//   X6  the rule not asking for one commit                                     -> 1 RED: the same row
 console.log("\n7. SECTION 69 (v4853): THE WHOLE NATIVE SWEEP -- EVERY GATE THAT MAKES A node-webgpu DEVICE, FOUND BY READING CODE");
 {
     // a fixture tree: a call, an import under another name (four real gates do this), a comment and a string -- only the first two count
@@ -433,6 +441,14 @@ console.log("\n7. SECTION 69 (v4853): THE WHOLE NATIVE SWEEP -- EVERY GATE THAT 
        !unpaired.ok && unpaired.bad.map((r) => r.gate + ":" + r.kind).join() === "g/c:unpaired" && !samePkg.ok && !nativeSweepCompare(P0, { gates: [] }).ok &&
        !nativeSweepCompare(P0, sweep("0.6.2", [["g/a", true], ["g/b", true], ["g/c", true]], "def5678 2026-10-13 another")).ok && held.commit === "abc1234",
        `held ${JSON.stringify(held.count)}; regression ${regress.bad.length}, changed ${changed.bad.length}, unpaired ${unpaired.bad.length}, same package ${samePkg.ok}`);
+    // section 69's condition H: the pilot here, both sweeps at one commit, committed as written and held to the rule
+    const pil = (v) => JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", `native-sweep-r69-linux-${v}.json`), "utf8"));
+    const H69 = nativeSweepCompare(pil("0.6.0"), pil("0.6.2")), swept = new Set(H69.rows.map((r) => r.gate)), since = tree.filter((g) => !swept.has(g));
+    console.log(`  ----  section 69, H (here): ${H69.pinned} against ${H69.candidate} at ${H69.commit}: ${JSON.stringify(H69.count)}` +
+                (since.length ? `; native gates added since, not in the pilot: ${since.join(", ")}` : ""));
+    ok("!! *** section 69, condition H: the pilot's two native sweeps here -- 0.6.0 and 0.6.2, one commit -- hold by the rule: every gate green under 0.6.2, none a regression ***",
+       H69.ok && H69.pinned === "0.6.0" && H69.candidate === "0.6.2" && H69.count.regression === 0 && H69.rows.length >= 26 && pil("0.6.2").native === true && pil("0.6.0").native === true,
+       `${H69.rows.length} gates, ${H69.bad.length} failing the rule`);
     // the CLI's --native: an --only that matches no native gate still says so, exits 1, and marks its report as the native sweep
     const tmp = path.join(os.tmpdir(), `swek-realgpu-native-${process.pid}.json`);
     const { SWEK_LAUNCH_ARGS: _unset, ...envNoArgs } = process.env;

@@ -4505,6 +4505,20 @@ set SWEK_WEBGPU=
 ```
 Send back both JSON files from each GPU.
 
-**The pilot here.** PILOT_PENDING
+**The pilot here: H holds.** `realGpuRun --native` on 0.6.0 (the pin) and on 0.6.2, at one commit (694d8cd4), committed
+as written: `tools/ship/native-sweep-r69-linux-0.6.0.json` and `-0.6.2.json`. On SwiftShader through Vulkan, the 26 gates are
+26 green under both packages: 0 regressions, 0 changed reds, 0 unpaired. `realGpuRun-selfcheck.mjs` holds the pair to the rule.
+- **A first pilot ran its two sweeps either side of a commit.** No gate's code changed between them, and the rule as written
+  said "one commit" -- but `nativeSweepCompare` did not ask. It asks now, and the pilot was re-run on one commit.
+- **What H cannot say.** There is no D3D12 here, so neither compiler ran: this box shows that 0.6.2's Dawn changes nothing the
+  native gates ask on Vulkan. I and N are the question.
+
+**Sabotages (v4853).** Against `tools/ship/realGpuRun.mjs`, each red by name, restored byte-identical:
+- **X1:** `NATIVE_USE` call-only, missing the four gates that import a runner under another name -> 2 red.
+- **X2:** `nativeGateList` reading comments and strings -> 2 red (this gate joins the sweep, by its strings).
+- **X3:** the native sweep taking an FSR run's hardware flags -> 2 red.
+- **X4:** a red under both packages holding whatever its rows -> 1 red.
+- **X5:** a regression read as a held gate -> 1 red.
+- **X6:** the rule not asking for one commit -> 1 red.
 
 **Not in this round.** Moving the pin. That is the verdict round's, once H, I and N are read.
