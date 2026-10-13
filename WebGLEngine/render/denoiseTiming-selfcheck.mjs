@@ -1,10 +1,12 @@
 // WebGLEngine/render/denoiseTiming-selfcheck.mjs -- the denoiser arc, round 12: what a pass costs on the device
 //
 // Run: node render/denoiseTiming-selfcheck.mjs            (on the rig: node tools/ship/realGpuRun.mjs --only denoise)
+//      node render/denoiseTiming-selfcheck.mjs --fxc-ladder --result <file>   (internal, round 19: r12 and r15 with use_dxc disabled)
 //
 // GATES the timing half of render/denoiseDevice.mjs (pre-registration section 37). Its exports, named here: TIMING_SIZES,
 // largestBuffer, timingInput, summarize, adapterOf, timingDevice, timingLadder, and round 15's passBytes -- and the
-// denoiser's time() and output().
+// denoiser's time() and output(). Round 19 reads nativeSetsFor, FXC_UNBUILT_SETS and nativeAdapterKey from it, and
+// tools/ship/headlessGpu.mjs's nativeCompiler, webgpuPackage and noteNativeAdapter, and render/denoiseCompile.mjs's dawnFlags.
 // Sections 35-36 put round 11's network on the device and found every time SwiftShader's: a CPU running a JIT. This times
 // the shipped network on a ladder of sizes, 64 x 64 up to a 1080p frame, two ways -- natively on node-webgpu's default
 // adapter, and through denoise.html's own "Time the network" in Chromium -- and prints what it measured as "----" lines,
@@ -17,11 +19,20 @@
 // ladder also prints that pass against r14's two, and each set's buffers at each size.
 // Round 16 (section 54) put r12, r15, r16a and r16b on both ladders (TIMED_SETS). Section 57 withdrew r16a and r16b --
 // node-webgpu's FXC never built their kernel on either GPU -- so both ladders now time r12 and r15.
-// Round 18 (section 61): both ladders time r12, r15, r18t and r18u (TIMED_SETS) -- natively without the BROWSER_ONLY_SETS on a
+// Round 18 (section 61): both ladders time r12, r15, r18t and r18u (TIMED_SETS) -- natively without the browser-only sets on a
 // D3D12 adapter (nativeSetsFor), where node-webgpu's FXC stopped on one's kernel and crashed on the other's (section 60); and
 // the native ladder's device has an unrounded clock, tools/ship/headlessGpu.mjs's FINE_CLOCK_FLAG: Dawn otherwise rounds every
 // timestamp down to a whole 65,536 ns, as it did in every native time of round 17's probes. The page's report carries its
 // adapter's key (pageKey), which section 61's rule fills render/denoiseDevice.mjs's PAGE_KERNELS_BY_ADAPTER by.
+// Round 19 (section 66): the native ladder's sets follow its COMPILER, read off the package with the device's own flags
+// (nativeCompiler; nativePlan below) -- on D3D12 under DXC, all four; under FXC, none named or one unread, r12 and r15, the
+// FXC_UNBUILT_SETS left out. A SWEK_WEBGPU this box cannot load is a red, not a skip. The adapter is noted where realGpuRun reads
+// adapters (noteNativeAdapter), with its key for section 66's NATIVE_KERNELS_BY_ADAPTER, and each native "rXX against r15" line
+// is section 66's (the page's stays section 61's). Section 66's fourth test needs r15 under FXC: where the package ships DXC,
+// this file runs ITSELF again (--fxc-ladder) -- r12 and r15, use_dxc disabled, its own process, since Dawn fixes a device's
+// compiler when it is made -- and prints each round-18 set's DXC median against that r15 at the largest size both ladders
+// measured, marked unpaired: two processes, one after the other, not section 39's turns. Where it does not (FXC as shipped,
+// or not win32 -- this box), one SKIP says why; the child's flags, the plan and the unpaired line are pure rows here.
 //
 // *** WHAT IS ASSERTED IS THE TIMER, NOT THE TIME. *** On any device: the first size is measured; every time is a finite
 // positive number; the device's clock, where it has one, nests inside the wall clock and each layer's span inside the
@@ -66,12 +77,17 @@
 //   U13 the page's timing report without its adapter's key                      1 RED (the key row)
 "use strict";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const SELF = fileURLToPath(import.meta.url);
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
-const { TIMING_SIZES, largestBuffer, passBytes, timingInput, summarize, adapterOf, timingLadder, decodeNet, KERNEL_SETS, TIMED_SETS, BROWSER_ONLY_SETS, nativeSetsFor } = await imp("render/denoiseDevice.mjs");
+const { TIMING_SIZES, largestBuffer, passBytes, timingInput, summarize, adapterOf, timingLadder, decodeNet, KERNEL_SETS, TIMED_SETS, FXC_UNBUILT_SETS, nativeSetsFor,
+        isDxcCompiler, nativeAdapterKey } = await imp("render/denoiseDevice.mjs");
+const { dawnFlags } = await imp("render/denoiseCompile.mjs");
 const H = await imp("tools/ship/headlessGpu.mjs");
 const { runInEngineOrigin } = await imp("tools/ship/webgpuHarness.mjs");
 // v4838: each ladder as a report table (tools/ship/gateReport.mjs) -- the "----" lines the rig carries back, kept past the terminal
@@ -84,10 +100,18 @@ const say = (m) => console.log("  ----  " + m);
 const t0 = Date.now();
 const net = decodeNet(JSON.parse(fs.readFileSync(path.join(ENG, "render/denoise-net-r11.json"), "utf8")).net);
 const CAP = 1500, QUANTUM = 0.2;   // the ladder's cap a pass, ms; a browser rounds timestamps to 0.1 ms, so nesting gets two quanta
-// both ladders time TIMED_SETS (section 61); natively, nativeSetsFor() leaves out the BROWSER_ONLY_SETS on a D3D12 adapter --
-// sections 43 and 46 timed r12, r14, r15 natively, and section 57 r12 and r15
+// both ladders time TIMED_SETS (section 61); natively, nativeSetsFor() leaves out the FXC_UNBUILT_SETS on a D3D12 adapter whose
+// compiler is not DXC (section 66) -- sections 43 and 46 timed r12, r14, r15 natively, section 57 r12 and r15
 const GRID_NS = 65536;   // Dawn's timestamp quantum when timestamp_quantization is on (section 60)
 const onGrid = (ms) => Math.round(ms * 1e6) % GRID_NS === 0;
+// Round 19 (section 66): every native ladder's options but its budget -- the gate's ladder 600 s, the FXC child's 300 s, the
+// child itself stopped at 420 s (FXC rebuilds every pipeline at every size: about 20-25 s of builds a size for r15 on the 1080)
+const LADDER = { capMs: CAP, warmup: 1, minReps: 3, budgetMs: 1500 }, NATIVE_MS = 600000, FXC_MS = 300000, FXC_CHILD_MS = 420000;
+// the FXC child's sets and device flags: r15 for section 66's fourth test, r12 so its K1 lines read as rounds 15's and 18's
+// FXC ladders did; use_dxc disabled and the fine clock in ONE disable entry -- Dawn keeps the last of two entries with one key
+// (section 49), so two would let it compile with DXC or round the clock -- and no dump_shaders, which would fill a timed child's stdout
+const FXC_SETS = Object.freeze(["r12", "r15"]), FXC_FLAGS = dawnFlags(["disable-dawn-features=use_dxc", H.FINE_CLOCK_FLAG], { dump: false });
+const FXC_CHILD = process.argv.includes("--fxc-ladder"), RESULT = process.argv.includes("--result") ? process.argv[process.argv.indexOf("--result") + 1] : null;
 
 // what any ladder must be, wherever it ran: returns the rows that were measured
 function holds(label, r) {
@@ -126,7 +150,7 @@ function report(label, r) {
     if (r.rows.r15) {
         const vs = r.sets.filter((s) => /^r18/.test(s)).flatMap((B) => r.rows[B].map((b, i) => [B, b, r.rows.r15[i]]).filter(([, b, a]) => !a.skipped && !b.skipped)
             .map(([B, b, a]) => [B, b.W, b.H, a.gpu && b.gpu ? a.gpu.median / b.gpu.median : a.wall.median / b.wall.median, a.gpu && b.gpu ? "device" : "wall"]));
-        if (vs.length) REPORT.table(`${label}: each round-18 set against r15 -- r15's median over the set's (section 61)`, ["set", "W", "H", "x as fast as r15", "clock"], vs);
+        if (vs.length) REPORT.table(`${label}: each round-18 set against r15 -- r15's median over the set's (${r15Section(label)})`, ["set", "W", "H", "x as fast as r15", "clock"], vs);
     }
     for (const s of r.sets) for (const x of r.rows[s]) {
         if (x.skipped) { say(`${label} ${s}: ${x.W} x ${x.H} skipped -- ${x.reason}`); continue; }
@@ -148,13 +172,33 @@ function report(label, r) {
     });
     for (const [B, qs] of Object.entries(r.speedup)) for (const q of qs) if (q.measured)
         say(`${label}: ${B} against ${r.sets[0]} at ${q.W} x ${q.H}: ${q.ratio.toFixed(2)} x as fast, on the ${q.clock === "device" ? "device's clock" : "wall clock"}`);
-    // round 18 (section 61): each round-18 set against r15 at every size both measured -- the ratio section 61's page rule reads
+    // round 18 (section 61): each round-18 set against r15 at every size both measured -- the ratio section 61's page rule reads,
+    // and since round 19 the native ladder's for section 66's third test (vsR15Line tags it by label)
     if (r.rows.r15) for (const B of r.sets.filter((s) => /^r18/.test(s))) r.rows[B].forEach((b, i) => {
         const a = r.rows.r15[i];
         if (a.skipped || b.skipped) return;
-        const dev = !!(a.gpu && b.gpu), ratio = dev ? a.gpu.median / b.gpu.median : a.wall.median / b.wall.median;
-        say(`${label}: ${B} against r15 at ${b.W} x ${b.H}: ${ratio.toFixed(3)} x as fast, on the ${dev ? "device's clock" : "wall clock"} -- section 61`);
+        say(vsR15Line(label, B, b, a));
     });
+}
+// Round 19 (section 66): the rule an "rXX against r15" line is read by -- the page's, section 61's; a native ladder's, section 66's
+const r15Section = (label) => (/^native\b/.test(label) ? "section 66" : "section 61");
+// set B's row `b` against r15's row `a` at one size: r15's median over B's, on the device's clock where both have one
+function vsR15Line(label, B, b, a) {
+    const dev = !!(a.gpu && b.gpu), ratio = dev ? a.gpu.median / b.gpu.median : a.wall.median / b.wall.median;
+    return `${label}: ${B} against r15 at ${b.W} x ${b.H}: ${ratio.toFixed(3)} x as fast, on the ${dev ? "device's clock" : "wall clock"} -- ${r15Section(label)}`;
+}
+// Round 19 (section 66, test 4): set B's median in the DXC ladder `dxc` against r15's in the FXC ladder `fxc`, at the LARGEST size
+// (by pixels) that both measured -- B there under DXC, r15 there under FXC -- on the device's clock where both have one. The two
+// ladders ran in two processes, one after the other, so this is unpaired (not section 39's turns) and the line says so. null --
+// no line -- when no size is common, or either ladder is missing.
+function vsFxc(dxc, fxc, B) {
+    const done = (L, s) => (L && L.rows && L.rows[s] ? L.rows[s].filter((x) => !x.skipped) : []), fx = done(fxc, "r15");
+    const both = done(dxc, B).map((b) => [b, fx.find((a) => a.W === b.W && a.H === b.H)]).filter(([, a]) => a);
+    if (!both.length) return null;
+    const [b, a] = both.reduce((m, p) => (p[0].W * p[0].H > m[0].W * m[0].H ? p : m));
+    const dev = !!(a.gpu && b.gpu), ratio = dev ? a.gpu.median / b.gpu.median : a.wall.median / b.wall.median;
+    return { W: b.W, H: b.H, ratio, clock: dev ? "device" : "wall",
+        text: `native: ${B} against r15 under FXC at ${b.W} x ${b.H}: ${ratio.toFixed(3)} x as fast, on the ${dev ? "device's clock" : "wall clock"} -- unpaired: two processes, one after the other -- section 66` };
 }
 // what a PAIRED ladder must be, wherever it ran (section 39): both sets, each held as a ladder, taking turns in the stated
 // order on one device, different kernels, and a speedup that is the ratio of the two medians on the clock it names
@@ -187,6 +231,66 @@ function pairedHolds(label, r, want = KERNEL_SETS) {
     ok(`!! ${label}: each set's speedup at every size it and ${A} measured is ${A}'s median over its own, on the device's clock where both have one -- section 43's K1, read off the rig`, right,
         r ? others.map((B) => `${B}: ` + (r.speedup[B] || []).filter((q) => q.measured).map((q) => `${q.W} x ${q.H} ${q.ratio.toFixed(2)} x`).join(", ")).join("; ") : "");
 }
+// section 61: the flag reached the device -- with timestamps on a 1 ns grid, a whole number of 65,536 ns is a 1-in-65,536 chance a time
+function clockRow(label, r, sets) {
+    const ts = sets.flatMap((s) => r.rows[s].filter((x) => !x.skipped && x.timestamps).flatMap((x) => [...x.raw.gpu, ...x.raw.perPass.flat()]));
+    if (!r.adapter.timestamps) console.log(`  SKIP  the ${label} clock's grain: this adapter offers no timestamp queries`);
+    else ok(`!! section 61: the ${label} device's clock is not Dawn's rounded one -- not every time is a whole number of 65,536 ns, as every native time in round 17's probes was`,
+        ts.length >= 10 && !ts.every(onGrid), `${ts.filter(onGrid).length} of ${ts.length} device times on the 65,536 ns grid`);
+}
+
+// Round 19 (section 66): WHAT A NATIVE RUN DOES ON A BOX, FROM WHAT IT HAS -- its compiler, read off the package with the
+// device's own flags (tools/ship/headlessGpu.mjs's nativeCompiler: the adapter cannot say, its description is "D3D12 ..." under
+// either compiler); the sets nativeSetsFor leaves it under that compiler; and whether the FXC ladder runs -- only where the
+// compiler as shipped is DXC, so FXC is a SECOND compiler of the same package (fxcSkip null), else why not. Pure, so its D3D12
+// branches are held in section 1 on stub adapters and packages: this box's SwiftShader takes neither.
+function nativePlan({ adapter, pkg, platform, flags }) {
+    const compiler = H.nativeCompiler({ pkg, platform, flags }), sets = nativeSetsFor(adapter, TIMED_SETS, { compiler });
+    const fxcSkip = isDxcCompiler(compiler) ? null : compiler
+        ? `the package's compiler as shipped is ${compiler} (node-webgpu ${pkg && pkg.version ? pkg.version : "version unread"}; ${!(pkg && pkg.dxcBeside) ? "no dxcompiler.dll beside dawn.node" :
+            H.versionAtLeast(pkg.version, "0.6.2") ? "dxcompiler.dll beside dawn.node, use_dxc disabled by the device's flags" : "dxcompiler.dll beside dawn.node, but a Dawn before 0.6.2 forces use_dxc off (section 64)"}) -- the native ladder above is already FXC's`
+        : `${platform} has no D3D compiler -- r15 under FXC is timed only where the package ships DXC, on win32 (the rig)`;
+    return { compiler, sets, dropped: TIMED_SETS.filter((s) => !sets.includes(s)), fxcSkip };
+}
+// ONE native device a process, made here for both modes -- the gate's own ladder as shipped, and the FXC child's with FXC_FLAGS --
+// so the file keeps one create call, its flags chosen by mode on that line (tools/ship/headlessGpu-selfcheck.mjs's census reads
+// it for FINE_CLOCK_FLAG). The plan is read off the flags the device was made with, and `onPlan` sees it before any pipeline
+// is built: under FXC, building r18t or r18u stops or crashes the process (section 60). The FXC child times FXC_SETS.
+async function nativeLadder(W, { fxc = false, totalMs, onPlan = () => {} }) {
+    H.configureVulkanIcd();
+    let flags; const gpu = W.mod.create(flags = fxc ? FXC_FLAGS : [H.FINE_CLOCK_FLAG]);
+    const adapter = await gpu.requestAdapter(), pkg = H.webgpuPackage(W.from);
+    const plan = { ...nativePlan({ adapter, pkg, platform: process.platform, flags }), flags, pkg };
+    if (fxc) plan.sets = [...FXC_SETS];
+    onPlan(adapter, plan);
+    return { plan, r: await timingLadder(net, () => gpu.requestAdapter(), { sets: plan.sets, ...LADDER, totalMs }) };
+}
+// the FXC ladder, from the gate: this file again in a child (spawnSync, stopped at FXC_CHILD_MS), its ladder back through a file --
+// on Windows a pipe can lose the last line a process writes (section 45; render/denoiseCompile-selfcheck.mjs's children)
+function fxcLadder() {
+    const resFile = path.join(os.tmpdir(), `swek-denoise-fxc-ladder-${process.pid}.json`), t = Date.now();
+    try { fs.unlinkSync(resFile); } catch {}
+    const c = spawnSync(process.execPath, [SELF, "--fxc-ladder", "--result", resFile], { cwd: ENG, encoding: "utf8", timeout: FXC_CHILD_MS, maxBuffer: 1 << 29 });
+    let got = null; try { got = JSON.parse(fs.readFileSync(resFile, "utf8")); fs.unlinkSync(resFile); } catch {}
+    const at = (c.stdout || "").lastIndexOf("@@RESULT ");
+    if (!got && at >= 0) try { got = JSON.parse((c.stdout.slice(at + 9).split("\n")[0] || "").trim()); } catch {}
+    return { ...(got || { error: c.error ? `the process was stopped: ${c.error.code || c.error.message}` : `no result (exit ${c.status}): ${(c.stderr || "").split("\n").slice(-3).join(" ").slice(0, 200)}` }),
+             spawnMs: Date.now() - t };
+}
+
+// ---- ROUND 19 (section 66): THE FXC LADDER'S CHILD -- r12 and r15 with use_dxc disabled, one process, one compiler ----------
+// The ladder goes to the --result file, written synchronously before anything is printed; stdout's line is the fallback.
+if (FXC_CHILD) {
+    let result;
+    try {
+        const W = H.resolveWebgpu(); if (W.refused) throw new Error(W.refused);
+        const t = Date.now(), { plan, r } = await nativeLadder(W, { fxc: true, totalMs: FXC_MS });
+        result = { ladder: r, compiler: plan.compiler, flags: plan.flags, version: plan.pkg && plan.pkg.version || null, ms: Date.now() - t };
+    } catch (e) { result = { error: String(e && e.message || e).slice(0, 300) }; }
+    if (RESULT) fs.writeFileSync(RESULT, JSON.stringify(result));
+    console.log("@@RESULT " + JSON.stringify(result));
+    H.exitCleanly ? H.exitCleanly(0) : process.exit(0);
+}
 
 console.log("1. THE LADDER'S ARITHMETIC");
 {
@@ -202,10 +306,67 @@ console.log("1. THE LADDER'S ARITHMETIC");
         passBytes(net, 1080, 1920, "r12") === passBytes(net, 1080, 1920, "r14"),
         `at 1080p: r14 ${(passBytes(net, 1080, 1920, "r14") / 2 ** 20).toFixed(0)} MiB, r15 ${(passBytes(net, 1080, 1920, "r15") / 2 ** 20).toFixed(0)} MiB`);
     const d3d = { info: { vendor: "nvidia", architecture: "pascal", description: "D3D12 driver version 32.0.15.8180" } }, vk = { info: { vendor: "google", architecture: "swiftshader", description: "Vulkan" } };
-    ok("  round 18: both ladders time r12, r15, r18t and r18u -- r12 first, the reference every speedup is read against -- and natively on a D3D12 adapter, r12 and r15 alone",
-        TIMED_SETS.join() === "r12,r15,r18t,r18u" && TIMED_SETS.every((s) => KERNEL_SETS.includes(s)) && BROWSER_ONLY_SETS.join() === "r18t,r18u" &&
-        nativeSetsFor(d3d, TIMED_SETS).join() === "r12,r15" && nativeSetsFor(vk, TIMED_SETS).join() === TIMED_SETS.join() && nativeSetsFor({ info: {} }, TIMED_SETS).join() === TIMED_SETS.join(),
-        "section 60: node-webgpu's FXC stopped on r18t's kernel and crashed on r18u's");
+    // round 19 (section 66): by the run's compiler -- FXC, none named, or one a dump could not read keep round 18's two sets out on
+    // D3D12; DXC (as nativeCompiler names it, or as a dump reads it) builds all four; Vulkan builds all four whatever is named
+    const all = TIMED_SETS.join(), by = (ad, compiler) => nativeSetsFor(ad, TIMED_SETS, { compiler }).join();
+    ok("  round 19: both ladders time r12, r15, r18t and r18u -- r12 first, the reference every speedup is read against -- and natively on a D3D12 adapter by the run's compiler: " +
+        "under FXC, none named or one unread, r12 and r15 alone; under DXC all four; on Vulkan all four",
+        all === "r12,r15,r18t,r18u" && TIMED_SETS.every((s) => KERNEL_SETS.includes(s)) && FXC_UNBUILT_SETS.join() === "r18t,r18u" &&
+        by(d3d, "FXC") === "r12,r15" && by(d3d, null) === "r12,r15" && by(d3d, "unknown (no dump)") === "r12,r15" && nativeSetsFor(d3d, TIMED_SETS).join() === "r12,r15" &&
+        by(d3d, "DXC") === all && by(d3d, "DXC (DXIL)") === all && by(vk, null) === all && by(vk, "FXC") === all && by({ info: {} }, null) === all,
+        `D3D12: FXC ${by(d3d, "FXC")}, none ${by(d3d, null)}, DXC ${by(d3d, "DXC")}; Vulkan: ${by(vk, null)} -- section 60: node-webgpu 0.6.0's FXC stopped on r18t's kernel and crashed on r18u's; section 65: 0.6.2's DXC built both`);
+    // round 19 (section 66): the plan a native run makes from its package and its device's flags, on stub D3D12 adapters and
+    // packages -- the rig's branches, which this box's SwiftShader never takes
+    const shipped = [H.FINE_CLOCK_FLAG], plan = (adapter, pkg, platform, flags) => nativePlan({ adapter, pkg, platform, flags });
+    const p062 = plan(d3d, { version: "0.6.2", dxcBeside: true }, "win32", shipped), p060 = plan(d3d, { version: "0.6.0", dxcBeside: false }, "win32", shipped),
+          p061 = plan(d3d, { version: "0.6.1", dxcBeside: true }, "win32", shipped), pUnread = plan(d3d, null, "win32", shipped),
+          pChild = plan(d3d, { version: "0.6.2", dxcBeside: true }, "win32", FXC_FLAGS), pLinux = plan(vk, { version: "0.6.2", dxcBeside: true }, "linux", shipped);
+    const says = (p) => `${p.compiler || "none"}: ${p.sets.join(",")}; FXC ladder ${p.fxcSkip ? "skipped" : "runs"}`;
+    ok("!! round 19: a native run's plan is read off its package WITH ITS DEVICE'S FLAGS -- 0.6.2 shipping DXC on D3D12: DXC, all four sets, and the FXC ladder; 0.6.0, 0.6.1 with the DLL " +
+        "copied beside, or a package unread: FXC, r12 and r15, no FXC ladder; the FXC child's own flags on 0.6.2: FXC; Linux: no D3D compiler, all four, no FXC ladder",
+        p062.compiler === "DXC" && p062.sets.join() === all && p062.dropped.length === 0 && p062.fxcSkip === null &&
+        [p060, p061, pUnread].every((p) => p.compiler === "FXC" && p.sets.join() === "r12,r15" && p.dropped.join() === "r18t,r18u" && /as shipped is FXC/.test(p.fxcSkip || "")) &&
+        /before 0\.6\.2 forces use_dxc off/.test(p061.fxcSkip) && /no dxcompiler\.dll/.test(p060.fxcSkip) &&
+        pChild.compiler === "FXC" && pChild.sets.join() === "r12,r15" && pLinux.compiler === null && pLinux.sets.join() === all && /linux has no D3D compiler/.test(pLinux.fxcSkip || ""),
+        [p062, p060, p061, pUnread, pChild, pLinux].map(says).join("  /  "));
+    // round 19 (section 66): the FXC child's device flags, as nativeLadder hands them to Dawn
+    const dis = FXC_FLAGS.filter((f) => f.startsWith("disable-dawn-features=")), feats = dis.length ? dis[0].slice(dis[0].indexOf("=") + 1).split(",") : [];
+    ok("!! round 19: the FXC child's device flags are ONE disable entry carrying use_dxc AND the fine clock, and no dump_shaders -- two entries would let Dawn keep the last (section 49), " +
+        "compiling with DXC or rounding the clock; a dump would fill a timed child's stdout -- and the child times r12 and r15",
+        FXC_FLAGS.length === 1 && dis.length === 1 && feats.includes("use_dxc") && feats.includes("timestamp_quantization") &&
+        !FXC_FLAGS.some((f) => /dump_shaders/.test(f)) && FXC_SETS.join() === "r12,r15",
+        JSON.stringify(FXC_FLAGS));
+    // ...and the wiring that hands them to Dawn, read off this file: the FXC child never runs off win32, so no other row here sees
+    // its device made with the gate's flags, its ladder run as the gate's, or the gate spawning it without the mode
+    const SRC = fs.readFileSync(SELF, "utf8"), creates = [...SRC.matchAll(/\bmod\.create\(([^\n]*)/g)].map((m) => m[1]);
+    const at0 = SRC.indexOf("\nif (FXC_CHILD) {"), child = at0 < 0 ? "" : SRC.slice(at0, SRC.indexOf("\n}\n", at0));
+    ok("!! round 19: the file's ONE create call makes the FXC child's device with FXC_FLAGS and the gate's with the fine clock alone; the child -- spawned by the gate with --fxc-ladder " +
+        "and its result file -- runs its ladder in that mode and writes the file",
+        creates.length === 1 && /^flags = fxc \? FXC_FLAGS : \[H\.FINE_CLOCK_FLAG\]\);$/.test(creates[0]) &&
+        /nativeLadder\(W, \{ fxc: true, totalMs: FXC_MS \}\)/.test(child) && /fs\.writeFileSync\(RESULT, /.test(child) &&
+        /spawnSync\(process\.execPath, \[SELF, "--fxc-ladder", "--result", resFile\]/.test(SRC) && /\nconst FXC_CHILD = process\.argv\.includes\("--fxc-ladder"\), RESULT = /.test(SRC),
+        `${creates.length} create call(s): create(${(creates[0] || "NONE").slice(0, 60)}; the child block ${child ? child.split("\n").length + " lines" : "NOT FOUND"}`);
+    // round 19: an "rXX against r15" line is the page's rule's (section 61) or the native ladder's (section 66), by its label
+    const row = (W, H_, ms, skipped = false) => (skipped ? { W, H: H_, skipped: true, reason: "over the 1500 ms cap" } : { W, H: H_, skipped: false, gpu: { median: ms }, wall: { median: ms * 1.25 } });
+    const ln = { native: vsR15Line("native", "r18t", row(256, 256, 8), row(256, 256, 12)), page: vsR15Line("page", "r18u", row(256, 256, 8), row(256, 256, 12)),
+                 fxc: vsR15Line("native FXC", "r18t", row(64, 64, 1), row(64, 64, 2)), wall: vsR15Line("native", "r18u", { ...row(64, 64, 2), gpu: null }, row(64, 64, 3)) };
+    ok("!! round 19: each \"rXX against r15\" line is r15's median over the set's -- a native ladder's tagged section 66, the page's section 61",
+        ln.native === "native: r18t against r15 at 256 x 256: 1.500 x as fast, on the device's clock -- section 66" && ln.page.endsWith("1.500 x as fast, on the device's clock -- section 61") &&
+        ln.fxc.endsWith("-- section 66") && ln.wall === "native: r18u against r15 at 64 x 64: 1.500 x as fast, on the wall clock -- section 66",
+        `${ln.native}  /  ${ln.page}`);
+    // round 19 (section 66, test 4): the unpaired line, at the largest size BOTH ladders measured -- here 256 x 256: the DXC ladder
+    // measured r18t to 512, the FXC ladder r15 only to 256
+    const dxcL = { rows: { r18t: [row(64, 64, 1), row(128, 128, 2), row(256, 256, 8), row(512, 512, 30), row(1024, 1024, 0, true)] } };
+    const fxcL = { rows: { r15: [row(64, 64, 2), row(128, 128, 5), row(256, 256, 16), row(512, 512, 0, true), row(1024, 1024, 0, true)] } };
+    const u = vsFxc(dxcL, fxcL, "r18t"), uw = vsFxc(dxcL, { rows: { r15: [{ ...row(64, 64, 3), gpu: null }] } }, "r18t");
+    ok("!! round 19: r15 under FXC against a set under DXC is read at the largest size BOTH ladders measured, r15's FXC median over the set's DXC one, the line marked unpaired -- " +
+        "and no line where no size is common",
+        !!u && u.W === 256 && u.H === 256 && u.ratio === 2 && u.clock === "device" &&
+        u.text === "native: r18t against r15 under FXC at 256 x 256: 2.000 x as fast, on the device's clock -- unpaired: two processes, one after the other -- section 66" &&
+        !!uw && uw.W === 64 && uw.clock === "wall" && uw.ratio === 3 && /on the wall clock -- unpaired/.test(uw.text) &&
+        vsFxc(dxcL, { rows: { r15: [row(64, 64, 0, true)] } }, "r18t") === null && vsFxc(dxcL, null, "r18t") === null && vsFxc(dxcL, fxcL, "r18u") === null &&
+        vsFxc({ rows: { r18t: [row(64, 64, 0, true)] } }, fxcL, "r18t") === null,
+        u ? u.text : "no line");
     ok("  a time is on Dawn's rounded grid when it is a whole number of 65,536 ns -- section 60's finding, read off round 17's native times",
         onGrid(0.131072) && onGrid(8.912896) && !onGrid(0.101376) && !onGrid(9.059328) && H.FINE_CLOCK_FLAG === "disable-dawn-features=timestamp_quantization");
     const a = timingInput(8, 16), b = timingInput(8, 16);
@@ -217,39 +378,64 @@ console.log("1. THE LADDER'S ARITHMETIC");
         adapterOf({ info: {}, features: new Set(["timestamp-query"]) }).timestamps === true && adapterOf({ info: {}, features: new Set() }).timestamps === false);
 }
 
-const skip = H.headlessGpuSkipReason ? H.headlessGpuSkipReason() : null;
+// section 64 (round 19 here): a SWEK_WEBGPU this box cannot load is a red, not a skip -- as a skip the gate passed with no native
+// row, and realGpuRun's report kept no trace of it (render/denoiseCompile-selfcheck.mjs's rule, for the same reason)
+const W0 = H.resolveWebgpu();
+const skip = W0.refused ? null : H.headlessGpuSkipReason();
 let NATIVE_SETS = TIMED_SETS;
 console.log("\n2. NATIVE: node-webgpu's default adapter (on the rig, the GPU)");
-if (skip) console.log("  SKIP  " + skip);
+if (W0.refused) ok(`!! ${H.WEBGPU_ENV} names a node-webgpu package this box can load -- a refused one is a red here, never a skip`, false, W0.refused);
+else if (skip) console.log("  SKIP  " + skip);
 else {
-    let r = null, err = null;
+    let r = null, err = null, plan = null, noted = null, key = null, vendor = null;
     try {
-        H.configureVulkanIcd();
-        // section 61: the device's clock unrounded -- Dawn otherwise rounds every timestamp down to a whole 65,536 ns
-        const { mod } = H.resolveWebgpu(), gpu = mod.create([H.FINE_CLOCK_FLAG]);
+        // section 61: the device's clock unrounded -- Dawn otherwise rounds every timestamp down to a whole 65,536 ns.
         // round 14 (section 43): natively r12 against r14 -- r13's native failure is section 42's finding, and each native
-        // fast pipeline costs minutes to build under the D3D12 compiler node-webgpu ships -- with a 600 s ladder budget;
+        // fast pipeline cost minutes to build under the D3D12 compiler node-webgpu 0.6.0 ships -- with a 600 s ladder budget;
         // round 15 (section 46) adds r15, whose hidden layers are r14's; since section 57, r12 and r15; since section 61,
-        // TIMED_SETS less what nativeSetsFor leaves out on this adapter
-        NATIVE_SETS = nativeSetsFor(await gpu.requestAdapter(), TIMED_SETS);
-        for (const s of TIMED_SETS.filter((x) => !NATIVE_SETS.includes(x)))
-            console.log(`  SKIP  native ${s}: a browser-only set on a D3D12 adapter -- node-webgpu's FXC does not build its kernel (section 60); the page times it`);
-        r = await timingLadder(net, () => gpu.requestAdapter(), { sets: NATIVE_SETS, capMs: CAP, warmup: 1, minReps: 3, budgetMs: 1500, totalMs: 600000 });
-        // the rig's report names every adapter a gate ran on; this one is not reached through the browser harness, so it says itself
-        if (process.env.SWEK_ADAPTER_LOG) {
-            const [vendor, architecture, description] = r.adapter.name.split(" / ");
-            fs.appendFileSync(process.env.SWEK_ADAPTER_LOG, JSON.stringify({ gate: path.relative(ENG, path.resolve(process.argv[1] || "")).replace(/\\/g, "/"),
-                adapter: { vendor: vendor || null, architecture: architecture || null, description: description || null }, software: r.adapter.software, launchArgs: ["node-webgpu (native)"] }) + "\n");
-        }
+        // TIMED_SETS less what nativeSetsFor leaves out on this adapter; since section 66, by the compiler read off the package
+        ({ r, plan } = await nativeLadder(W0, { totalMs: NATIVE_MS, onPlan: (adapter, p) => {
+            plan = p; NATIVE_SETS = p.sets;
+            // the rig's report names every adapter a gate ran on; this one is not reached through the browser harness, so it
+            // says itself -- a "----" line realGpuRun keeps, and the SWEK_ADAPTER_LOG record it reads adapters from
+            noted = H.noteNativeAdapter(adapter, { compiler: p.compiler });
+            key = nativeAdapterKey(adapter.info, process.platform); vendor = (adapter.info && adapter.info.vendor) || null;
+            // section 66's rule fills NATIVE_KERNELS_BY_ADAPTER by this key, read off this line in the rig's report
+            say(`native: this adapter's key for section 66's table: ${key === null ? "none -- the adapter names no vendor" : key}`);
+            say(`native: node-webgpu ${p.pkg && p.pkg.version ? p.pkg.version : "(version unread)"}${process.env[H.WEBGPU_ENV] ? " (" + H.WEBGPU_ENV + ")" : ""}; compiler, read off the package with this device's flags: ` +
+                `${p.compiler || "none -- " + process.platform + " has no D3D compiler"}; sets timed: ${p.sets.join(", ")}`);
+            for (const s of p.dropped)
+                console.log(`  SKIP  native ${s}: a D3D12 adapter whose compiler, read off the package, is ${p.compiler || "unread (counted as FXC)"} -- node-webgpu's FXC does not build its kernel (section 60); ` +
+                    "the page times it, and a package that ships DXC times it here (section 66)");
+        } }));
     } catch (e) { err = String(e && e.message || e); }
     if (err) ok("!! the native ladder ran", false, err.slice(0, 200));
     else {
         pairedHolds("native", r, NATIVE_SETS); report("native", r);
-        // section 61: the flag reached the device -- with timestamps on a 1 ns grid, a whole number of 65,536 ns is a 1-in-65,536 chance a time
-        const ts = NATIVE_SETS.flatMap((s) => r.rows[s].filter((x) => !x.skipped && x.timestamps).flatMap((x) => [...x.raw.gpu, ...x.raw.perPass.flat()]));
-        if (!r.adapter.timestamps) console.log("  SKIP  the native clock's grain: this adapter offers no timestamp queries");
-        else ok("!! section 61: the native device's clock is not Dawn's rounded one -- not every time is a whole number of 65,536 ns, as every native time in round 17's probes was",
-            ts.length >= 10 && !ts.every(onGrid), `${ts.filter(onGrid).length} of ${ts.length} device times on the 65,536 ns grid`);
+        clockRow("native", r, NATIVE_SETS);
+        ok("  round 19: the adapter noted for the rig's report is the ladder's own -- its name and whether it is software -- and its key for section 66's table is this platform's, its vendor's and its architecture's",
+            !!noted && noted.name === r.adapter.name && noted.software === r.adapter.software &&
+            (vendor ? key !== null && key.startsWith(`${process.platform}/${vendor}/`) && /^[^/]+\/[^/]+\/[^/]*$/.test(key) : key === null),
+            `${noted ? noted.name + (noted.software ? " (software)" : "") : "not noted"}; key ${key}`);
+        // section 66, test 4: r15 under FXC -- only where the package ships DXC, so FXC is a second compiler of the same package
+        console.log("\n2b. NATIVE, r15 UNDER FXC: the same package with use_dxc disabled, in a child process (section 66)");
+        if (plan.fxcSkip) console.log(`  SKIP  native FXC ladder: ${plan.fxcSkip}`);
+        else {
+            const got = fxcLadder(), L = got.ladder || null;
+            ok("!! native FXC: the child timed r12 and r15 on this adapter with use_dxc disabled -- its compiler, read off the package with its own flags, FXC -- and reported its ladder",
+                !got.error && !!L && got.compiler === "FXC" && JSON.stringify(got.flags) === JSON.stringify(FXC_FLAGS) && L.sets.join() === FXC_SETS.join() && L.adapter.name === r.adapter.name,
+                got.error ? got.error : `${got.compiler}; ${JSON.stringify(got.flags)}; ${L ? L.adapter.name : "no ladder"}; ${(got.spawnMs / 1000).toFixed(0)} s`);
+            if (L) {
+                say(`native FXC: node-webgpu ${got.version || "(version unread)"} with ${got.flags.join(" ")}, in its own process after the native ladder -- compiler, read off the package with these flags: ${got.compiler}; ` +
+                    `sets timed: ${L.sets.join(", ")}; ${(got.ms / 1000).toFixed(0)} s`);
+                pairedHolds("native FXC", L, FXC_SETS); report("native FXC", L);
+                clockRow("native FXC", L, FXC_SETS);
+                for (const B of r.sets.filter((s) => /^r18/.test(s))) {
+                    const v = vsFxc(r, L, B);
+                    if (v) say(v.text); else console.log(`  SKIP  native: ${B} against r15 under FXC -- no size both ladders measured`);
+                }
+            }
+        }
     }
 }
 

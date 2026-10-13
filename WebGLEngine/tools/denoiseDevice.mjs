@@ -14,7 +14,9 @@
 //           its last pass stores no logit, so it is judged through the image (judgeHeadApply), its hidden layers cell for cell
 //       node tools/denoiseDevice.mjs --measure-r18t [--cache <dir>]   (and --measure-r18u)
 //           section 61's K0 (a): the same on round 18's page sets (the pixel-tiled kernel with inline weights, or the fast
-//           kernel with a block written out, then k_head_apply) -> render/denoise-results-r18t.json, -r18u.json; judged as r15 is
+//           kernel with a block written out, then k_head_apply) -> render/denoise-results-r18t.json, -r18u.json; judged as r15 is.
+//           v4849 (round 19, section 66): refused, exit 2, on a D3D12 adapter whose run compiles with FXC, which builds neither
+//           set (section 60) -- SWEK_WEBGPU naming a node-webgpu 0.6.2 package runs them under its DXC
 //       (round 16's --measure-r16a and --measure-r16b wrote render/denoise-results-r16a.json and -r16b.json at 4b8e9d92,
 //       section 55; section 57 withdrew both sets, and their flags with them)
 //
@@ -35,7 +37,7 @@ import { SPLITS_R11 } from "../render/denoiseScenes.mjs";
 import { denoise } from "../render/denoiseNet.mjs";
 import { relMSE } from "../render/denoiseStats.mjs";
 import { conv2dCpu, conv2dCpuFma } from "../brain/conv2d.mjs";
-import { APPLY_TOL, kernelApplyCpu, judgeHeadApply, deviceLayers, createDeviceDenoiser, encodeNet, decodeNet } from "../render/denoiseDevice.mjs";
+import { APPLY_TOL, kernelApplyCpu, judgeHeadApply, deviceLayers, createDeviceDenoiser, encodeNet, decodeNet, nativeSetsFor } from "../render/denoiseDevice.mjs";
 import * as GPU from "./ship/headlessGpu.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -70,14 +72,28 @@ if (args.includes("--export-r11")) {
 } else if (measure) {
     const { kernels, results: RESULTS } = MEASURES[measure];
     refuseIfExists(RESULTS);
+    // v4849 -- round 19 (section 66): the device's package, and the compiler the run compiles with, read off it with the flags the
+    // device is made with (FLAGS: none, Dawn as shipped) -- before anything is read, cached or built. --measure-r18t and
+    // --measure-r18u built on a Dawn made as shipped and never asked: on a D3D12 adapter under FXC, r18t's kernel stops the build and
+    // r18u's crashes it (section 60), an image in. A set nativeSetsFor drops for this adapter and compiler is refused here, by
+    // name; 0.6.2's DXC built both (section 65). render/denoiseDevice-selfcheck.mjs reads this source: no gate runs this file.
+    GPU.configureVulkanIcd();
+    const W = GPU.resolveWebgpu(), FLAGS = [];
+    if (!W.mod) { console.log(`[denoiseDevice] ${measure} needs a device: ${W.refused || "node-webgpu did not resolve"}`); process.exit(2); }
+    const pkg = GPU.webgpuPackage(W.from), compiler = GPU.nativeCompiler({ pkg, platform: process.platform, flags: FLAGS });
+    const gpu = W.mod.create([...FLAGS]), first = await gpu.requestAdapter();
+    if (!nativeSetsFor(first, [kernels], { compiler }).length) {
+        console.log(`[denoiseDevice] ${measure} refused: ${kernels} is one of FXC_UNBUILT_SETS and this run compiles with ${compiler || "FXC"} on a D3D12 adapter ` +
+                    `(${(first && first.info && first.info.description) || "?"}; node-webgpu ${(pkg && pkg.version) || "(version unread)"} from ${W.from}), which does not build its kernel (section 60) -- ` +
+                    `set ${GPU.WEBGPU_ENV} to the directory of a node-webgpu 0.6.2 package, which ships its DXC beside dawn.node`);
+        GPU.exitCleanly(2);
+    }
     const shipped = JSON.parse(fs.readFileSync(path.join(ENG, NET_FILE), "utf8")), net = decodeNet(shipped.net);
     const R11 = JSON.parse(fs.readFileSync(path.join(ENG, RESULTS_R11), "utf8")), { image, sppIn, sppRef } = R11.config;
     const git = (...a) => execFileSync("git", a, { cwd: ENG, encoding: "utf8", maxBuffer: 1 << 28 });
     const dir = arg("--cache");
     const cache = dir ? openCache(path.resolve(dir), { results: RESULTS, commit: git("rev-parse", "HEAD").trim(),
                                                       diff: hashArrays([git("diff", "HEAD", "--", "render", "brain", "physics", "tools")]) }) : null;
-    GPU.configureVulkanIcd();
-    const { mod } = GPU.resolveWebgpu(), gpu = mod.create([]);
     const t0 = Date.now(), rows = [];
     // a set whose last pass is k_head_apply (r15, r18t, r18u) stores no logit: its head is judged through the image
     const fusedSet = deviceLayers(net, kernels).at(-1).kernel === "head_apply";

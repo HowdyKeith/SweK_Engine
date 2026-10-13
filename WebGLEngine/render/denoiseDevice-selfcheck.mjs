@@ -6,8 +6,9 @@
 // (pre-registration section 35). Its exports, each named here: APPLY_TOL, kernelApplyWgsl, packApplyUniforms,
 // kernelApplyCpu, kernelFor, deviceLayers, denoiseTwin, createDeviceDenoiser, encodeNet, decodeNet, KERNEL_SETS,
 // DEFAULT_KERNELS, round 14's PAGE_KERNELS, applyFor and kernelApplyFastWgsl, round 15's kernelHeadApplyWgsl and
-// judgeHeadApply, and round 18's R18_KERNELS, BROWSER_ONLY_SETS, isD3D12Native, nativeSetsFor, PAGE_KERNELS_BY_ADAPTER,
-// pageAdapterKey and pageKernelsFor -- and, held by
+// judgeHeadApply, round 18's R18_KERNELS, FXC_UNBUILT_SETS (round 18's BROWSER_ONLY_SETS, renamed by round 19), isD3D12Native,
+// nativeSetsFor, PAGE_KERNELS_BY_ADAPTER, pageAdapterKey and pageKernelsFor, and round 19's isDxcCompiler,
+// NATIVE_KERNELS_BY_ADAPTER, nativeAdapterKey and nativeKernelsFor -- and, held by
 // render/denoiseTiming-selfcheck.mjs rather than here (section 37), TIMING_SIZES, largestBuffer, timingInput, summarize,
 // adapterOf, timingDevice and timingLadder. What it holds: the
 // apply twin is render/denoiseNet.mjs's f64 kernel within f32 rounding, mask and borders included; the head runs on the
@@ -33,8 +34,19 @@
 // written out -- each with r15's fused last pass. Their hidden layers are judged cell for cell, their last pass through the
 // image, and where no cell fused each set's every hidden layer and its image are r15's, bit for bit: natively where the
 // adapter is not D3D12 (on one, node-webgpu's FXC stopped on r18t's kernel and crashed on r18u's -- section 60 -- so their
-// rows print SKIP there), and in the browser always. The page runs pageKernelsFor(its adapter's key), r15 on any adapter
-// section 61's table does not name.
+// rows print SKIP there; since round 19, under FXC only), and in the browser always. The page runs pageKernelsFor(its
+// adapter's key), r15 on any adapter section 61's table does not name.
+// Round 19 (section 66): node-webgpu 0.6.2 compiles with DXC, which built both round-18 sets' kernels in seconds, exact, on
+// both of the rig's GPUs (section 65) -- so their native rows run on a D3D12 adapter too when the run's compiler is DXC, and
+// print SKIP there only under FXC, naming the compiler read. That compiler is read off the package (tools/ship/headlessGpu.mjs's
+// nativeCompiler, handed the flags this gate's device is made with: none, Dawn as shipped) -- the adapter cannot say, and the
+// compile gate holds the reading to Dawn's own dump in the same run. A SWEK_WEBGPU this box cannot load is a red here, never a
+// skip: as a skip, a DXC run with a mistyped path passed green with no native row. The native adapter, with that compiler, is
+// named where tools/ship/realGpuRun.mjs reads adapters, and one measured ("----") line says which round-18 sets' native rows ran
+// and whether every one was green -- section 66's condition (1), readable off the rig's report, which keeps only measured and
+// failing lines. NATIVE_KERNELS_BY_ADAPTER, a DXC run's native set by adapter, is empty until section 66's rule is read off the
+// rig, and DEFAULT_KERNELS stays r15. tools/denoiseDevice.mjs's --measure-r18t and --measure-r18u refuse, by name, a run whose
+// compiler FXC_UNBUILT_SETS drops; no gate runs that CLI, so a row here reads its source.
 //
 // *** NOTHING HERE RENDERS A DATASET SEED. *** The images are synthetic; the networks are drawn from seeds here.
 // *** ONE DEVICE PER JOB. *** Measured while building this: a Dawn device reused after the JS thread had been busy for
@@ -137,6 +149,7 @@
 //       in the table, so the page row checks the miss path; on either rig GPU the same row checks the table's set
 //   V7  the table names a third adapter (this box's)                            1 RED (the verdict row)
 "use strict";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -144,7 +157,8 @@ const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
 const { APPLY_TOL, kernelApplyWgsl, packApplyUniforms, kernelApplyCpu, kernelFor, deviceLayers, denoiseTwin, createDeviceDenoiser, encodeNet, decodeNet,
         KERNEL_SETS, DEFAULT_KERNELS, PAGE_KERNELS, applyFor, kernelApplyFastWgsl, kernelHeadApplyWgsl, judgeHeadApply,
-        R18_KERNELS, BROWSER_ONLY_SETS, isD3D12Native, nativeSetsFor, PAGE_KERNELS_BY_ADAPTER, pageAdapterKey, pageKernelsFor, passBytes, TIMED_SETS } = await imp("render/denoiseDevice.mjs");
+        R18_KERNELS, FXC_UNBUILT_SETS, isD3D12Native, nativeSetsFor, PAGE_KERNELS_BY_ADAPTER, pageAdapterKey, pageKernelsFor, passBytes, TIMED_SETS,
+        isDxcCompiler, NATIVE_KERNELS_BY_ADAPTER, nativeAdapterKey, nativeKernelsFor } = await imp("render/denoiseDevice.mjs");
 const CMP = await imp("render/denoiseCompile.mjs");
 const { makeDenoiser, denoise, KERNEL_TAPS, shapeFor, paramCount } = await imp("render/denoiseNet.mjs");
 const { conv2dCpu, conv2dCpuFma, COUT_MAX, tileShape, fastAltShape, conv2dTileWgsl, conv2dFastAltWgsl } = await imp("brain/conv2d.mjs");
@@ -158,7 +172,8 @@ const REPORT = gateReport("render/denoiseDevice-selfcheck.mjs"), K0ROWS = [];
 const k0row = (where, set, J, worst) => K0ROWS.push([where, set, J.reduce((a, j) => a + j.plain, 0), J.reduce((a, j) => a + j.fused, 0), J.reduce((a, j) => a + j.unexplained, 0), worst]);
 
 let fails = 0;
-const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
+// v4849 -- it returns the row's result, so round 19's measured line can say which round-18 sets' native rows were green
+const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; return !!c; };
 const t0 = Date.now();
 const worstRel = (a, b, eps = 1e-30) => { let w = 0; for (let i = 0; i < a.length; i++) w = Math.max(w, Math.abs(a[i] - b[i]) / (Math.abs(b[i]) + eps)); return w; };
 
@@ -229,11 +244,55 @@ console.log("1. THE KERNEL'S TWIN, ON THE CPU");
             tileShape(Lt[1], T).groups === 1 && fastAltShape(Lu[0], U).blocks === 2 && fastAltShape(Lu[1], U).blocks === 4 &&
             /fn k_conv_tile/.test(ct) && !/let w\d+ = F\.w/.test(ct) && /fn k_conv_fast_alt/.test(cu) && kernelFor({ Cin: 64, Cout: 32, k: 3 }, "r18t") === "tiled" && kernelFor({ Cin: 64, Cout: 32, k: 3 }, "r18u") === "tiled",
             `${Lt.map((l) => l.kernel).join()} / ${Lu.map((l) => l.kernel).join()}; a layer too big for one uniform binding falls back as in r15`);
+        // v4849 -- round 19 (section 66): which sets a native gate builds, by the run's compiler as well as its adapter. Round 18's
+        // row here ("r18t and r18u are browser-only on D3D12") held the adapter alone. On 0.6.2 the rig's descriptions are "D3D12
+        // driver version ..." under either compiler, so the compiler comes from the package (headlessGpu's nativeCompiler: "DXC" or
+        // "FXC") or a dump (denoiseCompile's dumpStats: "DXC (DXIL)", "FXC (DXBC)", "unknown (no dump)"). This box has no D3D12, so
+        // the DXC and FXC branches are held HERE, on stub adapters with the rig's own descriptions -- the 1080's and the Intel's.
         const d3d = { info: { vendor: "intel", architecture: "gen-9", description: "D3D12 driver version 31.0.101.2137" } }, vk = { info: { vendor: "google", architecture: "swiftshader", description: "Vulkan" } };
-        ok("!! round 18: r18t and r18u are browser-only on D3D12 -- a native adapter whose description names D3D12 builds neither, any other builds both, and a browser's adapter is never asked",
-            BROWSER_ONLY_SETS.join() === "r18t,r18u" && isD3D12Native(d3d) && !isD3D12Native(vk) && !isD3D12Native({ info: { vendor: "intel", architecture: "gen-9" } }) && !isD3D12Native(null) &&
-            nativeSetsFor(d3d, KERNEL_SETS).join() === "r12,r13,r14,r15" && nativeSetsFor(vk, KERNEL_SETS).join() === KERNEL_SETS.join(),
-            "section 60: node-webgpu's FXC stopped on r18t's kernel at 3 minutes and crashed on r18u's, on both GPUs");
+        const d3n = { info: { vendor: "nvidia", architecture: "pascal", description: "D3D12 driver version 32.0.15.8180" } }, FOUR = "r12,r13,r14,r15", SIX = KERNEL_SETS.join();
+        // undefined is the two-argument call (no options at all); null and "" a compiler not read
+        const FXC_SAID = [undefined, null, "", "FXC", "FXC (DXBC)", "unknown (no dump)"], DXC_SAID = ["DXC", "DXC (DXIL)"];
+        const setsBy = (a, c) => (c === undefined ? nativeSetsFor(a, KERNEL_SETS) : nativeSetsFor(a, KERNEL_SETS, { compiler: c })).join();
+        const said = (c) => (c === undefined ? "(no options)" : JSON.stringify(c));
+        ok("!! round 19 (section 66): FXC builds neither round-18 set -- on a D3D12 adapter, a run whose compiler is FXC (the package's \"FXC\", the dump's \"FXC (DXBC)\"), unknown, or not named at all builds r12-r15 natively and never FXC_UNBUILT_SETS",
+            FXC_UNBUILT_SETS.join() === "r18t,r18u" && Object.isFrozen(FXC_UNBUILT_SETS) && isD3D12Native(d3d) && isD3D12Native(d3n) && !isD3D12Native(vk) &&
+            !isD3D12Native({ info: { vendor: "intel", architecture: "gen-9" } }) && !isD3D12Native(null) && [d3d, d3n].every((a) => FXC_SAID.every((c) => setsBy(a, c) === FOUR)),
+            `on the 1080's description: ${FXC_SAID.map((c) => `${said(c)} ${setsBy(d3n, c)}`).join("; ")} -- section 60: 0.6.0's FXC stopped on r18t's kernel at 3 minutes and crashed on r18u's, on both GPUs`);
+        ok("!! round 19 (section 66): DXC builds both -- on a D3D12 adapter, a run whose compiler is DXC (the package's \"DXC\", the dump's \"DXC (DXIL)\") builds all six sets natively; an adapter that is not D3D12 builds all six whatever compiler is named, and a browser's adapter is never asked",
+            [d3d, d3n].every((a) => DXC_SAID.every((c) => setsBy(a, c) === SIX)) && [...FXC_SAID, ...DXC_SAID].every((c) => setsBy(vk, c) === SIX) && nativeSetsFor(vk, KERNEL_SETS) !== KERNEL_SETS,
+            `on the 1080's description: ${DXC_SAID.map((c) => `${said(c)} ${setsBy(d3n, c)}`).join("; ")}; Vulkan under "FXC": ${setsBy(vk, "FXC")} -- section 65: 0.6.2's DXC built both in seconds, exact, on both GPUs`);
+        const notDxc = ["FXC", "FXC (DXBC)", "unknown (no dump)", "", null, undefined, "dxc", "DXCompiler", "not DXC", "SPIR-V"];
+        ok("  round 19: isDxcCompiler is DXC as the package names it (\"DXC\") or a dump reads it (\"DXC (DXIL)\"), and nothing else -- not FXC, unknown, none, a lower-case name, a longer word, or DXC named second",
+            DXC_SAID.every((c) => isDxcCompiler(c) === true) && notDxc.every((c) => isDxcCompiler(c) === false),
+            `true for ${DXC_SAID.map(said).join(", ")}; false for ${notDxc.map(said).join(", ")}`);
+        // v4849 -- round 19 (section 66): the native set by adapter, for a DXC run only -- empty until the rule is read off both GPUs'
+        // round-19 runs (realGpuRun --only denoise, SWEK_WEBGPU naming node-webgpu 0.6.2), keyed as the timing gate prints it
+        const nk = { "win32/nvidia/pascal": "r18t" }, keyN = nativeAdapterKey(d3n.info, "win32");
+        ok("!! round 19 (section 66): NATIVE_KERNELS_BY_ADAPTER is frozen and EMPTY until section 66's rule is read off the rig -- and a native adapter's key is Node's platform, its vendor and its architecture, none without a platform or a vendor",
+            Object.isFrozen(NATIVE_KERNELS_BY_ADAPTER) && Object.keys(NATIVE_KERNELS_BY_ADAPTER).length === 0 && keyN === "win32/nvidia/pascal" &&
+            nativeAdapterKey(d3d.info, "win32") === "win32/intel/gen-9" && nativeAdapterKey(vk.info, "linux") === "linux/google/swiftshader" && nativeAdapterKey({ vendor: "intel" }, "win32") === "win32/intel/" &&
+            nativeAdapterKey(d3n.info, undefined) === null && nativeAdapterKey(d3n.info, "") === null && nativeAdapterKey({}, "win32") === null && nativeAdapterKey(null, "win32") === null,
+            `${JSON.stringify(NATIVE_KERNELS_BY_ADAPTER)}; the 1080's key ${keyN}`);
+        ok("!! round 19 (section 66): nativeKernelsFor gives a table's set for a key it names under DXC ONLY -- DEFAULT_KERNELS (r15, a set FXC builds) under FXC, unknown or no compiler, for a key the table does not name, for no key, and from the shipped table",
+            DXC_SAID.every((c) => nativeKernelsFor(keyN, c, nk) === "r18t") && FXC_SAID.every((c) => nativeKernelsFor(keyN, c, nk) === DEFAULT_KERNELS) &&
+            nativeKernelsFor("win32/intel/gen-9", "DXC", nk) === DEFAULT_KERNELS && nativeKernelsFor(null, "DXC", nk) === DEFAULT_KERNELS && nativeKernelsFor("constructor", "DXC", nk) === DEFAULT_KERNELS &&
+            nativeKernelsFor(keyN, "DXC") === DEFAULT_KERNELS && nativeKernelsFor("constructor", "DXC") === DEFAULT_KERNELS &&
+            DEFAULT_KERNELS === "r15" && nativeSetsFor(d3n, [DEFAULT_KERNELS], { compiler: "FXC" }).length === 1,
+            `a fixture table ${JSON.stringify(nk)}: ${[...DXC_SAID, "FXC", null].map((c) => `${said(c)} ${nativeKernelsFor(keyN, c, nk)}`).join(", ")}; the shipped table under "DXC": ${nativeKernelsFor(keyN, "DXC")}`);
+        // v4849 -- round 19: tools/denoiseDevice.mjs's --measure-r18t and --measure-r18u built natively through mod.create([]) and never
+        // asked the compiler: on a D3D12 adapter under FXC the build stops or crashes an image in (section 60). No gate runs that CLI
+        // (section 35's measurements are one command each), so this reads its source: the compiler read with the flags its device
+        // is made with, and a set nativeSetsFor drops refused -- exit 2, naming SWEK_WEBGPU -- before any image is built
+        {
+            const cli = fs.readFileSync(path.join(ENG, "tools", "denoiseDevice.mjs"), "utf8");
+            const iRead = cli.search(/GPU\.nativeCompiler\(\{ pkg, platform: process\.platform, flags: FLAGS \}\)/), iMake = cli.indexOf("W.mod.create([...FLAGS])");
+            const iAsk = cli.search(/if \(!nativeSetsFor\(\w+, \[kernels\], \{ compiler \}\)\.length\)/), iBuild = cli.indexOf("createDeviceDenoiser(dev,");
+            const refusal = iAsk > 0 ? cli.slice(iAsk, cli.indexOf("\n    }", iAsk)) : "";
+            ok("  round 19: tools/denoiseDevice.mjs reads its run's compiler with its own device's flags, and refuses a set nativeSetsFor drops -- exit 2, one line naming SWEK_WEBGPU's remedy -- before any image is built",
+                iRead > 0 && iMake > iRead && iAsk > iMake && iBuild > iAsk && (cli.match(/\bmod\.create\(/g) || []).length === 1 && /GPU\.exitCleanly\(2\)/.test(refusal) && /GPU\.WEBGPU_ENV/.test(refusal),
+                `compiler read at ${iRead}, the device made at ${iMake}, the refusal at ${iAsk}, the first build at ${iBuild}`);
+        }
         const tbl = { "Windows/intel/gen-9": "r18u" };
         ok("!! round 18: the page's key is platform, vendor and architecture -- none without a platform, as every browser but Chromium -- and pageKernelsFor gives the table's set for a key it names, PAGE_KERNELS for any other",
             pageAdapterKey({ vendor: "intel", architecture: "gen-9", description: "x" }, { platform: "Windows" }) === "Windows/intel/gen-9" &&
@@ -243,9 +302,10 @@ console.log("1. THE KERNEL'S TWIN, ON THE CPU");
             pageKernelsFor("constructor", tbl) === PAGE_KERNELS && pageKernelsFor("constructor") === PAGE_KERNELS && pageKernelsFor("Windows/amd/rdna-3") === PAGE_KERNELS,
             "the table's own prototype is not a key; an adapter the shipped table does not name runs PAGE_KERNELS");
         const verdict = [["Windows/intel/gen-9", "r18u"], ["Windows/nvidia/pascal", "r18t"]];
+        // v4849 -- round 19 renamed BROWSER_ONLY_SETS to FXC_UNBUILT_SETS; the table's two sets are still exactly those
         ok("!! round 18's verdict (section 63): the page's table is section 61's rule read off both GPUs' runs -- r18u for the Intel gen-9, r18t for the GTX 1080, in Chrome on Windows -- and nothing else; PAGE_KERNELS and DEFAULT_KERNELS stay r15",
             JSON.stringify(Object.entries(PAGE_KERNELS_BY_ADAPTER).sort()) === JSON.stringify(verdict) && Object.isFrozen(PAGE_KERNELS_BY_ADAPTER) &&
-            Object.values(PAGE_KERNELS_BY_ADAPTER).every((v) => KERNEL_SETS.includes(v) && BROWSER_ONLY_SETS.includes(v)) && PAGE_KERNELS === "r15" && DEFAULT_KERNELS === "r15" &&
+            Object.values(PAGE_KERNELS_BY_ADAPTER).every((v) => KERNEL_SETS.includes(v) && FXC_UNBUILT_SETS.includes(v)) && PAGE_KERNELS === "r15" && DEFAULT_KERNELS === "r15" &&
             pageKernelsFor("Windows/intel/gen-9") === "r18u" && pageKernelsFor("Windows/nvidia/pascal") === "r18t" && pageKernelsFor("Linux/google/swiftshader") === "r15",
             JSON.stringify(PAGE_KERNELS_BY_ADAPTER) + " -- section 63: r18u 1.524 x r15 at 1024 on the Intel, r18t 1.087 x at 1080p on the 1080");
     }
@@ -284,18 +344,36 @@ console.log("\n2. THE SHIPPED NETWORK'S ENCODING");
     ok("  the large network's shape is section 28's, with the mask's tenth channel", shape.map((s) => s.slice(0, 2).join(">")).join() === "10>32,32>32,32>32,32>32,32>81");
     // v4845 -- TIMED_SETS was one of the symbols definitionGates' census found no row of this gate naming. render/denoiseTiming-selfcheck.mjs
     // holds its order; this holds what it is FOR: every set a pass or the page can run is on the ladders, so no default ships untimed.
-    const runnable = [DEFAULT_KERNELS, PAGE_KERNELS, ...Object.values(PAGE_KERNELS_BY_ADAPTER)];
-    ok("!! every set a pass or the page can choose -- the default, the page's, and each adapter's measured pick -- is one the ladders time, with r12 first as the reference",
+    // v4849 -- round 19: and each native adapter's pick (NATIVE_KERNELS_BY_ADAPTER), once section 66's rule fills it
+    const runnable = [DEFAULT_KERNELS, PAGE_KERNELS, ...Object.values(PAGE_KERNELS_BY_ADAPTER), ...Object.values(NATIVE_KERNELS_BY_ADAPTER)];
+    ok("!! every set a pass or the page can choose -- the default, the page's, and each adapter's measured pick, on the page or natively -- is one the ladders time, with r12 first as the reference",
         runnable.every((s) => TIMED_SETS.includes(s)) && TIMED_SETS[0] === "r12" && TIMED_SETS.every((s) => KERNEL_SETS.includes(s)) && Object.isFrozen(TIMED_SETS),
         `timed ${TIMED_SETS.join(", ")}; runnable ${[...new Set(runnable)].join(", ")}`);
 }
 
 console.log("\n3. *** THE WHOLE PASS ON THE DEVICE (Dawn) ***");
-const skip = H.headlessGpuSkipReason ? H.headlessGpuSkipReason() : null;
-if (skip) console.log("  SKIP  " + skip);
+// v4849 -- round 19 (section 66): the package this gate's device comes from, and the compiler the run compiles with -- read off
+// the package with the flags the device is made with (FLAGS: none, Dawn as shipped; one list for both, so they cannot part),
+// because the adapter cannot say which (on 0.6.2 its description is "D3D12 driver version ..." under either). The compile gate
+// holds this reading to Dawn's dump in the same run. A SWEK_WEBGPU this box cannot load is a red here, never a skip, as in the
+// compile gate (section 64): printed as a skip by headlessGpuSkipReason, a DXC run with a mistyped path passed green with no
+// native row -- and section 66 reads its condition (1) off these rows.
+const W = H.resolveWebgpu(), FLAGS = Object.freeze([]), PKG = H.webgpuPackage(W.from);
+const COMPILER = H.nativeCompiler({ pkg: PKG, platform: process.platform, flags: FLAGS });
+const compilerSaid = `${COMPILER || `no D3D compiler on ${process.platform}`}, from node-webgpu ${(PKG && PKG.version) || "(version unread)"}`;
+const skip = W.refused ? null : H.headlessGpuSkipReason();
+if (W.refused) ok(`!! round 19: ${H.WEBGPU_ENV} names a node-webgpu package this box can load -- a refused one is a red here, never a skip (a DXC run would pass with no native row)`, false, W.refused);
+else if (skip) console.log("  SKIP  " + skip);
 else try {
     H.configureVulkanIcd();
-    const { mod } = H.resolveWebgpu(), gpu = mod.create([]);
+    const gpu = W.mod.create([...FLAGS]);
+    // v4849 -- round 19 (section 66): the native adapter, named where tools/ship/realGpuRun.mjs reads adapters -- a measured line it
+    // keeps, with the compiler read above, and the SWEK_ADAPTER_LOG record its verdict counts. Round 18's r18 reports named this
+    // gate's adapter nowhere (the "...." line at the end of this section is not one realGpuRun reads). Noted before any job, so a
+    // gate that dies later has still named it; the record is kept here too, so a row can hold what it says.
+    const NATIVE = await gpu.requestAdapter(), NOTED = [];
+    H.noteNativeAdapter(NATIVE, { gate: fileURLToPath(import.meta.url), compiler: COMPILER, env: { SWEK_ADAPTER_LOG: process.env.SWEK_ADAPTER_LOG || "(this gate's own copy)" },
+        append: (f, line) => { NOTED.push(JSON.parse(line)); if (process.env.SWEK_ADAPTER_LOG) fs.appendFileSync(f, line); } });
     // one job: a fresh adapter and device, the network built and run, everything read back, the device destroyed --
     // before any CPU work long enough to matter
     // round 12's kernels unless told otherwise -- the rows below that name no set are about them, whatever the default is
@@ -335,6 +413,12 @@ else try {
             `r12 ${a12} B allocated = passBytes ${passBytes(net, HH, WW, "r12")} + weights ${wb}; r15 ${a15} against ${passBytes(net, HH, WW, "r15")}`);
     }
     const r = await job(net, x, HH, WW, 10);
+    {
+        const rec = NOTED[0] || {}, a = rec.adapter, named = a ? [a.vendor, a.architecture, a.description].filter(Boolean).join(" / ") : null;
+        ok("!! round 19 (section 66): the native adapter is named where realGpuRun reads adapters -- one record, keyed by this gate's path from the engine root, naming the adapter the jobs run on, its software flag a boolean",
+            NOTED.length === 1 && rec.gate === "render/denoiseDevice-selfcheck.mjs" && named === r.adapter && typeof rec.software === "boolean" && (rec.launchArgs || [])[0] === "node-webgpu (native)",
+            `${named} (${rec.software ? "SOFTWARE" : "hardware"}), ${NOTED.length} record(s) keyed ${rec.gate}; compiler ${compilerSaid}`);
+    }
     const J = judge(net, x, HH, WW, r.acts);
     ok(`!! *** every cell of every layer, on the device, is the twin's or the fused mirror's, given the device's own input to that layer -- the head of ${KERNEL_TAPS} on the direct kernel among them ***`,
         J.every((j) => j.unexplained === 0) && J[4].kernel === "direct", J.map((j) => `${j.kernel} ${j.plain}+${j.fused}f`).join(", "));
@@ -365,22 +449,25 @@ else try {
     const none15 = [...J14, ...J15].every((j) => j.fused === 0);
     ok("  ...and where no cell of r14 or r15 fused, r15's image is r14's, bit for bit -- the same logits, summed by k_apply_fast's order", !none15 || r15.y.every((v, i) => Object.is(v, r14.y[i])),
         none15 ? "no cell fused in either set on this device: the images must agree exactly" : "a set fused cells here, so the images may differ where it did");
-    // round 18 (section 61): r18t and r18u, the same network and image -- K0 natively where the adapter is not D3D12: the
-    // hidden layers cell for cell, the fused last pass through the image; and where nothing fused, r15's every layer bit for bit
-    const native18 = nativeSetsFor(await gpu.requestAdapter(), BROWSER_ONLY_SETS);
-    for (const set of BROWSER_ONLY_SETS) {
-        if (!native18.includes(set)) { console.log(`  SKIP  K0 natively for ${set}: a browser-only set on a D3D12 adapter -- node-webgpu's FXC does not build its kernel (section 60); section 5 holds it in the browser`); continue; }
+    // round 18 (section 61): r18t and r18u, the same network and image -- K0 natively where the adapter is not D3D12, and since
+    // round 19 (section 66) on a D3D12 adapter whose run compiles with DXC: the hidden layers cell for cell, the fused last pass
+    // through the image; and where nothing fused, r15's every layer bit for bit. K18 keeps each set's native rows' results.
+    const native18 = nativeSetsFor(NATIVE, FXC_UNBUILT_SETS, { compiler: COMPILER }), K18 = Object.fromEntries(FXC_UNBUILT_SETS.map((s) => [s, []]));
+    const unbuilt = `on a D3D12 adapter whose run compiles with ${compilerSaid} -- FXC does not build its kernel (section 60), DXC does (section 65): ` +
+                    `${H.WEBGPU_ENV} naming node-webgpu 0.6.2, which ships its DXC beside dawn.node`;
+    for (const set of FXC_UNBUILT_SETS) {
+        if (!native18.includes(set)) { console.log(`  SKIP  K0 natively for ${set}: one of FXC_UNBUILT_SETS, ${unbuilt}; section 5 holds it in the browser`); continue; }
         const r18 = await job(net, x, HH, WW, 10, set), J18 = judge(net, x, HH, WW, r18.acts, set), L18 = deviceLayers(net, set), k = R18_KERNELS[set].kernel;
         const j18 = judgeHeadApply(x, r18.acts[3], L18[4], r18.y, HH, WW);
         k0row("native", set, J18, j18.worst);
-        ok(`!! *** K0 natively: the ${set} set -- its hidden layers (${k}) every cell the twin's or the fused mirror's, given the device's own input; k_head_apply's image within APPLY_TOL ***`,
+        K18[set].push(ok(`!! *** K0 natively: the ${set} set -- its hidden layers (${k}) every cell the twin's or the fused mirror's, given the device's own input; k_head_apply's image within APPLY_TOL ***`,
             J18.slice(0, 4).every((j) => j.unexplained === 0) && J18.map((j) => j.kernel).join() === `${k},${k},${k},${k},head_apply` && r18.acts[4] === null &&
             j18.worst <= APPLY_TOL && worstRel(r18.y, ref, 1e-12) < 1e-5,
-            J18.slice(0, 4).map((j) => `${j.kernel} ${j.plain}+${j.fused}f`).join(", ") + `; head and kernel ${j18.worst.toExponential(2)}`);
+            J18.slice(0, 4).map((j) => `${j.kernel} ${j.plain}+${j.fused}f`).join(", ") + `; head and kernel ${j18.worst.toExponential(2)}`));
         const none18 = [...J15, ...J18].every((j) => j.fused === 0);
-        ok(`  ...and where no cell of r15 or ${set} fused, ${set}'s every hidden layer and its image are r15's, bit for bit -- the kernel moves which thread adds and how the code is written, never the order`,
+        K18[set].push(ok(`  ...and where no cell of r15 or ${set} fused, ${set}'s every hidden layer and its image are r15's, bit for bit -- the kernel moves which thread adds and how the code is written, never the order`,
             !none18 || (r18.y.every((v, i) => Object.is(v, r15.y[i])) && r18.acts.slice(0, 4).every((a, i) => a.every((v, j) => Object.is(v, r15.acts[i][j])))),
-            none18 ? "no cell fused in either set on this device: every layer must agree exactly" : "a set fused cells here, so the layers may differ where it did");
+            none18 ? "no cell fused in either set on this device: every layer must agree exactly" : "a set fused cells here, so the layers may differ where it did"));
     }
     // the order probe (render/denoiseCompile.mjs): a head whose products are exact and whose sums are not, so the image is
     // within APPLY_TOL of the twin's only if the head added in the twin's order
@@ -437,11 +524,18 @@ else try {
             const rt = await job(net9, x9, 13, 11, 9, set), Lt = deviceLayers(net9, set), Jt = judge(net9, x9, 13, 11, rt.acts, set);
             const jt = judgeHeadApply(x9, rt.acts[Lt.length - 2], Lt[Lt.length - 1], rt.y, 13, 11);
             out.push({ set, ok: Jt.slice(0, -1).every((j) => j.unexplained === 0) && Jt.slice(0, -1).every((j) => j.kernel === R18_KERNELS[set].kernel) && jt.worst <= APPLY_TOL, w: jt.worst });
+            K18[set].push(out[out.length - 1].ok);
         }
-        if (!native18.length) console.log("  SKIP  r18t and r18u on the small network: browser-only sets on a D3D12 adapter (section 60)");
-        else ok("  ...and r18t and r18u on the small network, no mask: every layer on their kernels explained, the image within its bound",
+        for (const set of FXC_UNBUILT_SETS) if (!native18.includes(set)) console.log(`  SKIP  ${set} on the small network: one of FXC_UNBUILT_SETS, ${unbuilt}`);
+        if (native18.length) ok(`  ...and ${native18.join(" and ")} on the small network, no mask: every layer on their kernels explained, the image within its bound`,
             out.every((o) => o.ok), out.map((o) => `${o.set} ${o.w.toExponential(2)}`).join(", "));
     }
+    // v4849 -- round 19 (section 66)'s condition (1), readable off the rig's report: realGpuRun keeps measured and failing lines,
+    // never a PASS or a SKIP, so which round-18 sets' native rows ran here, under which compiler, and whether every one was green
+    // is said on one measured line -- by the key nativeAdapterKey gives this adapter
+    console.log(`  ----  native K0 for round 18's sets on ${nativeAdapterKey(NATIVE && NATIVE.info, process.platform) || "(an adapter with no vendor)"}, compiler ${compilerSaid}: ` +
+        FXC_UNBUILT_SETS.map((s) => (!native18.includes(s) ? `${s} not built natively (one of FXC_UNBUILT_SETS, under FXC)` :
+            `${s} ${K18[s].length && K18[s].every(Boolean) ? "green" : "RED"} (${K18[s].filter(Boolean).length} of ${K18[s].length} native rows)`)).join("; "));
     let refusedC = null;
     try { const a = await gpu.requestAdapter(), dv = await a.requestDevice(); try { await createDeviceDenoiser(dv, net, { H: 4, W: 4, C: 9 }); } finally { dv.destroy(); } } catch (e) { refusedC = e.message; }
     ok("  a network handed an input of the wrong width is refused, not read at the wrong stride", /10 input channels was handed an input of 9/.test(refusedC || ""));
