@@ -1,6 +1,6 @@
 {
  "gate": "brain/conv2d-selfcheck.mjs",
- "at": "2026-10-11",
+ "at": "2026-10-13",
  "tables": [
   {
    "title": "the manifest's kernels on the device: each cell the f32 twin's (plain), the fused mirror's, or unexplained",
