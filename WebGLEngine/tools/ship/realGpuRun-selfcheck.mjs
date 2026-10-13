@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 import { gateList, categorize, parseRows, verdict, runGates, runLaunchArgs, probeSoftwareGl, softwareGlLines, TREE_SOFTWARE_GL,
          probeNativeAdapters, nativeAdapterLines, GATE_TIMEOUT_MS, RETIRED_SOFTWARE_GL, TREE_SOFTWARE_WEBGPU, SOFTWARE_GL_CANDIDATES,
          NATIVE_LAUNCH, readAdapterLog, gateEntry, addAdapters, nodeWebgpuRecord,   // v4851, section 66: these five
-         NATIVE_USE, nativeGateList, nativeLaunchArgs } from "./realGpuRun.mjs";   // v4853, section 69: these three
+         NATIVE_USE, nativeGateList, nativeLaunchArgs, nativeSweepCompare } from "./realGpuRun.mjs";   // v4853, section 69: these four
 import { noteNativeAdapter } from "./headlessGpu.mjs";
 import { webgpuSkipReason, launchArgsFor, hardwareArgsFor, parityArgsFor, HARDWARE_ARGS, softwareClaims } from "./webgpuHarness.mjs";
 import { gateReport } from "./gateReport.mjs";
@@ -418,6 +418,20 @@ console.log("\n7. SECTION 69 (v4853): THE WHOLE NATIVE SWEEP -- EVERY GATE THAT 
        nativeLaunchArgs({}) === null && JSON.stringify(nativeLaunchArgs({ SWEK_LAUNCH_ARGS: " --a  --b " })) === '["--a","--b"]' &&
        JSON.stringify(runLaunchArgs({}, "win32")) !== JSON.stringify(nativeLaunchArgs({})),
        `unset: ${JSON.stringify(nativeLaunchArgs({}))}; an FSR run on win32 unset: ${JSON.stringify(runLaunchArgs({}, "win32"))}`);
+    // section 69's rule on fixtures: a pinned sweep and a candidate's, gate by gate
+    const sweep = (v, gates) => ({ nodeWebgpu: { version: v }, gates: gates.map(([gate, ok, fails = []]) => ({ gate, ok, fails })) });
+    const P0 = sweep("0.6.0", [["g/a", true], ["g/b", false, ["FAIL  !! row x   worst 1.2e-3"]], ["g/c", false, ["FAIL  row y   3"]]]);
+    const cmp = (gates, v = "0.6.2") => nativeSweepCompare(P0, sweep(v, gates));
+    const held = cmp([["g/a", true], ["g/b", false, ["FAIL  !! row x   worst 9.9e-3"]], ["g/c", true]]);
+    const regress = cmp([["g/a", false, ["FAIL  row z   1"]], ["g/b", false, ["FAIL  !! row x   1"]], ["g/c", true]]);
+    const changed = cmp([["g/a", true], ["g/b", false, ["FAIL  !! row w   1"]], ["g/c", true]]);
+    const unpaired = cmp([["g/a", true], ["g/b", false, ["FAIL  !! row x   1"]]]), samePkg = cmp([["g/a", true], ["g/b", true], ["g/c", true]], "0.6.0");
+    ok("!! section 69's rule: a gate holds green under the candidate, or red under BOTH with the same failing rows (whatever their numbers); a regression, a changed red, a gate missing from one sweep, or two sweeps of one package do not",
+       held.ok && held.count.green === 1 && held.count["shared-red"] === 1 && held.count.fixed === 1 &&
+       !regress.ok && regress.bad.map((r) => r.gate + ":" + r.kind).join() === "g/a:regression" &&
+       !changed.ok && changed.bad.map((r) => r.gate + ":" + r.kind).join() === "g/b:changed" &&
+       !unpaired.ok && unpaired.bad.map((r) => r.gate + ":" + r.kind).join() === "g/c:unpaired" && !samePkg.ok && !nativeSweepCompare(P0, { gates: [] }).ok,
+       `held ${JSON.stringify(held.count)}; regression ${regress.bad.length}, changed ${changed.bad.length}, unpaired ${unpaired.bad.length}, same package ${samePkg.ok}`);
     // the CLI's --native: an --only that matches no native gate still says so, exits 1, and marks its report as the native sweep
     const tmp = path.join(os.tmpdir(), `swek-realgpu-native-${process.pid}.json`);
     const { SWEK_LAUNCH_ARGS: _unset, ...envNoArgs } = process.env;

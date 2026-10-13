@@ -66,6 +66,32 @@ export function nativeGateList(root = ENG, { files = null, read = (f) => fs.read
 }
 
 /**
+ * v4853 -- SECTION 69'S RULE, AS CODE: two native sweeps on one box at one commit, the pinned package's and a candidate's. A gate
+ * holds when it is green under the candidate, or red under BOTH with the same failing rows (by label: a row's text before its
+ * three-space detail, which carries numbers that move run to run) -- a red the candidate did not bring. It fails when it is red
+ * under the candidate and green under the pin (a REGRESSION), red under both with different rows (CHANGED), or missing from
+ * either report (UNPAIRED). `ok` needs every gate to hold, both reports to name the same gates, and each to say its package.
+ */
+const rowLabel = (l) => String(l).replace(/^\s*FAIL\s+/, "").split("   ")[0].trim();
+export function nativeSweepCompare(pinned, candidate) {
+    const by = (rep) => new Map(((rep && rep.gates) || []).map((g) => [g.gate, g]));
+    const P = by(pinned), C = by(candidate), names = [...new Set([...P.keys(), ...C.keys()])].sort();
+    const rows = names.map((gate) => {
+        const p = P.get(gate), c = C.get(gate);
+        if (!p || !c) return { gate, kind: "unpaired" };
+        if (c.ok) return { gate, kind: p.ok ? "green" : "fixed" };
+        if (p.ok) return { gate, kind: "regression", fails: c.fails || [] };
+        const same = JSON.stringify((p.fails || []).map(rowLabel).sort()) === JSON.stringify((c.fails || []).map(rowLabel).sort());
+        return { gate, kind: same ? "shared-red" : "changed", fails: c.fails || [] };
+    });
+    const bad = rows.filter((r) => ["unpaired", "regression", "changed"].includes(r.kind));
+    const pkg = (rep) => (rep && rep.nodeWebgpu && rep.nodeWebgpu.version) || null;
+    return { ok: names.length > 0 && bad.length === 0 && !!pkg(pinned) && !!pkg(candidate) && pkg(pinned) !== pkg(candidate),
+             pinned: pkg(pinned), candidate: pkg(candidate), rows, bad,
+             count: Object.fromEntries(["green", "fixed", "shared-red", "regression", "changed", "unpaired"].map((k) => [k, rows.filter((r) => r.kind === k).length])) };
+}
+
+/**
  * A gate's kind from its source: timing if it reads a clock, quality if it grades in dB, exact otherwise. The denoiser's
  * timing gate reads its clocks inside render/denoiseDevice.mjs's timingLadder, so a call to that is a clock read too.
  */
