@@ -8,6 +8,7 @@
 // UNIFORM_MAX, fastShape, conv2dFastWgsl, packFastUniforms -- round 14's (section 43): headShape, conv2dHeadWgsl,
 // packHeadUniforms, planarToChannelsLast -- round 16's (section 54): tileShape, conv2dTileWgsl, packTileUniforms,
 // tileWorkgroups -- and round 17's (section 59): fastAltShape, conv2dFastAltWgsl, packFastAltUniforms.
+// Round 19 (section 66, v4851): which rounds' device rows stand aside, by adapter and by the run's compiler (nativeStandAside).
 //
 // What it holds: the twin to the f64 reference within f32 rounding; the identity kernel exact through every pass;
 // a 1x1 convolution BIT-IDENTICAL to the GPU Brain's dense layer (render/brainTsl.mjs's mlpLayerCpu), so the dense
@@ -69,6 +70,17 @@
 //       so the tap adds a zero product -- the skip but for the sign of a zero
 //   Q5  the tile kernel's inline weights: pixel 1 reads the next vec4           1 RED (the two-pixel case; the one-pixel case has no
 //       pixel 1)
+//   section 66 (v4851), against the stand-aside by adapter AND compiler (section 5e; full gate each time, restored, md5 verified):
+//   R1  round 17 stands aside under DXC too                                     1 RED (the D3D12-under-DXC row)
+//   R2  round 16 runs under DXC as round 17 does                                1 RED (the same row)
+//   R3  r17Comparator always "hoist" (round 16's tile built on D3D12 under DXC) 1 RED (the same row)
+//   R4  an unread compiler counted as DXC                                       1 RED (the FXC-or-unread row)
+//   R5  round 17's SKIP line stops naming the compiler                          1 RED (the same row)
+//   R6  every adapter stands aside unless the compiler is DXC                   1 RED (the off-D3D12 row) -- and SwiftShader's round-16 and
+//       round-17 device rows all said SKIP, 82 PASS falling to 53: nothing else on this box sees a stand-aside that is too wide
+//   R7  NATIVE_FLAGS made ["disable-dawn-features=use_dxc"]                     1 RED (the flags row)
+//   and a check, not a sabotage: r17Comparator forced to "fast" on SwiftShader -- round 17's two inline rows ran against the fast
+//   kernel's bits and were green (0 fused of 12,768 and 4,477), so the D3D12-under-DXC path is exercised on a device here
 //
 // *** S5 WAS EXPECTED TO GO ZERO RED AND DID NOT. *** A missing barrier is a race, and races hide on a device that
 // runs a workgroup's threads one after another. SwiftShader does run them in order -- which is exactly why it is
@@ -119,7 +131,7 @@ const COMPILER = H.nativeCompiler({ pkg: WPKG, platform: process.platform, flags
 // names it, the round as a number -- so section 5e holds every branch on the rig's own descriptions, on a box with no D3D12.
 function nativeStandAside(adapter, compiler, round) {
     if (!fxcAdapter(adapter)) return null;
-    if (false && round === 17 && compiler === "DXC") return null;
+    if (round === 17 && compiler === "DXC") return null;
     const said = compiler === "DXC" || compiler === "FXC" ? compiler : `an unread compiler (${JSON.stringify(compiler ?? null)}), counted as FXC`;
     if (round === 17) return `${FXC_SKIP_R17}; this run compiles with ${said}, and under DXC (node-webgpu 0.6.2) they run (section 66)`;
     if (round === 16) return `${FXC_SKIP}; this run compiles with ${said}, and round 16's shapes stand aside under DXC too: the rig's DXC probe ran round 17's shapes only (section 66)`;
@@ -370,7 +382,8 @@ console.log("\n5e. WHICH ROUNDS' DEVICE ROWS STAND ASIDE, BY ADAPTER AND COMPILE
             return (c === "FXC" ? /this run compiles with FXC,/.test(why) : why.includes(`an unread compiler (${JSON.stringify(c ?? null)}), counted as FXC`)) && why.includes(`section ${r === 16 ? 57 : 60}`);
         }))),
         `the 1080 under ${NOT_DXC.map((c) => `${said(c)}: 16 ${runs(gtx, c, 16) ? "runs" : "aside"}, 17 ${runs(gtx, c, 17) ? "runs" : "aside"}`).join("; ")}`);
-    // SABOTAGED v4851: every adapter stands aside unless the compiler is DXC (the D3D12 test made compiler-only) -> RED by name (this row alone); restored.
+    // SABOTAGED v4851: every adapter stands aside unless the compiler is DXC (the D3D12 test made compiler-only) -> RED by name (this row alone; SwiftShader's own
+    //   round-16 and round-17 device rows then printed SKIP, 82 PASS falling to 53 with no other red -- why this row has to exist); restored.
     ok("  round 19: off D3D12 -- SwiftShader, Vulkan, Metal, an adapter with no description, none -- both rounds run whatever compiler is named, and round 17's inline rows keep the hoisted tile as their comparator",
         OFF.every((a) => [...NOT_DXC, "DXC"].every((c) => runs(a, c, 16) && runs(a, c, 17) && r17Comparator(a, c) === "hoist")),
         `on SwiftShader under "FXC": 16 ${runs(OFF[0], "FXC", 16) ? "runs" : "aside"}, 17 ${runs(OFF[0], "FXC", 17) ? "runs" : "aside"}`);

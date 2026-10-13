@@ -88,6 +88,16 @@
 //   W8  this gate's child back to [...dawnFlags(flags), FINE_CLOCK_FLAG]          1 RED (the both-children row)
 //   W9  the build probe's child back to a hand-built flag list                   1 RED (the same row). The first draft left
 //       both uncaught: Linux runs "as shipped" alone, so no row here could see a second disable entry (review of section 64).
+//   round 19 (section 66, v4851), against compilerMatchesDumps, dxcVariantsBuild, DXC_VARIANTS and this gate. Each run on SwiftShader,
+//   restored by copy from /tmp, md5 verified:
+//   V1  r18t's hidden kernel at px 4, not R18_KERNELS's 2                        1 RED (the hidden kernels' job row)
+//   V2  condition 0's DXC case satisfied by one DXIL dump                        2 RED (the condition-0 fixtures, the build row)
+//   V3  its FXC case blind to a DXIL dump                                        1 RED (the condition-0 fixtures)
+//   V4  a child with no dump counted as DXIL under DXC                           2 RED (the condition-0 fixtures, the build row)
+//   V5  the hidden kernels built on the prediction alone                         1 RED (the build row)
+//   V6  this gate's prediction made for win32 (FXC beside SPIR-V dumps)          1 RED (condition 0's live row)
+//   V7  the child finds its kernel in VARIANTS alone                             1 RED (the pilot row)
+//   V8  the hidden kernels counted in a mode where they stood aside               1 RED (native / as shipped, section 4)
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -197,7 +207,7 @@ console.log("1. THE INSTRUMENT, ON THE CPU");
     // section 66 (v4851): r18t's and r18u's hidden-layer kernels -- each with a job at 64 x 64, judged, and its WGSL exactly what
     // render/denoiseDevice.mjs builds for the layer in that set (kernelFor names the kernel; R18_KERNELS gives its cfg), on the
     // same layer r15 runs on r13-fast-3x3, so the kernel-level line below compares one layer on three kernels. dxcOnly, both
-    // SABOTAGED v4851: r18t's cfg px 2 -> 4 in DXC_VARIANTS -> RED by name (and nothing else); restored.
+    // SABOTAGED v4851: r18t's cfg px 2 -> 4 in DXC_VARIANTS -> RED by name (this row alone; the pilot's still exact); restored.
     const DD = await imp("render/denoiseDevice.mjs"), CV = await imp("brain/conv2d.mjs"), base = VARIANTS.find((v) => v.id === "r13-fast-3x3");
     const hidden = DXC_VARIANTS.map((v) => { const j = jobFor(v), L = v.L(64).layer, set = v.id.slice(0, 4), cfg = DD.R18_KERNELS[set]?.cfg;
         const want = DD.kernelFor(L, set) === "tile_inline" ? CV.conv2dTileWgsl(L, cfg) : DD.kernelFor(L, set) === "fast_unroll" ? CV.conv2dFastAltWgsl(L, cfg) : null;
@@ -208,8 +218,11 @@ console.log("1. THE INSTRUMENT, ON THE CPU");
         hidden.map((h) => `${h.id}: ${h.ok ? "the device's kernel" : "NOT the device's kernel"}`).join("; "));
     // section 66's condition 0, on fixtures every box runs: the package's prediction held to the dumps. "unknown (no dump)" is
     // never DXIL -- 0.6.2's Dawn fails device creation when DXC will not load and dumps nothing, which is the prediction failing
-    // SABOTAGED v4851: compilerMatchesDumps's DXC case with `dxil > 0` for `dxil === cs.length` -> RED by name (this row); restored.
-    // SABOTAGED v4851: its FXC case without `dxil === 0` -> RED by name (this row); restored.
+    // SABOTAGED v4851: compilerMatchesDumps's DXC case with `dxil > 0` for `dxil === cs.length` -> 2 RED by name (this row, and the
+    //   build row below, which reads it); restored.
+    // SABOTAGED v4851: its FXC case without `dxil === 0` -> 1 RED by name (this row); restored.
+    // SABOTAGED v4851: its DXC case counting a child with no dump as DXIL (`dxil + none`) -> 2 RED by name (this row and the build
+    //   row); restored.
     const X = "DXC (DXIL)", B = "FXC (DXBC)", U = "unknown (no dump)", S = "SPIR-V (no D3D compiler)", eight = (c) => Array(8).fill(c);
     const cm = [
         ["DXC, every dump DXIL", "DXC", eight(X), true], ["DXC, one dump DXBC", "DXC", [...eight(X).slice(1), B], false],
@@ -221,7 +234,7 @@ console.log("1. THE INSTRUMENT, ON THE CPU");
         cm.every((c) => c.got === c.want) && cm.every((c) => c.d3d === (c.n.startsWith("none") ? false : true)),
         cm.map((c) => `${c.n}: ${c.got ? "agree" : "red"}${c.got === c.want ? "" : " (WRONG)"}`).join("; "));
     // ...and the hidden kernels build only where that holds over the eight base kernels: DXC predicted and all eight DXIL
-    // SABOTAGED v4851: dxcVariantsBuild without the all-DXIL check (prediction alone) -> RED by name (this row); restored.
+    // SABOTAGED v4851: dxcVariantsBuild without the all-DXIL check (prediction alone) -> 1 RED by name (this row); restored.
     const vb = [
         ["DXC, eight DXIL", "DXC", eight(X), true], ["DXC, seven DXIL and one DXBC", "DXC", [...eight(X).slice(1), B], false],
         ["DXC, seven DXIL and one with no dump", "DXC", [...eight(X).slice(1), U], false], ["DXC, only seven dumps", "DXC", eight(X).slice(1), false],
@@ -348,7 +361,8 @@ else {
     // same run -- DXIL exactly when the package said DXC. Red is what an adapter below shader model 6.0 would show (Dawn forces
     // FXC there whatever the package ships), or a 0.6.2 whose DXC did not load. Off win32 the package predicts no D3D compiler and
     // no dump here is D3D's: the row then says so and claims nothing about D3D -- condition 0 is the rig's to test.
-    // SABOTAGED v4851: the prediction made for platform "win32" here (FXC, beside SPIR-V dumps) -> RED by name; restored.
+    // SABOTAGED v4851: the prediction made for platform "win32" here (FXC, beside 8 SPIR-V dumps) -> 1 RED by name (this row; the
+    //   hidden kernels stood aside and the pilot did not run, as on an FXC box); restored.
     {
         const shipped = modes.find((m) => m.name === "as shipped"), predicted = predictedBy[shipped.name];
         const dumps = rows.filter((x) => x.path === "native" && x.compiler === shipped.name).map((x) => x.result.dump.compiler), cz = compilerMatchesDumps(predicted, dumps);
@@ -360,7 +374,7 @@ else {
     // without this the child's lookup of them, their builds and their twins would first run on the rig. Here they cannot meet FXC
     // (section 60's reason for standing aside), so each is built once, as shipped, held exact -- in its own list, never a mode's
     // group, and its line is SwiftShader's, not section 66's DXC line.
-    // SABOTAGED v4851: the child looking its kernel up in VARIANTS alone -> RED by name (this row: both "NOT BUILT"); restored.
+    // SABOTAGED v4851: the child looking its kernel up in VARIANTS alone -> 1 RED by name (this row: both "NOT BUILT"); restored.
     if (predictedBy["as shipped"] == null && !win) {
         const pilot = [];
         for (const v of DXC_VARIANTS) child(modes[0], v, pilot, "pilot");
@@ -412,6 +426,7 @@ if (rows.length) {
         const gs = rows.filter((x) => `${x.path} / ${x.compiler}` === g);
         // section 66 (v4851): a native mode that built r18t's and r18u's hidden kernels counts them; one where they stood aside
         // does not -- standing aside is not "unbuilt", and the browser's list is VARIANTS alone
+        // SABOTAGED v4851: the hidden kernels counted in every native mode, built or not -> 1 RED by name (native / as shipped); restored.
         ok(`!! ${g}: every kernel built or said why, and every one built is exact -- conv cells the twin's or the fused mirror's, the kernel apply within APPLY_TOL`,
             gs.length === VARIANTS.length + (gs[0].path === "native" && dxcBuiltModes.has(gs[0].compiler) ? DXC_VARIANTS.length : 0) && gs.every((x) => x.result.built ? x.result.exact === true : !!x.result.reason),
             gs.filter((x) => !x.result.built || !x.result.exact).map((x) => `${x.id}: ${x.result.built ? x.result.detail : x.result.reason}`).join("; ") || `${gs.length} kernels, all exact`);
