@@ -131,7 +131,8 @@ export async function readIntBuffer(renderer, buffer) { return new Int32Array(aw
         const src = text.replace(/from 'three\/tsl'/g, "from '" + location.origin + "/vendor/three-webgpu/three.tsl.js'")
                         .replace(/from 'three\/webgpu'/g, "from '" + location.origin + "/vendor/three-webgpu/three.webgpu.js'")
                         .replace(/from '\.\/gpu-raw-test-utils\.js'/g, "from '" + shimUrl + "'");
-        await import(blob(src));
+        const testUrl = blob(src);   // a blob: URL in the page, never a filesystem path
+        await import(testUrl);
         const { __tests } = await import(shimUrl);
         for (const t of __tests) {
             errors = []; formats = [];

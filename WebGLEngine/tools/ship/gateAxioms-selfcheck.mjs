@@ -124,6 +124,10 @@ console.log(`\n  ${pure} gates assume NOTHING outside their own arithmetic.\n`);
         "tools/ship/postChain-selfcheck.mjs", "tools/ship/verifiedPolygonIntersection-selfcheck.mjs",
         "tools/ship/voxtralBrowser-selfcheck.mjs",
         "tools/ship/qrBridge-selfcheck.mjs", "tools/ship/webcodecsFramesToMp4-selfcheck.mjs",
+        // v4854 -- 22 -> 23: tools/ship/threeTextureBarrier-selfcheck.mjs asks navigator.gpu's adapter which features it offers
+        // ('texture-formats-tier2' decides what three's test should do) and dispatches the barrier kernel raw, in a page served by
+        // webgpuHarness; with no WebGPU it SKIPS section 2 by name and still holds the files and the record.
+        "tools/ship/threeTextureBarrier-selfcheck.mjs",
     ]);
     const gpuNow = [...byGate.entries()].filter(([, h]) => h.includes("gpu")).map(([f]) => f).sort();
     const arrived = gpuNow.filter((g) => !GPU_GATES.includes(g));
