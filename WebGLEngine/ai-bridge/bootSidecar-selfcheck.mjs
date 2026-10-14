@@ -31,6 +31,12 @@ const write = (o) => fs.writeFileSync(REPORT, JSON.stringify(o, null, 2));
 // ---- 2. A FRESH REPORT ---------------------------------------------------------------------------------------------
 {
     fs.writeFileSync(INPUT, "{}");
+    // v4854 -- the rig's v4854 verify read this row "STALE (0s old): catalog changed after the report was made" ON THE FLOORED
+    // comparison v3936 introduced -- so on that box the catalog's mtime ran a whole millisecond or more ahead of the report's
+    // producedAt, written just after it. The row's claim is "a report NEWER than its inputs", so the input is made older than
+    // the report, by a margin no file clock can erase, rather than left to tie or not with the next line on whatever box runs it.
+    const before = (Date.now() - 10000) / 1000;
+    fs.utimesSync(INPUT, before, before);
     const rep = makeReport({ kind: "swek-discovery-snapshot", producedBy: "powershell/discover.ps1",
         inputs: { catalog: INPUT }, observations: [{ service: "_http._tcp", hosts: 3 }, { service: "_go2rtc._tcp", hosts: 0 }] });
     write(rep);

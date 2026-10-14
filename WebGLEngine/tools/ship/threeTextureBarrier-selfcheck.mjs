@@ -62,7 +62,11 @@ export function patched(testText, diffText) {
         fs.mkdirSync(path.join(dir, path.dirname(REL)), { recursive: true });
         fs.writeFileSync(path.join(dir, REL), testText);
         fs.writeFileSync(path.join(dir, "fix.diff"), diffText);
-        execFileSync("git", ["apply", "fix.diff"], { cwd: dir, stdio: ["ignore", "pipe", "pipe"] });
+        // v4854 -- the rig's verify read "nothing removed": this temp dir is outside the repository, so its `* -text` does not
+        // reach it, and Git for Windows' default core.autocrlf=true wrote the patched file back with CRLF -- whereupon the
+        // `textureBarrier();\n` deletion below matched nothing. Line endings are pinned here, not left to the box's git config.
+        // SABOTAGED v4854: without the two -c flags -> 1 RED, the LF row in section 1b, by name; restored, md5 verified.
+        execFileSync("git", ["-c", "core.autocrlf=false", "-c", "core.eol=lf", "apply", "fix.diff"], { cwd: dir, stdio: ["ignore", "pipe", "pipe"] });
         return fs.readFileSync(path.join(dir, REL), "utf8");
     } catch (e) { return null; }
     finally { fs.rmSync(dir, { recursive: true, force: true }); }
@@ -166,6 +170,17 @@ ok("...and the code it changes is the format and nothing else: RedFormat importe
    ch.added.length === 2 && ch.added.includes("import { StorageTexture, FloatType, RedFormat } from 'three/webgpu';") &&
    ch.added.includes("storageTex.format = RedFormat;"),
    `removed ${JSON.stringify(ch.removed)}, added ${JSON.stringify(ch.added)}`);
+
+// v4854 -- the rig's verify: Git for Windows' default core.autocrlf=true made patched() return CRLF text (its temp dir is outside
+// the repository's `* -text`), and section 2's deletion matched nothing. Forced here, through git's own environment config.
+{
+    const saved = { c: process.env.GIT_CONFIG_COUNT, k: process.env.GIT_CONFIG_KEY_0, v: process.env.GIT_CONFIG_VALUE_0 };
+    Object.assign(process.env, { GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "core.autocrlf", GIT_CONFIG_VALUE_0: "true" });
+    let crlfBox; try { crlfBox = testText && diffText ? patched(testText, diffText) : null; }
+    finally { for (const [e, k] of [["GIT_CONFIG_COUNT", "c"], ["GIT_CONFIG_KEY_0", "k"], ["GIT_CONFIG_VALUE_0", "v"]]) { if (saved[k] === undefined) delete process.env[e]; else process.env[e] = saved[k]; } }
+    ok("!! the patched test comes back with LF line endings even on a box whose git converts to CRLF (core.autocrlf=true, Git for Windows' default) -- and is the same text as here",
+       crlfBox !== null && !crlfBox.includes("\r") && crlfBox === fixed, crlfBox === null ? "patched() returned nothing" : `${(crlfBox.match(/\r/g) || []).length} CR characters`);
+}
 
 console.log("\n2. ON THIS ADAPTER: three's own test file, through the vendored three (r186), and the same kernel in raw WebGPU");
 const skip = webgpuSkipReason();
