@@ -203,6 +203,10 @@ export function runLaunchArgs(env = process.env, platform = process.platform) {
  * minutes per fast-kernel pipeline. A gate stopped at the cap reads as a failure with no rows, so the cap is set well clear.
  */
 export const GATE_TIMEOUT_MS = 1800000;
+// v4853 -- since section 69's --native, this file names gates through gateFiles() and runnerBudget-selfcheck counts it a runner
+const budgetIsOwn =   // read from the source by runnerBudget-selfcheck, not imported (rtPipelineDiag's form: an export with no importer is a referenceKind orphan)
+    "GATE_TIMEOUT_MS is a ceiling against a hung gate on a REAL GPU, where one FXC pipeline took minutes (section 42); a gate stopped at it " +
+    "reads as a red with no rows. It is not a per-gate budget: no verdict is read from it, and gateBudget's table is the sandbox's ship-time costs";
 
 /**
  * v4853 (section 69): the native sweep's browser flags are the GATES' OWN, as a verify runs them -- unless SWEK_LAUNCH_ARGS names

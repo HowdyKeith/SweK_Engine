@@ -70,6 +70,10 @@ if (args.includes("--child")) {
 
 // ---- THE PARENT ----------------------------------------------------------------------------------------------------
 const OUT = path.resolve(arg("--out") || "denoise-build-probe.json"), CAP_S = Number(arg("--cap") || 180);
+// v4853 -- runnerBudget-selfcheck counts this a runner (it names realGpuRun.mjs); its limit is its own, and says so
+const budgetIsOwn =   // read from the source by runnerBudget-selfcheck, not imported
+    "--cap (default 180 s) stops ONE SHAPE'S build in its own process -- the time a compiler takes is what this probe measures, and a shape " +
+    "that FXC cannot finish is reported as stopped at the cap (section 57). It runs no gate, so gateBudget's per-gate table does not apply";
 const git = spawnSync("git", ["log", "-1", "--format=%h %cs %s"], { cwd: ENG, encoding: "utf8" });
 const HP = await imp("tools/ship/headlessGpu.mjs"), WGPU = HP.resolveWebgpu(), WPKG = HP.webgpuPackage(WGPU.from);
 const report = { at: new Date().toISOString(), platform: `${process.platform} ${os.release()} ${os.arch()}`, node: process.version,
