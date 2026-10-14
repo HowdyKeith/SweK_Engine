@@ -111,7 +111,7 @@ try {
   const { TRANSIENT_FIXTURES } = await import("./gateSweep.mjs");
   const left = TRANSIENT_FIXTURES.filter((f) => fs.existsSync(f));
   check("no transient gate fixture was left on disk by a killed run", left.length === 0,
-        left.length ? left.join(", ") + " -- delete it; it enumerates as a gate and one of them exits 3" : "");
+        left.length ? left.join(", ") + " -- delete it: a killed gate's leftover (the zz- ones enumerate as gates and one exits 3; .maze-boot.mjs moves the file censuses)" : "");
 // v4778 review -- a crash here FAILS now instead of printing a NOTE, for the reason 1c gives: this step is the
 // ship-time road recordReach.SHIP_STEPS credits with DRIFT_AT_V4482, REACH_AT_V4548 and PROBE_AT_V4536, and on
 // the rig (recordDrift-selfcheck 4,829 ms) the only one -- a NOTE would let verify pass with those records

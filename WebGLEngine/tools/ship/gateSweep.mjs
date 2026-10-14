@@ -14932,6 +14932,11 @@ export function repairsAgainst(baselineRed, confirmedRed) {
 export const TRANSIENT_FIXTURES = Object.freeze([
     "tools/ship/zz-temp-fixture-selfcheck.mjs",
     "tools/ship/zz-treeread-fixture-selfcheck.mjs",
+    // v4856 -- brain/tools/maze-walker-selfcheck.mjs writes brain-maze's module, patched, to the engine root (beside the page,
+    // so its relative imports resolve) and deletes it in a `finally`. The rig's v4856 verify found it stranded by a cap kill:
+    // one more .mjs in the tree, so runtimeGap's census read 4686 against 4685 and recordDrift-selfcheck read the census
+    // drifted, red alone -- two reds for one leftover. Not a gate name, but the same kill and the same remedy.
+    ".maze-boot.mjs",
 ]);
 
 /**

@@ -855,6 +855,16 @@ sec("THE TWO EXPORTS NO GATE NAMED, CLOSED BY ASSERTION (v4647q)");
             makers[p] && fs.readFileSync(path.join(ENG_ROOT, makers[p]), "utf8").includes(JSON.stringify(p))),
         "...and TRANSIENT_DIRS is the four in-tree mkdtemp prefixes, SPELLED, each one a name a gate really creates",
         GS.TRANSIENT_DIRS.map(([d, p]) => d + "/" + p + "*").join(", "));
+    // v4856 -- and TRANSIENT_FIXTURES' maze entry is the very name brain/tools/maze-walker-selfcheck.mjs writes at the engine root:
+    // the rig's v4856 verify found it stranded by a cap kill, and two census reds followed. A rename of the fixture that left the
+    // list behind would put both reds back. SABOTAGED v4856: the entry spelled ".maze-boot.js" -> 1 RED, this row; restored, md5 verified.
+    {
+        const mz = fs.readFileSync(path.join(ENG_ROOT, "brain", "tools", "maze-walker-selfcheck.mjs"), "utf8");
+        const written = (mz.match(/const tmp = path\.join\(HERE, "([^"]+)"\)/) || [])[1] || null;
+        ok(!!written && GS.TRANSIENT_FIXTURES.includes(written) && /HERE = path\.dirname\(path\.dirname\(path\.dirname\(/.test(mz),
+            "...and TRANSIENT_FIXTURES names the file maze-walker-selfcheck writes at the engine root, so a cap kill's leftover is reclaimed",
+            `maze-walker writes ${written}; listed ${GS.TRANSIENT_FIXTURES.includes(written)}`);
+    }
 }
 
 console.log(fails === 0 ? "\nALL GREEN" : `\n${fails} FAILED`);
