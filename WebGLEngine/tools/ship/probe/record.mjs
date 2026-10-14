@@ -10,6 +10,10 @@ import { fileURLToPath } from "node:url";
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
 export const reads = new Set(), dirs = new Set(), execs = new Set();
+// v4857 -- AND WHAT IT WRITES INSIDE THE TREE. A file a gate creates under the engine root and deletes in a `finally` is
+// stranded by a SIGKILL, and the rig's v4856 verify lost two gates to one such file (.maze-boot.mjs). The read side has been
+// probed since v4566; this is the write side, so tools/ship/strandCensus.mjs can name every such file instead of the rig.
+export const writes = new Set();
 export const flags = { net: false, spawnedNonNode: false, spawnedNode: 0 };
 
 /** A path relative to the engine root, or null when it is not one of ours to invalidate on. */
@@ -28,3 +32,4 @@ export function rel(p) {
 
 export const addRead = (p) => { const r = rel(p); if (r) reads.add(r); };
 export const addDir = (p) => { const r = rel(p); if (r) dirs.add(r); };
+export const addWrite = (p) => { const r = rel(p); if (r) writes.add(r); };

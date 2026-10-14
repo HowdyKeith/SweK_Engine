@@ -43,7 +43,7 @@ import path from "node:path";
 import os from "node:os";
 import Module from "node:module";
 import { register } from "node:module";
-import { reads, dirs, execs, flags, addRead, addDir } from "./probe/record.mjs";
+import { reads, dirs, execs, writes, flags, addRead, addDir, addWrite } from "./probe/record.mjs";
 import { WRAPPERS } from "./probe/cpWrap.mjs";
 
 register(new URL("./probe/hooks.mjs", import.meta.url).href);
@@ -59,6 +59,14 @@ for (const name of ["readdirSync", "readdir", "statSync", "existsSync", "lstatSy
     if (typeof orig !== "function") continue;
     fs[name] = function (p, ...rest) { addDir(p); return orig.call(this, p, ...rest); };
 }
+// v4857 -- the write side, CJS half (the loader hook's half is probe/fsShim.mjs). mkdtempSync is recorded by what it returns.
+for (const [name, arg] of [["writeFileSync", 0], ["appendFileSync", 0], ["writeFile", 0], ["mkdirSync", 0], ["copyFileSync", 1],
+                           ["renameSync", 1], ["createWriteStream", 0], ["cpSync", 1]]) {
+    const orig = fs[name];
+    if (typeof orig !== "function") continue;
+    fs[name] = function (...a) { addWrite(a[arg]); return orig.apply(this, a); };
+}
+{ const orig = fs.mkdtempSync; if (typeof orig === "function") fs.mkdtempSync = function (...a) { const d = orig.apply(this, a); addWrite(d); return d; }; }
 const origLoad = Module._load;
 Module._load = function (request, ...rest) {
     if (/^(node:)?(net|http|https|tls|dgram)$/.test(request)) flags.net = true;
@@ -88,7 +96,7 @@ process.on("exit", () => {
         fs.writeFileSync(OUT, JSON.stringify({
             pid: process.pid, ppid: process.ppid,
             reads: [...reads].sort(), dirs: [...dirs].sort(),
-            execs: [...execs].sort(),
+            execs: [...execs].sort(), writes: [...writes].sort(),
             spawnedNode: flags.spawnedNode, spawnedNonNode: flags.spawnedNonNode,
             net: flags.net, exit: process.exitCode ?? 0,
         }));
