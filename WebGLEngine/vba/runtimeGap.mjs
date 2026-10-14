@@ -621,7 +621,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4838 -- THE DENOISER ARC'S MERGE: RE-DERIVED over the merged tree: main's 4636 plus the arc's 30 files since the v4818 split.
     // v4840 -- files 4636 -> 4637: tools/ship/wasmDoors-selfcheck.mjs.
     // v4842 -- main's v4838 merged with this line's v4838-v4841: RE-DERIVED over the merged tree.
-    files: 4684,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
+    // v4854 -- files 4684 -> 4685: tools/ship/threeTextureBarrier-selfcheck.mjs (three's own test file is kept as .txt, not counted).
+    files: 4685,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
     // (v4691 note, carried)                               // v4691 -- RE-DERIVED: tools/ship/textureInProbe.mjs arrived, one ES module with a closure and top-level await -- four rows moved (files, ES modules, closures, async/await) and eight held.
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
@@ -1236,8 +1237,11 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4849 -- the tactics trainer (tools/ship/tacticsTrain.mjs, trainTactics.mjs, its gate): files 4681 -> 4684, ES modules 4376 -> 4379, closures 4221 -> 4224, async/await 1762 -> 1763 and Promises 427 -> 428 (trainTactics's Promise.all over its worker processes, as trainLeague6dof's); fetch/XHR holds at 252 because the roster gate's page script is HANDED the trained file and does not fetch it.
     // v4850 -- no file added; async/await 1763 -> 1764: tools/ship/afterVerdict-selfcheck.mjs awaits a dynamic import of
     // sourceScan for its section 3b (the tree-wide ratchets, merged in from this line's v4846 round).
-    esModules: 4379, closures: 4224, asyncAwait: 1764, typedArrays: 1303, promises: 428,
-    fetchXhr: 252, performanceNow: 250, raf: 127, webgl: 200, webgpu: 62, threads: 26, wasm: 27,
+    // v4854 -- tools/ship/threeTextureBarrier-selfcheck.mjs: files 4684 -> 4685, ES modules 4379 -> 4380, closures 4224 -> 4225,
+    // async/await 1764 -> 1765, typed arrays 1303 -> 1304 (the read-back), Promises 428 -> 429 (the page waits for a late device
+    // error), and WebGPU 62 -> 63: it asks the adapter for a device and dispatches the barrier kernel raw. The other rows hold.
+    esModules: 4380, closures: 4225, asyncAwait: 1765, typedArrays: 1304, promises: 429,
+    fetchXhr: 252, performanceNow: 250, raf: 127, webgl: 200, webgpu: 63, threads: 26, wasm: 27,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.

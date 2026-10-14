@@ -102,7 +102,10 @@ bytes `record.json` names:
   the runner as `../e2e/puppeteer-unit-local.diff`): 1894 tests, 1891 passed, 1 todo, 2 failed, on both builds -- and the GPU-native
   TSL tests run, 169 on WebGPU and 169 on the WebGL 2 backend, none skipped. The two that fail are `dev`'s own and fail on `dev` here
   the same way: textureBarrier's read-back sum on SwiftShader's Vulkan, and integer `mod()` of negative operands on the WebGL 2 backend
-  (`e2e.json` gives each reason). (v4836 read 1893 passed and 0 failed, but headless Chromium gave the TSL tests no backend there and
+  (`e2e.json` gives each reason). The first is the test's, not the barrier's: its storage texture is `rgba32float`, which core
+  WebGPU does not allow `read_write` without `texture-formats-tier2`, and SwiftShader does not offer it, so the kernel never runs.
+  [`unit/texture-barrier-r32float.diff`](unit/texture-barrier-r32float.diff) makes it `r32float`, and with it alone on `dev` the
+  run is 1892 passed, 1 todo, 1 failed (`mod()`); its pull request text is [`unit/texture-barrier.md`](unit/texture-barrier.md). (v4836 read 1893 passed and 0 failed, but headless Chromium gave the TSL tests no backend there and
   they passed as skipped -- a patch to the node renderers was not exercised by them until this run.)
 - e2e ([`e2e.json`](e2e.json), the runner as `../e2e/puppeteer-local.diff`): 202 WebGPU examples, 191 passed and the same 11
   failed on both builds; on the WebGL 2 backend, 148 passed and the same 54 failed on both. 200 of the 202 screenshots are the

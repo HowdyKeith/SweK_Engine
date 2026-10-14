@@ -20,7 +20,7 @@
   "failedOnBoth": [
    {
     "test": "Nodes > TSL > barriers > textureBarrier: a workgroup-mate's storage-texture write is visible after the barrier",
-    "why": "on this box's SwiftShader Vulkan the four texels read back after textureBarrier() do not sum to 10; the same on dev and with all sixteen -- dev's own test failing on this device, not investigated further"
+    "why": "the test's StorageTexture is FloatType with the default RGBAFormat, so rgba32float, accessed read_write -- which core WebGPU allows only on r32float, r32sint and r32uint; rgba32float needs 'texture-formats-tier2', which SwiftShader's adapter does not offer. The bind group layout fails validation (\"RGBA32Float does not support storage texture access ReadWrite\"), the kernel never runs and the sum reads 0. Not the barrier: unit/texture-barrier-r32float.diff sets RedFormat (r32float) and the test passes (unit/texture-barrier.md, held by tools/ship/threeTextureBarrier-selfcheck.mjs)"
    },
    {
     "test": "Nodes > TSL > math library > mod(): integer truncated vs. float floored semantics diverge on negative operands [webgl]",
@@ -28,7 +28,20 @@
    }
   ],
   "runner": "test/unit/puppeteer.unit-local.js (../e2e/puppeteer-unit-local.diff): three's puppeteer.unit.js with the e2e runner's SwiftShader Vulkan and ANGLE flags in place of lavapipe, and its swizzle workaround",
-  "note": "v4811: 1525 tests. v4836: 1894 (#34918 consolidated the TSL unit tests), 1893 passed, 1 todo, 0 failed -- but with no WebGPU or WebGL backend in headless Chromium here, gpu-test-utils passed its 338 GPU-native tests as SKIPPED, so the patches to the node renderers were not exercised. v4841: with SwiftShader under both backends the 169 WebGPU and 169 WebGL 2 tests run, none skipped; 2 fail, the same 2 on both builds."
+  "note": "v4811: 1525 tests. v4836: 1894 (#34918 consolidated the TSL unit tests), 1893 passed, 1 todo, 0 failed -- but with no WebGPU or WebGL backend in headless Chromium here, gpu-test-utils passed its 338 GPU-native tests as SKIPPED, so the patches to the node renderers were not exercised. v4841: with SwiftShader under both backends the 169 WebGPU and 169 WebGL 2 tests run, none skipped; 2 fail, the same 2 on both builds.",
+  "withTextureBarrierFix": {
+   "tests": 1894,
+   "passed": 1892,
+   "todo": 1,
+   "failed": 1,
+   "gpu": {
+    "webgpu": 169,
+    "webgl": 169,
+    "skippedForBackend": 0
+   },
+   "note": "dev 11738a9 with unit/texture-barrier-r32float.diff alone, the same runner; npm run lint clean on the patched file",
+   "failedTest": "the integer mod() test on the WebGL 2 backend, as on dev"
+  }
  },
  "webgpu": {
   "examples": 202,
