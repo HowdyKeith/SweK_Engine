@@ -30,14 +30,16 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn, execFileSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { gateFiles } from "./staleness.mjs";
 import { TRANSIENT_FIXTURES, TRANSIENT_DIRS, TRANSIENT_PATHS } from "./gateSweep.mjs";
 import { FIXTURE_DIRS, FIXTURE_PREFIX } from "./fixtureLitter.mjs";
 import { COPY_SUFFIX } from "./exitBusy.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-const PROBE = path.join(ENG, "tools", "ship", "inputProbe.mjs");
+// v4857 -- a file:// URL, not a path: on Windows "C:\\..." parses as a URL scheme and --import dies before the gate runs a
+// line (the rig's first v4857 verify). Assigned through pathToFileURL on its own line so windowsImport-selfcheck can read it.
+const PROBE = pathToFileURL(path.join(ENG, "tools", "ship", "inputProbe.mjs")).href;
 
 const under = (rel, dir, prefix) => (dir ? rel.startsWith(dir + "/" + prefix) : !rel.includes("/") && rel.startsWith(prefix));
 
@@ -95,7 +97,7 @@ function runOne(gate, { capMs }) {
     return new Promise((resolve) => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), "swek-strand-")), t0 = Date.now();
         // node's own timeout sends the SIGKILL, and the exit handler below reads the signal back: a stopped gate is `capped`
-        const child = spawn(process.execPath, ["--import", PROBE, gate], {
+        const child = spawn(process.execPath, [gate], {   // NODE_OPTIONS carries the probe, into this gate and every node child
             cwd: ENG, stdio: "ignore", timeout: capMs, killSignal: "SIGKILL",
             env: { ...process.env, SWEK_PROBE_DIR: dir, NODE_OPTIONS: `${process.env.NODE_OPTIONS || ""} --import ${PROBE}`.trim() } });
         child.on("exit", (code, signal) => {

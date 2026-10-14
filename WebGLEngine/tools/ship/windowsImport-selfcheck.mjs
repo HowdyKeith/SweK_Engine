@@ -213,6 +213,7 @@ function walk(dir, out = []) {
 {
     const files = walk(ENG);
     const offenders = [], loaderOffenders = [], undecidable = [];
+    let loaderSeen = 0;
     for (const f of files) {
         let src = ""; try { src = readOnce(f); } catch { continue; }
         // *** PRE-FILTERED ON THE RAW TEXT BEFORE LEXING, AND THAT IS A BUDGET FACT, NOT A TIDY-UP. ***
@@ -317,13 +318,24 @@ function walk(dir, out = []) {
         // THIS section's own necessary condition: the ARG regex below cannot match unless one of the two flag
         // spellings appears literally, so the lexer only runs on a file that could produce a finding.
         if (!src.includes("--import") && !src.includes("--experimental-loader")) continue;
-        const code = codeOnly(src);
+        // *** v4857 -- noComments, NOT codeOnly: codeOnly EMPTIES STRING LITERALS, so `"--import"` reached the regex below as `""`
+        // and this scan could not match anything at all. The row passed on every tree since codeOnly was swapped in for speed, and
+        // tools/ship/strandCensus.mjs shipped `["--import", PROBE, gate]` with PROBE a raw path straight past it -- the rig's v4857
+        // verify, where the census gate died on Windows before running a line. The scan reads strings, so it keeps them.
+        // SABOTAGED v4857: codeOnly put back -> 1 RED, this row ("0 flag argument(s) read"); strandCensus's PROBE put back to a raw
+        // path.join -> 1 RED, this row, naming it. Each restored, md5 verified.
+        const code = noComments(src);
         // THE CALL FORM IS LISTED FIRST so `pathToFileURL(HOOK).href` matches as one expression rather than
         // as the bare identifier `pathToFileURL` -- which is exactly what the first version of this check did,
         // and it duly reported the line this round had just FIXED. A checker that cannot read the correct form
         // teaches you to ignore it.
         const ARG = /["'`]--(?:import|experimental-loader)["'`]\s*,\s*([A-Za-z_$][\w$.]*\s*\([^()]*\)(?:\.\w+)*|path\.(?:join|resolve)\([^)]*\)|[A-Za-z_$][\w$.]*)/g;
-        for (const m of code.matchAll(ARG)) {
+        // v4857 -- and the two other spellings a flag takes, both in NODE_OPTIONS: a template (`--import ${HOOK}`, the census's second
+        // copy of the same defect) and a concatenation (`"--import " + hook`, recordInputs' correct form).
+        const TPL = /--(?:import|experimental-loader)[ =]\$\{\s*([^}]+?)\s*\}/g;
+        const CAT = /["'`]--(?:import|experimental-loader)[ =]["'`]\s*\+\s*([A-Za-z_$][\w$.]*(?:\s*\([^()]*\))?(?:\.\w+)*)/g;
+        loaderSeen += [...code.matchAll(ARG), ...code.matchAll(TPL), ...code.matchAll(CAT)].length;
+        for (const m of [...code.matchAll(ARG), ...code.matchAll(TPL), ...code.matchAll(CAT)]) {
             const arg = m[1].trim();
             let safe;
             if (/^pathToFileURL\s*\(/.test(arg)) safe = true;                 // converted at the call site
@@ -338,9 +350,10 @@ function walk(dir, out = []) {
     ok("!! NO dynamic import is given a raw filesystem path", offenders.length === 0,
        offenders.length ? "WOULD CRASH ON WINDOWS: " + offenders.slice(0, 4).join(" | ")
                         : files.length + " files scanned -- on Windows an absolute path starts with C:, and 'c:' parses as a URL SCHEME, so the loader throws ERR_UNSUPPORTED_ESM_URL_SCHEME");
-    ok("!! ...and NO --import / --experimental-loader FLAG is given one either", loaderOffenders.length === 0,
+    ok("!! ...and NO --import / --experimental-loader FLAG is given one either", loaderOffenders.length === 0 && loaderSeen > 0,
        loaderOffenders.length ? "WOULD DIE ON WINDOWS BEFORE RUNNING A LINE: " + loaderOffenders.slice(0, 4).join(" | ")
-                              : "the loader flags resolve through the same ESM machinery as import(), so a raw " +
+                              : loaderSeen + " flag argument(s) read (0 would mean the scan is blind again, and is red). " +
+                                "The loader flags resolve through the same ESM machinery as import(), so a raw " +
                                 "path fails there identically -- and it is a spawn ARGUMENT rather than call " +
                                 "syntax, so the scan above cannot see it");
     ok("...and the scan covered the whole tree", files.length > 500, files.length + " source files");

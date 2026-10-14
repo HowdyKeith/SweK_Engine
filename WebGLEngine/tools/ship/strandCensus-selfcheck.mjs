@@ -31,7 +31,9 @@ import { FIXTURE_DIRS, FIXTURE_PREFIX } from "./fixtureLitter.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
-const ok = (c, msg, detail = "") => { console.log(`${c ? "  ok  " : "  RED "} ${msg}${detail ? "\n        " + detail : ""}`); if (!c) fails++; };
+// v4857 -- "  FAIL  " is the spelling failLines' FAIL_LINE reads; the first draft printed RED, and the rig's verify could only say
+// the gate "died rather than found something" because no row it recognised was red.
+const ok = (c, msg, detail = "") => { console.log(`${c ? "  ok    " : "  FAIL  "}${msg}${detail ? "\n        " + detail : ""}`); if (!c) fails++; };
 
 console.log("1. THE CLASSIFIER, ON FIXTURES");
 {
@@ -60,7 +62,7 @@ const R = readCensus(census);
        R.strandable.length ? R.strandable.map((p) => `${p.rel} <- ${p.gate}`).join("; ") : `${census.gatesRun} gates run, ${R.covered.length} paths covered`);
     ok(R.left.length === 0, "...and nothing is left untracked and unignored after a clean exit",
        R.left.map((p) => `${p.rel} <- ${p.gate}`).join("; "));
-    ok(census.gatesRun >= 1900 && compactCensus(census) === fs.readFileSync(path.join(ENG, "tools", "ship", "strand-census.json"), "utf8"),
+    ok(census.gatesRun >= 1900 && compactCensus(census) === fs.readFileSync(path.join(ENG, "tools", "ship", "strand-census.json"), "utf8").replace(/\r\n/g, "\n"),
        "...the census is the whole population, written by strandCensus itself", `gatesRun ${census.gatesRun}; unread at the cap ${R.unread.length}`);
 }
 
