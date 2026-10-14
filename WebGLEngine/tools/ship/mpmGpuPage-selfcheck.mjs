@@ -316,7 +316,10 @@ console.log("\n9. A REAL BROWSER LOADS BOTH PAGES, BECAUSE SOURCE CHECKS DID NOT
     const { createRequire } = await import("node:module");
     const { chromium: _probe, from: pwFrom } = resolvePlaywright(createRequire(import.meta.url));
     const SHELL = HEADLESS_SHELL;
-    const PW = pwFrom;
+    // v4858 -- the resolver can answer with a BARE name ("playwright", found on NODE_PATH), and the child's createRequire takes
+    // only an absolute path or a file URL: it threw ERR_INVALID_ARG_VALUE before loading a page, and the row read as the page
+    // failing. The bare name is resolved here, in the parent, to the file it names.
+    const PW = path.isAbsolute(pwFrom) ? pwFrom : createRequire(import.meta.url).resolve(pwFrom);
     const why = browserSkipReason(_probe, pwFrom);
     if (why) {
         console.log("  SKIP  the live page load   " + why + " -- SKIPPING WITH A REASON RATHER THAN PASSING QUIETLY.");
