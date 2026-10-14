@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it. `poolHorizon` (v4816) is the stamp of the first pool entry that run did NOT take: it reached every entry stamped earlier and none stamped at or after it.",
- "at": "2026-10-14T17:12:27.165Z",
+ "at": "2026-10-14T17:20:57.524Z",
  "poolAt": "2026-10-14T17:00:38.489Z",
  "poolHorizon": "2026-10-11T00:08:01.399Z",
  "budgetMs": 3000,
@@ -2578,10 +2578,10 @@
   },
   {
    "gate": "tools/ship/avatarServerViews-selfcheck.mjs",
-   "ms": 20018,
-   "code": "timeout/signal",
-   "priorMs": 19830,
-   "at": "2026-10-14T17:00:38.489Z"
+   "ms": 20302,
+   "code": 0,
+   "priorMs": 20008,
+   "at": "2026-10-14T17:20:19.116Z"
   },
   {
    "gate": "tools/ship/avatarZWander-selfcheck.mjs",
@@ -3184,10 +3184,10 @@
   },
   {
    "gate": "tools/ship/eulerGpu-selfcheck.mjs",
-   "ms": 12309,
+   "ms": 11195,
    "code": 0,
-   "priorMs": 9773,
-   "at": "2026-10-14T17:00:38.489Z"
+   "priorMs": 11547,
+   "at": "2026-10-14T17:20:57.524Z"
   },
   {
    "gate": "tools/ship/exitBanner-selfcheck.mjs",

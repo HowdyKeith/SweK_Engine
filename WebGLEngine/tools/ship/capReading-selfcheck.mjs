@@ -221,12 +221,18 @@ export const LET_FINISH_V4573 = Object.freeze({
         // (median 9,246) and the re-filed alone reading is 9,434. v4647l's runs (15,003 / 15,136 / 16,459, against a
         // filed 14,806) are kept in `why` as what the gate cost then. SABOTAGE: v4647l's three runs put back -> 2 red,
         // the population row naming eulerGpu DISAGREEING AND UNNAMED, and the corroboration row; restored md5-identical.
-        Object.freeze({ gate: "tools/ship/eulerGpu-selfcheck.mjs", table: 18450, now: 9434,
-            runs: Object.freeze([9193, 9336, 9246]),
-            earlierRuns: Object.freeze([Object.freeze([15003, 15136, 16459])]),   // v4647l's minute, kept as noise evidence
+        // v4857 -- MOVED A THIRD TIME, UP: the ship rotation filed 12,309 and an alone re-time 11,158. Three runs on a quiet box,
+        // each filed by `sweepRotation --gate eulerGpu-selfcheck --cap-s 300 --write` as it was taken: 11,378 / 11,547 / 11,195
+        // (median 11,378, spread 3.1%), the last filed 11,195. The first box reading since the node-webgpu pin moved to 0.6.2
+        // (v4856), and this is a GPU gate; the v4815 minute is kept in earlierRuns. SABOTAGE: the v4815 runs put back as `runs` -> 2 red
+        // (the population row and the corroboration row); restored md5-identical.
+        Object.freeze({ gate: "tools/ship/eulerGpu-selfcheck.mjs", table: 18450, now: 11195,
+            runs: Object.freeze([11378, 11547, 11195]),
+            earlierRuns: Object.freeze([Object.freeze([15003, 15136, 16459]), Object.freeze([9193, 9336, 9246])]),   // v4647l's and v4815's minutes, kept as noise evidence
             why: "18,450 at the cap pass, 17,904 at v4637 (3.0% -- the reading that set this row's tolerance), " +
-                 "~15,100 at v4647l across three runs in one minute (15,003 / 15,136 / 16,459, filed 14,806), and " +
-                 "~9,250 at v4815 across three quiet runs, the alone reading filed 9,434 -- 2.0% from their median. " +
+                 "~15,100 at v4647l across three runs in one minute (15,003 / 15,136 / 16,459, filed 14,806), " +
+                 "~9,250 at v4815 across three quiet runs (filed 9,434), and ~11,400 at v4857 on the 0.6.2 pin across three " +
+                 "quiet runs, the alone reading filed 11,195 -- 1.6% from their median. " +
                  "Kept rather than re-taken: 18,450 is what the gate cost when the cap was hiding it.",
         }),
         // v4776 -- the merge's --killed rotation let two more of the seventeen finish, both faster than the table. The
