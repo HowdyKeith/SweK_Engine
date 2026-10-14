@@ -9210,6 +9210,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "sabotages red by name. NOT CLOSED: on SwiftShader the test passes with the barrier deleted too -- it shows the barrier runs, " +
                  "not that it orders. The draft is Keith's to file.",
     }),
+    // v4857 -- the census of what a killed gate can leave in the tree, run over every gate rather than learnt one rig failure at a time.
+    since555: Object.freeze({
+        at: "v4857", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/strandCensus-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green, 1.5 s. tools/ship/strandCensus.mjs ran all 1971 gates under the input probe, which now records WRITES inside the " +
+                 "tree, and found 54 paths from about 25 gates that a gate makes and removes with no cleanup list naming them -- a SIGKILL " +
+                 "at the sweep's cap strands each, as it stranded .maze-boot.mjs on the rig. TRANSIENT_PATHS names them; the sweep's " +
+                 "reclaim and fixtureLitter's now remove directories too. Two more were left after a clean exit and are a box's own " +
+                 "state (ai-bridge/apks, the loop-scope flag): .gitignore'd, never deleted. The committed census reads 0 strandable, 0 " +
+                 "left; every entry is a path some gate wrote; no prefix matches a committed file; maze-walker is read live. Six sabotages " +
+                 "red by name. NOT SEEN: writes by a non-node child, and the 19 gates the census stopped at its 300 s cap.",
+    }),
     // v4849 -- since553. ONE new gate file: tools/ship/tacticsTrain-selfcheck.mjs (the tool that fits the Endless-Sky tactics weights in the arena and the file it wrote, held to its own `by` on recomputed numbers), plus the 'trained' rows of
     // brain/tacticsRoster-selfcheck.mjs (the choice, the panel's format check, both pages, a saved choice surviving a reload).
     since553: Object.freeze({
@@ -14938,6 +14953,65 @@ export const TRANSIENT_FIXTURES = Object.freeze([
     // drifted, red alone -- two reds for one leftover. Not a gate name, but the same kill and the same remedy.
     ".maze-boot.mjs",
 ]);
+
+/**
+ * *** v4857 -- AND EVERY OTHER PATH A KILLED GATE CAN STRAND, FOUND BY RUNNING THE GATES RATHER THAN BY THE RIG. ***
+ *
+ * Each entry above was added after a rig verify found its leftover. tools/ship/strandCensus.mjs ran every gate once under the
+ * input probe, which since v4857 records WRITES inside the tree, and classified each path by what a clean exit left: 54 paths
+ * from about 25 gates were created and removed again by the gate itself, so a SIGKILL at the sweep's cap strands them, and no
+ * list named them -- gfx-door-probe.html among them, which surfaced this session as an untracked file mid-step-4b.
+ *
+ * [directory, name prefix, writer]: reclaimStrandedFixtures removes every entry in `directory` whose name starts with the
+ * prefix, recursively, once no gate is running. A prefix (not a pattern) because several writers put a pid or a mkdtemp
+ * suffix after a fixed head. strandCensus-selfcheck holds three things: the committed census has no strandable path these
+ * lists do not name; every entry here is a path some gate really wrote; and no prefix matches a committed file, so the
+ * reclaim can never delete anything git tracks. "" is the engine root. NOT here, on purpose: ai-bridge/swek_loop_scope.flag
+ * and ai-bridge/apks, which gates write but which are a box's own state (the loop scope; the bridge's APK folder) -- they
+ * are .gitignore'd, never deleted.
+ */
+export const TRANSIENT_PATHS = Object.freeze([
+    ["ai-bridge/tools", ".sc-mk-", "ai-bridge/tools/discovery-selfcheck.mjs"],
+    ["ai-bridge/tools", ".sc-tunnel-reg-", "ai-bridge/tools/discovery-selfcheck.mjs"],
+    ["", ".bz-page-boot.mjs", "bz/tools/bz-page-selfcheck.mjs"],
+    ["", "gfx-door-probe.html", "gfx/frontDoor-selfcheck.mjs"],
+    ["tools/roundhouse", ".renderAccountability-selfcheck-marker.json", "render/renderAccountability-selfcheck.mjs"],
+    ["tools/roundhouse", "__routeProbe-selfcheck.mjs", "tools/roundhouse/gateActivity-selfcheck.mjs"],
+    ["", "fixture-artefact.json", "tools/ship/artefactWriters-selfcheck.mjs"],
+    ["", "fixture-heal.json", "tools/ship/artefactWriters-selfcheck.mjs"],
+    ["tools", "__healfixture__", "tools/ship/artefactWriters-selfcheck.mjs"],
+    ["tools", "__writerfixture__", "tools/ship/artefactWriters-selfcheck.mjs"],
+    ["brain/bench", "__gatecheck", "tools/ship/browserSafety-selfcheck.mjs"],
+    ["tools/ship", ".budgetExile-fixture-timings.json", "tools/ship/budgetExile-selfcheck.mjs"],
+    ["", "__fx", "tools/ship/frozenRecords-selfcheck.mjs"],
+    ["tools/ship", "zz_not_an_inputsets_fixture.txt", "tools/ship/inputSets-selfcheck.mjs"],
+    ["", ".orrery-seed-probe.json", "tools/ship/orrerySeed-selfcheck.mjs"],
+    ["", ".orrery-drift-probe.json", "tools/ship/orreryView-selfcheck.mjs"],
+    ["tools/render-qa", ".__req_probe.html", "tools/ship/pageRequirements-selfcheck.mjs"],
+    ["tools/ship", "population-census.json.bak", "tools/ship/populationCensus-selfcheck.mjs"],
+    ["ai-bridge", "__qrBridge.", "tools/ship/qrBridge-selfcheck.mjs"],
+    ["ai-bridge", "__exportBridge.", "tools/ship/webcodecsFramesToMp4-selfcheck.mjs"],
+    ["ai-bridge", "__webcodecsBridge.", "tools/ship/webcodecsFramesToMp4-selfcheck.mjs"],
+    ["ai-bridge", ".swek-exitgate-tmp.js", "tools/ship/requestedExit-selfcheck.mjs"],
+    ["physics/render", "_ptBefore.mjs", "tools/ship/roughDiffuseWired-selfcheck.mjs"],
+    ["physics/render", "_ptUncompensated.mjs", "tools/ship/roughDiffuseWired-selfcheck.mjs"],
+    ["tools/ship", ".shipVerdict-liar.mjs", "tools/ship/shipVerdict-selfcheck.mjs"],
+    ["tools/ship", ".sweepCoverage-confirm.json", "tools/ship/sweepCoverage-selfcheck.mjs"],
+    ["tools/ship", ".sweepCoverage-probe.json", "tools/ship/sweepCoverage-selfcheck.mjs"],
+]);
+
+/** Remove every TRANSIENT_PATHS entry under `root`. Called only where no gate is running (see quickSweep's reclaim). */
+export function reclaimTransientPaths(root = ENG) {
+    const gone = [];
+    for (const [dir, prefix] of TRANSIENT_PATHS) {
+        let names = [];
+        try { names = fs.readdirSync(path.join(root, dir)); } catch { continue; }
+        for (const nm of names.filter((x) => x.startsWith(prefix))) {
+            try { fs.rmSync(path.join(root, dir, nm), { recursive: true, force: true }); gone.push(dir ? dir + "/" + nm : nm); } catch {}
+        }
+    }
+    return gone;
+}
 
 /**
  * *** v4681 -- AND THE SCRATCH DIRECTORIES THREE GATES MAKE INSIDE THE TREE, WHICH THE SAME KILL STRANDS. ***

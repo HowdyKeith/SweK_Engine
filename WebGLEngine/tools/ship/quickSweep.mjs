@@ -39,7 +39,7 @@ import { boxId, canonicalId, hostFacts } from "./hostScale.mjs";
 // the session removing from its own record.
 import { FAIL_LINE } from "./failLines.mjs";
 import { skippable, readRecordCached as readInputRecord } from "./inputSets.mjs";   // v4725: read once per process while unchanged
-import { enumerateGates, classify, VERDICT, SWEEP_V4297, ENG, exitKind, exitName, EXIT_KIND, reclaimScratchDirs, TRANSIENT_FIXTURES } from "./gateSweep.mjs";
+import { enumerateGates, classify, VERDICT, SWEEP_V4297, ENG, exitKind, exitName, EXIT_KIND, reclaimScratchDirs, TRANSIENT_FIXTURES, reclaimTransientPaths } from "./gateSweep.mjs";
 import { FIXTURE_DIRS, FIXTURE_PREFIX, reclaimMutations } from "./fixtureLitter.mjs";
 import { sweepStrays } from "./exitBusy.mjs";
 import { parseArgs, refusalLines } from "./cliArgs.mjs";
@@ -725,10 +725,13 @@ export function reclaimStrandedFixtures(root = ENG) {
     for (const dir of FIXTURE_DIRS) {
         let names = [];
         try { names = fs.readdirSync(path.join(root, dir)); } catch { continue; }
+        // v4857: rmSync, not unlinkSync -- doorKinds-selfcheck's __doorfixture__ is a DIRECTORY, and unlink refuses one, so the
+        // reclaim reported it gone-or-absent and left it (strandCensus found its four files). A `__` name is never tracked.
         for (const nm of names.filter((x) => x.startsWith(FIXTURE_PREFIX))) {
-            try { fs.unlinkSync(path.join(root, dir, nm)); gone.push(dir + "/" + nm); } catch {}
+            try { fs.rmSync(path.join(root, dir, nm), { recursive: true, force: true }); gone.push(dir + "/" + nm); } catch {}
         }
     }
+    for (const rel of reclaimTransientPaths(root)) gone.push(rel);   // v4857: what strandCensus found no list named
     for (const q of sweepStrays(root)) gone.push(path.relative(root, q).split(path.sep).join("/"));
     // v4815 -- AND A TRACKED FILE A KILLED GATE WAS HALF-WAY THROUGH BENDING. fixtureLitter's mutation ledger has held the
     // original of every ledgered edit since v4692, but only rigRunner's own next run ever read it back. The ledger lives

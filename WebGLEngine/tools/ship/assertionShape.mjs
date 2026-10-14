@@ -927,8 +927,11 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // nothing else moved.
     // v4854 -- tools/ship/threeTextureBarrier-selfcheck.mjs: gates, usesOk, definesOk and nameFirst each by one more (1970 -> 1971,
     // 1949 -> 1950, 1941 -> 1942, 1841 -> 1842); the rest hold.
-    gates: 1971, usesOk: 1950, definesOk: 1942, importsOk: 0,
-    distinctDefinitions: 43, nameFirst: 1842, condFirst: 97, unknownSignature: 11,
+    // v4857 -- tools/ship/strandCensus-selfcheck.mjs: gates, usesOk, definesOk and condFirst each by one (1971 -> 1972, 1950 -> 1951,
+    // 1942 -> 1943, 97 -> 98), and distinctDefinitions 43 -> 44: its ok(c, msg, detail = "") prints the PASS rows with their detail,
+    // which the tree's one (c, m, d) spelling does not. The rest hold.
+    gates: 1972, usesOk: 1951, definesOk: 1943, importsOk: 0,
+    distinctDefinitions: 44, nameFirst: 1842, condFirst: 98, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

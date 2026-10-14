@@ -51,7 +51,7 @@ export function reclaimStranded() {
         let names = [];
         try { names = fs.readdirSync(fixtureAbs(dir)); } catch { continue; }
         for (const nm of names.filter((x) => x.startsWith(FIXTURE_PREFIX))) {
-            try { fs.unlinkSync(fixtureAbs(dir + "/" + nm)); stranded.push(dir + "/" + nm); } catch {}
+            try { fs.rmSync(fixtureAbs(dir + "/" + nm), { recursive: true, force: true }); stranded.push(dir + "/" + nm); } catch {}   // v4857: a `__` directory too
         }
     }
     return stranded;

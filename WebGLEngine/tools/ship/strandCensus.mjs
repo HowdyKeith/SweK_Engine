@@ -2,7 +2,7 @@
 // WebGLEngine/tools/ship/strandCensus.mjs -- v4857
 //
 // Run:  node tools/ship/strandCensus.mjs --run [--workers 4] [--cap-s 300] [--out FILE] [--only SUBSTRING]
-//       node tools/ship/strandCensus.mjs --read FILE
+//       node tools/ship/strandCensus.mjs --read FILE      (the committed one: tools/ship/strand-census.json)
 //
 // *** WHAT CAN A KILLED GATE LEAVE IN THE TREE? *** quickSweep SIGKILLs a gate at its cap, and a SIGKILL runs no
 // `finally`. A gate that creates a file under the engine root and removes it on the way out leaves it behind --
@@ -15,8 +15,8 @@
 // WRITES inside the tree as well as what it reads (named imports, require and node children alike). The moment
 // a gate exits, each path it wrote is classified:
 //
-//   covered     a cleanup the sweep already runs after a kill names it (TRANSIENT_FIXTURES, TRANSIENT_DIRS, a `__`
-//               fixture in FIXTURE_DIRS, an exitBusy copy)
+//   covered     a cleanup the sweep already runs after a kill names it (TRANSIENT_FIXTURES, TRANSIENT_DIRS,
+//               TRANSIENT_PATHS, a `__` fixture in FIXTURE_DIRS, an exitBusy copy), or sits inside a directory one names
 //   tracked     a committed file, or a directory holding one: the gate rewrites a record on purpose, or bends a
 //               file and puts it back -- reported, because a kill mid-rewrite leaves a modified tracked file
 //   ignored     a path git ignores (gate-reports, *.local.json, captures): output, not litter
@@ -32,21 +32,25 @@ import path from "node:path";
 import { spawn, execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { gateFiles } from "./staleness.mjs";
-import { TRANSIENT_FIXTURES, TRANSIENT_DIRS } from "./gateSweep.mjs";
+import { TRANSIENT_FIXTURES, TRANSIENT_DIRS, TRANSIENT_PATHS } from "./gateSweep.mjs";
 import { FIXTURE_DIRS, FIXTURE_PREFIX } from "./fixtureLitter.mjs";
 import { COPY_SUFFIX } from "./exitBusy.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const PROBE = path.join(ENG, "tools", "ship", "inputProbe.mjs");
 
+const under = (rel, dir, prefix) => (dir ? rel.startsWith(dir + "/" + prefix) : !rel.includes("/") && rel.startsWith(prefix));
+
 /** Is `rel` named by a cleanup the sweep already runs after a kill? Each owner spells its own names. */
 export function coveredBy(rel) {
     if (TRANSIENT_FIXTURES.includes(rel)) return "TRANSIENT_FIXTURES";
-    for (const [dir, prefix] of TRANSIENT_DIRS) if (rel.startsWith(dir + "/" + prefix)) return "TRANSIENT_DIRS";
+    for (const [dir, prefix] of TRANSIENT_DIRS) if (under(rel, dir, prefix)) return "TRANSIENT_DIRS";
+    for (const [dir, prefix] of TRANSIENT_PATHS) if (under(rel, dir, prefix)) return "TRANSIENT_PATHS";
     const dir = path.posix.dirname(rel), base = path.posix.basename(rel);
     if (FIXTURE_DIRS.includes(dir) && base.startsWith(FIXTURE_PREFIX)) return "fixtureLitter";
     if (COPY_SUFFIX && base.endsWith(COPY_SUFFIX)) return "exitBusy";
-    return null;
+    // a file inside a reclaimed directory goes with it
+    return dir && dir !== "." ? coveredBy(dir) : null;
 }
 
 /**
@@ -113,6 +117,14 @@ export async function runCensus({ workers = 4, capMs = 300000, only = null, log 
              workers, capMs, gates: out.sort((a, b) => a.gate.localeCompare(b.gate)) };
 }
 
+/** The committed form: the gates that wrote inside the tree or hit the cap, one per line; the rest counted in gatesRun. */
+export function compactCensus(c) {
+    const keep = c.gates.filter((g) => g.writes.length || g.capped);
+    const head = { generatedFrom: c.generatedFrom, at: c.at, host: c.host, platform: c.platform, workers: c.workers, capMs: c.capMs, gatesRun: c.gatesRun ?? c.gates.length,
+                   note: "gates that wrote nothing inside the tree and exited under the cap are counted in gatesRun and omitted" };
+    return JSON.stringify(head, null, 1).slice(0, -2) + ",\n \"gates\": [\n" + keep.map((g) => "  " + JSON.stringify(g)).join(",\n") + "\n ]\n}\n";
+}
+
 /** Classify a saved census against this tree. */
 export function readCensus(census, root = ENG) {
     const { tracked, trackedDirs } = trackedSets(root);
@@ -131,7 +143,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     if (a.includes("--run")) {
         census = await runCensus({ workers: Number(val("--workers", 4)), capMs: 1000 * Number(val("--cap-s", 300)), only: val("--only", null) });
         const out = path.resolve(val("--out", "strand-census.json"));
-        fs.writeFileSync(out, JSON.stringify(census, null, 1) + "\n");
+        fs.writeFileSync(out, compactCensus(census));
         console.log(`[strandCensus] ${census.gates.length} gates run; the census: ${out}`);
     } else if (a.includes("--read")) census = JSON.parse(fs.readFileSync(path.resolve(val("--read")), "utf8"));
     else { console.log("usage: node tools/ship/strandCensus.mjs --run [--workers 4] [--cap-s 300] [--out FILE] [--only S] | --read FILE"); process.exit(2); }

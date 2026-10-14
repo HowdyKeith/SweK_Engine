@@ -161,3 +161,8 @@ WebGLEngine/tools/roundhouse/lab-replays/
 /*_clone/
 .*_clone.tmp/
 WebGLEngine/ai-bridge/tasker-state.json
+
+# v4857 -- two paths gates write that are a box's own state, never litter (tools/ship/strandCensus.mjs found them as
+# "left after a clean exit"): the bridge's APK folder and the loop-scope flag. Ignored, never reclaimed.
+WebGLEngine/ai-bridge/apks/
+WebGLEngine/ai-bridge/swek_loop_scope.flag

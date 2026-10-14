@@ -622,7 +622,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4840 -- files 4636 -> 4637: tools/ship/wasmDoors-selfcheck.mjs.
     // v4842 -- main's v4838 merged with this line's v4838-v4841: RE-DERIVED over the merged tree.
     // v4854 -- files 4684 -> 4685: tools/ship/threeTextureBarrier-selfcheck.mjs (three's own test file is kept as .txt, not counted).
-    files: 4685,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
+    // v4857 -- files 4685 -> 4687: tools/ship/strandCensus.mjs and tools/ship/strandCensus-selfcheck.mjs.
+    files: 4687,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
     // (v4691 note, carried)                               // v4691 -- RE-DERIVED: tools/ship/textureInProbe.mjs arrived, one ES module with a closure and top-level await -- four rows moved (files, ES modules, closures, async/await) and eight held.
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
@@ -1240,7 +1241,10 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4854 -- tools/ship/threeTextureBarrier-selfcheck.mjs: files 4684 -> 4685, ES modules 4379 -> 4380, closures 4224 -> 4225,
     // async/await 1764 -> 1765, typed arrays 1303 -> 1304 (the read-back), Promises 428 -> 429 (the page waits for a late device
     // error), and WebGPU 62 -> 63: it asks the adapter for a device and dispatches the barrier kernel raw. The other rows hold.
-    esModules: 4380, closures: 4225, asyncAwait: 1765, typedArrays: 1304, promises: 429,
+    // v4857 -- tools/ship/strandCensus.mjs and its gate: files 4685 -> 4687, ES modules 4380 -> 4382, closures 4225 -> 4227,
+    // async/await 1765 -> 1768 (the census awaits its workers; the gate awaits a live probe run), Promises 429 -> 430 (runOne
+    // wraps a child's exit). The other seven rows hold, threads among them.
+    esModules: 4382, closures: 4227, asyncAwait: 1768, typedArrays: 1304, promises: 430,
     fetchXhr: 252, performanceNow: 250, raf: 127, webgl: 200, webgpu: 63, threads: 26, wasm: 27,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

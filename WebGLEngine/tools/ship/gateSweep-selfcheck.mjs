@@ -865,6 +865,31 @@ sec("THE TWO EXPORTS NO GATE NAMED, CLOSED BY ASSERTION (v4647q)");
             "...and TRANSIENT_FIXTURES names the file maze-walker-selfcheck writes at the engine root, so a cap kill's leftover is reclaimed",
             `maze-walker writes ${written}; listed ${GS.TRANSIENT_FIXTURES.includes(written)}`);
     }
+    // v4857 -- TRANSIENT_PATHS, the paths tools/ship/strandCensus.mjs found gates making and removing with no list naming them.
+    // Every entry is planted on a scratch root, as a file and (for a second copy) a directory holding one, beside a name one
+    // character off the prefix; reclaimTransientPaths must take every planted path and leave every neighbour. strandCensus-
+    // selfcheck holds the other side: each entry is a path the census saw written, and no prefix matches a committed file.
+    // SABOTAGED v4857: reclaimTransientPaths removing only files (fs.unlinkSync) -> 1 RED, this row; restored, md5 verified.
+    {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), "swek-tpaths-"));
+        const planted = [], kept = [];
+        try {
+            for (const [dir, prefix] of GS.TRANSIENT_PATHS) {
+                const d = path.join(root, dir); fs.mkdirSync(d, { recursive: true });
+                const at = (nm) => (dir ? dir + "/" : "") + nm;
+                fs.writeFileSync(path.join(d, prefix), "x"); planted.push(at(prefix));
+                fs.mkdirSync(path.join(d, prefix + "dir9", "deep"), { recursive: true }); fs.writeFileSync(path.join(d, prefix + "dir9", "deep", "f"), "x"); planted.push(at(prefix + "dir9"));
+                const twin = "Q" + prefix.slice(1); fs.writeFileSync(path.join(d, twin), "x"); kept.push(at(twin));
+            }
+            const gone = new Set(GS.reclaimTransientPaths(root));
+            const missed = planted.filter((r) => !gone.has(r) || fs.existsSync(path.join(root, r)));
+            const lost = kept.filter((r) => !fs.existsSync(path.join(root, r)));
+            ok(GS.TRANSIENT_PATHS.length >= 27 && !missed.length && !lost.length,
+                "...and reclaimTransientPaths takes every TRANSIENT_PATHS entry, file or directory, and no name beside it",
+                missed.length || lost.length ? `missed ${missed.slice(0, 4).join(", ")}; removed a neighbour ${lost.slice(0, 4).join(", ")}`
+                                             : `${planted.length} planted and reclaimed across ${GS.TRANSIENT_PATHS.length} entries; ${kept.length} neighbours kept`);
+        } finally { fs.rmSync(root, { recursive: true, force: true }); }
+    }
 }
 
 console.log(fails === 0 ? "\nALL GREEN" : `\n${fails} FAILED`);
