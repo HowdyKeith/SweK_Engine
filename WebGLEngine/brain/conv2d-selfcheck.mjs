@@ -9,6 +9,7 @@
 // packHeadUniforms, planarToChannelsLast -- round 16's (section 54): tileShape, conv2dTileWgsl, packTileUniforms,
 // tileWorkgroups -- and round 17's (section 59): fastAltShape, conv2dFastAltWgsl, packFastAltUniforms.
 // Round 19 (section 66, v4851): which rounds' device rows stand aside, by adapter and by the run's compiler (nativeStandAside).
+// Round 22 (section 71, v4859): round 16's rows run on D3D12 under DXC too, so only FXC (or an unread compiler) stands aside there.
 //
 // What it holds: the twin to the f64 reference within f32 rounding; the identity kernel exact through every pass;
 // a 1x1 convolution BIT-IDENTICAL to the GPU Brain's dense layer (render/brainTsl.mjs's mlpLayerCpu), so the dense
@@ -129,17 +130,20 @@ const COMPILER = H.nativeCompiler({ pkg: WPKG, platform: process.platform, flags
 // null: the round's device rows run on this adapter under this compiler; else the SKIP line's reason, naming the compiler read.
 // Pure -- the adapter as runWgslComputeNative reports it ({ vendor, architecture, description }), the compiler as nativeCompiler
 // names it, the round as a number -- so section 5e holds every branch on the rig's own descriptions, on a box with no D3D12.
+// v4859 -- round 22 (section 71): ROUND 16'S DEVICE ROWS RUN UNDER DXC TOO. On both of the rig's GPUs, node-webgpu 0.6.2 with
+// nothing set built all ten of round 16's shapes natively under DXC (BUILD_PROBE: the hoisted tile at every px, edge skip and zero;
+// 1.3 s at worst), every dump DXIL, every one exact at 64 x 64 -- so the stand-aside narrows to FXC, as round 17's did at section 66.
 function nativeStandAside(adapter, compiler, round) {
     if (!fxcAdapter(adapter)) return null;
-    if (round === 17 && compiler === "DXC") return null;
+    if ((round === 16 || round === 17) && compiler === "DXC") return null;
     const said = compiler === "DXC" || compiler === "FXC" ? compiler : `an unread compiler (${JSON.stringify(compiler ?? null)}), counted as FXC`;
     if (round === 17) return `${FXC_SKIP_R17}; this run compiles with ${said}, and under DXC (node-webgpu 0.6.2) they run (section 66)`;
-    if (round === 16) return `${FXC_SKIP}; this run compiles with ${said}, and round 16's shapes stand aside under DXC too: the rig's DXC probe ran round 17's shapes only (section 66)`;
+    if (round === 16) return `${FXC_SKIP}; this run compiles with ${said}, and under DXC (node-webgpu 0.6.2) they run (section 71)`;
     return `round ${round}'s kernels are not named by section 66 and stand aside on a D3D12 adapter under any compiler; this run compiles with ${said}`;
 }
 // round 17's inline-weight rows compare, where neither fused, with the tile kernel's hoisted weights -- round 16's shapes. Where
-// round 16 stands aside and round 17 runs (D3D12 under DXC) that comparator would build a round-16 shape on D3D12, so the fast
-// kernel's bits stand in: round 16's own rows hold the hoisted tile to exactly those bits wherever both run (sections 54-58)
+// round 16 stands aside and round 17 runs (D3D12 under DXC until v4859) that comparator would build a round-16 shape on D3D12, so the
+// fast kernel's bits stand in: round 16's own rows hold the hoisted tile to exactly those bits wherever both run (sections 54-58)
 const r17Comparator = (adapter, compiler) => (nativeStandAside(adapter, compiler, 16) ? "fast" : "hoist");
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -368,11 +372,13 @@ console.log("\n5e. WHICH ROUNDS' DEVICE ROWS STAND ASIDE, BY ADAPTER AND COMPILE
     const NOT_DXC = ["FXC", undefined, null, "", "unknown (no dump)", "dxc", "DXCompiler"], said = (c) => (c === undefined ? "(none)" : JSON.stringify(c));
     const runs = (a, c, r) => nativeStandAside(a, c, r) === null;
     // SABOTAGED v4851: round 17 stands aside under DXC too (its DXC exemption dropped) -> RED by name (this row alone); restored.
-    // SABOTAGED v4851: round 16 runs under DXC as round 17 does -> RED by name (this row alone); restored.
-    // SABOTAGED v4851: r17Comparator always "hoist" (round 17's inline rows would build round 16's hoisted tile on D3D12) -> RED by name (this row alone); restored.
-    ok("!! round 19 (section 66): on a D3D12 adapter under DXC, round 17's device rows run and round 16's stand aside -- the rig's DXC probe ran round 17's shapes only -- and round 17's inline rows compare with the fast kernel, never building round 16's hoisted tile",
-        RIG.every((a) => runs(a, "DXC", 17) && /round 16's shapes stand aside under DXC too/.test(nativeStandAside(a, "DXC", 16) || "") &&
-            !runs(a, "DXC", undefined) && !runs(a, "DXC", "17") && r17Comparator(a, "DXC") === "fast"),
+    // v4859 -- round 22 (section 71) turned this row's round-16 half over: round 16's shapes built and were exact natively under DXC on
+    // both GPUs, so on D3D12 under DXC both rounds run, and round 17's inline rows compare with the hoisted tile again, as they do off D3D12.
+    // SABOTAGED v4859: round 16 standing aside under DXC again (its DXC exemption dropped) -> RED by name (this row alone); restored, md5 verified.
+    // SABOTAGED v4859: r17Comparator always "fast" -> RED by name (this row and the off-D3D12 row); restored, md5 verified.
+    ok("!! round 22 (section 71): on a D3D12 adapter under DXC, round 16's and round 17's device rows both run -- the rig built all ten of round 16's shapes natively under DXC, exact -- and round 17's inline rows compare with round 16's hoisted tile",
+        RIG.every((a) => runs(a, "DXC", 17) && runs(a, "DXC", 16) &&
+            !runs(a, "DXC", undefined) && !runs(a, "DXC", "17") && r17Comparator(a, "DXC") === "hoist"),
         RIG.map((a) => `${a.vendor}: 17 ${runs(a, "DXC", 17) ? "runs" : "aside"}, 16 ${runs(a, "DXC", 16) ? "runs" : "aside"}, comparator ${r17Comparator(a, "DXC")}`).join("; "));
     // SABOTAGED v4851: an unread compiler counted as DXC (compiler !== "FXC" in place of === "DXC") -> RED by name (this row alone); restored.
     // SABOTAGED v4851: the SKIP line stops naming the compiler (said dropped from round 17's reason) -> RED by name (this row alone); restored.
@@ -417,7 +423,7 @@ else {
     let adapter = null;
     for (const P of PROBES) {
         // section 57: the tile kernel's manifest case is last, so the adapter is known before it
-        // v4851 (section 66): round 16's shape -- it stands aside on D3D12 under DXC too
+        // v4851 (section 66): round 16's shape; v4859 (section 71): it stands aside on D3D12 under FXC only
         const asideP = P.entryPoint === "k_conv_tile" ? nativeStandAside(adapter, COMPILER, 16) : null;
         if (asideP) { console.log(`  SKIP  ${P.id}: ${asideP}`); continue; }
         // each entry run through its own packer, inputs and dispatch -- the manifest is what a lab-wide runner would use
@@ -533,7 +539,8 @@ else {
             uniforms: packTileUniforms({ H: a.H, W: a.W, layer: F.layer }, cfg), workgroups: tileWorkgroups(a.H, a.W, a, cfg), inputs: [{ binding: 2, data: F.x }] }); };
         for (const [a, cfg] of [[{ H: 21, W: 19, Cin: 10, Cout: 32, k: 3, act: "relu", seed: 41 }, { px: 2, g4: 8, edge: "zero" }], [{ H: 11, W: 37, Cin: 13, Cout: 11, k: 3, act: "none", seed: 53 }, { px: 1, g4: 8, edge: "skip" }]]) {
             // v4851 (section 66): the comparator is the hoisted tile -- round 16's shape -- except where round 16 stands aside and this
-            // runs (D3D12 under DXC): there the fast kernel's bits, so no round-16 shape is built on D3D12 (r17Comparator, held in 5e)
+            // runs: there the fast kernel's bits (r17Comparator, held in 5e). Since v4859 (section 71) no adapter and compiler gives that
+            // pair -- both rounds run on D3D12 under DXC and both stand aside under FXC -- and the fallback is kept for a future split.
             const hoist = r17Comparator(adapter, COMPILER) === "hoist";
             const [ri, rh] = [await tile(a, { ...cfg, weights: "inline" }), hoist ? await tile(a, cfg) : await fast(a)], ji = ri.ok ? judge(ri, a) : null, jh = rh.ok ? judge(rh, a) : null;
             ok(`!! round 17: the tile kernel's inline weights, ${a.H} x ${a.W}, ${a.Cin} -> ${a.Cout}, ${cfg.px} px, edge ${cfg.edge}: every cell explained -- and where neither fused, ` +

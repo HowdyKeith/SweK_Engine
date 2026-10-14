@@ -358,6 +358,27 @@ node tools/denoiseBuildProbe.mjs --probe r16 --native-only --out denoise-probe-r
   1.05 x faster than the fast kernel.
 - **Send back both JSON files and the three `--which` lines from each GPU.**
 
+**The outcome (section 72).** Both GPUs picked as predicted with nothing set: r18u on the Intel, r15 on the 1080, both under DXC
+on node-webgpu 0.6.2. All ten of round 16's shapes built natively under DXC and were exact on both, so conv2d's round-16 rows no
+longer stand aside on D3D12 under DXC -- only under FXC. On the Intel two shapes were 1.05 x faster than the fast kernel at 64 x 64,
+which names round 23.
+
+### Round 23: the Intel's two named shapes at frame sizes, twice (pre-registration section 73)
+
+On each GPU, with v4859 or later, in the verified clone:
+
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node tools/denoiseBuildProbe.mjs --probe r16 --native-only --sizes 64,256,1024 --out denoise-probe-r23-a.json
+node tools/denoiseBuildProbe.mjs --probe r16 --native-only --sizes 64,256,1024 --out denoise-probe-r23-b.json
+```
+
+- **Twice, back to back,** from the same clone: the rule needs a shape's margin to hold in both runs.
+- **Don't commit or pull between the two runs.**
+- **Section 73 predicts:** neither named shape holds 1.05 x over the fast kernel at 256 and 1024 on the Intel; nothing holds on the 1080.
+- **Send back both JSON files from each GPU.**
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and

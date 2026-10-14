@@ -4623,3 +4623,91 @@ Send back both JSON files and the three `--which` lines from each GPU.
 **Not in this round.** Retiring the FXC paths. With the pin on 0.6.2, FXC runs only where a gate asks for it by disabling
 `use_dxc` (the timing gate's FXC ladder, the compile gate's "use_dxc off" mode); those stay, as the comparison every DXC
 reading is held to.
+
+## 72. ROUND 22 -- THE VERDICT: D AND B HOLD ON BOTH GPUS; ROUND 16'S STAND-ASIDE NARROWS TO FXC; TWO SHAPES NAME A ROUND 23 ON THE INTEL
+
+**What arrived.** From each GPU at 0c5f68bb (v4858's release), with `SWEK_WEBGPU` cleared: `realGpuRun --only denoise`, the
+three `--which` lines, and `denoiseBuildProbe --probe r16 --native-only`. The two probe reports are committed as received:
+`render/denoise-probe-r16-native-dxc-0.6.2-intel-gen9.json` and `-gtx1080.json`.
+
+**D holds on both GPUs.**
+- Both runs report node-webgpu 0.6.2, chosen by the resolver's list, compiler DXC. All three denoiser gates are green (exact
+  1/1, timing 2/2), and the timing gate's native ladder timed r12, r15, r18t and r18u.
+- `--which` on the Intel: key win32/intel/gen-9, kernels r18u (section 67's entry, under DXC), worst 1.05e-6.
+- `--which` on the 1080: key win32/nvidia/pascal, kernels r15 (no entry -- DEFAULT_KERNELS), worst 1.01e-6.
+- Both within 1e-4 of the f64 network. The prediction held.
+
+**B holds on both GPUs.** All ten of round 16's shapes built natively under DXC -- 1.3 s at worst on the Intel, 0.4 s on the
+1080, against the 180 s cap. Every dump says DXC (DXIL), and every shape is exact at 64 x 64. The prediction held.
+
+**So, as the rule fixed: round 16's device rows stop standing aside on D3D12 under DXC.** `brain/conv2d-selfcheck.mjs`'s
+`nativeStandAside` exempts round 16 under DXC as it has exempted round 17 since section 66, so only FXC (or an unread compiler)
+stands aside there. Round 17's inline-weight rows compare with round 16's hoisted tile again on D3D12 under DXC, as they always
+have off D3D12. Section 5e's row is turned over to say so; two sabotages, each red by name: round 16 standing aside under DXC
+again (1 red), and `r17Comparator` always "fast" (2 red: that row and the off-D3D12 row).
+
+**Speed (decides nothing): the third prediction fails on the Intel.** Each 32-input shape's 64 x 64 pass against the fast
+kernel's (fast-32) in the same run, device clock, 30 passes:
+
+| Shape | Intel gen-9 | GTX 1080 |
+|---|---|---|
+| fast-32 (the fast kernel) | 1.152 ms | 0.101 ms |
+| tile2-zero-32 | 0.939 ms -- **1.23 x faster** | 0.138 ms -- 0.73 x |
+| tile1-skip-32 | 1.006 ms -- **1.15 x faster** | 0.104 ms -- 0.97 x |
+| tile4-zero-32 | 1.277 ms -- 0.90 x | 0.141 ms -- 0.72 x |
+| tile2g4-zero-32 | 1.490 ms -- 0.77 x | 0.103 ms -- 0.98 x |
+| tile2g4-skip-32 | 1.529 ms -- 0.75 x | 0.118 ms -- 0.86 x |
+| tile2-skip-32 | 1.428 ms -- 0.81 x | 0.160 ms -- 0.63 x |
+| tile4-skip-32 | 2.082 ms -- 0.55 x | 0.176 ms -- 0.57 x |
+
+The two 10-input shapes (tile2-zero-10, tile4-zero-10) do the first layer's 10 -> 32, a third of a 32 -> 32 layer's work, and
+are not compared with a 32 -> 32 kernel. On the 1080 no shape is 1.05 x faster: the prediction held there. On the Intel two are,
+and by the rule each is named as the subject of a round 23. Two things are said with them, because they bear on that round:
+- **tile2-zero-32 is round 18's r18t kernel in all but name.** Its DXIL is the same length as r18t-tile-inline-3x3's (1,981
+  lines, in the same run's compile gate), and section 67 timed r18t natively on this Intel at 0.95 x r15 at 1024 x 1024 under DXC.
+- **The Intel's 64 x 64 readings move by a fifth between modes.** The same run's compile gate timed r18t's hidden kernel at
+  1.23 x the fast kernel as shipped and 1.00 x with `use_dxc` -- one kernel, one compiler, two processes. A 64 x 64 margin on this
+  GPU is a hypothesis.
+
+## 73. ROUND 23 -- THE TWO SHAPES THE INTEL NAMED, AT THE SIZES A FRAME IS: FIXED BEFORE THE RIG RUNS IT
+
+**Why this round.** Section 72 named tile2-zero-32 and tile1-skip-32 on the Intel gen-9: each 1.05 x faster than the fast
+kernel at 64 x 64, natively under DXC. Section 72 also says why a 64 x 64 margin there decides nothing. This round asks the
+same probe at sizes a frame is, twice.
+
+**What changes now.** Nothing in the code: `denoiseBuildProbe --probe r16 --sizes` already times every round-16 shape at any size
+list (section 56's tool). This section fixes the rule.
+
+**The pilot here (SwiftShader, Vulkan; no D3D compiler, so it says nothing about DXC).** `--probe r16 --native-only --sizes
+64,256`: all ten built and exact at 64 x 64. At 256 x 256 the fast kernel took 798 ms a pass, tile2-zero-32 522 ms (1.53 x
+faster), tile4-zero-32 463 ms (1.72 x) and tile1-skip-32 1,021 ms (0.78 x) -- a CPU's times, which say the probe runs at every
+size and nothing about a GPU. 1024 x 1024 was not run here: a CPU device takes minutes a pass.
+
+**The rule, fixed now.**
+- **On the Intel,** `denoiseBuildProbe --probe r16 --native-only --sizes 64,256,1024` is run TWICE, one after the other, from the
+  same clone and commit. A named shape **holds** when it is at least 1.05 x faster than fast-32 at 256 x 256 AND at 1024 x 1024,
+  in BOTH runs, on the device's clock. Anything else and it is retired, named, with its four ratios.
+- **On the 1080,** the same two runs, as the control: no shape there was 1.05 x faster at 64 x 64, and a shape that is at the
+  larger sizes is reported, not acted on -- the 1080 named nothing in section 72.
+- **A shape that holds names a round 24 and moves no set.** The Intel's set is r18u, whose hidden kernel ran 1.5 to 1.6 x r15's
+  natively under DXC (section 67), and r15's hidden kernel is the fast kernel. So a shape that holds here has to beat r18u, not r15,
+  before any set could change -- that comparison is round 24's, and would be fixed before its run.
+
+**Predictions, fixed now.**
+- **tile2-zero-32 is retired.** It is r18t's kernel, and r18t ran 0.95 x r15 at 1024 x 1024 natively on the Intel under DXC
+  (section 67): at the larger sizes it should land within a few per cent of the fast kernel, not 5 % ahead.
+- **tile1-skip-32 is retired.** Chrome's DXC ran every 32-input round-16 shape slower than the fast kernel at every size
+  (section 58), and section 72's 1.15 x is a single 64 x 64 reading on the GPU whose 64 x 64 readings moved by a fifth.
+- **No shape holds on the 1080.**
+
+**On the rig.** On each GPU, from the verified clone at v4859 or later, `SWEK_WEBGPU` cleared:
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node tools/denoiseBuildProbe.mjs --probe r16 --native-only --sizes 64,256,1024 --out denoise-probe-r23-a.json
+node tools/denoiseBuildProbe.mjs --probe r16 --native-only --sizes 64,256,1024 --out denoise-probe-r23-b.json
+```
+Send back both JSON files from each GPU. Don't commit or pull between the two runs.
+
+**Not in this round.** Any change to a set, and the 10-input shapes: they do the first layer only, and section 72 does not
+compare them with a 32 -> 32 kernel.
