@@ -449,6 +449,17 @@ console.log("\n7. SECTION 69 (v4853): THE WHOLE NATIVE SWEEP -- EVERY GATE THAT 
     ok("!! *** section 69, condition H: the pilot's two native sweeps here -- 0.6.0 and 0.6.2, one commit -- hold by the rule: every gate green under 0.6.2, none a regression ***",
        H69.ok && H69.pinned === "0.6.0" && H69.candidate === "0.6.2" && H69.count.regression === 0 && H69.rows.length >= 26 && pil("0.6.2").native === true && pil("0.6.0").native === true,
        `${H69.rows.length} gates, ${H69.bad.length} failing the rule`);
+    // v4856 -- section 70, conditions I and N: each rig GPU's pair, committed as received, held to the same rule -- and the Intel's
+    // first "0.6.0" sweep, which ran with SWEK_WEBGPU still naming 0.6.2, is the reason the rule refuses a pair of one package.
+    // SABOTAGED v4856: the pair read as 0.6.2 twice -> 1 RED, this row, by name; restored, md5 verified.
+    const sweepOf = (g, v) => JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", `native-sweep-r69-${g}-${v}.json`), "utf8"));
+    const rig = (g) => nativeSweepCompare(sweepOf(g, "0.6.0"), sweepOf(g, "0.6.2"));
+    const I70 = rig("intel-gen9"), N70 = rig("gtx1080");
+    for (const [n, c] of [["I (Intel gen-9)", I70], ["N (GTX 1080)", N70]])
+        console.log(`  ----  section 70, ${n}: ${c.pinned} against ${c.candidate} at ${c.commit}: ${JSON.stringify(c.count)}; red on the pin, green on 0.6.2: ${c.rows.filter((r) => r.kind === "fixed").map((r) => r.gate).join(", ") || "none"}`);
+    ok("!! *** section 70, conditions I and N: on the Intel gen-9 and the GTX 1080 the two native sweeps -- the pin and 0.6.2, one commit each -- hold by the rule: no gate worse on 0.6.2 ***",
+       [I70, N70].every((c) => c.ok && c.pinned === "0.6.0" && c.candidate === "0.6.2" && c.count.regression === 0 && c.count.changed === 0 && c.count.unpaired === 0 && c.rows.length === 26),
+       `Intel ${I70.ok} (${I70.count.fixed} fixed), 1080 ${N70.ok} (${N70.count.fixed} fixed)`);
     // the CLI's --native: an --only that matches no native gate still says so, exits 1, and marks its report as the native sweep
     const tmp = path.join(os.tmpdir(), `swek-realgpu-native-${process.pid}.json`);
     const { SWEK_LAUNCH_ARGS: _unset, ...envNoArgs } = process.env;

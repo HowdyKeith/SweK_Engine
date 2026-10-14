@@ -342,8 +342,14 @@ export const EXIT_HAZARD = Object.freeze({
  * that Playwright was not already carrying.
  */
 export const LICENCES = Object.freeze({
-    nodeWebgpu: Object.freeze({ npm: "webgpu", version: "0.6.0", repo: "dawn-gpu/node-webgpu", licence: "MIT",
+    // v4856 -- THE PIN MOVES TO 0.6.2 (render/learned-denoiser-preregistration.md section 70): section 69's native sweep held
+    // here and on both rig GPUs, no gate worse on 0.6.2 and five the pin had red made green. 0.6.2 ships Microsoft's DXC beside
+    // dawn.node on win32 -- its own licence, read from the package, below. Still installed by npm, never copied here.
+    nodeWebgpu: Object.freeze({ npm: "webgpu", version: "0.6.2", repo: "dawn-gpu/node-webgpu", licence: "MIT",
                                 read: "node_modules/webgpu/package.json + LICENSE.md", vendored: false }),
+    dxc: Object.freeze({ licence: "NCSA", what: "LLVM Release License (University of Illinois/NCSA), with third-party notices",
+                         shipped: "inside node-webgpu 0.6.2, dist/win32-*/dxcompiler.dll beside dawn.node, with dxcompiler-LICENSE.TXT and dxcompiler-ThirdPartyNotices.txt",
+                         vendored: false, obligation: "none new here -- the notices travel inside the npm package that carries the DLL; nothing is copied into this repository" }),
     swiftShader: Object.freeze({ licence: "Apache-2.0", vendored: false,
                                  source: "shipped inside the Playwright chromium bundle as libvk_swiftshader.so",
                                  obligation: "none new -- the file is Playwright's, reached by path, never copied here" }),

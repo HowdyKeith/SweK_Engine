@@ -54,14 +54,16 @@ if [ -d "$AIB" ] && ! (cd "$AIB" && node -e 'require.resolve("@napi-rs/canvas");
 fi
 
 # The warm path: synchronous, instant, no race. Nothing below this line runs on a cached container.
-if node -e 'require("/opt/node22/lib/node_modules/webgpu")' >/dev/null 2>&1; then
-  echo "[session-start] node-webgpu already present -- nothing to install"
+# v4856 -- the pin is 0.6.2 (section 70), and a container cached on 0.6.0 must not read "already present": the version is asked.
+WEBGPU_PIN=0.6.2
+if [ "$(node -e 'try { console.log(require("/opt/node22/lib/node_modules/webgpu/package.json").version) } catch { }' 2>/dev/null)" = "$WEBGPU_PIN" ]; then
+  echo "[session-start] node-webgpu $WEBGPU_PIN already present -- nothing to install"
   exit 0
 fi
 
 # The cold path waits. It is the only path that touches the network, and it is measured in seconds.
-echo "[session-start] installing node-webgpu (pinned to the version tools/ship/headlessGpu.mjs records)"
-npm install -g webgpu@0.6.0 --no-fund --no-audit
+echo "[session-start] installing node-webgpu $WEBGPU_PIN (pinned to the version tools/ship/headlessGpu.mjs records)"
+npm install -g webgpu@$WEBGPU_PIN --no-fund --no-audit
 
 # Report what the tree itself concludes, rather than assuming the install worked. headlessGpuSkipReason() is the
 # same function every native-WebGPU gate consults, so this line is the gates' own answer and not a proxy for it.

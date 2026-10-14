@@ -4522,3 +4522,53 @@ as written: `tools/ship/native-sweep-r69-linux-0.6.0.json` and `-0.6.2.json`. On
 - **X6:** the rule not asking for one commit -> 1 red.
 
 **Not in this round.** Moving the pin. That is the verdict round's, once H, I and N are read.
+
+## 70. ROUND 21 -- THE VERDICT: THE PIN MOVES TO node-webgpu 0.6.2
+
+**What arrived.** Two native sweeps per GPU, `realGpuRun --native` on the pin and on 0.6.2, at f36fee83 (v4853's release).
+Committed as received: `tools/ship/native-sweep-r69-intel-gen9-0.6.0.json` and `-0.6.2.json`, and the same for `gtx1080`.
+- **The Intel's first pinned sweep was a 0.6.2 sweep.** `SWEK_WEBGPU` was still set in that console, so the package loaded
+  was 0.6.2 both times. The rule refused the pair -- two sweeps of one package -- and the pinned sweep was re-run at the same
+  commit with `SWEK_WEBGPU` cleared. That refusal is why the rule asks for two packages, and it is not committed.
+
+**Section 69's rule, read off all three boxes.** `nativeSweepCompare`, held in `tools/ship/realGpuRun-selfcheck.mjs`:
+
+| Box | Commit | Green on 0.6.0 | Green on 0.6.2 | Regressions | Red on the pin, green on 0.6.2 |
+|---|---|---|---|---|---|
+| H, here (SwiftShader, Vulkan) | 9d5b2d43 | 26 of 26 | 26 of 26 | 0 | none |
+| I, Intel gen-9 | f36fee83 | 23 of 26 | **26 of 26** | 0 | denoiseDevice, crossBackend, deviceCompute |
+| N, GTX 1080 | f36fee83 | 24 of 26 | **26 of 26** | 0 | denoiseDevice, crossBackend |
+
+- **H, I and N hold.** No gate is worse on 0.6.2 anywhere; no gate is red on both packages; nothing is unpaired.
+- **So the pin moves to 0.6.2.**
+
+**The predictions, fixed in section 69.**
+- **Q1 (here) held.**
+- **Q2 (the 1080) and Q3 (the Intel) held, and more than held.** The risk named -- rows that demand a CPU twin's bits under a
+  compiler that may contract a multiply-add -- went the other way: the pin was the one whose bits parted. On the pin:
+  - crossBackend read `hmcGpu.WGSL_HMC_PROBE` 2,047 of 16,384 floats apart on the Intel, and `splitSumWgsl.BRDF_LUT_WGSL`
+    and `fresnelF82Wgsl.F82_TINT_WGSL` apart on the 1080; deviceCompute read the same probe apart on the Intel.
+    Under DXC all three agree. Why DXC's bits meet the browser's and FXC's do not is not read here.
+  - denoiseDevice stopped at `realGpuRun`'s 30-minute cap on the 1080, and on the Intel the native caller's child process
+    died with exit 3221225477 (an access violation) under 0.6.0. Both are green on 0.6.2.
+- **Q4, reported:** the denoiser's native timings move as section 67's P3 measured: r15 about 7 % slower under DXC.
+
+**What moves.**
+- **`tools/ship/headlessGpu.mjs`'s `LICENCES.nodeWebgpu.version` is 0.6.2,** and a `dxc` entry records the licence read
+  from the package: DXC ships under the LLVM release licence (University of Illinois/NCSA), with its third-party notices,
+  inside `dist/win32-*` beside `dawn.node`. The tree vendors nothing; the notices travel inside the npm package.
+- **`.claude/hooks/session-start.sh` installs `webgpu@0.6.2`,** named once as `WEBGPU_PIN`, and its warm path now asks the
+  installed version: a container cached on 0.6.0 used to read "already present" and keep it. `headlessGpu-selfcheck` holds
+  the hook's pin to the record.
+- **The rig installs 0.6.2:** `npm install -g webgpu@0.6.2`. From then on every native D3D12 run compiles with DXC, and
+  `nativePick` gives the Intel r18u by default (section 67). The gates that time FXC keep doing so with `use_dxc` disabled.
+- **Nothing in the denoiser's tables changes.** `NATIVE_KERNELS_BY_ADAPTER`, `PAGE_KERNELS_BY_ADAPTER` and `DEFAULT_KERNELS`
+  are as sections 63 and 67 left them.
+
+**Sabotages (v4856).** Each restored byte-identical:
+- the Intel's pair read as 0.6.2 twice -> 1 red (the I/N row);
+- the hook's `WEBGPU_PIN` set back to 0.6.0 -> 1 red (the pin row);
+- the record's DXC licence spelled MIT -> 1 red (the licence row).
+
+**Not in this round.** The text of the gates' own SKIP and refusal lines still names 0.6.0 where it describes what FXC did in
+sections 57-60; those are records of what was measured, and stay.

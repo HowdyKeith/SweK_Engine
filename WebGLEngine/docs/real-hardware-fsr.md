@@ -331,6 +331,16 @@ set SWEK_WEBGPU=
 - **The browser runs as in a verify**, not on the GPU's hardware flags; only the package differs.
 - **Send back both JSON files from each GPU.**
 
+**The outcome (section 70): the pin is node-webgpu 0.6.2.** No gate was worse on 0.6.2 on either GPU, and five gates red on
+0.6.0 went green. On each GPU, once, from any console:
+
+```
+npm install -g webgpu@0.6.2
+```
+
+From then on the verified clone's native gates compile with DXC on D3D12, and `SWEK_WEBGPU` is not needed to reach 0.6.2.
+A console that still has `SWEK_WEBGPU` set loads whatever it names: clear it with `set SWEK_WEBGPU=`.
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and

@@ -1,0 +1,654 @@
+{
+ "generatedFrom": "tools/ship/realGpuRun.mjs",
+ "at": "2026-10-14T03:10:01.690Z",
+ "platform": "win32 10.0.22631 x64",
+ "node": "v24.17.0",
+ "commit": "f36fee83 2026-10-13 v4853: record the release",
+ "only": null,
+ "native": true,
+ "launchArgs": null,
+ "gates": [
+  {
+   "gate": "brain/conv2d-selfcheck.mjs",
+   "category": "quality",
+   "ok": true,
+   "ms": 346812,
+   "adapters": [],
+   "software": null,
+   "fails": [],
+   "measured": [],
+   "skips": [
+    "SKIP  conv2d.conv2dTileWgsl: the pixel-tiled kernel is not built natively on a D3D12 adapter: node-webgpu's FXC did not finish it in 3 minutes on either GPU (section 57); this run compiles with FXC, and round 16's shapes stand aside under DXC too: the rig's DXC probe ran round 17's shapes only (section 66)",
+    "SKIP  the pixel-tiled kernel's device cases, edge zero's and its identity key: the pixel-tiled kernel is not built natively on a D3D12 adapter: node-webgpu's FXC did not finish it in 3 minutes on either GPU (section 57); this run compiles with FXC, and round 16's shapes stand aside under DXC too: the rig's DXC probe ran round 17's shapes only (section 66)",
+    "SKIP  round 17's device cases: round 17's kernels are not built natively on a D3D12 adapter under FXC: node-webgpu 0.6.0's FXC stopped on r18t's kernel and crashed on r18u's on both GPUs (section 60); this run compiles with FXC, and under DXC (node-webgpu 0.6.2) they run (section 66)"
+   ]
+  },
+  {
+   "gate": "physics/render/fresnelF82Wgsl-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 313,
+   "adapters": [],
+   "software": null,
+   "fails": [],
+   "measured": [
+    "worst disagreement across all cases and angles: 2.453e-7 at f0=0.9 b=0.1 mu=0.1563"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "physics/render/rtPipeline-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 50959,
+   "adapters": [],
+   "software": null,
+   "fails": [],
+   "measured": [
+    "Vulkan RT stages: 4 implemented of 5",
+    "PRESENT  raygen        rtRaygen",
+    "PRESENT  intersection  rtIntersect",
+    "ABSENT   anyHit        --",
+    "PRESENT  closestHit    rtClosestHit",
+    "PRESENT  miss          rtMiss",
+    "----",
+    "pipeline vs v4417 monolith: 0 of 576 differ",
+    "pipeline vs CPU f64:        0 of 576 differ",
+    "----",
+    "two spheres apart     24x24 spp=16 -> 0 of 576 differ",
+    "two spheres apart     32x32 spp=64 -> 0 of 1024 differ",
+    "two spheres apart     48x48 spp=16 -> 0 of 2304 differ",
+    "two spheres TOUCHING  24x24 spp=16 -> 0 of 576 differ",
+    "two spheres TOUCHING  32x32 spp=64 -> 0 of 1024 differ",
+    "two spheres TOUCHING  48x48 spp=16 -> 0 of 2304 differ",
+    "PLANT swap records:  121 differ, max|d| 2.500e-1",
+    "PLANT ignore record: 69 differ, max|d| 2.500e-1",
+    "----",
+    "three spheres 32x32 spp=64: 1 of 1024 differ, max|d| 2.466e-2",
+    "CPU pixels not representable in f32: 0 of 1024  (the values stay dyadic)",
+    "----",
+    "mirror record vs lambertian record -- CONSTANT sky: 15 of 576 differ",
+    "mirror record vs lambertian record -- GRADIENT sky: 70 of 576 differ",
+    "----",
+    "cube BVH: 5 nodes, 12 triangles, depth 2",
+    "32 rays against the cube: 0 true mismatches, 1 genuine shared-edge ties",
+    "camera facing the bare cube, no spheres: 484 of 1024 px are not sky",
+    "----",
+    "RGB two-sphere vs CPU f64 RGB: 0 of 1728 differ",
+    "24 of 24 rays hit the mesh; vertex colour vs baryAt(): 0 disagree, max|d|=1.176e-7",
+    "----",
+    "12 triangles, alternating materials: 0 read the wrong record",
+    "full render (bounced, rgb) through the REAL meshMaterials render path: all-bright 0.95270, alternating 0.76445, all-dark 0.57433",
+    "----",
+    "cpu (8 seeds): mean 0.229534, relSd 1.05%",
+    "gpu (8 seeds, offset +2000): mean 0.227655, relSd 1.17%",
+    "ratio 0.991814, |ratio-1| 0.008186, 3-sigma bound 0.016654",
+    "10. bvhBuffersFromTriSoup() -- BIT-IDENTICAL TO bvhBuffersFromMesh() ON THE SAME TRIANGLES, FROM A FLAT BUFFER",
+    "viaMesh: 5 nodes, 12 triangles -- viaSoup: 5 nodes, 12 triangles",
+    "11. NEXT-EVENT ESTIMATION -- cone sampling, shadow ray, double-count guard, scalar pipeline",
+    "nee wide-cone direct light: cpu mean 4.293643 (relSd 0.243%), gpu mean 4.294555 (relSd 0.191%), ratio 1.000212, bound 0.003285",
+    "plantDoubleCount mean 5.418402, ratio to honest nee:true 1.2617",
+    "nee far-light + occluder: cpu mean 0.929813 (relSd 0.043%), gpu mean 0.929769 (relSd 0.030%), ratio 0.999953, bound 0.000561",
+    "nee enclosing light (environment-light shape): cpu mean 2.887344 (relSd 0.037%), gpu mean 2.887247 (relSd 0.061%), ratio 0.999967, bound 0.000757",
+    "12. ENVIRONMENT-MAP LIGHTING -- the miss shader's first texture binding",
+    "captured atlas: 96x16, faceSize0=16",
+    "38 well-conditioned directions (4 near-tie excluded): max|gpu-cpu| = 4.238e-7 at d=[0.250,0.866,0.433]",
+    "empty scene, sky only: cpu mean 1.591970 (relSd 0.11%), gpu mean 1.591914 (relSd 0.09%), ratio 0.999965, bound 0.001483",
+    "13. RTX ROUND 8: THE MICROFACET (GGX) MATERIAL",
+    "13a. bsdf-only microfacet sphere, sky: cpu 0.311002 (relSd 0.416%), gpu 0.310742 (relSd 0.171%), ratio 0.999163, bound 0.004767",
+    "13b. bsdf mode, real light (bounce is the only route): cpu 0.388880 (relSd 0.331%), gpu 0.387820 (relSd 0.289%), ratio 0.997275, bound 0.004666",
+    "13c. nee mode, real light (bounce onto it is suppressed): cpu 0.388636 (relSd 0.295%), gpu 0.387654 (relSd 0.356%), ratio 0.997475, bound 0.004902",
+    "13d. mis mode, real light (balance heuristic): cpu 0.388847 (relSd 0.314%), gpu 0.387799 (relSd 0.286%), ratio 0.997307, bound 0.004506",
+    "13e. mis mode, rough surface + wide light: cpu 0.456590 (relSd 0.143%), gpu 0.456213 (relSd 0.187%), ratio 0.999176, bound 0.002496",
+    "13f. mixed lambertian(nee)+microfacet(mis): cpu 1.804774 (relSd 0.192%), gpu 1.801208 (relSd 0.187%), ratio 0.998024, bound 0.002845",
+    "13g. mirror fix: clean(fixed) 1.033811, sabotaged(pre-round-8 shape) 0.955385, ratio 0.924139",
+    "14. RTX ROUND 9: MULTI-SCATTER ENERGY COMPENSATION",
+    "table: alpha=0.6, K=24, Eavg=0.6307",
+    "14b. msComp bsdf-only microfacet sphere, sky: cpu 0.564002 (relSd 0.167%), gpu 0.564606 (relSd 0.141%), ratio 1.001071, bound 0.002318",
+    "14c. msComp bsdf mode, real light: cpu 1.046377 (relSd 0.104%), gpu 1.046315 (relSd 0.175%), ratio 0.999941, bound 0.002161",
+    "14d. msComp nee mode, real light: cpu 1.046369 (relSd 0.055%), gpu 1.046373 (relSd 0.122%), ratio 1.000003, bound 0.001416",
+    "14e. msComp mis mode, real light: cpu 1.046373 (relSd 0.064%), gpu 1.046432 (relSd 0.119%), ratio 1.000057, bound 0.001429",
+    "14f. high roughness (0.9), mis mode: cpu 1.169631 (relSd 0.034%), gpu 1.169737 (relSd 0.122%), ratio 1.000091, bound 0.001340",
+    "14g. regression: no msTable, mis mode (round 8 behavior): cpu 0.388847 (relSd 0.314%), gpu 0.387764 (relSd 0.213%), ratio 0.997215, bound 0.004026",
+    "14h. plantMsNoDenominator: clean 1.045579, planted 0.864157, ratio 0.826487",
+    "14i. coin-flip bounce weight: clean(fixed) 1.046089, sabotaged(no * PI / p) 0.824940, ratio 0.788594",
+    "14j. mesh-wide msComp: cpu 0.341650 (relSd 0.243%), gpu 0.342064 (relSd 0.251%), ratio 1.001212, bound 0.003706",
+    "14k. per-triangle msComp smoke test: 144 px, finite&non-negative=true, notAllSky=true, mean=0.33463",
+    "renderer 515092f29b2198b0 over 24 files, math 6e3b9abe8118cb47: 120 means served, 0 computed and kept, 0 with a callback computed every time; 4299 ms spent computing means this run"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "physics/render/specularIBLWgsl-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 676,
+   "adapters": [],
+   "software": null,
+   "fails": [],
+   "measured": [
+    "atlas 36x23, 4 mips, faceSize0=6, LUT 8x8 at y=15",
+    "case 0 dir=[0.00,0.00,1.00] rough=0: cpu=[0.80282,0.08028,0.08028] gpu=[0.80282,0.08028,0.08028] worst-rel=9.70e-8",
+    "case 1 dir=[0.00,0.00,1.00] rough=0.5: cpu=[4.71182,0.34255,0.36313] gpu=[4.71182,0.34255,0.36313] worst-rel=1.37e-7",
+    "case 2 dir=[0.00,0.00,1.00] rough=1: cpu=[1.16923,0.16341,0.19722] gpu=[1.16923,0.16341,0.19722] worst-rel=7.17e-8",
+    "case 3 dir=[1.00,0.00,0.00] rough=0.33: cpu=[0.00367,0.00441,0.00735] gpu=[0.00367,0.00441,0.00735] worst-rel=3.54e-8",
+    "case 4 dir=[0.50,0.50,0.71] rough=0.66: cpu=[0.11029,0.06241,0.13991] gpu=[0.11029,0.06241,0.13991] worst-rel=7.75e-8",
+    "case 5 dir=[-1.00,0.00,0.00] rough=0.15: cpu=[0.00386,0.00463,0.00772] gpu=[0.00386,0.00463,0.00772] worst-rel=7.47e-8"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "physics/render/specularProbeCapture-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 1918,
+   "adapters": [],
+   "software": null,
+   "fails": [],
+   "measured": [
+    "atlas 48x8, faceSize0=8, mipCount=1 (lutK=0 lutR=0 -- no LUT region, on purpose)",
+    "dir=[0,0,1] alpha=0.15 ch=0: cpu=9.611070 gpu=9.610886 rel=1.92e-5",
+    "dir=[0,0,1] alpha=0.15 ch=1: cpu=1.018532 gpu=1.018515 rel=1.65e-5",
+    "dir=[0,0,1] alpha=0.15 ch=2: cpu=1.060273 gpu=1.060258 rel=1.48e-5",
+    "dir=[0,0,1] alpha=0.6 ch=0: cpu=2.284961 gpu=2.284861 rel=4.37e-5",
+    "dir=[0,0,1] alpha=0.6 ch=1: cpu=0.326416 gpu=0.326407 rel=2.85e-5",
+    "dir=[0,0,1] alpha=0.6 ch=2: cpu=0.397593 gpu=0.397584 rel=2.23e-5",
+    "dir=[1,0,0] alpha=0.15 ch=0: cpu=0.104831 gpu=0.104832 rel=3.70e-6",
+    "dir=[1,0,0] alpha=0.15 ch=1: cpu=0.120454 gpu=0.120454 rel=1.75e-6",
+    "dir=[1,0,0] alpha=0.15 ch=2: cpu=0.200390 gpu=0.200391 rel=1.33e-6",
+    "dir=[1,0,0] alpha=0.6 ch=0: cpu=0.149710 gpu=0.149712 rel=1.20e-5",
+    "dir=[1,0,0] alpha=0.6 ch=1: cpu=0.124694 gpu=0.124694 rel=1.93e-6",
+    "dir=[1,0,0] alpha=0.6 ch=2: cpu=0.204450 gpu=0.204450 rel=2.30e-7",
+    "dir=[0.4,0.4,0.82] alpha=0.15 ch=0: cpu=1.050509 gpu=1.045609 rel=4.66e-3",
+    "dir=[0.4,0.4,0.82] alpha=0.15 ch=1: cpu=0.209794 gpu=0.209331 rel=2.21e-3",
+    "dir=[0.4,0.4,0.82] alpha=0.15 ch=2: cpu=0.285931 gpu=0.285488 rel=1.55e-3",
+    "dir=[0.4,0.4,0.82] alpha=0.6 ch=0: cpu=1.463713 gpu=1.471646 rel=5.42e-3",
+    "dir=[0.4,0.4,0.82] alpha=0.6 ch=1: cpu=0.248831 gpu=0.249580 rel=3.01e-3",
+    "dir=[0.4,0.4,0.82] alpha=0.6 ch=2: cpu=0.323308 gpu=0.324025 rel=2.22e-3",
+    "dir=[0,0,1] alpha=0.15: via-capture=[9.6111,1.0185,1.0603] analytic=[9.0146,0.9622,1.0063] worst-rel=6.6%",
+    "dir=[0,0,1] alpha=0.6: via-capture=[2.2850,0.3264,0.3976] analytic=[1.8647,0.2867,0.3596] worst-rel=22.5%",
+    "dir=[1,0,0] alpha=0.15: via-capture=[0.1048,0.1205,0.2004] analytic=[0.1032,0.1203,0.2003] worst-rel=1.5%",
+    "dir=[1,0,0] alpha=0.6: via-capture=[0.1497,0.1247,0.2044] analytic=[0.1226,0.1221,0.2020] worst-rel=22.1%",
+    "dir=[0.4,0.4,0.82] alpha=0.15: via-capture=[1.0505,0.2098,0.2859] analytic=[0.3030,0.1392,0.2184] worst-rel=246.7%",
+    "dir=[0.4,0.4,0.82] alpha=0.6: via-capture=[1.4637,0.2488,0.3233] analytic=[0.4962,0.1574,0.2358] worst-rel=195.0%",
+    "true cpu=[9.6111,1.0185,1.0603], sabotaged gpu=[9.6109,9.6109,9.6109]",
+    "captured chain +Z luma stddev per mip: 1.3810 -> 0.5338 -> 0.2103 -> 0.1285",
+    "SABOTAGE: reversed mip order fails the monotonicity check (specularProbeBake-selfcheck.mjs's own technique, replayed on the captured chain)",
+    "mip 3 (fully rough) mean |analytic - captured| absolute error: 0.04076 at samples=32 (what the live page bakes with), 0.03644 at samples=2048 -- close to each other, which is the variance-not-bug signature: a genuine logic error would not shrink toward the SAME floor as sample count rises, it would stay wrong."
+   ],
+   "skips": []
+  },
+  {
+   "gate": "physics/render/specularProbeLit-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 5193,
+   "adapters": [],
+   "software": null,
+   "fails": [],
+   "measured": [
+    "atlas 36x23, 4 mips (capped at 4), faceSize0=6",
+    "this is the same validation step that caught the const-array-runtime-indexing mistake in an earlier draft (see this file's own commit): WGSL module compilation is checked independent of entry point, so a vertex+fragment module needs no compute shim to be SYNTAX- and TYPE-checked.",
+    "case 0 dir=[0.00,0.00,1.00] rough=0: cpu=[0.80275,0.08027,0.08027] gpu=[0.80275,0.08027,0.08027] worst-rel=2.97e-8",
+    "case 1 dir=[0.00,0.00,1.00] rough=0.5: cpu=[4.71252,0.34262,0.36315] gpu=[4.71252,0.34262,0.36315] worst-rel=8.82e-8",
+    "case 2 dir=[0.00,0.00,1.00] rough=1: cpu=[1.16945,0.16337,0.19729] gpu=[1.16945,0.16337,0.19729] worst-rel=3.30e-8",
+    "case 3 dir=[1.00,0.00,0.00] rough=0.33: cpu=[0.00367,0.00441,0.00735] gpu=[0.00367,0.00441,0.00735] worst-rel=4.51e-8",
+    "case 4 dir=[0.50,0.50,0.71] rough=0.66: cpu=[0.11033,0.06241,0.13995] gpu=[0.11033,0.06241,0.13995] worst-rel=9.41e-8",
+    "well-conditioned (mid-brightness after roughness=1 blur): cpu(same 8-bit atlas)=[0.48039,0.16390,0.19781] gpu=[0.48235,0.16471,0.19608] rel=[0.004,0.005,0.009]",
+    "near-zero background, near the 1/255 floor on PURPOSE: cpu(same 8-bit atlas)=[0.00423,0.00504,0.00829] gpu=[0.00392,0.00392,0.00784] rel=[0.073,0.222,0.054]",
+    "Case 1's ~0.4-0.9% disagreement is the expected floor for TWO independent 8-bit quantizations (the input atlas AND the output framebuffer) -- not a logic error. Case 2 is included and its LARGER relative disagreement is deliberately not hidden: at true values of 0.004-0.008, a SINGLE framebuffer quantization step (1/255=0.0039) is comparable to the value itself, so relative error balloons through "
+   ],
+   "skips": []
+  },
+  {
+   "gate": "physics/render/splitSumWgsl-selfcheck.mjs",
+   "category": "quality",
+   "ok": true,
+   "ms": 1278,
+   "adapters": [],
+   "software": null,
+   "fails": [],
+   "measured": [
+    "adapter: D3D12 driver version 31.0.101.2137",
+    "gradient alpha 0.1: gpu 0.977178 cpu 0.977179 rel 4.399e-7",
+    "gradient alpha 0.5: gpu 0.881792 cpu 0.881794 rel 2.647e-6",
+    "spot alpha 0.1: gpu 26.829700 cpu 26.829842 rel 5.278e-6",
+    "spot alpha 0.5: gpu 3.761253 cpu 3.761259 rel 1.530e-6"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "render/denoiseCompile-selfcheck.mjs",
+   "category": "timing",
+   "ok": true,
+   "ms": 344986,
+   "adapters": [
+    "google swiftshader"
+   ],
+   "software": true,
+   "fails": [],
+   "measured": [
+    "node-webgpu 0.6.0 from C:\\Users\\Keith\\AppData\\Roaming\\npm\\node_modules\\webgpu\\index.js; native compilers: D3D12; DXC none of its own -- a Dawn built without DXC forces use_dxc off (section 64), so this package runs as shipped alone and section 43's A1 is untested here; modes: as shipped",
+    "native / as shipped in all: 8 of 8 built; dumps: 8 FXC (DXBC); compiler, from the package: FXC; dumps at C:\\Users\\Keith\\AppData\\Local\\Temp\\swek-denoise-dump-0.6.0-as_shipped-*.txt",
+    "native / as shipped: r12-tiled-3x3: build 983 ms, pass 8.044 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 363 lines, 9 loops, 37 indexable-temp lines, 3 barriers",
+    "native / as shipped: r13-fast-3x3: build 6106 ms, pass 0.746 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 537 lines, 6 loops, 0 indexable-temp lines, 3 barriers",
+    "native / as shipped: r12-direct-head: build 296 ms, pass 4.365 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 217 lines, 5 loops, 0 indexable-temp lines, 0 barriers",
+    "native / as shipped: r13-fast-head: build 281183 ms, pass 1313.939 ms (device clock, 3 passes), 331776 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 9785 lines, 6 loops, 0 indexable-temp lines, 3 barriers",
+    "native / as shipped: r14-head: build 169 ms, pass 1.322 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 97 lines, 1 loops, 0 indexable-temp lines, 0 barriers",
+    "native / as shipped: r12-apply: build 107 ms, pass 1.049 ms (device clock, 30 passes), worst 4.59e-7 (APPLY_TOL 0.00001); dump: FXC (DXBC), 299 lines, 3 loops, 85 indexable-temp lines, 0 barriers",
+    "native / as shipped: r14-apply-fast: build 1203 ms, pass 0.377 ms (device clock, 30 passes), worst 4.59e-7 (APPLY_TOL 0.00001); dump: FXC (DXBC), 324 lines, 5 loops, 0 indexable-temp lines, 2 barriers",
+    "native / as shipped: r15-head-apply: build 15388 ms, pass 0.364 ms (device clock, 30 passes), worst 5.45e-7 against the twin's logits, which are the fused mirror's here (APPLY_TOL 0.00001); dump: FXC (DXBC), 4954 lines, 3 loops, 0 indexable-temp lines, 2 barriers",
+    "browser / Chrome's: r12-tiled-3x3: build 484 ms, pass 230.844 ms (device clock, 7 passes), 131072 plain, 0 fused, 0 unexplained",
+    "browser / Chrome's: r13-fast-3x3: build 558 ms, pass 96.351 ms (device clock, 16 passes), 131072 plain, 0 fused, 0 unexplained",
+    "browser / Chrome's: r12-direct-head: build 42 ms, pass 120.036 ms (device clock, 13 passes), 331776 plain, 0 fused, 0 unexplained",
+    "browser / Chrome's: r13-fast-head: build 414 ms, pass 58.349 ms (device clock, 26 passes), 331776 plain, 0 fused, 0 unexplained",
+    "browser / Chrome's: r14-head: build 23 ms, pass 23.916 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained",
+    "browser / Chrome's: r12-apply: build 64 ms, pass 9.951 ms (device clock, 30 passes), worst 5.11e-7 (APPLY_TOL 0.00001)",
+    "browser / Chrome's: r14-apply-fast: build 520 ms, pass 16.426 ms (device clock, 30 passes), worst 5.11e-7 (APPLY_TOL 0.00001)",
+    "browser / Chrome's: r15-head-apply: build 3231 ms, pass 32.509 ms (device clock, 30 passes), worst 4.99e-7 against the twin's logits, which are the fused mirror's here (APPLY_TOL 0.00001)"
+   ],
+   "skips": [
+    "SKIP  section 66: native / as shipped: r18t's and r18u's hidden kernels (r18t-tile-inline-3x3, r18u-fast-unroll-3x3) stand aside, not counted as unbuilt -- the compiler is FXC, not DXC"
+   ]
+  },
+  {
+   "gate": "render/denoiseDevice-selfcheck.mjs",
+   "category": "exact",
+   "ok": false,
+   "ms": 570240,
+   "adapters": [
+    "intel gen-9 D3D12 driver version 31.0.101.2137 (native)",
+    "google swiftshader"
+   ],
+   "software": true,
+   "fails": [
+    "FAIL  !! round 20 (section 68): the native caller picks what nativePick gives this adapter and this run's compiler, builds it, and runs one pass within 1e-4 of the f64 network   exit 3221225477; the gate's own pick win32/intel/gen-9 r15; [denoiseDevice] --which: adapter intel / gen-9 / D3D12 driver version 31.0.101.2137; node-webgpu 0.6.0 from C:\\Users\\Keith\\AppData\\Roaming\\npm\\node_modules\\webgpu"
+   ],
+   "measured": [
+    "section 66 on win32/intel/gen-9: r18t K1 9.02 x at 256 x 256, 0.951 x r15 under DXC at 1024 x 1024, 0.881 x r15 under FXC at 1024 x 1024, fails condition 3; r18u K1 14.01 x at 256 x 256, 1.59 x r15 under DXC at 1024 x 1024, 1.474 x r15 under FXC at 1024 x 1024, qualifies -> r18u",
+    "section 66 on win32/nvidia/pascal: r18t K1 24.99 x at 1920 x 1080, 1.076 x r15 under DXC at 1920 x 1080, 0.996 x r15 under FXC at 1920 x 1080, fails condition 4; r18u K1 15.17 x at 1920 x 1080, 0.653 x r15 under DXC at 1920 x 1080, 0.605 x r15 under FXC at 1920 x 1080, fails condition 3 -> no entry",
+    "section 68: the packages the rig had installed (the pin is 0.6.0): intel 0.6.1, nvidia 0.6.0",
+    "native adapter: intel / gen-9 / D3D12 driver version 31.0.101.2137 (hardware); compiler, from the package: FXC",
+    "native K0 for round 18's sets on win32/intel/gen-9, compiler FXC, from node-webgpu 0.6.0: r18t not built natively (one of FXC_UNBUILT_SETS, under FXC); r18u not built natively (one of FXC_UNBUILT_SETS, under FXC)",
+    "native caller here: no pick line; no run line"
+   ],
+   "skips": [
+    "SKIP  K0 natively for r18t: one of FXC_UNBUILT_SETS, on a D3D12 adapter whose run compiles with FXC, from node-webgpu 0.6.0 -- FXC does not build its kernel (section 60), DXC does (section 65): SWEK_WEBGPU naming node-webgpu 0.6.2, which ships its DXC beside dawn.node; section 5 holds it in the browser",
+    "SKIP  K0 natively for r18u: one of FXC_UNBUILT_SETS, on a D3D12 adapter whose run compiles with FXC, from node-webgpu 0.6.0 -- FXC does not build its kernel (section 60), DXC does (section 65): SWEK_WEBGPU naming node-webgpu 0.6.2, which ships its DXC beside dawn.node; section 5 holds it in the browser",
+    "SKIP  r18t on the small network: one of FXC_UNBUILT_SETS, on a D3D12 adapter whose run compiles with FXC, from node-webgpu 0.6.0 -- FXC does not build its kernel (section 60), DXC does (section 65): SWEK_WEBGPU naming node-webgpu 0.6.2, which ships its DXC beside dawn.node",
+    "SKIP  r18u on the small network: one of FXC_UNBUILT_SETS, on a D3D12 adapter whose run compiles with FXC, from node-webgpu 0.6.0 -- FXC does not build its kernel (section 60), DXC does (section 65): SWEK_WEBGPU naming node-webgpu 0.6.2, which ships its DXC beside dawn.node"
+   ]
+  },
+  {
+   "gate": "render/denoiseTiming-selfcheck.mjs",
+   "category": "timing",
+   "ok": true,
+   "ms": 242293,
+   "adapters": [
+    "intel gen-9 D3D12 driver version 31.0.101.2137 (native)",
+    "google swiftshader"
+   ],
+   "software": true,
+   "fails": [],
+   "measured": [
+    "native adapter: intel / gen-9 / D3D12 driver version 31.0.101.2137 (hardware); compiler, from the package: FXC",
+    "native: this adapter's key for section 66's table: win32/intel/gen-9",
+    "native: node-webgpu 0.6.0; compiler, read off the package with this device's flags: FXC; sets timed: r12, r15",
+    "native: adapter intel / gen-9 / D3D12 driver version 31.0.101.2137 (hardware)",
+    "native r12: 64 x 64: 30.678 ms a pass (10th-90th 30.276-35.282, 30 passes); on the device's clock 30.005 ms; 0.134 Mpx/s; conv 9.4 GFLOP/s; 3 MiB of buffers; layer 0 2.333, layer 1 7.335, layer 2 7.372, layer 3 7.334, layer 4 4.373, kernel 1.090",
+    "native r12: 128 x 128: 122.869 ms a pass (10th-90th 119.407-145.841, 13 passes); on the device's clock 120.669 ms; 0.133 Mpx/s; conv 9.3 GFLOP/s; 14 MiB of buffers; layer 0 8.987, layer 1 29.959, layer 2 29.916, layer 3 29.769, layer 4 17.792, kernel 4.299",
+    "native r12: 256 x 256: 479.441 ms a pass (10th-90th 456.798-563.604, 4 passes); on the device's clock 458.996 ms; 0.137 Mpx/s; conv 9.8 GFLOP/s; 56 MiB of buffers; layer 0 33.239, layer 1 113.741, layer 2 114.207, layer 3 112.885, layer 4 68.440, kernel 16.482",
+    "native r12: 512 x 512 skipped -- predicted 1918 ms a pass, over the 1500 ms cap",
+    "native r12: 1024 x 1024 skipped -- predicted 7672 ms a pass, over the 1500 ms cap",
+    "native r12: 1920 x 1080 skipped -- predicted 15172 ms a pass, over the 1500 ms cap",
+    "native r15: 64 x 64: 3.895 ms a pass (10th-90th 3.752-4.185, 30 passes); on the device's clock 3.363 ms; 1.052 Mpx/s; conv (hidden layers) 85.8 GFLOP/s; 2 MiB of buffers; layer 0 0.416, layer 1 0.861, layer 2 0.828, layer 3 0.809, layer 4 and kernel 0.414",
+    "native r15: 128 x 128: 12.138 ms a pass (10th-90th 11.795-14.307, 30 passes); on the device's clock 11.584 ms; 1.350 Mpx/s; conv (hidden layers) 97.0 GFLOP/s; 9 MiB of buffers; layer 0 1.345, layer 1 3.166, layer 2 2.920, layer 3 2.882, layer 4 and kernel 1.321",
+    "native r15: 256 x 256: 54.202 ms a pass (10th-90th 47.185-54.579, 30 passes); on the device's clock 53.461 ms; 1.209 Mpx/s; conv (hidden layers) 85.8 GFLOP/s; 35 MiB of buffers; layer 0 5.591, layer 1 13.681, layer 2 13.664, layer 3 13.694, layer 4 and kernel 6.730",
+    "native r15: 512 x 512: 166.175 ms a pass (10th-90th 164.088-216.020, 10 passes); on the device's clock 165.243 ms; 1.578 Mpx/s; conv (hidden layers) 106.9 GFLOP/s; 141 MiB of buffers; layer 0 17.510, layer 1 46.306, layer 2 43.602, layer 3 42.291, layer 4 and kernel 17.419",
+    "native r15: 1024 x 1024: 849.245 ms a pass (10th-90th 696.155-909.938, 3 passes); on the device's clock 848.393 ms; 1.235 Mpx/s; conv (hidden layers) 84.6 GFLOP/s; 564 MiB of buffers; layer 0 86.101, layer 1 223.922, layer 2 228.335, layer 3 218.361, layer 4 and kernel 91.551",
+    "native r15: 1920 x 1080 skipped -- predicted 1680 ms a pass, over the 1500 ms cap",
+    "native: r15 against r12 at 64 x 64: 8.92 x as fast, on the device's clock",
+    "native: r15 against r12 at 128 x 128: 10.42 x as fast, on the device's clock",
+    "native: r15 against r12 at 256 x 256: 8.59 x as fast, on the device's clock",
+    "page: adapter google / swiftshader -- SOFTWARE: these are a CPU's times, not a GPU's",
+    "page r12: 64 x 64: 1043.000 ms a pass (10th-90th 1007.300-1072.500, 3 passes); on the device's clock 1041.560 ms; 0.004 Mpx/s; conv 0.3 GFLOP/s; 3 MiB of buffers; layer 0 107.404, layer 1 265.911, layer 2 284.195, layer 3 280.496, layer 4 116.075, kernel 12.538",
+    "page r12: 128 x 128 skipped -- predicted 4182 ms a pass, over the 1500 ms cap",
+    "page r12: 256 x 256 skipped -- predicted 16730 ms a pass, over the 1500 ms cap",
+    "page r12: 512 x 512 skipped -- predicted 66918 ms a pass, over the 1500 ms cap",
+    "page r12: 1024 x 1024 skipped -- predicted 267674 ms a pass, over the 1500 ms cap",
+    "page r12: 1920 x 1080 skipped -- predicted 529335 ms a pass, over the 1500 ms cap",
+    "page r15: 64 x 64: 373.500 ms a pass (10th-90th 336.800-390.200, 6 passes); on the device's clock 371.835 ms; 0.011 Mpx/s; conv (hidden layers) 0.8 GFLOP/s; 2 MiB of buffers; layer 0 34.966, layer 1 94.800, layer 2 88.899, layer 3 107.801, layer 4 and kernel 39.449",
+    "page r15: 128 x 128: 1525.000 ms a pass (10th-90th 1490.000-1584.100, 3 passes); on the device's clock 1523.790 ms; 0.011 Mpx/s; conv (hidden layers) 0.7 GFLOP/s; 9 MiB of buffers; layer 0 168.791, layer 1 381.097, layer 2 419.572, layer 3 379.207, layer 4 and kernel 156.963",
+    "page r15: 256 x 256 skipped -- predicted 6102 ms a pass, over the 1500 ms cap",
+    "page r15: 512 x 512 skipped -- predicted 24406 ms a pass, over the 1500 ms cap",
+    "page r15: 1024 x 1024 skipped -- predicted 97626 ms a pass, over the 1500 ms cap",
+    "page r15: 1920 x 1080 skipped -- predicted 193058 ms a pass, over the 1500 ms cap",
+    "page r18t: 64 x 64: 260.800 ms a pass (10th-90th 237.100-278.600, 9 passes); on the device's clock 259.197 ms; 0.016 Mpx/s; conv (hidden layers) 1.2 GFLOP/s; 2 MiB of buffers; layer 0 24.946, layer 1 65.590, layer 2 63.625, layer 3 58.965, layer 4 and kernel 42.069",
+    "page r18t: 128 x 128: 1016.000 ms a pass (10th-90th 1003.100-1065.600, 3 passes); on the device's clock 1014.794 ms; 0.016 Mpx/s; conv (hidden layers) 1.1 GFLOP/s; 9 MiB of buffers; layer 0 115.871, layer 1 269.611, layer 2 257.097, layer 3 266.787, layer 4 and kernel 144.228",
+    "page r18t: 256 x 256 skipped -- predicted 4065 ms a pass, over the 1500 ms cap",
+    "page r18t: 512 x 512 skipped -- predicted 16261 ms a pass, over the 1500 ms cap",
+    "page r18t: 1024 x 1024 skipped -- predicted 65043 ms a pass, over the 1500 ms cap",
+    "page r18t: 1920 x 1080 skipped -- predicted 128625 ms a pass, over the 1500 ms cap",
+    "page r18u: 64 x 64: 768.200 ms a pass (10th-90th 737.900-774.600, 3 passes); on the device's clock 766.451 ms; 0.005 Mpx/s; conv (hidden layers) 0.3 GFLOP/s; 2 MiB of buffers; layer 0 101.610, layer 1 200.988, layer 2 210.354, layer 3 213.818, layer 4 and kernel 40.741",
+    "page r18u: 128 x 128 skipped -- predicted 3074 ms a pass, over the 1500 ms cap",
+    "page r18u: 256 x 256 skipped -- predicted 12296 ms a pass, over the 1500 ms cap",
+    "page r18u: 512 x 512 skipped -- predicted 49184 ms a pass, over the 1500 ms cap",
+    "page r18u: 1024 x 1024 skipped -- predicted 196736 ms a pass, over the 1500 ms cap",
+    "page r18u: 1920 x 1080 skipped -- predicted 389053 ms a pass, over the 1500 ms cap",
+    "page: r15 against r12 at 64 x 64: 2.80 x as fast, on the device's clock",
+    "page: r18t against r12 at 64 x 64: 4.02 x as fast, on the device's clock",
+    "page: r18u against r12 at 64 x 64: 1.36 x as fast, on the device's clock",
+    "page: r18t against r15 at 64 x 64: 1.435 x as fast, on the device's clock -- section 61",
+    "page: r18t against r15 at 128 x 128: 1.502 x as fast, on the device's clock -- section 61",
+    "page: r18u against r15 at 64 x 64: 0.485 x as fast, on the device's clock -- section 61",
+    "page: this adapter's key for section 61's table: Windows/google/swiftshader"
+   ],
+   "skips": [
+    "SKIP  native r18t: a D3D12 adapter whose compiler, read off the package, is FXC -- node-webgpu's FXC does not build its kernel (section 60); the page times it, and a package that ships DXC times it here (section 66)",
+    "SKIP  native r18u: a D3D12 adapter whose compiler, read off the package, is FXC -- node-webgpu's FXC does not build its kernel (section 60); the page times it, and a package that ships DXC times it here (section 66)",
+    "SKIP  native FXC ladder: the package's compiler as shipped is FXC (node-webgpu 0.6.0; no dxcompiler.dll beside dawn.node) -- the native ladder above is already FXC's"
+   ]
+  },
+  {
+   "gate": "tools/roundhouse/hmcGpu-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 560,
+   "adapters": [],
+   "software": null,
+   "fails": [],
+   "measured": [
+    "against the f32 mirror: 1018 of 16384 endpoint values bit-identical, worst 3.099e-6 (measured, not asserted: tslPhysics-selfcheck found the browser's WebGPU 1.371e-6 from the mirror at v4370, and this is the same rasteriser)"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "tools/ship/badTvWgsl-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 970,
+   "adapters": [],
+   "software": null,
+   "fails": [],
+   "measured": [
+    "badTvPass.js's GLSL is built from the model's constants for the same reason: 'a second hand-written 0.2 or 50.0 is how a port drifts'. The WGSL now follows that rule and the check enforces it.",
+    "this is the check that cannot be done by eye: a reversed select still produces noise, still tears the picture, and is a different function.",
+    "wgslSpec PARSES WGSL; it does not compile it. Section 4 hands both to a driver, which is the only thing that can actually reject a shader.",
+    "the census v4269 took stands. What it got wrong was a capability claim about this machine, made without running anything -- the same shape as the guessed sabotage counts v4267 shipped."
+   ],
+   "skips": []
+  },
+  {
+   "gate": "tools/ship/bloomFused-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 2927,
+   "adapters": [],
+   "software": null,
+   "fails": [],
+   "measured": [
+    "a defect worth FIXING and a defect worth KNOWING ABOUT are different. This one is a millionth, no eye can see it, and correcting it would alter every existing image for no visible gain.",
+    "half a byte is the FLOOR of this comparison, not a loose tolerance: the frame is read back as 8-bit, so 0.5/255 is the rounding of the last write and nothing can do better. The oracle is now allowed to stand in for the shaders, and only now.",
+    "*** BIT-IDENTICAL WAS NEVER AVAILABLE AND CLAIMING IT WOULD HAVE BEEN A LIE. *** The fused shader adds the same nine taps in the same order, but a GPU may contract a multiply and an add into one FMA and a JavaScript engine may not, so the last bit is free to differ. The tolerance is stated in EPSILONS rather than as a decimal, because that says what kind of difference is being permitted rather tha",
+    "the first draft of the table said three and this check said five. *** THE CLAIM WAS WRONG AND THE COUNT WAS RIGHT, *** which is the only reason to count something the reader could have taken on trust: SSAO and god rays sit between the blur and the composite, they are guarded so they are easy to forget, and a round announcing 'three passes become one' while five live there is overstating by omissio",
+    "NO TIMING IS REPORTED AND THAT IS DELIBERATE. The only device here is google/swiftshader, a software rasteriser; fusing passes is a memory-traffic win and timing memory traffic on a CPU measures the CPU. The round-trip count is exact, structural, and does not depend on what silicon happens to be present. *** A NUMBER THAT WOULD LOOK LIKE EVIDENCE AND BE NOISE IS WORSE THAN NONE. ***"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "tools/ship/bloomFusedTexture-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 3601,
+   "adapters": [],
+   "software": null,
+   "fails": [],
+   "measured": [
+    "*** THIS IS WHY THE FORMAT IS NOT A DETAIL. *** An 8-bit target is the obvious default, it validates, it dispatches, it produces a picture, and it silently deletes the dynamic range that is the entire point of a bloom pass. Nothing but a measurement distinguishes it from the right answer, because the failure is invisible anywhere the scene happens to be dim.",
+    "scene texture in, bloom texture out, ONE dispatch. That is the shape a renderer calls. What v4284 had was the same arithmetic with its input computed and its output in a buffer, which is a proof about a filter rather than a pass.",
+    "*** NO TIMING, AGAIN, AND FOR THE SAME REASON. *** The payoff of fusing three passes is memory traffic; the only WebGPU device here is google/swiftshader, a software rasteriser; timing memory traffic on a CPU measures the CPU. Building the wiring before the measurement is defensible -- it puts the measurement one run away from anyone with hardware instead of one round away. Claiming the measuremen"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "tools/ship/brainKernels-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 3097,
+   "adapters": [
+    "google swiftshader"
+   ],
+   "software": true,
+   "fails": [],
+   "measured": [],
+   "skips": []
+  },
+  {
+   "gate": "tools/ship/crossBackend-selfcheck.mjs",
+   "category": "exact",
+   "ok": false,
+   "ms": 135227,
+   "adapters": [],
+   "software": null,
+   "fails": [
+    "FAIL  !! identical: hmcGpu.WGSL_HMC_PROBE   2047/16384, max diff 2.861e-6 at 0",
+    "FAIL  !! *** no divergence anywhere in the corpus ***   130007 floats across 129 shaders"
+   ],
+   "measured": [],
+   "skips": []
+  },
+  {
+   "gate": "tools/ship/deviceCompute-selfcheck.mjs",
+   "category": "timing",
+   "ok": false,
+   "ms": 19137,
+   "adapters": [
+    "intel gen-9"
+   ],
+   "software": false,
+   "fails": [
+    "FAIL  identical through the device: hmcGpu.WGSL_HMC_PROBE   2047/16384, first differs at 0, max 2.861e-6 -- differs, no f64 reference",
+    "FAIL  *** all of them: the device is a third path to the same bytes ***   90839 floats across 54 kernels in 6056 ms on the device"
+   ],
+   "measured": [],
+   "skips": []
+  },
+  {
+   "gate": "tools/ship/harnessLiveness-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 5634,
+   "adapters": [],
+   "software": null,
+   "fails": [],
+   "measured": [
+    "before this round the same entry scored { ok: true, n: 8, same: 8, identical: true }",
+    "a kernel that writes only the first half: native read-back [1,2,3,4,\"FILL\",\"FILL\",\"FILL\",\"FILL\"]",
+    "temporalLock.RING_PUSH_WGSL            n=2048  untouched=  0  distinct=2030",
+    "temporalLock.SHADING_SHIFT_WGSL        n= 256  untouched=  0  distinct= 256",
+    "temporalLock.RIDGE_WGSL                n= 256  untouched=  0  distinct=   2",
+    "temporalLock.FIELD_RIDGE_WGSL          n= 256  untouched=  0  distinct=   2",
+    "temporalLock.COHERENT_RIDGE_WGSL       n= 256  untouched=  0  distinct=   2",
+    "temporalReject.DISOCCLUSION_WGSL       n= 256  untouched=  0  distinct=   2",
+    "temporalReject.FACTOR_WGSL             n= 256  untouched=  0  distinct=  10",
+    "temporalReject.RECTIFY_WGSL            n=1024  untouched=  0  distinct= 721",
+    "temporalAccumulate.ACCUMULATE_WGSL     n=1024  untouched=  0  distinct= 721",
+    "temporalResolve.RESOLVE_WGSL           n=1024  untouched=  0  distinct= 721",
+    "motionVectors.MOTION_WGSL              n=1024  untouched=  0  distinct=  33",
+    "ringFloor.RING_FLOOR_WGSL              n= 256  untouched=  0  distinct= 101"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "tools/ship/headlessGpu-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 12147,
+   "adapters": [],
+   "software": null,
+   "fails": [],
+   "measured": [],
+   "skips": []
+  },
+  {
+   "gate": "tools/ship/liveCubeCapture-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 16534,
+   "adapters": [
+    "google swiftshader"
+   ],
+   "software": true,
+   "fails": [],
+   "measured": [
+    "marker direction [0.159,0.264,0.951] -> dirToFace says face 4, texel (9, 5) of 16 (angular radius 4.8 deg vs 5.6 deg/texel)",
+    "webgpu: brightest captured texel is face 4 (9, 5), luminance 3.000",
+    "webgl2: brightest captured texel is face 4 (9, 5), luminance 3.000",
+    "background stayed near-zero away from the marker's own face: 0 of 3072 texels lit outside it (some spill onto the marker's neighbouring texels on the same face is expected, not counted here)",
+    "fed into physics/render/specularProbeCapture.mjs's CAPTURED_PREFILTER_WGSL, native (headlessGpu), the same shader specularProbeCapture-selfcheck.mjs already verifies against an analytic capture:",
+    "the live sphere (radius 0.14 at [0,1,0.5], camera at [0,1,2] looking straight at it) should key 332 pixels",
+    "webgpu (compute+drawIndexedIndirect): 7506 of 19200 pixels lit, fleetIndex 6, 795 records",
+    "webgl2 (cpu-twin+drawIndexed): 7494 of 19200 pixels lit, fleetIndex 6, 795 records",
+    "208 of 19200 pixels keyed to the live sphere's own interior (80% radius, same camera and sphere as section 3)",
+    "webgpu: mean local luma gradient across the sphere's own interior, by roughness [0, 0.5, 1] = [12.29, 3.00, 2.69]",
+    "webgl2: mean local luma gradient across the sphere's own interior, by roughness [0, 0.5, 1] = [12.12, 3.00, 2.73]"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "tools/ship/mpmDevice-selfcheck.mjs",
+   "category": "timing",
+   "ok": true,
+   "ms": 3131,
+   "adapters": [
+    "google swiftshader"
+   ],
+   "software": true,
+   "fails": [],
+   "measured": [],
+   "skips": []
+  },
+  {
+   "gate": "tools/ship/pathTracerWgsl-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 566,
+   "adapters": [],
+   "software": null,
+   "fails": [],
+   "measured": [
+    "this adapter converts u32->f32 through the signed path (rounds twice); FLOAT_BOUNDARY records 5475 of 32669 high states landing on the far neighbour over 65536 draws. NOT A PASS CONDITION.",
+    "WGSL specifies sqrt tightly and sin/cos only to an absolute error near 2^-11; this adapter's tan is off by 4.590e-5 and its sqrt by 1.711e-8. Both conformant. Per-frame constants belong in a uniform.",
+    "the record covers 1 adapter(s): google/swiftshader",
+    "adapter intel/gen-9: 3 of 3 per-adapter reading(s) OWED -- no reading on file for this adapter, so those rows measured and reported rather than asserted. The durable row -- tan() in the shader is worse on the ray directions -- held. Re-run with --record ON THAT BOX."
+   ],
+   "skips": []
+  },
+  {
+   "gate": "tools/ship/probeConvention-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 3435,
+   "adapters": [],
+   "software": null,
+   "fails": [],
+   "measured": [
+    "gpuKernel.MPM_WGSL: device-graded by tools/ship/mpmDevice-selfcheck.mjs; compiled here only",
+    "flowfield.FLOWFIELD_WGSL: device-graded by brain/tools/flowfield-selfcheck.mjs; compiled here only"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "tools/ship/slugWgsl-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 8151,
+   "adapters": [],
+   "software": null,
+   "fails": [],
+   "measured": [
+    "adapter: D3D12 driver version 31.0.101.2137 -- Dawn on SwiftShader, the same implementation Chromium carries (headlessGpu.mjs)",
+    "the constructed font (A-F): 6 glyphs, 22045 samples compared (281 within 0.002 em of the outline set aside), curve texels 1 row(s), band texels 1 row(s) at width 4096",
+    "IBM Plex Serif, the ship-label alphabet: 66 glyphs, 61092 samples compared (2334 within 0.002 em of the outline set aside), curve texels 1 row(s), band texels 2 row(s) at width 4096",
+    "constructed font at 28 px/em: 2313 samples, 268 of them partial coverage (antialiased edge), 1957 bit-identical, worst |gpu - cpu| 3.059e-6, mean 3.879e-8, 0 would round to a different 8-bit byte",
+    "constructed font at 12 px/em: 474 samples, 173 of them partial coverage (antialiased edge), 316 bit-identical, worst |gpu - cpu| 8.985e-7, mean 2.532e-8, 0 would round to a different 8-bit byte",
+    "Plex at 28 px/em: 26406 samples, 7895 of them partial coverage (antialiased edge), 17595 bit-identical, worst |gpu - cpu| 3.084e-6, mean 2.479e-8, 0 would round to a different 8-bit byte",
+    "Plex at 12 px/em: 5243 samples, 3105 of them partial coverage (antialiased edge), 2023 bit-identical, worst |gpu - cpu| 6.873e-7, mean 2.670e-8, 0 would round to a different 8-bit byte",
+    "the 8-bit straddle count is REPORTED and not asserted: two values a hair either side of a rounding boundary land on different bytes for a difference far below the tolerance, and asserting zero there would be asserting a property of the sample grid rather than of the shader.",
+    "orthographic, square pixels: corner 0 moves (-0.50000, -0.50000) px on screen; |shift| 0.70711, closed form 0.70711",
+    "perspective, plane turned 0.6 rad: corner 0 moves (-0.43766, -0.55562) px on screen; |shift| 0.70729, closed form 0.70728"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "tools/ship/worleyDevice-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 2113,
+   "adapters": [
+    "google swiftshader"
+   ],
+   "software": true,
+   "fails": [],
+   "measured": [],
+   "skips": []
+  },
+  {
+   "gate": "tools/ship/xpbdDevice-selfcheck.mjs",
+   "category": "timing",
+   "ok": true,
+   "ms": 3252,
+   "adapters": [
+    "google swiftshader"
+   ],
+   "software": true,
+   "fails": [],
+   "measured": [
+    "adapter: D3D12 driver version 31.0.101.2137",
+    "WebGPU vs the f32 mirror after 40 frames: 75 of 75 coordinates bit-identical, worst 0.00e+0 -- measured, not asserted (see the header)",
+    "WebGPU: 40 frames in 189 ms through the device (12 colors x 5 iterations + 2 dispatches per frame); WebGL2 twin 5 ms",
+    "with contact, WebGPU vs f64: worst 2.09e-6 -- printed, not bounded (a pair set is discontinuous in the positions)"
+   ],
+   "skips": []
+  }
+ ],
+ "adapters": [
+  {
+   "name": "google swiftshader",
+   "software": true,
+   "launchArgs": [
+    "--enable-unsafe-webgpu",
+    "--use-angle=d3d11",
+    "--use-webgpu-adapter=swiftshader"
+   ],
+   "native": false
+  },
+  {
+   "name": "intel gen-9 D3D12 driver version 31.0.101.2137",
+   "software": false,
+   "launchArgs": [
+    "node-webgpu (native)"
+   ],
+   "native": true
+  },
+  {
+   "name": "intel gen-9",
+   "software": false,
+   "launchArgs": [
+    "--enable-unsafe-webgpu",
+    "--use-angle=d3d11"
+   ],
+   "native": false
+  }
+ ],
+ "verdict": "*** SOFTWARE ADAPTER (google swiftshader): THIS IS NOT A REAL-HARDWARE RUN -- its times are a CPU's ***",
+ "summary": "exact 17/19, quality 2/2, timing 4/5",
+ "nodeWebgpu": {
+  "version": "0.6.0",
+  "from": "C:\\Users\\Keith\\AppData\\Roaming\\npm\\node_modules\\webgpu\\index.js",
+  "dir": "C:\\Users\\Keith\\AppData\\Roaming\\npm\\node_modules\\webgpu",
+  "dxcBeside": false,
+  "compiler": "FXC",
+  "chosenBy": "the resolver's list"
+ }
+}

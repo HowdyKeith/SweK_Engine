@@ -340,6 +340,20 @@ sec("6. WHAT IS NOT SOLVED IS SAID IN THE MODULE, NOT ONLY HERE");
     ok(HG.LICENCES.nodeWebgpu.vendored === false && HG.LICENCES.swiftShader.vendored === false,
        "*** and NEITHER is vendored -- the driver is reached by path inside Playwright's own bundle ***",
        "no file is copied into this repository, so no distribution obligation is added");
+    // v4856 -- the pin moved to 0.6.2 (section 70). It is spelled twice -- the record here and the session-start hook that installs
+    // it -- and two spellings of one fact are how a pin drifts, so the hook's WEBGPU_PIN is held to the record.
+    // SABOTAGED v4856: the hook's WEBGPU_PIN set back to 0.6.0 -> 1 RED, this row; the record's dxc licence as "MIT" -> 1 RED, the
+    // next. Each restored, md5 verified.
+    // A tree without the hook (an unpacked release, which carries the engine and not the repository's .claude) holds the record alone.
+    const hookPath = path.join(HERE, "..", "..", "..", ".claude", "hooks", "session-start.sh"), FS = await import("node:fs");
+    const hook = FS.existsSync(hookPath) ? FS.readFileSync(hookPath, "utf8") : null;
+    const hookPin = hook ? ((hook.match(/^WEBGPU_PIN=(\S+)$/m) || [])[1] || null) : null;
+    ok(HG.LICENCES.nodeWebgpu.version === "0.6.2" && (hook === null || (hookPin === HG.LICENCES.nodeWebgpu.version && /npm install -g webgpu@\$WEBGPU_PIN\b/.test(hook) && !/webgpu@0\.6\.[01]\b/.test(hook))),
+       "the pin is 0.6.2 (section 70), and the session-start hook installs exactly the version this record names -- and no other",
+       `record ${HG.LICENCES.nodeWebgpu.version}, hook ${hook === null ? "not in this tree (an unpacked release)" : hookPin}`);
+    ok(HG.LICENCES.dxc && HG.LICENCES.dxc.licence === "NCSA" && HG.LICENCES.dxc.vendored === false && /dxcompiler-LICENSE\.TXT/.test(HG.LICENCES.dxc.shipped),
+       "  ...and the DXC 0.6.2 carries on win32 has its own licence recorded, read from the package (NCSA), and is not vendored either",
+       HG.LICENCES.dxc ? HG.LICENCES.dxc.what : "no dxc entry");
     const icdBefore = process.env.VK_ICD_FILENAMES;
     process.env.VK_ICD_FILENAMES = "/somebody/elses/choice.json";
     const res = HG.configureVulkanIcd();
