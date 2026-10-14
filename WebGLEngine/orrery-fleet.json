@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "421965989d76f646ceeeb51e268dd43c08678f57",
+ "head": "b570180e0e0443b9b3289a00da4efd48732f48b2",
  "bodies": {
   "box3d": [
    {
@@ -722,7 +722,7 @@
    {
     "path": "main.js",
     "bytes": 3602744,
-    "sha": "e9bac002bc93c0576ac8d67db4832f85006ece0b"
+    "sha": "a004e3fe510d3d79c4e30782a675c3b32f77082c"
    },
    {
     "path": "mpm3d.html",
@@ -1218,8 +1218,8 @@
    },
    {
     "path": "tools/ship/threeTextureBarrier-selfcheck.mjs",
-    "bytes": 18015,
-    "sha": "e9bac002bc93c0576ac8d67db4832f85006ece0b"
+    "bytes": 18102,
+    "sha": "b570180e0e0443b9b3289a00da4efd48732f48b2"
    },
    {
     "path": "tools/ship/threeUpstream-selfcheck.mjs",
