@@ -13,17 +13,19 @@
 //   4. no list prefix matches a committed file, so a reclaim can never delete anything git tracks
 //   5. reclaimTransientPaths and fixtureLitter's reclaim remove what they name (directories too) and nothing else, on a scratch root
 //   6. the probe still sees a write: maze-walker's .maze-boot.mjs, the leftover that started this, read live
+//   7. the census declares its cap (budgetIsOwn, which runnerBudget asks of every runner): a kill ceiling, and a stopped gate is unread
 //
 // SABOTAGED v4857: TRANSIENT_PATHS without gfx-door-probe.html -> 3 RED (row 1's classes, row 2's strandable, row 5's reclaim);
 // coveredBy without the ancestor step -> 2 RED (row 1's directory row; row 2, the __doorfixture__ files turn strandable);
 // an entry ["", "main", ...] added -> 4 RED, row 4 among them (main.js is tracked); reclaimTransientPaths joining root to the
 // name without its directory -> 1 RED, row 5; the probe's addWrite recording nothing -> 1 RED, row 6. Each restored, md5 verified.
+// budgetIsOwn saying a stopped gate is `skipped` rather than unread -> 1 RED, row 7; restored, md5 verified.
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { coveredBy, classify, readCensus, trackedSets, ignoredSet, runCensus, compactCensus } from "./strandCensus.mjs";
+import { coveredBy, classify, readCensus, trackedSets, ignoredSet, runCensus, compactCensus, budgetIsOwn } from "./strandCensus.mjs";
 import { TRANSIENT_FIXTURES, TRANSIENT_DIRS, TRANSIENT_PATHS, reclaimTransientPaths } from "./gateSweep.mjs";
 import { FIXTURE_DIRS, FIXTURE_PREFIX } from "./fixtureLitter.mjs";
 
@@ -109,6 +111,11 @@ console.log("\n6. THE PROBE STILL SEES A WRITE (LIVE)");
        "maze-walker, run under the probe, is seen writing .maze-boot.mjs and removing it -- the leftover that took two gates red on the rig",
        JSON.stringify({ code: g.code, writes: g.writes, ms: g.ms }));
 }
+
+console.log("\n7. THE CAP IS DECLARED");
+ok(typeof budgetIsOwn === "string" && /--cap-s/.test(budgetIsOwn) && /unread/.test(budgetIsOwn) && R.unread.every((g) => census.gates.find((x) => x.gate === g).writes.length === 0),
+   "strandCensus declares its own limit (budgetIsOwn): --cap-s is a kill ceiling, and a gate it stops is unread with no writes claimed for it",
+   String(budgetIsOwn).slice(0, 120));
 
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: writes by a non-node child (a browser, git, a shell) and the " + R.unread.length + " gates the census " +

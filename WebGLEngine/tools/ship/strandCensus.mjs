@@ -84,15 +84,21 @@ export function ignoredSet(rels, root = ENG) {
     } catch (e) { return new Set(String(e.stdout || "").split("\n").map((l) => l.trim()).filter(Boolean)); }   // exit 1: none ignored
 }
 
+// v4857 -- runnerBudget asks every runner that spawns a gate under a limit to read gateBudget or say why not.
+export const budgetIsOwn =
+    "the cap here is not a per-gate budget. This runner spawns a gate to observe what it WRITES inside the tree and keeps " +
+    "the duration only as a note, so gateBudget.MEASURED has nothing to say about it. --cap-s (300 s by default) is a " +
+    "SIGKILL ceiling so one slow gate cannot stall a whole-tree census; a gate stopped there wrote no probe file and is " +
+    "listed as unread, never as clean.";
+
 function runOne(gate, { capMs }) {
     return new Promise((resolve) => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), "swek-strand-")), t0 = Date.now();
+        // node's own timeout sends the SIGKILL, and the exit handler below reads the signal back: a stopped gate is `capped`
         const child = spawn(process.execPath, ["--import", PROBE, gate], {
-            cwd: ENG, stdio: "ignore",
+            cwd: ENG, stdio: "ignore", timeout: capMs, killSignal: "SIGKILL",
             env: { ...process.env, SWEK_PROBE_DIR: dir, NODE_OPTIONS: `${process.env.NODE_OPTIONS || ""} --import ${PROBE}`.trim() } });
-        const timer = setTimeout(() => { try { child.kill("SIGKILL"); } catch {} }, capMs);
         child.on("exit", (code, signal) => {
-            clearTimeout(timer);
             const writes = new Set();
             for (const f of fs.readdirSync(dir)) { try { for (const w of JSON.parse(fs.readFileSync(path.join(dir, f), "utf8")).writes || []) writes.add(w); } catch {} }
             fs.rmSync(dir, { recursive: true, force: true });
