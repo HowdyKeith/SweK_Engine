@@ -231,14 +231,25 @@ export function highWater(opts = {}) {
         catch { return null; }                              // no upstream: nothing to exclude, and that is fine
     })();
     const { rows, unreadable } = refOrdinals(opts);
+    // v4854 -- *** AND A BRANCH ALREADY MERGED INTO THIS BUILD DOES NOT COLLIDE WITH IT EITHER. *** The other session's
+    // v4854 was merged here to be shipped, and this check refused v4854 because that branch's ref still named it -- for a
+    // different round, it said, when it was the very round this build carries. A ref whose tip is an ancestor of HEAD has
+    // every heading it holds in this build's own changelog; its numbers are this build's, not a rival's. An ancestry test
+    // that cannot be run (a shallow clone) counts as NOT merged, the side that refuses -- and refs supplied by a fixture are
+    // never asked of the real repository: the gate's fixture names real branches, and the first draft read their real ancestry.
+    const merged = new Set(opts.mergedRefs !== undefined ? opts.mergedRefs : (opts.refsOverride || opts.readOverride) ? [] : (() => {
+        const exec = opts.run || ((args) => execFileSync("git", args, { cwd: REPO, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }));
+        return rows.map((r) => r.ref).filter((ref) => ref !== self && (() => { try { exec(["merge-base", "--is-ancestor", ref, "HEAD"]); return true; } catch { return false; } })());
+    })());
     let top = null, where = null, titles = null;
     for (const r of rows) {
         if (self && r.ref === self) continue;
+        if (merged.has(r.ref)) continue;
         if (top == null || r.top > top) { top = r.top; where = r.ref; titles = r.titles; }
     }
     // `self` is returned rather than left implicit: preflight needs it to skip this branch when
     // naming who spent a number, and re-deriving it there would be the same fact computed twice.
-    return { top, where, titles, rows, unreadable, self };
+    return { top, where, titles, rows, unreadable, self, merged };
 }
 
 /** The ordinals origin/main's changelog has spent, or null with a reason. */
@@ -327,7 +338,7 @@ export function preflight(shipping, opts = {}) {
         // printed the v4662 branch's entry for that number instead of the branch that actually named it. A
         // refusal that names the WRONG round is worse than one that names none: it sends the reader to a
         // file that does not hold what they were told is there.
-        const holder = (hw.rows || []).find((r) => r.titles && r.titles.has(want) && r.ref !== hw.self);
+        const holder = (hw.rows || []).find((r) => r.titles && r.titles.has(want) && r.ref !== hw.self && !(hw.merged && hw.merged.has(r.ref)));
         const taken = holder && holder.titles.get(want);
         return { ok: false, shipping, mainVersion: mv, freshness, ordinalTop: spent ? spent[0] : null, highWater: hw.top,
                  refusal: `v${hw.top} is already spent on ${hw.where}` +

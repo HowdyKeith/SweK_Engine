@@ -340,6 +340,19 @@ const against = (main) => (v) => preflight(v, {
        "this is what the check did before the exclusion was made explicit -- it passed by accident, because " +
        "the push had not happened yet");
 
+    // *** v4854 -- A BRANCH MERGED INTO THIS BUILD DOES NOT COLLIDE WITH IT. *** The other session's v4854 was merged here to
+    // ship, and the check refused v4854 for a "different round" that was the very round being shipped.
+    // SABOTAGED v4854: highWater without the merged skip -> 1 RED, the first row below, by name; restored, md5 verified.
+    const both = ["refs/remotes/origin/claude/v4662-last-teleports", "refs/remotes/origin/claude/v4661-complete-singles"];
+    ok(preflight("v4662", opts("v4662", { mergedRefs: both })).ok === true,
+       "!! *** v4662 is permitted when the branch that spent it -- and every branch above it -- is already merged into this build ***",
+       (preflight("v4662", opts("v4662", { mergedRefs: both })).refusal || "permitted").slice(0, 100));
+    const one = preflight("v4661", opts("v4661", { mergedRefs: [both[0]] }));
+    ok(one.ok === false && /the last nine complete sites/.test(one.refusal || "") && /v4661-complete-singles/.test(one.refusal || ""),
+       "  ...and a branch NOT merged still holds its number: with only v4662's branch merged, v4661 is refused, naming the branch that spent it",
+       (one.refusal || "").slice(0, 120));
+    ok(highWater(opts("v4663", { mergedRefs: [] })).top === 4662 && highWater(opts("v4663")).merged.size === 0,
+       "  ...and fixture refs are never asked of the real repository's ancestry: unless a fixture names them merged, none is -- the side that refuses");
     ok(preflight("v4663", opts("v4663")).ok === true && preflight("v4668", opts("v4668")).ok === true,
        "*** and v4663 -- the first seat above every ref -- is permitted, as is anything past it ***");
 
