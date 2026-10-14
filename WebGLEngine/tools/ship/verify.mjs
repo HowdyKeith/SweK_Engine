@@ -656,7 +656,7 @@ if (process.env.SWEK_QUICKSWEEP !== "0") {
         else if (e.stage === "slice") process.stderr.write(`[verify]   slice ${e.done}  ${clock()}  ${e.gate}\n`);
         else if (e.stage === "write") process.stderr.write(`[verify] sweep done, recording timings  ${clock()}\n`);
       } });
-    console.log(`[verify] quick sweep: ${r.ran} of ${r.enumerated} gates under ${budgetMs} ms in ${(r.ms / 1000).toFixed(0)} s -- ${r.green} green, ` +
+    console.log(`[verify] quick sweep: ${r.ran} of ${r.enumerated} gates under ${budgetMs} ms in ${(r.ms / 1000).toFixed(0)} s at ${r.workers} at once -- ${r.green} green, ` +
       `${r.knownRed.length} known red, ${r.newRed.length} NEW red, ${r.falseReds} false red, ${r.unmeasured.length} unmeasured, ${r.dropped.length} now over budget`);
     for (const k of r.knownRed) console.log(`[verify]   known red  ${k.gate}  (${k.record})`);
     // *** v4647c -- THE FALSE REDS ARE NAMED HERE, BECAUSE A SECOND BOX REPORTED 143 AND COULD NAME NONE. ***

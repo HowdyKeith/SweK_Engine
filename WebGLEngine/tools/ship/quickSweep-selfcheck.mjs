@@ -1039,6 +1039,27 @@ console.log("\n7. *** WHOSE RECORD IT IS, AND WHAT A GATE THAT DIED SILENTLY SAI
         "...max bounds it, and an empty or missing tail is an empty list, never a throw");
 }
 
+// ---- v4857: HOW MANY AT ONCE IS READ OFF THE BOX ------------------------------------------------------------------------
+// SABOTAGED v4857: sweepWorkers without its memory term -> 1 RED, the boxes row (the rig's Intel reads 8); runQuickSweep's
+// default put back to DEFAULTS.workers -> 1 RED, the default row. Each restored, md5 verified.
+{
+    console.log("\nv4857. THE SWEEP'S WORKER COUNT IS A PROPERTY OF THE BOX");
+    const W = Q.sweepWorkers, gb = (n) => n * 1024;
+    const boxes = [["this sandbox's type, 4c 16 GB (16095 MB as read)", { cpus: 4, totalMemMB: 16095 }, 8],
+                   ["the rig's Intel, 8c 8 GB", { cpus: 8, totalMemMB: gb(8) - 150 }, 4],
+                   ["a 2-core 4 GB box", { cpus: 2, totalMemMB: gb(4) }, 2],
+                   ["a 1-core 1 GB box", { cpus: 1, totalMemMB: gb(1) }, 1],
+                   ["a 32-core 128 GB box", { cpus: 32, totalMemMB: gb(128) }, Q.DEFAULTS.workers]];
+    const got = boxes.map(([, f]) => W(f));
+    ok(boxes.every(([, , want], i) => got[i] === want) && Q.DEFAULTS.workers === 8,
+       "!! two workers per core and one per 2 GB, whichever is smaller -- this sandbox's 8 unchanged, the rig's 8 GB Intel 4, never above DEFAULTS.workers, never below one",
+       boxes.map(([n], i) => `${n}: ${got[i]}`).join("; "));
+    const src = fs.readFileSync(path.join(ENG, "tools", "ship", "quickSweep.mjs"), "utf8");
+    ok(/export async function runQuickSweep\(\{ budgetMs = DEFAULTS\.budgetMs, workers = sweepWorkers\(\),/.test(src) && /workers: arg\("--workers", sweepWorkers\(\)\)/.test(src),
+       "...and the sweep and its command line both default to it, so verify's sweep runs at the box's count; --workers still overrides",
+       `here: ${W()} at once on this box`);
+}
+
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the gates over the budget THE ROTATION HAS NOT REACHED YET. v4408 answered the older " +
     "version of this line -- that a regression in a 40-second gate is found by the full sweep and by nothing at " +

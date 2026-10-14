@@ -32,7 +32,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { backfillStamps } from "./sweepCoverage.mjs";
-import { boxId, canonicalId } from "./hostScale.mjs";
+import { boxId, canonicalId, hostFacts } from "./hostScale.mjs";
 // The FAIL-line rule is IMPORTED, not re-spelled. tools/ship/failLines.mjs owns "what an assertion line
 // looks like" and its own header is about exactly this problem -- "AN EXIT CODE IS NOT A FINDING". Two
 // copies of that regex is how one of them quietly stops matching, which is the defect this file has spent
@@ -83,6 +83,23 @@ export const KIND = Object.freeze({ LOADED: "loaded", ALONE: "alone", CAPPED: "c
 
 export const DEFAULTS = Object.freeze({ budgetMs: 3000, workers: 8, capMs: 20000, timingsFile: "tools/ship/sweep-timings.json",
                                         serialSliceMs: 15000 });
+
+/**
+ * *** v4857 -- HOW MANY GATES AT ONCE IS A PROPERTY OF THE BOX, NOT A CONSTANT. *** DEFAULTS.workers (8) was set on this
+ * sandbox, a 4-core 16 GB box, and it is still that box's number. The rig's Intel is 8 cores and 8 GB, and at 8 workers
+ * its v4856 verify read 100 gates over budget, 13 false reds and six cap kills -- one of which stranded .maze-boot.mjs
+ * and took two gates red with it -- and its v4851 verify lost a gate to ERR_NO_BUFFER_SPACE. The binding constraint there
+ * is memory: most gates launch a browser, and eight of them in 8 GB is the box refusing, not the gates failing.
+ *
+ * So the count is read off the box, at the ratio this sandbox already runs green: two workers per core and one per 2 GB,
+ * whichever is smaller, never above DEFAULTS.workers (which stays the ceiling, so no box runs MORE than it did) and never
+ * below one. This sandbox: min(8, 8, 8) = 8, unchanged. The rig's Intel: min(16, 4, 8) = 4. Memory in whole gigabytes, as
+ * boxId reads it, so the count cannot flicker with a megabyte of drift. `--workers` still overrides it.
+ */
+export function sweepWorkers(facts = hostFacts(), ceiling = DEFAULTS.workers) {
+    const cpus = Math.max(1, (facts && facts.cpus) || 1), gb = Math.round(((facts && facts.totalMemMB) || 0) / 1024);
+    return Math.max(1, Math.min(ceiling, 2 * cpus, Math.floor(gb / 2)));
+}
 
 /**
  * *** WHAT THIS FILE RECORDS IS A CONTENDED SAMPLE, AND THE TREE HAS BEEN READING IT AS A COST. ***
@@ -733,7 +750,7 @@ export function reclaimStrandedFixtures(root = ENG) {
  * caller nobody has written yet inherits the safe one. That is the difference between arming a tool and
  * arming everything that holds it.
  */
-export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DEFAULTS.workers, capMs = DEFAULTS.capMs,
+export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = sweepWorkers(), capMs = DEFAULTS.capMs,
                                       timingsFile = DEFAULTS.timingsFile, root = ENG, gates = null, write = true, onProgress = null,
                                       serialSliceMs = DEFAULTS.serialSliceMs, skipUnchanged = false,
                                       onStage = null, log = (m) => console.log(m) } = {}) {
@@ -1340,7 +1357,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     }
     // No Number() here: parseArgs already refused anything that is not a positive finite number, so a value
     // that reaches this line is one. Converting at the point of use is how `--budget --json` became NaN.
-    const opts = { budgetMs: arg("--budget", DEFAULTS.budgetMs), workers: arg("--workers", DEFAULTS.workers),
+    const opts = { budgetMs: arg("--budget", DEFAULTS.budgetMs), workers: arg("--workers", sweepWorkers()),
                    capMs: arg("--cap", DEFAULTS.capMs), timingsFile: arg("--timings", DEFAULTS.timingsFile) };
     let lastPct = -1;
     // *** v4574 -- ARMED. THE DEFAULT IS NOW TO SKIP, AND --full IS HOW YOU TURN IT OFF. ***
