@@ -4572,3 +4572,54 @@ Committed as received: `tools/ship/native-sweep-r69-intel-gen9-0.6.0.json` and `
 
 **Not in this round.** The text of the gates' own SKIP and refusal lines still names 0.6.0 where it describes what FXC did in
 sections 57-60; those are records of what was measured, and stay.
+
+## 71. ROUND 22 -- ON THE NEW PIN: THE DEFAULT PICKS, AND ROUND 16'S SHAPES NATIVELY UNDER DXC; FIXED BEFORE THE RIG RUNS IT
+
+**Why this round.** Section 70 moved the pin to node-webgpu 0.6.2, so a native run on D3D12 now compiles with DXC as shipped,
+with no `SWEK_WEBGPU`. Two things follow that no run has shown yet:
+- **D, the defaults.** Sections 67 and 68 were read through `SWEK_WEBGPU`. On the pin itself, the Intel's native default
+  should be r18u and the 1080's r15, with nothing set.
+- **B, round 16's shapes.** They have stood aside on every D3D12 adapter since section 57: node-webgpu's FXC built none of
+  them at 32 inputs, and section 66 kept them aside under DXC too, because the rig's DXC probe ran round 17's shapes only.
+  Chrome's DXC built all ten and ran none faster (section 58). Natively under DXC they have never been asked.
+
+**What changes now.** Nothing in the code. This section fixes the rule; the verdict round applies it.
+
+**The pilot here (SwiftShader, Vulkan; no D3D compiler, so it says nothing about DXC).** `denoiseBuildProbe --probe r16
+--native-only` on the pin: all ten shapes built (0.7 to 3.8 s), every one exact at 64 x 64, every cell the twin's, none
+fused. On this CPU the fast kernel's pass was 66 ms and the tile shapes' 59 to 457 ms -- a CPU's times, deciding nothing.
+
+**The rule, fixed now.**
+- **D holds on a GPU** when its plain `realGpuRun --only denoise`, with `SWEK_WEBGPU` unset, reports node-webgpu 0.6.2 chosen by
+  the resolver's list with compiler DXC; all three denoiser gates are green; and the timing gate's native ladder times all four
+  of `TIMED_SETS`. And `node tools/denoiseDevice.mjs --which`, also unset, prints the GPU's key, compiler DXC, and the set
+  section 67's table gives it: r18u on the Intel, r15 on the 1080, each within 1e-4 of the f64 network.
+- **B holds on a GPU** when `node tools/denoiseBuildProbe.mjs --probe r16 --native-only` builds all ten shapes within the 180 s
+  cap, each dump says DXIL, and every one is exact at 64 x 64.
+- **If B holds on both GPUs,** conv2d's round-16 rows stop standing aside on D3D12 under DXC: `brain/conv2d-selfcheck.mjs`'s
+  stand-aside narrows to FXC alone, as round 17's did in section 66. A shape that fails on either GPU keeps the stand-aside, and
+  is named.
+- **Speed decides nothing here.** Each shape's 64 x 64 pass is reported against the fast kernel's in the same run. A shape at
+  least 1.05 x faster than the fast kernel on a GPU is named as the subject of a round 23, fixed before its run; none moves a set.
+
+**Predictions, fixed now.**
+- **D holds on both GPUs.** Sections 67 and 68 measured exactly these picks through `SWEK_WEBGPU`, and the pin is that package.
+- **B holds on both GPUs.** DXC built round 18's tile-inline kernel in 0.15 to 0.21 s on both (section 67), and Chrome's DXC built
+  all ten round-16 shapes in under 0.7 s each (section 58).
+- **No round-16 shape is 1.05 x faster than the fast kernel natively.** Chrome's DXC ran every 32-input shape 1.15 to 6.63 x
+  slower than the fast kernel (section 58), and the native passes have tracked Chrome's within about a quarter (section 65).
+
+**On the rig.** On each GPU, after v4856 or later is pulled and `npm install -g webgpu@0.6.2` has run, from a console with
+`SWEK_WEBGPU` cleared:
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise-r22.json
+node tools/denoiseDevice.mjs --which
+node tools/denoiseBuildProbe.mjs --probe r16 --native-only --out denoise-probe-r16-native-dxc.json
+```
+Send back both JSON files and the three `--which` lines from each GPU.
+
+**Not in this round.** Retiring the FXC paths. With the pin on 0.6.2, FXC runs only where a gate asks for it by disabling
+`use_dxc` (the timing gate's FXC ladder, the compile gate's "use_dxc off" mode); those stay, as the comparison every DXC
+reading is held to.

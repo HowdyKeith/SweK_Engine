@@ -341,6 +341,23 @@ npm install -g webgpu@0.6.2
 From then on the verified clone's native gates compile with DXC on D3D12, and `SWEK_WEBGPU` is not needed to reach 0.6.2.
 A console that still has `SWEK_WEBGPU` set loads whatever it names: clear it with `set SWEK_WEBGPU=`.
 
+### Round 22: the new pin's defaults, and round 16's shapes natively under DXC (pre-registration section 71)
+
+On each GPU, with v4856 or later and `npm install -g webgpu@0.6.2` done, in the verified clone:
+
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise-r22.json
+node tools/denoiseDevice.mjs --which
+node tools/denoiseBuildProbe.mjs --probe r16 --native-only --out denoise-probe-r16-native-dxc.json
+```
+
+- **No `SWEK_WEBGPU` this time:** the point is what the pin does by itself.
+- **Section 71 predicts:** the Intel picks r18u and the 1080 r15; all ten round-16 shapes build and are exact on both; none is
+  1.05 x faster than the fast kernel.
+- **Send back both JSON files and the three `--which` lines from each GPU.**
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and
