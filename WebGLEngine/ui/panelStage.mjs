@@ -43,7 +43,7 @@ export function makeStage(opts = {}) {
     // keep behaving exactly as it did, which the original gate's ordering check asserts.
     const railHost = opts.railHost || opts.stageHost;
     let live = null;                      // { el, anchor }
-    // *** v4864 -- THE RAIL GETS AN ANCHOR TOO. *** restore() put the panel back at its anchor and the rail back
+    // *** v4863 -- THE RAIL GETS AN ANCHOR TOO. *** restore() put the panel back at its anchor and the rail back
     // with railHome.appendChild -- the END of its home, wherever it had been. On server.html the rail is
     // #dialsRow, near the TOP of #gaugeAvatarCol with the chat, the peer bar and the drawers below it, so every
     // staged panel sent the gauges and the avatar to the bottom of the column on the way back. The gate never
@@ -91,7 +91,7 @@ export function makeStage(opts = {}) {
             // order -- v3667's arrangement, unchanged. When it is a different container the order inside the
             // stage does not arise at all.
             if (rail) {
-                // v4864 -- marked only while the rail is AT HOME: restore() above has just sent it back, so this
+                // v4863 -- marked only while the rail is AT HOME: restore() above has just sent it back, so this
                 // is where it lives, not where it was staged last time.
                 if (rail.parentNode && rail.parentNode === railHome) {
                     if (railAnchor && railAnchor.parentNode) railAnchor.parentNode.removeChild(railAnchor);   // a failed present's leftover

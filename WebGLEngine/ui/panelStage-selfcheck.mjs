@@ -9,8 +9,8 @@
 //
 // Driven against a DOM stub with an injected document, so every case is a literal instead of a browser.
 //
-// v4864 -- section 2b: the RAIL goes back between its neighbours, not to the end of its home.
-//   SABOTAGE: restore() made to skip the rail's anchor (`if (false)`, so it appends as before v4864) ->
+// v4863 -- section 2b: the RAIL goes back between its neighbours, not to the end of its home.
+//   SABOTAGE: restore() made to skip the rail's anchor (`if (false)`, so it appends as before v4863) ->
 //   exit=1, 5 red by name: 2b's three lines, plus section 2's "the rail goes home too" and section 5's "rail
 //   returned", because the unused anchor is left behind in the home as residue. Restored, md5-identical.
 
@@ -81,7 +81,7 @@ function world() {
     ok("the rail goes home too", idsOf(w.railHome) === "RAIL" && w.stage.childNodes.length === 0);
 }
 
-// --- 2b. v4864 -- THE RAIL GOES BACK WHERE IT WAS TOO, NOT TO THE END OF ITS HOME --------------------------------
+// --- 2b. v4863 -- THE RAIL GOES BACK WHERE IT WAS TOO, NOT TO THE END OF ITS HOME --------------------------------
 // Every world above gives the rail a home holding the rail and nothing else, so "appended" and "where it was"
 // are the same place and section 2's "the rail goes home too" could not tell them apart. server.html's rail
 // (#dialsRow) has the chat, the peer bar and the drawers BELOW it in its home, and appendChild sent the gauges

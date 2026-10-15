@@ -110,7 +110,7 @@ window.addEventListener("load", function () {
   .bigbtns button { min-height:54px; padding:5px 16px; font-size:15px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; white-space:normal; text-align:center; line-height:1.2; max-width:160px; }
   .bigbtns #vmWidget { min-height:0; }
   .bigbtns #vmWidget button { min-height:0; padding:6px 10px; font-size:13px; }
-  /* v4864 -- the SVG dials beside the avatar in #dialsRow. HERE AND NOT INLINE because gaugeInfoPanel clears the
+  /* v4863 -- the SVG dials beside the avatar in #dialsRow. HERE AND NOT INLINE because gaugeInfoPanel clears the
      element's inline display every time the gauges tab is shown; cleared, it falls back to this. */
   #dials { display:flex; gap:14px; align-items:flex-start; flex:0 0 auto; }
   button:hover { background:#143020; }
@@ -476,7 +476,7 @@ window.addEventListener("load", function () {
              gained the whole width while losing half its height is not "filling the space". The constant
              now sits on the element it was actually sizing. -->
         <div id="dialsRow" style="display:flex;flex-wrap:wrap;align-items:stretch;justify-content:center;gap:20px;flex:1 1 auto;min-height:230px;">
-          <!-- v4864 -- THE SVG DIALS ARE BACK IN THE ROW, BESIDE THE AVATAR. Keith: "when it loads, there
+          <!-- v4863 -- THE SVG DIALS ARE BACK IN THE ROW, BESIDE THE AVATAR. Keith: "when it loads, there
                should be gauges and avatar, but only avatar is appearing." v4413 hid them in a display:none
                wrapper so the avatar could take the whole row, on Keith's ask then to "extend the avatar and
                the new gauges in that same scene" -- and THE GAUGES IN THE SCENE WERE NEVER BUILT for the
@@ -6705,7 +6705,7 @@ try{const r=await fetch("/self/whoami",{cache:"no-store"});const j=await r.json(
           // justifyContent, which is the rule this handler pair already follows -- except that the value put
           // back is READ FROM THE NODE (railFlexHome, above) rather than cleared, because this one is inline.
           rail.style.flex="0 0 auto";
-          // *** v4864 -- AND WITH THE INFO BOX VISIBLE AGAIN, THE lockInfo BELOW TAKES THE RAIL BACK TO 1 1 auto. ***
+          // *** v4863 -- AND WITH THE INFO BOX VISIBLE AGAIN, THE lockInfo BELOW TAKES THE RAIL BACK TO 1 1 auto. ***
           // gaugeInfoPanel's stretchToRow (v3912) sets it so the info text top-aligns with the staged drawer
           // and reaches its bottom. v4450 measured this column EMPTY at 720 px because the info box was then
           // mounted inside #dials' display:none wrapper; it holds the info text now, and the avatar the pin

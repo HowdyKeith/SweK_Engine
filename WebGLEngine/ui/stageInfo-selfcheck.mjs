@@ -2,8 +2,8 @@
 //
 // Run: node ui/stageInfo-selfcheck.mjs
 //
-// v4864 -- 'back to the right' reads the returned dials' WIDTH, not their display value: it read
-//   dials === "block" and passed from v4413 to v4863 while #dials sat in a display:none wrapper.
+// v4863 -- 'back to the right' reads the returned dials' WIDTH, not their display value: it read
+//   dials === "block" and passed from v4413 to v4862 while #dials sat in a display:none wrapper.
 //   SABOTAGE: #dials put back inside that wrapper -> exit=1, 1 red BY NAME ("dials flex at 0 px").
 //   Restored, md5-identical.
 //
@@ -376,8 +376,8 @@ console.log("__J__" + JSON.stringify(out));`;
                 r.back.panelHome === "gaugeSections",
                 "stage hidden, row home in #gaugeAvatarCol, dials " + r.back.dials + " at " + r.back.dialsW + " px and " +
                 "avatar " + r.back.robot + " at " + r.back.robotW + " px, panel back in #gaugeSections -- THE PIN IS " +
-                "RELEASED RATHER THAN LEFT UP OVER THE RETURNED DIALS. *** v4864 -- 'VISIBLE' IS NOW A WIDTH, NOT A " +
-                "DISPLAY VALUE. *** This read dials === \"block\" and PASSED FROM v4413 TO v4863 while the dials " +
+                "RELEASED RATHER THAN LEFT UP OVER THE RETURNED DIALS. *** v4863 -- 'VISIBLE' IS NOW A WIDTH, NOT A " +
+                "DISPLAY VALUE. *** This read dials === \"block\" and PASSED FROM v4413 TO v4862 while the dials " +
                 "sat in a display:none wrapper: their own display was block, and a hidden parent does not change " +
                 "an element's computed display. Now they are flex, from a server.html rule, and a box of 0 px is " +
                 "what hidden looks like whichever ancestor did the hiding");
