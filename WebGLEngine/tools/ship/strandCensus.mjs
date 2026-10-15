@@ -127,7 +127,9 @@ export async function runCensus({ workers = 4, capMs = 300000, only = null, log 
 
 /** The committed form: the gates that wrote inside the tree or hit the cap, one per line; the rest counted in gatesRun. */
 export function compactCensus(c) {
-    const keep = c.gates.filter((g) => g.writes.length || g.capped);
+    // v4863 -- a gate re-run under its own cap (`capMs` on the row: the census's capped gates, read again) is kept even when it
+    // wrote nothing, so the file says it was read rather than dropping it beside the gates never capped
+    const keep = c.gates.filter((g) => g.writes.length || g.capped || g.capMs);
     const head = { generatedFrom: c.generatedFrom, at: c.at, host: c.host, platform: c.platform, workers: c.workers, capMs: c.capMs, gatesRun: c.gatesRun ?? c.gates.length,
                    note: "gates that wrote nothing inside the tree and exited under the cap are counted in gatesRun and omitted" };
     return JSON.stringify(head, null, 1).slice(0, -2) + ",\n \"gates\": [\n" + keep.map((g) => "  " + JSON.stringify(g)).join(",\n") + "\n ]\n}\n";
