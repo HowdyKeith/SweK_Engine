@@ -2,6 +2,11 @@
 //
 // Run: node ui/stageInfo-selfcheck.mjs
 //
+// v4863 -- 'back to the right' reads the returned dials' WIDTH, not their display value: it read
+//   dials === "block" and passed from v4413 to v4862 while #dials sat in a display:none wrapper.
+//   SABOTAGE: #dials put back inside that wrapper -> exit=1, 1 red BY NAME ("dials flex at 0 px").
+//   Restored, md5-identical.
+//
 // *** THE ASK, AND WHY IT IS THREE CHANGES RATHER THAN ONE. *** Keith, looking at a clicked drawer on the rig:
 // "the gauges and avatar should not be shown on a clicked server.html open panel. in this case the Voxel &
 // Render should fill the panel. the link hover which shows in the hover link info panel, this view should have
@@ -320,6 +325,7 @@ for (const vw of [1280, 1920]) {
       const panel = document.querySelector('.gpanel[data-panel="render"]');
       return { stage: cs(g("panelStage")).display, railHome: g("dialsRow").parentElement.id,
                dials: cs(g("dials")).display, robot: cs(g("dialsRobot")).display,
+               dialsW: g("dials").offsetWidth, robotW: g("dialsRobot").offsetWidth,
                panelHome: panel.parentElement.id };
     });
   }
@@ -366,9 +372,15 @@ console.log("__J__" + JSON.stringify(out));`;
                 "#gaugeAvatarCol's own flex:1 1 460px grows to)");
             ok("!! and 'back to the right' puts everything back, gauges included",
                 r.back && r.back.stage === "none" && r.back.railHome === "gaugeAvatarCol" &&
-                r.back.dials === "block" && r.back.robot === "block" && r.back.panelHome === "gaugeSections",
-                "stage hidden, row home in #gaugeAvatarCol, dials and avatar visible again, panel back in " +
-                "#gaugeSections -- THE PIN IS RELEASED RATHER THAN LEFT UP OVER THE RETURNED DIALS");
+                r.back.dials !== "none" && r.back.dialsW > 0 && r.back.robot === "block" && r.back.robotW > 0 &&
+                r.back.panelHome === "gaugeSections",
+                "stage hidden, row home in #gaugeAvatarCol, dials " + r.back.dials + " at " + r.back.dialsW + " px and " +
+                "avatar " + r.back.robot + " at " + r.back.robotW + " px, panel back in #gaugeSections -- THE PIN IS " +
+                "RELEASED RATHER THAN LEFT UP OVER THE RETURNED DIALS. *** v4863 -- 'VISIBLE' IS NOW A WIDTH, NOT A " +
+                "DISPLAY VALUE. *** This read dials === \"block\" and PASSED FROM v4413 TO v4862 while the dials " +
+                "sat in a display:none wrapper: their own display was block, and a hidden parent does not change " +
+                "an element's computed display. Now they are flex, from a server.html rule, and a box of 0 px is " +
+                "what hidden looks like whichever ancestor did the hiding");
         } catch (e) {
             ok("the live drawer click completed", false, String(e.message).slice(0, 200));
         }

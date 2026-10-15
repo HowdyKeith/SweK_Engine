@@ -8,6 +8,11 @@
 // because its neighbours moved while it was away.
 //
 // Driven against a DOM stub with an injected document, so every case is a literal instead of a browser.
+//
+// v4863 -- section 2b: the RAIL goes back between its neighbours, not to the end of its home.
+//   SABOTAGE: restore() made to skip the rail's anchor (`if (false)`, so it appends as before v4863) ->
+//   exit=1, 5 red by name: 2b's three lines, plus section 2's "the rail goes home too" and section 5's "rail
+//   returned", because the unused anchor is left behind in the home as residue. Restored, md5-identical.
 
 import { readFileSync } from "node:fs";
 import { makeStage } from "./panelStage.mjs";
@@ -74,6 +79,33 @@ function world() {
     ok("!! B returns between A and C", idsOf(w.right) === "A,B,C");
     ok("the anchor is removed, leaving no residue", !w.right.childNodes.some((n) => n.nodeType === 8));
     ok("the rail goes home too", idsOf(w.railHome) === "RAIL" && w.stage.childNodes.length === 0);
+}
+
+// --- 2b. v4863 -- THE RAIL GOES BACK WHERE IT WAS TOO, NOT TO THE END OF ITS HOME --------------------------------
+// Every world above gives the rail a home holding the rail and nothing else, so "appended" and "where it was"
+// are the same place and section 2's "the rail goes home too" could not tell them apart. server.html's rail
+// (#dialsRow) has the chat, the peer bar and the drawers BELOW it in its home, and appendChild sent the gauges
+// and the avatar to the bottom of the column after every staged panel. Measured in Chromium on v4862.
+{
+    say("2b. THE RAIL'S HOME HAS NEIGHBOURS -- the case every other world here leaves out.");
+    const w = world();
+    const top = node("div", "TOP"), below = node("div", "BELOW");
+    w.railHome.insertBefore(top, w.rail); w.railHome.appendChild(below);
+    const st = makeStage({ doc, stageHost: w.stage, rail: w.rail, railHome: w.railHome });
+    say("     before: " + idsOf(w.railHome));
+    st.present(w.b);
+    say("     during: " + idsOf(w.railHome) + "   (the rail's anchor holds its gap)");
+    const late = node("div", "NEW");
+    w.railHome.insertBefore(late, w.railHome.childNodes[0]);   // and the home changes while it is away
+    st.restore();
+    say("     after:  " + idsOf(w.railHome));
+    ok("!! the rail returns between the same neighbours, not after the last of them",
+        idsOf(w.railHome) === "NEW,TOP,RAIL,BELOW",
+        "appended, it reads NEW,TOP,BELOW,RAIL -- the gauges and the avatar at the bottom of the column");
+    ok("...and its anchor is removed with it", !w.railHome.childNodes.some((n) => n.nodeType === 8));
+    st.present(w.c); st.present(w.a); st.restore();
+    ok("...and it is still in place after two presents in a row", idsOf(w.railHome) === "NEW,TOP,RAIL,BELOW",
+        "the second present restores the first, which is where a stale anchor from the first would bite");
 }
 
 // --- 3. THE CASE AN INDEX WOULD FAIL --------------------------------------------------------------------------------

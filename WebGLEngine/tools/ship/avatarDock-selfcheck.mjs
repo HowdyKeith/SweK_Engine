@@ -1,6 +1,27 @@
 #!/usr/bin/env node
 // WebGLEngine/tools/ship/avatarDock-selfcheck.mjs -- v4413, widened v4450
 //
+// ---- v4863: THE DIALS COME BACK, AND THE INFO BOX AND THE RAIL'S PLACE COME BACK WITH THEM -----------------
+// Keith: "when it loads, there should be gauges and avatar, but only avatar is appearing." v4413 moved #dials
+// into a display:none wrapper so the avatar could take the row, and the "new gauges in that same scene" it
+// was making room for were never built for the default SVG robot -- so from v4413 the page loaded with no
+// gauges. Two more things rode on that wrapper and nothing said so: gaugeInfoPanel mounts its info box into
+// #dials' PARENT, so the Hover/Select tab showed an empty row; and v4450's staged "empty 720 px column" was
+// empty for the same reason. Separately, ui/panelStage.mjs sent the rail home with appendChild, so after
+// every staged panel the dials and the avatar sat at the bottom of the column (measured on v4862 too).
+// THIS GATE ASSERTED THE ABSENCE: "the SVG dials are out of the row" and "the avatar spans its row" were
+// both true and both the bug. They are inverted, and the checks around them re-aimed at a shared row.
+//   SABOTAGE LOG (each restored and md5-verified):
+//     S1. #dials back inside a display:none wrapper            -> exit=1, 7 red: dials in the row, both ends,
+//         tracking, ceiling, the visible info box and the staged rail -- everything the wrapper took away.
+//     S2. #dials' flex moved inline, the sheet rule removed    -> exit=1, 1 red BY NAME: "the dials come back
+//         as FLEX", read after gaugeInfoPanel cleared the inline display.
+//     S3. the avatar's flex-basis back to auto                 -> exit=1, 4 red, the "row WIDENS again" line
+//         among them. A first draft asserted a SHRINKING window instead; under this sabotage it stayed green
+//         here (the surface fits beside the dials in this harness), so it is reported, not asserted.
+//     S4. flex-wrap removed from #dialsRow                     -> exit=1, 1 red BY NAME: the phone-width wrap.
+//     S5. panelStage's rail anchor skipped (appendChild)       -> exit=1, 1 red BY NAME: "to the SAME PLACE".
+//
 // ---- v4450: THE GROWTH AXIS, WHICH v4413 GAVE A FLOOR AND NO CEILING ON --------------------------------
 // Keith: "on server.html the svg grows huge and scrolls down screen." #dialsRow carries flex:1 1 auto and is
 // MOVED BETWEEN PARENTS OF DIFFERENT flex-direction at runtime -- row at home, column once panelStage puts it
@@ -130,8 +151,11 @@ const say = (m) => console.log("  ----  " + m);
             await new Promise((r) => { f.onload = r; setTimeout(r, 25000); });
             await new Promise((r) => setTimeout(r, 3500));
             const d = f.contentDocument, w = f.contentWindow;
+            // v4863 -- the box carries its EDGES as well as its size: the dials and the avatar now SHARE the row,
+            // and "do they sit side by side, and do the two of them reach both ends" is a question about edges.
             const box = (id) => { const e = d.getElementById(id); if (!e) return null;
-                const b = e.getBoundingClientRect(); return { w: Math.round(b.width), h: Math.round(b.height) }; };
+                const b = e.getBoundingClientRect(); return { w: Math.round(b.width), h: Math.round(b.height),
+                    l: Math.round(b.left), r: Math.round(b.right), t: Math.round(b.top), b: Math.round(b.bottom) }; };
             const read = () => {
                 const robot = d.getElementById("dialsRobot");
                 const surf = robot ? [...robot.children].find((c) => getComputedStyle(c).position === "static") : null;
@@ -139,7 +163,9 @@ const say = (m) => console.log("  ----  " + m);
                 return { row: box("dialsRow"), dials: box("dials"), host: box("dialsRobot"),
                          surface: sb ? { w: Math.round(sb.width), h: Math.round(sb.height) } : null };
             };
+            const at = async (px) => { f.style.width = px + "px"; await new Promise((r) => setTimeout(r, 1800)); return read(); };
             const wide = read();
+            const dialsParent = (d.getElementById("dials") || {}).parentElement;
             // v4451 -- A THIRD, GENUINELY NARROW WIDTH. With a ceiling in place, 1400 and 900 both sit ABOVE
             // it, so the pair that proved "the surface follows its box" in v4413 now proves only that the cap
             // holds -- the ResizeObserver could be dead and both would still read the same. 500 puts the row
@@ -154,6 +180,12 @@ const say = (m) => console.log("  ----  " + m);
             f.style.width = "900px";
             await new Promise((r) => setTimeout(r, 1800));
             const narrow = read();
+            // v4863 -- WITH THE DIALS BACK, THE CEILING NEEDS WIDER PROBES. At 1400 the avatar now has the row
+            // less the dials, 334 px -- BELOW the 420 cap -- so 1400 and 900 now sit on the TRACKING side of it,
+            // and "pinned above the ceiling" needs two rows where the avatar's share is still over 420: 1900
+            // (543) and 2400 (793), measured. Then back to 1400, because a surface already at the cap is what a
+            // SHRINKING window starts from, and that is where a basis of auto dropped the avatar under the dials.
+            const big = await at(1900), huge = await at(2400), shrunk = await at(1400);
             // the staged-panel path: gaugeInfoPanel hides the avatar WITH the dials, and this round moved the
             // dials without moving that contract.
             // The panel exposes showInfo()/showGauges(), NOT show(): the first draft of this gate reached for
@@ -163,9 +195,16 @@ const say = (m) => console.log("  ----  " + m);
             try {
                 const gi = w._gaugeInfo;
                 const robot = d.getElementById("dialsRobot"), row = d.getElementById("dialsRow");
-                const snap = () => ({ display: getComputedStyle(robot).display,
+                const dials = d.getElementById("dials");
+                // v4863 -- the info box is gaugeInfoPanel's row, which it inserts into #dials' PARENT. Until
+                // v4863 that parent was the display:none wrapper, so the box was mounted and never seen.
+                const infoBox = () => [...row.children].find((c) => c !== dials && c !== robot && getComputedStyle(c).display !== "none");
+                const snap = () => { const ib = infoBox(); return { display: getComputedStyle(robot).display,
                     w: Math.round(robot.getBoundingClientRect().width),
-                    row: Math.round(row.getBoundingClientRect().width) });
+                    row: Math.round(row.getBoundingClientRect().width),
+                    dials: getComputedStyle(dials).display, dialsW: Math.round(dials.getBoundingClientRect().width),
+                    info: ib ? { w: Math.round(ib.getBoundingClientRect().width), h: Math.round(ib.getBoundingClientRect().height),
+                                 text: (ib.textContent || "").trim().length } : null }; };
                 if (gi && gi.showInfo && gi.showGauges) {
                     const before = snap();
                     gi.showInfo(); await new Promise((r) => setTimeout(r, 600));
@@ -180,30 +219,39 @@ const say = (m) => console.log("  ----  " + m);
             // so v4413's flex:1 1 auto means grow HORIZONTALLY -- which is the whole of what that round was
             // asked for. panelStage moves the same node into #stageInfo, which is flex-direction:column, and
             // the identical declaration then means grow VERTICALLY, up to the height of the staged panel.
-            // The counterfactual is driven ON THE SAME LIVE PAGE rather than compared against a number from
-            // another run: present a tall panel, read the row, put the pre-v4450 value back, read it again.
+            // *** v4863 -- AND WHAT FILLS THAT HEIGHT IS NOW THE INFO BOX, WHICH v4450 NEVER SAW. *** v4450 measured
+            // the staged rail at 720 px with NOTHING in it, pinned it to 0 0 auto, and said so: the avatar is
+            // hidden while staged, and the info box was mounted inside #dials' display:none wrapper. With the
+            // wrapper gone the box is visible, and gaugeInfoPanel's stretchToRow (v3912: "top-align with the
+            // links drawer and reach its bottom") sets the rail back to 1 1 auto when the info tab is raised --
+            // which onPresent does right after the pin. So the rail reaches the staged panel's height again,
+            // holding the info text, and the avatar it once could have stretched is hidden. Read here: the
+            // rail's height against the panel's, what is visible inside it, and where it lands on the way home.
             let axis = null;
             try {
                 const st = w._panelStage, row = d.getElementById("dialsRow");
+                const robot = d.getElementById("dialsRobot"), dials = d.getElementById("dials");
                 if (st && st.present && row) {
                     const tall = d.createElement("div"); tall.style.height = "900px"; tall.textContent = "staged";
                     d.body.appendChild(tall);
                     const h = () => Math.round(row.getBoundingClientRect().height);
+                    const sib = () => [row.previousElementSibling && row.previousElementSibling.id,
+                                       row.nextElementSibling && row.nextElementSibling.id].join(" | ");
                     const home = h(), homeFlex = getComputedStyle(row).flex, homeW = Math.round(row.getBoundingClientRect().width);
+                    const homeSib = sib();
                     st.present(tall); await new Promise((r) => setTimeout(r, 900));
-                    const fixed = h();
-                    row.style.flex = "1 1 auto";                       // exactly what the stylesheet says, pre-v4450
-                    await new Promise((r) => setTimeout(r, 700));
-                    const before = h();
-                    row.style.flex = "0 0 auto";
+                    const fixed = h(), panelH = Math.round(tall.getBoundingClientRect().height);
+                    const shown = [...row.children].filter((c) => getComputedStyle(c).display !== "none");
+                    const inside = shown.map((c) => c.id || "(info box)").join(", ");
+                    const infoText = shown.filter((c) => c !== dials && c !== robot).map((c) => (c.textContent || "").trim()).join("").length;
                     st.restore(); await new Promise((r) => setTimeout(r, 900));
-                    axis = { home, homeFlex, homeW, fixed, before, restored: h(),
+                    axis = { home, homeFlex, homeW, homeSib, fixed, panelH, inside, infoText, restored: h(), restoredSib: sib(),
                              flex: getComputedStyle(row).flex, restoredW: Math.round(row.getBoundingClientRect().width) };
                 }
             } catch (e) { axis = { error: String(e && e.message) }; }
 
-            return { wide, narrow, tiny, staged, axis, zoom: getComputedStyle(d.body).zoom,
-                     dialsPresent: !!d.getElementById("dials") };
+            return { wide, narrow, tiny, big, huge, shrunk, staged, axis, zoom: getComputedStyle(d.body).zoom,
+                     dialsPresent: !!d.getElementById("dials"), dialsParent: dialsParent ? dialsParent.id : null };
         }` });
 
     if (probe.skipped) {
@@ -214,23 +262,34 @@ const say = (m) => console.log("  ----  " + m);
         const r = probe.result || {};
         const wide = r.wide || {}, narrow = r.narrow || {};
         say(`zoom ${r.zoom}; wide: row ${wide.row && wide.row.w}, dials ${wide.dials && wide.dials.w}, host ` +
-            `${wide.host && wide.host.w}; narrow: row ${narrow.row && narrow.row.w}, host ${narrow.host && narrow.host.w}`);
+            `${wide.host && wide.host.w}; narrow: row ${narrow.row && narrow.row.w}, dials ${narrow.dials && narrow.dials.w}, ` +
+            `host ${narrow.host && narrow.host.w}`);
 
-        ok("!! *** THE SVG DIALS ARE OUT OF THE ROW, and still present for every path that reads them ***",
-           !!wide.dials && wide.dials.w === 0 && r.dialsPresent === true,
-           `#dials measures ${wide.dials ? wide.dials.w : "?"} px wide and getElementById finds it: ` +
-           `${r.dialsPresent}. *** THE FIRST DRAFT SET style="display:none" ON #dials AND MEASURED IT 285 PX ` +
-           "WIDE ANYWAY: *** gaugeInfoPanel's show() writes `dialsEl.style.display = infoUp ? \"none\" : \"\"`, " +
-           "and the empty string CLEARS THE INLINE STYLE -- which is where the none was. A wrapper the panel " +
-           "does not know about cannot be cleared by it");
-
-        const fills = (b) => b.host && b.row && b.row.w > 0 && b.host.w / b.row.w > 0.98;
-        ok("!! *** THE AVATAR SPANS ITS ROW, at BOTH widths ***",
-           fills(wide) && fills(narrow),
-           `host/row = ${wide.host && wide.row ? (wide.host.w / wide.row.w).toFixed(3) : "?"} wide, ` +
-           `${narrow.host && narrow.row ? (narrow.host.w / narrow.row.w).toFixed(3) : "?"} narrow. BEFORE v4413 ` +
-           "IT WAS 178 OF 676 -- 0.263. Two widths, because the defect was a FIXED NUMBER and a fixed number " +
-           "is right at exactly one width by luck");
+        // *** v4863 -- THE DIALS ARE BACK, AND THE TWO CHECKS THAT ASSERTED THEIR ABSENCE ARE INVERTED. *** Keith:
+        // "when it loads, there should be gauges and avatar, but only avatar is appearing." v4413 hid the dials
+        // so the avatar could take the row, on his ask then to "extend the avatar and the new gauges in that
+        // same scene", and the gauges in the scene were never built for the default SVG robot -- so this gate
+        // spent 450 versions asserting, correctly, a page with no gauges on it. The row is now SHARED, and
+        // what is checked is that the two of them fill it between them, beside each other.
+        const beside = (b) => !!b.dials && !!b.host && Math.abs(b.dials.t - b.host.t) <= 2 && b.dials.w > 0 && b.host.w > 0;
+        const spans = (b) => beside(b) && !!b.row && Math.abs(b.dials.l - b.row.l) <= 2 && Math.abs(b.host.r - b.row.r) <= 2;
+        ok("!! *** THE SVG DIALS ARE IN THE ROW, BESIDE THE AVATAR, at BOTH widths ***",
+           r.dialsParent === "dialsRow" && beside(wide) && beside(narrow),
+           `#dials' parent is #${r.dialsParent}; dials ${wide.dials && wide.dials.w} px and avatar ${wide.host && wide.host.w} ` +
+           `side by side at the ${wide.row && wide.row.w} row, ${narrow.dials && narrow.dials.w} and ${narrow.host && narrow.host.w} ` +
+           `at the ${narrow.row && narrow.row.w} one. FROM v4413 TO v4862 THE DIALS SAT IN A display:none WRAPPER, ` +
+           "still built and still polling, and measured 0 px wide on every load");
+        ok("!! ...and between them they reach both ends of the row, the avatar taking what the dials leave",
+           spans(wide) && spans(narrow),
+           `dials from ${wide.dials && wide.dials.l} (row ${wide.row && wide.row.l}), avatar to ${wide.host && wide.host.r} ` +
+           `(row ${wide.row && wide.row.r}). The avatar's share is the row less the dials, NOT A TYPED WIDTH -- ` +
+           "v4413's sizeFromHost still makes the box the authority, and this is the box");
+        const tiny = r.tiny || {};
+        ok("!! ...and on a phone-width row the avatar WRAPS UNDER the dials rather than being squeezed past its floor",
+           !!tiny.dials && !!tiny.host && !!tiny.row && tiny.host.t >= tiny.dials.b - 2 && tiny.host.w / tiny.row.w > 0.98,
+           `the ${tiny.row && tiny.row.w} px row: dials ${tiny.dials && tiny.dials.w} wide, avatar below them at ` +
+           `${tiny.host && tiny.host.w}. Beside them it would have had ${tiny.row && tiny.dials ? tiny.row.w - tiny.dials.w : "?"} ` +
+           "px less the gap, against the mount's minSize of 120");
 
         // *** v4451 -- THIS CHECK CHANGED SHAPE BECAUSE THE DESIGN DID, AND THE OLD FORM WOULD NOW PASS ON A
         // DEAD OBSERVER. *** v4413 asserted `wide.surface.w > narrow.surface.w + 20` at 1400 and 900. With
@@ -239,21 +298,40 @@ const say = (m) => console.log("  ----  " + m);
         // been set just high enough, the two would have read equal for a GOOD reason and equal for a dead
         // ResizeObserver would look identical. So the property is split in two and each half is driven at a
         // width where it can actually fail.
-        const tiny = r.tiny || {};
+        // v4863 -- AND THE WIDTHS MOVED, BECAUSE THE AVATAR'S SHARE DID. With the dials back, 1400 gives the
+        // avatar 334 px -- below the ceiling -- so 900 and 1400 are now the TRACKING pair, and the ceiling is
+        // read at 1900 and 2400, where its share was measured at 543 and 793.
+        const big = r.big || {}, huge = r.huge || {}, shrunk = r.shrunk || {};
         ok("!! ...and the SURFACE follows the box BELOW the ceiling, which is what a ResizeObserver is for",
-           !!tiny.surface && !!narrow.surface && narrow.surface.w > tiny.surface.w + 20,
-           `surface ${narrow.surface && narrow.surface.w} px at the ${narrow.row && narrow.row.w} row, ` +
-           `${tiny.surface && tiny.surface.w} at the ${tiny.row && tiny.row.w} one. ` +
+           !!wide.surface && !!narrow.surface && wide.surface.w > narrow.surface.w + 20,
+           `surface ${narrow.surface && narrow.surface.w} px for the ${narrow.host && narrow.host.w} px avatar box, ` +
+           `${wide.surface && wide.surface.w} for the ${wide.host && wide.host.w} one. ` +
            "A SCENE MEASURED ONCE AT MOUNT IS A TYPED CONSTANT THAT ARRIVES LATE: the panel " +
            "opening or the window resizing moves the box, and the scene has to move with it");
         ok("!! *** ...and it is PINNED at the ceiling above it, which is the cap Keith asked for ***",
-           !!wide.surface && !!narrow.surface && wide.surface.w === narrow.surface.w &&
-           !!wide.row && !!narrow.row && wide.row.w > narrow.row.w + 100,
-           `row ${narrow.row && narrow.row.w} -> ${wide.row && wide.row.w} and the surface holds at ` +
-           `${wide.surface && wide.surface.w} px. MEASURED BEFORE THE CAP: 341 / 621 / 749 / 1005 px at window ` +
+           !!big.surface && !!huge.surface && big.surface.w === huge.surface.w && !!wide.surface &&
+           big.surface.w > wide.surface.w && !!big.host && !!huge.host && huge.host.w > big.host.w + 100,
+           `avatar box ${big.host && big.host.w} -> ${huge.host && huge.host.w} and the surface holds at ` +
+           `${big.surface && big.surface.w} px. MEASURED BEFORE THE CAP: 341 / 621 / 749 / 1005 px at window ` +
            "widths 900 / 1400 / 1920 / 2560, WITH THE ROBOT INSIDE DRAWN 100 px WIDE AT ALL FOUR -- the viewBox " +
            "is 60x88 and letterboxes into a 147 px-tall box, so every pixel past ~100 was empty and a box that " +
            "tripled held the same figure. The row still grows; the scene no longer follows it into nothing");
+        // v4863 -- THE AVATAR'S flex-basis IS 120px, NOT auto, AND THIS IS THE LINE THAT HOLDS IT. A basis of
+        // auto is the SURFACE's width, so it REMEMBERS the last size: wrapped under the dials on a phone-width
+        // row (surface ~267 there), the avatar asks for 267 again when the row widens to 426, the dials plus
+        // that overflow it, and it stays wrapped. SABOTAGED: basis back to auto -> 4 red, this line among them.
+        ok("!! ...and when the row WIDENS again after the phone wrap, the avatar comes back BESIDE the dials",
+           beside(narrow) && !!narrow.row && narrow.host.w < narrow.row.w * 0.9,
+           `360 -> 900: avatar ${narrow.host && narrow.host.w} px ${beside(narrow) ? "beside" : "NOT beside"} dials ` +
+           `${narrow.dials && narrow.dials.w} in the ${narrow.row && narrow.row.w} row. A basis of auto is the ` +
+           "surface's last width, so an avatar that had a whole line to itself keeps asking for it");
+        // REPORTED, NOT ASSERTED: the same memory from the other side, a window SHRINKING from above the
+        // ceiling. In a standalone Chromium window, 1900 -> 1400 with a basis of auto WRAPPED (row 670, dials
+        // 357, surface 420). In THIS harness it does not -- the surface is 336 zoomed px and the dials stay 285,
+        // which fit the 676 row with room to spare -- so a check here would pass under its own sabotage, and a
+        // check that cannot fail is not one. The line above is what the sabotage turns red.
+        say(`shrinking 2400 -> 1400: avatar ${shrunk.host && shrunk.host.w} px, ${beside(shrunk) ? "beside" : "NOT beside"} ` +
+            `dials ${shrunk.dials && shrunk.dials.w} in the ${shrunk.row && shrunk.row.w} row (reported, not asserted -- see the comment)`);
 
         ok("...and the row keeps the height the dials used to prop it to",
            !!wide.row && wide.row.h >= 140,
@@ -262,22 +340,33 @@ const say = (m) => console.log("  ----  " + m);
            "is not filling the space. THE SAME 230 now sits on the row it was actually sizing, not a new number");
 
         const st = r.staged;
-        ok("!! *** THE STAGED PANEL STILL HIDES THE AVATAR, AND IT COMES BACK AT FULL WIDTH ***",
-           !!st && !st.error && st.onInfo.display === "none" && st.onInfo.w === 0 &&
-           st.back.w === st.back.row && st.back.w > 0,
-           st && !st.error
-             ? `start ${st.before.display} at ${st.before.w}/${st.before.row}; showInfo -> ${st.onInfo.display} at ` +
-               `${st.onInfo.w}; showGauges -> ${st.back.display} at ${st.back.w}/${st.back.row}. v3671 put the ` +
-               "avatar in gaugeInfoPanel's hideWith list because it is a SIBLING of #dials, and this round moved " +
-               "#dials into a wrapper -- an avatar left standing beside a staged panel is the regression that " +
-               "would cause, and a narrowed one on the way back is the other"
+        const stOk = !!st && !st.error;
+        ok("!! *** THE INFO TAB HIDES THE DIALS AND THE AVATAR, AND BOTH COME BACK AS THEY WERE ***",
+           stOk && st.onInfo.display === "none" && st.onInfo.w === 0 && st.onInfo.dials === "none" &&
+           st.back.w === st.before.w && st.back.row === st.before.row && st.back.dialsW === st.before.dialsW && st.back.w > 0,
+           stOk
+             ? `start: avatar ${st.before.w}, dials ${st.before.dialsW}, row ${st.before.row}; showInfo -> avatar ` +
+               `${st.onInfo.display}, dials ${st.onInfo.dials}; showGauges -> avatar ${st.back.w}, dials ${st.back.dialsW}, ` +
+               `row ${st.back.row}. v3671 put the avatar in gaugeInfoPanel's hideWith list because it is a SIBLING ` +
+               "of #dials -- an avatar left standing beside the info box is one regression, and a row that comes " +
+               "back narrower is the other"
              : `could not drive the panel: ${st ? st.error : "no _gaugeInfo"}`);
+        ok("!! ...and the dials come back as FLEX, from the stylesheet, after the panel CLEARED their inline display",
+           stOk && st.back.dials === "flex",
+           stOk ? `#dials resolves to ${st.back.dials} after showGauges(). gaugeInfoPanel writes ` +
+             "`dialsEl.style.display = \"\"`, which deletes an inline display: an inline flex would come back as " +
+             "BLOCK. The flex is a server.html rule for that reason" : "not measured");
+        ok("!! ...and the info box the tab raises is VISIBLE, with text in it -- which it was not from v4413 to v4862",
+           stOk && !!st.onInfo.info && st.onInfo.info.w > 0 && st.onInfo.info.h > 0 && st.onInfo.info.text > 0,
+           stOk && st.onInfo.info ? `info box ${st.onInfo.info.w}x${st.onInfo.info.h}, ${st.onInfo.info.text} characters. ` +
+             "gaugeInfoPanel mounts it into #dials' PARENT, which was the display:none wrapper -- so the Hover/Select " +
+             "tab hid the gauges and the avatar and showed an empty row" : "no visible info box in the row");
 
         ok("...and the display it comes back as is BLOCK, not the inline-flex the markup asks for",
-           !!st && !st.error && st.back.display === "block",
-           st && !st.error ? `#dialsRobot resolves to ${st.back.display}. gaugeInfoPanel writes ` +
+           stOk && st.back.display === "block",
+           stOk ? `#dialsRobot resolves to ${st.back.display}. gaugeInfoPanel writes ` +
              "`el.style.display = \"\"` which CLEARS THE INLINE DISPLAY, so the inline-flex in the markup " +
-             "survives only until the first showGauges(). THE ROW STILL FILLS BECAUSE flex:1 1 auto IS WHAT " +
+             "survives only until the first showGauges(). THE ROW STILL FILLS BECAUSE flex:1 1 120px IS WHAT " +
              "MAKES IT FILL and that is not cleared -- said here because a reader of the markup would expect " +
              "inline-flex and measure block" : "not measured");
 
@@ -289,14 +378,19 @@ const say = (m) => console.log("  ----  " + m);
                ". This is the half v4450 was reported about, and it is a layout claim -- there is no reading of " +
                "the stylesheet that answers it, because the answer depends on which parent the node is in");
         } else {
-            ok("!! *** THE RAIL DOES NOT GROW ON THE AXIS IT WAS NEVER SIZED FOR ***",
-               a.fixed > 0 && a.before > 0 && a.fixed < a.before * 0.6,
-               `staged: ${a.fixed} px tall with v4450's pin, ${a.before} px without it -- ` +
-               `${a.before - a.fixed} px of EMPTY column reclaimed, measured on one page moments apart. ` +
-               "The avatar itself is hidden while a panel is staged (onPresent raises the info tab, which is " +
-               "what hides it), so this box was empty at 720 px -- a gap, not a giant robot");
-            ok("...and the home height is untouched, so v4413's row is not narrowed to buy it",
-               a.home === a.restored && Math.abs(a.home - a.fixed) < 4,
+            // *** v4863 -- v4450's "THE RAIL DOES NOT GROW" IS REPLACED, AND THE REASON IS WHAT IT GREW AROUND. ***
+            // v4450 measured 720 px of EMPTY column and pinned the rail to its content. The column was empty
+            // because the info box was mounted inside the hidden wrapper; with the box visible, gaugeInfoPanel's
+            // stretchToRow (v3912) takes the rail to the staged panel's height on purpose, so the info text
+            // top-aligns with the drawer and reaches its bottom. What must not grow is the AVATAR, and it is not
+            // in the column at all -- which is checked here rather than assumed.
+            ok("!! *** STAGED, THE RAIL HOLDS THE INFO TEXT AT THE PANEL'S HEIGHT, AND NEITHER THE AVATAR NOR THE DIALS ***",
+               !!a.inside && !a.inside.split(", ").some((id) => id === "dials" || id === "dialsRobot") && a.infoText > 0 &&
+               Math.abs(a.fixed - a.panelH) <= 4,
+               `staged: rail ${a.fixed} px against a ${a.panelH} px panel; visible inside it: ${a.inside || "nothing"}, ` +
+               `${a.infoText} characters of info. v4450 read this box at 720 px with NOTHING in it`);
+            ok("...and the home height is untouched by the visit",
+               a.home === a.restored,
                `home ${a.home}, staged ${a.fixed}, restored ${a.restored}. RESTORE IS ASSERTED AND NOT ASSUMED: ` +
                "leaving a style on a node that has gone home is how a panel-stage bug becomes a 'the gauges look " +
                "wrong now' bug with no obvious cause, which is the rule onRestore already states for justifyContent");
@@ -312,14 +406,21 @@ const say = (m) => console.log("  ----  " + m);
                `flex ${a.homeFlex} -> ${a.flex}, width ${a.homeW} -> ${a.restoredW}. COMPARED AGAINST THE NODE'S ` +
                "OWN STARTING VALUE, not a literal: a gate that typed \"1 1 auto\" would be a second declaration " +
                "of the thing the markup already says, and would go stale the day the markup changed");
+            // v4863 -- MEASURED ON v4862 IN CHROMIUM: after "back to the right" the avatar sat at the BOTTOM of
+            // the column, under the chat, the peer bar and every drawer. ui/panelStage.mjs sent the rail home
+            // with appendChild; it now goes back to an anchor, as the panel always did.
+            ok("!! *** ...and to the SAME PLACE in its column, not the bottom of it ***",
+               !!a.homeSib && a.restoredSib === a.homeSib,
+               `neighbours before: ${a.homeSib}; after: ${a.restoredSib}. Appended, the row comes back after the ` +
+               "last drawer and the gauges and the avatar are off the bottom of the screen");
         }
     }
 
-    REPORT.table("the dock, before and after", ["what", "v4412", "v4413 wide", "v4413 narrow"], [
-            ["row width", 676, wide.row ? wide.row.w : 0, narrow.row ? narrow.row.w : 0],
-            ["dials width", 288, wide.dials ? wide.dials.w : 0, narrow.dials ? narrow.dials.w : 0],
-            ["avatar host width", 178, wide.host ? wide.host.w : 0, narrow.host ? narrow.host.w : 0],
-        ], "Read through server.html's own body zoom of 0.8, the same way in every column.");
+    REPORT.table("the dock, before and after", ["what", "v4412", "v4413-v4862", "v4863 wide", "v4863 narrow"], [
+            ["row width", 676, 676, wide.row ? wide.row.w : 0, narrow.row ? narrow.row.w : 0],
+            ["dials width", 288, 0, wide.dials ? wide.dials.w : 0, narrow.dials ? narrow.dials.w : 0],
+            ["avatar host width", 178, 676, wide.host ? wide.host.w : 0, narrow.host ? narrow.host.w : 0],
+        ], "Read through server.html's own body zoom of 0.8, the same way in every column. v4412 and v4413-v4862 are the figures recorded at v4413, at the wide width.");
     }
 }
 
