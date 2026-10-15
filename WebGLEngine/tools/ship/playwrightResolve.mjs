@@ -228,10 +228,20 @@ export const PLAYWRIGHT_PATHS = [
  * NEXT box moves the install again.
  * @param {NodeRequire|((m:string)=>any)} [requireFn] pass createRequire(import.meta.url) from an ESM caller
  */
+/** The file a resolved entry names: the entry itself when it is a path, else what the same require resolves it to; the name as given only if it cannot. */
+export function absoluteFrom(req, m) {
+    if (path.isAbsolute(m)) return m;
+    try { if (typeof req.resolve === "function") return req.resolve(m); } catch { /* fall through */ }
+    return m;
+}
 export function resolvePlaywright(requireFn) {
     const req = requireFn || createRequire(import.meta.url);
     for (const m of PLAYWRIGHT_PATHS) {
-        try { return { chromium: req(m).chromium, from: m }; } catch { /* next */ }
+        // *** v4863 -- `from` IS ALWAYS A PATH. *** A bare entry ("playwright", found through NODE_PATH or a node_modules above the
+        // caller) used to come back bare, and every caller that asked existsSync(from), or handed it to a child's createRequire,
+        // went wrong on the box where it happened: mpmGpuPage crashed (v4858), stageInfo, blobarium and blobRecorder skipped their
+        // browser rows with chromium on disk (v4862, v4863). Resolved here, once, to the file the name names.
+        try { const chromium = req(m).chromium; return { chromium, from: absoluteFrom(req, m) }; } catch { /* next */ }
     }
     return { chromium: null, from: "" };
 }

@@ -98,6 +98,13 @@
 //   V6  this gate's prediction made for win32 (FXC beside SPIR-V dumps)          1 RED (condition 0's live row)
 //   V7  the child finds its kernel in VARIANTS alone                             1 RED (the pilot row)
 //   V8  the hidden kernels counted in a mode where they stood aside               1 RED (native / as shipped, section 4)
+//   section 79 (v4863), against modeVariants and this gate's FXC retirement. Each run on SwiftShader, restored by copy, md5 verified:
+//   F1  modeVariants filtering under any compiler, not FXC alone                 2 RED (the section 79 fixtures; native / as shipped
+//       in section 4, one kernel of eight -- section 4 counts from the compiler, not from modeVariants: a first draft counted
+//       modeVariants' own list there, and this sabotage then went 1 RED, the fixtures alone)
+//   F2  modeVariants never filtering                                             1 RED (the section 79 fixtures)
+//   F3  section 4's count back to VARIANTS.length in every native mode           0 RED here: no mode on this box is FXC. The rig's
+//       "use_dxc off" group (one kernel) is what would go red
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -109,7 +116,7 @@ const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SELF = fileURLToPath(import.meta.url);
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
 const { VARIANTS, BUILD_PROBE, BUILD_PROBE_R17, jobFor, measure, dumpStats, dawnFlags, nativeModes, headApplyProbe, buildJob, runJob, measureSizes,
-        DXC_VARIANTS, compilerMatchesDumps, dxcVariantsBuild } = await imp("render/denoiseCompile.mjs");
+        DXC_VARIANTS, compilerMatchesDumps, dxcVariantsBuild, FXC_CONTROL_IDS, modeVariants } = await imp("render/denoiseCompile.mjs");
 
 // ---- THE CHILD: one kernel, one compiler, one process ----------------------------------------------------------
 // *** THE RESULT GOES TO A FILE. *** On the GTX 1080 (section 45) every native child exited 0 with its shader dump on
@@ -188,6 +195,13 @@ console.log("1. THE INSTRUMENT, ON THE CPU");
         names({ win: true, dawnDir: "C:/nw/dist/win32-x64" }) === "as shipped" && names({ win: true, dawnDir: null, dxcBeside: true }) === "as shipped" &&
         names({ win: false, dawnDir: "/nw/dist/linux-x64", dxcBeside: true }) === "as shipped",
         [names({ win: true, dawnDir: "C:/nw/dist/win32-x64" }), names({ win: true, dawnDir: null, dxcBeside: true }), names({ win: false, dawnDir: "/nw", dxcBeside: true })].join("  /  "));
+    // section 79 (v4863): the denoiser's FXC paths retired -- a mode whose compiler is FXC builds the control kernel alone, and
+    // every other compiler (DXC, or none off D3D12) every kernel; SWEK_DENOISE_FXC=all puts every kernel back under FXC
+    const ids = (c, o) => modeVariants(c, VARIANTS, o).map((v) => v.id).join();
+    ok("!! section 79: under FXC the control kernel alone (r12-tiled-3x3, one of VARIANTS); under DXC or no D3D compiler all eight; SWEK_DENOISE_FXC=all all eight under FXC",
+        FXC_CONTROL_IDS.join() === "r12-tiled-3x3" && FXC_CONTROL_IDS.every((id) => VARIANTS.some((v) => v.id === id)) && ids("FXC") === "r12-tiled-3x3" &&
+        ids("DXC") === VARIANTS.map((v) => v.id).join() && ids(null) === ids("DXC") && ids("FXC", { all: true }) === ids("DXC") && Object.isFrozen(FXC_CONTROL_IDS),
+        `FXC: ${ids("FXC")}; DXC: ${modeVariants("DXC", VARIANTS).length}; none: ${modeVariants(null, VARIANTS).length}; FXC, all: ${modeVariants("FXC", VARIANTS, { all: true }).length}`);
     let jobsOk = true; for (const v of VARIANTS) { const j = jobFor(v); jobsOk &&= typeof j.code === "string" && j.out > 0 && j.wg.length === 3; }
     ok(`  every kernel has a job: ${VARIANTS.map((v) => v.id).join(", ")}`, jobsOk);
     // section 56: tools/denoiseBuildProbe.mjs's shapes -- ids unique, a job each, the candidates without the guarded copy of the
@@ -297,6 +311,8 @@ const W0 = H.resolveWebgpu();
 const skip = W0.refused ? null : H.headlessGpuSkipReason();
 const rows = [];   // { path, compiler, id, result }
 const dxcBuiltModes = new Set();   // section 66 (v4851): the native modes that built DXC_VARIANTS, so section 4 counts them there and only there
+const FXC_ALL = process.env.SWEK_DENOISE_FXC === "all";
+const predictedBy = {};            // each native mode's predicted compiler (nativeCompiler, that mode's flags); section 4 reads it since section 79
 console.log("\n2. NATIVE: each kernel in its own process, under each compiler this box has");
 if (W0.refused) ok(`!! ${H.WEBGPU_ENV} names a node-webgpu package this box can load -- a refused one is a red here, never a skip`, false, W0.refused);
 else if (skip) console.log("  SKIP  " + skip);
@@ -336,13 +352,18 @@ else {
         say(`${label}: at 64 x 64, r15's hidden kernel (r13-fast-3x3) over ` + DXC_VARIANTS.map((v) => `${v.id.slice(0, 4)}'s (${v.id}): ` +
             (r15 && pm(v.id) ? `${(r15 / pm(v.id)).toFixed(3)} x (${r15.toFixed(3)} ms against ${pm(v.id).toFixed(3)} ms)` : "not measured")).join("; ") + " -- deciding nothing");
     };
-    const predictedBy = {};   // each mode's predicted compiler (nativeCompiler, that mode's flags)
     for (const m of modes) {
-        for (const v of VARIANTS) child(m, v);
         // section 66 (v4851): what the package predicts for THIS mode's flags -- "use_dxc off" is FXC on 0.6.2 -- and whether r18t's
         // and r18u's hidden kernels build here: DXC predicted AND the eight base kernels' dumps all DXIL. Anywhere else they
         // stand aside and are not counted as unbuilt: FXC stopped on one and crashed on the other (section 60)
         const predicted = predictedBy[m.name] = H.nativeCompiler({ pkg, flags: m.flags });
+        // section 79 (v4863): under FXC, the control kernel alone -- the denoiser's FXC paths are retired; SWEK_DENOISE_FXC=all runs them
+        const planned = modeVariants(predicted, VARIANTS, { all: FXC_ALL });
+        if (planned.length < VARIANTS.length)
+            console.log(`  SKIP  section 79: native / ${m.name} is FXC -- the denoiser's FXC paths are retired; ${planned.map((v) => v.id).join(", ")} alone is built, as FXC's control, ` +
+                `and the other ${VARIANTS.length - planned.length} stand aside, not counted as unbuilt (SWEK_DENOISE_FXC=all builds them)` +
+                (m.name === "as shipped" ? `. REFUSED: node-webgpu ${ver} ships no DXC the denoiser can use -- its native path needs 0.6.2 (dxcompiler.dll beside dawn.node)` : ""));
+        for (const v of planned) child(m, v);
         const base = rows.filter((x) => x.path === "native" && x.compiler === m.name), go = dxcVariantsBuild(predicted, base.map((x) => x.result.dump.compiler));
         if (go.build) { dxcBuiltModes.add(m.name); for (const v of DXC_VARIANTS) child(m, v); }
         else console.log(`  SKIP  section 66: native / ${m.name}: r18t's and r18u's hidden kernels (${DXC_VARIANTS.map((v) => v.id).join(", ")}) stand aside, not counted as unbuilt -- ${go.why}`);
@@ -428,7 +449,7 @@ if (rows.length) {
         // does not -- standing aside is not "unbuilt", and the browser's list is VARIANTS alone
         // SABOTAGED v4851: the hidden kernels counted in every native mode, built or not -> 1 RED by name (native / as shipped); restored.
         ok(`!! ${g}: every kernel built or said why, and every one built is exact -- conv cells the twin's or the fused mirror's, the kernel apply within APPLY_TOL`,
-            gs.length === VARIANTS.length + (gs[0].path === "native" && dxcBuiltModes.has(gs[0].compiler) ? DXC_VARIANTS.length : 0) && gs.every((x) => x.result.built ? x.result.exact === true : !!x.result.reason),
+            gs.length === (gs[0].path === "native" && predictedBy[gs[0].compiler] === "FXC" && !FXC_ALL ? FXC_CONTROL_IDS.length : VARIANTS.length) + (gs[0].path === "native" && dxcBuiltModes.has(gs[0].compiler) ? DXC_VARIANTS.length : 0) && gs.every((x) => x.result.built ? x.result.exact === true : !!x.result.reason),
             gs.filter((x) => !x.result.built || !x.result.exact).map((x) => `${x.id}: ${x.result.built ? x.result.detail : x.result.reason}`).join("; ") || `${gs.length} kernels, all exact`);
         ok(`  ${g}: every build and pass time finite and positive`,
             gs.filter((x) => x.result.built).every((x) => [x.result.buildMs, x.result.passMs].every((t) => Number.isFinite(t) && t > 0)));

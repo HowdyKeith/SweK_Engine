@@ -36,7 +36,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { HEADLESS_SHELL } from "../tools/ship/playwrightResolve.mjs";
+import { HEADLESS_SHELL, resolvePlaywright } from "../tools/ship/playwrightResolve.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const skip = (why) => {
@@ -55,7 +55,8 @@ catch { skip("cairosvg is not installed (pip install cairosvg --break-system-pac
 // It named a Linux root, a Linux layout and a PINNED BUILD NUMBER, so it could never be
 // true on the rig. Imported now, and resolved per platform.
 const SHELL = HEADLESS_SHELL;
-const PW = "/home/claude/.npm-global/lib/node_modules/playwright/index.js";
+// v4863 -- resolved through the shared list (an absolute path since v4863), not one sandbox's hand-copied one
+const PW = resolvePlaywright().from;
 if (!fs.existsSync(SHELL) || !fs.existsSync(PW)) skip("headless browser or playwright not found at the known path");
 
 let fails = 0;

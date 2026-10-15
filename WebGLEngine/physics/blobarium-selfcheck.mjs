@@ -33,7 +33,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import { HEADLESS_SHELL } from "../tools/ship/playwrightResolve.mjs";
+import { HEADLESS_SHELL, resolvePlaywright, browserSkipReason } from "../tools/ship/playwrightResolve.mjs";
 
 const require = createRequire(import.meta.url);
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -72,10 +72,13 @@ const ok = (name, cond, detail) => {
 // true on the rig. Imported now, and resolved per platform.
 const SHELL = HEADLESS_SHELL;
 let chromium = null;
-try { ({ chromium } = require("/home/claude/.npm-global/lib/node_modules/playwright/index.js")); } catch { /* absent */ }
+// v4863 -- the playwright path was still hand-copied, one sandbox's, so on every box but that one the gate skipped -- here too, with
+// chromium at SHELL and a message saying it was not. resolvePlaywright holds the list; browserSkipReason says which half is missing.
+const PWR = resolvePlaywright(require);
+chromium = PWR.chromium;
 
 if (!chromium || !fs.existsSync(SHELL)) {
-    console.log("  SKIP  the whole blobarium   no chromium at " + SHELL +
+    console.log("  SKIP  the whole blobarium   " + (browserSkipReason(chromium, PWR.from, SHELL) || "no chromium at " + SHELL) +
                 " -- box3d.wasm needs a SERVER (its loader imports an absolute path), so this gate needs a browser. SKIPPING WITH A REASON RATHER THAN PASSING QUIETLY: A CHECK THAT PASSES WHEN IT DID NOT RUN IS DECORATION.");
     console.log("\nblobarium-selfcheck: all checks pass");
     process.exit(0);
