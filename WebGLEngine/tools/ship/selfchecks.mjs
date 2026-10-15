@@ -25,7 +25,7 @@ import { parseOrExit, refusalLines } from "./cliArgs.mjs";   // v4826 -- an opti
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 // v4826 -- the options, parsed once and strictly. `--affected` takes the changed files as bare words after it; bare words anywhere else are refused.
-const SPEC = { values: { "--timeout": "number", "--budget": "number" }, flags: ["--verbose", "--affected", "--select-only", "--count-only"], positional: true };
+const SPEC = { values: { "--timeout": "number", "--budget": "number", "--resume-since": "string" }, flags: ["--verbose", "--affected", "--select-only", "--count-only"], positional: true };
 const CLI = parseOrExit("selfchecks", SPEC);
 if (CLI.rest.length && !CLI.flags.has("--affected")) { for (const l of refusalLines("selfchecks", [`unexpected argument "${CLI.rest[0]}" -- bare words are changed files, and only --affected takes them`], SPEC)) console.error(l); process.exit(2); }
 const VERBOSE = CLI.flags.has("--verbose");
@@ -221,6 +221,28 @@ if (CLI.flags.has("--count-only")) {
     process.exit(0);
 }
 
+// v4864 -- *** --resume-since <ISO time>: FINISH A FULL RUN THAT DIED, WITHOUT RE-TIMING WHAT IT ALREADY TIMED. ***
+// The 2026-10-15 full re-take was stopped at 1092 of 1972 gates by a container restart, and a full run is about nine
+// hours here: starting again from the first gate is how a re-take never finishes. This runs only the gates whose
+// record entry is older than the given time (or missing) -- the dead run's own start -- so a gate that failed or
+// skipped in it (and so wrote no entry) is attempted again too. Reaching the end then means every runnable gate was
+// either timed since that moment or attempted in this run, which is what `complete` claims of an unfiltered run, so
+// the record says complete -- and says `resumedFrom`, so the claim names the two runs it was made of.
+let RESUME_SINCE = null;
+if ("--resume-since" in CLI.values) {
+    RESUME_SINCE = String(CLI.values["--resume-since"]);
+    if (!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(RESUME_SINCE) || CLI.flags.has("--affected") || "--budget" in CLI.values) {
+        console.log("[selfchecks] --resume-since takes one UTC time as 2026-10-15T16:48:00Z, and composes with neither --affected nor --budget.");
+        process.exit(2);
+    }
+    let prevAt = {};
+    try { prevAt = JSON.parse(fs.readFileSync(TIMINGS_PATH, "utf8")).at || {}; } catch {}
+    const before = toRun.length;
+    toRun = toRun.filter((f) => { const at = prevAt[path.relative(ROOT, f).replace(/\\/g, "/")]; return !at || at < RESUME_SINCE; });
+    console.log("[selfchecks] --resume-since " + RESUME_SINCE + ": running " + toRun.length + " of " + before + " runnable gates; the other " +
+                (before - toRun.length) + " were timed since then.");
+}
+
 // v3285 -- *** --budget <seconds>: A WALL-CLOCK CAP, COMPOSED WITH --affected RATHER THAN RIVALLING IT. ***
 // --affected answers "which gates can this change reach"; --budget answers "and which of those fit in the time
 // I actually have". The planner (gateSelection.mjs) orders reachable-first, then cheapest-first inside each
@@ -411,6 +433,7 @@ function writeTimings(complete) {
             ...prev,
             captured: prev.captured,
             coverage: { complete, timedThisRun: n, totalInRecord: Object.keys(merged).length,
+                        ...(RESUME_SINCE ? { resumedFrom: RESUME_SINCE } : {}),
                         at: new Date().toISOString().slice(0, 19) + "Z",
                         // *** SAID AS A COUNT, BECAUSE AN UNPROVENANCED ENTRY IS THE THING BEING RETIRED. ***
                         // `complete` above is about THIS RUN's coverage of the suite; this is about the RECORD's
@@ -426,7 +449,7 @@ function writeTimings(complete) {
 }
 // `complete` is now DERIVED from the population rather than asserted by the call site: the run reached its end,
 // AND it was allowed to see every runnable gate. A --budget pass reaching its last selected gate writes false.
-writeTimings(toRun.length === UNFILTERED_COUNT);
+writeTimings(toRun.length === UNFILTERED_COUNT || !!RESUME_SINCE);
 
 const secs = ((Date.now() - t0) / 1000).toFixed(1);
 console.log("");
