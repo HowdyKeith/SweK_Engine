@@ -265,9 +265,15 @@ say("\n5. A REAL BROWSER OPENS A DRAWER AND CHECKS ALL THREE ASKS AT ONCE");
     const SHELL = HEADLESS_SHELL;
     // v4484: this was a hand-copy of ONE of PLAYWRIGHT_PATHS, which is the list resolvePlaywright tries in
     // order. Both halves of "where is chromium" were spelled here; both are imported now.
-    const PW = resolvePlaywright().from;
+    // v4862 -- the resolver can answer with a BARE name ("playwright", found on NODE_PATH), and existsSync on a bare name is false,
+    // so this skipped its browser rows with chromium sitting at SHELL and a message blaming chromium -- 7.4 s down to 0.4 s, which the
+    // ship rotation filed as a returnee. Resolved to the file it names, as tools/ship/mpmGpuPage-selfcheck.mjs does since v4858;
+    // and the skip names the half that is missing.
+    const pwFrom = resolvePlaywright().from;
+    let PW = pwFrom;
+    try { if (pwFrom && !path.isAbsolute(pwFrom)) PW = (await import("node:module")).createRequire(import.meta.url).resolve(pwFrom); } catch { PW = pwFrom; }
     if (!fs.existsSync(SHELL) || !fs.existsSync(PW)) {
-        console.log("  SKIP  the live drawer click   no chromium at " + SHELL + " -- SKIPPING WITH A REASON " +
+        console.log("  SKIP  the live drawer click   " + (!fs.existsSync(SHELL) ? "no chromium at " + SHELL : "playwright does not resolve (" + JSON.stringify(pwFrom) + ")") + " -- SKIPPING WITH A REASON " +
             "RATHER THAN PASSING QUIETLY. A gate that reports green when it did not run is worse than one " +
             "that reports nothing.");
     } else {
