@@ -379,6 +379,26 @@ node tools/denoiseBuildProbe.mjs --probe r16 --native-only --sizes 64,256,1024 -
 - **Section 73 predicts:** neither named shape holds 1.05 x over the fast kernel at 256 and 1024 on the Intel; nothing holds on the 1080.
 - **Send back both JSON files from each GPU.**
 
+**The outcome (section 74).** On the Intel neither named shape held at 256 and 1024 in both runs. On the 1080, tile2-zero-32 --
+r18t's kernel -- was 1.14 to 1.24 x the fast kernel at 256 and 1024 in both runs. That is reported, not acted on, and names
+round 24.
+
+### Round 24: the 1080's native entry, asked again without the FXC condition (pre-registration section 75)
+
+On each GPU, with v4860 or later, in the verified clone:
+
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r24-a.json
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r24-b.json
+```
+
+- **Twice, back to back,** from the same clone: a set qualifies only when it holds in both runs.
+- **Don't commit or pull between the two runs.**
+- **Section 75 predicts:** r18t qualifies on the 1080 in both runs and becomes its native default; the Intel stays r18u.
+- **Send back all four JSON files.**
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and

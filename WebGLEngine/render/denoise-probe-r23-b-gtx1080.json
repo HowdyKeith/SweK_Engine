@@ -1,0 +1,499 @@
+{
+ "at": "2026-10-15T00:32:29.657Z",
+ "platform": "win32 10.0.22631 x64",
+ "node": "v24.15.0",
+ "commit": "b2a4a1d2 2026-10-14 v4859: record the release",
+ "probe": "r16",
+ "sizes": [
+  64,
+  256,
+  1024
+ ],
+ "capSeconds": 180,
+ "nodeWebgpu": {
+  "version": "0.6.2",
+  "from": "C:\\Users\\howdy\\AppData\\Roaming\\npm\\node_modules\\webgpu\\index.js",
+  "refused": null,
+  "dxcBeside": true,
+  "dxc": "Dawn's choice"
+ },
+ "native": [
+  {
+   "id": "fast-32",
+   "what": "the fast kernel, 32 -> 32 at 3 x 3: the baseline",
+   "cfg": null,
+   "seconds": 2.192,
+   "dumpFile": "C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-denoise-probe-dump-fast-32.txt",
+   "built": true,
+   "buildMs": 93.61560000000003,
+   "exact": true,
+   "sizes": [
+    {
+     "N": 64,
+     "passMs": 0.101376,
+     "passes": 30,
+     "clock": "device",
+     "exact": true,
+     "detail": "131072 plain, 0 fused, 0 unexplained"
+    },
+    {
+     "N": 256,
+     "passMs": 0.681984,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    },
+    {
+     "N": 1024,
+     "passMs": 9.059328,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    }
+   ],
+   "adapter": "nvidia / pascal / D3D12 driver version 32.0.15.8180",
+   "dump": {
+    "compiler": "DXC (DXIL)",
+    "lines": 1339,
+    "loops": 0,
+    "indexableTemps": 0,
+    "barriers": 4
+   }
+  },
+  {
+   "id": "tile2-zero-32",
+   "what": "2 pixels x 8 vec4s, edge zero, 32 -> 32",
+   "cfg": {
+    "px": 2,
+    "g4": 8,
+    "edge": "zero"
+   },
+   "seconds": 2.352,
+   "dumpFile": "C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-denoise-probe-dump-tile2-zero-32.txt",
+   "built": true,
+   "buildMs": 176.89839999999998,
+   "exact": true,
+   "sizes": [
+    {
+     "N": 64,
+     "passMs": 0.120832,
+     "passes": 30,
+     "clock": "device",
+     "exact": true,
+     "detail": "131072 plain, 0 fused, 0 unexplained"
+    },
+    {
+     "N": 256,
+     "passMs": 0.548864,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    },
+    {
+     "N": 1024,
+     "passMs": 7.957504,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    }
+   ],
+   "adapter": "nvidia / pascal / D3D12 driver version 32.0.15.8180",
+   "dump": {
+    "compiler": "DXC (DXIL)",
+    "lines": 2029,
+    "loops": 0,
+    "indexableTemps": 0,
+    "barriers": 4
+   }
+  },
+  {
+   "id": "tile4-zero-32",
+   "what": "4 pixels x 4 vec4s, edge zero, 32 -> 32",
+   "cfg": {
+    "px": 4,
+    "g4": 4,
+    "edge": "zero"
+   },
+   "seconds": 2.446,
+   "dumpFile": "C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-denoise-probe-dump-tile4-zero-32.txt",
+   "built": true,
+   "buildMs": 184.60789999999997,
+   "exact": true,
+   "sizes": [
+    {
+     "N": 64,
+     "passMs": 0.119808,
+     "passes": 30,
+     "clock": "device",
+     "exact": true,
+     "detail": "131072 plain, 0 fused, 0 unexplained"
+    },
+    {
+     "N": 256,
+     "passMs": 0.668672,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    },
+    {
+     "N": 1024,
+     "passMs": 11.213824,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    }
+   ],
+   "adapter": "nvidia / pascal / D3D12 driver version 32.0.15.8180",
+   "dump": {
+    "compiler": "DXC (DXIL)",
+    "lines": 1952,
+    "loops": 0,
+    "indexableTemps": 0,
+    "barriers": 4
+   }
+  },
+  {
+   "id": "tile2g4-zero-32",
+   "what": "2 pixels x 4 vec4s (the fast kernel's accumulator count), edge zero, 32 -> 32",
+   "cfg": {
+    "px": 2,
+    "g4": 4,
+    "edge": "zero"
+   },
+   "seconds": 2.274,
+   "dumpFile": "C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-denoise-probe-dump-tile2g4-zero-32.txt",
+   "built": true,
+   "buildMs": 121.0539,
+   "exact": true,
+   "sizes": [
+    {
+     "N": 64,
+     "passMs": 0.089088,
+     "passes": 30,
+     "clock": "device",
+     "exact": true,
+     "detail": "131072 plain, 0 fused, 0 unexplained"
+    },
+    {
+     "N": 256,
+     "passMs": 0.59392,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    },
+    {
+     "N": 1024,
+     "passMs": 8.78592,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    }
+   ],
+   "adapter": "nvidia / pascal / D3D12 driver version 32.0.15.8180",
+   "dump": {
+    "compiler": "DXC (DXIL)",
+    "lines": 1198,
+    "loops": 0,
+    "indexableTemps": 0,
+    "barriers": 4
+   }
+  },
+  {
+   "id": "tile2-zero-10",
+   "what": "2 pixels x 8 vec4s, edge zero, the first layer's 10 -> 32",
+   "cfg": {
+    "px": 2,
+    "g4": 8,
+    "edge": "zero"
+   },
+   "seconds": 1.324,
+   "dumpFile": "C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-denoise-probe-dump-tile2-zero-10.txt",
+   "built": true,
+   "buildMs": 173.142,
+   "exact": true,
+   "sizes": [
+    {
+     "N": 64,
+     "passMs": 0.044032,
+     "passes": 30,
+     "clock": "device",
+     "exact": true,
+     "detail": "131072 plain, 0 fused, 0 unexplained"
+    },
+    {
+     "N": 256,
+     "passMs": 0.18944,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    },
+    {
+     "N": 1024,
+     "passMs": 2.573312,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    }
+   ],
+   "adapter": "nvidia / pascal / D3D12 driver version 32.0.15.8180",
+   "dump": {
+    "compiler": "DXC (DXIL)",
+    "lines": 2029,
+    "loops": 0,
+    "indexableTemps": 0,
+    "barriers": 4
+   }
+  },
+  {
+   "id": "tile4-zero-10",
+   "what": "4 pixels x 4 vec4s, edge zero, the first layer's 10 -> 32",
+   "cfg": {
+    "px": 4,
+    "g4": 4,
+    "edge": "zero"
+   },
+   "seconds": 1.401,
+   "dumpFile": "C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-denoise-probe-dump-tile4-zero-10.txt",
+   "built": true,
+   "buildMs": 200.8669,
+   "exact": true,
+   "sizes": [
+    {
+     "N": 64,
+     "passMs": 0.043008,
+     "passes": 30,
+     "clock": "device",
+     "exact": true,
+     "detail": "131072 plain, 0 fused, 0 unexplained"
+    },
+    {
+     "N": 256,
+     "passMs": 0.239616,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    },
+    {
+     "N": 1024,
+     "passMs": 3.141632,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    }
+   ],
+   "adapter": "nvidia / pascal / D3D12 driver version 32.0.15.8180",
+   "dump": {
+    "compiler": "DXC (DXIL)",
+    "lines": 1952,
+    "loops": 0,
+    "indexableTemps": 0,
+    "barriers": 4
+   }
+  },
+  {
+   "id": "tile1-skip-32",
+   "what": "1 pixel x 8 vec4s, edge skip: the guarded copy at the fast kernel's accumulator count",
+   "cfg": {
+    "px": 1,
+    "g4": 8,
+    "edge": "skip"
+   },
+   "seconds": 2.243,
+   "dumpFile": "C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-denoise-probe-dump-tile1-skip-32.txt",
+   "built": true,
+   "buildMs": 128.08429999999998,
+   "exact": true,
+   "sizes": [
+    {
+     "N": 64,
+     "passMs": 0.09216,
+     "passes": 30,
+     "clock": "device",
+     "exact": true,
+     "detail": "131072 plain, 0 fused, 0 unexplained"
+    },
+    {
+     "N": 256,
+     "passMs": 0.57856,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    },
+    {
+     "N": 1024,
+     "passMs": 8.951808,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    }
+   ],
+   "adapter": "nvidia / pascal / D3D12 driver version 32.0.15.8180",
+   "dump": {
+    "compiler": "DXC (DXIL)",
+    "lines": 1345,
+    "loops": 0,
+    "indexableTemps": 0,
+    "barriers": 4
+   }
+  },
+  {
+   "id": "tile2g4-skip-32",
+   "what": "2 pixels x 4 vec4s, edge skip",
+   "cfg": {
+    "px": 2,
+    "g4": 4,
+    "edge": "skip"
+   },
+   "seconds": 2.309,
+   "dumpFile": "C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-denoise-probe-dump-tile2g4-skip-32.txt",
+   "built": true,
+   "buildMs": 151.02009999999996,
+   "exact": true,
+   "sizes": [
+    {
+     "N": 64,
+     "passMs": 0.101376,
+     "passes": 30,
+     "clock": "device",
+     "exact": true,
+     "detail": "131072 plain, 0 fused, 0 unexplained"
+    },
+    {
+     "N": 256,
+     "passMs": 0.627712,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    },
+    {
+     "N": 1024,
+     "passMs": 9.465856,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    }
+   ],
+   "adapter": "nvidia / pascal / D3D12 driver version 32.0.15.8180",
+   "dump": {
+    "compiler": "DXC (DXIL)",
+    "lines": 1582,
+    "loops": 0,
+    "indexableTemps": 0,
+    "barriers": 4
+   }
+  },
+  {
+   "id": "tile2-skip-32",
+   "what": "r16a's kernel as section 54 shipped it: 2 pixels x 8 vec4s, edge skip",
+   "cfg": {
+    "px": 2,
+    "g4": 8,
+    "edge": "skip"
+   },
+   "seconds": 2.409,
+   "dumpFile": "C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-denoise-probe-dump-tile2-skip-32.txt",
+   "built": true,
+   "buildMs": 327.0819,
+   "exact": true,
+   "sizes": [
+    {
+     "N": 64,
+     "passMs": 0.142336,
+     "passes": 30,
+     "clock": "device",
+     "exact": true,
+     "detail": "131072 plain, 0 fused, 0 unexplained"
+    },
+    {
+     "N": 256,
+     "passMs": 0.672768,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    },
+    {
+     "N": 1024,
+     "passMs": 8.55552,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    }
+   ],
+   "adapter": "nvidia / pascal / D3D12 driver version 32.0.15.8180",
+   "dump": {
+    "compiler": "DXC (DXIL)",
+    "lines": 2718,
+    "loops": 0,
+    "indexableTemps": 0,
+    "barriers": 4
+   }
+  },
+  {
+   "id": "tile4-skip-32",
+   "what": "r16b's kernel as section 54 shipped it: 4 pixels x 4 vec4s, edge skip",
+   "cfg": {
+    "px": 4,
+    "g4": 4,
+    "edge": "skip"
+   },
+   "seconds": 2.535,
+   "dumpFile": "C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-denoise-probe-dump-tile4-skip-32.txt",
+   "built": true,
+   "buildMs": 273.51140000000004,
+   "exact": true,
+   "sizes": [
+    {
+     "N": 64,
+     "passMs": 0.154624,
+     "passes": 30,
+     "clock": "device",
+     "exact": true,
+     "detail": "131072 plain, 0 fused, 0 unexplained"
+    },
+    {
+     "N": 256,
+     "passMs": 0.77824,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    },
+    {
+     "N": 1024,
+     "passMs": 10.237952,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    }
+   ],
+   "adapter": "nvidia / pascal / D3D12 driver version 32.0.15.8180",
+   "dump": {
+    "compiler": "DXC (DXIL)",
+    "lines": 2688,
+    "loops": 0,
+    "indexableTemps": 0,
+    "barriers": 4
+   }
+  }
+ ],
+ "browser": null
+}

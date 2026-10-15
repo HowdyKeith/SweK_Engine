@@ -1,0 +1,499 @@
+{
+ "at": "2026-10-15T00:35:07.228Z",
+ "platform": "win32 10.0.22631 x64",
+ "node": "v24.17.0",
+ "commit": "b2a4a1d2 2026-10-14 v4859: record the release",
+ "probe": "r16",
+ "sizes": [
+  64,
+  256,
+  1024
+ ],
+ "capSeconds": 180,
+ "nodeWebgpu": {
+  "version": "0.6.2",
+  "from": "C:\\Users\\Keith\\AppData\\Roaming\\npm\\node_modules\\webgpu\\index.js",
+  "refused": null,
+  "dxcBeside": true,
+  "dxc": "Dawn's choice"
+ },
+ "native": [
+  {
+   "id": "fast-32",
+   "what": "the fast kernel, 32 -> 32 at 3 x 3: the baseline",
+   "cfg": null,
+   "seconds": 6.702,
+   "dumpFile": "C:\\Users\\Keith\\AppData\\Local\\Temp\\swek-denoise-probe-dump-fast-32.txt",
+   "built": true,
+   "buildMs": 131.8083,
+   "exact": true,
+   "sizes": [
+    {
+     "N": 64,
+     "passMs": 1.138815,
+     "passes": 30,
+     "clock": "device",
+     "exact": true,
+     "detail": "131072 plain, 0 fused, 0 unexplained"
+    },
+    {
+     "N": 256,
+     "passMs": 14.277443,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    },
+    {
+     "N": 1024,
+     "passMs": 212.183852,
+     "passes": 8,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    }
+   ],
+   "adapter": "intel / gen-9 / D3D12 driver version 31.0.101.2137",
+   "dump": {
+    "compiler": "DXC (DXIL)",
+    "lines": 1329,
+    "loops": 0,
+    "indexableTemps": 0,
+    "barriers": 4
+   }
+  },
+  {
+   "id": "tile2-zero-32",
+   "what": "2 pixels x 8 vec4s, edge zero, 32 -> 32",
+   "cfg": {
+    "px": 2,
+    "g4": 8,
+    "edge": "zero"
+   },
+   "seconds": 5.218,
+   "dumpFile": "C:\\Users\\Keith\\AppData\\Local\\Temp\\swek-denoise-probe-dump-tile2-zero-32.txt",
+   "built": true,
+   "buildMs": 362.66110000000003,
+   "exact": true,
+   "sizes": [
+    {
+     "N": 64,
+     "passMs": 1.066567,
+     "passes": 30,
+     "clock": "device",
+     "exact": true,
+     "detail": "131072 plain, 0 fused, 0 unexplained"
+    },
+    {
+     "N": 256,
+     "passMs": 12.331141,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    },
+    {
+     "N": 1024,
+     "passMs": 288.383578,
+     "passes": 6,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    }
+   ],
+   "adapter": "intel / gen-9 / D3D12 driver version 31.0.101.2137",
+   "dump": {
+    "compiler": "DXC (DXIL)",
+    "lines": 1981,
+    "loops": 0,
+    "indexableTemps": 0,
+    "barriers": 4
+   }
+  },
+  {
+   "id": "tile4-zero-32",
+   "what": "4 pixels x 4 vec4s, edge zero, 32 -> 32",
+   "cfg": {
+    "px": 4,
+    "g4": 4,
+    "edge": "zero"
+   },
+   "seconds": 7.772,
+   "dumpFile": "C:\\Users\\Keith\\AppData\\Local\\Temp\\swek-denoise-probe-dump-tile4-zero-32.txt",
+   "built": true,
+   "buildMs": 256.88470000000007,
+   "exact": true,
+   "sizes": [
+    {
+     "N": 64,
+     "passMs": 1.263897,
+     "passes": 30,
+     "clock": "device",
+     "exact": true,
+     "detail": "131072 plain, 0 fused, 0 unexplained"
+    },
+    {
+     "N": 256,
+     "passMs": 23.399051,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    },
+    {
+     "N": 1024,
+     "passMs": 783.641589,
+     "passes": 3,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    }
+   ],
+   "adapter": "intel / gen-9 / D3D12 driver version 31.0.101.2137",
+   "dump": {
+    "compiler": "DXC (DXIL)",
+    "lines": 1904,
+    "loops": 0,
+    "indexableTemps": 0,
+    "barriers": 4
+   }
+  },
+  {
+   "id": "tile2g4-zero-32",
+   "what": "2 pixels x 4 vec4s (the fast kernel's accumulator count), edge zero, 32 -> 32",
+   "cfg": {
+    "px": 2,
+    "g4": 4,
+    "edge": "zero"
+   },
+   "seconds": 6.398,
+   "dumpFile": "C:\\Users\\Keith\\AppData\\Local\\Temp\\swek-denoise-probe-dump-tile2g4-zero-32.txt",
+   "built": true,
+   "buildMs": 399.54220000000004,
+   "exact": true,
+   "sizes": [
+    {
+     "N": 64,
+     "passMs": 1.624308,
+     "passes": 30,
+     "clock": "device",
+     "exact": true,
+     "detail": "131072 plain, 0 fused, 0 unexplained"
+    },
+    {
+     "N": 256,
+     "passMs": 23.001057,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    },
+    {
+     "N": 1024,
+     "passMs": 526.981433,
+     "passes": 3,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    }
+   ],
+   "adapter": "intel / gen-9 / D3D12 driver version 31.0.101.2137",
+   "dump": {
+    "compiler": "DXC (DXIL)",
+    "lines": 1182,
+    "loops": 0,
+    "indexableTemps": 0,
+    "barriers": 4
+   }
+  },
+  {
+   "id": "tile2-zero-10",
+   "what": "2 pixels x 8 vec4s, edge zero, the first layer's 10 -> 32",
+   "cfg": {
+    "px": 2,
+    "g4": 8,
+    "edge": "zero"
+   },
+   "seconds": 4.016,
+   "dumpFile": "C:\\Users\\Keith\\AppData\\Local\\Temp\\swek-denoise-probe-dump-tile2-zero-10.txt",
+   "built": true,
+   "buildMs": 513.5123000000001,
+   "exact": true,
+   "sizes": [
+    {
+     "N": 64,
+     "passMs": 0.454743,
+     "passes": 30,
+     "clock": "device",
+     "exact": true,
+     "detail": "131072 plain, 0 fused, 0 unexplained"
+    },
+    {
+     "N": 256,
+     "passMs": 4.704677,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    },
+    {
+     "N": 1024,
+     "passMs": 108.246059,
+     "passes": 13,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    }
+   ],
+   "adapter": "intel / gen-9 / D3D12 driver version 31.0.101.2137",
+   "dump": {
+    "compiler": "DXC (DXIL)",
+    "lines": 1981,
+    "loops": 0,
+    "indexableTemps": 0,
+    "barriers": 4
+   }
+  },
+  {
+   "id": "tile4-zero-10",
+   "what": "4 pixels x 4 vec4s, edge zero, the first layer's 10 -> 32",
+   "cfg": {
+    "px": 4,
+    "g4": 4,
+    "edge": "zero"
+   },
+   "seconds": 4.543,
+   "dumpFile": "C:\\Users\\Keith\\AppData\\Local\\Temp\\swek-denoise-probe-dump-tile4-zero-10.txt",
+   "built": true,
+   "buildMs": 428.81429999999995,
+   "exact": true,
+   "sizes": [
+    {
+     "N": 64,
+     "passMs": 0.560491,
+     "passes": 30,
+     "clock": "device",
+     "exact": true,
+     "detail": "131072 plain, 0 fused, 0 unexplained"
+    },
+    {
+     "N": 256,
+     "passMs": 7.696546,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    },
+    {
+     "N": 1024,
+     "passMs": 153.802764,
+     "passes": 9,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    }
+   ],
+   "adapter": "intel / gen-9 / D3D12 driver version 31.0.101.2137",
+   "dump": {
+    "compiler": "DXC (DXIL)",
+    "lines": 1904,
+    "loops": 0,
+    "indexableTemps": 0,
+    "barriers": 4
+   }
+  },
+  {
+   "id": "tile1-skip-32",
+   "what": "1 pixel x 8 vec4s, edge skip: the guarded copy at the fast kernel's accumulator count",
+   "cfg": {
+    "px": 1,
+    "g4": 8,
+    "edge": "skip"
+   },
+   "seconds": 7.602,
+   "dumpFile": "C:\\Users\\Keith\\AppData\\Local\\Temp\\swek-denoise-probe-dump-tile1-skip-32.txt",
+   "built": true,
+   "buildMs": 317.1839,
+   "exact": true,
+   "sizes": [
+    {
+     "N": 64,
+     "passMs": 1.28423,
+     "passes": 30,
+     "clock": "device",
+     "exact": true,
+     "detail": "131072 plain, 0 fused, 0 unexplained"
+    },
+    {
+     "N": 256,
+     "passMs": 19.925022,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    },
+    {
+     "N": 1024,
+     "passMs": 377.904762,
+     "passes": 4,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    }
+   ],
+   "adapter": "intel / gen-9 / D3D12 driver version 31.0.101.2137",
+   "dump": {
+    "compiler": "DXC (DXIL)",
+    "lines": 1329,
+    "loops": 0,
+    "indexableTemps": 0,
+    "barriers": 4
+   }
+  },
+  {
+   "id": "tile2g4-skip-32",
+   "what": "2 pixels x 4 vec4s, edge skip",
+   "cfg": {
+    "px": 2,
+    "g4": 4,
+    "edge": "skip"
+   },
+   "seconds": 7.086,
+   "dumpFile": "C:\\Users\\Keith\\AppData\\Local\\Temp\\swek-denoise-probe-dump-tile2g4-skip-32.txt",
+   "built": true,
+   "buildMs": 268.1831,
+   "exact": true,
+   "sizes": [
+    {
+     "N": 64,
+     "passMs": 1.543476,
+     "passes": 30,
+     "clock": "device",
+     "exact": true,
+     "detail": "131072 plain, 0 fused, 0 unexplained"
+    },
+    {
+     "N": 256,
+     "passMs": 24.587783,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    },
+    {
+     "N": 1024,
+     "passMs": 517.185586,
+     "passes": 3,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    }
+   ],
+   "adapter": "intel / gen-9 / D3D12 driver version 31.0.101.2137",
+   "dump": {
+    "compiler": "DXC (DXIL)",
+    "lines": 1567,
+    "loops": 0,
+    "indexableTemps": 0,
+    "barriers": 4
+   }
+  },
+  {
+   "id": "tile2-skip-32",
+   "what": "r16a's kernel as section 54 shipped it: 2 pixels x 8 vec4s, edge skip",
+   "cfg": {
+    "px": 2,
+    "g4": 8,
+    "edge": "skip"
+   },
+   "seconds": 7.216,
+   "dumpFile": "C:\\Users\\Keith\\AppData\\Local\\Temp\\swek-denoise-probe-dump-tile2-skip-32.txt",
+   "built": true,
+   "buildMs": 690.0023999999999,
+   "exact": true,
+   "sizes": [
+    {
+     "N": 64,
+     "passMs": 1.118066,
+     "passes": 30,
+     "clock": "device",
+     "exact": true,
+     "detail": "131072 plain, 0 fused, 0 unexplained"
+    },
+    {
+     "N": 256,
+     "passMs": 14.852102,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    },
+    {
+     "N": 1024,
+     "passMs": 342.996474,
+     "passes": 5,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    }
+   ],
+   "adapter": "intel / gen-9 / D3D12 driver version 31.0.101.2137",
+   "dump": {
+    "compiler": "DXC (DXIL)",
+    "lines": 2671,
+    "loops": 0,
+    "indexableTemps": 0,
+    "barriers": 4
+   }
+  },
+  {
+   "id": "tile4-skip-32",
+   "what": "r16b's kernel as section 54 shipped it: 4 pixels x 4 vec4s, edge skip",
+   "cfg": {
+    "px": 4,
+    "g4": 4,
+    "edge": "skip"
+   },
+   "seconds": 7.336,
+   "dumpFile": "C:\\Users\\Keith\\AppData\\Local\\Temp\\swek-denoise-probe-dump-tile4-skip-32.txt",
+   "built": true,
+   "buildMs": 809.5028000000001,
+   "exact": true,
+   "sizes": [
+    {
+     "N": 64,
+     "passMs": 1.857805,
+     "passes": 30,
+     "clock": "device",
+     "exact": true,
+     "detail": "131072 plain, 0 fused, 0 unexplained"
+    },
+    {
+     "N": 256,
+     "passMs": 23.010141,
+     "passes": 30,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    },
+    {
+     "N": 1024,
+     "passMs": 512.052833,
+     "passes": 3,
+     "clock": "device",
+     "exact": null,
+     "detail": "not judged at this size: the same kernel is held to the twin at 64 x 64"
+    }
+   ],
+   "adapter": "intel / gen-9 / D3D12 driver version 31.0.101.2137",
+   "dump": {
+    "compiler": "DXC (DXIL)",
+    "lines": 2643,
+    "loops": 0,
+    "indexableTemps": 0,
+    "barriers": 4
+   }
+  }
+ ],
+ "browser": null
+}

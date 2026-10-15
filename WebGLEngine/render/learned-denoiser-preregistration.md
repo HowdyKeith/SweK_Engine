@@ -4711,3 +4711,81 @@ Send back both JSON files from each GPU. Don't commit or pull between the two ru
 
 **Not in this round.** Any change to a set, and the 10-input shapes: they do the first layer only, and section 72 does not
 compare them with a 32 -> 32 kernel.
+
+## 74. ROUND 23 -- THE VERDICT: NEITHER INTEL SHAPE HOLDS; ON THE 1080, r18t's KERNEL DOES, AND THAT NAMES ROUND 24
+
+**What arrived.** Two `denoiseBuildProbe --probe r16 --native-only --sizes 64,256,1024` runs per GPU, back to back, at b2a4a1d2
+(v4859's release), node-webgpu 0.6.2 under DXC. Committed as received: `render/denoise-probe-r23-a-intel-gen9.json` and `-b-`,
+and the same for `gtx1080`. Round 22's two `realGpuRun --only denoise` reports, which section 75 reads, are committed beside
+them as `render/denoise-rig-r22-intel-gen9.json` and `-gtx1080.json`.
+
+**The rule.** A named shape holds when it is at least 1.05 x faster than fast-32 at 256 x 256 AND 1024 x 1024 in both runs.
+Ratios are fast-32's pass over the shape's, device clock, at 64 / 256 / 1024:
+
+| Shape | Intel, run a | Intel, run b | 1080, run a | 1080, run b |
+|---|---|---|---|---|
+| tile2-zero-32 (named) | 1.06 / 1.04 / 1.08 | 1.07 / 1.16 / 0.74 | 0.83 / **1.21 / 1.14** | 0.84 / **1.24 / 1.14** |
+| tile1-skip-32 (named) | 1.01 / 0.99 / 0.77 | 0.89 / 0.72 / 0.56 | 1.12 / 1.17 / 1.02 | 1.10 / 1.18 / 1.01 |
+| tile2g4-zero-32 | 0.83 / 0.67 / 0.54 | 0.70 / 0.62 / 0.40 | 1.16 / 1.14 / 1.02 | 1.14 / 1.15 / 1.03 |
+| tile2-skip-32 | 1.23 / 1.14 / 0.86 | 1.02 / 0.96 / 0.62 | 0.73 / 1.02 / 1.03 | 0.71 / 1.01 / 1.06 |
+| tile4-zero-32 | 0.79 / 0.62 / 0.47 | 0.90 / 0.61 / 0.27 | 0.88 / 1.01 / 0.95 | 0.85 / 1.02 / 0.81 |
+| tile2g4-skip-32 | 0.85 / 0.73 / 0.56 | 0.74 / 0.58 / 0.41 | 0.98 / 1.03 / 0.96 | 1.00 / 1.09 / 0.96 |
+| tile4-skip-32 | 0.72 / 0.69 / 0.55 | 0.61 / 0.62 / 0.41 | 0.66 / 0.86 / 0.88 | 0.66 / 0.88 / 0.88 |
+
+**On the Intel, both named shapes are retired, as predicted.** tile2-zero-32 misses at 256 in run a (1.04) and at 1024 in run b
+(0.74); tile1-skip-32 is slower than the fast kernel at every larger size in both runs -- section 72's 1.15 x was one 64 x 64
+reading. Run b read slower than run a across the board on this GPU (tile4-zero-32 at 1024: 425 ms, then 784 ms), the second
+time in two rounds that one Intel run has disagreed with the next by a fifth or more.
+
+**On the 1080, the prediction "no shape holds" failed.** tile2-zero-32 is 1.21 and 1.14 x the fast kernel at 256 and 1024 in run
+a, and 1.24 and 1.14 x in run b; it is slower only at 64 x 64, which is why section 72's 64 x 64 probe did not see it. By the rule
+the 1080's result is reported and acts on nothing. What it says is not new: tile2-zero-32 is r18t's kernel (the same 2,029-line
+DXIL), and section 67 timed r18t natively on this GPU at 1.076 x r15 under DXC at 1920 x 1080. The 1080 was refused an entry
+then by condition 4 alone -- r18t had also to beat r15 under FXC. That is section 75's subject.
+
+## 75. ROUND 24 -- THE 1080's NATIVE ENTRY, ASKED AGAIN WITHOUT CONDITION 4: FIXED BEFORE THE RIG RUNS IT
+
+**Why this round.** Section 66 gave a native run's table five conditions, and condition 4 asked a set to beat r15 under FXC
+because "a native caller that moves to 0.6.2 changes its compiler as well as its set" -- it had to beat what that caller ran
+then. Section 70 moved the pin to 0.6.2, and section 72 measured the result: with nothing set, every native run on D3D12 now
+compiles with DXC. The caller condition 4 protected no longer exists; what a native caller runs today on the 1080 is r15 under
+DXC, which is condition 3. On the 1080, condition 4 was the only one r18t failed (section 67), and section 74 has just measured
+r18t's kernel ahead of the fast kernel at frame sizes on the same GPU.
+
+**What changes now.** Nothing in the code. This section fixes the rule.
+
+**The rule, fixed now.**
+- **Section 66's conditions 0 to 3, unchanged; condition 4 dropped.** 0: the run's compiler is DXC. 1: the set's native K0 rows
+  are green. 2: K1 against r12 natively under DXC (at least 2 x at the largest size both measured, at least 1 x at every size).
+  3: at least 1.05 x as fast as r15 under DXC, at the largest size the set and r15 were both measured on the native ladder.
+- **Twice.** On each GPU, `realGpuRun --only denoise` is run twice, one after the other, from the same clone and commit, with
+  `SWEK_WEBGPU` cleared. A set qualifies on a GPU only when 0 to 3 hold in BOTH runs.
+- **The 1080's entry.** If r18t or r18u qualifies there, `NATIVE_KERNELS_BY_ADAPTER` gains `"win32/nvidia/pascal"` with the
+  qualifying set -- the one whose smaller condition-3 ratio of its two runs is the larger; a tie goes to r18u, as in section 66.
+  If neither qualifies, the 1080 keeps no entry and DEFAULT_KERNELS (r15).
+- **The Intel is the control and its entry is not re-decided.** Its two runs are reported against the same conditions. If r18u
+  fails a condition there in either run, that is named as the subject of a later round, and the entry stays.
+- **Every FXC run still gets DEFAULT_KERNELS,** as the table has always said: a run that disables `use_dxc` changes compiler,
+  and nothing here measured a set under FXC.
+- **The verdict round** moves `render/denoiseDevice-selfcheck.mjs`'s `rule66Entries` to the rule above (with condition 4 kept
+  as a reported line, not a condition), derives the table from the committed round-24 reports, and names each change.
+
+**Predictions, fixed now.**
+- **r18t qualifies on the 1080 in both runs, and its entry is r18t.** Round 22's report, committed above, reads r18t at 1.088 x
+  r15 under DXC at 1920 x 1080, K1 26.02 x at 1024 x 1024 and above 1 x at every size, all three denoiser gates green, compiler
+  DXC. Section 67's run read 1.076 x. Both clear 1.05 by a margin of the size the two have differed by.
+- **r18u does not qualify on the 1080** (0.653 x in round 22's report).
+- **The Intel's control holds: r18u meets 0 to 3 in both runs** (round 22: 1.50 x at 1024 x 1024).
+- **The margin is thin on the 1080:** 1.088 and 1.076 are within 4 % of the bar. A run that lands under it is the rule working,
+  and the 1080 keeps r15.
+
+**On the rig.** On each GPU, from the verified clone at v4860 or later, `SWEK_WEBGPU` cleared:
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r24-a.json
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r24-b.json
+```
+Send back all four JSON files. Don't commit or pull between the two runs.
+
+**Not in this round.** The page's table (section 63's, Chrome on Windows: r18t on the 1080 already), and any set under FXC.
