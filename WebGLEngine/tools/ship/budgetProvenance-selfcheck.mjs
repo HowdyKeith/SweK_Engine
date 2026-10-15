@@ -426,10 +426,14 @@ console.log("\n7. configContract, REMOVED RATHER THAN CORRECTED, AND WHY THAT DI
         "have given 6,946 ms to a gate observed at 5,769 ms under load: the tightening that manufactures a " +
         "timeout out of a check that is fine. THE TABLE IS THE SLOW TAIL AND A 3 s GATE IS THE POPULATION.");
 
-    ok("...and the measurement outlives the entry, in the record built for it",
-        G.timings[gate] === REMEASURE_V4581.median && G.kinds[gate] === "median of 3 alone" && G.boxes[gate],
-        `gate-timings holds ${G.timings[gate]} ms as '${G.kinds[gate]}'. v4580 added that kind for a hand median; ` +
-        "this is the first entry written with it deliberately rather than to correct a cold sample.");
+    // v4864 -- the full serial re-take of gate-timings.json (2026-10-15) timed this gate again, 5165 ms in the suite, and its
+    // merge put that over the v4581 hand median: a newer reading with provenance is the record doing its job, not a regression.
+    // The v4581 median stays frozen above (REMEASURE_V4581); what the record must still say is that this is a few-second gate,
+    // provenanced -- not the 78,000 ms the table had. Pinning the one value made the next re-take red by construction.
+    ok("...and the measurement outlives the entry, in the record built for it -- a provenanced reading, a few seconds, nowhere near the 78 s the table had",
+        Number.isFinite(G.timings[gate]) && G.timings[gate] < wasSmaller / 10 && !!G.kinds[gate] && !!G.boxes[gate] && !!(G.at || {})[gate],
+        `gate-timings holds ${G.timings[gate]} ms as '${G.kinds[gate]}' (${(G.at || {})[gate] || "no date"}); v4581's hand median was ${REMEASURE_V4581.median} ms ` +
+        "('median of 3 alone', the first entry written with that kind deliberately).");
 
     ok("...and the entry's own first sentence had said it was unnecessary from the day it was written",
         GB_SRC.includes("IT NEVER NEEDED A BIGGER BUDGET AT ALL"),
