@@ -217,7 +217,11 @@ const rigGate = (rep, name) => (rep.gates || []).find((g) => g.gate === `render/
 const rigLines = (g) => (g && g.measured) || [];
 const sizeRatios = (lines, head) => lines.map((l) => l.startsWith(head) && l.slice(head.length).match(/^(\d+) x (\d+): ([\d.]+) x as fast/))
     .filter(Boolean).map((m) => ({ px: +m[1] * +m[2], size: `${m[1]} x ${m[2]}`, r: +m[3] })).sort((a, b) => a.px - b.px);
-function rule66Entries(rep) {
+// v4861 -- SECTION 75'S RULE is the same function with condition 4 reported and not asked ({ fxc: false }): with the pin on 0.6.2
+// a native caller already runs r15 under DXC, so "beat r15 under FXC" protected a caller who no longer exists. Conditions 0 and 1 keep
+// the code's reading, the WHOLE compile and exact gates green, which section 76 adopted over the prose's "the row is green" after
+// round 24's second runs crashed on both GPUs in rows the prose did not name.
+function rule66Entries(rep, { fxc: askFxc = true } = {}) {
     const comp = rigGate(rep, "denoiseCompile"), dev = rigGate(rep, "denoiseDevice"), tim = rigGate(rep, "denoiseTiming");
     const T = rigLines(tim), keyLine = T.map((l) => l.match(/^native: this adapter's key for section 66's table: (\S+)$/)).find(Boolean);
     const key = keyLine ? keyLine[1] : null;
@@ -228,7 +232,7 @@ function rule66Entries(rep) {
         const k1 = sizeRatios(T, `native: ${s} against r12 at `), dxc = sizeRatios(T, `native: ${s} against r15 at `), fxc = sizeRatios(T, `native: ${s} against r15 under FXC at `);
         const top = (a) => (a.length ? a[a.length - 1] : null);
         const conds = [c0, c1, !!tim && tim.ok === true && k1.length > 0 && top(k1).r >= 2 && k1.every((x) => x.r >= 1),
-                       !!top(dxc) && top(dxc).r >= RULE66_MIN, !!top(fxc) && top(fxc).r >= RULE66_MIN];
+                       !!top(dxc) && top(dxc).r >= RULE66_MIN, !askFxc || (!!top(fxc) && top(fxc).r >= RULE66_MIN)];
         const fail = conds.indexOf(false);
         return { s, fail, c3: top(dxc), line: `${s} K1 ${top(k1) ? top(k1).r + " x at " + top(k1).size : "none"}, ${top(dxc) ? top(dxc).r + " x r15 under DXC at " + top(dxc).size : "no DXC ratio"}, ` +
                  `${top(fxc) ? top(fxc).r + " x r15 under FXC at " + top(fxc).size : "no FXC ratio"}${fail < 0 ? ", qualifies" : `, fails condition ${fail}`}` };
@@ -425,6 +429,33 @@ console.log("1. THE KERNEL'S TWIN, ON THE CPU");
             ok("  section 66's predictions, read off the same reports: P1 (the Intel's entry is r18u), P2 (the 1080 gets none, by condition 4), P3 (r15 slower under DXC than FXC on both)",
                 r66[0].entry === "r18u" && r66[1].entry === null && r66[1].fail.r18t === 4 && r66[1].fail.r18u === 3 && r66[0].fail.r18t === 3 && r66[0].fail.r18u === -1 && p3.every((p) => p && p.dxc > p.fxc),
                 p3.map((p) => p ? `r15 at ${p.size}: ${p.dxc} ms under DXC, ${p.fxc} ms under FXC` : "unread").join("; "));
+        }
+        // v4861 -- ROUND 24'S VERDICT (section 76): section 75's rule -- conditions 0 to 3, in BOTH of a GPU's two runs -- read off the
+        // four committed reports (render/denoise-rig-r24-{a,b}-*.json, realGpuRun --only denoise at v4860's release, SWEK_WEBGPU cleared).
+        // Run b crashed on both GPUs (0xC0000005: two FXC-mode build children on the 1080, the native caller on the Intel), each gate
+        // that held the crash went red, and under the strict reading a red gate fails its condition. So no set qualifies on the 1080 in
+        // both runs and the table is unchanged; the Intel is the control and its entry is not re-decided (section 75).
+        // SABOTAGED v4861: rule66Entries' condition 0 back to the prose's "the row is green" (comp.ok dropped) -> 1 RED, this row (the
+        //   discrimination row sets run b's gate green itself, so it stands); NATIVE_KERNELS_BY_ADAPTER given "win32/nvidia/pascal": "r18t"
+        //   -> 5 RED (this row, round 19's verdict, the two nativeKernelsFor/nativePick rows, and section 68's --which outcome); each restored, md5 verified.
+        {
+            const rig = (f) => JSON.parse(fs.readFileSync(path.join(ENG, "render", f), "utf8"));
+            const R24 = { intel: ["a", "b"].map((r) => rig(`denoise-rig-r24-${r}-intel-gen9.json`)), gtx1080: ["a", "b"].map((r) => rig(`denoise-rig-r24-${r}-gtx1080.json`)) };
+            const runs = Object.fromEntries(Object.entries(R24).map(([k, reps]) => [k, reps.map((r) => rule66Entries(r, { fxc: false })[0])]));
+            const both = (rs) => (rs.every((e) => e.key === rs[0].key && e.entry) && rs.every((e) => e.entry === rs[0].entry) ? rs[0].entry : null);
+            for (const [k, rs] of Object.entries(runs)) console.log(`  ----  section 75 on ${rs[0].key}: ${rs.map((e, i) => `run ${"ab"[i]} ${e.entry || "none"} (${e.lines.join("; ")})`).join(" | ")}`);
+            ok("!! *** round 24's verdict (section 76): read strictly, no set holds section 75's conditions in both of the 1080's runs -- run b's compile gate crashed -- so the 1080 keeps no entry and the table is unchanged ***",
+                runs.gtx1080[0].entry === "r18t" && runs.gtx1080[1].entry === null && runs.gtx1080[1].fail.r18t === 0 && both(runs.gtx1080) === null &&
+                runs.intel[0].entry === "r18u" && runs.intel[1].entry === null && runs.intel[1].fail.r18u === 1 &&
+                JSON.stringify(NATIVE_KERNELS_BY_ADAPTER) === JSON.stringify({ "win32/intel/gen-9": "r18u" }),
+                `1080: run a ${runs.gtx1080[0].entry}, run b ${runs.gtx1080[1].entry} (fails condition ${runs.gtx1080[1].fail.r18t}); Intel: run a ${runs.intel[0].entry}, run b ${runs.intel[1].entry} (fails condition ${runs.intel[1].fail.r18u})`);
+            // and it discriminates: with run b's compile gate green, r18t holds in both and the 1080 would take it; and condition 4 dropped
+            // is what moves it -- the same run a under section 66's rule gives the 1080 nothing
+            const fixed = JSON.parse(JSON.stringify(R24.gtx1080[1])); rigGate(fixed, "denoiseCompile").ok = true;
+            const [eF] = rule66Entries(fixed, { fxc: false }), [e66] = rule66Entries(R24.gtx1080[0]);
+            ok("  ...and the rule discriminates: run b with its compile gate green gives r18t in both runs, and run a under section 66's rule, condition 4 asked, gives nothing",
+                both([runs.gtx1080[0], eF]) === "r18t" && e66.entry === null && e66.fail.r18t === 4,
+                `run b repaired: ${eF.entry}; run a with condition 4: ${e66.entry} (fails ${e66.fail.r18t}); r18t against r15 under DXC at 1920 x 1080: ${runs.gtx1080.map((e) => e.lines[0].match(/([\d.]+) x r15 under DXC/)?.[1]).join(" and ")}`);
         }
         // v4852+ -- SECTION 68'S OUTCOME (round 20): the rig's six --which lines per GPU, held to the table fixed before they ran, and
         // each re-derived from nativePick on the adapter and compiler the line itself names -- so the rig's reasons are this code's

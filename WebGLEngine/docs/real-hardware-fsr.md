@@ -399,6 +399,34 @@ node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r24-b.json
 - **Section 75 predicts:** r18t qualifies on the 1080 in both runs and becomes its native default; the Intel stays r18u.
 - **Send back all four JSON files.**
 
+**The outcome (section 76), read strictly: the 1080 keeps r15.** r18t beat r15 under DXC by 1.086 and 1.091 x at 1920 x 1080 on
+the 1080, but both GPUs' second runs crashed with an access violation in a native child (the 1080's compile gate in its FXC mode,
+the Intel's exact gate in the native caller), so a gate was red in each run b and no set qualified in both.
+
+### Round 24b: the crash first, then the two runs again (pre-registration section 77)
+
+On the 1080, in the verified clone with v4861 or later:
+
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node render/denoiseCompile-selfcheck.mjs
+node render/denoiseCompile-selfcheck.mjs
+node render/denoiseCompile-selfcheck.mjs
+```
+
+On the Intel, the same three lines with `render/denoiseDevice-selfcheck.mjs`. Then, on each GPU:
+
+```
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r24b-a.json
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r24b-b.json
+```
+
+- **Step 1 decides nothing:** it asks whether the crash happens in a gate run alone.
+- **Don't commit or pull between runs.**
+- **Section 77 predicts:** no crash; r18t qualifies on the 1080 in both runs; the Intel stays r18u.
+- **Send back the step-1 console output and all four JSON files.**
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and

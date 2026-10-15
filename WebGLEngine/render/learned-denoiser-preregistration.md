@@ -4789,3 +4789,78 @@ node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r24-b.json
 Send back all four JSON files. Don't commit or pull between the two runs.
 
 **Not in this round.** The page's table (section 63's, Chrome on Windows: r18t on the 1080 already), and any set under FXC.
+
+## 76. ROUND 24 -- THE VERDICT, READ STRICTLY: THE 1080 KEEPS r15, BECAUSE BOTH GPUS' SECOND RUNS CRASHED
+
+**What arrived.** Two `realGpuRun --only denoise` runs per GPU at 16e69a09 (v4860's release), `SWEK_WEBGPU` cleared, node-webgpu
+0.6.2 under DXC. Committed as received: `render/denoise-rig-r24-a-intel-gen9.json` and `-b-`, and the same for `gtx1080`.
+
+**Condition 3, where it was measured** (the set's median over r15's, device clock, at the largest common size):
+
+| | Run a | Run b |
+|---|---|---|
+| r18t, GTX 1080 (1920 x 1080) | 1.086 x | 1.091 x |
+| r18u, GTX 1080 | 0.659 x | 0.658 x |
+| r18u, Intel gen-9 (1024 x 1024), the control | 1.514 x | 1.527 x |
+
+**Both run b's crashed, with the same code.** Windows exit 3221225477 (0xC0000005, an access violation), in a native child:
+- **On the 1080,** in the compile gate's "use_dxc off" mode -- FXC -- the r13-fast-head and r15-head-apply children exited with no
+  result, and the gate went red on "every native child reported a result". The same gate's browser part said playwright was not
+  installed, in the clone whose run a had run it; that is unexplained here and named.
+- **On the Intel,** in the exact gate's round-20 row: the native caller (`tools/denoiseDevice.mjs --which`, r18u) exited with it.
+None of these rows is one sections 66 and 75 name. The as-shipped DXIL row and every K0 row were green in all four runs.
+
+**The gap, and the reading taken.** Sections 66 and 75 wrote condition 0 as "the compile gate's row ... is green" and condition 1
+as "the set's native rows in the exact gate are green". `rule66Entries`, which applied section 66 from v4852, asks the WHOLE compile
+gate and the WHOLE exact gate to be green. Read the prose's way, r18t qualifies in both 1080 runs and the 1080 takes it; read the
+code's way, both run b's fail (the 1080's at condition 0, the Intel's at condition 1) and nothing qualifies in both. **The code's
+reading is taken.** Choosing the reading that gives the new default, after the data, on runs whose own gates crashed, is the choice
+a pre-registration exists to prevent. Keith's call, made after the four reports and both readings were laid out side by side.
+
+**So:** `NATIVE_KERNELS_BY_ADAPTER` is unchanged -- `"win32/intel/gen-9": "r18u"` only -- and the 1080's native default stays r15.
+`render/denoiseDevice-selfcheck.mjs` derives that from the four reports with section 75's rule (`rule66Entries(rep, { fxc: false })`,
+condition 4 reported, not asked) and holds that a green run b would give r18t in both. Section 75's predictions: r18t on the 1080
+held in run a and was not reached in run b; r18u not qualifying on the 1080 held; the Intel's control held in run a and failed
+condition 1 in run b, by the crash. **What the conditions say about r18t is not in doubt; what two crashes in two run b's are is.**
+
+## 77. ROUND 24b -- THE CRASH FIRST, THEN SECTION 75's TWO RUNS AGAIN, READ STRICTLY: FIXED BEFORE THE RIG RUNS IT
+
+**Why this round.** Section 76 kept the 1080 on r15 because both GPUs' second runs crashed with an access violation in a native
+child. The rule's verdict waits on runs that do not crash, and nothing here can reproduce one: SwiftShader has no D3D12.
+
+**What changes now.** Nothing in the code but section 76's rows. This section fixes the rule.
+
+**Step 1, the crash, reported and deciding nothing.** On each GPU, the gate that crashed there, three times one after another:
+`node render/denoiseCompile-selfcheck.mjs` on the 1080 and `node render/denoiseDevice-selfcheck.mjs` on the Intel. Each run's exit
+code and its FAIL lines are reported. A crash that repeats in a gate run alone names round 25, about the crash, before any table moves.
+
+**Step 2, the rule, fixed now.** Section 75's, unchanged in its conditions -- 0 to 3, condition 4 reported -- and section 76's reading
+of 0 and 1: the whole compile gate and the whole exact gate green. Two `realGpuRun --only denoise` runs per GPU, one after the
+other, from the same clone and commit, `SWEK_WEBGPU` cleared. A set qualifies on a GPU only when 0 to 3 hold in BOTH runs.
+- If r18t (or r18u) qualifies on the 1080, `NATIVE_KERNELS_BY_ADAPTER` gains `"win32/nvidia/pascal"` with it -- the larger of the
+  smaller condition-3 ratios of its two runs, a tie to r18u.
+- If either run crashes again, no set qualifies, the 1080 stays on r15, and round 25 is the crash.
+- The Intel is the control, as in section 75: its entry is not re-decided, and a failure there is named for a later round.
+
+**Predictions, fixed now.**
+- **Step 1: neither gate crashes in three runs alone.** Each crash was in a second run, minutes after a first that was clean on the
+  same box. The one native crash on record before these, a Dawn futex crash in v4855's round, came from a second Dawn instance
+  made late inside one gate, and went when the gate reused its own device; that is the nearest precedent, and it is not this one.
+- **Step 2: neither run crashes, and r18t qualifies on the 1080 in both.** Its condition-3 ratio has read 1.076, 1.088, 1.086 and
+  1.091 across sections 67, 72 and 76 -- four readings, every one over 1.05 by 2.5 % or more.
+- **The Intel's control holds in both runs.**
+
+**On the rig.** On each GPU, from the verified clone at v4861 or later, `SWEK_WEBGPU` cleared. Step 1 on the 1080:
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node render/denoiseCompile-selfcheck.mjs
+node render/denoiseCompile-selfcheck.mjs
+node render/denoiseCompile-selfcheck.mjs
+```
+and on the Intel, the same three lines with `render/denoiseDevice-selfcheck.mjs`. Then step 2, on each GPU:
+```
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r24b-a.json
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r24b-b.json
+```
+Send back the console output of step 1 and all four JSON files. Don't commit or pull between runs.
