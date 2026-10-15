@@ -43,6 +43,13 @@ export function makeStage(opts = {}) {
     // keep behaving exactly as it did, which the original gate's ordering check asserts.
     const railHost = opts.railHost || opts.stageHost;
     let live = null;                      // { el, anchor }
+    // *** v4864 -- THE RAIL GETS AN ANCHOR TOO. *** restore() put the panel back at its anchor and the rail back
+    // with railHome.appendChild -- the END of its home, wherever it had been. On server.html the rail is
+    // #dialsRow, near the TOP of #gaugeAvatarCol with the chat, the peer bar and the drawers below it, so every
+    // staged panel sent the gauges and the avatar to the bottom of the column on the way back. The gate never
+    // saw it because its rail's home held the rail and nothing else, where the end and "where it was" are the
+    // same place. Same reason, same instrument as the panel's anchor above.
+    let railAnchor = null;
 
     const anchorFor = () => {
         // A COMMENT NODE, not an empty <span>: it cannot be styled, selected, matched by a CSS rule, counted by
@@ -60,7 +67,15 @@ export function makeStage(opts = {}) {
             else if (el.parentNode === stageHost) stageHost.removeChild(el);   // its home vanished: do not strand it on stage
             if (anchor && anchor.parentNode) anchor.parentNode.removeChild(anchor);
         } catch (e) {}
-        if (rail && railHome) { try { railHome.appendChild(rail); } catch (e) {} }
+        if (rail && railHome) {
+            try {
+                if (railAnchor && railAnchor.parentNode) {
+                    railAnchor.parentNode.insertBefore(rail, railAnchor);
+                    railAnchor.parentNode.removeChild(railAnchor);
+                } else railHome.appendChild(rail);                // no anchor (or its home vanished): the old behaviour
+            } catch (e) {}
+        }
+        railAnchor = null;
         if (opts.onRestore) { try { opts.onRestore(el); } catch (e) {} }
         return true;
     }
@@ -75,7 +90,16 @@ export function makeStage(opts = {}) {
             // When railHost IS stageHost the rail goes in FIRST, so it sits to the LEFT of the panel in source
             // order -- v3667's arrangement, unchanged. When it is a different container the order inside the
             // stage does not arise at all.
-            if (rail) railHost.appendChild(rail);
+            if (rail) {
+                // v4864 -- marked only while the rail is AT HOME: restore() above has just sent it back, so this
+                // is where it lives, not where it was staged last time.
+                if (rail.parentNode && rail.parentNode === railHome) {
+                    if (railAnchor && railAnchor.parentNode) railAnchor.parentNode.removeChild(railAnchor);   // a failed present's leftover
+                    railAnchor = anchorFor();
+                    railHome.insertBefore(railAnchor, rail);
+                }
+                railHost.appendChild(rail);
+            }
             stageHost.appendChild(el);                            // appendChild MOVES a node that already has a parent
         } catch (e) { return false; }
         live = { el, anchor };

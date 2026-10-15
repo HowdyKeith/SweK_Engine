@@ -110,6 +110,9 @@ window.addEventListener("load", function () {
   .bigbtns button { min-height:54px; padding:5px 16px; font-size:15px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; white-space:normal; text-align:center; line-height:1.2; max-width:160px; }
   .bigbtns #vmWidget { min-height:0; }
   .bigbtns #vmWidget button { min-height:0; padding:6px 10px; font-size:13px; }
+  /* v4864 -- the SVG dials beside the avatar in #dialsRow. HERE AND NOT INLINE because gaugeInfoPanel clears the
+     element's inline display every time the gauges tab is shown; cleared, it falls back to this. */
+  #dials { display:flex; gap:14px; align-items:flex-start; flex:0 0 auto; }
   button:hover { background:#143020; }
   button.warn { color:var(--warn); border-color:#5a4a1f; background:#231d10; }
   button.demospill { color:#ffb454; border-color:#6a4a1a; background:#2a1d0c; border-radius:999px; font-weight:600; }
@@ -472,25 +475,31 @@ window.addEventListener("load", function () {
              open; retiring them measured the row at 100 px tall where it had been 184, and an avatar that
              gained the whole width while losing half its height is not "filling the space". The constant
              now sits on the element it was actually sizing. -->
-        <div id="dialsRow" style="display:flex;align-items:stretch;justify-content:center;gap:20px;flex:1 1 auto;min-height:230px;">
-          <!-- v4413 -- THE SVG DIALS ARE OUT OF THE LAYOUT AND THE AVATAR SCENE TAKES THE WHOLE ROW.
-               Keith, on the screenshot: "this avatar view should actually not show the svg gauges, but
-               instead extend the avatar and the new gauges in that same scene, to fill the entire space
-               also to the left." MEASURED at v4412: #dialsRow was 676 px wide, #dials took 288 of it and
-               #dialsRobot 178 -- the avatar had TWENTY-SIX PER CENT of the row.
-               #dials is kept in the DOM and hidden rather than deleted: ui/gaugeInfoPanel.js's hideWith
-               list (v3671) and show("info") both reach for it by id and treat it as #dialsRobot's SIBLING,
-               so removing the element would break the staged-panel path that hides the avatar with it. -->
-          <!-- *** AND THE RETIREMENT IS STRUCTURAL, NOT AN INLINE display:none. *** The first draft set
-               style="display:none" on #dials itself and MEASURED IT 285 px WIDE ANYWAY: gaugeInfoPanel's
-               show() writes `dialsEl.style.display = infoUp ? "none" : ""`, and the empty string clears the
-               INLINE style -- which is where the none was -- so the div reverted to a visible block the
-               first time the gauges tab was shown. A wrapper the panel does not know about cannot be
-               cleared by it. #dials keeps its id and its box for every path that reaches for it. -->
-          <div id="dialsRetired" style="display:none;">
-            <div id="dials" title="Live SVG dials — retired from this row at v4413; the avatar scene has the space. Still built and still driven, so every path that reads it still reads it." style="display:flex;gap:14px;align-items:flex-start;min-height:230px;"></div>
-          </div>
-          <span id="dialsRobot" style="display:inline-flex;align-items:stretch;align-self:stretch;flex:1 1 auto;min-width:0;overflow:visible;" title="SweK — turns red on errors"></span>
+        <div id="dialsRow" style="display:flex;flex-wrap:wrap;align-items:stretch;justify-content:center;gap:20px;flex:1 1 auto;min-height:230px;">
+          <!-- v4864 -- THE SVG DIALS ARE BACK IN THE ROW, BESIDE THE AVATAR. Keith: "when it loads, there
+               should be gauges and avatar, but only avatar is appearing." v4413 hid them in a display:none
+               wrapper so the avatar could take the whole row, on Keith's ask then to "extend the avatar and
+               the new gauges in that same scene" -- and THE GAUGES IN THE SCENE WERE NEVER BUILT for the
+               default SVG robot, so from v4413 on the page loaded with no gauges at all. The wrapper is gone:
+               #dials is a direct child of the row again, ahead of the avatar, which takes what is left (its
+               floor and ceiling are the mount's minSize/maxSize).
+               *** ITS display:flex IS IN THE STYLESHEET, NOT INLINE, and that is load-bearing. ***
+               gaugeInfoPanel's show() writes `dialsEl.style.display = infoUp ? "none" : ""` and the empty
+               string CLEARS THE INLINE STYLE -- an inline flex would be gone after the first trip to the
+               info tab, and the dials would come back as a plain block. Cleared, it falls back to the sheet.
+               *** THE ROW WRAPS, AND THE AVATAR'S BASIS IS 120px RATHER THAN auto. *** On a phone the row is
+               about 334 px and the dials take 285 of it, which would leave the avatar 29 px against the mount's
+               minSize of 120 -- so it wraps under the dials instead. Its basis is that same 120 because a
+               basis of auto is the SURFACE's width, up to the 420 ceiling, and a surface already at 420 is
+               what a window that SHRINKS starts from -- and a surface sized on a whole line of its own is
+               what a window that WIDENS again after a phone-width wrap starts from. MEASURED both: loading at
+               1900 then resizing to 1400, with auto the avatar wrapped below the dials (670 px wide, row 651
+               tall) and stayed there, and with 120px it stays beside them at 293; and in
+               tools/ship/avatarDock-selfcheck.mjs, 360 then 900, auto keeps it wrapped and 120px brings it back
+               beside them. A fresh load at 1400 does not wrap either way, which is why this is said as a resize
+               and not as a width. -->
+          <div id="dials" title="Live SVG dials: CPU, RAM and GPU, then the fabric row (SweK peers, remotes, battery)."></div>
+          <span id="dialsRobot" style="display:inline-flex;align-items:stretch;align-self:stretch;flex:1 1 120px;min-width:0;overflow:visible;" title="SweK — turns red on errors"></span>
         </div>
               <div id="swekChat" style="border-top:1px solid var(--line);margin-top:4px;padding-top:7px;">
           <div style="color:var(--go);font-weight:bold;font-size:11px;margin-bottom:4px;">&#128172; SweK chat <span style="color:var(--dim);font-weight:normal;">&mdash; the target box's avatar speaks it</span></div>
@@ -6696,6 +6705,12 @@ try{const r=await fetch("/self/whoami",{cache:"no-store"});const j=await r.json(
           // justifyContent, which is the rule this handler pair already follows -- except that the value put
           // back is READ FROM THE NODE (railFlexHome, above) rather than cleared, because this one is inline.
           rail.style.flex="0 0 auto";
+          // *** v4864 -- AND WITH THE INFO BOX VISIBLE AGAIN, THE lockInfo BELOW TAKES THE RAIL BACK TO 1 1 auto. ***
+          // gaugeInfoPanel's stretchToRow (v3912) sets it so the info text top-aligns with the staged drawer
+          // and reaches its bottom. v4450 measured this column EMPTY at 720 px because the info box was then
+          // mounted inside #dials' display:none wrapper; it holds the info text now, and the avatar the pin
+          // was guarding is hidden by the same tab raise. The pin stays for a page where gaugeInfoPanel did
+          // not load: then nothing hides the dials and the avatar, and they must not stretch down the column.
           // *** THE GAUGES AND THE AVATAR ARE HIDDEN BY RAISING THE INFO TAB, NOT BY REACHING FOR THEM. ***
           // show("info") already hides #dials and everything in hideWith -- #dialsRobot among them -- so
           // asking for the tab hides exactly the set the panel itself declares. A display:none typed here
