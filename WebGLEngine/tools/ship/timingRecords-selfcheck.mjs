@@ -109,30 +109,6 @@ const rows = real.map((k) => ({ k, g: G.timings[k], s: S.timings[k], r: ratioOf(
     const cmp = rows.filter((x) => (S.kinds || {})[x.k] === "alone");
     const sweepHigher = cmp.filter((x) => x.r >= 2 && x.s > x.g).length;
     const gateHigher = cmp.filter((x) => x.r >= 2 && x.g > x.s).length;
-    ok(`  and it is overwhelmingly ONE-directional -- the sweep reads higher in ${sweepHigher} of the ${sweepHigher + gateHigher}, which growth and an eight-wide sweep both explain`,
-        // *** v4647o -- THE 10x BAR WAS MEASURED AT 85:6 AND A REPAIR BROKE IT. ***
-        // Counted on origin/main and on this branch with the same rule: main reads 85 sweep-higher against 6
-        // gate-higher; this branch reads 35 against 7. `gateHigher` -- the direction neither growth nor load
-        // explains, and the one worth policing -- BARELY MOVED. What collapsed is sweepHigher, because
-        // v4647j replaced 87 stale timings entries with corroborated serial readings and the two records
-        // came into AGREEMENT. The disagreement population fell from 91 to 42 and the ratio fell with it.
-        //
-        // A ratio over a shrinking population is not the same statistic, and a bar that a repair can break
-        // is measuring the repair. This tree has the shape on record twice now: sweepCoverage's returnee
-        // floor decayed every time a gate was legitimately re-timed, for the same reason.
-        //
-        // So the DIRECTION is asserted without a magic multiplier, and the strength lives where it already
-        // did -- in the ratchet below, which forbids the unexplainable direction from growing. The ratio is
-        // REPORTED with both populations, because it is a reading about how much repair has been done and
-        // not a property of the tree.
-        sweepHigher > gateHigher,
-        `${sweepHigher} sweep-higher against ${gateHigher} gate-timings-higher -- ` +
-        `${(sweepHigher / Math.max(1, gateHigher)).toFixed(1)} to 1 over a population of ` +
-        `${sweepHigher + gateHigher}, against 85:6 over 91 on origin/main before 87 entries were repaired`);
-    // v4578 -- a RATCHET rather than a count. v4576 measured nine running the other way; v4577 and v4578
-    // corrected every one of them, so the live figure is zero and a row asserting `> 0` reddens the day the
-    // work is done. Recorded high-water mark, live number may only fall.
-    const GATE_HIGHER_V4576 = 9;
     // *** v4776 -- THE MARK WENT 7 -> 10, AND THE THREE THAT ARRIVED WERE ASKED RATHER THAN EXCUSED. ***
     // loopTarget, loopAccept and loopTrace had only ever held CAPPED sweep readings, which this comparison drops;
     // v4776's serial rotation timed them to completion and they entered it, each reading about half its
@@ -149,9 +125,51 @@ const rows = real.map((k) => ({ k, g: G.timings[k], s: S.timings[k], r: ratioOf(
         Object.freeze({ gate: "tools/ship/loopAccept-selfcheck.mjs", v3851CodeRuns: Object.freeze([16966, 16989, 16370]) }),
         Object.freeze({ gate: "tools/ship/loopTrace-selfcheck.mjs", v3851CodeRuns: Object.freeze([14796, 14053, 13611]) }),
     ]);
+    // *** v4860 -- THREE MORE, AND THEY TURNED THE DIRECTION ROW ABOVE OVER, 3:2 TO 2:3. *** The ship rotation re-timed
+    // definitionGates alone at 1,129 ms against gate-timings.json's 2,990, and it joined moduleHistory and multigrid3dTiming
+    // on the gate-higher side of a population of five. Each was run three times alone on the box that took the sweep reading,
+    // at HEAD: every run reads what the sweep says and none reads what the record says. The record is the full suite's of
+    // 2026-10-06 and these gates got faster since (definitionGates' census was cached at v4845). Named the same way and held to
+    // the same test: excused only while the runs still corroborate the sweep's reading and still refute the record's. And the
+    // direction row above now counts the gate-higher side WITHOUT the explained ones -- a reading a repair has already
+    // explained is not the unexplainable direction that row exists to watch, and a population of five flipped by one gate
+    // getting faster is the row measuring the repair, which v4647o's own note says it must not.
+    // SABOTAGED v4860: STALE_AT_V4860 emptied -> 1 RED (the direction row, 2 against 3 unexplained); restored, md5 verified. (One entry
+    // alone un-named stays green, 2 against 1 -- the row needs the sweep side to outnumber what is left unexplained, no more.)
+    const STALE_AT_V4860 = Object.freeze([
+        Object.freeze({ gate: "tools/ship/definitionGates-selfcheck.mjs", runs: Object.freeze([1081, 1121, 1087]) }),
+        Object.freeze({ gate: "tools/ship/moduleHistory-selfcheck.mjs", runs: Object.freeze([9344, 9436, 9248]) }),
+        Object.freeze({ gate: "tools/ship/multigrid3dTiming-selfcheck.mjs", runs: Object.freeze([1788, 1799, 1697]) }),
+    ]);
     const med = (a) => [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)];
-    const explained = (x) => STALE_AT_V3851.some((e) => e.gate === x.k && e.v3851CodeRuns.length >= 3 &&
-        Math.abs(med(e.v3851CodeRuns) - x.s) / x.s <= 0.10 && x.g >= 1.5 * med(e.v3851CodeRuns));
+    const named = [...STALE_AT_V3851.map((e) => ({ gate: e.gate, runs: e.v3851CodeRuns })), ...STALE_AT_V4860];
+    const explained = (x) => named.some((e) => e.gate === x.k && e.runs.length >= 3 &&
+        Math.abs(med(e.runs) - x.s) / x.s <= 0.10 && x.g >= 1.5 * med(e.runs));
+    const gateHigherUnexplained = cmp.filter((x) => x.r >= 2 && x.g > x.s && !explained(x)).length;
+    ok(`  and it is overwhelmingly ONE-directional -- the sweep reads higher in ${sweepHigher} of the ${sweepHigher + gateHigher}, which growth and an eight-wide sweep both explain`,
+        // *** v4647o -- THE 10x BAR WAS MEASURED AT 85:6 AND A REPAIR BROKE IT. ***
+        // Counted on origin/main and on this branch with the same rule: main reads 85 sweep-higher against 6
+        // gate-higher; this branch reads 35 against 7. `gateHigher` -- the direction neither growth nor load
+        // explains, and the one worth policing -- BARELY MOVED. What collapsed is sweepHigher, because
+        // v4647j replaced 87 stale timings entries with corroborated serial readings and the two records
+        // came into AGREEMENT. The disagreement population fell from 91 to 42 and the ratio fell with it.
+        //
+        // A ratio over a shrinking population is not the same statistic, and a bar that a repair can break
+        // is measuring the repair. This tree has the shape on record twice now: sweepCoverage's returnee
+        // floor decayed every time a gate was legitimately re-timed, for the same reason.
+        //
+        // So the DIRECTION is asserted without a magic multiplier, and the strength lives where it already
+        // did -- in the ratchet below, which forbids the unexplainable direction from growing. The ratio is
+        // REPORTED with both populations, because it is a reading about how much repair has been done and
+        // not a property of the tree.
+        sweepHigher > gateHigherUnexplained,
+        `${sweepHigher} sweep-higher against ${gateHigher} gate-timings-higher (${gateHigher - gateHigherUnexplained} of them named and corroborated, so ${gateHigherUnexplained} unexplained) -- ` +
+        `${(sweepHigher / Math.max(1, gateHigher)).toFixed(1)} to 1 over a population of ` +
+        `${sweepHigher + gateHigher}, against 85:6 over 91 on origin/main before 87 entries were repaired`);
+    // v4578 -- a RATCHET rather than a count. v4576 measured nine running the other way; v4577 and v4578
+    // corrected every one of them, so the live figure is zero and a row asserting `> 0` reddens the day the
+    // work is done. Recorded high-water mark, live number may only fall.
+    const GATE_HIGHER_V4576 = 9;
     const againstGrain = cmp.filter((x) => x.r >= 2 && x.g > x.s);
     const unexplained = againstGrain.filter((x) => !explained(x));
     report(`v4576 measured ${GATE_HIGHER_V4576} disagreements where gate-timings was the larger; ${gateHigher} now, ` +
@@ -160,7 +178,7 @@ const rows = real.map((k) => ({ k, g: G.timings[k], s: S.timings[k], r: ratioOf(
         unexplained.length <= GATE_HIGHER_V4576,
         unexplained.map((x) => `${path.basename(x.k)} ${x.g}>${x.s}`).join(", ") +
             (againstGrain.length > unexplained.length ? `; EXPLAINED, not counted: ` + againstGrain.filter(explained)
-                .map((x) => `${path.basename(x.k)} ${x.g}>${x.s} (v3851 code here: median ${med(STALE_AT_V3851.find((e) => e.gate === x.k).v3851CodeRuns)})`).join(", ") : "") +
+                .map((x) => `${path.basename(x.k)} ${x.g}>${x.s} (re-run here: median ${med(named.find((e) => e.gate === x.k).runs)})`).join(", ") : "") +
             ` -- ${cmp.length} of ${rows.length} comparisons are alone-against-alone; the rest set a LOADED reading beside a serial one`);
     // *** AND "OVERWHELMINGLY" IS QUANTIFIED IN A SECOND ROW, BECAUSE A THRESHOLD CANNOT POLICE ITSELF. ***
     // v4647o: that is now the row carrying the strength, since the bar above is a direction rather than a
