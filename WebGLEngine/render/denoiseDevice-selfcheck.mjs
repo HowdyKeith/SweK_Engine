@@ -189,7 +189,10 @@ const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
 const { APPLY_TOL, kernelApplyWgsl, packApplyUniforms, kernelApplyCpu, kernelFor, deviceLayers, denoiseTwin, createDeviceDenoiser, encodeNet, decodeNet,
         KERNEL_SETS, DEFAULT_KERNELS, PAGE_KERNELS, applyFor, kernelApplyFastWgsl, kernelHeadApplyWgsl, judgeHeadApply,
         R18_KERNELS, FXC_UNBUILT_SETS, isD3D12Native, nativeSetsFor, PAGE_KERNELS_BY_ADAPTER, pageAdapterKey, pageKernelsFor, passBytes, TIMED_SETS,
-        isDxcCompiler, NATIVE_KERNELS_BY_ADAPTER, nativeAdapterKey, nativeKernelsFor, nativePick, createNativeDenoiser } = await imp("render/denoiseDevice.mjs");
+        isDxcCompiler, NATIVE_KERNELS_BY_ADAPTER, NATIVE_KERNELS_DECIDED_BY, nativeAdapterKey, nativeKernelsFor, nativePick, createNativeDenoiser } = await imp("render/denoiseDevice.mjs");
+// v4862 -- the native table as sections 67 and 68 measured it, before section 78 gave the 1080 r18t. Rows about what the rig ran THEN
+// (section 68's --which runs, round 19's verdict) are held to it; rows about what a native run picks NOW, to the shipped table.
+const NATIVE_KERNELS_AT_V4852 = Object.freeze({ "win32/intel/gen-9": "r18u" });
 const CMP = await imp("render/denoiseCompile.mjs");
 const { makeDenoiser, denoise, KERNEL_TAPS, shapeFor, paramCount } = await imp("render/denoiseNet.mjs");
 const { conv2dCpu, conv2dCpuFma, COUT_MAX, tileShape, fastAltShape, conv2dTileWgsl, conv2dFastAltWgsl } = await imp("brain/conv2d.mjs");
@@ -372,16 +375,17 @@ console.log("1. THE KERNEL'S TWIN, ON THE CPU");
         ok("!! round 19 (section 66): nativeKernelsFor gives a table's set for a key it names under DXC ONLY -- DEFAULT_KERNELS (r15, a set FXC builds) under FXC, unknown or no compiler, for a key the table does not name, for no key, and from the shipped table",
             DXC_SAID.every((c) => nativeKernelsFor(keyN, c, nk) === "r18t") && FXC_SAID.every((c) => nativeKernelsFor(keyN, c, nk) === DEFAULT_KERNELS) &&
             nativeKernelsFor("win32/intel/gen-9", "DXC", nk) === DEFAULT_KERNELS && nativeKernelsFor(null, "DXC", nk) === DEFAULT_KERNELS && nativeKernelsFor("constructor", "DXC", nk) === DEFAULT_KERNELS &&
-            nativeKernelsFor(keyN, "DXC") === DEFAULT_KERNELS && nativeKernelsFor("constructor", "DXC") === DEFAULT_KERNELS &&
+            nativeKernelsFor(keyN, "DXC") === "r18t" && FXC_SAID.every((c) => nativeKernelsFor(keyN, c) === DEFAULT_KERNELS) && nativeKernelsFor("constructor", "DXC") === DEFAULT_KERNELS &&
             nativeKernelsFor("win32/intel/gen-9", "DXC") === "r18u" && FXC_SAID.every((c) => nativeKernelsFor("win32/intel/gen-9", c) === DEFAULT_KERNELS) &&
             DEFAULT_KERNELS === "r15" && nativeSetsFor(d3n, [DEFAULT_KERNELS], { compiler: "FXC" }).length === 1,
             `a fixture table ${JSON.stringify(nk)}: ${[...DXC_SAID, "FXC", null].map((c) => `${said(c)} ${nativeKernelsFor(keyN, c, nk)}`).join(", ")}; the shipped table under "DXC": the 1080 ${nativeKernelsFor(keyN, "DXC")}, the Intel ${nativeKernelsFor("win32/intel/gen-9", "DXC")}, the Intel under "FXC" ${nativeKernelsFor("win32/intel/gen-9", "FXC")}`);
         // v4852 -- round 20 (section 68): the native caller's pick, as denoise.html picks the page's -- on the rig's own adapters, stubbed
         const pick = (a, c, plat = "win32", table) => nativePick(a, { compiler: c, platform: plat, ...(table ? { table } : {}) });
-        const pI = pick(d3d, "DXC"), pIF = pick(d3d, "FXC"), pIN = pick(d3d, null), pN = pick(d3n, "DXC"), pV = pick(vk, null, "linux"), p0 = pick(null, "DXC");
-        ok("!! round 20 (section 68): nativePick takes section 67's set for the Intel under DXC, and r15 for the Intel under FXC or an unread compiler, for the 1080, off win32 and with no adapter -- and says which",
+        const pI = pick(d3d, "DXC"), pIF = pick(d3d, "FXC"), pIN = pick(d3d, null), pN = pick(d3n, "DXC"), pNF = pick(d3n, "FXC"), pV = pick(vk, null, "linux"), p0 = pick(null, "DXC");
+        // v4862 -- the 1080 under DXC takes section 78's r18t now; under FXC it is DEFAULT_KERNELS like the Intel. Each reason names its section.
+        ok("!! round 20 (section 68): nativePick takes section 67's set for the Intel and section 78's for the 1080 under DXC, and r15 for either under FXC or an unread compiler, off win32 and with no adapter -- and says which",
             pI.key === "win32/intel/gen-9" && pI.kernels === "r18u" && /^section 67's for win32\/intel\/gen-9/.test(pI.why) &&
-            [pIF, pIN].every((p) => p.kernels === DEFAULT_KERNELS && /entry is for a DXC run/.test(p.why)) && pN.kernels === DEFAULT_KERNELS && /^no entry for win32\/nvidia\/pascal/.test(pN.why) &&
+            [pIF, pIN, pNF].every((p) => p.kernels === DEFAULT_KERNELS && /entry is for a DXC run/.test(p.why)) && pN.kernels === "r18t" && /^section 78's for win32\/nvidia\/pascal/.test(pN.why) &&
             pV.key === "linux/google/swiftshader" && pV.kernels === DEFAULT_KERNELS && p0.key === null && p0.kernels === DEFAULT_KERNELS && /^no key/.test(p0.why) &&
             typeof createNativeDenoiser === "function",
             [pI, pIF, pIN, pN, pV, p0].map((p) => `${p.key || "(no key)"} ${p.kernels}`).join("; "));
@@ -409,9 +413,10 @@ console.log("1. THE KERNEL'S TWIN, ON THE CPU");
             const got = r66.filter((e) => e.entry).map((e) => [e.key, e.entry]);
             for (const e of r66) console.log(`  ----  section 66 on ${e.key}: ${e.lines.join("; ")} -> ${e.entry || "no entry"}`);
             ok("!! *** round 19's verdict (section 67): NATIVE_KERNELS_BY_ADAPTER is section 66's rule read off both GPUs' round-19 reports -- r18u for the Intel gen-9, nothing for the GTX 1080 -- and nothing else ***",
-                JSON.stringify(Object.entries(NATIVE_KERNELS_BY_ADAPTER).sort()) === JSON.stringify(got.sort()) && got.length === 1 && got[0][0] === "win32/intel/gen-9" && got[0][1] === "r18u" &&
+                JSON.stringify(Object.entries(NATIVE_KERNELS_AT_V4852).sort()) === JSON.stringify(got.sort()) && got.length === 1 && got[0][0] === "win32/intel/gen-9" && got[0][1] === "r18u" &&
+                got.every(([k, v]) => NATIVE_KERNELS_BY_ADAPTER[k] === v) &&
                 r66.length === 2 && r66.every((e) => e.key) && Object.values(NATIVE_KERNELS_BY_ADAPTER).every((v) => TIMED_SETS.includes(v) && FXC_UNBUILT_SETS.includes(v)) && DEFAULT_KERNELS === "r15",
-                `${JSON.stringify(NATIVE_KERNELS_BY_ADAPTER)} against the rule's ${JSON.stringify(Object.fromEntries(got))}`);
+                `the table as round 19 left it, ${JSON.stringify(NATIVE_KERNELS_AT_V4852)}, against the rule's ${JSON.stringify(Object.fromEntries(got))}; the shipped table keeps it`);
             // the rule DISCRIMINATES: the 1080's report with r18t's unpaired FXC ratio at its largest size moved over 1.05 gives r18t,
             // the Intel's with r18u's FXC ratio moved under gives nothing, and a report with no key gives no entry
             const lift = JSON.parse(JSON.stringify(R19.gtx1080)), drop = JSON.parse(JSON.stringify(R19.intel)), nokey = JSON.parse(JSON.stringify(R19.intel));
@@ -447,7 +452,7 @@ console.log("1. THE KERNEL'S TWIN, ON THE CPU");
             ok("!! *** round 24's verdict (section 76): read strictly, no set holds section 75's conditions in both of the 1080's runs -- run b's compile gate crashed -- so the 1080 keeps no entry and the table is unchanged ***",
                 runs.gtx1080[0].entry === "r18t" && runs.gtx1080[1].entry === null && runs.gtx1080[1].fail.r18t === 0 && both(runs.gtx1080) === null &&
                 runs.intel[0].entry === "r18u" && runs.intel[1].entry === null && runs.intel[1].fail.r18u === 1 &&
-                JSON.stringify(NATIVE_KERNELS_BY_ADAPTER) === JSON.stringify({ "win32/intel/gen-9": "r18u" }),
+                JSON.stringify(NATIVE_KERNELS_AT_V4852) === JSON.stringify({ "win32/intel/gen-9": "r18u" }),
                 `1080: run a ${runs.gtx1080[0].entry}, run b ${runs.gtx1080[1].entry} (fails condition ${runs.gtx1080[1].fail.r18t}); Intel: run a ${runs.intel[0].entry}, run b ${runs.intel[1].entry} (fails condition ${runs.intel[1].fail.r18u})`);
             // and it discriminates: with run b's compile gate green, r18t holds in both and the 1080 would take it; and condition 4 dropped
             // is what moves it -- the same run a under section 66's rule gives the 1080 nothing
@@ -457,12 +462,43 @@ console.log("1. THE KERNEL'S TWIN, ON THE CPU");
                 both([runs.gtx1080[0], eF]) === "r18t" && e66.entry === null && e66.fail.r18t === 4,
                 `run b repaired: ${eF.entry}; run a with condition 4: ${e66.entry} (fails ${e66.fail.r18t}); r18t against r15 under DXC at 1920 x 1080: ${runs.gtx1080.map((e) => e.lines[0].match(/([\d.]+) x r15 under DXC/)?.[1]).join(" and ")}`);
         }
+        // v4862 -- ROUND 24b'S VERDICT (section 78): section 77's rule -- section 75's conditions 0 to 3, the whole compile and exact gates
+        // green, in BOTH of a GPU's two runs -- read off the four committed reports (render/denoise-rig-r24b-{a,b}-*.json, realGpuRun --only
+        // denoise at v4861's release, SWEK_WEBGPU cleared; step 1's standalone runs are render/denoise-rig-r24b-step1.txt). Every gate green
+        // in all four; r18t qualifies on the 1080 in both, so the table is round 19's plus that one entry, and the Intel's control holds.
+        // SABOTAGED v4862: the 1080's entry removed from NATIVE_KERNELS_BY_ADAPTER -> 3 RED (this row, the nativeKernelsFor row and the
+        //   nativePick row); the 1080's run b r18t-against-r15 at 1920 x 1080 read as 1.040 -> 1 RED (this row; the discrimination row
+        //   edits its own copy); NATIVE_KERNELS_DECIDED_BY naming section 67 for the 1080 -> 2 RED (the nativePick row and this one). Each restored, md5 verified.
+        {
+            const rig = (f) => JSON.parse(fs.readFileSync(path.join(ENG, "render", f), "utf8"));
+            const R = { intel: ["a", "b"].map((r) => rig(`denoise-rig-r24b-${r}-intel-gen9.json`)), gtx1080: ["a", "b"].map((r) => rig(`denoise-rig-r24b-${r}-gtx1080.json`)) };
+            const runs = Object.fromEntries(Object.entries(R).map(([k, reps]) => [k, reps.map((r) => rule66Entries(r, { fxc: false })[0])]));
+            const both = (rs) => (rs.every((e) => e.key && e.key === rs[0].key && e.entry && e.entry === rs[0].entry) ? rs[0].entry : null);
+            const allGreen = Object.values(R).flat().every((r) => (r.gates || []).length === 3 && r.gates.every((g) => g.ok === true));
+            for (const [k, rs] of Object.entries(runs)) console.log(`  ----  section 77 on ${rs[0].key}: ${rs.map((e, i) => `run ${"ab"[i]} ${e.entry || "none"}`).join(", ")}; ${rs[0].lines.join("; ")}`);
+            const want = { ...NATIVE_KERNELS_AT_V4852, [runs.gtx1080[0].key]: both(runs.gtx1080) };
+            ok("!! *** round 24b's verdict (section 78): every gate green in all four runs, r18t qualifies on the 1080 in both, and NATIVE_KERNELS_BY_ADAPTER is round 19's table plus win32/nvidia/pascal -> r18t, decided by section 78 ***",
+                allGreen && both(runs.gtx1080) === "r18t" && both(runs.intel) === "r18u" && runs.gtx1080.every((e) => e.fail.r18u === 3) &&
+                JSON.stringify(Object.entries(NATIVE_KERNELS_BY_ADAPTER).sort()) === JSON.stringify(Object.entries(want).sort()) &&
+                NATIVE_KERNELS_DECIDED_BY["win32/nvidia/pascal"] === "section 78" && NATIVE_KERNELS_DECIDED_BY["win32/intel/gen-9"] === "section 67" &&
+                Object.keys(NATIVE_KERNELS_DECIDED_BY).sort().join() === Object.keys(NATIVE_KERNELS_BY_ADAPTER).sort().join() && Object.isFrozen(NATIVE_KERNELS_DECIDED_BY),
+                `${JSON.stringify(NATIVE_KERNELS_BY_ADAPTER)} against the rule's ${JSON.stringify(want)}; the 1080's r18t at 1920 x 1080: ` +
+                runs.gtx1080.map((e) => e.lines[0].match(/([\d.]+) x r15 under DXC/)?.[1]).join(" and ") + `; the Intel's control r18u: ${runs.intel.map((e) => e.entry).join(", ")}`);
+            // it discriminates: one 1080 run under the bar, or one run with a red gate, and the 1080 gets nothing
+            const low = JSON.parse(JSON.stringify(R.gtx1080[1]));
+            for (const g of low.gates) g.measured = (g.measured || []).map((l) => (/^native: r18t against r15 at 1920 x 1080/.test(l) ? l.replace(/: [\d.]+ x as fast/, ": 1.040 x as fast") : l));
+            const red = JSON.parse(JSON.stringify(R.gtx1080[0])); rigGate(red, "denoiseDevice").ok = false;
+            const [eLow] = rule66Entries(low, { fxc: false }), [eRed] = rule66Entries(red, { fxc: false });
+            ok("  ...and it discriminates: the 1080's run b with r18t at 1.040 x, or its run a with the exact gate red, and r18t no longer holds in both",
+                both([runs.gtx1080[0], eLow]) === null && eLow.fail.r18t === 3 && both([eRed, runs.gtx1080[1]]) === null && eRed.fail.r18t === 1,
+                `run b at 1.040 x: fails condition ${eLow.fail.r18t}; run a with a red exact gate: fails condition ${eRed.fail.r18t}`);
+        }
         // v4852+ -- SECTION 68'S OUTCOME (round 20): the rig's six --which lines per GPU, held to the table fixed before they ran, and
         // each re-derived from nativePick on the adapter and compiler the line itself names -- so the rig's reasons are this code's
         {
             const runs = parseWhich(fs.readFileSync(path.join(ENG, "render", "denoise-rig-r20-which.txt"), "utf8"));
             const held = WHICH_PREDICTED.map((w, i) => {
-                const r = runs[i] || {}, re = r.bad ? null : nativePick({ info: { vendor: r.vendor, architecture: r.architecture, description: r.description } }, { compiler: r.compiler, platform: "win32" });
+                const r = runs[i] || {}, re = r.bad ? null : nativePick({ info: { vendor: r.vendor, architecture: r.architecture, description: r.description } }, { compiler: r.compiler, platform: "win32", table: NATIVE_KERNELS_AT_V4852 });   // v4862: the table these runs ran against
                 const ok1 = !r.bad && r.vendor === w.vendor && r.compiler === (w.dxc ? "DXC" : "FXC") && H.versionAtLeast(r.version, "0.6.2") === w.dxc &&
                     r.key === w.key && r.kernels === w.kernels && r.built === w.kernels && w.why.test(r.why) && r.worst <= 1e-4 &&
                     re.key === r.key && re.kernels === r.kernels && re.why === r.why;

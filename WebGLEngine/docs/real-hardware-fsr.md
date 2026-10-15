@@ -427,6 +427,10 @@ node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r24b-b.json
 - **Section 77 predicts:** no crash; r18t qualifies on the 1080 in both runs; the Intel stays r18u.
 - **Send back the step-1 console output and all four JSON files.**
 
+**The outcome (section 78): the 1080's native default is r18t.** Neither gate crashed alone (three runs each), every gate was green
+in all four runs, and r18t beat r15 under DXC on the 1080 by 1.080 and 1.068 x at 1920 x 1080. A native run on the 1080 under DXC
+now takes r18t; the Intel keeps r18u. Nothing to install.
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and

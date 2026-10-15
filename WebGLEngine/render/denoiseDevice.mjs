@@ -362,10 +362,15 @@ export const pageKernelsFor = (key, table = PAGE_KERNELS_BY_ADAPTER) => (key && 
  * whose compiler is DXC only, since FXC builds neither round-18 set (section 60). Section 67 read the rule off both GPUs'
  * round-19 runs (render/denoise-rig-r19-*.json, node-webgpu 0.6.2 through SWEK_WEBGPU): on the Intel gen-9, r18u's pass was
  * 1.590 x r15's under DXC and 1.474 x r15's under FXC at 1024 x 1024, and r18t's 0.951 x; on the GTX 1080, r18t's was 1.076 x
- * r15's under DXC at 1920 x 1080 but 0.996 x r15's under FXC (condition 4), and r18u's 0.653 x -- so the 1080 has no entry.
+ * r15's under DXC at 1920 x 1080 but 0.996 x r15's under FXC (condition 4), and r18u's 0.653 x -- so the 1080 had no entry.
+ * v4862 -- section 78 read section 77's rule (section 75's conditions 0 to 3 -- condition 4 dropped, the pin being DXC -- with the
+ * whole compile and exact gates green, in both of two runs) off round 24b's reports (render/denoise-rig-r24b-*.json): r18t on the
+ * GTX 1080, 1.080 and 1.068 x r15 under DXC at 1920 x 1080, every gate green in both. So the 1080's native default is r18t.
  * Every FXC run, and every adapter the table does not name, gets DEFAULT_KERNELS from nativeKernelsFor.
  */
-export const NATIVE_KERNELS_BY_ADAPTER = Object.freeze({ "win32/intel/gen-9": "r18u" });
+export const NATIVE_KERNELS_BY_ADAPTER = Object.freeze({ "win32/intel/gen-9": "r18u", "win32/nvidia/pascal": "r18t" });
+/** Which pre-registration's verdict put each entry in the table -- the reason nativePick prints names it. */
+export const NATIVE_KERNELS_DECIDED_BY = Object.freeze({ "win32/intel/gen-9": "section 67", "win32/nvidia/pascal": "section 78" });
 /** A native adapter's key: "<platform>/<vendor>/<architecture>", the platform Node's (process.platform), so "win32/nvidia/pascal". */
 export const nativeAdapterKey = (info, platform) => (platform && info && info.vendor ? `${platform}/${info.vendor}/${info.architecture || ""}` : null);
 /** The set a native run takes for its adapter's key under `compiler`: NATIVE_KERNELS_BY_ADAPTER's when the compiler is DXC, else DEFAULT_KERNELS. */
@@ -382,7 +387,7 @@ export function nativePick(adapter, { compiler = null, platform = null, table = 
     const key = nativeAdapterKey(adapter && adapter.info, platform), kernels = nativeKernelsFor(key, compiler, table);
     const why = !key ? "no key -- DEFAULT_KERNELS" : !Object.hasOwn(table, key) ? `no entry for ${key} -- DEFAULT_KERNELS`
               : !isDxcCompiler(compiler) ? `${key}'s entry is for a DXC run, and this run compiles with ${compiler || "an unread compiler"} -- DEFAULT_KERNELS`
-              : `section 67's for ${key}, under DXC`;
+              : `${Object.hasOwn(NATIVE_KERNELS_DECIDED_BY, key) ? NATIVE_KERNELS_DECIDED_BY[key] : "the table"}'s for ${key}, under DXC`;
     return { key, kernels, why };
 }
 /** A native denoiser on `dev` (made from `adapter`), on the set nativePick gives this adapter and compiler; the pick rides along. */

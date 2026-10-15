@@ -1,0 +1,560 @@
+C:\SweK_pub\WebGLEngine>set SWEK_WEBGPU=
+
+C:\SweK_pub\WebGLEngine>node render\denoiseDevice-selfcheck.mjs
+1. THE KERNEL'S TWIN, ON THE CPU
+  PASS  !! the whole f32 twin -- conv2dCpu layer by layer, then kernelApplyCpu -- is the f64 network's output within f32 rounding   worst relative 5.10e-7
+  PASS    kernelApplyCpu on the f64 network's logits is its kernel within f32 rounding -- borders, mask and albedo floor included
+  PASS    a tap across the emitter mask is never weighed: made a million times brighter, the mask's far side leaks into no pixel
+  PASS    the uniform block: H, W, C, the mask channel -- 9 with the mask, none (0xffffffff) without -- and the floor as an f32
+  PASS  !! the large network's four hidden layers run TILED and its head of 81 logits DIRECT -- past the tiled kernel's COUT_MAX 32, on the kernel that never had one
+  PASS  !! round 14: the r14 set runs the hidden layers on the fast kernel and the 81-logit head -- the last layer only -- on the head kernel, then k_apply_fast; r12 and r13 keep k_apply (section 49 put the default on r14 and the page on r13; section 50 moved both to r15)   fast,fast,fast,fast,head + apply_fast; a 1 x 1 layer that is not the last stays on the fast kernel
+  PASS  !! round 13: the r13 set runs every layer of the large network on the fast kernel, the 81-logit head among them (section 39)   a layer too big for one uniform binding (64 -> 32 at 3 x 3) falls back to its r12 kernel; an unknown set is refused by name
+  PASS  !! round 15: the r15 set runs the hidden layers on the fast kernel and the 81-logit head WITH the kernel apply as one pass, k_head_apply -- no apply pass of its own; by section 46's rules on both GPUs it is the default and the page (section 50)   fast,fast,fast,fast,head_apply; a 1 x 1 layer that is not the last, or not of 81 logits, stays on the fast kernel -- and the generator refuses one by name
+  PASS  !! round 18: r18t runs every hidden layer on the pixel-tiled kernel at 2 pixels x 8 vec4s, edge zero, weights inline; r18u on the fast kernel with a block written out; both the 81-logit head as r15 does -- k_head_apply, one pass   tile_inline,tile_inline,tile_inline,tile_inline,head_apply / fast_unroll,fast_unroll,fast_unroll,fast_unroll,head_apply; a layer too big for one uniform binding falls back as in r15
+  PASS  !! round 19 (section 66): FXC builds neither round-18 set -- on a D3D12 adapter, a run whose compiler is FXC (the package's "FXC", the dump's "FXC (DXBC)"), unknown, or not named at all builds r12-r15 natively and never FXC_UNBUILT_SETS   on the 1080's description: (no options) r12,r13,r14,r15; null r12,r13,r14,r15; "" r12,r13,r14,r15; "FXC" r12,r13,r14,r15; "FXC (DXBC)" r12,r13,r14,r15; "unknown (no dump)" r12,r13,r14,r15 -- section 60: 0.6.0's FXC stopped on r18t's kernel at 3 minutes and crashed on r18u's, on both GPUs
+  PASS  !! round 19 (section 66): DXC builds both -- on a D3D12 adapter, a run whose compiler is DXC (the package's "DXC", the dump's "DXC (DXIL)") builds all six sets natively; an adapter that is not D3D12 builds all six whatever compiler is named, and a browser's adapter is never asked   on the 1080's description: "DXC" r12,r13,r14,r15,r18t,r18u; "DXC (DXIL)" r12,r13,r14,r15,r18t,r18u; Vulkan under "FXC": r12,r13,r14,r15,r18t,r18u -- section 65: 0.6.2's DXC built both in seconds, exact, on both GPUs
+  PASS    round 19: isDxcCompiler is DXC as the package names it ("DXC") or a dump reads it ("DXC (DXIL)"), and nothing else -- not FXC, unknown, none, a lower-case name, a longer word, or DXC named second   true for "DXC", "DXC (DXIL)"; false for "FXC", "FXC (DXBC)", "unknown (no dump)", "", null, (no options), "dxc", "DXCompiler", "not DXC", "SPIR-V"
+  PASS  !! round 19 (section 66): NATIVE_KERNELS_BY_ADAPTER is frozen, and a native adapter's key is Node's platform, its vendor and its architecture, none without a platform or a vendor   {"win32/intel/gen-9":"r18u"}; the 1080's key win32/nvidia/pascal
+  PASS  !! round 19 (section 66): nativeKernelsFor gives a table's set for a key it names under DXC ONLY -- DEFAULT_KERNELS (r15, a set FXC builds) under FXC, unknown or no compiler, for a key the table does not name, for no key, and from the shipped table   a fixture table {"win32/nvidia/pascal":"r18t"}: "DXC" r18t, "DXC (DXIL)" r18t, "FXC" r15, null r15; the shipped table under "DXC": the 1080 r15, the Intel r18u, the Intel under "FXC" r15
+  PASS  !! round 20 (section 68): nativePick takes section 67's set for the Intel under DXC, and r15 for the Intel under FXC or an unread compiler, for the 1080, off win32 and with no adapter -- and says which   win32/intel/gen-9 r18u; win32/intel/gen-9 r15; win32/intel/gen-9 r15; win32/nvidia/pascal r15; linux/google/swiftshader r15; (no key) r15
+  PASS    round 19: tools/denoiseDevice.mjs reads its run's compiler with its own device's flags, and refuses a set nativeSetsFor drops -- exit 2, one line naming SWEK_WEBGPU's remedy -- before any image is built   compiler read at 1030, the device made at 1117, the refusal at 1183, the first build at 3448
+  ----  section 66 on win32/intel/gen-9: r18t K1 9.02 x at 256 x 256, 0.951 x r15 under DXC at 1024 x 1024, 0.881 x r15 under FXC at 1024 x 1024, fails condition 3; r18u K1 14.01 x at 256 x 256, 1.59 x r15 under DXC at 1024 x 1024, 1.474 x r15 under FXC at 1024 x 1024, qualifies -> r18u
+  ----  section 66 on win32/nvidia/pascal: r18t K1 24.99 x at 1920 x 1080, 1.076 x r15 under DXC at 1920 x 1080, 0.996 x r15 under FXC at 1920 x 1080, fails condition 4; r18u K1 15.17 x at 1920 x 1080, 0.653 x r15 under DXC at 1920 x 1080, 0.605 x r15 under FXC at 1920 x 1080, fails condition 3 -> no entry
+  PASS  !! *** round 19's verdict (section 67): NATIVE_KERNELS_BY_ADAPTER is section 66's rule read off both GPUs' round-19 reports -- r18u for the Intel gen-9, nothing for the GTX 1080 -- and nothing else ***   {"win32/intel/gen-9":"r18u"} against the rule's {"win32/intel/gen-9":"r18u"}
+  PASS    ...and the rule discriminates: condition 4 alone moves the 1080 to r18t and the Intel to nothing, and a report with no key gets no entry   1080 with r18t at 1.060 x under FXC: r18t; the Intel with r18u at 1.040 x under FXC: null; no key: null
+  PASS    section 66's predictions, read off the same reports: P1 (the Intel's entry is r18u), P2 (the 1080 gets none, by condition 4), P3 (r15 slower under DXC than FXC on both)   r15 at 1024 x 1024: 985.875 ms under DXC, 913.731 ms under FXC; r15 at 1920 x 1080: 80.861 ms under DXC, 74.836 ms under FXC
+  ----  section 75 on win32/intel/gen-9: run a r18u (r18t K1 9.04 x at 256 x 256, 1.024 x r15 under DXC at 1024 x 1024, 0.967 x r15 under FXC at 1024 x 1024, fails condition 3; r18u K1 14.57 x at 256 x 256, 1.514 x r15 under DXC at 1024 x 1024, 1.431 x r15 under FXC at 1024 x 1024, qualifies) | run b none (r18t K1 9.11 x at 256 x 256, 1.021 x r15 under DXC at 1024 x 1024, 1.011 x r15 under FXC at 1024 x 1024, fails condition 1; r18u K1 13.97 x at 256 x 256, 1.527 x r15 under DXC at 1024 x 1024, 1.511 x r15 under FXC at 1024 x 1024, fails condition 1)
+  ----  section 75 on win32/nvidia/pascal: run a r18t (r18t K1 24.76 x at 1024 x 1024, 1.086 x r15 under DXC at 1920 x 1080, 1.016 x r15 under FXC at 1920 x 1080, qualifies; r18u K1 14.77 x at 1024 x 1024, 0.659 x r15 under DXC at 1920 x 1080, 0.617 x r15 under FXC at 1920 x 1080, fails condition 3) | run b none (r18t K1 17.33 x at 1920 x 1080, 1.091 x r15 under DXC at 1920 x 1080, 1.027 x r15 under FXC at 1920 x 1080, fails condition 0; r18u K1 10.45 x at 1920 x 1080, 0.658 x r15 under DXC at 1920 x 1080, 0.619 x r15 under FXC at 1920 x 1080, fails condition 0)
+  PASS  !! *** round 24's verdict (section 76): read strictly, no set holds section 75's conditions in both of the 1080's runs -- run b's compile gate crashed -- so the 1080 keeps no entry and the table is unchanged ***   1080: run a r18t, run b null (fails condition 0); Intel: run a r18u, run b null (fails condition 1)
+  PASS    ...and the rule discriminates: run b with its compile gate green gives r18t in both runs, and run a under section 66's rule, condition 4 asked, gives nothing   run b repaired: r18t; run a with condition 4: null (fails 4); r18t against r15 under DXC at 1920 x 1080: 1.086 and 1.091
+  PASS  !! *** section 68's outcome: the rig's four --which runs are the four section 68 predicted -- key, set, reason and compiler -- each pass within 1e-4 of the f64 network, and each reason is nativePick's own on the adapter the line names ***   intel 0.6.1 FXC: r15, 0.00000105; intel 0.6.2 DXC: r18u, 0.00000105; nvidia 0.6.0 FXC: r15, 0.00000101; nvidia 0.6.2 DXC: r15, 0.00000101
+  ----  section 68: the packages the rig had installed (the pin is 0.6.0): intel 0.6.1, nvidia 0.6.0
+  PASS  !! round 18: the page's key is platform, vendor and architecture -- none without a platform, as every browser but Chromium -- and pageKernelsFor gives the table's set for a key it names, PAGE_KERNELS for any other   the table's own prototype is not a key; an adapter the shipped table does not name runs PAGE_KERNELS
+  PASS  !! round 18's verdict (section 63): the page's table is section 61's rule read off both GPUs' runs -- r18u for the Intel gen-9, r18t for the GTX 1080, in Chrome on Windows -- and nothing else; PAGE_KERNELS and DEFAULT_KERNELS stay r15   {"Windows/intel/gen-9":"r18u","Windows/nvidia/pascal":"r18t"} -- section 63: r18u 1.524 x r15 at 1024 on the Intel, r18t 1.087 x at 1080p on the 1080
+  PASS    k_head_apply: five bindings, one barrier, its 81 taps unrolled -- each logit a named lane, no private array a compiler would put in memory
+  PASS  !! round 15: the order probe is a probe -- every product exact, so its twin logits ARE the fused mirror's -- and a head added last-first moves its image past APPLY_TOL, which judgeHeadApply sees   331776 of 331776 logits the same both ways; added last-first: worst 1.28e-1, 99.9% of values past APPLY_TOL
+  PASS    a residual network is refused by name: only the kernel-predicting network runs on the device
+  PASS    kernelApplyWgsl is one kernel, k_apply, with its four bindings
+
+2. THE SHIPPED NETWORK'S ENCODING
+  PASS  !! encodeNet then decodeNet, through JSON, is the network bit for bit -- every weight, every bias, every shape   33329 parameters
+  PASS    a layer whose weights do not fill its shape is refused, not zero-padded
+  PASS    the large network's shape is section 28's, with the mask's tenth channel
+  PASS  !! every set a pass or the page can choose -- the default, the page's, and each adapter's measured pick, on the page or natively -- is one the ladders time, with r12 first as the reference   timed r12, r15, r18t, r18u; runnable r15, r18u, r18t
+
+3. *** THE WHOLE PASS ON THE DEVICE (Dawn) ***
+  ----  native adapter: intel / gen-9 / D3D12 driver version 31.0.101.2137 (hardware); compiler, from the package: DXC
+  PASS  !! passBytes is the per-pixel storage the device denoiser really allocates: r15 exactly, r12 plus its weights (which r12 alone keeps in storage) -- and the 81 logits a pixel are the difference   r12 487628 B allocated = passBytes 354312 + weights 133316; r15 225036 against 225036
+  PASS  !! round 19 (section 66): the native adapter is named where realGpuRun reads adapters -- one record, keyed by this gate's path from the engine root, naming the adapter the jobs run on, its software flag a boolean   intel / gen-9 / D3D12 driver version 31.0.101.2137 (hardware), 1 record(s) keyed render/denoiseDevice-selfcheck.mjs; compiler DXC, from node-webgpu 0.6.2
+  PASS  !! *** every cell of every layer, on the device, is the twin's or the fused mirror's, given the device's own input to that layer -- the head of 81 on the direct kernel among them ***   tiled 12768+0f, tiled 12768+0f, tiled 12768+0f, tiled 12768+0f, direct 32319+0f
+  PASS  !! the kernel on the device is its twin within APPLY_TOL 0.00001 on every value -- exp and division are not correctly rounded in WGSL, so it is held to a bound, not to bits   worst relative 3.72e-7, 27 x inside
+  PASS    the whole pass on the device is the f64 network's output within f32 rounding   worst relative 5.10e-7
+  PASS  !! *** K0 natively: the r14 set -- the fast kernel, the head kernel's planar logits (read back and judged channels last), and k_apply_fast -- every cell the twin's or the fused mirror's, given the device's own input; the kernel within APPLY_TOL ***   fast 12768+0f, fast 12768+0f, fast 12768+0f, fast 12768+0f, head 14233+18086f; kernel 6.16e-7
+  PASS    ...and where no layer of either set fused a cell, the two sets' images are the same bits   a set fused cells here, so the images may differ where it did
+  PASS  !! *** K0 natively: the r15 set -- the fast kernel's hidden layers every cell the twin's or the fused mirror's, and k_head_apply's image within APPLY_TOL of kernelApplyCpu on the twin's logits or the fused mirror's, from the device's own input to the head ***   fast 12768+0f, fast 12768+0f, fast 12768+0f, fast 12768+0f; head and kernel 2.98e-7 (twin 3.72e-7, mirror 6.16e-7)
+  PASS    ...and where no cell of r14 or r15 fused, r15's image is r14's, bit for bit -- the same logits, summed by k_apply_fast's order   a set fused cells here, so the images may differ where it did
+  PASS  !! *** K0 natively: the r18t set -- its hidden layers (tile_inline) every cell the twin's or the fused mirror's, given the device's own input; k_head_apply's image within APPLY_TOL ***   tile_inline 12768+0f, tile_inline 12768+0f, tile_inline 12768+0f, tile_inline 12768+0f; head and kernel 2.98e-7
+  PASS    ...and where no cell of r15 or r18t fused, r18t's every hidden layer and its image are r15's, bit for bit -- the kernel moves which thread adds and how the code is written, never the order   no cell fused in either set on this device: every layer must agree exactly
+  PASS  !! *** K0 natively: the r18u set -- its hidden layers (fast_unroll) every cell the twin's or the fused mirror's, given the device's own input; k_head_apply's image within APPLY_TOL ***   fast_unroll 12768+0f, fast_unroll 12768+0f, fast_unroll 12768+0f, fast_unroll 12768+0f; head and kernel 2.98e-7
+  PASS    ...and where no cell of r15 or r18u fused, r18u's every hidden layer and its image are r15's, bit for bit -- the kernel moves which thread adds and how the code is written, never the order   no cell fused in either set on this device: every layer must agree exactly
+  PASS  !! k_head_apply on the order probe -- every product exact, so the twin's logits ARE the fused mirror's, and only the ORDER of the head's adds can move the image -- is within APPLY_TOL   worst 5.45e-7 against the twin's logits, which are the fused mirror's here (APPLY_TOL 0.00001)
+  PASS    ...and with every head bias plus 100, k_head_apply's image is still within APPLY_TOL of its twin -- the largest logit is subtracted, or e^100 would overflow   worst relative 3.85e-7
+  PASS    ...and the device reads the mask: the same network with the mask erased gives another image
+  PASS    the kernel alone, handed every logit plus 100, gives the same image within its bound -- the largest logit is subtracted before exp, or e^100 would overflow   worst relative 2.21e-6
+  PASS    ...and k_apply_fast, handed the same shifted logits planar, gives the same image within its bound   worst relative 2.21e-6
+  PASS    the small network on nine channels, no mask: every layer explained, the kernel within its bound   tiled,tiled,tiled,direct
+  PASS    ...and on r15 too, no mask: k_head_apply's every tap inside the image weighed, its image within its bound   worst relative 2.51e-7
+  PASS    ...and r18t and r18u on the small network, no mask: every layer on their kernels explained, the image within its bound   r18t 2.51e-7, r18u 2.51e-7
+  ----  native K0 for round 18's sets on win32/intel/gen-9, compiler DXC, from node-webgpu 0.6.2: r18t green (3 of 3 native rows); r18u green (3 of 3 native rows)
+  PASS    round 20 (section 68): createNativeDenoiser builds the set it picked -- a fixture table naming this adapter r18u under DXC hands back an r18u denoiser   picked r18u (section 67's for win32/intel/gen-9, under DXC); built fast_unroll,fast_unroll,fast_unroll,fast_unroll,head_apply
+  PASS    a network handed an input of the wrong width is refused, not read at the wrong stride
+  ....  adapter: intel / gen-9 / D3D12 driver version 31.0.101.2137; one 21 x 19 pass 18 ms (SwiftShader's, a JIT's cost and not a GPU's)
+
+4. THE PAGE, IN CHROMIUM: denoise.html ON ITS OWN DEVICE
+  PASS  !! *** the page renders a scene of C, runs the network ON ITS DEVICE, and finds the image the f64 network's within f32 rounding -- no page error ***   C 991234: rendered in 1.0 s; the network ran on the device (google / swiftshader), kernels r15 in 2657 ms; against the f64 network on the CPU, worst r; errors 0
+  PASS    round 18: ...and the page runs the set section 61's table gives its adapter's key -- PAGE_KERNELS (r15), the key Windows/google/swiftshader not in the table -- and its caption says which   network, on the device (google / swiftshader), kernels r15 0.0007
+  PASS    ...and it refuses a round 11 test seed before rendering it, and says above everything that it covers R and C only   seed 35000 belongs to the arc's dataset and is refused -- choose another
+
+5. EVERY KERNEL SET IN THE BROWSER, CELL FOR CELL (rounds 13-15 and 18, sections 39, 43, 46 and 61, K0 (c))
+  PASS  !! the r12 set in the browser's own device, every cell the twin's or the fused mirror's, the kernel within APPLY_TOL   tiled 12768+0f, tiled 12768+0f, tiled 12768+0f, tiled 12768+0f, direct 32319+0f; kernel 4.50e-7
+  PASS  !! *** K0 in the browser: the r13 set in the browser's own device, every cell the twin's or the fused mirror's, the kernel within APPLY_TOL ***   fast 12768+0f, fast 12768+0f, fast 12768+0f, fast 12768+0f, fast 32319+0f; kernel 4.50e-7
+  PASS  !! *** K0 in the browser: the r14 set in the browser's own device, every cell the twin's or the fused mirror's, the kernel within APPLY_TOL ***   fast 12768+0f, fast 12768+0f, fast 12768+0f, fast 12768+0f, head 32319+0f; kernel 4.50e-7
+  PASS  !! *** K0 in the browser: the r15 set in the browser's own device, every cell the twin's or the fused mirror's, the kernel within APPLY_TOL ***   fast 12768+0f, fast 12768+0f, fast 12768+0f, fast 12768+0f, head_apply 0+0f; kernel 3.80e-7
+  PASS  !! *** K0 in the browser: the r18t set in the browser's own device, every cell the twin's or the fused mirror's, the kernel within APPLY_TOL ***   tile_inline 12768+0f, tile_inline 12768+0f, tile_inline 12768+0f, tile_inline 12768+0f, head_apply 0+0f; kernel 3.80e-7
+  PASS  !! *** K0 in the browser: the r18u set in the browser's own device, every cell the twin's or the fused mirror's, the kernel within APPLY_TOL ***   fast_unroll 12768+0f, fast_unroll 12768+0f, fast_unroll 12768+0f, fast_unroll 12768+0f, head_apply 0+0f; kernel 3.80e-7
+
+6. ROUND 20 (section 68): THE NATIVE CALLER, RUN AS THE RIG RUNS IT -- tools/denoiseDevice.mjs --which
+  ----  native caller here: key win32/intel/gen-9, kernels r18u (section 67's for win32/intel/gen-9, under DXC); ran in 13.027 ms, worst 1.05e-6
+  PASS  !! round 20 (section 68): the native caller picks what nativePick gives this adapter and this run's compiler, builds it, and runs one pass within 1e-4 of the f64 network   exit 0; the gate's own pick win32/intel/gen-9 r18u
+
+ALL GREEN (108050 ms)
+not closed here: the shipped network itself, on the images it was measured on. `node tools/denoiseDevice.mjs --measure-r12` is section 35's one command, and no gate runs it; rounds 13-15's and 18's are `--measure-r13`, `--measure-r14`, `--measure-r15`, `--measure-r18t` and `--measure-r18u` (K0 (a)).
+
+C:\SweK_pub\WebGLEngine>node render\denoiseDevice-selfcheck.mjs
+1. THE KERNEL'S TWIN, ON THE CPU
+  PASS  !! the whole f32 twin -- conv2dCpu layer by layer, then kernelApplyCpu -- is the f64 network's output within f32 rounding   worst relative 5.10e-7
+  PASS    kernelApplyCpu on the f64 network's logits is its kernel within f32 rounding -- borders, mask and albedo floor included
+  PASS    a tap across the emitter mask is never weighed: made a million times brighter, the mask's far side leaks into no pixel
+  PASS    the uniform block: H, W, C, the mask channel -- 9 with the mask, none (0xffffffff) without -- and the floor as an f32
+  PASS  !! the large network's four hidden layers run TILED and its head of 81 logits DIRECT -- past the tiled kernel's COUT_MAX 32, on the kernel that never had one
+  PASS  !! round 14: the r14 set runs the hidden layers on the fast kernel and the 81-logit head -- the last layer only -- on the head kernel, then k_apply_fast; r12 and r13 keep k_apply (section 49 put the default on r14 and the page on r13; section 50 moved both to r15)   fast,fast,fast,fast,head + apply_fast; a 1 x 1 layer that is not the last stays on the fast kernel
+  PASS  !! round 13: the r13 set runs every layer of the large network on the fast kernel, the 81-logit head among them (section 39)   a layer too big for one uniform binding (64 -> 32 at 3 x 3) falls back to its r12 kernel; an unknown set is refused by name
+  PASS  !! round 15: the r15 set runs the hidden layers on the fast kernel and the 81-logit head WITH the kernel apply as one pass, k_head_apply -- no apply pass of its own; by section 46's rules on both GPUs it is the default and the page (section 50)   fast,fast,fast,fast,head_apply; a 1 x 1 layer that is not the last, or not of 81 logits, stays on the fast kernel -- and the generator refuses one by name
+  PASS  !! round 18: r18t runs every hidden layer on the pixel-tiled kernel at 2 pixels x 8 vec4s, edge zero, weights inline; r18u on the fast kernel with a block written out; both the 81-logit head as r15 does -- k_head_apply, one pass   tile_inline,tile_inline,tile_inline,tile_inline,head_apply / fast_unroll,fast_unroll,fast_unroll,fast_unroll,head_apply; a layer too big for one uniform binding falls back as in r15
+  PASS  !! round 19 (section 66): FXC builds neither round-18 set -- on a D3D12 adapter, a run whose compiler is FXC (the package's "FXC", the dump's "FXC (DXBC)"), unknown, or not named at all builds r12-r15 natively and never FXC_UNBUILT_SETS   on the 1080's description: (no options) r12,r13,r14,r15; null r12,r13,r14,r15; "" r12,r13,r14,r15; "FXC" r12,r13,r14,r15; "FXC (DXBC)" r12,r13,r14,r15; "unknown (no dump)" r12,r13,r14,r15 -- section 60: 0.6.0's FXC stopped on r18t's kernel at 3 minutes and crashed on r18u's, on both GPUs
+  PASS  !! round 19 (section 66): DXC builds both -- on a D3D12 adapter, a run whose compiler is DXC (the package's "DXC", the dump's "DXC (DXIL)") builds all six sets natively; an adapter that is not D3D12 builds all six whatever compiler is named, and a browser's adapter is never asked   on the 1080's description: "DXC" r12,r13,r14,r15,r18t,r18u; "DXC (DXIL)" r12,r13,r14,r15,r18t,r18u; Vulkan under "FXC": r12,r13,r14,r15,r18t,r18u -- section 65: 0.6.2's DXC built both in seconds, exact, on both GPUs
+  PASS    round 19: isDxcCompiler is DXC as the package names it ("DXC") or a dump reads it ("DXC (DXIL)"), and nothing else -- not FXC, unknown, none, a lower-case name, a longer word, or DXC named second   true for "DXC", "DXC (DXIL)"; false for "FXC", "FXC (DXBC)", "unknown (no dump)", "", null, (no options), "dxc", "DXCompiler", "not DXC", "SPIR-V"
+  PASS  !! round 19 (section 66): NATIVE_KERNELS_BY_ADAPTER is frozen, and a native adapter's key is Node's platform, its vendor and its architecture, none without a platform or a vendor   {"win32/intel/gen-9":"r18u"}; the 1080's key win32/nvidia/pascal
+  PASS  !! round 19 (section 66): nativeKernelsFor gives a table's set for a key it names under DXC ONLY -- DEFAULT_KERNELS (r15, a set FXC builds) under FXC, unknown or no compiler, for a key the table does not name, for no key, and from the shipped table   a fixture table {"win32/nvidia/pascal":"r18t"}: "DXC" r18t, "DXC (DXIL)" r18t, "FXC" r15, null r15; the shipped table under "DXC": the 1080 r15, the Intel r18u, the Intel under "FXC" r15
+  PASS  !! round 20 (section 68): nativePick takes section 67's set for the Intel under DXC, and r15 for the Intel under FXC or an unread compiler, for the 1080, off win32 and with no adapter -- and says which   win32/intel/gen-9 r18u; win32/intel/gen-9 r15; win32/intel/gen-9 r15; win32/nvidia/pascal r15; linux/google/swiftshader r15; (no key) r15
+  PASS    round 19: tools/denoiseDevice.mjs reads its run's compiler with its own device's flags, and refuses a set nativeSetsFor drops -- exit 2, one line naming SWEK_WEBGPU's remedy -- before any image is built   compiler read at 1030, the device made at 1117, the refusal at 1183, the first build at 3448
+  ----  section 66 on win32/intel/gen-9: r18t K1 9.02 x at 256 x 256, 0.951 x r15 under DXC at 1024 x 1024, 0.881 x r15 under FXC at 1024 x 1024, fails condition 3; r18u K1 14.01 x at 256 x 256, 1.59 x r15 under DXC at 1024 x 1024, 1.474 x r15 under FXC at 1024 x 1024, qualifies -> r18u
+  ----  section 66 on win32/nvidia/pascal: r18t K1 24.99 x at 1920 x 1080, 1.076 x r15 under DXC at 1920 x 1080, 0.996 x r15 under FXC at 1920 x 1080, fails condition 4; r18u K1 15.17 x at 1920 x 1080, 0.653 x r15 under DXC at 1920 x 1080, 0.605 x r15 under FXC at 1920 x 1080, fails condition 3 -> no entry
+  PASS  !! *** round 19's verdict (section 67): NATIVE_KERNELS_BY_ADAPTER is section 66's rule read off both GPUs' round-19 reports -- r18u for the Intel gen-9, nothing for the GTX 1080 -- and nothing else ***   {"win32/intel/gen-9":"r18u"} against the rule's {"win32/intel/gen-9":"r18u"}
+  PASS    ...and the rule discriminates: condition 4 alone moves the 1080 to r18t and the Intel to nothing, and a report with no key gets no entry   1080 with r18t at 1.060 x under FXC: r18t; the Intel with r18u at 1.040 x under FXC: null; no key: null
+  PASS    section 66's predictions, read off the same reports: P1 (the Intel's entry is r18u), P2 (the 1080 gets none, by condition 4), P3 (r15 slower under DXC than FXC on both)   r15 at 1024 x 1024: 985.875 ms under DXC, 913.731 ms under FXC; r15 at 1920 x 1080: 80.861 ms under DXC, 74.836 ms under FXC
+  ----  section 75 on win32/intel/gen-9: run a r18u (r18t K1 9.04 x at 256 x 256, 1.024 x r15 under DXC at 1024 x 1024, 0.967 x r15 under FXC at 1024 x 1024, fails condition 3; r18u K1 14.57 x at 256 x 256, 1.514 x r15 under DXC at 1024 x 1024, 1.431 x r15 under FXC at 1024 x 1024, qualifies) | run b none (r18t K1 9.11 x at 256 x 256, 1.021 x r15 under DXC at 1024 x 1024, 1.011 x r15 under FXC at 1024 x 1024, fails condition 1; r18u K1 13.97 x at 256 x 256, 1.527 x r15 under DXC at 1024 x 1024, 1.511 x r15 under FXC at 1024 x 1024, fails condition 1)
+  ----  section 75 on win32/nvidia/pascal: run a r18t (r18t K1 24.76 x at 1024 x 1024, 1.086 x r15 under DXC at 1920 x 1080, 1.016 x r15 under FXC at 1920 x 1080, qualifies; r18u K1 14.77 x at 1024 x 1024, 0.659 x r15 under DXC at 1920 x 1080, 0.617 x r15 under FXC at 1920 x 1080, fails condition 3) | run b none (r18t K1 17.33 x at 1920 x 1080, 1.091 x r15 under DXC at 1920 x 1080, 1.027 x r15 under FXC at 1920 x 1080, fails condition 0; r18u K1 10.45 x at 1920 x 1080, 0.658 x r15 under DXC at 1920 x 1080, 0.619 x r15 under FXC at 1920 x 1080, fails condition 0)
+  PASS  !! *** round 24's verdict (section 76): read strictly, no set holds section 75's conditions in both of the 1080's runs -- run b's compile gate crashed -- so the 1080 keeps no entry and the table is unchanged ***   1080: run a r18t, run b null (fails condition 0); Intel: run a r18u, run b null (fails condition 1)
+  PASS    ...and the rule discriminates: run b with its compile gate green gives r18t in both runs, and run a under section 66's rule, condition 4 asked, gives nothing   run b repaired: r18t; run a with condition 4: null (fails 4); r18t against r15 under DXC at 1920 x 1080: 1.086 and 1.091
+  PASS  !! *** section 68's outcome: the rig's four --which runs are the four section 68 predicted -- key, set, reason and compiler -- each pass within 1e-4 of the f64 network, and each reason is nativePick's own on the adapter the line names ***   intel 0.6.1 FXC: r15, 0.00000105; intel 0.6.2 DXC: r18u, 0.00000105; nvidia 0.6.0 FXC: r15, 0.00000101; nvidia 0.6.2 DXC: r15, 0.00000101
+  ----  section 68: the packages the rig had installed (the pin is 0.6.0): intel 0.6.1, nvidia 0.6.0
+  PASS  !! round 18: the page's key is platform, vendor and architecture -- none without a platform, as every browser but Chromium -- and pageKernelsFor gives the table's set for a key it names, PAGE_KERNELS for any other   the table's own prototype is not a key; an adapter the shipped table does not name runs PAGE_KERNELS
+  PASS  !! round 18's verdict (section 63): the page's table is section 61's rule read off both GPUs' runs -- r18u for the Intel gen-9, r18t for the GTX 1080, in Chrome on Windows -- and nothing else; PAGE_KERNELS and DEFAULT_KERNELS stay r15   {"Windows/intel/gen-9":"r18u","Windows/nvidia/pascal":"r18t"} -- section 63: r18u 1.524 x r15 at 1024 on the Intel, r18t 1.087 x at 1080p on the 1080
+  PASS    k_head_apply: five bindings, one barrier, its 81 taps unrolled -- each logit a named lane, no private array a compiler would put in memory
+  PASS  !! round 15: the order probe is a probe -- every product exact, so its twin logits ARE the fused mirror's -- and a head added last-first moves its image past APPLY_TOL, which judgeHeadApply sees   331776 of 331776 logits the same both ways; added last-first: worst 1.28e-1, 99.9% of values past APPLY_TOL
+  PASS    a residual network is refused by name: only the kernel-predicting network runs on the device
+  PASS    kernelApplyWgsl is one kernel, k_apply, with its four bindings
+
+2. THE SHIPPED NETWORK'S ENCODING
+  PASS  !! encodeNet then decodeNet, through JSON, is the network bit for bit -- every weight, every bias, every shape   33329 parameters
+  PASS    a layer whose weights do not fill its shape is refused, not zero-padded
+  PASS    the large network's shape is section 28's, with the mask's tenth channel
+  PASS  !! every set a pass or the page can choose -- the default, the page's, and each adapter's measured pick, on the page or natively -- is one the ladders time, with r12 first as the reference   timed r12, r15, r18t, r18u; runnable r15, r18u, r18t
+
+3. *** THE WHOLE PASS ON THE DEVICE (Dawn) ***
+  ----  native adapter: intel / gen-9 / D3D12 driver version 31.0.101.2137 (hardware); compiler, from the package: DXC
+  PASS  !! passBytes is the per-pixel storage the device denoiser really allocates: r15 exactly, r12 plus its weights (which r12 alone keeps in storage) -- and the 81 logits a pixel are the difference   r12 487628 B allocated = passBytes 354312 + weights 133316; r15 225036 against 225036
+  PASS  !! round 19 (section 66): the native adapter is named where realGpuRun reads adapters -- one record, keyed by this gate's path from the engine root, naming the adapter the jobs run on, its software flag a boolean   intel / gen-9 / D3D12 driver version 31.0.101.2137 (hardware), 1 record(s) keyed render/denoiseDevice-selfcheck.mjs; compiler DXC, from node-webgpu 0.6.2
+  PASS  !! *** every cell of every layer, on the device, is the twin's or the fused mirror's, given the device's own input to that layer -- the head of 81 on the direct kernel among them ***   tiled 12768+0f, tiled 12768+0f, tiled 12768+0f, tiled 12768+0f, direct 32319+0f
+  PASS  !! the kernel on the device is its twin within APPLY_TOL 0.00001 on every value -- exp and division are not correctly rounded in WGSL, so it is held to a bound, not to bits   worst relative 3.72e-7, 27 x inside
+  PASS    the whole pass on the device is the f64 network's output within f32 rounding   worst relative 5.10e-7
+  PASS  !! *** K0 natively: the r14 set -- the fast kernel, the head kernel's planar logits (read back and judged channels last), and k_apply_fast -- every cell the twin's or the fused mirror's, given the device's own input; the kernel within APPLY_TOL ***   fast 12768+0f, fast 12768+0f, fast 12768+0f, fast 12768+0f, head 14233+18086f; kernel 6.16e-7
+  PASS    ...and where no layer of either set fused a cell, the two sets' images are the same bits   a set fused cells here, so the images may differ where it did
+  PASS  !! *** K0 natively: the r15 set -- the fast kernel's hidden layers every cell the twin's or the fused mirror's, and k_head_apply's image within APPLY_TOL of kernelApplyCpu on the twin's logits or the fused mirror's, from the device's own input to the head ***   fast 12768+0f, fast 12768+0f, fast 12768+0f, fast 12768+0f; head and kernel 2.98e-7 (twin 3.72e-7, mirror 6.16e-7)
+  PASS    ...and where no cell of r14 or r15 fused, r15's image is r14's, bit for bit -- the same logits, summed by k_apply_fast's order   a set fused cells here, so the images may differ where it did
+  PASS  !! *** K0 natively: the r18t set -- its hidden layers (tile_inline) every cell the twin's or the fused mirror's, given the device's own input; k_head_apply's image within APPLY_TOL ***   tile_inline 12768+0f, tile_inline 12768+0f, tile_inline 12768+0f, tile_inline 12768+0f; head and kernel 2.98e-7
+  PASS    ...and where no cell of r15 or r18t fused, r18t's every hidden layer and its image are r15's, bit for bit -- the kernel moves which thread adds and how the code is written, never the order   no cell fused in either set on this device: every layer must agree exactly
+  PASS  !! *** K0 natively: the r18u set -- its hidden layers (fast_unroll) every cell the twin's or the fused mirror's, given the device's own input; k_head_apply's image within APPLY_TOL ***   fast_unroll 12768+0f, fast_unroll 12768+0f, fast_unroll 12768+0f, fast_unroll 12768+0f; head and kernel 2.98e-7
+  PASS    ...and where no cell of r15 or r18u fused, r18u's every hidden layer and its image are r15's, bit for bit -- the kernel moves which thread adds and how the code is written, never the order   no cell fused in either set on this device: every layer must agree exactly
+  PASS  !! k_head_apply on the order probe -- every product exact, so the twin's logits ARE the fused mirror's, and only the ORDER of the head's adds can move the image -- is within APPLY_TOL   worst 5.45e-7 against the twin's logits, which are the fused mirror's here (APPLY_TOL 0.00001)
+  PASS    ...and with every head bias plus 100, k_head_apply's image is still within APPLY_TOL of its twin -- the largest logit is subtracted, or e^100 would overflow   worst relative 3.85e-7
+  PASS    ...and the device reads the mask: the same network with the mask erased gives another image
+  PASS    the kernel alone, handed every logit plus 100, gives the same image within its bound -- the largest logit is subtracted before exp, or e^100 would overflow   worst relative 2.21e-6
+  PASS    ...and k_apply_fast, handed the same shifted logits planar, gives the same image within its bound   worst relative 2.21e-6
+  PASS    the small network on nine channels, no mask: every layer explained, the kernel within its bound   tiled,tiled,tiled,direct
+  PASS    ...and on r15 too, no mask: k_head_apply's every tap inside the image weighed, its image within its bound   worst relative 2.51e-7
+  PASS    ...and r18t and r18u on the small network, no mask: every layer on their kernels explained, the image within its bound   r18t 2.51e-7, r18u 2.51e-7
+  ----  native K0 for round 18's sets on win32/intel/gen-9, compiler DXC, from node-webgpu 0.6.2: r18t green (3 of 3 native rows); r18u green (3 of 3 native rows)
+  PASS    round 20 (section 68): createNativeDenoiser builds the set it picked -- a fixture table naming this adapter r18u under DXC hands back an r18u denoiser   picked r18u (section 67's for win32/intel/gen-9, under DXC); built fast_unroll,fast_unroll,fast_unroll,fast_unroll,head_apply
+  PASS    a network handed an input of the wrong width is refused, not read at the wrong stride
+  ....  adapter: intel / gen-9 / D3D12 driver version 31.0.101.2137; one 21 x 19 pass 11 ms (SwiftShader's, a JIT's cost and not a GPU's)
+
+4. THE PAGE, IN CHROMIUM: denoise.html ON ITS OWN DEVICE
+  PASS  !! *** the page renders a scene of C, runs the network ON ITS DEVICE, and finds the image the f64 network's within f32 rounding -- no page error ***   C 991234: rendered in 1.0 s; the network ran on the device (google / swiftshader), kernels r15 in 2777 ms; against the f64 network on the CPU, worst r; errors 0
+  PASS    round 18: ...and the page runs the set section 61's table gives its adapter's key -- PAGE_KERNELS (r15), the key Windows/google/swiftshader not in the table -- and its caption says which   network, on the device (google / swiftshader), kernels r15 0.0007
+  PASS    ...and it refuses a round 11 test seed before rendering it, and says above everything that it covers R and C only   seed 35000 belongs to the arc's dataset and is refused -- choose another
+
+5. EVERY KERNEL SET IN THE BROWSER, CELL FOR CELL (rounds 13-15 and 18, sections 39, 43, 46 and 61, K0 (c))
+  PASS  !! the r12 set in the browser's own device, every cell the twin's or the fused mirror's, the kernel within APPLY_TOL   tiled 12768+0f, tiled 12768+0f, tiled 12768+0f, tiled 12768+0f, direct 32319+0f; kernel 4.50e-7
+  PASS  !! *** K0 in the browser: the r13 set in the browser's own device, every cell the twin's or the fused mirror's, the kernel within APPLY_TOL ***   fast 12768+0f, fast 12768+0f, fast 12768+0f, fast 12768+0f, fast 32319+0f; kernel 4.50e-7
+  PASS  !! *** K0 in the browser: the r14 set in the browser's own device, every cell the twin's or the fused mirror's, the kernel within APPLY_TOL ***   fast 12768+0f, fast 12768+0f, fast 12768+0f, fast 12768+0f, head 32319+0f; kernel 4.50e-7
+  PASS  !! *** K0 in the browser: the r15 set in the browser's own device, every cell the twin's or the fused mirror's, the kernel within APPLY_TOL ***   fast 12768+0f, fast 12768+0f, fast 12768+0f, fast 12768+0f, head_apply 0+0f; kernel 3.80e-7
+  PASS  !! *** K0 in the browser: the r18t set in the browser's own device, every cell the twin's or the fused mirror's, the kernel within APPLY_TOL ***   tile_inline 12768+0f, tile_inline 12768+0f, tile_inline 12768+0f, tile_inline 12768+0f, head_apply 0+0f; kernel 3.80e-7
+  PASS  !! *** K0 in the browser: the r18u set in the browser's own device, every cell the twin's or the fused mirror's, the kernel within APPLY_TOL ***   fast_unroll 12768+0f, fast_unroll 12768+0f, fast_unroll 12768+0f, fast_unroll 12768+0f, head_apply 0+0f; kernel 3.80e-7
+
+6. ROUND 20 (section 68): THE NATIVE CALLER, RUN AS THE RIG RUNS IT -- tools/denoiseDevice.mjs --which
+  ----  native caller here: key win32/intel/gen-9, kernels r18u (section 67's for win32/intel/gen-9, under DXC); ran in 6.489 ms, worst 1.05e-6
+  PASS  !! round 20 (section 68): the native caller picks what nativePick gives this adapter and this run's compiler, builds it, and runs one pass within 1e-4 of the f64 network   exit 0; the gate's own pick win32/intel/gen-9 r18u
+
+ALL GREEN (112064 ms)
+not closed here: the shipped network itself, on the images it was measured on. `node tools/denoiseDevice.mjs --measure-r12` is section 35's one command, and no gate runs it; rounds 13-15's and 18's are `--measure-r13`, `--measure-r14`, `--measure-r15`, `--measure-r18t` and `--measure-r18u` (K0 (a)).
+
+C:\SweK_pub\WebGLEngine>node render\denoiseDevice-selfcheck.mjs
+1. THE KERNEL'S TWIN, ON THE CPU
+  PASS  !! the whole f32 twin -- conv2dCpu layer by layer, then kernelApplyCpu -- is the f64 network's output within f32 rounding   worst relative 5.10e-7
+  PASS    kernelApplyCpu on the f64 network's logits is its kernel within f32 rounding -- borders, mask and albedo floor included
+  PASS    a tap across the emitter mask is never weighed: made a million times brighter, the mask's far side leaks into no pixel
+  PASS    the uniform block: H, W, C, the mask channel -- 9 with the mask, none (0xffffffff) without -- and the floor as an f32
+  PASS  !! the large network's four hidden layers run TILED and its head of 81 logits DIRECT -- past the tiled kernel's COUT_MAX 32, on the kernel that never had one
+  PASS  !! round 14: the r14 set runs the hidden layers on the fast kernel and the 81-logit head -- the last layer only -- on the head kernel, then k_apply_fast; r12 and r13 keep k_apply (section 49 put the default on r14 and the page on r13; section 50 moved both to r15)   fast,fast,fast,fast,head + apply_fast; a 1 x 1 layer that is not the last stays on the fast kernel
+  PASS  !! round 13: the r13 set runs every layer of the large network on the fast kernel, the 81-logit head among them (section 39)   a layer too big for one uniform binding (64 -> 32 at 3 x 3) falls back to its r12 kernel; an unknown set is refused by name
+  PASS  !! round 15: the r15 set runs the hidden layers on the fast kernel and the 81-logit head WITH the kernel apply as one pass, k_head_apply -- no apply pass of its own; by section 46's rules on both GPUs it is the default and the page (section 50)   fast,fast,fast,fast,head_apply; a 1 x 1 layer that is not the last, or not of 81 logits, stays on the fast kernel -- and the generator refuses one by name
+  PASS  !! round 18: r18t runs every hidden layer on the pixel-tiled kernel at 2 pixels x 8 vec4s, edge zero, weights inline; r18u on the fast kernel with a block written out; both the 81-logit head as r15 does -- k_head_apply, one pass   tile_inline,tile_inline,tile_inline,tile_inline,head_apply / fast_unroll,fast_unroll,fast_unroll,fast_unroll,head_apply; a layer too big for one uniform binding falls back as in r15
+  PASS  !! round 19 (section 66): FXC builds neither round-18 set -- on a D3D12 adapter, a run whose compiler is FXC (the package's "FXC", the dump's "FXC (DXBC)"), unknown, or not named at all builds r12-r15 natively and never FXC_UNBUILT_SETS   on the 1080's description: (no options) r12,r13,r14,r15; null r12,r13,r14,r15; "" r12,r13,r14,r15; "FXC" r12,r13,r14,r15; "FXC (DXBC)" r12,r13,r14,r15; "unknown (no dump)" r12,r13,r14,r15 -- section 60: 0.6.0's FXC stopped on r18t's kernel at 3 minutes and crashed on r18u's, on both GPUs
+  PASS  !! round 19 (section 66): DXC builds both -- on a D3D12 adapter, a run whose compiler is DXC (the package's "DXC", the dump's "DXC (DXIL)") builds all six sets natively; an adapter that is not D3D12 builds all six whatever compiler is named, and a browser's adapter is never asked   on the 1080's description: "DXC" r12,r13,r14,r15,r18t,r18u; "DXC (DXIL)" r12,r13,r14,r15,r18t,r18u; Vulkan under "FXC": r12,r13,r14,r15,r18t,r18u -- section 65: 0.6.2's DXC built both in seconds, exact, on both GPUs
+  PASS    round 19: isDxcCompiler is DXC as the package names it ("DXC") or a dump reads it ("DXC (DXIL)"), and nothing else -- not FXC, unknown, none, a lower-case name, a longer word, or DXC named second   true for "DXC", "DXC (DXIL)"; false for "FXC", "FXC (DXBC)", "unknown (no dump)", "", null, (no options), "dxc", "DXCompiler", "not DXC", "SPIR-V"
+  PASS  !! round 19 (section 66): NATIVE_KERNELS_BY_ADAPTER is frozen, and a native adapter's key is Node's platform, its vendor and its architecture, none without a platform or a vendor   {"win32/intel/gen-9":"r18u"}; the 1080's key win32/nvidia/pascal
+  PASS  !! round 19 (section 66): nativeKernelsFor gives a table's set for a key it names under DXC ONLY -- DEFAULT_KERNELS (r15, a set FXC builds) under FXC, unknown or no compiler, for a key the table does not name, for no key, and from the shipped table   a fixture table {"win32/nvidia/pascal":"r18t"}: "DXC" r18t, "DXC (DXIL)" r18t, "FXC" r15, null r15; the shipped table under "DXC": the 1080 r15, the Intel r18u, the Intel under "FXC" r15
+  PASS  !! round 20 (section 68): nativePick takes section 67's set for the Intel under DXC, and r15 for the Intel under FXC or an unread compiler, for the 1080, off win32 and with no adapter -- and says which   win32/intel/gen-9 r18u; win32/intel/gen-9 r15; win32/intel/gen-9 r15; win32/nvidia/pascal r15; linux/google/swiftshader r15; (no key) r15
+  PASS    round 19: tools/denoiseDevice.mjs reads its run's compiler with its own device's flags, and refuses a set nativeSetsFor drops -- exit 2, one line naming SWEK_WEBGPU's remedy -- before any image is built   compiler read at 1030, the device made at 1117, the refusal at 1183, the first build at 3448
+  ----  section 66 on win32/intel/gen-9: r18t K1 9.02 x at 256 x 256, 0.951 x r15 under DXC at 1024 x 1024, 0.881 x r15 under FXC at 1024 x 1024, fails condition 3; r18u K1 14.01 x at 256 x 256, 1.59 x r15 under DXC at 1024 x 1024, 1.474 x r15 under FXC at 1024 x 1024, qualifies -> r18u
+  ----  section 66 on win32/nvidia/pascal: r18t K1 24.99 x at 1920 x 1080, 1.076 x r15 under DXC at 1920 x 1080, 0.996 x r15 under FXC at 1920 x 1080, fails condition 4; r18u K1 15.17 x at 1920 x 1080, 0.653 x r15 under DXC at 1920 x 1080, 0.605 x r15 under FXC at 1920 x 1080, fails condition 3 -> no entry
+  PASS  !! *** round 19's verdict (section 67): NATIVE_KERNELS_BY_ADAPTER is section 66's rule read off both GPUs' round-19 reports -- r18u for the Intel gen-9, nothing for the GTX 1080 -- and nothing else ***   {"win32/intel/gen-9":"r18u"} against the rule's {"win32/intel/gen-9":"r18u"}
+  PASS    ...and the rule discriminates: condition 4 alone moves the 1080 to r18t and the Intel to nothing, and a report with no key gets no entry   1080 with r18t at 1.060 x under FXC: r18t; the Intel with r18u at 1.040 x under FXC: null; no key: null
+  PASS    section 66's predictions, read off the same reports: P1 (the Intel's entry is r18u), P2 (the 1080 gets none, by condition 4), P3 (r15 slower under DXC than FXC on both)   r15 at 1024 x 1024: 985.875 ms under DXC, 913.731 ms under FXC; r15 at 1920 x 1080: 80.861 ms under DXC, 74.836 ms under FXC
+  ----  section 75 on win32/intel/gen-9: run a r18u (r18t K1 9.04 x at 256 x 256, 1.024 x r15 under DXC at 1024 x 1024, 0.967 x r15 under FXC at 1024 x 1024, fails condition 3; r18u K1 14.57 x at 256 x 256, 1.514 x r15 under DXC at 1024 x 1024, 1.431 x r15 under FXC at 1024 x 1024, qualifies) | run b none (r18t K1 9.11 x at 256 x 256, 1.021 x r15 under DXC at 1024 x 1024, 1.011 x r15 under FXC at 1024 x 1024, fails condition 1; r18u K1 13.97 x at 256 x 256, 1.527 x r15 under DXC at 1024 x 1024, 1.511 x r15 under FXC at 1024 x 1024, fails condition 1)
+  ----  section 75 on win32/nvidia/pascal: run a r18t (r18t K1 24.76 x at 1024 x 1024, 1.086 x r15 under DXC at 1920 x 1080, 1.016 x r15 under FXC at 1920 x 1080, qualifies; r18u K1 14.77 x at 1024 x 1024, 0.659 x r15 under DXC at 1920 x 1080, 0.617 x r15 under FXC at 1920 x 1080, fails condition 3) | run b none (r18t K1 17.33 x at 1920 x 1080, 1.091 x r15 under DXC at 1920 x 1080, 1.027 x r15 under FXC at 1920 x 1080, fails condition 0; r18u K1 10.45 x at 1920 x 1080, 0.658 x r15 under DXC at 1920 x 1080, 0.619 x r15 under FXC at 1920 x 1080, fails condition 0)
+  PASS  !! *** round 24's verdict (section 76): read strictly, no set holds section 75's conditions in both of the 1080's runs -- run b's compile gate crashed -- so the 1080 keeps no entry and the table is unchanged ***   1080: run a r18t, run b null (fails condition 0); Intel: run a r18u, run b null (fails condition 1)
+  PASS    ...and the rule discriminates: run b with its compile gate green gives r18t in both runs, and run a under section 66's rule, condition 4 asked, gives nothing   run b repaired: r18t; run a with condition 4: null (fails 4); r18t against r15 under DXC at 1920 x 1080: 1.086 and 1.091
+  PASS  !! *** section 68's outcome: the rig's four --which runs are the four section 68 predicted -- key, set, reason and compiler -- each pass within 1e-4 of the f64 network, and each reason is nativePick's own on the adapter the line names ***   intel 0.6.1 FXC: r15, 0.00000105; intel 0.6.2 DXC: r18u, 0.00000105; nvidia 0.6.0 FXC: r15, 0.00000101; nvidia 0.6.2 DXC: r15, 0.00000101
+  ----  section 68: the packages the rig had installed (the pin is 0.6.0): intel 0.6.1, nvidia 0.6.0
+  PASS  !! round 18: the page's key is platform, vendor and architecture -- none without a platform, as every browser but Chromium -- and pageKernelsFor gives the table's set for a key it names, PAGE_KERNELS for any other   the table's own prototype is not a key; an adapter the shipped table does not name runs PAGE_KERNELS
+  PASS  !! round 18's verdict (section 63): the page's table is section 61's rule read off both GPUs' runs -- r18u for the Intel gen-9, r18t for the GTX 1080, in Chrome on Windows -- and nothing else; PAGE_KERNELS and DEFAULT_KERNELS stay r15   {"Windows/intel/gen-9":"r18u","Windows/nvidia/pascal":"r18t"} -- section 63: r18u 1.524 x r15 at 1024 on the Intel, r18t 1.087 x at 1080p on the 1080
+  PASS    k_head_apply: five bindings, one barrier, its 81 taps unrolled -- each logit a named lane, no private array a compiler would put in memory
+  PASS  !! round 15: the order probe is a probe -- every product exact, so its twin logits ARE the fused mirror's -- and a head added last-first moves its image past APPLY_TOL, which judgeHeadApply sees   331776 of 331776 logits the same both ways; added last-first: worst 1.28e-1, 99.9% of values past APPLY_TOL
+  PASS    a residual network is refused by name: only the kernel-predicting network runs on the device
+  PASS    kernelApplyWgsl is one kernel, k_apply, with its four bindings
+
+2. THE SHIPPED NETWORK'S ENCODING
+  PASS  !! encodeNet then decodeNet, through JSON, is the network bit for bit -- every weight, every bias, every shape   33329 parameters
+  PASS    a layer whose weights do not fill its shape is refused, not zero-padded
+  PASS    the large network's shape is section 28's, with the mask's tenth channel
+  PASS  !! every set a pass or the page can choose -- the default, the page's, and each adapter's measured pick, on the page or natively -- is one the ladders time, with r12 first as the reference   timed r12, r15, r18t, r18u; runnable r15, r18u, r18t
+
+3. *** THE WHOLE PASS ON THE DEVICE (Dawn) ***
+  ----  native adapter: intel / gen-9 / D3D12 driver version 31.0.101.2137 (hardware); compiler, from the package: DXC
+  PASS  !! passBytes is the per-pixel storage the device denoiser really allocates: r15 exactly, r12 plus its weights (which r12 alone keeps in storage) -- and the 81 logits a pixel are the difference   r12 487628 B allocated = passBytes 354312 + weights 133316; r15 225036 against 225036
+  PASS  !! round 19 (section 66): the native adapter is named where realGpuRun reads adapters -- one record, keyed by this gate's path from the engine root, naming the adapter the jobs run on, its software flag a boolean   intel / gen-9 / D3D12 driver version 31.0.101.2137 (hardware), 1 record(s) keyed render/denoiseDevice-selfcheck.mjs; compiler DXC, from node-webgpu 0.6.2
+  PASS  !! *** every cell of every layer, on the device, is the twin's or the fused mirror's, given the device's own input to that layer -- the head of 81 on the direct kernel among them ***   tiled 12768+0f, tiled 12768+0f, tiled 12768+0f, tiled 12768+0f, direct 32319+0f
+  PASS  !! the kernel on the device is its twin within APPLY_TOL 0.00001 on every value -- exp and division are not correctly rounded in WGSL, so it is held to a bound, not to bits   worst relative 3.72e-7, 27 x inside
+  PASS    the whole pass on the device is the f64 network's output within f32 rounding   worst relative 5.10e-7
+  PASS  !! *** K0 natively: the r14 set -- the fast kernel, the head kernel's planar logits (read back and judged channels last), and k_apply_fast -- every cell the twin's or the fused mirror's, given the device's own input; the kernel within APPLY_TOL ***   fast 12768+0f, fast 12768+0f, fast 12768+0f, fast 12768+0f, head 14233+18086f; kernel 6.16e-7
+  PASS    ...and where no layer of either set fused a cell, the two sets' images are the same bits   a set fused cells here, so the images may differ where it did
+  PASS  !! *** K0 natively: the r15 set -- the fast kernel's hidden layers every cell the twin's or the fused mirror's, and k_head_apply's image within APPLY_TOL of kernelApplyCpu on the twin's logits or the fused mirror's, from the device's own input to the head ***   fast 12768+0f, fast 12768+0f, fast 12768+0f, fast 12768+0f; head and kernel 2.98e-7 (twin 3.72e-7, mirror 6.16e-7)
+  PASS    ...and where no cell of r14 or r15 fused, r15's image is r14's, bit for bit -- the same logits, summed by k_apply_fast's order   a set fused cells here, so the images may differ where it did
+  PASS  !! *** K0 natively: the r18t set -- its hidden layers (tile_inline) every cell the twin's or the fused mirror's, given the device's own input; k_head_apply's image within APPLY_TOL ***   tile_inline 12768+0f, tile_inline 12768+0f, tile_inline 12768+0f, tile_inline 12768+0f; head and kernel 2.98e-7
+  PASS    ...and where no cell of r15 or r18t fused, r18t's every hidden layer and its image are r15's, bit for bit -- the kernel moves which thread adds and how the code is written, never the order   no cell fused in either set on this device: every layer must agree exactly
+  PASS  !! *** K0 natively: the r18u set -- its hidden layers (fast_unroll) every cell the twin's or the fused mirror's, given the device's own input; k_head_apply's image within APPLY_TOL ***   fast_unroll 12768+0f, fast_unroll 12768+0f, fast_unroll 12768+0f, fast_unroll 12768+0f; head and kernel 2.98e-7
+  PASS    ...and where no cell of r15 or r18u fused, r18u's every hidden layer and its image are r15's, bit for bit -- the kernel moves which thread adds and how the code is written, never the order   no cell fused in either set on this device: every layer must agree exactly
+  PASS  !! k_head_apply on the order probe -- every product exact, so the twin's logits ARE the fused mirror's, and only the ORDER of the head's adds can move the image -- is within APPLY_TOL   worst 5.45e-7 against the twin's logits, which are the fused mirror's here (APPLY_TOL 0.00001)
+  PASS    ...and with every head bias plus 100, k_head_apply's image is still within APPLY_TOL of its twin -- the largest logit is subtracted, or e^100 would overflow   worst relative 3.85e-7
+  PASS    ...and the device reads the mask: the same network with the mask erased gives another image
+  PASS    the kernel alone, handed every logit plus 100, gives the same image within its bound -- the largest logit is subtracted before exp, or e^100 would overflow   worst relative 2.21e-6
+  PASS    ...and k_apply_fast, handed the same shifted logits planar, gives the same image within its bound   worst relative 2.21e-6
+  PASS    the small network on nine channels, no mask: every layer explained, the kernel within its bound   tiled,tiled,tiled,direct
+  PASS    ...and on r15 too, no mask: k_head_apply's every tap inside the image weighed, its image within its bound   worst relative 2.51e-7
+  PASS    ...and r18t and r18u on the small network, no mask: every layer on their kernels explained, the image within its bound   r18t 2.51e-7, r18u 2.51e-7
+  ----  native K0 for round 18's sets on win32/intel/gen-9, compiler DXC, from node-webgpu 0.6.2: r18t green (3 of 3 native rows); r18u green (3 of 3 native rows)
+  PASS    round 20 (section 68): createNativeDenoiser builds the set it picked -- a fixture table naming this adapter r18u under DXC hands back an r18u denoiser   picked r18u (section 67's for win32/intel/gen-9, under DXC); built fast_unroll,fast_unroll,fast_unroll,fast_unroll,head_apply
+  PASS    a network handed an input of the wrong width is refused, not read at the wrong stride
+  ....  adapter: intel / gen-9 / D3D12 driver version 31.0.101.2137; one 21 x 19 pass 17 ms (SwiftShader's, a JIT's cost and not a GPU's)
+
+4. THE PAGE, IN CHROMIUM: denoise.html ON ITS OWN DEVICE
+  PASS  !! *** the page renders a scene of C, runs the network ON ITS DEVICE, and finds the image the f64 network's within f32 rounding -- no page error ***   C 991234: rendered in 1.3 s; the network ran on the device (google / swiftshader), kernels r15 in 2734 ms; against the f64 network on the CPU, worst r; errors 0
+  PASS    round 18: ...and the page runs the set section 61's table gives its adapter's key -- PAGE_KERNELS (r15), the key Windows/google/swiftshader not in the table -- and its caption says which   network, on the device (google / swiftshader), kernels r15 0.0007
+  PASS    ...and it refuses a round 11 test seed before rendering it, and says above everything that it covers R and C only   seed 35000 belongs to the arc's dataset and is refused -- choose another
+
+5. EVERY KERNEL SET IN THE BROWSER, CELL FOR CELL (rounds 13-15 and 18, sections 39, 43, 46 and 61, K0 (c))
+  PASS  !! the r12 set in the browser's own device, every cell the twin's or the fused mirror's, the kernel within APPLY_TOL   tiled 12768+0f, tiled 12768+0f, tiled 12768+0f, tiled 12768+0f, direct 32319+0f; kernel 4.50e-7
+  PASS  !! *** K0 in the browser: the r13 set in the browser's own device, every cell the twin's or the fused mirror's, the kernel within APPLY_TOL ***   fast 12768+0f, fast 12768+0f, fast 12768+0f, fast 12768+0f, fast 32319+0f; kernel 4.50e-7
+  PASS  !! *** K0 in the browser: the r14 set in the browser's own device, every cell the twin's or the fused mirror's, the kernel within APPLY_TOL ***   fast 12768+0f, fast 12768+0f, fast 12768+0f, fast 12768+0f, head 32319+0f; kernel 4.50e-7
+  PASS  !! *** K0 in the browser: the r15 set in the browser's own device, every cell the twin's or the fused mirror's, the kernel within APPLY_TOL ***   fast 12768+0f, fast 12768+0f, fast 12768+0f, fast 12768+0f, head_apply 0+0f; kernel 3.80e-7
+  PASS  !! *** K0 in the browser: the r18t set in the browser's own device, every cell the twin's or the fused mirror's, the kernel within APPLY_TOL ***   tile_inline 12768+0f, tile_inline 12768+0f, tile_inline 12768+0f, tile_inline 12768+0f, head_apply 0+0f; kernel 3.80e-7
+  PASS  !! *** K0 in the browser: the r18u set in the browser's own device, every cell the twin's or the fused mirror's, the kernel within APPLY_TOL ***   fast_unroll 12768+0f, fast_unroll 12768+0f, fast_unroll 12768+0f, fast_unroll 12768+0f, head_apply 0+0f; kernel 3.80e-7
+
+6. ROUND 20 (section 68): THE NATIVE CALLER, RUN AS THE RIG RUNS IT -- tools/denoiseDevice.mjs --which
+  ----  native caller here: key win32/intel/gen-9, kernels r18u (section 67's for win32/intel/gen-9, under DXC); ran in 7.351 ms, worst 1.05e-6
+  PASS  !! round 20 (section 68): the native caller picks what nativePick gives this adapter and this run's compiler, builds it, and runs one pass within 1e-4 of the f64 network   exit 0; the gate's own pick win32/intel/gen-9 r18u
+
+ALL GREEN (104320 ms)
+not closed here: the shipped network itself, on the images it was measured on. `node tools/denoiseDevice.mjs --measure-r12` is section 35's one command, and no gate runs it; rounds 13-15's and 18's are `--measure-r13`, `--measure-r14`, `--measure-r15`, `--measure-r18t` and `--measure-r18u` (K0 (a)).
+
+
+
+
+C:\swek_src\WebGLEngine>set SWEK_WEBGPU=
+
+C:\swek_src\WebGLEngine>node render\denoiseCompile-selfcheck.mjs
+1. THE INSTRUMENT, ON THE CPU
+  PASS    the dump is read for the kernel's own block -- not Dawn's internal shader after it -- for its compiler and its code's shape: FXC's DXBC, a loop, an indexable temp, a barrier
+  PASS    the child asks Dawn for its features in ONE entry -- dump_shaders with use_dxc, not two entries of which Dawn keeps the last   section 49: two entries left every use_dxc dump empty, on both GPUs -- got ["enable-dawn-features=dump_shaders,use_dxc"]
+  PASS    ...and its DISABLED features in one entry too -- "use_dxc off" and the fine clock together, so neither erases the other   got ["enable-dawn-features=dump_shaders","disable-dawn-features=use_dxc,timestamp_quantization"]
+  PASS    ...and both native children -- this gate's and the build probe's -- make their Dawn flags with it, the fine clock merged in   denoiseCompile-selfcheck.mjs: create(dawnFlags([...flags, H.FINE_CLOCK_FLAG]));; denoiseBuildProbe.mjs: create(dawnFlags([...DXC_FLAGS, H.FINE_CLOCK_FLAG]));
+  PASS    node-webgpu 0.6.2 on D3D12 (dxcompiler.dll beside dawn.node): as shipped, use_dxc and use_dxc off, from the package alone -- nothing copied   as shipped | use_dxc | use_dxc off
+  PASS    ...0.6.0 and 0.6.1 (no DXC of their own) on D3D12: as shipped alone -- their Dawn forces use_dxc off, so a use_dxc run would be FXC under another name; not D3D12, as shipped alone   as shipped  /  as shipped  /  as shipped
+  PASS    every kernel has a job: r12-tiled-3x3, r13-fast-3x3, r12-direct-head, r13-fast-head, r14-head, r12-apply, r14-apply-fast, r15-head-apply
+  PASS    the build probe's 10 shapes (section 56) each have a job; edge zero has no guarded copy and edge skip has one; section 54's two kernels come last   fast-32, tile2-zero-32, tile4-zero-32, tile2g4-zero-32, tile2-zero-10, tile4-zero-10, tile1-skip-32, tile2g4-skip-32, tile2-skip-32, tile4-skip-32
+  PASS    round 17's 7 shapes (section 59) each have a job at 64 x 64, judged, and at 1024 x 1024, whose twin is not computed: the fast kernel first   fast-32, fast-vec4-32, fast-unroll-32, fast-vec4-unroll-32, tile2-zero-inline-32, tile4-zero-inline-32, tile1-skip-inline-32
+  PASS    section 66: r18t's and r18u's hidden-layer kernels each have a job at 64 x 64, judged, dxcOnly, their WGSL the device's own for that set (R18_KERNELS) -- on r13-fast-3x3's layer, r15's hidden kernel   r18t-tile-inline-3x3: the device's kernel; r18u-fast-unroll-3x3: the device's kernel
+  PASS  !! section 66's condition 0 on fixtures: the dumps say DXIL exactly when the package said DXC -- DXC needs every dump DXIL (a child with no dump is not), FXC no DXIL and some DXBC; off win32 no D3D dump, and no D3D evidence claimed   DXC, every dump DXIL: agree; DXC, one dump DXBC: red; DXC, one child with no dump: red; DXC, no dump at all: red; DXC, no children: red; FXC, one dump DXIL: red; FXC, every dump DXBC: agree; FXC, no D3D dump at all: red; none (off win32), SPIR-V dumps: agree; none (off win32), a DXIL dump: red
+  PASS  !! section 66: r18t's and r18u's hidden kernels build only in a mode whose compiler is DXC and whose eight base kernels all dumped DXIL -- under FXC, or off win32, they stand aside   DXC, eight DXIL: build; DXC, seven DXIL and one DXBC: stand aside; DXC, seven DXIL and one with no dump: stand aside; DXC, only seven dumps: stand aside; FXC, eight DXIL: stand aside; FXC, eight DXBC: stand aside; none (off win32): stand aside
+
+1b. THE PROBE'S ARITHMETIC, AND THE BUILD-AND-TIME CONTRACT ON A STAND-IN DEVICE
+  PASS  !! headApplyProbe's every activation-by-weight product is exact in f32 -- so a fused multiply-add rounds as a multiply then an add, and only the ORDER of the sums can move a logit   64 activations x 9 weights, every product exact; the same probe twice
+  PASS  !! buildJob reports a WGSL error by line and column, a pipeline failure by its message, and a build's wall time from the clock it is given   WGSL did not compile: 3:7 bad token; pipeline: boom; buildMs 5
+  PASS  !! runJob: one untimed pass then three timed, on the device's clock where it has timestamps and the wall's where not; the output read back whole and judged; every buffer it made destroyed   device 2 ms x 3, wall 5 ms; 6 buffers made, 6 destroyed
+  PASS  !! measureSizes builds the kernel ONCE and times it at every size, judging only where the twin is held (64 x 64)   1 module for 2 sizes; judged false, -
+
+2. NATIVE: each kernel in its own process, under each compiler this box has
+  ----  node-webgpu 0.6.2 from C:\Users\howdy\AppData\Roaming\npm\node_modules\webgpu\index.js; native compilers: D3D12; DXC ships beside dawn.node -- runs as shipped, use_dxc and use_dxc off, from the package alone; modes: as shipped, use_dxc, use_dxc off
+  ----  native / as shipped in all: 10 of 10 built; dumps: 10 DXC (DXIL); compiler, from the package: DXC; dumps at C:\Users\howdy\AppData\Local\Temp\swek-denoise-dump-0.6.2-as_shipped-*.txt
+  ----  section 66, native / as shipped under DXC: at 64 x 64, r15's hidden kernel (r13-fast-3x3) over r18t's (r18t-tile-inline-3x3): 0.727 x (0.103 ms against 0.142 ms); r18u's (r18u-fast-unroll-3x3): 0.727 x (0.103 ms against 0.142 ms) -- deciding nothing
+  ----  native / use_dxc in all: 10 of 10 built; dumps: 10 DXC (DXIL); compiler, from the package: DXC; dumps at C:\Users\howdy\AppData\Local\Temp\swek-denoise-dump-0.6.2-use_dxc-*.txt
+  ----  section 66, native / use_dxc under DXC: at 64 x 64, r15's hidden kernel (r13-fast-3x3) over r18t's (r18t-tile-inline-3x3): 0.712 x (0.101 ms against 0.142 ms); r18u's (r18u-fast-unroll-3x3): 0.723 x (0.101 ms against 0.140 ms) -- deciding nothing
+  SKIP  section 66: native / use_dxc off: r18t's and r18u's hidden kernels (r18t-tile-inline-3x3, r18u-fast-unroll-3x3) stand aside, not counted as unbuilt -- the compiler is FXC, not DXC
+  ----  native / use_dxc off in all: 8 of 8 built; dumps: 8 FXC (DXBC); compiler, from the package: FXC; dumps at C:\Users\howdy\AppData\Local\Temp\swek-denoise-dump-0.6.2-use_dxc_off-*.txt
+  PASS  !! section 66's condition 0: the package said DXC for "as shipped", and its 10 children's dumps say DXIL exactly when it said DXC   predicted DXC; 10 dump(s): 10 DXIL, 0 DXBC, 0 SPIR-V, 0 without a compiler
+  PASS  !! every native child reported a result -- a child that exits without one is the instrument failing, not a kernel saying why   28 children, each with a result
+  PASS  !! section 61: the native children's clocks are not Dawn's rounded one -- not every pass time is a whole number of 65,536 ns   0 of 28 native passes on the 65,536 ns grid
+
+3. THE BROWSER: denoise.html's "Time each kernel", in Chromium, on its own adapter
+  PASS  !! the page built and timed every kernel on its own device, showed the table, and said how many were exact -- no page error   google / swiftshader: 8 of 8 kernels built and exact
+
+4. WHAT WAS MEASURED
+  PASS  !! native / as shipped: every kernel built or said why, and every one built is exact -- conv cells the twin's or the fused mirror's, the kernel apply within APPLY_TOL   10 kernels, all exact
+  PASS    native / as shipped: every build and pass time finite and positive
+  ----  native / as shipped: r12-tiled-3x3: build 73 ms, pass 1.397 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 612 lines, 0 loops, 0 indexable-temp lines, 4 barriers
+  ----  native / as shipped: r13-fast-3x3: build 128 ms, pass 0.103 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 1339 lines, 0 loops, 0 indexable-temp lines, 4 barriers
+  ----  native / as shipped: r12-direct-head: build 41 ms, pass 0.434 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 358 lines, 0 loops, 0 indexable-temp lines, 0 barriers
+  ----  native / as shipped: r13-fast-head: build 92 ms, pass 0.056 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 1173 lines, 0 loops, 0 indexable-temp lines, 4 barriers
+  ----  native / as shipped: r14-head: build 49 ms, pass 0.115 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 249 lines, 0 loops, 0 indexable-temp lines, 0 barriers
+  ----  native / as shipped: r12-apply: build 75 ms, pass 0.091 ms (device clock, 30 passes), worst 4.56e-7 (APPLY_TOL 0.00001); dump: DXC (DXIL), 576 lines, 0 loops, 0 indexable-temp lines, 0 barriers
+  ----  native / as shipped: r14-apply-fast: build 74 ms, pass 0.089 ms (device clock, 30 passes), worst 4.56e-7 (APPLY_TOL 0.00001); dump: DXC (DXIL), 566 lines, 0 loops, 0 indexable-temp lines, 3 barriers
+  ----  native / as shipped: r15-head-apply: build 1253 ms, pass 0.051 ms (device clock, 30 passes), worst 6.26e-7 against the twin's logits, which are the fused mirror's here (APPLY_TOL 0.00001); dump: DXC (DXIL), 8910 lines, 0 loops, 0 indexable-temp lines, 3 barriers
+  ----  native / as shipped: r18t-tile-inline-3x3: build 138 ms, pass 0.142 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 2029 lines, 0 loops, 0 indexable-temp lines, 4 barriers
+  ----  native / as shipped: r18u-fast-unroll-3x3: build 838 ms, pass 0.142 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 12506 lines, 0 loops, 0 indexable-temp lines, 4 barriers
+  PASS  !! native / use_dxc: every kernel built or said why, and every one built is exact -- conv cells the twin's or the fused mirror's, the kernel apply within APPLY_TOL   10 kernels, all exact
+  PASS    native / use_dxc: every build and pass time finite and positive
+  ----  native / use_dxc: r12-tiled-3x3: build 86 ms, pass 1.397 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 612 lines, 0 loops, 0 indexable-temp lines, 4 barriers
+  ----  native / use_dxc: r13-fast-3x3: build 111 ms, pass 0.101 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 1339 lines, 0 loops, 0 indexable-temp lines, 4 barriers
+  ----  native / use_dxc: r12-direct-head: build 45 ms, pass 0.422 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 358 lines, 0 loops, 0 indexable-temp lines, 0 barriers
+  ----  native / use_dxc: r13-fast-head: build 90 ms, pass 0.056 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 1173 lines, 0 loops, 0 indexable-temp lines, 4 barriers
+  ----  native / use_dxc: r14-head: build 36 ms, pass 0.115 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 249 lines, 0 loops, 0 indexable-temp lines, 0 barriers
+  ----  native / use_dxc: r12-apply: build 81 ms, pass 0.090 ms (device clock, 30 passes), worst 4.56e-7 (APPLY_TOL 0.00001); dump: DXC (DXIL), 576 lines, 0 loops, 0 indexable-temp lines, 0 barriers
+  ----  native / use_dxc: r14-apply-fast: build 70 ms, pass 0.089 ms (device clock, 30 passes), worst 4.56e-7 (APPLY_TOL 0.00001); dump: DXC (DXIL), 566 lines, 0 loops, 0 indexable-temp lines, 3 barriers
+  ----  native / use_dxc: r15-head-apply: build 1345 ms, pass 0.051 ms (device clock, 30 passes), worst 6.26e-7 against the twin's logits, which are the fused mirror's here (APPLY_TOL 0.00001); dump: DXC (DXIL), 8910 lines, 0 loops, 0 indexable-temp lines, 3 barriers
+  ----  native / use_dxc: r18t-tile-inline-3x3: build 154 ms, pass 0.142 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 2029 lines, 0 loops, 0 indexable-temp lines, 4 barriers
+  ----  native / use_dxc: r18u-fast-unroll-3x3: build 861 ms, pass 0.140 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 12506 lines, 0 loops, 0 indexable-temp lines, 4 barriers
+  PASS  !! native / use_dxc off: every kernel built or said why, and every one built is exact -- conv cells the twin's or the fused mirror's, the kernel apply within APPLY_TOL   8 kernels, all exact
+  PASS    native / use_dxc off: every build and pass time finite and positive
+  ----  native / use_dxc off: r12-tiled-3x3: build 418 ms, pass 1.118 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 363 lines, 9 loops, 37 indexable-temp lines, 3 barriers
+  ----  native / use_dxc off: r13-fast-3x3: build 3744 ms, pass 0.160 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 537 lines, 6 loops, 0 indexable-temp lines, 3 barriers
+  ----  native / use_dxc off: r12-direct-head: build 234 ms, pass 0.348 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 217 lines, 5 loops, 0 indexable-temp lines, 0 barriers
+  ----  native / use_dxc off: r13-fast-head: build 127228 ms, pass 22.615 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 9785 lines, 6 loops, 0 indexable-temp lines, 3 barriers
+  ----  native / use_dxc off: r14-head: build 134 ms, pass 0.096 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 97 lines, 1 loops, 0 indexable-temp lines, 0 barriers
+  ----  native / use_dxc off: r12-apply: build 100 ms, pass 0.127 ms (device clock, 30 passes), worst 4.56e-7 (APPLY_TOL 0.00001); dump: FXC (DXBC), 299 lines, 3 loops, 85 indexable-temp lines, 0 barriers
+  ----  native / use_dxc off: r14-apply-fast: build 200 ms, pass 0.071 ms (device clock, 30 passes), worst 4.56e-7 (APPLY_TOL 0.00001); dump: FXC (DXBC), 324 lines, 5 loops, 0 indexable-temp lines, 2 barriers
+  ----  native / use_dxc off: r15-head-apply: build 8555 ms, pass 0.103 ms (device clock, 30 passes), worst 6.26e-7 against the twin's logits, which are the fused mirror's here (APPLY_TOL 0.00001); dump: FXC (DXBC), 4954 lines, 3 loops, 0 indexable-temp lines, 2 barriers
+  PASS  !! browser / Chrome's: every kernel built or said why, and every one built is exact -- conv cells the twin's or the fused mirror's, the kernel apply within APPLY_TOL   8 kernels, all exact
+  PASS    browser / Chrome's: every build and pass time finite and positive
+  ----  browser / Chrome's: r12-tiled-3x3: build 259 ms, pass 123.096 ms (device clock, 13 passes), 131072 plain, 0 fused, 0 unexplained
+  ----  browser / Chrome's: r13-fast-3x3: build 413 ms, pass 43.163 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained
+  ----  browser / Chrome's: r12-direct-head: build 49 ms, pass 61.229 ms (device clock, 25 passes), 331776 plain, 0 fused, 0 unexplained
+  ----  browser / Chrome's: r13-fast-head: build 321 ms, pass 27.283 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained
+  ----  browser / Chrome's: r14-head: build 18 ms, pass 13.250 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained
+  ----  browser / Chrome's: r12-apply: build 70 ms, pass 6.369 ms (device clock, 30 passes), worst 5.11e-7 (APPLY_TOL 0.00001)
+  ----  browser / Chrome's: r14-apply-fast: build 335 ms, pass 8.694 ms (device clock, 30 passes), worst 5.11e-7 (APPLY_TOL 0.00001)
+  ----  browser / Chrome's: r15-head-apply: build 2453 ms, pass 25.375 ms (device clock, 30 passes), worst 4.99e-7 against the twin's logits, which are the fused mirror's here (APPLY_TOL 0.00001)
+  PASS    on D3D12 every native run that built has a dump naming its compiler -- DXBC is FXC, DXIL is DXC   as shipped/r12-tiled-3x3: DXC (DXIL); as shipped/r13-fast-3x3: DXC (DXIL); as shipped/r12-direct-head: DXC (DXIL); as shipped/r13-fast-head: DXC (DXIL); as shipped/r14-head: DXC (DXIL); as shipped/r12-apply: DXC (DXIL); as shipped/r14-apply-fast: DXC (DXIL); as shipped/r15-head-apply: DXC (DXIL); as
+
+ALL GREEN (194587 ms)
+not closed here: any number, and any cause. The build and pass times above are what section 43's A reads; on SwiftShader they are a CPU's, and the D3D12 compilers are a Windows GPU's to show.
+
+C:\swek_src\WebGLEngine>node render\denoiseCompile-selfcheck.mjs
+1. THE INSTRUMENT, ON THE CPU
+  PASS    the dump is read for the kernel's own block -- not Dawn's internal shader after it -- for its compiler and its code's shape: FXC's DXBC, a loop, an indexable temp, a barrier
+  PASS    the child asks Dawn for its features in ONE entry -- dump_shaders with use_dxc, not two entries of which Dawn keeps the last   section 49: two entries left every use_dxc dump empty, on both GPUs -- got ["enable-dawn-features=dump_shaders,use_dxc"]
+  PASS    ...and its DISABLED features in one entry too -- "use_dxc off" and the fine clock together, so neither erases the other   got ["enable-dawn-features=dump_shaders","disable-dawn-features=use_dxc,timestamp_quantization"]
+  PASS    ...and both native children -- this gate's and the build probe's -- make their Dawn flags with it, the fine clock merged in   denoiseCompile-selfcheck.mjs: create(dawnFlags([...flags, H.FINE_CLOCK_FLAG]));; denoiseBuildProbe.mjs: create(dawnFlags([...DXC_FLAGS, H.FINE_CLOCK_FLAG]));
+  PASS    node-webgpu 0.6.2 on D3D12 (dxcompiler.dll beside dawn.node): as shipped, use_dxc and use_dxc off, from the package alone -- nothing copied   as shipped | use_dxc | use_dxc off
+  PASS    ...0.6.0 and 0.6.1 (no DXC of their own) on D3D12: as shipped alone -- their Dawn forces use_dxc off, so a use_dxc run would be FXC under another name; not D3D12, as shipped alone   as shipped  /  as shipped  /  as shipped
+  PASS    every kernel has a job: r12-tiled-3x3, r13-fast-3x3, r12-direct-head, r13-fast-head, r14-head, r12-apply, r14-apply-fast, r15-head-apply
+  PASS    the build probe's 10 shapes (section 56) each have a job; edge zero has no guarded copy and edge skip has one; section 54's two kernels come last   fast-32, tile2-zero-32, tile4-zero-32, tile2g4-zero-32, tile2-zero-10, tile4-zero-10, tile1-skip-32, tile2g4-skip-32, tile2-skip-32, tile4-skip-32
+  PASS    round 17's 7 shapes (section 59) each have a job at 64 x 64, judged, and at 1024 x 1024, whose twin is not computed: the fast kernel first   fast-32, fast-vec4-32, fast-unroll-32, fast-vec4-unroll-32, tile2-zero-inline-32, tile4-zero-inline-32, tile1-skip-inline-32
+  PASS    section 66: r18t's and r18u's hidden-layer kernels each have a job at 64 x 64, judged, dxcOnly, their WGSL the device's own for that set (R18_KERNELS) -- on r13-fast-3x3's layer, r15's hidden kernel   r18t-tile-inline-3x3: the device's kernel; r18u-fast-unroll-3x3: the device's kernel
+  PASS  !! section 66's condition 0 on fixtures: the dumps say DXIL exactly when the package said DXC -- DXC needs every dump DXIL (a child with no dump is not), FXC no DXIL and some DXBC; off win32 no D3D dump, and no D3D evidence claimed   DXC, every dump DXIL: agree; DXC, one dump DXBC: red; DXC, one child with no dump: red; DXC, no dump at all: red; DXC, no children: red; FXC, one dump DXIL: red; FXC, every dump DXBC: agree; FXC, no D3D dump at all: red; none (off win32), SPIR-V dumps: agree; none (off win32), a DXIL dump: red
+  PASS  !! section 66: r18t's and r18u's hidden kernels build only in a mode whose compiler is DXC and whose eight base kernels all dumped DXIL -- under FXC, or off win32, they stand aside   DXC, eight DXIL: build; DXC, seven DXIL and one DXBC: stand aside; DXC, seven DXIL and one with no dump: stand aside; DXC, only seven dumps: stand aside; FXC, eight DXIL: stand aside; FXC, eight DXBC: stand aside; none (off win32): stand aside
+
+1b. THE PROBE'S ARITHMETIC, AND THE BUILD-AND-TIME CONTRACT ON A STAND-IN DEVICE
+  PASS  !! headApplyProbe's every activation-by-weight product is exact in f32 -- so a fused multiply-add rounds as a multiply then an add, and only the ORDER of the sums can move a logit   64 activations x 9 weights, every product exact; the same probe twice
+  PASS  !! buildJob reports a WGSL error by line and column, a pipeline failure by its message, and a build's wall time from the clock it is given   WGSL did not compile: 3:7 bad token; pipeline: boom; buildMs 5
+  PASS  !! runJob: one untimed pass then three timed, on the device's clock where it has timestamps and the wall's where not; the output read back whole and judged; every buffer it made destroyed   device 2 ms x 3, wall 5 ms; 6 buffers made, 6 destroyed
+  PASS  !! measureSizes builds the kernel ONCE and times it at every size, judging only where the twin is held (64 x 64)   1 module for 2 sizes; judged false, -
+
+2. NATIVE: each kernel in its own process, under each compiler this box has
+  ----  node-webgpu 0.6.2 from C:\Users\howdy\AppData\Roaming\npm\node_modules\webgpu\index.js; native compilers: D3D12; DXC ships beside dawn.node -- runs as shipped, use_dxc and use_dxc off, from the package alone; modes: as shipped, use_dxc, use_dxc off
+  ----  native / as shipped in all: 10 of 10 built; dumps: 10 DXC (DXIL); compiler, from the package: DXC; dumps at C:\Users\howdy\AppData\Local\Temp\swek-denoise-dump-0.6.2-as_shipped-*.txt
+  ----  section 66, native / as shipped under DXC: at 64 x 64, r15's hidden kernel (r13-fast-3x3) over r18t's (r18t-tile-inline-3x3): 0.717 x (0.101 ms against 0.141 ms); r18u's (r18u-fast-unroll-3x3): 0.728 x (0.101 ms against 0.139 ms) -- deciding nothing
+  ----  native / use_dxc in all: 10 of 10 built; dumps: 10 DXC (DXIL); compiler, from the package: DXC; dumps at C:\Users\howdy\AppData\Local\Temp\swek-denoise-dump-0.6.2-use_dxc-*.txt
+  ----  section 66, native / use_dxc under DXC: at 64 x 64, r15's hidden kernel (r13-fast-3x3) over r18t's (r18t-tile-inline-3x3): 0.733 x (0.101 ms against 0.138 ms); r18u's (r18u-fast-unroll-3x3): 0.723 x (0.101 ms against 0.140 ms) -- deciding nothing
+  SKIP  section 66: native / use_dxc off: r18t's and r18u's hidden kernels (r18t-tile-inline-3x3, r18u-fast-unroll-3x3) stand aside, not counted as unbuilt -- the compiler is FXC, not DXC
+  ----  native / use_dxc off in all: 8 of 8 built; dumps: 8 FXC (DXBC); compiler, from the package: FXC; dumps at C:\Users\howdy\AppData\Local\Temp\swek-denoise-dump-0.6.2-use_dxc_off-*.txt
+  PASS  !! section 66's condition 0: the package said DXC for "as shipped", and its 10 children's dumps say DXIL exactly when it said DXC   predicted DXC; 10 dump(s): 10 DXIL, 0 DXBC, 0 SPIR-V, 0 without a compiler
+  PASS  !! every native child reported a result -- a child that exits without one is the instrument failing, not a kernel saying why   28 children, each with a result
+  PASS  !! section 61: the native children's clocks are not Dawn's rounded one -- not every pass time is a whole number of 65,536 ns   0 of 28 native passes on the 65,536 ns grid
+
+3. THE BROWSER: denoise.html's "Time each kernel", in Chromium, on its own adapter
+  PASS  !! the page built and timed every kernel on its own device, showed the table, and said how many were exact -- no page error   google / swiftshader: 8 of 8 kernels built and exact
+
+4. WHAT WAS MEASURED
+  PASS  !! native / as shipped: every kernel built or said why, and every one built is exact -- conv cells the twin's or the fused mirror's, the kernel apply within APPLY_TOL   10 kernels, all exact
+  PASS    native / as shipped: every build and pass time finite and positive
+  ----  native / as shipped: r12-tiled-3x3: build 59 ms, pass 1.389 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 612 lines, 0 loops, 0 indexable-temp lines, 4 barriers
+  ----  native / as shipped: r13-fast-3x3: build 104 ms, pass 0.101 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 1339 lines, 0 loops, 0 indexable-temp lines, 4 barriers
+  ----  native / as shipped: r12-direct-head: build 34 ms, pass 0.419 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 358 lines, 0 loops, 0 indexable-temp lines, 0 barriers
+  ----  native / as shipped: r13-fast-head: build 156 ms, pass 0.056 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 1173 lines, 0 loops, 0 indexable-temp lines, 4 barriers
+  ----  native / as shipped: r14-head: build 37 ms, pass 0.128 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 249 lines, 0 loops, 0 indexable-temp lines, 0 barriers
+  ----  native / as shipped: r12-apply: build 75 ms, pass 0.089 ms (device clock, 30 passes), worst 4.56e-7 (APPLY_TOL 0.00001); dump: DXC (DXIL), 576 lines, 0 loops, 0 indexable-temp lines, 0 barriers
+  ----  native / as shipped: r14-apply-fast: build 61 ms, pass 0.088 ms (device clock, 30 passes), worst 4.56e-7 (APPLY_TOL 0.00001); dump: DXC (DXIL), 566 lines, 0 loops, 0 indexable-temp lines, 3 barriers
+  ----  native / as shipped: r15-head-apply: build 1306 ms, pass 0.051 ms (device clock, 30 passes), worst 6.26e-7 against the twin's logits, which are the fused mirror's here (APPLY_TOL 0.00001); dump: DXC (DXIL), 8910 lines, 0 loops, 0 indexable-temp lines, 3 barriers
+  ----  native / as shipped: r18t-tile-inline-3x3: build 187 ms, pass 0.141 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 2029 lines, 0 loops, 0 indexable-temp lines, 4 barriers
+  ----  native / as shipped: r18u-fast-unroll-3x3: build 763 ms, pass 0.139 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 12506 lines, 0 loops, 0 indexable-temp lines, 4 barriers
+  PASS  !! native / use_dxc: every kernel built or said why, and every one built is exact -- conv cells the twin's or the fused mirror's, the kernel apply within APPLY_TOL   10 kernels, all exact
+  PASS    native / use_dxc: every build and pass time finite and positive
+  ----  native / use_dxc: r12-tiled-3x3: build 99 ms, pass 1.389 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 612 lines, 0 loops, 0 indexable-temp lines, 4 barriers
+  ----  native / use_dxc: r13-fast-3x3: build 113 ms, pass 0.101 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 1339 lines, 0 loops, 0 indexable-temp lines, 4 barriers
+  ----  native / use_dxc: r12-direct-head: build 60 ms, pass 0.421 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 358 lines, 0 loops, 0 indexable-temp lines, 0 barriers
+  ----  native / use_dxc: r13-fast-head: build 122 ms, pass 0.056 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 1173 lines, 0 loops, 0 indexable-temp lines, 4 barriers
+  ----  native / use_dxc: r14-head: build 30 ms, pass 0.128 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 249 lines, 0 loops, 0 indexable-temp lines, 0 barriers
+  ----  native / use_dxc: r12-apply: build 52 ms, pass 0.089 ms (device clock, 30 passes), worst 4.56e-7 (APPLY_TOL 0.00001); dump: DXC (DXIL), 576 lines, 0 loops, 0 indexable-temp lines, 0 barriers
+  ----  native / use_dxc: r14-apply-fast: build 84 ms, pass 0.089 ms (device clock, 30 passes), worst 4.56e-7 (APPLY_TOL 0.00001); dump: DXC (DXIL), 566 lines, 0 loops, 0 indexable-temp lines, 3 barriers
+  ----  native / use_dxc: r15-head-apply: build 1198 ms, pass 0.051 ms (device clock, 30 passes), worst 6.26e-7 against the twin's logits, which are the fused mirror's here (APPLY_TOL 0.00001); dump: DXC (DXIL), 8910 lines, 0 loops, 0 indexable-temp lines, 3 barriers
+  ----  native / use_dxc: r18t-tile-inline-3x3: build 169 ms, pass 0.138 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 2029 lines, 0 loops, 0 indexable-temp lines, 4 barriers
+  ----  native / use_dxc: r18u-fast-unroll-3x3: build 828 ms, pass 0.140 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 12506 lines, 0 loops, 0 indexable-temp lines, 4 barriers
+  PASS  !! native / use_dxc off: every kernel built or said why, and every one built is exact -- conv cells the twin's or the fused mirror's, the kernel apply within APPLY_TOL   8 kernels, all exact
+  PASS    native / use_dxc off: every build and pass time finite and positive
+  ----  native / use_dxc off: r12-tiled-3x3: build 436 ms, pass 1.085 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 363 lines, 9 loops, 37 indexable-temp lines, 3 barriers
+  ----  native / use_dxc off: r13-fast-3x3: build 3866 ms, pass 0.139 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 537 lines, 6 loops, 0 indexable-temp lines, 3 barriers
+  ----  native / use_dxc off: r12-direct-head: build 236 ms, pass 0.358 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 217 lines, 5 loops, 0 indexable-temp lines, 0 barriers
+  ----  native / use_dxc off: r13-fast-head: build 126975 ms, pass 22.570 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 9785 lines, 6 loops, 0 indexable-temp lines, 3 barriers
+  ----  native / use_dxc off: r14-head: build 137 ms, pass 0.106 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 97 lines, 1 loops, 0 indexable-temp lines, 0 barriers
+  ----  native / use_dxc off: r12-apply: build 108 ms, pass 0.144 ms (device clock, 30 passes), worst 4.56e-7 (APPLY_TOL 0.00001); dump: FXC (DXBC), 299 lines, 3 loops, 85 indexable-temp lines, 0 barriers
+  ----  native / use_dxc off: r14-apply-fast: build 217 ms, pass 0.083 ms (device clock, 30 passes), worst 4.56e-7 (APPLY_TOL 0.00001); dump: FXC (DXBC), 324 lines, 5 loops, 0 indexable-temp lines, 2 barriers
+  ----  native / use_dxc off: r15-head-apply: build 8406 ms, pass 0.103 ms (device clock, 30 passes), worst 6.26e-7 against the twin's logits, which are the fused mirror's here (APPLY_TOL 0.00001); dump: FXC (DXBC), 4954 lines, 3 loops, 0 indexable-temp lines, 2 barriers
+  PASS  !! browser / Chrome's: every kernel built or said why, and every one built is exact -- conv cells the twin's or the fused mirror's, the kernel apply within APPLY_TOL   8 kernels, all exact
+  PASS    browser / Chrome's: every build and pass time finite and positive
+  ----  browser / Chrome's: r12-tiled-3x3: build 271 ms, pass 120.829 ms (device clock, 13 passes), 131072 plain, 0 fused, 0 unexplained
+  ----  browser / Chrome's: r13-fast-3x3: build 388 ms, pass 46.628 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained
+  ----  browser / Chrome's: r12-direct-head: build 31 ms, pass 60.263 ms (device clock, 25 passes), 331776 plain, 0 fused, 0 unexplained
+  ----  browser / Chrome's: r13-fast-head: build 307 ms, pass 23.485 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained
+  ----  browser / Chrome's: r14-head: build 37 ms, pass 13.269 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained
+  ----  browser / Chrome's: r12-apply: build 75 ms, pass 6.459 ms (device clock, 30 passes), worst 5.11e-7 (APPLY_TOL 0.00001)
+  ----  browser / Chrome's: r14-apply-fast: build 368 ms, pass 9.027 ms (device clock, 30 passes), worst 5.11e-7 (APPLY_TOL 0.00001)
+  ----  browser / Chrome's: r15-head-apply: build 2349 ms, pass 19.780 ms (device clock, 30 passes), worst 4.99e-7 against the twin's logits, which are the fused mirror's here (APPLY_TOL 0.00001)
+  PASS    on D3D12 every native run that built has a dump naming its compiler -- DXBC is FXC, DXIL is DXC   as shipped/r12-tiled-3x3: DXC (DXIL); as shipped/r13-fast-3x3: DXC (DXIL); as shipped/r12-direct-head: DXC (DXIL); as shipped/r13-fast-head: DXC (DXIL); as shipped/r14-head: DXC (DXIL); as shipped/r12-apply: DXC (DXIL); as shipped/r14-apply-fast: DXC (DXIL); as shipped/r15-head-apply: DXC (DXIL); as
+
+ALL GREEN (193788 ms)
+not closed here: any number, and any cause. The build and pass times above are what section 43's A reads; on SwiftShader they are a CPU's, and the D3D12 compilers are a Windows GPU's to show.
+
+C:\swek_src\WebGLEngine>node render\denoiseCompile-selfcheck.mjs
+1. THE INSTRUMENT, ON THE CPU
+  PASS    the dump is read for the kernel's own block -- not Dawn's internal shader after it -- for its compiler and its code's shape: FXC's DXBC, a loop, an indexable temp, a barrier
+  PASS    the child asks Dawn for its features in ONE entry -- dump_shaders with use_dxc, not two entries of which Dawn keeps the last   section 49: two entries left every use_dxc dump empty, on both GPUs -- got ["enable-dawn-features=dump_shaders,use_dxc"]
+  PASS    ...and its DISABLED features in one entry too -- "use_dxc off" and the fine clock together, so neither erases the other   got ["enable-dawn-features=dump_shaders","disable-dawn-features=use_dxc,timestamp_quantization"]
+  PASS    ...and both native children -- this gate's and the build probe's -- make their Dawn flags with it, the fine clock merged in   denoiseCompile-selfcheck.mjs: create(dawnFlags([...flags, H.FINE_CLOCK_FLAG]));; denoiseBuildProbe.mjs: create(dawnFlags([...DXC_FLAGS, H.FINE_CLOCK_FLAG]));
+  PASS    node-webgpu 0.6.2 on D3D12 (dxcompiler.dll beside dawn.node): as shipped, use_dxc and use_dxc off, from the package alone -- nothing copied   as shipped | use_dxc | use_dxc off
+  PASS    ...0.6.0 and 0.6.1 (no DXC of their own) on D3D12: as shipped alone -- their Dawn forces use_dxc off, so a use_dxc run would be FXC under another name; not D3D12, as shipped alone   as shipped  /  as shipped  /  as shipped
+  PASS    every kernel has a job: r12-tiled-3x3, r13-fast-3x3, r12-direct-head, r13-fast-head, r14-head, r12-apply, r14-apply-fast, r15-head-apply
+  PASS    the build probe's 10 shapes (section 56) each have a job; edge zero has no guarded copy and edge skip has one; section 54's two kernels come last   fast-32, tile2-zero-32, tile4-zero-32, tile2g4-zero-32, tile2-zero-10, tile4-zero-10, tile1-skip-32, tile2g4-skip-32, tile2-skip-32, tile4-skip-32
+  PASS    round 17's 7 shapes (section 59) each have a job at 64 x 64, judged, and at 1024 x 1024, whose twin is not computed: the fast kernel first   fast-32, fast-vec4-32, fast-unroll-32, fast-vec4-unroll-32, tile2-zero-inline-32, tile4-zero-inline-32, tile1-skip-inline-32
+  PASS    section 66: r18t's and r18u's hidden-layer kernels each have a job at 64 x 64, judged, dxcOnly, their WGSL the device's own for that set (R18_KERNELS) -- on r13-fast-3x3's layer, r15's hidden kernel   r18t-tile-inline-3x3: the device's kernel; r18u-fast-unroll-3x3: the device's kernel
+  PASS  !! section 66's condition 0 on fixtures: the dumps say DXIL exactly when the package said DXC -- DXC needs every dump DXIL (a child with no dump is not), FXC no DXIL and some DXBC; off win32 no D3D dump, and no D3D evidence claimed   DXC, every dump DXIL: agree; DXC, one dump DXBC: red; DXC, one child with no dump: red; DXC, no dump at all: red; DXC, no children: red; FXC, one dump DXIL: red; FXC, every dump DXBC: agree; FXC, no D3D dump at all: red; none (off win32), SPIR-V dumps: agree; none (off win32), a DXIL dump: red
+  PASS  !! section 66: r18t's and r18u's hidden kernels build only in a mode whose compiler is DXC and whose eight base kernels all dumped DXIL -- under FXC, or off win32, they stand aside   DXC, eight DXIL: build; DXC, seven DXIL and one DXBC: stand aside; DXC, seven DXIL and one with no dump: stand aside; DXC, only seven dumps: stand aside; FXC, eight DXIL: stand aside; FXC, eight DXBC: stand aside; none (off win32): stand aside
+
+1b. THE PROBE'S ARITHMETIC, AND THE BUILD-AND-TIME CONTRACT ON A STAND-IN DEVICE
+  PASS  !! headApplyProbe's every activation-by-weight product is exact in f32 -- so a fused multiply-add rounds as a multiply then an add, and only the ORDER of the sums can move a logit   64 activations x 9 weights, every product exact; the same probe twice
+  PASS  !! buildJob reports a WGSL error by line and column, a pipeline failure by its message, and a build's wall time from the clock it is given   WGSL did not compile: 3:7 bad token; pipeline: boom; buildMs 5
+  PASS  !! runJob: one untimed pass then three timed, on the device's clock where it has timestamps and the wall's where not; the output read back whole and judged; every buffer it made destroyed   device 2 ms x 3, wall 5 ms; 6 buffers made, 6 destroyed
+  PASS  !! measureSizes builds the kernel ONCE and times it at every size, judging only where the twin is held (64 x 64)   1 module for 2 sizes; judged false, -
+
+2. NATIVE: each kernel in its own process, under each compiler this box has
+  ----  node-webgpu 0.6.2 from C:\Users\howdy\AppData\Roaming\npm\node_modules\webgpu\index.js; native compilers: D3D12; DXC ships beside dawn.node -- runs as shipped, use_dxc and use_dxc off, from the package alone; modes: as shipped, use_dxc, use_dxc off
+  ----  native / as shipped in all: 10 of 10 built; dumps: 10 DXC (DXIL); compiler, from the package: DXC; dumps at C:\Users\howdy\AppData\Local\Temp\swek-denoise-dump-0.6.2-as_shipped-*.txt
+  ----  section 66, native / as shipped under DXC: at 64 x 64, r15's hidden kernel (r13-fast-3x3) over r18t's (r18t-tile-inline-3x3): 0.733 x (0.101 ms against 0.138 ms); r18u's (r18u-fast-unroll-3x3): 0.728 x (0.101 ms against 0.139 ms) -- deciding nothing
+  ----  native / use_dxc in all: 10 of 10 built; dumps: 10 DXC (DXIL); compiler, from the package: DXC; dumps at C:\Users\howdy\AppData\Local\Temp\swek-denoise-dump-0.6.2-use_dxc-*.txt
+  ----  section 66, native / use_dxc under DXC: at 64 x 64, r15's hidden kernel (r13-fast-3x3) over r18t's (r18t-tile-inline-3x3): 0.712 x (0.101 ms against 0.142 ms); r18u's (r18u-fast-unroll-3x3): 0.723 x (0.101 ms against 0.140 ms) -- deciding nothing
+  SKIP  section 66: native / use_dxc off: r18t's and r18u's hidden kernels (r18t-tile-inline-3x3, r18u-fast-unroll-3x3) stand aside, not counted as unbuilt -- the compiler is FXC, not DXC
+  ----  native / use_dxc off in all: 8 of 8 built; dumps: 8 FXC (DXBC); compiler, from the package: FXC; dumps at C:\Users\howdy\AppData\Local\Temp\swek-denoise-dump-0.6.2-use_dxc_off-*.txt
+  PASS  !! section 66's condition 0: the package said DXC for "as shipped", and its 10 children's dumps say DXIL exactly when it said DXC   predicted DXC; 10 dump(s): 10 DXIL, 0 DXBC, 0 SPIR-V, 0 without a compiler
+  PASS  !! every native child reported a result -- a child that exits without one is the instrument failing, not a kernel saying why   28 children, each with a result
+  PASS  !! section 61: the native children's clocks are not Dawn's rounded one -- not every pass time is a whole number of 65,536 ns   0 of 28 native passes on the 65,536 ns grid
+
+3. THE BROWSER: denoise.html's "Time each kernel", in Chromium, on its own adapter
+  PASS  !! the page built and timed every kernel on its own device, showed the table, and said how many were exact -- no page error   google / swiftshader: 8 of 8 kernels built and exact
+
+4. WHAT WAS MEASURED
+  PASS  !! native / as shipped: every kernel built or said why, and every one built is exact -- conv cells the twin's or the fused mirror's, the kernel apply within APPLY_TOL   10 kernels, all exact
+  PASS    native / as shipped: every build and pass time finite and positive
+  ----  native / as shipped: r12-tiled-3x3: build 59 ms, pass 1.392 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 612 lines, 0 loops, 0 indexable-temp lines, 4 barriers
+  ----  native / as shipped: r13-fast-3x3: build 127 ms, pass 0.101 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 1339 lines, 0 loops, 0 indexable-temp lines, 4 barriers
+  ----  native / as shipped: r12-direct-head: build 35 ms, pass 0.419 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 358 lines, 0 loops, 0 indexable-temp lines, 0 barriers
+  ----  native / as shipped: r13-fast-head: build 110 ms, pass 0.056 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 1173 lines, 0 loops, 0 indexable-temp lines, 4 barriers
+  ----  native / as shipped: r14-head: build 28 ms, pass 0.128 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 249 lines, 0 loops, 0 indexable-temp lines, 0 barriers
+  ----  native / as shipped: r12-apply: build 44 ms, pass 0.090 ms (device clock, 30 passes), worst 4.56e-7 (APPLY_TOL 0.00001); dump: DXC (DXIL), 576 lines, 0 loops, 0 indexable-temp lines, 0 barriers
+  ----  native / as shipped: r14-apply-fast: build 46 ms, pass 0.088 ms (device clock, 30 passes), worst 4.56e-7 (APPLY_TOL 0.00001); dump: DXC (DXIL), 566 lines, 0 loops, 0 indexable-temp lines, 3 barriers
+  ----  native / as shipped: r15-head-apply: build 1237 ms, pass 0.051 ms (device clock, 30 passes), worst 6.26e-7 against the twin's logits, which are the fused mirror's here (APPLY_TOL 0.00001); dump: DXC (DXIL), 8910 lines, 0 loops, 0 indexable-temp lines, 3 barriers
+  ----  native / as shipped: r18t-tile-inline-3x3: build 218 ms, pass 0.138 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 2029 lines, 0 loops, 0 indexable-temp lines, 4 barriers
+  ----  native / as shipped: r18u-fast-unroll-3x3: build 743 ms, pass 0.139 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 12506 lines, 0 loops, 0 indexable-temp lines, 4 barriers
+  PASS  !! native / use_dxc: every kernel built or said why, and every one built is exact -- conv cells the twin's or the fused mirror's, the kernel apply within APPLY_TOL   10 kernels, all exact
+  PASS    native / use_dxc: every build and pass time finite and positive
+  ----  native / use_dxc: r12-tiled-3x3: build 71 ms, pass 1.392 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 612 lines, 0 loops, 0 indexable-temp lines, 4 barriers
+  ----  native / use_dxc: r13-fast-3x3: build 163 ms, pass 0.101 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 1339 lines, 0 loops, 0 indexable-temp lines, 4 barriers
+  ----  native / use_dxc: r12-direct-head: build 60 ms, pass 0.421 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 358 lines, 0 loops, 0 indexable-temp lines, 0 barriers
+  ----  native / use_dxc: r13-fast-head: build 108 ms, pass 0.056 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 1173 lines, 0 loops, 0 indexable-temp lines, 4 barriers
+  ----  native / use_dxc: r14-head: build 42 ms, pass 0.114 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 249 lines, 0 loops, 0 indexable-temp lines, 0 barriers
+  ----  native / use_dxc: r12-apply: build 86 ms, pass 0.088 ms (device clock, 30 passes), worst 4.56e-7 (APPLY_TOL 0.00001); dump: DXC (DXIL), 576 lines, 0 loops, 0 indexable-temp lines, 0 barriers
+  ----  native / use_dxc: r14-apply-fast: build 62 ms, pass 0.088 ms (device clock, 30 passes), worst 4.56e-7 (APPLY_TOL 0.00001); dump: DXC (DXIL), 566 lines, 0 loops, 0 indexable-temp lines, 3 barriers
+  ----  native / use_dxc: r15-head-apply: build 1253 ms, pass 0.051 ms (device clock, 30 passes), worst 6.26e-7 against the twin's logits, which are the fused mirror's here (APPLY_TOL 0.00001); dump: DXC (DXIL), 8910 lines, 0 loops, 0 indexable-temp lines, 3 barriers
+  ----  native / use_dxc: r18t-tile-inline-3x3: build 178 ms, pass 0.142 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 2029 lines, 0 loops, 0 indexable-temp lines, 4 barriers
+  ----  native / use_dxc: r18u-fast-unroll-3x3: build 771 ms, pass 0.140 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 12506 lines, 0 loops, 0 indexable-temp lines, 4 barriers
+  PASS  !! native / use_dxc off: every kernel built or said why, and every one built is exact -- conv cells the twin's or the fused mirror's, the kernel apply within APPLY_TOL   8 kernels, all exact
+  PASS    native / use_dxc off: every build and pass time finite and positive
+  ----  native / use_dxc off: r12-tiled-3x3: build 401 ms, pass 1.089 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 363 lines, 9 loops, 37 indexable-temp lines, 3 barriers
+  ----  native / use_dxc off: r13-fast-3x3: build 3574 ms, pass 0.139 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 537 lines, 6 loops, 0 indexable-temp lines, 3 barriers
+  ----  native / use_dxc off: r12-direct-head: build 275 ms, pass 0.358 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 217 lines, 5 loops, 0 indexable-temp lines, 0 barriers
+  ----  native / use_dxc off: r13-fast-head: build 123396 ms, pass 22.760 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 9785 lines, 6 loops, 0 indexable-temp lines, 3 barriers
+  ----  native / use_dxc off: r14-head: build 155 ms, pass 0.106 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 97 lines, 1 loops, 0 indexable-temp lines, 0 barriers
+  ----  native / use_dxc off: r12-apply: build 90 ms, pass 0.144 ms (device clock, 30 passes), worst 4.56e-7 (APPLY_TOL 0.00001); dump: FXC (DXBC), 299 lines, 3 loops, 85 indexable-temp lines, 0 barriers
+  ----  native / use_dxc off: r14-apply-fast: build 204 ms, pass 0.071 ms (device clock, 30 passes), worst 4.56e-7 (APPLY_TOL 0.00001); dump: FXC (DXBC), 324 lines, 5 loops, 0 indexable-temp lines, 2 barriers
+  ----  native / use_dxc off: r15-head-apply: build 8536 ms, pass 0.070 ms (device clock, 30 passes), worst 6.26e-7 against the twin's logits, which are the fused mirror's here (APPLY_TOL 0.00001); dump: FXC (DXBC), 4954 lines, 3 loops, 0 indexable-temp lines, 2 barriers
+  PASS  !! browser / Chrome's: every kernel built or said why, and every one built is exact -- conv cells the twin's or the fused mirror's, the kernel apply within APPLY_TOL   8 kernels, all exact
+  PASS    browser / Chrome's: every build and pass time finite and positive
+  ----  browser / Chrome's: r12-tiled-3x3: build 255 ms, pass 110.490 ms (device clock, 14 passes), 131072 plain, 0 fused, 0 unexplained
+  ----  browser / Chrome's: r13-fast-3x3: build 403 ms, pass 42.007 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained
+  ----  browser / Chrome's: r12-direct-head: build 36 ms, pass 60.124 ms (device clock, 25 passes), 331776 plain, 0 fused, 0 unexplained
+  ----  browser / Chrome's: r13-fast-head: build 296 ms, pass 23.371 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained
+  ----  browser / Chrome's: r14-head: build 42 ms, pass 13.242 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained
+  ----  browser / Chrome's: r12-apply: build 62 ms, pass 6.446 ms (device clock, 30 passes), worst 5.11e-7 (APPLY_TOL 0.00001)
+  ----  browser / Chrome's: r14-apply-fast: build 379 ms, pass 9.107 ms (device clock, 30 passes), worst 5.11e-7 (APPLY_TOL 0.00001)
+  ----  browser / Chrome's: r15-head-apply: build 2423 ms, pass 17.409 ms (device clock, 30 passes), worst 4.99e-7 against the twin's logits, which are the fused mirror's here (APPLY_TOL 0.00001)
+  PASS    on D3D12 every native run that built has a dump naming its compiler -- DXBC is FXC, DXIL is DXC   as shipped/r12-tiled-3x3: DXC (DXIL); as shipped/r13-fast-3x3: DXC (DXIL); as shipped/r12-direct-head: DXC (DXIL); as shipped/r13-fast-head: DXC (DXIL); as shipped/r14-head: DXC (DXIL); as shipped/r12-apply: DXC (DXIL); as shipped/r14-apply-fast: DXC (DXIL); as shipped/r15-head-apply: DXC (DXIL); as
+
+ALL GREEN (188897 ms)
+not closed here: any number, and any cause. The build and pass times above are what section 43's A reads; on SwiftShader they are a CPU's, and the D3D12 compilers are a Windows GPU's to show.
+
+C:\swek_src\WebGLEngine>node tools\ship\realGpuRun.mjs --only denoise --out denoise-rig-r24b-a.json
+
+the FSR, frame-generation and denoiser gates, with the harness logging each call's adapter (win32)
+  PASS  render/denoiseCompile-selfcheck.mjs  [timing]  183.6 s  on nvidia pascal  (1 SKIP)
+  PASS  render/denoiseDevice-selfcheck.mjs  [exact]  47.9 s  on nvidia pascal D3D12 driver version 32.0.15.8180 (native), nvidia pascal
+  PASS  render/denoiseTiming-selfcheck.mjs  [timing]  229.7 s  on nvidia pascal D3D12 driver version 32.0.15.8180 (native), nvidia pascal
+  on 2af5f7da 2026-10-15 v4861: record the release; node-webgpu 0.6.2 (the resolver's list) at C:\Users\howdy\AppData\Roaming\npm\node_modules\webgpu; dxcompiler.dll beside dawn.node: yes; predicted compiler: DXC
+
+a real-hardware run on nvidia pascal; nvidia pascal D3D12 driver version 32.0.15.8180 (native)
+exact 1/1, quality 0/0, timing 2/2  --  the report: C:\swek_src\WebGLEngine\denoise-rig-r24b-a.json
+
+C:\swek_src\WebGLEngine>node tools\ship\realGpuRun.mjs --only denoise --out denoise-rig-r24b-b.json
+
+the FSR, frame-generation and denoiser gates, with the harness logging each call's adapter (win32)
+  PASS  render/denoiseCompile-selfcheck.mjs  [timing]  177.7 s  on nvidia pascal  (1 SKIP)
+  PASS  render/denoiseDevice-selfcheck.mjs  [exact]  47.0 s  on nvidia pascal D3D12 driver version 32.0.15.8180 (native), nvidia pascal
+  PASS  render/denoiseTiming-selfcheck.mjs  [timing]  236.3 s  on nvidia pascal D3D12 driver version 32.0.15.8180 (native), nvidia pascal
+  on 2af5f7da 2026-10-15 v4861: record the release; node-webgpu 0.6.2 (the resolver's list) at C:\Users\howdy\AppData\Roaming\npm\node_modules\webgpu; dxcompiler.dll beside dawn.node: yes; predicted compiler: DXC
+
+a real-hardware run on nvidia pascal; nvidia pascal D3D12 driver version 32.0.15.8180 (native)
+exact 1/1, quality 0/0, timing 2/2  --  the report: C:\swek_src\WebGLEngine\denoise-rig-r24b-b.json
+
+
+
+

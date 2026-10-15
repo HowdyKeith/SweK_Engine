@@ -4864,3 +4864,36 @@ node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r24b-a.json
 node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r24b-b.json
 ```
 Send back the console output of step 1 and all four JSON files. Don't commit or pull between runs.
+
+## 78. ROUND 24b -- THE VERDICT: NO CRASH, r18t HOLDS ON THE 1080 IN BOTH RUNS, AND THE 1080's NATIVE DEFAULT IS r18t
+
+**What arrived.** Step 1's console output -- each crashing gate run alone three times -- and two `realGpuRun --only denoise` runs
+per GPU at 2af5f7da (v4861's release), `SWEK_WEBGPU` cleared. Committed as received: `render/denoise-rig-r24b-step1.txt` and
+`render/denoise-rig-r24b-{a,b}-{intel-gen9,gtx1080}.json`.
+
+**Step 1: neither gate crashed alone, as predicted.** `denoiseDevice-selfcheck` on the Intel: ALL GREEN three times, the
+native-caller row exit 0 each time. `denoiseCompile-selfcheck` on the 1080: ALL GREEN three times, "28 children, each with a result"
+each time. Round 24's two crashes did not repeat; what caused them is not known, and is named here rather than guessed at.
+
+**Step 2, section 77's rule, read strictly.** Every gate green in all four runs (exact 1/1, timing 2/2 each).
+
+| | Run a | Run b | In both? |
+|---|---|---|---|
+| r18t, GTX 1080, against r15 under DXC at 1920 x 1080 | 1.080 x | 1.068 x | **yes** -- conditions 0 to 3 |
+| r18u, GTX 1080 | 0.655 x | 0.651 x | no, condition 3 |
+| r18u, Intel gen-9, at 1024 x 1024 (the control) | 1.526 x | 1.530 x | yes -- the control holds |
+| r18t, Intel gen-9 | 0.951 x | 1.042 x | no, condition 3 |
+
+**So: `NATIVE_KERNELS_BY_ADAPTER` gains `"win32/nvidia/pascal": "r18t"`.** A native run on the GTX 1080 under DXC now takes r18t;
+under FXC it takes DEFAULT_KERNELS, as every FXC run does. The deciding ratio is the smaller of the two runs', 1.068 x -- 1.7 % over
+the bar, the thinnest of the six readings r18t has had on this GPU (1.076, 1.088, 1.086, 1.091, 1.080, 1.068). Every one is over it.
+`NATIVE_KERNELS_DECIDED_BY` names the section that put each entry in, so `nativePick`'s reason says "section 78's for
+win32/nvidia/pascal" where it said "section 67's" for every entry. `render/denoiseDevice-selfcheck.mjs` derives the table from the
+four reports, holds that one run under the bar or one red gate would leave the 1080 nothing, and holds the rows about what the rig
+ran before this -- section 68's --which runs, round 19's verdict -- to the table as it stood then (`NATIVE_KERNELS_AT_V4852`).
+
+**Every prediction of section 77's held:** no crash alone; no crash in either run; r18t on the 1080 in both; the Intel's control.
+
+**What it does not change.** The page's table (section 63's, already r18t on the 1080 in Chrome), DEFAULT_KERNELS, and any FXC run.
+The next native run of `denoiseDevice-selfcheck` on the 1080 builds r18t through the native caller where it built r15: that row
+is held within 1e-4 of the f64 network, as r18t's K0 rows already are on that GPU.
