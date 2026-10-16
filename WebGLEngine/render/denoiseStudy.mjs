@@ -21,7 +21,7 @@
 // Without it everything is computed, as before; with it the result is the same, bit for bit
 // (render/denoiseCache-selfcheck.mjs). A scene rendered under --harvest is never served to a run without it.
 "use strict";
-import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
+import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
 import { renderSequence, temporalChannels, sequenceSeeds } from "./denoiseTemporal.mjs";
 import { withMask, emitterCoverage } from "./denoiseMask.mjs";
 import { jointBilateral, tuneFilter } from "./denoiseFilter.mjs";
@@ -121,6 +121,52 @@ export const HARVESTS = Object.freeze({
 export function studyOptions(round) {
     const { results, ...opts } = round;
     return opts;
+}
+
+/**
+ * Section 79, THE MESH ROUND: the network and the filter the device ships, on scenes of the engine's own geometry, with
+ * NOTHING trained or tuned here. The network is round 11's seed 1 as render/denoise-net-r11.json stores it -- the file
+ * denoise.html loads -- and the filter is the setting that file names, tuned on round 11's 192 training scenes. The
+ * caller decodes both (tools/denoiseStudy.mjs --harvest-mesh) and hands them in, so this module never reads a shipped
+ * file it could read differently from the page.
+ * C2 is CITED from round 11 (denoiseStats.verdict's c2Prior): this round trains no network, so it has no shuffled-target
+ * network of its own; the one that trained this network lost to the filter there by a mean d of -1.856.
+ */
+export const RESULTS_MESH = "render/denoise-results-mesh.json";
+export const SHIPPED_NET = "render/denoise-net-r11.json";
+export const ROUND_MESH = Object.freeze({ splits: SPLITS_MESH, emitterMask: true, test: "signflip",
+                                          c2Prior: Object.freeze({ round: 11, meanD: -1.8564223228700172, ok: true }), results: RESULTS_MESH });
+/**
+ * The shipped pair on a test set, end to end: render T1 and T2 (each with its second reference, for C3), measure noisy,
+ * filter, network and floor per image exactly as runStudy's `measure` does, and hand them to verdict(). C4 here is the
+ * question a round with no training can ask -- the forward pass, run twice, bit for bit -- and C5 is runStudy's.
+ * The network's column is ONE seed, the shipped one: a deployment question, about what the page runs.
+ */
+export function runShippedStudy({ splits = ROUND_MESH.splits, net, filter, emitterMask = ROUND_MESH.emitterMask, test = ROUND_MESH.test, c2Prior = ROUND_MESH.c2Prior,
+                                  harvest = false, image = IMAGE, sppIn = SPP_IN, sppRef = SPP_REF, cache = null, log = () => {} } = {}) {
+    if (!net || !filter) throw new Error("denoiseStudy: runShippedStudy needs the shipped network and filter, decoded by its caller");
+    const t0 = Date.now(), timings = {};
+    const lap = (k) => { timings[k] = Date.now() - t0; log(`${k} at ${(timings[k] / 1000).toFixed(1)} s`); };
+    const config = { image, sppIn, sppRef, harvest, emitterMask, test, c2Prior, filter, trained: "nothing -- the shipped network and filter",
+                     splits: Object.fromEntries(Object.entries(splits).map(([k, v]) => [k, { family: v.family, n: v.seeds.length, first: v.seeds[0] }])) };
+    const R = {};
+    for (const name of ["T1", "T2"]) R[name] = renderSplit(splits[name], { harvest, image, sppIn, sppRef, ref2: true, emitterMask, cache });
+    lap("tests rendered");
+    const outs = Object.fromEntries(["T1", "T2"].map((name) => [name, R[name].map((im) => denoise(net, im.x, image, image).y)]));
+    const again = R.T1.map((im) => denoise(net, im.x, image, image).y);
+    const determinism = again.every((y, i) => y.length === outs.T1[i].length && y.every((v, j) => Object.is(v, outs.T1[i][j])));
+    const allSeeds = Object.values(splits).flatMap((s) => s.seeds).flatMap((s) => { const r = renderSeeds(s); return [r.input, r.ref, r.ref2]; });
+    const seedsDistinct = new Set(allSeeds).size === allSeeds.length;
+    const measure = (name) => ({
+        noisy: R[name].map((im) => relMSE(noisyOf(im), im.ref)),
+        filter: R[name].map((im) => relMSE(jointBilateral(im.x, image, image, filter), im.ref)),
+        net: [R[name].map((im, i) => relMSE(outs[name][i], im.ref))],
+        floor: R[name].map((im) => relMSE(im.ref2 ?? im.ref, im.ref)),
+    });
+    const tables = { T1: measure("T1"), T2: measure("T2") };
+    lap("measured");
+    const V = verdict({ sets: { H1: tables.T1, H2: tables.T2 }, shuffled: null, c2Prior, determinism, seedsDistinct, test });
+    return { verdict: V, tables, filter, timings, determinism, seedsDistinct, seedCount: allSeeds.length, config };
 }
 
 /** The miniature: the same pipeline, scenes seeded outside every split, sizes small enough for a gate. */

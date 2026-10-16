@@ -1,6 +1,8 @@
 // WebGLEngine/tools/denoiseStudy.mjs -- the denoiser arc's study, from the command line
 //
-// Run:  node tools/denoiseStudy.mjs --harvest-r11  one large network trained on families R and C together (section 32) -> render/denoise-results-r11.json
+// Run:  node tools/denoiseStudy.mjs --harvest-mesh  the SHIPPED network and filter on the engine's own geometry, nothing trained (section 79)
+//                                                  -> render/denoise-results-mesh.json
+//       node tools/denoiseStudy.mjs --harvest-r11  one large network trained on families R and C together (section 32) -> render/denoise-results-r11.json
 //       node tools/denoiseStudy.mjs --secondary-r11  round 11 again, for section 32's secondary the first run skipped (section 33)
 //                                                    -> render/denoise-results-r11-secondary.json
 //       node tools/denoiseStudy.mjs --harvest-r10  the large network trained on family C (section 30) -> render/denoise-results-r10.json
@@ -36,7 +38,9 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { execFileSync } from "node:child_process";
 import { openCache, hashArrays } from "../render/denoiseCache.mjs";
-import { runStudy, MINI, HARVESTS, studyOptions } from "../render/denoiseStudy.mjs";
+import { runStudy, MINI, HARVESTS, studyOptions, runShippedStudy, ROUND_MESH, SHIPPED_NET } from "../render/denoiseStudy.mjs";
+import { decodeNet } from "../render/denoiseDevice.mjs";
+import crypto from "node:crypto";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -47,6 +51,23 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     if (args.includes("--mini")) {
         const out = runStudy({ ...MINI, c0: false, log: (m) => console.log("[denoiseStudy --mini] " + m) });
         console.log(JSON.stringify({ run: out.verdict.run, reasons: out.verdict.reasons, determinism: out.determinism }, null, 1));
+    } else if (args.includes("--harvest-mesh")) {
+        // section 79: nothing trained -- the shipped pair, decoded here exactly as denoise.html decodes it (decodeNet over
+        // the file's `net`, the filter the file names), and the file's own sha-256 written beside the results
+        const file = path.join(ENG, ROUND_MESH.results);
+        if (fs.existsSync(file)) { console.log(`[denoiseStudy] ${ROUND_MESH.results} exists -- a harvest's results are never overwritten`); process.exit(2); }
+        const bytes = fs.readFileSync(path.join(ENG, SHIPPED_NET)), shipped = JSON.parse(bytes.toString("utf8"));
+        const at = args.indexOf("--cache"), dir = at >= 0 ? args[at + 1] : null;
+        if (at >= 0 && !dir) { console.log("[denoiseStudy] --cache needs a directory"); process.exit(2); }
+        const git = (...a) => execFileSync("git", a, { cwd: ENG, encoding: "utf8", maxBuffer: 1 << 28 });
+        const cache = dir ? openCache(path.resolve(dir), { results: ROUND_MESH.results, commit: git("rev-parse", "HEAD").trim(),
+                                                         diff: hashArrays([git("diff", "HEAD", "--", "render", "brain", "physics", "mesh", "tools/denoiseStudy.mjs")]) }) : null;
+        if (cache) console.log(`[denoiseStudy] cache ${cache.dir}`);
+        const out = runShippedStudy({ net: decodeNet(shipped.net), filter: shipped.filter, harvest: true, cache, log: (m) => console.log("[denoiseStudy] " + m) });
+        out.shipped = { file: SHIPPED_NET, sha256: crypto.createHash("sha256").update(bytes).digest("hex"), source: shipped.source };
+        if (cache) out.cache = { hits: cache.hits, misses: cache.misses };
+        fs.writeFileSync(file, JSON.stringify(out, (k, v) => (v instanceof Float64Array ? Array.from(v) : v), 1) + "\n");
+        console.log(`[denoiseStudy] wrote ${ROUND_MESH.results}`);
     } else if (round) {
         const file = path.join(ENG, round.results);
         if (fs.existsSync(file)) { console.log(`[denoiseStudy] ${round.results} exists -- a harvest's results are never overwritten`); process.exit(2); }
@@ -66,7 +87,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         // section 33: the verdict is in the file, which is committed before it is read -- the log says only that it was written
         console.log(`[denoiseStudy] wrote ${round.results}`);
     } else {
-        console.log("usage: node tools/denoiseStudy.mjs --mini | --secondary-r11 | --harvest-r11 | --harvest-r10 | --harvest-r9 | --harvest-r8 | --harvest-r7 | --harvest-r6 | --harvest-r5 | --harvest-r4 | --harvest-r3 | --harvest-r2 | --harvest-r1 [--cache <dir>] [--workers <n>]   (a harvest renders the pre-registered dataset; see render/learned-denoiser-preregistration.md)");
+        console.log("usage: node tools/denoiseStudy.mjs --mini | --harvest-mesh | --secondary-r11 | --harvest-r11 | --harvest-r10 | --harvest-r9 | --harvest-r8 | --harvest-r7 | --harvest-r6 | --harvest-r5 | --harvest-r4 | --harvest-r3 | --harvest-r2 | --harvest-r1 [--cache <dir>] [--workers <n>]   (a harvest renders the pre-registered dataset; see render/learned-denoiser-preregistration.md)");
         process.exit(2);
     }
 }

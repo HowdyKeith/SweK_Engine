@@ -5,7 +5,7 @@
 // GATES render/denoiseStudy.mjs -- the pre-registered study as one pipeline (tools/denoiseStudy.mjs is its CLI) -- on its MINIATURE only (scenes seeded
 // outside every split, 16 x 16, four training steps). Its exports, each named here: SEEDS, RESULTS, RESULTS_R2,
 // RESULTS_R3, RESULTS_R4, RESULTS_R5, RESULTS_R6, RESULTS_R7, RESULTS_R8, RESULTS_R9, RESULTS_R10, RESULTS_R11, ROUND1, ROUND2, ROUND3, ROUND4, ROUND5, ROUND6, ROUND7, ROUND8, ROUND9, ROUND10, ROUND11, MINI, shuffledTargets, stopBeforeTests, renderSplit,
-// runStudy, HARVESTS, studyOptions. What it holds is the PLUMBING: that every stage runs, in order, on every
+// runStudy, HARVESTS, studyOptions, RESULTS_MESH, SHIPPED_NET, ROUND_MESH, runShippedStudy (section 79). What it holds is the PLUMBING: that every stage runs, in order, on every
 // split, and hands verdict() what the pre-registration says -- not any number the miniature produces, which is
 // meaningless at this size and is not looked at beyond its shape.
 //
@@ -49,6 +49,11 @@
 //   R31 --secondary-r11 runs round 10                                            1 RED
 //   R32 --harvest-r11 runs round 10                                              1 RED
 //   R33 the runner logs the verdict again                                        1 RED
+//   R34 (section 79) runShippedStudy drops its cited C2                          1 RED
+//   R35 ROUND_MESH's cited C2 retyped to four places                             1 RED
+//   R36 H2's network errors computed from H1's outputs                           1 RED
+//   R37 ROUND_MESH without the emitter mask the shipped network was trained with 1 RED
+//   R38 --harvest-mesh writing round 11's results file                           1 RED
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -306,6 +311,50 @@ console.log("\n13. THE RUNNER HANDS THE STUDY EVERY OPTION A ROUND NAMES (pre-re
     // the verdict is in the file, committed before it is read: the harvest branch logs no part of it
     const cli = fs.readFileSync(path.join(ENG, "tools/denoiseStudy.mjs"), "utf8"), branch = cli.slice(cli.indexOf("} else if (round) {"), cli.indexOf("} else {", cli.indexOf("} else if (round) {")));
     ok("  a harvest's log names no part of its verdict: the runner's harvest branch never reads it", branch.length > 500 && !/verdict|status|supported/.test(branch.replace(/\/\/.*$/gm, "")));
+}
+
+console.log("\n14. THE MESH ROUND: THE SHIPPED PAIR, NOTHING TRAINED (pre-registration section 79)");
+{
+    const { runShippedStudy, ROUND_MESH, RESULTS_MESH, SHIPPED_NET } = await imp("render/denoiseStudy.mjs");
+    const { SPLITS_MESH } = await imp("render/denoiseScenes.mjs");
+    const { decodeNet } = await imp("render/denoiseDevice.mjs");
+    const shipped = JSON.parse(fs.readFileSync(path.join(ENG, SHIPPED_NET), "utf8")), net = decodeNet(shipped.net);
+    const r11 = JSON.parse(fs.readFileSync(path.join(ENG, RESULTS_R11), "utf8"));
+    ok("!! ROUND_MESH: the mesh splits, the emitter mask, the sign-flip test, and C2 CITED from round 11 -- its mean d the one round 11's file holds, bit for bit",
+        ROUND_MESH.splits === SPLITS_MESH && ROUND_MESH.emitterMask === true && ROUND_MESH.test === "signflip" && ROUND_MESH.results === RESULTS_MESH &&
+        RESULTS_MESH === "render/denoise-results-mesh.json" && SHIPPED_NET === "render/denoise-net-r11.json" && ROUND_MESH.c2Prior.round === 11 &&
+        Object.is(ROUND_MESH.c2Prior.meanD, r11.verdict.controls.C2.meanD) && ROUND_MESH.c2Prior.ok === r11.verdict.controls.C2.ok,
+        `cited ${ROUND_MESH.c2Prior.meanD}; round 11's file ${r11.verdict.controls.C2.meanD}`);
+    let threw = null; try { runShippedStudy({ net, filter: shipped.filter, image: 4, sppIn: 1, sppRef: 1 }); } catch (e) { threw = e.message; }
+    ok("!! on the REAL mesh splits without harvest it is refused at its first scene", /seed 36000 is a dataset seed/.test(threw || ""), threw);
+    let threw2 = null; try { runShippedStudy({ splits: SPLITS_MESH }); } catch (e) { threw2 = e.message; }
+    ok("  without the shipped network and filter it refuses rather than run something else", /needs the shipped network and filter/.test(threw2 || ""));
+    // the miniature: V and M scenes seeded outside every split, 16 x 16 -- the PLUMBING, no number read for its value
+    const mini = Object.freeze({ T1: Object.freeze({ family: "V", seeds: Object.freeze([950000, 950001]) }), T2: Object.freeze({ family: "M", seeds: Object.freeze([960000, 960001]) }) });
+    const out = runShippedStudy({ splits: mini, net, filter: shipped.filter, image: 16, sppIn: 4, sppRef: 16 });
+    const V = out.verdict, T = out.tables;
+    const shapeOk = ["T1", "T2"].every((n) => ["noisy", "filter", "floor"].every((k) => T[n][k].length === 2 && T[n][k].every(Number.isFinite)) &&
+        T[n].net.length === 1 && T[n].net[0].length === 2);
+    ok("!! end to end on the miniature: two test sets, one network column (the shipped seed), C4 from the forward pass run twice, C5, and C2 cited from round 11",
+        shapeOk && out.determinism === true && out.seedsDistinct === true && out.seedCount === 12 && V.controls.C2.citedFrom === 11 && V.controls.C2.ok === true &&
+        V.controls.C4 === true && V.controls.C5 === true && Object.keys(V.hypotheses).join() === "H1,H2" && V.hypotheses.H1.test === "signflip",
+        `run ${V.run}; ${JSON.stringify(V.controls.C2)}`);
+    // the measured errors are the page's own arithmetic: recomputed here from scratch for one image of each set
+    const { renderSplit: rs } = await imp("render/denoiseStudy.mjs");
+    const again = ["T1", "T2"].map((n) => rs(mini[n], { harvest: false, image: 16, sppIn: 4, sppRef: 16, ref2: true, emitterMask: true }));
+    const { jointBilateral } = await imp("render/denoiseFilter.mjs");
+    const same = ["T1", "T2"].every((n, k) => { const im = again[k][1];
+        return Object.is(T[n].net[0][1], relMSE(denoise(net, im.x, 16, 16).y, im.ref)) && Object.is(T[n].filter[1], relMSE(jointBilateral(im.x, 16, 16, shipped.filter), im.ref)) &&
+               Object.is(T[n].floor[1], relMSE(im.ref2, im.ref)); });
+    ok("!! each set's network and filter errors are the shipped pair's on THAT set's own image, recomputed from nothing, bit for bit", same);
+    ok("  the filter it ran is the one the shipped file names", JSON.stringify(out.filter) === JSON.stringify(shipped.filter) && JSON.stringify(out.config.filter) === JSON.stringify(shipped.filter));
+    // the command: decodes the shipped file, writes the mesh round's file and refuses an existing one, logs no part of the verdict
+    const cli = fs.readFileSync(path.join(ENG, "tools/denoiseStudy.mjs"), "utf8");
+    const b0 = cli.indexOf('} else if (args.includes("--harvest-mesh")) {'), branch = b0 >= 0 ? cli.slice(b0, cli.indexOf("} else if (round) {", b0)) : "";
+    const code = branch.replace(/\/\/.*$/gm, "");
+    ok("!! --harvest-mesh decodes the shipped file with decodeNet, runs runShippedStudy under harvest, writes ROUND_MESH.results and never an existing one, and logs no verdict",
+        branch.length > 400 && /decodeNet\(shipped\.net\)/.test(code) && /filter: shipped\.filter/.test(code) && /runShippedStudy\(/.test(code) && /harvest: true/.test(code) &&
+        /path\.join\(ENG, ROUND_MESH\.results\)/.test(code) && /existsSync\(file\)/.test(code) && /sha256/.test(code) && !/verdict|status|supported/.test(code));
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +

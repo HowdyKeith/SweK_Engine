@@ -4897,3 +4897,113 @@ ran before this -- section 68's --which runs, round 19's verdict -- to the table
 **What it does not change.** The page's table (section 63's, already r18t on the 1080 in Chrome), DEFAULT_KERNELS, and any FXC run.
 The next native run of `denoiseDevice-selfcheck` on the 1080 builds r18t through the native caller where it built r15: that row
 is held within 1e-4 of the f64 network, as r18t's K0 rows already are on that GPU.
+
+## 79. ROUND 25 -- THE MESH ROUND: THE SHIPPED NETWORK ON THE ENGINE'S OWN GEOMETRY, FIXED BEFORE ANY OF ITS TEST SCENES EXIST
+
+Committed with the code that implements it. No scene of this round's two test sets has been rendered.
+
+**Why this round.** Since section 34 the page has said the network was trained on families R and C and that nothing in
+the arc says it works on any other scene. Every scene in the arc is spheres. Keith asked for the network on the engine's
+own content. This round asks it, and asks nothing else.
+
+> **Does the network the device ships beat the filter it ships, on scenes built from this engine's own geometry?**
+
+**Nothing is trained or tuned.**
+- The network is round 11's seed 1, as `render/denoise-net-r11.json` stores it: the file `denoise.html` loads, sha-256
+  `f1a84d47db611e77a6c46dcca3bc2ed40d5756d0ca6480157b65b8bc2557e856`. `tools/denoiseStudy.mjs --harvest-mesh` decodes it
+  with `decodeNet`, as the page does, and writes the hash beside the results.
+- The filter is the setting that file names, tuned on round 11's 192 training scenes: sS 1, sN 1, sA 0.2, sI 4.
+- The input is round 11's: 64 x 64, 4 samples, the nine channels and the emitter mask. The references are 1024 samples,
+  each test image with a second one for C3.
+- **One network, not three seeds' mean.** This is a deployment question, about what the page runs. Rounds 1-11 held each
+  image's network error to the mean over seeds 1-3; here it is seed 1's alone.
+
+**The two families, both new, both built from R.** `render/denoiseScenes.mjs`'s families V and M take family R's scene
+for their own seed: the ground, the emitters, the sky, the camera, and every resting sphere's place, size and material,
+exactly as R draws them. Then each resting sphere is replaced by a closed triangle mesh, inside the sphere's footprint
+(a box of side 2 x radius at its centre, resting on the ground), with the sphere's material.
+- **V, voxel structures.** A grid of 3-6 cells a side, grown from the bottom centre cell by random face neighbours until
+  35-70% of it is filled. Meshed by `mesh/voxelMeshGreedy.js`, voxel-viewer.html's own buffer builder.
+- **M, solids.** Half are lathed (`mesh/lathe.mjs`: 3-6 rows from the ground to 70-100% of the box's height, each of
+  radius 30-100% of the sphere's, 48 segments). Half are extruded (`mesh/extrudePolygon.mjs`: a star-shaped polygon of
+  3-8 points at 40-100% of the sphere's radius, stood upright, 50-100% of the box's height).
+- **So the one thing that differs from the family the network was trained on is the shape:** flat faces, hard edges,
+  and normals that jump. Materials, lights, sky and camera are R's.
+- Every mesh is wound outward, because the tracer takes a hit's normal as it comes. The emitters stay spheres, because
+  next-event estimation samples a sphere's solid angle. A conductor mesh carries an albedo of 0, which its shading never
+  reads, because the tracer refuses a mesh entry without one; the gate renders one at 0 and at 1 and holds them equal.
+- R's own draws are untouched. Its fingerprint over 40 scenes is the one computed from the module before V and M
+  existed.
+
+**Splits** (`SPLITS_MESH`), test sets only:
+
+| Set | Family | Seeds |
+|---|---|---|
+| T1 -> **H1** | 12 of V | **36000-36011** |
+| T2 -> **H2** | 12 of M | **37000-37011** |
+
+No earlier split touched these seeds. C5 holds over the round's 72 render seeds.
+
+**The statistic is section 6's, with section 28's test.**
+- Per image, `d_i = ln relMSE(filter_i) - ln relMSE(net_i)`. Positive means the network won.
+- Each hypothesis is supported iff the mean of d over its 12 images is > 0 and the exact one-sided sign-flip test's p is
+  below its Holm threshold. Holm-Bonferroni runs over {H1, H2} at family alpha 0.05.
+
+**Controls.**
+- **C1, sanity, on each test set,** as section 7 first wrote it. There are no training images to decide it on, so it is
+  decided here. Both methods must beat the noisy input on at least 11 of 12 images of each set, or the run is not
+  reported.
+- **C2, cited from round 11.** This round trains nothing, so it has no shuffled-target network of its own. C2 asks
+  whether the statistic measures denoising or something the training made up, and that is a question about the network
+  under test. Round 11's shuffled-target network lost to the filter by a mean d of -1.856: held.
+  `denoiseStats.verdict`'s `c2Prior` carries it, and the gate holds it to round 11's file bit for bit.
+- **C3, the reference floor, per set:** a set is not resolvable if the network is within 2 x of its floor on more than
+  half of its images.
+- **C4, determinism:** the forward pass, run twice over T1, gives the same output bit for bit.
+- **C5:** the 72 render seeds are distinct.
+
+**What each outcome buys.**
+- **H1 and H2 supported:** the page's scope note may say the shipped network also beats the shipped filter on this
+  engine's voxel structures and lathed and extruded solids, in R's materials, light and sky. It may not say more than
+  that: no other material, light or sky has been tested.
+- **One only:** the note may name that family alone.
+- **Neither:** the page's note stands as it is. A round training on mesh scenes would be a later question, pre-registered
+  on its own.
+- **Not reported** (C1, C4 or C5 fired) or **not resolvable** (C3, or a cited C2 that had failed): nothing moves.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 holds on both sets.
+- **P2 and P3:** H1 and H2 are both supported.
+  - The reasoning: the network predicts a kernel over real noisy samples from the same guide channels the filter weighs,
+    and ten rounds found it failing where the MATERIALS and LIGHT changed (family C). Here only the shape changes.
+- **P4:** each set's mean d is below round 11's H1 (0.548). The network was fitted to spheres' smoothly turning
+  normals, and a voxel edge is a step it has not seen.
+- All four are reported either way.
+
+**Secondary, reported, never tested:** per-image d, each set's noisy error and floor, and time.
+
+**What was seen first.**
+- Everything in sections 1-78.
+- **The scenes, on seeds outside every split (90001-90004):** a contact sheet at 48 samples, radiance and normals, R
+  against V and M. It found two bugs, both fixed before this was written:
+  - The voxel faces were first built by hand from `greedyMesh3d`'s quads. A quad's `pos` is its cell, not its face's
+    plane, so every +x, +y and +z face sat inside its block, facing in, and conductors rendered black.
+  - The extruded and lathed solids needed their winding checked. Every mesh is now held to a positive signed volume.
+- **The pilot, on seeds 90100-90107, with NO network or filter:** brightness, the noisy input against a 256-sample
+  reference, and time.
+
+| family | mean radiance, median [range] | noisy relMSE vs 256 spp, median | 256 spp, median | triangles, median |
+|---|---|---|---|---|
+| R | 0.393 [0.284-0.799] | 0.0784 | 2.0 s | 0 |
+| V | 0.387 [0.260-0.794] | 0.0879 | 6.5 s | 484 |
+| M | 0.401 [0.274-0.796] | 0.0654 | 5.1 s | 870 |
+
+  - V and M sit where R does, so relMSE's 0.01 offset treats them as it treats R.
+  - A 1024-sample reference takes about 26 s for V and 20 s for M here.
+- `render/denoiseStudy-selfcheck.mjs` runs the shipped pair on four 16 x 16 scenes of V and M outside every split, to
+  hold the plumbing. It prints no error and no effect, and none was read.
+- Nothing of either test set has been rendered.
+
+**The command:** `node tools/denoiseStudy.mjs --harvest-mesh --cache <dir>` -> `render/denoise-results-mesh.json`.
+- It refuses if the file exists.
+- It runs here, about 25 minutes, and the file is committed byte for byte before it is read. Section 80 reads it.
