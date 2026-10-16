@@ -1701,10 +1701,17 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "denoise-winograd",
+        blocker: "CLOSED",
+        what: "DONE as the denoiser arc's round 27 (pre-registration sections 83-86), unshipped on the feature branch at this writing. The set r27w ran every hidden 3 x 3 layer on brain/conv2d.mjs's Winograd F(2x2, 3x3) kernel at one vec4 a thread, under a restated exactness key (K0w). NO TABLE ENTRY MOVES: on both GPUs and both paths, in both runs, r27w was about a third of the speed of the present entry.",
+        how: "Section 86, read off four realGpuRun --only denoise reports at d11534e3 (render/denoise-rig-r27-{a,b}-*.json, committed byte for byte before they were read), with section 83's rule written as code (rule83Entries in render/denoiseDevice-selfcheck.mjs). Every gate green in all four. K0w held natively and in Chrome on both GPUs, and K1 held. Condition 3 failed on every GPU, path and run: r27w at 0.297 and 0.296 x r18t natively on the 1080 at 1920 x 1080 (0.301 and 0.297 x on the page), and 0.348 and 0.326 x r18u natively on the Intel at 512 x 512 (0.338 and 0.369 x on the page).",
+        why: "*** THE PREDICTION WAS OFF BY A FACTOR OF FOUR, AND THAT IS WHY IT IS KEPT. *** Section 83 predicted 1.22-1.25 x r18t on the 1080 from an instruction count (8 an output channel, a pixel and an input channel against the fast kernel's 11.5). The rig measured about 3.8 x r15's time per 32 -> 32 layer on the 1080 and 2.3 x on the Intel. Three unmeasured candidates are in section 86: 8 z groups each restaging the same window, the transformed weights in a storage buffer rather than a uniform binding, and register pressure. What did hold is the key: a twin of a kernel's own order, held to the f64 network at 1e-5 on every value, now has a hardware reading on both GPUs, natively and in Chrome.",
+    },
+    {
+        id: "denoise-winograd-probe",
         blocker: "HARDWARE",
-        what: "Winograd F(2x2, 3x3) kernels for the four 3 x 3 layers, which are 92% of the network's multiply-adds (30,528 of 33,120 a pixel): 2.25x fewer multiplies, in f32. PRE-REGISTERED as the denoiser arc's round 27 (section 83): the set r27w, every hidden layer on brain/conv2d.mjs's Winograd kernel at one vec4 a thread, r15's fused last pass.",
-        how: "The key, restated: every hidden cell is conv2dCpuWino's -- a twin of its own, since Winograd cannot add in the canonical order -- or its fused mirror's; and the image is within 1e-5 of the f64 network on every value, the bound every set has met since section 35 and, for r27w, the only bridge to r15. Exact on SwiftShader here, natively and in Chromium, and nearer the f64 network than r15 in the pilot. K0w (a) HOLDS (section 84): on round 11's 24 test images all 12,582,912 hidden cells were the Winograd twin's and the image was within 1.43e-6 of the f64 network on every value. The page's and the native tables move only by section 83's rule, read off two realGpuRun --only denoise runs per GPU: 1.05 x the GPU's present entry (r18u on the Intel, r18t on the 1080) at the largest size both measured, in both runs.",
-        why: "No hardware feature needed: it runs on both GPUs, natively and in Chrome. Keith set it second, after the FSR1 round. Section 83's arithmetic ceiling is 1.33 x r15 on the 1080 and 1.42 x on the Intel, and it predicts r27w qualifies on the 1080 only.",
+        what: "OPTIONAL, AND OWED BY NOTHING: time the Winograd kernel at two and four vec4s a thread (winoShape's g4 2 and 4: 4 and 2 z groups instead of 8) in denoiseCompile-selfcheck's kernel-level line, on both GPUs.",
+        how: "Two DXC_VARIANTS entries beside r27w-wino-3x3, judged against their own twin as that one is; K0w already holds at two on SwiftShader. One realGpuRun --only denoise per GPU; no table can move from it, so no pre-registered rule is needed.",
+        why: "It is the cheapest reading that separates section 86's first candidate (redundant staging) from its third (registers): fewer z groups help the first and hurt the third. Section 83 conditioned a shape round on r27w holding on one GPU, and it held on neither. A shape would have to be about 3.4 x faster on the 1080 to reach r18t, and 2.9-3.1 x on the Intel to reach r18u.",
     },
     {
         id: "rig-adapter-features-probe",
@@ -1727,7 +1734,7 @@ export const NEXT_ROUNDS = [
         what: "Kernels that share inputs or reduce sums across a subgroup -- the order the scratch study's tree sum stands in for (1.6e-7 from f64, as exact as today's path).",
         how: "Needs the subgroups feature, natively (Dawn over DXC's wave ops) and in Chrome; then the same restated key as Winograd.",
         why: "No multiply saved, so its gain is occupancy and shared-memory traffic -- uncertain enough that it waits behind Winograd.",
-        upstream: "rig-adapter-features-probe, and denoise-winograd's restated exactness key.",
+        upstream: "rig-adapter-features-probe. The restated exactness key it also waited on held on hardware in section 86 (round 27: K0w natively and in Chrome on both GPUs).",
     },
     {
         id: "denoise-f16-storage",

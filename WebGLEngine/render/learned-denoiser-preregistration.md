@@ -5476,3 +5476,131 @@ names that say what they are:
 **The runs again.** Section 83's rule is unchanged. Each new report must carry two checks before anything is read off it:
 - its `commit` field names a commit on `claude/tier-2-keys-patch-4lwhzk` at 687dfd05 or later;
 - its timing gate's "sets timed" line includes r27w.
+
+## 86. ROUND 27 -- THE VERDICT: K0w HOLDS ON BOTH GPUS, AND r27w RUNS AT A THIRD OF THE SPEED OF EACH ONE'S PRESENT ENTRY. NO ENTRY MOVES
+
+**What arrived.** Four `realGpuRun --only denoise` reports, two per GPU, run on 2026-10-16 at d11534e3 ("v4868: record the
+release"), which is on main and descends from 687dfd05, the commit carrying section 83. They are committed byte for byte at
+4bfe5757, before this section was written:
+
+| File | Run at (UTC) | Gates |
+|---|---|---|
+| `render/denoise-rig-r27-a-intel-gen9.json` | 16:34 | exact, compile, timing: all green |
+| `render/denoise-rig-r27-b-intel-gen9.json` | 16:58 | all green |
+| `render/denoise-rig-r27-a-gtx1080.json` | 16:37 | all green |
+| `render/denoise-rig-r27-b-gtx1080.json` | 16:46 | all green |
+
+- **They were opened on arrival,** before that commit, for section 85's two checks. Both hold in all four: the `commit` field
+  names d11534e3, and every timing gate's "sets timed" line reads "r12, r15, r18t, r18u, r27w".
+- **No run crashed and no gate hit the 30-minute cap.** The longest gate was the Intel's run b timing gate, at 541 s.
+
+**Section 83's rule, read strictly. Every condition must hold in both runs.**
+
+| GPU, path | Present entry | 0: DXC, compile gate | 1: K0w | 2: K1 against r12, runs a / b | 3: r27w against the entry, runs a / b | Qualifies |
+|---|---|---|---|---|---|---|
+| Intel gen-9, native | r18u | DXC, green | 2 of 2 native rows, both runs | 5.12 / 4.82 x at 256 x 256 | **0.348 / 0.326 x** at 512 x 512 | no |
+| Intel gen-9, page | r18u | -- | browser row green, both runs | 4.59 / 4.06 x at 256 x 256 | **0.338 / 0.369 x** at 512 x 512 | no |
+| GTX 1080, native | r18t | DXC, green | 2 of 2 native rows, both runs | 7.80 / 7.85 x at 1024 x 1024 | **0.297 / 0.296 x** at 1920 x 1080 | no |
+| GTX 1080, page | r18t | -- | browser row green, both runs | 7.68 / 7.71 x at 1024 x 1024 | **0.301 / 0.297 x** at 1920 x 1080 | no |
+
+- On the Intel, 512 x 512 is the largest size both sets measured. r27w's ladder predicted 1,526-2,326 ms a pass at
+  1024 x 1024, over the 1,500 ms cap, and skipped it.
+- **Conditions 0 to 2 hold on every GPU, path and run. Condition 3 fails on every one,** by a factor of about three. Nothing
+  here is near the 1.05 bar, and the two runs agree to within the Intel's run-to-run noise.
+- **No entry moves.**
+  - `NATIVE_KERNELS_BY_ADAPTER`: r18u on the Intel (section 67), r18t on the 1080 (section 78).
+  - `PAGE_KERNELS_BY_ADAPTER`: r18u on the Intel, r18t on the 1080 (section 63).
+  - r15 everywhere else. Neither table names r27w.
+
+**The rule as code.** `rule83Entries` in `render/denoiseDevice-selfcheck.mjs`, beside `rule66Entries`, reads one report per
+call. It takes the present entries from the tables as section 83 found them (`RULE83_AT`), not from the live tables.
+- **The verdict row.** It reads the four committed reports: every gate green at d11534e3, conditions 0 to 2 held, condition 3
+  failed on every GPU, path and run. Both live tables must equal what the rule derives, with no r27w in either.
+- **The discrimination row.** It works on copies of the reports:
+  - The 1080's two runs lifted to 1.100 x r18t natively give the 1080 r27w natively, and still nothing on the page.
+  - One run lifted gives nothing.
+  - One exact gate red fails condition 1.
+  - Lifting r27w over r15 but not over r18t still fails condition 3. The bar is the present entry.
+  - A skipped exact-gate row fails the page's K0w, not the native one.
+  - A report whose timing gate did not time r27w has no key, which is section 85's check.
+- **The predictions row,** below.
+- **Sabotaged.** Seven runs, each restored byte-identical (md5) and logged in the gate's header as Z1-Z7. None was 0 red.
+  - The bar at 0.25: 3 red, the verdict, the discrimination row and the predictions.
+  - The present entry read as r15 whatever the table says: 1 red, the discrimination row. r27w is under r15 as well, so the
+    verdict alone cannot tell the two apart. This is why the discrimination row lifts r15 alone.
+  - The 1080's page entry set to r27w in `render/denoiseDevice.mjs`: 2 red, this verdict and section 63's.
+  - A skipped exact-gate row not failing the page's K0w: 1 red.
+  - Section 85's "sets timed" check dropped: 1 red.
+  - The committed 1080 run b edited to 1.100 x r18t natively: 3 red.
+  - "Both runs" read as "either run": 1 red.
+
+**The predictions.**
+- **P1 FAILED.** Section 83 predicted r27w at 1.22 x r18t on the 1080's page and 1.23-1.25 x natively. It measured 0.30 x on
+  both, off by a factor of four.
+- **P2 held, but not as reasoned.** The prediction was 0.93 x r18u on the page and 0.89 x natively, a near miss. The
+  measurement was 0.33-0.37 x.
+- **P3 held:** K0w on both GPUs, natively and in Chrome, in both runs.
+  - Its aside was wrong. It said "with some cells fused on the 1080, as r15's were". The compile gate's job for the Winograd
+    kernel read 131,072 plain, 0 fused, 0 unexplained, under DXC as shipped and with use_dxc, on both GPUs in both runs.
+  - r15's hidden kernel (r13-fast-3x3) fused no cell on the 1080 either. The fused cells these reports show are the Intel's
+    head kernels: 221,346 fused in r13-fast-head and in r14-head.
+  - The failure section 83 named, a DXC that reassociates the transforms' adds, did not happen.
+- **P4 held,** in section 84.
+
+**Reported, deciding nothing.**
+- **The compile gate's kernel-level line.** One hidden layer at 64 x 64, r15's kernel over r27w's, under DXC as shipped and with
+  use_dxc:
+
+  | GPU | Run a | Run b |
+  |---|---|---|
+  | GTX 1080 | 0.527 and 0.535 x | 0.532 and 0.534 x |
+  | Intel | 0.427 and 0.370 x | 0.713 and 0.710 x |
+
+  The Intel's two runs disagree by nearly two to one on a sub-3 ms kernel. The ladder below is the steadier reading.
+- **The gap widens with size on the 1080.** Natively, r27w against r15 runs from 0.64 x at 64 x 64 to 0.32 x at
+  1920 x 1080, the same in both runs. On the Intel it runs from 0.64-0.65 x at 64 x 64 to 0.45-0.48 x at 512 x 512.
+- **Per 32 -> 32 hidden layer (layers 1 to 3), natively at the largest size:**
+  - The 1080 at 1920 x 1080: r27w 68.3 ms, r18t 16.2 ms, r15 18.0 ms.
+  - The Intel at 512 x 512, run a: r27w 104-107 ms, r18u 33-37 ms, r15 45-46 ms.
+  - Counted at the direct sum's multiply-adds, that is about 555 GFLOP/s against r18t's 2,350 on the 1080, and about 45
+    against r18u's 139 on the Intel.
+- **The fused counts natively and in Chrome are unread.** Section 83 listed them as reported. The exact gate counts them (its
+  K0 table), but `realGpuRun` keeps measured lines and FAIL lines, not that table. The compile gate's job is the only count
+  these reports carry for r27w.
+- **FXC.** r27w stood aside where `FXC_UNTRIED_SETS` says it should:
+  - the FXC child timed r12 and r15 only;
+  - the compile gate's use_dxc-off mode printed its stand-aside SKIP.
+- **The Intel's run b was noisier throughout.** At 512 x 512, r15's native pass took 278 ms against run a's 172. Both runs fail
+  condition 3 by a factor of three, so the noise bears on no condition.
+
+**Why it is slow. Not measured here, and said as such.**
+- **Section 83's instruction count was the wrong model.** It counted about 8 instructions an output channel, a pixel and an
+  input channel against the fast kernel's 11.5, so about 0.7 x r15's time. The rig measured about 3.8 x r15's time per
+  layer on the 1080 and about 2.3 x on the Intel.
+- **Three differences in the code could each cost that much.** Nothing here separates them.
+  1. **Redundant staging.** At 32 output channels and one vec4 a thread, r27w dispatches 8 z groups (`winoShape`: groups 8).
+     Each stages and transforms the same 18 x 18 window for every input channel. r15's fast kernel covers all 32 output
+     channels in one z group (`fastShape`: g4 8, groups 1), so it stages each window once.
+  2. **Where the weights live.** r27w reads its transformed weights from a storage buffer: 16 vec4 loads an input channel a
+     thread, 64 KiB in all, the whole of a default uniform binding. The fast kernel reads its 37 KB of weights from a uniform
+     binding.
+  3. **Registers.** A thread holds 16 vec4 accumulators and 16 transformed inputs, against the fast kernel's 8 vec4
+     accumulators.
+     So fewer threads can be in flight. The DXIL dumps (1,269-1,270 lines, no loops) say nothing about register allocation.
+
+**What follows.**
+- **Section 83 conditioned the next shapes on a result that did not come.** Two or four vec4s a thread, or the weights in a
+  uniform binding, were "for a later round, if r27w holds on one GPU and a probe says which." It held on neither. So no round
+  is owed, and the backlog's `denoise-winograd` is CLOSED.
+- **The one optional probe is logged as `denoise-winograd-probe`.** It would time two and four vec4s a thread in the compile
+  gate's kernel-level line on both GPUs.
+  - Fewer z groups attack the first difference above and worsen the third.
+  - To reach r18t, a shape would have to be about 3.4 x faster on the 1080, and 2.9-3.1 x on the Intel to reach r18u.
+    Probing it costs little. Nothing here suggests the shape alone closes that gap.
+- **The restated key held on hardware.** K0w now has a reading on both GPUs, natively and in Chrome. A twin of a kernel's
+  own order, held to the f64 network at 1e-5 on every value, is a key any later non-canonical kernel can use. The backlog's
+  `denoise-subgroup-reduction` waits on that, and now only on the features probe.
+- **The tables stand as before:**
+  - r18u on the Intel gen-9, natively and on the page;
+  - r18t on the GTX 1080, natively and on the page;
+  - r15 everywhere else, and `DEFAULT_KERNELS` and `PAGE_KERNELS` unchanged.
