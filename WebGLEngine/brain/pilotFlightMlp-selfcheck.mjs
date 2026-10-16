@@ -1,6 +1,6 @@
 // WebGLEngine/brain/pilotFlightMlp-selfcheck.mjs
 //
-// Run: node brain/pilotFlightMlp-selfcheck.mjs      (~3 s)
+// Run: node brain/pilotFlightMlp-selfcheck.mjs      (~2 s)
 //
 // THE SIBLING GATE OF brain/pilotFlightMlp.mjs (v4870): the GPU Brain's pilot for real flight -- a plain MLP, 18 features -> 32 relu -> 32 relu -> 4, 1,796 weights -- whose hand weights are the PD autopilot written through
 // eight relu channels of each layer. The CPU twin is held to an independent restatement written HERE and to render/brainTsl.mjs's f32 mirror of the GPU kernel; the hand weights to the autopilot and to the fruit fly's hand

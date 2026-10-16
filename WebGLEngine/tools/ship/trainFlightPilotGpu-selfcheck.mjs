@@ -1,4 +1,4 @@
-// WebGLEngine/tools/ship/trainFlightPilotGpu-selfcheck.mjs -- v4870 (beside tools/ship/trainFlightPilot.mjs) (~100 s)
+// WebGLEngine/tools/ship/trainFlightPilotGpu-selfcheck.mjs -- v4870 (beside tools/ship/trainFlightPilot.mjs) (~70 s)
 //
 // Run: node tools/ship/trainFlightPilotGpu-selfcheck.mjs
 //
@@ -32,6 +32,11 @@
 //   B12 brainOf() defaults to the GPU brain                                       2 red (the brainOf() row and the SETS_GPU row)
 //   B13 the unknown brain is not refused                                          0 red THE FIRST TIME -- THE SABOTAGE JSON WAS MALFORMED, so the guarded throw was never taken out; redone with `if (false) throw`, 1 red (the brainOf() row, which includes the unknown-name refusal)
 //   B14 a missing --brain value is taken as the fruit fly                         1 red (the "a typo must not silently train the fruit fly" row)
+//   THE PARSER WAS REWRITTEN AFTER THE VERDICT (tools/ship/cliArgs-selfcheck.mjs found the --brain pre-scan's argv.indexOf idiom): parseArgs reads the command line in ONE pass and lays the brain's defaults under what was given. B1, B2, B14 and the rest of the
+//   parser's branches were therefore applied again to the new code, six of them (the same tool, the same gate):
+//   Q1 the brain's seed default not applied 4 | Q2 the output file always the fruit fly's 3 | Q3 an explicit option loses to the brain's defaults 1, THEN THE GATE HANGS (the options it passes down are ignored, so a later row trains the full recipe: the red row is
+//   the first, the timeout the second -- the same species as the hung gate of v4869, read from the partial output) | Q4 an empty or missing --brain value taken as the fruit fly 0 RED THE FIRST TIME: in the one-pass loop a missing value throws before the brain is
+//   read, so the branch the sabotage changed was reachable only by --brain "" -- which no row asked; the row now asks, and it goes red 1 | Q5 an unknown brain accepted 1 | Q6 the unknown-option refusal dropped 1.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -60,8 +65,8 @@ sec("1. the argument parser takes --brain");
     ok("!! with no --brain the tool trains the fruit fly, as it did at v4869: brain 'fly', seed 6000, the fruit fly's file", d.brain === "fly" && d.seed === 6000 && d.out === TR.DEFAULT_OUT && path.basename(d.out) === "pilotFlightWeightsDefault.json");
     ok("!! --brain gpu sets the brain, the seed (7000) and the file (brain/pilotFlightMlpWeightsDefault.json) and leaves the rest of the recipe alone", g.brain === "gpu" && g.seed === 7000 && path.basename(g.out) === "pilotFlightMlpWeightsDefault.json" && path.resolve(path.dirname(g.out)) === path.resolve(ENG, "brain") && ["runs", "iters", "sigma", "maxK"].every((k) => g[k] === TR.RECIPE[k]) && g.workers === 1 && g.write === false);
     ok("!! an explicit option beats the brain's default whichever side of --brain it is on (--seed 5 before or after), and the options after it are read", g2.brain === "gpu" && g2.seed === 5 && g2.iters === 9 && g3.seed === 5 && g3.brain === "gpu");
-    const e1 = throws(() => TR.parseArgs(["--brain", "tpu"])), e2 = throws(() => TR.parseArgs(["--brain"])), e3 = throws(() => TR.parseArgs(["--runs", "2", "--brain"]));
-    ok("an unknown brain and a missing value are each REFUSED with the reason (a typo must not silently train the fruit fly), and --brain is among the options the unknown-option message lists", /--brain must be one of fly, gpu, got "tpu"/.test(e1) && /--brain needs a value/.test(e2) && /--brain needs a value/.test(e3) && /--brain/.test(throws(() => TR.parseArgs(["--bogus"]))), [e1, e2].join(" | "));
+    const e1 = throws(() => TR.parseArgs(["--brain", "tpu"])), e2 = throws(() => TR.parseArgs(["--brain"])), e3 = throws(() => TR.parseArgs(["--runs", "2", "--brain"])), e4 = throws(() => TR.parseArgs(["--brain", ""]));
+    ok("an unknown brain and a missing value are each REFUSED with the reason (a typo must not silently train the fruit fly), and --brain is among the options the unknown-option message lists", /--brain must be one of fly, gpu, got "tpu"/.test(e1) && /--brain needs a value/.test(e2) && /--brain needs a value/.test(e3) && /--brain must be one of fly, gpu, got ""/.test(e4) && /--brain/.test(throws(() => TR.parseArgs(["--bogus"]))), [e1, e2].join(" | "));
 }
 
 sec("2. BRAINS");

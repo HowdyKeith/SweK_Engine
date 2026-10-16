@@ -21,6 +21,8 @@
 //   TWO FINDINGS. S WENT 0 RED THE FIRST TIME: the only dump row ran on a stub result whose runs were empty, so a dump without its weights passed; the row now takes a real finish() result and compares all 1,099 weights of every run. AND A
 //   PARSER THAT LETS A TYPO THROUGH HUNG THE GATE, which is what such a parser would do to the person: the command went on to train the default recipe, four runs of a thousand iterations. The bad-argument rows now inject a `run` that
 //   throws, so the sabotage is a red row and not a five-minute timeout (the harness has a timeout row for that now, too).
+//   v4870, FIVE MORE (the brain table, section 1b: the four symbols this gate names so the GPU Brain's choice cannot change the fruit fly's tool), every one red by name (the ids are BT1-BT5 here; the sabotage files called them V1-V5):
+//   BT1 brainOf() defaults to the GPU Brain 5 | BT2 setsOf() always returns the fruit fly's sets 1 | BT3 SETS_GPU's audit is the fruit fly's AUDIT3 1 | BT4 SETS_GPU's training set is not the fruit fly's 1 | BT5 BRAINS is not frozen 1.
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -52,6 +54,12 @@ const d1 = TR.parseArgs(["--runs", "3", "--iters", "50", "--workers", "4", "--on
 ok("every option is read: --runs, --iters, --seed, --sigma, --maxK, --workers, --one, --out, --dump, --write, --quiet", d1.runs === 3 && d1.iters === 50 && d1.workers === 4 && d1.one === 2 && d1.maxK === 6 && d1.write && d1.quiet && d1.out === "x.json" && d1.dump === "d.json" && TR.parseArgs(["--seed", "9", "--sigma", "0.1"]).seed === 9 && TR.parseArgs(["--sigma", "0.1"]).sigma === 0.1);
 const e1 = throws(() => TR.parseArgs(["--bogus"])), e2 = throws(() => TR.parseArgs(["--runs"])), e3 = throws(() => TR.parseArgs(["--runs", "many"])), e4 = throws(() => TR.parseArgs(["stray"]));
 ok("an unknown option, a missing value, a non-number and a stray argument are each REFUSED with the reason (a typo must not silently train the default recipe)", /unknown option "--bogus"/.test(e1) && /--runs needs a value/.test(e2) && /--runs needs a number/.test(e3) && /unexpected argument "stray"/.test(e4), [e1, e2, e3, e4].join(" | "));
+
+// v4870 -- THE BRAIN TABLE. The tool trains two networks since v4870 (--brain fly | gpu); tools/ship/trainFlightPilotGpu-selfcheck.mjs holds the GPU brain's whole path (the parser, the children, the blob, the shipped file), and these rows hold the
+// four symbols that choose between them from THIS gate -- the fruit fly's -- so that choosing the GPU brain cannot change what the fruit fly's tool does, and so a symbol a gate exists to guard is named by the gate beside its module.
+sec("1b. the brain table: BRAINS, brainOf(), SETS_GPU and setsOf() leave the fruit fly's tool alone");
+ok("!! brainOf() is the FRUIT FLY for no brain named and for 'fly', the GPU Brain's entry for 'gpu', and BRAINS holds exactly those two, frozen; an unknown name is refused by name", TR.brainOf({}) === TR.BRAINS.fly && TR.brainOf({ brain: "fly" }) === TR.BRAINS.fly && TR.brainOf({ brain: "gpu" }) === TR.BRAINS.gpu && TR.BRAINS.fly !== TR.BRAINS.gpu && Object.keys(TR.BRAINS).join() === "fly,gpu" && Object.isFrozen(TR.BRAINS) && /tpu/.test(throws(() => TR.brainOf({ brain: "tpu" })) || ""));
+ok("!! setsOf() is SETS (the fruit fly's audits, read at v4869) for the fruit fly and SETS_GPU for the GPU Brain, and the two differ ONLY in the audit and the safety audit: the same train, held-out, pool and reserve by identity", TR.setsOf({}) === TR.SETS && TR.setsOf({ brain: "fly" }) === TR.SETS && TR.setsOf({ brain: "gpu" }) === TR.SETS_GPU && TR.SETS !== TR.SETS_GPU && Object.isFrozen(TR.SETS_GPU) && TR.SETS_GPU.train === TR.SETS.train && TR.SETS_GPU.heldOut === TR.SETS.heldOut && TR.SETS_GPU.pool === TR.SETS.pool && TR.SETS_GPU.reserve === TR.SETS.reserve && TR.SETS_GPU.audit !== TR.SETS.audit && TR.SETS_GPU.safetyAudit !== TR.SETS.safetyAudit);
 
 sec("2. the tails: tails(), allowance(), tailReasons()");
 const flight = (kind, seed, status, deg) => ({ kind, seed, status, maxAlpha: deg * Math.PI / 180 });

@@ -20,8 +20,9 @@
 //   T16 fly ignores the model's mass 1 | T17 the tick step 1/30 -> 1/60 5 | T19 `crashed` counts nothing 1 | T20 versus() swaps better and worse 1 | T21 the fingerprint sampled every 31 ticks 1 | T22 a crash does not end the flight 1
 //   v4869, EIGHT MORE (the trainer's sets: TRAIN_WIDE 40, HELD_OUT_WIDE 30, AUDIT3 36, SAFETY_POOL 500, SAFETY_AUDIT 500; rows in sections 3 and 4), every one red by name:
 //   S1 TRAIN_WIDE's second recovery range overlaps HELD_OUT_WIDE 3 | S2 AUDIT3 nominal overlaps the spent AUDIT2 2 | S3 SAFETY_AUDIT recovery is the pool's seeds 1 | S4 HELD_OUT_WIDE nominal one short 2 | S5 SAFETY_POOL nominal half size 1 |
-//   v4870, FOUR MORE (the GPU brain's audits): see the log below the v4869 one.
 //   S6 AUDIT3 gusty one short 2 | S7 HELD_OUT_WIDE nominal runs into the spent AUDIT_SET 3 | S8 SAFETY_AUDIT gusty runs into the pool 1.
+//   v4870, FIVE MORE (the GPU brain's audits, AUDIT4_SET 36 and SAFETY_AUDIT2_SET 500), every one red by name -- an earlier draft of this log promised four and listed none, the five below were run when that was found:
+//   U1 AUDIT4 nominal runs into the fruit fly's AUDIT3 2 | U2 AUDIT4 gusty one short 2 | U3 SAFETY_AUDIT2 recovery runs into the fruit fly's SAFETY_AUDIT 1 | U4 SAFETY_AUDIT2 nominal half size 1 | U5 AUDIT4 recovery is the spent AUDIT2's range 2.
 //   T7 FIRST WENT 0 RED: no scenario ever crossed +-pi, so the wrap was never exercised; the 3.0 -> -3.0 row exists because of it. A NaN guard on the score (T18) could not be reached -- the flight model reads a bad control as neutral and ends the
 //   flight on a non-finite state before an error is summed -- and was REMOVED rather than kept as dead code that a sabotage cannot see.
 //   fly() flew every model at the TRAINER's mass until T16 found it: createState defaulted the state's mass, and a lighter airframe flew the same flight.

@@ -1,6 +1,6 @@
 // WebGLEngine/brain/pilotFlightTrain-selfcheck.mjs
 //
-// Run: node brain/pilotFlightTrain-selfcheck.mjs      (~30 s)
+// Run: node brain/pilotFlightTrain-selfcheck.mjs      (~42 s)
 //
 // THE TRAINING FUNCTIONS OF THE FRUIT-FLY PILOT, GRADED ON WHAT A (1+1)-ES FROM THE AUTOPILOT MUST DO (v4869; they lived in brain/pilotFlightPolicy-selfcheck.mjs for a day and took it from 1.8 s to 26 s, out of the quick sweep and
 // into the rotation, so they were moved here and the policy gate is fast again). tools/ship/trainFlightPilot-selfcheck.mjs holds the TOOL built on them; this file holds mutate, train, prune and evaluate of brain/pilotFlightPolicy.mjs:

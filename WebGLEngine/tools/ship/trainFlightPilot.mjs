@@ -56,16 +56,17 @@ const cmp = T.describeEval;
 /** Parse `--name value` / `--flag` argv, REFUSING an option it does not know (a typo must not silently train the default recipe). `--one K` is the child's mode (see trainPilotFlight.mjs). */
 export function parseArgs(argv) {
     const known = { runs: Number, iters: Number, seed: Number, sigma: Number, maxK: Number, workers: Number, one: Number, out: String, dump: String, brain: String, write: Boolean, quiet: Boolean };
-    const bi = argv.indexOf("--brain"), want = bi >= 0 ? argv[bi + 1] : "fly";
-    if (!BRAINS[want]) throw new Error(bi >= 0 && want == null ? "--brain needs a value" : `--brain must be one of ${Object.keys(BRAINS).join(", ")}, got ${JSON.stringify(want)}`);
-    const b = BRAINS[want], o = { ...RECIPE, seed: b.seed, brain: b.id, workers: 1, one: null, out: b.out, dump: null, write: false, quiet: false };
+    const given = {};   // what the command line set, in ONE pass: the brain's own defaults (its seed, its file) go underneath it afterwards, so an explicit option beats them on whichever side of --brain it is written
     for (let i = 0; i < argv.length; i++) {
         const a = argv[i]; if (!a.startsWith("--")) throw new Error(`unexpected argument ${JSON.stringify(a)}`);
-        const k = a.slice(2); if (k === "brain") { i++; continue; }   // read above, before the defaults that depend on it
+        const k = a.slice(2);
         if (!(k in known)) throw new Error(`unknown option ${JSON.stringify(a)} (known: ${Object.keys(known).map((n) => "--" + n).join(", ")})`);
-        if (known[k] === Boolean) o[k] = true; else { const v = argv[++i]; if (v == null) throw new Error(`${a} needs a value`); o[k] = known[k] === Number ? Number(v) : v; if (known[k] === Number && !Number.isFinite(o[k])) throw new Error(`${a} needs a number, got ${JSON.stringify(v)}`); }
+        if (known[k] === Boolean) given[k] = true; else { const v = argv[++i]; if (v == null) throw new Error(`${a} needs a value`); given[k] = known[k] === Number ? Number(v) : v; if (known[k] === Number && !Number.isFinite(given[k])) throw new Error(`${a} needs a number, got ${JSON.stringify(v)}`); }
     }
-    return o;
+    const want = "brain" in given ? given.brain : "fly";
+    if (!BRAINS[want]) throw new Error(`--brain must be one of ${Object.keys(BRAINS).join(", ")}, got ${JSON.stringify(want)}`);
+    const b = BRAINS[want];
+    return { ...RECIPE, seed: b.seed, workers: 1, one: null, out: b.out, dump: null, write: false, quiet: false, ...given, brain: b.id };
 }
 
 // ---- the tails -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

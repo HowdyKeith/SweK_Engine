@@ -89,6 +89,7 @@ import * as T from "/brain/flightTask.mjs";
 import * as PR from "/brain/pilotRoster.mjs";
 import * as PB from "/brain/peerBrain.mjs";
 import { weightsHash } from "/brain/drivePolicy.mjs";
+import { describeWebGPU, showOriginBanner } from "/ui/webgpuProbe.mjs";
 
 // ---- the mission and the fleet -------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 const DT = T.DT, N = 3, LEG_SECONDS = 25, LEG_TICKS = Math.round(LEG_SECONDS / DT);
@@ -225,7 +226,11 @@ function syncGpuBrains() {
 }
 async function initGpu() {
   try {
-    if (!navigator.gpu) throw new Error("this browser has no WebGPU (navigator.gpu is missing)");
+    if (!navigator.gpu) {   // ASK WHICH ORIGIN THIS IS BEFORE BLAMING THE BROWSER (ui/webgpuProbe.mjs): navigator.gpu is withheld from an insecure origin, e.g. http://<lan-ip>:8787, on a machine whose WebGPU works
+      const why = describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location });
+      if (why.reason === "insecure-origin") showOriginBanner(why);   // the clickable localhost route, once, at the top of the page
+      throw new Error(why.reason === "insecure-origin" ? why.short : "navigator.gpu is missing on this page (WebGPU is not exposed here)");
+    }
     const adapter = await navigator.gpu.requestAdapter(); if (!adapter) throw new Error("WebGPU gave no adapter");
     let info = {}; try { info = adapter.info || (adapter.requestAdapterInfo ? await adapter.requestAdapterInfo() : {}) || {}; } catch {}
     gpuDevice = await adapter.requestDevice();

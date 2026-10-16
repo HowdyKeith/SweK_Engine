@@ -1,6 +1,6 @@
 // WebGLEngine/brain/pilotFlightGpu-selfcheck.mjs
 //
-// Run: node brain/pilotFlightGpu-selfcheck.mjs      (~10 s)
+// Run: node brain/pilotFlightGpu-selfcheck.mjs      (~14 s)
 //
 // THE GPU BRAIN FLYING, GRADED ON A REAL WebGPU DEVICE: brain/pilotFlightGpu.mjs runs brain/pilotFlightMlp.mjs's network through brain/mlp.js's BatchedMLP (headless Chromium via tools/ship/webgpuHarness.mjs -- on this build
 // box that device is SwiftShader, the same one every GPU gate in the tree runs on; on a GPU machine it is the card) and this file holds it to the CPU twin the pilot was trained on.
