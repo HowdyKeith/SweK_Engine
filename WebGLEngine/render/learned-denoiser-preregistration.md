@@ -5434,3 +5434,45 @@ r15's 399 in section 47. This is SwiftShader, a CPU's time, and no evidence for 
 - K0w (b) and (c), K1, and section 83's rule on Keith's two GPUs. Those come from two runs on each GPU of
   `node tools/ship/realGpuRun.mjs --only denoise`, as section 83 says.
 - Until then the tables are as they stand: r18u on the Intel, r18t on the 1080, r15 everywhere else.
+
+## 85. ROUND 27 -- FOUR RIG RUNS ARRIVED FROM OLD COMMITS: NO VERDICT, AND THE RUNS ARE OWED AGAIN
+
+**What arrived.** Four `realGpuRun --only denoise` reports, two per GPU, on 2026-10-16. They are committed byte for byte under
+names that say what they are:
+
+| File | Run at | The report's `commit` |
+|---|---|---|
+| `render/denoise-rig-r27-stale-intel-gen9-a.json` | 13:37 | 66a7ae38, v4863's release |
+| `render/denoise-rig-r27-stale-intel-gen9-b.json` | 13:56 | 66a7ae38, v4863's release |
+| `render/denoise-rig-r27-stale-gtx1080-a.json` | 13:19 | 2af5f7da, v4861's release |
+| `render/denoise-rig-r27-stale-gtx1080-b.json` | 13:23 | 2af5f7da, v4861's release |
+
+- **They were read before this commit.** They were opened in full when they arrived. They bear on no rule, for the reason below.
+
+**Why they decide nothing.**
+- Section 83's rule reads runs from a clone of `claude/tier-2-keys-patch-4lwhzk` at a commit carrying section 83: 687dfd05 or
+  later. These ran on the rigs' existing checkouts, two and four versions before it.
+- **The string "r27w" appears in none of the four.**
+  - Every timing gate says "sets timed: r12, r15, r18t, r18u".
+  - No exact gate prints the "native K0w for round 27's set" line.
+  - No compile gate built the Winograd kernel.
+- So K0w (b) and (c), K1 and section 83's conditions have no reading on either GPU. **No table moves.**
+
+**One finding, reported and deciding nothing.**
+- **The 1080's run a stopped its timing gate 39 s in, inside the native ladder.** realGpuRun records it as not ok, with no FAIL
+  line. Its last measured line is "sets timed: r12, r15, r18t, r18u". Run b, five minutes later, completed in 246 s.
+- The console was not sent, so the cause is unread.
+- **It was a first run, and it was the timing gate.** Section 76's two crashes were in second runs, in the compile gate on the
+  1080 and the exact gate on the Intel. Section 78's runs did not crash. This is v4861's code, and nothing in round 27 touched it.
+- **Section 83's rule already covers it.** A crash in either of round 27's runs means no entry moves on that GPU.
+
+**What the old code's runs repeat, for the record.**
+- **The 1080, run b, natively under DXC:** r18t 1.092 x r15 at 1920 x 1080 (section 78 read 1.080 and 1.068).
+- **The 1080 on the page:** r18t 1.101 x r15.
+- **The Intel, natively at 1024 x 1024:** r18u 1.385 and 1.483 x r15 in runs a and b.
+- **The Intel on the page:** r18u 1.560 and 1.561 x r15.
+- Every exact gate was green on both GPUs.
+
+**The runs again.** Section 83's rule is unchanged. Each new report must carry two checks before anything is read off it:
+- its `commit` field names a commit on `claude/tier-2-keys-patch-4lwhzk` at 687dfd05 or later;
+- its timing gate's "sets timed" line includes r27w.
