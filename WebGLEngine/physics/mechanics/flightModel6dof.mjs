@@ -1,0 +1,211 @@
+// WebGLEngine/physics/mechanics/flightModel6dof.mjs -- v4866
+//
+// REAL FLIGHT, ONCE: a light trainer aircraft with gravity, an engine, a stalling wing and three control surfaces, flown by a pilot that sends FOUR numbers -- pitch, roll, yaw, throttle -- and by nothing else. This is
+// the physics under every "real flight" pilot this tree trains (the fruit-fly brain, the GPU brain, the PD autopilot): it is built from the primitives that were already here and gated -- the rigid body
+// (physics/mechanics/rigidBody6dof.mjs), the lifting surface (aeroSurface.mjs, with the stall it gained this round) and the four-surface assembly with control mixing (aircraftAssembly.mjs) -- and adds only
+// what they left out: weight, thrust, fuselage drag, the air each surface actually sits in (the aircraft's velocity PLUS its rotation carried to the surface: v + w x r, which is where damping comes from),
+// a ground, and the two things a pilot needs before it can be asked to fly: a TRIM (the controls that hold a steady flight) and the attitude and air-data numbers it reads.
+//
+// *** WHAT THE EARLIER FLIGHT PAGE (es-aircraft.html) DID NOT HAVE, AND THIS DOES. *** That page has no gravity and holds a fixed heading; its "pilot" steers a point. Here the aircraft falls if it is not flown,
+// stalls if it is flown too slowly, spins its nose into the wind if it slips, and ends in a crash or a touchdown. A pilot that flies this has learned to fly.
+//
+// CONVENTIONS -- and one the earlier modules got WRONG IN A LABEL, NOT IN A NUMBER. Body: nose +X, up +Z, and +Y is the aircraft's LEFT (a right-handed frame: up x nose = left). aircraftAssembly.mjs names [0,1,0]
+// RIGHT_BODY and its header says "right = +Y"; that is the aircraft's left wing, so its "leftWing" is physically the right one. NOTHING in the physics depends on the name -- the pair is symmetric and every
+// sign in this file is derived from geometry -- and this module does not use the name: its pilot senses are defined from the frame itself and proved against it in the gate:
+//   pitch  +1 = stick back = nose UP     (the elevator is driven by -pitch; rotation about +Y takes the nose DOWN)
+//   roll   +1 = stick right = bank RIGHT (right wing down; rotation about +X by a positive angle)
+//   yaw    +1 = right pedal = nose RIGHT (rotation about +Z by a NEGATIVE angle)
+//   throttle 0..1.   World: +Z up, ground at z = 0; heading 0 = world +X, a right turn INCREASES it.
+// attitude() and rates() report in those same senses (bank positive right wing down, pitch positive nose up, rates positive in the commanded direction), so a controller written against them needs no sign
+// juggling and the three it would get wrong are the three the gate pins.
+//
+// THE AIRFRAME (TRAINER; a Cessna-172-class numbers, none of them fitted to anything but the closed forms the gate holds them to): 1000 kg, I = [1300, 1800, 2700], two wing halves of 8 m^2 (aspect ratio 7, lift
+// slope 5.7, incidence 2 degrees) whose centre of lift sits 2.2 m out, a horizontal tail of 1.6 m^2 at 4.2 m aft, a fin/rudder of 1.0 m^2 at the same station, a fuselage drag area of 0.5 m^2, and an engine of 4000 N
+// static thrust that fades linearly to zero at 90 m/s (thrust = 4000 * throttle * max(0, 1 - V/90)). Wings, tail and fin all stall (aeroSurface.STALL: 15 degrees to separate, 8 to finish). From those numbers:
+// stall speed ~26.5 m/s, trim at 45 m/s needs 3.0 degrees of pitch and 0.66 throttle, the top level speed is ~52 m/s.
+//
+// WHAT IS NOT IN IT, SAID PLAINLY (each is a thing a better model has, and none of them is hidden by a gate that happens to pass): no air-density change with altitude (the trainer flies the lowest few hundred
+// metres), no dihedral effect (a slip does not roll the wings), no fuselage lift or side force, no downwash or prop wash on the tail, no flaps, no gyroscopic or torque effect from the engine, the thrust line
+// passes through the centre of mass (no thrust-pitch coupling), and no ground model beyond classification: the first contact ENDS the flight as a touchdown or a crash (below). Takeoff and landing rolls are a later
+// slice. Wind enters as a uniform steady vector.
+//
+// THE GROUND. Three wheels (nose, two mains) and the wingtips and tail are the contact points. A flight ends the tick any of them reaches z = 0: a WHEEL contact is a TOUCHDOWN if the point's sink speed is at most
+// 3 m/s, the bank at most 15 degrees and the pitch within -10..+15 degrees (a wing-low or tail-first arrival is not a landing); anything else -- a tip, the tail, an inverted aircraft, a hard arrival -- is a CRASH.
+// classify() is a pure function of the state, so stepFlight() on a state that has already ended returns it unchanged: a finished flight stays finished.
+//
+// Pure: no DOM, no clock, no random. physics/mechanics/flightModel6dof-selfcheck.mjs holds this to closed forms (free fall, damping rates, the stall speed, the phugoid period, the engine) and to symmetry.
+"use strict";
+import { createBody, step, createAccumulator, applyForceAtPoint, worldToBody, rotateByQuat, cross3 } from "./rigidBody6dof.mjs";
+import { applySurfaceForce, STALL } from "./aeroSurface.mjs";
+import { createAircraft, mixControls, withDeflection } from "./aircraftAssembly.mjs";
+
+export const GRAVITY = 9.80665, DT = 1 / 60;
+export { STALL };
+
+export const TRAINER = Object.freeze({
+    name: "trainer", mass: 1000, inertia: Object.freeze([1300, 1800, 2700]),
+    airframe: Object.freeze({
+        wingSpanHalf: 2.2, wingArea: 8, wingAspectRatio: 7, wingClAlpha: 5.7, tailMountX: -4.2, tailArea: 1.6, tailAspectRatio: 4, tailClAlpha: 4.5, rudderArea: 1.0,
+        elevatorMaxDeflection: 0.4, aileronMaxDeflection: 0.4, rudderMaxDeflection: 0.4,
+    }),
+    wingIncidence: 0.035, stall: STALL, parasiteArea: 0.5, thrustMax: 4000, propSpeed: 90, thrustPoint: Object.freeze([2, 0, 0]),
+    wheels: Object.freeze([[1.8, 0, -1.3], [-0.3, 1.2, -1.3], [-0.3, -1.2, -1.3]]),
+    hull: Object.freeze([[0, 5.3, 0], [0, -5.3, 0], [-5.5, 0, 0.3], [2.5, 0, 0.2]]),   // wingtips, tail, nose
+    touchdown: Object.freeze({ maxSink: 3, maxBank: 15 * Math.PI / 180, minPitch: -10 * Math.PI / 180, maxPitch: 15 * Math.PI / 180 }),
+});
+
+export const AIR_DENSITY = 1.225;   // the value aeroSurface.mjs uses; flightModel6dof does not vary it (see the header)
+
+/** Build a flight model from an airframe spec (default TRAINER). Returns { spec, aircraft, mass, inertia, weight }. The aircraft is aircraftAssembly's four surfaces with the wing incidence set and every surface given the stall. */
+export function createFlightModel(spec = TRAINER) {
+    const aircraft = createAircraft({ ...spec.airframe });
+    for (const k of ["leftWing", "rightWing"]) aircraft.surfaces[k].incidence = spec.wingIncidence;
+    if (spec.stall) for (const s of Object.values(aircraft.surfaces)) s.stall = { ...spec.stall };
+    return { spec, aircraft, mass: spec.mass, inertia: [...spec.inertia], weight: spec.mass * GRAVITY };
+}
+
+const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+const num = (v) => (Number.isFinite(v) ? v : 0);
+
+/** The pilot's four numbers, sanitised: pitch/roll/yaw clamped to [-1, 1], throttle to [0, 1]; a NaN or an infinity is read as 0 (so a diverged controller cannot put NaN into the physics). */
+export function sanitize(c = {}) {
+    return { pitch: clamp(num(c.pitch), -1, 1), roll: clamp(num(c.roll), -1, 1), yaw: clamp(num(c.yaw), -1, 1), throttle: clamp(num(c.throttle), 0, 1) };
+}
+
+/** Pilot senses -> the assembly's mixer (see the header: its positive pitch is nose DOWN, its positive roll is a LEFT bank, its positive yaw is nose LEFT). `controls` are used as given; the public functions sanitise first. */
+const deflectionsOf = (model, c) => mixControls(model.aircraft, { pitch: -c.pitch, roll: -c.roll, yaw: -c.yaw });
+export function surfaceDeflections(model, controls) { return deflectionsOf(model, sanitize(controls)); }
+
+/** The force and moment sum for ALREADY-SANITISED controls. trim() calls this directly: it must be able to ask for a throttle of 1.13 to learn that a speed is out of reach, which the clamp would hide. */
+function evaluate(model, state, c, windWorld) {
+    const spec = model.spec, defl = deflectionsOf(model, c), acc = createAccumulator();
+    const air = [state.vel[0] - windWorld[0], state.vel[1] - windWorld[1], state.vel[2] - windWorld[2]], vb = worldToBody(state.q, air), perSurface = {};
+    for (const name of Object.keys(model.aircraft.surfaces)) {
+        const s = withDeflection(model.aircraft.surfaces[name], defl[name]), r = cross3(state.w, s.mount);
+        perSurface[name] = applySurfaceForce(acc, [vb[0] + r[0], vb[1] + r[1], vb[2] + r[2]], s);
+    }
+    const V = Math.hypot(vb[0], vb[1], vb[2]);
+    if (V > 1e-6) { const k = -0.5 * AIR_DENSITY * V * spec.parasiteArea; applyForceAtPoint(acc, [k * vb[0], k * vb[1], k * vb[2]], [0, 0, 0]); }
+    const thrust = spec.thrustMax * c.throttle * Math.max(0, 1 - V / spec.propSpeed);
+    applyForceAtPoint(acc, [thrust, 0, 0], spec.thrustPoint);
+    applyForceAtPoint(acc, worldToBody(state.q, [0, 0, -state.mass * GRAVITY]), [0, 0, 0]);   // the state's own mass: the same one the integrator divides by
+    return { acc, perSurface, airspeed: V, thrust };
+}
+
+/**
+ * Every force and moment on the aircraft in this state, body frame. `windWorld` is the air's velocity (default still). Each surface sits in the air at ITS point: the aircraft's air-relative velocity plus
+ * w x r. Returns { acc, perSurface, airspeed, thrust }: `acc` is a rigidBody6dof accumulator ready for step(); perSurface is keyed like the assembly's surfaces ({force, cl, cd, alpha, q}).
+ */
+export function forcesAndMoments(model, state, controls, windWorld = [0, 0, 0]) { return evaluate(model, state, sanitize(controls), windWorld); }
+
+// ---- attitude and air data (the pilot's senses; see the header) -------------------------------------------------------------------------------------------------------------------------------------------------
+
+const qmul = (a, b) => [a[0] * b[0] - a[1] * b[1] - a[2] * b[2] - a[3] * b[3], a[0] * b[1] + a[1] * b[0] + a[2] * b[3] - a[3] * b[2], a[0] * b[2] - a[1] * b[3] + a[2] * b[0] + a[3] * b[1], a[0] * b[3] + a[1] * b[2] - a[2] * b[1] + a[3] * b[0]];
+const axisQ = (axis, angle) => { const s = Math.sin(angle / 2); return [Math.cos(angle / 2), axis[0] * s, axis[1] * s, axis[2] * s]; };
+
+/** The body quaternion for a heading (right turn positive), pitch (nose up positive) and bank (right wing down positive): yaw about +Z by -heading, then pitch about +Y by -pitch, then roll about +X by +bank. */
+export function attitudeQuat(heading = 0, pitch = 0, bank = 0) {
+    return qmul(qmul(axisQ([0, 0, 1], -heading), axisQ([0, 1, 0], -pitch)), axisQ([1, 0, 0], bank));
+}
+
+/** A flight state: at `pos`, flying at `speed` along the flight path `gamma` (climb angle) in `heading`, the nose at `pitch` and the wings at `bank`, turning at `w` (body rates, default none). It carries its own mass and inertia (default the TRAINER's); weight is the state's mass times g. */
+export function createState({ pos = [0, 0, 300], speed = 45, heading = 0, pitch = 0, bank = 0, gamma = 0, w = [0, 0, 0], mass = TRAINER.mass, inertia = TRAINER.inertia } = {}) {
+    const h = [Math.cos(heading), -Math.sin(heading)];
+    return createBody({ mass, I: inertia, pos, vel: [speed * Math.cos(gamma) * h[0], speed * Math.cos(gamma) * h[1], speed * Math.sin(gamma)], q: attitudeQuat(heading, pitch, bank), w });
+}
+
+/** { pitch, bank, heading, airspeed, alpha, beta, gamma, climb, altitude } for a state (angles in radians, in the pilot's senses; alpha is the body angle of attack, beta positive when the aircraft slips to the right). */
+export function attitude(state, windWorld = [0, 0, 0]) {
+    const f = rotateByQuat(state.q, [1, 0, 0]), yAxis = rotateByQuat(state.q, [0, 1, 0]), up = rotateByQuat(state.q, [0, 0, 1]);
+    const vb = worldToBody(state.q, [state.vel[0] - windWorld[0], state.vel[1] - windWorld[1], state.vel[2] - windWorld[2]]), V = Math.hypot(vb[0], vb[1], vb[2]);
+    return {
+        pitch: Math.asin(clamp(f[2], -1, 1)), bank: Math.atan2(yAxis[2], up[2]), heading: Math.atan2(-f[1], f[0]),
+        airspeed: V, alpha: Math.atan2(-vb[2], vb[0]), beta: V > 1e-9 ? Math.asin(clamp(-vb[1] / V, -1, 1)) : 0,
+        gamma: Math.hypot(state.vel[0], state.vel[1], state.vel[2]) > 1e-9 ? Math.asin(clamp(state.vel[2] / Math.hypot(state.vel[0], state.vel[1], state.vel[2]), -1, 1)) : 0, climb: state.vel[2], altitude: state.pos[2],
+    };
+}
+
+/** Body angular rates in the pilot's senses: { roll: positive right bank, pitch: positive nose up, yaw: positive nose right } (rad/s). */
+export function rates(state) { return { roll: state.w[0], pitch: -state.w[1], yaw: -state.w[2] }; }
+
+// ---- ground -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+/** Where each contact point is and how fast it is sinking (world z, and -vz of the point: the body's velocity plus w x r). */
+function contactPoints(model, state) {
+    const out = [];
+    const one = (p, kind) => {
+        const off = rotateByQuat(state.q, p), wb = rotateByQuat(state.q, state.w), vel = [state.vel[0] + (wb[1] * off[2] - wb[2] * off[1]), state.vel[1] + (wb[2] * off[0] - wb[0] * off[2]), state.vel[2] + (wb[0] * off[1] - wb[1] * off[0])];
+        out.push({ kind, z: state.pos[2] + off[2], sink: -vel[2] });
+    };
+    for (const p of model.spec.wheels) one(p, "wheel");
+    for (const p of model.spec.hull) one(p, "hull");
+    return out;
+}
+
+/** "airborne" | "touchdown" | "crashed" | "lost" (a non-finite state), with the numbers that decided it. A pure function of the state. */
+export function classify(model, state) {
+    if (![...state.pos, ...state.vel, ...state.q, ...state.w].every(Number.isFinite)) return { status: "lost" };
+    const hit = contactPoints(model, state).filter((p) => p.z <= 0);
+    if (!hit.length) return { status: "airborne" };
+    const a = attitude(state), t = model.spec.touchdown, sink = Math.max(...hit.map((p) => p.sink));
+    const gentle = hit.every((p) => p.kind === "wheel") && sink <= t.maxSink && Math.abs(a.bank) <= t.maxBank && a.pitch >= t.minPitch && a.pitch <= t.maxPitch;
+    return { status: gentle ? "touchdown" : "crashed", sink, bank: a.bank, pitch: a.pitch, hull: hit.some((p) => p.kind === "hull") };
+}
+
+/** One tick: { state, status, ...classification }. A state that has already ended is returned unchanged. */
+export function stepFlight(model, state, controls, dt = DT, windWorld = [0, 0, 0]) {
+    const before = classify(model, state);
+    if (before.status !== "airborne") return { state, ...before };
+    const next = step(state, forcesAndMoments(model, state, controls, windWorld).acc, dt);
+    return { state: next, ...classify(model, next) };
+}
+
+// ---- trim -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+/**
+ * The controls that hold a steady, straight flight at `speed` and climb angle `gamma` (0 = level): a Newton solve over [pitch attitude, stick, throttle] for zero body force along X and Z and zero pitching
+ * moment. Returns { speed, gamma, pitchAttitude, alpha, pitch, throttle, residual: [Fx, Fz, My], converged, feasible }: `pitch` is the stick (+ = back), `feasible` is converged with the throttle in 0..1, the
+ * stick within +-1 and the wing below its stall angle -- an aircraft below its stall speed has a "solution" the aircraft cannot hold.
+ */
+export function trim(model, speed, { gamma = 0 } = {}) {
+    const resid = (x) => {
+        const s = createState({ pos: [0, 0, 500], speed, pitch: x[0], gamma, mass: model.mass, inertia: model.inertia }), f = evaluate(model, s, { pitch: x[1], roll: 0, yaw: 0, throttle: x[2] }, [0, 0, 0]).acc;
+        return [f.force[0], f.force[2], f.torque[1]];
+    };
+    let x = [gamma + 0.05, 0, 0.6], converged = false;
+    for (let it = 0; it < 60; it++) {
+        const r0 = resid(x), J = [];
+        for (let j = 0; j < 3; j++) { const d = x.slice(); d[j] += 1e-6; const r1 = resid(d); J.push(r1.map((v, i) => (v - r0[i]) / 1e-6)); }
+        const A = [0, 1, 2].map((i) => [J[0][i], J[1][i], J[2][i], -r0[i]]);
+        for (let c = 0; c < 3; c++) { let p = c; for (let r = c + 1; r < 3; r++) if (Math.abs(A[r][c]) > Math.abs(A[p][c])) p = r; [A[c], A[p]] = [A[p], A[c]]; if (Math.abs(A[c][c]) < 1e-14) return fail(); for (let r = c + 1; r < 3; r++) { const f = A[r][c] / A[c][c]; for (let k = c; k < 4; k++) A[r][k] -= f * A[c][k]; } }
+        const dx = [0, 0, 0]; for (let i = 2; i >= 0; i--) { let sum = A[i][3]; for (let k = i + 1; k < 3; k++) sum -= A[i][k] * dx[k]; dx[i] = sum / A[i][i]; }
+        const lim = Math.min(1, 0.2 / Math.max(Math.abs(dx[0]), 1e-12));   // a step that moves the attitude by more than 0.2 rad is shortened
+        x = x.map((v, i) => v + lim * dx[i]);
+        if (!x.every(Number.isFinite)) return fail();
+        if (Math.hypot(...dx) < 1e-9) { converged = true; break; }
+    }
+    function fail() { return { speed, gamma, pitchAttitude: NaN, alpha: NaN, pitch: NaN, throttle: NaN, residual: [NaN, NaN, NaN], converged: false, feasible: false }; }
+    const residual = resid(x), alpha = x[0] - gamma, stallAngle = model.spec.stall ? model.spec.stall.angle : Infinity;
+    const wingAlpha = alpha + model.spec.wingIncidence;
+    return { speed, gamma, pitchAttitude: x[0], alpha, pitch: x[1], throttle: x[2], residual, converged, feasible: converged && x[2] >= 0 && x[2] <= 1 && Math.abs(x[1]) <= 1 && wingAlpha < stallAngle };
+}
+
+/** The highest speed at which level flight is feasible at full throttle (bisection on the trim; the throttle rises with speed past the minimum-power speed). */
+export function maxLevelSpeed(model, lo = 40, hi = 90) {
+    for (let i = 0; i < 40; i++) { const mid = (lo + hi) / 2, t = trim(model, mid); if (t.converged && t.throttle <= 1) lo = mid; else hi = mid; }
+    return lo;
+}
+
+// ---- front door -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+export function reportLines() {
+    const m = createFlightModel(), lines = [`[flightModel6dof] ${m.spec.name}: ${m.mass} kg, ${(m.aircraft.surfaces.leftWing.area * 2).toFixed(0)} m^2 of wing, ${m.spec.thrustMax} N static thrust, weight ${m.weight.toFixed(0)} N`];
+    for (const V of [30, 38, 45, 52]) { const t = trim(m, V); lines.push(`  trim ${V} m/s: pitch ${(t.pitchAttitude * 180 / Math.PI).toFixed(2)} deg  stick ${t.pitch.toFixed(3)}  throttle ${t.throttle.toFixed(3)}  ${t.feasible ? "feasible" : "NOT feasible"}`); }
+    lines.push(`  top level speed ${maxLevelSpeed(m).toFixed(1)} m/s`);
+    return lines;
+}
+
+if (typeof process !== "undefined" && Array.isArray(process.argv)) {   // see aircraftAssembly.mjs for why this is guarded and the import is dynamic
+    const { pathToFileURL } = await import("node:url");
+    if (import.meta.url === pathToFileURL(process.argv[1] || "").href) { for (const l of reportLines()) console.log(l); process.exit(0); }
+}

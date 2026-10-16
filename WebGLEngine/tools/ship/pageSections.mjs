@@ -664,7 +664,7 @@ export const SECTIONS = [
     // are filed by the LINE that made them, which is the decision Keith made, and four is above the founding size
     // of Blobs, PetFBI and Toroidal Buffers.
     { id: "rtx", tab: "rtx", label: "RTX", note: "the rtx line: the path-traced viewer, 6DOF and aerodynamic flight, and the fly connectome",
-      pages: ["rtx-viewer.html", "es-box3d-6dof.html", "es-aircraft.html", "fly-connectome.html"] },
+      pages: ["rtx-viewer.html", "es-box3d-6dof.html", "es-aircraft.html", "es-flight6dof.html", "fly-connectome.html"] },
     // v4778 -- FRUIT FLY BRAIN, KEITH'S CALL, AND THE FIRST SECTION WHOSE EVERY PAGE IS ALSO SOMEWHERE ELSE. Keith:
     // "There can be duplicate links in folder buckets. So Fruit Fly Brain could have its own link bucket too." Until
     // this round a page lived in exactly one drawer because the mover MOVED its one anchor; it now moves the anchor
@@ -692,7 +692,7 @@ export const SECTIONS = [
     // panel-brain, race-car, es-box3d-6dof and es-aircraft, and every one of those is a COMMENT or a catalogue string
     // naming the module (main.js, orreryFleet, instruments, brainTrail, raceCar, autopilot6dof), not an import.
     { id: "flybrain", tab: "flybrain", label: "Fruit Fly Brain", note: "pages built on Janelia's male-cns connectome: the connectome, and the brains that drive, shoot and fly through it",
-      pages: ["fly-connectome.html", "race-brain.html", "es-box3d-fly3d.html"] },
+      pages: ["fly-connectome.html", "race-brain.html", "es-box3d-fly3d.html", "es-flight6dof.html"] },
     // FSR, KEITH'S CALL: "Let's separate fsr into a link bucket." fsr.html and fsr-three.html sat in UNPLACED since
     // v4623 waiting on exactly this: the temporal/FSR arc gave fsr.html an adapter path, so it belonged in the WebGPU
     // drawer, which is at MAX_PER_PANEL, as is the techniques drawer (Renders) it used to sit in -- "a drawer decision,

@@ -384,6 +384,8 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         // importmap, the same shape as the es-box3d pages beside them. Two arrivals, none gone.
         "es-aircraft.html",
         "es-box3d-6dof.html",
+        // v4867 -- es-flight6dof.html, real flight with three pilots (importmap and OrbitControls, as es-aircraft.html beside it). One arrival, none gone: 80 -> 81.
+        "es-flight6dof.html",
         "ev/esShipModels.js",
         "ev/spriteHull.js",
         "eve.html",

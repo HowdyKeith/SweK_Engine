@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 480,
+ "count": 481,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -1044,6 +1044,13 @@
    "t": "SweK &middot; Endless Sky on Box3D",
    "d": "",
    "g": "endlesssky",
+   "p": 0
+  },
+  {
+   "f": "es-flight6dof.html",
+   "t": "SweK &middot; Real flight",
+   "d": "Real flight: three aircraft fly one mission under flightModel6dof's physics (gravity, thrust, a stalling wing, per-surface local airflow, a ground that ends a flight), each with a pilot you choose -- the PD autopilot, the same laws written through the fruit fly's Giant Fiber Circuit network, noise on those weights, an imported pilot, or you on the keyboard. Wind and gusts are sliders. Answer-key gates: flightModel6dof-selfcheck, autopilotFlight-selfcheck, pilotFlightPolicy-selfcheck, flightPage-selfcheck.",
+   "g": "rtx",
    "p": 0
   },
   {

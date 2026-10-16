@@ -1583,9 +1583,10 @@ console.log("\n*** v4647m -- THE VERDICT MUST NOT DEPEND ON WHICH RUN HAPPENED L
     // which consults the roll; restored md5-identical.
     // v4829: the v4813 row's rule, for this roll too -- an entry is justified over live, OR carries `returned` and is cheap alone, in the sweep, and retired on readings under the bar.
     // sweepBudget retired at v4829 (2,328 / 2,503 / 2,462 alone) and this row went red at step 4b because it still demanded justifiedOver of every entry.
+    // v4867 -- headlessGpu RETIRED too (see its entry), which left NO entry without `returned` and the old `some((x) => !x.returned)` red at the verdict: the populations this row keeps non-empty are now "returned and not back over" and "still over, or back over" (sweepBudget, `back` v4839), which is what the two branches of rollEntryHolds actually are.
     // SABOTAGE v4829: sweepBudget's returned.aloneMs set to 3,500 -> this row red by name; headlessGpu's entry given readings none of which is over -> this row red; both restored.
     ok("!! *** the v4815 still-over roll names only returnees genuinely over on the new host, each justified live -- or returned, live ***",
-       SC.STILL_OVER_AT_V4815.stillOver.length > 0 && SC.STILL_OVER_AT_V4815.stillOver.every((x) => rollEntryHolds(x)) && SC.STILL_OVER_AT_V4815.stillOver.some((x) => x.returned) && SC.STILL_OVER_AT_V4815.stillOver.some((x) => !x.returned),
+       SC.STILL_OVER_AT_V4815.stillOver.length > 0 && SC.STILL_OVER_AT_V4815.stillOver.every((x) => rollEntryHolds(x)) && SC.STILL_OVER_AT_V4815.stillOver.some((x) => x.returned && !x.back) && SC.STILL_OVER_AT_V4815.stillOver.some((x) => !x.returned || x.back),
        SC.STILL_OVER_AT_V4815.stillOver.map((x) => `${x.gate.split("/").pop()} ${x.back ? "RETURNED " + x.returned.at + ", BACK OVER " + x.back.at + " (" + x.back.loadedMs + " ms loaded), " : x.returned ? "RETURNED " + x.returned.at + ", " : ""}alone ${aloneMs(x.gate)} ms, ` +
            `${inSweep(x.gate) ? "in" : "out of"} the sweep`).join("; "));
 

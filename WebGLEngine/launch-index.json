@@ -21,7 +21,7 @@
   }
  },
  "counts": {
-  "page": 479,
+  "page": 481,
   "demo": 49,
   "builtin": 38
  },
@@ -991,7 +991,7 @@
    "id": "denoise.html",
    "display": "Denoise",
    "href": "/denoise.html",
-   "section": null,
+   "section": "Denoiser",
    "collision": false
   },
   {
@@ -1216,6 +1216,14 @@
    "display": "Es Box3d",
    "href": "/es-box3d.html",
    "section": "Game: Endless Sky",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "es-flight6dof.html",
+   "display": "Es Flight6dof",
+   "href": "/es-flight6dof.html",
+   "section": null,
    "collision": false
   },
   {
@@ -1527,7 +1535,7 @@
    "id": "fsr-three.html",
    "display": "Fsr Three",
    "href": "/fsr-three.html",
-   "section": null,
+   "section": "FSR",
    "collision": false
   },
   {
@@ -1535,7 +1543,7 @@
    "id": "fsr.html",
    "display": "Fsr",
    "href": "/fsr.html",
-   "section": null,
+   "section": "FSR",
    "collision": false
   },
   {
@@ -1815,7 +1823,7 @@
    "id": "install-fsr-caches.html",
    "display": "Install Fsr Caches",
    "href": "/install-fsr-caches.html",
-   "section": "Opt-in: somebody else's work",
+   "section": "FSR",
    "collision": false
   },
   {

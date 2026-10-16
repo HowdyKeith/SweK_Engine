@@ -9210,6 +9210,39 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "sabotages red by name. NOT CLOSED: on SwiftShader the test passes with the barrier deleted too -- it shows the barrier runs, " +
                  "not that it orders. The draft is Keith's to file.",
     }),
+    // v4867 -- since558 (the highest on any branch at the time was since557, read across every remote ref after a full fetch; v4864 and v4865 are still spent on two other branches). FOUR new gate files: brain/autopilotFlight-selfcheck.mjs,
+    // brain/flightTask-selfcheck.mjs, brain/pilotFlightPolicy-selfcheck.mjs and tools/ship/flightPage-selfcheck.mjs.
+    since558: Object.freeze({
+        at: "v4867", swept: 4, green: 4, red: 0,
+        added: Object.freeze([
+            "brain/autopilotFlight-selfcheck.mjs",
+            "brain/flightTask-selfcheck.mjs",
+            "brain/pilotFlightPolicy-selfcheck.mjs",
+            "tools/ship/flightPage-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green, 0.5 / 1.1 / 1.7 / 1.8 s. *** THE FIRST AUTOPILOT FOR REAL FLIGHT PULLED AN AIRCRAFT STARTING 170 DEGREES BANKED INTO THE GROUND (18 m above it at the lowest) *** -- back-stick for a banked wing's lost lift is a pull toward the earth when inverted; the " +
+                 "`upright` factor (wings first, then pull) is the fix, and the same start is level in 5.4 s having lost 10 m. Each law is held to its closed form (the coordinated-turn rate to 0.3%, the climb's thrust to W sin(gamma)), the hand weights of the fruit fly's " +
+                 "Giant Fiber Circuit are the autopilot to 5.8e-8 and fly the same flight over 36 scenarios, against a restatement of the network written in the gate from the topology file, with every one of the 313 synapses checked alone. One hundred and one sabotages, " +
+                 "ten first at 0 red. The 4 m/s climb command is more than full throttle holds at 45 m/s; five of 20 recovery scenarios brush the stall. NOT CLOSED: no pilot here has learned anything (the trained fruit-fly pilot and the GPU network are the next two rounds); " +
+                 "the page has been looked at in a software renderer and flown by nobody on a keyboard; no ground avoidance, takeoff or landing; the rig.",
+    }),
+    // v4866 -- since557 (the highest on any branch at the time was since556, read across every remote ref after a full fetch; v4864 and v4865 are already spent on two other branches). ONE new gate file:
+    // physics/mechanics/flightModel6dof-selfcheck.mjs (a trainer flown under gravity, thrust and a stall, held to closed forms), plus section 15 of physics/mechanics/aeroSurface-selfcheck.mjs (the opt-in stall).
+    since557: Object.freeze({
+        at: "v4866", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "physics/mechanics/flightModel6dof-selfcheck.mjs",
+        ]),
+        widened: Object.freeze([
+            "physics/mechanics/aeroSurface-selfcheck.mjs (section 15: stall is null by default and bit-identical below the angle, continuous at it, lift falls past it, the flat plate beyond the blend, separated drag, symmetric, the TOTAL alpha decides, finite from -180 to 180)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green, 0.7 s, 102 rows. THE AXIS THE EARLIER AIRCRAFT MODULES CALL RIGHT (+Y) IS THE AIRCRAFT'S LEFT: the pilot senses are proved against the frame's geometry, not against the names. The trainer's pitch stiffness, pitch and roll damping, " +
+                 "the fin's damping and the weathervane torque agree with hand-derived oracles to 0.07-0.5%, the stall speed to sqrt(2W/(rho S Clmax)), the phugoid to 12.7% of Lanchester's period and damped. The elevator runs out of travel at 27.5-28 m/s, " +
+                 "above the 26.1 m/s stall, so level flight cannot be trimmed in the last 2 m/s above the stall. Forty-five sabotages of the flight model and fourteen of the stall red by name, five of the first at 0 red and fixed by a row that reaches the branch. " +
+                 "NOT CLOSED: no pilot flies it yet and no page shows it; no altitude density, dihedral, downwash or ground roll; the airframe is a Cessna-class guess, not a fitted aircraft; the rig.",
+    }),
     // v4857 -- the census of what a killed gate can leave in the tree, run over every gate rather than learnt one rig failure at a time.
     since555: Object.freeze({
         at: "v4857", swept: 1, green: 1, red: 0,
