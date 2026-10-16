@@ -76,6 +76,14 @@ console.log("1. THE AIRFRAME AS BUILT");
     ok("TRAINER is frozen (a pilot cannot edit the aircraft it is flying)", Object.isFrozen(F.TRAINER) && Object.isFrozen(F.TRAINER.airframe) && Object.isFrozen(F.TRAINER.inertia));
 }
 
+console.log("\n1b. THE PUBLIC CONSTANTS AND THE SANITISER");
+{
+    const c = F.sanitize({ pitch: 2, roll: NaN, yaw: -2, throttle: 3 }), d = F.sanitize(), s0 = F.createState({ speed: 30, pitch: 0.1 });
+    ok("!! sanitize clamps pitch/roll/yaw to [-1, 1] and throttle to [0, 1], reads a non-finite number as 0, and answers a call with no argument as the neutral controls", c.pitch === 1 && c.roll === 0 && c.yaw === -1 && c.throttle === 1 && d.pitch === 0 && d.roll === 0 && d.yaw === 0 && d.throttle === 0, JSON.stringify(c));
+    ok("!! DT is 1/60 and it is stepFlight's default tick: a step without a dt is the step at F.DT, bit for bit", F.DT === 1 / 60 && JSON.stringify(F.stepFlight(model, s0, CRUISE).state) === JSON.stringify(F.stepFlight(model, s0, CRUISE, F.DT).state) && JSON.stringify(F.stepFlight(model, s0, CRUISE).state) !== JSON.stringify(F.stepFlight(model, s0, CRUISE, 1 / 30).state));
+    ok("!! F.STALL is aeroSurface's STALL, re-exported (the same frozen object), and the TRAINER's stall is that object", F.STALL === A.STALL && F.TRAINER.stall === A.STALL && F.GRAVITY === 9.80665 && F.AIR_DENSITY === A.AIR_DENSITY_SEA_LEVEL);
+}
+
 console.log("\n2. *** CONVENTIONS, PROVED FROM THE FRAME -- NOT FROM THE NAMES THE EARLIER MODULES GAVE THE AXES ***");
 {
     // a right-handed frame, nose +X, up +Z: rotating the nose from +X toward +Y is a counter-clockwise turn seen from above, which is a turn to the LEFT. So +Y is the left of the aircraft, and "RIGHT_BODY = [0,1,0]" in

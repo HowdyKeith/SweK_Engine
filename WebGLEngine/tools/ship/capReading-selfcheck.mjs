@@ -252,6 +252,15 @@ export const LET_FINISH_V4573 = Object.freeze({
             why: "21,060 at the cap pass; 18,797 filed by the v4776 rotation (18,115-18,848 across three quiet runs); 19,161-20,905 across three quiet runs at v4828, the alone reading filed 20,105 -- " +
                  "the median. Moved with the box, confirmed, and the historical number kept.",
         }),
+        // v4866 -- paintFields MOVED, DOWN: the ship rotation filed 16,770 (the first run of the slice, the box warming after a restart) and the table says 14,496. Three alone runs on a quiet box (load average 0.6), each filed by
+        // `sweepRotation --gate tools/ship/paintFields-selfcheck.mjs --cap-s 300 --write` as it was taken: 13,123 / 12,885 / 12,435 (median 12,885, the last filed 12,435). 14.2% under the table's number and 25.8% under the rotation's,
+        // which is the within-box spread this table's 10% bound sits inside. The rotation's 16,770 is kept in earlierRuns as what a first run on a warming box reads.
+        Object.freeze({ gate: "tools/ship/paintFields-selfcheck.mjs", table: 14496, now: 12435,
+            runs: Object.freeze([13123, 12885, 12435]),
+            earlierRuns: Object.freeze([Object.freeze([16770])]),
+            why: "14,496 at the cap pass (v4573); 14,803 filed before v4866; 16,770 from the v4866 rotation's first run of the slice; 12,435-13,123 across three quiet alone runs, the last filed 12,435 -- " +
+                 "the same gate, 14% faster than the table on this box. Kept rather than re-taken: 14,496 is what the gate cost when the cap was hiding it.",
+        }),
         // v4838 -- the record's new owner re-timed gateSelection, whose only reading had been the loaded one this table took
         // (declaredCost's v4820 ratchet named it). Two alone runs straight after the handover read 14,413 / 13,997; three more
         // on a quiet box, each filed by `sweepRotation --gate g --cap-s 300 --write` as it was taken, read 12,538 / 12,865 /

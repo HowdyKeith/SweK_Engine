@@ -9221,7 +9221,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
             "physics/mechanics/aeroSurface-selfcheck.mjs (section 15: stall is null by default and bit-identical below the angle, continuous at it, lift falls past it, the flat plate beyond the blend, separated drag, symmetric, the TOTAL alpha decides, finite from -180 to 180)",
         ]),
         redOnArrival: Object.freeze([]),
-        verdict: "green, 0.7 s, 99 rows. THE AXIS THE EARLIER AIRCRAFT MODULES CALL RIGHT (+Y) IS THE AIRCRAFT'S LEFT: the pilot senses are proved against the frame's geometry, not against the names. The trainer's pitch stiffness, pitch and roll damping, " +
+        verdict: "green, 0.7 s, 102 rows. THE AXIS THE EARLIER AIRCRAFT MODULES CALL RIGHT (+Y) IS THE AIRCRAFT'S LEFT: the pilot senses are proved against the frame's geometry, not against the names. The trainer's pitch stiffness, pitch and roll damping, " +
                  "the fin's damping and the weathervane torque agree with hand-derived oracles to 0.07-0.5%, the stall speed to sqrt(2W/(rho S Clmax)), the phugoid to 12.7% of Lanchester's period and damped. The elevator runs out of travel at 27.5-28 m/s, " +
                  "above the 26.1 m/s stall, so level flight cannot be trimmed in the last 2 m/s above the stall. Forty-five sabotages of the flight model and fourteen of the stall red by name, five of the first at 0 red and fixed by a row that reaches the branch. " +
                  "NOT CLOSED: no pilot flies it yet and no page shows it; no altitude density, dihedral, downwash or ground roll; the airframe is a Cessna-class guess, not a fitted aircraft; the rig.",
