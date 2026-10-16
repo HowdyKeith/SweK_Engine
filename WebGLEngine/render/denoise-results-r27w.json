@@ -1,0 +1,1182 @@
+{
+ "config": {
+  "net": "render/denoise-net-r11.json",
+  "results": "render/denoise-results-r11.json",
+  "kernels": "r27w",
+  "image": 64,
+  "sppIn": 4,
+  "sppRef": 1024,
+  "APPLY_TOL": 0.00001,
+  "D3_REL": 0.0001,
+  "D4_REL": 0.00001,
+  "images": 24
+ },
+ "criteria": {
+  "D0": {
+   "ok": true,
+   "what": "the shipped network on the CPU (f64) gives the harvest's seed-1 relMSE on every test image, bit for bit"
+  },
+  "D1": {
+   "ok": true,
+   "what": "every conv cell on the device is the twin's or the fused mirror's -- the pair its kernel answers to (twinsOf) -- given the device's own input to that layer -- the hidden layers' cells: the head's are never stored, and are judged through the image (D2)",
+   "fused": 0,
+   "cells": 12582912
+  },
+  "D2": {
+   "ok": true,
+   "worst": 5.556026660316128e-7,
+   "what": "the head and kernel pass on the device within APPLY_TOL of kernelApplyCpu on the twin's logits or the fused mirror's, from the device's own input to the head"
+  },
+  "D3": {
+   "ok": true,
+   "worst": 5.190484793082817e-7,
+   "sameWins": true,
+   "winsDevice": {
+    "T1": 12,
+    "T2": 12
+   },
+   "winsCpu": {
+    "T1": 12,
+    "T2": 12
+   },
+   "what": "the device's relMSE within D3_REL of the f64 network's on every image, and it beats the primary filter on exactly the same images"
+  },
+  "D4": {
+   "ok": true,
+   "worst": 0.0000014291586388157045,
+   "what": "the device's image within D4_REL of the f64 network's on every value (relative, floor 1e-12) -- section 83's restated key"
+  }
+ },
+ "rows": [
+  {
+   "set": "T1",
+   "family": "R",
+   "seed": 34000,
+   "harvestSeed1": 0.006422441181340871,
+   "cpu": 0.006422441181340871,
+   "device": 0.006422440826394072,
+   "filter": 0.007127678952346995,
+   "layers": [
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "head_apply",
+     "plain": 0,
+     "fused": 0,
+     "unexplained": 0,
+     "image": true
+    }
+   ],
+   "applyWorst": 5.459474864031779e-7,
+   "applyTwin": 5.459474864031779e-7,
+   "applyMirror": 5.459474864031779e-7,
+   "imageWorst": 9.238571935577304e-7,
+   "ms": 364.52040300000226
+  },
+  {
+   "set": "T1",
+   "family": "R",
+   "seed": 34001,
+   "harvestSeed1": 0.00028168987615648683,
+   "cpu": 0.00028168987615648683,
+   "device": 0.0002816900223671887,
+   "filter": 0.0004127785411363638,
+   "layers": [
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "head_apply",
+     "plain": 0,
+     "fused": 0,
+     "unexplained": 0,
+     "image": true
+    }
+   ],
+   "applyWorst": 4.159429951788879e-7,
+   "applyTwin": 4.903742477413852e-7,
+   "applyMirror": 5.004962107119077e-7,
+   "imageWorst": 7.527388636841223e-7,
+   "ms": 344.3755630000087
+  },
+  {
+   "set": "T1",
+   "family": "R",
+   "seed": 34002,
+   "harvestSeed1": 0.007277114250448133,
+   "cpu": 0.007277114250448133,
+   "device": 0.0072771140709585146,
+   "filter": 0.012218097684141574,
+   "layers": [
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "head_apply",
+     "plain": 0,
+     "fused": 0,
+     "unexplained": 0,
+     "image": true
+    }
+   ],
+   "applyWorst": 5.556026660316128e-7,
+   "applyTwin": 5.556026660316128e-7,
+   "applyMirror": 5.556026660316128e-7,
+   "imageWorst": 8.345116144520228e-7,
+   "ms": 331.90406800000346
+  },
+  {
+   "set": "T1",
+   "family": "R",
+   "seed": 34003,
+   "harvestSeed1": 0.0036633124112583413,
+   "cpu": 0.0036633124112583413,
+   "device": 0.0036633125065053166,
+   "filter": 0.007914088147026566,
+   "layers": [
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "head_apply",
+     "plain": 0,
+     "fused": 0,
+     "unexplained": 0,
+     "image": true
+    }
+   ],
+   "applyWorst": 4.880845385848887e-7,
+   "applyTwin": 4.880845385848887e-7,
+   "applyMirror": 4.880845385848887e-7,
+   "imageWorst": 8.993973936599624e-7,
+   "ms": 317.0965650000144
+  },
+  {
+   "set": "T1",
+   "family": "R",
+   "seed": 34004,
+   "harvestSeed1": 0.0029201770126475873,
+   "cpu": 0.0029201770126475873,
+   "device": 0.0029201769833627103,
+   "filter": 0.005751877557362167,
+   "layers": [
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "head_apply",
+     "plain": 0,
+     "fused": 0,
+     "unexplained": 0,
+     "image": true
+    }
+   ],
+   "applyWorst": 5.28867435675176e-7,
+   "applyTwin": 5.28867435675176e-7,
+   "applyMirror": 5.28867435675176e-7,
+   "imageWorst": 7.430817085644141e-7,
+   "ms": 391.6057940000319
+  },
+  {
+   "set": "T1",
+   "family": "R",
+   "seed": 34005,
+   "harvestSeed1": 0.02160415634340856,
+   "cpu": 0.02160415634340856,
+   "device": 0.021604156138029466,
+   "filter": 0.052823732294815275,
+   "layers": [
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "head_apply",
+     "plain": 0,
+     "fused": 0,
+     "unexplained": 0,
+     "image": true
+    }
+   ],
+   "applyWorst": 4.152687250637619e-7,
+   "applyTwin": 5.914133290173303e-7,
+   "applyMirror": 5.190859602197437e-7,
+   "imageWorst": 9.30837372566871e-7,
+   "ms": 316.9489649999887
+  },
+  {
+   "set": "T1",
+   "family": "R",
+   "seed": 34006,
+   "harvestSeed1": 0.0006821203885446041,
+   "cpu": 0.0006821203885446041,
+   "device": 0.0006821204352592377,
+   "filter": 0.0013329267949464681,
+   "layers": [
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "head_apply",
+     "plain": 0,
+     "fused": 0,
+     "unexplained": 0,
+     "image": true
+    }
+   ],
+   "applyWorst": 4.851573389508084e-7,
+   "applyTwin": 5.02905368129244e-7,
+   "applyMirror": 4.851573389508084e-7,
+   "imageWorst": 0.000001002688923935536,
+   "ms": 329.74439900001744
+  },
+  {
+   "set": "T1",
+   "family": "R",
+   "seed": 34007,
+   "harvestSeed1": 0.005120004318935663,
+   "cpu": 0.005120004318935663,
+   "device": 0.005120003588831892,
+   "filter": 0.017712559953735916,
+   "layers": [
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "head_apply",
+     "plain": 0,
+     "fused": 0,
+     "unexplained": 0,
+     "image": true
+    }
+   ],
+   "applyWorst": 5.179792829006011e-7,
+   "applyTwin": 5.244596852428976e-7,
+   "applyMirror": 5.179792829006011e-7,
+   "imageWorst": 7.925598833471275e-7,
+   "ms": 310.75934300001245
+  },
+  {
+   "set": "T1",
+   "family": "R",
+   "seed": 34008,
+   "harvestSeed1": 0.0057847815155065785,
+   "cpu": 0.0057847815155065785,
+   "device": 0.00578478113909828,
+   "filter": 0.006479697721616769,
+   "layers": [
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "head_apply",
+     "plain": 0,
+     "fused": 0,
+     "unexplained": 0,
+     "image": true
+    }
+   ],
+   "applyWorst": 3.925366997280702e-7,
+   "applyTwin": 4.911220222833287e-7,
+   "applyMirror": 7.015456453658701e-7,
+   "imageWorst": 0.0000011058290463646034,
+   "ms": 325.22276499995496
+  },
+  {
+   "set": "T1",
+   "family": "R",
+   "seed": 34009,
+   "harvestSeed1": 0.0037662053284221683,
+   "cpu": 0.0037662053284221683,
+   "device": 0.0037662052474233335,
+   "filter": 0.0060083779255430915,
+   "layers": [
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "head_apply",
+     "plain": 0,
+     "fused": 0,
+     "unexplained": 0,
+     "image": true
+    }
+   ],
+   "applyWorst": 5.551241392886958e-7,
+   "applyTwin": 5.551241392886958e-7,
+   "applyMirror": 6.381020584078515e-7,
+   "imageWorst": 7.277373105000978e-7,
+   "ms": 433.0296249999665
+  },
+  {
+   "set": "T1",
+   "family": "R",
+   "seed": 34010,
+   "harvestSeed1": 0.004125821059120095,
+   "cpu": 0.004125821059120095,
+   "device": 0.004125820962509283,
+   "filter": 0.007142952912747087,
+   "layers": [
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "head_apply",
+     "plain": 0,
+     "fused": 0,
+     "unexplained": 0,
+     "image": true
+    }
+   ],
+   "applyWorst": 4.13920476770162e-7,
+   "applyTwin": 4.58922700987721e-7,
+   "applyMirror": 6.363151549335137e-7,
+   "imageWorst": 8.483995913381868e-7,
+   "ms": 361.7844739999855
+  },
+  {
+   "set": "T1",
+   "family": "R",
+   "seed": 34011,
+   "harvestSeed1": 0.009163250833054245,
+   "cpu": 0.009163250833054245,
+   "device": 0.009163250434231255,
+   "filter": 0.017700900074805674,
+   "layers": [
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "head_apply",
+     "plain": 0,
+     "fused": 0,
+     "unexplained": 0,
+     "image": true
+    }
+   ],
+   "applyWorst": 5.381324994145118e-7,
+   "applyTwin": 5.381324994145118e-7,
+   "applyMirror": 5.912700747276684e-7,
+   "imageWorst": 8.326176240430255e-7,
+   "ms": 371.38660500000697
+  },
+  {
+   "set": "T2",
+   "family": "C",
+   "seed": 35000,
+   "harvestSeed1": 0.003487089341561108,
+   "cpu": 0.003487089341561108,
+   "device": 0.0034870893004987492,
+   "filter": 0.011450333946562433,
+   "layers": [
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "head_apply",
+     "plain": 0,
+     "fused": 0,
+     "unexplained": 0,
+     "image": true
+    }
+   ],
+   "applyWorst": 3.7433040479060565e-7,
+   "applyTwin": 4.679130497767774e-7,
+   "applyMirror": 8.476629978242375e-7,
+   "imageWorst": 0.0000011925036566864367,
+   "ms": 374.2632009999361
+  },
+  {
+   "set": "T2",
+   "family": "C",
+   "seed": 35001,
+   "harvestSeed1": 0.0022247020087470134,
+   "cpu": 0.0022247020087470134,
+   "device": 0.0022247021406642882,
+   "filter": 0.0035364646761590524,
+   "layers": [
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "head_apply",
+     "plain": 0,
+     "fused": 0,
+     "unexplained": 0,
+     "image": true
+    }
+   ],
+   "applyWorst": 4.7510954541399917e-7,
+   "applyTwin": 4.959841814111741e-7,
+   "applyMirror": 6.385027366227292e-7,
+   "imageWorst": 8.855417854959711e-7,
+   "ms": 333.4004320000531
+  },
+  {
+   "set": "T2",
+   "family": "C",
+   "seed": 35002,
+   "harvestSeed1": 0.001370859343406225,
+   "cpu": 0.001370859343406225,
+   "device": 0.0013708593079127798,
+   "filter": 0.0023345153398855244,
+   "layers": [
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "head_apply",
+     "plain": 0,
+     "fused": 0,
+     "unexplained": 0,
+     "image": true
+    }
+   ],
+   "applyWorst": 3.4330677664689984e-7,
+   "applyTwin": 4.524147573040424e-7,
+   "applyMirror": 8.40746066849775e-7,
+   "imageWorst": 8.153539604557689e-7,
+   "ms": 374.3104980000062
+  },
+  {
+   "set": "T2",
+   "family": "C",
+   "seed": 35003,
+   "harvestSeed1": 0.003477326494009918,
+   "cpu": 0.003477326494009918,
+   "device": 0.003477326382723186,
+   "filter": 0.004373320049823571,
+   "layers": [
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "head_apply",
+     "plain": 0,
+     "fused": 0,
+     "unexplained": 0,
+     "image": true
+    }
+   ],
+   "applyWorst": 3.9040131224812284e-7,
+   "applyTwin": 5.465617517960019e-7,
+   "applyMirror": 4.6530283304282924e-7,
+   "imageWorst": 9.722411352579129e-7,
+   "ms": 344.9391599999508
+  },
+  {
+   "set": "T2",
+   "family": "C",
+   "seed": 35004,
+   "harvestSeed1": 0.004436881666229531,
+   "cpu": 0.004436881666229531,
+   "device": 0.004436882235365346,
+   "filter": 0.017280010465178294,
+   "layers": [
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "head_apply",
+     "plain": 0,
+     "fused": 0,
+     "unexplained": 0,
+     "image": true
+    }
+   ],
+   "applyWorst": 3.8160469966031076e-7,
+   "applyTwin": 5.129954574252244e-7,
+   "applyMirror": 6.272953521052722e-7,
+   "imageWorst": 9.13948953572003e-7,
+   "ms": 348.68893399997614
+  },
+  {
+   "set": "T2",
+   "family": "C",
+   "seed": 35005,
+   "harvestSeed1": 0.0017252703121043893,
+   "cpu": 0.0017252703121043893,
+   "device": 0.0017252699819006393,
+   "filter": 0.006002315153334772,
+   "layers": [
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "head_apply",
+     "plain": 0,
+     "fused": 0,
+     "unexplained": 0,
+     "image": true
+    }
+   ],
+   "applyWorst": 4.6165962943504867e-7,
+   "applyTwin": 5.024532278851492e-7,
+   "applyMirror": 0.0000010060125778878292,
+   "imageWorst": 0.0000012145739438899894,
+   "ms": 329.2693999999901
+  },
+  {
+   "set": "T2",
+   "family": "C",
+   "seed": 35006,
+   "harvestSeed1": 0.001693431264470012,
+   "cpu": 0.001693431264470012,
+   "device": 0.001693431139369906,
+   "filter": 0.0023566127759728117,
+   "layers": [
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "head_apply",
+     "plain": 0,
+     "fused": 0,
+     "unexplained": 0,
+     "image": true
+    }
+   ],
+   "applyWorst": 4.84209875605676e-7,
+   "applyTwin": 4.920460751944812e-7,
+   "applyMirror": 4.84209875605676e-7,
+   "imageWorst": 8.846948329758627e-7,
+   "ms": 352.4726550000487
+  },
+  {
+   "set": "T2",
+   "family": "C",
+   "seed": 35007,
+   "harvestSeed1": 0.004347130935076071,
+   "cpu": 0.004347130935076071,
+   "device": 0.0043471309954749866,
+   "filter": 0.007400641639759283,
+   "layers": [
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "head_apply",
+     "plain": 0,
+     "fused": 0,
+     "unexplained": 0,
+     "image": true
+    }
+   ],
+   "applyWorst": 4.491156867216881e-7,
+   "applyTwin": 4.600904330750731e-7,
+   "applyMirror": 4.491156867216881e-7,
+   "imageWorst": 0.000001160118175209071,
+   "ms": 352.78450100007467
+  },
+  {
+   "set": "T2",
+   "family": "C",
+   "seed": 35008,
+   "harvestSeed1": 0.0019087241759311964,
+   "cpu": 0.0019087241759311964,
+   "device": 0.0019087244681845795,
+   "filter": 0.0035573849119634343,
+   "layers": [
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "head_apply",
+     "plain": 0,
+     "fused": 0,
+     "unexplained": 0,
+     "image": true
+    }
+   ],
+   "applyWorst": 3.986700685449396e-7,
+   "applyTwin": 4.6046600080213177e-7,
+   "applyMirror": 5.463502050179144e-7,
+   "imageWorst": 0.0000011577699382862325,
+   "ms": 333.9019739999203
+  },
+  {
+   "set": "T2",
+   "family": "C",
+   "seed": 35009,
+   "harvestSeed1": 0.0037909341459674076,
+   "cpu": 0.0037909341459674076,
+   "device": 0.0037909341207387486,
+   "filter": 0.0046551225039358985,
+   "layers": [
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "head_apply",
+     "plain": 0,
+     "fused": 0,
+     "unexplained": 0,
+     "image": true
+    }
+   ],
+   "applyWorst": 4.71786105767085e-7,
+   "applyTwin": 4.962285800865787e-7,
+   "applyMirror": 5.271809558515603e-7,
+   "imageWorst": 9.197318955066492e-7,
+   "ms": 314.3454530000454
+  },
+  {
+   "set": "T2",
+   "family": "C",
+   "seed": 35010,
+   "harvestSeed1": 0.0033150087975977014,
+   "cpu": 0.0033150087975977014,
+   "device": 0.0033150087483165935,
+   "filter": 0.013212860315291884,
+   "layers": [
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "head_apply",
+     "plain": 0,
+     "fused": 0,
+     "unexplained": 0,
+     "image": true
+    }
+   ],
+   "applyWorst": 5.329524973221358e-7,
+   "applyTwin": 5.329524973221358e-7,
+   "applyMirror": 5.677533579488479e-7,
+   "imageWorst": 0.0000011756748969375029,
+   "ms": 317.59682299999986
+  },
+  {
+   "set": "T2",
+   "family": "C",
+   "seed": 35011,
+   "harvestSeed1": 0.0020110897434901013,
+   "cpu": 0.0020110897434901013,
+   "device": 0.002011089600893944,
+   "filter": 0.005923362049796466,
+   "layers": [
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "wino",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "head_apply",
+     "plain": 0,
+     "fused": 0,
+     "unexplained": 0,
+     "image": true
+    }
+   ],
+   "applyWorst": 4.595284135608673e-7,
+   "applyTwin": 5.906643578581359e-7,
+   "applyMirror": 6.946831935503389e-7,
+   "imageWorst": 0.0000014291586388157045,
+   "ms": 363.38841399992816
+  }
+ ],
+ "adapter": "google / swiftshader / SwiftShader driver 5.0.0",
+ "seconds": 863.258
+}
