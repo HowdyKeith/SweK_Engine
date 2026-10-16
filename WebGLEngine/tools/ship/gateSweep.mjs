@@ -9210,6 +9210,20 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "sabotages red by name. NOT CLOSED: on SwiftShader the test passes with the barrier deleted too -- it shows the barrier runs, " +
                  "not that it orders. The draft is Keith's to file.",
     }),
+    // v4868 -- since559 (the highest on any branch at the time was since558, read across every remote ref after a full fetch; v4864 and v4865 are still spent on two other branches). TWO new gate files: tools/ship/trainFlightPilot-selfcheck.mjs
+    // (the tool that trains the fruit-fly flight pilot, and the shipped file held to its `by`) and brain/pilotFlightTrain-selfcheck.mjs (mutate, train and prune of that pilot, split out of brain/pilotFlightPolicy-selfcheck.mjs).
+    since559: Object.freeze({
+        at: "v4868", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "brain/pilotFlightTrain-selfcheck.mjs",
+            "tools/ship/trainFlightPilot-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green, 25 / 85 s. *** THE TOOL REFUSED ITS FIRST TWO CHAMPIONS, AND THE SECOND REFUSAL SHOWED THE RULE WAS WRONG AS WELL AS THE PILOT *** -- the first won 17 of 18 audit scenarios and pulled into a 40-degree stall on one it had not met; the second won 35 of 36 and failed one stall brush, " +
+                 "and 300 recovery starts then showed the autopilot itself brushes the stall in 18% of them and had simply done none in the 54 flights that judged it. The rule was replaced (eligibility on a 500-start pool, a fresh audit and a fresh 500-start safety audit read once), three audits declared spent, and seed 6002 shipped " +
+                 "(243 of 1,099 weights moved; -0.3199 against -0.4223 on 36 scenarios nothing had flown, better on 34; 0 flights ended early on 500 starts against the autopilot's 2). Fifty-five sabotages, four first at 0 red and one that hung the gate. NOT CLOSED: the gain is in recovery and gusts and is almost nothing on calm starts; " +
+                 "no safer in the stall than the autopilot; nothing run on the rig, whose verify of v4867 died with 0xC0000005 in five gates and a differential against v4863 is owed; the GPU-brain pilot is the next round.",
+    }),
     // v4867 -- since558 (the highest on any branch at the time was since557, read across every remote ref after a full fetch; v4864 and v4865 are still spent on two other branches). FOUR new gate files: brain/autopilotFlight-selfcheck.mjs,
     // brain/flightTask-selfcheck.mjs, brain/pilotFlightPolicy-selfcheck.mjs and tools/ship/flightPage-selfcheck.mjs.
     since558: Object.freeze({

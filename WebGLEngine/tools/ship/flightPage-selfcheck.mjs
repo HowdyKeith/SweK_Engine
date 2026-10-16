@@ -13,13 +13,21 @@
 //   H3 the wind ignored 2 | H13 the wind's heading sign flipped 1 | H4 the keyboard pilot untrimmed 1 | H6 A and D swapped 1 | H7 the keys never read in the step 1 | H20 S and W swapped (the pull has the wrong sign) 1 |
 //   H5 the default roster's second aircraft the autopilot, not the hand weights 1 | H17 the noise pilot the autopilot 2 | H19 pilot labels dropped 2 | H9 an import of ANY brain accepted 1 | H12 the pilots not re-resolved when an import arrives 2 |
 //   H14 a crashed aircraft not marked 1 | H15 the card does not say CRASHED 1 | H8 an aircraft that is not flying is not charged 1
+//   v4868, TEN MORE (the shipped pilot: fetched, offered, the default seat, flown, and its failure paths), every one red by name:
+//   P1 the default roster's third seat the noise pilot again 1 | P2 the shipped file fetched from a path that is not there 5 | P3 rosterCtx holds no shipped pilot 2 | P4 the roster does not offer 'shipped' 1 | P5 the shipped weights halved on arrival 2 |
+//   P6 the pilot line leaves the shipped pilot out 2 | P7 roster.shipped always null 2 | P8 a failed shipped fetch not said (shippedErr never set) 1 | P9 a failed later load discards the pilot the page holds 1 | P10 a good load does not clear the error 1.
+//   P8 WENT 0 RED THE FIRST TIME: nothing in the gate made the load fail. The page's loader is now loadShipped(url), exposed on the hook, and the gate asks it for a file that is not there (one deliberate 404, which the page-errors row now
+//   expects exactly once) and for another policy's brain.
 //   THREE WENT 0 RED THE FIRST TIME: H8 (the old string was not in the file -- the page's score text differed), H12 (the gate chose the imported pilot AFTER importing it, which re-resolves on its own; the choice now comes first and the import
 //   alone must seat it) and H20 (no row pulled back; the S-key row exists because of it). THE FIRST VERSION OF THE KEYBOARD ROW ROLLED THE AIRCRAFT FOR SIX REAL SECONDS: the stick was read per FRAME and the flight per tick, so a held key meant
 //   a different thing at 1x, 4x and in the gate; the keys are read in simulated time now, which is also why a stick means the same thing at 4x.
 "use strict";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 import { createRequire } from "node:module";
+import fs from "node:fs";
 import path from "node:path";
+import * as PB from "../../brain/peerBrain.mjs";
+import * as PF from "../../brain/pilotFlightPolicy.mjs";
 import { fileURLToPath } from "node:url";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -52,8 +60,13 @@ else {
             const hdg = (q) => { const x = 1 - 2 * (q[2] * q[2] + q[3] * q[3]), y = 2 * (q[0] * q[3] + q[1] * q[2]); return Math.atan2(-y, x); };
             const finite = (st) => st.fleet.every((s) => s.pos.every(Number.isFinite) && s.vel.every(Number.isFinite) && s.q.every(Number.isFinite) && Number.isFinite(s.score));
 
-            // ---- the default roster: PD autopilot, hand weights, hand + noise 0.05 ----
-            D.setSpec(0, "scripted"); D.setSpec(1, "hand"); D.setSpec(2, "noise05"); D.reset();
+            // ---- v4868: the page's OWN default roster, before anything touches it, once the shipped pilot has loaded (or said why not) ----
+            const tS = performance.now(); while (performance.now() - tS < 15000 && !D.roster.shipped && !D.roster.shippedError) await wait(100);
+            out.ownSpecs = D.specs; out.ownLabels = D.roster.labels; out.ownChoices = D.roster.choices;
+            out.shipped = D.roster.shipped ? Array.from(D.roster.shipped) : null; out.shippedError = D.roster.shippedError;
+            out.pilotLine = doc.getElementById("pilotLine").textContent;
+            // ---- the roster the rest of the run flies: PD autopilot, hand weights, hand + noise 0.05 ----
+            D.setSpec(0, "scripted"); D.setSpec(1, "hand"); D.setSpec(2, "noise05"); D.reset(); D.step(0);   // step(0) repaints the cards: the page repaints them on a frame, and a frame is not guaranteed in a background iframe
             out.labels = D.roster.labels; out.choices = D.roster.choices; out.specs = D.specs;
             out.start = snap();
             out.cardsStart = [0, 1, 2].map((i) => doc.getElementById("card" + i).textContent);
@@ -65,6 +78,14 @@ else {
             out.finiteDefault = finite(snap());
             out.heading = out.leg2.fleet.map((s) => hdg(s.q));
 
+            // ---- the SHIPPED pilot flies the same mission beside the autopilot ----
+            D.setSpec(0, "scripted"); D.setSpec(1, "shipped"); D.setSpec(2, "hand"); D.reset(); D.step(1560);
+            out.shippedRun = snap(); out.shippedFinite = finite(out.shippedRun); out.shippedLabels = D.roster.labels; out.shippedHdg = out.shippedRun.fleet.map((s) => hdg(s.q));
+            // ---- the shipped pilot's FAILURE paths: a file that is not there, a brain for another policy, and then the good one again ----
+            out.badFetch = await D.roster.loadShipped("/brain/pilotFlightWeightsNope.json"); out.badFetchErr = D.roster.shippedError; out.stillShipped = !!D.roster.shipped; out.badLine = doc.getElementById("pilotLine").textContent;
+            out.wrongBrain = await D.roster.loadShipped("/brain/pilotAircraftWeightsDefault.json"); out.wrongErr = D.roster.shippedError;
+            out.goodAgain = await D.roster.loadShipped(); out.goodErr = D.roster.shippedError; out.goodLine = doc.getElementById("pilotLine").textContent;
+            D.setSpec(0, "scripted"); D.setSpec(1, "hand"); D.setSpec(2, "noise05");
             // ---- a network that outputs nothing: aircraft 2 flies the zero pilot and falls ----
             D.setSpec(1, "zero"); D.reset(); D.step(600);
             out.zero = snap(); out.zeroCard = doc.getElementById("card1").textContent; out.otherCard = doc.getElementById("card0").textContent;
@@ -113,13 +134,18 @@ else {
 
     ok("the harness booted es-flight6dof.html and found window.__flightDemo", run.ok && run.result && run.result.booted, run.ok ? (run.result ? "" : "no result") : String(run.reason || JSON.stringify(run)).slice(0, 300));
     if (run.pageErrors && run.pageErrors.length) report("page console errors", run.pageErrors.slice(0, 5).join(" | ").slice(0, 400));
-    ok("!! no page errors were logged during the whole run", !run.pageErrors || run.pageErrors.length === 0, (run.pageErrors || []).join(" | ").slice(0, 300));
+    // the run asks for a file that is not there ON PURPOSE, once (the shipped pilot's failure path): the browser logs that as one 404 and nothing else may be logged
+    const errs404 = (run.pageErrors || []).filter((e) => /\b404\b/.test(e)), other = (run.pageErrors || []).filter((e) => !/\b404\b/.test(e));
+    ok("!! no page errors were logged during the whole run -- except the ONE 404 the gate asks for on purpose (the shipped pilot's failure path); a second missing file would be a second 404", other.length === 0 && errs404.length === 1, (run.pageErrors || []).join(" | ").slice(0, 300));
 
     if (run.ok && run.result && run.result.booted) {
         const r = run.result, R2D = 180 / Math.PI;
         const speed = (s) => Math.hypot(s.vel[0], s.vel[1], s.vel[2]);
         ok("!! three aircraft spawn, side by side 90 m apart at 300 m, flying at 45 m/s", r.start.fleet.length === 3 && r.start.fleet.every((s, i) => Math.abs(s.pos[2] - 300) < 1e-9 && Math.abs(s.pos[1] - (i - 1) * 90) < 1e-9 && Math.abs(speed(s) - 45) < 1e-6 && s.status === "airborne"));
-        ok("!! the roster's default is the PD autopilot, the hand weights, and hand + noise 0.05, and the choices offered include the keyboard", JSON.stringify(r.specs) === JSON.stringify(["scripted", "hand", "noise05"]) && /PD autopilot/.test(r.labels[0]) && /hand weights/.test(r.labels[1]) && /noise 0.05/.test(r.labels[2]) && r.choices.includes("manual") && r.choices.includes("zero") && r.choices.includes("hand") && !r.choices.includes("imported"), JSON.stringify(r.labels) + " " + JSON.stringify(r.choices));
+        const shippedFile = JSON.parse(fs.readFileSync(path.join(ENG, "brain", "pilotFlightWeightsDefault.json"), "utf8")), shippedImp = PB.importBrain(PB.describePolicy("pilotFlightPolicy", PF), shippedFile);
+        ok("!! THE PAGE FETCHES THE SHIPPED PILOT: brain/pilotFlightWeightsDefault.json arrives through the same importer the Import button uses, without an error, as the file's own 1,099 weights bit for bit (and no 404 in the console)", shippedImp.ok && r.shipped && r.shipped.length === 1099 && !r.shippedError && r.shipped.every((v, i) => v === shippedImp.weights[i]), r.shippedError || `${r.shipped ? r.shipped.length : 0} weights`);
+        ok("!! THE PAGE'S OWN DEFAULT ROSTER (read before the gate touches a seat) is the PD autopilot, the hand weights and the SHIPPED pilot, the shipped pilot is among the choices, and the pilot line names it with its held-out score", JSON.stringify(r.ownSpecs) === JSON.stringify(["scripted", "hand", "shipped"]) && /PD autopilot/.test(r.ownLabels[0]) && /hand weights/.test(r.ownLabels[1]) && /shipped pilot brain/.test(r.ownLabels[2]) && r.ownChoices.includes("shipped") && /shipped pilot [0-9a-f]{8}: held-out score -0\.2965/.test(r.pilotLine), r.ownLabels.join(" | ") + " :: " + r.pilotLine.slice(0, 80));
+        ok("!! the roster the rest of the run flies is the PD autopilot, the hand weights, and hand + noise 0.05, and the choices offered include the keyboard", JSON.stringify(r.specs) === JSON.stringify(["scripted", "hand", "noise05"]) && /PD autopilot/.test(r.labels[0]) && /hand weights/.test(r.labels[1]) && /noise 0.05/.test(r.labels[2]) && r.choices.includes("manual") && r.choices.includes("zero") && r.choices.includes("hand") && !r.choices.includes("imported"), JSON.stringify(r.labels) + " " + JSON.stringify(r.choices));
         ok("!! the cards name each pilot and say the aircraft is flying", r.cardsStart.every((t, i) => t.includes(r.labels[i]) && /flying/.test(t) && /score/.test(t)), r.cardsStart[0].slice(0, 120));
         ok("!! the tick counter advanced by exactly the steps taken (750, 1500, then 60 more) and the mission moves on every 25 s: leg 1 is 300 m / 0 rad / 45 m/s, leg 2 (from tick 750) is 360 m / 1.2 rad / 42 m/s, leg 3 (from tick 1500) is 280 m / 2.6 rad / 47 m/s", r.start.tick === 0 && r.leg1.tick === 750 && r.leg2.tick === 1500 && r.start.mission.altitude === 300 && r.start.mission.airspeed === 45 && r.leg1.mission.altitude === 360 && Math.abs(r.leg1.mission.heading - 1.2) < 1e-9 && r.leg1.mission.airspeed === 42 && r.leg2.mission.altitude === 280 && Math.abs(r.leg2.mission.heading - 2.6) < 1e-9 && r.leg2.mission.airspeed === 47, `${JSON.stringify(r.start.mission)} -> ${JSON.stringify(r.leg1.mission)} -> ${JSON.stringify(r.leg2.mission)}`);
         ok("!! every state stays finite and every aircraft is still flying after 51 s of mission", r.finiteDefault && r.leg2.fleet.every((s) => s.status === "airborne"));
@@ -129,6 +155,10 @@ else {
         ok("!! the mission is really flown: by 50 s the autopilot is climbing toward 360 m, 8 s into the second leg it is within 40 m of it, turning right (heading above 20 degrees), with the airspeed within 4 m/s of 42", a.pos[2] > 330 && a.pos[2] < 395 && r.heading[0] > 20 / R2D && Math.abs(speed(a) - 42) < 4, `alt ${a.pos[2].toFixed(1)}, hdg ${(r.heading[0] * R2D).toFixed(1)}, V ${speed(a).toFixed(1)}`);
         ok("!! the noisy pilot still flies (hand + noise 0.05 stays airborne through the mission) and scores worse than the autopilot", r.leg2.fleet[2].status === "airborne" && r.leg2.fleet[2].score < a.score, `${r.leg2.fleet[2].score.toFixed(3)} vs ${a.score.toFixed(3)}`);
 
+        { const A = r.shippedRun.fleet[0], S = r.shippedRun.fleet[1], H = r.shippedRun.fleet[2];
+          report("the shipped pilot beside the autopilot and the hand weights, 52 s of mission", `scores ${A.score.toFixed(3)} (autopilot) | ${S.score.toFixed(3)} (shipped) | ${H.score.toFixed(3)} (hand); altitude ${A.pos[2].toFixed(1)} | ${S.pos[2].toFixed(1)} | ${H.pos[2].toFixed(1)}`);
+          ok("!! THE SHIPPED PILOT FLIES THE PAGE'S MISSION: seated in aircraft 2 it is still flying after 52 s, every state finite, the card names it, it follows the mission's second leg (climbing toward 360 m and turning right, within 60 m and 12 degrees of the autopilot's), and the hand weights beside it still fly the autopilot's flight", S.status === "airborne" && r.shippedFinite && /shipped pilot brain/.test(r.shippedLabels[1]) && Math.abs(S.pos[2] - A.pos[2]) < 60 && r.shippedHdg[1] > 20 / R2D && Math.abs(r.shippedHdg[1] - r.shippedHdg[0]) < 12 / R2D && Math.abs(H.pos[2] - A.pos[2]) < 0.5, `altitude ${S.pos[2].toFixed(1)} vs ${A.pos[2].toFixed(1)}, heading ${(r.shippedHdg[1] * R2D).toFixed(1)} vs ${(r.shippedHdg[0] * R2D).toFixed(1)}`); }
+        ok("!! A SHIPPED PILOT THAT WILL NOT LOAD IS SAID, AND THE ONE THE PAGE HOLDS IS KEPT: a file that is not there gives 'HTTP 404' on the pilot line, a brain for another policy is refused by name, neither takes the pilot away, and loading the good file again clears the error", r.badFetch === false && /HTTP 404/.test(r.badFetchErr || "") && r.stillShipped && /the shipped pilot did not load \(.*HTTP 404/.test(r.badLine) && /shipped pilot [0-9a-f]{8}/.test(r.badLine) && r.wrongBrain === false && /pilotAircraftPolicy/.test(r.wrongErr || "") && /pilotFlightPolicy/.test(r.wrongErr || "") && r.goodAgain === true && r.goodErr === null && !/did not load/.test(r.goodLine), `${r.badFetchErr} | ${r.wrongErr}`);
         ok("!! A NETWORK THAT OUTPUTS NOTHING FALLS: the zero pilot's aircraft is no longer flying after 20 s, the card says CRASHED, and its neighbours are still flying", r.zero.fleet[1].status !== "airborne" && /CRASHED|TOUCHDOWN|LOST/.test(r.zeroCard) && r.zero.fleet[0].status === "airborne" && /flying/.test(r.otherCard), `${r.zero.fleet[1].status}: ${r.zeroCard.slice(0, 60)}`);
         ok("...and the finished aircraft stopped scoring as flown (its score is the worst a flight can have at that tick or near it: below -3)", r.zero.fleet[1].score < -3 && r.zero.fleet[0].score > -1, `${r.zero.fleet[1].score.toFixed(2)} vs ${r.zero.fleet[0].score.toFixed(2)}`);
 

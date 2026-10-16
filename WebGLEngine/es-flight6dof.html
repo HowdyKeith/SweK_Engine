@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- es-flight6dof.html -- REAL FLIGHT (v4867): three aircraft fly the same mission under the same physics, each with a pilot YOU choose.
+<!-- es-flight6dof.html -- REAL FLIGHT (v4867, the trained fruit fly v4868): three aircraft fly the same mission under the same physics, each with a pilot YOU choose.
 
      The physics is physics/mechanics/flightModel6dof.mjs: a 1000 kg trainer with weight, an engine, a wing that stalls, per-surface local airflow (velocity plus w x r), and a ground that ends a flight as a touchdown or a crash.
      Nothing on this page is a point steered through space (es-aircraft.html's patrol has no gravity and holds a heading): an aircraft that is not flown FALLS, one flown too slowly STALLS, and one flown into the ground is gone.
@@ -7,19 +7,20 @@
      THE PILOT IS FOUR NUMBERS -- pitch, roll, yaw, throttle -- from one of:
        the PD autopilot (brain/autopilotFlight.mjs)   altitude, airspeed and heading hold as a cascade of PD laws with no memory
        hand weights                                   the SAME laws written through the fruit fly's network (brain/pilotFlightPolicy.mjs: the 34 neurons of the real Giant Fiber Circuit); they fly the same flight
+       shipped pilot brain                            the SAME network with weights TRAINED on brain/flightTask.mjs's job (tools/ship/trainPilotFlight.mjs: a sparse-mutation (1+1)-ES from the hand weights, champion picked on held-out scenarios, graded once on an audit nothing had flown); fetched from brain/pilotFlightWeightsDefault.json
        hand + noise / zero                            the hand weights with noise on every weight, and a network that outputs nothing (it does not fly: it falls)
        an imported pilot                              a swek-brain-v1 file for this network, from a file you pick
        YOU (keyboard)                                 trimmed for the current airspeed, so a neutral stick holds level flight; the stick moves the controls from there
      The mission is a list of targets (an altitude, a heading, an airspeed) that changes every 25 seconds; the wind is a steady vector with gusts, and the sliders are yours. Every pilot is graded the way brain/flightTask.mjs grades it
      (mean tracking error, per tick), so the number under each name here is the number a trained pilot is trained on.
 
-     WHAT IS NOT HERE, SAID PLAINLY: the trained pilots (the fruit-fly network trained on this job, and the GPU network) are the next rounds; takeoff and landing (the first contact with the ground ends a flight); terrain you can fly
+     WHAT IS NOT HERE, SAID PLAINLY: the GPU network (the next round); takeoff and landing (the first contact with the ground ends a flight); terrain you can fly
      into by a target below it (the ground is flat at z = 0 and the pilots do not look at it). -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="demo:desc" content="Real flight: three aircraft fly one mission under flightModel6dof's physics (gravity, thrust, a stalling wing, per-surface local airflow, a ground that ends a flight), each with a pilot you choose -- the PD autopilot, the same laws written through the fruit fly's Giant Fiber Circuit network, noise on those weights, an imported pilot, or you on the keyboard. Wind and gusts are sliders. Answer-key gates: flightModel6dof-selfcheck, autopilotFlight-selfcheck, pilotFlightPolicy-selfcheck, flightPage-selfcheck.">
+<meta name="demo:desc" content="Real flight: three aircraft fly one mission under flightModel6dof's physics (gravity, thrust, a stalling wing, per-surface local airflow, a ground that ends a flight), each with a pilot you choose -- the PD autopilot, the same laws written through the fruit fly's Giant Fiber Circuit network, that network trained on this job (the shipped pilot), noise on those weights, an imported pilot, or you on the keyboard. Wind and gusts are sliders. Answer-key gates: flightModel6dof-selfcheck, autopilotFlight-selfcheck, pilotFlightPolicy-selfcheck, flightPage-selfcheck.">
 <title>SweK &middot; Real flight</title>
 <style>
   html,body { margin:0; height:100%; background:#0a1626; color:#cfe0f5; font:12px ui-monospace,Menlo,monospace; overflow:hidden; }
@@ -64,7 +65,7 @@
   <div style="display:flex;gap:6px;margin-bottom:6px;align-items:center;"><button id="importPilotBtn">Import pilot</button><input id="importPilotFile" type="file" accept="application/json" style="display:none;"><button id="clearPilot" disabled>Clear imported</button></div>
   <div id="pilotLine" style="color:#8fb6d0;margin-bottom:4px;"></div>
   <div id="rosterNote" style="color:#7fb069;margin-bottom:4px;"></div>
-  <div style="color:#5f7590;line-height:1.4;">Every network pilot is the same network, wired like a fly's Giant Fiber circuit, with the autopilot's contract (pitch, roll, yaw and throttle from the pointing errors, the rates and the air data); a choice picks which WEIGHTS fly it. The PD autopilot is not a network, and the hand weights are that autopilot written through the network (they fly the same flight). A change applies at once, mid-flight; Start also respawns. <b>You</b>: S/&darr; pull back (nose up), W/&uarr; push, A/&larr; roll left, D/&rarr; roll right, Q/E rudder, R/F throttle up/down; neutral is trimmed for your airspeed.</div>
+  <div style="color:#5f7590;line-height:1.4;">Every network pilot is the same network, wired like a fly's Giant Fiber circuit, with the autopilot's contract (pitch, roll, yaw and throttle from the pointing errors, the rates and the air data); a choice picks which WEIGHTS fly it. The PD autopilot is not a network, and the hand weights are that autopilot written through the network (they fly the same flight); the shipped pilot is the same network with weights trained on the job the number under each name is graded on. A change applies at once, mid-flight; Start also respawns. <b>You</b>: S/&darr; pull back (nose up), W/&uarr; push, A/&larr; roll left, D/&rarr; roll right, Q/E rudder, R/F throttle up/down; neutral is trimmed for your airspeed.</div>
 </div>
 <div id="board"></div>
 <div id="hint">real physics: gravity, a stalling wing, a ground that ends the flight &mdash; drag to orbit, scroll to zoom (orbit camera)</div>
@@ -144,11 +145,11 @@ function trailLine(i) {
 
 // ---- the pilots (brain/pilotRoster.mjs resolves a choice of weights to a pilot function) ------------------------------------------------------------------------------------------------------------------
 const ROSTER_KEY = "swek.flightRoster.v1", NAMES = { scriptedLabel: "PD autopilot (autopilotFlight.mjs)", scriptedName: "PD autopilot" };
-const DEFAULT_SPECS = ["scripted", "hand", "noise05"];
+const DEFAULT_SPECS = ["scripted", "hand", "shipped"];
 let specs = (() => { try { const a = JSON.parse(localStorage.getItem(ROSTER_KEY) || "null"); return Array.isArray(a) && a.length === N ? a.map((x) => (typeof x === "string" && x.length < 64 ? x : "scripted")) : DEFAULT_SPECS.slice(); } catch { return DEFAULT_SPECS.slice(); } })();
 const DESC = PB.describePolicy("pilotFlightPolicy", PF);
-let importedW = null, importedMeta = null, importErr = null, avail = 0;
-const rosterCtx = () => ({ PP: PF, shipped: null, imported: importedW, brainPilotOn: false, ...NAMES });
+let shippedW = null, shippedMeta = null, shippedErr = null, importedW = null, importedMeta = null, importErr = null, avail = 0;
+const rosterCtx = () => ({ PP: PF, shipped: shippedW, imported: importedW, brainPilotOn: false, ...NAMES });
 const saveSpecs = () => { try { localStorage.setItem(ROSTER_KEY, JSON.stringify(specs)); } catch {} };
 const keys = new Set(); let stickPitch = 0, stickRoll = 0, stickYaw = 0, throttleHeld = 0.66;
 function manualPilot(state, target, wind) {
@@ -169,7 +170,7 @@ function resolvePilots() {
   return pilots;
 }
 function renderRoster() {
-  const ch = [...PR.choices({ shipped: false, imported: !!importedW, brainPanel: false, scriptedLabel: NAMES.scriptedLabel }), { id: "manual", label: "you (keyboard)" }];
+  const ch = [...PR.choices({ shipped: !!shippedW, imported: !!importedW, brainPanel: false, scriptedLabel: NAMES.scriptedLabel }), { id: "manual", label: "you (keyboard)" }];
   for (let i = 0; i < N; i++) {
     const sel = document.getElementById("pilot" + i); sel.textContent = "";
     for (const c of ch) { const o = document.createElement("option"); o.value = c.id; o.textContent = c.label; sel.appendChild(o); }
@@ -179,11 +180,23 @@ function renderRoster() {
 }
 function pilotLine() {
   const el = document.getElementById("pilotLine");
-  el.textContent = (importedW ? `imported pilot ${weightsHash(importedW)}` + (importedMeta && importedMeta.score != null ? `: score ${importedMeta.score}` : "") : "no imported pilot") + (importErr ? `  --  import refused: ${importErr}` : "");
+  const one = (label, w, meta) => w ? `${label} ${weightsHash(w)}` + (meta && meta.score != null ? `: held-out score ${meta.score}` : "") : null;
+  const parts = [one("shipped pilot", shippedW, shippedMeta), one("imported pilot", importedW, importedMeta)].filter(Boolean);
+  el.textContent = (parts.length ? parts.join("  |  ") : shippedErr ? "" : "loading the shipped pilot ...") + (shippedErr ? `${parts.length ? "  --  " : ""}the shipped pilot did not load (${shippedErr})` : "") + (importErr ? `  --  import refused: ${importErr}` : "");
   document.getElementById("clearPilot").disabled = !importedW;
 }
 function availChanged() { avail++; renderRoster(); pilotLine(); resolvePilots(); }
 function importBlob(blob) { const r = PB.importBrain(DESC, blob); if (r.ok) { importedW = r.weights; importedMeta = r.meta; importErr = null; } else importErr = r.reason; availChanged(); return r.ok; }
+// the shipped pilot: a swek-brain-v1 file (brain/pilotFlightWeightsDefault.json, made by tools/ship/trainPilotFlight.mjs). A missing or malformed one is SAID (shippedErr, on the pilot line) and, if there is none already, the roster
+// simply does not offer "shipped"; a failed LATER load keeps the pilot the page already holds. loadShipped(url) is also the gate's door to the failure path.
+function loadShipped(url = "/brain/pilotFlightWeightsDefault.json") {
+  return fetch(url).then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }).then((blob) => {
+    const r = PB.importBrain(DESC, blob);
+    if (r.ok) { shippedW = r.weights; shippedMeta = r.meta; shippedErr = null; } else shippedErr = r.reason;
+    availChanged(); return r.ok;
+  }).catch((e) => { shippedErr = "could not fetch it (" + (e && e.message) + ")"; availChanged(); return false; });
+}
+loadShipped();
 document.getElementById("importPilotBtn").onclick = () => document.getElementById("importPilotFile").click();
 document.getElementById("importPilotFile").addEventListener("change", async (e) => {
   const f = e.target.files && e.target.files[0]; e.target.value = ""; if (!f) return;
@@ -299,7 +312,7 @@ window.__flightDemo = {
   state() { return { tick, mission: missionAt(tick), fleet: fleet.map((s) => ({ status: s.status, pos: s.state.pos.slice(), vel: s.state.vel.slice(), q: s.state.q.slice(), controls: s.controls, score: scoreOf(s) })) }; },
   step(n = 1) { for (let i = 0; i < n; i++) stepFleet(); syncScene(); updateBoard(); },
   reset, setWind, get specs() { return specs.slice(); }, setSpec(i, spec) { specs[i] = spec; saveSpecs(); renderRoster(); resolvePilots(); },
-  roster: { get labels() { return resolvePilots().map((p) => p.label); }, get choices() { return [...document.getElementById("pilot0").options].map((o) => o.value); }, importBlob, get imported() { return importedW; }, get importError() { return importErr; } },
+  roster: { get labels() { return resolvePilots().map((p) => p.label); }, get choices() { return [...document.getElementById("pilot0").options].map((o) => o.value); }, importBlob, loadShipped, get shipped() { return shippedW; }, get shippedError() { return shippedErr; }, get imported() { return importedW; }, get importError() { return importErr; } },
 };
 requestAnimationFrame(frame);
 </script>
