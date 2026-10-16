@@ -84,6 +84,10 @@
 //   Y1  render/denoiseDevice.mjs's kernelFor never picks the Winograd kernel -> 2 RED: "different kernels", natively and on the page
 //   Y3  nativeSetsFor ignoring FXC_UNTRIED_SETS                              -> 2 RED: the ladders' sets row, the native plan row
 //   Y7  every "r27w against rXX" line tagged section 61                      -> 1 RED: "each \"r27w against rXX\" line is that set's median"
+// v4871 -- SECTION 87'S ROWS, SABOTAGED. Each in this file, the gate run on SwiftShader, restored by copy, md5 verified:
+//   R1  fxcLadderSkip without the retirement (the plan's reason or null)  -> 1 RED: "section 87: the FXC ladder is retired"
+//   R2  the gate's call site back to plan.fxcSkip                         -> 1 RED: "the gate decides the FXC ladder by fxcLadderSkip(plan)".
+//       Off win32 the plan always skips, so only the source row sees it
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -278,6 +282,14 @@ function nativePlan({ adapter, pkg, platform, flags }) {
         : `${platform} has no D3D compiler -- r15 under FXC is timed only where the package ships DXC, on win32 (the rig)`;
     return { compiler, sets, dropped: TIMED_SETS.filter((s) => !sets.includes(s)), fxcSkip };
 }
+// Section 87 (v4871): THE FXC LADDER RETIRED. Where nativePlan would run it (the package's compiler as shipped is DXC), it is
+// skipped by default -- section 75 dropped condition 4, the only thing it fed, and it was about half the Intel's denoise run.
+// SWEK_DENOISE_FXC=all runs it as before. Pure: the plan's own reason first, then the retirement's.
+const FXC_RETIRED = "retired by section 87 (v4871) -- the denoiser's FXC paths fed condition 4 alone, which section 75 dropped; SWEK_DENOISE_FXC=all runs it";
+function fxcLadderSkip(plan, env = process.env) {
+    if (plan.fxcSkip) return plan.fxcSkip;
+    return env.SWEK_DENOISE_FXC === "all" ? null : FXC_RETIRED;
+}
 // ONE native device a process, made here for both modes -- the gate's own ladder as shipped, and the FXC child's with FXC_FLAGS --
 // so the file keeps one create call, its flags chosen by mode on that line (tools/ship/headlessGpu-selfcheck.mjs's census reads
 // it for FINE_CLOCK_FLAG). The plan is read off the flags the device was made with, and `onPlan` sees it before any pipeline
@@ -356,6 +368,13 @@ console.log("1. THE LADDER'S ARITHMETIC");
         pChild.compiler === "FXC" && pChild.sets.join() === "r12,r15" && pLinux.compiler === null && pLinux.sets.join() === all && /linux has no D3D compiler/.test(pLinux.fxcSkip || ""),
         [p062, p060, p061, pUnread, pChild, pLinux].map(says).join("  /  "));
     // round 19 (section 66): the FXC child's device flags, as nativeLadder hands them to Dawn
+    // section 87 (v4871): the FXC ladder retired -- skipped by default where the plan would run it, the plan's own reason kept
+    // where it would not, and SWEK_DENOISE_FXC=all putting it back
+    const sk = (p, env) => fxcLadderSkip(p, env);
+    ok("!! section 87: the FXC ladder is retired -- 0.6.2 on D3D12 skips it by default with the retirement's reason and runs it under SWEK_DENOISE_FXC=all; 0.6.0 and linux keep their own reasons",
+        sk(p062, {}) === FXC_RETIRED && sk(p062, { SWEK_DENOISE_FXC: "all" }) === null && sk(p062, { SWEK_DENOISE_FXC: "1" }) === FXC_RETIRED &&
+        sk(p060, {}) === p060.fxcSkip && sk(p060, { SWEK_DENOISE_FXC: "all" }) === p060.fxcSkip && sk(pLinux, { SWEK_DENOISE_FXC: "all" }) === pLinux.fxcSkip && /section 87/.test(FXC_RETIRED),
+        `0.6.2: ${sk(p062, {}) ? "skipped" : "runs"}, all: ${sk(p062, { SWEK_DENOISE_FXC: "all" }) ? "skipped" : "runs"}; 0.6.0: ${(sk(p060, {}) || "").slice(0, 40)}`);
     const dis = FXC_FLAGS.filter((f) => f.startsWith("disable-dawn-features=")), feats = dis.length ? dis[0].slice(dis[0].indexOf("=") + 1).split(",") : [];
     ok("!! round 19: the FXC child's device flags are ONE disable entry carrying use_dxc AND the fine clock, and no dump_shaders -- two entries would let Dawn keep the last (section 49), " +
         "compiling with DXC or rounding the clock; a dump would fill a timed child's stdout -- and the child times r12 and r15",
@@ -372,6 +391,12 @@ console.log("1. THE LADDER'S ARITHMETIC");
         /nativeLadder\(W, \{ fxc: true, totalMs: FXC_MS \}\)/.test(child) && /fs\.writeFileSync\(RESULT, /.test(child) &&
         /spawnSync\(process\.execPath, \[SELF, "--fxc-ladder", "--result", resFile\]/.test(SRC) && /\nconst FXC_CHILD = process\.argv\.includes\("--fxc-ladder"\), RESULT = /.test(SRC),
         `${creates.length} create call(s): create(${(creates[0] || "NONE").slice(0, 60)}; the child block ${child ? child.split("\n").length + " lines" : "NOT FOUND"}`);
+    // section 87 (v4871): the gate asks fxcLadderSkip, not the plan alone -- off win32 the plan always skips, so no live row here
+    // would see the retirement bypassed
+    ok("  section 87: the gate decides the FXC ladder by fxcLadderSkip(plan), and spawns it only where that names no reason",
+        /\n {8}const fxcWhy = fxcLadderSkip\(plan\);\n {8}if \(fxcWhy\) console\.log\(`  SKIP  native FXC ladder: \$\{fxcWhy\}`\);\n {8}else \{\n {12}const got = fxcLadder\(\)/.test(SRC) &&
+        (SRC.match(/\bfxcLadder\(\)/g) || []).length === 2,
+        `${(SRC.match(/\bfxcLadder\(\)/g) || []).length} mention(s) of the ladder's function, called (its definition and the one call)`);
     // round 19: an "rXX against r15" line is the page's rule's (section 61) or the native ladder's (section 66), by its label
     const row = (W, H_, ms, skipped = false) => (skipped ? { W, H: H_, skipped: true, reason: "over the 1500 ms cap" } : { W, H: H_, skipped: false, gpu: { median: ms }, wall: { median: ms * 1.25 } });
     const ln = { native: vsR15Line("native", "r18t", row(256, 256, 8), row(256, 256, 12)), page: vsR15Line("page", "r18u", row(256, 256, 8), row(256, 256, 12)),
@@ -451,7 +476,8 @@ else {
             `${noted ? noted.name + (noted.software ? " (software)" : "") : "not noted"}; key ${key}`);
         // section 66, test 4: r15 under FXC -- only where the package ships DXC, so FXC is a second compiler of the same package
         console.log("\n2b. NATIVE, r15 UNDER FXC: the same package with use_dxc disabled, in a child process (section 66)");
-        if (plan.fxcSkip) console.log(`  SKIP  native FXC ladder: ${plan.fxcSkip}`);
+        const fxcWhy = fxcLadderSkip(plan);
+        if (fxcWhy) console.log(`  SKIP  native FXC ladder: ${fxcWhy}`);
         else {
             const got = fxcLadder(), L = got.ladder || null;
             ok("!! native FXC: the child timed r12 and r15 on this adapter with use_dxc disabled -- its compiler, read off the package with its own flags, FXC -- and reported its ladder",

@@ -32,7 +32,7 @@
 "use strict";
 import { shellRoots, resolveHeadlessShell, SHELL_LEAVES, SHELL_DIR, HEADLESS_SHELL,
          HEADLESS_SHELL_TRIED, PLAYWRIGHT_PATHS, browserSkipReason, askPlaywright, globalNpmPaths, siblingCopies,
-         resolvePlaywright, SHELL_DIR_SAMPLES, DXC_LEAVES, resolveDxcDir, launchEnv, dxcAdvice } from "./playwrightResolve.mjs";
+         resolvePlaywright, absoluteFrom, SHELL_DIR_SAMPLES, DXC_LEAVES, resolveDxcDir, launchEnv, dxcAdvice } from "./playwrightResolve.mjs";
 import fs from "node:fs";
 import { treePaths } from "./treeRead.mjs";
 import path from "node:path";
@@ -425,6 +425,31 @@ console.log("\nTHE v4778 RIG RUN: 248 GATES RED ON A PACKAGE THIS LIST COULD NOT
     }
     ok("!! *** no file guards on the resolver's OBJECT (`if (!pw)`, `if (!pw || ...)`: always false; the field is pw.chromium), nor hands browserSkipReason a require ***",
        offenders.length === 0, offenders.length ? "STILL: " + offenders.join(", ") : "none of the files that call resolvePlaywright");
+}
+
+// *** v4871 -- resolvePlaywright's `from` IS A PATH, AND NO GATE SPELLS ITS OWN. *** A bare "playwright" came back bare and three gates
+// that tested existsSync(from) skipped their browser rows on a box with chromium on disk; three more had hand-copied one sandbox's
+// path and skipped everywhere else. SABOTAGED v4871: absoluteFrom returning the name as given -> 1 RED, the first row; one gate's
+// literal put back (blobarium's) -> 1 RED, the second row, naming it. Each restored, md5 verified.
+console.log("\n9. A RESOLVED PLAYWRIGHT IS A PATH, AND THE LIST IS THE ONLY PLACE ONE IS SPELLED");
+{
+    const fakeReq = Object.assign((m) => { if (m === "playwright") return { chromium: { launch() {} } }; throw new Error("absent"); },
+        { resolve: (m) => (m === "playwright" ? "/opt/x/node_modules/playwright/index.js" : (() => { throw new Error("absent"); })()) });
+    const noResolve = (m) => { if (m === "playwright") return { chromium: {} }; throw new Error("absent"); };
+    const got = resolvePlaywright(fakeReq), plain = resolvePlaywright(noResolve);
+    ok("!! a bare entry that resolves comes back as the file it names, a path stays a path, and a require with no .resolve keeps the name",
+        got.from === "/opt/x/node_modules/playwright/index.js" && path.isAbsolute(got.from) && absoluteFrom(fakeReq, "/a/b.js") === "/a/b.js" &&
+        plain.from === "playwright" && absoluteFrom(noResolve, "playwright") === "playwright" && absoluteFrom(fakeReq, "nope") === "nope",
+        `bare -> ${got.from}; no .resolve -> ${plain.from}; this box: ${resolvePlaywright().from || "(none)"}`);
+    // a WHOLE string literal that is a playwright install path, in any engine source but the list's own module and this gate
+    const LIT = /(["'`])[^"'`\n]*node_modules[\\/]+playwright(?:[\\/]+index\.js)?\1/;
+    // treePaths gives ABSOLUTE paths: the first draft joined them to ENG again, read nothing, and passed on an empty population
+    const files = treePaths(ENG).map((f) => path.relative(ENG, f).split(path.sep).join("/")).filter((r) => /\.(mjs|js)$/.test(r) && !/node_modules|vendor\//.test(r));
+    const spelled = files.filter((r) => !/^tools\/ship\/playwrightResolve(-selfcheck)?\.mjs$/.test(r) && LIT.test(fs.readFileSync(path.join(ENG, r), "utf8")));
+    const listOwn = LIT.test(fs.readFileSync(path.join(ENG, "tools", "ship", "playwrightResolve.mjs"), "utf8"));
+    ok("!! no gate or module spells its own playwright path -- each asks resolvePlaywright, so a box that has playwright is a box every browser gate can use",
+        spelled.length === 0 && files.length > 1000 && listOwn, spelled.length ? "STILL SPELLED IN: " + spelled.join(", ") :
+        `none of ${files.length} sources outside tools/ship/playwrightResolve.mjs, whose own list the same pattern does find (${listOwn}) -- so the scan can see one`);
 }
 
 console.log(`\nplaywrightResolve-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);

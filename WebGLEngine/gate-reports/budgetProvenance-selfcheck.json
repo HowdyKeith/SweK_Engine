@@ -1,6 +1,6 @@
 {
  "gate": "tools/ship/budgetProvenance-selfcheck.mjs",
- "at": "2026-10-11",
+ "at": "2026-10-15",
  "tables": [
   {
    "title": "MEASURED entries against an independent observation, by ratio",
@@ -21,19 +21,19 @@
      "3x - 10x",
      3,
      10,
-     1
+     2
     ],
     [
      "1.5x - 3x",
      1.5,
      3,
-     13
+     22
     ],
     [
      "within 1.5x",
      0.7,
      1.5,
-     50
+     40
     ],
     [
      "MEASURED is LOWER",
@@ -60,28 +60,28 @@
      3.1150624378384353
     ],
     [
+     "tools/roundhouse/labExport-selfcheck.mjs",
+     241111,
+     78658,
+     3.065308042411452
+    ],
+    [
      "tools/ship/sheddingSpectrum-selfcheck.mjs",
      120946,
      43074,
      2.807865533732646
     ],
     [
-     "tools/roundhouse/labExport-selfcheck.mjs",
-     241111,
-     89103,
-     2.7059807189432457
-    ],
-    [
-     "tools/ship/eulerGpu-selfcheck.mjs",
-     23368,
-     11480,
-     2.035540069686411
+     "tools/roundhouse/khMichalke-selfcheck.mjs",
+     670254,
+     311969,
+     2.14846346912674
     ],
     [
      "tools/roundhouse/khConvergence-selfcheck.mjs",
      593499,
-     307047,
-     1.9329255781688146
+     280240,
+     2.1178240079931485
     ]
    ],
    "note": null

@@ -20,7 +20,7 @@
 import fs from "node:fs";
 import { createRequire } from "node:module";
 import { probeRecording, sniffContainer, sniffMp4Codec } from "./blobRecorder.js";
-import { HEADLESS_SHELL } from "../tools/ship/playwrightResolve.mjs";
+import { HEADLESS_SHELL, resolvePlaywright, browserSkipReason } from "../tools/ship/playwrightResolve.mjs";
 
 const require = createRequire(import.meta.url);
 let fails = 0;
@@ -72,10 +72,12 @@ const ok = (name, cond, detail) => {
     // true on the rig. Imported now, and resolved per platform.
     const SHELL = HEADLESS_SHELL;
     let chromium = null;
-    try { ({ chromium } = require("/home/claude/.npm-global/lib/node_modules/playwright/index.js")); } catch { /* absent */ }
+    // v4871 -- resolved through the shared list, not one sandbox's path: the hand-copy skipped this block wherever that path was not
+    const PWR = resolvePlaywright(require);
+    chromium = PWR.chromium;
 
     if (!chromium || !fs.existsSync(SHELL)) {
-        console.log("  SKIP  the live browser block   no playwright/chromium at " + SHELL +
+        console.log("  SKIP  the live browser block   " + (browserSkipReason(chromium, PWR.from, SHELL) || "no chromium at " + SHELL) +
                     " -- SKIPPING WITH A REASON RATHER THAN PASSING QUIETLY. A CHECK THAT PASSES WHEN IT DID NOT RUN IS DECORATION. (It IS present in the sandbox this was written in, which is the whole reason the finding exists: I nearly labelled this rig-only WITHOUT LOOKING, for the fifth time this session.)");
     } else {
         const b = await chromium.launch({ executablePath: SHELL });

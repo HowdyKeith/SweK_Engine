@@ -121,6 +121,6 @@ ok(typeof budgetIsOwn === "string" && /--cap-s/.test(budgetIsOwn) && /unread/.te
 
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: writes by a non-node child (a browser, git, a shell) and the " + R.unread.length + " gates the census " +
-    "stopped at its cap (" + R.unread.slice(0, 3).join(", ") + ", ...) -- their writes were never read, so they are unknown, not clean. " +
+    "stopped at its cap (" + R.unread.slice(0, 3).join(", ") + (R.unread.length > 3 ? ", ..." : "") + ") -- their writes were never read, so they are unknown, not clean. " +
     "A new gate's writes are not in the census until it is re-run: node tools/ship/strandCensus.mjs --run --out tools/ship/strand-census.json.");
 process.exitCode = fails ? 1 : 0;

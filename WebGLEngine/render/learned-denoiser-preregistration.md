@@ -5604,3 +5604,56 @@ call. It takes the present entries from the tables as section 83 found them (`RU
   - r18u on the Intel gen-9, natively and on the page;
   - r18t on the GTX 1080, natively and on the page;
   - r15 everywhere else, and `DEFAULT_KERNELS` and `PAGE_KERNELS` unchanged.
+
+## 87. ROUND 28 -- THE DENOISER'S FXC PATHS RETIRED: FIXED BEFORE THE RIG RUNS IT
+
+**Where this section comes from.** It was written as section 79, round 25, on the branch `ccr-6c3eeb7c-pxz6kx`. That branch was
+labelled v4864 and never reached main. This file's section 79 and round 25 went to the mesh round (v4868) in the meantime. The
+section is renumbered at the merge that ships it, v4871. Its text is unchanged except for the numbers, the version and one note
+at the end. No rig has run it.
+
+**Why.** Every FXC row since section 66 fed condition 4, and section 75 dropped condition 4. Both native defaults are now decided
+under DXC (sections 67 and 78), and no FXC run decides anything. They still cost the most time in each denoise run. In round 24b
+(run a), the compile gate's "use_dxc off" mode spent 301 s on the Intel and 127 s on the 1080 building one kernel,
+r13-fast-head, under FXC. The timing gate's FXC child added 167 s and 131 s.
+
+**What v4871 changes.**
+- `render/denoiseCompile.mjs`'s `modeVariants`: a native mode whose compiler is FXC (read off the package with that mode's flags)
+  builds the control kernel alone, `FXC_CONTROL_IDS` = r12-tiled-3x3. On 0.6.2 that is "use_dxc off". The other seven stand aside,
+  not counted as unbuilt. DXC, and no D3D compiler (off win32), build all eight, as before.
+- A package with no DXC of its own (0.6.0, 0.6.1), whose "as shipped" is FXC, gets the same single kernel and a line that says
+  REFUSED: its native path needs 0.6.2.
+- `render/denoiseTiming-selfcheck.mjs`: the FXC ladder is skipped by default with section 87's reason, where the plan would have
+  run it.
+- `SWEK_DENOISE_FXC=all` puts both back as they were.
+- Nothing else changes: `NATIVE_KERNELS_BY_ADAPTER`, DEFAULT_KERNELS, the page's table, and every DXC row.
+
+**The run.** On each GPU, with v4871 or later and `SWEK_WEBGPU` cleared:
+`node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r28.json`, then `node tools/denoiseDevice.mjs --which`.
+
+**Predicted, and deciding:**
+1. All three denoise gates are green on both GPUs.
+2. The compile gate's "use_dxc off" group is r12-tiled-3x3 alone: built, exact, its dump FXC (DXBC). Its section 87 line names the
+   seven that stood aside.
+3. The timing gate's "2b" says `SKIP  native FXC ladder: retired by section 87 ...`.
+4. `--which` still says r18u on the Intel and r18t on the 1080.
+
+If any of these fails, the verdict reverts the retirement (`modeVariants` and `fxcLadderSkip` back to building and running
+everything) and says why.
+
+**Predicted, reported, not deciding.** Each GPU's compile gate under 200 s on the Intel (365 and 385 s in round 24b) and under 120 s
+on the 1080 (184 and 178 s). Each timing gate below the lower of its two round-24b runs (351 s Intel, 230 s 1080). A miss is named
+in the verdict and does not revert anything: these are what the change is for, not what makes it safe.
+
+**What cannot be checked here.** No mode on this box is FXC (SwiftShader, Linux), so the live single-kernel group and the live skip
+are the rig's. Here they are held by fixtures (section 87's rows in both gates) and a source row in the timing gate. Sabotage F3
+(section 4 counting eight kernels in every mode) is 0 RED on this box, and is named as such in the compile gate's header.
+
+**Since this was written** (a note added at the merge, not a change to the rule):
+- **Round 27 added r27w.** It added r27w's kernel to `DXC_VARIANTS` and r27w to both ladders, and r27w stands aside under FXC
+  either way (`FXC_UNTRIED_SETS`). The DXC-only kernels are untouched by this section, as before.
+- **The newest baseline is round 27's runs** (section 86). The timing predictions above are against round 24b's runs, so read
+  the timing lines against these as well.
+  - The compile gates took 421 and 455 s on the Intel and 211 and 227 s on the 1080.
+  - The timing gates took 506 and 541 s on the Intel and 267 and 269 s on the 1080, with r27w's ladder in them.
+  - Their FXC children took 292, 318, 141 and 144 s.

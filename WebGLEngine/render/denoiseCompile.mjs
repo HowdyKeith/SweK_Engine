@@ -330,3 +330,15 @@ export function nativeModes({ win = false, dawnDir = null, dxcBeside = false } =
     if (!win || !dawnDir || !dxcBeside) return modes;
     return [...modes, { name: "use_dxc", flags: ["enable-dawn-features=use_dxc"] }, { name: "use_dxc off", flags: ["disable-dawn-features=use_dxc"] }];
 }
+
+// Section 87 (v4871): THE DENOISER'S FXC PATHS RETIRED. Sections 66-78 settled the native default on both rigs under DXC
+// (NATIVE_KERNELS_BY_ADAPTER), and every FXC row since section 66 has been condition 4 -- dropped in section 75. A mode whose
+// compiler, read off the package with that mode's flags (headlessGpu's nativeCompiler), is FXC now builds the control kernels
+// alone: "use_dxc off" on 0.6.2, and "as shipped" on a package with no DXC of its own (0.6.0, 0.6.1), whose gate says so as a
+// refusal. `all` (SWEK_DENOISE_FXC=all) builds every kernel under FXC, as before section 87. Any other compiler -- DXC, or none
+// (not D3D12) -- builds every kernel.
+export const FXC_CONTROL_IDS = Object.freeze(["r12-tiled-3x3"]);
+export function modeVariants(compiler, variants, { all = false } = {}) {
+    if (all || compiler !== "FXC") return variants;
+    return variants.filter((v) => FXC_CONTROL_IDS.includes(v.id));
+}
