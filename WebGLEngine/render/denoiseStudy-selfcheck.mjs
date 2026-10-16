@@ -54,6 +54,9 @@
 //   R36 H2's network errors computed from H1's outputs                           1 RED
 //   R37 ROUND_MESH without the emitter mask the shipped network was trained with 1 RED
 //   R38 --harvest-mesh writing round 11's results file                           1 RED
+//   R39 (section 80) ROUND_MESH judged by the sign test (count only)             3 RED -- the re-derivation among them:
+//       by count H2 is 7 of 12, p 0.39, and is not supported
+//   R40 the page's scope note no longer citing section 80                        1 RED
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -352,6 +355,25 @@ console.log("\n14. THE MESH ROUND: THE SHIPPED PAIR, NOTHING TRAINED (pre-regist
     const cli = fs.readFileSync(path.join(ENG, "tools/denoiseStudy.mjs"), "utf8");
     const b0 = cli.indexOf('} else if (args.includes("--harvest-mesh")) {'), branch = b0 >= 0 ? cli.slice(b0, cli.indexOf("} else if (round) {", b0)) : "";
     const code = branch.replace(/\/\/.*$/gm, "");
+    // section 80: the committed results, read back by code -- the verdict re-derived from the file's own tables under
+    // ROUND_MESH's rule, so the section's "both supported" is the rule's output, not a sentence somebody typed
+    const mfile = path.join(ENG, RESULTS_MESH);
+    if (fs.existsSync(mfile)) {
+        const res = JSON.parse(fs.readFileSync(mfile, "utf8"));
+        const again = verdict({ sets: { H1: res.tables.T1, H2: res.tables.T2 }, shuffled: null, c2Prior: ROUND_MESH.c2Prior,
+                                determinism: res.determinism, seedsDistinct: res.seedsDistinct, test: ROUND_MESH.test });
+        const st = (v) => Object.fromEntries(Object.entries(v.hypotheses).map(([h, x]) => [h, [x.status, x.k, Number(x.meanD.toFixed(12))]]));
+        ok("!! *** section 80: verdict() over the committed mesh results' own tables gives the file's verdict -- reported, H1 and H2 SUPPORTED ***",
+            again.run === "reported" && res.verdict.run === "reported" && JSON.stringify(st(again)) === JSON.stringify(st(res.verdict)) &&
+            again.hypotheses.H1.status === "supported" && again.hypotheses.H2.status === "supported" &&
+            res.shipped && res.shipped.file === SHIPPED_NET && /^[0-9a-f]{64}$/.test(res.shipped.sha256),
+            `H1 ${again.hypotheses.H1.status} (mean d ${again.hypotheses.H1.meanD.toFixed(3)}, ${again.hypotheses.H1.k}/12), ` +
+            `H2 ${again.hypotheses.H2.status} (mean d ${again.hypotheses.H2.meanD.toFixed(3)}, ${again.hypotheses.H2.k}/12)`);
+        const page = fs.readFileSync(path.join(ENG, "denoise.html"), "utf8"), scope = (page.match(/<p class="scope" id="scope">([\s\S]*?)<\/p>/) || [, ""])[1];
+        ok("!! ...and the page's scope note widens exactly as section 79 allowed: both mesh families named, section 80 cited, R and C still the only ones it renders",
+            /voxel\s+structures/.test(scope) && /lathed and extruded solids/.test(scope) && /section 80/.test(scope) && /renders only those/.test(scope) &&
+            /any other\s+material, light or sky/.test(scope));
+    } else ok("!! section 80 reads render/denoise-results-mesh.json, and it is not there", false);
     ok("!! --harvest-mesh decodes the shipped file with decodeNet, runs runShippedStudy under harvest, writes ROUND_MESH.results and never an existing one, and logs no verdict",
         branch.length > 400 && /decodeNet\(shipped\.net\)/.test(code) && /filter: shipped\.filter/.test(code) && /runShippedStudy\(/.test(code) && /harvest: true/.test(code) &&
         /path\.join\(ENG, ROUND_MESH\.results\)/.test(code) && /existsSync\(file\)/.test(code) && /sha256/.test(code) && !/verdict|status|supported/.test(code));

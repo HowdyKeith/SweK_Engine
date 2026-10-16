@@ -5007,3 +5007,49 @@ No earlier split touched these seeds. C5 holds over the round's 72 render seeds.
 **The command:** `node tools/denoiseStudy.mjs --harvest-mesh --cache <dir>` -> `render/denoise-results-mesh.json`.
 - It refuses if the file exists.
 - It runs here, about 25 minutes, and the file is committed byte for byte before it is read. Section 80 reads it.
+
+## 80. ROUND 25 -- THE VERDICT: THE SHIPPED NETWORK BEATS THE SHIPPED FILTER ON BOTH OF THE ENGINE'S OWN GEOMETRIES
+
+**What arrived.** `render/denoise-results-mesh.json`, written by `tools/denoiseStudy.mjs --harvest-mesh` at c4ff58d2 and
+committed byte for byte (40a0ecbd, sha-256 `5a1eba21...`) before it was read. The shipped file it ran is the one section 79
+named (sha-256 `f1a84d47...`). 1,318 s to render the 24 test scenes and their 48 references here, 14 s to measure.
+
+**The run is reported: every control held.**
+- **C1:** on both sets, the network and the filter each beat the noisy input on 12 of 12 images.
+- **C2,** cited from round 11: held (mean d -1.856 there).
+- **C3:** one V image of 12 within 2 x of its floor, none of M's: both resolvable.
+- **C4:** the forward pass twice over T1, bit for bit. **C5:** 72 distinct render seeds.
+
+| | H1: 12 of V, voxel structures | H2: 12 of M, lathed and extruded solids |
+|---|---|---|
+| mean d | **0.647** | **0.304** |
+| images the network won | 10 of 12 | 7 of 12 |
+| sign-flip p (Holm threshold) | 0.00098 (0.025) | 0.0181 (0.05) |
+| sign test p, reported | 0.019 | 0.387 |
+| **status** | **supported** | **supported** |
+
+**So the page's scope note widens, as section 79 fixed:** the shipped network also beats the shipped filter on this engine's
+voxel structures and its lathed and extruded solids, in family R's materials, light and sky. It says nothing more: no other
+material, light or sky was tested, and the page still renders only R and C.
+
+**H2 rests on size, not count, and that is said here rather than left in the table.**
+- The network won 7 of 12, and by count alone (the sign test) that is p 0.39.
+- The pre-registered test, section 28's sign-flip, weighs each image by how much it was won or lost. Three wins are large
+  (1.463, 0.762, 0.722) and every loss is small (the largest -0.147), which is how it reaches p 0.018.
+- That is the test the arc has used since round 9, and the result stands under it. A reader holding the network to
+  winning MOST mesh solids would not find that here.
+
+**The predictions.**
+- **P1 held:** C1 held on both sets.
+- **P2 and P3 held:** both supported.
+- **P4 was half wrong.** I predicted each set's mean d would fall below round 11's H1 (0.548), because a voxel edge is a
+  step the network had not seen. M's 0.304 is below it. **V's 0.647 is above it.** The voxel set's three largest wins
+  (d 2.615, 2.086, 1.133) are its three noisiest images (noisy relMSE 0.71, 0.91, 0.65). There, the filter left 0.107-0.117
+  and the network 0.008-0.034. The step the network had not seen did not cost it what I expected. Nothing here measured
+  why.
+
+**What it does not change.** `PAGE_KERNELS`, the native tables, `DEFAULT_KERNELS`, the shipped weights and the filter. It is
+a finding about scope, and the page's note is the one thing that moves.
+
+**Not in this round.** Other materials, lights or skies on these shapes. The path tracer page's own scenes. A network
+trained on mesh scenes.

@@ -31,8 +31,11 @@
 
   <p class="scope" id="scope"><b>Trained on two families of scenes, R and C, and this page renders only those.</b>
     Round 11 found it beats the hand-written filter on new scenes of both. Across eleven pre-registered rounds, no
-    network in the arc ever beat the filter on a family it was <b>not</b> trained on, in either direction. Nothing here
-    says it works on any other scene &mdash; the path tracer's own scenes included.</p>
+    network in the arc ever beat the filter on a family it was <b>not</b> trained on, in either direction &mdash; families
+    that changed the materials and the light. Round 25 changed only the shape: R's scenes with this engine's own voxel
+    structures and lathed and extruded solids in place of the spheres, and the network shipped here beat the filter
+    shipped here on new scenes of both (pre-registration section 80). Nothing here says it works with any other
+    material, light or sky &mdash; the path tracer's own scenes included.</p>
 
   <div class="row">
     <label>Family <select id="family">
