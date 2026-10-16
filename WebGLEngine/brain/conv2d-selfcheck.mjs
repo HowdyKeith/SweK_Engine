@@ -8,7 +8,7 @@
 // UNIFORM_MAX, fastShape, conv2dFastWgsl, packFastUniforms -- round 14's (section 43): headShape, conv2dHeadWgsl,
 // packHeadUniforms, planarToChannelsLast -- round 16's (section 54): tileShape, conv2dTileWgsl, packTileUniforms,
 // tileWorkgroups -- round 17's (section 59): fastAltShape, conv2dFastAltWgsl, packFastAltUniforms -- and round 27's (section 83,
-// v4864): WINO_CB, WINO_G4S, winoShape, winoFilter, conv2dCpuWino, conv2dCpuWinoFma, conv2dWinoWgsl, packWinoUniforms, winoWorkgroups.
+// v4868): WINO_CB, WINO_G4S, winoShape, winoFilter, conv2dCpuWino, conv2dCpuWinoFma, conv2dWinoWgsl, packWinoUniforms, winoWorkgroups.
 // Round 19 (section 66, v4851): which rounds' device rows stand aside, by adapter and by the run's compiler (nativeStandAside).
 // Round 22 (section 71, v4859): round 16's rows run on D3D12 under DXC too, so only FXC (or an unread compiler) stands aside there.
 //
@@ -81,7 +81,7 @@
 //   R6  every adapter stands aside unless the compiler is DXC                   1 RED (the off-D3D12 row) -- and SwiftShader's round-16 and
 //       round-17 device rows all said SKIP, 82 PASS falling to 53: nothing else on this box sees a stand-aside that is too wide
 //   R7  NATIVE_FLAGS made ["disable-dawn-features=use_dxc"]                     1 RED (the flags row)
-//   section 83 (v4864), against the Winograd kernel, its twin and its buffers (full gate each time, restored, md5 verified):
+//   section 83 (v4868), against the Winograd kernel, its twin and its buffers (full gate each time, restored, md5 verified):
 //   W1  the twin's B^T row 2 as d1 - d2, its sign flipped                       11 RED -- the order row, the not-canonical row, the CPU
 //       integer key and all eight device cases; the transform row stays green, as it should: it is written from the matrices
 //   W2  the kernel's weights read without the group offset                       9 RED -- every device case (each has z groups) and the
@@ -156,7 +156,7 @@ const COMPILER = H.nativeCompiler({ pkg: WPKG, platform: process.platform, flags
 // 1.3 s at worst), every dump DXIL, every one exact at 64 x 64 -- so the stand-aside narrows to FXC, as round 17's did at section 66.
 function nativeStandAside(adapter, compiler, round) {
     if (!fxcAdapter(adapter)) return null;
-    // v4864 -- round 27 (section 83): the Winograd kernel runs under DXC, which built every shape the rig was handed (sections 65, 71),
+    // v4868 -- round 27 (section 83): the Winograd kernel runs under DXC, which built every shape the rig was handed (sections 65, 71),
     // and stands aside under FXC, where nobody has built it -- an FXC that never finishes a pipeline stops this gate (section 56)
     if ((round === 16 || round === 17 || round === 27) && compiler === "DXC") return null;
     const said = compiler === "DXC" || compiler === "FXC" ? compiler : `an unread compiler (${JSON.stringify(compiler ?? null)}), counted as FXC`;
@@ -412,7 +412,7 @@ console.log("\n5e. WHICH ROUNDS' DEVICE ROWS STAND ASIDE, BY ADAPTER AND COMPILE
             return (c === "FXC" ? /this run compiles with FXC,/.test(why) : why.includes(`an unread compiler (${JSON.stringify(c ?? null)}), counted as FXC`)) && why.includes(`section ${r === 16 ? 57 : 60}`);
         }))),
         `the 1080 under ${NOT_DXC.map((c) => `${said(c)}: 16 ${runs(gtx, c, 16) ? "runs" : "aside"}, 17 ${runs(gtx, c, 17) ? "runs" : "aside"}`).join("; ")}`);
-    // v4864 -- round 27 (section 83): the Winograd kernel's device rows as round 17's are: run under DXC, stand aside under anything else on D3D12
+    // v4868 -- round 27 (section 83): the Winograd kernel's device rows as round 17's are: run under DXC, stand aside under anything else on D3D12
     ok("!! round 27 (section 83): on a D3D12 adapter the Winograd kernel's device rows run under DXC and stand aside under FXC, an unread compiler or none, the SKIP line naming the compiler and section 83; off D3D12 they run under any compiler",
         RIG.every((a) => runs(a, "DXC", 27) && NOT_DXC.every((c) => { const why = nativeStandAside(a, c, 27) || "";
             return why.includes("section 83") && (c === "FXC" ? /this run compiles with FXC,/.test(why) : why.includes(`an unread compiler (${JSON.stringify(c ?? null)}), counted as FXC`)); })) &&

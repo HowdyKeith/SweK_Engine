@@ -80,7 +80,7 @@
 //   S7  the unpaired ratio read at the SMALLEST common size              -> RED: "read at the largest size BOTH ladders measured"
 //   S8  every "rXX against r15" line tagged section 61                   -> RED: "each ... line is r15's median over the set's"
 //   S9  nativePlan reading the compiler without the device's flags       -> RED: "a native run's plan is read off its package WITH ITS DEVICE'S FLAGS"
-// v4864 -- ROUND 27 (section 83), against r27w on the ladders. Each restored byte-identical (md5):
+// v4868 -- ROUND 27 (section 83), against r27w on the ladders. Each restored byte-identical (md5):
 //   Y1  render/denoiseDevice.mjs's kernelFor never picks the Winograd kernel -> 2 RED: "different kernels", natively and on the page
 //   Y3  nativeSetsFor ignoring FXC_UNTRIED_SETS                              -> 2 RED: the ladders' sets row, the native plan row
 //   Y7  every "r27w against rXX" line tagged section 61                      -> 1 RED: "each \"r27w against rXX\" line is that set's median"
@@ -188,7 +188,7 @@ function report(label, r) {
         if (a.skipped || b.skipped) return;
         say(vsR15Line(label, B, b, a));
     });
-    // v4864 -- round 27 (section 83): r27w against r15 and against each round-18 set -- what each GPU runs today, natively under DXC
+    // v4868 -- round 27 (section 83): r27w against r15 and against each round-18 set -- what each GPU runs today, natively under DXC
     // and on the page -- at every size both measured, A's median over r27w's: the ratios section 83's rule reads
     if (r.rows.r27w) {
         const vs = [];
@@ -201,7 +201,7 @@ function report(label, r) {
         if (vs.length) REPORT.table(`${label}: r27w against r15 and each round-18 set -- that set's median over r27w's (section 83)`, ["against", "W", "H", "x as fast", "clock"], vs);
     }
 }
-// v4864 -- round 27 (section 83): set B's row `b` against set A's row `a` at one size: A's median over B's, on the device's clock where both have one
+// v4868 -- round 27 (section 83): set B's row `b` against set A's row `a` at one size: A's median over B's, on the device's clock where both have one
 function vsSetLine(label, B, A, b, a) {
     const dev = !!(a.gpu && b.gpu), ratio = dev ? a.gpu.median / b.gpu.median : a.wall.median / b.wall.median;
     return `${label}: ${B} against ${A} at ${b.W} x ${b.H}: ${ratio.toFixed(3)} x as fast, on the ${dev ? "device's clock" : "wall clock"} -- section 83`;
@@ -380,7 +380,7 @@ console.log("1. THE LADDER'S ARITHMETIC");
         ln.native === "native: r18t against r15 at 256 x 256: 1.500 x as fast, on the device's clock -- section 66" && ln.page.endsWith("1.500 x as fast, on the device's clock -- section 61") &&
         ln.fxc.endsWith("-- section 66") && ln.wall === "native: r18u against r15 at 64 x 64: 1.500 x as fast, on the wall clock -- section 66",
         `${ln.native}  /  ${ln.page}`);
-    // v4864 -- round 27 (section 83): r27w's lines against r15 and each round-18 set, tagged section 83 on either ladder
+    // v4868 -- round 27 (section 83): r27w's lines against r15 and each round-18 set, tagged section 83 on either ladder
     const l27 = [vsSetLine("native", "r27w", "r18t", row(1920, 1080, 8), row(1920, 1080, 10)), vsSetLine("page", "r27w", "r18u", { ...row(1024, 1024, 4), gpu: null }, row(1024, 1024, 5))];
     ok("!! round 27: each \"r27w against rXX\" line is that set's median over r27w's, tagged section 83 on either ladder -- the ratio section 83's rule reads",
         l27[0] === "native: r27w against r18t at 1920 x 1080: 1.250 x as fast, on the device's clock -- section 83" && l27[1] === "page: r27w against r18u at 1024 x 1024: 1.250 x as fast, on the wall clock -- section 83",

@@ -68,7 +68,7 @@ console.log("1. THE GAP: THE JUDGE EXISTS, THE SCULPTOR EXISTS, AND NOTHING HAS 
     // detail line read "6 consumer(s), 0 gate(s)" while LISTING two tools\\ship\\ gates among them. Same defect class as treeRead's /\\/vendor\\// at c00f2ec3; normalising where the path
     // is produced fixes every comparison downstream at once rather than one literal at a time.
     const rel = importers.map((f) => path.relative(ENG, f).replace(/\\/g, "/")).sort();
-    // *** v4864 -- THE SCULPTOR GOT ITS FIRST CONSUMER THAT IS NOT A JUDGE, AND IT IS NAMED, NOT WAVED THROUGH. ***
+    // *** v4868 -- THE SCULPTOR GOT ITS FIRST CONSUMER THAT IS NOT A JUDGE, AND IT IS NAMED, NOT WAVED THROUGH. ***
     // render/denoiseScenes.mjs's family M (the denoiser arc's section 79) lathes half its solids. This line asserted
     // "a gate or another mesh module" because that was the whole population; the population moved, so the line
     // names the one engine path and still refuses any OTHER -- a page or engine module importing the lathe stays red
@@ -77,7 +77,7 @@ console.log("1. THE GAP: THE JUDGE EXISTS, THE SCULPTOR EXISTS, AND NOTHING HAS 
     const gateOnly = rel.every((r) => r.startsWith("tools/ship/") || r.startsWith("mesh/") || KNOWN_USERS.includes(r));
     ok("...and every importer of it is a gate, another mesh module, or the one engine path named here (the denoiser's mesh family)",
        rel.length > 0 && gateOnly, rel.join(", "));
-    report("Its consumers were ONLY a judge until v4864, which was scoring the sculptor's own output against the " +
+    report("Its consumers were ONLY a judge until v4868, which was scoring the sculptor's own output against the " +
            "sculptor's own input; mesh/songLathe.mjs added the third party, and the denoiser's family M is now a user.");
 }
 

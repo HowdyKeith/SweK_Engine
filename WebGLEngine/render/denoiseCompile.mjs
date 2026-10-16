@@ -38,7 +38,7 @@ export const VARIANTS = Object.freeze([
 export const DXC_VARIANTS = Object.freeze([
     { id: "r18t-tile-inline-3x3", what: "r18t's hidden-layer kernel: the pixel-tiled kernel at R18_KERNELS.r18t, 32 -> 32 at 3 x 3", kind: "tile", cfg: D.R18_KERNELS.r18t.cfg, dxcOnly: true, L: (n) => conv(32, 32, 3, "relu", 11, n) },
     { id: "r18u-fast-unroll-3x3", what: "r18u's hidden-layer kernel: the fast kernel unrolled at R18_KERNELS.r18u, 32 -> 32 at 3 x 3", kind: "fastalt", opts: D.R18_KERNELS.r18u.cfg, dxcOnly: true, L: (n) => conv(32, 32, 3, "relu", 11, n) },
-    // v4864 -- round 27 (section 83): r27w's hidden-layer kernel, Winograd F(2 x 2, 3 x 3) at R27_KERNELS.r27w, judged against ITS
+    // v4868 -- round 27 (section 83): r27w's hidden-layer kernel, Winograd F(2 x 2, 3 x 3) at R27_KERNELS.r27w, judged against ITS
     // twin. dxcOnly for a reason of its own: nobody has built it under FXC, and an FXC that never finishes stops this gate (section 56)
     { id: "r27w-wino-3x3", what: "r27w's hidden-layer kernel: Winograd F(2 x 2, 3 x 3) at R27_KERNELS.r27w, 32 -> 32 at 3 x 3", kind: "wino", cfg: D.R27_KERNELS.r27w.cfg, dxcOnly: true, L: (n) => conv(32, 32, 3, "relu", 11, n) },
 ].map((v) => Object.freeze(v)));
@@ -175,7 +175,7 @@ export function jobFor(v, { N: NN = N } = {}) {
     }
     const F = v.L(NN), L = F.layer, m = NN * NN, g8 = Math.ceil(NN / 8);
     let tw = null, fm = null;
-    // v4864 -- round 27: a Winograd kernel is held to its own twin and mirror, every other conv kernel to conv2dCpu's
+    // v4868 -- round 27: a Winograd kernel is held to its own twin and mirror, every other conv kernel to conv2dCpu's
     const twin = v.kind === "wino" ? Cv.conv2dCpuWino : Cv.conv2dCpu, mirror = v.kind === "wino" ? Cv.conv2dCpuWinoFma : Cv.conv2dCpuFma;
     const judge = NN > N ? null : (y) => { tw = tw || twin(F.x, NN, NN, L); fm = fm || mirror(F.x, NN, NN, L);
                            let plain = 0, fused = 0, un = 0; for (let i = 0; i < tw.length; i++) { const c = Math.fround(y[i]); if (c === tw[i]) plain++; else if (c === fm[i]) fused++; else un++; }

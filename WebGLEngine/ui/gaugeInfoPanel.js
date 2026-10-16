@@ -174,7 +174,7 @@ export function mountGaugeInfo({ dialsEl, host, getStats, barMount = null, barAf
                                  fixedH = 0, dockMax = 0, stretchToRow = false,
                                  dockScale = 0.8 } = {}) {
     if (!dialsEl || !host) return null;
-    // v4864 -- the host's own overflow, read at mount, so the gauges tab can have it back (see show()).
+    // v4868 -- the host's own overflow, read at mount, so the gauges tab can have it back (see show()).
     const hostOverflow0 = host.style.overflow;
     const sel = makeSelection();
     let tab = "gauges";
@@ -398,7 +398,7 @@ export function mountGaugeInfo({ dialsEl, host, getStats, barMount = null, barAf
         if (which === "info") lockHeight();               // capture the resting height BEFORE the gauges vanish
         tab = which;
         const infoUp = which === "info";
-        // *** v4864 -- THE CLIP IS THE INFO PANE'S, AND IT IS HANDED BACK WITH THE GAUGES. *** lockHeight's
+        // *** v4868 -- THE CLIP IS THE INFO PANE'S, AND IT IS HANDED BACK WITH THE GAUGES. *** lockHeight's
         // stretchToRow branch sets overflow:hidden on the host so a long info body scrolls its own pane, and
         // nothing ever unset it -- so after one visit to the info tab the GAUGES' row clipped too. On
         // server.html the avatar's favourites picker hangs 202 px below the avatar's box; on a phone-width row,

@@ -495,19 +495,26 @@ export const REACH_AT_V4548 = Object.freeze({
         // and this row went red naming it unnamed. Re-timed at a 60 s cap it FINISHES, at 20,866 ms exit 0: expensive and
         // green, 4% over the cap, like the first three.
         "tools/ship/orreryFleet-selfcheck.mjs",
+        // *** v4868 -- A SEVENTH, AND IT IS THE QUICK SWEEP'S OWN GATE. *** The record held tools/ship/quickSweep-selfcheck.mjs at
+        // 19,002 ms, finished. v4868's ship rotation cut it off at the 20 s cap (20,012 ms, no verdict), and this row went red
+        // naming it unnamed. Re-timed alone at a 300 s cap it FINISHES, at 20,616 ms exit 0: expensive and green, 3% over the
+        // cap -- the gate reads its own sweep's record, so its cost grows with the population it reads.
+        "tools/ship/quickSweep-selfcheck.mjs",
     ]),
     // What v4568 measured about them, so the correction is a number rather than a retraction. v4641 added the
     // fourth: `finished` still equals `of`, because every one of them DOES end when the cap allows it -- and
     // `killed: 0` is still true. What changed is that finishing is no longer the same as passing.
     // v4814: 4 -> 5 with rtPipeline-selfcheck (see atCapGates); it finished, so `finished` still equals `of`.
     // v4815: 5 -> 6 with orreryFleet-selfcheck; it finished, so `finished` still equals `of`.
-    atCapGatesFinish: Object.freeze({ of: 6, finished: 6, killed: 0,
+    // v4868: 6 -> 7 with quickSweep-selfcheck; it finished, so `finished` still equals `of`.
+    atCapGatesFinish: Object.freeze({ of: 7, finished: 7, killed: 0,
         ms: Object.freeze({ "tools/ship/redCensus-selfcheck.mjs": 45245,
                             "tools/ship/dockFraming-selfcheck.mjs": 21536,
                             "physics/render/transmission-selfcheck.mjs": 19395,
                             "tools/ship/budgetExile-selfcheck.mjs": 40863,
                             "physics/render/rtPipeline-selfcheck.mjs": 56770,
-                            "tools/ship/orreryFleet-selfcheck.mjs": 20866 }) }),
+                            "tools/ship/orreryFleet-selfcheck.mjs": 20866,
+                            "tools/ship/quickSweep-selfcheck.mjs": 20616 }) }),
     // *** v4548 -- AND ONE OF THE THREE HAS CROSSED BACK, BY 28 MILLISECONDS. *** The note above says
     // transmission-selfcheck is "no longer even over the cap" at 19,395 ms; one round later the rotation
     // read it at 20,026 and 20,028 and the cap KILLED it, so it moved from graded to cut off -- a 3% spread

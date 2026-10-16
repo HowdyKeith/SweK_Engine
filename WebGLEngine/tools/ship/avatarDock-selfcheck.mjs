@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // WebGLEngine/tools/ship/avatarDock-selfcheck.mjs -- v4413, widened v4450
 //
-// ---- v4864: THE AVATAR'S HEIGHT WAS A RUNAWAY, AND THE INFO TAB'S CLIP OUTLIVED THE INFO TAB --------------
+// ---- v4868: THE AVATAR'S HEIGHT WAS A RUNAWAY, AND THE INFO TAB'S CLIP OUTLIVED THE INFO TAB --------------
 // Asked to look at a height that stayed tall after the window shrank, and it was worse than a memory: at a 1900
 // window the avatar's box measured 6 px taller than its surface on every frame, so sizeFromHost rebuilt the
 // surface 6 px taller, 230 -> 420 over 3.6 s of a fresh load, stopped only by v4451's ceiling. The 6 px is a
@@ -229,7 +229,7 @@ const say = (m) => console.log("  ----  " + m);
                 }
             } catch (e) { staged = { error: String(e && e.message) }; }
 
-            // v4864 -- THE FAVOURITES PICKER, AFTER ONE VISIT TO THE INFO TAB, ON A PHONE-WIDTH ROW. gaugeInfoPanel
+            // v4868 -- THE FAVOURITES PICKER, AFTER ONE VISIT TO THE INFO TAB, ON A PHONE-WIDTH ROW. gaugeInfoPanel
             // set overflow:hidden on the row for the info pane and never handed it back, and the picker hangs
             // 202 px below the avatar's box -- which on a phone is a line of its own about 100 px tall. Its list
             // is padded to the 150 px max-height a full list reaches, because this harness has no assets to list.
@@ -400,7 +400,7 @@ const say = (m) => console.log("  ----  " + m);
              "gaugeInfoPanel mounts it into #dials' PARENT, which was the display:none wrapper -- so the Hover/Select " +
              "tab hid the gauges and the avatar and showed an empty row" : "no visible info box in the row");
 
-        // *** v4864 -- THIS LINE ASSERTED "BLOCK", AND BLOCK WAS A RUNAWAY. *** It recorded, accurately, that
+        // *** v4868 -- THIS LINE ASSERTED "BLOCK", AND BLOCK WAS A RUNAWAY. *** It recorded, accurately, that
         // gaugeInfoPanel's cleared inline display left #dialsRobot a block box -- and a block box puts the surface
         // on a text line with descender space under it, 6 px of it. sizeFromHost builds the surface to the host's
         // height, so the host grew 6 px, so the surface did: 230 -> 420 over 3.6 s of a 1900 load, stopped only
@@ -419,7 +419,7 @@ const say = (m) => console.log("  ----  " + m);
            settled(big) && settled(huge),
            `at 1900: surface ${big.surface && big.surface.h} in a ${big.host && big.host.h} px box; at 2400: ` +
            `${huge.surface && huge.surface.h} in ${huge.host && huge.host.h}; the ceiling reads ${Math.round(ceil)} here. ` +
-           "BEFORE v4864 THE 1900 LOAD RAN 230 -> 420 (unzoomed) IN 6 px STEPS, the box always 6 px taller than its surface");
+           "BEFORE v4868 THE 1900 LOAD RAN 230 -> 420 (unzoomed) IN 6 px STEPS, the box always 6 px taller than its surface");
 
         const pk = r.picker;
         ok("!! ...and the favourites picker is NOT CLIPPED on a phone-width row after a visit to the info tab",

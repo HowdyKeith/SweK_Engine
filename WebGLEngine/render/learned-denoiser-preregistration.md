@@ -5371,7 +5371,7 @@ node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r27-b.json
 - Send back all four JSON files. Don't commit or pull between the two runs.
 - **Each report is committed byte for byte** before it is read.
 
-**Sabotages (v4864).** Twenty-one runs, each restored byte-identical and logged in its gate's header. None was 0 red.
+**Sabotages (v4868).** Twenty-one runs, each restored byte-identical and logged in its gate's header. None was 0 red.
 - **`brain/conv2d-selfcheck.mjs`, W1-W10.**
   - The twin's transform with one sign flipped: 11 red.
   - The kernel's weights without the group offset: 9 red.

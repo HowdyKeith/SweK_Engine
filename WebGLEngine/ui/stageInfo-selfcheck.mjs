@@ -6,7 +6,7 @@
 //   dials === "block" and passed from v4413 to v4862 while #dials sat in a display:none wrapper.
 //   SABOTAGE: #dials put back inside that wrapper -> exit=1, 1 red BY NAME ("dials flex at 0 px").
 //   Restored, md5-identical.
-// v4864 -- the avatar is read the same way: it is flex now (a server.html rule, which stopped a 6 px-a-frame
+// v4868 -- the avatar is read the same way: it is flex now (a server.html rule, which stopped a 6 px-a-frame
 //   height runaway), and "=== block" would have failed a fix for a reason that says nothing about visibility.
 //
 // *** THE ASK, AND WHY IT IS THREE CHANGES RATHER THAN ONE. *** Keith, looking at a clicked drawer on the rig:

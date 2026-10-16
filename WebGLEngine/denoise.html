@@ -197,7 +197,7 @@ $("time").onclick = async () => {
         if (!navigator.gpu) { $("timeStatus").textContent = noGpu() + ": nothing to time"; return; }
         await loadNet();
         $("timeStatus").textContent = "timing..."; await frame();
-        // the sets take turns (round 18: r12, r15 and its two candidates; v4864, round 27: and r27w), so the ladder gets 300 s rather than the default 120;
+        // the sets take turns (round 18: r12, r15 and its two candidates; v4868, round 27: and r27w), so the ladder gets 300 s rather than the default 120;
         // the report carries the adapter's key, which section 61's rule fills PAGE_KERNELS_BY_ADAPTER by
         const a0 = await navigator.gpu.requestAdapter(), pageKey = pageAdapterKey(a0 && a0.info, navigator.userAgentData);
         const r = await timingLadder(net, () => navigator.gpu.requestAdapter(), { sets: TIMED_SETS, totalMs: 300000 });

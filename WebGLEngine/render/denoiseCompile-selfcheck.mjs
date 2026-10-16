@@ -98,7 +98,7 @@
 //   V6  this gate's prediction made for win32 (FXC beside SPIR-V dumps)          1 RED (condition 0's live row)
 //   V7  the child finds its kernel in VARIANTS alone                             1 RED (the pilot row)
 //   V8  the hidden kernels counted in a mode where they stood aside               1 RED (native / as shipped, section 4)
-// v4864 -- round 27 (section 83), against r27w's hidden kernel in DXC_VARIANTS. Each run on SwiftShader, restored, md5 verified:
+// v4868 -- round 27 (section 83), against r27w's hidden kernel in DXC_VARIANTS. Each run on SwiftShader, restored, md5 verified:
 //   Y8  jobFor judging the Winograd kernel against conv2dCpu                  1 RED (the pilot row: every cell unexplained)
 //   Y9  r27w's variant at two vec4s, not R27_KERNELS's one                     1 RED (the hidden kernels' job row)
 "use strict";
@@ -212,7 +212,7 @@ console.log("1. THE INSTRUMENT, ON THE CPU");
     // same layer r15 runs on r13-fast-3x3, so the kernel-level line below compares one layer on three kernels. dxcOnly, both
     // SABOTAGED v4851: r18t's cfg px 2 -> 4 in DXC_VARIANTS -> RED by name (this row alone; the pilot's still exact); restored.
     const DD = await imp("render/denoiseDevice.mjs"), CV = await imp("brain/conv2d.mjs"), base = VARIANTS.find((v) => v.id === "r13-fast-3x3");
-    // v4864 -- round 27 (section 83): and r27w's, the Winograd kernel at R27_KERNELS's cfg
+    // v4868 -- round 27 (section 83): and r27w's, the Winograd kernel at R27_KERNELS's cfg
     const hidden = DXC_VARIANTS.map((v) => { const j = jobFor(v), L = v.L(64).layer, set = v.id.slice(0, 4), cfg = DD.R18_KERNELS[set]?.cfg || DD.R27_KERNELS[set]?.cfg;
         const k = DD.kernelFor(L, set), want = k === "tile_inline" ? CV.conv2dTileWgsl(L, cfg) : k === "fast_unroll" ? CV.conv2dFastAltWgsl(L, cfg) : k === "wino" ? CV.conv2dWinoWgsl(L, cfg) : null;
         return { id: v.id, set, ok: v.dxcOnly === true && typeof j.judge === "function" && j.out === 64 * 64 * 32 && j.wg.length === 3 && want !== null && j.code === want &&

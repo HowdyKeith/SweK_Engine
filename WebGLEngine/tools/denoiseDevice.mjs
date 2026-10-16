@@ -18,7 +18,7 @@
 //           v4849 (round 19, section 66): refused, exit 2, on a D3D12 adapter whose run compiles with FXC, which builds neither
 //           set (section 60) -- SWEK_WEBGPU naming a node-webgpu 0.6.2 package runs them under its DXC
 //       node tools/denoiseDevice.mjs --measure-r27w [--cache <dir>]
-//           v4864 -- section 83's K0w (a): the same on round 27's Winograd set (every hidden 3 x 3 layer on the Winograd kernel, then
+//           v4868 -- section 83's K0w (a): the same on round 27's Winograd set (every hidden 3 x 3 layer on the Winograd kernel, then
 //           k_head_apply) -> render/denoise-results-r27w.json; each hidden cell judged against the twin its kernel answers to
 //           (render/denoiseDevice.mjs's twinsOf: conv2dCpuWino or its fused mirror), and D4, the restated key: the image within 1e-5
 //           of the f64 network's on every value. Refused, exit 2, on a D3D12 adapter under FXC, where nobody has built its kernel
@@ -60,7 +60,7 @@ const MEASURES = { "--measure-r12": { kernels: "r12", results: RESULTS_R12 }, "-
 const measure = Object.keys(MEASURES).find((k) => process.argv.includes(k));
 // section 35's bound for D3: the device's relMSE on an image within this relative distance of the f64 network's
 const D3_REL = 1e-4;
-// v4864 -- section 83's restated key, D4: the device's image within this of the f64 network's on every value, relative, with a floor of
+// v4868 -- section 83's restated key, D4: the device's image within this of the f64 network's on every value, relative, with a floor of
 // 1e-12 -- the bound render/denoiseDevice-selfcheck.mjs has held every set's image to since section 35, and for r27w the bridge to r15
 const D4_REL = 1e-5;
 const args = process.argv.slice(2), arg = (k) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : null; };
@@ -154,7 +154,7 @@ if (args.includes("--export-r11")) {
             const layers = DL.map((L, j) => {
                 // a fused last pass (k_head_apply) stores no cell: it is judged through the image, below
                 if (L.kernel === "head_apply") return { kernel: L.kernel, plain: 0, fused: 0, unexplained: 0, image: true };
-                // v4864 -- the twin and mirror this layer's kernel answers to: the Winograd pair for r27w's hidden layers (section 83)
+                // v4868 -- the twin and mirror this layer's kernel answers to: the Winograd pair for r27w's hidden layers (section 83)
                 const input = j ? out.acts[j - 1] : Float32Array.from(x), T = twinsOf(L), tw = T.twin(input, image, image, L), fm = T.mirror(input, image, image, L);
                 let plain = 0, fused = 0, unexplained = 0;
                 for (let c = 0; c < tw.length; c++) { const v = out.acts[j][c]; if (v === tw[c]) plain++; else if (v === fm[c]) fused++; else unexplained++; }

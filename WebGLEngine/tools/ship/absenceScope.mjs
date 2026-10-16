@@ -333,12 +333,12 @@ export const INSCOPE_ARRIVALS_SINCE_V4435 = Object.freeze([
         why: "task #83 (078afe40): a MeshBVH over the collider meshed from a Gaussian-splat scene" }),
     Object.freeze({ file: "world/worldColliderBVH.mjs", at: "v4778",
         why: "task #89 (0a5f69d5): per-chunk MeshBVHs over the meshed voxel terrain, cached by generation -- a builder's caller at world scale" }),
-    // v4864 -- the denoiser arc's round 25 (pre-registration section 79), the mesh round: the path tracer's test scenes with their
+    // v4868 -- the denoiser arc's round 25 (pre-registration section 79), the mesh round: the path tracer's test scenes with their
     // spheres replaced by the engine's own geometry. Found by the quick sweep after the round, not by the round, which ran its own
     // gates and not this one -- the third time an arrival here was seen by a sweep rather than by its author.
-    Object.freeze({ file: "render/denoiseScenes.mjs", at: "v4864",
+    Object.freeze({ file: "render/denoiseScenes.mjs", at: "v4868",
         why: "makeSceneMesh (c4ff58d2): each voxel structure, lathed or extruded solid is a mesh entry the path tracer reads as `bvh: new MeshBVH(tris)` -- a USER of meshBVH's build, at test-scene scale" }),
-    Object.freeze({ file: "render/denoiseScenes-selfcheck.mjs", at: "v4864",
+    Object.freeze({ file: "render/denoiseScenes-selfcheck.mjs", at: "v4868",
         why: "its gate's section 11 (c4ff58d2), which reads each mesh scene's BVH back -- its triangle count and footprint against the mesh it was built from" }),
 ]);
 

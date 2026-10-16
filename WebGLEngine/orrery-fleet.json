@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "33dfebf6728f2765a2a52043b24d6536ec23a580",
+ "head": "e93a87a4f18e06392aec282c739a3f2ffc37f680",
  "bodies": {
   "box3d": [
    {
@@ -268,7 +268,7 @@
    {
     "path": "tools/ship/slugReupload-selfcheck.mjs",
     "bytes": 19599,
-    "sha": "a70d9c786e3bed4679e472630d97c8a05da23a7c"
+    "sha": "3f35c79439838c4243b838c6f140675502706892"
    },
    {
     "path": "tools/ship/slugShatter-selfcheck.mjs",
@@ -340,7 +340,7 @@
    },
    {
     "path": "server.html",
-    "bytes": 887600,
+    "bytes": 888437,
     "sha": "33dfebf6728f2765a2a52043b24d6536ec23a580"
    },
    {
@@ -726,7 +726,7 @@
    },
    {
     "path": "main.js",
-    "bytes": 3632192,
+    "bytes": 3635577,
     "sha": "33dfebf6728f2765a2a52043b24d6536ec23a580"
    },
    {
@@ -771,7 +771,7 @@
    },
    {
     "path": "server.html",
-    "bytes": 887600,
+    "bytes": 888437,
     "sha": "33dfebf6728f2765a2a52043b24d6536ec23a580"
    },
    {
