@@ -9300,6 +9300,28 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "above the 26.1 m/s stall, so level flight cannot be trimmed in the last 2 m/s above the stall. Forty-five sabotages of the flight model and fourteen of the stall red by name, five of the first at 0 red and fixed by a row that reaches the branch. " +
                  "NOT CLOSED: no pilot flies it yet and no page shows it; no altitude density, dihedral, downwash or ground roll; the airframe is a Cessna-class guess, not a fitted aircraft; the rig.",
     }),
+    // v4871 -- since556, the first closing taken from `versionPreflight --next` after a full fetch rather than by hand. NO new gate
+    // file -- three widened: the collision avoidance this round built is held where the modules it changed are held.
+    since556: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened three.
+        at: "v4871", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/versionPreflight-selfcheck.mjs (sections 7-10 and 9b: every branch copy against the remote in a real-git fixture, the un-bumped tree's blind spot, the ledger's closings, --next, and the CLI's option)",
+            "tools/ship/shipVerdict-selfcheck.mjs (section 8b: the label asked before and after verify; VERIFY_ARGS held to verify.mjs's own spec; the label fetch's 180 s declared in budgetIsOwn)",
+            "tools/ship/cliArgs-selfcheck.mjs (versionPreflight and shipVerdict adopted the parser and are driven with an option nobody has spelled)",
+        ]),
+        verdict: "*** THREE CAUSES, NOT ONE, AND THE WORST WAS A BLIND SPOT IN THE GUARD ITSELF. *** (1) versionPreflight read every branch from " +
+                 "this clone's copies and asked only main whether its copy was current -- v4838 was spent twice that way; it now compares every " +
+                 "branch head with the remote and refuses from a stale view, naming the fetch. (2) A tree identical to main's build was exempt " +
+                 "for EVERY number asked about, not only main's own: the ritual asks before bumping, so every candidate number was approved " +
+                 "unchecked -- measured, v4864 OK'd while a branch held v4864. (3) Verify is fifteen minutes in which a label can go, as v4853 " +
+                 "did; shipVerdict asks before and after it. And the ledger's closings, which merge without a conflict: --next names the next " +
+                 "free one across every ref, and a closing another unmerged branch declares for a different round is refused. Sixteen " +
+                 "sabotages red by name. NOT CLOSED: two sessions can still pick one number in the same minute; the check after verify makes " +
+                 "the loser renumber before pushing, but only a claim the remote enforces could stop the race itself.",
+    }),
     // v4857 -- the census of what a killed gate can leave in the tree, run over every gate rather than learnt one rig failure at a time.
     since555: Object.freeze({
         at: "v4857", swept: 1, green: 1, red: 0,

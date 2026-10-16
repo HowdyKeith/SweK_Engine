@@ -22,6 +22,17 @@ and reports a spurious ENOENT from the repo root.
 - No long-running gate is still in flight: `pgrep -fa "node .*-selfcheck.mjs"`. Gates rewrite
   `knowledge-index.json` and `cloud/swek-rendezvous/rendezvous-state.json` as side effects; a gate finishing
   mid-ritual dirties the tree after you staged it.
+- Take the NUMBERS from the tree, never from memory or from main alone (v4871). Several sessions ship at once,
+  and a number free on main can be spent on a branch:
+
+      git fetch origin "+refs/heads/*:refs/remotes/origin/*"
+      node tools/ship/versionPreflight.mjs --next      # names the next free vNNNN AND the next free gateSweep closing
+
+  Use both: the version for the bump, the closing as the `sinceNNN` key of this round's gateSweep ledger entry.
+  `node tools/ship/versionPreflight.mjs vNNNN` refuses a number while ANY branch copy is behind the remote (it names
+  the fetch), and refuses a ledger closing another unmerged branch already declares for a different round.
+  shipVerdict asks about the label again before and after verify, fetching if the view is stale; a label lost in
+  that window ends DO NOT SHIP. If it is refused: take the next number `--next` names and re-bump.
 
 ## 1. Version bumps (two files, same note)
 
