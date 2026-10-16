@@ -1,6 +1,21 @@
 #!/usr/bin/env node
 // WebGLEngine/tools/ship/avatarDock-selfcheck.mjs -- v4413, widened v4450
 //
+// ---- v4864: THE AVATAR'S HEIGHT WAS A RUNAWAY, AND THE INFO TAB'S CLIP OUTLIVED THE INFO TAB --------------
+// Asked to look at a height that stayed tall after the window shrank, and it was worse than a memory: at a 1900
+// window the avatar's box measured 6 px taller than its surface on every frame, so sizeFromHost rebuilt the
+// surface 6 px taller, 230 -> 420 over 3.6 s of a fresh load, stopped only by v4451's ceiling. The 6 px is a
+// text line's descender space: gaugeInfoPanel clears #dialsRobot's inline display, the box fell back to BLOCK,
+// and the surface sat on a line. This gate's own line said "the display it comes back as is BLOCK" -- true,
+// and the cause. A server.html rule makes it flex. Separately, the info pane's overflow:hidden stayed on the
+// row after the gauges came back, and clipped the favourites picker's bottom 65 px on a phone-width row.
+//   SABOTAGE LOG (each restored and md5-verified):
+//     R1. the #dialsRobot flex rule removed            -> exit=1, 2 red BY NAME: "comes back as FLEX" and "NO RUNAWAY".
+//     R2. gaugeInfoPanel's overflow hand-back skipped  -> exit=1, 1 red BY NAME: "the favourites picker is NOT CLIPPED".
+//   A first draft compared the row's height at 1400 against 1900 and 2400. It read 184 / 164 / 164 -- the 230
+//   min-height had been lifted between the probes -- and, worse, a runaway saturates at the ceiling at BOTH wide
+//   widths and would read equal there. The check reads the runaway's own signatures instead.
+//
 // ---- v4863: THE DIALS COME BACK, AND THE INFO BOX AND THE RAIL'S PLACE COME BACK WITH THEM -----------------
 // Keith: "when it loads, there should be gauges and avatar, but only avatar is appearing." v4413 moved #dials
 // into a display:none wrapper so the avatar could take the row, and the "new gauges in that same scene" it
@@ -214,6 +229,29 @@ const say = (m) => console.log("  ----  " + m);
                 }
             } catch (e) { staged = { error: String(e && e.message) }; }
 
+            // v4864 -- THE FAVOURITES PICKER, AFTER ONE VISIT TO THE INFO TAB, ON A PHONE-WIDTH ROW. gaugeInfoPanel
+            // set overflow:hidden on the row for the info pane and never handed it back, and the picker hangs
+            // 202 px below the avatar's box -- which on a phone is a line of its own about 100 px tall. Its list
+            // is padded to the 150 px max-height a full list reaches, because this harness has no assets to list.
+            let picker = null;
+            try {
+                const gi = w._gaugeInfo, row = d.getElementById("dialsRow"), star = d.getElementById("avatarFavBtn");
+                if (gi && star) {
+                    f.style.width = "360px"; await new Promise((r) => setTimeout(r, 1800));
+                    gi.showInfo(); await new Promise((r) => setTimeout(r, 500));
+                    gi.showGauges(); await new Promise((r) => setTimeout(r, 700));
+                    star.click(); await new Promise((r) => setTimeout(r, 1500));
+                    const p = star.nextElementSibling; p.style.minHeight = "150px";
+                    await new Promise((r) => setTimeout(r, 200));
+                    const pr = p.getBoundingClientRect(), rr = row.getBoundingClientRect();
+                    const hit = d.elementFromPoint(pr.left + pr.width / 2, pr.bottom - 4);
+                    picker = { overflow: getComputedStyle(row).overflow, bottom: Math.round(pr.bottom), rowBottom: Math.round(rr.bottom),
+                               visible: !!hit && p.contains(hit) };
+                    star.click();                                         // close it again
+                    f.style.width = "1400px"; await new Promise((r) => setTimeout(r, 1800));
+                }
+            } catch (e) { picker = { error: String(e && e.message) }; }
+
             // *** v4450 -- THE RAIL IS MOVED BETWEEN PARENTS OF DIFFERENT flex-direction AT RUNTIME, AND
             // flex:1 1 auto MEANS A DIFFERENT AXIS IN EACH. *** #dialsRow's home is a row-direction flex,
             // so v4413's flex:1 1 auto means grow HORIZONTALLY -- which is the whole of what that round was
@@ -250,7 +288,7 @@ const say = (m) => console.log("  ----  " + m);
                 }
             } catch (e) { axis = { error: String(e && e.message) }; }
 
-            return { wide, narrow, tiny, big, huge, shrunk, staged, axis, zoom: getComputedStyle(d.body).zoom,
+            return { wide, narrow, tiny, big, huge, shrunk, staged, picker, axis, zoom: getComputedStyle(d.body).zoom,
                      dialsPresent: !!d.getElementById("dials"), dialsParent: dialsParent ? dialsParent.id : null };
         }` });
 
@@ -362,13 +400,34 @@ const say = (m) => console.log("  ----  " + m);
              "gaugeInfoPanel mounts it into #dials' PARENT, which was the display:none wrapper -- so the Hover/Select " +
              "tab hid the gauges and the avatar and showed an empty row" : "no visible info box in the row");
 
-        ok("...and the display it comes back as is BLOCK, not the inline-flex the markup asks for",
-           stOk && st.back.display === "block",
-           stOk ? `#dialsRobot resolves to ${st.back.display}. gaugeInfoPanel writes ` +
-             "`el.style.display = \"\"` which CLEARS THE INLINE DISPLAY, so the inline-flex in the markup " +
-             "survives only until the first showGauges(). THE ROW STILL FILLS BECAUSE flex:1 1 120px IS WHAT " +
-             "MAKES IT FILL and that is not cleared -- said here because a reader of the markup would expect " +
-             "inline-flex and measure block" : "not measured");
+        // *** v4864 -- THIS LINE ASSERTED "BLOCK", AND BLOCK WAS A RUNAWAY. *** It recorded, accurately, that
+        // gaugeInfoPanel's cleared inline display left #dialsRobot a block box -- and a block box puts the surface
+        // on a text line with descender space under it, 6 px of it. sizeFromHost builds the surface to the host's
+        // height, so the host grew 6 px, so the surface did: 230 -> 420 over 3.6 s of a 1900 load, stopped only
+        // by v4451's ceiling. The host is a flex box from a server.html rule now, and the next line holds the
+        // consequence rather than the declaration.
+        ok("!! ...and the avatar's box comes back as FLEX, from the stylesheet, after the panel CLEARED its inline display",
+           stOk && st.back.display === "flex",
+           stOk ? `#dialsRobot resolves to ${st.back.display} after showGauges(). As a block box it carried the surface ` +
+             "on a text line, 6 px taller than the surface, and sizeFromHost chased that 6 px up to the ceiling" : "not measured");
+        // The runaway's two signatures, read where the avatar is HEIGHT-bound (1900, 2400): the box TALLER than
+        // the surface it holds (the 6 px line gap that feeds the loop), and a surface pushed to the 420 ceiling.
+        // Comparing row heights across widths would not do: run away, both rows saturate at the cap and read EQUAL.
+        const ceil = 420 * (parseFloat(r.zoom) || 1);
+        const settled = (b) => !!b.surface && !!b.host && b.host.h - b.surface.h <= 1 && b.surface.h < ceil - 20;
+        ok("!! *** ...and NO RUNAWAY: where the avatar is height-bound its box is no taller than its surface, and the surface is nowhere near the ceiling ***",
+           settled(big) && settled(huge),
+           `at 1900: surface ${big.surface && big.surface.h} in a ${big.host && big.host.h} px box; at 2400: ` +
+           `${huge.surface && huge.surface.h} in ${huge.host && huge.host.h}; the ceiling reads ${Math.round(ceil)} here. ` +
+           "BEFORE v4864 THE 1900 LOAD RAN 230 -> 420 (unzoomed) IN 6 px STEPS, the box always 6 px taller than its surface");
+
+        const pk = r.picker;
+        ok("!! ...and the favourites picker is NOT CLIPPED on a phone-width row after a visit to the info tab",
+           !!pk && !pk.error && pk.visible === true && pk.overflow !== "hidden",
+           pk && !pk.error ? `row overflow ${pk.overflow}; picker bottom ${pk.bottom} against the row's ${pk.rowBottom}, ` +
+             `its last pixels ${pk.visible ? "visible" : "HIDDEN"}. gaugeInfoPanel's stretchToRow set overflow:hidden for ` +
+             "the info pane and never handed it back, so after one hover the gauges' row clipped the picker's bottom 65 px"
+             : `could not open the picker: ${pk ? pk.error : "no _gaugeInfo or no star"}`);
 
         {
         const a = (probe.result || {}).axis;

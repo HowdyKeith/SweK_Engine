@@ -113,6 +113,14 @@ window.addEventListener("load", function () {
   /* v4863 -- the SVG dials beside the avatar in #dialsRow. HERE AND NOT INLINE because gaugeInfoPanel clears the
      element's inline display every time the gauges tab is shown; cleared, it falls back to this. */
   #dials { display:flex; gap:14px; align-items:flex-start; flex:0 0 auto; }
+  /* v4864 -- THE AVATAR'S HOST IS A FLEX BOX FROM THE SHEET, FOR THE SAME REASON, AND HERE IT STOPS A RUNAWAY.
+     gaugeInfoPanel clears #dialsRobot's inline inline-flex too, so the host fell back to BLOCK and the surface sat
+     on a text line, with the line's descender space under it: the host measured 6 px taller than the surface.
+     sizeFromHost then built the surface to the host's height, the host grew 6 px again, and so on. MEASURED at a
+     1900 window: 230 -> 420 in 6 px steps over 3.6 s of a fresh load, stopped only by v4451's 420 ceiling -- the
+     "svg grows huge" of v4450, capped there and never stopped. A flex item is not on a line, so the host is
+     exactly as tall as the row makes it. (At 1400 the robot is width-bound and the loop never started.) */
+  #dialsRobot { display:flex; align-items:stretch; }
   button:hover { background:#143020; }
   button.warn { color:var(--warn); border-color:#5a4a1f; background:#231d10; }
   button.demospill { color:#ffb454; border-color:#6a4a1a; background:#2a1d0c; border-radius:999px; font-weight:600; }
