@@ -5053,3 +5053,100 @@ a finding about scope, and the page's note is the one thing that moves.
 
 **Not in this round.** Other materials, lights or skies on these shapes. The path tracer page's own scenes. A network
 trained on mesh scenes.
+
+## 81. ROUND 26 -- HALF RESOLUTION, THEN FSR1: FIXED BEFORE ANY OF ITS TEST SCENES EXIST
+
+Committed with the code that implements it. No scene of this round's test set has been rendered.
+
+**Why this round.** Keith asked whether the arc would include FSR, and then for this round first.
+- Every speed round so far has made the network's kernels faster. The other lever changes no arithmetic: trace and denoise
+  a quarter of the pixels, then upscale.
+- Section 54 puts a 1080p pass on the GTX 1080 at about 75-80 ms, and 30 frames a second needs 33. A quarter of that is
+  about 20 ms, by arithmetic, if the picture survives the upscale. Time is not measured here.
+- The tree's FSR1 is `fx/fsr/fsr.js`: EASU, then RCAS, transcribed from AMD's `ffx_fsr1.h` and held to its CPU reference.
+
+> **Is a frame traced and denoised at half resolution, then upscaled by FSR1, closer to the reference than the frames it
+> could be instead?**
+
+**Nothing is trained or tuned.** The network is round 11's seed 1, from the file the page loads (section 79's sha-256).
+The input is the arc's: 4 samples (or 1 for D), the nine channels, the emitter mask.
+
+**The frames, per test image.** Each is judged against the same 64 x 64 reference, with a second for C3.
+
+| Frame | Traced | Then |
+|---|---|---|
+| **A** | 64 x 64, 4 samples | denoised -- today's page; reported, never tested |
+| **B, the candidate** | 32 x 32, 4 samples | denoised at 32 x 32, then FSR1 to 64 x 64 |
+| **C** | the same frame as B | denoised, then bilinear to 64 x 64 -- FSR1's control |
+| **D** | 64 x 64, 1 sample | denoised -- the SAME NUMBER OF SAMPLES as B |
+
+- **The upscale's space.** FSR1 wants perceptual input in [0, 1], and radiance is neither. Per channel,
+  t = (x / (1 + x))^(1 / 2.2): Reinhard, then a display gamma. The upscale runs on t, and the result is inverted exactly.
+- **The clamp.** An upscaled t is clamped to [0, the brightest t of its frame], because RCAS overshoots a local peak
+  unclamped. The same space and the same clamp apply to every upscale, so B and C differ by the filter alone.
+- **RCAS** runs at sharpness 0.9 on `fsr.js`'s scale, which is AMD's default of 0.2 stops, with FSR1's denoise on: the
+  frame it sharpens is a denoised path-traced frame with grain left in it.
+- **Each input is traced on its own render seed:** `renderSeeds`' three, then 1-sample (seed x 8 + 4) and half-size
+  (seed x 8 + 5). A's input is exactly the arc's own input for that scene; the gate holds it to `renderSplit`'s bit for bit.
+
+**The split** (`SPLITS_FSR1`), one test set read by both hypotheses:
+
+| Set | Scenes | Seeds |
+|---|---|---|
+| T1 -> H1 and H2 | 6 of R, 6 of C, each as its own family | **40000-40005** and **41000-41005** |
+
+These are the families the network was trained on, so what changes is the resolution and nothing about the scenes. No
+earlier split touched these seeds. C5 holds over the round's 60 render seeds.
+
+**The hypotheses**, with section 6's statistic and section 28's test. `verdict()`'s `filter` column is the comparator and
+its `net` column is B.
+- **H1: B beats D.** At the same number of samples, half resolution plus FSR1 is closer to the reference than full
+  resolution at 1 sample. Effect per image: `d = ln relMSE(D) - ln relMSE(B)`.
+- **H2: B beats C.** FSR1 is closer than bilinear on the same denoised half-size frame. Effect: `d = ln relMSE(C) - ln relMSE(B)`.
+- Each is supported iff its mean d is > 0 and its sign-flip p is below its Holm threshold, over {H1, H2} at 0.05.
+
+**Controls.**
+- **C1, on the test set, per hypothesis.** Both of its frames must beat that hypothesis's own un-denoised frame on at
+  least 11 of 12: D's 1-sample input for H1, and B's half-size input upscaled bilinearly for H2.
+- **C2:** cited from round 11, as in section 79.
+- **C3:** B within 2 x of the floor on more than half the images makes that hypothesis not resolvable.
+- **C4:** the candidate's chain, run twice, gives B bit for bit.
+- **C5:** 60 distinct render seeds.
+
+**What each outcome buys.**
+- **H1 and H2 supported:** a round that times the half-size chain on the rig, and FSR1 on the GPU
+  (`fx/fsr/fsrGPU.js`) after the denoiser, is next. The page could offer half resolution as a mode, measured.
+- **H2 only:** FSR1 beats bilinear, but half resolution loses to tracing fewer samples at full size. At equal samples
+  the full-size frame is the better spend, and the lever is not worth the round above.
+- **H1 only:** half resolution is the better spend, but FSR1 adds nothing over bilinear on these frames.
+- **Neither, not reported or not resolvable:** recorded as found. `denoise-fsr2-temporal` stays behind it.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1: H2 is supported.** EASU follows an edge where bilinear smears across it.
+- **P2: H1 is NOT supported.** Round 11's own record shows the shipped network at 1 sample has about 2.5 x its 4-sample
+  error (median relMSE 0.0113 against 0.0046 on R), but a 64 x 64 picture holds its scene far more coarsely than a 1080p
+  frame. At this size a sphere's silhouette is a few pixels, and half of them are lost to the upscale. My guess is that
+  the lost edges cost more than the noise saved. **This test is harder on the upscaler than real use would be, and a
+  result here says so about 64 x 64, not about 1080p.**
+- **P3:** B's error is above A's on most images. The quarter has a price, and section 82 reports it.
+
+**Secondary, reported, never tested.**
+- **The price of the quarter:** d of A against B.
+- **EASU alone, and RCAS without its denoise,** each against B.
+- Per-image tables, every frame's noisy input error, the floor.
+
+**What was seen first.**
+- Everything in sections 1-80, including round 11's 1- and 16-sample secondary, read for P2 above.
+- **The pilot, on two scenes outside every split (R 990001, C 990002), mechanics only, nothing scored against a reference:**
+  - The transfer round-trips through float32 to 1.7e-5 relative at worst, over 1e-6 to 300.
+  - Every upscale's output was finite.
+  - An image takes 12-25 s to render here. The half-size denoise takes about 0.1 s, and each upscale under 0.04 s.
+  - The clamp engaged: on R's scene, 251 of 12,288 values of the FSR1 upscale were held at the frame's brightest. That
+    is RCAS's overshoot, as `fsr.js`'s gate predicts, and is reported here before the test set exists.
+- `render/denoiseStudy-selfcheck.mjs` runs the chain on two 16 x 16 scenes outside every split, to hold the plumbing. It
+  prints no error and no effect, and none was read.
+- Nothing of the test set has been rendered.
+
+**The command:** `node tools/denoiseStudy.mjs --harvest-fsr1 --cache <dir>` -> `render/denoise-results-fsr1.json`.
+- It refuses if the file exists.
+- About 4 minutes here. The file is committed byte for byte before it is read, and section 82 reads it.

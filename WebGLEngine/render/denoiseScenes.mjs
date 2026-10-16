@@ -141,9 +141,17 @@ export const SPLITS_MESH = Object.freeze({
     T1: Object.freeze({ family: "V", seeds: range(36000, 12) }),
     T2: Object.freeze({ family: "M", seeds: range(37000, 12) }),
 });
+/**
+ * Section 81's split, the upscale round: ONE test set, read by both hypotheses -- 6 new scenes of R (40000) and 6 of C
+ * (41000), the families the shipped network was trained on, so what changes is the RESOLUTION and nothing about the
+ * scenes. No training: the network and the filter are the shipped ones.
+ */
+export const SPLITS_FSR1 = Object.freeze({
+    T1: Object.freeze({ family: "R+C", families: Object.freeze([...rep("R", 6), ...rep("C", 6)]), seeds: Object.freeze([...range(40000, 6), ...range(41000, 6)]) }),
+});
 /** The family of a split's i-th scene: its own entry in `families` when the split mixes them, else the split's. */
 export const familyOf = (split, i) => (split.families ? split.families[i] : split.family);
-const RESERVED = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH].flatMap((S) => Object.values(S).flatMap((s) => s.seeds)));
+const RESERVED = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1].flatMap((S) => Object.values(S).flatMap((s) => s.seeds)));
 export const isDatasetSeed = (seed) => RESERVED.has(seed);
 
 /** The render seeds of a scene: the input, the reference and the second reference -- distinct for every scene seed. */

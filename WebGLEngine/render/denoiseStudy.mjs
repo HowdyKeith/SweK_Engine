@@ -21,13 +21,14 @@
 // Without it everything is computed, as before; with it the result is the same, bit for bit
 // (render/denoiseCache-selfcheck.mjs). A scene rendered under --harvest is never served to a run without it.
 "use strict";
-import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
+import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
 import { renderSequence, temporalChannels, sequenceSeeds } from "./denoiseTemporal.mjs";
 import { withMask, emitterCoverage } from "./denoiseMask.mjs";
 import { jointBilateral, tuneFilter } from "./denoiseFilter.mjs";
 import { trainDenoiser, denoise, TRAIN, TRAIN_LONG, INIT } from "./denoiseNet.mjs";
-import { relMSE, verdict, trainFit, historyFit, trainSanity } from "./denoiseStats.mjs";
+import { relMSE, verdict, trainFit, historyFit, trainSanity, effects } from "./denoiseStats.mjs";
 import { cached, cachedMany, hashArrays } from "./denoiseCache.mjs";
+import { upscale, renderUpscaleImages, renderSeedsUpscale, RCAS_SHARPNESS, RCAS_DENOISE, GAMMA } from "./denoiseUpscale.mjs";
 import { trainParallel } from "./denoisePool.mjs";
 
 export const SEEDS = Object.freeze([1, 2, 3]);
@@ -167,6 +168,55 @@ export function runShippedStudy({ splits = ROUND_MESH.splits, net, filter, emitt
     lap("measured");
     const V = verdict({ sets: { H1: tables.T1, H2: tables.T2 }, shuffled: null, c2Prior, determinism, seedsDistinct, test });
     return { verdict: V, tables, filter, timings, determinism, seedsDistinct, seedCount: allSeeds.length, config };
+}
+
+/**
+ * Section 81, THE UPSCALE ROUND: the shipped network on a frame traced at HALF resolution, brought to full resolution by
+ * FSR1 (render/denoiseUpscale.mjs), against the frames it could be instead. Nothing trained or tuned. Per image, every
+ * frame judged against the same full-size reference:
+ *   A  full size, 4 samples, denoised -- today's page (reported, never tested: what the quarter costs)
+ *   B  half size, 4 samples, denoised, then FSR1 -- the CANDIDATE
+ *   C  the same denoised half-size frame, bilinear instead of FSR1 -- FSR1's control
+ *   D  full size, 1 sample, denoised -- the SAME NUMBER OF SAMPLES as B
+ * H1: B beats D. H2: B beats C. verdict()'s `filter` column is the arm B is held against and its `net` column is B; its
+ * `noisy` is that hypothesis's own un-denoised frame (D's 1-sample input for H1, B's half-size input upscaled bilinearly
+ * for H2), so C1 asks of both arms that they beat what they started from. C2 is cited from round 11, as in section 79.
+ */
+export const RESULTS_FSR1 = "render/denoise-results-fsr1.json";
+export const ROUND_FSR1 = Object.freeze({ splits: SPLITS_FSR1, test: "signflip", c2Prior: ROUND_MESH.c2Prior, results: RESULTS_FSR1 });
+export function runUpscaleStudy({ splits = ROUND_FSR1.splits, net, test = ROUND_FSR1.test, c2Prior = ROUND_FSR1.c2Prior,
+                                  harvest = false, image = IMAGE, sppIn = SPP_IN, sppRef = SPP_REF, cache = null, log = () => {} } = {}) {
+    if (!net) throw new Error("denoiseStudy: runUpscaleStudy needs the shipped network, decoded by its caller");
+    const t0 = Date.now(), timings = {};
+    const lap = (k) => { timings[k] = Date.now() - t0; log(`${k} at ${(timings[k] / 1000).toFixed(1)} s`); };
+    const split = splits.T1, half = image / 2;
+    const config = { image, half, sppIn, sppRef, harvest, test, c2Prior, upscale: { kind: "fsr1", rcasSharpness: RCAS_SHARPNESS, rcasDenoise: RCAS_DENOISE, gamma: GAMMA },
+                     trained: "nothing -- the shipped network", split: { family: split.family, n: split.seeds.length, first: split.seeds[0] },
+                     hypotheses: { H1: "B (half size + FSR1) against D (full size at 1 sample)", H2: "B against C (half size + bilinear)" } };
+    const ims = split.seeds.map((seed, i) => cached(cache, `upscale-${familyOf(split, i)}-${seed}-${image}-${sppIn}-${sppRef}-${harvest ? "harvest" : "gate"}`,
+        () => renderUpscaleImages(familyOf(split, i), seed, { harvest, w: image, h: image, sppIn, sppRef })));
+    lap("tests rendered");
+    const den = (fr) => denoise(net, fr.x, fr.h, fr.w).y;
+    const frames = (im) => { const h4 = den(im.half4); return {
+        A: den(im.full4), B: upscale(h4, half, half, image, image, "fsr1"), C: upscale(h4, half, half, image, image, "bilinear"), D: den(im.full1),
+        easu: upscale(h4, half, half, image, image, "easu"), fsr1NoDenoise: upscale(h4, half, half, image, image, "fsr1-nodenoise"),
+        noisyFull1: im.full1.input, noisyFull4: im.full4.input, noisyHalfUp: upscale(im.half4.input, half, half, image, image, "bilinear") }; };
+    const F = ims.map(frames);
+    // C4: the candidate's whole chain -- trace already done, so network and upscale -- twice, bit for bit
+    const determinism = ims.every((im, i) => { const again = upscale(den(im.half4), half, half, image, image, "fsr1"); return again.every((v, j) => Object.is(v, F[i].B[j])); });
+    const allSeeds = split.seeds.flatMap((s) => Object.values(renderSeedsUpscale(s)));
+    const seedsDistinct = new Set(allSeeds).size === allSeeds.length;
+    const rel = (k) => F.map((f, i) => relMSE(f[k], ims[i].ref));
+    const tables = Object.fromEntries(["A", "B", "C", "D", "easu", "fsr1NoDenoise", "noisyFull1", "noisyFull4", "noisyHalfUp"].map((k) => [k, rel(k)]));
+    tables.floor = ims.map((im) => relMSE(im.ref2, im.ref));
+    lap("measured");
+    const sets = { H1: { noisy: tables.noisyFull1, filter: tables.D, net: [tables.B], floor: tables.floor },
+                   H2: { noisy: tables.noisyHalfUp, filter: tables.C, net: [tables.B], floor: tables.floor } };
+    const V = verdict({ sets, shuffled: null, c2Prior, determinism, seedsDistinct, test });
+    // reported, never tested: the price of the quarter (d of A against B: positive where the full-size frame was better),
+    // and the two halves of FSR1 against the whole
+    const secondary = { priceOfHalf: effects(tables.B, tables.A), easuAloneVsFsr1: effects(tables.easu, tables.B), rcasNoDenoiseVsFsr1: effects(tables.fsr1NoDenoise, tables.B) };
+    return { verdict: V, tables, secondary, timings, determinism, seedsDistinct, seedCount: allSeeds.length, config };
 }
 
 /** The miniature: the same pipeline, scenes seeded outside every split, sizes small enough for a gate. */

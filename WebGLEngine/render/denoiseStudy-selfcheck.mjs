@@ -5,7 +5,7 @@
 // GATES render/denoiseStudy.mjs -- the pre-registered study as one pipeline (tools/denoiseStudy.mjs is its CLI) -- on its MINIATURE only (scenes seeded
 // outside every split, 16 x 16, four training steps). Its exports, each named here: SEEDS, RESULTS, RESULTS_R2,
 // RESULTS_R3, RESULTS_R4, RESULTS_R5, RESULTS_R6, RESULTS_R7, RESULTS_R8, RESULTS_R9, RESULTS_R10, RESULTS_R11, ROUND1, ROUND2, ROUND3, ROUND4, ROUND5, ROUND6, ROUND7, ROUND8, ROUND9, ROUND10, ROUND11, MINI, shuffledTargets, stopBeforeTests, renderSplit,
-// runStudy, HARVESTS, studyOptions, RESULTS_MESH, SHIPPED_NET, ROUND_MESH, runShippedStudy (section 79). What it holds is the PLUMBING: that every stage runs, in order, on every
+// runStudy, HARVESTS, studyOptions, RESULTS_MESH, SHIPPED_NET, ROUND_MESH, runShippedStudy (section 79), RESULTS_FSR1, ROUND_FSR1, runUpscaleStudy (section 81). What it holds is the PLUMBING: that every stage runs, in order, on every
 // split, and hands verdict() what the pre-registration says -- not any number the miniature produces, which is
 // meaningless at this size and is not looked at beyond its shape.
 //
@@ -57,6 +57,9 @@
 //   R39 (section 80) ROUND_MESH judged by the sign test (count only)             3 RED -- the re-derivation among them:
 //       by count H2 is 7 of 12, p 0.39, and is not supported
 //   R40 the page's scope note no longer citing section 80                        1 RED
+//   R41 (section 81) H1 held against C instead of D                             1 RED
+//   R42 B upscaled bilinearly instead of by FSR1                                 2 RED -- the B row, and C4, whose re-run is FSR1's
+//   R43 --harvest-fsr1 leaving fx/fsr out of its cache stamp                     1 RED
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -377,6 +380,45 @@ console.log("\n14. THE MESH ROUND: THE SHIPPED PAIR, NOTHING TRAINED (pre-regist
     ok("!! --harvest-mesh decodes the shipped file with decodeNet, runs runShippedStudy under harvest, writes ROUND_MESH.results and never an existing one, and logs no verdict",
         branch.length > 400 && /decodeNet\(shipped\.net\)/.test(code) && /filter: shipped\.filter/.test(code) && /runShippedStudy\(/.test(code) && /harvest: true/.test(code) &&
         /path\.join\(ENG, ROUND_MESH\.results\)/.test(code) && /existsSync\(file\)/.test(code) && /sha256/.test(code) && !/verdict|status|supported/.test(code));
+}
+
+console.log("\n15. THE UPSCALE ROUND: HALF SIZE + FSR1 AGAINST THE FRAMES IT COULD BE INSTEAD (pre-registration section 81)");
+{
+    const { runUpscaleStudy, ROUND_FSR1, RESULTS_FSR1, ROUND_MESH, SHIPPED_NET } = await imp("render/denoiseStudy.mjs");
+    const { SPLITS_FSR1 } = await imp("render/denoiseScenes.mjs");
+    const { decodeNet } = await imp("render/denoiseDevice.mjs");
+    const net = decodeNet(JSON.parse(fs.readFileSync(path.join(ENG, SHIPPED_NET), "utf8")).net);
+    ok("!! ROUND_FSR1: the upscale split, the sign-flip test, C2 cited from round 11 as section 79 cites it, its own results file",
+        ROUND_FSR1.splits === SPLITS_FSR1 && ROUND_FSR1.test === "signflip" && ROUND_FSR1.c2Prior === ROUND_MESH.c2Prior &&
+        ROUND_FSR1.results === RESULTS_FSR1 && RESULTS_FSR1 === "render/denoise-results-fsr1.json");
+    let threw = null; try { runUpscaleStudy({ net, image: 4, sppIn: 1, sppRef: 1 }); } catch (e) { threw = e.message; }
+    ok("!! on the REAL split without harvest it is refused at its first scene", /seed 40000 is a dataset seed/.test(threw || ""), threw);
+    let threw2 = null; try { runUpscaleStudy({}); } catch (e) { threw2 = e.message; }
+    ok("  without the shipped network it refuses rather than run something else", /needs the shipped network/.test(threw2 || ""));
+    // the miniature: R and C scenes outside every split, 16 x 16 (half 8) -- the PLUMBING, no number read for its value
+    const mini = Object.freeze({ T1: Object.freeze({ family: "R+C", families: Object.freeze(["R", "C"]), seeds: Object.freeze([990100, 990101]) }) });
+    const out = runUpscaleStudy({ splits: mini, net, image: 16, sppIn: 4, sppRef: 8 }), V = out.verdict, T = out.tables;
+    const shapeOk = ["A", "B", "C", "D", "easu", "fsr1NoDenoise", "noisyFull1", "noisyFull4", "noisyHalfUp", "floor"].every((k) => T[k].length === 2 && T[k].every(Number.isFinite));
+    ok("!! end to end on the miniature: every frame measured, the candidate's chain twice bit for bit (C4), 10 distinct render seeds (C5), C2 cited",
+        shapeOk && out.determinism === true && out.seedsDistinct === true && out.seedCount === 10 && V.controls.C2.citedFrom === 11 && V.controls.C4 === true &&
+        Object.keys(V.hypotheses).join() === "H1,H2" && out.config.half === 8 && out.config.upscale.kind === "fsr1", `run ${V.run}`);
+    // the columns verdict() reads are the arms the pre-registration names: H1's comparator is D, H2's is C, B is the candidate in both
+    const dWant = (cmp) => T.B.map((b, i) => Math.log(cmp[i]) - Math.log(b));
+    ok("!! H1 holds B (half + FSR1) against D (full size at 1 sample) and H2 holds B against C (half + bilinear) -- the effects are those columns' own",
+        V.hypotheses.H1.d.every((v, i) => Object.is(v, dWant(T.D)[i])) && V.hypotheses.H2.d.every((v, i) => Object.is(v, dWant(T.C)[i])) &&
+        V.hypotheses.H1.c1.netWins === T.B.filter((v, i) => v < T.noisyFull1[i]).length && V.hypotheses.H2.c1.filterWins === T.C.filter((v, i) => v < T.noisyHalfUp[i]).length);
+    // the frames are what they say: B is the shipped network at half size through FSR1, recomputed from nothing
+    const { renderUpscaleImages, upscale } = await imp("render/denoiseUpscale.mjs");
+    const im = renderUpscaleImages("C", 990101, { w: 16, h: 16, sppIn: 4, sppRef: 8 });
+    const B1 = upscale(denoise(net, im.half4.x, 8, 8).y, 8, 8, 16, 16, "fsr1"), D1 = denoise(net, im.full1.x, 16, 16).y;
+    ok("!! B and D for an image are the shipped network's own frames -- half size then FSR1, and full size at 1 sample -- scored against that image's reference, bit for bit",
+        Object.is(T.B[1], relMSE(B1, im.ref)) && Object.is(T.D[1], relMSE(D1, im.ref)) && Object.is(T.floor[1], relMSE(im.ref2, im.ref)));
+    const cli = fs.readFileSync(path.join(ENG, "tools/denoiseStudy.mjs"), "utf8");
+    const b0 = cli.indexOf('} else if (args.includes("--harvest-fsr1")) {'), branch = b0 >= 0 ? cli.slice(b0, cli.indexOf('} else if (args.includes("--harvest-mesh")) {', b0)) : "";
+    const code = branch.replace(/\/\/.*$/gm, "");
+    ok("!! --harvest-fsr1 decodes the shipped file with decodeNet, runs runUpscaleStudy under harvest, writes ROUND_FSR1.results and never an existing one, and logs no verdict",
+        branch.length > 400 && /decodeNet\(shipped\.net\)/.test(code) && /runUpscaleStudy\(/.test(code) && /harvest: true/.test(code) &&
+        /path\.join\(ENG, ROUND_FSR1\.results\)/.test(code) && /existsSync\(file\)/.test(code) && /sha256/.test(code) && /"fx\/fsr"/.test(code) && !/verdict|status|supported/.test(code));
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
