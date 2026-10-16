@@ -9210,10 +9210,10 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "sabotages red by name. NOT CLOSED: on SwiftShader the test passes with the barrier deleted too -- it shows the barrier runs, " +
                  "not that it orders. The draft is Keith's to file.",
     }),
-    // v4868 -- since559 (the highest on any branch at the time was since558, read across every remote ref after a full fetch; v4864 and v4865 are still spent on two other branches). TWO new gate files: tools/ship/trainFlightPilot-selfcheck.mjs
+    // v4869 -- since559 (the highest on any branch at the time was since558, read across every remote ref after a full fetch; v4864 and v4865 are still spent on two other branches). TWO new gate files: tools/ship/trainFlightPilot-selfcheck.mjs
     // (the tool that trains the fruit-fly flight pilot, and the shipped file held to its `by`) and brain/pilotFlightTrain-selfcheck.mjs (mutate, train and prune of that pilot, split out of brain/pilotFlightPolicy-selfcheck.mjs).
     since559: Object.freeze({
-        at: "v4868", swept: 2, green: 2, red: 0,
+        at: "v4869", swept: 2, green: 2, red: 0,
         added: Object.freeze([
             "brain/pilotFlightTrain-selfcheck.mjs",
             "tools/ship/trainFlightPilot-selfcheck.mjs",

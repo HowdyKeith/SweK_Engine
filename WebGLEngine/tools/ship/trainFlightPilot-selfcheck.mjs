@@ -1,4 +1,4 @@
-// WebGLEngine/tools/ship/trainFlightPilot-selfcheck.mjs -- v4868 (beside tools/ship/trainFlightPilot.mjs) (~60 s)
+// WebGLEngine/tools/ship/trainFlightPilot-selfcheck.mjs -- v4869 (beside tools/ship/trainFlightPilot.mjs) (~60 s)
 //
 // Run: node tools/ship/trainFlightPilot-selfcheck.mjs      (~90 s: section 9 flies the shipped pilot's 1,170 graded scenarios and the safety pool, twice -- the champion's and the autopilot's)
 //
@@ -12,7 +12,7 @@
 //
 // WHY THE SETS ARE INJECTABLE: finish() on the real sets flies about 2,000 flights (70 s). The logic is driven on small slices of the real sets; SETS (the real ones) is held to be the real ones by identity.
 //
-// SABOTAGE LOG, v4868 -- TWENTY-FOUR, each applied to tools/ship/trainFlightPilot.mjs in a scratch worktree, the gate run, the worktree restored; every one red by name (the number is how many rows went red):
+// SABOTAGE LOG, v4869 -- TWENTY-FOUR, each applied to tools/ship/trainFlightPilot.mjs in a scratch worktree, the gate run, the worktree restored; every one red by name (the number is how many rows went red):
 //   A parseArgs: an unknown option read past 3 | B qualifies: the audit-score clause dropped 2 | C qualifies: held-out > loosened to >= 2 | D finish: the champion is the best held-out of ALL searches, eligibility ignored 3 | E finish: the audit
 //   flown on the held-out scenarios 1 | F finish: the champion picked on TRAIN score 1 | G blobOf: the count of weights that differ left out of `by` 1 | H command: --write writes though the champion does not qualify 1 | I RECIPE: 1000 iterations
 //   -> 800 2 | J qualifies: the reserve-score clause dropped 2 | K qualifies: the kind clause dropped 3 | L qualifies: better > worse loosened to >= 1 | M tailReasons: the new-crash clause dropped 6 | N allowance: one standard error, not two 2 |

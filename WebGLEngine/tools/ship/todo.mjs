@@ -315,6 +315,94 @@ export const TODO = [
                 "`node tools/ship/textureBytes.mjs <external>/asset_library --write tools/ship/texture-bytes.json` there and the gate grades it.",
         evidence: "node tools/ship/textureBytes-selfcheck.mjs",
     },
+
+    // ----------------------------------------------------------------------------------------------------------
+    // v4870: THE REAL-FLIGHT BACKLOG, IN THE ORDER KEITH ASKED FOR IT TO BE DONE. These were scoped in conversation after v4869/v4870 gave
+    // es-flight6dof.html a fruit-fly pilot and a GPU-Brain pilot, in answer to "do we have dogfights... can we pick which brain is in
+    // gunner seat... can we swap in actual models/gltf... can the pilots eject if the ship is going to blow up?" -- and then "also, in
+    // server.html in the peer list... can we add whether the fly brain is available? then the peers brains would be included in the
+    // choose roster selection". Each `evidence` below prints what is TRUE TODAY, so the item goes red the moment it stops being true
+    // (todo-selfcheck prints the open list; the order is the `order` field, 1 first).
+    // ----------------------------------------------------------------------------------------------------------
+    {
+        id: "flight-guns-dogfight",
+        status: "open", size: "medium", order: 1,
+        title: "Guns on the real-flight model, and a dogfight task: two aircraft, a fixed forward gun each, a score for hits landed and hits taken",
+        why: "es-flight6dof.html flies one aircraft against a tracking task and nothing shoots. The tree already has the pieces on the ground: " +
+             "physics/ballistics.mjs and physics/turret.mjs (shells, an exact aim solution, a reload) and brain/gunnerPolicy.mjs (a gunner for a car). " +
+             "The real-flight model has no gun mount, no round count, no hit test against a body that is not a car, and no task that scores a fight " +
+             "-- brain/flightTask.mjs scores tracking error only.",
+        note: "SCOPE: a forward-fixed gun (boresight along the nose, +X), a muzzle velocity added to the aircraft's own velocity, a hit sphere on the " +
+              "target, a magazine and a reload; a `dogfight` task in brain/flightTask.mjs with its own sets (train / held-out / audit read once, as " +
+              "every task here is); the autopilot and the two trained pilots as opponents. A pilot that has only ever tracked a heading will not " +
+              "know how to put its nose on a target -- the features need a bearing-to-target (lead angle) and the hand weights need a pursuit rule " +
+              "before training can start from something equal to a baseline. NOT IN SCOPE: gunner seats (item 4), ejection (item 6).",
+        evidence: "node -e 'import(\"./brain/flightTask.mjs\").then(m=>console.log(\"gun/fire/shot/dogfight exports:\", Object.keys(m).filter(k=>/gun|fire|shot|dogfight/i.test(k)).length))'   # 0 today",
+    },
+    {
+        id: "flight-model-picker",
+        status: "open", size: "medium", order: 2,
+        title: "A model picker on es-flight6dof.html (and es-box3d-6dof.html): swap the default aircraft/ship body for a glTF from the asset library",
+        why: "Both pages draw a built-in body. The tree has the glTF path (the asset library, the Khronos samples, the loaders the other pages use) " +
+             "but neither 6DOF page offers it, so a flight cannot be watched in anything but the default mesh.",
+        note: "SCOPE: a picker listing the asset library's glTFs, the chosen mesh scaled to the flight model's reference length and re-oriented to the " +
+              "model's frame (nose +X, up +Z -- most glTFs are +Z-forward/+Y-up, and that conversion is the part that goes wrong), the flight model " +
+              "UNCHANGED (a mesh is a skin, not a different aircraft; say so on the page), the default kept as the fallback when a load fails. The " +
+              "gate loads a small glTF in the headless browser on both backends and holds the pose to the state to the same tolerance the default body is.",
+        evidence: "node -e 'const s=require(\"fs\").readFileSync(\"es-flight6dof.html\",\"utf8\");console.log(\"flight page mentions gltf:\",/gltf/i.test(s))'   # false today",
+    },
+    {
+        id: "peer-fly-brain-badge",
+        status: "open", size: "small", order: 3,
+        title: "server.html's peer list: show whether a peer has the fruit-fly pilot and the GPU-Brain pilot available, beside the Brain badge it already shows",
+        why: "capBadges() in server.html shows a 'Brain live/idle/stale' badge from ai-bridge's /peer/probe (which reads the peer's /ai/brain/health). That is the " +
+             "Deno GPU-Brain PROCESS, the field solver -- it says nothing about the real-flight pilots, and nothing about the fruit-fly brain at all. A " +
+             "peer cannot be chosen as a pilot's home until the list says what it can run.",
+        note: "SCOPE: the peer reports, on /node/caps, which pilot brains it can serve -- `fly` (the fruit-fly circuit is CPU JavaScript: available when the " +
+              "peer's tree carries brain/pilotFlightPolicy.mjs and its shipped weights, with the weights hash and engine version so a mismatched peer is " +
+              "visible) and `gpu` (available only when the peer can run brain/pilotFlightGpu.mjs on a REAL adapter -- say 'software adapter' when it is " +
+              "one, as the flight page does); /peer/probe passes them through as caps.pilotFly / caps.pilotGpu; capBadges() draws them next to the Brain " +
+              "badge, struck through when absent (the existing `cap()` helper). The GPU chip in the Peer-activity header stays as it is.",
+        evidence: "node -e 'const s=require(\"fs\").readFileSync(\"server.html\",\"utf8\");console.log(\"capBadges draws a pilot-brain badge:\",/pilotFly|pilotGpu/.test(s))'   # false today",
+    },
+    {
+        id: "gunner-seats",
+        status: "open", size: "large", order: 4,
+        title: "Gunner seats on ships and aircraft: pick the brain (hand rule, fruit fly, GPU Brain) for each gunner the way a pilot's is picked",
+        why: "brain/gunnerPolicy.mjs is a gunner for the race car's turret; nothing seats one on a ship or an aircraft, and the roster on the flight page " +
+             "picks only a pilot. A seat should be (role, brain) with the role the vehicle's own: pilot, gunner, and later engineer.",
+        note: "SCOPE: a seat model (a vehicle declares its seats and what each controls -- a pilot's four controls, a gunner's yaw/pitch/fire), the " +
+              "roster choosing a brain per seat, gunner policies for the fruit-fly circuit and the GPU MLP trained by the same recipe and the same " +
+              "audit discipline as the pilots (train / held-out / pool / audits read once). Depends on item 1 (there must be a gun and a score to train on).",
+        evidence: "node -e 'const s=require(\"fs\").readFileSync(\"es-flight6dof.html\",\"utf8\");console.log(\"flight page mentions gunner:\",/gunner/i.test(s))'   # false today",
+    },
+    {
+        id: "peer-brains-in-roster",
+        status: "open", size: "medium", order: 5,
+        title: "The roster offers peers' brains as seat choices: a fleet node's fruit-fly or GPU-Brain pilot (and gunner) flying a seat on this page",
+        why: "Once the peer list says a peer can run a brain (item 3), the roster chooser on es-flight6dof.html should be able to pick it: " +
+             "'the fruit fly on <peer>', 'the GPU Brain on <peer>'. Today every pilot is a local object.",
+        note: "SCOPE: a remote-decide endpoint on ai-bridge (POST feature rows, receive controls; the fruit fly runs in node, the GPU pilot through " +
+              "node-webgpu or the peer's own browser page), relayed through /peer/* the way the VM and docker calls are so the page makes no cross-origin " +
+              "call; remote seats are ASYNC like the GPU seats already are (stepFleetGpu/held), with a per-tick deadline and a stated fallback to the local " +
+              "hand weights when the peer is slow or gone -- said on the roster note and the pilot line, as the device-loss fallback already is. A round trip " +
+              "per tick is milliseconds on a LAN, so the page may run slower than real time with a remote seat; say so. Seats (item 4) come first so one " +
+              "chooser serves pilots and gunners.",
+        evidence: "node ai-bridge/brainCensus-selfcheck.mjs   # what the census knows today; the roster has no remote choice yet",
+    },
+    {
+        id: "pilot-ejection",
+        status: "open", size: "medium", order: 6,
+        title: "Ejection: a crew pod leaves the vehicle when the hull is about to fail; pilot state alive / ejected / lost; scoring that counts it",
+        why: "A ship that blows up takes its pilot with it, and nothing in the flight or battle pages models the crew separately from the hull.",
+        note: "SCOPE: a hull-integrity reading (the crash/damage model the race pages use, extended to a flight body), an ejection rule (hull below a " +
+              "threshold, or an unrecoverable state -- deep stall below a floor, or a collision predicted inside N seconds), a pod that inherits the " +
+              "vehicle's velocity plus a kick and falls under its own drag, a pilot state recorded per seat, and a score that counts a survived " +
+              "ejection as less bad than a lost pilot and more bad than a landing. A TRAINED brain gets the eject switch as a fifth output only if " +
+              "the scoring makes it learnable; the first version is a hand rule, and the page says so. Depends on items 1 and 4 (damage to eject from, " +
+              "seats to eject).",
+        evidence: "node -e 'const s=require(\"fs\").readFileSync(\"es-flight6dof.html\",\"utf8\");console.log(\"flight page mentions eject:\",/eject/i.test(s))'   # false today",
+    },
 ];
 
 export const byStatus = (s) => TODO.filter((t) => t.status === s);

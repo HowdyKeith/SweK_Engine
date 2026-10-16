@@ -17,7 +17,7 @@
 //   6  the zero weights output nothing and the aircraft falls; noise is deterministic for a seed, scales with sigma, and a noisy pilot flies worse than the hand pilot and still flies at 0.05
 //   7  the brain file round-trips through peerBrain (export, import, the same weights), a file for another policy is refused by name; pilotRoster resolves hand, zero, noise, imported and an unavailable id to pilots that fly
 //
-// v4868: section 7 also holds the SHIPPED pilot (brain/pilotFlightWeightsDefault.json) to the roster: it imports, resolves as 'shipped', flies, and beats the hand pilot on a recovery start. The training functions have their own gate,
+// v4869: section 7 also holds the SHIPPED pilot (brain/pilotFlightWeightsDefault.json) to the roster: it imports, resolves as 'shipped', flies, and beats the hand pilot on a recovery start. The training functions have their own gate,
 // brain/pilotFlightTrain-selfcheck.mjs.
 //
 // SABOTAGE LOG -- each applied to brain/pilotFlightPolicy.mjs in a scratch worktree, the gate run, the worktree restored:

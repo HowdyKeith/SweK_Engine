@@ -1,4 +1,4 @@
-// WebGLEngine/brain/flightTask.mjs -- v4867, TRAIN_WIDE_SET v4868
+// WebGLEngine/brain/flightTask.mjs -- v4867, the trainer's sets v4869, the GPU brain's audits v4870
 //
 // THE JOB EVERY REAL-FLIGHT PILOT IS GIVEN AND GRADED ON, ONCE: start somewhere that is not trim, be told an altitude, a heading and an airspeed, and hold them for 40 seconds -- sometimes in a steady wind with gusts. The PD autopilot
 // (brain/autopilotFlight.mjs), the fruit-fly network (brain/pilotFlightPolicy.mjs) and the GPU network all fly THIS, through one function (state, target, wind) -> { pitch, roll, yaw, throttle }, so a score means the same thing for
@@ -79,7 +79,7 @@ export function fly(pilot, sc, { seconds = SECONDS, dt = DT, model = defaultMode
 // ---- the sets ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 const mk = (spec) => Object.freeze(spec.flatMap(([kind, seeds]) => seeds.map((s) => scenario(s, kind))));
 export const TRAIN_SET = mk([["nominal", [1, 2, 3, 4]], ["recovery", [1, 2, 3, 4]], ["gusty", [1, 2, 3, 4]]]);
-// *** THE SEARCHES TRAIN ON TRAIN_WIDE_SET, THE CHAMPION IS PICKED ON HELD_OUT_WIDE_SET AMONG SEARCHES THE SAFETY POOL ALLOWS, AND THE VERDICT IS READ ON AUDIT3_SET AND SAFETY_AUDIT_SET -- AND WHY THERE ARE SO MANY SETS. *** v4868, in order:
+// *** THE SEARCHES TRAIN ON TRAIN_WIDE_SET, THE CHAMPION IS PICKED ON HELD_OUT_WIDE_SET AMONG SEARCHES THE SAFETY POOL ALLOWS, AND THE VERDICT IS READ ON AUDIT3_SET AND SAFETY_AUDIT_SET -- AND WHY THERE ARE SO MANY SETS. *** v4869, in order:
 //   1. Four searches of 1,500 iterations on the 12 scenarios of TRAIN_SET took the train score from -0.453 to between -0.223 and -0.260 and the held-out score from -0.503 to -0.367, -0.793, -1.334 and -1.480: three of four had
 //      learned the twelve and crashed on scenarios they had not met. The same searches on 30 scenarios (seeds 1..10 of each kind) held out at -0.313..-0.364 after 750 iterations, none crashing.
 //   2. The first real run on those 30 (4 searches x 1000 iterations, seeds 6000..6003) picked a champion that beat the autopilot on the held-out scenarios (-0.257 against -0.503) and flew 17 of the 18 AUDIT_SET scenarios better
@@ -104,6 +104,11 @@ export const AUDIT2_SET = mk([WIDE("nominal", [31, 42]), WIDE("recovery", [31, 4
 export const AUDIT3_SET = mk([WIDE("nominal", [51, 62]), WIDE("recovery", [51, 62]), WIDE("gusty", [51, 62])]);
 export const SAFETY_POOL_SET = mk([WIDE("nominal", [1000, 1099]), WIDE("recovery", [1000, 1299]), WIDE("gusty", [1000, 1099])]);
 export const SAFETY_AUDIT_SET = mk([WIDE("nominal", [2000, 2099]), WIDE("recovery", [2000, 2299]), WIDE("gusty", [2000, 2099])]);
+// v4870 -- THE GPU BRAIN'S OWN AUDITS. AUDIT3_SET and SAFETY_AUDIT_SET were read ONCE, for the fruit fly's champion (v4869); the GPU Brain's MLP is a different network started from the same laws and is graded on sets of its own, so that
+// every audit is read once by one champion: AUDIT4_SET (seeds 71..82 of each kind, 36 scenarios) and SAFETY_AUDIT2_SET (500 starts, seeds 3000..). The searches still train on TRAIN_WIDE_SET, the champion is still picked on
+// HELD_OUT_WIDE_SET among the searches SAFETY_POOL_SET allows, and BASELINE_SET is still the reserve: none of those is an audit.
+export const AUDIT4_SET = mk([WIDE("nominal", [71, 82]), WIDE("recovery", [71, 82]), WIDE("gusty", [71, 82])]);
+export const SAFETY_AUDIT2_SET = mk([WIDE("nominal", [3000, 3099]), WIDE("recovery", [3000, 3299]), WIDE("gusty", [3000, 3099])]);
 export const HELD_OUT_SET = mk([["nominal", [11, 12, 13, 14]], ["recovery", [11, 12, 13, 14]], ["gusty", [11, 12, 13, 14]]]);
 export const AUDIT_SET = mk([["nominal", [21, 22, 23, 24, 25, 26]], ["recovery", [21, 22, 23, 24, 25, 26]], ["gusty", [21, 22, 23, 24, 25, 26]]]);
 export const BASELINE_SET = mk([["nominal", [501, 502, 503, 504, 505, 506]], ["recovery", [501, 502, 503, 504, 505, 506]], ["gusty", [501, 502, 503, 504, 505, 506]]]);
