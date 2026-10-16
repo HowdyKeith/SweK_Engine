@@ -362,7 +362,12 @@ export const STILL_OVER_AT_V4815 = Object.freeze({
         Object.freeze({ gate: "tools/ship/headlessGpu-selfcheck.mjs", recordedWas: 4518, hereMs: 3382,
             serialMs: Object.freeze([3072, 3224, 3247]),
             why: "about 2.4 s alone on the 2.10 GHz host this round (2,317-2,770 ms), 3,072 / 3,224 / 3,247 alone on " +
-                 "the 2.80 GHz host that owns the record since the v4815 handover; the gate did not change between them" }),
+                 "the 2.80 GHz host that owns the record since the v4815 handover; the gate did not change between them",
+            // v4867 -- RETURNED, BY THE RULE THIS ROLL WAS WRITTEN WITH, AND FOUND BY THE VERDICT AFTER A ROTATION: the record is on the 2.10 GHz host (142c0d) and the ship rotation filed this gate at 3,512 ms with a red --
+            // "the native call is faster than the browser call, this run", 668 ms native against 247 browser, a first-run adapter warm-up and not a defect: alone it passed three times at 69 / 16 / 18 ms native against 395 / 221 / 209
+            // browser -- and re-timing it alone filed 2,370 ms. Three quiet runs filed one at a time by `sweepRotation --gate tools/ship/headlessGpu-selfcheck.mjs --cap-s 300 --write`: 2,897 / 2,557 / 2,639 ms, the last filed. Under the
+            // bar and back in the sweep on this host, as the v4815 note said it was before the handover. A straddler: the first of the three is within 4% of the bar.
+            returned: Object.freeze({ at: "v4867", aloneMs: 2639, serialMs: Object.freeze([2897, 2557, 2639]) }) }),
         Object.freeze({ gate: "tools/roundhouse/sweepBudget-selfcheck.mjs", recordedWas: 5526, hereMs: 3270,
             serialMs: Object.freeze([3353, 3086, 3214]),
             why: "2,545 ms in the record before the host change, 3,353 / 3,086 / 3,214 alone on the 2.80 GHz host; the " +

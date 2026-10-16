@@ -26,6 +26,14 @@
 //                      and the write the sabotage skipped was redundant. Both batches now skip it by design, the gate holds the structure by name,
 //                      and the sabotage became D': the reuse path writing the indices anyway (the pre-finding code)
 //
+// v4867 -- THE ORDERING ROW FAILED ON TWO BOXES IN A WEEK AND THE DESIGN WAS THE CAUSE. It timed the three modes in BLOCKS (recreate x 40 frames, then reuse x 40, then draw-only x 40) and asked that draw-only be no slower than reuse
+// within 0.5 ms and reuse no slower than recreate within 1 ms, so whatever the machine did during the third block landed on the third mode: 8.90 <= 8.10 here in the v4867 verdict (and again alone), 19.30 <= 16.90 on Keith's 8-core rig
+// and, on its WebGL2 half, 5.80 <= 1.00 -- a draw that uploads nothing "costing" five times a draw that uploads, which no cost of drawing can explain. The three modes are now timed IN ROTATION, frame by frame (the order rotates), so
+// drift lands on all of them, and each tolerance is relative (10%) plus an absolute millisecond: a frame is 8 ms alone and 25 ms with eight of these running at once. MEASURED: 42 sequential runs pass; with eight at once, 2 of 40
+// fail, which the quick sweep's alone re-run reads as a false red; the old design failed alone. WHAT THE ROW CAN NO LONGER SEE, SAID: a draw-only that is slower than reuse by under 10% and a millisecond, or a reuse that is slower
+// than recreate by as much -- it is a plausibility check on the order, not a performance regression test; the rows that hold the design are the allocation counts (reuse allocates nothing once warm) and the identical pixels.
+// SABOTAGE (v4867): a 6 ms busy wait in the draw-only path -> 2 red (the order row, both backends); in the reuse path -> 2 red; reuse destroying its buffers before every set (the pre-v4493 behaviour) -> 2 red (the allocation rows).
+// Removing the rotation (each frame running the modes in a fixed order) -> 0 red: the rotation is what makes the row survive a noisy box, not what lets it catch a regression.
 // Run: node tools/ship/slugReupload-selfcheck.mjs      (~2.7 s)
 "use strict";
 import fs from "node:fs";
@@ -107,20 +115,26 @@ sec("2. THE BROWSER, BOTH BACKENDS: destroy-and-create against reuse against dra
                 const frameOf = (mode, f) => {
                     const ready = [];
                     LABELS.forEach((L, i) => { const b = batches[i];
-                        if (mode === "recreate") { b.destroy(); b.set(L + (f % 2 ? "" : " "), { size: PX }); }
+                        if (mode === "recreate") { b.destroy(); b.set(L + " ", { size: PX }); }
                         else if (mode === "reuse") b.set(L + (f % 2 ? "" : " "), { size: PX });
                         ready.push({ b, rows: rowsFor(i) }); });
                     return dev.frame(({ pass }) => { pass.clear([0, 0, 0, 1]); for (const q of ready) q.b.draw(pass, q.rows, [W, H]); });
                 };
-                for (const mode of ["recreate", "reuse", "drawOnly"]) {
-                    for (const b of batches) b.stats = null;
-                    frameOf(mode, 0); await drain();                                      // warm
-                    for (const b of batches) b.stats = null;
-                    const times = [];
-                    for (let f = 1; f <= FRAMES; f++) { const t0 = performance.now(); frameOf(mode, f); await drain(); times.push(performance.now() - t0); }
-                    o.ms[mode] = median(times);
-                    o.stats[mode] = batches.reduce((s, b) => { const st = b.stats || { sets: 0, allocations: 0, bytes: 0 }; return { sets: s.sets + st.sets, allocations: s.allocations + st.allocations, bytes: s.bytes + st.bytes }; }, { sets: 0, allocations: 0, bytes: 0 });
+                // THE THREE MODES ARE TIMED IN ROTATION, frame by frame (v4867): block by block (recreate x 40, then reuse x 40, then draw-only x 40) whatever the machine did in the minute the third block ran landed on the third mode, and
+                // the row that says draw-only is the cheapest failed on two boxes in a week (this one at 8.90 <= 8.10, and Keith's 8-core at 19.30 <= 16.90 and, on WebGL2, 5.80 <= 1.00). Each frame runs all three, in an order that
+                // rotates, so drift lands on all of them. Stats are read as the change across each timed frame. RECREATE USES THE LONGER LABEL EVERY FRAME (it allocates anyway), so the buffers it leaves are always big enough for reuse.
+                const modes = ["recreate", "reuse", "drawOnly"], times = { recreate: [], reuse: [], drawOnly: [] }, acc = { recreate: { sets: 0, allocations: 0, bytes: 0 }, reuse: { sets: 0, allocations: 0, bytes: 0 }, drawOnly: { sets: 0, allocations: 0, bytes: 0 } };
+                const totals = () => batches.reduce((s, b) => { const st = b.stats || { sets: 0, allocations: 0, bytes: 0 }; return { sets: s.sets + st.sets, allocations: s.allocations + st.allocations, bytes: s.bytes + st.bytes }; }, { sets: 0, allocations: 0, bytes: 0 });
+                for (const mode of modes) { frameOf(mode, 0); await drain(); }                                       // warm each
+                for (let f = 1; f <= FRAMES; f++) {
+                    for (let k = 0; k < 3; k++) {
+                        const mode = modes[(f + k) % 3], before = totals(), t0 = performance.now();
+                        frameOf(mode, f); await drain();
+                        times[mode].push(performance.now() - t0);
+                        const after = totals(); acc[mode].sets += after.sets - before.sets; acc[mode].allocations += after.allocations - before.allocations; acc[mode].bytes += after.bytes - before.bytes;
+                    }
                 }
+                for (const mode of modes) { o.ms[mode] = median(times[mode]); o.stats[mode] = acc[mode]; }
                 // the same picture either way: one frame each of recreate and reuse, read back
                 const pix = async (mode) => { const fr = await (async () => { const ready = []; LABELS.forEach((L, i) => { const b = batches[i]; if (mode === "recreate") b.destroy(); b.set(L, { size: PX }); ready.push({ b, rows: rowsFor(i) }); });
                     return dev.frame(({ pass }) => { pass.clear([0, 0, 0, 1]); for (const q of ready) q.b.draw(pass, q.rows, [W, H]); }, { read: true }); })(); return fr.pixels; };
@@ -136,9 +150,11 @@ sec("2. THE BROWSER, BOTH BACKENDS: destroy-and-create against reuse against dra
               const o = { ms: {}, stats: {} };
               const frameOf = (mode, f) => { gl.viewport(0, 0, W, H); gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
                   LABELS.forEach((L, i) => { if (mode !== "drawOnly") tbs[i].set(L + (f % 2 ? "" : " "), { size: PX }); tbs[i].draw(rowsFor(i), [W, H]); }); };
-              for (const mode of ["set", "drawOnly"]) { for (const b of tbs) b.stats = null; frameOf(mode, 0); gl.finish(); for (const b of tbs) b.stats = null; const times = [];
-                  for (let f = 1; f <= FRAMES; f++) { const t0 = performance.now(); frameOf(mode, f); gl.finish(); times.push(performance.now() - t0); }
-                  o.ms[mode] = median(times); o.stats[mode] = tbs.reduce((s, b) => { const st = b.stats || { sets: 0, allocations: 0, bytes: 0 }; return { sets: s.sets + st.sets, allocations: s.allocations + st.allocations, bytes: s.bytes + st.bytes }; }, { sets: 0, allocations: 0, bytes: 0 }); }
+              const rtimes = { set: [], drawOnly: [] }, racc = { set: { sets: 0, allocations: 0, bytes: 0 }, drawOnly: { sets: 0, allocations: 0, bytes: 0 } };
+              const rtotals = () => tbs.reduce((s, b) => { const st = b.stats || { sets: 0, allocations: 0, bytes: 0 }; return { sets: s.sets + st.sets, allocations: s.allocations + st.allocations, bytes: s.bytes + st.bytes }; }, { sets: 0, allocations: 0, bytes: 0 });
+              for (const mode of ["set", "drawOnly"]) { frameOf(mode, 0); gl.finish(); }
+              for (let f = 1; f <= FRAMES; f++) { for (let k = 0; k < 2; k++) { const mode = ["set", "drawOnly"][(f + k) % 2], before = rtotals(), t0 = performance.now(); frameOf(mode, f); gl.finish(); rtimes[mode].push(performance.now() - t0); const after = rtotals(); racc[mode].sets += after.sets - before.sets; racc[mode].allocations += after.allocations - before.allocations; racc[mode].bytes += after.bytes - before.bytes; } }
+              for (const mode of ["set", "drawOnly"]) { o.ms[mode] = median(rtimes[mode]); o.stats[mode] = racc[mode]; }
               out.raw = o; }
             return out;
         }` });
@@ -151,7 +167,7 @@ sec("2. THE BROWSER, BOTH BACKENDS: destroy-and-create against reuse against dra
                 ok(`*** ${bk}: reuse allocates NOTHING once warm over ${FRAMES} frames of ${LABELS.length} changing labels, where recreate allocated ${st.recreate.allocations}; and it writes vertices only (no index bytes) ***`,
             st.reuse.allocations === 0 && st.recreate.allocations === 2 * LABELS.length * FRAMES && st.reuse.sets === LABELS.length * FRAMES && st.reuse.bytes < st.recreate.bytes && (st.recreate.bytes - st.reuse.bytes) % 24 === 0);
                 ok(`  ${bk}: reuse draws the same pixels as destroy-and-create`, o.sameDiff === 0 && o.lit > 500, `${o.sameDiff} pixels differ, ${o.lit} lit`);
-                ok(`  ${bk}: draw-only is not slower than reuse, and reuse is not slower than recreate by more than a millisecond (the order the design predicts, within this box's noise)`, m.drawOnly <= m.reuse + 0.5 && m.reuse <= m.recreate + 1.0, `${m.drawOnly.toFixed(2)} <= ${m.reuse.toFixed(2)} <= ${m.recreate.toFixed(2)}`);
+                ok(`  ${bk}: draw-only is not slower than reuse (by more than 10% and a millisecond), and reuse is not slower than recreate (by more than 10% and a millisecond): the order the design predicts, within this box's noise; the three modes are timed in rotation, frame by frame`, m.drawOnly <= m.reuse * 1.1 + 1.0 && m.reuse <= m.recreate * 1.1 + 1.0, `${m.drawOnly.toFixed(2)} <= ${m.reuse.toFixed(2)} <= ${m.recreate.toFixed(2)}`);
             }
             const o = r.result.raw;
             report(`raw SlugTextBatch on WebGL2: set+draw ${o.ms.set.toFixed(2)} ms a frame, draw-only ${o.ms.drawOnly.toFixed(2)}; ${o.stats.set.allocations} bufferData stores over ${FRAMES} frames, ${(o.stats.set.bytes / FRAMES / 1024).toFixed(1)} KiB a frame`);
