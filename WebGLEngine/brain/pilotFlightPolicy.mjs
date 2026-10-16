@@ -17,6 +17,7 @@
 "use strict";
 import * as Topo from "./gfcTopology.mjs";
 import * as AF from "./autopilotFlight.mjs";
+import * as T from "./flightTask.mjs";
 
 export const FEATURES = 18, HIDDEN = Topo.NEURON_ORDER.length, OUTPUTS = 4;
 export const REC_STEPS = 3, REC_EDGES = Topo.EDGES.length;
@@ -102,6 +103,44 @@ export function handWeights(gains = {}) {
 const gauss = (rng) => { let u = 0, v = 0; while (!u) u = rng(); while (!v) v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
 /** A copy of `w` with a gaussian of `sigma` added to every weight (the roster's "hand + noise"). */
 export function perturb(w, sigma, rng) { const o = Float32Array.from(w); for (let i = 0; i < o.length; i++) o[i] += gauss(rng) * sigma; return o; }
+
+// ---- training: the recipe every pilot in this tree is made by --------------------------------------------------------------------------------------------------------------------------------------------
+const mulberry = (a) => () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+/** The weights `w` flown over a set of scenarios (brain/flightTask.mjs evaluate()): { score, runs, crashed, byKind }. */
+export const evaluate = (w, set = T.TRAIN_WIDE_SET, opts = {}) => T.evaluate(pilotFor(w), set, opts);
+/** A copy of `w` with 1..maxK randomly chosen weights moved by a gaussian of `sigma`: the sparse mutation of brain/pilotAircraftPolicy.mjs. */
+export function mutate(w, sigma, rng, maxK = 4) {
+    const o = Float32Array.from(w), k = 1 + Math.floor(rng() * maxK);
+    for (let j = 0; j < k; j++) o[Math.floor(rng() * o.length)] += gauss(rng) * sigma;
+    return o;
+}
+/** (1+1)-ES from the hand weights (the autopilot) on TRAIN_WIDE_SET. A child that scores exactly its parent replaces it, counted apart. Deterministic for a seed. */
+export function train({ seed = 7, iters = 600, sigma = 0.3, maxK = 4, start = null, trainSet = T.TRAIN_WIDE_SET, onIter = null } = {}) {
+    const rng = mulberry(seed); let best = start ? Float32Array.from(start) : handWeights();
+    let bestScore = evaluate(best, trainSet).score, improved = 0, neutral = 0; const history = [{ i: 0, score: bestScore }];
+    for (let i = 1; i <= iters; i++) {
+        const cand = mutate(best, sigma, rng, maxK), score = evaluate(cand, trainSet).score;
+        if (score > bestScore + 1e-9) { best = cand; bestScore = score; improved++; } else if (score >= bestScore - 1e-9) { best = cand; neutral++; }
+        if (i % 50 === 0 || i === iters) history.push({ i, score: bestScore });
+        if (onIter) onIter(i, { score: bestScore, improved, neutral });
+    }
+    return { weights: best, trainScore: bestScore, history, iters, improved, neutral };
+}
+/** Put every weight that differs from `toward` (default: the hand weights) back whenever the TRAIN score does not fall, passes repeated to a fixed point. */
+export function prune(w, { toward = null, trainSet = T.TRAIN_WIDE_SET } = {}) {
+    const base0 = toward ? Float32Array.from(toward) : handWeights(), out = Float32Array.from(w);
+    const differs = () => { const idx = []; for (let i = 0; i < out.length; i++) if (Math.abs(out[i] - base0[i]) > 1e-6) idx.push(i); return idx; };
+    const moved = differs().length; let best = evaluate(out, trainSet).score, passes = 0, reverted;
+    do {
+        reverted = 0; passes++;
+        for (const i of differs()) {
+            const keep = out[i]; out[i] = base0[i];
+            const s = evaluate(out, trainSet).score;
+            if (s >= best - 1e-9) { best = Math.max(best, s); reverted++; } else out[i] = keep;
+        }
+    } while (reverted > 0);
+    return { weights: out, kept: differs().length, moved, passes, trainScore: best };
+}
 
 // ---- the front door ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 export function reportLines() {

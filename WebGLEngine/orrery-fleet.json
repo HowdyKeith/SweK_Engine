@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "e93a87a4f18e06392aec282c739a3f2ffc37f680",
+ "head": "c6b16a513f6614e8d5755b9cea73fd6279dceecc",
  "bodies": {
   "box3d": [
    {
@@ -341,7 +341,7 @@
    {
     "path": "server.html",
     "bytes": 888437,
-    "sha": "33dfebf6728f2765a2a52043b24d6536ec23a580"
+    "sha": "80426e248ab016e10f3fea742ac5853a54f48959"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
@@ -621,8 +621,8 @@
    },
    {
     "path": "es-flight6dof.html",
-    "bytes": 26970,
-    "sha": "33dfebf6728f2765a2a52043b24d6536ec23a580"
+    "bytes": 37761,
+    "sha": "f0225806120d7f86c36eb92e28d24d92174cd5ff"
    },
    {
     "path": "ev/esShipModels.js",
@@ -726,8 +726,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3635577,
-    "sha": "33dfebf6728f2765a2a52043b24d6536ec23a580"
+    "bytes": 3644911,
+    "sha": "f0225806120d7f86c36eb92e28d24d92174cd5ff"
    },
    {
     "path": "mpm3d.html",
@@ -772,7 +772,7 @@
    {
     "path": "server.html",
     "bytes": 888437,
-    "sha": "33dfebf6728f2765a2a52043b24d6536ec23a580"
+    "sha": "80426e248ab016e10f3fea742ac5853a54f48959"
    },
    {
     "path": "shipavatar.html",

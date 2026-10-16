@@ -226,13 +226,18 @@ export const LET_FINISH_V4573 = Object.freeze({
         // (median 11,378, spread 3.1%), the last filed 11,195. The first box reading since the node-webgpu pin moved to 0.6.2
         // (v4856), and this is a GPU gate; the v4815 minute is kept in earlierRuns. SABOTAGE: the v4815 runs put back as `runs` -> 2 red
         // (the population row and the corroboration row); restored md5-identical.
-        Object.freeze({ gate: "tools/ship/eulerGpu-selfcheck.mjs", table: 18450, now: 11195,
-            runs: Object.freeze([11378, 11547, 11195]),
-            earlierRuns: Object.freeze([Object.freeze([15003, 15136, 16459]), Object.freeze([9193, 9336, 9246])]),   // v4647l's and v4815's minutes, kept as noise evidence
+        // v4869 -- MOVED A FOURTH TIME, DOWN: the ship rotation filed 8,984 and the box read 11,378 / 11,547 / 11,195 at v4857, so the runs are RE-TAKEN, three on a quiet box each filed by
+        // `sweepRotation --gate eulerGpu-selfcheck --cap-s 300 --write` as it was taken: 10,068 / 9,463 / 11,014 (median 10,068, filed 11,014 -- 8.6% from it: this GPU gate's own spread is 15%, which is why the row's bound is 10% of the
+        // FILED reading and not of the median). The v4857 minute is kept in earlierRuns.
+        // v4870 -- MOVED A FIFTH TIME, DOWN AGAIN: the 80-slot rotation filed 10,661 and the merge of main's line had changed the box's load; three quiet runs, each filed as taken: 8,884 / 9,324 / 8,552 (median 8,884, filed 8,552 -- 3.7% from it).
+        // The v4869 minute is kept in earlierRuns.
+        Object.freeze({ gate: "tools/ship/eulerGpu-selfcheck.mjs", table: 18450, now: 8552,
+            runs: Object.freeze([8884, 9324, 8552]),
+            earlierRuns: Object.freeze([Object.freeze([15003, 15136, 16459]), Object.freeze([9193, 9336, 9246]), Object.freeze([11378, 11547, 11195]), Object.freeze([10068, 9463, 11014])]),   // v4647l's, v4815's, v4857's and v4869's minutes, kept as noise evidence
             why: "18,450 at the cap pass, 17,904 at v4637 (3.0% -- the reading that set this row's tolerance), " +
                  "~15,100 at v4647l across three runs in one minute (15,003 / 15,136 / 16,459, filed 14,806), " +
                  "~9,250 at v4815 across three quiet runs (filed 9,434), and ~11,400 at v4857 on the 0.6.2 pin across three " +
-                 "quiet runs, the alone reading filed 11,195 -- 1.6% from their median. " +
+                 "quiet runs, the alone reading filed 11,195 -- 1.6% from their median; and 9,463-11,014 at v4869 (median 10,068, filed 11,014), the ship rotation's own single reading having been 8,984; and 8,552-9,324 at v4870 (median 8,884, filed 8,552). " +
                  "Kept rather than re-taken: 18,450 is what the gate cost when the cap was hiding it.",
         }),
         // v4776 -- the merge's --killed rotation let two more of the seventeen finish, both faster than the table. The
@@ -240,10 +245,12 @@ export const LET_FINISH_V4573 = Object.freeze({
         // loading the box to 26 on four cores. With them killed, three runs each on a quiet box:
         // v4828 -- RE-TAKEN for both below: this round's rotation filed readings 10% and 19% above the v4776 runs (this box reads these two gates slower than the one that took them), so the runs
         // are three fresh ones on a quiet box, each filed by `sweepRotation --gate g --cap-s 300 --write` as it was taken, and the v4776 minutes are kept as `earlierRuns`.
-        Object.freeze({ gate: "tools/ship/loopTrace-selfcheck.mjs", table: 15880, now: 15336,
-            runs: Object.freeze([15891, 15164, 15336]),
-            earlierRuns: Object.freeze([Object.freeze([13690, 13736, 13585])]),
-            why: "15,880 at the cap pass; 13,503 filed by the v4776 rotation (13,585-13,736 across three quiet runs); 15,164-15,891 across three quiet runs at v4828, the alone reading filed 15,336 -- " +
+        // v4869 -- RE-TAKEN: the ship rotation filed 13,277; three quiet runs, each filed as taken: 14,111 / 14,380 / 14,392 (median 14,380, filed 14,392). The v4828 minute is kept in earlierRuns.
+        // v4870 -- RE-TAKEN: the 80-slot rotation filed 16,352; three quiet runs, each filed as taken: 13,029 / 14,219 / 13,228 (median 13,228, filed 13,228). The v4869 minute is kept in earlierRuns.
+        Object.freeze({ gate: "tools/ship/loopTrace-selfcheck.mjs", table: 15880, now: 13228,
+            runs: Object.freeze([13029, 14219, 13228]),
+            earlierRuns: Object.freeze([Object.freeze([13690, 13736, 13585]), Object.freeze([15891, 15164, 15336]), Object.freeze([14111, 14380, 14392])]),
+            why: "15,880 at the cap pass; 13,503 filed by the v4776 rotation (13,585-13,736 across three quiet runs); 15,164-15,891 across three quiet runs at v4828, the alone reading filed 15,336; 14,111-14,392 at v4869, filed 14,392; 13,029-14,219 at v4870, filed 13,228 -- " +
                  "the median. The same gate, the same cost to within the box: 13.6 s on one machine and 15.3 s on another is noise in the table, not drift in the gate.",
         }),
         Object.freeze({ gate: "physics/render/transmission-selfcheck.mjs", table: 21060, now: 20105,
@@ -265,12 +272,13 @@ export const LET_FINISH_V4573 = Object.freeze({
         // (declaredCost's v4820 ratchet named it). Two alone runs straight after the handover read 14,413 / 13,997; three more
         // on a quiet box, each filed by `sweepRotation --gate g --cap-s 300 --write` as it was taken, read 12,538 / 12,865 /
         // 12,753. The table's 67,823 was contention, not the gate.
-        Object.freeze({ gate: "tools/ship/gateSelection-selfcheck.mjs", table: 67823, now: 12753,
-            runs: Object.freeze([12538, 12865, 12753]),
-            earlierRuns: Object.freeze([Object.freeze([14413, 13997])]),
+        // v4870 -- RE-TAKEN: the 80-slot rotation filed 11,428; three quiet runs, each filed as taken: 10,720 / 11,092 / 11,610 (median 11,092, filed 11,610 -- 4.7% from it). The v4838 minute is kept in earlierRuns.
+        Object.freeze({ gate: "tools/ship/gateSelection-selfcheck.mjs", table: 67823, now: 11610,
+            runs: Object.freeze([10720, 11092, 11610]),
+            earlierRuns: Object.freeze([Object.freeze([14413, 13997]), Object.freeze([12538, 12865, 12753])]),
             why: "67,823 at the cap pass, a LOADED reading (a 2026-09-09 sweep filed 69,346 the same way, and it stood as the gate's " +
                  "only reading until v4838); 13,997-14,413 alone straight after v4838's handover, and 12,538-12,865 across three " +
-                 "quiet runs, the alone reading filed 12,753 -- the median. Its header's ~14s was right all along.",
+                 "quiet runs, the alone reading filed 12,753 -- the median; and 10,720-11,610 at v4870, filed 11,610. Its header's ~14s was right all along.",
         }),
     ]);
     // A roll entry earns its exemption only if its own runs corroborate the FILED reading -- otherwise

@@ -1049,7 +1049,7 @@
   {
    "f": "es-flight6dof.html",
    "t": "SweK &middot; Real flight",
-   "d": "Real flight: three aircraft fly one mission under flightModel6dof's physics (gravity, thrust, a stalling wing, per-surface local airflow, a ground that ends a flight), each with a pilot you choose -- the PD autopilot, the same laws written through the fruit fly's Giant Fiber Circuit network, noise on those weights, an imported pilot, or you on the keyboard. Wind and gusts are sliders. Answer-key gates: flightModel6dof-selfcheck, autopilotFlight-selfcheck, pilotFlightPolicy-selfcheck, flightPage-selfcheck.",
+   "d": "Real flight: three aircraft fly one mission under flightModel6dof's physics (gravity, thrust, a stalling wing, per-surface local airflow, a ground that ends a flight), each with a pilot you choose -- the PD autopilot, the same laws written through the fruit fly's Giant Fiber Circuit network, that network trained on this job (the shipped pilot), the GPU Brain's MLP trained on this job and run on a WebGPU device, noise on those weights, an imported pilot, or you on the keyboard. Wind and gusts are sliders. Answer-key gates: flightModel6dof-selfcheck, autopilotFlight-selfcheck, pilotFlightPolicy-selfcheck, flightPage-selfcheck.",
    "g": "rtx",
    "p": 0
   },

@@ -1,6 +1,6 @@
 // WebGLEngine/brain/pilotFlightPolicy-selfcheck.mjs
 //
-// Run: node brain/pilotFlightPolicy-selfcheck.mjs      (~1.8 s)
+// Run: node brain/pilotFlightPolicy-selfcheck.mjs      (~2 s)
 //
 // THE SIBLING GATE OF brain/pilotFlightPolicy.mjs (v4867): the fruit-fly network as a real-flight pilot, whose hand weights are the PD autopilot written through the 34 neurons of the Giant Fiber Circuit. The claim worth a gate is not
 // "it flies" -- it is "the weights ARE the autopilot", and "the network IS the circuit". Both are asked of it with an independent restatement of the network written HERE, from the topology file, with no code from the module:
@@ -17,6 +17,9 @@
 //   6  the zero weights output nothing and the aircraft falls; noise is deterministic for a seed, scales with sigma, and a noisy pilot flies worse than the hand pilot and still flies at 0.05
 //   7  the brain file round-trips through peerBrain (export, import, the same weights), a file for another policy is refused by name; pilotRoster resolves hand, zero, noise, imported and an unavailable id to pilots that fly
 //
+// v4869: section 7 also holds the SHIPPED pilot (brain/pilotFlightWeightsDefault.json) to the roster: it imports, resolves as 'shipped', flies, and beats the hand pilot on a recovery start. The training functions have their own gate,
+// brain/pilotFlightTrain-selfcheck.mjs.
+//
 // SABOTAGE LOG -- each applied to brain/pilotFlightPolicy.mjs in a scratch worktree, the gate run, the worktree restored:
 //   33 sabotages, every one red by name (the number is how many rows went red):
 //   HAND WEIGHTS  P1 the bank comp coefficient from the wrong gain 4 | P2 roll sign flipped 9 | P3 yaw scale 0.2 -> 0.1 4 | P4 throttle climb scale 5 -> 1 4 | P5 readout pair not negated 6 | P6 input pair's second channel not negated 9 | P23 gain overrides ignored 1
@@ -30,6 +33,7 @@
 //   THE FORWARD PASS WAS REWRITTEN WHEN THE GATE TOOK 3.1 S AND MOST OF IT WAS mlpLayerCpu's dense 34 x 34 recurrent matrix: over the circuit's own 313 edges it is a third of the multiplies and the gate runs in 1.7 s, which keeps it inside the
 //   ship-time sweep's 3 s; the old dense path is kept as layersOf() for the twins and the gate holds the two to each other.
 "use strict";
+import fs from "node:fs";
 import * as PF from "./pilotFlightPolicy.mjs";
 import * as AF from "./autopilotFlight.mjs";
 import * as T from "./flightTask.mjs";
@@ -200,8 +204,21 @@ console.log("\n7. THE BRAIN FILE AND THE ROSTER");
     ok("...the hand, noise-0.05 and imported pilots fly (airborne for 40 s) and the zero pilot does not", flies(rs[0].weights[0]) && flies(rs[1].weights[0]) && flies(rs[2].weights[0]) && !flies(rs[3].weights[0]));
     const bogus = PR.resolveTeam("A", "league", ctx, 2);
     ok("!! a choice the page does not hold (league) falls back to the hand weights AND SAYS SO", bogus.problems.length === 1 && /league/.test(bogus.problems[0]) && bogus.weights.every((w) => w.every((v, i) => v === hw[i])));
+    const shippedBlob = JSON.parse(fs.readFileSync(new URL("./pilotFlightWeightsDefault.json", import.meta.url), "utf8")), shippedImp = PB.importBrain(DESC, shippedBlob);
+    ok("!! the SHIPPED pilot (brain/pilotFlightWeightsDefault.json, made by tools/ship/trainPilotFlight.mjs; tools/ship/trainFlightPilot-selfcheck.mjs holds it to its `by`) imports through the page's importer", shippedImp.ok && shippedImp.weights.length === 1099, shippedImp.ok ? "" : shippedImp.reason);
+    if (shippedImp.ok) {
+        const sh = PR.resolveTeam("A", "shipped", { ...ctx, shipped: shippedImp.weights }, 3), unavailable = PR.resolveTeam("A", "shipped", ctx, 3);
+        const rec = T.scenario(3, "recovery"), fs1 = T.fly(PF.pilotFor(sh.weights[0]), rec), fh = T.fly(PF.pilotFor(hw), rec);
+        ok("!! pilotRoster resolves 'shipped' to the shipped file's weights (one vector per aircraft, labelled 'shipped pilot brain', no problems), the pilot flies and does better than the hand pilot on a recovery start; where the page holds no shipped pilot the choice falls back to the hand weights AND SAYS SO", sh.problems.length === 0 && /shipped pilot brain/.test(sh.label) && sh.weights.length === 3 && sh.weights.every((v) => v.every((x, i) => x === shippedImp.weights[i])) && fs1.status === "airborne" && fs1.score > fh.score && unavailable.problems.length === 1 && /shipped/.test(unavailable.problems[0]) && unavailable.weights.every((v) => v.every((x, i) => x === hw[i])), `recovery 3: ${fs1.score.toFixed(3)} vs the hand pilot's ${fh.score.toFixed(3)}`);
+    }
     const L = PF.reportLines();
     ok("the front door names the module, the circuit and the 1,099 weights, says how many of them the hand weights use, and no line says NaN or undefined", L.some((l) => /pilotFlightPolicy/.test(l) && /34 neurons/.test(l) && /1099/.test(l)) && L.some((l) => /30 of 1099 non-zero/.test(l)) && L.every((l) => !/NaN|undefined/.test(l)));
+}
+
+console.log("\n8. THE TRAINING FUNCTIONS EXIST AND ANSWER FOR THE AUTOPILOT (brain/pilotFlightTrain-selfcheck.mjs holds what they do)");
+{
+    const hw = PF.handWeights(), two = T.TRAIN_SET.slice(0, 2), t0 = PF.train({ seed: 1, iters: 0, trainSet: two }), p0 = PF.prune(hw, { trainSet: two });
+    ok("!! train() with no iterations returns the hand weights untouched, scored on the scenarios it was given, and prune() of the hand weights moves and keeps nothing: the autopilot is where both start and where a prune ends", t0.weights.every((v, i) => v === hw[i]) && t0.improved === 0 && t0.neutral === 0 && t0.trainScore === PF.evaluate(hw, two).score && p0.moved === 0 && p0.kept === 0 && p0.trainScore === t0.trainScore && typeof PF.mutate === "function");
 }
 
 console.log(fails ? `\npilotFlightPolicy-selfcheck: ${fails} FAILED` : "\npilotFlightPolicy-selfcheck: all checks pass");
