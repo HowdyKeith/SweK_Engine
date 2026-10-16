@@ -9210,9 +9210,31 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "sabotages red by name. NOT CLOSED: on SwiftShader the test passes with the barrier deleted too -- it shows the barrier runs, " +
                  "not that it orders. The draft is Keith's to file.",
     }),
-    // v4869 -- since559 (the highest on any branch at the time was since558, read across every remote ref after a full fetch; v4864 and v4865 are still spent on two other branches). TWO new gate files: tools/ship/trainFlightPilot-selfcheck.mjs
-    // (the tool that trains the fruit-fly flight pilot, and the shipped file held to its `by`) and brain/pilotFlightTrain-selfcheck.mjs (mutate, train and prune of that pilot, split out of brain/pilotFlightPolicy-selfcheck.mjs).
+    // v4868 -- since559 (the highest on any branch at the time was since558, read across every remote ref after a full fetch). ONE new gate file: render/denoiseUpscale-selfcheck.mjs
+    // (the denoiser arc's round 26), plus the gates rounds 25-27 widened -- the mesh round, the FSR1 round and the Winograd round, and server.html's avatar fix.
     since559: Object.freeze({
+        at: "v4868", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/denoiseUpscale-selfcheck.mjs",
+        ]),
+        widened: Object.freeze([
+            "brain/conv2d-selfcheck.mjs (section 5f and section 6's round-27 rows: the Winograd F(2x2,3x3) kernel, its own twin conv2dCpuWino held to an order written from B^T, G and A^T, an integer key against conv2dForward, every device cell the twin's at 1, 2 and 4 vec4s; ten sabotages red)",
+            "render/denoiseDevice-selfcheck.mjs (round 27: r27w's layers, twinsOf, FXC_UNTRIED_SETS, K0w natively, on the small network and in the browser, the whole r27w twin within 1e-5 of f64, --measure-r27w's source)",
+            "render/denoiseTiming-selfcheck.mjs (r27w on both ladders, its \"r27w against rXX\" lines tagged section 83)",
+            "render/denoiseCompile-selfcheck.mjs (r27w's hidden kernel among the DXC-only variants, judged against its own twin)",
+            "render/denoiseScenes-selfcheck.mjs (sections 11-12: the mesh round's voxel, lathed and extruded scenes, and SPLITS_FSR1)",
+            "render/denoiseStudy-selfcheck.mjs (sections 14-15: the mesh and upscale studies, and the re-derivations of sections 80 and 82)",
+            "render/denoiseStats-selfcheck.mjs (section 7: a cited C2)",
+            "tools/ship/songLathe-selfcheck.mjs (render/denoiseScenes.mjs as a known lathe user)",
+            "tools/ship/avatarDock-selfcheck.mjs and ui/stageInfo-selfcheck.mjs (server.html's avatar height runaway and the picker's clip)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green, 0.3 s, 14 rows: the transfer FSR1 runs in, the four upscales as fx/fsr/fsr.js's own functions clamped to the frame's brightest, the round's render seeds and its dataset refusal; six sabotages red by name, one at 0 red first and fixed. " +
+                 "ROUND 26 WAS NOT REPORTED (C1 on H2), and descriptively half resolution lost at 64 x 64; ROUND 27 holds K0w (a) on all 24 test images, 12,582,912 hidden cells every one the Winograd twin's. " +
+                 "NOT CLOSED: round 27's speed rule on either GPU -- the first four rig runs ran old commits (section 85) and are owed again.",
+    // v4869 -- since560 (the highest on any branch at the time was since559, read across every remote ref after a full fetch -- main took since559 for the denoiser's v4868 while this branch held it, so this round's moved up one; v4864 and v4865 are still spent on two other branches). TWO new gate files: tools/ship/trainFlightPilot-selfcheck.mjs
+    // (the tool that trains the fruit-fly flight pilot, and the shipped file held to its `by`) and brain/pilotFlightTrain-selfcheck.mjs (mutate, train and prune of that pilot, split out of brain/pilotFlightPolicy-selfcheck.mjs).
+    since560: Object.freeze({
         at: "v4869", swept: 2, green: 2, red: 0,
         added: Object.freeze([
             "brain/pilotFlightTrain-selfcheck.mjs",

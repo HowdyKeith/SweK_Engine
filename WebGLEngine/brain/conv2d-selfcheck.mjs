@@ -7,7 +7,8 @@
 // conv2dTiledWgsl, packProbeUniforms, probeFixture, probeCpu, keyCpu, PROBES -- round 13's (section 39): FAST_GROUP,
 // UNIFORM_MAX, fastShape, conv2dFastWgsl, packFastUniforms -- round 14's (section 43): headShape, conv2dHeadWgsl,
 // packHeadUniforms, planarToChannelsLast -- round 16's (section 54): tileShape, conv2dTileWgsl, packTileUniforms,
-// tileWorkgroups -- and round 17's (section 59): fastAltShape, conv2dFastAltWgsl, packFastAltUniforms.
+// tileWorkgroups -- round 17's (section 59): fastAltShape, conv2dFastAltWgsl, packFastAltUniforms -- and round 27's (section 83,
+// v4868): WINO_CB, WINO_G4S, winoShape, winoFilter, conv2dCpuWino, conv2dCpuWinoFma, conv2dWinoWgsl, packWinoUniforms, winoWorkgroups.
 // Round 19 (section 66, v4851): which rounds' device rows stand aside, by adapter and by the run's compiler (nativeStandAside).
 // Round 22 (section 71, v4859): round 16's rows run on D3D12 under DXC too, so only FXC (or an unread compiler) stands aside there.
 //
@@ -80,6 +81,25 @@
 //   R6  every adapter stands aside unless the compiler is DXC                   1 RED (the off-D3D12 row) -- and SwiftShader's round-16 and
 //       round-17 device rows all said SKIP, 82 PASS falling to 53: nothing else on this box sees a stand-aside that is too wide
 //   R7  NATIVE_FLAGS made ["disable-dawn-features=use_dxc"]                     1 RED (the flags row)
+//   section 83 (v4868), against the Winograd kernel, its twin and its buffers (full gate each time, restored, md5 verified):
+//   W1  the twin's B^T row 2 as d1 - d2, its sign flipped                       11 RED -- the order row, the not-canonical row, the CPU
+//       integer key and all eight device cases; the transform row stays green, as it should: it is written from the matrices
+//   W2  the kernel's weights read without the group offset                       9 RED -- every device case (each has z groups) and the
+//       device integer key
+//   W3  the kernel's window origin one pixel right (its -1 dropped)              9 RED -- the same nine
+//   W4  the kernel's second barrier removed                                       8 RED -- every device case but the 3 x 5 image, whose
+//       few live threads read their block before the next load reaches it; deterministic on SwiftShader, as S5, F4 and P3 were
+//   W5  the twin sums M from the last input channel down                          9 RED -- the order row and all eight device cases
+//   W6  the kernel's guard on channels past Cout removed                          4 RED -- the 13 -> 11 cases, the 6 -> 7 case and the
+//       device integer key (Cout 5): exactly the cases whose Cout is not a multiple of four
+//   W7  packWinoUniforms' bias one float late                                    10 RED -- the layout row, all eight device cases, the
+//       device integer key
+//   W8  winoShape holding any odd k                                               1 RED -- the shape row
+//   W9  winoFilter filing position (i, j) at (j, i) -- in the kernel AND the twin  5 RED -- the order row, the not-canonical row, both
+//       integer keys and the layout row. *** NOT ONE DEVICE CELL ROW: *** the kernel and its twin read the same wrong weights and agree
+//       cell for cell. A mistake the twin shares is invisible to every row that compares the device with the twin, which is why the
+//       order is held by rows written from the matrices and the integer key against conv2dForward, not by the twin alone
+//   W10 nativeStandAside without round 27's DXC exemption                         1 RED -- the round-27 stand-aside row (5e)
 //   and a check, not a sabotage: r17Comparator forced to "fast" on SwiftShader -- round 17's two inline rows ran against the fast
 //   kernel's bits and were green (0 fused of 12,768 and 4,477), so the D3D12-under-DXC path is exercised on a device here
 //
@@ -98,7 +118,8 @@ const C = await imp("brain/conv2d.mjs");
 const { TILE, K_MAX, CB, COUT_MAX, conv2dForward, conv2dCpu, conv2dCpuFma, conv2dBackward, conv2dWgsl, conv2dTiledWgsl,
         packProbeUniforms, probeFixture, probeCpu, keyCpu, PROBES, FAST_GROUP, UNIFORM_MAX, fastShape, conv2dFastWgsl, packFastUniforms,
         headShape, conv2dHeadWgsl, packHeadUniforms, planarToChannelsLast, tileShape, conv2dTileWgsl, packTileUniforms, tileWorkgroups,
-        fastAltShape, conv2dFastAltWgsl, packFastAltUniforms } = C;
+        fastAltShape, conv2dFastAltWgsl, packFastAltUniforms, WINO_CB, WINO_G4S, winoShape, winoFilter, conv2dCpuWino, conv2dCpuWinoFma, conv2dWinoWgsl,
+        packWinoUniforms, winoWorkgroups } = C;
 const { mlpLayerCpu } = await imp("render/brainTsl.mjs");
 const H = await imp("tools/ship/headlessGpu.mjs");
 // v4838: the device cases as a report table (tools/ship/gateReport.mjs) -- the counts every PASS line prints, kept past the terminal
@@ -135,10 +156,13 @@ const COMPILER = H.nativeCompiler({ pkg: WPKG, platform: process.platform, flags
 // 1.3 s at worst), every dump DXIL, every one exact at 64 x 64 -- so the stand-aside narrows to FXC, as round 17's did at section 66.
 function nativeStandAside(adapter, compiler, round) {
     if (!fxcAdapter(adapter)) return null;
-    if ((round === 16 || round === 17) && compiler === "DXC") return null;
+    // v4868 -- round 27 (section 83): the Winograd kernel runs under DXC, which built every shape the rig was handed (sections 65, 71),
+    // and stands aside under FXC, where nobody has built it -- an FXC that never finishes a pipeline stops this gate (section 56)
+    if ((round === 16 || round === 17 || round === 27) && compiler === "DXC") return null;
     const said = compiler === "DXC" || compiler === "FXC" ? compiler : `an unread compiler (${JSON.stringify(compiler ?? null)}), counted as FXC`;
     if (round === 17) return `${FXC_SKIP_R17}; this run compiles with ${said}, and under DXC (node-webgpu 0.6.2) they run (section 66)`;
     if (round === 16) return `${FXC_SKIP}; this run compiles with ${said}, and under DXC (node-webgpu 0.6.2) they run (section 71)`;
+    if (round === 27) return `round 27's Winograd kernel has never been built under FXC, and stands aside there on the safe side; this run compiles with ${said}, and under DXC it runs (section 83)`;
     return `round ${round}'s kernels are not named by section 66 and stand aside on a D3D12 adapter under any compiler; this run compiles with ${said}`;
 }
 // round 17's inline-weight rows compare, where neither fused, with the tile kernel's hoisted weights -- round 16's shapes. Where
@@ -388,6 +412,12 @@ console.log("\n5e. WHICH ROUNDS' DEVICE ROWS STAND ASIDE, BY ADAPTER AND COMPILE
             return (c === "FXC" ? /this run compiles with FXC,/.test(why) : why.includes(`an unread compiler (${JSON.stringify(c ?? null)}), counted as FXC`)) && why.includes(`section ${r === 16 ? 57 : 60}`);
         }))),
         `the 1080 under ${NOT_DXC.map((c) => `${said(c)}: 16 ${runs(gtx, c, 16) ? "runs" : "aside"}, 17 ${runs(gtx, c, 17) ? "runs" : "aside"}`).join("; ")}`);
+    // v4868 -- round 27 (section 83): the Winograd kernel's device rows as round 17's are: run under DXC, stand aside under anything else on D3D12
+    ok("!! round 27 (section 83): on a D3D12 adapter the Winograd kernel's device rows run under DXC and stand aside under FXC, an unread compiler or none, the SKIP line naming the compiler and section 83; off D3D12 they run under any compiler",
+        RIG.every((a) => runs(a, "DXC", 27) && NOT_DXC.every((c) => { const why = nativeStandAside(a, c, 27) || "";
+            return why.includes("section 83") && (c === "FXC" ? /this run compiles with FXC,/.test(why) : why.includes(`an unread compiler (${JSON.stringify(c ?? null)}), counted as FXC`)); })) &&
+            OFF.every((a) => [...NOT_DXC, "DXC"].every((c) => runs(a, c, 27))),
+        `the 1080: under DXC ${runs(gtx, "DXC", 27) ? "runs" : "aside"}, under FXC ${runs(gtx, "FXC", 27) ? "runs" : "aside"}; SwiftShader under FXC ${runs(OFF[0], "FXC", 27) ? "runs" : "aside"}`);
     // SABOTAGED v4851: every adapter stands aside unless the compiler is DXC (the D3D12 test made compiler-only) -> RED by name (this row alone; SwiftShader's own
     //   round-16 and round-17 device rows then printed SKIP, 82 PASS falling to 53 with no other red -- why this row has to exist); restored.
     ok("  round 19: off D3D12 -- SwiftShader, Vulkan, Metal, an adapter with no description, none -- both rounds run whatever compiler is named, and round 17's inline rows keep the hoisted tile as their comparator",
@@ -402,6 +432,107 @@ console.log("\n5e. WHICH ROUNDS' DEVICE ROWS STAND ASIDE, BY ADAPTER AND COMPILE
         made.length > 0 && made.every((m) => m === "mod.create([])") && Object.isFrozen(NATIVE_FLAGS) && NATIVE_FLAGS.length === 0 &&
             COMPILER === H.nativeCompiler({ pkg: WPKG, platform: process.platform, flags: [] }) && (process.platform === "win32" ? ["DXC", "FXC"].includes(COMPILER) : COMPILER === null),
         `instanceFor: ${made.join(", ") || "not found"}; NATIVE_FLAGS ${JSON.stringify(NATIVE_FLAGS)}; this run: ${COMPILER || `none on ${process.platform}`}, node-webgpu ${(WPKG && WPKG.version) || "(version unread)"}`);
+}
+
+console.log("\n5f. THE WINOGRAD KERNEL'S TRANSFORM, ITS TWIN'S ORDER AND ITS BUFFERS, ON THE CPU (round 27, section 83)");
+// Written here from the three matrices, not from brain/conv2d.mjs's loops: B^T, G and A^T as arrays, a dense f64 product, and an
+// f32 product that adds each row's nonzero terms left to right with a rounding after every add -- the order the module's header
+// states. Every row of B^T and A^T has its first nonzero at +1 or -1 and the rest +-1, so that rule IS the stated order.
+const WB = [[1, 0, -1, 0], [0, 1, 1, 0], [0, -1, 1, 0], [0, 1, 0, -1]], WG = [[1, 0, 0], [0.5, 0.5, 0.5], [0.5, -0.5, 0.5], [0, 0, 1]], WA = [[1, 1, 1, 0], [0, 1, -1, -1]];
+const mm = (A, B) => A.map((r) => B[0].map((_, j) => r.reduce((s, a, k) => s + a * B[k][j], 0)));
+const tp = (A) => A[0].map((_, j) => A.map((r) => r[j]));
+const rowF = (row, v) => { let acc = null; row.forEach((c, k) => { if (!c) return; const t = c > 0 ? v[k] : -v[k]; acc = acc === null ? t : Math.fround(acc + t); }); return acc; };
+const leftF = (Mx, X) => tp(tp(X).map((col) => Mx.map((r) => rowF(r, col))));        // Mx X, a column of X at a time
+const rightF = (X, Mx) => X.map((row) => Mx.map((r) => rowF(r, row)));                 // X Mx^T, a row of X at a time
+// round 27's exact key: 9 x 7, 6 -> 5, integers in [-4, 4], integer weights in [-2, 2] and biases in [-3, 3]
+function winoIntKey() {
+    const I = { H: 9, W: 7, Cin: 6, Cout: 5, k: 3, act: "none" }, xi = new Float32Array(I.H * I.W * I.Cin), Wi = new Float32Array(I.Cout * 9 * I.Cin), bi = new Float32Array(I.Cout);
+    let s = 17; const ri = (m) => { s = (s * 1103515245 + 12345) >>> 0; return (s % (2 * m + 1)) - m; };
+    for (let i = 0; i < xi.length; i++) xi[i] = ri(4);
+    for (let i = 0; i < Wi.length; i++) Wi[i] = ri(2);
+    for (let i = 0; i < bi.length; i++) bi[i] = ri(3);
+    return { I, xi, LI: { ...I, W: Wi, b: bi } };
+}
+// one layer, Winograd by the matrices: `f32` false is exact f64 (the transform's own arithmetic); true is the twin's order
+function winoByMatrices(x, H, W, L, f32) {
+    const { Cin, Cout } = L, y = new Float64Array(H * W * Cout), f = f32 ? Math.fround : (v) => v;
+    const g = (co, ci) => [0, 1, 2].map((ky) => [0, 1, 2].map((kx) => Math.fround(L.W[((co * 3 + ky) * 3 + kx) * Cin + ci])));
+    const U = []; for (let co = 0; co < Cout; co++) { U.push([]); for (let ci = 0; ci < Cin; ci++) U[co].push(mm(mm(WG, g(co, ci)), tp(WG)).map((r) => r.map(Math.fround))); }
+    const U64 = []; for (let co = 0; co < Cout; co++) { U64.push([]); for (let ci = 0; ci < Cin; ci++) U64[co].push(mm(mm(WG, g(co, ci)), tp(WG))); }
+    for (let py = 0; py < H; py += 2) for (let px = 0; px < W; px += 2) {
+        const Vs = [];
+        for (let ci = 0; ci < Cin; ci++) {
+            const d = [0, 1, 2, 3].map((i) => [0, 1, 2, 3].map((j) => { const yy = py - 1 + i, xx = px - 1 + j; return yy < 0 || yy >= H || xx < 0 || xx >= W ? 0 : Math.fround(x[(yy * W + xx) * Cin + ci]); }));
+            Vs.push(f32 ? rightF(leftF(WB, d), WB) : mm(mm(WB, d), tp(WB)));
+        }
+        for (let co = 0; co < Cout; co++) {
+            const M = [0, 1, 2, 3].map(() => [0, 0, 0, 0]);
+            for (let ci = 0; ci < Cin; ci++) for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) M[i][j] = f(M[i][j] + f((f32 ? U : U64)[co][ci][i][j] * Vs[ci][i][j]));
+            const Y = f32 ? rightF(leftF(WA, M), WA) : mm(mm(WA, M), tp(WA));
+            for (let a = 0; a < 2; a++) for (let b = 0; b < 2; b++) {
+                if (py + a >= H || px + b >= W) continue;
+                const v = f(Y[a][b] + f(L.b[co]));
+                y[((py + a) * W + px + b) * Cout + co] = String(L.act ?? "none") === "relu" ? Math.max(v, 0) : v;
+            }
+        }
+    }
+    return y;
+}
+{
+    const cases = [{ H: 7, W: 5, Cin: 4, Cout: 3, k: 3, act: "none", seed: 3 }, { H: 9, W: 11, Cin: 10, Cout: 13, k: 3, act: "relu", seed: 41 }, { H: 6, W: 8, Cin: 13, Cout: 4, k: 3, act: "none", seed: 9 }];
+    let worst64 = 0, orderDiff = 0, cells = 0, worstTw = 0, worstDir = 0, notDirect = 0;
+    for (const a of cases) {
+        const F = probeFixture(a), ref = conv2dForward(F.x, F.H, F.W, F.layer), mx = Math.max(...Array.from(ref, Math.abs));
+        const w64 = winoByMatrices(F.x, F.H, F.W, F.layer, false), w32 = winoByMatrices(F.x, F.H, F.W, F.layer, true), tw = conv2dCpuWino(F.x, F.H, F.W, F.layer), dt = conv2dCpu(F.x, F.H, F.W, F.layer);
+        for (let i = 0; i < ref.length; i++) {
+            worst64 = Math.max(worst64, Math.abs(w64[i] - ref[i]) / mx); cells++;
+            if (w32[i] !== tw[i]) orderDiff++;
+            worstTw = Math.max(worstTw, Math.abs(tw[i] - ref[i]) / mx); worstDir = Math.max(worstDir, Math.abs(dt[i] - ref[i]) / mx);
+            if (tw[i] !== dt[i]) notDirect++;
+        }
+    }
+    ok("!! round 27: the transform IS the convolution -- Winograd F(2 x 2, 3 x 3) written here from B^T, G and A^T in f64 equals conv2dForward on every cell, borders, partial tiles and partial vec4s included",
+        worst64 < 1e-12, `worst ${worst64.toExponential(2)} of the output's largest, over ${cells} cells of three layers (odd sizes, 4 to 13 input channels)`);
+    ok("!! *** round 27: conv2dCpuWino IS the order its header states -- the matrices' rows added left to right, an f32 rounding after every add, M from zero over ci ascending, then the bias -- cell for cell ***",
+        orderDiff === 0, `${orderDiff} of ${cells} cells differ from the order written here from the matrices`);
+    ok("  ...and it is NOT the canonical order: it gives other bits than conv2dCpu, as close to the f64 layer -- a twin of its own, which is why a Winograd cell is never judged against conv2dCpu",
+        notDirect > cells / 4 && worstTw < 1e-6 && worstTw > 0, `${notDirect} of ${cells} cells differ from conv2dCpu; worst against conv2dForward: Winograd ${worstTw.toExponential(2)}, direct ${worstDir.toExponential(2)}, of the output's largest`);
+    const F = probeFixture({ H: 5, W: 6, Cin: 7, Cout: 11, k: 3, act: "relu", seed: 23 }), tw = conv2dCpuWino(F.x, F.H, F.W, F.layer), fm = conv2dCpuWinoFma(F.x, F.H, F.W, F.layer);
+    ok("  its fused mirror differs from it on some cells, as the direct kernels' does -- M + V U is the kernel's one multiply-add, the transforms' coefficients all +-1",
+        diffCount(tw, fm) > 0, `${diffCount(tw, fm)} of ${tw.length} cells`);
+    // an exact key of its own: Winograd cannot pass the identity key bit for bit (V's sums round), but with small integers in and
+    // integer weights, every value it makes is a multiple of a quarter far below 2^24 -- so every order gives the same bits
+    const { I, xi, LI } = winoIntKey(), refI = conv2dForward(xi, I.H, I.W, LI);
+    ok("!! round 27's exact key: integers in, integer weights and biases -- every transform, product and sum exact in f32 -- and the twin and its mirror are conv2dForward bit for bit",
+        [conv2dCpuWino(xi, I.H, I.W, LI), conv2dCpuWinoFma(xi, I.H, I.W, LI)].every((o) => o.every((v, i) => v === refI[i])) && refI.some((v) => Math.abs(v) > 20));
+    // the transformed weights: every one G g G^T of its channel pair, in f64 from the f32 weights, rounded once, where the header says
+    const L = probeFixture({ H: 2, W: 2, Cin: 7, Cout: 11, k: 3, act: "none", seed: 29 }).layer, S = winoShape(L), U = winoFilter(L, S.C4);
+    let misplaced = 0, placed = 0, pad = 0;
+    for (let co = 0; co < 11; co++) for (let ci = 0; ci < 7; ci++) {
+        const g = [0, 1, 2].map((ky) => [0, 1, 2].map((kx) => Math.fround(L.W[((co * 3 + ky) * 3 + kx) * 7 + ci]))), u = mm(mm(WG, g), tp(WG));
+        for (let e = 0; e < 16; e++) { placed++; if (U[(e * 7 + ci) * S.C4 * 4 + co] !== Math.fround(u[e >> 2][e & 3])) misplaced++; }
+    }
+    for (let e = 0; e < 16; e++) for (let ci = 0; ci < 7; ci++) for (let co = 11; co < 4 * S.C4; co++) if (U[(e * 7 + ci) * S.C4 * 4 + co] !== 0) pad++;
+    const pk = packWinoUniforms({ H: 5, W: 6, layer: L }), pu = new Uint32Array(pk.uniforms.buffer);
+    let bias = 0; for (let co = 0; co < 11; co++) if (pk.uniforms[4 + co] !== L.b[co]) bias++;
+    ok("!! round 27: winoFilter puts G g G^T of (co, ci) at position e = 4 i + j where the header says -- e, then ci, then co as vec4s, the padding past Cout zero -- and packWinoUniforms holds H, W and the bias, its weights winoFilter's",
+        misplaced === 0 && pad === 0 && U.length === 16 * 7 * S.C4 * 4 && pu[0] === 5 && pu[1] === 6 && bias === 0 && pk.uniforms.length * 4 === S.bytes && same(Array.from(pk.weights), Array.from(U)) &&
+            Array.from(pk.uniforms.slice(4 + 11)).every((v) => v === 0),
+        `${misplaced} misplaced of ${placed}, ${pad} nonzero padding, ${bias} bias misplaced; ${S.bytes} uniform bytes, ${S.weightBytes} weight bytes`);
+    const sh = (Ld, cfg) => winoShape(Ld, cfg), L10 = { Cin: 10, Cout: 32, k: 3 }, L32 = { Cin: 32, Cout: 32, k: 3 };
+    const refuse = (fn) => { try { fn(); return null; } catch (e) { return e.message; } };
+    ok(`  winoShape: the denoiser's 10 -> 32 and 32 -> 32 fit at ${WINO_G4S.join(", ")} vec4s a thread -- 64 KiB of weights at 32 -> 32, one vec4 -- in ${sh(L32).wgBytes} B of window; a 1 x 1 or 5 x 5 layer, or 3 vec4s, does not, and the kernel and its twin refuse them by name`,
+        WINO_G4S.every((g4) => sh(L10, { g4 }).fits && sh(L32, { g4 }).fits) && sh(L32).weightBytes === 65536 && sh(L32).groups === 8 && sh(L32, { g4: 2 }).groups === 4 && sh(L32).wgBytes === 18 * 18 * WINO_CB * 4 &&
+            !sh({ Cin: 32, Cout: 81, k: 1 }).fits && !sh({ Cin: 4, Cout: 4, k: 5 }).fits && !sh(L32, { g4: 3 }).fits &&
+            /Winograd kernel holds a 3 x 3 layer/.test(refuse(() => conv2dWinoWgsl({ Cin: 32, Cout: 81, k: 1 })) || "") &&
+            /3 x 3 layer, got k 1/.test(refuse(() => conv2dCpuWino(new Float32Array(4), 2, 2, { Cin: 1, Cout: 1, k: 1, W: [1], b: [0] })) || "") &&
+            /cannot hold/.test(refuse(() => packWinoUniforms({ H: 2, W: 2, layer: { ...L, k: 1 } })) || ""),
+        `32 -> 32: ${sh(L32).groups} z groups of 1 vec4, ${sh(L32, { g4: 2 }).groups} of 2, ${sh(L32, { g4: 4 }).groups} of 4`);
+    const c1 = conv2dWinoWgsl({ ...L32, act: "relu" }, { g4: 1 }), c2 = conv2dWinoWgsl({ ...L32, act: "relu" }, { g4: 2 });
+    ok("  its code: entry k_conv_wino, 16 vec4 accumulators a vec4 of outputs kept, the transformed weights a read-only storage array at binding 3, no weight in the uniform block",
+        /fn k_conv_wino/.test(c1) && (c1.match(/var m\d+_\d+ = vec4<f32>\(0\.0\);/g) || []).length === 16 && (c2.match(/var m\d+_\d+ = vec4<f32>\(0\.0\);/g) || []).length === 32 &&
+            /@binding\(3\) var<storage, read>\s+U: array<vec4<f32>>/.test(c1) && /struct WP \{ H: u32, W: u32, pad0: u32, pad1: u32, b: array<vec4<f32>, 8> \}/.test(c1),
+        `g4 1: ${(c1.match(/var m\d+_\d+/g) || []).length} accumulators, g4 2: ${(c2.match(/var m\d+_\d+/g) || []).length}`);
 }
 
 console.log("\n6. *** EVERY KERNEL ON THE DEVICE, CELL FOR CELL AGAINST THE TWIN ***");
@@ -555,6 +686,33 @@ else {
             out.push(kt.ok && K.x.every((v, i) => Math.fround(kt.values[i]) === v));
         }
         ok("  the identity key on the device, 9 x 21, five channels (one partial block): the fast kernel's other ways return their input bit for bit", out.every(Boolean), out.join(", "));
+    }
+    // round 27 (section 83): the Winograd kernel against ITS twin and fused mirror (conv2dCpuWino, conv2dCpuWinoFma), never conv2dCpu's --
+    // the denoiser's 10 -> 32 and 32 -> 32 on odd sizes, 13 -> 11 on a 33 x 35 image (four blocks, the last partial; a partial vec4;
+    // three workgroups a side, the last partial), and a 3 x 5 image smaller than one workgroup, at every g4 -- then its exact key
+    // against conv2dForward. On D3D12 it runs under DXC and stands aside under FXC, where nobody has built it.
+    const aside27 = nativeStandAside(adapter, COMPILER, 27);
+    if (aside27) console.log(`  SKIP  round 27's device cases: ${aside27}`);
+    else {
+        const wino = (a, cfg, F = probeFixture(a)) => { const pk = packWinoUniforms({ H: a.H, W: a.W, layer: F.layer }, cfg);
+            return H.runWgslComputeNative({ code: conv2dWinoWgsl(a, cfg), entryPoint: "k_conv_wino", outCount: a.H * a.W * a.Cout, uniforms: pk.uniforms,
+                workgroups: winoWorkgroups(a.H, a.W, a, cfg), inputs: [{ binding: 2, data: F.x }, { binding: 3, data: pk.weights }] }); };
+        const judgeW = (r, a) => { const F = probeFixture(a), tw = conv2dCpuWino(F.x, F.H, F.W, F.layer), fm = conv2dCpuWinoFma(F.x, F.H, F.W, F.layer); let unexplained = 0, fused = 0;
+            for (let i = 0; i < tw.length; i++) { const v = Math.fround(r.values[i]); if (v === tw[i]) continue; if (v === fm[i]) fused++; else unexplained++; }
+            return { unexplained, fused, n: tw.length }; };
+        for (const [a, g4s] of [[{ H: 21, W: 19, Cin: 10, Cout: 32, k: 3, act: "relu", seed: 41 }, [1, 2, 4]], [{ H: 19, W: 13, Cin: 32, Cout: 32, k: 3, act: "relu", seed: 43 }, [1, 2]],
+                                [{ H: 33, W: 35, Cin: 13, Cout: 11, k: 3, act: "none", seed: 53 }, [1, 2]], [{ H: 3, W: 5, Cin: 6, Cout: 7, k: 3, act: "relu", seed: 3 }, [1]]]) {
+            for (const g4 of g4s) {
+                const r = await wino(a, { g4 }), j = r.ok ? judgeW(r, a) : null, S = winoShape(a, { g4 });
+                if (j) CASES.push([`conv2d.conv2dWinoWgsl g4 ${g4}`, a.H, a.W, a.Cin, a.Cout, j.n - j.fused, j.fused, j.unexplained]);
+                ok(`!! round 27: the Winograd kernel, ${a.H} x ${a.W}, ${a.Cin} -> ${a.Cout}, ${S.g4} vec4 a thread (${S.groups} z group${S.groups > 1 ? "s" : ""}): every cell conv2dCpuWino's or its fused mirror's`,
+                    r.ok && j.unexplained === 0, r.ok ? `${j.n - j.fused} plain, ${j.fused} fused, ${j.unexplained} unexplained` : r.reason + " " + (r.errors || []).join("; "));
+            }
+        }
+        const { I, xi, LI } = winoIntKey(), refI = conv2dForward(xi, I.H, I.W, LI), outI = [];
+        for (const g4 of [1, 2]) { const r = await wino(I, { g4 }, { H: I.H, W: I.W, x: xi, layer: LI }); outI.push(r.ok && refI.every((v, i) => Math.fround(r.values[i]) === v)); }
+        ok("!! round 27's exact key on the device: integers in, integer weights -- the Winograd kernel gives conv2dForward's bits at 1 and 2 vec4s a thread, whatever order a compiler kept",
+            outI.every(Boolean), outI.join(", "));
     }
     {
         const K1 = keyCpu({ k: 1, C: 5 }), n = K1.H * K1.W, ka1 = { H: K1.H, W: K1.W, Cin: K1.layer.Cin, Cout: K1.layer.Cout, k: 1, act: "none" };

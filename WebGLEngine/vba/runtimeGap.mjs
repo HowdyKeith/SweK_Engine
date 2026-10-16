@@ -625,8 +625,9 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4867 -- files 4689 -> 4696, ES modules 4384 -> 4391, closures 4229 -> 4236, async/await 1769 -> 1772, typed arrays 1304 -> 1306, Promises 430 -> 431, performance.now 250 -> 251: brain/autopilotFlight.mjs, brain/flightTask.mjs, brain/pilotFlightPolicy.mjs and their three gates, es-flight6dof.html's page gate (tools/ship/flightPage-selfcheck.mjs), and es-flight6dof.html itself.
     // v4866 -- files 4687 -> 4689, ES modules 4382 -> 4384, closures 4227 -> 4229 and async/await 1768 -> 1769: physics/mechanics/flightModel6dof.mjs and its gate (the guarded top-level await import of node:url is the one await).
     // v4857 -- files 4685 -> 4687: tools/ship/strandCensus.mjs and tools/ship/strandCensus-selfcheck.mjs.
-    // v4869 -- files 4696 -> 4700, ES modules 4391 -> 4395, closures 4236 -> 4239, async/await 1772 -> 1775, typed arrays 1306 -> 1309, Promises 431 -> 432: tools/ship/trainFlightPilot.mjs, tools/ship/trainPilotFlight.mjs and the two gates, tools/ship/trainFlightPilot-selfcheck.mjs and brain/pilotFlightTrain-selfcheck.mjs (the command awaits its child processes; the gate awaits the command). performance.now held at 251.
-    files: 4700,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
+    // v4868 -- files 4696 -> 4698, ES modules 4391 -> 4393, closures 4236 -> 4238, async/await 1772 -> 1773, typed arrays 1306 -> 1308: render/denoiseUpscale.mjs and its gate, the denoiser arc's round 26.
+    // v4869 -- files 4698 -> 4702, ES modules 4393 -> 4397, closures 4238 -> 4241, async/await 1773 -> 1776, typed arrays 1308 -> 1311, Promises 431 -> 432: tools/ship/trainFlightPilot.mjs, tools/ship/trainPilotFlight.mjs and the two gates, tools/ship/trainFlightPilot-selfcheck.mjs and brain/pilotFlightTrain-selfcheck.mjs (the command awaits its child processes; the gate awaits the command). performance.now held at 251.
+    files: 4702,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
     // (v4691 note, carried)                               // v4691 -- RE-DERIVED: tools/ship/textureInProbe.mjs arrived, one ES module with a closure and top-level await -- four rows moved (files, ES modules, closures, async/await) and eight held.
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
@@ -1247,7 +1248,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4857 -- tools/ship/strandCensus.mjs and its gate: files 4685 -> 4687, ES modules 4380 -> 4382, closures 4225 -> 4227,
     // async/await 1765 -> 1768 (the census awaits its workers; the gate awaits a live probe run), Promises 429 -> 430 (runOne
     // wraps a child's exit). The other seven rows hold, threads among them.
-    esModules: 4395, closures: 4239, asyncAwait: 1775, typedArrays: 1309, promises: 432,
+    esModules: 4397, closures: 4241, asyncAwait: 1776, typedArrays: 1311, promises: 432,
     fetchXhr: 252, performanceNow: 251, raf: 127, webgl: 200, webgpu: 63, threads: 26, wasm: 27,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

@@ -52,13 +52,19 @@
 // The page runs PAGE_KERNELS and every other caller DEFAULT_KERNELS. Section 43's rules, read off both GPUs' round-14 runs
 // (section 49), put the page on r13 and the default on r14; section 46's, read off their round-15 runs (section 50), put
 // both on r15 -- the later run's decision stands.
+// Round 27 (section 83) adds "r27w": r15 with every hidden 3 x 3 layer on brain/conv2d.mjs's Winograd F(2 x 2, 3 x 3) kernel --
+// the first set whose hidden cells are NOT added in the canonical order. Its layers are held cell for cell to the Winograd
+// twin (conv2dCpuWino, or its fused mirror), so a judge asks twinsOf(layer) which pair a layer answers to; and its image is
+// held to the f64 network within section 83's bound, since it cannot be r15's bits. Every other set below adds every cell in
+// the same order.
 // Every set adds every cell in the same order, so all are held to the same twin, cell for cell. The pass runs DEFAULT_KERNELS
 // unless told otherwise; section 39's outcome rule, read off the rig, is what may change it. The timing ladder times
 // the sets it is handed, taking turns on one device.
 "use strict";
 import { conv2dWgsl, conv2dTiledWgsl, conv2dFastWgsl, conv2dHeadWgsl, packProbeUniforms, packFastUniforms, packHeadUniforms, fastShape, headShape,
          conv2dTileWgsl, packTileUniforms, tileShape, tileWorkgroups, conv2dFastAltWgsl, packFastAltUniforms, fastAltShape,
-         planarToChannelsLast, conv2dCpu, conv2dCpuFma, TILE, K_MAX, COUT_MAX } from "../brain/conv2d.mjs";
+         planarToChannelsLast, conv2dCpu, conv2dCpuFma, TILE, K_MAX, COUT_MAX,
+         conv2dWinoWgsl, packWinoUniforms, winoShape, winoWorkgroups, conv2dCpuWino, conv2dCpuWinoFma } from "../brain/conv2d.mjs";
 import { KERNEL_RADIUS, KERNEL_TAPS, headOf } from "./denoiseNet.mjs";
 import { ALBEDO_FLOOR, strideOf } from "./denoiseScenes.mjs";
 import { maskChannelOf } from "./denoiseMask.mjs";
@@ -307,8 +313,8 @@ export function kernelApplyCpu(x, logits, H, W) {
     return y;
 }
 
-/** The kernel sets a pass can run on: round 12's, round 13's fast kernel (section 39), round 14's (section 43), round 15's (section 46), round 18's two (section 61). */
-export const KERNEL_SETS = Object.freeze(["r12", "r13", "r14", "r15", "r18t", "r18u"]);
+/** The kernel sets a pass can run on: round 12's, round 13's fast kernel (section 39), round 14's (section 43), round 15's (section 46), round 18's two (section 61), round 27's Winograd set (section 83). */
+export const KERNEL_SETS = Object.freeze(["r12", "r13", "r14", "r15", "r18t", "r18u", "r27w"]);
 /**
  * Round 18 (section 61): the kernel each round-18 set runs its hidden layers on, and that kernel's configuration --
  * brain/conv2d.mjs's pixel-tiled kernel (tileShape's cfg) or its fast kernel written another way (fastAltShape's opts).
@@ -317,6 +323,18 @@ export const R18_KERNELS = Object.freeze({
     r18t: Object.freeze({ kernel: "tile_inline", cfg: Object.freeze({ px: 2, g4: 8, edge: "zero", weights: "inline" }) }),
     r18u: Object.freeze({ kernel: "fast_unroll", cfg: Object.freeze({ reads: "f32", unroll: true }) }),
 });
+/**
+ * Round 27 (section 83): the kernel the Winograd set runs its hidden 3 x 3 layers on, and its configuration (winoShape's cfg):
+ * one vec4 of output channels a thread -- 16 vec4 accumulators, 64 floats, where the fast kernel keeps 32. Section 83 says why
+ * one and not two: two is 128 accumulator floats, past the 128 registers a lane has on the Intel gen-9 at SIMD8.
+ */
+export const R27_KERNELS = Object.freeze({ r27w: Object.freeze({ kernel: "wino", cfg: Object.freeze({ g4: 1 }) }) });
+/**
+ * Round 27: the sets no gate builds natively on a D3D12 adapter whose compiler is FXC because nobody has tried -- FXC_UNBUILT_SETS
+ * is the sets FXC was SEEN to fail. Since section 70 the pin's compiler is DXC, and an FXC that never finishes a pipeline stops a
+ * gate for its whole budget (section 56), so an untried kernel stands aside under FXC on the safe side.
+ */
+export const FXC_UNTRIED_SETS = Object.freeze(["r27w"]);
 /**
  * The sets no gate builds natively on a D3D12 adapter whose compiler is FXC: node-webgpu 0.6.0's FXC stopped on r18t's kernel
  * and crashed on r18u's (section 60). Round 18 called them browser-only; 0.6.2's DXC built both natively (section 65).
@@ -331,13 +349,13 @@ export const isDxcCompiler = (compiler) => /^DXC\b/.test(compiler || "");
  * compiler is not DXC, without FXC_UNBUILT_SETS -- no compiler named counts as FXC, the safe side. Never for a browser's adapter.
  */
 export const nativeSetsFor = (adapter, sets, { compiler = null } = {}) =>
-    (isD3D12Native(adapter) && !isDxcCompiler(compiler) ? sets.filter((s) => !FXC_UNBUILT_SETS.includes(s)) : [...sets]);
+    (isD3D12Native(adapter) && !isDxcCompiler(compiler) ? sets.filter((s) => !FXC_UNBUILT_SETS.includes(s) && !FXC_UNTRIED_SETS.includes(s)) : [...sets]);
 /**
  * The sets the ladders time: r12, the reference every speedup is read against; r15, the default and the page's (section 50);
- * and round 18's two (section 61) -- on the page always, natively where nativeSetsFor allows (since section 66, a DXC run on D3D12 too). Section 54 added round 16's two
+ * round 18's two (section 61) and round 27's (section 83) -- on the page always, natively where nativeSetsFor allows (since section 66, a DXC run on D3D12 too). Section 54 added round 16's two
  * candidates and section 57 withdrew them; r13 and r14 are decided (sections 49 and 50) and left out.
  */
-export const TIMED_SETS = Object.freeze(["r12", "r15", "r18t", "r18u"]);
+export const TIMED_SETS = Object.freeze(["r12", "r15", "r18t", "r18u", "r27w"]);
 /** The set a pass runs unless told otherwise: r15, by section 46's default rule on both GPUs (section 50) -- 9.25 x against r14's 6.33. */
 export const DEFAULT_KERNELS = "r15";
 /** The set denoise.html runs on an adapter PAGE_KERNELS_BY_ADAPTER does not name: r15, by section 46's page rule on both GPUs (section 50) -- 9.25 x against r13's 6.49 and r14's 6.33. */
@@ -402,12 +420,14 @@ export async function createNativeDenoiser(adapter, dev, net, { H, W, C, compile
  * r14: r13's, except that the LAST layer (`last`), when it is 1 x 1 and fits, runs the head kernel and writes planar --
  * only the last, because only k_apply_fast reads a planar layer. r15: r13's, except that the last layer, when it is the 1 x 1
  * head of KERNEL_TAPS logits and fits, runs with the kernel apply as one pass, k_head_apply. r18t and r18u: r15's last layer;
- * every other layer on the set's R18_KERNELS kernel when it fits, else r15's kernel for it.
+ * every other layer on the set's R18_KERNELS kernel when it fits, else r15's kernel for it. r27w: the same, on R27_KERNELS's
+ * Winograd kernel, which holds 3 x 3 layers only.
  */
 export const kernelFor = (L, set = DEFAULT_KERNELS, last = false) => {
     if (!KERNEL_SETS.includes(set)) throw new Error(`denoiseDevice: no kernel set "${set}" -- the sets are ${KERNEL_SETS.join(", ")}`);
     if (set === "r14" && last && headShape(L).fits) return "head";
-    if ((set === "r15" || set in R18_KERNELS) && last && L.Cout === KERNEL_TAPS && headShape(L).fits) return "head_apply";
+    if ((set === "r15" || set in R18_KERNELS || set in R27_KERNELS) && last && L.Cout === KERNEL_TAPS && headShape(L).fits) return "head_apply";
+    if (set === "r27w" && winoShape(L, R27_KERNELS.r27w.cfg).fits) return "wino";
     if (set === "r18t" && tileShape(L, R18_KERNELS.r18t.cfg).fits) return "tile_inline";
     if (set === "r18u" && fastAltShape(L, R18_KERNELS.r18u.cfg).fits) return "fast_unroll";
     return set !== "r12" && fastShape(L).fits ? "fast" : L.k <= K_MAX && L.Cout <= COUT_MAX ? "tiled" : "direct";
@@ -425,11 +445,17 @@ export function deviceLayers(net, set = DEFAULT_KERNELS) {
                                        kernel: kernelFor(L, set, i === net.layers.length - 1) }));
 }
 
-/** The whole pass's twin, layer by layer through conv2dCpu, then kernelApplyCpu: { y, acts } -- the device's order exactly. */
-export function denoiseTwin(net, x, H, W) {
-    const layers = deviceLayers(net), acts = [];
+/**
+ * Round 27 (section 83): the twin and the fused mirror a device layer is held to, by its kernel -- conv2dCpuWino and
+ * conv2dCpuWinoFma for the Winograd kernel, which adds other numbers in another order; conv2dCpu and conv2dCpuFma for every
+ * other kernel, which all add in the canonical one. { twin, mirror }.
+ */
+export const twinsOf = (L) => (L.kernel === "wino" ? { twin: conv2dCpuWino, mirror: conv2dCpuWinoFma } : { twin: conv2dCpu, mirror: conv2dCpuFma });
+/** The whole pass's twin in `set`, layer by layer through each layer's twin (twinsOf), then kernelApplyCpu: { y, acts } -- the device's order exactly. */
+export function denoiseTwin(net, x, H, W, set = DEFAULT_KERNELS) {
+    const layers = deviceLayers(net, set), acts = [];
     let a = Float32Array.from(x);
-    for (const L of layers) { a = conv2dCpu(a, H, W, L); acts.push(a); }
+    for (const L of layers) { a = twinsOf(L).twin(a, H, W, L); acts.push(a); }
     return { y: kernelApplyCpu(x, a, H, W), acts };
 }
 
@@ -455,6 +481,7 @@ export async function createDeviceDenoiser(dev, net, { H, W, C, kernels = DEFAUL
     for (const [i, L] of layers.entries()) if (L.kernel === "fast") await build("fast" + i, conv2dFastWgsl(L), "k_conv_fast");
     for (const [i, L] of layers.entries()) if (L.kernel === "tile_inline") await build("tile_inline" + i, conv2dTileWgsl(L, R18_KERNELS.r18t.cfg), "k_conv_tile");
     for (const [i, L] of layers.entries()) if (L.kernel === "fast_unroll") await build("fast_unroll" + i, conv2dFastAltWgsl(L, R18_KERNELS.r18u.cfg), "k_conv_fast_alt");
+    for (const [i, L] of layers.entries()) if (L.kernel === "wino") await build("wino" + i, conv2dWinoWgsl(L, R27_KERNELS.r27w.cfg), "k_conv_wino");
     for (const [i, L] of layers.entries()) if (L.kernel === "head") await build("head" + i, conv2dHeadWgsl(L), "k_head");
     for (const [i, L] of layers.entries()) if (L.kernel === "head_apply") await build("head_apply" + i, kernelHeadApplyWgsl(L), "k_head_apply");
     const apply = applyFor(layers);
@@ -510,6 +537,15 @@ export async function createDeviceDenoiser(dev, net, { H, W, C, kernels = DEFAUL
             return { p, wg: [...groups, fastAltShape(L, cfg).groups], bind: dev.createBindGroup({ layout: p.getBindGroupLayout(0), entries: [
                 { binding: 0, resource: { buffer: outs[i] } }, { binding: 1, resource: { buffer: buffer(uni.byteLength, BU.UNIFORM | BU.COPY_DST, uni) } },
                 { binding: 2, resource: { buffer: i ? outs[i - 1] : xBuf } }] }) };
+        }
+        if (L.kernel === "wino") {
+            // round 27's r27w: H, W and the bias in the uniform block, the transformed weights in a storage buffer at binding 3,
+            // a workgroup per 16 x 16 outputs
+            const cfg = R27_KERNELS.r27w.cfg, p = pipe["wino" + i], pk = packWinoUniforms({ H, W, layer: L }, cfg);
+            return { p, wg: winoWorkgroups(H, W, L, cfg), bind: dev.createBindGroup({ layout: p.getBindGroupLayout(0), entries: [
+                { binding: 0, resource: { buffer: outs[i] } }, { binding: 1, resource: { buffer: buffer(pk.uniforms.byteLength, BU.UNIFORM | BU.COPY_DST, pk.uniforms) } },
+                { binding: 2, resource: { buffer: i ? outs[i - 1] : xBuf } },
+                { binding: 3, resource: { buffer: buffer(pk.weights.byteLength, BU.STORAGE | BU.COPY_DST, pk.weights) } }] }) };
         }
         const p = pipe[L.kernel];
         const uni = buffer(32, BU.UNIFORM | BU.COPY_DST, packProbeUniforms({ H, W, Cin: L.Cin, Cout: L.Cout, k: L.k, act: L.act, tiled: L.kernel === "tiled" }));

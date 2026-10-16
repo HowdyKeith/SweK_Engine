@@ -48,6 +48,12 @@
 // round-19 reports (section 67, v4852: r18u on the Intel gen-9, nothing on the GTX 1080) -- derived here by rule66Entries from
 // the committed reports, not retyped -- and DEFAULT_KERNELS stays r15. tools/denoiseDevice.mjs's --measure-r18t and --measure-r18u refuse, by name, a run whose
 // compiler FXC_UNBUILT_SETS drops; no gate runs that CLI, so a row here reads its source.
+// Round 27 (section 83, v4868): "r27w", every hidden 3 x 3 layer on brain/conv2d.mjs's Winograd kernel, with r15's fused last pass --
+// the first set whose hidden cells are NOT added in the canonical order. Each layer is judged against the twin twinsOf names for its
+// kernel (conv2dCpuWino or its fused mirror for a Winograd layer), the last pass through the image as r15's, and -- the restated
+// key -- the image held to the f64 network's 1e-5 per value, the bound every set has met since section 35 and, for r27w, the only
+// bridge to r15: its bits cannot be r15's. Natively under DXC and off D3D12, never under FXC (FXC_UNTRIED_SETS), and in the browser
+// always, with its own measured line for the rig's report and R27_KERNELS's configuration, one vec4 a thread, named.
 //
 // *** NOTHING HERE RENDERS A DATASET SEED. *** The images are synthetic; the networks are drawn from seeds here.
 // *** ONE DEVICE PER JOB. *** Measured while building this: a Dawn device reused after the JS thread had been busy for
@@ -178,6 +184,18 @@
 //   W2  the rig file: the 1080 under DXC given a reason nativePick does not  -> 1 RED: the same row
 //   W3  the rig file: the Intel's DXC pass 2e-4 from the f64 network         -> 1 RED: the same row
 //   W4  the version test reading 0.6.1 as DXC-capable                        -> 1 RED: the same row (the Intel's installed 0.6.1)
+// v4868 -- ROUND 27 (section 83), against the r27w set, twinsOf and FXC_UNTRIED_SETS. Each restored byte-identical (md5):
+//   Y1  kernelFor never picks the Winograd kernel for r27w                  -> 6 RED: the whole-twin row, the layers row, K0w natively,
+//       the not-r15's-bits row, the small network, K0w in the browser (and 2 in render/denoiseTiming-selfcheck.mjs: different kernels)
+//   Y2  twinsOf giving every layer the direct pair                          -> 5 RED: the whole-twin row, the layers row, K0w natively,
+//       the small network, K0w in the browser -- every Winograd cell then reads as unexplained. The not-r15's-bits row stays green, as
+//       it should: it compares the device with r15, not with a twin
+//   Y3  nativeSetsFor ignoring FXC_UNTRIED_SETS                              -> 2 RED: the FXC row and the FXC_UNTRIED_SETS row (and 2 in
+//       render/denoiseTiming-selfcheck.mjs: the ladders' sets row and the native plan row)
+//   Y4  the Winograd layers dispatched at two vec4s' z groups, half of them  -> 3 RED: K0w natively, the small network, K0w in the browser
+//   Y5  --measure-r27w judging every layer against the direct pair            -> 1 RED: the CLI source row (no gate runs the CLI)
+//   Y6  R27_KERNELS at two vec4s a thread                                     -> 1 RED: the layers row -- K0w holds at two, as it should;
+//       the configuration is held by name, because section 83 says why one
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -189,13 +207,14 @@ const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
 const { APPLY_TOL, kernelApplyWgsl, packApplyUniforms, kernelApplyCpu, kernelFor, deviceLayers, denoiseTwin, createDeviceDenoiser, encodeNet, decodeNet,
         KERNEL_SETS, DEFAULT_KERNELS, PAGE_KERNELS, applyFor, kernelApplyFastWgsl, kernelHeadApplyWgsl, judgeHeadApply,
         R18_KERNELS, FXC_UNBUILT_SETS, isD3D12Native, nativeSetsFor, PAGE_KERNELS_BY_ADAPTER, pageAdapterKey, pageKernelsFor, passBytes, TIMED_SETS,
-        isDxcCompiler, NATIVE_KERNELS_BY_ADAPTER, NATIVE_KERNELS_DECIDED_BY, nativeAdapterKey, nativeKernelsFor, nativePick, createNativeDenoiser } = await imp("render/denoiseDevice.mjs");
+        isDxcCompiler, NATIVE_KERNELS_BY_ADAPTER, NATIVE_KERNELS_DECIDED_BY, nativeAdapterKey, nativeKernelsFor, nativePick, createNativeDenoiser,
+        R27_KERNELS, FXC_UNTRIED_SETS, twinsOf } = await imp("render/denoiseDevice.mjs");
 // v4862 -- the native table as sections 67 and 68 measured it, before section 78 gave the 1080 r18t. Rows about what the rig ran THEN
 // (section 68's --which runs, round 19's verdict) are held to it; rows about what a native run picks NOW, to the shipped table.
 const NATIVE_KERNELS_AT_V4852 = Object.freeze({ "win32/intel/gen-9": "r18u" });
 const CMP = await imp("render/denoiseCompile.mjs");
 const { makeDenoiser, denoise, KERNEL_TAPS, shapeFor, paramCount } = await imp("render/denoiseNet.mjs");
-const { conv2dCpu, conv2dCpuFma, COUT_MAX, tileShape, fastAltShape, conv2dTileWgsl, conv2dFastAltWgsl } = await imp("brain/conv2d.mjs");
+const { conv2dCpu, conv2dCpuFma, COUT_MAX, tileShape, fastAltShape, conv2dTileWgsl, conv2dFastAltWgsl, conv2dCpuWino, conv2dCpuWinoFma, winoShape, conv2dWinoWgsl } = await imp("brain/conv2d.mjs");
 const { seededRandom } = await imp("brain/convNet.mjs");
 const { ALBEDO_FLOOR } = await imp("render/denoiseScenes.mjs");
 const H = await imp("tools/ship/headlessGpu.mjs");
@@ -295,6 +314,10 @@ console.log("1. THE KERNEL'S TWIN, ON THE CPU");
     const ref = denoise(net, x, HH, WW), twin = denoiseTwin(net, x, HH, WW);
     const w = worstRel(twin.y, ref.y, 1e-12);
     ok("!! the whole f32 twin -- conv2dCpu layer by layer, then kernelApplyCpu -- is the f64 network's output within f32 rounding", w > 0 && w < 1e-5, `worst relative ${w.toExponential(2)}`);
+    // v4868 -- round 27 (section 83): the whole twin of the Winograd set, through the twins its layers answer to (twinsOf)
+    const tw27 = denoiseTwin(net, x, HH, WW, "r27w"), w27 = worstRel(tw27.y, ref.y, 1e-12);
+    ok("!! round 27 (section 83): the r27w twin -- conv2dCpuWino for the hidden layers, conv2dCpu for the head, then kernelApplyCpu -- is the f64 network's output within the same 1e-5, and not r15's twin's bits",
+        w27 > 0 && w27 < 1e-5 && tw27.acts[0].some((v, i) => !Object.is(v, twin.acts[0][i])), `worst relative ${w27.toExponential(2)} (r15's twin ${w.toExponential(2)})`);
     // the twin's kernel on the f64 network's own logits: only f32 rounding between them
     const logits = Float32Array.from(ref.acts[ref.acts.length - 1]), ya = kernelApplyCpu(x, logits, HH, WW);
     ok("  kernelApplyCpu on the f64 network's logits is its kernel within f32 rounding -- borders, mask and albedo floor included", worstRel(ya, ref.y, 1e-12) < 1e-5);
@@ -320,7 +343,7 @@ console.log("1. THE KERNEL'S TWIN, ON THE CPU");
         L14s.map((l) => l.kernel).join() === "fast,fast,fast,head" && kernelFor({ Cin: 32, Cout: 81, k: 1 }, "r14", false) === "fast",
         `${L14.map((l) => l.kernel).join()} + ${applyFor(L14)}; a 1 x 1 layer that is not the last stays on the fast kernel`);
     ok(`!! round 13: the r13 set runs every layer of the large network on the fast kernel, the ${KERNEL_TAPS}-logit head among them (section 39)`,
-        L13.map((l) => l.kernel).join() === "fast,fast,fast,fast,fast" && KERNEL_SETS.join() === "r12,r13,r14,r15,r18t,r18u" &&
+        L13.map((l) => l.kernel).join() === "fast,fast,fast,fast,fast" && KERNEL_SETS.join() === "r12,r13,r14,r15,r18t,r18u,r27w" &&
         kernelFor({ Cin: 64, Cout: 32, k: 3 }, "r13") === "tiled" && /no kernel set "r16"/.test(noSet || ""),
         "a layer too big for one uniform binding (64 -> 32 at 3 x 3) falls back to its r12 kernel; an unknown set is refused by name");
     const L15 = deviceLayers(net, "r15"), L15s = deviceLayers(makeDenoiser(4, "he", "kernel", 9), "r15");
@@ -342,6 +365,14 @@ console.log("1. THE KERNEL'S TWIN, ON THE CPU");
             tileShape(Lt[1], T).groups === 1 && fastAltShape(Lu[0], U).blocks === 2 && fastAltShape(Lu[1], U).blocks === 4 &&
             /fn k_conv_tile/.test(ct) && !/let w\d+ = F\.w/.test(ct) && /fn k_conv_fast_alt/.test(cu) && kernelFor({ Cin: 64, Cout: 32, k: 3 }, "r18t") === "tiled" && kernelFor({ Cin: 64, Cout: 32, k: 3 }, "r18u") === "tiled",
             `${Lt.map((l) => l.kernel).join()} / ${Lu.map((l) => l.kernel).join()}; a layer too big for one uniform binding falls back as in r15`);
+        // v4868 -- round 27 (section 83): the Winograd set's layers, the twin each is judged against, and the kernel it generates
+        const Lw = deviceLayers(net, "r27w"), Lws = deviceLayers(makeDenoiser(4, "he", "kernel", 9), "r27w"), Cw = R27_KERNELS.r27w.cfg, cw = conv2dWinoWgsl(Lw[1], Cw);
+        ok(`!! round 27 (section 83): r27w runs every hidden 3 x 3 layer on the Winograd kernel at one vec4 a thread and the ${KERNEL_TAPS}-logit head as r15 does -- k_head_apply; a layer the kernel cannot hold (1 x 1 not last, 5 x 5) falls back to r15's kernel; and twinsOf holds a Winograd layer to conv2dCpuWino and its mirror, every other to conv2dCpu and its`,
+            Lw.map((l) => l.kernel).join() === "wino,wino,wino,wino,head_apply" && applyFor(Lw) === "head_apply" && Lws.map((l) => l.kernel).join() === "wino,wino,wino,head_apply" &&
+            Cw.g4 === 1 && Object.isFrozen(Cw) && Object.isFrozen(R27_KERNELS) && winoShape(Lw[0], Cw).groups === 8 && /fn k_conv_wino/.test(cw) &&
+            kernelFor({ Cin: 32, Cout: 32, k: 1 }, "r27w") === "fast" && kernelFor({ Cin: 4, Cout: 4, k: 5 }, "r27w") === "fast" &&
+            twinsOf(Lw[0]).twin === conv2dCpuWino && twinsOf(Lw[0]).mirror === conv2dCpuWinoFma && twinsOf(Lw[4]).twin === conv2dCpu && twinsOf(L15[0]).twin === conv2dCpu && twinsOf(L15[0]).mirror === conv2dCpuFma,
+            `${Lw.map((l) => l.kernel).join()}; small network ${Lws.map((l) => l.kernel).join()}`);
         // v4849 -- round 19 (section 66): which sets a native gate builds, by the run's compiler as well as its adapter. Round 18's
         // row here ("r18t and r18u are browser-only on D3D12") held the adapter alone. On 0.6.2 the rig's descriptions are "D3D12
         // driver version ..." under either compiler, so the compiler comes from the package (headlessGpu's nativeCompiler: "DXC" or
@@ -353,17 +384,24 @@ console.log("1. THE KERNEL'S TWIN, ON THE CPU");
         const FXC_SAID = [undefined, null, "", "FXC", "FXC (DXBC)", "unknown (no dump)"], DXC_SAID = ["DXC", "DXC (DXIL)"];
         const setsBy = (a, c) => (c === undefined ? nativeSetsFor(a, KERNEL_SETS) : nativeSetsFor(a, KERNEL_SETS, { compiler: c })).join();
         const said = (c) => (c === undefined ? "(no options)" : JSON.stringify(c));
-        ok("!! round 19 (section 66): FXC builds neither round-18 set -- on a D3D12 adapter, a run whose compiler is FXC (the package's \"FXC\", the dump's \"FXC (DXBC)\"), unknown, or not named at all builds r12-r15 natively and never FXC_UNBUILT_SETS",
+        ok("!! round 19 (section 66): FXC builds neither round-18 set -- on a D3D12 adapter, a run whose compiler is FXC (the package's \"FXC\", the dump's \"FXC (DXBC)\"), unknown, or not named at all builds r12-r15 natively and never FXC_UNBUILT_SETS (nor, since round 27, FXC_UNTRIED_SETS)",
             FXC_UNBUILT_SETS.join() === "r18t,r18u" && Object.isFrozen(FXC_UNBUILT_SETS) && isD3D12Native(d3d) && isD3D12Native(d3n) && !isD3D12Native(vk) &&
             !isD3D12Native({ info: { vendor: "intel", architecture: "gen-9" } }) && !isD3D12Native(null) && [d3d, d3n].every((a) => FXC_SAID.every((c) => setsBy(a, c) === FOUR)),
             `on the 1080's description: ${FXC_SAID.map((c) => `${said(c)} ${setsBy(d3n, c)}`).join("; ")} -- section 60: 0.6.0's FXC stopped on r18t's kernel at 3 minutes and crashed on r18u's, on both GPUs`);
-        ok("!! round 19 (section 66): DXC builds both -- on a D3D12 adapter, a run whose compiler is DXC (the package's \"DXC\", the dump's \"DXC (DXIL)\") builds all six sets natively; an adapter that is not D3D12 builds all six whatever compiler is named, and a browser's adapter is never asked",
+        ok("!! round 19 (section 66): DXC builds both -- on a D3D12 adapter, a run whose compiler is DXC (the package's \"DXC\", the dump's \"DXC (DXIL)\") builds every set natively, r27w among them; an adapter that is not D3D12 builds every set whatever compiler is named, and a browser's adapter is never asked",
             [d3d, d3n].every((a) => DXC_SAID.every((c) => setsBy(a, c) === SIX)) && [...FXC_SAID, ...DXC_SAID].every((c) => setsBy(vk, c) === SIX) && nativeSetsFor(vk, KERNEL_SETS) !== KERNEL_SETS,
             `on the 1080's description: ${DXC_SAID.map((c) => `${said(c)} ${setsBy(d3n, c)}`).join("; ")}; Vulkan under "FXC": ${setsBy(vk, "FXC")} -- section 65: 0.6.2's DXC built both in seconds, exact, on both GPUs`);
         const notDxc = ["FXC", "FXC (DXBC)", "unknown (no dump)", "", null, undefined, "dxc", "DXCompiler", "not DXC", "SPIR-V"];
         ok("  round 19: isDxcCompiler is DXC as the package names it (\"DXC\") or a dump reads it (\"DXC (DXIL)\"), and nothing else -- not FXC, unknown, none, a lower-case name, a longer word, or DXC named second",
             DXC_SAID.every((c) => isDxcCompiler(c) === true) && notDxc.every((c) => isDxcCompiler(c) === false),
             `true for ${DXC_SAID.map(said).join(", ")}; false for ${notDxc.map(said).join(", ")}`);
+        // v4868 -- round 27 (section 83): r27w was never built under FXC, so it stands aside there on the safe side -- a list of its own,
+        // since FXC_UNBUILT_SETS is the sets FXC was SEEN to fail (section 60)
+        ok("!! round 27 (section 83): FXC_UNTRIED_SETS is r27w alone, and nativeSetsFor drops it on a D3D12 adapter under FXC, an unknown compiler or none, keeps it under DXC, and keeps it off D3D12 under anything",
+            FXC_UNTRIED_SETS.join() === "r27w" && Object.isFrozen(FXC_UNTRIED_SETS) && !FXC_UNBUILT_SETS.includes("r27w") &&
+            [d3d, d3n].every((a) => FXC_SAID.every((c) => !setsBy(a, c).includes("r27w")) && DXC_SAID.every((c) => setsBy(a, c).includes("r27w"))) &&
+            [...FXC_SAID, ...DXC_SAID].every((c) => setsBy(vk, c).includes("r27w")),
+            `the 1080 under "FXC": ${setsBy(d3n, "FXC")}; under "DXC": ${setsBy(d3n, "DXC")}`);
         // v4849 -- round 19 (section 66): the native set by adapter, for a DXC run only, keyed as the timing gate prints it.
         // v4852 -- section 67 read the rule off both GPUs' round-19 runs; the verdict rows below derive the table from them.
         const nk = { "win32/nvidia/pascal": "r18t" }, keyN = nativeAdapterKey(d3n.info, "win32");
@@ -402,6 +440,14 @@ console.log("1. THE KERNEL'S TWIN, ON THE CPU");
             ok("  round 19: tools/denoiseDevice.mjs reads its run's compiler with its own device's flags, and refuses a set nativeSetsFor drops -- exit 2, one line naming SWEK_WEBGPU's remedy -- before any image is built",
                 iRead > 0 && iMake > iRead && iAsk > iMake && iBuild > iAsk && (cli.match(/\bmod\.create\(/g) || []).length === 1 && /GPU\.exitCleanly\(2\)/.test(refusal) && /GPU\.WEBGPU_ENV/.test(refusal),
                 `compiler read at ${iRead}, the device made at ${iMake}, the refusal at ${iAsk}, the first build at ${iBuild}`);
+            // v4868 -- round 27 (section 83): --measure-r27w is K0w (a), and nothing runs it but a person -- so its source is read: the flag
+            // names r27w and its own results file, every hidden layer is judged against the pair twinsOf names (never conv2dCpu by name,
+            // which would call every Winograd cell unexplained), and D4, the restated key, is in the file at D4_REL 1e-5
+            const flag = /"--measure-r27w": \{ kernels: "r27w", results: RESULTS_R27W \}/.test(cliAll) && /RESULTS_R27W = "render\/denoise-results-r27w\.json"/.test(cliAll);
+            const judged = /T = twinsOf\(L\), tw = T\.twin\(input, image, image, L\), fm = T\.mirror\(input, image, image, L\)/.test(cli) && !/\bconv2dCpu(Fma)?\(/.test(cli);
+            const d4 = /const D4_REL = 1e-5;/.test(cliAll) && /D4: \{ ok: D4 <= D4_REL, worst: D4,/.test(cli) && /imageWorst = Math\.max\(imageWorst, Math\.abs\(out\.y\[c\] - y64\[c\]\) \/ \(Math\.abs\(y64\[c\]\) \+ 1e-12\)\)/.test(cli);
+            ok("  round 27 (section 83): tools/denoiseDevice.mjs --measure-r27w writes its own file, judges every hidden layer against the twin its kernel answers to (twinsOf), and carries D4, the image within 1e-5 of the f64 network on every value",
+                flag && judged && d4, `flag ${flag}, twinsOf ${judged}, D4 ${d4}`);
         }
         // v4852 -- ROUND 19'S VERDICT (section 67): section 66's rule, written as code and read off the two committed rig reports
         // (render/denoise-rig-r19-*.json: realGpuRun --only denoise, SWEK_WEBGPU naming node-webgpu 0.6.2, at v4851's release commit).
@@ -609,7 +655,8 @@ else try {
     // fused last layer (r15's k_head_apply), which stores no cell and is judged through the image (judgeHeadApply)
     const judge = (net, x, h, w, acts, set = "r12") => deviceLayers(net, set).map((L, i) => {
         if (L.kernel === "head_apply") return { kernel: L.kernel, plain: 0, fused: 0, unexplained: 0, image: true };
-        const input = i ? acts[i - 1] : Float32Array.from(x), tw = conv2dCpu(input, h, w, L), fm = conv2dCpuFma(input, h, w, L);
+        // v4868 -- round 27: the twin and mirror this layer's kernel answers to (twinsOf): the Winograd pair for a Winograd layer
+        const input = i ? acts[i - 1] : Float32Array.from(x), T = twinsOf(L), tw = T.twin(input, h, w, L), fm = T.mirror(input, h, w, L);
         let plain = 0, fused = 0, unexplained = 0;
         for (let j = 0; j < tw.length; j++) { const v = acts[i][j]; if (v === tw[j]) plain++; else if (v === fm[j]) fused++; else unexplained++; }
         return { kernel: L.kernel, plain, fused, unexplained };
@@ -688,6 +735,24 @@ else try {
             !none18 || (r18.y.every((v, i) => Object.is(v, r15.y[i])) && r18.acts.slice(0, 4).every((a, i) => a.every((v, j) => Object.is(v, r15.acts[i][j])))),
             none18 ? "no cell fused in either set on this device: every layer must agree exactly" : "a set fused cells here, so the layers may differ where it did"));
     }
+    // v4868 -- round 27 (section 83): r27w, the same network and image -- K0w natively where nativeSetsFor allows (DXC on D3D12, and off it):
+    // its hidden layers cell for cell against the Winograd twin or its mirror (judge asks twinsOf), its fused last pass through the image,
+    // and -- the key restated -- the image within 1e-5 of the f64 network on every value. KW keeps the native rows' results for the
+    // measured line below.
+    const native27 = nativeSetsFor(NATIVE, FXC_UNTRIED_SETS, { compiler: COMPILER }), KW = [];
+    if (!native27.includes("r27w")) console.log(`  SKIP  K0w natively for r27w: one of FXC_UNTRIED_SETS, on a D3D12 adapter whose run compiles with ${compilerSaid} -- never built under FXC (section 83); section 5 holds it in the browser`);
+    else {
+        const r27 = await job(net, x, HH, WW, 10, "r27w"), J27 = judge(net, x, HH, WW, r27.acts, "r27w"), L27 = deviceLayers(net, "r27w");
+        const j27 = judgeHeadApply(x, r27.acts[3], L27[4], r27.y, HH, WW), w64 = worstRel(r27.y, ref, 1e-12), w15 = worstRel(r15.y, ref, 1e-12);
+        k0row("native", "r27w", J27, j27.worst);
+        KW.push(ok(`!! *** K0w natively (section 83): the r27w set -- its hidden layers (wino) every cell conv2dCpuWino's or its fused mirror's, given the device's own input; k_head_apply's image within APPLY_TOL; the image within 1e-5 of the f64 network on every value ***`,
+            J27.slice(0, 4).every((j) => j.unexplained === 0) && J27.map((j) => j.kernel).join() === "wino,wino,wino,wino,head_apply" && r27.acts[4] === null && j27.worst <= APPLY_TOL && w64 < 1e-5,
+            J27.slice(0, 4).map((j) => `${j.kernel} ${j.plain}+${j.fused}f${j.unexplained ? "+" + j.unexplained + "?" : ""}`).join(", ") +
+            `; head and kernel ${j27.worst.toExponential(2)}; the image against the f64 network ${w64.toExponential(2)} (r15's ${w15.toExponential(2)})`));
+        const moved = r27.acts[0].reduce((a, v, j) => a + (Object.is(v, r15.acts[0][j]) ? 0 : 1), 0);
+        ok("  ...and its first layer is NOT r15's bits, from the same input -- another order, so the same-bits-as-r15 rows every earlier set carries cannot apply; its bridge to r15 is the f64 bound",
+            moved > 0, `${moved} of ${r27.acts[0].length} first-layer cells differ from r15's`);
+    }
     // the order probe (render/denoiseCompile.mjs): a head whose products are exact and whose sums are not, so the image is
     // within APPLY_TOL of the twin's only if the head added in the twin's order
     {
@@ -749,12 +814,23 @@ else try {
         if (native18.length) ok(`  ...and ${native18.join(" and ")} on the small network, no mask: every layer on their kernels explained, the image within its bound`,
             out.every((o) => o.ok), out.map((o) => `${o.set} ${o.w.toExponential(2)}`).join(", "));
     }
+    // v4868 -- round 27 on the small network: nine inputs (blocks of 4, 4 and 1 staged), 16 hidden channels (four z groups of one vec4)
+    if (native27.includes("r27w")) {
+        const rw = await job(net9, x9, 13, 11, 9, "r27w"), Lw9 = deviceLayers(net9, "r27w"), Jw = judge(net9, x9, 13, 11, rw.acts, "r27w");
+        const jw = judgeHeadApply(x9, rw.acts[Lw9.length - 2], Lw9[Lw9.length - 1], rw.y, 13, 11), w64 = worstRel(rw.y, denoise(net9, x9, 13, 11).y, 1e-12);
+        KW.push(ok("  ...and r27w on the small network, no mask: every Winograd cell explained against its twin, the image within its bound and within 1e-5 of the f64 network",
+            Jw.slice(0, -1).every((j) => j.unexplained === 0 && j.kernel === "wino") && jw.worst <= APPLY_TOL && w64 < 1e-5, `head and kernel ${jw.worst.toExponential(2)}; against f64 ${w64.toExponential(2)}`));
+    } else console.log("  SKIP  r27w on the small network: one of FXC_UNTRIED_SETS, under FXC on a D3D12 adapter (section 83)");
     // v4849 -- round 19 (section 66)'s condition (1), readable off the rig's report: realGpuRun keeps measured and failing lines,
     // never a PASS or a SKIP, so which round-18 sets' native rows ran here, under which compiler, and whether every one was green
     // is said on one measured line -- by the key nativeAdapterKey gives this adapter
     console.log(`  ----  native K0 for round 18's sets on ${nativeAdapterKey(NATIVE && NATIVE.info, process.platform) || "(an adapter with no vendor)"}, compiler ${compilerSaid}: ` +
         FXC_UNBUILT_SETS.map((s) => (!native18.includes(s) ? `${s} not built natively (one of FXC_UNBUILT_SETS, under FXC)` :
             `${s} ${K18[s].length && K18[s].every(Boolean) ? "green" : "RED"} (${K18[s].filter(Boolean).length} of ${K18[s].length} native rows)`)).join("; "));
+    // v4868 -- round 27 (section 83)'s condition, readable off the rig's report the same way: whether r27w's native rows ran, under
+    // which compiler, and whether every one was green
+    console.log(`  ----  native K0w for round 27's set on ${nativeAdapterKey(NATIVE && NATIVE.info, process.platform) || "(an adapter with no vendor)"}, compiler ${compilerSaid}: ` +
+        (!native27.includes("r27w") ? "r27w not built natively (one of FXC_UNTRIED_SETS, under FXC)" : `r27w ${KW.length && KW.every(Boolean) ? "green" : "RED"} (${KW.filter(Boolean).length} of ${KW.length} native rows)`));
     let refusedC = null;
     // v4852 -- round 20 (section 68): this box's native pick, and the builder held to it. This box picks r15 whatever a caller does,
     // so a builder that ignored the pick would pass section 6's row; here the pick is forced off r15 through a fixture table naming
@@ -813,14 +889,14 @@ console.log("\n4. THE PAGE, IN CHROMIUM: denoise.html ON ITS OWN DEVICE");
     }
 }
 
-console.log("\n5. EVERY KERNEL SET IN THE BROWSER, CELL FOR CELL (rounds 13-15 and 18, sections 39, 43, 46 and 61, K0 (c))");
+console.log("\n5. EVERY KERNEL SET IN THE BROWSER, CELL FOR CELL (rounds 13-15, 18 and 27, sections 39, 43, 46, 61 and 83, K0 (c))");
 {
     // in the engine's origin, on the browser's own adapter: the large network drawn from a seed, both sets run with every
     // layer read back, and each cell judged against the twin and the fused mirror in the page itself -- an adapter per set,
     // as a browser's adapter gives one device
     const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 480000, script: `async () => {
         const D = await import("/render/denoiseDevice.mjs"), Cv = await import("/brain/conv2d.mjs"), N = await import("/render/denoiseNet.mjs");
-        const net = N.makeDenoiser(3, "he", "kernel", 10, "large"), h = 21, w = 19, x = D.timingInput(h, w, 10, 7), out = {};
+        const net = N.makeDenoiser(3, "he", "kernel", 10, "large"), h = 21, w = 19, x = D.timingInput(h, w, 10, 7), out = {}, y64 = N.denoise(net, x, h, w).y;
         if (!navigator.gpu) return { error: "no navigator.gpu" };
         for (const set of D.KERNEL_SETS) {
             const a = await navigator.gpu.requestAdapter(); if (!a) return { error: "no adapter" };
@@ -830,7 +906,7 @@ console.log("\n5. EVERY KERNEL SET IN THE BROWSER, CELL FOR CELL (rounds 13-15 a
                 const DL = D.deviceLayers(net, set), fusedLast = DL[DL.length - 1].kernel === "head_apply";
                 const layers = DL.map((L, i) => {
                     if (L.kernel === "head_apply") return { kernel: L.kernel, plain: 0, fused: 0, unexplained: 0 };
-                    const input = i ? res.acts[i - 1] : Float32Array.from(x), tw = Cv.conv2dCpu(input, h, w, L), fm = Cv.conv2dCpuFma(input, h, w, L);
+                    const input = i ? res.acts[i - 1] : Float32Array.from(x), T = D.twinsOf(L), tw = T.twin(input, h, w, L), fm = T.mirror(input, h, w, L);
                     let plain = 0, fused = 0, unexplained = 0;
                     for (let j = 0; j < tw.length; j++) { const v = res.acts[i][j]; if (v === tw[j]) plain++; else if (v === fm[j]) fused++; else unexplained++; }
                     return { kernel: L.kernel, plain, fused, unexplained };
@@ -839,7 +915,8 @@ console.log("\n5. EVERY KERNEL SET IN THE BROWSER, CELL FOR CELL (rounds 13-15 a
                 let worst = 0;
                 if (fusedLast) worst = D.judgeHeadApply(x, res.acts[DL.length - 2], DL[DL.length - 1], res.y, h, w).worst;
                 else { const tw = D.kernelApplyCpu(x, res.acts[res.acts.length - 1], h, w); for (let j = 0; j < tw.length; j++) worst = Math.max(worst, Math.abs(res.y[j] - tw[j]) / (Math.abs(tw[j]) + 1e-30)); }
-                out[set] = { layers, worst, kernels: Dn.layers.map((L) => L.kernel) };
+                let w64 = 0; for (let j = 0; j < y64.length; j++) w64 = Math.max(w64, Math.abs(res.y[j] - y64[j]) / (Math.abs(y64[j]) + 1e-12));
+                out[set] = { layers, worst, w64, kernels: Dn.layers.map((L) => L.kernel) };
                 Dn.destroy();
             } finally { dev.destroy(); }
         }
@@ -850,11 +927,13 @@ console.log("\n5. EVERY KERNEL SET IN THE BROWSER, CELL FOR CELL (rounds 13-15 a
         const O = (r.result && r.result.out) || {}, line = (s) => O[s] ? O[s].layers.map((j) => `${j.kernel} ${j.plain}+${j.fused}f${j.unexplained ? "+" + j.unexplained + "?" : ""}`).join(", ") : "not run";
         for (const s of KERNEL_SETS) if (O[s]) k0row("browser", s, O[s].layers, O[s].worst);
         for (const s of KERNEL_SETS)
-            ok(`!! ${s !== "r12" ? "*** K0 in the browser: " : ""}the ${s} set in the browser's own device, every cell the twin's or the fused mirror's, the kernel within APPLY_TOL${s !== "r12" ? " ***" : ""}`,
-                r.ok && !r.pageErrors.length && !!O[s] && O[s].layers.length === 5 && O[s].layers.every((j) => j.unexplained === 0) && O[s].worst <= APPLY_TOL &&
+            ok(`!! ${s !== "r12" ? `*** K0${s === "r27w" ? "w" : ""} in the browser: ` : ""}the ${s} set in the browser's own device, every cell ${s === "r27w" ? "the Winograd twin's or its fused mirror's" : "the twin's or the fused mirror's"}, the kernel within APPLY_TOL` +
+               `${s === "r27w" ? ", the image within 1e-5 of the f64 network (section 83)" : ""}${s !== "r12" ? " ***" : ""}`,
+                r.ok && !r.pageErrors.length && !!O[s] && O[s].layers.length === 5 && O[s].layers.every((j) => j.unexplained === 0) && O[s].worst <= APPLY_TOL && (s !== "r27w" || O[s].w64 < 1e-5) &&
                 O[s].kernels.join() === { r12: "tiled,tiled,tiled,tiled,direct", r13: "fast,fast,fast,fast,fast", r14: "fast,fast,fast,fast,head", r15: "fast,fast,fast,fast,head_apply",
-                                         r18t: "tile_inline,tile_inline,tile_inline,tile_inline,head_apply", r18u: "fast_unroll,fast_unroll,fast_unroll,fast_unroll,head_apply" }[s],
-                r.ok ? `${line(s)}; kernel ${O[s] ? O[s].worst.toExponential(2) : "-"}` + (r.result && r.result.error ? "; " + r.result.error : "") : r.reason);
+                                         r18t: "tile_inline,tile_inline,tile_inline,tile_inline,head_apply", r18u: "fast_unroll,fast_unroll,fast_unroll,fast_unroll,head_apply",
+                                         r27w: "wino,wino,wino,wino,head_apply" }[s],
+                r.ok ? `${line(s)}; kernel ${O[s] ? O[s].worst.toExponential(2) : "-"}; image against f64 ${O[s] ? O[s].w64.toExponential(2) : "-"}` + (r.result && r.result.error ? "; " + r.result.error : "") : r.reason);
     }
 }
 
@@ -874,7 +953,7 @@ else {
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
     "\nnot closed here: the shipped network itself, on the images it was measured on. `node tools/denoiseDevice.mjs --measure-r12` is " +
-    "section 35's one command, and no gate runs it; rounds 13-15's and 18's are `--measure-r13`, `--measure-r14`, `--measure-r15`, `--measure-r18t` and `--measure-r18u` (K0 (a)).");
+    "section 35's one command, and no gate runs it; rounds 13-15's, 18's and 27's are `--measure-r13`, `--measure-r14`, `--measure-r15`, `--measure-r18t`, `--measure-r18u` and `--measure-r27w` (K0 (a)).");
 if (K0ROWS.length) REPORT.table("K0 on a 21 x 19 image of the large network: each set's conv cells (the twin's, the fused mirror's, unexplained) and its kernel's worst relative error (APPLY_TOL 1e-5)",
     ["path", "set", "plain cells", "fused cells", "unexplained", "worst kernel error"], K0ROWS);
 else REPORT.skip("K0 on a device", "no WebGPU device here");

@@ -4,7 +4,7 @@
 //
 // GATES render/denoiseScenes.mjs, the pre-registration's section 3 and 4 as code. Its exports, each named here: IMAGE,
 // SPP_IN, SPP_REF, ALBEDO_FLOOR, CHANNELS, SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, familyOf, isDatasetSeed, strideOf,
-// renderSeeds, makeScene, guideBuffers,
+// renderSeeds, makeScene, guideBuffers, SPLITS_MESH, signedVolume (section 79), SPLITS_FSR1 (section 81),
 // renderImages, inputChannels, remodulate.
 //
 // *** NOTHING HERE RENDERS A DATASET SEED. *** Every scene this gate draws is seeded from 900000 up, outside every
@@ -41,6 +41,14 @@
 //   D30 SPLITS_R11 left out of the dataset refusal                               1 RED
 //   D31 SPLITS_R11's training families listed C first: half its scenes drawn     1 RED
 //       as the wrong family
+//   D32 (section 79) every mesh's winding flip inverted -- inward meshes         1 RED
+//   D33 family M drawing only lathes                                             1 RED
+//   D34 a mesh given a fixed grey albedo instead of its sphere's material        2 RED (the material row; and no
+//       conductor mesh left for the albedo-never-read row to render)
+//   D35 SPLITS_MESH left out of the dataset refusal                              1 RED
+//   D36 a voxel structure scaled 1.5x past its sphere's footprint                1 RED
+//   D37 (section 81) SPLITS_FSR1 left out of the dataset refusal                 1 RED
+//   D38 SPLITS_FSR1's C half drawn as family R                                    1 RED
 //   D4  an emitter's base colour taken from its albedo (0) instead of 1          1 RED
 //   D5  remodulate multiplying by the raw albedo, not the floored one            1 RED -- ZERO on the first draft, whose
 //       round trip never saw an albedo under the floor; the near-black row was written for it
@@ -345,6 +353,106 @@ console.log("\n10. ROUND 11'S SPLITS -- ONE NETWORK FOR BOTH FAMILIES (pre-regis
         V.T1.family === "R" && V.T1.seeds.length === 12 && V.T1.seeds[0] === 34000 && V.T2.family === "C" && V.T2.seeds.length === 12 && V.T2.seeds[0] === 35000 &&
         r11.every((s2) => !seen10.has(s2)) && new Set(r11).size === 24 && refused11 === 24 && new Set(eleven).size === eleven.length,
         `${refused11} of ${r11.length} refused; ${eleven.length} render seeds`);
+}
+
+console.log("\n11. THE MESH ROUND -- FAMILIES V AND M, THE ENGINE'S OWN GEOMETRY IN R'S SCENES (pre-registration section 79)");
+{
+    const { SPLITS_MESH, signedVolume } = D;
+    const { render } = await import(pathToFileURL(path.join(ENG, "physics", "render", "pathTracer.mjs")).href);
+    const { triNormal } = await import(pathToFileURL(path.join(ENG, "mesh", "meshBVH.mjs")).href);
+    const { emitterCoverage } = await import(pathToFileURL(path.join(ENG, "render", "denoiseMask.mjs")).href);
+    // family R is the family the shipped network was trained on, and V and M are built FROM it: it must draw exactly
+    // what it drew before they existed. 1675988019.5704567 over 2,685 numbers, computed from HEAD's module before V and M.
+    let fp = 0, k = 1;
+    const walk = (v) => { if (typeof v === "number") fp += v * ((k++ % 97) + 1); else if (Array.isArray(v)) v.forEach(walk); else if (v && typeof v === "object") for (const key of Object.keys(v).sort()) walk(v[key]); };
+    for (let s2 = 900000; s2 < 900040; s2++) { const S = makeScene("R", s2); walk(S); for (const d of [[0, 1, 0], [0, -1, 0], [0.6, 0.2, 0.77]]) walk(S.sky(d)); }
+    ok("!! family R is untouched by V and M: the fingerprint of 40 R scenes is the one computed before they existed",
+        fp.toPrecision(17) === "1675988019.5704567" && k === 2686, `${fp.toPrecision(17)} over ${k - 1} numbers`);
+
+    // every V and M scene is R's scene for its seed with each resting sphere replaced, in its footprint, with its material
+    const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+    const matOf = (o) => { const { centre, radius, bvh, mesh, ...m } = o; return m; };
+    let asR = true, inBox = true, outward = true, axisAligned = true, materials = true, counted = 0, kinds = { lathe: 0, extrude: 0 }, conductorMeshes = 0;
+    for (const fam of ["V", "M"]) for (let s2 = 900400; s2 < 900430; s2++) {
+        const S = makeScene(fam, s2), R = makeScene("R", s2);
+        asR &&= S.family === fam && S.scene.length === R.scene.length && same(S.scene[0], R.scene[0]) && same(S.eye, R.eye) && same(S.look, R.look) &&
+            S.fovDeg === R.fovDeg && S.skyKind === R.skyKind && [[0, 1, 0], [0.3, -0.2, 0.93]].every((d) => S.sky(d) === R.sky(d));
+        S.scene.forEach((o, i) => {
+            const r = R.scene[i];
+            if (i === 0 || r.emit) { asR &&= same(o, r); return; }
+            counted++;
+            const t = o.bvh && o.bvh.tris, [x, , z] = r.centre, rad = r.radius;
+            if (!t) { asR = false; return; }
+            const want = matOf(r); if (want.albedo === undefined) { want.albedo = 0; conductorMeshes++; }
+            materials &&= same(matOf(o), want);
+            // to 1e-6, not 1e-9: lathe and extrudePolygon hand back FLOAT32 positions, and an extruded point lands up to
+            // 1.6e-8 past the box -- float32 rounding at this size, measured, not a mesh outside its footprint
+            const e = 1e-6;
+            for (let j = 0; j < t.length; j += 3) inBox &&= t[j] >= x - rad - e && t[j] <= x + rad + e && t[j + 1] >= -e && t[j + 1] <= 2 * rad + e && t[j + 2] >= z - rad - e && t[j + 2] <= z + rad + e;
+            outward &&= signedVolume(t) > 0;
+            if (fam === "V") for (let j = 0; j < t.length; j += 9) { const n = triNormal(t, j); axisAligned &&= n.filter((v) => Math.abs(v) > 1e-9).length === 1; }
+            else (o.mesh.tris % 48 === 0 && o.mesh.tris >= 4 * 48 ? kinds.lathe++ : kinds.extrude++);
+        });
+    }
+    ok("!! V and M are R's scene for the same seed -- ground, emitters, sky, camera -- with every resting sphere replaced by a mesh",
+        asR && counted > 100, `${counted} meshes over 60 scenes`);
+    ok("!! each mesh carries its sphere's material and nothing else (a conductor's never-read albedo set to 0), and sits inside the sphere's footprint box",
+        materials && inBox && conductorMeshes > 0, `${conductorMeshes} conductor meshes`);
+    ok("!! every mesh is wound OUTWARD -- the tracer takes a hit's normal as it comes -- and every voxel triangle faces along one axis",
+        outward && axisAligned);
+    ok("  M draws both of its kinds, lathed and extruded", kinds.lathe > 5 && kinds.extrude > 5, JSON.stringify(kinds));
+    const A = makeScene("V", 900401), B = makeScene("V", 900401);
+    ok("  deterministic in (family, seed): the same seed gives the same triangles, bit for bit",
+        A.scene.every((o, i) => !o.bvh || (o.bvh.tris.length === B.scene[i].bvh.tris.length && o.bvh.tris.every((v, j) => Object.is(v, B.scene[i].bvh.tris[j])))));
+
+    // the conductor's albedo is never read: one conductor mesh rendered at albedo 0 and at albedo 1, bit for bit
+    let probe = null;
+    for (let s2 = 900400; s2 < 900430 && !probe; s2++) { const S = makeScene("V", s2); const i = S.scene.findIndex((o) => o.bvh && o.roughness !== undefined); if (i > 0) probe = { S, i }; }
+    if (probe) {
+        const o = (sc) => render(sc, { w: 12, h: 12, spp: 4, seed: 3, rgb: true, eye: probe.S.eye, look: probe.S.look, up: probe.S.up, fovDeg: probe.S.fovDeg, sky: probe.S.sky });
+        const at = (a) => probe.S.scene.map((x, j) => (j === probe.i ? { ...x, albedo: a } : x));
+        const y0 = o(at(0)), y1 = o(at(1));
+        ok("!! a conductor mesh's albedo is NEVER READ: rendered at albedo 0 and at 1, the image is the same bit for bit",
+            y0.every((v, j) => Object.is(v, y1[j])), `scene ${probe.S.seed}, entry ${probe.i}`);
+    } else ok("!! a conductor mesh to render was found in 30 V scenes", false);
+
+    // the guide buffers and the emitter mask read a mesh hit as they read a sphere's
+    const G = makeScene("V", 900402), W = 24, g = guideBuffers(G, W, W), Bc = cameraBasis(G);
+    let meshPx = 0, guideOk = true;
+    for (let y = 0; y < W; y++) for (let x = 0; x < W; x++) {
+        const hit = intersect(G.eye, pixelRay(x, y, 0.5, 0.5, W, W, Bc), G.scene), i = (y * W + x) * 3;
+        if (!hit || !hit.sphere.bvh) continue;
+        meshPx++;
+        const src = hit.sphere.roughness !== undefined ? hit.sphere.F0 : hit.sphere.albedo;
+        guideOk &&= [0, 1, 2].every((c) => g.albedo[i + c] === src[c] && g.normal[i + c] === hit.N[c]);
+    }
+    const cov = emitterCoverage(G, W, W);
+    ok("  on a mesh hit the guide buffers carry the mesh's base colour and its face normal, and the emitter mask runs over a mesh scene",
+        meshPx > 10 && guideOk && cov.length === W * W && cov.every((v) => v >= 0 && v <= 1), `${meshPx} mesh pixels of ${W * W}`);
+
+    // the splits: test sets only, on ranges no earlier split touched, refused without harvest, C5 across the round
+    const earlier = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11].flatMap((S) => Object.values(S).flatMap((x) => x.seeds)));
+    const mesh = [...SPLITS_MESH.T1.seeds, ...SPLITS_MESH.T2.seeds];
+    let refused = 0;
+    for (const s2 of mesh) { try { renderImages(SPLITS_MESH.T1.seeds.includes(s2) ? "V" : "M", s2, { w: 2, h: 2, sppIn: 1, sppRef: 1 }); } catch (e) { if (/dataset seed/.test(e.message)) refused++; } }
+    const rs = mesh.flatMap((s2) => { const r = D.renderSeeds(s2); return [r.input, r.ref, r.ref2]; });
+    ok("!! SPLITS_MESH: no training split; H1 on 12 of V (36000), H2 on 12 of M (37000), no seed an earlier split used, every one refused without harvest, 72 distinct render seeds",
+        Object.keys(SPLITS_MESH).join() === "T1,T2" && SPLITS_MESH.T1.family === "V" && SPLITS_MESH.T1.seeds[0] === 36000 && SPLITS_MESH.T1.seeds.length === 12 &&
+        SPLITS_MESH.T2.family === "M" && SPLITS_MESH.T2.seeds[0] === 37000 && SPLITS_MESH.T2.seeds.length === 12 && mesh.every((s2) => !earlier.has(s2)) &&
+        refused === 24 && new Set(rs).size === 72, `${refused} of 24 refused`);
+}
+
+console.log("\n12. THE UPSCALE ROUND'S SPLIT (pre-registration section 81)");
+{
+    const { SPLITS_FSR1, SPLITS_MESH } = D;
+    const S1 = SPLITS_FSR1.T1, earlier = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH]
+        .flatMap((S) => Object.values(S).flatMap((x) => x.seeds)));
+    let refused = 0;
+    S1.seeds.forEach((s2, i) => { try { renderImages(familyOf(S1, i), s2, { w: 2, h: 2, sppIn: 1, sppRef: 1 }); } catch (e) { if (/dataset seed/.test(e.message)) refused++; } });
+    ok("!! SPLITS_FSR1: one test set, 6 new scenes of R (40000) then 6 of C (41000), each drawn as its own family, on seeds no earlier split used, every one refused without harvest",
+        Object.keys(SPLITS_FSR1).join() === "T1" && S1.seeds.length === 12 && S1.seeds.slice(0, 6).every((s2, i) => s2 === 40000 + i && familyOf(S1, i) === "R") &&
+        S1.seeds.slice(6).every((s2, i) => s2 === 41000 + i && familyOf(S1, 6 + i) === "C") && S1.seeds.every((s2) => !earlier.has(s2)) && refused === 12,
+        `${refused} of 12 refused`);
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +

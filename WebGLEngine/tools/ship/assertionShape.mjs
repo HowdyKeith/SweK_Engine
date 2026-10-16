@@ -932,9 +932,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // which the tree's one (c, m, d) spelling does not. The rest hold.
     // v4866 -- physics/mechanics/flightModel6dof-selfcheck.mjs: gates, usesOk, definesOk and nameFirst each by one (1972 -> 1973, 1951 -> 1952, 1943 -> 1944, 1842 -> 1843); it spells ok(name, cond, detail) like the tree's majority.
     // v4867 -- four new gates (brain/autopilotFlight-selfcheck.mjs, brain/flightTask-selfcheck.mjs, brain/pilotFlightPolicy-selfcheck.mjs, tools/ship/flightPage-selfcheck.mjs), each spelling ok(name, cond, detail) like the tree's majority: gates, usesOk, definesOk and nameFirst each by four (1973 -> 1977, 1952 -> 1956, 1944 -> 1948, 1843 -> 1847).
-    // v4869 -- two new gates (tools/ship/trainFlightPilot-selfcheck.mjs and brain/pilotFlightTrain-selfcheck.mjs), each spelling ok(name, cond, detail): gates, usesOk, definesOk and nameFirst each by two (1977 -> 1979, 1956 -> 1958, 1948 -> 1950, 1847 -> 1849); nothing else moved.
-    gates: 1979, usesOk: 1958, definesOk: 1950, importsOk: 0,
-    distinctDefinitions: 44, nameFirst: 1849, condFirst: 98, unknownSignature: 11,
+    // v4868 -- one new gate (render/denoiseUpscale-selfcheck.mjs, the denoiser arc's round 26), spelling ok(name, cond, detail) like the tree's majority: gates, usesOk, definesOk and nameFirst each +1.
+    // v4869 -- two new gates (tools/ship/trainFlightPilot-selfcheck.mjs and brain/pilotFlightTrain-selfcheck.mjs), each spelling ok(name, cond, detail): gates, usesOk, definesOk and nameFirst each by two (1978 -> 1980, 1957 -> 1959, 1949 -> 1951, 1848 -> 1850, on top of the denoiser's v4868); nothing else moved.
+    gates: 1980, usesOk: 1959, definesOk: 1951, importsOk: 0,
+    distinctDefinitions: 44, nameFirst: 1850, condFirst: 98, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

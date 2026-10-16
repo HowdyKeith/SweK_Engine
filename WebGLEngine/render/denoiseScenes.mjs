@@ -12,6 +12,10 @@
 "use strict";
 import { render, intersect, cameraBasis, pixelRay } from "../physics/render/pathTracer.mjs";
 import { rng } from "../physics/render/furnace.mjs";
+import { buildVoxelMeshGreedy } from "../mesh/voxelMeshGreedy.js";
+import { lathe } from "../mesh/lathe.mjs";
+import { extrudePolygon } from "../mesh/extrudePolygon.mjs";
+import { MeshBVH } from "../mesh/meshBVH.mjs";
 
 export const IMAGE = 64;          // the pre-registration's 64 x 64
 export const SPP_IN = 4;
@@ -128,9 +132,26 @@ export const SPLITS_R11 = Object.freeze({
     T1: Object.freeze({ family: "R", seeds: range(34000, 12) }),
     T2: Object.freeze({ family: "C", seeds: range(35000, 12) }),
 });
+/**
+ * Section 79's splits, the mesh round: NO TRAINING. The network and the filter are the ones the device ships (round 11's,
+ * render/denoise-net-r11.json), and only test scenes are drawn -- H1 on 12 scenes of family V (voxel structures, 36000),
+ * H2 on 12 of family M (lathed and extruded solids, 37000), on ranges no earlier split touched.
+ */
+export const SPLITS_MESH = Object.freeze({
+    T1: Object.freeze({ family: "V", seeds: range(36000, 12) }),
+    T2: Object.freeze({ family: "M", seeds: range(37000, 12) }),
+});
+/**
+ * Section 81's split, the upscale round: ONE test set, read by both hypotheses -- 6 new scenes of R (40000) and 6 of C
+ * (41000), the families the shipped network was trained on, so what changes is the RESOLUTION and nothing about the
+ * scenes. No training: the network and the filter are the shipped ones.
+ */
+export const SPLITS_FSR1 = Object.freeze({
+    T1: Object.freeze({ family: "R+C", families: Object.freeze([...rep("R", 6), ...rep("C", 6)]), seeds: Object.freeze([...range(40000, 6), ...range(41000, 6)]) }),
+});
 /** The family of a split's i-th scene: its own entry in `families` when the split mixes them, else the split's. */
 export const familyOf = (split, i) => (split.families ? split.families[i] : split.family);
-const RESERVED = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11].flatMap((S) => Object.values(S).flatMap((s) => s.seeds)));
+const RESERVED = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1].flatMap((S) => Object.values(S).flatMap((s) => s.seeds)));
 export const isDatasetSeed = (seed) => RESERVED.has(seed);
 
 /** The render seeds of a scene: the input, the reference and the second reference -- distinct for every scene seed. */
@@ -144,7 +165,8 @@ export function renderSeeds(seed) { return { input: seed * 8 + 1, ref: seed * 8 
 export function makeScene(family, seed) {
     if (family === "C") return makeSceneC(seed);
     if (family === "R") return makeSceneR(seed);
-    if (family !== "A" && family !== "B") throw new Error("denoiseScenes: family is A, B, C or R, got " + family);
+    if (family === "V" || family === "M") return makeSceneMesh(family, seed);
+    if (family !== "A" && family !== "B") throw new Error("denoiseScenes: family is A, B, C, R, V or M, got " + family);
     const r = rng(((seed >>> 0) * 2654435761 + (family === "A" ? 17 : 29)) >>> 0);
     const U = (a, b) => a + (b - a) * r();
     const scene = [{ centre: [0, -100, 0], radius: 100, albedo: [U(0.3, 0.7), U(0.3, 0.7), U(0.3, 0.7)] }];
@@ -249,6 +271,96 @@ function makeSceneR(seed) {
     const ang = U(0, 2 * Math.PI), ringR = U(3.5, 5.5);
     const eye = [ringR * Math.cos(ang), U(0.7, 2.5), ringR * Math.sin(ang)];
     return { family: "R", seed, scene, sky, skyKind, lightRadius: null, eye, look: [0, 0.4, 0], up: [0, 1, 0], fovDeg: 40 };
+}
+
+/**
+ * Families V and M, the mesh round (pre-registration section 79): THE ENGINE'S OWN GEOMETRY IN FAMILY R'S SCENES.
+ * Each draws family R's scene for its own seed -- the ground, the emitters, the sky, the camera, and every resting
+ * sphere's place, size and material, exactly as R would -- and then replaces each resting sphere by a closed triangle
+ * mesh built by this tree's own mesh code, in the sphere's footprint (its centre, a box of side 2 x radius, resting on
+ * the ground) and with the sphere's material. So the ONE thing that differs from the family the network was trained
+ * on is the shape: flat faces, hard edges, normals that jump. The shapes draw from their own stream, so R's draws are
+ * R's whatever V and M do.
+ * - **V, voxel structures:** a grid of 3-6 cells a side, grown from the bottom centre cell by adding random face
+ *   neighbours until 35-70% of the grid is filled, meshed by mesh/voxelMeshGreedy.js -- voxel-viewer.html's own builder.
+ * - **M, solids:** half lathed (mesh/lathe.mjs: 3-6 rows from the ground to 70-100% of the box's height, each of radius
+ *   30-100% of the sphere's, 48 segments), half extruded (mesh/extrudePolygon.mjs: a star-shaped polygon of 3-8 points
+ *   at 40-100% of the sphere's radius, stood upright, 50-100% of the box's height).
+ * Every mesh is wound OUTWARD (its signed volume positive) -- the tracer takes a hit's normal as it comes, and a sphere's
+ * always faces out. The emitters stay spheres: next-event estimation samples a sphere's solid angle.
+ */
+const MESH_SALT = Object.freeze({ V: 43, M: 47 });
+/** Signed volume of a flat triangle buffer (9 floats a triangle): positive when the mesh is wound outward. */
+export function signedVolume(tris) {
+    let v = 0;
+    for (let o = 0; o < tris.length; o += 9) {
+        const [ax, ay, az, bx, by, bz, cx, cy, cz] = tris.subarray(o, o + 9);
+        v += (ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx) + az * (bx * cy - by * cx)) / 6;
+    }
+    return v;
+}
+/** A flat triangle buffer from flat positions and indices, each vertex through `at`, wound outward. */
+function outward(positions, indices, at) {
+    const tris = new Float64Array(indices.length * 3);
+    for (let t = 0; t < indices.length; t++) {
+        const p = at(positions[indices[t] * 3], positions[indices[t] * 3 + 1], positions[indices[t] * 3 + 2]);
+        tris[t * 3] = p[0]; tris[t * 3 + 1] = p[1]; tris[t * 3 + 2] = p[2];
+    }
+    if (signedVolume(tris) < 0) for (let o = 0; o < tris.length; o += 9) for (let k = 0; k < 3; k++) {
+        const b = tris[o + 3 + k]; tris[o + 3 + k] = tris[o + 6 + k]; tris[o + 6 + k] = b;
+    }
+    return tris;
+}
+function voxelMesh(U, r, x, rad, z) {
+    const N = 3 + Math.floor(r() * 4), want = Math.max(2, Math.round(U(0.35, 0.7) * N * N * N)), c = Math.floor(N / 2);
+    const key = (b) => b.join(","), have = new Set([key([c, 0, c])]), blocks = [[c, 0, c]];
+    const steps = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+    for (let tries = 0; blocks.length < want && tries < 20000; tries++) {
+        const b = blocks[Math.floor(r() * blocks.length)], d = steps[Math.floor(r() * 6)];
+        const q = [b[0] + d[0], b[1] + d[1], b[2] + d[2]];
+        if (q.some((v) => v < 0 || v >= N) || have.has(key(q))) continue;
+        have.add(key(q)); blocks.push(q);
+    }
+    // MESHED BY voxel-viewer.html's OWN BUFFER BUILDER, not by a corner rule written here. A first draft built the
+    // quads from greedyMesh3d directly and got both halves of the convention wrong: a quad's pos is its CELL, not
+    // its face plane, so every +x, +y and +z face sat one cell inside its block, facing in -- conductors rendered
+    // black. buildVoxelMeshGreedy places each face at +-0.5 about the voxel's centre and winds each quad by its own
+    // normal, and mesh/voxelMeshGreedy-selfcheck.mjs proves that per quad.
+    const m = buildVoxelMeshGreedy(blocks.map((b) => [b[0], b[1], b[2], 0])), size = (2 * rad) / N;
+    return outward(m.positions, m.indices, (a, b, cc) => [x - rad + (a + 0.5) * size, (b + 0.5) * size, z - rad + (cc + 0.5) * size]);
+}
+function solidMesh(U, r, x, rad, z) {
+    if (r() < 0.5) {
+        const K = 3 + Math.floor(r() * 4), h = 2 * rad * U(0.7, 1);
+        const rows = Array.from({ length: K }, (_, k) => ({ y: (h * k) / (K - 1), r: rad * U(0.3, 1) }));
+        const m = lathe({ axis: 0, rows }, 48);
+        return outward(m.positions, m.indices, (a, b, c) => [x + a, b, z + c]);
+    }
+    const n = 3 + Math.floor(r() * 6), h = 2 * rad * U(0.5, 1), phase = U(0, 2 * Math.PI);
+    const pts = Array.from({ length: n }, (_, i) => {
+        const t = phase + (2 * Math.PI * (i + U(-0.3, 0.3))) / n, rr = rad * U(0.4, 1);
+        return [rr * Math.cos(t), rr * Math.sin(t)];
+    });
+    const m = extrudePolygon(pts, h);
+    // extruded along z from -h/2 to h/2: z becomes height (0..h), the polygon lies in x and z
+    return outward(m.positions, m.indices, (a, b, c) => [x + a, c + h / 2, z + b]);
+}
+function makeSceneMesh(family, seed) {
+    const S = makeSceneR(seed);
+    const r = rng(((seed >>> 0) * 2654435761 + MESH_SALT[family]) >>> 0);
+    const U = (a, b) => a + (b - a) * r();
+    const scene = S.scene.map((o, i) => {
+        if (i === 0 || o.emit) return o;                       // the ground and the emitters, as R drew them
+        const [x, , z] = o.centre, rad = o.radius;
+        const tris = family === "V" ? voxelMesh(U, r, x, rad, z) : solidMesh(U, r, x, rad, z);
+        const { centre, radius, ...material } = o;             // the sphere's material, nothing else
+        // A CONDUCTOR'S albedo IS NEVER READ -- its branch returns before the Lambertian alb() and its light
+        // sampling skips the Lambertian loop -- but the tracer refuses a mesh entry without the field, so it gets
+        // 0. render/denoiseScenes-selfcheck renders one conductor mesh at albedo 0 and at 1 and holds them equal.
+        if (material.albedo === undefined) material.albedo = 0;
+        return { ...material, bvh: new MeshBVH(tris), mesh: { kind: family, tris: tris.length / 9, footprint: [x, rad, z, rad] } };
+    });
+    return { ...S, family, seed, scene };
 }
 
 /**

@@ -80,6 +80,10 @@
 //   S7  the unpaired ratio read at the SMALLEST common size              -> RED: "read at the largest size BOTH ladders measured"
 //   S8  every "rXX against r15" line tagged section 61                   -> RED: "each ... line is r15's median over the set's"
 //   S9  nativePlan reading the compiler without the device's flags       -> RED: "a native run's plan is read off its package WITH ITS DEVICE'S FLAGS"
+// v4868 -- ROUND 27 (section 83), against r27w on the ladders. Each restored byte-identical (md5):
+//   Y1  render/denoiseDevice.mjs's kernelFor never picks the Winograd kernel -> 2 RED: "different kernels", natively and on the page
+//   Y3  nativeSetsFor ignoring FXC_UNTRIED_SETS                              -> 2 RED: the ladders' sets row, the native plan row
+//   Y7  every "r27w against rXX" line tagged section 61                      -> 1 RED: "each \"r27w against rXX\" line is that set's median"
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -90,7 +94,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SELF = fileURLToPath(import.meta.url);
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
-const { TIMING_SIZES, largestBuffer, passBytes, timingInput, summarize, adapterOf, timingLadder, decodeNet, KERNEL_SETS, TIMED_SETS, FXC_UNBUILT_SETS, nativeSetsFor,
+const { TIMING_SIZES, largestBuffer, passBytes, timingInput, summarize, adapterOf, timingLadder, decodeNet, KERNEL_SETS, TIMED_SETS, FXC_UNBUILT_SETS, FXC_UNTRIED_SETS, nativeSetsFor,
         isDxcCompiler, nativeAdapterKey } = await imp("render/denoiseDevice.mjs");
 const { dawnFlags } = await imp("render/denoiseCompile.mjs");
 const H = await imp("tools/ship/headlessGpu.mjs");
@@ -184,6 +188,23 @@ function report(label, r) {
         if (a.skipped || b.skipped) return;
         say(vsR15Line(label, B, b, a));
     });
+    // v4868 -- round 27 (section 83): r27w against r15 and against each round-18 set -- what each GPU runs today, natively under DXC
+    // and on the page -- at every size both measured, A's median over r27w's: the ratios section 83's rule reads
+    if (r.rows.r27w) {
+        const vs = [];
+        for (const A of r.sets.filter((s) => s === "r15" || /^r18/.test(s))) r.rows.r27w.forEach((b, i) => {
+            const a = r.rows[A][i];
+            if (a.skipped || b.skipped) return;
+            say(vsSetLine(label, "r27w", A, b, a));
+            vs.push([A, b.W, b.H, a.gpu && b.gpu ? a.gpu.median / b.gpu.median : a.wall.median / b.wall.median, a.gpu && b.gpu ? "device" : "wall"]);
+        });
+        if (vs.length) REPORT.table(`${label}: r27w against r15 and each round-18 set -- that set's median over r27w's (section 83)`, ["against", "W", "H", "x as fast", "clock"], vs);
+    }
+}
+// v4868 -- round 27 (section 83): set B's row `b` against set A's row `a` at one size: A's median over B's, on the device's clock where both have one
+function vsSetLine(label, B, A, b, a) {
+    const dev = !!(a.gpu && b.gpu), ratio = dev ? a.gpu.median / b.gpu.median : a.wall.median / b.wall.median;
+    return `${label}: ${B} against ${A} at ${b.W} x ${b.H}: ${ratio.toFixed(3)} x as fast, on the ${dev ? "device's clock" : "wall clock"} -- section 83`;
 }
 // Round 19 (section 66): the rule an "rXX against r15" line is read by -- the page's, section 61's; a native ladder's, section 66's
 const r15Section = (label) => (/^native\b/.test(label) ? "section 66" : "section 61");
@@ -221,7 +242,7 @@ function pairedHolds(label, r, want = KERNEL_SETS) {
     // what each set's layers run on, read off the pass names the ladder printed
     const kinds = { r12: "tiled,tiled,tiled,tiled,direct|apply", r13: "fast,fast,fast,fast,fast|apply", r14: "fast,fast,fast,fast,head|apply_fast",
                     r15: "fast,fast,fast,fast,head_apply|head_apply", r18t: "tile_inline,tile_inline,tile_inline,tile_inline,head_apply|head_apply",
-                    r18u: "fast_unroll,fast_unroll,fast_unroll,fast_unroll,head_apply|head_apply" };
+                    r18u: "fast_unroll,fast_unroll,fast_unroll,fast_unroll,head_apply|head_apply", r27w: "wino,wino,wino,wino,head_apply|head_apply" };
     // the apply is the sixth pass, or -- r15, whose head and kernel are one pass -- the fifth's
     const kindOf = (x) => x.passes.slice(0, 5).map((n) => /\((\w+),/.exec(n)[1]).join() + "|" + (x.passes[5] ? /\((\w+)\)$/.exec(x.passes[5])[1] : /\((\w+),/.exec(x.passes[4])[1]);
     ok(`  ${label}: and they are different kernels -- ${want.map((s) => `${s} ${kinds[s]}`).join("; ")}`,
@@ -314,9 +335,9 @@ console.log("1. THE LADDER'S ARITHMETIC");
     // round 19 (section 66): by the run's compiler -- FXC, none named, or one a dump could not read keep round 18's two sets out on
     // D3D12; DXC (as nativeCompiler names it, or as a dump reads it) builds all four; Vulkan builds all four whatever is named
     const all = TIMED_SETS.join(), by = (ad, compiler) => nativeSetsFor(ad, TIMED_SETS, { compiler }).join();
-    ok("  round 19: both ladders time r12, r15, r18t and r18u -- r12 first, the reference every speedup is read against -- and natively on a D3D12 adapter by the run's compiler: " +
-        "under FXC, none named or one unread, r12 and r15 alone; under DXC all four; on Vulkan all four",
-        all === "r12,r15,r18t,r18u" && TIMED_SETS.every((s) => KERNEL_SETS.includes(s)) && FXC_UNBUILT_SETS.join() === "r18t,r18u" &&
+    ok("  round 19: both ladders time r12, r15, r18t, r18u and (round 27) r27w -- r12 first, the reference every speedup is read against -- and natively on a D3D12 adapter by the run's compiler: " +
+        "under FXC, none named or one unread, r12 and r15 alone; under DXC all five; on Vulkan all five",
+        all === "r12,r15,r18t,r18u,r27w" && TIMED_SETS.every((s) => KERNEL_SETS.includes(s)) && FXC_UNBUILT_SETS.join() === "r18t,r18u" && FXC_UNTRIED_SETS.join() === "r27w" &&
         by(d3d, "FXC") === "r12,r15" && by(d3d, null) === "r12,r15" && by(d3d, "unknown (no dump)") === "r12,r15" && nativeSetsFor(d3d, TIMED_SETS).join() === "r12,r15" &&
         by(d3d, "DXC") === all && by(d3d, "DXC (DXIL)") === all && by(vk, null) === all && by(vk, "FXC") === all && by({ info: {} }, null) === all,
         `D3D12: FXC ${by(d3d, "FXC")}, none ${by(d3d, null)}, DXC ${by(d3d, "DXC")}; Vulkan: ${by(vk, null)} -- section 60: node-webgpu 0.6.0's FXC stopped on r18t's kernel and crashed on r18u's; section 65: 0.6.2's DXC built both`);
@@ -327,10 +348,10 @@ console.log("1. THE LADDER'S ARITHMETIC");
           p061 = plan(d3d, { version: "0.6.1", dxcBeside: true }, "win32", shipped), pUnread = plan(d3d, null, "win32", shipped),
           pChild = plan(d3d, { version: "0.6.2", dxcBeside: true }, "win32", FXC_FLAGS), pLinux = plan(vk, { version: "0.6.2", dxcBeside: true }, "linux", shipped);
     const says = (p) => `${p.compiler || "none"}: ${p.sets.join(",")}; FXC ladder ${p.fxcSkip ? "skipped" : "runs"}`;
-    ok("!! round 19: a native run's plan is read off its package WITH ITS DEVICE'S FLAGS -- 0.6.2 shipping DXC on D3D12: DXC, all four sets, and the FXC ladder; 0.6.0, 0.6.1 with the DLL " +
-        "copied beside, or a package unread: FXC, r12 and r15, no FXC ladder; the FXC child's own flags on 0.6.2: FXC; Linux: no D3D compiler, all four, no FXC ladder",
+    ok("!! round 19: a native run's plan is read off its package WITH ITS DEVICE'S FLAGS -- 0.6.2 shipping DXC on D3D12: DXC, all five sets, and the FXC ladder; 0.6.0, 0.6.1 with the DLL " +
+        "copied beside, or a package unread: FXC, r12 and r15, no FXC ladder; the FXC child's own flags on 0.6.2: FXC; Linux: no D3D compiler, all five, no FXC ladder",
         p062.compiler === "DXC" && p062.sets.join() === all && p062.dropped.length === 0 && p062.fxcSkip === null &&
-        [p060, p061, pUnread].every((p) => p.compiler === "FXC" && p.sets.join() === "r12,r15" && p.dropped.join() === "r18t,r18u" && /as shipped is FXC/.test(p.fxcSkip || "")) &&
+        [p060, p061, pUnread].every((p) => p.compiler === "FXC" && p.sets.join() === "r12,r15" && p.dropped.join() === "r18t,r18u,r27w" && /as shipped is FXC/.test(p.fxcSkip || "")) &&
         /before 0\.6\.2 forces use_dxc off/.test(p061.fxcSkip) && /no dxcompiler\.dll/.test(p060.fxcSkip) &&
         pChild.compiler === "FXC" && pChild.sets.join() === "r12,r15" && pLinux.compiler === null && pLinux.sets.join() === all && /linux has no D3D compiler/.test(pLinux.fxcSkip || ""),
         [p062, p060, p061, pUnread, pChild, pLinux].map(says).join("  /  "));
@@ -359,6 +380,11 @@ console.log("1. THE LADDER'S ARITHMETIC");
         ln.native === "native: r18t against r15 at 256 x 256: 1.500 x as fast, on the device's clock -- section 66" && ln.page.endsWith("1.500 x as fast, on the device's clock -- section 61") &&
         ln.fxc.endsWith("-- section 66") && ln.wall === "native: r18u against r15 at 64 x 64: 1.500 x as fast, on the wall clock -- section 66",
         `${ln.native}  /  ${ln.page}`);
+    // v4868 -- round 27 (section 83): r27w's lines against r15 and each round-18 set, tagged section 83 on either ladder
+    const l27 = [vsSetLine("native", "r27w", "r18t", row(1920, 1080, 8), row(1920, 1080, 10)), vsSetLine("page", "r27w", "r18u", { ...row(1024, 1024, 4), gpu: null }, row(1024, 1024, 5))];
+    ok("!! round 27: each \"r27w against rXX\" line is that set's median over r27w's, tagged section 83 on either ladder -- the ratio section 83's rule reads",
+        l27[0] === "native: r27w against r18t at 1920 x 1080: 1.250 x as fast, on the device's clock -- section 83" && l27[1] === "page: r27w against r18u at 1024 x 1024: 1.250 x as fast, on the wall clock -- section 83",
+        l27.join(" / "));
     // round 19 (section 66, test 4): the unpaired line, at the largest size BOTH ladders measured -- here 256 x 256: the DXC ladder
     // measured r18t to 512, the FXC ladder r15 only to 256
     const dxcL = { rows: { r18t: [row(64, 64, 1), row(128, 128, 2), row(256, 256, 8), row(512, 512, 30), row(1024, 1024, 0, true)] } };
@@ -410,7 +436,8 @@ else {
             say(`native: node-webgpu ${p.pkg && p.pkg.version ? p.pkg.version : "(version unread)"}${process.env[H.WEBGPU_ENV] ? " (" + H.WEBGPU_ENV + ")" : ""}; compiler, read off the package with this device's flags: ` +
                 `${p.compiler || "none -- " + process.platform + " has no D3D compiler"}; sets timed: ${p.sets.join(", ")}`);
             for (const s of p.dropped)
-                console.log(`  SKIP  native ${s}: a D3D12 adapter whose compiler, read off the package, is ${p.compiler || "unread (counted as FXC)"} -- node-webgpu's FXC does not build its kernel (section 60); ` +
+                console.log(`  SKIP  native ${s}: a D3D12 adapter whose compiler, read off the package, is ${p.compiler || "unread (counted as FXC)"} -- ` +
+                    (FXC_UNTRIED_SETS.includes(s) ? "its kernel has never been built under FXC (section 83); " : "node-webgpu's FXC does not build its kernel (section 60); ") +
                     "the page times it, and a package that ships DXC times it here (section 66)");
         } }));
     } catch (e) { err = String(e && e.message || e); }

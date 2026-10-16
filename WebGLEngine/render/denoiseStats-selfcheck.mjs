@@ -26,6 +26,8 @@
 //   S17 the sign-flip test without its tie tolerance                             1 RED (equal effects of 0.1 split by rounding)
 //   S18 the sign-flip test counts only sums strictly above the observed          2 RED
 //   S19 the sign-flip test with every magnitude 1 -- the count again             4 RED
+//   S20 a C2 cited as FAILED treated as held (section 79)                        1 RED
+//   S21 a cited C2 AND a shuffled network both accepted                         1 RED
 "use strict";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -172,6 +174,26 @@ console.log("\n6. THE SIGN-FLIP TEST -- EACH IMAGE WEIGHED BY HOW MUCH (pre-regi
         h.test === "signflip" && h.p === signFlipUpper(h.d) && h.pSign === signTestUpper(h.k, 12) && h.p !== h.pSign && vs.hypotheses.H2.p === signTestUpper(9, 12) &&
         vs.hypotheses.H2.test === undefined && vf.hypotheses.H1.status === "supported", `H2: sign-flip ${h.p.toFixed(4)}, sign ${h.pSign.toFixed(4)}`);
     ok("  an unknown test is refused", (() => { try { verdict({ sets: T, determinism: true, seedsDistinct: true, test: "t" }); return false; } catch { return true; } })());
+}
+
+console.log("\n7. C2 CITED FROM THE ROUND THAT TRAINED THE NETWORK (pre-registration section 79: a round that trains nothing)");
+{
+    const T = { H1: set({ wins: 12 }), H2: set({ wins: 11 }) };
+    const prior = { round: 11, meanD: -1.8564223228700172, ok: true };
+    const v = verdict({ sets: T, shuffled: null, c2Prior: prior, determinism: true, seedsDistinct: true, test: "signflip" });
+    ok("!! a cited C2 that held there holds here, and says where it came from", v.run === "reported" && v.controls.C2.ok === true &&
+        v.controls.C2.citedFrom === 11 && v.controls.C2.meanD === prior.meanD && v.hypotheses.H1.status === "supported",
+        `run ${v.run}; C2 ${JSON.stringify(v.controls.C2)}`);
+    const vf = verdict({ sets: T, shuffled: null, c2Prior: { ...prior, meanD: 0.2, ok: false }, determinism: true, seedsDistinct: true, test: "signflip" });
+    ok("!! a cited C2 that FAILED there makes this run not resolvable, and the reason names the round", vf.run === "not resolvable" &&
+        vf.hypotheses.H1.status === "not resolvable" && vf.reasons.some((r) => /cited from round 11/.test(r)), vf.reasons.join(" | "));
+    const none = verdict({ sets: T, shuffled: null, determinism: true, seedsDistinct: true, test: "signflip" });
+    ok("  with neither a shuffled network nor a cited C2, the run is still not resolvable -- citing is explicit, never a default",
+        none.run === "not resolvable" && none.reasons.some((r) => /not run/.test(r)));
+    const throws = (o) => { try { verdict({ sets: T, determinism: true, seedsDistinct: true, ...o }); return false; } catch { return true; } };
+    ok("  both sources at once are refused, and so is a citation missing its round, its mean d or its outcome",
+        throws({ shuffled: [shuffledLoses(T.H1)], c2Prior: prior }) && throws({ shuffled: null, c2Prior: { meanD: -1, ok: true } }) &&
+        throws({ shuffled: null, c2Prior: { round: 11, ok: true } }) && throws({ shuffled: null, c2Prior: { round: 11, meanD: -1 } }));
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"}` +

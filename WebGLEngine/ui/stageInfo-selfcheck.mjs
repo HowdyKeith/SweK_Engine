@@ -6,6 +6,8 @@
 //   dials === "block" and passed from v4413 to v4862 while #dials sat in a display:none wrapper.
 //   SABOTAGE: #dials put back inside that wrapper -> exit=1, 1 red BY NAME ("dials flex at 0 px").
 //   Restored, md5-identical.
+// v4868 -- the avatar is read the same way: it is flex now (a server.html rule, which stopped a 6 px-a-frame
+//   height runaway), and "=== block" would have failed a fix for a reason that says nothing about visibility.
 //
 // *** THE ASK, AND WHY IT IS THREE CHANGES RATHER THAN ONE. *** Keith, looking at a clicked drawer on the rig:
 // "the gauges and avatar should not be shown on a clicked server.html open panel. in this case the Voxel &
@@ -372,7 +374,7 @@ console.log("__J__" + JSON.stringify(out));`;
                 "#gaugeAvatarCol's own flex:1 1 460px grows to)");
             ok("!! and 'back to the right' puts everything back, gauges included",
                 r.back && r.back.stage === "none" && r.back.railHome === "gaugeAvatarCol" &&
-                r.back.dials !== "none" && r.back.dialsW > 0 && r.back.robot === "block" && r.back.robotW > 0 &&
+                r.back.dials !== "none" && r.back.dialsW > 0 && r.back.robot !== "none" && r.back.robotW > 0 &&
                 r.back.panelHome === "gaugeSections",
                 "stage hidden, row home in #gaugeAvatarCol, dials " + r.back.dials + " at " + r.back.dialsW + " px and " +
                 "avatar " + r.back.robot + " at " + r.back.robotW + " px, panel back in #gaugeSections -- THE PIN IS " +

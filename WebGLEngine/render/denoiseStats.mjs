@@ -131,7 +131,17 @@ export function trainSanity(filterRel, netRel, noisyRel) {
  * to: "sign" (sections 6-27) or "signflip" (section 28); each hypothesis reports both p values, and `p` is the tested
  * one. Returns { run, reasons, hypotheses, controls }.
  */
-export function verdict({ sets, shuffled, determinism, seedsDistinct, c0 = null, c6 = null, c1Train = null, test = "sign", alpha = 0.05, inFamily = "H1" }) {
+/**
+ * `c2Prior` (section 79): a round that TRAINS NOTHING has no shuffled-target network of its own to run, and C2 is a
+ * question about how a network was trained -- whether the statistic measures denoising or something the training made
+ * up. Such a round names the round that trained its network and that round's C2, { round, meanD, ok }, and the
+ * control is that record: held where it held there, reported as cited, never re-derived. Passing `shuffled` as well
+ * is refused -- one control, one source.
+ */
+export function verdict({ sets, shuffled, determinism, seedsDistinct, c0 = null, c6 = null, c1Train = null, c2Prior = null, test = "sign", alpha = 0.05, inFamily = "H1" }) {
+    if (c2Prior && shuffled) throw new Error("denoiseStats: C2 from a shuffled-target network AND from a prior round -- one source");
+    if (c2Prior && !(typeof c2Prior.round === "number" && typeof c2Prior.ok === "boolean" && Number.isFinite(c2Prior.meanD)))
+        throw new Error("denoiseStats: c2Prior needs { round, meanD, ok }");
     if (!TESTS.includes(test)) throw new Error(`denoiseStats: test "${test}" is not one of ${TESTS.join(", ")}`);
     const reasons = [], controls = {};
     // C6 (section 17), like C0, is decided before the test sets exist
@@ -178,6 +188,9 @@ export function verdict({ sets, shuffled, determinism, seedsDistinct, c0 = null,
         const meanS = dS.reduce((a, v) => a + v, 0) / dS.length;
         c2 = meanS <= 0; controls.C2 = { meanD: meanS, ok: c2 };
         if (!c2) reasons.push(`C2: the shuffled-target network beat the filter on ${inFamily} (mean d ${meanS.toFixed(4)})`);
+    } else if (c2Prior) {
+        c2 = c2Prior.ok; controls.C2 = { meanD: c2Prior.meanD, ok: c2Prior.ok, citedFrom: c2Prior.round };
+        if (!c2) reasons.push(`C2, cited from round ${c2Prior.round}: its shuffled-target network beat the filter (mean d ${c2Prior.meanD.toFixed(4)})`);
     } else { controls.C2 = { ok: false }; c2 = false; reasons.push("C2: the shuffled-target network was not run"); }
     const tests = holm(names.map((nm) => H[nm].p), alpha);
     names.forEach((nm, i) => {

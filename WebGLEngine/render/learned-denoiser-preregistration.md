@@ -4897,3 +4897,582 @@ ran before this -- section 68's --which runs, round 19's verdict -- to the table
 **What it does not change.** The page's table (section 63's, already r18t on the 1080 in Chrome), DEFAULT_KERNELS, and any FXC run.
 The next native run of `denoiseDevice-selfcheck` on the 1080 builds r18t through the native caller where it built r15: that row
 is held within 1e-4 of the f64 network, as r18t's K0 rows already are on that GPU.
+
+## 79. ROUND 25 -- THE MESH ROUND: THE SHIPPED NETWORK ON THE ENGINE'S OWN GEOMETRY, FIXED BEFORE ANY OF ITS TEST SCENES EXIST
+
+Committed with the code that implements it. No scene of this round's two test sets has been rendered.
+
+**Why this round.** Since section 34 the page has said the network was trained on families R and C and that nothing in
+the arc says it works on any other scene. Every scene in the arc is spheres. Keith asked for the network on the engine's
+own content. This round asks it, and asks nothing else.
+
+> **Does the network the device ships beat the filter it ships, on scenes built from this engine's own geometry?**
+
+**Nothing is trained or tuned.**
+- The network is round 11's seed 1, as `render/denoise-net-r11.json` stores it: the file `denoise.html` loads, sha-256
+  `f1a84d47db611e77a6c46dcca3bc2ed40d5756d0ca6480157b65b8bc2557e856`. `tools/denoiseStudy.mjs --harvest-mesh` decodes it
+  with `decodeNet`, as the page does, and writes the hash beside the results.
+- The filter is the setting that file names, tuned on round 11's 192 training scenes: sS 1, sN 1, sA 0.2, sI 4.
+- The input is round 11's: 64 x 64, 4 samples, the nine channels and the emitter mask. The references are 1024 samples,
+  each test image with a second one for C3.
+- **One network, not three seeds' mean.** This is a deployment question, about what the page runs. Rounds 1-11 held each
+  image's network error to the mean over seeds 1-3; here it is seed 1's alone.
+
+**The two families, both new, both built from R.** `render/denoiseScenes.mjs`'s families V and M take family R's scene
+for their own seed: the ground, the emitters, the sky, the camera, and every resting sphere's place, size and material,
+exactly as R draws them. Then each resting sphere is replaced by a closed triangle mesh, inside the sphere's footprint
+(a box of side 2 x radius at its centre, resting on the ground), with the sphere's material.
+- **V, voxel structures.** A grid of 3-6 cells a side, grown from the bottom centre cell by random face neighbours until
+  35-70% of it is filled. Meshed by `mesh/voxelMeshGreedy.js`, voxel-viewer.html's own buffer builder.
+- **M, solids.** Half are lathed (`mesh/lathe.mjs`: 3-6 rows from the ground to 70-100% of the box's height, each of
+  radius 30-100% of the sphere's, 48 segments). Half are extruded (`mesh/extrudePolygon.mjs`: a star-shaped polygon of
+  3-8 points at 40-100% of the sphere's radius, stood upright, 50-100% of the box's height).
+- **So the one thing that differs from the family the network was trained on is the shape:** flat faces, hard edges,
+  and normals that jump. Materials, lights, sky and camera are R's.
+- Every mesh is wound outward, because the tracer takes a hit's normal as it comes. The emitters stay spheres, because
+  next-event estimation samples a sphere's solid angle. A conductor mesh carries an albedo of 0, which its shading never
+  reads, because the tracer refuses a mesh entry without one; the gate renders one at 0 and at 1 and holds them equal.
+- R's own draws are untouched. Its fingerprint over 40 scenes is the one computed from the module before V and M
+  existed.
+
+**Splits** (`SPLITS_MESH`), test sets only:
+
+| Set | Family | Seeds |
+|---|---|---|
+| T1 -> **H1** | 12 of V | **36000-36011** |
+| T2 -> **H2** | 12 of M | **37000-37011** |
+
+No earlier split touched these seeds. C5 holds over the round's 72 render seeds.
+
+**The statistic is section 6's, with section 28's test.**
+- Per image, `d_i = ln relMSE(filter_i) - ln relMSE(net_i)`. Positive means the network won.
+- Each hypothesis is supported iff the mean of d over its 12 images is > 0 and the exact one-sided sign-flip test's p is
+  below its Holm threshold. Holm-Bonferroni runs over {H1, H2} at family alpha 0.05.
+
+**Controls.**
+- **C1, sanity, on each test set,** as section 7 first wrote it. There are no training images to decide it on, so it is
+  decided here. Both methods must beat the noisy input on at least 11 of 12 images of each set, or the run is not
+  reported.
+- **C2, cited from round 11.** This round trains nothing, so it has no shuffled-target network of its own. C2 asks
+  whether the statistic measures denoising or something the training made up, and that is a question about the network
+  under test. Round 11's shuffled-target network lost to the filter by a mean d of -1.856: held.
+  `denoiseStats.verdict`'s `c2Prior` carries it, and the gate holds it to round 11's file bit for bit.
+- **C3, the reference floor, per set:** a set is not resolvable if the network is within 2 x of its floor on more than
+  half of its images.
+- **C4, determinism:** the forward pass, run twice over T1, gives the same output bit for bit.
+- **C5:** the 72 render seeds are distinct.
+
+**What each outcome buys.**
+- **H1 and H2 supported:** the page's scope note may say the shipped network also beats the shipped filter on this
+  engine's voxel structures and lathed and extruded solids, in R's materials, light and sky. It may not say more than
+  that: no other material, light or sky has been tested.
+- **One only:** the note may name that family alone.
+- **Neither:** the page's note stands as it is. A round training on mesh scenes would be a later question, pre-registered
+  on its own.
+- **Not reported** (C1, C4 or C5 fired) or **not resolvable** (C3, or a cited C2 that had failed): nothing moves.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 holds on both sets.
+- **P2 and P3:** H1 and H2 are both supported.
+  - The reasoning: the network predicts a kernel over real noisy samples from the same guide channels the filter weighs,
+    and ten rounds found it failing where the MATERIALS and LIGHT changed (family C). Here only the shape changes.
+- **P4:** each set's mean d is below round 11's H1 (0.548). The network was fitted to spheres' smoothly turning
+  normals, and a voxel edge is a step it has not seen.
+- All four are reported either way.
+
+**Secondary, reported, never tested:** per-image d, each set's noisy error and floor, and time.
+
+**What was seen first.**
+- Everything in sections 1-78.
+- **The scenes, on seeds outside every split (90001-90004):** a contact sheet at 48 samples, radiance and normals, R
+  against V and M. It found two bugs, both fixed before this was written:
+  - The voxel faces were first built by hand from `greedyMesh3d`'s quads. A quad's `pos` is its cell, not its face's
+    plane, so every +x, +y and +z face sat inside its block, facing in, and conductors rendered black.
+  - The extruded and lathed solids needed their winding checked. Every mesh is now held to a positive signed volume.
+- **The pilot, on seeds 90100-90107, with NO network or filter:** brightness, the noisy input against a 256-sample
+  reference, and time.
+
+| family | mean radiance, median [range] | noisy relMSE vs 256 spp, median | 256 spp, median | triangles, median |
+|---|---|---|---|---|
+| R | 0.393 [0.284-0.799] | 0.0784 | 2.0 s | 0 |
+| V | 0.387 [0.260-0.794] | 0.0879 | 6.5 s | 484 |
+| M | 0.401 [0.274-0.796] | 0.0654 | 5.1 s | 870 |
+
+  - V and M sit where R does, so relMSE's 0.01 offset treats them as it treats R.
+  - A 1024-sample reference takes about 26 s for V and 20 s for M here.
+- `render/denoiseStudy-selfcheck.mjs` runs the shipped pair on four 16 x 16 scenes of V and M outside every split, to
+  hold the plumbing. It prints no error and no effect, and none was read.
+- Nothing of either test set has been rendered.
+
+**The command:** `node tools/denoiseStudy.mjs --harvest-mesh --cache <dir>` -> `render/denoise-results-mesh.json`.
+- It refuses if the file exists.
+- It runs here, about 25 minutes, and the file is committed byte for byte before it is read. Section 80 reads it.
+
+## 80. ROUND 25 -- THE VERDICT: THE SHIPPED NETWORK BEATS THE SHIPPED FILTER ON BOTH OF THE ENGINE'S OWN GEOMETRIES
+
+**What arrived.** `render/denoise-results-mesh.json`, written by `tools/denoiseStudy.mjs --harvest-mesh` at c4ff58d2 and
+committed byte for byte (40a0ecbd, sha-256 `5a1eba21...`) before it was read. The shipped file it ran is the one section 79
+named (sha-256 `f1a84d47...`). 1,318 s to render the 24 test scenes and their 48 references here, 14 s to measure.
+
+**The run is reported: every control held.**
+- **C1:** on both sets, the network and the filter each beat the noisy input on 12 of 12 images.
+- **C2,** cited from round 11: held (mean d -1.856 there).
+- **C3:** one V image of 12 within 2 x of its floor, none of M's: both resolvable.
+- **C4:** the forward pass twice over T1, bit for bit. **C5:** 72 distinct render seeds.
+
+| | H1: 12 of V, voxel structures | H2: 12 of M, lathed and extruded solids |
+|---|---|---|
+| mean d | **0.647** | **0.304** |
+| images the network won | 10 of 12 | 7 of 12 |
+| sign-flip p (Holm threshold) | 0.00098 (0.025) | 0.0181 (0.05) |
+| sign test p, reported | 0.019 | 0.387 |
+| **status** | **supported** | **supported** |
+
+**So the page's scope note widens, as section 79 fixed:** the shipped network also beats the shipped filter on this engine's
+voxel structures and its lathed and extruded solids, in family R's materials, light and sky. It says nothing more: no other
+material, light or sky was tested, and the page still renders only R and C.
+
+**H2 rests on size, not count, and that is said here rather than left in the table.**
+- The network won 7 of 12, and by count alone (the sign test) that is p 0.39.
+- The pre-registered test, section 28's sign-flip, weighs each image by how much it was won or lost. Three wins are large
+  (1.463, 0.762, 0.722) and every loss is small (the largest -0.147), which is how it reaches p 0.018.
+- That is the test the arc has used since round 9, and the result stands under it. A reader holding the network to
+  winning MOST mesh solids would not find that here.
+
+**The predictions.**
+- **P1 held:** C1 held on both sets.
+- **P2 and P3 held:** both supported.
+- **P4 was half wrong.** I predicted each set's mean d would fall below round 11's H1 (0.548), because a voxel edge is a
+  step the network had not seen. M's 0.304 is below it. **V's 0.647 is above it.** The voxel set's three largest wins
+  (d 2.615, 2.086, 1.133) are its three noisiest images (noisy relMSE 0.71, 0.91, 0.65). There, the filter left 0.107-0.117
+  and the network 0.008-0.034. The step the network had not seen did not cost it what I expected. Nothing here measured
+  why.
+
+**What it does not change.** `PAGE_KERNELS`, the native tables, `DEFAULT_KERNELS`, the shipped weights and the filter. It is
+a finding about scope, and the page's note is the one thing that moves.
+
+**Not in this round.** Other materials, lights or skies on these shapes. The path tracer page's own scenes. A network
+trained on mesh scenes.
+
+## 81. ROUND 26 -- HALF RESOLUTION, THEN FSR1: FIXED BEFORE ANY OF ITS TEST SCENES EXIST
+
+Committed with the code that implements it. No scene of this round's test set has been rendered.
+
+**Why this round.** Keith asked whether the arc would include FSR, and then for this round first.
+- Every speed round so far has made the network's kernels faster. The other lever changes no arithmetic: trace and denoise
+  a quarter of the pixels, then upscale.
+- Section 54 puts a 1080p pass on the GTX 1080 at about 75-80 ms, and 30 frames a second needs 33. A quarter of that is
+  about 20 ms, by arithmetic, if the picture survives the upscale. Time is not measured here.
+- The tree's FSR1 is `fx/fsr/fsr.js`: EASU, then RCAS, transcribed from AMD's `ffx_fsr1.h` and held to its CPU reference.
+
+> **Is a frame traced and denoised at half resolution, then upscaled by FSR1, closer to the reference than the frames it
+> could be instead?**
+
+**Nothing is trained or tuned.** The network is round 11's seed 1, from the file the page loads (section 79's sha-256).
+The input is the arc's: 4 samples (or 1 for D), the nine channels, the emitter mask.
+
+**The frames, per test image.** Each is judged against the same 64 x 64 reference, with a second for C3.
+
+| Frame | Traced | Then |
+|---|---|---|
+| **A** | 64 x 64, 4 samples | denoised -- today's page; reported, never tested |
+| **B, the candidate** | 32 x 32, 4 samples | denoised at 32 x 32, then FSR1 to 64 x 64 |
+| **C** | the same frame as B | denoised, then bilinear to 64 x 64 -- FSR1's control |
+| **D** | 64 x 64, 1 sample | denoised -- the SAME NUMBER OF SAMPLES as B |
+
+- **The upscale's space.** FSR1 wants perceptual input in [0, 1], and radiance is neither. Per channel,
+  t = (x / (1 + x))^(1 / 2.2): Reinhard, then a display gamma. The upscale runs on t, and the result is inverted exactly.
+- **The clamp.** An upscaled t is clamped to [0, the brightest t of its frame], because RCAS overshoots a local peak
+  unclamped. The same space and the same clamp apply to every upscale, so B and C differ by the filter alone.
+- **RCAS** runs at sharpness 0.9 on `fsr.js`'s scale, which is AMD's default of 0.2 stops, with FSR1's denoise on: the
+  frame it sharpens is a denoised path-traced frame with grain left in it.
+- **Each input is traced on its own render seed:** `renderSeeds`' three, then 1-sample (seed x 8 + 4) and half-size
+  (seed x 8 + 5). A's input is exactly the arc's own input for that scene; the gate holds it to `renderSplit`'s bit for bit.
+
+**The split** (`SPLITS_FSR1`), one test set read by both hypotheses:
+
+| Set | Scenes | Seeds |
+|---|---|---|
+| T1 -> H1 and H2 | 6 of R, 6 of C, each as its own family | **40000-40005** and **41000-41005** |
+
+These are the families the network was trained on, so what changes is the resolution and nothing about the scenes. No
+earlier split touched these seeds. C5 holds over the round's 60 render seeds.
+
+**The hypotheses**, with section 6's statistic and section 28's test. `verdict()`'s `filter` column is the comparator and
+its `net` column is B.
+- **H1: B beats D.** At the same number of samples, half resolution plus FSR1 is closer to the reference than full
+  resolution at 1 sample. Effect per image: `d = ln relMSE(D) - ln relMSE(B)`.
+- **H2: B beats C.** FSR1 is closer than bilinear on the same denoised half-size frame. Effect: `d = ln relMSE(C) - ln relMSE(B)`.
+- Each is supported iff its mean d is > 0 and its sign-flip p is below its Holm threshold, over {H1, H2} at 0.05.
+
+**Controls.**
+- **C1, on the test set, per hypothesis.** Both of its frames must beat that hypothesis's own un-denoised frame on at
+  least 11 of 12: D's 1-sample input for H1, and B's half-size input upscaled bilinearly for H2.
+- **C2:** cited from round 11, as in section 79.
+- **C3:** B within 2 x of the floor on more than half the images makes that hypothesis not resolvable.
+- **C4:** the candidate's chain, run twice, gives B bit for bit.
+- **C5:** 60 distinct render seeds.
+
+**What each outcome buys.**
+- **H1 and H2 supported:** a round that times the half-size chain on the rig, and FSR1 on the GPU
+  (`fx/fsr/fsrGPU.js`) after the denoiser, is next. The page could offer half resolution as a mode, measured.
+- **H2 only:** FSR1 beats bilinear, but half resolution loses to tracing fewer samples at full size. At equal samples
+  the full-size frame is the better spend, and the lever is not worth the round above.
+- **H1 only:** half resolution is the better spend, but FSR1 adds nothing over bilinear on these frames.
+- **Neither, not reported or not resolvable:** recorded as found. `denoise-fsr2-temporal` stays behind it.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1: H2 is supported.** EASU follows an edge where bilinear smears across it.
+- **P2: H1 is NOT supported.** Round 11's own record shows the shipped network at 1 sample has about 2.5 x its 4-sample
+  error (median relMSE 0.0113 against 0.0046 on R), but a 64 x 64 picture holds its scene far more coarsely than a 1080p
+  frame. At this size a sphere's silhouette is a few pixels, and half of them are lost to the upscale. My guess is that
+  the lost edges cost more than the noise saved. **This test is harder on the upscaler than real use would be, and a
+  result here says so about 64 x 64, not about 1080p.**
+- **P3:** B's error is above A's on most images. The quarter has a price, and section 82 reports it.
+
+**Secondary, reported, never tested.**
+- **The price of the quarter:** d of A against B.
+- **EASU alone, and RCAS without its denoise,** each against B.
+- Per-image tables, every frame's noisy input error, the floor.
+
+**What was seen first.**
+- Everything in sections 1-80, including round 11's 1- and 16-sample secondary, read for P2 above.
+- **The pilot, on two scenes outside every split (R 990001, C 990002), mechanics only, nothing scored against a reference:**
+  - The transfer round-trips through float32 to 1.7e-5 relative at worst, over 1e-6 to 300.
+  - Every upscale's output was finite.
+  - An image takes 12-25 s to render here. The half-size denoise takes about 0.1 s, and each upscale under 0.04 s.
+  - The clamp engaged: on R's scene, 251 of 12,288 values of the FSR1 upscale were held at the frame's brightest. That
+    is RCAS's overshoot, as `fsr.js`'s gate predicts, and is reported here before the test set exists.
+- `render/denoiseStudy-selfcheck.mjs` runs the chain on two 16 x 16 scenes outside every split, to hold the plumbing. It
+  prints no error and no effect, and none was read.
+- Nothing of the test set has been rendered.
+
+**The command:** `node tools/denoiseStudy.mjs --harvest-fsr1 --cache <dir>` -> `render/denoise-results-fsr1.json`.
+- It refuses if the file exists.
+- About 4 minutes here. The file is committed byte for byte before it is read, and section 82 reads it.
+
+## 82. ROUND 26 -- NOT REPORTED: C1 FIRED ON H2. DESCRIPTIVELY, HALF RESOLUTION LOST TO EVERY OTHER FRAME AT 64 x 64
+
+**What arrived.** `render/denoise-results-fsr1.json`, written by `tools/denoiseStudy.mjs --harvest-fsr1` at c22a0295 and
+committed byte for byte (c6dd56f5) before it was read. 254 s to render the 12 test images here, 10 s to measure.
+
+**The run is not reported. Neither hypothesis is decided.**
+- **C1 fired on H2.** C1 asks both of a hypothesis's frames to beat that hypothesis's own un-denoised frame on at least 11
+  of 12 images. For H2 that frame is B's half-size input, upscaled bilinearly.
+  - B (FSR1) beat it on 9 of 12, and C (bilinear) on 9 of 12.
+  - **So on three images, denoising the half-size frame and then upscaling it did no better than upscaling its noise.**
+    Section 7 wrote C1 for exactly that: "something upstream is broken".
+- C1 held on H1: D on 12, B on 11. C2 (cited), C3 (no image near its floor), C4 and C5 held.
+- Section 81's rule for this outcome: recorded as found, and `denoise-fsr2-temporal` stays behind it.
+
+**What the file shows, reported and testing nothing.**
+
+| | B (half size + FSR1) against | mean d (positive: B better) | images B won |
+|---|---|---|---|
+| H1's direction | D, full size at 1 sample | -0.493 | 2 of 12 |
+| H2's direction | C, half size + bilinear | -0.180 | 3 of 12 |
+| the price of the quarter | A, today's full size at 4 samples | -1.406 (about 4 x the error) | 0 of 12 |
+
+- **RCAS made every image worse.** EASU alone had a lower error than EASU then RCAS on all 12 images (mean d 0.180 in
+  EASU's favour). RCAS without its denoise was worse again, on all 12.
+- **So, at 64 x 64, the half-size chain lost to every frame it was measured against,** and the sharpening half of FSR1
+  cost more than it gave.
+
+**The predictions,** read against the directions, since nothing was decided.
+- **P1 (H2 supported) pointed the wrong way:** FSR1 lost to bilinear on 9 of 12.
+- **P2 (H1 not supported) pointed the way it said:** B lost to D on 10 of 12.
+- **P3 held:** B's error is above A's on all 12.
+
+**What this does and does not say.**
+- Section 81 fixed this caveat before the run: 64 x 64 holds a scene far more coarsely than a 1080p frame, so this test
+  is harder on an upscaler than real use. It says nothing about 1080p.
+- **A cause, not measured:** at half size the network sees every scene at twice the scale it was trained on, with its
+  9 x 9 kernel covering twice the scene. C1's three failures are where that would bite. Nothing here tested it.
+- **What stands:** the arc has no evidence that half resolution is a better spend than full resolution, at this size.
+  The backlog's FSR2 and FSR3 entries stay behind it.
+
+**What it does not change.** The page, the network, the filter, every kernel table.
+
+**Not in this round, and logged in the backlog:** the same question at a frame size nearer real use (256 x 256 upscaled
+from 128), with EASU alone as the candidate since RCAS hurt here; and a network trained at the scale it is run at.
+
+## 83. ROUND 27 -- WINOGRAD F(2 x 2, 3 x 3) FOR THE HIDDEN LAYERS, UNDER A RESTATED EXACTNESS KEY: FIXED BEFORE THE RIG RUNS IT
+
+**Why this round.** Keith asked for it after the relaxed-exactness study (backlog `denoise-winograd`), second after round 26.
+- The four 3 x 3 hidden layers are 92% of the network's multiply-adds: 30,528 of 33,120 a pixel.
+- Winograd's F(2 x 2, 3 x 3) makes a 2 x 2 block of outputs from a 4 x 4 block of inputs in 16 multiplies an input and output
+  channel pair. The direct sum takes 36, so that is 2.25 x fewer.
+- It needs no hardware feature, so it runs on both GPUs, natively and in Chrome.
+- **What it cannot do is add in the canonical order.** Every set so far adds b, then block by block, ky, kx, ci, one product
+  at a time. Winograd adds other numbers, transformed ones, in another domain, then mixes sixteen sums. So no set before it is
+  its twin, and the exactness key has to be restated. That is this section's first job.
+
+**What changes. Built and piloted here first, on SwiftShader only.**
+- **`brain/conv2d.mjs`: the Winograd kernel.**
+  - `conv2dWinoWgsl(layer, { g4 })`, entry `k_conv_wino`. A thread is one 2 x 2 tile of outputs and `g4` vec4s of output
+    channels, with 16 vec4 accumulators for each vec4.
+  - A workgroup is 8 x 8 threads, so 16 x 16 outputs. Their 18 x 18 window is staged in workgroup memory four input channels
+    at a time (5,184 B), zero outside the image. Winograd pads; it cannot skip a tap.
+  - The filter transform U = G g G^T is done on the host (`winoFilter`): in f64 from the f32 weights, rounded to f32 once.
+  - On the device: V = B^T d B, then M = M + v U over the input channels from zero, then A^T M A, the bias and the activation.
+    Every coefficient on the device is +1 or -1, so M + v U is the kernel's only multiply-add.
+  - The transformed weights are a read-only storage buffer at binding 3. At 32 -> 32 they are 64 KiB, the whole of a default
+    uniform binding with no room for the bias. The uniform block holds H, W and the bias (`packWinoUniforms`).
+  - `conv2dCpuWino` is its twin: the kernel's operations in the kernel's order, rounded to f32 after every one.
+    `conv2dCpuWinoFma` is the fused mirror, M + v U rounded once.
+  - `winoShape` holds 3 x 3 layers only, at 1, 2 or 4 vec4s a thread.
+- **`render/denoiseDevice.mjs`: the set "r27w".**
+  - r15 with every hidden 3 x 3 layer on the Winograd kernel at one vec4 a thread (`R27_KERNELS`), and r15's fused last pass.
+  - `twinsOf(layer)` names the twin and mirror a layer is judged against: the Winograd pair for a Winograd layer, `conv2dCpu`'s
+    for every other. The exact gate, the compile gate's job and `--measure-r27w` all ask it.
+  - `denoiseTwin` takes a set.
+  - `FXC_UNTRIED_SETS` is new and names r27w. `nativeSetsFor` leaves it out on a D3D12 adapter whose compiler is not DXC.
+    Nobody has built it under FXC, and an FXC that never finishes a pipeline stops a gate for its whole budget (section 56).
+    `FXC_UNBUILT_SETS` stays the sets FXC was seen to fail.
+  - `TIMED_SETS` gains r27w, so both ladders time it beside r12, r15, r18t and r18u.
+- **Why one vec4 a thread.** Two is 128 accumulator floats a thread. A gen-9 lane at SIMD8 has 128 registers, so two would
+  spill there before anything else is counted. One is 64; the fast kernel keeps 32.
+  This is arithmetic, not a measurement: the compile gate builds the one shape the set runs.
+- **The gates.**
+  - `brain/conv2d-selfcheck.mjs` section 5f, from the three matrices written in the gate, not the module's loops. The
+    transform equals `conv2dForward` in f64 (worst 4.3e-16). The twin is that order, cell for cell. It is not `conv2dCpu`'s
+    bits. An integer key is exact in any order, and the weight and uniform layout is as the header says.
+  - Section 6 adds the device. On SwiftShader the kernel is its twin on every cell at 1, 2 and 4 vec4s, on odd sizes, partial
+    blocks, partial vec4s and an image smaller than one workgroup, and the integer key gives `conv2dForward`'s bits.
+  - The device rows run under DXC and off D3D12, and stand aside under FXC.
+  - `render/denoiseDevice-selfcheck.mjs` adds:
+    - K0w natively, on the large and small networks;
+    - K0w in the browser;
+    - a measured line, "native K0w for round 27's set ...", which `realGpuRun` keeps;
+    - rows for r27w's layers, `twinsOf`, `FXC_UNTRIED_SETS`, and `--measure-r27w`'s source.
+  - `render/denoiseTiming-selfcheck.mjs` times r27w on both ladders. It prints "r27w against r15", "against r18t" and
+    "against r18u" at every size both measured, tagged section 83.
+  - `render/denoiseCompile-selfcheck.mjs` adds r27w's hidden kernel to `DXC_VARIANTS`, judged against its own twin.
+  - `tools/ship/wgslCorpus.mjs` adds it compile-only.
+- **`tools/denoiseDevice.mjs --measure-r27w`:** K0w (a) on round 11's 24 test images, with D4 (below) in the file.
+
+**What exactness means for r27w: the key, restated.**
+- **Cells.** Every hidden cell is `conv2dCpuWino`'s or `conv2dCpuWinoFma`'s, given the device's own input to that layer. This
+  is K0's rule with another twin: explained, not tolerated.
+- **The last pass** is r15's, judged through the image against `kernelApplyCpu` on the twin's logits or the mirror's, within
+  APPLY_TOL.
+- **The image.** The device's image is within 1e-5 of the f64 network's on every value, relative, with a floor of 1e-12.
+  - That is not a new bound. The exact gate has held every set's image to it since section 35, beside the cells.
+  - What is new is its job. For every earlier set it was implied by the cells, since their twin was r15's. For r27w it is
+    the only bridge between the set's cells and the shipped network, because its bits cannot be r15's.
+  - So in `--measure-r27w` it is a criterion of its own, **D4**, beside section 35's D0 to D3.
+- **K0w holds** when the cells, the last pass and the image hold:
+  - **(a) here:** `--measure-r27w` on the 24 test images, D0 to D4, its output committed before it is read;
+  - **(b) natively on each GPU under DXC:** the exact gate's K0w rows;
+  - **(c) in Chrome on each GPU:** the exact gate's browser row for r27w.
+- **The rows that held earlier sets to r15's bits do not apply to r27w,** and a row says why: its first layer differs from
+  r15's on the same input.
+
+**The pilot, here on SwiftShader. No threshold below was read from it.**
+- **Six scenes outside every split,** R 980000-980002 and C 981000-981002, at 64 x 64, with the shipped network.
+- **Every hidden cell was the Winograd twin's:** 3,145,728 cells, none fused, none unexplained. The last pass was within 5.5e-7
+  of its twin's logits (APPLY_TOL 1e-5).
+- **r27w's image against the f64 network:**
+
+| Measure | r27w | r15 |
+|---|---|---|
+| Worst value | 2.98e-6 | 3.23e-6 |
+| Worst difference over the image's largest value | 5.6e-7 | 5.9e-7 |
+| relMSE against the reference | within 8.3e-8 of the f64 network's | within 1.8e-7 |
+
+- r27w was nearer the f64 network than r15's exact path by every measure. The filter was beaten on the same images either
+  way, and no image's d moved by more than 8.3e-8.
+- **Why it is no worse.**
+  - The filter transform is exact in f64 and rounded once.
+  - Each of the sixteen sums has as many terms as there are input channels. The direct sum has nine times as many.
+- **The gates, here.**
+  - **The exact gate natively:** K0w held on the large network at 21 x 19 (4 x 12,768 hidden cells, every one the Winograd
+    twin's, none fused) and on the small one.
+  - **The exact gate in Chromium:** K0w held the same way.
+  - **The image against the f64 network** stayed within the 1e-5 bound on every path.
+  - **The timing gate:** a CPU's times, recorded and deciding nothing. Natively at 128 x 128, r27w was 1.006 x r15's pass and
+    0.655 x r18t's. On the page it was 0.831 x and 0.600 x. At 64 x 64 it was 3.3 x r18u's natively; r18u's written-out block
+    is slow on SwiftShader, as section 62 found.
+  - **SwiftShader runs a workgroup's threads one after another on a CPU.** What a GPU does with 16 accumulators a thread is
+    what the rig is for.
+
+**The rule, fixed now.** The page's table (`PAGE_KERNELS_BY_ADAPTER`) and the native table (`NATIVE_KERNELS_BY_ADAPTER`) each give a
+GPU r27w in place of its present entry -- r18u on the Intel gen-9, r18t on the GTX 1080, on both paths -- when r27w qualifies on
+that GPU and path.
+- **Twice, read strictly, as section 75.** On each GPU, `realGpuRun --only denoise` is run twice, one after the other, from the
+  same clone and commit. r27w qualifies on a GPU and path only when every condition holds in BOTH runs.
+- **Natively:**
+  0. **The run's compiler is DXC,** and the whole compile gate is green (section 76's reading).
+  1. **K0w (b):** the whole exact gate is green, and its measured line says r27w green.
+  2. **K1 against r12 natively,** section 39's: at least 2 x at the largest size both measured, at least 1 x at every size.
+  3. **At least 1.05 x as fast as the GPU's present native entry** (r18u on the Intel, r18t on the 1080), at the largest size
+     both were measured on the native ladder. That is the entry's median over r27w's, on the device's clock: the "native: r27w
+     against r18u" (or "r18t") line.
+- **On the page:**
+  1. **K0w (c):** r27w's browser row in the exact gate is green.
+  2. **K1 against r12 on the page,** as above.
+  3. **At least 1.05 x as fast as the GPU's present page entry,** as above, from the "page: r27w against ..." line.
+- **The entry.** Where r27w qualifies, the GPU's entry on that path becomes r27w. Where it does not, the entry stays.
+  - `DEFAULT_KERNELS` and `PAGE_KERNELS` stay r15 for every adapter the tables do not name.
+  - A native run that is not DXC still gets `DEFAULT_KERNELS`.
+- **A gate stopped by `realGpuRun`'s 30-minute cap reaches no verdict on its path.** A crash in either run means no entry
+  moves on that GPU, as in section 76.
+- **The threshold is section 61's, 1.05.**
+- **The verdict section** writes the rule as code in the exact gate, beside `rule66Entries`, and derives any entry from the
+  committed reports.
+
+**Predictions, fixed now, deciding nothing.**
+- **The arithmetic.**
+  - At one vec4 a thread, a Winograd output costs 4 multiply-adds an input channel and output channel, plus 2 adds for its
+    share of the input transform. The direct sum costs 9 multiply-adds.
+  - So the hidden layers do 1.5 x fewer operations, if they are bound by arithmetic and nothing else changes.
+  - **They are not bound by arithmetic alone.** Section 54 measured the fast kernel's hidden layers at about 24% of the 1080's
+    f32 peak and 20% of the Intel's.
+    - Counted in instructions with the loads included, an output channel of one pixel and one input channel costs the fast
+      kernel about 11.5: 9 multiply-adds, and its share of a 9-tap window and 72 weight vec4s.
+    - r27w's costs about 8: 4 multiply-adds, 2 transform adds and 2 loads. That is 1.4 x fewer, the same order.
+    - The figures below are a ceiling, not an expectation.
+  - Section 54's table puts the hidden layers at 75% of r15's page pass on the 1080 and 89% on the Intel. So at the ceiling,
+    r27w's pass would be 1.33 x r15's on the 1080 and 1.42 x on the Intel.
+  - Against the present entries, at their measured ratios to r15:
+    - r18t on the 1080: 1.087 x on the page (section 63), 1.080 and 1.068 x natively (section 78);
+    - r18u on the Intel: 1.524 x on the page (section 63), 1.590 x natively (section 67).
+
+| GPU | r27w against its present entry, on the page | natively | Qualifies |
+|---|---|---|---|
+| GTX 1080 | 1.22 x r18t | 1.23-1.25 x | yes |
+| Intel gen-9 | 0.93 x r18u | 0.89 x | no |
+
+- **Said now:**
+  - P1: r27w qualifies on the 1080, natively and on the page.
+  - P2: it does not qualify on the Intel, on either path. r18u's written-out block is already 1.52-1.59 x r15 there, more than
+    the ceiling above leaves r27w.
+  - P3: K0w holds on both GPUs, natively and in Chrome, with some cells fused on the 1080, as r15's were.
+  - P4: K0w (a) holds on all 24 test images, D4 among them, with r27w's image nearer the f64 network than r15's on most of them.
+- **What could make P3 fail, said now.** A D3D12 compiler that reassociates the transforms' adds would make cells match neither
+  twin. The direct kernels' sums kept their order on both GPUs (section 65). A straight-line transform is a different shape of
+  code, and nothing here has seen what DXC does with it.
+
+**Reported, deciding nothing.**
+- **The compile gate's kernel-level line:** r27w's hidden kernel against r15's (r13-fast-3x3), r18t's and r18u's, at 64 x 64,
+  natively under DXC.
+- **Each GPU's ladders,** size by size, r27w against r15, r18t and r18u.
+- **How many hidden cells fused,** natively and in Chrome.
+
+**On the rig.**
+- On each GPU, from a verified clone of `claude/tier-2-keys-patch-4lwhzk` at a commit carrying this section, `SWEK_WEBGPU`
+  cleared:
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r27-a.json
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r27-b.json
+```
+- Send back all four JSON files. Don't commit or pull between the two runs.
+- **Each report is committed byte for byte** before it is read.
+
+**Sabotages (v4868).** Twenty-one runs, each restored byte-identical and logged in its gate's header. None was 0 red.
+- **`brain/conv2d-selfcheck.mjs`, W1-W10.**
+  - The twin's transform with one sign flipped: 11 red.
+  - The kernel's weights without the group offset: 9 red.
+  - Its window origin a pixel right: 9 red.
+  - Its second barrier removed: 8 red.
+  - The twin summing the channels backwards: 9 red.
+  - The guard on channels past Cout removed: 4 red, exactly the cases whose Cout is not a multiple of four.
+  - The bias a float late: 10 red.
+  - `winoShape` holding any odd k: 1 red.
+  - The stand-aside without round 27's DXC exemption: 1 red.
+- **W9 is the one worth reading.** It files the transformed weights at (j, i) for (i, j), in the kernel and the twin alike.
+  - **Not one device cell row went red.** Both read the same wrong weights and agree cell for cell.
+  - Five rows caught it: the order row and the layout row, written from the matrices, and the two integer keys, held to
+    `conv2dForward`.
+  - So a twin cannot be the only witness to its own order, and section 5f exists for that reason.
+- **`render/denoiseDevice-selfcheck.mjs`, Y1-Y6.**
+  - `kernelFor` never picking the Winograd kernel: 6 red, plus 2 in the timing gate.
+  - `twinsOf` giving every layer the direct pair: 5 red. Every Winograd cell then reads as unexplained.
+  - `nativeSetsFor` ignoring `FXC_UNTRIED_SETS`: 2 red, plus 2 in the timing gate.
+  - The Winograd layers dispatched with half their z groups: 3 red.
+  - `--measure-r27w` judging against the direct pair: 1 red, the source row.
+  - `R27_KERNELS` at two vec4s: 1 red. K0w holds at two, so the configuration is held by name.
+- **`render/denoiseTiming-selfcheck.mjs`, Y7:** the "r27w against" lines tagged section 61, 1 red.
+- **`render/denoiseCompile-selfcheck.mjs`, Y8-Y9:** the job judged against `conv2dCpu`, 1 red; the variant at two vec4s, 1 red.
+
+**Not in this round.**
+- Two or four vec4s a thread, or the transformed weights in a uniform binding. Those are shapes for a later round, if r27w
+  holds on one GPU and a probe says which.
+- F(4 x 4, 3 x 3): 4 x fewer multiplies, at a precision cost nothing here has measured.
+- Any change to `DEFAULT_KERNELS`, to an FXC run, or to the network.
+
+## 84. ROUND 27 -- REPORTED HERE: K0w (a) HOLDS, r27w ON THE 24 TEST IMAGES
+
+`node tools/denoiseDevice.mjs --measure-r27w` ran here on SwiftShader at 687dfd05, the commit carrying section 83, with no
+cache, so it rendered the 24 test images itself: 863 s.
+- **The output, unedited,** is `render/denoise-results-r27w.json`, committed at af3a3795 before it was read.
+- **The kernels:** on every image the four hidden layers ran on the Winograd kernel (`wino`), and the head and the kernel
+  apply as one pass (`k_head_apply`).
+
+**K0w (a) holds. Every criterion, D0 to D4, is true.**
+
+| Criterion | r27w |
+|---|---|
+| D0, the shipped file is the harvest's network | its f64 relMSE equals round 11's seed 1 on all 24 images, bit for bit |
+| D1, the hidden layers | 12,582,912 conv cells, every one `conv2dCpuWino`'s: none fused, none unexplained |
+| D2, the head and kernel pass | worst 5.6e-7 against `kernelApplyCpu` on the twin's logits or the mirror's (bound 1e-5); against the twin's alone 5.9e-7, the mirror's alone 1.0e-6 |
+| D3, the verdict on the device | relMSE within 5.2e-7 of the f64 network's on every image (bound 1e-4); the primary filter beaten on 12 of 12 images of R and 12 of 12 of C, the same images as on the CPU |
+| **D4, the restated key** | **the image within 1.43e-6 of the f64 network's on every value (bound 1e-5); median over images 9.1e-7** |
+
+**Against r15 (section 47's run, the same 24 images).**
+- r27w's relMSE was nearer the f64 network's than r15's on 19 of 24 images.
+- The single farthest image is r27w's: 5.2e-7 against r15's worst of 3.8e-7.
+- Both are three orders inside D3's bound. r15's file carries no per-value figure, so D4 has no r15 column.
+- **P4 held as worded:** K0w (a) on all 24 images, D4 among them, r27w nearer on most of them.
+
+**Reported, not a criterion.** A 64 x 64 image took a median of 345 ms (311-433) with r27w, read-back included, against
+r15's 399 in section 47. This is SwiftShader, a CPU's time, and no evidence for section 83's rule.
+
+**Still open:**
+- K0w (b) and (c), K1, and section 83's rule on Keith's two GPUs. Those come from two runs on each GPU of
+  `node tools/ship/realGpuRun.mjs --only denoise`, as section 83 says.
+- Until then the tables are as they stand: r18u on the Intel, r18t on the 1080, r15 everywhere else.
+
+## 85. ROUND 27 -- FOUR RIG RUNS ARRIVED FROM OLD COMMITS: NO VERDICT, AND THE RUNS ARE OWED AGAIN
+
+**What arrived.** Four `realGpuRun --only denoise` reports, two per GPU, on 2026-10-16. They are committed byte for byte under
+names that say what they are:
+
+| File | Run at | The report's `commit` |
+|---|---|---|
+| `render/denoise-rig-r27-stale-intel-gen9-a.json` | 13:37 | 66a7ae38, v4863's release |
+| `render/denoise-rig-r27-stale-intel-gen9-b.json` | 13:56 | 66a7ae38, v4863's release |
+| `render/denoise-rig-r27-stale-gtx1080-a.json` | 13:19 | 2af5f7da, v4861's release |
+| `render/denoise-rig-r27-stale-gtx1080-b.json` | 13:23 | 2af5f7da, v4861's release |
+
+- **They were read before this commit.** They were opened in full when they arrived. They bear on no rule, for the reason below.
+
+**Why they decide nothing.**
+- Section 83's rule reads runs from a clone of `claude/tier-2-keys-patch-4lwhzk` at a commit carrying section 83: 687dfd05 or
+  later. These ran on the rigs' existing checkouts, two and four versions before it.
+- **The string "r27w" appears in none of the four.**
+  - Every timing gate says "sets timed: r12, r15, r18t, r18u".
+  - No exact gate prints the "native K0w for round 27's set" line.
+  - No compile gate built the Winograd kernel.
+- So K0w (b) and (c), K1 and section 83's conditions have no reading on either GPU. **No table moves.**
+
+**One finding, reported and deciding nothing.**
+- **The 1080's run a stopped its timing gate 39 s in, inside the native ladder.** realGpuRun records it as not ok, with no FAIL
+  line. Its last measured line is "sets timed: r12, r15, r18t, r18u". Run b, five minutes later, completed in 246 s.
+- The console was not sent, so the cause is unread.
+- **It was a first run, and it was the timing gate.** Section 76's two crashes were in second runs, in the compile gate on the
+  1080 and the exact gate on the Intel. Section 78's runs did not crash. This is v4861's code, and nothing in round 27 touched it.
+- **Section 83's rule already covers it.** A crash in either of round 27's runs means no entry moves on that GPU.
+
+**What the old code's runs repeat, for the record.**
+- **The 1080, run b, natively under DXC:** r18t 1.092 x r15 at 1920 x 1080 (section 78 read 1.080 and 1.068).
+- **The 1080 on the page:** r18t 1.101 x r15.
+- **The Intel, natively at 1024 x 1024:** r18u 1.385 and 1.483 x r15 in runs a and b.
+- **The Intel on the page:** r18u 1.560 and 1.561 x r15.
+- Every exact gate was green on both GPUs.
+
+**The runs again.** Section 83's rule is unchanged. Each new report must carry two checks before anything is read off it:
+- its `commit` field names a commit on `claude/tier-2-keys-patch-4lwhzk` at 687dfd05 or later;
+- its timing gate's "sets timed" line includes r27w.

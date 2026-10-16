@@ -174,6 +174,8 @@ export function mountGaugeInfo({ dialsEl, host, getStats, barMount = null, barAf
                                  fixedH = 0, dockMax = 0, stretchToRow = false,
                                  dockScale = 0.8 } = {}) {
     if (!dialsEl || !host) return null;
+    // v4868 -- the host's own overflow, read at mount, so the gauges tab can have it back (see show()).
+    const hostOverflow0 = host.style.overflow;
     const sel = makeSelection();
     let tab = "gauges";
     // v3823 -- HARD LOCK ON THE INFO TAB. pinInfo() defeats the AUTOMATION (userTook clears autoRaised), but on
@@ -396,6 +398,13 @@ export function mountGaugeInfo({ dialsEl, host, getStats, barMount = null, barAf
         if (which === "info") lockHeight();               // capture the resting height BEFORE the gauges vanish
         tab = which;
         const infoUp = which === "info";
+        // *** v4868 -- THE CLIP IS THE INFO PANE'S, AND IT IS HANDED BACK WITH THE GAUGES. *** lockHeight's
+        // stretchToRow branch sets overflow:hidden on the host so a long info body scrolls its own pane, and
+        // nothing ever unset it -- so after one visit to the info tab the GAUGES' row clipped too. On
+        // server.html the avatar's favourites picker hangs 202 px below the avatar's box; on a phone-width row,
+        // where the avatar wraps to a line of its own, MEASURED its bottom 65 px cut off after one hover. The
+        // fixed-height path is left as it was: there the box is the same height on both tabs by design.
+        if (stretchToRow && !infoUp) host.style.overflow = hostOverflow0;
         dialsEl.style.display = infoUp ? "none" : "";
         // *** v3671 -- THE AVATAR GOES WITH THE DIALS. *** Keith: "the info panel should also replace the
         // avatar that shows on the info's right." #dialsRobot is a SIBLING of #dials, not a child, so hiding
