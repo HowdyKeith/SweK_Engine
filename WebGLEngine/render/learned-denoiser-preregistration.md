@@ -5402,3 +5402,35 @@ node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r27-b.json
   holds on one GPU and a probe says which.
 - F(4 x 4, 3 x 3): 4 x fewer multiplies, at a precision cost nothing here has measured.
 - Any change to `DEFAULT_KERNELS`, to an FXC run, or to the network.
+
+## 84. ROUND 27 -- REPORTED HERE: K0w (a) HOLDS, r27w ON THE 24 TEST IMAGES
+
+`node tools/denoiseDevice.mjs --measure-r27w` ran here on SwiftShader at 687dfd05, the commit carrying section 83, with no
+cache, so it rendered the 24 test images itself: 863 s.
+- **The output, unedited,** is `render/denoise-results-r27w.json`, committed at af3a3795 before it was read.
+- **The kernels:** on every image the four hidden layers ran on the Winograd kernel (`wino`), and the head and the kernel
+  apply as one pass (`k_head_apply`).
+
+**K0w (a) holds. Every criterion, D0 to D4, is true.**
+
+| Criterion | r27w |
+|---|---|
+| D0, the shipped file is the harvest's network | its f64 relMSE equals round 11's seed 1 on all 24 images, bit for bit |
+| D1, the hidden layers | 12,582,912 conv cells, every one `conv2dCpuWino`'s: none fused, none unexplained |
+| D2, the head and kernel pass | worst 5.6e-7 against `kernelApplyCpu` on the twin's logits or the mirror's (bound 1e-5); against the twin's alone 5.9e-7, the mirror's alone 1.0e-6 |
+| D3, the verdict on the device | relMSE within 5.2e-7 of the f64 network's on every image (bound 1e-4); the primary filter beaten on 12 of 12 images of R and 12 of 12 of C, the same images as on the CPU |
+| **D4, the restated key** | **the image within 1.43e-6 of the f64 network's on every value (bound 1e-5); median over images 9.1e-7** |
+
+**Against r15 (section 47's run, the same 24 images).**
+- r27w's relMSE was nearer the f64 network's than r15's on 19 of 24 images.
+- The single farthest image is r27w's: 5.2e-7 against r15's worst of 3.8e-7.
+- Both are three orders inside D3's bound. r15's file carries no per-value figure, so D4 has no r15 column.
+- **P4 held as worded:** K0w (a) on all 24 images, D4 among them, r27w nearer on most of them.
+
+**Reported, not a criterion.** A 64 x 64 image took a median of 345 ms (311-433) with r27w, read-back included, against
+r15's 399 in section 47. This is SwiftShader, a CPU's time, and no evidence for section 83's rule.
+
+**Still open:**
+- K0w (b) and (c), K1, and section 83's rule on Keith's two GPUs. Those come from two runs on each GPU of
+  `node tools/ship/realGpuRun.mjs --only denoise`, as section 83 says.
+- Until then the tables are as they stand: r18u on the Intel, r18t on the 1080, r15 everywhere else.
