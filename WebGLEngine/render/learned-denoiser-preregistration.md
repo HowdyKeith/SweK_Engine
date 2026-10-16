@@ -5195,3 +5195,210 @@ committed byte for byte (c6dd56f5) before it was read. 254 s to render the 12 te
 
 **Not in this round, and logged in the backlog:** the same question at a frame size nearer real use (256 x 256 upscaled
 from 128), with EASU alone as the candidate since RCAS hurt here; and a network trained at the scale it is run at.
+
+## 83. ROUND 27 -- WINOGRAD F(2 x 2, 3 x 3) FOR THE HIDDEN LAYERS, UNDER A RESTATED EXACTNESS KEY: FIXED BEFORE THE RIG RUNS IT
+
+**Why this round.** Keith asked for it after the relaxed-exactness study (backlog `denoise-winograd`), second after round 26.
+- The four 3 x 3 hidden layers are 92% of the network's multiply-adds: 30,528 of 33,120 a pixel.
+- Winograd's F(2 x 2, 3 x 3) makes a 2 x 2 block of outputs from a 4 x 4 block of inputs in 16 multiplies an input and output
+  channel pair. The direct sum takes 36, so that is 2.25 x fewer.
+- It needs no hardware feature, so it runs on both GPUs, natively and in Chrome.
+- **What it cannot do is add in the canonical order.** Every set so far adds b, then block by block, ky, kx, ci, one product
+  at a time. Winograd adds other numbers, transformed ones, in another domain, then mixes sixteen sums. So no set before it is
+  its twin, and the exactness key has to be restated. That is this section's first job.
+
+**What changes. Built and piloted here first, on SwiftShader only.**
+- **`brain/conv2d.mjs`: the Winograd kernel.**
+  - `conv2dWinoWgsl(layer, { g4 })`, entry `k_conv_wino`. A thread is one 2 x 2 tile of outputs and `g4` vec4s of output
+    channels, with 16 vec4 accumulators for each vec4.
+  - A workgroup is 8 x 8 threads, so 16 x 16 outputs. Their 18 x 18 window is staged in workgroup memory four input channels
+    at a time (5,184 B), zero outside the image. Winograd pads; it cannot skip a tap.
+  - The filter transform U = G g G^T is done on the host (`winoFilter`): in f64 from the f32 weights, rounded to f32 once.
+  - On the device: V = B^T d B, then M = M + v U over the input channels from zero, then A^T M A, the bias and the activation.
+    Every coefficient on the device is +1 or -1, so M + v U is the kernel's only multiply-add.
+  - The transformed weights are a read-only storage buffer at binding 3. At 32 -> 32 they are 64 KiB, the whole of a default
+    uniform binding with no room for the bias. The uniform block holds H, W and the bias (`packWinoUniforms`).
+  - `conv2dCpuWino` is its twin: the kernel's operations in the kernel's order, rounded to f32 after every one.
+    `conv2dCpuWinoFma` is the fused mirror, M + v U rounded once.
+  - `winoShape` holds 3 x 3 layers only, at 1, 2 or 4 vec4s a thread.
+- **`render/denoiseDevice.mjs`: the set "r27w".**
+  - r15 with every hidden 3 x 3 layer on the Winograd kernel at one vec4 a thread (`R27_KERNELS`), and r15's fused last pass.
+  - `twinsOf(layer)` names the twin and mirror a layer is judged against: the Winograd pair for a Winograd layer, `conv2dCpu`'s
+    for every other. The exact gate, the compile gate's job and `--measure-r27w` all ask it.
+  - `denoiseTwin` takes a set.
+  - `FXC_UNTRIED_SETS` is new and names r27w. `nativeSetsFor` leaves it out on a D3D12 adapter whose compiler is not DXC.
+    Nobody has built it under FXC, and an FXC that never finishes a pipeline stops a gate for its whole budget (section 56).
+    `FXC_UNBUILT_SETS` stays the sets FXC was seen to fail.
+  - `TIMED_SETS` gains r27w, so both ladders time it beside r12, r15, r18t and r18u.
+- **Why one vec4 a thread.** Two is 128 accumulator floats a thread. A gen-9 lane at SIMD8 has 128 registers, so two would
+  spill there before anything else is counted. One is 64; the fast kernel keeps 32.
+  This is arithmetic, not a measurement: the compile gate builds the one shape the set runs.
+- **The gates.**
+  - `brain/conv2d-selfcheck.mjs` section 5f, from the three matrices written in the gate, not the module's loops. The
+    transform equals `conv2dForward` in f64 (worst 4.3e-16). The twin is that order, cell for cell. It is not `conv2dCpu`'s
+    bits. An integer key is exact in any order, and the weight and uniform layout is as the header says.
+  - Section 6 adds the device. On SwiftShader the kernel is its twin on every cell at 1, 2 and 4 vec4s, on odd sizes, partial
+    blocks, partial vec4s and an image smaller than one workgroup, and the integer key gives `conv2dForward`'s bits.
+  - The device rows run under DXC and off D3D12, and stand aside under FXC.
+  - `render/denoiseDevice-selfcheck.mjs` adds:
+    - K0w natively, on the large and small networks;
+    - K0w in the browser;
+    - a measured line, "native K0w for round 27's set ...", which `realGpuRun` keeps;
+    - rows for r27w's layers, `twinsOf`, `FXC_UNTRIED_SETS`, and `--measure-r27w`'s source.
+  - `render/denoiseTiming-selfcheck.mjs` times r27w on both ladders. It prints "r27w against r15", "against r18t" and
+    "against r18u" at every size both measured, tagged section 83.
+  - `render/denoiseCompile-selfcheck.mjs` adds r27w's hidden kernel to `DXC_VARIANTS`, judged against its own twin.
+  - `tools/ship/wgslCorpus.mjs` adds it compile-only.
+- **`tools/denoiseDevice.mjs --measure-r27w`:** K0w (a) on round 11's 24 test images, with D4 (below) in the file.
+
+**What exactness means for r27w: the key, restated.**
+- **Cells.** Every hidden cell is `conv2dCpuWino`'s or `conv2dCpuWinoFma`'s, given the device's own input to that layer. This
+  is K0's rule with another twin: explained, not tolerated.
+- **The last pass** is r15's, judged through the image against `kernelApplyCpu` on the twin's logits or the mirror's, within
+  APPLY_TOL.
+- **The image.** The device's image is within 1e-5 of the f64 network's on every value, relative, with a floor of 1e-12.
+  - That is not a new bound. The exact gate has held every set's image to it since section 35, beside the cells.
+  - What is new is its job. For every earlier set it was implied by the cells, since their twin was r15's. For r27w it is
+    the only bridge between the set's cells and the shipped network, because its bits cannot be r15's.
+  - So in `--measure-r27w` it is a criterion of its own, **D4**, beside section 35's D0 to D3.
+- **K0w holds** when the cells, the last pass and the image hold:
+  - **(a) here:** `--measure-r27w` on the 24 test images, D0 to D4, its output committed before it is read;
+  - **(b) natively on each GPU under DXC:** the exact gate's K0w rows;
+  - **(c) in Chrome on each GPU:** the exact gate's browser row for r27w.
+- **The rows that held earlier sets to r15's bits do not apply to r27w,** and a row says why: its first layer differs from
+  r15's on the same input.
+
+**The pilot, here on SwiftShader. No threshold below was read from it.**
+- **Six scenes outside every split,** R 980000-980002 and C 981000-981002, at 64 x 64, with the shipped network.
+- **Every hidden cell was the Winograd twin's:** 3,145,728 cells, none fused, none unexplained. The last pass was within 5.5e-7
+  of its twin's logits (APPLY_TOL 1e-5).
+- **r27w's image against the f64 network:**
+
+| Measure | r27w | r15 |
+|---|---|---|
+| Worst value | 2.98e-6 | 3.23e-6 |
+| Worst difference over the image's largest value | 5.6e-7 | 5.9e-7 |
+| relMSE against the reference | within 8.3e-8 of the f64 network's | within 1.8e-7 |
+
+- r27w was nearer the f64 network than r15's exact path by every measure. The filter was beaten on the same images either
+  way, and no image's d moved by more than 8.3e-8.
+- **Why it is no worse.**
+  - The filter transform is exact in f64 and rounded once.
+  - Each of the sixteen sums has as many terms as there are input channels. The direct sum has nine times as many.
+- **The gates, here.**
+  - **The exact gate natively:** K0w held on the large network at 21 x 19 (4 x 12,768 hidden cells, every one the Winograd
+    twin's, none fused) and on the small one.
+  - **The exact gate in Chromium:** K0w held the same way.
+  - **The image against the f64 network** stayed within the 1e-5 bound on every path.
+  - **The timing gate:** a CPU's times, recorded and deciding nothing. Natively at 128 x 128, r27w was 1.006 x r15's pass and
+    0.655 x r18t's. On the page it was 0.831 x and 0.600 x. At 64 x 64 it was 3.3 x r18u's natively; r18u's written-out block
+    is slow on SwiftShader, as section 62 found.
+  - **SwiftShader runs a workgroup's threads one after another on a CPU.** What a GPU does with 16 accumulators a thread is
+    what the rig is for.
+
+**The rule, fixed now.** The page's table (`PAGE_KERNELS_BY_ADAPTER`) and the native table (`NATIVE_KERNELS_BY_ADAPTER`) each give a
+GPU r27w in place of its present entry -- r18u on the Intel gen-9, r18t on the GTX 1080, on both paths -- when r27w qualifies on
+that GPU and path.
+- **Twice, read strictly, as section 75.** On each GPU, `realGpuRun --only denoise` is run twice, one after the other, from the
+  same clone and commit. r27w qualifies on a GPU and path only when every condition holds in BOTH runs.
+- **Natively:**
+  0. **The run's compiler is DXC,** and the whole compile gate is green (section 76's reading).
+  1. **K0w (b):** the whole exact gate is green, and its measured line says r27w green.
+  2. **K1 against r12 natively,** section 39's: at least 2 x at the largest size both measured, at least 1 x at every size.
+  3. **At least 1.05 x as fast as the GPU's present native entry** (r18u on the Intel, r18t on the 1080), at the largest size
+     both were measured on the native ladder. That is the entry's median over r27w's, on the device's clock: the "native: r27w
+     against r18u" (or "r18t") line.
+- **On the page:**
+  1. **K0w (c):** r27w's browser row in the exact gate is green.
+  2. **K1 against r12 on the page,** as above.
+  3. **At least 1.05 x as fast as the GPU's present page entry,** as above, from the "page: r27w against ..." line.
+- **The entry.** Where r27w qualifies, the GPU's entry on that path becomes r27w. Where it does not, the entry stays.
+  - `DEFAULT_KERNELS` and `PAGE_KERNELS` stay r15 for every adapter the tables do not name.
+  - A native run that is not DXC still gets `DEFAULT_KERNELS`.
+- **A gate stopped by `realGpuRun`'s 30-minute cap reaches no verdict on its path.** A crash in either run means no entry
+  moves on that GPU, as in section 76.
+- **The threshold is section 61's, 1.05.**
+- **The verdict section** writes the rule as code in the exact gate, beside `rule66Entries`, and derives any entry from the
+  committed reports.
+
+**Predictions, fixed now, deciding nothing.**
+- **The arithmetic.**
+  - At one vec4 a thread, a Winograd output costs 4 multiply-adds an input channel and output channel, plus 2 adds for its
+    share of the input transform. The direct sum costs 9 multiply-adds.
+  - So the hidden layers do 1.5 x fewer operations, if they are bound by arithmetic and nothing else changes.
+  - **They are not bound by arithmetic alone.** Section 54 measured the fast kernel's hidden layers at about 24% of the 1080's
+    f32 peak and 20% of the Intel's.
+    - Counted in instructions with the loads included, an output channel of one pixel and one input channel costs the fast
+      kernel about 11.5: 9 multiply-adds, and its share of a 9-tap window and 72 weight vec4s.
+    - r27w's costs about 8: 4 multiply-adds, 2 transform adds and 2 loads. That is 1.4 x fewer, the same order.
+    - The figures below are a ceiling, not an expectation.
+  - Section 54's table puts the hidden layers at 75% of r15's page pass on the 1080 and 89% on the Intel. So at the ceiling,
+    r27w's pass would be 1.33 x r15's on the 1080 and 1.42 x on the Intel.
+  - Against the present entries, at their measured ratios to r15:
+    - r18t on the 1080: 1.087 x on the page (section 63), 1.080 and 1.068 x natively (section 78);
+    - r18u on the Intel: 1.524 x on the page (section 63), 1.590 x natively (section 67).
+
+| GPU | r27w against its present entry, on the page | natively | Qualifies |
+|---|---|---|---|
+| GTX 1080 | 1.22 x r18t | 1.23-1.25 x | yes |
+| Intel gen-9 | 0.93 x r18u | 0.89 x | no |
+
+- **Said now:**
+  - P1: r27w qualifies on the 1080, natively and on the page.
+  - P2: it does not qualify on the Intel, on either path. r18u's written-out block is already 1.52-1.59 x r15 there, more than
+    the ceiling above leaves r27w.
+  - P3: K0w holds on both GPUs, natively and in Chrome, with some cells fused on the 1080, as r15's were.
+  - P4: K0w (a) holds on all 24 test images, D4 among them, with r27w's image nearer the f64 network than r15's on most of them.
+- **What could make P3 fail, said now.** A D3D12 compiler that reassociates the transforms' adds would make cells match neither
+  twin. The direct kernels' sums kept their order on both GPUs (section 65). A straight-line transform is a different shape of
+  code, and nothing here has seen what DXC does with it.
+
+**Reported, deciding nothing.**
+- **The compile gate's kernel-level line:** r27w's hidden kernel against r15's (r13-fast-3x3), r18t's and r18u's, at 64 x 64,
+  natively under DXC.
+- **Each GPU's ladders,** size by size, r27w against r15, r18t and r18u.
+- **How many hidden cells fused,** natively and in Chrome.
+
+**On the rig.**
+- On each GPU, from a verified clone of `claude/tier-2-keys-patch-4lwhzk` at a commit carrying this section, `SWEK_WEBGPU`
+  cleared:
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r27-a.json
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r27-b.json
+```
+- Send back all four JSON files. Don't commit or pull between the two runs.
+- **Each report is committed byte for byte** before it is read.
+
+**Sabotages (v4864).** Twenty-one runs, each restored byte-identical and logged in its gate's header. None was 0 red.
+- **`brain/conv2d-selfcheck.mjs`, W1-W10.**
+  - The twin's transform with one sign flipped: 11 red.
+  - The kernel's weights without the group offset: 9 red.
+  - Its window origin a pixel right: 9 red.
+  - Its second barrier removed: 8 red.
+  - The twin summing the channels backwards: 9 red.
+  - The guard on channels past Cout removed: 4 red, exactly the cases whose Cout is not a multiple of four.
+  - The bias a float late: 10 red.
+  - `winoShape` holding any odd k: 1 red.
+  - The stand-aside without round 27's DXC exemption: 1 red.
+- **W9 is the one worth reading.** It files the transformed weights at (j, i) for (i, j), in the kernel and the twin alike.
+  - **Not one device cell row went red.** Both read the same wrong weights and agree cell for cell.
+  - Five rows caught it: the order row and the layout row, written from the matrices, and the two integer keys, held to
+    `conv2dForward`.
+  - So a twin cannot be the only witness to its own order, and section 5f exists for that reason.
+- **`render/denoiseDevice-selfcheck.mjs`, Y1-Y6.**
+  - `kernelFor` never picking the Winograd kernel: 6 red, plus 2 in the timing gate.
+  - `twinsOf` giving every layer the direct pair: 5 red. Every Winograd cell then reads as unexplained.
+  - `nativeSetsFor` ignoring `FXC_UNTRIED_SETS`: 2 red, plus 2 in the timing gate.
+  - The Winograd layers dispatched with half their z groups: 3 red.
+  - `--measure-r27w` judging against the direct pair: 1 red, the source row.
+  - `R27_KERNELS` at two vec4s: 1 red. K0w holds at two, so the configuration is held by name.
+- **`render/denoiseTiming-selfcheck.mjs`, Y7:** the "r27w against" lines tagged section 61, 1 red.
+- **`render/denoiseCompile-selfcheck.mjs`, Y8-Y9:** the job judged against `conv2dCpu`, 1 red; the variant at two vec4s, 1 red.
+
+**Not in this round.**
+- Two or four vec4s a thread, or the transformed weights in a uniform binding. Those are shapes for a later round, if r27w
+  holds on one GPU and a probe says which.
+- F(4 x 4, 3 x 3): 4 x fewer multiplies, at a precision cost nothing here has measured.
+- Any change to `DEFAULT_KERNELS`, to an FXC run, or to the network.

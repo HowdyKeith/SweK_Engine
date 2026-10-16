@@ -98,6 +98,9 @@
 //   V6  this gate's prediction made for win32 (FXC beside SPIR-V dumps)          1 RED (condition 0's live row)
 //   V7  the child finds its kernel in VARIANTS alone                             1 RED (the pilot row)
 //   V8  the hidden kernels counted in a mode where they stood aside               1 RED (native / as shipped, section 4)
+// v4864 -- round 27 (section 83), against r27w's hidden kernel in DXC_VARIANTS. Each run on SwiftShader, restored, md5 verified:
+//   Y8  jobFor judging the Winograd kernel against conv2dCpu                  1 RED (the pilot row: every cell unexplained)
+//   Y9  r27w's variant at two vec4s, not R27_KERNELS's one                     1 RED (the hidden kernels' job row)
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -209,12 +212,13 @@ console.log("1. THE INSTRUMENT, ON THE CPU");
     // same layer r15 runs on r13-fast-3x3, so the kernel-level line below compares one layer on three kernels. dxcOnly, both
     // SABOTAGED v4851: r18t's cfg px 2 -> 4 in DXC_VARIANTS -> RED by name (this row alone; the pilot's still exact); restored.
     const DD = await imp("render/denoiseDevice.mjs"), CV = await imp("brain/conv2d.mjs"), base = VARIANTS.find((v) => v.id === "r13-fast-3x3");
-    const hidden = DXC_VARIANTS.map((v) => { const j = jobFor(v), L = v.L(64).layer, set = v.id.slice(0, 4), cfg = DD.R18_KERNELS[set]?.cfg;
-        const want = DD.kernelFor(L, set) === "tile_inline" ? CV.conv2dTileWgsl(L, cfg) : DD.kernelFor(L, set) === "fast_unroll" ? CV.conv2dFastAltWgsl(L, cfg) : null;
+    // v4864 -- round 27 (section 83): and r27w's, the Winograd kernel at R27_KERNELS's cfg
+    const hidden = DXC_VARIANTS.map((v) => { const j = jobFor(v), L = v.L(64).layer, set = v.id.slice(0, 4), cfg = DD.R18_KERNELS[set]?.cfg || DD.R27_KERNELS[set]?.cfg;
+        const k = DD.kernelFor(L, set), want = k === "tile_inline" ? CV.conv2dTileWgsl(L, cfg) : k === "fast_unroll" ? CV.conv2dFastAltWgsl(L, cfg) : k === "wino" ? CV.conv2dWinoWgsl(L, cfg) : null;
         return { id: v.id, set, ok: v.dxcOnly === true && typeof j.judge === "function" && j.out === 64 * 64 * 32 && j.wg.length === 3 && want !== null && j.code === want &&
                                     DD.kernelFor(L, "r15") === "fast" && L.Cin === base.L(64).layer.Cin && L.k === base.L(64).layer.k && L.Cout === base.L(64).layer.Cout }; });
-    ok(`  section 66: r18t's and r18u's hidden-layer kernels each have a job at 64 x 64, judged, dxcOnly, their WGSL the device's own for that set (R18_KERNELS) -- on r13-fast-3x3's layer, r15's hidden kernel`,
-        hidden.length === 2 && hidden.map((h) => h.set).join() === "r18t,r18u" && hidden.every((h) => h.ok) && !VARIANTS.some((v) => v.dxcOnly) && VARIANTS.length === 8,
+    ok(`  section 66: r18t's, r18u's and (section 83) r27w's hidden-layer kernels each have a job at 64 x 64, judged, dxcOnly, their WGSL the device's own for that set (R18_KERNELS, R27_KERNELS) -- on r13-fast-3x3's layer, r15's hidden kernel`,
+        hidden.length === 3 && hidden.map((h) => h.set).join() === "r18t,r18u,r27w" && hidden.every((h) => h.ok) && !VARIANTS.some((v) => v.dxcOnly) && VARIANTS.length === 8,
         hidden.map((h) => `${h.id}: ${h.ok ? "the device's kernel" : "NOT the device's kernel"}`).join("; "));
     // section 66's condition 0, on fixtures every box runs: the package's prediction held to the dumps. "unknown (no dump)" is
     // never DXIL -- 0.6.2's Dawn fails device creation when DXC will not load and dumps nothing, which is the prediction failing
@@ -240,7 +244,7 @@ console.log("1. THE INSTRUMENT, ON THE CPU");
         ["DXC, seven DXIL and one with no dump", "DXC", [...eight(X).slice(1), U], false], ["DXC, only seven dumps", "DXC", eight(X).slice(1), false],
         ["FXC, eight DXIL", "FXC", eight(X), false], ["FXC, eight DXBC", "FXC", eight(B), false], ["none (off win32)", null, eight(S), false],
     ].map(([n, p, cs, want]) => { const r = dxcVariantsBuild(p, cs); return { n, want, got: r.build, why: r.why }; });
-    ok("!! section 66: r18t's and r18u's hidden kernels build only in a mode whose compiler is DXC and whose eight base kernels all dumped DXIL -- under FXC, or off win32, they stand aside",
+    ok("!! section 66: the DXC-only hidden kernels (r18t's, r18u's and, since section 83, r27w's) build only in a mode whose compiler is DXC and whose eight base kernels all dumped DXIL -- under FXC, or off win32, they stand aside",
         vb.every((c) => c.got === c.want) && vb.every((c) => typeof c.why === "string" && c.why.length > 0),
         vb.map((c) => `${c.n}: ${c.got ? "build" : "stand aside"}${c.got === c.want ? "" : " (WRONG)"}`).join("; "));
 }
@@ -345,7 +349,7 @@ else {
         const predicted = predictedBy[m.name] = H.nativeCompiler({ pkg, flags: m.flags });
         const base = rows.filter((x) => x.path === "native" && x.compiler === m.name), go = dxcVariantsBuild(predicted, base.map((x) => x.result.dump.compiler));
         if (go.build) { dxcBuiltModes.add(m.name); for (const v of DXC_VARIANTS) child(m, v); }
-        else console.log(`  SKIP  section 66: native / ${m.name}: r18t's and r18u's hidden kernels (${DXC_VARIANTS.map((v) => v.id).join(", ")}) stand aside, not counted as unbuilt -- ${go.why}`);
+        else console.log(`  SKIP  section 66: native / ${m.name}: the DXC-only hidden kernels (${DXC_VARIANTS.map((v) => v.id).join(", ")}) stand aside, not counted as unbuilt -- ${go.why}`);
         // section 64: one line a mode, which C1 is read from -- how many built, what their dumps say, the first reason any did
         // not, and where the dumps are (realGpuRun's report keeps "----" lines, and named no dump file before this)
         const ms = rows.filter((x) => x.path === "native" && x.compiler === m.name), by = {};
@@ -378,7 +382,7 @@ else {
     if (predictedBy["as shipped"] == null && !win) {
         const pilot = [];
         for (const v of DXC_VARIANTS) child(modes[0], v, pilot, "pilot");
-        ok("!! section 66's pilot, off win32: r18t's and r18u's hidden kernels each built natively, as shipped, by a child that reported, and exact against the twin -- a plumbing check, no D3D compiler",
+        ok("!! section 66's pilot, off win32: the DXC-only hidden kernels (r18t's, r18u's, r27w's) each built natively, as shipped, by a child that reported, and exact against the twin -- a plumbing check, no D3D compiler",
             pilot.length === DXC_VARIANTS.length && pilot.every((x) => !x.result.noResult && x.result.built && x.result.exact === true &&
                 [x.result.buildMs, x.result.passMs].every((t) => Number.isFinite(t) && t > 0)),
             pilot.map((x) => `${x.id}: ${x.result.built ? `${x.result.detail}, pass ${x.result.passMs.toFixed(3)} ms` : "NOT BUILT -- " + x.result.reason}`).join("; "));

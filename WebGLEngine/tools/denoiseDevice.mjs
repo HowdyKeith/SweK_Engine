@@ -17,6 +17,11 @@
 //           kernel with a block written out, then k_head_apply) -> render/denoise-results-r18t.json, -r18u.json; judged as r15 is.
 //           v4849 (round 19, section 66): refused, exit 2, on a D3D12 adapter whose run compiles with FXC, which builds neither
 //           set (section 60) -- SWEK_WEBGPU naming a node-webgpu 0.6.2 package runs them under its DXC
+//       node tools/denoiseDevice.mjs --measure-r27w [--cache <dir>]
+//           v4864 -- section 83's K0w (a): the same on round 27's Winograd set (every hidden 3 x 3 layer on the Winograd kernel, then
+//           k_head_apply) -> render/denoise-results-r27w.json; each hidden cell judged against the twin its kernel answers to
+//           (render/denoiseDevice.mjs's twinsOf: conv2dCpuWino or its fused mirror), and D4, the restated key: the image within 1e-5
+//           of the f64 network's on every value. Refused, exit 2, on a D3D12 adapter under FXC, where nobody has built its kernel
 //       node tools/denoiseDevice.mjs --which
 //           section 68's native caller, on this box: the adapter, the package and the compiler read off it, the adapter's key, and
 //           the set nativePick takes for them (section 67's NATIVE_KERNELS_BY_ADAPTER under DXC, DEFAULT_KERNELS otherwise) -- then
@@ -40,21 +45,24 @@ import { renderSplit, RESULTS_R11 } from "../render/denoiseStudy.mjs";
 import { SPLITS_R11 } from "../render/denoiseScenes.mjs";
 import { denoise } from "../render/denoiseNet.mjs";
 import { relMSE } from "../render/denoiseStats.mjs";
-import { conv2dCpu, conv2dCpuFma } from "../brain/conv2d.mjs";
-import { APPLY_TOL, kernelApplyCpu, judgeHeadApply, deviceLayers, createDeviceDenoiser, createNativeDenoiser, encodeNet, decodeNet, nativeSetsFor } from "../render/denoiseDevice.mjs";
+import { APPLY_TOL, kernelApplyCpu, judgeHeadApply, deviceLayers, createDeviceDenoiser, createNativeDenoiser, encodeNet, decodeNet, nativeSetsFor, twinsOf } from "../render/denoiseDevice.mjs";
 import * as GPU from "./ship/headlessGpu.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const NET_FILE = "render/denoise-net-r11.json", RESULTS_R12 = "render/denoise-results-r12.json", RESULTS_R13 = "render/denoise-results-r13.json";
 const RESULTS_R14 = "render/denoise-results-r14.json", RESULTS_R15 = "render/denoise-results-r15.json";
-const RESULTS_R18T = "render/denoise-results-r18t.json", RESULTS_R18U = "render/denoise-results-r18u.json";
+const RESULTS_R18T = "render/denoise-results-r18t.json", RESULTS_R18U = "render/denoise-results-r18u.json", RESULTS_R27W = "render/denoise-results-r27w.json";
 // each measurement, by flag: the kernel set it runs the device pass on, and the file it writes (sections 35, 39, 43, 46 and 61)
 const MEASURES = { "--measure-r12": { kernels: "r12", results: RESULTS_R12 }, "--measure-r13": { kernels: "r13", results: RESULTS_R13 },
                    "--measure-r14": { kernels: "r14", results: RESULTS_R14 }, "--measure-r15": { kernels: "r15", results: RESULTS_R15 },
-                   "--measure-r18t": { kernels: "r18t", results: RESULTS_R18T }, "--measure-r18u": { kernels: "r18u", results: RESULTS_R18U } };
+                   "--measure-r18t": { kernels: "r18t", results: RESULTS_R18T }, "--measure-r18u": { kernels: "r18u", results: RESULTS_R18U },
+                   "--measure-r27w": { kernels: "r27w", results: RESULTS_R27W } };
 const measure = Object.keys(MEASURES).find((k) => process.argv.includes(k));
 // section 35's bound for D3: the device's relMSE on an image within this relative distance of the f64 network's
 const D3_REL = 1e-4;
+// v4864 -- section 83's restated key, D4: the device's image within this of the f64 network's on every value, relative, with a floor of
+// 1e-12 -- the bound render/denoiseDevice-selfcheck.mjs has held every set's image to since section 35, and for r27w the bridge to r15
+const D4_REL = 1e-5;
 const args = process.argv.slice(2), arg = (k) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : null; };
 const refuseIfExists = (f) => { if (fs.existsSync(path.join(ENG, f))) { console.log(`[denoiseDevice] ${f} exists -- it is never overwritten`); process.exit(2); } };
 
@@ -115,8 +123,8 @@ if (args.includes("--export-r11")) {
     const pkg = GPU.webgpuPackage(W.from), compiler = GPU.nativeCompiler({ pkg, platform: process.platform, flags: FLAGS });
     const gpu = W.mod.create([...FLAGS]), first = await gpu.requestAdapter();
     if (!nativeSetsFor(first, [kernels], { compiler }).length) {
-        console.log(`[denoiseDevice] ${measure} refused: ${kernels} is one of FXC_UNBUILT_SETS and this run compiles with ${compiler || "FXC"} on a D3D12 adapter ` +
-                    `(${(first && first.info && first.info.description) || "?"}; node-webgpu ${(pkg && pkg.version) || "(version unread)"} from ${W.from}), which does not build its kernel (section 60) -- ` +
+        console.log(`[denoiseDevice] ${measure} refused: ${kernels} is one of FXC_UNBUILT_SETS or FXC_UNTRIED_SETS and this run compiles with ${compiler || "FXC"} on a D3D12 adapter ` +
+                    `(${(first && first.info && first.info.description) || "?"}; node-webgpu ${(pkg && pkg.version) || "(version unread)"} from ${W.from}), which does not build its kernel (section 60) or never has (section 83) -- ` +
                     `set ${GPU.WEBGPU_ENV} to the directory of a node-webgpu 0.6.2 package, which ships its DXC beside dawn.node`);
         GPU.exitCleanly(2);
     }
@@ -146,7 +154,8 @@ if (args.includes("--export-r11")) {
             const layers = DL.map((L, j) => {
                 // a fused last pass (k_head_apply) stores no cell: it is judged through the image, below
                 if (L.kernel === "head_apply") return { kernel: L.kernel, plain: 0, fused: 0, unexplained: 0, image: true };
-                const input = j ? out.acts[j - 1] : Float32Array.from(x), tw = conv2dCpu(input, image, image, L), fm = conv2dCpuFma(input, image, image, L);
+                // v4864 -- the twin and mirror this layer's kernel answers to: the Winograd pair for r27w's hidden layers (section 83)
+                const input = j ? out.acts[j - 1] : Float32Array.from(x), T = twinsOf(L), tw = T.twin(input, image, image, L), fm = T.mirror(input, image, image, L);
                 let plain = 0, fused = 0, unexplained = 0;
                 for (let c = 0; c < tw.length; c++) { const v = out.acts[j][c]; if (v === tw[c]) plain++; else if (v === fm[c]) fused++; else unexplained++; }
                 return { kernel: L.kernel, plain, fused, unexplained };
@@ -156,21 +165,23 @@ if (args.includes("--export-r11")) {
             else { const tw = kernelApplyCpu(x, out.acts[out.acts.length - 1], image, image);
                    for (let c = 0; c < tw.length; c++) applyWorst = Math.max(applyWorst, Math.abs(out.y[c] - tw[c]) / (Math.abs(tw[c]) + 1e-30)); }
             const filter = R11.tables[name].filter[i];
+            let imageWorst = 0; for (let c = 0; c < y64.length; c++) imageWorst = Math.max(imageWorst, Math.abs(out.y[c] - y64[c]) / (Math.abs(y64[c]) + 1e-12));
             rows.push({ set: name, family: SPLITS_R11[name].family, seed: SPLITS_R11[name].seeds[i], harvestSeed1: R11.tables[name].net[0][i], cpu: rel64, device: relDev, filter,
-                        layers, applyWorst, ...(fusedLast ? { applyTwin, applyMirror } : {}), ms: out.ms });
+                        layers, applyWorst, ...(fusedLast ? { applyTwin, applyMirror } : {}), imageWorst, ms: out.ms });
         }
     }
     const D0 = rows.every((r) => Object.is(r.cpu, r.harvestSeed1));
     const D1 = rows.every((r) => r.layers.every((l) => l.unexplained === 0));
     const D2 = Math.max(...rows.map((r) => r.applyWorst));
     const D3 = Math.max(...rows.map((r) => Math.abs(r.device / r.cpu - 1)));
+    const D4 = Math.max(...rows.map((r) => r.imageWorst));
     const wins = (k, set) => rows.filter((r) => r.set === set && r[k] < r.filter).map((r) => r.seed);
     const sameWins = ["T1", "T2"].every((s) => wins("device", s).join() === wins("cpu", s).join());
     const out = {
-        config: { net: NET_FILE, results: RESULTS_R11, kernels, image, sppIn, sppRef, APPLY_TOL, D3_REL, images: rows.length },
+        config: { net: NET_FILE, results: RESULTS_R11, kernels, image, sppIn, sppRef, APPLY_TOL, D3_REL, D4_REL, images: rows.length },
         criteria: {
             D0: { ok: D0, what: "the shipped network on the CPU (f64) gives the harvest's seed-1 relMSE on every test image, bit for bit" },
-            D1: { ok: D1, what: "every conv cell on the device is the twin's or the fused mirror's, given the device's own input to that layer" +
+            D1: { ok: D1, what: "every conv cell on the device is the twin's or the fused mirror's -- the pair its kernel answers to (twinsOf) -- given the device's own input to that layer" +
                       (fusedSet ? " -- the hidden layers' cells: the head's are never stored, and are judged through the image (D2)" : ""),
                   fused: rows.reduce((a, r) => a + r.layers.reduce((b, l) => b + l.fused, 0), 0), cells: rows.reduce((a, r) => a + r.layers.reduce((b, l) => b + l.plain + l.fused + l.unexplained, 0), 0) },
             D2: { ok: D2 <= APPLY_TOL, worst: D2, what: fusedSet
@@ -179,6 +190,7 @@ if (args.includes("--export-r11")) {
             D3: { ok: D3 <= D3_REL && sameWins, worst: D3, sameWins, winsDevice: { T1: wins("device", "T1").length, T2: wins("device", "T2").length },
                   winsCpu: { T1: wins("cpu", "T1").length, T2: wins("cpu", "T2").length },
                   what: "the device's relMSE within D3_REL of the f64 network's on every image, and it beats the primary filter on exactly the same images" },
+            D4: { ok: D4 <= D4_REL, worst: D4, what: "the device's image within D4_REL of the f64 network's on every value (relative, floor 1e-12) -- section 83's restated key" },
         },
         rows, adapter: adapterName, seconds: (Date.now() - t0) / 1000, ...(cache ? { cache: { hits: cache.hits, misses: cache.misses } } : {}),
     };
@@ -188,6 +200,6 @@ if (args.includes("--export-r11")) {
     GPU.exitCleanly(0);
 } else {
     console.log("usage: node tools/denoiseDevice.mjs --export-r11 --cache <dir> --key <record> | --measure-r12 [--cache <dir>] | --measure-r13 [--cache <dir>] | --measure-r14 [--cache <dir>]" +
-                " | --measure-r15 | --measure-r18t | --measure-r18u [--cache <dir>] | --which   (see render/learned-denoiser-preregistration.md, sections 35, 39, 43, 46, 61 and 68)");
+                " | --measure-r15 | --measure-r18t | --measure-r18u | --measure-r27w [--cache <dir>] | --which   (see render/learned-denoiser-preregistration.md, sections 35, 39, 43, 46, 61, 68 and 83)");
     process.exit(2);
 }

@@ -35,6 +35,8 @@
 // WGSL lets a compiler contract `acc + x * W` into one fma (brainTsl.mjs's mlpLayerCpuFma found 56 cells move on
 // Keith's NVIDIA box for the MLP), so conv2dCpuFma is the fused mirror, and a cell a device computes is held to
 // one or the other -- explained, not tolerated.
+// *** ONE KERNEL HERE IS THE EXCEPTION, AND SAYS SO: *** round 27's Winograd kernel (section 83, below) adds transformed numbers in a
+// transformed domain, so it is held to a twin of its own, conv2dCpuWino, and never to conv2dCpu.
 "use strict";
 
 export const TILE = 8;          // the tiled kernel's workgroup is TILE x TILE output pixels
@@ -652,6 +654,179 @@ export function packTileUniforms({ H, W, layer }, cfg = {}) {
 }
 /** The pixel-tiled kernel's dispatch at H x W: a workgroup per TILE PX x TILE pixels, a z group per G4 vec4s. */
 export const tileWorkgroups = (H, W, layer, cfg = {}) => { const S = tileShape(layer, cfg); return [Math.ceil(W / (TILE * S.px)), Math.ceil(H / TILE), S.groups]; };
+
+// ---- THE WINOGRAD KERNEL (the denoiser arc, round 27: pre-registration section 83) --------------------------------------
+//
+// Winograd's F(2 x 2, 3 x 3): a 2 x 2 block of outputs from a 4 x 4 block of inputs in 16 multiplies an input channel and an
+// output channel, where the direct sum takes 36 -- 2.25 x fewer. Each 3 x 3 filter is transformed once, ON THE HOST
+// (winoFilter: U = G g G^T in f64, rounded to f32 once); each 4 x 4 input tile on the device (V = B^T d B, adds and
+// subtracts only); the 16 products are summed over the input channels IN THE TRANSFORMED DOMAIN (M = the sum over ci of
+// U V, ci ascending, from zero); and the 2 x 2 outputs come back by A^T M A, adds and subtracts only, then the bias and the
+// activation:
+//
+//   B^T = [1 0 -1 0; 0 1 1 0; 0 -1 1 0; 0 1 0 -1]    G = [1 0 0; 1/2 1/2 1/2; 1/2 -1/2 1/2; 0 0 1]    A^T = [1 1 1 0; 0 1 -1 -1]
+//
+// *** THIS IS NOT THE CANONICAL ORDER, AND NO KERNEL ABOVE IS ITS TWIN. *** Every kernel above adds b, then block by block,
+// ky, kx, ci: one product of an input and a weight at a time into one accumulator. This one adds other numbers -- transformed
+// ones -- in another domain, then mixes sixteen sums. So it has a twin of its own, conv2dCpuWino, which does the kernel's
+// operations in the kernel's order with an f32 rounding after every one, and a fused mirror, conv2dCpuWinoFma, for a compiler
+// that contracts M + V U into one fma: the kernel's only multiply-add, since every coefficient on the device is 1 or -1 (the
+// halves of G are the host's). A cell the device computes is held to one or the other, as every kernel above is held to
+// conv2dCpu or conv2dCpuFma. What changes is how far that twin sits from the f64 layer, and section 83 fixes the bound.
+//
+// THE THREAD. One 2 x 2 tile of outputs and `g4` vec4s of output channels: 16 vec4 accumulators each, one per transformed
+// position. A workgroup is TILE x TILE threads, so 16 x 16 outputs; the 18 x 18 window they read (their tiles and a pixel of
+// halo each side) is staged in workgroup memory WINO_CB input channels at a time, ZERO outside the image -- Winograd pads, it
+// cannot skip a tap (the direct kernels' "skipping and adding a zero" again, here the only way). Groups of output channels
+// run across z, as the fast kernel's do, so every thread of a workgroup reads the same weights. The transformed weights are
+// 16 Cin C4 vec4s -- 64 KiB at 32 -> 32, all of a default uniform binding with no room for the bias -- so they are a
+// read-only STORAGE buffer at binding 3, and the uniform block holds H, W and the bias.
+export const WINO_CB = 4;                      // input channels staged a block: 18 x 18 x 4 x 4 B = 5,184 B of workgroup memory
+export const WINO_G4S = Object.freeze([1, 2, 4]);   // vec4s of output channels a thread may keep, 16 accumulators each
+const WT = 2 * TILE + 2;                       // the staged window's side: a workgroup's 16 outputs and a pixel of halo each side
+
+/**
+ * The Winograd kernel's shape for a layer and { g4 }: G vec4s a thread keeps (at most the layer's own), groups of them across
+ * z, C4 vec4s of padded output channels, the uniform block's bytes (16 of H and W, then the bias), the transformed weights'
+ * bytes, the window's workgroup bytes, and whether the kernel holds it -- a 3 x 3 layer only.
+ */
+export function winoShape({ Cin, Cout, k }, { g4 = 1 } = {}) {
+    const c4 = Math.ceil(Cout / 4), G = Math.min(g4, c4), groups = Math.ceil(c4 / G), C4 = groups * G;
+    const bytes = 16 + 16 * C4, weightBytes = 16 * 16 * Cin * C4, wgBytes = WT * WT * WINO_CB * 4;
+    return { g4: G, groups, C4, bytes, weightBytes, wgBytes, fits: k === 3 && WINO_G4S.includes(g4) && bytes <= UNIFORM_MAX && wgBytes <= WORKGROUP_MAX };
+}
+
+/**
+ * A 3 x 3 layer's transformed weights, G g G^T per (output, input) channel pair, computed in f64 from the f32 weights and
+ * rounded to f32 ONCE: position e = 4 i + j (i the transform of the filter's rows, j of its columns) of channel pair
+ * (co, ci) at float ((e Cin + ci) C4 + co / 4) 4 + co % 4 -- e outermost, then ci, then the output channels as vec4s, the
+ * padding past Cout zero. What the kernel reads at binding 3, and what its twin multiplies by.
+ */
+export function winoFilter({ Cin, Cout, k, W }, C4 = Math.ceil(Cout / 4)) {
+    if (k !== 3) throw new Error(`conv2d: the Winograd transform is for a 3 x 3 filter, got k ${k}`);
+    const U = new Float32Array(16 * Cin * C4 * 4), w = (co, ky, kx, ci) => Math.fround(W[((co * 3 + ky) * 3 + kx) * Cin + ci]);
+    for (let co = 0; co < Cout; co++) for (let ci = 0; ci < Cin; ci++) {
+        const Gg = [];                                  // G g, a filter column at a time: Gg[kx][i]
+        for (let kx = 0; kx < 3; kx++) { const a = w(co, 0, kx, ci), b = w(co, 1, kx, ci), c = w(co, 2, kx, ci); Gg.push([a, (a + b + c) / 2, (a - b + c) / 2, c]); }
+        for (let i = 0; i < 4; i++) {                   // (G g) G^T, a row at a time
+            const a = Gg[0][i], b = Gg[1][i], c = Gg[2][i], row = [a, (a + b + c) / 2, (a - b + c) / 2, c];
+            for (let j = 0; j < 4; j++) U[((i * 4 + j) * Cin + ci) * C4 * 4 + co] = row[j];
+        }
+    }
+    return U;
+}
+
+/** The Winograd forward pass in f32 -- the twin (fused false) or the fused mirror (fused true) -- in the kernel's order. */
+function winoForward(x, H, W, layer, fused) {
+    check(H, W, layer);
+    if (layer.k !== 3) throw new Error(`conv2d: the Winograd twin is for a 3 x 3 layer, got k ${layer.k}`);
+    const { Cin, Cout } = layer, f = Math.fround, relu = String(layer.act ?? "none") === "relu", C4 = Math.ceil(Cout / 4), U = winoFilter(layer, C4);
+    const y = new Float32Array(H * W * Cout), V = new Float32Array(Cin * 16), d = new Float32Array(16), t = new Float32Array(16), M = new Float32Array(16);
+    const at = (yy, xx, ci) => (yy < 0 || yy >= H || xx < 0 || xx >= W ? 0 : f(x[(yy * W + xx) * Cin + ci]));
+    for (let py = 0; py < H; py += 2) for (let px = 0; px < W; px += 2) {
+        for (let ci = 0; ci < Cin; ci++) {
+            for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) d[i * 4 + j] = at(py - 1 + i, px - 1 + j, ci);
+            // t = B^T d, a column at a time
+            for (let j = 0; j < 4; j++) { t[j] = f(d[j] - d[8 + j]); t[4 + j] = f(d[4 + j] + d[8 + j]); t[8 + j] = f(d[8 + j] - d[4 + j]); t[12 + j] = f(d[4 + j] - d[12 + j]); }
+            // V = t B, a row at a time
+            for (let i = 0; i < 4; i++) { const r = 4 * i, o = 16 * ci + r; V[o] = f(t[r] - t[r + 2]); V[o + 1] = f(t[r + 1] + t[r + 2]); V[o + 2] = f(t[r + 2] - t[r + 1]); V[o + 3] = f(t[r + 1] - t[r + 3]); }
+        }
+        for (let co = 0; co < Cout; co++) {
+            M.fill(0);
+            for (let ci = 0; ci < Cin; ci++) for (let e = 0; e < 16; e++) {
+                const v = V[16 * ci + e], u = U[(e * Cin + ci) * C4 * 4 + co];
+                M[e] = fused ? f(v * u + M[e]) : f(M[e] + f(v * u));
+            }
+            // A^T M A: s and q are A^T M's two rows, a column at a time; then the 2 x 2 outputs, the bias, the activation
+            const s = [0, 1, 2, 3].map((j) => f(f(M[j] + M[4 + j]) + M[8 + j])), q = [0, 1, 2, 3].map((j) => f(f(M[4 + j] - M[8 + j]) - M[12 + j]));
+            const out = [f(f(s[0] + s[1]) + s[2]), f(f(s[1] - s[2]) - s[3]), f(f(q[0] + q[1]) + q[2]), f(f(q[1] - q[2]) - q[3])], b = f(layer.b[co]);
+            for (let a = 0; a < 4; a++) {
+                const yy = py + (a >> 1), xx = px + (a & 1);
+                if (yy >= H || xx >= W) continue;
+                const v = f(out[a] + b);
+                y[(yy * W + xx) * Cout + co] = relu ? f(Math.max(v, 0)) : v;
+            }
+        }
+    }
+    return y;
+}
+/** The Winograd kernel's twin: f32, rounded after every operation, in the kernel's order. A 3 x 3 layer only. */
+export function conv2dCpuWino(x, H, W, layer) { return winoForward(x, H, W, layer, false); }
+/** Its fused mirror: each M + V U rounded once, as a compiler that contracts it to an fma would. */
+export function conv2dCpuWinoFma(x, H, W, layer) { return winoForward(x, H, W, layer, true); }
+
+/** The Winograd kernel (entry k_conv_wino), generated for one 3 x 3 layer and one { g4 }. */
+export function conv2dWinoWgsl({ Cin, Cout, k, act = "none" }, cfg = {}) {
+    const S = winoShape({ Cin, Cout, k }, cfg);
+    if (!S.fits) throw new Error(`conv2d: the Winograd kernel holds a 3 x 3 layer at g4 ${WINO_G4S.join("/")}, a bias in one ${UNIFORM_MAX}-byte uniform binding and a window in ${WORKGROUP_MAX} bytes -- got ${Cin} -> ${Cout}, k ${k}, g4 ${cfg.g4}`);
+    const G = S.g4, js = Array.from({ length: G }, (_, j) => j), es = Array.from({ length: 16 }, (_, e) => e), r4 = [0, 1, 2, 3];
+    const lanes = ["x", "y", "z", "w"], m = (e, j) => `m${e}_${j}`;
+    const outFor = (j) => [
+        ...r4.map((c) => `let s${c} = (${m(c, j)} + ${m(4 + c, j)}) + ${m(8 + c, j)}; let q${c} = (${m(4 + c, j)} - ${m(8 + c, j)}) - ${m(12 + c, j)};`),
+        `let b = P.b[g * ${G}u + ${j}u];`,
+        `var y0 = ((s0 + s1) + s2) + b; var y1 = ((s1 - s2) - s3) + b; var y2 = ((q0 + q1) + q2) + b; var y3 = ((q1 - q2) - q3) + b;`,
+        ...(act === "relu" ? [r4.map((a) => `y${a} = max(y${a}, vec4<f32>(0.0));`).join(" ")] : []),
+        ...r4.map((a) => `if (py + ${a >> 1}u < P.H && px + ${a & 1}u < P.W) { let o = ((py + ${a >> 1}u) * P.W + px + ${a & 1}u) * ${Cout}u + c + ${4 * j}u; ` +
+            lanes.map((l, n) => `if (c + ${4 * j + n}u < ${Cout}u) { Y[o + ${n}u] = y${a}.${l}; }`).join(" ") + " }"),
+    ];
+    return `
+struct WP { H: u32, W: u32, pad0: u32, pad1: u32, b: array<vec4<f32>, ${S.C4}> };
+@group(0) @binding(0) var<storage, read_write> Y: array<f32>;            // H x W x ${Cout}
+@group(0) @binding(1) var<uniform> P: WP;                                 // packWinoUniforms: H, W, the bias
+@group(0) @binding(2) var<storage, read>       X: array<f32>;            // H x W x ${Cin}
+@group(0) @binding(3) var<storage, read>       U: array<vec4<f32>>;      // winoFilter: 16 x ${Cin} x ${S.C4} vec4s
+var<workgroup> T: array<f32, ${WT * WT * WINO_CB}>;
+@compute @workgroup_size(${TILE}, ${TILE}, 1)
+fn k_conv_wino(@builtin(local_invocation_id) lid: vec3<u32>, @builtin(workgroup_id) wid: vec3<u32>) {
+    let ox = i32(wid.x * ${2 * TILE}u) - 1; let oy = i32(wid.y * ${2 * TILE}u) - 1;
+    // this thread's tile: outputs (px, py) to (px + 1, py + 1)
+    let px = wid.x * ${2 * TILE}u + 2u * lid.x; let py = wid.y * ${2 * TILE}u + 2u * lid.y; let g = wid.z;
+    ${es.map((e) => js.map((j) => `var ${m(e, j)} = vec4<f32>(0.0);`).join(" ")).join("\n    ")}
+    for (var c0 = 0u; c0 < ${Cin}u; c0 = c0 + ${WINO_CB}u) {
+        let nb = min(${WINO_CB}u, ${Cin}u - c0);
+        for (var i = lid.y * ${TILE}u + lid.x; i < ${WT * WT}u * nb; i = i + ${TILE * TILE}u) {
+            let cj = i % nb; let t = i / nb; let sx = ox + i32(t % ${WT}u); let sy = oy + i32(t / ${WT}u);
+            var v = 0.0;
+            if (sx >= 0 && sx < i32(P.W) && sy >= 0 && sy < i32(P.H)) { v = X[(u32(sy) * P.W + u32(sx)) * ${Cin}u + c0 + cj]; }
+            T[i] = v;
+        }
+        workgroupBarrier();
+        for (var cj = 0u; cj < nb; cj = cj + 1u) {
+            // d: the tile's 4 x 4 inputs, out of the window
+            let o = (2u * lid.y * ${WT}u + 2u * lid.x) * nb + cj;
+            ${r4.map((i) => r4.map((j) => `let d${i}${j} = T[o + ${i * WT + j}u * nb];`).join(" ")).join("\n            ")}
+            // t = B^T d, a column at a time
+            ${r4.map((j) => `let t0${j} = d0${j} - d2${j}; let t1${j} = d1${j} + d2${j}; let t2${j} = d2${j} - d1${j}; let t3${j} = d1${j} - d3${j};`).join("\n            ")}
+            // v = t B, a row at a time
+            ${r4.map((i) => `let v${i}0 = t${i}0 - t${i}2; let v${i}1 = t${i}1 + t${i}2; let v${i}2 = t${i}2 - t${i}1; let v${i}3 = t${i}1 - t${i}3;`).join("\n            ")}
+            // M = M + v U, position by position: U of (e, ci, vec4 g ${G} + j) is at (e ${Cin} + ci) ${S.C4} + g ${G} + j
+            let ub = (c0 + cj) * ${S.C4}u + g * ${G}u;
+            ${es.map((e) => js.map((j) => `${m(e, j)} = ${m(e, j)} + v${e >> 2}${e & 3} * U[ub + ${e * Cin * S.C4 + j}u];`).join(" ")).join("\n            ")}
+        }
+        workgroupBarrier();
+    }
+    // A^T M A, the bias, the activation; a tile's outputs outside the image are not written
+    let c = g * ${4 * G}u;
+    ${js.map((j) => "{\n        " + outFor(j).join("\n        ") + "\n    }").join("\n    ")}
+}
+`;
+}
+
+/**
+ * The Winograd kernel's two buffers for one layer at H x W: `uniforms`, H and W as u32 bits then the bias of co at float
+ * 4 + co (padding zero), for binding 1; and `weights`, winoFilter's transformed weights, for binding 3. Refuses a layer the
+ * kernel cannot hold, by name.
+ */
+export function packWinoUniforms({ H, W, layer }, cfg = {}) {
+    const { Cin, Cout, k } = layer, S = winoShape(layer, cfg);
+    if (!S.fits) throw new Error(`conv2d: the Winograd kernel cannot hold ${Cin} -> ${Cout}, k ${k}, g4 ${cfg.g4}`);
+    const buf = new ArrayBuffer(S.bytes), u = new Uint32Array(buf), f = new Float32Array(buf);
+    u[0] = H; u[1] = W;
+    for (let co = 0; co < Cout; co++) f[4 + co] = layer.b[co];
+    return { uniforms: f, weights: winoFilter(layer, S.C4) };
+}
+/** The Winograd kernel's dispatch at H x W: a workgroup per 16 x 16 outputs (TILE x TILE tiles of 2 x 2), a z group per g4 vec4s. */
+export const winoWorkgroups = (H, W, layer, cfg = {}) => [Math.ceil(W / (2 * TILE)), Math.ceil(H / (2 * TILE)), winoShape(layer, cfg).groups];
 
 /** Planar (Cout planes of n) to channels last (n x Cout): how a planar layer's output is judged against the twin. */
 export function planarToChannelsLast(y, n, Cout) {

@@ -839,6 +839,12 @@ export function corpus() {
         { id: "conv2d.conv2dFastAltWgsl", from: "brain/conv2d.mjs", compileOnly: true,
           why: "the fast kernel with its tile read four channels at a time and a block's taps and channels written out, its weights block by block at constant offsets -- compile-only until the build probe shows FXC builds it (section 59)",
           opts: { code: CONV.conv2dFastAltWgsl({ Cin: 32, Cout: 32, k: 3, act: "relu" }, { reads: "vec4", unroll: true }), entryPoint: "k_conv_fast_alt", compileOnly: true, outCount: 0 } },
+        // the denoiser arc, round 27 (section 83): the Winograd F(2 x 2, 3 x 3) kernel, held to ITS twin (conv2dCpuWino) by
+        // brain/conv2d-selfcheck.mjs. COMPILE-ONLY, as round 17's kernels were before the build probe: nobody has built it under FXC,
+        // and a native run of this corpus on a D3D12 adapter would build it there first
+        { id: "conv2d.conv2dWinoWgsl", from: "brain/conv2d.mjs", compileOnly: true,
+          why: "the convolution in Winograd's transformed domain: a 4 x 4 input tile turned into 16 values by adds and subtracts, 16 vec4 accumulators summed over the input channels, then 2 x 2 outputs back by adds and subtracts -- a twin of its own, not the canonical order; compile-only until a native FXC build is seen (section 83)",
+          opts: { code: CONV.conv2dWinoWgsl({ Cin: 32, Cout: 32, k: 3, act: "relu" }, { g4: 1 }), entryPoint: "k_conv_wino", compileOnly: true, outCount: 0 } },
         // the denoiser arc, round 15 (section 46): the head and the kernel apply as one pass -- two uniform blocks, the
         // apply's and the head's, which the one-uniform harness signature cannot bind, so compile-only here; its image is
         // held to the twin's by render/denoiseDevice-selfcheck.mjs and render/denoiseCompile-selfcheck.mjs, natively and in

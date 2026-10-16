@@ -1701,10 +1701,10 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "denoise-winograd",
-        blocker: "OPEN",
-        what: "Winograd F(2x2, 3x3) kernels for the four 3 x 3 layers, which are 92% of the network's multiply-adds (30,528 of 33,120 a pixel): 2.25x fewer multiplies, in f32.",
-        how: "Under a restated exactness key -- the image within a tolerance of the f64 network instead of every cell === the f32 twin. A scratch study (12 scenes outside every split) put f32 Winograd 2.4e-7 (max relative) from the f64 network, the same order as today's exact path (3.5e-7), and its largest shift in any image's d at 8.5e-8. The key and those numbers belong in the round's pre-registration as its pilot; then a K1-style speed rule, the ladder, and the rig.",
-        why: "No hardware feature needed: it runs on both GPUs, natively and in Chrome. Keith set it second, after the FSR1 round.",
+        blocker: "HARDWARE",
+        what: "Winograd F(2x2, 3x3) kernels for the four 3 x 3 layers, which are 92% of the network's multiply-adds (30,528 of 33,120 a pixel): 2.25x fewer multiplies, in f32. PRE-REGISTERED as the denoiser arc's round 27 (section 83): the set r27w, every hidden layer on brain/conv2d.mjs's Winograd kernel at one vec4 a thread, r15's fused last pass.",
+        how: "The key, restated: every hidden cell is conv2dCpuWino's -- a twin of its own, since Winograd cannot add in the canonical order -- or its fused mirror's; and the image is within 1e-5 of the f64 network on every value, the bound every set has met since section 35 and, for r27w, the only bridge to r15. Exact on SwiftShader here, natively and in Chromium, and nearer the f64 network than r15 in the pilot. K0w (a) is tools/denoiseDevice.mjs --measure-r27w; the page's and the native tables move only by section 83's rule, read off two realGpuRun --only denoise runs per GPU: 1.05 x the GPU's present entry (r18u on the Intel, r18t on the 1080) at the largest size both measured, in both runs.",
+        why: "No hardware feature needed: it runs on both GPUs, natively and in Chrome. Keith set it second, after the FSR1 round. Section 83's arithmetic ceiling is 1.33 x r15 on the 1080 and 1.42 x on the Intel, and it predicts r27w qualifies on the 1080 only.",
     },
     {
         id: "rig-adapter-features-probe",
