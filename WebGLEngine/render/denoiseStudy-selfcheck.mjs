@@ -60,6 +60,8 @@
 //   R41 (section 81) H1 held against C instead of D                             1 RED
 //   R42 B upscaled bilinearly instead of by FSR1                                 2 RED -- the B row, and C4, whose re-run is FSR1's
 //   R43 --harvest-fsr1 leaving fx/fsr out of its cache stamp                     1 RED
+//   R44 (section 82) C1's eleven of twelve lowered to nine                       1 RED -- the re-derivation then reads
+//       'reported', which the committed file is not
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -413,6 +415,18 @@ console.log("\n15. THE UPSCALE ROUND: HALF SIZE + FSR1 AGAINST THE FRAMES IT COU
     const B1 = upscale(denoise(net, im.half4.x, 8, 8).y, 8, 8, 16, 16, "fsr1"), D1 = denoise(net, im.full1.x, 16, 16).y;
     ok("!! B and D for an image are the shipped network's own frames -- half size then FSR1, and full size at 1 sample -- scored against that image's reference, bit for bit",
         Object.is(T.B[1], relMSE(B1, im.ref)) && Object.is(T.D[1], relMSE(D1, im.ref)) && Object.is(T.floor[1], relMSE(im.ref2, im.ref)));
+    // section 82: the committed upscale results, read back by code -- "not reported, C1 on H2" is the rule's output
+    const ufile = path.join(ENG, RESULTS_FSR1);
+    if (fs.existsSync(ufile)) {
+        const res = JSON.parse(fs.readFileSync(ufile, "utf8")), T2 = res.tables;
+        const sets = { H1: { noisy: T2.noisyFull1, filter: T2.D, net: [T2.B], floor: T2.floor }, H2: { noisy: T2.noisyHalfUp, filter: T2.C, net: [T2.B], floor: T2.floor } };
+        const again = verdict({ sets, shuffled: null, c2Prior: ROUND_FSR1.c2Prior, determinism: res.determinism, seedsDistinct: res.seedsDistinct, test: ROUND_FSR1.test });
+        const h2 = again.hypotheses.H2.c1;
+        ok("!! *** section 82: verdict() over the committed upscale results' own tables gives the file's verdict -- NOT REPORTED, C1 on H2 (9 and 9 of 12) ***",
+            again.run === "not reported" && res.verdict.run === "not reported" && JSON.stringify(again.reasons) === JSON.stringify(res.verdict.reasons) &&
+            h2.netWins === 9 && h2.filterWins === 9 && h2.ok === false && again.hypotheses.H1.c1.ok === true,
+            again.reasons.join(" | "));
+    } else ok("!! section 82 reads render/denoise-results-fsr1.json, and it is not there", false);
     const cli = fs.readFileSync(path.join(ENG, "tools/denoiseStudy.mjs"), "utf8");
     const b0 = cli.indexOf('} else if (args.includes("--harvest-fsr1")) {'), branch = b0 >= 0 ? cli.slice(b0, cli.indexOf('} else if (args.includes("--harvest-mesh")) {', b0)) : "";
     const code = branch.replace(/\/\/.*$/gm, "");

@@ -5150,3 +5150,48 @@ its `net` column is B.
 **The command:** `node tools/denoiseStudy.mjs --harvest-fsr1 --cache <dir>` -> `render/denoise-results-fsr1.json`.
 - It refuses if the file exists.
 - About 4 minutes here. The file is committed byte for byte before it is read, and section 82 reads it.
+
+## 82. ROUND 26 -- NOT REPORTED: C1 FIRED ON H2. DESCRIPTIVELY, HALF RESOLUTION LOST TO EVERY OTHER FRAME AT 64 x 64
+
+**What arrived.** `render/denoise-results-fsr1.json`, written by `tools/denoiseStudy.mjs --harvest-fsr1` at c22a0295 and
+committed byte for byte (c6dd56f5) before it was read. 254 s to render the 12 test images here, 10 s to measure.
+
+**The run is not reported. Neither hypothesis is decided.**
+- **C1 fired on H2.** C1 asks both of a hypothesis's frames to beat that hypothesis's own un-denoised frame on at least 11
+  of 12 images. For H2 that frame is B's half-size input, upscaled bilinearly.
+  - B (FSR1) beat it on 9 of 12, and C (bilinear) on 9 of 12.
+  - **So on three images, denoising the half-size frame and then upscaling it did no better than upscaling its noise.**
+    Section 7 wrote C1 for exactly that: "something upstream is broken".
+- C1 held on H1: D on 12, B on 11. C2 (cited), C3 (no image near its floor), C4 and C5 held.
+- Section 81's rule for this outcome: recorded as found, and `denoise-fsr2-temporal` stays behind it.
+
+**What the file shows, reported and testing nothing.**
+
+| | B (half size + FSR1) against | mean d (positive: B better) | images B won |
+|---|---|---|---|
+| H1's direction | D, full size at 1 sample | -0.493 | 2 of 12 |
+| H2's direction | C, half size + bilinear | -0.180 | 3 of 12 |
+| the price of the quarter | A, today's full size at 4 samples | -1.406 (about 4 x the error) | 0 of 12 |
+
+- **RCAS made every image worse.** EASU alone had a lower error than EASU then RCAS on all 12 images (mean d 0.180 in
+  EASU's favour). RCAS without its denoise was worse again, on all 12.
+- **So, at 64 x 64, the half-size chain lost to every frame it was measured against,** and the sharpening half of FSR1
+  cost more than it gave.
+
+**The predictions,** read against the directions, since nothing was decided.
+- **P1 (H2 supported) pointed the wrong way:** FSR1 lost to bilinear on 9 of 12.
+- **P2 (H1 not supported) pointed the way it said:** B lost to D on 10 of 12.
+- **P3 held:** B's error is above A's on all 12.
+
+**What this does and does not say.**
+- Section 81 fixed this caveat before the run: 64 x 64 holds a scene far more coarsely than a 1080p frame, so this test
+  is harder on an upscaler than real use. It says nothing about 1080p.
+- **A cause, not measured:** at half size the network sees every scene at twice the scale it was trained on, with its
+  9 x 9 kernel covering twice the scene. C1's three failures are where that would bite. Nothing here tested it.
+- **What stands:** the arc has no evidence that half resolution is a better spend than full resolution, at this size.
+  The backlog's FSR2 and FSR3 entries stay behind it.
+
+**What it does not change.** The page, the network, the filter, every kernel table.
+
+**Not in this round, and logged in the backlog:** the same question at a frame size nearer real use (256 x 256 upscaled
+from 128), with EASU alone as the candidate since RCAS hurt here; and a network trained at the scale it is run at.
