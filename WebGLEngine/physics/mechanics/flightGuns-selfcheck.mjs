@@ -15,12 +15,13 @@
 //                   (an aircraft turned to point the gun, fire(), stepRounds() at 1/30 s) puts a hit on a target that flies across at 60 m/s from 150 to 500 m
 //   6  THE HITS     a round does not hit its owner; it takes the nearer of two targets; it dies on the ground and at its life; a hit is reported once
 //
-// SABOTAGE LOG -- TWENTY-SIX, each applied to physics/mechanics/flightGuns.mjs in a scratch worktree, the gate run, the worktree restored; every one red by name (the number is how many rows went red):
+// SABOTAGE LOG -- THIRTY-ONE (twenty-six and five more on fireFrom, below), each applied to physics/mechanics/flightGuns.mjs in a scratch worktree, the gate run, the worktree restored; every one red by name (the number is how many rows went red):
 //   S1 boresight sign flipped 1 | S2 the muzzle offset ignored in the muzzle's place 2 | S3 the muzzle's rotation velocity ignored 2 | S4 w x r the wrong way round 2 | S5 a round falls a quarter g t^2 1 | S6 a round's velocity not changed by gravity 2 |
 //   S7 credit kept when the trigger is released 1 | S8 the rate doubled 4 | S9 rounds rounded, not floored 2 | S10 the magazine not clamping the last burst 1 | S11 a round hits its owner 1 | S12 the first target reached, not the earliest 1 |
 //   S13 rounds survive the ground 1 | S14 rounds live twice as long 1 (S13 and S14 share one row, which asks both) | S15 a sampled-distance hit test 7 | S16 the hit test in the world frame, a moving target ignored 2 | S17 a hit allowed beyond the end of the tick 2 |
 //   S18 the aim ignoring the fall of the round 3 | S19 the aim ignoring the shooter's own velocity 2 | S20 the aim ignoring the target's velocity 3 | S21 the aim iteration stopping at 0.1 s 3 | S22 a round without the muzzle's own velocity 3 | S23 a round spawned at the centre of mass 1.
 //   AND THREE ON THE FRONT DOOR, once section 7 existed: E5 the report line says NaN 1 | E6 GUN not frozen 1 | E7 the hit sphere 5 m 1 (only the numbers row sees it: the sweep rows pass their own radius, and the fights that depend on 4 m are the dogfight gate's).
+//   AND FIVE ON fireFrom, once the seats fired through it: F1 the muzzle function called on every tick, fired or not 1 | F2 a muzzle given as a value ignored 1 | F3 fire() drops the owner 2 (the one-round row) | F4 fireFrom drops the owner 2 (the same row, and the new value row sees it only through the owner it asks) | F5 the muzzle's velocity left out of the round 4
 //   S10 is the one the 300-round rows could not have seen (REASONED, NOT RUN: the 5-round row was written before the sabotages): at 15 rounds a second a 1/30 s tick never fires more than the magazine has left, so the clamp could be deleted and those rows would pass.
 "use strict";
 import * as G from "./flightGuns.mjs";
@@ -86,6 +87,16 @@ console.log("\n3. THE TRIGGER");
     const one = G.fire(G.createGun(), s, true, 1 / 30), idle = G.fire(G.createGun(), s, false, 1 / 30);
     ok("a round leaves the MUZZLE at the start of the tick with the muzzle's velocity plus 300 m/s along the gun, age 0, and its owner (an id the task gives it); a released trigger returns the same gun", one.rounds.length === 0 && idle.rounds.length === 0 && idle.gun.ammo === 300 && (() => { const f = G.fire(G.createGun(), s, true, 1 / 15, 7), m = G.muzzleOf(s); return f.rounds.length === 1 && f.rounds[0].owner === 7 && f.rounds[0].age === 0 && near(f.rounds[0].pos, m.pos, 1e-12) && near(f.rounds[0].vel, [m.vel[0] + 300 * m.dir[0], m.vel[1] + 300 * m.dir[1], m.vel[2] + 300 * m.dir[2]], 1e-9); })(), "the first 1/30 s of a 15/s gun is half a round: none yet");
     ok("a gun is a frozen value: fire() hands back a new one and the old one still has its ammo", (() => { const g0 = G.createGun(); G.fire(g0, s, true, 1 / 15); return g0.ammo === 300 && Object.isFrozen(g0); })());
+    // fireFrom: the same trigger for a gun that is not on the nose (physics/mechanics/gunSeats.mjs fires its turrets through it)
+    const mv = { pos: [7, 8, 9], vel: [10, 20, 30], dir: [0, 0, 1] };
+    const val = G.fireFrom(G.createGun(), mv, true, 1 / 15, 4), viaFire = G.fire(G.createGun(), s, true, 1 / 15, 4), m0 = G.muzzleOf(s), same = G.fireFrom(G.createGun(), m0, true, 1 / 15, 4);
+    ok("!! fireFrom takes the muzzle as a VALUE: a round leaves at that position with that velocity plus 300 m/s along that direction ((10, 20, 330)), age 0 and the owner; fire() is fireFrom() with muzzleOf(shooter), the same round to the bit",
+        val.rounds.length === 1 && near(val.rounds[0].pos, [7, 8, 9], 0) && near(val.rounds[0].vel, [10, 20, 330], 1e-12) && val.rounds[0].age === 0 && val.rounds[0].owner === 4 && val.gun.ammo === 299
+        && JSON.stringify(viaFire.rounds) === JSON.stringify(same.rounds) && viaFire.gun.ammo === same.gun.ammo, `${val.rounds[0] && val.rounds[0].vel}`);
+    let calls = 0, gun2 = G.createGun(), shots = 0;
+    for (let i = 0; i < 30; i++) { const r = G.fireFrom(gun2, () => { calls++; return mv; }, true, 1 / 60, 0); gun2 = r.gun; shots += r.rounds.length; }
+    ok("!! ...or as a FUNCTION called only when a round leaves: 30 ticks at 1/60 s (half a second: 7 rounds at 15 a second) call it once per tick that fires and not on the ticks that do not, and never with the trigger up",
+        shots === 7 && calls === 7 && (() => { let c = 0; G.fireFrom(G.createGun(), () => { c++; return mv; }, false, 1 / 15); return c === 0; })(), `${shots} rounds, ${calls} calls`);
 }
 
 console.log("\n4. THE SWEEP");

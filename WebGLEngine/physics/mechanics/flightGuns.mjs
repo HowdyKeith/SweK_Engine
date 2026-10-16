@@ -49,11 +49,19 @@ export function muzzleOf(state, spec = GUN) {
  * Returns { gun, rounds }: the next gun and the rounds fired this tick (each { pos, vel, age, owner }).
  */
 export function fire(gun, shooter, wantFire, dt, owner = 0) {
+    return fireFrom(gun, () => muzzleOf(shooter, gun.spec), wantFire, dt, owner);
+}
+
+/**
+ * The trigger for a gun that is NOT fixed to an aircraft's nose: the same cadence, magazine and round as fire(), with the muzzle handed in -- a value { pos, vel, dir } or a function that makes one (called only when a round leaves, so a
+ * turret's pose is not worked out for a tick that fires nothing). physics/mechanics/gunSeats.mjs fires its turrets through this.
+ */
+export function fireFrom(gun, muzzle, wantFire, dt, owner = 0) {
     if (!wantFire || gun.ammo <= 0) return { gun: gun.credit === 0 ? gun : Object.freeze({ ...gun, credit: 0 }), rounds: [] };
     const credit = gun.credit + gun.spec.rate * dt, n = Math.min(Math.floor(credit + 1e-9), gun.ammo);
     const next = Object.freeze({ ...gun, ammo: gun.ammo - n, credit: gun.ammo - n <= 0 ? 0 : credit - n, fired: gun.fired + n });
     if (n <= 0) return { gun: next, rounds: [] };
-    const m = muzzleOf(shooter, gun.spec), v = add(m.vel, mul(m.dir, gun.spec.muzzleSpeed));
+    const m = typeof muzzle === "function" ? muzzle() : muzzle, v = add(m.vel, mul(m.dir, gun.spec.muzzleSpeed));
     return { gun: next, rounds: Array.from({ length: n }, () => ({ pos: m.pos.slice(), vel: v.slice(), age: 0, owner })) };
 }
 
@@ -133,5 +141,7 @@ export function reportLines() {
     ];
 }
 
-import { pathToFileURL } from "node:url";
-if (typeof process !== "undefined" && process.argv && import.meta.url === pathToFileURL(process.argv[1] || "").href) { for (const l of reportLines()) console.log(l); }
+if (typeof process !== "undefined" && Array.isArray(process.argv)) {   // see physics/mechanics/aircraftAssembly.mjs for why this is guarded and the import is dynamic
+    const { pathToFileURL } = await import("node:url");
+    if (import.meta.url === pathToFileURL(process.argv[1] || "").href) { for (const l of reportLines()) console.log(l); process.exit(0); }
+}

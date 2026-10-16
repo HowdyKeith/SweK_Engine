@@ -37,6 +37,7 @@ export const SPEED_LIMITS = Object.freeze([38, 52]);
 export const STANDOFF = 220;            // the range the guidance tries to hold, m
 export const KILL_BONUS = 0.25;
 export const BREAK_RANGE = 140, BREAK_CLOSING = 15, BREAK_TURN = 0.9, BREAK_CLIMB = 30;   // inside 140 m and closing faster than 15 m/s the guidance BREAKS OFF: it turns 0.9 rad away from the side the opponent is on and takes 30 m of separation in altitude
+export const KEEP_OUT_RANGE = 30, KEEP_OUT_CLOSING = 1;   // *** FOUND BY THE FIRST TRAINING RUN. *** Inside 30 m and still closing (over 1 m/s) the guidance breaks off WHATEVER the closing speed: see pursuit()
 export const COLLISION_RANGE = 6;       // two aircraft this close have hit each other (the airframe is 10.6 m across): both are lost
 export const A_ID = 1, B_ID = 2;
 
@@ -86,7 +87,10 @@ export function pursuit(me, foe, spec = G.GUN) {
     // BREAK OFF: lead pursuit flown head-on ends in a collision (two aircraft closing at 90 m/s, each turning toward the other's lead point), and a score that is mostly collisions grades the guidance, not the pilot. Inside BREAK_RANGE and
     // closing faster than BREAK_CLOSING, ask for a turn AWAY from the side the opponent is on and for altitude separation; the pursuit resumes as the range opens (the closing speed goes negative).
     const los = sub(foe.pos, me.pos), closing = range > 1e-9 ? -dot(sub(foe.vel, me.vel), los) / range : 0;
-    if (range < BREAK_RANGE && closing > BREAK_CLOSING) {
+    // KEEP OUT (the first training run's finding): the break above is for a FAST closure (over 15 m/s inside 140 m). A pilot trained on this task learned to ignore the airspeed the guidance asks for (speed is not in the score, and a faster aircraft turns
+    // tighter), carried 50 m/s through a request for 38 and crept up a turning opponent's tail at 4 m/s -- under the break's 15 -- until it clipped it at 6 m, in three of the fifty turning fights of a safety audit; the PD autopilot, which follows the
+    // speed it is asked for, never closes and never did. The guidance has to keep any pilot out of the opponent, so inside KEEP_OUT_RANGE and still closing at all it breaks off as well. Shooting from 30 m or more is unchanged.
+    if ((range < BREAK_RANGE && closing > BREAK_CLOSING) || (range < KEEP_OUT_RANGE && closing > KEEP_OUT_CLOSING)) {
         const a = F.attitude(me), f = fwdOf(a.heading), side = f[0] * los[1] - f[1] * los[0];   // (forward x line of sight).z: positive when the opponent is on the left
         return { target: { heading: a.heading + (side > 0 ? BREAK_TURN : -BREAK_TURN), altitude: Math.max(MIN_ALTITUDE, me.pos[2] + (foe.pos[2] > me.pos[2] ? -BREAK_CLIMB : BREAK_CLIMB)), airspeed: clamp(vFoe, SPEED_LIMITS[0], SPEED_LIMITS[1]) }, range, sol, breaking: true };
     }
@@ -113,12 +117,12 @@ function scriptedTarget(sc, t) {
 
 /**
  * Fly one fight. `pilotA` is the pilot under test, (state, target, wind) -> controls. Returns { score, dealt, taken (hits), fired (rounds A fired), firedB (rounds B fired), hitRate, firstHit (s or null), killedB (s or null), statusA, statusB (airborne |
- * destroyed | collided | touchdown | crashed | lost), ticks, closest (m), minAltitude, fingerprint, seed, kind }. Deterministic.
+ * destroyed | collided | touchdown | crashed | lost), ticks, closest (m), minAltitude, maxAlpha (A's, radians), minV (A's slowest airspeed), fingerprint, seed, kind }. Deterministic.
  */
 export function duel(pilotA, sc, { seconds = SECONDS, dt = DT, model = AF.defaultModel(), spec = G.GUN, specB = spec, pilotB = AF.pilot } = {}) {
     const mk = (o) => F.createState({ ...o, mass: model.mass, inertia: model.inertia });
     const A = { id: A_ID, state: mk(sc.a), gun: G.createGun(spec), hits: 0, taken: 0, status: "airborne" }, Bs = { id: B_ID, state: mk(sc.b), gun: G.createGun(specB), hits: 0, taken: 0, status: "airborne" };
-    let rounds = [], firstHit = null, killedB = null, closest = Infinity, minAlt = Infinity, h = 0x811c9dc5, ticks = 0;
+    let rounds = [], firstHit = null, killedB = null, closest = Infinity, minAlt = Infinity, maxAlpha = 0, minV = Infinity, h = 0x811c9dc5, ticks = 0;
     const total = Math.round(seconds / dt), still = [0, 0, 0];
     for (let i = 0; i < total; i++) {
         const t = i * dt;
@@ -138,6 +142,7 @@ export function duel(pilotA, sc, { seconds = SECONDS, dt = DT, model = AF.defaul
         A.state = ra.state; Bs.state = rb.state; ticks = i + 1;
         const range = norm(sub(A.state.pos, Bs.state.pos)); if (range < closest) closest = range;
         if (A.state.pos[2] < minAlt) minAlt = A.state.pos[2];
+        { const att = F.attitude(A.state); if (att.alpha > maxAlpha) maxAlpha = att.alpha; if (att.airspeed < minV) minV = att.airspeed; }
         if (i % 30 === 0) for (const c of [A.state.pos[0], A.state.pos[1], A.state.pos[2], Bs.state.pos[0], Bs.state.pos[1], Bs.state.pos[2], A.hits, Bs.hits]) h = foldHash(h, Math.round(c * 1000) & 0xffffffff);
         if (ra.status !== "airborne") A.status = ra.status; if (rb.status !== "airborne") Bs.status = rb.status;
         if (range < COLLISION_RANGE) { A.status = "collided"; Bs.status = "collided"; }
@@ -148,13 +153,38 @@ export function duel(pilotA, sc, { seconds = SECONDS, dt = DT, model = AF.defaul
     const aLost = A.status !== "airborne" ? Math.max(A.taken, spec.hp) : A.taken;   // the ground (or a kill) takes the full hit points
     const dealt = Math.min(A.hits, spec.hp), taken = Math.min(aLost, spec.hp);
     const score = (dealt - taken) / spec.hp * spec.damage + (killedB !== null && A.status === "airborne" ? KILL_BONUS * Math.max(0, seconds - killedB) / seconds : 0);
-    return { score, dealt: A.hits, taken: A.taken, fired: A.gun.fired, firedB: Bs.gun.fired, hitRate: A.gun.fired ? A.hits / A.gun.fired : 0, firstHit, killedB, statusA: A.status, statusB: Bs.status, ticks, closest, minAltitude: minAlt, fingerprint: (h >>> 0).toString(16).padStart(8, "0"), seed: sc.seed, kind: sc.kind };
+    return { score, dealt: A.hits, taken: A.taken, fired: A.gun.fired, firedB: Bs.gun.fired, hitRate: A.gun.fired ? A.hits / A.gun.fired : 0, firstHit, killedB, statusA: A.status, statusB: Bs.status, ticks, closest, minAltitude: minAlt, maxAlpha, minV: Number.isFinite(minV) ? minV : 0, fingerprint: (h >>> 0).toString(16).padStart(8, "0"), seed: sc.seed, kind: sc.kind };
 }
 
 const mk = (spec) => Object.freeze(spec.flatMap(([kind, seeds]) => seeds.map((s) => scenario(s, kind))));
 const range = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
 /** The fights a pilot is graded on: six of each kind, seeds 1..6. (No pilot has trained on a dogfight yet, so there is one set and no held-out; the day one trains, the sets of flightTask.mjs's discipline apply.) */
 export const DOGFIGHT_SET = mk(KINDS.map((k) => [k, range(1, 6)]));
+
+/**
+ * THE SETS A PILOT IS TRAINED AND JUDGED ON (the discipline of brain/flightTask.mjs, kept): the searches train on TRAIN_FIGHT_SET (ten of each kind, 40 fights), the champion is picked on HELD_OUT_FIGHT_SET (ten of each, 40) among the searches that
+ * POOL_FIGHT_SET (one hundred of each, 400 fights nothing trains on) allows, and AUDIT_FIGHT_SET (thirty of each, 120) and SAFETY_AUDIT_FIGHT_SET (fifty of each, 200) are READ ONCE, for the one champion. The GPU network's champion is judged on audits of its own
+ * (AUDIT2_FIGHT_SET, SAFETY_AUDIT2_FIGHT_SET) because an audit read by one champion is spent. DOGFIGHT_BENCH_SET is the reserve, the regression guard. Seeds are disjoint from every other set here and from each other (the gate holds that).
+ */
+export const TRAIN_FIGHT_SET = mk(KINDS.map((k) => [k, range(200, 209)]));
+export const HELD_OUT_FIGHT_SET = mk(KINDS.map((k) => [k, range(300, 309)]));
+export const POOL_FIGHT_SET = mk(KINDS.map((k) => [k, range(1000, 1099)]));   // 100 of each kind (it was 50 of each until the first run: a 6% tail in the turning fights was 0 of 50 here and 3 of 50 on the safety audit)
+export const AUDIT_FIGHT_SET = mk(KINDS.map((k) => [k, range(2000, 2029)]));
+export const SAFETY_AUDIT_FIGHT_SET = mk(KINDS.map((k) => [k, range(3000, 3049)]));
+export const AUDIT2_FIGHT_SET = mk(KINDS.map((k) => [k, range(2100, 2129)]));
+export const SAFETY_AUDIT2_FIGHT_SET = mk(KINDS.map((k) => [k, range(3100, 3149)]));
+// *** SPENT, DECLARED: AUDIT_FIGHT_SET and SAFETY_AUDIT_FIGHT_SET WERE READ BY A SMOKE TEST. *** The first run of tools/ship/trainPilotDogfight.mjs was `--runs 2 --iters 3` to see that the command ran; it found a champion (a three-iteration copy of the
+// autopilot, gain 0.0015 on 120 fights) and so read the audit and the safety audit -- the command reads them whenever a champion exists, which is its job. They are no longer unread, so the fruit fly's champion is judged on AUDIT3_FIGHT_SET and
+// SAFETY_AUDIT3_FIGHT_SET, which nothing has flown, and the two spent sets stay here so that nothing is trained or judged on them by accident. `--smoke` exists so that this cannot happen again: it points every slot at SMOKE_FIGHT_SET and refuses --write.
+export const AUDIT3_FIGHT_SET = mk(KINDS.map((k) => [k, range(2200, 2229)]));
+export const SAFETY_AUDIT3_FIGHT_SET = mk(KINDS.map((k) => [k, range(3200, 3249)]));
+// *** SPENT, DECLARED, A SECOND TIME: AUDIT3_FIGHT_SET AND SAFETY_AUDIT3_FIGHT_SET WERE READ BY THE FIRST REAL RUN. *** The fruit fly's first champion (trained under the guidance WITHOUT the keep-out rule) was graded on them: audit 0.8432 against the autopilot's
+// 0.4667 (89 fights better, 9 worse, a paired gain of 0.3765 +- 0.0526) and REFUSED -- on the safety audit it lost three fights to a collision that the autopilot does not (turning 3210, 3215, 3220: the pilot had learned to ignore the airspeed the guidance asks
+// for and crept up the opponent's tail at 4 m/s until it clipped it at 6 m; see pursuit()). The guidance was fixed, every pilot is retrained under it, and the fruit fly is judged on AUDIT4_FIGHT_SET and SAFETY_AUDIT4_FIGHT_SET, which nothing has flown.
+export const AUDIT4_FIGHT_SET = mk(KINDS.map((k) => [k, range(2300, 2329)]));
+export const SAFETY_AUDIT4_FIGHT_SET = mk(KINDS.map((k) => [k, range(3300, 3349)]));
+/** Eight fights for running the command to see that it runs: every slot of the trainer's sets, under `--smoke`, and nothing else; a smoke champion is never written. */
+export const SMOKE_FIGHT_SET = mk(KINDS.map((k) => [k, range(9000, 9001)]));
 
 /** A larger set to measure with, seeds 100..159 of the two kinds that tell pilots apart (the other two are won by almost any pilot that can follow a heading): sixty duels and sixty fights against a turning opponent. */
 export const DOGFIGHT_BENCH_SET = mk([["duel", range(100, 159)], ["turning", range(100, 159)]]);
@@ -173,5 +203,7 @@ export function reportLines() {
         `  ${DOGFIGHT_SET.length} fights (${KINDS.join(", ")}): the PD autopilot flying pursuit guidance scores ${r.score.toFixed(3)} (${KINDS.map((k) => `${k} ${r.byKind[k].toFixed(3)}`).join(", ")}); ${r.dealt} hits landed on ${r.fired} rounds, ${r.taken} taken, ${r.kills} kills, ${r.deaths} lost`];
 }
 
-import { pathToFileURL } from "node:url";
-if (typeof process !== "undefined" && process.argv && import.meta.url === pathToFileURL(process.argv[1] || "").href) { for (const l of reportLines()) console.log(l); }
+if (typeof process !== "undefined" && Array.isArray(process.argv)) {   // see physics/mechanics/aircraftAssembly.mjs for why this is guarded and the import is dynamic
+    const { pathToFileURL } = await import("node:url");
+    if (import.meta.url === pathToFileURL(process.argv[1] || "").href) { for (const l of reportLines()) console.log(l); process.exit(0); }
+}
