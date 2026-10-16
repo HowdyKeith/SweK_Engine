@@ -68,6 +68,8 @@ const sub3 = (a, b) => add3(a, b, -1);
 const norm3 = (v) => Math.hypot(v[0], v[1], v[2]);
 const unit3 = (v) => { const n = norm3(v); return n > 1e-12 ? scale3(v, 1 / n) : [0, 0, 0]; };
 
+/** A light-aircraft stall: attached flow to 15 degrees, separated by 23, with the flat plate's drag on top. Pass it as createSurface({ stall: STALL }); nothing stalls unless a surface is given one. */
+export const STALL = Object.freeze({ angle: 15 * Math.PI / 180, width: 8 * Math.PI / 180, drag: 1.8 });
 export const AIR_DENSITY_SEA_LEVEL = 1.225;   // kg/m^3, standard atmosphere at 15C -- matches this tree's own
                                                 // ballistics.mjs convention of naming a real physical constant
                                                 // rather than burying it in a formula.
@@ -83,11 +85,11 @@ export const AIR_DENSITY_SEA_LEVEL = 1.225;   // kg/m^3, standard atmosphere at 
  * physics/mechanics/rigidBody6dof.mjs's own boxInertia() already makes). `control`, if present, is
  * {effectiveness, deflection} -- deflection in radians, positive meaning whatever sign convention the caller
  * chooses (it enters symmetrically as +effectiveness*deflection, see reportLines() for a worked example). */
-export function createSurface({ mount = [0, 0, 0], span = [0, 1, 0], chord = [1, 0, 0], area = 1, aspectRatio = 6, clAlpha = 2 * Math.PI, cd0 = 0.02, oswaldEfficiency = 0.85, incidence = 0, zeroLiftAlpha = 0, control = null } = {}) {
+export function createSurface({ mount = [0, 0, 0], span = [0, 1, 0], chord = [1, 0, 0], area = 1, aspectRatio = 6, clAlpha = 2 * Math.PI, cd0 = 0.02, oswaldEfficiency = 0.85, incidence = 0, zeroLiftAlpha = 0, control = null, stall = null } = {}) {
     const spanU = unit3(span);
     const chordU = unit3(sub3(chord, scale3(spanU, dot3(chord, spanU))));
     const normal = unit3(cross3(chordU, spanU));
-    return { mount: [...mount], span: spanU, chord: chordU, normal, area, aspectRatio, clAlpha, cd0, oswaldEfficiency, incidence, zeroLiftAlpha, control: control ? { ...control } : null };
+    return { mount: [...mount], span: spanU, chord: chordU, normal, area, aspectRatio, clAlpha, cd0, oswaldEfficiency, incidence, zeroLiftAlpha, control: control ? { ...control } : null, stall: stall ? { ...stall } : null };
 }
 
 /** Body-frame relative airflow at a rigidBody6dof body -- the aircraft's own velocity minus the wind, rotated
@@ -113,9 +115,18 @@ export function surfaceForce(flowBody, surface) {
     const deflectTerm = surface.control ? surface.control.deflection * surface.control.effectiveness : 0;
     const alpha = alphaGeo + surface.incidence - surface.zeroLiftAlpha + deflectTerm;
 
-    const cl = surface.clAlpha * Math.sin(alpha) * Math.cos(alpha);
     const k = 1 / (Math.PI * surface.oswaldEfficiency * surface.aspectRatio);
-    const cd = surface.cd0 + k * cl * cl;
+    let cl = surface.clAlpha * Math.sin(alpha) * Math.cos(alpha), cd;
+    if (surface.stall) {
+        // v4866 -- AN OPT-IN STALL (stall: null, the default, takes the else branch below and is the expression this file has always had). Attached flow up to `angle`; over the next `width` radians the lift
+        // blends (smoothstep) into the flat plate's 2 sin(alpha) cos(alpha) = sin(2 alpha), which peaks at 1.0 at 45 degrees and is where the closed form's own post-peak shape was already pointing; separated
+        // flow adds `drag` * sin^2(alpha) * blend to the parabolic polar. The lift is continuous at `angle` (the blend starts at 0) and falls from there: a wing that is pulled past it LOSES lift, which the
+        // un-stalled form (a peak of pi at 45 degrees) never did, and which a flight model needs before a pilot can be asked to respect an airspeed.
+        const a = Math.abs(alpha), { angle, width, drag } = surface.stall;
+        let sep = 0;
+        if (a > angle) { const t = Math.min(1, (a - angle) / width), b = t * t * (3 - 2 * t); cl = (1 - b) * cl + b * Math.sin(2 * alpha); sep = b * drag * Math.sin(alpha) * Math.sin(alpha); }
+        cd = surface.cd0 + k * cl * cl + sep;
+    } else cd = surface.cd0 + k * cl * cl;
 
     const planarDir = unit3(planar);
     const liftDir = unit3(cross3(planarDir, surface.span));

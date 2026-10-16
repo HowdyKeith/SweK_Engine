@@ -43,6 +43,11 @@
 //      orthonormality/handedness checks (the default-orientation case alone stays green, since its default
 //      normal=[0,0,1] happens to already equal chord x span for the shipped default axes) and section 12b's
 //      Gram-Schmidt-correction checks (an unchecked, un-corrected chord is trusted as-is again).
+//   v4866 -- THE OPT-IN STALL (section 15). 14 sabotages of aeroSurface.mjs, each red by name: S1b stall ON by default (4 red: the default row, the 45 degree peak, the un-stalled-still-climbing row ...) | S2 stall
+//   never applied 7 | S3 the blend a step (no smoothstep) 3 | S4 the blend linear, not smoothstep 1 (only the continuity row at 1e-6 degree sees it: a linear blend leaves the angle with a slope) | S5 separated drag
+//   dropped 2 | S6 separated drag ~ sin(alpha) not sin^2 2 | S7 abs() dropped so a negative alpha never stalls 2 | S8 the flat plate without its factor 2 2 | S9 the polar built from the attached lift 2 |
+//   S10 the stall angle read against the geometric alpha, not the total 1 | S11 createSurface keeps the caller's stall object 1 | S12 STALL not frozen 1 | S13 blend width halved 2 | S14 the blend not capped at 1
+//   (lift of 120 at 45 degrees) 3. S1 as first written (`if (true)` on a null stall) crashed instead of going red and was replaced by S1b, which survives to the row.
 "use strict";
 import { pathToFileURL } from "node:url";
 import { createBody, boxInertia, worldToBody, rotateByQuat, createAccumulator, applyForceAtPoint } from "./rigidBody6dof.mjs";
@@ -215,6 +220,36 @@ console.log("\n14. THE FRONT DOOR");
     const L = A.reportLines();
     ok("reportLines names the module and shows wing+tail forces and a resulting torque", L.some((l) => /aeroSurface/.test(l)) && L.some((l) => /wing:/.test(l)) && L.some((l) => /tail:/.test(l)) && L.some((l) => /net torque/.test(l)));
     ok("...and no report line stringifies a missing field as the literal word \"undefined\"", L.every((l) => !/\bundefined\b/.test(l)));
+}
+
+console.log("\n15. *** THE OPT-IN STALL (v4866) -- NOTHING STALLS UNLESS A SURFACE IS GIVEN ONE; A STALLED ONE LOSES LIFT AND GAINS DRAG, CONTINUOUSLY ***");
+{
+    const D = Math.PI / 180, stalled = A.createSurface({ area: 4, aspectRatio: 6, clAlpha: 5.7, cd0: 0.02, oswaldEfficiency: 0.85, stall: A.STALL });
+    const k = 1 / (Math.PI * 0.85 * 6), flowAt = (deg, V = 30) => [V * Math.cos(deg * D), 0, -V * Math.sin(deg * D)];
+    ok("!! the default is NO stall: a surface made without one carries stall === null", wing.stall === null && A.createSurface().stall === null);
+    ok("!! STALL is frozen and names a light aircraft's numbers (15 deg to separate, 8 deg to finish, flat-plate drag 1.8)", Object.isFrozen(A.STALL) && near(A.STALL.angle, 15 * D, 1e-15) && near(A.STALL.width, 8 * D, 1e-15) && A.STALL.drag === 1.8);
+    ok("!! createSurface COPIES the stall it is given -- mutating the caller's object afterwards moves nothing", (() => { const mine = { angle: 0.2, width: 0.1, drag: 1 }, s = A.createSurface({ stall: mine }); mine.angle = 9; return s.stall.angle === 0.2; })());
+    const same = [0, 5, 10, 14.99].every((deg) => { const a = A.surfaceForce(flowAt(deg), wing), b = A.surfaceForce(flowAt(deg), stalled); return a.cl === b.cl && a.cd === b.cd && a.force.every((v, i) => v === b.force[i]); });
+    ok("!! BELOW the stall angle a stalled surface is BIT-IDENTICAL to the un-stalled one (0, 5, 10, 14.99 deg: cl, cd and every force component)", same);
+    const edge = (d) => { const a = A.surfaceForce(flowAt(15 + d), wing), b = A.surfaceForce(flowAt(15 + d), stalled); return { dcl: Math.abs(a.cl - b.cl), dcd: Math.abs(a.cd - b.cd) }; };
+    const e = edge(1e-6);
+    ok("!! CONTINUOUS at the stall angle: 1e-6 deg past it, cl and cd have moved by less than 1e-9 (the blend starts at zero with zero slope)", e.dcl < 1e-9 && e.dcd < 1e-9, `dcl=${e.dcl.toExponential(2)} dcd=${e.dcd.toExponential(2)}`);
+    const cl = (deg) => A.surfaceForce(flowAt(deg), stalled).cl;
+    ok("!! LIFT FALLS PAST THE STALL: cl(15) > cl(19) > cl(23), strictly", cl(15) > cl(19) && cl(19) > cl(23), `${cl(15).toFixed(4)} > ${cl(19).toFixed(4)} > ${cl(23).toFixed(4)}`);
+    ok("!! ...and the un-stalled closed form does the opposite, still climbing at 23 degrees (this is what the stall is FOR)", A.surfaceForce(flowAt(23), wing).cl > A.surfaceForce(flowAt(15), wing).cl);
+    ok("!! FULLY SEPARATED (23 deg and beyond) is EXACTLY the flat plate: cl = sin(2 alpha) at 23, 30, 45 deg", [23, 30, 45].every((deg) => near(cl(deg), Math.sin(2 * deg * D), 1e-12)), [23, 30, 45].map((deg) => cl(deg).toFixed(4)).join(" "));
+    const sep = A.surfaceForce(flowAt(30), stalled), a30 = 30 * D;
+    ok("!! SEPARATED DRAG is the polar PLUS drag * sin^2(alpha): cd(30 deg) === cd0 + k cl^2 + 1.8 sin^2(30 deg)", near(sep.cd, 0.02 + k * sep.cl * sep.cl + 1.8 * Math.sin(a30) ** 2, 1e-12), `${sep.cd.toFixed(5)}`);
+    ok("!! ...which is more than three times the attached drag at the stall angle (cd(30) > 3 cd(15))", sep.cd > 3 * A.surfaceForce(flowAt(15), stalled).cd, `${sep.cd.toFixed(4)} vs ${A.surfaceForce(flowAt(15), stalled).cd.toFixed(4)}`);
+    const neg = A.surfaceForce(flowAt(-30), stalled);
+    ok("!! SYMMETRIC: -30 degrees gives -cl and the same cd and the same force magnitude as +30", near(neg.cl, -sep.cl, 1e-12) && near(neg.cd, sep.cd, 1e-12) && near(norm3(neg.force), norm3(sep.force), 1e-9));
+    const mid = A.surfaceForce(flowAt(19), stalled), t = (19 - 15) / 8, blend = t * t * (3 - 2 * t), a19 = 19 * D;
+    ok("!! INSIDE the blend (19 deg, halfway) cl is the smoothstep mix of the two forms: (1-b) clAlpha sin cos + b sin(2 alpha), b = 0.5", near(mid.cl, (1 - blend) * 5.7 * Math.sin(a19) * Math.cos(a19) + blend * Math.sin(2 * a19), 1e-12) && near(blend, 0.5, 1e-12), `cl=${mid.cl.toFixed(5)}`);
+    // the angle is the TOTAL alpha -- incidence and control deflection count, the geometric angle alone does not decide it
+    const tilted = A.createSurface({ area: 4, aspectRatio: 6, clAlpha: 5.7, stall: A.STALL, incidence: 0.1 }), plain = A.createSurface({ area: 4, aspectRatio: 6, clAlpha: 5.7, incidence: 0.1 });
+    const atTilt = A.surfaceForce(flowAt(12), tilted), noTilt = A.surfaceForce(flowAt(12), plain);   // 12 deg + 5.73 deg of incidence = 17.7 deg total, in the blend
+    ok("!! the stall angle is the TOTAL alpha: 12 deg of flow + 0.1 rad of incidence stalls (cl differs from the un-stalled form), 12 deg alone does not", atTilt.alpha > A.STALL.angle && atTilt.cl !== noTilt.cl && A.surfaceForce(flowAt(12), stalled).cl === A.surfaceForce(flowAt(12), wing).cl, `alpha=${(atTilt.alpha / D).toFixed(2)}deg`);
+    ok("!! no NaN or Infinity anywhere in -180..180 degrees at 0.5 deg steps, and cl never exceeds the flat plate's 1.0 once past the blend", (() => { for (let deg = -180; deg <= 180; deg += 0.5) { const r = A.surfaceForce(flowAt(deg), stalled); if (!Number.isFinite(r.cl) || !Number.isFinite(r.cd) || !r.force.every(Number.isFinite)) return false; if (Math.abs(deg) >= 23 && Math.abs(deg) <= 157 && Math.abs(r.cl) > 1 + 1e-12) return false; } return true; })());
 }
 
 console.log(fails ? `\naeroSurface-selfcheck: ${fails} FAILED` : "\naeroSurface-selfcheck: all checks pass");
