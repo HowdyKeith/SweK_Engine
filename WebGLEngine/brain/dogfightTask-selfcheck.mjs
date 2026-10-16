@@ -1,0 +1,158 @@
+// WebGLEngine/brain/dogfightTask-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
+//
+// Run: node brain/dogfightTask-selfcheck.mjs      (~15 s)
+//
+// THE DOGFIGHT AS A JOB: scenarios that are what they say, a guidance law whose sign and size are closed forms, a trigger rule that fires exactly when a round would hit, a fight whose bookkeeping is recomputable from its own
+// numbers, and the pinned scores of the five pilots that fly it. brain/dogfightTask.mjs is the machinery under test; the gun (physics/mechanics/flightGuns.mjs) has its own gate.
+//
+//   1  SCENARIOS    deterministic (a kind and a seed always make the same fight), frozen, an unknown kind refused by name; each kind is the geometry its header says (tail: 250..450 m behind, same heading +-7 degrees;
+//                   offset: 30..70 degrees off the tail, heading at B; turning: B turns at 0.05..0.09 rad/s; duel: 700..1000 m apart facing each other, B hunts and shoots); the two sets are the sizes they claim and share no fight
+//   2  GUIDANCE     pursuit() against closed forms: a target dead ahead on the same course is flown at heading 0, its altitude and 45 + 0.04 (range - 220) m/s; a target moving left is LED to the left of where it is
+//                   (the lead point, not the target); the airspeed clamps at 38 and 52; the altitude never goes under 120 m; and the BREAK-OFF turns away from the side the opponent is on, only when it is close AND closing
+//   3  THE TRIGGER  fireControl() fires on a gun pointed within a hit radius of the lead solution and not outside it, reports the predicted miss as sin(error) x path length, and does not fire beyond 450 m or with an empty gun
+//   4  THE FIGHT    the score is recomputable from the result's own fields on every fight of the set; an aircraft with no controls ends on the ground with its full hit points taken; two aircraft flown at each other collide, both are
+//                   lost, and it counts against A; a hunting B really does hit A; a kill takes 20 hits; the same fight twice is bit-identical and a different pilot flies a different fight
+//   5  THE PILOTS   the PD autopilot's numbers on both sets are PINNED; the fruit fly's and the GPU Brain's HAND weights fly exactly the autopilot's fights (they ARE the autopilot, in a fight too); the two TRAINED pilots'
+//                   numbers are pinned and none of the five ends a fight on the ground. THEY WERE TRAINED TO HOLD A HEADING, NOT TO FIGHT: the differences between them on the duel are within two standard errors
+//                   except where said, and this gate says so rather than pinning a winner.
+//
+// SABOTAGE LOG -- THIRTY-SEVEN, each applied to brain/dogfightTask.mjs in a scratch worktree, the gate run, the worktree restored; every one red by name (the number is how many rows went red):
+//   D1 the kind not mixed into the seed 2 | D2 tail starts up to 550 m behind 3 | D3 the turning opponent always turns one way 3 | D4 offset only to one side 3 | D5 offset down to 6 degrees off the tail 3 | D6 the duel's B does not shoot 5 |
+//   D7 the duel's A starts facing away 5 | D8 pursuit without the lead 5 | D9 pursuit without the altitude floor 1 | D10 the closing-speed gain the wrong way 5 | D11 the speed limits widened 5 | D12 the break-off turns toward the opponent 3 |
+//   D13 the break-off climbs into an opponent above 3 | D14 the break-off regardless of closing speed 3 | D15 the break-off range 250 m 4 | D16 the fire tolerance doubled 3 | D17 the trigger range 900 m 3 | D18 the predicted miss not scaled by the path 4 |
+//   D19 an empty gun still fires 1 | D20 the collision range 0.5 m 1 | D21 a collision not recorded 2 | D22 no kill bonus 4 | D23 the ground does not charge the full hit points 3 | D24 a hit on B counted twice 4 | D25 B's trigger reads A's magazine 1 (SEE BELOW) |
+//   D26 the default opponent pilot flies with no controls 7 | D27 the turning opponent turns the other way 2 | D28 the first hit not recorded 1 | D29 the closest approach not tracked 2 (SEE BELOW) | D30 kills counted as any end of B's flight 1 |
+//   D31 fights last 30 s 4 | D32 the seconds option ignored 1 | D33 the bench set's seeds shifted 1.
+//   AND FOUR ON THE CONSTANTS AND THE FRONT DOOR, once those rows existed: E1 the report line says undefined 1 | E2 SPEED_LIMITS not frozen 1 | E3 the standoff 230 m 5 | E4 the sides numbered the other way 1.
+//   TWO WENT 0 RED, AND WHAT THE GATE WAS MISSING IS NOW IN IT. D25: both aircraft carry the same gun, so B's trigger reading A's magazine instead of its own changed nothing anywhere -- the fight had no way to give the two a different gun. duel() takes a `specB` for B's gun
+//   (default: the same), and the row "B'S GUN IS B'S OWN" flies an UNARMED A at an ARMED hunting B (A is shot down in five seconds, B having fired 27 rounds) and the same pass with both unarmed (a collision); D25 then goes red. D29: `closest` was only asserted to be positive, and
+//   Infinity is positive; the bookkeeping row now asks Number.isFinite(closest). THE FIRST DRAFT'S TOLERANCES WERE ALSO WRONG IN FOUR PLACES, found by running it: the duel's range is 704..1,024 m and not 700..1,000 (the lateral offset adds to it); a hunted pass flown by an
+//   ARMED A is won by the gun before the aircraft can collide (A shoots B down head-on at 207 m), so the collision row flies it unarmed and the armed one has a row of its own; the miss prediction moves 1% when the nose is turned (the muzzle moves 2 cm); and a turned HEADING
+//   also turns the VELOCITY the lead solution is made from, so the trigger row turns the attitude only.
+"use strict";
+import * as D from "./dogfightTask.mjs";
+import * as G from "../physics/mechanics/flightGuns.mjs";
+import * as F from "../physics/mechanics/flightModel6dof.mjs";
+import * as AF from "./autopilotFlight.mjs";
+import * as PF from "./pilotFlightPolicy.mjs";
+import * as MF from "./pilotFlightMlp.mjs";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+let fails = 0;
+function ok(name, cond, detail) { console.log(`  ${cond ? "PASS" : "FAIL"}  ${name}${detail ? "   " + detail : ""}`); if (!cond) fails++; }
+const sec = (t) => console.log("\n" + t);
+const throws = (fn) => { try { fn(); return null; } catch (e) { return e.message; } };
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const norm = (a) => Math.hypot(a[0], a[1], a[2]);
+const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const fwd = (h) => [Math.cos(h), -Math.sin(h)];
+const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+const headingTo = (dx, dy) => Math.atan2(-dy, dx);
+const KINDS = D.KINDS;
+
+console.log("dogfightTask-selfcheck -- two aircraft, a gun each, a pilot under test\n");
+
+sec("1. SCENARIOS");
+{
+    const all = KINDS.flatMap((k) => Array.from({ length: 40 }, (_, i) => D.scenario(i + 1, k)));
+    ok("!! deterministic and frozen: a kind and a seed always make the same fight (compared by value), every scenario is frozen with its two starts and its opponent, and the kinds differ from one another at one seed", JSON.stringify(D.scenario(7, "duel")) === JSON.stringify(D.scenario(7, "duel")) && all.every((s) => Object.isFrozen(s) && Object.isFrozen(s.a) && Object.isFrozen(s.b) && Object.isFrozen(s.opponent)) && new Set(KINDS.map((k) => JSON.stringify(D.scenario(7, k)))).size === 4 && JSON.stringify(D.scenario(7, "tail")) !== JSON.stringify(D.scenario(8, "tail")));
+    ok("an unknown kind is refused by name, with the kinds that exist", /unknown kind "ambush"/.test(throws(() => D.scenario(1, "ambush")) || "") && /tail, offset, turning, duel/.test(throws(() => D.scenario(1, "ambush")) || ""));
+    const tails = all.filter((s) => s.kind === "tail" || s.kind === "turning");
+    ok("!! TAIL and TURNING: A is 250..450 m BEHIND B along B's heading (within 30 m to the side), its heading within 0.12 rad of B's, within 25 m of B's altitude, B at 43..47 m/s and 300 m +- 40", tails.every((s) => { const f = fwd(s.b.heading), d = [s.b.pos[0] - s.a.pos[0], s.b.pos[1] - s.a.pos[1]], along = d[0] * f[0] + d[1] * f[1], side = Math.abs(-d[0] * f[1] + d[1] * f[0]); return along >= 250 - 1e-9 && along <= 450 + 1e-9 && side <= 30 + 1e-9 && Math.abs(wrap(s.a.heading - s.b.heading)) <= 0.12 + 1e-9 && Math.abs(s.a.pos[2] - s.b.pos[2]) <= 25 + 1e-9 && s.b.speed >= 43 && s.b.speed <= 47 && Math.abs(s.b.pos[2] - 300) <= 40 + 1e-9; }), `${tails.length} scenarios`);
+    ok("!! TAIL: B flies straight and does not shoot; TURNING: B turns at 0.05..0.09 rad/s to a side (both signs occur) and does not shoot", all.filter((s) => s.kind === "tail").every((s) => s.opponent.kind === "straight" && !s.opponent.fires) && all.filter((s) => s.kind === "turning").every((s) => s.opponent.kind === "turn" && !s.opponent.fires && Math.abs(s.opponent.rate) >= 0.05 - 1e-12 && Math.abs(s.opponent.rate) <= 0.09 + 1e-12) && all.filter((s) => s.kind === "turning").some((s) => s.opponent.rate > 0) && all.filter((s) => s.kind === "turning").some((s) => s.opponent.rate < 0));
+    const offs = all.filter((s) => s.kind === "offset");
+    ok("!! OFFSET: 300..500 m from B, 30..70 degrees off B's tail (both sides occur), A's heading within 0.2 rad of the bearing to B, B straight and silent", offs.every((s) => { const d = [s.b.pos[0] - s.a.pos[0], s.b.pos[1] - s.a.pos[1]], L = Math.hypot(d[0], d[1]), f = fwd(s.b.heading), phi = Math.acos((d[0] * f[0] + d[1] * f[1]) / L); return L >= 300 - 1e-9 && L <= 500 + 1e-9 && phi >= 0.52 - 1e-9 && phi <= 1.22 + 1e-9 && Math.abs(wrap(s.a.heading - headingTo(d[0], d[1]))) <= 0.2 + 1e-9 && s.opponent.kind === "straight" && !s.opponent.fires; }) && offs.some((s) => (s.b.pos[0] - s.a.pos[0]) * fwd(s.b.heading)[1] - (s.b.pos[1] - s.a.pos[1]) * fwd(s.b.heading)[0] > 0) && offs.some((s) => (s.b.pos[0] - s.a.pos[0]) * fwd(s.b.heading)[1] - (s.b.pos[1] - s.a.pos[1]) * fwd(s.b.heading)[0] < 0));
+    const duels = all.filter((s) => s.kind === "duel");
+    ok("!! DUEL: 700..1000 m along the line of approach and 80..220 m to the side (704..1,024 m of range), each facing the other within 0.15 rad, A within 25 m of B's altitude, and B HUNTS and SHOOTS", duels.every((s) => { const d = [s.b.pos[0] - s.a.pos[0], s.b.pos[1] - s.a.pos[1]], L = Math.hypot(d[0], d[1]); return L >= Math.hypot(700, 80) - 1e-9 && L <= Math.hypot(1000, 220) + 1e-9 && Math.abs(wrap(s.a.heading - headingTo(d[0], d[1]))) <= 0.15 + 1e-9 && Math.abs(wrap(s.b.heading - headingTo(-d[0], -d[1]))) <= 0.15 + 1e-9 && s.opponent.kind === "hunt" && s.opponent.fires; }));
+    const idsOf = (set) => new Set(set.map((s) => s.kind + s.seed));
+    ok("!! THE SETS: DOGFIGHT_SET is 24 fights (six of each kind), DOGFIGHT_BENCH_SET is 120 (sixty duels, sixty turning, seeds 100..159), both frozen, and they share no fight", D.DOGFIGHT_SET.length === 24 && KINDS.every((k) => D.DOGFIGHT_SET.filter((s) => s.kind === k).length === 6) && D.DOGFIGHT_BENCH_SET.length === 120 && D.DOGFIGHT_BENCH_SET.filter((s) => s.kind === "duel").length === 60 && D.DOGFIGHT_BENCH_SET.filter((s) => s.kind === "turning").length === 60 && Object.isFrozen(D.DOGFIGHT_SET) && Object.isFrozen(D.DOGFIGHT_BENCH_SET) && [...idsOf(D.DOGFIGHT_SET)].every((x) => !idsOf(D.DOGFIGHT_BENCH_SET).has(x)) && Math.min(...D.DOGFIGHT_BENCH_SET.map((s) => s.seed)) === 100 && Math.max(...D.DOGFIGHT_BENCH_SET.map((s) => s.seed)) === 159);
+}
+
+ok("!! THE CONSTANTS ARE THE ONES THE HEADER SAYS: 1/30 s ticks for 60 s, guidance never under 120 m, the trigger inside 450 m at one hit radius, speeds 38..52 m/s, a 220 m standoff, a 0.25 kill bonus, the break-off inside 140 m and closing over 15 m/s turning 0.9 rad and taking 30 m, a collision inside 6 m, sides 1 and 2", D.DT === 1 / 30 && D.SECONDS === 60 && D.MIN_ALTITUDE === 120 && D.MAX_RANGE === 450 && D.FIRE_TOLERANCE === 1 && D.SPEED_LIMITS[0] === 38 && D.SPEED_LIMITS[1] === 52 && Object.isFrozen(D.SPEED_LIMITS) && D.STANDOFF === 220 && D.KILL_BONUS === 0.25 && D.BREAK_RANGE === 140 && D.BREAK_CLOSING === 15 && D.BREAK_TURN === 0.9 && D.BREAK_CLIMB === 30 && D.COLLISION_RANGE === 6 && D.A_ID === 1 && D.B_ID === 2);
+const rl = D.reportLines();
+ok("the module's report names the task, both sets' size and the autopilot's score, and no line says NaN or undefined", rl.length >= 2 && /dogfightTask/.test(rl[0]) && /24 fights/.test(rl[1]) && /0\.411/.test(rl[1]) && !rl.some((l) => /NaN|undefined/.test(l)), rl[1]);
+
+sec("2. GUIDANCE: pursuit()");
+{
+    const me = (extra = {}) => F.createState({ pos: [0, 0, 300], speed: 45, heading: 0, ...extra });
+    const foe = (pos, vel) => ({ pos, vel });
+    const ahead = D.pursuit(me(), foe([300, 0, 300], [45, 0, 0]));
+    ok("!! A TARGET DEAD AHEAD ON THE SAME COURSE: heading 0, the target's altitude, and 45 + 0.04 (300 - 220) = 48.2 m/s to close the 80 m it is outside the standoff", Math.abs(ahead.target.heading) < 1e-12 && Math.abs(ahead.target.altitude - 300) < 1e-9 && Math.abs(ahead.target.airspeed - 48.2) < 1e-9 && !ahead.breaking, `${ahead.target.heading} ${ahead.target.altitude} ${ahead.target.airspeed}`);
+    const still = D.pursuit(me(), foe([300, 0, 300], [0, 0, 0])), left = D.pursuit(me(), foe([300, 0, 300], [0, 25, 0])), right = D.pursuit(me(), foe([300, 0, 300], [0, -25, 0]));
+    ok("!! A TARGET MOVING LEFT (+Y) IS LED TO THE LEFT: the heading is negative (left is negative), more so than the heading to a still target's drop point, and a target moving right is led the same amount the other way (a right turn increases heading)", left.target.heading < -0.02 && right.target.heading > 0.02 && Math.abs(left.target.heading + right.target.heading) < 1e-9 && Math.abs(still.target.heading) < 1e-9, `${left.target.heading.toFixed(4)} ${right.target.heading.toFixed(4)}`);
+    const lead = G.aimSolution(G.muzzleOf(me()), [300, 0, 300], [0, 25, 0]);
+    ok("...and the lead is the GUN'S (flightGuns.aimSolution's point): the heading is the bearing to the point the target reaches in the round's time of flight", Math.abs(left.target.heading - headingTo(lead.point[0], lead.point[1])) < 1e-12 && Math.abs(left.sol.t - lead.t) < 1e-12);
+    const far = D.pursuit(me(), foe([2300, 0, 300], [45, 0, 0])), slow = D.pursuit(me(), foe([200, 0, 300], [20, 0, 0])), low = D.pursuit(me(), foe([300, 0, 50], [45, 0, 0]));
+    ok("!! THE LIMITS: a target 2,300 m away is chased at the 52 m/s cap (45 + 0.04 x 2,080 would be 128), a slow one inside the standoff gives 38 m/s (not 20 - 0.8), and a target at 50 m of altitude is followed no lower than 120 m", far.target.airspeed === 52 && slow.target.airspeed === 38 && low.target.altitude === 120, `${far.target.airspeed} ${slow.target.airspeed} ${low.target.altitude}`);
+    const headOnLeft = D.pursuit(me(), foe([100, 20, 300], [-45, 0, 0])), headOnRight = D.pursuit(me(), foe([100, -20, 300], [-45, 0, 0])), above = D.pursuit(me(), foe([100, 20, 330], [-45, 0, 0])), below = D.pursuit(me(), foe([100, 20, 270], [-45, 0, 0]));
+    ok("!! BREAK-OFF, 100 m ahead and closing at 90 m/s: an opponent on the LEFT is broken away from to the RIGHT (heading +0.9), one on the right to the left (-0.9); it goes up (+30 m) from an opponent at its own height or below and DOWN (-30 m) from one above", headOnLeft.breaking === true && Math.abs(headOnLeft.target.heading - 0.9) < 1e-9 && headOnRight.breaking === true && Math.abs(headOnRight.target.heading + 0.9) < 1e-9 && Math.abs(headOnLeft.target.altitude - 330) < 1e-9 && Math.abs(below.target.altitude - 330) < 1e-9 && Math.abs(above.target.altitude - 270) < 1e-9, `${headOnLeft.target.heading} ${headOnRight.target.heading} ${headOnLeft.target.altitude} ${above.target.altitude}`);
+    const turned = D.pursuit(me({ heading: 1.0 }), foe([100 * Math.cos(1.0), -100 * Math.sin(1.0) + 20, 300], [-45 * Math.cos(1.0), 45 * Math.sin(1.0), 0]));
+    ok("the break-off is relative to the aircraft's own heading (the same fight turned through 1 rad breaks to heading 1 +- 0.9, on the side the opponent is on in ITS frame)", turned.breaking === true && Math.abs(Math.abs(wrap(turned.target.heading - 1.0)) - 0.9) < 1e-9, `${turned.target.heading.toFixed(4)}`);
+    const farHead = D.pursuit(me(), foe([200, 20, 300], [-45, 0, 0])), slowClose = D.pursuit(me(), foe([100, 20, 300], [35, 0, 0])), justOut = D.pursuit(me(), foe([141, 0, 300], [-45, 0, 0]));
+    ok("!! IT ONLY BREAKS WHEN IT MUST: not at 200 m even closing at 90 m/s, not at 100 m closing at 10 m/s (a slow overtake), not at 141 m; and at exactly the edge (139.9 m, closing 90) it does", !farHead.breaking && !slowClose.breaking && !justOut.breaking && D.pursuit(me(), foe([139.9, 0, 300], [-45, 0, 0])).breaking === true);
+    ok("with no solution (a target running away faster than the round) it is PURE PURSUIT: the bearing to the target, with the limits kept", (() => { const g = D.pursuit(me(), foe([300, 100, 300], [400, 0, 0])); return g.sol === null && Math.abs(g.target.heading - headingTo(300, 100)) < 1e-12 && g.target.airspeed === 52; })());
+}
+
+sec("3. THE TRIGGER: fireControl()");
+{
+    const tp = [250, 0, 300], tv = [45, 0, 0];
+    const turnedTo = (dHeading) => { let s = F.createState({ pos: [0, 0, 300], speed: 45, heading: 0 }); for (let it = 0; it < 6; it++) { const sol = G.aimSolution(G.muzzleOf(s), tp, tv), az = Math.atan2(-sol.dir[1], sol.dir[0]), el = Math.asin(sol.dir[2]); s = F.createState({ pos: [0, 0, 300], speed: 45, heading: az, pitch: el - G.GUN.boresight }); } const sol = G.aimSolution(G.muzzleOf(s), tp, tv), az = Math.atan2(-sol.dir[1], sol.dir[0]); return { ...s, q: F.attitudeQuat(az + dHeading, Math.asin(sol.dir[2]) - G.GUN.boresight, 0) }; };   // only the ATTITUDE turns: the velocity (which the lead solution uses) stays where it was
+    const gun = G.createGun(), aimed = D.fireControl(turnedTo(0), { pos: tp, vel: tv }, gun);
+    ok("!! A GUN POINTED AT THE LEAD SOLUTION FIRES, with a predicted miss of about nothing (< 0.05 m)", aimed.fire === true && aimed.miss < 0.05 && Math.abs(aimed.range - 250) < 1e-9, `miss ${aimed.miss.toExponential(1)}`);
+    const sol0 = G.aimSolution(G.muzzleOf(turnedTo(0)), tp, tv), path = sol0.t * 300;
+    const inside = D.fireControl(turnedTo(0.5 * 4 / path), { pos: tp, vel: tv }, gun), outside = D.fireControl(turnedTo(1.5 * 4 / path), { pos: tp, vel: tv }, gun);
+    ok("!! THE THRESHOLD IS THE HIT RADIUS: pointed half a radius (2 m at the target) off it fires, one and a half radii off it does not, and the predicted miss is sin(error) x the round's path (within 2.5%: turning the nose moves the muzzle 2 cm, which moves the solution by 1% of the error)", inside.fire === true && outside.fire === false && Math.abs(inside.miss - 2) < 0.02 && Math.abs(outside.miss - 6) < 0.06 && Math.abs(inside.miss - Math.sin(0.5 * 4 / path * Math.cos(Math.asin(sol0.dir[2]))) * path) < 0.05, `${inside.miss.toFixed(3)} ${outside.miss.toFixed(3)}`);
+    const emptied = Object.freeze({ ...gun, ammo: 0 });
+    ok("!! NO TRIGGER WITH AN EMPTY GUN, none beyond 450 m (the same aligned shot at 500 m), and none when there is no solution", D.fireControl(turnedTo(0), { pos: tp, vel: tv }, emptied).fire === false && (() => { const far = [500, 0, 300]; let s = F.createState({ pos: [0, 0, 300], speed: 45, heading: 0 }); for (let it = 0; it < 6; it++) { const sol = G.aimSolution(G.muzzleOf(s), far, tv); s = F.createState({ pos: [0, 0, 300], speed: 45, heading: Math.atan2(-sol.dir[1], sol.dir[0]), pitch: Math.asin(sol.dir[2]) - G.GUN.boresight }); } return D.fireControl(s, { pos: far, vel: tv }, gun).fire === false; })() && D.fireControl(turnedTo(0), { pos: [300, 0, 300], vel: [500, 0, 0] }, gun).fire === false);
+    ok("a target BEHIND the aircraft is not fired at (the nose is the wrong way: a miss of hundreds of metres)", D.fireControl(F.createState({ pos: [0, 0, 300], speed: 45, heading: 0 }), { pos: [-250, 0, 300], vel: [45, 0, 0] }, gun).fire === false);
+}
+
+sec("4. THE FIGHT");
+{
+    const rs = D.evaluate(AF.pilot).results;
+    const recomputed = rs.every((r) => { const lost = r.statusA !== "airborne" ? 20 : r.taken, want = (Math.min(r.dealt, 20) - Math.min(lost, 20)) / 20 + (r.killedB !== null && r.statusA === "airborne" ? 0.25 * Math.max(0, 60 - r.killedB) / 60 : 0); return Math.abs(r.score - want) < 1e-12; });
+    ok("!! THE SCORE IS RECOMPUTABLE FROM THE RESULT'S OWN FIELDS on all 24 fights: (min(dealt, 20) - min(lost, 20)) / 20 plus 0.25 (60 - t_kill) / 60 for a kill, where an aircraft that is not airborne has lost its 20", recomputed);
+    ok("!! THE BOOKKEEPING HOLDS: hits never exceed rounds fired, rounds fired never exceed the 300 in the magazine, hit rate is hits / rounds, a kill needs 20 hits and a destroyed B is exactly a killed one, the first hit comes no later than the kill, and no fight is longer than 1,800 ticks", rs.every((r) => r.dealt <= r.fired && r.fired <= 300 && Math.abs(r.hitRate - (r.fired ? r.dealt / r.fired : 0)) < 1e-12 && (r.statusB === "destroyed") === (r.killedB !== null) && (r.killedB === null || (r.dealt >= 20 && r.firstHit !== null && r.firstHit <= r.killedB)) && r.ticks <= 1800 && r.ticks >= 1 && r.closest > 0 && Number.isFinite(r.closest) && Number.isFinite(r.minAltitude)), `${rs.filter((r) => r.killedB !== null).length} kills of ${rs.length}`);
+    const zero = () => ({ pitch: 0, roll: 0, yaw: 0, throttle: 0 }), sc0 = D.scenario(1, "tail");
+    const fell = D.duel(zero, sc0);
+    ok("!! AN AIRCRAFT WITH NO CONTROLS FALLS: it ends on the ground (crashed or touchdown), A has TAKEN ITS FULL 20 hit points though nobody shot it, the fight ends the tick it lands and the score is (hits it got in before - 20) / 20", (fell.statusA === "crashed" || fell.statusA === "touchdown") && fell.taken === 0 && fell.ticks < 1800 && Math.abs(fell.score - (Math.min(fell.dealt, 20) - 20) / 20) < 1e-12 && fell.score <= -0.5, `${fell.statusA} after ${(fell.ticks / 30).toFixed(1)} s, score ${fell.score.toFixed(3)}`);
+    const headOn = { seed: 0, kind: "duel", a: { pos: [0, 0, 300], speed: 45, heading: 0, pitch: 0.03, bank: 0, gamma: 0 }, b: { pos: [600, 0, 300], speed: 45, heading: Math.PI, pitch: 0.03, bank: 0, gamma: 0 }, opponent: { kind: "straight", rate: 0, fires: false } };
+    const straight = (s, t, w) => AF.pilot(s, { heading: 0, altitude: 300, airspeed: 45 }, w), unarmed = Object.freeze({ ...G.GUN, magazine: 0 }), crash = D.duel(straight, headOn, { spec: unarmed });
+    const gunned = D.duel(straight, headOn);
+    ok("!! TWO UNARMED AIRCRAFT FLOWN AT EACH OTHER COLLIDE (A's magazine is empty -- armed, it would shoot B down first, see the next row): closing at 90 m/s on one line they are both 'collided' inside 7 s, the fight ends there, A has lost its 20 (the score is (hits it got in - 20) / 20) and B is not credited as killed", crash.statusA === "collided" && crash.statusB === "collided" && crash.ticks < 7 * 30 && crash.killedB === null && Math.abs(crash.score - (Math.min(crash.dealt, 20) - 20) / 20) < 1e-12 && crash.closest < D.COLLISION_RANGE, `${crash.statusA} at ${(crash.ticks / 30).toFixed(2)} s, closest ${crash.closest.toFixed(2)} m, hits ${crash.dealt}`);
+    ok("!! ARMED, THE SAME HEAD-ON PASS IS WON BY THE GUN: A flying straight at a B that does not turn shoots it down before they meet (20 hits at about 200 m, a quick kill that scores more than 1), and nobody collides", gunned.statusB === "destroyed" && gunned.statusA === "airborne" && gunned.killedB !== null && gunned.killedB < 5 && gunned.score > 1 && gunned.closest > D.COLLISION_RANGE, `B destroyed at ${gunned.killedB && gunned.killedB.toFixed(2)} s, range ${gunned.closest.toFixed(0)} m, score ${gunned.score.toFixed(3)}`);
+    const apart = D.duel(straight, { ...headOn, b: { ...headOn.b, pos: [600, 60, 300] } }, { spec: unarmed });
+    ok("...and the same pass 60 m to the side is no collision (A and B fly through each other's airspace and the fight runs its minute)", apart.statusA === "airborne" && apart.statusB === "airborne" && apart.closest > D.COLLISION_RANGE && apart.ticks === 1800, `closest ${apart.closest.toFixed(1)} m`);
+    const hunted = D.duel(straight, { ...headOn, opponent: { kind: "hunt", rate: 0, fires: true } }, { spec: unarmed, specB: G.GUN });
+    ok("!! B'S GUN IS B'S OWN: an UNARMED A flown straight at an ARMED hunting B is shot down (A destroyed with its 20 hits taken, before they meet, and B fired rounds), and the same fight with B's magazine empty too is a collision -- the trigger reads the magazine of the aircraft that pulls it", hunted.statusA === "destroyed" && hunted.taken >= 20 && hunted.firedB > 0 && hunted.fired === 0 && hunted.closest > D.COLLISION_RANGE && Math.abs(hunted.score + 1) < 1e-12 && D.duel(straight, { ...headOn, opponent: { kind: "hunt", rate: 0, fires: true } }, { spec: unarmed }).statusA === "collided", `A ${hunted.statusA} at ${(hunted.ticks / 30).toFixed(2)} s, B fired ${hunted.firedB}, ${hunted.taken} hits`);
+    const duels = D.evaluate(AF.pilot, D.DOGFIGHT_BENCH_SET.filter((s) => s.kind === "duel")).results;
+    ok("!! A HUNTING B REALLY SHOOTS: over the sixty bench duels B lands hits on A in many of them (A.taken > 0 in at least 10), A is destroyed exactly when it took 20, and a fight in which A was killed ends the tick of the 20th hit", duels.filter((r) => r.taken > 0).length >= 10 && duels.every((r) => (r.statusA === "destroyed") === (r.taken >= 20)) && duels.filter((r) => r.statusA === "destroyed").length > 0, `${duels.filter((r) => r.taken > 0).length} of 60 duels took a hit, ${duels.filter((r) => r.statusA === "destroyed").length} lost`);
+    const k1 = D.duel(AF.pilot, D.scenario(3, "tail")), k2 = D.duel(AF.pilot, D.scenario(3, "tail")), k3 = D.duel(zero, D.scenario(3, "tail"));
+    ok("deterministic: the same pilot in the same fight gives the same result bit for bit (every field, the fingerprint included), and a different pilot flies a different fight", JSON.stringify(k1) === JSON.stringify(k2) && k1.fingerprint !== k3.fingerprint && /^[0-9a-f]{8}$/.test(k1.fingerprint));
+    const noShots = D.duel(AF.pilot, D.scenario(2, "turning"), { seconds: 10 });
+    ok("`seconds` bounds the fight (10 s is at most 300 ticks) and the opponent's gun is silent in a scenario that says it does not fire (B.taken counts only A's rounds in 'tail': A is never hit)", noShots.ticks <= 300 && D.evaluate(AF.pilot, D.DOGFIGHT_SET.filter((s) => s.kind === "tail" || s.kind === "offset" || s.kind === "turning")).results.every((r) => r.taken === 0));
+}
+
+sec("5. THE PILOTS");
+{
+    const load = (f) => Float64Array.from(JSON.parse(fs.readFileSync(path.join(ENG, "brain", f), "utf8")).weights);
+    const pilots = { autopilot: AF.pilot, flyHand: PF.pilotFor(PF.handWeights()), flyTrained: PF.pilotFor(load("pilotFlightWeightsDefault.json")), gpuHand: MF.pilotFor(MF.handWeights()), gpuTrained: MF.pilotFor(load("pilotFlightMlpWeightsDefault.json")) };
+    const run = {}; for (const [n, p] of Object.entries(pilots)) run[n] = { set: D.evaluate(p, D.DOGFIGHT_SET), bench: D.evaluate(p, D.DOGFIGHT_BENCH_SET) };
+    const sd = (r, kind) => { const rs = r.results.filter((x) => x.kind === kind), m = rs.reduce((s, x) => s + x.score, 0) / rs.length; return Math.sqrt(rs.reduce((s, x) => s + (x.score - m) ** 2, 0) / (rs.length - 1) / rs.length); };
+    const near = (a, b, tol = 5e-4) => Math.abs(a - b) <= tol;
+    const A = run.autopilot;
+    ok("!! THE PD AUTOPILOT'S FIGHTS ARE PINNED: on the 24 fights it scores 0.4109 (tail 0.7144, offset 0.8769, turning 0.1333, duel -0.0812) with 235 hits on 347 rounds, 53 taken, 10 kills and no aircraft lost; on the 120 bench fights 0.0583 (turning 0.0757, duel 0.0409), 290 hits on 355 rounds, 165 taken, 7 kills, 3 lost (one a collision)", near(A.set.score, 0.4109) && near(A.set.byKind.tail, 0.7144) && near(A.set.byKind.offset, 0.8769) && near(A.set.byKind.turning, 0.1333) && near(A.set.byKind.duel, -0.0812) && A.set.dealt === 235 && A.set.fired === 347 && A.set.taken === 53 && A.set.kills === 10 && A.set.deaths === 0 && near(A.bench.score, 0.0583) && near(A.bench.byKind.turning, 0.0757) && near(A.bench.byKind.duel, 0.0409) && A.bench.dealt === 290 && A.bench.fired === 355 && A.bench.taken === 165 && A.bench.kills === 7 && A.bench.deaths === 3 && A.bench.results.filter((r) => r.statusA === "collided").length === 1, `${A.set.score.toFixed(4)} / ${A.bench.score.toFixed(4)}`);
+    ok("!! THE HAND-WEIGHTS NETWORKS ARE THE AUTOPILOT IN A FIGHT TOO: the fruit fly's and the GPU Brain's hand weights fly the autopilot's 144 fights with the same hits, rounds, kills and scores (to 1e-3) -- they are the same laws, and a fight is a sensitive test of that", ["flyHand", "gpuHand"].every((n) => ["set", "bench"].every((w) => run[n][w].dealt === A[w].dealt && run[n][w].taken === A[w].taken && run[n][w].fired === A[w].fired && run[n][w].kills === A[w].kills && near(run[n][w].score, A[w].score, 1e-3))), ["flyHand", "gpuHand"].map((n) => run[n].bench.score.toFixed(4)).join(" "));
+    const F_ = run.flyTrained, Gp = run.gpuTrained;
+    ok("!! THE TWO TRAINED PILOTS' FIGHTS ARE PINNED (they were trained to hold a heading, not to fight): the fruit fly's 0.5007 on the 24 (261 hits on 377, 40 taken, 10 kills) and 0.0363 on the bench (293 on 370, 219 taken, 3 kills, 4 lost); the GPU Brain's 0.5225 (262 on 393, 29 taken, 11 kills) and 0.1167 (414 on 553, 177 taken, 10 kills, 5 lost)", near(F_.set.score, 0.5007) && F_.set.dealt === 261 && F_.set.fired === 377 && F_.set.taken === 40 && F_.set.kills === 10 && near(F_.bench.score, 0.0363) && F_.bench.dealt === 293 && F_.bench.fired === 370 && F_.bench.taken === 219 && F_.bench.kills === 3 && F_.bench.deaths === 4 && near(Gp.set.score, 0.5225) && Gp.set.dealt === 262 && Gp.set.fired === 393 && Gp.set.taken === 29 && Gp.set.kills === 11 && near(Gp.bench.score, 0.1167) && Gp.bench.dealt === 414 && Gp.bench.fired === 553 && Gp.bench.taken === 177 && Gp.bench.kills === 10 && Gp.bench.deaths === 5, `fly ${F_.set.score.toFixed(4)} / ${F_.bench.score.toFixed(4)}, gpu ${Gp.set.score.toFixed(4)} / ${Gp.bench.score.toFixed(4)}`);
+    const dA = A.bench.byKind.duel, dF = F_.bench.byKind.duel, dG = Gp.bench.byKind.duel, seA = sd(A.bench, "duel"), seF = sd(F_.bench, "duel"), seG = sd(Gp.bench, "duel");
+    console.log(`  ----  the duel on the 60 bench fights (mean +- standard error): autopilot ${dA.toFixed(3)} +- ${seA.toFixed(3)}, fruit fly ${dF.toFixed(3)} +- ${seF.toFixed(3)}, GPU Brain ${dG.toFixed(3)} +- ${seG.toFixed(3)}`);
+    ok("!! NOTHING HERE SAYS A TRAINED PILOT FIGHTS BETTER: on the 60 bench duels the fruit fly's mean is within two standard errors of the autopilot's, and the GPU Brain's lead over it (0.165) is under two standard errors of the difference -- a measured tie that the gate states rather than hides, and which flips the day a number below is not a tie", Math.abs(dF - dA) < 2 * Math.hypot(seF, seA) && Math.abs(dG - dA) < 2 * Math.hypot(seG, seA), `fly ${(dF - dA).toFixed(3)} vs 2 se ${(2 * Math.hypot(seF, seA)).toFixed(3)}; gpu ${(dG - dA).toFixed(3)} vs ${(2 * Math.hypot(seG, seA)).toFixed(3)}`);
+    ok("!! NONE OF THE FIVE ENDS A FIGHT ON THE GROUND on either set (no crash, no touchdown, no lost state), whatever the guidance asks of it", Object.values(run).every((r) => [r.set, r.bench].every((e) => e.results.every((x) => !["crashed", "touchdown", "lost"].includes(x.statusA)))));
+}
+
+console.log(fails ? `\ndogfightTask-selfcheck: ${fails} FAILED` : "\ndogfightTask-selfcheck: all checks pass");
+process.exit(fails ? 1 : 0);

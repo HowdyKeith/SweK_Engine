@@ -332,12 +332,36 @@ export const TODO = [
              "physics/ballistics.mjs and physics/turret.mjs (shells, an exact aim solution, a reload) and brain/gunnerPolicy.mjs (a gunner for a car). " +
              "The real-flight model has no gun mount, no round count, no hit test against a body that is not a car, and no task that scores a fight " +
              "-- brain/flightTask.mjs scores tracking error only.",
-        note: "SCOPE: a forward-fixed gun (boresight along the nose, +X), a muzzle velocity added to the aircraft's own velocity, a hit sphere on the " +
-              "target, a magazine and a reload; a `dogfight` task in brain/flightTask.mjs with its own sets (train / held-out / audit read once, as " +
-              "every task here is); the autopilot and the two trained pilots as opponents. A pilot that has only ever tracked a heading will not " +
-              "know how to put its nose on a target -- the features need a bearing-to-target (lead angle) and the hand weights need a pursuit rule " +
-              "before training can start from something equal to a baseline. NOT IN SCOPE: gunner seats (item 4), ejection (item 6).",
-        evidence: "node -e 'import(\"./brain/flightTask.mjs\").then(m=>console.log(\"gun/fire/shot/dogfight exports:\", Object.keys(m).filter(k=>/gun|fire|shot|dogfight/i.test(k)).length))'   # 0 today",
+        progress: "BUILT, NOT SHIPPED (the version is chosen at ship time; another chat holds v4871): physics/mechanics/flightGuns.mjs (the gun, exact rounds, a swept hit test, a lead-and-drop aim solution; 26 sabotages) and brain/dogfightTask.mjs " +
+                  "(pursuit guidance that hands any heading-altitude-airspeed pilot the opponent's lead point, a break-off, a hand trigger rule, four kinds of fight, the score; 37 sabotages). MEASURED, not hoped: the PD autopilot flying the guidance wins " +
+                  "its 24 fights 0.4109, and the fruit fly's and GPU network's HAND weights fly exactly its fights; the two trained pilots differ from it on the duel by less than two standard errors on sixty fresh duels. " +
+                  "STILL OPEN HERE: the page that shows a fight (dogfight-page) and a pilot that has LEARNED to fight (dogfight-pilot-training).",
+        note: "SCOPE AS BUILT: a forward-fixed gun (boresight 2.9 degrees below the nose, harmonised to trim), 300 m/s relative to the muzzle, 15 a second, 300 rounds, a 4 m hit sphere, 20 hits to kill; a dogfight task in brain/dogfightTask.mjs (its own sets: " +
+              "DOGFIGHT_SET 24 and DOGFIGHT_BENCH_SET 120 -- no pilot has TRAINED on a fight yet, so there is no train/held-out/audit split, and the day one trains the discipline of brain/flightTask.mjs applies); the autopilot and the two trained pilots " +
+              "as the pilot under test; the opponent always the PD autopilot. THE DESIGN CHOICE THAT SPARED THE NETWORKS: guidance, not new features -- the pilots still take {heading, altitude, airspeed} and the task asks for the lead point -- so no weight " +
+              "of any pilot changed. WHAT THAT COSTS: nothing here has discovered a better way to get the nose on a target, and no pilot decides when to shoot (dogfight-pilot-training). NOT IN SCOPE: gunner seats (item 4), ejection (item 6).",
+        evidence: "node brain/dogfightTask.mjs   # the PD autopilot's fights, from the task as built",
+    },
+    {
+        id: "dogfight-page",
+        status: "open", size: "medium", order: 1.5,
+        title: "A page that shows a fight: two aircraft, tracers, hit points, a pilot chosen for each side, a scenario and a seed",
+        why: "brain/dogfightTask.mjs scores fights and nobody can watch one. es-flight6dof.html flies a mission; a fight needs rounds drawn in the air, a hit flash, hit-point bars and the kill, and the roster it already has (autopilot, shipped fruit fly, shipped GPU pilot) for side A.",
+        note: "Either a mode of es-flight6dof.html or a page of its own (es-dogfight6dof.html) built from the same pieces. The fight must run through brain/dogfightTask.mjs's duel() so the page and the gate cannot disagree about a fight -- the gate for the page holds the " +
+              "page's result for a scenario to the module's, field for field, as flightPage-selfcheck holds the flight page's states. GPU seats are async (stepFleetGpu), so the page steps the duel itself and asks the device for side A's controls each tick; say " +
+              "that a software adapter makes it slower than real time. Needs a version of duel() that can be stepped a tick at a time (it runs a whole fight today).",
+        evidence: "node -e 'console.log(\"dogfight pages:\", require(\"fs\").readdirSync(\".\").filter((f)=>/dogfight/i.test(f)&&f.endsWith(\".html\")).length)'   # 0 today",
+    },
+    {
+        id: "dogfight-pilot-training",
+        status: "open", size: "large", order: 1.6,
+        title: "A pilot that has LEARNED to fight: the trigger as a control, the opponent in its senses, trained on fights by the recipe the flight pilots were",
+        why: "Every pilot that flies the dogfight today was trained to hold a heading; the guidance does the fighting and a hand rule pulls the trigger. On sixty fresh duels the PD autopilot (0.041 +- 0.064), the trained fruit fly (0.025 +- 0.056) and the trained GPU " +
+             "network (0.206 +- 0.069) are a tie within two standard errors. A pilot that learned the geometry (when to break, when to pull the nose through, when to fire) is the point of a dogfight.",
+        note: "SCOPE: a fifth output (fire) and opponent features (bearing, range, closing speed, the lead error) on both networks -- a NEW layout, so new weight files and new hand weights that reproduce the autopilot plus the hand trigger exactly, before any search; " +
+              "train/held-out/audit/safety sets for fights in the discipline of brain/flightTask.mjs (an audit read once; spent sets declared), self-play or a league against the autopilot and the shipped pilots; the tails that matter here are collisions and " +
+              "ground contacts, which the flight task counted as stalls. Depends on dogfight-page only for being watched, not for training.",
+        evidence: "node -e 'import(\"./brain/dogfightTask.mjs\").then(m=>console.log(\"trained-on-fights sets:\", Object.keys(m).filter(k=>/TRAIN|HELD_OUT|AUDIT/.test(k)).length))'   # 0 today",
     },
     {
         id: "flight-model-picker",
