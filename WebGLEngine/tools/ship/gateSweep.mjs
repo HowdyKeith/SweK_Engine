@@ -9210,6 +9210,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "sabotages red by name. NOT CLOSED: on SwiftShader the test passes with the barrier deleted too -- it shows the barrier runs, " +
                  "not that it orders. The draft is Keith's to file.",
     }),
+    // v4867 -- since558 (the highest on any branch at the time was since557, read across every remote ref after a full fetch; v4864 and v4865 are still spent on two other branches). FOUR new gate files: brain/autopilotFlight-selfcheck.mjs,
+    // brain/flightTask-selfcheck.mjs, brain/pilotFlightPolicy-selfcheck.mjs and tools/ship/flightPage-selfcheck.mjs.
+    since558: Object.freeze({
+        at: "v4867", swept: 4, green: 4, red: 0,
+        added: Object.freeze([
+            "brain/autopilotFlight-selfcheck.mjs",
+            "brain/flightTask-selfcheck.mjs",
+            "brain/pilotFlightPolicy-selfcheck.mjs",
+            "tools/ship/flightPage-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green, 0.5 / 1.1 / 1.7 / 1.8 s. *** THE FIRST AUTOPILOT FOR REAL FLIGHT PULLED AN AIRCRAFT STARTING 170 DEGREES BANKED INTO THE GROUND (18 m above it at the lowest) *** -- back-stick for a banked wing's lost lift is a pull toward the earth when inverted; the " +
+                 "`upright` factor (wings first, then pull) is the fix, and the same start is level in 5.4 s having lost 10 m. Each law is held to its closed form (the coordinated-turn rate to 0.3%, the climb's thrust to W sin(gamma)), the hand weights of the fruit fly's " +
+                 "Giant Fiber Circuit are the autopilot to 5.8e-8 and fly the same flight over 36 scenarios, against a restatement of the network written in the gate from the topology file, with every one of the 313 synapses checked alone. One hundred and one sabotages, " +
+                 "ten first at 0 red. The 4 m/s climb command is more than full throttle holds at 45 m/s; five of 20 recovery scenarios brush the stall. NOT CLOSED: no pilot here has learned anything (the trained fruit-fly pilot and the GPU network are the next two rounds); " +
+                 "the page has been looked at in a software renderer and flown by nobody on a keyboard; no ground avoidance, takeoff or landing; the rig.",
+    }),
     // v4866 -- since557 (the highest on any branch at the time was since556, read across every remote ref after a full fetch; v4864 and v4865 are already spent on two other branches). ONE new gate file:
     // physics/mechanics/flightModel6dof-selfcheck.mjs (a trainer flown under gravity, thrust and a stall, held to closed forms), plus section 15 of physics/mechanics/aeroSurface-selfcheck.mjs (the opt-in stall).
     since557: Object.freeze({

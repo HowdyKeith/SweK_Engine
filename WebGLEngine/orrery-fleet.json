@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "66a7ae3870190f1bbbcbc8066102618501b33d00",
+ "head": "670788a1263d24831a2ae5f6f7c01c34e18bc10c",
  "bodies": {
   "box3d": [
    {
@@ -340,7 +340,7 @@
    },
    {
     "path": "server.html",
-    "bytes": 887042,
+    "bytes": 887600,
     "sha": "4609dcdd612cb1b37a511a4785bc05592d734b56"
    },
    {
@@ -620,6 +620,11 @@
     "sha": "55b5f11279559a30b5a75b32b8c5a8f73de55035"
    },
    {
+    "path": "es-flight6dof.html",
+    "bytes": 26970,
+    "sha": null
+   },
+   {
     "path": "ev/esShipModels.js",
     "bytes": 9883,
     "sha": "66db97c45b5286d98d1c018506effca552f05a23"
@@ -721,8 +726,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3627914,
-    "sha": "4609dcdd612cb1b37a511a4785bc05592d734b56"
+    "bytes": 3632192,
+    "sha": "be0c27bd8338c429bcdc98102255686a2519afbb"
    },
    {
     "path": "mpm3d.html",
@@ -766,7 +771,7 @@
    },
    {
     "path": "server.html",
-    "bytes": 887042,
+    "bytes": 887600,
     "sha": "4609dcdd612cb1b37a511a4785bc05592d734b56"
    },
    {

@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<!-- es-flight6dof.html -- REAL FLIGHT (v4867): three aircraft fly the same mission under the same physics, each with a pilot YOU choose.
+
+     The physics is physics/mechanics/flightModel6dof.mjs: a 1000 kg trainer with weight, an engine, a wing that stalls, per-surface local airflow (velocity plus w x r), and a ground that ends a flight as a touchdown or a crash.
+     Nothing on this page is a point steered through space (es-aircraft.html's patrol has no gravity and holds a heading): an aircraft that is not flown FALLS, one flown too slowly STALLS, and one flown into the ground is gone.
+
+     THE PILOT IS FOUR NUMBERS -- pitch, roll, yaw, throttle -- from one of:
+       the PD autopilot (brain/autopilotFlight.mjs)   altitude, airspeed and heading hold as a cascade of PD laws with no memory
+       hand weights                                   the SAME laws written through the fruit fly's network (brain/pilotFlightPolicy.mjs: the 34 neurons of the real Giant Fiber Circuit); they fly the same flight
+       hand + noise / zero                            the hand weights with noise on every weight, and a network that outputs nothing (it does not fly: it falls)
+       an imported pilot                              a swek-brain-v1 file for this network, from a file you pick
+       YOU (keyboard)                                 trimmed for the current airspeed, so a neutral stick holds level flight; the stick moves the controls from there
+     The mission is a list of targets (an altitude, a heading, an airspeed) that changes every 25 seconds; the wind is a steady vector with gusts, and the sliders are yours. Every pilot is graded the way brain/flightTask.mjs grades it
+     (mean tracking error, per tick), so the number under each name here is the number a trained pilot is trained on.
+
+     WHAT IS NOT HERE, SAID PLAINLY: the trained pilots (the fruit-fly network trained on this job, and the GPU network) are the next rounds; takeoff and landing (the first contact with the ground ends a flight); terrain you can fly
+     into by a target below it (the ground is flat at z = 0 and the pilots do not look at it). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:desc" content="Real flight: three aircraft fly one mission under flightModel6dof's physics (gravity, thrust, a stalling wing, per-surface local airflow, a ground that ends a flight), each with a pilot you choose -- the PD autopilot, the same laws written through the fruit fly's Giant Fiber Circuit network, noise on those weights, an imported pilot, or you on the keyboard. Wind and gusts are sliders. Answer-key gates: flightModel6dof-selfcheck, autopilotFlight-selfcheck, pilotFlightPolicy-selfcheck, flightPage-selfcheck.">
+<title>SweK &middot; Real flight</title>
+<style>
+  html,body { margin:0; height:100%; background:#0a1626; color:#cfe0f5; font:12px ui-monospace,Menlo,monospace; overflow:hidden; }
+  #hud { position:fixed; top:6px; left:8px; right:8px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; z-index:2; pointer-events:none; background:#0a1220d9; border:1px solid #2f486c; border-radius:8px; padding:5px 10px; }
+  #hud > * { pointer-events:auto; }
+  a { color:#5ad6ff; text-decoration:none; } a:hover { text-decoration:underline; }
+  button, select { background:#152136; color:#b9d4ff; border:1px solid #2f486c; border-radius:5px; cursor:pointer; font:11px ui-monospace,monospace; padding:2px 9px; }
+  label { color:#8fb6d0; }
+  input[type=range] { vertical-align:middle; width:90px; }
+  #mission { position:fixed; top:58px; left:8px; z-index:2; color:#f6a623; background:#0a1220d9; border:1px solid #2f486c; border-radius:8px; padding:3px 10px; }
+  #board { position:fixed; bottom:8px; left:10px; right:10px; z-index:2; display:flex; gap:10px; flex-wrap:wrap; pointer-events:none; }
+  .card { background:#0a1220e0; border:1px solid #2f486c; border-radius:8px; padding:6px 9px; min-width:300px; flex:1 1 300px; max-width:520px; pointer-events:auto; }
+  .card b { color:#2fd6b0; } .card .bad { color:#ff6b6b; } .card .good { color:#7fb069; }
+  .card .row { color:#9fb6cf; white-space:pre-wrap; }
+  #rosterPanel { position:fixed; top:92px; left:10px; z-index:3; display:none; background:#0a1220; border:1px solid #2f486c; border-radius:8px; padding:10px; max-width:470px; box-shadow:0 8px 30px #000a; color:#b9d4ff; }
+  #rosterPanel td { padding:2px 10px 2px 0; } #rosterPanel td:first-child { color:#8fb6d0; }
+  #hint { position:fixed; bottom:150px; right:10px; color:#cfe0f5; background:#0a1220b3; border-radius:6px; padding:2px 8px; z-index:1; text-align:right; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <b style="color:#2fd6b0">&#9992; Real flight</b>
+  <span id="stat" style="color:#9fe6c0"></span>
+  <button id="resetBtn" title="respawn all three aircraft and restart the mission">&#8635; Reset</button>
+  <button id="rosterBtn" title="Load Pilots: choose who flies each aircraft -- the PD autopilot, the same laws written through the fruit fly's network, noise on those weights, an imported pilot, or you on the keyboard -- then Start.">&#9992; Load Pilots</button>
+  <label>camera <select id="camMode"><option value="chase">chase</option><option value="orbit">orbit</option></select>
+    <select id="camTarget"><option value="0">aircraft 1</option><option value="1">aircraft 2</option><option value="2">aircraft 3</option></select></label>
+  <label>wind <input id="windSpeed" type="range" min="0" max="12" step="0.5" value="0"><span id="windSpeedV">0</span> m/s</label>
+  <label>from <input id="windDir" type="range" min="0" max="355" step="5" value="90"><span id="windDirV">90</span>&deg;</label>
+  <label>gusts <input id="windGust" type="range" min="0" max="4" step="0.5" value="0"><span id="windGustV">0</span> m/s</label>
+  <label>speed <select id="timeScale"><option>1</option><option>2</option><option>4</option></select>x</label>
+</div>
+<div id="mission"></div>
+<div id="rosterPanel">
+  <div style="margin-bottom:6px;color:#f6a623;letter-spacing:.08em;">LOAD PILOTS</div>
+  <table style="border-collapse:collapse;margin-bottom:6px;"><tbody>
+    <tr><td>aircraft 1</td><td><select id="pilot0" style="max-width:300px;"></select></td></tr>
+    <tr><td>aircraft 2</td><td><select id="pilot1" style="max-width:300px;"></select></td></tr>
+    <tr><td>aircraft 3</td><td><select id="pilot2" style="max-width:300px;"></select></td></tr>
+  </tbody></table>
+  <div style="display:flex;gap:6px;margin-bottom:6px;"><button id="startFlight">Start</button><button id="rosterReset">Default pilots</button></div>
+  <div style="display:flex;gap:6px;margin-bottom:6px;align-items:center;"><button id="importPilotBtn">Import pilot</button><input id="importPilotFile" type="file" accept="application/json" style="display:none;"><button id="clearPilot" disabled>Clear imported</button></div>
+  <div id="pilotLine" style="color:#8fb6d0;margin-bottom:4px;"></div>
+  <div id="rosterNote" style="color:#7fb069;margin-bottom:4px;"></div>
+  <div style="color:#5f7590;line-height:1.4;">Every network pilot is the same network, wired like a fly's Giant Fiber circuit, with the autopilot's contract (pitch, roll, yaw and throttle from the pointing errors, the rates and the air data); a choice picks which WEIGHTS fly it. The PD autopilot is not a network, and the hand weights are that autopilot written through the network (they fly the same flight). A change applies at once, mid-flight; Start also respawns. <b>You</b>: S/&darr; pull back (nose up), W/&uarr; push, A/&larr; roll left, D/&rarr; roll right, Q/E rudder, R/F throttle up/down; neutral is trimmed for your airspeed.</div>
+</div>
+<div id="board"></div>
+<div id="hint">real physics: gravity, a stalling wing, a ground that ends the flight &mdash; drag to orbit, scroll to zoom (orbit camera)</div>
+
+<script type="importmap">
+{ "imports": { "three": "/vendor/three/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from "/vendor/three/three.module.js";
+import { OrbitControls } from "/vendor/three/jsm/controls/OrbitControls.js";
+import * as RB from "/physics/mechanics/rigidBody6dof.mjs";
+import * as F from "/physics/mechanics/flightModel6dof.mjs";
+import * as AF from "/brain/autopilotFlight.mjs";
+import * as PF from "/brain/pilotFlightPolicy.mjs";
+import * as T from "/brain/flightTask.mjs";
+import * as PR from "/brain/pilotRoster.mjs";
+import * as PB from "/brain/peerBrain.mjs";
+import { weightsHash } from "/brain/drivePolicy.mjs";
+
+// ---- the mission and the fleet -------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+const DT = T.DT, N = 3, LEG_SECONDS = 25, LEG_TICKS = Math.round(LEG_SECONDS / DT);
+const MISSION = Object.freeze([
+  { altitude: 300, heading: 0.0, airspeed: 45 }, { altitude: 360, heading: 1.2, airspeed: 42 }, { altitude: 280, heading: 2.6, airspeed: 47 },
+  { altitude: 340, heading: -2.0, airspeed: 44 }, { altitude: 300, heading: -0.6, airspeed: 46 },
+]);
+const D2R = Math.PI / 180, R2D = 180 / Math.PI;
+const model = F.createFlightModel();
+const missionAt = (tick) => MISSION[Math.floor(tick / LEG_TICKS) % MISSION.length];
+
+// ---- the wind: a steady vector blowing TOWARD a compass heading (0 = world +X, a right turn raises it), plus gusts (flightTask.windAt's sums of sines) ------------------------------------------------------
+let windSpec = null;
+function setWind(speed, towardDeg, gust) {
+  const h = towardDeg * D2R, mean = [speed * Math.cos(h), -speed * Math.sin(h), 0];
+  windSpec = (speed > 0 || gust > 0) ? { mean, amp: [gust, gust, gust * 0.5], freq: [[0.7, 2.3], [0.5, 1.9], [1.1, 3.1]], phase: [[0.4, 2.1], [1.7, 0.3], [3.0, 5.2]] } : null;
+}
+const windNow = (tick) => T.windAt(windSpec, tick * DT);
+
+// ---- Three.js scene -- Z-UP like the physics (nose +X, up +Z), so the aircraft's own axes need no remapping ---------------------------------------------------------------------------------------------------
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x7fb2e6); scene.fog = new THREE.Fog(0x9fc4ea, 1500, 9000);
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.5, 30000);
+camera.up.set(0, 0, 1); camera.position.set(-60, 0, 330);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+const orbit = new OrbitControls(camera, renderer.domElement);
+orbit.enableDamping = true; orbit.dampingFactor = 0.08; orbit.target.set(0, 0, 300); orbit.enabled = false;
+scene.add(new THREE.HemisphereLight(0xdcecff, 0x5a6b4a, 1.1));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(500, -300, 900); scene.add(sun);
+{
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(60000, 60000), new THREE.MeshStandardMaterial({ color: 0x5f7a45, roughness: 1 }));
+  scene.add(ground);
+  const grid = new THREE.GridHelper(30000, 150, 0x7c9a5a, 0x6c8a4c); grid.rotation.x = Math.PI / 2; grid.position.z = 0.2; scene.add(grid);
+  // pylons, scattered by a fixed seed, so the speed and the height are readable from the air
+  let s = 4242; const rnd = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
+  const pylons = new THREE.InstancedMesh(new THREE.BoxGeometry(6, 6, 1), new THREE.MeshStandardMaterial({ color: 0xd9d2c0 }), 260), m = new THREE.Matrix4();
+  for (let i = 0; i < 260; i++) { const h = 20 + rnd() * 90; m.compose(new THREE.Vector3((rnd() - 0.5) * 9000, (rnd() - 0.5) * 9000, h / 2), new THREE.Quaternion(), new THREE.Vector3(1, 1, h)); pylons.setMatrixAt(i, m); }
+  scene.add(pylons);
+}
+const HULL = [0x2fd6b0, 0xf6a623, 0x9b8cff].map((c) => new THREE.MeshStandardMaterial({ color: c, metalness: 0.2, roughness: 0.55 }));
+const HULL_DEAD = new THREE.MeshStandardMaterial({ color: 0x6b2222, roughness: 0.9 });
+function makeAircraft(i) {
+  const g = new THREE.Group(), mat = HULL[i % HULL.length];
+  const fus = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.8, 6.4, 12), mat); fus.rotation.z = Math.PI / 2; fus.position.x = -0.6; g.add(fus);
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.55, 1.6, 12), mat); nose.rotation.z = -Math.PI / 2; nose.position.x = 3.4; g.add(nose);
+  const wing = new THREE.Mesh(new THREE.BoxGeometry(1.7, 10.6, 0.16), mat); wing.position.set(0.2, 0, 0.5); g.add(wing);
+  const tailplane = new THREE.Mesh(new THREE.BoxGeometry(1.1, 3.6, 0.1), mat); tailplane.position.set(-4.2, 0, 0.2); g.add(tailplane);
+  const fin = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.1, 1.5), mat); fin.position.set(-4.2, 0, 0.9); g.add(fin);
+  const prop = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 0.04, 20), new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.25 })); prop.rotation.z = Math.PI / 2; prop.position.x = 4.3; g.add(prop);
+  g.userData.hull = [fus, nose, wing, tailplane, fin]; g.userData.mat = mat;
+  scene.add(g); return g;
+}
+function trailLine(i) {
+  const geom = new THREE.BufferGeometry(); geom.setAttribute("position", new THREE.BufferAttribute(new Float32Array(240 * 3), 3)); geom.setDrawRange(0, 0);
+  const line = new THREE.Line(geom, new THREE.LineBasicMaterial({ color: HULL[i % HULL.length].color })); line.frustumCulled = false; scene.add(line); return line;
+}
+
+// ---- the pilots (brain/pilotRoster.mjs resolves a choice of weights to a pilot function) ------------------------------------------------------------------------------------------------------------------
+const ROSTER_KEY = "swek.flightRoster.v1", NAMES = { scriptedLabel: "PD autopilot (autopilotFlight.mjs)", scriptedName: "PD autopilot" };
+const DEFAULT_SPECS = ["scripted", "hand", "noise05"];
+let specs = (() => { try { const a = JSON.parse(localStorage.getItem(ROSTER_KEY) || "null"); return Array.isArray(a) && a.length === N ? a.map((x) => (typeof x === "string" && x.length < 64 ? x : "scripted")) : DEFAULT_SPECS.slice(); } catch { return DEFAULT_SPECS.slice(); } })();
+const DESC = PB.describePolicy("pilotFlightPolicy", PF);
+let importedW = null, importedMeta = null, importErr = null, avail = 0;
+const rosterCtx = () => ({ PP: PF, shipped: null, imported: importedW, brainPilotOn: false, ...NAMES });
+const saveSpecs = () => { try { localStorage.setItem(ROSTER_KEY, JSON.stringify(specs)); } catch {} };
+const keys = new Set(); let stickPitch = 0, stickRoll = 0, stickYaw = 0, throttleHeld = 0.66;
+function manualPilot(state, target, wind) {
+  const gd = AF.guidance(state, target, wind);
+  return { pitch: Math.max(-1, Math.min(1, gd.stickTrim + 0.55 * stickPitch)), roll: stickRoll, yaw: 0.6 * stickYaw, throttle: throttleHeld };
+}
+let pilots = [], pilotKey = "";
+function resolvePilots() {
+  const key = specs.join("|") + "|" + avail; if (pilots.length && pilotKey === key) return pilots;
+  pilotKey = key; const notes = [];
+  pilots = specs.map((spec, i) => {
+    if (spec === "manual") return { fn: manualPilot, label: "you (keyboard)", manual: true };
+    const r = PR.resolveTeam("A", spec, rosterCtx(), N); notes.push(...r.problems);
+    if (r.scripted) return { fn: (s, t, w) => AF.pilot(s, t, w), label: NAMES.scriptedName };
+    return { fn: PF.pilotFor(r.weights[i]), label: r.label };
+  });
+  const el = document.getElementById("rosterNote"); if (el) el.textContent = pilots.map((p, i) => `${i + 1}: ${p.label}`).join("  |  ") + (notes.length ? "  --  " + notes.join("; ") : "");
+  return pilots;
+}
+function renderRoster() {
+  const ch = [...PR.choices({ shipped: false, imported: !!importedW, brainPanel: false, scriptedLabel: NAMES.scriptedLabel }), { id: "manual", label: "you (keyboard)" }];
+  for (let i = 0; i < N; i++) {
+    const sel = document.getElementById("pilot" + i); sel.textContent = "";
+    for (const c of ch) { const o = document.createElement("option"); o.value = c.id; o.textContent = c.label; sel.appendChild(o); }
+    if (!ch.some((c) => c.id === specs[i])) { const o = document.createElement("option"); o.value = specs[i]; o.textContent = specs[i] + " (not available here)"; sel.appendChild(o); }
+    sel.value = specs[i]; sel.onchange = () => { specs[i] = sel.value; saveSpecs(); resolvePilots(); };
+  }
+}
+function pilotLine() {
+  const el = document.getElementById("pilotLine");
+  el.textContent = (importedW ? `imported pilot ${weightsHash(importedW)}` + (importedMeta && importedMeta.score != null ? `: score ${importedMeta.score}` : "") : "no imported pilot") + (importErr ? `  --  import refused: ${importErr}` : "");
+  document.getElementById("clearPilot").disabled = !importedW;
+}
+function availChanged() { avail++; renderRoster(); pilotLine(); resolvePilots(); }
+function importBlob(blob) { const r = PB.importBrain(DESC, blob); if (r.ok) { importedW = r.weights; importedMeta = r.meta; importErr = null; } else importErr = r.reason; availChanged(); return r.ok; }
+document.getElementById("importPilotBtn").onclick = () => document.getElementById("importPilotFile").click();
+document.getElementById("importPilotFile").addEventListener("change", async (e) => {
+  const f = e.target.files && e.target.files[0]; e.target.value = ""; if (!f) return;
+  try { importBlob(JSON.parse(await f.text())); } catch (err) { importErr = "not a readable JSON file (" + (err && err.message) + ")"; availChanged(); }
+});
+document.getElementById("clearPilot").onclick = () => { importedW = null; importedMeta = null; importErr = null; availChanged(); };
+document.getElementById("rosterBtn").onclick = () => { const p = document.getElementById("rosterPanel"); p.style.display = p.style.display === "block" ? "none" : "block"; renderRoster(); };
+document.getElementById("startFlight").onclick = () => { reset(); };
+document.getElementById("rosterReset").onclick = () => { specs = DEFAULT_SPECS.slice(); saveSpecs(); renderRoster(); resolvePilots(); };
+
+// ---- the fleet -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+let fleet = [], tick = 0;
+function spawn() {
+  const t45 = F.trim(model, 45), out = [];
+  for (let i = 0; i < N; i++) {
+    const state = F.createState({ pos: [0, (i - 1) * 90, 300], speed: 45, pitch: t45.pitchAttitude });
+    out.push({ state, status: "airborne", mesh: makeAircraft(i), trail: trailLine(i), trailN: 0, eAlt: 0, eHdg: 0, eSpd: 0, flown: 0, controls: { pitch: 0, roll: 0, yaw: 0, throttle: 0 } });
+  }
+  return out;
+}
+function clearFleet() { for (const s of fleet) { scene.remove(s.mesh); scene.remove(s.trail); s.trail.geometry.dispose(); for (const c of s.mesh.children) if (c.geometry) c.geometry.dispose(); } }
+function reset() { clearFleet(); tick = 0; stickPitch = stickRoll = stickYaw = 0; throttleHeld = 0.66; fleet = spawn(); resolvePilots(); }
+
+function stepFleet() {
+  updateStick(DT);   // the keys are read in SIMULATED time, so the stick means the same thing at 1x, 4x and in the gate
+  const target = missionAt(tick), wind = windNow(tick), ps = resolvePilots();
+  for (let i = 0; i < fleet.length; i++) {
+    const s = fleet[i]; if (s.status !== "airborne") continue;
+    const c = ps[i].fn(s.state, target, wind); s.controls = F.sanitize(c);
+    const r = F.stepFlight(model, s.state, c, DT, wind); s.state = r.state;
+    if (r.status !== "airborne") { s.status = r.status; continue; }
+    const a = F.attitude(s.state, wind), he = Math.atan2(Math.sin(target.heading - a.heading), Math.cos(target.heading - a.heading));
+    s.eAlt += Math.min(3, Math.abs(a.altitude - target.altitude) / 50); s.eHdg += Math.min(3, Math.abs(he)); s.eSpd += Math.min(3, Math.abs(a.airspeed - target.airspeed) / 10); s.flown++;
+  }
+  tick++;
+}
+// the score the page shows is the running version of flightTask's: minus the mean per-tick error over the ticks flown, with every tick not flown charged the worst
+const scoreOf = (s) => { const total = Math.max(tick, 1); return -((s.eAlt + s.eHdg + 0.5 * s.eSpd) + T.WORST_TICK * (total - s.flown)) / total; };
+
+function syncScene() {
+  for (const s of fleet) {
+    const p = s.state.pos, pq = RB.toPoseQuat(s.state.q);
+    s.mesh.position.set(p[0], p[1], p[2]); s.mesh.quaternion.set(pq[0], pq[1], pq[2], pq[3]);
+    if (s.status !== "airborne") for (const h of s.mesh.userData.hull) h.material = HULL_DEAD;
+    if (tick % 3 === 0 && s.status === "airborne") {
+      const arr = s.trail.geometry.attributes.position.array, n = Math.min(s.trailN + 1, 240);
+      if (s.trailN >= 240) arr.copyWithin(0, 3); const k = Math.min(s.trailN, 239) * 3; arr[k] = p[0]; arr[k + 1] = p[1]; arr[k + 2] = p[2];
+      s.trailN = n; s.trail.geometry.attributes.position.needsUpdate = true; s.trail.geometry.setDrawRange(0, n);
+    }
+  }
+}
+const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
+function updateCamera() {
+  const mode = document.getElementById("camMode").value;
+  orbit.enabled = mode === "orbit";
+  const s = fleet[Number(document.getElementById("camTarget").value) || 0]; if (!s) return;
+  const p = s.state.pos, f = RB.rotateByQuat(s.state.q, [1, 0, 0]);
+  if (mode === "orbit") { orbit.target.set(p[0], p[1], p[2]); orbit.update(); return; }
+  const back = new THREE.Vector3(f[0], f[1], 0).normalize().multiplyScalar(-34);
+  camPos.lerp(new THREE.Vector3(p[0] + back.x, p[1] + back.y, p[2] + 9), 0.12);
+  camLook.lerp(new THREE.Vector3(p[0] + f[0] * 25, p[1] + f[1] * 25, p[2] + f[2] * 25), 0.2);
+  camera.position.copy(camPos); camera.lookAt(camLook);
+}
+
+// ---- the board: one card per aircraft, the mission, the stat line ---------------------------------------------------------------------------------------------------------------------------------------------
+const board = document.getElementById("board");
+for (let i = 0; i < N; i++) { const d = document.createElement("div"); d.className = "card"; d.id = "card" + i; board.appendChild(d); }
+function updateBoard() {
+  const tg = missionAt(tick), left = LEG_SECONDS - ((tick % LEG_TICKS) * DT), nxt = MISSION[(Math.floor(tick / LEG_TICKS) + 1) % MISSION.length], ps = resolvePilots();
+  document.getElementById("mission").textContent = `target: altitude ${tg.altitude} m · heading ${(tg.heading * R2D).toFixed(0)}° · ${tg.airspeed} m/s   (next in ${left.toFixed(0)} s: ${nxt.altitude} m, ${(nxt.heading * R2D).toFixed(0)}°, ${nxt.airspeed} m/s)`;
+  const wind = windNow(tick);
+  document.getElementById("stat").textContent = `t ${(tick * DT).toFixed(0)} s · wind ${Math.hypot(wind[0], wind[1]).toFixed(1)} m/s`;
+  fleet.forEach((s, i) => {
+    const a = F.attitude(s.state, wind), card = document.getElementById("card" + i), st = s.status === "airborne" ? `<span class="good">flying</span>` : `<span class="bad">${s.status === "touchdown" ? "TOUCHDOWN (flight over)" : s.status === "crashed" ? "CRASHED" : "LOST"}</span>`;
+    card.innerHTML = `<b>${i + 1}. ${ps[i].label}</b> · ${st}<div class="row">alt ${a.altitude.toFixed(0)} m (${tg.altitude})  hdg ${(a.heading * R2D).toFixed(0)}° (${(tg.heading * R2D).toFixed(0)}°)  V ${a.airspeed.toFixed(1)} m/s (${tg.airspeed})</div>` +
+      `<div class="row">bank ${(a.bank * R2D).toFixed(0)}°  pitch ${(a.pitch * R2D).toFixed(0)}°  α ${(a.alpha * R2D).toFixed(1)}°  β ${(a.beta * R2D).toFixed(1)}°  climb ${s.state.vel[2].toFixed(1)}</div>` +
+      `<div class="row">stick ${s.controls.pitch.toFixed(2)} ${s.controls.roll.toFixed(2)} ${s.controls.yaw.toFixed(2)}  throttle ${s.controls.throttle.toFixed(2)}   score <b>${scoreOf(s).toFixed(3)}</b></div>`;
+  });
+}
+
+// ---- the keyboard (aircraft whose pilot is "you") --------------------------------------------------------------------------------------------------------------------------------------------------------------
+addEventListener("keydown", (e) => { keys.add(e.code); if (/^(Arrow|Key[WASDQERF])/.test(e.code) && specs.includes("manual")) e.preventDefault(); });
+addEventListener("keyup", (e) => keys.delete(e.code));
+function updateStick(dt) {
+  const axis = (neg, pos) => (neg.some((k) => keys.has(k)) ? -1 : 0) + (pos.some((k) => keys.has(k)) ? 1 : 0);
+  const move = (v, target, rate) => v + Math.max(-rate * dt, Math.min(rate * dt, target - v));
+  stickPitch = move(stickPitch, axis(["KeyW", "ArrowUp"], ["KeyS", "ArrowDown"]), 3);   // S / down: pull back = nose up = positive
+  stickRoll = move(stickRoll, axis(["KeyA", "ArrowLeft"], ["KeyD", "ArrowRight"]), 4);
+  stickYaw = move(stickYaw, axis(["KeyQ"], ["KeyE"]), 4);
+  throttleHeld = Math.max(0, Math.min(1, throttleHeld + axis(["KeyF"], ["KeyR"]) * 0.5 * dt));
+}
+
+// ---- the loop ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+document.getElementById("resetBtn").onclick = () => reset();
+for (const id of ["windSpeed", "windDir", "windGust"]) document.getElementById(id).oninput = () => {
+  const sp = Number(document.getElementById("windSpeed").value), dr = Number(document.getElementById("windDir").value), gu = Number(document.getElementById("windGust").value);
+  document.getElementById("windSpeedV").textContent = sp; document.getElementById("windDirV").textContent = dr; document.getElementById("windGustV").textContent = gu; setWind(sp, dr, gu);
+};
+addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+let last = performance.now(), acc = 0;
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  acc += dt * Number(document.getElementById("timeScale").value); let n = 0;
+  while (acc >= DT && n < 8) { stepFleet(); acc -= DT; n++; } if (acc > DT * 8) acc = 0;
+  syncScene(); updateCamera(); updateBoard(); renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+setWind(0, 90, 0); renderRoster(); pilotLine(); reset();
+camPos.set(-40, 0, 309); camLook.set(30, 0, 300);
+
+// a debug hook: exact numeric state without scraping pixels, and a clock the gate drives (tools/ship/flightPage-selfcheck.mjs)
+window.__flightDemo = {
+  state() { return { tick, mission: missionAt(tick), fleet: fleet.map((s) => ({ status: s.status, pos: s.state.pos.slice(), vel: s.state.vel.slice(), q: s.state.q.slice(), controls: s.controls, score: scoreOf(s) })) }; },
+  step(n = 1) { for (let i = 0; i < n; i++) stepFleet(); syncScene(); updateBoard(); },
+  reset, setWind, get specs() { return specs.slice(); }, setSpec(i, spec) { specs[i] = spec; saveSpecs(); renderRoster(); resolvePilots(); },
+  roster: { get labels() { return resolvePilots().map((p) => p.label); }, get choices() { return [...document.getElementById("pilot0").options].map((o) => o.value); }, importBlob, get imported() { return importedW; }, get importError() { return importErr; } },
+};
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

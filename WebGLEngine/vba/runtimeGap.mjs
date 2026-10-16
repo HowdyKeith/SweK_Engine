@@ -622,9 +622,10 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4840 -- files 4636 -> 4637: tools/ship/wasmDoors-selfcheck.mjs.
     // v4842 -- main's v4838 merged with this line's v4838-v4841: RE-DERIVED over the merged tree.
     // v4854 -- files 4684 -> 4685: tools/ship/threeTextureBarrier-selfcheck.mjs (three's own test file is kept as .txt, not counted).
+    // v4867 -- files 4689 -> 4696, ES modules 4384 -> 4391, closures 4229 -> 4236, async/await 1769 -> 1772, typed arrays 1304 -> 1306, Promises 430 -> 431, performance.now 250 -> 251: brain/autopilotFlight.mjs, brain/flightTask.mjs, brain/pilotFlightPolicy.mjs and their three gates, es-flight6dof.html's page gate (tools/ship/flightPage-selfcheck.mjs), and es-flight6dof.html itself.
     // v4866 -- files 4687 -> 4689, ES modules 4382 -> 4384, closures 4227 -> 4229 and async/await 1768 -> 1769: physics/mechanics/flightModel6dof.mjs and its gate (the guarded top-level await import of node:url is the one await).
     // v4857 -- files 4685 -> 4687: tools/ship/strandCensus.mjs and tools/ship/strandCensus-selfcheck.mjs.
-    files: 4689,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
+    files: 4696,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
     // (v4691 note, carried)                               // v4691 -- RE-DERIVED: tools/ship/textureInProbe.mjs arrived, one ES module with a closure and top-level await -- four rows moved (files, ES modules, closures, async/await) and eight held.
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
@@ -1245,8 +1246,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4857 -- tools/ship/strandCensus.mjs and its gate: files 4685 -> 4687, ES modules 4380 -> 4382, closures 4225 -> 4227,
     // async/await 1765 -> 1768 (the census awaits its workers; the gate awaits a live probe run), Promises 429 -> 430 (runOne
     // wraps a child's exit). The other seven rows hold, threads among them.
-    esModules: 4384, closures: 4229, asyncAwait: 1769, typedArrays: 1304, promises: 430,
-    fetchXhr: 252, performanceNow: 250, raf: 127, webgl: 200, webgpu: 63, threads: 26, wasm: 27,
+    esModules: 4391, closures: 4236, asyncAwait: 1772, typedArrays: 1306, promises: 431,
+    fetchXhr: 252, performanceNow: 251, raf: 127, webgl: 200, webgpu: 63, threads: 26, wasm: 27,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.

@@ -931,8 +931,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // 1942 -> 1943, 97 -> 98), and distinctDefinitions 43 -> 44: its ok(c, msg, detail = "") prints the PASS rows with their detail,
     // which the tree's one (c, m, d) spelling does not. The rest hold.
     // v4866 -- physics/mechanics/flightModel6dof-selfcheck.mjs: gates, usesOk, definesOk and nameFirst each by one (1972 -> 1973, 1951 -> 1952, 1943 -> 1944, 1842 -> 1843); it spells ok(name, cond, detail) like the tree's majority.
-    gates: 1973, usesOk: 1952, definesOk: 1944, importsOk: 0,
-    distinctDefinitions: 44, nameFirst: 1843, condFirst: 98, unknownSignature: 11,
+    // v4867 -- four new gates (brain/autopilotFlight-selfcheck.mjs, brain/flightTask-selfcheck.mjs, brain/pilotFlightPolicy-selfcheck.mjs, tools/ship/flightPage-selfcheck.mjs), each spelling ok(name, cond, detail) like the tree's majority: gates, usesOk, definesOk and nameFirst each by four (1973 -> 1977, 1952 -> 1956, 1944 -> 1948, 1843 -> 1847).
+    gates: 1977, usesOk: 1956, definesOk: 1948, importsOk: 0,
+    distinctDefinitions: 44, nameFirst: 1847, condFirst: 98, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
