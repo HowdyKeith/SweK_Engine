@@ -1679,10 +1679,25 @@ export const NEXT_ROUNDS = [
     // ---- order he set: the FSR1 round first, then Winograd.
     {
         id: "denoise-fsr1-halfres",
+        blocker: "CLOSED",
+        what: "DONE as the denoiser arc's round 26 (pre-registration sections 81-82), unshipped on the feature branch at this writing. NOT REPORTED: C1 fired on H2 -- the half-size frame denoised and then upscaled, by FSR1 and by bilinear alike, beat upscaling its noise on 9 of 12 images, under the 11 the control asks. Neither hypothesis is decided.",
+        how: "The shipped network and filter on 12 R + C scenes at 64 x 64 (SPLITS_FSR1, seeds 40000-40005 and 41000-41005), traced four ways an image on seeds of their own; render/denoiseUpscale.mjs runs fx/fsr/fsr.js in a Reinhard-and-gamma space and clamps to the frame's brightest. render/denoise-results-fsr1.json was committed byte for byte before it was read.",
+        why: "*** DESCRIPTIVELY, THE HALF-SIZE CHAIN LOST TO EVERY FRAME IT WAS MEASURED AGAINST, AND THAT IS WHY IT IS KEPT. *** Against the full-size 1-sample frame at equal samples, mean d -0.493 (B won 2 of 12); against half size + bilinear, -0.180 (3 of 12); against today's full-size 4-sample frame, -1.406 (0 of 12). EASU alone beat EASU then RCAS on all 12. Section 81 fixed the caveat before the run: 64 x 64 is far coarser than a 1080p frame, so this says nothing about 1080p -- the two entries below carry the question on.",
+    },
+    {
+        id: "denoise-halfres-at-scale",
         blocker: "OPEN",
-        what: "Denoise at HALF resolution and upscale with FSR1 (EASU + RCAS), against denoising at full resolution -- the real-time lever that changes no arithmetic: a quarter of the pixels to trace and to denoise.",
-        how: "A pre-registered round in render/learned-denoiser-preregistration.md: the shipped network and filter, 32 x 32 renders upscaled to 64 x 64 by fx/fsr/fsr.js, judged against the 64 x 64 reference with the arc's statistic. Compared at EQUAL samples against a full-resolution 1-sample frame, and against bilinear as FSR1's control.",
-        why: "Section 40-63's kernels put a 1080p pass on the GTX 1080 at ~75-80 ms; 30 fps needs 33. A quarter of the pixels is ~20 ms by arithmetic -- if the picture survives it. Keith set this first.",
+        what: "Round 26's question at a frame size nearer real use: 128 x 128 traced and denoised, upscaled to 256 x 256, against the full-size 1-sample frame at equal samples -- with EASU ALONE as the candidate, since RCAS made every image worse at 64 x 64.",
+        how: "Section 81's shape and render/denoiseUpscale.mjs as they stand, at 256 x 256 and on new test seeds. The references are the cost: 16x the pixels of round 26's 254 s of rendering, so the harvest wants the rig's CPU or the worker pool.",
+        why: "Round 26 could not separate a real loss from the size it was run at: at 64 x 64 a pixel covers so much of a scene that any upscale is guessing. This is the run that can.",
+    },
+    {
+        id: "denoise-network-at-run-scale",
+        blocker: "UPSTREAM",
+        what: "A network trained on half-size renders -- its 9 x 9 kernel covering the scene the way it does when it runs at half size -- tested in round 26's arrangement.",
+        how: "Round 11's training on the same 192 R + C scenes rendered at half size, then a pre-registered harvest against the shipped network on the half-size chain.",
+        why: "Section 82's unmeasured cause: at half size the shipped network sees every scene at twice the scale it was trained on, and C1's three failures are where that would bite.",
+        upstream: "denoise-halfres-at-scale: only if half resolution still loses at a realistic size, and loses in the denoise rather than the upscale.",
     },
     {
         id: "denoise-winograd",
@@ -1734,7 +1749,7 @@ export const NEXT_ROUNDS = [
         what: "FSR2's temporal upscale on denoised path-traced frames: jittered renders, motion vectors and history.",
         how: "fx/fsr/fsrTemporalTsl.mjs drives a three.js scene; the path tracer is neither a three.js scene nor does it make motion vectors or jitter. Those are the work.",
         why: "Temporal reuse is where real-time path tracing gets most of its samples.",
-        upstream: "denoise-fsr1-halfres: only if the spatial round says upscaling a denoised frame keeps enough of the picture.",
+        upstream: "denoise-halfres-at-scale: round 26 (denoise-fsr1-halfres) was not reported and, descriptively, the half-size chain lost at 64 x 64 -- the spatial round has to say upscaling a denoised frame keeps enough of the picture first.",
     },
     {
         id: "denoise-fsr3-framegen",
@@ -1750,7 +1765,7 @@ export const NEXT_ROUNDS = [
         what: "An FSR4-style learned upscaler: a trained network replacing the hand-written upscale chain.",
         how: "render/learned-preregistration.md (v4689) declined it as out of reach. The tree now ships a trained network on the device (the denoiser) through the same conv kernels, which is the half of the machinery that did not exist then.",
         why: "Logged because Keith asked about FSR 1-4 together; it would be its own arc, larger than any round here.",
-        upstream: "denoise-fsr1-halfres and denoise-fsr2-temporal: a measured want first -- the hand-written upscalers on these frames, and where they fall short.",
+        upstream: "denoise-halfres-at-scale and denoise-fsr2-temporal: a measured want first -- the hand-written upscalers on these frames, and where they fall short.",
     },
     {
         id: "denoise-mesh-other-materials",
