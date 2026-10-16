@@ -347,6 +347,72 @@ console.log("\n8. v4836 -- after a SHIP, the verdict names step 4b; the verdict 
     } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
 
+// v4864 -- SABOTAGED, each restored by copy: the after-verify check removed -> 2 RED (the free-label control, asked once
+// not twice, and the spent-while-verify-ran row, which SHIPPED); the before-verify refusal removed -> 1 RED (the already-spent
+// row: verify RAN); checkLabel fetching on ANY refusal -> 1 RED (the no-fetch row); a failed fetch returned as a pass -> 1 RED
+// (the git's-words row); a stand-in given the real checkLabel -> 1 RED (the choice row); VERIFY_ARGS missing verify's --zip
+// -> 1 RED (the spec row). Six, six caught.
+console.log("\n8b. v4864 -- the label is asked before verify and again after it, the window v4853 was lost in");
+{
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "shipverdict-label-"));
+    try {
+        const mark = path.join(dir, "verify-ran");
+        const green = path.join(dir, "verify-green.mjs");
+        fs.writeFileSync(green, `import fs from "node:fs";\nfs.writeFileSync(${JSON.stringify(mark)}, "ran");\nconsole.log("[verify] ALL GREEN");\n`);
+        const run = async (labelCheck, argv = ["--version", "v9001"]) => {
+            const lines = [], asked = []; let code = null;
+            try { fs.rmSync(mark, { force: true }); } catch {}
+            const d = await SV.main({ eng: ENG, argv, verifyPath: green, preflight: () => [], nextStep: null, scan: noScan,
+                                      labelCheck: labelCheck && (async (v) => { asked.push(v); return labelCheck(asked.length); }),
+                                      out: (m) => lines.push(...String(m).split("\n")), exit: (c) => { code = c; } });
+            for (const sig of SV.CATCHABLE) process.removeAllListeners(sig);
+            const t = lines.filter((l) => l.trim());
+            return { d, t, code, asked, ran: fs.existsSync(mark), last: t[t.length - 1] || "" };
+        };
+        const free = await run(() => ({ ok: true, fetched: false, refusal: null }));
+        ok("CONTROL: a label free before and after -- asked TWICE, verify runs, SHIP, and the after-line says still free",
+            free.code === 0 && free.ran && free.asked.join() === "v9001,v9001" && /^\[ship\] SHIP /.test(free.last) &&
+            free.t.some((l) => /label v9001 asked again after verify: still free/.test(l)),
+            `exit ${free.code}, asked ${free.asked.join()}; last ${JSON.stringify(free.last)}`);
+        const lost = await run((n) => n === 1 ? { ok: true, fetched: false, refusal: null }
+                                              : { ok: false, fetched: true, refusal: "v9001 is already spent on refs/remotes/origin/FIXTURE" });
+        ok("!! *** a label SPENT WHILE VERIFY RAN turns a green verify into DO NOT SHIP, naming the label and the branch, as the last line ***",
+            lost.code === 1 && lost.ran && /^\[ship\] DO NOT SHIP -- the label v9001 was spent while verify ran -- .*FIXTURE/.test(lost.last) &&
+            lost.t.some((l) => /asked again after verify: SPENT \(every branch head fetched first\)/.test(l)) && lost.d.labelSpent === true,
+            `exit ${lost.code}; last ${JSON.stringify(lost.last)}`);
+        const gone = await run(() => ({ ok: false, fetched: false, refusal: "v9001 is already spent on refs/remotes/origin/EARLIER" }));
+        ok("!! *** a label ALREADY spent is refused BEFORE verify: the sweep never starts, exit 1, DO NOT SHIP -- NOT RUN ***",
+            gone.code === 1 && !gone.ran && gone.asked.length === 1 && /^\[ship\] DO NOT SHIP -- NOT RUN: the label v9001 is not free/.test(gone.last) &&
+            gone.t.some((l) => /label refused\s+v9001: .*EARLIER/.test(l)) &&
+            SV.labelRefusedTrailer("v9001", { refusal: "v9001 is already spent on refs/remotes/origin/EARLIER" }).split("\n").filter((l) => l.trim()).every((l) => gone.t.includes(l)),
+            `verify ${gone.ran ? "RAN" : "not started"}, exit ${gone.code}; last ${JSON.stringify(gone.last)}`);
+        const noVersion = await run(() => ({ ok: false, refusal: "must not be asked" }), ["--markers", "x"]);
+        ok("CONTROL: with no --version there is no label to ask about, and nothing is refused for one",
+            noVersion.asked.length === 0 && noVersion.code === 0 && noVersion.ran, `asked ${noVersion.asked.length}, exit ${noVersion.code}`);
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+
+    ok("the REAL verify asks with checkLabel; a stand-in asks nothing unless a check is passed",
+        SV.chosenLabelCheck({ verifyPath: null }) === SV.checkLabel && SV.chosenLabelCheck({ verifyPath: "x.mjs" }) === null &&
+        SV.chosenLabelCheck({ eng: ENG, verifyPath: path.join(ENG, "tools", "ship", "verify.mjs") }) === SV.checkLabel &&
+        SV.versionArg(["--markers", "a", "--version", "v1"]) === "v1" && SV.versionArg(["--version", "--markers"]) === null);
+    // VERIFY_ARGS is verify.mjs's own spec, copied so shipVerdict can refuse a typo before running anything; held to verify's line here
+    const vline = (fs.readFileSync(path.join(ENG, "tools", "ship", "verify.mjs"), "utf8").match(/parseOrExit\("verify", (\{[^\n]*\})\);/) || [])[1];
+    ok("!! shipVerdict's VERIFY_ARGS is verify.mjs's own option spec, value for value -- a drifted copy would refuse what verify accepts",
+        !!vline && JSON.stringify(Function("return " + vline)()) === JSON.stringify(SV.VERIFY_ARGS), vline ? vline.slice(0, 120) : "verify.mjs's parseOrExit line not found");
+    // checkLabel itself, with the preflight and the fetch stubbed: it fetches only for a stale VIEW, and asks again after
+    const seq = (...answers) => { let i = 0; return () => answers[Math.min(i++, answers.length - 1)]; };
+    let fetches = 0;
+    const fetch = () => { fetches++; };
+    const a = await SV.checkLabel("v1", { preflight: seq({ ok: false, staleView: true, refusal: "stale" }, { ok: true }), fetch });
+    ok("!! checkLabel: a refusal that is ONLY a stale view fetches every branch head once and asks again -- free after the fetch",
+        a.ok === true && a.fetched === true && fetches === 1, JSON.stringify(a));
+    fetches = 0;
+    const b = await SV.checkLabel("v1", { preflight: seq({ ok: false, staleView: false, refusal: "spent on X" }), fetch });
+    ok("...a real refusal is returned as it stands, with no fetch -- fetching cannot unspend a number", b.ok === false && fetches === 0 && b.refusal === "spent on X");
+    const c = await SV.checkLabel("v1", { preflight: seq({ ok: false, staleView: true, refusal: "stale" }), fetch: () => { throw Object.assign(new Error("x"), { stderr: "fatal: unable to access FIXTURE\n" }); } });
+    ok("...and a fetch that fails is a refusal in git's own words, never a pass", c.ok === false && /fetching every branch head failed -- fatal: unable to access FIXTURE/.test(c.refusal || ""), c.refusal);
+}
+
 console.log("\n9. v4844 -- the command the refusal names works as typed, the CLI line itself refuses, and a signal during the check still says so");
 // Ported from a review of the same pre-flight drafted on another line before v4833 reached it: the printed fix began with cd,
 // so "run this again" failed from render-qa; passing the real verify.mjs explicitly turned the check off with every row
@@ -361,10 +427,12 @@ console.log("\n9. v4844 -- the command the refusal names works as typed, the CLI
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "shipverdict-cli-"));
     try {
         // THE CLI LINE ITSELF, from a stub tree: shipVerdict.mjs copied in finds that tree by its own location, as on the rig, and
-        // its three tree imports are the stub's. Run from OUTSIDE the tree, so a CLI that took its tree from the cwd would fail.
+        // its tree imports are the stub's (cliArgs.mjs, v4864, the real file). Run from OUTSIDE the tree, so a CLI that took its tree from the cwd would fail.
         const stubEng = path.join(dir, "eng"), stubShip = path.join(stubEng, "tools", "ship"), ran = path.join(dir, "verify-ran");
         fs.mkdirSync(stubShip, { recursive: true });
         fs.copyFileSync(path.join(ENG, "tools", "ship", "shipVerdict.mjs"), path.join(stubShip, "shipVerdict.mjs"));
+        // v4864 -- and the parser it reads argv with, copied as it stands: a stub of the tree's one parser would test the stub
+        fs.copyFileSync(path.join(ENG, "tools", "ship", "cliArgs.mjs"), path.join(stubShip, "cliArgs.mjs"));
         fs.writeFileSync(path.join(stubShip, "playwrightResolve.mjs"), 'export const HEADLESS_SHELL = "";\n' +
             'export function resolvePlaywright() { return { chromium: null, from: "" }; }\n' +
             'export function browserSkipReason(c) { return c ? "" : "stub: playwright is not installed here -- to fix: cd somewhere && npm install"; }\n');
@@ -476,9 +544,10 @@ console.log("\n10. v4846 -- a clone without origin/main: scanRef says ABSENT by 
     const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "shipVerdict.mjs"), "utf8")
         .split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n");
     const picked = [...src.matchAll(/timeout:\s*(\d+)/g)].map((m) => Number(m[1]));
-    ok("!! budgetIsOwn names the one limit shipVerdict picks -- 15 s, on git probes and not on gates -- and the code picks no other",
-        typeof SV.budgetIsOwn === "string" && /15 s/.test(SV.budgetIsOwn) && /not gates/.test(SV.budgetIsOwn) &&
-        picked.length > 0 && picked.every((ms) => ms === 15000),
+    // v4864: two limits now -- the label check's fetch of every branch head joined the git probes, and is declared beside them
+    ok("!! budgetIsOwn names the limits shipVerdict picks -- 15 s on git probes, 180 s on the label's fetch, none on gates -- and the code picks no other",
+        typeof SV.budgetIsOwn === "string" && /15 s/.test(SV.budgetIsOwn) && /180 s/.test(SV.budgetIsOwn) && /not gates/.test(SV.budgetIsOwn) &&
+        picked.includes(15000) && picked.includes(180000) && picked.every((ms) => ms === 15000 || ms === 180000),
         `picked ${JSON.stringify(picked)}; ${String(SV.budgetIsOwn).slice(0, 80)}`);
 }
 

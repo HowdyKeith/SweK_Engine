@@ -47,6 +47,21 @@
 //  10. verify.mjs's row back to printing only refusals, and its stale NOTE back to `git fetch origin main`
 //                                            -> 1 RED each (run separately): the wiring row in section 6
 //
+// v4864 -- SECTIONS 7-10 (every branch copy asked whether it is the remote's; the un-bumped tree's blind spot; the ledger's
+// closings; the CLI's option), each sabotage restored by copy:
+//  11. branchFreshness ignores branches it never fetched -> 2 RED: the stale/unfetched naming row and the stale-view refusal
+//  12. branchFreshness never sees a moved branch       -> 2 RED: the same two
+//  13. preflight's stale-view refusal removed           -> 1 RED: the refusal row
+//  14. `!sameBuild` put back on the high-water check    -> 1 RED: section 8's v4864-from-main's-tree row -- the blind spot itself
+//  15. closingCensus counts MERGED branches as rivals    -> 3 RED: the rival row, the no-rival control, the ships control
+//  16. closingsOf takes the first `at` in the WHOLE text -> 4 RED: the parse row (it read the decoy comment), the rival row,
+//                                                          the main row, the refusal row
+//  17. closingCensus's next is the top, not one past it -> 3 RED: the next row, the no-rival control, the refusal row
+//  18. preflight's closing refusal removed               -> 1 RED: the refusal row
+//  19. FETCH_ALL without its :refs/remotes/origin/* destination -> 1 RED: section 7's fixture row -- git refuses the
+//      refspec ("invalid refspec") when the cure is run exactly as written, so the fixture cannot reach its after-fetch rows
+// Nine more, nine caught.
+//
 // Run: node tools/ship/versionPreflight-selfcheck.mjs   (exit 0 all-pass, 1 on any fail)
 
 import fs from "node:fs";
@@ -55,7 +70,8 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { preflight, versionNumber, engineVersionOf, mainVersion, ordinalsOf, mainOrdinals, refOrdinals, highWater, ENG,
-         refFreshness, gitRunner, FETCH_MAIN, ABSENT_REASON } from "./versionPreflight.mjs";
+         refFreshness, gitRunner, FETCH_MAIN, ABSENT_REASON,
+         branchFreshness, FETCH_ALL, closingsOf, closingCensus, LEDGER, nextFree } from "./versionPreflight.mjs";
 
 let pass = 0, fail = 0;
 const ok = (c, m, d) => { if (c) pass++; else { fail++; console.error("  FAIL  " + m + (d ? "   " + d : "")); } };
@@ -483,6 +499,162 @@ const against = (main) => (v) => preflight(v, {
     ok(/behind the remote -- " \+ FETCH_MAIN/.test(row) && /pf\.note/.test(row) && !/git fetch origin main"/.test(row),
        "!! verify.mjs's preflight row prints the note when main is unreadable, and the refspec fetch when it is behind",
        /pf\.note/.test(row) ? (/FETCH_MAIN/.test(row) ? "" : "the stale NOTE names no FETCH_MAIN") : "pf.note is never printed");
+}
+
+// 7) v4864 -- EVERY BRANCH'S COPY IS ASKED WHETHER IT IS THE REMOTE'S, against real git. A remote with three branches is
+//    cloned; then one branch moves on the remote and a fourth appears there. The clone's view is now what the session that
+//    spent v4838 a second time was holding: a copy that predates a push, and a branch it never saw.
+{
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "vpf-branches-"));
+    const env = { ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^GIT_/.test(k))),
+                  GIT_CEILING_DIRECTORIES: path.dirname(tmp), LC_ALL: "C", LANGUAGE: "" };
+    const git = (cwd, ...a) => execFileSync("git", a, { cwd, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+    const who = ["-c", "user.name=fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false"];
+    const src = path.join(tmp, "src"), bare = path.join(tmp, "remote.git"), clone = path.join(tmp, "clone");
+    try {
+        fs.mkdirSync(path.join(src, "WebGLEngine"), { recursive: true }); fs.mkdirSync(path.join(src, "docs"));
+        const put = (v, title) => {
+            fs.writeFileSync(path.join(src, "WebGLEngine", "main.js"), `const ENGINE_VERSION = "${v}";   // fixture\n`);
+            fs.writeFileSync(path.join(src, "docs", "CHANGELOG.md"), `# changelog\n\n## ${v} -- ${title}\n`);
+            git(src, "add", "-A"); git(src, ...who, "commit", "-q", "--no-verify", "-m", v);
+        };
+        git(src, "init", "-q"); git(src, "symbolic-ref", "HEAD", "refs/heads/main");
+        put("v4321", "main's round");
+        git(src, "branch", "line-a"); git(src, "branch", "line-b");
+        git(tmp, "clone", "-q", "--bare", src, bare);
+        git(tmp, "clone", "-q", bare, clone);
+        const run = gitRunner(clone, { env });
+        const f0 = branchFreshness({ run });
+        ok(f0.known === true && f0.stale.length === 0 && f0.unfetched.length === 0 && f0.remoteCount === 3,
+           "CONTROL: a fresh clone's copies are the remote's -- current, nothing refused for its view", f0.note);
+        // the remote moves: line-a gains a round, line-c appears; the clone fetches nothing
+        git(src, "checkout", "-q", "line-a"); put("v4322", "line-a's round, pushed after the clone fetched");
+        git(src, "checkout", "-q", "-b", "line-c"); put("v4323", "line-c's round, on a branch the clone never saw");
+        git(src, "push", "-q", bare, "line-a", "line-c");
+        const f1 = branchFreshness({ run });
+        ok(f1.known && f1.stale.join() === "line-a" && f1.unfetched.join() === "line-c" && f1.note.includes(FETCH_ALL),
+           "!! *** a branch that MOVED on the remote is named stale, one the clone NEVER FETCHED is named unfetched, and the cure is named ***",
+           f1.note);
+        const local = (v) => `const ENGINE_VERSION = "${v}";   // this branch's build\n`;
+        const ask = (v, extra = {}) => preflight(v, { run, branchFreshnessOverride: f1, mainVersionOverride: "v4321",
+            mainSourceOverride: local("v4321"), localSourceOverride: local(v), mainOrdinalsOverride: ordinalsOf("## v4321 -- main's round\n"),
+            closingsOverride: null, ...extra });
+        const r1 = ask("v4322");
+        ok(r1.ok === false && r1.staleView === true && /line-a/.test(r1.refusal || "") && /line-c/.test(r1.refusal || "") && (r1.refusal || "").includes(FETCH_ALL),
+           "!! *** the preflight REFUSES v4322 from the stale view -- the number line-a's push spent, invisible to this clone -- and names the fetch ***",
+           (r1.refusal || "").slice(0, 200));
+        // the cure, run exactly as written: "git" split off and the shell's quotes taken away, as a shell would
+        git(clone, ...FETCH_ALL.split(/\s+/).slice(1).map((a) => a.replace(/^"(.*)"$/, "$1")));
+        const f2 = branchFreshness({ run });
+        ok(f2.known && !f2.stale.length && !f2.unfetched.length, "...and after exactly that command, every copy is the remote's", f2.note);
+        const r2 = ask("v4322", { branchFreshnessOverride: f2 });
+        ok(r2.ok === false && !r2.staleView && /v4323|v4322/.test(r2.refusal || "") && /line-/.test(r2.refusal || ""),
+           "!! *** ...and the SAME question is now refused for the real reason: the fetched branches spent v4322 and v4323 ***",
+           (r2.refusal || "").slice(0, 200));
+        ok(ask("v4324", { branchFreshnessOverride: f2 }).ok === true, "CONTROL: past everything every branch spent, v4324 is free");
+        // an unreachable remote stands aside, reported -- the guard must not become the reason nobody can ship offline
+        git(clone, "remote", "set-url", "origin", path.join(tmp, "no-such-remote"));
+        const f3 = branchFreshness({ run });
+        ok(f3.known === false && f3.cause === "unreachable" && /no-such-remote/.test(f3.note) && ask("v4324", { branchFreshnessOverride: f3 }).ok === true,
+           "...an UNREACHABLE remote is reported in git's words and refuses nothing", f3.note);
+    } catch (e) {
+        ok(false, "the branch-freshness fixture could be built and driven", String((e && e.stderr) || (e && e.message) || e).split("\n")[0]);
+    } finally {
+        try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}
+    }
+}
+
+// 8) v4864 -- THE EXEMPTION THAT HID EVERY CANDIDATE NUMBER. A tree identical to main's build is exempt for main's OWN number
+//    (v4350's follow-up commit). It was exempt for EVERY number: asked about v4864 from main's v4863 tree, the preflight said
+//    OK while a branch carried v4864 -- and an un-bumped tree is exactly where a round asks before picking its number.
+{
+    const same = `const ENGINE_VERSION = "v4863";   // main's build, and this tree's\n`;
+    const REFS = { "refs/remotes/origin/main": "## v4863 -- main's round\n",
+                   "refs/remotes/origin/other-line": "## v4864 -- the other line's round, pushed, not on main\n## v4863 -- main's round\n" };
+    const opts = { ...SEALED, mainVersionOverride: "v4863", mainSourceOverride: same, localSourceOverride: same,
+                   mainOrdinalsOverride: ordinalsOf(REFS["refs/remotes/origin/main"]),
+                   refsOverride: Object.keys(REFS), readOverride: (r) => REFS[r], selfRef: null, mergedRefs: [] };
+    const r = preflight("v4864", opts);
+    ok(r.ok === false && /other-line/.test(r.refusal || "") && /the other line's round/.test(r.refusal || ""),
+       "!! *** asked about v4864 from a tree identical to main, the preflight REFUSES it and names the branch that spent it ***",
+       r.refusal || "answered OK -- the un-bumped tree's blind spot");
+    ok(preflight("v4863", opts).ok === true, "CONTROL: main's own number from main's own build is still the follow-up commit v4350 allowed");
+    ok(preflight("v4865", opts).ok === true, "CONTROL: and past the branch, v4865 is free from the same tree");
+}
+
+// 9) v4864 -- THE LEDGER'S CLOSINGS, which merge without a text conflict and collide silently (since529-since532 at v4842).
+{
+    const ledger = (entries) => "export const SS = Object.freeze({\n" + entries.map(([k, at]) =>
+        `    // a comment naming since999 and at: "a decoy"\n    ${k}: Object.freeze({\n        at: "${at}", swept: 0,\n    }),\n`).join("") + "});\n";
+    const parsed = closingsOf(ledger([["since12", "v4001"], ["since13", "v4002"]]) + "\nconst x = { since14: 3 };\n");
+    ok(parsed.size === 2 && parsed.get("since12") === "v4001" && parsed.get("since13") === "v4002" && !parsed.has("since999") && !parsed.has("since14"),
+       "closingsOf reads each closing's key and its own `at` -- not a comment's, not a neighbour's, not a non-closing key",
+       JSON.stringify([...parsed]));
+    // a stub git: each ref's ledger is a blob, and only `merged-line` is an ancestor of HEAD
+    const T = {
+        main: ledger([["since40", "v4100"], ["since41", "v4101"]]),
+        mine: ledger([["since40", "v4100"], ["since41", "v4101"], ["since42", "v4105 -- this branch"]]),
+        rival: ledger([["since40", "v4100"], ["since41", "v4101"], ["since42", "v4104 -- another branch's round"], ["since43", "v4106"]]),
+        merged: ledger([["since40", "v4100"], ["since41", "v4101"], ["since42", "v4099 -- already in this build"]]),
+        same: ledger([["since40", "v4100"], ["since41", "v4101"], ["since42", "v4105 -- this branch"]]),
+    };
+    const REF = { "refs/remotes/origin/main": "main", "refs/remotes/origin/rival": "rival", "refs/remotes/origin/merged-line": "merged",
+                  "refs/remotes/origin/my-pushed-copy": "same" };
+    const stub = (refs) => (args) => {
+        if (args[0] === "rev-parse") { const ref = args[3].split(":")[0]; if (!REF[ref] || !args[3].endsWith(LEDGER)) throw Object.assign(new Error("no"), { status: 1 }); return "blob-" + REF[ref] + "\n"; }
+        if (args[0] === "cat-file") return T[args[2].replace("blob-", "")];
+        if (args[0] === "for-each-ref") return refs.join("\n") + "\n";
+        if (args[0] === "merge-base") { if (args[2] === "refs/remotes/origin/merged-line") return ""; throw Object.assign(new Error("not an ancestor"), { status: 1 }); }
+        throw new Error("unexpected git " + args.join(" "));
+    };
+    const all = Object.keys(REF);
+    const c = closingCensus({ run: stub(all), mineText: T.mine, self: "refs/remotes/origin/my-pushed-copy" });
+    ok(c.collisions.length === 1 && c.collisions[0].key === "since42" && /rival/.test(c.collisions[0].ref) && /another branch/.test(c.collisions[0].theirs),
+       "!! *** since42, added here, is a COLLISION with the unmerged branch that declares it for another round -- and only with that one ***",
+       JSON.stringify(c.collisions));
+    ok(c.next === 44 && /rival/.test(c.where), "...and the next free closing is one past every branch's: since44, the rival's since43 counted", `${c.next} (${c.where})`);
+    const noRival = closingCensus({ run: stub(all.filter((r) => !/rival/.test(r))), mineText: T.mine, self: "refs/remotes/origin/my-pushed-copy" });
+    ok(noRival.collisions.length === 0 && noRival.next === 43,
+       "CONTROL: without the rival -- a MERGED branch's since42 and this branch's own pushed copy collide with nothing", JSON.stringify(noRival.collisions));
+    const onMain = closingCensus({ run: stub(["refs/remotes/origin/main"]), mineText: ledger([["since40", "v4100"], ["since41", "v4999 -- rewritten here"]]), self: null });
+    ok(onMain.collisions.length === 1 && onMain.collisions[0].key === "since41" && /origin\/main/.test(onMain.collisions[0].ref),
+       "...and a key main itself declares for a different round is a collision with main", JSON.stringify(onMain.collisions));
+    const r = preflight("v4106", { ...SEALED, mainVersionOverride: "v4100", mainSourceOverride: "a\n", localSourceOverride: "b\n",
+                                    mainOrdinalsOverride: ordinalsOf("## v4100 -- main\n"), closingsOverride: c });
+    ok(r.ok === false && /since42/.test(r.refusal || "") && /rival/.test(r.refusal || "") && /since44/.test(r.refusal || ""),
+       "!! *** the preflight REFUSES the round while its closing collides, naming the key, the branch, and since44 to take ***", (r.refusal || "").slice(0, 200));
+    ok(preflight("v4106", { ...SEALED, mainVersionOverride: "v4100", mainSourceOverride: "a\n", localSourceOverride: "b\n",
+                            mainOrdinalsOverride: ordinalsOf("## v4100 -- main\n"), closingsOverride: noRival }).ok === true,
+       "CONTROL: the same round with no collision ships");
+}
+
+// 9b) v4864 -- `--next`: one past EVERYTHING spent -- this tree's marker and changelog, main's marker and changelog, every
+//     branch's changelog -- and one past every ledger closing. Each source is made the highest in turn, so none can be dropped silently.
+{
+    const base = { localSourceOverride: `const ENGINE_VERSION = "v4100";\n`, localChangelogOverride: "## v4100 -- here\n",
+                   mainVersionOverride: "v4100", mainOrdinalsOverride: ordinalsOf("## v4100 -- main\n"),
+                   refsOverride: ["refs/remotes/origin/line"], readOverride: () => "## v4100 -- a branch\n",
+                   closingsOverride: { next: 556, top: 555, where: "refs/remotes/origin/line", unreadable: [] } };
+    const cases = [
+        ["this tree's marker", { localSourceOverride: `const ENGINE_VERSION = "v4110";\n` }, "v4111"],
+        ["this tree's changelog", { localChangelogOverride: "## v4111 -- here\n" }, "v4112"],
+        ["main's marker", { mainVersionOverride: "v4112" }, "v4113"],
+        ["main's changelog, ahead of its marker", { mainOrdinalsOverride: ordinalsOf("## v4113 -- main\n") }, "v4114"],
+        ["a branch's changelog", { readOverride: () => "## v4114 -- a branch's round\n" }, "v4115"],
+    ];
+    const got = cases.map(([what, o, want]) => { const n = nextFree({ ...base, ...o }); return { what, want, got: n.version, closing: n.closing }; });
+    ok(got.every((g) => g.got === g.want) && got.every((g) => g.closing === "since556"),
+       "!! *** nextFree names one past whichever source is highest -- tree marker, tree changelog, main marker, main changelog, a branch -- and the next closing ***",
+       got.map((g) => `${g.what}: ${g.got}${g.got === g.want ? "" : " (want " + g.want + ")"}`).join("; "));
+    const n = nextFree({ ...base, readOverride: () => "## v4114 -- a branch's round\n" });
+    ok(n.versionWhere === "refs/remotes/origin/line" && n.closingWhere === "refs/remotes/origin/line", "...and says WHERE the highest number was spent", `${n.versionWhere} / ${n.closingWhere}`);
+}
+
+// 10) v4864 -- the CLI's option is read by cliArgs, so a typo is refused by name rather than read as a version
+{
+    const r = (() => { try { execFileSync(process.execPath, [path.join(ENG, "tools", "ship", "versionPreflight.mjs"), "--nxt"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }); return { status: 0, err: "" }; }
+                       catch (e) { return { status: e.status, err: String(e.stderr || "") }; } })();
+    ok(r.status === 2 && /unknown option --nxt/.test(r.err) && /--next/.test(r.err), "!! `--nxt` is refused with exit 2 and the nearest option named, before any git is asked", r.err.split("\n")[0]);
 }
 
 if (fail) { console.error(`\nversionPreflight-selfcheck: ${pass} pass, ${fail} FAIL`); process.exit(1); }

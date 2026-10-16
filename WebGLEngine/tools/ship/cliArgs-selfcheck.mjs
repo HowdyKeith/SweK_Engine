@@ -260,7 +260,9 @@ console.log("\nv4826. parseOrExit, the positional spec, and the fifteen tools");
     const L5 = { err: [], exit: [] }; parseOrExit("t", { values: { "--out": "path" } }, ["loose"], io(L5));
     ok2("a bare word under a spec that takes no files is refused, by name", L5.exit[0] === 2 && /unexpected argument "loose"/.test(L5.err[0]));
 
-    const fs2 = (await import("node:fs")).default, NEWER = ["tools/ship/lockstepPeer.mjs", "tools/ship/lockstepRelay.mjs", "tools/ship/flakeProbe.mjs", "tools/ship/afterVerdict.mjs"], BETWEEN = ["tools/ship/boxTimings.mjs", "tools/ship/gateProfile.mjs", "tools/ship/realGpuRun.mjs", "tools/ship/rtPipelineDiag.mjs", "tools/ship/textureInProbe.mjs", "tools/ship/threePatch.mjs"];
+    // v4864 -- versionPreflight (--next, its version as a positional word) and shipVerdict (verify's options, read for the label) adopted
+    // the parser. SABOTAGED: shipVerdict's parseOrExit line commented out -> this row RED (shipVerdict ran on past the option); restored.
+    const fs2 = (await import("node:fs")).default, NEWER = ["tools/ship/lockstepPeer.mjs", "tools/ship/lockstepRelay.mjs", "tools/ship/flakeProbe.mjs", "tools/ship/afterVerdict.mjs", "tools/ship/versionPreflight.mjs", "tools/ship/shipVerdict.mjs"], BETWEEN = ["tools/ship/boxTimings.mjs", "tools/ship/gateProfile.mjs", "tools/ship/realGpuRun.mjs", "tools/ship/rtPipelineDiag.mjs", "tools/ship/textureInProbe.mjs", "tools/ship/threePatch.mjs"];
     const tools = [...SILENT_AT_V4647G.wasSilent, ...SILENT_AT_V4647G.adopted, ...BETWEEN, ...NEWER];
     const spawnRefusal = (m) => new Promise((resolve) => {
         const p = spawn(process.execPath, [path.join(ENG, m), "--an-option-nobody-has-spelled"], { cwd: ENG }); let out = ""; const t0 = Date.now();
@@ -268,7 +270,7 @@ console.log("\nv4826. parseOrExit, the positional spec, and the fifteen tools");
         const k = setTimeout(() => p.kill("SIGKILL"), 20000); p.on("close", (code) => { clearTimeout(k); resolve({ m, code, out, ms: Date.now() - t0 }); });
     });
     const runs = await Promise.all(tools.map(spawnRefusal)), bad = runs.filter((r) => !(r.code === 2 && /unknown option --an-option-nobody-has-spelled/.test(r.out) && /nothing was run/.test(r.out)));
-    ok2("!! all " + tools.length + " tools -- the 13 converted at v4826, the 2 adopted at v4647g, the 6 adopted in between, the 3 written at v4826 and afterVerdict (v4835) -- REFUSE an option nobody has spelled: exit 2, the option named, 'nothing was run', each inside 20 s", bad.length === 0, bad.length ? bad.map((r) => `${r.m} exit ${r.code}: ${r.out.split("\n")[0].slice(0, 90)}`).join(" | ") : `${runs.length} refused, slowest ${Math.max(...runs.map((r) => r.ms))} ms`);
+    ok2("!! all " + tools.length + " tools -- the 13 converted at v4826, the 2 adopted at v4647g, the 6 adopted in between, the 3 written at v4826, afterVerdict (v4835), and versionPreflight and shipVerdict (v4864, which grew options) -- REFUSE an option nobody has spelled: exit 2, the option named, 'nothing was run', each inside 20 s", bad.length === 0, bad.length ? bad.map((r) => `${r.m} exit ${r.code}: ${r.out.split("\n")[0].slice(0, 90)}`).join(" | ") : `${runs.length} refused, slowest ${Math.max(...runs.map((r) => r.ms))} ms`);
     ok2("...and every tool in tools/ship that IMPORTS the parser to use it is in that list (so a tool that adopts later is driven too, or the gate names it as a library that has no command line)", (() => {
         const LIB = new Set([]);   // no declared exceptions: every importer of the parser is a command line and is driven
         const importers = fs2.readdirSync(path.join(ENG, "tools", "ship")).filter((f) => f.endsWith(".mjs") && !f.endsWith("-selfcheck.mjs") && f !== "cliArgs.mjs").map((f) => "tools/ship/" + f).filter((m) => /import\s*\{[^}]*\b(parseArgs|parseOrExit)\b[^}]*\}\s*from\s*"\.\/cliArgs\.mjs"/.test(fs2.readFileSync(path.join(ENG, m), "utf8")));

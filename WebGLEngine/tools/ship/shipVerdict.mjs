@@ -29,6 +29,7 @@ import { createRequire } from "node:module";
 import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
 import { ensureDxc, describe as describeDxc } from "./ensureDxc.mjs";
 import { plan as afterVerdictPlan } from "./afterVerdict.mjs";
+import { parseArgs, parseOrExit } from "./cliArgs.mjs";   // v4864 -- the label is read from argv, so argv is read the tree's one way
 
 // Anchored at line start and followed by a space -- the shape git writes. An unanchored match would trip on
 // prose about conflict markers and on any file that mentions one mid-line; this round's changelog is such a
@@ -72,9 +73,12 @@ export function scanTracked(root, files = null) {
 // spawns verify.mjs unbounded (verify's sweep reads gateBudget's table itself), and since v4846 it also asks git two
 // questions by exit status, each under 15 s. Those are local `rev-parse --verify` and `remote get-url` calls, not gates,
 // so the table has nothing to say about them; the limit only stops a wedged git from holding the pre-flight.
+// v4864 -- and one more, also not a gate: the label check's fetch of every branch head, which talks to the remote and so gets
+// a network's limit rather than a local probe's.
 export const budgetIsOwn =
-    "the only limit shipVerdict chooses is 15 s on its two local git probes (rev-parse --verify, remote get-url), which are " +
-    "not gates; verify.mjs, the one gate runner it spawns, runs unbounded and its sweep reads gateBudget's table";
+    "the limits shipVerdict chooses are 15 s on its two local git probes (rev-parse --verify, remote get-url) and 180 s on " +
+    "the label check's one fetch of every branch head (v4864), which are not gates; verify.mjs, the one gate runner it " +
+    "spawns, runs unbounded and its sweep reads gateBudget's table";
 
 // v4846 -- git's exit status, or null when git could not be started at all (no git on the box, no such folder). The two
 // questions below are asked by STATUS because git's wording differs by subcommand and the status does not: v4402's skip
@@ -271,6 +275,52 @@ export function chosenNextStep({ eng = ENG_HERE, verifyPath = null, nextStep } =
         "ship-time step ran against the record this verdict wrote (the ship skill's step 4b)";
 }
 
+// *** v4864 -- THE LABEL, ASKED BEFORE VERIFY AND AGAIN AFTER IT, BECAUSE VERIFY IS THE WINDOW A NUMBER IS LOST IN. ***
+// v4853 was free on every branch when this line picked it and spent by another session before this line pushed: verify
+// ran for fifteen minutes in between, and nothing asked again. versionPreflight.mjs cannot close a race by reading -- two
+// sessions can see one number free in the same minute -- but it can be asked at both ends of the longest step, so a
+// label lost during verify ends as DO NOT SHIP rather than as a pushed collision. Asked before verify too, so a label
+// already spent ends in seconds as NOT RUN instead of after the sweep. When the preflight's only objection is that this
+// clone's copies of the branches are stale (v4864's branch freshness), every branch head is fetched -- refs only, never the
+// working tree -- and the preflight is asked once more; the line says it fetched. A shallow clone fetches at depth 1.
+// The options shipVerdict forwards to verify.mjs, read by cliArgs with VERIFY'S OWN spec (verify.mjs's CLI line, copied here and
+// held to it by shipVerdict-selfcheck): the label is read the tree's one way, and a mistyped option is refused before the
+// readiness check, the label check and its fetch -- not twenty seconds later by verify.
+export const VERIFY_ARGS = Object.freeze({ values: { "--version": "string", "--markers": "string", "--zip": "path", "--sweep-budget": "number" }, flags: ["--skip-qa"] });
+export function versionArg(argv = []) {
+    const cli = parseArgs(argv, VERIFY_ARGS);
+    return cli.values["--version"] || null;
+}
+export async function checkLabel(version, { root = path.resolve(ENG_HERE, ".."), fetch = null, preflight = null } = {}) {
+    const ask = preflight || (await import("./versionPreflight.mjs")).preflight;
+    let r = ask(version), fetched = false;
+    if (!r.ok && r.staleView) {
+        const doFetch = fetch || (() => {
+            let shallow = false;
+            try { shallow = execFileSync("git", ["rev-parse", "--is-shallow-repository"], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim() === "true"; } catch {}
+            execFileSync("git", ["fetch", "--quiet", ...(shallow ? ["--depth", "1"] : []), "origin", "+refs/heads/*:refs/remotes/origin/*"],
+                         { cwd: root, stdio: ["ignore", "ignore", "pipe"], timeout: 180000 });
+        });
+        try { doFetch(); fetched = true; }
+        catch (e) {
+            const said = String((e && e.stderr) || (e && e.message) || e).split(/\r?\n/).map((l) => l.trim()).find(Boolean) || "no reason given";
+            return { ok: false, fetched: false, refusal: "the label could not be checked: fetching every branch head failed -- " + said.slice(0, 160) };
+        }
+        r = ask(version);
+    }
+    return { ok: !!r.ok, fetched, refusal: r.refusal || null };
+}
+/** The real verify asks about its label; a stand-in gets no check unless one is passed (as chosenPreflight). */
+export function chosenLabelCheck({ eng = ENG_HERE, verifyPath = null, labelCheck } = {}) {
+    if (labelCheck !== undefined) return labelCheck;
+    return isRealVerify({ eng, verifyPath }) ? checkLabel : null;
+}
+export function labelRefusedTrailer(version, r) {
+    return [`[ship]   label refused  ${version}: ${r.refusal}`, "",
+            `[ship] verify exit=none  not run -- ${version} is not free, so a passing verify could not ship it`,
+            `[ship] DO NOT SHIP -- NOT RUN: the label ${version} is not free; take the number versionPreflight --next names and bump again`].join("\n");
+}
+
 export function notReadyTrailer(items) {
     return [
         ...items.map((n) => `[ship]   not ready  ${n.what}`),
@@ -284,7 +334,7 @@ export function notReadyTrailer(items) {
 // stand-in verify rather than a twenty-minute sweep. The CLI below passes none, so the tree's own verify.mjs runs and the
 // readiness check comes first; shipVerdict-selfcheck section 9 runs that CLI line itself from a stub tree. `preflight`,
 // `nextStep`, `env` and `scan` likewise (v4844: the in-process drives each read all 6,800 tracked files without `scan`).
-export async function main({ eng, argv = [], verifyPath = null, preflight = undefined, nextStep = undefined, env = process.env, scan = scanTracked,
+export async function main({ eng, argv = [], verifyPath = null, preflight = undefined, nextStep = undefined, labelCheck = undefined, env = process.env, scan = scanTracked,
                              out = (m) => console.log(m), exit = (c) => process.exit(c) }) {
     const root = path.resolve(eng, "..");
     const t0 = Date.now();
@@ -314,13 +364,30 @@ export async function main({ eng, argv = [], verifyPath = null, preflight = unde
         exit(1);
         return { ship: false, notRun: true, reason: "NOT RUN: " + notReady.map((n) => n.what).join("; ") };
     }
+    // v4864 -- the label, before the sweep is paid for (see checkLabel)
+    const version = versionArg(argv), lc = version ? chosenLabelCheck({ eng, verifyPath, labelCheck }) : null;
+    if (lc) {
+        const before = await lc(version);
+        if (!before.ok) {
+            out(labelRefusedTrailer(version, before));
+            exit(1);
+            return { ship: false, notRun: true, reason: `NOT RUN: the label ${version} is not free -- ${before.refusal}` };
+        }
+        out(`[ship] label ${version}: free on every branch${before.fetched ? " (every branch head fetched first)" : ""}`);
+    }
     const verify = await runProcess(process.execPath, [verifyPath || path.join(eng, "tools", "ship", "verify.mjs"), ...argv],
                                     { cwd: eng, echo: true, onChild: (p) => { child = p; } });
     const conflicts = scan(root);
-    const d = decide({ verify, conflicts });
+    let d = decide({ verify, conflicts });
     out("");
     out(`[ship] verify exit=${verify.code}  conflicts=${conflicts.hits.length}/${conflicts.scanned} files  after ${Math.round((Date.now() - t0) / 1000)} s`);
     for (const h of conflicts.hits) out(`[ship]   conflict  ${h.file}  line(s) ${h.marks.map((m) => m.line).join(", ")}`);
+    // v4864 -- and again after it: the fifteen minutes in which v4853 went
+    if (d.ship && lc) {
+        const after = await lc(version);
+        out(`[ship] label ${version} asked again after verify: ${after.ok ? "still free" : "SPENT"}${after.fetched ? " (every branch head fetched first)" : ""}`);
+        if (!after.ok) d = { ...d, ship: false, labelSpent: true, reason: `the label ${version} was spent while verify ran -- ${after.refusal}` };
+    }
     const next = d.ship ? chosenNextStep({ eng, verifyPath, nextStep }) : null;
     if (next) { try { out(next()); } catch (e) { out("[ship] next: node tools/ship/afterVerdict.mjs (its plan could not be read: " + String(e && e.message).slice(0, 80) + ")"); } }
     out(`[ship] ${d.ship ? "SHIP" : "DO NOT SHIP"} -- ${d.reason}`);
@@ -331,5 +398,6 @@ export async function main({ eng, argv = [], verifyPath = null, preflight = unde
 const isMain = process.argv[1] && path.resolve(process.argv[1]).endsWith("shipVerdict.mjs");
 if (isMain) {
     const eng = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+    parseOrExit("shipVerdict", VERIFY_ARGS);   // v4864 -- exit 2 on an option verify would refuse, before anything is run or fetched
     await main({ eng, argv: process.argv.slice(2) });
 }

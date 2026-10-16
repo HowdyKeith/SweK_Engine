@@ -34,6 +34,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import VM from "../../tools/ship/versionMarker.js";   // v4556 -- one definition of how to read a version marker
+import { parseArgs, refusalLines } from "./cliArgs.mjs";   // v4864 -- the CLI grew an option, so it reads argv the tree's one way
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const REPO = path.resolve(ENG, "..");
@@ -268,6 +269,142 @@ export function mainOrdinals({ run = null } = {}) {
                            : { ordinals: null, titles: null, absent: false, reason: "origin/main's changelog has no `## vNNNN` heading this could parse" };
 }
 
+// ====================================================================================================
+// *** v4864 -- THE HIGH-WATER WAS READ FROM THIS CLONE'S COPY OF EVERY BRANCH, AND ONLY main WAS EVER ASKED
+// WHETHER ITS COPY WAS CURRENT. ***
+// highWater() reads refs/remotes/origin/*, which is what this clone saw at its last fetch, and refFreshness()
+// compares one of those refs with the remote: main. MEASURED, TWICE IN ONE WEEK:
+//   v4838 -- one session pushed its v4838 at 17:01; another spent v4838 on a different round at 23:29, its own
+//            preflight passing. Its view of the first branch predated the push, so the number read as free.
+//            The label was released for one round and left in the changelog for the other.
+//   v4853 -- a full fetch here showed v4853 free; another session pushed v4853 minutes later, while this
+//            round was being bookkept. Caught only because the preflight was asked again after the push.
+// The first is a stale view and is closed below: every branch head the remote holds is compared with this
+// clone's copy (`git ls-remote --heads`, which reads and never writes), and a number is refused while any
+// copy is behind or missing -- a number free in a stale view is not free. The cure is one fetch, named.
+// The second is a race no read can close: two sessions can each see a number free in the same minute.
+// What a read CAN do is shrink the window, so tools/ship/shipVerdict.mjs asks again AFTER the fifteen-minute
+// verify (with a fresh fetch) and turns a SHIP into DO NOT SHIP when the label went in the meantime.
+// ====================================================================================================
+
+/** The fetch that brings every branch head into this clone -- a --branch or shallow clone included. */
+export const FETCH_ALL = 'git fetch origin "+refs/heads/*:refs/remotes/origin/*"';
+
+const HEX = /^[0-9a-f]{40,64}$/;
+const listed = (names, n = 6) => names.slice(0, n).join(", ") + (names.length > n ? ` and ${names.length - n} more` : "");
+
+/**
+ * Is this clone's copy of every remote branch the remote's? { known, stale, unfetched, remoteCount, cause, note }.
+ * `stale` moved on the remote since the last fetch; `unfetched` exist there and never reached this clone. A
+ * branch deleted on the remote but still copied here is neither: its numbers stay spent, which is the side
+ * that refuses. An unreachable remote is reported and stands aside, as refFreshness's does.
+ */
+export function branchFreshness({ run = null } = {}) {
+    const exec = run || gitRunner();
+    let remoteText;
+    try { remoteText = String(exec(["ls-remote", "--heads", "origin"]) || ""); }
+    catch (e) {
+        return { known: false, stale: [], unfetched: [], remoteCount: null, cause: "unreachable",
+                 note: "the remote's branch heads could not be listed (offline, or no origin remote): " + gitLine(e) +
+                       " -- the high-water below used this clone's copies as they stand" };
+    }
+    const remote = new Map();
+    for (const line of remoteText.split(/\r?\n/)) {
+        const [sha, ref] = line.trim().split(/\s+/);
+        if (sha && HEX.test(sha) && ref && ref.startsWith("refs/heads/")) remote.set(ref.slice("refs/heads/".length), sha);
+    }
+    let localText;
+    try { localText = String(exec(["for-each-ref", "--format=%(objectname) %(refname)", "refs/remotes/origin"]) || ""); }
+    catch (e) { return { known: false, stale: [], unfetched: [], remoteCount: remote.size, cause: "git", note: "this clone's remote refs could not be listed: " + gitLine(e) }; }
+    const local = new Map();
+    for (const line of localText.split(/\r?\n/)) {
+        const [sha, ref] = line.trim().split(/\s+/);
+        if (sha && HEX.test(sha) && ref && ref.startsWith("refs/remotes/origin/") && ref !== "refs/remotes/origin/HEAD") local.set(ref.slice("refs/remotes/origin/".length), sha);
+    }
+    const stale = [], unfetched = [];
+    for (const [name, sha] of remote) {
+        if (!local.has(name)) unfetched.push(name);
+        else if (local.get(name) !== sha) stale.push(name);
+    }
+    stale.sort(); unfetched.sort();
+    const current = !stale.length && !unfetched.length;
+    return { known: true, stale, unfetched, remoteCount: remote.size, cause: current ? null : "behind",
+             note: current ? `all ${remote.size} of the remote's branch heads are in this clone as the remote holds them`
+                           : `${stale.length} branch head(s) moved on the remote since this clone fetched` +
+                             (stale.length ? ` (${listed(stale)})` : "") + ` and ${unfetched.length} never reached it` +
+                             (unfetched.length ? ` (${listed(unfetched)})` : "") + ` -- run: ${FETCH_ALL}` };
+}
+
+// ====================================================================================================
+// *** v4864 -- AND THE LEDGER'S ORDINALS COLLIDE THE SAME WAY, WHERE NO TEXT CONFLICT SHOWS IT. ***
+// gateSweep.mjs's closings are keyed `sinceNNN`, picked by hand as the next number. At v4842 both lines had
+// written since529-since532 in different parts of the file; git merged them cleanly into one object literal
+// that declared each key twice, and the later declaration silently won -- eight of the denoiser arc's gates
+// left the surplus arithmetic. gateSweep-selfcheck's duplicate-key row caught it, AFTER the merge. Two
+// questions are asked here BEFORE one: which ordinal is free on every branch, and does any closing this
+// branch added share its key with another unmerged branch's closing for a different round.
+// ====================================================================================================
+
+export const LEDGER = "WebGLEngine/tools/ship/gateSweep.mjs";
+
+/** Every closing a gateSweep.mjs text declares: Map("since554" -> its `at`, or null when none is near). */
+export function closingsOf(text) {
+    const out = new Map(), s = String(text || "");
+    const re = /^[ \t]*(since\d+):[ \t]*Object\.freeze\(\{/gm;
+    const hits = [...s.matchAll(re)];
+    hits.forEach((m, i) => {
+        // the `at` of THIS closing: looked for before the next closing starts, never in a neighbour's body
+        const body = s.slice(m.index + m[0].length, i + 1 < hits.length ? hits[i + 1].index : m.index + m[0].length + 2000);
+        const at = /\bat:\s*"([^"]*)"/.exec(body);
+        if (!out.has(m[1])) out.set(m[1], at ? at[1] : null);
+    });
+    return out;
+}
+const ordinal = (key) => Number(String(key).replace(/^since/, ""));
+
+/**
+ * The closings census across refs. Returns { next, top, where, collisions, unreadable, read }:
+ * `next` is one past the highest ordinal declared in this tree, on main or on any other ref; `collisions` are
+ * the closings this tree declares that main does not, whose key another unmerged ref declares for a different
+ * `at`. Each ref's ledger is read by blob id, once per distinct blob, so a hundred branches sharing a file cost one parse.
+ */
+export function closingCensus({ run = null, refs = null, mineText = null, mainRef = "refs/remotes/origin/main", self = undefined, merged = null } = {}) {
+    const exec = run || gitRunner();
+    const byBlob = new Map(), unreadable = [];
+    const ledgerAt = (rev) => {
+        let id;
+        try { id = String(exec(["rev-parse", "--verify", "--quiet", `${rev}:${LEDGER}`]) || "").trim(); } catch { return null; }
+        if (!id) return null;
+        if (!byBlob.has(id)) { try { byBlob.set(id, closingsOf(exec(["cat-file", "blob", id]))); } catch { byBlob.set(id, null); } }
+        return byBlob.get(id);
+    };
+    const mine = closingsOf(mineText != null ? mineText : (() => { try { return fs.readFileSync(path.join(REPO, LEDGER), "utf8"); } catch { return ""; } })());
+    const main = ledgerAt(mainRef) || new Map();
+    let all = refs;
+    if (!all) {
+        try { all = exec(["for-each-ref", "--format=%(refname)", "refs/remotes"]).split(/\r?\n/).map((r) => r.trim()).filter((r) => r && !/\/HEAD$/.test(r)); }
+        catch { all = []; }
+    }
+    const me = self !== undefined ? self : (() => { try { return "refs/remotes/" + exec(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]).trim(); } catch { return null; } })();
+    const isMerged = merged ? (r) => merged.has(r) : (r) => { try { exec(["merge-base", "--is-ancestor", r, "HEAD"]); return true; } catch { return false; } };
+    // what this tree adds to main: keys main lacks, and keys main holds for a different round (a merge would declare both)
+    const added = [...mine].filter(([k, at]) => !main.has(k) || main.get(k) !== at);
+    const collisions = [];
+    for (const [k, at] of added) if (main.has(k) && main.get(k) !== at) collisions.push({ key: k, ref: mainRef, theirs: main.get(k), mine: at });
+    let top = Math.max(0, ...[...mine.keys(), ...main.keys()].map(ordinal)), where = "this tree or main";
+    let read = 0;
+    for (const ref of all) {
+        if (ref === mainRef) continue;
+        const theirs = ledgerAt(ref);
+        if (!theirs) { unreadable.push(ref); continue; }
+        read++;
+        for (const k of theirs.keys()) { const n = ordinal(k); if (n > top) { top = n; where = ref; } }
+        if (ref === me || !added.length || isMerged(ref)) continue;
+        for (const [k, at] of added) if (theirs.has(k) && theirs.get(k) !== at) collisions.push({ key: k, ref, theirs: theirs.get(k), mine: at });
+    }
+    return { next: top + 1, top, where, collisions, unreadable, read };
+}
+
 /**
  * The whole check. Returns { ok, refusal, mainVersion, shipping, freshness }.
  * `shipping` is the number this round intends to ship, e.g. "v4338".
@@ -324,6 +461,16 @@ export function preflight(shipping, opts = {}) {
                           `. Supersede FORWARD: v${have + 1} or later.` +
                           (freshness && freshness.stale ? " (and origin/main is itself behind the remote -- fetch first, the real number may be higher)" : "") };
     }
+    // v4864 -- *** THE VIEW BEFORE THE NUMBERS READ FROM IT. *** Every check below reads this clone's copies of the
+    // branches; a copy behind the remote is how v4838 was spent twice. Skipped with skipFreshness (every fixture's
+    // SEALED default), and a fixture states the answer with branchFreshnessOverride rather than asking the network.
+    const bf = opts.branchFreshnessOverride !== undefined ? opts.branchFreshnessOverride : opts.skipFreshness ? null : branchFreshness(opts);
+    if (bf && bf.known && (bf.stale.length || bf.unfetched.length)) {
+        return { ok: false, shipping, mainVersion: mv, freshness, branchFreshness: bf, staleView: true,
+                 refusal: `the branches this would check ${shipping} against are this clone's copies, and they are not the remote's: ` +
+                          bf.note.replace(/ -- run: .*$/, "") +
+                          `. A number free in a stale view is not free -- v4838 was spent twice exactly this way. Run: ${FETCH_ALL} and ask again.` };
+    }
     // *** THE SECOND NUMBER. *** Past the marker check, and only for a build that is not main's own.
     const ord = opts.mainOrdinalsOverride !== undefined ? opts.mainOrdinalsOverride : mainOrdinals(opts);
     const spent = ord && ord.ordinals;
@@ -332,7 +479,15 @@ export function preflight(shipping, opts = {}) {
     // Checked BEFORE main's own, because it is the stronger claim: a number free on main and taken on a
     // pushed branch is taken, and finding that out at the merge is what this file exists to prevent.
     const hw = opts.highWaterOverride !== undefined ? opts.highWaterOverride : highWater(opts);
-    if (!sameBuild && hw && hw.top != null && want <= hw.top && !(spent && spent.length && want <= spent[0])) {
+    // v4864 -- *** NOT `!sameBuild` ANY MORE: THAT EXEMPTED EVERY NUMBER ASKED ABOUT FROM AN UN-BUMPED TREE. *** sameBuild
+    // means this tree IS main's build, and the exemption exists for one question: may main's own number be asked
+    // about again (v4350's follow-up commit) -- answered yes, above, by the early return for `want === have`. For any
+    // OTHER number the tree is not that build's claim on it, and the exemption skipped both checks below: the
+    // ritual "run versionPreflight before picking a number" asks from a tree still identical to main, so every
+    // candidate number was approved without being compared with a single branch. MEASURED at v4864: asked about
+    // v4864 from main's v4863 tree, this answered OK while refs/remotes/origin/ccr-6c3eeb7c-pxz6kx carried a
+    // v4864 heading and highWater() itself returned 4864 for that ref. v4853's collision was picked the same way.
+    if (hw && hw.top != null && want <= hw.top && !(spent && spent.length && want <= spent[0])) {
         // v4667 -- THE TITLE COMES FROM WHICHEVER REF SPENT THE NUMBER, not from the highest one. The first
         // version read hw.titles, which belongs to the ref holding the high-water mark, so asking about v4661
         // printed the v4662 branch's entry for that number instead of the branch that actually named it. A
@@ -348,7 +503,7 @@ export function preflight(shipping, opts = {}) {
                           (spent && spent.length ? ` (origin/main is only at v${spent[0]}, which is why asking the trunk alone said this was fine)` : "") +
                           `. Supersede FORWARD: v${hw.top + 1} or later.` };
     }
-    if (!sameBuild && spent && spent.length) {
+    if (spent && spent.length) {   // v4864: and here, for the same reason
         const top = spent[0], taken = ord.titles && ord.titles.get(want);
         if (want <= top) {
             return { ok: false, shipping, mainVersion: mv, freshness, ordinalTop: top,
@@ -362,19 +517,70 @@ export function preflight(shipping, opts = {}) {
                                    `comparing markers alone said this was fine)` : "") };
         }
     }
+    // v4864 -- *** AND THE LEDGER'S OWN NUMBERS, which no text conflict shows. *** A fixture supplies closingsOverride;
+    // one that supplies refs or reads (SEALED does) is never asked of the real repository, as with `merged` above.
+    const cc = opts.closingsOverride !== undefined ? opts.closingsOverride
+             : (opts.refsOverride || opts.readOverride || opts.highWaterOverride !== undefined) ? null
+             : closingCensus({ ...(opts.run ? { run: opts.run } : {}), self: hw && hw.self !== undefined ? hw.self : undefined, merged: hw && hw.merged ? hw.merged : null });
+    if (cc && cc.collisions && cc.collisions.length) {
+        const c = cc.collisions[0];
+        return { ok: false, shipping, mainVersion: mv, freshness, closings: cc,
+                 refusal: `gateSweep.mjs's closing ${c.key}, which this tree adds for "${c.mine}", is declared on ${c.ref} for "${c.theirs}"` +
+                          (cc.collisions.length > 1 ? ` (and ${cc.collisions.length - 1} more: ${cc.collisions.slice(1).map((x) => `${x.key} on ${x.ref}`).join(", ")})` : "") +
+                          ` -- merged, one object literal declares the key twice and the later silently wins, as since529-since532 did at v4842.` +
+                          ` Renumber this tree's closing to since${cc.next} or later.` };
+    }
     const note = (!sameBuild && spent && spent.length && have != null && spent[0] > have)
         ? `main's changelog has spent v${spent[0]} while its marker reads v${have} -- ${spent[0] - have} rounds ahead, ` +
           `so the ordinal is the binding number here` : undefined;
     return { ok: true, shipping, mainVersion: mv, freshness, refusal: null, ordinalTop: spent ? spent[0] : null,
-             ...(note ? { note } : {}) };
+             ...(bf ? { branchFreshness: bf } : {}), ...(cc ? { closings: cc } : {}), ...(note ? { note } : {}) };
 }
 
-// Run directly: node tools/ship/versionPreflight.mjs vNNNN
+/**
+ * v4864 -- the numbers a NEW round should take: one past everything any ref has spent (this tree, main's marker and
+ * changelog, and every other ref's changelog, this branch's own pushed rounds included), and one past every ledger closing.
+ */
+export function nextFree(opts = {}) {
+    // every input injectable the way preflight's are, so a fixture states the world instead of reading this repository
+    const local = opts.localSourceOverride !== undefined ? opts.localSourceOverride
+                : (() => { try { return fs.readFileSync(path.join(ENG, "main.js"), "utf8"); } catch { return ""; } })();
+    const localChlog = opts.localChangelogOverride !== undefined ? opts.localChangelogOverride
+                     : (() => { try { return fs.readFileSync(path.join(REPO, "docs", "CHANGELOG.md"), "utf8"); } catch { return ""; } })();
+    const mv = opts.mainVersionOverride !== undefined ? { version: opts.mainVersionOverride } : mainVersion(opts);
+    const mo = opts.mainOrdinalsOverride !== undefined ? opts.mainOrdinalsOverride : mainOrdinals(opts);
+    const ro = refOrdinals(opts);
+    const seen = [versionNumber(engineVersionOf(local)), versionNumber(mv.version), ...((mo && mo.ordinals) || []).slice(0, 1),
+                  ...ordinalsOf(localChlog).ordinals.slice(0, 1), ...ro.rows.map((r) => r.top)].filter((n) => n != null);
+    const top = Math.max(0, ...seen);
+    const holder = ro.rows.find((r) => r.top === top);
+    const cc = opts.closingsOverride !== undefined ? opts.closingsOverride : closingCensus(opts.run ? { run: opts.run } : {});
+    return { version: "v" + (top + 1), versionTop: top, versionWhere: holder ? holder.ref : "this tree or main",
+             closing: "since" + cc.next, closingTop: cc.top, closingWhere: cc.where, unreadable: [...new Set([...ro.unreadable, ...(cc.unreadable || [])])] };
+}
+
+// Run directly: node tools/ship/versionPreflight.mjs [vNNNN]      -- may this round ship as vNNNN?
+//               node tools/ship/versionPreflight.mjs --next       -- which version and ledger closing should a new round take?
+// v4864: parsed by cliArgs, the tree's one parser, with the version as its positional word.
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-    const arg = process.argv[2] || engineVersionOf(fs.readFileSync(path.join(ENG, "main.js"), "utf8"));
-    const r = preflight(arg);
+    const CLI = { values: {}, flags: ["--next"], positional: true };
+    const cli = parseArgs(process.argv.slice(2), CLI);
+    if (cli.errors.length) { for (const l of refusalLines("versionPreflight", cli.errors, CLI)) console.error(l); process.exit(2); }
+    const bf = branchFreshness();
+    if (cli.flags.has("--next")) {
+        if (bf.known && bf.cause === "behind") console.log("  [versionPreflight] NOTE  " + bf.note + " -- the numbers below may be higher");
+        else if (!bf.known) console.log("  [versionPreflight] NOTE  " + bf.note);
+        const n = nextFree();
+        console.log(`  [versionPreflight] next version: ${n.version}   (highest spent: v${n.versionTop}, on ${n.versionWhere})`);
+        console.log(`  [versionPreflight] next ledger closing: ${n.closing}   (highest declared: since${n.closingTop}, on ${n.closingWhere})`);
+        if (n.unreadable.length) console.log(`  [versionPreflight] ${n.unreadable.length} ref(s) carried no changelog or ledger to read: ${n.unreadable.slice(0, 4).join(", ")}${n.unreadable.length > 4 ? " ..." : ""}`);
+        process.exit(0);
+    }
+    const arg = cli.rest[0] || engineVersionOf(fs.readFileSync(path.join(ENG, "main.js"), "utf8"));
+    const r = preflight(arg, { branchFreshnessOverride: bf });
     if (r.freshness && r.freshness.note) console.log("  [versionPreflight] " + r.freshness.note);
+    if (bf.note && !r.staleView) console.log("  [versionPreflight] " + bf.note);
     if (r.refusal) { console.log("  [versionPreflight] REFUSED: " + r.refusal); process.exit(1); }
     console.log(`  [versionPreflight] OK: shipping ${r.shipping}, origin/main carries ${r.mainVersion || "(unreadable)"}` +
-                (r.note ? " -- " + r.note : ""));
+                (r.closings ? `; ledger: next closing since${r.closings.next}` : "") + (r.note ? " -- " + r.note : ""));
 }
