@@ -257,6 +257,23 @@ export function nativeCompiler({ pkg = null, platform = process.platform, flags 
  * adapter's own fallback flag where Dawn gives one, else the name -- an explicit boolean, because realGpuRun calls a record
  * without one software.
  */
+/**
+ * v4871+ -- rig-adapter-features-probe: what an adapter OFFERS, beside what it is. A kernel round that wants half precision or
+ * subgroups (the backlog's denoise-f16-intel and denoise-subgroup-reduction) has first to know whether the GPU exposes them to
+ * WebGPU at all, natively and in Chrome, and no rig report recorded it. ADAPTER_LIMITS are the limits those rounds read first;
+ * webgpuHarness.mjs passes this list into the page, so both halves of a run record the same names.
+ */
+export const ADAPTER_LIMITS = Object.freeze(["maxComputeWorkgroupStorageSize", "maxComputeInvocationsPerWorkgroup", "maxComputeWorkgroupSizeX",
+    "maxStorageBufferBindingSize", "maxUniformBufferBindingSize", "maxBufferSize", "maxStorageBuffersPerShaderStage"]);
+/** An adapter's features (sorted names), ADAPTER_LIMITS' values and its subgroup sizes where its info has them; null for what it does not expose. */
+export function adapterCaps(adapter, limits = ADAPTER_LIMITS) {
+    const f = adapter && adapter.features, l = adapter && adapter.limits, info = (adapter && adapter.info) || {};
+    const num = (v) => (typeof v === "number" ? v : typeof v === "bigint" ? Number(v) : null);
+    return { features: f && typeof f[Symbol.iterator] === "function" ? [...f].map(String).sort() : null,
+             limits: l ? Object.fromEntries(limits.map((k) => [k, num(l[k])])) : null,
+             subgroups: num(info.subgroupMinSize) != null || num(info.subgroupMaxSize) != null ? { min: num(info.subgroupMinSize), max: num(info.subgroupMaxSize) } : null };
+}
+
 export function noteNativeAdapter(adapter, { gate = process.argv[1] || "", compiler = null, env = process.env, append = fs.appendFileSync, say = console.log, hints = /swiftshader|llvmpipe|softwarerasterizer|microsoft basic render|lavapipe|warp/i } = {}) {
     const i = adapter?.info || {}, name = [i.vendor, i.architecture, i.description].filter(Boolean).join(" / ") || "unnamed";
     const fallback = adapter && "isFallbackAdapter" in adapter ? adapter.isFallbackAdapter === true : (i.isFallbackAdapter === true);
@@ -266,7 +283,7 @@ export function noteNativeAdapter(adapter, { gate = process.argv[1] || "", compi
         const eng = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
         try {
             append(env.SWEK_ADAPTER_LOG, JSON.stringify({ gate: path.relative(eng, path.resolve(gate)).replace(/\\/g, "/"),
-                adapter: { vendor: i.vendor || null, architecture: i.architecture || null, description: i.description || null },
+                adapter: { vendor: i.vendor || null, architecture: i.architecture || null, description: i.description || null, caps: adapterCaps(adapter) },
                 software, launchArgs: ["node-webgpu (native)"] }) + "\n");
         } catch { /* the line above is the record a reader sees; the log is realGpuRun's convenience */ }
     }

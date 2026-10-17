@@ -2,6 +2,8 @@
 //
 // Run:  node tools/denoiseStudy.mjs --harvest-fsr1  the shipped network at HALF resolution, upscaled by FSR1, against the frames it could be
 //                                                  instead (section 81) -> render/denoise-results-fsr1.json
+// Run:  node tools/denoiseStudy.mjs --harvest-halfres  round 29 (section 89): the same question at 256 x 256, traced at 128,
+//                                                     EASU the candidate -> render/denoise-results-halfres.json
 //       node tools/denoiseStudy.mjs --harvest-mesh  the SHIPPED network and filter on the engine's own geometry, nothing trained (section 79)
 //                                                  -> render/denoise-results-mesh.json
 //       node tools/denoiseStudy.mjs --harvest-r11  one large network trained on families R and C together (section 32) -> render/denoise-results-r11.json
@@ -40,7 +42,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { execFileSync } from "node:child_process";
 import { openCache, hashArrays } from "../render/denoiseCache.mjs";
-import { runStudy, MINI, HARVESTS, studyOptions, runShippedStudy, ROUND_MESH, SHIPPED_NET, runUpscaleStudy, ROUND_FSR1 } from "../render/denoiseStudy.mjs";
+import { runStudy, MINI, HARVESTS, studyOptions, runShippedStudy, ROUND_MESH, SHIPPED_NET, runUpscaleStudy, ROUND_FSR1, ROUND_HALFRES } from "../render/denoiseStudy.mjs";
 import { decodeNet } from "../render/denoiseDevice.mjs";
 import crypto from "node:crypto";
 
@@ -53,6 +55,24 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     if (args.includes("--mini")) {
         const out = runStudy({ ...MINI, c0: false, log: (m) => console.log("[denoiseStudy --mini] " + m) });
         console.log(JSON.stringify({ run: out.verdict.run, reasons: out.verdict.reasons, determinism: out.determinism }, null, 1));
+    } else if (args.includes("--harvest-halfres")) {
+        // section 89, round 29: round 26's chain at 256 x 256 with EASU the candidate -- nothing trained, the shipped network decoded
+        // as denoise.html decodes it, its sha-256 beside the results
+        const file = path.join(ENG, ROUND_HALFRES.results);
+        if (fs.existsSync(file)) { console.log(`[denoiseStudy] ${ROUND_HALFRES.results} exists -- a harvest's results are never overwritten`); process.exit(2); }
+        const bytes = fs.readFileSync(path.join(ENG, SHIPPED_NET)), shipped = JSON.parse(bytes.toString("utf8"));
+        const at = args.indexOf("--cache"), dir = at >= 0 ? args[at + 1] : null;
+        if (at >= 0 && !dir) { console.log("[denoiseStudy] --cache needs a directory"); process.exit(2); }
+        const git = (...a) => execFileSync("git", a, { cwd: ENG, encoding: "utf8", maxBuffer: 1 << 28 });
+        const cache = dir ? openCache(path.resolve(dir), { results: ROUND_HALFRES.results, commit: git("rev-parse", "HEAD").trim(),
+                                                         diff: hashArrays([git("diff", "HEAD", "--", "render", "brain", "physics", "mesh", "fx/fsr", "tools/denoiseStudy.mjs")]) }) : null;
+        if (cache) console.log(`[denoiseStudy] cache ${cache.dir}`);
+        const out = runUpscaleStudy({ splits: ROUND_HALFRES.splits, image: ROUND_HALFRES.image, candidate: ROUND_HALFRES.candidate, test: ROUND_HALFRES.test,
+                                      c2Prior: ROUND_HALFRES.c2Prior, net: decodeNet(shipped.net), harvest: true, cache, log: (m) => console.log("[denoiseStudy] " + m) });
+        out.shipped = { file: SHIPPED_NET, sha256: crypto.createHash("sha256").update(bytes).digest("hex"), source: shipped.source };
+        if (cache) out.cache = { hits: cache.hits, misses: cache.misses };
+        fs.writeFileSync(file, JSON.stringify(out, (k, v) => (v instanceof Float64Array ? Array.from(v) : v), 1) + "\n");
+        console.log(`[denoiseStudy] wrote ${ROUND_HALFRES.results}`);
     } else if (args.includes("--harvest-fsr1")) {
         // section 81: nothing trained -- the shipped network decoded as denoise.html decodes it, its sha-256 beside the results
         const file = path.join(ENG, ROUND_FSR1.results);
@@ -105,7 +125,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         // section 33: the verdict is in the file, which is committed before it is read -- the log says only that it was written
         console.log(`[denoiseStudy] wrote ${round.results}`);
     } else {
-        console.log("usage: node tools/denoiseStudy.mjs --mini | --harvest-fsr1 | --harvest-mesh | --secondary-r11 | --harvest-r11 | --harvest-r10 | --harvest-r9 | --harvest-r8 | --harvest-r7 | --harvest-r6 | --harvest-r5 | --harvest-r4 | --harvest-r3 | --harvest-r2 | --harvest-r1 [--cache <dir>] [--workers <n>]   (a harvest renders the pre-registered dataset; see render/learned-denoiser-preregistration.md)");
+        console.log("usage: node tools/denoiseStudy.mjs --mini | --harvest-halfres | --harvest-fsr1 | --harvest-mesh | --secondary-r11 | --harvest-r11 | --harvest-r10 | --harvest-r9 | --harvest-r8 | --harvest-r7 | --harvest-r6 | --harvest-r5 | --harvest-r4 | --harvest-r3 | --harvest-r2 | --harvest-r1 [--cache <dir>] [--workers <n>]   (a harvest renders the pre-registered dataset; see render/learned-denoiser-preregistration.md)");
         process.exit(2);
     }
 }

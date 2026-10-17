@@ -62,6 +62,11 @@
 //   R43 --harvest-fsr1 leaving fx/fsr out of its cache stamp                     1 RED
 //   R44 (section 82) C1's eleven of twelve lowered to nine                       1 RED -- the re-derivation then reads
 //       'reported', which the committed file is not
+//   R45 (section 89) B upscaled by FSR1 whatever the candidate                   1 RED -- the EASU end-to-end row
+//   R46 ROUND_HALFRES at 128 x 128 instead of 256                              1 RED
+//   R47 --harvest-halfres not passing ROUND_HALFRES's candidate                  1 RED -- the CLI row (the run would be round 26's FSR1)
+//   R48 C4's re-run hard-coded to FSR1                                          1 RED -- the EASU end-to-end row (C4 false)
+//   R49 the candidate guard removed                                             1 RED -- the refusal row (upscale's own error is not the guard's)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -433,6 +438,46 @@ console.log("\n15. THE UPSCALE ROUND: HALF SIZE + FSR1 AGAINST THE FRAMES IT COU
     ok("!! --harvest-fsr1 decodes the shipped file with decodeNet, runs runUpscaleStudy under harvest, writes ROUND_FSR1.results and never an existing one, and logs no verdict",
         branch.length > 400 && /decodeNet\(shipped\.net\)/.test(code) && /runUpscaleStudy\(/.test(code) && /harvest: true/.test(code) &&
         /path\.join\(ENG, ROUND_FSR1\.results\)/.test(code) && /existsSync\(file\)/.test(code) && /sha256/.test(code) && /"fx\/fsr"/.test(code) && !/verdict|status|supported/.test(code));
+}
+
+console.log("\n16. ROUND 29: THE SAME QUESTION AT 256 x 256, EASU THE CANDIDATE (pre-registration section 89)");
+{
+    const { runUpscaleStudy, ROUND_HALFRES, RESULTS_HALFRES, ROUND_FSR1, ROUND_MESH, SHIPPED_NET } = await imp("render/denoiseStudy.mjs");
+    const { SPLITS_HALFRES } = await imp("render/denoiseScenes.mjs");
+    const { decodeNet } = await imp("render/denoiseDevice.mjs");
+    const { renderUpscaleImages, upscale } = await imp("render/denoiseUpscale.mjs");
+    const net = decodeNet(JSON.parse(fs.readFileSync(path.join(ENG, SHIPPED_NET), "utf8")).net);
+    ok("!! ROUND_HALFRES: its own split, 256 x 256 (half 128), EASU the candidate, the sign-flip test, C2 cited from round 11 as round 26 cites it, its own results file",
+        ROUND_HALFRES.splits === SPLITS_HALFRES && ROUND_HALFRES.image === 256 && ROUND_HALFRES.candidate === "easu" && ROUND_HALFRES.test === "signflip" &&
+        ROUND_HALFRES.c2Prior === ROUND_MESH.c2Prior && ROUND_HALFRES.c2Prior === ROUND_FSR1.c2Prior &&
+        ROUND_HALFRES.results === RESULTS_HALFRES && RESULTS_HALFRES === "render/denoise-results-halfres.json");
+    let threw = null; try { runUpscaleStudy({ splits: ROUND_HALFRES.splits, candidate: "easu", net, image: 4, sppIn: 1, sppRef: 1 }); } catch (e) { threw = e.message; }
+    let threw2 = null; try { runUpscaleStudy({ net, candidate: "lanczos", image: 4, sppIn: 1, sppRef: 1 }); } catch (e) { threw2 = e.message; }
+    ok("!! on the REAL split without harvest it is refused at its first scene, and a candidate other than FSR1 or EASU is refused before anything renders",
+        /seed 42000 is a dataset seed/.test(threw || "") && /candidate is "fsr1" \(section 81\) or "easu" \(section 89\)/.test(threw2 || ""), `${threw} | ${threw2}`);
+    // the miniature, EASU the candidate: the PLUMBING, no number read for its value
+    const mini = Object.freeze({ T1: Object.freeze({ family: "R+C", families: Object.freeze(["R", "C"]), seeds: Object.freeze([990100, 990101]) }) });
+    const out = runUpscaleStudy({ splits: mini, net, candidate: "easu", image: 16, sppIn: 4, sppRef: 8 }), V = out.verdict, T = out.tables;
+    const shapeOk = ["A", "B", "C", "D", "easu", "fsr1", "fsr1NoDenoise", "noisyFull1", "noisyFull4", "noisyHalfUp", "floor"].every((k) => T[k].length === 2 && T[k].every(Number.isFinite));
+    const im = renderUpscaleImages("C", 990101, { w: 16, h: 16, sppIn: 4, sppRef: 8 });
+    const B1 = upscale(denoise(net, im.half4.x, 8, 8).y, 8, 8, 16, 16, "easu");
+    const dOf = (x) => T.B.map((b, i) => Math.log(x[i]) - Math.log(b));
+    ok("!! end to end with EASU: B is the shipped network at half size through EASU, recomputed from nothing; C4 re-runs EASU; FSR1 whole and RCAS without denoise are reported against B; H1 and H2 are D's and C's columns",
+        shapeOk && Object.is(T.B[1], relMSE(B1, im.ref)) && T.B.every((v, i) => Object.is(v, T.easu[i])) && out.determinism === true && out.seedsDistinct === true &&
+        out.seedCount === 10 && out.config.upscale.kind === "easu" && /half size \+ EASU/.test(out.config.hypotheses.H1) &&
+        out.secondary.fsr1VsEasu.every((v, i) => Object.is(v, dOf(T.fsr1)[i])) && out.secondary.rcasNoDenoiseVsEasu.every((v, i) => Object.is(v, dOf(T.fsr1NoDenoise)[i])) &&
+        V.hypotheses.H1.d.every((v, i) => Object.is(v, dOf(T.D)[i])) && V.hypotheses.H2.d.every((v, i) => Object.is(v, dOf(T.C)[i])), `run ${V.run}`);
+    // round 26's chain is untouched by the parameter: no candidate is FSR1, and its tables carry no fsr1 column of their own
+    const r26 = runUpscaleStudy({ splits: mini, net, image: 16, sppIn: 4, sppRef: 8 });
+    ok("  ...and round 26's default is unchanged: FSR1 the candidate, its own secondary, no separate fsr1 column",
+        r26.config.upscale.kind === "fsr1" && !("fsr1" in r26.tables) && "easuAloneVsFsr1" in r26.secondary && T.C.every((v, i) => Object.is(v, r26.tables.C[i])));
+    const cli = fs.readFileSync(path.join(ENG, "tools/denoiseStudy.mjs"), "utf8");
+    const b0 = cli.indexOf('} else if (args.includes("--harvest-halfres")) {'), branch = b0 >= 0 ? cli.slice(b0, cli.indexOf('} else if (args.includes("--harvest-fsr1")) {', b0)) : "";
+    const code = branch.replace(/\/\/.*$/gm, "");
+    ok("!! --harvest-halfres decodes the shipped file with decodeNet, runs runUpscaleStudy on ROUND_HALFRES's split, size and candidate under harvest, writes its results file and never an existing one, and logs no verdict",
+        branch.length > 400 && /decodeNet\(shipped\.net\)/.test(code) && /runUpscaleStudy\(/.test(code) && /harvest: true/.test(code) &&
+        /splits: ROUND_HALFRES\.splits/.test(code) && /image: ROUND_HALFRES\.image/.test(code) && /candidate: ROUND_HALFRES\.candidate/.test(code) &&
+        /path\.join\(ENG, ROUND_HALFRES\.results\)/.test(code) && /existsSync\(file\)/.test(code) && /sha256/.test(code) && /"fx\/fsr"/.test(code) && !/verdict|status|supported/.test(code));
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +

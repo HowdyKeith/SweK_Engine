@@ -138,7 +138,9 @@ export function readAdapterLog(text, gate) {
     const recs = String(text || "").split("\n").filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } })
         .filter((x) => x && x.gate === gate)
         .map((x) => ({ name: x.adapter ? [x.adapter.vendor, x.adapter.architecture, x.adapter.description].filter(Boolean).join(" ") || "unnamed" : "none",
-                       software: x.software, launchArgs: x.launchArgs, native: Array.isArray(x.launchArgs) && x.launchArgs.includes(NATIVE_LAUNCH) }));
+                       software: x.software, launchArgs: x.launchArgs, native: Array.isArray(x.launchArgs) && x.launchArgs.includes(NATIVE_LAUNCH),
+                       // v4871+ (rig-adapter-features-probe): features, ADAPTER_LIMITS and subgroup sizes, as the writer read them; null from an older writer
+                       caps: (x.adapter && x.adapter.caps) || null }));
     const adapters = [];
     for (const r of recs) if (r.name !== "none" && !adapters.some((a) => adapterLabel(a) === adapterLabel(r))) adapters.push(r);
     return { names: [...new Set(recs.map(adapterLabel))], adapters };
@@ -153,10 +155,14 @@ export function gateEntry({ gate, src, status, ms, stdout = "", logText = "" }) 
              adapters: seen.adapters };
 }
 
+/** One adapter's caps as a console line: its features, then subgroup sizes and the workgroup-memory limit where known. */
+export const capsLine = (c) => `${c.features ? (c.features.length ? c.features.join(", ") : "none") : "unknown"}` +
+    (c.subgroups ? `; subgroups ${c.subgroups.min}-${c.subgroups.max}` : "") +
+    (c.limits && c.limits.maxComputeWorkgroupStorageSize != null ? `; workgroup storage ${c.limits.maxComputeWorkgroupStorageSize} B` : "");
 /** The run's adapter list, one per label: the browser's and the native half's reading of one GPU are two lines, not one. */
 export function addAdapters(list, adapters) {
     for (const x of adapters) if (!list.some((a) => adapterLabel(a) === adapterLabel(x)))
-        list.push({ name: x.name, software: x.software, launchArgs: x.launchArgs, native: x.native });
+        list.push({ name: x.name, software: x.software, launchArgs: x.launchArgs, native: x.native, caps: x.caps || null });
     return list;
 }
 
@@ -237,6 +243,8 @@ export function runGates({ root = ENG, only = null, native = false, log = consol
             (entry.skips.length ? `  (${entry.skips.length} SKIP)` : ""));
     }
     try { fs.unlinkSync(logFile); } catch {}
+    // v4871+ (rig-adapter-features-probe): one line per adapter, so the console says what each half of the GPU offers
+    for (const a of report.adapters) log(`  features on ${adapterLabel(a)}: ${a.caps ? capsLine(a.caps) : "not recorded"}`);
     report.verdict = verdict(report);
     report.summary = ["exact", "quality", "timing"].map((c) => { const gs = report.gates.filter((x) => x.category === c); return `${c} ${gs.filter((x) => x.ok).length}/${gs.length}`; }).join(", ");
     return report;

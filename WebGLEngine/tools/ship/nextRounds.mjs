@@ -1687,6 +1687,8 @@ export const NEXT_ROUNDS = [
     {
         id: "denoise-halfres-at-scale",
         blocker: "OPEN",
+        // v4871+: PRE-REGISTERED as the denoiser arc's round 29 (section 89): SPLITS_HALFRES (6 R at 42000, 6 C at 43000), 256 x 256
+        // traced at 128, EASU the candidate, `node tools/denoiseStudy.mjs --harvest-halfres` -> render/denoise-results-halfres.json
         what: "Round 26's question at a frame size nearer real use: 128 x 128 traced and denoised, upscaled to 256 x 256, against the full-size 1-sample frame at equal samples -- with EASU ALONE as the candidate, since RCAS made every image worse at 64 x 64.",
         how: "Section 81's shape and render/denoiseUpscale.mjs as they stand, at 256 x 256 and on new test seeds. The references are the cost: 16x the pixels of round 26's 254 s of rendering, so the harvest wants the rig's CPU or the worker pool.",
         why: "Round 26 could not separate a real loss from the size it was run at: at 64 x 64 a pixel covers so much of a scene that any upscale is guessing. This is the run that can.",
@@ -1716,6 +1718,8 @@ export const NEXT_ROUNDS = [
     {
         id: "rig-adapter-features-probe",
         blocker: "HARDWARE",
+        // v4871+: BUILT -- headlessGpu.adapterCaps and the browser harness record features, ADAPTER_LIMITS and subgroup sizes per adapter;
+        // realGpuRun keeps them in the report and prints one line per adapter. Owed: the next rig run, which reads them on both GPUs.
         what: "Record each adapter's WebGPU features and limits -- shader-f16, subgroups, packed 4x8 integer dot product -- in tools/ship/realGpuRun.mjs's report, natively and in Chrome.",
         how: "One field in the report the rig already writes; no new run. The denoiser's rig reports (render/denoise-rig-*.json) record no features today, so nothing in the tree says whether either GPU exposes half precision or subgroups to WebGPU.",
         why: "Every precision or subgroup round below depends on it, and guessing a feature that a driver does not expose would be a round spent finding that out.",
@@ -1798,10 +1802,10 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "denoise-r18t-margin-1080",
-        blocker: "HARDWARE",
-        what: "A confirmation run of r18t's page margin on the GTX 1080: section 63 qualified it at 1.087x against a 1.05 bar, on one run.",
-        how: "The page ladder again on the 1080, read against section 61's rule unchanged.",
-        why: "The narrowest margin in the page table.",
+        blocker: "CLOSED",
+        what: "DONE without a round of its own (v4871+): the confirmation it asked for is in the committed rig reports. Section 63 qualified r18t on the 1080's page at 1.087x against a 1.05 bar on one run; ten later runs of the same page ladder read 1.073-1.101x at 1920 x 1080.",
+        how: "Read off every render/denoise-rig-*gtx1080*.json carrying the page ladder: r18 1.087 (section 63's), r19 1.097, r22 1.087, r24 a/b 1.087 and 1.080, r24b a/b 1.079 and 1.073, r27 a/b 1.081 and 1.100, round 27's stale run b 1.101, r28 1.089. At 1024 x 1024 they read 1.061-1.105.",
+        why: "The narrowest margin in the page table, now eleven readings over the bar across seven commits (01429c8e to 8490e721), the lowest 2.2% clear.",
     },
     {
         id: "sweep-timings-stray-host-files",

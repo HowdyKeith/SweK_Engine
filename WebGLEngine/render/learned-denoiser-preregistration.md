@@ -5730,3 +5730,127 @@ They were opened on arrival, as sections 85 and 86's were.
 
 **What is next.** The FXC retirement owes nothing further. A native run under FXC still gets `DEFAULT_KERNELS`, and builds one
 control kernel where it built eight.
+
+## 89. ROUND 29 -- HALF RESOLUTION AT 256 x 256, EASU THE CANDIDATE: FIXED BEFORE ANY OF ITS TEST SCENES EXIST
+
+Committed with the code that implements it. No scene of this round's test set has been rendered.
+
+**Why this round.** Round 26 asked whether a half-size frame upscaled by FSR1 beats the frames it could be instead, at 64 x 64,
+and was not reported (section 82). Descriptively, the half-size chain lost to every frame it was measured against.
+- Section 81 fixed the caveat before that run: 64 x 64 holds a scene far more coarsely than real use, so a test there is
+  harder on an upscaler than a real frame is. Section 82 could not separate a real loss from the size.
+- This round asks the same question at 256 x 256, traced and denoised at 128 x 128. That is the nearest size this machine can
+  render a reference for: 1,024 samples at 16 times round 26's pixels.
+- The backlog's FSR2, FSR3 and learned-upscaler entries wait on this one (`denoise-halfres-at-scale`).
+
+> **Is a frame traced and denoised at 128 x 128, then upscaled to 256 x 256 by EASU, closer to the reference than the frames
+> it could be instead?**
+
+**Nothing is trained or tuned.** The network is round 11's seed 1, from the file the page loads. Its sha-256 is written beside
+the results. The input is the arc's: 4 samples (or 1 for D), the nine channels and the emitter mask.
+
+**The frames, per test image.** Each is judged against the same 256 x 256 reference, with a second for C3.
+
+| Frame | Traced | Then |
+|---|---|---|
+| **A** | 256 x 256, 4 samples | denoised -- today's page at this size; reported, never tested |
+| **B, the candidate** | 128 x 128, 4 samples | denoised at 128 x 128, then EASU to 256 x 256 |
+| **C** | the same frame as B | denoised, then bilinear to 256 x 256 -- EASU's control |
+| **D** | 256 x 256, 1 sample | denoised -- the SAME NUMBER OF SAMPLES as B |
+
+- **EASU alone, not FSR1.** EASU is FSR1's upscaling pass. RCAS, its sharpening pass, made every one of round 26's 12 images
+  worse (section 82), so RCAS is not the candidate here. FSR1 whole, and RCAS without its denoise, are reported against B and
+  never tested.
+- **Everything else is section 81's, by the same code.**
+  - The upscale's space: Reinhard, then a display gamma, inverted exactly.
+  - The clamp to the frame's brightest value.
+  - RCAS at sharpness 0.9 where it is reported.
+  - Each input traced on its own render seed (`renderSeeds`' three, then seed x 8 + 4 and + 5).
+- `runUpscaleStudy` takes the candidate as a parameter. Its default is still FSR1, and the gate holds round 26's chain
+  unchanged.
+
+**The split** (`SPLITS_HALFRES`), one test set read by both hypotheses:
+
+| Set | Scenes | Seeds |
+|---|---|---|
+| T1 -> H1 and H2 | 6 of R, 6 of C, each as its own family | **42000-42005** and **43000-43005** |
+
+These are the families the network was trained on. No earlier split touched these seeds, round 26's among them, and every one
+is refused without `harvest`. C5 holds over the round's 60 render seeds.
+
+**The hypotheses**, with section 6's statistic and section 28's test. `verdict()`'s `filter` column is the comparator and its
+`net` column is B.
+- **H1: B beats D.** At the same number of samples, half resolution plus EASU is closer to the reference than full resolution at
+  1 sample. Effect per image: `d = ln relMSE(D) - ln relMSE(B)`.
+- **H2: B beats C.** EASU is closer than bilinear on the same denoised half-size frame. Effect: `d = ln relMSE(C) - ln relMSE(B)`.
+- Each is supported iff its mean d is > 0 and its sign-flip p is below its Holm threshold, over {H1, H2} at 0.05.
+
+**Controls, section 81's, unchanged.**
+- **C1, per hypothesis:** both of its frames must beat that hypothesis's own un-denoised frame on at least 11 of 12 images. For
+  H1 that is D's 1-sample input; for H2, B's half-size input upscaled bilinearly. This is the control that fired on H2 in round
+  26.
+- **C2:** cited from round 11, as in sections 79 and 81.
+- **C3:** B within 2 x of the floor on more than half the images makes that hypothesis not resolvable.
+- **C4:** the candidate's chain, run twice, gives B bit for bit.
+- **C5:** 60 distinct render seeds.
+
+**What each outcome buys.**
+- **H1 supported, with or without H2:** at this size, half resolution is the better spend of four samples a pixel.
+  - The next round times the half-size chain on the rig, with EASU on the GPU after the denoiser.
+  - `denoise-fsr2-temporal` comes off its blocker.
+- **H2 only:** EASU beats bilinear, but the full-size frame at equal samples is the better spend. The half-resolution lever is
+  not worth a rig round at this size.
+- **Neither, not reported or not resolvable:** recorded as found, and the FSR entries stay behind it. If C1 fires on H2 again,
+  `denoise-network-at-run-scale` becomes the next round.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1: H1 is NOT supported, but the gap narrows from round 26's.**
+  - There, B lost to D by a mean d of -0.493.
+  - For B to beat D, the half-size chain must cost less than tracing at 1 sample does. Round 11's record puts that cost near
+    2.5 x the 4-sample error on R (ln 0.9). Round 26's "price of the quarter" was 4 x (ln 1.406).
+  - At 256 x 256 a silhouette spans four times the pixels it did at 64, so the upscale loses less. My guess is a price between
+    the two, and a mean d in H1's direction between -0.4 and 0.
+- **P2: H2 is supported, with a small d.** At 64 x 64, EASU and bilinear were close: FSR1 lost to bilinear by 0.180, and EASU
+  beat FSR1 by 0.180. At 256, EASU's edge-following has more pixels to follow an edge across.
+- **P3: B's error is above A's on every image,** and the price of the quarter is below round 26's 1.406.
+- **P4: C1 holds on both hypotheses.** At 128 x 128 the network sees a scene at twice the scale it was trained on, not half
+  as at 32 x 32.
+
+**Secondary, reported, never tested.**
+- **The price of the quarter:** d of A against B.
+- **FSR1 whole, and RCAS without its denoise,** each against B (positive: EASU alone was better).
+- Per-image tables, every frame's noisy input error, and the floor.
+
+**What was seen first.**
+- Everything in sections 1-88, including section 82's descriptive numbers, which P1 to P3 are written from.
+- **The pilot, on two scenes outside every split (R 990003, C 990004), mechanics only, nothing scored against a reference:**
+  - Rendering took 145 s for R. C took 359 s, but that run overlapped another gate's, so it is not a clean time.
+  - Each 256 x 256 denoise took 4.9-5.5 s and each 128 x 128 one 1.3-1.5 s; the four upscales together under 0.5 s.
+  - Every output was finite. The transfer round-trips through float32 to 1.9e-5 relative at worst, over 1e-6 to 300.
+  - **EASU never needed the clamp:** 0 of 196,608 values on both scenes. FSR1 had 180 and 91 values held, which is RCAS's
+    overshoot, as at 64 x 64.
+- `render/denoiseStudy-selfcheck.mjs` runs the EASU chain on two 16 x 16 scenes outside every split, to hold the plumbing. It
+  reads no number for its value.
+- Nothing of the test set has been rendered.
+
+**Sabotaged before the harvest.** Seven runs, each restored byte-identical by SHA-256, logged as D39-D40 and R45-R49 in the
+gates' headers. None was 0 red.
+- The split left out of the dataset refusal: 2 red.
+- Its C half drawn as R: 1 red.
+- B upscaled by FSR1 whatever the candidate: 1 red.
+- The round at 128 x 128: 1 red.
+- The harvest not passing the candidate: 1 red.
+- C4's re-run hard-coded to FSR1: 1 red.
+- The candidate guard removed: 1 red.
+
+**The command:** `node tools/denoiseStudy.mjs --harvest-halfres --cache <dir>` -> `render/denoise-results-halfres.json`.
+- It refuses if the file exists.
+- By the pilot, about 45 minutes here. The file is committed byte for byte before it is read, and section 90 reads it.
+
+**Also in this commit, and not part of the round's question.**
+- **`rig-adapter-features-probe`:** each adapter's features, a fixed set of limits and its subgroup sizes are now in
+  `realGpuRun`'s report, natively and in Chrome, with one console line per adapter. Sabotaged six ways, F1-F6.
+  - On this box's SwiftShader both halves list `subgroups` and neither offers `shader-f16`.
+  - The rig's next run reads both GPUs.
+- **`denoise-r18t-margin-1080` is closed** from the committed reports. Section 63's single 1.087 x is now one of eleven page
+  readings at 1920 x 1080, all between 1.073 and 1.101 x.
