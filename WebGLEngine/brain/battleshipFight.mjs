@@ -56,16 +56,16 @@ export function scenario(seed, kind, { fighters = FIGHTERS } = {}) {
 }
 
 /**
- * The arena for a seed and a kind. Options: fighters (8), gunners (a preset name or a handGunner options object; default `regular`), pilot (the fighters' pilot function, or an array of them one per fighter in turn; default the PD autopilot), seconds (120), behaviour ("face" | "hold"), cruise (0.3).
+ * The arena for a seed and a kind. Options: fighters (8), gunners (a preset name or a handGunner options object; default `regular`), pilot (the fighters' pilot function, or an array of them one per fighter in turn; default the PD autopilot), seconds (120), behaviour ("face" | "hold"), cruise (0.3), friendlyFire (false: rounds hit every craft but their owner, spaceArena's option) and holdFire (true: the fighters' hold-fire rule and the seats' interlock, which only matter with friendlyFire).
  * Returns { arena, ship, scenario, gunners (what was asked for), gunnerOptions (what handGunner was given: the shared defaults, then the setting's own over them) } with `arena` steppable (spaceArena.stepSpaceArena).
  */
-export function build(seed, kind, { fighters = FIGHTERS, gunners = DEFAULT_GUNNERS, pilot = undefined, seconds = SECONDS, behaviour = "face", cruise = 0.3 } = {}) {
+export function build(seed, kind, { fighters = FIGHTERS, gunners = DEFAULT_GUNNERS, pilot = undefined, seconds = SECONDS, behaviour = "face", cruise = 0.3, friendlyFire = false, holdFire = true } = {}) {
     const opts = typeof gunners === "string" ? GUNNERS[gunners] : gunners;
     if (!opts || typeof opts !== "object") throw new Error(`battleshipFight.build: gunners must be one of ${Object.keys(GUNNERS).join(", ")} or a handGunner options object (got ${gunners})`);
     const ship = CS.createCapitalShip(), sc = scenario(seed, kind, { fighters }), gunnerOptions = { ...SHARED, ...opts };
-    const crafts = [{ id: SHIP_ID, team: 1, name: "capital ship", kind: "capital", ship, state: sc.ship, behaviour, cruise, gunner: (seat, k) => GS.handGunner({ seed: seed * 100 + k, ...gunnerOptions }) }];
-    sc.fighters.forEach((f, i) => crafts.push({ id: SHIP_ID + 1 + i, team: 2, name: `fighter ${i + 1}`, kind: "fighter", state: { pos: f.pos, q: f.q }, ...(pilot ? { pilot: Array.isArray(pilot) ? pilot[i % pilot.length] : pilot } : {}) }));
-    return { arena: SA.createSpaceArena({ crafts, seconds }), ship, scenario: sc, gunners: opts, gunnerOptions };
+    const crafts = [{ id: SHIP_ID, team: 1, name: "capital ship", kind: "capital", ship, state: sc.ship, behaviour, cruise, holdFire, gunner: (seat, k) => GS.handGunner({ seed: seed * 100 + k, ...gunnerOptions }) }];
+    sc.fighters.forEach((f, i) => crafts.push({ id: SHIP_ID + 1 + i, team: 2, name: `fighter ${i + 1}`, kind: "fighter", state: { pos: f.pos, q: f.q }, holdFire, ...(pilot ? { pilot: Array.isArray(pilot) ? pilot[i % pilot.length] : pilot } : {}) }));
+    return { arena: SA.createSpaceArena({ crafts, seconds, friendlyFire }), ship, scenario: sc, gunners: opts, gunnerOptions };
 }
 
 /** A fight in numbers, from the arena as it stands (finished or not): who is left, what each side did to the other (the damage on the ship is what it has lost of its hit points, so it and `hpLeft` add up to the 1,500 whatever the last round overkilled), and the winner ("ship" when it flies and no fighter does, "fighters" when one does and it does not, "none" otherwise). */
@@ -74,10 +74,11 @@ export function tally(arena) {
     const shipFlying = flyingNow(s), fightersFlying = fs.filter(flyingNow).length;
     return {
         over: arena.over, t: arena.t, ticks: arena.i,
-        ship: { status: s.status, hpLeft: Math.max(0, s.hp), enginesRunning: s.enginesRunning, partsOut: out, seatRounds: s.seats.reduce((a, x) => a + x.state.gun.fired, 0), hitsDealt: s.hits, waves: s.waves, charge: s.charge },
-        fighters: fs.map((c) => ({ id: c.id, name: c.name, status: c.status, hpLeft: Math.max(0, c.hp), fired: c.gun.fired, hitsDealt: c.hits, mode: c.mode })),
+        ship: { status: s.status, hpLeft: Math.max(0, s.hp), enginesRunning: s.enginesRunning, partsOut: out, seatRounds: s.seats.reduce((a, x) => a + x.state.gun.fired, 0), hitsDealt: s.hits, waves: s.waves, charge: s.charge, friendlyHits: s.friendlyHits, friendlyTaken: s.friendlyTaken, held: s.held },
+        fighters: fs.map((c) => ({ id: c.id, name: c.name, status: c.status, hpLeft: Math.max(0, c.hp), fired: c.gun.fired, hitsDealt: c.hits, mode: c.mode, friendlyHits: c.friendlyHits, friendlyTaken: c.friendlyTaken, held: c.held })),
         killed: fs.filter((c) => c.status === "destroyed").length, rammed: fs.filter((c) => c.status === "rammed").length, flying: fightersFlying,
         damageOnShip: s.hpMax - Math.max(0, s.hp),
+        friendlyHits: s.friendlyHits + fs.reduce((a, c) => a + c.friendlyHits, 0),
         winner: shipFlying && fightersFlying === 0 ? "ship" : !shipFlying && fightersFlying > 0 ? "fighters" : "none",
     };
 }

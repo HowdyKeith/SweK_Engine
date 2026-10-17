@@ -10,11 +10,17 @@
 //                 takes its seat out of the fight, an engine pod a third of the thrust), and its wave-motion cannon -- an INVENTED weapon -- charges, and fires one hit-scan beam along the bow when an enemy is in it.
 //
 //   A TICK      every live craft decides from the states the tick started with; fighters and seats fire; the wave-motion cannon fires if it is charged and something is in its line; every body moves one tick; fighters that touch each other collide (brain/shipCollision6dof.mjs, as the page);
-//               every round moves and is tested against the enemy craft (flightGuns.stepRounds with g = 0 and no ground: space) -- ROUNDS ARE TESTED PER TEAM AGAINST THE OTHER TEAMS' CRAFT ONLY, as the page's weapons are (so there is no friendly fire and no hold-fire rule here, unlike the flight arena); a fighter that touches a ship's
+//               every round moves and is tested against the enemy craft (flightGuns.stepRounds with g = 0 and no ground: space) -- ROUNDS ARE TESTED PER TEAM AGAINST THE OTHER TEAMS' CRAFT ONLY, as the page's weapons are (so BY DEFAULT there is no friendly fire and no hold-fire rule, unlike the flight arena -- `friendlyFire: true` turns both on, below); a fighter that touches a ship's
 //               hull is lost and the ship takes 25; hit points gone is destroyed. THE FIGHT IS OVER when fewer than two teams have a craft flying, or at the time limit.
 //
 //   THE FIGHTERS' DOCTRINE AGAINST A CAPITAL SHIP is a HAND RULE, chosen, not trained, and the reason it exists is measured: the page's pilot has no braking, so a fighter that simply pursues a ship arrives at its hull at speed and rams it. A fighter APPROACHES by steering for a point 60 units to one side of the ship
 //               (the side is its id's parity), thrusting; within 220 units and closing it STRAFES -- nose on the ship's lead point, thrust cut, guns firing -- and the lateral velocity it built on the way in carries it past. The learned 6DOF pilots (brain/pilot6dofPolicy.mjs) answer the same call and can fly it; nothing here was trained for it.
+//
+//   FRIENDLY FIRE (the option `friendlyFire`, default off, so that every fight pinned without it is the same fight): a round then hits any craft but its owner -- a team-mate, another ship of the team, and the OWNER SHIP'S OWN HULL (a round fired across the deck reaches the parts it crosses; the parts whose sphere the muzzle starts
+//               inside are skipped, as a fighter is skipped by its own rounds). A hit on a team-mate takes its hit points (and a part's), is NOT credited to the shooter's `hits`, is counted in the shooter's `friendlyHits` and the victim's `friendlyTaken`, and its event says `friendly: true`. A craft's `holdFire` (default true) is
+//               the rule that keeps it from doing it: a fighter does not pull its trigger while its round (a straight line in vacuum: the closest approach is closed form) would pass within a team-mate's size plus HOLD_FIRE_MARGIN (2) of it before it reached its target's range; a SEAT'S INTERLOCK is the same test with the ship's own
+//               hull added -- the line from the muzzle for OWN_HULL_REACH (50) units against the ship's other parts -- and the seat keeps tracking while its trigger is held (`held` counts the ticks, on the seat and on the craft); the wave-motion cannon holds while a team-mate is in its beam. WITH `holdFire: false` the fighters shoot
+//               each other and the ship shoots itself.
 //
 // WHAT IS NOT HERE, SAID PLAINLY: hit volumes are SPHERES, a fighter's 1.5 units (the page's are oriented boxes: tests of the page's own fighter-against-fighter fight are not this arena's); a fighter that touches a hull is lost without an impulse; ships do not collide with each other; wind and gravity do not exist (vacuum);
 // a destroyed craft does not tumble (it stops, dark, where it was). stepSpaceArena() MUTATES the arena it is given. Pure otherwise: no DOM, no clock, no random.
@@ -32,7 +38,7 @@ export const FIGHTER = Object.freeze({ half: Object.freeze([1.6, 0.7, 0.7]), mas
 export const FIGHTER_GUN = Object.freeze({ ...G.GUN, muzzleSpeed: 900, rate: 1000 / 300, magazine: 1e6, life: 2.5, damage: 18 });
 /** The autopilot's numbers on the page (PAGE_AUTOPILOT): thrust 16, standoff 50, the weapon's speed for the lead. */
 export const AUTOPILOT = Object.freeze({ weaponSpeed: 900, thrustForce: 16, standoff: 50 });
-export const STRAFE_RANGE = 220, APPROACH_OFFSET = 60, RAM_DAMAGE = 25, VISION = 1500;
+export const STRAFE_RANGE = 220, APPROACH_OFFSET = 60, RAM_DAMAGE = 25, VISION = 1500, HOLD_FIRE_MARGIN = 2, OWN_HULL_REACH = 50;
 
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const add = (a, b, s = 1) => [a[0] + b[0] * s, a[1] + b[1] * s, a[2] + b[2] * s];
@@ -45,7 +51,7 @@ const unit = (a, fallback = [1, 0, 0]) => { const n = norm(a); return n > 1e-9 ?
  * A new arena. `crafts` are the definitions above; ids must be distinct positive integers. Returns { dt, seconds, t, i, crafts, rounds, events, done, over, autopilot }. A craft carries { id, team, name, kind, body, hp, hpMax, dead, status ("flying" | "destroyed" | "rammed"),
  * hits (damage it has dealt to the enemy), gun / seats / enginesRunning / partHp (Map part id -> hit points left) / charge / waves, last }.
  */
-export function createSpaceArena({ crafts, dt = DT, seconds = 120, autopilot = AUTOPILOT } = {}) {
+export function createSpaceArena({ crafts, dt = DT, seconds = 120, autopilot = AUTOPILOT, friendlyFire = false } = {}) {
     if (!Array.isArray(crafts) || crafts.length < 2) throw new Error("spaceArena.createSpaceArena: an arena needs at least two crafts");
     const ids = new Set();
     for (const c of crafts) {
@@ -57,15 +63,15 @@ export function createSpaceArena({ crafts, dt = DT, seconds = 120, autopilot = A
     const made = crafts.map((c) => {
         const st = c.state || {}, cap = c.kind === "capital", ship = c.ship || null;
         const body = RB.createBody({ mass: cap ? ship.mass : FIGHTER.mass, I: cap ? [...ship.I] : RB.boxInertia({ m: FIGHTER.mass, hx: FIGHTER.half[0], hy: FIGHTER.half[1], hz: FIGHTER.half[2] }), pos: st.pos, vel: st.vel, q: st.q, w: st.w });
-        const out = { id: c.id, team: c.team ?? c.id, name: c.name || `craft ${c.id}`, kind: c.kind, body, hp: c.hp ?? (cap ? ship.hp : FIGHTER.hp), hpMax: c.hp ?? (cap ? ship.hp : FIGHTER.hp), dead: false, status: "flying", hits: 0, last: null,
+        const out = { id: c.id, team: c.team ?? c.id, name: c.name || `craft ${c.id}`, kind: c.kind, body, hp: c.hp ?? (cap ? ship.hp : FIGHTER.hp), hpMax: c.hp ?? (cap ? ship.hp : FIGHTER.hp), dead: false, status: "flying", hits: 0, friendlyHits: 0, friendlyTaken: 0, held: 0, holdFire: c.holdFire !== false, last: null,
             ship, pilot: c.pilot || null, behaviour: c.behaviour || "face", cruise: c.cruise ?? 0.3, aimRadius: cap ? ship.aimRadius : FIGHTER.radius, mode: "approach", gun: cap ? null : G.createGun(FIGHTER_GUN), seats: [], enginesRunning: cap ? ship.engines.length : 0, partHp: new Map(), partHits: new Map(), charge: 0, waves: 0 };
         if (cap) {
-            out.seats = ship.seats.map((seat, k) => ({ seat, state: GS.createSeatState(seat), decide: c.gunner ? c.gunner(seat, k) : GS.handGunner({ seed: c.id * 100 + k, gravity: 0, maxRange: 600, burst: 1 }), last: null, part: ship.seatPart[k] }));
+            out.seats = ship.seats.map((seat, k) => ({ seat, state: GS.createSeatState(seat), decide: c.gunner ? c.gunner(seat, k) : GS.handGunner({ seed: c.id * 100 + k, gravity: 0, maxRange: 600, burst: 1 }), last: null, part: ship.seatPart[k], held: 0, blocked: null }));
             for (const p of ship.parts) if (p.hp !== null) out.partHp.set(p.id, p.hp);
         }
         return out;
     });
-    return { dt, seconds, t: 0, i: 0, crafts: made, rounds: [], events: [], done: false, over: null, autopilot: { ...autopilot } };
+    return { dt, seconds, t: 0, i: 0, crafts: made, rounds: [], events: [], done: false, over: null, autopilot: { ...autopilot }, friendlyFire: !!friendlyFire };
 }
 
 const flying = (c) => !c.dead;
@@ -96,11 +102,14 @@ export function fighterAim(arena, c, foe) {
     return { target: { pos: add(foe.body.pos, s, APPROACH_OFFSET * sign), vel: foe.body.vel }, opts: base, strafe: false, mode: "approach" };
 }
 
-/** The wave-motion cannon's beam, from the ship's bow along its axis: the craft of other teams still flying whose centre is within the beam's width (plus their own radius) of the line, out to the range. */
-export function waveTargets(arena, c) {
+/** The craft of other teams still flying that the wave-motion cannon's beam reaches, from the ship's bow along its axis: those whose centre is within the beam's width (plus their own radius) of the line, out to the range. */
+export function waveTargets(arena, c) { return inBeam(arena, c, (o) => o.team !== c.team); }
+/** ...and the team-mates of the ship (other craft of its team, still flying) in the same beam: what the cannon holds its fire for, and with `friendlyFire` and no `holdFire` what it hits. */
+export function waveMates(arena, c) { return inBeam(arena, c, (o) => o.team === c.team); }
+function inBeam(arena, c, pred) {
     const w = c.ship.waveGun, fwd = RB.rotateByQuat(c.body.q, [1, 0, 0]), from = add(c.body.pos, RB.rotateByQuat(c.body.q, w.muzzle)), out = [];
     for (const o of arena.crafts) {
-        if (o === c || o.team === c.team || !flying(o)) continue;
+        if (o === c || !pred(o) || !flying(o)) continue;
         const rel = sub(o.body.pos, from), along = dot(rel, fwd);
         if (along < 0 || along > w.range) continue;
         const perp = norm(sub(rel, [fwd[0] * along, fwd[1] * along, fwd[2] * along]));
@@ -109,23 +118,76 @@ export function waveTargets(arena, c) {
     return out;
 }
 
+/** The closest a round (from `pos`, velocity `vel`) comes to a point moving in a straight line (from `p`, velocity `v`) inside `horizon` seconds, as { t, d }: both paths are straight in vacuum, so the minimum of |p - pos + (v - vel) t| over [0, horizon] is closed form. */
+export function approach(pos, vel, p, v, horizon) {
+    const r = sub(p, pos), w = sub(v, vel), ww = dot(w, w), t = ww < 1e-12 ? 0 : Math.max(0, Math.min(horizon, -dot(r, w) / ww));
+    return { t, d: norm(add(r, w, t)) };
+}
+
+/**
+ * The team-mate of `c` (another craft of its team, still flying) that a round fired from `muzzle` ({ pos, vel, dir }) at `speed` would come within its size plus HOLD_FIRE_MARGIN of inside `horizon` seconds, as { craft, miss, part } (the nearest such), or null. A fighter is one sphere of its hit radius; a ship is
+ * each of its parts' spheres, carried at the ship's velocity for the horizon (its turning over a second or two is ignored).
+ */
+export function friendInLine(arena, c, muzzle, speed, horizon) {
+    const vel = add(muzzle.vel, muzzle.dir, speed);
+    let best = null;
+    for (const f of arena.crafts) {
+        if (f === c || f.team !== c.team || !flying(f)) continue;
+        const spheres = f.kind === "capital" ? CS.partCentres(f.ship, f.body).map((q) => ({ center: q.center, radius: q.radius, part: q.name })) : [{ center: f.body.pos, radius: FIGHTER.radius, part: null }];
+        for (const q of spheres) {
+            const a = approach(muzzle.pos, vel, q.center, f.body.vel, horizon);
+            if (a.d < q.radius + HOLD_FIRE_MARGIN && (best === null || a.d < best.miss)) best = { craft: f, miss: a.d, part: q.part };
+        }
+    }
+    return best;
+}
+
+/** The name of the first part of the ship `c` carries that the line from `muzzle` along its direction crosses within OWN_HULL_REACH units, not counting a part whose sphere the muzzle is inside (the mount's own), or null. */
+export function ownHullInLine(c, muzzle) {
+    let best = null;
+    for (const q of CS.partCentres(c.ship, c.body)) {
+        const rel = sub(q.center, muzzle.pos), along = dot(rel, muzzle.dir);
+        if (norm(rel) <= q.radius) continue;
+        const t = Math.max(0, Math.min(OWN_HULL_REACH, along)), miss = norm(sub(rel, [muzzle.dir[0] * t, muzzle.dir[1] * t, muzzle.dir[2] * t]));
+        if (miss < q.radius && (best === null || t < best.t)) best = { t, name: q.name };
+    }
+    return best && best.name;
+}
+
+const fighterMuzzle = (c) => ({ pos: add(c.body.pos, RB.rotateByQuat(c.body.q, FIGHTER.muzzle)), vel: c.body.vel.slice(), dir: RB.rotateByQuat(c.body.q, [1, 0, 0]) });
+/** Why a seat that wants to fire may not: "hull: <part>" (its line crosses the ship's own), "friend: <craft>" (a team-mate in its line before its target) or null. */
+function seatBlocked(arena, c, st, cmd) {
+    const mz = GS.muzzleOfSeat(st.seat, st.state, c.body), gun = st.seat.gun, own = ownHullInLine(c, mz);
+    if (own) return `hull: ${own}`;
+    const target = cmd.target != null ? arena.crafts.find((o) => o.id === cmd.target) : null, range = target ? norm(sub(target.body.pos, mz.pos)) : gun.muzzleSpeed * gun.life;
+    const m = friendInLine(arena, c, mz, gun.muzzleSpeed, Math.min(gun.life, range / gun.muzzleSpeed + 0.15));
+    return m ? `friend: ${m.craft.name}` : null;
+}
+
 /** One tick of every craft and every round. Mutates and returns the arena; a finished arena is returned untouched. `arena.events` is this tick's: [{ type: "hit" | "part" | "kill" | "wave" | "ram" | "collision", ... }]. */
 export function stepSpaceArena(arena) {
     if (arena.done) return arena;
     const { dt } = arena, t = arena.i * dt, tEnd = (arena.i + 1) * dt, events = [], alive = arena.crafts.filter(flying), plan = new Map(), fresh = [];
-    const tag = (rounds, c, gun) => rounds.map((r) => ({ ...r, team: c.team, dmg: gun.damage, life: gun.life }));
+    const tag = (rounds, c, gun) => {
+        const inside = arena.friendlyFire && c.kind === "capital" ? CS.partCentres(c.ship, c.body) : null;   // a ship's round skips the parts it is fired from inside
+        return rounds.map((r) => ({ ...r, team: c.team, dmg: gun.damage, life: gun.life, ...(inside ? { skip: inside.filter((q) => norm(sub(r.pos, q.center)) <= q.radius).map((q) => q.part) } : {}) }));
+    };
     // decisions, all from the states the tick started with
     for (const c of alive) {
         const foe = nearestFoe(arena, c);
         if (c.kind === "fighter") {
-            let torque = [0, 0, 0], thrust = 0, fire = false, aim = null;
+            let torque = [0, 0, 0], thrust = 0, fire = false, aim = null, held = false;
             if (foe) {
                 aim = fighterAim(arena, c, foe); c.mode = aim.mode;
                 const d = (c.pilot || AP.decide)(c.body, aim.target, aim.opts);
                 torque = d.torqueBody; thrust = d.thrust; fire = !!d.firing && aim.strafe;
+                if (fire && arena.friendlyFire && c.holdFire) {
+                    const mz = fighterMuzzle(c), range = norm(sub(foe.body.pos, mz.pos));
+                    if (friendInLine(arena, c, mz, FIGHTER_GUN.muzzleSpeed, Math.min(FIGHTER_GUN.life, range / FIGHTER_GUN.muzzleSpeed + 0.15))) { fire = false; held = true; c.held += 1; }
+                }
             }
             plan.set(c, { torque, thrust, fire, foe });
-            c.last = { foe: foe ? foe.id : null, fire, thrust, mode: aim ? aim.mode : "idle", target: aim ? aim.target.pos : null };
+            c.last = { foe: foe ? foe.id : null, fire, thrust, mode: aim ? aim.mode : "idle", target: aim ? aim.target.pos : null, held };
         } else {
             let torque = [0, 0, 0];
             if (c.behaviour === "face" && foe) torque = CS.limitTorque(c.ship, AP.decide(c.body, { pos: foe.body.pos, vel: foe.body.vel }, { kp: c.ship.kp, kd: c.ship.kd, thrustForce: 0, standoff: 1e9 }).torqueBody);
@@ -142,7 +204,13 @@ export function stepSpaceArena(arena) {
         } else {
             const shown = alive.filter((o) => o.team !== c.team && norm(sub(o.body.pos, c.body.pos)) < VISION).map((o) => ({ id: o.id, pos: o.body.pos, vel: o.body.vel, radius: o.aimRadius }));
             for (const st of c.seats) {
-                const cmd = seatWorks(c, st) ? st.decide(st.seat, st.state, c.body, shown, t) : { yaw: st.state.yaw, pitch: st.state.pitch, fire: false, target: null }, out = GS.stepSeat(st.seat, st.state, c.body, cmd, dt, c.id);
+                const cmd = seatWorks(c, st) ? st.decide(st.seat, st.state, c.body, shown, t) : { yaw: st.state.yaw, pitch: st.state.pitch, fire: false, target: null };
+                let go = cmd; st.blocked = null;
+                if (cmd.fire && arena.friendlyFire && c.holdFire) {   // the line that matters is the one the seat points along AFTER this tick's slew, so the slew is done first without the trigger
+                    const aimed = GS.stepSeat(st.seat, st.state, c.body, { ...cmd, fire: false }, dt, c.id).state, why = seatBlocked(arena, c, { seat: st.seat, state: aimed }, cmd);
+                    if (why) { st.blocked = why; go = { ...cmd, fire: false }; st.held += 1; c.held += 1; }
+                }
+                const out = GS.stepSeat(st.seat, st.state, c.body, go, dt, c.id);
                 st.state = out.state; st.last = cmd; fresh.push(...tag(out.rounds, c, st.seat.gun));
             }
         }
@@ -153,11 +221,13 @@ export function stepSpaceArena(arena) {
         if (c.kind !== "capital") continue;
         const w = c.ship.waveGun; c.charge = Math.min(w.charge, c.charge + dt);
         if (c.charge >= w.charge) {
-            const hit = waveTargets(arena, c);
-            if (hit.length) {
+            const hit = waveTargets(arena, c), mates = arena.friendlyFire ? waveMates(arena, c) : [];
+            if (hit.length && mates.length && c.holdFire) c.held += 1;   // held: a team-mate is in the beam
+            else if (hit.length) {
                 c.charge = 0; c.waves += 1;
                 for (const o of hit) { o.hp -= w.damage; c.hits += w.damage; waved.add(o); }
-                events.push({ type: "wave", t: tEnd, craft: c.id, victims: hit.map((o) => o.id), damage: w.damage });
+                for (const o of mates) { o.hp -= w.damage; c.friendlyHits += w.damage; o.friendlyTaken += w.damage; waved.add(o); }
+                events.push({ type: "wave", t: tEnd, craft: c.id, victims: hit.map((o) => o.id), ...(mates.length ? { friendly: mates.map((o) => o.id) } : {}), damage: w.damage });
             }
         }
     }
@@ -179,16 +249,27 @@ export function stepSpaceArena(arena) {
         return from.map((p, k) => ({ id: c.id, part: p.part, from: p.center, to: to[k].center, radius: p.radius }));
     });
     const all = [...arena.rounds, ...fresh], teams = [...new Set(all.map((r) => r.team))], survivors = [], hits = [];
-    for (const tm of teams) {
-        const mine = all.filter((r) => r.team === tm), res = G.stepRounds(mine, dt, targetsOf(alive.filter((c) => c.team !== tm)), { g: 0, ground: null, life: 5 });
-        survivors.push(...res.rounds); hits.push(...res.hits);
+    if (!arena.friendlyFire) {
+        for (const tm of teams) {
+            const mine = all.filter((r) => r.team === tm), res = G.stepRounds(mine, dt, targetsOf(alive.filter((c) => c.team !== tm)), { g: 0, ground: null, life: 5 });
+            survivors.push(...res.rounds); hits.push(...res.hits);
+        }
+    } else {   // FRIENDLY FIRE: every craft is a target but the round's owner (a ship's own parts, but the ones it was fired from inside)
+        const everyone = targetsOf(alive), groups = new Map();
+        for (const r of all) { const key = r.owner + ":" + (r.skip ? r.skip.join(",") : "-"); if (!groups.has(key)) groups.set(key, []); groups.get(key).push(r); }
+        for (const [, rs] of groups) {
+            // flightGuns.stepRounds never lets a round hit a target with its owner's id, so the parts of the ship's own hull it may hit are handed to it under the id's negative and given back
+            const owner = rs[0].owner, skip = rs[0].skip || null, targets = everyone.filter((q) => q.id !== owner || (skip !== null && !skip.includes(q.part))).map((q) => (q.id === owner ? { ...q, id: -q.id } : q)), res = G.stepRounds(rs, dt, targets, { g: 0, ground: null, life: 5 });
+            survivors.push(...res.rounds); hits.push(...res.hits.map((h) => (h.target < 0 ? { ...h, target: -h.target } : h)));
+        }
     }
     arena.rounds = survivors;
     const byId = new Map(arena.crafts.map((c) => [c.id, c]));
     for (const h of hits) {
         const victim = byId.get(h.target), shooter = byId.get(h.owner), dmg = h.round.dmg;
-        victim.hp -= dmg; shooter.hits += dmg;
-        events.push({ type: "hit", t: tEnd, shooter: shooter.id, victim: victim.id, point: h.point, damage: dmg, ...(h.part !== undefined ? { part: h.part } : {}) });
+        const friendly = victim.team === shooter.team;   // only with friendlyFire: not the enemy's, so not the shooter's credit
+        victim.hp -= dmg; if (friendly) { shooter.friendlyHits += dmg; victim.friendlyTaken += dmg; } else shooter.hits += dmg;
+        events.push({ type: "hit", t: tEnd, shooter: shooter.id, victim: victim.id, point: h.point, damage: dmg, ...(friendly ? { friendly: true } : {}), ...(h.part !== undefined ? { part: h.part } : {}) });
         if (h.part !== undefined) {
             victim.partHits.set(h.part, (victim.partHits.get(h.part) || 0) + dmg);
             if (victim.partHp.has(h.part)) {
