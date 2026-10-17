@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 481,
+ "count": 484,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -392,6 +392,13 @@
    "f": "boids.html",
    "t": "Boids flocking",
    "d": "Classic flocking — separation, alignment, cohesion. Tap to scatter.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "bomber.html",
+   "t": "SweK &middot; Bomber",
+   "d": "Bomber: a B-29-style bomber with five gun seats, each with a gunner, against trained fighters -- a window per craft (plane, pilot, each gun seat, the networks) stepped by brain/dogfightArena.mjs under brain/bomberFight.mjs.",
    "g": "",
    "p": 0
   },
@@ -945,6 +952,13 @@
    "f": "doctor.html",
    "t": "Doctor",
    "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "dogfight.html",
+   "t": "SweK &middot; Dogfight",
+   "d": "Dogfight: two aircraft fight under brain/dogfightTask.mjs's rules (pursuit guidance, a hand trigger, a 300 m/s gun that falls, 20 hits kill) stepped by brain/dogfightArena.mjs, each with a window down the right that a click switches between the plane from outside, the pilot's seat, the gun's sight with its lead pip, and the pilot's network thinking, live. Pilots: the PD autopilot, the fruit fly's network (hand weights, trained to fly, trained to fight) and the GPU Brain's network (the same three, on its CPU twin). Answer-key gates: dogfightArena-selfcheck, flightViews-selfcheck, dogfightTask-selfcheck, dogfightPage-selfcheck.",
    "g": "",
    "p": 0
   },
@@ -2793,6 +2807,13 @@
    "f": "song-globe.html",
    "t": "🌍 Song Globe — SweK Engine",
    "d": "An audio file wrapped onto a globe: time goes round it, frequency runs pole to pole, loudness is height, silence is sea. A pure tone is a ring; a rising sweep is a spiral.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "space-battleship.html",
+   "t": "SweK &middot; Space battleship",
+   "d": "Battleship: a Yamato-like space battleship with thirteen gun seats, each with a gunner, against the 6DOF fighters -- a window per craft (plane, pilot, each gun seat, the networks) stepped by brain/spaceArena.mjs under brain/battleshipFight.mjs.",
    "g": "",
    "p": 0
   },

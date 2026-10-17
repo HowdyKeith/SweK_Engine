@@ -117,14 +117,18 @@ console.log("1. *** THE ITEM SAID '82 FILES TOUCH WASM'. THAT WAS THE LOOSEST RE
     // v4840 -- RE-TAKEN 123 -> 124, AND IT IS CODE. tools/ship/wasmDoors-selfcheck.mjs arrived: the computed-door census's gate,
     // whose fixture glue is a string that calls WebAssembly.instantiate. +1 mention, +1 inCode; comment-only stayed at 26 and
     // callsApi at 13 (a string calls nothing), so the split says what it should. Found by budgetExile at v4840's step 4b.
-    ok("!! 124 files mention .wasm or the WebAssembly API -- the item's number, and it is the loose one",
-        mentions === 124, `${mentions} mention it`);
+    // UNNUMBERED (the v4874 ship) -- RE-TAKEN 124 -> 125, AND IT IS CODE. ai-bridge/tools/roundhouseRoutes-selfcheck.mjs arrived: the
+    // gate that boots the real server and drives physics-lab.html, whose small static file server carries the type table
+    // ({ ".wasm": "application/wasm" }) because the page it serves loads the box3d module. +1 mention, +1 inCode; comment-only stayed
+    // at 26. Found by the first verdict's quick sweep, not by the gate's author.
+    ok("!! 125 files mention .wasm or the WebAssembly API -- the item's number, and it is the loose one",
+        mentions === 125, `${mentions} mention it`);
     // *** AND THIS ROW'S TITLE CARRIED A NUMBER ITS ASSERTION DOES NOT CHECK. *** It said "24 of those are
     // comments" while asserting only `inCode === 94`, so when comment-only went to 25 the row kept passing and
     // kept saying 24 -- a title reporting a moving quantity as a fixed one, beside a detail line printing the
     // true value. Both halves are asserted now, so the title cannot drift away from the check underneath it.
-    ok("!! ...but 26 of those are comments and prose only; 98 mention it in live code",
-        inCode === 98 && mentions - inCode === 26, `${inCode} in code, ${mentions - inCode} comment-only`);
+    ok("!! ...but 26 of those are comments and prose only; 99 mention it in live code",
+        inCode === 99 && mentions - inCode === 26, `${inCode} in code, ${mentions - inCode} comment-only`);
     // *** AND MY OWN GREP GAVE 12, WHICH WAS WRONG, FOR THE FOURTH TIME IN THIS CLASS. *** A raw search for
     // /WebAssembly\./ matched wasm-demo.html, where the text is a SENTENCE -- "executed by the bridge's own
     // Node WebAssembly. No Docker" -- and the full stop matched the escaped dot. Same shape as the licence

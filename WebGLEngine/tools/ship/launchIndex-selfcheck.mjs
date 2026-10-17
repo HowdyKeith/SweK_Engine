@@ -62,6 +62,23 @@ const ix = buildIndex();
        ix.multiSurface.some((e) => e.display === "Boids") && ix.multiSurface.some((e) => e.display === "Gray Scott"),
        ix.multiSurface.map((e) => e.display).join(", ") + " — boids.html and demo:boids are the SAME demo through " +
        "two doors. 'Boids' and 'Boids 2' would tell a reader they are different things");
+    // UNNUMBERED (the v4874 ship) -- *** A PAGE THAT SHARES AN ID WITH A LAUNCHER IS MERGED INTO IT, WHETHER OR NOT IT IS THE SAME THING. ***
+    // idKey() strips ".html", separators and case, so the space battleship's page, first named battleship.html, was MERGED into the
+    // builtin "battleship" (the 3D board game, /?go=battleship) and the game's launcher VANISHED from the index -- a count of 38 built-ins
+    // became 37 and nothing red noticed, because the rows above only floor the merges at eight. The merged set is now NAMED: a new merge
+    // is a decision someone makes with the name in front of them, not a side effect of a file name.
+    // SABOTAGE, restored: a file named battleship.html written beside the others (the name the page first had) -> RED, both rows, by name:
+    // "NEW MERGES: Battleship" and the built-in launcher missing from the index. Found by the ship's first verdict regenerating the index,
+    // where launchIndex.mjs --write quietly removed the board game's launcher and printed "13 one-thing-two-surfaces" for "12".
+    const KNOWN_MERGES = ["AudioLab", "Asteroids", "Boids", "Cellular Automata", "Credits", "Gray Scott", "Pachinko", "Pipboy Models", "Realterrain", "Showcase", "Slime Mold", "Aquarium"];
+    const mergedNames = ix.multiSurface.map((e) => e.display);
+    const extra = mergedNames.filter((n) => !KNOWN_MERGES.includes(n)), lost = KNOWN_MERGES.filter((n) => !mergedNames.includes(n));
+    ok("!! THE MERGED SET IS EXACTLY THE TWELVE KNOWN ONE-THING-TWO-SURFACES ENTRIES: a page whose file name happens to equal a launcher's id is not silently folded into it (and its launcher dropped from the index)",
+       extra.length === 0 && lost.length === 0,
+       extra.length || lost.length ? "NEW MERGES: " + (extra.join(", ") || "none") + "; GONE: " + (lost.join(", ") || "none") : mergedNames.length + " merges, all of them known");
+    ok("!! ...and the built-in launcher for the 3D board game is still in the index as its own entry, next to the page that shares its stem",
+       ix.entries.some((e) => e.kind === "builtin" && e.id === "battleship") && ix.entries.some((e) => e.id === "battleship3d.html"),
+       "/?go=battleship must not be folded into another page's entry");
     ok("!! ...and each merged entry keeps EVERY route rather than dropping one",
        ix.multiSurface.every((e) => e.routes.length >= 2 && new Set(e.kinds).size >= 2),
        "keying a map by label would have silently kept the last one, which is how a page vanishes from an index " +

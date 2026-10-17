@@ -21,7 +21,7 @@
   }
  },
  "counts": {
-  "page": 481,
+  "page": 484,
   "demo": 49,
   "builtin": 38
  },
@@ -471,6 +471,14 @@
    "id": "boids.html",
    "display": "Boids",
    "href": "/boids.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "bomber.html",
+   "display": "Bomber",
+   "href": "/bomber.html",
    "section": null,
    "collision": false
   },
@@ -1108,6 +1116,14 @@
   },
   {
    "kind": "page",
+   "id": "dogfight.html",
+   "display": "Dogfight",
+   "href": "/dogfight.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
    "id": "doom-fire.html",
    "display": "Doom Fire",
    "href": "/doom-fire.html",
@@ -1223,7 +1239,7 @@
    "id": "es-flight6dof.html",
    "display": "Es Flight6dof",
    "href": "/es-flight6dof.html",
-   "section": null,
+   "section": "Fruit Fly Brain",
    "collision": false
   },
   {
@@ -3215,6 +3231,14 @@
    "id": "song-globe.html",
    "display": "Song Globe",
    "href": "/song-globe.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "space-battleship.html",
+   "display": "Space Battleship",
+   "href": "/space-battleship.html",
    "section": null,
    "collision": false
   },

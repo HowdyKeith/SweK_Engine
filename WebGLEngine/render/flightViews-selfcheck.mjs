@@ -143,7 +143,7 @@ console.log("\n5. THE GUN'S SIGHT");
     ok("!! `onScreen` is false when the lead pip is off the picture (a sight turned 90 degrees away has no pip on it, though the solution exists), and true on the solution", away.onScreen === false && g0.onScreen === true, `${away.lead}`);
     const gone = V.gunsight(camSol, m, { pos: [400, 0, 300], vel: [400, 0, 0] }, W, H);
     ok("!! a target that cannot be reached (receding faster than the round) has no pip, no pipper and no time of flight, and still a range; no target at all gives the bore only", gone.lead === null && gone.pipper === null && gone.tof === null && Math.abs(gone.range - 400) < 3 && (() => { const n = V.gunsight(camSol, m, null, W, H); return n.lead === null && n.pipper === null && n.range === null && !!n.bore; })());
-    // IN VACUUM (gravity 0): the round flies straight, so the pipper is on the gun's line; the 6DOF space battle's sights (battleship.html)
+    // IN VACUUM (gravity 0): the round flies straight, so the pipper is on the gun's line; the 6DOF space battle's sights (space-battleship.html)
     const vac = { pos: [0, 0, 300], vel: [0, 0, 0], dir: [1, 0, 0] }, rel = sub(target.pos, vac.pos), vv = dot(target.vel, target.vel) - 300 * 300, rv = dot(rel, target.vel), rr = dot(rel, rel);
     const tStraight = (-rv - Math.sqrt(rv * rv - vv * rr)) / vv;   // |rel + v t| = 300 t: the smaller root of (v.v - 300^2) t^2 + 2 rel.v t + rel.rel = 0 (the leading coefficient is negative, so this is the positive one)
     const solV = G.aimSolution(vac, target.pos, target.vel, G.GUN, 0), mV = { ...vac, dir: solV.dir }, gV = V.gunsight(look(mV), mV, target, W, H, G.GUN, 0);

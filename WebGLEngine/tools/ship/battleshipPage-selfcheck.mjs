@@ -2,7 +2,7 @@
 //
 // Run: node tools/ship/battleshipPage-selfcheck.mjs      (~2 min: a real browser, software rendering, thirty full fights of up to 120 s)
 //
-// THE PAGE-WIRING GATE for battleship.html. Everything the page WIRES TOGETHER -- brain/battleshipFight.mjs (the scenario, the gunners, the tally: pinned on its own), brain/spaceArena.mjs (the ship, its thirteen seats, its parts, the cannon, the fighters' doctrine: held on its own),
+// THE PAGE-WIRING GATE for space-battleship.html. Everything the page WIRES TOGETHER -- brain/battleshipFight.mjs (the scenario, the gunners, the tally: pinned on its own), brain/spaceArena.mjs (the ship, its thirteen seats, its parts, the cannon, the fighters' doctrine: held on its own),
 // physics/mechanics/capitalShip.mjs, render/flightViews.mjs (the cameras, nextWindow, seatRows, the vacuum sight, the 6DOF pilot's activations), brain/pilot6dofPolicy.mjs and its three shipped weight files -- is gated on its own; this file proves the WIRING in a real browser: the page
 // boots with no error and flies the fight it says, ONE WINDOW PER CRAFT stacked down the right (the ship's first and taller), a CLICK on the ship's window goes plane -> pilot -> seat 1 ... seat 13 -> brain -> plane (a fighter's goes plane -> pilot -> gunner -> brain) without touching the
 // others, the views are really different pictures (the WebGL pixels under each window are read back), a gun seat's window draws the sight for the target THAT gunner chose, in VACUUM (the pipper and the lead pip, where flightViews.gunsight puts them with gravity 0 -- and not where the Earth's gravity
@@ -11,7 +11,7 @@
 // the league pilot, the close-quarters pilot, a mix), the ship's behaviour and cruise -- are the fight that runs: every one is checked against brain/battleshipFight.fight() run here, to the bit in every count. The stack scrolls when the craft do not fit and a window half out of it is cut at its
 // edge. The exact state is read through window.__battleship (a hook the page exposes, whose step(n) is the gate's clock: no waiting on frames).
 //
-// SABOTAGE LOG -- NINETY-ONE (and fourteen more for friendly fire, below), each applied to battleship.html in a scratch worktree, the gate run, the worktree restored; every one red by name (the number is how many rows went red):
+// SABOTAGE LOG -- NINETY-ONE (and fourteen more for friendly fire, below), each applied to space-battleship.html in a scratch worktree, the gate run, the worktree restored; every one red by name (the number is how many rows went red):
 //   BSP1 a click does nothing 3 | BSP2 the ship's window skips the seats 2 | BSP3 a click on a window switches the plane windows too 3 | BSP4 a window for the ship only 1
 //   BSP5 the views are not kept across a new fight 1 | BSP6 the seat is not kept across a new fight 1 | BSP7 the window label never names the seat 1 | BSP8 a seat's view is the pilot's camera 6
 //   BSP9 a seat's view is always seat 1's 4 | BSP10 the sight's target is the ship's nearest foe, not the gunner's 2 | BSP11 no pipper in the sight 1 | BSP12 no lead pip in the sight 1
@@ -94,7 +94,7 @@ let fails = 0;
 function ok(name, cond, detail) { console.log(`  ${cond ? "PASS" : "FAIL"}  ${name}${detail ? "   " + detail : ""}`); if (!cond) fails++; }
 function report(name, detail) { console.log(`  ----  ${name}   ${detail}`); }
 
-console.log("battleshipPage-selfcheck -- battleship.html really wires the gated modules together\n");
+console.log("battleshipPage-selfcheck -- space-battleship.html really wires the gated modules together\n");
 
 const skip = webgpuSkipReason(createRequire(import.meta.url));
 if (skip) { console.log(`  SKIP  ${skip}`); report("*** NOT A PASS. ***", ""); fails++; }
@@ -102,10 +102,10 @@ else {
     const run = await runInEngineOrigin({
         engineRoot: ENG, timeoutMs: 560000,
         script: `async () => {
-            globalThis.__swekStep = "booting battleship.html in an iframe";
+            globalThis.__swekStep = "booting space-battleship.html in an iframe";
             const f = document.createElement("iframe");
             f.style.width = "1100px"; f.style.height = "1250px";
-            f.src = "/battleship.html";
+            f.src = "/space-battleship.html";
             document.body.appendChild(f);
             await new Promise((res) => { f.onload = res; });
             const win = f.contentWindow, doc = win.document, wait = (ms) => new Promise((res) => setTimeout(res, ms));
@@ -281,7 +281,7 @@ else {
               out.hand.good = await Hn.loadHand("fly", dataUrl(CUSTOM.fly)); out.hand.goodErr = Hn.error("fly"); out.hand.goodLoaded = Hn.loaded("fly");
               out.hand.wrong2 = await Hn.loadHand("fly", "/brain/pilot6dofWeightsDefault.json"); out.hand.keptAfterRefuse = Hn.loaded("fly");
               out.hand.otherNet = await Hn.loadHand("fly", dataUrl(CUSTOM.mlp)); out.hand.otherNetErr = Hn.error("fly"); out.hand.keptAfterOther = Hn.loaded("fly");
-              const f2 = document.createElement("iframe"); f2.style.width = "1100px"; f2.style.height = "900px"; f2.src = "/battleship.html?hand=mlphand&kind=swarm&seed=4&crew=1&ff=1&hold=0&wrecks=1&impact=1&fighters=5&ships=2&escorts=2"; document.body.appendChild(f2);
+              const f2 = document.createElement("iframe"); f2.style.width = "1100px"; f2.style.height = "900px"; f2.src = "/space-battleship.html?hand=mlphand&kind=swarm&seed=4&crew=1&ff=1&hold=0&wrecks=1&impact=1&fighters=5&ships=2&escorts=2"; document.body.appendChild(f2);
               await new Promise((res) => { f2.onload = res; }); const t1 = performance.now(); while (performance.now() - t1 < 40000 && !f2.contentWindow.__battleship) await wait(200);
               const B2 = f2.contentWindow.__battleship; await B2.ready; B2.hold(true); const s2 = B2.state();
               out.hand.url = { hand: s2.hand, scenario: s2.scenario, crew: s2.crew, ff: s2.friendlyFire, wrecks: s2.wrecks, impact: s2.impact, n: s2.crafts.length, holdFire: s2.crafts[0].holdFire, sel: f2.contentWindow.document.getElementById("hand").value, ships: s2.ships, escorts: s2.escorts, nships: f2.contentWindow.document.getElementById("nships").value, nesc: f2.contentWindow.document.getElementById("nesc").value }; f2.remove();
@@ -326,7 +326,7 @@ else {
         }`,
     });
 
-    ok("the harness booted battleship.html and found window.__battleship", run.ok && run.result && run.result.booted, run.ok ? (run.result ? "" : "no result") : String(run.reason || JSON.stringify(run)).slice(0, 300));
+    ok("the harness booted space-battleship.html and found window.__battleship", run.ok && run.result && run.result.booted, run.ok ? (run.result ? "" : "no result") : String(run.reason || JSON.stringify(run)).slice(0, 300));
     if (run.pageErrors && run.pageErrors.length) report("page console errors", run.pageErrors.slice(0, 5).join(" | ").slice(0, 400));
     // the run asks for one file that is not there ON PURPOSE (the pilot file's failure path): the browser logs that as one 404, and nothing else may be logged
     const errs404 = (run.pageErrors || []).filter((e) => /\b404\b/.test(e)), other = (run.pageErrors || []).filter((e) => !/\b404\b/.test(e));
