@@ -134,8 +134,8 @@ const HANDS = [
   { id: "rule", label: "the hand gunner's rule" },
   { id: "flyhand", label: "fruit fly, hand weights (the rule written into the net)", mod: SG, policy: "seatGunnerPolicy", hand: true },
   { id: "mlphand", label: "GPU brain, hand weights (the rule written into the net)", mod: MG, policy: "seatGunnerMlp", hand: true },
-  { id: "fly", label: "fruit fly, trained", mod: SG, policy: "seatGunnerPolicy", file: "/brain/seatGunnerWeightsDefault.json" },
-  { id: "mlp", label: "GPU brain, trained", mod: MG, policy: "seatGunnerMlp", file: "/brain/seatGunnerMlpWeightsDefault.json" },
+  { id: "fly", label: "fruit fly, trained (for the green sight)", mod: SG, policy: "seatGunnerPolicy", file: "/brain/seatGunnerWeightsDefault.json" },
+  { id: "mlp", label: "GPU brain, trained (for the green sight)", mod: MG, policy: "seatGunnerMlp", file: "/brain/seatGunnerMlpWeightsDefault.json" },
 ];
 const handLoaded = new Map(), handErrors = new Map();   // id -> { weights, meta } | reason
 function loadHand(h, url = h.file) {
