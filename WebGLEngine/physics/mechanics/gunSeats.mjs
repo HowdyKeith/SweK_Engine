@@ -110,12 +110,16 @@ export function fitTrack(entries) {
  *   sigma      rad  the aim error on each axis (a Gaussian, repeatable: the seed, the seat and the time make it)
  *   maxRange   m    how far it will shoot, measured from the body's centre
  *   tolerance       how many target radii of predicted miss it will fire within, for the gun as it points NOW
+ *   burst      s    how long the trigger is HELD once the gunner has decided to fire (0, the default, is no hold: the trigger is down exactly on the ticks the gun is within tolerance). A gun that fires a round every few ticks banks a round only while the trigger STAYS down (flightGuns.fireFrom
+ *                   banks nothing while it is up), so a gun of 6 or 1.5 rounds a second under an aim error that flickers the decision from tick to tick fires almost nothing -- measured: 45 rounds in 20 seconds from seats that were 'firing' on 2,500 ticks. A burst is what a hand on a trigger does.
  *   gravity    m/s^2  the fall the gunner allows the round (flightGuns.GRAVITY, 9.80665, by default; 0 for a gun in VACUUM, where a round flies straight -- the rounds themselves are the arena's to fly with the same number)
  *   observe         null (the default) gives the gunner the target's velocity as it is. { window, sigmaRange, floor } makes it a SIGHT THAT ONLY SEES WHERE THE TARGET IS: each tick it measures the target's position with a Gaussian error of
  *                   max(floor, sigmaRange x range) metres on each axis, fits a straight line (fitTrack) through the measurements of the `window` seconds that ended `delay` ago, and leads that line's slope; it acts on a target
  *                   only once three measurements are in the window. A target that holds its velocity is led to within the slope's noise; one that turns is led by the average of the window, which is behind it.
  */
-export function handGunner({ delay = 0.25, sigma = 0.012, seed = 1, maxRange = 450, tolerance = 1, observe = null, gravity = G.GRAVITY } = {}) {
+export function handGunner({ delay = 0.25, sigma = 0.012, seed = 1, maxRange = 450, tolerance = 1, observe = null, gravity = G.GRAVITY, burst = 0 } = {}) {
+    if (!(Number.isFinite(burst) && burst >= 0)) throw new Error(`gunSeats.handGunner: burst must be a number of seconds, 0 or more (got ${burst})`);
+    let holdUntil = -Infinity;   // the time the trigger is held to, once the gunner has decided to fire
     if (!Number.isFinite(gravity)) throw new Error(`gunSeats.handGunner: gravity must be a finite number (got ${gravity})`);
     const seen = new Map();   // seat id | target id -> what was seen, oldest first: [{ t, pos, vel }]
     const hash = (str) => { let h = 2166136261; for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619); return h >>> 0; };
@@ -144,10 +148,11 @@ export function handGunner({ delay = 0.25, sigma = 0.012, seed = 1, maxRange = 4
             const a = reachOf(seat, body, sol.dir); if (!a.inArc) continue;
             if (!best || sol.t < best.sol.t) best = { tg, sol, a };
         }
-        if (!best) return { yaw: 0, pitch: 0, fire: false, target: null };
+        if (!best) { holdUntil = -Infinity; return { yaw: 0, pitch: 0, fire: false, target: null }; }
         const rng = mulberry((seed * 7919 + Math.round(t * 1000) * 104729 + hash(seat.id)) >>> 0), ey = sigma ? gauss(rng) * sigma : 0, ep = sigma ? gauss(rng) * sigma : 0;
         const c = clamp(dot(cur.dir, best.sol.dir), -1, 1), miss = Math.sin(Math.acos(c)) * best.sol.t * seat.gun.muzzleSpeed, radius = best.tg.radius ?? G.GUN.hitRadius;
-        return { yaw: best.a.yaw + ey, pitch: best.a.pitch + ep, fire: miss <= tolerance * radius, target: best.tg.id };
+        const aimed = miss <= tolerance * radius; if (aimed && burst > 0) holdUntil = t + burst;
+        return { yaw: best.a.yaw + ey, pitch: best.a.pitch + ep, fire: aimed || t < holdUntil, target: best.tg.id };
     };
 }
 

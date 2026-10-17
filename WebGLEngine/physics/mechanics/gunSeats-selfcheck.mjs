@@ -21,6 +21,7 @@
 //   8  END TO END   a perfect gunner on a fixed seat hits a target crossing at 60 m/s at 250 m; the same seat with a slew too slow to follow it hits nothing of a target crossing behind it, and only what passes through its line of fire of one that crosses that; a sloppy gunner (0.1 rad) hits less than half as often; a gunner with a delay hits as
 //                   a perfect one does after its reaction time; a tail gunner on a bomber at 80 m/s hits a fighter that closes from behind and a forward-only seat on the same bomber, which cannot see it, does not even fire
 //   7c THE GUNNER IN VACUUM   handGunner's `gravity` (0 for a gun in space): the seat points along the line to a target that stands still (in air above it by the round's fall), a gunner that knows there is no gravity hits a crossing target with rounds flown at g = 0 and one that allows for a fall that does not happen hits nothing, and a gravity that is not a number is refused
+//   7d THE TRIGGER HELD FOR A BURST   handGunner's `burst`: with none the trigger is down exactly on the ticks the gun is on the target; with one it STAYS down for that long once pulled, ends when the target goes and is not resumed by its return; measured why it exists (a 3-a-second gun under aim error fires 0 rounds in 5 s with a flickering trigger and 14 with a one-second burst)
 //   9  THE FRONT DOOR  makeSeat refuses what cannot be built by name (no id, a NaN mount, up parallel to rest, a slew of 0, an arc that runs backwards), a seat is frozen all the way down, its gun defaults to flightGuns.GUN, the export list is
 //                   pinned, and the report lines say real numbers
 //
@@ -41,6 +42,7 @@
 //   H20 the time not in the error's seed 2 | H21 old pictures never dropped (the oldest ever seen is used) 1 | H22 the solution made from the body's centre, not the muzzle 2 | R1 the report line says NaN 1
 //   AND THIRTEEN ON THE SIGHT THAT ONLY SEES WHERE THE TARGET IS (fitTrack and handGunner's `observe`), every one red by name: J1 fitTrack accepts two measurements 3 | J2 fitTrack's means not divided 8 | J3 fitTrack's position at the first time 2 | J4 fitTrack with no time spread divides by zero 1 | J5 the sight's noise is zero 4 | J6 the sight uses every measurement ever made 1 | J7 the sight uses fresh measurements (no delay) 4 | J8 the sight does not carry its position forward 4 | J9 the sight leads with the true velocity 2 | J10 the measurement noise the same every tick 1 | J11 the measurement noise the same for every seat 1 | J12 the noise floor ignored 1 | J13 the window defaults to nothing 1 (J13 went 0 red the first time: every call passed its window; a row now asks for the defaults)
 // AND FOUR ON THE GUNNER IN VACUUM (section 7c: handGunner's `gravity`), every one red by name: K1 the gunner's gravity option ignored (always the earth's) 2 | K2 the default gravity is 0 11 | K3 a gravity that is not a number is accepted 1 | K4 gravity applied twice over 9
+// AND EIGHT ON THE TRIGGER HELD FOR A BURST (section 7d: handGunner's `burst`), every one red by name, none 0 red: M1 the burst ignored 3 | M2 a burst never ends 1 | M3 a burst survives the target going 1 | M4 a burst twice as long 1 | M5 a burst lasts to its last tick, inclusive 1 | M6 a burst that is not a number accepted 1 | M7 the trigger held from the start when there is a burst 1 | M8 a negative burst accepted 1
 // NOT SABOTAGED, SAID PLAINLY: the 1e-9 slack in the gunner's `h[i].t <= t - delay + 1e-9` (it only decides which picture a float-noisy tick lands on, and carrying a picture forward at its own velocity makes the choice invisible for a target that holds it), and the seat id inside the gunner's memory key (one gunner per seat is the contract, so a shared key is never read).
 "use strict";
 import * as S from "./gunSeats.mjs";
@@ -319,6 +321,24 @@ console.log("\n7c. THE GUNNER IN VACUUM");
     ok("!! END TO END IN VACUUM: rounds flown with no gravity (flightGuns.stepRounds with g = 0) hit a target crossing at 40 m/s 400 m out when the gunner knows there is no gravity (more than 10 hits), and NONE when it allows for a fall that does not happen (it fires 8.7 m high at a target 4 m across) -- the number is the gunner's, the world's is the arena's", vacuum.hits > 10 && wrong.fired > 10 && wrong.hits === 0, `${vacuum.hits} hits of ${vacuum.fired} fired; the gunner that allows for gravity ${wrong.hits} of ${wrong.fired}`);
     const thr = (v) => { try { S.handGunner({ gravity: v }); return null; } catch (e) { return String(e.message); } };
     ok("!! a gravity that is not a number is refused by name (NaN, Infinity, a string), and 0 and 9.80665 are taken", [NaN, Infinity, "9.8"].every((v) => /gravity must be a finite number/.test(thr(v) || "")) && thr(0) === null && thr(9.80665) === null && thr(1.62) === null);
+}
+
+console.log("\n7d. THE TRIGGER HELD FOR A BURST");
+{
+    // a still target 200 m out: the gunner (no reaction time, no aim error) at the rest position is NOT aimed (the seat points forward, the target is up and to one side); with the seat at the angles it commands it IS
+    const target = { id: "x", pos: [150, 120, 300], vel: [0, 0, 0], radius: 4 };
+    const first = S.handGunner({ delay: 0, sigma: 0 })(BALL, rest0, still, [target], 0), aimedState = { ...rest0, yaw: first.yaw, pitch: first.pitch };
+    const trace = (opts) => { const g = S.handGunner({ delay: 0, sigma: 0, ...opts }), out = []; for (let k = 0; k < 40; k++) { const t = k / 30, st = k === 5 ? aimedState : rest0; out.push(g(BALL, st, still, [target], t).fire ? 1 : 0); } return out.join(""); };
+    ok("!! WITHOUT a burst (the default) the trigger is down on exactly the ticks the gun is on the target -- tick 5 of 40 and no other", trace({}) === "0".repeat(5) + "1" + "0".repeat(34) && first.fire === false, trace({}));
+    ok("!! WITH a burst of 0.5 s the trigger, once pulled at tick 5 (t = 0.1667 s), STAYS down until t = 0.6667 s -- ticks 5 to 19 (t < t0 + 0.5) and not 20 -- and was not down before the gun was on the target", trace({ burst: 0.5 }) === "0".repeat(5) + "1".repeat(15) + "0".repeat(20), trace({ burst: 0.5 }));
+    const g2 = S.handGunner({ delay: 0, sigma: 0, burst: 1 }); g2(BALL, aimedState, still, [target], 0); const held = g2(BALL, rest0, still, [target], 0.3).fire, gone = g2(BALL, rest0, still, [], 0.4).fire, back = g2(BALL, rest0, still, [target], 0.5).fire;
+    ok("!! a burst ends when the target goes: held at 0.3 s after a pull at 0, DROPPED at 0.4 s when nothing is in range, and NOT picked up again when the target returns at 0.5 s (still inside the old second -- the gunner has to be on it again)", held === true && gone === false && back === false);
+    const rounds = (burst) => { const seat = S.makeSeat({ id: "slow", mount: [0, 0, 0], rest: [1, 0, 0], arc: { yaw: [-3, 3], pitch: [-1.5, 1.5] }, slew: { yaw: 6, pitch: 6 }, reach: 1, gun: { ...G.GUN, rate: 3, magazine: 1000 } }), g = S.handGunner({ delay: 0, sigma: 0.012, seed: 4, burst, gravity: 0 }); let st = S.createSeatState(seat);
+        for (let i = 0; i < 150; i++) { const cmd = g(seat, st, still, [{ id: "x", pos: [200, 20, 0], vel: [0, 0, 0], radius: 2 }], i / 30); st = S.stepSeat(seat, st, still, cmd, 1 / 30, 1).state; } return st.gun.fired; };
+    const r0 = rounds(0), r1 = rounds(1);
+    ok("!! WHY IT EXISTS, MEASURED: a gun of 3 rounds a second under an aim error of 0.012 rad on a still target 200 m out for 5 s fires " + r0 + " rounds when the trigger flickers with the aim (a round is banked only while the trigger stays down) and " + r1 + " with a one-second burst (3 a second is about 15)", r1 >= 10 && r1 <= 16 && r0 < r1 / 3, `${r0} vs ${r1}`);
+    const thr = (v) => { try { S.handGunner({ burst: v }); return null; } catch (e) { return String(e.message); } };
+    ok("!! a burst that is not a number of seconds, 0 or more, is refused by name (-1, NaN, a string, Infinity), and 0 and 2.5 are taken", [-1, NaN, "1", Infinity].every((v) => /burst must be a number of seconds/.test(thr(v) || "")) && thr(0) === null && thr(2.5) === null);
 }
 
 console.log("\n8. END TO END");

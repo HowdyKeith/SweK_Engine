@@ -1,8 +1,8 @@
 // WebGLEngine/physics/mechanics/capitalShip.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// A CAPITAL SHIP FOR THE 6DOF SPACE BATTLE, in the manner of the Space Battleship Yamato (Star Blazers' Argo): a long hull, three triple main turrets (two forward, one aft), point-defence mounts on the flanks and the belly, three engine pods at
+// A CAPITAL SHIP FOR THE 6DOF SPACE BATTLE, in the manner of the Space Battleship Yamato (Star Blazers' Argo): a long hull, three triple main turrets (two forward, one aft), point-defence mounts on the flanks, the belly and the deck, three engine pods at
 // the stern, and a forward "wave-motion cannon". It is a rigid body (physics/mechanics/rigidBody6dof.mjs) with a mass and inertia that come from its size, hit volumes that are a list of spheres (a round has to reach one, and what it reaches is
-// named), and gun seats (physics/mechanics/gunSeats.mjs -- the seat model the B-29 shares) with a gunner each. The page's fighters are 3.2 units long, 8 kg and turn at several radians a second; this is 48 units long, 4,400 kg (the fighters' own
+// named), and thirteen gun seats (physics/mechanics/gunSeats.mjs -- the seat model the B-29 shares) with a gunner each. The page's fighters are 3.2 units long, 8 kg and turn at several radians a second; this is 48 units long, 4,400 kg (the fighters' own
 // density), and turns at no more than 0.25 rad/s^2 -- a hull whose gunners do the work.
 //
 // WHAT IS INVENTED, SAID PLAINLY, BECAUSE NONE OF IT IS MEASURED FROM A REAL SHIP OR A CARTOON'S DRAWINGS: every number below -- the length (48 units, about 15 fighters), the turret positions and arcs, the guns' speeds and rates, the hit points, the turn rate -- is
@@ -40,9 +40,11 @@ const PARTS = [
     ["port PD 1", "pd", 10, 4.6, 1, 1.0, 60], ["port PD 2", "pd", 0, 4.9, 1, 1.0, 60], ["port PD 3", "pd", -10, 4.6, 1, 1.0, 60],
     ["starboard PD 1", "pd", 10, -4.6, 1, 1.0, 60], ["starboard PD 2", "pd", 0, -4.9, 1, 1.0, 60], ["starboard PD 3", "pd", -10, -4.6, 1, 1.0, 60],
     ["ventral PD 1", "pd", 6, 0, -4.3, 1.0, 60], ["ventral PD 2", "pd", -8, 0, -4.3, 1.0, 60],
+    ["dorsal PD 1", "pd", 3, 0, 5.8, 1.0, 60], ["dorsal PD 2", "pd", -9.5, 0, 5.8, 1.0, 60],
 ];
 // the seats: [id, name, the part it sits in, mount, rest, up, yaw arc, pitch arc, slew yaw, slew pitch, reach, gun]. The main turrets sit on the deck and fire anywhere above it but astern of the superstructure for A and B and ahead of it for C (a 100-degree blind sector
-// behind each); a flank mount sees a hemisphere facing outward from its side, a ventral one the hemisphere below.
+// behind each); a flank mount sees a hemisphere facing outward from its side, a ventral one the hemisphere below and a dorsal one the hemisphere above. THE TWO DORSAL MOUNTS EXIST BECAUSE A GATE FOUND A HOLE: with only flank and belly mounts a target straight above the deck is a degree past the edge of every flank mount's hemisphere (they sit 5 units off the axis) and
+// out of every main turret's pitch (83 degrees) -- a blind cone over the ship.
 const MAIN_ARC = { yaw: [-2.6, 2.6], pitch: [-0.05, 1.45] }, HEMI = { yaw: [-PI / 2, PI / 2], pitch: [-PI / 2, PI / 2] };
 const SEATS = [
     ["main-a", "main turret A", "main turret A", [16, 0, 6.2], [1, 0, 0], [0, 0, 1], MAIN_ARC, 0.5, 0.4, 3.0, MAIN_GUN],
@@ -51,6 +53,7 @@ const SEATS = [
     ["pd-p1", "port PD 1", "port PD 1", [10, 4.8, 1], [0, 1, 0], [0, 0, 1], HEMI, 3.0, 2.5, 1.0, PD_GUN], ["pd-p2", "port PD 2", "port PD 2", [0, 5.1, 1], [0, 1, 0], [0, 0, 1], HEMI, 3.0, 2.5, 1.0, PD_GUN], ["pd-p3", "port PD 3", "port PD 3", [-10, 4.8, 1], [0, 1, 0], [0, 0, 1], HEMI, 3.0, 2.5, 1.0, PD_GUN],
     ["pd-s1", "starboard PD 1", "starboard PD 1", [10, -4.8, 1], [0, -1, 0], [0, 0, 1], HEMI, 3.0, 2.5, 1.0, PD_GUN], ["pd-s2", "starboard PD 2", "starboard PD 2", [0, -5.1, 1], [0, -1, 0], [0, 0, 1], HEMI, 3.0, 2.5, 1.0, PD_GUN], ["pd-s3", "starboard PD 3", "starboard PD 3", [-10, -4.8, 1], [0, -1, 0], [0, 0, 1], HEMI, 3.0, 2.5, 1.0, PD_GUN],
     ["pd-v1", "ventral PD 1", "ventral PD 1", [6, 0, -4.5], [0, 0, -1], [1, 0, 0], HEMI, 3.0, 2.5, 1.0, PD_GUN], ["pd-v2", "ventral PD 2", "ventral PD 2", [-8, 0, -4.5], [0, 0, -1], [1, 0, 0], HEMI, 3.0, 2.5, 1.0, PD_GUN],
+    ["pd-d1", "dorsal PD 1", "dorsal PD 1", [3, 0, 6.9], [0, 0, 1], [1, 0, 0], HEMI, 3.0, 2.5, 1.0, PD_GUN], ["pd-d2", "dorsal PD 2", "dorsal PD 2", [-9.5, 0, 6.9], [0, 0, 1], [1, 0, 0], HEMI, 3.0, 2.5, 1.0, PD_GUN],
 ];
 
 /**
