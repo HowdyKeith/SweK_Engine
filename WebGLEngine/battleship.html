@@ -251,7 +251,7 @@ function tickOnce() {
 // ---- the windows: one per craft, a click switches the view ------------------------------------------------------------------------------------------------------------------------------------------------------
 const stack = el("stack"), wins = [], winCam = new THREE.PerspectiveCamera(60, 262 / 144, 0.3, 40000);
 winCam.up.set(0, 0, 1);
-const keepViews = [], scissors = [];
+const keepViews = [], scissors = [], windowMarkers = [];
 const DRAW_F = Object.freeze({ ...V.VIEW_DRAW, chaseBack: 10, chaseUp: 3.2, chaseAhead: 4, seat: Object.freeze([0.9, 0, 0.35]), sightAhead: 500, fovPilot: 1.25 });
 const DRAW_S = Object.freeze({ ...V.VIEW_DRAW, chaseBack: 74, chaseUp: 24, chaseAhead: 12, seat: Object.freeze([-2, 0, 10.4]), sightAhead: 800, fovPilot: 1.25 });
 const drawFor = (c) => (c.kind === "capital" ? DRAW_S : DRAW_F);
@@ -337,7 +337,7 @@ function drawOverlay(w, c, W, H) {
 function renderWindows() {
   const cr = renderer.domElement.getBoundingClientRect(), sr = stack.getBoundingClientRect(), live = arena.crafts;
   renderer.setScissorTest(true); if (markers) markers.visible = false;
-  scissors.length = 0;
+  scissors.length = 0; windowMarkers.length = 0;
   for (const w of wins) {
     const c = live[w.i], r = w.gl.getBoundingClientRect(), W = Math.max(2, Math.round(r.width)), H = Math.max(2, Math.round(r.height));
     if (w.ov.width !== W || w.ov.height !== H) { w.ov.width = W; w.ov.height = H; }
@@ -350,6 +350,7 @@ function renderWindows() {
     else {
       cameraLike(cameraOf(w, c), r.width, r.height);
       const hide = w.view !== "plane"; if (hide) meshes[w.i].visible = false;
+      windowMarkers.push(markers ? markers.visible : null);   // the gate reads that the dots are off while a window is drawn
       renderer.render(scene, winCam);
       if (hide) meshes[w.i].visible = true;
     }
@@ -492,6 +493,7 @@ window.__battleship = {
   windows: () => wins.map((w) => ({ craft: w.i, view: w.view, seat: w.seat, label: w.label.textContent, bg: getComputedStyle(w.el).backgroundColor, rect: (({ x, y, width, height }) => ({ x, y, width, height }))(w.gl.getBoundingClientRect()) })),
   clickWindow(i) { wins[i].el.dispatchEvent(new MouseEvent("click", { bubbles: true })); renderFrame(0); return { view: wins[i].view, seat: wins[i].seat }; },
   setView(i, v, seat = 0) { wins[i].view = v; wins[i].seat = seat; setLabel(wins[i]); renderFrame(0); }, pixels: pixelStats, ink: overlayInk, inkColor,
+  windowMarkers: () => windowMarkers.slice(),
   cameraOf: (i) => { const cam = cameraOf(wins[i], arena.crafts[i]); return cam && { eye: cam.eye.slice(), target: cam.target.slice(), up: cam.up.slice(), fov: cam.fov }; },
   tracers: () => ({ pd: tracerP.geom.drawRange.count / 2, main: tracerM.geom.drawRange.count / 2, fighter: tracerF.geom.drawRange.count / 2 }),
   sight: (i) => wins[i].sight, texts: (i) => wins[i].texts.slice(), scissors: () => scissors.map((s) => s && { ...s }), stackRect: () => (({ x, y, width, height }) => ({ x, y, width, height }))(stack.getBoundingClientRect()),
