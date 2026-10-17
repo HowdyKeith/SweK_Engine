@@ -9276,6 +9276,31 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "population census grown by one; and three rows restated where a fresh record broke a count rather than a claim. The label-collision " +
                  "round's guards picked this ship's numbers. NOT CLOSED: section 87 needs the rig, and libmSensitivity and responseCensus still time out.",
     }),
+    // v4873 -- since563, from `versionPreflight --next` after a full fetch (the highest declared anywhere was since562). It closes
+    // TWO versions: v4872 shipped without a closing of its own, and v4873 supersedes it before it was published. NO new gate file.
+    since563: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and neither version added a gate.
+        at: "v4873", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "render/denoiseDevice-selfcheck.mjs (v4872, section 88: round 28's verdict as rule87 and rule87which over the committed rig files, and its discrimination row)",
+            "render/denoiseScenes-selfcheck.mjs (v4872: SPLITS_HALFRES and SPLITS_EMITTER reserved)",
+            "render/denoiseStudy-selfcheck.mjs (v4872: rounds 29 and 30 end to end on miniatures, sections 90 and 92 re-derived from the committed results, section 91's rule and predictions)",
+            "render/denoiseUpscale-selfcheck.mjs (v4872, section 91: the fill, the composite, the emitter-aware chain and the share near an emitter)",
+            "render/denoiseMask-selfcheck.mjs (v4872, section 91: emitterRadiance, and a traced emitter pixel equal to it bit for bit)",
+            "tools/ship/realGpuRun-selfcheck.mjs (v4872: each adapter's features, limits and subgroup sizes in the report, natively and in Chrome)",
+            "tools/ship/headlessGpu-selfcheck.mjs (v4872: adapterCaps and ADAPTER_LIMITS named and exercised in their own gate)",
+            "tools/ship/timingRecords-selfcheck.mjs (v4872: frozenRecords' named runs re-timed at a median of 928 ms)",
+            "render/temporalGPU-selfcheck.mjs (v4873: the chain's I/O counted, not timed)",
+        ]),
+        verdict: "*** v4872 REACHED MAIN AND WAS NEVER PUBLISHED: THE RIG'S CLONE VERIFY FOUND A STOPWATCH IN A CORRECTNESS GATE. *** " +
+                 "temporalGPU-selfcheck asserted the temporal chain's smaller I/O as a time ratio and read 1.29x on the rig's Chrome SwiftShader, " +
+                 "every picture row green; it now counts the bytes and submissions, one 96 x 96 picture and one encoder fewer, exactly. v4872 " +
+                 "itself carried denoiser rounds 28-30 -- round 30 reported, both supported -- and the rig features probe, and its ship found " +
+                 "four reds the tree's own procedures resolved (an export named in its own gate, a census row, a stale report, a re-timed named " +
+                 "run). NOT CLOSED: the counted row on the rig, and the features probe's first reading on either GPU.",
+    }),
     // v4870 -- since561 (the highest on any branch at the time was since560, this branch's own, read across every remote ref after a full fetch; nothing past since559 exists elsewhere). THREE new gate files: brain/pilotFlightMlp-selfcheck.mjs
     // (the GPU Brain's pilot network, its CPU twin and its hand weights), brain/pilotFlightGpu-selfcheck.mjs (that network on a device, in a headless browser) and tools/ship/trainFlightPilotGpu-selfcheck.mjs (the trainer's --brain gpu).
     since561: Object.freeze({
