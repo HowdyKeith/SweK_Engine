@@ -3,8 +3,9 @@
 // Run: node render/denoiseUpscale-selfcheck.mjs
 //
 // GATES render/denoiseUpscale.mjs: the transfer FSR1 runs in, the four upscales, the render seeds and the frames of one
-// image of the upscale round. Its exports, each named here: GAMMA, RCAS_SHARPNESS, RCAS_DENOISE, UPSCALES, toPerceptual,
-// fromPerceptual, upscale, renderSeedsUpscale, renderUpscaleImages.
+// image of the upscale round, and round 30's emitter-aware chain (section 91). Its exports, each named here: GAMMA,
+// RCAS_SHARPNESS, RCAS_DENOISE, UPSCALES, toPerceptual, fromPerceptual, upscale, fillEmitters, compositeEmitters,
+// emitterAwareUpscale, nearEmitterShare, renderSeedsUpscale, renderUpscaleImages.
 //
 // *** NOTHING HERE RENDERS A DATASET SEED, AND NOTHING HERE SCORES AN UPSCALE AGAINST A REFERENCE. *** Every scene is
 // seeded from 990000 up, outside every split, and what is held is that each piece is the piece the pre-registration fixed --
@@ -19,6 +20,12 @@
 //   U5 the half-size frame traced on the full-size frame's render seed            1 RED -- ZERO on the first draft, whose
 //      seed row compared the two full-size inputs only; the row now re-traces each input on its own seed
 //   U6 the dataset refusal switched off                                            1 RED
+//   U7 (section 91) the fill reads emitter pixels too                              3 RED -- never-reads, ring by ring, the chain's leak
+//   U8 the fill written in place as it goes, in scan order                         1 RED -- ring by ring (the mirror disagrees)
+//   U9 the composite without (1 - cov)                                             1 RED
+//   U10 the aware upscale without its fill                                         1 RED -- the chain row: the emitter leaks out again
+//   U11 the share near an emitter ignoring its reach                               1 RED
+//   U12 only whole emitter pixels filled (cov >= 1), the rim kept                  3 RED -- never-reads, ring by ring, the chain's leak
 "use strict";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -26,7 +33,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
 const U = await imp("render/denoiseUpscale.mjs");
-const { GAMMA, RCAS_SHARPNESS, RCAS_DENOISE, UPSCALES, toPerceptual, fromPerceptual, upscale, renderSeedsUpscale, renderUpscaleImages } = U;
+const { GAMMA, RCAS_SHARPNESS, RCAS_DENOISE, UPSCALES, toPerceptual, fromPerceptual, upscale, renderSeedsUpscale, renderUpscaleImages, fillEmitters, compositeEmitters, emitterAwareUpscale, nearEmitterShare } = U;
+const same = (a, b) => a.length === b.length && a.every((v, i) => Object.is(v, b[i]));
 const { fsr1CPU, easuCPU, bilinearCPU } = await imp("fx/fsr/fsr.js");
 const { renderSeeds, isDatasetSeed, SPLITS_FSR1 } = await imp("render/denoiseScenes.mjs");
 const { renderSplit } = await imp("render/denoiseStudy.mjs");
@@ -101,6 +109,67 @@ console.log("\n3. ONE IMAGE OF THE ROUND: FIVE RENDER SEEDS, THREE INPUTS, THE A
     for (const s of SPLITS_FSR1.T1.seeds) { try { renderUpscaleImages("R", s, { w: 2, h: 2, sppIn: 1, sppRef: 1 }); } catch (e) { if (/dataset seed/.test(e.message)) refused++; } }
     try { renderUpscaleImages("R", 990011, { w: 15, h: 16, sppIn: 1, sppRef: 1 }); } catch (e) { if (/no half size/.test(e.message)) odd++; }
     ok("!! every one of the round's seeds is REFUSED without { harvest: true }, and a frame with no half size is refused", refused === 12 && odd === 1 && SPLITS_FSR1.T1.seeds.every(isDatasetSeed), `${refused} of 12`);
+}
+
+console.log("\n4. SECTION 91: THE EMITTERS TAKEN OUT OF THE UPSCALE -- THE FILL, THE COMPOSITE, THE CHAIN, THE SHARE NEAR AN EMITTER");
+{
+    // a planted 8 x 6 half-size frame: a ramp, and an emitter patch of 25 at the top right whose own coverage marks it
+    const w = 8, h = 6, W = 16, H = 12, img = new Float64Array(w * h * 3), cov = new Float64Array(w * h);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const p = y * w + x, e = x >= 5 && y < 3;
+        cov[p] = e ? (x === 5 || y === 2 ? 0.5 : 1) : 0;
+        for (let c = 0; c < 3; c++) img[p * 3 + c] = e ? 25 : 0.05 + 0.03 * x + 0.01 * y + 0.002 * c;
+    }
+    const F = fillEmitters(img, cov, w, h), holes = [...cov.keys()].filter((p) => cov[p] > 0);
+    const known = (p) => cov[p] === 0;
+    ok("!! the fill leaves every pixel no emitter touches as it was, bit for bit, and comes back unchanged from a frame with no emitter in it",
+        [...cov.keys()].filter(known).every((p) => [0, 1, 2].every((c) => Object.is(F[p * 3 + c], img[p * 3 + c]))) &&
+        fillEmitters(img, new Float64Array(w * h), w, h).every((v, i) => Object.is(v, img[i])));
+    // the emitter's own radiance is NEVER read: the same frame with the patch at 1e9 fills to the same bits
+    const loud = Float64Array.from(img, (v, i) => (cov[(i / 3) | 0] > 0 ? 1e9 : v));
+    const maxKnown = Math.max(...[...cov.keys()].filter(known).flatMap((p) => [0, 1, 2].map((c) => img[p * 3 + c])));
+    ok("!! *** and it never reads an emitter pixel's own value: the patch at 25 or at 1e9 fills to the same bits, every filled value inside the range of the light beside it ***",
+        same(fillEmitters(loud, cov, w, h), F) && holes.every((p) => [0, 1, 2].every((c) => F[p * 3 + c] <= maxKnown && F[p * 3 + c] > 0)), `${holes.length} holes`);
+    // ring by ring: a first-ring pixel is the mean of its KNOWN 8-neighbours as they were, and the order of visit does not
+    // matter -- the frame mirrored left to right fills to the mirror, to the last few bits of a reordered sum
+    const q0 = 2 * w + 5, ns = [];   // (5, 2): a rim pixel of the patch, filled in the first ring
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const q = (2 + dy) * w + 5 + dx; if ((dx || dy) && known(q)) ns.push(q); }
+    const mirror = (a, C) => Float64Array.from(a, (_, i) => { const p = (i / C) | 0, c = i % C, x = p % w, y = (p / w) | 0; return a[(y * w + (w - 1 - x)) * C + c]; });
+    const back = mirror(fillEmitters(mirror(img, 3), mirror(cov, 1), w, h), 3);
+    ok("!! ring by ring, each filled pixel the mean of the neighbours known after the last ring -- and the result does not depend on the order pixels are visited",
+        cov[q0] > 0 && ns.length === 5 && [0, 1, 2].every((c) => Math.abs(F[q0 * 3 + c] - ns.reduce((a, q) => a + img[q * 3 + c], 0) / ns.length) < 1e-15) &&
+        back.every((v, i) => Math.abs(v - F[i]) <= 1e-12 * Math.abs(F[i])), `(5, 2) from its ${ns.length} known neighbours`);
+    let threw = 0;
+    try { fillEmitters(img, new Float64Array(w * h).fill(1), w, h); } catch (e) { if (/nothing to fill from/.test(e.message)) threw++; }
+    try { fillEmitters(img, cov, w + 1, h); } catch { threw++; }
+    ok("  a frame that is all emitter, or not the size it says, is refused", threw === 2);
+    // the composite: E + (1 - cov) x frame -- E exactly where covered whole, the frame exactly where nothing is
+    const n = W * H, fc = new Float64Array(n), fE = new Float64Array(n * 3), up = new Float64Array(n * 3);
+    for (let p = 0; p < n; p++) { const x = p % W, y = (p / W) | 0; fc[p] = x >= 11 && y < 6 ? (x === 11 || y === 5 ? 0.25 : 1) : 0; for (let c = 0; c < 3; c++) { fE[p * 3 + c] = fc[p] * (20 + c); up[p * 3 + c] = 0.1 + 0.01 * x + 0.001 * c; } }
+    const full = { cov: fc, E: fE }, comp = compositeEmitters(up, full);
+    ok("!! the composite is E + (1 - cov) x the frame: the emission alone where covered whole, the frame alone where no emitter is, the blend at the rim",
+        [...Array(n).keys()].every((p) => [0, 1, 2].every((c) => Object.is(comp[p * 3 + c], fE[p * 3 + c] + (1 - fc[p]) * up[p * 3 + c]))) &&
+        [...Array(n).keys()].every((p) => fc[p] !== 1 || [0, 1, 2].every((c) => Object.is(comp[p * 3 + c], fE[p * 3 + c]))) &&
+        [...Array(n).keys()].every((p) => fc[p] !== 0 || [0, 1, 2].every((c) => Object.is(comp[p * 3 + c], up[p * 3 + c]))));
+    // the chain is those three in that order, bit for bit; and it keeps the emitter's light OUT of the pixels no emitter
+    // covers, where the plain upscale carries it in
+    const kinds = ["easu", "bilinear"], chainOk = kinds.every((k) => same(emitterAwareUpscale(img, cov, w, h, W, H, k, full), compositeEmitters(upscale(F, w, h, W, H, k), full)));
+    const outside = [...Array(n).keys()].filter((p) => fc[p] === 0);
+    const leak = (y) => outside.filter((p) => [0, 1, 2].some((c) => y[p * 3 + c] > maxKnown * (1 + 1e-4))).length;
+    const awareLeak = kinds.map((k) => leak(emitterAwareUpscale(img, cov, w, h, W, H, k, full))), plainLeak = kinds.map((k) => leak(upscale(img, w, h, W, H, k)));
+    ok("!! *** the emitter-aware upscale IS fill, then `upscale`, then the composite -- and no pixel outside the emitter comes out brighter than the light beside it, where the plain upscale's do ***",
+        chainOk && awareLeak.every((v) => v === 0) && plainLeak.every((v) => v > 0), `aware ${awareLeak.join("/")} against plain ${plainLeak.join("/")} pixels past the brightest non-emitter value`);
+    let threw2 = 0;
+    try { emitterAwareUpscale(img, cov, w, h, W + 2, H, "easu", full); } catch { threw2++; }
+    try { compositeEmitters(up.subarray(3), full); } catch { threw2++; }
+    ok("  a full-size coverage of the wrong size, or a frame that does not match it, is refused", threw2 === 2);
+    // the share near an emitter: planted errors, one pixel each, at Chebyshev distance 2 and 3 from the only covered pixel
+    const r = new Float64Array(n * 3).fill(1), c1 = new Float64Array(n), at = (x, y) => y * W + x;
+    c1[at(4, 4)] = 0.5;
+    const err = (ps) => { const y = Float64Array.from(r); for (const p of ps) y[p * 3] = 2; return y; };
+    const s2 = nearEmitterShare(err([at(6, 4)]), r, c1, W, H), s3 = nearEmitterShare(err([at(7, 4)]), r, c1, W, H), sHalf = nearEmitterShare(err([at(6, 6), at(10, 10)]), r, c1, W, H);
+    ok("!! the share of relMSE's sum within 2 px of an emitter pixel (Chebyshev): an error 2 away counts, 3 away does not, one of each is a half, and no emitter in view is 0",
+        s2 === 1 && s3 === 0 && Math.abs(sHalf - 0.5) < 1e-15 && nearEmitterShare(err([at(6, 4)]), r, new Float64Array(n), W, H) === 0, `${s2} ${s3} ${sHalf}`);
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +

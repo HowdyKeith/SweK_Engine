@@ -22,6 +22,7 @@ import { render } from "../physics/render/pathTracer.mjs";
 import { makeScene, renderSeeds, guideBuffers, inputChannels, isDatasetSeed, IMAGE, SPP_IN, SPP_REF } from "./denoiseScenes.mjs";
 import { emitterCoverage, withMask } from "./denoiseMask.mjs";
 import { fsr1CPU, easuCPU, bilinearCPU } from "../fx/fsr/fsr.js";
+import { REL_EPS } from "./denoiseStats.mjs";
 
 /** The display gamma of the transfer. */
 export const GAMMA = 2.2;
@@ -58,6 +59,76 @@ export function upscale(img3, w, h, W, H, kind = "fsr1") {
     const y = new Float64Array(W * H * 3);
     for (let p = 0; p < W * H; p++) for (let c = 0; c < 3; c++) y[p * 3 + c] = fromPerceptual(Math.min(Math.max(out[p * 4 + c], 0), tMax));
     return y;
+}
+
+/**
+ * Section 91 (round 30): a w x h rgb frame with every pixel an emitter touches (cov > 0) replaced from the pixels none
+ * touches -- ring by ring inward, each such pixel taking the mean of its 8-neighbours that were known after the previous
+ * ring, so the result does not depend on the order pixels are visited. What an upscale reads at an emitter afterwards is
+ * the light beside it, never the emitter's own radiance. A frame with no emitter pixel comes back as it went in.
+ */
+export function fillEmitters(img3, cov, w, h) {
+    if (img3.length !== w * h * 3 || cov.length !== w * h) throw new Error(`denoiseUpscale: ${img3.length} values and ${cov.length} coverages are not a ${w} x ${h} frame`);
+    const y = Float64Array.from(img3), known = Uint8Array.from(cov, (c) => (c > 0 ? 0 : 1));
+    if (!known.includes(1)) throw new Error("denoiseUpscale: every pixel is an emitter's -- there is nothing to fill from");
+    for (;;) {
+        const ring = [];
+        for (let py = 0; py < h; py++) for (let px = 0; px < w; px++) {
+            const p = py * w + px;
+            if (known[p]) continue;
+            let n = 0, r = 0, g = 0, b = 0;
+            for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+                const qx = px + dx, qy = py + dy, q = qy * w + qx;
+                if ((dx || dy) && qx >= 0 && qx < w && qy >= 0 && qy < h && known[q]) { n++; r += y[q * 3]; g += y[q * 3 + 1]; b += y[q * 3 + 2]; }
+            }
+            if (n) ring.push(p, r / n, g / n, b / n);
+        }
+        if (!ring.length) return y;
+        for (let k = 0; k < ring.length; k += 4) { const p = ring[k]; y[p * 3] = ring[k + 1]; y[p * 3 + 1] = ring[k + 2]; y[p * 3 + 2] = ring[k + 3]; known[p] = 1; }
+    }
+}
+
+/** Section 91: the emitters put back -- E + (1 - cov) x the frame, per pixel; { cov, E } is render/denoiseMask.mjs's emitterRadiance at the frame's size. */
+export function compositeEmitters(img3, { cov, E }) {
+    if (img3.length !== cov.length * 3 || E.length !== img3.length) throw new Error(`denoiseUpscale: ${img3.length} values against ${cov.length} coverages and ${E.length} emissions`);
+    const y = new Float64Array(img3.length);
+    for (let p = 0; p < cov.length; p++) for (let c = 0; c < 3; c++) y[p * 3 + c] = E[p * 3 + c] + (1 - cov[p]) * img3[p * 3 + c];
+    return y;
+}
+
+/**
+ * Section 91, THE EMITTER-AWARE UPSCALE: the emitters taken out of the frame before the upscale and put back after it, at
+ * full size, from the geometry. The w x h frame's emitter pixels (covHalf > 0, its own coverage) are filled from their
+ * neighbours, the filled frame goes through `upscale` unchanged, and each W x H pixel is then E + (1 - cov) x the upscaled
+ * value -- the emitters' own light where they cover it, the upscaled light beside them where they do not. `full` is
+ * emitterRadiance at W x H.
+ */
+export function emitterAwareUpscale(img3, covHalf, w, h, W, H, kind, full) {
+    if (full.cov.length !== W * H) throw new Error(`denoiseUpscale: ${full.cov.length} full-size coverages are not ${W} x ${H}`);
+    return compositeEmitters(upscale(fillEmitters(img3, covHalf, w, h), w, h, W, H, kind), full);
+}
+
+/**
+ * Section 91, reported: the share of relMSE's sum (y against r, W x H x 3) that lies within `reach` pixels (Chebyshev) of
+ * a pixel an emitter touches (cov > 0) -- section 90's descriptive split, fixed now so it can be read beside the test.
+ * 0 when no emitter is in view.
+ */
+export function nearEmitterShare(y, r, cov, W, H, reach = 2) {
+    if (y.length !== W * H * 3 || r.length !== y.length || cov.length !== W * H) throw new Error(`denoiseUpscale: ${y.length}, ${r.length} and ${cov.length} values are not a ${W} x ${H} frame`);
+    let near = 0, all = 0;
+    for (let py = 0; py < H; py++) for (let px = 0; px < W; px++) {
+        let by = false;
+        for (let dy = -reach; dy <= reach && !by; dy++) for (let dx = -reach; dx <= reach; dx++) {
+            const qx = px + dx, qy = py + dy;
+            if (qx >= 0 && qx < W && qy >= 0 && qy < H && cov[qy * W + qx] > 0) { by = true; break; }
+        }
+        for (let c = 0; c < 3; c++) {
+            const i = (py * W + px) * 3 + c, e = y[i] - r[i], t = e * e / (r[i] * r[i] + REL_EPS);
+            all += t;
+            if (by) near += t;
+        }
+    }
+    return all > 0 ? near / all : 0;
 }
 
 /** The render seeds of one image of the round: renderSeeds' three, then the full-size 1-sample input and the half-size input. */

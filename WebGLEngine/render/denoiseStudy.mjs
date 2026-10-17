@@ -21,14 +21,14 @@
 // Without it everything is computed, as before; with it the result is the same, bit for bit
 // (render/denoiseCache-selfcheck.mjs). A scene rendered under --harvest is never served to a run without it.
 "use strict";
-import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
+import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
 import { renderSequence, temporalChannels, sequenceSeeds } from "./denoiseTemporal.mjs";
-import { withMask, emitterCoverage } from "./denoiseMask.mjs";
+import { withMask, emitterCoverage, emitterRadiance, MASK_STRIDE, MASK_CHANNEL, COVERAGE_GRID } from "./denoiseMask.mjs";
 import { jointBilateral, tuneFilter } from "./denoiseFilter.mjs";
 import { trainDenoiser, denoise, TRAIN, TRAIN_LONG, INIT } from "./denoiseNet.mjs";
 import { relMSE, verdict, trainFit, historyFit, trainSanity, effects } from "./denoiseStats.mjs";
 import { cached, cachedMany, hashArrays } from "./denoiseCache.mjs";
-import { upscale, renderUpscaleImages, renderSeedsUpscale, RCAS_SHARPNESS, RCAS_DENOISE, GAMMA } from "./denoiseUpscale.mjs";
+import { upscale, renderUpscaleImages, renderSeedsUpscale, emitterAwareUpscale, fillEmitters, compositeEmitters, nearEmitterShare, RCAS_SHARPNESS, RCAS_DENOISE, GAMMA } from "./denoiseUpscale.mjs";
 import { trainParallel } from "./denoisePool.mjs";
 
 export const SEEDS = Object.freeze([1, 2, 3]);
@@ -231,6 +231,79 @@ export function runUpscaleStudy({ splits = ROUND_FSR1.splits, net, test = ROUND_
     const secondary = candidate === "fsr1"
         ? { priceOfHalf: effects(tables.B, tables.A), easuAloneVsFsr1: effects(tables.easu, tables.B), rcasNoDenoiseVsFsr1: effects(tables.fsr1NoDenoise, tables.B) }
         : { priceOfHalf: effects(tables.B, tables.A), fsr1VsEasu: effects(tables.fsr1, tables.B), rcasNoDenoiseVsEasu: effects(tables.fsr1NoDenoise, tables.B) };
+    return { verdict: V, tables, secondary, timings, determinism, seedsDistinct, seedCount: allSeeds.length, config };
+}
+
+/**
+ * Section 91, ROUND 30, THE EMITTER-AWARE UPSCALE: round 29's chain with the light sources taken out of the upscale. The
+ * half-size frame's emitter pixels are filled from their neighbours, the rest goes through EASU, and the emitters are put
+ * back at full size from the geometry -- E + (1 - cov) x the upscaled frame, emitterRadiance's coverage and emission
+ * (render/denoiseUpscale.mjs's emitterAwareUpscale). Per image, every frame against the same full-size reference:
+ *   A  full size, 4 samples, denoised -- today's page (reported)
+ *   B  half size, 4 samples, denoised, emitter-aware EASU -- the CANDIDATE
+ *   C  the same, emitter-aware bilinear -- EASU's control
+ *   D  full size, 1 sample, denoised -- the same number of samples as B
+ * H1: B beats D. H2: B beats C. H1's noisy frame is D's own 1-sample input; H2's is B's half-size input through the SAME
+ * emitter-aware bilinear chain, so C1 asks of both arms that they beat what the composite alone gives the noise. Reported,
+ * never tested: round 29's plain EASU and bilinear on the same frame, D with the emitters composited at full size, the
+ * price of the quarter, and the share of each frame's error within 2 px of an emitter.
+ */
+export const RESULTS_EMITTER = "render/denoise-results-emitter.json";
+export const ROUND_EMITTER = Object.freeze({ splits: SPLITS_EMITTER, image: 256, test: "signflip", c2Prior: ROUND_MESH.c2Prior, results: RESULTS_EMITTER });
+/** Section 91's two hypotheses over a round 30 table: verdict()'s columns, by name, so the run and the verdict's re-derivation read one definition. */
+export const emitterSets = (t) => ({ H1: { noisy: t.noisyFull1, filter: t.D, net: [t.B], floor: t.floor },
+                                     H2: { noisy: t.noisyHalfAware, filter: t.C, net: [t.B], floor: t.floor } });
+export function runEmitterAwareStudy({ splits = ROUND_EMITTER.splits, net, test = ROUND_EMITTER.test, c2Prior = ROUND_EMITTER.c2Prior,
+                                       harvest = false, image = IMAGE, sppIn = SPP_IN, sppRef = SPP_REF, cache = null, log = () => {} } = {}) {
+    if (!net) throw new Error("denoiseStudy: runEmitterAwareStudy needs the shipped network, decoded by its caller");
+    const t0 = Date.now(), timings = {};
+    const lap = (k) => { timings[k] = Date.now() - t0; log(`${k} at ${(timings[k] / 1000).toFixed(1)} s`); };
+    const split = splits.T1, half = image / 2;
+    const config = { image, half, sppIn, sppRef, harvest, test, c2Prior,
+                     upscale: { kind: "easu", gamma: GAMMA, coverageGrid: COVERAGE_GRID, fill: "cov > 0 at half size, filled ring by ring from the 8-neighbours known after the last ring",
+                                composite: "E + (1 - cov) x the upscaled frame, emitterRadiance at full size" },
+                     trained: "nothing -- the shipped network", split: { family: split.family, n: split.seeds.length, first: split.seeds[0] },
+                     hypotheses: { H1: "B (half size + emitter-aware EASU) against D (full size at 1 sample)", H2: "B against C (half size + emitter-aware bilinear)" } };
+    const ims = split.seeds.map((seed, i) => cached(cache, `upscale-${familyOf(split, i)}-${seed}-${image}-${sppIn}-${sppRef}-${harvest ? "harvest" : "gate"}`,
+        () => renderUpscaleImages(familyOf(split, i), seed, { harvest, w: image, h: image, sppIn, sppRef })));
+    lap("tests rendered");
+    const maskOf = (fr) => Float64Array.from({ length: fr.w * fr.h }, (_, p) => fr.x[p * MASK_STRIDE + MASK_CHANNEL]);
+    const fullOf = (i) => emitterRadiance(makeScene(familyOf(split, i), split.seeds[i]), image, image);
+    const full = ims.map((im, i) => {
+        const f = fullOf(i), m = maskOf(im.full4);
+        // the composite's coverage IS the mask the network reads at full size -- a mismatch is a bug, and nothing is measured over it
+        if (!f.cov.every((v, p) => Object.is(v, m[p]))) throw new Error(`denoiseStudy: image ${i}'s emitterRadiance coverage is not its full-size input's mask`);
+        return f;
+    });
+    const den = (fr) => denoise(net, fr.x, fr.h, fr.w).y;
+    const frames = (im, i) => {
+        const h4 = den(im.half4), ch = maskOf(im.half4), F = full[i], D = den(im.full1);
+        const aware = (img, kind) => emitterAwareUpscale(img, ch, half, half, image, image, kind, F);
+        return { A: den(im.full4), B: aware(h4, "easu"), C: aware(h4, "bilinear"), D,
+                 plainEasu: upscale(h4, half, half, image, image, "easu"), plainBilinear: upscale(h4, half, half, image, image, "bilinear"),
+                 Daware: compositeEmitters(fillEmitters(D, F.cov, image, image), F),
+                 noisyFull1: im.full1.input, noisyFull4: im.full4.input, noisyHalfAware: aware(im.half4.input, "bilinear"),
+                 noisyHalfUp: upscale(im.half4.input, half, half, image, image, "bilinear") };
+    };
+    const Fr = ims.map(frames);
+    // C4: the candidate's whole chain twice, bit for bit -- the network, the emitters' geometry, the fill, EASU, the composite
+    const determinism = ims.every((im, i) => {
+        const again = emitterAwareUpscale(den(im.half4), maskOf(im.half4), half, half, image, image, "easu", fullOf(i));
+        return again.every((v, j) => Object.is(v, Fr[i].B[j]));
+    });
+    const allSeeds = split.seeds.flatMap((s) => Object.values(renderSeedsUpscale(s)));
+    const seedsDistinct = new Set(allSeeds).size === allSeeds.length;
+    const rel = (k) => Fr.map((f, i) => relMSE(f[k], ims[i].ref));
+    const tables = Object.fromEntries(["A", "B", "C", "D", "plainEasu", "plainBilinear", "Daware", "noisyFull1", "noisyFull4", "noisyHalfAware", "noisyHalfUp"].map((k) => [k, rel(k)]));
+    tables.floor = ims.map((im) => relMSE(im.ref2, im.ref));
+    lap("measured");
+    const sets = emitterSets(tables);
+    const V = verdict({ sets, shuffled: null, c2Prior, determinism, seedsDistinct, test });
+    // reported, never tested (each d positive where B was better, but the price of the quarter, positive where A was)
+    const near = (k) => Fr.map((f, i) => nearEmitterShare(f[k], ims[i].ref, full[i].cov, image, image));
+    const secondary = { priceOfHalf: effects(tables.B, tables.A), awareVsPlainEasu: effects(tables.plainEasu, tables.B), dAwareVsB: effects(tables.Daware, tables.B),
+                        nearEmitter: { B: near("B"), C: near("C"), plainEasu: near("plainEasu"), D: near("D") },
+                        emitterPixels: full.map((f) => f.cov.reduce((a, v) => a + (v > 0 ? 1 : 0), 0)) };
     return { verdict: V, tables, secondary, timings, determinism, seedsDistinct, seedCount: allSeeds.length, config };
 }
 

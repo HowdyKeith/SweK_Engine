@@ -51,6 +51,8 @@
 //   D38 SPLITS_FSR1's C half drawn as family R                                    1 RED
 //   D39 (section 89) SPLITS_HALFRES left out of the dataset refusal               1 RED here (and 1 in denoiseStudy-selfcheck: the refusal row)
 //   D40 SPLITS_HALFRES's C half drawn as family R                                 1 RED
+//   D41 (section 91) SPLITS_EMITTER left out of the dataset refusal               1 RED here (and 1 in denoiseStudy-selfcheck: the refusal row)
+//   D42 SPLITS_EMITTER's C half drawn as family R                                 1 RED
 //   D4  an emitter's base colour taken from its albedo (0) instead of 1          1 RED
 //   D5  remodulate multiplying by the raw albedo, not the floored one            1 RED -- ZERO on the first draft, whose
 //       round trip never saw an albedo under the floor; the near-black row was written for it
@@ -467,6 +469,19 @@ console.log("\n13. ROUND 29'S SPLIT (pre-registration section 89)");
     ok("!! SPLITS_HALFRES: one test set, 6 new scenes of R (42000) then 6 of C (43000), each drawn as its own family, on seeds no earlier split used (round 26's among them), every one refused without harvest",
         Object.keys(SPLITS_HALFRES).join() === "T1" && S1.seeds.length === 12 && S1.seeds.slice(0, 6).every((s2, i) => s2 === 42000 + i && familyOf(S1, i) === "R") &&
         S1.seeds.slice(6).every((s2, i) => s2 === 43000 + i && familyOf(S1, 6 + i) === "C") && S1.seeds.every((s2) => !earlier.has(s2)) && refused === 12,
+        `${refused} of 12 refused`);
+}
+
+console.log("\n14. ROUND 30'S SPLIT (pre-registration section 91)");
+{
+    const { SPLITS_EMITTER, SPLITS_HALFRES, SPLITS_FSR1, SPLITS_MESH } = D;
+    const S1 = SPLITS_EMITTER.T1, earlier = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES]
+        .flatMap((S) => Object.values(S).flatMap((x) => x.seeds)));
+    let refused = 0;
+    S1.seeds.forEach((s2, i) => { try { renderImages(familyOf(S1, i), s2, { w: 2, h: 2, sppIn: 1, sppRef: 1 }); } catch (e) { if (/dataset seed/.test(e.message)) refused++; } });
+    ok("!! SPLITS_EMITTER: one test set, 6 new scenes of R (44000) then 6 of C (45000), each drawn as its own family, on seeds no earlier split used (rounds 26 and 29's among them), every one refused without harvest",
+        Object.keys(SPLITS_EMITTER).join() === "T1" && S1.seeds.length === 12 && S1.seeds.slice(0, 6).every((s2, i) => s2 === 44000 + i && familyOf(S1, i) === "R") &&
+        S1.seeds.slice(6).every((s2, i) => s2 === 45000 + i && familyOf(S1, 6 + i) === "C") && S1.seeds.every((s2) => !earlier.has(s2)) && refused === 12,
         `${refused} of 12 refused`);
 }
 

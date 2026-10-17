@@ -40,6 +40,31 @@ export function emitterCoverage(S, w, h) {
     return cov;
 }
 
+/**
+ * Section 91 (round 30): what the emitters put into each pixel, from the geometry alone -- emitterCoverage's grid, and at
+ * each of its rays whose first hit is an emitter, that emitter's emission. { cov, E }: cov is emitterCoverage's, bit for
+ * bit, and E (H x W x 3) the mean over the grid of the emission met, 0 for a ray that met anything else. A camera ray that
+ * meets an emitter returns exactly its emission (physics/render/pathTracer.mjs: radiance 0 plus throughput 1 times emit,
+ * at depth 0, before any bounce), so a pixel the emitters cover whole is E there, with no noise and nothing traced.
+ */
+export function emitterRadiance(S, w, h) {
+    const B = cameraBasis(S), n = COVERAGE_GRID, cov = new Float64Array(w * h), E = new Float64Array(w * h * 3);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        let k = 0, r = 0, g = 0, b = 0;
+        for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+            const hit = intersect(S.eye, pixelRay(x, y, (i + 0.5) / n, (j + 0.5) / n, w, h, B), S.scene);
+            if (!hit || !hit.sphere.emit) continue;
+            const e = hit.sphere.emit;
+            k++;
+            if (typeof e === "number") { r += e; g += e; b += e; } else { r += e[0]; g += e[1]; b += e[2]; }
+        }
+        const p = y * w + x;
+        cov[p] = k / (n * n);
+        E[p * 3] = r / (n * n); E[p * 3 + 1] = g / (n * n); E[p * 3 + 2] = b / (n * n);
+    }
+    return { cov, E };
+}
+
 /** The mask's channel in an input of stride C: MASK_CHANNEL at MASK_STRIDE, and -1 (no mask) at any other stride. */
 export const maskChannelOf = (C) => (C === MASK_STRIDE ? MASK_CHANNEL : -1);
 

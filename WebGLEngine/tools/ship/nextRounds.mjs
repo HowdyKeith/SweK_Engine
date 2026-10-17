@@ -1694,7 +1694,10 @@ export const NEXT_ROUNDS = [
     {
         id: "denoise-halfres-emitter-aware",
         blocker: "OPEN",
-        what: "Round 29's chain with the emitters taken out of the upscale: emitter pixels composited at full resolution from the geometry (exact and noise-free: an emitter's radiance is its emission), and EASU run on the rest with the emitter mask refusing taps across it -- the arrangement the network's own kernel apply already uses (section 21).",
+        // v4871+: PRE-REGISTERED as section 91 (round 30), harvest owed -- render/denoiseUpscale.mjs's emitterAwareUpscale and
+        // render/denoiseMask.mjs's emitterRadiance, on SPLITS_EMITTER (R 44000, C 45000). Built as a FILL rather than a refusal of
+        // taps: the half-size frame's emitter pixels are filled from their neighbours, so EASU itself (fx/fsr/fsr.js) runs unchanged.
+        what: "Round 29's chain with the emitters taken out of the upscale: emitter pixels composited at full resolution from the geometry (exact and noise-free: an emitter's radiance is its emission), and EASU run on the rest with the emitter pixels filled from their neighbours first, so no tap reads an emitter's radiance -- the network's own kernel apply refuses such taps outright (section 21).",
         how: "A pre-registered round on new R and C seeds at 256 x 256, round 29's frames and controls, B the emitter-aware chain and round 29's plain EASU chain reported beside it. The guide buffers at full size cost a rasterization, not a trace.",
         why: "Round 29's descriptive split (section 90): the half-size chain won every emitter-free image against both comparators and lost every bright-emitter image, with nearly all of its error at emitter edges. If the edge is the whole loss, this is the round that shows half resolution paying for itself, and FSR2 comes off its blocker after it.",
     },

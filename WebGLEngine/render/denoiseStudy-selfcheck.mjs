@@ -72,6 +72,19 @@
 //   R52 the committed round 29 results' C4 edited to false                       1 RED -- section 90's row
 //   R53 section 90's row without its bilinear count (filterWins === 12)          0 RED -- redundant by construction: the same row compares
 //       the verdict's reasons, which state both counts
+//   R54 (section 91) B through plain EASU                                        2 RED -- end to end, and C4 (the re-run is the aware chain)
+//   R55 H2's noisy frame round 29's plain bilinear upscale                       0 RED ON THE FIRST DRAFT -- a finding: the row compared the
+//       verdict alone, and on two images C1's counts over either noisy frame are the same. The hypotheses' columns are now ONE
+//       exported function (emitterSets), held column by column by identity, and the run held to calling it:
+//   R55b the same, in emitterSets                                                1 RED
+//   R56 C4's re-run the plain EASU chain                                         1 RED
+//   R57 ROUND_EMITTER at 128 x 128                                               1 RED
+//   R58 --harvest-emitter running round 29's study                               1 RED
+//   R59 H1 held against D composited instead of D (in the run's inline sets)     1 RED -- the verdict's d differ
+//   R59b the same, in emitterSets                                                1 RED
+//   R60 the mask-agreement refusal removed                                       1 RED -- the source row
+//   R61 D composited without its fill                                            1 RED
+//   R62 the run building its sets inline, H2 over the plain bilinear noise       1 RED -- the run-calls-emitterSets clause
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -497,6 +510,67 @@ console.log("\n16. ROUND 29: THE SAME QUESTION AT 256 x 256, EASU THE CANDIDATE 
         branch.length > 400 && /decodeNet\(shipped\.net\)/.test(code) && /runUpscaleStudy\(/.test(code) && /harvest: true/.test(code) &&
         /splits: ROUND_HALFRES\.splits/.test(code) && /image: ROUND_HALFRES\.image/.test(code) && /candidate: ROUND_HALFRES\.candidate/.test(code) &&
         /path\.join\(ENG, ROUND_HALFRES\.results\)/.test(code) && /existsSync\(file\)/.test(code) && /sha256/.test(code) && /"fx\/fsr"/.test(code) && !/verdict|status|supported/.test(code));
+}
+
+console.log("\n17. ROUND 30: THE EMITTERS TAKEN OUT OF THE UPSCALE (pre-registration section 91)");
+{
+    const { runEmitterAwareStudy, emitterSets, ROUND_EMITTER, RESULTS_EMITTER, ROUND_HALFRES, ROUND_MESH, SHIPPED_NET } = await imp("render/denoiseStudy.mjs");
+    const { SPLITS_EMITTER, makeScene } = await imp("render/denoiseScenes.mjs");
+    const { decodeNet } = await imp("render/denoiseDevice.mjs");
+    const { renderUpscaleImages, upscale, emitterAwareUpscale, fillEmitters, compositeEmitters, nearEmitterShare } = await imp("render/denoiseUpscale.mjs");
+    const { emitterRadiance, MASK_STRIDE, MASK_CHANNEL } = await imp("render/denoiseMask.mjs");
+    const net = decodeNet(JSON.parse(fs.readFileSync(path.join(ENG, SHIPPED_NET), "utf8")).net);
+    ok("!! ROUND_EMITTER: its own split, 256 x 256 (half 128), the sign-flip test, C2 cited from round 11 as rounds 26 and 29 cite it, its own results file",
+        ROUND_EMITTER.splits === SPLITS_EMITTER && ROUND_EMITTER.image === 256 && ROUND_EMITTER.test === "signflip" &&
+        ROUND_EMITTER.c2Prior === ROUND_MESH.c2Prior && ROUND_EMITTER.c2Prior === ROUND_HALFRES.c2Prior &&
+        ROUND_EMITTER.results === RESULTS_EMITTER && RESULTS_EMITTER === "render/denoise-results-emitter.json");
+    let threw = null; try { runEmitterAwareStudy({ net, image: 4, sppIn: 1, sppRef: 1 }); } catch (e) { threw = e.message; }
+    ok("!! on the REAL split without harvest it is refused at its first scene", /seed 44000 is a dataset seed/.test(threw || ""), threw);
+    // the miniature, on two scenes outside every split with an emitter in view at 16 x 16: the PLUMBING, no number read for its value
+    const mini = Object.freeze({ T1: Object.freeze({ family: "R+C", families: Object.freeze(["R", "C"]), seeds: Object.freeze([990211, 990101]) }) });
+    const out = runEmitterAwareStudy({ splits: mini, net, image: 16, sppIn: 4, sppRef: 8 }), V = out.verdict, T = out.tables, X = out.secondary;
+    const cols = ["A", "B", "C", "D", "plainEasu", "plainBilinear", "Daware", "noisyFull1", "noisyFull4", "noisyHalfAware", "noisyHalfUp", "floor"];
+    const shapeOk = cols.every((k) => T[k].length === 2 && T[k].every(Number.isFinite)) && Object.keys(T).length === cols.length;
+    // every frame recomputed from nothing: the images, the emitters' light from the geometry, the network, the chain
+    const mask = (fr) => Float64Array.from({ length: fr.w * fr.h }, (_, p) => fr.x[p * MASK_STRIDE + MASK_CHANNEL]);
+    const want = mini.T1.seeds.map((seed, i) => {
+        const fam = mini.T1.families[i], im = renderUpscaleImages(fam, seed, { w: 16, h: 16, sppIn: 4, sppRef: 8 }), F = emitterRadiance(makeScene(fam, seed), 16, 16);
+        const h4 = denoise(net, im.half4.x, 8, 8).y, D = denoise(net, im.full1.x, 16, 16).y, aw = (y, k) => emitterAwareUpscale(y, mask(im.half4), 8, 8, 16, 16, k, F);
+        const fr = { B: aw(h4, "easu"), C: aw(h4, "bilinear"), D, plainEasu: upscale(h4, 8, 8, 16, 16, "easu"), Daware: compositeEmitters(fillEmitters(D, F.cov, 16, 16), F),
+                     noisyHalfAware: aw(im.half4.input, "bilinear"), noisyHalfUp: upscale(im.half4.input, 8, 8, 16, 16, "bilinear") };
+        return { rel: Object.fromEntries(Object.entries(fr).map(([k, y]) => [k, relMSE(y, im.ref)])), nearB: nearEmitterShare(fr.B, im.ref, F.cov, 16, 16),
+                 lit: F.cov.filter((v) => v > 0).length };
+    });
+    const recomputed = ["B", "C", "D", "plainEasu", "Daware", "noisyHalfAware", "noisyHalfUp"].every((k) => want.every((wt, i) => Object.is(T[k][i], wt.rel[k])));
+    ok("!! *** end to end: B is the shipped network at half size, the emitters filled out, EASU, the emitters composited back from the geometry -- recomputed from nothing; so are C, H2's noisy frame, D composited, and round 29's plain EASU ***",
+        shapeOk && recomputed && want.every((wt) => wt.lit > 0) && X.emitterPixels.every((n, i) => n === want[i].lit) && X.nearEmitter.B.every((v, i) => Object.is(v, want[i].nearB)),
+        `${want.map((wt) => wt.lit).join(" + ")} emitter pixels in view`);
+    const dOf = (x) => T.B.map((b, i) => Math.log(x[i]) - Math.log(b));
+    // the columns by IDENTITY, not by the verdict they give: on two images, C1's counts over H2's noisy frame read the same
+    // whether that frame is the emitter-aware one or round 29's plain bilinear -- measured, sabotage R55 went 0 red on the
+    // verdict alone -- so the definition is one exported function, held here column by column, and the run is held to it
+    const st = emitterSets(T);
+    const columns = st.H1.noisy === T.noisyFull1 && st.H1.filter === T.D && st.H1.net.length === 1 && st.H1.net[0] === T.B && st.H1.floor === T.floor &&
+        st.H2.noisy === T.noisyHalfAware && st.H2.filter === T.C && st.H2.net.length === 1 && st.H2.net[0] === T.B && st.H2.floor === T.floor &&
+        /const sets = emitterSets\(tables\);\s+const V = verdict\(\{ sets, /.test(runEmitterAwareStudy.toString());
+    const again = verdict({ sets: st, shuffled: null, c2Prior: ROUND_EMITTER.c2Prior, determinism: out.determinism, seedsDistinct: out.seedsDistinct, test: ROUND_EMITTER.test });
+    ok("!! the verdict is section 91's: H1 B against D over D's 1-sample input, H2 B against C over the half-size input through the SAME emitter-aware bilinear chain -- C4 re-runs the whole candidate chain",
+        columns && JSON.stringify(again) === JSON.stringify(V) && V.hypotheses.H1.d.every((v, i) => Object.is(v, dOf(T.D)[i])) && V.hypotheses.H2.d.every((v, i) => Object.is(v, dOf(T.C)[i])) &&
+        out.determinism === true && out.seedsDistinct === true && out.seedCount === 10 && out.config.upscale.kind === "easu" &&
+        /emitter-aware EASU/.test(out.config.hypotheses.H1) && /emitter-aware bilinear/.test(out.config.hypotheses.H2), `run ${V.run}`);
+    ok("  reported beside it, never tested: the price of the quarter (A against B), aware against plain EASU, D composited against B, the share near an emitter of B, C, plain EASU and D",
+        X.priceOfHalf.every((v, i) => Object.is(v, Math.log(T.B[i]) - Math.log(T.A[i]))) && X.awareVsPlainEasu.every((v, i) => Object.is(v, dOf(T.plainEasu)[i])) &&
+        X.dAwareVsB.every((v, i) => Object.is(v, dOf(T.Daware)[i])) && ["B", "C", "plainEasu", "D"].every((k) => X.nearEmitter[k].length === 2 && X.nearEmitter[k].every((v) => v >= 0 && v <= 1)));
+    const src = runEmitterAwareStudy.toString();
+    ok("  ...and the run refuses to measure over a composite whose coverage is not the mask the network read at full size",
+        /if \(!f\.cov\.every\(\(v, p\) => Object\.is\(v, m\[p\]\)\)\) throw new Error/.test(src));
+    const cli = fs.readFileSync(path.join(ENG, "tools/denoiseStudy.mjs"), "utf8");
+    const b0 = cli.indexOf('} else if (args.includes("--harvest-emitter")) {'), branch = b0 >= 0 ? cli.slice(b0, cli.indexOf('} else if (args.includes("--harvest-halfres")) {', b0)) : "";
+    const code = branch.replace(/\/\/.*$/gm, "");
+    ok("!! --harvest-emitter decodes the shipped file with decodeNet, runs runEmitterAwareStudy on ROUND_EMITTER's split and size under harvest, writes its results file and never an existing one, and logs no verdict",
+        branch.length > 400 && /decodeNet\(shipped\.net\)/.test(code) && /runEmitterAwareStudy\(/.test(code) && !/runUpscaleStudy/.test(code) && /harvest: true/.test(code) &&
+        /splits: ROUND_EMITTER\.splits/.test(code) && /image: ROUND_EMITTER\.image/.test(code) && /test: ROUND_EMITTER\.test/.test(code) && /c2Prior: ROUND_EMITTER\.c2Prior/.test(code) &&
+        /path\.join\(ENG, ROUND_EMITTER\.results\)/.test(code) && /existsSync\(file\)/.test(code) && /sha256/.test(code) && /"fx\/fsr"/.test(code) && !/verdict|status|supported/.test(code));
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
