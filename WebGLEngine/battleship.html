@@ -38,6 +38,7 @@
   .card { background:#0a1220e0; border:1px solid #2f486c; border-radius:8px; padding:5px 9px; min-width:250px; flex:1 1 250px; max-width:460px; }
   .card b { color:#2fd6b0; } .card.f b { color:#f6a623; } .card .bad { color:#ff6b6b; } .card .good { color:#7fb069; }
   .card .row { color:#9fb6cf; white-space:pre-wrap; }
+  .card.e { border-color:#3f8fe0; } .card.e b { color:#6fc2ff; }
   .bar { height:6px; background:#26354f; border-radius:3px; margin:3px 0; } .bar > i { display:block; height:100%; background:#7fb069; border-radius:3px; } .bar.wave > i { background:#5ad6ff; }
   #log { position:fixed; top:128px; left:10px; z-index:1; color:#f6a623; background:#0a1220b3; border-radius:6px; padding:3px 9px; white-space:pre; min-width:260px; }
   #note { position:fixed; top:112px; right:300px; z-index:1; color:#cfe0f5; background:#0a1220b3; border-radius:6px; padding:2px 8px; text-align:right; max-width:560px; }
@@ -49,7 +50,10 @@
   <label>attack <select id="kind"><option value="bow">bow</option><option value="beam" selected>beam</option><option value="stern">stern</option><option value="swarm">swarm</option></select>
     seed <input id="seed" type="number" min="1" max="99999" value="1"></label>
   <label>fighters <input id="nfight" type="number" min="1" max="12" value="8"></label>
+  <label title="a second capital ship 140 units abeam of the first (both face the enemy; they do not keep a formation)">ships <select id="nships"><option value="1" selected>1</option><option value="2">2</option></select></label>
+  <label title="fighters of the ship's own side (blue), 100-160 units out toward the attackers, flown by the PD autopilot at the nearest enemy fighter">escorts <input id="nesc" type="number" min="0" max="12" value="0"></label>
   <label>gunners <select id="gunners"><option value="perfect">perfect</option><option value="ace">ace</option><option value="regular" selected>regular</option><option value="green">green</option></select></label>
+  <label title="who works each gun seat's HAND (the aim error and the trigger) behind that gunner's sight: the hand gunner's rule, or a network in every seat -- the fruit fly's escape circuit or the GPU Brain's plain network, on weights that ARE the rule (hand weights) or trained"> hand <select id="hand" style="max-width:230px"></select></label>
   <label>fighters fly <select id="pilotF" style="max-width:210px"></select></label>
   <label title="face: the hull turns toward the nearest enemy at its own limit; hold: it keeps its heading">ship <select id="behaviour"><option value="face" selected>faces the enemy</option><option value="hold">holds its heading</option></select></label>
   <label title="a fraction of the ship's thrust to cruise at, 0-1">cruise <input id="cruise" type="number" min="0" max="1" step="0.1" value="0.3"></label>
@@ -84,10 +88,12 @@ import * as P6 from "/brain/pilot6dofPolicy.mjs";
 import * as SA from "/brain/spaceArena.mjs";
 import * as BS from "/brain/battleshipFight.mjs";
 import * as PB from "/brain/peerBrain.mjs";
+import * as SG from "/brain/seatGunnerPolicy.mjs";
+import * as MG from "/brain/seatGunnerMlp.mjs";
 import * as V from "/render/flightViews.mjs";
 import { weightsHash } from "/brain/drivePolicy.mjs";
 
-const R2D = 180 / Math.PI, FIGHTER_COLORS = [0xff9a4f, 0xf6a623, 0xe8734a, 0xd4a017, 0xff8c42, 0xc97b2a], SHIP_COLOR = 0x6f8fa0;
+const R2D = 180 / Math.PI, FIGHTER_COLORS = [0xff9a4f, 0xf6a623, 0xe8734a, 0xd4a017, 0xff8c42, 0xc97b2a], ESCORT_COLORS = [0x4fa8ff, 0x6fc2ff, 0x3f8fe0, 0x8ad0ff, 0x5a9cf0, 0x2f7fd0], SHIP_COLOR = 0x6f8fa0;
 const MAX_FIGHTERS = 12;
 
 // ---- the pilots: a choice resolves to { id, label, list: [{ id, fn, weights, label }] } -- the list is dealt to the fighters in turn (a "mix" has several) ---------------------------------------------------------------------
@@ -123,6 +129,30 @@ function resolvePilot(id) {
   const one = single(c); return { id: c.id === one.id ? c.id : "pd", label: one.label, list: [one] };
 }
 
+// ---- the hands: the hand gunner's rule, or a network in every seat as the HAND behind the same sight (brain/seatGunnerPolicy.mjs: the fruit fly's escape circuit; brain/seatGunnerMlp.mjs: the GPU Brain's plain network). A choice resolves to { id, label, net: { module, weights } | null } ----
+const HANDS = [
+  { id: "rule", label: "the hand gunner's rule" },
+  { id: "flyhand", label: "fruit fly, hand weights (the rule written into the net)", mod: SG, policy: "seatGunnerPolicy", hand: true },
+  { id: "mlphand", label: "GPU brain, hand weights (the rule written into the net)", mod: MG, policy: "seatGunnerMlp", hand: true },
+  { id: "fly", label: "fruit fly, trained", mod: SG, policy: "seatGunnerPolicy", file: "/brain/seatGunnerWeightsDefault.json" },
+  { id: "mlp", label: "GPU brain, trained", mod: MG, policy: "seatGunnerMlp", file: "/brain/seatGunnerMlpWeightsDefault.json" },
+];
+const handLoaded = new Map(), handErrors = new Map();   // id -> { weights, meta } | reason
+function loadHand(h, url = h.file) {
+  return fetch(url).then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }).then((blob) => {
+    const r = PB.importBrain(PB.describePolicy(h.policy, h.mod), blob);
+    if (r.ok) { handLoaded.set(h.id, { weights: r.weights, meta: r.meta }); handErrors.delete(h.id); } else handErrors.set(h.id, r.reason);   // a refused LATER load keeps the hand the page already holds, and says why
+    return r.ok;
+  }).catch((e) => { handErrors.set(h.id, "could not fetch it (" + (e && e.message) + ")"); return false; });
+}
+const handAvailable = (h) => !h.file || handLoaded.has(h.id);
+function resolveHand(id) {
+  const h = HANDS.find((x) => x.id === id && handAvailable(x)) || HANDS[0];
+  if (!h.mod) return { id: h.id, label: h.label, net: null };
+  const got = h.hand ? { weights: h.mod.handWeights(), meta: null } : handLoaded.get(h.id);
+  return { id: h.id, label: h.label + (h.file ? ` ${weightsHash(got.weights)}` : "") + (got.meta && got.meta.score != null ? ` (held-out ${got.meta.score})` : ""), net: { module: h.mod, weights: got.weights } };
+}
+
 // ---- Three.js scene, Z-UP like the physics (nose +X, up +Z): space -- a black sky, stars, a drifting dust to see motion against, light from one side ----------------------------------------------------------------
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x02040a);
@@ -152,8 +182,8 @@ const sun = new THREE.DirectionalLight(0xfff2dd, 2.2); sun.position.set(500, -30
 }
 const CREW_DEAD = new THREE.MeshStandardMaterial({ color: 0x5b6670, roughness: 1 }), HULL_DEAD = new THREE.MeshStandardMaterial({ color: 0x3a1c1c, roughness: 0.95 }), PART_DEAD = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 1 });
 const GLOW_ON = new THREE.MeshBasicMaterial({ color: 0xffb06a }), GLOW_OFF = new THREE.MeshBasicMaterial({ color: 0x151515 });
-function makeFighter(i) {   // the 6DOF page's hull: nose +X, a cylinder, a cone, a wing, the engine glow
-  const g = new THREE.Group(), mat = new THREE.MeshStandardMaterial({ color: FIGHTER_COLORS[i % FIGHTER_COLORS.length], metalness: 0.3, roughness: 0.5 });
+function makeFighter(i, palette = FIGHTER_COLORS) {   // the 6DOF page's hull: nose +X, a cylinder, a cone, a wing, the engine glow
+  const g = new THREE.Group(), mat = new THREE.MeshStandardMaterial({ color: palette[i % palette.length], metalness: 0.3, roughness: 0.5 });
   const body = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.5, 2.6, 14), mat); body.rotation.z = Math.PI / 2; g.add(body);
   const nose = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.9, 14), mat); nose.rotation.z = -Math.PI / 2; nose.position.x = 1.6; g.add(nose);
   const wing = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.0, 1.9), mat); g.add(wing);
@@ -199,7 +229,7 @@ function trailLine(color) {
 // the rounds: a short streak behind each one (the ship's point defence in cyan, its main shells in red, the fighters' in yellow); the hits: a flash that grows and fades; the markers: a dot per craft, for the big picture, where a fighter is 3 units in 1,000
 const MAX_ROUNDS = 1600;
 function tracerSet(color) { const geom = new THREE.BufferGeometry(); geom.setAttribute("position", new THREE.BufferAttribute(new Float32Array(MAX_ROUNDS * 6), 3)); geom.setDrawRange(0, 0); const l = new THREE.LineSegments(geom, new THREE.LineBasicMaterial({ color })); l.frustumCulled = false; scene.add(l); return { geom, l }; }
-const tracerP = tracerSet(0x7ff0ff), tracerM = tracerSet(0xff5a3c), tracerF = tracerSet(0xfff1a0);
+const tracerP = tracerSet(0x7ff0ff), tracerM = tracerSet(0xff5a3c), tracerF = tracerSet(0xfff1a0), tracerE = tracerSet(0x9fd0ff);
 const flashes = []; const FLASH_MAT = () => new THREE.MeshBasicMaterial({ color: 0xffb340, transparent: true, opacity: 1 });
 function spawnFlash(p, big = 1) { const m = new THREE.Mesh(new THREE.SphereGeometry(big, 10, 8), FLASH_MAT()); m.position.set(p[0], p[1], p[2]); m.userData.age = 0; scene.add(m); flashes.push(m); }
 let markers = null;
@@ -209,10 +239,12 @@ function makeMarkers(n) {
 }
 
 // ---- the fight ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-let fight = null, arena = null, pilots = null, meshes = [], trails = [], trailN = [], deadShown = [], log = [], paused = false, held = false, beamAge = 99, lastShipHitLog = -99, lastFriendlyLog = new Map();
+let fight = null, arena = null, pilots = null, handNow = null, meshes = [], trails = [], trailN = [], deadShown = [], log = [], paused = false, held = false, beamAges = new Map(), lastShipHitLog = new Map(), lastFriendlyLog = new Map();
 const el = (id) => document.getElementById(id);
-const nameOf = (c) => (c.kind === "capital" ? "battleship" : c.name);
-const pilotOf = (fi) => pilots.list[fi % pilots.list.length];
+const shipTeam = () => arena.crafts[0].team, isRaider = (c) => c.kind === "fighter" && c.team !== shipTeam(), isEscort = (c) => c.kind === "fighter" && c.team === shipTeam(), shipIndex = (c) => arena.crafts.filter((q) => q.kind === "capital").indexOf(c);
+const nameOf = (c) => (c.kind === "capital" ? (c === arena.crafts[0] ? "battleship" : "second ship") : c.name);
+const ESCORT_PILOT = { id: "pd", fn: undefined, weights: null, label: "PD autopilot (escort)" };
+const pilotOf = (fi) => pilots.list[fi % pilots.list.length], pilotForCraft = (c) => (isEscort(c) ? ESCORT_PILOT : pilotOf(c.id - arena.crafts[0].id - 1));
 const clearFight = () => {
   for (const m of meshes) { scene.remove(m); m.traverse((c) => { if (c.geometry) c.geometry.dispose(); }); }
   for (const t of trails) { scene.remove(t); t.geometry.dispose(); }
@@ -220,37 +252,38 @@ const clearFight = () => {
   if (markers) { scene.remove(markers); markers.geometry.dispose(); markers = null; }
   flashes.length = 0; meshes = []; trails = [];
 };
-function newFight({ kind = el("kind").value, seed = Number(el("seed").value) || 1, fighters = Number(el("nfight").value) || 8, gunners = el("gunners").value, f = el("pilotF").value, behaviour = el("behaviour").value, cruise = el("cruise").value === "" ? 0.3 : Number(el("cruise").value), friendlyFire = el("ff").checked, holdFire = el("hold").checked, wrecks = el("wrecks").checked, impact = el("impact").checked ? SA.ROUND_MASS : 0, crew = el("crew").checked } = {}) {
+function newFight({ kind = el("kind").value, seed = Number(el("seed").value) || 1, fighters = Number(el("nfight").value) || 8, gunners = el("gunners").value, f = el("pilotF").value, behaviour = el("behaviour").value, cruise = el("cruise").value === "" ? 0.3 : Number(el("cruise").value), friendlyFire = el("ff").checked, holdFire = el("hold").checked, wrecks = el("wrecks").checked, impact = el("impact").checked ? SA.ROUND_MASS : 0, crew = el("crew").checked, hand = el("hand").value, ships = Number(el("nships").value) || 1, escorts = Number(el("nesc").value) || 0 } = {}) {
   clearFight();
-  fighters = Math.max(1, Math.min(MAX_FIGHTERS, Math.round(fighters))); seed = Math.max(1, Math.round(seed)); cruise = Math.max(0, Math.min(1, Number.isFinite(cruise) ? cruise : 0.3));
-  pilots = resolvePilot(f);
-  fight = BS.build(seed, kind, { fighters, gunners, pilot: pilots.list.map((p) => p.fn), behaviour, cruise, friendlyFire: !!friendlyFire, holdFire: !!holdFire, wrecks: !!wrecks, impact: impact === true ? SA.ROUND_MASS : Number(impact) || 0, crew: !!crew });
+  fighters = Math.max(1, Math.min(MAX_FIGHTERS, Math.round(fighters))); seed = Math.max(1, Math.round(seed)); ships = ships >= 2 ? 2 : 1; escorts = Math.max(0, Math.min(BS.MAX_ESCORTS, Math.round(escorts) || 0)); cruise = Math.max(0, Math.min(1, Number.isFinite(cruise) ? cruise : 0.3));
+  pilots = resolvePilot(f); handNow = resolveHand(hand);
+  fight = BS.build(seed, kind, { fighters, gunners, pilot: pilots.list.map((p) => p.fn), behaviour, cruise, friendlyFire: !!friendlyFire, holdFire: !!holdFire, wrecks: !!wrecks, impact: impact === true ? SA.ROUND_MASS : Number(impact) || 0, crew: !!crew, network: handNow.net, ships, escorts });
   arena = fight.arena;
-  meshes = arena.crafts.map((c, i) => (c.kind === "capital" ? makeShip(c.ship) : makeFighter(i - 1)));
-  trails = arena.crafts.map((c, i) => trailLine(c.kind === "capital" ? 0x6fd6c0 : FIGHTER_COLORS[(i - 1) % FIGHTER_COLORS.length])); trailN = arena.crafts.map(() => 0); deadShown = arena.crafts.map(() => false);
+  const escortN = new Map(arena.crafts.filter(isEscort).map((c, k) => [c.id, k]));
+  meshes = arena.crafts.map((c, i) => (c.kind === "capital" ? makeShip(c.ship) : isEscort(c) ? makeFighter(escortN.get(c.id), ESCORT_COLORS) : makeFighter(i - 1)));
+  trails = arena.crafts.map((c, i) => trailLine(c.kind === "capital" ? 0x6fd6c0 : isEscort(c) ? ESCORT_COLORS[escortN.get(c.id) % ESCORT_COLORS.length] : FIGHTER_COLORS[(i - 1) % FIGHTER_COLORS.length])); trailN = arena.crafts.map(() => 0); deadShown = arena.crafts.map(() => false);
   markers = makeMarkers(arena.crafts.length);
-  beamAge = 99; lastShipHitLog = -99; lastFriendlyLog = new Map(); log = [];
-  el("kind").value = kind; el("seed").value = String(fight.scenario.seed); el("nfight").value = String(fighters); el("gunners").value = typeof gunners === "string" ? gunners : "regular"; el("pilotF").value = pilots.id; el("behaviour").value = behaviour; el("cruise").value = String(cruise); el("ff").checked = !!friendlyFire; el("hold").checked = !!holdFire; el("wrecks").checked = !!wrecks; el("impact").checked = arena.impact > 0; el("crew").checked = !!crew;
+  beamAges = new Map(); lastShipHitLog = new Map(); lastFriendlyLog = new Map(); log = [];
+  el("kind").value = kind; el("seed").value = String(fight.scenario.seed); el("nfight").value = String(fighters); el("gunners").value = typeof gunners === "string" ? gunners : "regular"; el("pilotF").value = pilots.id; el("hand").value = handNow.id; el("behaviour").value = behaviour; el("cruise").value = String(cruise); el("ff").checked = !!friendlyFire; el("hold").checked = !!holdFire; el("wrecks").checked = !!wrecks; el("impact").checked = arena.impact > 0; el("crew").checked = !!crew; el("nships").value = String(ships); el("nesc").value = String(escorts);
   buildWindows(); camPos.set(...arena.crafts[0].body.pos).add(new THREE.Vector3(-120, -160, 70)); camLook.set(...arena.crafts[0].body.pos);
   renderNote(); renderFrame(0, true);
 }
 function tickOnce() {
   SA.stepSpaceArena(arena);
-  const nm = (id) => nameOf(arena.crafts.find((c) => c.id === id)), ship = arena.crafts[0];
+  const nm = (id) => nameOf(arena.crafts.find((c) => c.id === id)), many = arena.crafts.filter((c) => c.kind === "capital").length > 1, tag = (id) => (many ? ` [${nm(id)}]` : "");
   for (const e of arena.events) {
     if (e.type === "hit") {
       const v = arena.crafts.find((c) => c.id === e.victim); spawnFlash(e.point, v.kind === "capital" ? 1.2 : 1);
-      if (e.friendly) { const fk = `${e.shooter}>${e.victim}`; if (arena.i - (lastFriendlyLog.get(fk) ?? -99) >= 15) { lastFriendlyLog.set(fk, arena.i); log.push(`${e.t.toFixed(1)} s  FRIENDLY FIRE: ${nm(e.shooter)} hit ${e.shooter === e.victim ? "itself" : nm(e.victim)}${e.part !== undefined ? ` — ${ship.ship.parts[e.part].name}` : ""}  (${Math.max(0, Math.round(v.hp))} of ${v.hpMax} hit points left)`); } }
-      else if (v.kind === "capital" && arena.i - lastShipHitLog >= 15) { lastShipHitLog = arena.i; log.push(`${e.t.toFixed(1)} s  ${nm(e.shooter)} hit the battleship${e.part !== undefined ? ` — ${ship.ship.parts[e.part].name}` : ""}  (${Math.max(0, Math.round(v.hp))} of ${v.hpMax} hit points left)`); }
+      if (e.friendly) { const fk = `${e.shooter}>${e.victim}`; if (arena.i - (lastFriendlyLog.get(fk) ?? -99) >= 15) { lastFriendlyLog.set(fk, arena.i); log.push(`${e.t.toFixed(1)} s  FRIENDLY FIRE: ${nm(e.shooter)} hit ${e.shooter === e.victim ? "itself" : nm(e.victim)}${e.part !== undefined ? ` — ${v.ship.parts[e.part].name}` : ""}  (${Math.max(0, Math.round(v.hp))} of ${v.hpMax} hit points left)`); } }
+      else if (v.kind === "capital" && arena.i - (lastShipHitLog.get(v.id) ?? -99) >= 15) { lastShipHitLog.set(v.id, arena.i); log.push(`${e.t.toFixed(1)} s  ${nm(e.shooter)} hit the ${nameOf(v)}${e.part !== undefined ? ` — ${v.ship.parts[e.part].name}` : ""}  (${Math.max(0, Math.round(v.hp))} of ${v.hpMax} hit points left)`); }
     }
-    else if (e.type === "part") log.push(`${e.t.toFixed(1)} s  ${e.name} OUT${e.kind === "engine" ? ` — ${e.running} of ${CS.ENGINE_PODS} engine pods running` : ""}`);
-    else if (e.type === "crew") log.push(e.what === "bridge" ? `${e.t.toFixed(1)} s  BRIDGE CREW LOST — the battleship has no helm and no cannon` : `${e.t.toFixed(1)} s  the gunner of ${e.name} is KILLED (his mount stands)`);
+    else if (e.type === "part") log.push(`${e.t.toFixed(1)} s  ${e.name} OUT${tag(e.craft)}${e.kind === "engine" ? ` — ${e.running} of ${CS.ENGINE_PODS} engine pods running` : ""}`);
+    else if (e.type === "crew") log.push(e.what === "bridge" ? `${e.t.toFixed(1)} s  BRIDGE CREW LOST — the ${nm(e.craft)} has no helm and no cannon` : `${e.t.toFixed(1)} s  the gunner of ${e.name}${tag(e.craft)} is KILLED (his mount stands)`);
     else if (e.type === "kill") log.push(`${e.t.toFixed(1)} s  ${nm(e.craft)} DESTROYED${e.by === "wave" ? " by the wave-motion cannon" : ""}`);
-    else if (e.type === "wave") { beamAge = 0; log.push(`${e.t.toFixed(1)} s  WAVE-MOTION CANNON fires — ${e.victims.length} craft in the beam (${e.damage} each)`); }
+    else if (e.type === "wave") { beamAges.set(e.craft, 0); log.push(`${e.t.toFixed(1)} s  WAVE-MOTION CANNON fires${tag(e.craft)} — ${e.victims.length} craft in the beam (${e.damage} each)`); }
     else if (e.type === "ram") log.push(`${e.t.toFixed(1)} s  ${nm(e.craft)} rammed the hull (-${e.damage})`);
     else if (e.type === "collision") log.push(`${e.t.toFixed(1)} s  ${nm(e.craft)} collided with ${nm(e.with)}`);
   }
-  if (beamAge < 99) beamAge += arena.dt;
+  for (const [id, age] of beamAges) beamAges.set(id, age + arena.dt);
   if (arena.done && !log.some((l) => /^OVER/.test(l))) log.push(`OVER (${arena.over}) at ${arena.t.toFixed(1)} s — ${BS.tally(arena).winner === "none" ? "no winner" : BS.tally(arena).winner + " win"}`);
   if (log.length > 14) log = log.slice(-14);
 }
@@ -265,7 +298,7 @@ const drawFor = (c) => (c.kind === "capital" ? DRAW_S : DRAW_F);
 function buildWindows() {
   for (const w of wins) keepViews[w.i] = { view: w.view, seat: w.seat };
   stack.textContent = ""; wins.length = 0;
-  const n = arena.crafts.length, unit = Math.floor((innerHeight - 12 - 6 * n) / (n + 1)) - 2, fH = Math.max(96, Math.min(160, unit)), sH = 2 * fH + 8;   // the ship counts as two craft; the box's 1 px border is outside its height; the stack scrolls if they do not fit
+  const n = arena.crafts.length, unit = Math.floor((innerHeight - 12 - 6 * n) / (n + arena.crafts.filter((q) => q.kind === "capital").length)) - 2, fH = Math.max(96, Math.min(160, unit)), sH = 2 * fH + 8;   // the ship counts as two craft; the box's 1 px border is outside its height; the stack scrolls if they do not fit
   stack.style.setProperty("--wh", fH + "px"); stack.style.setProperty("--sh", sH + "px");
   arena.crafts.forEach((c, i) => {
     const box = document.createElement("div"), h = c.kind === "capital" ? sH : fH; box.className = "win" + (c.kind === "capital" ? " ship" : ""); box.dataset.craft = String(i);
@@ -293,8 +326,8 @@ function cameraOf(w, c) {
 const clamp1 = (v) => (v < -1 ? -1 : v > 1 ? 1 : v);
 // THE BRAIN WINDOW. A fighter: the pilot's network live -- 12 features, 34 hidden, 5 outputs -- or the PD autopilot's features and its five commands in the network's own scale (the torque as a fraction of I x 40, thrust and trigger +-1), the features and the command of
 // the CURRENT state against the foe it is flying at. The battleship has no pilot: its hull's state (how fast it is turning, its thrust, engines, the cannon's charge, its hull), then a row per gun seat.
-function fighterRows(c, fi) {
-  const p = pilotOf(fi), foe = SA.nearestFoe(arena, c);
+function fighterRows(c, p) {
+  const foe = SA.nearestFoe(arena, c);
   if (!foe) return [{ who: "pilot", layer: "features", names: P6.FEATURE_NAMES, values: P6.FEATURE_NAMES.map(() => 0) }, { who: "pilot", layer: "outputs", names: P6.OUTPUT_NAMES, values: P6.OUTPUT_NAMES.map(() => 0) }];
   const aim = SA.fighterAim(arena, c, foe), x = P6.features(c.body, aim.target, aim.opts);
   let act;
@@ -306,9 +339,17 @@ function shipRows(c) {
   const w = c.body.w, thr = c.last ? c.last.thrust : 0;
   const rows = [{ who: "helm", layer: "hull", label: "hull", names: ["turn x", "turn y", "turn z", "thrust", "engines", "cannon", "hull"], values: [clamp1(w[0] / 0.5), clamp1(w[1] / 0.5), clamp1(w[2] / 0.5), thr / CS.thrustWith(c.ship, CS.ENGINE_PODS), c.enginesRunning / CS.ENGINE_PODS, c.charge / c.ship.waveGun.charge, Math.max(0, c.hp) / c.hpMax] }];
   rows.push(...V.seatRows(c.seats.map((s2) => ({ seat: s2.seat, state: s2.state, cmd: s2.last }))));
+  const wi = arena.crafts.indexOf(c); rows.push(...handRows(c, wins[wi] ? wins[wi].seat : 0));
   return rows;
 }
-const brainRowsOf = (c) => (c.kind === "capital" ? shipRows(c) : fighterRows(c, c.id - arena.crafts[0].id - 1));
+// THE HAND'S OWN NETWORK, for the seat the ship's window is on: the twelve features the sight and the arena showed it the last tick it was asked, the hidden layer, and the three outputs (a yaw and a pitch correction, the trigger); idle (zeros) when it had no target
+function handRows(c, k) {
+  const net = handNow && handNow.net, s = c.seats[k]; if (!net || !s) return [];
+  const last = s.decide && s.decide.last, nF = net.module.FEATURES, nH = net.module.HIDDEN, nO = net.module.OUTPUTS;
+  const act = last ? V.pilotActivations(net.module, net.weights, last.x) : { input: new Float32Array(nF), hidden: new Float32Array(nH), output: new Float32Array(nO) };
+  return V.pilotRows({ who: s.seat.id, act, featureNames: net.module.FEATURE_NAMES, outputNames: net.module.OUTPUT_NAMES }).map((r) => ({ ...r, label: `s${k + 1} ${last ? r.layer.slice(0, 4) : "idle"}` }));
+}
+const brainRowsOf = (c) => (c.kind === "capital" ? shipRows(c) : fighterRows(c, pilotForCraft(c)));
 const fmt = (v, d = 0) => (Number.isFinite(v) ? v.toFixed(d) : "—");
 const hudLine = (c) => `V ${fmt(Math.hypot(...c.body.vel), 1)} u/s  HP ${Math.max(0, Math.round(c.hp))}/${c.hpMax}  ` + (c.seats.length ? `rounds ${c.seats.reduce((a, s) => a + s.state.gun.ammo, 0)}` : `fired ${c.gun.fired}`);
 function drawSight(ctx, cam, muzzle, foe, spec, W, H) {
@@ -324,7 +365,7 @@ function drawSight(ctx, cam, muzzle, foe, spec, W, H) {
 function drawOverlay(w, c, W, H) {
   const ctx = w.ctx; ctx.clearRect(0, 0, W, H); w.texts = []; w.sight = null;
   ctx.font = "10px ui-monospace,Menlo,monospace"; ctx.lineWidth = 2;
-  if (w.view === "brain") { V.drawRows(ctx, W, H, brainRowsOf(c), { title: `${nameOf(c)} · ${c.kind === "capital" ? "hull and gunners (rules)" : pilotOf(c.id - arena.crafts[0].id - 1).label}` }); return; }
+  if (w.view === "brain") { V.drawRows(ctx, W, H, brainRowsOf(c), { title: `${nameOf(c)} · ${c.kind === "capital" ? `hull and gunners (${handNow.net ? "networks" : "rules"})` : pilotForCraft(c).label}` }); return; }
   ctx.fillStyle = "#cfe0f5"; ctx.fillText(w.view === "plane" ? `${nameOf(c)}${c.status !== "flying" ? ` — ${c.status}` : c.kind === "fighter" ? ` — ${c.mode}` : ""}` : hudLine(c), 4, H - 5);
   if (w.view === "pilot") { ctx.fillStyle = "#7fe0a0"; ctx.fillRect(Math.round(W / 2) - 6, Math.round(H / 2), 13, 1); ctx.fillRect(Math.round(W / 2), Math.round(H / 2) - 6, 1, 13); }
   if (w.view === "gunner") {
@@ -335,6 +376,7 @@ function drawOverlay(w, c, W, H) {
       if (c.partHp.has(st.part) && c.partHp.get(st.part) <= 0) { ctx.fillStyle = "#ff6b6b"; ctx.fillText("SEAT OUT", W - 62, 24); }
       if (c.crew && c.crew.dead.has(st.seat.id)) { ctx.fillStyle = "#ff6b6b"; ctx.fillText("GUNNER DOWN", W - 80, 36); }
       if (st.blocked) { ctx.fillStyle = "#f6a623"; ctx.fillText(`INTERLOCK — ${st.blocked}`, 4, H - 29); }
+      if (handNow.net && st.decide.last) { const y = st.decide.last.y; ctx.fillStyle = "#c9a8ff"; ctx.fillText(`net: yaw ${(y[0] * SG.AIM_GAIN * R2D).toFixed(1)}°  pitch ${(y[1] * SG.AIM_GAIN * R2D).toFixed(1)}°  trigger ${y[2].toFixed(2)}`, 4, H - 41); }
       if (st.last && st.last.fire) { ctx.fillStyle = "#ff6b6b"; ctx.fillText("FIRE", W - 32, 12); }
     } else {
       const cam = cameraOf(w, c), foe = c.last && c.last.foe != null ? arena.crafts.find((o) => o.id === c.last.foe) : null;
@@ -386,7 +428,7 @@ function syncScene(dt) {
     const p = c.body.pos, pq = RB.toPoseQuat(c.body.q), m = meshes[i], live = c.status === "flying";
     m.position.set(p[0], p[1], p[2]); m.quaternion.set(pq[0], pq[1], pq[2], pq[3]);
     mk[i * 3] = p[0]; mk[i * 3 + 1] = p[1]; mk[i * 3 + 2] = p[2];
-    const col = !live ? [0.3, 0.3, 0.3] : c.kind === "capital" ? [0.2, 1, 0.8] : [1, 0.6, 0.2]; mc[i * 3] = col[0]; mc[i * 3 + 1] = col[1]; mc[i * 3 + 2] = col[2];
+    const col = !live ? [0.3, 0.3, 0.3] : c.kind === "capital" ? [0.2, 1, 0.8] : isEscort(c) ? [0.4, 0.7, 1] : [1, 0.6, 0.2]; mc[i * 3] = col[0]; mc[i * 3 + 1] = col[1]; mc[i * 3 + 2] = col[2];
     if (c.kind === "capital") {
       const ud = m.userData;
       c.seats.forEach((s, k) => {
@@ -397,7 +439,7 @@ function syncScene(dt) {
       });
       for (const e of ud.engines) { const out = c.partHp.get(e.id) <= 0; e.nac.material = out ? PART_DEAD : e.mat; e.glow.material = out || !live || !(c.last && c.last.thrust > 0) ? GLOW_OFF : GLOW_ON; }
       const f = Math.min(1, c.charge / c.ship.waveGun.charge); ud.charge.scale.setScalar(0.2 + 2.2 * f); ud.charge.material.opacity = live ? 0.25 + 0.7 * f : 0.05;
-      ud.beam.visible = beamAge < 0.4; if (ud.beam.visible) ud.beam.material.opacity = 0.5 * (1 - beamAge / 0.4);
+      const age = beamAges.get(c.id) ?? 99; ud.beam.visible = age < 0.4; if (ud.beam.visible) ud.beam.material.opacity = 0.5 * (1 - age / 0.4);
       for (const s of ud.spheres) s.visible = showSpheres;
     } else m.userData.eng.material = live && c.last && c.last.thrust > 0 ? GLOW_ON : GLOW_OFF;
     if (!live && !deadShown[i]) { deadShown[i] = true; for (const h of m.userData.hull) h.material = HULL_DEAD; }
@@ -408,40 +450,47 @@ function syncScene(dt) {
     }
   });
   markers.geometry.attributes.position.needsUpdate = true; markers.geometry.attributes.color.needsUpdate = true;
-  let np = 0, nm = 0, nf = 0; const ap = tracerP.geom.attributes.position.array, am = tracerM.geom.attributes.position.array, af = tracerF.geom.attributes.position.array, shipTeam = arena.crafts[0].team;
+  let np = 0, nm = 0, nf = 0, ne = 0; const ap = tracerP.geom.attributes.position.array, am = tracerM.geom.attributes.position.array, af = tracerF.geom.attributes.position.array, ae = tracerE.geom.attributes.position.array, shipTeam = arena.crafts[0].team, kindOf = new Map(arena.crafts.map((c) => [c.id, c.kind]));
   for (const r of arena.rounds) {
-    const main = r.team === shipTeam && r.dmg > 30, ownShip = r.team === shipTeam, arr = ownShip ? (main ? am : ap) : af, n = ownShip ? (main ? nm : np) : nf, streak = main ? 0.08 : 0.05; if (n >= MAX_ROUNDS) continue;
+    const ownShip = r.team === shipTeam, esc = ownShip && kindOf.get(r.owner) === "fighter", main = ownShip && !esc && r.dmg > 30, arr = esc ? ae : ownShip ? (main ? am : ap) : af, n = esc ? ne : ownShip ? (main ? nm : np) : nf, streak = main ? 0.08 : 0.05; if (n >= MAX_ROUNDS) continue;
     arr[n * 6] = r.pos[0]; arr[n * 6 + 1] = r.pos[1]; arr[n * 6 + 2] = r.pos[2]; arr[n * 6 + 3] = r.pos[0] - r.vel[0] * streak; arr[n * 6 + 4] = r.pos[1] - r.vel[1] * streak; arr[n * 6 + 5] = r.pos[2] - r.vel[2] * streak;
-    if (ownShip) { if (main) nm++; else np++; } else nf++;
+    if (esc) ne++; else if (ownShip) { if (main) nm++; else np++; } else nf++;
   }
-  for (const [t, n] of [[tracerP, np], [tracerM, nm], [tracerF, nf]]) { t.geom.attributes.position.needsUpdate = true; t.geom.setDrawRange(0, n * 2); }
+  for (const [t, n] of [[tracerP, np], [tracerM, nm], [tracerF, nf], [tracerE, ne]]) { t.geom.attributes.position.needsUpdate = true; t.geom.setDrawRange(0, n * 2); }
   for (let k = flashes.length - 1; k >= 0; k--) { const f = flashes[k]; f.userData.age += dt; f.scale.setScalar(1 + f.userData.age * 10); f.material.opacity = Math.max(0, 1 - f.userData.age / 0.5); if (f.userData.age > 0.5) { scene.remove(f); f.geometry.dispose(); f.material.dispose(); flashes.splice(k, 1); } }
 }
 
 // ---- the board ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 function renderNote() { el("note").textContent = wins.length ? "click a window to switch it: plane · pilot · gun seats 1-13 (the battleship) · gunner (a fighter) · brain" : ""; }
 function updateBoard() {
-  const board = el("board");
-  if (board.children.length !== 2) { board.textContent = ""; for (const id of ["card0", "card1"]) { const d = document.createElement("div"); d.className = "card" + (id === "card1" ? " f" : ""); d.id = id; board.appendChild(d); } }
-  const s = arena.crafts[0], fs = arena.crafts.slice(1), t = BS.tally(arena), left = Math.max(0, s.hp);
-  const out = t.ship.partsOut;
-  el("card0").innerHTML = `<b>battleship</b> · ${s.status === "flying" ? `<span class="good">flying</span>` : `<span class="bad">${s.status.toUpperCase()}</span>`} · gunners ${typeof fight.gunners === "object" ? el("gunners").value : fight.gunners}<div class="bar"><i style="width:${(100 * left / s.hpMax).toFixed(0)}%"></i></div>` +
-    `<div class="row">hit points ${Math.round(left)}/${s.hpMax}   engines ${s.ship.engines.map((id) => (s.partHp.get(id) > 0 ? "●" : "○")).join(" ")} ${s.enginesRunning} of ${CS.ENGINE_PODS}</div>` +
-    `<div class="row">wave-motion cannon (invented) ${Math.round(100 * s.charge / s.ship.waveGun.charge)}% charged, fired ${s.waves}<div class="bar wave"><i style="width:${(100 * s.charge / s.ship.waveGun.charge).toFixed(0)}%"></i></div></div>` +
-    `<div class="row">parts out: ${out.length ? out.join(", ") : "none"}   rounds fired by the seats ${t.ship.seatRounds}   hits landed ${s.hits}</div>` +
-    (arena.crew ? `<div class="row">crew: ${s.helm ? "bridge at its post" : `<span class="bad">BRIDGE CREW LOST: NO HELM, NO CANNON</span>`}, ${t.ship.crewDead.length} of ${s.seats.length} gunners killed${t.ship.crewDead.length ? " (" + t.ship.crewDead.join(", ") + ")" : ""}</div>` : "") +
-    (arena.friendlyFire ? `<div class="row">friendly fire ON, rules ${s.holdFire ? "on" : "OFF"}: its own guns have hit it for ${t.ship.friendlyTaken}, its seats held fire ${t.ship.held} ticks, ${t.friendlyHits} hit points of friendly damage in all</div>` : "");
+  const board = el("board"), caps = arena.crafts.filter((c) => c.kind === "capital"), escs = arena.crafts.filter(isEscort), want = ["card0", "card1", ...(caps.length > 1 ? ["card2"] : []), ...(escs.length ? ["card3"] : [])];
+  if ([...board.children].map((d) => d.id).join() !== want.join()) { board.textContent = ""; for (const id of want) { const d = document.createElement("div"); d.className = "card" + (id === "card1" ? " f" : id === "card3" ? " e" : ""); d.id = id; board.appendChild(d); } }
+  const fs = arena.crafts.filter(isRaider), t = BS.tally(arena);
+  const shipCard = (s, st, title) => {
+    const left = Math.max(0, s.hp), out = st.partsOut;
+    return `<b>${title}</b> · ${s.status === "flying" ? `<span class="good">flying</span>` : `<span class="bad">${s.status.toUpperCase()}</span>`} · gunners ${typeof fight.gunners === "object" ? el("gunners").value : fight.gunners}${handNow.net ? ` · hand: ${handNow.label}` : ""}<div class="bar"><i style="width:${(100 * left / s.hpMax).toFixed(0)}%"></i></div>` +
+      `<div class="row">hit points ${Math.round(left)}/${s.hpMax}   engines ${s.ship.engines.map((id) => (s.partHp.get(id) > 0 ? "●" : "○")).join(" ")} ${s.enginesRunning} of ${CS.ENGINE_PODS}</div>` +
+      `<div class="row">wave-motion cannon (invented) ${Math.round(100 * s.charge / s.ship.waveGun.charge)}% charged, fired ${s.waves}<div class="bar wave"><i style="width:${(100 * s.charge / s.ship.waveGun.charge).toFixed(0)}%"></i></div></div>` +
+      `<div class="row">parts out: ${out.length ? out.join(", ") : "none"}   rounds fired by the seats ${st.seatRounds}   hits landed ${s.hits}</div>` +
+      (arena.crew ? `<div class="row">crew: ${s.helm ? "bridge at its post" : `<span class="bad">BRIDGE CREW LOST: NO HELM, NO CANNON</span>`}, ${st.crewDead.length} of ${s.seats.length} gunners killed${st.crewDead.length ? " (" + st.crewDead.join(", ") + ")" : ""}</div>` : "") +
+      (arena.friendlyFire ? `<div class="row">friendly fire ON, rules ${s.holdFire ? "on" : "OFF"}: its own guns have hit it for ${st.friendlyTaken}, its seats held fire ${st.held} ticks${s === caps[0] ? `, ${t.friendlyHits} hit points of friendly damage in all` : ""}</div>` : "");
+  };
+  el("card0").innerHTML = shipCard(caps[0], t.ships[0], "battleship");
   el("card1").innerHTML = `<b>${fs.length} fighters</b> · ${pilots.label} · ${t.flying} flying, ${t.killed} shot down, ${t.rammed} rammed` +
     fs.map((c, i) => `<div class="row">${c.status === "flying" ? "●" : "○"} ${c.name}  ${Math.max(0, Math.round(c.hp)).toString().padStart(3)} hp  ${c.status === "flying" ? c.mode : c.status}  fired ${c.gun.fired}  hits ${c.hits}${arena.friendlyFire ? `  friendly ${c.friendlyHits}/${c.friendlyTaken}  held ${c.held}` : ""}</div>`).join("");
+  if (caps.length > 1) el("card2").innerHTML = shipCard(caps[1], t.ships[1], "second ship");
+  if (escs.length) el("card3").innerHTML = `<b>${escs.length} escorts</b> · ${ESCORT_PILOT.label} · ${escs.filter((c) => !c.dead).length} flying, ${escs.filter((c) => c.status === "destroyed").length} lost` +
+    escs.map((c) => `<div class="row">${c.status === "flying" ? "●" : "○"} ${c.name}  ${Math.max(0, Math.round(c.hp)).toString().padStart(3)} hp  ${c.status === "flying" ? c.mode : c.status}  fired ${c.gun.fired}  hits ${c.hits}${arena.friendlyFire ? `  friendly ${c.friendlyHits}/${c.friendlyTaken}  held ${c.held}` : ""}</div>`).join("");
   el("stat").textContent = `${fight.scenario.kind} ${fight.scenario.seed} · t ${arena.t.toFixed(1)} s · ${t.killed + t.rammed} of ${fs.length} fighters down${arena.done ? ` · OVER (${t.winner === "none" ? "no winner" : t.winner + " win"})` : ""}`;
   el("log").textContent = log.join("\n"); el("log").style.display = log.length ? "block" : "none";
 }
 
 // ---- controls ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 function fillSelect(sel) { const keep = sel.value; sel.textContent = ""; for (const c of CHOICES) { const o = document.createElement("option"); o.value = c.id; o.textContent = c.label + (available(c) ? "" : " — not available"); o.disabled = !available(c); sel.appendChild(o); } if (keep) sel.value = keep; }
-function fillRosters() { fillSelect(el("pilotF")); }
+function fillHands(sel) { const keep = sel.value; sel.textContent = ""; for (const h of HANDS) { const o = document.createElement("option"); o.value = h.id; o.textContent = h.label + (handAvailable(h) ? "" : " — not available"); o.disabled = !handAvailable(h); sel.appendChild(o); } if (keep) sel.value = keep; }
+function fillRosters() { fillSelect(el("pilotF")); fillHands(el("hand")); }
 el("newBtn").onclick = () => newFight();
-for (const id of ["kind", "pilotF", "gunners", "nfight", "behaviour", "cruise", "seed", "ff", "hold", "wrecks", "impact", "crew"]) el(id).onchange = () => newFight();
+for (const id of ["kind", "pilotF", "hand", "gunners", "nfight", "nships", "nesc", "behaviour", "cruise", "seed", "ff", "hold", "wrecks", "impact", "crew"]) el(id).onchange = () => newFight();
 el("pauseBtn").onclick = () => { paused = !paused; el("pauseBtn").textContent = paused ? "▶ Play" : "❚❚ Pause"; };
 el("stepBtn").onclick = () => { paused = true; el("pauseBtn").textContent = "▶ Play"; if (!arena.done) tickOnce(); };
 addEventListener("keydown", (e) => { if (e.code === "Space" && !/^(INPUT|SELECT|BUTTON)$/.test((e.target && e.target.tagName) || "")) { e.preventDefault(); el("pauseBtn").click(); } });
@@ -461,11 +510,11 @@ function frame(now) {
 
 // ---- boot: the pilots' files first, then the fight ------------------------------------------------------------------------------------------------------------------------------------------------------
 const params = new URLSearchParams(location.search);
-const ready = Promise.allSettled(CHOICES.filter((c) => c.file).map((c) => loadChoice(c))).then(() => {
+const ready = Promise.allSettled([...CHOICES.filter((c) => c.file).map((c) => loadChoice(c)), ...HANDS.filter((h) => h.file).map((h) => loadHand(h))]).then(() => {
   fillRosters();
-  const pick = (k, dflt) => { const v = params.get(k); return CHOICES.some((c) => c.id === v && available(c)) ? v : dflt; };
+  const pick = (k, dflt) => { const v = params.get(k); return CHOICES.some((c) => c.id === v && available(c)) ? v : dflt; }, pickHand = (v) => (HANDS.some((h) => h.id === v && handAvailable(h)) ? v : "rule");
   newFight({ kind: BS.KINDS.includes(params.get("kind")) ? params.get("kind") : "beam", seed: Number(params.get("seed")) || 1, fighters: Number(params.get("fighters")) || BS.FIGHTERS, gunners: BS.GUNNERS[params.get("gunners")] ? params.get("gunners") : BS.DEFAULT_GUNNERS,
-    f: pick("f", "pd"), behaviour: params.get("behaviour") === "hold" ? "hold" : "face", friendlyFire: params.get("ff") === "1", holdFire: params.get("hold") !== "0", wrecks: params.get("wrecks") === "1", impact: params.get("impact") === "1" ? SA.ROUND_MASS : 0, crew: params.get("crew") === "1", cruise: params.get("cruise") === null || params.get("cruise") === "" || !Number.isFinite(Number(params.get("cruise"))) ? 0.3 : Number(params.get("cruise")) });
+    f: pick("f", "pd"), hand: pickHand(params.get("hand")), ships: Number(params.get("ships")) === 2 ? 2 : 1, escorts: Number(params.get("escorts")) || 0, behaviour: params.get("behaviour") === "hold" ? "hold" : "face", friendlyFire: params.get("ff") === "1", holdFire: params.get("hold") !== "0", wrecks: params.get("wrecks") === "1", impact: params.get("impact") === "1" ? SA.ROUND_MASS : 0, crew: params.get("crew") === "1", cruise: params.get("cruise") === null || params.get("cruise") === "" || !Number.isFinite(Number(params.get("cruise"))) ? 0.3 : Number(params.get("cruise")) });
   requestAnimationFrame(frame);
 });
 
@@ -482,25 +531,26 @@ const pixelStats = (i) => {
 };
 const inkColor = (i, rgb, tol = 30) => { const w = wins[i], d = w.ctx.getImageData(0, 0, w.ov.width, w.ov.height).data; let n = 0; for (let k = 0; k < d.length; k += 4) if (d[k + 3] > 100 && Math.abs(d[k] - rgb[0]) <= tol && Math.abs(d[k + 1] - rgb[1]) <= tol && Math.abs(d[k + 2] - rgb[2]) <= tol) n++; return n; };
 const overlayInk = (i) => { const w = wins[i], d = w.ctx.getImageData(0, 0, w.ov.width, w.ov.height).data; let n = 0; for (let k = 3; k < d.length; k += 4) if (d[k] > 0) n++; return n; };
+const shipMesh = (ship) => arena.crafts.indexOf(arena.crafts.filter((q) => q.kind === "capital")[ship]);
 window.__battleship = {
   ready,
   state() { return { tick: arena.i, t: arena.t, done: arena.done, over: arena.over, scenario: { kind: fight.scenario.kind, seed: fight.scenario.seed }, rounds: arena.rounds.length,
     crafts: arena.crafts.map((c) => ({ id: c.id, team: c.team, name: c.name, kind: c.kind, status: c.status, pos: c.body.pos.slice(), vel: c.body.vel.slice(), q: c.body.q.slice(), w: c.body.w.slice(), hp: c.hp, hpMax: c.hpMax, hits: c.hits, mode: c.mode, enginesRunning: c.enginesRunning, charge: c.charge, waves: c.waves,
       fired: c.gun ? c.gun.fired : null, partsOut: [...c.partHp].filter(([, hp]) => hp <= 0).map(([id]) => c.ship.parts[id].name), friendlyHits: c.friendlyHits, friendlyTaken: c.friendlyTaken, held: c.held, holdFire: c.holdFire, helm: c.helm, crewDead: c.crew ? [...c.crew.dead] : [], crewBridge: c.crew ? c.crew.bridge : null,
       seats: c.seats.map((s) => ({ id: s.seat.id, name: s.seat.name, yaw: s.state.yaw, pitch: s.state.pitch, fired: s.state.gun.fired, ammo: s.state.gun.ammo, works: SA.seatWorks(c, s), held: s.held, blocked: s.blocked, last: s.last && { fire: s.last.fire, target: s.last.target } })), last: c.last && { foe: c.last.foe, fire: c.last.fire, thrust: c.last.thrust, mode: c.last.mode, held: c.last.held } })),
-    log: log.slice(), pilots: { id: pilots.id, label: pilots.label, list: pilots.list.map((p) => ({ id: p.id, label: p.label })) }, gunners: fight.gunners, gunnerOptions: fight.gunnerOptions, behaviour: arena.crafts[0].behaviour, cruise: arena.crafts[0].cruise, friendlyFire: arena.friendlyFire, wrecks: arena.wrecks, impact: arena.impact, crew: arena.crew }; },
+    log: log.slice(), pilots: { id: pilots.id, label: pilots.label, list: pilots.list.map((p) => ({ id: p.id, label: p.label })) }, hand: { id: handNow.id, label: handNow.label, network: !!handNow.net }, gunners: fight.gunners, gunnerOptions: fight.gunnerOptions, ships: arena.crafts.filter((c) => c.kind === "capital").length, escorts: arena.crafts.filter(isEscort).length, behaviour: arena.crafts[0].behaviour, cruise: arena.crafts[0].cruise, friendlyFire: arena.friendlyFire, wrecks: arena.wrecks, impact: arena.impact, crew: arena.crew }; },
   tally: () => BS.tally(arena),
   brainRows: (i) => brainRowsOf(arena.crafts[i]).map((r) => ({ label: r.label || `${r.who[0]} ${r.layer}`, layer: r.layer, n: r.values.length, values: r.values.slice() })),
   // a debug aid for the gate: n rounds dropped from OUTSIDE the named part of the ship along the way in (the flank mounts from their own side, the belly from below, the deck and the turrets from above, the pods from astern), owned by the first fighter
-  shoot(partName, n = 1) {
-    const c = arena.crafts[0], p = CS.partCentres(c.ship, c.body).find((q) => q.name === partName); if (!p) return 0;
-    const side = /^port/.test(partName) ? [0, 1, 0] : /^starboard/.test(partName) ? [0, -1, 0] : /^ventral/.test(partName) ? [0, 0, -1] : /engine/.test(partName) ? [-1, 0, 0] : [0, 0, 1], out = RB.rotateByQuat(c.body.q, side), f = arena.crafts[1];
+  shoot(partName, n = 1, ship = 0) {
+    const c = arena.crafts.filter((q) => q.kind === "capital")[ship], p = CS.partCentres(c.ship, c.body).find((q) => q.name === partName); if (!p) return 0;
+    const side = /^port/.test(partName) ? [0, 1, 0] : /^starboard/.test(partName) ? [0, -1, 0] : /^ventral/.test(partName) ? [0, 0, -1] : /engine/.test(partName) ? [-1, 0, 0] : [0, 0, 1], out = RB.rotateByQuat(c.body.q, side), f = arena.crafts.find(isRaider);
     for (let k = 0; k < n; k++) arena.rounds.push({ pos: [p.center[0] + out[0] * (12 + 4 * k), p.center[1] + out[1] * (12 + 4 * k), p.center[2] + out[2] * (12 + 4 * k)], vel: [c.body.vel[0] - out[0] * 300, c.body.vel[1] - out[1] * 300, c.body.vel[2] - out[2] * 300], age: 0, owner: f.id, team: f.team, dmg: SA.FIGHTER_GUN.damage, life: 5 });
     return n;
   },
   step(n = 1, render = true) { for (let i = 0; i < n && !arena.done; i++) tickOnce(); if (render) renderFrame(0); },   // render false: the gate's long searches do not draw nine windows a tick
   // a debug aid for the gate: fighter k is put at the centre of the ship's forward hull, so that the next tick is a ram
-  ram(k = 1) { const c = arena.crafts[0], f = arena.crafts[k], p = CS.partCentres(c.ship, c.body).find((q) => q.name === "forward hull"); if (!f || !p) return false; f.body.pos = p.center.slice(); f.body.vel = c.body.vel.slice(); return true; },
+  ram(k = 1, ship = 0) { const c = arena.crafts.filter((q) => q.kind === "capital")[ship], f = arena.crafts[k], p = CS.partCentres(c.ship, c.body).find((q) => q.name === "forward hull"); if (!f || !p) return false; f.body.pos = p.center.slice(); f.body.vel = c.body.vel.slice(); return true; },
   // a debug aid for the gate: fighter b is put `dist` units dead ahead of fighter a's nose, in its line of fire
   crowd(a, b, dist = 40) { const fa = arena.crafts[a], fb = arena.crafts[b]; if (!fa || !fb) return false; const d = RB.rotateByQuat(fa.body.q, [1, 0, 0]); fb.body.pos = [0, 1, 2].map((k) => fa.body.pos[k] + d[k] * dist); fb.body.vel = fa.body.vel.slice(); return true; },
   hold(on = true) { held = !!on; }, pause(on = true) { paused = !!on; },
@@ -510,19 +560,20 @@ window.__battleship = {
   setView(i, v, seat = 0) { wins[i].view = v; wins[i].seat = seat; setLabel(wins[i]); renderFrame(0); }, pixels: pixelStats, ink: overlayInk, inkColor,
   windowMarkers: () => windowMarkers.slice(),
   cameraOf: (i) => { const cam = cameraOf(wins[i], arena.crafts[i]); return cam && { eye: cam.eye.slice(), target: cam.target.slice(), up: cam.up.slice(), fov: cam.fov }; },
-  tracers: () => ({ pd: tracerP.geom.drawRange.count / 2, main: tracerM.geom.drawRange.count / 2, fighter: tracerF.geom.drawRange.count / 2 }),
+  tracers: () => ({ pd: tracerP.geom.drawRange.count / 2, main: tracerM.geom.drawRange.count / 2, fighter: tracerF.geom.drawRange.count / 2, escort: tracerE.geom.drawRange.count / 2 }),
   sight: (i) => wins[i].sight, texts: (i) => wins[i].texts.slice(), scissors: () => scissors.map((s) => s && { ...s }), stackRect: () => (({ x, y, width, height }) => ({ x, y, width, height }))(stack.getBoundingClientRect()),
-  turretAim: (k) => { const m = meshes[0].userData.turrets[k].barrel.quaternion; return [m.x, m.y, m.z, m.w]; },
-  seatShown: () => meshes[0].userData.turrets.map((t) => ({ dead: t.dead, crewDown: !!t.crewDown, look: t.base.material === PART_DEAD ? "destroyed" : t.base.material === CREW_DEAD ? "unmanned" : "live" })),
-  engineShown: () => meshes[0].userData.engines.map((e) => ({ out: e.nac.material === PART_DEAD, glow: e.glow.material === GLOW_ON })),
-  cannonShown: () => ({ charge: meshes[0].userData.charge.scale.x, beam: meshes[0].userData.beam.visible }),
-  fighterGlow: () => meshes.slice(1).map((m) => m.userData.eng.material === GLOW_ON),
-  spheresShown: () => meshes[0].userData.spheres.map((s) => s.visible),
+  turretAim: (k, ship = 0) => { const m = meshes[arena.crafts.indexOf(arena.crafts.filter((q) => q.kind === "capital")[ship])].userData.turrets[k].barrel.quaternion; return [m.x, m.y, m.z, m.w]; },
+  seatShown: (ship = 0) => meshes[shipMesh(ship)].userData.turrets.map((t) => ({ dead: t.dead, crewDown: !!t.crewDown, look: t.base.material === PART_DEAD ? "destroyed" : t.base.material === CREW_DEAD ? "unmanned" : "live" })),
+  engineShown: (ship = 0) => meshes[shipMesh(ship)].userData.engines.map((e) => ({ out: e.nac.material === PART_DEAD, glow: e.glow.material === GLOW_ON })),
+  cannonShown: (ship = 0) => ({ charge: meshes[shipMesh(ship)].userData.charge.scale.x, beam: meshes[shipMesh(ship)].userData.beam.visible }),
+  fighterGlow: () => meshes.filter((m) => m.userData.kind === "fighter").map((m) => m.userData.eng.material === GLOW_ON),
+  spheresShown: (ship = 0) => meshes[shipMesh(ship)].userData.spheres.map((s) => s.visible),
   markers: () => ({ n: markers.geometry.attributes.position.count, visible: markers.visible, pos: Array.from(markers.geometry.attributes.position.array), color: Array.from(markers.geometry.attributes.color.array) }),
   mainCamera: () => ({ pos: camera.position.toArray(), look: camLook.toArray() }),
   settleCamera() { renderFrame(0, true); },
   mainView() { const v = new THREE.Vector3(); return arena.crafts.map((c) => { v.set(...c.body.pos).project(camera); return [v.x, v.y, v.z]; }); },
   get paused() { return paused; },
+  hands: { forget(id) { handLoaded.delete(id); fillRosters(); }, get choices() { return [...el("hand").options].map((o) => ({ id: o.value, disabled: o.disabled })); }, get label() { return handNow.label; }, error: (id) => handErrors.get(id) || null, loaded: (id) => handLoaded.has(id), loadHand: (id, url) => loadHand(HANDS.find((h) => h.id === id), url), refill: fillRosters },
   roster: { forget(id) { loaded.delete(id); fillRosters(); }, get choices() { return [...el("pilotF").options].map((o) => ({ id: o.value, disabled: o.disabled })); }, get label() { return pilots.label; }, error: (id) => errors.get(id) || null, loaded: (id) => loaded.has(id), loadChoice: (id, url) => loadChoice(CHOICES.find((c) => c.id === id), url), refill: fillRosters },
 };
 </script>

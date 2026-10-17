@@ -49,6 +49,18 @@
 //   BSP115 a dead gunner's window says SEAT OUT too 1 | BSP116 a dead gunner's turret is not drawn differently 1 | BSP117 a dead gunner's turret is drawn as a destroyed one 1
 //   BSP118 the card says nothing of the crew 2 | BSP119 the card says the bridge is at its post when it is not 1 | BSP120 the card counts no gunners killed 1 | BSP121 the hook hides the dead gunners 1
 //   BSP122 the hook hides the helm 1
+// AND SIXTEEN MORE ONCE THE PAGE HAD A SECOND SHIP AND AN ESCORT (P1-P18 less the two that were dropped as equivalent; run on the gate without the rows before them, which can only add reds), each red by name:
+//   P1 the ships control is ignored 1 | P2 the escorts control is ignored 1 | P3 a change of the ships or escorts does not start a new fight 1 | P4 escorts' markers are orange 1
+//   P5 the second ship's card shows the first's numbers 1 | P6 shoot ignores which ship 1 | P7 both ships are 'battleship' 1 | P8 a part out does not say which ship 1 | P9 the windows are sized for one ship 1
+//   P10 the escorts' rounds are drawn as the ship's point defence 1 | P11 the URL's ships is ignored 1 | P12 the URL's escorts is ignored 1 | P13 the second ship's card is never filled 2
+//   P15 the second ship shows the network of the first ship's window's seat 1 | P17 the escorts' card names no escort 1 | P18 an escort's brain window shows the attackers' pilot 1
+// FIVE WENT 0 RED THE FIRST TIME AND WERE GAPS IN THE GATE: P1, P2 and P3 (the ships and escorts controls ignored, or a change of them not restarting the fight -- every fight the rows started named its options, so a control's own value was never read: the controls row now sets them and presses New fight, and a change event of each is dispatched), P9 (the windows sized for one ship -- two ships and four attackers in a page 1,250 px tall are 148 px windows that fit, and 160 that overflow by a hundred) and P18 (an escort's brain window titled as an attacker's -- the attackers fly the same PD autopilot, so the title is all that tells); a row was added for each and each re-run red.
+// AND SIXTEEN MORE ONCE THE PAGE HAD A HAND ROSTER (R1-R16: the rule, two networks on their hand weights, two trained ones, the brain and gunner windows, the files that will not load, the URL), each red by name:
+//   R1 the hand control is ignored 1 | R2 the network is not given to the fight 3 | R3 a hand that is not loaded is offered 2 | R4 the fruit fly's hand weights are the GPU brain's 1
+//   R5 the hand weights are zero 1 | R6 the hand's label has no hash 1 | R7 the brain window never shows the network 2 | R8 an idle network's rows are not marked idle 1
+//   R9 the trigger shown is the pitch output 1 | R10 the seat's window never says what the network did 1 | R11 a refused load takes the held hand away 1 | R12 the policy a hand file must be is wrong 4
+//   R13 the URL's hand is ignored 1 | R14 the ship's card never names the hand 2 | R15 the state hides that a network is in the seats 3 | R16 the brain rows show the network on zeros 1
+// R1 (the hand control ignored) and R4 (the fruit fly's hand weights the GPU brain's) went 0 red the first time, for the reasons above: the controls row now sets the hand, and the brain rows are read for all four networks (34 hidden units, 32).
 "use strict";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 import { createRequire } from "node:module";
@@ -64,8 +76,19 @@ import * as CS from "../../physics/mechanics/capitalShip.mjs";
 import * as GS from "../../physics/mechanics/gunSeats.mjs";
 import * as RB from "../../physics/mechanics/rigidBody6dof.mjs";
 import * as V from "../../render/flightViews.mjs";
+import * as SG from "../../brain/seatGunnerPolicy.mjs";
+import * as MG from "../../brain/seatGunnerMlp.mjs";
 import { weightsHash } from "../../brain/drivePolicy.mjs";
 
+// a network that is NOT the hand gunner: it corrects each seat's yaw by the range feature (unit 0) and fires on the sight's flag through a unit of its own (unit 1) -- so the page's fight with it is a different fight, and a wiring mistake shows
+function rangeWeights(m) {
+    const w = m.zeroWeights(), F = 12;
+    if (m === SG) { const outBase = SG.FEATURES * SG.HIDDEN + SG.HIDDEN + SG.REC_EDGES; w[0 * F + 4] = 1; w[outBase + 0 * SG.HIDDEN + 0] = 6; w[1 * F + 3] = 1; w[outBase + 2 * SG.HIDDEN + 1] = 4; w[outBase + SG.HIDDEN * SG.OUTPUTS + 2] = -2; }
+    else { const O_W2 = 416, O_W3 = 1472, O_B3 = 1568; w[0 * F + 4] = 1; w[O_W2 + 0 * 32 + 0] = 1; w[O_W3 + 0 * 32 + 0] = 6; w[1 * F + 3] = 1; w[O_W2 + 1 * 32 + 1] = 1; w[O_W3 + 2 * 32 + 1] = 4; w[O_B3 + 2] = -2; }
+    return w;
+}
+const NET = { fly: SG, mlp: MG }, POLICY = { fly: "seatGunnerPolicy", mlp: "seatGunnerMlp" };
+const CUSTOM = Object.fromEntries(Object.entries(NET).map(([id, m]) => [id, JSON.stringify(PB.exportBrain(PB.describePolicy(POLICY[id], m), rangeWeights(m), { score: 0.5, by: "the gate's own network", citation: "gate" }))]));
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
 function ok(name, cond, detail) { console.log(`  ${cond ? "PASS" : "FAIL"}  ${name}${detail ? "   " + detail : ""}`); if (!cond) fails++; }
@@ -94,7 +117,7 @@ else {
             const sel = (id) => doc.getElementById(id);
             const set = (id, v) => { const e = sel(id); if (e.type === "checkbox") e.checked = v; else e.value = String(v); };
             const fightOf = (o) => { B.newFight(o); B.step(3700); return { tally: B.tally(), state: B.state() }; };
-            const base = { kind: "beam", seed: 1, fighters: 8, gunners: "regular", f: "pd", behaviour: "face", cruise: 0.3, friendlyFire: false, holdFire: true, wrecks: false, impact: 0, crew: false };   // every option named: an option left out is read off the page's own control, which the last fight left where it was
+            const base = { kind: "beam", seed: 1, fighters: 8, gunners: "regular", f: "pd", behaviour: "face", cruise: 0.3, friendlyFire: false, holdFire: true, wrecks: false, impact: 0, crew: false, ships: 1, escorts: 0, hand: "rule" };   // every option named: an option left out is read off the page's own control, which the last fight left where it was
 
             // ---- the page's OWN default fight, before anything touches it ----
             out.boot = { windows: B.windows(), choices: B.roster.choices, label: B.roster.label, state: B.state(), cards: cards(), stat: sel("stat").textContent, note: sel("note").textContent,
@@ -237,6 +260,51 @@ else {
             B.newFight({ ...base, f: "mix", fighters: 4 }); out.fail.mixList = B.state().pilots.list.map((p) => p.id);
             await B.roster.loadChoice("league"); B.newFight({ ...base, f: "mix", fighters: 4 }); out.fail.mixListAfter = B.state().pilots.list.map((p) => p.id);
 
+            // ---- the hands: the rule; two networks on their hand weights; a network that is not the hand, from a file; the brain and gunner windows; the roster; the URL ----
+            {
+              const Hn = B.hands, CUSTOM = ${JSON.stringify(CUSTOM)}, dataUrl = (t) => "data:application/json," + encodeURIComponent(t); out.hand = {};
+              out.hand.choices0 = Hn.choices; B.newFight({ ...base }); out.hand.def = B.state().hand; out.hand.sel0 = sel("hand").value; out.hand.card0 = cards()[0];
+              for (const id of ["flyhand", "mlphand"]) out.hand[id] = { ...fightOf({ ...base, hand: id }), sel: sel("hand").value, card: cards()[0] };
+              for (const id of ["fly", "mlp"]) if (Hn.loaded(id)) out.hand["shipped_" + id] = { ...fightOf({ ...base, hand: id }), sel: sel("hand").value, card: cards()[0], label: Hn.label };
+              out.hand.custom = {};
+              for (const id of ["fly", "mlp"]) { const loaded = await Hn.loadHand(id, dataUrl(CUSTOM[id])); out.hand.custom[id] = { loaded, err: Hn.error(id), ...fightOf({ ...base, hand: id }), label: Hn.label, card: cards()[0] }; }
+              out.hand.brain = {};
+              for (const id of ["fly", "mlp", "flyhand", "mlphand", "rule"]) {
+                B.newFight({ ...base, hand: id }); B.setView(0, "brain", 2); const idle = B.brainRows(0);
+                let k = -1; for (let t = 0; t < 700 && k < 0; t++) { B.step(1, false); k = B.state().crafts[0].seats.findIndex((q) => q.last && q.last.target != null); }
+                B.setView(0, "brain", k >= 0 ? k : 0); B.step(0); const tick = B.state().tick, rows = B.brainRows(0); B.setView(0, "gunner", k >= 0 ? k : 0); B.step(0); const texts = B.texts(0); B.setView(0, "plane");
+                out.hand.brain[id] = { idle, k, tick, rows, texts };
+              }
+              Hn.forget("fly"); out.hand.afterForget = Hn.choices; B.newFight({ ...base, hand: "fly" }); out.hand.fallback = B.state().hand; out.hand.fallbackSel = sel("hand").value;
+              out.hand.bad = await Hn.loadHand("fly", dataUrl("{not json")); out.hand.badErr = Hn.error("fly"); out.hand.badLoaded = Hn.loaded("fly");
+              out.hand.wrong = await Hn.loadHand("fly", "/brain/pilot6dofWeightsDefault.json"); out.hand.wrongErr = Hn.error("fly"); out.hand.wrongLoaded = Hn.loaded("fly");
+              out.hand.good = await Hn.loadHand("fly", dataUrl(CUSTOM.fly)); out.hand.goodErr = Hn.error("fly"); out.hand.goodLoaded = Hn.loaded("fly");
+              out.hand.wrong2 = await Hn.loadHand("fly", "/brain/pilot6dofWeightsDefault.json"); out.hand.keptAfterRefuse = Hn.loaded("fly");
+              out.hand.otherNet = await Hn.loadHand("fly", dataUrl(CUSTOM.mlp)); out.hand.otherNetErr = Hn.error("fly"); out.hand.keptAfterOther = Hn.loaded("fly");
+              const f2 = document.createElement("iframe"); f2.style.width = "1100px"; f2.style.height = "900px"; f2.src = "/battleship.html?hand=mlphand&kind=swarm&seed=4&crew=1&ff=1&hold=0&wrecks=1&impact=1&fighters=5&ships=2&escorts=2"; document.body.appendChild(f2);
+              await new Promise((res) => { f2.onload = res; }); const t1 = performance.now(); while (performance.now() - t1 < 40000 && !f2.contentWindow.__battleship) await wait(200);
+              const B2 = f2.contentWindow.__battleship; await B2.ready; B2.hold(true); const s2 = B2.state();
+              out.hand.url = { hand: s2.hand, scenario: s2.scenario, crew: s2.crew, ff: s2.friendlyFire, wrecks: s2.wrecks, impact: s2.impact, n: s2.crafts.length, holdFire: s2.crafts[0].holdFire, sel: f2.contentWindow.document.getElementById("hand").value, ships: s2.ships, escorts: s2.escorts, nships: f2.contentWindow.document.getElementById("nships").value, nesc: f2.contentWindow.document.getElementById("nesc").value }; f2.remove();
+              B.newFight({ ...base });
+            }
+
+            // ---- a second ship and an escort ----
+            {
+              out.nb4 = {}; const Y = { ...base, ships: 2, escorts: 3 };
+              out.nb4.fight = fightOf(Y); out.nb4.cards = cards(); out.nb4.cardIds = [...doc.querySelectorAll(".card")].map((d) => d.id); out.nb4.windows = B.windows(); out.nb4.ctrl = [sel("nships").value, sel("nesc").value]; out.nb4.shipBoxes = [...doc.querySelectorAll(".win")].map((d) => d.className.includes("ship"));
+              B.newFight(Y); B.step(10); out.nb4.markers = B.markers(); out.nb4.glow = B.fighterGlow().length; out.nb4.tracers = []; B.step(90);
+              for (let t = 0; t < 10; t++) { B.step(60); out.nb4.tracers.push(B.tracers()); }
+              B.newFight(Y); B.step(20); B.shoot("engine pod 2", 6, 1); B.step(8); const stE2 = B.state();
+              out.nb4.engine = { s0: B.engineShown(0), s1: B.engineShown(1), running: stE2.crafts.filter((c) => c.kind === "capital").map((c) => c.enginesRunning), log: stE2.log, cards: cards(), seatsB: B.seatShown(1).length };
+              B.setView(9, "brain", 0); out.nb4.brainB = B.brainRows(9); doc.querySelectorAll(".win")[10].scrollIntoView({ block: "nearest" }); B.setView(10, "brain", 0); out.nb4.brainE = B.brainRows(10); out.nb4.brainEtexts = B.texts(10); out.nb4.labels = B.windows().map((w) => w.label);
+              out.nb4.shipped = fightOf({ ...Y, f: "shipped" });
+              B.newFight({ ...base, ships: 2, fighters: 4 }); f.style.height = "1250px"; await wait(300); B.step(2); { const stk = doc.getElementById("stack"); out.nb4.fit = { scrollHeight: stk.scrollHeight, clientHeight: stk.clientHeight, windows: B.windows().length }; }
+              B.newFight({ ...base }); set("nships", 2); set("nesc", 2); set("hand", "mlphand"); sel("newBtn").click(); B.step(3700); out.nb4.ui = { tally: B.tally(), state: B.state(), sel: ["nships", "nesc", "hand"].map((id) => sel(id).value) };
+              B.newFight({ ...base }); B.step(10); out.nb4.change = {};
+              for (const [id, v] of [["nships", 2], ["nesc", 3], ["hand", "flyhand"]]) { set(id, v); sel(id).dispatchEvent(new win.Event("change", { bubbles: true })); const st2 = B.state(); out.nb4.change[id] = { tick: st2.tick, crafts: st2.crafts.length, ships: st2.ships, escorts: st2.escorts, hand: st2.hand.id }; }
+              B.newFight({ ...Y, hand: "mlphand" }); B.step(300); B.setView(9, "brain", 3); const bn = B.brainRows(9); out.nb4.brainNet = bn.length; out.nb4.brainNetLabels = bn.slice(-3).map((q) => q.label); B.newFight({ ...base });
+            }
+
             // ---- the big picture keeps every craft in frame, and the camera modes go where they say ----
             B.newFight({ ...base, kind: "stern", seed: 2 }); B.step(300); sel("camMode").value = "overview"; B.settleCamera(); out.mainNdc = B.mainView();
             B.step(300); B.settleCamera(); out.mainNdc2 = B.mainView();
@@ -262,7 +330,9 @@ else {
     if (run.pageErrors && run.pageErrors.length) report("page console errors", run.pageErrors.slice(0, 5).join(" | ").slice(0, 400));
     // the run asks for one file that is not there ON PURPOSE (the pilot file's failure path): the browser logs that as one 404, and nothing else may be logged
     const errs404 = (run.pageErrors || []).filter((e) => /\b404\b/.test(e)), other = (run.pageErrors || []).filter((e) => !/\b404\b/.test(e));
-    ok("!! no page errors were logged during the whole run -- except the ONE 404 the gate asks for on purpose (the pilot file that is not there); a second missing file would be a second 404", other.length === 0 && errs404.length <= 1, `${other.length} other, ${errs404.length} x 404 ${other.slice(0, 2).join(" | ").slice(0, 200)}`);
+    // a trained gunner's file that is not shipped is asked for by each of the two pages the run loads (the page itself and the URL test's) and is a 404 each time: the allowance is the gate's own one on purpose plus exactly those
+    const absentHands = ["seatGunnerWeightsDefault.json", "seatGunnerMlpWeightsDefault.json"].filter((f) => !fs.existsSync(path.join(ENG, "brain", f))).length;
+    ok("!! no page errors were logged during the whole run -- except the ONE 404 the gate asks for on purpose (the pilot file that is not there) and the 404s for a trained gunner's file that is not shipped (two pages ask for each; none once both are shipped); a second missing file would be another 404", other.length === 0 && errs404.length <= 1 + 2 * absentHands, `${other.length} other, ${errs404.length} x 404 (allowed ${1 + 2 * absentHands}) ${other.slice(0, 2).join(" | ").slice(0, 200)}`);
 
     if (run.ok && run.result && run.result.booted) {
         const r = run.result;
@@ -457,6 +527,59 @@ else {
         ok("!! A PILOT FILE THAT WILL NOT LOAD IS SAID AND THE PILOT THE PAGE HOLDS IS KEPT: a file that is not there gives 'HTTP 404', a flight pilot's file offered as the 6DOF pilot's is refused by name, neither takes the pilot away, and loading the good file again clears the error",
             F.missing === false && /HTTP 404/.test(F.missingErr) && F.stillLoaded === true && F.wrong === false && /pilotFlightPolicy/.test(F.wrongErr) && /pilot6dofPolicy/.test(F.wrongErr) && F.stillLoaded2 === true && F.good === true && F.goodErr === null, `${F.missingErr} | ${(F.wrongErr || "").slice(0, 100)}`);
         ok("!! a pilot whose file is not here is NOT OFFERED (disabled in the roster), a fight that asks for it anyway is flown by the PD autopilot with the label saying why, and a MIX leaves it out of its list until it is loaded again", F.choices.find((c) => c.id === "league").disabled === true && F.choices.find((c) => c.id === "mix").disabled === false && F.fallbackId === "pd" && /PD autopilot/.test(F.fallback) && /not loaded|could not/.test(F.fallback) && F.mixList.join() === "pd,shipped,close" && F.mixListAfter.join() === "pd,shipped,league,close", `${F.fallback} | ${F.mixList} -> ${F.mixListAfter}`);
+
+        // ---- 9c the hands ----
+        {
+            const Hd = r.hand, ids = Hd.choices0.map((c) => c.id).join(), shipFile = (n) => fs.existsSync(path.join(ENG, "brain", n === "fly" ? "seatGunnerWeightsDefault.json" : "seatGunnerMlpWeightsDefault.json"));
+            const O = { fighters: 8, gunners: "regular", behaviour: "face", cruise: 0.3 }, plain = BS.fight(1, "beam", O), net = (m, w) => BS.fight(1, "beam", { ...O, network: { module: m, weights: w } });
+            const cw = { fly: rangeWeights(SG), mlp: rangeWeights(MG) }, NETS = { fly: SG, mlp: MG }, near5 = (a, b) => a.length === b.length && a.every((v, i) => Math.abs(v - b[i]) < 1e-5);
+            ok("!! THE HAND ROSTER OFFERS ITS FIVE AND THE PAGE STARTS WITH THE RULE: the rule, the fruit fly and the GPU brain on their hand weights (always there), and the two trained networks (offered only if their files are shipped and load); the page's own fight is the rule's, its select says rule, its state says no network and its card does not mention a hand",
+                ids === "rule,flyhand,mlphand,fly,mlp" && Hd.choices0.filter((c) => ["rule", "flyhand", "mlphand"].includes(c.id)).every((c) => c.disabled === false) && Hd.choices0.filter((c) => c.id === "fly" || c.id === "mlp").every((c) => c.disabled === !shipFile(c.id)) && Hd.def.id === "rule" && Hd.def.network === false && Hd.sel0 === "rule" && !/hand:/.test(Hd.card0), ids + " " + Hd.choices0.map((c) => (c.disabled ? "x" : "ok")).join(""));
+            ok("!! A NETWORK ON ITS HAND WEIGHTS IS THE SAME FIGHT ON THE PAGE: the fruit fly and the GPU brain, chosen in the roster, give battleshipFight.fight()'s tally with that network in every count -- which is also the tally of the fight with no network, the hand weights being the rule -- and the select, the state and the card say which is in the seats",
+                [["flyhand", SG, "fruit fly, hand weights"], ["mlphand", MG, "GPU brain, hand weights"]].every(([id, m, name]) => same(Hd[id].tally, net(m, m.handWeights())) && same(Hd[id].tally, plain) && Hd[id].state.hand.id === id && Hd[id].state.hand.network === true && Hd[id].sel === id && Hd[id].card.includes("hand: " + name)) && plain.ship.seatRounds > 100, `${plain.ship.seatRounds} seat rounds`);
+            for (const id of ["fly", "mlp"]) if (shipFile(id)) {
+                const w = weightsOf(id === "fly" ? "seatGunnerWeightsDefault.json" : "seatGunnerMlpWeightsDefault.json"), got = Hd["shipped_" + id];
+                ok(`!! THE SHIPPED ${id === "fly" ? "FRUIT FLY" : "GPU BRAIN"} GUNNER IS LOADED AND FLOWN: the roster offers it, the page's fight is battleshipFight.fight()'s with those weights in every count, and its label carries the weights' hash and held-out score`, !!got && same(got.tally, net(NETS[id], w)) && got.sel === id && got.label.includes(weightsHash(w)) && /held-out \d/.test(got.label) && got.state.hand.network === true);
+            }
+            const cu = Hd.custom;
+            ok("!! A NETWORK THAT IS NOT THE HAND, LOADED FROM A FILE, IS THE FIGHT THE MODULE FLIES WITH IT: each of the gate's two (a yaw corrected by the range feature, a trigger through a unit of its own) loads, is the page's fight in every count -- not the rule's (the seats fire a different number of rounds) -- and its label carries the weights' hash and score",
+                ["fly", "mlp"].every((id) => cu[id].loaded === true && cu[id].err === null && same(cu[id].tally, net(NETS[id], cw[id])) && !same(cu[id].tally, plain) && cu[id].tally.ship.seatRounds !== plain.ship.seatRounds && cu[id].state.hand.id === id && cu[id].state.hand.network === true && cu[id].label.includes(weightsHash(cw[id])) && /held-out 0\.5/.test(cu[id].label) && cu[id].card.includes("hand: ")), ["fly", "mlp"].map((id) => `${id} ${cu[id].tally.ship.seatRounds}`).join(", ") + ` rounds against ${plain.ship.seatRounds}`);
+            const HW = { fly: cw.fly, mlp: cw.mlp, flyhand: SG.handWeights(), mlphand: MG.handWeights() }, HM = { fly: SG, mlp: MG, flyhand: SG, mlphand: MG };
+            const brainChecks = ["fly", "mlp", "flyhand", "mlphand"].map((id) => {
+                const m = HM[id], br = Hd.brain[id], ref = BS.build(1, "beam", { ...O, network: { module: m, weights: HW[id] } }).arena; for (let i = 0; i < br.tick; i++) SA.stepSpaceArena(ref);
+                const seat = br.k >= 0 ? ref.crafts[0].seats[br.k] : null, last = seat && seat.decide.last, act = last && V.pilotActivations(m, HW[id], last.x), want = last && V.pilotRows({ who: seat.seat.id, act, featureNames: m.FEATURE_NAMES, outputNames: m.OUTPUT_NAMES }), tail = br.rows.slice(-3), idle = br.idle.slice(-3);
+                return { id, ok: !!last && br.rows.length === 1 + 13 + 3 && tail.map((q) => q.label).join() === `s${br.k + 1} feat,s${br.k + 1} hidd,s${br.k + 1} outp` && tail.every((q, i) => q.n === want[i].values.length && near5(q.values, want[i].values)) && tail[0].n === 12 && tail[1].n === m.HIDDEN && tail[2].n === 3 && tail[2].values.some((v) => Math.abs(v) > 1e-3) && idle.map((q) => q.label).join() === "s3 idle,s3 idle,s3 idle" && idle.every((q) => q.values.every((v) => v === 0)) && br.idle.length === 17,
+                    text: !!last && br.texts.some((t) => t === `net: yaw ${(last.y[0] * SG.AIM_GAIN * 180 / Math.PI).toFixed(1)}°  pitch ${(last.y[1] * SG.AIM_GAIN * 180 / Math.PI).toFixed(1)}°  trigger ${last.y[2].toFixed(2)}`) };
+            });
+            ok("!! THE SHIP'S BRAIN WINDOW SHOWS THE NETWORK IN THE SEAT IT IS ON (the fruit fly's with 34 hidden units, the GPU brain's with 32, on hand weights and on the gate's own): with a network for the hand the window grows three rows after the hull's and the thirteen seats' -- the twelve features the network was last shown, its hidden layer, its three outputs -- for the seat the ship's window is on, equal (to 1e-5) to what the module's own arena gives at the same tick and the library's activations; before the network has been asked (tick 0) the three rows are labelled idle and zero", brainChecks.every((q) => q.ok), brainChecks.map((q) => `${q.id} ${q.ok}`).join(" "));
+            ok("!! ...and the seat's own window says what the network did to the aim: 'net: yaw +x.x° pitch +y.y° trigger +z.zz' -- the correction and the trigger the network gave the sight's answer, as the module's arena has them at that tick", brainChecks.every((q) => q.text), brainChecks.map((q) => `${q.id} ${q.text}`).join(" "));
+            const rb = Hd.brain.rule;
+            ok("!! WITH THE RULE FOR THE HAND THERE IS NO NETWORK TO SHOW: the ship's brain window is the hull's row and the thirteen seats' (14 rows, nothing idle or in features) and no seat's window says 'net:'; the page that started with the rule had the same", rb.k >= 0 && rb.rows.length === 14 && rb.idle.length === 14 && rb.rows.every((q) => !/idle|feat|hidd|outp/.test(q.label)) && rb.texts.every((t) => !/^net:/.test(t)));
+            ok("!! A HAND WHOSE FILE IS NOT HERE IS NOT OFFERED, and a fight that asks for it anyway is flown by the rule: forgotten, the trained fruit fly is disabled in the roster, a fight naming it has the rule in the seats (state and select say rule)", Hd.afterForget.find((c) => c.id === "fly").disabled === true && Hd.fallback.id === "rule" && Hd.fallback.network === false && Hd.fallbackSel === "rule");
+            ok("!! A FILE THAT WILL NOT LOAD IS SAID AND THE HAND THE PAGE HOLDS IS KEPT: text that is not JSON gives 'could not fetch it', a pilot's file offered as the gunner's is refused by name (both policies), neither is taken as the hand; the right file loads; a later refused one (a pilot's, and the GPU brain's file offered as the fruit fly's) leaves the good one in place",
+                Hd.bad === false && /could not fetch it/.test(Hd.badErr) && Hd.badLoaded === false && Hd.wrong === false && /seatGunnerPolicy/.test(Hd.wrongErr) && /pilot6dofPolicy/.test(Hd.wrongErr) && Hd.wrongLoaded === false && Hd.good === true && Hd.goodErr === null && Hd.goodLoaded === true && Hd.wrong2 === false && Hd.keptAfterRefuse === true && Hd.otherNet === false && /seatGunnerPolicy/.test(Hd.otherNetErr) && /seatGunnerMlp/.test(Hd.otherNetErr) && Hd.keptAfterOther === true, Hd.wrongErr);
+            const u = Hd.url;
+            ok("!! THE URL CHOOSES THE FIGHT: ?hand=mlphand&kind=swarm&seed=4&crew=1&ff=1&hold=0&wrecks=1&impact=1&fighters=5&ships=2&escorts=2 starts a swarm attack, seed 4, five attackers, a second ship and two escorts (nine craft), with the GPU brain on its hand weights, the crew, friendly fire and the wrecks on, the hold-fire rule off and the impact the arena's round mass -- the select agrees", u.hand.id === "mlphand" && u.hand.network === true && u.sel === "mlphand" && u.scenario.kind === "swarm" && u.scenario.seed === 4 && u.n === 9 && u.ships === 2 && u.escorts === 2 && u.nships === "2" && u.nesc === "2" && u.crew === true && u.ff === true && u.wrecks === true && u.impact === SA.ROUND_MASS && u.holdFire === false, JSON.stringify(u).slice(0, 200));
+        }
+
+        // ---- 9d a second ship and an escort ----
+        {
+            const N = r.nb4, O = { fighters: 8, gunners: "regular", behaviour: "face", cruise: 0.3, ships: 2, escorts: 3 }, ref = BS.fight(1, "beam", O), refShipped = BS.fight(1, "beam", { ...O, pilot: SHIPPED });
+            ok("!! A SECOND SHIP AND THREE ESCORTS ARE THE FIGHT THE MODULE FLIES: the page's beam attack with two ships and three escorts (seed 1, regular gunners) is battleshipFight.fight()'s with those options in every number the tally has -- both ships', the attackers', the escorts' -- and with the shipped pilot for the attackers it is that fight too (the escorts stay on the PD autopilot)",
+                JSON.stringify(N.fight.tally) === JSON.stringify(ref) && JSON.stringify(N.shipped.tally) === JSON.stringify(refShipped) && ref.ships.length === 2 && ref.escorts.length === 3 && ref.fighters.length === 8 && JSON.stringify(ref) !== JSON.stringify(refShipped), `${ref.winner}, ${ref.ticks} ticks, ${ref.killed} shot down, ${ref.damageOnShips} damage on the ships`);
+            ok("!! THERE IS A WINDOW FOR EVERY CRAFT AND A CARD FOR EVERY SIDE: thirteen windows (the first ship, eight attackers, the second ship, three escorts), the two ships' taller than the rest; four cards in the order ship, attackers, second ship, escorts (card0-card3), the second ship's and the escorts' named; the controls say 2 and 3",
+                N.windows.length === 13 && N.shipBoxes.map((v, i) => v === (i === 0 || i === 9)).every(Boolean) && N.windows[0].rect.height > N.windows[1].rect.height * 1.5 && Math.abs(N.windows[9].rect.height - N.windows[0].rect.height) < 1 && N.cardIds.join() === "card0,card1,card2,card3" && /^battleship/.test(N.cards[0]) && /^8 fighters/.test(N.cards[1]) && /^second ship/.test(N.cards[2]) && /^3 escorts/.test(N.cards[3]) && /escort 1/.test(N.cards[3]) && N.ctrl.join() === "2,3", N.cards.map((c) => c.slice(0, 24)).join(" | "));
+            const mk = N.markers, col = (i) => [mk.color[3 * i], mk.color[3 * i + 1], mk.color[3 * i + 2]], near3 = (a, b) => a.every((v, i) => Math.abs(v - b[i]) < 1e-3);
+            ok("!! THE DOTS IN THE BIG PICTURE KNOW THE SIDES: thirteen markers; both ships in the ship colour, the attackers orange, the escorts BLUE; the escorts' rounds are drawn apart (a tracer set of their own, seen in the first 10 s) and the ground fighters' glow hook counts only fighters (eleven)", mk.n === 13 && near3(col(0), [0.2, 1, 0.8]) && near3(col(9), [0.2, 1, 0.8]) && [1, 2, 3, 4, 5, 6, 7, 8].every((i) => near3(col(i), [1, 0.6, 0.2])) && [10, 11, 12].every((i) => near3(col(i), [0.4, 0.7, 1])) && N.tracers.some((t) => t.escort > 0) && N.tracers.some((t) => t.pd > 0) && N.glow === 11, `escort tracers ${N.tracers.map((t) => t.escort).join(",")}`);
+            ok("!! THE SECOND SHIP IS ITS OWN SHIP ON THE PAGE: six rounds dropped on its engine pod 2 put THAT pod out on THAT ship (its drawing dark, the first ship's three still lit; two engines running on it, three on the first), the log says which ship ('engine pod 2 OUT [second ship]'), its card lists the part and the first ship's says none; its brain window is the hull's row and its thirteen seats' (14 rows), an escort's is the PD autopilot's (twelve features, five commands)",
+                N.engine.s1.map((e) => e.out).join() === "false,true,false" && N.engine.s0.every((e) => !e.out) && N.engine.running.join() === "3,2" && N.engine.log.some((l) => /engine pod 2 OUT \[second ship\]/.test(l)) && /parts out: engine pod 2/.test(N.engine.cards[2]) && /parts out: none/.test(N.engine.cards[0]) && N.engine.seatsB === 13 && N.brainB.length === 14 && N.brainB[0].n === 7 && N.brainE.length === 2 && N.brainE[0].n === 12 && N.brainE[1].n === 5 && N.labels[9] !== N.labels[0] && /second ship/.test(N.labels[9]) && /escort 1/.test(N.labels[10]), N.labels.slice(9, 11).join(" | "));
+            const U = N.ui, fightU = BS.fight(1, "beam", { fighters: 8, gunners: "regular", behaviour: "face", cruise: 0.3, ships: 2, escorts: 2, network: { module: MG, weights: MG.handWeights() } });
+            ok("!! EVERY NEW CONTROL IS THE FIGHT THAT RUNS: the ships set to 2, the escorts to 2 and the hand to the GPU brain's hand weights with the New fight button pressed is battleshipFight.fight()'s with those options in every number, the controls and the state say the same; and a change of any of the three starts the fight again from tick 0 with what it says (13 -> 10 -> 13 -> 13 craft: 2 ships, then 3 escorts, then the hand)",
+                same(U.tally, fightU) && JSON.stringify(U.tally) === JSON.stringify(fightU) && U.sel.join() === "2,2,mlphand" && U.state.ships === 2 && U.state.escorts === 2 && U.state.hand.id === "mlphand" && N.change.nships.tick === 0 && N.change.nships.crafts === 10 && N.change.nships.ships === 2 && N.change.nesc.tick === 0 && N.change.nesc.crafts === 13 && N.change.nesc.escorts === 3 && N.change.hand.tick === 0 && N.change.hand.hand === "flyhand" && N.change.hand.crafts === 13, `${U.sel.join()} ${Object.values(N.change).map((c) => c.crafts).join(",")}`);
+            ok("!! THE WINDOWS ARE SIZED FOR THE SHIPS THERE ARE: a second ship counts as two craft more, so two ships and four attackers fit the stack of a page 1,250 px high to within the few pixels of the stack's own padding (windows 148 high; sized for one ship they would be 160 and overflow by about a hundred) -- the formula is the number of craft plus the number of ships", N.fit.windows === 6 && N.fit.scrollHeight <= N.fit.clientHeight + 8, JSON.stringify(N.fit));
+            ok("and an escort's brain window says whose pilot it shows -- the PD autopilot's, marked as the escort's -- not the attackers' pilot (the attackers here fly the PD autopilot too, so the title is the only thing that tells)", N.brainEtexts.some((t) => /escort 1 · PD autopilot \(escort\)/.test(t)), N.brainEtexts.join(" | ").slice(0, 120));
+            ok("and a network in the seats is in the SECOND ship's too: with the GPU brain for the hand its brain window grows the three network rows (17 rows), for the seat ITS OWN window is on (the fourth: s4), not the first ship's window's (the first)", N.brainNet === 17 && N.brainNetLabels.every((l) => /^s4 /.test(l)), String(N.brainNet) + " " + N.brainNetLabels.join());
+        }
 
         // ---- 9b a ram ----
         {

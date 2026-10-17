@@ -23,6 +23,10 @@
 //   G27 the pitch output is not squashed 1 | G28 the trigger is the yaw output 3 | G29 the yaw correction comes from the pitch output 1 | G30 range fraction clamped at 2 1 | G31 yaw fraction clamped at -0.5 2
 //   G32 a 30-damage gun is heavy 1
 // FIVE WENT 0 RED THE FIRST TIME AND WERE GAPS IN THE GATE, NOT IN THE SABOTAGES (G5 the pitch error over the yaw arc -- the point-defence mount's two arcs are both pi/2, so only a main turret with a non-zero error tells them apart; G17 the layers' memo never noticing an edit in place; G19 the sight's reach never reaching the features; G31 a yaw fraction clamped short at one end; G32 the heavy boundary at exactly 30 -- no gun on the ship is): a row was added for each and each sabotage re-run red as logged above.
+// AND NINE MORE ONCE THE DECIDER KEPT WHAT THE NETWORK WAS LAST SHOWN (`decide.last`, for the page's brain window) AND NAMED ITS LIVE WEIGHTS (`liveIndices`, which the trainer breeds half its children from), each red by name:
+//   G33 decide.last has the features and the outputs swapped 1 | G34 decide.last is not cleared for a tick with no target 1 | G35 decide.last is not cleared for a target the arena does not show 1
+//   G36 decide.last is undefined before the first tick 1 | G37 decide.last shows lastFire as 0 though the network was shown 1 1 | G38 the live weights leave out unit 0's bias 1
+//   G39 the live weights take unit 1's output weights 1 | G40 the live weights leave out the trigger's bias 1 | G41 the live weights take unit 1's row of the encoder 1
 "use strict";
 import * as SG from "./seatGunnerPolicy.mjs";
 import * as Topo from "./gfcTopology.mjs";
@@ -96,6 +100,9 @@ section(() => {
     const dyn = (rule) => () => ({ yaw: 0, pitch: 0, fire: rule.fire, target: 2 }), rA = { fire: true }, rB = { fire: false }, dA = SG.gunnerFor(w, dyn(rA)), dB = SG.gunnerFor(w, dyn(rB));
     const a1 = dA(pd, st, body, [tg], 1).fire; rA.fire = false; const a2 = dA(pd, st, body, [tg], 2).fire, b1 = dB(pd, st, body, [tg], 1).fire, a3 = (() => { rA.fire = false; const f1 = dA(pd, st, body, [tg], 3).fire; return f1; })();
     ok("!! EVERY SEAT'S DECIDER REMEMBERS ITS OWN LAST TRIGGER (the `lastFire` feature): a decider that fired on the rule's word keeps firing the next tick when the rule has gone quiet (the trigger is routed through the network from the feature), another with no history does not; and the factory gives each seat a decider of its own", a1 === true && a2 === true && b1 === false && Aoff(pd, st, body, [tg], 1).fire === false && SG.gunnerFactory(w, () => () => ({ yaw: 0, pitch: 0, fire: false, target: null }))(pd, 0) !== SG.gunnerFactory(w, () => () => ({ yaw: 0, pitch: 0, fire: false, target: null }))(pd, 1) && typeof Bsight === "object");
+    const R = { yaw: 0.5, pitch: 0.1, fire: true, target: 2 }, dl = SG.gunnerFor(SG.handWeights(), () => R), l0 = dl.last;
+    dl(pd, st, body, [tg], 1); const l1 = dl.last, wantX = SG.features(pd, st, body, R, tg, false), wantY = SG.forward(SG.handWeights(), wantX); dl(pd, st, body, [tg], 2); const l2 = dl.last; R.target = null; dl(pd, st, body, [tg], 3); const l3 = dl.last; R.target = 2; dl(pd, st, body, [tg], 4); const l4 = dl.last; R.target = 99; dl(pd, st, body, [tg], 5); const l5 = dl.last;
+    ok("!! THE DECIDER KEEPS WHAT THE NETWORK WAS LAST SHOWN AND SAID (`decide.last`, for a page to draw): null before the first tick; after a tick with a target the twelve features (the closed form, `lastFire` 0) and the three outputs (the network's own forward on them) -- and a tick later the `lastFire` feature is 1; null again for a tick with no target and for a target the arena does not show; back after a target returns", l0 === null && l1 && near(l1.x, wantX, 0) && near(Array.from(l1.y), Array.from(wantY), 0) && l1.x[10] === 0 && l1.y.length === 3 && l2 && l2.x[10] === 1 && l3 === null && l4 && l4.x[10] === 0 && l5 === null, JSON.stringify(l1 && l1.y));
     // reach: hidden unit 0 = relu(rangeFrac), yaw output = tanh(unit 0): the yaw correction is 0.05 x tanh(range / reach)
     const wr = SG.zeroWeights(); wr[0 * 12 + 4] = 1; wr[ob + 0 * 34 + 0] = 1;
     const aim = (opts) => SG.gunnerFor(wr, sightOf({ yaw: 0, pitch: 0, fire: false, target: 2 }), opts)(pd, st, body, [tg], 1).yaw, rf = (reach) => SG.features(pd, st, body, { yaw: 0, pitch: 0, fire: false, target: 2 }, tg, false, reach)[4];
@@ -125,9 +132,16 @@ section(() => {
     ok("the hand weights are three non-zero entries: the 'aimed' channel into hidden unit 0 (1), hidden unit 0 into the trigger (4) and the trigger's bias (-2)", Array.from(w).filter((v) => v !== 0).length === 3 && w[0 * 12 + 3] === 1 && w[12 * 34 + 34 + 313 + 2 * 34] === 4 && w[12 * 34 + 34 + 313 + 34 * 3 + 2] === -2);
 });
 
+console.log("\n5b. THE LIVE WEIGHTS");
+section(() => {
+    const live = SG.liveIndices(), hand = SG.handWeights(), probes = Array.from({ length: 12 }, (_, k) => Array.from({ length: 12 }, (_, i) => (k % 2) * (i === 3 ? 1 : 0) + Math.sin(k * 7 + i * 3) * 0.5)), run = (w) => probes.map((x) => SG.forward(w, x));
+    const moves = (i) => { const w = Float32Array.from(hand); w[i] += 0.7; const a = run(hand), b = run(w); return a.some((y, k) => y.some((v, j) => Math.abs(v - b[k][j]) > 1e-6)); };
+    ok("!! THE LIVE WEIGHTS ARE THE ONES WIRED INTO THE HAND PATH: nineteen distinct indices in range (unit 0's row of the encoder, its bias, its three weights into the outputs, the three output biases), every one of them changes an output on some probe when moved from the hand weights, the three non-zero hand weights are among them -- and weights outside them (unit 1's row, a recurrent synapse, unit 1 into the trigger) change no output at all", live.length === 19 && new Set(live).size === 19 && live.every((i) => Number.isInteger(i) && i >= 0 && i < 860) && live.every(moves) && [3, 12 * 34 + 34 + 313 + 2 * 34, 12 * 34 + 34 + 313 + 34 * 3 + 2].every((i) => live.includes(i)) && !live.includes(12 + 3) && [12 + 3, 12 * 34 + 34 + 5, 12 * 34 + 34 + 313 + 2 * 34 + 1].every((i) => !moves(i)), live.join(","));
+});
+
 console.log("\n6. THE FRONT DOOR");
 section(() => {
-    ok("!! the export list is pinned: AIM_GAIN, FEATURES, FEATURE_NAMES, HEAVY_DAMAGE, HIDDEN, OUTPUTS, OUTPUT_NAMES, REACH, REC_EDGES, REC_STEPS, WEIGHT_COUNT, features, forward, gunnerFactory, gunnerFor, handWeights, layersOf, mutate, perturb, reportLines, rngFor, zeroWeights", Object.keys(SG).sort().join() === "AIM_GAIN,FEATURES,FEATURE_NAMES,HEAVY_DAMAGE,HIDDEN,OUTPUTS,OUTPUT_NAMES,REACH,REC_EDGES,REC_STEPS,WEIGHT_COUNT,features,forward,gunnerFactory,gunnerFor,handWeights,layersOf,mutate,perturb,reportLines,rngFor,zeroWeights", Object.keys(SG).sort().join());
+    ok("!! the export list is pinned: AIM_GAIN, FEATURES, FEATURE_NAMES, HEAVY_DAMAGE, HIDDEN, OUTPUTS, OUTPUT_NAMES, REACH, REC_EDGES, REC_STEPS, WEIGHT_COUNT, features, forward, gunnerFactory, gunnerFor, handWeights, layersOf, liveIndices, mutate, perturb, reportLines, rngFor, zeroWeights", Object.keys(SG).sort().join() === "AIM_GAIN,FEATURES,FEATURE_NAMES,HEAVY_DAMAGE,HIDDEN,OUTPUTS,OUTPUT_NAMES,REACH,REC_EDGES,REC_STEPS,WEIGHT_COUNT,features,forward,gunnerFactory,gunnerFor,handWeights,layersOf,liveIndices,mutate,perturb,reportLines,rngFor,zeroWeights", Object.keys(SG).sort().join());
     const lines = SG.reportLines();
     ok("the report lines say real numbers: 12 features, 34 hidden, 3 outputs, 860 weights, three non-zero hand weights", lines.length === 2 && lines.every((l) => !/NaN|undefined/.test(l)) && /12 features, 34 hidden/.test(lines[1]) && /860 weights/.test(lines[1]) && /in 3 non-zero weights/.test(lines[1]), lines[1]);
 });

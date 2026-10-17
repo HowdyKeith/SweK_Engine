@@ -14,6 +14,8 @@
 //   M1 the width is 16 4 | M2 the last layer is relu 3 | M3 the pitch output is not squashed 2 | M4 the second layer does not carry the aimed unit 3 | M5 no trigger bias 2
 //   M6 the fruit fly's network is run on these weights 2 | M7 perturb is mutate 1 | M8 the closing feature is zero 1 | M9 the second layer is cut at the wrong offset 5
 //   M10 the hand weights drive the pitch output, not the trigger 1 | M11 every seat gets seat 0's sight 1
+// AND THREE MORE ONCE THE NETWORK NAMED ITS LIVE WEIGHTS (`liveIndices`), each red by name:
+//   M12 the live weights leave out the second layer's bias 1 | M13 the live weights take unit 1's output weights 1 | M14 the live weights' output biases are off by one 1
 "use strict";
 import * as MG from "./seatGunnerMlp.mjs";
 import * as SG from "./seatGunnerPolicy.mjs";
@@ -44,6 +46,8 @@ section(() => {
     const pd = SHIP.seats.find((s) => s.name === "port PD 2"), st = (() => { const q = GS.createSeatState(pd); return { ...q, yaw: 0.3, pitch: -0.2 }; })(), body = { pos: [0, 0, 0], vel: [0, 0, 0], q: Q, w: [0, 0, 0] }, tg = { id: 2, pos: [0, 300, 0], vel: [0, 0, 0] };
     const b = MG.zeroWeights(); b[1568] = Math.atanh(0.5); b[1569] = Math.atanh(-0.3); b[1570] = 1;
     const r = MG.gunnerFor(b, () => ({ yaw: 0.5, pitch: 0.1, fire: false, target: 2 }))(pd, st, body, [tg], 1);
+    const dl = MG.gunnerFor(MG.handWeights(), () => ({ yaw: 0.5, pitch: 0.1, fire: true, target: 2 })), l0 = dl.last; dl(pd, st, body, [tg], 1);
+    ok("!! THE DECIDER KEEPS WHAT THE NETWORK WAS LAST SHOWN AND SAID (`decide.last`): null before the first tick; after a tick with a target the twelve features and the three outputs of THIS network's forward on them (not the fruit fly's)", l0 === null && dl.last && dl.last.x.length === 12 && dl.last.y.length === 3 && dl.last.y.every((v, i) => v === MG.forward(MG.handWeights(), dl.last.x)[i]) && dl.last.y[2] > 0);
     ok("!! THE DECIDER USES ITS OUTPUTS: biases giving +0.5, -0.3 and +0.76 add 0.05 x 0.5 to the sight's yaw and 0.05 x -0.3 to its pitch and turn the trigger on though the sight's rule said no; a negative third output stops a rule that fires", Math.abs(r.yaw - 0.525) < 1e-6 && Math.abs(r.pitch - 0.085) < 1e-6 && r.fire === true && r.target === 2 && (() => { const c = MG.zeroWeights(); c[1570] = -1; return MG.gunnerFor(c, () => ({ yaw: 0, pitch: 0, fire: true, target: 2 }))(pd, st, body, [tg], 1).fire === false; })());
 });
 
@@ -59,9 +63,16 @@ section(() => {
     ok("and the hand weights are four non-zero entries (the aimed channel through two hidden layers into the trigger, and its bias)", Array.from(MG.handWeights()).filter((v) => v !== 0).length === 4);
 });
 
+console.log("\n3b. THE LIVE WEIGHTS");
+section(() => {
+    const live = MG.liveIndices(), hand = MG.handWeights(), probes = Array.from({ length: 12 }, (_, k) => Array.from({ length: 12 }, (_, i) => (k % 2) * (i === 3 ? 1 : 0) + Math.sin(k * 7 + i * 3) * 0.5)), run = (w) => probes.map((x) => MG.forward(w, x));
+    const moves = (i) => { const w = Float32Array.from(hand); w[i] += 0.7; const a = run(hand), b = run(w); return a.some((y, k) => y.some((v, j) => Math.abs(v - b[k][j]) > 1e-6)); };
+    ok("!! THE LIVE WEIGHTS ARE THE ONES WIRED INTO THE HAND PATH: twenty-one distinct indices in range (unit 0's row of the first layer, its two biases, the weight between its two layers, its three weights into the outputs, the three output biases), every one changes an output on some probe when moved from the hand weights (the hand weights' four non-zero entries are among them), and weights outside them (unit 1's row, unit 1 into the trigger, a weight between units 1) change no output at all", live.length === 21 && new Set(live).size === 21 && live.every((i) => Number.isInteger(i) && i >= 0 && i < 1571) && live.every(moves) && [3, 416, 1472 + 64, 1570].every((i) => live.includes(i)) && [12 + 3, 416 + 33, 1472 + 64 + 1].every((i) => !moves(i)), live.join(","));
+});
+
 console.log("\n4. THE FRONT DOOR");
 section(() => {
-    ok("!! the export list is pinned: FEATURES, FEATURE_NAMES, HIDDEN, LAYER_SIZES, OUTPUTS, OUTPUT_NAMES, WEIGHT_COUNT, WIDTH, features, forward, gunnerFactory, gunnerFor, handWeights, layersOf, mutate, perturb, reportLines, rngFor, zeroWeights", Object.keys(MG).sort().join() === "FEATURES,FEATURE_NAMES,HIDDEN,LAYER_SIZES,OUTPUTS,OUTPUT_NAMES,WEIGHT_COUNT,WIDTH,features,forward,gunnerFactory,gunnerFor,handWeights,layersOf,mutate,perturb,reportLines,rngFor,zeroWeights", Object.keys(MG).sort().join());
+    ok("!! the export list is pinned: FEATURES, FEATURE_NAMES, HIDDEN, LAYER_SIZES, OUTPUTS, OUTPUT_NAMES, WEIGHT_COUNT, WIDTH, features, forward, gunnerFactory, gunnerFor, handWeights, layersOf, liveIndices, mutate, perturb, reportLines, rngFor, zeroWeights", Object.keys(MG).sort().join() === "FEATURES,FEATURE_NAMES,HIDDEN,LAYER_SIZES,OUTPUTS,OUTPUT_NAMES,WEIGHT_COUNT,WIDTH,features,forward,gunnerFactory,gunnerFor,handWeights,layersOf,liveIndices,mutate,perturb,reportLines,rngFor,zeroWeights", Object.keys(MG).sort().join());
     const lines = MG.reportLines();
     ok("the report lines say real numbers", lines.length === 2 && lines.every((l) => !/NaN|undefined/.test(l)) && /1571 weights/.test(lines[1]) && /in 4 non-zero weights/.test(lines[1]), lines[1]);
 });

@@ -44,6 +44,15 @@ export function handWeights() {
     return w;
 }
 export const perturb = SG.perturb, mutate = SG.mutate, rngFor = SG.rngFor;
+/** The weights wired into the hand path (see seatGunnerPolicy.liveIndices): unit 0 of each hidden layer -- its row of the first layer, its two biases, the weight between them, its weights into the three outputs -- and the output biases: 12 + 1 + 1 + 1 + 3 + 3 = 21 of the 1,571. */
+export function liveIndices() {
+    const idx = [];
+    for (let f = 0; f < FEATURES; f++) idx.push(O_W1 + 0 * FEATURES + f);
+    idx.push(O_B1 + 0, O_W2 + 0 * WIDTH + 0, O_B2 + 0);
+    for (let o = 0; o < OUTPUTS; o++) idx.push(O_W3 + o * WIDTH + 0);
+    for (let o = 0; o < OUTPUTS; o++) idx.push(O_B3 + o);
+    return idx;
+}
 
 export function reportLines() {
     const nz = Array.from(handWeights()).filter((v) => v !== 0).length;

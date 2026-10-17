@@ -84,18 +84,20 @@ export function features(seat, st, body, rule, tg, lastFire = false, reach = REA
 
 /**
  * The gunner for ONE seat from weights `w` and a sight: decide(seat, st, body, targets, t) -> { yaw, pitch, fire, target } (the gunSeats contract). With no target the sight's own answer stands (the network is not asked); with one, the network's
- * correction is added to the sight's aim and its trigger replaces the sight's. `reach` is the sight's maxRange (REACH if not said); `forward` is the network to run (this module's by default; brain/seatGunnerMlp.mjs hands in its own).
+ * correction is added to the sight's aim and its trigger replaces the sight's; the decider's `last` holds what the network was shown and said the last time it was asked (null if the tick had no target). `reach` is the sight's maxRange (REACH if not said); `forward` is the network to run (this module's by default; brain/seatGunnerMlp.mjs hands in its own).
  */
 export function gunnerFor(w, sight, { reach = REACH, forward: fwd = forward } = {}) {
     let lastFire = false;
-    return function decide(seat, st, body, targets, t = 0) {
+    function decide(seat, st, body, targets, t = 0) {
         const rule = sight(seat, st, body, targets, t);
-        if (rule.target == null) { lastFire = false; return rule; }
-        const tg = targets.find((x) => x.id === rule.target); if (!tg) { lastFire = false; return rule; }
-        const y = fwd(w, features(seat, st, body, rule, tg, lastFire, reach)), fire = y[2] > 0;
-        lastFire = fire;
+        if (rule.target == null) { lastFire = false; decide.last = null; return rule; }
+        const tg = targets.find((x) => x.id === rule.target); if (!tg) { lastFire = false; decide.last = null; return rule; }
+        const x = features(seat, st, body, rule, tg, lastFire, reach), y = fwd(w, x), fire = y[2] > 0;
+        lastFire = fire; decide.last = { x, y };
         return { yaw: rule.yaw + AIM_GAIN * y[0], pitch: rule.pitch + AIM_GAIN * y[1], fire, target: rule.target };
-    };
+    }
+    decide.last = null;   // what the network was last shown and answered ({ x: the twelve features, y: the three outputs }), or null when the tick had no target: for a page to draw
+    return decide;
 }
 
 /** The factory spaceArena's `gunner(seat, k)` option wants, for weights `w`: each seat gets its own sight from `makeSight(seat, k)` and a network of its own (it remembers its own last trigger). */
@@ -108,6 +110,19 @@ export function handWeights() {
     w[outBase + 2 * HIDDEN + 0] = 4;                            // fire = tanh(4 h0 - 2): positive exactly when aimed is 1
     w[outBase + HIDDEN * OUTPUTS + 2] = -2;
     return w;
+}
+
+/**
+ * The weights wired into the hand path -- the ones a single change can reach the three outputs through (the hand weights' own unit 0, whose row of the encoder, bias and weights into the outputs and the output biases are these): 12 + 1 + 3 + 3 = 19 of the 860. A search that moves one to four weights
+ * of 860 at random almost never moves one of these (the 841 others do nothing until a unit that carries them is switched on), so the trainer (tools/ship/trainSeatGunner.mjs) breeds half its children from these alone.
+ */
+export function liveIndices() {
+    const outBase = FEATURES * HIDDEN + HIDDEN + REC_EDGES, idx = [];
+    for (let f = 0; f < FEATURES; f++) idx.push(0 * FEATURES + f);                       // unit 0's row of the encoder
+    idx.push(FEATURES * HIDDEN + 0);                                                      // unit 0's bias
+    for (let o = 0; o < OUTPUTS; o++) idx.push(outBase + o * HIDDEN + 0);                 // unit 0 into each output
+    for (let o = 0; o < OUTPUTS; o++) idx.push(outBase + HIDDEN * OUTPUTS + o);           // the output biases
+    return idx;
 }
 
 const mulberry = (a) => () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
