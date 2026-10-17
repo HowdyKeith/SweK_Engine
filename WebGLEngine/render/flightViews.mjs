@@ -9,6 +9,10 @@
 //   brain    not a camera: the pilot's network, live -- its features, its hidden activations and its four outputs, as bars (the fruit fly's 34 neurons or the GPU Brain's two layers; the PD autopilot has no network, so its 18 features
 //            and four outputs only) -- and a gunner's, when the craft has gun seats
 //
+// A CRAFT WITH GUN SEATS (the bomber) has one 'gunner' view PER SEAT: a click goes plane -> pilot -> seat 1 -> seat 2 ... -> the last seat -> brain -> plane (nextWindow), the seat's view is seatCamera() looking along the turret and the
+// brain window adds, under the pilot's network, a row per seat (seatRows): what the gunner wants the seat to do and what it is doing, as fractions of the seat's arc. THE HAND GUNNER HAS NO NETWORK -- those rows are its rule's inputs
+// and outputs, said so in the label; a gunner brain that is a network (the fruit fly, the GPU Brain) is a later round.
+//
 // Everything here is a pure function of the craft's state: a camera is { eye, target, up, fov } (a vertical field of view, radians) and project() puts a world point on that camera's picture, so the geometry is held headless by
 // render/flightViews-selfcheck.mjs and the page only hands the same camera to Three.js. WHAT IS NOT HERE, SAID PLAINLY: the drawing of the scene (the page does that) and any cockpit model -- the pilot's view has no canopy frame or
 // instruments, only the horizon, the world and the reticle.
@@ -25,6 +29,18 @@ export function nextView(view, hasGunner = true) {
     const list = hasGunner ? VIEWS : VIEWS.filter((v) => v !== "gunner");
     const i = list.indexOf(view);
     return list[(i + 1) % list.length];
+}
+
+/**
+ * The next view of a window and the seat it shows, for a craft with `seats` gun seats (0 for a craft with a fixed gun or none): plane -> pilot -> the gunner's view of seat 0, 1, ... seats-1 (a fixed gun has one gunner's view, seat 0, and `hasGunner`
+ * false has none) -> brain -> plane. `win` is { view, seat }; an unknown view goes to the plane. Returns a new { view, seat }.
+ */
+export function nextWindow(win, { seats = 0, hasGunner = true } = {}) {
+    const views = seats > 0 ? seats : hasGunner ? 1 : 0, seat = Number.isInteger(win.seat) ? win.seat : 0;
+    if (win.view === "plane") return { view: "pilot", seat: 0 };
+    if (win.view === "pilot") return views > 0 ? { view: "gunner", seat: 0 } : { view: "brain", seat: 0 };
+    if (win.view === "gunner") return seat + 1 < views ? { view: "gunner", seat: seat + 1 } : { view: "brain", seat: 0 };
+    return { view: "plane", seat: 0 };
 }
 
 export const VIEW_DRAW = Object.freeze({
@@ -152,6 +168,21 @@ export function pilotRows({ who = "pilot", act, featureNames, outputNames }) {
     return rows;
 }
 
+const clamp1 = (v) => (v < -1 ? -1 : v > 1 ? 1 : v);
+/** An angle as a fraction of half an arc about its centre: the arc's centre is 0, its edges -1 and +1 (an arc of no width is 0). */
+const arcFraction = (v, arc) => (arc[1] > arc[0] ? clamp1((v - (arc[0] + arc[1]) / 2) / ((arc[1] - arc[0]) / 2)) : 0);
+/**
+ * The gunner part of the brain window: a row per seat of [what the gunner wants: yaw, pitch; what the seat is doing: yaw, pitch; the trigger (+1 firing, -1 not); a target (+1 has one, -1 none)], the angles as fractions of the seat's arc about its
+ * centre (full scale is the arc's edge). `items` are { seat, state, cmd } -- the seat (gunSeats.makeSeat), its state (yaw, pitch) and the gunner's last command ({ yaw, pitch, fire, target }, or null before the first). The rows carry a `label` for drawRows.
+ */
+export function seatRows(items) {
+    return items.map(({ seat, state, cmd }, k) => {
+        const c = cmd || { yaw: 0, pitch: 0, fire: false, target: null };
+        return { who: seat.id, layer: "aim", label: `s${k + 1} aim`, names: ["want yaw", "want pitch", "yaw", "pitch", "fire", "target"],
+            values: [arcFraction(c.yaw, seat.arc.yaw), arcFraction(c.pitch, seat.arc.pitch), arcFraction(state.yaw, seat.arc.yaw), arcFraction(state.pitch, seat.arc.pitch), c.fire ? 1 : -1, c.target != null ? 1 : -1] };
+    });
+}
+
 /**
  * Draw the rows as bars on a 2D context of w x h (render/carViews.mjs's drawBrainPanel, written out here so a page that wants only the bars does not load the race cars' scene): one row of bars per layer, each bar signed about the row's
  * centre line (blue above for a positive value, amber below for a negative one), a hidden activation shown at half scale, every value clamped to [-1, 1]. Returns the number of bars drawn.
@@ -161,7 +192,7 @@ export function drawRows(ctx, w, h, rows, { title = "" } = {}) {
     const rowH = Math.max(10, Math.floor((h - 14) / Math.max(1, rows.length))), pad = 46; let y = 12, bars = 0;
     ctx.font = "9px ui-monospace,Menlo,monospace"; ctx.fillStyle = "#9fb2d4"; ctx.fillText(title.slice(0, 40), 3, 9);
     for (const r of rows) {
-        ctx.fillStyle = "#5f7aa0"; ctx.fillText(`${r.who[0]} ${r.layer}`, 3, y + rowH - 3);
+        ctx.fillStyle = "#5f7aa0"; ctx.fillText(r.label || `${r.who[0]} ${r.layer}`, 3, y + rowH - 3);
         const n = r.values.length, bw = Math.max(2, Math.floor((w - pad - 4) / n) - 1), mid = y + rowH / 2;
         for (let i = 0; i < n; i++) {
             const v = Math.max(-1, Math.min(1, r.values[i] / (r.layer === "hidden" ? 2 : 1))), bh = Math.abs(v) * (rowH / 2 - 1), x = pad + i * (bw + 1);
@@ -173,8 +204,8 @@ export function drawRows(ctx, w, h, rows, { title = "" } = {}) {
 }
 
 /** The label under a window: the craft, the view, and what the view costs. */
-export function windowLabel(i, name, view, draw = VIEW_DRAW) {
-    const what = { plane: "from outside, behind and above", pilot: "the pilot's seat", gunner: "the gun's sight, the lead pip", brain: "the network, live" }[view] || view;
+export function windowLabel(i, name, view, draw = VIEW_DRAW, seat = null) {
+    const what = { plane: "from outside, behind and above", pilot: "the pilot's seat", gunner: seat ? `gun seat ${seat.index + 1} of ${seat.count}: ${seat.name}` : "the gun's sight, the lead pip", brain: seat ? "the network, live, and the gunners'" : "the network, live" }[view] || view;
     return `${i + 1}. ${name} -- ${view} (${what}) -- click to switch`;
 }
 

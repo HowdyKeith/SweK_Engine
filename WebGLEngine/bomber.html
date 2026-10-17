@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<!-- bomber.html -- UNNUMBERED (the version is chosen at ship time): A B-29-STYLE BOMBER, ITS GUNNERS, AND THE FIGHTERS THAT ATTACK IT -- A WINDOW FOR EACH CRAFT DOWN THE RIGHT.
+
+     The fight is brain/bomberFight.mjs's: a bomber (physics/mechanics/bomber.mjs -- the trainer's flight enlarged by dynamic similarity, four engines, a hull of seventeen spheres, FIVE GUN SEATS each with a gunner) against 1-5 trainer-class fighters,
+     stepped a tick at a time by brain/dogfightArena.mjs (which brain/dogfightArena-selfcheck.mjs holds to dogfightTask.duel() to the bit for a fight of two, and to its own arithmetic for the bomber, its hull, its engines and the friendly-fire rule).
+
+     THE WINDOWS (render/flightViews.mjs): one per craft, stacked down the right, and a CLICK on a window switches what it shows. A FIGHTER's goes plane, pilot, gunner (its fixed gun's sight: the pipper and the lead pip), brain. THE BOMBER's goes
+     plane, pilot, then ONE VIEW PER GUN SEAT -- the forward upper turret, the forward lower, the aft upper, the aft lower, the tail -- looking along the turret as it slews, with the sight drawn for the target that gunner has chosen, and then brain: the
+     pilot's network (or the PD autopilot's features and outputs) and, under it, a row per seat of what its gunner wants the seat to do and what the seat is doing. THE HAND GUNNER HAS NO NETWORK: those rows are the inputs and outputs of its rule.
+
+     THE GUNNERS' SKILL IS A SETTING I CHOSE (perfect, ace, regular, green -- brain/bomberFight.mjs says what each is), not a measurement of any gunner. THE FIGHTERS' PILOTS are the same roster as dogfight.html's (the PD autopilot, the fruit fly's network, the GPU Brain's network on its
+     CPU twin; hand, trained to fly, trained to fight) -- and so can be the BOMBER'S: the pilots we have fly it through froudeScale.scalePilot(), shown the trainer's world. WHAT THE DOGFIGHT PILOTS WERE GRADED AGAINST, SAID PLAINLY: only the PD autopilot, in fights of two.
+     Against this bomber the trained fighters hit it where the PD ones never do (the gate for brain/bomberFight.mjs pins that) -- and nothing was trained for a bomber.
+
+     WHAT IS NOT HERE: wind, a falling wreck (a lost craft goes dark where it was), a crew that can be killed, an interlock that keeps a turret from firing into its own bomber's tail, a formation of bombers, an escort, the fighters breaking away,
+     and a gunner brain that is a network (a later round). The hit spheres can be shown (the box below): they are what a round has to reach, and a hit on an engine's puts it out after eight. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:desc" content="Bomber: a B-29-style bomber with five gun seats, each with a gunner, against trained fighters -- a window per craft (plane, pilot, each gun seat, the networks) stepped by brain/dogfightArena.mjs under brain/bomberFight.mjs.">
+<title>SweK &middot; Bomber</title>
+<style>
+  html,body { margin:0; height:100%; background:#0a1626; color:#cfe0f5; font:12px ui-monospace,Menlo,monospace; overflow:hidden; }
+  #hud { position:fixed; top:6px; left:8px; right:286px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; z-index:2; background:#0a1220d9; border:1px solid #2f486c; border-radius:8px; padding:5px 10px; }
+  a { color:#5ad6ff; text-decoration:none; } a:hover { text-decoration:underline; }
+  button, select, input { background:#152136; color:#b9d4ff; border:1px solid #2f486c; border-radius:5px; cursor:pointer; font:11px ui-monospace,monospace; padding:2px 8px; }
+  input[type=number] { width:56px; cursor:text; } input[type=checkbox] { padding:0; }
+  label { color:#8fb6d0; }
+  #stack { position:fixed; top:6px; right:8px; width:264px; z-index:2; display:flex; flex-direction:column; gap:6px; }
+  .win { position:relative; width:262px; height:var(--wh, 200px); flex:0 0 auto; border:1px solid #2f486c; border-radius:6px; background:transparent; cursor:pointer; overflow:hidden; }   /* TRANSPARENT: the picture under a window is drawn into the page's one WebGL canvas BEHIND the boxes */
+  .win:hover { border-color:#5ad6ff; }
+  .win .wl { position:absolute; top:0; left:0; right:0; height:16px; line-height:16px; padding:0 6px; font-size:10px; color:#9fb2d4; background:#0a1220; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; z-index:1; }
+  .win .wgl { position:absolute; top:16px; left:0; right:0; bottom:0; }
+  .win .wov { position:absolute; top:16px; left:0; width:100%; height:calc(100% - 16px); pointer-events:none; }
+  #board { position:fixed; bottom:8px; left:10px; right:286px; z-index:2; display:flex; gap:8px; flex-wrap:wrap; pointer-events:none; }
+  .card { background:#0a1220e0; border:1px solid #2f486c; border-radius:8px; padding:5px 9px; min-width:250px; flex:1 1 250px; max-width:420px; }
+  .card b { color:#2fd6b0; } .card.f b { color:#f6a623; } .card .bad { color:#ff6b6b; } .card .good { color:#7fb069; }
+  .card .row { color:#9fb6cf; white-space:pre-wrap; }
+  .bar { height:6px; background:#26354f; border-radius:3px; margin:3px 0; } .bar > i { display:block; height:100%; background:#7fb069; border-radius:3px; }
+  #log { position:fixed; top:128px; left:10px; z-index:1; color:#f6a623; background:#0a1220b3; border-radius:6px; padding:3px 9px; white-space:pre; min-width:260px; }
+  #note { position:fixed; top:112px; right:286px; z-index:1; color:#cfe0f5; background:#0a1220b3; border-radius:6px; padding:2px 8px; text-align:right; max-width:560px; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <b style="color:#2fd6b0">&#9992; Bomber</b>
+  <label>attack <select id="kind"><option value="stern">stern</option><option value="beam" selected>beam</option><option value="head-on">head-on</option><option value="mixed">mixed</option></select>
+    seed <input id="seed" type="number" min="1" max="99999" value="1"></label>
+  <label>fighters <input id="nfight" type="number" min="1" max="5" value="3"></label>
+  <label>gunners <select id="gunners"><option value="perfect">perfect</option><option value="ace">ace</option><option value="regular" selected>regular</option><option value="green">green</option></select></label>
+  <label>fighters fly <select id="pilotF" style="max-width:190px"></select></label>
+  <label>bomber flies <select id="pilotB" style="max-width:190px"></select></label>
+  <label title="a fighter holds its fire while a team-mate is in its line (without it the fighters shoot each other)"><input id="hold" type="checkbox" checked> hold fire</label>
+  <label title="the spheres a round has to reach"><input id="spheres" type="checkbox"> hit spheres</label>
+  <button id="newBtn" title="start this fight again from its first tick, with what is chosen">&#8635; New fight</button>
+  <button id="pauseBtn">&#10074;&#10074; Pause</button><button id="stepBtn" title="one tick (1/30 s)">+1 tick</button>
+  <label>speed <select id="timeScale"><option>1</option><option>2</option><option>4</option><option>8</option></select>x</label>
+  <label>view <select id="camMode"><option value="overview">overview</option><option value="chase0">chase bomber</option><option value="chase1">chase fighter 1</option><option value="orbit">orbit</option></select></label>
+  <span id="stat" style="color:#9fe6c0"></span>
+</div>
+<div id="log"></div>
+<div id="stack"></div>
+<div id="board"></div>
+<div id="note"></div>
+
+<script type="importmap">
+{ "imports": { "three": "/vendor/three/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from "/vendor/three/three.module.js";
+import { OrbitControls } from "/vendor/three/jsm/controls/OrbitControls.js";
+import * as RB from "/physics/mechanics/rigidBody6dof.mjs";
+import * as F from "/physics/mechanics/flightModel6dof.mjs";
+import * as G from "/physics/mechanics/flightGuns.mjs";
+import * as GS from "/physics/mechanics/gunSeats.mjs";
+import * as SC from "/physics/mechanics/froudeScale.mjs";
+import * as BM from "/physics/mechanics/bomber.mjs";
+import * as AF from "/brain/autopilotFlight.mjs";
+import * as PF from "/brain/pilotFlightPolicy.mjs";
+import * as MF from "/brain/pilotFlightMlp.mjs";
+import * as A from "/brain/dogfightArena.mjs";
+import * as BF from "/brain/bomberFight.mjs";
+import * as PB from "/brain/peerBrain.mjs";
+import * as V from "/render/flightViews.mjs";
+import { weightsHash } from "/brain/drivePolicy.mjs";
+
+const R2D = 180 / Math.PI, FIGHTER_COLORS = [0xf6a623, 0xe8734a, 0xd4a017, 0xff8c42, 0xc97b2a], BOMBER_COLOR = 0x2fd6b0;
+
+// ---- the pilots: a choice resolves to { fn, label, policy, weights } -----------------------------------------------------------------------------------------------------------------------------------------
+const DESC = { pilotFlightPolicy: PB.describePolicy("pilotFlightPolicy", PF), pilotFlightMlp: PB.describePolicy("pilotFlightMlp", MF) };
+const CHOICES = [
+  { id: "pd", label: "PD autopilot", policy: null },
+  { id: "hand", label: "fruit fly, hand weights", policy: PF, policyId: "pilotFlightPolicy", hand: () => PF.handWeights() },
+  { id: "flight", label: "fruit fly trained to FLY", policy: PF, policyId: "pilotFlightPolicy", file: "/brain/pilotFlightWeightsDefault.json" },
+  { id: "dogfight", label: "fruit fly trained to FIGHT", policy: PF, policyId: "pilotFlightPolicy", file: "/brain/pilotDogfightWeightsDefault.json" },
+  { id: "gpuHand", label: "GPU Brain network, hand weights (CPU twin)", policy: MF, policyId: "pilotFlightMlp", hand: () => MF.handWeights() },
+  { id: "gpuFlight", label: "GPU Brain trained to FLY (CPU twin)", policy: MF, policyId: "pilotFlightMlp", file: "/brain/pilotFlightMlpWeightsDefault.json" },
+  { id: "gpuDogfight", label: "GPU Brain trained to FIGHT (CPU twin)", policy: MF, policyId: "pilotFlightMlp", file: "/brain/pilotDogfightMlpWeightsDefault.json" },
+];
+const loaded = new Map(), errors = new Map();   // id -> { weights, meta } | reason
+function loadChoice(c, url = c.file) {
+  return fetch(url).then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }).then((blob) => {
+    const r = PB.importBrain(DESC[c.policyId], blob);
+    if (r.ok) { loaded.set(c.id, { weights: r.weights, meta: r.meta }); errors.delete(c.id); } else errors.set(c.id, r.reason);   // a refused LATER load keeps the pilot the page already holds, and says why
+    return r.ok;
+  }).catch((e) => { errors.set(c.id, "could not fetch it (" + (e && e.message) + ")"); return false; });
+}
+const available = (c) => !c.file || loaded.has(c.id);
+function resolvePilot(id) {
+  const c = CHOICES.find((x) => x.id === id) || CHOICES[0];
+  if (!c.policy) return { id: "pd", fn: (s, t, w) => AF.pilot(s, t, w), label: c.label, policy: null, weights: null };
+  const w = c.hand ? c.hand() : loaded.get(c.id) && loaded.get(c.id).weights;
+  if (!w) return { id: "pd", fn: (s, t, w2) => AF.pilot(s, t, w2), label: `PD autopilot (${c.label}: ${errors.get(c.id) || "not loaded"})`, policy: null, weights: null };
+  const meta = loaded.get(c.id) && loaded.get(c.id).meta;
+  return { id: c.id, fn: c.policy.pilotFor(w), label: c.label + (c.file ? ` ${weightsHash(w)}` : "") + (meta && meta.score != null ? ` (held-out ${meta.score})` : ""), policy: c.policy, weights: w };
+}
+
+// ---- Three.js scene, Z-UP like the physics (nose +X, up +Z) ---------------------------------------------------------------------------------------------------------------------------------------------------
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x7fb2e6); scene.fog = new THREE.Fog(0x9fc4ea, 1500, 9000);
+const camera = new THREE.PerspectiveCamera(51.6, innerWidth / innerHeight, 0.5, 30000);   // 0.9 rad vertical, the overview's
+camera.up.set(0, 0, 1); camera.position.set(-400, -300, 500);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+renderer.domElement.style.position = "fixed"; renderer.domElement.style.inset = "0";
+const orbit = new OrbitControls(camera, renderer.domElement);
+orbit.enableDamping = true; orbit.dampingFactor = 0.08; orbit.enabled = false;
+scene.add(new THREE.HemisphereLight(0xdcecff, 0x5a6b4a, 1.1));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(500, -300, 900); scene.add(sun);
+{
+  scene.add(new THREE.Mesh(new THREE.PlaneGeometry(60000, 60000), new THREE.MeshStandardMaterial({ color: 0x5f7a45, roughness: 1 })));
+  const grid = new THREE.GridHelper(30000, 150, 0x7c9a5a, 0x6c8a4c); grid.rotation.x = Math.PI / 2; grid.position.z = 0.2; scene.add(grid);
+  let s = 4242; const rnd = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
+  const pylons = new THREE.InstancedMesh(new THREE.BoxGeometry(6, 6, 1), new THREE.MeshStandardMaterial({ color: 0xd9d2c0 }), 260), m = new THREE.Matrix4();
+  for (let i = 0; i < 260; i++) { const h = 20 + rnd() * 90; m.compose(new THREE.Vector3((rnd() - 0.5) * 9000, (rnd() - 0.5) * 9000, h / 2), new THREE.Quaternion(), new THREE.Vector3(1, 1, h)); pylons.setMatrixAt(i, m); }
+  scene.add(pylons);
+}
+const HULL_DEAD = new THREE.MeshStandardMaterial({ color: 0x4a2020, roughness: 0.9 });
+const ENGINE_DEAD = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 1 });
+function makeFighter(i) {
+  const g = new THREE.Group(), mat = new THREE.MeshStandardMaterial({ color: FIGHTER_COLORS[i % FIGHTER_COLORS.length], metalness: 0.2, roughness: 0.55 });
+  const fus = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.8, 6.4, 12), mat); fus.rotation.z = Math.PI / 2; fus.position.x = -0.6; g.add(fus);
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.55, 1.6, 12), mat); nose.rotation.z = -Math.PI / 2; nose.position.x = 3.4; g.add(nose);
+  const wing = new THREE.Mesh(new THREE.BoxGeometry(1.7, 10.6, 0.16), mat); wing.position.set(0.2, 0, 0.5); g.add(wing);
+  const tailplane = new THREE.Mesh(new THREE.BoxGeometry(1.1, 3.6, 0.1), mat); tailplane.position.set(-4.2, 0, 0.2); g.add(tailplane);
+  const fin = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.1, 1.5), mat); fin.position.set(-4.2, 0, 0.9); g.add(fin);
+  const prop = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 0.04, 20), new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.25 })); prop.rotation.z = Math.PI / 2; prop.position.x = 4.3; g.add(prop);
+  g.userData = { hull: [fus, nose, wing, tailplane, fin], kind: "fighter" }; scene.add(g); return g;
+}
+// THE BOMBER is drawn from the same numbers the fight is: the fuselage between its hull spheres, the wings from tip to tip, a nacelle and a disc at each ENGINE sphere, the fin at the fin sphere, and a dome and a pair of barrels at each SEAT's mount
+// (the barrels point where the seat points NOW). `showSpheres` adds the hit spheres themselves.
+function makeBomber(bomber) {
+  const g = new THREE.Group(), mat = new THREE.MeshStandardMaterial({ color: BOMBER_COLOR, metalness: 0.35, roughness: 0.45 }), k = bomber.k, hull = [], P = bomber.parts;
+  const part = (name) => P.find((p) => p.name === name), fusParts = P.filter((p) => ["nose", "cockpit", "forward fuselage", "waist", "aft fuselage", "tail cone"].includes(p.name)).sort((a, b) => a.center[0] - b.center[0]);
+  for (let i = 0; i + 1 < fusParts.length; i++) {
+    const a = fusParts[i], b = fusParts[i + 1], len = b.center[0] - a.center[0], seg = new THREE.Mesh(new THREE.CylinderGeometry(b.radius * 0.8, a.radius * 0.8, len, 14), mat);
+    seg.rotation.z = -Math.PI / 2; seg.position.set((a.center[0] + b.center[0]) / 2, 0, (a.center[2] + b.center[2]) / 2); g.add(seg); hull.push(seg);
+  }
+  const nose = fusParts[fusParts.length - 1], cap = new THREE.Mesh(new THREE.ConeGeometry(nose.radius * 0.8, 3 * k, 14), mat); cap.rotation.z = -Math.PI / 2; cap.position.set(nose.center[0] + 1.5 * k, 0, nose.center[2]); g.add(cap); hull.push(cap);
+  const tip = part("left wing tip"), root = part("left wing root"), wing = new THREE.Mesh(new THREE.BoxGeometry(7 * k, 2 * (tip.center[1] + tip.radius * 0.6), 0.45 * k), mat); wing.position.set(root.center[0], 0, root.center[2] + 0.2 * k); g.add(wing); hull.push(wing);
+  const tailC = part("tail cone"), tp = new THREE.Mesh(new THREE.BoxGeometry(3.2 * k, 14 * k, 0.25 * k), mat); tp.position.set(tailC.center[0] + 1.2 * k, 0, tailC.center[2] + 0.5 * k); g.add(tp); hull.push(tp);
+  const fin = part("fin"), finM = new THREE.Mesh(new THREE.BoxGeometry(4 * k, 0.3 * k, 6 * k), mat); finM.position.set(fin.center[0] + 0.5 * k, 0, fin.center[2] + 0.5 * k); g.add(finM); hull.push(finM);
+  const engines = bomber.engines.map((id) => {
+    const p = P[id], nac = new THREE.Mesh(new THREE.CylinderGeometry(p.radius * 0.55, p.radius * 0.5, 5 * k, 12), mat); nac.rotation.z = -Math.PI / 2; nac.position.set(p.center[0] + 0.5 * k, p.center[1], p.center[2]); g.add(nac);
+    const disc = new THREE.Mesh(new THREE.CylinderGeometry(3 * k, 3 * k, 0.05 * k, 24), new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.22 })); disc.rotation.z = Math.PI / 2; disc.position.set(p.center[0] + 3.1 * k, p.center[1], p.center[2]); g.add(disc);
+    hull.push(nac); return { nac, disc, id, mat: nac.material };
+  });
+  const turrets = bomber.seats.map((seat) => {
+    const grp = new THREE.Group(); grp.position.set(...seat.mount);
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.75 * k, 12, 8), new THREE.MeshStandardMaterial({ color: 0xcfe0f5, metalness: 0.2, roughness: 0.3 })); grp.add(dome);
+    const barrel = new THREE.Group(); for (const dy of [-0.18, 0.18]) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.07 * k, 0.07 * k, 1.8 * k, 6), new THREE.MeshStandardMaterial({ color: 0x222222 })); b.position.set(dy * k, 0.9 * k, 0); barrel.add(b); } grp.add(barrel);
+    g.add(grp); return { grp, barrel };
+  });
+  const spheres = P.map((p) => { const m = new THREE.Mesh(new THREE.SphereGeometry(p.radius, 14, 10), new THREE.MeshBasicMaterial({ color: p.kind === "engine" ? 0xff6b6b : 0xf6e05a, wireframe: true, transparent: true, opacity: 0.55 })); m.position.set(...p.center); m.visible = false; g.add(m); return m; });
+  g.userData = { hull, engines, turrets, spheres, kind: "bomber" }; scene.add(g); return g;
+}
+function trailLine(color) {
+  const geom = new THREE.BufferGeometry(); geom.setAttribute("position", new THREE.BufferAttribute(new Float32Array(240 * 3), 3)); geom.setDrawRange(0, 0);
+  const line = new THREE.Line(geom, new THREE.LineBasicMaterial({ color })); line.frustumCulled = false; scene.add(line); return line;
+}
+// the rounds: a short streak behind each one (the bomber's turrets in cyan, the fighters' in yellow); the hits: a flash that grows and fades
+const MAX_ROUNDS = 1200;
+function tracerSet(color) { const geom = new THREE.BufferGeometry(); geom.setAttribute("position", new THREE.BufferAttribute(new Float32Array(MAX_ROUNDS * 6), 3)); geom.setDrawRange(0, 0); const l = new THREE.LineSegments(geom, new THREE.LineBasicMaterial({ color })); l.frustumCulled = false; scene.add(l); return { geom, l }; }
+const tracerB = tracerSet(0x7ff0ff), tracerF = tracerSet(0xfff1a0);
+const flashes = []; const FLASH_MAT = () => new THREE.MeshBasicMaterial({ color: 0xffb340, transparent: true, opacity: 1 });
+function spawnFlash(p, big = 1) { const m = new THREE.Mesh(new THREE.SphereGeometry(big, 10, 8), FLASH_MAT()); m.position.set(p[0], p[1], p[2]); m.userData.age = 0; scene.add(m); flashes.push(m); }
+
+// ---- the fight ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+let fight = null, arena = null, bomberCfg = null, pilots = { f: null, b: null }, meshes = [], trails = [], trailN = [], deadShown = [], enginesShown = [], log = [], paused = false, held = false;
+const el = (id) => document.getElementById(id);
+const nameOf = (c) => (c.bomber ? "bomber" : c.name.split(" · ")[0]);
+function clearFight() { for (const m of meshes) { scene.remove(m); m.traverse((c) => { if (c.geometry) c.geometry.dispose(); }); } for (const t of trails) { scene.remove(t); t.geometry.dispose(); } for (const f of flashes) { scene.remove(f); f.geometry.dispose(); f.material.dispose(); } flashes.length = 0; meshes = []; trails = []; }
+function newFight({ kind = el("kind").value, seed = Number(el("seed").value) || 1, fighters = Number(el("nfight").value) || 3, gunners = el("gunners").value, f = el("pilotF").value, b = el("pilotB").value, hold = el("hold").checked } = {}) {
+  clearFight();
+  fighters = Math.max(1, Math.min(5, Math.round(fighters))); seed = Math.max(1, Math.round(seed));
+  pilots = { f: resolvePilot(f), b: resolvePilot(b) };
+  fight = BF.build(seed, kind, { fighters, gunners, pilot: pilots.f.fn, bomberPilot: pilots.b.fn, holdFire: hold });
+  arena = fight.arena; bomberCfg = fight.bomber;
+  arena.crafts[0].name = `bomber · ${pilots.b.label}`; arena.crafts.slice(1).forEach((c) => { c.name = `${c.name} · ${pilots.f.label}`; });
+  meshes = arena.crafts.map((c, i) => (c.bomber ? makeBomber(c.bomber) : makeFighter(i - 1))); trails = arena.crafts.map((c, i) => trailLine(c.bomber ? BOMBER_COLOR : FIGHTER_COLORS[(i - 1) % FIGHTER_COLORS.length])); trailN = arena.crafts.map(() => 0); deadShown = arena.crafts.map(() => false); enginesShown = [4];
+  log = []; el("kind").value = kind; el("seed").value = String(fight.scenario.seed); el("nfight").value = String(fighters); el("gunners").value = typeof gunners === "string" ? gunners : "regular"; el("pilotF").value = pilots.f.id; el("pilotB").value = pilots.b.id; el("hold").checked = !!hold;
+  buildWindows(); camPos.set(...arena.crafts[0].state.pos).add(new THREE.Vector3(-200, -150, 100)); camLook.set(...arena.crafts[0].state.pos);
+  renderNote(); renderFrame(0, true);
+}
+function tickOnce() {
+  A.stepArena(arena);
+  const nm = (id) => nameOf(arena.crafts.find((c) => c.id === id));
+  for (const e of arena.events) {
+    if (e.type === "hit") {
+      const v = arena.crafts.find((c) => c.id === e.victim); spawnFlash(e.point, v.bomber ? 0.8 : 1);
+      if (v.bomber || e.friendly || arena.i % 6 === 0 || v.taken >= v.hp) log.push(`${e.t.toFixed(1)} s  ${nm(e.shooter)} hit ${nm(e.victim)}${e.friendly ? " (FRIENDLY FIRE)" : ""}${e.part !== undefined ? ` — ${v.bomber.parts[e.part].name}` : ""}  (${Math.max(0, v.hp - v.taken)} hit points left)`);
+    }
+    else if (e.type === "engine") log.push(`${e.t.toFixed(1)} s  ${e.name} OUT — ${e.running} engine${e.running === 1 ? "" : "s"} running`);
+    else if (e.type === "kill") log.push(`${e.t.toFixed(1)} s  ${nm(e.craft)} DESTROYED`);
+    else if (e.type === "ended") log.push(`${e.t.toFixed(1)} s  ${nm(e.craft)}: ${e.status}`);
+    else if (e.type === "collision") log.push(`${e.t.toFixed(1)} s  ${nm(e.craft)} collided with ${nm(e.with)}`);
+  }
+  if (arena.done && !log.some((l) => /^OVER/.test(l))) log.push(`OVER (${arena.over}) at ${arena.t.toFixed(1)} s — ${BF.tally(arena).winner === "none" ? "no winner" : BF.tally(arena).winner + " win"}`);
+  if (log.length > 14) log = log.slice(-14);
+}
+
+// ---- the windows: one per craft, a click switches the view ------------------------------------------------------------------------------------------------------------------------------------------------------
+const stack = el("stack"), wins = [], winCam = new THREE.PerspectiveCamera(60, 262 / 184, 0.3, 30000);
+winCam.up.set(0, 0, 1);
+const keepViews = [];
+const drawFor = (c) => (c.bomber ? Object.freeze({ ...V.VIEW_DRAW, chaseBack: 46, chaseUp: 13, chaseAhead: 10, seat: Object.freeze([8.5 * c.bomber.k, 0, 1.4 * c.bomber.k]), sightAhead: 120 }) : V.VIEW_DRAW);
+function buildWindows() {
+  for (const w of wins) keepViews[w.i] = { view: w.view, seat: w.seat };
+  stack.textContent = ""; wins.length = 0;
+  const n = arena.crafts.length, wh = Math.max(96, Math.min(200, Math.floor((innerHeight - 12 - 6 * (n - 1)) / n) - 2));   // the box's 1 px border is outside its height
+  stack.style.setProperty("--wh", wh + "px");
+  arena.crafts.forEach((c, i) => {
+    const box = document.createElement("div"); box.className = "win"; box.dataset.craft = String(i);
+    box.innerHTML = `<div class="wl"></div><div class="wgl"></div><canvas class="wov" width="262" height="${wh - 16}"></canvas>`;
+    const keep = keepViews[i], seat = keep && c.seats.length ? Math.min(keep.seat || 0, c.seats.length - 1) : 0;
+    const w = { i, view: keep ? keep.view : "plane", seat, el: box, gl: box.querySelector(".wgl"), ov: box.querySelector(".wov"), label: box.querySelector(".wl") };
+    w.ctx = w.ov.getContext("2d"); w.texts = []; w.sight = null; { const ft = w.ctx.fillText.bind(w.ctx); w.ctx.fillText = (t, x, y) => { w.texts.push(String(t)); ft(t, x, y); }; }   // the gate reads what a window says
+    box.addEventListener("click", () => cycle(i)); stack.appendChild(box); wins.push(w); setLabel(w);
+  });
+}
+const setLabel = (w) => {
+  const c = arena.crafts[w.i], seats = c.seats;
+  w.label.textContent = V.windowLabel(w.i, nameOf(c), w.view, V.VIEW_DRAW, seats.length ? { index: w.seat, count: seats.length, name: seats[w.seat].seat.name } : null);
+};
+function cycle(i) { const w = wins[i]; if (!w) return; const c = arena.crafts[i], nx = V.nextWindow({ view: w.view, seat: w.seat }, { seats: c.seats.length, hasGunner: true }); w.view = nx.view; w.seat = nx.seat; setLabel(w); renderNote(); }
+const cameraLike = (cam, W, H) => { winCam.position.set(...cam.eye); winCam.up.set(...cam.up); winCam.fov = cam.fov * R2D; winCam.aspect = W / H; winCam.updateProjectionMatrix(); winCam.lookAt(...cam.target); winCam.updateMatrixWorld(true); };
+const seatMuzzle = (c, k) => GS.muzzleOfSeat(c.seats[k].seat, c.seats[k].state, c.state);
+// a window's camera spec: a seat's view looks along the turret as it points now
+function cameraOf(w, c) {
+  const draw = drawFor(c);
+  if (w.view === "gunner" && c.seats.length) return V.seatCamera(c.state, seatMuzzle(c, w.seat), { draw });
+  return V.cameraFor(w.view, c.state, { spec: c.spec, draw });
+}
+const brainRowsOf = (c) => {
+  const p = c.bomber ? pilots.b : pilots.f, s = c.bomber ? c.bomber.scale : 1, target = (c.last && c.last.target) || { altitude: c.state.pos[2], heading: F.attitude(c.state).heading, airspeed: 45 };
+  const st = s === 1 ? c.state : SC.scaleState(c.state, s), tg = s === 1 ? target : SC.scaleTarget(target, s), x = PF.features(st, tg);   // the bomber's pilot is shown the trainer's world, so the bars are that world's
+  const act = p.policy ? V.pilotActivations(p.policy, p.weights, x) : { input: Float32Array.from(x), output: Float32Array.of(c.last ? c.last.controls.pitch : 0, c.last ? c.last.controls.roll : 0, c.last ? c.last.controls.yaw : 0, c.last ? c.last.controls.throttle * 2 - 1 : 0) };
+  const rows = V.pilotRows({ who: "pilot", act, featureNames: PF.FEATURE_NAMES, outputNames: PF.OUTPUT_NAMES });
+  if (c.seats.length) rows.push(...V.seatRows(c.seats.map((s2) => ({ seat: s2.seat, state: s2.state, cmd: s2.last }))));
+  return rows;
+};
+const ammoOf = (c) => (c.seats.length ? c.seats.reduce((a, s) => a + s.state.gun.ammo, 0) : c.gun.ammo);
+function drawSight(ctx, cam, muzzle, foe, spec, W, H) {
+  const cross = (x, y, n) => { ctx.fillStyle = "#7fe0a0"; ctx.fillRect(Math.round(x) - n, Math.round(y), 2 * n + 1, 1); ctx.fillRect(Math.round(x), Math.round(y) - n, 1, 2 * n + 1); };   // whole pixels, so a cross is the same colour wherever it sits
+  const gs = V.gunsight(cam, muzzle, foe && foe.status === "airborne" ? { pos: foe.state.pos, vel: foe.state.vel } : null, W, H, spec);
+  cross(gs.bore[0], gs.bore[1], 8);
+  if (gs.pipper) { ctx.strokeStyle = "#5ad6ff"; ctx.beginPath(); ctx.arc(gs.pipper[0], gs.pipper[1], 7, 0, 6.2832); ctx.stroke(); }
+  if (gs.lead) { ctx.strokeStyle = "#f6a623"; ctx.beginPath(); ctx.moveTo(gs.lead[0], gs.lead[1] - 7); ctx.lineTo(gs.lead[0] + 7, gs.lead[1]); ctx.lineTo(gs.lead[0], gs.lead[1] + 7); ctx.lineTo(gs.lead[0] - 7, gs.lead[1]); ctx.closePath(); ctx.stroke(); }
+  if (gs.pipper && gs.lead) { ctx.strokeStyle = "#5f7590"; ctx.beginPath(); ctx.moveTo(gs.pipper[0], gs.pipper[1]); ctx.lineTo(gs.lead[0], gs.lead[1]); ctx.stroke(); }
+  ctx.fillStyle = "#cfe0f5"; ctx.fillText(gs.range == null ? "no target" : `${foe ? nameOf(foe) : ""} range ${gs.range.toFixed(0)} m` + (gs.tof != null ? `  flight ${gs.tof.toFixed(2)} s` : "  out of reach"), 4, 12);
+  return { foe: foe ? foe.id : null, range: gs.range, tof: gs.tof, bore: gs.bore, pipper: gs.pipper, lead: gs.lead, W, H };
+}
+function drawOverlay(w, c, W, H) {
+  const ctx = w.ctx; ctx.clearRect(0, 0, W, H); w.texts = []; w.sight = null;
+  ctx.font = "10px ui-monospace,Menlo,monospace"; ctx.lineWidth = 2;
+  const hud = V.hudText(c.state, { hp: c.hp, taken: c.taken, ammo: ammoOf(c) });
+  if (w.view === "brain") { V.drawRows(ctx, W, H, brainRowsOf(c), { title: `${nameOf(c)} · ${c.bomber ? pilots.b.label : pilots.f.label}` }); return; }
+  ctx.fillStyle = "#cfe0f5"; ctx.fillText(w.view === "plane" ? `${nameOf(c)}${c.status !== "airborne" ? ` — ${c.status}` : ""}` : hud, 4, H - 5);
+  if (w.view === "pilot") { ctx.fillStyle = "#7fe0a0"; ctx.fillRect(Math.round(W / 2) - 6, Math.round(H / 2), 13, 1); ctx.fillRect(Math.round(W / 2), Math.round(H / 2) - 6, 1, 13); }
+  if (w.view === "gunner") {
+    if (c.seats.length) {
+      const st = c.seats[w.seat], cam = cameraOf(w, c), foe = st.last && st.last.target != null ? arena.crafts.find((o) => o.id === st.last.target) : null;
+      w.sight = drawSight(ctx, cam, seatMuzzle(c, w.seat), foe, st.seat.gun, W, H);
+      ctx.fillStyle = "#9fb2d4"; ctx.fillText(`yaw ${(st.state.yaw * R2D).toFixed(0)}°  pitch ${(st.state.pitch * R2D).toFixed(0)}°  rounds ${st.state.gun.ammo}`, 4, H - 17);
+      if (st.last && st.last.fire) { ctx.fillStyle = "#ff6b6b"; ctx.fillText("FIRE", W - 32, 12); }
+    } else {
+      const cam = V.gunSightCamera(c.state, { spec: c.spec, draw: drawFor(c) }), foe = c.last && c.last.foe ? arena.crafts.find((o) => o.id === c.last.foe) : null;
+      w.sight = drawSight(ctx, cam, G.muzzleOf(c.state, c.spec), foe, c.spec, W, H);
+      if (c.last && c.last.fire) { ctx.fillStyle = "#ff6b6b"; ctx.fillText("FIRE", W - 32, 12); }
+      if (c.last && c.last.held) { ctx.fillStyle = "#f6a623"; ctx.fillText("HOLD — a team-mate in the line", W - 176, 24); }
+    }
+  }
+}
+function renderWindows() {
+  const cr = renderer.domElement.getBoundingClientRect(), live = arena.crafts;
+  renderer.setScissorTest(true);
+  for (const w of wins) {
+    const c = live[w.i], r = w.gl.getBoundingClientRect(), W = Math.max(2, Math.round(r.width)), H = Math.max(2, Math.round(r.height));
+    if (w.ov.width !== W || w.ov.height !== H) { w.ov.width = W; w.ov.height = H; }
+    setLabel(w);
+    const x = r.left - cr.left, y = cr.bottom - r.bottom;
+    renderer.setViewport(x, y, r.width, r.height); renderer.setScissor(x, y, r.width, r.height);
+    if (w.view === "brain") { const bg = renderer.getClearColor(new THREE.Color()); renderer.setClearColor(0x050805, 1); renderer.clear(); renderer.setClearColor(bg, 1); }
+    else {
+      cameraLike(cameraOf(w, c), r.width, r.height);
+      const hide = w.view !== "plane"; if (hide) meshes[w.i].visible = false;
+      renderer.render(scene, winCam);
+      if (hide) meshes[w.i].visible = true;
+    }
+    drawOverlay(w, c, W, H);
+  }
+  renderer.setScissorTest(false); renderer.setViewport(0, 0, innerWidth, innerHeight);
+}
+
+// ---- the big picture ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
+function updateCamera(snap = false) {
+  const mode = el("camMode").value; orbit.enabled = mode === "orbit";
+  if (mode === "orbit") { const m = arena.crafts[0].state.pos; orbit.target.set(m[0], m[1], m[2]); orbit.update(); return; }
+  let spec;
+  if (mode === "overview") spec = V.overviewCamera(arena.crafts.map((c) => c.state), { aspect: innerWidth / innerHeight, fov: camera.fov / R2D });
+  else { const c = arena.crafts[mode === "chase1" ? Math.min(1, arena.crafts.length - 1) : 0]; spec = V.planeCamera(c.state, { draw: drawFor(c) }); }
+  if (snap) { camPos.set(...spec.eye); camLook.set(...spec.target); } else { camPos.lerp(new THREE.Vector3(...spec.eye), 0.15); camLook.lerp(new THREE.Vector3(...spec.target), 0.2); }
+  camera.position.copy(camPos); camera.lookAt(camLook);
+}
+function syncScene(dt) {
+  const showSpheres = el("spheres").checked;
+  arena.crafts.forEach((c, i) => {
+    const p = c.state.pos, pq = RB.toPoseQuat(c.state.q), m = meshes[i];
+    m.position.set(p[0], p[1], p[2]); m.quaternion.set(pq[0], pq[1], pq[2], pq[3]);
+    if (c.bomber) {
+      c.seats.forEach((s, k) => { const d = GS.dirAt(s.seat, s.state.yaw, s.state.pitch), t = m.userData.turrets[k]; t.barrel.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(d[0], d[1], d[2])); });
+      for (const e of m.userData.engines) { const out = c.engineHp.get(e.id) <= 0; if (!deadShown[i]) e.nac.material = out ? ENGINE_DEAD : e.mat; e.disc.visible = !out && c.status === "airborne"; }
+      for (const s of m.userData.spheres) s.visible = showSpheres;
+    }
+    if (c.status !== "airborne" && !deadShown[i]) { deadShown[i] = true; for (const h of m.userData.hull) h.material = HULL_DEAD; }
+    if (arena.i % 3 === 0 && c.status === "airborne") {
+      const arr = trails[i].geometry.attributes.position.array, n = Math.min(trailN[i] + 1, 240);
+      if (trailN[i] >= 240) arr.copyWithin(0, 3); const k = Math.min(trailN[i], 239) * 3; arr[k] = p[0]; arr[k + 1] = p[1]; arr[k + 2] = p[2];
+      trailN[i] = n; trails[i].geometry.attributes.position.needsUpdate = true; trails[i].geometry.setDrawRange(0, n);
+    }
+  });
+  let nb = 0, nf = 0; const ab = tracerB.geom.attributes.position.array, af = tracerF.geom.attributes.position.array;
+  for (const r of arena.rounds) {
+    const isB = r.owner === arena.crafts[0].id, arr = isB ? ab : af, n = isB ? nb : nf; if (n >= MAX_ROUNDS) continue;
+    arr[n * 6] = r.pos[0]; arr[n * 6 + 1] = r.pos[1]; arr[n * 6 + 2] = r.pos[2]; arr[n * 6 + 3] = r.pos[0] - r.vel[0] * 0.05; arr[n * 6 + 4] = r.pos[1] - r.vel[1] * 0.05; arr[n * 6 + 5] = r.pos[2] - r.vel[2] * 0.05;
+    if (isB) nb++; else nf++;
+  }
+  tracerB.geom.attributes.position.needsUpdate = true; tracerB.geom.setDrawRange(0, nb * 2); tracerF.geom.attributes.position.needsUpdate = true; tracerF.geom.setDrawRange(0, nf * 2);
+  for (let k = flashes.length - 1; k >= 0; k--) { const f = flashes[k]; f.userData.age += dt; f.scale.setScalar(1 + f.userData.age * 14); f.material.opacity = Math.max(0, 1 - f.userData.age / 0.5); if (f.userData.age > 0.5) { scene.remove(f); f.geometry.dispose(); f.material.dispose(); flashes.splice(k, 1); } }
+}
+
+// ---- the board ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+function renderNote() { el("note").textContent = wins.length ? "click a window to switch it: plane · pilot · gun seats (the bomber) · gunner (a fighter) · brain" : ""; }
+function updateBoard() {
+  const board = el("board");
+  if (board.children.length !== arena.crafts.length) { board.textContent = ""; arena.crafts.forEach((c, i) => { const d = document.createElement("div"); d.className = "card" + (c.bomber ? "" : " f"); d.id = "card" + i; board.appendChild(d); }); }
+  arena.crafts.forEach((c, i) => {
+    const a = F.attitude(c.state), st = c.status === "airborne" ? `<span class="good">flying</span>` : `<span class="bad">${c.status.toUpperCase()}</span>`, left = Math.max(0, c.hp - c.taken);
+    let extra;
+    if (c.bomber) extra = `<div class="row">engines ${c.bomber.engines.map((id) => (c.engineHp.get(id) > 0 ? "●" : "○")).join(" ")} ${c.enginesRunning} of 4   gunners (hand rule): ${c.seats.map((s) => s.state.gun.fired).join(" · ")} rounds fired by seat   hits landed ${c.hits}</div>`;
+    else extra = `<div class="row">hits landed ${c.hits}${c.friendlyHits ? `   FRIENDLY ${c.friendlyHits}` : ""}   rounds ${c.gun.ammo} left (${c.gun.fired} fired)${c.held ? `   held fire ${c.held} ticks` : ""}</div>`;
+    el("card" + i).innerHTML = `<b>${nameOf(c)}</b> · ${c.bomber ? pilots.b.label : pilots.f.label} · ${st}<div class="bar"><i style="width:${(100 * left / c.hp).toFixed(0)}%"></i></div>` +
+      `<div class="row">hit points ${left}/${c.hp}</div>${extra}` +
+      `<div class="row">V ${a.airspeed.toFixed(1)} m/s  alt ${a.altitude.toFixed(0)} m  hdg ${(a.heading * R2D).toFixed(0)}°  α ${(a.alpha * R2D).toFixed(1)}°</div>`;
+  });
+  const t = BF.tally(arena);
+  el("stat").textContent = `${fight.scenario.kind} ${fight.scenario.seed} · t ${arena.t.toFixed(1)} s · ${t.killed} of ${arena.crafts.length - 1} fighters down${arena.done ? ` · OVER (${t.winner === "none" ? "no winner" : t.winner + " win"})` : ""}`;
+  el("log").textContent = log.join("\n"); el("log").style.display = log.length ? "block" : "none";
+}
+
+// ---- controls ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+function fillSelect(sel) { const keep = sel.value; sel.textContent = ""; for (const c of CHOICES) { const o = document.createElement("option"); o.value = c.id; o.textContent = c.label + (available(c) ? "" : " — not available"); o.disabled = !available(c); sel.appendChild(o); } if (keep) sel.value = keep; }
+function fillRosters() { fillSelect(el("pilotF")); fillSelect(el("pilotB")); }
+el("newBtn").onclick = () => newFight();
+for (const id of ["kind", "pilotF", "pilotB", "gunners", "nfight", "hold", "seed"]) el(id).onchange = () => newFight();
+el("pauseBtn").onclick = () => { paused = !paused; el("pauseBtn").textContent = paused ? "▶ Play" : "❚❚ Pause"; };
+el("stepBtn").onclick = () => { paused = true; el("pauseBtn").textContent = "▶ Play"; if (!arena.done) tickOnce(); };
+addEventListener("keydown", (e) => { if (e.code === "Space" && !/^(INPUT|SELECT|BUTTON)$/.test((e.target && e.target.tagName) || "")) { e.preventDefault(); el("pauseBtn").click(); } });
+addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); if (arena) buildWindows(); });
+
+let last = performance.now(), acc = 0;
+function renderFrame(dt = 0, snap = false) { syncScene(dt); updateCamera(snap); updateBoard(); renderer.setViewport(0, 0, innerWidth, innerHeight); renderer.render(scene, camera); renderWindows(); }
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  if (arena && !paused && !held) {
+    acc += dt * Number(el("timeScale").value); let n = 0;
+    while (acc >= A.DT && n < 16 && !arena.done) { tickOnce(); acc -= A.DT; n++; } if (acc > A.DT * 16) acc = 0;
+  }
+  if (arena) renderFrame(dt);
+  requestAnimationFrame(frame);
+}
+
+// ---- boot: the pilots' files first, then the fight ------------------------------------------------------------------------------------------------------------------------------------------------------
+const params = new URLSearchParams(location.search);
+const ready = Promise.allSettled(CHOICES.filter((c) => c.file).map((c) => loadChoice(c))).then(() => {
+  fillRosters();
+  const pick = (k, dflt) => { const v = params.get(k); return CHOICES.some((c) => c.id === v && available(c)) ? v : dflt; };
+  newFight({ kind: BF.KINDS.includes(params.get("kind")) ? params.get("kind") : "beam", seed: Number(params.get("seed")) || 1, fighters: Number(params.get("fighters")) || 3, gunners: BF.GUNNERS[params.get("gunners")] ? params.get("gunners") : BF.DEFAULT_GUNNERS,
+    f: pick("f", available(CHOICES[3]) ? "dogfight" : "hand"), b: pick("b", "pd"), hold: params.get("hold") !== "0" });
+  requestAnimationFrame(frame);
+});
+
+// a debug hook: exact numeric state, a clock the gate drives, the windows and what they show (tools/ship/bomberPage-selfcheck.mjs)
+const pixelStats = (i) => {
+  renderFrame(0); const gl = renderer.getContext(), w = wins[i], cr = renderer.domElement.getBoundingClientRect(), r = w.gl.getBoundingClientRect(), dpr = renderer.getPixelRatio();
+  const x = Math.round((r.left - cr.left) * dpr), y = Math.round((cr.bottom - r.bottom) * dpr), W = Math.round(r.width * dpr), H = Math.round(r.height * dpr), buf = new Uint8Array(W * H * 4);
+  gl.readPixels(x, y, W, H, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+  const seen = new Set(); let sum = [0, 0, 0];
+  for (let k = 0; k < buf.length; k += 4) { seen.add(((buf[k] >> 4) << 8) | ((buf[k + 1] >> 4) << 4) | (buf[k + 2] >> 4)); sum[0] += buf[k]; sum[1] += buf[k + 1]; sum[2] += buf[k + 2]; }
+  const n = buf.length / 4; return { w: W, h: H, distinct: seen.size, mean: sum.map((v) => v / n) };
+};
+const inkColor = (i, rgb, tol = 30) => { const w = wins[i], d = w.ctx.getImageData(0, 0, w.ov.width, w.ov.height).data; let n = 0; for (let k = 0; k < d.length; k += 4) if (d[k + 3] > 100 && Math.abs(d[k] - rgb[0]) <= tol && Math.abs(d[k + 1] - rgb[1]) <= tol && Math.abs(d[k + 2] - rgb[2]) <= tol) n++; return n; };
+const overlayInk = (i) => { const w = wins[i], d = w.ctx.getImageData(0, 0, w.ov.width, w.ov.height).data; let n = 0; for (let k = 3; k < d.length; k += 4) if (d[k] > 0) n++; return n; };
+window.__bomber = {
+  ready,
+  state() { return { tick: arena.i, t: arena.t, done: arena.done, over: arena.over, scenario: { kind: fight.scenario.kind, seed: fight.scenario.seed }, closest: arena.closest, rounds: arena.rounds.length,
+    crafts: arena.crafts.map((c) => ({ id: c.id, team: c.team, name: c.name, status: c.status, pos: c.state.pos.slice(), vel: c.state.vel.slice(), hits: c.hits, taken: c.taken, hp: c.hp, fired: c.gun.fired, ammo: c.gun.ammo, friendlyHits: c.friendlyHits, held: c.held, holdFire: c.holdFire, enginesRunning: c.enginesRunning,
+      seats: c.seats.map((s) => ({ id: s.seat.id, name: s.seat.name, yaw: s.state.yaw, pitch: s.state.pitch, fired: s.state.gun.fired, ammo: s.state.gun.ammo, last: s.last && { fire: s.last.fire, target: s.last.target } })), last: c.last && { foe: c.last.foe, fire: c.last.fire, held: c.last.held, target: c.last.target, controls: c.last.controls } })),
+    log: log.slice(), pilots: { f: { id: pilots.f.id, label: pilots.f.label }, b: { id: pilots.b.id, label: pilots.b.label } }, gunners: fight.gunners }; },
+  tally: () => BF.tally(arena),
+  brainRows: (i) => brainRowsOf(arena.crafts[i]).map((r) => ({ label: r.label || `${r.who[0]} ${r.layer}`, layer: r.layer, n: r.values.length, values: r.values.slice() })),
+  // a debug aid for the gate: n rounds dropped from 15 m above the named hull sphere of the bomber, owned by the first fighter (so a hit is an enemy hit)
+  shoot(partName, n = 1) { const c = arena.crafts[0], p = BM.partCentres(c.bomber, c.state).find((q) => q.name === partName); if (!p) return 0; for (let k = 0; k < n; k++) arena.rounds.push({ pos: [p.center[0], p.center[1], p.center[2] + 15 + 3 * k], vel: [c.state.vel[0], c.state.vel[1], c.state.vel[2] - 300], age: 0, owner: arena.crafts[1].id }); return n; },
+  step(n = 1) { for (let i = 0; i < n && !arena.done; i++) tickOnce(); renderFrame(0); },
+  hold(on = true) { held = !!on; }, pause(on = true) { paused = !!on; },
+  newFight,
+  windows: () => wins.map((w) => ({ craft: w.i, view: w.view, seat: w.seat, label: w.label.textContent, bg: getComputedStyle(w.el).backgroundColor, rect: (({ x, y, width, height }) => ({ x, y, width, height }))(w.gl.getBoundingClientRect()) })),
+  clickWindow(i) { wins[i].el.dispatchEvent(new MouseEvent("click", { bubbles: true })); renderFrame(0); return { view: wins[i].view, seat: wins[i].seat }; },
+  setView(i, v, seat = 0) { wins[i].view = v; wins[i].seat = seat; setLabel(wins[i]); renderFrame(0); }, pixels: pixelStats, ink: overlayInk, inkColor,
+  sight: (i) => wins[i].sight, texts: (i) => wins[i].texts.slice(),
+  turretAim: (k) => { const m = meshes[0].userData.turrets[k].barrel.quaternion; return [m.x, m.y, m.z, m.w]; },
+  engineShown: () => meshes[0].userData.engines.map((e) => ({ out: e.nac.material === ENGINE_DEAD, disc: e.disc.visible })),
+  spheresShown: () => meshes[0].userData.spheres.map((s) => s.visible),
+  mainCamera: () => ({ pos: camera.position.toArray(), look: camLook.toArray() }),
+  settleCamera() { renderFrame(0, true); },
+  mainView() { const v = new THREE.Vector3(); return arena.crafts.map((c) => { v.set(...c.state.pos).project(camera); return [v.x, v.y, v.z]; }); },
+  get paused() { return paused; },
+  roster: { forget(id) { loaded.delete(id); fillRosters(); }, get choices() { return [...el("pilotF").options].map((o) => ({ id: o.value, disabled: o.disabled })); }, get labels() { return [pilots.f.label, pilots.b.label]; }, error: (id) => errors.get(id) || null, loaded: (id) => loaded.has(id), loadChoice: (id, url) => loadChoice(CHOICES.find((c) => c.id === id), url), refill: fillRosters },
+};
+</script>
+</body>
+</html>
