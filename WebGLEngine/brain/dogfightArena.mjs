@@ -17,8 +17,14 @@
 //             GUN SEATS has a gunner (gunSeats.handGunner by default, one per seat; `gunner(seat, index)` gives another) that is shown the enemy craft still flying and turns its seat and fires its twin gun through gunSeats.stepSeat, the rounds
 //             owned by the bomber. A craft with no bomber is exactly what it was.
 // WHAT IS NOT HERE, SAID PLAINLY: a destroyed craft does not fall (the fight of two ends the tick one is destroyed, as dogfightTask's does; a falling wreck is the page's to draw), no wind (still air, as the task's), one fixed forward gun per
-// craft (gun SEATS are physics/mechanics/gunSeats.mjs and join this in the bomber's slice), and no friendly-fire rule beyond "a round does not hit its owner" (flightGuns.stepRounds'). stepArena() MUTATES the arena it is given: the page's
-// loop is one object stepped 30 times a second. Pure otherwise: no DOM, no clock, no random.
+// craft (the gun SEATS of a bomber are physics/mechanics/gunSeats.mjs's, above). stepArena() MUTATES the arena it is given: the page's loop is one object stepped 30 times a second. Pure otherwise: no DOM, no clock, no random.
+//
+//   FRIENDLY FIRE   a round hits whatever it reaches but its owner -- a team-mate too -- and that is a MEASURED PROBLEM here, not a hypothetical: three fighters closing on one bomber from the same side shoot through one another (the
+//             first exploratory fights counted 29 friendly hits against 0.2 on the bomber). So two things. (1) THE ACCOUNTING: a hit on a team-mate takes the victim's hit points but is NOT credited to the shooter as a hit dealt (`hits`, the
+//             score and `firstHitAt` are the enemy's); it is counted in the shooter's `friendlyHits` and the victim's `friendlyTaken`, and the event says `friendly: true`. (2) A HOLD-FIRE RULE, a craft's `holdFire` (default true): a fixed gun
+//             does not fire while a round fired along its bore -- the round's own ballistic path against the team-mate's straight path -- would pass within the team-mate's size plus HOLD_FIRE_MARGIN (2 m) of it inside the time the
+//             enemy's range would take; the trigger held back is counted in `held`. The rule is a HAND RULE (a pilot who will not shoot through his wingman), chosen, not trained, and it covers the fixed guns: the gunners of a bomber's seats do
+//             not look for team-mates (a bomber's own hull is excluded by the round's owner; another friendly craft in a formation is not).
 "use strict";
 import * as F from "../physics/mechanics/flightModel6dof.mjs";
 import * as G from "../physics/mechanics/flightGuns.mjs";
@@ -29,6 +35,7 @@ import * as BM from "../physics/mechanics/bomber.mjs";
 import * as SC from "../physics/mechanics/froudeScale.mjs";
 
 export const DT = D.DT, COLLISION_RANGE = D.COLLISION_RANGE;
+export const HOLD_FIRE_MARGIN = 2;   // m: the clearance a fixed gun wants from a team-mate along the path of its round
 const still = Object.freeze([0, 0, 0]);
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const norm = (a) => Math.hypot(a[0], a[1], a[2]);
@@ -49,7 +56,7 @@ export function createArena({ crafts, dt = DT, seconds = D.SECONDS, model = AF.d
         const bomber = c.bomber || null, m = c.model || (bomber ? bomber.model : model), sp = c.spec || spec, state = F.createState({ ...c.state, mass: m.mass, inertia: m.inertia });
         const seats = bomber ? bomber.seats.map((seat, k) => ({ seat, state: GS.createSeatState(seat), decide: c.gunner ? c.gunner(seat, k) : GS.handGunner({ seed: c.id * 100 + k }), last: null })) : [];
         return { id: c.id, team: c.team ?? c.id, name: c.name || `craft ${c.id}`, pilot: bomber ? SC.scalePilot(c.pilot, bomber.scale) : c.pilot, behaviour: c.behaviour || "hunt", script: c.script || null, fires: c.fires !== false, model: m, spec: sp, hp: c.hp ?? (bomber ? bomber.hp : sp.hp),
-            state, gun: G.createGun(sp), hits: 0, taken: 0, status: "airborne", firstHitAt: null, killedAt: null, minAltitude: Infinity, maxAlpha: 0, minV: Infinity, last: null,
+            state, gun: G.createGun(sp), hits: 0, taken: 0, friendlyHits: 0, friendlyTaken: 0, held: 0, holdFire: c.holdFire !== false, status: "airborne", firstHitAt: null, killedAt: null, minAltitude: Infinity, maxAlpha: 0, minV: Infinity, last: null,
             bomber, seats, enginesRunning: bomber ? bomber.engines.length : 0, engineHp: new Map(bomber ? bomber.engines.map((id) => [id, bomber.parts[id].hp]) : []), aimRadius: c.aimRadius ?? (bomber ? 0.35 * bomber.span : sp.hitRadius), partHits: new Map() };
     });
     return { dt, seconds, t: 0, i: 0, crafts: made, rounds: [], events: [], closest: Infinity, done: false, over: null };
@@ -74,6 +81,29 @@ export function nearestFoe(arena, c) {
     return best;
 }
 
+/** The size a craft presents to a round: a bomber's aim radius is its trigger's, a fighter's its gun spec's hit sphere. */
+const sizeOf = (c) => (c.bomber ? c.aimRadius : c.spec.hitRadius);
+/**
+ * Would a round fired now from c's fixed gun pass through a team-mate? The round flies as flightGuns.stepRound has it (the muzzle's velocity plus the muzzle speed along the bore, gravity pulling it down) and the team-mate flies straight on
+ * the velocity it has; the question is whether they come within the team-mate's size plus HOLD_FIRE_MARGIN of each other before `reach` seconds are up. The closest approach is found by sampling every 20 ms and refining the best sample
+ * (the relative speed is 300 m/s, so a sample alone is 6 m wide). Returns { craft, miss } for the team-mate the round passes nearest, or null.
+ */
+export function friendInLine(arena, c, reach) {
+    const m = G.muzzleOf(c.state, c.spec), v = [m.vel[0] + m.dir[0] * c.spec.muzzleSpeed, m.vel[1] + m.dir[1] * c.spec.muzzleSpeed, m.vel[2] + m.dir[2] * c.spec.muzzleSpeed], g = G.GRAVITY;
+    let best = null;
+    for (const f of arena.crafts) {
+        if (f === c || f.team !== c.team || !flying(f)) continue;
+        const at = (t) => Math.hypot(m.pos[0] + v[0] * t - (f.state.pos[0] + f.state.vel[0] * t), m.pos[1] + v[1] * t - (f.state.pos[1] + f.state.vel[1] * t), m.pos[2] + v[2] * t - 0.5 * g * t * t - (f.state.pos[2] + f.state.vel[2] * t));
+        let bt = 0, bd = at(0);
+        for (let t = 0.02; t <= reach + 1e-9; t += 0.02) { const d = at(t); if (d < bd) { bd = d; bt = t; } }
+        let lo = Math.max(0, bt - 0.02), hi = Math.min(reach, bt + 0.02);
+        for (let i = 0; i < 40; i++) { const m1 = lo + (hi - lo) / 3, m2 = hi - (hi - lo) / 3; if (at(m1) < at(m2)) hi = m2; else lo = m1; }
+        bd = Math.min(bd, at((lo + hi) / 2));
+        if (bd < sizeOf(f) + HOLD_FIRE_MARGIN && (best === null || bd < best.miss)) best = { craft: f, miss: bd };
+    }
+    return best;
+}
+
 /** One tick of every craft and every round. Mutates and returns the arena; a finished arena is returned untouched. `arena.events` is this tick's: [{ type: "hit" | "kill" | "ended" | "collision", ... }]. */
 export function stepArena(arena) {
     if (arena.done) return arena;
@@ -86,10 +116,14 @@ export function stepArena(arena) {
         if (c.behaviour === "script") target = c.script(t);
         else if (foe) target = D.pursuit(c.state, foe.state, c.spec).target;
         else target = { heading: F.attitude(c.state).heading, altitude: c.state.pos[2], airspeed: F.attitude(c.state).airspeed };
-        if (foe && c.fires) fire = D.fireControl(c.state, foe.state, c.gun, c.spec, foe.aimRadius).fire;
+        let held = false;
+        if (foe && c.fires) {
+            const fc = D.fireControl(c.state, foe.state, c.gun, c.spec, foe.aimRadius); fire = fc.fire;
+            if (fire && c.holdFire && friendInLine(arena, c, Math.min(c.spec.life, fc.range / c.spec.muzzleSpeed + 0.15))) { fire = false; held = true; c.held += 1; }
+        }
         const controls = c.pilot(c.state, target, still);
         plan.set(c, { target, controls, fire, foe });
-        c.last = { target, controls, fire, foe: foe ? foe.id : null };
+        c.last = { target, controls, fire, held, foe: foe ? foe.id : null };
     }
     for (const c of alive) {
         const p = plan.get(c), shot = G.fire(c.gun, c.state, !!p.fire, dt, c.id);
@@ -113,9 +147,11 @@ export function stepArena(arena) {
     const byId = new Map(arena.crafts.map((c) => [c.id, c]));
     for (const h of res.hits) {
         const victim = byId.get(h.target), shooter = byId.get(h.owner);
-        victim.taken += shooter.spec.damage; shooter.hits += shooter.spec.damage;
-        if (shooter.firstHitAt === null) shooter.firstHitAt = (arena.i + 1) * dt;
-        events.push({ type: "hit", t: (arena.i + 1) * dt, shooter: shooter.id, victim: victim.id, point: h.point, ...(h.part !== undefined ? { part: h.part } : {}) });
+        const friendly = victim.team === shooter.team;
+        victim.taken += shooter.spec.damage;
+        if (friendly) { shooter.friendlyHits += shooter.spec.damage; victim.friendlyTaken += shooter.spec.damage; }
+        else { shooter.hits += shooter.spec.damage; if (shooter.firstHitAt === null) shooter.firstHitAt = (arena.i + 1) * dt; }
+        events.push({ type: "hit", t: (arena.i + 1) * dt, shooter: shooter.id, victim: victim.id, point: h.point, friendly, ...(h.part !== undefined ? { part: h.part } : {}) });
         if (h.part !== undefined) {
             victim.partHits.set(h.part, (victim.partHits.get(h.part) || 0) + shooter.spec.damage);
             if (victim.engineHp.has(h.part)) {
