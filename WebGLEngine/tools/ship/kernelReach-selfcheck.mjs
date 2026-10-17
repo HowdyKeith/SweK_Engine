@@ -6,6 +6,11 @@
 // IMPORTING 107 producer modules to hash the shader text each one yields: that is what makes two names for one
 // kernel resolve to one kernel rather than to a guess about naming conventions. quickSweep re-runs an
 // over-budget gate serially per v4408 and files an ALONE reading.
+// v4871 -- *** IT HAD BECOME 553 s, AND NOTHING SAW IT UNTIL THE FULL SERIAL RE-TAKE TIMED IT AT 563 s. *** The cost was
+// tools/ship/kernelReach.mjs running noComments over every file again for every producer (152 x 5,305 files); each
+// file is stripped once now. RUNTIME 55442 ms ALONE (median of 55442/58097/54828), the output identical line for line
+// to the 553 s run's with the timings masked. SABOTAGED v4871, each restored and md5-checked: the stripping cache holding raw
+// text -> 0 RED at first, so the fixture fx/d/notes.js was added and it is 2 RED; `inside` read off the wrong file -> 3 RED.
 //
 // SABOTAGE: 6 mutations, 6 caught, no 0-RED. Restored and md5-checked against a sentinel taken first.
 //   M1 the module-dispatch route dropped -> 3 rows red, and the tree's count went 17 -> 39, which is the size of
@@ -66,6 +71,12 @@ console.log("1. *** THE CLASSIFIER, DRIVEN ON ALL FOUR WAYS A KERNEL CAN BE REAC
         // (d) UNREACHABLE: the only thing naming it is a gate
         "fx/d/dWgsl.mjs": "const D_WGSL = `@compute fn main() {}`;\nexport { D_WGSL };",
         "fx/d/d-selfcheck.mjs": "import { D_WGSL } from './dWgsl.mjs'; console.log(D_WGSL);",
+        // ...and a non-gate file that names it only in COMMENTS, one of them trailing code (v4637's case: a line that
+        // starts with code is not skipped by the line test, so only noComments keeps it out). v4871 -- kernelReach strips each
+        // file once (codeOf) instead of inside useSites; this file is what holds that path to the stripping, which the
+        // useSites rows below cannot see. SABOTAGED v4871: codeOf caching the raw text -> 2 RED ("a kernel only a GATE names"
+        // and the probe row, 0 unreachable). Before this file existed the same sabotage went 0 RED -- the gap the change opened.
+        "fx/d/notes.js": "// D_WGSL was the first draft's kernel\nexport const retired = 1;   // see D_WGSL in fx/d\n",
         // (e) a PROBE: named for what it is, and owed no runtime caller
         "fx/e/eWgsl.mjs": "const E_PROBE_WGSL = `@compute fn main() {}`;\nexport { E_PROBE_WGSL };",
     };

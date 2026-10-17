@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/populationCensus.mjs",
  "roots": "physics,simulation,fluid",
- "total": 559,
+ "total": 560,
  "areas": {
   "fluid": 8,
   "physics/acoustics": 2,
@@ -28,7 +28,7 @@
   "physics/jolt": 3,
   "physics/langevin": 1,
   "physics/md": 13,
-  "physics/mechanics": 13,
+  "physics/mechanics": 14,
   "physics/mesh": 27,
   "physics/mpm": 14,
   "physics/nuclear": 4,
@@ -213,6 +213,7 @@
   "physics/mechanics/aircraftAssembly.mjs",
   "physics/mechanics/contactImpulse.mjs",
   "physics/mechanics/contactKeys.mjs",
+  "physics/mechanics/flightModel6dof.mjs",
   "physics/mechanics/fragmentRotation.mjs",
   "physics/mechanics/freeRotation.mjs",
   "physics/mechanics/pendulumExact.mjs",

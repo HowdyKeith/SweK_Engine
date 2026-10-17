@@ -80,8 +80,6 @@ export const classOf = (symbol) =>
  * kernel in it look used by its own module.
  */
 export function useSites(src, sym) {
-    const word = new RegExp("\\b" + sym.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b");
-    let n = 0;
     // *** v4637 -- A LINE-ORIENTED COMMENT TEST CANNOT SEE A TRAILING ONE, AND THE BIGGEST COMMENT IN THIS
     // TREE IS A TRAILING ONE. *** The loop below skips a line whose FIRST characters are `//`, which is every
     // comment except the one that matters most: `const ENGINE_VERSION = "vNNNN";   // vNNNN -- <the round
@@ -97,7 +95,19 @@ export function useSites(src, sym) {
     // it reached then: "A PATH IS TEXT THE CODE CONTAINS; A CHANGELOG IS A COMMENT", solved by noComments().
     // That is the scanner used here: it tracks strings, template literals, block comments and regex literals,
     // so it strips a comment wherever it starts rather than only at a line's head.
-    src = noComments(String(src));
+    return useSitesInCode(noComments(String(src)), sym);
+}
+// v4871 -- *** THE SAME COUNT ON TEXT noComments HAS ALREADY STRIPPED, SO kernelReach STRIPS EACH FILE ONCE. ***
+// kernelReach asked useSites of every source file for every producer, and useSites ran noComments -- a scanner
+// that walks the text a character at a time -- on each call: 152 producers x 5,305 files x 100 MB. The serial
+// re-take (2026-10-16) timed the gate at 563 s, and alone at 553 s, against the 25.6 s its header and the sweep
+// had carried since v4589. v4637 put the scanner in useSites, and the sweep's reading never moved off 25.6 s.
+// The count is unchanged: the same lines of the same stripped text, and a file the symbol never appears in
+// (the word test over the whole text) has no line that could count.
+function useSitesInCode(src, sym) {
+    const word = new RegExp("\\b" + sym.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b");
+    if (!word.test(src)) return 0;
+    let n = 0;
     for (const line of src.split("\n")) {
         if (!word.test(line)) continue;
         if (new RegExp("(export\\s+)?(const|let|var|function)\\s+" + sym + "\\b").test(line)) continue;
@@ -132,6 +142,8 @@ export async function kernelReach({ producers = null, files = null, read = null,
     const all = files || treeFiles();
     const rd = read || ((f) => { try { return fs.readFileSync(path.join(ENG, f), "utf8"); } catch { return ""; } });
     const srcOf = new Map(all.map((f) => [f, rd(f)]));
+    // v4871 -- each file's text with its comments stripped, made once on first ask (see useSitesInCode)
+    const stripped = new Map(), codeOf = (f) => { let c = stripped.get(f); if (c === undefined) stripped.set(f, c = noComments(String(srcOf.get(f) || ""))); return c; };
     // pathToFileURL, not the bare path: Node's ESM loader rejects a raw filesystem path on Windows, where
     // C:\\... reads as a URL scheme. Caught by tools/ship/windowsImport-selfcheck.mjs at the v4645 merge --
     // main's v4642 repaired the same shape in trellisAutoRig-selfcheck and this one arrived from the other
@@ -155,8 +167,8 @@ export async function kernelReach({ producers = null, files = null, read = null,
         // was built for exactly this question on the defining file and skips comment, declaration and
         // re-export lines; asking it here makes the two halves of the same census agree on what a use is.
         const outside = all.filter((f) => f !== p.file && !isGate(f) && !isTool(f) &&
-                                          useSites(srcOf.get(f) || "", p.symbol) > 0);
-        const inside = useSites(srcOf.get(p.file) || "", p.symbol);
+                                          useSitesInCode(codeOf(f), p.symbol) > 0);
+        const inside = useSitesInCode(codeOf(p.file), p.symbol);
         const modImporters = importersOf(p.file).filter((f) => !isGate(f) && !isTool(f));
         let text = null;
         try {

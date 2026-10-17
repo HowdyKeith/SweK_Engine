@@ -103,7 +103,17 @@
 // tools/ship/genGateMeasure-selfcheck.mjs at 174,853 ms, above domScope's 166,680, and gateBudget-selfcheck went red on
 // the same line. Timed a second time, alone: 217,392 ms, exit 0. The two disagree as domScope's did, and the LARGER is
 // the basis. The default moves 500.0 s -> 652.2 s with this line. (domScope's own reading in that run was below this.)
-export const SLOWEST_GENERAL = { gate: "tools/ship/genGateMeasure-selfcheck.mjs", ms: 217392 };
+//
+// *** v4871 -- RE-PINNED TO tacticsTrain, THE SAME WAY. *** The full serial re-take (2026-10-15/16, complete, 1976 gates)
+// recorded tools/ship/tacticsTrain-selfcheck.mjs at 336,419 ms, above genGateMeasure's 217,392, and gateBudget-selfcheck went
+// red on the same line. Timed a second time, alone: 317,028 ms, exit 0. The LARGER is the basis. (The sweep's older alone
+// reading is 383,240 ms; it is not a gate-timings entry, which is what the row compares, and is said here rather than
+// used.) It stays in the general population: one search over arena battles, not a fixture cluster. The re-take also put
+// kernelReach first, at 563 s -- that was a defect, not a cost: each file is now stripped of comments once (v4871,
+// tools/ship/kernelReach.mjs) and the gate is 55 s. The default moves 652.2 s -> 1009.3 s with this line. SABOTAGED v4871:
+// the pin back at 217,392 -> 1 RED (gateBudget-selfcheck's slowest row); sheddingSpectrum's basis back at 120,946 -> 1 RED
+// (budgetProvenance-selfcheck's 3x row). Each restored, md5 verified.
+export const SLOWEST_GENERAL = { gate: "tools/ship/tacticsTrain-selfcheck.mjs", ms: 336419 };
 
 // *** v4580 -- WHAT AN ENTRY IN gate-timings.json IS, WHICH UNTIL NOW NOTHING SAID. ***
 //
@@ -278,10 +288,12 @@ export const MEASURED_RUNS = Object.freeze({
     }),
     // Run here at v4530, three alone, `date +%s%3N` around the process.
     // +1 run from this session's full-suite sweep: gate-timings.json recorded 11565ms, exit 0.
+    // v4871 -- +1 run from the full serial re-take (2026-10-16): gate-timings.json recorded 14130ms, exit 0. Appended, not
+    // replacing: the gate is the same, and the basis is the slowest completion recorded for it.
     "tools/ship/crashDamage-selfcheck.mjs": Object.freeze({
-        observedHere: true, at: "v4530; +1 run from the full-suite sweep this session",
+        observedHere: true, at: "v4530; +1 run from the full-suite sweep this session; +1 from the v4871 serial re-take",
         runs: Object.freeze([{ ms: 9114, code: 0 }, { ms: 9404, code: 0 }, { ms: 9009, code: 0 },
-                             { ms: 11565, code: 0 }]),
+                             { ms: 11565, code: 0 }, { ms: 14130, code: 0 }]),
     }),
     // Run here at v4778, seven times one after another, `date +%s%3N` around the process (the first with %N),
     // on a box other sessions were also using (load average 2.1 to 3.1). FOUR EXITED 0 AND ARE THE ROWS. The
@@ -476,11 +488,11 @@ export const MEASURED = {
     // census, it RUNS gates -- so it is measured here. Basis 140,941 ms, the run overlapping the last two minutes
     // of the knobLiveness stopwatch; the rig at 1.63x would be ~230 s, inside the 282 s this basis buys.
     "tools/ship/redCensus-selfcheck.mjs":            140941,
-    "tools/ship/orphanTriage-selfcheck.mjs":         10719,  // -> lowered to observed 10719ms at v4815 (basis was 431386); the full selfchecks.mjs run and the alone sweep readings agree
+    "tools/ship/orphanTriage-selfcheck.mjs":         10832,  // -> lowered to observed 10719ms at v4815 (basis was 431386); the full selfchecks.mjs run and the alone sweep readings agree; v4871 raised to the serial re-take's 10832ms
     "tools/ship/shaderRefs-selfcheck.mjs":           55601,  // -> lowered to observed 55601ms at v4815 (basis was 288017); the full selfchecks.mjs run and the alone sweep readings agree
     "tools/ship/windTunnel-selfcheck.mjs":            63300,
     "simulation/lbm/inflow-selfcheck.mjs":           111804,
-    "tools/ship/sheddingSpectrum-selfcheck.mjs":     120946,
+    "tools/ship/sheddingSpectrum-selfcheck.mjs":     43074,   // v4871 -- lowered from 120946, above every completion on record, to the slowest one (the 2026-10-06 full run's); the serial re-take read 36280 and the sweep 36066, so the old basis stood 3.3x over (budgetProvenance's bound is 3.2x) -- the way v4815 lowered orphanTriage
     "tools/roundhouse/thermalScaling-selfcheck.mjs": 65216,  // -> lowered to observed 65216ms at v4815 (basis was 232051); the full selfchecks.mjs run and the alone sweep readings agree
     "tools/roundhouse/labExport-selfcheck.mjs":      241111,
     "tools/roundhouse/pipeFlowKey-selfcheck.mjs":    57322,  // -> lowered to observed 57322ms at v4815 (basis was 250473); the full selfchecks.mjs run and the alone sweep readings agree
