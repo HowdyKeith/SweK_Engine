@@ -1,6 +1,6 @@
 // WebGLEngine/brain/seatGunnerPolicy-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/seatGunnerPolicy-selfcheck.mjs      (~3 s)
+// Run: node brain/seatGunnerPolicy-selfcheck.mjs      (~1.5 s)
 //
 // THE FRUIT FLY IN A GUN SEAT, HELD TO ITS CONTRACT. brain/seatGunnerPolicy.mjs puts a network where the hand gunner sat: the sight is the hand gunner's, the network is the hand (a correction to the aim and the trigger).
 //
