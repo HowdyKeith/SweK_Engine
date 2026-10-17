@@ -1,5 +1,5 @@
 {
- "host": "linux-x64-4c-16gb-142c0d",
+ "host": "linux-x64-4c-16gb-420793",
  "note": "OBSERVED at the last quickSweep run: ms per gate (serial where a serial re-run happened) and exit code. *** `kinds` (v4579) SAYS WHICH QUANTITY EACH MS IS: `loaded` is a parallel reading taken with `workers` gates running at once, `alone` is a serial re-run, `capped` is the SIGKILL cap and not a runtime at all. The two real kinds sit about 1.93x apart (v4578), so comparing a ms against anything without knowing its kind is comparing two different quantities -- which is how nine entries came to hold the wrong one. *** Rewritten every run; used only to choose which gates are under the ship-time budget. Not a claim about the tree -- the register is. `at` is PER ENTRY (v4408): the capture that actually observed that gate. `captured` is this run's stamp and applies ONLY to entries whose `at` equals it -- the rest were not run and say so. `crossings` (v4536) counts CONSECUTIVE sweeps on which a gate came in over budget, and it takes two to evict: one crossing is a reading from one hour, and this box moves 12-36% between hours on unchanged code. A gate that comes back under loses its count entirely. `serial` (v4562) is the UNCONTENDED cost -- from a phase-2 run or from this sweep's rotating slice -- while `timings` is a sample taken while seven other gates fought for the box and runs a MEDIAN 2.41x above it. Ask costOf(), not timings[], for what a gate costs. `contended` (v4556) says WHICH of the two `timings[g]` is: true for a parallel sample, false for a serial reading filed there -- by a red re-run, a budget confirm, or sweepRotation. A ratio taken without it divides 164 measurements by themselves. Ask contentionPairs() for the population a contention ratio may be taken over.",
  "kindsInferred": [
   "brain/rl/dock-hazard-selfcheck.mjs",
@@ -2111,7 +2111,8 @@
   "tools/ship/trainFlightPilot-selfcheck.mjs": 81514,
   "brain/pilotFlightMlp-selfcheck.mjs": 1627,
   "brain/pilotFlightGpu-selfcheck.mjs": 13755,
-  "tools/ship/trainFlightPilotGpu-selfcheck.mjs": 69621
+  "tools/ship/trainFlightPilotGpu-selfcheck.mjs": 69621,
+  "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": 12360
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -4099,7 +4100,8 @@
   "tools/ship/trainFlightPilot-selfcheck.mjs": 0,
   "brain/pilotFlightMlp-selfcheck.mjs": 0,
   "brain/pilotFlightGpu-selfcheck.mjs": 0,
-  "tools/ship/trainFlightPilotGpu-selfcheck.mjs": 0
+  "tools/ship/trainFlightPilotGpu-selfcheck.mjs": 0,
+  "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-10-17T13:43:52.982Z",
@@ -6087,7 +6089,8 @@
   "tools/ship/trainFlightPilot-selfcheck.mjs": "2026-10-16T17:41:21.719Z",
   "brain/pilotFlightMlp-selfcheck.mjs": "2026-10-17T13:43:52.982Z",
   "brain/pilotFlightGpu-selfcheck.mjs": "2026-10-16T17:15:36.331Z",
-  "tools/ship/trainFlightPilotGpu-selfcheck.mjs": "2026-10-16T17:16:46.111Z"
+  "tools/ship/trainFlightPilotGpu-selfcheck.mjs": "2026-10-16T17:16:46.111Z",
+  "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": "2026-10-17T23:01:38.072Z"
  },
  "capAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 20000,
@@ -8050,7 +8053,8 @@
   "brain/pilotFlightMlp-selfcheck.mjs": 20000,
   "brain/pilotFlightGpu-selfcheck.mjs": 300000,
   "tools/ship/trainFlightPilotGpu-selfcheck.mjs": 300000,
-  "tools/ship/kernelReach-selfcheck.mjs": 300000
+  "tools/ship/kernelReach-selfcheck.mjs": 300000,
+  "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": 180000
  },
  "finished": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": true,
@@ -10033,7 +10037,8 @@
   "brain/pilotFlightMlp-selfcheck.mjs": true,
   "brain/pilotFlightGpu-selfcheck.mjs": true,
   "tools/ship/trainFlightPilotGpu-selfcheck.mjs": true,
-  "tools/ship/kernelReach-selfcheck.mjs": true
+  "tools/ship/kernelReach-selfcheck.mjs": true,
+  "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": true
  },
  "crossings": {
   "brain/gunnerPolicy-selfcheck.mjs": 2,
@@ -12085,7 +12090,8 @@
   "brain/pilotFlightMlp-selfcheck.mjs": 1627,
   "brain/pilotFlightGpu-selfcheck.mjs": 13755,
   "tools/ship/trainFlightPilotGpu-selfcheck.mjs": 69621,
-  "tools/ship/kernelReach-selfcheck.mjs": 56897
+  "tools/ship/kernelReach-selfcheck.mjs": 56897,
+  "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": 12360
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-10-17T01:42:35.975Z",
@@ -13964,7 +13970,8 @@
   "brain/pilotFlightMlp-selfcheck.mjs": "2026-10-17T13:43:37.738Z",
   "brain/pilotFlightGpu-selfcheck.mjs": "2026-10-16T17:15:36.331Z",
   "tools/ship/trainFlightPilotGpu-selfcheck.mjs": "2026-10-16T17:16:46.111Z",
-  "tools/ship/kernelReach-selfcheck.mjs": "2026-10-17T00:51:15.259Z"
+  "tools/ship/kernelReach-selfcheck.mjs": "2026-10-17T00:51:15.259Z",
+  "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": "2026-10-17T23:01:38.072Z"
  },
  "serialRing": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": [
@@ -23268,6 +23275,9 @@
   ],
   "tools/ship/kernelReach-selfcheck.mjs": [
    56897
+  ],
+  "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": [
+   12360
   ]
  },
  "contended": {
@@ -25147,7 +25157,8 @@
   "brain/pilotFlightMlp-selfcheck.mjs": false,
   "brain/pilotFlightGpu-selfcheck.mjs": false,
   "tools/ship/trainFlightPilotGpu-selfcheck.mjs": false,
-  "tools/ship/kernelReach-selfcheck.mjs": false
+  "tools/ship/kernelReach-selfcheck.mjs": false,
+  "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": false
  },
  "kinds": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "loaded",
@@ -27135,6 +27146,7 @@
   "tools/ship/trainFlightPilot-selfcheck.mjs": "alone",
   "brain/pilotFlightMlp-selfcheck.mjs": "alone",
   "brain/pilotFlightGpu-selfcheck.mjs": "alone",
-  "tools/ship/trainFlightPilotGpu-selfcheck.mjs": "alone"
+  "tools/ship/trainFlightPilotGpu-selfcheck.mjs": "alone",
+  "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": "alone"
  }
 }
