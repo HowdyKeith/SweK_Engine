@@ -28,6 +28,8 @@
 //   T34 the GPU brain's policy id is the fruit fly's 1 | T35 the champion is the worst on held-out 1 | T36 the audit is flown on the train fights 1 | T37 the regular sight is not flown 2
 //   T38 the file's score is the audit's 2 | T39 the file does not quote the hand gunner 2 | T40 a live child moves up to maxK + 1 weights 1 | T41 a live child moves any weight 1
 // THREE WENT 0 RED THE FIRST TIME AND WERE GAPS IN THE GATE: T35 (the champion the worst of the searches), T36 (the audit flown on the train fights) -- run() was only checked on searches that all ended at the hand gunner, so every choice among them was a tie; the row that can tell has a made-up gunner, a search that finds it and one that does not -- and T40 (a live child one weight too big: only the net's own mutate() was measured for size); a row was added for each and each re-run red.
+// AND FIVE MORE ON THE SHIPPED GPU BRAIN FILE (brain/seatGunnerMlpWeightsDefault.json, edited in the scratch worktree, the gate run, the file restored), each red by name:
+//   W1 the file's score is not what the held-out fights give it 1 | W2 the file names the fruit fly's policy 1 | W3 the file quotes a kill the audit does not give 1 | W4 the trigger's bias is moved 1 | W5 the file quotes a different hand gunner's audit 1
 "use strict";
 import fs from "node:fs";
 import * as T from "./trainSeatGunner.mjs";
@@ -137,31 +139,31 @@ console.log("\n8. THE FILE WRITTEN");
 section(() => {
     const fake = (s, k) => ({ score: s, killed: k, damage: 200, wins: 0, rounds: 1000, hits: 900, runs: Array(12).fill({}) });
     for (const [n, m] of Object.entries(NETS)) {
-        const opts = T.parseArgs(["--net", n, "--runs", "2", "--seed", "3010"]), res = { hand: { audit: fake(0.6, 20) }, champion: { seed: 3011, weights: m.handWeights(), kept: 3, moved: 7, heldOut: fake(0.75, 30), audit: fake(0.7, 25) } };
+        const opts = T.parseArgs(["--net", n, "--runs", "2", "--seed", "3010"]), res = { hand: { audit: fake(0.6, 20) }, champion: { seed: 3011, weights: m.handWeights(), kept: 3, moved: 7, heldOut: fake(0.75, 30), audit: fake(0.7, 25) }, others: { perfect: { hand: fake(1.5, 96), champion: fake(1.4, 90) }, ace: { hand: fake(1.5, 96), champion: fake(1.45, 93) }, regular: { hand: fake(1.4, 94), champion: fake(1.42, 95) } } };
         const blob = T.blobOf(m, res, opts), back = PB.importBrain(PB.describePolicy(T.POLICY_ID[n], m), blob);
         ok(`!! THE ${n === "mlp" ? "GPU BRAIN" : "FRUIT FLY"}'S FILE is a swek-brain-v1 blob the page's importBrain accepts (${m.WEIGHT_COUNT} weights, the policy id ${T.POLICY_ID[n]}, the weights back to the bit), whose score is the champion's held-out 0.750 and whose \`by\` names the recipe (seed 3011 of 2 runs 3010..3011, sigma, the weights a child, the iterations, the sight, the pruning: 3 of ${m.WEIGHT_COUNT} differ from the hand gunner) and all three scores in the library's own words`,
-            back.ok && same(Array.from(back.weights), Array.from(m.handWeights())) && blob.weightCount === m.WEIGHT_COUNT && blob.policy === T.POLICY_ID[n] && back.meta.score === 0.75 && blob.by.includes("seed 3011 of 2 runs (3010..3011)") && blob.by.includes("sigma 0.3") && blob.by.includes("1-4 weights per child") && blob.by.includes("green sight") && blob.by.includes(`3 of ${m.WEIGHT_COUNT} weights differ from the hand gunner`) && blob.by.includes(T.describeEval(fake(0.75, 30))) && blob.by.includes(T.describeEval(fake(0.7, 25))) && blob.by.includes(T.describeEval(fake(0.6, 20))) && blob.by.includes("champion picked on held-out") && !!blob.citation, blob.by.slice(0, 60));
+            back.ok && same(Array.from(back.weights), Array.from(m.handWeights())) && blob.weightCount === m.WEIGHT_COUNT && blob.policy === T.POLICY_ID[n] && back.meta.score === 0.75 && blob.by.includes("seed 3011 of 2 runs (3010..3011)") && blob.by.includes("sigma 0.3") && blob.by.includes("1-4 weights per child") && blob.by.includes("green sight") && blob.by.includes(`strict improvements only; 50% of the children bred from the ${m.liveIndices().length} live weights`) && blob.by.includes(`3 of ${m.WEIGHT_COUNT} weights differ from the hand gunner`) && blob.by.includes(T.describeEval(fake(0.75, 30))) && blob.by.includes(T.describeEval(fake(0.7, 25))) && blob.by.includes(T.describeEval(fake(0.6, 20))) && blob.by.includes("champion picked on held-out") && blob.by.includes("perfect 1.500 -> 1.400, ace 1.500 -> 1.450, regular 1.400 -> 1.420") && T.describeOthers(res.others) === "perfect 1.500 -> 1.400, ace 1.500 -> 1.450, regular 1.400 -> 1.420" && !!blob.citation, blob.by.slice(0, 60));
     }
 });
 
 console.log("\n9. THE SHIPPED FILES");
 section(() => {
-    let handHeld = null, handAudit = null;
+    let handHeld = null, handAudit = null, handOthers = null;
     const present = Object.entries(NETS).filter(([n]) => fs.existsSync(T.DEFAULT_OUT[n]));
     if (!present.length) { ok("no gunner network is shipped yet: there is nothing for the page to offer and nothing here to grade (a trainer that finds no network better than the hand gunner ships none)", true); return; }
     for (const [n, m] of present) {
         const blob = JSON.parse(fs.readFileSync(T.DEFAULT_OUT[n], "utf8")), back = PB.importBrain(PB.describePolicy(T.POLICY_ID[n], m), blob);
-        handHeld ??= T.evaluate(m, null, T.HELD_OUT_FIGHTS); handAudit ??= T.evaluate(m, null, T.AUDIT_FIGHTS);
-        const h = T.evaluate(m, back.weights, T.HELD_OUT_FIGHTS), a = T.evaluate(m, back.weights, T.AUDIT_FIGHTS);
-        ok(`!! THE SHIPPED ${n === "mlp" ? "GPU BRAIN" : "FRUIT FLY"} GUNNER IS WHAT ITS FILE SAYS: it loads (${m.WEIGHT_COUNT} weights), its score is the held-out score the held-out fights give it now (${h.score.toFixed(3)}), its \`by\` quotes the held-out and the audit results and the hand gunner's audit in the library's own words -- recomputed here -- and it BEATS the hand gunner on both (held-out ${h.score.toFixed(3)} against ${handHeld.score.toFixed(3)}, audit ${a.score.toFixed(3)} against ${handAudit.score.toFixed(3)}) without losing a kill`,
-            back.ok && back.weights.length === m.WEIGHT_COUNT && back.meta.score === Number(h.score.toFixed(3)) && blob.by.includes(T.describeEval(h)) && blob.by.includes(T.describeEval(a)) && blob.by.includes(T.describeEval(handAudit)) && T.qualifies({ heldOut: h, audit: a }, { heldOut: handHeld, audit: handAudit }).ok, T.describeEval(a).slice(0, 70));
+        handHeld ??= T.evaluate(m, null, T.HELD_OUT_FIGHTS); handAudit ??= T.evaluate(m, null, T.AUDIT_FIGHTS); handOthers ??= Object.fromEntries(["perfect", "ace", "regular"].map((k) => [k, T.evaluate(m, null, T.AUDIT_FIGHTS, { sight: k })]));
+        const h = T.evaluate(m, back.weights, T.HELD_OUT_FIGHTS), a = T.evaluate(m, back.weights, T.AUDIT_FIGHTS), others = Object.fromEntries(["perfect", "ace", "regular"].map((k) => [k, { hand: handOthers[k], champion: T.evaluate(m, back.weights, T.AUDIT_FIGHTS, { sight: k }) }]));
+        ok(`!! THE SHIPPED ${n === "mlp" ? "GPU BRAIN" : "FRUIT FLY"} GUNNER IS WHAT ITS FILE SAYS: it loads (${m.WEIGHT_COUNT} weights), its score is the held-out score the held-out fights give it now (${h.score.toFixed(3)}), its \`by\` quotes the held-out and the audit results and the hand gunner's audit and what it did behind the three sights it was NOT trained for (perfect, ace, regular: the gunner it makes worse is said, not hidden) in the library's own words -- recomputed here -- and it BEATS the hand gunner on both (held-out ${h.score.toFixed(3)} against ${handHeld.score.toFixed(3)}, audit ${a.score.toFixed(3)} against ${handAudit.score.toFixed(3)}) without losing a kill`,
+            back.ok && back.weights.length === m.WEIGHT_COUNT && back.meta.score === Number(h.score.toFixed(3)) && blob.by.includes(T.describeEval(h)) && blob.by.includes(T.describeEval(a)) && blob.by.includes(T.describeEval(handAudit)) && blob.by.includes(T.describeOthers(others)) && T.qualifies({ heldOut: h, audit: a }, { heldOut: handHeld, audit: handAudit }).ok, T.describeEval(a).slice(0, 70));
     }
 });
 
 console.log("\n10. THE FRONT DOOR");
 section(() => {
-    const want = "AUDIT_FIGHTS,DEFAULT_OUT,HELD_OUT_FIGHTS,KINDS,POLICY_ID,RECIPE,SECONDS,SIGHT,TRAIN_FIGHTS,blobOf,describeEval,evaluate,parseArgs,prune,qualifies,run,scoreOf,train";
-    ok("!! the export list is pinned: AUDIT_FIGHTS, DEFAULT_OUT, HELD_OUT_FIGHTS, KINDS, POLICY_ID, RECIPE, SECONDS, SIGHT, TRAIN_FIGHTS, blobOf, describeEval, evaluate, parseArgs, prune, qualifies, run, scoreOf, train", Object.keys(T).sort().join() === want, Object.keys(T).sort().join());
+    const want = "AUDIT_FIGHTS,DEFAULT_OUT,HELD_OUT_FIGHTS,KINDS,POLICY_ID,RECIPE,SECONDS,SIGHT,TRAIN_FIGHTS,blobOf,describeEval,describeOthers,evaluate,parseArgs,prune,qualifies,run,scoreOf,train";
+    ok("!! the export list is pinned: AUDIT_FIGHTS, DEFAULT_OUT, HELD_OUT_FIGHTS, KINDS, POLICY_ID, RECIPE, SECONDS, SIGHT, TRAIN_FIGHTS, blobOf, describeEval, describeOthers, evaluate, parseArgs, prune, qualifies, run, scoreOf, train", Object.keys(T).sort().join() === want, Object.keys(T).sort().join());
 });
 
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
