@@ -16,11 +16,12 @@
 // A SPENT AUDIT, SAID PLAINLY: the audit and safety audit named in a shipped file's `by` were read ONCE, by the champion that was shipped. This gate reads them again to check the file, which selects nothing. A retrain draws a FRESH pair (the tool
 // refuses nothing here: brain/dogfightTask.mjs names AUDIT5 as the next one to add, and the trainer gate's "spent audit" row is where it is declared spent).
 //
-// SABOTAGE LOG -- TWELVE, applied to the shipped file, the tool, or the task in a scratch worktree, the gate run, the worktree restored; every one red by name (the number is how many rows went red):
+// SABOTAGE LOG -- SIXTEEN, applied to the shipped files, the tool, or the task in a scratch worktree, the gate run, the worktree restored; every one red by name (the number is how many rows went red); Z1-Z12 on the fruit fly's file and the tool and the task, Z13-Z16 on the GPU Brain's file:
 //   Z1 one weight nudged (0.55 -> 0.56) 2 | Z2 `by` says 94 fights better, not 93 1 | Z3 the file's score edited 1 | Z4 the file names the other policy 1 | Z5 the citation no longer says dogfights 2
 //   Z6 weightCount off by one 2 | Z7 the opponent sentence cut from `by` 1 | Z8 the z floor raised to 6 (the shipped pilot's 4.94 no longer qualifies) 1
 //   Z9 the task changed under the file (BREAK_RANGE 140 -> 100: the champion is then ineligible on the pool, so the rows after it have nothing to read) 1 | Z10 the audit set swapped for another pair 2
 //   Z11 the weights array one short 1 | Z12 the held-out set swapped for the training set (the champion is picked on the wrong fights) 2
+//   Z13 the GPU file's `by` says 68 fights better 1 | Z14 the GPU file's weightCount off by one 2 | Z15 the GPU file's score edited 1 | Z16 the GPU file names the fruit fly's policy 1
 // AN EQUIVALENT MUTANT, SAID PLAINLY: KEEP_OUT_RANGE 30 -> 31 and 30 -> 90 in brain/dogfightTask.mjs go 0 red. The keep-out rule is DORMANT in the fruit fly's shipped fights: the guidance asks for less airspeed than the opponent flies inside 220 m, so nothing closes inside 90 m. The rule exists for pilots that ignore the airspeed they are asked for
 //   (the first training run's champion did, and collided), and brain/dogfightTask-selfcheck.mjs holds it on a pilot that does.
 "use strict";
@@ -42,7 +43,8 @@ console.log("trainDogfightPilotShipped-selfcheck -- the shipped dogfight pilots 
 const BRAINS = [
     { id: "fly", file: "pilotDogfightWeightsDefault.json", policy: PF, name: "THE FRUIT FLY", required: true, count: 1099, citation: /Giant Fiber Circuit/, keptMax: 400,
         autopilot: { audit: "0.5150", safetyLost: 3, safetyDeep: 0, safetyBrush: 0, poolLost: 1 } },
-    { id: "gpu", file: "pilotDogfightMlpWeightsDefault.json", policy: MF, name: "THE GPU BRAIN", required: false, count: 1796, citation: /GPU Brain/, keptMax: 600, autopilot: null },
+    { id: "gpu", file: "pilotDogfightMlpWeightsDefault.json", policy: MF, name: "THE GPU BRAIN", required: false, count: 1796, citation: /GPU Brain/, keptMax: 600,
+        autopilot: { audit: "0.4519", safetyLost: 0, safetyDeep: 0, safetyBrush: 0, poolLost: 1 } },
 ];
 
 let n = 0;

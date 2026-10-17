@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<!-- dogfight.html -- UNNUMBERED (the version is chosen at ship time): TWO AIRCRAFT FIGHT, AND EACH HAS ITS OWN WINDOW DOWN THE RIGHT.
+
+     The fight is brain/dogfightTask.mjs's -- the same scenarios (tail, offset, turning, duel), the same pursuit guidance, the same hand trigger, the same gun (physics/mechanics/flightGuns.mjs: 300 m/s rounds that fall, 15 a second, a 4 m sphere, 20 hits kill) and the same
+     flight model (physics/mechanics/flightModel6dof.mjs) -- run a tick at a time by brain/dogfightArena.mjs, which brain/dogfightArena-selfcheck.mjs holds to dogfightTask.duel() to the bit, so what you watch here is a fight the trainer would score the same.
+
+     THE WINDOWS (render/flightViews.mjs; the way race-brain.html gave each race car a window): one per aircraft, stacked down the right, and a CLICK on a window switches what it shows --
+       plane    the aircraft from outside, behind and above, along its heading (so its bank and pitch can be seen)
+       pilot    the pilot's seat, looking along the nose, the picture rolling with the aircraft; a line of airspeed, altitude, heading, hit points and rounds
+       gunner   the gun's sight: the eye looking along the gun, a bore cross at its axis, the pipper where a round fired now would be at the target's range and the lead pip where the target will be when it gets there
+       brain    not a camera: the pilot's network as it decides, live -- its 18 features, its hidden activations and its four outputs (the PD autopilot has no network, so its features and outputs only)
+     The big picture keeps both aircraft in frame (overview), follows one of them (chase), or lets you orbit.
+
+     THE PILOTS (each side picks): the PD autopilot (the task's own opponent); the fruit fly's network on the autopilot's hand weights; that network trained to FLY; that network trained to FIGHT (tools/ship/trainPilotDogfight.mjs: a sparse-mutation (1+1)-ES from the autopilot's weights on the
+     dogfight task, the champion picked on held-out fights, graded once on an audit nothing had flown); and the same three for the GPU Brain's 18-32-32-4 network, which RUNS HERE ON ITS CPU TWIN (the dogfight is not on the device; the flight page runs it on WebGPU).
+     WHAT THE DOGFIGHT PILOTS WERE GRADED AGAINST, SAID PLAINLY: ONLY THE PD AUTOPILOT, flying the pursuit guidance, as opponent. Put one against a different pilot and nothing here says it will win.
+
+     WHAT IS NOT HERE: wind (still air, as the task's), a falling wreck (a destroyed aircraft goes dark where it was), any damage but hit points, a human pilot (the flight page has the keyboard). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:desc" content="Dogfight: two aircraft fight under brain/dogfightTask.mjs's rules (pursuit guidance, a hand trigger, a 300 m/s gun that falls, 20 hits kill) stepped by brain/dogfightArena.mjs, each with a window down the right that a click switches between the plane from outside, the pilot's seat, the gun's sight with its lead pip, and the pilot's network thinking, live. Pilots: the PD autopilot, the fruit fly's network (hand weights, trained to fly, trained to fight) and the GPU Brain's network (the same three, on its CPU twin). Answer-key gates: dogfightArena-selfcheck, flightViews-selfcheck, dogfightTask-selfcheck, dogfightPage-selfcheck.">
+<title>SweK &middot; Dogfight</title>
+<style>
+  html,body { margin:0; height:100%; background:#0a1626; color:#cfe0f5; font:12px ui-monospace,Menlo,monospace; overflow:hidden; }
+  #hud { position:fixed; top:6px; left:8px; right:286px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; z-index:2; background:#0a1220d9; border:1px solid #2f486c; border-radius:8px; padding:5px 10px; }
+  a { color:#5ad6ff; text-decoration:none; } a:hover { text-decoration:underline; }
+  button, select, input { background:#152136; color:#b9d4ff; border:1px solid #2f486c; border-radius:5px; cursor:pointer; font:11px ui-monospace,monospace; padding:2px 8px; }
+  input[type=number] { width:64px; cursor:text; }
+  label { color:#8fb6d0; }
+  #stack { position:fixed; top:6px; right:8px; width:264px; z-index:2; display:flex; flex-direction:column; gap:8px; max-height:calc(100% - 12px); overflow:auto; }
+  .win { position:relative; width:262px; height:200px; flex:0 0 auto; border:1px solid #2f486c; border-radius:6px; background:transparent; cursor:pointer; overflow:hidden; }   /* TRANSPARENT: the picture under a window is drawn into the page's one WebGL canvas, behind this box */
+  .win:hover { border-color:#5ad6ff; }
+  .win .wl { position:absolute; top:0; left:0; right:0; height:16px; line-height:16px; padding:0 6px; font-size:10px; color:#9fb2d4; background:#0a1220; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; z-index:1; }
+  .win .wgl { position:absolute; top:16px; left:0; right:0; bottom:0; }
+  .win .wov { position:absolute; top:16px; left:0; width:100%; height:calc(100% - 16px); pointer-events:none; }
+  #board { position:fixed; bottom:8px; left:10px; right:286px; z-index:2; display:flex; gap:10px; flex-wrap:wrap; pointer-events:none; }
+  .card { background:#0a1220e0; border:1px solid #2f486c; border-radius:8px; padding:6px 9px; min-width:300px; flex:1 1 300px; max-width:520px; }
+  .card b { color:#2fd6b0; } .card.b2 b { color:#f6a623; } .card .bad { color:#ff6b6b; } .card .good { color:#7fb069; }
+  .card .row { color:#9fb6cf; white-space:pre-wrap; }
+  .bar { height:6px; background:#26354f; border-radius:3px; margin:3px 0; } .bar > i { display:block; height:100%; background:#7fb069; border-radius:3px; }
+  #log { position:fixed; top:84px; left:10px; z-index:1; color:#f6a623; background:#0a1220b3; border-radius:6px; padding:3px 9px; white-space:pre; min-width:260px; }
+  #note { position:fixed; bottom:96px; right:286px; z-index:1; color:#cfe0f5; background:#0a1220b3; border-radius:6px; padding:2px 8px; text-align:right; max-width:560px; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <b style="color:#2fd6b0">&#9876; Dogfight</b>
+  <label>fight <select id="kind"><option value="duel">duel (head-on, both shoot)</option><option value="tail">tail chase</option><option value="offset">offset</option><option value="turning">turning target</option></select>
+    seed <input id="seed" type="number" min="1" max="99999" value="3"></label>
+  <label>A <select id="pilotA" style="max-width:200px"></select></label>
+  <label>B <select id="pilotB" style="max-width:200px"></select></label>
+  <button id="newBtn" title="start this fight again from its first tick, with the pilots chosen">&#8635; New fight</button>
+  <button id="pauseBtn">&#10074;&#10074; Pause</button><button id="stepBtn" title="one tick (1/30 s)">+1 tick</button>
+  <label>speed <select id="timeScale"><option>1</option><option>2</option><option>4</option><option>8</option></select>x</label>
+  <label>view <select id="camMode"><option value="overview">overview</option><option value="chase0">chase A</option><option value="chase1">chase B</option><option value="orbit">orbit</option></select></label>
+  <span id="stat" style="color:#9fe6c0"></span>
+</div>
+<div id="log"></div>
+<div id="stack"></div>
+<div id="board"></div>
+<div id="note"></div>
+
+<script type="importmap">
+{ "imports": { "three": "/vendor/three/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from "/vendor/three/three.module.js";
+import { OrbitControls } from "/vendor/three/jsm/controls/OrbitControls.js";
+import * as RB from "/physics/mechanics/rigidBody6dof.mjs";
+import * as F from "/physics/mechanics/flightModel6dof.mjs";
+import * as G from "/physics/mechanics/flightGuns.mjs";
+import * as AF from "/brain/autopilotFlight.mjs";
+import * as PF from "/brain/pilotFlightPolicy.mjs";
+import * as MF from "/brain/pilotFlightMlp.mjs";
+import * as D from "/brain/dogfightTask.mjs";
+import * as A from "/brain/dogfightArena.mjs";
+import * as PB from "/brain/peerBrain.mjs";
+import * as V from "/render/flightViews.mjs";
+import { weightsHash } from "/brain/drivePolicy.mjs";
+
+const R2D = 180 / Math.PI, SIDE = [{ name: "A", color: 0x2fd6b0 }, { name: "B", color: 0xf6a623 }];
+
+// ---- the pilots: a choice resolves to { fn, label, policy, weights } ---------------------------------------------------------------------------------------------------------------------------------------------
+const DESC = { pilotFlightPolicy: PB.describePolicy("pilotFlightPolicy", PF), pilotFlightMlp: PB.describePolicy("pilotFlightMlp", MF) };
+const CHOICES = [
+  { id: "pd", label: "PD autopilot (the task's opponent)", policy: null },
+  { id: "hand", label: "fruit fly, hand weights", policy: PF, policyId: "pilotFlightPolicy", hand: () => PF.handWeights() },
+  { id: "flight", label: "fruit fly trained to FLY", policy: PF, policyId: "pilotFlightPolicy", file: "/brain/pilotFlightWeightsDefault.json" },
+  { id: "dogfight", label: "fruit fly trained to FIGHT", policy: PF, policyId: "pilotFlightPolicy", file: "/brain/pilotDogfightWeightsDefault.json" },
+  { id: "gpuHand", label: "GPU Brain network, hand weights (CPU twin)", policy: MF, policyId: "pilotFlightMlp", hand: () => MF.handWeights() },
+  { id: "gpuFlight", label: "GPU Brain trained to FLY (CPU twin)", policy: MF, policyId: "pilotFlightMlp", file: "/brain/pilotFlightMlpWeightsDefault.json" },
+  { id: "gpuDogfight", label: "GPU Brain trained to FIGHT (CPU twin)", policy: MF, policyId: "pilotFlightMlp", file: "/brain/pilotDogfightMlpWeightsDefault.json" },
+];
+const loaded = new Map(), errors = new Map();   // id -> { weights, meta } | reason
+function loadChoice(c, url = c.file) {
+  return fetch(url).then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }).then((blob) => {
+    const r = PB.importBrain(DESC[c.policyId], blob);
+    if (r.ok) { loaded.set(c.id, { weights: r.weights, meta: r.meta }); errors.delete(c.id); } else errors.set(c.id, r.reason);   // a refused LATER load keeps the pilot the page already holds, and says why
+    return r.ok;
+  }).catch((e) => { errors.set(c.id, "could not fetch it (" + (e && e.message) + ")"); return false; });
+}
+const available = (c) => !c.file || loaded.has(c.id);
+function resolvePilot(id) {
+  const c = CHOICES.find((x) => x.id === id) || CHOICES[0];
+  if (!c.policy) return { id: "pd", fn: (s, t, w) => AF.pilot(s, t, w), label: c.label, policy: null, weights: null };
+  const w = c.hand ? c.hand() : loaded.get(c.id) && loaded.get(c.id).weights;
+  if (!w) return { id: "pd", fn: (s, t, w2) => AF.pilot(s, t, w2), label: `PD autopilot (${c.label}: ${errors.get(c.id) || "not loaded"})`, policy: null, weights: null };
+  const meta = loaded.get(c.id) && loaded.get(c.id).meta;
+  return { id: c.id, fn: c.policy.pilotFor(w), label: c.label + (c.file ? ` ${weightsHash(w)}` : "") + (meta && meta.score != null ? ` (held-out ${meta.score})` : ""), policy: c.policy, weights: w };
+}
+
+// ---- Three.js scene, Z-UP like the physics (nose +X, up +Z) -----------------------------------------------------------------------------------------------------------------------------------------------------
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x7fb2e6); scene.fog = new THREE.Fog(0x9fc4ea, 1500, 9000);
+const camera = new THREE.PerspectiveCamera(51.6, innerWidth / innerHeight, 0.5, 30000);   // 0.9 rad vertical, the overview's
+camera.up.set(0, 0, 1); camera.position.set(-400, -300, 500);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+renderer.domElement.style.position = "fixed"; renderer.domElement.style.inset = "0";
+const orbit = new OrbitControls(camera, renderer.domElement);
+orbit.enableDamping = true; orbit.dampingFactor = 0.08; orbit.enabled = false;
+scene.add(new THREE.HemisphereLight(0xdcecff, 0x5a6b4a, 1.1));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(500, -300, 900); scene.add(sun);
+{
+  scene.add(new THREE.Mesh(new THREE.PlaneGeometry(60000, 60000), new THREE.MeshStandardMaterial({ color: 0x5f7a45, roughness: 1 })));
+  const grid = new THREE.GridHelper(30000, 150, 0x7c9a5a, 0x6c8a4c); grid.rotation.x = Math.PI / 2; grid.position.z = 0.2; scene.add(grid);
+  let s = 4242; const rnd = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
+  const pylons = new THREE.InstancedMesh(new THREE.BoxGeometry(6, 6, 1), new THREE.MeshStandardMaterial({ color: 0xd9d2c0 }), 260), m = new THREE.Matrix4();
+  for (let i = 0; i < 260; i++) { const h = 20 + rnd() * 90; m.compose(new THREE.Vector3((rnd() - 0.5) * 9000, (rnd() - 0.5) * 9000, h / 2), new THREE.Quaternion(), new THREE.Vector3(1, 1, h)); pylons.setMatrixAt(i, m); }
+  scene.add(pylons);
+}
+const HULL = SIDE.map((s) => new THREE.MeshStandardMaterial({ color: s.color, metalness: 0.2, roughness: 0.55 }));
+const HULL_DEAD = new THREE.MeshStandardMaterial({ color: 0x4a2020, roughness: 0.9 });
+function makeAircraft(i) {
+  const g = new THREE.Group(), mat = HULL[i % HULL.length];
+  const fus = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.8, 6.4, 12), mat); fus.rotation.z = Math.PI / 2; fus.position.x = -0.6; g.add(fus);
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.55, 1.6, 12), mat); nose.rotation.z = -Math.PI / 2; nose.position.x = 3.4; g.add(nose);
+  const wing = new THREE.Mesh(new THREE.BoxGeometry(1.7, 10.6, 0.16), mat); wing.position.set(0.2, 0, 0.5); g.add(wing);
+  const tailplane = new THREE.Mesh(new THREE.BoxGeometry(1.1, 3.6, 0.1), mat); tailplane.position.set(-4.2, 0, 0.2); g.add(tailplane);
+  const fin = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.1, 1.5), mat); fin.position.set(-4.2, 0, 0.9); g.add(fin);
+  const prop = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 0.04, 20), new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.25 })); prop.rotation.z = Math.PI / 2; prop.position.x = 4.3; g.add(prop);
+  g.userData.hull = [fus, nose, wing, tailplane, fin]; scene.add(g); return g;
+}
+function trailLine(i) {
+  const geom = new THREE.BufferGeometry(); geom.setAttribute("position", new THREE.BufferAttribute(new Float32Array(240 * 3), 3)); geom.setDrawRange(0, 0);
+  const line = new THREE.Line(geom, new THREE.LineBasicMaterial({ color: SIDE[i % SIDE.length].color })); line.frustumCulled = false; scene.add(line); return line;
+}
+// the rounds: a short streak behind each one; the hits: a flash that grows and fades
+const MAX_ROUNDS = 400, tracerGeom = new THREE.BufferGeometry();
+tracerGeom.setAttribute("position", new THREE.BufferAttribute(new Float32Array(MAX_ROUNDS * 6), 3)); tracerGeom.setDrawRange(0, 0);
+const tracers = new THREE.LineSegments(tracerGeom, new THREE.LineBasicMaterial({ color: 0xfff1a0 })); tracers.frustumCulled = false; scene.add(tracers);
+const flashes = []; const FLASH_MAT = () => new THREE.MeshBasicMaterial({ color: 0xffb340, transparent: true, opacity: 1 });
+function spawnFlash(p) { const m = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), FLASH_MAT()); m.position.set(p[0], p[1], p[2]); m.userData.age = 0; scene.add(m); flashes.push(m); }
+
+// ---- the fight ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+let arena = null, scenario = null, pilots = [null, null], meshes = [], trails = [], trailN = [], deadShown = [], log = [], paused = false, held = false;
+const el = (id) => document.getElementById(id);
+function clearFight() { for (const m of meshes) { scene.remove(m); for (const c of m.children) if (c.geometry) c.geometry.dispose(); } for (const t of trails) { scene.remove(t); t.geometry.dispose(); } for (const f of flashes) { scene.remove(f); f.geometry.dispose(); f.material.dispose(); } flashes.length = 0; meshes = []; trails = []; }
+function newFight({ kind = el("kind").value, seed = Number(el("seed").value) || 1, a = el("pilotA").value, b = el("pilotB").value } = {}) {
+  clearFight();
+  scenario = D.scenario(Math.max(1, Math.round(seed)), kind);
+  pilots = [resolvePilot(a), resolvePilot(b)];
+  arena = A.arenaFromScenario(scenario, pilots[0].fn, { pilotB: pilots[1].fn, names: [`A · ${pilots[0].label}`, `B · ${pilots[1].label}`] });
+  meshes = arena.crafts.map((c, i) => makeAircraft(i)); trails = arena.crafts.map((c, i) => trailLine(i)); trailN = arena.crafts.map(() => 0); deadShown = arena.crafts.map(() => false);
+  log = []; el("kind").value = kind; el("seed").value = String(scenario.seed); el("pilotA").value = pilots[0].id; el("pilotB").value = pilots[1].id;
+  buildWindows(); camPos.set(...arena.crafts[0].state.pos).add(new THREE.Vector3(-300, -200, 200)); camLook.set(...arena.crafts[0].state.pos);
+  renderNote(); renderFrame(0);
+}
+function tickOnce() {
+  A.stepArena(arena);
+  for (const e of arena.events) {
+    const nm = (id) => SIDE[arena.crafts.findIndex((c) => c.id === id)].name;
+    if (e.type === "hit") { spawnFlash(e.point); const v = arena.crafts.find((c) => c.id === e.victim); log.push(`${e.t.toFixed(1)} s  ${nm(e.shooter)} hit ${nm(e.victim)}  (${v.hp - v.taken} hit points left)`); }
+    else if (e.type === "kill") log.push(`${e.t.toFixed(1)} s  ${nm(e.craft)} DESTROYED`);
+    else if (e.type === "ended") log.push(`${e.t.toFixed(1)} s  ${nm(e.craft)}: ${e.status}`);
+    else if (e.type === "collision") log.push(`${e.t.toFixed(1)} s  ${nm(e.craft)} collided with ${nm(e.with)}`);
+  }
+  if (arena.done && !log.some((l) => /^OVER/.test(l))) log.push(`OVER (${arena.over}) at ${arena.t.toFixed(1)} s`);
+  if (log.length > 8) log = log.slice(-8);
+}
+
+// ---- the windows: one per aircraft, a click switches the view ------------------------------------------------------------------------------------------------------------------------------------------
+const stack = el("stack"), wins = [], winCam = new THREE.PerspectiveCamera(60, 262 / 184, 0.3, 30000);
+winCam.up.set(0, 0, 1);
+const keepViews = [];
+function buildWindows() {
+  for (const w of wins) keepViews[w.i] = w.view;
+  stack.textContent = ""; wins.length = 0;
+  arena.crafts.forEach((c, i) => {
+    const box = document.createElement("div"); box.className = "win"; box.dataset.craft = String(i);
+    box.innerHTML = `<div class="wl"></div><div class="wgl"></div><canvas class="wov" width="262" height="184"></canvas>`;
+    const w = { i, view: keepViews[i] || "plane", el: box, gl: box.querySelector(".wgl"), ov: box.querySelector(".wov"), label: box.querySelector(".wl") };
+    w.ctx = w.ov.getContext("2d"); box.addEventListener("click", () => cycle(i)); stack.appendChild(box); wins.push(w); setLabel(w);
+  });
+}
+const setLabel = (w) => { w.label.textContent = V.windowLabel(w.i, `${SIDE[w.i].name} · ${pilots[w.i].label}`, w.view); };
+function cycle(i) { const w = wins[i]; if (!w) return; w.view = V.nextView(w.view, true); setLabel(w); renderNote(); }
+const cameraLike = (cam, W, H) => { winCam.position.set(...cam.eye); winCam.up.set(...cam.up); winCam.fov = cam.fov * R2D; winCam.aspect = W / H; winCam.updateProjectionMatrix(); winCam.lookAt(...cam.target); winCam.updateMatrixWorld(true); };
+const brainRowsOf = (c, i) => {
+  const p = pilots[i], target = (c.last && c.last.target) || { altitude: c.state.pos[2], heading: F.attitude(c.state).heading, airspeed: 45 }, x = PF.features(c.state, target);
+  const act = p.policy ? V.pilotActivations(p.policy, p.weights, x) : { input: Float32Array.from(x), output: Float32Array.of(c.last ? c.last.controls.pitch : 0, c.last ? c.last.controls.roll : 0, c.last ? c.last.controls.yaw : 0, c.last ? c.last.controls.throttle * 2 - 1 : 0) };
+  return V.pilotRows({ who: "pilot", act, featureNames: PF.FEATURE_NAMES, outputNames: PF.OUTPUT_NAMES });
+};
+function drawOverlay(w, c, W, H) {
+  const ctx = w.ctx; ctx.clearRect(0, 0, W, H);
+  ctx.font = "10px ui-monospace,Menlo,monospace"; ctx.lineWidth = 2;
+  const hud = V.hudText(c.state, { hp: c.hp, taken: c.taken, ammo: c.gun.ammo });
+  if (w.view === "brain") { V.drawRows(ctx, W, H, brainRowsOf(c, w.i), { title: `${SIDE[w.i].name} · ${pilots[w.i].label}` }); return; }
+  ctx.fillStyle = "#cfe0f5"; ctx.fillText(w.view === "plane" ? `${SIDE[w.i].name}${c.status !== "airborne" ? ` — ${c.status}` : ""}` : hud, 4, H - 5);
+  const cross = (x, y, n) => { ctx.fillStyle = "#7fe0a0"; ctx.fillRect(Math.round(x) - n, Math.round(y), 2 * n + 1, 1); ctx.fillRect(Math.round(x), Math.round(y) - n, 1, 2 * n + 1); };   // whole pixels, so a cross is the same colour wherever it sits
+  if (w.view === "pilot") cross(W / 2, H / 2, 6);
+  if (w.view === "gunner") {
+    const cam = V.gunSightCamera(c.state, { spec: c.spec }), foe = c.last && c.last.foe ? arena.crafts.find((o) => o.id === c.last.foe) : null;
+    const gs = V.gunsight(cam, G.muzzleOf(c.state, c.spec), foe && foe.status === "airborne" ? { pos: foe.state.pos, vel: foe.state.vel } : null, W, H, c.spec);
+    cross(gs.bore[0], gs.bore[1], 8);
+    if (gs.pipper) { ctx.strokeStyle = "#5ad6ff"; ctx.beginPath(); ctx.arc(gs.pipper[0], gs.pipper[1], 7, 0, 6.2832); ctx.stroke(); }
+    if (gs.lead) { ctx.strokeStyle = "#f6a623"; ctx.beginPath(); ctx.moveTo(gs.lead[0], gs.lead[1] - 7); ctx.lineTo(gs.lead[0] + 7, gs.lead[1]); ctx.lineTo(gs.lead[0], gs.lead[1] + 7); ctx.lineTo(gs.lead[0] - 7, gs.lead[1]); ctx.closePath(); ctx.stroke(); }
+    if (gs.pipper && gs.lead) { ctx.strokeStyle = "#5f7590"; ctx.beginPath(); ctx.moveTo(gs.pipper[0], gs.pipper[1]); ctx.lineTo(gs.lead[0], gs.lead[1]); ctx.stroke(); }
+    ctx.fillStyle = "#cfe0f5"; ctx.fillText(gs.range == null ? "no target" : `range ${gs.range.toFixed(0)} m` + (gs.tof != null ? `  flight ${gs.tof.toFixed(2)} s` : "  out of reach"), 4, 12);
+    if (c.last && c.last.fire) { ctx.fillStyle = "#ff6b6b"; ctx.fillText("FIRE", W - 32, 12); }
+  }
+}
+function renderWindows() {
+  const cr = renderer.domElement.getBoundingClientRect(), live = arena.crafts;
+  renderer.setScissorTest(true);
+  for (const w of wins) {
+    const c = live[w.i], r = w.gl.getBoundingClientRect(), W = Math.max(2, Math.round(r.width)), H = Math.max(2, Math.round(r.height));
+    if (w.ov.width !== W || w.ov.height !== H) { w.ov.width = W; w.ov.height = H; }
+    setLabel(w);
+    const x = r.left - cr.left, y = cr.bottom - r.bottom;
+    renderer.setViewport(x, y, r.width, r.height); renderer.setScissor(x, y, r.width, r.height);
+    if (w.view === "brain") { const bg = renderer.getClearColor(new THREE.Color()); renderer.setClearColor(0x050805, 1); renderer.clear(); renderer.setClearColor(bg, 1); }
+    else {
+      const camSpec = V.cameraFor(w.view, c.state, { spec: c.spec }); cameraLike(camSpec, r.width, r.height);
+      const hide = w.view !== "plane"; if (hide) meshes[w.i].visible = false;
+      renderer.render(scene, winCam);
+      if (hide) meshes[w.i].visible = true;
+    }
+    drawOverlay(w, c, W, H);
+  }
+  renderer.setScissorTest(false); renderer.setViewport(0, 0, innerWidth, innerHeight);
+}
+
+// ---- the big picture ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
+function updateCamera(snap = false) {
+  const mode = el("camMode").value; orbit.enabled = mode === "orbit";
+  if (mode === "orbit") { const m = arena.crafts[0].state.pos; orbit.target.set(m[0], m[1], m[2]); orbit.update(); return; }
+  let spec;
+  if (mode === "overview") spec = V.overviewCamera(arena.crafts.map((c) => c.state), { aspect: innerWidth / innerHeight, fov: camera.fov / R2D });
+  else spec = V.planeCamera(arena.crafts[mode === "chase1" ? 1 : 0].state);
+  if (snap) { camPos.set(...spec.eye); camLook.set(...spec.target); } else { camPos.lerp(new THREE.Vector3(...spec.eye), 0.15); camLook.lerp(new THREE.Vector3(...spec.target), 0.2); }
+  camera.position.copy(camPos); camera.lookAt(camLook);
+}
+function syncScene(dt) {
+  arena.crafts.forEach((c, i) => {
+    const p = c.state.pos, pq = RB.toPoseQuat(c.state.q), m = meshes[i];
+    m.position.set(p[0], p[1], p[2]); m.quaternion.set(pq[0], pq[1], pq[2], pq[3]);
+    if (c.status !== "airborne" && !deadShown[i]) { deadShown[i] = true; for (const h of m.userData.hull) h.material = HULL_DEAD; }
+    if (arena.i % 3 === 0 && c.status === "airborne") {
+      const arr = trails[i].geometry.attributes.position.array, n = Math.min(trailN[i] + 1, 240);
+      if (trailN[i] >= 240) arr.copyWithin(0, 3); const k = Math.min(trailN[i], 239) * 3; arr[k] = p[0]; arr[k + 1] = p[1]; arr[k + 2] = p[2];
+      trailN[i] = n; trails[i].geometry.attributes.position.needsUpdate = true; trails[i].geometry.setDrawRange(0, n);
+    }
+  });
+  const arr = tracerGeom.attributes.position.array, n = Math.min(arena.rounds.length, MAX_ROUNDS);
+  for (let k = 0; k < n; k++) { const r = arena.rounds[k]; arr[k * 6] = r.pos[0]; arr[k * 6 + 1] = r.pos[1]; arr[k * 6 + 2] = r.pos[2]; arr[k * 6 + 3] = r.pos[0] - r.vel[0] * 0.05; arr[k * 6 + 4] = r.pos[1] - r.vel[1] * 0.05; arr[k * 6 + 5] = r.pos[2] - r.vel[2] * 0.05; }
+  tracerGeom.attributes.position.needsUpdate = true; tracerGeom.setDrawRange(0, n * 2);
+  for (let k = flashes.length - 1; k >= 0; k--) { const f = flashes[k]; f.userData.age += dt; f.scale.setScalar(1 + f.userData.age * 14); f.material.opacity = Math.max(0, 1 - f.userData.age / 0.5); if (f.userData.age > 0.5) { scene.remove(f); f.geometry.dispose(); f.material.dispose(); flashes.splice(k, 1); } }
+}
+
+// ---- the board ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+function renderNote() { el("note").textContent = wins.length ? "click a window to switch it: plane · pilot · gunner · brain" : ""; }
+function updateBoard() {
+  const board = el("board");
+  if (board.children.length !== arena.crafts.length) { board.textContent = ""; arena.crafts.forEach((c, i) => { const d = document.createElement("div"); d.className = "card b" + (i + 1); d.id = "card" + i; board.appendChild(d); }); }
+  arena.crafts.forEach((c, i) => {
+    const a = F.attitude(c.state), st = c.status === "airborne" ? `<span class="good">flying</span>` : `<span class="bad">${c.status.toUpperCase()}</span>`, left = Math.max(0, c.hp - c.taken);
+    el("card" + i).innerHTML = `<b>${SIDE[i].name}</b> · ${pilots[i].label} · ${st}<div class="bar"><i style="width:${(100 * left / c.hp).toFixed(0)}%"></i></div>` +
+      `<div class="row">hit points ${left}/${c.hp}   hits landed ${c.hits}   rounds ${c.gun.ammo} left (${c.gun.fired} fired)</div>` +
+      `<div class="row">V ${a.airspeed.toFixed(1)} m/s  alt ${a.altitude.toFixed(0)} m  hdg ${(a.heading * R2D).toFixed(0)}°  bank ${(a.bank * R2D).toFixed(0)}°  α ${(a.alpha * R2D).toFixed(1)}°</div>`;
+  });
+  el("stat").textContent = `${scenario.kind} ${scenario.seed} · t ${arena.t.toFixed(1)} s${arena.done ? " · OVER" : ""}` + (arena.crafts.length === 2 ? ` · A's score ${A.resultOf(arena, D.A_ID).score.toFixed(3)}` : "");
+  el("log").textContent = log.join("\n"); el("log").style.display = log.length ? "block" : "none";
+}
+
+// ---- controls ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+function fillSelect(sel) { const keep = sel.value; sel.textContent = ""; for (const c of CHOICES) { const o = document.createElement("option"); o.value = c.id; o.textContent = c.label + (available(c) ? "" : " — not available"); o.disabled = !available(c); sel.appendChild(o); } if (keep) sel.value = keep; }
+function fillRosters() { fillSelect(el("pilotA")); fillSelect(el("pilotB")); }
+el("newBtn").onclick = () => newFight();
+for (const id of ["kind", "pilotA", "pilotB"]) el(id).onchange = () => newFight();
+el("seed").onchange = () => newFight();
+el("pauseBtn").onclick = () => { paused = !paused; el("pauseBtn").textContent = paused ? "▶ Play" : "❚❚ Pause"; };
+el("stepBtn").onclick = () => { paused = true; el("pauseBtn").textContent = "▶ Play"; if (!arena.done) tickOnce(); };
+addEventListener("keydown", (e) => { if (e.code === "Space" && !/^(INPUT|SELECT|BUTTON)$/.test((e.target && e.target.tagName) || "")) { e.preventDefault(); el("pauseBtn").click(); } });
+addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+
+let last = performance.now(), acc = 0;
+function renderFrame(dt = 0, snap = false) { syncScene(dt); updateCamera(snap); updateBoard(); renderer.setViewport(0, 0, innerWidth, innerHeight); renderer.render(scene, camera); renderWindows(); }
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  if (arena && !paused && !held) {
+    acc += dt * Number(el("timeScale").value); let n = 0;
+    while (acc >= A.DT && n < 16 && !arena.done) { tickOnce(); acc -= A.DT; n++; } if (acc > A.DT * 16) acc = 0;
+  }
+  if (arena) renderFrame(dt);
+  requestAnimationFrame(frame);
+}
+
+// ---- boot: the pilots' files first, then the fight ------------------------------------------------------------------------------------------------------------------------------------------------------
+const params = new URLSearchParams(location.search);
+const ready = Promise.allSettled(CHOICES.filter((c) => c.file).map((c) => loadChoice(c))).then(() => {
+  fillRosters();
+  const pick = (k, dflt) => { const v = params.get(k); return CHOICES.some((c) => c.id === v && available(c)) ? v : dflt; };
+  newFight({ kind: D.KINDS.includes(params.get("kind")) ? params.get("kind") : "duel", seed: Number(params.get("seed")) || 3, a: pick("a", available(CHOICES[3]) ? "dogfight" : "hand"), b: pick("b", "pd") });
+  requestAnimationFrame(frame);
+});
+
+// a debug hook: exact numeric state, a clock the gate drives, the windows and what they show (tools/ship/dogfightPage-selfcheck.mjs)
+const pixelStats = (i) => {
+  renderFrame(0); const gl = renderer.getContext(), w = wins[i], cr = renderer.domElement.getBoundingClientRect(), r = w.gl.getBoundingClientRect(), dpr = renderer.getPixelRatio();
+  const x = Math.round((r.left - cr.left) * dpr), y = Math.round((cr.bottom - r.bottom) * dpr), W = Math.round(r.width * dpr), H = Math.round(r.height * dpr), buf = new Uint8Array(W * H * 4);
+  gl.readPixels(x, y, W, H, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+  const seen = new Set(); let sum = [0, 0, 0];
+  for (let k = 0; k < buf.length; k += 4) { seen.add(((buf[k] >> 4) << 8) | ((buf[k + 1] >> 4) << 4) | (buf[k + 2] >> 4)); sum[0] += buf[k]; sum[1] += buf[k + 1]; sum[2] += buf[k + 2]; }
+  const n = buf.length / 4; return { w: W, h: H, distinct: seen.size, mean: sum.map((v) => v / n) };
+};
+const inkColor = (i, rgb, tol = 30) => { const w = wins[i], d = w.ctx.getImageData(0, 0, w.ov.width, w.ov.height).data; let n = 0; for (let k = 0; k < d.length; k += 4) if (d[k + 3] > 100 && Math.abs(d[k] - rgb[0]) <= tol && Math.abs(d[k + 1] - rgb[1]) <= tol && Math.abs(d[k + 2] - rgb[2]) <= tol) n++; return n; };
+const overlayInk = (i) => { const w = wins[i], d = w.ctx.getImageData(0, 0, w.ov.width, w.ov.height).data; let n = 0; for (let k = 3; k < d.length; k += 4) if (d[k] > 0) n++; return n; };
+window.__dogfight = {
+  ready,
+  state() { return { tick: arena.i, t: arena.t, done: arena.done, over: arena.over, scenario: { kind: scenario.kind, seed: scenario.seed }, closest: arena.closest, rounds: arena.rounds.length,
+    crafts: arena.crafts.map((c) => ({ id: c.id, team: c.team, status: c.status, pos: c.state.pos.slice(), vel: c.state.vel.slice(), hits: c.hits, taken: c.taken, hp: c.hp, fired: c.gun.fired, ammo: c.gun.ammo, last: c.last && { foe: c.last.foe, fire: c.last.fire, target: c.last.target, controls: c.last.controls } })),
+    log: log.slice(), pilots: pilots.map((p) => ({ id: p.id, label: p.label })) }; },
+  step(n = 1) { for (let i = 0; i < n && !arena.done; i++) tickOnce(); renderFrame(0); },
+  hold(on = true) { held = !!on; }, pause(on = true) { paused = !!on; },
+  newFight, resultA: () => A.resultOf(arena, D.A_ID),
+  windows: () => wins.map((w) => ({ craft: w.i, view: w.view, label: w.label.textContent, bg: getComputedStyle(w.el).backgroundColor, rect: (({ x, y, width, height }) => ({ x, y, width, height }))(w.gl.getBoundingClientRect()) })),
+  clickWindow(i) { wins[i].el.dispatchEvent(new MouseEvent("click", { bubbles: true })); renderFrame(0); return wins[i].view; },
+  setView(i, v) { wins[i].view = v; setLabel(wins[i]); renderFrame(0); }, pixels: pixelStats, ink: overlayInk, inkColor,
+  mainCamera: () => ({ pos: camera.position.toArray(), look: camLook.toArray() }),
+  settleCamera() { renderFrame(0, true); },
+  mainView() { const v = new THREE.Vector3(); return arena.crafts.map((c) => { v.set(...c.state.pos).project(camera); return [v.x, v.y, v.z]; }); },
+  get paused() { return paused; },
+  roster: { forget(id) { loaded.delete(id); fillRosters(); }, get choices() { return [...el("pilotA").options].map((o) => ({ id: o.value, disabled: o.disabled })); }, get labels() { return pilots.map((p) => p.label); }, error: (id) => errors.get(id) || null, loaded: (id) => loaded.has(id), loadChoice: (id, url) => loadChoice(CHOICES.find((c) => c.id === id), url), refill: fillRosters },
+};
+</script>
+</body>
+</html>

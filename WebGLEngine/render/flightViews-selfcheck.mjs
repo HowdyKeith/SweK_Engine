@@ -15,9 +15,11 @@
 //   6  THE SEAT     a gun seat's eye is 0.4 m behind the muzzle along the gun, looking along it, up perpendicular to the gun; a gun pointing straight up falls back to the nose for up
 //   7  THE BRAIN    pilotActivations() runs the layers (the fruit fly's 34 hidden and the GPU Brain's 32) and its outputs are the controls the policy gives (throttle mapped to [-1, 1]); the output stage applied to the hidden state IS the output;
 //                   pilotRows() has features, hidden and outputs (a pilot with no network has two rows) with the names the policy gives
-//   8  THE FRONT DOOR   the labels name the craft and the view, VIEW_DRAW is frozen, the export list is pinned, the report line says real numbers
+//   8  THE MAIN WINDOW  overviewCamera() has every craft in the picture by geometry (210 random placements, three window shapes), at exactly max(150, 1.35 r / sin(the narrower half-angle)), looking at the centroid; hudText() is speed, altitude, heading, hit points and rounds
+//   9  THE BARS         drawRows() paints one bar per value, signed about the row's centre line, a hidden value at half scale, clamped to the row, the labels and the title cut to 40 characters
+//  10  THE FRONT DOOR   the labels name the craft and the view, VIEW_DRAW is frozen, the export list is pinned, the report line says real numbers
 //
-// SABOTAGE LOG -- FORTY, each applied to render/flightViews.mjs in a scratch worktree, the gate run, the worktree restored; every one red by name (the number is how many rows went red):
+// SABOTAGE LOG -- FORTY (the cameras and the brain window), and below them fifteen more (the overview and the HUD line) and eleven (the bars), each applied to render/flightViews.mjs in a scratch worktree, the gate run, the worktree restored; every one red by name (the number is how many rows went red):
 //   V1 a click on the last view does not wrap 2 | V2 the gunner's view is not skipped for a craft with no gun 1 | V3 plane and pilot swapped in the list 2 | V4 the chase 25 m back 7
 //   V5 the chase looks behind the craft 4 | V6 the chase eye in front (x) 4 | V7 the chase eye on the wrong side (y) 2 | V8 the chase eye at the craft's height 6 | V9 the chase rolls with the craft 1
 //   V10 the chase follows the pitch (the nose not flattened) 3 | V11 no fallback for a nose straight up 1 | V12 the pilot's seat offset not rotated with the craft 1 | V13 the pilot's view does not roll 2
@@ -27,6 +29,8 @@
 //   V27 the lead pip is where the target IS 2 | V28 the pipper ignores the round's fall 2 | V29 the pipper ignores the shooter's own velocity 2 | V30 the time of flight doubled 1 | V31 the range from the eye 1
 //   V32 onScreen always true 1 | V33 the throttle not mapped to [-1, 1] 4 | V34 the hidden state taken after the first layer only 2 | V35 the hidden row never shown 2 | V36 the label does not say how to switch 1
 //   V37 VIEW_DRAW not frozen 1 | V38 the report line says NaN 1 | V39 the seat 5 cm higher 4 | V40 the gunner's field of view widened 1
+// FIFTEEN MORE once the main window's camera and the HUD line existed (every one red by name): O1 the overview distance without the margin 2 | O2 the sphere's radius from the first craft, not the centroid 2 | O3 the centroid not divided by the count 2 | O4 only the vertical half-angle 1 | O5 no minimum distance 1 | O6 the overview's height uses cos 1 | O7 the overview bearing mirrored 1 | O8 the overview's up is +Y 1 | O9 the speed is the ground speed 1 (after the HUD row used a climb: with a level flight it was an equivalent mutant) | O10 the heading counts the wrong way round 1 | O11 the heading not wrapped into 0..359 1 | O12 hit points can go negative 1 | O13 the heading not padded 2 | O14 the altitude to a tenth 2 | O15 the rounds left not printed 1
+// AND ELEVEN MORE ON drawRows (the bars, written out here so the page does not load the race cars' scene for them), every one red by name: D1 bar colours swapped 1 | D2 a hidden value not halved 1 | D3 values not clamped 1 | D4 positive bars hang below the line 2 | D5 the title not cut 1 | D6 the bars start at x = 40 1 | D7 the bar count doubled 1 | D8 the row label is the whole 'who' 1 | D9 the background not painted 3 | D10 the row height from the whole height 3 | D11 a bar fills the whole half-row 1
 // THREE REWRITES THE SABOTAGES FORCED: V34 (the hidden state after the first layer only) went 0 red because the hand weights' later layers are the IDENTITY -- the brain rows now run on the hand weights with noise 0.1 and assert the later layers matter; V33 (the throttle not mapped) went 0 red on the first noise level
 // because the throttle saturated at 1, where 2t - 1 = t -- the seed is pinned where it is interior; the straight-up fallbacks (V11, V18) would have been equivalent mutants against the first draft of their rows, where the craft's velocity and nose were both +X (REASONED, NOT RUN: the rows were rewritten before the sabotages) -- they now use a craft that moves along +Y and one that heads 90 degrees. NOT SABOTAGED: sightAhead (it only sets how far along an unchanged direction the target is).
 "use strict";
@@ -152,13 +156,50 @@ console.log("\n7. THE BRAIN WINDOW");
     ok("!! a pilot with no network (the PD autopilot) has two rows: its 18 features and its four outputs", noNet.length === 2 && noNet[0].layer === "features" && noNet[1].layer === "outputs" && noNet[1].values.length === 4);
 }
 
-console.log("\n8. THE FRONT DOOR");
+console.log("\n8. THE MAIN WINDOW'S CAMERA AND THE HUD LINE");
+{
+    const rng = mulberry(77), WW = 1280, HH = 720;
+    let worst = 0, centre = 0, short = 0, n = 0, outside = 0;
+    for (const aspect of [16 / 9, 4 / 3, 0.6]) for (let k = 0; k < 70; k++) {
+        const m = 2 + Math.floor(rng() * 4), sts = Array.from({ length: m }, () => ({ pos: [(rng() - 0.5) * 3000, (rng() - 0.5) * 3000, 100 + rng() * 400] }));
+        const cam = V.overviewCamera(sts, { aspect }), W2 = Math.round(HH * aspect), cen = [0, 1, 2].map((i) => sts.reduce((a, b) => a + b.pos[i], 0) / m), r = Math.max(...sts.map((q) => norm(sub(q.pos, cen))));
+        const half = Math.min(0.45, Math.atan(Math.tan(0.45) * aspect)), want = Math.max(150, 1.35 * r / Math.sin(half));
+        n++; if (Math.abs(cam.distance - want) > 1e-6) short++;
+        const c0 = V.project(cam, cen, W2, HH); centre = Math.max(centre, Math.abs(c0[0] - W2 / 2), Math.abs(c0[1] - HH / 2));
+        for (const q of sts) { const p = V.project(cam, q.pos, W2, HH); if (!p || p[0] < 0 || p[0] > W2 || p[1] < 0 || p[1] > HH) outside++; else worst = Math.max(worst, Math.abs(p[0] - W2 / 2) / (W2 / 2), Math.abs(p[1] - HH / 2) / (HH / 2)); }
+    }
+    ok("!! the main window's camera has EVERY craft in the picture: 210 random placements of 2-5 craft over 3 km (landscape, 4:3 and a tall narrow window), none outside the frame (the farthest is at most " + (worst * 100).toFixed(0) + "% of the way to the edge), the centroid on the centre to 1e-6, and the distance exactly max(150, 1.35 r / sin(the narrower half-angle))", outside === 0 && short === 0 && centre < 1e-6 && n === 210 && worst < 0.75, `${outside} outside, ${short} wrong distances, centre ${centre.toExponential(1)}, worst ${worst.toFixed(3)}`);
+    const one = V.overviewCamera([{ pos: [10, 20, 300] }]), off = [one.eye[0] - 10, one.eye[1] - 20, one.eye[2] - 300];
+    ok("!! one craft: the distance is the minimum (150 m), along the fixed bearing (-0.6 rad from +X) and elevation (0.45 rad), looking at the craft with the world's up", Math.abs(one.distance - 150) < 1e-12 && near(off, [150 * Math.cos(0.45) * Math.cos(-0.6), 150 * Math.cos(0.45) * Math.sin(-0.6), 150 * Math.sin(0.45)], 1e-9) && near(one.target, [10, 20, 300], 1e-12) && near(one.up, [0, 0, 1], 0), `${off.map((v) => v.toFixed(2))}`);
+    const two = V.overviewCamera([{ pos: [0, 0, 300] }, { pos: [2000, 0, 300] }]), wide = V.overviewCamera([{ pos: [0, 0, 300] }, { pos: [2000, 0, 300] }], { fov: 1.4 });
+    ok("two craft 2 km apart: r = 1000 and d = 1.35 r / sin(0.45) = 3103.7; a wider field of view needs a shorter distance", Math.abs(two.distance - 1.35 * 1000 / Math.sin(0.45)) < 1e-9 && wide.distance < two.distance, `${two.distance.toFixed(1)} vs ${wide.distance.toFixed(1)}`);
+    const lvl = F.createState({ pos: [0, 0, 300], speed: 45, heading: 0 });
+    ok("!! the HUD line: speed over the air, altitude, heading, hit points left and rounds left -- 45 m/s at 300 m heading 0 with 20 hit points and 300 rounds", V.hudText(lvl, { hp: 20, taken: 0, ammo: 300 }) === "IAS 45 m/s  ALT 300 m  HDG 000  HP 20/20  RDS 300", V.hudText(lvl, { hp: 20, taken: 0, ammo: 300 }));
+    const east = F.createState({ pos: [0, 0, 123.4], speed: 45, heading: PI / 2 }), west = F.createState({ pos: [0, 0, 300], speed: 45, heading: -PI / 2 }), fast = { ...lvl, vel: [30, 40, 120] };
+    ok("!! heading 90 degrees is 090 (a right turn raises it), -90 is 270, the speed is the length of the velocity (30, 40, 120 is 130: the climb counts), the altitude is rounded, hit points never go below 0 (25 taken of 20 is 0/20), and 359.6 wraps to 000", V.hudText(east).includes("HDG 090") && V.hudText(east).includes("ALT 123 m") && V.hudText(west).includes("HDG 270") && V.hudText(fast).includes("IAS 130 m/s") && V.hudText(lvl, { hp: 20, taken: 25 }).includes("HP 0/20") && V.hudText(F.createState({ pos: [0, 0, 300], speed: 45, heading: 359.6 * PI / 180 })).includes("HDG 000"));
+}
+
+console.log("\n9. THE BARS");
+{
+    const calls = [], ctx = { set fillStyle(v) { this._f = v; }, get fillStyle() { return this._f; }, set font(v) {}, fillRect(x, y, w, h) { calls.push({ op: "rect", x, y, w, h, color: this._f }); }, fillText(t, x, y) { calls.push({ op: "text", t, x, y }); } };
+    const rows = [{ who: "pilot", layer: "features", names: ["a", "b", "c"], values: [1, -0.5, 0.25] }, { who: "pilot", layer: "hidden", names: ["h0", "h1"], values: [2, -1] }, { who: "pilot", layer: "outputs", names: ["o"], values: [5] }];
+    const n = V.drawRows(ctx, 200, 100, rows, { title: "A".repeat(60) }), rects = calls.filter((c) => c.op === "rect"), bars = rects.slice(1), rowH = Math.max(10, Math.floor((100 - 14) / 3)), mid = (k) => 12 + rowH * k + rowH / 2, amp = rowH / 2 - 1;
+    ok("!! drawRows paints the background and one bar per value (6 here) and says so: positive bars blue and above the row's centre line, negative amber and below it", n === 6 && rects[0].w === 200 && rects[0].h === 100 && rects[0].color === "#050805" && bars.length === 6
+        && bars[0].color === "#59d1ff" && Math.abs((bars[0].y + bars[0].h) - mid(0)) < 1e-9 && bars[1].color === "#f6a623" && Math.abs(bars[1].y - mid(0)) < 1e-9, `${n} bars`);
+    ok("!! a bar is |v| of the half-row tall: 1 is the whole half-row, -0.5 half of it, 0.25 a quarter; a HIDDEN value is shown at half scale (2 is a full bar, -1 half of one); a value past 1 is clamped (5 is a full bar)",
+        Math.abs(bars[0].h - amp) < 1e-9 && Math.abs(bars[1].h - amp * 0.5) < 1e-9 && Math.abs(bars[2].h - amp * 0.25) < 1e-9 && Math.abs(bars[3].h - amp) < 1e-9 && Math.abs(bars[4].h - amp * 0.5) < 1e-9 && Math.abs(bars[5].h - amp) < 1e-9, bars.map((b) => b.h.toFixed(2)).join(" "));
+    ok("the bars of a row are side by side from x = 46 (a bar wide enough to be seen, 1 px between), each row below the one before, and the labels name 'p features', 'p hidden', 'p outputs' with the title cut to 40 characters",
+        bars[0].x === 46 && bars[1].x > bars[0].x + bars[0].w && bars[3].y < mid(1) + 1 && Math.abs((bars[3].y + bars[3].h) - mid(1)) < 1e-9 && calls.filter((c) => c.op === "text").map((c) => c.t).join("|") === "A".repeat(40) + "|p features|p hidden|p outputs");
+    ok("a row with no values draws no bars, no rows draws only the background", V.drawRows({ ...ctx, fillRect() {}, fillText() {}, set fillStyle(v) {}, set font(v) {} }, 100, 50, [{ who: "p", layer: "outputs", names: [], values: [] }]) === 0 && V.drawRows({ ...ctx, fillRect() {}, fillText() {}, set fillStyle(v) {}, set font(v) {} }, 100, 50, []) === 0);
+}
+
+console.log("\n10. THE FRONT DOOR");
 {
     ok("the window label names the craft number, the craft and the view and says how to switch", /^2\. Hawk -- gunner/.test(V.windowLabel(1, "Hawk", "gunner")) && /click to switch/.test(V.windowLabel(0, "x", "brain")) && /network, live/.test(V.windowLabel(0, "x", "brain")) && /outside/.test(V.windowLabel(0, "x", "plane")) && /seat/.test(V.windowLabel(0, "x", "pilot")));
     const D = V.VIEW_DRAW;
     ok("!! the draw numbers are pinned: a 240 x 160 window, fields of view 0.95 (plane), 1.25 (pilot) and 0.55 (gunner), the chase 24 m back, 7 m up and 6 m ahead, the seat at (0.9, 0, 0.55), the sight 60 m out", D.width === 240 && D.height === 160 && D.fovPlane === 0.95 && D.fovPilot === 1.25 && D.fovGunner === 0.55 && D.chaseBack === 24 && D.chaseUp === 7 && D.chaseAhead === 6 && D.seat.join() === "0.9,0,0.55" && D.sightAhead === 60 && D.refreshEvery === 1);
     ok("VIEW_DRAW and VIEWS are frozen", Object.isFrozen(V.VIEW_DRAW) && Object.isFrozen(V.VIEWS) && Object.isFrozen(V.VIEW_DRAW.seat) && Object.isFrozen(V.VIEW_DRAW.clear));
-    ok("!! the export list is pinned: VIEWS, VIEW_DRAW, basisOf, cameraFor, gunSightCamera, gunsight, nextView, pilotActivations, pilotCamera, pilotRows, planeCamera, project, reportLines, seatCamera, windowLabel", Object.keys(V).sort().join(",") === "VIEWS,VIEW_DRAW,basisOf,cameraFor,gunSightCamera,gunsight,nextView,pilotActivations,pilotCamera,pilotRows,planeCamera,project,reportLines,seatCamera,windowLabel", Object.keys(V).sort().join(","));
+    ok("!! the export list is pinned: VIEWS, VIEW_DRAW, basisOf, cameraFor, drawRows, gunSightCamera, gunsight, hudText, nextView, overviewCamera, pilotActivations, pilotCamera, pilotRows, planeCamera, project, reportLines, seatCamera, windowLabel", Object.keys(V).sort().join(",") === "VIEWS,VIEW_DRAW,basisOf,cameraFor,drawRows,gunSightCamera,gunsight,hudText,nextView,overviewCamera,pilotActivations,pilotCamera,pilotRows,planeCamera,project,reportLines,seatCamera,windowLabel", Object.keys(V).sort().join(","));
     const lines = V.reportLines();
     ok("the report lines say real numbers (no NaN, no undefined) and name the module", lines.length === 2 && lines.every((l) => !/NaN|undefined/.test(l)) && /view window per craft/.test(lines[0]), lines[1]);
 }

@@ -73,6 +73,26 @@ export function seatCamera(state, muzzle, { draw = VIEW_DRAW } = {}) {
     return { eye, target: add(eye, dir, draw.sightAhead), up: unit(up), fov: draw.fovGunner };
 }
 
+/**
+ * The main window's camera: every craft in the picture. It looks at the centroid of the craft from a fixed bearing and elevation (`azimuth` is measured from the world's +X about +Z, `elevation` up from the ground plane), and its distance is the
+ * smallest that puts a sphere holding every craft inside the field of view (whichever of the vertical and horizontal halves is narrower), times `margin`: d = max(minDistance, margin r / sin(half-angle)), r the farthest craft from the
+ * centroid. A craft inside that sphere is inside the picture BY GEOMETRY (a point of the sphere is at most asin(r / d) from the axis), which the gate checks on random placements.
+ */
+export function overviewCamera(states, { fov = 0.9, aspect = 16 / 9, azimuth = -0.6, elevation = 0.45, margin = 1.35, minDistance = 150 } = {}) {
+    const n = states.length || 1, c = [0, 0, 0];
+    for (const s of states) { c[0] += s.pos[0] / n; c[1] += s.pos[1] / n; c[2] += s.pos[2] / n; }
+    let r = 0; for (const s of states) r = Math.max(r, norm(sub(s.pos, c)));
+    const half = Math.min(fov / 2, Math.atan(Math.tan(fov / 2) * aspect)), d = Math.max(minDistance, margin * r / Math.sin(half));
+    const eye = [c[0] + d * Math.cos(elevation) * Math.cos(azimuth), c[1] + d * Math.cos(elevation) * Math.sin(azimuth), c[2] + d * Math.sin(elevation)];
+    return { eye, target: c, up: [0, 0, 1], fov, aspect, distance: d };
+}
+
+/** The line a window prints for a craft: airspeed (the speed over the air, m/s), altitude (m), heading (degrees, 0 = world +X, a right turn raises it, 0..359), hit points left, and rounds left. */
+export function hudText(state, { hp = 20, taken = 0, ammo = 0 } = {}) {
+    const ias = norm(state.vel), hdg = Math.atan2(-rotateByQuat(state.q, [1, 0, 0])[1], rotateByQuat(state.q, [1, 0, 0])[0]) * 180 / Math.PI, h = ((Math.round(hdg) % 360) + 360) % 360;
+    return `IAS ${ias.toFixed(0)} m/s  ALT ${state.pos[2].toFixed(0)} m  HDG ${String(h).padStart(3, "0")}  HP ${Math.max(0, hp - taken)}/${hp}  RDS ${ammo}`;
+}
+
 /** The camera a view names for a craft, or null for the brain view (which is not a camera). `gun` is { muzzle } for a seat, or omitted for the fixed gun. */
 export function cameraFor(view, state, opts = {}) {
     if (view === "plane") return planeCamera(state, opts);
@@ -130,6 +150,26 @@ export function pilotRows({ who = "pilot", act, featureNames, outputNames }) {
     if (act.hidden && act.hidden !== act.input) rows.push({ who, layer: "hidden", names: Array.from(act.hidden, (_, i) => "h" + i), values: Array.from(act.hidden) });
     rows.push({ who, layer: "outputs", names: outputNames, values: Array.from(act.output) });
     return rows;
+}
+
+/**
+ * Draw the rows as bars on a 2D context of w x h (render/carViews.mjs's drawBrainPanel, written out here so a page that wants only the bars does not load the race cars' scene): one row of bars per layer, each bar signed about the row's
+ * centre line (blue above for a positive value, amber below for a negative one), a hidden activation shown at half scale, every value clamped to [-1, 1]. Returns the number of bars drawn.
+ */
+export function drawRows(ctx, w, h, rows, { title = "" } = {}) {
+    ctx.fillStyle = "#050805"; ctx.fillRect(0, 0, w, h);
+    const rowH = Math.max(10, Math.floor((h - 14) / Math.max(1, rows.length))), pad = 46; let y = 12, bars = 0;
+    ctx.font = "9px ui-monospace,Menlo,monospace"; ctx.fillStyle = "#9fb2d4"; ctx.fillText(title.slice(0, 40), 3, 9);
+    for (const r of rows) {
+        ctx.fillStyle = "#5f7aa0"; ctx.fillText(`${r.who[0]} ${r.layer}`, 3, y + rowH - 3);
+        const n = r.values.length, bw = Math.max(2, Math.floor((w - pad - 4) / n) - 1), mid = y + rowH / 2;
+        for (let i = 0; i < n; i++) {
+            const v = Math.max(-1, Math.min(1, r.values[i] / (r.layer === "hidden" ? 2 : 1))), bh = Math.abs(v) * (rowH / 2 - 1), x = pad + i * (bw + 1);
+            ctx.fillStyle = v >= 0 ? "#59d1ff" : "#f6a623"; ctx.fillRect(x, v >= 0 ? mid - bh : mid, bw, Math.max(1, bh)); bars++;
+        }
+        y += rowH;
+    }
+    return bars;
 }
 
 /** The label under a window: the craft, the view, and what the view costs. */
