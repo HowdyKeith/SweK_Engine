@@ -12,6 +12,10 @@
 //             (the ground) marks the craft, two craft closer than COLLISION_RANGE have hit each other and BOTH are lost, and a craft whose hit points are gone is destroyed. A craft that is not flying takes no further part (it is not a target,
 //             it does not fire) and keeps its last state. THE FIGHT IS OVER when fewer than two teams have a craft flying, or at the time limit.
 //
+//   A BOMBER  a craft may carry `bomber` (physics/mechanics/bomber.mjs): then its FLIGHT is the bomber's scaled model with the engines still running (modelFor), its pilot is wrapped to be shown the trainer's world (froudeScale.scalePilot) so the pilots
+//             we have fly it, its HIT VOLUME is the bomber's spheres (a round names the part it reached; an engine shot to nothing -- 8 hits -- goes out and the thrust falls by a quarter), its hit points are the bomber's (60), and each of its
+//             GUN SEATS has a gunner (gunSeats.handGunner by default, one per seat; `gunner(seat, index)` gives another) that is shown the enemy craft still flying and turns its seat and fires its twin gun through gunSeats.stepSeat, the rounds
+//             owned by the bomber. A craft with no bomber is exactly what it was.
 // WHAT IS NOT HERE, SAID PLAINLY: a destroyed craft does not fall (the fight of two ends the tick one is destroyed, as dogfightTask's does; a falling wreck is the page's to draw), no wind (still air, as the task's), one fixed forward gun per
 // craft (gun SEATS are physics/mechanics/gunSeats.mjs and join this in the bomber's slice), and no friendly-fire rule beyond "a round does not hit its owner" (flightGuns.stepRounds'). stepArena() MUTATES the arena it is given: the page's
 // loop is one object stepped 30 times a second. Pure otherwise: no DOM, no clock, no random.
@@ -20,6 +24,9 @@ import * as F from "../physics/mechanics/flightModel6dof.mjs";
 import * as G from "../physics/mechanics/flightGuns.mjs";
 import * as AF from "./autopilotFlight.mjs";
 import * as D from "./dogfightTask.mjs";
+import * as GS from "../physics/mechanics/gunSeats.mjs";
+import * as BM from "../physics/mechanics/bomber.mjs";
+import * as SC from "../physics/mechanics/froudeScale.mjs";
 
 export const DT = D.DT, COLLISION_RANGE = D.COLLISION_RANGE;
 const still = Object.freeze([0, 0, 0]);
@@ -39,14 +46,23 @@ export function createArena({ crafts, dt = DT, seconds = D.SECONDS, model = AF.d
         if (c.behaviour === "script" && typeof c.script !== "function") throw new Error(`dogfightArena.createArena: craft ${c.id} scripts its target but has no script function`);
     }
     const made = crafts.map((c) => {
-        const m = c.model || model, sp = c.spec || spec, state = F.createState({ ...c.state, mass: m.mass, inertia: m.inertia });
-        return { id: c.id, team: c.team ?? c.id, name: c.name || `craft ${c.id}`, pilot: c.pilot, behaviour: c.behaviour || "hunt", script: c.script || null, fires: c.fires !== false, model: m, spec: sp, hp: c.hp ?? sp.hp,
-            state, gun: G.createGun(sp), hits: 0, taken: 0, status: "airborne", firstHitAt: null, killedAt: null, minAltitude: Infinity, maxAlpha: 0, minV: Infinity, last: null };
+        const bomber = c.bomber || null, m = c.model || (bomber ? bomber.model : model), sp = c.spec || spec, state = F.createState({ ...c.state, mass: m.mass, inertia: m.inertia });
+        const seats = bomber ? bomber.seats.map((seat, k) => ({ seat, state: GS.createSeatState(seat), decide: c.gunner ? c.gunner(seat, k) : GS.handGunner({ seed: c.id * 100 + k }), last: null })) : [];
+        return { id: c.id, team: c.team ?? c.id, name: c.name || `craft ${c.id}`, pilot: bomber ? SC.scalePilot(c.pilot, bomber.scale) : c.pilot, behaviour: c.behaviour || "hunt", script: c.script || null, fires: c.fires !== false, model: m, spec: sp, hp: c.hp ?? (bomber ? bomber.hp : sp.hp),
+            state, gun: G.createGun(sp), hits: 0, taken: 0, status: "airborne", firstHitAt: null, killedAt: null, minAltitude: Infinity, maxAlpha: 0, minV: Infinity, last: null,
+            bomber, seats, enginesRunning: bomber ? bomber.engines.length : 0, engineHp: new Map(bomber ? bomber.engines.map((id) => [id, bomber.parts[id].hp]) : []), aimRadius: c.aimRadius ?? (bomber ? 0.35 * bomber.span : sp.hitRadius), partHits: new Map() };
     });
     return { dt, seconds, t: 0, i: 0, crafts: made, rounds: [], events: [], closest: Infinity, done: false, over: null };
 }
 
 const flying = (c) => c.status === "airborne";
+/** Have two craft hit each other? Two plain craft: closer than COLLISION_RANGE. A bomber is its spheres: the other craft is inside one of them (grown by 2 m for the other's own size) -- a fighter in the bomber's wing, not 6 m from its centre. */
+function collides(A, B, range) {
+    if (!A.bomber && !B.bomber) return range < COLLISION_RANGE;
+    const big = A.bomber ? A : B, other = big === A ? B : A, mine = BM.partCentres(big.bomber, big.state);
+    if (other.bomber) return range < COLLISION_RANGE;
+    return mine.some((p) => norm(sub(other.state.pos, p.center)) < p.radius + 2);
+}
 /** The nearest enemy craft still flying, from c, or null. Ties go to the lower id. */
 export function nearestFoe(arena, c) {
     let best = null, bd = Infinity;
@@ -62,7 +78,7 @@ export function nearestFoe(arena, c) {
 export function stepArena(arena) {
     if (arena.done) return arena;
     const { dt } = arena, t = arena.i * dt, events = [];
-    const alive = arena.crafts.filter(flying), plan = new Map(), fresh = [];
+    const alive = arena.crafts.filter(flying), plan = new Map(), fresh = [], flightModel = (c) => (c.bomber ? c.bomber.modelFor(c.enginesRunning) : c.model);
     // decisions, all from the states the tick started with
     for (const c of alive) {
         const foe = nearestFoe(arena, c);
@@ -70,7 +86,7 @@ export function stepArena(arena) {
         if (c.behaviour === "script") target = c.script(t);
         else if (foe) target = D.pursuit(c.state, foe.state, c.spec).target;
         else target = { heading: F.attitude(c.state).heading, altitude: c.state.pos[2], airspeed: F.attitude(c.state).airspeed };
-        if (foe && c.fires) fire = D.fireControl(c.state, foe.state, c.gun, c.spec).fire;
+        if (foe && c.fires) fire = D.fireControl(c.state, foe.state, c.gun, c.spec, foe.aimRadius).fire;
         const controls = c.pilot(c.state, target, still);
         plan.set(c, { target, controls, fire, foe });
         c.last = { target, controls, fire, foe: foe ? foe.id : null };
@@ -79,9 +95,19 @@ export function stepArena(arena) {
         const p = plan.get(c), shot = G.fire(c.gun, c.state, !!p.fire, dt, c.id);
         c.gun = shot.gun; fresh.push(...shot.rounds);
     }
+    // the gun seats: each gunner is shown the enemy craft still flying (position, velocity, size) and answers with where to turn its seat and whether to fire, from the states the tick started with
+    for (const c of alive) {
+        if (!c.seats.length) continue;
+        const shown = alive.filter((o) => o.team !== c.team).map((o) => ({ id: o.id, pos: o.state.pos, vel: o.state.vel, radius: o.bomber ? o.aimRadius : o.spec.hitRadius }));
+        for (const st of c.seats) { const cmd = st.decide(st.seat, st.state, c.state, shown, t), out = GS.stepSeat(st.seat, st.state, c.state, cmd, dt, c.id); st.state = out.state; st.last = cmd; fresh.push(...out.rounds); }
+    }
     const stepped = new Map();
-    for (const c of alive) stepped.set(c, F.stepFlight(c.model, c.state, plan.get(c).controls, dt, still));
-    const targets = alive.map((c) => ({ id: c.id, from: c.state.pos, to: stepped.get(c).state.pos, radius: c.spec.hitRadius }));
+    for (const c of alive) stepped.set(c, F.stepFlight(flightModel(c), c.state, plan.get(c).controls, dt, still));
+    const targets = alive.flatMap((c) => {
+        if (!c.bomber) return [{ id: c.id, from: c.state.pos, to: stepped.get(c).state.pos, radius: c.spec.hitRadius }];
+        const from = BM.partCentres(c.bomber, c.state), to = BM.partCentres(c.bomber, stepped.get(c).state);
+        return from.map((p, k) => ({ id: c.id, part: p.part, from: p.center, to: to[k].center, radius: p.radius }));
+    });
     const res = G.stepRounds([...arena.rounds, ...fresh], dt, targets, { life: arena.crafts[0].spec.life });
     arena.rounds = res.rounds;
     const byId = new Map(arena.crafts.map((c) => [c.id, c]));
@@ -89,7 +115,14 @@ export function stepArena(arena) {
         const victim = byId.get(h.target), shooter = byId.get(h.owner);
         victim.taken += shooter.spec.damage; shooter.hits += shooter.spec.damage;
         if (shooter.firstHitAt === null) shooter.firstHitAt = (arena.i + 1) * dt;
-        events.push({ type: "hit", t: (arena.i + 1) * dt, shooter: shooter.id, victim: victim.id, point: h.point });
+        events.push({ type: "hit", t: (arena.i + 1) * dt, shooter: shooter.id, victim: victim.id, point: h.point, ...(h.part !== undefined ? { part: h.part } : {}) });
+        if (h.part !== undefined) {
+            victim.partHits.set(h.part, (victim.partHits.get(h.part) || 0) + shooter.spec.damage);
+            if (victim.engineHp.has(h.part)) {
+                const left = victim.engineHp.get(h.part) - shooter.spec.damage; victim.engineHp.set(h.part, left);
+                if (left <= 0 && left + shooter.spec.damage > 0) { victim.enginesRunning -= 1; events.push({ type: "engine", t: (arena.i + 1) * dt, craft: victim.id, part: h.part, name: victim.bomber.parts[h.part].name, running: victim.enginesRunning }); }
+            }
+        }
     }
     for (const c of alive) c.state = stepped.get(c).state;
     arena.i += 1; arena.t = arena.i * dt;
@@ -104,7 +137,7 @@ export function stepArena(arena) {
         if (!alive.includes(A) || !alive.includes(B)) continue;
         const range = norm(sub(A.state.pos, B.state.pos));
         if (range < arena.closest) arena.closest = range;
-        if (range < COLLISION_RANGE) {
+        if (collides(A, B, range)) {
             for (const X of [A, B]) if (X.status !== "collided") { X.status = "collided"; events.push({ type: "collision", t: arena.t, craft: X.id, with: (X === A ? B : A).id }); }
         }
     }

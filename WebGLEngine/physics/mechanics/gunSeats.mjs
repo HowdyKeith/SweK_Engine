@@ -88,6 +88,21 @@ export function stepSeat(seat, st, body, cmd, dt, owner = 0) {
 }
 
 /**
+ * A TRACK: the straight line through what a sight has measured, by least squares. `entries` is [{ t, pos }] (seconds, metres in the world); fewer than 3 entries is no track (null). Returns { t (the latest time), pos (the fitted
+ * position there), vel (the slope: the target's velocity as a sight that only sees where it is would estimate it), n }. A noise-free straight-line target is recovered exactly; with noise of sigma on each position the slope's
+ * standard deviation is sigma / (dt sqrt(N (N^2 - 1) / 12)) for N samples dt apart.
+ */
+export function fitTrack(entries) {
+    const n = entries.length; if (n < 3) return null;
+    const tm = entries.reduce((a, e) => a + e.t, 0) / n, pm = [0, 1, 2].map((i) => entries.reduce((a, e) => a + e.pos[i], 0) / n);
+    let stt = 0; const stp = [0, 0, 0];
+    for (const e of entries) { const dt = e.t - tm; stt += dt * dt; for (let i = 0; i < 3; i++) stp[i] += dt * (e.pos[i] - pm[i]); }
+    if (!(stt > 1e-12)) return null;
+    const vel = stp.map((v) => v / stt), last = entries[n - 1].t;
+    return { t: last, pos: pm.map((v, i) => v + vel[i] * (last - tm)), vel, n };
+}
+
+/**
  * The hand gunner: one per seat, because it REMEMBERS what it has seen. decide(seat, state, body, targets, t) -> { yaw, pitch, fire, target } where `targets` is [{ id, pos, vel, radius? }] in the world and `t` is the time in seconds
  * (any origin; it must not go backwards). See the header for what it does and does not model.
  *   delay      s    THE GUNNER'S REACTION: what it knows of a target is what the target was `delay` seconds ago, carried forward at the velocity it had THEN. A target that holds its velocity is predicted exactly (the sight does
@@ -95,8 +110,11 @@ export function stepSeat(seat, st, body, cmd, dt, owner = 0) {
  *   sigma      rad  the aim error on each axis (a Gaussian, repeatable: the seed, the seat and the time make it)
  *   maxRange   m    how far it will shoot, measured from the body's centre
  *   tolerance       how many target radii of predicted miss it will fire within, for the gun as it points NOW
+ *   observe         null (the default) gives the gunner the target's velocity as it is. { window, sigmaRange, floor } makes it a SIGHT THAT ONLY SEES WHERE THE TARGET IS: each tick it measures the target's position with a Gaussian error of
+ *                   max(floor, sigmaRange x range) metres on each axis, fits a straight line (fitTrack) through the measurements of the `window` seconds that ended `delay` ago, and leads that line's slope; it acts on a target
+ *                   only once three measurements are in the window. A target that holds its velocity is led to within the slope's noise; one that turns is led by the average of the window, which is behind it.
  */
-export function handGunner({ delay = 0.25, sigma = 0.012, seed = 1, maxRange = 450, tolerance = 1 } = {}) {
+export function handGunner({ delay = 0.25, sigma = 0.012, seed = 1, maxRange = 450, tolerance = 1, observe = null } = {}) {
     const seen = new Map();   // seat id | target id -> what was seen, oldest first: [{ t, pos, vel }]
     const hash = (str) => { let h = 2166136261; for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619); return h >>> 0; };
     return function decide(seat, st, body, targets, t = 0) {
@@ -105,11 +123,21 @@ export function handGunner({ delay = 0.25, sigma = 0.012, seed = 1, maxRange = 4
             const key = seat.id + "|" + tg.id;
             if (norm(sub(tg.pos, body.pos)) > maxRange) { seen.delete(key); continue; }
             let h = seen.get(key); if (!h) seen.set(key, h = []);
-            h.push({ t, pos: tg.pos.slice(), vel: tg.vel.slice() });
-            let k = -1; for (let i = 0; i < h.length; i++) if (h[i].t <= t - delay + 1e-9) k = i; else break;
-            if (k < 0) continue;
-            if (k > 0) h.splice(0, k);
-            const was = h[0], age = t - was.t, now = add(was.pos, mul(was.vel, age));
+            let was, age, now;
+            if (observe) {
+                const orng = mulberry((seed * 15485863 + Math.round(t * 1000) * 32452843 + hash(key)) >>> 0), range = norm(sub(tg.pos, body.pos)), sig = Math.max(observe.floor ?? 0.5, (observe.sigmaRange ?? 0.01) * range);
+                h.push({ t, pos: [tg.pos[0] + gauss(orng) * sig, tg.pos[1] + gauss(orng) * sig, tg.pos[2] + gauss(orng) * sig] });
+                const lo = t - delay - (observe.window ?? 0.6) - 1e-9, hi = t - delay + 1e-9, win = h.filter((e) => e.t >= lo && e.t <= hi);
+                while (h.length && h[0].t < lo - 0.1) h.shift();
+                const fit = fitTrack(win); if (!fit) continue;
+                age = t - fit.t; now = add(fit.pos, mul(fit.vel, age)); was = { vel: fit.vel };
+            } else {
+                h.push({ t, pos: tg.pos.slice(), vel: tg.vel.slice() });
+                let k = -1; for (let i = 0; i < h.length; i++) if (h[i].t <= t - delay + 1e-9) k = i; else break;
+                if (k < 0) continue;
+                if (k > 0) h.splice(0, k);
+                was = h[0]; age = t - was.t; now = add(was.pos, mul(was.vel, age));
+            }
             const sol = G.aimSolution(cur, now, was.vel, seat.gun); if (!sol) continue;
             const a = reachOf(seat, body, sol.dir); if (!a.inArc) continue;
             if (!best || sol.t < best.sol.t) best = { tg, sol, a };

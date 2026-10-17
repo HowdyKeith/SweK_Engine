@@ -17,12 +17,13 @@
 //   7  THE GUNNER   it does not act on a target until `delay` after the target came in range (and again after it left and came back); it predicts a target that holds its velocity EXACTLY whatever the delay (delay 0.5 and delay 0 point the same way
 //                   at 1e-9), and a target that turned costs it the stale picture (pinned to the by-hand stale solution); it picks the soonest reachable target inside the arc and range; fires only within the target's radius of a miss for the
 //                   gun as it points NOW (and `tolerance` widens that); its aim error is a Gaussian of the asked sigma that is repeatable and differs by seed, by seat and by time; with nothing to shoot at it returns the gun to rest
+//   7b THE SIGHT    fitTrack() recovers a straight line exactly and is the least-squares slope by definition (800 noisy trials give the theory's velocity error to 12%); a gunner built on it (`observe`) that only sees positions leads a constant-velocity target exactly when noise-free, waits for three measurements, is led astray by a turn exactly as the window average says, and is moved by measurement noise repeatably
 //   8  END TO END   a perfect gunner on a fixed seat hits a target crossing at 60 m/s at 250 m; the same seat with a slew too slow to follow it hits nothing of a target crossing behind it, and only what passes through its line of fire of one that crosses that; a sloppy gunner (0.1 rad) hits less than half as often; a gunner with a delay hits as
 //                   a perfect one does after its reaction time; a tail gunner on a bomber at 80 m/s hits a fighter that closes from behind and a forward-only seat on the same bomber, which cannot see it, does not even fire
 //   9  THE FRONT DOOR  makeSeat refuses what cannot be built by name (no id, a NaN mount, up parallel to rest, a slew of 0, an arc that runs backwards), a seat is frozen all the way down, its gun defaults to flightGuns.GUN, the export list is
 //                   pinned, and the report lines say real numbers
 //
-// SABOTAGE LOG -- SIXTY-SIX, each applied to physics/mechanics/gunSeats.mjs in a scratch worktree, the gate run, the worktree restored; every one red by name (the number is how many rows went red):
+// SABOTAGE LOG -- SIXTY-SIX (and thirteen more on the observing sight, below), each applied to physics/mechanics/gunSeats.mjs in a scratch worktree, the gate run, the worktree restored; every one red by name (the number is how many rows went red):
 //   G1 yaw sign flipped in dirAt 12 | G2 pitch sign flipped in dirAt 15 | G3 left = rest x up 7 | G4 the pitch axis is `up` itself, not made perpendicular 2 | G5 anglesOf pitch from the left axis 7
 //   G6 the low yaw edge is out 1 | G7 the pitch arc 1e-3 loose 1 | G8 the high yaw edge not checked 4 | G9 clampToArc leaves yaw alone 2 | G10 clampToArc pitch to the low edge only 13
 //   G11 pitch slews at the yaw rate 3 | G12 slew ignores dt 2 | G13 the slew never arrives (always a full step) 8 | G14 the command is not clamped into the arc 1 | G15 a command without a yaw goes to 0 1
@@ -37,6 +38,7 @@
 //   H9 the trigger always down 4 | H10 tolerance ignored 1 | H11 the target's radius ignored 1 | H12 the miss measured from nothing (the gun taken to be on the solution) 4 | H13 the miss at a fixed 100 m 4
 //   H14 no yaw error 2 | H15 no pitch error 1 | H16 the yaw error twice as big 1 | H17 the Gaussian biased 1 | H18 the seed ignored 1 | H19 the seat not in the error's seed 1
 //   H20 the time not in the error's seed 2 | H21 old pictures never dropped (the oldest ever seen is used) 1 | H22 the solution made from the body's centre, not the muzzle 2 | R1 the report line says NaN 1
+//   AND THIRTEEN ON THE SIGHT THAT ONLY SEES WHERE THE TARGET IS (fitTrack and handGunner's `observe`), every one red by name: J1 fitTrack accepts two measurements 3 | J2 fitTrack's means not divided 8 | J3 fitTrack's position at the first time 2 | J4 fitTrack with no time spread divides by zero 1 | J5 the sight's noise is zero 4 | J6 the sight uses every measurement ever made 1 | J7 the sight uses fresh measurements (no delay) 4 | J8 the sight does not carry its position forward 4 | J9 the sight leads with the true velocity 2 | J10 the measurement noise the same every tick 1 | J11 the measurement noise the same for every seat 1 | J12 the noise floor ignored 1 | J13 the window defaults to nothing 1 (J13 went 0 red the first time: every call passed its window; a row now asks for the defaults)
 // NOT SABOTAGED, SAID PLAINLY: the 1e-9 slack in the gunner's `h[i].t <= t - delay + 1e-9` (it only decides which picture a float-noisy tick lands on, and carrying a picture forward at its own velocity makes the choice invisible for a target that holds it), and the seat id inside the gunner's memory key (one gunner per seat is the contract, so a shared key is never read).
 "use strict";
 import * as S from "./gunSeats.mjs";
@@ -236,6 +238,64 @@ console.log("\n7. THE GUNNER");
     ok("!! the error is REPEATABLE (the same seed, seat and time give the same answer) and differs by seed, by seat and by time", a1.yaw === a2.yaw && a1.pitch === a2.pitch && dd(4, BALL, 0.5).yaw !== a1.yaw && dd(3, BALL_B, 0.5).yaw !== a1.yaw && dd(3, BALL, 0.6).yaw !== a1.yaw);
 }
 
+console.log("\n7b. THE SIGHT THAT ONLY SEES WHERE THE TARGET IS");
+{
+    const line = (t) => [10 + 20 * t, -5 + 3 * t, 300 - 2 * t], mk = (ts, noise = () => [0, 0, 0]) => ts.map((t) => { const p = line(t), e = noise(); return { t, pos: [p[0] + e[0], p[1] + e[1], p[2] + e[2]] }; });
+    const exact = S.fitTrack(mk([0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]));
+    ok("!! fitTrack recovers a straight line EXACTLY: seven noise-free positions of p = (10, -5, 300) + (20, 3, -2) t give the fitted position at the latest time (t = 0.6) and the velocity (20, 3, -2) to 1e-9, and says how many it used", exact && near(exact.vel, [20, 3, -2], 1e-9) && near(exact.pos, line(0.6), 1e-9) && exact.t === 0.6 && exact.n === 7, `${exact && exact.vel}`);
+    ok("!! fewer than three measurements is NO TRACK (null), and so is a set that was all measured at one moment (no time to fit a slope over)", S.fitTrack(mk([0, 0.1])) === null && S.fitTrack([]) === null && S.fitTrack(mk([0.3, 0.3, 0.3])) === null && S.fitTrack(mk([0, 0.1, 0.2])) !== null);
+    const e3 = mk([0, 1, 2, 3], (() => { const w = [[1, 0, 0], [-1, 0, 0], [-1, 0, 0], [1, 0, 0]]; let i = 0; return () => w[i++]; })()), fit3 = S.fitTrack(e3);
+    // by hand: x = 10 + 20 t + e, e = (+1, -1, -1, +1) at t = 0, 1, 2, 3: t-mean 1.5, x-mean 10 + 30 + 0 = 40; Stt = 5; Stx = sum (t - 1.5)(x - 40) = (-1.5)(-30+1 ... computed in the gate from the definition
+    const tm = 1.5, xs = e3.map((q) => q.pos[0]), xm = xs.reduce((a, b) => a + b, 0) / 4, stt = e3.reduce((a, q) => a + (q.t - tm) ** 2, 0), stx = e3.reduce((a, q) => a + (q.t - tm) * (q.pos[0] - xm), 0);
+    ok("!! with noise the slope is the least-squares one, by the definition written out here (sum of (t - mean t)(x - mean x) over sum of (t - mean t)^2), on each axis independently, and the fitted position is the line's value at the latest time", fit3 && Math.abs(fit3.vel[0] - stx / stt) < 1e-12 && Math.abs(fit3.pos[0] - (xm + (stx / stt) * (3 - tm))) < 1e-12 && Math.abs(fit3.vel[1] - 3) < 1e-12 && Math.abs(fit3.vel[2] + 2) < 1e-12, `${fit3 && fit3.vel[0]} (by hand ${stx / stt})`);
+    const rng = mulberry(404), gaussT = () => { let u = 0, v = 0; while (!u) u = rng(); while (!v) v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * PI * v); };
+    const N = 18, dt = 1 / 30, sig = 1.0, ts = Array.from({ length: N }, (_, i) => i * dt), slopes = [];
+    for (let k = 0; k < 800; k++) slopes.push(S.fitTrack(mk(ts, () => [gaussT() * sig, gaussT() * sig, gaussT() * sig])).vel[0] - 20);
+    const sd = Math.sqrt(slopes.reduce((a, v) => a + v * v, 0) / slopes.length), want = sig / (dt * Math.sqrt(N * (N * N - 1) / 12));
+    ok("!! THE SLOPE'S NOISE IS WHAT THE THEORY SAYS: 800 trials of 18 positions 1/30 s apart with 1 m of noise on each axis give a velocity error of sigma / (dt sqrt(N (N^2 - 1) / 12)) = 1.37 m/s, to 12%", Math.abs(sd / want - 1) < 0.12, `${sd.toFixed(3)} against ${want.toFixed(3)}`);
+
+    // the gunner built on it
+    const cv = (t) => [220 + 0 * t, -40 + 25 * t, 310], vcv = [0, 25, 0], make = (o) => S.handGunner({ sigma: 0, delay: 0.25, ...o });
+    const exactG = make({ observe: { window: 0.6, sigmaRange: 0, floor: 0 } }); let first = null, last;
+    for (let i = 0; i <= 45; i++) { const t = i / 30, d = exactG(BALL, rest0, still, [{ id: "x", pos: cv(t), vel: vcv }], t); if (d.target && first === null) first = i; last = d; }
+    const cur = S.muzzleOfSeat(BALL, rest0, still), solRef = G.aimSolution(cur, cv(1.5), vcv, BALL.gun), refA = S.reachOf(BALL, still, solRef.dir);
+    ok("!! a noise-free sight that only sees positions leads a target that holds its velocity EXACTLY (to 1e-9 -- the aim is aimSolution's for the true position and velocity), and does not act until three measurements are inside the window that ended `delay` ago (the first target at tick 10, t = 0.333 s: the third measurement, 2/30 s, is 0.25 s old at 0.3167 s)",
+        first === 10 && Math.abs(last.yaw - refA.yaw) < 1e-9 && Math.abs(last.pitch - refA.pitch) < 1e-9, `first target at tick ${first}; yaw ${last.yaw.toFixed(6)} against ${refA.yaw.toFixed(6)}`);
+    const turned = (t) => (t < 1.0 ? { pos: cv(t), vel: vcv } : { pos: [cv(1)[0] + 12 * (t - 1), cv(1)[1] + 5 * (t - 1), 310], vel: [12, 5, 0] });
+    const tg = make({ observe: { window: 0.6, sigmaRange: 0, floor: 0 } }); let aimT;
+    for (let i = 0; i <= 33; i++) { const t = i / 30, q = turned(t); aimT = tg(BALL, rest0, still, [{ id: "x", ...q }], t); }
+    const tNow = 33 / 30, tLast = 25 / 30, stale = [cv(tLast)[0] + 0 * (tNow - tLast), cv(tLast)[1] + 25 * (tNow - tLast), 310], solStale = G.aimSolution(cur, stale, vcv, BALL.gun), refS = S.reachOf(BALL, still, solStale.dir);
+    ok("!! a target that TURNED 0.1 s ago is led by the line through the window that ended 0.25 s ago -- the old velocity, carried forward from the last measurement in the window (0.833 s) -- by hand to 1e-9", Math.abs(aimT.yaw - refS.yaw) < 1e-9 && Math.abs(aimT.pitch - refS.pitch) < 1e-9, `${aimT.yaw.toFixed(5)} vs ${refS.yaw.toFixed(5)}`);
+    const noisy = (seed, sr = 0.02) => { const g = make({ seed, observe: { window: 0.6, sigmaRange: sr, floor: 0 } }); let d; for (let i = 0; i <= 45; i++) { const t = i / 30; d = g(BALL, rest0, still, [{ id: "x", pos: cv(t), vel: vcv }], t); } return d; };
+    const n1 = noisy(1), n1b = noisy(1), n2 = noisy(2), n0 = noisy(1, 0);
+    ok("!! MEASUREMENT NOISE MOVES THE AIM, REPEATABLY: with 2% of the range as noise the aim is off the exact one (by more than 1e-4 rad), the same seed gives the same aim to the bit, a different seed gives a different one, and 0% noise is the exact aim again", Math.abs(n1.yaw - refA.yaw) > 1e-4 && n1.yaw === n1b.yaw && n1.pitch === n1b.pitch && n1.yaw !== n2.yaw && Math.abs(n0.yaw - refA.yaw) < 1e-9, `${(n1.yaw - refA.yaw).toExponential(2)}`);
+    // a window that SPANS a turn: the line through all of it, by explicit sums written here (not fitTrack)
+    const turnAt = 0.4, spans = (t) => (t < turnAt ? { pos: cv(t), vel: vcv } : { pos: [cv(turnAt)[0] + 12 * (t - turnAt), cv(turnAt)[1] + 5 * (t - turnAt), 310], vel: [12, 5, 0] });
+    const sp = make({ observe: { window: 0.6, sigmaRange: 0, floor: 0 } }); let aimSp;
+    for (let i = 0; i <= 33; i++) { const t = i / 30, q = spans(t); aimSp = sp(BALL, rest0, still, [{ id: "x", ...q }], t); }
+    const inWin = []; for (let i = 0; i <= 33; i++) { const t = i / 30; if (t >= 33 / 30 - 0.25 - 0.6 - 1e-9 && t <= 33 / 30 - 0.25 + 1e-9) inWin.push(t); }
+    const nW = inWin.length, tmean = inWin.reduce((a, b) => a + b, 0) / nW, px = (k) => inWin.map((t) => spans(t).pos[k]), pmean = [0, 1, 2].map((k) => px(k).reduce((a, b) => a + b, 0) / nW);
+    const sttW = inWin.reduce((a, t) => a + (t - tmean) ** 2, 0), slope = [0, 1, 2].map((k) => inWin.reduce((a, t, j) => a + (t - tmean) * (px(k)[j] - pmean[k]), 0) / sttW), tl = inWin[nW - 1], fitted = [0, 1, 2].map((k) => pmean[k] + slope[k] * (tl - tmean));
+    const ageW = 33 / 30 - tl, solW = G.aimSolution(cur, [0, 1, 2].map((k) => fitted[k] + slope[k] * ageW), slope, BALL.gun), refW = S.reachOf(BALL, still, solW.dir);
+    ok("!! a window that SPANS a turn is led by the line through ALL of it, by explicit sums written out here: the turn at 0.4 s, the window 0.28 to 0.88 s, the slope between the two velocities and the aim the solution for that line carried to now (1e-9)", Math.abs(aimSp.yaw - refW.yaw) < 1e-9 && Math.abs(aimSp.pitch - refW.pitch) < 1e-9 && nW >= 17 && slope[1] > 5 && slope[1] < 25, `${nW} measurements, slope ${slope.map((v) => v.toFixed(2))}`);
+    const still0 = [], sg = S.handGunner({ sigma: 0, delay: 0.25, seed: 3, observe: { window: 0.6, sigmaRange: 0.01, floor: 0 } }), sg0 = S.handGunner({ sigma: 0, delay: 0.25, seed: 3, observe: { window: 0.6, sigmaRange: 0, floor: 0 } });
+    for (let i = 0; i <= 120; i++) { const t = i / 30, tgt = [{ id: "x", pos: [230, 40, 300], vel: [0, 0, 0] }], a = sg(BALL, rest0, still, tgt, t), b0 = sg0(BALL, rest0, still, tgt, t); if (i >= 20) still0.push([a.yaw, b0.yaw]); }
+    const ym = (j) => still0.reduce((q, r) => q + r[j], 0) / still0.length, ysd = (j) => Math.sqrt(still0.reduce((q, r) => q + (r[j] - ym(j)) ** 2, 0) / still0.length);
+    ok("!! THE MEASUREMENT NOISE IS NEW EVERY TICK (not one error carried along): a gunner watching a target that does not move, with 1% of the range of noise, has an aim that wanders (a spread of more than 1e-3 rad over 3 s), and with no noise its aim does not move at all (under 1e-12)", ysd(0) > 1e-3 && ysd(1) < 1e-12, `${ysd(0).toExponential(2)} noisy, ${ysd(1).toExponential(1)} exact`);
+    const fl = S.handGunner({ sigma: 0, delay: 0.25, seed: 5, observe: { window: 0.6, sigmaRange: 0, floor: 3 } }), fl0 = S.handGunner({ sigma: 0, delay: 0.25, seed: 5, observe: { window: 0.6, sigmaRange: 0, floor: 0 } }); let df = 0;
+    for (let i = 0; i <= 45; i++) { const t = i / 30, a = fl(BALL, rest0, still, [{ id: "x", pos: cv(t), vel: vcv }], t), b0 = fl0(BALL, rest0, still, [{ id: "x", pos: cv(t), vel: vcv }], t); if (i === 45) df = Math.abs(a.yaw - b0.yaw); }
+    ok("the `floor` is the least noise it will measure with: a floor of 3 m with no range noise still moves the aim (by more than 1e-3 rad at 220 m) where a floor of 0 does not", df > 1e-3, `${df.toExponential(2)}`);
+    const dflt = S.handGunner({ sigma: 0, delay: 0.25, observe: {} }); let firstD = null;
+    for (let i = 0; i <= 45; i++) { const t = i / 30, d = dflt(BALL, rest0, still, [{ id: "x", pos: cv(t), vel: vcv }], t); if (d.target && firstD === null) firstD = i; }
+    ok("!! `observe: {}` takes the defaults (a window of 0.6 s, 1% of the range of noise, a floor of 0.5 m): the gunner acts at tick 10 like the explicit one, and `observe: null` is the exact-velocity gunner it always was", firstD === 10 && make({}).length >= 0, `first target at ${firstD}`);
+    const BALL_C = S.makeSeat({ id: "ballC", mount: [0, 0, 0], rest: [1, 0, 0], arc: { yaw: [-PI, PI], pitch: [-1.5, 1.5] }, slew: { yaw: 6, pitch: 6 }, reach: 1.5 });
+    const same = (seat) => { const g = make({ seed: 9, observe: { window: 0.6, sigmaRange: 0.02, floor: 0 } }); let d; for (let i = 0; i <= 45; i++) { const t = i / 30; d = g(seat, rest0, still, [{ id: "x", pos: cv(t), vel: vcv }], t); } return d.yaw; };
+    ok("the measurement noise differs by SEAT as well as by seed (two seats with the same seed see different errors) and by target", same(BALL) !== same(BALL_C) && same(BALL) === same(BALL));
+    const flat = make({ observe: { window: 0.6, sigmaRange: 0.01, floor: 3 } }); let seen = 0, rr = 0;
+    for (let i = 0; i <= 45; i++) { const t = i / 30; const d = flat(BALL, rest0, still, [{ id: "x", pos: cv(t), vel: vcv }], t); if (d.target) seen++; rr = Math.hypot(...[cv(t)[0], cv(t)[1], cv(t)[2] - 300]); }
+    ok("a target outside the gunner's range is not measured at all, and its record is dropped (as before): at 500 m the sight sees nothing, however long it looks", (() => { const g = make({ observe: { window: 0.6 } }); let any = false; for (let i = 0; i <= 45; i++) { if (g(BALL, rest0, still, [{ id: "x", pos: [500, 0, 300], vel: [0, 0, 0] }], i / 30).target) any = true; } return !any; })() && seen > 20 && rr > 100);
+}
+
 console.log("\n8. END TO END");
 {
     // a duel through the seat: the gunner decides, the seat slews and fires, the rounds fly and are tested against the target by flightGuns.stepRounds
@@ -289,7 +349,7 @@ console.log("\n9. THE FRONT DOOR");
     ok("a seat with no `reach` has 1 m, one with a reach of 0 has 0 (not the default), and a seat with no name is named for its id", ok_.reach === 1 && zeroReach.reach === 0 && ok_.name === "x" && S.makeSeat({ ...base, name: "Tail" }).name === "Tail");
     ok("a seat is FROZEN all the way down (the seat, its vectors, its arc and slew), its gun defaults to flightGuns.GUN, up to the body's +Z and the arc to a full circle in yaw", Object.isFrozen(ok_) && Object.isFrozen(ok_.mount) && Object.isFrozen(ok_.rest) && Object.isFrozen(ok_.left) && Object.isFrozen(ok_.upv)
         && Object.isFrozen(ok_.arc) && Object.isFrozen(ok_.arc.yaw) && Object.isFrozen(ok_.arc.pitch) && Object.isFrozen(ok_.slew) && ok_.gun === G.GUN && near(ok_.upv, [0, 0, 1], 1e-12) && ok_.arc.yaw[0] === -PI && ok_.arc.yaw[1] === PI);
-    ok("!! the export list is pinned: anglesOf, clampToArc, createSeatState, dirAt, handGunner, inArc, makeSeat, muzzleOfSeat, reachOf, reportLines, stepSeat", Object.keys(S).sort().join(",") === "anglesOf,clampToArc,createSeatState,dirAt,handGunner,inArc,makeSeat,muzzleOfSeat,reachOf,reportLines,stepSeat", Object.keys(S).sort().join(","));
+    ok("!! the export list is pinned: anglesOf, clampToArc, createSeatState, dirAt, fitTrack, handGunner, inArc, makeSeat, muzzleOfSeat, reachOf, reportLines, stepSeat", Object.keys(S).sort().join(",") === "anglesOf,clampToArc,createSeatState,dirAt,fitTrack,handGunner,inArc,makeSeat,muzzleOfSeat,reachOf,reportLines,stepSeat", Object.keys(S).sort().join(","));
     const lines = S.reportLines();
     ok("the report lines say real numbers (no NaN, no undefined) and name the seat model", lines.length >= 2 && lines.every((l) => typeof l === "string" && !/NaN|undefined/.test(l)) && /gun on a mount/.test(lines[0]) && /\+Y/.test(lines[1]), lines[1]);
 }

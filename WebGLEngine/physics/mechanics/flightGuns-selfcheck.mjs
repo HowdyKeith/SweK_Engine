@@ -15,13 +15,14 @@
 //                   (an aircraft turned to point the gun, fire(), stepRounds() at 1/30 s) puts a hit on a target that flies across at 60 m/s from 150 to 500 m
 //   6  THE HITS     a round does not hit its owner; it takes the nearer of two targets; it dies on the ground and at its life; a hit is reported once
 //
-// SABOTAGE LOG -- THIRTY-ONE (twenty-six and five more on fireFrom, below), each applied to physics/mechanics/flightGuns.mjs in a scratch worktree, the gate run, the worktree restored; every one red by name (the number is how many rows went red):
+// SABOTAGE LOG -- THIRTY-FIVE (twenty-six, five more on fireFrom and four on the part a hit names, below), each applied to physics/mechanics/flightGuns.mjs in a scratch worktree, the gate run, the worktree restored; every one red by name (the number is how many rows went red):
 //   S1 boresight sign flipped 1 | S2 the muzzle offset ignored in the muzzle's place 2 | S3 the muzzle's rotation velocity ignored 2 | S4 w x r the wrong way round 2 | S5 a round falls a quarter g t^2 1 | S6 a round's velocity not changed by gravity 2 |
 //   S7 credit kept when the trigger is released 1 | S8 the rate doubled 4 | S9 rounds rounded, not floored 2 | S10 the magazine not clamping the last burst 1 | S11 a round hits its owner 1 | S12 the first target reached, not the earliest 1 |
 //   S13 rounds survive the ground 1 | S14 rounds live twice as long 1 (S13 and S14 share one row, which asks both) | S15 a sampled-distance hit test 7 | S16 the hit test in the world frame, a moving target ignored 2 | S17 a hit allowed beyond the end of the tick 2 |
 //   S18 the aim ignoring the fall of the round 3 | S19 the aim ignoring the shooter's own velocity 2 | S20 the aim ignoring the target's velocity 3 | S21 the aim iteration stopping at 0.1 s 3 | S22 a round without the muzzle's own velocity 3 | S23 a round spawned at the centre of mass 1.
 //   AND THREE ON THE FRONT DOOR, once section 7 existed: E5 the report line says NaN 1 | E6 GUN not frozen 1 | E7 the hit sphere 5 m 1 (only the numbers row sees it: the sweep rows pass their own radius, and the fights that depend on 4 m are the dogfight gate's).
 //   AND FIVE ON fireFrom, once the seats fired through it: F1 the muzzle function called on every tick, fired or not 1 | F2 a muzzle given as a value ignored 1 | F3 fire() drops the owner 2 (the one-round row) | F4 fireFrom drops the owner 2 (the same row, and the new value row sees it only through the owner it asks) | F5 the muzzle's velocity left out of the round 4
+//   AND FOUR ON THE PART A HIT NAMES (a craft of several spheres, which the bomber is): F6 a hit never names its part 1 | F7 a plain hit carries an undefined part 2 | F8 the part taken from the last target tested, not the nearest 1 (0 on the first listing: the nearest happened to be last) | F9 the part label lost on the way to the hit 1
 //   S10 is the one the 300-round rows could not have seen (REASONED, NOT RUN: the 5-round row was written before the sabotages): at 15 rounds a second a 1/30 s tick never fires more than the magazine has left, so the clamp could be deleted and those rows would pass.
 "use strict";
 import * as G from "./flightGuns.mjs";
@@ -162,6 +163,18 @@ console.log("\n6. THE HITS");
     ok("a round on the ground is removed (a round at z = 0.5 falling at 20 m/s), and a round at its life is removed (age 1.99 + 1/30 >= 2), not kept as a ghost", G.stepRounds([{ pos: [0, 0, 0.5], vel: [300, 0, -20], age: 0, owner: 1 }], dt, []).rounds.length === 0 && G.stepRounds([{ ...rd(1), age: 1.99 }], dt, []).rounds.length === 0 && G.stepRounds([{ ...rd(1), age: 1.9 }], dt, []).rounds.length === 1);
     const a = G.stepRounds([rd(1), rd(1, 10)], dt, [tgt(2, 30)]), b = G.stepRounds([rd(1), rd(1, 10)], dt, [tgt(2, 30)]);
     ok("deterministic: the same rounds and targets give the same survivors and the same hits, and a round that misses is carried forward aged by the tick", JSON.stringify(a) === JSON.stringify(b) && a.rounds.length === 2 && Math.abs(a.rounds[0].age - dt) < 1e-12);
+}
+
+{
+    // a craft made of several spheres: one target per part, the craft's id on each, a `part` label on each
+    const dt = 1 / 30, part = (name, x, R = 4) => ({ id: 2, part: name, from: [x, 0, 300], to: [x, 0, 300], radius: R }), rd = (owner, x = 0) => ({ pos: [x, 0, 300], vel: [300, 0, 0], age: 0, owner });
+    const near_ = G.stepRounds([rd(1)], dt, [part("tail", 14), part("nose", 6)]), one = G.stepRounds([rd(1)], dt, [{ id: 2, from: [6, 0, 300], to: [6, 0, 300], radius: 4 }]);
+    ok("!! A HIT SAYS WHICH PART OF A CRAFT IT REACHED: a craft of two spheres (ids 2, parts 'tail' listed first at 14 m and 'nose' at 6 m) is hit once, by the NEARER sphere whichever order they are listed in, and the hit names it ('nose'); a plain target's hit has no `part` at all (not an undefined one)",
+        near_.hits.length === 1 && near_.hits[0].target === 2 && near_.hits[0].part === "nose" && near_.rounds.length === 0 && G.stepRounds([rd(1)], dt, [part("nose", 6), part("tail", 14)]).hits[0].part === "nose" && one.hits.length === 1 && !("part" in one.hits[0]), JSON.stringify(near_.hits[0]));
+    const own = G.stepRounds([rd(2)], dt, [part("tail", 14), part("nose", 6)]);
+    ok("!! a round does not hit ITS OWNER'S PARTS either (the owner's id is on every part): a round of craft 2 through both of craft 2's spheres survives, and craft 1's does not", own.hits.length === 0 && own.rounds.length === 1 && G.stepRounds([rd(1)], dt, [part("tail", 12)]).hits.length === 1);
+    const mixed = G.stepRounds([rd(1)], dt, [part("wing", 20), { id: 3, from: [9, 0, 300], to: [9, 0, 300], radius: 4 }]);
+    ok("a plain craft nearer than a part of another is the one hit (the part label belongs to the hit's own target, not to a neighbour's)", mixed.hits.length === 1 && mixed.hits[0].target === 3 && !("part" in mixed.hits[0]));
 }
 
 console.log("\n7. THE FRONT DOOR");

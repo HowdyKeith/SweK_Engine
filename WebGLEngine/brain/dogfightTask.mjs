@@ -99,14 +99,14 @@ export function pursuit(me, foe, spec = G.GUN) {
 
 /**
  * THE TRIGGER: pull it when a round fired along the gun WOULD hit -- the gun axis is within FIRE_TOLERANCE hit radii of the lead solution at the opponent's range -- the opponent is inside MAX_RANGE and the gun has rounds.
- * Returns { fire, miss (m, the predicted distance between the round and the opponent at its time of flight), range }. A prediction on STRAIGHT lines: an opponent that turns while the round flies is missed.
+ * `foeRadius` is how far off the line the round may miss the opponent's centre and still be taken to hit: the gun's own hit sphere by default (a fighter), the aircraft's size for a bigger target (the bomber's). Returns { fire, miss (m, the predicted distance between the round and the opponent at its time of flight), range }. A prediction on STRAIGHT lines: an opponent that turns while the round flies is missed.
  */
-export function fireControl(me, foe, gun, spec = G.GUN) {
+export function fireControl(me, foe, gun, spec = G.GUN, foeRadius = spec.hitRadius) {
     if (gun.ammo <= 0) return { fire: false, miss: Infinity, range: Infinity };
     const m = G.muzzleOf(me, spec), sol = G.aimSolution(m, foe.pos, foe.vel, spec), range = norm(sub(foe.pos, me.pos));
     if (!sol || range > MAX_RANGE) return { fire: false, miss: Infinity, range };
     const c = clamp(dot(m.dir, sol.dir), -1, 1), miss = Math.sin(Math.acos(c)) * sol.t * spec.muzzleSpeed;
-    return { fire: miss <= FIRE_TOLERANCE * spec.hitRadius, miss, range };
+    return { fire: miss <= FIRE_TOLERANCE * foeRadius, miss, range };
 }
 
 /** The opponent's guidance target for a scripted kind at time t: straight holds what it started with; turn advances the heading at `rate`. (A hunting opponent uses pursuit().) */

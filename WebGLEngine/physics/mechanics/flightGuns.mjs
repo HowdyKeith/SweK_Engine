@@ -88,8 +88,8 @@ export function sweepHit(p0, p1, c0, c1, R) {
 }
 
 /**
- * One tick of every round in flight against the targets. `targets` is [{ id, from, to, radius }] (the centre at the tick's start and end). A round does not hit its own owner; it is removed on a hit, on the ground
- * (z <= 0), or when it is older than `life`. Returns { rounds (survivors), hits: [{ owner, target, t, point }] }, hits in round order. A round hits the EARLIEST target it reaches.
+ * One tick of every round in flight against the targets. `targets` is [{ id, from, to, radius, part? }] (the centre at the tick's start and end; a craft made of several spheres gives each its own target with the craft's id and a `part` label, and the hit says which part it reached). A round does not hit its own owner; it is removed on a hit, on the ground
+ * (z <= 0), or when it is older than `life`. Returns { rounds (survivors), hits: [{ owner, target, part?, t, point }] }, hits in round order (`part` only when the target gave one). A round hits the EARLIEST target it reaches.
  */
 export function stepRounds(rounds, dt, targets, { life = GUN.life, g = GRAVITY } = {}) {
     const alive = [], hits = [];
@@ -99,9 +99,9 @@ export function stepRounds(rounds, dt, targets, { life = GUN.life, g = GRAVITY }
         for (const tg of targets) {
             if (tg.id === r.owner) continue;
             const t = sweepHit(r.pos, n.pos, tg.from, tg.to, tg.radius);
-            if (t !== null && (best === null || t < best.t)) best = { t, target: tg.id };
+            if (t !== null && (best === null || t < best.t)) best = { t, target: tg.id, part: tg.part };
         }
-        if (best) { hits.push({ owner: r.owner, target: best.target, t: best.t, point: [r.pos[0] + (n.pos[0] - r.pos[0]) * best.t, r.pos[1] + (n.pos[1] - r.pos[1]) * best.t, r.pos[2] + (n.pos[2] - r.pos[2]) * best.t] }); continue; }
+        if (best) { hits.push({ owner: r.owner, target: best.target, ...(best.part !== undefined ? { part: best.part } : {}), t: best.t, point: [r.pos[0] + (n.pos[0] - r.pos[0]) * best.t, r.pos[1] + (n.pos[1] - r.pos[1]) * best.t, r.pos[2] + (n.pos[2] - r.pos[2]) * best.t] }); continue; }
         if (n.pos[2] <= 0 || n.age >= life) continue;
         alive.push(n);
     }
