@@ -9247,6 +9247,35 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "(243 of 1,099 weights moved; -0.3199 against -0.4223 on 36 scenarios nothing had flown, better on 34; 0 flights ended early on 500 starts against the autopilot's 2). Fifty-five sabotages, four first at 0 red and one that hung the gate. NOT CLOSED: the gain is in recovery and gusts and is almost nothing on calm starts; " +
                  "no safer in the stall than the autopilot; nothing run on the rig, whose verify of v4867 died with 0xC0000005 in five gates and a differential against v4863 is owed; the GPU-brain pilot is the next round.",
     }),
+    // v4871 -- since562, from `versionPreflight --next` after a full fetch (the highest declared anywhere was since561). NO new gate
+    // file: three rounds widened sixteen -- round 27's verdict, the re-timing round's merge and finished re-take, and the
+    // label-collision round's merge (its own closing, since556, comes in with it).
+    since562: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate.
+        at: "v4871", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "render/denoiseDevice-selfcheck.mjs (round 27's verdict: rule83Entries read off the four committed reports, the discrimination row, section 83's predictions)",
+            "render/denoiseCompile-selfcheck.mjs (section 87: under FXC the control kernel alone)",
+            "render/denoiseTiming-selfcheck.mjs (section 87: the FXC ladder retired by default)",
+            "physics/blobarium-selfcheck.mjs, render/blobRecorder-selfcheck.mjs, render/holoAgree-selfcheck.mjs and tools/ship/playwrightResolve-selfcheck.mjs (playwright's resolved `from` is always a path)",
+            "tools/ship/strandCensus-selfcheck.mjs (a re-run row carrying its own cap is kept)",
+            "tools/ship/kernelReach-selfcheck.mjs (a comment-only fixture for the per-file stripping, the gate now 55 s from 553)",
+            "tools/ship/gateReach-selfcheck.mjs (the census at 560, physics/mechanics/flightModel6dof.mjs)",
+            "tools/ship/timingProvenance-selfcheck.mjs (a resumed run's writer and coverage claim; spacesimStart's median re-taken)",
+            "tools/ship/timingRecords-selfcheck.mjs (frozenRecords named against the re-take)",
+            "tools/ship/budgetProvenance-selfcheck.mjs (a majority within 1.5x; configContract's reading)",
+            "tools/ship/cliArgs-selfcheck.mjs, tools/ship/shipVerdict-selfcheck.mjs and tools/ship/versionPreflight-selfcheck.mjs (the label-collision round)",
+        ]),
+        verdict: "*** THREE ROUNDS, AND THE ONE THAT TIMED EVERY GATE FOUND THE DEFECTS NOTHING ELSE COULD SEE. *** Round 27: Winograd's r27w is exact " +
+                 "under the restated key natively and in Chrome on both GPUs and runs at 0.30x r18t on the 1080 and 0.33-0.37x r18u on the Intel, so " +
+                 "no table entry moves. The re-timing round's serial re-take, finished here with --resume-since (complete, 1976 entries), turned five " +
+                 "record-reading gates red: kernelReach at 553 s against a 25.6 s record, a per-producer noComments pass now done once per file (55 s, " +
+                 "output identical); the slowest general gate re-pinned to tacticsTrain at 336 s; three budget bases moved to their observations; the " +
+                 "population census grown by one; and three rows restated where a fresh record broke a count rather than a claim. The label-collision " +
+                 "round's guards picked this ship's numbers. NOT CLOSED: section 87 needs the rig, and libmSensitivity and responseCensus still time out.",
+    }),
     // v4870 -- since561 (the highest on any branch at the time was since560, this branch's own, read across every remote ref after a full fetch; nothing past since559 exists elsewhere). THREE new gate files: brain/pilotFlightMlp-selfcheck.mjs
     // (the GPU Brain's pilot network, its CPU twin and its hand weights), brain/pilotFlightGpu-selfcheck.mjs (that network on a device, in a headless browser) and tools/ship/trainFlightPilotGpu-selfcheck.mjs (the trainer's --brain gpu).
     since561: Object.freeze({
