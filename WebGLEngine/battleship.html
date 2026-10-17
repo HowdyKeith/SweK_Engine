@@ -55,6 +55,9 @@
   <label title="a fraction of the ship's thrust to cruise at, 0-1">cruise <input id="cruise" type="number" min="0" max="1" step="0.1" value="0.3"></label>
   <label title="rounds hit every craft but their owner: a team-mate in the line, and the ship's own hull (off: they hit the other side only, as the 6DOF page's do)"><input id="ff" type="checkbox"> friendly fire</label>
   <label title="with friendly fire on: a fighter holds its trigger while a team-mate is in its line, a seat holds its fire while its line crosses the ship's own hull or a team-mate (the interlock)"><input id="hold" type="checkbox" checked> hold fire</label>
+  <label title="a destroyed craft keeps its momentum and spin and goes on drifting and tumbling (it is still no target)"><input id="wrecks" type="checkbox"> wrecks</label>
+  <label title="a hit gives the victim the round's momentum at the hit point (a round of 0.002): a hit off its centre spins a fighter"><input id="impact" type="checkbox"> impacts</label>
+  <label title="the bridge has a crew and each seat a gunner, who dies at half the hit points of his mount: a dead gunner's turret stands and does not fire, a dead bridge crew leaves the ship with no helm and no cannon"><input id="crew" type="checkbox"> crew</label>
   <label title="the spheres a round has to reach"><input id="spheres" type="checkbox"> hit spheres</label>
   <button id="newBtn" title="start this fight again from its first tick, with what is chosen">&#8635; New fight</button>
   <button id="pauseBtn">&#10074;&#10074; Pause</button><button id="stepBtn" title="one tick (1/30 s)">+1 tick</button>
@@ -147,7 +150,7 @@ const sun = new THREE.DirectionalLight(0xfff2dd, 2.2); sun.position.set(500, -30
   cloud(2600, 20000, 1.6, 0xcfe0ff, true);     // the stars
   cloud(240, 3000, 1.5, 0x4f5f78, false);        // a little dust, to see the craft move against
 }
-const HULL_DEAD = new THREE.MeshStandardMaterial({ color: 0x3a1c1c, roughness: 0.95 }), PART_DEAD = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 1 });
+const CREW_DEAD = new THREE.MeshStandardMaterial({ color: 0x5b6670, roughness: 1 }), HULL_DEAD = new THREE.MeshStandardMaterial({ color: 0x3a1c1c, roughness: 0.95 }), PART_DEAD = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 1 });
 const GLOW_ON = new THREE.MeshBasicMaterial({ color: 0xffb06a }), GLOW_OFF = new THREE.MeshBasicMaterial({ color: 0x151515 });
 function makeFighter(i) {   // the 6DOF page's hull: nose +X, a cylinder, a cone, a wing, the engine glow
   const g = new THREE.Group(), mat = new THREE.MeshStandardMaterial({ color: FIGHTER_COLORS[i % FIGHTER_COLORS.length], metalness: 0.3, roughness: 0.5 });
@@ -217,17 +220,17 @@ const clearFight = () => {
   if (markers) { scene.remove(markers); markers.geometry.dispose(); markers = null; }
   flashes.length = 0; meshes = []; trails = [];
 };
-function newFight({ kind = el("kind").value, seed = Number(el("seed").value) || 1, fighters = Number(el("nfight").value) || 8, gunners = el("gunners").value, f = el("pilotF").value, behaviour = el("behaviour").value, cruise = el("cruise").value === "" ? 0.3 : Number(el("cruise").value), friendlyFire = el("ff").checked, holdFire = el("hold").checked } = {}) {
+function newFight({ kind = el("kind").value, seed = Number(el("seed").value) || 1, fighters = Number(el("nfight").value) || 8, gunners = el("gunners").value, f = el("pilotF").value, behaviour = el("behaviour").value, cruise = el("cruise").value === "" ? 0.3 : Number(el("cruise").value), friendlyFire = el("ff").checked, holdFire = el("hold").checked, wrecks = el("wrecks").checked, impact = el("impact").checked ? SA.ROUND_MASS : 0, crew = el("crew").checked } = {}) {
   clearFight();
   fighters = Math.max(1, Math.min(MAX_FIGHTERS, Math.round(fighters))); seed = Math.max(1, Math.round(seed)); cruise = Math.max(0, Math.min(1, Number.isFinite(cruise) ? cruise : 0.3));
   pilots = resolvePilot(f);
-  fight = BS.build(seed, kind, { fighters, gunners, pilot: pilots.list.map((p) => p.fn), behaviour, cruise, friendlyFire: !!friendlyFire, holdFire: !!holdFire });
+  fight = BS.build(seed, kind, { fighters, gunners, pilot: pilots.list.map((p) => p.fn), behaviour, cruise, friendlyFire: !!friendlyFire, holdFire: !!holdFire, wrecks: !!wrecks, impact: impact === true ? SA.ROUND_MASS : Number(impact) || 0, crew: !!crew });
   arena = fight.arena;
   meshes = arena.crafts.map((c, i) => (c.kind === "capital" ? makeShip(c.ship) : makeFighter(i - 1)));
   trails = arena.crafts.map((c, i) => trailLine(c.kind === "capital" ? 0x6fd6c0 : FIGHTER_COLORS[(i - 1) % FIGHTER_COLORS.length])); trailN = arena.crafts.map(() => 0); deadShown = arena.crafts.map(() => false);
   markers = makeMarkers(arena.crafts.length);
   beamAge = 99; lastShipHitLog = -99; lastFriendlyLog = new Map(); log = [];
-  el("kind").value = kind; el("seed").value = String(fight.scenario.seed); el("nfight").value = String(fighters); el("gunners").value = typeof gunners === "string" ? gunners : "regular"; el("pilotF").value = pilots.id; el("behaviour").value = behaviour; el("cruise").value = String(cruise); el("ff").checked = !!friendlyFire; el("hold").checked = !!holdFire;
+  el("kind").value = kind; el("seed").value = String(fight.scenario.seed); el("nfight").value = String(fighters); el("gunners").value = typeof gunners === "string" ? gunners : "regular"; el("pilotF").value = pilots.id; el("behaviour").value = behaviour; el("cruise").value = String(cruise); el("ff").checked = !!friendlyFire; el("hold").checked = !!holdFire; el("wrecks").checked = !!wrecks; el("impact").checked = arena.impact > 0; el("crew").checked = !!crew;
   buildWindows(); camPos.set(...arena.crafts[0].body.pos).add(new THREE.Vector3(-120, -160, 70)); camLook.set(...arena.crafts[0].body.pos);
   renderNote(); renderFrame(0, true);
 }
@@ -241,6 +244,7 @@ function tickOnce() {
       else if (v.kind === "capital" && arena.i - lastShipHitLog >= 15) { lastShipHitLog = arena.i; log.push(`${e.t.toFixed(1)} s  ${nm(e.shooter)} hit the battleship${e.part !== undefined ? ` — ${ship.ship.parts[e.part].name}` : ""}  (${Math.max(0, Math.round(v.hp))} of ${v.hpMax} hit points left)`); }
     }
     else if (e.type === "part") log.push(`${e.t.toFixed(1)} s  ${e.name} OUT${e.kind === "engine" ? ` — ${e.running} of ${CS.ENGINE_PODS} engine pods running` : ""}`);
+    else if (e.type === "crew") log.push(e.what === "bridge" ? `${e.t.toFixed(1)} s  BRIDGE CREW LOST — the battleship has no helm and no cannon` : `${e.t.toFixed(1)} s  the gunner of ${e.name} is KILLED (his mount stands)`);
     else if (e.type === "kill") log.push(`${e.t.toFixed(1)} s  ${nm(e.craft)} DESTROYED${e.by === "wave" ? " by the wave-motion cannon" : ""}`);
     else if (e.type === "wave") { beamAge = 0; log.push(`${e.t.toFixed(1)} s  WAVE-MOTION CANNON fires — ${e.victims.length} craft in the beam (${e.damage} each)`); }
     else if (e.type === "ram") log.push(`${e.t.toFixed(1)} s  ${nm(e.craft)} rammed the hull (-${e.damage})`);
@@ -328,7 +332,8 @@ function drawOverlay(w, c, W, H) {
       const st = c.seats[w.seat], cam = cameraOf(w, c), foe = st.last && st.last.target != null ? arena.crafts.find((o) => o.id === st.last.target) : null;
       w.sight = drawSight(ctx, cam, seatMuzzle(c, w.seat), foe, st.seat.gun, W, H);
       ctx.fillStyle = "#9fb2d4"; ctx.fillText(`yaw ${(st.state.yaw * R2D).toFixed(0)}°  pitch ${(st.state.pitch * R2D).toFixed(0)}°  rounds ${st.state.gun.ammo}`, 4, H - 17);
-      if (!SA.seatWorks(c, st)) { ctx.fillStyle = "#ff6b6b"; ctx.fillText("SEAT OUT", W - 62, 24); }
+      if (c.partHp.has(st.part) && c.partHp.get(st.part) <= 0) { ctx.fillStyle = "#ff6b6b"; ctx.fillText("SEAT OUT", W - 62, 24); }
+      if (c.crew && c.crew.dead.has(st.seat.id)) { ctx.fillStyle = "#ff6b6b"; ctx.fillText("GUNNER DOWN", W - 80, 36); }
       if (st.blocked) { ctx.fillStyle = "#f6a623"; ctx.fillText(`INTERLOCK — ${st.blocked}`, 4, H - 29); }
       if (st.last && st.last.fire) { ctx.fillStyle = "#ff6b6b"; ctx.fillText("FIRE", W - 32, 12); }
     } else {
@@ -385,9 +390,10 @@ function syncScene(dt) {
     if (c.kind === "capital") {
       const ud = m.userData;
       c.seats.forEach((s, k) => {
-        const d = GS.dirAt(s.seat, s.state.yaw, s.state.pitch), t = ud.turrets[k], out = !SA.seatWorks(c, s);
+        const d = GS.dirAt(s.seat, s.state.yaw, s.state.pitch), t = ud.turrets[k], out = c.partHp.has(s.part) && c.partHp.get(s.part) <= 0, down = !!(c.crew && c.crew.dead.has(s.seat.id));
         t.barrel.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(d[0], d[1], d[2]));
         if (out && !t.dead) { t.dead = true; t.base.material = PART_DEAD; for (const b of t.barrel.children) b.material = PART_DEAD; }
+        else if (down && !out && !t.crewDown) { t.crewDown = true; t.base.material = CREW_DEAD; for (const b of t.barrel.children) b.material = CREW_DEAD; }
       });
       for (const e of ud.engines) { const out = c.partHp.get(e.id) <= 0; e.nac.material = out ? PART_DEAD : e.mat; e.glow.material = out || !live || !(c.last && c.last.thrust > 0) ? GLOW_OFF : GLOW_ON; }
       const f = Math.min(1, c.charge / c.ship.waveGun.charge); ud.charge.scale.setScalar(0.2 + 2.2 * f); ud.charge.material.opacity = live ? 0.25 + 0.7 * f : 0.05;
@@ -423,6 +429,7 @@ function updateBoard() {
     `<div class="row">hit points ${Math.round(left)}/${s.hpMax}   engines ${s.ship.engines.map((id) => (s.partHp.get(id) > 0 ? "●" : "○")).join(" ")} ${s.enginesRunning} of ${CS.ENGINE_PODS}</div>` +
     `<div class="row">wave-motion cannon (invented) ${Math.round(100 * s.charge / s.ship.waveGun.charge)}% charged, fired ${s.waves}<div class="bar wave"><i style="width:${(100 * s.charge / s.ship.waveGun.charge).toFixed(0)}%"></i></div></div>` +
     `<div class="row">parts out: ${out.length ? out.join(", ") : "none"}   rounds fired by the seats ${t.ship.seatRounds}   hits landed ${s.hits}</div>` +
+    (arena.crew ? `<div class="row">crew: ${s.helm ? "bridge at its post" : `<span class="bad">BRIDGE CREW LOST: NO HELM, NO CANNON</span>`}, ${t.ship.crewDead.length} of ${s.seats.length} gunners killed${t.ship.crewDead.length ? " (" + t.ship.crewDead.join(", ") + ")" : ""}</div>` : "") +
     (arena.friendlyFire ? `<div class="row">friendly fire ON, rules ${s.holdFire ? "on" : "OFF"}: its own guns have hit it for ${t.ship.friendlyTaken}, its seats held fire ${t.ship.held} ticks, ${t.friendlyHits} hit points of friendly damage in all</div>` : "");
   el("card1").innerHTML = `<b>${fs.length} fighters</b> · ${pilots.label} · ${t.flying} flying, ${t.killed} shot down, ${t.rammed} rammed` +
     fs.map((c, i) => `<div class="row">${c.status === "flying" ? "●" : "○"} ${c.name}  ${Math.max(0, Math.round(c.hp)).toString().padStart(3)} hp  ${c.status === "flying" ? c.mode : c.status}  fired ${c.gun.fired}  hits ${c.hits}${arena.friendlyFire ? `  friendly ${c.friendlyHits}/${c.friendlyTaken}  held ${c.held}` : ""}</div>`).join("");
@@ -434,7 +441,7 @@ function updateBoard() {
 function fillSelect(sel) { const keep = sel.value; sel.textContent = ""; for (const c of CHOICES) { const o = document.createElement("option"); o.value = c.id; o.textContent = c.label + (available(c) ? "" : " — not available"); o.disabled = !available(c); sel.appendChild(o); } if (keep) sel.value = keep; }
 function fillRosters() { fillSelect(el("pilotF")); }
 el("newBtn").onclick = () => newFight();
-for (const id of ["kind", "pilotF", "gunners", "nfight", "behaviour", "cruise", "seed", "ff", "hold"]) el(id).onchange = () => newFight();
+for (const id of ["kind", "pilotF", "gunners", "nfight", "behaviour", "cruise", "seed", "ff", "hold", "wrecks", "impact", "crew"]) el(id).onchange = () => newFight();
 el("pauseBtn").onclick = () => { paused = !paused; el("pauseBtn").textContent = paused ? "▶ Play" : "❚❚ Pause"; };
 el("stepBtn").onclick = () => { paused = true; el("pauseBtn").textContent = "▶ Play"; if (!arena.done) tickOnce(); };
 addEventListener("keydown", (e) => { if (e.code === "Space" && !/^(INPUT|SELECT|BUTTON)$/.test((e.target && e.target.tagName) || "")) { e.preventDefault(); el("pauseBtn").click(); } });
@@ -458,7 +465,7 @@ const ready = Promise.allSettled(CHOICES.filter((c) => c.file).map((c) => loadCh
   fillRosters();
   const pick = (k, dflt) => { const v = params.get(k); return CHOICES.some((c) => c.id === v && available(c)) ? v : dflt; };
   newFight({ kind: BS.KINDS.includes(params.get("kind")) ? params.get("kind") : "beam", seed: Number(params.get("seed")) || 1, fighters: Number(params.get("fighters")) || BS.FIGHTERS, gunners: BS.GUNNERS[params.get("gunners")] ? params.get("gunners") : BS.DEFAULT_GUNNERS,
-    f: pick("f", "pd"), behaviour: params.get("behaviour") === "hold" ? "hold" : "face", friendlyFire: params.get("ff") === "1", holdFire: params.get("hold") !== "0", cruise: params.get("cruise") === null || params.get("cruise") === "" || !Number.isFinite(Number(params.get("cruise"))) ? 0.3 : Number(params.get("cruise")) });
+    f: pick("f", "pd"), behaviour: params.get("behaviour") === "hold" ? "hold" : "face", friendlyFire: params.get("ff") === "1", holdFire: params.get("hold") !== "0", wrecks: params.get("wrecks") === "1", impact: params.get("impact") === "1" ? SA.ROUND_MASS : 0, crew: params.get("crew") === "1", cruise: params.get("cruise") === null || params.get("cruise") === "" || !Number.isFinite(Number(params.get("cruise"))) ? 0.3 : Number(params.get("cruise")) });
   requestAnimationFrame(frame);
 });
 
@@ -479,9 +486,9 @@ window.__battleship = {
   ready,
   state() { return { tick: arena.i, t: arena.t, done: arena.done, over: arena.over, scenario: { kind: fight.scenario.kind, seed: fight.scenario.seed }, rounds: arena.rounds.length,
     crafts: arena.crafts.map((c) => ({ id: c.id, team: c.team, name: c.name, kind: c.kind, status: c.status, pos: c.body.pos.slice(), vel: c.body.vel.slice(), q: c.body.q.slice(), w: c.body.w.slice(), hp: c.hp, hpMax: c.hpMax, hits: c.hits, mode: c.mode, enginesRunning: c.enginesRunning, charge: c.charge, waves: c.waves,
-      fired: c.gun ? c.gun.fired : null, partsOut: [...c.partHp].filter(([, hp]) => hp <= 0).map(([id]) => c.ship.parts[id].name), friendlyHits: c.friendlyHits, friendlyTaken: c.friendlyTaken, held: c.held, holdFire: c.holdFire,
+      fired: c.gun ? c.gun.fired : null, partsOut: [...c.partHp].filter(([, hp]) => hp <= 0).map(([id]) => c.ship.parts[id].name), friendlyHits: c.friendlyHits, friendlyTaken: c.friendlyTaken, held: c.held, holdFire: c.holdFire, helm: c.helm, crewDead: c.crew ? [...c.crew.dead] : [], crewBridge: c.crew ? c.crew.bridge : null,
       seats: c.seats.map((s) => ({ id: s.seat.id, name: s.seat.name, yaw: s.state.yaw, pitch: s.state.pitch, fired: s.state.gun.fired, ammo: s.state.gun.ammo, works: SA.seatWorks(c, s), held: s.held, blocked: s.blocked, last: s.last && { fire: s.last.fire, target: s.last.target } })), last: c.last && { foe: c.last.foe, fire: c.last.fire, thrust: c.last.thrust, mode: c.last.mode, held: c.last.held } })),
-    log: log.slice(), pilots: { id: pilots.id, label: pilots.label, list: pilots.list.map((p) => ({ id: p.id, label: p.label })) }, gunners: fight.gunners, gunnerOptions: fight.gunnerOptions, behaviour: arena.crafts[0].behaviour, cruise: arena.crafts[0].cruise, friendlyFire: arena.friendlyFire }; },
+    log: log.slice(), pilots: { id: pilots.id, label: pilots.label, list: pilots.list.map((p) => ({ id: p.id, label: p.label })) }, gunners: fight.gunners, gunnerOptions: fight.gunnerOptions, behaviour: arena.crafts[0].behaviour, cruise: arena.crafts[0].cruise, friendlyFire: arena.friendlyFire, wrecks: arena.wrecks, impact: arena.impact, crew: arena.crew }; },
   tally: () => BS.tally(arena),
   brainRows: (i) => brainRowsOf(arena.crafts[i]).map((r) => ({ label: r.label || `${r.who[0]} ${r.layer}`, layer: r.layer, n: r.values.length, values: r.values.slice() })),
   // a debug aid for the gate: n rounds dropped from OUTSIDE the named part of the ship along the way in (the flank mounts from their own side, the belly from below, the deck and the turrets from above, the pods from astern), owned by the first fighter
@@ -506,7 +513,7 @@ window.__battleship = {
   tracers: () => ({ pd: tracerP.geom.drawRange.count / 2, main: tracerM.geom.drawRange.count / 2, fighter: tracerF.geom.drawRange.count / 2 }),
   sight: (i) => wins[i].sight, texts: (i) => wins[i].texts.slice(), scissors: () => scissors.map((s) => s && { ...s }), stackRect: () => (({ x, y, width, height }) => ({ x, y, width, height }))(stack.getBoundingClientRect()),
   turretAim: (k) => { const m = meshes[0].userData.turrets[k].barrel.quaternion; return [m.x, m.y, m.z, m.w]; },
-  seatShown: () => meshes[0].userData.turrets.map((t) => ({ dead: t.dead })),
+  seatShown: () => meshes[0].userData.turrets.map((t) => ({ dead: t.dead, crewDown: !!t.crewDown, look: t.base.material === PART_DEAD ? "destroyed" : t.base.material === CREW_DEAD ? "unmanned" : "live" })),
   engineShown: () => meshes[0].userData.engines.map((e) => ({ out: e.nac.material === PART_DEAD, glow: e.glow.material === GLOW_ON })),
   cannonShown: () => ({ charge: meshes[0].userData.charge.scale.x, beam: meshes[0].userData.beam.visible }),
   fighterGlow: () => meshes.slice(1).map((m) => m.userData.eng.material === GLOW_ON),

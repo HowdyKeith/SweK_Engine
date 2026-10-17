@@ -22,8 +22,12 @@
 //               hull added -- the line from the muzzle for OWN_HULL_REACH (50) units against the ship's other parts -- and the seat keeps tracking while its trigger is held (`held` counts the ticks, on the seat and on the craft); the wave-motion cannon holds while a team-mate is in its beam. WITH `holdFire: false` the fighters shoot
 //               each other and the ship shoots itself.
 //
+//   WRECKS, IMPACTS AND CREW (three more options, all off by default): `wrecks` -- a destroyed craft keeps its momentum and its spin, no force and no torque on it, and goes on drifting and tumbling (it is still no target and no shooter); `impact` (a round's mass, ROUND_MASS 0.002 on the page) -- a round that hits gives the victim its
+//               momentum relative to it, AT THE HIT POINT, so a hit off a craft's centre spins it (and what spins a wreck is the hits that killed it); `crew` -- the ship's BRIDGE has its crew (BRIDGE_CREW 200, the hits on the bridge sphere) and each seat its GUNNER, who dies at CREW_FRACTION (half) of the hit points of the part the seat sits in, before the part is out: a seat
+//               whose gunner is dead does not fire (seatWorks) although its turret stands, a ship whose bridge crew is dead has no helm -- it turns no more, its engines are set to nothing -- and its cannon, fired from the bridge, charges no more; each death is a `crew` event. THE NUMBERS ARE INVENTED, the recoil of the guns is not modelled and neither is the damage a tumbling wreck would do.
+//
 // WHAT IS NOT HERE, SAID PLAINLY: hit volumes are SPHERES, a fighter's 1.5 units (the page's are oriented boxes: tests of the page's own fighter-against-fighter fight are not this arena's); a fighter that touches a hull is lost without an impulse; ships do not collide with each other; wind and gravity do not exist (vacuum);
-// a destroyed craft does not tumble (it stops, dark, where it was). stepSpaceArena() MUTATES the arena it is given. Pure otherwise: no DOM, no clock, no random.
+// by default a destroyed craft does not tumble (it stops, dark, where it was: `wrecks` lets it drift). stepSpaceArena() MUTATES the arena it is given. Pure otherwise: no DOM, no clock, no random.
 "use strict";
 import * as RB from "../physics/mechanics/rigidBody6dof.mjs";
 import * as G from "../physics/mechanics/flightGuns.mjs";
@@ -39,10 +43,13 @@ export const FIGHTER_GUN = Object.freeze({ ...G.GUN, muzzleSpeed: 900, rate: 100
 /** The autopilot's numbers on the page (PAGE_AUTOPILOT): thrust 16, standoff 50, the weapon's speed for the lead. */
 export const AUTOPILOT = Object.freeze({ weaponSpeed: 900, thrustForce: 16, standoff: 50 });
 export const STRAFE_RANGE = 220, APPROACH_OFFSET = 60, RAM_DAMAGE = 25, VISION = 1500, HOLD_FIRE_MARGIN = 2, OWN_HULL_REACH = 50;
+/** The options below, with the numbers the scenario and the page use (all INVENTED): a round's mass for `impact`, the share of a seat's part's hit points that its gunner's life is worth for `crew`, and the bridge crew's hit points. */
+export const ROUND_MASS = 0.002, CREW_FRACTION = 0.5, BRIDGE_CREW = 200;
 
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const add = (a, b, s = 1) => [a[0] + b[0] * s, a[1] + b[1] * s, a[2] + b[2] * s];
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const mul = (a, k) => [a[0] * k, a[1] * k, a[2] * k];
 const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const norm = (a) => Math.hypot(a[0], a[1], a[2]);
 const unit = (a, fallback = [1, 0, 0]) => { const n = norm(a); return n > 1e-9 ? [a[0] / n, a[1] / n, a[2] / n] : fallback; };
@@ -51,7 +58,7 @@ const unit = (a, fallback = [1, 0, 0]) => { const n = norm(a); return n > 1e-9 ?
  * A new arena. `crafts` are the definitions above; ids must be distinct positive integers. Returns { dt, seconds, t, i, crafts, rounds, events, done, over, autopilot }. A craft carries { id, team, name, kind, body, hp, hpMax, dead, status ("flying" | "destroyed" | "rammed"),
  * hits (damage it has dealt to the enemy), gun / seats / enginesRunning / partHp (Map part id -> hit points left) / charge / waves, last }.
  */
-export function createSpaceArena({ crafts, dt = DT, seconds = 120, autopilot = AUTOPILOT, friendlyFire = false } = {}) {
+export function createSpaceArena({ crafts, dt = DT, seconds = 120, autopilot = AUTOPILOT, friendlyFire = false, wrecks = false, impact = 0, crew = false } = {}) {
     if (!Array.isArray(crafts) || crafts.length < 2) throw new Error("spaceArena.createSpaceArena: an arena needs at least two crafts");
     const ids = new Set();
     for (const c of crafts) {
@@ -65,13 +72,15 @@ export function createSpaceArena({ crafts, dt = DT, seconds = 120, autopilot = A
         const body = RB.createBody({ mass: cap ? ship.mass : FIGHTER.mass, I: cap ? [...ship.I] : RB.boxInertia({ m: FIGHTER.mass, hx: FIGHTER.half[0], hy: FIGHTER.half[1], hz: FIGHTER.half[2] }), pos: st.pos, vel: st.vel, q: st.q, w: st.w });
         const out = { id: c.id, team: c.team ?? c.id, name: c.name || `craft ${c.id}`, kind: c.kind, body, hp: c.hp ?? (cap ? ship.hp : FIGHTER.hp), hpMax: c.hp ?? (cap ? ship.hp : FIGHTER.hp), dead: false, status: "flying", hits: 0, friendlyHits: 0, friendlyTaken: 0, held: 0, holdFire: c.holdFire !== false, last: null,
             ship, pilot: c.pilot || null, behaviour: c.behaviour || "face", cruise: c.cruise ?? 0.3, aimRadius: cap ? ship.aimRadius : FIGHTER.radius, mode: "approach", gun: cap ? null : G.createGun(FIGHTER_GUN), seats: [], enginesRunning: cap ? ship.engines.length : 0, partHp: new Map(), partHits: new Map(), charge: 0, waves: 0 };
+        out.helm = true; out.crew = null;
         if (cap) {
+            if (crew) out.crew = { bridge: BRIDGE_CREW, bridgeOut: false, seats: new Map(ship.seats.map((seat, k) => [seat.id, CREW_FRACTION * (ship.parts[ship.seatPart[k]].hp ?? 0)])), dead: new Set() };
             out.seats = ship.seats.map((seat, k) => ({ seat, state: GS.createSeatState(seat), decide: c.gunner ? c.gunner(seat, k) : GS.handGunner({ seed: c.id * 100 + k, gravity: 0, maxRange: 600, burst: 1 }), last: null, part: ship.seatPart[k], held: 0, blocked: null }));
             for (const p of ship.parts) if (p.hp !== null) out.partHp.set(p.id, p.hp);
         }
         return out;
     });
-    return { dt, seconds, t: 0, i: 0, crafts: made, rounds: [], events: [], done: false, over: null, autopilot: { ...autopilot }, friendlyFire: !!friendlyFire };
+    return { dt, seconds, t: 0, i: 0, crafts: made, rounds: [], events: [], done: false, over: null, autopilot: { ...autopilot }, friendlyFire: !!friendlyFire, wrecks: !!wrecks, impact, crew: !!crew };
 }
 
 const flying = (c) => !c.dead;
@@ -86,8 +95,8 @@ export function nearestFoe(arena, c) {
     return best;
 }
 
-/** Is a seat able to fire: the part it sits in has hit points left (a seat in a part that has none to lose always is)? */
-export const seatWorks = (c, st) => !c.partHp.has(st.part) || c.partHp.get(st.part) > 0;
+/** Is a seat able to fire: the part it sits in has hit points left (a seat in a part that has none to lose always is) and, with the `crew` option, its gunner is alive? */
+export const seatWorks = (c, st) => (!c.partHp.has(st.part) || c.partHp.get(st.part) > 0) && !(c.crew && c.crew.dead.has(st.seat.id));
 
 /**
  * What a fighter steers for and whether it may fire, against `foe`. Against a capital ship it flies the DOCTRINE in the header: approach a point APPROACH_OFFSET to the side (the side is the id's parity) with thrust, strafe within STRAFE_RANGE while closing (nose on the ship's lead, thrust cut). Against a
@@ -192,8 +201,9 @@ export function stepSpaceArena(arena) {
             let torque = [0, 0, 0];
             if (c.behaviour === "face" && foe) torque = CS.limitTorque(c.ship, AP.decide(c.body, { pos: foe.body.pos, vel: foe.body.vel }, { kp: c.ship.kp, kd: c.ship.kd, thrustForce: 0, standoff: 1e9 }).torqueBody);
             else torque = CS.limitTorque(c.ship, AP.decide(c.body, { pos: add(c.body.pos, RB.rotateByQuat(c.body.q, [1, 0, 0]), 1000) }, { kp: c.ship.kp, kd: c.ship.kd, thrustForce: 0, standoff: 1e9 }).torqueBody);
-            plan.set(c, { torque, thrust: CS.thrustWith(c.ship, c.enginesRunning) * c.cruise, fire: false, foe });
-            c.last = { foe: foe ? foe.id : null, fire: false, thrust: plan.get(c).thrust, mode: c.behaviour };
+            if (!c.helm) torque = [0, 0, 0];   // the bridge crew is gone: nobody turns the hull or sets the engines (`crew` option)
+            plan.set(c, { torque, thrust: c.helm ? CS.thrustWith(c.ship, c.enginesRunning) * c.cruise : 0, fire: false, foe });
+            c.last = { foe: foe ? foe.id : null, fire: false, thrust: plan.get(c).thrust, mode: c.helm ? c.behaviour : "no helm" };
         }
     }
     // the guns: a fighter's fixed gun, then every working seat
@@ -218,7 +228,7 @@ export function stepSpaceArena(arena) {
     // the wave-motion cannon: it charges, and fires when something of the other teams is in its line
     const waved = new Set();
     for (const c of alive) {
-        if (c.kind !== "capital") continue;
+        if (c.kind !== "capital" || !c.helm) continue;   // the cannon is fired from the bridge
         const w = c.ship.waveGun; c.charge = Math.min(w.charge, c.charge + dt);
         if (c.charge >= w.charge) {
             const hit = waveTargets(arena, c), mates = arena.friendlyFire ? waveMates(arena, c) : [];
@@ -239,6 +249,7 @@ export function stepSpaceArena(arena) {
         acc.torque = p.torque.slice();
         c.body = RB.step(c.body, acc, dt);
     }
+    if (arena.wrecks) for (const c of arena.crafts) if (c.dead && !alive.includes(c)) c.body = RB.step(c.body, RB.createAccumulator(), dt);   // a wreck keeps its momentum and its spin: no force on it, no torque
     // fighters that touch each other collide, as the page's do (the pairs of live fighters, in craft order)
     for (const e of SC.resolveShipCollisions(alive.filter((c) => c.kind === "fighter"), FIGHTER.half)) events.push({ type: "collision", t: tEnd, craft: e.a.id, with: e.b.id, damage: e.dmg });
     // every round moves and is tested against the other teams' craft
@@ -270,7 +281,16 @@ export function stepSpaceArena(arena) {
         const friendly = victim.team === shooter.team;   // only with friendlyFire: not the enemy's, so not the shooter's credit
         victim.hp -= dmg; if (friendly) { shooter.friendlyHits += dmg; victim.friendlyTaken += dmg; } else shooter.hits += dmg;
         events.push({ type: "hit", t: tEnd, shooter: shooter.id, victim: victim.id, point: h.point, damage: dmg, ...(friendly ? { friendly: true } : {}), ...(h.part !== undefined ? { part: h.part } : {}) });
+        if (arena.impact > 0) {   // the round's momentum, relative to the victim's, goes into it: at the hit point, so a hit off its centre spins it
+            const vb = victim.body, J = mul(sub(h.round.vel, vb.vel), arena.impact), tq = RB.worldToBody(vb.q, cross(sub(h.point, vb.pos), J));
+            vb.vel = add(vb.vel, J, 1 / vb.mass); vb.w = [0, 1, 2].map((i) => vb.w[i] + tq[i] / vb.I[i]);
+        }
         if (h.part !== undefined) {
+            if (victim.crew) {   // `crew`: the bridge has its crew, and each seat its gunner, who dies at a share of the part's hit points
+                const cr = victim.crew, kind = victim.ship.parts[h.part].kind;
+                if (kind === "bridge" && !cr.bridgeOut) { cr.bridge -= dmg; if (cr.bridge <= 0) { cr.bridgeOut = true; victim.helm = false; events.push({ type: "crew", t: tEnd, craft: victim.id, what: "bridge" }); } }
+                victim.ship.seats.forEach((seat, k) => { if (victim.ship.seatPart[k] === h.part && !cr.dead.has(seat.id)) { const left = cr.seats.get(seat.id) - dmg; cr.seats.set(seat.id, left); if (left <= 0) { cr.dead.add(seat.id); events.push({ type: "crew", t: tEnd, craft: victim.id, what: "seat", seat: seat.id, name: seat.name }); } } });
+            }
             victim.partHits.set(h.part, (victim.partHits.get(h.part) || 0) + dmg);
             if (victim.partHp.has(h.part)) {
                 const left = victim.partHp.get(h.part) - dmg; victim.partHp.set(h.part, left);
