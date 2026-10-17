@@ -5657,3 +5657,76 @@ are the rig's. Here they are held by fixtures (section 87's rows in both gates) 
   - The compile gates took 421 and 455 s on the Intel and 211 and 227 s on the 1080.
   - The timing gates took 506 and 541 s on the Intel and 267 and 269 s on the 1080, with r27w's ladder in them.
   - Their FXC children took 292, 318, 141 and 144 s.
+
+## 88. ROUND 28 -- THE VERDICT: SECTION 87's FOUR PREDICTIONS HOLD ON BOTH GPUS, AND THE FXC RETIREMENT STANDS
+
+**What arrived.** One `realGpuRun --only denoise` per GPU, then `tools/denoiseDevice.mjs --which`, as section 87 asks, both on
+2026-10-17 at 8490e721 ("v4871: record the release"). They are committed byte for byte at 0a8c4c48:
+- `render/denoise-rig-r28-intel-gen9.json`;
+- `render/denoise-rig-r28-gtx1080.json`;
+- `render/denoise-rig-r28-which.txt`, the console with each GPU's `--which` lines, CRLF as the rig wrote it.
+
+They were opened on arrival, as sections 85 and 86's were.
+
+**The four deciding predictions.**
+
+| Prediction | Intel gen-9 | GTX 1080 |
+|---|---|---|
+| 1. All three denoise gates green | exact, compile, timing: all green | all green |
+| 2. FXC's group is r12-tiled-3x3 alone: built, exact, FXC (DXBC) | "1 of 1 built; dumps: 1 FXC (DXBC)"; 131,072 plain, 0 fused, 0 unexplained | the same |
+| 3. The FXC ladder skipped with section 87's reason | "SKIP native FXC ladder: retired by section 87 (v4871)"; no FXC line timed | the same |
+| 4. `--which` unchanged | r18u, section 67's, under DXC, within 1.05e-6 of the f64 network | r18t, section 78's, under DXC, within 1.01e-6 |
+
+- **All four hold on both GPUs. The retirement stands.**
+  - Under FXC, `modeVariants` builds r12-tiled-3x3 alone, as a control.
+  - The timing gate's FXC ladder skips.
+  - `SWEK_DENOISE_FXC=all` puts both back.
+  - Nothing else changes.
+- **Prediction 2's second sentence, read strictly.** It says the section 87 line "names the seven that stood aside". The line
+  counts them instead: "the other 7 stand aside, not counted as unbuilt".
+  - The code that prints it was written in the same commit as the prediction, and has always printed a count.
+  - Read as the line that code prints, the prediction holds. Read as "lists seven names", it does not.
+  - That is said here rather than decided quietly. Nothing else in the verdict turns on it.
+
+**The rule as code.** Two rows in `render/denoiseDevice-selfcheck.mjs`, beside section 68's outcome row:
+- **The verdict row** reads the committed files. Each `--which` line is parsed by `parseWhich` and re-derived by `nativePick` on
+  the adapter and compiler it names.
+- **The discrimination row** works on copies. All eight kernels built under FXC fails prediction 2. The FXC ladder run fails
+  prediction 3. A `--which` naming r15 for the Intel fails prediction 4.
+- **Sabotaged five ways (X1-X5),** each red by name, each file restored byte-identical by SHA-256.
+
+**The first sabotage runner left two things broken, and neither showed in its red count.**
+- It was killed by its caller's timeout during X4. A Python `finally` does not run on SIGTERM, so the `--which` rule was left
+  without its kernels clause.
+- It also wrote files back in text mode. The committed console came back with LF endings, and its md5 was "restored" against text
+  it had already converted.
+- `git status` showed the console. X4's next attempt, finding nothing to edit, showed the clause.
+- Both were put back, and the console was compared byte for byte with the upload.
+- The runner now reads and writes bytes and restores on SIGTERM. Every round 27 and round 28 rig file was re-checked against its
+  upload, and all are identical.
+
+**Reported, not deciding: what the retirement was for.** Every bound section 87 set is met.
+
+| | Intel gen-9 | GTX 1080 |
+|---|---|---|
+| Compile gate | **50.1 s** (bound 200; round 24b 365 and 385; round 27 421 and 455) | **34.6 s** (bound 120; 184 and 178; 211 and 227) |
+| Timing gate | **193.2 s** (bound 351; round 27 506 and 541) | **154.0 s** (bound 230; 267 and 269) |
+| The whole denoise run | **328.3 s**, against 1,032.6 and 1,083.1 s in round 27 | **241.4 s**, against 530.3 and 552.3 s |
+
+- On the Intel the whole run is about a third of round 27's, and on the 1080 under half. Round 27 timed r27w too, as this run does,
+  so most of the gap is the FXC paths: the compile gate's seven retired FXC builds (r13-fast-head alone took 346 s on the Intel in
+  round 27) and the timing gate's FXC child (292 and 318 s there). The rest is one run's conditions against another's.
+
+**Also read off the same runs, deciding nothing.**
+- **The tables, as they stand:**
+  - On the Intel, r18u is 1.549x r15 natively at 1024 x 1024 and 1.530x on the page.
+  - On the 1080, r18t is 1.081x r15 natively at 1920 x 1080 and 1.089x on the page.
+- **r27w is where section 86 left it:** 0.388x r18u natively at 512 x 512 on the Intel, and 0.302x r18t at 1920 x 1080 on the 1080.
+- **One stall.** The 1080's page ladder timed r27w at 1920 x 1080 at 684 ms a pass, with a 90th percentile of 7,623 ms over three
+  passes.
+  - Layer 3 took 340 ms and the head 186 ms, against 66 and 18 natively.
+  - Round 27's two page runs read 250.4 and 248.3 ms at that size.
+  - r27w is closed and nothing reads that figure, so it is recorded and not chased.
+
+**What is next.** The FXC retirement owes nothing further. A native run under FXC still gets `DEFAULT_KERNELS`, and builds one
+control kernel where it built eight.

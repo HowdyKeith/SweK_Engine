@@ -206,6 +206,19 @@
 //   Z6  the committed 1080 run b edited to 1.100 x r18t natively at 1080p     -> 3 RED: the verdict, the discrimination row (its one-run
 //       lift is now two), the predictions -- one run alone still moves no entry, and the verdict row reads condition 3 in every run
 //   Z7  both runs asked as either run (some for every)                        -> 1 RED: the discrimination row
+// v4871+ -- ROUND 28'S VERDICT (section 88): the two rows read off render/denoise-rig-r28-*.json and -which.txt. Each restored byte-identical
+// (sha256), by a runner that reads and writes bytes and restores on SIGTERM:
+//   X1  prediction 3 looking for section 79's reason (the number before the renumbering)  -> 1 RED: the verdict
+//   X2  the committed Intel report's use_dxc-off group edited to 8 of 8 built             -> 1 RED: the verdict
+//   X3  the committed console's 1080 --which edited to r15                                -> 1 RED: the verdict
+//   X4  the Intel's expected set made r15                                                 -> 1 RED: the verdict
+//   X5  the --which rule without its kernels clause and its nativePick re-derivation      -> 1 RED: the discrimination row (either clause
+//       alone catches r15, so removing one alone should leave the row green -- read off the code, not run: the run that would have
+//       measured it is the killed one below)
+//   *** THE FIRST RUNNER LEFT TWO THINGS BROKEN, AND NEITHER WAS ITS RED COUNT. *** It was killed by its caller's timeout during X4, and a
+//   Python `finally` does not run on SIGTERM: the --which rule was left without its kernels clause. And it wrote files back in text mode,
+//   so the committed console -- CRLF, as the rig wrote it -- came back LF, with its md5 "restored" against the text it had already
+//   converted. git status showed the second, a grep for the clause the first; both were put back and cmp'd against the upload.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -647,6 +660,49 @@ console.log("1. THE KERNEL'S TWIN, ON THE CPU");
                 runs.length === 4 && held.every((h) => h.ok), held.map((h) => (h.ok ? "" : "WRONG ") + h.line).join("; "));
             const asInstalled = runs.filter((r, i) => !r.bad && !WHICH_PREDICTED[i].dxc).map((r) => `${r.vendor} ${r.version}`);
             console.log(`  ----  section 68: the packages the rig had installed (the pin is 0.6.0): ${asInstalled.join(", ")}`);
+        }
+        // v4871+ -- ROUND 28'S VERDICT (section 88): section 87's four deciding predictions, read off the committed run -- one realGpuRun
+        // --only denoise per GPU at 8490e721 (render/denoise-rig-r28-{intel-gen9,gtx1080}.json) and the console with each GPU's --which
+        // (render/denoise-rig-r28-which.txt). 1: every gate green; 2: the compile gate's use_dxc-off group is r12-tiled-3x3 alone, built,
+        // exact, its dump FXC (DXBC), the other seven standing aside by section 87's line; 3: the timing gate's FXC ladder skipped with
+        // section 87's reason, and no FXC line timed; 4: --which r18u on the Intel and r18t on the 1080, each line nativePick's own. The
+        // gate durations section 87 reported without deciding on are printed beside it. The retirement stands.
+        {
+            const rig = (f) => JSON.parse(fs.readFileSync(path.join(ENG, "render", f), "utf8"));
+            const R28 = { intel: rig("denoise-rig-r28-intel-gen9.json"), gtx1080: rig("denoise-rig-r28-gtx1080.json") };
+            const which28 = parseWhich(fs.readFileSync(path.join(ENG, "render", "denoise-rig-r28-which.txt"), "utf8"));
+            const rule87 = (rep) => {
+                const comp = rigGate(rep, "denoiseCompile"), tim = rigGate(rep, "denoiseTiming"), C = rigLines(comp), T = rigLines(tim);
+                const p1 = (rep.gates || []).length === 3 && rep.gates.every((g) => g.ok === true);
+                const offJobs = C.filter((l) => l.startsWith("native / use_dxc off: "));
+                const p2 = C.some((l) => /^native \/ use_dxc off in all: 1 of 1 built; dumps: 1 FXC \(DXBC\); compiler, from the package: FXC;/.test(l)) &&
+                    offJobs.length === 1 && /^native \/ use_dxc off: r12-tiled-3x3: .*, 131072 plain, 0 fused, 0 unexplained; dump: FXC \(DXBC\)/.test(offJobs[0]) &&
+                    (comp.skips || []).some((l) => /^SKIP  section 87: native \/ use_dxc off is FXC -- the denoiser's FXC paths are retired; r12-tiled-3x3 alone is built, as FXC's control, and the other 7 stand aside, not counted as unbuilt/.test(l));
+                const p3 = (tim.skips || []).some((l) => /^SKIP  native FXC ladder: retired by section 87 /.test(l)) && !T.some((l) => /^native FXC/.test(l));
+                return { p1, p2, p3, compS: Math.round(comp.ms / 1000), timS: Math.round(tim.ms / 1000), commit: rep.commit || "" };
+            };
+            const r = Object.fromEntries(Object.entries(R28).map(([k, rep]) => [k, rule87(rep)]));
+            const want = { intel: { vendor: "intel", key: "win32/intel/gen-9", kernels: "r18u" }, nvidia: { vendor: "nvidia", key: "win32/nvidia/pascal", kernels: "r18t" } };
+            const rule87which = (W) => W.length === 2 && W.every((w) => {
+                const t = !w.bad && want[w.vendor], re = t && nativePick({ info: { vendor: w.vendor, architecture: w.architecture, description: w.description } }, { compiler: w.compiler, platform: "win32" });
+                return !!t && w.compiler === "DXC" && w.key === t.key && w.kernels === t.kernels && w.built === t.kernels && w.worst <= 1e-4 &&
+                    re.key === w.key && re.kernels === w.kernels && re.why === w.why;
+            });
+            const p4 = rule87which(which28);
+            ok("!! *** round 28's verdict (section 88): section 87's four deciding predictions hold on both GPUs at 8490e721 -- every gate green, FXC builds the control kernel alone, the FXC ladder is skipped, --which unchanged -- so the FXC retirement stands ***",
+                Object.values(r).every((x) => x.p1 && x.p2 && x.p3 && /^8490e721 /.test(x.commit)) && p4,
+                Object.entries(r).map(([k, x]) => `${k}: 1 ${x.p1}, 2 ${x.p2}, 3 ${x.p3}`).join("; ") + `; 4 ${p4} (${which28.map((w) => `${w.vendor} ${w.kernels}`).join(", ")})`);
+            console.log(`  ----  section 87, reported and not deciding: compile gate ${r.intel.compS} s on the Intel (bound 200) and ${r.gtx1080.compS} s on the 1080 (bound 120); ` +
+                `timing gate ${r.intel.timS} s (bound 351) and ${r.gtx1080.timS} s (bound 230)`);
+            // it discriminates. On copies: the Intel's compile gate building all eight under FXC fails 2; the 1080's timing gate with the
+            // FXC ladder run fails 3; a --which naming r15 for the Intel fails 4
+            const all8 = JSON.parse(JSON.stringify(R28.intel));
+            for (const g of all8.gates) g.measured = (g.measured || []).map((l) => l.replace("native / use_dxc off in all: 1 of 1 built; dumps: 1 FXC", "native / use_dxc off in all: 8 of 8 built; dumps: 8 FXC"));
+            const ran = JSON.parse(JSON.stringify(R28.gtx1080)); rigGate(ran, "denoiseTiming").skips = []; rigGate(ran, "denoiseTiming").measured.push("native FXC: node-webgpu 0.6.2 ...; sets timed: r12, r15");
+            const w15 = parseWhich(fs.readFileSync(path.join(ENG, "render", "denoise-rig-r28-which.txt"), "utf8").replace("kernels r18u -- section 67's for win32/intel/gen-9, under DXC", "kernels r15 -- no entry"));
+            ok("  ...and it discriminates: all eight built under FXC, the FXC ladder run, or --which naming r15 on the Intel, and the verdict would not hold",
+                !rule87(all8).p2 && !rule87(ran).p3 && !rule87which(w15),
+                `eight under FXC: prediction 2 ${rule87(all8).p2}; ladder run: prediction 3 ${rule87(ran).p3}; --which naming r15: prediction 4 ${rule87which(w15)}`);
         }
         const tbl = { "Windows/intel/gen-9": "r18u" };
         ok("!! round 18: the page's key is platform, vendor and architecture -- none without a platform, as every browser but Chromium -- and pageKernelsFor gives the table's set for a key it names, PAGE_KERNELS for any other",
