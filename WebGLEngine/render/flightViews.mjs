@@ -134,30 +134,32 @@ export function project(cam, p, W, H) {
 /**
  * What the gunner's window draws over the picture: where the gun points on the screen (`bore`, the centre of a sight that looks along the gun), where a round fired now would be at the target's range (`pipper`, the point on the
  * gun's line that far out, dropped by the round's fall), and where the target will be when it gets there (`lead`, flightGuns.aimSolution's point), each as [x, y] pixels or null when off the picture or behind the eye; with the
- * range in metres and the time of flight in seconds (null when no round can reach the target). `muzzle` is { pos, vel, dir } as flightGuns.muzzleOf; `target` is { pos, vel }.
+ * range in metres and the time of flight in seconds (null when no round can reach the target). `muzzle` is { pos, vel, dir } as flightGuns.muzzleOf; `target` is { pos, vel }. `gravity` is the round's fall (flightGuns.GRAVITY by default; 0 for a gun in VACUUM,
+ * where the round flies straight and the pipper is on the gun's line -- the 6DOF space battle's sights, as gunSeats.handGunner's `gravity: 0` is its gunners').
  */
-export function gunsight(cam, muzzle, target, W, H, spec = G.GUN) {
+export function gunsight(cam, muzzle, target, W, H, spec = G.GUN, gravity = G.GRAVITY) {
     const bore = project(cam, add(cam.eye, unit(sub(cam.target, cam.eye)), 100), W, H);
     const out = { bore: bore && [bore[0], bore[1]], pipper: null, lead: null, range: null, tof: null, onScreen: false };
     if (!target) return out;
-    const sol = G.aimSolution(muzzle, target.pos, target.vel, spec);
+    const sol = G.aimSolution(muzzle, target.pos, target.vel, spec, gravity);
     out.range = norm(sub(target.pos, muzzle.pos));
     if (!sol) return out;
     out.tof = sol.t;
-    const t = sol.t, v = add(muzzle.vel, muzzle.dir, spec.muzzleSpeed), there = [muzzle.pos[0] + v[0] * t, muzzle.pos[1] + v[1] * t, muzzle.pos[2] + v[2] * t - 0.5 * G.GRAVITY * t * t];
+    const t = sol.t, v = add(muzzle.vel, muzzle.dir, spec.muzzleSpeed), there = [muzzle.pos[0] + v[0] * t, muzzle.pos[1] + v[1] * t, muzzle.pos[2] + v[2] * t - 0.5 * gravity * t * t];
     const pip = project(cam, there, W, H), lead = project(cam, sol.point, W, H);
     out.pipper = pip && [pip[0], pip[1]]; out.lead = lead && [lead[0], lead[1]];
     out.onScreen = !!(lead && lead[0] >= 0 && lead[0] <= W && lead[1] >= 0 && lead[1] <= H);
     return out;
 }
 
-/** A policy's activations on one feature vector: { input, hidden (the state before the output stage), output (the four controls in [-1, 1]: pitch, roll, yaw, and throttle mapped from 0..1) }. `policy` is pilotFlightPolicy or pilotFlightMlp. */
+/** A policy's activations on one feature vector: { input, hidden (the state before the output stage), output (the four controls in [-1, 1]: pitch, roll, yaw, and throttle mapped from 0..1) }. `policy` is pilotFlightPolicy or pilotFlightMlp -- or the 6DOF space pilot,
+ *  brain/pilot6dofPolicy.mjs, whose forward() answers an ARRAY of five numbers already in [-1, 1] (torque about x, y and z, thrust, fire) and whose output is that array as it stands. */
 export function pilotActivations(policy, w, x) {
     const layers = policy.layersOf(w), input = Float32Array.from(x);
     let hidden = input;
     for (let i = 0; i < layers.length - 1; i++) hidden = mlpLayerCpu(layers[i], hidden, 1);
     const c = policy.forward(w, input);
-    return { input, hidden, output: Float32Array.of(c.pitch, c.roll, c.yaw, c.throttle * 2 - 1) };
+    return { input, hidden, output: Array.isArray(c) ? Float32Array.from(c) : Float32Array.of(c.pitch, c.roll, c.yaw, c.throttle * 2 - 1) };
 }
 
 /** The rows the brain window draws: one per layer, in the shape carViews.drawBrainPanel takes ({ who, layer, names, values }). A pilot with no network (the PD autopilot) has features and outputs only. */

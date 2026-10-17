@@ -11,9 +11,11 @@
 //                   horizon tilts), and the same point in level flight is exactly on the centre line
 //   4  THE PROJECTION   a point straight ahead is the centre, one at the edge of the field of view is the edge (right: x = W, up: y = 0), one behind the eye is null, depth is the distance along the view; the aspect ratio is W / H
 //   5  THE SIGHT    the gun's sight looks along flightGuns.muzzleOf's axis (0.05 rad below the nose) and `bore` is the centre; the lead pip is where aimSolution's point lands and the pipper is where the round fired now would be, and the two
-//                   are THE SAME PIXEL when the gun is on the solution and a known number of pixels apart when it is 0.01 rad off; the range and the time of flight are the solution's; a target that cannot be reached has no pip and no tof
+//                   are THE SAME PIXEL when the gun is on the solution and a known number of pixels apart when it is 0.01 rad off; the range and the time of flight are the solution's; a target that cannot be reached has no pip and no tof;
+//                   in VACUUM (gravity 0, the space battle's sights) the round flies straight: the pipper, the lead pip and the bore are one pixel for a gun on the solution, the time of flight is the straight-line intercept's closed form, and gravity is a parameter (left out it is the Earth's)
 //   6  THE SEAT     a gun seat's eye is 0.4 m behind the muzzle along the gun, looking along it, up perpendicular to the gun; a gun pointing straight up falls back to the nose for up
-//   7  THE BRAIN    pilotActivations() runs the layers (the fruit fly's 34 hidden and the GPU Brain's 32) and its outputs are the controls the policy gives (throttle mapped to [-1, 1]); the output stage applied to the hidden state IS the output;
+//   7  THE BRAIN    pilotActivations() runs the layers (the fruit fly's 34 hidden and the GPU Brain's 32) and its outputs are the controls the policy gives (throttle mapped to [-1, 1]); the output stage applied to the hidden state IS the output; the 6DOF SPACE PILOT's forward() is an array of five
+//                   in [-1, 1] and is the output as it stands (12 features, 34 hidden after the recurrent steps);
 //                   pilotRows() has features, hidden and outputs (a pilot with no network has two rows) with the names the policy gives
 //   8  THE MAIN WINDOW  overviewCamera() has every craft in the picture by geometry (210 random placements, three window shapes), at exactly max(150, 1.35 r / sin(the narrower half-angle)), looking at the centroid; hudText() is speed, altitude, heading, hit points and rounds
 //   9  THE BARS         drawRows() paints one bar per value, signed about the row's centre line, a hidden value at half scale, clamped to the row, the labels and the title cut to 40 characters
@@ -41,6 +43,10 @@
 //   N13 the trigger sign inverted 2 | N14 the target sign inverted 2 | N15 wanted and actual swapped 1 | N16 a seat with no command yet is firing at a target 1 | N17 the seat labels count from 0 2
 //   N18 the seat rows carry no label 2 | N19 an arc of no width is NaN 1 | N20 drawRows ignores a row's label 1 | N21 the gunner's label does not name the seat 1 | N22 the seat count in the label is wrong 1
 //   N23 the brain label ignores the gunners 1 | N24 the seat rows have five values (no target) 3
+// AND ELEVEN MORE ONCE THE SPACE BATTLE NEEDED A SIGHT IN VACUUM AND THE 6DOF PILOT'S NETWORK IN THE BRAIN WINDOW (the gunsight's `gravity` and pilotActivations' array branch; section 5's last two rows and section 7's 6DOF block), each red by name, none 0 red:
+//   W1 the sight's solution ignores gravity, the Earth's always 2 | W2 the pipper's fall is always the Earth's 2 | W3 the default gravity is none 4 | W4 the default gravity is 9.8 4
+//   W5 a gravity of 0 means the Earth's, in the solution 2 | W6 ...and in the pipper 2 | W7 an array output is cut to its first four 3 | W8 an array output is never recognised 3
+//   W9 an array output is clamped to 0..1 2 | W10 the 6DOF pilot's hidden state is taken after the first layer only 3 | W11 an object output loses its throttle mapping 4
 "use strict";
 import * as V from "./flightViews.mjs";
 import * as G from "../physics/mechanics/flightGuns.mjs";
@@ -49,6 +55,8 @@ import * as PF from "../brain/pilotFlightPolicy.mjs";
 import * as MF from "../brain/pilotFlightMlp.mjs";
 import * as AF from "../brain/autopilotFlight.mjs";
 import * as GS from "../physics/mechanics/gunSeats.mjs";
+import * as P6 from "../brain/pilot6dofPolicy.mjs";
+import * as RB from "../physics/mechanics/rigidBody6dof.mjs";
 import { mlpLayerCpu } from "./brainTsl.mjs";
 
 let fails = 0;
@@ -135,6 +143,15 @@ console.log("\n5. THE GUN'S SIGHT");
     ok("!! `onScreen` is false when the lead pip is off the picture (a sight turned 90 degrees away has no pip on it, though the solution exists), and true on the solution", away.onScreen === false && g0.onScreen === true, `${away.lead}`);
     const gone = V.gunsight(camSol, m, { pos: [400, 0, 300], vel: [400, 0, 0] }, W, H);
     ok("!! a target that cannot be reached (receding faster than the round) has no pip, no pipper and no time of flight, and still a range; no target at all gives the bore only", gone.lead === null && gone.pipper === null && gone.tof === null && Math.abs(gone.range - 400) < 3 && (() => { const n = V.gunsight(camSol, m, null, W, H); return n.lead === null && n.pipper === null && n.range === null && !!n.bore; })());
+    // IN VACUUM (gravity 0): the round flies straight, so the pipper is on the gun's line; the 6DOF space battle's sights (battleship.html)
+    const vac = { pos: [0, 0, 300], vel: [0, 0, 0], dir: [1, 0, 0] }, rel = sub(target.pos, vac.pos), vv = dot(target.vel, target.vel) - 300 * 300, rv = dot(rel, target.vel), rr = dot(rel, rel);
+    const tStraight = (-rv - Math.sqrt(rv * rv - vv * rr)) / vv;   // |rel + v t| = 300 t: the smaller root of (v.v - 300^2) t^2 + 2 rel.v t + rel.rel = 0 (the leading coefficient is negative, so this is the positive one)
+    const solV = G.aimSolution(vac, target.pos, target.vel, G.GUN, 0), mV = { ...vac, dir: solV.dir }, gV = V.gunsight(look(mV), mV, target, W, H, G.GUN, 0);
+    ok("!! with gravity 0 the round flies STRAIGHT: a gun on the vacuum solution (muzzle at rest) has the pipper, the lead pip and the bore on the SAME pixel (the centre of the picture) to 1e-6, and the time of flight is the straight-line intercept's closed form (the smaller root of |rel + v t| = 300 t)",
+        gV.pipper && gV.lead && near(gV.pipper, gV.lead, 1e-6) && near(gV.pipper, gV.bore, 1e-6) && near(gV.bore, [W / 2, H / 2], 1e-9) && Math.abs(gV.tof - tStraight) < 1e-9 && Math.abs(solV.t - tStraight) < 1e-9, `pipper ${gV.pipper}, lead ${gV.lead}, tof ${gV.tof} vs ${tStraight}`);
+    const gE = V.gunsight(camSol, mSol, target, W, H, G.GUN, G.GRAVITY), gA = V.gunsight(camSol, mSol, target, W, H, G.GUN, 0);
+    ok("!! gravity is a parameter and not a constant: leaving it out IS the Earth's 9.80665 (the same pixels, time and range as passing flightGuns.GRAVITY, to 1e-12), and 0 gives another answer for the same gun -- a gun aimed ABOVE the line to a target (for the fall) has its vacuum pipper ABOVE the lead pip on the picture, by more than a pixel, and a different time of flight",
+        near(g0.pipper, gE.pipper, 1e-12) && near(g0.lead, gE.lead, 1e-12) && g0.tof === gE.tof && g0.range === gE.range && gA.pipper && gA.lead && gA.pipper[1] < gA.lead[1] - 1 && Math.abs(gA.tof - gE.tof) > 1e-4, `${gA.pipper} vs lead ${gA.lead}, tof ${gA.tof} vs ${gE.tof}`);
 }
 
 console.log("\n6. A GUN SEAT'S VIEW");
@@ -160,6 +177,18 @@ console.log("\n7. THE BRAIN WINDOW");
         ok(`!! ...and the output stage applied to the hidden state IS the output (to 1e-5, before the clamp) -- on weights whose later layers MATTER (the hand weights' are the identity; these are the hand weights with noise 0.1, whose throttle is interior to 0..1 so that mapping it to [-1, 1] changes it), so the hidden state shown is the one after ALL the layers before the output: the window shows the state that makes the decision`, Math.max(...Array.from(act.hidden, (v, i) => Math.abs(v - firstOnly[i]))) > 1e-3 && c.throttle > 0.05 && c.throttle < 0.95 && [0, 1, 2].every((i) => Math.abs(Math.max(-1, Math.min(1, again[i])) - act.output[i]) < 1e-5) && Math.abs(Math.max(0, Math.min(1, again[3])) * 2 - 1 - act.output[3]) < 1e-5);
         const rows = V.pilotRows({ act, featureNames: P.FEATURE_NAMES, outputNames: P.OUTPUT_NAMES });
         ok(`the rows: features (18, named), hidden (${hiddenN}, h0..), outputs (pitch, roll, yaw, throttle)`, rows.length === 3 && rows[0].layer === "features" && rows[0].values.length === 18 && rows[0].names.length === 18 && rows[1].layer === "hidden" && rows[1].values.length === hiddenN && rows[1].names[0] === "h0" && rows[2].layer === "outputs" && rows[2].names.join() === "pitch,roll,yaw,throttle");
+    }
+    {   // THE 6DOF SPACE PILOT (brain/pilot6dofPolicy.mjs): twelve features, 34 hidden after the three recurrent steps, five outputs that forward() already gives in [-1, 1] as an ARRAY (torque x, y, z, thrust, fire)
+        const body = RB.createBody({ mass: 8, I: RB.boxInertia({ m: 8, hx: 1.6, hy: 0.7, hz: 0.7 }), pos: [0, 0, 0], vel: [3, 1, -2], q: [0.9, 0.1, 0.3, 0.3], w: [0.2, -0.1, 0.3] }), tgt = { pos: [180, 40, -25], vel: [-4, 2, 1] };
+        const xs = P6.features(body, tgt, { weaponSpeed: 900, thrustForce: 16, standoff: 50 }), w6 = P6.perturb(P6.handWeights(), 0.1, mulberry(3)), act = V.pilotActivations(P6, w6, xs), c6 = P6.forward(w6, xs);
+        const layers = P6.layersOf(w6), last = layers[layers.length - 1], again = mlpLayerCpu(last, act.hidden, 1), firstOnly = mlpLayerCpu(layers[0], Float32Array.from(xs), 1);
+        ok("!! the 6DOF space pilot: 12 features in, 34 hidden, five outputs -- the torque about x, y and z, the thrust and the trigger -- and they are the ARRAY the policy gives, as it stands (to the f32 rounding of the features the window shows), every one in [-1, 1]",
+            act.input.length === 12 && act.hidden.length === 34 && act.output.length === 5 && c6.length === 5 && c6.every((v, i) => Math.abs(act.output[i] - v) < 1e-5) && act.output.every((v) => v >= -1 && v <= 1) && act.output.some((v) => Math.abs(v) > 0.05), `${Array.from(act.output).map((v) => v.toFixed(3))}`);
+        ok("!! ...and the output stage applied to the hidden state IS the output (the tanh of it, to 1e-5) on weights whose recurrent steps MATTER (noise 0.1 on the hand weights, whose recurrent edges are zero: the hidden state differs from the first layer's alone), so the hidden state shown is the one after ALL the layers before the output",
+            Math.max(...Array.from(act.hidden, (v, i) => Math.abs(v - firstOnly[i]))) > 1e-3 && [0, 1, 2, 3, 4].every((i) => Math.abs(Math.tanh(again[i]) - act.output[i]) < 1e-5));
+        const rows6 = V.pilotRows({ act, featureNames: P6.FEATURE_NAMES, outputNames: P6.OUTPUT_NAMES });
+        ok("the rows: features (12, named), hidden (34, h0..), outputs (torqueX, torqueY, torqueZ, thrust, firing); and a flight pilot's outputs are still the four controls (the array branch is not taken for an object)", rows6.length === 3 && rows6[0].values.length === 12 && rows6[0].names[1] === "errX" && rows6[1].values.length === 34 && rows6[2].names.join() === "torqueX,torqueY,torqueZ,thrust,firing" && rows6[2].values.length === 5
+            && V.pilotActivations(PF, PF.perturb(PF.handWeights(), 0.1, mulberry(1)), PF.features(st, target)).output.length === 4);
     }
     const gd = AF.guidance(st, target), x = PF.featuresFrom(gd), noNet = V.pilotRows({ act: { input: Float32Array.from(x), output: Float32Array.of(0.1, -0.2, 0, 0.3) }, featureNames: PF.FEATURE_NAMES, outputNames: PF.OUTPUT_NAMES });
     ok("!! a pilot with no network (the PD autopilot) has two rows: its 18 features and its four outputs", noNet.length === 2 && noNet[0].layer === "features" && noNet[1].layer === "outputs" && noNet[1].values.length === 4);
