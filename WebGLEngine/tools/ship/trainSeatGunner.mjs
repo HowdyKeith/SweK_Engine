@@ -106,6 +106,15 @@ export function qualifies(champ, hand) {
     return { ok: reasons.length === 0, reasons };
 }
 
+/** What the trainer is, in the tree's reporting shape (the instrument bench runs this in node). Every figure is read off the constants the trainer uses, so the report cannot drift from the recipe. */
+export function reportLines() {
+    return [
+        `[trainSeatGunner] trains the hand of the battleship's gun seats: a (1+1)-ES over a gunner network's weights, ${RECIPE.runs} runs of ${RECIPE.iters} iterations from seed ${RECIPE.seed}, sigma ${RECIPE.sigma}, at most ${RECIPE.maxK} weights a child, ${Math.round(RECIPE.liveShare * 100)}% of the children bred from the live weights, then ${RECIPE.passes} prune passes`,
+        `[trainSeatGunner] graded on ${SECONDS} s battleship fights behind the ${SIGHT} sight: ${TRAIN_FIGHTS.length} train, ${HELD_OUT_FIGHTS.length} held-out and ${AUDIT_FIGHTS.length} audit fights; a champion is written only if it beats the hand gunner's score on held-out AND audit fights and is not behind it in kills on either`,
+        `[trainSeatGunner] two networks: ${Object.keys(POLICY_ID).map((k) => `${k} (${POLICY_ID[k]})`).join(", ")}`,
+    ];
+}
+
 /** `sets` (default the real ones) lets the gate fly the whole procedure on a handful of short fights: { train, heldOut, audit, seconds }. */
 export function run(net, opts, log = () => {}, sets = { train: TRAIN_FIGHTS, heldOut: HELD_OUT_FIGHTS, audit: AUDIT_FIGHTS, seconds: SECONDS }) {
     const ev = { seconds: sets.seconds }, hand = net.handWeights(), handRes = { train: evaluate(net, hand, sets.train, ev), heldOut: evaluate(net, hand, sets.heldOut, ev), audit: evaluate(net, hand, sets.audit, ev) };

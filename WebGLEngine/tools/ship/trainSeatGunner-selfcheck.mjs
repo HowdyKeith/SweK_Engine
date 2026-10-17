@@ -31,6 +31,11 @@
 // AND FIVE MORE ON THE SHIPPED GPU BRAIN FILE (brain/seatGunnerMlpWeightsDefault.json, edited in the scratch worktree, the gate run, the file restored), each red by name:
 //   W1 the file's score is not what the held-out fights give it 1 | W2 the file names the fruit fly's policy 1 | W3 the file quotes a kill the audit does not give 1 | W4 the trigger's bias is moved 1 | W5 the file quotes a different hand gunner's audit 1
 "use strict";
+// UNNUMBERED (the v4874 ship), SECTION 11 -- reportLines(), SEVEN MORE SABOTAGES, the module restored byte for byte after each (the number is how many rows went red):
+//   R1 the report quotes 310 iterations, not the recipe's 1 | R2 the live-weight share dropped from the first line 1 | R3 a typographic apostrophe in the first line 1
+//   R4 reportLines() returns [] 3 | R5 the networks' policy names dropped 1 | R6 the report's sentence on when a file is written, "AND audit" dropped 0 -- A FINDING,
+//   the three rows above it never read that sentence. Closed with a row that asserts the sentence AND the rule it states (qualifies(), four clauses, each alone refusing a
+//   champion better everywhere else); re-sabotaged 1 red. R7 the export pin without reportLines 1 (the pin moved with the export, on purpose).
 import fs from "node:fs";
 import * as T from "./trainSeatGunner.mjs";
 import * as BF from "../../brain/battleshipFight.mjs";
@@ -162,9 +167,35 @@ section(() => {
 
 console.log("\n10. THE FRONT DOOR");
 section(() => {
-    const want = "AUDIT_FIGHTS,DEFAULT_OUT,HELD_OUT_FIGHTS,KINDS,POLICY_ID,RECIPE,SECONDS,SIGHT,TRAIN_FIGHTS,blobOf,describeEval,describeOthers,evaluate,parseArgs,prune,qualifies,run,scoreOf,train";
-    ok("!! the export list is pinned: AUDIT_FIGHTS, DEFAULT_OUT, HELD_OUT_FIGHTS, KINDS, POLICY_ID, RECIPE, SECONDS, SIGHT, TRAIN_FIGHTS, blobOf, describeEval, describeOthers, evaluate, parseArgs, prune, qualifies, run, scoreOf, train", Object.keys(T).sort().join() === want, Object.keys(T).sort().join());
+    const want = "AUDIT_FIGHTS,DEFAULT_OUT,HELD_OUT_FIGHTS,KINDS,POLICY_ID,RECIPE,SECONDS,SIGHT,TRAIN_FIGHTS,blobOf,describeEval,describeOthers,evaluate,parseArgs,prune,qualifies,reportLines,run,scoreOf,train";
+    ok("!! the export list is pinned: AUDIT_FIGHTS, DEFAULT_OUT, HELD_OUT_FIGHTS, KINDS, POLICY_ID, RECIPE, SECONDS, SIGHT, TRAIN_FIGHTS, blobOf, describeEval, describeOthers, evaluate, parseArgs, prune, qualifies, reportLines, run, scoreOf, train", Object.keys(T).sort().join() === want, Object.keys(T).sort().join());
 });
+
+// UNNUMBERED (the v4874 ship) -- reportLines(): the instrument registry's reverse check ("no bench page points at a module that cannot report")
+// found three of this line's entries claiming a bench page for a module with no reportLines(); two were page gates with no module at all and
+// went to page: null as the tree does, and this trainer's was given the report it was claiming. The report is read off the recipe's own
+// constants, so these rows hold that it says what the trainer does and not what it once did.
+{
+    console.log("\n11. reportLines(): THE TRAINER'S REPORT, FOR THE INSTRUMENT BENCH");
+    const lines = T.reportLines(), R = T.RECIPE, text = Array.isArray(lines) ? lines.join("\n") : "";
+    ok("!! reportLines() IS A NON-EMPTY ARRAY OF ASCII STRINGS (the contract reportDoors holds every report to)",
+        Array.isArray(lines) && lines.length >= 3 && lines.every((l) => typeof l === "string" && l.length > 0 && /^[\x20-\x7e]+$/.test(l)), JSON.stringify(lines && lines.length));
+    ok("!! IT QUOTES THE RECIPE THE TRAINER RUNS, not a copy of it: the runs, the iterations, the seed, the sigma, the child size, the live-weight share and the prune passes",
+        text.includes(`${R.runs} runs of ${R.iters} iterations from seed ${R.seed}`) && text.includes(`sigma ${R.sigma}`) && text.includes(`at most ${R.maxK} weights`) &&
+        text.includes(`${Math.round(R.liveShare * 100)}% of the children`) && text.includes(`${R.passes} prune passes`));
+    ok("!! ...and the sets it grades on (their sizes, the sight, the fight length) and both networks by name",
+        text.includes(`${T.TRAIN_FIGHTS.length} train, ${T.HELD_OUT_FIGHTS.length} held-out and ${T.AUDIT_FIGHTS.length} audit`) && text.includes(`${T.SECONDS} s battleship fights behind the ${T.SIGHT} sight`) &&
+        text.includes("fruitfly (seatGunnerPolicy)") && text.includes("mlp (seatGunnerMlp)"));
+    // The report's one claim about WHEN a file is written is qualifies()'s, and is held to it: a sabotage that dropped "AND audit" from the
+    // sentence went 0 red in the first batch (the three rows above never read it), so the sentence is asserted and so is the rule it states.
+    const hand = { heldOut: { score: 1, killed: 5 }, audit: { score: 1, killed: 5 } };
+    const better = { heldOut: { score: 2, killed: 5 }, audit: { score: 2, killed: 5 } };
+    ok("!! THE REPORT'S SENTENCE ON WHEN A FILE IS WRITTEN IS qualifies()'s RULE: held-out AND audit score, and not behind in kills on either -- each of the four clauses alone refuses a champion that is better everywhere else",
+        text.includes("beats the hand gunner's score on held-out AND audit fights and is not behind it in kills on either") &&
+        T.qualifies(better, hand).ok === true &&
+        T.qualifies({ ...better, audit: { score: 1, killed: 5 } }, hand).ok === false && T.qualifies({ ...better, heldOut: { score: 1, killed: 5 } }, hand).ok === false &&
+        T.qualifies({ ...better, heldOut: { score: 2, killed: 4 } }, hand).ok === false && T.qualifies({ ...better, audit: { score: 2, killed: 4 } }, hand).ok === false);
+}
 
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 process.exit(fails ? 1 : 0);
