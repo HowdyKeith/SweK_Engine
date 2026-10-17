@@ -85,6 +85,13 @@
 //   R60 the mask-agreement refusal removed                                       1 RED -- the source row
 //   R61 D composited without its fill                                            1 RED
 //   R62 the run building its sets inline, H2 over the plain bilinear noise       1 RED -- the run-calls-emitterSets clause
+//   R63 (section 92) the committed round 30 results' verdict edited to "not reported"  2 RED -- the verdict row and the rule row
+//   R64 C1's eleven of twelve raised to thirteen                                 7 RED -- every re-derivation (sections 80, 82, 90, 92),
+//       the two training-C1 rows, and P1/P2 among the predictions
+//   R65 section 92's rule with its qualification flipped                         1 RED
+//   R66 the committed results' first D-composited effect edited to -20           2 RED -- the rule row and P6
+//   R67 the committed results' network sha-256 edited                            1 RED
+//   R68 the committed results' B at an emitter-free image moved one digit        2 RED -- the verdict row (its d) and the bit-for-bit row
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -571,6 +578,51 @@ console.log("\n17. ROUND 30: THE EMITTERS TAKEN OUT OF THE UPSCALE (pre-registra
         branch.length > 400 && /decodeNet\(shipped\.net\)/.test(code) && /runEmitterAwareStudy\(/.test(code) && !/runUpscaleStudy/.test(code) && /harvest: true/.test(code) &&
         /splits: ROUND_EMITTER\.splits/.test(code) && /image: ROUND_EMITTER\.image/.test(code) && /test: ROUND_EMITTER\.test/.test(code) && /c2Prior: ROUND_EMITTER\.c2Prior/.test(code) &&
         /path\.join\(ENG, ROUND_EMITTER\.results\)/.test(code) && /existsSync\(file\)/.test(code) && /sha256/.test(code) && /"fx\/fsr"/.test(code) && !/verdict|status|supported/.test(code));
+    // section 92: the committed round 30 results, read back by code -- REPORTED, both hypotheses supported, as the rule gives it over
+    // the file's own tables through the one definition of the hypotheses' columns
+    const efile = path.join(ENG, RESULTS_EMITTER);
+    if (fs.existsSync(efile)) {
+        const res = JSON.parse(fs.readFileSync(efile, "utf8")), T4 = res.tables, X4 = res.secondary;
+        const again4 = verdict({ sets: emitterSets(T4), shuffled: null, c2Prior: ROUND_EMITTER.c2Prior, determinism: res.determinism, seedsDistinct: res.seedsDistinct, test: ROUND_EMITTER.test });
+        const H1 = again4.hypotheses.H1, H2 = again4.hypotheses.H2;
+        ok("!! *** section 92: verdict() over the committed round 30 tables gives the file's verdict -- REPORTED, H1 SUPPORTED (12 of 12, p 1/4096 under 0.025), H2 SUPPORTED (10 of 12, p 0.0022 under 0.05) ***",
+            again4.run === "reported" && res.verdict.run === "reported" && JSON.stringify(again4) === JSON.stringify(res.verdict) && again4.reasons.length === 0 &&
+            H1.status === "supported" && H1.k === 12 && H1.p === 1 / 4096 && H1.threshold === 0.025 && H1.meanD > 0.69 && H1.meanD < 0.70 &&
+            H2.status === "supported" && H2.k === 10 && H2.p < 0.0023 && H2.threshold === 0.05 && H2.meanD > 0.10 && H2.meanD < 0.11 &&
+            [H1, H2].every((h) => h.c1.ok && h.c1.netWins === 12 && h.c1.filterWins === 12 && h.c3.nearFloor === 0) &&
+            res.determinism === true && res.seedsDistinct === true && res.seedCount === 60 && res.config.image === 256 && res.config.upscale.kind === "easu",
+            `H1 ${H1.meanD.toFixed(3)} p ${H1.p} | H2 ${H2.meanD.toFixed(3)} p ${H2.p.toFixed(4)}`);
+        const crypto = await import("node:crypto");
+        ok("!! ...and the network that ran is the one the page ships: the file's sha-256 is render/denoise-net-r11.json's, in this tree",
+            res.shipped.file === SHIPPED_NET && res.shipped.sha256 === crypto.createHash("sha256").update(fs.readFileSync(path.join(ENG, SHIPPED_NET))).digest("hex"));
+        const none = X4.emitterPixels.map((n, i) => (n === 0 ? i : -1)).filter((i) => i >= 0);
+        ok("!! on every image with no emitter pixel in view (8 of 12), the chain IS round 29's, bit for bit -- B plain EASU, C plain bilinear, D composited D, H2's noisy frame the plain one",
+            none.length === 8 && none.every((i) => Object.is(T4.B[i], T4.plainEasu[i]) && Object.is(T4.C[i], T4.plainBilinear[i]) && Object.is(T4.Daware[i], T4.D[i]) &&
+                Object.is(T4.noisyHalfAware[i], T4.noisyHalfUp[i]) && Object.is(X4.awareVsPlainEasu[i], 0)), `no emitter in view: ${none.join(",")}`);
+        // section 91's qualification, fixed before the run: H1 supported is half resolution's only if B ALSO beats D composited on the mean
+        const mean = (a) => a.reduce((x, v) => x + v, 0) / a.length;
+        const rule92 = (r) => r.verdict.run !== "reported" ? "recorded"
+            : r.verdict.hypotheses.H1.status === "supported" ? (mean(r.secondary.dAwareVsB) > 0 ? "rig-timing" : "composite-fullres")
+            : r.verdict.hypotheses.H2.status === "supported" ? "no-rig" : "recorded";
+        const flipD = { ...res, secondary: { ...X4, dAwareVsB: X4.dAwareVsB.map((v) => -v) } };
+        const onlyH2 = { ...res, verdict: { ...res.verdict, hypotheses: { ...res.verdict.hypotheses, H1: { ...res.verdict.hypotheses.H1, status: "not supported" } } } };
+        ok("!! *** section 92's rule, as section 91 fixed it: H1 supported AND B ahead of D composited on the mean -- the half resolution carried it, so the next round is the rig's ***",
+            rule92(res) === "rig-timing" && rule92(flipD) === "composite-fullres" && rule92(onlyH2) === "no-rig" && mean(X4.dAwareVsB) > 0.62 && mean(X4.dAwareVsB) < H1.meanD,
+            `D composited against B: mean ${mean(X4.dAwareVsB).toFixed(3)}`);
+        // the seven predictions, read off the file -- they decided nothing, and the claim that all seven held is this row's
+        const wins = (a) => a.filter((v) => v > 0).length, lit = X4.emitterPixels.map((n) => n > 0);
+        const P = {
+            P1: H2.status === "supported" && H2.meanD >= 0.03 && H2.meanD <= 0.25 && H2.k >= 10,
+            P2: H1.status === "supported" && H1.meanD >= 0.3 && H1.meanD <= 0.8 && H1.k >= 11,
+            P3: [H1, H2].every((h) => h.c1.netWins === 12 && h.c1.filterWins === 12),
+            P4: lit.every((l, i) => (l ? X4.awareVsPlainEasu[i] > 0 : Object.is(X4.awareVsPlainEasu[i], 0))),
+            P5: X4.nearEmitter.B.every((v) => v < 0.5) && lit.every((l, i) => !l || X4.nearEmitter.B[i] < X4.nearEmitter.plainEasu[i]),
+            P6: mean(X4.dAwareVsB) > 0 && wins(X4.dAwareVsB) >= 9 && mean(X4.dAwareVsB) < H1.meanD,
+            P7: mean(X4.priceOfHalf) >= 0.3 && mean(X4.priceOfHalf) <= 0.8 && wins(X4.priceOfHalf) >= 10,
+        };
+        ok("  ...and section 91's seven predictions, read off the file: all seven held", Object.values(P).every(Boolean),
+            Object.entries(P).map(([k, v]) => `${k} ${v ? "held" : "FAILED"}`).join(", "));
+    } else ok("!! section 92 reads render/denoise-results-emitter.json, and it is not there", false);
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +

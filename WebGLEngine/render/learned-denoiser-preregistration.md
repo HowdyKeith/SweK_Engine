@@ -6118,3 +6118,93 @@ every one is refused without `harvest`. C5 holds over the round's 60 render seed
 - It refuses if the file exists.
 - By the pilot, about 65 minutes here: rendering dominates, as in round 29 (3,509 s), and the chain adds seconds an image.
 - The file is committed byte for byte before it is read, and section 92 reads it.
+
+## 92. ROUND 30 -- REPORTED, BOTH HYPOTHESES SUPPORTED: WITH THE EMITTERS COMPOSITED, HALF RESOLUTION IS THE BETTER SPEND AT 256 x 256
+
+**What arrived.** `render/denoise-results-emitter.json`, written by `tools/denoiseStudy.mjs --harvest-emitter` at 5a2241e0, the
+commit carrying section 91. It took 3,744 s to render the 12 test images at 256 x 256 here and 213 s to measure. The file was
+committed byte for byte at d876dfce before it was read. Its network sha-256 is `render/denoise-net-r11.json`'s, the file the
+page loads.
+
+**The run is reported, and both hypotheses are supported.**
+
+| | B (half size + emitter-aware EASU) against | mean d (positive: B better) | B won | sign-flip p | Holm threshold |
+|---|---|---|---|---|---|
+| **H1** | D, full size at 1 sample | **+0.694** | 12 of 12 | 0.00024 | 0.025 |
+| **H2** | C, half size + emitter-aware bilinear | **+0.104** | 10 of 12 | 0.0022 | 0.05 |
+
+- H1's p is 1/4096, the smallest a sign-flip test over 12 images can give.
+- **Every control held.**
+  - C1 held for all four arms at 12 of 12. On H1, B and D each beat D's 1-sample input. On H2, B and C each beat the half-size
+    input through the same emitter-aware bilinear chain.
+  - C2 is cited from round 11. C3: no image was near its floor on either hypothesis. C4 held, and C5 over 60 distinct render
+    seeds.
+- **`render/denoiseStudy-selfcheck.mjs` re-derives all of it from the file's own tables,** through `emitterSets`, the one
+  definition of the hypotheses' columns. Beside that are four more rows: the network's sha-256, the bit-for-bit identities
+  below, section 91's rule, and the seven predictions. Sabotaged R63-R68; none was 0 red.
+
+**What it says, and where it stops.**
+- At 256 x 256, take a frame traced and denoised at a quarter of the pixels and upscaled by EASU, with the light sources put
+  back at full size from the geometry. On every one of 12 new images, it was closer to the reference than the full-size frame
+  traced at the same number of samples. And EASU beat bilinear inside that chain.
+- **Only four of the twelve images had an emitter in view:** R 44000, 44001, 44002 and 44004, with 30, 1,268, 950 and 1,715
+  emitter pixels.
+  - None of the six C scenes had an emitter pixel in view. That is how the scenes were drawn, not a choice. C's two lights are
+    small (radius 0.15-0.3), at height 1.8-3.2.
+  - On the other eight images the chain is round 29's, bit for bit, and a gate row holds that.
+- **So this round is also a pre-registered test, on new seeds, of section 90's descriptive split,** and it held. The split
+  below is descriptive and decides nothing:
+
+  | | images | H1 mean d | H2 mean d |
+  |---|---|---|---|
+  | no emitter in view | 8 | +0.551 (+0.09 to +1.12) | +0.124 (-0.053 to +0.286) |
+  | an emitter in view | 4 | +0.980 (+0.86 to +1.21) | +0.064 (-0.004 to +0.205) |
+
+  - **H2's two losses** are R 44000 (-0.004, the image with 30 emitter pixels) and C 45000 (-0.053, no emitter in view).
+  - So EASU lost to bilinear on one plain image. In round 29 it lost on none of eight.
+- **256 x 256 is not 1080p.** Nothing here says what the chain costs on a GPU, including the full-size emitter coverage at 64
+  rays a pixel that the composite needs. That is the next round's question.
+- **The composite's residual is small where it was measured.** B's share of its error within 2 px of an emitter pixel was at
+  most 2.4% (R 44004). On the same four images, plain EASU's share was 12-92% and D's 1-34%.
+
+**Reported, testing nothing.**
+
+| B against | mean d (positive: B better) | B won |
+|---|---|---|
+| round 29's plain EASU, on the same frame | +0.345 (0 exactly on the 8 without an emitter; +0.12, +1.01, +2.55 and +0.46 on the 4 with one) | 4 of 4 with an emitter |
+| D composited (the same fill and composite at full size) | +0.626 | 12 of 12 |
+| A, full size at 4 samples (the price of the quarter) | -0.327 (round 29: -1.149) | 0 of 12 |
+
+- **The composite helps D too.** On the four images with an emitter, D composited beat D by d +0.01, +0.23, +0.42 and +0.16. B
+  still beat D composited on all twelve, which is the qualification section 91 fixed. So the half resolution carried H1, not
+  the composite alone.
+- **The composite helps the noisy frame too.** On all four emitter images, H2's noisy frame improved on round 29's plain
+  bilinear one: 0.0287 to 0.0282, 0.0201 to 0.0172, 0.0112 to 0.0079, and 0.0197 to 0.0174. That is why C1 now asks against
+  it. Both denoised arms beat it on 12 of 12.
+
+**The predictions: all seven held**, read off the file by the gate's last row.
+- **P1, H2 supported:** +0.104, inside +0.03 to +0.25, on 10 of 12.
+- **P2, H1 supported:** +0.694, inside +0.3 to +0.8, on 12 of 12.
+- **P3, C1 at 12 of 12 for every arm:** it was.
+- **P4:** the aware chain beat plain EASU on all four images with an emitter pixel, and equalled it exactly on the eight
+  without.
+- **P5:** B's share near an emitter was at most 0.024, below plain EASU's on all four.
+- **P6:** B beat D composited on 12 of 12, by +0.626, below H1's +0.694.
+- **P7:** the price of the quarter fell to 0.327, inside 0.3 to 0.8 but near its floor, with B's error above A's on all 12.
+- **What none of them foresaw:** that none of the six C scenes would have a light in view. Every emitter case in this round
+  is a white R light.
+
+**What follows, by section 91's rule** (`rule92` in the gate): H1 is supported, and B is ahead of D composited on the mean.
+- **The next round times the chain on the rig,** logged as `denoise-halfres-rig-timing`. At 1920 x 1080 output, that is:
+  - the denoiser at 960 x 540;
+  - the fill and composite in WGSL, gated against `render/denoiseUpscale.mjs`'s CPU reference;
+  - EASU through `fx/fsr/fsrGPU.js`;
+  - the full-size emitter coverage the composite needs.
+  It is held against today's full-size page.
+- **`denoise-fsr2-temporal` comes off its blocker.**
+- **`denoise-network-at-run-scale` stays blocked.** The half-size denoise held: C beat its noisy frame on 12 of 12, as it did
+  in round 29.
+- **`denoise-halfres-emitter-aware` is closed.**
+
+**What it does not change.** The page, the network, the filter, every kernel table. The emitter-aware chain is a CPU reference
+until the rig round puts it on a GPU.

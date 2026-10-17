@@ -1693,13 +1693,17 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "denoise-halfres-emitter-aware",
+        blocker: "CLOSED",
+        what: "DONE as the denoiser arc's round 30 (pre-registration sections 91-92), unshipped on the feature branch at this writing. REPORTED, BOTH SUPPORTED: half size + emitter-aware EASU beat full size at 1 sample (H1, mean d +0.694, 12 of 12, p 1/4096) and emitter-aware bilinear (H2, +0.104, 10 of 12, p 0.0022); C1 at 12 of 12 for all four arms.",
+        how: "SPLITS_EMITTER (6 R at 44000, 6 C at 45000), 256 x 256 traced and denoised at 128. render/denoiseUpscale.mjs's emitterAwareUpscale fills the half-size frame's emitter pixels from their neighbours, runs fx/fsr/fsr.js's EASU unchanged, and composites E + (1 - cov) x the result at full size from render/denoiseMask.mjs's emitterRadiance. render/denoise-results-emitter.json committed byte for byte (d876dfce) before it was read; 3744 s to render here.",
+        why: "*** ONLY FOUR OF THE TWELVE IMAGES HAD A LIGHT IN VIEW, ALL WHITE R LIGHTS, AND THAT IS WHY IT IS KEPT. *** On the other eight the chain is round 29's bit for bit, so the round is also section 90's descriptive split tested on new seeds -- and it held. B also beat D with the same composite at full size on 12 of 12 (+0.626), so the half resolution carried H1, not the composite alone. All seven predictions held. Nothing says what it costs on a GPU: the entry below carries that.",
+    },
+    {
+        id: "denoise-halfres-rig-timing",
         blocker: "OPEN",
-        // v4871+: PRE-REGISTERED as section 91 (round 30), harvest owed -- render/denoiseUpscale.mjs's emitterAwareUpscale and
-        // render/denoiseMask.mjs's emitterRadiance, on SPLITS_EMITTER (R 44000, C 45000). Built as a FILL rather than a refusal of
-        // taps: the half-size frame's emitter pixels are filled from their neighbours, so EASU itself (fx/fsr/fsr.js) runs unchanged.
-        what: "Round 29's chain with the emitters taken out of the upscale: emitter pixels composited at full resolution from the geometry (exact and noise-free: an emitter's radiance is its emission), and EASU run on the rest with the emitter pixels filled from their neighbours first, so no tap reads an emitter's radiance -- the network's own kernel apply refuses such taps outright (section 21).",
-        how: "A pre-registered round on new R and C seeds at 256 x 256, round 29's frames and controls, B the emitter-aware chain and round 29's plain EASU chain reported beside it. The guide buffers at full size cost a rasterization, not a trace.",
-        why: "Round 29's descriptive split (section 90): the half-size chain won every emitter-free image against both comparators and lost every bright-emitter image, with nearly all of its error at emitter edges. If the edge is the whole loss, this is the round that shows half resolution paying for itself, and FSR2 comes off its blocker after it.",
+        what: "Round 30's chain on the rig at 1920 x 1080: the shipped network at 960 x 540, the emitter fill and composite in WGSL, EASU through fx/fsr/fsrGPU.js, and the full-size emitter coverage the composite needs -- timed against today's full-size page on both GPUs.",
+        how: "Build the fill and composite as WGSL and gate them bit-near against render/denoiseUpscale.mjs's CPU reference (the ring fill needs a bounded-pass form on a GPU; its reference is the CPU one), pilot on SwiftShader here, then a pre-registered timing round on the rig. The coverage guide is 64 primary rays a pixel on the CPU today; what it costs on a GPU is part of what is timed.",
+        why: "Section 92: at 256 x 256 the half-size chain beat the full-size frame at equal samples on 12 of 12 images. A full-size pass on the GTX 1080 is ~75-80 ms (section 54); the denoise at a quarter of the pixels is the saving, and whether the fill, EASU, the composite and the guide leave any of it is the question.",
     },
     {
         id: "denoise-network-at-run-scale",
@@ -1707,7 +1711,7 @@ export const NEXT_ROUNDS = [
         what: "A network trained on half-size renders -- its 9 x 9 kernel covering the scene the way it does when it runs at half size -- tested in round 26's arrangement.",
         how: "Round 11's training on the same 192 R + C scenes rendered at half size, then a pre-registered harvest against the shipped network on the half-size chain.",
         why: "Section 82's unmeasured cause: at half size the shipped network sees every scene at twice the scale it was trained on, and C1's three failures are where that would bite.",
-        upstream: "denoise-halfres-at-scale: only if half resolution still loses at a realistic size, and loses in the denoise rather than the upscale. Round 29 (section 90) lost in the UPSCALE: the denoised half-size frame upscaled bilinearly beat its noisy frame on 12 of 12. So by this entry's own condition it stays blocked -- though section 89 named it as next if C1 fired on H2 again; section 90 sets the two side by side.",
+        upstream: "denoise-halfres-at-scale: only if half resolution still loses at a realistic size, and loses in the denoise rather than the upscale. Round 29 (section 90) lost in the UPSCALE: the denoised half-size frame upscaled bilinearly beat its noisy frame on 12 of 12. So by this entry's own condition it stays blocked -- though section 89 named it as next if C1 fired on H2 again; section 90 sets the two side by side. Round 30 (section 92) held the half-size denoise again: C beat its noisy frame on 12 of 12.",
     },
     {
         id: "denoise-winograd",
@@ -1764,11 +1768,13 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "denoise-fsr2-temporal",
-        blocker: "UPSTREAM",
+        blocker: "OPEN",
+        // v4871+: OFF ITS BLOCKER at round 30 -- section 92 reported the spatial half-size chain, emitters composited, supported on both
+        // hypotheses at 256 x 256, which is what this entry waited on. The upstream line below is kept as the record of what it was.
         what: "FSR2's temporal upscale on denoised path-traced frames: jittered renders, motion vectors and history.",
         how: "fx/fsr/fsrTemporalTsl.mjs drives a three.js scene; the path tracer is neither a three.js scene nor does it make motion vectors or jitter. Those are the work.",
         why: "Temporal reuse is where real-time path tracing gets most of its samples.",
-        upstream: "denoise-halfres-emitter-aware: rounds 26 and 29 were not reported; at 256 x 256 the half-size chain won every emitter-free image and lost at light sources (section 90). The spatial round has to show upscaling a denoised frame keeps enough of the picture, emitters included, first.",
+        upstream: "CLEARED -- denoise-halfres-emitter-aware: rounds 26 and 29 were not reported; round 30 (section 92) was, with the half-size chain ahead of full size at equal samples on 12 of 12 images once the emitters were composited.",
     },
     {
         id: "denoise-fsr3-framegen",
