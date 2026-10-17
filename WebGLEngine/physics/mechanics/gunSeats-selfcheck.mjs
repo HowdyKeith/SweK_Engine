@@ -20,6 +20,7 @@
 //   7b THE SIGHT    fitTrack() recovers a straight line exactly and is the least-squares slope by definition (800 noisy trials give the theory's velocity error to 12%); a gunner built on it (`observe`) that only sees positions leads a constant-velocity target exactly when noise-free, waits for three measurements, is led astray by a turn exactly as the window average says, and is moved by measurement noise repeatably
 //   8  END TO END   a perfect gunner on a fixed seat hits a target crossing at 60 m/s at 250 m; the same seat with a slew too slow to follow it hits nothing of a target crossing behind it, and only what passes through its line of fire of one that crosses that; a sloppy gunner (0.1 rad) hits less than half as often; a gunner with a delay hits as
 //                   a perfect one does after its reaction time; a tail gunner on a bomber at 80 m/s hits a fighter that closes from behind and a forward-only seat on the same bomber, which cannot see it, does not even fire
+//   7c THE GUNNER IN VACUUM   handGunner's `gravity` (0 for a gun in space): the seat points along the line to a target that stands still (in air above it by the round's fall), a gunner that knows there is no gravity hits a crossing target with rounds flown at g = 0 and one that allows for a fall that does not happen hits nothing, and a gravity that is not a number is refused
 //   9  THE FRONT DOOR  makeSeat refuses what cannot be built by name (no id, a NaN mount, up parallel to rest, a slew of 0, an arc that runs backwards), a seat is frozen all the way down, its gun defaults to flightGuns.GUN, the export list is
 //                   pinned, and the report lines say real numbers
 //
@@ -39,6 +40,7 @@
 //   H14 no yaw error 2 | H15 no pitch error 1 | H16 the yaw error twice as big 1 | H17 the Gaussian biased 1 | H18 the seed ignored 1 | H19 the seat not in the error's seed 1
 //   H20 the time not in the error's seed 2 | H21 old pictures never dropped (the oldest ever seen is used) 1 | H22 the solution made from the body's centre, not the muzzle 2 | R1 the report line says NaN 1
 //   AND THIRTEEN ON THE SIGHT THAT ONLY SEES WHERE THE TARGET IS (fitTrack and handGunner's `observe`), every one red by name: J1 fitTrack accepts two measurements 3 | J2 fitTrack's means not divided 8 | J3 fitTrack's position at the first time 2 | J4 fitTrack with no time spread divides by zero 1 | J5 the sight's noise is zero 4 | J6 the sight uses every measurement ever made 1 | J7 the sight uses fresh measurements (no delay) 4 | J8 the sight does not carry its position forward 4 | J9 the sight leads with the true velocity 2 | J10 the measurement noise the same every tick 1 | J11 the measurement noise the same for every seat 1 | J12 the noise floor ignored 1 | J13 the window defaults to nothing 1 (J13 went 0 red the first time: every call passed its window; a row now asks for the defaults)
+// AND FOUR ON THE GUNNER IN VACUUM (section 7c: handGunner's `gravity`), every one red by name: K1 the gunner's gravity option ignored (always the earth's) 2 | K2 the default gravity is 0 11 | K3 a gravity that is not a number is accepted 1 | K4 gravity applied twice over 9
 // NOT SABOTAGED, SAID PLAINLY: the 1e-9 slack in the gunner's `h[i].t <= t - delay + 1e-9` (it only decides which picture a float-noisy tick lands on, and carrying a picture forward at its own velocity makes the choice invisible for a target that holds it), and the seat id inside the gunner's memory key (one gunner per seat is the contract, so a shared key is never read).
 "use strict";
 import * as S from "./gunSeats.mjs";
@@ -294,6 +296,29 @@ console.log("\n7b. THE SIGHT THAT ONLY SEES WHERE THE TARGET IS");
     const flat = make({ observe: { window: 0.6, sigmaRange: 0.01, floor: 3 } }); let seen = 0, rr = 0;
     for (let i = 0; i <= 45; i++) { const t = i / 30; const d = flat(BALL, rest0, still, [{ id: "x", pos: cv(t), vel: vcv }], t); if (d.target) seen++; rr = Math.hypot(...[cv(t)[0], cv(t)[1], cv(t)[2] - 300]); }
     ok("a target outside the gunner's range is not measured at all, and its record is dropped (as before): at 500 m the sight sees nothing, however long it looks", (() => { const g = make({ observe: { window: 0.6 } }); let any = false; for (let i = 0; i <= 45; i++) { if (g(BALL, rest0, still, [{ id: "x", pos: [500, 0, 300], vel: [0, 0, 0] }], i / 30).target) any = true; } return !any; })() && seen > 20 && rr > 100);
+}
+
+console.log("\n7c. THE GUNNER IN VACUUM");
+{
+    // a target standing still 400 m ahead at the seat's own height: in air the round falls, so the gunner points ABOVE the line; with gravity 0 it points ALONG it
+    const target = { id: "x", pos: [400, 0, 300], vel: [0, 0, 0], radius: 4 }, line = S.reachOf(BALL, still, [1, 0, 0]);
+    const run = (opts) => { const g = S.handGunner({ delay: 0, sigma: 0, ...opts }); let d; for (let i = 0; i <= 3; i++) d = g(BALL, rest0, still, [target], i / 30); return d; };
+    const air = run({}), vac = run({ gravity: 0 }), t = 400 / BALL.gun.muzzleSpeed, drop = 0.5 * G.GRAVITY * t * t;
+    ok("!! in VACUUM (gravity 0) the gunner points ALONG THE LINE to a target that stands still -- pitch 0 to 1e-4 rad, yaw 0 -- and in air (the default) ABOVE it by the round's fall (the muzzle's 0.4 m of reach aside: about drop/range = 0.0218 rad, within 10%)", Math.abs(vac.pitch - line.pitch) < 1e-4 && Math.abs(vac.yaw) < 1e-9 && air.pitch > vac.pitch + 0.9 * drop / 400 && air.pitch < vac.pitch + 1.1 * drop / 400, `vacuum ${vac.pitch.toFixed(5)}, air ${air.pitch.toFixed(5)} (the drop ${drop.toFixed(2)} m is ${(drop / 400).toFixed(5)} rad)`);
+    // end to end: the rounds are flown in vacuum (stepRounds with g = 0); a target crossing at 40 m/s 400 m out is hit by the gunner who knows there is no gravity, and missed by the one who allows for a fall that does not happen
+    const fightIn = (opts) => {
+        const g = S.handGunner({ delay: 0, sigma: 0, tolerance: 1, ...opts }); let st = S.createSeatState(BALL), rounds = [], hits = 0, fired = 0;
+        for (let i = 0; i < 150; i++) {
+            const tt = i / 30, tpos = [400, 60 - 40 * tt, 300], cmd = g(BALL, st, still, [{ id: "x", pos: tpos, vel: [0, -40, 0], radius: 4 }], tt), out = S.stepSeat(BALL, st, still, cmd, 1 / 30, 1);
+            st = out.state; fired += out.rounds.length;
+            const tg = [{ id: 2, from: tpos, to: [400, 60 - 40 * (tt + 1 / 30), 300], radius: 4 }], res = G.stepRounds([...rounds, ...out.rounds], 1 / 30, tg, { g: 0, life: 4 }); rounds = res.rounds; hits += res.hits.length;
+        }
+        return { hits, fired };
+    };
+    const vacuum = fightIn({ gravity: 0 }), wrong = fightIn({});
+    ok("!! END TO END IN VACUUM: rounds flown with no gravity (flightGuns.stepRounds with g = 0) hit a target crossing at 40 m/s 400 m out when the gunner knows there is no gravity (more than 10 hits), and NONE when it allows for a fall that does not happen (it fires 8.7 m high at a target 4 m across) -- the number is the gunner's, the world's is the arena's", vacuum.hits > 10 && wrong.fired > 10 && wrong.hits === 0, `${vacuum.hits} hits of ${vacuum.fired} fired; the gunner that allows for gravity ${wrong.hits} of ${wrong.fired}`);
+    const thr = (v) => { try { S.handGunner({ gravity: v }); return null; } catch (e) { return String(e.message); } };
+    ok("!! a gravity that is not a number is refused by name (NaN, Infinity, a string), and 0 and 9.80665 are taken", [NaN, Infinity, "9.8"].every((v) => /gravity must be a finite number/.test(thr(v) || "")) && thr(0) === null && thr(9.80665) === null && thr(1.62) === null);
 }
 
 console.log("\n8. END TO END");

@@ -110,11 +110,13 @@ export function fitTrack(entries) {
  *   sigma      rad  the aim error on each axis (a Gaussian, repeatable: the seed, the seat and the time make it)
  *   maxRange   m    how far it will shoot, measured from the body's centre
  *   tolerance       how many target radii of predicted miss it will fire within, for the gun as it points NOW
+ *   gravity    m/s^2  the fall the gunner allows the round (flightGuns.GRAVITY, 9.80665, by default; 0 for a gun in VACUUM, where a round flies straight -- the rounds themselves are the arena's to fly with the same number)
  *   observe         null (the default) gives the gunner the target's velocity as it is. { window, sigmaRange, floor } makes it a SIGHT THAT ONLY SEES WHERE THE TARGET IS: each tick it measures the target's position with a Gaussian error of
  *                   max(floor, sigmaRange x range) metres on each axis, fits a straight line (fitTrack) through the measurements of the `window` seconds that ended `delay` ago, and leads that line's slope; it acts on a target
  *                   only once three measurements are in the window. A target that holds its velocity is led to within the slope's noise; one that turns is led by the average of the window, which is behind it.
  */
-export function handGunner({ delay = 0.25, sigma = 0.012, seed = 1, maxRange = 450, tolerance = 1, observe = null } = {}) {
+export function handGunner({ delay = 0.25, sigma = 0.012, seed = 1, maxRange = 450, tolerance = 1, observe = null, gravity = G.GRAVITY } = {}) {
+    if (!Number.isFinite(gravity)) throw new Error(`gunSeats.handGunner: gravity must be a finite number (got ${gravity})`);
     const seen = new Map();   // seat id | target id -> what was seen, oldest first: [{ t, pos, vel }]
     const hash = (str) => { let h = 2166136261; for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619); return h >>> 0; };
     return function decide(seat, st, body, targets, t = 0) {
@@ -138,7 +140,7 @@ export function handGunner({ delay = 0.25, sigma = 0.012, seed = 1, maxRange = 4
                 if (k > 0) h.splice(0, k);
                 was = h[0]; age = t - was.t; now = add(was.pos, mul(was.vel, age));
             }
-            const sol = G.aimSolution(cur, now, was.vel, seat.gun); if (!sol) continue;
+            const sol = G.aimSolution(cur, now, was.vel, seat.gun, gravity); if (!sol) continue;
             const a = reachOf(seat, body, sol.dir); if (!a.inArc) continue;
             if (!best || sol.t < best.sol.t) best = { tg, sol, a };
         }

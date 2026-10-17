@@ -24,6 +24,7 @@
 //   AND FIVE ON fireFrom, once the seats fired through it: F1 the muzzle function called on every tick, fired or not 1 | F2 a muzzle given as a value ignored 1 | F3 fire() drops the owner 2 (the one-round row) | F4 fireFrom drops the owner 2 (the same row, and the new value row sees it only through the owner it asks) | F5 the muzzle's velocity left out of the round 4
 //   AND FOUR ON THE PART A HIT NAMES (a craft of several spheres, which the bomber is): F6 a hit never names its part 1 | F7 a plain hit carries an undefined part 2 | F8 the part taken from the last target tested, not the nearest 1 (0 on the first listing: the nearest happened to be last) | F9 the part label lost on the way to the hit 1
 //   S10 is the one the 300-round rows could not have seen (REASONED, NOT RUN: the 5-round row was written before the sabotages): at 15 rounds a second a 1/30 s tick never fires more than the magazine has left, so the clamp could be deleted and those rows would pass.
+// AND SEVEN ON THE ROUNDS OF A WORLD WITH NO GROUND (section 6b: stepRounds' `ground`, a round's own `life`, and a hit that carries its round -- added for the space battleship's guns, the same arena arithmetic), every one red by name: R1 the ground option ignored (always z = 0) 1 | R2 a null ground read as z <= 0 1 | R3 a round's own life ignored 1 | R4 a life that is not a number taken as it is 1 | R5 a hit does not carry its round 1 (after its row was made to fail instead of crash) | R6 a hit carries the round AFTER the tick 1 | R7 the ground is above, not below 7
 "use strict";
 import * as G from "./flightGuns.mjs";
 import * as F from "./flightModel6dof.mjs";
@@ -175,6 +176,17 @@ console.log("\n6. THE HITS");
     ok("!! a round does not hit ITS OWNER'S PARTS either (the owner's id is on every part): a round of craft 2 through both of craft 2's spheres survives, and craft 1's does not", own.hits.length === 0 && own.rounds.length === 1 && G.stepRounds([rd(1)], dt, [part("tail", 12)]).hits.length === 1);
     const mixed = G.stepRounds([rd(1)], dt, [part("wing", 20), { id: 3, from: [9, 0, 300], to: [9, 0, 300], radius: 4 }]);
     ok("a plain craft nearer than a part of another is the one hit (the part label belongs to the hit's own target, not to a neighbour's)", mixed.hits.length === 1 && mixed.hits[0].target === 3 && !("part" in mixed.hits[0]));
+}
+
+console.log("\n6b. A WORLD WITH NO GROUND, A ROUND WITH ITS OWN LIFE, A HIT THAT NAMES ITS ROUND");
+{
+    const dt = 1 / 30, low = { pos: [0, 0, -20], vel: [100, 0, 0], age: 0, owner: 1 };
+    ok("!! with `ground: null` (space) a round far below z = 0 is NOT removed -- it is carried on, aged by the tick, and a hit on a target down there is a hit; by default (ground 0) the same round is gone, and with `ground: -50` it is gone below -50 and not above", G.stepRounds([low], dt, [], { g: 0, ground: null }).rounds.length === 1 && G.stepRounds([low], dt, [], { g: 0 }).rounds.length === 0 && G.stepRounds([low], dt, [], { g: 0, ground: -50 }).rounds.length === 1 && G.stepRounds([{ ...low, pos: [0, 0, -60] }], dt, [], { g: 0, ground: -50 }).rounds.length === 0 && G.stepRounds([low], dt, [{ id: 2, from: [4, 0, -20], to: [4, 0, -20], radius: 4 }], { g: 0, ground: null }).hits.length === 1);
+    const born = (extra) => ({ pos: [0, 0, 100], vel: [10, 0, 0], age: 0, owner: 1, ...extra });
+    const res = G.stepRounds([born({ life: 0.05 }), born({ life: 1 }), born({}), born({ life: NaN })], 0.1, [], { g: 0, life: 0.5 });
+    ok("!! a round that carries a `life` (a number) lives for ITS life, not the call's: with the call's life 0.5 s, a round of life 0.05 is gone after 0.1 s and one of life 1 and one with none (the call's 0.5) are still flying; a life that is not a number (NaN) falls back to the call's; and at a later tick the life-1 round outlives the call's 0.5 s", res.rounds.length === 3 && res.rounds.map((r) => r.life).join() === "1,,NaN" && (() => { let rs = res.rounds; for (let i = 0; i < 5; i++) rs = G.stepRounds(rs, 0.1, [], { g: 0, life: 0.5 }).rounds; return rs.length === 1 && rs[0].life === 1; })());
+    const hit = G.stepRounds([born({ dmg: 60, kind: "main" })], dt, [{ id: 2, from: [0.5, 0, 100], to: [0.5, 0, 100], radius: 3 }], { g: 0 }).hits[0];
+    ok("!! a hit carries THE ROUND that made it, as it entered the tick, with whatever else the round carries (a damage of 60 and a kind), so a caller with guns of several kinds knows which one hit; and the hit's own fields are as they were (owner, target, t, point)", hit && hit.round && hit.round.dmg === 60 && hit.round.kind === "main" && hit.round.owner === 1 && hit.round.age === 0 && hit.owner === 1 && hit.target === 2 && hit.t === 0 && hit.point.length === 3);
 }
 
 console.log("\n7. THE FRONT DOOR");

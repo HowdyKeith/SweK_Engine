@@ -89,9 +89,10 @@ export function sweepHit(p0, p1, c0, c1, R) {
 
 /**
  * One tick of every round in flight against the targets. `targets` is [{ id, from, to, radius, part? }] (the centre at the tick's start and end; a craft made of several spheres gives each its own target with the craft's id and a `part` label, and the hit says which part it reached). A round does not hit its own owner; it is removed on a hit, on the ground
- * (z <= 0), or when it is older than `life`. Returns { rounds (survivors), hits: [{ owner, target, part?, t, point }] }, hits in round order (`part` only when the target gave one). A round hits the EARLIEST target it reaches.
+ * (z <= `ground`, 0 by default; `ground: null` is a world with none -- space), or when it is older than its own `life` if it carries one (a number) and the call's `life` if not. Returns { rounds (survivors), hits: [{ owner, target, part?, round, t, point }] }, hits in round order
+ * (`part` only when the target gave one; `round` is the round as it entered the tick, with whatever else it carries -- a damage, a life -- so a caller with guns of several kinds can tell which one hit). A round hits the EARLIEST target it reaches.
  */
-export function stepRounds(rounds, dt, targets, { life = GUN.life, g = GRAVITY } = {}) {
+export function stepRounds(rounds, dt, targets, { life = GUN.life, g = GRAVITY, ground = 0 } = {}) {
     const alive = [], hits = [];
     for (const r of rounds) {
         const n = stepRound(r, dt, g);
@@ -101,8 +102,8 @@ export function stepRounds(rounds, dt, targets, { life = GUN.life, g = GRAVITY }
             const t = sweepHit(r.pos, n.pos, tg.from, tg.to, tg.radius);
             if (t !== null && (best === null || t < best.t)) best = { t, target: tg.id, part: tg.part };
         }
-        if (best) { hits.push({ owner: r.owner, target: best.target, ...(best.part !== undefined ? { part: best.part } : {}), t: best.t, point: [r.pos[0] + (n.pos[0] - r.pos[0]) * best.t, r.pos[1] + (n.pos[1] - r.pos[1]) * best.t, r.pos[2] + (n.pos[2] - r.pos[2]) * best.t] }); continue; }
-        if (n.pos[2] <= 0 || n.age >= life) continue;
+        if (best) { hits.push({ owner: r.owner, target: best.target, ...(best.part !== undefined ? { part: best.part } : {}), round: r, t: best.t, point: [r.pos[0] + (n.pos[0] - r.pos[0]) * best.t, r.pos[1] + (n.pos[1] - r.pos[1]) * best.t, r.pos[2] + (n.pos[2] - r.pos[2]) * best.t] }); continue; }
+        if ((ground !== null && n.pos[2] <= ground) || n.age >= (Number.isFinite(r.life) ? r.life : life)) continue;
         alive.push(n);
     }
     return { rounds: alive, hits };
