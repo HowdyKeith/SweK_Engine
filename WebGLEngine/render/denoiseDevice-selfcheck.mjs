@@ -196,6 +196,29 @@
 //   Y5  --measure-r27w judging every layer against the direct pair            -> 1 RED: the CLI source row (no gate runs the CLI)
 //   Y6  R27_KERNELS at two vec4s a thread                                     -> 1 RED: the layers row -- K0w holds at two, as it should;
 //       the configuration is held by name, because section 83 says why one
+// v4869 -- ROUND 27'S VERDICT (section 86): rule83Entries and its three rows. Each restored byte-identical (md5):
+//   Z1  RULE83_MIN 0.25 instead of 1.05                                       -> 3 RED: the verdict, the discrimination row, the predictions
+//   Z2  the present entry read as r15 whatever the table said                 -> 1 RED: the discrimination row (r27w is under r15 too, so the
+//       verdict alone cannot tell; lifted over r15 and not r18t, the copy then qualifies)
+//   Z3  render/denoiseDevice.mjs: the 1080's page entry given r27w            -> 2 RED: the verdict and round 18's page verdict (section 63)
+//   Z4  the page's K0w ignoring a skipped exact-gate row                       -> 1 RED: the discrimination row
+//   Z5  section 85's check dropped (a report that did not time r27w keyed)    -> 1 RED: the discrimination row
+//   Z6  the committed 1080 run b edited to 1.100 x r18t natively at 1080p     -> 3 RED: the verdict, the discrimination row (its one-run
+//       lift is now two), the predictions -- one run alone still moves no entry, and the verdict row reads condition 3 in every run
+//   Z7  both runs asked as either run (some for every)                        -> 1 RED: the discrimination row
+// v4871+ -- ROUND 28'S VERDICT (section 88): the two rows read off render/denoise-rig-r28-*.json and -which.txt. Each restored byte-identical
+// (sha256), by a runner that reads and writes bytes and restores on SIGTERM:
+//   X1  prediction 3 looking for section 79's reason (the number before the renumbering)  -> 1 RED: the verdict
+//   X2  the committed Intel report's use_dxc-off group edited to 8 of 8 built             -> 1 RED: the verdict
+//   X3  the committed console's 1080 --which edited to r15                                -> 1 RED: the verdict
+//   X4  the Intel's expected set made r15                                                 -> 1 RED: the verdict
+//   X5  the --which rule without its kernels clause and its nativePick re-derivation      -> 1 RED: the discrimination row (either clause
+//       alone catches r15, so removing one alone should leave the row green -- read off the code, not run: the run that would have
+//       measured it is the killed one below)
+//   *** THE FIRST RUNNER LEFT TWO THINGS BROKEN, AND NEITHER WAS ITS RED COUNT. *** It was killed by its caller's timeout during X4, and a
+//   Python `finally` does not run on SIGTERM: the --which rule was left without its kernels clause. And it wrote files back in text mode,
+//   so the committed console -- CRLF, as the rig wrote it -- came back LF, with its md5 "restored" against the text it had already
+//   converted. git status showed the second, a grep for the clause the first; both were put back and cmp'd against the upload.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -261,6 +284,40 @@ function rule66Entries(rep, { fxc: askFxc = true } = {}) {
     });
     const q = sets.filter((x) => x.fail < 0).sort((a, b) => a.c3.r - b.c3.r || RULE66_SETS.indexOf(a.s) - RULE66_SETS.indexOf(b.s));
     return [{ key, entry: key && q.length ? q[q.length - 1].s : null, fail: Object.fromEntries(sets.map((x) => [x.s, x.fail])), lines: sets.map((x) => x.line) }];
+}
+// v4869 -- SECTION 83'S RULE, AS CODE, read off one realGpuRun --only denoise report. Per path it asks the conditions in order and
+// records the first that fails. Natively: 0 the run's compiler is DXC and the whole compile gate green (rule66's condition 0, which
+// is section 76's reading); 1 K0w (b), the whole exact gate green and its measured line "r27w green (N of N native rows)"; 2 K1 against
+// r12 natively (at least 2 x at the largest size both measured, at least 1 x at every one); 3 at least 1.05 x the GPU's present
+// native entry at the largest size both measured. On the page: 1 K0w (c), the whole exact gate green with no row skipped and its
+// browser adapter hardware -- a browser row that went red is a FAIL line, one that could not run a SKIP line; 2 K1 on the page; 3 at
+// least 1.05 x the present page entry. The present entries are the tables as section 83 was fixed (RULE83_AT), not the live ones,
+// so the rule reads what r27w had to beat; an adapter neither names is held to r15. A report whose timing gate did not time r27w
+// (section 85's check) reads as no key, and so no entry.
+const RULE83_MIN = 1.05;
+const RULE83_AT = Object.freeze({ native: Object.freeze({ "win32/intel/gen-9": "r18u", "win32/nvidia/pascal": "r18t" }),
+                                  page: Object.freeze({ "Windows/intel/gen-9": "r18u", "Windows/nvidia/pascal": "r18t" }) });
+function rule83Entries(rep) {
+    const comp = rigGate(rep, "denoiseCompile"), dev = rigGate(rep, "denoiseDevice"), tim = rigGate(rep, "denoiseTiming");
+    const T = rigLines(tim), keyOf = (re) => (T.map((l) => l.match(re)).find(Boolean) || [])[1] || null;
+    const timed = T.some((l) => /^native: .*; sets timed: (?:\S+, )*r27w(?:,|$)/.test(l));
+    const keys = timed ? { native: keyOf(/^native: this adapter's key for section 66's table: (\S+)$/), page: keyOf(/^page: this adapter's key for section 61's table: (\S+)$/) } : { native: null, page: null };
+    const c0 = !!comp && comp.ok === true && !!rep.nodeWebgpu && rep.nodeWebgpu.compiler === "DXC" &&
+        rigLines(comp).some((l) => /^native \/ as shipped in all: (\d+) of \1 built; dumps: \1 DXC \(DXIL\); compiler, from the package: DXC;/.test(l));
+    const devGreen = !!dev && dev.ok === true && !(dev.fails || []).length;
+    const k0w = { native: devGreen && rigLines(dev).some((l) => /^native K0w for round 27's set on .*: r27w green \((\d+) of \1 native rows\)$/.test(l)),
+                  page: devGreen && !(dev.skips || []).length && dev.software === false && (dev.adapters || []).some((a) => !/\(native\)$/.test(a)) };
+    const top = (a) => (a.length ? a[a.length - 1] : null), out = { key: keys };
+    for (const p of ["native", "page"]) {
+        const present = keys[p] && Object.hasOwn(RULE83_AT[p], keys[p]) ? RULE83_AT[p][keys[p]] : "r15";
+        const k1 = sizeRatios(T, `${p}: r27w against r12 at `), c3 = sizeRatios(T, `${p}: r27w against ${present} at `);
+        const conds = [p === "page" || c0, k0w[p], !!tim && tim.ok === true && k1.length > 0 && top(k1).r >= 2 && k1.every((x) => x.r >= 1), !!top(c3) && top(c3).r >= RULE83_MIN];
+        const fail = keys[p] ? conds.indexOf(false) : 0;
+        out[p] = { present, fail, entry: keys[p] && fail < 0 ? "r27w" : null, c3: top(c3),
+                   line: `${p}: K1 ${top(k1) ? top(k1).r + " x at " + top(k1).size : "none"}, ${top(c3) ? top(c3).r + " x " + present + " at " + top(c3).size : "no ratio against " + present}` +
+                         `${!keys[p] ? ", no key" : fail < 0 ? ", qualifies" : `, fails condition ${fail}`}` };
+    }
+    return out;
 }
 // v4852+ -- SECTION 68'S OUTCOME: tools/denoiseDevice.mjs --which, as the rig printed it (render/denoise-rig-r20-which.txt,
 // committed as received). Each run is three lines: the adapter, package and compiler; the key, set and reason; the pass.
@@ -539,6 +596,55 @@ console.log("1. THE KERNEL'S TWIN, ON THE CPU");
                 both([runs.gtx1080[0], eLow]) === null && eLow.fail.r18t === 3 && both([eRed, runs.gtx1080[1]]) === null && eRed.fail.r18t === 1,
                 `run b at 1.040 x: fails condition ${eLow.fail.r18t}; run a with a red exact gate: fails condition ${eRed.fail.r18t}`);
         }
+        // v4869 -- ROUND 27'S VERDICT (section 86): section 83's rule -- per GPU and path, every condition in BOTH of two runs -- read off
+        // the four committed reports (render/denoise-rig-r27-{a,b}-*.json, realGpuRun --only denoise at d11534e3, v4868's release record,
+        // SWEK_WEBGPU cleared). Every gate green in all four; K0w and K1 hold on both GPUs and both paths; r27w fails condition 3 on every
+        // one -- 0.30 x r18t on the 1080 and 0.33-0.37 x r18u on the Intel -- so no entry moves and both tables are as section 83 found them.
+        {
+            const rig = (f) => JSON.parse(fs.readFileSync(path.join(ENG, "render", f), "utf8"));
+            const R = { intel: ["a", "b"].map((r) => rig(`denoise-rig-r27-${r}-intel-gen9.json`)), gtx1080: ["a", "b"].map((r) => rig(`denoise-rig-r27-${r}-gtx1080.json`)) };
+            const runs = Object.fromEntries(Object.entries(R).map(([k, reps]) => [k, reps.map(rule83Entries)]));
+            const both = (rs, p) => (rs.every((e) => e.key[p] && e.key[p] === rs[0].key[p] && e[p].entry === "r27w") ? "r27w" : null);
+            const derive = (p) => { const t = { ...RULE83_AT[p] }; for (const rs of Object.values(runs)) if (both(rs, p)) t[rs[0].key[p]] = "r27w"; return t; };
+            const same = (a, b) => JSON.stringify(Object.entries(a).sort()) === JSON.stringify(Object.entries(b).sort());
+            const allGreen = Object.values(R).flat().every((r) => (r.gates || []).length === 3 && r.gates.every((g) => g.ok === true) && /^d11534e3 /.test(r.commit || ""));
+            for (const [k, rs] of Object.entries(runs)) for (const p of ["native", "page"]) console.log(`  ----  section 83 on ${rs[0].key[p]}: ${rs.map((e, i) => `run ${"ab"[i]} ${e[p].line}`).join(" | ")}`);
+            const want = { native: { "win32/intel/gen-9": "r18u", "win32/nvidia/pascal": "r18t" }, page: { "Windows/intel/gen-9": "r18u", "Windows/nvidia/pascal": "r18t" } };
+            const read = Object.values(runs).flat().every((e) => e.native.fail === 3 && e.page.fail === 3);
+            ok("!! *** round 27's verdict (section 86): every gate green in all four runs at d11534e3, K0w and K1 hold on both GPUs and paths, r27w fails condition 3 on every one in both runs, and both tables are as section 83 found them -- no r27w in either ***",
+                allGreen && read && same(derive("native"), want.native) && same(derive("page"), want.page) &&
+                same(NATIVE_KERNELS_BY_ADAPTER, want.native) && same(PAGE_KERNELS_BY_ADAPTER, want.page) && same(RULE83_AT.native, want.native) && same(RULE83_AT.page, want.page) &&
+                NATIVE_KERNELS_DECIDED_BY["win32/intel/gen-9"] === "section 67" && NATIVE_KERNELS_DECIDED_BY["win32/nvidia/pascal"] === "section 78" &&
+                ![...Object.values(NATIVE_KERNELS_BY_ADAPTER), ...Object.values(PAGE_KERNELS_BY_ADAPTER)].includes("r27w") && DEFAULT_KERNELS === "r15" && PAGE_KERNELS === "r15",
+                Object.entries(runs).map(([k, rs]) => `${k}: native ${rs.map((e) => e.native.c3 && e.native.c3.r).join(" and ")} x ${rs[0].native.present}, page ${rs.map((e) => e.page.c3 && e.page.c3.r).join(" and ")} x ${rs[0].page.present}`).join("; "));
+            // it discriminates. On copies: the 1080's two runs with r27w at 1.100 x r18t natively at 1920 x 1080 give the 1080 r27w natively
+            // and nothing on the page; one run lifted gives nothing (both runs); lifted with one exact gate red fails condition 1; r27w lifted
+            // over r15 but not r18t still fails 3 (the present entry, not r15); a skipped row fails the page's condition 1 and not the native
+            // one; and a report that did not time r27w has no key (section 85's check)
+            const lift = (rep, re) => { const c = JSON.parse(JSON.stringify(rep)); for (const g of c.gates) g.measured = (g.measured || []).map((l) => (re.test(l) ? l.replace(/: [\d.]+ x as fast/, ": 1.100 x as fast") : l)); return c; };
+            const L = R.gtx1080.map((r) => lift(r, /^native: r27w against r18t at 1920 x 1080/)), eL = L.map(rule83Entries);
+            const red = lift(R.gtx1080[0], /^native: r27w against r18t at 1920 x 1080/); rigGate(red, "denoiseDevice").ok = false;
+            const r15only = rule83Entries(lift(R.gtx1080[0], /^native: r27w against r15 at 1920 x 1080/));
+            const skip = JSON.parse(JSON.stringify(R.intel[0])); rigGate(skip, "denoiseDevice").skips = ["SKIP  section 5: no browser"];
+            const eS = rule83Entries(skip);
+            const stale = JSON.parse(JSON.stringify(R.intel[0])); for (const g of stale.gates) g.measured = (g.measured || []).map((l) => l.replace(/, r27w$/, ""));
+            const eStale = rule83Entries(stale);
+            ok("  ...and it discriminates: the 1080 lifted to 1.100 x r18t natively in both runs takes r27w natively and not on the page; in one run, or with one exact gate red, or lifted over r15 alone, it takes nothing; a skipped row fails the page's K0w only; a report that did not time r27w has no key",
+                both(eL, "native") === "r27w" && both(eL, "page") === null && both([eL[0], runs.gtx1080[1]], "native") === null &&
+                both([rule83Entries(red), eL[1]], "native") === null && rule83Entries(red).native.fail === 1 && r15only.native.fail === 3 &&
+                eS.page.fail === 1 && eS.native.fail === 3 && eStale.key.native === null && eStale.native.fail === 0 && eStale.native.entry === null,
+                `lifted: native ${eL.map((e) => e.native.entry || "none").join(", ")}, page ${eL.map((e) => e.page.entry || "none").join(", ")}; red exact gate: fails ${rule83Entries(red).native.fail}; ` +
+                `over r15 only: fails ${r15only.native.fail}; skipped row: page fails ${eS.page.fail}, native ${eS.native.fail}; not timed: key ${eStale.key.native}`);
+            // section 83's predictions, read off the same reports. P1 (r27w qualifies on the 1080, natively and on the page) FAILED; P2 (not
+            // on the Intel) held; P3 (K0w on both GPUs, natively and in Chrome) held -- and its aside, "with some cells fused on the 1080, as
+            // r15's were", is not what the compile gate saw: r27w's hidden kernel fused no cell in either mode on either GPU, as r15's did not
+            const fusedW = Object.values(R).flat().map((r) => rigLines(rigGate(r, "denoiseCompile")).map((l) => l.match(/^native \/ (?:as shipped|use_dxc): r27w-wino-3x3: .*?, (\d+) plain, (\d+) fused, (\d+) unexplained;/)).filter(Boolean));
+            ok("  section 83's predictions, read off the same reports: P1 FAILED (the 1080 takes nothing on either path), P2 held (nor the Intel), P3 held (K0w natively and in Chrome on both GPUs, both runs) -- with no Winograd cell fused, where P3's aside expected some on the 1080",
+                runs.gtx1080.every((e) => !e.native.entry && !e.page.entry) && runs.intel.every((e) => !e.native.entry && !e.page.entry) &&
+                Object.values(runs).flat().every((e) => e.native.fail > 1 && e.page.fail > 1) &&
+                fusedW.every((m) => m.length === 2 && m.every((x) => +x[1] === 131072 && +x[2] === 0 && +x[3] === 0)),
+                `the Winograd kernel's compile-gate job, as shipped and use_dxc, per run: ${fusedW.map((m) => m.map((x) => `${x[1]} plain + ${x[2]} fused`).join(" / ")).join("; ")}`);
+        }
         // v4852+ -- SECTION 68'S OUTCOME (round 20): the rig's six --which lines per GPU, held to the table fixed before they ran, and
         // each re-derived from nativePick on the adapter and compiler the line itself names -- so the rig's reasons are this code's
         {
@@ -554,6 +660,49 @@ console.log("1. THE KERNEL'S TWIN, ON THE CPU");
                 runs.length === 4 && held.every((h) => h.ok), held.map((h) => (h.ok ? "" : "WRONG ") + h.line).join("; "));
             const asInstalled = runs.filter((r, i) => !r.bad && !WHICH_PREDICTED[i].dxc).map((r) => `${r.vendor} ${r.version}`);
             console.log(`  ----  section 68: the packages the rig had installed (the pin is 0.6.0): ${asInstalled.join(", ")}`);
+        }
+        // v4871+ -- ROUND 28'S VERDICT (section 88): section 87's four deciding predictions, read off the committed run -- one realGpuRun
+        // --only denoise per GPU at 8490e721 (render/denoise-rig-r28-{intel-gen9,gtx1080}.json) and the console with each GPU's --which
+        // (render/denoise-rig-r28-which.txt). 1: every gate green; 2: the compile gate's use_dxc-off group is r12-tiled-3x3 alone, built,
+        // exact, its dump FXC (DXBC), the other seven standing aside by section 87's line; 3: the timing gate's FXC ladder skipped with
+        // section 87's reason, and no FXC line timed; 4: --which r18u on the Intel and r18t on the 1080, each line nativePick's own. The
+        // gate durations section 87 reported without deciding on are printed beside it. The retirement stands.
+        {
+            const rig = (f) => JSON.parse(fs.readFileSync(path.join(ENG, "render", f), "utf8"));
+            const R28 = { intel: rig("denoise-rig-r28-intel-gen9.json"), gtx1080: rig("denoise-rig-r28-gtx1080.json") };
+            const which28 = parseWhich(fs.readFileSync(path.join(ENG, "render", "denoise-rig-r28-which.txt"), "utf8"));
+            const rule87 = (rep) => {
+                const comp = rigGate(rep, "denoiseCompile"), tim = rigGate(rep, "denoiseTiming"), C = rigLines(comp), T = rigLines(tim);
+                const p1 = (rep.gates || []).length === 3 && rep.gates.every((g) => g.ok === true);
+                const offJobs = C.filter((l) => l.startsWith("native / use_dxc off: "));
+                const p2 = C.some((l) => /^native \/ use_dxc off in all: 1 of 1 built; dumps: 1 FXC \(DXBC\); compiler, from the package: FXC;/.test(l)) &&
+                    offJobs.length === 1 && /^native \/ use_dxc off: r12-tiled-3x3: .*, 131072 plain, 0 fused, 0 unexplained; dump: FXC \(DXBC\)/.test(offJobs[0]) &&
+                    (comp.skips || []).some((l) => /^SKIP  section 87: native \/ use_dxc off is FXC -- the denoiser's FXC paths are retired; r12-tiled-3x3 alone is built, as FXC's control, and the other 7 stand aside, not counted as unbuilt/.test(l));
+                const p3 = (tim.skips || []).some((l) => /^SKIP  native FXC ladder: retired by section 87 /.test(l)) && !T.some((l) => /^native FXC/.test(l));
+                return { p1, p2, p3, compS: Math.round(comp.ms / 1000), timS: Math.round(tim.ms / 1000), commit: rep.commit || "" };
+            };
+            const r = Object.fromEntries(Object.entries(R28).map(([k, rep]) => [k, rule87(rep)]));
+            const want = { intel: { vendor: "intel", key: "win32/intel/gen-9", kernels: "r18u" }, nvidia: { vendor: "nvidia", key: "win32/nvidia/pascal", kernels: "r18t" } };
+            const rule87which = (W) => W.length === 2 && W.every((w) => {
+                const t = !w.bad && want[w.vendor], re = t && nativePick({ info: { vendor: w.vendor, architecture: w.architecture, description: w.description } }, { compiler: w.compiler, platform: "win32" });
+                return !!t && w.compiler === "DXC" && w.key === t.key && w.kernels === t.kernels && w.built === t.kernels && w.worst <= 1e-4 &&
+                    re.key === w.key && re.kernels === w.kernels && re.why === w.why;
+            });
+            const p4 = rule87which(which28);
+            ok("!! *** round 28's verdict (section 88): section 87's four deciding predictions hold on both GPUs at 8490e721 -- every gate green, FXC builds the control kernel alone, the FXC ladder is skipped, --which unchanged -- so the FXC retirement stands ***",
+                Object.values(r).every((x) => x.p1 && x.p2 && x.p3 && /^8490e721 /.test(x.commit)) && p4,
+                Object.entries(r).map(([k, x]) => `${k}: 1 ${x.p1}, 2 ${x.p2}, 3 ${x.p3}`).join("; ") + `; 4 ${p4} (${which28.map((w) => `${w.vendor} ${w.kernels}`).join(", ")})`);
+            console.log(`  ----  section 87, reported and not deciding: compile gate ${r.intel.compS} s on the Intel (bound 200) and ${r.gtx1080.compS} s on the 1080 (bound 120); ` +
+                `timing gate ${r.intel.timS} s (bound 351) and ${r.gtx1080.timS} s (bound 230)`);
+            // it discriminates. On copies: the Intel's compile gate building all eight under FXC fails 2; the 1080's timing gate with the
+            // FXC ladder run fails 3; a --which naming r15 for the Intel fails 4
+            const all8 = JSON.parse(JSON.stringify(R28.intel));
+            for (const g of all8.gates) g.measured = (g.measured || []).map((l) => l.replace("native / use_dxc off in all: 1 of 1 built; dumps: 1 FXC", "native / use_dxc off in all: 8 of 8 built; dumps: 8 FXC"));
+            const ran = JSON.parse(JSON.stringify(R28.gtx1080)); rigGate(ran, "denoiseTiming").skips = []; rigGate(ran, "denoiseTiming").measured.push("native FXC: node-webgpu 0.6.2 ...; sets timed: r12, r15");
+            const w15 = parseWhich(fs.readFileSync(path.join(ENG, "render", "denoise-rig-r28-which.txt"), "utf8").replace("kernels r18u -- section 67's for win32/intel/gen-9, under DXC", "kernels r15 -- no entry"));
+            ok("  ...and it discriminates: all eight built under FXC, the FXC ladder run, or --which naming r15 on the Intel, and the verdict would not hold",
+                !rule87(all8).p2 && !rule87(ran).p3 && !rule87which(w15),
+                `eight under FXC: prediction 2 ${rule87(all8).p2}; ladder run: prediction 3 ${rule87(ran).p3}; --which naming r15: prediction 4 ${rule87which(w15)}`);
         }
         const tbl = { "Windows/intel/gen-9": "r18u" };
         ok("!! round 18: the page's key is platform, vendor and architecture -- none without a platform, as every browser but Chromium -- and pageKernelsFor gives the table's set for a key it names, PAGE_KERNELS for any other",

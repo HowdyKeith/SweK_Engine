@@ -21,14 +21,14 @@
 // Without it everything is computed, as before; with it the result is the same, bit for bit
 // (render/denoiseCache-selfcheck.mjs). A scene rendered under --harvest is never served to a run without it.
 "use strict";
-import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
+import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
 import { renderSequence, temporalChannels, sequenceSeeds } from "./denoiseTemporal.mjs";
-import { withMask, emitterCoverage } from "./denoiseMask.mjs";
+import { withMask, emitterCoverage, emitterRadiance, MASK_STRIDE, MASK_CHANNEL, COVERAGE_GRID } from "./denoiseMask.mjs";
 import { jointBilateral, tuneFilter } from "./denoiseFilter.mjs";
 import { trainDenoiser, denoise, TRAIN, TRAIN_LONG, INIT } from "./denoiseNet.mjs";
 import { relMSE, verdict, trainFit, historyFit, trainSanity, effects } from "./denoiseStats.mjs";
 import { cached, cachedMany, hashArrays } from "./denoiseCache.mjs";
-import { upscale, renderUpscaleImages, renderSeedsUpscale, RCAS_SHARPNESS, RCAS_DENOISE, GAMMA } from "./denoiseUpscale.mjs";
+import { upscale, renderUpscaleImages, renderSeedsUpscale, emitterAwareUpscale, fillEmitters, compositeEmitters, nearEmitterShare, RCAS_SHARPNESS, RCAS_DENOISE, GAMMA } from "./denoiseUpscale.mjs";
 import { trainParallel } from "./denoisePool.mjs";
 
 export const SEEDS = Object.freeze([1, 2, 3]);
@@ -184,30 +184,42 @@ export function runShippedStudy({ splits = ROUND_MESH.splits, net, filter, emitt
  */
 export const RESULTS_FSR1 = "render/denoise-results-fsr1.json";
 export const ROUND_FSR1 = Object.freeze({ splits: SPLITS_FSR1, test: "signflip", c2Prior: ROUND_MESH.c2Prior, results: RESULTS_FSR1 });
-export function runUpscaleStudy({ splits = ROUND_FSR1.splits, net, test = ROUND_FSR1.test, c2Prior = ROUND_FSR1.c2Prior,
+/**
+ * Section 89, ROUND 29: round 26's question at a frame size nearer real use -- 256 x 256, the half size 128 -- with EASU ALONE as
+ * the candidate, because RCAS made every image worse at 64 x 64 (section 82). The same frames and hypotheses with B the half-size
+ * frame through EASU: H1, B against D (full size at 1 sample, the same samples); H2, B against C (bilinear on the same frame).
+ * FSR1 whole (EASU then RCAS) and RCAS without its denoise are reported against B, never tested.
+ */
+export const RESULTS_HALFRES = "render/denoise-results-halfres.json";
+export const ROUND_HALFRES = Object.freeze({ splits: SPLITS_HALFRES, image: 256, candidate: "easu", test: "signflip", c2Prior: ROUND_MESH.c2Prior, results: RESULTS_HALFRES });
+export function runUpscaleStudy({ splits = ROUND_FSR1.splits, net, test = ROUND_FSR1.test, c2Prior = ROUND_FSR1.c2Prior, candidate = "fsr1",
                                   harvest = false, image = IMAGE, sppIn = SPP_IN, sppRef = SPP_REF, cache = null, log = () => {} } = {}) {
     if (!net) throw new Error("denoiseStudy: runUpscaleStudy needs the shipped network, decoded by its caller");
+    if (candidate !== "fsr1" && candidate !== "easu") throw new Error(`denoiseStudy: the upscale round's candidate is "fsr1" (section 81) or "easu" (section 89), not "${candidate}"`);
     const t0 = Date.now(), timings = {};
     const lap = (k) => { timings[k] = Date.now() - t0; log(`${k} at ${(timings[k] / 1000).toFixed(1)} s`); };
     const split = splits.T1, half = image / 2;
-    const config = { image, half, sppIn, sppRef, harvest, test, c2Prior, upscale: { kind: "fsr1", rcasSharpness: RCAS_SHARPNESS, rcasDenoise: RCAS_DENOISE, gamma: GAMMA },
+    const label = candidate === "fsr1" ? "FSR1" : "EASU";
+    const config = { image, half, sppIn, sppRef, harvest, test, c2Prior, upscale: { kind: candidate, rcasSharpness: RCAS_SHARPNESS, rcasDenoise: RCAS_DENOISE, gamma: GAMMA },
                      trained: "nothing -- the shipped network", split: { family: split.family, n: split.seeds.length, first: split.seeds[0] },
-                     hypotheses: { H1: "B (half size + FSR1) against D (full size at 1 sample)", H2: "B against C (half size + bilinear)" } };
+                     hypotheses: { H1: `B (half size + ${label}) against D (full size at 1 sample)`, H2: "B against C (half size + bilinear)" } };
     const ims = split.seeds.map((seed, i) => cached(cache, `upscale-${familyOf(split, i)}-${seed}-${image}-${sppIn}-${sppRef}-${harvest ? "harvest" : "gate"}`,
         () => renderUpscaleImages(familyOf(split, i), seed, { harvest, w: image, h: image, sppIn, sppRef })));
     lap("tests rendered");
     const den = (fr) => denoise(net, fr.x, fr.h, fr.w).y;
     const frames = (im) => { const h4 = den(im.half4); return {
-        A: den(im.full4), B: upscale(h4, half, half, image, image, "fsr1"), C: upscale(h4, half, half, image, image, "bilinear"), D: den(im.full1),
+        A: den(im.full4), B: upscale(h4, half, half, image, image, candidate), C: upscale(h4, half, half, image, image, "bilinear"), D: den(im.full1),
         easu: upscale(h4, half, half, image, image, "easu"), fsr1NoDenoise: upscale(h4, half, half, image, image, "fsr1-nodenoise"),
+        // section 89: with EASU the candidate, FSR1 whole is a frame of its own, reported against it
+        ...(candidate === "fsr1" ? {} : { fsr1: upscale(h4, half, half, image, image, "fsr1") }),
         noisyFull1: im.full1.input, noisyFull4: im.full4.input, noisyHalfUp: upscale(im.half4.input, half, half, image, image, "bilinear") }; };
     const F = ims.map(frames);
     // C4: the candidate's whole chain -- trace already done, so network and upscale -- twice, bit for bit
-    const determinism = ims.every((im, i) => { const again = upscale(den(im.half4), half, half, image, image, "fsr1"); return again.every((v, j) => Object.is(v, F[i].B[j])); });
+    const determinism = ims.every((im, i) => { const again = upscale(den(im.half4), half, half, image, image, candidate); return again.every((v, j) => Object.is(v, F[i].B[j])); });
     const allSeeds = split.seeds.flatMap((s) => Object.values(renderSeedsUpscale(s)));
     const seedsDistinct = new Set(allSeeds).size === allSeeds.length;
     const rel = (k) => F.map((f, i) => relMSE(f[k], ims[i].ref));
-    const tables = Object.fromEntries(["A", "B", "C", "D", "easu", "fsr1NoDenoise", "noisyFull1", "noisyFull4", "noisyHalfUp"].map((k) => [k, rel(k)]));
+    const tables = Object.fromEntries(["A", "B", "C", "D", "easu", "fsr1NoDenoise", ...(candidate === "fsr1" ? [] : ["fsr1"]), "noisyFull1", "noisyFull4", "noisyHalfUp"].map((k) => [k, rel(k)]));
     tables.floor = ims.map((im) => relMSE(im.ref2, im.ref));
     lap("measured");
     const sets = { H1: { noisy: tables.noisyFull1, filter: tables.D, net: [tables.B], floor: tables.floor },
@@ -215,7 +227,83 @@ export function runUpscaleStudy({ splits = ROUND_FSR1.splits, net, test = ROUND_
     const V = verdict({ sets, shuffled: null, c2Prior, determinism, seedsDistinct, test });
     // reported, never tested: the price of the quarter (d of A against B: positive where the full-size frame was better),
     // and the two halves of FSR1 against the whole
-    const secondary = { priceOfHalf: effects(tables.B, tables.A), easuAloneVsFsr1: effects(tables.easu, tables.B), rcasNoDenoiseVsFsr1: effects(tables.fsr1NoDenoise, tables.B) };
+    // (section 89, EASU the candidate: d of FSR1 whole and of RCAS without its denoise against B -- positive where EASU alone was better)
+    const secondary = candidate === "fsr1"
+        ? { priceOfHalf: effects(tables.B, tables.A), easuAloneVsFsr1: effects(tables.easu, tables.B), rcasNoDenoiseVsFsr1: effects(tables.fsr1NoDenoise, tables.B) }
+        : { priceOfHalf: effects(tables.B, tables.A), fsr1VsEasu: effects(tables.fsr1, tables.B), rcasNoDenoiseVsEasu: effects(tables.fsr1NoDenoise, tables.B) };
+    return { verdict: V, tables, secondary, timings, determinism, seedsDistinct, seedCount: allSeeds.length, config };
+}
+
+/**
+ * Section 91, ROUND 30, THE EMITTER-AWARE UPSCALE: round 29's chain with the light sources taken out of the upscale. The
+ * half-size frame's emitter pixels are filled from their neighbours, the rest goes through EASU, and the emitters are put
+ * back at full size from the geometry -- E + (1 - cov) x the upscaled frame, emitterRadiance's coverage and emission
+ * (render/denoiseUpscale.mjs's emitterAwareUpscale). Per image, every frame against the same full-size reference:
+ *   A  full size, 4 samples, denoised -- today's page (reported)
+ *   B  half size, 4 samples, denoised, emitter-aware EASU -- the CANDIDATE
+ *   C  the same, emitter-aware bilinear -- EASU's control
+ *   D  full size, 1 sample, denoised -- the same number of samples as B
+ * H1: B beats D. H2: B beats C. H1's noisy frame is D's own 1-sample input; H2's is B's half-size input through the SAME
+ * emitter-aware bilinear chain, so C1 asks of both arms that they beat what the composite alone gives the noise. Reported,
+ * never tested: round 29's plain EASU and bilinear on the same frame, D with the emitters composited at full size, the
+ * price of the quarter, and the share of each frame's error within 2 px of an emitter.
+ */
+export const RESULTS_EMITTER = "render/denoise-results-emitter.json";
+export const ROUND_EMITTER = Object.freeze({ splits: SPLITS_EMITTER, image: 256, test: "signflip", c2Prior: ROUND_MESH.c2Prior, results: RESULTS_EMITTER });
+/** Section 91's two hypotheses over a round 30 table: verdict()'s columns, by name, so the run and the verdict's re-derivation read one definition. */
+export const emitterSets = (t) => ({ H1: { noisy: t.noisyFull1, filter: t.D, net: [t.B], floor: t.floor },
+                                     H2: { noisy: t.noisyHalfAware, filter: t.C, net: [t.B], floor: t.floor } });
+export function runEmitterAwareStudy({ splits = ROUND_EMITTER.splits, net, test = ROUND_EMITTER.test, c2Prior = ROUND_EMITTER.c2Prior,
+                                       harvest = false, image = IMAGE, sppIn = SPP_IN, sppRef = SPP_REF, cache = null, log = () => {} } = {}) {
+    if (!net) throw new Error("denoiseStudy: runEmitterAwareStudy needs the shipped network, decoded by its caller");
+    const t0 = Date.now(), timings = {};
+    const lap = (k) => { timings[k] = Date.now() - t0; log(`${k} at ${(timings[k] / 1000).toFixed(1)} s`); };
+    const split = splits.T1, half = image / 2;
+    const config = { image, half, sppIn, sppRef, harvest, test, c2Prior,
+                     upscale: { kind: "easu", gamma: GAMMA, coverageGrid: COVERAGE_GRID, fill: "cov > 0 at half size, filled ring by ring from the 8-neighbours known after the last ring",
+                                composite: "E + (1 - cov) x the upscaled frame, emitterRadiance at full size" },
+                     trained: "nothing -- the shipped network", split: { family: split.family, n: split.seeds.length, first: split.seeds[0] },
+                     hypotheses: { H1: "B (half size + emitter-aware EASU) against D (full size at 1 sample)", H2: "B against C (half size + emitter-aware bilinear)" } };
+    const ims = split.seeds.map((seed, i) => cached(cache, `upscale-${familyOf(split, i)}-${seed}-${image}-${sppIn}-${sppRef}-${harvest ? "harvest" : "gate"}`,
+        () => renderUpscaleImages(familyOf(split, i), seed, { harvest, w: image, h: image, sppIn, sppRef })));
+    lap("tests rendered");
+    const maskOf = (fr) => Float64Array.from({ length: fr.w * fr.h }, (_, p) => fr.x[p * MASK_STRIDE + MASK_CHANNEL]);
+    const fullOf = (i) => emitterRadiance(makeScene(familyOf(split, i), split.seeds[i]), image, image);
+    const full = ims.map((im, i) => {
+        const f = fullOf(i), m = maskOf(im.full4);
+        // the composite's coverage IS the mask the network reads at full size -- a mismatch is a bug, and nothing is measured over it
+        if (!f.cov.every((v, p) => Object.is(v, m[p]))) throw new Error(`denoiseStudy: image ${i}'s emitterRadiance coverage is not its full-size input's mask`);
+        return f;
+    });
+    const den = (fr) => denoise(net, fr.x, fr.h, fr.w).y;
+    const frames = (im, i) => {
+        const h4 = den(im.half4), ch = maskOf(im.half4), F = full[i], D = den(im.full1);
+        const aware = (img, kind) => emitterAwareUpscale(img, ch, half, half, image, image, kind, F);
+        return { A: den(im.full4), B: aware(h4, "easu"), C: aware(h4, "bilinear"), D,
+                 plainEasu: upscale(h4, half, half, image, image, "easu"), plainBilinear: upscale(h4, half, half, image, image, "bilinear"),
+                 Daware: compositeEmitters(fillEmitters(D, F.cov, image, image), F),
+                 noisyFull1: im.full1.input, noisyFull4: im.full4.input, noisyHalfAware: aware(im.half4.input, "bilinear"),
+                 noisyHalfUp: upscale(im.half4.input, half, half, image, image, "bilinear") };
+    };
+    const Fr = ims.map(frames);
+    // C4: the candidate's whole chain twice, bit for bit -- the network, the emitters' geometry, the fill, EASU, the composite
+    const determinism = ims.every((im, i) => {
+        const again = emitterAwareUpscale(den(im.half4), maskOf(im.half4), half, half, image, image, "easu", fullOf(i));
+        return again.every((v, j) => Object.is(v, Fr[i].B[j]));
+    });
+    const allSeeds = split.seeds.flatMap((s) => Object.values(renderSeedsUpscale(s)));
+    const seedsDistinct = new Set(allSeeds).size === allSeeds.length;
+    const rel = (k) => Fr.map((f, i) => relMSE(f[k], ims[i].ref));
+    const tables = Object.fromEntries(["A", "B", "C", "D", "plainEasu", "plainBilinear", "Daware", "noisyFull1", "noisyFull4", "noisyHalfAware", "noisyHalfUp"].map((k) => [k, rel(k)]));
+    tables.floor = ims.map((im) => relMSE(im.ref2, im.ref));
+    lap("measured");
+    const sets = emitterSets(tables);
+    const V = verdict({ sets, shuffled: null, c2Prior, determinism, seedsDistinct, test });
+    // reported, never tested (each d positive where B was better, but the price of the quarter, positive where A was)
+    const near = (k) => Fr.map((f, i) => nearEmitterShare(f[k], ims[i].ref, full[i].cov, image, image));
+    const secondary = { priceOfHalf: effects(tables.B, tables.A), awareVsPlainEasu: effects(tables.plainEasu, tables.B), dAwareVsB: effects(tables.Daware, tables.B),
+                        nearEmitter: { B: near("B"), C: near("C"), plainEasu: near("plainEasu"), D: near("D") },
+                        emitterPixels: full.map((f) => f.cov.reduce((a, v) => a + (v > 0 ? 1 : 0), 0)) };
     return { verdict: V, tables, secondary, timings, determinism, seedsDistinct, seedCount: allSeeds.length, config };
 }
 

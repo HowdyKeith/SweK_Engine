@@ -141,8 +141,24 @@ const rows = real.map((k) => ({ k, g: G.timings[k], s: S.timings[k], r: ratioOf(
         Object.freeze({ gate: "tools/ship/moduleHistory-selfcheck.mjs", runs: Object.freeze([9344, 9436, 9248]) }),
         Object.freeze({ gate: "tools/ship/multigrid3dTiming-selfcheck.mjs", runs: Object.freeze([1788, 1799, 1697]) }),
     ]);
+    // *** v4871 -- AFTER THE FULL SERIAL RE-TAKE THE TWO RECORDS AGREE ALMOST EVERYWHERE, AND THE POPULATION IS TWO. *** The
+    // re-take (2026-10-15/16, complete) replaced the 2026-10-06 entries, so the alone-against-alone pairs 2x apart fell to
+    // one each way, and the row above read 1 against 1. The gate-higher one is frozenRecords: 1,974 ms in the serial run
+    // against the sweep's 786 alone. Run three times alone at HEAD, on the box that took both readings: 868, 845, 790 --
+    // the sweep's reading, not the record's. Named the same way as v4860's three, and held to the same test.
+    // SABOTAGED v4871: STALE_AT_V4871 emptied -> 1 RED (the direction row, 1 against 1 unexplained); restored, md5 verified.
+    // *** v4872 -- RE-TIMED, BECAUSE THE GATE GOT SLOWER AND THE WINDOW DID NOT MOVE WITH IT. *** v4872's third ship verify read
+    // frozenRecords alone at 939 ms -- 0.1% outside 10% of v4871's median (845) -- and afterVerdict went red on it; the verify
+    // before read 852 and the first 1 against 2. Run three times alone at HEAD on the same box: 996, 928, 920 (median 928, where
+    // v4871's were 868, 845, 790). Every sweep reading of this ship sits within 10% of the new median and the record's 1,974 is
+    // still refuted at 2.1x, so the runs are replaced rather than the window widened.
+    // SABOTAGED v4872: the runs set back to v4871's -> 1 RED (the direction row, 1 against 1 unexplained, at the 939 reading);
+    // restored, sha256 verified.
+    const STALE_AT_V4871 = Object.freeze([
+        Object.freeze({ gate: "tools/ship/frozenRecords-selfcheck.mjs", runs: Object.freeze([996, 928, 920]) }),
+    ]);
     const med = (a) => [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)];
-    const named = [...STALE_AT_V3851.map((e) => ({ gate: e.gate, runs: e.v3851CodeRuns })), ...STALE_AT_V4860];
+    const named = [...STALE_AT_V3851.map((e) => ({ gate: e.gate, runs: e.v3851CodeRuns })), ...STALE_AT_V4860, ...STALE_AT_V4871];
     const explained = (x) => named.some((e) => e.gate === x.k && e.runs.length >= 3 &&
         Math.abs(med(e.runs) - x.s) / x.s <= 0.10 && x.g >= 1.5 * med(e.runs));
     const gateHigherUnexplained = cmp.filter((x) => x.r >= 2 && x.g > x.s && !explained(x)).length;

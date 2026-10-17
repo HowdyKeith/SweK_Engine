@@ -9247,6 +9247,60 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "(243 of 1,099 weights moved; -0.3199 against -0.4223 on 36 scenarios nothing had flown, better on 34; 0 flights ended early on 500 starts against the autopilot's 2). Fifty-five sabotages, four first at 0 red and one that hung the gate. NOT CLOSED: the gain is in recovery and gusts and is almost nothing on calm starts; " +
                  "no safer in the stall than the autopilot; nothing run on the rig, whose verify of v4867 died with 0xC0000005 in five gates and a differential against v4863 is owed; the GPU-brain pilot is the next round.",
     }),
+    // v4871 -- since562, from `versionPreflight --next` after a full fetch (the highest declared anywhere was since561). NO new gate
+    // file: three rounds widened sixteen -- round 27's verdict, the re-timing round's merge and finished re-take, and the
+    // label-collision round's merge (its own closing, since556, comes in with it).
+    since562: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate.
+        at: "v4871", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "render/denoiseDevice-selfcheck.mjs (round 27's verdict: rule83Entries read off the four committed reports, the discrimination row, section 83's predictions)",
+            "render/denoiseCompile-selfcheck.mjs (section 87: under FXC the control kernel alone)",
+            "render/denoiseTiming-selfcheck.mjs (section 87: the FXC ladder retired by default)",
+            "physics/blobarium-selfcheck.mjs, render/blobRecorder-selfcheck.mjs, render/holoAgree-selfcheck.mjs and tools/ship/playwrightResolve-selfcheck.mjs (playwright's resolved `from` is always a path)",
+            "tools/ship/strandCensus-selfcheck.mjs (a re-run row carrying its own cap is kept)",
+            "tools/ship/kernelReach-selfcheck.mjs (a comment-only fixture for the per-file stripping, the gate now 55 s from 553)",
+            "tools/ship/gateReach-selfcheck.mjs (the census at 560, physics/mechanics/flightModel6dof.mjs)",
+            "tools/ship/timingProvenance-selfcheck.mjs (a resumed run's writer and coverage claim; spacesimStart's median re-taken)",
+            "tools/ship/timingRecords-selfcheck.mjs (frozenRecords named against the re-take)",
+            "tools/ship/budgetProvenance-selfcheck.mjs (a majority within 1.5x; configContract's reading)",
+            "tools/ship/cliArgs-selfcheck.mjs, tools/ship/shipVerdict-selfcheck.mjs and tools/ship/versionPreflight-selfcheck.mjs (the label-collision round)",
+        ]),
+        verdict: "*** THREE ROUNDS, AND THE ONE THAT TIMED EVERY GATE FOUND THE DEFECTS NOTHING ELSE COULD SEE. *** Round 27: Winograd's r27w is exact " +
+                 "under the restated key natively and in Chrome on both GPUs and runs at 0.30x r18t on the 1080 and 0.33-0.37x r18u on the Intel, so " +
+                 "no table entry moves. The re-timing round's serial re-take, finished here with --resume-since (complete, 1976 entries), turned five " +
+                 "record-reading gates red: kernelReach at 553 s against a 25.6 s record, a per-producer noComments pass now done once per file (55 s, " +
+                 "output identical); the slowest general gate re-pinned to tacticsTrain at 336 s; three budget bases moved to their observations; the " +
+                 "population census grown by one; and three rows restated where a fresh record broke a count rather than a claim. The label-collision " +
+                 "round's guards picked this ship's numbers. NOT CLOSED: section 87 needs the rig, and libmSensitivity and responseCensus still time out.",
+    }),
+    // v4873 -- since563, from `versionPreflight --next` after a full fetch (the highest declared anywhere was since562). It closes
+    // TWO versions: v4872 shipped without a closing of its own, and v4873 supersedes it before it was published. NO new gate file.
+    since563: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and neither version added a gate.
+        at: "v4873", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "render/denoiseDevice-selfcheck.mjs (v4872, section 88: round 28's verdict as rule87 and rule87which over the committed rig files, and its discrimination row)",
+            "render/denoiseScenes-selfcheck.mjs (v4872: SPLITS_HALFRES and SPLITS_EMITTER reserved)",
+            "render/denoiseStudy-selfcheck.mjs (v4872: rounds 29 and 30 end to end on miniatures, sections 90 and 92 re-derived from the committed results, section 91's rule and predictions)",
+            "render/denoiseUpscale-selfcheck.mjs (v4872, section 91: the fill, the composite, the emitter-aware chain and the share near an emitter)",
+            "render/denoiseMask-selfcheck.mjs (v4872, section 91: emitterRadiance, and a traced emitter pixel equal to it bit for bit)",
+            "tools/ship/realGpuRun-selfcheck.mjs (v4872: each adapter's features, limits and subgroup sizes in the report, natively and in Chrome)",
+            "tools/ship/headlessGpu-selfcheck.mjs (v4872: adapterCaps and ADAPTER_LIMITS named and exercised in their own gate)",
+            "tools/ship/timingRecords-selfcheck.mjs (v4872: frozenRecords' named runs re-timed at a median of 928 ms)",
+            "render/temporalGPU-selfcheck.mjs (v4873: the chain's I/O counted, not timed)",
+        ]),
+        verdict: "*** v4872 REACHED MAIN AND WAS NEVER PUBLISHED: THE RIG'S CLONE VERIFY FOUND A STOPWATCH IN A CORRECTNESS GATE. *** " +
+                 "temporalGPU-selfcheck asserted the temporal chain's smaller I/O as a time ratio and read 1.29x on the rig's Chrome SwiftShader, " +
+                 "every picture row green; it now counts the bytes and submissions, one 96 x 96 picture and one encoder fewer, exactly. v4872 " +
+                 "itself carried denoiser rounds 28-30 -- round 30 reported, both supported -- and the rig features probe, and its ship found " +
+                 "four reds the tree's own procedures resolved (an export named in its own gate, a census row, a stale report, a re-timed named " +
+                 "run). NOT CLOSED: the counted row on the rig, and the features probe's first reading on either GPU.",
+    }),
     // v4870 -- since561 (the highest on any branch at the time was since560, this branch's own, read across every remote ref after a full fetch; nothing past since559 exists elsewhere). THREE new gate files: brain/pilotFlightMlp-selfcheck.mjs
     // (the GPU Brain's pilot network, its CPU twin and its hand weights), brain/pilotFlightGpu-selfcheck.mjs (that network on a device, in a headless browser) and tools/ship/trainFlightPilotGpu-selfcheck.mjs (the trainer's --brain gpu).
     since561: Object.freeze({
@@ -9299,6 +9353,28 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "the fin's damping and the weathervane torque agree with hand-derived oracles to 0.07-0.5%, the stall speed to sqrt(2W/(rho S Clmax)), the phugoid to 12.7% of Lanchester's period and damped. The elevator runs out of travel at 27.5-28 m/s, " +
                  "above the 26.1 m/s stall, so level flight cannot be trimmed in the last 2 m/s above the stall. Forty-five sabotages of the flight model and fourteen of the stall red by name, five of the first at 0 red and fixed by a row that reaches the branch. " +
                  "NOT CLOSED: no pilot flies it yet and no page shows it; no altitude density, dihedral, downwash or ground roll; the airframe is a Cessna-class guess, not a fitted aircraft; the rig.",
+    }),
+    // v4871 -- since556, the first closing taken from `versionPreflight --next` after a full fetch rather than by hand. NO new gate
+    // file -- three widened: the collision avoidance this round built is held where the modules it changed are held.
+    since556: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened three.
+        at: "v4871", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/versionPreflight-selfcheck.mjs (sections 7-10 and 9b: every branch copy against the remote in a real-git fixture, the un-bumped tree's blind spot, the ledger's closings, --next, and the CLI's option)",
+            "tools/ship/shipVerdict-selfcheck.mjs (section 8b: the label asked before and after verify; VERIFY_ARGS held to verify.mjs's own spec; the label fetch's 180 s declared in budgetIsOwn)",
+            "tools/ship/cliArgs-selfcheck.mjs (versionPreflight and shipVerdict adopted the parser and are driven with an option nobody has spelled)",
+        ]),
+        verdict: "*** THREE CAUSES, NOT ONE, AND THE WORST WAS A BLIND SPOT IN THE GUARD ITSELF. *** (1) versionPreflight read every branch from " +
+                 "this clone's copies and asked only main whether its copy was current -- v4838 was spent twice that way; it now compares every " +
+                 "branch head with the remote and refuses from a stale view, naming the fetch. (2) A tree identical to main's build was exempt " +
+                 "for EVERY number asked about, not only main's own: the ritual asks before bumping, so every candidate number was approved " +
+                 "unchecked -- measured, v4864 OK'd while a branch held v4864. (3) Verify is fifteen minutes in which a label can go, as v4853 " +
+                 "did; shipVerdict asks before and after it. And the ledger's closings, which merge without a conflict: --next names the next " +
+                 "free one across every ref, and a closing another unmerged branch declares for a different round is refused. Sixteen " +
+                 "sabotages red by name. NOT CLOSED: two sessions can still pick one number in the same minute; the check after verify makes " +
+                 "the loser renumber before pushing, but only a claim the remote enforces could stop the race itself.",
     }),
     // v4857 -- the census of what a killed gate can leave in the tree, run over every gate rather than learnt one rig failure at a time.
     since555: Object.freeze({

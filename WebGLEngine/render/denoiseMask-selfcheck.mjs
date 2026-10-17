@@ -4,7 +4,7 @@
 //
 // GATES render/denoiseMask.mjs -- the emitter mask of pre-registration section 21 -- and the one rule both methods take
 // from it: a pixel is never averaged with a neighbour on the other side of the mask. Its exports, each named here:
-// MASK_STRIDE, MASK_CHANNEL, COVERAGE_GRID, emitterCoverage, maskChannelOf, withMask. Also held here: the rule inside render/denoiseFilter.mjs's jointBilateral and render/denoiseNet.mjs's kernel
+// MASK_STRIDE, MASK_CHANNEL, COVERAGE_GRID, emitterCoverage, emitterRadiance, maskChannelOf, withMask. Also held here: the rule inside render/denoiseFilter.mjs's jointBilateral and render/denoiseNet.mjs's kernel
 // head, and render/denoiseStudy.mjs's masked pipeline on a miniature.
 //
 // *** NOTHING HERE RENDERS A DATASET SEED. *** Every scene is seeded from 950000 up or built by hand.
@@ -18,13 +18,17 @@
 //   M8  the comparison training split rendered WITHOUT the mask (round 7's fix)  2 RED (0 until denoise() refused an input of another width: read at the wrong stride, the errors were finite)
 //   M5  withMask writes the mask over the normal's z                             4 RED
 //   M6  the no-mask networks trained on the masked inputs                        1 RED
+//   M9  (section 91) emitterRadiance's light the mean over the emitter rays only  1 RED -- the coverage-x-emission row (the study's
+//       end-to-end row recomputes B with the same emitterRadiance, so it moves with it, as it should)
+//   M10 a tinted emission read as its first channel                              2 RED -- the tint row and the traced row
+//   M11 emitterRadiance from the centre ray alone                                1 RED
 "use strict";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
-const { MASK_STRIDE, MASK_CHANNEL, COVERAGE_GRID, emitterCoverage, maskChannelOf, withMask } = await imp("render/denoiseMask.mjs");
+const { MASK_STRIDE, MASK_CHANNEL, COVERAGE_GRID, emitterCoverage, emitterRadiance, maskChannelOf, withMask } = await imp("render/denoiseMask.mjs");
 const { CHANNELS, makeScene, renderImages, inputChannels } = await imp("render/denoiseScenes.mjs");
 const { jointBilateral } = await imp("render/denoiseFilter.mjs");
 const { makeDenoiser, denoise, lossAndGrads, INIT } = await imp("render/denoiseNet.mjs");
@@ -152,6 +156,36 @@ console.log("\n6. THE MASKED PIPELINE, ON A MINIATURE");
     const O1 = out?.secondary["T1@otherTraining"], O2 = out?.secondary["T2@otherTraining"];
     ok("!! a comparison training split under the mask is rendered WITH it: its filter and networks read the same 10-channel test images and give finite errors",
         !!O1 && !!O2 && O1.net.length === 3 && [...O1.filter, ...O1.net.flat(), ...O2.filter, ...O2.net.flat()].every((v) => Number.isFinite(v) && v > 0), err);
+}
+
+console.log("\n7. SECTION 91: THE EMITTERS' OWN LIGHT, FROM THE GEOMETRY (emitterRadiance)");
+{
+    // section 2's emitter and occluder, white (emit 10): the coverage must be emitterCoverage's to the bit, and the light
+    // cov x 10 -- the mean over the grid, a ray that met anything else contributing nothing
+    const S = { scene: [{ centre: [0, 0, 0], radius: 0.5, albedo: 0, emit: 10 }, { centre: [0.5, 0, 2.5], radius: 0.5, albedo: [0.5, 0.5, 0.5] }],
+                eye: [0, 0, 5], look: [0, 0, 0], up: [0, 1, 0], fovDeg: 40 };
+    const { cov, E } = emitterRadiance(S, 32, 32), ref = emitterCoverage(S, 32, 32);
+    const partial = Array.from(cov).filter((v) => v > 0 && v < 1).length;
+    ok("!! its coverage IS emitterCoverage's, bit for bit, and its light is coverage x emission -- nothing where no emitter is met, the mean over the WHOLE grid at the rim",
+        same(cov, ref) && partial > 10 && Array.from(cov).every((c, p) => [0, 1, 2].every((k) => Math.abs(E[p * 3 + k] - c * 10) <= 1e-12 * 10)),
+        `${partial} rim pixels`);
+    // two TINTED emitters side by side, apart -- integer emissions, so every sum below is exact and the rows can ask for bits
+    const warm = [30, 20, 10], cool = [5, 10, 40];
+    const T = { scene: [{ centre: [-0.9, 0, 0], radius: 0.6, albedo: 0, emit: warm }, { centre: [0.9, 0, 0], radius: 0.6, albedo: 0, emit: cool }],
+                eye: [0, 0, 5], look: [0, 0, 0], up: [0, 1, 0], fovDeg: 40 };
+    const R2 = emitterRadiance(T, 32, 32), whole = [], tint = (p) => [0, 1, 2].map((k) => R2.E[p * 3 + k]);
+    for (let p = 0; p < 32 * 32; p++) if (R2.cov[p] === 1) whole.push(p);
+    const left = whole.filter((p) => p % 32 < 16), right = whole.filter((p) => p % 32 >= 16);
+    ok("!! a TINTED emitter's light is its own tint, channel by channel: a pixel either one covers whole is exactly that emitter's emission",
+        left.length > 10 && right.length > 10 && left.every((p) => tint(p).every((v, k) => Object.is(v, warm[k]))) && right.every((p) => tint(p).every((v, k) => Object.is(v, cool[k]))),
+        `${left.length} + ${right.length} whole pixels`);
+    // THE PREMISE OF THE COMPOSITE: a camera ray that meets an emitter returns exactly its emission. Traced, at pixels whose
+    // whole 3 x 3 neighbourhood is covered (so no jittered sample can fall off the disc), the render IS E, bit for bit
+    const { render } = await imp("physics/render/pathTracer.mjs");
+    const img = render(T.scene, { w: 32, h: 32, spp: 4, seed: 5, rgb: true, eye: T.eye, look: T.look, up: T.up, fovDeg: T.fovDeg });
+    const inner = whole.filter((p) => { const x = p % 32, y = (p / 32) | 0; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (R2.cov[(y + dy) * 32 + x + dx] !== 1) return false; return true; });
+    ok("!! *** and that IS what the path tracer returns there: traced at 4 samples, every inner emitter pixel equals E to the bit -- no noise, nothing past the first hit ***",
+        inner.length > 10 && inner.every((p) => [0, 1, 2].every((k) => Object.is(img[p * 3 + k], R2.E[p * 3 + k]))), `${inner.length} inner pixels`);
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +

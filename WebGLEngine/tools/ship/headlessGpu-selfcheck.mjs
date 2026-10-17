@@ -441,6 +441,24 @@ sec("8c. v4851 -- ROUND 19'S CORE: THE COMPILER READ OFF THE PACKAGE, AND THE NA
         recs[0].rec.launchArgs.join() === "node-webgpu (native)" && recs[0].rec.adapter.vendor === "nvidia",
         "!! noteNativeAdapter names the adapter as a measured line with the package's compiler, and appends the record realGpuRun reads (gate relative, native, software an explicit boolean) -- only when a log is set",
         lines.join(" | ").slice(0, 200));
+    // v4872 -- rig-adapter-features-probe's two exports, named in THIS gate: definitionGates found them exercised only by
+    // realGpuRun-selfcheck, which imports the module but does not share its name, and the tree-wide ratchets read 351 and 686
+    // against 350 and 684. ADAPTER_LIMITS is the list both halves of a run record; adapterCaps reads one adapter against it.
+    // SABOTAGED v4872: adapterCaps leaving the features in insertion order -> this row RED by name; ADAPTER_LIMITS without
+    // maxComputeWorkgroupStorageSize -> this row RED by name; noteNativeAdapter's record without caps -> this row RED by name; each
+    // restored byte-identical (sha256).
+    const L = HG.ADAPTER_LIMITS;
+    const fakeCaps = HG.adapterCaps({ info: { subgroupMinSize: 16, subgroupMaxSize: 16 }, features: new Set(["timestamp-query", "subgroups", "shader-f16"]),
+                                      limits: { maxComputeWorkgroupStorageSize: 16384, maxBufferSize: 268435456n } });
+    const bare = HG.adapterCaps({ info: {} }), two = HG.adapterCaps({ limits: { maxBufferSize: 1, maxComputeWorkgroupSizeX: 256 } }, ["maxComputeWorkgroupSizeX"]);
+    ok(Object.isFrozen(L) && L.length === 7 && new Set(L).size === 7 && L.includes("maxComputeWorkgroupStorageSize") && L.includes("maxBufferSize") &&
+        JSON.stringify(fakeCaps.features) === JSON.stringify(["shader-f16", "subgroups", "timestamp-query"]) &&
+        Object.keys(fakeCaps.limits).join() === L.join() && fakeCaps.limits.maxComputeWorkgroupStorageSize === 16384 && fakeCaps.limits.maxBufferSize === 268435456 &&
+        fakeCaps.limits.maxStorageBuffersPerShaderStage === null && fakeCaps.subgroups.min === 16 && fakeCaps.subgroups.max === 16 &&
+        bare.features === null && bare.limits === null && bare.subgroups === null && JSON.stringify(two.limits) === '{"maxComputeWorkgroupSizeX":256}' &&
+        recs[0].rec.adapter.caps && recs[0].rec.adapter.caps.features === null && recs[0].rec.adapter.caps.subgroups === null,
+        "!! ADAPTER_LIMITS is seven frozen limit names, and adapterCaps reads an adapter against them: features sorted, a BigInt limit as a number, a missing one null, subgroup sizes -- null for whatever it does not expose, and noteNativeAdapter's record carries it",
+        `features ${fakeCaps.features.join(",")}; maxBufferSize ${fakeCaps.limits.maxBufferSize}`);
 }
 
 sec("9. THE TEXTURE READ-BACK ARITHMETIC");

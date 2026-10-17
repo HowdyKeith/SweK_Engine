@@ -416,7 +416,11 @@ console.log("\n8. TWO FILTERS, ONE OF WHICH WRITES");
     // remedy was `complete: false` on periodic flushes plus `true` at the end. The end of a FILTERED run is not
     // the end of the suite, and the call site passed a literal true.
     const FILTERED_RUN_V4580 = Object.freeze({ selected: 953, runnable: 1630, wroteComplete: true });
-    const derived = /writeTimings\(toRun\.length === UNFILTERED_COUNT\)/.test(SELFCHECKS);
+    // v4871 -- and a RESUMED run (--resume-since, which finished the 2026-10-15 serial re-take after a container restart)
+    // claims it too: it runs only what was not timed since the dead run began, so reaching its end means every runnable
+    // gate was timed since then or attempted now -- the population claim, from two runs, and the record says
+    // `resumedFrom`. Still derived, never a literal. SABOTAGED v4871: the resumed form refused by the regex -> 1 RED, this row.
+    const derived = /writeTimings\(toRun\.length === UNFILTERED_COUNT(?: \|\| !!RESUME_SINCE)?\)/.test(SELFCHECKS);
     const literal = /writeTimings\(true\);/.test(SELFCHECKS);
     say("a --budget pass covered / of runnable, and claimed complete",
         `${FILTERED_RUN_V4580.selected} of ${FILTERED_RUN_V4580.runnable} -> complete: ${FILTERED_RUN_V4580.wroteComplete}`);
@@ -434,10 +438,15 @@ console.log("\n8. TWO FILTERS, ONE OF WHICH WRITES");
         // timed population at least the runnable suite's. SABOTAGE: coverage set to {complete: true, timedThisRun:
         // 953} in a copy -> 1 red, this row.
         /v4580: THE RECORD NOW SAYS HOW IT KNOWS/.test(G.captured) &&
-            (G.coverage.complete === false || G.coverage.timedThisRun >= FILTERED_RUN_V4580.runnable),
+            (G.coverage.complete === false || G.coverage.timedThisRun >= FILTERED_RUN_V4580.runnable ||
+             // v4871 -- a resumed run's own count is its half; the claim is the entries stamped since the run it resumed.
+             // SABOTAGED v4871: this clause disabled -> 1 RED, this row (the live record is a resumed one)
+             (!!G.coverage.resumedFrom && Object.values(G.at || {}).filter((t) => t >= G.coverage.resumedFrom).length >= FILTERED_RUN_V4580.runnable)),
         "correcting the flag without recording why would leave the next reader to rediscover that a 58% pass can " +
         "write `true`. The correction is in `captured` beside the claim it corrects. Live: complete " +
-        G.coverage.complete + " with " + G.coverage.timedThisRun + " timed this run, against " + FILTERED_RUN_V4580.runnable + " runnable at v4580");
+        G.coverage.complete + " with " + G.coverage.timedThisRun + " timed this run" +
+        (G.coverage.resumedFrom ? ", resumed from " + G.coverage.resumedFrom + " (" + Object.values(G.at || {}).filter((t) => t >= G.coverage.resumedFrom).length + " entries stamped since)" : "") +
+        ", against " + FILTERED_RUN_V4580.runnable + " runnable at v4580");
 }
 
 // ---------------------------------------------------------------------------
@@ -525,8 +534,14 @@ console.log("\n10. *** A COMPLETED RUN IS STILL ONE COLD SAMPLE, AND THIS ROUND'
         "down from the one this round set out to separate.");
 
     const g = "tools/ship/spacesimStart-selfcheck.mjs";
+    // v4871 -- *** A FULL RUN WRITES OVER A HAND MEDIAN, AND THE 2026-10-16 SERIAL RE-TAKE DID: 124 BECAME ONE COLD 179 MS
+    // SAMPLE, KIND 'complete'. *** It was sound this time (1.13x the median, not 12x), but a runner sample wearing the slot
+    // a median held is the state this row exists to refuse. So the median was taken again, three alone, and recorded
+    // with its kind; each re-take is frozen here beside v4580's, and the next full run that writes over it turns this row
+    // red until somebody does the same. SABOTAGE: the v4871 entry dropped from the list -> 1 RED, this row.
+    const SPACESIM_MEDIANS = Object.freeze({ v4580: Object.freeze({ ms: 124, runs: "128/124/123" }), v4871: Object.freeze({ ms: 158, runs: "168/158/152" }) });
     ok("...and the outlier is corrected to the median and MARKED as one, not left as a completed run",
-        (G.timings || {})[g] === 124 && (G.kinds || {})[g] === TIMING_KIND.MEDIAN3 && (G.boxes || {})[g],
+        Object.values(SPACESIM_MEDIANS).some((m) => (G.timings || {})[g] === m.ms) && (G.kinds || {})[g] === TIMING_KIND.MEDIAN3 && (G.boxes || {})[g],
         `${(G.timings || {})[g]} ms, kind '${(G.kinds || {})[g]}'. Correcting the number without changing the kind ` +
         "would leave a hand median wearing a runner sample's label -- provenance that is precisely wrong, which " +
         "is worse than the bare integer this round replaced.");

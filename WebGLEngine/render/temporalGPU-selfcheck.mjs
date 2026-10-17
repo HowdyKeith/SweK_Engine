@@ -6,6 +6,11 @@
 // second pipeline, four atomics per pixel and a 16-byte readback, and the difference is inside the noise here) -- just inside the 3000 ms sweep budget, unlike the FSR
 // runner's gate, because this one dispatches 8 pictures and times 30 rather than timing 60.
 //
+// SABOTAGE v4872 (the I/O row, counted rather than timed -- see section 2's note): 2 mutations, 2 caught, no 0-RED.
+//   S8 the chain reading back its mid buffer too -> the I/O row alone.
+//   S9 the chain dispatching its two passes in two frames -> the I/O row alone; every picture row stays green, which is why
+//      the row counts submissions and not only bytes.
+//
 // SABOTAGE v4591 (the counters): 6 mutations, 6 caught, no 0-RED.
 //   T1 the clamped counter also added to the reused bucket -> 3 rows, including the census row at 16865 + 89 +
 //      672, which is what a double-counted total looks like when something checks the sum.
@@ -142,12 +147,23 @@ else {
         const msChain = await time(() => G.resolveAndAccumulate({ src, rw: a.R, rh: a.R, dw: a.D, dh: a.D, jitter: a.JIT, history: hist, motion: mot, alpha: 0.1 }), REPS);
         const msTwo = await time(async () => { const x = await G.resolve({ src, rw: a.R, rh: a.R, dw: a.D, dh: a.D, jitter: a.JIT });
                                                return G.accumulate({ current: x.data, history: hist, motion: mot, w: a.D, h: a.D, alpha: 0.1 }); }, REPS);
+        // v4872 -- THE I/O, COUNTED RATHER THAN TIMED. Every byte the runner hands the device goes through dev.buffer({ data }), every
+        // byte it takes back through dev.read(), and every encoder through dev.frame(): each is wrapped while the two forms run once.
+        const io = { up: 0, down: 0, frames: 0 }, oBuf = dev.buffer, oRead = dev.read, oFrame = dev.frame;
+        dev.buffer = (d) => { if (d && d.data) io.up += d.data.byteLength; return oBuf(d); };
+        dev.read = async (b) => { const out = await oRead(b); io.down += out.byteLength; return out; };
+        dev.frame = (fn, o) => { io.frames++; return oFrame(fn, o); };
+        const ioOf = async (fn) => { io.up = 0; io.down = 0; io.frames = 0; await fn(); return { ...io }; };
+        const ioChain = await ioOf(() => G.resolveAndAccumulate({ src, rw: a.R, rh: a.R, dw: a.D, dh: a.D, jitter: a.JIT, history: hist, motion: mot, alpha: 0.1 }));
+        const ioTwo = await ioOf(async () => { const x = await G.resolve({ src, rw: a.R, rh: a.R, dw: a.D, dh: a.D, jitter: a.JIT });
+                                              return G.accumulate({ current: x.data, history: hist, motion: mot, w: a.D, h: a.D, alpha: 0.1 }); });
+        dev.buffer = oBuf; dev.read = oRead; dev.frame = oFrame;
 
         return { res: Array.from(res.data), conf: Array.from(res.confidence), resNoJit: Array.from(resNoJit.data),
                  accFirst: Array.from(accFirst.data), acc: Array.from(acc.data), accNoClamp: Array.from(accNoClamp.data),
                  chain: Array.from(chain.data), accStats: acc.stats, chainStats: chain.stats,
                  uncountedStats: accUncounted.stats, uncountedReason: accUncounted.statsReason,
-                 accUncountedSame: (() => { for (let i = 0; i < acc.data.length; i++) if (acc.data[i] !== accUncounted.data[i]) return false; return true; })(), refused, errs, backend: dev.backend, msChain, msTwo, reps: REPS,
+                 accUncountedSame: (() => { for (let i = 0; i < acc.data.length; i++) if (acc.data[i] !== accUncounted.data[i]) return false; return true; })(), refused, errs, backend: dev.backend, msChain, msTwo, ioChain, ioTwo, reps: REPS,
                  adapter: (dev.adapterInfo && (dev.adapterInfo.description || dev.adapterInfo.vendor)) || "unknown" };
     }` });
 
@@ -241,10 +257,21 @@ else {
         say(`SPEED at ${R}x${R} -> ${D}x${D}, mean of ${G.reps}`,
             `chained ${G.msChain.toFixed(2)} ms, the two separately ${G.msTwo.toFixed(2)} ms ` +
             `(${(100 * (G.msTwo - G.msChain) / G.msTwo).toFixed(0)}% saved: one ${D}x${D} readback and upload not taken)`);
-        ok("!! the chain does strictly less I/O than the two-call form, which is the part that is not hardware",
-           G.msChain <= G.msTwo * 1.2,
-           `chained ${G.msChain.toFixed(2)} ms against ${G.msTwo.toFixed(2)} ms -- slack for timing noise on a ` +
-           "software adapter, not a performance claim");
+        // *** v4872 -- THIS ROW CLAIMED LESS I/O AND MEASURED IT WITH A STOPWATCH, AND THE RIG'S STOPWATCH SAID NO. *** It asserted
+        // msChain <= 1.2 x msTwo, its own detail calling that "slack for timing noise ... not a performance claim". v4872's clone
+        // verify on the rig went red on it, and alone it read chained 9.73 ms against 7.55 (1.29x), on Chrome's SwiftShader there,
+        // with every picture, counter and bit-identity row above green. What the row names is structural, so it is now COUNTED:
+        // the chain hands the device one display-size picture fewer, takes one fewer back, and submits one encoder instead of two.
+        // Those are exact on every adapter. The time stays above as a reported line, which is all a stopwatch on a shared box can be.
+        // SABOTAGED v4872: the chain reading back its mid buffer too -> this row RED by name; the chain dispatching its two passes
+        // in two frames -> this row RED by name, with every picture row still green; each restored byte-identical (sha256).
+        const step = D * D * 4 * 4;   // one display-size rgba f32 picture, in bytes
+        const io = G.ioChain && G.ioTwo ? { up: G.ioTwo.up - G.ioChain.up, down: G.ioTwo.down - G.ioChain.down } : null;
+        ok("!! the chain does strictly less I/O than the two-call form, which is the part that is not hardware -- one display-size upload, one readback and one submission fewer, COUNTED",
+           !!io && io.up === step && io.down === step && G.ioTwo.frames === 2 && G.ioChain.frames === 1,
+           io ? `uploads ${G.ioChain.up} against ${G.ioTwo.up} B, readbacks ${G.ioChain.down} against ${G.ioTwo.down} B, submissions ` +
+                `${G.ioChain.frames} against ${G.ioTwo.frames} -- the difference is ${io.up} and ${io.down} B, one ${D}x${D} rgba f32 picture (${step} B) each way`
+              : "the page returned no I/O counts");
         ok("...and the refusal is DRIVEN: a non-webgpu device throws at construction",
            typeof G.refused === "string" && /webgpu/.test(G.refused), G.refused || "it did NOT throw");
     }

@@ -1,6 +1,6 @@
 {
  "gate": "tools/ship/timingProvenance-selfcheck.mjs",
- "at": "2026-10-11",
+ "at": "2026-10-17",
  "tables": [
   {
    "title": "the serial probe (frozen at v4580)",

@@ -431,6 +431,24 @@ node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r24b-b.json
 in all four runs, and r18t beat r15 under DXC on the 1080 by 1.080 and 1.068 x at 1920 x 1080. A native run on the 1080 under DXC
 now takes r18t; the Intel keeps r18u. Nothing to install.
 
+### Round 28: the denoiser's FXC paths retired (pre-registration section 87)
+
+On each GPU, in the verified clone with v4871 or later:
+
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r28.json
+node tools/denoiseDevice.mjs --which
+```
+
+- **What changed:** under FXC the compile gate builds only r12-tiled-3x3, as a control. The timing gate's FXC ladder is skipped.
+  `SWEK_DENOISE_FXC=all` runs both as before.
+- **Section 87 predicts:** every gate green; the "use_dxc off" group is r12-tiled-3x3 alone, exact and DXBC; the FXC ladder line
+  says SKIP with section 87's reason; `--which` is r18u on the Intel and r18t on the 1080. The compile gate should drop to under
+  200 s on the Intel and under 120 s on the 1080.
+- **Send back the JSON file and the `--which` line from each GPU.**
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and

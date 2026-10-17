@@ -1,0 +1,40 @@
+C:\SweK_src\WebGLEngine>set SWEK_WEBGPU=
+
+C:\SweK_src\WebGLEngine>node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r28.json
+
+the FSR, frame-generation and denoiser gates, with the harness logging each call's adapter (win32)
+  PASS  render/denoiseCompile-selfcheck.mjs  [timing]  50.1 s  on intel gen-9  (2 SKIP)
+  PASS  render/denoiseDevice-selfcheck.mjs  [exact]  85.0 s  on intel gen-9 D3D12 driver version 31.0.101.2137 (native), intel gen-9
+  PASS  render/denoiseTiming-selfcheck.mjs  [timing]  193.2 s  on intel gen-9 D3D12 driver version 31.0.101.2137 (native), intel gen-9  (1 SKIP)
+  on 8490e721 2026-10-16 v4871: record the release; node-webgpu 0.6.2 (the resolver's list) at C:\Users\Keith\AppData\Roaming\npm\node_modules\webgpu; dxcompiler.dll beside dawn.node: yes; predicted compiler: DXC
+
+a real-hardware run on intel gen-9; intel gen-9 D3D12 driver version 31.0.101.2137 (native)
+exact 1/1, quality 0/0, timing 2/2  --  the report: C:\SweK_src\WebGLEngine\denoise-rig-r28.json
+
+C:\SweK_src\WebGLEngine>node tools/denoiseDevice.mjs --which
+[denoiseDevice] --which: adapter intel / gen-9 / D3D12 driver version 31.0.101.2137; node-webgpu 0.6.2 from C:\Users\Keith\AppData\Roaming\npm\node_modules\webgpu\index.js; compiler DXC
+[denoiseDevice] --which: key win32/intel/gen-9; kernels r18u -- section 67's for win32/intel/gen-9, under DXC
+[denoiseDevice] --which: r18u built and ran one 64 x 64 pass in 8.710 ms; worst relative difference from the f64 network on the CPU 1.05e-6
+
+C:\SweK_src\WebGLEngine>
+
+
+C:\swek_src\swek-v4871\WebGLEngine>set SWEK_WEBGPU=
+
+C:\swek_src\swek-v4871\WebGLEngine>node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r28.json
+
+the FSR, frame-generation and denoiser gates, with the harness logging each call's adapter (win32)
+  PASS  render/denoiseCompile-selfcheck.mjs  [timing]  34.6 s  on nvidia pascal  (2 SKIP)
+  PASS  render/denoiseDevice-selfcheck.mjs  [exact]  52.9 s  on nvidia pascal D3D12 driver version 32.0.15.8180 (native), nvidia pascal
+  PASS  render/denoiseTiming-selfcheck.mjs  [timing]  154.0 s  on nvidia pascal D3D12 driver version 32.0.15.8180 (native), nvidia pascal  (1 SKIP)
+  on 8490e721 2026-10-16 v4871: record the release; node-webgpu 0.6.2 (the resolver's list) at C:\Users\howdy\AppData\Roaming\npm\node_modules\webgpu; dxcompiler.dll beside dawn.node: yes; predicted compiler: DXC
+
+a real-hardware run on nvidia pascal; nvidia pascal D3D12 driver version 32.0.15.8180 (native)
+exact 1/1, quality 0/0, timing 2/2  --  the report: C:\swek_src\swek-v4871\WebGLEngine\denoise-rig-r28.json
+
+C:\swek_src\swek-v4871\WebGLEngine>node tools/denoiseDevice.mjs --which
+[denoiseDevice] --which: adapter nvidia / pascal / D3D12 driver version 32.0.15.8180; node-webgpu 0.6.2 from C:\Users\howdy\AppData\Roaming\npm\node_modules\webgpu\index.js; compiler DXC
+[denoiseDevice] --which: key win32/nvidia/pascal; kernels r18t -- section 78's for win32/nvidia/pascal, under DXC
+[denoiseDevice] --which: r18t built and ran one 64 x 64 pass in 5.323 ms; worst relative difference from the f64 network on the CPU 1.01e-6
+
+C:\swek_src\swek-v4871\WebGLEngine>

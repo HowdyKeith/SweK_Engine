@@ -557,7 +557,7 @@ console.log("\n7. *** THE MIRROR standingReds NEVER HAD: A ZERO IS AS OLD AS THE
     // retirement carries the round that measured it. The row checks the union: what matters is that every gate
     // that LEFT the still-over roll left it with readings, whichever round took them.
     const V29ret = [...(SC.RETURNED_AT_V4529.returnedAt_v4535 || []), ...(SC.RETURNED_AT_V4529.returnedAt_v4565 || []),
-                    ...(SC.RETURNED_AT_V4529.returnedAt_v4545 || [])];
+                    ...(SC.RETURNED_AT_V4529.returnedAt_v4545 || []), ...(SC.RETURNED_AT_V4529.returnedAt_v4871 || [])];
     ok("!! a returnee that went back over the budget on a later box is NAMED with its serial readings, and is live over",
        // v4647m: this roll is the OSCILLATOR roll, so it is graded by the oscillator predicate rather than
        // by the union -- an entry here that were merely over everywhere would be on the wrong roll.

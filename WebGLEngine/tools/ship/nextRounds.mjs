@@ -1686,10 +1686,24 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "denoise-halfres-at-scale",
+        blocker: "CLOSED",
+        what: "DONE as the denoiser arc's round 29 (pre-registration sections 89-90), unshipped on the feature branch at this writing. NOT REPORTED: C1 fired on H2 again -- but this time the half-size frame upscaled BILINEARLY beat its noisy frame on 12 of 12, and through EASU on only 9.",
+        how: "SPLITS_HALFRES (6 R at 42000, 6 C at 43000), 256 x 256 traced and denoised at 128, EASU the candidate; render/denoise-results-halfres.json committed byte for byte (0c242093) before it was read. 3509 s to render here.",
+        why: "*** THE LOSS IS IN THE UPSCALE, AT LIGHT SOURCES, AND THAT IS WHY IT IS KEPT. *** Descriptively: on the 8 images without a bright emitter in view, half size + EASU beat bilinear on all 8 and full size at 1 sample on all 8 (H1 d +0.17 to +1.00). The 4 it lost (R1, R4, C1, C5) are exactly the ones with emitters of peak radiance 16-37, and 86-98% of EASU's error there sits within 2 px of an emitter pixel (under 3% of the frame) -- computed after the file was committed, from the harvest's own cache, and deciding nothing. The next entry carries it.",
+    },
+    {
+        id: "denoise-halfres-emitter-aware",
+        blocker: "CLOSED",
+        what: "DONE as the denoiser arc's round 30 (pre-registration sections 91-92), unshipped on the feature branch at this writing. REPORTED, BOTH SUPPORTED: half size + emitter-aware EASU beat full size at 1 sample (H1, mean d +0.694, 12 of 12, p 1/4096) and emitter-aware bilinear (H2, +0.104, 10 of 12, p 0.0022); C1 at 12 of 12 for all four arms.",
+        how: "SPLITS_EMITTER (6 R at 44000, 6 C at 45000), 256 x 256 traced and denoised at 128. render/denoiseUpscale.mjs's emitterAwareUpscale fills the half-size frame's emitter pixels from their neighbours, runs fx/fsr/fsr.js's EASU unchanged, and composites E + (1 - cov) x the result at full size from render/denoiseMask.mjs's emitterRadiance. render/denoise-results-emitter.json committed byte for byte (d876dfce) before it was read; 3744 s to render here.",
+        why: "*** ONLY FOUR OF THE TWELVE IMAGES HAD A LIGHT IN VIEW, ALL WHITE R LIGHTS, AND THAT IS WHY IT IS KEPT. *** On the other eight the chain is round 29's bit for bit, so the round is also section 90's descriptive split tested on new seeds -- and it held. B also beat D with the same composite at full size on 12 of 12 (+0.626), so the half resolution carried H1, not the composite alone. All seven predictions held. Nothing says what it costs on a GPU: the entry below carries that.",
+    },
+    {
+        id: "denoise-halfres-rig-timing",
         blocker: "OPEN",
-        what: "Round 26's question at a frame size nearer real use: 128 x 128 traced and denoised, upscaled to 256 x 256, against the full-size 1-sample frame at equal samples -- with EASU ALONE as the candidate, since RCAS made every image worse at 64 x 64.",
-        how: "Section 81's shape and render/denoiseUpscale.mjs as they stand, at 256 x 256 and on new test seeds. The references are the cost: 16x the pixels of round 26's 254 s of rendering, so the harvest wants the rig's CPU or the worker pool.",
-        why: "Round 26 could not separate a real loss from the size it was run at: at 64 x 64 a pixel covers so much of a scene that any upscale is guessing. This is the run that can.",
+        what: "Round 30's chain on the rig at 1920 x 1080: the shipped network at 960 x 540, the emitter fill and composite in WGSL, EASU through fx/fsr/fsrGPU.js, and the full-size emitter coverage the composite needs -- timed against today's full-size page on both GPUs.",
+        how: "Build the fill and composite as WGSL and gate them bit-near against render/denoiseUpscale.mjs's CPU reference (the ring fill needs a bounded-pass form on a GPU; its reference is the CPU one), pilot on SwiftShader here, then a pre-registered timing round on the rig. The coverage guide is 64 primary rays a pixel on the CPU today; what it costs on a GPU is part of what is timed.",
+        why: "Section 92: at 256 x 256 the half-size chain beat the full-size frame at equal samples on 12 of 12 images. A full-size pass on the GTX 1080 is ~75-80 ms (section 54); the denoise at a quarter of the pixels is the saving, and whether the fill, EASU, the composite and the guide leave any of it is the question.",
     },
     {
         id: "denoise-network-at-run-scale",
@@ -1697,18 +1711,27 @@ export const NEXT_ROUNDS = [
         what: "A network trained on half-size renders -- its 9 x 9 kernel covering the scene the way it does when it runs at half size -- tested in round 26's arrangement.",
         how: "Round 11's training on the same 192 R + C scenes rendered at half size, then a pre-registered harvest against the shipped network on the half-size chain.",
         why: "Section 82's unmeasured cause: at half size the shipped network sees every scene at twice the scale it was trained on, and C1's three failures are where that would bite.",
-        upstream: "denoise-halfres-at-scale: only if half resolution still loses at a realistic size, and loses in the denoise rather than the upscale.",
+        upstream: "denoise-halfres-at-scale: only if half resolution still loses at a realistic size, and loses in the denoise rather than the upscale. Round 29 (section 90) lost in the UPSCALE: the denoised half-size frame upscaled bilinearly beat its noisy frame on 12 of 12. So by this entry's own condition it stays blocked -- though section 89 named it as next if C1 fired on H2 again; section 90 sets the two side by side. Round 30 (section 92) held the half-size denoise again: C beat its noisy frame on 12 of 12.",
     },
     {
         id: "denoise-winograd",
+        blocker: "CLOSED",
+        what: "DONE as the denoiser arc's round 27 (pre-registration sections 83-86), unshipped on the feature branch at this writing. The set r27w ran every hidden 3 x 3 layer on brain/conv2d.mjs's Winograd F(2x2, 3x3) kernel at one vec4 a thread, under a restated exactness key (K0w). NO TABLE ENTRY MOVES: on both GPUs and both paths, in both runs, r27w was about a third of the speed of the present entry.",
+        how: "Section 86, read off four realGpuRun --only denoise reports at d11534e3 (render/denoise-rig-r27-{a,b}-*.json, committed byte for byte before they were read), with section 83's rule written as code (rule83Entries in render/denoiseDevice-selfcheck.mjs). Every gate green in all four. K0w held natively and in Chrome on both GPUs, and K1 held. Condition 3 failed on every GPU, path and run: r27w at 0.297 and 0.296 x r18t natively on the 1080 at 1920 x 1080 (0.301 and 0.297 x on the page), and 0.348 and 0.326 x r18u natively on the Intel at 512 x 512 (0.338 and 0.369 x on the page).",
+        why: "*** THE PREDICTION WAS OFF BY A FACTOR OF FOUR, AND THAT IS WHY IT IS KEPT. *** Section 83 predicted 1.22-1.25 x r18t on the 1080 from an instruction count (8 an output channel, a pixel and an input channel against the fast kernel's 11.5). The rig measured about 3.8 x r15's time per 32 -> 32 layer on the 1080 and 2.3 x on the Intel. Three unmeasured candidates are in section 86: 8 z groups each restaging the same window, the transformed weights in a storage buffer rather than a uniform binding, and register pressure. What did hold is the key: a twin of a kernel's own order, held to the f64 network at 1e-5 on every value, now has a hardware reading on both GPUs, natively and in Chrome.",
+    },
+    {
+        id: "denoise-winograd-probe",
         blocker: "HARDWARE",
-        what: "Winograd F(2x2, 3x3) kernels for the four 3 x 3 layers, which are 92% of the network's multiply-adds (30,528 of 33,120 a pixel): 2.25x fewer multiplies, in f32. PRE-REGISTERED as the denoiser arc's round 27 (section 83): the set r27w, every hidden layer on brain/conv2d.mjs's Winograd kernel at one vec4 a thread, r15's fused last pass.",
-        how: "The key, restated: every hidden cell is conv2dCpuWino's -- a twin of its own, since Winograd cannot add in the canonical order -- or its fused mirror's; and the image is within 1e-5 of the f64 network on every value, the bound every set has met since section 35 and, for r27w, the only bridge to r15. Exact on SwiftShader here, natively and in Chromium, and nearer the f64 network than r15 in the pilot. K0w (a) HOLDS (section 84): on round 11's 24 test images all 12,582,912 hidden cells were the Winograd twin's and the image was within 1.43e-6 of the f64 network on every value. The page's and the native tables move only by section 83's rule, read off two realGpuRun --only denoise runs per GPU: 1.05 x the GPU's present entry (r18u on the Intel, r18t on the 1080) at the largest size both measured, in both runs.",
-        why: "No hardware feature needed: it runs on both GPUs, natively and in Chrome. Keith set it second, after the FSR1 round. Section 83's arithmetic ceiling is 1.33 x r15 on the 1080 and 1.42 x on the Intel, and it predicts r27w qualifies on the 1080 only.",
+        what: "OPTIONAL, AND OWED BY NOTHING: time the Winograd kernel at two and four vec4s a thread (winoShape's g4 2 and 4: 4 and 2 z groups instead of 8) in denoiseCompile-selfcheck's kernel-level line, on both GPUs.",
+        how: "Two DXC_VARIANTS entries beside r27w-wino-3x3, judged against their own twin as that one is; K0w already holds at two on SwiftShader. One realGpuRun --only denoise per GPU; no table can move from it, so no pre-registered rule is needed.",
+        why: "It is the cheapest reading that separates section 86's first candidate (redundant staging) from its third (registers): fewer z groups help the first and hurt the third. Section 83 conditioned a shape round on r27w holding on one GPU, and it held on neither. A shape would have to be about 3.4 x faster on the 1080 to reach r18t, and 2.9-3.1 x on the Intel to reach r18u.",
     },
     {
         id: "rig-adapter-features-probe",
         blocker: "HARDWARE",
+        // v4871+: BUILT -- headlessGpu.adapterCaps and the browser harness record features, ADAPTER_LIMITS and subgroup sizes per adapter;
+        // realGpuRun keeps them in the report and prints one line per adapter. Owed: the next rig run, which reads them on both GPUs.
         what: "Record each adapter's WebGPU features and limits -- shader-f16, subgroups, packed 4x8 integer dot product -- in tools/ship/realGpuRun.mjs's report, natively and in Chrome.",
         how: "One field in the report the rig already writes; no new run. The denoiser's rig reports (render/denoise-rig-*.json) record no features today, so nothing in the tree says whether either GPU exposes half precision or subgroups to WebGPU.",
         why: "Every precision or subgroup round below depends on it, and guessing a feature that a driver does not expose would be a round spent finding that out.",
@@ -1727,7 +1750,7 @@ export const NEXT_ROUNDS = [
         what: "Kernels that share inputs or reduce sums across a subgroup -- the order the scratch study's tree sum stands in for (1.6e-7 from f64, as exact as today's path).",
         how: "Needs the subgroups feature, natively (Dawn over DXC's wave ops) and in Chrome; then the same restated key as Winograd.",
         why: "No multiply saved, so its gain is occupancy and shared-memory traffic -- uncertain enough that it waits behind Winograd.",
-        upstream: "rig-adapter-features-probe, and denoise-winograd's restated exactness key.",
+        upstream: "rig-adapter-features-probe. The restated exactness key it also waited on held on hardware in section 86 (round 27: K0w natively and in Chrome on both GPUs).",
     },
     {
         id: "denoise-f16-storage",
@@ -1745,11 +1768,13 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "denoise-fsr2-temporal",
-        blocker: "UPSTREAM",
+        blocker: "OPEN",
+        // v4871+: OFF ITS BLOCKER at round 30 -- section 92 reported the spatial half-size chain, emitters composited, supported on both
+        // hypotheses at 256 x 256, which is what this entry waited on. The upstream line below is kept as the record of what it was.
         what: "FSR2's temporal upscale on denoised path-traced frames: jittered renders, motion vectors and history.",
         how: "fx/fsr/fsrTemporalTsl.mjs drives a three.js scene; the path tracer is neither a three.js scene nor does it make motion vectors or jitter. Those are the work.",
         why: "Temporal reuse is where real-time path tracing gets most of its samples.",
-        upstream: "denoise-halfres-at-scale: round 26 (denoise-fsr1-halfres) was not reported and, descriptively, the half-size chain lost at 64 x 64 -- the spatial round has to say upscaling a denoised frame keeps enough of the picture first.",
+        upstream: "CLEARED -- denoise-halfres-emitter-aware: rounds 26 and 29 were not reported; round 30 (section 92) was, with the half-size chain ahead of full size at equal samples on 12 of 12 images once the emitters were composited.",
     },
     {
         id: "denoise-fsr3-framegen",
@@ -1791,10 +1816,10 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "denoise-r18t-margin-1080",
-        blocker: "HARDWARE",
-        what: "A confirmation run of r18t's page margin on the GTX 1080: section 63 qualified it at 1.087x against a 1.05 bar, on one run.",
-        how: "The page ladder again on the 1080, read against section 61's rule unchanged.",
-        why: "The narrowest margin in the page table.",
+        blocker: "CLOSED",
+        what: "DONE without a round of its own (v4871+): the confirmation it asked for is in the committed rig reports. Section 63 qualified r18t on the 1080's page at 1.087x against a 1.05 bar on one run; ten later runs of the same page ladder read 1.073-1.101x at 1920 x 1080.",
+        how: "Read off every render/denoise-rig-*gtx1080*.json carrying the page ladder: r18 1.087 (section 63's), r19 1.097, r22 1.087, r24 a/b 1.087 and 1.080, r24b a/b 1.079 and 1.073, r27 a/b 1.081 and 1.100, round 27's stale run b 1.101, r28 1.089. At 1024 x 1024 they read 1.061-1.105.",
+        why: "The narrowest margin in the page table, now eleven readings over the bar across seven commits (01429c8e to 8490e721), the lowest 2.2% clear.",
     },
     {
         id: "sweep-timings-stray-host-files",

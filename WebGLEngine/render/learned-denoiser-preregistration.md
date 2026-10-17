@@ -5476,3 +5476,735 @@ names that say what they are:
 **The runs again.** Section 83's rule is unchanged. Each new report must carry two checks before anything is read off it:
 - its `commit` field names a commit on `claude/tier-2-keys-patch-4lwhzk` at 687dfd05 or later;
 - its timing gate's "sets timed" line includes r27w.
+
+## 86. ROUND 27 -- THE VERDICT: K0w HOLDS ON BOTH GPUS, AND r27w RUNS AT A THIRD OF THE SPEED OF EACH ONE'S PRESENT ENTRY. NO ENTRY MOVES
+
+**What arrived.** Four `realGpuRun --only denoise` reports, two per GPU, run on 2026-10-16 at d11534e3 ("v4868: record the
+release"), which is on main and descends from 687dfd05, the commit carrying section 83. They are committed byte for byte at
+4bfe5757, before this section was written:
+
+| File | Run at (UTC) | Gates |
+|---|---|---|
+| `render/denoise-rig-r27-a-intel-gen9.json` | 16:34 | exact, compile, timing: all green |
+| `render/denoise-rig-r27-b-intel-gen9.json` | 16:58 | all green |
+| `render/denoise-rig-r27-a-gtx1080.json` | 16:37 | all green |
+| `render/denoise-rig-r27-b-gtx1080.json` | 16:46 | all green |
+
+- **They were opened on arrival,** before that commit, for section 85's two checks. Both hold in all four: the `commit` field
+  names d11534e3, and every timing gate's "sets timed" line reads "r12, r15, r18t, r18u, r27w".
+- **No run crashed and no gate hit the 30-minute cap.** The longest gate was the Intel's run b timing gate, at 541 s.
+
+**Section 83's rule, read strictly. Every condition must hold in both runs.**
+
+| GPU, path | Present entry | 0: DXC, compile gate | 1: K0w | 2: K1 against r12, runs a / b | 3: r27w against the entry, runs a / b | Qualifies |
+|---|---|---|---|---|---|---|
+| Intel gen-9, native | r18u | DXC, green | 2 of 2 native rows, both runs | 5.12 / 4.82 x at 256 x 256 | **0.348 / 0.326 x** at 512 x 512 | no |
+| Intel gen-9, page | r18u | -- | browser row green, both runs | 4.59 / 4.06 x at 256 x 256 | **0.338 / 0.369 x** at 512 x 512 | no |
+| GTX 1080, native | r18t | DXC, green | 2 of 2 native rows, both runs | 7.80 / 7.85 x at 1024 x 1024 | **0.297 / 0.296 x** at 1920 x 1080 | no |
+| GTX 1080, page | r18t | -- | browser row green, both runs | 7.68 / 7.71 x at 1024 x 1024 | **0.301 / 0.297 x** at 1920 x 1080 | no |
+
+- On the Intel, 512 x 512 is the largest size both sets measured. r27w's ladder predicted 1,526-2,326 ms a pass at
+  1024 x 1024, over the 1,500 ms cap, and skipped it.
+- **Conditions 0 to 2 hold on every GPU, path and run. Condition 3 fails on every one,** by a factor of about three. Nothing
+  here is near the 1.05 bar, and the two runs agree to within the Intel's run-to-run noise.
+- **No entry moves.**
+  - `NATIVE_KERNELS_BY_ADAPTER`: r18u on the Intel (section 67), r18t on the 1080 (section 78).
+  - `PAGE_KERNELS_BY_ADAPTER`: r18u on the Intel, r18t on the 1080 (section 63).
+  - r15 everywhere else. Neither table names r27w.
+
+**The rule as code.** `rule83Entries` in `render/denoiseDevice-selfcheck.mjs`, beside `rule66Entries`, reads one report per
+call. It takes the present entries from the tables as section 83 found them (`RULE83_AT`), not from the live tables.
+- **The verdict row.** It reads the four committed reports: every gate green at d11534e3, conditions 0 to 2 held, condition 3
+  failed on every GPU, path and run. Both live tables must equal what the rule derives, with no r27w in either.
+- **The discrimination row.** It works on copies of the reports:
+  - The 1080's two runs lifted to 1.100 x r18t natively give the 1080 r27w natively, and still nothing on the page.
+  - One run lifted gives nothing.
+  - One exact gate red fails condition 1.
+  - Lifting r27w over r15 but not over r18t still fails condition 3. The bar is the present entry.
+  - A skipped exact-gate row fails the page's K0w, not the native one.
+  - A report whose timing gate did not time r27w has no key, which is section 85's check.
+- **The predictions row,** below.
+- **Sabotaged.** Seven runs, each restored byte-identical (md5) and logged in the gate's header as Z1-Z7. None was 0 red.
+  - The bar at 0.25: 3 red, the verdict, the discrimination row and the predictions.
+  - The present entry read as r15 whatever the table says: 1 red, the discrimination row. r27w is under r15 as well, so the
+    verdict alone cannot tell the two apart. This is why the discrimination row lifts r15 alone.
+  - The 1080's page entry set to r27w in `render/denoiseDevice.mjs`: 2 red, this verdict and section 63's.
+  - A skipped exact-gate row not failing the page's K0w: 1 red.
+  - Section 85's "sets timed" check dropped: 1 red.
+  - The committed 1080 run b edited to 1.100 x r18t natively: 3 red.
+  - "Both runs" read as "either run": 1 red.
+
+**The predictions.**
+- **P1 FAILED.** Section 83 predicted r27w at 1.22 x r18t on the 1080's page and 1.23-1.25 x natively. It measured 0.30 x on
+  both, off by a factor of four.
+- **P2 held, but not as reasoned.** The prediction was 0.93 x r18u on the page and 0.89 x natively, a near miss. The
+  measurement was 0.33-0.37 x.
+- **P3 held:** K0w on both GPUs, natively and in Chrome, in both runs.
+  - Its aside was wrong. It said "with some cells fused on the 1080, as r15's were". The compile gate's job for the Winograd
+    kernel read 131,072 plain, 0 fused, 0 unexplained, under DXC as shipped and with use_dxc, on both GPUs in both runs.
+  - r15's hidden kernel (r13-fast-3x3) fused no cell on the 1080 either. The fused cells these reports show are the Intel's
+    head kernels: 221,346 fused in r13-fast-head and in r14-head.
+  - The failure section 83 named, a DXC that reassociates the transforms' adds, did not happen.
+- **P4 held,** in section 84.
+
+**Reported, deciding nothing.**
+- **The compile gate's kernel-level line.** One hidden layer at 64 x 64, r15's kernel over r27w's, under DXC as shipped and with
+  use_dxc:
+
+  | GPU | Run a | Run b |
+  |---|---|---|
+  | GTX 1080 | 0.527 and 0.535 x | 0.532 and 0.534 x |
+  | Intel | 0.427 and 0.370 x | 0.713 and 0.710 x |
+
+  The Intel's two runs disagree by nearly two to one on a sub-3 ms kernel. The ladder below is the steadier reading.
+- **The gap widens with size on the 1080.** Natively, r27w against r15 runs from 0.64 x at 64 x 64 to 0.32 x at
+  1920 x 1080, the same in both runs. On the Intel it runs from 0.64-0.65 x at 64 x 64 to 0.45-0.48 x at 512 x 512.
+- **Per 32 -> 32 hidden layer (layers 1 to 3), natively at the largest size:**
+  - The 1080 at 1920 x 1080: r27w 68.3 ms, r18t 16.2 ms, r15 18.0 ms.
+  - The Intel at 512 x 512, run a: r27w 104-107 ms, r18u 33-37 ms, r15 45-46 ms.
+  - Counted at the direct sum's multiply-adds, that is about 555 GFLOP/s against r18t's 2,350 on the 1080, and about 45
+    against r18u's 139 on the Intel.
+- **The fused counts natively and in Chrome are unread.** Section 83 listed them as reported. The exact gate counts them (its
+  K0 table), but `realGpuRun` keeps measured lines and FAIL lines, not that table. The compile gate's job is the only count
+  these reports carry for r27w.
+- **FXC.** r27w stood aside where `FXC_UNTRIED_SETS` says it should:
+  - the FXC child timed r12 and r15 only;
+  - the compile gate's use_dxc-off mode printed its stand-aside SKIP.
+- **The Intel's run b was noisier throughout.** At 512 x 512, r15's native pass took 278 ms against run a's 172. Both runs fail
+  condition 3 by a factor of three, so the noise bears on no condition.
+
+**Why it is slow. Not measured here, and said as such.**
+- **Section 83's instruction count was the wrong model.** It counted about 8 instructions an output channel, a pixel and an
+  input channel against the fast kernel's 11.5, so about 0.7 x r15's time. The rig measured about 3.8 x r15's time per
+  layer on the 1080 and about 2.3 x on the Intel.
+- **Three differences in the code could each cost that much.** Nothing here separates them.
+  1. **Redundant staging.** At 32 output channels and one vec4 a thread, r27w dispatches 8 z groups (`winoShape`: groups 8).
+     Each stages and transforms the same 18 x 18 window for every input channel. r15's fast kernel covers all 32 output
+     channels in one z group (`fastShape`: g4 8, groups 1), so it stages each window once.
+  2. **Where the weights live.** r27w reads its transformed weights from a storage buffer: 16 vec4 loads an input channel a
+     thread, 64 KiB in all, the whole of a default uniform binding. The fast kernel reads its 37 KB of weights from a uniform
+     binding.
+  3. **Registers.** A thread holds 16 vec4 accumulators and 16 transformed inputs, against the fast kernel's 8 vec4
+     accumulators.
+     So fewer threads can be in flight. The DXIL dumps (1,269-1,270 lines, no loops) say nothing about register allocation.
+
+**What follows.**
+- **Section 83 conditioned the next shapes on a result that did not come.** Two or four vec4s a thread, or the weights in a
+  uniform binding, were "for a later round, if r27w holds on one GPU and a probe says which." It held on neither. So no round
+  is owed, and the backlog's `denoise-winograd` is CLOSED.
+- **The one optional probe is logged as `denoise-winograd-probe`.** It would time two and four vec4s a thread in the compile
+  gate's kernel-level line on both GPUs.
+  - Fewer z groups attack the first difference above and worsen the third.
+  - To reach r18t, a shape would have to be about 3.4 x faster on the 1080, and 2.9-3.1 x on the Intel to reach r18u.
+    Probing it costs little. Nothing here suggests the shape alone closes that gap.
+- **The restated key held on hardware.** K0w now has a reading on both GPUs, natively and in Chrome. A twin of a kernel's
+  own order, held to the f64 network at 1e-5 on every value, is a key any later non-canonical kernel can use. The backlog's
+  `denoise-subgroup-reduction` waits on that, and now only on the features probe.
+- **The tables stand as before:**
+  - r18u on the Intel gen-9, natively and on the page;
+  - r18t on the GTX 1080, natively and on the page;
+  - r15 everywhere else, and `DEFAULT_KERNELS` and `PAGE_KERNELS` unchanged.
+
+## 87. ROUND 28 -- THE DENOISER'S FXC PATHS RETIRED: FIXED BEFORE THE RIG RUNS IT
+
+**Where this section comes from.** It was written as section 79, round 25, on the branch `ccr-6c3eeb7c-pxz6kx`. That branch was
+labelled v4864 and never reached main. This file's section 79 and round 25 went to the mesh round (v4868) in the meantime. The
+section is renumbered at the merge that ships it, v4871. Its text is unchanged except for the numbers, the version and one note
+at the end. No rig has run it.
+
+**Why.** Every FXC row since section 66 fed condition 4, and section 75 dropped condition 4. Both native defaults are now decided
+under DXC (sections 67 and 78), and no FXC run decides anything. They still cost the most time in each denoise run. In round 24b
+(run a), the compile gate's "use_dxc off" mode spent 301 s on the Intel and 127 s on the 1080 building one kernel,
+r13-fast-head, under FXC. The timing gate's FXC child added 167 s and 131 s.
+
+**What v4871 changes.**
+- `render/denoiseCompile.mjs`'s `modeVariants`: a native mode whose compiler is FXC (read off the package with that mode's flags)
+  builds the control kernel alone, `FXC_CONTROL_IDS` = r12-tiled-3x3. On 0.6.2 that is "use_dxc off". The other seven stand aside,
+  not counted as unbuilt. DXC, and no D3D compiler (off win32), build all eight, as before.
+- A package with no DXC of its own (0.6.0, 0.6.1), whose "as shipped" is FXC, gets the same single kernel and a line that says
+  REFUSED: its native path needs 0.6.2.
+- `render/denoiseTiming-selfcheck.mjs`: the FXC ladder is skipped by default with section 87's reason, where the plan would have
+  run it.
+- `SWEK_DENOISE_FXC=all` puts both back as they were.
+- Nothing else changes: `NATIVE_KERNELS_BY_ADAPTER`, DEFAULT_KERNELS, the page's table, and every DXC row.
+
+**The run.** On each GPU, with v4871 or later and `SWEK_WEBGPU` cleared:
+`node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r28.json`, then `node tools/denoiseDevice.mjs --which`.
+
+**Predicted, and deciding:**
+1. All three denoise gates are green on both GPUs.
+2. The compile gate's "use_dxc off" group is r12-tiled-3x3 alone: built, exact, its dump FXC (DXBC). Its section 87 line names the
+   seven that stood aside.
+3. The timing gate's "2b" says `SKIP  native FXC ladder: retired by section 87 ...`.
+4. `--which` still says r18u on the Intel and r18t on the 1080.
+
+If any of these fails, the verdict reverts the retirement (`modeVariants` and `fxcLadderSkip` back to building and running
+everything) and says why.
+
+**Predicted, reported, not deciding.** Each GPU's compile gate under 200 s on the Intel (365 and 385 s in round 24b) and under 120 s
+on the 1080 (184 and 178 s). Each timing gate below the lower of its two round-24b runs (351 s Intel, 230 s 1080). A miss is named
+in the verdict and does not revert anything: these are what the change is for, not what makes it safe.
+
+**What cannot be checked here.** No mode on this box is FXC (SwiftShader, Linux), so the live single-kernel group and the live skip
+are the rig's. Here they are held by fixtures (section 87's rows in both gates) and a source row in the timing gate. Sabotage F3
+(section 4 counting eight kernels in every mode) is 0 RED on this box, and is named as such in the compile gate's header.
+
+**Since this was written** (a note added at the merge, not a change to the rule):
+- **Round 27 added r27w.** It added r27w's kernel to `DXC_VARIANTS` and r27w to both ladders, and r27w stands aside under FXC
+  either way (`FXC_UNTRIED_SETS`). The DXC-only kernels are untouched by this section, as before.
+- **The newest baseline is round 27's runs** (section 86). The timing predictions above are against round 24b's runs, so read
+  the timing lines against these as well.
+  - The compile gates took 421 and 455 s on the Intel and 211 and 227 s on the 1080.
+  - The timing gates took 506 and 541 s on the Intel and 267 and 269 s on the 1080, with r27w's ladder in them.
+  - Their FXC children took 292, 318, 141 and 144 s.
+
+## 88. ROUND 28 -- THE VERDICT: SECTION 87's FOUR PREDICTIONS HOLD ON BOTH GPUS, AND THE FXC RETIREMENT STANDS
+
+**What arrived.** One `realGpuRun --only denoise` per GPU, then `tools/denoiseDevice.mjs --which`, as section 87 asks, both on
+2026-10-17 at 8490e721 ("v4871: record the release"). They are committed byte for byte at 0a8c4c48:
+- `render/denoise-rig-r28-intel-gen9.json`;
+- `render/denoise-rig-r28-gtx1080.json`;
+- `render/denoise-rig-r28-which.txt`, the console with each GPU's `--which` lines, CRLF as the rig wrote it.
+
+They were opened on arrival, as sections 85 and 86's were.
+
+**The four deciding predictions.**
+
+| Prediction | Intel gen-9 | GTX 1080 |
+|---|---|---|
+| 1. All three denoise gates green | exact, compile, timing: all green | all green |
+| 2. FXC's group is r12-tiled-3x3 alone: built, exact, FXC (DXBC) | "1 of 1 built; dumps: 1 FXC (DXBC)"; 131,072 plain, 0 fused, 0 unexplained | the same |
+| 3. The FXC ladder skipped with section 87's reason | "SKIP native FXC ladder: retired by section 87 (v4871)"; no FXC line timed | the same |
+| 4. `--which` unchanged | r18u, section 67's, under DXC, within 1.05e-6 of the f64 network | r18t, section 78's, under DXC, within 1.01e-6 |
+
+- **All four hold on both GPUs. The retirement stands.**
+  - Under FXC, `modeVariants` builds r12-tiled-3x3 alone, as a control.
+  - The timing gate's FXC ladder skips.
+  - `SWEK_DENOISE_FXC=all` puts both back.
+  - Nothing else changes.
+- **Prediction 2's second sentence, read strictly.** It says the section 87 line "names the seven that stood aside". The line
+  counts them instead: "the other 7 stand aside, not counted as unbuilt".
+  - The code that prints it was written in the same commit as the prediction, and has always printed a count.
+  - Read as the line that code prints, the prediction holds. Read as "lists seven names", it does not.
+  - That is said here rather than decided quietly. Nothing else in the verdict turns on it.
+
+**The rule as code.** Two rows in `render/denoiseDevice-selfcheck.mjs`, beside section 68's outcome row:
+- **The verdict row** reads the committed files. Each `--which` line is parsed by `parseWhich` and re-derived by `nativePick` on
+  the adapter and compiler it names.
+- **The discrimination row** works on copies. All eight kernels built under FXC fails prediction 2. The FXC ladder run fails
+  prediction 3. A `--which` naming r15 for the Intel fails prediction 4.
+- **Sabotaged five ways (X1-X5),** each red by name, each file restored byte-identical by SHA-256.
+
+**The first sabotage runner left two things broken, and neither showed in its red count.**
+- It was killed by its caller's timeout during X4. A Python `finally` does not run on SIGTERM, so the `--which` rule was left
+  without its kernels clause.
+- It also wrote files back in text mode. The committed console came back with LF endings, and its md5 was "restored" against text
+  it had already converted.
+- `git status` showed the console. X4's next attempt, finding nothing to edit, showed the clause.
+- Both were put back, and the console was compared byte for byte with the upload.
+- The runner now reads and writes bytes and restores on SIGTERM. Every round 27 and round 28 rig file was re-checked against its
+  upload, and all are identical.
+
+**Reported, not deciding: what the retirement was for.** Every bound section 87 set is met.
+
+| | Intel gen-9 | GTX 1080 |
+|---|---|---|
+| Compile gate | **50.1 s** (bound 200; round 24b 365 and 385; round 27 421 and 455) | **34.6 s** (bound 120; 184 and 178; 211 and 227) |
+| Timing gate | **193.2 s** (bound 351; round 27 506 and 541) | **154.0 s** (bound 230; 267 and 269) |
+| The whole denoise run | **328.3 s**, against 1,032.6 and 1,083.1 s in round 27 | **241.4 s**, against 530.3 and 552.3 s |
+
+- On the Intel the whole run is about a third of round 27's, and on the 1080 under half. Round 27 timed r27w too, as this run does,
+  so most of the gap is the FXC paths: the compile gate's seven retired FXC builds (r13-fast-head alone took 346 s on the Intel in
+  round 27) and the timing gate's FXC child (292 and 318 s there). The rest is one run's conditions against another's.
+
+**Also read off the same runs, deciding nothing.**
+- **The tables, as they stand:**
+  - On the Intel, r18u is 1.549x r15 natively at 1024 x 1024 and 1.530x on the page.
+  - On the 1080, r18t is 1.081x r15 natively at 1920 x 1080 and 1.089x on the page.
+- **r27w is where section 86 left it:** 0.388x r18u natively at 512 x 512 on the Intel, and 0.302x r18t at 1920 x 1080 on the 1080.
+- **One stall.** The 1080's page ladder timed r27w at 1920 x 1080 at 684 ms a pass, with a 90th percentile of 7,623 ms over three
+  passes.
+  - Layer 3 took 340 ms and the head 186 ms, against 66 and 18 natively.
+  - Round 27's two page runs read 250.4 and 248.3 ms at that size.
+  - r27w is closed and nothing reads that figure, so it is recorded and not chased.
+
+**What is next.** The FXC retirement owes nothing further. A native run under FXC still gets `DEFAULT_KERNELS`, and builds one
+control kernel where it built eight.
+
+## 89. ROUND 29 -- HALF RESOLUTION AT 256 x 256, EASU THE CANDIDATE: FIXED BEFORE ANY OF ITS TEST SCENES EXIST
+
+Committed with the code that implements it. No scene of this round's test set has been rendered.
+
+**Why this round.** Round 26 asked whether a half-size frame upscaled by FSR1 beats the frames it could be instead, at 64 x 64,
+and was not reported (section 82). Descriptively, the half-size chain lost to every frame it was measured against.
+- Section 81 fixed the caveat before that run: 64 x 64 holds a scene far more coarsely than real use, so a test there is
+  harder on an upscaler than a real frame is. Section 82 could not separate a real loss from the size.
+- This round asks the same question at 256 x 256, traced and denoised at 128 x 128. That is the nearest size this machine can
+  render a reference for: 1,024 samples at 16 times round 26's pixels.
+- The backlog's FSR2, FSR3 and learned-upscaler entries wait on this one (`denoise-halfres-at-scale`).
+
+> **Is a frame traced and denoised at 128 x 128, then upscaled to 256 x 256 by EASU, closer to the reference than the frames
+> it could be instead?**
+
+**Nothing is trained or tuned.** The network is round 11's seed 1, from the file the page loads. Its sha-256 is written beside
+the results. The input is the arc's: 4 samples (or 1 for D), the nine channels and the emitter mask.
+
+**The frames, per test image.** Each is judged against the same 256 x 256 reference, with a second for C3.
+
+| Frame | Traced | Then |
+|---|---|---|
+| **A** | 256 x 256, 4 samples | denoised -- today's page at this size; reported, never tested |
+| **B, the candidate** | 128 x 128, 4 samples | denoised at 128 x 128, then EASU to 256 x 256 |
+| **C** | the same frame as B | denoised, then bilinear to 256 x 256 -- EASU's control |
+| **D** | 256 x 256, 1 sample | denoised -- the SAME NUMBER OF SAMPLES as B |
+
+- **EASU alone, not FSR1.** EASU is FSR1's upscaling pass. RCAS, its sharpening pass, made every one of round 26's 12 images
+  worse (section 82), so RCAS is not the candidate here. FSR1 whole, and RCAS without its denoise, are reported against B and
+  never tested.
+- **Everything else is section 81's, by the same code.**
+  - The upscale's space: Reinhard, then a display gamma, inverted exactly.
+  - The clamp to the frame's brightest value.
+  - RCAS at sharpness 0.9 where it is reported.
+  - Each input traced on its own render seed (`renderSeeds`' three, then seed x 8 + 4 and + 5).
+- `runUpscaleStudy` takes the candidate as a parameter. Its default is still FSR1, and the gate holds round 26's chain
+  unchanged.
+
+**The split** (`SPLITS_HALFRES`), one test set read by both hypotheses:
+
+| Set | Scenes | Seeds |
+|---|---|---|
+| T1 -> H1 and H2 | 6 of R, 6 of C, each as its own family | **42000-42005** and **43000-43005** |
+
+These are the families the network was trained on. No earlier split touched these seeds, round 26's among them, and every one
+is refused without `harvest`. C5 holds over the round's 60 render seeds.
+
+**The hypotheses**, with section 6's statistic and section 28's test. `verdict()`'s `filter` column is the comparator and its
+`net` column is B.
+- **H1: B beats D.** At the same number of samples, half resolution plus EASU is closer to the reference than full resolution at
+  1 sample. Effect per image: `d = ln relMSE(D) - ln relMSE(B)`.
+- **H2: B beats C.** EASU is closer than bilinear on the same denoised half-size frame. Effect: `d = ln relMSE(C) - ln relMSE(B)`.
+- Each is supported iff its mean d is > 0 and its sign-flip p is below its Holm threshold, over {H1, H2} at 0.05.
+
+**Controls, section 81's, unchanged.**
+- **C1, per hypothesis:** both of its frames must beat that hypothesis's own un-denoised frame on at least 11 of 12 images. For
+  H1 that is D's 1-sample input; for H2, B's half-size input upscaled bilinearly. This is the control that fired on H2 in round
+  26.
+- **C2:** cited from round 11, as in sections 79 and 81.
+- **C3:** B within 2 x of the floor on more than half the images makes that hypothesis not resolvable.
+- **C4:** the candidate's chain, run twice, gives B bit for bit.
+- **C5:** 60 distinct render seeds.
+
+**What each outcome buys.**
+- **H1 supported, with or without H2:** at this size, half resolution is the better spend of four samples a pixel.
+  - The next round times the half-size chain on the rig, with EASU on the GPU after the denoiser.
+  - `denoise-fsr2-temporal` comes off its blocker.
+- **H2 only:** EASU beats bilinear, but the full-size frame at equal samples is the better spend. The half-resolution lever is
+  not worth a rig round at this size.
+- **Neither, not reported or not resolvable:** recorded as found, and the FSR entries stay behind it. If C1 fires on H2 again,
+  `denoise-network-at-run-scale` becomes the next round.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1: H1 is NOT supported, but the gap narrows from round 26's.**
+  - There, B lost to D by a mean d of -0.493.
+  - For B to beat D, the half-size chain must cost less than tracing at 1 sample does. Round 11's record puts that cost near
+    2.5 x the 4-sample error on R (ln 0.9). Round 26's "price of the quarter" was 4 x (ln 1.406).
+  - At 256 x 256 a silhouette spans four times the pixels it did at 64, so the upscale loses less. My guess is a price between
+    the two, and a mean d in H1's direction between -0.4 and 0.
+- **P2: H2 is supported, with a small d.** At 64 x 64, EASU and bilinear were close: FSR1 lost to bilinear by 0.180, and EASU
+  beat FSR1 by 0.180. At 256, EASU's edge-following has more pixels to follow an edge across.
+- **P3: B's error is above A's on every image,** and the price of the quarter is below round 26's 1.406.
+- **P4: C1 holds on both hypotheses.** At 128 x 128 the network sees a scene at twice the scale it was trained on, not half
+  as at 32 x 32.
+
+**Secondary, reported, never tested.**
+- **The price of the quarter:** d of A against B.
+- **FSR1 whole, and RCAS without its denoise,** each against B (positive: EASU alone was better).
+- Per-image tables, every frame's noisy input error, and the floor.
+
+**What was seen first.**
+- Everything in sections 1-88, including section 82's descriptive numbers, which P1 to P3 are written from.
+- **The pilot, on two scenes outside every split (R 990003, C 990004), mechanics only, nothing scored against a reference:**
+  - Rendering took 145 s for R. C took 359 s, but that run overlapped another gate's, so it is not a clean time.
+  - Each 256 x 256 denoise took 4.9-5.5 s and each 128 x 128 one 1.3-1.5 s; the four upscales together under 0.5 s.
+  - Every output was finite. The transfer round-trips through float32 to 1.9e-5 relative at worst, over 1e-6 to 300.
+  - **EASU never needed the clamp:** 0 of 196,608 values on both scenes. FSR1 had 180 and 91 values held, which is RCAS's
+    overshoot, as at 64 x 64.
+- `render/denoiseStudy-selfcheck.mjs` runs the EASU chain on two 16 x 16 scenes outside every split, to hold the plumbing. It
+  reads no number for its value.
+- Nothing of the test set has been rendered.
+
+**Sabotaged before the harvest.** Seven runs, each restored byte-identical by SHA-256, logged as D39-D40 and R45-R49 in the
+gates' headers. None was 0 red.
+- The split left out of the dataset refusal: 2 red.
+- Its C half drawn as R: 1 red.
+- B upscaled by FSR1 whatever the candidate: 1 red.
+- The round at 128 x 128: 1 red.
+- The harvest not passing the candidate: 1 red.
+- C4's re-run hard-coded to FSR1: 1 red.
+- The candidate guard removed: 1 red.
+
+**The command:** `node tools/denoiseStudy.mjs --harvest-halfres --cache <dir>` -> `render/denoise-results-halfres.json`.
+- It refuses if the file exists.
+- By the pilot, about 45 minutes here. The file is committed byte for byte before it is read, and section 90 reads it.
+
+**Also in this commit, and not part of the round's question.**
+- **`rig-adapter-features-probe`:** each adapter's features, a fixed set of limits and its subgroup sizes are now in
+  `realGpuRun`'s report, natively and in Chrome, with one console line per adapter. Sabotaged six ways, F1-F6.
+  - On this box's SwiftShader both halves list `subgroups` and neither offers `shader-f16`.
+  - The rig's next run reads both GPUs.
+- **`denoise-r18t-margin-1080` is closed** from the committed reports. Section 63's single 1.087 x is now one of eleven page
+  readings at 1920 x 1080, all between 1.073 and 1.101 x.
+
+## 90. ROUND 29 -- NOT REPORTED: C1 FIRED ON H2 AGAIN, AND THIS TIME THE LOSS IS IN THE UPSCALE, AT LIGHT SOURCES
+
+**What arrived.** `render/denoise-results-halfres.json`, written by `tools/denoiseStudy.mjs --harvest-halfres` at ccd2df60, the
+commit carrying section 89. It took 3,509 s to render the 12 test images at 256 x 256 here and 165 s to measure. The file was
+committed byte for byte at 0c242093 before it was read.
+
+**The run is not reported. Neither hypothesis is decided.**
+- **C1 fired on H2.** Both of H2's frames must beat B's half-size input upscaled bilinearly on at least 11 of 12 images. **C
+  (bilinear) did on 12 of 12; B (EASU) on 9.**
+- **That is the difference from round 26,** where both did on 9. Here the network's denoised half-size frame holds up through
+  a bilinear upscale on every image. On three, it is the EASU step that ends up no better than upscaling the noise.
+- C1 held on H1 (D 12, B 11). C2 (cited), C3 (no image near its floor), C4 and C5 (60 distinct render seeds) held.
+- `render/denoiseStudy-selfcheck.mjs` re-derives the verdict from the file's own tables. Sabotaged R50-R53; R53 is 0 red by
+  construction, as its note says.
+
+**What the file shows, reported and testing nothing.**
+
+| | B (half size + EASU) against | mean d (positive: B better) | images B won |
+|---|---|---|---|
+| H1's direction | D, full size at 1 sample | -0.302 (round 26: -0.493) | 8 of 12 |
+| H2's direction | C, half size + bilinear | -0.237 | 8 of 12 |
+| the price of the quarter | A, full size at 4 samples | -1.149 (round 26: -1.406) | 0 of 12 |
+
+- **RCAS made every image worse again.** FSR1 whole lost to EASU alone on all 12 (mean d 0.130 in EASU's favour), and RCAS
+  without its denoise lost on all 12 (0.213).
+
+**The split, found after the file was committed, deciding nothing.**
+- **Where the four losses are.** B lost to both comparators on R1, R4, C1 and C5. Those are exactly the four images with a bright
+  light source in view.
+  - Their references peak at radiance 16, 17, 30 and 37. No other image peaks above 8.7.
+  - On those four, 86-98% of B's error lies within 2 px of an emitter pixel, which is 0.1-2.7% of the frame.
+  - C's error sits there too (82-89%), but it is 1.5 to 6 times smaller (R4 1.45 x, C5 2.0 x, C1 2.4 x, R1 6.0 x).
+- **The other eight,** seven with no emitter in view and R2 with a dim one (peak 8.7), go the other way:
+  - B beat C on all eight (d +0.02 to +0.28);
+  - B beat D on all eight (d +0.17 to +1.00).
+- **How these were computed.** From the harvest's own cache, by re-running the half-size denoise and both upscales on each
+  image. Each pixel's term of relMSE was attributed to whether it lies within 2 px of the emitter coverage channel.
+  - This is a description of the twelve images the test was run on, not a test.
+  - It was chosen after the result was read, so it decides nothing and supports nothing.
+- **A reading, not measured as a cause.** The upscaler does not know where the emitter edge is. It interpolates an emitter's
+  radiance (tens) into the dark pixels beside it, whose reference is near zero, and relMSE weighs those pixels most. EASU's
+  edge-following carries the bright value further along an edge than bilinear does.
+
+**The predictions,** read against the directions, since nothing was decided.
+- **P1 (H1 not supported, gap narrowing) pointed the way it said.** The mean d went from -0.493 to -0.302, inside the -0.4 to 0
+  it named.
+- **P2 (H2 supported) pointed the wrong way** on the mean. It pointed the right way on the eight images without a bright
+  emitter.
+- **P3 held:** B above A on all 12, at a price of 1.149, below round 26's 1.406.
+- **P4 (C1 holds on both) failed,** on H2, by the EASU arm alone.
+
+**What follows, and a conflict between two things written before the run.**
+- **Section 89 said:** "If C1 fires on H2 again, `denoise-network-at-run-scale` becomes the next round."
+- **The backlog said, at round 26:** that entry is "only if half resolution still loses at a realistic size, and loses in the
+  denoise rather than the upscale."
+- This round lost in the upscale. The denoise held: C, the same denoised frame upscaled bilinearly, beat its noisy frame on 12
+  of 12.
+- **The two statements point different ways on this outcome, and the choice is Keith's.** Section 89's sentence was written
+  without that distinction in view. The backlog's condition is the more specific one, and this round's data answer it.
+- **Logged as `denoise-halfres-emitter-aware`, and recommended:**
+  - Composite the emitter pixels at full resolution from the geometry. A pure emitter's radiance is its emission, so those
+    pixels need no tracing and no noise.
+  - Upscale the rest with the emitter mask refusing taps across it, as the network's kernel apply already does (section 21).
+  - Pre-register it on new seeds at 256 x 256.
+- **`denoise-fsr2-temporal`** now waits on that round.
+
+**What it does not change.** The page, the network, the filter, every kernel table.
+
+## 91. ROUND 30 -- THE EMITTERS TAKEN OUT OF THE UPSCALE: FIXED BEFORE ANY OF ITS TEST SCENES EXIST
+
+Committed with the code that implements it. No scene of this round's test set has been rendered.
+
+**Why this round.** Round 29 (section 90) was not reported: C1 fired on H2, because B (half size + EASU) beat its noisy frame on
+only 9 of 12 images. Two descriptive findings came out of it, both chosen after the result was read, so neither decides anything.
+- The half-size chain won every image without a bright light source in view, against both comparators.
+- It lost every image with one. Nearly all of its error (86-98%) lay within 2 px of an emitter pixel: the upscaler carried an
+  emitter's radiance (tens) into the dark pixels beside it, where the reference is near zero.
+
+Keith chose this round over `denoise-network-at-run-scale`, since the loss was in the upscale, not the denoise. It is
+`denoise-halfres-emitter-aware` in the backlog.
+
+> **With the light sources taken out of the upscale and put back at full size from the geometry, is a frame traced and denoised
+> at 128 x 128, then upscaled to 256 x 256 by EASU, closer to the reference than the frames it could be instead?**
+
+**Nothing is trained or tuned.** The network is round 11's seed 1, from the file the page loads. Its sha-256 is written beside
+the results. The input is the arc's: 4 samples (or 1 for D), the nine channels and the emitter mask.
+
+**The emitter-aware chain** (`render/denoiseUpscale.mjs`'s `emitterAwareUpscale`), on a frame denoised at half size:
+1. **Take the emitters out.** Every half-size pixel an emitter touches (its own mask, coverage > 0) is replaced from the pixels
+   none touches. The fill goes ring by ring inward: each such pixel takes the mean of its 8-neighbours that were known after
+   the previous ring, so the order pixels are visited does not matter. No emitter pixel's own value is ever read.
+2. **Upscale the rest** with `upscale`, unchanged: the same transfer, the same clamp, EASU or bilinear from `fx/fsr/fsr.js`.
+3. **Put the emitters back** at full size: each pixel becomes `E + (1 - cov) x` the upscaled value.
+   - `cov` is the emitter coverage at 256 x 256: the arc's own mask, the one the network reads for A and D. It comes from the
+     same 8 x 8 grid of primary rays per pixel (section 21).
+   - `E` is the mean, over that same grid, of the emission each ray meets (`render/denoiseMask.mjs`'s `emitterRadiance`). It
+     is 0 for a ray that meets anything else.
+   - A camera ray that meets an emitter returns exactly its emission (`physics/render/pathTracer.mjs`: at depth 0, before any
+     bounce). So a pixel the emitters cover whole is `E` there, with no noise and nothing traced.
+     `render/denoiseMask-selfcheck.mjs` traces such pixels and holds the render to `E` bit for bit.
+- **A fill, not a refusal of taps.** The backlog entry spoke of the mask refusing taps across it, as the network's kernel does
+  (section 21). Built that way, EASU itself would have to change. The fill gets the same effect, with no EASU tap ever reading
+  an emitter's radiance, while `fx/fsr/fsr.js` runs unmodified. That is how a shipped upscaler would be used.
+- **The grid is the arc's, not a finer one.** At a rim pixel, the composite is only as good as an 8 x 8 grid's estimate of
+  coverage. The grid's error there is a residual this round carries. A finer grid would have meant a different mask from the
+  one A and D are given.
+- **What the full-size guide would cost on the rig is not this round's question.** The arc computes the mask at full size on
+  the CPU, at 64 rays a pixel, for every frame. A rig round would have to time the same thing on the GPU.
+
+**The frames, per test image.** Each is judged against the same 256 x 256 reference, with a second for C3.
+
+| Frame | Traced | Then |
+|---|---|---|
+| **A** | 256 x 256, 4 samples | denoised -- today's page at this size; reported, never tested |
+| **B, the candidate** | 128 x 128, 4 samples | denoised, then the emitter-aware chain with EASU |
+| **C** | the same frame as B | denoised, then the emitter-aware chain with bilinear -- EASU's control |
+| **D** | 256 x 256, 1 sample | denoised -- the SAME NUMBER OF SAMPLES as B; unchanged from rounds 26 and 29 |
+
+Reported beside them, never tested:
+- round 29's plain EASU and plain bilinear, on the same denoised half-size frame;
+- **D composited:** D with the same fill and composite at full size, and no upscale.
+
+On an image with no emitter pixel at either size, the fill and the composite change nothing. There, B is round 29's chain bit
+for bit, and so is C.
+
+**The split** (`SPLITS_EMITTER`), one test set read by both hypotheses:
+
+| Set | Scenes | Seeds |
+|---|---|---|
+| T1 -> H1 and H2 | 6 of R, 6 of C, each as its own family | **44000-44005** and **45000-45005** |
+
+These are the families the network was trained on. No earlier split touched these seeds, rounds 26 and 29's among them, and
+every one is refused without `harvest`. C5 holds over the round's 60 render seeds.
+
+**The hypotheses**, with section 6's statistic and section 28's test. `verdict()`'s `filter` column is the comparator and its
+`net` column is B. Both are read from one exported definition, `emitterSets`.
+- **H1: B beats D.** At the same number of samples, half resolution through the emitter-aware chain is closer to the reference
+  than full resolution at 1 sample. Effect per image: `d = ln relMSE(D) - ln relMSE(B)`.
+- **H2: B beats C.** EASU is closer than bilinear inside the same chain, on the same denoised frame. Effect:
+  `d = ln relMSE(C) - ln relMSE(B)`.
+- Each is supported iff its mean d is > 0 and its sign-flip p is below its Holm threshold, over {H1, H2} at 0.05.
+
+**Controls.**
+- **C1, per hypothesis:** both of its frames must beat that hypothesis's own un-denoised frame on at least 11 of 12 images.
+  - For H1, that is D's 1-sample input, as before.
+  - **For H2, it is B's half-size input through the SAME emitter-aware bilinear chain.** In round 29 it was that input
+    upscaled bilinearly. The change is so that C1 asks of both arms what it was written to ask: that the denoise does
+    something. Against the plain upscale, the composite alone could carry an arm past C1 with the network contributing
+    nothing.
+- **C2:** cited from round 11, as in sections 79, 81 and 89.
+- **C3:** B within 2 x of the floor on more than half the images makes that hypothesis not resolvable.
+- **C4:** the candidate's whole chain, run twice, gives B bit for bit. That covers the network, the emitters' light from the
+  geometry, the fill, EASU and the composite.
+- **C5:** 60 distinct render seeds.
+- **And a refusal, not a control:** the run stops, measuring nothing, if any image's composite coverage differs from the mask
+  its full-size input carries.
+
+**What each outcome buys.**
+- **H1 supported, with or without H2:** at this size, half resolution with the emitters composited is the better spend of four
+  samples a pixel.
+  - The next round times the chain on the rig: the denoiser at half size, then the fill, EASU (or bilinear, if H2 fails) and
+    the composite on the GPU.
+  - `denoise-fsr2-temporal` comes off its blocker.
+  - **One qualification, fixed now.** If B loses to D composited on the mean, the composite carried H1 and the half
+    resolution did not. Then the next round is the composite at full size instead, logged as its own entry.
+- **H2 only:** EASU beats bilinear with the emitters out, but the full-size frame at equal samples is the better spend. The
+  half-resolution lever is not worth a rig round at this size.
+- **Neither, not reported or not resolvable:** recorded as found, and the FSR entries stay behind it.
+  - If C1 fires on H2 again with the emitters out, the next step depends on which arm failed. C failing (bilinear, the
+    plainer upscale) puts the half-size denoise in question, and `denoise-network-at-run-scale` becomes next by its own
+    condition. B alone failing puts EASU in question.
+
+**Predictions, fixed now, deciding nothing.** Each is written from round 29's committed tables.
+- **P1: H2 is supported.** I expect a mean d between +0.03 and +0.25, with B winning at least 10 of 12.
+  - On round 29's eight images without a bright emitter, EASU beat bilinear on all eight (d +0.02 to +0.28, mean +0.116).
+  - With the emitters out, the images with one should go the same way.
+- **P2: H1 is supported.** I expect a mean d between +0.3 and +0.8, with B winning at least 11 of 12.
+  - On the same eight, B beat D on all eight (d +0.17 to +1.00, mean +0.439).
+  - On an image with a bright emitter, D's rim pixels are 1-sample noise between 0 and the emission. The composite's are an
+    8 x 8 grid's estimate.
+- **P3: C1 holds on both hypotheses, 12 of 12 for every arm.** In round 29 the denoised frames sat far below their noisy
+  frames everywhere but at emitters (C 12 of 12; B's three misses were all emitter images).
+- **P4: the aware chain beats plain EASU on every image with an emitter pixel in view.** On every image with none, at either
+  size, it equals plain EASU exactly (d = 0) by construction.
+- **P5: B's share of error within 2 px of an emitter is below 50% on all twelve images,** against round 29's 86-98% on its four
+  bright-emitter images. It is below plain EASU's share on every image with an emitter in view.
+- **P6: B beats D composited on the mean,** on at least 9 of 12, by less than H1's margin.
+- **P7: the price of the quarter falls** to a mean between 0.3 and 0.8, with B's error still above A's on at least 10 of 12.
+  - In round 29 it was 1.149. The four emitter images gave 10.48 of the 13.79 summed, and the other eight averaged 0.413.
+
+**Secondary, reported, never tested.**
+- **The price of the quarter:** d of A against B.
+- **The aware chain against plain EASU:** d of round 29's chain against B.
+- **D composited against B.**
+- **The share of each frame's error within 2 px of an emitter pixel,** for B, C, plain EASU and D. This is section 90's
+  descriptive split, now fixed in code (`nearEmitterShare`) before the run.
+- **The number of emitter pixels in view per image,** and per-image tables, every noisy frame's error and the floor.
+
+**What was seen first.**
+- Everything in sections 1-90. That includes round 29's per-image tables, which P1 to P7 are written from.
+- **The premise, on 30 scenes per family outside every split (R and C 990200-990229), at 32 x 32 against 256 samples.** On the
+  21 scenes with at least two pixels covered whole, the reference over the geometry's `E` read 1.0000 on every whole pixel of
+  17 of them. On the other 4, the lowest single whole pixel read 0.985 to 0.996: the grid said whole, but some jittered
+  samples fell off the disc.
+  - This compares the reference with the geometry, not any frame of the round.
+  - It is the only comparison against a reference made before this commit.
+- **The miniature's tables were printed once while building.** That is 16 x 16 on two scenes outside every split, against an
+  8-sample reference.
+  - On the C scene the aware chain read worse than plain EASU (0.589 against 0.277).
+  - At 8 samples, that scene's rim pixels are not a reference. Its three emitter pixels have E 9.13, 11.82 and 1.61. Traced
+    at 64 samples they read 6.5, 8.1 and 1.1; traced again at 4,096, they read 8.25, 11.60 and 1.58.
+  - So the gap at 8 and 64 samples was the reference's noise. What is left, up to 10% at the first pixel, is the grid's own
+    error at a rim: the residual described above.
+  - That is also why the premise above was checked at 256 samples. Nothing from these numbers is in a prediction.
+- **The pilot, on two scenes outside every split with emitters in view (R 990211, C 990214), mechanics only, nothing scored
+  against a reference:**
+  - Rendering took 270 s for R and 353 s for C.
+  - The emitters' light from the geometry took 1.1-1.2 s at 256 x 256. Each 128 x 128 denoise took 1.5-1.6 s, each 256 x 256
+    one 5.3-5.6 s. The fill took 6-10 ms, and both emitter-aware upscales together 0.17-0.28 s.
+  - Emitter pixels at full size: R 2,955 whole and 236 at a rim, C 1,580 and 113. At half size, 832 and 439 were filled.
+  - On both: the composite's coverage equalled the full-size input's mask, C4 held bit for bit, and every frame was finite.
+    On every whole emitter pixel, B equalled E bit for bit.
+  - **The network passes an emitter's radiance through.** The denoised half-size frame peaked at exactly E's peak (26.43 and
+    41.46). After the fill it peaked at 0.98 and 1.49, the light beside the emitters. That is what EASU now reads.
+- `render/denoiseStudy-selfcheck.mjs` runs the whole round on two 16 x 16 scenes outside every split, to hold the plumbing. It
+  reads no number for its value.
+- Nothing of the test set has been rendered.
+
+**Sabotaged before the harvest.** Each run was restored byte-identical by SHA-256, and each is logged in its gate's header.
+- **One went 0 red, and that is a finding:** R55, H2's noisy frame swapped for round 29's plain bilinear one.
+  - The first draft's row compared the verdict alone. On two miniature images, C1's counts over either noisy frame come out
+    the same.
+  - The hypotheses' columns are now one exported function, held column by column by identity, with the run held to calling
+    it.
+  - Re-sabotaged as R55b, R59b and R62: 1 red each.
+- **The other 18 of the first set of 19, by name:**
+  - **`render/denoiseMask-selfcheck.mjs`:**
+    - M9, the light averaged over the emitter rays only: 1 red.
+    - M10, a tint read as one channel: 2 red.
+    - M11, the centre ray alone: 1 red.
+  - **`render/denoiseUpscale-selfcheck.mjs`:**
+    - U7, the fill reading emitter pixels: 3 red.
+    - U8, the fill in place, in scan order: 1 red.
+    - U9, the composite without `1 - cov`: 1 red.
+    - U10, the chain without its fill: 1 red.
+    - U11, the share ignoring its reach: 1 red.
+    - U12, only whole emitter pixels filled: 3 red.
+  - **`render/denoiseScenes-selfcheck.mjs`:**
+    - D41, the split out of the dataset refusal: 2 red, counting one in the study gate.
+    - D42, its C half drawn as R: 1 red.
+  - **`render/denoiseStudy-selfcheck.mjs`:**
+    - R54, B through plain EASU: 2 red.
+    - R56, C4 re-running plain EASU: 1 red.
+    - R57, the round at 128: 1 red.
+    - R58, the CLI running round 29's study: 1 red.
+    - R59, H1 against D composited: 1 red.
+    - R60, the mask refusal removed: 1 red.
+    - R61, D composited without its fill: 1 red.
+
+**The command:** `node tools/denoiseStudy.mjs --harvest-emitter --cache <dir>` -> `render/denoise-results-emitter.json`.
+- It refuses if the file exists.
+- By the pilot, about 65 minutes here: rendering dominates, as in round 29 (3,509 s), and the chain adds seconds an image.
+- The file is committed byte for byte before it is read, and section 92 reads it.
+
+## 92. ROUND 30 -- REPORTED, BOTH HYPOTHESES SUPPORTED: WITH THE EMITTERS COMPOSITED, HALF RESOLUTION IS THE BETTER SPEND AT 256 x 256
+
+**What arrived.** `render/denoise-results-emitter.json`, written by `tools/denoiseStudy.mjs --harvest-emitter` at 5a2241e0, the
+commit carrying section 91. It took 3,744 s to render the 12 test images at 256 x 256 here and 213 s to measure. The file was
+committed byte for byte at d876dfce before it was read. Its network sha-256 is `render/denoise-net-r11.json`'s, the file the
+page loads.
+
+**The run is reported, and both hypotheses are supported.**
+
+| | B (half size + emitter-aware EASU) against | mean d (positive: B better) | B won | sign-flip p | Holm threshold |
+|---|---|---|---|---|---|
+| **H1** | D, full size at 1 sample | **+0.694** | 12 of 12 | 0.00024 | 0.025 |
+| **H2** | C, half size + emitter-aware bilinear | **+0.104** | 10 of 12 | 0.0022 | 0.05 |
+
+- H1's p is 1/4096, the smallest a sign-flip test over 12 images can give.
+- **Every control held.**
+  - C1 held for all four arms at 12 of 12. On H1, B and D each beat D's 1-sample input. On H2, B and C each beat the half-size
+    input through the same emitter-aware bilinear chain.
+  - C2 is cited from round 11. C3: no image was near its floor on either hypothesis. C4 held, and C5 over 60 distinct render
+    seeds.
+- **`render/denoiseStudy-selfcheck.mjs` re-derives all of it from the file's own tables,** through `emitterSets`, the one
+  definition of the hypotheses' columns. Beside that are four more rows: the network's sha-256, the bit-for-bit identities
+  below, section 91's rule, and the seven predictions. Sabotaged R63-R68; none was 0 red.
+
+**What it says, and where it stops.**
+- At 256 x 256, take a frame traced and denoised at a quarter of the pixels and upscaled by EASU, with the light sources put
+  back at full size from the geometry. On every one of 12 new images, it was closer to the reference than the full-size frame
+  traced at the same number of samples. And EASU beat bilinear inside that chain.
+- **Only four of the twelve images had an emitter in view:** R 44000, 44001, 44002 and 44004, with 30, 1,268, 950 and 1,715
+  emitter pixels.
+  - None of the six C scenes had an emitter pixel in view. That is how the scenes were drawn, not a choice. C's two lights are
+    small (radius 0.15-0.3), at height 1.8-3.2.
+  - On the other eight images the chain is round 29's, bit for bit, and a gate row holds that.
+- **So this round is also a pre-registered test, on new seeds, of section 90's descriptive split,** and it held. The split
+  below is descriptive and decides nothing:
+
+  | | images | H1 mean d | H2 mean d |
+  |---|---|---|---|
+  | no emitter in view | 8 | +0.551 (+0.09 to +1.12) | +0.124 (-0.053 to +0.286) |
+  | an emitter in view | 4 | +0.980 (+0.86 to +1.21) | +0.064 (-0.004 to +0.205) |
+
+  - **H2's two losses** are R 44000 (-0.004, the image with 30 emitter pixels) and C 45000 (-0.053, no emitter in view).
+  - So EASU lost to bilinear on one plain image. In round 29 it lost on none of eight.
+- **256 x 256 is not 1080p.** Nothing here says what the chain costs on a GPU, including the full-size emitter coverage at 64
+  rays a pixel that the composite needs. That is the next round's question.
+- **The composite's residual is small where it was measured.** B's share of its error within 2 px of an emitter pixel was at
+  most 2.4% (R 44004). On the same four images, plain EASU's share was 12-92% and D's 1-34%.
+
+**Reported, testing nothing.**
+
+| B against | mean d (positive: B better) | B won |
+|---|---|---|
+| round 29's plain EASU, on the same frame | +0.345 (0 exactly on the 8 without an emitter; +0.12, +1.01, +2.55 and +0.46 on the 4 with one) | 4 of 4 with an emitter |
+| D composited (the same fill and composite at full size) | +0.626 | 12 of 12 |
+| A, full size at 4 samples (the price of the quarter) | -0.327 (round 29: -1.149) | 0 of 12 |
+
+- **The composite helps D too.** On the four images with an emitter, D composited beat D by d +0.01, +0.23, +0.42 and +0.16. B
+  still beat D composited on all twelve, which is the qualification section 91 fixed. So the half resolution carried H1, not
+  the composite alone.
+- **The composite helps the noisy frame too.** On all four emitter images, H2's noisy frame improved on round 29's plain
+  bilinear one: 0.0287 to 0.0282, 0.0201 to 0.0172, 0.0112 to 0.0079, and 0.0197 to 0.0174. That is why C1 now asks against
+  it. Both denoised arms beat it on 12 of 12.
+
+**The predictions: all seven held**, read off the file by the gate's last row.
+- **P1, H2 supported:** +0.104, inside +0.03 to +0.25, on 10 of 12.
+- **P2, H1 supported:** +0.694, inside +0.3 to +0.8, on 12 of 12.
+- **P3, C1 at 12 of 12 for every arm:** it was.
+- **P4:** the aware chain beat plain EASU on all four images with an emitter pixel, and equalled it exactly on the eight
+  without.
+- **P5:** B's share near an emitter was at most 0.024, below plain EASU's on all four.
+- **P6:** B beat D composited on 12 of 12, by +0.626, below H1's +0.694.
+- **P7:** the price of the quarter fell to 0.327, inside 0.3 to 0.8 but near its floor, with B's error above A's on all 12.
+- **What none of them foresaw:** that none of the six C scenes would have a light in view. Every emitter case in this round
+  is a white R light.
+
+**What follows, by section 91's rule** (`rule92` in the gate): H1 is supported, and B is ahead of D composited on the mean.
+- **The next round times the chain on the rig,** logged as `denoise-halfres-rig-timing`. At 1920 x 1080 output, that is:
+  - the denoiser at 960 x 540;
+  - the fill and composite in WGSL, gated against `render/denoiseUpscale.mjs`'s CPU reference;
+  - EASU through `fx/fsr/fsrGPU.js`;
+  - the full-size emitter coverage the composite needs.
+  It is held against today's full-size page.
+- **`denoise-fsr2-temporal` comes off its blocker.**
+- **`denoise-network-at-run-scale` stays blocked.** The half-size denoise held: C beat its noisy frame on 12 of 12, as it did
+  in round 29.
+- **`denoise-halfres-emitter-aware` is closed.**
+
+**What it does not change.** The page, the network, the filter, every kernel table. The emitter-aware chain is a CPU reference
+until the rig round puts it on a GPU.

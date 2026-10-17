@@ -62,6 +62,36 @@
 //   R43 --harvest-fsr1 leaving fx/fsr out of its cache stamp                     1 RED
 //   R44 (section 82) C1's eleven of twelve lowered to nine                       1 RED -- the re-derivation then reads
 //       'reported', which the committed file is not
+//   R45 (section 89) B upscaled by FSR1 whatever the candidate                   1 RED -- the EASU end-to-end row
+//   R46 ROUND_HALFRES at 128 x 128 instead of 256                              1 RED
+//   R47 --harvest-halfres not passing ROUND_HALFRES's candidate                  1 RED -- the CLI row (the run would be round 26's FSR1)
+//   R48 C4's re-run hard-coded to FSR1                                          1 RED -- the EASU end-to-end row (C4 false)
+//   R49 the candidate guard removed                                             1 RED -- the refusal row (upscale's own error is not the guard's)
+//   R50 (section 90) C1's eleven of twelve lowered to nine                      2 RED -- section 82's re-derivation and section 90's
+//   R51 the committed round 29 results' verdict edited to "reported"             1 RED -- section 90's row
+//   R52 the committed round 29 results' C4 edited to false                       1 RED -- section 90's row
+//   R53 section 90's row without its bilinear count (filterWins === 12)          0 RED -- redundant by construction: the same row compares
+//       the verdict's reasons, which state both counts
+//   R54 (section 91) B through plain EASU                                        2 RED -- end to end, and C4 (the re-run is the aware chain)
+//   R55 H2's noisy frame round 29's plain bilinear upscale                       0 RED ON THE FIRST DRAFT -- a finding: the row compared the
+//       verdict alone, and on two images C1's counts over either noisy frame are the same. The hypotheses' columns are now ONE
+//       exported function (emitterSets), held column by column by identity, and the run held to calling it:
+//   R55b the same, in emitterSets                                                1 RED
+//   R56 C4's re-run the plain EASU chain                                         1 RED
+//   R57 ROUND_EMITTER at 128 x 128                                               1 RED
+//   R58 --harvest-emitter running round 29's study                               1 RED
+//   R59 H1 held against D composited instead of D (in the run's inline sets)     1 RED -- the verdict's d differ
+//   R59b the same, in emitterSets                                                1 RED
+//   R60 the mask-agreement refusal removed                                       1 RED -- the source row
+//   R61 D composited without its fill                                            1 RED
+//   R62 the run building its sets inline, H2 over the plain bilinear noise       1 RED -- the run-calls-emitterSets clause
+//   R63 (section 92) the committed round 30 results' verdict edited to "not reported"  2 RED -- the verdict row and the rule row
+//   R64 C1's eleven of twelve raised to thirteen                                 7 RED -- every re-derivation (sections 80, 82, 90, 92),
+//       the two training-C1 rows, and P1/P2 among the predictions
+//   R65 section 92's rule with its qualification flipped                         1 RED
+//   R66 the committed results' first D-composited effect edited to -20           2 RED -- the rule row and P6
+//   R67 the committed results' network sha-256 edited                            1 RED
+//   R68 the committed results' B at an emitter-free image moved one digit        2 RED -- the verdict row (its d) and the bit-for-bit row
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -433,6 +463,166 @@ console.log("\n15. THE UPSCALE ROUND: HALF SIZE + FSR1 AGAINST THE FRAMES IT COU
     ok("!! --harvest-fsr1 decodes the shipped file with decodeNet, runs runUpscaleStudy under harvest, writes ROUND_FSR1.results and never an existing one, and logs no verdict",
         branch.length > 400 && /decodeNet\(shipped\.net\)/.test(code) && /runUpscaleStudy\(/.test(code) && /harvest: true/.test(code) &&
         /path\.join\(ENG, ROUND_FSR1\.results\)/.test(code) && /existsSync\(file\)/.test(code) && /sha256/.test(code) && /"fx\/fsr"/.test(code) && !/verdict|status|supported/.test(code));
+}
+
+console.log("\n16. ROUND 29: THE SAME QUESTION AT 256 x 256, EASU THE CANDIDATE (pre-registration section 89)");
+{
+    const { runUpscaleStudy, ROUND_HALFRES, RESULTS_HALFRES, ROUND_FSR1, ROUND_MESH, SHIPPED_NET } = await imp("render/denoiseStudy.mjs");
+    const { SPLITS_HALFRES } = await imp("render/denoiseScenes.mjs");
+    const { decodeNet } = await imp("render/denoiseDevice.mjs");
+    const { renderUpscaleImages, upscale } = await imp("render/denoiseUpscale.mjs");
+    const net = decodeNet(JSON.parse(fs.readFileSync(path.join(ENG, SHIPPED_NET), "utf8")).net);
+    ok("!! ROUND_HALFRES: its own split, 256 x 256 (half 128), EASU the candidate, the sign-flip test, C2 cited from round 11 as round 26 cites it, its own results file",
+        ROUND_HALFRES.splits === SPLITS_HALFRES && ROUND_HALFRES.image === 256 && ROUND_HALFRES.candidate === "easu" && ROUND_HALFRES.test === "signflip" &&
+        ROUND_HALFRES.c2Prior === ROUND_MESH.c2Prior && ROUND_HALFRES.c2Prior === ROUND_FSR1.c2Prior &&
+        ROUND_HALFRES.results === RESULTS_HALFRES && RESULTS_HALFRES === "render/denoise-results-halfres.json");
+    let threw = null; try { runUpscaleStudy({ splits: ROUND_HALFRES.splits, candidate: "easu", net, image: 4, sppIn: 1, sppRef: 1 }); } catch (e) { threw = e.message; }
+    let threw2 = null; try { runUpscaleStudy({ net, candidate: "lanczos", image: 4, sppIn: 1, sppRef: 1 }); } catch (e) { threw2 = e.message; }
+    ok("!! on the REAL split without harvest it is refused at its first scene, and a candidate other than FSR1 or EASU is refused before anything renders",
+        /seed 42000 is a dataset seed/.test(threw || "") && /candidate is "fsr1" \(section 81\) or "easu" \(section 89\)/.test(threw2 || ""), `${threw} | ${threw2}`);
+    // the miniature, EASU the candidate: the PLUMBING, no number read for its value
+    const mini = Object.freeze({ T1: Object.freeze({ family: "R+C", families: Object.freeze(["R", "C"]), seeds: Object.freeze([990100, 990101]) }) });
+    const out = runUpscaleStudy({ splits: mini, net, candidate: "easu", image: 16, sppIn: 4, sppRef: 8 }), V = out.verdict, T = out.tables;
+    const shapeOk = ["A", "B", "C", "D", "easu", "fsr1", "fsr1NoDenoise", "noisyFull1", "noisyFull4", "noisyHalfUp", "floor"].every((k) => T[k].length === 2 && T[k].every(Number.isFinite));
+    const im = renderUpscaleImages("C", 990101, { w: 16, h: 16, sppIn: 4, sppRef: 8 });
+    const B1 = upscale(denoise(net, im.half4.x, 8, 8).y, 8, 8, 16, 16, "easu");
+    const dOf = (x) => T.B.map((b, i) => Math.log(x[i]) - Math.log(b));
+    ok("!! end to end with EASU: B is the shipped network at half size through EASU, recomputed from nothing; C4 re-runs EASU; FSR1 whole and RCAS without denoise are reported against B; H1 and H2 are D's and C's columns",
+        shapeOk && Object.is(T.B[1], relMSE(B1, im.ref)) && T.B.every((v, i) => Object.is(v, T.easu[i])) && out.determinism === true && out.seedsDistinct === true &&
+        out.seedCount === 10 && out.config.upscale.kind === "easu" && /half size \+ EASU/.test(out.config.hypotheses.H1) &&
+        out.secondary.fsr1VsEasu.every((v, i) => Object.is(v, dOf(T.fsr1)[i])) && out.secondary.rcasNoDenoiseVsEasu.every((v, i) => Object.is(v, dOf(T.fsr1NoDenoise)[i])) &&
+        V.hypotheses.H1.d.every((v, i) => Object.is(v, dOf(T.D)[i])) && V.hypotheses.H2.d.every((v, i) => Object.is(v, dOf(T.C)[i])), `run ${V.run}`);
+    // round 26's chain is untouched by the parameter: no candidate is FSR1, and its tables carry no fsr1 column of their own
+    const r26 = runUpscaleStudy({ splits: mini, net, image: 16, sppIn: 4, sppRef: 8 });
+    ok("  ...and round 26's default is unchanged: FSR1 the candidate, its own secondary, no separate fsr1 column",
+        r26.config.upscale.kind === "fsr1" && !("fsr1" in r26.tables) && "easuAloneVsFsr1" in r26.secondary && T.C.every((v, i) => Object.is(v, r26.tables.C[i])));
+    const cli = fs.readFileSync(path.join(ENG, "tools/denoiseStudy.mjs"), "utf8");
+    const b0 = cli.indexOf('} else if (args.includes("--harvest-halfres")) {'), branch = b0 >= 0 ? cli.slice(b0, cli.indexOf('} else if (args.includes("--harvest-fsr1")) {', b0)) : "";
+    const code = branch.replace(/\/\/.*$/gm, "");
+    // section 90: the committed round 29 results, read back by code -- "not reported, C1 on H2" is the rule's output over the file's own
+    // tables, with C1's two counts (EASU's 9, bilinear's 12) and every other control as the file states them
+    const hfile = path.join(ENG, RESULTS_HALFRES);
+    if (fs.existsSync(hfile)) {
+        const res = JSON.parse(fs.readFileSync(hfile, "utf8")), T3 = res.tables;
+        const sets3 = { H1: { noisy: T3.noisyFull1, filter: T3.D, net: [T3.B], floor: T3.floor }, H2: { noisy: T3.noisyHalfUp, filter: T3.C, net: [T3.B], floor: T3.floor } };
+        const again3 = verdict({ sets: sets3, shuffled: null, c2Prior: ROUND_HALFRES.c2Prior, determinism: res.determinism, seedsDistinct: res.seedsDistinct, test: ROUND_HALFRES.test });
+        const c1h2 = again3.hypotheses.H2.c1, c1h1 = again3.hypotheses.H1.c1;
+        ok("!! *** section 90: verdict() over the committed round 29 tables gives the file's verdict -- NOT REPORTED, C1 on H2: EASU beat its noisy frame on 9 of 12, bilinear on 12 ***",
+            again3.run === "not reported" && res.verdict.run === "not reported" && JSON.stringify(again3.reasons) === JSON.stringify(res.verdict.reasons) &&
+            c1h2.netWins === 9 && c1h2.filterWins === 12 && c1h2.ok === false && c1h1.ok === true && c1h1.netWins === 11 && c1h1.filterWins === 12 &&
+            res.determinism === true && res.seedsDistinct === true && res.seedCount === 60 && res.config.image === 256 && res.config.upscale.kind === "easu" &&
+            T3.B.every((v, i) => Object.is(v, T3.easu[i])), again3.reasons.join(" | "));
+    } else ok("!! section 90 reads render/denoise-results-halfres.json, and it is not there", false);
+    ok("!! --harvest-halfres decodes the shipped file with decodeNet, runs runUpscaleStudy on ROUND_HALFRES's split, size and candidate under harvest, writes its results file and never an existing one, and logs no verdict",
+        branch.length > 400 && /decodeNet\(shipped\.net\)/.test(code) && /runUpscaleStudy\(/.test(code) && /harvest: true/.test(code) &&
+        /splits: ROUND_HALFRES\.splits/.test(code) && /image: ROUND_HALFRES\.image/.test(code) && /candidate: ROUND_HALFRES\.candidate/.test(code) &&
+        /path\.join\(ENG, ROUND_HALFRES\.results\)/.test(code) && /existsSync\(file\)/.test(code) && /sha256/.test(code) && /"fx\/fsr"/.test(code) && !/verdict|status|supported/.test(code));
+}
+
+console.log("\n17. ROUND 30: THE EMITTERS TAKEN OUT OF THE UPSCALE (pre-registration section 91)");
+{
+    const { runEmitterAwareStudy, emitterSets, ROUND_EMITTER, RESULTS_EMITTER, ROUND_HALFRES, ROUND_MESH, SHIPPED_NET } = await imp("render/denoiseStudy.mjs");
+    const { SPLITS_EMITTER, makeScene } = await imp("render/denoiseScenes.mjs");
+    const { decodeNet } = await imp("render/denoiseDevice.mjs");
+    const { renderUpscaleImages, upscale, emitterAwareUpscale, fillEmitters, compositeEmitters, nearEmitterShare } = await imp("render/denoiseUpscale.mjs");
+    const { emitterRadiance, MASK_STRIDE, MASK_CHANNEL } = await imp("render/denoiseMask.mjs");
+    const net = decodeNet(JSON.parse(fs.readFileSync(path.join(ENG, SHIPPED_NET), "utf8")).net);
+    ok("!! ROUND_EMITTER: its own split, 256 x 256 (half 128), the sign-flip test, C2 cited from round 11 as rounds 26 and 29 cite it, its own results file",
+        ROUND_EMITTER.splits === SPLITS_EMITTER && ROUND_EMITTER.image === 256 && ROUND_EMITTER.test === "signflip" &&
+        ROUND_EMITTER.c2Prior === ROUND_MESH.c2Prior && ROUND_EMITTER.c2Prior === ROUND_HALFRES.c2Prior &&
+        ROUND_EMITTER.results === RESULTS_EMITTER && RESULTS_EMITTER === "render/denoise-results-emitter.json");
+    let threw = null; try { runEmitterAwareStudy({ net, image: 4, sppIn: 1, sppRef: 1 }); } catch (e) { threw = e.message; }
+    ok("!! on the REAL split without harvest it is refused at its first scene", /seed 44000 is a dataset seed/.test(threw || ""), threw);
+    // the miniature, on two scenes outside every split with an emitter in view at 16 x 16: the PLUMBING, no number read for its value
+    const mini = Object.freeze({ T1: Object.freeze({ family: "R+C", families: Object.freeze(["R", "C"]), seeds: Object.freeze([990211, 990101]) }) });
+    const out = runEmitterAwareStudy({ splits: mini, net, image: 16, sppIn: 4, sppRef: 8 }), V = out.verdict, T = out.tables, X = out.secondary;
+    const cols = ["A", "B", "C", "D", "plainEasu", "plainBilinear", "Daware", "noisyFull1", "noisyFull4", "noisyHalfAware", "noisyHalfUp", "floor"];
+    const shapeOk = cols.every((k) => T[k].length === 2 && T[k].every(Number.isFinite)) && Object.keys(T).length === cols.length;
+    // every frame recomputed from nothing: the images, the emitters' light from the geometry, the network, the chain
+    const mask = (fr) => Float64Array.from({ length: fr.w * fr.h }, (_, p) => fr.x[p * MASK_STRIDE + MASK_CHANNEL]);
+    const want = mini.T1.seeds.map((seed, i) => {
+        const fam = mini.T1.families[i], im = renderUpscaleImages(fam, seed, { w: 16, h: 16, sppIn: 4, sppRef: 8 }), F = emitterRadiance(makeScene(fam, seed), 16, 16);
+        const h4 = denoise(net, im.half4.x, 8, 8).y, D = denoise(net, im.full1.x, 16, 16).y, aw = (y, k) => emitterAwareUpscale(y, mask(im.half4), 8, 8, 16, 16, k, F);
+        const fr = { B: aw(h4, "easu"), C: aw(h4, "bilinear"), D, plainEasu: upscale(h4, 8, 8, 16, 16, "easu"), Daware: compositeEmitters(fillEmitters(D, F.cov, 16, 16), F),
+                     noisyHalfAware: aw(im.half4.input, "bilinear"), noisyHalfUp: upscale(im.half4.input, 8, 8, 16, 16, "bilinear") };
+        return { rel: Object.fromEntries(Object.entries(fr).map(([k, y]) => [k, relMSE(y, im.ref)])), nearB: nearEmitterShare(fr.B, im.ref, F.cov, 16, 16),
+                 lit: F.cov.filter((v) => v > 0).length };
+    });
+    const recomputed = ["B", "C", "D", "plainEasu", "Daware", "noisyHalfAware", "noisyHalfUp"].every((k) => want.every((wt, i) => Object.is(T[k][i], wt.rel[k])));
+    ok("!! *** end to end: B is the shipped network at half size, the emitters filled out, EASU, the emitters composited back from the geometry -- recomputed from nothing; so are C, H2's noisy frame, D composited, and round 29's plain EASU ***",
+        shapeOk && recomputed && want.every((wt) => wt.lit > 0) && X.emitterPixels.every((n, i) => n === want[i].lit) && X.nearEmitter.B.every((v, i) => Object.is(v, want[i].nearB)),
+        `${want.map((wt) => wt.lit).join(" + ")} emitter pixels in view`);
+    const dOf = (x) => T.B.map((b, i) => Math.log(x[i]) - Math.log(b));
+    // the columns by IDENTITY, not by the verdict they give: on two images, C1's counts over H2's noisy frame read the same
+    // whether that frame is the emitter-aware one or round 29's plain bilinear -- measured, sabotage R55 went 0 red on the
+    // verdict alone -- so the definition is one exported function, held here column by column, and the run is held to it
+    const st = emitterSets(T);
+    const columns = st.H1.noisy === T.noisyFull1 && st.H1.filter === T.D && st.H1.net.length === 1 && st.H1.net[0] === T.B && st.H1.floor === T.floor &&
+        st.H2.noisy === T.noisyHalfAware && st.H2.filter === T.C && st.H2.net.length === 1 && st.H2.net[0] === T.B && st.H2.floor === T.floor &&
+        /const sets = emitterSets\(tables\);\s+const V = verdict\(\{ sets, /.test(runEmitterAwareStudy.toString());
+    const again = verdict({ sets: st, shuffled: null, c2Prior: ROUND_EMITTER.c2Prior, determinism: out.determinism, seedsDistinct: out.seedsDistinct, test: ROUND_EMITTER.test });
+    ok("!! the verdict is section 91's: H1 B against D over D's 1-sample input, H2 B against C over the half-size input through the SAME emitter-aware bilinear chain -- C4 re-runs the whole candidate chain",
+        columns && JSON.stringify(again) === JSON.stringify(V) && V.hypotheses.H1.d.every((v, i) => Object.is(v, dOf(T.D)[i])) && V.hypotheses.H2.d.every((v, i) => Object.is(v, dOf(T.C)[i])) &&
+        out.determinism === true && out.seedsDistinct === true && out.seedCount === 10 && out.config.upscale.kind === "easu" &&
+        /emitter-aware EASU/.test(out.config.hypotheses.H1) && /emitter-aware bilinear/.test(out.config.hypotheses.H2), `run ${V.run}`);
+    ok("  reported beside it, never tested: the price of the quarter (A against B), aware against plain EASU, D composited against B, the share near an emitter of B, C, plain EASU and D",
+        X.priceOfHalf.every((v, i) => Object.is(v, Math.log(T.B[i]) - Math.log(T.A[i]))) && X.awareVsPlainEasu.every((v, i) => Object.is(v, dOf(T.plainEasu)[i])) &&
+        X.dAwareVsB.every((v, i) => Object.is(v, dOf(T.Daware)[i])) && ["B", "C", "plainEasu", "D"].every((k) => X.nearEmitter[k].length === 2 && X.nearEmitter[k].every((v) => v >= 0 && v <= 1)));
+    const src = runEmitterAwareStudy.toString();
+    ok("  ...and the run refuses to measure over a composite whose coverage is not the mask the network read at full size",
+        /if \(!f\.cov\.every\(\(v, p\) => Object\.is\(v, m\[p\]\)\)\) throw new Error/.test(src));
+    const cli = fs.readFileSync(path.join(ENG, "tools/denoiseStudy.mjs"), "utf8");
+    const b0 = cli.indexOf('} else if (args.includes("--harvest-emitter")) {'), branch = b0 >= 0 ? cli.slice(b0, cli.indexOf('} else if (args.includes("--harvest-halfres")) {', b0)) : "";
+    const code = branch.replace(/\/\/.*$/gm, "");
+    ok("!! --harvest-emitter decodes the shipped file with decodeNet, runs runEmitterAwareStudy on ROUND_EMITTER's split and size under harvest, writes its results file and never an existing one, and logs no verdict",
+        branch.length > 400 && /decodeNet\(shipped\.net\)/.test(code) && /runEmitterAwareStudy\(/.test(code) && !/runUpscaleStudy/.test(code) && /harvest: true/.test(code) &&
+        /splits: ROUND_EMITTER\.splits/.test(code) && /image: ROUND_EMITTER\.image/.test(code) && /test: ROUND_EMITTER\.test/.test(code) && /c2Prior: ROUND_EMITTER\.c2Prior/.test(code) &&
+        /path\.join\(ENG, ROUND_EMITTER\.results\)/.test(code) && /existsSync\(file\)/.test(code) && /sha256/.test(code) && /"fx\/fsr"/.test(code) && !/verdict|status|supported/.test(code));
+    // section 92: the committed round 30 results, read back by code -- REPORTED, both hypotheses supported, as the rule gives it over
+    // the file's own tables through the one definition of the hypotheses' columns
+    const efile = path.join(ENG, RESULTS_EMITTER);
+    if (fs.existsSync(efile)) {
+        const res = JSON.parse(fs.readFileSync(efile, "utf8")), T4 = res.tables, X4 = res.secondary;
+        const again4 = verdict({ sets: emitterSets(T4), shuffled: null, c2Prior: ROUND_EMITTER.c2Prior, determinism: res.determinism, seedsDistinct: res.seedsDistinct, test: ROUND_EMITTER.test });
+        const H1 = again4.hypotheses.H1, H2 = again4.hypotheses.H2;
+        ok("!! *** section 92: verdict() over the committed round 30 tables gives the file's verdict -- REPORTED, H1 SUPPORTED (12 of 12, p 1/4096 under 0.025), H2 SUPPORTED (10 of 12, p 0.0022 under 0.05) ***",
+            again4.run === "reported" && res.verdict.run === "reported" && JSON.stringify(again4) === JSON.stringify(res.verdict) && again4.reasons.length === 0 &&
+            H1.status === "supported" && H1.k === 12 && H1.p === 1 / 4096 && H1.threshold === 0.025 && H1.meanD > 0.69 && H1.meanD < 0.70 &&
+            H2.status === "supported" && H2.k === 10 && H2.p < 0.0023 && H2.threshold === 0.05 && H2.meanD > 0.10 && H2.meanD < 0.11 &&
+            [H1, H2].every((h) => h.c1.ok && h.c1.netWins === 12 && h.c1.filterWins === 12 && h.c3.nearFloor === 0) &&
+            res.determinism === true && res.seedsDistinct === true && res.seedCount === 60 && res.config.image === 256 && res.config.upscale.kind === "easu",
+            `H1 ${H1.meanD.toFixed(3)} p ${H1.p} | H2 ${H2.meanD.toFixed(3)} p ${H2.p.toFixed(4)}`);
+        const crypto = await import("node:crypto");
+        ok("!! ...and the network that ran is the one the page ships: the file's sha-256 is render/denoise-net-r11.json's, in this tree",
+            res.shipped.file === SHIPPED_NET && res.shipped.sha256 === crypto.createHash("sha256").update(fs.readFileSync(path.join(ENG, SHIPPED_NET))).digest("hex"));
+        const none = X4.emitterPixels.map((n, i) => (n === 0 ? i : -1)).filter((i) => i >= 0);
+        ok("!! on every image with no emitter pixel in view (8 of 12), the chain IS round 29's, bit for bit -- B plain EASU, C plain bilinear, D composited D, H2's noisy frame the plain one",
+            none.length === 8 && none.every((i) => Object.is(T4.B[i], T4.plainEasu[i]) && Object.is(T4.C[i], T4.plainBilinear[i]) && Object.is(T4.Daware[i], T4.D[i]) &&
+                Object.is(T4.noisyHalfAware[i], T4.noisyHalfUp[i]) && Object.is(X4.awareVsPlainEasu[i], 0)), `no emitter in view: ${none.join(",")}`);
+        // section 91's qualification, fixed before the run: H1 supported is half resolution's only if B ALSO beats D composited on the mean
+        const mean = (a) => a.reduce((x, v) => x + v, 0) / a.length;
+        const rule92 = (r) => r.verdict.run !== "reported" ? "recorded"
+            : r.verdict.hypotheses.H1.status === "supported" ? (mean(r.secondary.dAwareVsB) > 0 ? "rig-timing" : "composite-fullres")
+            : r.verdict.hypotheses.H2.status === "supported" ? "no-rig" : "recorded";
+        const flipD = { ...res, secondary: { ...X4, dAwareVsB: X4.dAwareVsB.map((v) => -v) } };
+        const onlyH2 = { ...res, verdict: { ...res.verdict, hypotheses: { ...res.verdict.hypotheses, H1: { ...res.verdict.hypotheses.H1, status: "not supported" } } } };
+        ok("!! *** section 92's rule, as section 91 fixed it: H1 supported AND B ahead of D composited on the mean -- the half resolution carried it, so the next round is the rig's ***",
+            rule92(res) === "rig-timing" && rule92(flipD) === "composite-fullres" && rule92(onlyH2) === "no-rig" && mean(X4.dAwareVsB) > 0.62 && mean(X4.dAwareVsB) < H1.meanD,
+            `D composited against B: mean ${mean(X4.dAwareVsB).toFixed(3)}`);
+        // the seven predictions, read off the file -- they decided nothing, and the claim that all seven held is this row's
+        const wins = (a) => a.filter((v) => v > 0).length, lit = X4.emitterPixels.map((n) => n > 0);
+        const P = {
+            P1: H2.status === "supported" && H2.meanD >= 0.03 && H2.meanD <= 0.25 && H2.k >= 10,
+            P2: H1.status === "supported" && H1.meanD >= 0.3 && H1.meanD <= 0.8 && H1.k >= 11,
+            P3: [H1, H2].every((h) => h.c1.netWins === 12 && h.c1.filterWins === 12),
+            P4: lit.every((l, i) => (l ? X4.awareVsPlainEasu[i] > 0 : Object.is(X4.awareVsPlainEasu[i], 0))),
+            P5: X4.nearEmitter.B.every((v) => v < 0.5) && lit.every((l, i) => !l || X4.nearEmitter.B[i] < X4.nearEmitter.plainEasu[i]),
+            P6: mean(X4.dAwareVsB) > 0 && wins(X4.dAwareVsB) >= 9 && mean(X4.dAwareVsB) < H1.meanD,
+            P7: mean(X4.priceOfHalf) >= 0.3 && mean(X4.priceOfHalf) <= 0.8 && wins(X4.priceOfHalf) >= 10,
+        };
+        ok("  ...and section 91's seven predictions, read off the file: all seven held", Object.values(P).every(Boolean),
+            Object.entries(P).map(([k, v]) => `${k} ${v ? "held" : "FAILED"}`).join(", "));
+    } else ok("!! section 92 reads render/denoise-results-emitter.json, and it is not there", false);
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +

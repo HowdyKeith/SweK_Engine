@@ -216,6 +216,11 @@ for (const l of reachLines(r)) console.log("        " + l);
     //          reconciles:true: physics/render/rtCpuCache.mjs, the rtPipeline f64 reference cache (fdcd7395,
     //          tier-2), absent at main 16219a44 and at fdcd7395's parent. Growth only, live work, and
     //          gated in rtPipeline-selfcheck. Re-recorded with --write AFTER compare() had been read.
+    //   560 -> v4871 -- found RED by the full serial re-take (2026-10-16), which runs every gate, where nothing since
+    //          v4866 had run this one. compare(), read BEFORE writing, reports GREW, 1 ADDED, 0 REMOVED,
+    //          reconciles:true: physics/mechanics/flightModel6dof.mjs, real flight's trainer (be0c27bd, v4866, on
+    //          main), gated in its own flightModel6dof-selfcheck. Growth only, live work. Re-recorded with --write
+    //          AFTER compare() had been read.
     //
     // *** AND THE ROW HAD A DEFECT OF ITS OWN, WHICH IS WHY IT NOW ASKS THE MODULE RATHER THAN THE DISK. ***
     // It read the record with fs.readFileSync("tools/ship/population-census.json") -- A RELATIVE PATH -- so

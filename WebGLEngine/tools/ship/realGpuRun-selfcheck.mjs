@@ -6,6 +6,14 @@
 // quality or timing by the rule the doc states, it reads the tree's row format, and a run records the adapter each gate ran on
 // -- and says, first and loudly, when that adapter is software. On this box it is: SwiftShader, and the row that says so is
 // the one a real-hardware run turns around. SWEK_LAUNCH_ARGS reaches the browser, as the doc tells a Linux GPU owner to use it.
+// v4871+ -- rig-adapter-features-probe, SABOTAGED, each restored byte-identical (sha256):
+//   F1  adapterCaps leaving features unsorted                               -> 1 RED: the caps row
+//   F2  adapterCaps dropping a BigInt limit to null                         -> 1 RED: the caps row (Dawn hands maxBufferSize as a BigInt on some builds)
+//   F3  readAdapterLog dropping the caps                                    -> 1 RED: the caps row
+//   F4  addAdapters dropping the caps                                       -> 1 RED: the caps row
+//   F5  webgpuHarness not handing ADAPTER_LIMITS into the page               -> 5 RED: the browser-caps row, and four live-harness rows -- the
+//       page's code throws on the missing list and its adapter reads as none, which is the row proving the in-page code runs at all
+//   F6  noteNativeAdapter writing no caps                                   -> 1 RED: the caps row
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -14,9 +22,9 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { gateList, categorize, parseRows, verdict, runGates, runLaunchArgs, probeSoftwareGl, softwareGlLines, TREE_SOFTWARE_GL,
          probeNativeAdapters, nativeAdapterLines, GATE_TIMEOUT_MS, RETIRED_SOFTWARE_GL, TREE_SOFTWARE_WEBGPU, SOFTWARE_GL_CANDIDATES,
-         NATIVE_LAUNCH, readAdapterLog, gateEntry, addAdapters, nodeWebgpuRecord,
+         NATIVE_LAUNCH, readAdapterLog, gateEntry, addAdapters, nodeWebgpuRecord, capsLine,
          NATIVE_USE, nativeGateList, nativeLaunchArgs, nativeSweepCompare } from "./realGpuRun.mjs";   // v4851, section 66: NATIVE_LAUNCH..nodeWebgpuRecord; v4853, section 69: the last four
-import { noteNativeAdapter } from "./headlessGpu.mjs";
+import { noteNativeAdapter, adapterCaps, ADAPTER_LIMITS } from "./headlessGpu.mjs";
 import { webgpuSkipReason, launchArgsFor, hardwareArgsFor, parityArgsFor, HARDWARE_ARGS, softwareClaims } from "./webgpuHarness.mjs";
 import { gateReport } from "./gateReport.mjs";
 const GR = gateReport("tools/ship/realGpuRun-selfcheck.mjs");
@@ -270,6 +278,35 @@ console.log("\n6. ROUND 19 (section 66, v4851): NATIVE ADAPTERS NAMED, EACH GATE
        noted.adapters.length === 1 && noted.adapters[0].native === true && noted.adapters[0].software === false &&
        noted.names.join("|") === "intel gen-9 D3D12 driver version 31.0.101.2137 (native)" &&
        verdict({ adapters: addAdapters([], noted.adapters) }) === "a real-hardware run on intel gen-9 D3D12 driver version 31.0.101.2137 (native)");
+
+    // v4871+ -- rig-adapter-features-probe: what an adapter OFFERS travels with it. adapterCaps on a fake node-webgpu adapter (a Set of
+    // features out of order, a limit given as a BigInt, one missing, subgroup sizes in its info); noteNativeAdapter's record carries
+    // them; readAdapterLog and addAdapters keep them to the report; an older writer's record reads null, never an empty list.
+    // SABOTAGED v4871+: each restored byte-identical (sha256) -- see the header.
+    {
+        const fake = { info: { vendor: "intel", architecture: "gen-9", description: "D3D12", subgroupMinSize: 8, subgroupMaxSize: 32 }, isFallbackAdapter: false,
+                       features: new Set(["timestamp-query", "shader-f16", "subgroups"]),
+                       limits: { maxComputeWorkgroupStorageSize: 32768, maxComputeInvocationsPerWorkgroup: 1024, maxComputeWorkgroupSizeX: 1024,
+                                 maxStorageBufferBindingSize: 2147483644, maxUniformBufferBindingSize: 65536, maxBufferSize: 4294967296n } };
+        const c = adapterCaps(fake), none = adapterCaps({ info: {} });
+        let cbuf = "";
+        noteNativeAdapter(fake, { gate: path.join(ENG, "render/denoiseTiming-selfcheck.mjs"), env: { SWEK_ADAPTER_LOG: "(captured)" }, append: (f, l) => { cbuf += l; }, say: () => {} });
+        const back = readAdapterLog(cbuf, "render/denoiseTiming-selfcheck.mjs"), kept = addAdapters([], back.adapters);
+        const old = addAdapters([], readAdapterLog(JSON.stringify({ gate: "g.mjs", adapter: { vendor: "nvidia", architecture: "pascal", description: "x" }, software: false, launchArgs: ["node-webgpu (native)"] }), "g.mjs").adapters);
+        ok("!! *** the rig report records what each adapter offers: features sorted, ADAPTER_LIMITS as numbers (a BigInt read as one, a missing limit null), subgroup sizes -- written by noteNativeAdapter, kept to the report, null from an older writer ***",
+           JSON.stringify(c.features) === JSON.stringify(["shader-f16", "subgroups", "timestamp-query"]) && c.limits.maxBufferSize === 4294967296 &&
+           c.limits.maxStorageBuffersPerShaderStage === null && c.limits.maxComputeWorkgroupStorageSize === 32768 &&
+           Object.keys(c.limits).join() === ADAPTER_LIMITS.join() && c.subgroups.min === 8 && c.subgroups.max === 32 &&
+           none.features === null && none.limits === null && none.subgroups === null &&
+           JSON.stringify(kept[0].caps) === JSON.stringify(c) && old[0].caps === null &&
+           capsLine(kept[0].caps) === "shader-f16, subgroups, timestamp-query; subgroups 8-32; workgroup storage 32768 B",
+           capsLine(c));
+        // and the browser half asks the same names: webgpuHarness passes ADAPTER_LIMITS into the page and returns the caps in its record
+        const harness = fs.readFileSync(path.join(ENG, "tools/ship/webgpuHarness.mjs"), "utf8");
+        ok("  ...and the browser harness records the same caps for Chrome's adapter: ADAPTER_LIMITS handed into the page, features sorted, the caps inside the adapter it logs",
+           /import \{[^}]*\bADAPTER_LIMITS\b[^}]*\} from "\.\/headlessGpu\.mjs"/.test(harness) && /\}, \[\.\.\.ADAPTER_LIMITS\]\)\.catch\(\(\) => null\)/.test(harness) &&
+           /features: a\.features \? \[\.\.\.a\.features\]\.map\(String\)\.sort\(\) : null/.test(harness) && /isFallback: .*, caps \};/.test(harness));
+    }
 
     // a browser call that reached no device, beside the native one that did; and a native record that does not say its kind
     const mixed = gateEntry({ gate: GATE, src: "", status: 0, ms: 1, logText: line({ adapter: null, software: null, launchArgs: ["--enable-unsafe-webgpu"] }) + "\n" + ONLY_NATIVE });

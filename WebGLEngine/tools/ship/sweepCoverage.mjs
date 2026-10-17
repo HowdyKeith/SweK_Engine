@@ -279,15 +279,7 @@ export const RETURNED_AT_V4529 = Object.freeze({
                  "3,146 -- and 8-way it is 7,259. Three retirements and three returns: the gate is not " +
                  "moving, the measurement is, and the roll keeps it with every set of numbers rather than " +
                  "moving it a fourth time" }),
-        Object.freeze({ loadedMs: 3003, gate: "tools/ship/traderGraph-selfcheck.mjs", recordedWas: 3368, v4461Ms: 2793, hereMs: 3008,
-            quietMs: Object.freeze([2729, 2344, 2659]),
-            serialNow: Object.freeze([2245, 2308, 2319, 2437]),
-            why: "*** THE CLEAREST ILLUSTRATION ON THIS ROLL: THE VERIFY FILED IT AT 3,003 MS. THREE " +
-                 "MILLISECONDS OVER. *** Retired at v4535 on quiet readings and back in two days; retired " +
-                 "again at v4546 on 2,245 / 2,308 / 2,319 / 2,437 serial, the widest margin it has ever " +
-                 "had; and the very next 8-way sweep filed 3,003 and flipped the row that reads this roll. " +
-                 "A gate whose two measurements sit either side of the budget cannot be retired by taking " +
-                 "one of them, however carefully, and this is the third attempt to prove otherwise" }),
+        // v4871: traderGraph LEFT this roll a fourth time -- returnedAt_v4871 below, with every number it has ever produced.
         // v4813: wgslSpec LEFT this roll -- alone it now reads over the bar too (STILL_OVER_AT_V4813, below).
     ]),
     // *** v4565 -- RETIRED BY THE BAND PASS, AND IT TAKES A SENTENCE OF THE v4541 ENTRY WITH IT. ***
@@ -309,6 +301,23 @@ export const RETURNED_AT_V4529 = Object.freeze({
     // the same three read 2.4-2.5x slower 8-way than alone, same box, same minute. All three are back on
     // `stillOver` above with every set of numbers they have ever produced, which is what that roll is for.
     // The entries are not deleted from history; they are in the changelog and in this comment.
+    // *** v4871 -- traderGraph RETIRED A FOURTH TIME, BY THE PREDICATE THIS ROLL IS GRADED BY, AND KEPT WITH ITS NUMBERS. ***
+    // The v4871 verify's 8-way sweep filed it at 2,981 ms (contended), 19 ms under the budget, and `oscillates` says in so
+    // many words that "a live loaded sample may retire it": both rows that read this roll went red on exactly that.
+    // Three alone runs right after, 2,248 / 2,161 / 2,186, and its serial ring 2,482 / 2,132 / 2,322 -- under on every
+    // current reading, loaded and alone. Its own entry said one reading cannot retire it and this is a fourth attempt;
+    // the difference this time is that the LOADED side is the one that came in under. If the next 8-way sweep files it
+    // over 3,000 it goes back on `stillOver` with this entry's numbers beside the earlier ones -- the roll's whole content
+    // is that its two measurements straddle the bar, and the record keeps saying which side each one landed.
+    // SABOTAGED v4871: the entry left on `stillOver` -> 2 RED (both rows that read this roll), the state the verify left; restored.
+    returnedAt_v4871: Object.freeze([
+        Object.freeze({ gate: "tools/ship/traderGraph-selfcheck.mjs", overMs: 3008, loadedNow: 2981,
+            serialNow: Object.freeze([2248, 2161, 2186]),
+            earlier: "stillOver at v4529-v4870: loaded 3,003, recorded 3,368, v4461 2,793, quiet 2,729 / 2,344 / 2,659, serial 2,245 / 2,308 / 2,319 / 2,437",
+            why: "retired by the oscillator predicate itself when the v4871 verify's 8-way sweep filed 2,981 ms, 19 ms under the " +
+                 "budget; three alone runs after it read 2,248 / 2,161 / 2,186. The fourth retirement of a gate that has straddled " +
+                 "the bar since v4529, kept with every number so a return costs nothing to justify." }),
+    ]),
     returnedAt_v4545: Object.freeze([]),
     returnedAt_v4565: Object.freeze([
         Object.freeze({ gate: "tools/roundhouse/sweepBudget-selfcheck.mjs", overMs: 3172,

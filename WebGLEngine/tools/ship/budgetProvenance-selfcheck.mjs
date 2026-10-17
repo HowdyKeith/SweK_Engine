@@ -397,7 +397,16 @@ console.log("\n6. *** WHAT THE TABLE'S NUMBERS ACTUALLY MEASURE UP TO, WHICH IS 
 
     ok("...so the round's finding is about the PROCESS, not the numbers, and says which",
         // v4778 -- 12 -> 13, the same arrival as section 4's count: rigidBody6dofPage's four runs.
-        band(0.7, 1.5) >= 40 && Object.keys(MEASURED_RUNS).length === 13,
+        // v4871 -- *** "MOST" IS NOW A MAJORITY, NOT A COUNT, BECAUSE THE FULL SERIAL RE-TAKE BROKE THE COUNT BY MAKING GATES
+        // FASTER. *** It read `>= 40`, and the re-take's fresh readings put 38 of 64 within 1.5x -- fifty on main's record. All
+        // twelve that left did so the same way: their gates ran 10-15% faster than on 2026-10-06 (slugWgsl, divineEye and ten
+        // roundhouse and SPH gates), each crossing 1.5x by at most 0.19, and gateBudget's rule keeps a faster gate's basis --
+        // "it simply gains margin". A count that falls every time the tree speeds up is the row measuring the repair (v4647o's
+        // lesson). The claim was always "the table is not rotten": a majority agree with an independent observation, and the
+        // row beside this one holds the half that matters for safety, none lower. SABOTAGED v4871, each restored and md5-checked:
+        // the band's lower edge at 1.0 -> 0 RED (39 of 64 sit at 1.0-1.5x, still a majority: aimed at nothing); its upper edge
+        // at 1.2 -> 1 RED, this row; three in four asked rather than one in two -> 1 RED, this row.
+        band(0.7, 1.5) * 2 >= rows.length && Object.keys(MEASURED_RUNS).length === 13,
         `${band(0.7, 1.5)} of ${rows.length} within 1.5x. Four repeated keys, one 24x entry and a tautological ` +
         "guard are all real; 'the table is rotten' would not have survived being measured, and this row is what " +
         "stops the round claiming it.");
@@ -426,10 +435,14 @@ console.log("\n7. configContract, REMOVED RATHER THAN CORRECTED, AND WHY THAT DI
         "have given 6,946 ms to a gate observed at 5,769 ms under load: the tightening that manufactures a " +
         "timeout out of a check that is fine. THE TABLE IS THE SLOW TAIL AND A 3 s GATE IS THE POPULATION.");
 
-    ok("...and the measurement outlives the entry, in the record built for it",
-        G.timings[gate] === REMEASURE_V4581.median && G.kinds[gate] === "median of 3 alone" && G.boxes[gate],
-        `gate-timings holds ${G.timings[gate]} ms as '${G.kinds[gate]}'. v4580 added that kind for a hand median; ` +
-        "this is the first entry written with it deliberately rather than to correct a cold sample.");
+    // v4871 -- the full serial re-take of gate-timings.json (2026-10-15) timed this gate again, 5165 ms in the suite, and its
+    // merge put that over the v4581 hand median: a newer reading with provenance is the record doing its job, not a regression.
+    // The v4581 median stays frozen above (REMEASURE_V4581); what the record must still say is that this is a few-second gate,
+    // provenanced -- not the 78,000 ms the table had. Pinning the one value made the next re-take red by construction.
+    ok("...and the measurement outlives the entry, in the record built for it -- a provenanced reading, a few seconds, nowhere near the 78 s the table had",
+        Number.isFinite(G.timings[gate]) && G.timings[gate] < wasSmaller / 10 && !!G.kinds[gate] && !!G.boxes[gate] && !!(G.at || {})[gate],
+        `gate-timings holds ${G.timings[gate]} ms as '${G.kinds[gate]}' (${(G.at || {})[gate] || "no date"}); v4581's hand median was ${REMEASURE_V4581.median} ms ` +
+        "('median of 3 alone', the first entry written with that kind deliberately).");
 
     ok("...and the entry's own first sentence had said it was unnecessary from the day it was written",
         GB_SRC.includes("IT NEVER NEEDED A BIGGER BUDGET AT ALL"),

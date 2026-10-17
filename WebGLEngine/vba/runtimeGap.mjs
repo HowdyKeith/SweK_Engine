@@ -1249,7 +1249,9 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // async/await 1765 -> 1768 (the census awaits its workers; the gate awaits a live probe run), Promises 429 -> 430 (runOne
     // wraps a child's exit). The other seven rows hold, threads among them.
     // v4870 -- files 4702 -> 4707, ES modules 4397 -> 4402, closures 4241 -> 4246, async/await 1776 -> 1780, typed arrays 1311 -> 1316, Promises 432 -> 434, performance.now 251 -> 252: brain/pilotFlightMlp.mjs, brain/pilotFlightGpu.mjs and the three gates (brain/pilotFlightMlp-selfcheck.mjs, brain/pilotFlightGpu-selfcheck.mjs, tools/ship/trainFlightPilotGpu-selfcheck.mjs); the device runner awaits its dispatches and queues its calls on a Promise; the one new performance.now file is brain/pilotFlightGpu-selfcheck.mjs, which times its 1,200 dispatches (es-flight6dof.html and tools/ship/flightPage-selfcheck.mjs already read it).
-    esModules: 4402, closures: 4246, asyncAwait: 1780, typedArrays: 1316, promises: 434,
+    // v4872 -- no file added; typed arrays 1316 -> 1318: render/denoiseStudy.mjs and render/denoiseStudy-selfcheck.mjs read the emitter
+    // mask out of an input into a Float64Array (round 30's maskOf and its gate's twin). The other eleven rows hold.
+    esModules: 4402, closures: 4246, asyncAwait: 1780, typedArrays: 1318, promises: 434,
     fetchXhr: 252, performanceNow: 252, raf: 127, webgl: 200, webgpu: 63, threads: 26, wasm: 27,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
