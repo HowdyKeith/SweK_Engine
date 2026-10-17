@@ -1,6 +1,6 @@
 // WebGLEngine/brain/dogfightTask-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/dogfightTask-selfcheck.mjs      (~15 s)
+// Run: node brain/dogfightTask-selfcheck.mjs      (~70 s)
 //
 // THE DOGFIGHT AS A JOB: scenarios that are what they say, a guidance law whose sign and size are closed forms, a trigger rule that fires exactly when a round would hit, a fight whose bookkeeping is recomputable from its own
 // numbers, and the pinned scores of the five pilots that fly it. brain/dogfightTask.mjs is the machinery under test; the gun (physics/mechanics/flightGuns.mjs) has its own gate.

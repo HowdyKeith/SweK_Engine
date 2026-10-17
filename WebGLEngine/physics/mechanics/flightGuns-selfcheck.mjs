@@ -1,6 +1,6 @@
 // WebGLEngine/physics/mechanics/flightGuns-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node physics/mechanics/flightGuns-selfcheck.mjs      (~1 s)
+// Run: node physics/mechanics/flightGuns-selfcheck.mjs      (~0.1 s)
 //
 // THE GUN, HELD TO THE FORMS A GUN HAS, NOT TO ITSELF. physics/mechanics/flightGuns.mjs is a muzzle, a round that falls, a trigger and a hit test. Each is checked against something written here independently:
 //

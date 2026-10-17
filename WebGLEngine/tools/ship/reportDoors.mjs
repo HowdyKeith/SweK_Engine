@@ -265,6 +265,19 @@ export const CALL_COST_V4459 = Object.freeze({
             cheapSeconds: 0.0, linesBare: 154, linesCheap: 5 }),
         Object.freeze({ rel: "tools/ship/shaderRefs.mjs", bare: 52.0,
             cheap: "IMPOSSIBLE" }),
+        // UNNUMBERED (the v4874 ship) -- THREE REPORTS THAT FLY FIGHTS, ADDED BY THE GUNS-AND-BATTLESHIP LINE, AND THE COST WAS FOUND BY THE GATE'S OWN
+        // TIMING, NOT BY A READING: reportDoors-selfcheck went from 2.2 s to 21.7 s when brain/battleshipFight.mjs, brain/bomberFight.mjs and
+        // brain/dogfightTask.mjs arrived, because the bounded sample is the first fourteen self-reports in path order and `brain/` sorts early. Each
+        // report flies its pinned fights (twelve, six, a handful) and prints what they came to, which is what a bench click should show and not what a
+        // sample of fourteen should pay for. Measured alone on a 4-core 16 GB box, one call each: 13.9 s, 4.0 s and 1.7 s. No parameter, so no cheap
+        // path (IMPOSSIBLE, derived from the live signature by the gate). They are out of the bounded sample, as the seven above are, and --all still
+        // calls them.
+        Object.freeze({ rel: "brain/battleshipFight.mjs", bare: 13.9,
+            cheap: "IMPOSSIBLE" }),
+        Object.freeze({ rel: "brain/bomberFight.mjs", bare: 4.0,
+            cheap: "IMPOSSIBLE" }),
+        Object.freeze({ rel: "brain/dogfightTask.mjs", bare: 1.7,
+            cheap: "IMPOSSIBLE" }),
         // was "never returns". A census budget made it 38.0s, which is still far too slow for the
         // bounded sample below -- so it stays on NEVER_CALL for COST, which is a different reason.
         // UNMEASURED rather than MEASURED: the 38.0 s ALREADY carries an internal budget the front door sets

@@ -1,6 +1,6 @@
 // WebGLEngine/physics/mechanics/capitalShip-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node physics/mechanics/capitalShip-selfcheck.mjs      (~2 s)
+// Run: node physics/mechanics/capitalShip-selfcheck.mjs      (~0.7 s)
 //
 // THE CAPITAL SHIP, HELD TO CLOSED FORMS WHERE THERE ARE ANY AND SAID PLAINLY WHERE THERE ARE NONE. physics/mechanics/capitalShip.mjs is a hull, a row of hit spheres, thirteen gun seats, three engine pods and a fictional cannon -- and EVERY NUMBER IN IT IS INVENTED (the
 // module says so); what a gate can hold is that the numbers are consistent with each other and with the arithmetic they feed:

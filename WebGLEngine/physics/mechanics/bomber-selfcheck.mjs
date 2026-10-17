@@ -1,6 +1,6 @@
 // WebGLEngine/physics/mechanics/bomber-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node physics/mechanics/bomber-selfcheck.mjs      (~3 s)
+// Run: node physics/mechanics/bomber-selfcheck.mjs      (~0.3 s)
 //
 // THE BOMBER, HELD TO ITS LAYOUT AND TO ITS FLIGHT. physics/mechanics/bomber.mjs is a B-29-style layout (a hull of spheres, four engines, five gun seats) on the trainer's flight enlarged by similarity. What is held:
 //

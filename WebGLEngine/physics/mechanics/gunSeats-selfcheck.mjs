@@ -1,6 +1,6 @@
 // WebGLEngine/physics/mechanics/gunSeats-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node physics/mechanics/gunSeats-selfcheck.mjs      (~2 s)
+// Run: node physics/mechanics/gunSeats-selfcheck.mjs      (~0.2 s)
 //
 // THE GUN SEAT, HELD TO THE GEOMETRY OF A TURRET AND NOT TO ITSELF. physics/mechanics/gunSeats.mjs is a mount with an arc, a slew rate, a muzzle that moves with the body, and a gunner. Each part is checked against something written here independently:
 //

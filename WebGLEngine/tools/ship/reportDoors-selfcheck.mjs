@@ -212,6 +212,13 @@ console.log("\n4. the contract: a non-empty array of ASCII strings");
     }
     say(`called ${sample.length} of ${callable.length} callable self-reports in ${((Date.now() - t0) / 1000).toFixed(1)}s` +
         (ALL ? " (--all)" : " -- pass --all for every one, which costs 71s"));
+    // UNNUMBERED (the v4874 ship) -- *** THE BOUNDED SAMPLE IS BOUNDED IN SECONDS TOO. *** It is the first fourteen self-reports in path order, so a
+    // new module that sorts early and flies fights in its report enters it: three did (brain/battleshipFight.mjs 13.9 s, brain/bomberFight.mjs 4.0 s,
+    // brain/dogfightTask.mjs 1.7 s) and this gate went from 2.2 s to 21.7 s, out of the quick sweep, with every row green -- the clock was printed in
+    // the line above and asserted by nothing. The known-slow table is where such a report goes; this row is what sends the next one there. Not applied
+    // under --all, whose whole point is the cost.
+    ok("!! THE BOUNDED SAMPLE COSTS UNDER TEN SECONDS: a self-report that is slow enough to need the known-slow table is in it, and a new one that is not there fails here instead of silently taking the gate out of the quick sweep",
+       ALL || (Date.now() - t0) < 10000, `${((Date.now() - t0) / 1000).toFixed(1)} s for ${sample.length} reports`);
     ok("!! every self-report called returns a non-empty array of ASCII strings",
        broken.length === 0,
        broken.length ? broken.join("; ") : `${sample.length} reports, ${sample.length} well-formed. THE SAMPLE IS ` +

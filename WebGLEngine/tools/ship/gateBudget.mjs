@@ -113,7 +113,15 @@
 // tools/ship/kernelReach.mjs) and the gate is 55 s. The default moves 652.2 s -> 1009.3 s with this line. SABOTAGED v4871:
 // the pin back at 217,392 -> 1 RED (gateBudget-selfcheck's slowest row); sheddingSpectrum's basis back at 120,946 -> 1 RED
 // (budgetProvenance-selfcheck's 3x row). Each restored, md5 verified.
-export const SLOWEST_GENERAL = { gate: "tools/ship/tacticsTrain-selfcheck.mjs", ms: 336419 };
+//
+// *** UNNUMBERED (the v4874 ship) -- RE-PINNED TO battleshipFight, THE SAME WAY. *** brain/battleshipFight-selfcheck.mjs arrived with the space
+// battleship line (sixteen pinned fights, eight pilot sweeps, the gunner settings and 116 sabotages' worth of rows) and was timed ALONE on
+// linux-x64-4c-16gb-420793 by tools/ship/boxTimings.mjs: 365,068 ms and 369,178 ms. The first attempt, under the recorder's 200 s cap, was
+// killed at 200,068 ms and recorded as a floor; the same gate in a three-way parallel run took 408,100 ms, which is not an alone reading and is
+// not used. The LARGER of the two alone readings is the basis, 369,178 ms, above tacticsTrain's 336,419, and gateBudget-selfcheck went red on
+// the same line. It stays in the general population: sixteen fights and their sweeps, not a fixture cost. The default moves 1009.3 s -> 1107.5 s
+// with this line. SABOTAGED (below the pin, restored): the pin back at 336,419 -> 1 RED (gateBudget-selfcheck's slowest row).
+export const SLOWEST_GENERAL = { gate: "brain/battleshipFight-selfcheck.mjs", ms: 369178 };
 
 // *** v4580 -- WHAT AN ENTRY IN gate-timings.json IS, WHICH UNTIL NOW NOTHING SAID. ***
 //

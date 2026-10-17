@@ -1,6 +1,6 @@
 // WebGLEngine/brain/dogfightArena-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/dogfightArena-selfcheck.mjs      (~30 s: 96 fights flown twice)
+// Run: node brain/dogfightArena-selfcheck.mjs      (~12 s: 96 fights flown twice)
 //
 // THE STEPPABLE DOGFIGHT, HELD TO THE ONE THAT ALREADY EXISTS AND TO ARITHMETIC. brain/dogfightArena.mjs is brain/dogfightTask.mjs's fight with the loop turned inside out (so a page can watch it, and so it can hold more than two aircraft). Two things hold it:
 //

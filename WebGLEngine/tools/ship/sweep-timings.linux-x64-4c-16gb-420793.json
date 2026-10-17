@@ -1,7 +1,7 @@
 {
  "host": "linux-x64-4c-16gb-420793",
  "note": "THIS BOX'S OWN gate runtimes, written by tools/ship/boxTimings.mjs. The shared sweep-timings.json is host-claimed and a foreign box cannot write it (v4647, and that refusal is right); this is how a box records what IT measured without overwriting another machine's numbers. `kinds` says which quantity each ms is, as in the shared record: `alone` is an uncontended serial reading, `capped` is a FLOOR and not a runtime. Read for COVERAGE -- has this gate ever been timed -- and NOT for the ship-time budget, which still reads the shared file. See task #87. `serialRing` holds the last three alone readings; recordReach's margin row reads it on a box that does not own the shared record, because that row asks what a gate costs HERE and nothing here can refresh another box's ring.",
- "captured": "2026-10-17T21:47:48.676Z",
+ "captured": "2026-10-17T22:18:45.304Z",
  "timings": {
   "tools/ship/cloneProvision-selfcheck.mjs": 7171,
   "tools/ship/exitBusy-selfcheck.mjs": 15284,
@@ -35,7 +35,7 @@
   "tools/ship/train6dofLeague-selfcheck.mjs": 131622,
   "tools/ship/threeTextureBarrier-selfcheck.mjs": 1768,
   "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": 7486,
-  "brain/battleshipFight-selfcheck.mjs": 365068,
+  "brain/battleshipFight-selfcheck.mjs": 369178,
   "brain/bomberFight-selfcheck.mjs": 44549,
   "brain/dogfightArena-selfcheck.mjs": 12051,
   "brain/dogfightTask-selfcheck.mjs": 69925,
@@ -54,9 +54,9 @@
   "tools/ship/bomberPage-selfcheck.mjs": 38398,
   "tools/ship/dogfightPage-selfcheck.mjs": 7936,
   "tools/ship/trainDogfightPilot-selfcheck.mjs": 81147,
-  "tools/ship/trainDogfightPilotShipped-selfcheck.mjs": 246553,
-  "tools/ship/trainSeatGunner-selfcheck.mjs": 203017,
-  "tools/ship/reportDoors-selfcheck.mjs": 20526
+  "tools/ship/trainDogfightPilotShipped-selfcheck.mjs": 249293,
+  "tools/ship/trainSeatGunner-selfcheck.mjs": 204020,
+  "tools/ship/reportDoors-selfcheck.mjs": 1796
  },
  "at": {
   "tools/ship/cloneProvision-selfcheck.mjs": "2026-09-25T03:35:16.858Z",
@@ -91,7 +91,7 @@
   "tools/ship/train6dofLeague-selfcheck.mjs": "2026-10-13T01:23:04.414Z",
   "tools/ship/threeTextureBarrier-selfcheck.mjs": "2026-10-14T00:03:12.618Z",
   "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": "2026-10-17T21:40:43.045Z",
-  "brain/battleshipFight-selfcheck.mjs": "2026-10-17T21:47:48.676Z",
+  "brain/battleshipFight-selfcheck.mjs": "2026-10-17T22:01:23.317Z",
   "brain/bomberFight-selfcheck.mjs": "2026-10-17T21:40:43.045Z",
   "brain/dogfightArena-selfcheck.mjs": "2026-10-17T21:40:43.045Z",
   "brain/dogfightTask-selfcheck.mjs": "2026-10-17T21:40:43.045Z",
@@ -110,9 +110,9 @@
   "tools/ship/bomberPage-selfcheck.mjs": "2026-10-17T21:40:43.045Z",
   "tools/ship/dogfightPage-selfcheck.mjs": "2026-10-17T21:40:43.045Z",
   "tools/ship/trainDogfightPilot-selfcheck.mjs": "2026-10-17T21:40:43.045Z",
-  "tools/ship/trainDogfightPilotShipped-selfcheck.mjs": "2026-10-17T21:47:48.676Z",
-  "tools/ship/trainSeatGunner-selfcheck.mjs": "2026-10-17T21:47:48.676Z",
-  "tools/ship/reportDoors-selfcheck.mjs": "2026-10-17T21:40:43.045Z"
+  "tools/ship/trainDogfightPilotShipped-selfcheck.mjs": "2026-10-17T22:01:23.317Z",
+  "tools/ship/trainSeatGunner-selfcheck.mjs": "2026-10-17T22:01:23.317Z",
+  "tools/ship/reportDoors-selfcheck.mjs": "2026-10-17T22:18:45.304Z"
  },
  "kinds": {
   "tools/ship/cloneProvision-selfcheck.mjs": "alone",
@@ -458,18 +458,21 @@
    81147
   ],
   "tools/ship/reportDoors-selfcheck.mjs": [
-   20410,
-   21493,
-   20526
+   1508,
+   1602,
+   1796
   ],
   "brain/battleshipFight-selfcheck.mjs": [
-   365068
+   365068,
+   369178
   ],
   "tools/ship/trainDogfightPilotShipped-selfcheck.mjs": [
-   246553
+   246553,
+   249293
   ],
   "tools/ship/trainSeatGunner-selfcheck.mjs": [
-   203017
+   203017,
+   204020
   ]
  }
 }

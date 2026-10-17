@@ -1,6 +1,6 @@
 // WebGLEngine/brain/battleshipFight-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/battleshipFight-selfcheck.mjs      (~40 s: about 190 fights)
+// Run: node brain/battleshipFight-selfcheck.mjs      (~370 s: about 190 fights, a little over six minutes alone)
 //
 // THE CAPITAL SHIP'S FIGHT, HELD TO ITS OWN ARITHMETIC AND PINNED TO THE NUMBERS IT GIVES. brain/battleshipFight.mjs places a capital ship and the fighters that attack it for a seed and a kind of attack, seats the gunners at one of four settings, and sums a fight up. Five things hold it:
 //

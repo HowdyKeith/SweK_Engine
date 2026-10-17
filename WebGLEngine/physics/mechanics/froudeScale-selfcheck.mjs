@@ -1,6 +1,6 @@
 // WebGLEngine/physics/mechanics/froudeScale-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node physics/mechanics/froudeScale-selfcheck.mjs      (~8 s)
+// Run: node physics/mechanics/froudeScale-selfcheck.mjs      (~0.8 s)
 //
 // A BIGGER AIRCRAFT THE EXISTING PILOTS FLY UNCHANGED, HELD TO THE TRAINER'S FLIGHT. physics/mechanics/froudeScale.mjs scales a flight-model spec by dynamic similarity and wraps a pilot to be shown the trainer's world. The claim is a strong one -- that
 // a bomber at any scale, flown by the wrapped trainer pilot at a tick sqrt(s) longer, makes THE TRAINER'S FLIGHT, scaled -- and it is held by flying both:

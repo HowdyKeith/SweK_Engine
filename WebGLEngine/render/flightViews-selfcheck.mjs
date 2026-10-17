@@ -1,6 +1,6 @@
 // WebGLEngine/render/flightViews-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node render/flightViews-selfcheck.mjs      (~1 s)
+// Run: node render/flightViews-selfcheck.mjs      (~0.2 s)
 //
 // THE VIEW WINDOWS' GEOMETRY, HELD TO CLOSED FORMS. render/flightViews.mjs is cameras and a projection as pure functions of a craft's state; the page hands the same cameras to Three.js. Each is checked against something written here:
 //
