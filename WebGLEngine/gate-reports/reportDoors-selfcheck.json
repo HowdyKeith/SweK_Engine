@@ -1,6 +1,6 @@
 {
  "gate": "tools/ship/reportDoors-selfcheck.mjs",
- "at": "2026-10-11",
+ "at": "2026-10-17",
  "tables": [
   {
    "title": "the reportLines convention, by kind",
@@ -12,12 +12,12 @@
    "rows": [
     [
      "members",
-     "140",
+     "159",
      "modules exporting reportLines"
     ],
     [
      "self-reports",
-     "131",
+     "150",
      "callable with nothing"
     ],
     [
@@ -79,6 +79,21 @@
     [
      "tools/ship/shaderRefs.mjs",
      "52",
+     "no parameter -- nothing to pass"
+    ],
+    [
+     "brain/battleshipFight.mjs",
+     "13.9",
+     "no parameter -- nothing to pass"
+    ],
+    [
+     "brain/bomberFight.mjs",
+     "4",
+     "no parameter -- nothing to pass"
+    ],
+    [
+     "brain/dogfightTask.mjs",
+     "1.7",
      "no parameter -- nothing to pass"
     ],
     [

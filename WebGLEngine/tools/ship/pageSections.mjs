@@ -887,6 +887,12 @@ export const UNPLACED = new Map([
     ["bzflag-info.html", "same bzflag cluster, same two-anchor conflict: an 'Open BZFlag page' link already sits inside the bzflag gpanel"],
     ["bzflag-test.html", "same bzflag cluster, same two-anchor conflict: a 'Network test' link already sits inside the bzflag gpanel"],
     ["rocket-league.html", "fits Game Theory the same way bzflag.html does, and fails the same way: an 'Open full page' link already sits inside its own rocketleague gpanel"],
+    // UNNUMBERED (the v4874 ship) -- the three pages of the guns line, linked from server.html's Arriving area so that pageReach can see them (it caught all three
+    // as born invisible at the first verdict). WHICH DRAWER IS KEITH'S CALL, as it was for the rtx pages: the fruit-fly drawer already holds es-flight6dof.html, whose pilots
+    // these pages fly, but a combat page is not obviously a brain page, and the choice is one he makes with the three side by side.
+    ["dogfight.html", "two aircraft fight, a window per craft: linked from Arriving so it is reachable; the drawer is Keith's call (the fruit-fly drawer holds es-flight6dof.html, whose pilots it flies, but a fight is not obviously a brain page)"],
+    ["bomber.html", "a B-29-class bomber and its gun seats against fighters, a window per craft and per seat: linked from Arriving so it is reachable; the drawer is Keith's call, decided with dogfight.html and space-battleship.html side by side"],
+    ["space-battleship.html", "a Yamato-like capital ship and its thirteen gun seats against fighters in a 6DOF vacuum: linked from Arriving so it is reachable; the drawer is Keith's call, decided with dogfight.html and bomber.html side by side"],
 ]);
 
 /** Every page claimed by a section, flat. Arriving keeps what is NOT in here. */
