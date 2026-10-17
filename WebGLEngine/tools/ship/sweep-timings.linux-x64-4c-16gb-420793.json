@@ -1,7 +1,7 @@
 {
  "host": "linux-x64-4c-16gb-420793",
  "note": "THIS BOX'S OWN gate runtimes, written by tools/ship/boxTimings.mjs. The shared sweep-timings.json is host-claimed and a foreign box cannot write it (v4647, and that refusal is right); this is how a box records what IT measured without overwriting another machine's numbers. `kinds` says which quantity each ms is, as in the shared record: `alone` is an uncontended serial reading, `capped` is a FLOOR and not a runtime. Read for COVERAGE -- has this gate ever been timed -- and NOT for the ship-time budget, which still reads the shared file. See task #87. `serialRing` holds the last three alone readings; recordReach's margin row reads it on a box that does not own the shared record, because that row asks what a gate costs HERE and nothing here can refresh another box's ring.",
- "captured": "2026-10-17T21:14:56.966Z",
+ "captured": "2026-10-17T21:47:48.676Z",
  "timings": {
   "tools/ship/cloneProvision-selfcheck.mjs": 7171,
   "tools/ship/exitBusy-selfcheck.mjs": 15284,
@@ -34,29 +34,29 @@
   "tools/ship/trainAircraftPilot-selfcheck.mjs": 74576,
   "tools/ship/train6dofLeague-selfcheck.mjs": 131622,
   "tools/ship/threeTextureBarrier-selfcheck.mjs": 1768,
-  "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": 7775,
-  "brain/battleshipFight-selfcheck.mjs": 200068,
-  "brain/bomberFight-selfcheck.mjs": 45944,
-  "brain/dogfightArena-selfcheck.mjs": 11426,
-  "brain/dogfightTask-selfcheck.mjs": 67406,
-  "brain/dogfightTrain-selfcheck.mjs": 18540,
-  "brain/seatGunnerMlp-selfcheck.mjs": 1256,
-  "brain/seatGunnerPolicy-selfcheck.mjs": 1509,
-  "brain/spaceArena-selfcheck.mjs": 2219,
-  "physics/mechanics/bomber-selfcheck.mjs": 309,
-  "physics/mechanics/capitalShip-selfcheck.mjs": 735,
-  "physics/mechanics/flightGuns-selfcheck.mjs": 87,
-  "physics/mechanics/froudeScale-selfcheck.mjs": 755,
-  "physics/mechanics/gunSeats-selfcheck.mjs": 229,
-  "render/flightViews-selfcheck.mjs": 153,
-  "render/renderNow-selfcheck.mjs": 1103,
-  "tools/ship/battleshipPage-selfcheck.mjs": 116014,
-  "tools/ship/bomberPage-selfcheck.mjs": 36960,
-  "tools/ship/dogfightPage-selfcheck.mjs": 7821,
-  "tools/ship/trainDogfightPilot-selfcheck.mjs": 80390,
-  "tools/ship/trainDogfightPilotShipped-selfcheck.mjs": 200050,
-  "tools/ship/trainSeatGunner-selfcheck.mjs": 200120,
-  "tools/ship/reportDoors-selfcheck.mjs": 20410
+  "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": 7486,
+  "brain/battleshipFight-selfcheck.mjs": 365068,
+  "brain/bomberFight-selfcheck.mjs": 44549,
+  "brain/dogfightArena-selfcheck.mjs": 12051,
+  "brain/dogfightTask-selfcheck.mjs": 69925,
+  "brain/dogfightTrain-selfcheck.mjs": 18156,
+  "brain/seatGunnerMlp-selfcheck.mjs": 1259,
+  "brain/seatGunnerPolicy-selfcheck.mjs": 1500,
+  "brain/spaceArena-selfcheck.mjs": 2050,
+  "physics/mechanics/bomber-selfcheck.mjs": 310,
+  "physics/mechanics/capitalShip-selfcheck.mjs": 650,
+  "physics/mechanics/flightGuns-selfcheck.mjs": 83,
+  "physics/mechanics/froudeScale-selfcheck.mjs": 758,
+  "physics/mechanics/gunSeats-selfcheck.mjs": 216,
+  "render/flightViews-selfcheck.mjs": 188,
+  "render/renderNow-selfcheck.mjs": 1116,
+  "tools/ship/battleshipPage-selfcheck.mjs": 117325,
+  "tools/ship/bomberPage-selfcheck.mjs": 38398,
+  "tools/ship/dogfightPage-selfcheck.mjs": 7936,
+  "tools/ship/trainDogfightPilot-selfcheck.mjs": 81147,
+  "tools/ship/trainDogfightPilotShipped-selfcheck.mjs": 246553,
+  "tools/ship/trainSeatGunner-selfcheck.mjs": 203017,
+  "tools/ship/reportDoors-selfcheck.mjs": 20526
  },
  "at": {
   "tools/ship/cloneProvision-selfcheck.mjs": "2026-09-25T03:35:16.858Z",
@@ -90,29 +90,29 @@
   "tools/ship/trainAircraftPilot-selfcheck.mjs": "2026-10-12T03:44:23.363Z",
   "tools/ship/train6dofLeague-selfcheck.mjs": "2026-10-13T01:23:04.414Z",
   "tools/ship/threeTextureBarrier-selfcheck.mjs": "2026-10-14T00:03:12.618Z",
-  "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": "2026-10-17T21:14:56.966Z",
-  "brain/battleshipFight-selfcheck.mjs": "2026-10-17T21:14:56.966Z",
-  "brain/bomberFight-selfcheck.mjs": "2026-10-17T21:14:56.966Z",
-  "brain/dogfightArena-selfcheck.mjs": "2026-10-17T21:14:56.966Z",
-  "brain/dogfightTask-selfcheck.mjs": "2026-10-17T21:14:56.966Z",
-  "brain/dogfightTrain-selfcheck.mjs": "2026-10-17T21:14:56.966Z",
-  "brain/seatGunnerMlp-selfcheck.mjs": "2026-10-17T21:14:56.966Z",
-  "brain/seatGunnerPolicy-selfcheck.mjs": "2026-10-17T21:14:56.966Z",
-  "brain/spaceArena-selfcheck.mjs": "2026-10-17T21:14:56.966Z",
-  "physics/mechanics/bomber-selfcheck.mjs": "2026-10-17T21:14:56.966Z",
-  "physics/mechanics/capitalShip-selfcheck.mjs": "2026-10-17T21:14:56.966Z",
-  "physics/mechanics/flightGuns-selfcheck.mjs": "2026-10-17T21:14:56.966Z",
-  "physics/mechanics/froudeScale-selfcheck.mjs": "2026-10-17T21:14:56.966Z",
-  "physics/mechanics/gunSeats-selfcheck.mjs": "2026-10-17T21:14:56.966Z",
-  "render/flightViews-selfcheck.mjs": "2026-10-17T21:14:56.966Z",
-  "render/renderNow-selfcheck.mjs": "2026-10-17T21:14:56.966Z",
-  "tools/ship/battleshipPage-selfcheck.mjs": "2026-10-17T21:14:56.966Z",
-  "tools/ship/bomberPage-selfcheck.mjs": "2026-10-17T21:14:56.966Z",
-  "tools/ship/dogfightPage-selfcheck.mjs": "2026-10-17T21:14:56.966Z",
-  "tools/ship/trainDogfightPilot-selfcheck.mjs": "2026-10-17T21:14:56.966Z",
-  "tools/ship/trainDogfightPilotShipped-selfcheck.mjs": "2026-10-17T21:14:56.966Z",
-  "tools/ship/trainSeatGunner-selfcheck.mjs": "2026-10-17T21:14:56.966Z",
-  "tools/ship/reportDoors-selfcheck.mjs": "2026-10-17T21:14:56.966Z"
+  "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": "2026-10-17T21:40:43.045Z",
+  "brain/battleshipFight-selfcheck.mjs": "2026-10-17T21:47:48.676Z",
+  "brain/bomberFight-selfcheck.mjs": "2026-10-17T21:40:43.045Z",
+  "brain/dogfightArena-selfcheck.mjs": "2026-10-17T21:40:43.045Z",
+  "brain/dogfightTask-selfcheck.mjs": "2026-10-17T21:40:43.045Z",
+  "brain/dogfightTrain-selfcheck.mjs": "2026-10-17T21:40:43.045Z",
+  "brain/seatGunnerMlp-selfcheck.mjs": "2026-10-17T21:40:43.045Z",
+  "brain/seatGunnerPolicy-selfcheck.mjs": "2026-10-17T21:40:43.045Z",
+  "brain/spaceArena-selfcheck.mjs": "2026-10-17T21:40:43.045Z",
+  "physics/mechanics/bomber-selfcheck.mjs": "2026-10-17T21:40:43.045Z",
+  "physics/mechanics/capitalShip-selfcheck.mjs": "2026-10-17T21:40:43.045Z",
+  "physics/mechanics/flightGuns-selfcheck.mjs": "2026-10-17T21:40:43.045Z",
+  "physics/mechanics/froudeScale-selfcheck.mjs": "2026-10-17T21:40:43.045Z",
+  "physics/mechanics/gunSeats-selfcheck.mjs": "2026-10-17T21:40:43.045Z",
+  "render/flightViews-selfcheck.mjs": "2026-10-17T21:40:43.045Z",
+  "render/renderNow-selfcheck.mjs": "2026-10-17T21:40:43.045Z",
+  "tools/ship/battleshipPage-selfcheck.mjs": "2026-10-17T21:40:43.045Z",
+  "tools/ship/bomberPage-selfcheck.mjs": "2026-10-17T21:40:43.045Z",
+  "tools/ship/dogfightPage-selfcheck.mjs": "2026-10-17T21:40:43.045Z",
+  "tools/ship/trainDogfightPilot-selfcheck.mjs": "2026-10-17T21:40:43.045Z",
+  "tools/ship/trainDogfightPilotShipped-selfcheck.mjs": "2026-10-17T21:47:48.676Z",
+  "tools/ship/trainSeatGunner-selfcheck.mjs": "2026-10-17T21:47:48.676Z",
+  "tools/ship/reportDoors-selfcheck.mjs": "2026-10-17T21:40:43.045Z"
  },
  "kinds": {
   "tools/ship/cloneProvision-selfcheck.mjs": "alone",
@@ -147,7 +147,7 @@
   "tools/ship/train6dofLeague-selfcheck.mjs": "alone",
   "tools/ship/threeTextureBarrier-selfcheck.mjs": "alone",
   "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": "alone",
-  "brain/battleshipFight-selfcheck.mjs": "capped",
+  "brain/battleshipFight-selfcheck.mjs": "alone",
   "brain/bomberFight-selfcheck.mjs": "alone",
   "brain/dogfightArena-selfcheck.mjs": "alone",
   "brain/dogfightTask-selfcheck.mjs": "alone",
@@ -166,8 +166,8 @@
   "tools/ship/bomberPage-selfcheck.mjs": "alone",
   "tools/ship/dogfightPage-selfcheck.mjs": "alone",
   "tools/ship/trainDogfightPilot-selfcheck.mjs": "alone",
-  "tools/ship/trainDogfightPilotShipped-selfcheck.mjs": "capped",
-  "tools/ship/trainSeatGunner-selfcheck.mjs": "capped",
+  "tools/ship/trainDogfightPilotShipped-selfcheck.mjs": "alone",
+  "tools/ship/trainSeatGunner-selfcheck.mjs": "alone",
   "tools/ship/reportDoors-selfcheck.mjs": "alone"
  },
  "codes": {
@@ -203,7 +203,7 @@
   "tools/ship/train6dofLeague-selfcheck.mjs": 0,
   "tools/ship/threeTextureBarrier-selfcheck.mjs": 0,
   "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": 0,
-  "brain/battleshipFight-selfcheck.mjs": null,
+  "brain/battleshipFight-selfcheck.mjs": 0,
   "brain/bomberFight-selfcheck.mjs": 0,
   "brain/dogfightArena-selfcheck.mjs": 0,
   "brain/dogfightTask-selfcheck.mjs": 0,
@@ -222,8 +222,8 @@
   "tools/ship/bomberPage-selfcheck.mjs": 0,
   "tools/ship/dogfightPage-selfcheck.mjs": 0,
   "tools/ship/trainDogfightPilot-selfcheck.mjs": 0,
-  "tools/ship/trainDogfightPilotShipped-selfcheck.mjs": null,
-  "tools/ship/trainSeatGunner-selfcheck.mjs": null,
+  "tools/ship/trainDogfightPilotShipped-selfcheck.mjs": 0,
+  "tools/ship/trainSeatGunner-selfcheck.mjs": 0,
   "tools/ship/reportDoors-selfcheck.mjs": 0
  },
  "serialRing": {
@@ -363,64 +363,113 @@
    1768
   ],
   "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": [
-   7775
+   7775,
+   8005,
+   7486
   ],
   "brain/bomberFight-selfcheck.mjs": [
-   45944
+   45944,
+   45355,
+   44549
   ],
   "brain/dogfightArena-selfcheck.mjs": [
-   11426
+   11426,
+   12602,
+   12051
   ],
   "brain/dogfightTask-selfcheck.mjs": [
-   67406
+   67406,
+   70334,
+   69925
   ],
   "brain/dogfightTrain-selfcheck.mjs": [
-   18540
+   18540,
+   18843,
+   18156
   ],
   "brain/seatGunnerMlp-selfcheck.mjs": [
-   1256
+   1256,
+   1343,
+   1259
   ],
   "brain/seatGunnerPolicy-selfcheck.mjs": [
-   1509
+   1509,
+   1489,
+   1500
   ],
   "brain/spaceArena-selfcheck.mjs": [
-   2219
+   2219,
+   2027,
+   2050
   ],
   "physics/mechanics/bomber-selfcheck.mjs": [
-   309
+   309,
+   307,
+   310
   ],
   "physics/mechanics/capitalShip-selfcheck.mjs": [
-   735
+   735,
+   768,
+   650
   ],
   "physics/mechanics/flightGuns-selfcheck.mjs": [
-   87
+   87,
+   83,
+   83
   ],
   "physics/mechanics/froudeScale-selfcheck.mjs": [
-   755
+   755,
+   792,
+   758
   ],
   "physics/mechanics/gunSeats-selfcheck.mjs": [
-   229
+   229,
+   246,
+   216
   ],
   "render/flightViews-selfcheck.mjs": [
-   153
+   153,
+   167,
+   188
   ],
   "render/renderNow-selfcheck.mjs": [
-   1103
+   1103,
+   1127,
+   1116
   ],
   "tools/ship/battleshipPage-selfcheck.mjs": [
-   116014
+   116014,
+   121608,
+   117325
   ],
   "tools/ship/bomberPage-selfcheck.mjs": [
-   36960
+   36960,
+   37988,
+   38398
   ],
   "tools/ship/dogfightPage-selfcheck.mjs": [
-   7821
+   7821,
+   8242,
+   7936
   ],
   "tools/ship/trainDogfightPilot-selfcheck.mjs": [
-   80390
+   80390,
+   81505,
+   81147
   ],
   "tools/ship/reportDoors-selfcheck.mjs": [
-   20410
+   20410,
+   21493,
+   20526
+  ],
+  "brain/battleshipFight-selfcheck.mjs": [
+   365068
+  ],
+  "tools/ship/trainDogfightPilotShipped-selfcheck.mjs": [
+   246553
+  ],
+  "tools/ship/trainSeatGunner-selfcheck.mjs": [
+   203017
   ]
  }
 }
