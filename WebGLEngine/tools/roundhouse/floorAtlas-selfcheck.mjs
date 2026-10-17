@@ -152,9 +152,14 @@ let atlas = null;
        fetchLine === "/tools/roundhouse/",
        "fetch prefix is " + JSON.stringify(fetchLine) + " -- androidPeerBridge.js writes to tools/roundhouse, " +
        "and ai-bridge/roundhouseBridge.js's PREFIX (below) swallows anything under plain /roundhouse/ first");
+    // ASKED, NOT READ: this row used to match owns()'s source text inside an 80-character window, and the carve-out that
+    // lets the three /roundhouse/lab-* routes reach their own bridge (ELSEWHERE, UNNUMBERED) pushed the line out of it and
+    // turned the row red with the claim still true. The bridge is called instead.
+    const bridge = (await import("node:module")).createRequire(import.meta.url)("../../ai-bridge/roundhouseBridge.js");
     ok("...and that PREFIX really would have intercepted the old URL, so this was not a hypothetical collision",
        /const PREFIX = "\/roundhouse"/.test(bridgeSrc) &&
-       /owns\(url\)[\s\S]{0,80}url\.startsWith\(PREFIX \+ "\/"\)/.test(bridgeSrc),
+       bridge.owns("/roundhouse/magmap-bench.json") === true && bridge.owns("/roundhouse/cinder.json?x=1") === true &&
+       bridge.owns("/tools/roundhouse/magmap-bench.json") === false,
        "roundhouseBridge.owns() matches any /roundhouse/* path, and its handle() 404s anything it does not " +
        "recognise as a route -- a raw JSON filename never matches, so the request never reached a static file");
 }

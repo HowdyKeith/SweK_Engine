@@ -25,7 +25,7 @@ ok("two switches, off and on by default, and the address sets them (?genworld=1&
 ok("the modules it shows are the ones graded: makeTranslucentLayer, makePreviousCopy -- imported, not copied",
    /import \{ makeTranslucentLayer \} from "\.\/render\/translucentLayer\.mjs"/.test(src) && /import \{[^}]*makePreviousCopy[^}]*\} from "\.\/render\/temporalTsl\.mjs"/.test(src));
 ok("as a layer, the frames AND the motion stage's pass are drawn with them hidden",
-   /let back = hideThem\(\); renderer\.setRenderTarget\(cur\); await renderer\.renderAsync\(scene, camera\); back\(\);/.test(src) && /back = hideThem\(\); await motionStage\.render\(renderer, scene, camera\);/.test(src));
+   /let back = hideThem\(\); renderer\.setRenderTarget\(cur\); await renderNow\(renderer, scene, camera\); back\(\);/.test(src) && /back = hideThem\(\); await motionStage\.render\(renderer, scene, camera\);/.test(src));
 ok("...and the generator gets the layer at the generated time as `ui`, the HUD drawn into it, and the lens as `over` -- both occluded by the generator's own depth (v4767)",
    /const ui = asLayer \? async \(tt\) => \{[\s\S]{0,200}sceneAt\(tt\); await layer\(\)\.render\(renderer, scene, camera, \{ depth: g\.fg\.depthAt \}\)/.test(src) && /hudInto\(layer\(\)\.target/.test(src) &&
    /const over = asLayer \? async \(tt, frame\) => \{ sceneAt\(tt\); const tex = await layer\(\)\.renderOver\(renderer, scene, camera, frame, \{ depth: g\.fg\.depthAt \}\)/.test(src) && /toward: withArc \? towardStage\.motion\.texture : null, ui, over,/.test(src));
