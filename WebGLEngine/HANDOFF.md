@@ -3,6 +3,9 @@
 Written at the end of a very long session. BACKLOG.md carries the reasoning for every round in order and is the
 real record; this file is only the things that are *open*, which nothing else states in one place.
 
+**Resuming the denoiser arc?** Start at `render/denoiser-arc-handoff.md` (2026-10-17): where the arc stands, what is
+next, its method and the habits that keep it honest.
+
 ## State
 
 *** THIS SECTION USED TO DECLARE NUMBERS AND EVERY ONE OF THEM HAD GONE WRONG. *** At v3527 it still read
