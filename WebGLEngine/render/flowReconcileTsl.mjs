@@ -25,6 +25,7 @@
 // own vector and with its block's flow, so a knot pixel keeps the knot's and a wall pixel takes the wall's. The block mode
 // stays: it is FSR3's rule as the tree's mirror has it, and the measurement is only a measurement against it.
 "use strict";
+import { renderNow } from "./renderNow.mjs";
 import { requireTsl } from "./temporalTsl.mjs";
 import { SRC_APP, SRC_FLOW_BEAT, SRC_FLOW_ONLY } from "./flowReconcile.mjs";
 
@@ -154,7 +155,7 @@ export function makeFlowReconcile(THREE, TSL, { w, h, block = 8, margin = null, 
                     app: audit ? quad(blockNode(inputs, "app")) : null, sad: audit ? quad(blockNode(inputs, "sad")) : null }
                 : { field: quad(pixelNode(inputs, "field")), pixel: audit ? quad(pixelNode(inputs, "pixel")) : null });
             const sc = scenes.get(key), keep = renderer.getRenderTarget();
-            for (const k of ["decision", "app", "sad", "field", "pixel"]) if (sc[k]) { renderer.setRenderTarget(targets[k]); await renderer.renderAsync(sc[k], ortho); }
+            for (const k of ["decision", "app", "sad", "field", "pixel"]) if (sc[k]) { renderer.setRenderTarget(targets[k]); await renderNow(renderer, sc[k], ortho); }
             renderer.setRenderTarget(keep);
         },
         dispose() { for (const t of Object.values(targets)) t.dispose(); },

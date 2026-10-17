@@ -79,6 +79,7 @@
 // COLOUR: the chain runs on the LINEAR values a three.js target holds, as fsr.html's runs on its own; the output goes
 // through three's output transform when `output` is the canvas. RCAS's under- and overshoot are left to that clamp.
 "use strict";
+import { renderNow } from "../../render/renderNow.mjs";
 import { makeJitterState, jitterCurrent, advanceJitter, jitterPhaseCount } from "../../render/jitter.mjs";
 import { applyJitter, restoreProjection, glClip, makeMotionStage, resolveNode, accumulateNode } from "../../render/temporalTsl.mjs";
 import { dilateNodes, disocclusionNode, historyFactorNode } from "../../render/temporalClipTsl.mjs";
@@ -107,7 +108,7 @@ export async function probeHalfWrite(THREE, TSL, renderer, values) {
     const m = new THREE.NodeMaterial(); m.fragmentNode = TSL.vec4(v, v, v, 1); m.blending = THREE.NoBlending; m.depthTest = false; m.depthWrite = false;
     const sc = new THREE.Scene(); sc.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m));
     const was = renderer.getRenderTarget();
-    renderer.setRenderTarget(rt); await renderer.renderAsync(sc, new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)); renderer.setRenderTarget(was);
+    renderer.setRenderTarget(rt); await renderNow(renderer, sc, new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)); renderer.setRenderTarget(was);
     const px = await renderer.readRenderTargetPixelsAsync(rt, 0, 0, n, 1);
     rt.dispose(); m.dispose();
     return Array.from({ length: n }, (_, i) => px[i * 4]);
@@ -195,7 +196,7 @@ export function makeFsrTemporal(THREE, TSL, renderer, { renderWidth, renderHeigh
     const farScene = quad(TSL.vec4(1.0, 0.0, 0.0, 1.0));
     const jit = makeJitterState(up), base = new THREE.Matrix4();
     let frames = 0;
-    const draw = async (scene, target) => { renderer.setRenderTarget(target); await renderer.renderAsync(scene, ortho); };
+    const draw = async (scene, target) => { renderer.setRenderTarget(target); await renderNow(renderer, scene, ortho); };
     const px = dw * dh, floatBytes = 16;
     return {
         targets: t, stage, ring, history, locks, lockFrom, jitter: jit, period,
@@ -222,7 +223,7 @@ export function makeFsrTemporal(THREE, TSL, renderer, { renderWidth, renderHeigh
             camera.updateMatrixWorld(); base.copy(camera.projectionMatrix);
             const [jx, jy] = jitterCurrent(jit);
             applyJitter(camera, base, jx, jy, rw, rh);
-            renderer.setRenderTarget(t.colour); await renderer.renderAsync(scene, camera);
+            renderer.setRenderTarget(t.colour); await renderNow(renderer, scene, camera);
             restoreProjection(camera, base);
             await stage.render(renderer, scene, camera);
             await draw(sc.dM, t.dMotion); await draw(sc.dD, t.record[k]);

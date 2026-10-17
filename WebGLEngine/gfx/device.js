@@ -42,6 +42,7 @@
 // instancing, drawIndexed -- WebGL2 does natively, so a GPU-driven scene draws on both.
 "use strict";
 
+import { adapterOptions } from "../ui/webgpuProbe.mjs";
 import { checkHostUniforms } from "../render/wgslLayout.mjs";
 import { parseBindings, usedNames } from "../render/wgslSpec.mjs";
 
@@ -453,7 +454,7 @@ async function webgpuBackend(canvas, opts = {}) {
     if (typeof navigator === "undefined" || !navigator.gpu) return null;
     // v4467 -- `powerPreference` travels ("high-performance" for a bench page), and the adapter's own description
     // rides on the handle as `adapterInfo`, so a page that reports a vendor no longer needs navigator.gpu itself.
-    const adapter = await navigator.gpu.requestAdapter(opts.powerPreference ? { powerPreference: opts.powerPreference } : undefined); if (!adapter) return null;
+    const adapter = await navigator.gpu.requestAdapter(adapterOptions(opts.powerPreference)); if (!adapter) return null;
     const adapterInfo = (() => { try { const i = adapter.info || {}; return { vendor: i.vendor || null, architecture: i.architecture || null, description: i.description || null }; } catch (e) { return { vendor: null, architecture: null, description: null }; } })();
     const wanted = Array.isArray(opts.features) ? opts.features : DEFAULT_FEATURES;
     const offers = (f) => { try { return adapter.features.has(f); } catch (e) { return false; } };

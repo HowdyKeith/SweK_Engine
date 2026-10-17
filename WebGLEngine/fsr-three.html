@@ -94,6 +94,7 @@
 </div>
 <canvas id="view"></canvas>
 <script type="module">
+import { renderNow } from "/render/renderNow.mjs";
 import * as THREE from "./vendor/three-webgpu/three.webgpu.js";
 import * as TSL from "./vendor/three-webgpu/three.tsl.js";
 import { makeFsrSpatial } from "./fx/fsr/fsrTsl.mjs";
@@ -204,7 +205,7 @@ try {
             motionView = new THREE.Scene(); motionView.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m));
         }
         await motionStage.render(renderer, scene, camera);
-        renderer.setRenderTarget(null); await renderer.renderAsync(motionView, ortho);
+        renderer.setRenderTarget(null); await renderNow(renderer, motionView, ortho);
     };
 
     // v4736 -- A FRAME NOTHING RENDERED: render/frameInterpTsl.mjs, the first step of FSR3's frame generation on this
@@ -239,12 +240,12 @@ try {
         hudAt(time);
         const cc = renderer.getClearColor(new THREE.Color()), ca = renderer.getClearAlpha();
         renderer.setRenderTarget(uiTarget); renderer.setClearColor(0x000000, 0); await renderer.clearAsync();
-        renderer.autoClear = false; await renderer.renderAsync(hud, ortho); renderer.autoClear = true; renderer.setClearColor(cc, ca);
+        renderer.autoClear = false; await renderNow(renderer, hud, ortho); renderer.autoClear = true; renderer.setClearColor(cc, ca);
         return uiTarget.texture;
     };
     // the HUD for the frame generated between real frames k - 1 and k: drawn at the time generated, or the newer frame's
     const hudBetween = async (k) => ($("genuit").checked ? (tt) => hudUi(k - 1 + tt) : await hudUi(k));
-    const hudInto = async (target, time) => { hudAt(time); renderer.setRenderTarget(target); renderer.autoClear = false; await renderer.renderAsync(hud, ortho); renderer.autoClear = true; };
+    const hudInto = async (target, time) => { hudAt(time); renderer.setRenderTarget(target); renderer.autoClear = false; await renderNow(renderer, hud, ortho); renderer.autoClear = true; };
     // v4741: and with the optical flow reconciled in, per pixel (render/flowReconcileTsl.mjs), when "gen: + optical flow" is on
     // v4744: and on the arc, when "gen: motion on the arc" is on -- a toward stage (render/temporalTsl.mjs) renders each pixel's
     // displacement to its pose half-way between the two frames, and the generator splats with that
@@ -264,7 +265,7 @@ try {
         const withWorld = $("genworld").checked, asLayer = withWorld && $("genlayer").checked;
         if (withWorld) await stepMotes();
         const hideThem = () => (asLayer ? layer().hide(scene) : () => {});
-        let back = hideThem(); renderer.setRenderTarget(cur); await renderer.renderAsync(scene, camera); back();
+        let back = hideThem(); renderer.setRenderTarget(cur); await renderNow(renderer, scene, camera); back();
         if (withHud && !composite) await hudInto(cur, g.k);
         back = hideThem(); await motionStage.render(renderer, scene, camera);
         if (withArc) await towardStage.render(renderer, scene, camera, 0.5);
@@ -306,9 +307,9 @@ try {
             flowDbg = { of, frames, views, k: 0 };
         }
         const g = flowDbg, cur = g.frames[g.k % 2], prev = g.frames[(g.k + 1) % 2];
-        renderer.setRenderTarget(cur); await renderer.renderAsync(scene, camera);
+        renderer.setRenderTarget(cur); await renderNow(renderer, scene, camera);
         await g.of.flow(renderer, cur.texture, g.k ? prev.texture : cur.texture);
-        renderer.setRenderTarget(null); await renderer.renderAsync(g.views[g.k % 2], ortho);
+        renderer.setRenderTarget(null); await renderNow(renderer, g.views[g.k % 2], ortho);
         g.k++;
     };
 
@@ -408,13 +409,13 @@ try {
                         scX: [0, 1].map((k) => quad(disocclusionNode(TSL, dMot.texture, rec[1 - k].texture, { w: DW, h: DH, threshold }).node)) };
         }
         const g = maskDbg, k = g.k % 2;
-        renderer.setRenderTarget(g.current); await renderer.renderAsync(scene, camera);
+        renderer.setRenderTarget(g.current); await renderNow(renderer, scene, camera);
         await motionStage.render(renderer, scene, camera);
-        renderer.setRenderTarget(g.dMot); await renderer.renderAsync(g.scM, ortho);
-        renderer.setRenderTarget(g.rec[k]); await renderer.renderAsync(g.scD, ortho);
-        renderer.setRenderTarget(g.mask); await renderer.renderAsync(g.scX[k], ortho);
+        renderer.setRenderTarget(g.dMot); await renderNow(renderer, g.scM, ortho);
+        renderer.setRenderTarget(g.rec[k]); await renderNow(renderer, g.scD, ortho);
+        renderer.setRenderTarget(g.mask); await renderNow(renderer, g.scX[k], ortho);
         await g.ring.push(renderer); await g.ring.shading(renderer, g.shade);
-        renderer.setRenderTarget(null); await renderer.renderAsync(g.view, ortho);
+        renderer.setRenderTarget(null); await renderNow(renderer, g.view, ortho);
         g.k++;
     };
 
@@ -477,7 +478,7 @@ try {
         const t0 = performance.now();
         if (mode === "fsr") await fsr.render(renderer, scene, camera, null);
         else if (mode === "fsr2") { if (!fsr2) build2(); await fsr2.render(scene, camera, null); }
-        else if (mode === "locks") { if (!fsr2) build2(); await fsr2.render(scene, camera, lockView.target); renderer.setRenderTarget(null); await renderer.renderAsync(lockView.sc, ortho); }
+        else if (mode === "locks") { if (!fsr2) build2(); await fsr2.render(scene, camera, lockView.target); renderer.setRenderTarget(null); await renderNow(renderer, lockView.sc, ortho); }
         else if (mode === "bilinear") await fsr.renderBilinear(renderer, scene, camera, null);
         else if (mode === "motion") await showMotion();
         else if (mode === "masks") await showMasks();
@@ -485,7 +486,7 @@ try {
         else if (mode === "flow") await showFlow();
         else if (mode === "fsr3gen") await showFsr3();
         else if (mode === "fsr3paced") await showPaced(stamp);
-        else { renderer.setRenderTarget(null); await renderer.renderAsync(scene, camera); }
+        else { renderer.setRenderTarget(null); await renderNow(renderer, scene, camera); }
         avg = avg ? avg * 0.9 + (performance.now() - t0) * 0.1 : performance.now() - t0;
         const res = (mode === "native" || mode === "motion" || mode === "masks" || mode === "gen" || mode === "genholes" ? `${DW}x${DH}` : mode === "flow" ? `${DW}x${DH} in ${flowDbg.of.bw}x${flowDbg.of.bh} blocks of 8` : `${Math.round(DW / k)}x${Math.round(DH / k)} -> ${DW}x${DH}`)
             + ((mode === "fsr2" || mode === "locks") && fsr2 ? ` | locks ${fsr2.lockFrom || "off"}` : "")

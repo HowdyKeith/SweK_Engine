@@ -27,6 +27,8 @@
 </div>
 <script type="module" src="/ui/originNotice.js"></script>
 <script type="module">
+
+import { renderNow } from "/render/renderNow.mjs";
 import { PROBE_CONTROL, PROBE_VERSIONS, BUILD_FILES, tarballUrl, untar, pickBuild, rewriteImports } from "./render/threeProbe.mjs";
 const AT = "v4494";
 const q = new URLSearchParams(location.search);
@@ -74,7 +76,7 @@ async function renderProbe(THREE, T) {
     const mat = new THREE.MeshBasicNodeMaterial(); mat.colorNode = T.Fn(() => T.vec4(T.uv().x, T.uv().y, 0.5, 1.0))();
     scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat));
     const rt = new THREE.RenderTarget(N, N, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
-    renderer.setRenderTarget(rt); for (let i = 0; i < 2; i++) await renderer.renderAsync(scene, cam);
+    renderer.setRenderTarget(rt); for (let i = 0; i < 2; i++) await renderNow(renderer, scene, cam);
     const px = await renderer.readRenderTargetPixelsAsync(rt, 0, 0, N, N);
     const at = (x, y) => Array.from(px.slice((y * N + x) * 4, (y * N + x) * 4 + 4));
     const left = at(0, 32), right = at(N - 1, 32);

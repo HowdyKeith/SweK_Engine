@@ -13,6 +13,7 @@
 //     and the frame copy a transmission material samples reads the default framebuffer. One render into another framebuffer rebinds:
 //     readTargetPixels reads, then draws an empty scene into a 1x1 target of its own -- never the canvas, which an app is showing.
 "use strict";
+import { renderNow } from "./renderNow.mjs";
 
 /** The property refreshEveryRender sets: a node three never reads, there only to make three's observer refresh every render. */
 export const REFRESH_MARK = "swekRefreshEveryRender";
@@ -41,7 +42,7 @@ export async function readTargetPixels(THREE, renderer, target, x, y, w, h, inde
         let s = scratchOf.get(renderer); if (!s) { s = new THREE.RenderTarget(1, 1); scratchOf.set(renderer, s); }
         let e = EMPTY.get(renderer); if (!e) { e = { scene: new THREE.Scene(), camera: new THREE.Camera() }; EMPTY.set(renderer, e); }
         const keep = renderer.getRenderTarget();
-        renderer.setRenderTarget(s); await renderer.renderAsync(e.scene, e.camera); renderer.setRenderTarget(keep);
+        renderer.setRenderTarget(s); await renderNow(renderer, e.scene, e.camera); renderer.setRenderTarget(keep);
     }
     return px;
 }

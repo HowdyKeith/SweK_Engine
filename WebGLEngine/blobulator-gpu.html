@@ -114,6 +114,7 @@
 </script>
 
 <script type="module">
+import { adapterOptions } from "/ui/webgpuProbe.mjs";
 import { box3d } from "/physics/box3d/box3dLoader.js";
 // v3816 -- the detector is ui/webgpuProbe.mjs (v3666). "This browser has no WebGPU" is TRUE ABOUT THE FACT
 // AND WRONG ABOUT THE CAUSE on a LAN origin: over http://<ip>:8787 the browser HAS WebGPU and simply does
@@ -324,7 +325,7 @@ async function initGPU() {
   const _p = describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location: window.location });
   showOriginBanner(_p);   // v3981 -- clickable localhost route, once, at the top of the page
   if (!_p.available) { fallback(_p.message); return false; }
-  let adapter; try { adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" }) || await navigator.gpu.requestAdapter() || await navigator.gpu.requestAdapter({ powerPreference: "low-power" }); } catch (e) { fallback("requestAdapter threw: " + e.message); return false; }
+  let adapter; try { adapter = await navigator.gpu.requestAdapter(adapterOptions("high-performance")) || await navigator.gpu.requestAdapter() || await navigator.gpu.requestAdapter(adapterOptions("low-power")); } catch (e) { fallback("requestAdapter threw: " + e.message); return false; }
   if (!adapter) { fallback("no GPU adapter (WebGPU disabled or blocklisted)."); return false; }
   try { device = await adapter.requestDevice(); } catch (e) { fallback("requestDevice threw: " + e.message); return false; }
   device.lost.then((info) => { if (info && info.reason !== "destroyed") fallback("GPU device lost: " + info.message); });

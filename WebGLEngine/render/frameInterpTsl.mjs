@@ -36,6 +36,7 @@
 // depth of the surface the vector belongs to, and 0 in `valid` where the field declines to answer (interpolateFrameCPU's
 // NaN). flowFromMotionNode builds one from this tree's motion field at a block of 1.
 "use strict";
+import { renderNow } from "./renderNow.mjs";
 import { requireTsl } from "./temporalTsl.mjs";
 import { fillHolesNodes } from "./holeFillTsl.mjs";
 import { SIDE_PREV } from "./holeFill.mjs";
@@ -186,12 +187,12 @@ export function makeFrameInterp(THREE, TSL, { w, h, block, indexedBy, nearerIsLe
             const s2 = arc ? once(splats, "prev|" + fieldTex.uuid + "|" + toTTex.uuid, () => splatScene(fieldTex, toTTex, "prev")) : null;
             const prev = renderer.getRenderTarget(), pc = new THREE.Color(), pa = renderer.getClearAlpha(); renderer.getClearColor(pc);
             renderer.setRenderTarget(vecT); renderer.setClearColor(0x000000, 0); await renderer.clearAsync();
-            await renderer.renderAsync(s.sc, ortho);
-            if (s2) { renderer.setRenderTarget(vecT2); await renderer.clearAsync(); await renderer.renderAsync(s2.sc, ortho); }
+            await renderNow(renderer, s.sc, ortho);
+            if (s2) { renderer.setRenderTarget(vecT2); await renderer.clearAsync(); await renderNow(renderer, s2.sc, ortho); }
             if (fillScenes) {
-                renderer.setRenderTarget(filledT); await renderer.renderAsync(fillScenes.field, ortho);
-                renderer.setRenderTarget(sideT); await renderer.renderAsync(fillScenes.side, ortho);
-                if (fillScenes.field2) { renderer.setRenderTarget(filledT2); await renderer.renderAsync(fillScenes.field2, ortho); }
+                renderer.setRenderTarget(filledT); await renderNow(renderer, fillScenes.field, ortho);
+                renderer.setRenderTarget(sideT); await renderNow(renderer, fillScenes.side, ortho);
+                if (fillScenes.field2) { renderer.setRenderTarget(filledT2); await renderNow(renderer, fillScenes.field2, ortho); }
             }
             renderer.setClearColor(pc, pa); renderer.setRenderTarget(prev);
         },
@@ -199,7 +200,7 @@ export function makeFrameInterp(THREE, TSL, { w, h, block, indexedBy, nearerIsLe
         async gather(renderer, prevTex, curTex, output) {
             const sc = once(gathers, prevTex.uuid + "|" + curTex.uuid, () => quad(gatherNode(prevTex, curTex)));
             const prev = renderer.getRenderTarget();
-            renderer.setRenderTarget(output); await renderer.renderAsync(sc, ortho); renderer.setRenderTarget(prev);
+            renderer.setRenderTarget(output); await renderNow(renderer, sc, ortho); renderer.setRenderTarget(prev);
         },
         dispose() { vecT.dispose(); depthTexture.dispose(); if (filledT) { filledT.dispose(); sideT.dispose(); }
             if (arc) { vecT2.dispose(); depthTexture2.dispose(); if (filledT2) filledT2.dispose(); } for (const s of splats.values()) s.dispose(); },

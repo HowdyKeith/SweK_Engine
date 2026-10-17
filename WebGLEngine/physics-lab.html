@@ -919,15 +919,21 @@ function updateCoupling(id) {
 }
 // v3587 -- the Roundhouse drill-down. Reads the triage and the LIVE proposer registry, and refuses to imply
 // more than either supports.
-let RH = null;
-fetch("/roundhouse/lab-scenes", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null))
-  .then((j) => { if (j && j.ok) { RH = j; paintRoundhouse(sel.value); } })
-  .catch(() => { /* absent bridge leaves the panel at its default dash rather than claiming a verdict */ });
+let RH = null, RHwhy = "";
+// WHY THE PANEL IS EMPTY IS SAID, NOT LEFT AS A DASH. A 404 here was "Initiate AI workers does nothing" on Keith's rig: the server answered another bridge's unknown-route for these names (fixed in
+// ai-bridge/roundhouseBridge.js, held by ai-bridge/tools/roundhouseRoutes-selfcheck.mjs), and the page, which swallowed the answer, showed a dash and a greyed button with no reason. It still claims no verdict.
+fetch("/roundhouse/lab-scenes", { cache: "no-store" }).then((r) => { if (r.ok) return r.json(); RHwhy = "the server answered HTTP " + r.status + " for /roundhouse/lab-scenes -- it may be an older engine than this page (restart it: Start_Everything.bat)"; return null; })
+  .then((j) => { if (j && j.ok) { RH = j; RHwhy = ""; paintRoundhouse(sel.value); } else { if (j && !RHwhy) RHwhy = "the server's answer was not the scene list"; paintRoundhouse(sel.value); } })
+  .catch((e) => { RHwhy = "no SweK server answered at this address (" + ((e && e.message) || e) + ") -- the page needs the one on :8787"; paintRoundhouse(sel.value); });
 
 function paintRoundhouse(id) {
   const v = document.getElementById("rhVerdict"), k = document.getElementById("rhKey"),
         b = document.getElementById("initiateBtn");
-  if (!RH) { v.textContent = "bridge not reachable"; return; }
+  if (!RH) {
+    v.textContent = "bridge not reachable"; k.textContent = RHwhy || "waiting for the server's scene list...";
+    b.title = "The button runs a proposer on the server; the server's scene list has not arrived" + (RHwhy ? " (" + RHwhy + ")" : "") + ".";
+    return;
+  }
   const row = (RH.scenes || []).find((r) => r.scene === id);
   if (!row) { v.textContent = "no triage row for this scene"; k.textContent = ""; b.disabled = true; return; }
   if (row.registered) {

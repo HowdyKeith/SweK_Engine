@@ -70,7 +70,7 @@
 </main>
 
 <script type="module">
-import { describeWebGPU, showOriginBanner } from "/ui/webgpuProbe.mjs";
+import { describeWebGPU, showOriginBanner, adapterOptions } from "/ui/webgpuProbe.mjs";
 const $ = (id) => document.getElementById(id);
 const diag = $("diag");
 function say(html, cls) { diag.className = "diag" + (cls ? " " + cls : ""); diag.innerHTML = html; }
@@ -92,7 +92,7 @@ async function initGPU() {
       : "<b class='bad'>WebGPU is not available in this browser.</b>\n\nThis benchmark needs WebGPU (there is no WebGL fallback here).\nThings to check:\n  - Use Chrome/Edge/Brave/Arc 113+ on a desktop or laptop (Safari/Firefox: partial or off).\n  - Enable hardware acceleration in the browser settings.\n  - Visit chrome://gpu and confirm 'WebGPU' is 'Hardware accelerated'.\n\n(For a benchmark that runs everywhere, try the WASM Lab link above.)", "bad");
     return false;
   }
-  try { adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" }); }
+  try { adapter = await navigator.gpu.requestAdapter(adapterOptions("high-performance")); }
   catch (e) { say("<b class='bad'>requestAdapter threw:</b> " + e.message, "bad"); return false; }
   if (!adapter) { say("<b class='bad'>WebGPU present but no GPU adapter was granted.</b>\nOn laptops this can mean the browser is on the integrated GPU or acceleration is off. Check chrome://gpu.", "bad"); return false; }
   try { device = await adapter.requestDevice(); }

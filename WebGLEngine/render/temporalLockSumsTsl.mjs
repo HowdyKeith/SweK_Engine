@@ -2,6 +2,7 @@
 // with render/temporalLockTsl.mjs's makeLumaRing's interface, so fx/fsr/fsrTemporalTsl.mjs drives either. Graded by
 // render/temporalLockSumsTsl-selfcheck.mjs on both backends.
 "use strict";
+import { renderNow } from "./renderNow.mjs";
 import { requireTsl } from "./temporalTsl.mjs";
 // ================================================================================================================
 // THE SUMS: render/temporalLockSums.mjs's makeLumaSums, pushLumaSums, lumaSumsShiftCPU and lumaSumsMean -- the ring's two
@@ -64,7 +65,7 @@ export function makeLumaSums(THREE, TSL, { w, h, period, currentTex, motionTex, 
     let pushes = 0, phase = 0;
     const draw = async (renderer, scs, target) => {
         const prev = renderer.getRenderTarget();
-        renderer.setRenderTarget(target); await renderer.renderAsync(scs[(pushes + 1) % 2], ortho);
+        renderer.setRenderTarget(target); await renderNow(renderer, scs[(pushes + 1) % 2], ortho);
         renderer.setRenderTarget(prev);
     };
     return {
@@ -77,7 +78,7 @@ export function makeLumaSums(THREE, TSL, { w, h, period, currentTex, motionTex, 
         async push(renderer) {
             const prev = renderer.getRenderTarget(), k = pushes % 2;
             u.n.value = pushes; u.phaseIn.value = phase;
-            renderer.setRenderTarget(state[k]); await renderer.renderAsync(pushSc[k], ortho);
+            renderer.setRenderTarget(state[k]); await renderNow(renderer, pushSc[k], ortho);
             renderer.setRenderTarget(prev);
             pushes++; phase = (phase + 1) % period; u.held.value = phase;
         },

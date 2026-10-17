@@ -10,6 +10,15 @@
 //   native      makeFrameGen on the scene rendered at DISPLAY resolution -- four times the pixels drawn per real frame,
 //               the frames FSR3 exists not to render
 // and the upscaled frames' own quality, which a frame made from them cannot be expected to pass.
+//
+// *** UNNUMBERED -- THE 'DRAWS NO SCENE' COUNTER WAS BLIND TO render(). *** It counted scene draws by patching renderer.renderAsync.
+// The drivers moved off that name (it is deprecated since three r181; they draw through render/renderNow.mjs, which calls render()),
+// and the counter then read 0 whatever the generator drew -- the row stayed green with the claim it guards unchecked. Found by
+// reading the FSR gates' use of renderAsync after the migration, not by a red. The counter now patches BOTH entry points.
+// Sabotage (the generator draws the last scene before its own passes, fsr3Tsl.mjs restored from git after each):
+//   via renderAsync, new counter -> 1 red, '36 scene renders across its 18 calls' (renderAsync calls render, so each is counted twice)
+//   via render(),    new counter -> 1 red, '18 scene renders across its 18 calls'
+//   via render(),    OLD counter -> 0 red, '0 scene renders across its 18 calls' -- the blind spot, reproduced before it was closed.
 "use strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -80,9 +89,13 @@ else {
                         // reads the older frame's depth, which it keeps from the call before
                         if (k >= a.N - 3) {
                             // and it draws NO scene: every render the generation makes is of its own passes
-                            let sceneRenders = 0; const orig = renderer.renderAsync.bind(renderer);
+                            // BOTH entry points are counted: the drivers draw through fx/fsr/renderNow.mjs, which calls render(), and a
+                            // counter on renderAsync alone reads zero whatever they draw (the gap this replaced, found when renderAsync's
+                            // deprecation moved the drivers off it)
+                            let sceneRenders = 0; const orig = renderer.renderAsync.bind(renderer), origR = renderer.render.bind(renderer);
                             renderer.renderAsync = (s, c) => { if (s === scene) sceneRenders++; return orig(s, c); };
-                            await f3.generate(o2); renderer.renderAsync = orig; o.sceneRenders = (o.sceneRenders || 0) + sceneRenders; o.calls = (o.calls || 0) + 1;
+                            renderer.render = (s, c) => { if (s === scene) sceneRenders++; return origR(s, c); };
+                            await f3.generate(o2); renderer.renderAsync = orig; renderer.render = origR; o.sceneRenders = (o.sceneRenders || 0) + sceneRenders; o.calls = (o.calls || 0) + 1;
                         }
                     }
                     oc.psnr[field] = psnr(await read(o2, D), mid);

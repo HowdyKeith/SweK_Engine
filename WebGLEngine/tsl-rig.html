@@ -25,6 +25,7 @@
 <div id="out">starting&hellip;</div>
 <textarea id="json" readonly></textarea>
 <script type="module">
+import { renderNow } from "/render/renderNow.mjs";
 import * as THREE from "./vendor/three-webgpu/three.webgpu.js";
 import * as TSL from "./vendor/three-webgpu/three.tsl.js";
 import * as P from "./render/physicsTsl.mjs";
@@ -50,7 +51,7 @@ try {
         let renderer; try { renderer = new THREE.WebGPURenderer({ canvas, forceWebGL: mode === "webgl2", antialias: false }); await renderer.init(); } catch (e) { lines.push(`<span class="fail">${mode}: WebGPURenderer could not start: ${e.message}</span>`); result.backends[mode] = { error: e.message }; say(); continue; }
         const backend = renderer.backend.isWebGPUBackend ? "webgpu" : "webgl2"; result.backends[mode] = { got: backend };
         const rt = new THREE.RenderTarget(N, N, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
-        const draw = async (kit, times = 1) => { renderer.setRenderTarget(rt); for (let i = 0; i < times; i++) await renderer.renderAsync(kit.scene, kit.camera); return renderer.readRenderTargetPixelsAsync(rt, 0, 0, N, N); };
+        const draw = async (kit, times = 1) => { renderer.setRenderTarget(rt); for (let i = 0; i < times; i++) await renderNow(renderer, kit.scene, kit.camera); return renderer.readRenderTargetPixelsAsync(rt, 0, 0, N, N); };
         // keys through three
         const ly = P.makeLyapunovKeyTsl(THREE, TSL, { rLo: 4, rHi: 4 }); const p4 = await draw(ly, 2); const lams = []; for (let i = 0; i < N * N; i++) lams.push(P.decodeLyapunov(p4, i * 4));
         const hT = P.makeHeidlerKeyTsl(THREE, TSL, {}); const pT = await draw(hT, 2); let hMax = 0; for (let i = 0; i < N * N; i++) hMax = Math.max(hMax, P.decodeHeidler(pT, i * 4));
@@ -59,7 +60,7 @@ try {
         result.keys[`three:${backend}`] = keys;
         lines.push(`three's ${backend}: ln 2 reads <b>${keys.lyapunovMedian.toFixed(6)}</b> (${Math.abs(keys.lyapunovMedian - LN2) < 2e-3 ? "<span class=ok>within 2e-3</span>" : "<span class=fail>OFF</span>"}), the Heidler peak <b>${keys.heidlerPeak.toFixed(5)}</b> (${Math.abs(keys.heidlerPeak - 1) < 1e-4 ? "<span class=ok>1 within 1e-4</span>" : "<span class=fail>OFF</span>"}), Wien's x_lambda at column <b>${keys.wienPeakX.toFixed(3)}</b> (${Math.abs(keys.wienPeakX - 4.965114) <= 12 / N ? "<span class=ok>within a column</span>" : "<span class=fail>OFF</span>"})`); say();
         // timing through three: the 448-step loop at 256x256, mean of 10 frames after 3
-        const sweep = P.makeLyapunovKeyTsl(THREE, TSL, {}); await draw(sweep, 3); let t0 = performance.now(); for (let i = 0; i < 10; i++) await renderer.renderAsync(sweep.scene, sweep.camera); await renderer.readRenderTargetPixelsAsync(rt, 0, 0, 4, 4).catch(() => null); const msThree = (performance.now() - t0) / 10;
+        const sweep = P.makeLyapunovKeyTsl(THREE, TSL, {}); await draw(sweep, 3); let t0 = performance.now(); for (let i = 0; i < 10; i++) await renderNow(renderer, sweep.scene, sweep.camera); await renderer.readRenderTargetPixelsAsync(rt, 0, 0, 4, 4).catch(() => null); const msThree = (performance.now() - t0) / 10;
         result.timing.push({ path: "three TSL", backend, work: "lyapunov key 256x256, 448 iterations a pixel", msPerFrame: +msThree.toFixed(3) });
         emitted.lyapunov[backend] = (await S.emitShaders(renderer, { scene: sweep.scene, camera: sweep.camera, mesh: sweep.scene.children[0] })).fragment;
         const fx = B.makeBadTvTsl(THREE, TSL, { texture: B.sourceTexture(THREE, { pixels: src, width: 64, height: 64 }) }); fx.setKnobs({ time: 1.5 });

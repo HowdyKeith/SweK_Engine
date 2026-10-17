@@ -23,6 +23,7 @@
   <pre id="json" style="display:none;"></pre>
 </div>
 <script type="module">
+import { adapterOptions } from "/ui/webgpuProbe.mjs";
 import { describeWebGPU, showOriginBanner } from "/ui/webgpuProbe.mjs";
 import { WGSL_ISING, acceptThresholds, makeLattice, mirrorSweep, adjudicateSpins } from "./tools/roundhouse/isingGpu.mjs";
 import { yangMagnetisation } from "./physics/statmech/ising.js";
@@ -43,7 +44,7 @@ document.getElementById("run").onclick = async () => {
       return;
     }
   }
-  const adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" });
+  const adapter = await navigator.gpu.requestAdapter(adapterOptions("high-performance"));
   if (!adapter) { out.innerHTML = "<span class='bad'>no adapter</span>"; return; }
   const device = await adapter.requestDevice();
   const info = adapter.info || {};

@@ -113,7 +113,7 @@ console.log("\n1. THE RUNNER BINDS BY NAME, REFUSES BY NAME, AND THE TWO RIG PAG
     ok("*** mpm-gpu-check.html runs its kernel through makeMpmDevice and builds no pipeline of its own ***", /import \{ makeMpmDevice \} from "\/physics\/mpm\/mpmDevice\.mjs"/.test(mpm) && /makeMpmDevice\(dev, \{ nx: NX, ny: NY, block, walls, mode \}/.test(mpm) && !/createComputePipeline|requestAdapter|createBindGroup/.test(mpm));
     ok("  and its stencil sabotage still reaches the kernel, as the runner's `wgsl` option", /wgsl: src/.test(mpm) && /o\.w1 = 0\.755 -/.test(mpm));
     const dev = codeOf(read("gfx/device.js"));
-    ok("the device carries powerPreference to the adapter and the adapter's description on the handle", /powerPreference: opts\.powerPreference/.test(dev) && /adapterInfo/.test(dev));
+    ok("the device carries powerPreference to the adapter and the adapter's description on the handle", /adapterOptions\(opts\.powerPreference\)/.test(dev) && /adapterInfo/.test(dev));
 }
 
 console.log("\n2. EVERY RUNNABLE CORPUS ENTRY THROUGH THE DEVICE, HELD TO THE HEADLESS HARNESS BYTE FOR BYTE");

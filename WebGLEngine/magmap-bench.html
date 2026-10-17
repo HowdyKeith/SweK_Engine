@@ -49,6 +49,7 @@ class="bad">REJECTED</span>, not celebrated.</p>
 <div id="out"></div>
 
 <script type="module">
+import { adapterOptions } from "/ui/webgpuProbe.mjs";
 import { describeWebGPU, showOriginBanner } from "/ui/webgpuProbe.mjs";
 import { magmapGpu, WGSL, MAGMAP_TOL } from "./tools/roundhouse/magmapGpu.mjs";
 import { sampleTable, referenceCell } from "./tools/roundhouse/magmapKernel.mjs";
@@ -92,7 +93,7 @@ $("run").onclick = async () => {
     if (!_p.available) throw new Error(_p.reason === "insecure-origin" ? _p.message
       : "WebGPU unavailable -- needs Chrome/Android or Safari 18+");
     st("requesting adapter...");
-    const adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" });
+    const adapter = await navigator.gpu.requestAdapter(adapterOptions("high-performance"));
     if (!adapter) throw new Error("no GPU adapter");
     const device = await adapter.requestDevice();
     const info = (adapter.info || (adapter.requestAdapterInfo ? await adapter.requestAdapterInfo() : {})) || {};

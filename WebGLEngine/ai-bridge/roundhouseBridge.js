@@ -21,7 +21,18 @@ const ENGINE = path.join(__dirname, "..");
 const esm = (rel) => import(pathToFileURL(path.join(ENGINE, rel)).href);
 
 const PREFIX = "/roundhouse";
-function owns(url) { return typeof url === "string" && (url === PREFIX || url.startsWith(PREFIX + "/") || url.startsWith(PREFIX + "?")); }
+// *** ROUTES UNDER /roundhouse THAT ANOTHER BRIDGE ANSWERS. *** server.js asks this bridge first (it is mounted at the top of the router) and fingerprintBridge.js
+// much later, so a prefix test that said yes to the whole of /roundhouse/ made THIS bridge's `unknown-route` 404 the answer to /roundhouse/lab-scenes, /lab-scene-run and
+// /lab-replay -- physics-lab.html's Initiate button, labHome and race-brain's replay button have been dead on the real server since they were written, and every gate
+// that "drove the route for real" called fingerprintBridge.handle directly and so never went through the router. owns() says no for them; the names are fingerprintBridge's
+// own (ai-bridge/tools/roundhouseRoutes-selfcheck.mjs boots the real server and asks, and compares this list with the routes that file declares).
+const ELSEWHERE = Object.freeze(["/roundhouse/lab-scenes", "/roundhouse/lab-scene-run", "/roundhouse/lab-replay"]);
+function owns(url) {
+    if (typeof url !== "string") return false;
+    const p = url.split("?")[0];
+    if (ELSEWHERE.some((r) => p.startsWith(r))) return false;
+    return url === PREFIX || url.startsWith(PREFIX + "/") || url.startsWith(PREFIX + "?");
+}
 
 // Resolve a key WITHOUT returning it. true/false only.
 function keyAvailable() {
@@ -169,4 +180,4 @@ async function handle(req, res, { sendJson }) {
     return sendJson({ ok: false, error: "unknown-route", route }, 404);
 }
 
-module.exports = { owns, handle, keyAvailable, PREFIX };
+module.exports = { owns, handle, keyAvailable, PREFIX, ELSEWHERE };

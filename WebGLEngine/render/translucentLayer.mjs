@@ -47,6 +47,7 @@
 // the frame moves only at an occluder's edge, -0.29 and -0.81 dB where a box slides in front. From the stage's own clip depth
 // it is the geometry pass's to the bit, on both backends.
 "use strict";
+import { renderNow } from "./renderNow.mjs";
 import { refreshEveryRender } from "./threeWorkarounds.mjs";
 
 const RENDERABLE = (o) => !!(o && (o.isMesh || o.isLine || o.isPoints || o.isSprite));
@@ -103,9 +104,9 @@ export function makeTranslucentLayer(THREE, { w, h, type = null, select = isTran
         m.colorWrite = false; m.depthTest = true; m.depthWrite = true; m.depthFunc = THREE.AlwaysDepth; m.blending = THREE.NoBlending;
         sc = new THREE.Scene(); sc.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m)); depthQuads.set(key, sc); } return sc; };
     const occluders = async (renderer, scene, camera, hideThese, depth) => {
-        if (depth) { await renderer.renderAsync(depthQuad(depth, renderer.coordinateSystem === THREE.WebGLCoordinateSystem), ortho); return; }
+        if (depth) { await renderNow(renderer, depthQuad(depth, renderer.coordinateSystem === THREE.WebGLCoordinateSystem), ortho); return; }
         const back = hideAll(hideThese); scene.overrideMaterial = depthOnly;
-        try { await renderer.renderAsync(scene, camera); } finally { scene.overrideMaterial = null; back(); }
+        try { await renderNow(renderer, scene, camera); } finally { scene.overrideMaterial = null; back(); }
     };
     const copyOf = (tex) => { let sc = copies.get(tex); if (!sc) { const m = new THREE.NodeMaterial();
         m.fragmentNode = L.textureLoad(tex, L.ivec2(L.int(L.screenCoordinate.x), L.int(L.screenCoordinate.y))); m.blending = THREE.NoBlending; m.depthTest = false; m.depthWrite = false;
@@ -142,11 +143,11 @@ export function makeTranslucentLayer(THREE, { w, h, type = null, select = isTran
             const keep = { target: renderer.getRenderTarget(), auto: renderer.autoClear, bg: scene.background, over: scene.overrideMaterial };
             try {
                 // the frame, copied in; then what is opaque, depth only; then the backdrop readers, sampling the frame as it stands
-                renderer.setRenderTarget(overTarget); await renderer.renderAsync(copyOf(frame), ortho);
+                renderer.setRenderTarget(overTarget); await renderNow(renderer, copyOf(frame), ortho);
                 renderer.autoClear = false; scene.background = null;
                 await occluders(renderer, scene, camera, [...tr, ...bd], depth);
                 const back = hideAll([...op, ...tr]);
-                try { await renderer.renderAsync(scene, camera); } finally { back(); }
+                try { await renderNow(renderer, scene, camera); } finally { back(); }
             } finally {
                 scene.overrideMaterial = keep.over; scene.background = keep.bg; renderer.autoClear = keep.auto; renderer.setRenderTarget(keep.target);
             }
@@ -166,7 +167,7 @@ export function makeTranslucentLayer(THREE, { w, h, type = null, select = isTran
                 await occluders(renderer, scene, camera, tr, depth);
                 // the translucent things alone, over transparent black -- never a backdrop reader, which renderOver draws
                 const back = hideAll([...op, ...bd]); const undo = toLayer(tr);
-                try { await renderer.renderAsync(scene, camera); } finally { undo(); back(); }
+                try { await renderNow(renderer, scene, camera); } finally { undo(); back(); }
             } finally {
                 scene.overrideMaterial = keep.over; scene.background = keep.bg; renderer.autoClear = keep.auto;
                 renderer.setClearColor(keep.color, keep.alpha); renderer.setRenderTarget(keep.target);

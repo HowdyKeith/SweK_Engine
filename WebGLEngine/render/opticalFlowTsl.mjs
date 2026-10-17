@@ -31,6 +31,7 @@
 // *** EVERY ROUNDING IS floor(x + 0.5), Math.round, AND NOT round(). *** v4734 found render/opticalFlowWgsl.mjs's round()
 // tying to even at a block origin bx * block / scale that lands on a half -- 44 of 512 components, one by 79 pixels.
 "use strict";
+import { renderNow } from "./renderNow.mjs";
 import { requireTsl } from "./temporalTsl.mjs";
 
 /**
@@ -67,8 +68,8 @@ export function makeLumaPyramid(THREE, TSL, { w, h, levels = Infinity }) {
                 return vec4(c.x.mul(0.25).add(c.y.mul(0.5)).add(c.z.mul(0.25)), 0.0, 0.0, 1.0);
             })()));
             const prev = renderer.getRenderTarget();
-            renderer.setRenderTarget(targets[0]); await renderer.renderAsync(bases.get(srcTex), ortho);
-            for (let k = 0; k < downs.length; k++) { renderer.setRenderTarget(targets[k + 1]); await renderer.renderAsync(downs[k], ortho); }
+            renderer.setRenderTarget(targets[0]); await renderNow(renderer, bases.get(srcTex), ortho);
+            for (let k = 0; k < downs.length; k++) { renderer.setRenderTarget(targets[k + 1]); await renderNow(renderer, downs[k], ortho); }
             renderer.setRenderTarget(prev);
         },
         dispose() { for (const t of targets) t.dispose(); },
@@ -225,7 +226,7 @@ export function makeOpticalFlow(THREE, TSL, { w, h, block = 8, searchRadius = 4,
             if (seed) { if (!seedTex) throw new Error("render/opticalFlowTsl: a seeded flow needs the motion field -- flow(renderer, cur, prev, motion)"); seedNow = seedTex; for (const nd of seedNodes) nd.value = seedTex; }
             await cur.build(renderer, curTex); await prev.build(renderer, prevTex);
             const keep = renderer.getRenderTarget();
-            for (const p of passes) { renderer.setRenderTarget(p.out); await renderer.renderAsync(p.sc, ortho); }
+            for (const p of passes) { renderer.setRenderTarget(p.out); await renderNow(renderer, p.sc, ortho); }
             renderer.setRenderTarget(keep);
         },
         dispose() { cur.dispose(); prev.dispose(); for (const f of flows) f.dispose(); if (seedHolder) seedHolder.dispose(); },

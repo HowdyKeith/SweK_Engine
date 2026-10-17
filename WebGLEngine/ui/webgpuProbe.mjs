@@ -203,3 +203,16 @@ export async function probeAdapter(env = {}) {
                  message: "WebGPU adapter request failed \u2014 showing the SVG robot" };
     }
 }
+
+/**
+ * The options to hand navigator.gpu.requestAdapter for a power preference -- or none where the browser says it ignores one. Chrome on Windows logs "The powerPreference option is currently
+ * ignored when calling requestAdapter() on Windows" (crbug.com/369219127) EVERY time a page names one, on every page that benchmarks: the preference did nothing there and the console
+ * said so each load (Keith's rig, webgpu-bench.html). Where a preference IS honoured (Linux, macOS, ChromeOS) it travels unchanged; on Windows the adapter is whichever the OS's graphics
+ * settings give the browser, and a page that wants the discrete GPU is told to set that, not to ask here. Returns undefined (no argument at all) when there is nothing to say.
+ */
+export function adapterOptions(preference, env = {}) {
+    if (!preference) return undefined;
+    const nav = env.navigator || (typeof navigator !== "undefined" ? navigator : {}), plat = String((nav.userAgentData && nav.userAgentData.platform) || nav.platform || "");
+    if (/^win/i.test(plat)) return undefined;
+    return { powerPreference: preference };
+}

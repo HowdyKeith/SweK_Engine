@@ -14,9 +14,26 @@ import path from "node:path";
 //
 // Every global arrives as an argument, so each environment below is a literal instead of a browser.
 
+// *** UNNUMBERED -- adapterOptions() AND THE PAGE SCAN. *** Chrome on Windows ignores powerPreference in requestAdapter and says so on
+// every page load that names one (Keith's rig, webgpu-bench.html); adapterOptions(preference, env) is the one place that decides,
+// and the last two blocks of this file hold it and the twelve-odd pages and gfx/device.js that go through it. Sabotage log (each
+// mutant applied with the original saved beside it, run, restored; nothing went 0-red):
+//   A1 Windows check dropped                          -> 1 red (the carries/drops row)
+//   A2 userAgentData ignored (navigator.platform only) -> 1 red (the row feeds a platform that only the client hints name)
+//   A3 Windows gets {} instead of no argument         -> 1 red
+//   A4 empty preference still yields an object        -> 1 red (the 'missing preference' row)
+//   A5 a bare string returned instead of the options  -> 2 red
+//   A6 platform field order swapped                   -> 1 red (the row where the two fields disagree)
+//   A7 'low-power' replaced by 'high-performance'     -> 1 red
+//   P1 magmap-bench.html names { powerPreference } itself, P2 gfx/device.js does, P3 wormhole.html does across two lines
+//                                                     -> 1 red each (the scan), naming the row
+// Left unguarded, said plainly: a page that builds the options in a variable and passes the variable (no page does today -- hmc-bench
+// reaches it through requestDevice -> gfx/device.js); brain/gpu.js and cell-tracking/src/gpu_smooth.mjs, which still name the
+// option and are outside the scan on purpose (the Deno entry and a node tool); and a real Windows Chrome, which is where the
+// warning lives -- this gate holds the decision, not the console line.
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { describeWebGPU, probeAdapter } from "./webgpuProbe.mjs";
+import { describeWebGPU, probeAdapter, adapterOptions } from "./webgpuProbe.mjs";
 import { SOURCE_EXT } from "../tools/ship/moduleRefs.mjs";
 
 let fails = 0;
@@ -209,5 +226,19 @@ const env = (gpu, secure, host, proto = "http:") => ({
         "delivered confidently");
 }
 
+// ---- adapterOptions: a power preference only where the browser honours one
+{
+    const ao = (plat, ua) => adapterOptions("high-performance", { navigator: { platform: plat, userAgentData: ua } });
+    ok("!! adapterOptions CARRIES THE PREFERENCE WHERE IT IS HONOURED AND DROPS IT WHERE IT IS IGNORED (Chrome on Windows logs a warning each time a page names one): Linux, macOS and ChromeOS get { powerPreference: 'high-performance' }; Win32 -- by navigator.platform or by userAgentData.platform 'Windows' -- gets no argument at all",
+        JSON.stringify(ao("Linux x86_64")) === '{"powerPreference":"high-performance"}' && JSON.stringify(ao("MacIntel")) === '{"powerPreference":"high-performance"}' && JSON.stringify(ao("", { platform: "Chrome OS" })) === '{"powerPreference":"high-performance"}' && ao("Win32") === undefined && ao("", { platform: "Windows" }) === undefined && ao("Linux", { platform: "Windows" }) === undefined);
+    ok("...a missing preference is no argument on any platform, an environment with no navigator at all is not an exception, and 'low-power' travels like 'high-performance'", adapterOptions(undefined, { navigator: { platform: "Linux" } }) === undefined && adapterOptions("") === undefined && (() => { try { return adapterOptions("high-performance", {}) === undefined || typeof adapterOptions("high-performance", {}) === "object"; } catch { return false; } })() && JSON.stringify(adapterOptions("low-power", { navigator: { platform: "Linux" } })) === '{"powerPreference":"low-power"}');
+}
+// ---- no page asks for a power preference the browser will log that it ignored
+{
+    const here = path.dirname(fileURLToPath(import.meta.url)), root = path.resolve(here, ".."), pages = readdirSync(root).filter((f) => f.endsWith(".html")), files = [...pages, ...readdirSync(path.join(root, "gfx")).filter((f) => f.endsWith(".js")).map((f) => "gfx/" + f)];
+    const naked = files.filter((f) => /requestAdapter\(\s*\{\s*powerPreference/.test(readFileSync(path.join(root, f), "utf8")));
+    const users = files.filter((f) => /adapterOptions\(/.test(readFileSync(path.join(root, f), "utf8")));
+    ok("!! NO BROWSER PAGE NAMES A POWER PREFERENCE TO requestAdapter DIRECTLY: every html page and gfx/*.js goes through adapterOptions() (Chrome on Windows logs the ignored option on each load, the console line Keith's rig showed on webgpu-bench.html); the Deno entry brain/gpu.js and the cell-tracking tool are outside this scan on purpose (the warning is the browser's)", naked.length === 0 && users.length >= 12 && users.includes("webgpu-bench.html") && users.includes("gfx/device.js"), `${users.length} files use it; direct: ${naked.join(", ") || "none"}`);
+}
 console.log("webgpuProbe-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));
 process.exit(fails ? 1 : 0);

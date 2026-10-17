@@ -57,6 +57,7 @@
 //     clipDepth maps one to the other, and every depth this chain hands a later pass is CLIP z, the unit
 //     motionVectorsCPU and disocclusionCPU are written in.
 "use strict";
+import { renderNow } from "./renderNow.mjs";
 import { jitterProjection } from "./jitter.mjs";
 
 export const TEMPORAL_TSL_NEEDS = Object.freeze(["Fn", "float", "int", "vec2", "vec4", "ivec2", "uniform", "textureLoad",
@@ -632,12 +633,12 @@ export function makeMotionStage(THREE, TSL, { w, h, gl, type = null, toward = fa
                     if (o.isBatchedMesh && motionNode.regrow(o)) override.needsUpdate = true;
                     if (o.isSprite) { const m = spriteMaterial(o); swapped.push([o, o.material]); o.material = m; }
                     else { placedOver(o); if (o.isMesh && needsOwn(o.material)) { const m = ownMaterial(o); swapped.push([o, o.material]); o.material = m; } } });
-                renderer.setRenderTarget(surface); await renderer.renderAsync(scene, camera);
+                renderer.setRenderTarget(surface); await renderNow(renderer, scene, camera);
                 motionNode.endPass(scene);
             } finally { for (const [o, m] of swapped) o.material = m; scene.overrideMaterial = prevOverride; scene.background = prevBg; }
-            renderer.setRenderTarget(motion); await renderer.renderAsync(qM.scene, ortho);
-            renderer.setRenderTarget(depth); await renderer.renderAsync(qD.scene, ortho);
-            if (qC) { renderer.setRenderTarget(cameraT); await renderer.renderAsync(qC.scene, ortho); }
+            renderer.setRenderTarget(motion); await renderNow(renderer, qM.scene, ortho);
+            renderer.setRenderTarget(depth); await renderNow(renderer, qD.scene, ortho);
+            if (qC) { renderer.setRenderTarget(cameraT); await renderNow(renderer, qC.scene, ortho); }
             renderer.setRenderTarget(prevTarget);
             prevP.copy(camera.projectionMatrix); prevV.copy(camera.matrixWorldInverse);
             frames++;

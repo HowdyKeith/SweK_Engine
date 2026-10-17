@@ -40,6 +40,7 @@
 </div></div>
 
 <script type="module">
+import { adapterOptions } from "/ui/webgpuProbe.mjs";
 import { STARFIELD_WGSL, OCTAVES } from "/render/starField.mjs";
 // ===== the sim is es-box3d's, verbatim: tactics-policy pilots + Box3D collisions + shots. We only swap the view. =====
 import { spawnEnemies, stepAI, applyDamage } from "/ev/combat.js";
@@ -314,7 +315,7 @@ async function initGPU() {
     fallback("navigator.gpu is undefined (no WebGPU in this browser).");
     return false;
   }
-  let adapter; try { adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" }); } catch (e) { fallback("requestAdapter threw: " + e.message); return false; }
+  let adapter; try { adapter = await navigator.gpu.requestAdapter(adapterOptions("high-performance")); } catch (e) { fallback("requestAdapter threw: " + e.message); return false; }
   if (!adapter) { fallback("no GPU adapter."); return false; }
   try { device = await adapter.requestDevice(); } catch (e) { fallback("requestDevice threw: " + e.message); return false; }
   device.lost.then((i) => { if (i && i.reason !== "destroyed") fallback("GPU device lost: " + i.message); });

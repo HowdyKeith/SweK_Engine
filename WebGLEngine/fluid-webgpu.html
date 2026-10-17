@@ -33,6 +33,7 @@
 </div>
 <div id="note">Hybrid FLIP/PIC on a staggered MAC grid: atomic particle&rarr;grid splat, Jacobi pressure projection (incompressibility), grid&rarr;particle FLIP/PIC blend, RK2 advection. Algorithm mirrors <b>fluid/flip2d.mjs</b>, whose physics is unit-tested (divergence collapse, settling, mass conservation). ST-FLIP (SIGGRAPH 2026) large-time-step spacetime sampling is toggleable (motion-blurs the P2G deposit across the time-slab). A red-black Gauss-Seidel + SOR solver is also selectable.</div>
 <script type="module">
+import { adapterOptions } from "/ui/webgpuProbe.mjs";
 const NX = 128, NY = 128;                 // grid cells
 const N_U = (NX + 1) * NY, N_V = NX * (NY + 1), N_C = NX * NY;
 const MAX_P = 200000;                     // particle capacity
@@ -44,7 +45,7 @@ function fallback(msg) { modeEl.textContent = "no WebGPU"; modeEl.className = "f
 if (!navigator.gpu) { fallback(); } else init().catch((e) => { console.error(e); fallback(String(e.message || e)); });
 
 async function init() {
-  const adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" });
+  const adapter = await navigator.gpu.requestAdapter(adapterOptions("high-performance"));
   if (!adapter) return fallback("No GPU adapter.");
   const device = await adapter.requestDevice();
   // v3822 -- SURFACE GPU ERRORS INSTEAD OF FREEZING SILENTLY. Compute-pipeline validation and shader-compile

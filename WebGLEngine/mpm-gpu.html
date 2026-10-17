@@ -69,6 +69,7 @@
 </div>
 
 <script type="module">
+import { adapterOptions } from "/ui/webgpuProbe.mjs";
 import { MPM_WGSL, packParams, fixedPointScales, clampLimits, PF, PARTICLE_FLOATS } from "/physics/mpm/gpuKernel.mjs";
 import { lame } from "/physics/mpm/constitutive.mjs";
 import { alphaOf } from "/physics/mpm/druckerPrager.mjs";
@@ -153,7 +154,7 @@ async function initGPU() {
   const probe = describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location: window.location });
   showOriginBanner(probe);   // v3981 -- clickable localhost route, once, at the top of the page
   if (!probe.available) throw new Error(probe.message);
-  const adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" });
+  const adapter = await navigator.gpu.requestAdapter(adapterOptions("high-performance"));
   if (!adapter) throw new Error("WebGPU is present but this system offered no adapter. PRESENCE IS NOT " +
       "CAPABILITY -- a blocklisted driver or a headless session both look like this.");
   dev = await adapter.requestDevice();

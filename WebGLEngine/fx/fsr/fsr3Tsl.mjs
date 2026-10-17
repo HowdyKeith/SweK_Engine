@@ -20,6 +20,7 @@
 // and collect no such bonus, so the generated frame is as good as the upscaled frames around it -- within 0.2 dB, above
 // them on the turning knot -- and the gap to native generation is wider than the gap between the real frames.
 "use strict";
+import { renderNow } from "../../render/renderNow.mjs";
 import { makeFsrTemporal } from "./fsrTemporalTsl.mjs";
 import { makeFrameGen } from "./fsrFrameGenTsl.mjs";
 
@@ -54,7 +55,7 @@ export function makeFsr3(THREE, TSL, renderer, { fsr2 = {}, frameGen = {}, field
     const flat = () => new THREE.RenderTarget(dw, dh, { type: THREE.FloatType, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: false });
     const at = (tex) => TSL.textureLoad(tex, TSL.ivec2(TSL.int(TSL.screenCoordinate.x), TSL.int(TSL.screenCoordinate.y)));
     const kept = hold === 2 ? Array.from({ length: N }, () => ({ motion: flat(), depth: flat(), camera: up.stage.camera ? flat() : null })) : null;
-    const copies = new Map(), copy = async (src, dst) => { if (!copies.has(src)) copies.set(src, quad(at(src))); renderer.setRenderTarget(dst); await renderer.renderAsync(copies.get(src), ortho); };
+    const copies = new Map(), copy = async (src, dst) => { if (!copies.has(src)) copies.set(src, quad(at(src))); renderer.setRenderTarget(dst); await renderNow(renderer, copies.get(src), ortho); };
     // the NEWER frame's field, as makeFrameGen asks: FSR2's stage holds the last real frame's, which is the newer of the pair
     // *** THE DEPTH IS THE STAGE'S IN BOTH MODES, ONLY THE MOTION IS DILATED. *** FSR2's record -- the dilated depth -- is a
     // ping-pong pair and the one this frame wrote is record[k % 2]; reading it here would tie the generator to the chain's
@@ -71,7 +72,7 @@ export function makeFsr3(THREE, TSL, renderer, { fsr2 = {}, frameGen = {}, field
             await up.render(scene, camera, frames2[k]);
             if (kept) { const keep = renderer.getRenderTarget(), F = fieldOf(), K = kept[k];
                 await copy(F.motion, K.motion); await copy(F.depth, K.depth); if (K.camera) await copy(up.stage.camera.texture, K.camera); renderer.setRenderTarget(keep); }
-            if (output !== undefined && output !== false) { const keep = renderer.getRenderTarget(); renderer.setRenderTarget(output); await renderer.renderAsync(show[k], ortho); renderer.setRenderTarget(keep); }
+            if (output !== undefined && output !== false) { const keep = renderer.getRenderTarget(); renderer.setRenderTarget(output); await renderNow(renderer, show[k], ortho); renderer.setRenderTarget(keep); }
             frames++;
         },
         /**
@@ -99,12 +100,12 @@ export function makeFsr3(THREE, TSL, renderer, { fsr2 = {}, frameGen = {}, field
             // one real frame in there is nothing to be between: the call above only primed the generator's older depth, and
             // what is shown is the frame itself
             if (frames === 1) { if (ui) await gen.composite(renderer, frames2[0].texture, typeof ui === "function" ? await ui(1) : ui, output);
-                else { const keep = renderer.getRenderTarget(); renderer.setRenderTarget(output); await renderer.renderAsync(show[0], ortho); renderer.setRenderTarget(keep); } }
+                else { const keep = renderer.getRenderTarget(); renderer.setRenderTarget(output); await renderNow(renderer, show[0], ortho); renderer.setRenderTarget(keep); } }
         },
         /** Show real frame k again at `output` -- one of the last hold + 1, which this holds. */
         async show(k, output = null) {
             if (!(k <= frames - 1 && k >= frames - N && k >= 0)) throw new Error(`fx/fsr/fsr3Tsl: show holds the last ${N} real frames, ${Math.max(0, frames - N)} to ${frames - 1} -- got ${k}`);
-            const keep = renderer.getRenderTarget(); renderer.setRenderTarget(output); await renderer.renderAsync(show[k % N], ortho); renderer.setRenderTarget(keep);
+            const keep = renderer.getRenderTarget(); renderer.setRenderTarget(output); await renderNow(renderer, show[k % N], ortho); renderer.setRenderTarget(keep);
         },
         dispose() { up.dispose(); gen.dispose(); for (const f of frames2) f.dispose(); if (kept) for (const K of kept) for (const x of Object.values(K)) if (x) x.dispose(); },
     };

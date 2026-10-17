@@ -5,6 +5,7 @@
 // lockRelaxation, activeMask). Graded by render/temporalLockTsl-selfcheck.mjs. Written into render/temporalTsl.mjs
 // first and split out the same round, when that module's gate grew past the sweep's 20 s cap.
 "use strict";
+import { renderNow } from "./renderNow.mjs";
 import { requireTsl } from "./temporalTsl.mjs";
 // ================================================================================================================
 // v4730 -- THE LOCK RING: render/temporalLock.mjs's pushLuma and shadingShiftCPU -- what fsr.html's chain runs for
@@ -115,7 +116,7 @@ export function makeLumaRing(THREE, TSL, { w, h, period, currentTex, motionTex, 
     let pushes = 0;
     const draw = async (renderer, scs, target) => {
         const prev = renderer.getRenderTarget();
-        renderer.setRenderTarget(target); await renderer.renderAsync(scs[(pushes + 1) % 2], ortho);
+        renderer.setRenderTarget(target); await renderNow(renderer, scs[(pushes + 1) % 2], ortho);
         renderer.setRenderTarget(prev);
     };
     return {
@@ -127,8 +128,8 @@ export function makeLumaRing(THREE, TSL, { w, h, period, currentTex, motionTex, 
         async push(renderer) {
             const prev = renderer.getRenderTarget(), k = pushes % 2;
             u.n.value = pushes;
-            renderer.setRenderTarget(ring[k]); await renderer.renderAsync(pushSc[k], ortho);
-            renderer.setRenderTarget(filled[k]); await renderer.renderAsync(fillSc[k], ortho);
+            renderer.setRenderTarget(ring[k]); await renderNow(renderer, pushSc[k], ortho);
+            renderer.setRenderTarget(filled[k]); await renderNow(renderer, fillSc[k], ortho);
             renderer.setRenderTarget(prev);
             pushes++;
         },
@@ -303,7 +304,7 @@ export function makeLockLife(THREE, TSL, { w, h, motionTex, candidatesTex = null
     const advSc = adv.map((a) => quad(a.node)), relSc = rel.map((r) => quad(r.node)), actSc = act.map((a) => quad(a.node));
     const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     let frames = 0;
-    const draw = async (renderer, sc, target) => { const prev = renderer.getRenderTarget(); renderer.setRenderTarget(target); await renderer.renderAsync(sc, ortho); renderer.setRenderTarget(prev); };
+    const draw = async (renderer, sc, target) => { const prev = renderer.getRenderTarget(); renderer.setRenderTarget(target); await renderNow(renderer, sc, ortho); renderer.setRenderTarget(prev); };
     return {
         life, uniforms: { advance: adv.map((a) => a.uniforms), relaxation: rel.map((r) => r.uniforms) },
         /** The ping-pong pair: advance k writes targets[k % 2]. */

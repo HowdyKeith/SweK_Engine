@@ -38,6 +38,7 @@
 // the package's own temporal RCAS takes before its tonemap inversion (`max(pix, vec3f(0.0))`). The "none" path is
 // left unclamped, as the reference is.
 "use strict";
+import { renderNow } from "../../render/renderNow.mjs";
 
 /** The TSL names this file uses, checked up front so a three upgrade that drops one fails here by name. */
 export const TSL_NEEDS = Object.freeze(["Fn", "float", "int", "vec3", "vec4", "ivec2", "uniform", "textureLoad", "screenCoordinate",
@@ -246,16 +247,16 @@ export function makeFsrSpatial(THREE, TSL, { renderWidth, renderHeight, displayW
         /** Render `scene` through the chain. `output` is a RenderTarget or null for the canvas. */
         async render(renderer, scene, camera, output = null) {
             const prev = renderer.getRenderTarget();
-            renderer.setRenderTarget(sceneTarget); await renderer.renderAsync(scene, camera);
-            renderer.setRenderTarget(easuTarget); await renderer.renderAsync(qE.scene, ortho);
-            renderer.setRenderTarget(output); await renderer.renderAsync(qR.scene, ortho);
+            renderer.setRenderTarget(sceneTarget); await renderNow(renderer, scene, camera);
+            renderer.setRenderTarget(easuTarget); await renderNow(renderer, qE.scene, ortho);
+            renderer.setRenderTarget(output); await renderNow(renderer, qR.scene, ortho);
             renderer.setRenderTarget(prev);
         },
         /** The same low-resolution frame, stretched bilinearly instead -- the comparison FSR1 has to beat. */
         async renderBilinear(renderer, scene, camera, output = null) {
             const prev = renderer.getRenderTarget();
-            renderer.setRenderTarget(sceneTarget); await renderer.renderAsync(scene, camera);
-            renderer.setRenderTarget(output); await renderer.renderAsync(qB.scene, ortho);
+            renderer.setRenderTarget(sceneTarget); await renderNow(renderer, scene, camera);
+            renderer.setRenderTarget(output); await renderNow(renderer, qB.scene, ortho);
             renderer.setRenderTarget(prev);
         },
         dispose() { sceneTarget.dispose(); easuTarget.dispose(); qE.material.dispose(); qR.material.dispose(); qB.material.dispose(); },

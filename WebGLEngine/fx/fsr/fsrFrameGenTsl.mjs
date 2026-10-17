@@ -113,6 +113,7 @@
 // over the frame, fx/fsr/fsrFlowSeed-selfcheck.mjs's fast pans 2.2 to 7.4. A radius of 8 in its place changed every hole and
 // lost where the radius already did well (a shadow's changed pixels -1.6 dB). `fill: { radius: 4, side: "blend" }` is v4768's.
 "use strict";
+import { renderNow } from "../../render/renderNow.mjs";
 import { makeFrameInterp, flowFromMotionNode } from "../../render/frameInterpTsl.mjs";
 import { makeOpticalFlow } from "../../render/opticalFlowTsl.mjs";
 import { makeFlowReconcile } from "../../render/flowReconcileTsl.mjs";
@@ -160,7 +161,7 @@ export function makeFrameGen(THREE, TSL, { w, h, t = 0.5, fill = { radius: 4, re
     const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     const scenes = new Map();
     const once = (key, make) => { if (!scenes.has(key)) scenes.set(key, make()); return scenes.get(key); };
-    const draw = async (renderer, sc, target) => { renderer.setRenderTarget(target); await renderer.renderAsync(sc, ortho); };
+    const draw = async (renderer, sc, target) => { renderer.setRenderTarget(target); await renderNow(renderer, sc, ortho); };
     const of = flow ? makeOpticalFlow(THREE, TSL, { w, h, block: flow.block ?? 8, searchRadius: flow.searchRadius ?? 4, levels: flow.levels ?? 3, refineRadius: flow.refineRadius ?? null, grid: flow.grid ?? "level", seed: !!flow.seed, stillGuess: !!flow.stillGuess,
         retryRadius: flow.retryRadius ?? null, retryRatio: flow.retryRatio }) : null;
     const rec = flow ? makeFlowReconcile(THREE, TSL, { w, h, block: flow.block ?? 8, margin: flow.margin ?? null, marginStill: flow.marginStill ?? 0.5, stillPx: flow.stillPx ?? 0.05, mode: flow.mode ?? "pixel", radius: flow.radius ?? 1 }) : null;

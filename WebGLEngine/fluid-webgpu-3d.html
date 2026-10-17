@@ -34,6 +34,7 @@
 </div>
 <div id="note">3D hybrid FLIP/PIC on a staggered MAC grid: trilinear atomic particle&rarr;grid splat, Jacobi pressure projection, grid&rarr;particle FLIP/PIC blend, RK2 advection. Compute mirrors the unit-tested <b>fluid/flip3d.mjs</b>. Drag to orbit, scroll to zoom. Drop boxes and balls: each becomes a moving SOLID (amber marker) that the fluid splashes off "glass" shades particles as refractive liquid-glass droplets (impostor spheres, fresnel + fake refraction + chromatic tint) &mdash; the technique from the liquid-glass shaders, written directly.mdash; the 3D one-way rigid coupling, mirroring the unit-tested flip3d.mjs. "glass" shades droplets as refractive liquid-glass.</div>
 <script type="module">
+import { adapterOptions } from "/ui/webgpuProbe.mjs";
 const NX = 48, NY = 48, NZ = 48;
 const N_U = (NX + 1) * NY * NZ, N_V = NX * (NY + 1) * NZ, N_W = NX * NY * (NZ + 1), N_C = NX * NY * NZ;
 const MAX_P = 260000, SCALE = 16384.0;
@@ -56,7 +57,7 @@ function norm(a) { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l
 if (!navigator.gpu) fallback(); else init().catch(e => { console.error(e); fallback(String(e.message || e)); });
 
 async function init() {
-  const adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" });
+  const adapter = await navigator.gpu.requestAdapter(adapterOptions("high-performance"));
   if (!adapter) return fallback("No GPU adapter.");
   const device = await adapter.requestDevice();
   const ctx = cvs.getContext("webgpu");
