@@ -5854,3 +5854,71 @@ gates' headers. None was 0 red.
   - The rig's next run reads both GPUs.
 - **`denoise-r18t-margin-1080` is closed** from the committed reports. Section 63's single 1.087 x is now one of eleven page
   readings at 1920 x 1080, all between 1.073 and 1.101 x.
+
+## 90. ROUND 29 -- NOT REPORTED: C1 FIRED ON H2 AGAIN, AND THIS TIME THE LOSS IS IN THE UPSCALE, AT LIGHT SOURCES
+
+**What arrived.** `render/denoise-results-halfres.json`, written by `tools/denoiseStudy.mjs --harvest-halfres` at ccd2df60, the
+commit carrying section 89. It took 3,509 s to render the 12 test images at 256 x 256 here and 165 s to measure. The file was
+committed byte for byte at 0c242093 before it was read.
+
+**The run is not reported. Neither hypothesis is decided.**
+- **C1 fired on H2.** Both of H2's frames must beat B's half-size input upscaled bilinearly on at least 11 of 12 images. **C
+  (bilinear) did on 12 of 12; B (EASU) on 9.**
+- **That is the difference from round 26,** where both did on 9. Here the network's denoised half-size frame holds up through
+  a bilinear upscale on every image. On three, it is the EASU step that ends up no better than upscaling the noise.
+- C1 held on H1 (D 12, B 11). C2 (cited), C3 (no image near its floor), C4 and C5 (60 distinct render seeds) held.
+- `render/denoiseStudy-selfcheck.mjs` re-derives the verdict from the file's own tables. Sabotaged R50-R53; R53 is 0 red by
+  construction, as its note says.
+
+**What the file shows, reported and testing nothing.**
+
+| | B (half size + EASU) against | mean d (positive: B better) | images B won |
+|---|---|---|---|
+| H1's direction | D, full size at 1 sample | -0.302 (round 26: -0.493) | 8 of 12 |
+| H2's direction | C, half size + bilinear | -0.237 | 8 of 12 |
+| the price of the quarter | A, full size at 4 samples | -1.149 (round 26: -1.406) | 0 of 12 |
+
+- **RCAS made every image worse again.** FSR1 whole lost to EASU alone on all 12 (mean d 0.130 in EASU's favour), and RCAS
+  without its denoise lost on all 12 (0.213).
+
+**The split, found after the file was committed, deciding nothing.**
+- **Where the four losses are.** B lost to both comparators on R1, R4, C1 and C5. Those are exactly the four images with a bright
+  light source in view.
+  - Their references peak at radiance 16, 17, 30 and 37. No other image peaks above 8.7.
+  - On those four, 86-98% of B's error lies within 2 px of an emitter pixel, which is 0.1-2.7% of the frame.
+  - C's error sits there too (82-89%), but it is 1.5 to 6 times smaller (R4 1.45 x, C5 2.0 x, C1 2.4 x, R1 6.0 x).
+- **The other eight,** seven with no emitter in view and R2 with a dim one (peak 8.7), go the other way:
+  - B beat C on all eight (d +0.02 to +0.28);
+  - B beat D on all eight (d +0.17 to +1.00).
+- **How these were computed.** From the harvest's own cache, by re-running the half-size denoise and both upscales on each
+  image. Each pixel's term of relMSE was attributed to whether it lies within 2 px of the emitter coverage channel.
+  - This is a description of the twelve images the test was run on, not a test.
+  - It was chosen after the result was read, so it decides nothing and supports nothing.
+- **A reading, not measured as a cause.** The upscaler does not know where the emitter edge is. It interpolates an emitter's
+  radiance (tens) into the dark pixels beside it, whose reference is near zero, and relMSE weighs those pixels most. EASU's
+  edge-following carries the bright value further along an edge than bilinear does.
+
+**The predictions,** read against the directions, since nothing was decided.
+- **P1 (H1 not supported, gap narrowing) pointed the way it said.** The mean d went from -0.493 to -0.302, inside the -0.4 to 0
+  it named.
+- **P2 (H2 supported) pointed the wrong way** on the mean. It pointed the right way on the eight images without a bright
+  emitter.
+- **P3 held:** B above A on all 12, at a price of 1.149, below round 26's 1.406.
+- **P4 (C1 holds on both) failed,** on H2, by the EASU arm alone.
+
+**What follows, and a conflict between two things written before the run.**
+- **Section 89 said:** "If C1 fires on H2 again, `denoise-network-at-run-scale` becomes the next round."
+- **The backlog said, at round 26:** that entry is "only if half resolution still loses at a realistic size, and loses in the
+  denoise rather than the upscale."
+- This round lost in the upscale. The denoise held: C, the same denoised frame upscaled bilinearly, beat its noisy frame on 12
+  of 12.
+- **The two statements point different ways on this outcome, and the choice is Keith's.** Section 89's sentence was written
+  without that distinction in view. The backlog's condition is the more specific one, and this round's data answer it.
+- **Logged as `denoise-halfres-emitter-aware`, and recommended:**
+  - Composite the emitter pixels at full resolution from the geometry. A pure emitter's radiance is its emission, so those
+    pixels need no tracing and no noise.
+  - Upscale the rest with the emitter mask refusing taps across it, as the network's kernel apply already does (section 21).
+  - Pre-register it on new seeds at 256 x 256.
+- **`denoise-fsr2-temporal`** now waits on that round.
+
+**What it does not change.** The page, the network, the filter, every kernel table.

@@ -1686,12 +1686,17 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "denoise-halfres-at-scale",
+        blocker: "CLOSED",
+        what: "DONE as the denoiser arc's round 29 (pre-registration sections 89-90), unshipped on the feature branch at this writing. NOT REPORTED: C1 fired on H2 again -- but this time the half-size frame upscaled BILINEARLY beat its noisy frame on 12 of 12, and through EASU on only 9.",
+        how: "SPLITS_HALFRES (6 R at 42000, 6 C at 43000), 256 x 256 traced and denoised at 128, EASU the candidate; render/denoise-results-halfres.json committed byte for byte (0c242093) before it was read. 3509 s to render here.",
+        why: "*** THE LOSS IS IN THE UPSCALE, AT LIGHT SOURCES, AND THAT IS WHY IT IS KEPT. *** Descriptively: on the 8 images without a bright emitter in view, half size + EASU beat bilinear on all 8 and full size at 1 sample on all 8 (H1 d +0.17 to +1.00). The 4 it lost (R1, R4, C1, C5) are exactly the ones with emitters of peak radiance 16-37, and 86-98% of EASU's error there sits within 2 px of an emitter pixel (under 3% of the frame) -- computed after the file was committed, from the harvest's own cache, and deciding nothing. The next entry carries it.",
+    },
+    {
+        id: "denoise-halfres-emitter-aware",
         blocker: "OPEN",
-        // v4871+: PRE-REGISTERED as the denoiser arc's round 29 (section 89): SPLITS_HALFRES (6 R at 42000, 6 C at 43000), 256 x 256
-        // traced at 128, EASU the candidate, `node tools/denoiseStudy.mjs --harvest-halfres` -> render/denoise-results-halfres.json
-        what: "Round 26's question at a frame size nearer real use: 128 x 128 traced and denoised, upscaled to 256 x 256, against the full-size 1-sample frame at equal samples -- with EASU ALONE as the candidate, since RCAS made every image worse at 64 x 64.",
-        how: "Section 81's shape and render/denoiseUpscale.mjs as they stand, at 256 x 256 and on new test seeds. The references are the cost: 16x the pixels of round 26's 254 s of rendering, so the harvest wants the rig's CPU or the worker pool.",
-        why: "Round 26 could not separate a real loss from the size it was run at: at 64 x 64 a pixel covers so much of a scene that any upscale is guessing. This is the run that can.",
+        what: "Round 29's chain with the emitters taken out of the upscale: emitter pixels composited at full resolution from the geometry (exact and noise-free: an emitter's radiance is its emission), and EASU run on the rest with the emitter mask refusing taps across it -- the arrangement the network's own kernel apply already uses (section 21).",
+        how: "A pre-registered round on new R and C seeds at 256 x 256, round 29's frames and controls, B the emitter-aware chain and round 29's plain EASU chain reported beside it. The guide buffers at full size cost a rasterization, not a trace.",
+        why: "Round 29's descriptive split (section 90): the half-size chain won every emitter-free image against both comparators and lost every bright-emitter image, with nearly all of its error at emitter edges. If the edge is the whole loss, this is the round that shows half resolution paying for itself, and FSR2 comes off its blocker after it.",
     },
     {
         id: "denoise-network-at-run-scale",
@@ -1699,7 +1704,7 @@ export const NEXT_ROUNDS = [
         what: "A network trained on half-size renders -- its 9 x 9 kernel covering the scene the way it does when it runs at half size -- tested in round 26's arrangement.",
         how: "Round 11's training on the same 192 R + C scenes rendered at half size, then a pre-registered harvest against the shipped network on the half-size chain.",
         why: "Section 82's unmeasured cause: at half size the shipped network sees every scene at twice the scale it was trained on, and C1's three failures are where that would bite.",
-        upstream: "denoise-halfres-at-scale: only if half resolution still loses at a realistic size, and loses in the denoise rather than the upscale.",
+        upstream: "denoise-halfres-at-scale: only if half resolution still loses at a realistic size, and loses in the denoise rather than the upscale. Round 29 (section 90) lost in the UPSCALE: the denoised half-size frame upscaled bilinearly beat its noisy frame on 12 of 12. So by this entry's own condition it stays blocked -- though section 89 named it as next if C1 fired on H2 again; section 90 sets the two side by side.",
     },
     {
         id: "denoise-winograd",
@@ -1760,7 +1765,7 @@ export const NEXT_ROUNDS = [
         what: "FSR2's temporal upscale on denoised path-traced frames: jittered renders, motion vectors and history.",
         how: "fx/fsr/fsrTemporalTsl.mjs drives a three.js scene; the path tracer is neither a three.js scene nor does it make motion vectors or jitter. Those are the work.",
         why: "Temporal reuse is where real-time path tracing gets most of its samples.",
-        upstream: "denoise-halfres-at-scale: round 26 (denoise-fsr1-halfres) was not reported and, descriptively, the half-size chain lost at 64 x 64 -- the spatial round has to say upscaling a denoised frame keeps enough of the picture first.",
+        upstream: "denoise-halfres-emitter-aware: rounds 26 and 29 were not reported; at 256 x 256 the half-size chain won every emitter-free image and lost at light sources (section 90). The spatial round has to show upscaling a denoised frame keeps enough of the picture, emitters included, first.",
     },
     {
         id: "denoise-fsr3-framegen",

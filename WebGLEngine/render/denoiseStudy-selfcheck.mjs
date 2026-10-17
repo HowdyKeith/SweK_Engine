@@ -67,6 +67,11 @@
 //   R47 --harvest-halfres not passing ROUND_HALFRES's candidate                  1 RED -- the CLI row (the run would be round 26's FSR1)
 //   R48 C4's re-run hard-coded to FSR1                                          1 RED -- the EASU end-to-end row (C4 false)
 //   R49 the candidate guard removed                                             1 RED -- the refusal row (upscale's own error is not the guard's)
+//   R50 (section 90) C1's eleven of twelve lowered to nine                      2 RED -- section 82's re-derivation and section 90's
+//   R51 the committed round 29 results' verdict edited to "reported"             1 RED -- section 90's row
+//   R52 the committed round 29 results' C4 edited to false                       1 RED -- section 90's row
+//   R53 section 90's row without its bilinear count (filterWins === 12)          0 RED -- redundant by construction: the same row compares
+//       the verdict's reasons, which state both counts
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -474,6 +479,20 @@ console.log("\n16. ROUND 29: THE SAME QUESTION AT 256 x 256, EASU THE CANDIDATE 
     const cli = fs.readFileSync(path.join(ENG, "tools/denoiseStudy.mjs"), "utf8");
     const b0 = cli.indexOf('} else if (args.includes("--harvest-halfres")) {'), branch = b0 >= 0 ? cli.slice(b0, cli.indexOf('} else if (args.includes("--harvest-fsr1")) {', b0)) : "";
     const code = branch.replace(/\/\/.*$/gm, "");
+    // section 90: the committed round 29 results, read back by code -- "not reported, C1 on H2" is the rule's output over the file's own
+    // tables, with C1's two counts (EASU's 9, bilinear's 12) and every other control as the file states them
+    const hfile = path.join(ENG, RESULTS_HALFRES);
+    if (fs.existsSync(hfile)) {
+        const res = JSON.parse(fs.readFileSync(hfile, "utf8")), T3 = res.tables;
+        const sets3 = { H1: { noisy: T3.noisyFull1, filter: T3.D, net: [T3.B], floor: T3.floor }, H2: { noisy: T3.noisyHalfUp, filter: T3.C, net: [T3.B], floor: T3.floor } };
+        const again3 = verdict({ sets: sets3, shuffled: null, c2Prior: ROUND_HALFRES.c2Prior, determinism: res.determinism, seedsDistinct: res.seedsDistinct, test: ROUND_HALFRES.test });
+        const c1h2 = again3.hypotheses.H2.c1, c1h1 = again3.hypotheses.H1.c1;
+        ok("!! *** section 90: verdict() over the committed round 29 tables gives the file's verdict -- NOT REPORTED, C1 on H2: EASU beat its noisy frame on 9 of 12, bilinear on 12 ***",
+            again3.run === "not reported" && res.verdict.run === "not reported" && JSON.stringify(again3.reasons) === JSON.stringify(res.verdict.reasons) &&
+            c1h2.netWins === 9 && c1h2.filterWins === 12 && c1h2.ok === false && c1h1.ok === true && c1h1.netWins === 11 && c1h1.filterWins === 12 &&
+            res.determinism === true && res.seedsDistinct === true && res.seedCount === 60 && res.config.image === 256 && res.config.upscale.kind === "easu" &&
+            T3.B.every((v, i) => Object.is(v, T3.easu[i])), again3.reasons.join(" | "));
+    } else ok("!! section 90 reads render/denoise-results-halfres.json, and it is not there", false);
     ok("!! --harvest-halfres decodes the shipped file with decodeNet, runs runUpscaleStudy on ROUND_HALFRES's split, size and candidate under harvest, writes its results file and never an existing one, and logs no verdict",
         branch.length > 400 && /decodeNet\(shipped\.net\)/.test(code) && /runUpscaleStudy\(/.test(code) && /harvest: true/.test(code) &&
         /splits: ROUND_HALFRES\.splits/.test(code) && /image: ROUND_HALFRES\.image/.test(code) && /candidate: ROUND_HALFRES\.candidate/.test(code) &&
