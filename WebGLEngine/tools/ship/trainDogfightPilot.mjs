@@ -39,7 +39,7 @@ export const RECIPE = Object.freeze({ runs: 4, iters: 600, seed: 8000, sigma: 0.
  * importer takes them as pilots; what makes one a fighter is its `by`.
  */
 export const BRAINS = Object.freeze({
-    fly: Object.freeze({ id: "fly", policy: PF, policyId: "pilotFlightPolicy", out: path.resolve(HERE, "..", "..", "brain", "pilotDogfightWeightsDefault.json"), seed: 8000, name: "the fruit fly's Giant Fiber Circuit", citation: "male-cns Giant Fiber Circuit (Janelia FlyEM, vendor/male-cns/PROVENANCE.md), trained on dogfights" }),
+    fly: Object.freeze({ id: "fly", policy: PF, policyId: POLICY_ID, out: path.resolve(HERE, "..", "..", "brain", "pilotDogfightWeightsDefault.json"), seed: 8000, name: "the fruit fly's Giant Fiber Circuit", citation: "male-cns Giant Fiber Circuit (Janelia FlyEM, vendor/male-cns/PROVENANCE.md), trained on dogfights" }),
     gpu: Object.freeze({ id: "gpu", policy: MF, policyId: "pilotFlightMlp", out: path.resolve(HERE, "..", "..", "brain", "pilotDogfightMlpWeightsDefault.json"), seed: 9000, name: "the GPU Brain's MLP", citation: "SweK GPU Brain: brain/mlp.js BatchedMLP, an 18-32-32-4 relu network started from the autopilot's laws, trained on dogfights" }),
 });
 export const brainOf = (opts) => { const b = BRAINS[(opts && opts.brain) || "fly"]; if (!b) throw new Error(`unknown brain ${JSON.stringify(opts.brain)} (known: ${Object.keys(BRAINS).join(", ")})`); return b; };

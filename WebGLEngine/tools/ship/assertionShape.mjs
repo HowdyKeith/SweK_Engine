@@ -935,8 +935,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4868 -- one new gate (render/denoiseUpscale-selfcheck.mjs, the denoiser arc's round 26), spelling ok(name, cond, detail) like the tree's majority: gates, usesOk, definesOk and nameFirst each +1.
     // v4869 -- two new gates (tools/ship/trainFlightPilot-selfcheck.mjs and brain/pilotFlightTrain-selfcheck.mjs), each spelling ok(name, cond, detail): gates, usesOk, definesOk and nameFirst each by two (1978 -> 1980, 1957 -> 1959, 1949 -> 1951, 1848 -> 1850, on top of the denoiser's v4868); nothing else moved.
     // v4870 -- three new gates (brain/pilotFlightMlp-selfcheck.mjs, brain/pilotFlightGpu-selfcheck.mjs, tools/ship/trainFlightPilotGpu-selfcheck.mjs), each spelling ok(name, cond, detail): gates, usesOk, definesOk and nameFirst each by three (1980 -> 1983, 1959 -> 1962, 1951 -> 1954, 1850 -> 1853); nothing else moved.
-    gates: 1983, usesOk: 1962, definesOk: 1954, importsOk: 0,
-    distinctDefinitions: 44, nameFirst: 1853, condFirst: 98, unknownSignature: 11,
+    // v4874 -- twenty-two new gates, each spelling ok(name, cond, detail) like the tree's majority, so gates, usesOk, definesOk and nameFirst each move by twenty-two (1983 -> 2005, 1962 -> 1984, 1954 -> 1976, 1853 -> 1875); nothing else moved. They are the unnumbered line's: ai-bridge/tools/roundhouseRoutes-selfcheck.mjs, brain/{battleshipFight,bomberFight,dogfightArena,dogfightTask,dogfightTrain,seatGunnerMlp,seatGunnerPolicy,spaceArena}-selfcheck.mjs, physics/mechanics/{bomber,capitalShip,flightGuns,froudeScale,gunSeats}-selfcheck.mjs, render/{flightViews,renderNow}-selfcheck.mjs and tools/ship/{battleshipPage,bomberPage,dogfightPage,trainDogfightPilot,trainDogfightPilotShipped,trainSeatGunner}-selfcheck.mjs.
+    gates: 2005, usesOk: 1984, definesOk: 1976, importsOk: 0,
+    distinctDefinitions: 44, nameFirst: 1875, condFirst: 98, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

@@ -37,6 +37,16 @@
 //   Q39 (the paired gain against the wrong set) and Q42 (the --workers children not told --smoke) passed: the autopilot scored the same on the audit as on the held-out, and a child on the real train fights made the same 2-iteration search as one on the smoke fights -- the autopilot's audit is now 0.45 against its held-out 0.5, and the children's
 //   train score, improvements and neutral moves are compared too. Q3 (an explicit option losing to the defaults) HANGS the gate (the smoke command then runs the full 600 iterations) and was stopped at 240 s: a hang is a red that does not name its row, and is said so rather than counted as a pass.
 "use strict";
+// UNNUMBERED, section 8 -- describeEval and POLICY_ID were the two exported names of the trainer that no gate named (definitionGates
+// found the tree-wide counts 350 / 684 / 512 grown to 351 / 686 / 514 and nothing else). Sabotage log, the tool restored after each:
+//   POLICY_ID changed                                -> 3 red (the brain table, the blob's importer, the POLICY_ID row)
+//   describeEval's score to 3 places                 -> 3 red (the row, the partial-kinds row, the blob's `by` row)
+//   describeEval's kinds in reverse order            -> 2 red
+//   describeEval printing every kind                 -> FIRST TRY EXIT 1 WITH 0 FAIL LINES: the row threw out of the gate. Wrapped,
+//                                                       now 1 red by name
+//   describeEval's kills and losses swapped          -> 2 red
+//   the brain table going back to a second copy of the literal -> 0 red, AND IT CANNOT BE OTHERWISE: the value is the same string.
+//                                                       The row says so rather than claim a source property it does not hold.
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -230,6 +240,26 @@ sec("7. THE FILE: blobOf()");
         /TRAINED ON DOGFIGHTS/.test(by) && /seed 9000 of 1 runs \(9000\.\.9000\)/.test(by) && /sigma 0\.3/.test(by) && /1-4 weights per child/.test(by) && /9 iterations over the 40 train fights/.test(by) && /4 of the 1796 weights differ from the autopilot/.test(by) && /held-out 0\.6500/.test(by) && /\(the autopilot 0\.5000\)/.test(by) && /audit 0\.6[45]\d*/.test(by) && /\d+ fights better, \d+ worse/.test(by) && /gain 0\.(19|20)\d* \+- 0\.0\d*, \d+\.\d+ paired standard errors/.test(by) && /reserve 0\.6500|reserve 0\.5000/.test(by) && /safety audit of 40 fights: 0 lost to the ground or a collision \(the autopilot 0\)/.test(by) && /GRADED ONLY AGAINST THE PD AUTOPILOT AS OPPONENT/.test(by), by.slice(0, 90));
     const dump = TR.dumpOf(g, gOpts);
     ok("dumpOf() is plain JSON (it survives a round trip), names the recipe, the champion's seed and the verdict, and keeps every run's weights", JSON.stringify(JSON.parse(JSON.stringify(dump))) === JSON.stringify(dump) && dump.champion === 9000 && dump.recipe.runs === 1 && dump.verdict.ok === true && dump.runs[0].weights.length === 1796);
+}
+
+sec("8. THE TWO NAMES THE TREE'S CENSUS FOUND UNNAMED: describeEval AND POLICY_ID (UNNUMBERED)");
+{
+    // describeEval is the line every progress report, the champion's verdict and the blob's `by` quote an evaluation in; a
+    // changed format moves what a reader compares across runs, so it is held to the character. POLICY_ID is the fruit fly's
+    // policy name: the brain table, the blob the tool writes and the importer that must accept it all have to agree on it.
+    const kinds = D.KINDS.slice(), by = Object.fromEntries(kinds.map((k, i) => [k, 0.1 * (i + 1)]));
+    const full = TR.describeEval({ score: 0.123456, byKind: by, kills: 3, deaths: 1 });
+    const want = "0.1235 (" + kinds.map((k, i) => k + " " + (0.1 * (i + 1)).toFixed(3)).join(", ") + "; 3 kills, 1 lost)";
+    ok("!! describeEval() IS THE ONE-LINE EVALUATION: the score to 4 places, each kind in the dogfight task's own order to 3, then the kills and the losses",
+        full === want, JSON.stringify(full));
+    const part = (() => { try { return TR.describeEval({ score: -0.5, byKind: { duel: 0.25, tail: -1 }, kills: 0, deaths: 7 }); } catch (e) { return "threw: " + e.message; } })();
+    ok("...a kind the evaluation did not fly is left out (not printed as NaN or 0), the order is still the task's, and a negative score keeps its sign",
+        part === "-0.5000 (tail -1.000, duel 0.250; 0 kills, 7 lost)", JSON.stringify(part));
+    ok("!! POLICY_ID IS THE FRUIT FLY'S POLICY NAME and the brain table's id for the fruit fly is the same string (the tool builds the table from it; a second copy of the literal with the same value is not distinguishable by value, and no row pretends to)",
+        TR.POLICY_ID === "pilotFlightPolicy" && TR.BRAINS.fly.policyId === TR.POLICY_ID && TR.BRAINS.fly.policy === PF);
+    const desc = PB.describePolicy(TR.POLICY_ID, PF);
+    ok("...and it is the id the importer's description of the fruit fly's policy carries, with that policy's own weight count",
+        desc && desc.id === TR.POLICY_ID && desc.WEIGHT_COUNT === PF.WEIGHT_COUNT, "describePolicy(POLICY_ID) -> id " + JSON.stringify(desc && desc.id) + ", " + (desc && desc.WEIGHT_COUNT) + " weights");
 }
 
 console.log(fails ? `\ntrainDogfightPilot-selfcheck: ${fails} FAILED` : "\ntrainDogfightPilot-selfcheck: all checks pass");

@@ -9276,6 +9276,47 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "population census grown by one; and three rows restated where a fresh record broke a count rather than a claim. The label-collision " +
                  "round's guards picked this ship's numbers. NOT CLOSED: section 87 needs the rig, and libmSensitivity and responseCensus still time out.",
     }),
+    // v4874 -- since564, from `versionPreflight --next` after a full fetch (the highest declared anywhere was since563, main's; nothing else past it on any remote ref). TWENTY-TWO new gate files, all the unnumbered
+    // line's (the dogfight, the bomber, the space battleship, the seat gunners, and the rig-page fixes' two): this is their first sweep, run serially-by-three after main's v4873 was merged in.
+    since564: Object.freeze({
+        at: "v4874", swept: 22, green: 22, red: 0,
+        added: Object.freeze([
+            "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs",
+            "brain/battleshipFight-selfcheck.mjs",
+            "brain/bomberFight-selfcheck.mjs",
+            "brain/dogfightArena-selfcheck.mjs",
+            "brain/dogfightTask-selfcheck.mjs",
+            "brain/dogfightTrain-selfcheck.mjs",
+            "brain/seatGunnerMlp-selfcheck.mjs",
+            "brain/seatGunnerPolicy-selfcheck.mjs",
+            "brain/spaceArena-selfcheck.mjs",
+            "physics/mechanics/bomber-selfcheck.mjs",
+            "physics/mechanics/capitalShip-selfcheck.mjs",
+            "physics/mechanics/flightGuns-selfcheck.mjs",
+            "physics/mechanics/froudeScale-selfcheck.mjs",
+            "physics/mechanics/gunSeats-selfcheck.mjs",
+            "render/flightViews-selfcheck.mjs",
+            "render/renderNow-selfcheck.mjs",
+            "tools/ship/battleshipPage-selfcheck.mjs",
+            "tools/ship/bomberPage-selfcheck.mjs",
+            "tools/ship/dogfightPage-selfcheck.mjs",
+            "tools/ship/trainDogfightPilot-selfcheck.mjs",
+            "tools/ship/trainDogfightPilotShipped-selfcheck.mjs",
+            "tools/ship/trainSeatGunner-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "fx/fsr/fsr3Tsl-selfcheck.mjs (the 'draws NO scene' counter now patches render() as well as renderAsync(): with the drivers on render/renderNow.mjs the old counter read 0 whatever the generator drew)",
+            "tools/ship/fsrThreeWorld-selfcheck.mjs (the hide-the-layer row follows fsr-three.html to renderNow)",
+            "tools/roundhouse/floorAtlas-selfcheck.mjs (the PREFIX row asks roundhouseBridge.owns() instead of matching its source)",
+            "ui/webgpuProbe-selfcheck.mjs (adapterOptions() and the scan that no page names a power preference itself)",
+            "tools/ship/deviceCompute-selfcheck.mjs (gfx/device.js reaches requestAdapter through adapterOptions)",
+            "tools/ship/trainDogfightPilot-selfcheck.mjs (section 8: describeEval and POLICY_ID, the two names definitionGates found unnamed)",
+        ]),
+        verdict: "green, 22 of 22, 0.1 s to 408 s each under a three-way parallel load (the longest: brain/battleshipFight-selfcheck.mjs 408 s, tools/ship/trainDogfightPilotShipped-selfcheck.mjs 251 s, tools/ship/trainSeatGunner-selfcheck.mjs 214 s, tools/ship/battleshipPage-selfcheck.mjs 175 s; they are over the quick sweep's line and the rotation times them alone). " +
+                 "Each was sabotaged when it was written and its log is in its own header; the ones written this round that went 0 red first and were fixed in the gate are counted there. The 78 gates that import the modules the rig-page fixes touched were run after them and found two source-text gates this line had broken (fsrThreeWorld, floorAtlas, both repaired and sabotaged) and one that had gone blind without a red (fsr3Tsl's scene-draw counter); timingKind-selfcheck and gateSweep-selfcheck were red at 91b7cf11 as well, for want of this record and the timing records the ship writes. " +
+                 "NOT CLOSED: nothing of this has run on a real Windows Chrome or a real GPU; fsrFlowCost's timing row was red once under four-way load and green alone and has not been re-run under load at the pre-change commit; the rig's verify has not yet seen this tree.",
+    }),
     // v4873 -- since563, from `versionPreflight --next` after a full fetch (the highest declared anywhere was since562). It closes
     // TWO versions: v4872 shipped without a closing of its own, and v4873 supersedes it before it was published. NO new gate file.
     since563: Object.freeze({

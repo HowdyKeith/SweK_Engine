@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "37f93d661decd34a30acc55601bc2d9da7ed734d",
+ "head": "9455676df940fd10e4cd797b38e21f7e51b4d08c",
  "bodies": {
   "box3d": [
    {
@@ -555,6 +555,11 @@
     "sha": "c9d9ce2e614112b74590ef04b26cd79212466be8"
    },
    {
+    "path": "battleship.html",
+    "bytes": 68316,
+    "sha": "6fc9d1325477e196ae93b78311134d2290d33c2c"
+   },
+   {
     "path": "battleship3d.html",
     "bytes": 55076,
     "sha": "f21cfb089b75d5163f10c5f3286e7903c5650192"
@@ -573,6 +578,11 @@
     "path": "blobulator.html",
     "bytes": 25259,
     "sha": "67d3add6a172d5a5c4534d244baa7deaea248e54"
+   },
+   {
+    "path": "bomber.html",
+    "bytes": 45057,
+    "sha": "fb2fcb1ae26ae94a6767d8058e0c830aaec8359f"
    },
    {
     "path": "box3d-blobs.html",
@@ -598,6 +608,11 @@
     "path": "cosmic-web.html",
     "bytes": 8724,
     "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+   },
+   {
+    "path": "dogfight.html",
+    "bytes": 33442,
+    "sha": "d9c5384c16cd428db910a934e2d6c365f57fd66b"
    },
    {
     "path": "es-aircraft.html",
@@ -721,13 +736,13 @@
    },
    {
     "path": "lbm3d-gpu.html",
-    "bytes": 14332,
-    "sha": "ac8b6205f87234d1bf2d9506d9c540cc4c4feeb2"
+    "bytes": 14381,
+    "sha": "e42a281a36cd5d4c329b3eba073186d2bc029fb2"
    },
    {
     "path": "main.js",
-    "bytes": 3655597,
-    "sha": "37f93d661decd34a30acc55601bc2d9da7ed734d"
+    "bytes": 3661423,
+    "sha": "e4b6f551cc84dcee8dbf26678aeb7c0a6b4027f3"
    },
    {
     "path": "mpm3d.html",
@@ -933,8 +948,8 @@
    },
    {
     "path": "fsr-three.html",
-    "bytes": 48758,
-    "sha": "3010997dd290281cd20dbf19cbffe2823d6e18b9"
+    "bytes": 48796,
+    "sha": "e42a281a36cd5d4c329b3eba073186d2bc029fb2"
    },
    {
     "path": "fx/fsr/fsr3Hold-selfcheck.mjs",
@@ -958,8 +973,8 @@
    },
    {
     "path": "fx/fsr/fsr3Tsl-selfcheck.mjs",
-    "bytes": 21874,
-    "sha": "2269cecad488e6e125a39b6af6351aecaad9d1d8"
+    "bytes": 23387,
+    "sha": "e42a281a36cd5d4c329b3eba073186d2bc029fb2"
    },
    {
     "path": "fx/fsr/fsrFlicker-selfcheck.mjs",
@@ -1110,6 +1125,11 @@
     "path": "render/reactiveTsl-selfcheck.mjs",
     "bytes": 12747,
     "sha": "060a99334f7c830b36779a04b91157b063a7ab07"
+   },
+   {
+    "path": "render/renderNow-selfcheck.mjs",
+    "bytes": 12536,
+    "sha": "e42a281a36cd5d4c329b3eba073186d2bc029fb2"
    },
    {
     "path": "render/temporalClipTsl-selfcheck.mjs",
@@ -1278,8 +1298,8 @@
    },
    {
     "path": "tsl-rig.html",
-    "bytes": 11184,
-    "sha": "19f94a9c47991d70552c8dcaab2affdd5486d55d"
+    "bytes": 11233,
+    "sha": "e42a281a36cd5d4c329b3eba073186d2bc029fb2"
    },
    {
     "path": "ui/aiPresenceOrbWidget.js",
@@ -1288,6 +1308,11 @@
    }
   ],
   "three-webgpu-r185": [
+   {
+    "path": "render/renderNow-selfcheck.mjs",
+    "bytes": 12536,
+    "sha": "e42a281a36cd5d4c329b3eba073186d2bc029fb2"
+   },
    {
     "path": "tools/ship/threePatch.mjs",
     "bytes": 21567,
