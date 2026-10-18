@@ -11,6 +11,9 @@
 //
 //   A HELM PILOT (a capital ship's `helmPilot`, off by default): (rule, ctx) -> { torque, thrust }, called once a tick for a ship with a helm, AFTER the rule has decided: `rule` is { torque (body frame, already limited to the hull's own), thrust (a force along the nose) } -- whatever the behaviour made of them, a station's included -- and `ctx`
 //               is { body, ship, foe (the nearest enemy, or null), thrustMax (what the pods left give) }. What it returns REPLACES them, the torque limited to the hull's own again and the thrust clamped to 0..thrustMax. brain/helmPolicy.mjs is the network that fills it. A ship with no helm (the `crew` option) is not asked.
+//   A TWO-PHASE TICK (the seats' networks asked in a batch): a gunner that is a network (brain/seatGunnerPolicy.mjs's `decide`) has two halves, `prepare` (its sight and the twelve features) and `finish` (the controls into a command), and carries `net` (the weights, the layers, the `post`). The tick runs every working seat's `prepare`,
+//               hands the networks of the seats that have a target out as ONE batch ([{ net, x }]) and goes on with the controls it is sent back. stepSpaceArena() runs each network on the CPU as its gunner would have (the same arithmetic: the tick is the tick it always was, bit for bit); stepSpaceArenaAsync(arena, forwardBatch) lets a function of its own run the batch
+//               (brain/seatGunnerGpu.mjs: the GPU Brain's BatchedMLP on a GPUDevice, one forward() per distinct network per tick). A gunner with no halves is called whole, as it always was; a seat that cannot work is not asked.
 //   A TICK      every live craft decides from the states the tick started with; fighters and seats fire; the wave-motion cannon fires if it is charged and something is in its line; every body moves one tick; fighters that touch each other collide (brain/shipCollision6dof.mjs, as the page);
 //               every round moves and is tested against the enemy craft (flightGuns.stepRounds with g = 0 and no ground: space) -- ROUNDS ARE TESTED PER TEAM AGAINST THE OTHER TEAMS' CRAFT ONLY, as the page's weapons are (so BY DEFAULT there is no friendly fire and no hold-fire rule, unlike the flight arena -- `friendlyFire: true` turns both on, below); a fighter that touches a ship's
 //               hull is lost and the ship takes 25; hit points gone is destroyed. THE FIGHT IS OVER when fewer than two teams have a craft flying, or at the time limit.
@@ -204,8 +207,12 @@ export function stationPlan(arena, c) {
     return { aim, thrust: Math.max(0, Math.min(aMax, aPar / Math.cos(tilt))) * c.body.mass, slot, error: norm(e) };
 }
 
-/** One tick of every craft and every round. Mutates and returns the arena; a finished arena is returned untouched. `arena.events` is this tick's: [{ type: "hit" | "part" | "kill" | "wave" | "ram" | "collision", ... }]. */
-export function stepSpaceArena(arena) {
+/**
+ * One tick of every craft and every round, as a GENERATOR so that the seats' networks can be asked in a batch: the tick runs to the point where every working seat whose gunner is a network (it has `decide.prepare` and `decide.net`: brain/seatGunnerPolicy.mjs's) has done everything but the network, yields
+ * the batch ([{ net, x }]: the network and its twelve features, in seat order across the ships), and goes on with the controls it is sent back -- one array of three for each. A tick with no network seat yields nothing. stepSpaceArena() drives it with each seat's own CPU forward pass (the same call the
+ * gunner itself would make, so the tick is the tick it always was, bit for bit); stepSpaceArenaAsync() drives it with whatever batch function it is given (brain/seatGunnerGpu.mjs's, on a GPUDevice).
+ */
+function* tickGen(arena) {
     if (arena.done) return arena;
     const { dt } = arena, t = arena.i * dt, tEnd = (arena.i + 1) * dt, events = [], alive = arena.crafts.filter(flying), plan = new Map(), fresh = [];
     const tag = (rounds, c, gun) => {
@@ -244,15 +251,30 @@ export function stepSpaceArena(arena) {
             c.last = { foe: foe ? foe.id : null, fire: false, thrust: plan.get(c).thrust, mode: c.helm ? (c.behaviour === "station" && !station ? "face" : c.behaviour) : "no helm" };
         }
     }
+    // the seats decide, all of them before any of them acts: what each gunner wants, from the states the tick started with. A gunner that is a network does everything but the network now (its sight, its features), and the networks are run together, once, by whoever drives the tick
+    const shownOf = new Map(), seatCmd = new Map(), jobs = [], jobSeats = [];
+    for (const c of alive) {
+        if (c.kind !== "capital") continue;
+        const shown = alive.filter((o) => o.team !== c.team && norm(sub(o.body.pos, c.body.pos)) < VISION).map((o) => ({ id: o.id, pos: o.body.pos, vel: o.body.vel, radius: o.aimRadius }));
+        shownOf.set(c, shown);
+        for (const st of c.seats) {
+            if (!seatWorks(c, st)) { seatCmd.set(st, { yaw: st.state.yaw, pitch: st.state.pitch, fire: false, target: null }); continue; }
+            if (typeof st.decide.prepare === "function" && st.decide.net) {
+                const prep = st.decide.prepare(st.seat, st.state, c.body, shown, t);
+                if (prep.x === null) seatCmd.set(st, st.decide.finish(prep, null)); else { jobs.push({ net: st.decide.net, x: prep.x }); jobSeats.push({ st, prep }); }
+            } else seatCmd.set(st, st.decide(st.seat, st.state, c.body, shown, t));
+        }
+    }
+    if (jobs.length) { const ys = yield jobs; jobSeats.forEach(({ st, prep }, i) => seatCmd.set(st, st.decide.finish(prep, ys[i]))); }
     // the guns: a fighter's fixed gun, then every working seat
     for (const c of alive) {
         if (c.kind === "fighter") {
             const p = plan.get(c), shot = G.fireFrom(c.gun, () => ({ pos: add(c.body.pos, RB.rotateByQuat(c.body.q, FIGHTER.muzzle)), vel: c.body.vel.slice(), dir: RB.rotateByQuat(c.body.q, [1, 0, 0]) }), p.fire, dt, c.id);
             c.gun = shot.gun; fresh.push(...tag(shot.rounds, c, FIGHTER_GUN));
         } else {
-            const shown = alive.filter((o) => o.team !== c.team && norm(sub(o.body.pos, c.body.pos)) < VISION).map((o) => ({ id: o.id, pos: o.body.pos, vel: o.body.vel, radius: o.aimRadius }));
+            const shown = shownOf.get(c);
             for (const st of c.seats) {
-                const cmd = seatWorks(c, st) ? st.decide(st.seat, st.state, c.body, shown, t) : { yaw: st.state.yaw, pitch: st.state.pitch, fire: false, target: null };
+                const cmd = seatCmd.get(st);
                 let go = cmd; st.blocked = null;
                 if (cmd.fire && arena.friendlyFire && c.holdFire) {   // the line that matters is the one the seat points along AFTER this tick's slew, so the slew is done first without the trigger
                     const aimed = GS.stepSeat(st.seat, st.state, c.body, { ...cmd, fire: false }, dt, c.id).state, why = seatBlocked(arena, c, { seat: st.seat, state: aimed }, cmd);
@@ -361,6 +383,19 @@ export function stepSpaceArena(arena) {
     else if (arena.i >= Math.round(arena.seconds / dt)) { arena.done = true; arena.over = "time"; }
     arena.events = events;
     return arena;
+}
+
+/** One tick of every craft and every round. Mutates and returns the arena; a finished arena is returned untouched. `arena.events` is this tick's: [{ type: "hit" | "part" | "kill" | "wave" | "ram" | "collision", ... }]. The seats' networks are run one forward pass each, on the CPU. */
+export function stepSpaceArena(arena) {
+    const g = tickGen(arena); let r = g.next();
+    while (!r.done) r = g.next(r.value.map((j) => j.net.forward(j.net.w, j.x)));
+    return r.value;
+}
+/** The same tick with the seats' networks run by `forwardBatch(jobs) -> Promise<controls for each job>` (brain/seatGunnerGpu.mjs's gpuBatcher on a GPUDevice, or a CPU function of your own). Mutates and returns the arena. */
+export async function stepSpaceArenaAsync(arena, forwardBatch) {
+    const g = tickGen(arena); let r = g.next();
+    while (!r.done) r = g.next(await forwardBatch(r.value));
+    return r.value;
 }
 
 /** Step until the arena is done. Returns it. */

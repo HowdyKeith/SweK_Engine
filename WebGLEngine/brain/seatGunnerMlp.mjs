@@ -31,7 +31,7 @@ export function forward(w, x) {
     for (const l of layersOf(w)) h = mlpLayerCpu(l, h, 1);
     return [Math.tanh(h[0]), Math.tanh(h[1]), Math.tanh(h[2])];
 }
-export const gunnerFor = (w, sight, opts = {}) => SG.gunnerFor(w, sight, { ...opts, forward });
+export const gunnerFor = (w, sight, opts = {}) => SG.gunnerFor(w, sight, { ...opts, forward, layersOf, post: SG.post });
 export const gunnerFactory = (w, makeSight, opts = {}) => (seat, k) => gunnerFor(w, makeSight(seat, k), opts);
 
 /** The hand gunner in this network's weights: no correction, the trigger the sight's own flag (+4 and -2 through one unit of each hidden layer). */

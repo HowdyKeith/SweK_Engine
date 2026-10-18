@@ -21,6 +21,8 @@
 //  11  THE END        by time, one team left, none left; a finished fight is not stepped
 //  7b  WRECKS, IMPACTS AND CREW (three options, off by default)   a hit gives the victim the round's momentum relative to it at the hit point (J / m, and (r x J) / I about each axis, to 1e-12); a destroyed craft goes on exactly as rigidBody6dof.step carries a body with no force, is still no target and no shooter; the bridge crew (200) takes the helm and the cannon with it, a gunner dies at half his part's hit points and his seat stops while the part stands
 //  8b  FRIENDLY FIRE (the option, off by default)   rounds then hit every craft but their owner (a team-mate; the ship's own hull, but not the parts a round is fired from inside of), with the friendly hit counted apart and not credited; HOLD FIRE keeps a fighter's trigger back for a team-mate in the line (the closest approach in closed form, to the target's range, the mate's size plus 2 units) and a seat's INTERLOCK adds the ship's own hull and tests the line after the slew; the cannon holds for a mate in its beam; with the rules off the fighters shoot each other and the ship shoots itself
+//  6b  THE TWO-PHASE TICK   a network seat does everything but the network (prepare), every network is asked at once, then every seat takes its answer (finish): the fight is the fight it was, to the bit, for a ship of networks, for a mixed ship, for two ships of two kinds, and with a CPU batch driven asynchronously; the batch is asked at
+//                     most once a tick, never for a seat that cannot work or a rule gunner, first ship's seats first; its answers are what the seats do; the async tick awaits it and passes its failure on; a finished arena is left alone
 //  12  THE FRONT DOOR the export list is pinned and the report line says real numbers
 //  5b  A SHIP THAT KEEPS ITS STATION (behaviour 'station' with a leader and a world-frame offset)   a station is refused by name unless it is a capital ship with another capital ship for its leader and an offset of three numbers; the law written out in the gate and driven on states set by hand (the leader's own thrust along its nose,
 //                     kp 0.01 on the position error and kd 0.2 on the velocity error, the part along the nose as the throttle and never negative, the rest as a tilt of the nose of at most 0.6 rad, the pods capping the throttle); a dead leader leaves a ship that faces the enemy; and the measure that it works: two ships with an enemy
@@ -81,6 +83,10 @@
 //   T27 a station ship does not face its enemy when it has no leader 1 | T28 the tick does not apply the station's thrust (it is the cruise) 1 | T29 the tick does not apply the station's torque (it is the hold's) 1
 // THREE WENT 0 RED THE FIRST TIME AND WERE GAPS IN THE GATE, NOT EXCUSED: T19 (the floor on the tilt: the lateral test had no part along the nose smaller than the cruise acceleration, so the floor was never the larger -- a ship 5 units ahead of its slot and 1 short sideways is the row that can tell), T22 (ship collisions on by default: the off row
 //   passed `shipCollisions: false`, which says nothing about the default -- it now leaves the option out) and T27 (a station ship with no leader that does not face the enemy: the row read only the record's mode and foe, which are set whatever the hull does -- it now reads the spin after 10 s and the cruise thrust).
+// AND ELEVEN MORE ONCE THE TICK WAS TWO-PHASE (section 6b: a gunner that is a network does everything but the network, the arena asks all the networks at once -- stepSpaceArena runs them one by one on the CPU, stepSpaceArenaAsync hands the batch to a function), each applied to brain/spaceArena.mjs:
+//   AB1 the networks' answers are applied in reverse order 3 | AB2 a seat that cannot work is asked 3 | AB3 the networks are never batched 4 | AB4 the tick yields an empty batch 1 | AB5 the answers are dropped (the rule's aim stands) 4 | AB6 the sync driver runs the network on zero weights 2
+//   AB7 the async driver does not await the batch 1 (the section throws, red by name: it did not until 6b was wrapped -- an exception in a bare block crashes the gate with a stack and no row) | AB8 the second ship is batched before the first 1 | AB9 a finished arena is ticked 3 | AB10 every job gets the first answer 3
+//   AB11 a rule gunner is batched too 0 BY NAME, AND THE GATE CRASHES (exit 1, a TypeError in the first section that steps a rule ship: a gunner with no finish() cannot be finished) -- red, but not by a row.
 // AND THIRTEEN MORE ONCE A CAPITAL SHIP COULD HAVE A HELM PILOT (section 5c), each red by name:
 //   X1 a helmPilot is not validated 1 | X2 a fighter may have a helmPilot 1 | X3 the helmPilot is never called 1 | X4 a ship with no helm is asked 1 | X5 the pilot's torque is not limited 1 | X6 its thrust is not capped by the pods 1 | X7 its thrust may be negative 1 | X8 the pilot is told the pods give 1,500 whatever is running 1
 //   X9 the pilot is given the farthest enemy 1 | X10 the helmPilot is not recorded on the craft 2 | X11 the pilot is asked twice a tick 4 | X12 the pilot is given the cruise, not the station's thrust 1 | X13 the pilot is given the torque before the no-helm zeroing 2
@@ -93,6 +99,8 @@ import * as RB from "../physics/mechanics/rigidBody6dof.mjs";
 import * as G from "../physics/mechanics/flightGuns.mjs";
 import * as GS from "../physics/mechanics/gunSeats.mjs";
 import * as AP from "./autopilot6dof.mjs";
+import * as SG from "./seatGunnerPolicy.mjs";
+import * as MG from "./seatGunnerMlp.mjs";
 
 let fails = 0;
 function ok(name, cond, detail) { console.log(`  ${cond ? "PASS" : "FAIL"}  ${name}${detail ? "   " + detail : ""}`); if (!cond) fails++; }
@@ -275,6 +283,48 @@ console.log("\n6. THE SEATS");
     const c = arena([capital(1, 1, { cruise: 0, behaviour: "hold", gunner: undefined }), fighter(2, 2, [0, 0, 300])], { seconds: 20 }); const evC = run(c, 30 * 15), mainHits = evC.filter((e) => e.type === "hit" && e.damage === 60);
     ok("!! a target straight above the deck (where the main turrets' pitch stops at 83 degrees and the PD mounts of the flanks see it) is hit by the PD rounds and the main shells; a main shell does exactly 60", c.crafts[0].hits > 0 && evC.some((e) => e.type === "hit" && e.damage === 10) && mainHits.every((e) => e.damage === 60), `${evC.filter((e) => e.type === "hit").length} hits`);
 }
+
+console.log("\n6b. THE TWO-PHASE TICK (the seats' networks asked in a batch)");
+try {
+    const SPOTS = [[380, 60, 20], [-350, -80, -10], [100, 400, 0], [0, -420, 60]], regular = { delay: 0.4, sigma: 0.03, maxRange: 600, burst: 1, gravity: 0, observe: { window: 0.6, sigmaRange: 0.01 } };
+    const sightFor = (id) => (seat, k) => GS.handGunner({ seed: id * 100 + k, ...regular });
+    const wF = SG.perturb(SG.handWeights(), 0.2, SG.rngFor(11)), wM = MG.perturb(MG.handWeights(), 0.2, SG.rngFor(12));
+    // a network gunner and the same gunner with its halves hidden behind a plain function (the one-phase path, the way every gunner was called before the tick was two-phase)
+    const net = (mod, w, id) => (seat, k) => mod.gunnerFor(w, sightFor(id)(seat, k)), hide = (mk) => (seat, k) => { const d = mk(seat, k); return (s, st, b, tg, t) => d(s, st, b, tg, t); };
+    const build = (gunners, extra = {}) => { const cr = gunners.map((g, i) => ({ id: 1 + i, team: 1, name: "ship" + (i + 1), kind: "capital", ship: SHIP, state: { pos: [0, 140 * i - 70 * (gunners.length - 1), 0], q: Q }, cruise: 0.3, gunner: g })); SPOTS.forEach((p, i) => cr.push({ id: 10 + i, team: 2, name: "f" + (i + 1), kind: "fighter", state: { pos: p, q: Q }, hp: 1e9 })); return SA.createSpaceArena({ crafts: cr, seconds: 30, ...extra }); };
+    const sig = (a) => JSON.stringify([a.i, a.rounds.length, a.crafts.map((c) => [c.body.pos, c.body.vel, c.body.q, c.body.w, c.hp, c.hits, (c.seats || []).map((q) => [q.state.yaw, q.state.pitch, q.state.gun.fired, q.state.gun.ammo, q.last && q.last.fire])])]);
+    const fired = (a) => a.crafts.filter((c) => c.kind === "capital").reduce((n, c) => n + c.seats.reduce((m, q) => m + q.state.gun.fired, 0), 0);
+    const one = build([hide(net(SG, wF, 1))]), two = build([net(SG, wF, 1)]); run(one, 360); run(two, 360);
+    ok("!! THE TWO-PHASE TICK IS THE TICK IT WAS, TO THE BIT: a ship whose thirteen gunners are the fruit fly's network on non-hand weights, twelve seconds against four fighters, is in the same state (positions, velocities, attitudes, spins, hit points, every seat's aim, rounds and trigger) whether its gunners are called whole (their halves hidden behind a plain function: the old path) or as prepare, the network, finish (the new) -- and it was a fight (the seats fired)", sig(one) === sig(two) && fired(one) > 20, `${fired(one)} rounds`);
+    const mixed = (hideSome) => build([(seat, k) => (k < 3 ? (hideSome ? hide(net(MG, wM, 1)) : net(MG, wM, 1))(seat, k) : sightFor(1)(seat, k))]);
+    const mA = mixed(true), mB = mixed(false); run(mA, 360); run(mB, 360);
+    ok("...and for a ship whose three turrets are the GPU brain's network and whose ten mounts are the hand gunner's rule (a decider with no halves is called whole, as ever)", sig(mA) === sig(mB) && fired(mA) > 20, `${fired(mA)} rounds`);
+    // the async tick with a batch function of our own: it is asked for every network seat that has a target, in ship order and seat order
+    const calls = [], cpu = async (jobs) => { calls.push(jobs.map((j) => ({ w: j.net.w, n: j.x.length }))); return jobs.map((j) => j.net.forward(j.net.w, j.x)); };
+    const dualA = build([net(SG, wF, 1), net(MG, wM, 2)]), dualB = build([hide(net(SG, wF, 1)), hide(net(MG, wM, 2))]); let ticks = 0;
+    const driveAsync = async (a, n, batch) => { for (let i = 0; i < n && !a.done; i++) await SA.stepSpaceArenaAsync(a, batch); };
+    await driveAsync(dualA, 300, cpu); run(dualB, 300);
+    const order = calls.every((c) => { const ws = c.map((j) => j.w), first = ws.indexOf(wM); return first < 0 || ws.slice(first).every((w) => w === wM) && ws.slice(0, first).every((w) => w === wF); }), most = Math.max(...calls.map((c) => c.length));
+    ok("!! THE ASYNC TICK WITH A CPU BATCH IS THE SAME FIGHT, AND THE BATCH IS WHAT THE HEADER SAYS: two ships (the fruit fly's network in the first, the GPU brain's in the second) for ten seconds are in the state of the one-phase arena; the batch function was asked at most once a tick, with the first ship's seats' jobs before the second's (never a second ship's job before a first ship's), twelve features each, at most 26 in a batch, and in some ticks 20 or more",
+        sig(dualA) === sig(dualB) && calls.length > 50 && calls.length <= 300 && order && calls.every((c) => c.every((j) => j.n === 12)) && most <= 26 && most >= 20, `${calls.length} batches, the biggest ${most}`);
+    // the batch's answers are what the seats do
+    const all = (y) => async (jobs) => jobs.map(() => y.slice()), never = build([net(SG, wF, 1)]), always = build([net(SG, wF, 1)]), idleRule = build([sightFor(1)]); let ruleCalls = 0;
+    await driveAsync(never, 300, all([0, 0, -1])); await driveAsync(always, 300, all([0, 0, 1])); await driveAsync(idleRule, 120, async (j) => { ruleCalls++; return []; });
+    ok("!! THE BATCH'S ANSWERS ARE WHAT THE SEATS DO: a batch that answers every seat with a trigger OFF (0, 0, -1) gives a ship that fires no round in ten seconds; one that answers ON (0, 0, 1) gives one that fires at least 30; and a ship of rule gunners never asks the batch at all (0 calls in 4 s)", fired(never) === 0 && fired(always) >= 30 && ruleCalls === 0, `${fired(never)} / ${fired(always)} rounds, ${ruleCalls} calls`);
+    const out = build([net(SG, wF, 1)]), askedOut = []; for (const k of [0, 1, 2]) out.crafts[0].partHp.set(out.crafts[0].seats[k].part, 0);
+    await driveAsync(out, 120, async (jobs) => { askedOut.push(jobs.length); return jobs.map((j) => j.net.forward(j.net.w, j.x)); });
+    const fullAsk = []; const fullA = build([net(SG, wF, 1)]); await driveAsync(fullA, 120, async (jobs) => { fullAsk.push(jobs.length); return jobs.map((j) => j.net.forward(j.net.w, j.x)); });
+    ok("!! A SEAT THAT CANNOT WORK IS NOT ASKED: with the three turrets' parts shot to nothing the batch never has more than ten jobs in a tick (the ten mounts) where the whole ship's has up to thirteen", Math.max(...askedOut) <= 10 && Math.max(...fullAsk) >= 11 && Math.max(...fullAsk) <= 13, `${Math.max(...askedOut)} against ${Math.max(...fullAsk)}`);
+    const slow = build([net(SG, wF, 1)]), fast = build([net(SG, wF, 1)]);
+    await driveAsync(slow, 60, async (jobs) => { await new Promise((r) => setTimeout(r, 1)); return jobs.map((j) => j.net.forward(j.net.w, j.x)); }); await driveAsync(fast, 60, cpu);
+    const rej = build([net(SG, wF, 1)]); let rejMsg = null; try { for (let i = 0; i < 300; i++) await SA.stepSpaceArenaAsync(rej, async () => { throw new Error("device lost"); }); } catch (e) { rejMsg = e.message; }
+    const doneArena = build([net(SG, wF, 1)]); doneArena.done = true; let doneCalls = 0; const back = await SA.stepSpaceArenaAsync(doneArena, async () => { doneCalls++; return []; });
+    ok("!! THE ASYNC TICK AWAITS THE BATCH AND PASSES ITS FAILURE ON: a batch that waits a millisecond gives the state of one that does not; a batch that throws ('device lost') makes the tick REJECT with that message; and a finished arena is returned as it is with the batch never asked",
+        sig(slow) === sig(fast) && rejMsg === "device lost" && back === doneArena && doneCalls === 0);
+    const noNet = (seat, k) => { const d = SG.gunnerFor(wF, sightFor(1)(seat, k)); const p = (s, st, b, tg, t) => d(s, st, b, tg, t); p.prepare = d.prepare; p.finish = d.finish; return p; };   // halves but no `net`: it cannot be batched
+    const nn = build([noNet]), ref = build([hide(net(SG, wF, 1))]); run(nn, 200); run(ref, 200);
+    ok("a gunner that has the halves but no `net` (nothing to batch it with) is called whole, as every gunner was: the same state as the one-phase arena", sig(nn) === sig(ref));
+} catch (e) { ok(`!! the section THREW instead of answering: ${e.message}`, false, String(e.stack).split("\n")[1]); }
 
 console.log("\n7. THE PARTS");
 {
@@ -506,7 +556,7 @@ console.log("\n11. THE END");
 
 console.log("\n12. THE FRONT DOOR");
 {
-    ok("!! the export list is pinned: APPROACH_OFFSET, AUTOPILOT, BEHAVIOURS, BRIDGE_CREW, CREW_FRACTION, DT, FIGHTER, FIGHTER_GUN, HOLD_FIRE_MARGIN, OWN_HULL_REACH, RAM_DAMAGE, ROUND_MASS, STATION_KD, STATION_KP, STATION_MAX_TILT, STRAFE_RANGE, VISION, approach, createSpaceArena, fighterAim, friendInLine, nearestFoe, ownHullInLine, reportLines, runSpaceArena, seatWorks, stationPlan, stepSpaceArena, teamsFlying, waveMates, waveTargets", Object.keys(SA).sort().join(",") === "APPROACH_OFFSET,AUTOPILOT,BEHAVIOURS,BRIDGE_CREW,CREW_FRACTION,DT,FIGHTER,FIGHTER_GUN,HOLD_FIRE_MARGIN,OWN_HULL_REACH,RAM_DAMAGE,ROUND_MASS,STATION_KD,STATION_KP,STATION_MAX_TILT,STRAFE_RANGE,VISION,approach,createSpaceArena,fighterAim,friendInLine,nearestFoe,ownHullInLine,reportLines,runSpaceArena,seatWorks,stationPlan,stepSpaceArena,teamsFlying,waveMates,waveTargets", Object.keys(SA).sort().join(","));
+    ok("!! the export list is pinned: APPROACH_OFFSET, AUTOPILOT, BEHAVIOURS, BRIDGE_CREW, CREW_FRACTION, DT, FIGHTER, FIGHTER_GUN, HOLD_FIRE_MARGIN, OWN_HULL_REACH, RAM_DAMAGE, ROUND_MASS, STATION_KD, STATION_KP, STATION_MAX_TILT, STRAFE_RANGE, VISION, approach, createSpaceArena, fighterAim, friendInLine, nearestFoe, ownHullInLine, reportLines, runSpaceArena, seatWorks, stationPlan, stepSpaceArena, stepSpaceArenaAsync, teamsFlying, waveMates, waveTargets", Object.keys(SA).sort().join(",") === "APPROACH_OFFSET,AUTOPILOT,BEHAVIOURS,BRIDGE_CREW,CREW_FRACTION,DT,FIGHTER,FIGHTER_GUN,HOLD_FIRE_MARGIN,OWN_HULL_REACH,RAM_DAMAGE,ROUND_MASS,STATION_KD,STATION_KP,STATION_MAX_TILT,STRAFE_RANGE,VISION,approach,createSpaceArena,fighterAim,friendInLine,nearestFoe,ownHullInLine,reportLines,runSpaceArena,seatWorks,stationPlan,stepSpaceArena,stepSpaceArenaAsync,teamsFlying,waveMates,waveTargets", Object.keys(SA).sort().join(","));
     ok("the page's numbers are pinned and frozen: the fighter's half-extents 1.6 x 0.7 x 0.7, mass 8, 100 hit points, hit radius 1.5; the gun 900 units/s at 3.33 a second for 18 damage and 2.5 s; the autopilot's thrust 16 and standoff 50; the ram 25; the vision 1,500", SA.FIGHTER.half.join() === "1.6,0.7,0.7" && SA.FIGHTER.mass === 8 && SA.FIGHTER.hp === 100 && SA.FIGHTER.radius === 1.5 && SA.FIGHTER.engineMount.join() === "-1.4,0,0" && SA.FIGHTER.muzzle.join() === "1.4,0,0" && SA.FIGHTER_GUN.muzzleSpeed === 900 && SA.FIGHTER_GUN.damage === 18 && SA.FIGHTER_GUN.life === 2.5 && SA.AUTOPILOT.thrustForce === 16 && SA.AUTOPILOT.standoff === 50 && SA.AUTOPILOT.weaponSpeed === 900 && SA.RAM_DAMAGE === 25 && SA.VISION === 1500 && Object.isFrozen(SA.FIGHTER) && Object.isFrozen(SA.FIGHTER.half) && Object.isFrozen(SA.FIGHTER_GUN) && Object.isFrozen(SA.AUTOPILOT) && SA.DT === 1 / 30);
     const lines = SA.reportLines();
     ok("the report lines say real numbers and name the module", lines.length === 2 && lines.every((l) => !/NaN|undefined/.test(l)) && /space battle/.test(lines[0]) && /four fighters against the capital ship/.test(lines[1]), lines[1]);
