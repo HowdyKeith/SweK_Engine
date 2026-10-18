@@ -145,7 +145,7 @@ export function prune(w, { toward = null, trainSet = RT.TRAIN_SET } = {}) {
             const s = evaluate(out, trainSet).score;
             if (s >= best - 1e-9) { best = Math.max(best, s); reverted++; } else out[i] = keep;
         }
-    } while (reverted > 0);
+    } while (reverted > 0 && passes < 64);   // each reverting pass shrinks differs(), so it ends on its own; the cap is for a revert that did not revert (then it would never)
     return { weights: out, kept: differs().length, moved, passes, trainScore: best };
 }
 
