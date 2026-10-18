@@ -161,3 +161,25 @@ no contact ever comes from a boat that quiet outside 94 m -- the policy space ha
 
 Started 4 x 1500 iterations from the actuator champion; the processes died once (session resume) and were restarted from their iteration-200 checkpoints as seeds 9100..9103 (1000 iterations each).
 Result: see the next section if present; otherwise they had not finished when this was written.
+
+### Search-pinging (the 12th number) and self-play
+
+**searchPing** (`brain/subTactics.mjs`; default 0 = the old behaviour, so every pin stands): ping every N seconds while nothing is heard. Retuned (4 x 150 iterations; `brain/subTacticsThetaSearchPingWip.json`, seed 5100):
+160 fresh duels vs the drones **1.631 -> 1.772** (152 W / 0 L / 8 D); the quiet drone **1.00 -> 1.48**; BASELINE 1.557 -> 1.717. It pings blind every 7.7 s.
+
+**Self-play** (`tools/selfPlaySubTactics.mjs`, gated by `selfPlaySubTactics-selfcheck.mjs`; league results in `brain/subTacticsLeagueWip.json`). The duel's seats are NOT symmetric (A starts with the other
+boat in its forward arc), so every pairing is fought in both seats; `scoreFor(result, side)` in `brain/subDuel.mjs` scores a duel from either seat. Two leagues of 3 generations x 60 iterations each, started
+from the search-ping champion ("gen0"), each generation trained against the default and the previous three; cross-play on 24 fresh geometries (X's mean over both seats):
+
+| league 7001 (a counter-doctrine was found) | vs default | vs gen0 | vs gen1 | vs gen2 | vs gen3 |
+|---|---|---|---|---|---|
+| gen0 (the drone champion) | 1.24 | - | 0.16 | **-1.15** | **-1.43** |
+| gen2 | 1.53 | **1.41** | 1.39 | - | -0.35 |
+| gen3 | 1.56 | **1.67** | 1.58 | 0.45 | - |
+
+* **The drone champion is EXPLOITABLE.** gen2 and gen3 of league 7001 beat it by 1.4-1.7 (it loses 1.15-1.43 to them). The counter-doctrine, from the theta: **stop pinging blind** (searchPing 7.7 -> 0.13 -> 0),
+  because a ping is heard from ~10 km and tells the enemy where you are; **aim tighter** (aimTol 0.47 -> 0.33), **hold an echo longer** (echoWindow 13.7 -> 19.6), **evade harder and longer** (evadeTurn 1.7 -> 2.8 rad, nearly
+  a reversal). The cost shows against the drones: gen3 scores 1.645 on the fresh 160 (quiet drone 1.06, down from 1.48) -- the trade the drones could not show: **blind pinging finds a quiet boat and gets you killed by an awake one.**
+* **It is not robust**: league 7000, same recipe, found NOTHING (its generations lose to gen0 by 0.0-0.1 in cross-play, though they score 1.80 against the drones). Two leagues of 60 iterations on 8 geometries is a probe, not a
+  result; a larger league, a mixed-strategy opponent pool and a significance test over seeds are needed before saying how exploitable the doctrine is.
+* No rock-paper-scissors cycle was seen (league 7001 is transitive: gen3 > gen2 > gen1 ~ gen0 > default), but with 4 generations that is weak evidence either way.
