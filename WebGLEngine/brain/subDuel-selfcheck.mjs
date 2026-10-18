@@ -21,6 +21,7 @@
 //   D17 damage not applied 5 | D18 dealt not capped 3 | D19 no sinking at zero 5 | D20 the duel not ended on a death 4 | D21 kill bonus 1.0 4 | D22 speed bonus dropped 3 | D23 a loss not penalised 3 | D24 B's damage not subtracted 2
 //   D25 the owner can be hit (targets emptied) 5 | D26 the hull ignores the actuators 1 | D27 the opponent override ignored 4 | D28 the drone range 150..350 2 | D29 the depth order clamp 80 (1, after the row below) | D30 a contact leaks a range 1
 //   D31 an echo without a range 2 | D32 the ping count not kept 2 | D33 the fire count not kept 3 | D34 the torpedo's floor 3 m 5 | D35 loss events not logged 1
+//   F1-F6 (scoreFor, the score from either seat): the seats swapped 4 | a loss not penalised 3 | the loser gets the speed bonus 1 | the duel's length ignored 1 | a kill bonus for ANY loss, not only a sinking 1 (it went 0 red until the row where A drives into the floor and B must score exactly 0) | B's damage not subtracted 3
 // D29 went 0 red the first time: no tactician in the gate ever asked for a depth the arena had to refuse. The row that asks for 70 m (the floor is at 50) holds the clamp.
 "use strict";
 import * as D from "./subDuel.mjs";
@@ -107,10 +108,21 @@ console.log("\n6. DAMAGE");
     ok("!! the OWNER's torpedoes never touch the owner: A fires all four (the drone far off) and finishes with 100 hit points and afloat", own.fired[0] === 4 && own.hp[0] === 100 && own.fates[0] === "afloat" && own.damage[1] === 0);
 }
 
+console.log("\n6b. THE SCORE FROM EITHER SEAT");
+{
+    const win = D.duel(side(hold({ fire: true })), sc({ pos: [120, 0], speed: 0.5 }), { seconds: 240 }), lose = D.duel(side(hold()), sc({ pos: [100, 0], heading: Math.PI, speed: 2 }), { seconds: 240, opponent: side(hold({ fire: true })) }), n = total(240);
+    ok("!! scoreFor(result, 'A') IS the duel's own score, exactly, for a win, a loss and a draw", D.scoreFor(win, "A") === win.score && D.scoreFor(lose, "A") === lose.score && D.scoreFor(D.duel(side(hold()), sc({ pos: [-440, 0], heading: 0 }), { seconds: 60 }), "A", 60) === 0);
+    ok("!! the seat swap: when A sinks B for 100 damage, B's score is -(100)/100 - 0.5 = -1.5 (B dealt nothing, lost its boat, no speed bonus for the loser); when B sinks A it is damage/100 + 0.5 + 0.5 x (1 - ticks/total), the mirror of what A would have scored in the other seat", near(D.scoreFor(win, "B"), -win.damage[0] / 100 - 0.5, 1e-12) && near(D.scoreFor(lose, "B"), lose.damage[1] / 100 + 0.5 + 0.5 * (1 - lose.ticks / n), 1e-12) && D.scoreFor(win, "B") < 0 && D.scoreFor(lose, "B") > 1, `${D.scoreFor(win, "B")} ${D.scoreFor(lose, "B").toFixed(4)}`);
+    const sym = { fates: ["afloat", "afloat"], damage: [60, 20], ticks: 7200 };
+    ok("!! with no boat lost the two seats are exact opposites (damage only): A dealt 60 and took 20 -> +0.4 for A and -0.4 for B; and a duel where BOTH boats are sunk cancels the kill bonuses (each +0.5 - 0.5) and leaves the damage difference", near(D.scoreFor(sym, "A"), 0.4, 1e-12) && near(D.scoreFor(sym, "B"), -0.4, 1e-12) && near(D.scoreFor({ fates: ["sunk", "sunk"], damage: [100, 100], ticks: 5000 }, "A"), 0, 1e-12));
+    ok("the speed bonus uses the duel's length: the same result scored over 120 s instead of 240 s gives a different bonus", D.scoreFor(win, "A", 240) !== D.scoreFor(win, "A", 120));
+}
+
 console.log("\n7. LOSSES");
 {
     const sink = D.duel(side(hold(), (st, tg, cv) => ({ ballast: 1, thrust: 0 })), sc({ pos: [-400, 0], heading: 0 }), { seconds: 240 }), n = total(240);
     ok("!! a boat that floods its tank and drives into the FLOOR is lost ('grounded'): the duel ends that tick, B (untouched) wins, and the score is exactly -0.5 (a loss, no torpedo involved)", sink.fates[0] === "grounded" && sink.winner === "B" && sink.ticks < n && sink.damage[0] === 0 && sink.damage[1] === 0 && near(sink.score, -0.5, 1e-12) && sink.events.some((x) => x.type === "loss" && x.boat === 1 && x.why === "grounded"), `${sink.fates} ${sink.score}`);
+    ok("!! the KILL bonus is for SINKING, not for the other boat's own mistake: when A drives into the floor, A scores -0.5 and B (afloat, untouched) scores exactly 0 -- no kill bonus, no speed bonus", near(D.scoreFor(sink, "A"), -0.5, 1e-12) && D.scoreFor(sink, "B") === 0, `${D.scoreFor(sink, "B")}`);
     const draw = D.duel(side(hold()), sc({ pos: [-440, 0], heading: 0 }), { seconds: 120 });
     ok("!! nobody fires: the duel runs the whole time and is a DRAW of score exactly 0 (both afloat, no events but none)", draw.winner === "draw" && draw.ticks === total(120) && draw.score === 0 && draw.fates.join() === "afloat,afloat" && draw.fired.join() === "0,0");
 }
