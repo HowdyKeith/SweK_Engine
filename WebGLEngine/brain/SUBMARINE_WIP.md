@@ -107,7 +107,25 @@ Nothing ended early. **The depth-hold training transfers to terrain following (a
 are dominated by cruise time (all three waypoints are reached by every pilot), so the pilots are close; a better waypoint score needs a faster cruise or tighter
 turns, not a better depth loop. A pilot trained ON these missions has not been tried.
 
-## Open item being worked: the Munk x3 weakness
+## Round 2b result: multi-vessel training did NOT cleanly fix the Munk x3 weakness
 
-`tools/trainSubRobust.mjs` scores each candidate on five vessels (nominal, Munk x3, no Munk, fins x0.6, righting x2.5) instead of one.
-Result: see the next section if present; if not, the runs had not finished when this was written.
+`tools/trainSubRobust.mjs`: 4 searches x 200 iterations from the actuator champion, each candidate scored on five vessels (nominal, Munk x3, no Munk, fins x0.6,
+righting x2.5), under the actuator limits. HELD_OUT + BASELINE (48 dives), early ends in brackets:
+
+| pilot | nominal + limits | nominal instant | Munk x3 instant | Munk x3 + limits | Munk x5 instant |
+|---|---|---|---|---|---|
+| autopilot | -0.516 (0) | -0.498 (0) | -0.454 (0) | -0.462 (0) | -2.141 (0) |
+| actuator champion (7003) | -0.360 (0) | -0.322 (0) | -0.845 (1) | -1.066 (1) | -2.838 (4) |
+| robust 8000 (picked by robust held-out) | -0.395 (0) | -0.358 (0) | -0.611 (1) | -0.628 (0) | -2.778 (2) |
+| robust 8001 | -0.404 (0) | -0.369 (0) | -0.691 (1) | -0.692 (1) | -2.848 (5) |
+| robust 8002 | -0.455 (0) | -0.425 (0) | -0.473 (0) | -0.532 (0) | -2.541 (1) |
+| robust 8003 | -0.495 (0) | -0.473 (0) | -0.600 (0) | -0.649 (0) | -2.688 (3) |
+
+* It is a TRADE, not a fix. The closer a search gets to the autopilot on the Munk x3 hull (8002: -0.473 against -0.454), the more of the nominal gain it
+  gives back (-0.455 against the champion's -0.360; the autopilot is -0.516). None beats the autopilot on Munk x3, and 8000, the pre-declared pick, still ends a dive there.
+* A Munk x5 hull (5x the nominal) breaks every pilot including the autopilot (-2.14): that vessel is beyond the planes' authority, so this is a limit of the
+  vessel, not of the pilots.
+* 200 iterations is short (4-5 improvements per 4 weights moved); a longer search, a vessel-parameter feature the pilot can SEE, or a circuit with memory are the
+  untried answers. `brain/pilotSubWeightsRobustWip.json` is seed 8000, kept for the record, not as a recommended pilot.
+* Practical reading: **the network's gain over the autopilot depends on the hull's hydrodynamic stability being near the nominal.** For a real boat the Munk
+  moment is the least certain coefficient, so identify it before trusting a trained pilot, or train with it randomised for much longer.
