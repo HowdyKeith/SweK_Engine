@@ -18,14 +18,16 @@
 // NOT IN THIS GATE: the brain file's round trip through peerBrain and the roster (the helicopter page, Heli 6, brings both); the trainer (tools/ship/trainRotorPilot-selfcheck.mjs).
 //
 // SABOTAGE LOG (each applied to the module in a scratch copy, the gate run, the copy discarded; the number is how many rows went red):
-//   Each applied to brain/pilotRotorPolicy.mjs in a scratch copy, the gate run on the copy, the copy discarded; the number is how many rows went red. 61 mutants, none left at 0 (P = the hand weights' coefficients and
-//   the pair-of-channels layout, F = the features' scales, signs and clamps, N = the forward pass and the twin, O = noise, mutation, search and prune). FIVE WENT 0 RED THE FIRST TIME AND EACH GOT A ROW: F08 (the speed
-//   along the nose with a sign slip on the cross term: both earlier rows had heading 0 or no sideways velocity, so sin and the second component never mattered -- a row at heading 1.0 with 8 east and 4 north exists now),
-//   N06 (the pedal's non-finite output not guarded: the clamp row checked only the collective's), O05 (a search that accepts a worse child: six iterations at sigma 0.3 on two flights never drew one -- forty at sigma 3
-//   do, and the row asks that the returned weights score what the search says they score), O06 (the improvement counter: the old bound improved + neutral <= 6 is true of zero -- the row now counts the real rises from
-//   the per-iteration reports) and O08 (prune not repeating to a fixed point: a harmful bias and a partly compensating weight, which one pass cannot unwind, now exist as a row). F09 was re-run with them (2 red). O09
-//   (prune that never reverts) HUNG THE GATE the first time, because a revert that changes nothing is accepted for ever; prune now stops after 64 passes (a correct prune ends on its own, each pass shrinking the set of
-//   differing weights) and the mutant is two red rows by name.
+//   Each applied to brain/pilotRotorPolicy.mjs in a scratch copy, the gate run on the copy, the copy discarded; the number is how many rows went red. 69 mutants, none left at 0 (P = the hand weights' coefficients and
+//   the pair-of-channels layout, F = the features' scales, signs and clamps, N = the forward pass and the twin, O = noise, mutation, search and prune, G = prune's group testing). THE RUNS WERE IN TWO PARTS, SAID
+//   PLAINLY: the P, F, N and the non-prune O mutants were run against the module BEFORE prune gained its group-testing phase (the only change since; no flight, feature or forward-pass line moved), and O07-O09 and
+//   G01-G08 against the module as it stands. FIVE WENT 0 RED THE FIRST TIME AND EACH GOT A ROW: F08 (the speed along the nose with a sign slip on the cross term: both earlier rows had heading 0 or no sideways velocity
+//   -- a row at heading 1.0 with 8 east and 4 north exists now), N06 (the pedal's non-finite output not guarded), O05 (a search that accepts a worse child: forty iterations at sigma 3 draw one, six at 0.3 never did),
+//   O06 (the improvement counter: counted now from the per-iteration reports) and O08 (prune not repeating). O09 (prune that never reverts) HUNG THE GATE the first time, because a revert that changes nothing is accepted
+//   for ever; prune now stops after 64 passes and the mutant is a red row. THEN prune's cost was the problem, not its logic: the first training run would have spent about 75 minutes a pass putting 1,500 moved weights
+//   back one at a time, so prune now tries a block at a time and the gate drives it with a score of its own (the injectable `score`): seed 1200 of an eight-weight interaction score, found by search, is one the group
+//   test and a single pass leave three weights on and the repeating pass takes to two; 300 harmless weights go back in three evaluations; and a failing block is halved and BOTH halves tried (G04, dropping the first
+//   half, went 0 red until the 300-harmless-and-one-needed row was written).
 //   P01 collective climb coefficient 1x kVs 5; P02 pitch error coefficient doubled 5; P03 pitch rate sign 5; P04 bank error coefficient halved 4; P05 roll rate sign 5; P06 yaw coefficient doubled 4; P07 readout pair not
 //   negated 7; P08 input pair's second channel not negated 9; P09 gain overrides ignored 1; P10 pedal feed-forward weight 0.5 4; P11 collective feed-forward weight 0.9 4; P12 roll trim weight 0.9 4; P13 pitch trim
 //   weight 0.9 1; F01 pitch error scale /0.2 4; F02 pitch rate scale /0.25 4; F03 bank error clamp 4 3; F04 yaw-rate error sign 4; F05 rotor speed scale /6 1; F06 height scale /25 2; F07 climb scale /10 1; F08 speed
@@ -34,8 +36,10 @@
 //   collective clamped to [-1, 1] 3; N02 pitch clamp removed 2; N03 two recurrent steps 4; N04 recurrent identity removed in the edge pass 10; N05 synapses read source-first 4; N06 non-finite output not guarded 1; N07
 //   readout bias read one off 3; N08 no relu after a recurrent step 1; N09 the last synapse dropped 1; N10 the twin's memo never invalidated 1; N11 the twin's recurrent matrix transposed 2; N12 a NaN input feature not
 //   zeroed 1; N13 the twin's recurrent identity removed 1; N14 the input bias read one off 2; O01 noise doubled 1; O02 the zero weights shared 9; O03 mutation ignores maxK 1; O04 mutation moves one more 1; O05 search
-//   accepts worse children 1; O06 search never counts an improvement 1; O07 prune keeps a revert that costs 1; O08 prune does not repeat 1; O09 prune never reverts 2; O10 search ignores its start 1; O11 evaluate
-//   defaults to the held-out set 1; O12 train defaults to the held-out set 1; O13 search history not opened at the start score 3; O14 train ignores its seed 1.
+//   accepts worse children 1; O06 search never counts an improvement 1; O07 prune keeps a revert that costs 2; O08 prune does not repeat 1; O09 prune never reverts 1; O10 search ignores its start 1; O11 evaluate
+//   defaults to the held-out set 1; O12 train defaults to the held-out set 1; O13 search history not opened at the start score 3; O14 train ignores its seed 1; G01 group phase accepts every block 2; G02 group phase
+//   never accepts a block 2; G03 group phase drops the second half 2; G04 group phase drops the first half 1; G05 a failed block is not restored 2; G06 group phase is skipped 2; G07 group phase does not update the best
+//   score 1; G08 group phase restores the wrong values 2.
 "use strict";
 import * as PP from "./pilotRotorPolicy.mjs";
 import * as AR from "./autopilotRotor.mjs";
@@ -234,6 +238,9 @@ console.log("\n7. THE TRAINING FUNCTIONS");
     const junk = Float32Array.from(hw); for (let k = 0; k < 300; k++) junk[600 + k] += 0.05 + 0.001 * k;
     const flat = { n: 0 }; const jr = PP.prune(junk, { score: (x) => { flat.n++; return 0; } });
     ok("!! PRUNE TESTS A BLOCK AT A TIME BEFORE IT TESTS A WEIGHT AT A TIME: 300 weights moved and none of them matters (a flat score) go back in THREE evaluations -- the starting score, the block, and the one-at-a-time loop's pass over what is left (nothing) -- not 300; the cost of a prune is what a flight over the set costs, and a search leaves a thousand weights moved", jr.kept === 0 && jr.moved >= 300 && flat.n <= 3 && jr.weights.every((v, i) => v === hw[i]), `${flat.n} evaluations for ${jr.moved} moved weights`);
+    const half = Float32Array.from(hw); for (let k = 0; k < 300; k++) half[600 + k] += 0.05 + 0.001 * k; half[1100] += 1;
+    const hcalls = { n: 0 }, hr = PP.prune(half, { score: (x) => { hcalls.n++; return 5 * (x[1100] - hw[1100]); } });
+    ok("!! A BLOCK THAT FAILS IS HALVED, AND BOTH HALVES ARE TRIED: 300 weights that do not matter and one at the far end of the vector that does (a score of 5 x its deviation) -- the whole block fails, the first half (all harmless) goes back in ONE evaluation and the second is narrowed down to the one that matters in about two evaluations a level: under 30 evaluations in all, not 300, and the weights that matter stays", hr.kept === 1 && hr.moved === 301 && Math.abs(hr.weights[1100] - (hw[1100] + 1)) < 1e-6 && hr.weights.every((v, i) => i === 1100 || v === hw[i]) && hcalls.n <= 30, `${hcalls.n} evaluations`);
     const needed = Float32Array.from(hw); needed[4 * 20 + 4] = 0.4;   // the roll channel's trim coefficient (1 -> 0.4: the hover's -0.194 of roll becomes -0.078) is read by every flight: it matters
     const pr2 = PP.prune(needed, { trainSet: one });
     ok("!! ...and KEEPS one that does: the roll channel's trim coefficient moved from 1 to 0.4 hurts, so prune leaves it (kept 1), and the result scores no worse than the input", pr2.kept === 1 && pr2.weights[84] === Float32Array.from([0.4])[0] && pr2.trainScore >= PP.evaluate(needed, one).score - 1e-12, `kept ${pr2.kept}`);

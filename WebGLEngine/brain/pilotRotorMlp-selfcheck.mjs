@@ -15,16 +15,19 @@
 // network has the same layer shape and is held here to the same mirror, and its own GPU run is for the page that needs it (Heli 6).
 //
 // SABOTAGE LOG (each applied to the module in a scratch copy, the gate run, the copy discarded; the number is how many rows went red):
-//   Each applied to brain/pilotRotorMlp.mjs in a scratch copy, the gate run on the copy, the copy discarded; the number is how many rows went red. 32 mutants, none left at 0 (M01-M16 the forward pass, the layout, the
-//   twin and the hand weights; M17-M32 the training functions, the defaults and the shared senses). TWO WENT 0 RED THE FIRST TIME AND EACH GOT A ROW: M23 (a search that ignores the start it is given) and M26 (noise
-//   doubled) -- the fruit fly's gate had both rows already (a search with no iterations returns its start; noise is deterministic, absent at sigma 0 and scales with sigma) and this one had not copied them. The same rows
-//   for the search's report, the default sets, the seed and prune's repeating were added BEFORE this run, from the fruit fly's own log.
+//   Each applied to brain/pilotRotorMlp.mjs in a scratch copy, the gate run on the copy, the copy discarded; the number is how many rows went red. 40 mutants, none left at 0 (M01-M16 the forward pass, the layout, the
+//   twin and the hand weights; M17-M32 the training functions, the defaults and the shared senses; G01-G08 prune's group testing). THE RUNS WERE IN TWO PARTS, SAID PLAINLY: M01-M19, M23-M32 against the module before
+//   prune gained its group-testing phase (the only change since), and M20-M22 and G01-G08 against the module as it stands. TWO WENT 0 RED THE FIRST TIME AND EACH GOT A ROW: M23 (a search that ignores the start it is
+//   given) and M26 (noise doubled) -- the fruit fly's gate had both rows already and this one had not copied them. G04 (the group phase dropping the first half of a failing block) went 0 red until the 300-harmless-and-
+//   one-needed row was written, as in the fruit fly's gate; prune's fixed-point and block-test rows use a score of the gate's own (seed 1200, as there).
 //   M01 the second block's offset one late 7; M02 no relu on the first layer 3; M03 no relu on the second layer 2; M04 the readout bias ignored 2; M05 a NaN feature not zeroed 1; M06 collective clamped to [-1, 1] 2; M07
 //   a non-finite roll not guarded 1; M08 the second layer linear in layersOf 2; M09 layersOf copies instead of viewing 1; M10 the identity on the second layer halved 5; M11 only four of the eight channels copied 8; M12
 //   the readout of the negative channel flipped 4; M13 the pilot ignores the terrain 4; M14 gain overrides not carried 1; M15 the second layer reads the wrong neuron 6; M16 the first-layer bias read one off 2; M17
-//   mutation ignores maxK 1; M18 mutation moves one more 1; M19 search accepts worse children 1; M20 prune keeps a revert that costs 1; M21 prune does not repeat 1; M22 prune never reverts 2; M23 search ignores its
+//   mutation ignores maxK 1; M18 mutation moves one more 1; M19 search accepts worse children 1; M20 prune keeps a revert that costs 2; M21 prune does not repeat 1; M22 prune never reverts 1; M23 search ignores its
 //   start 1; M24 the readout offset one early 7; M25 the zero weights shared 9; M26 noise doubled 1; M27 the first-layer coefficients are not the fruit fly's 5; M28 the first layer rows swapped 6; M29 features not the
-//   fruit fly's 5; M30 evaluate defaults to the held-out set 1; M31 train defaults to the held-out set 1; M32 train ignores its seed 1.
+//   fruit fly's 5; M30 evaluate defaults to the held-out set 1; M31 train defaults to the held-out set 1; M32 train ignores its seed 1; G01 group phase accepts every block 2; G02 group phase never accepts a block 2; G03
+//   group phase drops the second half 2; G04 group phase drops the first half 1; G05 a failed block is not restored 2; G06 group phase is skipped 2; G07 group phase does not update the best score 1; G08 group phase
+//   restores the wrong values 2.
 "use strict";
 import * as MR from "./pilotRotorMlp.mjs";
 import * as PP from "./pilotRotorPolicy.mjs";
@@ -154,6 +157,9 @@ console.log("\n5. THE TRAINING FUNCTIONS");
     const junk = Float32Array.from(hw); for (let k = 0; k < 300; k++) junk[600 + k] += 0.05 + 0.001 * k;
     const flat = { n: 0 }; const jr = MR.prune(junk, { score: (x) => { flat.n++; return 0; } });
     ok("!! PRUNE TESTS A BLOCK AT A TIME BEFORE IT TESTS A WEIGHT AT A TIME: 300 weights moved and none of them matters (a flat score) go back in THREE evaluations -- the starting score, the block, and the one-at-a-time loop's pass over what is left (nothing) -- not 300; the cost of a prune is what a flight over the set costs, and a search leaves a thousand weights moved", jr.kept === 0 && jr.moved >= 300 && flat.n <= 3 && jr.weights.every((v, i) => v === hw[i]), `${flat.n} evaluations for ${jr.moved} moved weights`);
+    const half = Float32Array.from(hw); for (let k = 0; k < 300; k++) half[600 + k] += 0.05 + 0.001 * k; half[1100] += 1;
+    const hcalls = { n: 0 }, hr = MR.prune(half, { score: (x) => { hcalls.n++; return 5 * (x[1100] - hw[1100]); } });
+    ok("!! A BLOCK THAT FAILS IS HALVED, AND BOTH HALVES ARE TRIED: 300 weights that do not matter and one at the far end of the vector that does (a score of 5 x its deviation) -- the whole block fails, the first half (all harmless) goes back in ONE evaluation and the second is narrowed down to the one that matters in about two evaluations a level: under 30 evaluations in all, not 300, and the weights that matter stays", hr.kept === 1 && hr.moved === 301 && Math.abs(hr.weights[1100] - (hw[1100] + 1)) < 1e-6 && hr.weights.every((v, i) => i === 1100 || v === hw[i]) && hcalls.n <= 30, `${hcalls.n} evaluations`);
     const needed = Float32Array.from(hw); needed[4 * 20 + 4] = 0.4;
     const pr2 = MR.prune(needed, { trainSet: one });
     ok("!! ...and KEEPS one that does: the roll channel's trim coefficient moved from 1 to 0.4 hurts, so prune leaves it (kept 1), at a score no worse than the input", pr2.kept === 1 && pr2.weights[84] === Float32Array.from([0.4])[0] && pr2.trainScore >= MR.evaluate(needed, one).score - 1e-12, `kept ${pr2.kept}`);
