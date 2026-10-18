@@ -191,3 +191,17 @@ from the search-ping champion ("gen0"), each generation trained against the defa
 * **server.html:** a FLY BRAIN and a FISH BRAIN chip sit beside the GPU BRAIN chip (polled with `swekTick`), and every online peer row has a **Sub** button: it lists this box's local subs, then POSTs `{peer, id}` to `/subaquarium/send`; the peer's own trust rules decide admission. The fly chip did NOT exist before this -- only the GPU chip did -- so both were added.
 * **Honest status:** the fish chip reads **stand-in** (amber) because no fish circuit is vendored (ZAPBench is activity, not wiring); it goes `live` only when `vendor/zebrafish/*.json` exists AND a pilot is wired to it. The fly chip reads live (circuit + trained flight weights present).
 * **Gates:** `subAquariumCore-selfcheck`, `subAquariumBridge-selfcheck` (real loopback HTTP), `render/subAquariumSim-selfcheck`, `tools/ship/subAquariumPage-selfcheck` (headless Chromium, hostile name), `tools/ship/subAquariumServerHtml-selfcheck` (runs the chip and send code in node:vm; 21 sabotages, S11 and S21 equivalent mutants). `bridgeCensus` and `pageSections` pass; `sub-aquarium.html` is filed in UNPLACED (the drawer is Keith's call).
+
+## Robust pilot, trained much longer (seeds 9200-9203, 600 iterations each; UNNUMBERED)
+
+Five vessels (nominal, Munk x3, Munk 0, fins x0.6, righting x2.5), actuator limits on, mean score per set (higher is better; 0 is perfect):
+
+| pilot | HELD_OUT mean | HELD_OUT Munk x3 | BASELINE mean | BASELINE Munk x3 |
+|---|---|---|---|---|
+| PD autopilot | -0.570 | -0.481 | -0.582 | -0.432 |
+| actuator champion | -0.553 | -1.159 | -0.515 | -0.911 |
+| robust (8000s, 200 it) | -0.491 | -0.692 | -0.459 | -0.521 |
+| **long 9201 (saved)** | **-0.424** | -0.515 | **-0.415** | -0.411 |
+| long 9200 | -0.424 | -0.495 | -0.423 | -0.375 |
+
+All four long runs beat the autopilot on the mean over the five vessels; none loses a vessel by much, and the Munk x3 gap closes (BASELINE: -0.41 vs the autopilot's -0.43; HELD_OUT: -0.52 vs -0.48, still slightly behind). Gains from the longer run are modest (-0.49 -> -0.42): the search had flattened (robust-train moved ~0.002 in the last 100 iterations). On Munk x3 HELD_OUT the autopilot (-0.481) is still marginally the best. Saved: `brain/pilotSubWeightsRobustLongWip.json` (seed 9201). SAFETY pool/audit and AUDIT were NOT read.
