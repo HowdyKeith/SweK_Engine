@@ -13,11 +13,12 @@
 // written only when a champion qualifies, and whether one does is the experiment.
 //
 // SABOTAGE LOG (each applied to the module in a scratch copy, the gate run, the copy discarded; the number is how many rows went red):
-//   Each applied to tools/ship/trainRotorPilot.mjs in a scratch copy, the gate run on the copy (its children, which are separate processes, run the copy too), the copy discarded; the number is how many rows went red. 39
-//   mutants, none left at 0. FOUR WERE FOUND BY THE FIRST RUN, TWO OF THEM AS CRASHES: Y (--slice ignored by searchOne) and AA (the child not handed --slice) went 0 red because every comparison in the gate ran both
-//   sides with the same slice -- the search's reported train score is now held to its weights' score on the slice, and not on the whole set; AJ (the champion's audit compared against the wrong set, which throws) and AN
-//   (a GPU blob written under the fruit fly's policy, which throws) crashed the gate with a stack trace and no failed row, so the gate now turns anything that throws into a failed row by name and exits 1. The mutants
-//   are numbered R01-R39 here in the order of the run (the scratch files lettered them A-AN).
+//   Each applied to tools/ship/trainRotorPilot.mjs in a scratch copy (R01-R40) or to the SHIPPED FILE brain/pilotRotorWeightsDefault.json in a scratch tree (FM01-FM12), the gate run on the copy (its children, which are
+//   separate processes, run the copy too), the copy discarded; the number is how many rows went red. 52 mutants, none left at 0. FOUR OF THE FIRST 39 WERE FOUND BY THE FIRST RUN, TWO OF THEM AS CRASHES: Y (--slice
+//   ignored by searchOne) and AA (the child not handed --slice) went 0 red because every comparison ran both sides with the same slice -- the search's reported train score is now held to its weights' score on the slice;
+//   AJ (the champion's audit compared against the wrong set, which throws) and AN (a GPU blob written under the fruit fly's policy, which throws) crashed the gate with a stack trace and no failed row, so the gate now
+//   turns anything that throws into a failed row by name and exits 1. (R01-R39 are lettered A-AN in the scratch files.) R40 (blobOf leaving the known limits out of `by`) and FM01-FM12 belong to section 9, the shipped
+//   file: a weight moved, a number in `by` edited, the limits paragraph renamed, the policy renamed, the hand weights shipped as the trained pilot -- each a red row by name.
 //   R01 parseArgs reads an unknown option 2; R02 qualifies: the audit-score clause dropped 2; R03 qualifies: held-out > loosened to >= 2; R04 finish: eligibility ignored 4; R05 finish: the champion picked on the train
 //   score 2; R06 blobOf: the count of weights that differ left out 1; R07 command: --write writes though the champion does not qualify 1; R08 RECIPE iterations 800 1; R09 qualifies: the reserve-score clause dropped 2;
 //   R10 qualifies: the kind clause dropped 3; R11 qualifies: better > worse loosened to >= 1; R12 tailReasons: the fresh-crash clause dropped 9; R13 command --one: runs search K+1 1; R14 searchOne: the prune skipped 3;
@@ -25,7 +26,9 @@
 //   not frozen 1; R21 brainOf defaults to the GPU Brain 8; R22 setsOf always the fruit fly's 1; R23 SETS_GPU's audit is the fruit fly's 1; R24 endedEarly: an engine flight judged on its status 1; R25 searchOne ignores
 //   --slice 3; R26 the write refusal with --slice dropped 1; R27 the child does not get --slice 1; R28 a brain's own seed ignored 1; R29 blob score is the audit's 1; R30 hand safety read from the pool 3; R31 an unknown
 //   brain accepted 1; R32 tails counts nothing 6; R33 reserve crash clause dropped 2; R34 audit crash clause dropped 2; R35 the champion's vs read against the wrong set 1; R36 the --workers children not in run order 1;
-//   R37 --dump not written 1; R38 the blob's citation is the other brain's 1; R39 the blob's policy is the fruit fly's 1.
+//   R37 --dump not written 1; R38 the blob's citation is the other brain's 1; R39 the blob's policy is the fruit fly's 1; R40 blobOf leaves the known limits out of `by` 1; FM01 an output weight moved by 0.5 6; FM02 an
+//   input weight moved by 0.5 6; FM03 the audit number in `by` edited 3; FM04 the limits paragraph renamed 3; FM05 the count of differing weights edited 3; FM06 the file's score edited 3; FM07 the policy named for the
+//   other network 3; FM08 the weight count wrong 3; FM09 the recipe in `by` edited 3; FM10 the hand weights shipped as the trained pilot 8; FM11 the safety audit count in `by` edited 3; FM12 the citation edited 3.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -35,6 +38,8 @@ import * as TR from "./trainRotorPilot.mjs";
 import * as PP from "../../brain/pilotRotorPolicy.mjs";
 import * as MR from "../../brain/pilotRotorMlp.mjs";
 import * as RT from "../../brain/rotorTask.mjs";
+import * as AR from "../../brain/autopilotRotor.mjs";
+import * as RC from "../../physics/mechanics/rotorcraftModel6dof.mjs";
 import * as PB from "../../brain/peerBrain.mjs";
 import * as PF from "../../brain/pilotFlightPolicy.mjs";
 import { weightsHash } from "../../brain/drivePolicy.mjs";
@@ -200,10 +205,46 @@ sec("8. the file it writes");
 const fakeResult = { hand: { ...hand }, champion: champBlob, runs: [], verdict: { ok: true, reasons: [] } };
 const blob = TR.blobOf(fakeResult, { runs: 4, iters: 600, seed: 8000, sigma: 0.3, maxK: 4 });
 const imp = PB.importBrain(PB.describePolicy("pilotRotorPolicy", PP), blob);
+ok("!! EVERY FILE THE TOOL WRITES CARRIES THE KNOWN LIMITS in its `by`, in full (the library's LIMITS: the task does not charge ground speed at touchdown; the dead man's curve is not solved) -- and the GPU Brain's does too", blob.by.includes(TR.LIMITS) && TR.blobOf({ ...fakeResult, champion: { ...champBlob, weights: MR.handWeights() } }, { runs: 4, iters: 600, seed: 9000, sigma: 0.3, maxK: 4, brain: "gpu" }).by.includes(TR.LIMITS));
 ok("the blob is a swek-brain-v1 file for pilotRotorPolicy with 1,167 weights that the importer accepts, carrying a `by`, a score and a citation", blob.format === "swek-brain-v1" && blob.policy === "pilotRotorPolicy" && blob.weightCount === 1167 && imp.ok && imp.weights.length === 1167 && typeof blob.by === "string" && blob.by.length > 300 && typeof blob.citation === "string" && /Giant Fiber/.test(blob.citation));
 ok("the fruit fly's aeroplane pilot's importer refuses it by name (a blob of one policy cannot be taken for another), and so does the GPU Brain's helicopter policy", PB.importBrain(PB.describePolicy("pilotFlightPolicy", PF), blob).ok === false && PB.importBrain(PB.describePolicy("pilotRotorMlp", MR), blob).ok === false);
 ok("`by` records the recipe, the champion's seed, the count of weights that differ from the hand pilot and the sets it was picked and graded on, and quotes the held-out, the audit, the scenarios better and worse, the reserve and the safety audit", /seed 8001 of 4 runs \(8000\.\.8003\)/.test(blob.by) && /sigma 0\.3, 1-4 weights per child, 600 children per run/.test(blob.by) && /on the 28 training scenarios/.test(blob.by) && /17 of the 1167 weights differ from the hand pilot/.test(blob.by) && /champion picked on the 28 held-out scenarios/.test(blob.by) && /the 60 starts of the safety pool/.test(blob.by) && blob.by.includes(RT.describeEval(champBlob.heldOut).split(" (")[0]) === false && blob.by.includes(RT.describeEval(champBlob.audit)) && /over the 42 audit scenarios \(the hand pilot -1\.7800; 30 scenarios better, 5 worse\)/.test(blob.by) && /reserve -2\.1000 \(the hand pilot -2\.2400\)/.test(blob.by) && /safety audit of 60 starts: 1 ended early \(the hand pilot 1\), none that the hand pilot completes/.test(blob.by), blob.by.slice(0, 90));
 ok("`score` is the HELD-OUT score the champion was picked on, to four places, and the GPU Brain's blob is for pilotRotorMlp with 1,860 weights", blob.score === -1.5 && (() => { const gb = TR.blobOf({ ...fakeResult, champion: { ...champBlob, weights: MR.handWeights() } }, { runs: 4, iters: 600, seed: 9000, sigma: 0.3, maxK: 4, brain: "gpu" }); return gb.policy === "pilotRotorMlp" && gb.weightCount === 1860 && /GPU Brain/.test(gb.citation) && /on the 42 audit scenarios|over the 42 audit scenarios/.test(gb.by) && PB.importBrain(PB.describePolicy("pilotRotorMlp", MR), gb).ok; })());
+
+
+sec("9. THE SHIPPED FRUIT-FLY PILOT IS WHAT ITS `by` SAYS (brain/pilotRotorWeightsDefault.json)");
+{
+    const file = path.join(ENG, "brain", "pilotRotorWeightsDefault.json"), exists = fs.existsSync(file);
+    ok("the shipped pilot exists", exists, file);
+    if (exists) {
+        const blob = JSON.parse(fs.readFileSync(file, "utf8")), DESC = PB.describePolicy("pilotRotorPolicy", PP), imp = PB.importBrain(DESC, blob), by = blob.by || "";
+        ok("!! it is a swek-brain-v1 file for pilotRotorPolicy with 1,167 weights that the importer accepts, with a `by`, a score and a citation; the GPU Brain's helicopter policy and the aeroplane's pilot refuse it by name", imp.ok && blob.format === "swek-brain-v1" && blob.policy === "pilotRotorPolicy" && blob.weightCount === 1167 && typeof blob.score === "number" && by.length > 800 && /Giant Fiber/.test(blob.citation || "") && PB.importBrain(PB.describePolicy("pilotRotorMlp", MR), blob).ok === false && PB.importBrain(PB.describePolicy("pilotFlightPolicy", PF), blob).ok === false);
+        if (imp.ok) {
+            const w = imp.weights, hw = PP.handWeights(), ev = (x, set) => PP.evaluate(x, set), kept = Array.from(w).filter((v, i) => Math.abs(v - hw[i]) > 1e-6).length;
+            const heldOut = ev(w, RT.HELD_OUT_SET), audit = ev(w, RT.AUDIT_SET), reserve = ev(w, RT.BASELINE_SET), safety = TR.tails(ev(w, RT.SAFETY_AUDIT_SET)), pool = TR.tails(ev(w, RT.SAFETY_POOL_SET));
+            const hHeld = ev(hw, RT.HELD_OUT_SET), hAudit = ev(hw, RT.AUDIT_SET), hReserve = ev(hw, RT.BASELINE_SET), hSafety = TR.tails(ev(hw, RT.SAFETY_AUDIT_SET)), hPool = TR.tails(ev(hw, RT.SAFETY_POOL_SET));
+            const vs = RT.versus(audit, hAudit), R = TR.RECIPE;
+            ok("!! `by` quotes the RECIPE the tool holds (seed k of the runs 8000..8003, sigma 0.3, 1-4 weights a child, 600 children a run, the 28 training scenarios) and the sets the champion was picked and graded on", by.includes(`of ${R.runs} runs (${R.seed}..${R.seed + R.runs - 1}), sigma ${R.sigma}, 1-${R.maxK} weights per child, ${R.iters} children per run, on the ${RT.TRAIN_SET.length} training scenarios`) && by.includes(`champion picked on the ${RT.HELD_OUT_SET.length} held-out scenarios`) && by.includes(`the ${RT.SAFETY_POOL_SET.length} starts of the safety pool`) && by.includes(`over the ${RT.AUDIT_SET.length} audit scenarios`) && /seed (8000|8001|8002|8003) of 4 runs/.test(by));
+            ok("!! `by` is TRUE of the weights, recomputed here: the count of weights that differ from the hand pilot, the audit with every kind and the scenarios better and worse, the reserve, and the file's own `score` is the held-out score to four places", by.includes(`${kept} of the 1167 weights differ from the hand pilot`) && by.includes(`audit ${RT.describeEval(audit)} over the ${RT.AUDIT_SET.length} audit scenarios (the hand pilot ${hAudit.score.toFixed(4)}; ${vs.better} scenarios better, ${vs.worse} worse)`) && by.includes(`reserve ${reserve.score.toFixed(4)} (the hand pilot ${hReserve.score.toFixed(4)})`) && blob.score === Number(heldOut.score.toFixed(4)), `${kept} differ; audit ${audit.score.toFixed(4)} vs ${hAudit.score.toFixed(4)}; ${vs.better} better / ${vs.worse} worse`);
+            ok("!! ...and the safety audit it quotes: of 60 starts nothing had flown, the flights ended early, the champion's and the hand pilot's", by.includes(`safety audit of ${safety.n} starts: ${safety.crashed.length} ended early (the hand pilot ${hSafety.crashed.length}), none that the hand pilot completes.`), `${safety.crashed.length} vs ${hSafety.crashed.length}`);
+            ok("!! `by` CARRIES THE KNOWN LIMITS, in full (the library's LIMITS): the task does not charge ground speed at touchdown, and the dead man's curve is not solved", by.includes(TR.LIMITS) && /NOT the speed over the ground at touchdown/.test(TR.LIMITS) && /dead man's curve is NOT solved/.test(TR.LIMITS));
+            const q = TR.qualifies({ heldOut, audit, reserve, safety, vs }, { heldOut: hHeld, audit: hAudit, reserve: hReserve, safety: hSafety });
+            ok("!! *** THE SHIPPED PILOT QUALIFIES UNDER THE RULES AS THEY STAND NOW ***: every clause of qualifies(), recomputed from its weights on the held-out, audit, reserve and safety-audit scenarios", q.ok, q.reasons.join("; "));
+            ok("!! ...and it was ELIGIBLE: on the 60-start safety pool it ends no flight early that the hand pilot completes", TR.tailReasons(pool, hPool, "the safety pool").length === 0, `${pool.crashed.length} early on the pool against the hand pilot's ${hPool.crashed.length}`);
+            ok("it is a trained pilot and not the hand pilot: it beats the hand pilot on the held-out and the audit scores by more than 0.2, and differs from the hand weights in more than 50 places", heldOut.score > hHeld.score + 0.2 && audit.score > hAudit.score + 0.2 && kept > 50, `${(heldOut.score - hHeld.score).toFixed(3)} / ${(audit.score - hAudit.score).toFixed(3)}`);
+            // ---- the limits, MEASURED: first contact, the speed over the ground there, and whether it stands eight seconds on ----
+            const model = AR.defaultModel(), champ = PP.pilotFor(w), handP = (s, tg, wi, c) => AR.pilot(s, tg, wi, c);
+            const touch = (pilot, start, target) => { let s = RC.createState(model, { ...start }), first = null; for (let i = 0; i < 2400; i++) { const o = RC.stepRotor(model, s, pilot(s, target, [0, 0, 0], {}), RC.DT); s = o.state; if (!first && o.status !== "airborne") first = { st: o.status, sink: o.sink || 0, gs: Math.hypot(s.vel[0], s.vel[1]), i, end: null }; if (first && (o.status === "crashed" || i >= first.i + 480)) { first.end = o.status; break; } } return first; };
+            const T0 = AR.trimOf(model), rows = RT.AUDIT_SET.filter((c) => c.kind === "engine").map((c) => ({ h: touch(handP, c.start, c.target), c: touch(champ, c.start, c.target) }));
+            const standsH = rows.filter((r) => r.h && r.h.end !== "crashed").length, standsC = rows.filter((r) => r.c && r.c.end !== "crashed").length, both = rows.filter((r) => r.h && r.c && r.h.st === "landed" && r.c.st === "landed");
+            const mean = (a, k) => a.reduce((x, r) => x + r[k], 0) / a.length;
+            ok("!! THE GAIN, DECOMPOSED (the 20 engine-out audit flights): the champion is STANDING eight seconds after first contact in more of them than the hand pilot (14 against 9 -- the hand pilot lands softly and then crashes in the rollout in five), and in the 14 both land it comes down with the lower sink", standsH === 9 && standsC === 14 && both.length >= 13 && mean(both.map((r) => r.c), "sink") < mean(both.map((r) => r.h), "sink") - 0.5, `stands ${standsC} against ${standsH} of ${rows.length}; sink ${mean(both.map((r) => r.c), "sink").toFixed(2)} against ${mean(both.map((r) => r.h), "sink").toFixed(2)}`);
+            ok("!! THE LIMIT, MEASURED: it lands FASTER OVER THE GROUND than the hand pilot -- on the flights both land, a mean of over 20 m/s at first contact against the hand pilot's 15 (the task does not charge it, and the file says so)", mean(both.map((r) => r.c), "gs") > 20 && mean(both.map((r) => r.h), "gs") < 16, `${mean(both.map((r) => r.c), "gs").toFixed(1)} against ${mean(both.map((r) => r.h), "gs").toFixed(1)} m/s`);
+            const dmc = [[30, 0], [30, 10], [60, 0], [20, 10], [45, 10]].map(([alt, v]) => touch(champ, { pos: [0, 0, alt], velocity: [v, 0, 0], pitch: T0.pitchAttitude, bank: T0.bank, engine: "out" }, { altitude: alt }));
+            ok("!! THE DEAD MAN'S CURVE IS NOT SOLVED: the five starts the hand pilot's gate pins as crashes (30 m in a hover, 30 m at 10 m/s, 60 m in a hover, 20 m at 10 m/s, 45 m at 10 m/s) still end 'crashed' for the champion, at over 6 m/s of sink", dmc.every((x) => x && x.st === "crashed" && x.sink > 6), dmc.map((x) => x ? `${x.st} ${x.sink.toFixed(1)}` : "-").join(", "));
+        }
+    }
+}
 
 console.log(fails ? `\ntrainRotorPilot-selfcheck: ${fails} FAILED` : "\ntrainRotorPilot-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);

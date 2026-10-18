@@ -145,13 +145,20 @@ export function dumpOf(result, opts) {
         runs: result.runs.map((r) => ({ k: r.k, seed: r.seed, trainScore: r.trainScore, heldOut: sc(r.heldOut), pool: r.pool, eligible: r.eligible, kept: r.kept, moved: r.moved, weights: Array.from(r.weights) })) };
 }
 
+/**
+ * WHAT A READER OF A SHIPPED FILE MUST BE TOLD, written into every file's `by` (measured on the first shipped file, which the gate re-measures): the engine-out flight's cost charges the sink at first contact and whether the machine is standing eight seconds later and does NOT charge
+ * the speed over the ground at touchdown, and the rotor model has no roll-over or skid dig-in limit beyond its 30 degrees of tilt and 4.5 m/s of sink -- so a pilot can lower its sink by carrying speed in, and the one that did lands at over 20 m/s over the ground where the hand pilot lands at 15. And the dead
+ * man's curve is NOT solved: the low-and-slow starts the hand pilot's gate pins as crashes still end 'crashed'.
+ */
+export const LIMITS = "KNOWN LIMITS OF THE TASK THIS WAS MADE ON, SAID PLAINLY: the cost of an engine-out flight charges the sink at first contact and whether the machine is still standing eight seconds later, NOT the speed over the ground at touchdown, and the rotor model has no roll-over or skid dig-in limit beyond its 30 degrees of tilt and 4.5 m/s of sink -- so a pilot can lower its sink by carrying speed in, and this one lands faster over the ground than the hand pilot does (see the gate: tools/ship/trainRotorPilot-selfcheck.mjs, section 9). The dead man's curve is NOT solved: the low-and-slow starts brain/autopilotRotor-selfcheck.mjs pins as crashes (30 m in a hover, 30 m at 10 m/s, 60 m in a hover, 20 m at 10 m/s, 45 m at 10 m/s) still end 'crashed'.";
+
 /** The file written when the champion qualifies: the portable swek-brain-v1 blob, with the recipe and the numbers it was graded on in `by`. */
 export function blobOf(result, opts) {
     const B = brainOf(opts), sets = setsOf(opts), c = result.champion, h = result.hand, desc = PB.describePolicy(B.policyId, B.policy);
     const by = `sparse-mutation (1+1)-ES from the hand weights (the hand pilot's laws), seed ${c.seed} of ${opts.runs} runs (${opts.seed}..${opts.seed + opts.runs - 1}), sigma ${opts.sigma}, 1-${opts.maxK} weights per child, ${opts.iters} children per run, on the ${sets.train.length} training scenarios of brain/rotorTask.mjs (hover, recovery, engine out, rough ground); ` +
         `then pruned: ${c.kept} of the ${B.policy.WEIGHT_COUNT} weights differ from the hand pilot; champion picked on the ${sets.heldOut.length} held-out scenarios among the searches that end no flight early on the ${sets.pool.length} starts of the safety pool that the hand pilot completes; ` +
         `audit ${cmp(c.audit)} over the ${sets.audit.length} audit scenarios (the hand pilot ${h.audit.score.toFixed(4)}; ${c.vs.better} scenarios better, ${c.vs.worse} worse), reserve ${c.reserve.score.toFixed(4)} (the hand pilot ${h.reserve.score.toFixed(4)}), ` +
-        `safety audit of ${c.safety.n} starts: ${c.safety.crashed.length} ended early (the hand pilot ${h.safety.crashed.length}), none that the hand pilot completes.`;
+        `safety audit of ${c.safety.n} starts: ${c.safety.crashed.length} ended early (the hand pilot ${h.safety.crashed.length}), none that the hand pilot completes. ` + LIMITS;
     return PB.exportBrain(desc, c.weights, { score: Number(c.heldOut.score.toFixed(4)), by, citation: B.citation });
 }
 /**
