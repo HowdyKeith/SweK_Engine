@@ -192,6 +192,10 @@ export function mentionsOf(name, files) {
  * comparing against this reports an arrival and a departure BY NAME, and the round that changes one has to say
  * which and why -- which is what the two comments preserved above were doing by hand.
  */
+// UNNUMBERED (the v4874 ship) -- FOUR ARRIVALS, EACH BY NAME. three: bomber.html, dogfight.html and space-battleship.html (the guns line's pages, which
+// import the vendored three; the third was battleship.html until the launch index folded that name into the board game's built-in launcher). three-webgpu
+// and three-webgpu-r185: render/renderNow-selfcheck.mjs, which READS both builds' source to pin that renderAsync is exactly `await this.init();
+// this.render(scene, camera)` -- a real dependency, since a vendor move or an edit to those bodies is what makes it red.
 export const DEPENDANTS_AT_V4410 = Object.freeze({
     "box3d": Object.freeze([
         "ai-bridge/doctorBridge.js",
@@ -361,6 +365,9 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         // the constant is ever USED to reach the file, which a textual census cannot answer, so the rule was
         // deleted rather than shipped wrong. The list is what the census MEASURES -- files naming a vendor
         // path in a quoted specifier -- and this entry says where that differs from what it MEANS.
+        "bomber.html",
+        "dogfight.html",
+        "space-battleship.html",
         "tools/ship/treeRead-selfcheck.mjs",
         "ai-bridge/ensureThree.js",
         "ai-bridge/server.js",
@@ -456,6 +463,7 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         // already in this list.
         "ai-presence-orb.html",
         "orrery-gpu.html",
+        "render/renderNow-selfcheck.mjs",
         "tools/ship/aiPresenceOrb-selfcheck.mjs",
         "tools/ship/aiPresenceOrbPresent-selfcheck.mjs",
         "tools/ship/brainTsl-page.js",
@@ -550,6 +558,7 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
     // v4805 -- r185's three files, kept unchanged for the r185 drafts when vendor/three-webgpu moved to r186. Nothing in the engine
     // imports them: the patch applier reads them, and the upstream gates load them by a path they build.
     "three-webgpu-r185": Object.freeze([
+        "render/renderNow-selfcheck.mjs",
         "tools/ship/threePatch.mjs",
         // rig run 2 (main) -- threeUpstream-selfcheck's overlay section reads three.core.js through the overlay where a file
         // symlink is refused, and compares it with the vendored copy: a real read of this body, by name. v4819: the copy it

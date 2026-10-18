@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "9455676df940fd10e4cd797b38e21f7e51b4d08c",
+ "head": "c6a31c157f7f4d2a7718620a217e477647d8a8f0",
  "bodies": {
   "box3d": [
    {
@@ -340,8 +340,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 888437,
-    "sha": "80426e248ab016e10f3fea742ac5853a54f48959"
+    "bytes": 890008,
+    "sha": "0bfbff9b92d28ad542cc40f2a220d4e34f45168d"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
@@ -555,11 +555,6 @@
     "sha": "c9d9ce2e614112b74590ef04b26cd79212466be8"
    },
    {
-    "path": "battleship.html",
-    "bytes": 68316,
-    "sha": "6fc9d1325477e196ae93b78311134d2290d33c2c"
-   },
-   {
     "path": "battleship3d.html",
     "bytes": 55076,
     "sha": "f21cfb089b75d5163f10c5f3286e7903c5650192"
@@ -741,8 +736,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3661423,
-    "sha": "e4b6f551cc84dcee8dbf26678aeb7c0a6b4027f3"
+    "bytes": 3661435,
+    "sha": "0bfbff9b92d28ad542cc40f2a220d4e34f45168d"
    },
    {
     "path": "mpm3d.html",
@@ -786,8 +781,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 888437,
-    "sha": "80426e248ab016e10f3fea742ac5853a54f48959"
+    "bytes": 890008,
+    "sha": "0bfbff9b92d28ad542cc40f2a220d4e34f45168d"
    },
    {
     "path": "shipavatar.html",
@@ -803,6 +798,11 @@
     "path": "song-globe.html",
     "bytes": 8655,
     "sha": "cc2293510dd6de403175380275e7a76a7a4ececf"
+   },
+   {
+    "path": "space-battleship.html",
+    "bytes": 68328,
+    "sha": "0bfbff9b92d28ad542cc40f2a220d4e34f45168d"
    },
    {
     "path": "splat_viewer.html",
