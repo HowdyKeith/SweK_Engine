@@ -205,3 +205,18 @@ Five vessels (nominal, Munk x3, Munk 0, fins x0.6, righting x2.5), actuator limi
 | long 9200 | -0.424 | -0.495 | -0.423 | -0.375 |
 
 All four long runs beat the autopilot on the mean over the five vessels; none loses a vessel by much, and the Munk x3 gap closes (BASELINE: -0.41 vs the autopilot's -0.43; HELD_OUT: -0.52 vs -0.48, still slightly behind). Gains from the longer run are modest (-0.49 -> -0.42): the search had flattened (robust-train moved ~0.002 in the last 100 iterations). On Munk x3 HELD_OUT the autopilot (-0.481) is still marginally the best. Saved: `brain/pilotSubWeightsRobustLongWip.json` (seed 9201). SAFETY pool/audit and AUDIT were NOT read.
+
+### Safety pool and audit for the long champion (seed 9201), `tools/auditSubChampion.mjs`
+
+The seed-6002 audit sets are spent, so the audit used two NEW seed ranges (SAFETY_AUDIT2: 500 dives, seeds 3000-3099 / 3000-3299 / 3000-3099; AUDIT2: 36 dives, seeds 3500-3511 per kind). **They are now SPENT for 9201: read once, do not re-run after tuning.** Actuator limits on, champion vs PD autopilot:
+
+| set | hull | champion / autopilot | better / worse | ended that the autopilot completed | early ends | worst-5% |
+|---|---|---|---|---|---|---|
+| SAFETY_POOL (500) | nominal | -0.413 / -0.582 | 492 / 2 | 0 | 0 / 0 | -0.84 / -1.22 |
+| SAFETY_POOL (500) | Munk x3 | -0.560 / -0.535 | 345 / 128 | 1 | 1 / 0 | -1.88 / -1.38 |
+| SAFETY_AUDIT2 (500) | nominal | -0.395 / -0.565 | 496 / 1 | 0 | 0 / 0 | -0.79 / -1.23 |
+| SAFETY_AUDIT2 (500) | Munk x3 | -0.571 / -0.528 | 306 / 165 | 1 | 1 / 1 | -1.96 / -1.43 |
+| AUDIT2 (36) | nominal | -0.355 / -0.482 | 35 / 0 | 0 | 0 / 0 | -0.87 / -1.13 |
+| AUDIT2 (36) | Munk x3 | -0.421 / -0.411 | 21 / 12 | 0 | 0 / 0 | -1.01 / -0.95 |
+
+Verdict: on the nominal hull the champion QUALIFIES (never ends a dive the autopilot completes, better on 99%). On the Munk x3 hull it does NOT: slightly worse on the mean (-0.57 vs -0.53), its worst 5% is clearly worse (-1.96 vs -1.43), and it ends one dive the autopilot completes (the pool and the audit both). The long training narrowed the Munk x3 gap (the actuator champion was -0.91 to -1.16 there) but did not remove it. Claim to keep: "robust across five hulls on average, qualifies on the nominal hull, still a tail risk on a 3x-Munk hull".
