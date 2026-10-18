@@ -73,6 +73,7 @@
   <label title="the bridge has a crew and each seat a gunner, who dies at half the hit points of his mount: a dead gunner's turret stands and does not fire, a dead bridge crew leaves the ship with no helm and no cannon"><input id="crew" type="checkbox"> crew</label>
   <label title="the spheres a round has to reach"><input id="spheres" type="checkbox"> hit spheres</label>
   <button id="newBtn" title="start this fight again from its first tick, with what is chosen">&#8635; New fight</button>
+  <button id="backdropBtn" title="Backdrop: the baked nebula-and-stars sky and a sun disc where the sun shines from (render/spaceBackdrop.js, the sky es-box3d-fly3d.html wears) behind every window. Off by default: the flat fill and the star shell. The first press bakes it (about half a second). The sun disc is a picture, not a light.">Backdrop: off</button>
   <button id="pauseBtn">&#10074;&#10074; Pause</button><button id="stepBtn" title="one tick (1/30 s)">+1 tick</button>
   <label>speed <select id="timeScale"><option>1</option><option>2</option><option>4</option><option>8</option></select>x</label>
   <label>view <select id="camMode"><option value="overview">overview</option><option value="chase0">chase battleship</option><option value="chase1">chase fighter 1</option><option value="orbit">orbit</option></select></label>
@@ -102,6 +103,9 @@ import * as MG from "/brain/seatGunnerMlp.mjs";
 import * as HP from "/brain/helmPolicy.mjs";
 import * as V from "/render/flightViews.mjs";
 import { weightsHash } from "/brain/drivePolicy.mjs";
+import { mountBackdrop } from "/render/spaceBackdrop.js";   // the baked nebula and star es-box3d-fly3d.html wears, behind a Backdrop button here (off: the flat fill)
+import { bakeNebulaCubemap } from "/render/nebulaSkybox.js";
+import { bakeStarCubemap } from "/render/proceduralStar.js";
 
 const R2D = 180 / Math.PI, FIGHTER_COLORS = [0xff9a4f, 0xf6a623, 0xe8734a, 0xd4a017, 0xff8c42, 0xc97b2a], ESCORT_COLORS = [0x4fa8ff, 0x6fc2ff, 0x3f8fe0, 0x8ad0ff, 0x5a9cf0, 0x2f7fd0], SHIP_COLOR = 0x6f8fa0;
 const MAX_FIGHTERS = 12;
@@ -209,7 +213,6 @@ function fillHelms(sel) { const keep = sel.value; sel.textContent = ""; for (con
 
 // ---- Three.js scene, Z-UP like the physics (nose +X, up +Z): space -- a black sky, stars, a drifting dust to see motion against, light from one side ----------------------------------------------------------------
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x02040a);
 const camera = new THREE.PerspectiveCamera(51.6, innerWidth / innerHeight, 0.3, 40000);   // 0.9 rad vertical, the overview's
 camera.up.set(0, 0, 1); camera.position.set(-300, -400, 250);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -220,6 +223,7 @@ const orbit = new OrbitControls(camera, renderer.domElement);
 orbit.enableDamping = true; orbit.dampingFactor = 0.08; orbit.enabled = false;
 scene.add(new THREE.AmbientLight(0x8da4c4, 0.55));
 const sun = new THREE.DirectionalLight(0xfff2dd, 2.2); sun.position.set(500, -300, 400); scene.add(sun);
+let starShell = null;
 {
   let s = 9173; const rnd = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
   const cloud = (n, spread, size, color, shell) => {
@@ -229,11 +233,14 @@ const sun = new THREE.DirectionalLight(0xfff2dd, 2.2); sun.position.set(500, -30
       else { a[i * 3] = (rnd() - 0.5) * spread; a[i * 3 + 1] = (rnd() - 0.5) * spread; a[i * 3 + 2] = (rnd() - 0.5) * spread; }
     }
     const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(a, 3));
-    const p = new THREE.Points(g, new THREE.PointsMaterial({ color, size, sizeAttenuation: false })); p.frustumCulled = false; scene.add(p);
+    const p = new THREE.Points(g, new THREE.PointsMaterial({ color, size, sizeAttenuation: false })); p.frustumCulled = false; scene.add(p); return p;
   };
-  cloud(2600, 20000, 1.6, 0xcfe0ff, true);     // the stars
+  starShell = cloud(2600, 20000, 1.6, 0xcfe0ff, true);     // the stars
   cloud(240, 3000, 1.5, 0x4f5f78, false);        // a little dust, to see the craft move against
 }
+// the Backdrop button: OFF (the flat 0x02040a fill and the star shell above, exactly as before) until it is pressed; the first press bakes (about half a second). The sun disc sits where `sun` shines from.
+const backdrop = mountBackdrop(THREE, scene, { flat: 0x02040a, light: sun.position.toArray(), hide: [starShell],
+  makeCanvas: (w, h) => { const cv = document.createElement("canvas"); cv.width = w; cv.height = h; return cv; }, bakeNebula: bakeNebulaCubemap, bakeStar: bakeStarCubemap });
 const CREW_DEAD = new THREE.MeshStandardMaterial({ color: 0x5b6670, roughness: 1 }), HULL_DEAD = new THREE.MeshStandardMaterial({ color: 0x3a1c1c, roughness: 0.95 }), PART_DEAD = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 1 });
 const GLOW_ON = new THREE.MeshBasicMaterial({ color: 0xffb06a }), GLOW_OFF = new THREE.MeshBasicMaterial({ color: 0x151515 });
 function makeFighter(i, palette = FIGHTER_COLORS) {   // the 6DOF page's hull: nose +X, a cylinder, a cone, a wing, the engine glow
@@ -562,6 +569,13 @@ function fillSelect(sel) { const keep = sel.value; sel.textContent = ""; for (co
 function fillHands(sel, inherit = false) { const keep = sel.value; sel.textContent = ""; if (inherit) { const o = document.createElement("option"); o.value = ""; o.textContent = "as the hand on the left"; sel.appendChild(o); } for (const h of HANDS) { const o = document.createElement("option"); o.value = h.id; o.textContent = h.label + (handAvailable(h) ? "" : " — not available"); o.disabled = !handAvailable(h); sel.appendChild(o); } if (keep) sel.value = keep; }
 function fillRosters() { fillSelect(el("pilotF")); fillHelms(el("helm")); fillHands(el("hand")); fillHands(el("handMain"), true); fillHands(el("handPd"), true); }
 el("newBtn").onclick = () => newFight();
+const backdropBtn = el("backdropBtn");
+const backdropLabel = () => { backdropBtn.textContent = "Backdrop: " + (backdrop.on ? "on" : "off"); backdropBtn.title = backdropBtn.title.replace(/ \[.*\]$/, "") + (backdrop.error ? " [bake failed: " + backdrop.error + "]" : ""); };
+backdropBtn.onclick = () => {
+  if (backdrop.on || backdrop.baked) { backdrop.toggle(); backdropLabel(); renderFrame(0); return; }
+  backdropBtn.textContent = "Backdrop: baking..."; backdropBtn.disabled = true;   // paint the word, then the half second of work
+  requestAnimationFrame(() => setTimeout(() => { backdrop.set(true); backdropBtn.disabled = false; backdropLabel(); renderFrame(0); }, 0));
+};
 for (const id of ["kind", "pilotF", "hand", "handMain", "handPd", "handSeats", "gunners", "nfight", "helm", "nships", "nesc", "formation", "collide", "behaviour", "cruise", "seed", "ff", "hold", "wrecks", "impact", "crew"]) el(id).onchange = () => newFight();
 el("pauseBtn").onclick = () => { paused = !paused; el("pauseBtn").textContent = paused ? "▶ Play" : "❚❚ Pause"; };
 el("stepBtn").onclick = () => { paused = true; el("pauseBtn").textContent = "▶ Play"; if (!arena.done) tickOnce(); };
@@ -654,6 +668,9 @@ window.__battleship = {
   setView(i, v, seat = 0) { wins[i].view = v; wins[i].seat = seat; setLabel(wins[i]); renderFrame(0); }, pixels: pixelStats, ink: overlayInk, inkColor,
   windowMarkers: () => windowMarkers.slice(),
   cameraOf: (i) => { const cam = cameraOf(wins[i], arena.crafts[i]); return cam && { eye: cam.eye.slice(), target: cam.target.slice(), up: cam.up.slice(), fov: cam.fov }; },
+  // the Backdrop button's state, for tools/ship/spaceBackdropPage-selfcheck.mjs: describe() is plain data; frameMs(n) is the wall time of n full redraws (the big picture and every window)
+  backdrop: { describe: () => backdrop.describe(), light: () => sun.position.toArray(), set: (on) => { backdrop.set(on); backdropLabel(); renderFrame(0); return backdrop.on; }, click: () => backdropBtn.click(), label: () => backdropBtn.textContent, disabled: () => backdropBtn.disabled,
+    frameMs(n = 10) { renderFrame(0); const gl = renderer.getContext(), t0 = performance.now(); for (let k = 0; k < n; k++) renderFrame(0); gl.finish(); return (performance.now() - t0) / n; } },
   tracers: () => ({ pd: tracerP.geom.drawRange.count / 2, main: tracerM.geom.drawRange.count / 2, fighter: tracerF.geom.drawRange.count / 2, escort: tracerE.geom.drawRange.count / 2 }),
   sight: (i) => wins[i].sight, texts: (i) => wins[i].texts.slice(), scissors: () => scissors.map((s) => s && { ...s }), stackRect: () => (({ x, y, width, height }) => ({ x, y, width, height }))(stack.getBoundingClientRect()),
   turretAim: (k, ship = 0) => { const m = meshes[arena.crafts.indexOf(arena.crafts.filter((q) => q.kind === "capital")[ship])].userData.turrets[k].barrel.quaternion; return [m.x, m.y, m.z, m.w]; },
