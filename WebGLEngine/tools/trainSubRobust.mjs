@@ -27,6 +27,7 @@ for (let i = 1; i <= iters; i++) {
     const cand = P.mutate(best, 0.3, rng, 4), s = score(cand);
     if (s > bestScore + 1e-9) { best = cand; bestScore = s; improved++; } else if (s >= bestScore - 1e-9) best = cand;
     if (i % 50 === 0) console.error(`seed ${seed} iter ${i} robust-train ${bestScore.toFixed(4)} (${((Date.now() - t0) / 1000).toFixed(0)}s)`);
+    if (i % 100 === 0) fs.writeFileSync(out + ".ckpt", JSON.stringify({ seed, iter: i, from: from || "hand", actuators: useAct, trainScore: bestScore, improved, weights: Array.from(best) }));   // a lost container loses at most 100 iterations
 }
 const held = MODELS.reduce((a, m) => a + P.evaluate(best, T.HELD_OUT_SET, opts(m)).score, 0) / MODELS.length;
 fs.writeFileSync(out, JSON.stringify({ seed, iters, from: from || "hand", actuators: useAct, trainScore: bestScore, heldScore: held, improved, weights: Array.from(best) }));
