@@ -1,0 +1,157 @@
+<!doctype html>
+<!-- sub-aquarium.html -- UNNUMBERED (the version is chosen at ship time): A TANK OF SUBMARINES, AND PEERS CAN SEND THEIRS.
+
+     Every submarine in the tank swims with ITS OWN pilot, through the same vessel and the same pilot contract as the rest of the submarine work (render/subAquariumSim.mjs: physics/mechanics/subModel6dof.mjs, the PD autopilot, and the
+     connectome-wired network flying the 963 weights the sub arrived with). It wanders: a new heading, depth and speed every 20-45 s, and back to the middle of the tank near a wall. A boat that is lost (the floor, the surface) is put
+     back and the count is shown -- a pilot that keeps failing is a pilot you can SEE failing.
+
+     WHERE THE SUBS COME FROM: "Offer my subs" puts this box's own champions in the tank (ai-bridge/subAquariumBridge.js /subaquarium/seed). server.html's peer list has a "send sub" button per detected peer: it asks THIS box to
+     send the chosen sub to that peer's /subaquarium/arrive, and it appears in THEIR tank here. Subs from peers are marked with the address that sent them. WHAT A SUB IS: a name, 963 numbers and twelve more -- data, never code;
+     this page flies it with code it already has.
+
+     THE STAND-IN, SAID PLAINLY: the network in every sub here is wired like the fruit fly's Giant Fiber Circuit (34 neurons, 313 synapses). No fish circuit is vendored (ZAPBench is activity, not wiring), so "fish brain" is a name for
+     where this is going; the chip above says STAND-IN for exactly that reason.
+
+     Nothing from the network is ever put in the page as markup: every name and address goes in with textContent. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Sub Aquarium">
+<meta name="demo:desc" content="A tank of submarines, each flown by its own pilot (the PD autopilot, or a connectome-wired network with the weights it arrived with). Peers detected on the LAN can send their subs here from server.html's peer list. The network is the fruit fly's Giant Fiber Circuit as a stand-in; no fish circuit is vendored.">
+<meta name="demo:category" content="science">
+<title>SweK &middot; Sub Aquarium</title>
+<style>
+  :root { --bg:#050a12; --panel:#0b131f; --line:#1c2c44; --fg:#dbe7ff; --dim:#7c93b8; --cyan:#59d1ff; --amber:#f6a623; --green:#5fe08a; --red:#ff7a7a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:13px ui-monospace, Menlo, monospace; }
+  header { padding:14px 16px 6px; }
+  h1 { font-size:15px; letter-spacing:.13em; text-transform:uppercase; color:var(--cyan); margin:0 0 6px; }
+  .desc { color:var(--dim); max-width:900px; line-height:1.6; margin:0 0 6px; }
+  .bar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:6px 16px; }
+  button, select { background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:5px; padding:4px 10px; font:inherit; cursor:pointer; }
+  button:hover { border-color:var(--cyan); }
+  .chip { display:inline-flex; align-items:center; gap:6px; background:#141821; border:1px solid #2a3242; border-radius:4px; padding:2px 8px; font-size:11px; }
+  .dot { width:9px; height:9px; border-radius:50%; background:#555; }
+  main { display:flex; gap:12px; padding:6px 16px 16px; flex-wrap:wrap; align-items:flex-start; }
+  .tank { flex:1 1 560px; min-width:300px; }
+  canvas { display:block; width:100%; background:#04101c; border:1px solid var(--line); border-radius:8px; }
+  .side { width:300px; max-width:100%; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px; max-height:640px; overflow-y:auto; }
+  .row { display:flex; gap:8px; align-items:flex-start; padding:5px 4px; border-bottom:1px solid #12203a; }
+  .row.sel { background:#12203a; }
+  .sw { width:11px; height:11px; border-radius:50%; flex:none; margin-top:3px; }
+  .nm { color:var(--fg); } .sub { color:var(--dim); font-size:11px; line-height:1.5; }
+  .empty { color:var(--dim); line-height:1.7; padding:10px 4px; }
+  .note { padding:4px 16px 24px; color:#55617a; max-width:900px; line-height:1.7; }
+  .err { color:var(--red); }
+</style>
+</head>
+<body>
+<header>
+  <h1>&#9670; Sub Aquarium</h1>
+  <p class="desc">A tank of submarines. Each swims with its own pilot &mdash; the PD autopilot, or the network that arrived with it. Peers on your network can send theirs from
+    <a href="/server.html" style="color:var(--cyan)">server.html</a>&rsquo;s peer list.</p>
+</header>
+<div class="bar">
+  <button id="seedBtn" title="Put this box's own champions in the tank">Offer my subs</button>
+  <button id="refreshBtn" title="Fetch the tank's list now">Refresh</button>
+  <label>speed <select id="speedSel"><option value="1">1&times;</option><option value="4" selected>4&times;</option><option value="10">10&times;</option></select></label>
+  <span class="chip"><span class="dot" id="fishDot"></span><b>FISH BRAIN</b> <span id="fishWord">checking&hellip;</span></span>
+  <span id="msg" class="sub"></span>
+</div>
+<main>
+  <div class="tank">
+    <canvas id="plan" width="1000" height="600" aria-label="Plan view of the tank"></canvas>
+    <div style="height:10px"></div>
+    <canvas id="sideView" width="1000" height="220" aria-label="Side view of the tank: depth against length"></canvas>
+  </div>
+  <div class="side" id="list"></div>
+</main>
+<p class="note" id="fishDetail"></p>
+<script type="module">
+import { createTank, LENGTH, WIDTH, DEPTH_MIN, DEPTH_MAX } from "/render/subAquariumSim.mjs";
+
+const $ = (id) => document.getElementById(id);
+const plan = $("plan"), side = $("sideView"), pg = plan.getContext("2d"), sg = side.getContext("2d");
+const tank = createTank();
+let selected = null, lastFrame = 0, listErr = false;
+const DOT = { live: "#4ade80", standin: "#f6a623", offline: "#ff5a5a", err: "#555" }, WORD = { live: "live", standin: "stand-in", offline: "offline", err: "unreachable" };
+
+async function refresh() {
+  try {
+    const j = await fetch("/subaquarium/list", { cache: "no-store" }).then((r) => r.json());
+    if (j && j.ok) { tank.sync(j.subs); listErr = false; } else listErr = true;
+  } catch (e) { listErr = true; }
+  renderList();
+}
+async function fishHealth() {
+  let st = "err", detail = "the bridge did not answer /ai/fishbrain/health";
+  try { const j = await fetch("/ai/fishbrain/health", { cache: "no-store" }).then((r) => r.json()); if (j && j.state) { st = j.state; detail = j.detail || ""; } } catch (e) {}
+  $("fishDot").style.background = DOT[st] || DOT.err; $("fishWord").textContent = WORD[st] || st; $("fishDetail").textContent = detail;
+}
+async function post(path, body) { return fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) }).then((r) => r.json()).catch(() => ({ ok: false, error: "no answer" })); }
+
+$("seedBtn").onclick = async () => { const r = await post("/subaquarium/seed"); $("msg").textContent = r.ok ? `offered ${r.added} sub${r.added === 1 ? "" : "s"}` + (r.skipped && r.skipped.length ? `, skipped ${r.skipped.length}` : "") : "not allowed: " + (r.error || "?"); refresh(); fishHealth(); };
+$("refreshBtn").onclick = () => { refresh(); fishHealth(); };
+
+function renderList() {
+  const box = $("list"); box.textContent = "";
+  const snap = tank.snapshot();
+  if (!snap.length) {
+    const d = document.createElement("div"); d.className = "empty";
+    d.textContent = listErr ? "The tank did not answer. Is the bridge running?" : "The tank is empty. \"Offer my subs\" puts this box's champions in; a peer can send theirs from server.html's peer list.";
+    if (listErr) d.classList.add("err"); box.appendChild(d); return;
+  }
+  for (const s of snap) {
+    const row = document.createElement("div"); row.className = "row" + (s.id === selected ? " sel" : ""); row.dataset.id = s.id;
+    const sw = document.createElement("span"); sw.className = "sw"; sw.style.background = `hsl(${s.hue} 80% 60%)`;
+    const t = document.createElement("div"), n = document.createElement("div"), m = document.createElement("div"); n.className = "nm"; m.className = "sub";
+    n.textContent = s.name; m.id = "m_" + s.id;
+    t.appendChild(n); t.appendChild(m); row.appendChild(sw); row.appendChild(t);
+    row.onclick = () => { selected = s.id === selected ? null : s.id; renderList(); };
+    if (s.local) { const x = document.createElement("button"); x.textContent = "✕"; x.title = "Remove from the tank"; x.style.marginLeft = "auto"; x.onclick = async (e) => { e.stopPropagation(); await post("/subaquarium/remove", { id: s.id }); refresh(); }; row.appendChild(x); }
+    box.appendChild(row);
+  }
+}
+function updateStats(snap) {
+  for (const s of snap) {
+    const m = document.getElementById("m_" + s.id); if (!m) continue;
+    m.textContent = `${s.pilot === "network" ? "network" : "PD autopilot"} · ${s.local ? "this box" : "from " + s.from} · ${s.depth.toFixed(0)} m · ${s.speed.toFixed(1)} m/s` + (s.lost ? ` · lost ${s.lost}×` : "");
+  }
+}
+
+function drawSub(g, px, py, heading, hue, len, sel) {
+  g.save(); g.translate(px, py); g.rotate(-heading);   // the engine's heading increases to the right (clockwise seen from above); canvas y is down
+  g.fillStyle = `hsl(${hue} 80% ${sel ? 75 : 60}%)`; g.strokeStyle = sel ? "#fff" : "#0008"; g.lineWidth = sel ? 2 : 1;
+  g.beginPath(); g.ellipse(0, 0, len, len * 0.28, 0, 0, Math.PI * 2); g.fill(); g.stroke();
+  g.fillStyle = "#0006"; g.fillRect(len * 0.1, -len * 0.38, len * 0.2, len * 0.14);
+  g.restore();
+}
+function render() {
+  const snap = tank.snapshot();
+  pg.clearRect(0, 0, plan.width, plan.height); sg.clearRect(0, 0, side.width, side.height);
+  const sx = plan.width / LENGTH, sy = plan.height / WIDTH;
+  pg.strokeStyle = "#1c2c44"; pg.lineWidth = 1; for (let x = 0; x <= LENGTH; x += 50) { pg.beginPath(); pg.moveTo(x * sx, 0); pg.lineTo(x * sx, plan.height); pg.stroke(); } for (let y = 0; y <= WIDTH; y += 50) { pg.beginPath(); pg.moveTo(0, y * sy); pg.lineTo(plan.width, y * sy); pg.stroke(); }
+  const dx = side.width / LENGTH, dz = side.height / 50;
+  sg.fillStyle = "#07243a"; sg.fillRect(0, DEPTH_MIN * dz, side.width, (DEPTH_MAX - DEPTH_MIN) * dz); sg.strokeStyle = "#1c2c44"; sg.strokeRect(0, 0, side.width, side.height);
+  sg.fillStyle = "#7c93b8"; sg.font = "12px monospace"; sg.fillText("surface", 6, 12); sg.fillText("depth " + DEPTH_MIN + "–" + DEPTH_MAX + " m", 6, DEPTH_MIN * dz - 4); sg.fillText("floor 50 m", 6, side.height - 6);
+  for (const s of snap) {
+    const sel = s.id === selected;
+    pg.strokeStyle = `hsl(${s.hue} 70% 55% / .35)`; pg.lineWidth = 1.5; pg.beginPath(); s.trail.forEach((p, i) => { i ? pg.lineTo(p[0] * sx, p[1] * sy) : pg.moveTo(p[0] * sx, p[1] * sy); }); pg.stroke();
+    sg.strokeStyle = `hsl(${s.hue} 70% 55% / .35)`; sg.beginPath(); s.trail.forEach((p, i) => { i ? sg.lineTo(p[0] * dx, p[2] * dz) : sg.moveTo(p[0] * dx, p[2] * dz); }); sg.stroke();
+    drawSub(pg, s.x * sx, s.y * sy, s.heading, s.hue, 16, sel); drawSub(sg, s.x * dx, s.depth * dz, -s.pitch, s.hue, 12, sel);
+    pg.fillStyle = sel ? "#fff" : "#dbe7ff"; pg.font = "13px monospace"; pg.fillText(s.name, s.x * sx + 20, s.y * sy - 8);
+  }
+  updateStats(snap);
+}
+function frame(now) {
+  const dt = lastFrame ? (now - lastFrame) / 1000 : 0; lastFrame = now;
+  const k = Number($("speedSel").value) || 1;
+  for (let i = 0; i < k; i++) tank.step(dt);   // MAX_STEP clips each call, so a hidden tab does not fast-forward the sea
+  render(); requestAnimationFrame(frame);
+}
+refresh(); fishHealth(); setInterval(refresh, 3000); setInterval(fishHealth, 5000); requestAnimationFrame(frame);
+</script>
+<p class="note">Names and addresses reach this page as text only. A sub is numbers; the code that flies it is the code this page already loaded.</p>
+</body>
+</html>
