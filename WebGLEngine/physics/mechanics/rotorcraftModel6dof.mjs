@@ -33,9 +33,14 @@
 // THE GROUND AND THE FATE. Four skids at (+-1.4, +-1.0, -1.5) m. classify() is a pure function of the state: "crashed" if a hull point (the nose, the tail boom, the canopy) is on the ground, if a rotor tip is within 0.2 m of it, if a skid arrives with a sink speed of more than 4.5 m/s or with the machine more than 30 degrees
 // off the level; "landed" when a skid is on the ground and none of that is so (a landed helicopter can take off again: the flight is not over); "airborne" otherwise; "lost" for a state that is not finite. stepRotor() on a crashed state returns it unchanged.
 //
+// TERRAIN. The ground is physics/mechanics/terrain.mjs's height function (flat at 0 by default, and then every number is what it was before the terrain existed, to the bit): a skid is in contact when it is under the surface UNDER IT, the spring pushes along the surface's normal and the friction acts in its plane,
+// the sink is the speed into the surface along the normal, a hull point is on the ground when it is at or under the surface under IT (the nose can be over a step the centre of mass is not), the rotor's tip is read at twenty-four points round the disc against the surface under each (the lowest clearance), the tilt is
+// measured against the normal where the machine stands, and a landing on ground steeper than 15 degrees (INVENTED) is a crash named "steep slope". THE FRICTION IS REGULARISED COULOMB (it must be, to be stable at 60 Hz with these springs), so a machine on a gentle slope CREEPS: about 1.5 cm/s on 10 degrees in theory and under 6 cm/s measured.
+//
 // Pure: no DOM, no clock, no random. physics/mechanics/rotorcraftModel6dof-selfcheck.mjs holds this to closed forms (momentum theory, the hover, the climb, the torque balance, the autorotation, the symmetry) and to what the header says it is not.
 "use strict";
 import { createBody, step, createAccumulator, applyForceAtPoint, worldToBody, rotateByQuat } from "./rigidBody6dof.mjs";
+import { FLAT, asTerrain } from "./terrain.mjs";
 
 export const GRAVITY = 9.80665, DT = 1 / 60, AIR_DENSITY = 1.225;
 
@@ -50,7 +55,7 @@ export const ATTACK = Object.freeze({
     stabiliser: Object.freeze({ position: Object.freeze([-6.2, 0, 0.6]), area: 1.4, liftSlope: 3.5 }),
     skids: Object.freeze([[1.4, 1.0, -1.5], [1.4, -1.0, -1.5], [-1.4, 1.0, -1.5], [-1.4, -1.0, -1.5]]), skidSpring: 110000, skidDamper: 12000, friction: 0.6,
     hull: Object.freeze([[3.2, 0, -0.8], [-8.0, 0, 0.6], [0, 0, 1.9], [-4, 0, 1.0]]),   // the nose, the tail boom's end, the top of the mast, the boom
-    fate: Object.freeze({ maxSink: 4.5, maxTilt: 30 * Math.PI / 180, tipClearance: 0.2 }),
+    fate: Object.freeze({ maxSink: 4.5, maxTilt: 30 * Math.PI / 180, tipClearance: 0.2, maxSlope: 15 * Math.PI / 180 }),   // maxSlope INVENTED: skids on ground steeper than this are a crash (a roll-over), the way a real type's slope-landing limit is a few degrees
 });
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
@@ -192,9 +197,9 @@ export function sanitize(c = {}) {
 
 /**
  * Everything the airframe does in a state under controls and wind: { acc (the rigid body's force/torque accumulator, body frame), rotor: { thrust, vi, ... , omegaDot, engineTorque, aeroTorque }, flapDot: [da/dt, db/dt], contacts: [...] }.
- * The skids' contact forces are included. Pure.
+ * The skids' contact forces are included, against `terrain` (physics/mechanics/terrain.mjs; the flat ground at 0 by default, and then the same bits as before it existed). Pure.
  */
-export function forcesAndMoments(model, state, controls, windWorld = [0, 0, 0]) {
+export function forcesAndMoments(model, state, controls, windWorld = [0, 0, 0], terrain = FLAT) {
     const c = sanitize(controls), s = model.spec, r = s.rotor, acc = createAccumulator();
     const velBody = worldToBody(state.q, sub(state.vel, windWorld)), w = state.w;
     // the rotor: the hub's velocity through the air, resolved on the disc's normal
@@ -228,50 +233,78 @@ export function forcesAndMoments(model, state, controls, windWorld = [0, 0, 0]) 
     // gravity, in the body frame
     applyForceAtPoint(acc, worldToBody(state.q, [0, 0, -model.weight]));
     // the ground: the skids
-    const contacts = skidContacts(model, state, acc);
+    const contacts = skidContacts(model, state, acc, asTerrain(terrain));
     return { acc, rotor: { ...rt, omegaDot, engineTorque: Qeng, aeroTorque: Qaero, vc, vxy, normal: nHat }, flapDot, contacts, tail: { force: Ftail, pitch: pitchTail } };
 }
 
-/** Each skid's contact: the spring-damper force along the world's up and Coulomb friction along the ground, applied to `acc` (if given). Returns [{ z, sink, force }] for the skids on the ground. */
-function skidContacts(model, state, acc) {
+/**
+ * Each skid's contact: the spring-damper force along the ground's NORMAL (the world's up on flat ground) and Coulomb friction in the ground's plane, applied to `acc` (if given). Returns [{ z, sink, force }] for the skids on the ground: `z` the skid's height above the terrain
+ * under it (negative: in it), `sink` its speed into the surface along the normal. On the flat terrain the arithmetic is the original's, to the bit.
+ */
+function skidContacts(model, state, acc, terrain = FLAT) {
     const s = model.spec, out = [];
     for (const p of s.skids) {
-        const off = rotateByQuat(state.q, p), wWorld = rotateByQuat(state.q, state.w), z = state.pos[2] + off[2];
+        const off = rotateByQuat(state.q, p), wWorld = rotateByQuat(state.q, state.w), z = state.pos[2] + off[2] - (terrain.flat ? 0 : terrain.height(state.pos[0] + off[0], state.pos[1] + off[1]));
         if (z >= 0) continue;
-        const vPt = add(state.vel, cross(wWorld, off)), pen = -z, Fn = Math.max(0, s.skidSpring * pen - s.skidDamper * vPt[2]);
-        const vt = Math.hypot(vPt[0], vPt[1]), reg = vt / Math.sqrt(vt * vt + 0.05 * 0.05), Ft = s.friction * Fn * reg;
-        const fWorld = [vt > 1e-9 ? -Ft * vPt[0] / vt : 0, vt > 1e-9 ? -Ft * vPt[1] / vt : 0, Fn];
+        const vPt = add(state.vel, cross(wWorld, off));
+        let fWorld, sink;
+        if (terrain.flat) {
+            const pen = -z, Fn = Math.max(0, s.skidSpring * pen - s.skidDamper * vPt[2]);
+            const vt = Math.hypot(vPt[0], vPt[1]), reg = vt / Math.sqrt(vt * vt + 0.05 * 0.05), Ft = s.friction * Fn * reg;
+            fWorld = [vt > 1e-9 ? -Ft * vPt[0] / vt : 0, vt > 1e-9 ? -Ft * vPt[1] / vt : 0, Fn]; sink = -vPt[2];
+        } else {
+            const n = terrain.normal(state.pos[0] + off[0], state.pos[1] + off[1]), vN = dot(vPt, n), pen = -z * n[2], Fn = Math.max(0, s.skidSpring * pen - s.skidDamper * vN);
+            const vT = sub(vPt, scale(n, vN)), vt = norm(vT), reg = vt / Math.sqrt(vt * vt + 0.05 * 0.05), Ft = s.friction * Fn * reg;
+            fWorld = [Fn * n[0] - (vt > 1e-9 ? Ft * vT[0] / vt : 0), Fn * n[1] - (vt > 1e-9 ? Ft * vT[1] / vt : 0), Fn * n[2] - (vt > 1e-9 ? Ft * vT[2] / vt : 0)]; sink = -vN;
+        }
         if (acc) applyForceAtPoint(acc, worldToBody(state.q, fWorld), p);
-        out.push({ point: p, z, sink: -vPt[2], force: fWorld });
+        out.push({ point: p, z, sink, force: fWorld });
     }
     return out;
 }
 
 // ---- the ground and the flight's fate ---------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-/** "airborne" | "landed" | "crashed" | "lost", with the numbers that decided it. A pure function of the state. */
-export function classify(model, state) {
+/**
+ * "airborne" | "landed" | "crashed" | "lost", with the numbers that decided it. A pure function of the state and the terrain (the flat ground at 0 by default). Over a terrain: a hull point is on the ground when it is at or under the surface UNDER IT; the rotor's tip is read at twenty-four points round the
+ * disc (1.9 m apart: a feature narrower than that can slip between two) against the surface under each (the lowest clearance); the tilt is measured against the surface's normal where the machine stands, so a skid landing on a 10-degree slope is a landing and a landing on a 40-degree one is not; the sink is the skid's speed into the surface along its normal.
+ */
+export function classify(model, state, terrain = FLAT) {
     if (![...state.pos, ...state.vel, ...state.q, ...state.w, state.omega].every(Number.isFinite)) return { status: "lost" };
-    const s = model.spec, up = rotateByQuat(state.q, [0, 0, 1]), tilt = Math.acos(clamp(up[2], -1, 1));
-    const hull = s.hull.map((p) => state.pos[2] + rotateByQuat(state.q, p)[2]), hullLow = Math.min(...hull);
-    const n = rotateByQuat(state.q, [Math.sin(state.flapA), -Math.sin(state.flapB), Math.cos(state.flapA) * Math.cos(state.flapB)]), hubZ = state.pos[2] + rotateByQuat(state.q, s.rotor.hub)[2];
-    const tipLow = hubZ - s.rotor.radius * Math.sqrt(Math.max(0, 1 - n[2] * n[2] / (norm(n) ** 2)));
-    const skids = skidContacts(model, state, null), sink = skids.length ? Math.max(...skids.map((k) => k.sink)) : 0;
+    terrain = asTerrain(terrain);
+    const s = model.spec, up = rotateByQuat(state.q, [0, 0, 1]), flat = terrain.flat;
+    const tilt = flat ? Math.acos(clamp(up[2], -1, 1)) : Math.acos(clamp(dot(up, terrain.normal(state.pos[0], state.pos[1])), -1, 1));
+    const hull = s.hull.map((p) => { const o = rotateByQuat(state.q, p); return state.pos[2] + o[2] - (flat ? 0 : terrain.height(state.pos[0] + o[0], state.pos[1] + o[1])); }), hullLow = Math.min(...hull);
+    const n = rotateByQuat(state.q, [Math.sin(state.flapA), -Math.sin(state.flapB), Math.cos(state.flapA) * Math.cos(state.flapB)]), hubO = rotateByQuat(state.q, s.rotor.hub), hubZ = state.pos[2] + hubO[2];
+    let tipLow;
+    if (flat) tipLow = hubZ - s.rotor.radius * Math.sqrt(Math.max(0, 1 - n[2] * n[2] / (norm(n) ** 2)));
+    else {
+        // the samples' grid is aligned with the disc's tilt (u1 horizontal, u2 along the line of steepest slope of the disc), so its lowest and highest tips are samples exactly
+        const nn = norm(n), nh = [n[0] / nn, n[1] / nn, n[2] / nn], ref = Math.abs(nh[2]) < 1 - 1e-9 ? [0, 0, 1] : [1, 0, 0], e1 = cross(nh, ref), l1 = norm(e1), u1 = [e1[0] / l1, e1[1] / l1, e1[2] / l1], u2 = cross(nh, u1);
+        tipLow = Infinity;
+        for (let k = 0; k < 24; k++) {
+            const a = 2 * Math.PI * k / 24, c = Math.cos(a), sn = Math.sin(a), tx = state.pos[0] + hubO[0] + s.rotor.radius * (c * u1[0] + sn * u2[0]), ty = state.pos[1] + hubO[1] + s.rotor.radius * (c * u1[1] + sn * u2[1]);
+            tipLow = Math.min(tipLow, hubZ + s.rotor.radius * (c * u1[2] + sn * u2[2]) - terrain.height(tx, ty));
+        }
+    }
+    const skids = skidContacts(model, state, null, terrain), sink = skids.length ? Math.max(...skids.map((k) => k.sink)) : 0;
     if (hullLow <= 0) return { status: "crashed", why: "hull", tilt, sink };
     if (tipLow <= s.fate.tipClearance && state.omega > 0.2 * s.rotor.omega0) return { status: "crashed", why: "rotor strike", tilt, sink };
     if (skids.length && (sink > s.fate.maxSink || tilt > s.fate.maxTilt)) return { status: "crashed", why: sink > s.fate.maxSink ? "hard landing" : "tilted landing", tilt, sink };
+    if (skids.length && !flat && Math.acos(clamp(terrain.normal(state.pos[0], state.pos[1])[2], -1, 1)) > s.fate.maxSlope) return { status: "crashed", why: "steep slope", tilt, sink };
     return { status: skids.length ? "landed" : "airborne", tilt, sink, skids: skids.length };
 }
 
-/** One tick: { state, status, ...classification, rotor }. A state that has already ended (crashed, lost) is returned unchanged. A landed one steps on: a helicopter can take off again. */
-export function stepRotor(model, state, controls, dt = DT, windWorld = [0, 0, 0]) {
-    const before = classify(model, state);
+/** One tick: { state, status, ...classification, rotor }. A state that has already ended (crashed, lost) is returned unchanged. A landed one steps on: a helicopter can take off again. `terrain` is the ground (physics/mechanics/terrain.mjs; a bare function of (x, y) is accepted too). */
+export function stepRotor(model, state, controls, dt = DT, windWorld = [0, 0, 0], terrain = FLAT) {
+    terrain = asTerrain(terrain);
+    const before = classify(model, state, terrain);
     if (before.status === "crashed" || before.status === "lost") return { state, ...before };
-    const f = forcesAndMoments(model, state, controls, windWorld), c = sanitize(controls), r = model.spec.rotor;
+    const f = forcesAndMoments(model, state, controls, windWorld, terrain), c = sanitize(controls), r = model.spec.rotor;
     const body = step(state, f.acc, dt);
     const a = state.flapA + f.flapDot[0] * dt, b = state.flapB + f.flapDot[1] * dt;
     const next = { ...body, omega: Math.max(0, state.omega + f.rotor.omegaDot * dt), flapA: clamp(a, -1.2 * r.flapMax, 1.2 * r.flapMax), flapB: clamp(b, -1.2 * r.flapMax, 1.2 * r.flapMax), vi: f.rotor.vi, engine: state.engine, t: state.t + dt };
-    return { state: next, ...classify(model, next), rotor: f.rotor };
+    return { state: next, ...classify(model, next, terrain), rotor: f.rotor };
 }
 
 // ---- trim ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
