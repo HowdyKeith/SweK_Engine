@@ -12,7 +12,20 @@
 // NOT IN THIS GATE: the shipped files (brain/pilotRotorWeightsDefault.json, brain/pilotRotorMlpWeightsDefault.json): the aeroplane's gate has a section 9 that recomputes every number in a shipped file's `by`; this one gets it when a file is shipped, and not before -- a file is
 // written only when a champion qualifies, and whether one does is the experiment.
 //
-// SABOTAGE LOG: (filled in below once run)
+// SABOTAGE LOG (each applied to the module in a scratch copy, the gate run, the copy discarded; the number is how many rows went red):
+//   Each applied to tools/ship/trainRotorPilot.mjs in a scratch copy, the gate run on the copy (its children, which are separate processes, run the copy too), the copy discarded; the number is how many rows went red. 39
+//   mutants, none left at 0. FOUR WERE FOUND BY THE FIRST RUN, TWO OF THEM AS CRASHES: Y (--slice ignored by searchOne) and AA (the child not handed --slice) went 0 red because every comparison in the gate ran both
+//   sides with the same slice -- the search's reported train score is now held to its weights' score on the slice, and not on the whole set; AJ (the champion's audit compared against the wrong set, which throws) and AN
+//   (a GPU blob written under the fruit fly's policy, which throws) crashed the gate with a stack trace and no failed row, so the gate now turns anything that throws into a failed row by name and exits 1. The mutants
+//   are numbered R01-R39 here in the order of the run (the scratch files lettered them A-AN).
+//   R01 parseArgs reads an unknown option 2; R02 qualifies: the audit-score clause dropped 2; R03 qualifies: held-out > loosened to >= 2; R04 finish: eligibility ignored 4; R05 finish: the champion picked on the train
+//   score 2; R06 blobOf: the count of weights that differ left out 1; R07 command: --write writes though the champion does not qualify 1; R08 RECIPE iterations 800 1; R09 qualifies: the reserve-score clause dropped 2;
+//   R10 qualifies: the kind clause dropped 3; R11 qualifies: better > worse loosened to >= 1; R12 tailReasons: the fresh-crash clause dropped 9; R13 command --one: runs search K+1 1; R14 searchOne: the prune skipped 3;
+//   R15 dumpOf: the weights left out 1; R16 SETS: the pool is the safety audit 2; R17 KIND_SLACK 0.05 2; R18 finish: eligibility judged on the held-out set 3; R19 qualifies: the safety-audit clause dropped 2; R20 BRAINS
+//   not frozen 1; R21 brainOf defaults to the GPU Brain 8; R22 setsOf always the fruit fly's 1; R23 SETS_GPU's audit is the fruit fly's 1; R24 endedEarly: an engine flight judged on its status 1; R25 searchOne ignores
+//   --slice 3; R26 the write refusal with --slice dropped 1; R27 the child does not get --slice 1; R28 a brain's own seed ignored 1; R29 blob score is the audit's 1; R30 hand safety read from the pool 3; R31 an unknown
+//   brain accepted 1; R32 tails counts nothing 6; R33 reserve crash clause dropped 2; R34 audit crash clause dropped 2; R35 the champion's vs read against the wrong set 1; R36 the --workers children not in run order 1;
+//   R37 --dump not written 1; R38 the blob's citation is the other brain's 1; R39 the blob's policy is the fruit fly's 1.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -28,6 +41,9 @@ import { weightsHash } from "../../brain/drivePolicy.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0, sliceErr = "";
+// A THROW IS A RED ROW BY NAME, NOT A STACK TRACE (two of this gate's sabotages crashed it the first time: the champion's `versus` read against a set of another length, a GPU blob written under the fruit fly's policy): whatever throws, the gate says so as a failed row and exits 1
+const died = (e) => { console.log("  FAIL  !! THE GATE THREW before it finished, which is a failure of whatever it was asking: " + String((e && e.stack) || e).split("\n").slice(0, 3).join(" | ").slice(0, 400)); process.exit(1); };
+process.on("uncaughtException", died); process.on("unhandledRejection", died);
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const sec = (t) => console.log("\n" + t);
 const throws = (fn) => { try { fn(); return null; } catch (e) { return e.message; } };
@@ -149,7 +165,9 @@ const tool = path.join(ENG, "tools", "ship", "trainPilotRotor.mjs");
 const kid = spawnSync(process.execPath, [tool, "--one", "1", "--runs", "2", "--iters", "2", "--seed", "8000", "--slice", "7"], { encoding: "utf8", timeout: 300000 });
 const kidLine = (kid.stdout || "").split("\n").find((l) => l.startsWith("SEARCH ")), kidRun = kidLine ? JSON.parse(kidLine.slice(7)) : null;
 const inproc = TR.searchOne({ runs: 2, iters: 2, seed: 8000, sigma: 0.3, maxK: 4, slice: 7 }, 1);
-ok("!! `--one 1` (the child's mode) prints search 1 as one JSON line whose weights are the in-process search 1's, every one of the 1,167, exactly (on a slice of the training set, two iterations)", kid.status === 0 && kidRun && kidRun.seed === 8001 && kidRun.weights.length === 1167 && kidRun.weights.every((v, i) => v === inproc.weights[i]) && kidRun.kept === inproc.kept && kidRun.moved === inproc.moved, `status ${kid.status}, kept ${kidRun && kidRun.kept}`);
+const sliceSet = RT.TRAIN_SET.filter((_, i) => i % 7 === 0), sliceScore = (w) => PP.evaluate(w, sliceSet).score;
+ok("!! `--slice 7` TRAINS ON EVERY SEVENTH TRAINING SCENARIO (four of the 28): the search's reported train score is its weights' score on those four, and is NOT their score on all 28", sliceSet.length === 4 && near(inproc.trainScore, sliceScore(inproc.weights), 1e-9) && Math.abs(inproc.trainScore - PP.evaluate(inproc.weights).score) > 1e-3, `${inproc.trainScore.toFixed(4)} on four, ${PP.evaluate(inproc.weights).score.toFixed(4)} on all`);
+ok("!! `--one 1` (the child's mode) prints search 1 as one JSON line whose weights are the in-process search 1's, every one of the 1,167, exactly, AND whose train score is the weights' score on the SLICE the child was told to use (on a slice of the training set, two iterations)", kid.status === 0 && kidRun && kidRun.seed === 8001 && kidRun.weights.length === 1167 && kidRun.weights.every((v, i) => v === inproc.weights[i]) && kidRun.kept === inproc.kept && kidRun.moved === inproc.moved && near(kidRun.trainScore, sliceScore(inproc.weights), 1e-9) && near(kidRun.trainScore, inproc.trainScore, 1e-12), `status ${kid.status}, kept ${kidRun && kidRun.kept}, train ${kidRun && kidRun.trainScore}`);
 
 sec("7. the command, with its side effects injected");
 const cap = () => { const o = { lines: [], files: {}, err: [] }; o.io = { out: (m) => o.lines.push(m), err: (m) => o.err.push(m), writeFile: (f, c) => { o.files[f] = c; }, selfPath: tool }; return o; };
@@ -174,7 +192,7 @@ ok("--one K in the command prints the search as the SEARCH line the parent reads
 const c8 = cap(); let seen = null;
 const x8 = await TR.command(["--runs", "2", "--iters", "2", "--slice", "7", "--workers", "2", "--quiet"], { ...c8.io, finish: (opts, runs) => { seen = runs; return no; } });
 const inproc0 = TR.searchOne({ runs: 2, iters: 2, seed: 8000, sigma: 0.3, maxK: 4, slice: 7 }, 0);
-ok("!! `--workers 2` runs each search in its OWN PROCESS and finish() gets the weights those searches found: search 0 and search 1, the same bits as the in-process ones, in run order", x8 === 0 && seen && seen.length === 2 && seen[0].seed === 8000 && seen[1].seed === 8001 && seen[0].weights.every((v, i) => v === inproc0.weights[i]) && seen[1].weights.every((v, i) => v === inproc.weights[i]) && c8.lines.length === 0);
+ok("!! `--workers 2` runs each search in its OWN PROCESS (and hands each the --slice it was given) and finish() gets what those searches found: search 0 and search 1, the same bits and the same train scores as the in-process ones, in run order", x8 === 0 && seen && seen.length === 2 && seen[0].seed === 8000 && seen[1].seed === 8001 && seen[0].weights.every((v, i) => v === inproc0.weights[i]) && seen[1].weights.every((v, i) => v === inproc.weights[i]) && near(seen[0].trainScore, inproc0.trainScore, 1e-12) && near(seen[1].trainScore, inproc.trainScore, 1e-12) && c8.lines.length === 0);
 const cli = spawnSync(process.execPath, [tool, "--bogus"], { encoding: "utf8", timeout: 20000 });
 ok("the command file exits with the code the command returns: an unknown option exits 2 before any training", cli.status === 2 && /unknown option/.test(cli.stderr), cli.stderr.trim().slice(0, 80));
 
