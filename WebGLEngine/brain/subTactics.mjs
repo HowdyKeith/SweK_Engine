@@ -11,7 +11,8 @@
 //             aimTol of the estimate. (Torpedoes go where the NOSE points: a boat that cannot aim cannot shoot.) blindSnr > 0 also fires on a passive contact louder than that many dB (a loud contact is a near one).
 //     TRACK   a passive contact (or a ping heard) in the last 10 s: turn toward its bearing at trackSpeed; after pingAfter contacts, and no sooner than pingEvery seconds since the last, PING (it buys a range and
 //             tells every boat within ten kilometres where you are).
-//     SEARCH  otherwise sweep: hold the starting depth at searchSpeed, turning 0.8 rad one way then the other every 40 s.
+//     SEARCH  otherwise sweep: hold the starting depth at searchSpeed, turning 0.8 rad one way then the other every 40 s. With searchPing >= 1 it also PINGS every searchPing seconds while it hears nothing: the only way to
+//             find a boat creeping at 0.5 m/s (heard passively from ~94 m, echoed from ~392 m) -- at the price of announcing itself to everything within ten kilometres. 0 (the default) never pings blind; a value under 1 reads as 0.
 //   theta is a vector of NAMES -> numbers (THETA_DEFAULT); the search (a (1+1)-ES) mutates it.
 //
 //   THE SCRIPTED OPPONENTS (scripted(kind, sc)) are the drones the baseline is graded against: patrol (a steady 2 m/s, drifting its heading, deaf and mute), quiet (the same at 0.5 m/s: nearly inaudible),
@@ -20,8 +21,8 @@
 // Pure: no DOM, no Math.random, no clock. A tactician is a closure with its own memory: make one per duel.
 "use strict";
 
-export const THETA_DEFAULT = Object.freeze({ searchSpeed: 2.0, trackSpeed: 1.5, evadeSpeed: 4.0, fireRange: 320, aimTol: 0.17, pingAfter: 2, echoWindow: 8, evadeTime: 20, evadeTurn: 1.4, blindSnr: 99, pingEvery: 12 });
-export const THETA_BOUNDS = Object.freeze({ searchSpeed: [0.5, 4.5], trackSpeed: [0.5, 4.5], evadeSpeed: [0.5, 4.5], fireRange: [60, 500], aimTol: [0.03, 0.6], pingAfter: [1, 6], echoWindow: [2, 20], evadeTime: [5, 40], evadeTurn: [0.4, 2.8], blindSnr: [15, 99], pingEvery: [4, 40] });
+export const THETA_DEFAULT = Object.freeze({ searchSpeed: 2.0, trackSpeed: 1.5, evadeSpeed: 4.0, fireRange: 320, aimTol: 0.17, pingAfter: 2, echoWindow: 8, evadeTime: 20, evadeTurn: 1.4, blindSnr: 99, pingEvery: 12, searchPing: 0 });
+export const THETA_BOUNDS = Object.freeze({ searchSpeed: [0.5, 4.5], trackSpeed: [0.5, 4.5], evadeSpeed: [0.5, 4.5], fireRange: [60, 500], aimTol: [0.03, 0.6], pingAfter: [1, 6], echoWindow: [2, 20], evadeTime: [5, 40], evadeTurn: [0.4, 2.8], blindSnr: [15, 99], pingEvery: [4, 40], searchPing: [0, 40] });
 export const THETA_NAMES = Object.freeze(Object.keys(THETA_DEFAULT));
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
@@ -88,6 +89,7 @@ export function makeTactician(theta = THETA_DEFAULT, { canFire = true, canPing =
         }
         // ---- SEARCH ----
         out.heading = wrap(startHeading + (Math.floor(t / 40) % 2 === 0 ? 0.8 : -0.8)); out.depth = startDepth; out.speed = th.searchSpeed;
+        if (canPing && th.searchPing >= 1 && t - lastPingT >= th.searchPing) { out.ping = true; lastPingT = t; }
         return out;
     };
 }

@@ -18,6 +18,7 @@
 //   Y15 fires with the tube not ready 1 | Y16 the echo window ignored 1 | Y17 evades TOWARD the torpedo 2 | Y18 evade depth change 6 m 1 | Y19 evade depth unclamped 1 | Y20 evasion not held 1 | Y21 evades the quietest torpedo 1
 //   Y23 search holds the current depth, not the start 1 | Y24 sweep period 80 s 1 | Y25 pings heard ignored 1 | Y26 blind fire ignores alignment 1 | Y27 the drone's drift ignored 1 | Y28 the quiet drone at 1 m/s 1
 //   Y29 the evader may fire 1 | Y30 the memory shared across tacticians 6
+//   S1-S7 (round: searchPing, the 12th number): default 8 3 | the branch off 2 | the interval ignored 1 | canPing ignored 1 | values under 1 act 1 | the timer not updated 1 | bound 100 1
 //   Y22 (canEvade false is still honoured when the torpedo branch is entered anyway: the line that RETURNS the evasion tests canEvade a second time) is an EQUIVALENT MUTANT, left standing and said.
 // Y9, Y19, Y26 went 0 red the first time and Y30 was an identity (the 'mutation' replaced a line with itself): rows now hold the 10-second window on pingAfter (contacts 11 s apart are not two), the evade clamp from depths
 // outside the working band (60 m -> 42, 0 m -> 15), and the alignment of a blind shot (a strong contact 0.6 rad off does not fire); Y30 now moves the memory out of the closure.
@@ -40,7 +41,7 @@ console.log("1. THETA");
     const c = TA.clampTheta({ searchSpeed: 99, trackSpeed: -3, evadeSpeed: NaN, pingAfter: 2.6, fireRange: 1e9 });
     ok("!! clampTheta clips to the bounds (99 -> 4.5, -3 -> 0.5), takes the default for a NaN or a missing name, rounds pingAfter (2.6 -> 3), is frozen, and fills every name", c.searchSpeed === 4.5 && c.trackSpeed === 0.5 && c.evadeSpeed === TH.evadeSpeed && c.pingAfter === 3 && c.fireRange === 500 && c.aimTol === TH.aimTol && Object.isFrozen(c) && TA.THETA_NAMES.every((k) => k in c));
     const v = TA.thetaToVector(TH), back = TA.thetaFromVector(v);
-    ok("the vector round-trips in name order (11 numbers), and thetaFromVector clamps what it is given", v.length === 11 && TA.THETA_NAMES.every((k, i) => v[i] === TH[k] && back[k] === TH[k]) && TA.thetaFromVector(v.map(() => 1e9)).fireRange === 500);
+    ok("the vector round-trips in name order (12 numbers), and thetaFromVector clamps what it is given", v.length === 12 && TA.THETA_NAMES.every((k, i) => v[i] === TH[k] && back[k] === TH[k]) && TA.thetaFromVector(v.map(() => 1e9)).fireRange === 500);
 }
 
 console.log("\n2. GEOMETRY");
@@ -54,6 +55,21 @@ console.log("\n3. SEARCH");
 {
     const f = TA.makeTactician(), o0 = f(obs(0, {}, { heading: 0.3, depth: 27 })), o1 = f(obs(39, {}, { heading: 1.1, depth: 29 })), o2 = f(obs(41, {}, { heading: 1.1, depth: 29 })), o3 = f(obs(81, {}, { heading: 1.1, depth: 29 }));
     ok("!! with nothing heard it holds the STARTING depth (27, not the later 29) at searchSpeed and sweeps +0.8 rad off the STARTING heading for 40 s, then -0.8, then +0.8: 1.1 / -0.5 / 1.1 off 0.3", near(o0.depth, 27) && near(o0.heading, 1.1) && o0.speed === TH.searchSpeed && !o0.fire && !o0.ping && near(o1.heading, 1.1) && near(o2.heading, -0.5) && near(o3.heading, 1.1) && near(o2.depth, 27), `${o0.heading} ${o2.heading} ${o3.heading}`);
+}
+
+console.log("\n3b. SEARCH PING");
+{
+    const f0 = TA.makeTactician(), o0 = [0, 5, 10, 60].map((t) => f0(obs(t)).ping);
+    ok("!! the DEFAULT never pings blind: searchPing is 0, and four searching looks (t = 0, 5, 10, 60) ping on none", TH.searchPing === 0 && o0.every((p) => !p));
+    const f = TA.makeTactician({ ...TH, searchPing: 5 }), seq = [0, 2, 4.9, 5, 9, 10.5, 15].map((t) => f(obs(t)).ping);
+    ok("!! with searchPing 5 it pings at its FIRST search look (t = 0), then no sooner than 5 s after the last ping: t = 0 yes, 2 no, 4.9 no, 5 yes, 9 no, 10.5 yes, 15 no (10.5 + 5 = 15.5)", seq.join() === "true,false,false,true,false,true,false", seq.join());
+    const lo = TA.makeTactician({ ...TH, searchPing: 0.9 }), small = [0, 5, 20].map((t) => lo(obs(t)).ping);
+    ok("!! a searchPing under 1 reads as 0 (off): 0.9 never pings; searchPing 1 does", small.every((p) => !p) && TA.makeTactician({ ...TH, searchPing: 1 })(obs(0)).ping);
+    const np = TA.makeTactician({ ...TH, searchPing: 5 }, { canPing: false }), hold = TA.makeTactician({ ...TH, searchPing: 5 });
+    hold(obs(0));
+    ok("!! canPing false never pings blind; a boat that is EVADING (a torpedo heard) does not ping blind; and a boat that hears a contact is tracking, not searching, so the search timer does not fire (the track branch's own rules apply)", ![0, 6, 12].some((t) => np(obs(t)).ping) && !hold(obs(6, { contacts: [torp(0.3)] })).ping && !hold(obs(12, { contacts: [boat(0.3)] })).ping);
+    const b = TA.clampTheta({ searchPing: 99 }), c = TA.clampTheta({ searchPing: -4 });
+    ok("searchPing is clamped to 0..40 (99 -> 40, -4 -> 0) and a missing one is 0", b.searchPing === 40 && c.searchPing === 0 && TA.clampTheta({}).searchPing === 0);
 }
 
 console.log("\n4. TRACK");
