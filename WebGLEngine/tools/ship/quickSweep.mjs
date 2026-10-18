@@ -366,19 +366,6 @@ export const RECORD_HANDOVERS = Object.freeze([
                   "tacticsTrain-selfcheck (382,243 ms, exit 0) wrote sweep-timings.local.json and refused the shared " +
                   "record; that local file and its ledger were deleted at the handover, as at v4818 and v4838. " +
                   "420793 held the record from v4838 to v4850." }),
-    // v4874 -- TO 420793 AGAIN, FOR THE SAME REASON AS v4850 AND ON THE SAME ANSWER. The container this session runs on is the 2.80GHz host
-    // (md5 420793) while the record named 142c0d. The round added twenty-two gates, eight of them over the quick sweep's 20 s cap
-    // (battleshipFight 369 s, trainDogfightPilotShipped 249 s, trainSeatGunner 204 s, battleshipPage 117 s, trainDogfightPilot 81 s,
-    // dogfightTask 70 s, bomberFight 45 s, bomberPage 38 s), and with no reading in the shared record the first verdict's sweep ran them
-    // as unmeasured and killed them at the cap ("nothing timed out alone under the cap" -- twice, on two verdicts). Their readings, taken
-    // alone and committed in this box's per-box record and in gate-timings.json, are the better witness but not the one the sweep's
-    // membership reads. Keith chose the handover over shipping with the row red.
-    Object.freeze({ at: "v4874", from: "linux-x64-4c-16gb-142c0d", to: "linux-x64-4c-16gb-420793",
-        decidedBy: "Keith",
-        evidence: "Keith's answer \"Hand the record to this box (Recommended)\" to the record-owner question put in the v4874 ship, 2026-10-17, " +
-                  "after the second verdict. boxId() reads linux-x64-4c-16gb-420793 (Intel Xeon @ 2.80GHz); the shared record named 142c0d " +
-                  "(@ 2.10GHz), last written 2026-10-17T13:43Z by the v4873 round. The rotation and both verdicts here wrote " +
-                  "sweep-timings.local.json and refused the shared record. 142c0d held the record from v4850 to v4874." }),
 ]);
 
 /** The box that may write a record whose `host` reads `host`, after following every handover. */

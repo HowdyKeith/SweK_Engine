@@ -447,17 +447,7 @@ export const REACH_AT_V4548 = Object.freeze({
     // variance across which over-budget gates straddled the 3,000 ms line this run, the same wobble
     // reportDoors-selfcheck's own note beside `after` already documents (69/27/0, then 73/22/1 minutes
     // later on the same code). unguarded held at 14, so unchecked is 36 + 14 = 50.
-    // UNNUMBERED (the v4874 ship) -- THE CEILING MOVES 50 -> 64 BECAUSE THE RECORD'S OWNER MOVED, NOT BECAUSE A GUARDIAN DRIFTED, AND THE MEASUREMENT IS BELOW.
-    // Keith handed the shared timing record from 142c0d (2.10 GHz) to 420793 (2.80 GHz) at v4874 (quickSweep.RECORD_HANDOVERS), so the record is now
-    // this box's alone readings, and on this box 96 gates cost more than the 3000 ms line where 142c0d's record had them under it (mpmRefineBind
-    // 2.4 s -> 5.5 s, assertionShape 1.5 s -> 4.4 s, denoiseNet 2.8 s -> 4.7 s ...). Re-timed serially through the owner by sweepRotation --band
-    // 3000-8000 (130 gates): 0 came back under the line, 70 were materially slower still -- so it is the box and not a loaded reading. At origin/main's
-    // record this gate reads 47 unchecked (111 checked, 31 over budget, 16 guarded by nothing); on this one 64 (94 checked, 48 over budget, the same 16).
-    // The 17 that moved are guarded by gates now over the line, among them orreryFleet (9 records), quickSweep-selfcheck (7) and budgetExile (3), which were
-    // already 20 s and 130 s gates; no record lost a guardian and none gained a drift. The ceiling is raised to the measured 64, not above it, and
-    // it is still a ceiling: it falls when the record is handed back to a faster box or when those guardians are made cheaper, as v4813 found for the rig.
-    // The v4813 precedent moved the budget line instead (Keith's call then); that is not done here.
-    checked: 94, overBudget: 48, unguarded: 16, unchecked: 64,
+    checked: 64, overBudget: 36, unguarded: 14, unchecked: 50,
     // v4550 -- the UNMEASURED class was split out of over-budget after this gate went red twice inside full
     // sweeps and passed 68 times under load; the trigger was a concurrent REWRITE of sweep-timings.json, not
     // contention. Zero records sit in it on a settled tree, which is the expected reading.
