@@ -16,14 +16,18 @@ import { ACTUATORS } from "../physics/mechanics/subActuators.mjs";
 
 const range = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
 const mk = (spec) => spec.flatMap(([kind, seeds]) => seeds.map((s) => T.scenario(s, kind)));
-export const SAFETY_AUDIT2_SET = Object.freeze(mk([["nominal", range(3000, 3099)], ["recovery", range(3000, 3299)], ["current", range(3000, 3099)]]));
-export const AUDIT2_SET = Object.freeze(mk([["nominal", range(3500, 3511)], ["recovery", range(3500, 3511)], ["current", range(3500, 3511)]]));
+// base 3000 is the range spent for seed 9201; a later champion passes a fresh base (--base 6000 -> safety 6000.., audit 6500..). The ranges below 4000 and 4000-4299 (tail mining) and 5000-5179 (the tail evaluation sample) are taken.
+export const auditSets = (base = 3000) => ({
+    safety: Object.freeze(mk([["nominal", range(base, base + 99)], ["recovery", range(base, base + 299)], ["current", range(base, base + 99)]])),
+    audit: Object.freeze(mk([["nominal", range(base + 500, base + 511)], ["recovery", range(base + 500, base + 511)], ["current", range(base + 500, base + 511)]])),
+});
+export const SAFETY_AUDIT2_SET = auditSets(3000).safety, AUDIT2_SET = auditSets(3000).audit;
 
-const [file, mode] = process.argv.slice(2);
+const [file, mode] = process.argv.slice(2), baseI = process.argv.indexOf("--base"), BASE = baseI === -1 ? 3000 : +process.argv[baseI + 1], SETS = auditSets(BASE);
 if (process.argv[1] && process.argv[1].endsWith("auditSubChampion.mjs")) {
-    if (!file || !["pool", "audit"].includes(mode)) { console.error("usage: node tools/auditSubChampion.mjs <weights.json> pool|audit"); process.exit(2); }
+    if (!file || !["pool", "audit"].includes(mode)) { console.error("usage: node tools/auditSubChampion.mjs <weights.json> pool|audit [--base N]"); process.exit(2); }
     const w = Float32Array.from(JSON.parse(fs.readFileSync(file, "utf8")).weights), E = S.EXPLORER;
-    const sets = mode === "pool" ? [["SAFETY_POOL_SET", T.SAFETY_POOL_SET]] : [["SAFETY_AUDIT2_SET", SAFETY_AUDIT2_SET], ["AUDIT2_SET", AUDIT2_SET]];
+    const sets = mode === "pool" ? [["SAFETY_POOL_SET", T.SAFETY_POOL_SET]] : [[`SAFETY_AUDIT(${BASE})`, SETS.safety], [`AUDIT(${BASE + 500})`, SETS.audit]];
     for (const [hull, d] of [["nominal EXPLORER", {}], ["Munk x3 hull", { munk: 3000 }]]) {
         const model = S.createSubModel(Object.freeze({ ...E, ...d })), opts = { model, actuators: ACTUATORS };
         for (const [name, set] of sets) {

@@ -234,3 +234,16 @@ The long champion (9201) lost the Munk x3 tail. `mine` flew it on 500 never-used
 | tail 9303 | -0.449 | -0.410 | -0.637 / -1.38 / 0 | -0.481 / -1.75 / 0 |
 
 9300 is the one pick: only it matches the autopilot's tail on the fresh sample (-1.37 vs -1.35) with nothing ended. Costs: the 5-hull mean gives up 0.014 (-0.424 -> -0.438), nominal gets slightly worse (-0.366 -> -0.398), Munk 0 -0.484 -> -0.531. SAFETY_POOL (looked at, not trained on): nominal -0.453 vs -0.582 (463/23, 0 newly ended), Munk x3 -0.498 vs -0.535 (355/100, 0 newly ended, worst-5% -1.42 vs -1.38). AUDIT sets NOT read for this champion (the 3000/3500 ranges are spent for 9201 and informed this training; a new range is needed).
+
+### Audit of the tail-trained pilot (seed 9310) on a fresh range (`--base 6000`; SPENT for this champion, read once)
+
+`tools/auditSubChampion.mjs` now takes `--base N` (safety audit N..; audit N+500..); base 3000 is spent for 9201 and reproduces the earlier table exactly. Actuator limits on, champion vs PD autopilot:
+
+| set | hull | champion / autopilot | better / worse | newly ended | early ends | worst-5% |
+|---|---|---|---|---|---|---|
+| SAFETY_AUDIT (500) | nominal | -0.435 / -0.562 | 455 / 21 | 0 | 0 / 0 | -0.87 / -1.22 |
+| AUDIT (36) | nominal | -0.439 / -0.564 | 31 / 4 | 0 | 0 / 0 | -0.86 / -1.21 |
+| SAFETY_AUDIT (500) | Munk x3 | -0.477 / -0.521 | 365 / 90 | **1** | 2 / 1 | -1.59 / -1.51 |
+| AUDIT (36) | Munk x3 | -0.488 / -0.513 | 24 / 8 | 0 | 0 / 0 | -1.30 / -1.13 |
+
+Verdict: nominal QUALIFIES. Munk x3 does NOT meet the strict bar (no dive ended that the autopilot completes): it is better on the mean (-0.477 vs -0.521) and the tail gap shrank from -1.96 vs -1.43 (9201) to -1.59 vs -1.51, but one dive in 500 is still ended. The tail training moved the failure from "worse by 0.5 in the tail" to "worse by 0.08, one dive in 500"; it did not eliminate it.
