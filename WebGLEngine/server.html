@@ -543,6 +543,14 @@ window.addEventListener("load", function () {
      style="cursor:pointer;background:#141821;border:1px solid #2a3242;border-radius:4px;padding:1px 6px;font:10px monospace;color:#cfd8e3;display:inline-flex;align-items:center;gap:6px;font-weight:normal;">
   <span id="gpuBrainDot" style="width:9px;height:9px;border-radius:50%;background:#555;box-shadow:0 0 6px #555;transition:background .3s,box-shadow .3s"></span>
   <span><b style="color:#8ab4ff">GPU BRAIN</b> <span id="gpuBrainWord" style="color:#889">checking...</span></span>
+</div><div id="flyBrainStatus" role="button" tabindex="0" onkeydown="if(event.key===&#39;Enter&#39;||event.key===&#39; &#39;){event.preventDefault();this.click();}" onclick="window.open('/fly-connectome.html','_blank')" title="FLY BRAIN availability"
+     style="cursor:pointer;background:#141821;border:1px solid #2a3242;border-radius:4px;padding:1px 6px;font:10px monospace;color:#cfd8e3;display:inline-flex;align-items:center;gap:6px;font-weight:normal;">
+  <span id="flyBrainDot" style="width:9px;height:9px;border-radius:50%;background:#555;box-shadow:0 0 6px #555;transition:background .3s,box-shadow .3s"></span>
+  <span><b style="color:#9fe6c0">FLY BRAIN</b> <span id="flyBrainWord" style="color:#889">checking...</span></span>
+</div><div id="fishBrainStatus" role="button" tabindex="0" onkeydown="if(event.key===&#39;Enter&#39;||event.key===&#39; &#39;){event.preventDefault();this.click();}" onclick="window.open('/sub-aquarium.html','_blank')" title="FISH BRAIN availability"
+     style="cursor:pointer;background:#141821;border:1px solid #2a3242;border-radius:4px;padding:1px 6px;font:10px monospace;color:#cfd8e3;display:inline-flex;align-items:center;gap:6px;font-weight:normal;">
+  <span id="fishBrainDot" style="width:9px;height:9px;border-radius:50%;background:#555;box-shadow:0 0 6px #555;transition:background .3s,box-shadow .3s"></span>
+  <span><b style="color:#7fd1ff">FISH BRAIN</b> <span id="fishBrainWord" style="color:#889">checking...</span></span>
 </div></div>
         <div id="paSync" style="color:var(--dim);">sync: —</div>
         <div id="paTx" style="color:var(--ink);">↓ —  ↑ —  · 0 links</div>
@@ -724,6 +732,7 @@ window.addEventListener("load", function () {
                  Fiber escape circuit) fetched once from Janelia's Neuprint and vendored, drawn as their own
                  skeletons rather than a stylized model. Same class as the five physics front doors above it. -->
             <a href="/fly-connectome.html" target="_blank" rel="noopener" title="Fly Connectome: 34 real neurons from Janelia's male-cns connectome -- the fruit fly's Giant Fiber escape circuit, the fastest reflex in the animal's nervous system -- drawn as their own traced skeletons from a one-time Neuprint fetch. Orbit the circuit and pick a neuron to see its actual synaptic connections." style="color:#9fe6c0;text-decoration:none;border:1px solid #2a5a3a;padding:2px 6px;border-radius:3px;font-size:11px;">&#9670; Fly Connectome</a>
+            <a href="/sub-aquarium.html" target="_blank" rel="noopener" title="Sub Aquarium: submarines flown by the fruit fly's Giant Fiber Circuit (the fish-brain STAND-IN) swim in a tank; peers can send theirs here, and each peer row has a Sub button to send one of yours." style="color:#9fe6c0;text-decoration:none;border:1px solid #2a5a3a;padding:2px 6px;border-radius:3px;font-size:11px;">&#9670; Sub Aquarium</a>
             <a href="/settings.html" target="_blank" rel="noopener" title="Settings -- engine, cloud, tunnel, brain and hosting configuration; most of its controls drive other subsystems, so it is filed with the System Tools it operates.">Settings</a>
             <a href="/node-bun.html" target="_blank" rel="noopener" title="Node / Bun -- which runtime is serving this box, the Bun-vs-Node capability surface run on demand, and the one optional dependency (ws) that Bun ships built in. Filed with System Tools because it operates the rig: it reads /runtime, writes the use_bun.flag preference, and spawns tools/ship/bunSurface.mjs under each runtime.">Node / Bun</a>
             <!-- v4009 -- webgpu-llm.html SHIPPED AT v4007 AND WAS NEVER LINKED. The same defect this round fixed
@@ -4943,6 +4952,20 @@ A password fetches a token from the list server; an unregistered callsign needs 
     }).catch(function(){ _lighthouseHtml=""; });
   }
 
+  // UNNUMBERED -- send one of THIS box's own subs to a peer's Sub Aquarium. The box does the dialling (POST /subaquarium/send), so the peer's own trust rules decide whether it is admitted.
+  async function sendSubTo(peerUrl,btn){
+    var subs=[]; try{ var r=await fetch("/subaquarium/list",{cache:"no-store"}); var j=await r.json(); subs=(j.subs||[]).filter(function(x){return x.local;}); }catch(e){}
+    if(!subs.length){ alert("No local subs to send yet. Open the Sub Aquarium and press \u201cOffer my subs\u201d first."); return; }
+    var menu=subs.map(function(x,i){return (i+1)+". "+x.name+" ("+x.pilot+")";}).join("\n");
+    var pick=prompt("Send which sub to "+peerUrl+"?\n"+menu+"\n(number)","1"); if(pick===null) return;
+    var sub=subs[parseInt(pick,10)-1]; if(!sub){ alert("Not a number on the list."); return; }
+    var old=btn.textContent; btn.textContent="\u2026"; btn.disabled=true;
+    try{
+      var rr=await fetch("/subaquarium/send",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({peer:peerUrl,id:sub.id})}); var jj=await rr.json();
+      alert(jj&&jj.ok?("Sent \u201c"+sub.name+"\u201d to "+peerUrl+(jj.reply&&jj.reply.replaced?" (it replaced the copy already there)":"")):("Not sent: "+((jj&&jj.error)||"unknown")));
+    }catch(e){ alert("Send failed: "+e); }
+    btn.textContent=old; btn.disabled=false;
+  }
   function renderPeers(list){
     var _al=window._peerAlarms||[];
     var _ban=_al.length?("<div style='border:1px solid #803030;background:#2a1414;color:#ffb0b0;border-radius:6px;padding:5px 8px;margin-bottom:6px;font-size:11px'>\u26a0 favorite offline: "+_al.map(function(a){return esc(a.name||a.url||a.id);}).join(", ")+"</div>"):"";
@@ -4962,6 +4985,7 @@ A password fetches a token from the list server; an unregistered callsign needs 
           "<a href='"+esc(p.url)+"/' target='_blank' rel='noopener' title='open this peer full render' style='color:#9ed5ff;text-decoration:none;font-size:10px;border:1px solid #245;border-radius:4px;padding:1px 6px'>↗ render</a>"+
           "<button data-pf='grab' title='pull a file/folder FROM this peer\u2019s Downloads' style='font-size:10px;padding:1px 6px;background:#14241a;color:#9fe;border:1px solid #2a5a3a;border-radius:4px;cursor:pointer'>\u2b07 Grab</button>"+
           "<button data-pf='send' title='push a local file/folder TO this peer\u2019s Downloads' style='font-size:10px;padding:1px 6px;background:#142436;color:#9ed5ff;border:1px solid #2a4060;border-radius:4px;cursor:pointer'>\u2b06 Send</button>"+
+          (off?"":"<button data-sendsub='1' title='send one of THIS box\u2019s submarines to this peer\u2019s Sub Aquarium' style='font-size:10px;padding:1px 6px;background:#10262c;color:#7fd1ff;border:1px solid #24506a;border-radius:4px;cursor:pointer'>\u2693 Sub</button>")+
           ((pr&&pr.caps&&pr.caps.rustdeskId)
             ?("<button data-rd='"+esc(pr.caps.rustdeskId)+"' title='RustDesk remote into this peer \u2014 opens YOUR RustDesk client and connects to it (save the peer\u2019s permanent password once for unattended access)' style='font-size:10px;padding:1px 6px;background:#231a36;color:#cbb0ff;border:1px solid #4a3a6a;border-radius:4px;cursor:pointer'>\ud83d\udda5\ufe0f RustDesk In</button>"+
               "<button data-rdreq='"+esc(p.url)+"' title='Ask THIS peer to open a RustDesk viewer pointed at YOUR machine \u2014 their RustDesk client connects to you, you see the incoming request here' style='font-size:10px;padding:1px 6px;background:#1a2a1a;color:#7fe0a0;border:1px solid #2a5a3a;border-radius:4px;cursor:pointer'>\uD83D\uDCE1 Request View</button>")
@@ -5497,6 +5521,7 @@ A password fetches a token from the list server; an unregistered callsign needs 
       return;
     }
     var favEl=e.target.closest("[data-fav]"); if(favEl){ var fid=favEl.getAttribute("data-fav"); if(fid){ var fon=favEl.textContent.indexOf("\u2605")<0; api("/peer/favorite",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:fid,on:fon})}).then(function(){ refreshPeers(true); }); } return; }
+    var ss=e.target.closest("button[data-sendsub]"); if(ss){ sendSubTo(url,ss); return; }
     var pf=e.target.closest("button[data-pf]"); if(pf){ peerFiles(pf.getAttribute("data-pf"), url); return; }
     var rdi=e.target.closest("button[data-rdinstall]"); if(rdi){ var pu=rdi.getAttribute("data-rdinstall"); rdi.textContent="\ud83d\udda5\ufe0f installing\u2026"; rdi.disabled=true; try{(window._swekPush||function(){})({ t:Date.now(), level:"info", msg:"[rustdesk] installing on "+pu });}catch(_){} fetch("/peer/rustdesk/install",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({peer:pu})}).then(function(r){return r.json();}).then(function(j){ if(j&&(j.ok||j.started||j.alreadyInstalled)){ try{(window._swekPush||function(){})({ t:Date.now(), level:"info", msg:"[rustdesk] install running on "+pu+" \u2014 RustDesk In appears once it reports an ID" });}catch(_){} var tries=0; var iv=setInterval(function(){ tries++; probePeer(pu,true).then(function(pr){ if((pr&&pr.caps&&pr.caps.rustdeskId)||tries>24){ clearInterval(iv); renderPeers(peerList); } }); }, 5000); } else { alert("Install failed: "+((j&&j.error)||"")); rdi.textContent="\ud83d\udda5\ufe0f Install RustDesk"; rdi.disabled=false; } }).catch(function(){ alert("Install request failed."); rdi.textContent="\ud83d\udda5\ufe0f Install RustDesk"; rdi.disabled=false; }); return; }
     var rd=e.target.closest("button[data-rd]"); if(rd){ var rid=rd.getAttribute("data-rd"); try{(window._swekPush||function(){})({ t:Date.now(), level:"info", msg:"\ud83d\udda5\ufe0f RustDesk In \u2192 "+rid });}catch(_){} try{window._swekRobot&&window._swekRobot.play&&window._swekRobot.play("wave");}catch(e){} fetch("/rustdesk/uri?id="+encodeURIComponent(rid)).then(function(r){return r.json();}).then(function(j){ if(j&&j.uri){ window.location.href=j.uri; } else { alert("Couldn't build a RustDesk link for this peer."); } }).catch(function(){ alert("RustDesk link request failed."); }); return; }
@@ -7587,6 +7612,29 @@ try{const r=await fetch("/self/whoami",{cache:"no-store"});const j=await r.json(
     box.title=detail||"Open the GPU Brain console";
   }
   poll(); setInterval(() => swekTick("brain-health", poll),5000);
+})();
+</script>
+<!-- UNNUMBERED -- FLY BRAIN and FISH BRAIN chips, the same way as the GPU BRAIN chip: /ai/flybrain/health and /ai/fishbrain/health (ai-bridge/subAquariumBridge.js). The fish chip says "stand-in" in amber while no fish
+     circuit is vendored: the sub pilots are wired through the FLY's Giant Fiber Circuit. -->
+<script>
+(function(){
+  var DOT={ live:"#4ade80", standin:"#f6a623", stale:"#ff9f43", offline:"#ff5a5a", err:"#555" };
+  var WORD={ live:"live", standin:"stand-in", stale:"stale", offline:"offline", err:"unreachable" };
+  function chip(key,url,swekKey){
+    var dot=document.getElementById(key+"BrainDot"), word=document.getElementById(key+"BrainWord"), box=document.getElementById(key+"BrainStatus");
+    if(!dot||!word||!box) return;
+    async function poll(){
+      var st="err", detail="bridge did not answer "+url;
+      try{ var r=await fetch(url,{cache:"no-store"}); if(r.ok){ var j=await r.json(); st=j.state||"err"; detail=j.detail||""; } }catch(e){}
+      var c=DOT[st]||DOT.err;
+      dot.style.background=c; dot.style.boxShadow="0 0 6px "+c;
+      word.textContent=WORD[st]||st; word.style.color=(st==="live")?"#4ade80":(st==="standin")?"#f6a623":(st==="offline"||st==="err")?"#ff8a8a":"#cfd8e3";
+      box.title=detail;
+    }
+    poll(); setInterval(function(){ swekTick(swekKey, poll); },5000);
+  }
+  chip("fly","/ai/flybrain/health","flybrain-health");
+  chip("fish","/ai/fishbrain/health","fishbrain-health");
 })();
 </script>
 

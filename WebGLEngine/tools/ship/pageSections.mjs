@@ -893,6 +893,8 @@ export const UNPLACED = new Map([
     ["dogfight.html", "two aircraft fight, a window per craft: linked from Arriving so it is reachable; the drawer is Keith's call (the fruit-fly drawer holds es-flight6dof.html, whose pilots it flies, but a fight is not obviously a brain page)"],
     ["bomber.html", "a B-29-class bomber and its gun seats against fighters, a window per craft and per seat: linked from Arriving so it is reachable; the drawer is Keith's call, decided with dogfight.html and space-battleship.html side by side"],
     ["space-battleship.html", "a Yamato-like capital ship and its thirteen gun seats against fighters in a 6DOF vacuum: linked from Arriving so it is reachable; the drawer is Keith's call, decided with dogfight.html and bomber.html side by side"],
+    // UNNUMBERED -- the sub aquarium (WIP, the submarine line). Linked from Arriving so it is reachable, and it is the FISH BRAIN chip's click-through; the drawer is Keith's call: it is a brain page (the GFC pilots) AND a fleet page (peers send subs).
+    ["sub-aquarium.html", "a tank of submarines flown by the Giant Fiber Circuit stand-in pilots, and peers send subs here: linked from Arriving so it is reachable; the drawer is Keith's call (Fruit Fly Brain or Fleet)"],
 ]);
 
 /** Every page claimed by a section, flat. Arriving keeps what is NOT in here. */
