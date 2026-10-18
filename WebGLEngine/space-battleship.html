@@ -6,14 +6,14 @@
 
      THE WINDOWS (render/flightViews.mjs): one per craft, stacked down the right (the stack scrolls when the craft do not fit), and a CLICK on a window switches what it shows. A FIGHTER's goes plane, pilot, gunner (its fixed gun's sight: the pipper and the lead pip, drawn for VACUUM), brain.
      THE SHIP's goes plane, pilot (the bridge), then ONE VIEW PER GUN SEAT -- the three triple main turrets, then the ten point-defence mounts, port, starboard, belly and deck -- looking along the gun as it slews, with the sight drawn for the target that gunner has chosen, and then brain: the hull's own state
-     and, under it, a row per seat of what its gunner wants the seat to do and what the seat is doing. A FIGHTER'S brain is its pilot's network live (the 6DOF pilot's twelve features, 34 hidden and five outputs) or, for the PD autopilot, its features and the five outputs it gives. THE HULL'S HELM HAS NO NETWORK: its rows are
-     the inputs and outputs of a rule, said so in the label. A GUN SEAT'S GUNNER IS THE HAND GUNNER'S RULE OR A NETWORK AS ITS HAND behind the same sight (the fruit fly's escape circuit or the GPU Brain's plain network: brain/seatGunnerPolicy.mjs and seatGunnerMlp.mjs): the hand control puts one in every seat, the turrets' and the point defence's controls
+     and, under it, a row per seat of what its gunner wants the seat to do and what the seat is doing. A FIGHTER'S brain is its pilot's network live (the 6DOF pilot's twelve features, 34 hidden and five outputs) or, for the PD autopilot, its features and the five outputs it gives. THE HULL'S HELM IS A RULE OR A NETWORK THAT CORRECTS IT (the helm control: brain/helmPolicy.mjs, a fruit fly's escape circuit whose hand weights correct nothing -- NO HELM NETWORK WAS TRAINED): the hull's row is the inputs and outputs of the rule, said so in the label, and with a network at the helm
+     the ship's brain window has the network's features, hidden layer and outputs after the seats'. A GUN SEAT'S GUNNER IS THE HAND GUNNER'S RULE OR A NETWORK AS ITS HAND behind the same sight (the fruit fly's escape circuit or the GPU Brain's plain network: brain/seatGunnerPolicy.mjs and seatGunnerMlp.mjs): the hand control puts one in every seat, the turrets' and the point defence's controls
      put another in those groups and the seats field in single seats (battleshipFight.build's seatNetworks, the seat's own beating its group's beating the hand), and a seat that has a network shows its twelve features, its hidden layer and its three outputs in the ship's brain window and says which hand it has in its own.
 
      THE GUNNERS' SKILL IS A SETTING I CHOSE (perfect, ace, regular, green -- brain/battleshipFight.mjs says what each is), not a measurement of any gunner. THE FIGHTERS' PILOTS are the 6DOF page's roster (the PD autopilot; the PD written into the network's weights; the pilot it ships; the league-trained one; the close-quarters one; or a mix in turn).
      NOTHING WAS TRAINED FOR A CAPITAL SHIP: the fighters fly a hand doctrine (approach a point to one side of the ship, strafe past) and the learned pilots answer the same call. EVERY NUMBER OF THE SHIP IS INVENTED and the wave-motion cannon is a fiction (capitalShip.mjs says so in full).
 
-     WHAT IS NOT HERE: a formation of more than two ships, a pilot for the ship's helm (a second ship KEEPS A STATION on the first with the formation box, and the two ships' hulls collide with the ships-collide box; without them each faces its own enemy and the pair pass through each other), and a ship drawn like the real one -- it is a hull, a tower, turrets and pods
+     WHAT IS NOT HERE: a formation of more than two ships, a TRAINED pilot for the ship's helm (a second ship KEEPS A STATION on the first with the formation box, and the two ships' hulls collide with the ships-collide box; without them each faces its own enemy and the pair pass through each other), and a ship drawn like the real one -- it is a hull, a tower, turrets and pods
      drawn from the same numbers the fight runs on. (A fighter that tumbles when it is hit, a crew that can be killed, an interlock, friendly fire, a second ship and escorts are the boxes in the bar, off by default.) The hit spheres can be shown (the box below): they are what a round has to reach. THE FIGHTERS ARE SMALL: 3.2 units against a ship of 48, so the big picture marks every craft with a dot. -->
 <html lang="en">
 <head>
@@ -61,6 +61,8 @@
   <label title="a different hand in the THREE MAIN TURRETS than the one on the left ("as the hand on the left" keeps it) -- the rule, or a network, in those seats alone">turrets <select id="handMain" style="max-width:190px"></select></label>
   <label title="a different hand in the TEN POINT-DEFENCE MOUNTS than the one on the left ("as the hand on the left" keeps it)">point defence <select id="handPd" style="max-width:190px"></select></label>
   <label title="a hand for single seats, which wins over the two above: seat id, a colon and a hand id, separated by spaces -- e.g. main-a:fly pd-p1:rule pd-d2:mlphand. Seats: main-a main-b main-c pd-p1 pd-p2 pd-p3 pd-s1 pd-s2 pd-s3 pd-v1 pd-v2 pd-d1 pd-d2. Hands: rule flyhand mlphand fly mlp (the last two when their files are shipped)">seats <input id="handSeats" type="text" size="26" spellcheck="false" placeholder="main-a:fly pd-p1:rule"></label><span id="handNote" class="bad" style="font-size:11px"></span>
+  <label title="who works each capital ship's HELM (the torque that turns the hull and the throttle): the rule (face the nearest enemy at the hull's torque limit, cruise), or a network that CORRECTS the rule -- a fruit fly's escape circuit, on weights that ARE the rule (they correct nothing). NO HELM NETWORK WAS TRAINED">helm <select id="helm" style="max-width:230px"></select></label>
+  <button id="importBtn" title="load a peer's brain file (swek-brain-v1 JSON): a fighters' pilot, a gun seat's hand (the fruit fly's or the GPU brain's) or a ship's helm. It is added to that control's list ('6DOF pilot, imported' and the like) and NOT chosen for you; a file that is refused is said, and what the page held before is kept">Import a brain&hellip;</button><input id="importFile" type="file" accept="application/json,.json" style="display:none"><button id="clearImported" disabled title="forget every imported brain (a fight that asked for one then has the rule, or the PD autopilot)">Clear imported</button><span id="importNote" style="font-size:11px"></span>
   <label>fighters fly <select id="pilotF" style="max-width:210px"></select></label>
   <label title="face: the hull turns toward the nearest enemy at its own limit; hold: it keeps its heading">ship <select id="behaviour"><option value="face" selected>faces the enemy</option><option value="hold">holds its heading</option></select></label>
   <label title="a fraction of the ship's thrust to cruise at, 0-1">cruise <input id="cruise" type="number" min="0" max="1" step="0.1" value="0.3"></label>
@@ -97,6 +99,7 @@ import * as BS from "/brain/battleshipFight.mjs";
 import * as PB from "/brain/peerBrain.mjs";
 import * as SG from "/brain/seatGunnerPolicy.mjs";
 import * as MG from "/brain/seatGunnerMlp.mjs";
+import * as HP from "/brain/helmPolicy.mjs";
 import * as V from "/render/flightViews.mjs";
 import { weightsHash } from "/brain/drivePolicy.mjs";
 
@@ -111,6 +114,7 @@ const CHOICES = [
   { id: "shipped", label: "6DOF pilot, shipped", file: "/brain/pilot6dofWeightsDefault.json" },
   { id: "league", label: "6DOF pilot, league-trained", file: "/brain/pilot6dofWeightsLeague.json" },
   { id: "close", label: "6DOF pilot, close-quarters", file: "/brain/pilot6dofWeightsClose.json" },
+  { id: "imported", label: "6DOF pilot, imported", file: "(a file you chose)" },
   { id: "mix", label: "a mix: PD, shipped, league, close in turn", mix: ["pd", "shipped", "league", "close"] },
 ];
 const loaded = new Map(), errors = new Map();   // id -> { weights, meta } | reason
@@ -143,6 +147,8 @@ const HANDS = [
   { id: "mlphand", label: "GPU brain, hand weights (the rule written into the net)", mod: MG, policy: "seatGunnerMlp", hand: true },
   { id: "fly", label: "fruit fly, trained (for the green sight)", mod: SG, policy: "seatGunnerPolicy", file: "/brain/seatGunnerWeightsDefault.json" },
   { id: "mlp", label: "GPU brain, trained (for the green sight)", mod: MG, policy: "seatGunnerMlp", file: "/brain/seatGunnerMlpWeightsDefault.json" },
+  { id: "importedfly", label: "fruit fly gunner, imported", mod: SG, policy: "seatGunnerPolicy", file: "(a file you chose)" },
+  { id: "importedmlp", label: "GPU brain gunner, imported", mod: MG, policy: "seatGunnerMlp", file: "(a file you chose)" },
 ];
 const handLoaded = new Map(), handErrors = new Map();   // id -> { weights, meta } | reason
 function loadHand(h, url = h.file) {
@@ -184,6 +190,22 @@ function resolveHands({ hand, main = "", pd = "", seats = "" }) {
   for (const [seat, id] of ps.list) { seatNetworks[seat] = take(id).net; any = true; }
   return { base, byNet, seatNetworks: any ? seatNetworks : null, problems };
 }
+
+// ---- the helm: the rule, or a network that corrects the rule (brain/helmPolicy.mjs: the zero weights are the rule). A choice resolves to { id, label, net: { module, weights } | null } ----
+const HELMS = [
+  { id: "rule", label: "the rule (face the nearest enemy, cruise)" },
+  { id: "hand", label: "network, hand weights (corrects nothing: the rule)", mod: HP },
+  { id: "imported", label: "helm network, imported", mod: HP, file: "(a file you chose)" },
+];
+const helmLoaded = new Map();   // id -> { weights, meta }
+const helmAvailable = (h) => !h.file || helmLoaded.has(h.id);
+function resolveHelm(id) {
+  const h = HELMS.find((x) => x.id === id && helmAvailable(x)) || HELMS[0];
+  if (!h.mod) return { id: h.id, label: h.label, net: null };
+  const got = h.file ? helmLoaded.get(h.id) : { weights: h.mod.handWeights(), meta: null };
+  return { id: h.id, label: h.label + (h.file ? ` ${weightsHash(got.weights)}` : "") + (got.meta && got.meta.score != null ? ` (held-out ${got.meta.score})` : ""), net: { module: h.mod, weights: got.weights } };
+}
+function fillHelms(sel) { const keep = sel.value; sel.textContent = ""; for (const h of HELMS) { const o = document.createElement("option"); o.value = h.id; o.textContent = h.label + (helmAvailable(h) ? "" : " — not available"); o.disabled = !helmAvailable(h); sel.appendChild(o); } if (keep) sel.value = keep; }
 
 // ---- Three.js scene, Z-UP like the physics (nose +X, up +Z): space -- a black sky, stars, a drifting dust to see motion against, light from one side ----------------------------------------------------------------
 const scene = new THREE.Scene();
@@ -271,7 +293,7 @@ function makeMarkers(n) {
 }
 
 // ---- the fight ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-let fight = null, arena = null, pilots = null, handNow = null, handsNow = null, meshes = [], trails = [], trailN = [], deadShown = [], log = [], paused = false, held = false, beamAges = new Map(), lastShipHitLog = new Map(), lastFriendlyLog = new Map();
+let fight = null, arena = null, pilots = null, handNow = null, handsNow = null, helmNow = null, meshes = [], trails = [], trailN = [], deadShown = [], log = [], paused = false, held = false, beamAges = new Map(), lastShipHitLog = new Map(), lastFriendlyLog = new Map();
 const el = (id) => document.getElementById(id);
 const shipTeam = () => arena.crafts[0].team, isRaider = (c) => c.kind === "fighter" && c.team !== shipTeam(), isEscort = (c) => c.kind === "fighter" && c.team === shipTeam(), shipIndex = (c) => arena.crafts.filter((q) => q.kind === "capital").indexOf(c);
 const nameOf = (c) => (c.kind === "capital" ? (c === arena.crafts[0] ? "battleship" : "second ship") : c.name);
@@ -284,18 +306,18 @@ const clearFight = () => {
   if (markers) { scene.remove(markers); markers.geometry.dispose(); markers = null; }
   flashes.length = 0; meshes = []; trails = [];
 };
-function newFight({ kind = el("kind").value, seed = Number(el("seed").value) || 1, fighters = Number(el("nfight").value) || 8, gunners = el("gunners").value, f = el("pilotF").value, behaviour = el("behaviour").value, cruise = el("cruise").value === "" ? 0.3 : Number(el("cruise").value), friendlyFire = el("ff").checked, holdFire = el("hold").checked, wrecks = el("wrecks").checked, impact = el("impact").checked ? SA.ROUND_MASS : 0, crew = el("crew").checked, hand = el("hand").value, handMain = el("handMain").value, handPd = el("handPd").value, handSeats = el("handSeats").value, ships = Number(el("nships").value) || 1, escorts = Number(el("nesc").value) || 0, formation = el("formation").checked, shipCollisions = el("collide").checked } = {}) {
+function newFight({ kind = el("kind").value, seed = Number(el("seed").value) || 1, fighters = Number(el("nfight").value) || 8, gunners = el("gunners").value, f = el("pilotF").value, behaviour = el("behaviour").value, cruise = el("cruise").value === "" ? 0.3 : Number(el("cruise").value), friendlyFire = el("ff").checked, holdFire = el("hold").checked, wrecks = el("wrecks").checked, impact = el("impact").checked ? SA.ROUND_MASS : 0, crew = el("crew").checked, hand = el("hand").value, handMain = el("handMain").value, handPd = el("handPd").value, handSeats = el("handSeats").value, helm = el("helm").value, ships = Number(el("nships").value) || 1, escorts = Number(el("nesc").value) || 0, formation = el("formation").checked, shipCollisions = el("collide").checked } = {}) {
   clearFight();
   fighters = Math.max(1, Math.min(MAX_FIGHTERS, Math.round(fighters))); seed = Math.max(1, Math.round(seed)); ships = ships >= 2 ? 2 : 1; escorts = Math.max(0, Math.min(BS.MAX_ESCORTS, Math.round(escorts) || 0)); cruise = Math.max(0, Math.min(1, Number.isFinite(cruise) ? cruise : 0.3));
-  pilots = resolvePilot(f); handsNow = resolveHands({ hand, main: handMain, pd: handPd, seats: handSeats }); handNow = handsNow.base;
-  fight = BS.build(seed, kind, { fighters, gunners, pilot: pilots.list.map((p) => p.fn), behaviour, cruise, friendlyFire: !!friendlyFire, holdFire: !!holdFire, wrecks: !!wrecks, impact: impact === true ? SA.ROUND_MASS : Number(impact) || 0, crew: !!crew, network: handNow.net, seatNetworks: handsNow.seatNetworks, formation: !!formation && ships === 2, shipCollisions: !!shipCollisions, ships, escorts });
+  pilots = resolvePilot(f); handsNow = resolveHands({ hand, main: handMain, pd: handPd, seats: handSeats }); handNow = handsNow.base; helmNow = resolveHelm(helm);
+  fight = BS.build(seed, kind, { fighters, gunners, pilot: pilots.list.map((p) => p.fn), behaviour, cruise, friendlyFire: !!friendlyFire, holdFire: !!holdFire, wrecks: !!wrecks, impact: impact === true ? SA.ROUND_MASS : Number(impact) || 0, crew: !!crew, network: handNow.net, seatNetworks: handsNow.seatNetworks, helm: helmNow.net, formation: !!formation && ships === 2, shipCollisions: !!shipCollisions, ships, escorts });
   arena = fight.arena;
   const escortN = new Map(arena.crafts.filter(isEscort).map((c, k) => [c.id, k]));
   meshes = arena.crafts.map((c, i) => (c.kind === "capital" ? makeShip(c.ship) : isEscort(c) ? makeFighter(escortN.get(c.id), ESCORT_COLORS) : makeFighter(i - 1)));
   trails = arena.crafts.map((c, i) => trailLine(c.kind === "capital" ? 0x6fd6c0 : isEscort(c) ? ESCORT_COLORS[escortN.get(c.id) % ESCORT_COLORS.length] : FIGHTER_COLORS[(i - 1) % FIGHTER_COLORS.length])); trailN = arena.crafts.map(() => 0); deadShown = arena.crafts.map(() => false);
   markers = makeMarkers(arena.crafts.length);
   beamAges = new Map(); lastShipHitLog = new Map(); lastFriendlyLog = new Map(); log = [];
-  el("kind").value = kind; el("seed").value = String(fight.scenario.seed); el("nfight").value = String(fighters); el("gunners").value = typeof gunners === "string" ? gunners : "regular"; el("pilotF").value = pilots.id; el("hand").value = handNow.id; el("handMain").value = handMain && [...el("handMain").options].some((o) => o.value === handMain && !o.disabled) ? handMain : ""; el("handPd").value = handPd && [...el("handPd").options].some((o) => o.value === handPd && !o.disabled) ? handPd : ""; el("handSeats").value = handSeats; el("handNote").textContent = handsNow.problems.length ? " " + handsNow.problems.join("; ") : ""; el("behaviour").value = behaviour; el("cruise").value = String(cruise); el("ff").checked = !!friendlyFire; el("hold").checked = !!holdFire; el("wrecks").checked = !!wrecks; el("impact").checked = arena.impact > 0; el("crew").checked = !!crew; el("nships").value = String(ships); el("nesc").value = String(escorts); el("formation").checked = !!formation; el("collide").checked = !!shipCollisions;
+  el("kind").value = kind; el("seed").value = String(fight.scenario.seed); el("nfight").value = String(fighters); el("gunners").value = typeof gunners === "string" ? gunners : "regular"; el("pilotF").value = pilots.id; el("hand").value = handNow.id; el("handMain").value = handMain && [...el("handMain").options].some((o) => o.value === handMain && !o.disabled) ? handMain : ""; el("handPd").value = handPd && [...el("handPd").options].some((o) => o.value === handPd && !o.disabled) ? handPd : ""; el("handSeats").value = handSeats; el("helm").value = helmNow.id; el("handNote").textContent = handsNow.problems.length ? " " + handsNow.problems.join("; ") : ""; el("behaviour").value = behaviour; el("cruise").value = String(cruise); el("ff").checked = !!friendlyFire; el("hold").checked = !!holdFire; el("wrecks").checked = !!wrecks; el("impact").checked = arena.impact > 0; el("crew").checked = !!crew; el("nships").value = String(ships); el("nesc").value = String(escorts); el("formation").checked = !!formation; el("collide").checked = !!shipCollisions;
   buildWindows(); camPos.set(...arena.crafts[0].body.pos).add(new THREE.Vector3(-120, -160, 70)); camLook.set(...arena.crafts[0].body.pos);
   renderNote(); renderFrame(0, true);
 }
@@ -371,8 +393,15 @@ function shipRows(c) {
   const w = c.body.w, thr = c.last ? c.last.thrust : 0;
   const rows = [{ who: "helm", layer: "hull", label: "hull", names: ["turn x", "turn y", "turn z", "thrust", "engines", "cannon", "hull"], values: [clamp1(w[0] / 0.5), clamp1(w[1] / 0.5), clamp1(w[2] / 0.5), thr / CS.thrustWith(c.ship, CS.ENGINE_PODS), c.enginesRunning / CS.ENGINE_PODS, c.charge / c.ship.waveGun.charge, Math.max(0, c.hp) / c.hpMax] }];
   rows.push(...V.seatRows(c.seats.map((s2) => ({ seat: s2.seat, state: s2.state, cmd: s2.last }))));
-  const wi = arena.crafts.indexOf(c); rows.push(...handRows(c, wins[wi] ? wins[wi].seat : 0));
+  const wi = arena.crafts.indexOf(c); rows.push(...handRows(c, wins[wi] ? wins[wi].seat : 0)); rows.push(...helmRows(c));
   return rows;
+}
+// THE HELM'S OWN NETWORK, for the ship the window is on: the twelve features it was shown the last tick it was asked, the hidden layer, and the five outputs (three torque corrections, the throttle correction, one that is not used); idle (zeros) when it had no enemy to be shown
+function helmRows(c) {
+  const net = helmNow && helmNow.net, hp = c.helmPilot; if (!net || !hp) return [];
+  const last = hp.last, nF = net.module.FEATURES, nH = net.module.HIDDEN, nO = net.module.OUTPUTS;
+  const act = last ? V.pilotActivations(net.module, net.weights, last.x) : { input: new Float32Array(nF), hidden: new Float32Array(nH), output: new Float32Array(nO) };
+  return V.pilotRows({ who: "helm", act, featureNames: net.module.FEATURE_NAMES, outputNames: net.module.OUTPUT_NAMES }).map((r) => ({ ...r, label: `h ${last ? r.layer.slice(0, 4) : "idle"}` }));
 }
 // THE HAND'S OWN NETWORK, for the seat the ship's window is on: the twelve features the sight and the arena showed it the last tick it was asked, the hidden layer, and the three outputs (a yaw and a pitch correction, the trigger); idle (zeros) when it had no target
 function handRows(c, k) {
@@ -407,7 +436,7 @@ function drawSight(ctx, cam, muzzle, foe, spec, W, H) {
 function drawOverlay(w, c, W, H) {
   const ctx = w.ctx; ctx.clearRect(0, 0, W, H); w.texts = []; w.sight = null;
   ctx.font = "10px ui-monospace,Menlo,monospace"; ctx.lineWidth = 2;
-  if (w.view === "brain") { V.drawRows(ctx, W, H, brainRowsOf(c), { title: `${nameOf(c)} · ${c.kind === "capital" ? `hull and gunners (${anyNet() ? "networks" : "rules"})` : pilotForCraft(c).label}` }); return; }
+  if (w.view === "brain") { V.drawRows(ctx, W, H, brainRowsOf(c), { title: `${nameOf(c)} · ${c.kind === "capital" ? `hull and gunners (${anyNet() || helmNow.net ? "networks" : "rules"})` : pilotForCraft(c).label}` }); return; }
   ctx.fillStyle = "#cfe0f5"; ctx.fillText(w.view === "plane" ? `${nameOf(c)}${c.status !== "flying" ? ` — ${c.status}` : c.kind === "fighter" ? ` — ${c.mode}` : ""}` : hudLine(c), 4, H - 5);
   if (w.view === "pilot") { ctx.fillStyle = "#7fe0a0"; ctx.fillRect(Math.round(W / 2) - 6, Math.round(H / 2), 13, 1); ctx.fillRect(Math.round(W / 2), Math.round(H / 2) - 6, 1, 13); }
   if (w.view === "gunner") {
@@ -510,7 +539,7 @@ function updateBoard() {
   const fs = arena.crafts.filter(isRaider), t = BS.tally(arena);
   const shipCard = (s, st, title) => {
     const left = Math.max(0, s.hp), out = st.partsOut;
-    return `<b>${title}</b> · ${s.status === "flying" ? `<span class="good">flying</span>` : `<span class="bad">${s.status.toUpperCase()}</span>`} · gunners ${typeof fight.gunners === "object" ? el("gunners").value : fight.gunners}${handSummary()}<div class="bar"><i style="width:${(100 * left / s.hpMax).toFixed(0)}%"></i></div>` +
+    return `<b>${title}</b> · ${s.status === "flying" ? `<span class="good">flying</span>` : `<span class="bad">${s.status.toUpperCase()}</span>`} · gunners ${typeof fight.gunners === "object" ? el("gunners").value : fight.gunners}${handSummary()}${helmNow.net ? ` · helm: ${helmNow.label}` : ""}<div class="bar"><i style="width:${(100 * left / s.hpMax).toFixed(0)}%"></i></div>` +
       `<div class="row">hit points ${Math.round(left)}/${s.hpMax}   engines ${s.ship.engines.map((id) => (s.partHp.get(id) > 0 ? "●" : "○")).join(" ")} ${s.enginesRunning} of ${CS.ENGINE_PODS}</div>` +
       `<div class="row">wave-motion cannon (invented) ${Math.round(100 * s.charge / s.ship.waveGun.charge)}% charged, fired ${s.waves}<div class="bar wave"><i style="width:${(100 * s.charge / s.ship.waveGun.charge).toFixed(0)}%"></i></div></div>` +
       `<div class="row">parts out: ${out.length ? out.join(", ") : "none"}   rounds fired by the seats ${st.seatRounds}   hits landed ${s.hits}</div>` +
@@ -531,9 +560,9 @@ function updateBoard() {
 // ---- controls ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 function fillSelect(sel) { const keep = sel.value; sel.textContent = ""; for (const c of CHOICES) { const o = document.createElement("option"); o.value = c.id; o.textContent = c.label + (available(c) ? "" : " — not available"); o.disabled = !available(c); sel.appendChild(o); } if (keep) sel.value = keep; }
 function fillHands(sel, inherit = false) { const keep = sel.value; sel.textContent = ""; if (inherit) { const o = document.createElement("option"); o.value = ""; o.textContent = "as the hand on the left"; sel.appendChild(o); } for (const h of HANDS) { const o = document.createElement("option"); o.value = h.id; o.textContent = h.label + (handAvailable(h) ? "" : " — not available"); o.disabled = !handAvailable(h); sel.appendChild(o); } if (keep) sel.value = keep; }
-function fillRosters() { fillSelect(el("pilotF")); fillHands(el("hand")); fillHands(el("handMain"), true); fillHands(el("handPd"), true); }
+function fillRosters() { fillSelect(el("pilotF")); fillHelms(el("helm")); fillHands(el("hand")); fillHands(el("handMain"), true); fillHands(el("handPd"), true); }
 el("newBtn").onclick = () => newFight();
-for (const id of ["kind", "pilotF", "hand", "handMain", "handPd", "handSeats", "gunners", "nfight", "nships", "nesc", "formation", "collide", "behaviour", "cruise", "seed", "ff", "hold", "wrecks", "impact", "crew"]) el(id).onchange = () => newFight();
+for (const id of ["kind", "pilotF", "hand", "handMain", "handPd", "handSeats", "gunners", "nfight", "helm", "nships", "nesc", "formation", "collide", "behaviour", "cruise", "seed", "ff", "hold", "wrecks", "impact", "crew"]) el(id).onchange = () => newFight();
 el("pauseBtn").onclick = () => { paused = !paused; el("pauseBtn").textContent = paused ? "▶ Play" : "❚❚ Pause"; };
 el("stepBtn").onclick = () => { paused = true; el("pauseBtn").textContent = "▶ Play"; if (!arena.done) tickOnce(); };
 addEventListener("keydown", (e) => { if (e.code === "Space" && !/^(INPUT|SELECT|BUTTON)$/.test((e.target && e.target.tagName) || "")) { e.preventDefault(); el("pauseBtn").click(); } });
@@ -551,13 +580,35 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
+// ---- a peer's brain from a FILE (the swek-brain-v1 JSON that brain/peerBrain.mjs writes): routed by the policy the file says it is for, checked by peerBrain.importBrain (the format, the policy, the weight count, every weight finite -- it never throws), and ADDED to that control's list, never chosen for you. A file that is refused is said and the
+// brain the page already held is kept. ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+const IMPORT_KINDS = {
+  pilot6dofPolicy: { what: "a fighters' pilot", desc: DESC, put: (r) => loaded.set("imported", r), control: "fighters fly" },
+  seatGunnerPolicy: { what: "a gun seat's hand (the fruit fly's)", desc: PB.describePolicy("seatGunnerPolicy", SG), put: (r) => handLoaded.set("importedfly", r), control: "hand, turrets, point defence and seats" },
+  seatGunnerMlp: { what: "a gun seat's hand (the GPU brain's)", desc: PB.describePolicy("seatGunnerMlp", MG), put: (r) => handLoaded.set("importedmlp", r), control: "hand, turrets, point defence and seats" },
+  helmPolicy: { what: "a ship's helm", desc: PB.describePolicy("helmPolicy", HP), put: (r) => helmLoaded.set("imported", r), control: "helm" },
+};
+function importNote(ok, msg) { const n = el("importNote"); n.textContent = " " + msg; n.className = ok ? "good" : "bad"; return { ok, msg }; }
+function importBrainText(text, name = "the file") {
+  let blob; try { blob = JSON.parse(text); } catch (e) { return importNote(false, `${name}: not a readable JSON file (${e && e.message})`); }
+  const kind = blob && typeof blob === "object" && Object.hasOwn(IMPORT_KINDS, blob.policy) ? IMPORT_KINDS[blob.policy] : null;
+  if (!kind) return importNote(false, `${name}: this brain is for ${JSON.stringify(blob && typeof blob === "object" ? blob.policy : blob)}; this page takes ${Object.keys(IMPORT_KINDS).join(", ")}`);
+  const r = PB.importBrain(kind.desc, blob);
+  if (!r.ok) return importNote(false, `${name}: ${r.reason}`);
+  kind.put({ weights: r.weights, meta: r.meta }); fillRosters(); el("clearImported").disabled = false;
+  return importNote(true, `${name}: ${kind.what} (${weightsHash(r.weights)}${r.meta.score != null ? `, held-out ${r.meta.score}` : ""}${r.meta.by ? `, by ${r.meta.by}` : ""}) is in the "${kind.control}" list`);
+}
+el("importBtn").onclick = () => el("importFile").click();
+el("importFile").addEventListener("change", async (e) => { const f = e.target.files && e.target.files[0]; e.target.value = ""; if (!f) return; importBrainText(await f.text(), f.name); });
+el("clearImported").onclick = () => { loaded.delete("imported"); handLoaded.delete("importedfly"); handLoaded.delete("importedmlp"); helmLoaded.delete("imported"); fillRosters(); el("clearImported").disabled = true; importNote(true, "the imported brains are forgotten"); };
+
 // ---- boot: the pilots' files first, then the fight ------------------------------------------------------------------------------------------------------------------------------------------------------
 const params = new URLSearchParams(location.search);
-const ready = Promise.allSettled([...CHOICES.filter((c) => c.file).map((c) => loadChoice(c)), ...HANDS.filter((h) => h.file).map((h) => loadHand(h))]).then(() => {
+const ready = Promise.allSettled([...CHOICES.filter((c) => c.file && c.file[0] === "/").map((c) => loadChoice(c)), ...HANDS.filter((h) => h.file && h.file[0] === "/").map((h) => loadHand(h))]).then(() => {
   fillRosters();
   const pick = (k, dflt) => { const v = params.get(k); return CHOICES.some((c) => c.id === v && available(c)) ? v : dflt; }, pickHand = (v) => (HANDS.some((h) => h.id === v && handAvailable(h)) ? v : "rule"), pickGroupHand = (v) => (HANDS.some((h) => h.id === v && handAvailable(h)) ? v : "");
   newFight({ kind: BS.KINDS.includes(params.get("kind")) ? params.get("kind") : "beam", seed: Number(params.get("seed")) || 1, fighters: Number(params.get("fighters")) || BS.FIGHTERS, gunners: BS.GUNNERS[params.get("gunners")] ? params.get("gunners") : BS.DEFAULT_GUNNERS,
-    f: pick("f", "pd"), hand: pickHand(params.get("hand")), handMain: pickGroupHand(params.get("main")), handPd: pickGroupHand(params.get("pd")), handSeats: params.get("seats") || "", ships: Number(params.get("ships")) === 2 ? 2 : 1, escorts: Number(params.get("escorts")) || 0, formation: params.get("formation") === "1", shipCollisions: params.get("collide") === "1", behaviour: params.get("behaviour") === "hold" ? "hold" : "face", friendlyFire: params.get("ff") === "1", holdFire: params.get("hold") !== "0", wrecks: params.get("wrecks") === "1", impact: params.get("impact") === "1" ? SA.ROUND_MASS : 0, crew: params.get("crew") === "1", cruise: params.get("cruise") === null || params.get("cruise") === "" || !Number.isFinite(Number(params.get("cruise"))) ? 0.3 : Number(params.get("cruise")) });
+    f: pick("f", "pd"), hand: pickHand(params.get("hand")), handMain: pickGroupHand(params.get("main")), handPd: pickGroupHand(params.get("pd")), handSeats: params.get("seats") || "", helm: HELMS.some((h) => h.id === params.get("helm")) ? params.get("helm") : "rule", ships: Number(params.get("ships")) === 2 ? 2 : 1, escorts: Number(params.get("escorts")) || 0, formation: params.get("formation") === "1", shipCollisions: params.get("collide") === "1", behaviour: params.get("behaviour") === "hold" ? "hold" : "face", friendlyFire: params.get("ff") === "1", holdFire: params.get("hold") !== "0", wrecks: params.get("wrecks") === "1", impact: params.get("impact") === "1" ? SA.ROUND_MASS : 0, crew: params.get("crew") === "1", cruise: params.get("cruise") === null || params.get("cruise") === "" || !Number.isFinite(Number(params.get("cruise"))) ? 0.3 : Number(params.get("cruise")) });
   requestAnimationFrame(frame);
 });
 
@@ -581,7 +632,7 @@ window.__battleship = {
     crafts: arena.crafts.map((c) => ({ id: c.id, team: c.team, name: c.name, kind: c.kind, status: c.status, pos: c.body.pos.slice(), vel: c.body.vel.slice(), q: c.body.q.slice(), w: c.body.w.slice(), hp: c.hp, hpMax: c.hpMax, hits: c.hits, mode: c.mode, enginesRunning: c.enginesRunning, charge: c.charge, waves: c.waves,
       fired: c.gun ? c.gun.fired : null, partsOut: [...c.partHp].filter(([, hp]) => hp <= 0).map(([id]) => c.ship.parts[id].name), friendlyHits: c.friendlyHits, friendlyTaken: c.friendlyTaken, held: c.held, holdFire: c.holdFire, helm: c.helm, crewDead: c.crew ? [...c.crew.dead] : [], crewBridge: c.crew ? c.crew.bridge : null,
       seats: c.seats.map((s) => ({ id: s.seat.id, name: s.seat.name, yaw: s.state.yaw, pitch: s.state.pitch, fired: s.state.gun.fired, ammo: s.state.gun.ammo, works: SA.seatWorks(c, s), held: s.held, blocked: s.blocked, last: s.last && { fire: s.last.fire, target: s.last.target } })), last: c.last && { foe: c.last.foe, fire: c.last.fire, thrust: c.last.thrust, mode: c.last.mode, held: c.last.held } })),
-    log: log.slice(), pilots: { id: pilots.id, label: pilots.label, list: pilots.list.map((p) => ({ id: p.id, label: p.label })) }, hand: { id: handNow.id, label: handNow.label, network: !!handNow.net }, seatHands: fight.seatHands.map((h, k) => ({ seat: h.seat, from: h.from, id: handOf(k).id, network: !!h.net })), handProblems: handsNow.problems.slice(), gunners: fight.gunners, gunnerOptions: fight.gunnerOptions, ships: arena.crafts.filter((c) => c.kind === "capital").length, formation: arena.crafts.some((c) => c.behaviour === "station"), shipCollisions: arena.shipCollisions, escorts: arena.crafts.filter(isEscort).length, behaviour: arena.crafts[0].behaviour, cruise: arena.crafts[0].cruise, friendlyFire: arena.friendlyFire, wrecks: arena.wrecks, impact: arena.impact, crew: arena.crew }; },
+    log: log.slice(), pilots: { id: pilots.id, label: pilots.label, list: pilots.list.map((p) => ({ id: p.id, label: p.label })) }, hand: { id: handNow.id, label: handNow.label, network: !!handNow.net }, seatHands: fight.seatHands.map((h, k) => ({ seat: h.seat, from: h.from, id: handOf(k).id, network: !!h.net })), handProblems: handsNow.problems.slice(), helm: { id: helmNow.id, label: helmNow.label, network: !!helmNow.net }, gunners: fight.gunners, gunnerOptions: fight.gunnerOptions, ships: arena.crafts.filter((c) => c.kind === "capital").length, formation: arena.crafts.some((c) => c.behaviour === "station"), shipCollisions: arena.shipCollisions, escorts: arena.crafts.filter(isEscort).length, behaviour: arena.crafts[0].behaviour, cruise: arena.crafts[0].cruise, friendlyFire: arena.friendlyFire, wrecks: arena.wrecks, impact: arena.impact, crew: arena.crew }; },
   tally: () => BS.tally(arena),
   brainRows: (i) => brainRowsOf(arena.crafts[i]).map((r) => ({ label: r.label || `${r.who[0]} ${r.layer}`, layer: r.layer, n: r.values.length, values: r.values.slice() })),
   // a debug aid for the gate: n rounds dropped from OUTSIDE the named part of the ship along the way in (the flank mounts from their own side, the belly from below, the deck and the turrets from above, the pods from astern), owned by the first fighter
