@@ -15,7 +15,13 @@
 //   8  THE OPTIONS actuators: INSTANT rates are bit-for-bit none, the real rates change the duel; an `opponent` replaces the drone; a duel is deterministic
 //   9  THE SETS    disjoint, 24 / 24 / 24 / 32, frozen; the hand tactician's score is PINNED on TRAIN, HELD_OUT and BASELINE
 //
-// SABOTAGE LOG -- (filled in below once the sabotage runs are done).
+// SABOTAGE LOG -- THIRTY-FIVE, each applied to brain/subDuel.mjs in place (by a script, restored after each; cmp against the saved original at the end: byte-for-byte), the gate run; every one red by name (the number is how many rows went red):
+//   D1 stagger 8 4 | D2 look every 10 ticks 5 | D3 ammo 5 5 | D4 reload 100 ticks 2 | D5 hit points 150 6 | D6 the reload ignored 3 | D7 the magazine ignored 2 | D8 launch pitch ignored 1 | D9 the 'ready' flag always true 1
+//   D10 echoes never delivered 2 | D11 pings never heard 2 | D12 echoes not drained 2 | D13 the pinger hears its own ping 2 | D14 torpedoes not heard 1 | D15 a boat hears its own torpedo 1 | D16 boats hear no boats 2
+//   D17 damage not applied 5 | D18 dealt not capped 3 | D19 no sinking at zero 5 | D20 the duel not ended on a death 4 | D21 kill bonus 1.0 4 | D22 speed bonus dropped 3 | D23 a loss not penalised 3 | D24 B's damage not subtracted 2
+//   D25 the owner can be hit (targets emptied) 5 | D26 the hull ignores the actuators 1 | D27 the opponent override ignored 4 | D28 the drone range 150..350 2 | D29 the depth order clamp 80 (1, after the row below) | D30 a contact leaks a range 1
+//   D31 an echo without a range 2 | D32 the ping count not kept 2 | D33 the fire count not kept 3 | D34 the torpedo's floor 3 m 5 | D35 loss events not logged 1
+// D29 went 0 red the first time: no tactician in the gate ever asked for a depth the arena had to refuse. The row that asks for 70 m (the floor is at 50) holds the clamp.
 "use strict";
 import * as D from "./subDuel.mjs";
 import * as TA from "./subTactics.mjs";
@@ -115,6 +121,8 @@ console.log("\n8. THE OPTIONS");
     ok("!! a duel is deterministic: the same side and scenario give the same score, fingerprint and events", a.score === b.score && a.fingerprint === b.fingerprint && JSON.stringify(a.events) === JSON.stringify(b.events) && /^[0-9a-f]+$/.test(a.fingerprint), a.fingerprint);
     const i = D.duel(D.sideHand()(), D.scenario(4, "patrol"), { actuators: INSTANT }), r = D.duel(D.sideHand()(), D.scenario(4, "patrol"), { actuators: ACTUATORS });
     ok("!! with INSTANT rates a duel is bit-for-bit the duel with no actuators; with the real rates it is a different duel", i.fingerprint === a.fingerprint && i.score === a.score && r.fingerprint !== a.fingerprint);
+    const deep = spy((obs) => ({ depth: 70, heading: obs.self.heading, speed: 2 })), dr = D.duel(side(deep), sc({ pos: [-400, 0], heading: 0 }), { seconds: 120 }), dmax = Math.max(...deep.log.map((o) => o.self.depth));
+    ok("!! a tactician's ORDERS are clamped to the water the arena has: depth 12..45 (it asks for 70 m, a floor at 50 m would ground it; it holds at most 46 m and stays afloat), speed 0.3..4.5, and a NaN order is read as 'keep what you have'", dr.fates[0] === "afloat" && dmax <= 46 && dmax > 40, `max depth ${dmax.toFixed(1)} m, ${dr.fates[0]}`);
     const O = spy(hold()); D.duel(side(hold()), D.scenario(4, "patrol"), { seconds: 10, opponent: side(O) });
     ok("an `opponent` REPLACES the drone: its tactician gets the looks (here 20 in 10 s) instead of the patrol script", O.log.length === 20 && O.log[0].self.ammo === 4);
 }
