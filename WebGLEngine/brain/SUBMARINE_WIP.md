@@ -220,3 +220,17 @@ The seed-6002 audit sets are spent, so the audit used two NEW seed ranges (SAFET
 | AUDIT2 (36) | Munk x3 | -0.421 / -0.411 | 21 / 12 | 0 | 0 / 0 | -1.01 / -0.95 |
 
 Verdict: on the nominal hull the champion QUALIFIES (never ends a dive the autopilot completes, better on 99%). On the Munk x3 hull it does NOT: slightly worse on the mean (-0.57 vs -0.53), its worst 5% is clearly worse (-1.96 vs -1.43), and it ends one dive the autopilot completes (the pool and the audit both). The long training narrowed the Munk x3 gap (the actuator champion was -0.91 to -1.16 there) but did not remove it. Claim to keep: "robust across five hulls on average, qualifies on the nominal hull, still a tail risk on a 3x-Munk hull".
+
+## Tail-trained robust pilot (UNNUMBERED; `tools/trainSubTail.mjs`, `brain/pilotSubWeightsRobustTailWip.json`)
+
+The long champion (9201) lost the Munk x3 tail. `mine` flew it on 500 never-used dives (seeds 4000-4299 etc.) on the Munk x3 hull and kept the 60 worst against the autopilot (47 of them recovery dives; champion -1.61 vs autopilot -0.72 there, 3 ended). `train` = the five-hull objective + tailWeight x the mean on those 60. Four runs, 400 iterations each (they died at 100 and were resumed from checkpoint for 300 more): weight 1.0 (9300, 9301), weight 0.5 (9302, 9303).
+
+| pilot | HELD_OUT 5-hull mean | HELD_OUT Munk x3 | tail60 mean / worst-5% / ended | FRESH300 Munk x3 mean / worst-5% / ended (autopilot -0.529 / -1.351 / 0) |
+|---|---|---|---|---|
+| long 9201 | -0.424 | -0.515 | -1.614 / -6.16 / 3 | -0.556 / -1.87 / 1 |
+| tail 9300 (saved) | -0.438 | -0.435 | -0.652 / -1.33 / 0 | -0.492 / -1.37 / 0 |
+| tail 9301 | -0.440 | -0.444 | -0.763 / -3.18 / 1 | -0.499 / -1.57 / 1 |
+| tail 9302 | -0.433 | -0.462 | -0.635 / -1.27 / 0 | -0.508 / -1.78 / 0 |
+| tail 9303 | -0.449 | -0.410 | -0.637 / -1.38 / 0 | -0.481 / -1.75 / 0 |
+
+9300 is the one pick: only it matches the autopilot's tail on the fresh sample (-1.37 vs -1.35) with nothing ended. Costs: the 5-hull mean gives up 0.014 (-0.424 -> -0.438), nominal gets slightly worse (-0.366 -> -0.398), Munk 0 -0.484 -> -0.531. SAFETY_POOL (looked at, not trained on): nominal -0.453 vs -0.582 (463/23, 0 newly ended), Munk x3 -0.498 vs -0.535 (355/100, 0 newly ended, worst-5% -1.42 vs -1.38). AUDIT sets NOT read for this champion (the 3000/3500 ranges are spent for 9201 and informed this training; a new range is needed).
