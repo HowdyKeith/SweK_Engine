@@ -1,0 +1,20 @@
+{
+ "note": "UNNUMBERED WIP. Champion of 4 (1+1)-ES searches (tools/tuneSubTactics.mjs, seeds 5000..5003, 150 iterations) over the hand tactician's eleven numbers against the four scripted drones, picked on HELD_OUT_SET. AUDIT_SET (brain/subDuel.mjs) NOT read. Fixed, non-adaptive opponents: see brain/SUBMARINE_WIP.md.",
+ "seed": 5000,
+ "iters": 150,
+ "trainScore": 1.7220871720039808,
+ "heldScore": 1.6327112268518513,
+ "theta": {
+  "searchSpeed": 4.131392760468369,
+  "trackSpeed": 4.427937431075328,
+  "evadeSpeed": 3.6162004648855346,
+  "fireRange": 446.6904944616251,
+  "aimTol": 0.5171898055013743,
+  "pingAfter": 1,
+  "echoWindow": 9.21060075078207,
+  "evadeTime": 30.747825359196604,
+  "evadeTurn": 2.1926273757154986,
+  "blindSnr": 79.85018222556684,
+  "pingEvery": 4
+ }
+}

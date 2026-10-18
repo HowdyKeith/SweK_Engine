@@ -129,3 +129,35 @@ righting x2.5), under the actuator limits. HELD_OUT + BASELINE (48 dives), early
   untried answers. `brain/pilotSubWeightsRobustWip.json` is seed 8000, kept for the record, not as a recommended pilot.
 * Practical reading: **the network's gain over the autopilot depends on the hull's hydrodynamic stability being near the nominal.** For a real boat the Munk
   moment is the least certain coefficient, so identify it before trusting a trained pilot, or train with it randomised for much longer.
+
+## Sonar, torpedoes, the duel (all UNNUMBERED; each has a gate, every gate sabotaged)
+
+| file | what | gate |
+|---|---|---|
+| `physics/mechanics/subSonar.mjs` | the decibel budget SNR = SL - TL - NL + DI; passive contacts are a bearing + elevation and NO range; active echoes add a range and announce the pinger to ~10 km; going fast makes a boat louder AND its listener deafer; 60-degree baffles astern. TOY dB, not a calibrated sonar. | `subSonar-selfcheck.mjs` (23 sabotages) |
+| `physics/mechanics/subTorpedo.mjs` | point body, 6.5 m/s (faster than any boat), 90 s burn, passive cone seeker (35 deg) with its own flow noise, filtered proportional navigation, armed after 40 m, proximity fuse at the closest approach. Its first smoke test found two real defects (an edge-of-shell fuse; unfiltered noisy LOS rate). | `subTorpedo-selfcheck.mjs` (35 sabotages, one equivalent mutant) |
+| `brain/subTactics.mjs` | the tactician: search / track / ping / attack / evade from sonar ONLY; 11 tunable numbers (`theta`); scripted drones patrol, quiet, evader, hunter. | `subTactics-selfcheck.mjs` (30, one equivalent) |
+| `brain/subDuel.mjs` | the arena: looks at 2 Hz, 4 torpedoes with a 10 s reload, damage, sinking, losses, a kill-speed bonus. Score = (dealt - taken)/100 + 0.5 kill + up to 0.5 for speed - 0.5 for losing the boat. | `subDuel-selfcheck.mjs` (35) |
+
+### Tuning the tactician (`tools/tuneSubTactics.mjs`; theta in `brain/subTacticsThetaWip.json`)
+
+4 searches x 150 iterations, TRAIN_SET (24 duels, all four drones); champion (seed 5000) picked on HELD_OUT_SET. Score (higher is better, max 2.0):
+
+| | TRAIN | HELD_OUT | BASELINE | BASELINE W/L/D | fresh 160 duels (instant) | fresh 160 (actuator limits) |
+|---|---|---|---|---|---|---|
+| hand parameters | 0.998 | 1.307 | 0.815 | 14/4/6 | 1.221 (117W 11L 32D) | 1.199 |
+| tuned, seed 5000 | 1.722 | 1.633 | 1.557 | 20/0/4 | 1.631 (141W 1L 18D) | 1.617 |
+
+By drone on the 160 fresh duels: patrol 1.43 -> 1.86, quiet 0.96 -> 1.00, evader 1.57 -> 1.87, **hunter 0.92 -> 1.79**.
+The tuned DOCTRINE, in plain words: **go fast and loud and shoot first** -- search at 4.1 m/s (hand: 2.0), track at 4.4 (hand 1.5), ping after the FIRST contact
+and every 4 s (hand: second contact, every 12 s), fire from 447 m (hand 320) with a 30-degree aiming tolerance (hand 10; the torpedo seeker's cone is 35), evade for 31 s at 3.6 m/s.
+It beats the default hunter because it shoots from further and aims less carefully, which the torpedo's wide cone forgives.
+
+**What this does NOT show.** The opponents are FIXED scripts, not adapting: the hunter is the DEFAULT tactician, so "beats the hunter" means "beats that one doctrine". A tuned-vs-tuned
+fight (self-play) has not been run. AUDIT_SET (32 duels) is unread. The 'quiet' drone (0.5 m/s, heard from ~94 m) is still about half draws: the tactician only pings AFTER a passive contact, and
+no contact ever comes from a boat that quiet outside 94 m -- the policy space has no 'ping while searching' and a (1+1)-ES cannot invent one. The fix is a new parameter, not more search.
+
+### The long robust-pilot training (motion layer)
+
+Started 4 x 1500 iterations from the actuator champion; the processes died once (session resume) and were restarted from their iteration-200 checkpoints as seeds 9100..9103 (1000 iterations each).
+Result: see the next section if present; otherwise they had not finished when this was written.
