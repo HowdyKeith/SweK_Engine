@@ -14,6 +14,8 @@
 //
 // SABOTAGE LOG -- TWELVE, each applied to brain/subTask.mjs in place, the gate run, the file restored; every one red by name (the number is how many rows went red):
 //   T1 worst tick 3 not 7.5 1 | T2 depth cap 10 m not 5 2 | T3 speed weight 1 not 0.5 2 | T4 the score's heading error not wrapped 1 | T5 the vessel ignores the current 1 | T6 the weight error ignored 1
+//   K1-K7 (round 1, compareRuns and the tail sets): newlyEnded counts every end 1 (it went 0 red until the row with a dive BOTH sides ended) | the tail is the best 5% 1 | the tail is 10% 1 | a size mismatch allowed 1
+//   the tail pool overlaps TRAIN 1 | the audit pool smaller 1 | early ends tallied the wrong way round 1
 //   T7 TRAIN and HELD_OUT overlap 2 | T8 nominal gets a weight error 2 | T9 targets leave the water 3 | T10 the current does not depend on time 1 | T11 the seed ignored 1 | T12 an early end is not charged 2
 // T4 went 0 red the first time: the autopilot never turns more than pi, so a recomputation of ITS score cannot tell a wrapped heading error from an unwrapped one. The row that holds it flies a pilot that circles
 // under a constant rudder, which does. T12's first pattern did not match the file (the editor says so out loud now; it was silent in the first batch).
@@ -79,10 +81,16 @@ console.log("\n3. THE SCORE");
 
 console.log("\n4. THE SETS");
 {
-    const keys = (set) => set.map((x) => `${x.kind}:${x.seed}`), sets = { TRAIN_SET: T.TRAIN_SET, HELD_OUT_SET: T.HELD_OUT_SET, AUDIT_SET: T.AUDIT_SET, BASELINE_SET: T.BASELINE_SET };
+    const keys = (set) => set.map((x) => `${x.kind}:${x.seed}`), sets = { TRAIN_SET: T.TRAIN_SET, HELD_OUT_SET: T.HELD_OUT_SET, AUDIT_SET: T.AUDIT_SET, BASELINE_SET: T.BASELINE_SET, SAFETY_POOL_SET: T.SAFETY_POOL_SET, SAFETY_AUDIT_SET: T.SAFETY_AUDIT_SET };
     const names = Object.keys(sets); let overlap = 0; for (let i = 0; i < names.length; i++) for (let j = i + 1; j < names.length; j++) { const b = new Set(keys(sets[names[j]])); overlap += keys(sets[names[i]]).filter((k) => b.has(k)).length; }
-    ok("!! the four sets are pairwise DISJOINT by kind and seed (a trainer that sees TRAIN never sees the others), with no scenario twice in one set", overlap === 0 && names.every((n) => new Set(keys(sets[n])).size === sets[n].length), `overlap ${overlap}`);
+    ok("!! the six sets are pairwise DISJOINT by kind and seed (a trainer that sees TRAIN never sees the others), with no scenario twice in one set", overlap === 0 && names.every((n) => new Set(keys(sets[n])).size === sets[n].length), `overlap ${overlap}`);
     ok("the sets are the sizes the header says: TRAIN 40 (10 nominal, 20 recovery, 10 current), HELD_OUT 30, AUDIT 36, BASELINE 18; each is frozen", T.TRAIN_SET.length === 40 && T.HELD_OUT_SET.length === 30 && T.AUDIT_SET.length === 36 && T.BASELINE_SET.length === 18 && names.every((n) => Object.isFrozen(sets[n])) && T.TRAIN_SET.filter((x) => x.kind === "recovery").length === 20);
+    ok("the tail sets are the sizes the header says: SAFETY_POOL_SET and SAFETY_AUDIT_SET are 500 each (300 recovery, 100 nominal, 100 current)", T.SAFETY_POOL_SET.length === 500 && T.SAFETY_AUDIT_SET.length === 500 && T.SAFETY_POOL_SET.filter((x) => x.kind === "recovery").length === 300 && T.SAFETY_AUDIT_SET.filter((x) => x.kind === "nominal").length === 100);
+    const fake = (scores, statuses = []) => ({ score: scores.reduce((a, v) => a + v, 0) / scores.length, crashed: statuses.filter((q) => q !== "submerged").length, runs: scores.map((v, i) => ({ score: v, status: statuses[i] || "submerged" })) });
+    const r1 = fake(Array.from({ length: 20 }, (_, i) => -0.1 - 0.01 * i), ["grounded"]), ref = fake(Array.from({ length: 20 }, () => -0.5)), cmp = T.compareRuns(r1, ref);
+    ok("!! compareRuns is its closed form on a synthetic pair: 20 dives, the first ENDED against a reference that completed it -> newlyEnded 1, early [1, 0]; means [-0.195, -0.5]; the worst 5% (1 dive of 20) is -0.29 against -0.5; better 20, worse 0; and a pair over sets of different sizes is refused", cmp.newlyEnded === 1 && cmp.early[0] === 1 && cmp.early[1] === 0 && Math.abs(cmp.mean[0] + 0.195) < 1e-12 && Math.abs(cmp.tail5[0] + 0.29) < 1e-12 && cmp.tail5[1] === -0.5 && cmp.better === 20 && cmp.worse === 0 && (() => { try { T.compareRuns(r1, fake([-0.1])); return false; } catch (e) { return /different sizes/.test(e.message); } })(), JSON.stringify(cmp));
+    const both = T.compareRuns(fake([-1, -1, -0.2, -0.2], ["grounded", "broached"]), fake([-1, -0.2, -0.2, -0.2], ["grounded"]));
+    ok("!! newlyEnded counts only the dives `r` ended that `ref` COMPLETED: both ended dive 0 (not counted), only `r` ended dive 1 (counted) -> newlyEnded 1 though r ended 2", both.newlyEnded === 1 && both.early[0] === 2 && both.early[1] === 1, JSON.stringify(both.early));
     const ev = (set) => T.evaluate(A.pilot(), set), tr = ev(T.TRAIN_SET), ho = ev(T.HELD_OUT_SET), bl = ev(T.BASELINE_SET);
     const pin = (r, v, tol = 5e-4) => Math.abs(r.score - v) <= tol && r.crashed === 0;
     ok("!! the AUTOPILOT's score is PINNED on TRAIN, HELD_OUT and BASELINE (and it ends none of the 88 dives early) -- it moves when the vessel, the task or the autopilot's laws move", pin(tr, -0.5741) && pin(ho, -0.4880) && pin(bl, -0.5146), `${tr.score.toFixed(4)} ${ho.score.toFixed(4)} ${bl.score.toFixed(4)}`);

@@ -19,6 +19,7 @@
 // Pure: no DOM, no clock, no Math.random.
 "use strict";
 import * as S from "../physics/mechanics/subModel6dof.mjs";
+import { createActuators } from "../physics/mechanics/subActuators.mjs";
 import { foldHash } from "../physics/raceCar.mjs";
 
 export const DT = S.DT, SECONDS = 60;
@@ -56,13 +57,14 @@ const defaultModel = () => MODEL || (MODEL = S.createSubModel());
 
 /**
  * Fly one scenario with `pilot` ((state, target, current) -> controls). Returns { score, eDepth, eHdg, eSpd (mean per-tick errors over the ticks flown), status ("submerged" | "broached" | "grounded" | "crushed" | "lost"),
- * ticks (flown), minDepth, maxDepth, final: { depth, hdg, V }, fingerprint }. Deterministic.
+ * ticks (flown), minDepth, maxDepth, final: { depth, hdg, V }, fingerprint }. Deterministic. `actuators` (a rate set, subActuators.mjs) puts the slew limits between the pilot and the vessel.
  */
-export function fly(pilot, sc, { seconds = SECONDS, dt = DT, model = defaultModel() } = {}) {
+export function fly(pilot, sc, { seconds = SECONDS, dt = DT, model = defaultModel(), actuators = null } = {}) {
+    const act = actuators ? createActuators(actuators) : null;   // the rate limits between the pilot and the vessel (physics/mechanics/subActuators.mjs); absent = the instant vessel
     let s = S.createState({ ...sc.start, model }), eDepth = 0, eHdg = 0, eSpd = 0, flown = 0, status = "submerged", minDepth = Infinity, maxDepth = -Infinity, h = 0x811c9dc5;
     const total = Math.round(seconds / dt);
     for (let i = 0; i < total; i++) {
-        const cv = currentAt(sc.current, i * dt), res = S.stepSub(model, s, pilot(s, sc.target, cv), dt, cv, sc.weightError);
+        const cv = currentAt(sc.current, i * dt), cmd = pilot(s, sc.target, cv), res = S.stepSub(model, s, act ? act.step(cmd, dt) : cmd, dt, cv, sc.weightError);
         s = res.state;
         if (res.status !== "submerged") { status = res.status; break; }
         const a = S.attitude(s, cv), he = Math.atan2(Math.sin(sc.target.heading - a.heading), Math.cos(sc.target.heading - a.heading));
@@ -81,8 +83,12 @@ const WIDE = (kind, ...ranges) => [kind, ranges.flatMap(([a, b]) => Array.from({
 const mk = (spec) => Object.freeze(spec.flatMap(([kind, seeds]) => seeds.map((s) => scenario(s, kind))));
 export const TRAIN_SET = mk([WIDE("nominal", [1, 10]), WIDE("recovery", [1, 10], [101, 110]), WIDE("current", [1, 10])]);
 export const HELD_OUT_SET = mk([WIDE("nominal", [11, 20]), WIDE("recovery", [11, 20]), WIDE("current", [11, 20])]);
-export const AUDIT_SET = mk([WIDE("nominal", [51, 62]), WIDE("recovery", [51, 62]), WIDE("current", [51, 62])]);   // NOT YET READ by any champion
+export const AUDIT_SET = mk([WIDE("nominal", [51, 62]), WIDE("recovery", [51, 62]), WIDE("current", [51, 62])]);   // SPENT: read once, for brain/pilotSubWeightsWip.json (seed 6002); a later champion needs a set of its own
 export const BASELINE_SET = mk([WIDE("nominal", [501, 506]), WIDE("recovery", [501, 506]), WIDE("current", [501, 506])]);
+// THE TAIL SETS: a rare bad start is rare, so it takes a sample the size of the question (brain/flightTask.mjs SAFETY_POOL_SET has the argument). SAFETY_POOL_SET (500 starts: 300 recovery, 100 nominal, 100 current) is what
+// a champion is first judged on; SAFETY_AUDIT_SET (500 more, other seeds) is read ONCE, with AUDIT_SET, for the verdict.
+export const SAFETY_POOL_SET = mk([WIDE("nominal", [1000, 1099]), WIDE("recovery", [1000, 1299]), WIDE("current", [1000, 1099])]);
+export const SAFETY_AUDIT_SET = mk([WIDE("nominal", [2000, 2099]), WIDE("recovery", [2000, 2299]), WIDE("current", [2000, 2099])]);   // SPENT: read once, for brain/pilotSubWeightsWip.json (seed 6002); a later champion needs a set of its own
 
 /** `pilot` over a set: { score (the mean), runs, crashed (dives that ended early), byKind: { nominal, recovery, current } (mean score each) }. */
 export function evaluate(pilot, set, opts = {}) {
@@ -96,4 +102,15 @@ export const describeEval = (r) => `${r.score.toFixed(4)} (${KINDS.filter((k) =>
 export function versus(r, ref, eps = 0.01) {
     let better = 0, worse = 0; r.runs.forEach((x, i) => { const d = x.score - ref.runs[i].score; if (d > eps) better++; else if (d < -eps) worse++; });
     return { better, worse, same: r.runs.length - better - worse };
+}
+
+/**
+ * `r` against `ref` (both evaluate() results over the SAME set), the numbers a verdict is read from: how many dives `r` ENDED that `ref` completed (the safety count), each side's early ends, the means, the mean of each side's
+ * worst 5% of dives (the tail: a pilot can win on average and lose where it matters), and the dive-by-dive better/worse counts.
+ */
+export function compareRuns(r, ref, eps = 0.01) {
+    if (r.runs.length !== ref.runs.length) throw new Error("subTask.compareRuns: the two results are over sets of different sizes");
+    const tail = (x) => { const s = x.runs.map((q) => q.score).sort((a, b) => a - b), k = Math.max(1, Math.ceil(s.length * 0.05)); return s.slice(0, k).reduce((a, v) => a + v, 0) / k; };
+    const v = versus(r, ref, eps), newlyEnded = r.runs.filter((x, i) => x.status !== "submerged" && ref.runs[i].status === "submerged").length;
+    return { n: r.runs.length, newlyEnded, early: [r.crashed, ref.crashed], mean: [r.score, ref.score], tail5: [tail(r), tail(ref)], better: v.better, worse: v.worse, same: v.same };
 }

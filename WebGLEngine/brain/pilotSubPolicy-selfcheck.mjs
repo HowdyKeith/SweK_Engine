@@ -20,7 +20,7 @@
 //   P1 output clamp removed 4 | P2 a non-finite feature not read as 0 1 | P3 the recurrent identity dropped 7 | P4 the edge direction swapped 3 | P5 two recurrent steps, not three 1 | P6 the ballast channel's sign 3
 //   P7 the pitch channel's scale 4 | P8 the gain schedule dropped from a feature 3 | P9 train never accepts an improvement 2 | P10 train starts from zero weights 2 | P11 mutate moves 20 weights 2
 //   P12 a dangling edge allowed 1 | P13 a circuit under 8 neurons allowed 1 | P14 prune reports moved as kept 1 | P15 train accepts a worse child 2 | P16 the hand weights' thrust trim dropped 4
-//   P17 the default circuit swapped for 12 of its neurons 7
+//   P17 the default circuit swapped for 12 of its neurons 7 | P18 train ignores evalOpts at the start 1 | P19 train ignores evalOpts for candidates 1
 // P5 went 0 red the first time: forward() and layersOf() read the same REC_STEPS, so a network that quietly takes two steps agreed with itself. The independent three-step restatement (written here, plain arrays) holds
 // it. A sabotage of prune that loops forever (restoring a weight it had counted as reverted) HUNG the gate at the 300 s cap: caught by the cap, not by a row, and so replaced by P14.
 "use strict";
@@ -108,6 +108,8 @@ console.log("\n5. TRAINING");
     ok("!! train() is deterministic for a seed (same weights, same score), differs for another seed, and its reported score is the score of the weights it returns", a.trainScore === b.trainScore && a.weights.every((v, i) => v === b.weights[i]) && !a.weights.every((v, i) => v === c.weights[i]) && Math.abs(P.evaluate(a.weights, set).score - a.trainScore) < 1e-12, `${a.trainScore.toFixed(5)}`);
     const h0 = P.evaluate(P.handWeights(), set).score;
     ok("!! it starts from the hand weights and NEVER lowers the score: the result is at least the hand weights' on the set it trained on, history[0] is that score, and the history never falls", a.trainScore >= h0 - 1e-12 && Math.abs(a.history[0].score - h0) < 1e-12 && a.history.every((h, i) => i === 0 || h.score >= a.history[i - 1].score - 1e-12), `${h0.toFixed(5)} -> ${a.trainScore.toFixed(5)}`);
+    const ACT = { pitch: 1, yaw: 1, thrust: 1.5, ballast: 0.15 }, ea = P.train({ seed: 3, iters: 4, trainSet: set, evalOpts: { actuators: ACT } });
+    ok("!! train() passes evalOpts to every dive: a search under rate limits scores the hand weights as the LIMITED dive does (history[0] equals evaluate(hand, set, actuators), which differs from the unlimited score), and its reported score is that of its weights under the limits", Math.abs(ea.history[0].score - P.evaluate(P.handWeights(), set, { actuators: ACT }).score) < 1e-12 && Math.abs(ea.history[0].score - h0) > 1e-4 && Math.abs(P.evaluate(ea.weights, set, { actuators: ACT }).score - ea.trainScore) < 1e-12, `${h0.toFixed(5)} unlimited vs ${ea.history[0].score.toFixed(5)} limited`);
     const r = rnd(2), w = P.handWeights(); let moved = true; for (let i = 0; i < 40; i++) { const m = P.mutate(w, 0.3, r, 4); const n = m.reduce((c2, v, j) => c2 + (v !== w[j] ? 1 : 0), 0); if (n < 1 || n > 4) moved = false; }
     ok("mutate() moves between 1 and maxK weights (40 draws) and leaves the original alone", moved && w.every((v, i) => v === P.handWeights()[i]));
     const g = P.train({ seed: 7, iters: 12, sigma: 0.3, trainSet: set });

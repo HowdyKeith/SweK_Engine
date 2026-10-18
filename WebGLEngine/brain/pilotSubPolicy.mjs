@@ -115,12 +115,12 @@ export function createSubPolicy(topo, name = "circuit") {
         for (let j = 0; j < k; j++) o[Math.floor(rng() * o.length)] += gauss(rng) * sigma;
         return o;
     }
-    /** (1+1)-ES from the hand weights (the autopilot) on `trainSet`. A child that scores exactly its parent replaces it, counted apart. Deterministic for a seed. */
-    function train({ seed = 7, iters = 300, sigma = 0.3, maxK = 4, start = null, trainSet = T.TRAIN_SET, onIter = null } = {}) {
+    /** (1+1)-ES from the hand weights (the autopilot) on `trainSet`; `evalOpts` go to every dive (e.g. { actuators } to train against rate limits). A child that scores exactly its parent replaces it, counted apart. Deterministic for a seed. */
+    function train({ seed = 7, iters = 300, sigma = 0.3, maxK = 4, start = null, trainSet = T.TRAIN_SET, onIter = null, evalOpts = {} } = {}) {
         const rng = mulberry(seed); let best = start ? Float32Array.from(start) : handWeights();
-        let bestScore = evaluate(best, trainSet).score, improved = 0, neutral = 0; const history = [{ i: 0, score: bestScore }];
+        let bestScore = evaluate(best, trainSet, evalOpts).score, improved = 0, neutral = 0; const history = [{ i: 0, score: bestScore }];
         for (let i = 1; i <= iters; i++) {
-            const cand = mutate(best, sigma, rng, maxK), score = evaluate(cand, trainSet).score;
+            const cand = mutate(best, sigma, rng, maxK), score = evaluate(cand, trainSet, evalOpts).score;
             if (score > bestScore + 1e-9) { best = cand; bestScore = score; improved++; } else if (score >= bestScore - 1e-9) { best = cand; neutral++; }
             if (i % 50 === 0 || i === iters) history.push({ i, score: bestScore });
             if (onIter) onIter(i, { score: bestScore, improved, neutral });
