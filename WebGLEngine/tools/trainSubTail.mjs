@@ -17,7 +17,9 @@ import { ACTUATORS } from "../physics/mechanics/subActuators.mjs";
 
 const arg = (f, d = null) => { const i = process.argv.indexOf(f); return i === -1 ? d : process.argv[i + 1]; };
 const range = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
-export const MINING = [["nominal", range(4000, 4099)], ["recovery", range(4000, 4299)], ["current", range(4000, 4099)]].flatMap(([k, ss]) => ss.map((s) => ({ kind: k, seed: s })));
+// base 4000 is the first mining range (the long champion); a second round passes --base 8000 (taken so far: 3000-3599 and 6000-6511 audits, 4000-4299 mining, 5000-5179 evaluation sample)
+const BASE = process.argv.includes("--base") ? +process.argv[process.argv.indexOf("--base") + 1] : 4000;
+export const MINING = [["nominal", range(BASE, BASE + 99)], ["recovery", range(BASE, BASE + 299)], ["current", range(BASE, BASE + 99)]].flatMap(([k, ss]) => ss.map((s) => ({ kind: k, seed: s })));
 const E = S.EXPLORER, VARIANTS = [{}, { munk: 3000 }, { munk: 0 }, { finArea: E.finArea * 0.6 }, { bg: E.bg * 2.5 }];
 const MODELS = VARIANTS.map((d) => S.createSubModel(Object.freeze({ ...E, ...d }))), MUNK3 = MODELS[1];
 const opts = (m) => ({ model: m, actuators: ACTUATORS });
@@ -33,7 +35,7 @@ if (process.argv[1] && process.argv[1].endsWith("trainSubTail.mjs")) {
         fs.writeFileSync(out, JSON.stringify({ from, mined: set.length, championMean: r.score, autopilotMean: ref.score, ended: r.crashed, tail: rows }));
         console.log(`mined ${set.length} dives on Munk x3: champion ${r.score.toFixed(4)} autopilot ${ref.score.toFixed(4)} (${r.crashed} ended early); kept the ${rows.length} worst: champion ${(rows.reduce((a, x) => a + x.champion, 0) / rows.length).toFixed(3)} vs autopilot ${(rows.reduce((a, x) => a + x.autopilot, 0) / rows.length).toFixed(3)}; kinds ${JSON.stringify(rows.reduce((a, x) => (a[x.kind] = (a[x.kind] || 0) + 1, a), {}))}`);
     } else if (mode === "train") {
-        const seed = +arg("--seed", 9300), iters = +arg("--iters", 300), out = arg("--out"), tailW = +arg("--tailWeight", 1), tail = JSON.parse(fs.readFileSync(arg("--tail"), "utf8")).tail.map((x) => T.scenario(x.seed, x.kind));
+        const seed = +arg("--seed", 9300), tailFiles = (arg("--tail") || "").split(","), iters = +arg("--iters", 300), out = arg("--out"), tailW = +arg("--tailWeight", 1), tail = tailFiles.flatMap((f) => JSON.parse(fs.readFileSync(f, "utf8")).tail).map((x) => T.scenario(x.seed, x.kind));   // --tail a.json,b.json trains on the union (a later round keeps the earlier cases so they are not forgotten)
         if (!out || !from) { console.error("usage: node tools/trainSubTail.mjs train --seed N --iters N --from w.json --tail tail.json --out f.json"); process.exit(2); }
         const trainSet = T.TRAIN_SET.filter((_, i) => i % 2 === 0);
         const robust = (w) => MODELS.reduce((a, m) => a + P.evaluate(w, trainSet, opts(m)).score, 0) / MODELS.length, tailScore = (w) => P.evaluate(w, tail, opts(MUNK3)).score;
