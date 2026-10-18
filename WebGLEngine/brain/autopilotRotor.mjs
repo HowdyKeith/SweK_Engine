@@ -14,11 +14,13 @@
 //                           The nose is turned into the direction of travel when there is more than 6 m/s and no heading was asked for.
 // Without the pedal that goes with the collective a 30 m climb swung the nose 9.8 degrees and a takeoff 15.9; with it, 0.9 and 4.6. (The pilot reads the ground velocity, not the air's: a hover in a wind drifts a few metres, there being no integrator.)
 //
-// *** GROUND AVOIDANCE IS IN THE GUIDANCE, NOT IN THE LOOPS, AND IT IS WHY THIS PILOT CAN BE GIVEN A TERRAIN (`opts.terrain(x, y) -> height`; flat at 0 by default). *** The height asked for is never below the skids' height over the ground at the machine's own position plus `clearance`
+// *** GROUND AVOIDANCE IS IN THE GUIDANCE, NOT IN THE LOOPS, AND IT IS WHY THIS PILOT CAN BE GIVEN A TERRAIN (`opts.terrain`: physics/mechanics/terrain.mjs's ground, flat at 0 by default; a bare function (x, y) -> height is accepted too). *** The height asked for is never below the skids' height over the ground at the machine's own position plus `clearance`
 // (5 m: the "floor"), and never below the floor of the ground AHEAD: the ground is sampled along the way it is going at 8, 15, 30, 50, 80, 120, 180, 260 and 360 m and the height asked for is raised to the highest floor. And a climb takes time, so the speed asked for is limited by what that costs: at each
-// sample that is more than 2 m above the machine's height the speed may be no more than max(sqrt(2 x 1.2 x (d - 12 - 1 s of travel)) -- it can stop short of it -- , 0.6 x 5 x (d - 12 - 1 s of travel) / (the rise + 4) -- it can climb in time). A ridge across the way costs speed, then height, and the speed comes back as the
-// machine climbs; a wall costs a stop short of it and a climb in the hover. THE PILOT PLANS ON 1.2 m/s^2 OF BRAKING AND THE MACHINE GIVES ABOUT 3: that margin is the safety of the look-ahead, and a wall closer than the machine's real stopping distance (a 150 m wall 60 m off at 24 m/s: 104 m inside it; the same wall 100 m off: cleared by 28 m)
-// is not avoided. The clearances measured at 25 m/s, in the gate: ridges of 60, 120 and 200 m and walls of 40, 80 and 150 m all crossed with the skids never closer than 4.2 m (5 m asked); 100 s over rolling hills at 30 m: never closer than 18 m, never under 23.8 m/s.
+// sample that is more than 2 m above the machine's height the speed may be no more than max(sqrt(2 x 1.2 x (d - 20 - 1 s of travel)) -- it can stop short of it -- , 0.6 x 5 x (d - 20 - 1 s of travel) / (the rise + 4) -- it can climb in time). A ridge across the way costs speed, then height, and the speed comes back as the
+// machine climbs; a wall costs a stop short of it and a climb in the hover. THE PILOT PLANS ON 1.2 m/s^2 OF BRAKING AND THE MACHINE GIVES ABOUT 3: that margin is the safety of the look-ahead, and a wall closer than the machine's real stopping distance (a 150 m wall 60 m off at 24 m/s: flown into, a rotor strike; the same wall 140 m off: stopped 17 m short of the face, climbed in the hover and crossed)
+// is not avoided -- THE MODEL COLLIDES WITH THE SAME TERRAIN THE PILOT READS (physics/mechanics/terrain.mjs), so "not avoided" is a crash. Where an obstacle BEGINS between two look-ahead samples it is found by bisection (a wall seen only at the sample distance would be up to 100 m nearer than it looks: the first flight
+// with a real collision found that, and the rotor tip, 7.3 m ahead of the centre, which is why the stop line is 20 m). The clearances measured at 25 m/s, in the gate: ridges of 60, 120 and 200 m and walls of 40, 80 and 150 m all crossed with the skids never closer than 4.7 m (5 m asked); 100 s over rolling hills at 30 m: never closer than 18 m, never under 23.8 m/s;
+// 900 m across noise terrain 60 m in amplitude with slopes to 24 degrees: never closer than 27 m.
 // Landing (`land`) lifts the floor and descends on a profile, 0.3 of the height above the ground as a descent rate, never faster than 2 m/s and never slower than 0.25, and with the skids on the ground the collective goes to idle (0.15, zero blade pitch) and the machine is levelled.
 //
 // *** THE ENGINE QUITTING: AUTOROTATION. *** The pilot is told the engine is out (the annunciator, `state.engine`) or sees the rotor below 80% speed (the low-rotor horn). Then: the collective goes to the autorotation's (0.18, plus 0.1 per rad/s of rotor speed above the design: a rotor that is slow gets LESS collective, the descent drives it);
@@ -32,6 +34,7 @@
 // Pure: no DOM, no clock, no random. `wind` is passed to the attitude reader (airspeed), not used by the loops.
 "use strict";
 import * as H from "../physics/mechanics/rotorcraftModel6dof.mjs";
+import { asTerrain } from "../physics/mechanics/terrain.mjs";
 
 export const AUTOPILOT_ROTOR = Object.freeze({
     kTheta: 4.0, kQ: 1.9, kPhi: 2.6, kP: 0.9,
@@ -39,7 +42,7 @@ export const AUTOPILOT_ROTOR = Object.freeze({
     kAlt: 0.4, vsUp: 5, vsDown: 4, kVs: 0.12,
     kHdg: 1.2, rMax: 0.8, kYaw: 1.4, kCouple: 1,
     tiltAutoLow: 0, tiltAutoSlope: 0.02, cAuto: 0.18, cAutoMin: 0.1, cAutoMax: 0.6, landSpeed: 12, flareHeight: 60, flareLow: 8, cushionHeight: 25, kCush: 0.5, cushMin: 0.5, cushMax: 8, cushGain: 3,
-    clearance: 5, brakeSafe: 1.2, margin: 12, lag: 1.0, buffer: 4, slack: 2, idle: 0.15, kOmega: 0.1, glide: 28,
+    clearance: 5, brakeSafe: 1.2, margin: 20, lag: 1.0, buffer: 4, slack: 2, idle: 0.15, kOmega: 0.1, glide: 28,
 });
 export const TARGET_DEFAULT = Object.freeze({});
 /** The distances (m) along the way the machine is going at which the ground is read. */
@@ -48,7 +51,6 @@ export const LOOKAHEAD = Object.freeze([8, 15, 30, 50, 80, 120, 180, 260, 360]);
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const fin = (v) => (Number.isFinite(v) ? v : 0);
 export const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
-const flat = () => 0;
 
 // ---- the trim: what the model's hover wants, computed once per model ----------------------------------------------------------------------------------------------------------------------------------------
 const TRIMS = new WeakMap();
@@ -72,13 +74,13 @@ export const defaultModel = () => DEFAULT_MODEL || (DEFAULT_MODEL = H.createRoto
 /**
  * Everything the laws use, computed once. A learned pilot's features are these, so the hand weights and the hand controller read one set of numbers.
  * `target` is { pos: [x, y] (go there and hover), velocity: [vx, vy] (world; used if there is no pos), speed (the most it will fly, m/s), altitude (world height), agl (height of the skids above the ground; overrides altitude), heading, land };
- * `opts` may hold { model, terrain } and any gain.
+ * `opts` may hold { model, terrain } and any gain. `terrain` is whatever physics/mechanics/terrain.mjs's asTerrain takes -- a terrain, a spec, or a bare function (x, y) -> height -- and is the SAME ground the model is stepped over: the pilot looks at it, the model collides with it.
  */
 export function guidance(state, target = TARGET_DEFAULT, wind = [0, 0, 0], opts = {}) {
-    const g = { ...AUTOPILOT_ROTOR, ...opts }, model = opts.model || defaultModel(), T = trimOf(model), terrain = opts.terrain || flat, R = model.spec.rotor;
+    const g = { ...AUTOPILOT_ROTOR, ...opts }, model = opts.model || defaultModel(), T = trimOf(model), terrain = asTerrain(opts.terrain), R = model.spec.rotor;
     const a = H.attitude(state, wind), r = H.rates(state), pos = state.pos, h = a.heading, climb = state.vel[2];
     const fwd = [Math.cos(h), -Math.sin(h)], right = [-Math.sin(h), -Math.cos(h)], cosTilt = clamp(a.up[2], 0.2, 1);
-    const ground = fin(terrain(pos[0], pos[1])), agl = pos[2] - T.skidDrop * cosTilt - ground, land = !!target.land;
+    const ground = fin(terrain.height(pos[0], pos[1])), agl = pos[2] - T.skidDrop * cosTilt - ground, land = !!target.land;
     const engineOut = state.engine === "out" || state.omega < 0.8 * R.omega0;
     // ---- where to go
     let vCmd = [0, 0], speedCap = Math.max(0, fin(target.speed ?? g.speed));
@@ -100,10 +102,22 @@ export function guidance(state, target = TARGET_DEFAULT, wind = [0, 0, 0], opts 
         const vNow = Math.hypot(state.vel[0], state.vel[1]);
         if (vMag > 0.5) {
             const ux = vCmd[0] / vMag, uy = vCmd[1] / vMag;
-            for (const d of LOOKAHEAD) {
-                const floorAt = terrain(pos[0] + ux * d, pos[1] + uy * d) + T.skidDrop + g.clearance, need = floorAt - pos[2];   // a NaN height fails both comparisons below and the sample is skipped (the gate's NaN-terrain row holds that)
+            const blocked = (d) => terrain.height(pos[0] + ux * d, pos[1] + uy * d) + T.skidDrop + g.clearance - pos[2] > g.slack;   // false for a NaN height: no information is not an obstacle
+            const consider = (d) => {
+                const floorAt = terrain.height(pos[0] + ux * d, pos[1] + uy * d) + T.skidDrop + g.clearance, need = floorAt - pos[2];   // a NaN height fails both comparisons below and the sample is skipped (the gate's NaN-terrain row holds that)
                 if (floorAt > zCmd) zCmd = floorAt;
                 if (need > g.slack) { const dEff = Math.max(0, d - g.lag * vNow - g.margin); speedLimit = Math.min(speedLimit, Math.max(Math.sqrt(2 * g.brakeSafe * dEff), 0.6 * g.vsUp * dEff / (need + g.buffer))); }
+            };
+            let clearTo = 0, wasClear = true;
+            for (const d of LOOKAHEAD) {
+                const b = blocked(d);
+                if (b && wasClear) {   // an obstacle begins between the last clear distance and this sample: find where, to a thirty-second of the gap (a wall seen only at the sample distance would be up to 100 m nearer than it looks)
+                    let lo = clearTo, hi = d;
+                    for (let k = 0; k < 5; k++) { const mid = 0.5 * (lo + hi); if (blocked(mid)) hi = mid; else lo = mid; }
+                    consider(hi);
+                }
+                consider(d);
+                wasClear = !b; if (!b) clearTo = d;
             }
         }
     }
