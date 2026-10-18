@@ -92,7 +92,7 @@ export function guidance(state, target = TARGET_DEFAULT, wind = [0, 0, 0], opts 
         vCmd = [fwd[0] * vAuto, fwd[1] * vAuto]; vMag = vAuto;
     }
     // ---- the height asked for, and the floor under it
-    const userZ = land ? ground + T.skidDrop : target.agl != null ? ground + T.skidDrop + fin(target.agl) : target.altitude != null ? fin(target.altitude) : pos[2];
+    const userZ = target.agl != null ? ground + T.skidDrop + fin(target.agl) : target.altitude != null ? fin(target.altitude) : pos[2];
     let zCmd = userZ, speedLimit = Infinity;
     if (!land) {
         const floorHere = ground + T.skidDrop + g.clearance;
@@ -101,7 +101,7 @@ export function guidance(state, target = TARGET_DEFAULT, wind = [0, 0, 0], opts 
         if (vMag > 0.5) {
             const ux = vCmd[0] / vMag, uy = vCmd[1] / vMag;
             for (const d of LOOKAHEAD) {
-                const floorAt = fin(terrain(pos[0] + ux * d, pos[1] + uy * d)) + T.skidDrop + g.clearance, need = floorAt - pos[2];
+                const floorAt = terrain(pos[0] + ux * d, pos[1] + uy * d) + T.skidDrop + g.clearance, need = floorAt - pos[2];   // a NaN height fails both comparisons below and the sample is skipped (the gate's NaN-terrain row holds that)
                 if (floorAt > zCmd) zCmd = floorAt;
                 if (need > g.slack) { const dEff = Math.max(0, d - g.lag * vNow - g.margin); speedLimit = Math.min(speedLimit, Math.max(Math.sqrt(2 * g.brakeSafe * dEff), 0.6 * g.vsUp * dEff / (need + g.buffer))); }
             }
