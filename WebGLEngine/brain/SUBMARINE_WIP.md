@@ -12,13 +12,22 @@ Left without a version on purpose: another session is shipping. Nothing here tou
 | `brain/autopilotSub.mjs` | Memoryless PD cascade (the baseline and the network's start). | `autopilotSub-selfcheck.mjs` (1.8 s) |
 | `brain/pilotSubPolicy.mjs` | `createSubPolicy(topology)` -- the connectome-wired recurrent pilot, **circuit as a parameter**. Default = fly Giant Fiber Circuit (34 neurons, 313 synapses, 963 weights). | `pilotSubPolicy-selfcheck.mjs` (12 s) |
 
-## Measured so far (autopilot, then a 120-iteration (1+1)-ES from its weights, seed 7, run BEFORE the ballast-sign fix below)
+## Measured (retrained on the CURRENT autopilot)
 
-The hand weights are the autopilot to float32 (max control difference 1.4e-7 over 1,500 states). The ES run was done
-on the first draft of the autopilot (train -0.6148, held-out -0.5715, baseline -0.5646) and reached train -0.4686,
-held-out -0.4339, baseline -0.4532, ending none of 88 dives early. **That run predates the ballast-sign fix and is not
-repeated on the current autopilot** (train -0.5741, held-out -0.4880, baseline -0.5146), so treat it as "the loop works",
-not as a number. `AUDIT_SET` has not been read by anything.
+Four (1+1)-ES searches (seeds 6000..6003, 400 iterations, sigma 0.3, from the autopilot's hand weights, TRAIN_SET),
+champion picked on HELD_OUT_SET. Weights: `brain/pilotSubWeightsWip.json` (seed 6002).
+
+| pilot | TRAIN | HELD_OUT | BASELINE |
+|---|---|---|---|
+| autopilot (= hand weights, float32) | -0.5741 | -0.4880 | -0.5146 |
+| seed 6000 | -0.3732 | -0.3338 | -0.3667 |
+| seed 6001 | -0.3704 | -0.3316 | -0.3494 |
+| **seed 6002 (champion)** | **-0.3660** | **-0.3278** | **-0.3501** |
+| seed 6003 | -0.3850 | -0.3465 | -0.3679 |
+
+All four beat the autopilot on all three sets and end none of the 88 dives early. `AUDIT_SET` has NOT been read: the
+next step for a verdict is one read of it for seed 6002 (and a safety-pool style sample for rare starts, which this
+task does not have yet -- 30 held-out dives is a small sample for a tail).
 
 ## What this is NOT
 
