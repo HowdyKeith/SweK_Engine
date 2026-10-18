@@ -1,6 +1,6 @@
 // WebGLEngine/brain/seatGunnerMlp-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/seatGunnerMlp-selfcheck.mjs      (~2 s)
+// Run: node brain/seatGunnerMlp-selfcheck.mjs      (~1 s)
 //
 // THE GPU BRAIN'S PLAIN NETWORK IN A GUN SEAT, HELD TO THE FRUIT FLY'S CONTRACT (brain/seatGunnerPolicy-selfcheck.mjs holds that one): the same twelve features and three outputs, a 12 -> 32 -> 32 -> 3 relu network.
 //

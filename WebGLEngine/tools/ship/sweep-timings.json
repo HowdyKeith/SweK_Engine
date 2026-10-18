@@ -1810,7 +1810,7 @@
   "tools/ship/rendererIntent-selfcheck.mjs": 357,
   "tools/ship/repoLanding-selfcheck.mjs": 2616,
   "tools/ship/repoTerrain-selfcheck.mjs": 2183,
-  "tools/ship/reportDoors-selfcheck.mjs": 2563,
+  "tools/ship/reportDoors-selfcheck.mjs": 1294,
   "tools/ship/reportFresh-selfcheck.mjs": 1008,
   "tools/ship/requestPathSync-selfcheck.mjs": 1764,
   "tools/ship/requestedExit-selfcheck.mjs": 2214,
@@ -2112,7 +2112,28 @@
   "brain/pilotFlightMlp-selfcheck.mjs": 1627,
   "brain/pilotFlightGpu-selfcheck.mjs": 13755,
   "tools/ship/trainFlightPilotGpu-selfcheck.mjs": 69621,
-  "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": 5732
+  "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": 5732,
+  "brain/battleshipFight-selfcheck.mjs": 244213,
+  "brain/bomberFight-selfcheck.mjs": 30660,
+  "brain/dogfightArena-selfcheck.mjs": 7793,
+  "brain/dogfightTask-selfcheck.mjs": 49662,
+  "brain/dogfightTrain-selfcheck.mjs": 11518,
+  "brain/seatGunnerMlp-selfcheck.mjs": 802,
+  "brain/seatGunnerPolicy-selfcheck.mjs": 949,
+  "brain/spaceArena-selfcheck.mjs": 1266,
+  "physics/mechanics/bomber-selfcheck.mjs": 224,
+  "physics/mechanics/capitalShip-selfcheck.mjs": 563,
+  "physics/mechanics/flightGuns-selfcheck.mjs": 74,
+  "physics/mechanics/froudeScale-selfcheck.mjs": 513,
+  "physics/mechanics/gunSeats-selfcheck.mjs": 181,
+  "render/flightViews-selfcheck.mjs": 130,
+  "render/renderNow-selfcheck.mjs": 845,
+  "tools/ship/battleshipPage-selfcheck.mjs": 83284,
+  "tools/ship/bomberPage-selfcheck.mjs": 26359,
+  "tools/ship/dogfightPage-selfcheck.mjs": 5667,
+  "tools/ship/trainDogfightPilot-selfcheck.mjs": 59553,
+  "tools/ship/trainDogfightPilotShipped-selfcheck.mjs": 180830,
+  "tools/ship/trainSeatGunner-selfcheck.mjs": 146781
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -4101,7 +4122,28 @@
   "brain/pilotFlightMlp-selfcheck.mjs": 0,
   "brain/pilotFlightGpu-selfcheck.mjs": 0,
   "tools/ship/trainFlightPilotGpu-selfcheck.mjs": 0,
-  "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": 0
+  "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": 0,
+  "brain/battleshipFight-selfcheck.mjs": 0,
+  "brain/bomberFight-selfcheck.mjs": 0,
+  "brain/dogfightArena-selfcheck.mjs": 0,
+  "brain/dogfightTask-selfcheck.mjs": 0,
+  "brain/dogfightTrain-selfcheck.mjs": 0,
+  "brain/seatGunnerMlp-selfcheck.mjs": 0,
+  "brain/seatGunnerPolicy-selfcheck.mjs": 0,
+  "brain/spaceArena-selfcheck.mjs": 0,
+  "physics/mechanics/bomber-selfcheck.mjs": 0,
+  "physics/mechanics/capitalShip-selfcheck.mjs": 0,
+  "physics/mechanics/flightGuns-selfcheck.mjs": 0,
+  "physics/mechanics/froudeScale-selfcheck.mjs": 0,
+  "physics/mechanics/gunSeats-selfcheck.mjs": 0,
+  "render/flightViews-selfcheck.mjs": 0,
+  "render/renderNow-selfcheck.mjs": 0,
+  "tools/ship/battleshipPage-selfcheck.mjs": 0,
+  "tools/ship/bomberPage-selfcheck.mjs": 0,
+  "tools/ship/dogfightPage-selfcheck.mjs": 0,
+  "tools/ship/trainDogfightPilot-selfcheck.mjs": 0,
+  "tools/ship/trainDogfightPilotShipped-selfcheck.mjs": 0,
+  "tools/ship/trainSeatGunner-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-10-17T13:43:52.982Z",
@@ -5788,7 +5830,7 @@
   "tools/ship/rendererIntent-selfcheck.mjs": "2026-10-17T13:43:52.982Z",
   "tools/ship/repoLanding-selfcheck.mjs": "2026-10-17T13:43:52.982Z",
   "tools/ship/repoTerrain-selfcheck.mjs": "2026-10-17T13:43:52.982Z",
-  "tools/ship/reportDoors-selfcheck.mjs": "2026-10-17T13:43:52.982Z",
+  "tools/ship/reportDoors-selfcheck.mjs": "2026-10-18T04:35:35.925Z",
   "tools/ship/reportFresh-selfcheck.mjs": "2026-10-17T13:43:52.982Z",
   "tools/ship/requestPathSync-selfcheck.mjs": "2026-10-17T13:43:52.982Z",
   "tools/ship/requestedExit-selfcheck.mjs": "2026-10-17T13:43:52.982Z",
@@ -6090,7 +6132,28 @@
   "brain/pilotFlightMlp-selfcheck.mjs": "2026-10-17T13:43:52.982Z",
   "brain/pilotFlightGpu-selfcheck.mjs": "2026-10-16T17:15:36.331Z",
   "tools/ship/trainFlightPilotGpu-selfcheck.mjs": "2026-10-16T17:16:46.111Z",
-  "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": "2026-10-18T04:21:18.632Z"
+  "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": "2026-10-18T04:21:18.632Z",
+  "brain/battleshipFight-selfcheck.mjs": "2026-10-18T04:25:23.043Z",
+  "brain/bomberFight-selfcheck.mjs": "2026-10-18T04:25:53.911Z",
+  "brain/dogfightArena-selfcheck.mjs": "2026-10-18T04:26:01.944Z",
+  "brain/dogfightTask-selfcheck.mjs": "2026-10-18T04:26:51.824Z",
+  "brain/dogfightTrain-selfcheck.mjs": "2026-10-18T04:27:03.541Z",
+  "brain/seatGunnerMlp-selfcheck.mjs": "2026-10-18T04:27:04.520Z",
+  "brain/seatGunnerPolicy-selfcheck.mjs": "2026-10-18T04:27:05.643Z",
+  "brain/spaceArena-selfcheck.mjs": "2026-10-18T04:27:07.091Z",
+  "physics/mechanics/bomber-selfcheck.mjs": "2026-10-18T04:27:07.476Z",
+  "physics/mechanics/capitalShip-selfcheck.mjs": "2026-10-18T04:27:08.212Z",
+  "physics/mechanics/flightGuns-selfcheck.mjs": "2026-10-18T04:27:08.453Z",
+  "physics/mechanics/froudeScale-selfcheck.mjs": "2026-10-18T04:27:09.137Z",
+  "physics/mechanics/gunSeats-selfcheck.mjs": "2026-10-18T04:27:09.493Z",
+  "render/flightViews-selfcheck.mjs": "2026-10-18T04:27:09.790Z",
+  "render/renderNow-selfcheck.mjs": "2026-10-18T04:27:10.801Z",
+  "tools/ship/battleshipPage-selfcheck.mjs": "2026-10-18T04:28:34.254Z",
+  "tools/ship/bomberPage-selfcheck.mjs": "2026-10-18T04:29:00.793Z",
+  "tools/ship/dogfightPage-selfcheck.mjs": "2026-10-18T04:29:06.635Z",
+  "tools/ship/trainDogfightPilot-selfcheck.mjs": "2026-10-18T04:30:06.389Z",
+  "tools/ship/trainDogfightPilotShipped-selfcheck.mjs": "2026-10-18T04:33:07.445Z",
+  "tools/ship/trainSeatGunner-selfcheck.mjs": "2026-10-18T04:35:34.412Z"
  },
  "capAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 20000,
@@ -7754,7 +7817,7 @@
   "tools/ship/rendererIntent-selfcheck.mjs": 20000,
   "tools/ship/repoLanding-selfcheck.mjs": 20000,
   "tools/ship/repoTerrain-selfcheck.mjs": 20000,
-  "tools/ship/reportDoors-selfcheck.mjs": 20000,
+  "tools/ship/reportDoors-selfcheck.mjs": 180000,
   "tools/ship/reportFresh-selfcheck.mjs": 20000,
   "tools/ship/requestPathSync-selfcheck.mjs": 20000,
   "tools/ship/requestedExit-selfcheck.mjs": 20000,
@@ -8054,7 +8117,28 @@
   "brain/pilotFlightGpu-selfcheck.mjs": 300000,
   "tools/ship/trainFlightPilotGpu-selfcheck.mjs": 300000,
   "tools/ship/kernelReach-selfcheck.mjs": 300000,
-  "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": 180000
+  "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": 180000,
+  "brain/battleshipFight-selfcheck.mjs": 900000,
+  "brain/bomberFight-selfcheck.mjs": 180000,
+  "brain/dogfightArena-selfcheck.mjs": 180000,
+  "brain/dogfightTask-selfcheck.mjs": 180000,
+  "brain/dogfightTrain-selfcheck.mjs": 180000,
+  "brain/seatGunnerMlp-selfcheck.mjs": 180000,
+  "brain/seatGunnerPolicy-selfcheck.mjs": 180000,
+  "brain/spaceArena-selfcheck.mjs": 180000,
+  "physics/mechanics/bomber-selfcheck.mjs": 180000,
+  "physics/mechanics/capitalShip-selfcheck.mjs": 180000,
+  "physics/mechanics/flightGuns-selfcheck.mjs": 180000,
+  "physics/mechanics/froudeScale-selfcheck.mjs": 180000,
+  "physics/mechanics/gunSeats-selfcheck.mjs": 180000,
+  "render/flightViews-selfcheck.mjs": 180000,
+  "render/renderNow-selfcheck.mjs": 180000,
+  "tools/ship/battleshipPage-selfcheck.mjs": 180000,
+  "tools/ship/bomberPage-selfcheck.mjs": 180000,
+  "tools/ship/dogfightPage-selfcheck.mjs": 180000,
+  "tools/ship/trainDogfightPilot-selfcheck.mjs": 180000,
+  "tools/ship/trainDogfightPilotShipped-selfcheck.mjs": 900000,
+  "tools/ship/trainSeatGunner-selfcheck.mjs": 900000
  },
  "finished": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": true,
@@ -10038,7 +10122,28 @@
   "brain/pilotFlightGpu-selfcheck.mjs": true,
   "tools/ship/trainFlightPilotGpu-selfcheck.mjs": true,
   "tools/ship/kernelReach-selfcheck.mjs": true,
-  "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": true
+  "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": true,
+  "brain/battleshipFight-selfcheck.mjs": true,
+  "brain/bomberFight-selfcheck.mjs": true,
+  "brain/dogfightArena-selfcheck.mjs": true,
+  "brain/dogfightTask-selfcheck.mjs": true,
+  "brain/dogfightTrain-selfcheck.mjs": true,
+  "brain/seatGunnerMlp-selfcheck.mjs": true,
+  "brain/seatGunnerPolicy-selfcheck.mjs": true,
+  "brain/spaceArena-selfcheck.mjs": true,
+  "physics/mechanics/bomber-selfcheck.mjs": true,
+  "physics/mechanics/capitalShip-selfcheck.mjs": true,
+  "physics/mechanics/flightGuns-selfcheck.mjs": true,
+  "physics/mechanics/froudeScale-selfcheck.mjs": true,
+  "physics/mechanics/gunSeats-selfcheck.mjs": true,
+  "render/flightViews-selfcheck.mjs": true,
+  "render/renderNow-selfcheck.mjs": true,
+  "tools/ship/battleshipPage-selfcheck.mjs": true,
+  "tools/ship/bomberPage-selfcheck.mjs": true,
+  "tools/ship/dogfightPage-selfcheck.mjs": true,
+  "tools/ship/trainDogfightPilot-selfcheck.mjs": true,
+  "tools/ship/trainDogfightPilotShipped-selfcheck.mjs": true,
+  "tools/ship/trainSeatGunner-selfcheck.mjs": true
  },
  "crossings": {
   "brain/gunnerPolicy-selfcheck.mjs": 2,
@@ -11794,7 +11899,7 @@
   "tools/ship/rendererIntent-selfcheck.mjs": 163,
   "tools/ship/repoLanding-selfcheck.mjs": 1227,
   "tools/ship/repoTerrain-selfcheck.mjs": 724,
-  "tools/ship/reportDoors-selfcheck.mjs": 1322,
+  "tools/ship/reportDoors-selfcheck.mjs": 1294,
   "tools/ship/reportFresh-selfcheck.mjs": 639,
   "tools/ship/requestPathSync-selfcheck.mjs": 734,
   "tools/ship/requestedExit-selfcheck.mjs": 1970,
@@ -12091,7 +12196,28 @@
   "brain/pilotFlightGpu-selfcheck.mjs": 13755,
   "tools/ship/trainFlightPilotGpu-selfcheck.mjs": 69621,
   "tools/ship/kernelReach-selfcheck.mjs": 56897,
-  "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": 5732
+  "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": 5732,
+  "brain/battleshipFight-selfcheck.mjs": 244213,
+  "brain/bomberFight-selfcheck.mjs": 30660,
+  "brain/dogfightArena-selfcheck.mjs": 7793,
+  "brain/dogfightTask-selfcheck.mjs": 49662,
+  "brain/dogfightTrain-selfcheck.mjs": 11518,
+  "brain/seatGunnerMlp-selfcheck.mjs": 802,
+  "brain/seatGunnerPolicy-selfcheck.mjs": 949,
+  "brain/spaceArena-selfcheck.mjs": 1266,
+  "physics/mechanics/bomber-selfcheck.mjs": 224,
+  "physics/mechanics/capitalShip-selfcheck.mjs": 563,
+  "physics/mechanics/flightGuns-selfcheck.mjs": 74,
+  "physics/mechanics/froudeScale-selfcheck.mjs": 513,
+  "physics/mechanics/gunSeats-selfcheck.mjs": 181,
+  "render/flightViews-selfcheck.mjs": 130,
+  "render/renderNow-selfcheck.mjs": 845,
+  "tools/ship/battleshipPage-selfcheck.mjs": 83284,
+  "tools/ship/bomberPage-selfcheck.mjs": 26359,
+  "tools/ship/dogfightPage-selfcheck.mjs": 5667,
+  "tools/ship/trainDogfightPilot-selfcheck.mjs": 59553,
+  "tools/ship/trainDogfightPilotShipped-selfcheck.mjs": 180830,
+  "tools/ship/trainSeatGunner-selfcheck.mjs": 146781
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-10-17T01:42:35.975Z",
@@ -13674,7 +13800,7 @@
   "tools/ship/rendererIntent-selfcheck.mjs": "2026-10-17T09:58:35.870Z",
   "tools/ship/repoLanding-selfcheck.mjs": "2026-10-17T10:58:57.718Z",
   "tools/ship/repoTerrain-selfcheck.mjs": "2026-10-17T02:07:21.130Z",
-  "tools/ship/reportDoors-selfcheck.mjs": "2026-10-17T10:58:57.718Z",
+  "tools/ship/reportDoors-selfcheck.mjs": "2026-10-18T04:35:35.925Z",
   "tools/ship/reportFresh-selfcheck.mjs": "2026-10-17T09:58:35.870Z",
   "tools/ship/requestPathSync-selfcheck.mjs": "2026-10-17T09:58:35.870Z",
   "tools/ship/requestedExit-selfcheck.mjs": "2026-10-17T02:30:40.000Z",
@@ -13971,7 +14097,28 @@
   "brain/pilotFlightGpu-selfcheck.mjs": "2026-10-16T17:15:36.331Z",
   "tools/ship/trainFlightPilotGpu-selfcheck.mjs": "2026-10-16T17:16:46.111Z",
   "tools/ship/kernelReach-selfcheck.mjs": "2026-10-17T00:51:15.259Z",
-  "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": "2026-10-18T04:21:18.632Z"
+  "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": "2026-10-18T04:21:18.632Z",
+  "brain/battleshipFight-selfcheck.mjs": "2026-10-18T04:25:23.043Z",
+  "brain/bomberFight-selfcheck.mjs": "2026-10-18T04:25:53.911Z",
+  "brain/dogfightArena-selfcheck.mjs": "2026-10-18T04:26:01.944Z",
+  "brain/dogfightTask-selfcheck.mjs": "2026-10-18T04:26:51.824Z",
+  "brain/dogfightTrain-selfcheck.mjs": "2026-10-18T04:27:03.541Z",
+  "brain/seatGunnerMlp-selfcheck.mjs": "2026-10-18T04:27:04.520Z",
+  "brain/seatGunnerPolicy-selfcheck.mjs": "2026-10-18T04:27:05.643Z",
+  "brain/spaceArena-selfcheck.mjs": "2026-10-18T04:27:07.091Z",
+  "physics/mechanics/bomber-selfcheck.mjs": "2026-10-18T04:27:07.476Z",
+  "physics/mechanics/capitalShip-selfcheck.mjs": "2026-10-18T04:27:08.212Z",
+  "physics/mechanics/flightGuns-selfcheck.mjs": "2026-10-18T04:27:08.453Z",
+  "physics/mechanics/froudeScale-selfcheck.mjs": "2026-10-18T04:27:09.137Z",
+  "physics/mechanics/gunSeats-selfcheck.mjs": "2026-10-18T04:27:09.493Z",
+  "render/flightViews-selfcheck.mjs": "2026-10-18T04:27:09.790Z",
+  "render/renderNow-selfcheck.mjs": "2026-10-18T04:27:10.801Z",
+  "tools/ship/battleshipPage-selfcheck.mjs": "2026-10-18T04:28:34.254Z",
+  "tools/ship/bomberPage-selfcheck.mjs": "2026-10-18T04:29:00.793Z",
+  "tools/ship/dogfightPage-selfcheck.mjs": "2026-10-18T04:29:06.635Z",
+  "tools/ship/trainDogfightPilot-selfcheck.mjs": "2026-10-18T04:30:06.389Z",
+  "tools/ship/trainDogfightPilotShipped-selfcheck.mjs": "2026-10-18T04:33:07.445Z",
+  "tools/ship/trainSeatGunner-selfcheck.mjs": "2026-10-18T04:35:34.412Z"
  },
  "serialRing": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": [
@@ -21825,9 +21972,9 @@
    724
   ],
   "tools/ship/reportDoors-selfcheck.mjs": [
-   1279,
    1321,
-   1322
+   1322,
+   1294
   ],
   "tools/ship/reportFresh-selfcheck.mjs": [
    616,
@@ -23278,6 +23425,69 @@
   ],
   "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": [
    5732
+  ],
+  "brain/battleshipFight-selfcheck.mjs": [
+   244213
+  ],
+  "brain/bomberFight-selfcheck.mjs": [
+   30660
+  ],
+  "brain/dogfightArena-selfcheck.mjs": [
+   7793
+  ],
+  "brain/dogfightTask-selfcheck.mjs": [
+   49662
+  ],
+  "brain/dogfightTrain-selfcheck.mjs": [
+   11518
+  ],
+  "brain/seatGunnerMlp-selfcheck.mjs": [
+   802
+  ],
+  "brain/seatGunnerPolicy-selfcheck.mjs": [
+   949
+  ],
+  "brain/spaceArena-selfcheck.mjs": [
+   1266
+  ],
+  "physics/mechanics/bomber-selfcheck.mjs": [
+   224
+  ],
+  "physics/mechanics/capitalShip-selfcheck.mjs": [
+   563
+  ],
+  "physics/mechanics/flightGuns-selfcheck.mjs": [
+   74
+  ],
+  "physics/mechanics/froudeScale-selfcheck.mjs": [
+   513
+  ],
+  "physics/mechanics/gunSeats-selfcheck.mjs": [
+   181
+  ],
+  "render/flightViews-selfcheck.mjs": [
+   130
+  ],
+  "render/renderNow-selfcheck.mjs": [
+   845
+  ],
+  "tools/ship/battleshipPage-selfcheck.mjs": [
+   83284
+  ],
+  "tools/ship/bomberPage-selfcheck.mjs": [
+   26359
+  ],
+  "tools/ship/dogfightPage-selfcheck.mjs": [
+   5667
+  ],
+  "tools/ship/trainDogfightPilot-selfcheck.mjs": [
+   59553
+  ],
+  "tools/ship/trainDogfightPilotShipped-selfcheck.mjs": [
+   180830
+  ],
+  "tools/ship/trainSeatGunner-selfcheck.mjs": [
+   146781
   ]
  },
  "contended": {
@@ -24861,7 +25071,7 @@
   "tools/ship/rendererIntent-selfcheck.mjs": true,
   "tools/ship/repoLanding-selfcheck.mjs": true,
   "tools/ship/repoTerrain-selfcheck.mjs": true,
-  "tools/ship/reportDoors-selfcheck.mjs": true,
+  "tools/ship/reportDoors-selfcheck.mjs": false,
   "tools/ship/reportFresh-selfcheck.mjs": true,
   "tools/ship/requestPathSync-selfcheck.mjs": true,
   "tools/ship/requestedExit-selfcheck.mjs": true,
@@ -25158,7 +25368,28 @@
   "brain/pilotFlightGpu-selfcheck.mjs": false,
   "tools/ship/trainFlightPilotGpu-selfcheck.mjs": false,
   "tools/ship/kernelReach-selfcheck.mjs": false,
-  "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": false
+  "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": false,
+  "brain/battleshipFight-selfcheck.mjs": false,
+  "brain/bomberFight-selfcheck.mjs": false,
+  "brain/dogfightArena-selfcheck.mjs": false,
+  "brain/dogfightTask-selfcheck.mjs": false,
+  "brain/dogfightTrain-selfcheck.mjs": false,
+  "brain/seatGunnerMlp-selfcheck.mjs": false,
+  "brain/seatGunnerPolicy-selfcheck.mjs": false,
+  "brain/spaceArena-selfcheck.mjs": false,
+  "physics/mechanics/bomber-selfcheck.mjs": false,
+  "physics/mechanics/capitalShip-selfcheck.mjs": false,
+  "physics/mechanics/flightGuns-selfcheck.mjs": false,
+  "physics/mechanics/froudeScale-selfcheck.mjs": false,
+  "physics/mechanics/gunSeats-selfcheck.mjs": false,
+  "render/flightViews-selfcheck.mjs": false,
+  "render/renderNow-selfcheck.mjs": false,
+  "tools/ship/battleshipPage-selfcheck.mjs": false,
+  "tools/ship/bomberPage-selfcheck.mjs": false,
+  "tools/ship/dogfightPage-selfcheck.mjs": false,
+  "tools/ship/trainDogfightPilot-selfcheck.mjs": false,
+  "tools/ship/trainDogfightPilotShipped-selfcheck.mjs": false,
+  "tools/ship/trainSeatGunner-selfcheck.mjs": false
  },
  "kinds": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "loaded",
@@ -26845,7 +27076,7 @@
   "tools/ship/rendererIntent-selfcheck.mjs": "loaded",
   "tools/ship/repoLanding-selfcheck.mjs": "loaded",
   "tools/ship/repoTerrain-selfcheck.mjs": "loaded",
-  "tools/ship/reportDoors-selfcheck.mjs": "loaded",
+  "tools/ship/reportDoors-selfcheck.mjs": "alone",
   "tools/ship/reportFresh-selfcheck.mjs": "loaded",
   "tools/ship/requestPathSync-selfcheck.mjs": "loaded",
   "tools/ship/requestedExit-selfcheck.mjs": "loaded",
@@ -27147,6 +27378,27 @@
   "brain/pilotFlightMlp-selfcheck.mjs": "alone",
   "brain/pilotFlightGpu-selfcheck.mjs": "alone",
   "tools/ship/trainFlightPilotGpu-selfcheck.mjs": "alone",
-  "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": "alone"
+  "ai-bridge/tools/roundhouseRoutes-selfcheck.mjs": "alone",
+  "brain/battleshipFight-selfcheck.mjs": "alone",
+  "brain/bomberFight-selfcheck.mjs": "alone",
+  "brain/dogfightArena-selfcheck.mjs": "alone",
+  "brain/dogfightTask-selfcheck.mjs": "alone",
+  "brain/dogfightTrain-selfcheck.mjs": "alone",
+  "brain/seatGunnerMlp-selfcheck.mjs": "alone",
+  "brain/seatGunnerPolicy-selfcheck.mjs": "alone",
+  "brain/spaceArena-selfcheck.mjs": "alone",
+  "physics/mechanics/bomber-selfcheck.mjs": "alone",
+  "physics/mechanics/capitalShip-selfcheck.mjs": "alone",
+  "physics/mechanics/flightGuns-selfcheck.mjs": "alone",
+  "physics/mechanics/froudeScale-selfcheck.mjs": "alone",
+  "physics/mechanics/gunSeats-selfcheck.mjs": "alone",
+  "render/flightViews-selfcheck.mjs": "alone",
+  "render/renderNow-selfcheck.mjs": "alone",
+  "tools/ship/battleshipPage-selfcheck.mjs": "alone",
+  "tools/ship/bomberPage-selfcheck.mjs": "alone",
+  "tools/ship/dogfightPage-selfcheck.mjs": "alone",
+  "tools/ship/trainDogfightPilot-selfcheck.mjs": "alone",
+  "tools/ship/trainDogfightPilotShipped-selfcheck.mjs": "alone",
+  "tools/ship/trainSeatGunner-selfcheck.mjs": "alone"
  }
 }

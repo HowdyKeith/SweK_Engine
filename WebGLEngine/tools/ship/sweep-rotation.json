@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it. `poolHorizon` (v4816) is the stamp of the first pool entry that run did NOT take: it reached every entry stamped earlier and none stamped at or after it.",
- "at": "2026-10-18T04:21:18.632Z",
+ "at": "2026-10-18T04:35:35.925Z",
  "poolAt": "2026-10-17T13:29:02.542Z",
  "poolHorizon": "2026-10-15T16:38:16.059Z",
  "budgetMs": 3000,
@@ -83,11 +83,23 @@
    "at": "2026-10-16T04:25:37.387Z"
   },
   {
+   "gate": "brain/battleshipFight-selfcheck.mjs",
+   "ms": 244213,
+   "code": 0,
+   "at": "2026-10-18T04:25:23.043Z"
+  },
+  {
    "gate": "brain/bench/bandit-selfcheck.mjs",
    "ms": 5301,
    "code": 0,
    "priorMs": 4835,
    "at": "2026-10-16T17:23:35.938Z"
+  },
+  {
+   "gate": "brain/bomberFight-selfcheck.mjs",
+   "ms": 30660,
+   "code": 0,
+   "at": "2026-10-18T04:25:53.911Z"
   },
   {
    "gate": "brain/conv2d-selfcheck.mjs",
@@ -102,6 +114,24 @@
    "code": 0,
    "priorMs": 133,
    "at": "2026-10-08T02:06:24.786Z"
+  },
+  {
+   "gate": "brain/dogfightArena-selfcheck.mjs",
+   "ms": 7793,
+   "code": 0,
+   "at": "2026-10-18T04:26:01.944Z"
+  },
+  {
+   "gate": "brain/dogfightTask-selfcheck.mjs",
+   "ms": 49662,
+   "code": 0,
+   "at": "2026-10-18T04:26:51.824Z"
+  },
+  {
+   "gate": "brain/dogfightTrain-selfcheck.mjs",
+   "ms": 11518,
+   "code": 0,
+   "at": "2026-10-18T04:27:03.541Z"
   },
   {
    "gate": "brain/flightTask-selfcheck.mjs",
@@ -242,10 +272,28 @@
    "at": "2026-10-16T14:43:11.394Z"
   },
   {
+   "gate": "brain/seatGunnerMlp-selfcheck.mjs",
+   "ms": 802,
+   "code": 0,
+   "at": "2026-10-18T04:27:04.520Z"
+  },
+  {
+   "gate": "brain/seatGunnerPolicy-selfcheck.mjs",
+   "ms": 949,
+   "code": 0,
+   "at": "2026-10-18T04:27:05.643Z"
+  },
+  {
    "gate": "brain/shipCollision6dof-selfcheck.mjs",
    "ms": 1298,
    "code": 0,
    "at": "2026-10-13T01:14:54.702Z"
+  },
+  {
+   "gate": "brain/spaceArena-selfcheck.mjs",
+   "ms": 1266,
+   "code": 0,
+   "at": "2026-10-18T04:27:07.091Z"
   },
   {
    "gate": "brain/tacticsRoster-selfcheck.mjs",
@@ -688,6 +736,18 @@
    "at": "2026-10-17T09:44:34.092Z"
   },
   {
+   "gate": "physics/mechanics/bomber-selfcheck.mjs",
+   "ms": 224,
+   "code": 0,
+   "at": "2026-10-18T04:27:07.476Z"
+  },
+  {
+   "gate": "physics/mechanics/capitalShip-selfcheck.mjs",
+   "ms": 563,
+   "code": 0,
+   "at": "2026-10-18T04:27:08.212Z"
+  },
+  {
    "gate": "physics/mechanics/contactKeys-selfcheck.mjs",
    "ms": 1957,
    "code": 0,
@@ -695,11 +755,29 @@
    "at": "2026-10-10T22:54:28.625Z"
   },
   {
+   "gate": "physics/mechanics/flightGuns-selfcheck.mjs",
+   "ms": 74,
+   "code": 0,
+   "at": "2026-10-18T04:27:08.453Z"
+  },
+  {
    "gate": "physics/mechanics/freeRotation-selfcheck.mjs",
    "ms": 427,
    "code": 0,
    "priorMs": 3131,
    "at": "2026-09-07T22:31:49.491Z"
+  },
+  {
+   "gate": "physics/mechanics/froudeScale-selfcheck.mjs",
+   "ms": 513,
+   "code": 0,
+   "at": "2026-10-18T04:27:09.137Z"
+  },
+  {
+   "gate": "physics/mechanics/gunSeats-selfcheck.mjs",
+   "ms": 181,
+   "code": 0,
+   "at": "2026-10-18T04:27:09.493Z"
   },
   {
    "gate": "physics/mechanics/reposeOps-selfcheck.mjs",
@@ -1355,6 +1433,12 @@
    "at": "2026-10-11T22:07:07.355Z"
   },
   {
+   "gate": "render/flightViews-selfcheck.mjs",
+   "ms": 130,
+   "code": 0,
+   "at": "2026-10-18T04:27:09.790Z"
+  },
+  {
    "gate": "render/flowCost-selfcheck.mjs",
    "ms": 6339,
    "code": 0,
@@ -1416,6 +1500,12 @@
    "code": 0,
    "priorMs": 3998,
    "at": "2026-10-16T14:43:11.394Z"
+  },
+  {
+   "gate": "render/renderNow-selfcheck.mjs",
+   "ms": 845,
+   "code": 0,
+   "at": "2026-10-18T04:27:10.801Z"
   },
   {
    "gate": "render/ringFloorCost-selfcheck.mjs",
@@ -2692,6 +2782,12 @@
    "at": "2026-09-09T22:59:30.387Z"
   },
   {
+   "gate": "tools/ship/battleshipPage-selfcheck.mjs",
+   "ms": 83284,
+   "code": 0,
+   "at": "2026-10-18T04:28:34.254Z"
+  },
+  {
    "gate": "tools/ship/bellPage-selfcheck.mjs",
    "ms": 4614,
    "code": 0,
@@ -2746,6 +2842,12 @@
    "code": 0,
    "priorMs": 4273,
    "at": "2026-09-09T12:57:13.333Z"
+  },
+  {
+   "gate": "tools/ship/bomberPage-selfcheck.mjs",
+   "ms": 26359,
+   "code": 0,
+   "at": "2026-10-18T04:29:00.793Z"
   },
   {
    "gate": "tools/ship/boundListener-selfcheck.mjs",
@@ -3128,6 +3230,12 @@
    "code": 0,
    "priorMs": 4351,
    "at": "2026-10-16T14:43:11.394Z"
+  },
+  {
+   "gate": "tools/ship/dogfightPage-selfcheck.mjs",
+   "ms": 5667,
+   "code": 0,
+   "at": "2026-10-18T04:29:06.635Z"
   },
   {
    "gate": "tools/ship/domAnimation-selfcheck.mjs",
@@ -4628,10 +4736,10 @@
   },
   {
    "gate": "tools/ship/reportDoors-selfcheck.mjs",
-   "ms": 1363,
+   "ms": 1294,
    "code": 0,
-   "priorMs": 2005,
-   "at": "2026-10-05T19:00:48.596Z"
+   "priorMs": 2563,
+   "at": "2026-10-18T04:35:35.925Z"
   },
   {
    "gate": "tools/ship/reportFresh-selfcheck.mjs",
@@ -5093,6 +5201,18 @@
    "at": "2026-10-12T03:37:36.224Z"
   },
   {
+   "gate": "tools/ship/trainDogfightPilot-selfcheck.mjs",
+   "ms": 59553,
+   "code": 0,
+   "at": "2026-10-18T04:30:06.389Z"
+  },
+  {
+   "gate": "tools/ship/trainDogfightPilotShipped-selfcheck.mjs",
+   "ms": 180830,
+   "code": 0,
+   "at": "2026-10-18T04:33:07.445Z"
+  },
+  {
    "gate": "tools/ship/trainFlightPilot-selfcheck.mjs",
    "ms": 81514,
    "code": 0,
@@ -5104,6 +5224,12 @@
    "ms": 69621,
    "code": 0,
    "at": "2026-10-16T17:16:46.111Z"
+  },
+  {
+   "gate": "tools/ship/trainSeatGunner-selfcheck.mjs",
+   "ms": 146781,
+   "code": 0,
+   "at": "2026-10-18T04:35:34.412Z"
   },
   {
    "gate": "tools/ship/transitionSpec-selfcheck.mjs",
