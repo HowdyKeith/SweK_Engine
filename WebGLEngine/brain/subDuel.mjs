@@ -106,6 +106,16 @@ export function duel(side, sc, { seconds = SECONDS, dt = DT, actuators = null, m
     return { score, winner, hp: [A.hp, B.hp], damage: [dmgA, dmgB], fired: [A.fired, B.fired], hits: [A.hits, B.hits], pings: [A.pinged, B.pinged], fates: [A.fate, B.fate], ticks: flown, events, seed, kind: sc.kind, fingerprint: (h >>> 0).toString(16) };
 }
 
+
+/**
+ * The score of a duel result FROM A SIDE'S POINT OF VIEW (who = "A" or "B"): the same formula duel() scores A with, written for either side, so a tactician can be graded in either seat. A duel's own `score` is
+ * scoreFor(result, "A"). `seconds` is the duel's length (the speed bonus is the fraction of it left).
+ */
+export function scoreFor(result, who = "A", seconds = SECONDS) {
+    const me = who === "A" ? 0 : 1, you = 1 - me, total = Math.round(seconds / DT), lost = result.fates[me] !== "afloat", sunkYou = result.fates[you] === "sunk";
+    return (result.damage[me] - result.damage[you]) / HP + (sunkYou ? KILL_BONUS : 0) - (lost ? KILL_BONUS : 0) + (sunkYou && !lost ? SPEED_BONUS * (1 - result.ticks / total) : 0);
+}
+
 // ---- the sides, the sets ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 /** A side factory for the hand tactician with `theta` and a motion pilot (default the PD autopilot): call it once per duel. */
 export const sideHand = (theta = TA.THETA_DEFAULT, pilot = null) => () => ({ tactics: TA.makeTactician(theta), pilot: pilot || AS.pilot() });

@@ -1,0 +1,21 @@
+{
+ "note": "UNNUMBERED WIP. Champion of 4 (1+1)-ES searches (tools/tuneSubTactics.mjs, seeds 5100..5103, 150 iterations) over the 12 tactician numbers INCLUDING searchPing, against the four scripted drones, picked on HELD_OUT_SET; seeds 5100/5101 started from the previous champion (subTacticsThetaWip.json), 5102/5103 from the default. AUDIT_SET NOT read. Fixed, non-adaptive opponents.",
+ "seed": 5100,
+ "iters": 150,
+ "trainScore": 1.8597627314814815,
+ "heldScore": 1.8608333333333336,
+ "theta": {
+  "searchSpeed": 4.5,
+  "trackSpeed": 4.427937431075328,
+  "evadeSpeed": 3.417979071851008,
+  "fireRange": 457.6497693195073,
+  "aimTol": 0.46518273902599105,
+  "pingAfter": 1,
+  "echoWindow": 13.69436793898636,
+  "evadeTime": 36.867755751046126,
+  "evadeTurn": 1.7085338441028852,
+  "blindSnr": 66.15036643611151,
+  "pingEvery": 4,
+  "searchPing": 7.6937721116066
+ }
+}
