@@ -2617,6 +2617,8 @@ const bzProxy = require("./bzProxy.js");   // v2200 — ws://.../bz/ws?host=&por
 const rocketBridge = require("./rocketBridge.js");   // v2217 — /rocket/* : point at RocketSim collision meshes, prepare (probe), and run the RL training loop. Trusted requests only: these routes spawn node/python/pip.
 const puppeteerBridge = require("./puppeteerBridge.js");   // v2237 — /devtools/* : the engine screenshots + reads console errors + samples perf of its OWN pages via headless Chrome (puppeteer-core). Trusted-only; no agent/MCP needed.
 const fleetBridge = require("./fleetBridge.js");
+const subAquariumBridge = require("./subAquariumBridge.js"); // UNNUMBERED -- the sub aquarium: peers send their subs here; the FISH BRAIN / FLY BRAIN chips poll its health routes
+const subAquarium = subAquariumBridge.createBridge({ root: path.resolve(__dirname, "..") });
 const exportBridge = require("./exportBridge.js");
 const codemapBridge = require("./codemapBridge.js");   // v2519 -- the tree as a 3D city, coloured by the vNNNN markers it already carries   // /export/mp4 : webm clip -> YouTube-ready mp4 + description sidecar   // v2221 — POST /fleet/announce : when a peer sails into/out of the fleet, fan the event out to peers as an announcement. Trusted requests only: it broadcasts.
 const httpRange = require("./httpRange.js");   // v2208 — RFC 7233 byte ranges: seeking in a <video>, a page out of a CBZ, a television.
@@ -4891,6 +4893,12 @@ const server = http.createServer((req, res) => {
             Object.assign({ fromName: announceBridge.hostName(), avatar: currentAvatarUrl || "" }, payload),
             _announcePeers(), assetSync.selfUrl(PORT));
         Promise.resolve(fleetBridge.handle(req, res, { sendJson, isTrusted: _isTrustedReq, announce, host: announceBridge.hostName() }))
+            .catch((e) => { try { sendJson({ ok: false, error: String(e && e.message || e) }, 500); } catch (_) {} });
+        return;
+    }
+    // UNNUMBERED -- /subaquarium/* and the two brain-health routes. isTrusted is handed in so the bridge cannot decide for itself (same as fleetBridge).
+    if (subAquariumBridge.owns(req.url)) {
+        Promise.resolve(subAquarium.handle(req, res, { sendJson, isTrusted: _isTrustedReq }))
             .catch((e) => { try { sendJson({ ok: false, error: String(e && e.message || e) }, 500); } catch (_) {} });
         return;
     }
