@@ -188,6 +188,24 @@ console.log("\n6. THE ZERO WEIGHTS AND NOISE");
     ok("!! a noisy pilot flies WORSE than the hand pilot (hand + noise of 0.3 on every weight scores lower on the same flights)", nv.score < hv.score - 0.01, `${hv.score.toFixed(4)} -> ${nv.score.toFixed(4)}`);
 }
 
+
+// ---- a score whose interactions the gate controls, for prune's logic (prune takes `score` for it): eight weights with random pairwise and cubic interactions, from a seed -----------------------------------------------------
+const SYN_IDX = [100, 150, 200, 250, 300, 350, 400, 450];
+function synth(seed, hw) {
+    const r = mulberry(seed), Q = SYN_IDX.map(() => SYN_IDX.map(() => (r() - 0.5) * 6)), g = SYN_IDX.map(() => (r() - 0.5) * 3);
+    const T3 = Array.from({ length: 6 }, () => [Math.floor(r() * 8), Math.floor(r() * 8), Math.floor(r() * 8), (r() - 0.5) * 40]);
+    const d0 = SYN_IDX.map(() => [-0.3, -0.2, -0.1, 0.1, 0.2, 0.3][Math.floor(r() * 6)]);
+    const w = Float32Array.from(hw); SYN_IDX.forEach((i, k) => { w[i] += d0[k]; });
+    let calls = 0;
+    const score = (x) => {
+        calls++; const d = SYN_IDX.map((i) => x[i] - hw[i]); let s = 0;
+        for (let a = 0; a < 8; a++) { s += g[a] * d[a]; for (let b = 0; b < 8; b++) s -= Q[a][b] * d[a] * d[b] * (a === b ? 1 : 0.5); }
+        for (let c = 0; c < 6; c++) s += T3[c][3] * d[T3[c][0]] * d[T3[c][1]] * d[T3[c][2]];
+        return s;
+    };
+    return { w, score, calls: () => calls };
+}
+
 console.log("\n7. THE TRAINING FUNCTIONS");
 {
     const hw = PP.handWeights(), rng = mulberry(3);
@@ -210,9 +228,12 @@ console.log("\n7. THE TRAINING FUNCTIONS");
     const dirty = Float32Array.from(hw), deadEdge = Topo.EDGES.findIndex(([to]) => to >= 8); dirty[16 * 20 + 5] = 0.7; dirty[12 * 20 + 19] = -0.4; dirty[20 * 34 + 34 + deadEdge] = 0.2;
     const pr = PP.prune(dirty, { trainSet: one });
     ok("!! PRUNE PUTS BACK EVERY WEIGHT THAT DOES NOT MATTER: the hand weights with three weights nothing reads (the bank error into an unused neuron, the engine-out flag into another, a synapse into a neuron the readout does not read) come back as the hand weights exactly (moved 3, kept 0), at the hand score", pr.moved === 3 && pr.kept === 0 && pr.weights.every((v, i) => v === hw[i]) && near(pr.trainScore, PP.evaluate(hw, one).score, 1e-12), `moved ${pr.moved} kept ${pr.kept}`);
-    const pair = Float32Array.from(hw); pair[20 * 34 + 2] = 0.3; pair[2 * 20 + 0] = -0.1;   // a harmful bias (+0.3 of pitch) and a weight that partly cancels it (-0.1): each is only removable once the other is gone
-    const pp2 = PP.prune(pair, { trainSet: one });
-    ok("!! PRUNE REPEATS UNTIL NOTHING MORE COMES BACK: a harmful bias on the pitch channel (+0.3) and a weight that partly compensates it (-0.1, earlier in the vector) are not removable in one pass -- reverting the compensator first costs, the bias goes, and only THEN is the compensator unnecessary -- and prune unwinds both (kept 0, the hand weights exactly, in more than one pass)", pp2.kept === 0 && pp2.moved === 2 && pp2.passes >= 2 && pp2.weights.every((v, i) => v === hw[i]), `kept ${pp2.kept} in ${pp2.passes} passes`);
+    const sy = synth(1200, hw), spr = PP.prune(sy.w, { score: sy.score });
+    const stillWorse = SYN_IDX.filter((i) => Math.abs(spr.weights[i] - hw[i]) > 1e-6).every((i) => { const x = Float32Array.from(spr.weights); x[i] = hw[i]; return sy.score(x) < spr.trainScore - 1e-9; });
+    ok("!! PRUNE ENDS AT A FIXED POINT, AND GETS THERE IN MORE THAN ONE PASS WHEN IT HAS TO: on a score with interactions between eight weights (seed 1200: found by search, one the group test and a single one-at-a-time pass leave 3 weights on) prune ends with 2 kept in 3 passes, the score it reports is the weights' own, and putting back any ONE of the weights it kept lowers the score", spr.kept === 2 && spr.passes === 3 && spr.moved === 8 && stillWorse && spr.trainScore === sy.score(spr.weights), `kept ${spr.kept} of ${spr.moved} in ${spr.passes} passes`);
+    const junk = Float32Array.from(hw); for (let k = 0; k < 300; k++) junk[600 + k] += 0.05 + 0.001 * k;
+    const flat = { n: 0 }; const jr = PP.prune(junk, { score: (x) => { flat.n++; return 0; } });
+    ok("!! PRUNE TESTS A BLOCK AT A TIME BEFORE IT TESTS A WEIGHT AT A TIME: 300 weights moved and none of them matters (a flat score) go back in THREE evaluations -- the starting score, the block, and the one-at-a-time loop's pass over what is left (nothing) -- not 300; the cost of a prune is what a flight over the set costs, and a search leaves a thousand weights moved", jr.kept === 0 && jr.moved >= 300 && flat.n <= 3 && jr.weights.every((v, i) => v === hw[i]), `${flat.n} evaluations for ${jr.moved} moved weights`);
     const needed = Float32Array.from(hw); needed[4 * 20 + 4] = 0.4;   // the roll channel's trim coefficient (1 -> 0.4: the hover's -0.194 of roll becomes -0.078) is read by every flight: it matters
     const pr2 = PP.prune(needed, { trainSet: one });
     ok("!! ...and KEEPS one that does: the roll channel's trim coefficient moved from 1 to 0.4 hurts, so prune leaves it (kept 1), and the result scores no worse than the input", pr2.kept === 1 && pr2.weights[84] === Float32Array.from([0.4])[0] && pr2.trainScore >= PP.evaluate(needed, one).score - 1e-12, `kept ${pr2.kept}`);

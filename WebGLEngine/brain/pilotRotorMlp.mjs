@@ -94,15 +94,29 @@ export function train({ seed = 7, iters = 600, sigma = 0.3, maxK = 4, start = nu
     return { weights: best, trainScore: bestScore, history, iters, improved, neutral };
 }
 /** Put every weight that differs from `toward` (default: the hand weights) back whenever the TRAIN score does not fall, passes repeated to a fixed point. */
-export function prune(w, { toward = null, trainSet = RT.TRAIN_SET } = {}) {
-    const base0 = toward ? Float32Array.from(toward) : handWeights(), out = Float32Array.from(w);
+export function prune(w, { toward = null, trainSet = RT.TRAIN_SET, score = null } = {}) {   // `score` (weights -> number) is for the gate, which drives the logic with a score whose interactions it controls; null is the weights flown over trainSet
+    const base0 = toward ? Float32Array.from(toward) : handWeights(), out = Float32Array.from(w), ev = score || ((x) => evaluate(x, trainSet).score);
     const differs = () => { const idx = []; for (let i = 0; i < out.length; i++) if (Math.abs(out[i] - base0[i]) > 1e-6) idx.push(i); return idx; };
-    const moved = differs().length; let best = evaluate(out, trainSet).score, passes = 0, reverted;
+    const moved = differs().length; let best = ev(out), passes = 0, reverted;
+    // GROUP TESTING FIRST. Most of what a search moves is drift (a child that scores exactly its parent replaces it), and a flight over the set costs seconds: putting 1,500 weights back one at a time is 1,500 flights. So try
+    // putting back a whole block of them at once; if the score does not fall the block was nothing, and if it does, halve it and try the halves. What survives goes through the one-at-a-time loop below, which is what makes
+    // the result a fixed point (no single weight left that could be put back without the score falling).
+    const group = (idx) => {
+        if (!idx.length) return;
+        const keep = idx.map((i) => out[i]);
+        for (const i of idx) out[i] = base0[i];
+        const s = ev(out);
+        if (s >= best - 1e-9) { best = Math.max(best, s); return; }
+        idx.forEach((i, k) => { out[i] = keep[k]; });
+        if (idx.length === 1) return;
+        const h = idx.length >> 1; group(idx.slice(0, h)); group(idx.slice(h));
+    };
+    group(differs());
     do {
         reverted = 0; passes++;
         for (const i of differs()) {
             const keep = out[i]; out[i] = base0[i];
-            const s = evaluate(out, trainSet).score;
+            const s = ev(out);
             if (s >= best - 1e-9) { best = Math.max(best, s); reverted++; } else out[i] = keep;
         }
     } while (reverted > 0 && passes < 64);   // each reverting pass shrinks differs(), so it ends on its own; the cap is for a revert that did not revert (then it would never)
