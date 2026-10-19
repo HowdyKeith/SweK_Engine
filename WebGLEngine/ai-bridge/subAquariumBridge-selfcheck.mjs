@@ -191,8 +191,13 @@ console.log("\n8. TWO BOXES OVER REAL HTTP");
         ok("!! a peer that is not listening is 'peer unreachable' (a real connection refused), not a hang and not a crash", dead.ok === false && /peer unreachable/.test(dead.error));
         const big = await fetch(b.url + "/subaquarium/arrive", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sub: { name: "Huge", weights: Array.from({ length: 20000 }, () => 0.5) } }) });
         ok("!! a real over-size body (20,000 weights, ~100 KB) is 413 from B over the wire, and B's tank is unchanged", big.status === 413 && (await big.json()).ok === false && Bb.registry.counts().total === 1);
-    } finally { for (const x of [a, b, c]) x.srv.close(); }
+    } finally {
+        // v4877: WAIT for the three servers to close, and drop their keep-alive sockets (the fetches above leave them open). The old line closed and fell through to process.exit while the sockets were
+        // still closing, and Node 24 on Windows aborts there -- "Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), src\win\async.c, line 94", exit 3221226505, AFTER "all checks pass". Found on the rig's verdict.
+        await Promise.all([a, b, c].map((x) => new Promise((done) => { x.srv.close(() => done()); x.srv.closeAllConnections?.(); })));
+    }
 }
 
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
-process.exit(fails ? 1 : 0);
+process.exitCode = fails ? 1 : 0;   // v4877: not process.exit -- the loop drains by itself now that the servers are closed (see the finally above)
+setTimeout(() => process.exit(fails ? 1 : 0), 3000).unref();   // a safety net for a handle nothing here owns; it cannot fire while the loop is already empty
