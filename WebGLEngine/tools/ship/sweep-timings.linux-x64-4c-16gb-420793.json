@@ -1,7 +1,7 @@
 {
  "host": "linux-x64-4c-16gb-420793",
  "note": "THIS BOX'S OWN gate runtimes, written by tools/ship/boxTimings.mjs. The shared sweep-timings.json is host-claimed and a foreign box cannot write it (v4647, and that refusal is right); this is how a box records what IT measured without overwriting another machine's numbers. `kinds` says which quantity each ms is, as in the shared record: `alone` is an uncontended serial reading, `capped` is a FLOOR and not a runtime. Read for COVERAGE -- has this gate ever been timed -- and NOT for the ship-time budget, which still reads the shared file. See task #87. `serialRing` holds the last three alone readings; recordReach's margin row reads it on a box that does not own the shared record, because that row asks what a gate costs HERE and nothing here can refresh another box's ring.",
- "captured": "2026-10-19T04:13:13.703Z",
+ "captured": "2026-10-19T04:14:03.459Z",
  "timings": {
   "tools/ship/cloneProvision-selfcheck.mjs": 7171,
   "tools/ship/exitBusy-selfcheck.mjs": 15284,
@@ -57,23 +57,23 @@
   "tools/ship/trainDogfightPilotShipped-selfcheck.mjs": 249293,
   "tools/ship/trainSeatGunner-selfcheck.mjs": 204020,
   "tools/ship/reportDoors-selfcheck.mjs": 1796,
-  "ai-bridge/subAquariumBridge-selfcheck.mjs": 288,
-  "ai-bridge/subAquariumCore-selfcheck.mjs": 124,
-  "brain/autopilotSub-selfcheck.mjs": 2048,
-  "brain/missionTask-selfcheck.mjs": 3891,
-  "brain/pilotSubPolicy-selfcheck.mjs": 17411,
-  "brain/subDuel-selfcheck.mjs": 6964,
-  "brain/subTactics-selfcheck.mjs": 52,
-  "brain/subTask-selfcheck.mjs": 1662,
-  "physics/mechanics/subActuators-selfcheck.mjs": 1187,
-  "physics/mechanics/subModel6dof-selfcheck.mjs": 564,
-  "physics/mechanics/subSonar-selfcheck.mjs": 74,
-  "physics/mechanics/subTorpedo-selfcheck.mjs": 105,
-  "render/subAquariumSim-selfcheck.mjs": 5012,
-  "tools/selfPlaySubTactics-selfcheck.mjs": 3170,
-  "tools/ship/subAquariumPage-selfcheck.mjs": 4880,
-  "tools/ship/subAquariumServerHtml-selfcheck.mjs": 233,
-  "tools/ship/subDisturb-selfcheck.mjs": 2089
+  "ai-bridge/subAquariumBridge-selfcheck.mjs": 320,
+  "ai-bridge/subAquariumCore-selfcheck.mjs": 106,
+  "brain/autopilotSub-selfcheck.mjs": 1991,
+  "brain/missionTask-selfcheck.mjs": 3952,
+  "brain/pilotSubPolicy-selfcheck.mjs": 16372,
+  "brain/subDuel-selfcheck.mjs": 7401,
+  "brain/subTactics-selfcheck.mjs": 69,
+  "brain/subTask-selfcheck.mjs": 1413,
+  "physics/mechanics/subActuators-selfcheck.mjs": 1005,
+  "physics/mechanics/subModel6dof-selfcheck.mjs": 505,
+  "physics/mechanics/subSonar-selfcheck.mjs": 70,
+  "physics/mechanics/subTorpedo-selfcheck.mjs": 149,
+  "render/subAquariumSim-selfcheck.mjs": 4817,
+  "tools/selfPlaySubTactics-selfcheck.mjs": 2968,
+  "tools/ship/subAquariumPage-selfcheck.mjs": 4383,
+  "tools/ship/subAquariumServerHtml-selfcheck.mjs": 201,
+  "tools/ship/subDisturb-selfcheck.mjs": 2087
  },
  "at": {
   "tools/ship/cloneProvision-selfcheck.mjs": "2026-09-25T03:35:16.858Z",
@@ -130,23 +130,23 @@
   "tools/ship/trainDogfightPilotShipped-selfcheck.mjs": "2026-10-17T22:01:23.317Z",
   "tools/ship/trainSeatGunner-selfcheck.mjs": "2026-10-17T22:01:23.317Z",
   "tools/ship/reportDoors-selfcheck.mjs": "2026-10-17T22:18:45.304Z",
-  "ai-bridge/subAquariumBridge-selfcheck.mjs": "2026-10-19T04:13:13.703Z",
-  "ai-bridge/subAquariumCore-selfcheck.mjs": "2026-10-19T04:13:13.703Z",
-  "brain/autopilotSub-selfcheck.mjs": "2026-10-19T04:13:13.703Z",
-  "brain/missionTask-selfcheck.mjs": "2026-10-19T04:13:13.703Z",
-  "brain/pilotSubPolicy-selfcheck.mjs": "2026-10-19T04:13:13.703Z",
-  "brain/subDuel-selfcheck.mjs": "2026-10-19T04:13:13.703Z",
-  "brain/subTactics-selfcheck.mjs": "2026-10-19T04:13:13.703Z",
-  "brain/subTask-selfcheck.mjs": "2026-10-19T04:13:13.703Z",
-  "physics/mechanics/subActuators-selfcheck.mjs": "2026-10-19T04:13:13.703Z",
-  "physics/mechanics/subModel6dof-selfcheck.mjs": "2026-10-19T04:13:13.703Z",
-  "physics/mechanics/subSonar-selfcheck.mjs": "2026-10-19T04:13:13.703Z",
-  "physics/mechanics/subTorpedo-selfcheck.mjs": "2026-10-19T04:13:13.703Z",
-  "render/subAquariumSim-selfcheck.mjs": "2026-10-19T04:13:13.703Z",
-  "tools/selfPlaySubTactics-selfcheck.mjs": "2026-10-19T04:13:13.703Z",
-  "tools/ship/subAquariumPage-selfcheck.mjs": "2026-10-19T04:13:13.703Z",
-  "tools/ship/subAquariumServerHtml-selfcheck.mjs": "2026-10-19T04:13:13.703Z",
-  "tools/ship/subDisturb-selfcheck.mjs": "2026-10-19T04:13:13.703Z"
+  "ai-bridge/subAquariumBridge-selfcheck.mjs": "2026-10-19T04:14:03.459Z",
+  "ai-bridge/subAquariumCore-selfcheck.mjs": "2026-10-19T04:14:03.459Z",
+  "brain/autopilotSub-selfcheck.mjs": "2026-10-19T04:14:03.459Z",
+  "brain/missionTask-selfcheck.mjs": "2026-10-19T04:14:03.459Z",
+  "brain/pilotSubPolicy-selfcheck.mjs": "2026-10-19T04:14:03.459Z",
+  "brain/subDuel-selfcheck.mjs": "2026-10-19T04:14:03.459Z",
+  "brain/subTactics-selfcheck.mjs": "2026-10-19T04:14:03.459Z",
+  "brain/subTask-selfcheck.mjs": "2026-10-19T04:14:03.459Z",
+  "physics/mechanics/subActuators-selfcheck.mjs": "2026-10-19T04:14:03.459Z",
+  "physics/mechanics/subModel6dof-selfcheck.mjs": "2026-10-19T04:14:03.459Z",
+  "physics/mechanics/subSonar-selfcheck.mjs": "2026-10-19T04:14:03.459Z",
+  "physics/mechanics/subTorpedo-selfcheck.mjs": "2026-10-19T04:14:03.459Z",
+  "render/subAquariumSim-selfcheck.mjs": "2026-10-19T04:14:03.459Z",
+  "tools/selfPlaySubTactics-selfcheck.mjs": "2026-10-19T04:14:03.459Z",
+  "tools/ship/subAquariumPage-selfcheck.mjs": "2026-10-19T04:14:03.459Z",
+  "tools/ship/subAquariumServerHtml-selfcheck.mjs": "2026-10-19T04:14:03.459Z",
+  "tools/ship/subDisturb-selfcheck.mjs": "2026-10-19T04:14:03.459Z"
  },
  "kinds": {
   "tools/ship/cloneProvision-selfcheck.mjs": "alone",
@@ -544,71 +544,88 @@
   ],
   "ai-bridge/subAquariumBridge-selfcheck.mjs": [
    659,
-   288
+   288,
+   320
   ],
   "ai-bridge/subAquariumCore-selfcheck.mjs": [
    132,
-   124
+   124,
+   106
   ],
   "brain/autopilotSub-selfcheck.mjs": [
    2022,
-   2048
+   2048,
+   1991
   ],
   "brain/missionTask-selfcheck.mjs": [
    3712,
-   3891
+   3891,
+   3952
   ],
   "brain/pilotSubPolicy-selfcheck.mjs": [
    16546,
-   17411
+   17411,
+   16372
   ],
   "brain/subDuel-selfcheck.mjs": [
    7829,
-   6964
+   6964,
+   7401
   ],
   "brain/subTactics-selfcheck.mjs": [
    50,
-   52
+   52,
+   69
   ],
   "brain/subTask-selfcheck.mjs": [
    1399,
-   1662
+   1662,
+   1413
   ],
   "physics/mechanics/subActuators-selfcheck.mjs": [
    1260,
-   1187
+   1187,
+   1005
   ],
   "physics/mechanics/subModel6dof-selfcheck.mjs": [
    555,
-   564
+   564,
+   505
   ],
   "physics/mechanics/subSonar-selfcheck.mjs": [
    107,
-   74
+   74,
+   70
   ],
   "physics/mechanics/subTorpedo-selfcheck.mjs": [
    143,
-   105
+   105,
+   149
   ],
   "render/subAquariumSim-selfcheck.mjs": [
    5127,
-   5012
+   5012,
+   4817
   ],
   "tools/selfPlaySubTactics-selfcheck.mjs": [
    3353,
-   3170
+   3170,
+   2968
   ],
   "tools/ship/subAquariumPage-selfcheck.mjs": [
    6034,
-   4880
+   4880,
+   4383
   ],
   "tools/ship/subAquariumServerHtml-selfcheck.mjs": [
    227,
-   233
+   233,
+   201
   ],
   "tools/ship/subDisturb-selfcheck.mjs": [
    1687,
-   2089
+   2089,
+   2087
   ]
  }
 }
