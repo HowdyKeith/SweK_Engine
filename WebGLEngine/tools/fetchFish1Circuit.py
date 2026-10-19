@@ -22,6 +22,23 @@ DATASTACK = "fish1_full"
 SYN_TABLE = "synapses_axde_label"
 
 
+SYN_BASE = "synapses_axde"   # the synapses themselves; SYN_TABLE is a reference_tag layer over it (target_id -> synapses_axde.id; tag 1 inhibitory, 2 excitatory) and the server answers a root-id filter on it with a 500
+
+
+def synapses_of(client, **filt):
+    """Synapses of one root id (pre_pt_root_id=... or post_pt_root_id=...) from the BASE table, each carrying the tag the label table gives it ("none" if untagged). The filter is refused on the label table itself (HTTP 500 KeyError 'pre_pt_root_id', measured at v733)."""
+    df = getattr(client.materialize.tables, SYN_BASE)(**filt).query()
+    if len(df) == 0:
+        return df.assign(tag=[]) if hasattr(df, "assign") else df
+    ids = [int(v) for v in df["id"]]
+    tag = {}
+    for i in range(0, len(ids), 1000):
+        lab = getattr(client.materialize.tables, SYN_TABLE)(target_id=ids[i:i + 1000]).query()
+        for _, r in lab.iterrows():
+            tag[int(r["target_id"])] = str(r["tag"])
+    return df.assign(tag=[tag.get(int(v), "none") for v in df["id"]])
+
+
 def build_circuit(client, lore_ids, partners=0, version=None):
     """The induced circuit of `lore_ids` (+ strongest soma-annotated partners). `client` is a CAVEclient (or anything with the same .materialize.tables surface)."""
     bad = [str(l) for l in lore_ids if not str(l).strip().isdigit()]
@@ -47,8 +64,8 @@ def build_circuit(client, lore_ids, partners=0, version=None):
             tags.setdefault((a, b), {}).setdefault(str(s["tag"]), 0)
             tags[(a, b)][str(s["tag"])] += 1
     for rid in seeds:
-        take(client.materialize.tables.synapses_axde_label(pre_pt_root_id=rid).query(), "out")
-        take(client.materialize.tables.synapses_axde_label(post_pt_root_id=rid).query(), "in")
+        take(synapses_of(client, pre_pt_root_id=rid), "out")
+        take(synapses_of(client, post_pt_root_id=rid), "in")
     if partners:
         strength = {}
         for (a, b), n in counts.items():
@@ -64,8 +81,8 @@ def build_circuit(client, lore_ids, partners=0, version=None):
                 soma[other] = {"lore": str(r["id"]), "type": r["cell_type"], "xyz": [int(v) for v in r["pt_position"]]}
         # edges among the final set, from the synapses already read plus the new members' own
         for rid in [k for k in soma if k not in seeds]:
-            take(client.materialize.tables.synapses_axde_label(pre_pt_root_id=rid).query(), "out")
-            take(client.materialize.tables.synapses_axde_label(post_pt_root_id=rid).query(), "in")
+            take(synapses_of(client, pre_pt_root_id=rid), "out")
+            take(synapses_of(client, post_pt_root_id=rid), "in")
     members = set(soma)
     return soma, {k: v for k, v in counts.items() if k[0] in members and k[1] in members}, tags
 
@@ -111,12 +128,15 @@ def selftest():
             if "id" in kw: i = kw["id"]; return T(lambda: pd.DataFrame([{"id": i, "pt_root_id": rows[i][0], "cell_type": rows[i][1], "pt_position": [i and 10, 20, 30]}] if i in rows else []))
             rid = kw["pt_root_id"]; m = {v[0]: (k, v[1]) for k, v in rows.items()}
             return T(lambda: pd.DataFrame([{"id": m[rid][0], "pt_root_id": rid, "cell_type": m[rid][1], "pt_position": [1, 2, 3]}] if rid in m else []))
-        def synapses_axde_label(self, **kw):
-            syn = [(1, 101, 102, "2"), (2, 101, 102, "2"), (3, 102, 103, "2"), (4, 103, 101, "1"), (5, 999, 101, "2")]
+        syn = [(1, 101, 102, "2"), (2, 101, 102, "2"), (3, 102, 103, "2"), (4, 103, 101, "1"), (5, 999, 101, "2")]
+        def synapses_axde(self, **kw):   # the BASE table: the root-id filter works here and rows carry no tag
             def q():
-                sel = [s for s in syn if ("pre_pt_root_id" in kw and s[1] == kw["pre_pt_root_id"]) or ("post_pt_root_id" in kw and s[2] == kw["post_pt_root_id"])]
-                return pd.DataFrame([{"id": i, "pre_pt_root_id": a, "post_pt_root_id": b, "tag": t} for i, a, b, t in sel])
+                sel = [s for s in self.syn if ("pre_pt_root_id" in kw and s[1] == kw["pre_pt_root_id"]) or ("post_pt_root_id" in kw and s[2] == kw["post_pt_root_id"])]
+                return pd.DataFrame([{"id": i, "pre_pt_root_id": a, "post_pt_root_id": b} for i, a, b, t in sel], columns=["id", "pre_pt_root_id", "post_pt_root_id"])
             return T(q)
+        def synapses_axde_label(self, **kw):   # the tag layer: only target_id is filterable (a root-id filter on it is a server 500, as measured)
+            if set(kw) != {"target_id"}: raise RuntimeError("HTTP 500 'pre_pt_root_id' -- the label table cannot be filtered by root id")
+            return T(lambda: pd.DataFrame([{"target_id": i, "tag": t} for i, a, b, t in self.syn if i in kw["target_id"]], columns=["target_id", "tag"]))
     class C:
         class materialize: tables = Tables()
     soma, edges, tags = build_circuit(C, [1, 2, 3])
