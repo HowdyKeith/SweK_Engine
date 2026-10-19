@@ -27,12 +27,16 @@
 //   G33 decide.last has the features and the outputs swapped 1 | G34 decide.last is not cleared for a tick with no target 1 | G35 decide.last is not cleared for a target the arena does not show 1
 //   G36 decide.last is undefined before the first tick 1 | G37 decide.last shows lastFire as 0 though the network was shown 1 1 | G38 the live weights leave out unit 0's bias 1
 //   G39 the live weights take unit 1's output weights 1 | G40 the live weights leave out the trigger's bias 1 | G41 the live weights take unit 1's row of the encoder 1
+// AND ELEVEN MORE ONCE A DECISION WAS TWO HALVES (section 3b: prepare(), finish(), `decide.net`, post(); run against this gate and brain/seatGunnerMlp-selfcheck.mjs, the number being the rows red in both), each applied to brain/seatGunnerPolicy.mjs:
+//   K1 a tick with no target does not clear the last trigger 1 | K2 finish takes the trigger from the sight, not the outputs 7 | K3 finish does not remember the trigger 3 | K4 finish does not keep what was shown and said 3 | K5 the net lacks the weights 4 | K6 the net's forward is always this module's 3
+//   K7 the net's layers are always this module's 2 | K8 post is the identity 4 | K9 decide runs the network on zero weights 9 | K10 prepare gives the features of the wrong trigger memory 3 | K11 finish gives the aim of the sight without the correction 5. None went 0 red.
 "use strict";
 import * as SG from "./seatGunnerPolicy.mjs";
 import * as Topo from "./gfcTopology.mjs";
 import * as SA from "./spaceArena.mjs";
 import * as CS from "../physics/mechanics/capitalShip.mjs";
 import * as GS from "../physics/mechanics/gunSeats.mjs";
+import { mlpLayerCpu } from "../render/brainTsl.mjs";
 
 let fails = 0;
 function ok(name, cond, detail) { console.log(`  ${cond ? "PASS" : "FAIL"}  ${name}${detail ? "   " + detail : ""}`); if (!cond) fails++; }
@@ -110,6 +114,32 @@ section(() => {
         Math.abs(aim({}) - 0.05 * Math.tanh(rf(600))) < 1e-6 && Math.abs(aim({ reach: 300 }) - 0.05 * Math.tanh(rf(300))) < 1e-6 && Math.abs(aim({}) - aim({ reach: 300 })) > 1e-3, `${aim({}).toFixed(5)} ${aim({ reach: 300 }).toFixed(5)}`);
 });
 
+console.log("\n3b. THE TWO HALVES OF A DECISION (prepare, finish) AND WHAT A BATCH NEEDS (net)");
+section(() => {
+    const pd = seatNamed("port PD 2"), st = stateOf(pd, 0.3, -0.2, 800), body = bodyAt(), tg = { id: 2, pos: [0, 300, 0], vel: [0, 0, 0] }, w = SG.handWeights();
+    // two deciders from one sight, side by side for forty ticks: one called as decide(), one as prepare() + the module's forward + finish()
+    const rules = [{ yaw: 0.5, pitch: 0.1, fire: true, target: 2 }, { yaw: -0.3, pitch: 0.2, fire: false, target: 2 }, { yaw: 0, pitch: 0, fire: false, target: null }, { yaw: 0.1, pitch: 0.1, fire: true, target: 99 }, { yaw: 0.2, pitch: -0.1, fire: true, target: 2 }];
+    let ruleNow = rules[0]; const sight = () => ruleNow, a = SG.gunnerFor(w, sight), b = SG.gunnerFor(w, sight); let same = true, nTarget = 0, nNone = 0, featuresOk = true;
+    for (let t = 0; t < 40; t++) {
+        ruleNow = rules[(t * 3 + (t >> 2)) % rules.length];
+        const ca = a(pd, st, body, [tg], t), prep = b.prepare(pd, st, body, [tg], t), cb = b.finish(prep, prep.x === null ? null : SG.forward(w, prep.x));
+        if (prep.x === null) nNone++; else { nTarget++; featuresOk = featuresOk && prep.x.length === 12 && prep.rule === ruleNow; }
+        same = same && JSON.stringify(ca) === JSON.stringify(cb) && JSON.stringify(a.last) === JSON.stringify(b.last);
+    }
+    ok("!! A DECISION IS ITS TWO HALVES WITH THE NETWORK BETWEEN THEM, TO THE BIT: over forty ticks of changing rules (a target, none, a target the arena does not show) a decider called as decide() and another called as prepare(), the module's forward on the features it prepared, finish() give the same command and the same `last` every tick -- and the prepared features are twelve and the rule the sight's", same && featuresOk && nTarget > 10 && nNone > 5, `${nTarget} with a target, ${nNone} without`);
+    const noT = SG.gunnerFor(SG.zeroWeights(), () => ({ yaw: 0.4, pitch: 0.1, fire: true, target: null })), pn = noT.prepare(pd, st, body, [tg], 1);
+    ok("!! prepare() WITH NO TARGET IS THE SIGHT'S ANSWER AND NO FEATURES: x is null, the rule is the sight's (the very object), `last` is null -- and finish() hands the rule back untouched whatever it is given (the network is not asked); the same for a target the arena does not show", pn.x === null && pn.rule.yaw === 0.4 && noT.last === null && noT.finish(pn, [9, 9, 9]) === pn.rule && SG.gunnerFor(w, () => ({ yaw: 0, pitch: 0, fire: true, target: 99 })).prepare(pd, st, body, [tg], 1).x === null);
+    const hold = { yaw: 0.5, pitch: 0.1, fire: false, target: 2 }, dd = SG.gunnerFor(SG.zeroWeights(), () => hold), p1 = dd.prepare(pd, st, body, [tg], 1), y1 = [0.4, -0.2, 0.5], c1 = dd.finish(p1, y1);
+    const p2 = dd.prepare(pd, st, body, [tg], 2), c2 = dd.finish(p2, [0, 0, -0.1]), p3 = dd.prepare(pd, st, body, [tg], 3);
+    ok("!! finish() TAKES THE OUTPUTS IT IS GIVEN AND NO OTHERS: y = (0.4, -0.2, 0.5) gives the sight's aim plus 0.05 x 0.4 on yaw and 0.05 x -0.2 on pitch and a trigger ON although the zero network (the module's own forward) would never fire; `last` holds that very y and the prepared features; the trigger it set is what the NEXT prepare() shows as `lastFire` (feature 10: 1 after a trigger on, 0 after one off)",
+        Math.abs(c1.yaw - (0.5 + 0.05 * 0.4)) < 1e-12 && Math.abs(c1.pitch - (0.1 + 0.05 * -0.2)) < 1e-12 && c1.fire === true && c1.target === 2 && dd.last === null === false && p2.x[10] === 1 && c2.fire === false && p3.x[10] === 0 && dd.last.y[2] === -0.1 && dd.last.x === p2.x);
+    const dn = SG.gunnerFor(w, () => hold), fwdMine = (ww, x) => [0, 0, 0], dm = SG.gunnerFor(w, () => hold, { forward: fwdMine, layersOf: () => "layers", post: () => "post" });
+    ok("!! A DECIDER CARRIES WHAT A BATCH NEEDS TO RUN ITS NETWORK ELSEWHERE (`decide.net`): the weights (the very array), the forward it runs (this module's by default, the one given when one is), the layer specs function and the post that turns the last layer into the three controls -- and nothing else",
+        dn.net.w === w && dn.net.forward === SG.forward && dn.net.layersOf === SG.layersOf && dn.net.post === SG.post && Object.keys(dn.net).sort().join() === "forward,layersOf,post,w" && dm.net.forward === fwdMine && dm.net.layersOf() === "layers" && dm.net.post() === "post" && dm.net.w === w);
+    const x = SG.features(pd, st, body, hold, tg, false), lay = SG.layersOf(w); let h = Float32Array.from(x); for (let i = 0; i < lay.length - 1; i++) h = mlpLayerCpu(lay[i], h, 1); const raw = mlpLayerCpu(lay[lay.length - 1], h, 1);
+    ok("!! post() IS THE LAST LAYER'S OUTPUTS THROUGH tanh, AND forward() IS THE LAYERS THEN post(): for the hand weights on a prepared feature vector, forward(w, x) equals post of the last layer by the layers' own arithmetic, bit for bit, and post([1, -1, 0]) is tanh each", JSON.stringify(SG.forward(w, x)) === JSON.stringify(SG.post(Array.from(raw))) && JSON.stringify(SG.post([1, -1, 0])) === JSON.stringify([Math.tanh(1), Math.tanh(-1), 0]));
+});
+
 console.log("\n4. THE HAND WEIGHTS ARE THE HAND GUNNER");
 section(() => {
     const regular = { delay: 0.4, sigma: 0.03, maxRange: 600, burst: 1, gravity: 0, observe: { window: 0.6, sigmaRange: 0.01 } };
@@ -141,7 +171,7 @@ section(() => {
 
 console.log("\n6. THE FRONT DOOR");
 section(() => {
-    ok("!! the export list is pinned: AIM_GAIN, FEATURES, FEATURE_NAMES, HEAVY_DAMAGE, HIDDEN, OUTPUTS, OUTPUT_NAMES, REACH, REC_EDGES, REC_STEPS, WEIGHT_COUNT, features, forward, gunnerFactory, gunnerFor, handWeights, layersOf, liveIndices, mutate, perturb, reportLines, rngFor, zeroWeights", Object.keys(SG).sort().join() === "AIM_GAIN,FEATURES,FEATURE_NAMES,HEAVY_DAMAGE,HIDDEN,OUTPUTS,OUTPUT_NAMES,REACH,REC_EDGES,REC_STEPS,WEIGHT_COUNT,features,forward,gunnerFactory,gunnerFor,handWeights,layersOf,liveIndices,mutate,perturb,reportLines,rngFor,zeroWeights", Object.keys(SG).sort().join());
+    ok("!! the export list is pinned: AIM_GAIN, FEATURES, FEATURE_NAMES, HEAVY_DAMAGE, HIDDEN, OUTPUTS, OUTPUT_NAMES, REACH, REC_EDGES, REC_STEPS, WEIGHT_COUNT, features, forward, gunnerFactory, gunnerFor, handWeights, layersOf, liveIndices, mutate, perturb, post, reportLines, rngFor, zeroWeights", Object.keys(SG).sort().join() === "AIM_GAIN,FEATURES,FEATURE_NAMES,HEAVY_DAMAGE,HIDDEN,OUTPUTS,OUTPUT_NAMES,REACH,REC_EDGES,REC_STEPS,WEIGHT_COUNT,features,forward,gunnerFactory,gunnerFor,handWeights,layersOf,liveIndices,mutate,perturb,post,reportLines,rngFor,zeroWeights", Object.keys(SG).sort().join());
     const lines = SG.reportLines();
     ok("the report lines say real numbers: 12 features, 34 hidden, 3 outputs, 860 weights, three non-zero hand weights", lines.length === 2 && lines.every((l) => !/NaN|undefined/.test(l)) && /12 features, 34 hidden/.test(lines[1]) && /860 weights/.test(lines[1]) && /in 3 non-zero weights/.test(lines[1]), lines[1]);
 });

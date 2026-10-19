@@ -18,6 +18,9 @@
 // THE NETWORK is brain/gunnerPolicy.mjs's, for a different seat: the twelve features through an encoder into the 34 neurons of the real male-cns Giant Fiber Circuit (313 real synapses, three weight-tied recurrent steps, every other recurrent weight
 // structurally zero), out to three numbers. (Restated here, as pilot6dofPolicy restates it, because each file's constants are its contract.)
 //
+// A DECISION IS TWO HALVES (v-unnumbered): `decide.prepare` is everything before the network -- the sight's answer and the twelve features -- and `decide.finish(prep, y)` everything after it (the correction added to the aim, the trigger); decide() is the two with the module's own forward between them, bit for bit as it was. They exist so that an arena can ask the networks of
+// every seat of every ship at once (brain/spaceArena.mjs's two-phase tick), on the CPU one by one or in a batch on a GPU (brain/seatGunnerGpu.mjs); `decide.net` is { w, forward, layersOf, post }, what such a batch needs to run this seat's network.
+//
 // *** THE HAND WEIGHTS ARE THE HAND GUNNER, WRITTEN THROUGH THE NETWORK: no correction, and the trigger is the sight's own rule (the 'aimed' feature through one channel, +4 and -2 into a tanh: on exactly when the rule's flag is). *** A seat given them
 // does what a seat given the hand gunner does, to the bit (the gate flies both in the same fight and compares the states). The recurrent core is zero, which makes it an exact identity, as in gunnerPolicy and pilot6dofPolicy: the connectome is
 // there for a TRAINED gunner to use. The zero gunner never fires and never corrects (tanh 0 is not > 0).
@@ -62,13 +65,15 @@ function layersOfMemo(w) {
 }
 export const layersOf = (w) => layersOfMemo(w);
 
+/** The last layer's three outputs as the three controls in [-1, 1]. */
+export const post = (y) => [Math.tanh(y[0]), Math.tanh(y[1]), Math.tanh(y[2])];
 /** features -> three numbers in [-1, 1]: the yaw correction, the pitch correction, the trigger. */
 export function forward(w, x) {
     const layers = layersOfMemo(w);
     let h = Float32Array.from(x);
     for (let i = 0; i < layers.length - 1; i++) h = mlpLayerCpu(layers[i], h, 1);
     const y = mlpLayerCpu(layers[layers.length - 1], h, 1);
-    return [Math.tanh(y[0]), Math.tanh(y[1]), Math.tanh(y[2])];
+    return post(y);
 }
 
 const halfSpan = (arc) => Math.max((arc[1] - arc[0]) / 2, 1e-6), centre = (arc) => (arc[0] + arc[1]) / 2;
@@ -86,16 +91,24 @@ export function features(seat, st, body, rule, tg, lastFire = false, reach = REA
  * The gunner for ONE seat from weights `w` and a sight: decide(seat, st, body, targets, t) -> { yaw, pitch, fire, target } (the gunSeats contract). With no target the sight's own answer stands (the network is not asked); with one, the network's
  * correction is added to the sight's aim and its trigger replaces the sight's; the decider's `last` holds what the network was shown and said the last time it was asked (null if the tick had no target). `reach` is the sight's maxRange (REACH if not said); `forward` is the network to run (this module's by default; brain/seatGunnerMlp.mjs hands in its own).
  */
-export function gunnerFor(w, sight, { reach = REACH, forward: fwd = forward } = {}) {
+export function gunnerFor(w, sight, { reach = REACH, forward: fwd = forward, layersOf: lo = layersOf, post: pst = post } = {}) {
     let lastFire = false;
-    function decide(seat, st, body, targets, t = 0) {
+    // THE TWO HALVES, so that an arena can ask every seat's network at once (brain/spaceArena.mjs's two-phase tick): prepare() is everything before the network -- the sight's answer and the twelve features -- and finish() everything after it. decide() is the two with the network run between.
+    function prepare(seat, st, body, targets, t = 0) {
         const rule = sight(seat, st, body, targets, t);
-        if (rule.target == null) { lastFire = false; decide.last = null; return rule; }
-        const tg = targets.find((x) => x.id === rule.target); if (!tg) { lastFire = false; decide.last = null; return rule; }
-        const x = features(seat, st, body, rule, tg, lastFire, reach), y = fwd(w, x), fire = y[2] > 0;
-        lastFire = fire; decide.last = { x, y };
-        return { yaw: rule.yaw + AIM_GAIN * y[0], pitch: rule.pitch + AIM_GAIN * y[1], fire, target: rule.target };
+        if (rule.target == null) { lastFire = false; decide.last = null; return { rule, x: null }; }
+        const tg = targets.find((x) => x.id === rule.target); if (!tg) { lastFire = false; decide.last = null; return { rule, x: null }; }
+        return { rule, x: features(seat, st, body, rule, tg, lastFire, reach) };
     }
+    function finish(prep, y) {
+        if (prep.x === null) return prep.rule;
+        const fire = y[2] > 0;
+        lastFire = fire; decide.last = { x: prep.x, y };
+        return { yaw: prep.rule.yaw + AIM_GAIN * y[0], pitch: prep.rule.pitch + AIM_GAIN * y[1], fire, target: prep.rule.target };
+    }
+    function decide(seat, st, body, targets, t = 0) { const p = prepare(seat, st, body, targets, t); return finish(p, p.x === null ? null : fwd(w, p.x)); }
+    decide.prepare = prepare; decide.finish = finish;
+    decide.net = { w, forward: fwd, layersOf: lo, post: pst };   // what a batch needs to run this seat's network elsewhere (the GPU): the weights, the layers, and what turns the last layer into the three controls
     decide.last = null;   // what the network was last shown and answered ({ x: the twelve features, y: the three outputs }), or null when the tick had no target: for a page to draw
     return decide;
 }

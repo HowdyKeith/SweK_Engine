@@ -51,6 +51,15 @@ section(() => {
     ok("!! THE DECIDER USES ITS OUTPUTS: biases giving +0.5, -0.3 and +0.76 add 0.05 x 0.5 to the sight's yaw and 0.05 x -0.3 to its pitch and turn the trigger on though the sight's rule said no; a negative third output stops a rule that fires", Math.abs(r.yaw - 0.525) < 1e-6 && Math.abs(r.pitch - 0.085) < 1e-6 && r.fire === true && r.target === 2 && (() => { const c = MG.zeroWeights(); c[1570] = -1; return MG.gunnerFor(c, () => ({ yaw: 0, pitch: 0, fire: true, target: 2 }))(pd, st, body, [tg], 1).fire === false; })());
 });
 
+console.log("\n2b. WHAT A BATCH NEEDS TO RUN THIS NETWORK ELSEWHERE (`decide.net`)");
+section(() => {
+    const w = MG.perturb(MG.zeroWeights(), 0.3, SG.rngFor(5)), d = MG.gunnerFor(w, () => ({ yaw: 0, pitch: 0, fire: false, target: null }));
+    ok("!! A GPU BRAIN SEAT CARRIES ITS OWN NETWORK, NOT THE FRUIT FLY'S: its decider's `net` is the weights (the very array), THIS module's forward and layersOf (three layers, 12 -> 32 -> 32 -> 3) and the shared post (tanh of the three outputs); and the same decider, prepare() then this module's forward then finish(), is decide() to the bit",
+        d.net.w === w && d.net.forward === MG.forward && d.net.layersOf === MG.layersOf && d.net.layersOf(w).length === 3 && d.net.post === SG.post && d.net.forward !== SG.forward && typeof d.prepare === "function" && typeof d.finish === "function"
+        && (() => { const pd = SHIP.seats.find((s) => s.name === "port PD 2"), st = GS.createSeatState(pd), body = { pos: [0, 0, 0], vel: [0, 0, 0], q: Q, w: [0, 0, 0] }, tg = { id: 2, pos: [0, 300, 0], vel: [0, 0, 0] }, rule = { yaw: 0.5, pitch: 0.1, fire: true, target: 2 };
+            const a = MG.gunnerFor(w, () => rule), b = MG.gunnerFor(w, () => rule), ca = a(pd, st, body, [tg], 1), p = b.prepare(pd, st, body, [tg], 1), cb = b.finish(p, MG.forward(w, p.x)); return JSON.stringify(ca) === JSON.stringify(cb) && JSON.stringify(a.last) === JSON.stringify(b.last); })());
+});
+
 console.log("\n3. THE HAND WEIGHTS ARE THE HAND GUNNER");
 section(() => {
     const regular = { delay: 0.4, sigma: 0.03, maxRange: 600, burst: 1, gravity: 0, observe: { window: 0.6, sigmaRange: 0.01 } }, makeSight = (seat, k) => GS.handGunner({ seed: 200 + k, ...regular });

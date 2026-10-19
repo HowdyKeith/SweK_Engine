@@ -32,12 +32,15 @@
 // THE GROUND. Three wheels (nose, two mains) and the wingtips and tail are the contact points. A flight ends the tick any of them reaches z = 0: a WHEEL contact is a TOUCHDOWN if the point's sink speed is at most
 // 3 m/s, the bank at most 15 degrees and the pitch within -10..+15 degrees (a wing-low or tail-first arrival is not a landing); anything else -- a tip, the tail, an inverted aircraft, a hard arrival -- is a CRASH.
 // classify() is a pure function of the state, so stepFlight() on a state that has already ended returns it unchanged: a finished flight stays finished.
+// TERRAIN. The ground is physics/mechanics/terrain.mjs's height function (flat at 0 by default, and then every number is what it was before the terrain existed, to the bit): a contact point is on the ground when it is at or under the surface UNDER IT (a wing tip can be over a hill the nose is not), and a
+// touchdown also needs the ground no steeper than 5 degrees (INVENTED) at the aircraft. The sink is still the point's vertical speed and the bank and pitch limits are still the world's: nothing here lands an aircraft on a slope the way a pilot would, it only refuses to call it a landing.
 //
 // Pure: no DOM, no clock, no random. physics/mechanics/flightModel6dof-selfcheck.mjs holds this to closed forms (free fall, damping rates, the stall speed, the phugoid period, the engine) and to symmetry.
 "use strict";
 import { createBody, step, createAccumulator, applyForceAtPoint, worldToBody, rotateByQuat, cross3 } from "./rigidBody6dof.mjs";
 import { applySurfaceForce, STALL } from "./aeroSurface.mjs";
 import { createAircraft, mixControls, withDeflection } from "./aircraftAssembly.mjs";
+import { FLAT, asTerrain } from "./terrain.mjs";
 
 export const GRAVITY = 9.80665, DT = 1 / 60;
 export { STALL };
@@ -51,7 +54,7 @@ export const TRAINER = Object.freeze({
     wingIncidence: 0.035, stall: STALL, parasiteArea: 0.5, thrustMax: 4000, propSpeed: 90, thrustPoint: Object.freeze([2, 0, 0]),
     wheels: Object.freeze([[1.8, 0, -1.3], [-0.3, 1.2, -1.3], [-0.3, -1.2, -1.3]]),
     hull: Object.freeze([[0, 5.3, 0], [0, -5.3, 0], [-5.5, 0, 0.3], [2.5, 0, 0.2]]),   // wingtips, tail, nose
-    touchdown: Object.freeze({ maxSink: 3, maxBank: 15 * Math.PI / 180, minPitch: -10 * Math.PI / 180, maxPitch: 15 * Math.PI / 180 }),
+    touchdown: Object.freeze({ maxSink: 3, maxBank: 15 * Math.PI / 180, minPitch: -10 * Math.PI / 180, maxPitch: 15 * Math.PI / 180, maxSlope: 5 * Math.PI / 180 }),   // maxSlope INVENTED: wheels down on ground steeper than this are a crash, not a touchdown
 });
 
 export const AIR_DENSITY = 1.225;   // the value aeroSurface.mjs uses; flightModel6dof does not vary it (see the header)
@@ -130,34 +133,40 @@ export function rates(state) { return { roll: state.w[0], pitch: -state.w[1], ya
 
 // ---- ground -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-/** Where each contact point is and how fast it is sinking (world z, and -vz of the point: the body's velocity plus w x r). */
-function contactPoints(model, state) {
+/** Where each contact point is and how fast it is sinking (z above the terrain under it, and -vz of the point: the body's velocity plus w x r). */
+function contactPoints(model, state, terrain = FLAT) {
     const out = [];
     const one = (p, kind) => {
         const off = rotateByQuat(state.q, p), wb = rotateByQuat(state.q, state.w), vel = [state.vel[0] + (wb[1] * off[2] - wb[2] * off[1]), state.vel[1] + (wb[2] * off[0] - wb[0] * off[2]), state.vel[2] + (wb[0] * off[1] - wb[1] * off[0])];
-        out.push({ kind, z: state.pos[2] + off[2], sink: -vel[2] });
+        out.push({ kind, z: state.pos[2] + off[2] - (terrain.flat ? 0 : terrain.height(state.pos[0] + off[0], state.pos[1] + off[1])), sink: -vel[2] });
     };
     for (const p of model.spec.wheels) one(p, "wheel");
     for (const p of model.spec.hull) one(p, "hull");
     return out;
 }
 
-/** "airborne" | "touchdown" | "crashed" | "lost" (a non-finite state), with the numbers that decided it. A pure function of the state. */
-export function classify(model, state) {
+/**
+ * "airborne" | "touchdown" | "crashed" | "lost" (a non-finite state), with the numbers that decided it. A pure function of the state and the terrain (physics/mechanics/terrain.mjs: the flat ground at 0 by default, and then the same bits as before it existed; a bare function of (x, y) or a spec is accepted).
+ * A contact point is on the ground when it is at or under the surface UNDER IT (a wingtip can be over a hill the nose is not); a touchdown also needs the ground to be no steeper than 5 degrees (INVENTED) -- wheels down on a steep slope are a crash. The bank and pitch limits stay the WORLD's.
+ */
+export function classify(model, state, terrain = FLAT) {
     if (![...state.pos, ...state.vel, ...state.q, ...state.w].every(Number.isFinite)) return { status: "lost" };
-    const hit = contactPoints(model, state).filter((p) => p.z <= 0);
+    terrain = asTerrain(terrain);
+    const hit = contactPoints(model, state, terrain).filter((p) => p.z <= 0);
     if (!hit.length) return { status: "airborne" };
     const a = attitude(state), t = model.spec.touchdown, sink = Math.max(...hit.map((p) => p.sink));
-    const gentle = hit.every((p) => p.kind === "wheel") && sink <= t.maxSink && Math.abs(a.bank) <= t.maxBank && a.pitch >= t.minPitch && a.pitch <= t.maxPitch;
+    const slopeOk = terrain.flat || Math.acos(Math.min(1, Math.max(-1, terrain.normal(state.pos[0], state.pos[1])[2]))) <= t.maxSlope;
+    const gentle = hit.every((p) => p.kind === "wheel") && sink <= t.maxSink && Math.abs(a.bank) <= t.maxBank && a.pitch >= t.minPitch && a.pitch <= t.maxPitch && slopeOk;
     return { status: gentle ? "touchdown" : "crashed", sink, bank: a.bank, pitch: a.pitch, hull: hit.some((p) => p.kind === "hull") };
 }
 
 /** One tick: { state, status, ...classification }. A state that has already ended is returned unchanged. */
-export function stepFlight(model, state, controls, dt = DT, windWorld = [0, 0, 0]) {
-    const before = classify(model, state);
+export function stepFlight(model, state, controls, dt = DT, windWorld = [0, 0, 0], terrain = FLAT) {
+    terrain = asTerrain(terrain);
+    const before = classify(model, state, terrain);
     if (before.status !== "airborne") return { state, ...before };
     const next = step(state, forcesAndMoments(model, state, controls, windWorld).acc, dt);
-    return { state: next, ...classify(model, next) };
+    return { state: next, ...classify(model, next, terrain) };
 }
 
 // ---- trim -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

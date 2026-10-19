@@ -39,10 +39,19 @@
 //   speed at the contact point) -- no row had a pitch rate; the nose-down-rate row exists because of it. F31 and F37 went 0 red for the same reason (the stick limit ends every trim before the stall angle can;
 //   createState hard-coded the TRAINER's mass and the model's was never used) -- the first fixed by a row on an airframe whose elevator and engine do not run out, the second by making the STATE own its mass.
 //   F12 first FAILED BY CRASH (the shared STALL is frozen, so editing a surface's copy of it threw); the row now catches the throw and goes red by name.
+//   TERRAIN (section 11b, added when the ground became a height function, physics/mechanics/terrain.mjs; the 45 sabotages above were measured BEFORE that edit and have not been re-run: the ground rows they guard are the
+//   flat-path arithmetic, which section 11b's first row holds to the bit): 17 mutants of the contact tests against the first version of the rows left 4 at 0 red -- the contact height read at the origin (a null from the
+//   descent search ended the gate with no row failing by name; the search is null-safe now and the 'slope is the one under the aircraft' row catches it), the flat shortcut in the slope test (equivalent: the slope of
+//   FLAT is 0, dropped), stepFlight converting the terrain once (equivalent: classify converts it itself, dropped) and the next state read without the terrain (it found a crash one tick late, which the +-0.5 s wall row
+//   could not see: the one-tick row exists because of it). Second run, 15 of 15 red (the number is how many rows went red): FT1 contact ignores the terrain height 6; FT2 contact height read under the centre 2; FT3
+//   contact height read at the origin 3; FT4 contact x offset ignored 1; FT5 contact y offset ignored 1; FT6 slope never matters 2; FT7 slope read at the origin 1; FT8 slope limit 20 degrees 2; FT9 slope limit 1 degree
+//   1; FT11 slope inverted 4; FT12 classify does not convert 1; FT14 step: the state before is read without the terrain 1; FT15 step: the next state is read without the terrain 1; FT16 contact points not given the
+//   terrain 6; FT17 fast path for every terrain 6.
 "use strict";
 import { createBody, rotateByQuat, worldToBody, cross3 } from "./rigidBody6dof.mjs";
 import * as A from "./aeroSurface.mjs";
 import * as F from "./flightModel6dof.mjs";
+import * as TR from "./terrain.mjs";
 
 let fails = 0;
 function ok(name, cond, detail) { console.log(`  ${cond ? "PASS" : "FAIL"}  ${name}${detail ? "   " + detail : ""}`); if (!cond) fails++; }
@@ -305,6 +314,32 @@ console.log("\n11. CONTROLS ARE SANITISED; THE GROUND");
     const end = gentle.s, again = F.stepFlight(model, end, { throttle: 1, pitch: 1 });
     ok("!! a flight that has ended STAYS ended: stepFlight on a touched-down state returns the same state object and the same status, whatever the controls", again.state === end && again.status === "touchdown");
     ok("a hull point under the ground is a crash whatever the wheels do: a wing tip 0.1 m under at a 0.5 m/s sink with level wings is still a CRASH", (() => { const s = F.createState({ pos: [0, 0, 5], speed: 30, pitch: 0, bank: 5 * D2R, gamma: 0 }); s.pos[2] = 5.3 * Math.sin(5 * D2R) - 0.1; return F.classify(model, s).status === "crashed"; })());
+}
+
+console.log("\n11b. THE GROUND IS A TERRAIN");
+{
+    const TRN = TR, attempt = (fn, fallback = null) => { try { return fn(); } catch { return fallback; } };   // a mutant that makes a call throw must fail its row by name
+    const flightBits = (terr) => JSON.stringify([0, 1, 2].map((k) => { let s = k === 0 ? cruiseState() : F.createState({ pos: [0, 0, k === 1 ? 1.5 : 6], speed: 30, pitch: 4 * D2R, gamma: k === 1 ? -3 * D2R : -12 * D2R }), r = null; for (let i = 0; i < 300; i++) { r = F.stepFlight(model, s, CRUISE, F.DT, [0, 0, 0], terr); s = r.state; if (r.status !== "airborne") break; } return [s, r.status, r.sink, r.hull]; }));
+    const base = flightBits(undefined);
+    ok("!! NO TERRAIN, FLAT AND A FLAT SPEC ARE THE SAME FLIGHTS TO THE BIT (a cruise, a gentle arrival, a steep one): the fast path for the flat ground at 0 is the arithmetic the model had before the terrain existed", flightBits(TRN.FLAT) === base && flightBits(TRN.createTerrain({ kind: "flat" })) === base && flightBits({ kind: "flat" }) === base && base.length > 500);
+    const descend = (terr, x0, opts = {}) => { const h = terr.height(x0, 0), s = F.createState({ pos: [x0, 0, h + 6], speed: opts.speed ?? 30, pitch: opts.pitch ?? 4 * D2R, bank: opts.bank ?? 0, gamma: opts.gamma ?? -3 * D2R }); for (let z = 6; z > -1; z -= 0.002) { s.pos[2] = h + z; const c = F.classify(model, s, terr); if (c.status !== "airborne") return c; } return { status: "never touched" }; };
+    const cases = [{}, { gamma: -12 * D2R, speed: 40, pitch: 0 }, { bank: 16.5 * D2R }, { pitch: 22 * D2R }, { bank: 14 * D2R }];
+    const sameAs = (terr, x0) => cases.every((o) => { const a = descend(TRN.FLAT, 0, o), b = descend(terr, x0, o); return a.status === b.status && a.hull === b.hull && near(a.sink, b.sink, 1e-6); });
+    ok("!! RAISED GROUND IS THE SAME GROUND, HIGHER: the five arrivals (a gentle one, a 12-degree dive, 16.5 degrees of bank, a tail-first one, 14 degrees of bank) onto a plateau at 30 m are the same fates with the same sink as onto the flat ground at 0 (touchdown, crash, crash, crash, touchdown)", sameAs(TRN.createTerrain({ kind: "flat", level: 30 }), 0) && descend(TRN.createTerrain({ kind: "flat", level: 30 }), 0).status === "touchdown");
+    ok("!! A TERRAIN FLAT AT 0 THAT TAKES THE GENERAL PATH (a plane with no slope) GIVES THE SAME FATES: every contact point is read against the height under it and the slope is read, and nothing changes on level ground", sameAs(TRN.createTerrain({ kind: "plane", gx: 0, gy: 0 }), 0));
+    const slopeAt = (deg) => descend(TRN.createTerrain({ kind: "plane", gx: Math.tan(deg * D2R) }), 0);
+    ok("!! A TOUCHDOWN NEEDS GROUND NO STEEPER THAN 5 DEGREES: the gentle arrival (wheels first, 1.6 m/s of sink, nose 4 degrees up) onto a 3-degree slope is a 'touchdown' and onto an 8-degree one a 'crashed' with no hull point touching -- the slope alone", slopeAt(3).status === "touchdown" && slopeAt(8).status === "crashed" && slopeAt(8).hull === false && slopeAt(0).status === "touchdown");
+    const bump = TRN.createTerrain({ kind: "bump", x0: 60, y0: 0, height: 8, radius: 20 });
+    ok("!! THE SLOPE IS THE ONE UNDER THE AIRCRAFT, NOT AT THE ORIGIN: the same gentle arrival on the 19-degree flank of an 8 m bump, 14 m short of its crest, is a 'crashed', and at the origin of the same terrain (60 m from the bump, level) it is a 'touchdown'", descend(bump, 46).status === "crashed" && descend(bump, 46).hull === false && descend(bump, 0).status === "touchdown");
+    const towards = (terr, z0) => { let s = F.createState({ pos: [0, 0, z0], speed: 45, pitch: T45.pitchAttitude }), r = null; let n = 0; for (let i = 0; i < 900; i++) { r = F.stepFlight(model, s, CRUISE, F.DT, [0, 0, 0], terr); s = r.state; n = i + 1; if (r.status !== "airborne") break; } return { s, r, t: n / 60 }; };
+    const wall = TRN.createTerrain({ kind: "wall", x0: 300, height: 30 }), into = towards(wall, 10), over = towards(wall, 60);
+    ok("!! FLYING INTO A WALL IS A CRASH: at 45 m/s, 10 m up, towards a wall 30 m high at x = 300 the flight ends 'crashed' with a hull point (the nose, 2.5 m ahead of the centre) on the face, 297 +- 2 m along, about 6.6 s on; 60 m up it flies over (still airborne 15 s later, past the wall)", into.r.status === "crashed" && into.r.hull === true && near(into.s.pos[0], 297, 2) && near(into.t, 6.6, 0.5) && over.r.status === "airborne" && over.s.pos[0] > 600, `crash at x ${into.s.pos[0].toFixed(1)}`);
+    const wingBump = TRN.createTerrain({ kind: "bump", x0: 0, y0: 5.3, height: 6, radius: 1 }), tipState = F.createState({ pos: [0, 0, 4], speed: 30, pitch: 0, gamma: 0 });
+    ok("!! A HULL POINT IS ON THE GROUND WHEN IT IS UNDER THE SURFACE UNDER IT: a level aircraft 4 m up is airborne over flat ground, and over a 6 m bump that stands under the LEFT wing tip alone (0, 5.3) it is 'crashed' with a hull point touching -- and the same under the right tip", F.classify(model, tipState).status === "airborne" && F.classify(model, tipState, wingBump).status === "crashed" && F.classify(model, tipState, wingBump).hull === true && F.classify(model, tipState, TRN.createTerrain({ kind: "bump", x0: 0, y0: -5.3, height: 6, radius: 1 })).hull === true);
+    const plateau = TRN.createTerrain({ kind: "flat", level: 30 }), diving = F.createState({ pos: [0, 0, 31.3 + 0.001], speed: 30, pitch: 0, gamma: -0.17 }), diveStep = F.stepFlight(model, diving, CRUISE, F.DT, [0, 0, 0], plateau);
+    ok("!! THE STEP THAT ENDS A FLIGHT SAYS SO: an aircraft diving at 5 m/s with its wheels 1 mm over a plateau at 30 m is, after ONE tick, 'crashed' (a hard arrival on the plateau) -- the next state is read against the terrain, not against z = 0 (which would call it airborne and find out a tick late)", diveStep.status === "crashed" && diveStep.sink > 3 && F.stepFlight(model, diving, CRUISE).status === "airborne");
+    const inside = F.createState({ pos: [0, 0, 5], speed: 30 }), stepped = attempt(() => F.stepFlight(model, inside, CRUISE, F.DT, [0, 0, 0], plateau), { state: null, status: "threw" });
+    ok("!! A FLIGHT THAT BEGINS INSIDE THE GROUND IS ALREADY OVER: stepping an aircraft placed 5 m up inside a plateau 30 m high returns that very state 'crashed' with nothing integrated; and a bare function or a spec for the plateau does the same", stepped.state === inside && stepped.status === "crashed" && attempt(() => F.stepFlight(model, inside, CRUISE, F.DT, [0, 0, 0], () => 30).state === inside) === true && attempt(() => F.classify(model, inside, { kind: "flat", level: 30 }).status) === "crashed");
 }
 
 console.log("\n12. DETERMINISM AND FUZZ; THE FRONT DOOR");

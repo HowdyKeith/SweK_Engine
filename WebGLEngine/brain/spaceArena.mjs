@@ -5,10 +5,15 @@
 // brain/dogfightArena.mjs did for the flight fight -- and with a CAPITAL SHIP (physics/mechanics/capitalShip.mjs) that has gun seats with gunners. Two kinds of craft:
 //
 //   A FIGHTER   { id, team, name, kind: "fighter", state ({ pos, vel, q, w }), pilot ((body, target, opts) -> { torqueBody, thrust, firing }; default the PD autopilot) }. Against a CAPITAL SHIP it flies a doctrine of its own (see below); against a fighter it flies the page's plain pursuit.
-//   A CAPITAL   { id, team, name, kind: "capital", state, ship (createCapitalShip()), gunner ((seat, k) -> decide; default gunSeats.handGunner in vacuum), behaviour: "face" (turn toward the nearest enemy at the hull's own limit) | "hold" (keep the heading), cruise (a fraction of its thrust, default 0.3) }.
+//   A CAPITAL   { id, team, name, kind: "capital", state, ship (createCapitalShip()), gunner ((seat, k) -> decide; default gunSeats.handGunner in vacuum), behaviour: "face" (turn toward the nearest enemy at the hull's own limit) | "hold" (keep the heading) | "station" (keep a slot beside another ship: see below; needs `leader` and `offset`), cruise (a fraction of its thrust, default 0.3) }.
 //                 Its seats fire (each gunner is shown the enemy craft still flying and turns its seat and fires through gunSeats.stepSeat), its hit volume is the ship's spheres (a round names the part it reached; a turret or a PD mount shot to nothing
 //                 takes its seat out of the fight, an engine pod a third of the thrust), and its wave-motion cannon -- an INVENTED weapon -- charges, and fires one hit-scan beam along the bow when an enemy is in it.
 //
+//   A HELM PILOT (a capital ship's `helmPilot`, off by default): (rule, ctx) -> { torque, thrust }, called once a tick for a ship with a helm, AFTER the rule has decided: `rule` is { torque (body frame, already limited to the hull's own), thrust (a force along the nose) } -- whatever the behaviour made of them, a station's included -- and `ctx`
+//               is { body, ship, foe (the nearest enemy, or null), thrustMax (what the pods left give) }. What it returns REPLACES them, the torque limited to the hull's own again and the thrust clamped to 0..thrustMax. brain/helmPolicy.mjs is the network that fills it. A ship with no helm (the `crew` option) is not asked.
+//   A TWO-PHASE TICK (the seats' networks asked in a batch): a gunner that is a network (brain/seatGunnerPolicy.mjs's `decide`) has two halves, `prepare` (its sight and the twelve features) and `finish` (the controls into a command), and carries `net` (the weights, the layers, the `post`). The tick runs every working seat's `prepare`,
+//               hands the networks of the seats that have a target out as ONE batch ([{ net, x }]) and goes on with the controls it is sent back. stepSpaceArena() runs each network on the CPU as its gunner would have (the same arithmetic: the tick is the tick it always was, bit for bit); stepSpaceArenaAsync(arena, forwardBatch) lets a function of its own run the batch
+//               (brain/seatGunnerGpu.mjs: the GPU Brain's BatchedMLP on a GPUDevice, one forward() per distinct network per tick). A gunner with no halves is called whole, as it always was; a seat that cannot work is not asked.
 //   A TICK      every live craft decides from the states the tick started with; fighters and seats fire; the wave-motion cannon fires if it is charged and something is in its line; every body moves one tick; fighters that touch each other collide (brain/shipCollision6dof.mjs, as the page);
 //               every round moves and is tested against the enemy craft (flightGuns.stepRounds with g = 0 and no ground: space) -- ROUNDS ARE TESTED PER TEAM AGAINST THE OTHER TEAMS' CRAFT ONLY, as the page's weapons are (so BY DEFAULT there is no friendly fire and no hold-fire rule, unlike the flight arena -- `friendlyFire: true` turns both on, below); a fighter that touches a ship's
 //               hull is lost and the ship takes 25; hit points gone is destroyed. THE FIGHT IS OVER when fewer than two teams have a craft flying, or at the time limit.
@@ -16,6 +21,12 @@
 //   THE FIGHTERS' DOCTRINE AGAINST A CAPITAL SHIP is a HAND RULE, chosen, not trained, and the reason it exists is measured: the page's pilot has no braking, so a fighter that simply pursues a ship arrives at its hull at speed and rams it. A fighter APPROACHES by steering for a point 60 units to one side of the ship
 //               (the side is its id's parity), thrusting; within 220 units and closing it STRAFES -- nose on the ship's lead point, thrust cut, guns firing -- and the lateral velocity it built on the way in carries it past. The learned 6DOF pilots (brain/pilot6dofPolicy.mjs) answer the same call and can fly it; nothing here was trained for it.
 //
+//   A SHIP THAT KEEPS ITS STATION (behaviour "station", with `leader` -- the id of another capital ship -- and `offset`, [x, y, z] in the WORLD frame from the leader's centre): THE SLOT is the leader's centre plus the offset, so it moves with the leader and does NOT swing round it when the leader turns.
+//               The hull has ONE thrust axis (its nose), so the follower holds the slot as a thrust-vectoring craft does: it asks for the leader's own acceleration plus STATION_KP x the position error plus STATION_KD x the velocity error, takes the part of that along the leader's nose as its throttle (never negative: it cannot brake)
+//               and tilts its nose toward the rest by as much as the lateral part asks, never more than STATION_MAX_TILT (0.6 rad) -- so the lateral authority is what the throttle is, and a leader at cruise gives the follower about 0.07 of a unit per second squared of it: a slow formation. With the leader gone (destroyed) the ship faces the enemy as "face" does.
+//               THE GAINS ARE CHOSEN, not tuned to anything: a natural frequency of 0.1 rad/s and critical damping. A ship with no helm (the `crew` option) holds nothing.
+//   SHIPS THAT COLLIDE (the option `shipCollisions`, default off, so that every fight pinned without it is the same fight): the capital ships' HULL BOXES (capitalShip.HALF -- not the turrets and the pods, which stand on the hull) are resolved against each other every tick by brain/shipCollision6dof.mjs, the page's fighters' rule: the contact manifold, the impulse solver
+//               (restitution 0.35, friction 0.5) and the ram damage -- the impulse times 0.3, CAPPED AT 25, taken by BOTH ships equally. THE CAP IS THE FIGHTERS' AND IS HERE FOR WANT OF ONE OF ITS OWN: two 1,500-hit-point ships that meet at any speed lose 25 each, and that is the rule, said plainly, not a finding about battleships. Each contact is a `collision` event with `ships: true`.
 //   FRIENDLY FIRE (the option `friendlyFire`, default off, so that every fight pinned without it is the same fight): a round then hits any craft but its owner -- a team-mate, another ship of the team, and the OWNER SHIP'S OWN HULL (a round fired across the deck reaches the parts it crosses; the parts whose sphere the muzzle starts
 //               inside are skipped, as a fighter is skipped by its own rounds). A hit on a team-mate takes its hit points (and a part's), is NOT credited to the shooter's `hits`, is counted in the shooter's `friendlyHits` and the victim's `friendlyTaken`, and its event says `friendly: true`. A craft's `holdFire` (default true) is
 //               the rule that keeps it from doing it: a fighter does not pull its trigger while its round (a straight line in vacuum: the closest approach is closed form) would pass within a team-mate's size plus HOLD_FIRE_MARGIN (2) of it before it reached its target's range; a SEAT'S INTERLOCK is the same test with the ship's own
@@ -26,7 +37,7 @@
 //               momentum relative to it, AT THE HIT POINT, so a hit off a craft's centre spins it (and what spins a wreck is the hits that killed it); `crew` -- the ship's BRIDGE has its crew (BRIDGE_CREW 200, the hits on the bridge sphere) and each seat its GUNNER, who dies at CREW_FRACTION (half) of the hit points of the part the seat sits in, before the part is out: a seat
 //               whose gunner is dead does not fire (seatWorks) although its turret stands, a ship whose bridge crew is dead has no helm -- it turns no more, its engines are set to nothing -- and its cannon, fired from the bridge, charges no more; each death is a `crew` event. THE NUMBERS ARE INVENTED, the recoil of the guns is not modelled and neither is the damage a tumbling wreck would do.
 //
-// WHAT IS NOT HERE, SAID PLAINLY: hit volumes are SPHERES, a fighter's 1.5 units (the page's are oriented boxes: tests of the page's own fighter-against-fighter fight are not this arena's); a fighter that touches a hull is lost without an impulse; ships do not collide with each other; wind and gravity do not exist (vacuum);
+// WHAT IS NOT HERE, SAID PLAINLY: hit volumes are SPHERES, a fighter's 1.5 units (the page's are oriented boxes: tests of the page's own fighter-against-fighter fight are not this arena's); a fighter that touches a hull is lost without an impulse; ships collide with each other only with `shipCollisions` (hull boxes, the fighters' damage cap); wind and gravity do not exist (vacuum);
 // by default a destroyed craft does not tumble (it stops, dark, where it was: `wrecks` lets it drift). stepSpaceArena() MUTATES the arena it is given. Pure otherwise: no DOM, no clock, no random.
 "use strict";
 import * as RB from "../physics/mechanics/rigidBody6dof.mjs";
@@ -42,6 +53,7 @@ export const FIGHTER = Object.freeze({ half: Object.freeze([1.6, 0.7, 0.7]), mas
 export const FIGHTER_GUN = Object.freeze({ ...G.GUN, muzzleSpeed: 900, rate: 1000 / 300, magazine: 1e6, life: 2.5, damage: 18 });
 /** The autopilot's numbers on the page (PAGE_AUTOPILOT): thrust 16, standoff 50, the weapon's speed for the lead. */
 export const AUTOPILOT = Object.freeze({ weaponSpeed: 900, thrustForce: 16, standoff: 50 });
+export const STATION_KP = 0.01, STATION_KD = 0.2, STATION_MAX_TILT = 0.6;   // the slot controller: a natural frequency of 0.1 rad/s (kp = w^2), critical damping (kd = 2 w), and the most the nose is tilted off the leader's
 export const STRAFE_RANGE = 220, APPROACH_OFFSET = 60, RAM_DAMAGE = 25, VISION = 1500, HOLD_FIRE_MARGIN = 2, OWN_HULL_REACH = 50;
 /** The options below, with the numbers the scenario and the page use (all INVENTED): a round's mass for `impact`, the share of a seat's part's hit points that its gunner's life is worth for `crew`, and the bridge crew's hit points. */
 export const ROUND_MASS = 0.002, CREW_FRACTION = 0.5, BRIDGE_CREW = 200;
@@ -58,7 +70,7 @@ const unit = (a, fallback = [1, 0, 0]) => { const n = norm(a); return n > 1e-9 ?
  * A new arena. `crafts` are the definitions above; ids must be distinct positive integers. Returns { dt, seconds, t, i, crafts, rounds, events, done, over, autopilot }. A craft carries { id, team, name, kind, body, hp, hpMax, dead, status ("flying" | "destroyed" | "rammed"),
  * hits (damage it has dealt to the enemy), gun / seats / enginesRunning / partHp (Map part id -> hit points left) / charge / waves, last }.
  */
-export function createSpaceArena({ crafts, dt = DT, seconds = 120, autopilot = AUTOPILOT, friendlyFire = false, wrecks = false, impact = 0, crew = false } = {}) {
+export function createSpaceArena({ crafts, dt = DT, seconds = 120, autopilot = AUTOPILOT, friendlyFire = false, wrecks = false, impact = 0, crew = false, shipCollisions = false } = {}) {
     if (!Array.isArray(crafts) || crafts.length < 2) throw new Error("spaceArena.createSpaceArena: an arena needs at least two crafts");
     const ids = new Set();
     for (const c of crafts) {
@@ -66,12 +78,19 @@ export function createSpaceArena({ crafts, dt = DT, seconds = 120, autopilot = A
         ids.add(c.id);
         if (c.kind !== "fighter" && c.kind !== "capital") throw new Error(`spaceArena.createSpaceArena: craft ${c.id} is a "fighter" or a "capital" (got ${c.kind})`);
         if (c.kind === "capital" && !c.ship) throw new Error(`spaceArena.createSpaceArena: craft ${c.id} is a capital ship with no ship`);
+        if (c.helmPilot !== undefined && c.helmPilot !== null && (c.kind !== "capital" || typeof c.helmPilot !== "function")) throw new Error(`spaceArena.createSpaceArena: craft ${c.id}'s helmPilot is a function (rule, ctx) -> { torque, thrust } of a CAPITAL ship (got ${c.kind === "capital" ? typeof c.helmPilot : "a " + c.kind})`);
+        if (c.behaviour !== undefined && !BEHAVIOURS.includes(c.behaviour)) throw new Error(`spaceArena.createSpaceArena: craft ${c.id}'s behaviour must be one of ${BEHAVIOURS.join(", ")} (got ${c.behaviour})`);
+    }
+    for (const c of crafts) if (c.behaviour === "station") {
+        const lead = crafts.find((o) => o.id === c.leader);
+        if (c.kind !== "capital" || !lead || lead.kind !== "capital" || lead === c) throw new Error(`spaceArena.createSpaceArena: craft ${c.id} keeps a station: that is a capital ship with a \`leader\` that is the id of ANOTHER capital ship (got ${c.leader})`);
+        if (!Array.isArray(c.offset) || c.offset.length !== 3 || !c.offset.every(Number.isFinite)) throw new Error(`spaceArena.createSpaceArena: craft ${c.id} keeps a station: its \`offset\` is [x, y, z] from the leader's centre (got ${JSON.stringify(c.offset)})`);
     }
     const made = crafts.map((c) => {
         const st = c.state || {}, cap = c.kind === "capital", ship = c.ship || null;
         const body = RB.createBody({ mass: cap ? ship.mass : FIGHTER.mass, I: cap ? [...ship.I] : RB.boxInertia({ m: FIGHTER.mass, hx: FIGHTER.half[0], hy: FIGHTER.half[1], hz: FIGHTER.half[2] }), pos: st.pos, vel: st.vel, q: st.q, w: st.w });
         const out = { id: c.id, team: c.team ?? c.id, name: c.name || `craft ${c.id}`, kind: c.kind, body, hp: c.hp ?? (cap ? ship.hp : FIGHTER.hp), hpMax: c.hp ?? (cap ? ship.hp : FIGHTER.hp), dead: false, status: "flying", hits: 0, friendlyHits: 0, friendlyTaken: 0, held: 0, holdFire: c.holdFire !== false, last: null,
-            ship, pilot: c.pilot || null, behaviour: c.behaviour || "face", cruise: c.cruise ?? 0.3, aimRadius: cap ? ship.aimRadius : FIGHTER.radius, mode: "approach", gun: cap ? null : G.createGun(FIGHTER_GUN), seats: [], enginesRunning: cap ? ship.engines.length : 0, partHp: new Map(), partHits: new Map(), charge: 0, waves: 0 };
+            ship, pilot: c.pilot || null, helmPilot: c.helmPilot || null, behaviour: c.behaviour || "face", leader: c.leader ?? null, offset: c.offset ? c.offset.slice() : null, cruise: c.cruise ?? 0.3, aimRadius: cap ? ship.aimRadius : FIGHTER.radius, mode: "approach", gun: cap ? null : G.createGun(FIGHTER_GUN), seats: [], enginesRunning: cap ? ship.engines.length : 0, partHp: new Map(), partHits: new Map(), charge: 0, waves: 0 };
         out.helm = true; out.crew = null;
         if (cap) {
             if (crew) out.crew = { bridge: BRIDGE_CREW, bridgeOut: false, seats: new Map(ship.seats.map((seat, k) => [seat.id, CREW_FRACTION * (ship.parts[ship.seatPart[k]].hp ?? 0)])), dead: new Set() };
@@ -80,9 +99,10 @@ export function createSpaceArena({ crafts, dt = DT, seconds = 120, autopilot = A
         }
         return out;
     });
-    return { dt, seconds, t: 0, i: 0, crafts: made, rounds: [], events: [], done: false, over: null, autopilot: { ...autopilot }, friendlyFire: !!friendlyFire, wrecks: !!wrecks, impact, crew: !!crew };
+    return { dt, seconds, t: 0, i: 0, crafts: made, rounds: [], events: [], done: false, over: null, autopilot: { ...autopilot }, friendlyFire: !!friendlyFire, wrecks: !!wrecks, impact, crew: !!crew, shipCollisions: !!shipCollisions };
 }
 
+export const BEHAVIOURS = Object.freeze(["face", "hold", "station"]);
 const flying = (c) => !c.dead;
 /** The nearest enemy craft still flying, from c, or null. Ties go to the lower id. */
 export function nearestFoe(arena, c) {
@@ -173,8 +193,26 @@ function seatBlocked(arena, c, st, cmd) {
     return m ? `friend: ${m.craft.name}` : null;
 }
 
-/** One tick of every craft and every round. Mutates and returns the arena; a finished arena is returned untouched. `arena.events` is this tick's: [{ type: "hit" | "part" | "kill" | "wave" | "ram" | "collision", ... }]. */
-export function stepSpaceArena(arena) {
+/**
+ * What a ship keeping its station asks of the hull this tick, from the states the tick started with: { aim (a unit vector: where the nose should point), thrust (force along the nose), slot, error } -- or null when its leader is gone (destroyed), when the ship faces the enemy instead.
+ * See the header: the leader's own acceleration, plus kp x the error and kd x the velocity error, its part along the leader's nose as the throttle and the rest as the tilt of the nose.
+ */
+export function stationPlan(arena, c) {
+    const L = arena.crafts.find((o) => o.id === c.leader && !o.dead && o.kind === "capital"); if (!L) return null;
+    const slot = add(L.body.pos, c.offset), e = sub(slot, c.body.pos), de = sub(L.body.vel, c.body.vel);
+    const nL = RB.rotateByQuat(L.body.q, [1, 0, 0]), aL = L.helm ? CS.thrustWith(L.ship, L.enginesRunning) * L.cruise / L.body.mass : 0;
+    const aDes = add(add(mul(nL, aL), e, STATION_KP), de, STATION_KD), aPar = dot(aDes, nL), perp = sub(aDes, mul(nL, aPar)), perpN = norm(perp);
+    const tilt = Math.min(STATION_MAX_TILT, Math.atan2(perpN, Math.max(aPar, aL, 1e-9)));   // the lateral authority is what the throttle is: a floor of the leader's cruise acceleration when the part along the nose is less
+    const aim = perpN > 1e-12 ? unit(add(mul(nL, Math.cos(tilt)), perp, Math.sin(tilt) / perpN)) : nL, aMax = CS.thrustWith(c.ship, c.enginesRunning) / c.body.mass;
+    return { aim, thrust: Math.max(0, Math.min(aMax, aPar / Math.cos(tilt))) * c.body.mass, slot, error: norm(e) };
+}
+
+/**
+ * One tick of every craft and every round, as a GENERATOR so that the seats' networks can be asked in a batch: the tick runs to the point where every working seat whose gunner is a network (it has `decide.prepare` and `decide.net`: brain/seatGunnerPolicy.mjs's) has done everything but the network, yields
+ * the batch ([{ net, x }]: the network and its twelve features, in seat order across the ships), and goes on with the controls it is sent back -- one array of three for each. A tick with no network seat yields nothing. stepSpaceArena() drives it with each seat's own CPU forward pass (the same call the
+ * gunner itself would make, so the tick is the tick it always was, bit for bit); stepSpaceArenaAsync() drives it with whatever batch function it is given (brain/seatGunnerGpu.mjs's, on a GPUDevice).
+ */
+function* tickGen(arena) {
     if (arena.done) return arena;
     const { dt } = arena, t = arena.i * dt, tEnd = (arena.i + 1) * dt, events = [], alive = arena.crafts.filter(flying), plan = new Map(), fresh = [];
     const tag = (rounds, c, gun) => {
@@ -199,22 +237,44 @@ export function stepSpaceArena(arena) {
             c.last = { foe: foe ? foe.id : null, fire, thrust, mode: aim ? aim.mode : "idle", target: aim ? aim.target.pos : null, held };
         } else {
             let torque = [0, 0, 0];
-            if (c.behaviour === "face" && foe) torque = CS.limitTorque(c.ship, AP.decide(c.body, { pos: foe.body.pos, vel: foe.body.vel }, { kp: c.ship.kp, kd: c.ship.kd, thrustForce: 0, standoff: 1e9 }).torqueBody);
+            const station = c.behaviour === "station" ? stationPlan(arena, c) : null;
+            if (station) torque = CS.limitTorque(c.ship, AP.decide(c.body, { pos: add(c.body.pos, station.aim, 1000) }, { kp: c.ship.kp, kd: c.ship.kd, thrustForce: 0, standoff: 1e9 }).torqueBody);
+            else if ((c.behaviour === "face" || c.behaviour === "station") && foe) torque = CS.limitTorque(c.ship, AP.decide(c.body, { pos: foe.body.pos, vel: foe.body.vel }, { kp: c.ship.kp, kd: c.ship.kd, thrustForce: 0, standoff: 1e9 }).torqueBody);
             else torque = CS.limitTorque(c.ship, AP.decide(c.body, { pos: add(c.body.pos, RB.rotateByQuat(c.body.q, [1, 0, 0]), 1000) }, { kp: c.ship.kp, kd: c.ship.kd, thrustForce: 0, standoff: 1e9 }).torqueBody);
             if (!c.helm) torque = [0, 0, 0];   // the bridge crew is gone: nobody turns the hull or sets the engines (`crew` option)
-            plan.set(c, { torque, thrust: c.helm ? CS.thrustWith(c.ship, c.enginesRunning) * c.cruise : 0, fire: false, foe });
-            c.last = { foe: foe ? foe.id : null, fire: false, thrust: plan.get(c).thrust, mode: c.helm ? c.behaviour : "no helm" };
+            let thrust = c.helm ? (station ? station.thrust : CS.thrustWith(c.ship, c.enginesRunning) * c.cruise) : 0;
+            if (c.helmPilot && c.helm) {   // a helm pilot answers the rule's answer
+                const pods = CS.thrustWith(c.ship, c.enginesRunning), out = c.helmPilot({ torque, thrust }, { body: c.body, ship: c.ship, foe, thrustMax: pods });
+                torque = CS.limitTorque(c.ship, out.torque); thrust = Math.max(0, Math.min(pods, out.thrust));
+            }
+            plan.set(c, { torque, thrust, fire: false, foe });
+            c.last = { foe: foe ? foe.id : null, fire: false, thrust: plan.get(c).thrust, mode: c.helm ? (c.behaviour === "station" && !station ? "face" : c.behaviour) : "no helm" };
         }
     }
+    // the seats decide, all of them before any of them acts: what each gunner wants, from the states the tick started with. A gunner that is a network does everything but the network now (its sight, its features), and the networks are run together, once, by whoever drives the tick
+    const shownOf = new Map(), seatCmd = new Map(), jobs = [], jobSeats = [];
+    for (const c of alive) {
+        if (c.kind !== "capital") continue;
+        const shown = alive.filter((o) => o.team !== c.team && norm(sub(o.body.pos, c.body.pos)) < VISION).map((o) => ({ id: o.id, pos: o.body.pos, vel: o.body.vel, radius: o.aimRadius }));
+        shownOf.set(c, shown);
+        for (const st of c.seats) {
+            if (!seatWorks(c, st)) { seatCmd.set(st, { yaw: st.state.yaw, pitch: st.state.pitch, fire: false, target: null }); continue; }
+            if (typeof st.decide.prepare === "function" && st.decide.net) {
+                const prep = st.decide.prepare(st.seat, st.state, c.body, shown, t);
+                if (prep.x === null) seatCmd.set(st, st.decide.finish(prep, null)); else { jobs.push({ net: st.decide.net, x: prep.x }); jobSeats.push({ st, prep }); }
+            } else seatCmd.set(st, st.decide(st.seat, st.state, c.body, shown, t));
+        }
+    }
+    if (jobs.length) { const ys = yield jobs; jobSeats.forEach(({ st, prep }, i) => seatCmd.set(st, st.decide.finish(prep, ys[i]))); }
     // the guns: a fighter's fixed gun, then every working seat
     for (const c of alive) {
         if (c.kind === "fighter") {
             const p = plan.get(c), shot = G.fireFrom(c.gun, () => ({ pos: add(c.body.pos, RB.rotateByQuat(c.body.q, FIGHTER.muzzle)), vel: c.body.vel.slice(), dir: RB.rotateByQuat(c.body.q, [1, 0, 0]) }), p.fire, dt, c.id);
             c.gun = shot.gun; fresh.push(...tag(shot.rounds, c, FIGHTER_GUN));
         } else {
-            const shown = alive.filter((o) => o.team !== c.team && norm(sub(o.body.pos, c.body.pos)) < VISION).map((o) => ({ id: o.id, pos: o.body.pos, vel: o.body.vel, radius: o.aimRadius }));
+            const shown = shownOf.get(c);
             for (const st of c.seats) {
-                const cmd = seatWorks(c, st) ? st.decide(st.seat, st.state, c.body, shown, t) : { yaw: st.state.yaw, pitch: st.state.pitch, fire: false, target: null };
+                const cmd = seatCmd.get(st);
                 let go = cmd; st.blocked = null;
                 if (cmd.fire && arena.friendlyFire && c.holdFire) {   // the line that matters is the one the seat points along AFTER this tick's slew, so the slew is done first without the trigger
                     const aimed = GS.stepSeat(st.seat, st.state, c.body, { ...cmd, fire: false }, dt, c.id).state, why = seatBlocked(arena, c, { seat: st.seat, state: aimed }, cmd);
@@ -252,6 +312,8 @@ export function stepSpaceArena(arena) {
     if (arena.wrecks) for (const c of arena.crafts) if (c.dead && !alive.includes(c)) c.body = RB.step(c.body, RB.createAccumulator(), dt);   // a wreck keeps its momentum and its spin: no force on it, no torque
     // fighters that touch each other collide, as the page's do (the pairs of live fighters, in craft order)
     for (const e of SC.resolveShipCollisions(alive.filter((c) => c.kind === "fighter"), FIGHTER.half)) events.push({ type: "collision", t: tEnd, craft: e.a.id, with: e.b.id, damage: e.dmg });
+    // with `shipCollisions`, the capital ships' hull boxes collide too, by the same rule
+    if (arena.shipCollisions) for (const e of SC.resolveShipCollisions(alive.filter((c) => c.kind === "capital"), CS.HALF)) events.push({ type: "collision", t: tEnd, craft: e.a.id, with: e.b.id, damage: e.dmg, ships: true });
     // every round moves and is tested against the other teams' craft
     const targetsOf = (cs) => cs.flatMap((c) => {
         const b0 = before.get(c);
@@ -321,6 +383,19 @@ export function stepSpaceArena(arena) {
     else if (arena.i >= Math.round(arena.seconds / dt)) { arena.done = true; arena.over = "time"; }
     arena.events = events;
     return arena;
+}
+
+/** One tick of every craft and every round. Mutates and returns the arena; a finished arena is returned untouched. `arena.events` is this tick's: [{ type: "hit" | "part" | "kill" | "wave" | "ram" | "collision", ... }]. The seats' networks are run one forward pass each, on the CPU. */
+export function stepSpaceArena(arena) {
+    const g = tickGen(arena); let r = g.next();
+    while (!r.done) r = g.next(r.value.map((j) => j.net.forward(j.net.w, j.x)));
+    return r.value;
+}
+/** The same tick with the seats' networks run by `forwardBatch(jobs) -> Promise<controls for each job>` (brain/seatGunnerGpu.mjs's gpuBatcher on a GPUDevice, or a CPU function of your own). Mutates and returns the arena. */
+export async function stepSpaceArenaAsync(arena, forwardBatch) {
+    const g = tickGen(arena); let r = g.next();
+    while (!r.done) r = g.next(await forwardBatch(r.value));
+    return r.value;
 }
 
 /** Step until the arena is done. Returns it. */

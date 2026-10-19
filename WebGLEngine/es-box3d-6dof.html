@@ -33,7 +33,9 @@
   <b style="color:#2fd6b0">&#9889; 6DOF space combat</b>
   <span id="stat"></span>
   <button id="resetBtn" title="restart the fight now">&#8635; Reset battle</button>
+  <button id="backdropBtn" title="Backdrop: the baked nebula-and-stars sky and a sun disc where the key light is (render/spaceBackdrop.js, the same sky es-box3d-fly3d.html wears). Off by default: the flat fill. The first press bakes it (about half a second). The sun is a picture, not a light: the fighters are lit as they always were.">Backdrop: off</button>
   <button id="rosterBtn" title="Load Pilots (v4829): choose who flies EACH side -- the PD autopilot this page has always flown, or a brain (hand weights, zero, noise) -- then Start Fight. The brain is the same fly-wired network for every choice; a choice is a choice of weights. The hand brain IS the PD autopilot written through the network">&#127899; Load Pilots</button>
+  <a id="battleshipLink" href="/space-battleship.html" title="Space battleship: a Yamato-like capital ship with thirteen gun seats against these fighters, in the same Newtonian arena (brain/spaceArena.mjs) -- a window per craft and per seat. Linked here from the page this fight was built on.">&#9733; Space battleship</a>
   <span id="tick" style="display:none"></span>
 </div>
 <div id="rosterPanel" style="position:fixed;top:40px;left:10px;z-index:3;display:none;background:#0a1220;border:1px solid #2f486c;border-radius:8px;padding:10px;max-width:430px;box-shadow:0 8px 30px #000a;color:#b9d4ff;">
@@ -59,6 +61,9 @@ import { OrbitControls } from "/vendor/three/jsm/controls/OrbitControls.js";
 import * as RB from "/physics/mechanics/rigidBody6dof.mjs";
 import * as SC from "/brain/shipCollision6dof.mjs";   // v4848 -- ship-ship collisions, shared with the headless duel (brain/pilot6dofPolicy.mjs)
 import * as RBW from "/physics/mechanics/rigidBody6dofWeapon.mjs";
+import { mountBackdrop } from "/render/spaceBackdrop.js";   // the baked nebula and star fly3d wears, behind a Backdrop button here (off: the flat fill below)
+import { bakeNebulaCubemap } from "/render/nebulaSkybox.js";
+import { bakeStarCubemap } from "/render/proceduralStar.js";
 import * as AP from "/brain/autopilot6dof.mjs";
 import * as FA from "/brain/fleetAssign.mjs";
 import * as P6 from "/brain/pilot6dofPolicy.mjs";   // v4829 -- a learned pilot with the autopilot's own contract
@@ -90,7 +95,6 @@ function makeRng(seed) { let s = (seed >>> 0) || 1; return () => { s = (s * 1103
 
 // ---- Three.js scene (deliberately minimal -- this page proves the physics wiring, not a spectacle build) ----
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x03060d);
 const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 5000);
 camera.position.set(0, 30, 90);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -103,13 +107,17 @@ controls.enableDamping = true; controls.dampingFactor = 0.08; controls.target.se
 scene.add(new THREE.HemisphereLight(0xafe6ff, 0x0a1420, 1.0));
 const key = new THREE.DirectionalLight(0xffffff, 1.4); key.position.set(30, 60, 40); scene.add(key);
 scene.add(new THREE.AmbientLight(0x223a55, 0.5));
+let starPoints = null;
 {
   const N = 600, pos = new Float32Array(N * 3), rng = makeRng(7);
   for (let i = 0; i < N; i++) { const r = 800 + rng() * 400, th = rng() * Math.PI * 2, ph = Math.acos(rng() * 2 - 1);
     pos[i * 3] = r * Math.sin(ph) * Math.cos(th); pos[i * 3 + 1] = r * Math.cos(ph); pos[i * 3 + 2] = r * Math.sin(ph) * Math.sin(th); }
   const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-  scene.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0xaad4ff, size: 1.6, sizeAttenuation: false })));
+  starPoints = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xaad4ff, size: 1.6, sizeAttenuation: false })); scene.add(starPoints);
 }
+// the Backdrop button: OFF (the flat 0x03060d fill and the 600 points above, exactly as before) until it is pressed; the first press bakes (about 0.4 s)
+const backdrop = mountBackdrop(THREE, scene, { flat: 0x03060d, light: key.position.toArray(), hide: [starPoints],
+  makeCanvas: (w, h) => { const cv = document.createElement("canvas"); cv.width = w; cv.height = h; return cv; }, bakeNebula: bakeNebulaCubemap, bakeStar: bakeStarCubemap });
 
 const TEAM = {
   A: new THREE.MeshStandardMaterial({ color: 0x8fb6d0, metalness: 0.7, roughness: 0.35 }),
@@ -355,6 +363,13 @@ document.getElementById("importPilotFile").addEventListener("change", async (e) 
 document.getElementById("clearPilot").onclick = () => { importedW = null; importedMeta = null; importErr = null; availChanged(); };
 pilotLine();
 document.getElementById("resetBtn").onclick = () => newBattle();
+const backdropBtn = document.getElementById("backdropBtn");
+const backdropLabel = () => { backdropBtn.textContent = "Backdrop: " + (backdrop.on ? "on" : "off"); backdropBtn.title = backdropBtn.title.replace(/ \[.*\]$/, "") + (backdrop.error ? " [bake failed: " + backdrop.error + "]" : ""); };
+backdropBtn.onclick = () => {
+  if (backdrop.on || backdrop.baked) { backdrop.toggle(); backdropLabel(); return; }
+  backdropBtn.textContent = "Backdrop: baking..."; backdropBtn.disabled = true;   // paint the word, then the half second of work
+  requestAnimationFrame(() => setTimeout(() => { backdrop.set(true); backdropBtn.disabled = false; backdropLabel(); }, 0));
+};
 addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
 
 // a small debug hook -- read back exact numeric state without scraping rendered pixels, for
@@ -374,6 +389,20 @@ window.__sixdof = {
     // v4832 -- the shipped and the imported pilot, for the gate's page rows
     get shipped() { return shippedW; }, get shippedError() { return shippedErr; }, get league() { return leagueW; }, get leagueError() { return leagueErr; }, get close() { return closeW; }, get closeError() { return closeErr; }, get imported() { return importedW; }, importBlob, get choices() { return [...document.getElementById("pilotA").options].map((o) => o.value); } },
   get fleets() { return { A, B }; },
+  // the Backdrop button's state and a picture of it, for tools/ship/rigidBody6dofPage-selfcheck.mjs: describe() is plain data; pixels() draws the scene NOW (the sim does not advance inside one task, so
+  // two calls in a row are two pictures of the same scene) and reads the canvas back; `looking` points the camera first and puts it back after
+  backdrop: { describe: () => backdrop.describe(), light: () => key.position.toArray(), set: (on) => { backdrop.set(on); backdropLabel(); return backdrop.on; }, click: () => backdropBtn.click(), label: () => backdropBtn.textContent, disabled: () => backdropBtn.disabled,
+    pixels(looking) {
+      const eye = camera.position.clone(), q = camera.quaternion.clone();
+      if (looking) { camera.position.set(...looking.eye); camera.lookAt(...looking.target); camera.updateMatrixWorld(true); }
+      const t0 = performance.now(); renderer.render(scene, camera); const ms = performance.now() - t0;
+      const gl = renderer.getContext(), W = gl.drawingBufferWidth, H = gl.drawingBufferHeight, buf = new Uint8Array(W * H * 4);
+      gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+      if (looking) { camera.position.copy(eye); camera.quaternion.copy(q); camera.updateMatrixWorld(true); }
+      const seen = new Set(); let sum = [0, 0, 0], corner = [buf[0], buf[1], buf[2]], c = (Math.floor(H / 2) * W + Math.floor(W / 2)) * 4, center = [buf[c], buf[c + 1], buf[c + 2]];
+      for (let k = 0; k < buf.length; k += 4) { seen.add(((buf[k] >> 4) << 8) | ((buf[k + 1] >> 4) << 4) | (buf[k + 2] >> 4)); sum[0] += buf[k]; sum[1] += buf[k + 1]; sum[2] += buf[k + 2]; }
+      const n = buf.length / 4; return { w: W, h: H, distinct: seen.size, mean: sum.map((v) => v / n), corner, center, ms };
+    } },
 };
 
 requestAnimationFrame(frame);

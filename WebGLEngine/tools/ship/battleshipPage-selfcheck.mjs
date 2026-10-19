@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/battleshipPage-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/battleshipPage-selfcheck.mjs      (~2 min: a real browser, software rendering, thirty full fights of up to 120 s)
+// Run: node tools/ship/battleshipPage-selfcheck.mjs      (~3 min: a real browser, software rendering, forty full fights of up to 120 s)
 //
 // THE PAGE-WIRING GATE for space-battleship.html. Everything the page WIRES TOGETHER -- brain/battleshipFight.mjs (the scenario, the gunners, the tally: pinned on its own), brain/spaceArena.mjs (the ship, its thirteen seats, its parts, the cannon, the fighters' doctrine: held on its own),
 // physics/mechanics/capitalShip.mjs, render/flightViews.mjs (the cameras, nextWindow, seatRows, the vacuum sight, the 6DOF pilot's activations), brain/pilot6dofPolicy.mjs and its three shipped weight files -- is gated on its own; this file proves the WIRING in a real browser: the page
@@ -61,6 +61,24 @@
 //   R9 the trigger shown is the pitch output 1 | R10 the seat's window never says what the network did 1 | R11 a refused load takes the held hand away 1 | R12 the policy a hand file must be is wrong 4
 //   R13 the URL's hand is ignored 1 | R14 the ship's card never names the hand 2 | R15 the state hides that a network is in the seats 3 | R16 the brain rows show the network on zeros 1
 // R1 (the hand control ignored) and R4 (the fruit fly's hand weights the GPU brain's) went 0 red the first time, for the reasons above: the controls row now sets the hand, and the brain rows are read for all four networks (34 hidden units, 32).
+// AND TWENTY-ONE MORE ONCE THE PAGE COULD PUT A DIFFERENT HAND IN THE TURRETS, IN THE POINT DEFENCE AND IN SINGLE SEATS (SH1-SH21: the two group controls, the seats field, the URL's main, pd and seats; run on the gate with only the rows between SEATHANDS-BEGIN and SEATHANDS-END -- the others can only add reds), each red by name:
+//   SH1 the turrets' control is ignored 6 | SH2 the point defence's control is ignored 4 | SH3 the seats field is ignored 5 | SH4 the build is not given seatNetworks 7 | SH5 the URL's main is ignored 1 | SH6 the URL's pd is ignored 1
+//   SH7 the URL's seats is ignored 1 | SH8 the note beside the field stays empty 1 | SH9 the state hides the problems 1 | SH10 a seat that is not there is passed to the build 2 (the page does not boot: the build refuses the key and the run is lost -- red, and it is why the page filters)
+//   SH11 the brain rows use the base hand 1 | SH12 the seat's window never says the hand 1 | SH13 the card names one hand for a mixed ship 3 | SH14 the turrets' control does not start a fight 1 | SH15 'rule' for a group is taken as 'as the hand on the left' 1
+//   SH16 'rule' for a seat is taken as 'as the hand on the left' 4 | SH17 the selects are not set to the fight that was built 3 | SH18 there is no 'as the hand on the left' option 1 | SH19 every seat is reported with the base hand 6
+//   SH20 the card's point defence is the turrets' 2 | SH21 the seats field is not written back 2. None went 0 red.
+// AND FIFTEEN MORE ONCE THE PAGE HAD A FORMATION BOX AND A SHIPS-COLLIDE BOX (V1-V15; run on the gate with only the rows between SHIPFORM-BEGIN and SHIPFORM-END), each red by name:
+//   V1 the formation box is ignored 3 | V2 a formation is asked of the build whatever the ships 1 (the page does not boot: the build refuses one ship with a formation) | V3 the collide box is ignored 2 | V4 a ship collision is not logged 1 | V5 the zero-damage contacts are logged too 1
+//   V6 the URL's formation is ignored 1 | V7 the URL's collide is ignored 1 | V8 the formation box does not start a fight 1 | V9 the collide box does not start a fight 1 | V10 the state hides the formation 3 | V11 the state hides the collisions 2
+//   V12 the card never says the station 1 | V13 the formation box is not set to the fight built 4 | V14 the collide box is not set to the fight built 2 | V15 the ships' collision log names the wrong ships 1. None went 0 red.
+// AND ELEVEN MORE ONCE THE PAGE HAD A HELM CONTROL (Z1-Z11; run on the gate with only the rows between HELM-BEGIN and HELM-END), each red by name:
+//   Z1 the helm control is ignored 4 | Z2 the build is not given the helm 2 | Z3 the brain window has no helm rows 2 | Z4 every ship's window shows the first ship's helm 1 | Z5 an idle helm is not marked idle 1 | Z6 the URL's helm is ignored 1 | Z7 the helm control does not start a fight 1
+//   Z8 the state hides the helm 2 | Z9 the select is not set to the fight built 2 | Z10 the card never names the helm 1 | Z11 the network is offered as no network 4. None went 0 red. (The second-ship row first checked only that the rows were there; Z4 went 0 red until it compared the two ships' features.)
+// AND SIXTEEN MORE ONCE THE PAGE TOOK A PEER'S BRAIN FROM A FILE (P1-P16; run on the gate with only the rows between PEER-BEGIN and PEER-END; the file is dropped on the page's own file input, the button's click is counted), each red by name:
+//   P1 the policy table is reached through the prototype 1 | P2 a pilot file goes to the hand list 2 | P3 the GPU brain's gunner file goes to the fruit fly's place 2 (the page does not boot a fight: the build refuses the network) | P4 a helm file goes to the pilots 2 | P5 the file is not checked by peerBrain 4
+//   P6 a refused file forgets what was held 1 | P7 an imported pilot is chosen at once 1 | P8 an imported helm is chosen at once 1 | P9 clear leaves the helm 1 | P10 clear leaves the button enabled 1 | P11 an unloaded helm is offered 2 | P12 a helm that is not loaded is still resolved 2 (a page error)
+//   P13 the helm's label has no hash 1 | P14 a good import is reported as bad 1 | P15 the note does not say where it went 1 | P16 the import button does nothing 1 (0 red until the gate counted the click: the file was dropped on the input and never through the button).
+// A THING THE GATE FOUND IN ITSELF: the first "not chosen for you" check read the lists after fights of its own had left their controls on the imported choices (a fight writes its options back to the controls); it now starts a plain fight before the helm file is dropped and reads the lists straight after.
 "use strict";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 import { createRequire } from "node:module";
@@ -78,6 +96,7 @@ import * as RB from "../../physics/mechanics/rigidBody6dof.mjs";
 import * as V from "../../render/flightViews.mjs";
 import * as SG from "../../brain/seatGunnerPolicy.mjs";
 import * as MG from "../../brain/seatGunnerMlp.mjs";
+import * as HP from "../../brain/helmPolicy.mjs";
 import { weightsHash } from "../../brain/drivePolicy.mjs";
 
 // a network that is NOT the hand gunner: it corrects each seat's yaw by the range feature (unit 0) and fires on the sight's flag through a unit of its own (unit 1) -- so the page's fight with it is a different fight, and a wiring mistake shows
@@ -90,6 +109,14 @@ function rangeWeights(m) {
 const NET = { fly: SG, mlp: MG }, POLICY = { fly: "seatGunnerPolicy", mlp: "seatGunnerMlp" };
 const CUSTOM = Object.fromEntries(Object.entries(NET).map(([id, m]) => [id, JSON.stringify(PB.exportBrain(PB.describePolicy(POLICY[id], m), rangeWeights(m), { score: 0.5, by: "the gate's own network", citation: "gate" }))]));
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+// THE FILES A PEER WOULD SEND (swek-brain-v1, brain/peerBrain.mjs): the shipped pilot's own file, the gate's two gunner networks (CUSTOM above), and a helm network that is NOT the rule (a throttle correction: output bias 2)
+const HELM_W = (() => { const w = HP.zeroWeights(); w[HP.FEATURES * HP.HIDDEN + HP.HIDDEN + HP.REC_EDGES + HP.HIDDEN * HP.OUTPUTS + 3] = 2; return w; })();
+const PEER = (() => {
+    const pilot = fs.readFileSync(path.join(ENG, "brain", "pilot6dofWeightsDefault.json"), "utf8"), helm = PB.exportBrain(PB.describePolicy("helmPolicy", HP), HELM_W, { score: 0.25, by: "the gate's own helm", citation: "gate" }), pj = JSON.parse(pilot);
+    return { pilot, fly: CUSTOM.fly, mlp: CUSTOM.mlp, helm: JSON.stringify(helm),
+        notJson: "{not json", nul: "null", num: "3", drive: JSON.stringify({ format: PB.FORMAT, policy: "drivePolicy", weights: [] }), ctor: JSON.stringify({ format: PB.FORMAT, policy: "constructor", weights: [] }), proto: '{"format":"swek-brain-v1","policy":"__proto__","weights":[]}',
+        short: JSON.stringify({ ...pj, weights: pj.weights.slice(0, 10), weightCount: 10 }), format: JSON.stringify({ ...helm, format: "something-else" }), huge: JSON.stringify({ ...helm, weights: helm.weights.map((v, i) => (i === 7 ? 1e40 : v)) }), nanish: JSON.stringify({ ...helm, weights: helm.weights.map((v, i) => (i === 7 ? "x" : v)) }) };
+})();
 let fails = 0;
 function ok(name, cond, detail) { console.log(`  ${cond ? "PASS" : "FAIL"}  ${name}${detail ? "   " + detail : ""}`); if (!cond) fails++; }
 function report(name, detail) { console.log(`  ----  ${name}   ${detail}`); }
@@ -117,7 +144,7 @@ else {
             const sel = (id) => doc.getElementById(id);
             const set = (id, v) => { const e = sel(id); if (e.type === "checkbox") e.checked = v; else e.value = String(v); };
             const fightOf = (o) => { B.newFight(o); B.step(3700); return { tally: B.tally(), state: B.state() }; };
-            const base = { kind: "beam", seed: 1, fighters: 8, gunners: "regular", f: "pd", behaviour: "face", cruise: 0.3, friendlyFire: false, holdFire: true, wrecks: false, impact: 0, crew: false, ships: 1, escorts: 0, hand: "rule" };   // every option named: an option left out is read off the page's own control, which the last fight left where it was
+            const base = { kind: "beam", seed: 1, fighters: 8, gunners: "regular", f: "pd", behaviour: "face", cruise: 0.3, friendlyFire: false, holdFire: true, wrecks: false, impact: 0, crew: false, ships: 1, escorts: 0, hand: "rule", handMain: "", handPd: "", handSeats: "", formation: false, shipCollisions: false, helm: "rule" };   // every option named: an option left out is read off the page's own control, which the last fight left where it was
 
             // ---- the page's OWN default fight, before anything touches it ----
             out.boot = { windows: B.windows(), choices: B.roster.choices, label: B.roster.label, state: B.state(), cards: cards(), stat: sel("stat").textContent, note: sel("note").textContent,
@@ -305,6 +332,109 @@ else {
               B.newFight({ ...Y, hand: "mlphand" }); B.step(300); B.setView(9, "brain", 3); const bn = B.brainRows(9); out.nb4.brainNet = bn.length; out.nb4.brainNetLabels = bn.slice(-3).map((q) => q.label); B.newFight({ ...base });
             }
 
+            // ==== SEATHANDS-BEGIN (browser): a hand per GROUP of seats and per SEAT. fly and mlp are the gate's own range-weights networks here (loaded above); the hands on hand weights are always there ----
+            {
+              globalThis.__swekStep = "full fights: a hand per group and per seat";
+              const Hn = B.hands; Hn.refill();   // the rows above forgot the trained fruit fly and loaded the gate's own: the page refills its rosters after a load at boot, and so does this
+              out.seats = { loaded: [Hn.loaded("fly"), Hn.loaded("mlp")], options: ["handMain", "handPd"].map((id) => [...sel(id).options].map((o) => o.value + (o.disabled ? "!" : ""))) };
+              const grab = (o) => { const r = fightOf({ ...base, ...o }); return { tally: r.tally, seatHands: r.state.seatHands, problems: r.state.handProblems, hand: r.state.hand, card: cards()[0], sel: ["hand", "handMain", "handPd", "handSeats"].map((id) => sel(id).value), note: sel("handNote").textContent }; };
+              out.seats.plain = grab({});
+              out.seats.groups = grab({ handMain: "fly", handPd: "mlp" });
+              out.seats.single = grab({ hand: "fly", handMain: "mlphand", handSeats: "main-a:flyhand pd-p1:mlp pd-p2:rule" });
+              out.seats.pdRule = grab({ hand: "fly", handPd: "rule" });
+              out.seats.seatRule = grab({ hand: "fly", handSeats: "pd-p2:rule" });
+              out.seats.junk = grab({ handSeats: "main-z:fly pd-p1:nothing port:fly junk" });
+              B.newFight({ ...base, hand: "mlp", handMain: "fly" }); B.step(300); out.seats.win = [];
+              for (let k = 0; k < 13; k++) { B.setView(0, "brain", k); const rows = B.brainRows(0); B.setView(0, "gunner", k); B.step(0); out.seats.win.push({ k, rows: rows.length, n: rows.slice(-3).map((q) => q.n), texts: B.texts(0).filter((t) => /^(net|hand):/.test(t)) }); }
+              B.setView(0, "plane");
+              // the controls start the fight they name
+              B.newFight({ ...base }); out.seats.ctl = {};
+              for (const [id, v] of [["handMain", "flyhand"], ["handPd", "mlphand"]]) { set(id, v); sel(id).dispatchEvent(new win.Event("change", { bubbles: true })); out.seats.ctl[id] = { tick: B.state().tick, seatHands: B.state().seatHands, sel: sel(id).value }; }
+              set("handSeats", "pd-p1:rule"); sel("handSeats").dispatchEvent(new win.Event("change", { bubbles: true })); out.seats.ctl.handSeats = { tick: B.state().tick, seatHands: B.state().seatHands, sel: sel("handSeats").value };
+              const f3 = document.createElement("iframe"); f3.style.width = "1100px"; f3.style.height = "900px"; f3.src = "/space-battleship.html?main=flyhand&pd=mlphand&seats=pd-p1:rule"; document.body.appendChild(f3);
+              await new Promise((res) => { f3.onload = res; }); const t3 = performance.now(); while (performance.now() - t3 < 40000 && !f3.contentWindow.__battleship) await wait(200);
+              const B3 = f3.contentWindow.__battleship; await B3.ready; B3.hold(true); const s3 = B3.state(), d3 = f3.contentWindow.document;
+              out.seats.url = { seatHands: s3.seatHands, sel: ["hand", "handMain", "handPd", "handSeats"].map((id) => d3.getElementById(id).value), problems: s3.handProblems }; f3.remove();
+              B.newFight({ ...base });
+            }
+            // ==== SEATHANDS-END (browser)
+
+            // ==== SHIPFORM-BEGIN (browser): the second ship in station and the ships that collide ----
+            {
+              globalThis.__swekStep = "full fights: a ship in station and ships that collide";
+              const grab2 = (o) => {
+                B.newFight({ ...base, ...o }); const seen = [];
+                for (let k = 0; k < 125 && !B.state().done; k++) { B.step(30, false); for (const l of B.state().log) if (/THE SHIPS COLLIDED/.test(l) && !seen.includes(l)) seen.push(l); }
+                B.step(0); const st = B.state();
+                return { tally: B.tally(), formation: st.formation, shipCollisions: st.shipCollisions, ships: st.ships, hp: st.crafts.filter((c) => c.kind === "capital").map((c) => Math.round(c.hp)), seen, cards: cards(), sel: [sel("formation").checked, sel("collide").checked, sel("nships").value] };
+              };
+              out.form = {};
+              out.form.off = grab2({ ships: 2 });
+              out.form.on = grab2({ ships: 2, formation: true });
+              out.form.one = grab2({ ships: 1, formation: true });
+              const G12 = { kind: "stern", seed: 8, fighters: 12, gunners: "green", ships: 2 };
+              out.form.pass = grab2(G12);
+              out.form.hit = grab2({ ...G12, shipCollisions: true });
+              out.form.both = grab2({ ...G12, shipCollisions: true, formation: true });
+              B.newFight({ ...base, ships: 2 }); out.form.ctl = {};
+              set("formation", true); sel("formation").dispatchEvent(new win.Event("change", { bubbles: true })); out.form.ctl.formation = { tick: B.state().tick, formation: B.state().formation, sel: sel("formation").checked };
+              set("collide", true); sel("collide").dispatchEvent(new win.Event("change", { bubbles: true })); out.form.ctl.collide = { tick: B.state().tick, shipCollisions: B.state().shipCollisions, sel: sel("collide").checked };
+              const f4 = document.createElement("iframe"); f4.style.width = "1100px"; f4.style.height = "900px"; f4.src = "/space-battleship.html?ships=2&formation=1&collide=1"; document.body.appendChild(f4);
+              await new Promise((res) => { f4.onload = res; }); const t4 = performance.now(); while (performance.now() - t4 < 40000 && !f4.contentWindow.__battleship) await wait(200);
+              const B4 = f4.contentWindow.__battleship; await B4.ready; B4.hold(true); const s4 = B4.state(), d4 = f4.contentWindow.document;
+              out.form.url = { formation: s4.formation, shipCollisions: s4.shipCollisions, ships: s4.ships, sel: [d4.getElementById("formation").checked, d4.getElementById("collide").checked, d4.getElementById("nships").value] }; f4.remove();
+              B.newFight({ ...base });
+            }
+            // ==== SHIPFORM-END (browser)
+
+            // ==== HELM-BEGIN (browser): a network at the ships' helm ----
+            {
+              globalThis.__swekStep = "full fights: a network at the helm";
+              out.helmNet = { options: [...sel("helm").options].map((o) => o.value), sel0: sel("helm").value };
+              const grab3 = (o) => { const r = fightOf({ ...base, ...o }); return { tally: r.tally, helm: r.state.helm, sel: sel("helm").value, cards: cards() }; };
+              out.helmNet.rule = grab3({ helm: "rule" });
+              out.helmNet.hand = grab3({ helm: "hand" });
+              out.helmNet.two = grab3({ helm: "hand", ships: 2, escorts: 2, kind: "swarm", seed: 2, gunners: "green" });
+              B.newFight({ ...base, helm: "hand" }); B.setView(0, "brain", 0); out.helmNet.idle = B.brainRows(0); B.step(300); out.helmNet.rows = B.brainRows(0); out.helmNet.tick = B.state().tick; B.setView(0, "plane");
+              B.newFight({ ...base, helm: "rule" }); B.setView(0, "brain", 0); out.helmNet.ruleRows = B.brainRows(0); B.setView(0, "plane");
+              B.newFight({ ...base, helm: "hand", ships: 2 }); B.step(300); B.setView(0, "brain", 0); out.helmNet.rowsA = B.brainRows(0); B.setView(0, "plane"); B.setView(9, "brain", 0); out.helmNet.rowsB = B.brainRows(9); B.setView(9, "plane");
+              set("helm", "hand"); sel("helm").dispatchEvent(new win.Event("change", { bubbles: true })); out.helmNet.ctl = { tick: B.state().tick, helm: B.state().helm, sel: sel("helm").value };
+              const f5 = document.createElement("iframe"); f5.style.width = "1100px"; f5.style.height = "900px"; f5.src = "/space-battleship.html?helm=hand"; document.body.appendChild(f5);
+              await new Promise((res) => { f5.onload = res; }); const t5 = performance.now(); while (performance.now() - t5 < 40000 && !f5.contentWindow.__battleship) await wait(200);
+              const B5 = f5.contentWindow.__battleship; await B5.ready; B5.hold(true); out.helmNet.url = { helm: B5.state().helm, sel: f5.contentWindow.document.getElementById("helm").value }; f5.remove();
+              B.newFight({ ...base });
+            }
+            // ==== HELM-END (browser)
+
+            // ==== PEER-BEGIN (browser): a peer's brain from a FILE, through the page's own file input ----
+            {
+              globalThis.__swekStep = "full fights: a peer's brain from a file";
+              const PEER = ${JSON.stringify(PEER)}, opts = (id) => [...sel(id).options].map((o) => o.value + (o.disabled ? "!" : ""));
+              const drop = async (text, name) => { const inp = sel("importFile"), dt = new win.DataTransfer(); dt.items.add(new win.File([text], name, { type: "application/json" })); sel("importNote").textContent = ""; inp.files = dt.files; inp.dispatchEvent(new win.Event("change", { bubbles: true })); const t0 = performance.now(); while (!sel("importNote").textContent && performance.now() - t0 < 5000) await wait(20); return { note: sel("importNote").textContent, cls: sel("importNote").className, clearDisabled: sel("clearImported").disabled }; };
+              const snap = () => ({ pilot: opts("pilotF").filter((o) => /^imported/.test(o)), hand: opts("hand").filter((o) => /^imported/.test(o)), helm: opts("helm").filter((o) => /^imported/.test(o)), main: opts("handMain").filter((o) => /^imported/.test(o)) });
+              const grab4 = (o) => { const r = fightOf({ ...base, ...o }); return { tally: r.tally, pilots: r.state.pilots, hand: r.state.hand, helm: r.state.helm, cards: cards() }; };
+              let opened = 0; sel("importFile").addEventListener("click", (e) => { opened++; e.preventDefault(); }); sel("importBtn").click();   // the button opens the file chooser (here counted, and not opened)
+              out.peer = { opened, before: snap(), clear0: sel("clearImported").disabled, btn: !!sel("importBtn"), accept: sel("importFile").accept, hidden: sel("importFile").style.display };
+              B.hands.refill();
+              out.peer.pilotDrop = await drop(PEER.pilot, "shipped-pilot.json"); out.peer.afterPilot = snap(); out.peer.chosen1 = ["pilotF", "hand", "handMain", "handPd", "helm"].map((id) => sel(id).value);
+              out.peer.pilotFight = grab4({ f: "imported", kind: "swarm", seed: 3, fighters: 6 });
+              out.peer.flyDrop = await drop(PEER.fly, "gunner-fly.json"); out.peer.mlpDrop = await drop(PEER.mlp, "gunner-mlp.json"); out.peer.afterGunners = snap();
+              out.peer.flyFight = grab4({ hand: "importedfly" }); out.peer.mlpFight = grab4({ hand: "importedmlp" });
+              out.peer.groupFight = grab4({ handMain: "importedmlp", handPd: "importedfly" });
+              B.newFight({ ...base }); out.peer.helmDrop = await drop(PEER.helm, "helm.json"); out.peer.afterHelm = snap(); out.peer.chosen2 = ["pilotF", "hand", "handMain", "handPd", "helm"].map((id) => sel(id).value);
+              out.peer.helmFight = grab4({ helm: "imported" });
+              B.newFight({ ...base, helm: "imported" }); B.step(300); B.setView(0, "brain", 0); out.peer.helmRows = B.brainRows(0).slice(-3).map((q) => ({ label: q.label, n: q.n })); B.setView(0, "plane");
+              out.peer.refused = {};
+              for (const k of ["notJson", "nul", "num", "drive", "ctor", "proto", "short", "format", "huge", "nanish"]) out.peer.refused[k] = await drop(PEER[k], k + ".json");
+              out.peer.afterRefused = snap();
+              out.peer.keptFight = grab4({ f: "imported", kind: "swarm", seed: 3, fighters: 6 });
+              B.newFight({ ...base });
+              sel("clearImported").click(); out.peer.cleared = { snap: snap(), note: sel("importNote").textContent, clearDisabled: sel("clearImported").disabled };
+              out.peer.gone = { pilot: grab4({ f: "imported" }), hand: grab4({ hand: "importedfly" }), helm: grab4({ helm: "imported" }) };
+              B.newFight({ ...base });
+            }
+            // ==== PEER-END (browser)
+
             // ---- the big picture keeps every craft in frame, and the camera modes go where they say ----
             B.newFight({ ...base, kind: "stern", seed: 2 }); B.step(300); sel("camMode").value = "overview"; B.settleCamera(); out.mainNdc = B.mainView();
             B.step(300); B.settleCamera(); out.mainNdc2 = B.mainView();
@@ -350,7 +480,7 @@ else {
         const b = r.boot;
         ok("!! THE PAGE'S OWN FIGHT (before the gate touches it) is a beam attack, seed 1, eight fighters, regular gunners, the PD autopilot for the fighters, the ship facing the enemy at 0.3 cruise, the hit spheres OFF, the big picture on the overview, at tick 0 with everyone flying and nine markers",
             b.selects.join() === "beam,1,8,regular,pd,face,0.3" && b.ff === false && b.hold === true && b.state.friendlyFire === false && b.spheres === false && b.spheresShown.length === 22 && b.spheresShown.every((v) => v === false) && /PD autopilot/.test(b.label) && b.state.tick === 0 && b.state.crafts.length === 9 && b.state.crafts.every((c) => c.status === "flying") && b.camMode === "overview" && b.markers.n === 9 && b.markers.visible === true, `${b.selects.join()} | ${b.label}`);
-        ok("!! the roster offers all six pilots for the fighters, every one enabled (the PD autopilot; the PD written into the network; the shipped pilot; the league-trained one; the close-quarters one; a mix of them in turn)", b.choices.map((c) => c.id).join() === "pd,hand,shipped,league,close,mix" && b.choices.every((c) => !c.disabled));
+        ok("!! the roster offers all six pilots for the fighters, every one enabled (the PD autopilot; the PD written into the network; the shipped pilot; the league-trained one; the close-quarters one; a mix of them in turn), and a seventh, imported, DISABLED until a peer's file is dropped (the peer rows below)", b.choices.map((c) => c.id).join() === "pd,hand,shipped,league,close,imported,mix" && b.choices.filter((c) => c.id !== "imported").every((c) => !c.disabled) && b.choices.find((c) => c.id === "imported").disabled === true);
         ok("!! NINE WINDOWS, one per craft, THE SHIP'S FIRST AND TALLER, each showing the plane from outside to start with, each labelled with its number, its name and the view", b.windows.length === 9 && b.windows.every((w, i) => w.craft === i && w.view === "plane" && w.label.startsWith(`${i + 1}. ${i ? "fighter " + i : "battleship"} --`) && /\(from outside/.test(w.label) && /click to switch/.test(w.label)) && b.windows[0].rect.height > b.windows[1].rect.height * 1.8 && b.windows.slice(1).every((w) => w.rect.height === b.windows[1].rect.height), b.windows.map((w) => w.label).join(" | ").slice(0, 200));
         ok("the board has two cards: the ship's (flying, 1500/1500, its three engine pods, the cannon at 0% and the parts out: none) and the fighters' (eight rows with the pilot named, each flying in its approach), and the stat line and the note name the fight",
             b.cards.length === 2 && /^battleship/.test(b.cards[0]) && /flying/.test(b.cards[0]) && /hit points 1500\/1500/.test(b.cards[0]) && /engines ● ● ● 3 of 3/.test(b.cards[0]) && /wave-motion cannon \(invented\) 0% charged, fired 0/.test(b.cards[0]) && /parts out: none/.test(b.cards[0]) && /gunners regular/.test(b.cards[0])
@@ -533,8 +663,8 @@ else {
             const Hd = r.hand, ids = Hd.choices0.map((c) => c.id).join(), shipFile = (n) => fs.existsSync(path.join(ENG, "brain", n === "fly" ? "seatGunnerWeightsDefault.json" : "seatGunnerMlpWeightsDefault.json"));
             const O = { fighters: 8, gunners: "regular", behaviour: "face", cruise: 0.3 }, plain = BS.fight(1, "beam", O), net = (m, w) => BS.fight(1, "beam", { ...O, network: { module: m, weights: w } });
             const cw = { fly: rangeWeights(SG), mlp: rangeWeights(MG) }, NETS = { fly: SG, mlp: MG }, near5 = (a, b) => a.length === b.length && a.every((v, i) => Math.abs(v - b[i]) < 1e-5);
-            ok("!! THE HAND ROSTER OFFERS ITS FIVE AND THE PAGE STARTS WITH THE RULE: the rule, the fruit fly and the GPU brain on their hand weights (always there), and the two trained networks (offered only if their files are shipped and load); the page's own fight is the rule's, its select says rule, its state says no network and its card does not mention a hand",
-                ids === "rule,flyhand,mlphand,fly,mlp" && Hd.choices0.filter((c) => ["rule", "flyhand", "mlphand"].includes(c.id)).every((c) => c.disabled === false) && Hd.choices0.filter((c) => c.id === "fly" || c.id === "mlp").every((c) => c.disabled === !shipFile(c.id)) && Hd.def.id === "rule" && Hd.def.network === false && Hd.sel0 === "rule" && !/hand:/.test(Hd.card0), ids + " " + Hd.choices0.map((c) => (c.disabled ? "x" : "ok")).join(""));
+            ok("!! THE HAND ROSTER OFFERS ITS FIVE AND THE PAGE STARTS WITH THE RULE: the rule, the fruit fly and the GPU brain on their hand weights (always there), the two trained networks (offered only if their files are shipped and load) and the two imported ones (disabled until a peer's file is dropped); the page's own fight is the rule's, its select says rule, its state says no network and its card does not mention a hand",
+                ids === "rule,flyhand,mlphand,fly,mlp,importedfly,importedmlp" && Hd.choices0.filter((c) => ["rule", "flyhand", "mlphand"].includes(c.id)).every((c) => c.disabled === false) && Hd.choices0.filter((c) => /^imported/.test(c.id)).every((c) => c.disabled === true) && Hd.choices0.filter((c) => c.id === "fly" || c.id === "mlp").every((c) => c.disabled === !shipFile(c.id)) && Hd.def.id === "rule" && Hd.def.network === false && Hd.sel0 === "rule" && !/hand:/.test(Hd.card0), ids + " " + Hd.choices0.map((c) => (c.disabled ? "x" : "ok")).join(""));
             ok("!! A NETWORK ON ITS HAND WEIGHTS IS THE SAME FIGHT ON THE PAGE: the fruit fly and the GPU brain, chosen in the roster, give battleshipFight.fight()'s tally with that network in every count -- which is also the tally of the fight with no network, the hand weights being the rule -- and the select, the state and the card say which is in the seats",
                 [["flyhand", SG, "fruit fly, hand weights"], ["mlphand", MG, "GPU brain, hand weights"]].every(([id, m, name]) => same(Hd[id].tally, net(m, m.handWeights())) && same(Hd[id].tally, plain) && Hd[id].state.hand.id === id && Hd[id].state.hand.network === true && Hd[id].sel === id && Hd[id].card.includes("hand: " + name)) && plain.ship.seatRounds > 100, `${plain.ship.seatRounds} seat rounds`);
             for (const id of ["fly", "mlp"]) if (shipFile(id)) {
@@ -561,6 +691,100 @@ else {
             const u = Hd.url;
             ok("!! THE URL CHOOSES THE FIGHT: ?hand=mlphand&kind=swarm&seed=4&crew=1&ff=1&hold=0&wrecks=1&impact=1&fighters=5&ships=2&escorts=2 starts a swarm attack, seed 4, five attackers, a second ship and two escorts (nine craft), with the GPU brain on its hand weights, the crew, friendly fire and the wrecks on, the hold-fire rule off and the impact the arena's round mass -- the select agrees", u.hand.id === "mlphand" && u.hand.network === true && u.sel === "mlphand" && u.scenario.kind === "swarm" && u.scenario.seed === 4 && u.n === 9 && u.ships === 2 && u.escorts === 2 && u.nships === "2" && u.nesc === "2" && u.crew === true && u.ff === true && u.wrecks === true && u.impact === SA.ROUND_MASS && u.holdFire === false, JSON.stringify(u).slice(0, 200));
         }
+
+        // ==== SEATHANDS-BEGIN (node): a hand per group of seats and per seat ----
+        {
+            const S = r.seats, O = { fighters: 8, gunners: "regular", behaviour: "face", cruise: 0.3 }, ids = SHIP.seats.map((q) => q.id);
+            const cwF = { module: SG, weights: rangeWeights(SG) }, cwM = { module: MG, weights: rangeWeights(MG) }, handF = { module: SG, weights: SG.handWeights() }, handM = { module: MG, weights: MG.handWeights() };
+            const plainT = BS.fight(1, "beam", O), fightWith = (o) => BS.fight(1, "beam", { ...O, ...o });
+            const want = (fn) => ids.map((id) => { const [from, hid] = fn(id); return `${id}:${from}:${hid}`; }).join(" "), got = (x) => x.seatHands.map((h) => `${h.seat}:${h.from}:${h.id}`).join(" "), isMain = (id) => /^main-/.test(id);
+            ok("!! THE PAGE STARTS WITH THE SAME RULE IN EVERY SEAT AND OFFERS THE GROUPS: the turrets' and the point defence's selects offer 'as the hand on the left' first and then the seven hands (the trained two enabled only if their files are shipped, the two imported ones disabled), both say so by default, the seats field is empty and the note is empty; the thirteen seats are the rule from 'hand'; the fight is the one with no network",
+                S.loaded.every((v) => v === true) && S.options.every((o) => o[0] === "" && o.slice(1, 4).join() === "rule,flyhand,mlphand" && o.length === 8 && o.slice(6).join() === "importedfly!,importedmlp!") && S.plain.sel.join("|") === "rule|||" && S.plain.note === "" && S.plain.problems.length === 0 && got(S.plain) === want(() => ["hand", "rule"]) && same(S.plain.tally, plainT), got(S.plain).slice(0, 60));
+            ok("!! THE TURRETS' AND THE POINT DEFENCE'S CONTROLS ARE THE FIGHT THE MODULE FLIES: the gate's own fruit fly in the three turrets and its GPU brain in the ten point-defence mounts give battleshipFight.fight()'s tally with seatNetworks { main, pd } in every count -- and not the rule's; the state says which seat has which and from where (the group), the selects agree and the ship's card says 'hands: turrets fly, PD mlp'",
+                same(S.groups.tally, fightWith({ seatNetworks: { main: cwF, pd: cwM } })) && !same(S.groups.tally, plainT) && S.groups.tally.ship.seatRounds !== plainT.ship.seatRounds && got(S.groups) === want((id) => ["group", isMain(id) ? "fly" : "mlp"]) && S.groups.sel.join("|") === "rule|fly|mlp|" && /hands: turrets fly, PD mlp/.test(S.groups.card), `${S.groups.tally.ship.seatRounds} rounds against ${plainT.ship.seatRounds}`);
+            ok("!! A SEAT'S OWN HAND BEATS ITS GROUP'S AND THE GROUP'S BEATS THE BASE: with the fruit fly (the gate's) as the hand, the GPU brain on hand weights for the turrets and 'main-a:flyhand pd-p1:mlp pd-p2:rule' in the seats field, main-a has the fruit fly on hand weights (from its seat), main-b and main-c the GPU brain (from the group), pd-p1 the gate's GPU brain, pd-p2 the RULE although the base is a network, the other eight point-defence mounts the base -- and the fight is the module's with exactly that seatNetworks",
+                got(S.single) === want((id) => id === "main-a" ? ["seat", "flyhand"] : isMain(id) ? ["group", "mlphand"] : id === "pd-p1" ? ["seat", "mlp"] : id === "pd-p2" ? ["seat", "rule"] : ["network", "fly"])
+                && same(S.single.tally, fightWith({ network: cwF, seatNetworks: { main: handM, "main-a": handF, "pd-p1": cwM, "pd-p2": null } })) && S.single.sel.join("|") === "fly|mlphand||main-a:flyhand pd-p1:mlp pd-p2:rule" && /hands: turrets mixed, PD mixed/.test(S.single.card), got(S.single).slice(0, 80));
+            ok("!! 'THE RULE' IS A HAND TOO, FOR A GROUP AND FOR A SEAT: with the gate's fruit fly as the base, 'rule' for the point defence puts the rule in all ten mounts (the turrets keep the network), and 'pd-p2:rule' in the seats field puts it in that mount alone -- each the module's fight with that seatNetworks (null under the key), the card saying 'hands: turrets fly, PD rule' for the group",
+                got(S.pdRule) === want((id) => isMain(id) ? ["network", "fly"] : ["group", "rule"]) && same(S.pdRule.tally, fightWith({ network: cwF, seatNetworks: { pd: null } })) && /hands: turrets fly, PD rule/.test(S.pdRule.card)
+                && got(S.seatRule) === want((id) => id === "pd-p2" ? ["seat", "rule"] : ["network", "fly"]) && same(S.seatRule.tally, fightWith({ network: cwF, seatNetworks: { "pd-p2": null } })) && !same(S.pdRule.tally, S.seatRule.tally));
+            ok("!! WHAT THE PAGE CANNOT MAKE SENSE OF IS SAID AND LEFT OUT, AND THE FIGHT STILL RUNS: 'main-z:fly pd-p1:nothing port:fly junk' names a seat that is not there, a hand that is not one, a side (not a group, not a seat) and a word with no colon -- four problems, each naming the word, in the state and in the note beside the field; no seat has anything but the rule and the fight is the one with no network (the build is never asked for a key it would refuse)",
+                S.junk.problems.length === 4 && /"main-z" is not a seat/.test(S.junk.problems[0]) && /"nothing" is not a hand that is loaded/.test(S.junk.problems[1]) && /"port" is not a seat/.test(S.junk.problems[2]) && /"junk" is not seat:hand/.test(S.junk.problems[3]) && S.junk.problems.every((p) => S.junk.note.includes(p)) && got(S.junk) === want(() => ["hand", "rule"]) && same(S.junk.tally, plainT), S.junk.problems.join(" | "));
+            const nOf = (k) => S.win[k].n.join(), hid = { true: "fly", false: "mlp" };
+            ok("!! THE SHIP'S BRAIN WINDOW SHOWS THE NETWORK OF THE SEAT IT IS ON: with the gate's GPU brain as the hand and the gate's fruit fly for the turrets, the window on a turret (seats 1-3) grows the fruit fly's three rows -- 12 features, 34 hidden, 3 outputs, 17 rows in all -- and on each of the ten point-defence mounts the GPU brain's -- 12, 32, 3",
+                S.win.length === 13 && S.win.every((w) => w.rows === 17) && [0, 1, 2].every((k) => nOf(k) === "12,34,3") && [3, 4, 5, 6, 7, 8, 9, 10, 11, 12].every((k) => nOf(k) === "12,32,3"), S.win.map((w) => w.n[1]).join(","));
+            const hasNet = S.win.filter((w) => w.texts.some((t) => /^net:/.test(t)));
+            ok("!! ...and the seat's own window says which hand it is working: wherever a seat's window says what its network did ('net: yaw ... trigger ...') it also says 'hand: fly' (a turret) or 'hand: mlp' (a mount), and at least one turret and one mount showed it at tick 300; a window with no network line has no hand line",
+                hasNet.length >= 2 && hasNet.every((w) => w.texts.includes("hand: " + hid[w.k < 3])) && hasNet.some((w) => w.k < 3) && hasNet.some((w) => w.k >= 3) && S.win.filter((w) => !hasNet.includes(w)).every((w) => !w.texts.some((t) => /^hand:/.test(t))), hasNet.map((w) => w.k + 1).join(","));
+            const c = S.ctl;
+            ok("!! THE THREE CONTROLS START THE FIGHT THEY NAME: choosing flyhand for the turrets, then mlphand for the point defence, then 'pd-p1:rule' in the seats field each starts a new fight (the tick is back to 0) whose seats are those hands -- the turrets 'flyhand' from their group, the mounts 'mlphand' from theirs, and pd-p1 the rule from its seat",
+                c.handMain.tick === 0 && c.handPd.tick === 0 && c.handSeats.tick === 0 && got(c.handMain) === want((id) => isMain(id) ? ["group", "flyhand"] : ["hand", "rule"]) && got(c.handPd) === want((id) => isMain(id) ? ["group", "flyhand"] : ["group", "mlphand"]) && got(c.handSeats) === want((id) => id === "pd-p1" ? ["seat", "rule"] : isMain(id) ? ["group", "flyhand"] : ["group", "mlphand"]) && c.handSeats.sel === "pd-p1:rule", got(c.handSeats).slice(0, 70));
+            ok("!! THE URL CHOOSES THE HANDS: ?main=flyhand&pd=mlphand&seats=pd-p1:rule starts a fight whose turrets have the fruit fly on hand weights, whose mounts have the GPU brain on its, and whose pd-p1 has the rule, with the selects and the field saying so and no problem reported",
+                got(S.url) === want((id) => id === "pd-p1" ? ["seat", "rule"] : isMain(id) ? ["group", "flyhand"] : ["group", "mlphand"]) && S.url.sel.join("|") === "rule|flyhand|mlphand|pd-p1:rule" && S.url.problems.length === 0);
+        }
+        // ==== SEATHANDS-END (node)
+
+        // ==== SHIPFORM-BEGIN (node): the second ship in station and the ships that collide ----
+        {
+            const F = r.form, O = { fighters: 8, gunners: "regular", behaviour: "face", cruise: 0.3 }, G12 = { fighters: 12, gunners: "green" };
+            const lib = (kind, seed, o) => BS.fight(seed, kind, o), hpOf = (t) => t.ships.map((q) => Math.round(q.hpLeft)).join();
+            const L = { off: lib("beam", 1, { ...O, ships: 2 }), on: lib("beam", 1, { ...O, ships: 2, formation: true }), one: lib("beam", 1, O), pass: lib("stern", 8, { ...G12, ships: 2 }), hit: lib("stern", 8, { ...G12, ships: 2, shipCollisions: true }), both: lib("stern", 8, { ...G12, ships: 2, shipCollisions: true, formation: true }) };
+            ok("!! THE FORMATION BOX IS THE FIGHT THE MODULE FLIES: with two ships the second keeps its station -- battleshipFight.fight()'s tally with formation in every count, the state says so, the box is ticked and the second ship's card says 'keeps its station on the battleship: n units from its slot'; the fight without it is the one with both ships facing, and its card says nothing of a station",
+                same(F.on.tally, L.on) && F.on.formation === true && F.on.sel.join() === "true,false,2" && /keeps its station on the battleship: \d+\.\d units from its slot/.test(F.on.cards[2]) && same(F.off.tally, L.off) && F.off.formation === false && !F.off.cards.some((c) => /station/.test(c)) && !same(F.on.tally, F.off.tally) && hpOf(F.on.tally) === hpOf(L.on), `${F.on.tally.killed} down, ${hpOf(F.on.tally)} | ${F.off.tally.killed} down`);
+            ok("!! A FORMATION WITH ONE SHIP IS NOTHING, AND THE PAGE DOES NOT FALL OVER: with the box ticked and one ship the fight is the one-ship fight (battleshipFight.fight() with no formation), the state says no formation although the box stays ticked, and no card speaks of a station", same(F.one.tally, L.one) && F.one.formation === false && F.one.ships === 1 && F.one.sel.join() === "true,false,1" && !F.one.cards.some((c) => /station/.test(c)));
+            ok("!! THE SHIPS-COLLIDE BOX IS THE FIGHT WHERE THEY MEET: the stern attack of seed 8 (twelve fighters, green gunners, two ships) ends the ships on 1,500 and 1,320 without it and 1,450 and 1,270 with it -- the tallies of battleshipFight.fight() with and without shipCollisions in every count -- and the page's log says THE SHIPS COLLIDED twice with it (55.9 s and 56.9 s, 25 each) and never without; with the formation as well they never meet (294 and 1,338 left, no log line)",
+                same(F.pass.tally, L.pass) && F.pass.hp.join() === "1500,1320" && F.pass.seen.length === 0 && same(F.hit.tally, L.hit) && F.hit.hp.join() === "1450,1270" && F.hit.shipCollisions === true && F.hit.seen.length === 2 && /^55\.9 s  THE SHIPS COLLIDED: battleship and second ship \(-25 each\)$/.test(F.hit.seen[0]) && /^56\.9 s  THE SHIPS COLLIDED/.test(F.hit.seen[1])
+                && same(F.both.tally, L.both) && F.both.hp.join() === "294,1338" && F.both.seen.length === 0 && F.both.formation === true && F.both.sel.join() === "true,true,2", `${F.hit.seen.join(" | ")}`);
+            ok("!! THE TWO BOXES START THE FIGHT THEY NAME, AND THE URL SETS THEM: ticking formation, then ships collide, each starts a new fight (the tick is back to 0) whose state says so; ?ships=2&formation=1&collide=1 starts a two-ship fight with both on and both boxes ticked",
+                F.ctl.formation.tick === 0 && F.ctl.formation.formation === true && F.ctl.formation.sel === true && F.ctl.collide.tick === 0 && F.ctl.collide.shipCollisions === true && F.ctl.collide.sel === true && F.url.formation === true && F.url.shipCollisions === true && F.url.ships === 2 && F.url.sel.join() === "true,true,2");
+        }
+        // ==== SHIPFORM-END (node)
+
+        // ==== HELM-BEGIN (node): a network at the ships' helm ----
+        {
+            const Hm = r.helmNet, O = { fighters: 8, gunners: "regular", behaviour: "face", cruise: 0.3 }, handHelm = { module: HP, weights: HP.handWeights() }, near5 = (a, b) => a.length === b.length && a.every((v, i) => Math.abs(v - b[i]) < 1e-5);
+            const plainH = BS.fight(1, "beam", O), twoOpts = { ...O, gunners: "green", ships: 2, escorts: 2 }, twoPlain = BS.fight(2, "swarm", twoOpts);
+            ok("!! THE PAGE OFFERS THE RULE AND THE NETWORK ON ITS HAND WEIGHTS FOR THE HELM and starts with the rule: three choices ('rule', 'hand', and 'imported', disabled until a helm file is dropped), the select says rule, the state says no network and the ship's card does not mention a helm",
+                Hm.options.join() === "rule,hand,imported" && Hm.sel0 === "rule" && Hm.rule.helm.id === "rule" && Hm.rule.helm.network === false && Hm.rule.sel === "rule" && !/helm:/.test(Hm.rule.cards[0]), Hm.options.join());
+            ok("!! THE RULE'S WEIGHTS AT THE HELM ARE THE SAME FIGHT ON THE PAGE: the helm network on its hand weights gives battleshipFight.fight()'s tally in every count -- the tally of the rule -- in a beam attack with one ship and in a green-gunner swarm against two ships and two escorts, and the select, the state and the ship's card say which is at the helm",
+                same(Hm.hand.tally, BS.fight(1, "beam", { ...O, helm: handHelm })) && same(Hm.hand.tally, plainH) && Hm.hand.helm.id === "hand" && Hm.hand.helm.network === true && Hm.hand.sel === "hand" && /helm: network, hand weights/.test(Hm.hand.cards[0])
+                && same(Hm.two.tally, BS.fight(2, "swarm", { ...twoOpts, helm: handHelm })) && same(Hm.two.tally, twoPlain) && plainH.killed > 0, `${plainH.killed} down`);
+            const ref = BS.build(1, "beam", { ...O, helm: handHelm }).arena; for (let i = 0; i < Hm.tick; i++) SA.stepSpaceArena(ref);
+            const hl = ref.crafts[0].helmPilot.last, act = hl && V.pilotActivations(HP, HP.handWeights(), hl.x), want = hl && V.pilotRows({ who: "helm", act, featureNames: HP.FEATURE_NAMES, outputNames: HP.OUTPUT_NAMES }), tail = Hm.rows.slice(-3), idle = Hm.idle.slice(-3);
+            ok("!! THE SHIP'S BRAIN WINDOW SHOWS THE HELM'S NETWORK: with the network at the helm the window grows three rows after the hull's and the thirteen seats' (17 in all) -- the twelve features it was last shown, its 34 hidden units, its five outputs -- equal (to 1e-5) to what the module's own arena gives at the same tick (300) and the library's activations; before it has been asked (tick 0) they are labelled idle and zero; with the rule there are 14 rows and none of them is the helm's",
+                !!hl && Hm.rows.length === 17 && tail.map((q) => q.label).join() === "h feat,h hidd,h outp" && tail.every((q, i) => q.n === want[i].values.length && near5(q.values, want[i].values)) && tail[0].n === 12 && tail[1].n === 34 && tail[2].n === 5 && tail[0].values[7] !== 0
+                && Hm.idle.length === 17 && idle.map((q) => q.label).join() === "h idle,h idle,h idle" && idle.every((q) => q.values.every((v) => v === 0)) && Hm.ruleRows.length === 14 && Hm.ruleRows.every((q) => !/^h /.test(q.label)), `${Hm.rows.length} rows, features ${tail[0].values.slice(0, 4).map((v) => v.toFixed(2))}`);
+            ok("...and the SECOND SHIP'S window shows its own helm's (the features it was shown, not the first ship's): the window of ship 2 in a two-ship fight has the three rows too, and its features are not the first ship's", Hm.rowsB.length === 17 && Hm.rowsB.slice(-3).map((q) => q.label).join() === "h feat,h hidd,h outp" && Hm.rowsB.slice(-3)[0].values.some((v) => v !== 0) && Hm.rowsA.slice(-3)[0].values.join() !== Hm.rowsB.slice(-3)[0].values.join());
+            ok("!! THE HELM CONTROL STARTS THE FIGHT IT NAMES AND THE URL SETS IT: choosing the network starts a new fight (the tick is back to 0) whose state says network; ?helm=hand starts one with the network at the helm and the select saying so", Hm.ctl.tick === 0 && Hm.ctl.helm.network === true && Hm.ctl.sel === "hand" && Hm.url.helm.id === "hand" && Hm.url.helm.network === true && Hm.url.sel === "hand");
+        }
+        // ==== HELM-END (node)
+
+        // ==== PEER-BEGIN (node): a peer's brain from a file ----
+        {
+            const Pr = r.peer, O = { fighters: 8, gunners: "regular", behaviour: "face", cruise: 0.3 }, plainP = BS.fight(1, "beam", O), has = (a, id) => a.includes(id), imp = (a) => a.map((o) => o.replace("!", ""));
+            const pilotRef = BS.fight(3, "swarm", { ...O, fighters: 6, pilot: SHIPPED }), hw = Float32Array.from(JSON.parse(PEER.pilot).weights);
+            ok("!! BEFORE ANYTHING IS IMPORTED the page has the button (a click on it opens the file input once) and a hidden file input for JSON, every 'imported' choice is in its list and DISABLED (a fighters' pilot, two gunner hands for the hand and for the turrets, a helm) and 'Clear imported' is disabled",
+                Pr.btn && Pr.opened === 1 && /json/.test(Pr.accept) && Pr.hidden === "none" && Pr.before.pilot.join() === "imported!" && Pr.before.hand.join() === "importedfly!,importedmlp!" && Pr.before.main.join() === "importedfly!,importedmlp!" && Pr.before.helm.join() === "imported!" && Pr.clear0 === true, JSON.stringify(Pr.before));
+            ok("!! A PEER'S PILOT FILE IS ADDED TO THE FIGHTERS' LIST AND FLOWN: dropping the shipped pilot's own file on the input says what it is (a fighters' pilot, its weights' hash, its held-out score), enables 'imported' in the fighters' list and 'Clear imported' -- and NOT chosen for you (the fighters' list still says the PD autopilot, the hand the rule, the helm the rule) -- and the fight with it is battleshipFight.fight()'s with that pilot in every count, its label carrying the hash",
+                Pr.pilotDrop.cls === "good" && /shipped-pilot\.json: a fighters' pilot \(/.test(Pr.pilotDrop.note) && Pr.pilotDrop.note.includes(weightsHash(hw)) && /held-out/.test(Pr.pilotDrop.note) && /"fighters fly" list/.test(Pr.pilotDrop.note) && Pr.pilotDrop.clearDisabled === false && Pr.afterPilot.pilot.join() === "imported" && Pr.chosen1.join() === "pd,rule,,,rule" && same(Pr.pilotFight.tally, pilotRef) && Pr.pilotFight.pilots.id === "imported" && Pr.pilotFight.pilots.label.includes(weightsHash(hw)), Pr.pilotDrop.note.slice(0, 110));
+            const netFly = { module: SG, weights: rangeWeights(SG) }, netMlp = { module: MG, weights: rangeWeights(MG) };
+            ok("!! A PEER'S GUNNER FILES GO TO THE HAND LISTS, EACH BY THE POLICY IT SAYS IT IS FOR: the gate's fruit fly network (seatGunnerPolicy) and GPU brain (seatGunnerMlp) are said to be a gun seat's hand, add 'importedfly' and 'importedmlp' to the hand list AND to the turrets' and point defence's, and each is the fight the module flies with it in every count (not the rule's) with the hash and the score in its label; the two in different groups are the fight with seatNetworks { main: GPU brain, pd: fruit fly }",
+                /gun seat's hand \(the fruit fly's\)/.test(Pr.flyDrop.note) && /gun seat's hand \(the GPU brain's\)/.test(Pr.mlpDrop.note) && Pr.afterGunners.hand.join() === "importedfly,importedmlp" && Pr.afterGunners.main.join() === "importedfly,importedmlp"
+                && same(Pr.flyFight.tally, BS.fight(1, "beam", { ...O, network: netFly })) && same(Pr.mlpFight.tally, BS.fight(1, "beam", { ...O, network: netMlp })) && !same(Pr.flyFight.tally, plainP) && Pr.flyFight.hand.id === "importedfly" && Pr.flyFight.hand.label.includes(weightsHash(netFly.weights)) && /held-out 0\.5/.test(Pr.flyFight.hand.label)
+                && same(Pr.groupFight.tally, BS.fight(1, "beam", { ...O, seatNetworks: { main: netMlp, pd: netFly } })), `${Pr.flyFight.tally.ship.seatRounds} / ${Pr.mlpFight.tally.ship.seatRounds} rounds against ${plainP.ship.seatRounds}`);
+            const helmRef = BS.fight(1, "beam", { ...O, helm: { module: HP, weights: HELM_W } });
+            ok("!! A PEER'S HELM FILE GOES TO THE HELM LIST: a helm network that is not the rule (a throttle correction, helmPolicy) is said to be a ship's helm, 'imported' is enabled in the helm list, and the fight with it is battleshipFight.fight()'s with that helm in every count -- and NOT the rule's, and not chosen for you (after all three kinds the lists still say pd, rule, rule) -- with the ship's card naming it and the brain window showing its three rows (12 features, 34 hidden, 5 outputs)",
+                /a ship's helm \(/.test(Pr.helmDrop.note) && Pr.afterHelm.helm.join() === "imported" && Pr.chosen2.join() === "pd,rule,,,rule" && same(Pr.helmFight.tally, helmRef) && !same(Pr.helmFight.tally, plainP) && Pr.helmFight.helm.id === "imported" && /helm: helm network, imported/.test(Pr.helmFight.cards[0]) && Pr.helmFight.cards[0].includes(weightsHash(HELM_W)) && Pr.helmRows.map((q) => `${q.label}:${q.n}`).join() === "h feat:12,h hidd:34,h outp:5");
+            const R = Pr.refused, bad = (k) => R[k].cls === "bad";
+            ok("!! A FILE THAT IS NOT A BRAIN THIS PAGE CAN USE IS SAID AND REFUSED: text that is not JSON ('not a readable JSON file'), JSON null and a number, a brain for another policy (drivePolicy: the note lists what the page takes), a policy named 'constructor' or '__proto__' (not a way into the table), the pilot's file with ten weights ('weight count 10 does not match pilot6dofPolicy's current 930'), a wrong format tag, a weight that overflows float32 (1e40) and one that is not a number -- ten refusals, each marked bad",
+                ["notJson", "nul", "num", "drive", "ctor", "proto", "short", "format", "huge", "nanish"].every(bad) && /not a readable JSON file/.test(R.notJson.note) && /this brain is for null; this page takes pilot6dofPolicy, seatGunnerPolicy, seatGunnerMlp, helmPolicy/.test(R.nul.note) && /this brain is for 3\b/.test(R.num.note) && /this brain is for "drivePolicy"; this page takes/.test(R.drive.note) && /this brain is for "constructor"/.test(R.ctor.note) && /this brain is for "__proto__"/.test(R.proto.note)
+                && /weight count 10 does not match pilot6dofPolicy's current 930/.test(R.short.note) && /unknown format "something-else"/.test(R.format.note) && /overflows to Infinity as float32/.test(R.huge.note) && /not a finite number/.test(R.nanish.note), Object.entries(R).map(([k, v]) => `${k}: ${v.note.slice(0, 60)}`).join(" | ").slice(0, 400));
+            ok("...and WHAT THE PAGE HELD IS KEPT: after the ten refusals the imported pilot, both gunner hands and the helm are still enabled, and the fight with the imported pilot is the same fight as before",
+                Pr.afterRefused.pilot.join() === "imported" && Pr.afterRefused.hand.join() === "importedfly,importedmlp" && Pr.afterRefused.helm.join() === "imported" && same(Pr.keptFight.tally, pilotRef) && same(Pr.keptFight.tally, Pr.pilotFight.tally));
+            ok("!! 'CLEAR IMPORTED' FORGETS THEM ALL: the four 'imported' choices are disabled again, the button is disabled, the note says so -- and a fight that still asks for one is flown by the rule: the PD autopilot for the fighters (the label says 'not loaded'), the rule in the seats, the rule at the helm",
+                Pr.cleared.snap.pilot.join() === "imported!" && Pr.cleared.snap.hand.join() === "importedfly!,importedmlp!" && Pr.cleared.snap.helm.join() === "imported!" && Pr.cleared.clearDisabled === true && /forgotten/.test(Pr.cleared.note) && Pr.gone.pilot.pilots.id === "pd" && /not loaded/.test(Pr.gone.pilot.pilots.label) && Pr.gone.hand.hand.id === "rule" && Pr.gone.hand.hand.network === false && Pr.gone.helm.helm.id === "rule" && Pr.gone.helm.helm.network === false && same(Pr.gone.hand.tally, plainP));
+        }
+        // ==== PEER-END (node)
 
         // ---- 9d a second ship and an escort ----
         {
