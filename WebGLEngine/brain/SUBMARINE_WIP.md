@@ -247,3 +247,18 @@ The long champion (9201) lost the Munk x3 tail. `mine` flew it on 500 never-used
 | AUDIT (36) | Munk x3 | -0.488 / -0.513 | 24 / 8 | 0 | 0 / 0 | -1.30 / -1.13 |
 
 Verdict: nominal QUALIFIES. Munk x3 does NOT meet the strict bar (no dive ended that the autopilot completes): it is better on the mean (-0.477 vs -0.521) and the tail gap shrank from -1.96 vs -1.43 (9201) to -1.59 vs -1.51, but one dive in 500 is still ended. The tail training moved the failure from "worse by 0.5 in the tail" to "worse by 0.08, one dive in 500"; it did not eliminate it.
+
+## Second tail round (UNNUMBERED; `brain/pilotSubWeightsRobustTail2Wip.json`, seed 9400)
+
+The tail champion 9310 still lost one safety-audit dive in 500 on Munk x3. `mine --base 8000` flew it on 500 new Munk x3 dives (seeds 8000-8299 etc.; none ended, champion -0.464 vs autopilot -0.513) and kept the 60 worst. Four runs of 300 iterations from 9310 on the union of both tail sets (120 dives): weight 1.0 (9400, 9401), 2.0 (9402, 9403). Evaluated on the HELD_OUT five hulls, the 120 trained-on tail dives, and a FRESH 300 Munk x3 dives (seeds 9000+; used for picking, so a selection set, not an audit):
+
+| pilot | 5-hull mean | tail120 mean / worst-5% | fresh300 mean / worst-5% / ended (autopilot -0.535 / -1.295 / 0) |
+|---|---|---|---|
+| long 9201 | -0.424 | -1.122 / -4.54 | -0.565 / -1.73 / 1 |
+| tail 9310 | -0.438 | -0.664 / -1.50 | -0.496 / -1.31 / 0 |
+| **t2 9400 (saved)** | -0.457 | -0.512 / -1.24 | -0.427 / -1.02 / 0 |
+| t2 9401 | -0.440 | -0.567 / -1.20 | -0.459 / -1.22 / 0 |
+| t2 9402 (weight 2) | -0.427 | -0.592 / -1.30 | -0.485 / -1.34 / 0 |
+| t2 9403 (weight 2) | -0.458 | -0.554 / -1.05 | -0.462 / -1.20 / 0 |
+
+9400 has the best Munk x3 numbers (fresh worst-5% -1.02 against the autopilot's -1.30) and pays for it elsewhere: the five-hull mean gives up 0.019 against 9310 and 0.033 against 9201, nominal -0.439 (9310: -0.398, 9201: -0.366), Munk 0 -0.580. If the nominal hull matters more than the 3x hull, 9402 (mean -0.427) is the other pick but its fresh tail only just ties the autopilot. SAFETY_POOL for 9400 (read, not trained on): nominal -0.493 vs -0.582 (376/76, 0 newly ended), Munk x3 -0.423 vs -0.535 (459/26, 0 newly ended, worst-5% -1.15 vs -1.38). Audit NOT read; use `--base 7000`.
