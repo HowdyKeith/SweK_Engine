@@ -349,3 +349,29 @@ Audit on a fresh range, base 12000 (500 + 36 dives per hull, SPENT for this file
 | **awkward** | -2.212 / -2.350 | 256 / 227 | **25** | 31/17 | -5.41 / -5.31 | -1.937 / -2.264, 1 |
 
 Verdict: QUALIFIES on ten of the twelve hulls (including all five audited ones, and five never trained on). It does NOT qualify on the two extreme hulls: better mean there, but 14 and 25 dives in 500 ended that the autopilot completes, and the tail is no better. The wide training did not fix them; those hulls are probably at or past what the slew-limited actuators can control (the autopilot itself ends 17 dives on each), so the useful next step there is a different kind of change (an actuator or vessel limit, or an explicit "unrecoverable hull" fallback), not more search. Versus the tail pilot 9400 on the ordinary hulls the wide pilot is about the same (no measured gain), so its value is the modest improvement on the extreme hulls.
+
+## Flying on imperfect senses (UNNUMBERED; `tools/subDisturb.mjs`, `tools/auditSubDisturbed.mjs`)
+
+Until now every pilot was handed the exact state instantly and flew in gentle water. `subDisturb` takes those three kindnesses away, around any pilot: gaussian SENSOR noise on depth, attitude, velocity and body rates; a CONTROL DELAY; stronger GUSTS (a current added to scenarios that have none, scaled by the level). Levels: 0 clean | 1 good INS, short link (noise x1, 0.1 s, gust x1) | 2 rough (x3, 0.2 s, gust x2) | 3 bad day (x5, 0.3 s, gust x3). The PD autopilot is disturbed the same way (same noise seeds, same delay, same gusts), so each cell compares like with like. The gate holds the module (22 sabotages, all red).
+
+SAFETY_POOL (500 dives, actuator limits; champion / autopilot; newly ended = dives the champion ended that the autopilot completed):
+
+| hull | pilot | level 0 | level 1 | level 2 | level 3 (newly ended) |
+|---|---|---|---|---|---|
+| nominal | long 9201 | -0.412 / -0.582 | -0.429 / -0.595 | -0.475 / -0.624 | -0.536 / -0.661 (0) |
+| nominal | tail 9400 | -0.492 / -0.582 | -0.510 / -0.595 | -0.562 / -0.624 | -0.630 / -0.661 (0) |
+| nominal | wide 9501 | -0.482 / -0.582 | -0.501 / -0.595 | -0.554 / -0.624 | -0.623 / -0.661 (0) |
+| Munk x3 | long 9201 | -0.560 / -0.535 | -0.670 / -0.567 | -0.931 / -0.659 | **-1.223 / -0.832 (4)** |
+| Munk x3 | tail 9400 | -0.423 / -0.535 | -0.455 / -0.567 | -0.555 / -0.659 | -0.760 / -0.832 (4) |
+| Munk x3 | wide 9501 | -0.441 / -0.535 | -0.485 / -0.567 | -0.597 / -0.659 | -0.837 / -0.832 (5) |
+
+Fresh audit, base 14000 (500 + 36 dives; SPENT for the tail pilot), tail pilot 9400, disturbed autopilot as the reference:
+
+| hull | set | level 0 | level 1 | level 2 | level 3 | newly ended (L0/L1/L2/L3) |
+|---|---|---|---|---|---|---|
+| nominal | SAFETY_AUDIT | -0.475 / -0.573 | -0.492 / -0.588 | -0.545 / -0.617 | -0.615 / -0.653 | 0/0/0/0 |
+| nominal | AUDIT | -0.480 / -0.566 | -0.496 / -0.576 | -0.547 / -0.596 | -0.617 / -0.625 | 0/0/0/0 |
+| Munk x3 | SAFETY_AUDIT | -0.420 / -0.525 | -0.449 / -0.561 | -0.558 / -0.660 | -0.764 / -0.822 | 0/0/**1**/**3** |
+| Munk x3 | AUDIT | -0.394 / -0.495 | -0.407 / -0.514 | -0.475 / -0.589 | -0.607 / -0.703 | 0/0/0/0 |
+
+What it says. (1) The learned pilots keep their lead over the PD autopilot on the nominal hull at every level, but the lead shrinks with the noise: at the bad-day level the tail pilot is better on 276 of 460 safety-audit dives (the margin is nearly gone: -0.615 vs -0.653) and ends none the autopilot completes. (2) On the unstable Munk x3 hull the robustness ORDER is tail > wide > long: the long champion degrades much faster than the autopilot (-1.22 vs -0.83 at level 3, 4 newly ended) and the tail training bought a real margin; the wide pilot is no better than the autopilot at level 3. (3) The tail pilot holds the strict bar (no dive ended that the autopilot completes) through level 1 on both hulls; at level 2 it ends ONE Munk x3 safety-audit dive in 500, at level 3 three, so "robust to rough senses" is true for the mean and the ordinary hulls, not for the strict safety count on the 3x-Munk hull in a bad day. (4) The pilots were never trained with this noise: training on the disturbed levels is the obvious next step, and the delay (0.3 s on a hull that needs fast fin corrections) is the likely cause of the Munk x3 losses.
