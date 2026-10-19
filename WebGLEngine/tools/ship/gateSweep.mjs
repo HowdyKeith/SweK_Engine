@@ -9276,6 +9276,19 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "population census grown by one; and three rows restated where a fresh record broke a count rather than a claim. The label-collision " +
                  "round's guards picked this ship's numbers. NOT CLOSED: section 87 needs the rig, and libmSensitivity and responseCensus still time out.",
     }),
+    // v4876 -- since566, from `versionPreflight --next` after a full fetch (the highest declared anywhere was since565, this branch's). It closes v4876 and SUPERSEDES v4875, which reached main before its verdict: NO new gate file.
+    since566: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate file.
+        at: "v4876", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "ai-bridge/subAquariumCore-selfcheck.mjs, ai-bridge/subAquariumBridge-selfcheck.mjs, render/subAquariumSim-selfcheck.mjs, tools/ship/subAquariumPage-selfcheck.mjs (five seeds -> six, and a row pinning the noisy-senses sub to its weights file)",
+            "world/orreryEjecta.mjs's male-cns record 8 -> 10 (orreryFleet-selfcheck, which the quick sweep never runs, counted the aquarium bridge's availability probe)",
+            "tools/ship/realGpuRun-selfcheck.mjs (merged from claude/tier-2-keys-patch: each adapter's features, limits and subgroup sizes)",
+        ]),
+        verdict: "the gates this round touched were each run alone and are green; the full verdict is recorded in the round note. NOT CLOSED: releaseLedger, budgetEvidence, mechanical, mutationScore and operators were red in the v4875 attempt for reasons outside the tree's code (unpublished releases, a foreign timing record, stale mutation records).",
+    }),
     // v4875 -- since565, from `versionPreflight --next` after a full fetch (the highest declared anywhere was since564, main's). SEVENTEEN gate files, all the submarine line's: the vessel, its actuators, sonar and torpedoes, the autopilot and the
     // connectome-wired pilot, the depth/mission/duel tasks and the tactician, self-play, the sub aquarium (rules, bridge, tank, page, the server.html chips) and the disturbed-flight module. Each was sabotaged when it was written; the logs are in the gates' headers.
     since565: Object.freeze({
