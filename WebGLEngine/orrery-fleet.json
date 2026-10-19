@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "7fba6277d7a0aaf1fc909b746af0b234e24de00e",
+ "head": "93a082e1c721faf3aa6ef35a0e8d4d3c8b841bd2",
  "bodies": {
   "box3d": [
    {
@@ -442,8 +442,8 @@
   "male-cns": [
    {
     "path": "ai-bridge/subAquariumBridge-selfcheck.mjs",
-    "bytes": 28555,
-    "sha": "e336692128303e452c50f7fe9c9f385cc47c81b2"
+    "bytes": 28553,
+    "sha": "93a082e1c721faf3aa6ef35a0e8d4d3c8b841bd2"
    },
    {
     "path": "ai-bridge/subAquariumBridge.js",
@@ -746,8 +746,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3665204,
-    "sha": "5feb23be64e7cd5663904c3aee38679485831d2b"
+    "bytes": 3665902,
+    "sha": "ac06375b6b171495462e9fcb8365c39c1b478a1d"
    },
    {
     "path": "mpm3d.html",
