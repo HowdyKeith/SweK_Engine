@@ -262,3 +262,16 @@ The tail champion 9310 still lost one safety-audit dive in 500 on Munk x3. `mine
 | t2 9403 (weight 2) | -0.458 | -0.554 / -1.05 | -0.462 / -1.20 / 0 |
 
 9400 has the best Munk x3 numbers (fresh worst-5% -1.02 against the autopilot's -1.30) and pays for it elsewhere: the five-hull mean gives up 0.019 against 9310 and 0.033 against 9201, nominal -0.439 (9310: -0.398, 9201: -0.366), Munk 0 -0.580. If the nominal hull matters more than the 3x hull, 9402 (mean -0.427) is the other pick but its fresh tail only just ties the autopilot. SAFETY_POOL for 9400 (read, not trained on): nominal -0.493 vs -0.582 (376/76, 0 newly ended), Munk x3 -0.423 vs -0.535 (459/26, 0 newly ended, worst-5% -1.15 vs -1.38). Audit NOT read; use `--base 7000`.
+
+### Audit of the second tail pilot (seed 9400) on a fresh range (`--base 7000`; SPENT for this champion, read once)
+
+Actuator limits on, champion vs PD autopilot:
+
+| set | hull | champion / autopilot | better / worse | newly ended | early ends | worst-5% |
+|---|---|---|---|---|---|---|
+| SAFETY_AUDIT (500) | nominal | -0.489 / -0.575 | 389 / 71 | 0 | 0 / 0 | -0.94 / -1.17 |
+| AUDIT (36) | nominal | -0.441 / -0.511 | 25 / 7 | 0 | 0 / 0 | -0.90 / -1.17 |
+| SAFETY_AUDIT (500) | Munk x3 | -0.418 / -0.524 | 459 / 25 | 0 | 0 / 0 | -1.11 / -1.29 |
+| AUDIT (36) | Munk x3 | -0.388 / -0.480 | 32 / 3 | 0 | 0 / 0 | -1.11 / -1.35 |
+
+Verdict: QUALIFIES on BOTH hulls. No dive ended that the autopilot completes, no early ends, better mean and a better worst-5% tail on nominal and on Munk x3. The Munk x3 weakness of the long champion is closed on this audit. Caveats: the nominal-hull margin is smaller than for earlier champions (better on 389/500 against 496/500 for 9201; the price of the tail training), the other three hulls (Munk 0, fins x0.6, righting x2.5) were not part of this audit (their held-out means: -0.580 / -0.445 / -0.441, still better than the autopilot's -0.684 / -0.539 / -0.641), and the sim is the same EXPLORER model the pilot was trained in, so this is robustness to hull variants, not a sim-to-real result.
