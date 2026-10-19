@@ -114,6 +114,12 @@ console.log("\n3. THE LIVE PAGE");
             ok("!! removing a local sub with its button REALLY removes it (the bridge's tank lost one, and so did the list)", after === before - 1 && bridge.registry.counts().local === 4, `${before} -> ${after}`);
             await pg.selectOption("#speedSel", "10"); await pg.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));   // two frames at 10x, not a sleep
             ok("the speed selector accepts 10x and the page keeps running without error", (await pg.$eval("#speedSel", (e) => e.value)) === "10" && errs.length === 0);
+            const hulls = await pg.$$eval("#hullSel option", (o) => o.map((x) => [x.value, x.textContent]));
+            ok("!! the hull picker lists all twelve hulls of physics/mechanics/subHulls.mjs, each with its label as TEXT, and starts on the nominal hull", hulls.length === 12 && hulls.every(([v, t]) => v && t.length > 3) && (await pg.$eval("#hullSel", (e) => e.value)) === "nominal" && hulls.some(([v]) => v === "munk5"));
+            await pg.selectOption("#hullSel", "munk5"); await pg.waitForFunction(() => /hull: Munk x5/.test(document.getElementById("msg").textContent), null, { timeout: 5000 }).catch(() => {});
+            await pg.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+            const afterHull = await pg.$$eval("#list .row .sub", (e) => e.map((x) => x.textContent));
+            ok("!! choosing the Munk x5 hull says so, resets the subs on the new vessel without a script error, and the rows keep their live stats (a depth in m and a speed in m/s)", /hull: Munk x5/.test(await pg.textContent("#msg")) && (await pg.$eval("#hullSel", (e) => e.value)) === "munk5" && errs.length === 0 && afterHull.length > 0 && afterHull.every((t) => /\d+ m · \d+\.\d m\/s · Munk x5 \(extreme\)/.test(t)), afterHull[0]);
             try { await pg.screenshot({ path: process.env.AQ_SHOT || "/tmp/sub-aquarium.png" }); report("screenshot at " + (process.env.AQ_SHOT || "/tmp/sub-aquarium.png")); } catch {}
         } finally { await b.close(); server.close(); }
     }

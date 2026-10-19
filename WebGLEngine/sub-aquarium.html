@@ -56,6 +56,7 @@
   <button id="seedBtn" title="Put this box's own champions in the tank">Offer my subs</button>
   <button id="refreshBtn" title="Fetch the tank's list now">Refresh</button>
   <label>speed <select id="speedSel"><option value="1">1&times;</option><option value="4" selected>4&times;</option><option value="10">10&times;</option></select></label>
+  <label>hull <select id="hullSel" title="The vessel every sub in the tank is flown on. The pilots are not told which one it is."></select></label>
   <span class="chip"><span class="dot" id="fishDot"></span><b>FISH BRAIN</b> <span id="fishWord">checking&hellip;</span></span>
   <span id="msg" class="sub"></span>
 </div>
@@ -70,10 +71,17 @@
 <p class="note" id="fishDetail"></p>
 <script type="module">
 import { createTank, LENGTH, WIDTH, DEPTH_MIN, DEPTH_MAX } from "/render/subAquariumSim.mjs";
+import { LABELS } from "/physics/mechanics/subHulls.mjs";
 
 const $ = (id) => document.getElementById(id);
 const plan = $("plan"), side = $("sideView"), pg = plan.getContext("2d"), sg = side.getContext("2d");
 const tank = createTank();
+{   // the hull picker: the labels are text; changing it puts every sub back in the water on the new vessel
+    const sel = $("hullSel");
+    for (const [name, label] of Object.entries(LABELS)) { const o = document.createElement("option"); o.value = name; o.textContent = label; sel.appendChild(o); }
+    sel.value = tank.hull;
+    sel.addEventListener("change", () => { try { tank.setHull(sel.value); $("msg").textContent = "hull: " + (LABELS[sel.value] || sel.value); } catch (e) { sel.value = tank.hull; $("msg").textContent = "that hull is not available"; } });
+}
 let selected = null, lastFrame = 0, listErr = false;
 const DOT = { live: "#4ade80", standin: "#f6a623", offline: "#ff5a5a", err: "#555" }, WORD = { live: "live", standin: "stand-in", offline: "offline", err: "unreachable" };
 
@@ -116,7 +124,7 @@ function renderList() {
 function updateStats(snap) {
   for (const s of snap) {
     const m = document.getElementById("m_" + s.id); if (!m) continue;
-    m.textContent = `${s.pilot === "network" ? "network" : "PD autopilot"} · ${s.local ? "this box" : "from " + s.from} · ${s.depth.toFixed(0)} m · ${s.speed.toFixed(1)} m/s` + (s.lost ? ` · lost ${s.lost}×` : "");
+    m.textContent = `${s.pilot === "network" ? "network" : "PD autopilot"} · ${s.local ? "this box" : "from " + s.from} · ${s.depth.toFixed(0)} m · ${s.speed.toFixed(1)} m/s` + (s.hull && s.hull !== "nominal" ? ` · ${LABELS[s.hull] || s.hull}` : "") + (s.lost ? ` · lost ${s.lost}×` : "");
   }
 }
 

@@ -16,6 +16,7 @@
 import * as S from "../physics/mechanics/subModel6dof.mjs";
 import * as AS from "../brain/autopilotSub.mjs";
 import * as PS from "../brain/pilotSubPolicy.mjs";
+import * as H from "../physics/mechanics/subHulls.mjs";
 
 export const LENGTH = 500, WIDTH = 300, MARGIN = 60, DEPTH_MIN = 14, DEPTH_MAX = 40, TRAIL = 80, TRAIL_EVERY = 0.5, MAX_STEP = 0.1;
 const DT = S.DT, wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -27,12 +28,11 @@ export const headingTo = (x, y, tx, ty) => Math.atan2(-(ty - y), tx - x);
 /** Is a point inside the steering box (MARGIN m in from every wall)? */
 export const insideBox = (x, y) => x >= MARGIN && x <= LENGTH - MARGIN && y >= MARGIN && y <= WIDTH - MARGIN;
 
-const MODEL = S.createSubModel();
 
 /** A new tank. `sync(list)` reconciles it with the aquarium's list; `step(seconds)` advances it; `subs` are the live boats. */
-export function createTank() {
+export function createTank({ hull = "nominal" } = {}) {
     const subs = new Map();   // id -> live sub
-    let clock = 0;
+    let clock = 0, hullName = hull, MODEL = H.model(hull);   // the vessel every sub in the tank is (physics/mechanics/subHulls.mjs); the pilots do not know which
 
     function spawn(entry, rng, atCentre = false) {
         const x = atCentre ? LENGTH / 2 + (rng() - 0.5) * 60 : MARGIN + rng() * (LENGTH - 2 * MARGIN), y = atCentre ? WIDTH / 2 + (rng() - 0.5) * 40 : MARGIN + rng() * (WIDTH - 2 * MARGIN);
@@ -58,6 +58,13 @@ export function createTank() {
     return {
         subs,
         get clock() { return clock; },
+        get hull() { return hullName; },
+        /** Change the vessel of the whole tank (a name from physics/mechanics/subHulls.mjs; an unknown name throws and changes nothing). Every sub is put back in the water on the new hull, at a fresh start, with its trail cleared. */
+        setHull(name) {
+            const m = H.model(name); MODEL = m; hullName = name;
+            for (const sub of subs.values()) { sub.state = spawn(sub, sub.rng, true); sub.trail.length = 0; sub.wasInside = true; sub.status = "swimming"; retarget(sub); }
+            return name;
+        },
         /** Reconcile with the aquarium's list [{ id, name, hue, pilot, from, local, weights }]: new ids join, ids that are gone leave, the ones that stay keep swimming. Returns { added, removed }. */
         sync(list) {
             const want = new Set(list.map((e) => e.id)); let added = 0, removed = 0;
@@ -89,7 +96,7 @@ export function createTank() {
         },
         /** What a page draws: one plain record per sub. */
         snapshot() {
-            return [...subs.values()].map((sub) => { const a = S.attitude(sub.state); return { id: sub.id, name: sub.name, hue: sub.hue, pilot: sub.pilotKind, from: sub.from, local: sub.local, x: sub.state.pos[0], y: sub.state.pos[1], depth: a.depth, heading: a.heading, pitch: a.pitch, speed: a.speed, target: sub.target, lost: sub.lost, status: sub.status, trail: sub.trail.slice() }; });
+            return [...subs.values()].map((sub) => { const a = S.attitude(sub.state); return { hull: hullName, id: sub.id, name: sub.name, hue: sub.hue, pilot: sub.pilotKind, from: sub.from, local: sub.local, x: sub.state.pos[0], y: sub.state.pos[1], depth: a.depth, heading: a.heading, pitch: a.pitch, speed: a.speed, target: sub.target, lost: sub.lost, status: sub.status, trail: sub.trail.slice() }; });
         },
     };
 }

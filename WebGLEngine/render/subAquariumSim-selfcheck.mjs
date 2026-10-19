@@ -59,7 +59,7 @@ console.log("\n2. SYNC");
 
 console.log("\n3. SWIMMING");
 {
-    ok("!! the tree offers four subs here: the PD autopilot (no weights) and three trained networks (963 weights)", seed.length === 4 && seed[0].weights === null && seed.slice(1).every((s) => s.weights.length === 963));
+    ok("!! the tree offers five subs here: the PD autopilot (no weights) and four trained networks (963 weights)", seed.length === 5 && seed[0].weights === null && seed.slice(1).every((s) => s.weights.length === 963));
     const t = A.createTank(); t.sync(seed); let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9, minD = 1e9, maxD = -1e9;
     for (let i = 0; i < 30 * 600; i++) { t.step(1 / 30); if (i % 30 === 0) for (const s of t.snapshot()) { minX = Math.min(minX, s.x); maxX = Math.max(maxX, s.x); minY = Math.min(minY, s.y); maxY = Math.max(maxY, s.y); minD = Math.min(minD, s.depth); maxD = Math.max(maxD, s.depth); } }
     const snap = t.snapshot();
@@ -132,11 +132,33 @@ console.log("\n9. SNAPSHOT");
 {
     const t = A.createTank(); t.sync([entry("p", { name: "Pip", hue: 42, from: "10.0.0.2", local: true })]); run(t, 60);
     const s = t.snapshot()[0], tr = s.trail.length; s.trail.push([0, 0, 0]); s.trail.length = 0;
-    ok("!! a snapshot is a plain record with exactly the fields the page draws (id, name, hue, pilot, from, local, x, y, depth, heading, pitch, speed, target, lost, status, trail), and its trail is a COPY (emptying it does not empty the boat's)", Object.keys(s).sort().join() === "depth,from,heading,hue,id,local,lost,name,pilot,pitch,speed,status,target,trail,x,y".split(",").sort().join() && t.snapshot()[0].trail.length === tr && tr > 50 && s.name === "Pip" && s.hue === 42 && s.from === "10.0.0.2" && s.local === true && s.pilot === "autopilot");
+    ok("!! a snapshot is a plain record with exactly the fields the page draws (id, name, hue, hull, pilot, from, local, x, y, depth, heading, pitch, speed, target, lost, status, trail), and its trail is a COPY (emptying it does not empty the boat's)", Object.keys(s).sort().join() === "depth,from,heading,hue,hull,id,local,lost,name,pilot,pitch,speed,status,target,trail,x,y".split(",").sort().join() && t.snapshot()[0].trail.length === tr && tr > 50 && s.name === "Pip" && s.hue === 42 && s.from === "10.0.0.2" && s.local === true && s.pilot === "autopilot");
     run(t, 300);
     ok("!! a trail never grows past 80 points however long the boat swims (5 minutes more)", t.snapshot()[0].trail.length === 80 && A.TRAIL === 80 && t.snapshot()[0].trail.every((p) => p.length === 3 && p.every(Number.isFinite)));
     const big = A.createTank(); big.sync(Array.from({ length: 24 }, (_, i) => entry("g" + i, i % 2 ? { pilot: "network", weights: seed[2].weights } : {}))); const t0 = Date.now(); run(big, 60);
     ok("!! a full tank (24 subs, half of them networks) runs a minute of sea in well under 4 s: the page can run it at 10x on a laptop", Date.now() - t0 < 4000, `${Date.now() - t0} ms`);
+}
+
+console.log("\n10. THE HULL");
+{
+    const H = await import("../physics/mechanics/subHulls.mjs");
+    const swim = (hull, secs = 120) => { const q = A.createTank({ hull }); q.sync([entry("h", { pilot: "network", weights: seed[4].weights })]); run(q, secs); const x = q.snapshot()[0]; return { hull: q.hull, snap: JSON.stringify([x.x, x.y, x.depth, x.heading, x.pitch]), lost: x.lost, rec: x.hull }; };
+    const a = swim("nominal"), b = swim("heavy"), c = swim("nominal");
+    ok("!! the tank starts on the nominal hull by default, reports its hull in the tank and in every record, and the same sub swims DIFFERENTLY on the heavy hull (the hull is really the vessel, not a label) and identically twice on the same hull", new A.createTank().hull === "nominal" && a.hull === "nominal" && a.rec === "nominal" && b.rec === "heavy" && a.snap !== b.snap && a.snap === c.snap, `${a.snap} | ${b.snap}`);
+    const t = A.createTank(); t.sync([entry("p", { pilot: "network", weights: seed[4].weights }), entry("q")]); run(t, 90);
+    const before = t.snapshot().map((x) => x.trail.length), name = t.setHull("munk5"), after = t.snapshot();
+    ok("!! changing the hull puts every sub back in the water on the new vessel: the tank and the records name it, the trails are cleared, the subs are still there and still swimming", name === "munk5" && t.hull === "munk5" && after.length === 2 && after.every((x) => x.hull === "munk5" && x.trail.length === 0 && x.status === "swimming") && before.every((n) => n > 20));
+    const twin = (h) => { const q = A.createTank(); q.sync([entry("p", { pilot: "network", weights: seed[4].weights })]); run(q, 90); const pre = JSON.stringify(q.snapshot()[0].x); q.setHull(h); const post = JSON.stringify(q.snapshot()[0].x); run(q, 120); const x = q.snapshot()[0]; return { pre, post, end: JSON.stringify([x.x, x.y, x.depth, x.heading, x.pitch]) }; };
+    const tn = twin("nominal"), th = twin("heavy");
+    ok("!! setHull really changes the physics: two tanks with the SAME history and the same respawn, one put on the nominal hull and one on the heavy hull, swim differently afterwards (and the same hull twice swims the same)", tn.end !== th.end && tn.end === twin("nominal").end);
+    ok("!! setHull puts the boat back in the water: its position after the call is not the position before it", tn.pre !== tn.post && th.pre !== th.post);
+    let threw = false; try { t.setHull("no-such-hull"); } catch { threw = true; }
+    ok("!! an unknown hull name throws and changes NOTHING (the tank keeps its hull and its subs)", threw && t.hull === "munk5" && t.snapshot().length === 2);
+    let threw2 = false; try { A.createTank({ hull: "nope" }); } catch { threw2 = true; }
+    ok("an unknown hull name at creation throws too", threw2);
+    ok("!! every named hull has a picker label and builds a finite model, and the labels cover exactly the hulls (a hull with no label would be an unreachable option in the page)", Object.keys(H.SPECS).sort().join() === Object.keys(H.LABELS).sort().join() && Object.keys(H.SPECS).every((n) => Number.isFinite(H.model(n).mass)) && Object.keys(H.SPECS).length === 12);
+    const x5 = A.createTank({ hull: "munk5" }); x5.sync([entry("n", { pilot: "network", weights: seed[4].weights })]); run(x5, 300); const sn = x5.snapshot()[0];
+    ok("!! even on the extreme Munk x5 hull a five-minute swim leaves a finite state in the tank (the boat may be lost and respawned, never NaN)", Number.isFinite(sn.x) && Number.isFinite(sn.y) && Number.isFinite(sn.depth));
 }
 
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
