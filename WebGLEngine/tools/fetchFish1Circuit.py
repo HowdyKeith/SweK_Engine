@@ -15,7 +15,7 @@
 # WHICH LORE IDS? The notebook looks neurons up by lore id or by a voxel coordinate (Neuroglancer), not by name. The Mauthner cells are the two giant reticulospinal somata in rhombomere 4 of the hindbrain: find them
 # in Neuroglancer, click the soma, and read the lore id from the `somas` table. A root id printed in an example (the notebook's 864691128630286274) is an example of the FORMAT, not a verified Mauthner cell.
 # `--selftest` runs the conversion against a fake client with invented numbers (no network) -- a test of this file, not data.
-import argparse, json, sys, datetime
+import argparse, json, sys, datetime, os
 
 GLOBAL_URL = "https://global.brain-wire-test.org/"
 DATASTACK = "fish1_full"
@@ -119,5 +119,6 @@ if __name__ == "__main__":
     client.materialize.version = client.materialize.most_recent_version()
     soma, edges, tags = build_circuit(client, [x.strip() for x in a.lore.split(",") if x.strip()], a.partners)
     out = to_json(soma, edges, tags, client.materialize.version, GLOBAL_URL)
+    os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)   # vendor/zebrafish/ does not exist in a fresh clone
     json.dump(out, open(a.out, "w"), indent=1)
-    print(f"wrote {a.out}: {out['neuronCount']} neurons, {out['edgeCount']} edges (snapshot v{client.materialize.version})")
+    print(f"wrote {os.path.abspath(a.out)}: {out['neuronCount']} neurons, {out['edgeCount']} edges (snapshot v{client.materialize.version})")
