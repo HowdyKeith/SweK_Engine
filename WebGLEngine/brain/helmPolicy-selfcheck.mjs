@@ -1,6 +1,6 @@
 // WebGLEngine/brain/helmPolicy-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/helmPolicy-selfcheck.mjs      (~0.5 s)
+// Run: node brain/helmPolicy-selfcheck.mjs      (~0.2 s)
 //
 // A NETWORK FOR A CAPITAL SHIP'S HELM, HELD TO WHAT ITS HEADER SAYS. brain/helmPolicy.mjs puts a fruit fly's escape-circuit network (pilot6dofPolicy's, 930 weights) behind the rule that turns the hull and sets the engines, as a CORRECTION to the rule's answer: up to half the hull's torque limit about each axis and up to
 // 0.3 of the pods' thrust. This holds the module on its own; the arena's hook is held by brain/spaceArena-selfcheck.mjs, the fight's option by brain/battleshipFight-selfcheck.mjs and the page by tools/ship/battleshipPage-selfcheck.mjs.

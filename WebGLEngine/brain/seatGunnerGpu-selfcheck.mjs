@@ -1,6 +1,6 @@
 // WebGLEngine/brain/seatGunnerGpu-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/seatGunnerGpu-selfcheck.mjs      (~25 s: a headless Chromium, SwiftShader on the build box; the card on a rig)
+// Run: node brain/seatGunnerGpu-selfcheck.mjs      (~7 s: a headless Chromium, SwiftShader on the build box; the card on a rig)
 //
 // THE SEAT NETWORKS OF A FIGHT, DECIDED ON A REAL WebGPU DEVICE IN ONE BATCH, GRADED AGAINST THE CPU TWIN. brain/seatGunnerGpu.mjs runs the networks of a capital ship's gun seats (the fruit fly's and the GPU brain's, brain/seatGunnerPolicy.mjs and seatGunnerMlp.mjs) through brain/mlp.js's BatchedMLP for all the
 // seats of all the ships at once, through brain/spaceArena.mjs's two-phase tick (stepSpaceArenaAsync); this holds it to the CPU twin the networks were written against.

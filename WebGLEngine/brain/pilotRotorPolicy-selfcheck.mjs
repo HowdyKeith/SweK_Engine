@@ -1,6 +1,6 @@
 // WebGLEngine/brain/pilotRotorPolicy-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/pilotRotorPolicy-selfcheck.mjs      (~8 s)
+// Run: node brain/pilotRotorPolicy-selfcheck.mjs      (~70 s)
 //
 // THE SIBLING GATE OF brain/pilotRotorPolicy.mjs: the fruit-fly network as a helicopter pilot, whose hand weights are the hand pilot (brain/autopilotRotor.mjs) written through the 34 neurons of the Giant Fiber Circuit. The claim worth a gate is not "it flies" -- it is
 // "the weights ARE the hand pilot", and "the network IS the circuit". Both are asked of it with an independent restatement of the network written HERE, from the topology file, with no code from the module (brain/pilotFlightPolicy-selfcheck.mjs is the aeroplane's):

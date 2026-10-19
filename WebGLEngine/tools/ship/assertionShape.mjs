@@ -937,8 +937,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4870 -- three new gates (brain/pilotFlightMlp-selfcheck.mjs, brain/pilotFlightGpu-selfcheck.mjs, tools/ship/trainFlightPilotGpu-selfcheck.mjs), each spelling ok(name, cond, detail): gates, usesOk, definesOk and nameFirst each by three (1980 -> 1983, 1959 -> 1962, 1951 -> 1954, 1850 -> 1853); nothing else moved.
     // v4874 -- twenty-two new gates, each spelling ok(name, cond, detail) like the tree's majority, so gates, usesOk, definesOk and nameFirst each move by twenty-two (1983 -> 2005, 1962 -> 1984, 1954 -> 1976, 1853 -> 1875); nothing else moved. They are the unnumbered line's: ai-bridge/tools/roundhouseRoutes-selfcheck.mjs, brain/{battleshipFight,bomberFight,dogfightArena,dogfightTask,dogfightTrain,seatGunnerMlp,seatGunnerPolicy,spaceArena}-selfcheck.mjs, physics/mechanics/{bomber,capitalShip,flightGuns,froudeScale,gunSeats}-selfcheck.mjs, render/{flightViews,renderNow}-selfcheck.mjs and tools/ship/{battleshipPage,bomberPage,dogfightPage,trainDogfightPilot,trainDogfightPilotShipped,trainSeatGunner}-selfcheck.mjs.
     // v4875 -- seventeen new gates (the submarine line), each spelling ok(name, cond, detail) like the tree's majority: gates, usesOk, definesOk and nameFirst each move by seventeen (2005 -> 2022, 1984 -> 2001, 1976 -> 1993, 1875 -> 1892).
-    gates: 2022, usesOk: 2001, definesOk: 1993, importsOk: 0,
-    distinctDefinitions: 44, nameFirst: 1892, condFirst: 98, unknownSignature: 11,
+    // v4877 -- twelve gates (the rotorcraft branch), eleven of them spelling ok(name, cond, detail) like the tree's majority and one condFirst: gates 2022 -> 2034, usesOk 2001 -> 2013, definesOk 1993 -> 2005, nameFirst 1892 -> 1903, condFirst 98 -> 99.
+    gates: 2034, usesOk: 2013, definesOk: 2005, importsOk: 0,
+    distinctDefinitions: 44, nameFirst: 1903, condFirst: 99, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

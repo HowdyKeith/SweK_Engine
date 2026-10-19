@@ -1,6 +1,6 @@
 // WebGLEngine/physics/mechanics/terrain-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node physics/mechanics/terrain-selfcheck.mjs      (~0.3 s)
+// Run: node physics/mechanics/terrain-selfcheck.mjs      (~0.2 s)
 //
 // THE GROUND THE MODELS, THE PILOTS AND THE PAGES SHARE, HELD TO ITS CLOSED FORMS. physics/mechanics/terrain.mjs is a height function with a gradient and a normal, built from a JSON spec; what this gate protects is that the three things reading it cannot disagree about where the ground is:
 //

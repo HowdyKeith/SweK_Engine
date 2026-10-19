@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/trainRotorPilot-selfcheck.mjs -- UNNUMBERED (beside tools/ship/trainRotorPilot.mjs)
 //
-// Run: node tools/ship/trainRotorPilot-selfcheck.mjs      (~40 s)
+// Run: node tools/ship/trainRotorPilot-selfcheck.mjs      (~130 s)
 //
 // GRADES THE TOOL THAT MAKES THE HELICOPTER PILOTS, NOT THE PILOTS (tools/ship/trainFlightPilot-selfcheck.mjs is the aeroplane's). The tool's whole value is that it cannot flatter itself: several independent searches; a search is ELIGIBLE only if it ends no flight early
 // on a pool of 60 starts that the hand pilot completes; the champion is the best held-out of the eligible; the audit, the reserve and a second 60-start safety audit are read ONCE and only for the champion (and not at all when no search is eligible); and a file is written
