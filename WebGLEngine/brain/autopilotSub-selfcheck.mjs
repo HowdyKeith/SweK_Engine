@@ -1,6 +1,6 @@
 // WebGLEngine/brain/autopilotSub-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/autopilotSub-selfcheck.mjs      (~4 s)
+// Run: node brain/autopilotSub-selfcheck.mjs      (~2 s)
 //
 // THE HAND-WRITTEN SUBMARINE PILOT HELD TO ITS LAWS AND TO WHAT IT CAN DO. brain/autopilotSub.mjs is a cascade of memoryless PD loops; this gate holds each law to its sign and its closed form, and the whole to a measured capture:
 //
