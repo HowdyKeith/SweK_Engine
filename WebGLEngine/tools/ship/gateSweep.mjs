@@ -9276,6 +9276,35 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "population census grown by one; and three rows restated where a fresh record broke a count rather than a claim. The label-collision " +
                  "round's guards picked this ship's numbers. NOT CLOSED: section 87 needs the rig, and libmSensitivity and responseCensus still time out.",
     }),
+    // v4875 -- since565, from `versionPreflight --next` after a full fetch (the highest declared anywhere was since564, main's). SEVENTEEN gate files, all the submarine line's: the vessel, its actuators, sonar and torpedoes, the autopilot and the
+    // connectome-wired pilot, the depth/mission/duel tasks and the tactician, self-play, the sub aquarium (rules, bridge, tank, page, the server.html chips) and the disturbed-flight module. Each was sabotaged when it was written; the logs are in the gates' headers.
+    since565: Object.freeze({
+        at: "v4875", swept: 17, green: 17, red: 0,
+        added: Object.freeze([
+            "ai-bridge/subAquariumBridge-selfcheck.mjs",
+            "ai-bridge/subAquariumCore-selfcheck.mjs",
+            "brain/autopilotSub-selfcheck.mjs",
+            "brain/missionTask-selfcheck.mjs",
+            "brain/pilotSubPolicy-selfcheck.mjs",
+            "brain/subDuel-selfcheck.mjs",
+            "brain/subTactics-selfcheck.mjs",
+            "brain/subTask-selfcheck.mjs",
+            "physics/mechanics/subActuators-selfcheck.mjs",
+            "physics/mechanics/subModel6dof-selfcheck.mjs",
+            "physics/mechanics/subSonar-selfcheck.mjs",
+            "physics/mechanics/subTorpedo-selfcheck.mjs",
+            "render/subAquariumSim-selfcheck.mjs",
+            "tools/selfPlaySubTactics-selfcheck.mjs",
+            "tools/ship/subAquariumPage-selfcheck.mjs",
+            "tools/ship/subAquariumServerHtml-selfcheck.mjs",
+            "tools/ship/subDisturb-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/pageSections.mjs (sub-aquarium.html is filed in UNPLACED with its reason: the drawer is Keith's call)",
+        ]),
+        verdict: "green, 17 of 17, each run alone on the final tree before the version bump. The page gate drives a real headless Chromium against the real bridge. NOT CLOSED: the stale census gates (instruments, launchIndex, runtimeGap, physicsReach, orphanScan) were red on the new files until the ship's derived steps; nothing here has run on a real Windows Chrome or a real GPU.",
+    }),
     // v4874 -- since564, from `versionPreflight --next` after a full fetch (the highest declared anywhere was since563, main's; nothing else past it on any remote ref). TWENTY-TWO new gate files, all the unnumbered
     // line's (the dogfight, the bomber, the space battleship, the seat gunners, and the rig-page fixes' two): this is their first sweep, run serially-by-three after main's v4873 was merged in.
     since564: Object.freeze({
