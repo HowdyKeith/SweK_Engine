@@ -9298,7 +9298,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         widened: Object.freeze([
             "tools/ship/trainRotorPilot-selfcheck.mjs (section 9: the limits row and the gain row restated under the helicopter task's second rule -- a landing is charged its ground speed -- and the lands-faster row's parenthesis; the shipped pilot's recorded text was regenerated from its unchanged weights)",
         ]),
-        verdict: "green, 12 of 12, each run alone on the merged tree; trainRotorPilot-selfcheck was red on arrival (its section 9, five rows) and is repaired, not registered. brain/battleshipFight-selfcheck (a gate of the dogfight line, modified by the merge) takes longer than 280 s alone and was confirmed separately. NOT CLOSED: the v4876 reds that need the rig (releaseLedger, budgetEvidence) carry over; nothing here has run on a real GPU or a real helicopter.",
+        verdict: "green, 12 of 12, each run alone on the merged tree; trainRotorPilot-selfcheck was red on arrival (its section 9, five rows) and is repaired, not registered. brain/battleshipFight-selfcheck (a gate of the dogfight line, modified by the merge) takes longer than 280 s alone and was confirmed separately. NOT CLOSED: the reds that need the rig carry over (releaseLedger, budgetEvidence, and the four slow rotorcraft gates the shared timing record does not yet list as over budget); nothing here has run on a real GPU or a real helicopter.",
     }),
     // v4876 -- since566, from `versionPreflight --next` after a full fetch (the highest declared anywhere was since565, this branch's). It closes v4876 and SUPERSEDES v4875, which reached main before its verdict: NO new gate file.
     since566: Object.freeze({
