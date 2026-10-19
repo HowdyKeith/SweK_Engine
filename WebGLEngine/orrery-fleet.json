@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "183ca645cd7afe393b7d0291d149332cf6c38da2",
+ "head": "c54a701fb4e79fb5b2e099591f3599320254c2fa",
  "bodies": {
   "box3d": [
    {
@@ -442,8 +442,8 @@
   "male-cns": [
    {
     "path": "ai-bridge/subAquariumBridge-selfcheck.mjs",
-    "bytes": 28553,
-    "sha": "93a082e1c721faf3aa6ef35a0e8d4d3c8b841bd2"
+    "bytes": 29348,
+    "sha": "07fdb11ea136b05f8033bb21d088668fc74ee7ad"
    },
    {
     "path": "ai-bridge/subAquariumBridge.js",
@@ -746,8 +746,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3671537,
-    "sha": "2c31fd038874d8dca6c3a060923d5ea3e2641f47"
+    "bytes": 3674780,
+    "sha": "89c3630e488d8e7fe355788ee7556f15681e697d"
    },
    {
     "path": "mpm3d.html",
@@ -763,6 +763,11 @@
     "path": "physics/fire/fireMesh.js",
     "bytes": 7232,
     "sha": "d2e1ca617aa2c855bedc7abd4f2bbd48037a6c90"
+   },
+   {
+    "path": "physics/mesh/triArrangement.mjs",
+    "bytes": 32584,
+    "sha": "fb0d8aa8971db1b2b15d6931ec1f5e8e32507661"
    },
    {
     "path": "pipboy-models.html",

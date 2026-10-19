@@ -9276,6 +9276,18 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "population census grown by one; and three rows restated where a fresh record broke a count rather than a claim. The label-collision " +
                  "round's guards picked this ship's numbers. NOT CLOSED: section 87 needs the rig, and libmSensitivity and responseCensus still time out.",
     }),
+    // v4878 -- since569, from `versionPreflight --next` after a full fetch (the highest declared anywhere was since568, the BVH-CSG branch's entry renumbered at this merge). NO new gate file of this round's own: the one gate that arrived,
+    // physics/mesh/triArrangement-selfcheck.mjs, is since568's. This entry closes the round that merged the last two open branches and repaired a Windows-only abort in a gate.
+    since569: Object.freeze({
+        at: "v4878", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "ai-bridge/subAquariumBridge-selfcheck.mjs (waits for its three servers to close and exits through process.exitCode: Node 24 on Windows aborted with UV_HANDLE_CLOSING after 'all checks pass'; found by the rig, not reproducible on Linux)",
+            "tools/ship/assertionShape.mjs and vba/runtimeGap.mjs (census rows restated from the gates' own measurement after the BVH-CSG merge: one gate, two files)",
+        ]),
+        verdict: "no gate of this round's own to sweep; the three merged BVH-CSG gates were run alone and are green (triArrangement, meshBoolean, meshBooleanBlast); the census gates assertionShape and runtimeGap were red on arrival by exactly the merged files and are restated, not registered. The Windows abort is read from the assertion and confirmed only by the rig's rerun of the fixed commit. NOT CLOSED: no fish circuit; the rig's slow-gate rule for four rotor gates.",
+    }),
     // v4877 -- since567, from `versionPreflight --next` after a full fetch (the highest declared anywhere was since566, this branch's). The gate files are claude/sweet-lovelace's (the rotorcraft line: the helicopter model, its autopilot and pilot policies, the task, the trainer) and the two it
     // added beside them (the space backdrop and the guns page links), merged into this branch as the second of the open branches; their sabotage logs are in their own headers.
     since567: Object.freeze({
