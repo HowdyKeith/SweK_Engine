@@ -7,6 +7,8 @@
 // (the same noise seeds, the same delay, the same gusts): mean score, dives ended that the autopilot completes, early ends, worst-5%. Pilots default to the PD autopilot's neighbours: the long, tail and wide champions.
 "use strict";
 import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import * as P from "../brain/pilotSubPolicy.mjs";
 import * as AS from "../brain/autopilotSub.mjs";
 import * as T from "../brain/subTask.mjs";
@@ -16,7 +18,7 @@ import * as D from "./subDisturb.mjs";
 import { auditSets } from "./auditSubChampion.mjs";
 
 const arg = (f, d = null) => { const i = process.argv.indexOf(f); return i === -1 ? d : process.argv[i + 1]; };
-const mode = process.argv[2], hulls = (arg("--hulls", "nominal,munk3")).split(","), B = new URL("../brain/", import.meta.url).pathname;
+const mode = process.argv[2], hulls = (arg("--hulls", "nominal,munk3")).split(","), B = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../brain") + path.sep;
 const files = (arg("--pilots", B + "pilotSubWeightsRobustLongWip.json," + B + "pilotSubWeightsRobustTail2Wip.json," + B + "pilotSubWeightsRobustWideWip.json")).split(",");
 if (!["pool", "audit"].includes(mode)) { console.error("usage: node tools/auditSubDisturbed.mjs pool|audit [--base N] [--hulls a,b] [--pilots f1,f2]"); process.exit(2); }
 const sets = mode === "pool" ? [["SAFETY_POOL", T.SAFETY_POOL_SET]] : (() => { const a = auditSets(+arg("--base", 14000)); return [["SAFETY_AUDIT", a.safety], ["AUDIT", a.audit]]; })();

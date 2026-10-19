@@ -627,7 +627,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4857 -- files 4685 -> 4687: tools/ship/strandCensus.mjs and tools/ship/strandCensus-selfcheck.mjs.
     // v4868 -- files 4696 -> 4698, ES modules 4391 -> 4393, closures 4236 -> 4238, async/await 1772 -> 1773, typed arrays 1306 -> 1308: render/denoiseUpscale.mjs and its gate, the denoiser arc's round 26.
     // v4869 -- files 4698 -> 4702, ES modules 4393 -> 4397, closures 4238 -> 4241, async/await 1773 -> 1776, typed arrays 1308 -> 1311, Promises 431 -> 432: tools/ship/trainFlightPilot.mjs, tools/ship/trainPilotFlight.mjs and the two gates, tools/ship/trainFlightPilot-selfcheck.mjs and brain/pilotFlightTrain-selfcheck.mjs (the command awaits its child processes; the gate awaits the command). performance.now held at 251.
-    files: 4748,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
+    files: 4788,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
     // (v4691 note, carried)                               // v4691 -- RE-DERIVED: tools/ship/textureInProbe.mjs arrived, one ES module with a closure and top-level await -- four rows moved (files, ES modules, closures, async/await) and eight held.
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
@@ -1254,8 +1254,10 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4874 -- files 4707 -> 4748, ES modules 4402 -> 4443, closures 4246 -> 4285, async/await 1780 -> 1803, typed arrays 1318 -> 1337, Promises 434 -> 440, performance.now 252 -> 255: the unnumbered line (it added 44 source files over main -- the dogfight, bomber and battleship modules and pages, the seat
     // gunners' libraries and trainers, render/renderNow.mjs and the twenty-two gates -- and the census moved by 41, which is what its own file filter counts; the 44 is
     // git's and the 41 is the census's, not reconciled here). Main's v4871 to v4873 had moved typed arrays 1316 -> 1318 before them; the other rows hold.
-    esModules: 4443, closures: 4285, asyncAwait: 1803, typedArrays: 1337, promises: 440,
-    fetchXhr: 252, performanceNow: 255, raf: 127, webgl: 200, webgpu: 63, threads: 26, wasm: 27,
+    // v4875 -- the submarine line (40 source files and the 17 gates over main's v4874): files 4748 -> 4788, ES modules 4443 -> 4481, closures 4285 -> 4324, async/await 1803 -> 1813, typed arrays 1337 -> 1345, Promises 440 -> 444,
+    // fetch/XHR 252 -> 253, requestAnimationFrame 127 -> 128 (the aquarium page's frame loop); the other rows held.
+    esModules: 4481, closures: 4324, asyncAwait: 1813, typedArrays: 1345, promises: 444,
+    fetchXhr: 253, performanceNow: 255, raf: 128, webgl: 200, webgpu: 63, threads: 26, wasm: 27,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.

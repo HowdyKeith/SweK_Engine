@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 484,
+ "count": 485,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -2934,6 +2934,13 @@
    "t": "SweK &middot; Lane-Emden Polytropes",
    "d": "Turn the polytropic index and watch a star's density profile change shape -- and its surface run away to infinity as the index approaches 5. Three indices have exact closed forms and the page draws them over the integration so you can see the solver land on them; past n=5 the star has no edge at all, which is why Chandrasekhar used it as the boundary of physical polytropes.",
    "g": "cosmic",
+   "p": 0
+  },
+  {
+   "f": "sub-aquarium.html",
+   "t": "SweK &middot; Sub Aquarium",
+   "d": "A tank of submarines, each flown by its own pilot (the PD autopilot, or a connectome-wired network with the weights it arrived with). Peers detected on the LAN can send their subs here from server.html's peer list. The network is the fruit fly's Giant Fiber Circuit as a stand-in; no fish circuit is vendored.",
+   "g": "",
    "p": 0
   },
   {
