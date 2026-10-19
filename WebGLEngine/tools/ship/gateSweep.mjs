@@ -9287,7 +9287,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
             "world/orreryEjecta.mjs's male-cns record 8 -> 10 (orreryFleet-selfcheck, which the quick sweep never runs, counted the aquarium bridge's availability probe)",
             "tools/ship/realGpuRun-selfcheck.mjs (merged from claude/tier-2-keys-patch: each adapter's features, limits and subgroup sizes)",
         ]),
-        verdict: "the gates this round touched were each run alone and are green; the full verdict is recorded in the round note. NOT CLOSED: releaseLedger, budgetEvidence, mechanical, mutationScore and operators were red in the v4875 attempt for reasons outside the tree's code (unpublished releases, a foreign timing record, stale mutation records).",
+        verdict: "the gates this round touched were each run alone and are green; the full verdict is recorded in the round note. NOT CLOSED: releaseLedger (unpublished releases) and budgetEvidence (this box does not own the shared timing record) are red and need the rig; mechanical, mutationScore and operators read red only while the sandbox clone was shallow and pass unshallowed.",
     }),
     // v4875 -- since565, from `versionPreflight --next` after a full fetch (the highest declared anywhere was since564, main's). SEVENTEEN gate files, all the submarine line's: the vessel, its actuators, sonar and torpedoes, the autopilot and the
     // connectome-wired pilot, the depth/mission/duel tasks and the tactician, self-play, the sub aquarium (rules, bridge, tank, page, the server.html chips) and the disturbed-flight module. Each was sabotaged when it was written; the logs are in the gates' headers.
