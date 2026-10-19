@@ -29,7 +29,7 @@ for (let i = 1; i <= iters; i++) {
     const cand = P.mutate(best, 0.3, rng, 4), s = score(cand);
     if (s > bestScore + 1e-9) { best = cand; bestScore = s; improved++; } else if (s >= bestScore - 1e-9) best = cand;
     if (i % 25 === 0) console.error(`seed ${seed} iter ${i} objective ${bestScore.toFixed(4)} (${((Date.now() - t0) / 1000).toFixed(0)}s)`);
-    if (i % 50 === 0) fs.writeFileSync(out + ".ckpt", JSON.stringify({ seed, iter: i, from, objective: bestScore, improved, weights: Array.from(best) }));
+    if (i % 25 === 0) fs.writeFileSync(out + ".ckpt", JSON.stringify({ seed, iter: i, from, objective: bestScore, improved, weights: Array.from(best) }));
 }
 fs.writeFileSync(out, JSON.stringify({ seed, iters, from, hard, tailWeight: tailW, objective: bestScore, wideTrain: wide(best), tailScore: tailScore(best), improved, weights: Array.from(best) }));
 console.log(`seed ${seed} done: objective ${bestScore.toFixed(4)} wide-train ${wide(best).toFixed(4)} tail ${tailScore(best).toFixed(4)} (${improved} improved)`);
