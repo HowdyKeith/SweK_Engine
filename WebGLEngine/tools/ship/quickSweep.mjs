@@ -366,6 +366,14 @@ export const RECORD_HANDOVERS = Object.freeze([
                   "tacticsTrain-selfcheck (382,243 ms, exit 0) wrote sweep-timings.local.json and refused the shared " +
                   "record; that local file and its ledger were deleted at the handover, as at v4818 and v4838. " +
                   "420793 held the record from v4838 to v4850." }),
+    // v4877 -- AND TO 420793 AGAIN, BECAUSE THE SANDBOX RESTARTED ONTO THE OTHER HOST AND THE ROUND'S GATES HAD NOWHERE TO BE RECORDED. Twenty-nine new gates (the submarine line's seventeen and the rotorcraft branch's twelve) were in no
+    // shared record: budgetEvidence read 29 new since the capture, and four of them (pilotRotorMlp, pilotRotorPolicy, rotorTask, trainRotorPilot, 62 to 129 s each) were run by the quick sweep under its cap and timed out alone. Their
+    // readings went to sweep-timings.local.json, which nothing else reads. Keith chose the handover.
+    Object.freeze({ at: "v4877", from: "linux-x64-4c-16gb-142c0d", to: "linux-x64-4c-16gb-420793",
+        decidedBy: "Keith",
+        evidence: "Keith's answer \"yes, hand over the record\" to the record-owner question on 2026-10-19. boxId() reads linux-x64-4c-16gb-420793 at v4877; the shared record still named 142c0d, captured 2026-10-18T04:53Z. " +
+                  "The round's rotation (22 readings, twice) and its four single-gate readings went to sweep-timings.local.json and refused the shared record; those local files and their ledger are deleted at the handover, as at v4818, v4838 and v4850. " +
+                  "142c0d held the record from v4850 to v4877." }),
 ]);
 
 /** The box that may write a record whose `host` reads `host`, after following every handover. */
