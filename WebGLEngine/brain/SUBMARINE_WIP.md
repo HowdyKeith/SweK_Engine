@@ -326,3 +326,26 @@ Same tactician, same drones; the difference is the hull handling. The gain is al
 | `physicsReach` | 11 graded physics modules have no door (limit 7): `subModel6dof`, `subActuators`, `subSonar`, `subTorpedo` and their neighbours | give them a door (an instruments row or a page link) or move the baseline ON PURPOSE; the aquarium page already imports `subModel6dof` |
 | `orphanScan` | `brain/missionTask.mjs` (and `tools/trainSubWide.mjs` until it is mentioned) unreachable | wire missionTask into a page or register it in DIRECTORY_LOADED with a reason; these tools are run by hand: `tools/trainSubRobust.mjs`, `trainSubTail.mjs`, `trainSubWide.mjs`, `auditSubChampion.mjs`, `subHulls.mjs` |
 | `bridgeCensus`, `pageSections` | pass now; `sub-aquarium.html` sits in UNPLACED until a drawer is chosen | Keith's call |
+
+## Wide round (UNNUMBERED; `tools/trainSubWide.mjs`, `brain/pilotSubWeightsRobustWideWip.json`, seed 9501)
+
+Four runs of 300 iterations from the tail pilot (9400), objective = mean over TWELVE hulls (`tools/subHulls.mjs`: the five trained + seven unseen) on 20 TRAIN dives each + the Munk x3 tail term; seeds 9500/9501 weight the two hard hulls (Munk x5, awkward) 1x, 9502/9503 3x. Twelve-hull HELD_OUT mean (60 dives per hull): autopilot -0.856, tail 9400 -0.833, wide 9500 -0.823, **9501 -0.751**, 9502 -0.820, 9503 -0.820; all four match the tail pilot on the ten ordinary hulls and only 9501 moved the two hard ones (HELD_OUT Munk x5 -2.31 vs -2.68, awkward -2.17 vs -2.80). On the 500-dive SAFETY_POOL the hard-hull gain shrinks: Munk x5 -2.46 (autopilot -2.76) still ends 16 dives the autopilot completes (9400: 14), awkward -2.25 (-2.39) ends 24 (9400: 26). The 60-dive HELD_OUT overstated it.
+
+Audit on a fresh range, base 12000 (500 + 36 dives per hull, SPENT for this file), all twelve hulls, champion vs PD autopilot:
+
+| hull | SAFETY_AUDIT mean | better / worse | newly ended | early (c/a) | worst-5% | AUDIT (36) mean, newly |
+|---|---|---|---|---|---|---|
+| nominal | -0.460 / -0.560 | 424 / 45 | 0 | 0/0 | -0.90 / -1.15 | -0.497 / -0.604, 0 |
+| Munk x3 | -0.418 / -0.521 | 448 / 40 | 0 | 0/1 | -1.26 / -1.40 | -0.471 / -0.571, 0 (tail -1.81 / -1.53) |
+| Munk 0 | -0.620 / -0.763 | 436 / 48 | 0 | 0/0 | -1.21 / -1.54 | -0.658 / -0.814, 0 |
+| fins x0.6 | -0.477 / -0.593 | 458 / 31 | 0 | 0/0 | -0.98 / -1.23 | -0.519 / -0.638, 0 |
+| righting x2.5 | -0.468 / -0.672 | 464 / 25 | 0 | 0/0 | -0.92 / -1.50 | -0.505 / -0.704, 0 |
+| light | -0.425 / -0.500 | 413 / 45 | 0 | 0/0 | -0.85 / -1.05 | -0.462 / -0.547, 0 |
+| heavy | -0.506 / -0.637 | 440 / 43 | 0 | 0/0 | -0.97 / -1.28 | -0.541 / -0.673, 0 |
+| draggy | -0.471 / -0.683 | 499 / 1 | 0 | 0/0 | -0.92 / -1.27 | -0.502 / -0.716, 0 |
+| tiny fins | -0.499 / -0.647 | 475 / 16 | 0 | 0/0 | -1.04 / -1.34 | -0.548 / -0.691, 0 |
+| weak righting | -0.467 / -0.540 | 407 / 57 | 0 | 0/0 | -0.92 / -1.10 | -0.512 / -0.587, 0 |
+| **Munk x5** | -2.439 / -2.704 | 305 / 184 | **14** | 20/17 | -5.46 / -5.41 | -2.253 / -2.762, 1 |
+| **awkward** | -2.212 / -2.350 | 256 / 227 | **25** | 31/17 | -5.41 / -5.31 | -1.937 / -2.264, 1 |
+
+Verdict: QUALIFIES on ten of the twelve hulls (including all five audited ones, and five never trained on). It does NOT qualify on the two extreme hulls: better mean there, but 14 and 25 dives in 500 ended that the autopilot completes, and the tail is no better. The wide training did not fix them; those hulls are probably at or past what the slew-limited actuators can control (the autopilot itself ends 17 dives on each), so the useful next step there is a different kind of change (an actuator or vessel limit, or an explicit "unrecoverable hull" fallback), not more search. Versus the tail pilot 9400 on the ordinary hulls the wide pilot is about the same (no measured gain), so its value is the modest improvement on the extreme hulls.
