@@ -66,6 +66,9 @@ export const REPORTING = [
       blurb: "A skill library whose entries are CODE rather than hint text, composable so later skills call earlier ones -- the half of Voyager skillbook never had. It reports only that a body RAN or THREW: 'the code did not throw' is what Voyager accepts and it is not evidence a skill helped, so certification stays with skillbook's measured before/after. Writing skill bodies is REFUSED and the refusal is declared as data, with the expiry that would overturn it." },
     { rel: "tools/roundhouse/externalLinalg.mjs", label: "External linear algebra (LAPACK)",
       blurb: "The lab's own rank and det against Accelerate's LAPACK -- an answer key nobody here wrote. Reports ABSENT until the Mac-side reference has run." },
+    // v4877 -- brain/seatGunnerGpu.mjs came in with the rotorcraft/space-battle branch gated and with a reportLines() and a guarded main block, and NO page or tool ran it: graveyard counted it as an orphaned utility. The door is this row.
+    { rel: "brain/seatGunnerGpu.mjs", label: "Gun-seat networks on the GPU",
+      blurb: "A capital ship's gun-seat networks decided for ALL the seats of ALL the ships in one batch on the GPU (brain/mlp.js's BatchedMLP), through the arena's two-phase tick; the CPU twin is the reference. It reports PLAINLY that on a fight of two ships the GPU is SLOWER than the CPU (a read-back costs more than the few thousand multiply-adds a seat's network is), so what it buys is the machinery for a fleet or a thousand parallel copies, not a faster fight." },
     { rel: "tools/ship/decisionIndex.mjs", label: "Closed questions",
       blurb: "Every selfcheck header that records a DECISION NOT TO DO SOMETHING, with the file and the sentence. A decision looks exactly like an absence from outside the file that records it -- read this before proposing a round." },
     // v4031 -- REGISTERED WHEN IT WAS GIVEN A MAIN BLOCK, not before. It shipped with a page and a gate

@@ -246,5 +246,14 @@ console.log("\n7. THE TRAINING FUNCTIONS");
     ok("!! ...and KEEPS one that does: the roll channel's trim coefficient moved from 1 to 0.4 hurts, so prune leaves it (kept 1), and the result scores no worse than the input", pr2.kept === 1 && pr2.weights[84] === Float32Array.from([0.4])[0] && pr2.trainScore >= PP.evaluate(needed, one).score - 1e-12, `kept ${pr2.kept}`);
 }
 
+console.log("\n12. THE NAMED PIECES (featuresFrom, reportLines)");
+{
+    const st = H.createState(model, { pos: [0, 0, 30], velocity: [2, 0, 0], pitch: TRIM.pitchAttitude, bank: TRIM.bank }), tg = { altitude: 30 };
+    const viaGuidance = PP.featuresFrom(AR.guidance(st, tg, [0, 0, 0], {}), st), direct = PP.features(st, tg, [0, 0, 0], {});
+    ok("!! featuresFrom(guidance, state) IS features(state, target, wind, opts): the same twenty finite numbers whichever door the pilot comes in by", viaGuidance.length === 20 && viaGuidance.every((v, i) => v === direct[i]) && viaGuidance.every(Number.isFinite));
+    const L = PP.reportLines();
+    ok("!! reportLines() is the module's printed report: an array of strings opening with its own name, naming the Giant Fiber Circuit as a helicopter pilot with 20 features, 4 controls and 1167 weights", Array.isArray(L) && L.length >= 2 && L.every((l) => typeof l === "string") && L[0].startsWith("[pilotRotorPolicy]") && /Giant Fiber Circuit/.test(L[0]) && /1167 weights/.test(L[0]));
+}
+
 console.log(fails ? `\npilotRotorPolicy-selfcheck: ${fails} FAILED` : "\npilotRotorPolicy-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);

@@ -165,5 +165,16 @@ console.log("\n5. THE TRAINING FUNCTIONS");
     ok("!! ...and KEEPS one that does: the roll channel's trim coefficient moved from 1 to 0.4 hurts, so prune leaves it (kept 1), at a score no worse than the input", pr2.kept === 1 && pr2.weights[84] === Float32Array.from([0.4])[0] && pr2.trainScore >= MR.evaluate(needed, one).score - 1e-12, `kept ${pr2.kept}`);
 }
 
+console.log("\n12. THE NAMED PIECES (raw, reportLines)");
+{
+    const w = MR.handWeights(), x = Array.from({ length: FE }, (_, i) => Math.sin(i + 1)), y = MR.raw(w, x), c = MR.controlsOf(y), fwd = MR.forward(w, x);
+    ok("!! raw(w, x) is the network's four outputs BEFORE the clamp, and forward(w, x) is controlsOf(raw(w, x)) exactly", y.length === 4 && y.every(Number.isFinite) && KEYS.every((k) => c[k] === fwd[k]));
+    const bad = x.slice(); bad[3] = NaN; bad[7] = Infinity; const zeroed = x.slice(); zeroed[3] = 0; zeroed[7] = 0;
+    ok("!! a non-finite feature is read as 0 by raw: the outputs with NaN and Infinity in two inputs equal the outputs with those inputs zero, bit for bit, and are finite", MR.raw(w, bad).every((v, i) => v === MR.raw(w, zeroed)[i]) && MR.raw(w, bad).every(Number.isFinite));
+    ok("!! with every weight zero raw is four exact zeros whatever the features", MR.raw(new Float64Array(w.length), x).every((v) => v === 0));
+    const L = MR.reportLines();
+    ok("!! reportLines() is the module's printed report: an array of strings opening with its own name, naming 20 -> 32 -> 32 -> 4 and 1860 weights", Array.isArray(L) && L.length >= 2 && L.every((l) => typeof l === "string") && L[0].startsWith("[pilotRotorMlp]") && /20 -> 32 -> 32 -> 4/.test(L[0]) && /1860 weights/.test(L[0]));
+}
+
 console.log(fails ? `\npilotRotorMlp-selfcheck: ${fails} FAILED` : "\npilotRotorMlp-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);

@@ -2395,6 +2395,15 @@ export const INSTRUMENTS = [
       measures: "A point body at 6.5 m/s with a 90 s burn, a turn rate of 0.25 rad/s, a seeker cone of +-35 degrees, proportional navigation (N = 3) on a low-pass-filtered line of sight, armed after 40 m, a proximity fuse at the closest approach, and a dumb mode with no seeker.",
       key: "IT IS FASTER THAN THE BOAT IT HUNTS (6.5 against a top speed of 4.55 m/s) AND NEARLY BLIND TO A CREEPING ONE: the burn is 585 m, its seeker hears a boat at 0.5 / 2 / 4.5 m/s from 66 / 259 / 563 m, and the damage is 100 inside 3 m falling to 40 at 8 m. The module prints this itself.",
       gate: "physics/mechanics/subTorpedo-selfcheck.mjs" },
+    // v4877 -- the rotorcraft branch's two pilots that carry a reportLines(): the rows are the entries registryOrphans asks for, and each key is the module's own printed report (plus, for the fruit fly's, the shipped file's graded audit).
+    { id: "pilot-rotor-policy", page: "instrument-bench.html", name: "The Giant Fiber Circuit as a helicopter pilot", area: "brain",
+      measures: "The fruit fly's 34-neuron, 313-synapse Giant Fiber Circuit as a pilot for rotorcraftModel6dof.mjs: 20 features in, collective / pitch / roll / pedal out, 1,167 weights, the hand weights written through the circuit so it flies the hand pilot's flight before any search.",
+      key: "THE HAND WEIGHTS ARE THE HAND PILOT, NOT A FRESH GUESS: 28 of the 1,167 weights are non-zero and they are autopilotRotor.mjs's laws, which fly the same flight (asked to go 200 m ahead, up 20 m and turn 29 degrees right from a hover the net answers collective 1.000, pitch -1.000, roll -0.194, pedal 0.712). The shipped trained file is graded against the hand pilot on the audit scenarios under the task's second rule: -1.2188 against -2.0770, 24 scenarios better and 10 worse. The module prints this itself.",
+      gate: "brain/pilotRotorPolicy-selfcheck.mjs" },
+    { id: "pilot-rotor-mlp", page: "instrument-bench.html", name: "The GPU Brain's helicopter pilot: a plain 20-32-32-4 network", area: "brain",
+      measures: "A plain relu network (20 -> 32 -> 32 -> 4, 1,860 weights) as a helicopter pilot, taking the same 20 features and giving the same four controls as the fruit fly's circuit, so the two are compared on one task.",
+      key: "THE HAND WEIGHTS ARE THE HAND PILOT THROUGH EIGHT RELU CHANNELS OF EACH LAYER: 36 of the 1,860 weights are non-zero and they are autopilotRotor.mjs's laws, flying the same flight. The module prints this itself.",
+      gate: "brain/pilotRotorMlp-selfcheck.mjs" },
 ];
 
 export const AREAS = [...new Set(INSTRUMENTS.map((i) => i.area))];
