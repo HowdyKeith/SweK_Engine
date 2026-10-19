@@ -249,8 +249,10 @@ console.log("\n7. THE TRAINING FUNCTIONS");
 console.log("\n12. THE NAMED PIECES (featuresFrom, reportLines)");
 {
     const st = H.createState(model, { pos: [0, 0, 30], velocity: [2, 0, 0], pitch: TRIM.pitchAttitude, bank: TRIM.bank }), tg = { altitude: 30 };
-    const viaGuidance = PP.featuresFrom(AR.guidance(st, tg, [0, 0, 0], {}), st), direct = PP.features(st, tg, [0, 0, 0], {});
+    const wind = [1.5, 0.5, 0], viaGuidance = PP.featuresFrom(AR.guidance(st, tg, wind, {}), st), direct = PP.features(st, tg, wind, {});   // a wind that is not zero, so a features() that drops it is a different list
     ok("!! featuresFrom(guidance, state) IS features(state, target, wind, opts): the same twenty finite numbers whichever door the pilot comes in by", viaGuidance.length === 20 && viaGuidance.every((v, i) => v === direct[i]) && viaGuidance.every(Number.isFinite));
+    const side = PP.features(H.createState(model, { pos: [0, 0, 30], velocity: [0, 2, 0], pitch: TRIM.pitchAttitude, bank: TRIM.bank }), tg, [0, 0, 0], {}), iF = PP.FEATURE_NAMES.indexOf("speedFwd"), iR = PP.FEATURE_NAMES.indexOf("speedRight");
+    ok("!! featuresFrom reads the velocity in the BODY frame, by hand: at 2 m/s straight ahead speedFwd is 0.2 (2 / 10) and speedRight 0; at 2 m/s sideways speedFwd is 0 and speedRight -0.2; the bias is exactly 1 and there are as many numbers as FEATURE_NAMES (the wind reaches the attitude reader only, so no feature moves with it -- said here, not hidden)", direct.length === PP.FEATURE_NAMES.length && direct[0] === 1 && Math.abs(direct[iF] - 0.2) < 1e-12 && Math.abs(direct[iR]) < 1e-12 && Math.abs(side[iF]) < 1e-12 && Math.abs(side[iR] + 0.2) < 1e-12 && PP.features(st, tg, [6, 3, 0], {}).every((v, i) => v === direct[i]));
     const L = PP.reportLines();
     ok("!! reportLines() is the module's printed report: an array of strings opening with its own name, naming the Giant Fiber Circuit as a helicopter pilot with 20 features, 4 controls and 1167 weights", Array.isArray(L) && L.length >= 2 && L.every((l) => typeof l === "string") && L[0].startsWith("[pilotRotorPolicy]") && /Giant Fiber Circuit/.test(L[0]) && /1167 weights/.test(L[0]));
 }
