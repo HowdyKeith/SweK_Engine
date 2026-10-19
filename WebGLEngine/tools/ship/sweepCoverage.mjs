@@ -376,7 +376,12 @@ export const STILL_OVER_AT_V4815 = Object.freeze({
             // "the native call is faster than the browser call, this run", 668 ms native against 247 browser, a first-run adapter warm-up and not a defect: alone it passed three times at 69 / 16 / 18 ms native against 395 / 221 / 209
             // browser -- and re-timing it alone filed 2,370 ms. Three quiet runs filed one at a time by `sweepRotation --gate tools/ship/headlessGpu-selfcheck.mjs --cap-s 300 --write`: 2,897 / 2,557 / 2,639 ms, the last filed. Under the
             // bar and back in the sweep on this host, as the v4815 note said it was before the handover. A straddler: the first of the three is within 4% of the bar.
-            returned: Object.freeze({ at: "v4867", aloneMs: 2639, serialMs: Object.freeze([2897, 2557, 2639]) }) }),
+            returned: Object.freeze({ at: "v4867", aloneMs: 2639, serialMs: Object.freeze([2897, 2557, 2639]) }),
+            // v4877 -- AND OVER AGAIN, BECAUSE THE RECORD MOVED TO THIS HOST (quickSweep's v4877 handover, 142c0d -> 420793), as sweepBudget's did at v4839.
+            // Three runs filed one at a time by `sweepRotation --gate tools/ship/headlessGpu-selfcheck.mjs --cap-s 300 --write`: 5,025 / 4,849 / 4,669 ms, the last filed
+            // -- over the bar alone by half, the box and not the gate. `back` supersedes `returned`: the latest host move decides which property the entry is held to.
+            back: Object.freeze({ at: "v4877", box: "linux-x64-4c-16gb-420793", loadedMs: 5025,
+                serialMs: Object.freeze([5025, 4849, 4669]), quietMs: Object.freeze([5025, 4849, 4669]) }) }),
         Object.freeze({ gate: "tools/roundhouse/sweepBudget-selfcheck.mjs", recordedWas: 5526, hereMs: 3270,
             serialMs: Object.freeze([3353, 3086, 3214]),
             why: "2,545 ms in the record before the host change, 3,353 / 3,086 / 3,214 alone on the 2.80 GHz host; the " +
