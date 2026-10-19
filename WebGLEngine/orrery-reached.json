@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "models named as whole string literals by non-gate files that import gpu/khronosSamples.mjs",
- "head": "cfef9f6efe3a0f5b00384249a16107bf38dc7416",
+ "head": "59bbbc2f8a0f0a72497a11f4be12904783ba9772",
  "catalogue": 150,
  "coverage": {
   "total": 150,
@@ -25,7 +25,7 @@
  "wideTop": [
   {
    "name": "DirectionalLight",
-   "hits": 72
+   "hits": 73
   },
   {
    "name": "Fox",

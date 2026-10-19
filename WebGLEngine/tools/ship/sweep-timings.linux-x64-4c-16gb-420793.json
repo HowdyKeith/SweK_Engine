@@ -1,7 +1,7 @@
 {
  "host": "linux-x64-4c-16gb-420793",
  "note": "THIS BOX'S OWN gate runtimes, written by tools/ship/boxTimings.mjs. The shared sweep-timings.json is host-claimed and a foreign box cannot write it (v4647, and that refusal is right); this is how a box records what IT measured without overwriting another machine's numbers. `kinds` says which quantity each ms is, as in the shared record: `alone` is an uncontended serial reading, `capped` is a FLOOR and not a runtime. Read for COVERAGE -- has this gate ever been timed -- and NOT for the ship-time budget, which still reads the shared file. See task #87. `serialRing` holds the last three alone readings; recordReach's margin row reads it on a box that does not own the shared record, because that row asks what a gate costs HERE and nothing here can refresh another box's ring.",
- "captured": "2026-10-19T13:54:31.098Z",
+ "captured": "2026-10-19T14:00:31.682Z",
  "timings": {
   "tools/ship/cloneProvision-selfcheck.mjs": 7171,
   "tools/ship/exitBusy-selfcheck.mjs": 15284,
@@ -74,18 +74,18 @@
   "tools/ship/subAquariumPage-selfcheck.mjs": 4383,
   "tools/ship/subAquariumServerHtml-selfcheck.mjs": 201,
   "tools/ship/subDisturb-selfcheck.mjs": 2087,
-  "brain/autopilotRotor-selfcheck.mjs": 8749,
-  "brain/helmPolicy-selfcheck.mjs": 121,
-  "brain/pilotRotorMlp-selfcheck.mjs": 63658,
-  "brain/pilotRotorPolicy-selfcheck.mjs": 71135,
-  "brain/rotorTask-selfcheck.mjs": 63750,
-  "brain/seatGunnerGpu-selfcheck.mjs": 6824,
-  "physics/mechanics/rotorcraftModel6dof-selfcheck.mjs": 928,
-  "physics/mechanics/terrain-selfcheck.mjs": 149,
-  "render/spaceBackdrop-selfcheck.mjs": 1129,
-  "tools/ship/gunsPageLinks-selfcheck.mjs": 74,
-  "tools/ship/spaceBackdropPage-selfcheck.mjs": 8044,
-  "tools/ship/trainRotorPilot-selfcheck.mjs": 136021
+  "brain/autopilotRotor-selfcheck.mjs": 9486,
+  "brain/helmPolicy-selfcheck.mjs": 126,
+  "brain/pilotRotorMlp-selfcheck.mjs": 66152,
+  "brain/pilotRotorPolicy-selfcheck.mjs": 76672,
+  "brain/rotorTask-selfcheck.mjs": 61802,
+  "brain/seatGunnerGpu-selfcheck.mjs": 7460,
+  "physics/mechanics/rotorcraftModel6dof-selfcheck.mjs": 958,
+  "physics/mechanics/terrain-selfcheck.mjs": 164,
+  "render/spaceBackdrop-selfcheck.mjs": 1181,
+  "tools/ship/gunsPageLinks-selfcheck.mjs": 54,
+  "tools/ship/spaceBackdropPage-selfcheck.mjs": 8088,
+  "tools/ship/trainRotorPilot-selfcheck.mjs": 123289
  },
  "at": {
   "tools/ship/cloneProvision-selfcheck.mjs": "2026-09-25T03:35:16.858Z",
@@ -159,18 +159,18 @@
   "tools/ship/subAquariumPage-selfcheck.mjs": "2026-10-19T04:14:03.459Z",
   "tools/ship/subAquariumServerHtml-selfcheck.mjs": "2026-10-19T04:14:03.459Z",
   "tools/ship/subDisturb-selfcheck.mjs": "2026-10-19T04:14:03.459Z",
-  "brain/autopilotRotor-selfcheck.mjs": "2026-10-19T13:54:31.098Z",
-  "brain/helmPolicy-selfcheck.mjs": "2026-10-19T13:54:31.098Z",
-  "brain/pilotRotorMlp-selfcheck.mjs": "2026-10-19T13:54:31.098Z",
-  "brain/pilotRotorPolicy-selfcheck.mjs": "2026-10-19T13:54:31.098Z",
-  "brain/rotorTask-selfcheck.mjs": "2026-10-19T13:54:31.098Z",
-  "brain/seatGunnerGpu-selfcheck.mjs": "2026-10-19T13:54:31.098Z",
-  "physics/mechanics/rotorcraftModel6dof-selfcheck.mjs": "2026-10-19T13:54:31.098Z",
-  "physics/mechanics/terrain-selfcheck.mjs": "2026-10-19T13:54:31.098Z",
-  "render/spaceBackdrop-selfcheck.mjs": "2026-10-19T13:54:31.098Z",
-  "tools/ship/gunsPageLinks-selfcheck.mjs": "2026-10-19T13:54:31.098Z",
-  "tools/ship/spaceBackdropPage-selfcheck.mjs": "2026-10-19T13:54:31.098Z",
-  "tools/ship/trainRotorPilot-selfcheck.mjs": "2026-10-19T13:54:31.098Z"
+  "brain/autopilotRotor-selfcheck.mjs": "2026-10-19T14:00:31.682Z",
+  "brain/helmPolicy-selfcheck.mjs": "2026-10-19T14:00:31.682Z",
+  "brain/pilotRotorMlp-selfcheck.mjs": "2026-10-19T14:00:31.682Z",
+  "brain/pilotRotorPolicy-selfcheck.mjs": "2026-10-19T14:00:31.682Z",
+  "brain/rotorTask-selfcheck.mjs": "2026-10-19T14:00:31.682Z",
+  "brain/seatGunnerGpu-selfcheck.mjs": "2026-10-19T14:00:31.682Z",
+  "physics/mechanics/rotorcraftModel6dof-selfcheck.mjs": "2026-10-19T14:00:31.682Z",
+  "physics/mechanics/terrain-selfcheck.mjs": "2026-10-19T14:00:31.682Z",
+  "render/spaceBackdrop-selfcheck.mjs": "2026-10-19T14:00:31.682Z",
+  "tools/ship/gunsPageLinks-selfcheck.mjs": "2026-10-19T14:00:31.682Z",
+  "tools/ship/spaceBackdropPage-selfcheck.mjs": "2026-10-19T14:00:31.682Z",
+  "tools/ship/trainRotorPilot-selfcheck.mjs": "2026-10-19T14:00:31.682Z"
  },
  "kinds": {
   "tools/ship/cloneProvision-selfcheck.mjs": "alone",
@@ -677,51 +677,63 @@
   ],
   "brain/autopilotRotor-selfcheck.mjs": [
    9833,
-   8749
+   8749,
+   9486
   ],
   "brain/helmPolicy-selfcheck.mjs": [
    100,
-   121
+   121,
+   126
   ],
   "brain/pilotRotorMlp-selfcheck.mjs": [
    67264,
-   63658
+   63658,
+   66152
   ],
   "brain/pilotRotorPolicy-selfcheck.mjs": [
    67652,
-   71135
+   71135,
+   76672
   ],
   "brain/rotorTask-selfcheck.mjs": [
    61258,
-   63750
+   63750,
+   61802
   ],
   "brain/seatGunnerGpu-selfcheck.mjs": [
    7213,
-   6824
+   6824,
+   7460
   ],
   "physics/mechanics/rotorcraftModel6dof-selfcheck.mjs": [
    919,
-   928
+   928,
+   958
   ],
   "physics/mechanics/terrain-selfcheck.mjs": [
    119,
-   149
+   149,
+   164
   ],
   "render/spaceBackdrop-selfcheck.mjs": [
    1341,
-   1129
+   1129,
+   1181
   ],
   "tools/ship/gunsPageLinks-selfcheck.mjs": [
    66,
-   74
+   74,
+   54
   ],
   "tools/ship/spaceBackdropPage-selfcheck.mjs": [
    8150,
-   8044
+   8044,
+   8088
   ],
   "tools/ship/trainRotorPilot-selfcheck.mjs": [
    129037,
-   136021
+   136021,
+   123289
   ]
  }
 }

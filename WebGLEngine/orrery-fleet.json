@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "cfef9f6efe3a0f5b00384249a16107bf38dc7416",
+ "head": "59bbbc2f8a0f0a72497a11f4be12904783ba9772",
  "bodies": {
   "box3d": [
    {
@@ -631,8 +631,8 @@
    },
    {
     "path": "es-box3d-6dof.html",
-    "bytes": 30121,
-    "sha": "e1259600e060234b8b245b96d361d66bf7214380"
+    "bytes": 33948,
+    "sha": "73438b01ab028bba866158a39da6998016ed18ab"
    },
    {
     "path": "es-box3d-fly3d.html",
@@ -746,8 +746,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3668813,
-    "sha": "cfef9f6efe3a0f5b00384249a16107bf38dc7416"
+    "bytes": 3670903,
+    "sha": "c6959eb2165803b56cff9491e3e9f9338c309e26"
    },
    {
     "path": "mpm3d.html",
@@ -811,8 +811,8 @@
    },
    {
     "path": "space-battleship.html",
-    "bytes": 68328,
-    "sha": "0bfbff9b92d28ad542cc40f2a220d4e34f45168d"
+    "bytes": 85600,
+    "sha": "73438b01ab028bba866158a39da6998016ed18ab"
    },
    {
     "path": "splat_viewer.html",

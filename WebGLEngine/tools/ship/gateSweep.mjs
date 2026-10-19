@@ -9276,6 +9276,30 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "population census grown by one; and three rows restated where a fresh record broke a count rather than a claim. The label-collision " +
                  "round's guards picked this ship's numbers. NOT CLOSED: section 87 needs the rig, and libmSensitivity and responseCensus still time out.",
     }),
+    // v4877 -- since567, from `versionPreflight --next` after a full fetch (the highest declared anywhere was since566, this branch's). The gate files are claude/sweet-lovelace's (the rotorcraft line: the helicopter model, its autopilot and pilot policies, the task, the trainer) and the two it
+    // added beside them (the space backdrop and the guns page links), merged into this branch as the second of the open branches; their sabotage logs are in their own headers.
+    since567: Object.freeze({
+        at: "v4877", swept: 12, green: 12, red: 0,
+        added: Object.freeze([
+            "brain/autopilotRotor-selfcheck.mjs",
+            "brain/helmPolicy-selfcheck.mjs",
+            "brain/pilotRotorMlp-selfcheck.mjs",
+            "brain/pilotRotorPolicy-selfcheck.mjs",
+            "brain/rotorTask-selfcheck.mjs",
+            "brain/seatGunnerGpu-selfcheck.mjs",
+            "physics/mechanics/rotorcraftModel6dof-selfcheck.mjs",
+            "physics/mechanics/terrain-selfcheck.mjs",
+            "render/spaceBackdrop-selfcheck.mjs",
+            "tools/ship/gunsPageLinks-selfcheck.mjs",
+            "tools/ship/spaceBackdropPage-selfcheck.mjs",
+            "tools/ship/trainRotorPilot-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/trainRotorPilot-selfcheck.mjs (section 9: the limits row and the gain row restated under the helicopter task's second rule -- a landing is charged its ground speed -- and the lands-faster row's parenthesis; the shipped pilot's recorded text was regenerated from its unchanged weights)",
+        ]),
+        verdict: "green, 12 of 12, each run alone on the merged tree; trainRotorPilot-selfcheck was red on arrival (its section 9, five rows) and is repaired, not registered. brain/battleshipFight-selfcheck (a gate of the dogfight line, modified by the merge) takes longer than 280 s alone and was confirmed separately. NOT CLOSED: the v4876 reds that need the rig (releaseLedger, budgetEvidence) carry over; nothing here has run on a real GPU or a real helicopter.",
+    }),
     // v4876 -- since566, from `versionPreflight --next` after a full fetch (the highest declared anywhere was since565, this branch's). It closes v4876 and SUPERSEDES v4875, which reached main before its verdict: NO new gate file.
     since566: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate file.
