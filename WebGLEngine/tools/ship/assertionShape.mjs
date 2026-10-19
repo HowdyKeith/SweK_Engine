@@ -897,6 +897,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4830 -- 1940 -> 1942 for brain/pilotRoster-selfcheck.mjs and brain/pilot6dofPolicy-selfcheck.mjs, over v4829's murmurParity-selfcheck.mjs (1939 -> 1940). usesOk, definesOk and nameFirst each by two; the rest hold (the drift row named exactly these four).
     // v4831 -- 1942 -> 1944 for tools/ship/publishHygiene-selfcheck.mjs and tools/ship/brainStages-selfcheck.mjs. usesOk, definesOk and nameFirst each by two; the rest hold (the drift row named exactly these four).
     // v4834 -- 1944 -> 1945 for tools/ship/reportFresh-selfcheck.mjs. usesOk, definesOk and nameFirst each by one; the rest hold (the drift row named exactly these four).
+    // BVH-CSG round 9 (branch claude/shader-porting-swek-ozgvb0, at its merge onto main's v4831) -- 1944 -> 1945 for
+    // physics/mesh/triArrangement-selfcheck.mjs. usesOk, definesOk and nameFirst each by one; the rest hold (census() over the merged tree).
+    // RE-DERIVED at this branch's merge of main's v4834 -- 1946: both lines' 1945 counted one new gate each (reportFresh on main,
+    // triArrangement here), so census() over the merged tree reads 1946; usesOk, definesOk and nameFirst likewise one above either side.
     // v4835 -- 1945 -> 1946 for tools/ship/afterVerdict-selfcheck.mjs, on main. usesOk, definesOk and nameFirst each by one.
     // v4837 -- 1946 -> 1949 for this round's tools/ship/poolWatch-selfcheck.mjs, tools/ship/sysLagReading-selfcheck.mjs and tools/ship/train6dofPilot-selfcheck.mjs (v4836 added no gate file). usesOk, definesOk and nameFirst each by three more; the rest hold (the drift row named exactly these four).
     // the denoiser arc, round 1 -- 1930 -> 1931 for brain/conv2d-selfcheck.mjs. usesOk, definesOk and nameFirst each by

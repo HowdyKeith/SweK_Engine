@@ -604,7 +604,9 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4827 -- 4612 -> 4616 for brain/roster.mjs, brain/racePlay.mjs, race-lockstep.html and the two gates beside the modules (roster-selfcheck, racePlay-selfcheck); race-brain.html grew a panel.
     // v4830 -- 4617 -> 4621 for brain/pilotRoster.mjs, brain/pilot6dofPolicy.mjs and the two gates beside them (pilotRoster-selfcheck, pilot6dofPolicy-selfcheck), over v4829's murmurParity-selfcheck.mjs (4616 -> 4617); the fly3d and 6DOF pages grew a panel each.
     // v4831 -- 4621 -> 4625 for ui/publishCommands.mjs, ui/brainAsk.mjs and their two gates (publishHygiene-selfcheck, brainStages-selfcheck).
+    // BVH-CSG round 9, at its merge onto main's v4831 -- RE-TAKEN: 4625 -> 4627 for physics/mesh/triArrangement.mjs and its gate.
     // v4834 -- 4625 -> 4626 for tools/ship/reportFresh-selfcheck.mjs.
+    // RE-DERIVED at this branch's merge of main's v4834: 4628 -- main's 4626 (reportFresh) plus this branch's two (triArrangement and its gate).
     // v4835 -- 4626 -> 4628 for tools/ship/afterVerdict.mjs and its gate (on main).
     // v4837 -- 4628 -> 4636 for tools/ship/poolWatch.mjs, sysLagReading.mjs, takeLagReading.mjs, train6dofPilot.mjs, trainPilot6dof.mjs and their three gates (poolWatch-selfcheck, sysLagReading-selfcheck, train6dofPilot-selfcheck); verify.mjs, deviceOwed.mjs and the 6DOF page grew.
     // the denoiser arc, round 1 -- 4595 -> 4597 for brain/conv2d.mjs and brain/conv2d-selfcheck.mjs.
@@ -1185,7 +1187,11 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4831 -- ES modules 4316 -> 4320, closures 4163 -> 4166, async/await 1733 -> 1735, Promises 416 -> 417: the two modules and their
     // gates; the other rows hold. fetch/XHR holds at 251: brainAsk.mjs calls an injected fetchImpl, and the gate's own fetch went (see
     // tools/ship/brainStages-selfcheck.mjs on gateAxioms).
+    // BVH-CSG round 9 (branch claude/shader-porting-swek-ozgvb0, at its merge onto main's v4831) -- physics/mesh/triArrangement.mjs and its
+    // gate: ES modules 4320 -> 4322, closures 4166 -> 4168, typed arrays 1274 -> 1276 (Float64Array, Int32Array and Uint8Array in the
+    // module, Float64Array in the gate); the other rows hold -- neither file awaits, fetches or times anything.
     // v4834 -- ES modules 4320 -> 4321, closures 4166 -> 4167: tools/ship/reportFresh-selfcheck.mjs; the other rows hold.
+    // RE-DERIVED at this branch's merge of main's v4834: ES modules 4323, closures 4169, typed arrays 1276 -- main's v4834 rows plus round 9's two files.
     // v4835 -- ES modules 4321 -> 4323, closures 4167 -> 4169: tools/ship/afterVerdict.mjs and its gate (on main); the other rows hold.
     // v4837 -- ES modules 4323 -> 4331, closures 4169 -> 4177, async/await 1735 -> 1739, Promises 417 -> 419, fetch/XHR 251 -> 252: the five tools, their three gates and the 6DOF page's shipped-pilot fetch; sysLagReading.mjs calls fetch (251 -> 252).
     // the denoiser arc, round 1 -- brain/conv2d.mjs and its gate: files 4595 -> 4597, ES modules 4290 -> 4292, closures

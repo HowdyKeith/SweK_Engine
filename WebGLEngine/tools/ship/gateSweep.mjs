@@ -9661,6 +9661,26 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "the session-start hook now installs them. Step 4b found meshBVH (one ~4 ms timing) and avatarServerViews (a fixed sleep) " +
                  "red under load, both repaired. NOT CLOSED: a restart onto the other host strands the record again, one dated row away.",
     }),
+    // RENUMBERED since529 -> since568 at the v4878 merge into the v4877 line (main had since529 long since): main's v4835-v4837 took since526..since528.
+    // RENUMBERED since523 -> since526 at this branch's second merge of main (v4834): main's v4832-v4834 took since523..since525 in the
+    // same days, and in an object literal the later key silently wins (gateSweep-selfcheck's duplicate row). Ordinals only need to be distinct.
+    // BVH-CSG round 9, at its merge onto main's v4831 -- ONE new gate file: physics/mesh/triArrangement-selfcheck.mjs, the per-triangle
+    // arrangement meshBoolean.mjs now tries first. The round is a branch round and wears no version, so `at` names the merge it closed at.
+    since568: Object.freeze({
+        at: "v4831+bvh-csg-round-9", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "physics/mesh/triArrangement-selfcheck.mjs",
+        ]),
+        widened: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** SEGMENT-BOUNDED CUTTING: ONE TRIANGLE OF A CUT ALONG THE SEGMENTS WHERE B ACTUALLY CROSSES IT, NOT ALONG B's PLANES. *** " +
+                 "Faces need no code to check: a 1x1 square hole in the right triangle (0,0,0),(10,0,0),(0,10,0) gives exactly 1 and 49, nested " +
+                 "squares 1, 8 and 41, every output vertex bit-identical to a corner or a triTriIntersect endpoint; a square 2e-7 across keeps " +
+                 "its 4e-14 face (the round's lost first build dropped it); a crossing within TOL of A's edge closes against it and leaves a " +
+                 "2.75e-9 strip, measured. Four real-workload audits classify every output triangle on its own and find 0 that disagree with " +
+                 "their face. 33 checks after the review of the rebuild (a three-deep nest, a too-thin triangle, the validation grid's work). " +
+                 "28 sabotages on the reviewed module: red by name except a control, four backstops and a speed-up, each said why.",
+    }),
     // v4837 -- since528, not since524..since527: four other rounds took them on main in the same days. THREE new gate files: tools/ship/poolWatch-selfcheck.mjs (what the quick sweep does not run, and a recorded red in it failing the ship), tools/ship/sysLagReading-selfcheck.mjs (the two rig readings as one
     // command each, and the two backlog entries held to the code) and tools/ship/train6dofPilot-selfcheck.mjs (the tool that trains and ships the space-battle pilot). Built as v4832 while main shipped its own v4832 to v4836.
     since528: Object.freeze({
