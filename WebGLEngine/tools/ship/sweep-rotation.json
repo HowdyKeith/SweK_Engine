@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it. `poolHorizon` (v4816) is the stamp of the first pool entry that run did NOT take: it reached every entry stamped earlier and none stamped at or after it.",
- "at": "2026-10-19T20:52:02.386Z",
+ "at": "2026-10-19T20:53:42.215Z",
  "poolAt": "2026-10-19T20:27:51.134Z",
  "poolHorizon": "2026-10-16T04:34:29.776Z",
  "budgetMs": 3000,
@@ -3635,10 +3635,10 @@
   },
   {
    "gate": "tools/ship/fsrPageClocks-selfcheck.mjs",
-   "ms": 20031,
-   "code": "timeout/signal",
-   "priorMs": 14116,
-   "at": "2026-10-19T20:27:51.134Z"
+   "ms": 22337,
+   "code": 0,
+   "priorMs": 20031,
+   "at": "2026-10-19T20:52:24.947Z"
   },
   {
    "gate": "tools/ship/fsrPageConfirm-selfcheck.mjs",
@@ -4817,10 +4817,10 @@
   },
   {
    "gate": "tools/ship/rigTiming-selfcheck.mjs",
-   "ms": 20025,
-   "code": "timeout/signal",
-   "priorMs": 16129,
-   "at": "2026-10-19T20:27:51.134Z"
+   "ms": 21989,
+   "code": 0,
+   "priorMs": 20025,
+   "at": "2026-10-19T20:52:47.232Z"
   },
   {
    "gate": "tools/ship/rigidBody6dofPage-selfcheck.mjs",
@@ -4971,10 +4971,10 @@
   },
   {
    "gate": "tools/ship/slugNapalm-selfcheck.mjs",
-   "ms": 20091,
-   "code": "timeout/signal",
-   "priorMs": 13936,
-   "at": "2026-10-19T20:27:51.134Z"
+   "ms": 27496,
+   "code": 0,
+   "priorMs": 20091,
+   "at": "2026-10-19T20:53:14.977Z"
   },
   {
    "gate": "tools/ship/slugProjective-selfcheck.mjs",
@@ -5144,10 +5144,10 @@
   },
   {
    "gate": "tools/ship/swiftShaders-selfcheck.mjs",
-   "ms": 20027,
-   "code": "timeout/signal",
-   "priorMs": 14778,
-   "at": "2026-10-19T20:27:51.134Z"
+   "ms": 26964,
+   "code": 0,
+   "priorMs": 20027,
+   "at": "2026-10-19T20:53:42.215Z"
   },
   {
    "gate": "tools/ship/tacticsTrain-selfcheck.mjs",
