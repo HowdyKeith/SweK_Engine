@@ -59,7 +59,7 @@ console.log("\n2. SYNC");
 
 console.log("\n3. SWIMMING");
 {
-    ok("!! the tree offers five subs here: the PD autopilot (no weights) and four trained networks (963 weights)", seed.length === 5 && seed[0].weights === null && seed.slice(1).every((s) => s.weights.length === 963));
+    ok("!! the tree offers six subs here: the PD autopilot (no weights) and five trained networks (963 weights)", seed.length === 6 && seed[0].weights === null && seed.slice(1).every((s) => s.weights.length === 963));
     const t = A.createTank(); t.sync(seed); let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9, minD = 1e9, maxD = -1e9;
     for (let i = 0; i < 30 * 600; i++) { t.step(1 / 30); if (i % 30 === 0) for (const s of t.snapshot()) { minX = Math.min(minX, s.x); maxX = Math.max(maxX, s.x); minY = Math.min(minY, s.y); maxY = Math.max(maxY, s.y); minD = Math.min(minD, s.depth); maxD = Math.max(maxD, s.depth); } }
     const snap = t.snapshot();

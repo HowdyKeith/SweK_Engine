@@ -92,6 +92,7 @@ const SEED_RECIPES = [
     { name: "Explorer actuator champion", weights: "brain/pilotSubWeightsActuatorsWip.json", theta: "brain/subTacticsThetaSearchPingWip.json" },
     { name: "Explorer robust pilot", weights: "brain/pilotSubWeightsRobustWip.json", theta: "brain/subTacticsThetaSearchPingWip.json" },
     { name: "Explorer tail pilot", weights: "brain/pilotSubWeightsRobustTail2Wip.json", theta: "brain/subTacticsThetaSearchPingWip.json" },   // seed 9400: the one that qualifies on the Munk x3 hull too (brain/SUBMARINE_WIP.md)
+    { name: "Explorer noisy-senses pilot", weights: "brain/pilotSubWeightsRobustNoisyWip.json", theta: "brain/subTacticsThetaSearchPingWip.json" },   // seed 9602: trained on sensor noise, delay and gusts; qualifies at every disturbance level on five hulls (brain/SUBMARINE_WIP.md)
 ];
 /** Build the offerable subs from a reader: read(relPath) -> parsed JSON or null. A recipe whose file is missing or invalid is skipped, by name, with the reason. */
 function seedSubs(read) {

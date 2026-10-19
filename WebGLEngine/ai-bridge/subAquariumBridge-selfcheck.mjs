@@ -10,7 +10,7 @@
 //                  wrapped in { sub }; an invalid sub is 400 with the validator's own words; malformed JSON 400; over 64 KB 413 (and nothing stored); the same sub twice is one sub ('replaced'); 30 a minute an address,
 //                  the 31st is 429, another address is not limited, and the window slides (61 s later it is open again)
 //   4  THE LIST    public; newest first; carries the weights the page flies; counts split local from remote
-//   5  THE SEED    untrusted 403; trusted offers this tree's five champions as LOCAL subs (re-seeding replaces, it does not duplicate); a temp tree with no files offers only the PD autopilot and names what was skipped
+//   5  THE SEED    untrusted 403; trusted offers this tree's six champions as LOCAL subs (re-seeding replaces, it does not duplicate); a temp tree with no files offers only the PD autopilot and names what was skipped
 //   6  SENDING     untrusted 403; an unknown id 404; a REMOTE sub cannot be forwarded (400); a peer that is not LAN/mesh (a public IP, a hostname, file:, credentials in the URL) 400 and NOTHING dialled; a good peer is
 //                  dialled at <peer>/subaquarium/arrive with { sub: {name, circuit, weights, theta, hue} } and NO id, local or from, with redirects refused and a timeout; an unreachable or refusing peer is 502 with the reason
 //   8  OVER REAL HTTP  two bridges on loopback ports: A seeds and SENDS a champion to B, B's tank holds it bit for bit; sending again replaces it; a peer that refuses or is not listening is reported with its reason; a 100 KB body is 413 over the wire
@@ -128,9 +128,9 @@ console.log("\n5. THE SEED");
     const d = await call(b, "POST", "/subaquarium/seed", undefined, { trusted: false });
     ok("!! an untrusted seed is 403", d.status === 403 && b.registry.counts().total === 0);
     const s = await call(b, "POST", "/subaquarium/seed"), s2 = await call(b, "POST", "/subaquarium/seed");
-    ok("!! a trusted seed offers THIS tree's five champions as LOCAL subs (from 'this-box'); seeding again replaces them, it does not duplicate (still five)", s.json.added === 5 && s.json.skipped.length === 0 && s.json.counts.local === 5 && s2.json.counts.total === 5 && b.registry.list().every((x) => x.local && x.from === "this-box"), b.registry.list().map((x) => x.from).join());
+    ok("!! a trusted seed offers THIS tree's six champions as LOCAL subs (from 'this-box'); seeding again replaces them, it does not duplicate (still six)", s.json.added === 6 && s.json.skipped.length === 0 && s.json.counts.local === 6 && s2.json.counts.total === 6 && b.registry.list().every((x) => x.local && x.from === "this-box"), b.registry.list().map((x) => x.from).join());
     const e = mkBridge({ root: tmpRoot() }), es = await call(e, "POST", "/subaquarium/seed");
-    ok("!! a tree with no champion files offers ONLY the PD autopilot and names the four it skipped", es.json.added === 1 && es.json.skipped.length === 4 && es.json.counts.total === 1);
+    ok("!! a tree with no champion files offers ONLY the PD autopilot and names the five it skipped", es.json.added === 1 && es.json.skipped.length === 5 && es.json.counts.total === 1);
 }
 
 console.log("\n6. SENDING");
@@ -182,7 +182,7 @@ console.log("\n8. TWO BOXES OVER REAL HTTP");
         const seeded = await post(a.url + "/subaquarium/seed", {}), mine = (await fetch(a.url + "/subaquarium/list").then((r) => r.json())).subs.find((x) => x.name === "Explorer actuator champion");
         const sent = await post(a.url + "/subaquarium/send", { peer: b.url, id: mine.id });
         const there = (await fetch(b.url + "/subaquarium/list").then((r) => r.json())).subs, got = there.find((x) => x.name === "Explorer actuator champion");
-        ok("!! box A seeds its five champions, SENDS one to box B over real HTTP (loopback is LAN), and B's tank holds it: stored REMOTE, from 127.0.0.1, with all 963 weights and the twelve theta numbers intact (bit for bit the numbers A sent)", seeded.added === 5 && sent.ok && sent.peer === b.url && there.length === 1 && got && got.local === false && got.from === "127.0.0.1" && got.weights.length === 963 && got.weights.every((v, i) => v === mine.weights[i]) && C.THETA_NAMES.every((k) => got.theta[k] === mine.theta[k]) && got.id === mine.id, `${there.length} sub on B, id ${got && got.id}`);
+        ok("!! box A seeds its six champions, SENDS one to box B over real HTTP (loopback is LAN), and B's tank holds it: stored REMOTE, from 127.0.0.1, with all 963 weights and the twelve theta numbers intact (bit for bit the numbers A sent)", seeded.added === 6 && sent.ok && sent.peer === b.url && there.length === 1 && got && got.local === false && got.from === "127.0.0.1" && got.weights.length === 963 && got.weights.every((v, i) => v === mine.weights[i]) && C.THETA_NAMES.every((k) => got.theta[k] === mine.theta[k]) && got.id === mine.id, `${there.length} sub on B, id ${got && got.id}`);
         const again = await post(a.url + "/subaquarium/send", { peer: b.url, id: mine.id }), after = (await fetch(b.url + "/subaquarium/list").then((r) => r.json())).subs;
         ok("!! sending it AGAIN replaces it on B (replaced: true, still one sub), the id is the same on both boxes (the id is the content)", again.ok && again.reply.replaced === true && after.length === 1);
         const refused = await post(a.url + "/subaquarium/send", { peer: c.url, id: mine.id });
