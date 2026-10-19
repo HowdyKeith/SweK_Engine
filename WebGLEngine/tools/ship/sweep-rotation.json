@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it. `poolHorizon` (v4816) is the stamp of the first pool entry that run did NOT take: it reached every entry stamped earlier and none stamped at or after it.",
- "at": "2026-10-19T20:49:06.598Z",
+ "at": "2026-10-19T20:52:02.386Z",
  "poolAt": "2026-10-19T20:27:51.134Z",
  "poolHorizon": "2026-10-16T04:34:29.776Z",
  "budgetMs": 3000,
@@ -419,10 +419,10 @@
   },
   {
    "gate": "fx/fsr/fsr3Tsl-selfcheck.mjs",
-   "ms": 20037,
-   "code": "timeout/signal",
-   "priorMs": 15270,
-   "at": "2026-10-19T20:27:51.134Z"
+   "ms": 22501,
+   "code": 0,
+   "priorMs": 20037,
+   "at": "2026-10-19T20:49:45.974Z"
   },
   {
    "gate": "fx/fsr/fsrFlicker-selfcheck.mjs",
@@ -433,10 +433,10 @@
   },
   {
    "gate": "fx/fsr/fsrFlowCost-selfcheck.mjs",
-   "ms": 20028,
-   "code": "timeout/signal",
-   "priorMs": 13744,
-   "at": "2026-10-19T20:27:51.134Z"
+   "ms": 21080,
+   "code": 0,
+   "priorMs": 20028,
+   "at": "2026-10-19T20:50:07.275Z"
   },
   {
    "gate": "fx/fsr/fsrFlowGrid-selfcheck.mjs",
@@ -559,10 +559,10 @@
   },
   {
    "gate": "fx/fsr/fsrTemporalHalfQuality-selfcheck.mjs",
-   "ms": 20056,
-   "code": "timeout/signal",
-   "priorMs": 19392,
-   "at": "2026-10-19T20:27:51.134Z"
+   "ms": 21613,
+   "code": 0,
+   "priorMs": 20056,
+   "at": "2026-10-19T20:50:29.108Z"
   },
   {
    "gate": "fx/fsr/fsrTemporalLockGhost-selfcheck.mjs",
@@ -573,10 +573,10 @@
   },
   {
    "gate": "fx/fsr/fsrTemporalLocks-selfcheck.mjs",
-   "ms": 20026,
-   "code": "timeout/signal",
-   "priorMs": 13912,
-   "at": "2026-10-19T20:27:51.134Z"
+   "ms": 27035,
+   "code": 0,
+   "priorMs": 20026,
+   "at": "2026-10-19T20:50:56.364Z"
   },
   {
    "gate": "fx/fsr/fsrTemporalQuality-selfcheck.mjs",
@@ -1338,10 +1338,10 @@
   },
   {
    "gate": "physics/vibrationKnob-selfcheck.mjs",
-   "ms": 20012,
-   "code": "timeout/signal",
-   "priorMs": 17637,
-   "at": "2026-10-19T20:27:51.134Z"
+   "ms": 24824,
+   "code": 0,
+   "priorMs": 20012,
+   "at": "2026-10-19T20:51:21.415Z"
   },
   {
    "gate": "physics/xpbd/frictionKey-selfcheck.mjs",
@@ -1493,10 +1493,10 @@
   },
   {
    "gate": "render/frameInterpTsl-selfcheck.mjs",
-   "ms": 20072,
-   "code": "timeout/signal",
-   "priorMs": 14524,
-   "at": "2026-10-19T20:27:51.134Z"
+   "ms": 21727,
+   "code": 0,
+   "priorMs": 20072,
+   "at": "2026-10-19T20:51:43.390Z"
   },
   {
    "gate": "render/holeFillTsl-selfcheck.mjs",
@@ -3586,10 +3586,10 @@
   },
   {
    "gate": "tools/ship/frameVerdicts-selfcheck.mjs",
-   "ms": 20052,
-   "code": "timeout/signal",
-   "priorMs": 12598,
-   "at": "2026-10-19T20:27:51.134Z"
+   "ms": 18728,
+   "code": 0,
+   "priorMs": 20052,
+   "at": "2026-10-19T20:52:02.386Z"
   },
   {
    "gate": "tools/ship/frameVertical-selfcheck.mjs",
