@@ -1,11 +1,11 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it. `poolHorizon` (v4816) is the stamp of the first pool entry that run did NOT take: it reached every entry stamped earlier and none stamped at or after it.",
- "at": "2026-10-19T15:34:29.261Z",
+ "at": "2026-10-19T16:02:57.620Z",
  "poolAt": "2026-10-19T15:34:29.261Z",
  "poolHorizon": "2026-10-16T01:12:53.758Z",
  "budgetMs": 3000,
- "lastRun": 22,
+ "lastRun": 1,
  "rotated": [
   {
    "gate": "ai-bridge/assetSync-perf-selfcheck.mjs",
@@ -195,6 +195,18 @@
    "at": "2026-10-13T01:16:40.727Z"
   },
   {
+   "gate": "brain/pilotRotorMlp-selfcheck.mjs",
+   "ms": 59881,
+   "code": 0,
+   "at": "2026-10-19T15:35:29.359Z"
+  },
+  {
+   "gate": "brain/pilotRotorPolicy-selfcheck.mjs",
+   "ms": 62387,
+   "code": 0,
+   "at": "2026-10-19T15:36:31.941Z"
+  },
+  {
    "gate": "brain/raceLockstep-selfcheck.mjs",
    "ms": 2995,
    "code": 0,
@@ -270,6 +282,12 @@
    "code": 0,
    "priorMs": 4558,
    "at": "2026-10-16T14:43:11.394Z"
+  },
+  {
+   "gate": "brain/rotorTask-selfcheck.mjs",
+   "ms": 53577,
+   "code": 0,
+   "at": "2026-10-19T15:37:25.708Z"
   },
   {
    "gate": "brain/seatGunnerMlp-selfcheck.mjs",
@@ -450,10 +468,10 @@
   },
   {
    "gate": "fx/fsr/fsrFrameGen-selfcheck.mjs",
-   "ms": 20030,
-   "code": "timeout/signal",
-   "priorMs": 15933,
-   "at": "2026-10-19T15:34:29.261Z"
+   "ms": 21632,
+   "code": 0,
+   "priorMs": 20030,
+   "at": "2026-10-19T16:02:33.980Z"
   },
   {
    "gate": "fx/fsr/fsrFrameGenArc-selfcheck.mjs",
@@ -1684,10 +1702,10 @@
   },
   {
    "gate": "text/slug-selfcheck.mjs",
-   "ms": 19255,
+   "ms": 22162,
    "code": 0,
-   "priorMs": 13464,
-   "at": "2026-10-19T15:34:29.261Z"
+   "priorMs": 20557,
+   "at": "2026-10-19T16:02:12.137Z"
   },
   {
    "gate": "tools/bench/fleetBench-selfcheck.mjs",
@@ -2713,10 +2731,10 @@
   },
   {
    "gate": "tools/ship/avatarDock-selfcheck.mjs",
-   "ms": 20028,
-   "code": "timeout/signal",
-   "priorMs": 16936,
-   "at": "2026-10-19T15:34:29.261Z"
+   "ms": 23411,
+   "code": 0,
+   "priorMs": 20028,
+   "at": "2026-10-19T16:02:57.620Z"
   },
   {
    "gate": "tools/ship/avatarFraming-selfcheck.mjs",
@@ -5224,6 +5242,12 @@
    "ms": 69621,
    "code": 0,
    "at": "2026-10-16T17:16:46.111Z"
+  },
+  {
+   "gate": "tools/ship/trainRotorPilot-selfcheck.mjs",
+   "ms": 110763,
+   "code": 0,
+   "at": "2026-10-19T15:39:16.658Z"
   },
   {
    "gate": "tools/ship/trainSeatGunner-selfcheck.mjs",
