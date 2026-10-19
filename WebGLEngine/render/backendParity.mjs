@@ -278,9 +278,10 @@ export const PARITY_BASELINE = Object.freeze({
     // renderer. A tool, not a shader module; counted per v4392's rule that embedded shader text is counted. Found by a
     // census diff against 3677d747, the commit before it -- the only file that moved -- and missed for four commits,
     // because this gate was not in that round's battery. Keith's rig run read it first: measured 162, recorded 161.
-    glslBearing: 162,
+    // v4877 -- +1 to glslBearing, glslFramework and glslOnly: render/spaceBackdrop.js (the rotorcraft/space-battle branch) writes its GLSL for three.js's ShaderMaterial, which prepends the version header itself, and ships no WGSL half.
+    glslBearing: 163,
     glslDirective: 144,  // raw WebGL2 -- the file writes its own version header
-    glslFramework: 18,   // three.js prepends it: badTvPass, aquarellePass, grassField, solidTexture, atmosphere, ...
+    glslFramework: 19,   // three.js prepends it: badTvPass, aquarellePass, grassField, solidTexture, atmosphere, ...
     // v4392 -- 57 -> 58, and the file is a GATE rather than a shipping module. tools/ship/shipyard-selfcheck.mjs
     // section 8 embeds a WGSL compute shader to run the four float32 encodings on a real device, so it bears WGSL
     // and ships none. THAT IS THE POPULATION THIS CENSUS EXISTS TO SEE and it is counted rather than exempted:
@@ -353,7 +354,7 @@ export const PARITY_BASELINE = Object.freeze({
     // refuses. Compute, so no GLSL half; the same file is why wgslOnly moves too; nothing else changed.
     wgslBearing: 111,
     both: 24,            // v4778: +1, fly-connectome.html (above); before that +2 for fae26dbf's specularProbeLit pair
-    glslOnly: 138,       // v4778 rig run 4: +1, tools/ship/realGpuRun.mjs (above)
+    glslOnly: 139,       // v4778 rig run 4: +1, tools/ship/realGpuRun.mjs (above); v4877: +1, render/spaceBackdrop.js
     wgslOnly: 87,        // the denoiser arc, round 1: +1, brain/conv2d.mjs; round 12: +1, render/denoiseDevice.mjs; v4854: +1, tools/ship/threeTextureBarrier-selfcheck.mjs (see wgslBearing)
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.

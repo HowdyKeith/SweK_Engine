@@ -179,6 +179,10 @@ export const SEPARATOR_SITES_AT_V4647 = Object.freeze({
             why: "expects path.join(parent, name + \"_release\") inside outDirRefusal's message, which builds it with the same path.join" }),
         Object.freeze({ at: "v4845", gate: "tools/ship/playwrightResolve-selfcheck.mjs",
             why: "expects path.join(root, build, DXC_LEAVES[i]) in resolveDxcDir's tried list, which builds each entry with the same path.join over the same leaves" }),
+        // v4877 -- the rotorcraft branch's trainer gate (merged from claude/sweet-lovelace): both sides are NATIVE paths of the same file, one from path.resolve in tools/ship/trainRotorPilot.mjs (DEFAULT_OUT and the GPU
+        // brain's out) and one from path.join(ENG, "brain", ...) in the gate, each normalised by the platform to the same separator, so a win32 run compares two backslashed paths and a posix run two slashed ones.
+        Object.freeze({ at: "v4877", gate: "tools/ship/trainRotorPilot-selfcheck.mjs",
+            why: "expects path.join(ENG, \"brain\", ...) against DEFAULT_OUT and the GPU brain's out, which trainRotorPilot.mjs builds with path.resolve over the same directory; both are the platform's own normalised absolute path" }),
     ]),
     defects: Object.freeze([
         Object.freeze({ gate: "tools/ship/gateSweep-selfcheck.mjs", where: "cross-file",
