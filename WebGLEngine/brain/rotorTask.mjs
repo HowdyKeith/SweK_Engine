@@ -12,7 +12,7 @@
 //
 // THE SCORE of a hover or recovery flight is minus the mean per-tick tracking error: min(3, distance to the point / 30 m) + min(3, height error / 30 m) + min(3, heading error / 1 rad); 20 ticks a second for 30 s. A flight that ends early (a crash, a non-finite state) is charged the worst tick, 9, for every tick it did not
 // fly -- so ending the flight is never a way to stop being graded. (Landed is not an early end for these: the pilot is asked to HOVER; a touchdown is charged like a crash, because it did not hold the point.)
-// THE SCORE of an engine flight is minus its cost: a landing the machine walks away from (touchdown 'landed', and 'landed' still eight seconds later) costs 0.4 x sink / 4.5 (a soft landing is nearly free, a landing at the structure's limit costs 0.4), a crash costs 3 + 4 x min(1, sink / 20) -- so the worst landing is better than the best crash,
+// THE SCORE of an engine flight is minus its cost: a landing the machine walks away from (touchdown 'landed', and 'landed' still eight seconds later) costs 0.4 x sink / 4.5 (a soft landing is nearly free, a landing at the structure's limit costs 0.4) PLUS 0.4 x min(5, gs / 10) for the speed over the ground at first contact (see LANDING_GS: a stand-in for a rollover limit the airframe does not have), a crash costs 3 + 4 x min(1, sink / 20) -- so the worst landing is better than the best crash,
 // and a crash at 8 m/s is worse than one at 5. There is no term for effort or smoothness; the controls are clamped by the model, and a pilot that chatters is graded on where the helicopter goes.
 //
 // THE SETS are disjoint seeds for the jobs a set has in this tree (brain/flightTask.mjs argues each): TRAIN is what a search sees, HELD_OUT picks the champion among the search's own candidates, AUDIT (the fruit fly's) and AUDIT2 (the GPU network's) are read once each, by a shipped file's `by`, and BASELINE_SET is the reserve for comparing pilots no search has touched; SAFETY_POOL, SAFETY_AUDIT and SAFETY_AUDIT2 are the same story for the TAILS (60 starts each, every kind: a champion must end no flight early that the hand pilot completes).
@@ -28,6 +28,11 @@ export const DT = H.DT, SECONDS = 30, TICKS_PER_SCORE = 3;   // the model steps 
 export const WORST_TICK = 3 + 3 + 3;   // 9: what a scoring tick that was never flown is charged
 export const KINDS = Object.freeze(["hover", "recovery", "engine", "terrain"]);
 const ENGINE_SECONDS = 40, SETTLE_SECONDS = 8;
+/** THE LANDING GROUND-SPEED CHARGE (this task's second rule; the first charged sink only). A landing the machine walks away from also costs 0.4 x min(LANDING_GS_CAP, gs / LANDING_GS), gs the speed over the ground at first contact: 10 m/s (about 20 kt, a running landing on skids) costs what the sink limit costs, and it keeps
+ * rising to a cap, so that coming down slower is always better and the worst landing (0.4 + 2.0) is still better than the best crash (3). The airframe has NO rollover or dig-in limit, so this is a stand-in for one, CHOSEN and not measured. */
+export const LANDING_GS = 10, LANDING_GS_CAP = 5;
+/** What a landing the machine walks away from costs: 0.4 x min(1, sink / 4.5) + 0.4 x min(LANDING_GS_CAP, gs / LANDING_GS). Pure, so the gate can ask it the corners no flight reaches. */
+export const landingCost = (sink, gs) => 0.4 * Math.min(1, sink / 4.5) + 0.4 * Math.min(LANDING_GS_CAP, gs / LANDING_GS);
 
 const mulberry = (a) => () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 
@@ -67,7 +72,7 @@ export function windAt(wind, t) {
 
 /**
  * Fly one scenario with `pilot` ((state, target, wind) -> controls). Returns { score, status, ticks, ... }: for a hover or a recovery { ePos, eAlt, eHdg } (mean per-scoring-tick errors over the ticks flown) and `status` ("airborne" | "landed" | "crashed" | "lost" -- how the flight ENDED);
- * for an engine flight { sink, touchdown ("landed" | "crashed" | null), why, settled } (how it landed and whether it was still standing eight seconds later). Deterministic.
+ * for an engine flight { sink, gs (the speed over the ground at first contact), touchdown ("landed" | "crashed" | null), why, settled } (how it landed and whether it was still standing eight seconds later). Deterministic.
  */
 export function fly(pilot, sc, { model = AR.defaultModel() } = {}) {
     let s = H.createState(model, { ...sc.start }), h = 0x811c9dc5, status = "airborne", why = null, flown = 0;
@@ -78,13 +83,13 @@ export function fly(pilot, sc, { model = AR.defaultModel() } = {}) {
         for (let i = 0; i < total; i++) {
             const o = H.stepRotor(model, s, pilot(s, sc.target, [0, 0, 0], ctx), DT, [0, 0, 0], terrain); s = o.state; flown = i + 1;
             if (i % 30 === 0) for (const c of [s.pos[0], s.pos[2], s.q[0], s.q[1], s.q[2], s.q[3]]) h = foldHash(h, Math.round(c * 1000) & 0xffffffff);
-            if (!first && o.status !== "airborne") { first = { status: o.status, sink: o.sink || 0, why: o.why || null }; tEnd = i + Math.round(SETTLE_SECONDS / DT); }
+            if (!first && o.status !== "airborne") { first = { status: o.status, sink: o.sink || 0, gs: Math.hypot(s.vel[0], s.vel[1]), why: o.why || null }; tEnd = i + Math.round(SETTLE_SECONDS / DT); }
             if (o.status === "crashed" || o.status === "lost") { status = o.status; why = o.why || null; break; }
             if (i >= tEnd) break;
         }
         const touchdown = first ? first.status : null, standing = status !== "crashed" && status !== "lost";
-        const sink = first ? first.sink : 0, score = first ? (touchdown === "landed" && standing ? -0.4 * Math.min(1, sink / 4.5) : -(3 + 4 * Math.min(1, Math.max(sink, 0) / 20))) : -7;
-        return { score, status: first ? (standing ? "landed" : status) : "airborne", touchdown, sink, why: why || (first && first.why), settled: !!first && standing, ticks: flown, seed: sc.seed, kind: sc.kind, fingerprint: (h >>> 0).toString(16).padStart(8, "0") };
+        const sink = first ? first.sink : 0, gs = first ? first.gs : 0, score = first ? (touchdown === "landed" && standing ? -landingCost(sink, gs) : -(3 + 4 * Math.min(1, Math.max(sink, 0) / 20))) : -7;
+        return { score, status: first ? (standing ? "landed" : status) : "airborne", touchdown, sink, gs, why: why || (first && first.why), settled: !!first && standing, ticks: flown, seed: sc.seed, kind: sc.kind, fingerprint: (h >>> 0).toString(16).padStart(8, "0") };
     }
     const total = Math.round(SECONDS / DT), scoring = Math.floor(total / TICKS_PER_SCORE);
     let ePos = 0, eAlt = 0, eHdg = 0, scored = 0;
@@ -107,15 +112,27 @@ export function fly(pilot, sc, { model = AR.defaultModel() } = {}) {
 // ---- the sets ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 const mk = (spec) => Object.freeze(spec.flatMap(([kind, seeds]) => seeds.map((s) => scenario(s, kind))));
 const range = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
-export const TRAIN_SET = mk([["hover", range(1, 6)], ["recovery", range(1, 6)], ["engine", range(1, 12)], ["terrain", range(1, 4)]]);
+// TRAIN's recovery kind has twelve seeds, six of them (61..66) added with the second rule: the first GPU champion scored -0.851 on the six recovery scenarios it trained on (the hand pilot -0.865) and -0.985 on the eight unseen recovery scenarios of its audit (the hand pilot -0.865), and the fruit fly's showed the same gap, so the
+// training set the second rule is trained on has twice the recovery scenarios to overfit.
+export const TRAIN_SET = mk([["hover", range(1, 6)], ["recovery", [...range(1, 6), ...range(61, 66)]], ["engine", range(1, 12)], ["terrain", range(1, 4)]]);
 export const HELD_OUT_SET = mk([["hover", range(11, 16)], ["recovery", range(11, 16)], ["engine", range(13, 24)], ["terrain", range(11, 14)]]);
-export const AUDIT_SET = mk([["hover", range(21, 28)], ["recovery", range(21, 28)], ["engine", range(25, 44)], ["terrain", range(21, 26)]]);       // the fruit fly's audit: read once, by its champion
-export const AUDIT2_SET = mk([["hover", range(31, 38)], ["recovery", range(31, 38)], ["engine", range(45, 64)], ["terrain", range(31, 36)]]);      // the GPU network's audit: its own, so that neither champion is graded on what the other's was
-export const BASELINE_SET = mk([["hover", range(501, 504)], ["recovery", range(501, 504)], ["engine", range(501, 508)], ["terrain", range(501, 504)]]);   // the reserve: for comparing pilots no search has touched
+// THE AUDITS OF THE SECOND RULE. The first rule (landing cost = sink only) was the one the fruit fly's champion was graded under, and its audits (AUDIT 21..28/25..44/21..26, AUDIT2 31..38/45..64/31..36, BASELINE 501.., SAFETY_AUDIT 2001.., SAFETY_AUDIT2 3001..) were read by it and by the GPU network's first champion:
+// when a rule was wrong the sets that had seen it are declared SPENT (brain/flightTask.mjs, 5), so the second rule's audits are new seeds, and SPENT_V1_SETS keeps the old ones for the gate to hold the new ones disjoint from. TRAIN, HELD_OUT and SAFETY_POOL are selection sets and are kept.
+export const AUDIT_SET = mk([["hover", range(41, 48)], ["recovery", range(41, 48)], ["engine", range(65, 84)], ["terrain", range(41, 46)]]);       // the fruit fly's audit: read once, by its champion
+export const AUDIT2_SET = mk([["hover", range(51, 58)], ["recovery", range(51, 58)], ["engine", range(85, 104)], ["terrain", range(51, 56)]]);      // the GPU network's audit: its own, so that neither champion is graded on what the other's was
+export const BASELINE_SET = mk([["hover", range(601, 604)], ["recovery", range(601, 604)], ["engine", range(601, 608)], ["terrain", range(601, 604)]]);   // the reserve: for comparing pilots no search has touched
 // the TAILS: many starts of every kind. A search is only ELIGIBLE to be champion if on SAFETY_POOL_SET it ends no flight early that the hand pilot completes (an average cannot see a tail); the champion's own SAFETY_AUDIT_SET is read once, after.
 export const SAFETY_POOL_SET = mk([["hover", range(1001, 1010)], ["recovery", range(1001, 1010)], ["engine", range(1001, 1030)], ["terrain", range(1001, 1010)]]);
-export const SAFETY_AUDIT_SET = mk([["hover", range(2001, 2010)], ["recovery", range(2001, 2010)], ["engine", range(2001, 2030)], ["terrain", range(2001, 2010)]]);
-export const SAFETY_AUDIT2_SET = mk([["hover", range(3001, 3010)], ["recovery", range(3001, 3010)], ["engine", range(3001, 3030)], ["terrain", range(3001, 3010)]]);
+export const SAFETY_AUDIT_SET = mk([["hover", range(4001, 4010)], ["recovery", range(4001, 4010)], ["engine", range(4001, 4030)], ["terrain", range(4001, 4010)]]);
+export const SAFETY_AUDIT2_SET = mk([["hover", range(5001, 5010)], ["recovery", range(5001, 5010)], ["engine", range(5001, 5030)], ["terrain", range(5001, 5010)]]);
+/** The first rule's audits, as they were read: for the gate to hold the second rule's audits disjoint from them. Nothing trains, selects or grades on these any more. */
+export const SPENT_V1_SETS = Object.freeze({
+    AUDIT: mk([["hover", range(21, 28)], ["recovery", range(21, 28)], ["engine", range(25, 44)], ["terrain", range(21, 26)]]),
+    AUDIT2: mk([["hover", range(31, 38)], ["recovery", range(31, 38)], ["engine", range(45, 64)], ["terrain", range(31, 36)]]),
+    BASELINE: mk([["hover", range(501, 504)], ["recovery", range(501, 504)], ["engine", range(501, 508)], ["terrain", range(501, 504)]]),
+    SAFETY_AUDIT: mk([["hover", range(2001, 2010)], ["recovery", range(2001, 2010)], ["engine", range(2001, 2030)], ["terrain", range(2001, 2010)]]),
+    SAFETY_AUDIT2: mk([["hover", range(3001, 3010)], ["recovery", range(3001, 3010)], ["engine", range(3001, 3030)], ["terrain", range(3001, 3010)]]),
+});
 
 /** `pilot` over a set: { score (the mean), runs, crashed (flights that ended early, or engine flights that did not end standing), byKind: { hover, recovery, engine } (mean score each) }. */
 export function evaluate(pilot, set, opts = {}) {

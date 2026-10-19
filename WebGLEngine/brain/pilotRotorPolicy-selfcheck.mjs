@@ -225,7 +225,7 @@ console.log("\n7. THE TRAINING FUNCTIONS");
     const tr3 = PP.train({ seed: 5, iters: 6, sigma: 0.3, trainSet: one });
     ok("the search's seed is its own: seed 5 and seed 4 (same recipe, same flights) end at different weights", tr3.weights.some((v, i) => v !== tr.weights[i]) && tr3.history.length >= 2);
     const dflt = PP.evaluate(hw), tdz = PP.train({ seed: 1, iters: 0 });
-    ok("!! evaluate() AND train() DEFAULT TO THE TRAIN SET (28 scenarios: the hand pilot's -1.795278, pinned): the default is what a search sees, and the held-out and audit sets are never its default", near(dflt.score, -1.795278, 5e-6) && dflt.runs.length === 28 && near(tdz.trainScore, dflt.score, 1e-12) && tdz.history.length >= 1, `${dflt.score.toFixed(6)}`);
+    ok("!! evaluate() AND train() DEFAULT TO THE TRAIN SET (34 scenarios: the hand pilot's -1.683189, pinned): the default is what a search sees, and the held-out and audit sets are never its default", near(dflt.score, -1.683189, 5e-6) && dflt.runs.length === 34 && near(tdz.trainScore, dflt.score, 1e-12) && tdz.history.length >= 1, `${dflt.score.toFixed(6)}`);
     const start = PP.perturb(hw, 0.05, mulberry(8)), tz = PP.train({ seed: 4, iters: 0, start, trainSet: one });
     ok("a search with no iterations returns its start (the hand weights by default, a given `start` otherwise) at its own score", tz.weights.every((v, i) => v === start[i]) && PP.train({ seed: 1, iters: 0, trainSet: one }).weights.every((v, i) => v === hw[i]) && near(tz.trainScore, PP.evaluate(start, one).score, 1e-12));
     // prune: a vector that is the hand weights plus weights the flights never read goes back to the hand weights exactly
