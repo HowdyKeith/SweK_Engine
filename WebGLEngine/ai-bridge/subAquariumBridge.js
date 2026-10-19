@@ -47,8 +47,8 @@ function createBridge({ root = path.resolve(__dirname, ".."), now = () => Date.n
 
     const flyHealth = () => core.flyBrainHealth({ circuit: exists("vendor/male-cns/giant-fiber-circuit.json"), weights: exists("brain/pilotFlightWeightsDefault.json") });
     const fishHealth = () => {
-        const pilots = listJson("brain").filter((f) => /^pilotSubWeights.*Wip\.json$/.test(f)).map((f) => "brain/" + f), fishCircuit = listJson("vendor/zebrafish").length > 0, flyCircuit = exists("vendor/male-cns/giant-fiber-circuit.json");
-        return Object.assign(core.fishBrainHealth({ fishCircuit, flyCircuit, pilots }, reg.counts()), { circuit: { fish: fishCircuit, fly: flyCircuit }, pilots });
+        const pilots = listJson("brain").filter((f) => /^pilotSubWeights.*Wip\.json$/.test(f)).map((f) => "brain/" + f), fishPilots = pilots.filter((f) => { const j = read(f); return !!j && j.circuit === "fish"; }), fishCircuit = listJson("vendor/zebrafish").length > 0, flyCircuit = exists("vendor/male-cns/giant-fiber-circuit.json");
+        return Object.assign(core.fishBrainHealth({ fishCircuit, flyCircuit, pilots, fishPilots }, reg.counts()), { circuit: { fish: fishCircuit, fly: flyCircuit }, pilots, fishPilots });
     };
 
     function readBody(req) {
