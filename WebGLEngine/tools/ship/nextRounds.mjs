@@ -1729,35 +1729,37 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "rig-adapter-features-probe",
-        blocker: "HARDWARE",
-        // v4871+: BUILT -- headlessGpu.adapterCaps and the browser harness record features, ADAPTER_LIMITS and subgroup sizes per adapter;
-        // realGpuRun keeps them in the report and prints one line per adapter. Owed: the next rig run, which reads them on both GPUs.
-        what: "Record each adapter's WebGPU features and limits -- shader-f16, subgroups, packed 4x8 integer dot product -- in tools/ship/realGpuRun.mjs's report, natively and in Chrome.",
-        how: "One field in the report the rig already writes; no new run. The denoiser's rig reports (render/denoise-rig-*.json) record no features today, so nothing in the tree says whether either GPU exposes half precision or subgroups to WebGPU.",
-        why: "Every precision or subgroup round below depends on it, and guessing a feature that a driver does not expose would be a round spent finding that out.",
+        blocker: "CLOSED",
+        what: "DONE: built at v4872, first read on the rig at 303b020a (v4873's release record) -- render/denoise-rig-features-intel-gen9.json and render/denoise-rig-features-gtx1080.json, committed byte for byte (af773de9). EACH GPU OFFERS WHAT THE OTHER LACKS: gen-9 (driver 31.0.101.2137) exposes shader-f16 and NOT the subgroups feature, though its adapter info names a subgroup size of 16; the GTX 1080 (driver 32.0.15.8180) exposes subgroups at size 32 with subgroup-size-control, and NOT shader-f16. The same natively and in Chrome.",
+        how: "headlessGpu.adapterCaps natively and the same rule inside webgpuHarness's page; realGpuRun keeps both in its report. realGpuRun-selfcheck reads the two committed reports by code (the first-reading row, sabotaged F7-F9). Both GPUs: 32,768 B of workgroup storage and 1,024 invocations a workgroup. Packed 4x8 integer dot product is a WGSL language feature (navigator.gpu.wgslLanguageFeatures), not an adapter feature, so this probe does not record it -- said rather than left implied by the line above.",
+        why: "*** KEPT FOR THE SPLIT, BECAUSE IT DECIDES WHICH GPU EACH PRECISION OR SUBGROUP ROUND CAN RUN ON. *** denoise-f16-intel and denoise-subgroup-reduction come off their blocker, each for one GPU only. Both runs were green on every denoise gate; r18t ran at 1.077x r15 natively and 1.088x on the page at 1920 x 1080 on the 1080, inside the closed margin entry's 1.073-1.101x.",
     },
     {
         id: "denoise-f16-intel",
-        blocker: "UPSTREAM",
+        blocker: "OPEN",
+        // OFF ITS BLOCKER after v4873: the first features reading shows gen-9 exposing shader-f16 natively and in Chrome, and the 1080 not
+        // exposing it at all -- so "the GTX 1080 must never get this set" is now enforced by the device as well as by the plan.
         what: "A half-precision-arithmetic kernel set for the Intel gen-9 ONLY, chosen per adapter as section 63's page table and section 67's native table already choose.",
         how: "The scratch study measured f16 arithmetic throughout at 2.8e-3 (max relative) from the f64 network and a largest shift in any image's d of 3.3e-4 -- invisible to every verdict in the arc. Gen-9 runs f16 at twice its f32 rate. The GTX 1080's GP104 runs f16 at 1/64 of f32 -- general knowledge, not measured here -- so it must never get this set.",
         why: "The Intel's hidden layers sit at ~20% of its f32 peak (section 54); doubling the ALU rate is the one lever aimed at it.",
-        upstream: "rig-adapter-features-probe: whether gen-9's D3D12 driver exposes shader-f16 to WebGPU at all.",
+        upstream: "CLEARED -- rig-adapter-features-probe: gen-9's D3D12 driver (31.0.101.2137) exposes shader-f16 natively and in Chrome (render/denoise-rig-features-intel-gen9.json).",
     },
     {
         id: "denoise-subgroup-reduction",
-        blocker: "UPSTREAM",
+        blocker: "OPEN",
+        // OFF ITS BLOCKER after v4873, FOR THE GTX 1080 ONLY: the first features reading shows the 1080 exposing subgroups (size 32, with
+        // subgroup-size-control) natively and in Chrome, and gen-9 NOT exposing the feature on driver 31.0.101.2137, though its info names 16.
         what: "Kernels that share inputs or reduce sums across a subgroup -- the order the scratch study's tree sum stands in for (1.6e-7 from f64, as exact as today's path).",
         how: "Needs the subgroups feature, natively (Dawn over DXC's wave ops) and in Chrome; then the same restated key as Winograd.",
         why: "No multiply saved, so its gain is occupancy and shared-memory traffic -- uncertain enough that it waits behind Winograd.",
-        upstream: "rig-adapter-features-probe. The restated exactness key it also waited on held on hardware in section 86 (round 27: K0w natively and in Chrome on both GPUs).",
+        upstream: "CLEARED for the 1080 only -- rig-adapter-features-probe: subgroups at size 32 natively and in Chrome (render/denoise-rig-features-gtx1080.json); gen-9 does not expose the feature. The restated exactness key it also waited on held on hardware in section 86 (round 27: K0w natively and in Chrome on both GPUs).",
     },
     {
         id: "denoise-f16-storage",
         blocker: "OPEN",
         what: "Activations stored in half precision between layers, arithmetic in f32 -- half the memory traffic.",
         how: "Measured in the scratch study at 1.1e-3 from f64 and a d shift of 1.5e-4. Expected gain is small by arithmetic: the hidden layers move ~2 GB a 1080p frame on the 1080 (~33 GB/s against its 320) and ~1 GB a 1024 x 1024 pass on the Intel (~1.8 GB/s against ~34), so neither looks bandwidth-bound.",
-        why: "Logged so the estimate is checked before anybody spends a round on it; last in line of the precision levers.",
+        why: "Logged so the estimate is checked before anybody spends a round on it; last in line of the precision levers. Half-precision storage in WGSL needs shader-f16 too, which only gen-9 exposes (the first features reading, after v4873), so this is a gen-9 lever as well.",
     },
     {
         id: "denoise-smaller-network",

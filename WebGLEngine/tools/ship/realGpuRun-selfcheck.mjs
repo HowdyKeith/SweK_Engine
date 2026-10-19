@@ -14,6 +14,9 @@
 //   F5  webgpuHarness not handing ADAPTER_LIMITS into the page               -> 5 RED: the browser-caps row, and four live-harness rows -- the
 //       page's code throws on the missing list and its adapter reads as none, which is the row proving the in-page code runs at all
 //   F6  noteNativeAdapter writing no caps                                   -> 1 RED: the caps row
+//   F7  (the first reading) gen-9's native shader-f16 deleted from its committed report -> 1 RED: the first-reading row
+//   F8  the 1080's native report given shader-f16                           -> 1 RED: the first-reading row
+//   F9  the 1080's Chrome report without subgroups                          -> 1 RED: the first-reading row
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -306,6 +309,28 @@ console.log("\n6. ROUND 19 (section 66, v4851): NATIVE ADAPTERS NAMED, EACH GATE
         ok("  ...and the browser harness records the same caps for Chrome's adapter: ADAPTER_LIMITS handed into the page, features sorted, the caps inside the adapter it logs",
            /import \{[^}]*\bADAPTER_LIMITS\b[^}]*\} from "\.\/headlessGpu\.mjs"/.test(harness) && /\}, \[\.\.\.ADAPTER_LIMITS\]\)\.catch\(\(\) => null\)/.test(harness) &&
            /features: a\.features \? \[\.\.\.a\.features\]\.map\(String\)\.sort\(\) : null/.test(harness) && /isFallback: .*, caps \};/.test(harness));
+
+        // *** THE PROBE'S FIRST READING, ON BOTH GPUS, READ BY CODE OFF THE TWO COMMITTED RIG REPORTS. *** One realGpuRun --only denoise
+        // per GPU at 303b020a (v4873's release record), committed byte for byte at af773de9. EACH GPU OFFERS WHAT THE OTHER LACKS:
+        // gen-9 exposes shader-f16 and NOT the subgroups feature (its adapter info still names a subgroup size of 16); the 1080 exposes
+        // subgroups (size 32) and subgroup-size-control and NOT shader-f16. Natively and in Chrome alike, so the backlog's per-adapter
+        // tables can key on it. The rows the backlog moves on (denoise-f16-intel, denoise-subgroup-reduction) cite this one.
+        // SABOTAGED: gen-9's native shader-f16 deleted from its committed report -> 1 RED, this row; the 1080's native report given
+        // shader-f16 -> 1 RED; the 1080's Chrome report without subgroups -> 1 RED; each restored byte-identical (sha256).
+        const rig = (f) => JSON.parse(fs.readFileSync(path.join(ENG, "render", f), "utf8"));
+        const intel = rig("denoise-rig-features-intel-gen9.json"), nv = rig("denoise-rig-features-gtx1080.json");
+        const both = (r, re) => { const a = r.adapters.filter((x) => re.test(x.name) && x.software === false && x.caps); return a.length === 2 && a.some((x) => x.native) && a.some((x) => !x.native) ? a : null; };
+        const gi = both(intel, /^intel gen-9/), gn = both(nv, /^nvidia pascal/);
+        const has = (a, f) => a.every((x) => x.caps.features.includes(f)), lacks = (a, f) => a.every((x) => !x.caps.features.includes(f));
+        const size = (a, n) => a.every((x) => x.caps.subgroups && x.caps.subgroups.min === n && x.caps.subgroups.max === n);
+        const greenRun = (r) => /^303b020a /.test(r.commit) && r.only === "denoise" && r.gates.length === 3 && r.gates.every((g) => g.ok && g.software === false) && r.summary === "exact 1/1, quality 0/0, timing 2/2";
+        ok("!! *** the probe's first reading, off both committed rig reports: gen-9 offers shader-f16 and NOT subgroups; the 1080 offers subgroups (32) and NOT shader-f16 -- natively and in Chrome, every denoise gate green ***",
+           !!gi && !!gn && greenRun(intel) && greenRun(nv) &&
+           has(gi, "shader-f16") && lacks(gi, "subgroups") && size(gi, 16) &&
+           has(gn, "subgroups") && has(gn, "subgroup-size-control") && lacks(gn, "shader-f16") && size(gn, 32) &&
+           [...gi, ...gn].every((x) => x.caps.limits.maxComputeWorkgroupStorageSize === 32768 && x.caps.limits.maxComputeInvocationsPerWorkgroup === 1024),
+           gi && gn ? [["gen-9", gi], ["1080", gn]].map(([k, a]) => `${k}: shader-f16 ${has(a, "shader-f16") ? "yes" : "no"}, subgroups ${has(a, "subgroups") ? "yes" : "no"}, ` +
+                      `info size ${a[0].caps.subgroups ? a[0].caps.subgroups.min : "none"} (native and Chrome)`).join("; ") : "an adapter pair is missing from a committed report");
     }
 
     // a browser call that reached no device, beside the native one that did; and a native record that does not say its kind
