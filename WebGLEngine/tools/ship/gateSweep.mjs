@@ -9284,7 +9284,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         redOnArrival: Object.freeze([]),
         widened: Object.freeze([
             "ai-bridge/subAquariumBridge-selfcheck.mjs (waits for its three servers to close and exits through process.exitCode: Node 24 on Windows aborted with UV_HANDLE_CLOSING after 'all checks pass'; found by the rig, not reproducible on Linux)",
-            "tools/ship/assertionShape.mjs and vba/runtimeGap.mjs (census rows restated from the gates' own measurement after the BVH-CSG merge: one gate, two files)",
+            "the assertion-shape and runtime-gap census rows (restated from the gates' own measurement after the BVH-CSG merge: one gate, two files)",
         ]),
         verdict: "no gate of this round's own to sweep; the three merged BVH-CSG gates were run alone and are green (triArrangement, meshBoolean, meshBooleanBlast); the census gates assertionShape and runtimeGap were red on arrival by exactly the merged files and are restated, not registered. The Windows abort is read from the assertion and confirmed only by the rig's rerun of the fixed commit. NOT CLOSED: no fish circuit; the rig's slow-gate rule for four rotor gates.",
     }),
@@ -9677,7 +9677,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // RENUMBERED since523 -> since526 at this branch's second merge of main (v4834): main's v4832-v4834 took since523..since525 in the
     // same days, and in an object literal the later key silently wins (gateSweep-selfcheck's duplicate row). Ordinals only need to be distinct.
     // BVH-CSG round 9, at its merge onto main's v4831 -- ONE new gate file: physics/mesh/triArrangement-selfcheck.mjs, the per-triangle
-    // arrangement meshBoolean.mjs now tries first. The round is a branch round and wears no version, so `at` names the merge it closed at.
+    // arrangement the mesh boolean now tries first. The round is a branch round and wears no version, so `at` names the merge it closed at.
     since568: Object.freeze({
         at: "v4831+bvh-csg-round-9", swept: 1, green: 1, red: 0,
         added: Object.freeze([

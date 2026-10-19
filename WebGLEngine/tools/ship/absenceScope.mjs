@@ -317,6 +317,8 @@ export const INSCOPE_ARRIVALS_SINCE_V4435 = Object.freeze([
         why: "its gate (70ae8730), which builds the BVHs its fixtures are cut with" }),
     Object.freeze({ file: "physics/mesh/meshBooleanBlast-selfcheck.mjs", at: "v4778",
         why: "BVH-CSG round 7 (0ee1dda9): the head-to-head against meshCSG, building a MeshBVH per operand" }),
+    Object.freeze({ file: "physics/mesh/triArrangement-selfcheck.mjs", at: "v4878",
+        why: "BVH-CSG round 9 (the branch merged at v4878): the gate of the per-triangle arrangement, building a MeshBVH per operand and feeding the pair walk's candidates to the segment-bounded cutter" }),
     Object.freeze({ file: "physics/render/pathTracer.mjs", at: "v4778",
         why: "RTX round 4 (dc256881): the CPU reference tracer's intersect() grew a mesh branch that asks s.bvh.raycastFirst -- the oracle side of the concave-scene statistical gate" }),
     Object.freeze({ file: "physics/render/rtPipeline.mjs", at: "v4778",

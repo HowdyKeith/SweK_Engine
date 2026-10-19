@@ -269,10 +269,11 @@ export const LET_FINISH_V4573 = Object.freeze({
         // v4866 -- paintFields MOVED, DOWN: the ship rotation filed 16,770 (the first run of the slice, the box warming after a restart) and the table says 14,496. Three alone runs on a quiet box (load average 0.6), each filed by
         // `sweepRotation --gate tools/ship/paintFields-selfcheck.mjs --cap-s 300 --write` as it was taken: 13,123 / 12,885 / 12,435 (median 12,885, the last filed 12,435). 14.2% under the table's number and 25.8% under the rotation's,
         // which is the within-box spread this table's 10% bound sits inside. The rotation's 16,770 is kept in earlierRuns as what a first run on a warming box reads.
-        Object.freeze({ gate: "tools/ship/paintFields-selfcheck.mjs", table: 14496, now: 12435,
-            runs: Object.freeze([13123, 12885, 12435]),
-            earlierRuns: Object.freeze([Object.freeze([16770])]),
-            why: "14,496 at the cap pass (v4573); 14,803 filed before v4866; 16,770 from the v4866 rotation's first run of the slice; 12,435-13,123 across three quiet alone runs, the last filed 12,435 -- " +
+        // v4878 -- MOVED UP, WITH THE BOX: the 80-slot rotation filed 19,763; three runs on a quiet box, each filed as taken: 19,701 / 19,341 / 20,874 (median 19,701, filed 20,874 -- 5.6% from it). The v4866 minute is kept in earlierRuns.
+        Object.freeze({ gate: "tools/ship/paintFields-selfcheck.mjs", table: 14496, now: 20874,
+            runs: Object.freeze([19701, 19341, 20874]),
+            earlierRuns: Object.freeze([Object.freeze([16770]), Object.freeze([13123, 12885, 12435])]),
+            why: "14,496 at the cap pass (v4573); 14,803 filed before v4866; 16,770 from the v4866 rotation's first run of the slice; 12,435-13,123 across three quiet alone runs at v4866, then 19,341-20,874 at v4878 (filed 20,874) -- " +
                  "the same gate, 14% faster than the table on this box. Kept rather than re-taken: 14,496 is what the gate cost when the cap was hiding it.",
         }),
         // v4838 -- the record's new owner re-timed gateSelection, whose only reading had been the loaded one this table took
