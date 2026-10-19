@@ -586,7 +586,11 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
     // sees 10, and the three it wrongly keeps (es-box3d-fly3d.html, race-brain.html, server.html) name the body
     // inside a sentence -- a citation, a comment, a record -- while tools/bakeGfcTopology.mjs is a `joined`
     // (path.join(ROOT, "vendor", "male-cns", ...)) the substring rule never saw.
+    // v4875 -- 8 -> 10: ai-bridge/subAquariumBridge.js and its selfcheck name vendor/male-cns/giant-fiber-circuit.json to ask whether the fly circuit is on the disk (the FLY BRAIN chip's availability probe); the file is not read, it is
+    // looked for. A dependant by the substring rule's own test, the same kind as the three citations above, and listed because the fleet counts it.
     "male-cns": Object.freeze([
+        "ai-bridge/subAquariumBridge-selfcheck.mjs",
+        "ai-bridge/subAquariumBridge.js",
         "brain/gunnerPolicy-selfcheck.mjs",
         "fly-connectome.html",
         "tools/bakeGfcTopology.mjs",
