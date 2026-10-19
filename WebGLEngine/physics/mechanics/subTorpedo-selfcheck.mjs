@@ -1,6 +1,6 @@
 // WebGLEngine/physics/mechanics/subTorpedo-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node physics/mechanics/subTorpedo-selfcheck.mjs      (~3 s)
+// Run: node physics/mechanics/subTorpedo-selfcheck.mjs      (~0.2 s)
 //
 // THE TORPEDO HELD TO ITS CLOSED FORMS. physics/mechanics/subTorpedo.mjs is a point body with a cone seeker, a homing law, an arming distance and a proximity fuse; this gate holds each to the number a pencil gives:
 //   1  THE DAMAGE   100 inside 3 m, 40 at 8 m, linear between (70 at 5.5 m), none beyond 8 m, and none for a NaN

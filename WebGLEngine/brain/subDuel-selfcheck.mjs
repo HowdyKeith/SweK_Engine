@@ -1,6 +1,6 @@
 // WebGLEngine/brain/subDuel-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/subDuel-selfcheck.mjs      (~20 s)
+// Run: node brain/subDuel-selfcheck.mjs      (~7.5 s)
 //
 // THE ARENA HELD TO ITS RULES. brain/subDuel.mjs fights two boats with sonar and torpedoes; this gate holds the ARENA, not the tactician: spy tacticians record exactly what a boat is told, scripted ones do exactly what the
 // row needs, and every number is recomputed here.
@@ -149,6 +149,9 @@ console.log("\n9. THE SETS");
     ok("evaluate() counts wins, losses and draws (they sum to the set), and describeEval quotes the four kinds and the W/L/D", tr.wins + tr.losses + tr.draws === 24 && /hunter/.test(D.describeEval(tr)) && /W .* L .* D/.test(D.describeEval(tr)));
     // AUDIT_SET is deliberately NOT evaluated here: it is for a champion, once.
 }
+
+console.log("\n12. THE RULES AS LITERALS (the constants that make a score a score)");
+ok("!! a duel is 240 s of 2 Hz looks (15 ticks, boat B staggered by 7 ticks), four torpedoes with a 300-tick reload, 100 hp, and a score of (dealt - taken) / 100 plus a 0.5 kill bonus and up to 0.5 speed bonus -- pinned as literals here, not read back from the module", D.SECONDS === 240 && D.LOOK_EVERY === 15 && D.STAGGER === 7 && D.AMMO === 4 && D.RELOAD_TICKS === 300 && D.HP === 100 && D.KILL_BONUS === 0.5 && D.SPEED_BONUS === 0.5);
 
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 process.exit(fails ? 1 : 0);

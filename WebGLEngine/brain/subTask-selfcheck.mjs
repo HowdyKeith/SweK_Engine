@@ -1,6 +1,6 @@
 // WebGLEngine/brain/subTask-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/subTask-selfcheck.mjs      (~10 s)
+// Run: node brain/subTask-selfcheck.mjs      (~1.5 s)
 //
 // THE SUBMARINE'S JOB, HELD TO ITS OWN WORDS. brain/subTask.mjs is the one task the PD autopilot and the neural pilot are both graded on; this gate holds the task and not the pilots:
 //

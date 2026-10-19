@@ -96,9 +96,15 @@ console.log(`\n  ${pure} gates assume NOTHING outside their own arithmetic.\n`);
 {
     const net = [...byGate.entries()].filter(([, h]) => h.includes("net")).map(([f]) => f);
     const proc = [...byGate.entries()].filter(([, h]) => h.includes("proc")).length;
+    // v4875 -- A BOUND CROSSED, AND THE ANSWER IS THE v4332 ONE: A NAMED REGISTER, NOT 20 -> 21. ai-bridge/subAquariumBridge-selfcheck.mjs is the twentieth gate to call fetch, but its fetch goes to ITS OWN server on
+    // 127.0.0.1 (two real bridges on ephemeral loopback ports: a peer sends a sub to a peer), which is the one network use that is not "red on an aeroplane" -- an aeroplane has a loopback. It is named here, held to
+    // that claim by the row below (it must serve itself on 127.0.0.1), and EXCLUDED from the count of gates that reach out; the bound on the others stays at 20. A second loopback gate adds itself here in its own commit.
+    const LOOPBACK_ONLY = Object.freeze(["ai-bridge/subAquariumBridge-selfcheck.mjs"]);
+    const reachOut = net.filter((f) => !LOOPBACK_ONLY.includes(f));
     ok("!! very few gates reach the NETWORK, which is what makes the suite runnable anywhere",
-       net.length < 20,
-       `${net.length} of ${gates.length}. A GATE THAT NEEDS THE INTERNET IS A GATE THAT IS RED ON AN AEROPLANE, and worse, one whose GREEN depends on a stranger's server still saying what it said.`);
+       reachOut.length < 20,
+       `${reachOut.length} of ${gates.length} (${net.length} call fetch; ${net.length - reachOut.length} of them only to their own loopback server). A GATE THAT NEEDS THE INTERNET IS A GATE THAT IS RED ON AN AEROPLANE, and worse, one whose GREEN depends on a stranger's server still saying what it said.`);
+    ok("!! every gate in LOOPBACK_ONLY really is a fetch gate AND serves itself on 127.0.0.1 (a listen on the loopback address, and no url it dials that is not built from that server's own port)", LOOPBACK_ONLY.every((f) => net.includes(f) && (() => { const t = fs.readFileSync(path.join(ENG, f), "utf8"); return /127\.0\.0\.1/.test(t) && /\.listen\s*\(/.test(t) && !/\bfetch\s*\(\s*["'`]https?:\/\/(?!127\.0\.0\.1|localhost)/.test(t); })()), LOOPBACK_ONLY.join(", "));
     ok("...and few spawn a process", proc < 40,
        `${proc} use child_process. Each assumes a binary exists on THIS machine -- the shape behind every "works on my rig" report.`);
     // *** v4332 -- THIS WAS A BOUND AND IT HAS BECOME A REGISTER, WHICH IS v4258'S LESSON APPLIED HERE. ***
@@ -128,6 +134,9 @@ console.log(`\n  ${pure} gates assume NOTHING outside their own arithmetic.\n`);
         // ('texture-formats-tier2' decides what three's test should do) and dispatches the barrier kernel raw, in a page served by
         // webgpuHarness; with no WebGPU it SKIPS section 2 by name and still holds the files and the record.
         "tools/ship/threeTextureBarrier-selfcheck.mjs",
+        // v4875 -- 23 -> 24: tools/ship/subAquariumPage-selfcheck.mjs loads sub-aquarium.html in headless Chromium against the real bridge and reads the pixels of the page's two 2D canvases (the plan and the side view) to
+        // prove they are drawn, not blank; it needs a canvas context only where a browser exists, and SKIPS BY NAME without one.
+        "tools/ship/subAquariumPage-selfcheck.mjs",
     ]);
     const gpuNow = [...byGate.entries()].filter(([, h]) => h.includes("gpu")).map(([f]) => f).sort();
     const arrived = gpuNow.filter((g) => !GPU_GATES.includes(g));

@@ -1,6 +1,6 @@
 // WebGLEngine/brain/missionTask-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/missionTask-selfcheck.mjs      (~8 s)
+// Run: node brain/missionTask-selfcheck.mjs      (~4 s)
 //
 // THE SUBMARINE'S MISSIONS HELD TO THEIR OWN WORDS. brain/missionTask.mjs asks a pilot to follow a rolling seabed from two noisy sensors, or to visit three waypoints; this gate holds the task, not the pilots:
 //   1  DETERMINISM  a kind and a seed make the same scenario (frozen); a bad kind is refused by name; a mission dive is deterministic
@@ -114,6 +114,15 @@ console.log("\n6. THE SETS");
     const ev = (s) => M.evaluate(A.pilot(), s), tr = ev(M.TRAIN_SET), ho = ev(M.HELD_OUT_SET), bl = ev(M.BASELINE_SET), pin = (r, v) => Math.abs(r.score - v) <= 5e-4 && r.crashed === 0;
     ok("!! the AUTOPILOT's score is PINNED on TRAIN, HELD_OUT and BASELINE (and it ends none of the 88 dives early)", pin(tr, -0.7502) && pin(ho, -0.7276) && pin(bl, -0.7520), `${tr.score.toFixed(4)} ${ho.score.toFixed(4)} ${bl.score.toFixed(4)}`);
     ok("describeEval quotes the four kinds and the early-end count", /terrain/.test(M.describeEval(tr)) && /waypoint-current/.test(M.describeEval(tr)) && /0 ended early/.test(M.describeEval(tr)));
+}
+
+console.log("\n12. THE NAMED PIECES (KINDS, REACH, SONAR_RANGE)");
+{
+    const model = S.createSubModel(), wp = { x: 100, y: 50, depth: 30 }, at = (dx, dy, dz) => S.createState({ pos: [wp.x + dx, wp.y + dy, -(wp.depth + dz)], depth: wp.depth + dz, model });
+    ok("!! KINDS is the four missions, frozen, and each builds a scenario whose own kind it reports", Object.isFrozen(M.KINDS) && M.KINDS.join() === "terrain,terrain-current,waypoint,waypoint-current" && M.KINDS.every((k) => M.scenario(3, k).kind === k));
+    ok("!! a waypoint is REACHED within 10 m on the plane and 4 m in depth, no further: 9.9 m and 3.9 m are in, 10.1 m and 4.1 m are out (REACH is the frozen pair 10 / 4, pinned as literals)", M.REACH.horizontal === 10 && M.REACH.depth === 4 && Object.isFrozen(M.REACH) && M.reached(at(9.9, 0, 0), wp) && M.reached(at(0, 0, 3.9), wp) && !M.reached(at(10.1, 0, 0), wp) && !M.reached(at(0, 0, 4.1), wp));
+    const sc = M.scenario(5, "terrain"), st = S.createState({ pos: [40, 30, -25], depth: 25, heading: 0.3, model }), r = M.sense(sc, st, 0, model), a = S.attitude(st), ahead = M.seabedAt(sc.terrain, 40 + M.SONAR_RANGE * Math.cos(a.heading), 30 - M.SONAR_RANGE * Math.sin(a.heading));
+    ok("!! the forward sounder reads the seabed SONAR_RANGE = 20 m ahead along the heading, to within its noise (not the floor under the hull)", M.SONAR_RANGE === 20 && Math.abs(r.sonar - ahead) <= 3 * M.SONAR_NOISE);
 }
 
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");

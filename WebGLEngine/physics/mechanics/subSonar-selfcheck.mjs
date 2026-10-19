@@ -1,6 +1,6 @@
 // WebGLEngine/physics/mechanics/subSonar-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node physics/mechanics/subSonar-selfcheck.mjs      (~1 s)
+// Run: node physics/mechanics/subSonar-selfcheck.mjs      (~0.1 s)
 //
 // THE SONAR BUDGET HELD TO ITS CLOSED FORMS, ITS SIGNS AND ITS TRADE-OFFS. physics/mechanics/subSonar.mjs is decibel arithmetic plus geometry; this gate holds each term to the number a pencil gives:
 //   1  THE TERMS     sourceLevel is 100 at <= 0.5 m/s and +6.02 dB per doubling above; selfNoise the same from 50; noiseLevel is the POWER sum (66 and 66 make 69.01); transmissionLoss is 20 log10 r + 0.001 r (r < 1 read as 1);

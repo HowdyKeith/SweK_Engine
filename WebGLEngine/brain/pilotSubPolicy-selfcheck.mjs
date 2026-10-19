@@ -120,5 +120,14 @@ console.log("\n5. TRAINING");
     ok("the report says real numbers and names the circuit: 34 neurons, 313 synapses, 963 weights", rl.length === 2 && rl.every((l) => !/NaN|undefined/.test(l)) && /34 neurons/.test(rl[0]) && /963 weights/.test(rl[0]));
 }
 
+console.log("\n12. THE NAMED PIECES (featuresFrom, mulberry)");
+{
+    const st = S.createState({ depth: 24, speed: 2.2, heading: 0.1, pitch: 0.04, bank: 0.03 }), tg = { depth: 30, heading: 0.5, speed: 2.5 };
+    const viaGuidance = P.featuresFrom(A.guidance(st, tg, [0.1, 0, 0])), direct = P.features(st, tg, [0.1, 0, 0]);
+    ok("!! featuresFrom(guidance) IS features(state, target, current): the same fourteen numbers whichever door the pilot comes in by", viaGuidance.length === P.FEATURES && P.FEATURES === 14 && viaGuidance.every((v, i) => v === direct[i]) && viaGuidance.every(Number.isFinite));
+    const a = P.mulberry(7), b = P.mulberry(7), c = P.mulberry(8), sa = Array.from({ length: 6 }, () => a()), sb = Array.from({ length: 6 }, () => b()), sc = Array.from({ length: 6 }, () => c());
+    ok("!! mulberry(seed) is the deterministic generator every search here draws from: the same seed gives the same six numbers, another seed other ones, all in [0, 1)", sa.join() === sb.join() && sa.join() !== sc.join() && sa.every((v) => v >= 0 && v < 1) && new Set(sa).size === 6);
+}
+
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 process.exit(fails ? 1 : 0);

@@ -19,7 +19,7 @@ const arg = (f, d = null) => { const i = process.argv.indexOf(f); return i === -
 const range = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
 // base 4000 is the first mining range (the long champion); a second round passes --base 8000 (taken so far: 3000-3599 and 6000-6511 audits, 4000-4299 mining, 5000-5179 evaluation sample)
 const BASE = process.argv.includes("--base") ? +process.argv[process.argv.indexOf("--base") + 1] : 4000;
-export const MINING = [["nominal", range(BASE, BASE + 99)], ["recovery", range(BASE, BASE + 299)], ["current", range(BASE, BASE + 99)]].flatMap(([k, ss]) => ss.map((s) => ({ kind: k, seed: s })));
+const MINING = [["nominal", range(BASE, BASE + 99)], ["recovery", range(BASE, BASE + 299)], ["current", range(BASE, BASE + 99)]].flatMap(([k, ss]) => ss.map((s) => ({ kind: k, seed: s })));
 const E = S.EXPLORER, VARIANTS = [{}, { munk: 3000 }, { munk: 0 }, { finArea: E.finArea * 0.6 }, { bg: E.bg * 2.5 }];
 const MODELS = VARIANTS.map((d) => S.createSubModel(Object.freeze({ ...E, ...d }))), MUNK3 = MODELS[1];
 const opts = (m) => ({ model: m, actuators: ACTUATORS });

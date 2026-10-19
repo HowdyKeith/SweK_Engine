@@ -20,7 +20,7 @@ const load = (f) => Float32Array.from(JSON.parse(fs.readFileSync(f, "utf8")).wei
 const HULLS = [...H.TRAINED, ...H.WIDE], HARD = new Set(["munk5", "awkward"]), WT = HULLS.map((h) => (HARD.has(h) ? hard : 1)), WSUM = WT.reduce((a, b) => a + b, 0);
 const MODELS = HULLS.map(H.model), MUNK3 = MODELS[HULLS.indexOf("munk3")], opts = (m) => ({ model: m, actuators: ACTUATORS });
 const trainSet = T.TRAIN_SET.filter((_, i) => i % 2 === 0), tail = arg("--tail").split(",").flatMap((f) => JSON.parse(fs.readFileSync(f, "utf8")).tail).map((x) => T.scenario(x.seed, x.kind));
-export const wide = (w) => MODELS.reduce((a, m, i) => a + WT[i] * P.evaluate(w, trainSet, opts(m)).score, 0) / WSUM, tailScore = (w) => P.evaluate(w, tail, opts(MUNK3)).score;
+const wide = (w) => MODELS.reduce((a, m, i) => a + WT[i] * P.evaluate(w, trainSet, opts(m)).score, 0) / WSUM, tailScore = (w) => P.evaluate(w, tail, opts(MUNK3)).score;
 const score = (w) => wide(w) + tailW * tailScore(w);
 const rng = mulberry(seed), t0 = Date.now();
 let best = load(from), bestScore = score(best), improved = 0;

@@ -1,6 +1,6 @@
 // WebGLEngine/physics/mechanics/subModel6dof-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node physics/mechanics/subModel6dof-selfcheck.mjs      (~2 s)
+// Run: node physics/mechanics/subModel6dof-selfcheck.mjs      (~0.6 s)
 //
 // THE SUBMARINE HELD TO CLOSED FORMS, SIGNS AND ENDS. physics/mechanics/subModel6dof.mjs is a rigid body in water: this gate holds each force to the number a pencil gives and each control to the direction a pilot means.
 //

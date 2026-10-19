@@ -161,5 +161,12 @@ console.log("\n10. THE HULL");
     ok("!! even on the extreme Munk x5 hull a five-minute swim leaves a finite state in the tank (the boat may be lost and respawned, never NaN)", Number.isFinite(sn.x) && Number.isFinite(sn.y) && Number.isFinite(sn.depth));
 }
 
+console.log("\n11. THE NAMED CONSTANTS (DEPTH_MIN, DEPTH_MAX, TRAIL_EVERY)");
+{
+    const t = A.createTank(); t.sync([entry("trail", { pilot: "autopilot" })]); run(t, 30);
+    const n = t.snapshot()[0].trail.length;
+    ok("!! the swimming band is 14..40 m (DEPTH_MIN, DEPTH_MAX) and a trail point is laid at the first 30 Hz tick at or past every 0.5 s (TRAIL_EVERY; 16 ticks = 0.533 s, so thirty seconds of swimming leave 56 points, not 60 -- said here rather than rounded away)", A.DEPTH_MIN === 14 && A.DEPTH_MAX === 40 && A.TRAIL_EVERY === 0.5 && n >= 54 && n <= 58, `${n} points`);
+}
+
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 process.exit(fails ? 1 : 0);

@@ -92,5 +92,13 @@ console.log("\n5. THE SETS");
     ok("!! it ends none of the 88 dives on TRAIN, HELD_OUT and BASELINE early (it is the baseline: it must finish the job it is graded on)", r.every((x) => x.crashed === 0) && r.reduce((n, x) => n + x.runs.length, 0) === 88, r.map((x) => x.score.toFixed(4)).join(" "));
 }
 
+console.log("\n6. THE NAMED PIECES (wrapAngle, TARGET_DEFAULT, defaultModel)");
+{
+    const w = A.wrapAngle;
+    ok("!! wrapAngle folds any angle into (-pi, pi]: 3.5 -> 3.5 - 2pi, -3.5 -> -3.5 + 2pi, small angles unchanged to rounding (the fold goes through atan2), and every multiple of 0.1 rad from -20 to 20 lands in range and is congruent to its input mod 2pi", Math.abs(w(3.5) - (3.5 - 2 * Math.PI)) < 1e-12 && Math.abs(w(-3.5) - (-3.5 + 2 * Math.PI)) < 1e-12 && Math.abs(w(0.2) - 0.2) < 1e-15 && Array.from({ length: 401 }, (_, i) => -20 + i * 0.1).every((a) => { const r = w(a); return r > -Math.PI - 1e-12 && r <= Math.PI + 1e-12 && Math.abs(Math.sin(r) - Math.sin(a)) < 1e-9 && Math.abs(Math.cos(r) - Math.cos(a)) < 1e-9; }));
+    ok("!! TARGET_DEFAULT is the frozen target the autopilot holds when none is given (30 m, heading 0, 2.5 m/s), and decide(state) with no target IS decide(state, TARGET_DEFAULT)", Object.isFrozen(A.TARGET_DEFAULT) && A.TARGET_DEFAULT.depth === 30 && A.TARGET_DEFAULT.heading === 0 && A.TARGET_DEFAULT.speed === 2.5 && JSON.stringify(A.decide(S.createState({ depth: 25, speed: 2 }))) === JSON.stringify(A.decide(S.createState({ depth: 25, speed: 2 }), A.TARGET_DEFAULT)));
+    ok("!! defaultModel() is built once (the same object every call) and is the EXPLORER the trainer uses", A.defaultModel() === A.defaultModel() && A.defaultModel().spec.name === "explorer" && A.defaultModel().mass === 6000);
+}
+
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 process.exit(fails ? 1 : 0);

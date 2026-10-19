@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/subAquariumPage-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/subAquariumPage-selfcheck.mjs      (~15 s with a browser; sections 1-2 alone ~1 s)
+// Run: node tools/ship/subAquariumPage-selfcheck.mjs      (~5 s with a browser; sections 1-2 alone ~1 s)
 //
 // sub-aquarium.html IS THE PLACE A PEER'S SUB ARRIVES. A page that displays names and addresses from the network is exactly where "data became markup" happens, so this gate does two things: it reads the page's SOURCE for the
 // rules it must keep, and it DRIVES the page in headless Chromium against the REAL bridge (ai-bridge/subAquariumBridge.js) behind a real HTTP server, with a hostile sub in the tank.

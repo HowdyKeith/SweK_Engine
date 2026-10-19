@@ -1,6 +1,6 @@
 // WebGLEngine/ai-bridge/subAquariumBridge-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node ai-bridge/subAquariumBridge-selfcheck.mjs      (~1 s)
+// Run: node ai-bridge/subAquariumBridge-selfcheck.mjs      (~0.4 s)
 //
 // THE ROUTES HELD TO THEIR TRUST. ai-bridge/subAquariumBridge.js is driven here with fake requests and a fake peer; nothing listens on a port:
 //   1  ROUTING     owns() is exactly the seven routes (query strings ignored); a wrong method is 405; an unknown /subaquarium path under a known router is 404

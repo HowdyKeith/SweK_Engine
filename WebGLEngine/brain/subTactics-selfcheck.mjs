@@ -1,6 +1,6 @@
 // WebGLEngine/brain/subTactics-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/subTactics-selfcheck.mjs      (~1 s)
+// Run: node brain/subTactics-selfcheck.mjs      (~0.1 s)
 //
 // THE TACTICIAN HELD TO ITS OWN STATE MACHINE. brain/subTactics.mjs decides, from sonar alone, where to go, when to ping and when to fire; this gate feeds it synthetic observations and holds each answer to the closed form:
 //   1  THETA      the defaults are frozen and inside their bounds; clampTheta fills a missing or NaN name with the default, clips to the bounds and rounds pingAfter; the vector round-trips in name order
@@ -133,6 +133,14 @@ console.log("\n7. SCRIPTED");
     const a = TA.makeTactician(), b = TA.makeTactician(); a(obs(0, { contacts: [boat(0.9)] }));
     ok("!! two tacticians do not share memory: after one tracks a contact the other still searches", b(obs(1, {})).speed === TH.searchSpeed && a(obs(1, {})).speed === TH.trackSpeed);
     ok("the tactician is a pure function of its observations: the same sequence gives the same answers, and it edits nothing it is handed", (() => { const run = () => { const f = TA.makeTactician(), o = Object.freeze(obs(3, { contacts: Object.freeze([Object.freeze(boat(0.2))]) })); return JSON.stringify([f(obs(0)), f(o), f(obs(9, { echoes: [{ bearing: 0, elevation: 0, range: 200 }] }))]); }; return run() === run(); })());
+}
+
+console.log("\n12. THE NAMED PIECES (SCRIPTED_KINDS, evadeOrder)");
+{
+    ok("!! SCRIPTED_KINDS is the four drones, frozen, in this order, and every one builds a scripted tactician while an unknown one is refused", Object.isFrozen(TA.SCRIPTED_KINDS) && TA.SCRIPTED_KINDS.join() === "patrol,quiet,evader,hunter" && TA.SCRIPTED_KINDS.every((k) => typeof TA.scripted(k, {}) === "function" || typeof TA.scripted(k, {}) === "object") && (() => { try { TA.scripted("nope", {}); return false; } catch { return true; } })());
+    const th = TA.clampTheta(TA.THETA_DEFAULT), s = { depth: 20, heading: 0.4 };
+    const right = TA.evadeOrder(s, { bearing: 0.7 }, th), left = TA.evadeOrder(s, { bearing: -0.7 }, th), deep = TA.evadeOrder({ depth: 35, heading: 0 }, { bearing: 0.1 }, th);
+    ok("!! evadeOrder turns evadeTurn AWAY from the side the torpedo is on (a torpedo to the right: the heading falls; to the left: it rises), and changes depth by 12 m away from the middle band (20 m goes to 32, 35 m goes to 23), clamped into the legal depths", Math.abs(right.heading - (0.4 + 0.7 - th.evadeTurn)) < 1e-9 && Math.abs(left.heading - (0.4 - 0.7 + th.evadeTurn)) < 1e-9 && right.depth === 32 && deep.depth === 23);
 }
 
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
