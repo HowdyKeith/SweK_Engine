@@ -279,3 +279,50 @@ Verdict: QUALIFIES on BOTH hulls. No dive ended that the autopilot completes, no
 ### The tail pilot is an aquarium seed
 
 `ai-bridge/subAquariumCore.js` SEED_RECIPES gains **"Explorer tail pilot"** (weights `brain/pilotSubWeightsRobustTail2Wip.json`, seed 9400 -- the one audited on both hulls; theta `subTacticsThetaSearchPingWip.json`). "Offer my subs" now offers FIVE (PD autopilot + four trained pilots); the gates that pinned four were updated to five (core, bridge, page), and a new core row pins that the tail sub is built bit for bit from the Tail2 file and not from the long one (A33, A34 red). The FISH BRAIN chip's pilot count is the number of `brain/pilotSubWeights*Wip.json` files (6 today).
+
+## Audit of the tail pilot on the other three hulls (seed 9400; base 10000, SPENT for 9400 on these hulls)
+
+`tools/subHulls.mjs` names the hulls; `tools/auditSubChampion.mjs --hulls munk0,fins06,righting25 --base 10000`. Actuator limits, champion / PD autopilot:
+
+| hull | SAFETY_AUDIT (500) | better / worse | newly ended | worst-5% | AUDIT (36) | worst-5% |
+|---|---|---|---|---|---|---|
+| Munk 0 | -0.644 / -0.776 | 393 / 88 | 0 | -1.24 / -1.73 | -0.617 / -0.681 | -1.32 / -1.35 |
+| fins x0.6 | -0.499 / -0.610 | 420 / 43 | 0 | -1.00 / -1.36 | -0.468 / -0.523 | -0.99 / -1.09 |
+| righting x2.5 | -0.486 / -0.693 | 437 / 45 | 0 | -0.97 / -1.65 | -0.468 / -0.574 | -1.01 / -1.14 |
+
+QUALIFIES on all three (no early ends, none newly ended, better mean and better tail). With the earlier audit that is all five training hulls.
+
+## Hulls the pilot was never trained on (SAFETY_POOL, 500 dives, actuator limits; champion / autopilot)
+
+| hull | mean | better-worse | newly ended | early ends (c/a) | worst-5% |
+|---|---|---|---|---|---|
+| light (0.7x mass) | -0.452 / -0.522 | 358-90 | 0 | 0/0 | -0.89 / -1.15 |
+| heavy (1.4x mass) | -0.544 / -0.657 | 382-78 | 0 | 0/0 | -1.06 / -1.35 |
+| draggy | -0.502 / -0.708 | 499-0 | 0 | 0/0 | -0.97 / -1.34 |
+| tiny fins (0.4x) | -0.521 / -0.677 | 472-15 | 0 | 0/0 | -1.07 / -1.46 |
+| weak righting (0.4x) | -0.500 / -0.562 | 340-105 | 0 | 0/0 | -1.00 / -1.17 |
+| Munk x5 | -2.663 / -2.764 | 272-218 | **14** | 20/16 | -5.35 / -5.73 |
+| awkward (heavy + small fins + weak righting + Munk x2.5) | -2.508 / -2.392 | 182-314 | **26** | 35/13 | -5.96 / -5.26 |
+
+The pilot transfers to five unseen hulls without training. It fails on the two extreme ones, where the PD autopilot fails too (16 and 13 early ends of 500): those are the hulls to train on (`tools/trainSubWide.mjs`: the objective over all twelve hulls, the two hard hulls optionally weighted, the Munk x3 tail kept as a term).
+
+## Duels flown by the tail pilot (the tuned tactician 5100, actuator limits, 40 fresh duels: seeds 3001-3010 x 4 drones)
+
+| motion pilot of side A | score | patrol | quiet | evader | hunter | W / L / D |
+|---|---|---|---|---|---|---|
+| PD autopilot | 1.651 | 1.894 | 1.298 | 1.882 | 1.529 | 36 / 1 / 3 |
+| **tail pilot (9400)** | **1.733** | 1.889 | **1.634** | 1.882 | 1.526 | 38 / 1 / 1 |
+| long (9201) | 1.604 | 1.890 | 1.116 | 1.882 | 1.529 | 35 / 1 / 4 |
+
+Same tactician, same drones; the difference is the hull handling. The gain is almost all against the quiet drone (1.30 -> 1.63): a quiet target is found by getting the geometry right at low speed, which the PD autopilot does worst. Not a statistically powered result (40 duels, 10 per drone); the AUDIT_SET of the duel was NOT read.
+
+## Stale gates the numbered ship has to deal with (all from NEW FILES; none from a regression)
+
+| gate | what it says | the fix |
+|---|---|---|
+| `instruments` | knowledge index stale by the new files | `node tools/ship/buildKnowledgeIndex.mjs` |
+| `launchIndex` | 571 shipped vs 572 computed (derived at ship time) | regenerate at ship |
+| `runtimeGap` | the census no longer matches the file count (4748 -> 4784) | re-derive the census (the module that records it names the command) |
+| `physicsReach` | 11 graded physics modules have no door (limit 7): `subModel6dof`, `subActuators`, `subSonar`, `subTorpedo` and their neighbours | give them a door (an instruments row or a page link) or move the baseline ON PURPOSE; the aquarium page already imports `subModel6dof` |
+| `orphanScan` | `brain/missionTask.mjs` (and `tools/trainSubWide.mjs` until it is mentioned) unreachable | wire missionTask into a page or register it in DIRECTORY_LOADED with a reason; these tools are run by hand: `tools/trainSubRobust.mjs`, `trainSubTail.mjs`, `trainSubWide.mjs`, `auditSubChampion.mjs`, `subHulls.mjs` |
+| `bridgeCensus`, `pageSections` | pass now; `sub-aquarium.html` sits in UNPLACED until a drawer is chosen | Keith's call |

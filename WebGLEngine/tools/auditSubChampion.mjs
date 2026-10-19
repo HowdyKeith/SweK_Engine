@@ -13,6 +13,7 @@ import * as AS from "../brain/autopilotSub.mjs";
 import * as T from "../brain/subTask.mjs";
 import * as S from "../physics/mechanics/subModel6dof.mjs";
 import { ACTUATORS } from "../physics/mechanics/subActuators.mjs";
+import * as H from "./subHulls.mjs";
 
 const range = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
 const mk = (spec) => spec.flatMap(([kind, seeds]) => seeds.map((s) => T.scenario(s, kind)));
@@ -23,13 +24,13 @@ export const auditSets = (base = 3000) => ({
 });
 export const SAFETY_AUDIT2_SET = auditSets(3000).safety, AUDIT2_SET = auditSets(3000).audit;
 
-const [file, mode] = process.argv.slice(2), baseI = process.argv.indexOf("--base"), BASE = baseI === -1 ? 3000 : +process.argv[baseI + 1], SETS = auditSets(BASE);
+const [file, mode] = process.argv.slice(2), baseI = process.argv.indexOf("--base"), BASE = baseI === -1 ? 3000 : +process.argv[baseI + 1], SETS = auditSets(BASE), hullI = process.argv.indexOf("--hulls"), HULLS = hullI === -1 ? ["nominal", "munk3"] : process.argv[hullI + 1].split(",");   // --hulls a,b,c: names from tools/subHulls.mjs
 if (process.argv[1] && process.argv[1].endsWith("auditSubChampion.mjs")) {
     if (!file || !["pool", "audit"].includes(mode)) { console.error("usage: node tools/auditSubChampion.mjs <weights.json> pool|audit [--base N]"); process.exit(2); }
     const w = Float32Array.from(JSON.parse(fs.readFileSync(file, "utf8")).weights), E = S.EXPLORER;
     const sets = mode === "pool" ? [["SAFETY_POOL_SET", T.SAFETY_POOL_SET]] : [[`SAFETY_AUDIT(${BASE})`, SETS.safety], [`AUDIT(${BASE + 500})`, SETS.audit]];
-    for (const [hull, d] of [["nominal EXPLORER", {}], ["Munk x3 hull", { munk: 3000 }]]) {
-        const model = S.createSubModel(Object.freeze({ ...E, ...d })), opts = { model, actuators: ACTUATORS };
+    for (const hull of HULLS) {
+        const model = H.model(hull), opts = { model, actuators: ACTUATORS };
         for (const [name, set] of sets) {
             const r = T.evaluate(P.pilotFor(w), set, opts), ref = T.evaluate(AS.pilot(), set, opts), c = T.compareRuns(r, ref);
             console.log(`${name.padEnd(18)} ${hull.padEnd(17)} n=${String(c.n).padStart(3)}  champion ${c.mean[0].toFixed(4)} vs autopilot ${c.mean[1].toFixed(4)}   better/worse ${c.better}/${c.worse}   ended-that-autopilot-completed ${c.newlyEnded}   early ${c.early[0]}/${c.early[1]}   worst-5% ${c.tail5[0].toFixed(3)}/${c.tail5[1].toFixed(3)}`);
