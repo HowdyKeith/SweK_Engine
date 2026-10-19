@@ -1,6 +1,6 @@
 // WebGLEngine/brain/spaceArena-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/spaceArena-selfcheck.mjs      (~2 s)
+// Run: node brain/spaceArena-selfcheck.mjs      (~3 s)
 //
 // THE STEPPABLE SPACE BATTLE, HELD TO THE PAGE'S OWN ARITHMETIC AND TO ITS OWN. brain/spaceArena.mjs is es-box3d-6dof.html's fight with the loop turned inside out and a capital ship in it. Each row builds a small world whose answer can be worked out by hand:
 //
