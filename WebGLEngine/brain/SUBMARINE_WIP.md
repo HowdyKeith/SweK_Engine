@@ -275,3 +275,7 @@ Actuator limits on, champion vs PD autopilot:
 | AUDIT (36) | Munk x3 | -0.388 / -0.480 | 32 / 3 | 0 | 0 / 0 | -1.11 / -1.35 |
 
 Verdict: QUALIFIES on BOTH hulls. No dive ended that the autopilot completes, no early ends, better mean and a better worst-5% tail on nominal and on Munk x3. The Munk x3 weakness of the long champion is closed on this audit. Caveats: the nominal-hull margin is smaller than for earlier champions (better on 389/500 against 496/500 for 9201; the price of the tail training), the other three hulls (Munk 0, fins x0.6, righting x2.5) were not part of this audit (their held-out means: -0.580 / -0.445 / -0.441, still better than the autopilot's -0.684 / -0.539 / -0.641), and the sim is the same EXPLORER model the pilot was trained in, so this is robustness to hull variants, not a sim-to-real result.
+
+### The tail pilot is an aquarium seed
+
+`ai-bridge/subAquariumCore.js` SEED_RECIPES gains **"Explorer tail pilot"** (weights `brain/pilotSubWeightsRobustTail2Wip.json`, seed 9400 -- the one audited on both hulls; theta `subTacticsThetaSearchPingWip.json`). "Offer my subs" now offers FIVE (PD autopilot + four trained pilots); the gates that pinned four were updated to five (core, bridge, page), and a new core row pins that the tail sub is built bit for bit from the Tail2 file and not from the long one (A33, A34 red). The FISH BRAIN chip's pilot count is the number of `brain/pilotSubWeights*Wip.json` files (6 today).
