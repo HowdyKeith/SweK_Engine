@@ -12,6 +12,7 @@
 // proving what the first one already proved.
 "use strict";
 
+import { gateReport } from "./gateReport.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,12 +25,15 @@ let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const say = (m) => console.log("  ----  " + m);
 const M = E.MEASURED_AT_V4484;
+// v4880: the two tables below were printed and died with the terminal; gateReport-selfcheck named this gate as an arrival that argues in numbers.
+const REPORT = gateReport("tools/ship/emitReproducibility-selfcheck.mjs");
 
 // ---- 1. *** THE REGISTER IS THE FILES ON DISK, NOT A LIST SOMEBODY TYPED *** ----------------------------------
 {
     const present = E.ARTIFACTS.filter((a) => fs.existsSync(path.join(ENG, a.file)));
     const sizes = present.map((a) => ({ f: a.file, n: fs.statSync(path.join(ENG, a.file)).size }));
     for (const s of sizes) say(`${s.f.padEnd(36)} ${String(s.n).padStart(6)} bytes`);
+    REPORT.table("each emitted TSL artifact the register names, and its size on disk", ["artifact", "bytes"], sizes.map((s) => [s.f, s.n]));
     ok("!! *** THERE ARE FOUR EMITTED ARTIFACTS, AND v4480's SURVEY COUNTED THREE ***",
         present.length === M.artifacts && present.length === 4 && M.v4480SaidArtifacts === 3,
         "the survey looked for tsl-emitted-{race,physics,compute} and a glob that wants a hyphen after " +
@@ -179,6 +183,7 @@ const M = E.MEASURED_AT_V4484;
     ok("every file the register names is on disk and parses",
         missing.length === 0, missing.length ? "missing or unparsable: " + missing.join(", ") : `${rows.length} artifacts read`);
     for (const r of rows) say(`${r.a.file.padEnd(36)} declared ${r.a.languages} -- wgsl ${r.lang.wgsl}, glsl ${r.lang.glsl}`);
+    REPORT.table("languages each artifact declares against the languages detected in its content", ["artifact", "declared", "wgsl", "glsl"], rows.map((r) => [r.a.file, r.a.languages, String(r.lang.wgsl), String(r.lang.glsl)]));
     ok("!! every artifact carries the languages its register row declares, detected by CONTENT not by key name",
         rows.every((r) => (r.a.languages === 2 ? r.lang.both : r.lang.wgsl && !r.lang.glsl)),
         "the compute artifact's texts are called `emitted` and `transplanted`, so a name-based detector would " +
@@ -201,5 +206,6 @@ const M = E.MEASURED_AT_V4484;
         "would make this module a WGSL-bearing shader -- the trap v4462, v4479 and v4483 each sprang");
 }
 
+REPORT.write();
 console.log("emitReproducibility-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));
 process.exit(fails ? 1 : 0);

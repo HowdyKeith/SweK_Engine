@@ -1,0 +1,154 @@
+{
+ "gate": "tools/ship/hdrCost-selfcheck.mjs",
+ "at": "2026-10-20",
+ "tables": [
+  {
+   "title": "mean halo by source peak, at each bloom buffer format",
+   "columns": [
+    "format",
+    "peak 0.8",
+    "peak 1",
+    "peak 2",
+    "peak 4",
+    "peak 8",
+    "peak 16"
+   ],
+   "rows": [
+    [
+     "float",
+     22.6052,
+     25.3466,
+     34.4619,
+     45.633,
+     56.6309,
+     67.6883
+    ],
+    [
+     "f16",
+     22.6052,
+     25.3455,
+     34.4662,
+     45.6288,
+     56.6309,
+     67.684
+    ],
+    [
+     "unorm8",
+     22.3997,
+     25.1856,
+     25.4163,
+     25.4163,
+     25.4163,
+     25.4163
+    ]
+   ],
+   "note": null
+  },
+  {
+   "title": "each palette entry: its brightest channel, the emissive multiplier the shader gives it, and the peak after the boost",
+   "columns": [
+    "entry",
+    "max channel",
+    "multiplier",
+    "peak",
+    "over 1.0"
+   ],
+   "rows": [
+    [
+     "STONE",
+     0.7,
+     1,
+     0.7,
+     "false"
+    ],
+    [
+     "DIRT",
+     0.6,
+     1,
+     0.6,
+     "false"
+    ],
+    [
+     "GRASS",
+     0.8,
+     1,
+     0.8,
+     "false"
+    ],
+    [
+     "SAND",
+     0.92,
+     2.176,
+     2.002,
+     "true"
+    ],
+    [
+     "SNOW",
+     1,
+     2.5,
+     2.5,
+     "true"
+    ],
+    [
+     "ASH",
+     0.22,
+     1,
+     0.22,
+     "false"
+    ],
+    [
+     "REBAR",
+     0.38,
+     1,
+     0.38,
+     "false"
+    ],
+    [
+     "WATER",
+     0.85,
+     1,
+     0.85,
+     "false"
+    ],
+    [
+     "FLOWING_WATER",
+     0.95,
+     2.5,
+     2.375,
+     "true"
+    ],
+    [
+     "LAVA",
+     1,
+     2.5,
+     2.5,
+     "true"
+    ],
+    [
+     "ICE",
+     0.96,
+     2.5,
+     2.4,
+     "true"
+    ],
+    [
+     "SCREEN",
+     0.95,
+     2.5,
+     2.375,
+     "true"
+    ],
+    [
+     "MEMORY",
+     0.85,
+     1,
+     0.85,
+     "false"
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

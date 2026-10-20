@@ -1,0 +1,50 @@
+{
+ "gate": "tools/ship/littlePlanet-selfcheck.mjs",
+ "at": "2026-10-20",
+ "tables": [
+  {
+   "title": "per planet type: seeds baked, worst pole-row spread, mean equator spread",
+   "columns": [
+    "type",
+    "seeds",
+    "worst pole-row spread",
+    "mean equator"
+   ],
+   "rows": [
+    [
+     "ice",
+     29,
+     0,
+     138.24
+    ],
+    [
+     "gas",
+     40,
+     1,
+     5.53
+    ],
+    [
+     "molten",
+     23,
+     0,
+     79.78
+    ],
+    [
+     "terran",
+     66,
+     0,
+     96
+    ],
+    [
+     "desert",
+     42,
+     0,
+     38.07
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

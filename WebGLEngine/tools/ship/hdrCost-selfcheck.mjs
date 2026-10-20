@@ -22,6 +22,7 @@
 // goes red.
 "use strict";
 
+import { gateReport } from "./gateReport.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,6 +34,8 @@ let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const say = (m) => console.log("  ----  " + m);
 const M = H.MEASURED_AT_V4481;
+// v4880: the tables below were printed and died with the terminal; gateReport-selfcheck named this gate as an arrival that argues in numbers.
+const REPORT = gateReport("tools/ship/hdrCost-selfcheck.mjs");
 const near = (a, b, e = 1e-4) => Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= e;
 // *** THE FIRST DRAFT OF THIS STRIPPER ALSO REMOVED /* ... */ BLOCKS, AND THAT WAS ITSELF A DEFECT. *** On a
 // file the size of main.js a non-greedy block match starts at an unrelated "/*" inside a string or a regex and
@@ -111,6 +114,7 @@ const VOX = read("render", "voxelrenderer.js");
     say(`peaks   ${H.PROBE.peaks.map((p) => String(p).padStart(8)).join("")}`);
     for (const [n, r] of [["float ", hf], ["f16   ", hh], ["unorm8", hu]])
         say(`${n}  ${r.map((v) => v.toFixed(2).padStart(8)).join("")}`);
+    REPORT.table("mean halo by source peak, at each bloom buffer format", ["format", ...H.PROBE.peaks.map((p) => "peak " + p)], [["float", ...hf], ["f16", ...hh], ["unorm8", ...hu]]);
 
     ok("the frozen halo numbers are what the operators produce, at all three formats",
         hf.every((v, i) => near(v, M.haloFloat[i], 5e-4)) &&
@@ -179,6 +183,7 @@ const VOX = read("render", "voxelrenderer.js");
     const c = H.paletteHeadroom(pal);
     for (const r of c.rows)
         say(`${r.name.padEnd(15)} maxC ${r.maxC.toFixed(2)}  x${r.mul.toFixed(3)}  peak ${r.peak.toFixed(3)}${r.overOne ? "   OVER 1.0" : ""}`);
+    REPORT.table("each palette entry: its brightest channel, the emissive multiplier the shader gives it, and the peak after the boost", ["entry", "max channel", "multiplier", "peak", "over 1.0"], c.rows.map((r) => [r.name, +r.maxC.toFixed(2), +r.mul.toFixed(3), +r.peak.toFixed(3), String(!!r.overOne)]));
 
     ok("!! #133's rule is satisfied: the consumer is real and it is about half the palette",
         c.total === M.paletteEntries && c.overOne === M.paletteOverOne && c.overOne * 2 >= c.total - 1 &&
@@ -250,5 +255,6 @@ const VOX = read("render", "voxelrenderer.js");
         "the hint said \"(and memory blocks)\" for as long as the knob has existed, and the shader gives them 1.0x");
 }
 
+REPORT.write();
 console.log("hdrCost-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));
 process.exit(fails ? 1 : 0);

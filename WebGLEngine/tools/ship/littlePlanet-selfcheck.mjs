@@ -18,6 +18,7 @@
 // this row goes red and says the filter has started earning its place.
 "use strict";
 
+import { gateReport } from "./gateReport.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -32,6 +33,8 @@ let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const say = (m) => console.log("  ----  " + m);
 const M = L.MEASURED_AT_V4482;
+// v4880: the table below was printed and died with the terminal; gateReport-selfcheck named this gate as an arrival that argues in numbers.
+const REPORT = gateReport("tools/ship/littlePlanet-selfcheck.mjs");
 const near = (a, b, e) => Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= e;
 
 // procPlanet's OWN direction formula, transcribed from bakeEquirect's three lines and checked against it below.
@@ -204,6 +207,7 @@ const procDir = (lon, lat) => { const c = Math.cos(lat); return [c * Math.cos(lo
         if (p > worstPole) { worstPole = p; worstType = spec.type; }
     }
     for (const [t, b] of types) say(`${t.padEnd(8)} ${String(b.n).padStart(3)} seeds: worst pole-row spread ${b.pole}, mean equator ${(b.eq / b.n).toFixed(2)}`);
+    REPORT.table("per planet type: seeds baked, worst pole-row spread, mean equator spread", ["type", "seeds", "worst pole-row spread", "mean equator"], [...types].map(([t, b]) => [t, b.n, b.pole, +(b.eq / b.n).toFixed(2)]));
     const perType = [...types].every(([t, b]) => b.pole === M.poleRowSpreadByType[t]);
     const eqOk = [...types].every(([t, b]) => Math.abs(b.eq / b.n - M.equatorMeanByType[t]) <= 5e-3);
     ok("!! *** procPlanet's POLE ROWS ARE FLAT TO AT MOST ONE LEVEL IN EVERY WORLD TYPE -- WHY THE FILTER IS FREE ***",
@@ -302,5 +306,6 @@ const procDir = (lon, lat) => { const c = Math.cos(lat); return [c * Math.cos(lo
         "two framings of one world must not be able to disagree about the world");
 }
 
+REPORT.write();
 console.log("littlePlanet-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));
 process.exit(fails ? 1 : 0);

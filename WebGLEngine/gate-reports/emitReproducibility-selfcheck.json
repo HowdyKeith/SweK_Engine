@@ -1,0 +1,70 @@
+{
+ "gate": "tools/ship/emitReproducibility-selfcheck.mjs",
+ "at": "2026-10-20",
+ "tables": [
+  {
+   "title": "each emitted TSL artifact the register names, and its size on disk",
+   "columns": [
+    "artifact",
+    "bytes"
+   ],
+   "rows": [
+    [
+     "tools/ship/tsl-emitted.json",
+     37241
+    ],
+    [
+     "tools/ship/tsl-emitted-race.json",
+     43456
+    ],
+    [
+     "tools/ship/tsl-emitted-physics.json",
+     10960
+    ],
+    [
+     "tools/ship/tsl-emitted-compute.json",
+     3428
+    ]
+   ],
+   "note": null
+  },
+  {
+   "title": "languages each artifact declares against the languages detected in its content",
+   "columns": [
+    "artifact",
+    "declared",
+    "wgsl",
+    "glsl"
+   ],
+   "rows": [
+    [
+     "tools/ship/tsl-emitted.json",
+     2,
+     "true",
+     "true"
+    ],
+    [
+     "tools/ship/tsl-emitted-race.json",
+     2,
+     "true",
+     "true"
+    ],
+    [
+     "tools/ship/tsl-emitted-physics.json",
+     2,
+     "true",
+     "true"
+    ],
+    [
+     "tools/ship/tsl-emitted-compute.json",
+     1,
+     "true",
+     "false"
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}
