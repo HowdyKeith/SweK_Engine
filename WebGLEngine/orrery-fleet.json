@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "c54a701fb4e79fb5b2e099591f3599320254c2fa",
+ "head": "e1ce5f0d9506ca29ab8f4bc82a4b9b950c7fde6a",
  "bodies": {
   "box3d": [
    {
@@ -746,8 +746,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3674780,
-    "sha": "89c3630e488d8e7fe355788ee7556f15681e697d"
+    "bytes": 3678787,
+    "sha": "6a9c75258706ea8c8f206e88488e1318232278ef"
    },
    {
     "path": "mpm3d.html",
@@ -766,8 +766,8 @@
    },
    {
     "path": "physics/mesh/triArrangement.mjs",
-    "bytes": 32584,
-    "sha": "fb0d8aa8971db1b2b15d6931ec1f5e8e32507661"
+    "bytes": 60521,
+    "sha": "e1ce5f0d9506ca29ab8f4bc82a4b9b950c7fde6a"
    },
    {
     "path": "pipboy-models.html",

@@ -9355,6 +9355,18 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "8 s green; 5 page sabotages red) and the degenerate fight it uncovered -- every battle a draw, 36 hits, both " +
                  "fleets dead -- filed as sixdof-page-every-battle-a-draw. The two reds are a missing optional native module.",
     }),
+    // v4879 -- since571 (the arc's own round-21 closing took since570: it was written under since251, a key main already held). NO new gate file of this round's own: the six gates that arrived
+    // (blastEngine, exactArrangement, exactPredicates, implicitPoints, manifoldAudit, triContact) are the arc's, counted in since570. This entry closes the round that merged the whole BVH-CSG arc.
+    since571: Object.freeze({
+        at: "v4879", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "the eight gates of the arc's modules that gained a bench-report row (exactPredicates, implicitPoints, exactArrangement, manifoldAudit, triContact, triTriIntersect, triArrangement, meshBoolean) and the five that gained export rows (triContact, meshCSG, meshBoolean, triArrangement, uvUnwrap, blastEngine)",
+            "the absence-scope, gate-reach, assertion-shape, runtime-gap and definition-gates census rows, restated from the gates' own measurement after the merge (definitionGates' four ratchets lowered, not raised)",
+        ]),
+        verdict: "no gate of this round's own to sweep; 35 of the 37 gates the arc changed or touched were green on arrival (blastEngine included) and the other two were census rows, repaired not registered. NOT CLOSED: the arc's own measurements were not repeated here, destructible.html was not run in a browser, and about 19 older branches remain.",
+    }),
     // v4878 -- since569, from `versionPreflight --next` after a full fetch (the highest declared anywhere was since568, the BVH-CSG branch's entry renumbered at this merge). NO new gate file of this round's own: the one gate that arrived,
     // physics/mesh/triArrangement-selfcheck.mjs, is since568's. This entry closes the round that merged the last two open branches and repaired a Windows-only abort in a gate.
     since569: Object.freeze({
