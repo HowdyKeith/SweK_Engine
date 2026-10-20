@@ -4,22 +4,22 @@
 // NODE/BUN. MEASURED, THREADS ARE THE SECOND-SMALLEST GAP OF TWELVE, AND THE QUESTION HAS ITS SCALE INVERTED. ***
 //
 // The item's phrasing carries an assumption -- that threads are the big one and the rest is detail. Counted
-// over the 3,816 runtime source files in this tree (vendor, node_modules and dist excluded), COMMENT-STRIPPED:
+// over the 3,876 runtime source files in this tree (vendor, node_modules and dist excluded), COMMENT-STRIPPED:
 //
-//     ES modules              3525 files   92.4%
-//     closures as values      3405 files   89.2%
-//     async / await           1314 files   34.5%
-//     typed arrays             662 files   17.4%
-//     Promises                 329 files    8.7%
-//     fetch / XHR              223 files    5.9%
+//     ES modules              3585 files   92.5%
+//     closures as values      3461 files   89.3%
+//     async / await           1337 files   34.5%
+//     typed arrays             691 files   17.8%
+//     Promises                 333 files    8.6%
+//     fetch / XHR              224 files    5.8%
 //     performance.now          202 files    5.3%
 //     requestAnimationFrame    116 files    3.1%
-//     WebGL                    102 files    2.7%
-//     WebGPU                    35 files    0.9%
+//     WebGL                    105 files    2.7%
+//     WebGPU                    46 files    1.2%
 //     workers / threads         22 files    0.6%     <-- the thing the item asks "besides"
 //     WebAssembly               22 files    0.6%   <-- tied with it, and the tie is this round's own doing
 //
-// *** FIRST-CLASS FUNCTIONS ARE 155 TIMES MORE OF THIS TREE THAN THREADS ARE. *** 3,405 files against 22. A
+// *** FIRST-CLASS FUNCTIONS ARE 157 TIMES MORE OF THIS TREE THAN THREADS ARE. *** 3,461 files against 22. A
 // runtime that had threads and no closures could run 0.6% of what a runtime with closures and no threads
 // could. So the answer to "what is missing besides threads" is: nearly all of it, and threads barely register.
 //
@@ -217,6 +217,11 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // concurrent session shipped a different v4451 and reached main first, so this round is v4462.
     //
     // *** AND A THIRD MERGE MOVED THEM AGAIN, WHICH IS THE POINT OF RE-DERIVING RATHER THAN READING BACK. ***
+    // *** AND THE HEADER TABLE ABOVE WENT STALE AGAINST THESE CONSTANTS, WHICH IS THE SAME DEFECT ONE LEVEL
+    // OUT. *** v4477's merge re-froze the constants here and left the prose table at v4463's numbers, so the
+    // file's own header disagreed with the file's own data and NOTHING CHECKED, because the gate compares the
+    // census to the constants and never to the table. Both are corrected at v4478 and the divergence is
+    // recorded rather than quietly repaired -- this file's header is a complaint about exactly this shape.
     // v4477 merged this round's branch, and the census grew by 54 files: 3814 -> 3868. Eight of the twelve rows
     // moved -- ES modules +54, closures +50, async/await +20, typed arrays +29, Promises +3, fetch/XHR +1,
     // WebGPU +10 -- and threads and WebAssembly did NOT, which is the finding surviving a 54-file arrival

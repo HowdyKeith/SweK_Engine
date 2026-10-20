@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "33fbf1c4424c7189689f65995a8a04d325955f9e",
+ "head": "0173e6c1f99fe4c4441ef421e5ddf9e78b89c8e2",
  "bodies": {
   "box3d": [
    {
@@ -122,7 +122,7 @@
    {
     "path": "tools/ship/copiedOutsideVendor-selfcheck.mjs",
     "bytes": 24126,
-    "sha": "653e470323f8b29c839ef5e5d7971a21dc4b4e06"
+    "sha": "085367af2f3c9aa42eccf43cee6ad0e14f98b14c"
    },
    {
     "path": "tools/ship/jointDrive-selfcheck.mjs",
@@ -746,7 +746,7 @@
    },
    {
     "path": "main.js",
-    "bytes": 3678787,
+    "bytes": 3680970,
     "sha": "114977f12f69f64994b0c26d598eded01b51a694"
    },
    {
@@ -1153,7 +1153,7 @@
    },
    {
     "path": "render/temporalLockSumsTsl-selfcheck.mjs",
-    "bytes": 27647,
+    "bytes": 27654,
     "sha": "3010997dd290281cd20dbf19cbffe2823d6e18b9"
    },
    {
@@ -1283,17 +1283,17 @@
    },
    {
     "path": "tools/ship/tslPhysics-selfcheck.mjs",
-    "bytes": 127215,
+    "bytes": 127893,
     "sha": "fc12eefc9f64da7cf9431f56db51c076e84810ad"
    },
    {
     "path": "tools/ship/tslRace-selfcheck.mjs",
-    "bytes": 84598,
+    "bytes": 86593,
     "sha": "3b3a78d5f949562308b6cbc7df4e10ae8f9f18a8"
    },
    {
     "path": "tools/ship/tslSource-selfcheck.mjs",
-    "bytes": 45949,
+    "bytes": 46848,
     "sha": "7462bbb6fc5007f687e7fa809e891f4e4850b211"
    },
    {

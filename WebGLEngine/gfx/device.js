@@ -229,6 +229,44 @@ function nullBackend(opts = {}) {
     return dev;
 }
 
+/**
+ * *** DEVICE LOSS AND UNCAPTURED ERRORS, AS A FUNCTION A GATE CAN CALL. *** v4480.
+ *
+ * MEASURED before this existed: blackhole.html, fluid-webgpu.html and mpm-gpu.html each wired device.lost and
+ * this file, which every other caller reaches the GPU through, did not. The one-off demos were more robust
+ * than the abstraction. pushErrorScope and uncapturederror appeared in exactly three files and ALL THREE WERE
+ * GATES -- the test harness caught the validation errors the running engine dropped on the floor.
+ *
+ * *** IT IS A SEPARATE EXPORTED FUNCTION BECAUSE THE FIRST GATE FOR IT COULD NOT FAIL. *** Wrapping the wiring
+ * in `if (false && ...)` left every token the check grepped for still in the file, so the sabotage that
+ * disabled it cost ZERO RED -- v4450's finding in this tree's own words: "an assertion about where text sits
+ * is satisfied by a branch that is present and dead." A gate can CALL this with a stub device and watch the
+ * callback fire, which dead code cannot survive.
+ *
+ * Reason "destroyed" is excluded: that is the normal end of a device a caller destroyed on purpose, and the
+ * three pages all make the same exclusion. Treating it as a fault would cry wolf on every teardown.
+ */
+function _wireDeviceLoss(gpu, opts = {}) {
+    const state = { lost: null, errors: 0 };
+    if (gpu && gpu.lost && typeof gpu.lost.then === "function") {
+        gpu.lost.then((info) => {
+            if (info && info.reason === "destroyed") return;
+            state.lost = { reason: (info && info.reason) || "unknown", message: (info && info.message) || "" };
+            if (opts.onDeviceLost) { try { opts.onDeviceLost(state.lost); } catch { /* a reporter must not become the fault */ } }
+            else if (typeof console !== "undefined") console.error("[gfx/device] GPU DEVICE LOST: " + state.lost.reason + " " + state.lost.message);
+        });
+    }
+    if (gpu && gpu.addEventListener) {
+        gpu.addEventListener("uncapturederror", (e) => {
+            state.errors++;
+            const m = String((e && e.error && e.error.message) || e).slice(0, 300);
+            if (opts.onDeviceError) { try { opts.onDeviceError(m); } catch { /* ditto */ } }
+            else if (typeof console !== "undefined") console.error("[gfx/device] uncaptured WebGPU error: " + m);
+        });
+    }
+    return state;
+}
+
 // --- WebGL2 backend (real; rig) ------------------------------------------------------------------------------------
 function _glProgram(gl, vs, fs) {
     const c = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error("shader: " + gl.getShaderInfoLog(s)); return s; };
@@ -462,6 +500,15 @@ async function webgpuBackend(canvas, opts = {}) {
     const asked = [...new Set([...wanted.filter(offers), ...(opts.requireFeatures || [])])];
     const gpu = await adapter.requestDevice(asked.length ? { requiredFeatures: asked } : undefined);
     const features = Object.freeze((() => { try { return [...gpu.features]; } catch (e) { return asked.slice(); } })());   // what was GRANTED
+    // v4480 -- *** DEVICE LOSS WAS HANDLED IN THREE ONE-OFF PAGES AND NOT IN THE LAYER THEY ALL GO THROUGH. ***
+    // MEASURED: blackhole.html, fluid-webgpu.html and mpm-gpu.html each wire device.lost and report it; this
+    // file, which every other caller reaches the GPU through, did not. The demos were more robust than the
+    // abstraction. A lost device (driver reset, TDR, a backgrounded tab on some platforms) silently wedged
+    // anything drawn here: every later call throws or no-ops and nothing says why.
+    //
+    // Reason "destroyed" is EXCLUDED because it is the normal end of a device a caller destroyed on purpose --
+    // the three pages all make that same exclusion, and treating it as a fault would cry wolf on every teardown.
+    const _lossState = _wireDeviceLoss(gpu, opts);
     const ctx = (canvas && canvas.getContext) ? canvas.getContext("webgpu") : null; if (!ctx) return null; const fmt = navigator.gpu.getPreferredCanvasFormat();
     // *** Level 11 -- `offscreen: true` RENDERS INTO AN OWNED TEXTURE AND NEVER PRESENTS. *** Measured on the build
     // box's headless shell: ANY render pass whose attachment is the canvas's current texture loses the device
@@ -600,7 +647,9 @@ struct VO { @builtin(position) pos: vec4f, @location(0) uv: vec2f };
     let frameSeq = 0;                                     // v4497 -- see pass.uniform
     let qset = null;
     const dev = {
-        backend: "webgpu", gpu, ctx, fmt, offscreen, depth, adapterInfo, features,
+        backend: "webgpu",
+        // v4480 -- readable rather than only logged: a caller can ask whether the device died instead of guessing.
+        get lost() { return _lossState.lost; }, gpu, ctx, fmt, offscreen, depth, adapterInfo, features,
         capabilities: Object.freeze({ ...CAPABILITIES.webgpu, features, timestamps: features.includes("timestamp-query") }),
         /** The frame's depth texture as a bindable handle (null until a frame has cleared, or with depth off). */
         depthTexture: () => (dtex ? { gpu: dtex, view: dtex._view, w: dW, h: dH, nearest: true, depth: true } : null),
@@ -898,5 +947,5 @@ const CAPABILITIES = Object.freeze({
     null:   Object.freeze({ textures: true, compute: true, indirect: true, storage: true, instancing: true, indexed: true, depth: true, depthRead: false, blend: true, mipmaps: true, features: Object.freeze([]), timestamps: false, formats: Object.keys(TEXTURE_FORMATS) }),
 });
 
-export { requestDevice, _explainOrigin, _resetOriginNotice, detectBackends, nullBackend, webgl2Backend, webgpuBackend, _uniformLayout, BUFFER_USAGES, BLEND_MODES, TEXTURE_FORMATS, DEPTH_COMPARES, CAPABILITIES, DEFAULT_FEATURES };
+export { _wireDeviceLoss, requestDevice, _explainOrigin, _resetOriginNotice, detectBackends, nullBackend, webgl2Backend, webgpuBackend, _uniformLayout, BUFFER_USAGES, BLEND_MODES, TEXTURE_FORMATS, DEPTH_COMPARES, CAPABILITIES, DEFAULT_FEATURES };
 if (typeof module !== "undefined" && module.exports) module.exports = { requestDevice, detectBackends, nullBackend, webgl2Backend, webgpuBackend };

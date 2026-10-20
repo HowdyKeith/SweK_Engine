@@ -15,6 +15,9 @@ import { repoHeightfield, BIOME_ORDER } from "../world/repoHeightfield.js";
 import { BIOMES } from "../world/worleyBiomes.js";
 import { CAPTURED, UNPAPERED, REACHED } from "../world/orrery.mjs";
 import { planetSpec, bakeEquirect } from "../world/procPlanet.js";   // v4189 -- a planet from the commit that brought the body in
+// v4482 -- render/stereographic.js was built at v4463 and its ONLY importer in the whole tree was its own
+// selfcheck. This is the wiring: the same equirect bake, read through the little planet instead of a sphere.
+import { renderLittlePlanet } from "../render/littlePlanet.mjs";
 import { satelliteAt } from "../world/orreryFleet.mjs";   // v4329, #68 -- a satellite's position is a pure function of (seed, t)
 import { flybyAt, MAY_TAKE, MAY_NOT_TAKE, NOT_ASKED } from "../world/orreryReached.mjs";   // v4332, #48
 
@@ -258,7 +261,10 @@ export function drawPlanet(ctx, body, field, x, y, R, spin = 0) {
  */
 export const SURFACE_MEASURED = "file tree (measured)";
 export const SURFACE_SEEDED = "seeded from commit (generated)";
-export const SURFACE_KIND = Object.freeze([SURFACE_MEASURED, SURFACE_SEEDED]);
+// v4482 -- the third framing. It is the SAME generated surface as SURFACE_SEEDED, not a third source of
+// truth, and the label says so: what changes is where you stand, not where the pixels come from.
+export const SURFACE_LITTLE = "seeded, from the ground (little planet)";
+export const SURFACE_KIND = Object.freeze([SURFACE_MEASURED, SURFACE_SEEDED, SURFACE_LITTLE]);
 
 const _planetCache = new Map();
 
@@ -308,6 +314,30 @@ export function drawSeededPlanet(ctx, body, x, y, R, spin = 0, size = 256) {
         }
     }
     ctx.putImageData(img, Math.round(x - d / 2), Math.round(y - d / 2));
+}
+
+/**
+ * *** THE LITTLE PLANET: THE SAME BAKE, SEEN FROM THE SURFACE LOOKING DOWN. ***
+ *
+ * drawSeededPlanet puts the eye outside and shows one hemisphere, lit. This puts the eye ON the ground at the
+ * nadir and shows the WHOLE sphere at once -- the ground curls into a ball at the centre, the horizon is a
+ * circle at plane radius 2 exactly, and the zenith is the point at infinity the frame never reaches.
+ *
+ * No lambert term, and that is a decision rather than an omission: there is no terminator in this framing,
+ * because you can see the night side and the day side in the same picture. render/littlePlanet.mjs's header
+ * has the rest, including the 90-degree longitude disagreement between the two modules this reconciles.
+ *
+ * R is the radius at which the HORIZON is drawn, so the ball fills a disc of that size and the far hemisphere
+ * fills the corners around it. The frame is square and fully opaque: every plane point has an image.
+ */
+export function drawLittlePlanet(ctx, body, x, y, R, spin = 0, size = 256) {
+    const { tex } = seededPlanetFor(body, size);
+    const d = Math.max(2, Math.ceil(R * 2));
+    const shot = renderLittlePlanet(tex, { size: d, spin });
+    const img = ctx.createImageData(d, d);
+    img.data.set(shot.rgba);
+    ctx.putImageData(img, Math.round(x - d / 2), Math.round(y - d / 2));
+    return shot;
 }
 
 // ---------------------------------------------------------------------------------------------------------

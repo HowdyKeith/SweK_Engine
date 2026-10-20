@@ -61,6 +61,11 @@ or the `[knowledge]` line from step 3).
     node tools/ship/orreryFleetScan.mjs --write        # AFTER the version bump, not before -- see below
     node tools/ship/orreryReachedScan.mjs --write     # same rule, same reason
     node tools/ship/buildKnowledgeIndex.mjs --write    # prints "[knowledge] NNNN gates" -- this is the count
+    node tools/ship/observedGates.mjs --write          # v4485 -- merges the LAST sweep's completions into the
+                                                       # monotone evidence ledger. Only ever grows; a gate the
+                                                       # sweep killed at the cap keeps the time it was seen to
+                                                       # take. Without it budgetEvidence goes red about how busy
+                                                       # the box was rather than about the tree.
     node tools/ship/staleness.mjs --fix                # rewrites case-study.html's gate count
     node tools/ship/claimCheck-selfcheck.mjs           # must end "all checks pass"
 
@@ -166,6 +171,20 @@ writes nothing.
 *** A SHALLOW CLONE CANNOT GRADE TWO OF THESE GATES (v4838). *** The route the tree prints clones `--depth 1`. `orreryFleet-selfcheck` reads git history and `budgetExile-selfcheck` runs it live, so on such a clone
 both read RED whatever the tree holds (measured on v4837: both exit 1 shallow, both exit 0 after `git fetch --unshallow`). `afterVerdict` now says `NOT GRADED` for them and exits 3 -- run `git fetch --unshallow` and
 the command again; do not treat either as a defect in the round, and do not treat exit 3 as a pass.
+
+### 4c. Fold the sweep's timings into the monotone ledger -- AFTER verify, not only before (carried from the orrery-seeded branch, where it was numbered 4b; renumbered at its merge into the line that already had a 4b)
+
+    node tools/ship/observedGates.mjs --write          # again; step 3 ran it against the PREVIOUS sweep
+
+*** THE ROUND'S OWN NEW GATES ARE NEVER IN THE LEDGER WHEN VERIFY FIRST RUNS. *** Step 3's call merges the
+LAST sweep's completions, which by definition predate the gates this round added, so budgetEvidence-selfcheck
+reports them as carrying no evidence and the ship goes red. That is v4485's cause (a) -- correct, and
+self-resolving -- and it cost a red first-run on v4486, v4487 and v4488 before anybody wrote this line.
+
+Run it again once verify's sweep has timed them and the red clears without touching a register: at v4488 the
+second call read `+3 new` and budgetEvidence went green. Do it BEFORE restoring `sweep-timings.json` if the
+rotation left that file dirty -- the ledger reads the scratch file, and reverting first throws away the only
+record that this round's gates ever finished.
 
 ## 5. Commit and push (from the REPO ROOT, one level above WebGLEngine)
 

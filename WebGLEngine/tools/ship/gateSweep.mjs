@@ -15246,6 +15246,548 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "substitution has reset it. Both fixtures were added and the grading moved to exit codes.",
     }),
 
+    // v4880 -- THE THIRTEEN CLOSINGS BELOW WERE WRITTEN ON claude/orrery-seeded-by-git-log (rounds v4478 to v4490 of that line) UNDER since117..since129, KEYS MAIN HELD FOR OTHER ROUNDS: in an object literal the later key
+    // silently wins, so they are RENUMBERED FORWARD to since573..since585 at the merge and only their keys moved (their `at` still names the branch's own round). The v4479 closing's gate list lost
+    // tools/ship/blendModes-selfcheck.mjs: main had shipped its own device blend modes first (gfx/device.js BLEND_MODES, tools/ship/deviceBlend-selfcheck.mjs) and the branch's duplicate was not merged.
+    // v4478 -- the one hundred and seventeenth closing. The GPU clock the newer backend never had.
+    since573: Object.freeze({
+        at: "v4478", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/gpuTimer-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, seventeen checks in five sections, the last against a REAL WebGPU device " +
+                 "through webgpuHarness. MEASURED FIRST: ui/SystemPerfMonitor.js and ui/hud.js have timed the " +
+                 "GPU through EXT_disjoint_timer_query_webgl2 since long before gfx/device.js existed, and " +
+                 "`timestamp-query` / `createQuerySet` / `writeTimestamp` appear ZERO times in the whole tree. " +
+                 "So every WebGPU-against-WebGL2 comparison this tree could make was made with an instrument " +
+                 "that only works on ONE SIDE, and webgpu-bench.html times with performance.now() around " +
+                 "queue.onSubmittedWorkDone() -- CPU wall clock including submit and sync, not GPU execution. " +
+                 "*** AND THE FIRST THING THE REAL DEVICE SAID IS THAT A TIMESTAMP HAS A NOISE FLOOR. *** A " +
+                 "compute pass whose inner loop was made TEN TIMES LONGER did not get slower: 10 iters read " +
+                 "142,336 ns and 100 iters read 131,962 ns, LOWER, on the same device in the same session. And " +
+                 "one unchanged configuration read 103,841 and 190,114 -- a 1.83x spread with nothing moved. So " +
+                 "the module never returns a bare number: it takes samples, reports median WITH spread, " +
+                 "calibrates a floor from an EMPTY pass (the MAX of those samples, not the median, because a " +
+                 "median floor calls half the empty passes work), and *** REFUSES to call a sub-floor reading a " +
+                 "measurement *** -- verdict() returns ns: null there, which is render/panini.js's rule for a " +
+                 "direction with no image applied to time, and for the same stated reason. The device section " +
+                 "proves the MECHANISM on the real adapter (written, resolved, copied, read back, heavy/light " +
+                 "17.89x) and its own run reproduced the finding live: floor 182,068 ns against a light pass of " +
+                 "158,118 ns, BELOW the floor. *** WHAT IS NOT CLAIMED: A MAGNITUDE. *** That adapter is " +
+                 "SwiftShader, a CPU rasteriser; the timestamps are genuine WebGPU timestamps and the numbers " +
+                 "are a software device's, so the module CALIBRATES the floor rather than hard-coding it and " +
+                 "the frozen table is a record of one box. Thirteen sabotages, ALL RED BY NAME, two files " +
+                 "md5-identical. *** TWO COST ZERO RED FIRST AND BOTH WERE FINDINGS ABOUT THE CHECK. *** " +
+                 "Dropping `spread` from a resolved verdict did not pass -- it CRASHED, on undefined.toFixed in " +
+                 "a detail string, which killed every later section and reported a stack trace instead of a " +
+                 "name; v4434 hit that exact shape and the detail string cannot throw now. And deleting the " +
+                 "SwiftShader caveat from the module cost NOTHING, because nothing held the recorded provenance " +
+                 "against the observed one: MEASURED_AT.device could be rewritten to 'a real GPU' and every " +
+                 "check still passed. It is checked against the DEVICE ITSELF now. ALSO CORRECTED, one level " +
+                 "out: v4477's merge re-froze vba/runtimeGap.mjs's constants and left its prose table at " +
+                 "v4463's numbers, so that file's own header disagreed with its own data and nothing checked, " +
+                 "because the gate compares the census to the constants and never to the table. AND THIS ENTRY'S OWN " +
+                 "ORDINAL COLLIDED: it was written as since100 against a ledger that concurrent sessions had " +
+                 "already carried to since116, and gateSweep-selfcheck caught it BY NAME -- 'DUPLICATE: since100, " +
+                 "the later declaration wins silently and the earlier round's swept count disappears from the " +
+                 "surplus arithmetic'. Second time this session. Renumbered forward, never backward.",
+    }),
+    // v4479 -- the one hundred and eighteenth closing. Blend state, and a reference that was wrong.
+    since574: Object.freeze({
+        at: "v4479", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, fourteen checks in five sections, the last drawing through BOTH backends " +
+                 "in one browser launch. MEASURED: `gl.BLEND`, `blendFunc` and `blendEquation` appear ZERO " +
+                 "times in gfx/device.js and its WebGPU fragment target carries no `blend` key, so everything " +
+                 "the device draws is opaque -- which docs/TSL-ROADMAP.md names as the second thing blocking " +
+                 "the Slug text arc, in those words. *** AND THE ROUND OWES A CORRECTION IT CHECKS RATHER THAN " +
+                 "CONFESSES. *** The survey that opened this work cited gfx/device.js line 123 as evidence the " +
+                 "device 'cannot express the state where its backends most visibly disagree'. READ IN FULL " +
+                 "THAT COMMENT IS ABOUT MSAA: a GL canvas defaults to multisampling, WebGPU renders one sample " +
+                 "per pixel, 3,417 of 65,536 pixels differed, and Level 11 fixed it with antialias:false. A " +
+                 "solved problem wearing the word 'blended'. So the gap is real and NARROWER than claimed, and " +
+                 "section 1 holds that correction against device.js's actual bytes so it cannot drift back. It " +
+                 "also answers half the MSAA question before it is asked: MSAA is absent ON PURPOSE, with a " +
+                 "measured reason. Modes travel by NAME (none / alpha / premultiplied / additive) because the " +
+                 "two APIs spell the factors differently -- one-minus-src-alpha against ONE_MINUS_SRC_ALPHA -- " +
+                 "and a descriptor of raw enums could only be right for one backend. A MISSPELLED NAME THROWS " +
+                 "rather than falling back to opaque, because a silent fallback is a wrong picture with no " +
+                 "error beside it. Default stays none, so no pixel this tree already draws moves. *** THE " +
+                 "PARITY GATE FOUND THAT MY REFERENCE WAS WRONG AND BOTH DEVICES WERE RIGHT. *** composite() " +
+                 "did not clamp, so additive over an opaque destination predicted alpha 1.5 -> 383 while WebGL2 " +
+                 "and WebGPU both returned 255. The devices agreed with each other AND with the hardware; the " +
+                 "answer key was the defect. Only a three-way comparison shows that -- a check comparing the " +
+                 "two backends alone would have called 383-against-255 a pass. The clamp is a property of the " +
+                 "TARGET FORMAT, not the blend, so composite() takes the range and defaults to the 8-bit unorm " +
+                 "the device actually offers. All four modes now agree across both backends and with the " +
+                 "arithmetic, and read four DISTINCT pixels -- if blend were ignored every mode would read the " +
+                 "same opaque one and every other check would still pass. Twelve sabotages, ALL RED BY NAME, " +
+                 "three files md5-identical; disabling GL blend read '1 distinct result from 4 modes'. TWO " +
+                 "SELF-REFERENTIAL CATCHES ALONG THE WAY: a comment spelling out the GLSL version directive " +
+                 "made render/backendParity.mjs -- the file that CLASSIFIES shaders by that marker -- classify " +
+                 "itself, v4462's shape again; and the new gate became device.js's THIRD consumer and the " +
+                 "first that is a check rather than a demo, which that module's own report had called out as " +
+                 "missing. Four backendParity ratchets move: glslBearing 145->146, wgslBearing 69->70, both " +
+                 "13->14, glslDirective 129->130.",
+    }),
+    // v4480 -- the one hundred and nineteenth closing. Four gaps closed, and three of them were not gaps.
+    since575: Object.freeze({
+        at: "v4480", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/pipelineGaps-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, thirteen checks in five sections. The last four items of the TSL/WebGPU " +
+                 "survey Keith asked for, and *** THREE OF THE SIX FINDINGS WERE WRONG, WHICH IS THE ROUND. *** " +
+                 "DEVICE LOSS was real and is fixed: blackhole.html, fluid-webgpu.html and mpm-gpu.html each " +
+                 "wired device.lost and gfx/device.js, the layer they all go through, did not -- the one-off " +
+                 "demos were more robust than the abstraction -- and pushErrorScope / uncapturederror appeared " +
+                 "in exactly three files, ALL OF THEM GATES, so the test harness caught the validation errors " +
+                 "the running engine dropped. Both live in device.js now, with reason 'destroyed' excluded " +
+                 "because a deliberate teardown is not a fault. *** TSL AT BUILD TIME ALREADY EXISTED AND THE " +
+                 "SURVEY MISSED IT: *** tools/ship/tsl-emitted-{race,physics,compute}.json are already there, " +
+                 "stamped with the round that wrote them and the three version that emitted them, with five " +
+                 "readers. What is missing is not a compiler, it is REPRODUCIBILITY -- all three gates re-emit " +
+                 "on every run and then assert the file exists and is over a thousand characters; nothing " +
+                 "compares a fresh emit to the stored text. *** RENDER BUNDLES ARE REFUSED BY ARITHMETIC: *** " +
+                 "gpuDriven.mjs already draws per (fleet, LOD) region through drawIndexedIndirect with " +
+                 "instancing, so ten races times five LODs is FIFTY indirect draws at the ceiling and a bundle " +
+                 "would amortise nothing (#133). And MSAA is absent ON PURPOSE, settled at v4479. Three name " +
+                 "collisions are recorded in #144's family, each with the file that proves it: Fn( is a WASM " +
+                 "export lookup and not three's Fn, `blend` in device.js was one COMMENT, and sampleCount " +
+                 "counts DATA samples in MtoRenderer. All three made a grep read the opposite of the truth, " +
+                 "which is how the survey went wrong. Twelve sabotages, ALL RED BY NAME, three files " +
+                 "md5-identical. *** FOUR COST ZERO RED FIRST AND ALL FOUR WERE ONE FAMILY: the checks tested " +
+                 "TEXT OR SHAPE RATHER THAN BEHAVIOUR. *** Wrapping the loss wiring in `if (false && ...)` left " +
+                 "every token a grep looks for and passed -- v4450's finding verbatim, 'an assertion about " +
+                 "where text sits is satisfied by a branch that is present and dead' -- so the wiring is an " +
+                 "exported function now and the gate CALLS it with a stub device and watches the callbacks " +
+                 "fire. A collision row renamed to a nonexistent token passed because the check grepped three " +
+                 "HARD-CODED strings instead of reading the row's own token. And a claim shortened to four " +
+                 "words passed an inequality test. TWO CORRECTIONS TO MY OWN EARLIER ROUNDS ALONG THE WAY: a " +
+                 "prose regex here went red because device.js wraps 'Parity is / the promise' across a line -- " +
+                 "the same unwrapping defect v4463 fixed and gateQuality names, third instance in three " +
+                 "rounds; and v4479's blend gate read a HARD-CODED LINE RANGE of device.js, which this round's " +
+                 "own insertion moved, so it is anchored to the sentence rather than the line number now.",
+    }),
+    // v4481 -- the twenty-second closing of this arc, and the one the task itself insisted on: MEASURE THE COST
+    // BEFORE ADDING THE FORMAT. The number decided the round, and it decided against the thing I would have
+    // guessed.
+    since576: Object.freeze({
+        at: "v4481", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/hdrCost-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, twenty-three checks in five sections, 0.65 s. #180 said the " +
+                 "tree was 8-bit only and told the round to measure what the round trip costs before adding a " +
+                 "format. *** BANDING IS NOT THE COST AND CLIPPING SATURATES. *** On a ramp that never leaves " +
+                 "0..1, storing all four intermediates at 8 bits moves the final picture by ONE least " +
+                 "significant bit, rms 0.45 -- the last quantisation dominates the four before it. On an " +
+                 "emissive disc the halo grows 25.3 / 34.5 / 45.6 / 56.6 / 67.7 output levels for peaks 1 to " +
+                 "16 on the half-float path, and the 8-bit path returns 25.4163 FOR EVERY PEAK FROM 2.0 UP, " +
+                 "bit-identical: its HDR dynamic range is 1.0:1 and a 2x sun and a 16x sun are the same " +
+                 "picture. The clip is at the FIRST store, not in the blur -- scene 4.0/4.0/3.94/3.73 against " +
+                 "1.0/1.0/0.98/0.92 -- so promoting the blur targets alone would buy nothing. And HALF FLOAT " +
+                 "IS ENOUGH: rgba16float tracks the reference to 0.0043 of one output level, so nothing here " +
+                 "asks for rgba32float. *** THE SURVEY'S 'NO HDR TARGET ANYWHERE' WAS ITS FIFTH OVERCLAIM: *** " +
+                 "render/bloomPass.js has rendered the WHOLE chain into RGBA16F since Round 136, because " +
+                 "scene, bright, both blurs, SSAO, god rays and the colour copy all come out of one " +
+                 "_createColorTex; my follow-up guess that the blur chain was 8-bit was wrong too, and it was " +
+                 "wrong because I read two calls that create depthCopyColor. *** AND THE FLAG THAT KNOWS WHICH " +
+                 "PATH IS RUNNING WAS WRITTEN TWICE AND READ NOWHERE, *** the second-declaration defect this " +
+                 "same file already produced at v4288 -- it has a getter and a real reader in main.js now, and " +
+                 "the fallback warning states 25.4 instead of 'bloom will be weaker'. #133 is satisfied by " +
+                 "measurement: SIX OF TWELVE palette entries exceed 1.0 after the voxel emissive boost, " +
+                 "peaking at 2.5, so this is a fix and not a decoration. *** #144's FAMILY, FOURTH ENTRY: the " +
+                 "shader's `emissive` gates on smoothstep(0.85, 0.95, MAX CHANNEL), which is saturation and " +
+                 "not emission, *** so it boosts SAND, SNOW, FLOWING_WATER, ICE and SCREEN, and MEMORY -- one " +
+                 "of the two entries the palette itself labels emissive -- sits at max channel 0.85, EXACTLY " +
+                 "the smoothstep's lower edge, and gets a boost of ZERO. Recorded, not silently repaired: " +
+                 "moving that gate would recolour every snowfield in the tree. Sixteen sabotages, ALL RED BY " +
+                 "NAME, plus one CONTROL that edits only a comment and correctly costs nothing. *** ONE COST " +
+                 "ZERO RED AND IT WAS commentFalsePass's OWN RULE, FOR THE THIRD TIME IN ONE ROUND: *** the " +
+                 "sabotage that deleted main.js's reader left the comment naming it, and a grep of raw source " +
+                 "cannot tell the two apart. *** AND THE FIX FOR THAT WAS ITSELF A DEFECT: *** the first " +
+                 "stripper also removed block comments, which on a file the size of main.js matches from an " +
+                 "unrelated /* inside a string to the next */ and swallows thousands of lines of real code, " +
+                 "turning two unrelated rows red. Line comments only. v4287 had already measured ONE store of " +
+                 "one texture on real hardware (1.7480 clamped to 1.0000, 43% off the brightest); what was " +
+                 "never measured is what the whole chain does with the loss, and that is the part that turns " +
+                 "'bright things get dimmer' into 'all of them get the same brightness'. " +
+                 "tools/ship/passFootprint-selfcheck.mjs asserted the phrase this round deleted and now grades " +
+                 "the number that replaced it.",
+    }),
+    // v4482 -- the twenty-third closing, and the first one in this arc that WIRES an existing module rather than
+    // building a new capability. v4463 shipped the projection and closed by saying nothing called it. Measured
+    // at the start of this round, its only importer in the whole tree was still its own selfcheck.
+    since577: Object.freeze({
+        at: "v4482", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/littlePlanet-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, TWENTY checks in five sections, 5.9 s -- the survey of 200 seeded bakes is most of it. #173 asked for " +
+                 "the little planet over procPlanet's equirectangular bake and THREE THINGS TURNED UP BEFORE " +
+                 "ANY DRAWING CODE WAS WRITTEN. *** THE TWO MODULES DO NOT MEAN THE SAME THING BY 'lon', AND " +
+                 "THEY ARE OFF BY EXACTLY 90 DEGREES: *** stereographic.js reads atan2(x, -z) and procPlanet " +
+                 "reads atan2(z, x), measured over 49 pairs as a CONSTANT 90.000000 deg offset, spread " +
+                 "2.22e-16, same winding, latitude agreeing to 5.33e-15. A pure rotation about the polar axis " +
+                 "and not a mirror -- which is exactly why nobody would have caught it by eye, because a world " +
+                 "rotated a quarter turn still looks like a world. LON_QUARTER_TURN applies it once and the " +
+                 "gate checks it by ROUND TRIP (1.11e-16 over 40 points) rather than by reading the constant " +
+                 "back. *** THE SAMPLING RATE SPANS 511 TO 1 ACROSS ONE FRAME, *** which is #175's question " +
+                 "answered: footprint 0.1128 to 57.62 texels per pixel over a 512px frame reading a 256x128 " +
+                 "bake, 1.99% of pixels undersampled, 51.77% of the source reached at all. *** AND THE WORST " +
+                 "PIXELS ARE THE FOUR AT THE CENTRE, WHERE THE PROJECTION IS AT ITS BEST: *** the " +
+                 "stereographic magnification at the nadir is 1.000, its MINIMUM over the frame, and the blow " +
+                 "up there is the EQUIRECT's own cos(lat) singularity -- 0.318 texels across in latitude and " +
+                 "57.62 in longitude, an anisotropy of 181:1 in one pixel. A little planet looks straight down " +
+                 "and an equirectangular map is worst straight down. *** AND THE REASON I BUILT THE " +
+                 "FOOTPRINT-AWARE FILTER WAS WRONG. *** The header first said a nearest read would speckle the " +
+                 "centre and the speckle would move with frame size; measured, it moves 129 pixels by ONE " +
+                 "level and the centre pixel is identical at 256, 384 and 512. procPlanet's pole rows are flat " +
+                 "-- 0 for ice, molten, terran and desert over 200 seeds, and 1 at worst for gas -- because " +
+                 "bakeEquirect's outermost row sits at 89.30 deg where cos is 0.0122. The filter is KEPT and " +
+                 "its justification REPLACED, with a control proving it can do a large thing (0.89% of pixels " +
+                 "by 143 levels on a checkerboard) and a row that grades procPlanet's flat poles so the day a " +
+                 "world type grows a polar feature the filter starts earning instead of being found to have " +
+                 "been needed. That claim was itself corrected once: the first draft said 'exactly zero, every " +
+                 "type', read off per-type MEANS with a max over the south row alone, and the gate found the " +
+                 "gas giants' 1 on the north. TWENTY SABOTAGES, ALL RED BY NAME, plus one CONTROL that " +
+                 "sabotages the sibling drawSeededPlanet and correctly costs nothing. *** THREE COST ZERO RED " +
+                 "AND ONE WAS v4463's OWN DEFECT MADE AGAIN BY THE SAME HANDS ONE ROUND LATER: *** turning " +
+                 "littlePlanetDir's rotation into a REFLECTION changed nothing, because every landmark probed " +
+                 "sat on the u axis where vy is 0 -- which is the blind spot v4463 found in its own handedness " +
+                 "check, wrote down, and fixed there. Off the axis the mirror is a half turn in longitude and " +
+                 "that is asserted now. Swapping equirectUV's Math.floor for `% 1` also cost nothing because " +
+                 "sampleEquirect wraps the column too and rescues it downstream, so the contract is asserted " +
+                 "on the returned VALUE; the comment claiming the floor keeps a negative spin on the texture " +
+                 "was wrong. And the third was a CRASH rather than a weak check -- the row that calls " +
+                 "drawLittlePlanet against a stub read calls[0] in its DETAIL STRING, so removing putImageData " +
+                 "threw and killed every later section. v4434's shape, v4478 hit it too, third instance in two " +
+                 "rounds. WIRED: ui/orreryDraw.js gains drawLittlePlanet over the same cached bake " +
+                 "drawSeededPlanet uses, and orrery.html's surface toggle is a three-way cycle whose third " +
+                 "label says it is the SAME generated surface seen from the ground, not a third claim about " +
+                 "where the pixels came from. #174 stays open: nothing has compared the CPU pair to a GPU one " +
+                 "by value.",
+    }),
+    // v4483 -- the twenty-fourth closing, and the one that finally answers the limit v4463 declared about itself.
+    // It turned out to be a round about the INSTRUMENT: a screenshot is eight bits, and no GLSL result in this
+    // tree had ever been graded finer than 1/255.
+    since578: Object.freeze({
+        at: "v4483", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/stereoDevice-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, seventeen checks in six sections, 1.1 s. #174 asked whether " +
+                 "the CPU and GPU agree BY VALUE. They do, three ways, and the answer is only worth anything " +
+                 "because the instrument was calibrated first. *** A WebGL2 READBACK IS RGBA8, SO EVERY GLSL " +
+                 "GATE IN THIS TREE COMPARES AT 1/255 *** -- fine for a picture, useless for arithmetic, and " +
+                 "v4463's stated limit (the shader 'needs a screenshot') understated the problem rather than " +
+                 "naming it. NEW tools/ship/glslFloatPack.mjs packs a float across three channels: 24 bits held, " +
+                 "23 ACHIEVED on this device, worst error 2 steps of 2^-24 = 1.19e-7 against the 3.92e-3 of one " +
+                 "8-bit step -- 32,954x. *** AND THE OBVIOUS IDIOM FOR IT IS WRONG AT EXACTLY ONE INPUT, THE " +
+                 "MAXIMUM: *** floor(v * 16777215 + 0.5) at v = 1.0 rounds to 2^24 BEFORE floor runs, because " +
+                 "16777215.5 needs 25 mantissa bits, so the high byte computes as 256, saturates, and both low " +
+                 "bytes zero out. 255 of 256 test values were correct. The extremes are where a projection's " +
+                 "horizon and poles live, so it was the one value the packer could least afford, and the gate " +
+                 "drives the naive version on the device rather than arguing about it. NEW stereoWGSL() beside " +
+                 "v4463's stereoGLSL(), so the projection exists on the backend gfx/device.js is building " +
+                 "toward -- and because WGSL compute writes f32 to a storage buffer, it is the only path with " +
+                 "no 8-bit door. THE THREE-WAY: WGSL vs the JS agrees to 4.99e-8, UNDER HALF AN f32 ULP, and " +
+                 "the driver's unproject returns a unit vector to 5.2e-8 (v4463 named normalize() as a place a " +
+                 "real driver might differ; it does not, on this one). GLSL vs the JS reads 1.82e-7 against a " +
+                 "transport floor of 2.38e-7, WHICH IS NOT A CLAIM THAT GLSL IS 1.8e-7 WRONG -- a difference at " +
+                 "the instrument's own resolution measures the instrument, and the gate refuses to report " +
+                 "tighter. GLSL vs WGSL, 1.78e-7, also at the floor. Neither GPU is the answer key (v4479). " +
+                 "*** TWO MEASUREMENTS WERE THROWN AWAY BEFORE THESE WERE KEPT, AND BOTH ARE KEPT AS CONTROLS. " +
+                 "*** The first probe built its test points with sin and cos independently on each side and " +
+                 "read a WGSL-vs-CPU difference of 1.839e-4 -- fifteen hundred ulp, which it would have " +
+                 "reported as the projection disagreeing. It was the trig: the driver's sin/cos and V8's differ " +
+                 "by 8,316 ulp on the same spiral, measured, so the gate grades on a LATTICE with no " +
+                 "transcendental in it and checks that its own lattice has none. The second packed three " +
+                 "components into three ROWS and read 1.409 -- a whole unit, and a row-order mistake, the " +
+                 "harness flipping rows under a readback that assumed it did not. Fixed structurally: one row, " +
+                 "component chosen by column. FIFTEEN SABOTAGES, ALL RED BY NAME. *** ONE COST ZERO RED AND IT " +
+                 "WAS A SUBSTRING: *** renaming the WGSL entry point to stereoProjectXX passed a check that " +
+                 "asked whether the source includes 'stereoProject', because the longer name contains the " +
+                 "shorter one. The driver is asked instead -- a module that CALLS both entry points is compiled, " +
+                 "and a rename fails compilation. THREE FINDINGS IN OTHER FILES ALONG THE WAY. " +
+                 "render/backendParity.mjs classifies render/stereographic.js as bearing NEITHER language, " +
+                 "though it now emits both: the census finds shaders by their preamble and AN EMITTED FRAGMENT " +
+                 "HAS NO PREAMBLE, so all three +1s came from the gate, not the emitter. Measured for one file " +
+                 "and not claimed for a population. The comment recording that made backendParity.mjs CLASSIFY " +
+                 "ITSELF by spelling out the WGSL attributes -- the third instance of that shape, written " +
+                 "directly underneath the file's own warning about it at v4479. And the row asserting BOTH is " +
+                 "under a tenth of GLSL-bearing crossed its threshold, 14/146 to 15/147, 9.6% to 10.2%. The " +
+                 "divisor was NOT bumped: the claim is about dual-language REACH and a parity gate carrying " +
+                 "both languages in order to compare them is the instrument sitting in its own sample, so the " +
+                 "two gates are split out by name and reach reads 13 of 147, 8.8%.",
+    }),
+    // v4484 -- the twenty-fifth closing, and the first that answers a question THIS SESSION recorded as data
+    // rather than one Keith raised. v4480 wrote freshEmitComparedToStored: false into gfx/pipelineGaps.mjs and
+    // marked it "*** THE ACTUAL OPEN QUESTION ***". It is answered, and the survey that asked it was miscounting.
+    since579: Object.freeze({
+        at: "v4484", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/emitReproducibility-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, twenty-one checks in six sections, 0.06 s -- it deliberately " +
+                 "does NOT re-emit, because the three gates that pay 25 s of browser and three.js each now " +
+                 "grade reproducibility themselves and a second expensive run would prove what the first one " +
+                 "proved. *** THE ANSWER IS YES: ALL FOUR ARTIFACTS RE-EMIT BYTE-IDENTICAL. *** Same md5 and a " +
+                 "clean git status against files committed three days and many processes earlier, and it " +
+                 "survives every arrangement that could have broken it -- the same graph emitted twice through " +
+                 "one renderer, two freshly built graphs through one renderer, and a second renderer in the " +
+                 "same process all give the same 7,267-byte fragment. *** AND v4480's SURVEY SAID THREE " +
+                 "ARTIFACTS AND THERE ARE FOUR. *** tools/ship/tsl-emitted.json -- no suffix, 43,239 bytes, the " +
+                 "LARGEST of the set, written by tslSource-selfcheck and compiled by wgslCorpus -- was missed " +
+                 "because the survey looked for tsl-emitted-{race,physics,compute} and A GLOB THAT WANTS A " +
+                 "HYPHEN AFTER 'emitted' DOES NOT MATCH A NAME THAT ENDS THERE. The gate runs that glob as a " +
+                 "control so the finding is mechanical rather than anecdotal: tsl-emitted* matches four, " +
+                 "tsl-emitted-* matches three. *** AND THE READER COUNT WAS RIGHT WHILE ITS SET WAS WRONG: *** " +
+                 "the hard-coded list counted render/backendParity.mjs, which only NAMES the files in a " +
+                 "comment and loads nothing, and omitted pipelineGaps-selfcheck.mjs, which reads them -- four " +
+                 "real readers plus one false one came to the same 5 as five real ones, and only listing the " +
+                 "members shows it. NEW tools/ship/emitReproducibility.mjs owns the register and the " +
+                 "comparison; all EIGHT writes across the three gates now compare against the stored bytes " +
+                 "before writing and grade the answer, at zero extra runtime because the emit has already " +
+                 "happened by the time a write is reached. *** THE CHECK'S OWN FIRST DRAFT WENT RED AND THE " +
+                 "ARTIFACTS WERE RIGHT: *** four of the eight reported drift while git status was clean, " +
+                 "because tslRace-selfcheck writes its file FIVE times -- once with a fresh object that DROPS " +
+                 "the four sprite keys, then four merges that add them back -- so each merge was comparing " +
+                 "against a state THIS RUN had created. THE FIRST WRITE ERASES THE EVIDENCE THE LATER ONES " +
+                 "NEED. snapshot() takes the baseline before anything is written, and section 4 reproduces the " +
+                 "whole trap with real calls so the fix is graded rather than described. THREE MORE FINDINGS " +
+                 "IN THE FILE v4480 WROTE. Its gate stamped arts[0] and asserted top-level wgsl and glsl keys, " +
+                 "true of the race file and of no other -- THE FOUR DO NOT SHARE A SCHEMA -- so correcting the " +
+                 "list put a differently shaped file first and the row went red on a fact about itself; every " +
+                 "artifact is graded now, by CONTENT rather than key name. And tsl-emitted-compute.json " +
+                 "carries WGSL ALONE, which is not a gap: WebGL2 HAS NO COMPUTE STAGE, so there is no GLSL " +
+                 "counterpart to emit, and the survey's blanket 'both texts written to disk' is true of three " +
+                 "and structurally impossible for the fourth. SIXTEEN SABOTAGES, ALL RED BY NAME. Two needed " +
+                 "the gate fixed first: one renamed a register row to a nonexistent file and CRASHED an " +
+                 "unguarded JSON.parse in a later section, taking down the row in section 1 that had already " +
+                 "diagnosed it -- v4434's shape, third instance in three rounds, and a later section must not " +
+                 "be able to destroy an earlier one's finding. The other set tslRace's baseline to undefined, " +
+                 "disabling it, and PASSED a row that grepped for the identifier EMITTED_BASELINE, which the " +
+                 "sabotage kept. Fourth token-not-behaviour instance this session; the row grades the " +
+                 "assignment from snapshot() and the five uses now, and says outright that it checks wiring " +
+                 "while section 4 checks behaviour.",
+    }),
+    // v4485 -- the twenty-sixth closing, and the first about a defect in the SHIP RITUAL ITSELF rather than in
+    // anything the engine draws. It had been watched twelve times before anybody looked at it.
+    since580: Object.freeze({
+        at: "v4485", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/observedGates-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, eighteen checks in six sections, 0.12 s. " +
+                 "budgetEvidence-selfcheck went red on the first verify of EVERY round in this session and " +
+                 "green when re-run alone, twelve times, and the reason was never diagnosed until now. *** IT " +
+                 "IS TWO DIFFERENT CAUSES WEARING ONE SYMPTOM, AND THIS ROUND FIRST BLAMED ONE FOR BOTH. *** " +
+                 "(a) A GATE ADDED THIS ROUND HAS NO EVIDENCE YET, which is CORRECT and self-resolving: the " +
+                 "verify's own sweep times it and the next run is green. Eleven of the twelve were this, and " +
+                 "the fix must NOT touch it -- an observation never made cannot be invented. (b) A GATE THAT " +
+                 "ALREADY HAD EVIDENCE LOSES IT, because the sweep killed it at the cap on a busy box; seen " +
+                 "directly once, at v4482, on headlessGpu-selfcheck at 729 ms quiet against 190,675 ms under a " +
+                 "concurrent verify. *** THE ROUND'S OWN NEW GATE PROVED THE POINT BY GOING RED AS CASE (a) ON " +
+                 "THE DAY IT WAS WRITTEN, *** while the module beside it claimed all twelve for (b). " +
+                 "MEASURED: 215 of the 1,356 gates the sweep timed have runtime evidence from NOWHERE else " +
+                 "than tools/ship/sweep-timings.json, a file whose own note reads 'Rewritten every run ... Not " +
+                 "a claim about the tree'. The wall was asking a durable question of a scratch file. *** AND " +
+                 "THE TREE ALREADY HAD THE DISCIPLINE, WRITTEN DOWN, APPLIED TO THE OTHER FILE: *** " +
+                 "selfchecks.mjs writes gate-timings.json on every full run and MERGES, with the reason one " +
+                 "line above the call -- 'a partial run must not delete the timings of gates it never reached' " +
+                 "-- which is this round's own rule, already implemented. THE PREMISE THIS ROUND OPENED WITH, " +
+                 "that gate-timings.json is hand-fed and nothing merges into it, WAS WRONG ON BOTH COUNTS and " +
+                 "the new gate is where it was caught. The sweep file replaces and is RIGHT to: its job is to " +
+                 "say what is under budget on this box now, and merging stale entries would resurrect v4460's " +
+                 "defect. Two files, opposed requirements, one wall reading both as the same kind of record. " +
+                 "NEW tools/ship/observedGates.mjs writes a third file with the third requirement -- MONOTONE " +
+                 "-- and budgetEvidence consults it AFTER the two live sources, so a fresh observation still " +
+                 "wins and the ledger only backstops. The A/B is run for real: five simulated cap-kills erase " +
+                 "five gates' evidence without it (exit 1, '4 with none') and none with it (exit 0, '4 carried " +
+                 "by the monotone ledger'). FOURTEEN SABOTAGES, ALL RED BY NAME. *** ONE COST ZERO RED AND IT " +
+                 "WAS VACUITY: *** hard-wiring observedFinishes to `true` passed every row, because every row " +
+                 "was a POSITIVE one and a predicate that always says yes satisfies all of them -- including " +
+                 "the coverage claim and the A/B, which would then have been measuring nothing. That is " +
+                 "vacuity.mjs's cause one, in the last place it should have appeared. TWO MORE SELF-INFLICTED " +
+                 "TRAPS: the gate spelled out the token it searches for and matched ITSELF twice, one round " +
+                 "after v4484 disarmed exactly that by building its markers from fragments; and a first draft " +
+                 "accused statedRuntime-selfcheck of writing gate-timings.json because a write appeared within " +
+                 "200 characters of the words -- PROXIMITY IS NOT A TARGET, and the destination is resolved " +
+                 "now. And a row asserting that this file is in neither record was true the day it was written " +
+                 "and false at the next sweep: it grades the INVARIANT on a name that can never be swept, and " +
+                 "the ledger's one-round lag is REPORTED rather than asserted to be zero, because a check " +
+                 "demanding zero would go red every time a round added a gate, for succeeding.",
+    }),
+    since581: Object.freeze({
+        at: "v4486", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/shaderEmitters-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, thirty-eight checks in six sections, 0.88 s. v4483 refused to " +
+                 "generalise from one file -- 'how many other emitters this census cannot see is unknown and " +
+                 "is its own round' -- and the answer is FOURTEEN. render/backendParity.mjs finds a shader by " +
+                 "its PREAMBLE and an emitted function body has none, so fourteen files carrying runnable " +
+                 "shader source are counted as bearing neither language. Ten are emitted fragments handed to a " +
+                 "host program; TWO are COMPLETE shaders the framework tell misses because that tell is a " +
+                 "uniform declaration and neither file has one (a vertex shader need not, and " +
+                 "shaders/voxel.frag.js is a whole fragment shader in a .js file with no JavaScript in it); " +
+                 "one is a fixture built by concatenation. *** AND THE FOURTEENTH CLOSES A LOOP: THE DEFENCE " +
+                 "AGAINST A FALSE POSITIVE CREATED A FALSE NEGATIVE. *** wgslLayout-selfcheck holds a " +
+                 "compilable module and interpolates its stage attribute from a fragment assembled one line " +
+                 "above, under a comment naming exactly why. Six rounds have disarmed markers that way and " +
+                 "every one also removed the file from the census meant to see it. NEW " +
+                 "render/shaderEmitters.mjs is a SECOND census beside the first, not a widening: widening " +
+                 "classify() would move six ratchets at once, and the two files answer two questions -- " +
+                 "v4485's resolution for the two timing files. *** THE BODY SCAN'S OWN FAILURE IS THE MIRROR " +
+                 "OF SELF-CLASSIFICATION: A GATE THAT ASSERTS SOMETHING ABOUT A SHADER MUST QUOTE THE " +
+                 "SHADER, *** and eighteen files do. All 32 candidates were hand-read and labelled BEFORE any " +
+                 "threshold was chosen, and the thresholds were then swept against that key, which makes " +
+                 "agreement a FIT. *** SO THE BEST SCORE WAS REFUSED: *** radius 140 / floor 4 agrees with all " +
+                 "32 and is NOT shipped, because its four neighbours read 31, 30, 29 and 31 -- a spike is what " +
+                 "a threshold fitted to its own key looks like. Radius 200 holds 31 across floors 3 through 6, " +
+                 "four wide against at most two anywhere else, so the shipped claim is 31 of 32. The first " +
+                 "draft called that run three wide and WENT RED: it had read the span from floor 4. The one " +
+                 "row that stays wrong, swiftShaders-selfcheck, is named rather than excluded, and it is " +
+                 "irreducible for the reason v4381 already wrote down about brainTsl-selfcheck. TWENTY " +
+                 "SABOTAGES, ALL RED BY NAME. *** ONE COST ZERO RED AND IT WAS A REJECTION THAT DOES " +
+                 "NOTHING: *** deleting the escape test changed no row -- escape-only 0, call-only 16, both " +
+                 "16, neither 58 over every tell in the tree. It is kept, proved non-vacuous on a constructed " +
+                 "stored-pattern case, and the four-way count is REPORTED rather than pinned at zero, because " +
+                 "a row demanding zero would go red the day the rejection first earned its keep. AND A SECOND " +
+                 "ZERO-RED SABOTAGE WAS THE SABOTAGE BEING WRONG: a marker spelled into this module's " +
+                 "COMMENTS changes nothing, correctly, because classify() strips comments -- the rule settled " +
+                 "at v4266; in CODE it turns both censuses red. The first tell set also accepted any C-shaped " +
+                 "definition and matched FIVE box3d rig gates, which embed real C: GLSL is a C-family language " +
+                 "and syntax alone cannot separate them, so a scalar return must now carry a shading-language " +
+                 "type in its parameter list.",
+    }),
+    since582: Object.freeze({
+        at: "v4487", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/emitterCompile-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, thirty-four checks in five sections, 5.99 s -- slow on " +
+                 "purpose, because it launches a browser. v4486 counted fourteen files carrying runnable " +
+                 "shader text the preamble census calls none, and ran NONE of them; a census of shader text " +
+                 "that never compiles a line is a census of STRINGS. *** EVERY EMITTER COMPILES: *** nine rows " +
+                 "carry text this gate can hand a driver itself -- eleven programs, since dither and vorton " +
+                 "each ship a pair -- nine GLSL through WebGL2 and two WGSL through WebGPU, no errors. Four " +
+                 "have a receipt elsewhere and one is a fixture for a pair DETECTOR and is not a shader; both " +
+                 "sets are named rather than counted as passes. *** AND fx/dither.js SHIPS A GLSL AND A WGSL " +
+                 "THAT ARE NOT THE SAME FUNCTION. *** Its header says the shader cannot drift from the JS " +
+                 "because the shader is a function of the JS -- true of the 64 CONSTANTS, false of the " +
+                 "ARITHMETIC around them, which is written once per language. The JS wraps explicitly, GLSL's " +
+                 "mod() floors, and WGSL's % keeps the DIVIDEND's sign. Measured over 256 probe points from " +
+                 "-7.5 to +7.5: non-negative coordinates gave WGSL-vs-JS EXACTLY 0 and GLSL-vs-JS 8.894e-8 " +
+                 "under a 2.38e-7 transport floor; at the 192 points where either coordinate was negative the " +
+                 "GLSL still tracked the JS and the WGSL was off by 0.984375 -- 63/64, THE WHOLE SPAN OF THE " +
+                 "OFFSET -- at every single one. *** LATENT, NOT LIVE, AND THE RECORD SAYS SO: *** both " +
+                 "shipped call sites pass a fragment coordinate, which is never negative, so nothing on screen " +
+                 "was wrong; what was wrong was a public function two backends may call with any coordinate. " +
+                 "The WGSL floor-wraps now, the disagreement is 0 at all 256 points, and the gate still DRIVES " +
+                 "the old expression beside the new one because a fix whose defect cannot be demonstrated is a " +
+                 "claim. THE CONTROL: fx/vorton, the other dual-language emitter, on the same harness and " +
+                 "packer, agrees at 4.439e-8 / 2.631e-7 / 2.439e-7, all under the floor -- so the dither " +
+                 "number is dither's, not the method's. *** THE HARNESS TRAP, WRITTEN DOWN SINCE v4284, WAS " +
+                 "SPRUNG ANYWAY: *** it draws attributelessly, so a vertex shader reading an attribute " +
+                 "collapses and the frame returns ok:true and BLACK. The first probe wrote `in vec2 aPos` and " +
+                 "spent three probes blaming the shader, until a CONSTANT-COLOUR shader read black too. Every " +
+                 "device row asserts distinctColours now. FIFTEEN SABOTAGES, ALL RED BY NAME. *** TWO COST " +
+                 "ZERO RED AND BOTH WERE THE RECORD BEING DECORATION: *** the control's three figures were " +
+                 "checked only against the floor, so quadrupling one passed, and the per-row distinct-colour " +
+                 "expectations were typed beside the record instead of read from it. Both are derived from the " +
+                 "record now. The arrival moved backendParity to 148/72/16 -- a gate that COMPILES both " +
+                 "languages is shader-bearing -- and it is the THIRD dual-language gate on a list whose own " +
+                 "row says a fourth without a reason goes red.",
+    }),
+    since583: Object.freeze({
+        at: "v4488", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/deviceReach-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, twenty-nine checks in five sections, 4.00 s. v4269 said a " +
+                 "WGSL port could only be checked structurally, giving as its reason the proposition this " +
+                 "round counts; v4270 tested it and it was false. *** THE CORRECTION WAS APPLIED TO THE TWO " +
+                 "FILES IT WAS ABOUT AND TO NOTHING ELSE. *** Eighteen files carry a comment asserting, of " +
+                 "THIS environment, that a shader or device cannot run. Three are the correction quoting the " +
+                 "claim to refute it. FIFTEEN ARE LIVE, wrong for 218 versions, in a tree that has since " +
+                 "built stereoDevice, blendModes, gpuTimer, slugWgsl, headlessGpu and emitterCompile. The " +
+                 "gate proves them wrong by compiling and drawing a constant shader and reading 64,128,191 " +
+                 "back, not by listing filenames. *** THE SHARPEST ROW WAS WRITTEN AFTER THE CORRECTION: *** " +
+                 "render/stereographic.js is stamped v4463, 193 versions past v4270, and v4483 ran that " +
+                 "module's own shader and graded it to 4.99e-8 -- the sentence survived the round that " +
+                 "disproved it, in the same file. Three files corrected here, each keeping the old sentence " +
+                 "quoted; the other twelve LISTED AND LEFT, because a claim is corrected only when this round " +
+                 "ran the shader it is about. *** SECOND FINDING: A SHADER WITH A COSINE CANNOT BE GRADED " +
+                 "BELOW 1.797e-4. *** panini's GLSL reads 3.052e-5 and 8.928e-5 against its JS -- ninety " +
+                 "times the transport floor, which looks like a defect. The bisection says otherwise: atan " +
+                 "4.995e-7, length 5.233e-7, y/length 5.107e-7 all AT the floor; sin(atan) 4.444e-5, " +
+                 "cos(atan) 1.797e-4, 2/(1+cos(atan)) 9.060e-5 -- which is panini.y arrived at from the other " +
+                 "end. Every algebraic step is exact and only the transcendentals are not, so the floor is " +
+                 "SwiftShader's trig against V8's, not any shader above them. f32 conditioning was TESTED AND " +
+                 "REFUSED first: Math.fround at every step moved 8.928e-5 to 8.923e-5, and the worst point " +
+                 "sits at denom 1.9923, nowhere near the horizon. The floor is not so loose it hides a " +
+                 "defect: bending the shipped cosine by 1e-3 pushes the grade above it and the gate reddens. " +
+                 "THE CONTROL: ashimaNoise has no transcendental, agrees with snoise3f32 at 5.740e-7 under a " +
+                 "9.520e-7 floor, and disagrees with snoise3 by 4.078 -- four whole units on a function whose " +
+                 "range should be about [-1,1]; snoise3 runs -3.0298 to 3.2576 where snoise3f32 stays inside " +
+                 "[-0.8466, 0.8665]. v4243 added snoise3f32 on SIMULATED f32 evidence with no device, and a " +
+                 "driver now agrees with it. SIXTEEN SABOTAGES, ALL RED BY NAME. *** ONE COST ZERO RED AND " +
+                 "WAS THE RECORD BEING DECORATION AGAIN: *** the worst point's denominator, the half of the " +
+                 "conditioning argument that rules OUT the horizon, was stored and never derived. *** AND THE " +
+                 "MODULE JOINED ITS OWN POPULATION ON THE FIRST RUN, *** because its header quoted the " +
+                 "sentence it counts -- seventh instance in seven rounds, with the discipline written twenty " +
+                 "lines below and applied to the data but not to the prose above it.",
+    }),
+    since584: Object.freeze({
+        at: "v4489", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/parallaxSampler-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, twenty-two checks in six sections, 3.14 s. " +
+                 "render/parallaxOcclusion.js's JS is named parallaxUVMirror -- 'the JS model of " +
+                 "PARALLAX_GLSL' -- and its gate proves convergence, a flat heightmap, a head-on view and a " +
+                 "sabotage. All of that is THE MARCH. The two do not get their height from the same place: " +
+                 "the GLSL reads an 8-bit NEAREST texel and the JS calls a callback every caller hands a " +
+                 "continuous function. *** ON A REAL DRIVER, 256 POINTS, 16 LAYERS: 2.855e-3 with the " +
+                 "continuous height and 2.413e-7 with the sampler simulated, against a 2.380e-7 floor -- a " +
+                 "factor of 11,831. *** The march is a perfect mirror; the sampler is the whole discrepancy, " +
+                 "and 112 of 256 points land past nine tenths of a step, the worst 1.31 steps out, so the two " +
+                 "exit the march on DIFFERENT LAYERS. *** AND MORE LAYERS DOES NOT CONVERGE, WHICH THE OTHER " +
+                 "GATE'S HEADER PROMISES IT DOES: *** the sampler error is 8.206e-4 at 4, 8, 16 and 32 layers " +
+                 "-- identical, because it is the texel -- while one step halves each time. 0.094 of a step " +
+                 "at four layers, 0.750 at thirty-two. The claim is scoped in that header, with the number, " +
+                 "not withdrawn. *** THE GRAZING GUARD IS WHERE THEY REALLY DIVERGE: *** the mirror " +
+                 "normalises and the shader does not, which costs nothing because the function only uses " +
+                 "xy/z -- 2.413e-7 with a raw vector -- until max(z, 1e-4) bites, and then one clamps a " +
+                 "NORMALISED z and the other a RAW one and the answers are 7.343e+2 apart in a coordinate " +
+                 "that runs 0 to 1. The existing gate drives view-z of 0.8, 1, 0.6, 0.6, so that branch has " +
+                 "never run. NO SHIPPING BEHAVIOUR EDITED: three calls listed, none taken. EIGHTEEN " +
+                 "SABOTAGES, ALL RED BY NAME. *** THREE COST ZERO RED AND ALL THREE WERE ONE DEFECT -- A " +
+                 "CONTROL THAT COULD NOT SEPARATE THE RULES IT GRADED: *** bending texel selection from floor " +
+                 "to round passed everything, because the march averages over a forgiving staircase; and the " +
+                 "first draft of the isolating probe used a field varying in ONE axis sampled at exactly " +
+                 "k/16, where floor and round agree and a flipped row changes nothing. Both axes now, at 0.7 " +
+                 "and 0.3 of a texel.",
+    }),
+    since585: Object.freeze({
+        at: "v4490", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/auditCap-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, twenty checks in five sections. The register audit's cap " +
+                 "was a typed 120,000 ms and TWO OF THE THIRTY GATES IT CAPS EXCEED IT -- shaderRefs at " +
+                 "439,821 ms and doorKinds at 159,201 ms, run singly on a quiet box. A killed gate is recorded " +
+                 "as a timeout and registerRender then shows the register a BOUND where the gate's own " +
+                 "sentence belongs, which is the 'unopened mail' registerDrift exists to prevent, arriving " +
+                 "through the tool built to prevent it. The distribution is why a typed number could not " +
+                 "work: median 1,597 ms, slowest 275x the median, and the sixth-slowest already six times " +
+                 "faster than the fifth. *** AND THE KNOB WAS ADDED INSTEAD OF THE DEFAULT BEING FIXED, WITH " +
+                 "THE MEASUREMENT IN HAND: *** the freeze's own comment at v4471 reads 'their runtimes (75 s " +
+                 "to 151 s) are why SWEK_AUDIT_CAP_MS exists', and the default stayed at 120,000 -- below what " +
+                 "that round had just measured -- for nineteen rounds while the tail grew to 441 s. The " +
+                 "default is DERIVED now, twice the slowest runtime rounded up to the minute, and no " +
+                 "cap-sized literal is left in the freeze. *** v4489'S CONCLUSION WAS WRONG AND THE ROUND " +
+                 "REPRODUCES IT: *** it probed 120,000 and 300,000, saw a different gate killed each time, and " +
+                 "concluded no cap satisfies registerDrift's timeout rule. 300,000 lies STRICTLY BETWEEN " +
+                 "159,201 and 439,821 -- two samples either side of one runtime, and the gates were never " +
+                 "timed. At the derived 900,000 the audit has zero timeouts and registerDrift is ALL GREEN " +
+                 "with its rule untouched and nothing registered to get there. THE CIRCULARITY IS GUARDED: a " +
+                 "cap derived from readings taken under it would justify itself if a gate ever slowed past " +
+                 "it, so the audit must carry zero timeout rows AND the slowest row must sit 1.5x under the " +
+                 "cap. Headroom is REPORTED (2.04x) rather than asserted safe.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

@@ -46,7 +46,10 @@
 //
 // This is the MATH, in plain JS, so it can be tested exactly. paniniGLSL() emits the same arithmetic as a shader
 // string for the GPU path. THEY ARE NOT AUTOMATICALLY THE SAME FUNCTION -- one is JS on a CPU and one is GLSL on
-// a GPU, and nothing here can run the GPU. The selfcheck gates the JS and CHECKS THE SHADER TEXT AGAINST THE SAME
+// a GPU, AND THAT SENTENCE USED TO END "and nothing here can run the GPU" -- WHICH WAS FALSE FROM v4270 AND
+// STAYED IN THIS FILE FOR 218 VERSIONS. v4488 ran paniniProject on a real driver: it agrees with the JS to
+// 3.052e-5 in x and 8.928e-5 in y, both UNDER the 1.797e-4 trig floor that render/deviceReach.mjs measures
+// for anything containing a cosine. The selfcheck gates the JS and CHECKS THE SHADER TEXT AGAINST THE SAME
 // CONSTANTS, which is weaker and is labelled as such. RIG: the shader's actual output needs a screenshot.
 
 /**

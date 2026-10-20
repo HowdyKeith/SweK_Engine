@@ -1,10 +1,21 @@
 // WebGLEngine/tools/ship/parallaxOcclusion-selfcheck.mjs -- v2784
 //
 // Run: node tools/ship/parallaxOcclusion-selfcheck.mjs
-// GATES render/parallaxOcclusion.js. The shader can't run in the sandbox, so we prove parallaxUVMirror (the JS
-// model of PARALLAX_GLSL) converges to a fine reference march and behaves correctly: flat heightmap / head-on
-// view -> no shift; a sloped heightmap at an angle shifts the UV toward the near side; more layers -> closer to
-// the reference; and a SABOTAGE (no parallax) differs. Structural check keeps GLSL and mirror in sync.
+// GATES render/parallaxOcclusion.js. This line USED TO SAY "the shader can't run in the sandbox", which was
+// false from v4270 and stayed here for 1,705 versions; v4489 compiled PARALLAX_GLSL on a real driver and
+// graded it against the mirror. This gate stays cheap and structural, and the device work lives in
+// tools/ship/parallaxSampler-selfcheck.mjs.
+//
+// What is proven here is about THE MARCH: parallaxUVMirror (the JS model of PARALLAX_GLSL) converges to a fine
+// reference march and behaves correctly -- flat heightmap / head-on view -> no shift; a sloped heightmap at an
+// angle shifts the UV toward the near side; more layers -> closer to the reference; and a SABOTAGE (no
+// parallax) differs. Structural check keeps GLSL and mirror in sync.
+//
+// *** AND "MORE LAYERS -> CLOSER TO THE REFERENCE" IS TRUE OF THE MARCH AND FALSE OF THE PAIR. *** The shader
+// reads its height from an 8-bit NEAREST texel and the mirror from a continuous callback, so there is a
+// sampler error that does not depend on the layer count while the step does. v4489 measured it: 3.687e-4 at
+// four, eight, sixteen and thirty-two layers, against a step that halves each time. See
+// render/parallaxSampler.mjs -- the claim above is not withdrawn, it is scoped.
 
 import { parallaxUVMirror, PARALLAX_GLSL } from "../../render/parallaxOcclusion.js";
 

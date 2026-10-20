@@ -221,8 +221,13 @@ console.log("\n5. *** THE HALF-FLOAT ASSUMPTION, CHECKED AGAINST THE ENGINE THAT
         /emissive surfaces can output values > 1\.0/.test(bloom),
         "Round 136 promoted it from RGBA8 so values above 1 survive -- the assumption was not a lucky guess, " +
         "but nobody had looked until now");
-    ok("  and it falls back to RGBA8 when the extension is missing, warning that bloom will be WEAKER",
-        /EXT_color_buffer_half_float/.test(bloom) && /bloom will be weaker/.test(bloom));
+    // v4481 -- THIS ROW USED TO ASSERT THE PHRASE "bloom will be weaker", AND THAT PHRASE IS NOW GONE ON PURPOSE.
+    // render/hdrCost.mjs ran the whole five-step chain at both storage formats and the loss is not weakness, it
+    // is saturation: every scene peak from 2.0 upward gives the SAME halo on 8 bits. The warning states that
+    // number now, so this row grades the measurement rather than the adjective it replaced.
+    ok("  and it falls back to 8-bit when the extension is missing, warning with a NUMBER rather than an adjective",
+        /EXT_color_buffer_half_float/.test(bloom) && /hdrCost\.mjs/.test(bloom) && /25\.4 output levels/.test(bloom),
+        "\"bloom will be weaker\" was true and unmeasured for every round since 136");
     ok("*** and v4287 measured what WEAKER means: the peak clamps 1.7480 to 1.0000 ***",
         /rgba8unorm/.test(fs.readFileSync(path.join(ENG, "tools/ship/bloomFusedTexture-selfcheck.mjs"), "utf8")),
         "181 samples above 1.0 destroyed, 43% off the brightest -- the fallback path IS the format v4287 clipped");

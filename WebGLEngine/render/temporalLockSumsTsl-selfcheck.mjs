@@ -189,7 +189,7 @@ console.log("\n4. ON THE DEVICE: the driver's DEFAULT is the sums, and once they
 // not asserted: measured over 128 frames at 128x128 when the default was made, -0.010 to +0.014 dB across six cases.
 //
 // *** THE STILL ROW WAS WRITTEN "TO THE BIT" AND THE DEVICE SAID NO, TWICE. *** First: the mask read 0.019 on a scene
-// where nothing moves -- the older closed window held frames 0-31, and the driver's frame 0 on WebGPU was drawn
+// where nothing is in motion -- the older closed window held frames 0-31, and the driver's frame 0 on WebGPU was drawn
 // UNJITTERED (0.93 from frame P's, the same phase; every later frame within 1e-6 of its period's twin): three switched
 // the camera's clip convention and rebuilt its projection inside the colour pass, after the driver had jittered it.
 // This fixture drew the scene twice first, which converted the camera early; then the driver compiled the scene first,

@@ -178,6 +178,26 @@ console.log("\n4. *** ONE SET OF CONSTANTS: THE SHADERS ARE BUILT FROM THE ARRAY
         (DITHER_GLSL.match(/\d+(,\d+)+/) || [""])[0] === (DITHER_WGSL.match(/\d+(,\d+)+/) || [""])[0],
         "GLSL and WGSL are separate strings; the only thing keeping them equal is that both are built from BAYER8");
 
+    // *** v4487 -- THE CONSTANTS WERE THE SAME AND THE ARITHMETIC AROUND THEM WAS NOT, AND ONLY A DEVICE SAW
+    // IT. *** The three rows above are exactly right and they were not enough: the 64 numbers matched, and the
+    // WRAP that indexes into them is written once per language. GLSL's mod() floors, the JS writes
+    // ((v % N) + N) % N, and the WGSL used `%`, whose result in WGSL keeps the DIVIDEND's sign. At a negative
+    // coordinate the two shaders differed by 0.984375 -- 63/64, the whole span of the offset -- at every one of
+    // 192 probe points, measured on a real driver by tools/ship/emitterCompile-selfcheck.mjs.
+    //
+    // That gate launches a browser and this one must stay cheap, so the regression is caught HERE by shape and
+    // THERE by value. The shape is not "the file contains the word floor" -- that would pass on a comment about
+    // it -- but that the WGSL's index expressions divide and floor, and that neither takes a bare remainder.
+    {
+        const idx = (DITHER_WGSL.match(/let\s+[xy]\s*=\s*i32\([^;]*\);/g) || []);
+        ok("!! the WGSL wrap FLOORS, like GLSL's mod() and like the JS -- v4487's finding, held by shape",
+            idx.length === 2 && idx.every((e) => /floor\(/.test(e) && /\//.test(e)),
+            idx.join("  ") || "*** no index expressions found; the source has been restructured ***");
+        ok("!! ...and neither index takes a bare remainder, which is the exact expression that was wrong",
+            idx.length === 2 && idx.every((e) => !/%/.test(e)),
+            "WGSL's % keeps the dividend's sign, so a negative coordinate indexed the matrix negatively");
+    }
+
     // The arithmetic must mirror the JS, not merely the constants. Same centring, same tile size, same clamp.
     for (const [name, s] of [["GLSL", DITHER_GLSL], ["WGSL", DITHER_WGSL]]) {
         ok(`!! ${name} uses the CENTRED offset formula, matching bayerOffset`,
