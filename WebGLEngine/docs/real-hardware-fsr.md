@@ -449,6 +449,24 @@ node tools/denoiseDevice.mjs --which
   200 s on the Intel and under 120 s on the 1080.
 - **Send back the JSON file and the `--which` line from each GPU.**
 
+### Round 31: the half-size chain timed at 1920 x 1080 (pre-registration section 93)
+
+On each GPU, in a fresh clone of a commit carrying section 93:
+
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r31-a.json
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r31-b.json
+```
+
+- **What is new:** the denoise group now has a fourth gate, `render/denoiseUpscaleGPU-selfcheck.mjs`. On a GPU it times round
+  30's chain at 1920 x 1080 against today's page, in two `section 93:` lines.
+- **Section 93 predicts:** the chain is faster on both GPUs, by 1.4-3.0 x on the 1080 and 2.0-4.0 x on the Intel; every gate
+  green; the fill uses fewer than its 96 rings.
+- **Don't commit or pull between runs.**
+- **Send back all four JSON files.**
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and

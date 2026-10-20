@@ -23,6 +23,12 @@
 //   G8  EASU reads the frame before the fill                           1 RED (the chain). Its first form -- EASU bound to the
 //       input buffer -- was no sabotage at all: 24 rings is an even number of swaps, so the filled frame IS that buffer
 //   G9  the camera uniform's aspect inverted                           1 RED (the layout row; every frame here is square)
+//   and section 4's caller, by the same runner:
+//   T1  timeHalfChain's sum leaves the fill out                        1 RED (the sum row)
+//   T2  the fill on the device's clock past 30 passes                  1 RED (the sum row: the fill must be the wall's)
+//   T3  the page's table without the fill's row                        1 RED (the page row: 7 rows, not 8)
+//   T4  the full-size page timed from the half-size row                1 RED (the sum row). 0 RED at first: nothing held which
+//       ladder row each network time came from; the row now names both
 "use strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -184,7 +190,61 @@ else {
         ch.map((c) => `${c.k}: worst ${c.rel.toExponential(1)}, ${c.rings} rings, ${c.left} left`).join("; "));
 }
 
+console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at its pilot size, in Chromium");
+{
+    const drive = (size, ms) => runInEngineOrigin({ engineRoot: ENG, timeoutMs: ms + 60000, args: { size, ms }, script: `async (a) => {
+        const f = document.createElement("iframe"); f.style.width = "1200px"; f.style.height = "900px"; f.src = "/denoise.html"; document.body.appendChild(f);
+        await new Promise((r) => f.onload = r);
+        const d = f.contentDocument, $ = (id) => d.getElementById(id), wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        for (let i = 0; i < 100 && !$("chain"); i++) await wait(50);
+        $("chainSize").value = a.size; $("chain").click();
+        const t = Date.now();
+        while (Date.now() - t < a.ms && ($("chain").disabled || !$("chainJson").textContent) && !/failed|no WebGPU/.test($("chainStatus").textContent)) await wait(100);
+        return { status: $("chainStatus").textContent, json: $("chainJson").textContent, shown: $("chainTable").style.display !== "none", rows: $("chainTable").querySelectorAll("tbody tr").length };
+    }` });
+    const pg = await drive("128x72", 540000);
+    if (pg.skipped) console.log("  SKIP  " + pg.reason);
+    else {
+        let J = null; try { J = JSON.parse(pg.result?.json || "null"); } catch {}
+        const st = J && J.chain && J.chain.steps, keys = ["covHalf", "covFull", "fill", "rest", "whole"];
+        const fine = (x) => !!x && Number.isFinite(x.ms) && x.ms > 0 && (x.clock === "device" || x.clock === "wall");
+        ok("!! the page timed every step of the chain and both networks at its pilot size -- each a positive time on a named clock, the table shown, no page error",
+            pg.ok && !!st && keys.every((k) => fine(st[k])) && fine(J.networkFull) && fine(J.networkHalf) && !!J.full && !!J.half && pg.result.shown && pg.result.rows === 9 && !pg.pageErrors.length,
+            pg.ok ? (pg.result?.status || "").slice(0, 200) : pg.reason);
+        if (st) {
+            // the network times are the ladder's rows, w x h then W x H (T4 went 0 RED before this held which was which); today's page
+            // is the full-size network and its mask, the chain the half-size network and every step
+            const [halfRow, fullRow] = J.ladder.rows[J.kernels], med = (x) => (x.gpu ? x.gpu.median : x.wall.median);
+            const parts = J.half ? J.half.ms : NaN, sum = med(halfRow) + ["covHalf", "covFull", "fill", "rest"].reduce((a, k) => a + st[k].ms, 0);
+            ok("  ...the chain in all is the half-size network plus the four steps, today's page the full-size network and its mask, each network its own ladder row, the fill by the wall clock, on scene R 990000 with its light in view, every ring budgeted and some used",
+                Math.abs(parts - sum) < 1e-9 && st.fill.clock === "wall" && fullRow.W === 128 && fullRow.H === 72 && halfRow.W === 64 && halfRow.H === 36 &&
+                J.networkFull.ms === med(fullRow) && J.networkHalf.ms === med(halfRow) && Math.abs(J.full.ms - (med(fullRow) + st.covFull.ms)) < 1e-9 && st.whole.clock === "wall" && J.chain.maxRings === 96 && J.chain.rings > 0 && J.chain.rings < 96 &&
+                J.chain.inView > 0 && JSON.stringify(J.scene) === JSON.stringify(["R", 990000]) && J.chain.W === 128 && J.chain.w === 64,
+                `${J.chain.rings} of 96 rings filled; ${J.chain.inView} px in view at 64 x 36; ${keys.map((k) => `${k} ${st[k].ms.toFixed(2)} ms (${st[k].clock})`).join(", ")}`);
+        }
+        // ON A GPU, THE RIG'S SIZE (pre-registration section 93): 960 x 540 -> 1920 x 1080, every step a measured line the rig's
+        // report keeps. Not on a software adapter: SwiftShader's 1080p would be minutes of a CPU's time that decides nothing.
+        // SWEK_HALFCHAIN_RIGSIZE=1 runs it on any adapter -- how its plumbing was driven here once, on SwiftShader
+        if (J && J.ladder.adapter.software && process.env.SWEK_HALFCHAIN_RIGSIZE !== "1") console.log(`  SKIP  the rig's size, 1920 x 1080: ${J.ladder.adapter.name} is a software adapter -- section 93 reads a GPU's`);
+        else if (J) {
+            const rg = await drive("1920x1080", 1500000);
+            let K = null; try { K = JSON.parse(rg.result?.json || "null"); } catch {}
+            const ks = K && K.chain && K.chain.steps;
+            ok("!! section 93: at 1920 x 1080 the page timed both networks and every step of the chain, the fill reaching every pixel in its 96 rings",
+                rg.ok && !!ks && keys.every((k) => fine(ks[k])) && fine(K.networkFull) && fine(K.networkHalf) && !!K.full && !!K.half && K.chain.rings > 0 && K.chain.rings < 96 && !rg.pageErrors.length,
+                rg.ok ? (rg.result?.status || "").slice(0, 200) : rg.reason);
+            if (ks) {
+                const row = (x) => (x.skipped ? `not measured (${x.reason})` : `${(x.gpu ? x.gpu.median : x.wall.median).toFixed(3)} ms (${x.gpu ? "device" : "wall"})`), [lh, lf] = K.ladder.rows[K.kernels];
+                say(`section 93: ${K.ladder.adapter.name}, kernels ${K.kernels}; the network at 1920 x 1080 ${row(lf)}, at 960 x 540 ${row(lh)}; ` +
+                    (K.full && K.half ? `today's page (network and mask) ${K.full.ms.toFixed(3)} ms (${K.full.clocks.join(" + ")}); the half-size chain ${K.half.ms.toFixed(3)} ms (${K.half.clocks.join(" + ")}); ratio ${(K.full.ms / K.half.ms).toFixed(3)} x` : "no ratio: a part was not measured"));
+                say("section 93: the chain's steps -- " + ["covHalf", "covFull", "fill", "rest", "whole"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; ") +
+                    `; ${K.chain.rings} of 96 rings filled`);
+            }
+        }
+    }
+}
+
 console.log(fails ? `\nFAIL -- ${fails} check(s)` : "\nALL GREEN");
-console.log("not timed here: any of it. On SwiftShader a kernel's time is a CPU's; the rig round times the chain (backlog denoise-halfres-rig-timing).");
+console.log("not read here: any time section 4 printed. On SwiftShader a kernel's time is a CPU's; the rig round reads them (backlog denoise-halfres-rig-timing).");
 REPORT.write();
 process.exit(fails ? 1 : 0);

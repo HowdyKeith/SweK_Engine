@@ -30,6 +30,7 @@
 "use strict";
 import { EASU_WGSL } from "../fx/fsr/fsrKernels.js";
 import { cameraBasis } from "../physics/render/pathTracer.mjs";
+import { timingLadder } from "./denoiseDevice.mjs";
 
 /** Rays across a pixel are COVERAGE_GRID x COVERAGE_GRID (render/denoiseMask.mjs's). */
 export const COVERAGE_GRID_WGSL = 8;
@@ -307,4 +308,82 @@ export class DenoiseUpscaleGPU {
         for (const b of [tMax, uT, up, uE, fc, fE, dst, uC]) b.destroy();
         return { y, ...c, tMax: tm };
     }
+
+    /**
+     * Round 31: THE CHAIN'S STEPS TIMED, apart from the denoise, on scene S's geometry with the w x h frame upscaled to W x H.
+     * Every buffer is made once and kept, so no upload or readback is inside a time. Per rep, in this order:
+     *   covHalf, covFull   the coverage kernel at w x h and at W x H, one frame each
+     *   fill               maxRings ring passes and the left pass, one frame -- by the wall clock, always: more passes than
+     *                      gfx/device.js timestamps in one frame (30), and the exact fill needs one a ring (77 measured at
+     *                      960 x 540, R 44004)
+     *   rest               the transfer, EASU and the composite, one frame
+     *   whole              all of the above in ONE frame, by the wall clock -- what a frame of the chain costs
+     * A step is on the device's clock where the device grants timestamps and the step has 30 passes or fewer, else the wall
+     * clock (performance.now() around the frame and the queue's onSubmittedWorkDone). Each row says which. Returns medians.
+     */
+    async time(S, w, h, W, H, maxRings, { reps = 5 } = {}) {
+        const dev = this.device, gpu = dev.gpu, stamps = !!(dev.capabilities && dev.capabilities.timestamps), now = () => performance.now();
+        const sph = packSpheres(S.scene), mk = (n) => dev.buffer({ data: new Float32Array(n), usage: ["storage"] });
+        const bS = dev.buffer({ data: sph, usage: ["storage"] }), cH = mk(w * h), eH = mk(w * h * 3), cF = mk(W * H), eF = mk(W * H * 3);
+        const uH = dev.buffer({ data: cameraUniform(S, w, h, S.scene.length), usage: "uniform" }), uF = dev.buffer({ data: cameraUniform(S, W, H, S.scene.length), usage: "uniform" });
+        const covOps = (pass, c, e, u, ww, hh) => { this.p.cov.bind("sph", bS).bind("cov", c).bind("emis", e).bind("c", u); pass.dispatch(this.p.cov, groups(ww, hh)); };
+        // the half-size coverage once, read back outside every time, for the fill's known flags; the frame is smooth light
+        dev.frame(({ pass }) => { covOps(pass, cH, eH, uH, w, h); pass.clear([0, 0, 0, 1]); }, { offscreen: true });
+        const covHalf = Float64Array.from(new Float32Array(await dev.read(cH)));
+        const img = new Float64Array(w * h * 3); for (let p = 0; p < w * h; p++) for (let c = 0; c < 3; c++) img[p * 3 + c] = 0.2 + 0.5 * ((p % w) / w) + 0.1 * c;
+        const bufs = this._fillBufs(img, covHalf, w, h, maxRings), rgba0 = rgba(img, w * h), known0 = Uint32Array.from(covHalf, (c) => (c > 0 ? 0 : 1));
+        const reset = () => { gpu.queue.writeBuffer(bufs.a.gpu, 0, rgba0); gpu.queue.writeBuffer(bufs.kA.gpu, 0, known0); };
+        const tMax = dev.buffer({ data: new Uint32Array(1), usage: ["storage"] }), uT = dev.buffer({ data: u4(w, h), usage: "uniform" });
+        const up = mk(W * H * 4), uE = dev.buffer({ data: u4(w, h, W, H), usage: "uniform" }), dst = mk(W * H * 3), uC = dev.buffer({ data: u4(W, H), usage: "uniform" });
+        let filled = null;
+        const restOps = (pass, src) => {
+            this.p.toT.bind("img", src).bind("tMax", tMax).bind("u", uT); pass.dispatch(this.p.toT, groups(w, h));
+            this.p.easu.bind("src", src).bind("dst", up).bind("u", uE); pass.dispatch(this.p.easu, groups(W, H));
+            this.p.comp.bind("up", up).bind("cov", cF).bind("emis", eF).bind("tMax", tMax).bind("dst", dst).bind("u", uC); pass.dispatch(this.p.comp, groups(W, H));
+        };
+        const step = { covHalf: [], covFull: [], fill: [], rest: [], whole: [] }, clock = {};
+        const run = async (k, ops, passes) => {
+            const dc = stamps && passes <= 30;
+            await gpu.queue.onSubmittedWorkDone();
+            const t0 = now(), res = dev.frame(({ pass }) => { ops(pass); pass.clear([0, 0, 0, 1]); }, { offscreen: true, ...(dc ? { timing: true } : {}) });
+            if (dc) { const g = await res; step[k].push(g.gpuMs.compute); } else { await gpu.queue.onSubmittedWorkDone(); step[k].push(now() - t0); }
+            clock[k] = dc ? "device" : "wall";
+        };
+        for (let r = 0; r < reps + 1; r++) {         // the first rep warms every pipeline and is not kept
+            await run("covHalf", (pass) => covOps(pass, cH, eH, uH, w, h), 1);
+            await run("covFull", (pass) => covOps(pass, cF, eF, uF, W, H), 1);
+            reset(); await run("fill", (pass) => { filled = this._fillOps(pass, bufs, w, h, maxRings); }, 31);
+            await run("rest", (pass) => restOps(pass, filled), 3);
+            reset(); await run("whole", (pass) => { covOps(pass, cH, eH, uH, w, h); covOps(pass, cF, eF, uF, W, H); restOps(pass, this._fillOps(pass, bufs, w, h, maxRings)); }, 31);
+            if (r === 0) for (const k of Object.keys(step)) step[k].length = 0;
+        }
+        const c = await this._fillCounts(bufs);
+        this._free(bufs);
+        for (const b of [bS, cH, eH, cF, eF, uH, uF, tMax, uT, up, uE, dst, uC]) b.destroy();
+        const med = (a) => { const b = [...a].sort((x, y) => x - y); return b.length ? b[(b.length - 1) >> 1] : null; };
+        return { w, h, W, H, maxRings, reps, rings: c.rings, inView: covHalf.filter((v) => v > 0).length,
+                 steps: Object.fromEntries(Object.keys(step).map((k) => [k, { ms: med(step[k]), clock: clock[k], runs: step[k] }])) };
+    }
+}
+
+/**
+ * Round 31, WHAT THE PAGE TIMES (denoise.html's "Time the half-size chain"): the shipped network at w x h and at W x H on the
+ * page's own kernel set (render/denoiseDevice.mjs's timingLadder, the ladder the page already runs), and the chain's steps on
+ * scene S (DenoiseUpscaleGPU's time). `device` is a gfx/device.js webgpu device; `newAdapter` makes the ladder's adapters.
+ * Returns { ladder, chain, networkHalf, networkFull, full, half }, each sum on the clocks its parts were read on, named:
+ *   full   today's page at W x H: the network at W x H, and the emitter coverage at W x H, which is the mask it reads
+ *   half   the chain: the network at w x h, the coverage at w x h (its mask, and the fill's), the coverage at W x H (the
+ *          composite's guide), the fill, and the transfer, EASU and the composite
+ * The ladder's cap is 5000 ms a pass, not its default 1500: the Intel gen-9's page pass at 1920 x 1080 is 1.2-1.4 s (rounds 27
+ * and 28), close enough to 1500 that a prediction from the smaller size could skip the very row being compared.
+ */
+export async function timeHalfChain({ device, net, newAdapter, kernels, S, w, h, W, H, maxRings, reps = 5, totalMs = 300000, capMs = 5000 }) {
+    const ladder = await timingLadder(net, newAdapter, { sizes: [[w, h], [W, H]], sets: [kernels], totalMs, capMs });
+    const pick = (x) => (x.skipped ? null : { ms: x.gpu ? x.gpu.median : x.wall.median, clock: x.gpu ? "device" : "wall" });
+    const [networkHalf, networkFull] = ladder.rows[kernels].map(pick);
+    const chain = await new DenoiseUpscaleGPU(device).time(S, w, h, W, H, maxRings, { reps });
+    const st = chain.steps, sum = (parts) => (parts.every((x) => x && x.ms != null)
+        ? { ms: parts.reduce((a, x) => a + x.ms, 0), clocks: [...new Set(parts.map((x) => x.clock))] } : null);
+    return { ladder, chain, kernels, networkHalf, networkFull,
+             full: sum([networkFull, st.covFull]), half: sum([networkHalf, st.covHalf, st.covFull, st.fill, st.rest]) };
 }

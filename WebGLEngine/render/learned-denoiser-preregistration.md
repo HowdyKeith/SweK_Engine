@@ -6208,3 +6208,69 @@ page loads.
 
 **What it does not change.** The page, the network, the filter, every kernel table. The emitter-aware chain is a CPU reference
 until the rig round puts it on a GPU.
+
+## 93. ROUND 31 -- THE HALF-SIZE CHAIN TIMED ON THE RIG AT 1920 x 1080: FIXED BEFORE THE RIG RUNS IT
+
+**Why this round.** Section 92 supported both hypotheses at 256 x 256: a frame traced and denoised at a quarter of the pixels,
+its light sources filled out before EASU and put back at full size from the geometry, beat the full-size frame at equal samples
+on 12 of 12 images. Its rule (`rule92`) sent the arc here, as `denoise-halfres-rig-timing`: does the saving survive at 1080p on
+a GPU, once the fill, EASU, the composite and the coverage guide are paid for?
+
+> **At 1920 x 1080 output, on each GPU, is round 30's chain -- the network at 960 x 540, the coverage at both sizes, the fill,
+> EASU and the composite -- faster than today's page, the network at 1920 x 1080 with its mask?**
+
+**What exists for it (committed before this section).**
+- `render/denoiseUpscaleGPU.mjs`: the chain's kernels and their runner, through `gfx/device.js`. Coverage is
+  `render/denoiseMask.mjs`'s `emitterRadiance`, 64 rays a pixel, over the scene's spheres. The fill is round 30's ring rule, run
+  as a fixed number of ring passes, because a device cannot loop until nothing changes without a readback.
+  `fillEmittersBounded` in `render/denoiseUpscale.mjs` is that bounded form's CPU reference. Then the transfer, `fx/fsr`'s EASU
+  kernel, the clamp, the inverse and the composite, all on one encoder.
+- `render/denoiseUpscaleGPU-selfcheck.mjs` holds every step to its CPU reference. On SwiftShader: coverage 1 ray different in 8
+  frames, the fill within 1.2e-7, the whole chain within 2.3e-6 of `emitterAwareUpscale(..., "easu")`. Sabotaged G1-G9, T1-T4.
+  The gate joins `realGpuRun --only denoise`, and on a GPU its section 4 also runs the rig's size.
+- `denoise.html`'s "Time the half-size chain" (`timeHalfChain`) times both networks with the page's own `timingLadder`, on
+  the page's kernel set for the adapter (r18u on the Intel, r18t on the 1080, section 63), and each step of the chain on its own.
+
+**The arms, at 1920 x 1080 output.**
+- **Today's page, `full`:** the network at 1920 x 1080, plus the coverage at 1920 x 1080. The network reads the coverage as its
+  mask, so a GPU frame of today's page pays for it too.
+- **The chain, `half`:** the network at 960 x 540, the coverage at 960 x 540 (its mask and the fill's), the coverage at 1920 x
+  1080 (the composite's guide), the fill, and the transfer, EASU and the composite.
+- **The scene is R 990000**, not a dataset seed. Its light covers 25,765 of the half-size frame's pixels, and the fill needs 87
+  rings there (measured on the CPU). That is near the worst of the arc's: 77 for R 44004, 36 and 29 for R 44002 and 44001.
+- **The fill's budget is 96 rings, every frame.** Every ring pass runs over every pixel whether it fills any or not, so the fill
+  costs the same on any scene. A scene needing more than 96 would leave pixels at 0; the gate holds that it needed fewer.
+
+**The clocks.** The networks are timed on the device's clock wherever the adapter offers timestamps, as every timing round
+has been. The coverages and the transfer/EASU/composite step are also on the device's clock (one and three passes a frame). The
+fill is 97 passes, more than `gfx/device.js` timestamps in one frame (30), so it is on the wall clock: `performance.now()` around
+the frame and the queue's `onSubmittedWorkDone`. That includes the submit and the wait, so it can only overstate the fill. Each
+sum names the clocks it was made of. A fifth number, every step of the chain in one frame on the wall clock, is reported as a
+cross-check on the sum and decides nothing.
+
+**The test.** On each GPU, two runs of `realGpuRun --only denoise`, at a commit carrying this section:
+- **H (per GPU):** the ratio `full / half` is above 1.0 in both runs.
+- **C1:** every denoise gate is green in both runs. That includes `render/denoiseUpscaleGPU-selfcheck.mjs`'s device rows:
+  coverage, fill and chain held to the CPU on that GPU's own Chrome adapter.
+- **C2:** the fill reaches every pixel in its 96 rings, and fills on fewer than 96.
+- **C3:** both networks are on the device's clock. A run where either is on the wall clock has no verdict for that GPU.
+- **C4, reported:** the two runs' ratios, and how far apart they are.
+
+**Predicted, before any of it ran on a GPU** (from rounds 27-28's page ladders: the 1080's r18t at 1920 x 1080 is 73-75 ms a
+pass; the Intel's r18u is 1.16-1.37 s):
+- **GTX 1080:** H holds, with the ratio between 1.4 and 3.0. The network at 960 x 540 is 18-25 ms (a quarter of the pixels; a
+  smaller frame uses the GPU less well). The coverages are 1-10 ms together, the fill 3-15 ms, the rest 1-3 ms.
+- **Intel gen-9:** H holds, with the ratio between 2.0 and 4.0. The network is a larger share of its frame, so the fixed costs
+  weigh less.
+- **C2 holds** on both: the fill uses 87 rings at 960 x 540, as on the CPU.
+
+**What each outcome does.**
+- **H holds on both GPUs:** the half-size chain is cheaper than today's page at 1080p on both rigs, as well as better at equal
+  samples (section 92). Then `denoise-fsr2-temporal` (temporal accumulation over the half-size chain) is the arc's next round,
+  and putting the chain on the page as an option becomes a backlog item. The page itself does not change in this round.
+- **H fails on a GPU:** the steps are named from the run, and the backlog records where the saving went -- the fill's fixed 97
+  passes, the full-size coverage, or the network's poorer use of a smaller frame.
+- **Nothing changes in either case:** the page, the network, the filter, every kernel table, and `fx/fsr`.
+
+**Seen first, here, on SwiftShader -- a CPU's times, deciding nothing.** At the gate's pilot size (64 x 36 to 128 x 72) the
+chain ran 2.0-2.1 x as fast as the full-size network alone, before the mask was counted on the page's side.
