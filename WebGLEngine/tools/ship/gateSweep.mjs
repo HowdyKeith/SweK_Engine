@@ -15815,6 +15815,246 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "the sea being rebuilt went 0 red; the row that freezes time and compares the origin's height across seeds is what caught it. Unchecked, said plainly: that it looks like " +
                  "water to a person (a screenshot is written for that), the frame time on any GPU, and the opt-in sea.",
     }),
+    // *** v4884 -- ELEVEN CLOSINGS FROM claude/long-silence-elements-check-22ecrz, WHICH DECLARED THEM AS since117..since127 -- KEYS MAIN HAD ALREADY SPENT. *** A duplicate key in an object literal
+    // silently wins, so they are RENUMBERED FORWARD to since588..since598 at the merge and only their keys moved: each entry keeps its own `at` (v4478 to v4488, the branch's own numbering, none of which is a
+    // version main ever shipped) and its verdict as the branch wrote it.
+    since588: Object.freeze({
+        at: "v4478", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/zoomBlurExact-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        repaired: Object.freeze([]),
+        verdict: "THE NEAR MISS, BUILT. bloomPass.js's GODRAYS_FS is the tree's only radial-march-from-a-" +
+                 "point shader and every contract around that loop is inverted -- read out of its source, " +
+                 "not described. A zoom blur is an AVERAGE, so it has properties that hold exactly: a flat " +
+                 "image comes back bit-identical, strength 0 is the identity, the centre is a fixed point, " +
+                 "a radial ramp strictly shrinks. *** AND THE FIRST IS THE DESIGN, NOT A FREEBIE: *** the " +
+                 "obvious `acc += sample` kernel fails it -- 32 copies of 0.1 sum to 0.09999997 -- so the " +
+                 "reduction is a pairwise tree over a power-of-two count, refused otherwise. One reduceTree " +
+                 "call serves the oracle, the GLSL and the WGSL, so the parenthesisation in the shader IS " +
+                 "the evaluation order the oracle took. The WGSL is RUN on a real GPU: flat is bit-exact at " +
+                 "every strength, strength 0 is bit-exact for every image, varying images agree to 3 ulp " +
+                 "against a budget of 8 derived from the reduction depth. NINETEEN SABOTAGES, NINETEEN RED " +
+                 "-- four only after repair, and all four were one species: an oracle MORE ACCURATE than the " +
+                 "shader passes every comparison with it",
+    }),
+    since589: Object.freeze({
+        at: "v4479", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/deferralCensus-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        repaired: Object.freeze([
+            "physics/render/microfacetSampleWgsl-selfcheck.mjs (deferred 'combining two estimators'; SETTLED at v4413 and still advertising it 66 versions later)",
+            "physics/render/microfacetVndf-selfcheck.mjs (TWO stale notes in one paragraph: the anisotropic D landed v4412, the other strategy v4413)",
+            "tools/ship/nextRounds.mjs (first entries added since it was written at v3340 -- a 925-version gap in the file whose subject is records nobody re-reads)",
+        ]),
+        verdict: "*** THE BACKLOG BUILT TO STOP DEFERRALS LIVING IN PROSE HAD ITSELF BEEN LIVING IN PROSE. *** " +
+                 "nextRounds.mjs held 10 entries whose newest named version was v3553, against v4478, and " +
+                 "named NONE of the tree's 118 undecided prose deferrals -- reach 0 of 118. The design was " +
+                 "never wrong; nothing enumerated the prose, so nothing prompted an entry. deferralCensus " +
+                 "does that, deciding ONLY from structure on one line or its neighbour and reporting the " +
+                 "rest as UNDECIDED rather than open, because 'is this still owed' needs a file read. Two " +
+                 "files were then opened and THREE stale notes came out, checked against EXPORTS rather " +
+                 "than sentences. Seventeen sabotages, seventeen red -- four only after repair, and all " +
+                 "four were one shape: a check comparing against today's answer cannot see a constant equal " +
+                 "to today's answer",
+    }),
+    since590: Object.freeze({
+        at: "v4480", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/roundhouse/deviceReport-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        repaired: Object.freeze([
+            "tools/ship/deferralCensus-selfcheck.mjs (v4479's row pinned the backlog's entry count and went red the first time somebody added one -- a backlog is supposed to grow)",
+        ]),
+        verdict: "*** CRITERION 4'S TOLERANCE HAS NEVER REJECTED ANYTHING AND LIVES IN A PARAMETER LIST. *** " +
+                 "corroborateFully's tol = 1e-6 never reaches criterion 2, because all six nuisance knobs " +
+                 "declare their own with an argument beside it; it reaches criterion 4 for every device, and " +
+                 "NOT ONE of the seven refinement knobs declares one. Measured over 27 keyless observables: " +
+                 "8 move under a one-ulp libm shift and the worst amplifies by 8.7e7 against a default that " +
+                 "permits 4.5e9 -- fifty times under a bar nothing has ever approached. So c4 is REFUSED " +
+                 "rather than graded, and the amplifications are reported so the round that earns seven " +
+                 "tolerances starts from a table. ALSO FOUND: the apparatus declares REFINEMENT_KNOBS twice " +
+                 "in two shapes that disagree about lens and optics, and its nuisance knobs live in two " +
+                 "modules -- which is how this file's own first draft got the eligible set wrong, five " +
+                 "devices and the wrong five. Sixteen sabotages, sixteen red; two survived first and the " +
+                 "gate found two more defects in its own module before any sabotage ran",
+    }),
+    since591: Object.freeze({
+        at: "v4481", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/roundhouse/corroborationSubmit-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        repaired: Object.freeze([
+            "tools/roundhouse/submit-selfcheck.mjs (its prose said THREE recognised kinds; there were six, and this round makes seven -- a count in a sentence nobody re-counted since v2949)",
+        ]),
+        verdict: "*** CRITERION 4 HAS AN UNANSWERABLE MAJORITY AND THE MAILBOX COULD NOT CARRY THE ANSWER. *** " +
+                 "v2889's argument settles portability for any quantity touching only IEEE-specified " +
+                 "operations, and measured against the libm tripwire it reaches SEVEN of 27 keyless " +
+                 "observables. The other TWENTY make 1 to 160,004 raw transcendental calls and can only be " +
+                 "settled by another machine reporting the same bits. The tree has had a fleet and a " +
+                 "submission endpoint since v2949 -- six kinds, all GPU benches and transcripts, not one " +
+                 "carrying the value of an observable. This adds the seventh and its grader, keeping every " +
+                 "rule the surface earned: the device sends values and NEVER a verdict, the ledger appends " +
+                 "under a content-addressed key IMPORTED from deviceLedger, and agreement is asked of the f64 " +
+                 "BITS -- -0 and 0 are equal as numbers and different as bits, which is the fixture that " +
+                 "separates a real comparison from ===. NOTHING HAS SUBMITTED, and section 5 asserts that " +
+                 "rather than letting a green gate imply otherwise. Sixteen sabotages, sixteen red; three " +
+                 "survived first and all three were a check looking at the wrong thing",
+    }),
+    since592: Object.freeze({
+        at: "v4482", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        repaired: Object.freeze([
+            "tools/ship/unattendedHold-selfcheck.mjs (grepped ALREADY OWNS PORT 8787 after v4134 gave the port one derivation and the refusal correctly started echoing %SWEK_PORT%)",
+            "tools/ship/supersededFlag-selfcheck.mjs (the identical line, in a second file -- both now extract the refusal BLOCK and assert the branch rather than the characters)",
+            "tools/ship/pairlaneBridge-selfcheck.mjs (pinned label: \"File Transfer Utils\" through v4211's rename to \"Peer 2 Peer\", twice -- now asserts the id does not move with the label and that registry and button agree)",
+            "tools/ship/sunshineHost-selfcheck.mjs (ROUTES.length === 7 under a label reading \"every route ... is reachable\" -- now drives owns() over all 8)",
+            "tools/ship/winPathGuard-selfcheck.mjs (its own header's \"stripping comments is enough\" was false once a round note quoted the idiom in a STRING; detections read codeOnly() now, exemptions keep noComments())",
+            "tools/ship/bfcache-selfcheck.mjs (a REAL defect: camera-effects.html tore down on pagehide with no event.persisted check -- fixed in the page)",
+            "tools/ship/reportDoors.mjs (not a gate -- the real Windows bug winPathGuard was pointing at: new URL(import.meta.url).pathname builds C:\\C:\\... on Keith's rig, in a front door)",
+            "tools/ship/xbarPlugin-selfcheck.mjs (9 red on the rig, green here: it grepped ONE PERSON'S HOME DIRECTORY out of the source and matched the fixture root the test itself supplied; the shebang row asked whether the box was POSIX; and section 4 spawned through a shebang Windows does not honour)",
+            "tools/mac/xbarPlugin.mjs (the real bug deriving that check found: the import specifier was `\"file://\" + path`, so a root with a SPACE produced an unparseable specifier and a Windows root lost the third slash -- pathToFileURL now, which the module already imported)",
+            "tools/ship/freezeRegisterAudit.mjs (found by re-freezing, not by a paste: a run KILLED at the 120s cap had its partial output frozen as the gate's failing line -- doorKinds filed one line of however many it would have printed)",
+            "tools/ship/deferralCensus-selfcheck.mjs (my own v4479 row pinned reach === 1 and went red the first time the reach IMPROVED to 2 -- the same species as the four above, in the file that names the species)",
+        ]),
+        verdict: "*** KEITH PASTED EIGHTEEN RED GATE READINGS AND SIX OF THEM WERE THE GATE, NOT THE TREE. *** " +
+                 "Twelve reproduce in this sandbox and six do not, which is itself the finding: redCensus " +
+                 "calls its list a claim about a MOMENT and it is also a claim about a BOX. Four of the six " +
+                 "repairs were checks pinned to an ARRANGEMENT a later correct round changed -- a port " +
+                 "literal in two files, a panel label, a route COUNT under a label naming a contract -- so " +
+                 "each went red BECAUSE THE WORK IT ASKED FOR WAS DONE. Two were real: a Windows path idiom " +
+                 "in a front door, and a page tearing down on a bfcache freeze. FIVE ENTRIES COME OFF " +
+                 "RED_AT_V4279 and registerDrift's live re-run caught every one the same minute. NOT TOUCHED, " +
+                 "AND MOST OF THE BATCH: six gates green here and red on the rig -- three printing ALL PASS " +
+                 "and then aborting on a libuv double-close, so an EXIT CODE decides a verdict the checks did " +
+                 "not -- and five ratchets that have grown past their baselines, which are the gates being " +
+                 "RIGHT. Two sabotages on the repaired stripper, both correct: real code reddens, the same " +
+                 "text in a string does not",
+    }),
+    since593: Object.freeze({
+        at: "v4483", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        repaired: Object.freeze([
+            "tools/roundhouse/corroborationCensus.mjs (its SECOND REFINEMENT_KNOBS deleted -- all three entries were making a false claim: lens.map refines nothing, ct declared a value the device clamps away, optics.slit was right and is lost to a one-mode-per-device shape)",
+            "tools/roundhouse/refinementKnobs.mjs (gains STRUCTURAL_RE, which the census had held privately since v4036, so `live` stops counting a grid size as a physical response; and ct at [32,64,128,240] rather than the census's unreachable 256)",
+            "tools/roundhouse/deviceReport.mjs (refinementTableDivergence could not report AGREEMENT: handed the canonical table on both sides it called all eight devices divergent, which makes it useless as the detector that a second table has returned)",
+            "tools/roundhouse/deviceReport-selfcheck.mjs (three pinned arrangements: a `length === 7` that reddened on the eighth knob, a divergence row whose finding is closed, and a row asserting the migration had NOT happened)",
+            "tools/roundhouse/refinementKnobs-selfcheck.mjs (fld() returned undefined and every caller read .verdict off it -- a sabotage that should have shouted died at 0 FAIL lines; an absent field is a named MISSING verdict now and the same sabotage reds 11)",
+            "tools/ship/deferralCensus-selfcheck.mjs (its class-by-class row pinned HISTORY, which counts phrase hits in SHIPPED ROUND NOTES and therefore grows every round that uses one of the six phrases -- v4482 repaired the reach count in the same file for the same reason, and both were mine)",
+        ]),
+        verdict: "*** A DECLARED REFINEMENT KNOB THAT REFINED NOTHING, FOR 447 VERSIONS. *** The census called " +
+                 "lens.map refinable; sweeping mapN 9..31 leaves mapPeak, mapPeakExact, mapPeakErrFrac, " +
+                 "mapSpan and sourceRho BIT-IDENTICAL and moves only mapCells = mapN^2. It read as live because " +
+                 "the refinement runner had no idea what a physical quantity is -- the rule that knows was a " +
+                 "module-private const in the file next door. Moving it kills lens.map and, measured across " +
+                 "all eight canonical knobs, removes not one field and moves not one verdict. Blast radius " +
+                 "RE-DERIVED: 9 of 484 device/modes, not the 10 v4482 stored, because promoting ct at mode " +
+                 "parallel kept a flag that plan had counted as lost. FOUR SABOTAGES; the 0-RED one was the " +
+                 "second-best finding -- widening the filter CRASHED the gate at its first call site instead " +
+                 "of reddening, the third crash-instead-of-a-failure this session",
+    }),
+    since594: Object.freeze({
+        at: "v4484", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        repaired: Object.freeze([
+            "tools/roundhouse/corroborationSubmit.mjs (gradeSubmission returned DIFFERS -- one word for two opposite events: a libm rounding one call differently, which is the EXPECTED case for 20 of 27 observables, and a machine that is wrong)",
+            "tools/roundhouse/deviceReport.mjs (the per-observable conditioning bound is frozen so a submission can be graded when one arrives -- 27 observables, 8 movers, worst amplification 8.68e7)",
+        ]),
+        verdict: "*** THE TOLERANCE v4480 ASKED FOR CANNOT BE EARNED WHERE IT IS USED. *** corroborateFully's " +
+                 "c4 builds the device, builds it again under a simulated one-ulp libm shift, diffs the two and " +
+                 "grades `relMove <= tol` -- three consecutive statements in one process, so a tolerance taken " +
+                 "from that measurement is compared against the number it came from and the pass becomes " +
+                 "NECESSARY rather than contingent. THE TOLERANCE IS NOT MISSING; THE CHECK IS MISNAMED -- c4 " +
+                 "is called portability and measures conditioning. The round does not rename it and does not " +
+                 "grade it: 27 of 27 stay UNGRADED. It spends the measurement where it is NOT circular, on a " +
+                 "grader that was already built and already blind, using two legs neither taken for this " +
+                 "purpose -- real libms differ by at most one ulp (v3997, 200k inputs, sqrt as the IEEE " +
+                 "control) and the perturbation applies that coherently at every call site, which is the worst " +
+                 "case such a difference can produce, so no safety factor is invented. Four sabotages; the " +
+                 "0-red one was a GENUINE no-op identified rather than chased -- NaN <= bound is already false, " +
+                 "so the guard buys the REPORT and not the verdict, and the row now asserts that",
+    }),
+    since595: Object.freeze({
+        at: "v4485", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        repaired: Object.freeze([
+            "vba/runtimeGap.mjs (its census had drifted one row, typed arrays 693 -> 694, and THREE round notes had already claimed a re-derivation that never happened -- the count incremented from the previous note rather than measured)",
+            "tools/roundhouse/deviceReport.mjs (the wide sweep v4480 owed is a measurement now rather than a description: 81 observables over 4 of 6 eligible devices, and the mode that blocks the other two is named with its cost)",
+        ]),
+        verdict: "*** THE WIDE SWEEP, MEASURED RATHER THAN DESCRIBED. *** v4480 said the six-device sweep 'did " +
+                 "not return inside seven minutes' and that sentence was quoted as a measurement for five " +
+                 "rounds. It is 26 modes, 81 observables, 21 movers, 67.1 s -- and then optics.converge burning " +
+                 "12m38s of CPU without returning, ELEVEN TIMES every completed mode together, leaving quantum " +
+                 "and splat unswept. THE SCOPED WORST CASE SURVIVES TRIPLING THE POPULATION: kepler.conserve." +
+                 "growthGapFrac still tops it at 8.679e7, 261x its runner-up, so v4484's bound is unthreatened " +
+                 "by anything that ran -- and the record refuses to call itself a superset of SCOPE, which " +
+                 "contains a device this run never reached. THE BUDGET DID NOT WORK and the tree already knew " +
+                 "why: a setTimeout cannot interrupt synchronous work, which corroborationCensus records beside " +
+                 "its own budget, and the harness re-derived it the expensive way one round after reading that " +
+                 "file. ALSO: three consecutive round notes claimed a census re-derivation that never happened",
+    }),
+    since596: Object.freeze({
+        at: "v4486", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        repaired: Object.freeze([
+            "tools/roundhouse/deviceReport.mjs (WIDE_AT_V4485's headline is MARKED SUPERSEDED rather than edited -- its numbers are still true of the four devices that ran; the conclusion drawn from them was not)",
+            "tools/roundhouse/deviceReport-selfcheck.mjs (its v4485 row asserted 'the scoped worst case survives tripling the population', which was false when it was written and is now a row about reachability)",
+            "vba/runtimeGap.mjs (the census really did move this round, 3878 -> 3880, and was re-derived from the run rather than incremented -- which then reddened `closuresOverThreads: 157`, a stored ratio citing a closures count three re-derivations stale. A getter now)",
+        ]),
+        verdict: "*** THE SWEEP REACHED quantum AND v4485'S HEADLINE WAS WRONG BY SEVEN ORDERS OF MAGNITUDE. *** " +
+                 "That round swept the four devices it could finish, called kepler.conserve.growthGapFrac the " +
+                 "worst case, and listed quantum and splat as NOT COVERED in the same record. The unswept " +
+                 "device held 2.5735e15 -- twenty-nine million times larger -- and kepler's figure now ranks " +
+                 "fifth. New deviceReportOne.mjs + wideSweep.mjs run each mode in a CHILD PROCESS under a hard " +
+                 "cap, which is the budget that bites: optics.converge was SIGKILLed at 60 s and the sweep " +
+                 "continued, completing all six devices for the first time -- 39 modes, 117 observables. *** " +
+                 "AND THE NEW WORST IS NOT A CONDITIONING NUMBER: *** edgeRhsWorst is max |abs(kpRhs(E)) - 1|, " +
+                 "a RESIDUAL whose correct value is zero, and relMove divides by the value, so the denominator " +
+                 "IS the error. The move is EXACTLY 4/7, which is what a near-zero denominator does and not " +
+                 "what a scale does. All three such quantities are in the keyless population only because " +
+                 "KEYED_RE's vocabulary does not include drift or worst -- 13 of 117 would reclassify, taking " +
+                 "the whole top four. Four sabotages, four red by name",
+    }),
+    since597: Object.freeze({
+        at: "v4487", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        repaired: Object.freeze([
+            "tools/roundhouse/libmSensitivity.mjs (gains significantDigits and conditioningClass -- the absolute-move column amplification never had, which is what separates a residual at the round-off floor from one that is fully resolved)",
+            "tools/roundhouse/deviceReport.mjs (v4486's residual claim NARROWED in place: it called three fields residuals whose amplification is a near-zero denominator, and only ONE is -- numericEdgeWorst keeps 6.42 digits and normDrift 2.18)",
+        ]),
+        verdict: "*** THE REPAIR v4486 PROPOSED WOULD HAVE BEEN WRONG IN BOTH DIRECTIONS. *** It measured the " +
+                 "blast radius of widening KEYED_RE's vocabulary at 13 of 117 and declined to make the change. " +
+                 "Measured: only TWO of those 13 carry no significant digit, the other eleven keep 2.18 to " +
+                 "15.68 -- insideGapWorst keeps 15.68 and is named exactly like the one at the floor -- and " +
+                 "the two that ARE at the floor match none of the proposed words, so the rule would have " +
+                 "caught 0 OF THE 2 IT WAS FOR while reclassifying eleven good quantities. A NAME IS A GUESS " +
+                 "ABOUT A QUANTITY; significantDigits(base, pert) is the quantity. Four checks, every " +
+                 "boundary driven either side rather than asserted. NOTHING IS RECLASSIFIED: the criterion " +
+                 "exists and acting on it changes what `keyless` means, which is the round this makes possible",
+    }),
+    since598: Object.freeze({
+        at: "v4488", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/roundhouse/sensitivitySweep-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        repaired: Object.freeze([
+            "tools/roundhouse/libmSensitivity-selfcheck.mjs (its header stated ~150s and was never a measurement -- the sweep has no finite runtime, and the corrected figure is 1196.3s over 120 of 128 devices)",
+            "tools/roundhouse/libmSensitivity.mjs (v4487's floor finding was ANTICIPATED at v2905 by the gate beside it, which also named the remedy -- recorded, with the six-of-66 disagreement that makes the new criterion earn its place anyway)",
+        ]),
+        verdict: "*** THE GATE THAT COULD NOT BE RUN WAS THE ONE THAT ALREADY HELD THE ANSWER. *** " +
+                 "libmSensitivity-selfcheck has classified near-zero movers and used the phrase 'floor " +
+                 "artefact' since v2905, and named the remedy; v4487 re-derived it as new because that gate " +
+                 "does not return -- forty minutes against a stated 150s. MEASURED: 128 devices, 484 modes, " +
+                 "1196.7s, and EIGHT devices never finish. A skip list does not fix it and that was tested " +
+                 "first: with all eight declined in-process the sweep still exceeded 900s, because " +
+                 "instrumenting Math deoptimises those callsites for the rest of the process -- the same 120 " +
+                 "devices cost 476.7s in separate processes and over 900s in one. New sensitivityOne.mjs + " +
+                 "sensitivitySweep.mjs terminate at 1196.3s, reproducing the probe to four tenths of a second, " +
+                 "and NAME the eight. The new criterion survives the correction: it disagrees with the v2905 " +
+                 "magnitude rule on six of 66 movers, in both directions. Three sabotages, three red by name",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

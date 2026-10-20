@@ -6,7 +6,7 @@
 // v2907 -- CRITERION 3. TWO CLEAN CONVERGENCES, ONE OBSERVABLE THAT NEVER HAD ANY, AND A PREDICTION OF MINE
 // THAT FAILED.
 
-import { REFINEMENT_KNOBS, refinementSweep, refinementLines, classifySequence, REFINEMENT_REGISTRATION } from "./refinementKnobs.mjs";
+import { REFINEMENT_KNOBS, refinementSweep, refinementLines, classifySequence, REFINEMENT_REGISTRATION, runRefinement } from "./refinementKnobs.mjs";
 import { getDevice, DEVICE_NAMES } from "./devices.mjs";
 
 let fails = 0;
@@ -17,7 +17,27 @@ console.log();
 refinementLines(rows).forEach((l) => console.log(l));
 console.log();
 const by = (d) => rows.find((r) => r.device === d);
-const fld = (d, f) => by(d).fields.find((x) => x.field === f);
+// *** v4483 -- fld() RETURNED undefined AND EVERY CALLER READ .verdict OFF IT. *** Found by sabotage: widening
+// STRUCTURAL_RE to match every field name should have reddened this file loudly, and instead it CRASHED at the
+// first call site with "Cannot read properties of undefined" -- exit 1, zero FAIL lines, no sentence naming
+// anything. A crash reports nothing and a failure names the field, and a gate that dies on the first missing
+// field cannot tell you about the other eleven. An absent field is a MISSING verdict now, which fails the row
+// that asked for it and lets the rest of the run happen.
+const fld = (d, f) => {
+    const r = by(d);
+    // The placeholder is SHAPED LIKE A REAL FIELD, and getting that shape right took two goes, both recorded
+    // because the failure mode was identical each time. `vals: null` moved the crash from line 25 to a detail
+    // string mapping over the values; `vals: []` moved it again to one INDEXING them (r21.vals[3].toFixed).
+    // DETAIL STRINGS ARE ARGUMENTS AND ARE BUILT EAGERLY -- they run for a passing row and a failing one alike
+    // -- so a placeholder that is merely non-null still kills the report while it is describing the failure.
+    //
+    // An absent field reports NO VALUE AT EACH OF THE POINTS THAT WERE SWEPT, which is what NaN is for: every
+    // detail renders ("NaN -> NaN"), every numeric comparison against it is false, and the row therefore FAILS
+    // by name instead of taking the process down. The length comes from the knob's own value list.
+    const n = (r && r.values && r.values.length) || 4;
+    return (r && r.fields.find((x) => x.field === f)) ||
+           { field: f, verdict: "MISSING", vals: new Array(n).fill(NaN) };
+};
 
 // ---- 1. THE CLASSIFIER, WHICH NEEDED CALIBRATING BEFORE IT COULD BE TRUSTED ---------------------------------------
 {
@@ -129,6 +149,49 @@ const fld = (d, f) => by(d).fields.find((x) => x.field === f);
         REFINEMENT_KNOBS.chaos.values.length === 4 && REFINEMENT_KNOBS.chaos.values[3] === 6,
         "chaosDefaults clamps count to [3, 6], so the sequence is four points and the last two agree exactly. " +
         "A plateau over two points is not a proof of a plateau; raising the clamp is the follow-on");
+}
+
+// ---- 4b. THE KNOB THAT REFINED NOTHING, KEPT ALIVE AFTER THE TABLE THAT DECLARED IT WAS DELETED -------------
+// *** v4483 -- corroborationCensus.mjs DECLARED lens.map REFINABLE FOR 447 VERSIONS AND IT REFINES NOTHING. ***
+// That table is gone, so nothing in the tree would exercise this again -- and the STRUCTURAL_RE filter that
+// makes the emptiness visible would have no gate at all. The deleted entry is driven here on purpose: the
+// finding outlives the declaration that produced it, which is the only way a repair stays repaired.
+//
+// THE DISCRIMINATOR IS THAT THE EXCLUDED FIELD MUST EXIST AND MUST MOVE. A filter that dropped every field, or
+// a device that stopped reporting mapCells, would both give live:false and would both be a different fact.
+{
+    const DELETED_CENSUS_ENTRY = { mode: "map", param: "mapN", values: [9, 13, 21, 31] };
+    const r = await runRefinement("lens", DELETED_CENSUS_ENTRY);
+    const physical = r.fields.filter((f) => f.verdict !== "ECHO");
+    ok("!! *** lens.map is NOT live: refining the grid moves no physical quantity at all ***",
+        r.live === false && physical.length >= 5 && physical.every((f) => f.verdict === "SUSPECT-bit-identical"),
+        `${physical.length} physical fields over mapN 9..31, every one bit-identical: ` +
+        physical.map((f) => f.field).sort().join(", ") + ". The census called this refinable since v4036");
+
+    ok("...and the ONE field that responds is the grid size, which is the knob squared",
+        r.structural.includes("mapCells"),
+        `excluded as structural: ${r.structural.join(", ") || "NONE"}. mapCells is mapN^2 -- 81, 169, 441, 961 ` +
+        "-- so `live` was true because the GRID GOT BIGGER, which is the knob restated rather than a response");
+
+    // *** AND IT REALLY DOES MOVE, WHICH IS WHAT MAKES THE EXCLUSION A JUDGEMENT RATHER THAN AN ABSENCE. ***
+    const dev = await getDevice("lens");
+    const a = await dev.build({ mode: "map", config: { mapN: 9 } });
+    const b = await dev.build({ mode: "map", config: { mapN: 31 } });
+    ok("...and mapCells genuinely CHANGES, so this is an exclusion and not a field that went missing",
+        a.mapCells !== b.mapCells && Number.isFinite(a.mapCells) && Number.isFinite(b.mapCells) &&
+        a.mapPeak === b.mapPeak,
+        `mapCells ${a.mapCells} -> ${b.mapCells} while mapPeak is bit-identical at ${a.mapPeak}. A filter that ` +
+        "dropped everything, or a device that stopped reporting the field, would both read as 'not live' here " +
+        "and would both be a different fact");
+
+    // THE OTHER DIRECTION: the filter must not be silently eating physical fields on a knob that DOES work.
+    const good = await runRefinement("ct");
+    ok("!! ...and the same filter excludes NOTHING from a knob that really refines",
+        good.live === true && good.structural.length === 0 && good.fields.some((f) => f.verdict === "CONVERGING"),
+        `ct.parallel: ${good.fields.length} fields, ${good.structural.length} excluded, ` +
+        `${good.fields.filter((f) => f.verdict === "CONVERGING").map((f) => f.field).join(", ")} converging. ` +
+        "Measured across all eight canonical knobs at v4483: the filter removes not one field and moves not " +
+        "one verdict -- it is a no-op on everything that was already honest");
 }
 
 // ---- 5. WHAT THIS DOES NOT ESTABLISH --------------------------------------------------------------------------------

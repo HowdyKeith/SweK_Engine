@@ -28,12 +28,60 @@ import { preRegister } from "./corroborate.mjs";
  * criterion 3 watches every number the mode reports, because the interesting failures are the ones nobody
  * thought to nominate.
  */
+/**
+ * *** v4483 -- THE STRUCTURAL RULE, MOVED HERE BECAUSE THIS FILE IS WHERE IT WAS MISSING. ***
+ *
+ * corroborationCensus.mjs has had this regex since v4036 and calls what it matches "structural rather than
+ * physical -- counts, indices, flags. Grading them is noise." It was a module-private const there, so the
+ * REFINEMENT RUNNER IN THIS FILE NEVER ASKED, and `live` counted any number that moved.
+ *
+ * *** THE CASE THAT PROVES IT IS lens.map, WHICH THE CENSUS DECLARED REFINABLE FOR 447 VERSIONS. *** Sweeping
+ * mapN over 9, 13, 21, 31 moves EXACTLY ONE field -- mapCells, at 81, 169, 441, 961, which is mapN squared --
+ * while mapPeak (20.024981687576595), mapPeakExact, mapPeakErrFrac, mapSpan and sourceRho are BIT-IDENTICAL
+ * across the whole sweep. So the grid gets finer and not one physical quantity notices, and the runner
+ * reported live:true because the GRID SIZE is a number and it changed.
+ *
+ * The ECHO verdict below was built for this and cannot see it: it catches a field whose values EQUAL the knob
+ * values, and mapCells is a FUNCTION of them. Chasing that generally means guessing which transforms count,
+ * which is a worse rule than the one the census already wrote down and this file was simply not consulting.
+ *
+ * ONE OWNER, AND THE ARROW POINTS THIS WAY: the census imports the knob table from here, so the rule it needs
+ * lives here too rather than this file importing back out of the thing it feeds.
+ */
+export const STRUCTURAL_RE = /^(n|count|cells|steps|iters|index|i|j|k|mode|seed|size|len|length)$|Count$|Cells$|Steps$|^is[A-Z]|^has[A-Z]/;
+
 export const REFINEMENT_KNOBS = {
     // *** v3514 -- THE FIRST PROMOTION SINCE corroborationReach STARTED COUNTING. The census called blackhole
     // one knob short and named a REFINEMENT knob as what it lacked; escTol is one, measured rather than
     // assumed. It went looking for a different thing entirely -- v3512 suspected escTol of QUANTISING escapeV
     // and thereby faking the nuisance knob's bit-identical pass. IT DOES NOT (see knobCandidates), and the
     // sweep done to test that suspicion is what revealed a clean convergence sequence nobody had run.
+    // *** v4483 -- THE EIGHTH KNOB, AND IT ARRIVES BY MIGRATION RATHER THAN BY DISCOVERY. *** ct existed only
+    // in corroborationCensus.mjs's second REFINEMENT_KNOBS -- a table in a different shape ({key, values,
+    // modes} against {mode, param, why}) that this round deletes. Promoting it is the one entry of that table
+    // that survives contact with this file's rule, which is that a knob must state its argument.
+    //
+    // *** THE CENSUS DECLARED [64, 128, 256] AND THE DEVICE NEVER SWEPT 256. *** MEASURED at v4483: nAngles
+    // 240, 248, 256 and 512 return BIT-IDENTICAL values on every field ct reports -- fbpCorr 0.9946170682452325
+    // at all four -- so the knob CLAMPS AT 240 and the declared third point was a coerced duplicate of the
+    // second-to-last. A table that names a value the sweep cannot reach is describing a measurement nobody
+    // took, which is v4477's coercion finding arriving in a second place. The values here stop where the
+    // device does.
+    ct: {
+        mode: "parallel",
+        param: "nAngles",
+        why: "nAngles is the number of projection angles in the parallel-beam sinogram that filtered " +
+             "backprojection inverts. The phantom, the ramp filter and the reconstruction grid are all " +
+             "unchanged; adding angles refines the ANGULAR SAMPLING of the same transform, which is the " +
+             "textbook refinement direction for FBP. MEASURED at v4483 over 32, 64, 128, 240: fbpCorr " +
+             "0.96658812802216, 0.9851311495712941, 0.9927910274297742, 0.9946170682452325 -- CONVERGING, " +
+             "with successive differences 1.86e-2, 7.63e-3, 1.83e-3, each roughly a quarter of the last, " +
+             "which is what halving the angular step buys on a smooth phantom. rampGain converges beside it " +
+             "and bpCorr DRIFTS, which is the honest split: unfiltered backprojection does not converge to " +
+             "the phantom however many angles you give it, and a knob whose every field improved would be " +
+             "the suspicious result rather than the good one.",
+        values: [32, 64, 128, 240],
+    },
     blackhole: {
         mode: "escape",
         param: "escTol",
@@ -211,17 +259,23 @@ export async function runRefinement(name, knob = REFINEMENT_KNOBS[name]) {
         runs.push({ v, obs: await dev.build({ mode: knob.mode, config: { [knob.param]: v } }) });
     }
     const keys = new Set(runs.flatMap((r) => Object.keys(r.obs || {})));
-    const fields = [];
+    const fields = [], structural = [];
     for (const k of keys) {
         const vals = runs.map((r) => r.obs?.[k]);
         if (!vals.every(isNum)) continue;
         // the knob itself is echoed back by several devices; classifying it is noise
         if (k === knob.param) continue;
+        // v4483 -- AND SO IS A COUNT DERIVED FROM IT. See STRUCTURAL_RE above: lens.map's only responding
+        // field was mapCells = mapN^2, which made a knob that refines nothing read as live.
+        if (STRUCTURAL_RE.test(k)) { structural.push(k); continue; }
         fields.push({ field: k, ...classifySequence(vals, knob.values) });
     }
     const live = fields.some((f) => ["CONVERGING", "DRIFTING", "FLOOR-LIMITED", "ECHO"].includes(f.verdict));
     return {
         device: name, mode: knob.mode, param: knob.param, values: knob.values, live, fields,
+        // REPORTED, not merely dropped: a device whose ONLY movement was structural is the lens.map case, and
+        // a reader needs to see that the fields existed and were excluded rather than that none were found.
+        structural,
         positiveControl: knob.positiveControl
             ? fields.find((f) => f.field === knob.positiveControl) || { field: knob.positiveControl, verdict: "ABSENT" }
             : null,

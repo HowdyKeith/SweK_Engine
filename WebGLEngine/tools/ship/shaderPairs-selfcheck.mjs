@@ -241,11 +241,13 @@ console.log("\n2. THE TRIGGER COUNTS CO-OCCURRENCE AND THE DECISION NEEDS 5");
     //
     // 8 / 3 -> 9 / 4, read before raising again: physics/render/specularProbeLit.mjs (fae26dbf) is the new DUPLICATION,
     // sharing fetchTexelM/mipSizeAt/mipYAt for real; the fourth CONVENTION file shares only a generic entry-point name.
-    ok("*** of the files the trigger counts, NINE duplicate a computation and FOUR share only a convention ***",
-        C.duplication.length === 9 && C.convention.length === 4,
+    // v4884 MERGE -- 9 / 4 -> 9 / 5: render/zoomBlurExact.mjs (the long-silence branch's pairwise-sum zoom blur, renamed from its zoomBlur.mjs because main has its own) carries GLSL and WGSL and classifies
+    // CONVENTION with a generic-only shared-identifier list, exactly as the branch recorded for it at v4478 (2 -> 3 there): both halves are emitted by one reduceTree() call, so they cannot drift and an IR would buy nothing.
+    ok("*** of the files the trigger counts, NINE duplicate a computation and FIVE share only a convention ***",
+        C.duplication.length === 9 && C.convention.length === 5,
         `${C.duplication.length} DUPLICATION, ${C.convention.length} CONVENTION out of ${census.both.length} -- and ${C.disjoint.length} DISJOINT, REPORTED rather than asserted because that class is the noise this gate exists to name. An IR replaces DUPLICATION; it can do nothing for a file whose two halves compute different things, and render/bloomFused.mjs exists precisely because WebGPU can fuse what WebGL2 cannot`);
     ok("  ...and the two that bear on the decision are exactly the two that survived a detector replacement",
-        C.duplication.length + C.convention.length === 13,   // v4526 merge: 7 -> 11; specularProbeLit: 11 -> 13
+        C.duplication.length + C.convention.length === 14,   // v4526 merge: 7 -> 11; specularProbeLit: 11 -> 13; v4884: zoomBlurExact: 13 -> 14
         `main's v4383 replaced shaderCensus's detector and \`both\` fell 14 -> ${census.both.length}, a 29% move in the headline number. DUPLICATION and CONVENTION did not change by one file. THIS IS A CONTROL THAT WAS RUN WITHOUT BEING PLANNED: the round predicted the count was measuring something other than the claim, and then an independent correction to the count left the claim untouched`);
     ok("  and the five are named, so the decision rests on a list rather than on a number",
         C.duplication.every((r) => r.real.length >= DUPLICATION_MIN),

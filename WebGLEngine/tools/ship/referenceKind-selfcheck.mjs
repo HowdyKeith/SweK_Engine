@@ -258,7 +258,8 @@ const WHERE = GRAPH.where;
 // named the one arrival: vendor/three-webgpu-r185/three.tsl.js, the r185 build kept for the r185 drafts (its note is above).
 // 332 + 1 = 333, the reading; the arithmetic of two named lists, not a member-by-member diff, and said as such.
 // v4880 -- 333 -> 342 AT THE MERGE OF THE ORRERY-SEEDED BRANCH, MEASURED (342 over the merged tree): the branch's thirteen renumbered ledger closings (since573..585) name the paths of its modules in prose, and the census counts a module a sentence names as rescued. Caught up to what the merge brought, not loosened by hand; nothing here is wired or deleted by it.
-const RESCUED_CEILING = 343;   // v4883: 344 -> 343, as owed -- ocean-default.html and world/oceanWater.mjs import physics/ocean/oceanSurface.mjs, so it is wired and no longer rescued by a sentence.// v4881: +1, physics/ocean/oceanSurface.mjs -- named in prose and by an instruments row, imported by nothing until slice 2 (the cheap default water) draws from it. Caught up to a module that is waiting for its caller, by name; nothing is hidden by it.
+const RESCUED_CEILING = 346;   // v4884: 343 -> 346 at the merge of long-silence-elements-check, measured (346): the branch's renumbered closings and notes name tools/mac/xbarPlugin.mjs, tools/roundhouse/sensitivitySweep.mjs and wideSweep.mjs and tools/ship/freezeRegisterAudit.mjs in prose. Caught up to what the merge brought, by name; nothing is wired or deleted by it.
+//    // v4883: 344 -> 343, as owed -- ocean-default.html and world/oceanWater.mjs import physics/ocean/oceanSurface.mjs, so it is wired and no longer rescued by a sentence.// v4881: +1, physics/ocean/oceanSurface.mjs -- named in prose and by an instruments row, imported by nothing until slice 2 (the cheap default water) draws from it. Caught up to a module that is waiting for its caller, by name; nothing is hidden by it.
 
 const rescued = [];
 {
@@ -361,7 +362,8 @@ const rescued = [];
     // gateMutation, nextRounds, ship, verify -- named by a later closing, or left without their last non-gate
     // importer. The accrual the v4386 note predicted, one paragraph per round.
     // v4819 -- 57 at the merge, MEASURED over the merged tree: 57 against 57 (the exported-functions line alone had read 58).
-    const RITUAL_CEILING = 62;   // v4880: 57 -> 62, measured -- the five modules the orrery-seeded closings name (gfx/pipelineGaps.mjs, render/shaderEmitters.mjs and three more)
+    const RITUAL_CEILING = 65;   // v4884: 62 -> 65, measured -- three more modules the branch's renumbered closings name by path (read off the gate)
+    //    // v4880: 57 -> 62, measured -- the five modules the orrery-seeded closings name (gfx/pipelineGaps.mjs, render/shaderEmitters.mjs and three more)
     const ritual = rescued.filter((r) => r.by.includes("tools/ship/gateSweep.mjs"));
     ok("!! *** no NEW module is hidden from the orphan census by the ship ritual's own sweep closing ***",
        ritual.length <= RITUAL_CEILING,
