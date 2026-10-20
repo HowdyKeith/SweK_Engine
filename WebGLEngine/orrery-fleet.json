@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "8afe11a8d9638fade592d07ea0f8e40e5962f8ed",
+ "head": "6d3ba3113b30e2152bb70c2838c7df50d85c9763",
  "bodies": {
   "box3d": [
    {
@@ -1359,6 +1359,18 @@
     "path": "wasm-bench.html",
     "bytes": 19835,
     "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+   }
+  ],
+  "web-ocean": [
+   {
+    "path": "ocean-spike.html",
+    "bytes": 8423,
+    "sha": "6599a7e6fe02099ee636a2c7b409a287ed530b09"
+   },
+   {
+    "path": "tools/ship/oceanSpikePage-selfcheck.mjs",
+    "bytes": 15599,
+    "sha": "085367af2f3c9aa42eccf43cee6ad0e14f98b14c"
    }
   ],
   "xatlas": [

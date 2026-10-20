@@ -665,3 +665,16 @@ export const COMMIT_BELT_DRIFT_V4819 = Object.freeze({
     }),
     bodiesNow: 23,
 });
+
+// v4880 -- ONE ARRIVAL, vendor/web-ocean (noniv/web-ocean, MIT), brought by the ocean spike (085367af). v4819's record is a claim about v4819 and is
+// not rewritten: this one spreads it and adds the body. Its hash is read from `git log --format=%h --abbrev=8 -- WebGLEngine/vendor/web-ocean`.
+export const COMMIT_BELT_DRIFT_V4880 = Object.freeze({
+    ...COMMIT_BELT_DRIFT_V4819,
+    at: "v4880",
+    arrivedSince4475: Object.freeze({
+        ...COMMIT_BELT_DRIFT_V4819.arrivedSince4475,
+        "web-ocean": Object.freeze({ now: Object.freeze(["085367af"]),
+            why: "the level-1 ocean spike vendored noniv/web-ocean's published bundle byte for byte (ocean.html, LICENSE, PROVENANCE.txt); ocean-spike.html frames it" }),
+    }),
+    bodiesNow: 24,
+});

@@ -197,6 +197,12 @@ export function mentionsOf(name, files) {
 // and three-webgpu-r185: render/renderNow-selfcheck.mjs, which READS both builds' source to pin that renderAsync is exactly `await this.init();
 // this.render(scene, camera)` -- a real dependency, since a vendor move or an edit to those bodies is what makes it red.
 export const DEPENDANTS_AT_V4410 = Object.freeze({
+    // UNNUMBERED -- v4880: vendor/web-ocean (noniv/web-ocean, MIT) arrived with the ocean spike. Its dependants, each by name: ocean-spike.html (the page whose
+    // frame loads vendor/web-ocean/ocean.html), and the gate that pins the vendored bytes by hash.
+    "web-ocean": Object.freeze([
+        "ocean-spike.html",
+        "tools/ship/oceanSpikePage-selfcheck.mjs",
+    ]),
     "box3d": Object.freeze([
         "ai-bridge/doctorBridge.js",
         "ai-bridge/server.js",

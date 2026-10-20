@@ -1863,6 +1863,26 @@
    ]
   },
   {
+   "name": "web-ocean",
+   "arrived": "2026-10-20",
+   "sha": "085367af2f3c9aa42eccf43cee6ad0e14f98b14c",
+   "bytes": 104800,
+   "files": [
+    {
+     "path": "LICENSE",
+     "bytes": 1076
+    },
+    {
+     "path": "ocean.html",
+     "bytes": 102283
+    },
+    {
+     "path": "PROVENANCE.txt",
+     "bytes": 1441
+    }
+   ]
+  },
+  {
    "name": "xatlas",
    "arrived": "2026-09-09",
    "sha": "6b1a06864eca14d41613a26ce224e4c239b0e611",

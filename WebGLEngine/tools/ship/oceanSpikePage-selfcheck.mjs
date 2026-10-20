@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/oceanSpikePage-selfcheck.mjs -- UNNUMBERED (a spike; the version is chosen at ship time)
 //
-// Run: node tools/ship/oceanSpikePage-selfcheck.mjs      (~3 s with a browser; sections 1-2 alone ~0.1 s)
+// Run: node tools/ship/oceanSpikePage-selfcheck.mjs      (~1.3 s with a browser; sections 1-2 alone ~0.1 s)
 //
 // ocean-spike.html RUNS SOMEONE ELSE'S OCEAN, UNMODIFIED, IN A FRAME. THIS GATE HOLDS THE THREE THINGS THAT MAKE THAT SAFE TO CLAIM:
 //   1  THE VENDORED BYTES   vendor/web-ocean/ocean.html is exactly the 102,283 bytes noniv/web-ocean published at commit a07c7fd (sha256 pinned) -- "unmodified" is a claim about bytes, and a hash is the only thing

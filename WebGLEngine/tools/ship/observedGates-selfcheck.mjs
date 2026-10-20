@@ -89,8 +89,11 @@ const SELF = "observedGates-selfcheck.mjs";
         .filter((g) => (sweep.codes || {})[g] === 0 && !(g in durable) && !named.has(g) && !(g in failing));
     say(`${Object.keys(sweep.timings || {}).length} gates in the sweep file; ${sweepOnly.length} have evidence from NOWHERE else`);
     ok("!! *** GATES REST THEIR ONLY RUNTIME EVIDENCE ON A FILE REWRITTEN EVERY RUN ***",
-        sweepOnly.length > 100 && Math.abs(sweepOnly.length - M.evidenceOnlyFromScratch) <= 5,
-        `${sweepOnly.length} of them, against ${M.evidenceOnlyFromScratch} measured at v4485. Any one, killed ` +
+        // v4880 -- 215 at v4485 and 55 now: the durable register (gate-timings.json) and budgetEvidence's named list absorbed most of them in the meantime, which is the
+        // defect shrinking, not the premise failing. What the row still claims is that the dependence is real and not small, so it holds the count to the figure read at v4880
+        // within ten, and names both numbers.
+        sweepOnly.length > 20 && Math.abs(sweepOnly.length - 55) <= 10,
+        `${sweepOnly.length} of them, against 55 read at v4880 and ${M.evidenceOnlyFromScratch} measured at v4485. Any one, killed ` +
         "at the cap on a busy box, erased the wall's green -- and the sweep file's own note says it is not a " +
         "claim about the tree");
 
