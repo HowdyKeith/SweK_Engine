@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/subDisturb-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/subDisturb-selfcheck.mjs      (~3 s)
+// Run: node tools/ship/subDisturb-selfcheck.mjs      (~1.4 s)
 //
 // tools/subDisturb.mjs takes three kindnesses away from a pilot: exact senses, instant controls, still water. A robustness number measured through it is only worth what these rows make it worth, so they pin the knobs:
 //   1  THE LEVELS   the table of levels is what the reports say it is
