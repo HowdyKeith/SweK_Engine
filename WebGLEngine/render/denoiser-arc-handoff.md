@@ -37,13 +37,13 @@ node tools/ship/versionPreflight.mjs --next    # the next free version and sweep
 
 ## What is next -- Keith picks
 
-1. **`denoise-halfres-rig-timing`.** Round 30's chain on the rig at 1920 x 1080: the denoiser at 960 x 540, the fill
-   and composite in WGSL (gated against the CPU reference in `render/denoiseUpscale.mjs`), EASU through
-   `fx/fsr/fsrGPU.js`, and the full-size emitter coverage, timed against today's full-size page on both GPUs.
+1. **`denoise-fsr2-temporal`.** Round 31 (sections 93-94) found the half-size chain cheaper than today's page at
+   1080p on both GPUs (1.44-1.48 x on the 1080, 1.38-1.54 x on the Intel), so by its rule this is the arc's next round.
+   **`denoise-halfres-fixed-costs`** sits beside it: the chain's coverage and fill cost more than its network.
 2. **`denoise-f16-intel`** (gen-9 only). Half-precision kernels, now known to be exposed there.
 3. **`denoise-subgroup-reduction`** (GTX 1080 only). Subgroup kernels, now known to be exposed there.
 
-`denoise-fsr2-temporal` is also unblocked, behind the rig-timing round.
+`denoise-halfres-page` (the chain on the page as an option) waits on the fixed costs, or on Keith's call.
 
 ## The arc's method -- every round, in this order
 

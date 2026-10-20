@@ -6277,3 +6277,51 @@ chain ran 2.0-2.1 x as fast as the full-size network alone, before the mask was 
 At 1920 x 1080, forced on SwiftShader once (`SWEK_HALFCHAIN_RIGSIZE=1`) to drive the rig's path: the fill filled on 87 of
 its 96 rings, the CPU's count exactly, and every step of the chain was timed. The network at 1920 x 1080 was not: its pass was
 predicted at 111 s, over the cap, so that run's section-93 row was red, and no ratio was made. On a GPU the pass is 0.07-1.4 s.
+
+## 94. ROUND 31 -- THE VERDICT: THE HALF-SIZE CHAIN IS CHEAPER THAN TODAY'S PAGE AT 1080p ON BOTH GPUS
+
+**What arrived.** Two `realGpuRun --only denoise` runs on each GPU, `SWEK_WEBGPU` cleared: the Intel gen-9 at 1c60b346 (the
+commit that carried section 93), and the GTX 1080 at 77aaece5 (the same, plus one sentence of section 93). Committed as received
+at 7706ce4c, before this section was written: `render/denoise-rig-r31-{a,b}-{intel-gen9,gtx1080}.json`.
+
+**Section 93's rule, read off the reports.** `render/denoiseUpscaleGPU-selfcheck.mjs`'s section 5 re-derives every figure
+here from those four files: their commits, every gate's verdict, and the chain gate's two `section 93:` lines.
+
+| | Run a | Run b | H |
+|---|---|---|---|
+| GTX 1080 (r18t): today's page against the chain, at 1920 x 1080 | 92.2 / 64.1 ms = **1.439 x** | 89.5 / 60.5 ms = **1.479 x** | **holds** |
+| Intel gen-9 (r18u) | 1,591.5 / 1,035.3 ms = **1.537 x** | 1,606.1 / 1,167.6 ms = **1.376 x** | **holds** |
+
+- **C1:** every denoise gate was green in all four runs, the chain's own device rows among them.
+- **C2:** the fill filled on 87 of its 96 rings in every run, the CPU's count, so it reached every pixel.
+- **C3:** both networks were on the device's clock in every run.
+- **C4, reported:** the 1080's two runs were 3% apart, and the Intel's 11%.
+
+**So, by section 93's rule: `denoise-fsr2-temporal` is the arc's next round.** At 1080p the half-size chain is cheaper than
+today's page on both rigs, as well as closer to the reference at equal samples (section 92). Putting the chain on the page as
+an option becomes `denoise-halfres-page` in the backlog. Nothing changes in this round: the page, the network, the filter,
+every kernel table, and `fx/fsr`.
+
+**The predictions.** They decided nothing. Section 5's last row reads each one off the reports.
+- **Held:** the 1080's ratio (1.4-3.0 predicted); its network at 960 x 540 (18.4 ms both runs, 18-25 predicted); its transfer,
+  EASU and composite (1.0 ms, 1-3 predicted); and the 87 rings on both GPUs.
+- **Missed:** the Intel's ratio, 1.376-1.537 against 2.0-4.0 predicted. The 1080's two coverages, 21.1-21.3 ms against 1-10.
+  Its fill, 20.0-23.4 ms against 3-15.
+- **Why they missed:** the chain's fixed costs were underestimated on both GPUs. The prediction for the Intel was that the
+  network would be "a larger share of its frame, so the fixed costs weigh less". That was wrong: they weighed more.
+
+**What it says, and where it stops.**
+- **The chain's own steps cost more than the network they sit beside.** Both coverages, the fill, and the transfer, EASU and
+  composite together were 42-46 ms against an 18 ms network on the 1080. On the Intel they were 728-821 ms against 308-347 ms.
+  The chain kept its lead because the network at 1920 x 1080 costs about four times the one at 960 x 540 (72.7-75.2 ms
+  against 18.4 on the 1080; 1,317-1,333 ms against 308-347 on the Intel).
+- **The full-size coverage is part of today's page too.** It was 17 ms of the 1080's page and 274 ms of the Intel's, at 64
+  rays a pixel. It is the mask the network reads, so the chain was not charged for it alone.
+- **The fill was by the wall clock, and so can only be overstated.** The chain's steps in one frame, also by the wall clock,
+  were 40.6-40.7 ms on the 1080 and 728-795 ms on the Intel. That cross-check is close to the sum of the parts.
+- **The ratios are one scene's: R 990000, a large light, 87 rings.** Every ring pass runs over every pixel, so the fill costs
+  the same on any scene with 96 rings budgeted. The coverage's cost scales with the number of spheres, and this scene's six are
+  typical of family R.
+- **`denoise-halfres-fixed-costs`** records the levers: a fill over the lights' bounding boxes, or one that stops once nothing
+  is left, exact against `fillEmittersBounded`; and fewer coverage rays, which changes the guide and so is a new quality
+  question, not the same chain made faster.

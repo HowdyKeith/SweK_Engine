@@ -29,7 +29,15 @@
 //   T3  the page's table without the fill's row                        1 RED (the page row: 7 rows, not 8)
 //   T4  the full-size page timed from the half-size row                1 RED (the sum row). 0 RED at first: nothing held which
 //       ladder row each network time came from; the row now names both
+//   and section 5's verdict (section 94), by the same runner:
+//   V1  the rule asks one GPU, not both                                1 RED (the rule row)
+//   V2  a run counts at any commit                                     1 RED (the rule row: a stale run must leave it owed)
+//   V3  H holding at 0.9 x                                             1 RED (the rule row)
+//   V4  C2 dropped -- any ring count                                   1 RED (the rule row). 0 RED at first: no fixture's fill
+//       used all 96 rings; one does now
+//   V5  the Intel's predicted range widened to 1.3                     1 RED (the predictions row)
 "use strict";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin } from "../tools/ship/webgpuHarness.mjs";
@@ -242,6 +250,58 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
             }
         }
     }
+}
+
+console.log("\n5. SECTION 94: ROUND 31'S VERDICT, RE-DERIVED FROM THE FOUR REPORTS AS COMMITTED");
+{
+    // the commits that carry section 93 and that the rig ran: 1c60b346 brought it, 77aaece5 added one sentence to it
+    const SECTION93_COMMITS = Object.freeze(["1c60b346", "77aaece5"]);
+    const GPUS = { "intel-gen9": "intel / gen-9", gtx1080: "nvidia / pascal" };
+    const num = (re, t) => { const m = t.match(re); return m ? Number(m[1]) : null; };
+    // one report: its commit, every gate's verdict, and the two section-93 lines of the chain's gate, read back to numbers
+    const readRun = (rep) => {
+        const g = rep.gates.find((x) => x.gate === "render/denoiseUpscaleGPU-selfcheck.mjs"), m = (g && g.measured) || [];
+        const a = m.find((l) => /^section 93: .*kernels/.test(l)) || "", b = m.find((l) => /^section 93: the chain's steps/.test(l)) || "";
+        const step = (k) => ({ ms: num(new RegExp(`${k} ([0-9.]+) ms`), b), clock: (b.match(new RegExp(`${k} [0-9.]+ ms \\((\\w+)\\)`)) || [])[1] || null });
+        return { commit: String(rep.commit || "").slice(0, 8), allGreen: rep.gates.length === 4 && rep.gates.every((x) => x.ok), adapter: (a.match(/^section 93: ([^,]+),/) || [])[1] || null,
+            kernels: (a.match(/kernels (\w+);/) || [])[1] || null,
+            netFull: { ms: num(/1920 x 1080 ([0-9.]+) ms/, a), clock: (a.match(/1920 x 1080 [0-9.]+ ms \((\w+)\)/) || [])[1] || null },
+            netHalf: { ms: num(/at 960 x 540 ([0-9.]+) ms/, a), clock: (a.match(/at 960 x 540 [0-9.]+ ms \((\w+)\)/) || [])[1] || null },
+            full: num(/today's page \(network and mask\) ([0-9.]+) ms/, a), half: num(/the half-size chain ([0-9.]+) ms/, a), ratio: num(/ratio ([0-9.]+) x/, a),
+            covHalf: step("covHalf"), covFull: step("covFull"), fill: step("fill"), rest: step("rest"), whole: step("whole"),
+            rings: num(/; (\d+) of 96 rings filled/, b) };
+    };
+    // section 93's rule: a run counts when it is at a commit carrying section 93, every gate is green (C1), the fill reached every
+    // pixel and filled on fewer than 96 rings (C2), and both networks are on the device's clock (C3); H holds on a GPU when both
+    // its runs count and the ratio, re-made from the two times, is above 1.0 in each
+    const counts = (r) => SECTION93_COMMITS.includes(r.commit) && r.allGreen && r.rings > 0 && r.rings < 96 && r.netFull.clock === "device" && r.netHalf.clock === "device" &&
+        [r.full, r.half, r.ratio].every((v) => Number.isFinite(v) && v > 0) && Math.abs(r.full / r.half - r.ratio) < 0.002;
+    const H = (runs) => (runs.length === 2 && runs.every(counts) ? (runs.every((r) => r.full / r.half > 1) ? "holds" : "fails") : "no verdict");
+    const rule94 = (byGpu) => { const v = Object.values(byGpu).map(H); return v.every((x) => x === "holds") ? "fsr2-temporal" : v.includes("no verdict") ? "owed again" : "name the steps"; };
+    const R = {};
+    for (const g of Object.keys(GPUS)) R[g] = ["a", "b"].map((k) => readRun(JSON.parse(fs.readFileSync(path.join(ENG, "render", `denoise-rig-r31-${k}-${g}.json`), "utf8"))));
+    const all = Object.values(R).flat();
+    ok("!! section 94: the four reports read back -- each at a commit carrying section 93, on its GPU's adapter and the page's kernel set for it, every gate green, the fill short of its 96 rings, both networks on the device's clock",
+        Object.entries(R).every(([g, rs]) => rs.every((r) => counts(r) && r.adapter === GPUS[g] && r.kernels === (g === "gtx1080" ? "r18t" : "r18u"))),
+        all.map((r) => `${r.adapter} ${r.commit}: ${r.kernels}, ${r.rings} rings, ratio ${r.ratio}`).join("; "));
+    const slow = (rs, i) => rs.map((r, j) => (j === i ? { ...r, half: r.full * 1.01, ratio: Math.round(100000 / 1.01) / 100000 } : r));
+    const stale = (rs) => rs.map((r, j) => (j === 0 ? { ...r, commit: "502091b1" } : r));
+    // and a run whose fill used every ring: C2 then cannot say every pixel was reached (V4 went 0 RED before this fixture)
+    const full96 = (rs) => rs.map((r, j) => (j === 0 ? { ...r, rings: 96 } : r));
+    ok("!! *** section 94's rule, as section 93 fixed it: the chain cheaper than today's page in both runs on both GPUs -- so denoise-fsr2-temporal is the arc's next round ***",
+        H(R["intel-gen9"]) === "holds" && H(R.gtx1080) === "holds" && rule94(R) === "fsr2-temporal" &&
+        rule94({ ...R, gtx1080: slow(R.gtx1080, 1) }) === "name the steps" && rule94({ ...R, "intel-gen9": stale(R["intel-gen9"]) }) === "owed again" && rule94({ ...R, gtx1080: full96(R.gtx1080) }) === "owed again" && H(R.gtx1080.slice(0, 1)) === "no verdict",
+        Object.entries(R).map(([g, rs]) => `${g}: ${rs.map((r) => (r.full / r.half).toFixed(3)).join(" and ")} x`).join("; "));
+    // the predictions, read off the reports: they decided nothing, and section 94 says which held
+    const within = (rs, f, lo, hi) => rs.every((r) => f(r) >= lo && f(r) <= hi);
+    const I = R["intel-gen9"], N = R.gtx1080, cov = (r) => r.covHalf.ms + r.covFull.ms;
+    const P = { ratio1080: within(N, (r) => r.ratio, 1.4, 3.0), ratioIntel: within(I, (r) => r.ratio, 2.0, 4.0), net1080: within(N, (r) => r.netHalf.ms, 18, 25),
+                cov1080: within(N, cov, 1, 10), fill1080: within(N, (r) => r.fill.ms, 3, 15), rest1080: within(N, (r) => r.rest.ms, 1, 3), rings: all.every((r) => r.rings === 87) };
+    ok("  section 94's account of section 93's predictions: the 1080's ratio, its half-size network, its last three passes and the 87 rings held; the Intel's ratio, and the 1080's coverage and fill, did not",
+        P.ratio1080 && P.net1080 && P.rest1080 && P.rings && !P.ratioIntel && !P.cov1080 && !P.fill1080 && all.every((r) => r.fill.clock === "wall" && r.whole.clock === "wall" && r.covFull.clock === "device"),
+        `Intel ratio ${I.map((r) => r.ratio).join(", ")} (2.0-4.0 predicted); 1080 coverage ${N.map((r) => cov(r).toFixed(1)).join(", ")} ms (1-10), fill ${N.map((r) => r.fill.ms).join(", ")} ms (3-15)`);
+    // reported: what the chain's own steps cost against the half-size network they sit beside
+    for (const [g, rs] of Object.entries(R)) say(`section 94, ${g}: the network at 960 x 540 ${rs.map((r) => r.netHalf.ms.toFixed(1)).join(" / ")} ms; the chain's own steps (both coverages, the fill, the rest) ${rs.map((r) => (r.half - r.netHalf.ms).toFixed(1)).join(" / ")} ms -- reported, deciding nothing`);
 }
 
 console.log(fails ? `\nFAIL -- ${fails} check(s)` : "\nALL GREEN");

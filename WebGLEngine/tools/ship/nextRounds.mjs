@@ -1875,10 +1875,25 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "denoise-halfres-rig-timing",
+        blocker: "CLOSED",
+        what: "DONE as the denoiser arc's round 31 (pre-registration sections 93-94), unshipped on the feature branch at this writing. H HOLDS ON BOTH GPUS: at 1920 x 1080 output, round 30's chain -- the network at 960 x 540, the coverage at both sizes, the fill, EASU and the composite -- was cheaper than today's page (the network and its mask at full size) in both runs on each: 1.439 and 1.479 x on the GTX 1080 (r18t), 1.537 and 1.376 x on the Intel gen-9 (r18u). Every gate green, the fill 87 of 96 rings, both networks on the device's clock.",
+        how: "render/denoiseUpscaleGPU.mjs (the kernels, the runner, timeHalfChain), denoise.html's \"Time the half-size chain\", render/denoiseUpscaleGPU-selfcheck.mjs (each step against its CPU reference; section 4 the rig's size on a GPU; section 5 the verdict re-derived from render/denoise-rig-r31-{a,b}-{intel-gen9,gtx1080}.json).",
+        why: "*** THE CHAIN'S OWN STEPS COST MORE THAN THE NETWORK THEY SAVE ON. *** Coverage, fill and the rest were 42-46 ms against an 18 ms network on the 1080, and 728-821 ms against 308-347 ms on the Intel; the saving survived because the network at 1920 x 1080 costs four times the one at 960 x 540. The Intel's ratio missed its predicted 2.0-4.0, and the 1080's coverage (21 ms, 1-10 predicted) and fill (20-23 ms, 3-15) missed theirs -- denoise-halfres-fixed-costs.",
+    },
+    {
+        id: "denoise-halfres-fixed-costs",
         blocker: "OPEN",
-        what: "Round 30's chain on the rig at 1920 x 1080: the shipped network at 960 x 540, the emitter fill and composite in WGSL, EASU through fx/fsr/fsrGPU.js, and the full-size emitter coverage the composite needs -- timed against today's full-size page on both GPUs.",
-        how: "Build the fill and composite as WGSL and gate them bit-near against render/denoiseUpscale.mjs's CPU reference (the ring fill needs a bounded-pass form on a GPU; its reference is the CPU one), pilot on SwiftShader here, then a pre-registered timing round on the rig. The coverage guide is 64 primary rays a pixel on the CPU today; what it costs on a GPU is part of what is timed. ROUND 31, PART 1 (unshipped, on the branch): the kernels exist -- render/denoiseUpscaleGPU.mjs (coverage, the bounded ring fill, the transfer, the composite, and the chain on one encoder with fx/fsr's EASU), held to the CPU references by render/denoiseUpscaleGPU-selfcheck.mjs on SwiftShader (coverage 1 ray in 8 frames, fill 1.2e-7, chain 2.3e-6), sabotaged G1-G9. PART 2 (unshipped): the caller is denoise.html's \"Time the half-size chain\" (timeHalfChain), the gate drives it and joins realGpuRun --only denoise, and section 93 is the pre-registration. STILL OWED: the rig's two runs on each GPU, and section 94's verdict. MEASURED for it: the exact fill takes one pass a ring, and at 960 x 540 the R scenes need 29, 36 and 77 rings (R 44001, 44002, 44004) and 4 for a 112-pixel light -- more passes than gfx/device.js can timestamp in one frame (30), so the fill is timed by the wall clock or in chunks, and the pre-registration fixes which.",
-        why: "Section 92: at 256 x 256 the half-size chain beat the full-size frame at equal samples on 12 of 12 images. A full-size pass on the GTX 1080 is ~75-80 ms (section 54); the denoise at a quarter of the pixels is the saving, and whether the fill, EASU, the composite and the guide leave any of it is the question.",
+        what: "The half-size chain's own steps made cheaper: the emitter coverage (64 rays a pixel at both sizes) and the bounded fill (96 ring passes over every pixel).",
+        how: "Two levers, each to be held to its CPU reference before any rig time: a fill that runs over the lights' bounding boxes only, or skips rings once nothing is left (indirect dispatch), exact against fillEmittersBounded; and a coverage with fewer rays, which is a different guide and so a new quality question against section 92's chain, not a speed-up of the same one.",
+        why: "Section 94: the coverage and fill together were 681-771 ms on the Intel against a 308-347 ms network, and 41-45 ms against 18 ms on the 1080 -- the chain kept its lead only because the full-size network is four times the half-size one. The full-size coverage is also 274 ms of today's page on the Intel.",
+    },
+    {
+        id: "denoise-halfres-page",
+        blocker: "UPSTREAM",
+        what: "The half-size chain on denoise.html as an option beside today's full-size denoise, not in place of it.",
+        how: "The page traces on the CPU today; the chain's GPU steps exist (render/denoiseUpscaleGPU.mjs). An option renders at half size, denoises, and runs DenoiseUpscaleGPU's chain, with its relMSE beside today's.",
+        why: "Section 94's rule: cheaper at 1080p on both rigs (section 94) and better at equal samples at 256 x 256 (section 92).",
+        upstream: "denoise-halfres-fixed-costs first, or Keith's call: the chain as built spends more on its own steps than on the network.",
     },
     {
         id: "denoise-network-at-run-scale",
@@ -1948,6 +1963,8 @@ export const NEXT_ROUNDS = [
         blocker: "OPEN",
         // v4871+: OFF ITS BLOCKER at round 30 -- section 92 reported the spatial half-size chain, emitters composited, supported on both
         // hypotheses at 256 x 256, which is what this entry waited on. The upstream line below is kept as the record of what it was.
+        // round 31 (section 94): THE ARC'S NEXT ROUND, by section 93's rule -- the half-size chain is cheaper than today's page at 1080p
+        // on both rigs as well as better at equal samples, so temporal reuse over it is what follows.
         what: "FSR2's temporal upscale on denoised path-traced frames: jittered renders, motion vectors and history.",
         how: "fx/fsr/fsrTemporalTsl.mjs drives a three.js scene; the path tracer is neither a three.js scene nor does it make motion vectors or jitter. Those are the work.",
         why: "Temporal reuse is where real-time path tracing gets most of its samples.",

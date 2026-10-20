@@ -467,6 +467,11 @@ node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r31-b.json
 - **Don't commit or pull between runs.**
 - **Send back all four JSON files.**
 
+**The outcome (section 94): the half-size chain is cheaper than today's page at 1080p on both GPUs.** 1.439 and 1.479 x on
+the 1080, and 1.537 and 1.376 x on the Intel. Every gate was green, and the fill reached every pixel in 87 of its 96 rings. The
+chain's own steps cost more than its network, so the next speed work is `denoise-halfres-fixed-costs`. By section 93's rule the
+arc's next round is `denoise-fsr2-temporal`. Nothing to install.
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and
