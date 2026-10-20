@@ -1,6 +1,6 @@
 {
  "gate": "physics/render/microsurfaceWalk-selfcheck.mjs",
- "at": "2026-09-07",
+ "at": "2026-10-20",
  "tables": [
   {
    "title": "the walk against the analytic table, by roughness",
@@ -49,17 +49,17 @@
     [
      "0.16",
      "1.000000",
-     "1.053"
+     "1.054"
     ],
     [
      "0.49",
      "1.000000",
-     "1.393"
+     "1.392"
     ],
     [
      "1",
      "1.000000",
-     "2.056"
+     "2.060"
     ]
    ],
    "note": null
