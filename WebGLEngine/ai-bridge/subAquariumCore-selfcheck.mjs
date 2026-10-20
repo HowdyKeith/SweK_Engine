@@ -1,6 +1,6 @@
 // WebGLEngine/ai-bridge/subAquariumCore-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node ai-bridge/subAquariumCore-selfcheck.mjs      (~0.2 s)
+// Run: node ai-bridge/subAquariumCore-selfcheck.mjs      (~0.1 s)
 //
 // THE SUB AQUARIUM'S RULES HELD TO THEIR WORD. ai-bridge/subAquariumCore.js decides what a peer may send us, where it is kept and what two status chips say; it is pure, so every decision is tested directly:
 //   1  THE NAME       a name is a label, not markup: only letters, digits, space and . _ - ( ) survive, runs of space collapse, 40 characters at most, nothing left means refused
