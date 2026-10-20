@@ -227,6 +227,9 @@ for (const l of reachLines(r)) console.log("        " + l);
     //          subActuators, subHulls, subModel6dof, subSonar, subTorpedo and terrain, each gated in its own selfcheck) and physics/mesh +7 (the
     //          arc's blastEngine, exactArrangement, exactPredicates, implicitPoints, manifoldAudit, triContact and triArrangement, each gated
     //          in its own selfcheck). Growth only, live work. Re-recorded with --write AFTER compare() had been read.
+    //   580 -> v4881 -- compare(), read BEFORE writing, reports GREW, 1 ADDED, 0 REMOVED, reconciles:true: physics/ocean/oceanSurface.mjs, the
+    //          CPU sea the physics stands on (slice 1 of ocean-optin-surface), gated in its own oceanSurface-selfcheck. Growth only, live work.
+    //          Re-recorded with --write AFTER compare() had been read.
     //
     // *** AND THE ROW HAD A DEFECT OF ITS OWN, WHICH IS WHY IT NOW ASKS THE MODULE RATHER THAN THE DISK. ***
     // It read the record with fs.readFileSync("tools/ship/population-census.json") -- A RELATIVE PATH -- so

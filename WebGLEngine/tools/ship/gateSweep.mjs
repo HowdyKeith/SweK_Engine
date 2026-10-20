@@ -15788,6 +15788,18 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "it, so the audit must carry zero timeout rows AND the slowest row must sit 1.5x under the " +
                  "cap. Headroom is REPORTED (2.04x) rather than asserted safe.",
     }),
+    since586: Object.freeze({
+        at: "v4881", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/ocean/oceanSurface-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green on this box, run singly, twenty-four checks in six sections, and seven sabotages each turned it red by name. The CPU sea the physics stands on (slice 1 of " +
+                 "ocean-optin-surface): a sum of Gerstner waves, pure f64, a function of (x, z, t, seed) alone, because the GPU sea in ocean-spike.html reads its height back late " +
+                 "and GPU FFT is not bit-identical across machines. Every row is a closed form or a re-derivation, so there is no frozen record to go stale: with no steepness the " +
+                 "height is exactly A sin(k D.x - omega t + phi) and travels at the deep-water speed omega/k; with steepness the height at a WORLD point is the height of the particle " +
+                 "that sits there (found by fixed-point inversion, 3e-13 m), the normal is the height field's own to 2e-8 against central differences, and the crest is sharper than " +
+                 "the trough while still reaching exactly +-A. A spectrum whose steepness sum reaches 0.95 is refused, and a control just under it is accepted. Unchecked, said " +
+                 "plainly: that the heights look like a sea, bit-equality across engines (one engine here), and that anything in the engine reads it yet.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

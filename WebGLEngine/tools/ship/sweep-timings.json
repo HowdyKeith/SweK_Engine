@@ -2182,7 +2182,8 @@
   "tools/ship/parallaxSampler-selfcheck.mjs": 4270,
   "tools/ship/pipelineGaps-selfcheck.mjs": 511,
   "tools/ship/shaderEmitters-selfcheck.mjs": 2284,
-  "tools/ship/stereoDevice-selfcheck.mjs": 1591
+  "tools/ship/stereoDevice-selfcheck.mjs": 1591,
+  "physics/ocean/oceanSurface-selfcheck.mjs": 89
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -4241,7 +4242,8 @@
   "tools/ship/parallaxSampler-selfcheck.mjs": 0,
   "tools/ship/pipelineGaps-selfcheck.mjs": 0,
   "tools/ship/shaderEmitters-selfcheck.mjs": 0,
-  "tools/ship/stereoDevice-selfcheck.mjs": 0
+  "tools/ship/stereoDevice-selfcheck.mjs": 0,
+  "physics/ocean/oceanSurface-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-10-20T17:36:20.475Z",
@@ -6300,7 +6302,8 @@
   "tools/ship/parallaxSampler-selfcheck.mjs": "2026-10-20T17:00:55.057Z",
   "tools/ship/pipelineGaps-selfcheck.mjs": "2026-10-20T17:36:20.475Z",
   "tools/ship/shaderEmitters-selfcheck.mjs": "2026-10-20T17:36:20.475Z",
-  "tools/ship/stereoDevice-selfcheck.mjs": "2026-10-20T17:36:20.475Z"
+  "tools/ship/stereoDevice-selfcheck.mjs": "2026-10-20T17:36:20.475Z",
+  "physics/ocean/oceanSurface-selfcheck.mjs": "2026-10-20T18:28:02.699Z"
  },
  "capAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 20000,
@@ -8334,7 +8337,8 @@
   "tools/ship/parallaxSampler-selfcheck.mjs": 20000,
   "tools/ship/pipelineGaps-selfcheck.mjs": 20000,
   "tools/ship/shaderEmitters-selfcheck.mjs": 20000,
-  "tools/ship/stereoDevice-selfcheck.mjs": 20000
+  "tools/ship/stereoDevice-selfcheck.mjs": 20000,
+  "physics/ocean/oceanSurface-selfcheck.mjs": 100000
  },
  "finished": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": true,
@@ -10388,7 +10392,8 @@
   "tools/ship/parallaxSampler-selfcheck.mjs": true,
   "tools/ship/pipelineGaps-selfcheck.mjs": true,
   "tools/ship/shaderEmitters-selfcheck.mjs": true,
-  "tools/ship/stereoDevice-selfcheck.mjs": true
+  "tools/ship/stereoDevice-selfcheck.mjs": true,
+  "physics/ocean/oceanSurface-selfcheck.mjs": true
  },
  "crossings": {
   "brain/gunnerPolicy-selfcheck.mjs": 2,
@@ -12565,7 +12570,8 @@
   "tools/ship/hdrCost-selfcheck.mjs": 766,
   "tools/ship/oceanSpikePage-selfcheck.mjs": 1259,
   "tools/ship/pipelineGaps-selfcheck.mjs": 155,
-  "tools/ship/shaderEmitters-selfcheck.mjs": 1045
+  "tools/ship/shaderEmitters-selfcheck.mjs": 1045,
+  "physics/ocean/oceanSurface-selfcheck.mjs": 89
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-10-20T04:24:34.828Z",
@@ -14515,7 +14521,8 @@
   "tools/ship/hdrCost-selfcheck.mjs": "2026-10-20T16:25:35.630Z",
   "tools/ship/oceanSpikePage-selfcheck.mjs": "2026-10-20T17:36:05.463Z",
   "tools/ship/pipelineGaps-selfcheck.mjs": "2026-10-20T16:25:35.630Z",
-  "tools/ship/shaderEmitters-selfcheck.mjs": "2026-10-20T16:25:35.630Z"
+  "tools/ship/shaderEmitters-selfcheck.mjs": "2026-10-20T16:25:35.630Z",
+  "physics/ocean/oceanSurface-selfcheck.mjs": "2026-10-20T18:28:02.699Z"
  },
  "serialRing": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": [
@@ -24108,6 +24115,9 @@
   ],
   "tools/ship/shaderEmitters-selfcheck.mjs": [
    1045
+  ],
+  "physics/ocean/oceanSurface-selfcheck.mjs": [
+   89
   ]
  },
  "contended": {
@@ -26058,7 +26068,8 @@
   "tools/ship/parallaxSampler-selfcheck.mjs": false,
   "tools/ship/pipelineGaps-selfcheck.mjs": true,
   "tools/ship/shaderEmitters-selfcheck.mjs": true,
-  "tools/ship/stereoDevice-selfcheck.mjs": false
+  "tools/ship/stereoDevice-selfcheck.mjs": false,
+  "physics/ocean/oceanSurface-selfcheck.mjs": false
  },
  "kinds": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "loaded",
@@ -28117,6 +28128,7 @@
   "tools/ship/parallaxSampler-selfcheck.mjs": "alone",
   "tools/ship/pipelineGaps-selfcheck.mjs": "loaded",
   "tools/ship/shaderEmitters-selfcheck.mjs": "loaded",
-  "tools/ship/stereoDevice-selfcheck.mjs": "alone"
+  "tools/ship/stereoDevice-selfcheck.mjs": "alone",
+  "physics/ocean/oceanSurface-selfcheck.mjs": "alone"
  }
 }

@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/populationCensus.mjs",
  "roots": "physics,simulation,fluid",
- "total": 579,
+ "total": 580,
  "areas": {
   "fluid": 8,
   "physics/acoustics": 2,
@@ -32,6 +32,7 @@
   "physics/mesh": 34,
   "physics/mpm": 14,
   "physics/nuclear": 4,
+  "physics/ocean": 1,
   "physics/octree": 3,
   "physics/optics": 5,
   "physics/orbits": 4,
@@ -291,6 +292,7 @@
   "physics/nuclear/xenon.mjs",
   "physics/obbManifold.js",
   "physics/obbOverlap.js",
+  "physics/ocean/oceanSurface.mjs",
   "physics/octree/octree.js",
   "physics/octree/svoGenerator.js",
   "physics/octree/svoMarch.mjs",
