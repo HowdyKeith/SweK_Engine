@@ -144,7 +144,7 @@ const WGSL_FILES = [...walk(ENG)].filter((f) => f.endsWith(".wgsl")).sort();
     // v4838 -- and tools/denoiseBuildProbe.mjs (the denoiser arc, round 17): its devices hold a 32-channel layer at 1024 x
     // 1024, storage limits only. Its first form passed them through a helper, which this row read as "may" and went red on
     // at the arc's merge; the object is spelled out now, and the site named.
-    const STORAGE_LIMIT_SITES = ["render/denoiseDevice.mjs", "tools/denoiseBuildProbe.mjs"];
+    const STORAGE_LIMIT_SITES = ["fluid-webgpu-3d.html", "render/denoiseDevice.mjs", "tools/denoiseBuildProbe.mjs"]   /* v4880: fluid-webgpu-3d.html asks for 12 storage buffers per stage (its kernels bind up to 12; the default is 8) */;
     const WORKGROUP_LIMIT = /maxComputeInvocationsPerWorkgroup|maxComputeWorkgroupSize[XYZ]|maxComputeWorkgroupStorageSize|maxComputeWorkgroupsPerDimension/;
     let workgroupRaises = 0; const storageSites = [];
     for (const f of walk(ENG)) {

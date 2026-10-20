@@ -59,7 +59,10 @@ if (!navigator.gpu) fallback(); else init().catch(e => { console.error(e); fallb
 async function init() {
   const adapter = await navigator.gpu.requestAdapter(adapterOptions("high-performance"));
   if (!adapter) return fallback("No GPU adapter.");
-  const device = await adapter.requestDevice();
+  // the solver's kernels bind up to 12 storage buffers in one stage; the default limit is 8, so ask for what they need and refuse cleanly if the adapter cannot give it.
+  const NEED_STORAGE = 12;
+  if ((adapter.limits.maxStorageBuffersPerShaderStage || 0) < NEED_STORAGE) return fallback("This GPU allows " + adapter.limits.maxStorageBuffersPerShaderStage + " storage buffers per stage; the solver needs " + NEED_STORAGE + ".");
+  const device = await adapter.requestDevice({ requiredLimits: { maxStorageBuffersPerShaderStage: NEED_STORAGE } });
   const ctx = cvs.getContext("webgpu");
   const fmt = navigator.gpu.getPreferredCanvasFormat();
   ctx.configure({ device, format: fmt, alphaMode: "opaque" });
