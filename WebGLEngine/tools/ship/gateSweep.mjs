@@ -9304,6 +9304,19 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "8 s green; 5 page sabotages red) and the degenerate fight it uncovered -- every battle a draw, 36 hits, both " +
                  "fleets dead -- filed as sixdof-page-every-battle-a-draw. The two reds are a missing optional native module.",
     }),
+    // v4880 -- since572, the ocean spike (unnumbered until it ships; `at` names the spike, as the BVH-CSG branch rounds did). ONE new gate file: tools/ship/oceanSpikePage-selfcheck.mjs, which holds a vendored third-party ocean
+    // (vendor/web-ocean/ocean.html, MIT, byte-identical, sha256 pinned) and the page that frames it to what they claim. Twelve sabotages, all red by name; its first run passed every row and is the result the ritual distrusts.
+    since572: Object.freeze({
+        at: "v4880+ocean-spike", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/oceanSpikePage-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/copiedOutsideVendor-selfcheck.mjs (29 -> 30 MIT permission notices, the new one under vendor/; the first draft of the new gate quoted the licence's wording verbatim in a regex and was counted by this census as an unregistered copy outside vendor/, which is why the gate now splits the phrase)",
+        ]),
+        verdict: "green, 1 of 1 alone; the live half drives the PAGE against a stubbed adapter and a one-line stand-in for the ocean, because nothing in this sandbox has a WebGPU adapter. NOT CLOSED: the ocean itself was never seen to render here and its cost on any GPU is unmeasured -- the spike's whole purpose is that reading, taken on a rig.",
+    }),
     // v4879 -- since571 (the arc's own round-21 closing took since570: it was written under since251, a key main already held). NO new gate file of this round's own: the six gates that arrived
     // (blastEngine, exactArrangement, exactPredicates, implicitPoints, manifoldAudit, triContact) are the arc's, counted in since570. This entry closes the round that merged the whole BVH-CSG arc.
     since571: Object.freeze({

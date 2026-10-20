@@ -1,0 +1,117 @@
+<!doctype html>
+<!-- ocean-spike.html -- UNNUMBERED (a spike; the version is chosen at ship time).
+
+     A LEVEL-1 SPIKE: ANOTHER PROJECT'S OCEAN, RUN AS IT IS, IN A FRAME, SO THAT WE CAN SEE WHAT IT COSTS ON THIS RIG BEFORE DECIDING HOW MUCH OF IT TO TAKE.
+     The sea is noniv/web-ocean (MIT; vendor/web-ocean/ocean.html, byte-identical to upstream's published bundle, pinned by tools/ship/oceanSpikePage-selfcheck.mjs): a six-cascade FFT sea,
+     whitecaps and foam, its own atmosphere and clouds, HDR with bloom and tone mapping, all written straight on WebGPU. This page puts it in a frame beside a few SweK controls and does nothing else with it.
+
+     WHAT THIS SPIKE IS NOT, SAID PLAINLY:
+       - NOT DEPTH-COMPOSITED. The sea is its own canvas with its own camera, sky and post-processing. Nothing of SweK's is drawn into it and nothing in it can hide a SweK object.
+       - NOT USED BY ANY PHYSICS. The sea reads its own water height back from the GPU a few frames late; GPU FFT results are not bit-identical across machines. A boat, a buoyancy
+         test or a submarine broaching would need a separate analytic surface on the CPU. That is a level-2 decision and nothing here prejudges it.
+       - NOT SEEN TO RENDER WHERE IT WAS VENDORED. The sandbox has no WebGPU adapter. The first real reading is the one taken on a rig with a GPU, with the "Note reading" button below.
+     WHAT IT ANSWERS: does it run on this GPU, and what does it cost at each resolution (its own HUD prints FPS, and GPU time where the browser has timestamp-query).
+
+     Nothing is ever put in this page as markup: every status line and reading goes in with textContent. The page loads nothing from outside the engine's own origin. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Ocean spike">
+<meta name="demo:desc" content="A spike: the web-ocean WebGPU sea (an FFT ocean with whitecaps, foam and a physically based sky; MIT, vendored byte for byte) run as it is in a frame, with resolution choices and a button that records its FPS and GPU time, so the cost on this GPU is known before any of it is taken into the engine. Not depth-composited and not used by any physics.">
+<meta name="demo:category" content="graphics">
+<title>SweK &middot; Ocean spike</title>
+<style>
+  :root { --bg:#050a12; --panel:#0b131f; --line:#1c2c44; --fg:#dbe7ff; --dim:#7c93b8; --cyan:#59d1ff; --amber:#f6a623; --green:#5fe08a; --red:#ff7a7a; }
+  * { box-sizing:border-box; }
+  html, body { height:100%; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:13px ui-monospace, Menlo, monospace; display:flex; flex-direction:column; }
+  header { padding:12px 16px 6px; flex:none; }
+  h1 { font-size:15px; letter-spacing:.13em; text-transform:uppercase; color:var(--cyan); margin:0 0 6px; }
+  .desc { color:var(--dim); max-width:980px; line-height:1.55; margin:0 0 6px; }
+  .bar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; padding:6px 16px 8px; flex:none; }
+  .chip { border:1px solid var(--line); background:var(--panel); border-radius:6px; padding:4px 9px; display:inline-flex; gap:7px; align-items:center; }
+  .dot { width:9px; height:9px; border-radius:50%; background:var(--amber); display:inline-block; }
+  select, button { background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:6px; padding:4px 9px; font:inherit; cursor:pointer; }
+  button:hover, select:hover { border-color:var(--cyan); }
+  a { color:var(--cyan); }
+  #stage { flex:1 1 auto; min-height:300px; margin:0 16px; border:1px solid var(--line); border-radius:6px; overflow:hidden; background:#000; position:relative; }
+  #sea { position:absolute; inset:0; width:100%; height:100%; border:0; display:block; }
+  #nogpu { position:absolute; inset:0; display:none; padding:28px; color:var(--amber); line-height:1.6; }
+  footer { padding:8px 16px 12px; flex:none; color:var(--dim); }
+  #log { margin:6px 0 0; white-space:pre-wrap; color:var(--fg); min-height:1.4em; }
+  .small { font-size:12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Ocean spike &mdash; web-ocean in a frame</h1>
+  <p class="desc">Another project's WebGPU ocean (FFT waves, whitecaps, foam, a physically based sky), run as it is, so its cost on this GPU is measured before any of it is taken into the engine.
+    It is its own canvas with its own camera: nothing of SweK's is drawn into it, nothing in it hides a SweK object, and no physics reads it. Click the sea to look around (Esc releases),
+    WASD to move, H for its settings. <a href="/server.html">Back to the server page</a>.</p>
+</header>
+<div class="bar">
+  <span class="chip"><span class="dot" id="gpuDot"></span><span id="gpuWord">checking&hellip;</span></span>
+  <span class="chip small" id="gpuDetail">&nbsp;</span>
+  <label>resolution <select id="resSel">
+    <option value="native">native (the frame's size)</option>
+    <option value="1920x1080">1920 x 1080</option>
+    <option value="1280x720">1280 x 720</option>
+    <option value="960x540">960 x 540</option>
+  </select></label>
+  <button id="reloadBtn" type="button">Reload the sea</button>
+  <button id="noteBtn" type="button">Note reading</button>
+</div>
+<div id="stage">
+  <iframe id="sea" title="web-ocean" allow="fullscreen"></iframe>
+  <div id="nogpu">This browser has no WebGPU, so the sea is not started. The sea needs it and has no fallback; the engine's other water pages are unaffected.</div>
+</div>
+<footer>
+  <div class="small">Readings (the sea's own HUD, copied as text with the resolution that was chosen):</div>
+  <pre id="log"></pre>
+  <div class="small">Ocean: web-ocean (github.com/noniv/web-ocean) by Maksymilian Dendura, MIT licence, vendored unmodified at vendor/web-ocean (see its LICENSE and PROVENANCE.txt).</div>
+</footer>
+<script type="module">
+  const $ = (id) => document.getElementById(id);
+  const SEA = "/vendor/web-ocean/ocean.html";
+  const sea = $("sea"), dot = $("gpuDot"), word = $("gpuWord"), detail = $("gpuDetail"), logEl = $("log");
+  let gpuOk = false;
+
+  // the sea needs WebGPU; say so rather than let the frame show its own error. The adapter's name goes in as text.
+  async function probe() {
+    if (typeof navigator === "undefined" || !navigator.gpu) { word.textContent = "no WebGPU"; dot.style.background = "#ff7a7a"; detail.textContent = "navigator.gpu is absent in this browser"; return false; }
+    let adapter = null;
+    try { adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" }); } catch (e) { adapter = null; }
+    if (!adapter) { word.textContent = "no adapter"; dot.style.background = "#ff7a7a"; detail.textContent = "WebGPU is present but no adapter was returned"; return false; }
+    const info = adapter.info || {};
+    const name = [info.vendor, info.architecture, info.description].filter(Boolean).join(" ") || "adapter";
+    word.textContent = "WebGPU"; dot.style.background = "#5fe08a";
+    detail.textContent = name + (adapter.features && adapter.features.has("timestamp-query") ? " · GPU time available" : " · no GPU timer (FPS only)");
+    return true;
+  }
+
+  function resParams() {
+    const v = $("resSel").value;
+    if (v === "native") return "";
+    const [w, h] = v.split("x");
+    return "&w=" + encodeURIComponent(w) + "&h=" + encodeURIComponent(h);
+  }
+  function load() {
+    if (!gpuOk) { $("nogpu").style.display = "block"; sea.removeAttribute("src"); return; }
+    $("nogpu").style.display = "none";
+    sea.src = SEA + "?ui=1" + resParams();
+  }
+  function note() {
+    let hud = "(the sea's HUD cannot be read from here)";
+    try { const el = sea.contentDocument && sea.contentDocument.getElementById("fps"); if (el && el.textContent) hud = el.textContent; } catch (e) { /* a frame from another origin cannot be read */ }
+    const res = $("resSel").value;
+    logEl.textContent += (logEl.textContent ? "\n" : "") + res + " | " + hud;
+  }
+
+  $("reloadBtn").addEventListener("click", load);
+  $("resSel").addEventListener("change", load);
+  $("noteBtn").addEventListener("click", note);
+  probe().then((ok) => { gpuOk = ok; load(); });
+</script>
+</body>
+</html>

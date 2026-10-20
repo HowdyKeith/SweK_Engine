@@ -71,6 +71,7 @@ export const VENDORED = Object.freeze([
             "Font License 1.1, Copyright 2017 IBM Corp with Reserved Font Name Plex. A font licence is also " +
             "the only one here that constrains RENAMING rather than copying." },
     { path: "vendor/gifenc",    kind: KIND.THIRD_PARTY, spdx: "MIT",       grant: GRANT.LICENCE_FILE, file: "LICENSE" },
+    { path: "vendor/web-ocean", kind: KIND.THIRD_PARTY, spdx: "MIT",       grant: GRANT.LICENCE_FILE, file: "LICENSE" },   // v4880 spike: noniv/web-ocean ocean.html, byte-identical, pinned by tools/ship/oceanSpikePage-selfcheck.mjs
     { path: "vendor/grass",     kind: KIND.THIRD_PARTY, spdx: "MIT",       grant: GRANT.LICENCE_FILE, file: "LICENSE" },
     // v4498 -- the core of guillermolg00/morphicons (three files, no DOM, no dependencies), vendored when physics/mesh/strokeMorph.mjs's
     // written refusal expired: font glyphs are closed multi-subpath outlines, which is the half that file said not to re-derive.

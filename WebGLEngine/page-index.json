@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 485,
+ "count": 486,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -2066,6 +2066,13 @@
    "t": "NTFS Mounter (opt-in, macOS only)",
    "d": "",
    "g": "thirdparty",
+   "p": 0
+  },
+  {
+   "f": "ocean-spike.html",
+   "t": "SweK &middot; Ocean spike",
+   "d": "A spike: the web-ocean WebGPU sea (an FFT ocean with whitecaps, foam and a physically based sky; MIT, vendored byte for byte) run as it is in a frame, with resolution choices and a button that records its FPS and GPU time, so the cost on this GPU is known before any of it is taken into the engine. Not depth-composited and not used by any physics.",
+   "g": "",
    "p": 0
   },
   {

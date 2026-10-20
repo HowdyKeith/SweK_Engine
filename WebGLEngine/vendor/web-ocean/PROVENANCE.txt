@@ -1,0 +1,13 @@
+web-ocean
+MIT (Copyright (c) 2026 Maksymilian Dendura -- see LICENSE beside this file)
+https://github.com/noniv/web-ocean
+commit a07c7fd522ef0a897601c114f927a49d93d95520 (2026-10-17, "Add MIT license")
+vendored v4880 (a SPIKE, unnumbered until shipped): ocean.html ONLY, byte-identical to upstream's published single-file bundle -- 102,283 bytes,
+sha256 61e4fe5edf10253b0552570b574da7206754c2fb6033e2e6d73845daae4b36e8. Not modified in any way. Upstream's js/ sources, the minified bundle (ocean.min.html), the
+build files and the README images were NOT taken: the bundle is self-contained and is what the spike embeds.
+WHAT IT IS: a real-time WebGPU ocean written without an engine -- a six-cascade 256x256 FFT sea (JONSWAP wind sea plus a swell), a CDLOD surface mesh, whitecaps and
+foam, a Hillaire-style atmosphere with two cloud layers, HDR with bloom and AgX tone mapping. Its README says it was built with Claude Code.
+WHAT THE BUNDLE DOES NOT DO: it makes no network request (the file contains no http string), owns its canvas, camera, sky and post-processing, and reads the
+water height under its camera back from the GPU a few frames late. See ocean-spike.html for what that means for using it.
+VERIFIED BY READING AND BY HASH, NOT BY RUNNING: the sandbox this was vendored in has no WebGPU adapter, so the page was not seen to render here. The hash is the
+only claim; tools/ship/oceanSpikePage-selfcheck.mjs holds the file to it.
