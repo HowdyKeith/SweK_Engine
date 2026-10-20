@@ -26,13 +26,18 @@ export const EPS = 1e-9;
  * Ray against one triangle. Returns the ray parameter t, or null.
  * `tris` is a flat buffer, `i` the index of this triangle's first float.
  */
-export function rayTriangle(ox, oy, oz, dx, dy, dz, tris, i, eps = EPS) {
+export function rayTriangle(ox, oy, oz, dx, dy, dz, tris, i, eps = EPS, detRel = undefined) {
     const ax = tris[i], ay = tris[i + 1], az = tris[i + 2];
     const e1x = tris[i + 3] - ax, e1y = tris[i + 4] - ay, e1z = tris[i + 5] - az;
     const e2x = tris[i + 6] - ax, e2y = tris[i + 7] - ay, e2z = tris[i + 8] - az;
     const px = dy * e2z - dz * e2y, py = dz * e2x - dx * e2z, pz = dx * e2y - dy * e2x;
     const det = e1x * px + e1y * py + e1z * pz;
-    if (det > -eps && det < eps) return null;                 // ray parallel to the triangle's plane
+    // det is an AREA (|e1||e2| x the sine of their angle x the cosine of the ray's angle to the normal), and `eps` is
+    // a length: the default test rejects every triangle with edges under ~sqrt(eps) whatever the ray's angle. A caller
+    // passing `detRel` gets the dimensionless test instead -- parallel iff |det| <= detRel x |e1| x |e2| -- see
+    // physics/mesh/meshPointClassify.mjs (BVH-CSG round 11), the one caller that needs it. The default is unchanged.
+    if (detRel === undefined) { if (det > -eps && det < eps) return null; }   // ray parallel to the triangle's plane
+    else if (det * det <= detRel * detRel * (e1x * e1x + e1y * e1y + e1z * e1z) * (e2x * e2x + e2y * e2y + e2z * e2z)) return null;
     const inv = 1 / det;
     const tx = ox - ax, ty = oy - ay, tz = oz - az;
     const u = (tx * px + ty * py + tz * pz) * inv;
@@ -151,12 +156,25 @@ export class MeshBVH {
         out[0] = x0; out[1] = y0; out[2] = z0; out[3] = x1; out[4] = y1; out[5] = z1;
     }
 
-    _build(start, end, depth) {
+    // *** BVH-CSG ROUND 15: THE SAME TREE, BUILT WITHOUT ITS WASTE. *** The page's blast rebuilds this over the whole
+    // wall every shot, and on a 13,448-triangle wall the build was 21.8 ms of a 41 ms pin-prick shot. Four changes, each
+    // a reorganisation of exact operations, so `order`, `bounds` and `meta` come out bit for bit as before (min and max
+    // are exact; the SAH sums are formed from the same operands in the same order -- tools/ship/meshBVH-selfcheck.mjs
+    // holds the tree against a frozen copy of the old build): (1) no typed array allocated per node -- the bin scratch is
+    // reused, as nothing reads it after the partition; (2) the chosen axis's centroid range is kept, not scanned twice;
+    // (3) the split sweep is prefix/suffix, O(bins) rather than O(bins^2); (4) a child's bounds are the union of its
+    // side's bins -- exactly the min/max of its triangles' vertices -- instead of a second pass over them (the
+    // rank-split fallback still scans).
+    _build(start, end, depth, pre = null) {
         const node = this.nodes++;
         if (depth > this.depth) this.depth = depth;
-        const b = new Float64Array(6);
-        this._boundsOf(start, end, b);
-        this.bounds.set(b, node * 6);
+        const o6 = node * 6;
+        if (pre) for (let k = 0; k < 6; k++) this.bounds[o6 + k] = pre[k];
+        else {
+            const b = this._b6 || (this._b6 = new Float64Array(6));
+            this._boundsOf(start, end, b);
+            this.bounds.set(b, o6);
+        }
         const n = end - start;
         if (n <= this.maxLeaf) { this.meta[node * 3] = -1; this.meta[node * 3 + 1] = start; this.meta[node * 3 + 2] = n; this.leaves++; return node; }
 
@@ -164,79 +182,93 @@ export class MeshBVH {
         // coplanar fans, or a mesh of degenerate triangles -- no split separates anything, every SAH cost is
         // equal, and a naive "best bin" returns an empty side. That recurses on the same range forever. If no
         // bin split is valid the range is halved by rank instead, which always terminates.
-        let axis = 0, extent = -1;
+        const cent = this._cent, order = this.order, tris = this.tris;
+        let axis = 0, extent = -1, lo = 0, hi = 0;
         for (let a = 0; a < AXIS; a++) {
-            let lo = Infinity, hi = -Infinity;
-            for (let s = start; s < end; s++) { const c = this._cent[this.order[s] * 3 + a]; if (c < lo) lo = c; if (c > hi) hi = c; }
-            if (hi - lo > extent) { extent = hi - lo; axis = a; }
+            let l = Infinity, h = -Infinity;
+            for (let s = start; s < end; s++) { const c = cent[order[s] * 3 + a]; if (c < l) l = c; if (c > h) h = c; }
+            if (h - l > extent) { extent = h - l; axis = a; lo = l; hi = h; }
         }
-        let mid = -1;
+        let mid = -1, leftB = null, rightB = null;
         if (extent > 0) {
-            let lo = Infinity, hi = -Infinity;
-            for (let s = start; s < end; s++) { const c = this._cent[this.order[s] * 3 + axis]; if (c < lo) lo = c; if (c > hi) hi = c; }
             const B = this.bins, scale = B / (hi - lo);
-            const cnt = new Int32Array(B), bb = new Float64Array(B * 6).fill(0);
+            if (!this._cnt || this._cnt.length !== B) {
+                this._cnt = new Int32Array(B); this._bb = new Float64Array(B * 6);
+                this._pre = new Float64Array((B + 1) * 6); this._suf = new Float64Array((B + 1) * 6);
+                this._pc = new Int32Array(B + 1); this._sc = new Int32Array(B + 1);
+            }
+            const cnt = this._cnt, bb = this._bb;
+            cnt.fill(0);
             for (let i = 0; i < B; i++) { bb[i * 6] = bb[i * 6 + 1] = bb[i * 6 + 2] = Infinity; bb[i * 6 + 3] = bb[i * 6 + 4] = bb[i * 6 + 5] = -Infinity; }
             for (let s = start; s < end; s++) {
-                const t = this.order[s];
-                let bi = ((this._cent[t * 3 + axis] - lo) * scale) | 0; if (bi >= B) bi = B - 1;
+                const t = order[s];
+                let bi = ((cent[t * 3 + axis] - lo) * scale) | 0; if (bi >= B) bi = B - 1;
                 cnt[bi]++;
-                const o = t * 9;
+                const o = t * 9, q = bi * 6;
                 for (let c = 0; c < 3; c++) {
-                    const x = this.tris[o + c * 3], y = this.tris[o + c * 3 + 1], z = this.tris[o + c * 3 + 2];
-                    if (x < bb[bi * 6]) bb[bi * 6] = x; if (x > bb[bi * 6 + 3]) bb[bi * 6 + 3] = x;
-                    if (y < bb[bi * 6 + 1]) bb[bi * 6 + 1] = y; if (y > bb[bi * 6 + 4]) bb[bi * 6 + 4] = y;
-                    if (z < bb[bi * 6 + 2]) bb[bi * 6 + 2] = z; if (z > bb[bi * 6 + 5]) bb[bi * 6 + 5] = z;
+                    const x = tris[o + c * 3], y = tris[o + c * 3 + 1], z = tris[o + c * 3 + 2];
+                    if (x < bb[q]) bb[q] = x; if (x > bb[q + 3]) bb[q + 3] = x;
+                    if (y < bb[q + 1]) bb[q + 1] = y; if (y > bb[q + 4]) bb[q + 4] = y;
+                    if (z < bb[q + 2]) bb[q + 2] = z; if (z > bb[q + 5]) bb[q + 5] = z;
                 }
             }
-            const area = (x0, y0, z0, x1, y1, z1) => {
-                if (!(x1 >= x0)) return 0;
-                const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
+            // pre[s] = union of bins [0, s), suf[s] = union of bins [s, B): the same min/max the per-split loops formed
+            const pre6 = this._pre, suf = this._suf, pc = this._pc, sc = this._sc;
+            pre6[0] = pre6[1] = pre6[2] = Infinity; pre6[3] = pre6[4] = pre6[5] = -Infinity; pc[0] = 0;
+            for (let i = 0; i < B; i++) {
+                const p = i * 6, q = p + 6, g = i * 6;
+                pre6[q] = bb[g] < pre6[p] ? bb[g] : pre6[p]; pre6[q + 1] = bb[g + 1] < pre6[p + 1] ? bb[g + 1] : pre6[p + 1]; pre6[q + 2] = bb[g + 2] < pre6[p + 2] ? bb[g + 2] : pre6[p + 2];
+                pre6[q + 3] = bb[g + 3] > pre6[p + 3] ? bb[g + 3] : pre6[p + 3]; pre6[q + 4] = bb[g + 4] > pre6[p + 4] ? bb[g + 4] : pre6[p + 4]; pre6[q + 5] = bb[g + 5] > pre6[p + 5] ? bb[g + 5] : pre6[p + 5];
+                pc[i + 1] = pc[i] + cnt[i];
+            }
+            const e = B * 6;
+            suf[e] = suf[e + 1] = suf[e + 2] = Infinity; suf[e + 3] = suf[e + 4] = suf[e + 5] = -Infinity; sc[B] = 0;
+            for (let i = B - 1; i >= 0; i--) {
+                const q = i * 6, p = q + 6, g = i * 6;
+                suf[q] = bb[g] < suf[p] ? bb[g] : suf[p]; suf[q + 1] = bb[g + 1] < suf[p + 1] ? bb[g + 1] : suf[p + 1]; suf[q + 2] = bb[g + 2] < suf[p + 2] ? bb[g + 2] : suf[p + 2];
+                suf[q + 3] = bb[g + 3] > suf[p + 3] ? bb[g + 3] : suf[p + 3]; suf[q + 4] = bb[g + 4] > suf[p + 4] ? bb[g + 4] : suf[p + 4]; suf[q + 5] = bb[g + 5] > suf[p + 5] ? bb[g + 5] : suf[p + 5];
+                sc[i] = sc[i + 1] + cnt[i];
+            }
+            const area = (A, k) => {
+                if (!(A[k + 3] >= A[k])) return 0;
+                const dx = A[k + 3] - A[k], dy = A[k + 4] - A[k + 1], dz = A[k + 5] - A[k + 2];
                 return 2 * (dx * dy + dy * dz + dz * dx);
             };
             let bestCost = Infinity, bestBin = -1;
             for (let split = 1; split < B; split++) {
-                let lx0 = Infinity, ly0 = Infinity, lz0 = Infinity, lx1 = -Infinity, ly1 = -Infinity, lz1 = -Infinity, lc = 0;
-                for (let i = 0; i < split; i++) {
-                    if (!cnt[i]) continue;
-                    lc += cnt[i];
-                    if (bb[i * 6] < lx0) lx0 = bb[i * 6]; if (bb[i * 6 + 3] > lx1) lx1 = bb[i * 6 + 3];
-                    if (bb[i * 6 + 1] < ly0) ly0 = bb[i * 6 + 1]; if (bb[i * 6 + 4] > ly1) ly1 = bb[i * 6 + 4];
-                    if (bb[i * 6 + 2] < lz0) lz0 = bb[i * 6 + 2]; if (bb[i * 6 + 5] > lz1) lz1 = bb[i * 6 + 5];
-                }
-                let rx0 = Infinity, ry0 = Infinity, rz0 = Infinity, rx1 = -Infinity, ry1 = -Infinity, rz1 = -Infinity, rc = 0;
-                for (let i = split; i < B; i++) {
-                    if (!cnt[i]) continue;
-                    rc += cnt[i];
-                    if (bb[i * 6] < rx0) rx0 = bb[i * 6]; if (bb[i * 6 + 3] > rx1) rx1 = bb[i * 6 + 3];
-                    if (bb[i * 6 + 1] < ry0) ry0 = bb[i * 6 + 1]; if (bb[i * 6 + 4] > ry1) ry1 = bb[i * 6 + 4];
-                    if (bb[i * 6 + 2] < rz0) rz0 = bb[i * 6 + 2]; if (bb[i * 6 + 5] > rz1) rz1 = bb[i * 6 + 5];
-                }
+                const lc = pc[split], rc = sc[split];
                 if (!lc || !rc) continue;
-                const cost = lc * area(lx0, ly0, lz0, lx1, ly1, lz1) + rc * area(rx0, ry0, rz0, rx1, ry1, rz1);
+                const cost = lc * area(pre6, split * 6) + rc * area(suf, split * 6);
                 if (cost < bestCost) { bestCost = cost; bestBin = split; }
             }
             if (bestBin > 0) {
                 // partition in place around the chosen bin
                 let i = start, j = end - 1;
                 while (i <= j) {
-                    const t = this.order[i];
-                    let bi = ((this._cent[t * 3 + axis] - lo) * scale) | 0; if (bi >= B) bi = B - 1;
+                    const t = order[i];
+                    let bi = ((cent[t * 3 + axis] - lo) * scale) | 0; if (bi >= B) bi = B - 1;
                     if (bi < bestBin) i++;
-                    else { this.order[i] = this.order[j]; this.order[j] = t; j--; }
+                    else { order[i] = order[j]; order[j] = t; j--; }
                 }
-                if (i > start && i < end) mid = i;
+                if (i > start && i < end) {
+                    mid = i;
+                    // the children's boxes, which recursion below would overwrite in the scratch: kept per depth
+                    const lv = this._lvl || (this._lvl = []);
+                    const slot = lv[depth] || (lv[depth] = new Float64Array(12));
+                    for (let k = 0; k < 6; k++) { slot[k] = pre6[bestBin * 6 + k]; slot[6 + k] = suf[bestBin * 6 + k]; }
+                    leftB = slot.subarray(0, 6); rightB = slot.subarray(6, 12);
+                }
             }
         }
         if (mid < 0) {
             // the fallback described above: split by rank, which cannot produce an empty side
             mid = (start + end) >> 1;
-            const slice = Array.from(this.order.subarray(start, end));
-            slice.sort((a, b2) => this._cent[a * 3 + axis] - this._cent[b2 * 3 + axis]);
-            this.order.set(slice, start);
+            const slice = Array.from(order.subarray(start, end));
+            slice.sort((a, b2) => cent[a * 3 + axis] - cent[b2 * 3 + axis]);
+            order.set(slice, start);
         }
-        const left = this._build(start, mid, depth + 1);
-        const right = this._build(mid, end, depth + 1);
+        const left = this._build(start, mid, depth + 1, leftB);
+        const right = this._build(mid, end, depth + 1, rightB);
         this.meta[node * 3] = left; this.meta[node * 3 + 1] = right; this.meta[node * 3 + 2] = 0;
         return node;
     }
@@ -371,6 +403,104 @@ export class MeshBVH {
     }
 
     stats() { return { triangles: this.count, nodes: this.nodes, leaves: this.leaves, depth: this.depth, maxLeaf: this.maxLeaf }; }
+}
+
+/**
+ * *** BVH-CSG ROUND 23: THE LAST SHOT'S TREE, CARRIED FORWARD, IN PLACE OF A FULL BUILD. ***
+ *
+ * The page's blast rebuilt this over the whole wall every shot: 9-12% of a 100-shot chain, and on a small late blast most
+ * of the shot (seed 3's last: 16.5 ms of 27.9). Most of the wall comes through a shot untouched, so its triangles are
+ * the same triangles at new indices.
+ *
+ * deriveBVH(prev, tris, oldToNew) returns a tree over `tris` built from `prev`, a tree over the previous buffer.
+ * `oldToNew[i]` is the index in `tris` of prev's triangle i, or -1 where it is gone. Every triangle of `tris` no old one
+ * maps to is NEW. The result:
+ *   - prev's nodes, each leaf keeping the survivors of its range (compacted, in order), every box REFIT to them -- a box
+ *     only shrinks, so the old topology stays a valid tree, with empty leaves where everything went
+ *   - a tree built in full over the new triangles alone
+ *   - a root joining the two (node 0, where every query starts)
+ * It answers every query as a full build does -- the same triangles, by the same exact tests -- and differs only in
+ * shape, which meshBoolean's output no longer depends on (round 23's canonPairs). `derived` counts the chain of
+ * derivations and `appended` the triangles placed by the small builds since the last full one, so a caller can rebuild
+ * before the tree degrades.
+ */
+export function deriveBVH(prev, tris, oldToNew, opts = {}) {
+    const count = (tris.length / 9) | 0;
+    const maxLeaf = opts.maxLeaf || prev.maxLeaf, bins = opts.bins || prev.bins;
+    const order = new Int32Array(count), placed = new Uint8Array(count);
+    // prev's leaves, in the order their ranges sit in prev.order
+    const leaves = [];
+    for (let nd = 0; nd < prev.nodes; nd++) if (prev.meta[nd * 3] < 0) leaves.push(nd);
+    leaves.sort((a, b) => prev.meta[a * 3 + 1] - prev.meta[b * 3 + 1]);
+    const newStart = new Int32Array(prev.nodes), newCount = new Int32Array(prev.nodes);
+    let w = 0;
+    for (const nd of leaves) {
+        const s = prev.meta[nd * 3 + 1], c = prev.meta[nd * 3 + 2];
+        newStart[nd] = w;
+        for (let k = s; k < s + c; k++) {
+            const o = oldToNew[prev.order[k]];
+            if (o >= 0) { if (placed[o]) throw new Error("deriveBVH: triangle " + o + " mapped twice"); placed[o] = 1; order[w++] = o; }
+        }
+        newCount[nd] = w - newStart[nd];
+    }
+    const survivors = w, fresh = [];
+    for (let i = 0; i < count; i++) if (!placed[i]) fresh.push(i);
+    if (!survivors || !prev.nodes) return Object.assign(new MeshBVH(tris, { maxLeaf, bins }), { derived: 0, appended: 0 });
+    let sub = null;
+    if (fresh.length) {
+        const sb = new Float64Array(fresh.length * 9);
+        fresh.forEach((t, k) => sb.set(tris.subarray(t * 9, t * 9 + 9), k * 9));
+        sub = new MeshBVH(sb, { maxLeaf, bins });
+    }
+    const off = sub ? 1 : 0, base = off + prev.nodes, nodes = base + (sub ? sub.nodes : 0);
+    const bvh = Object.create(MeshBVH.prototype);
+    Object.assign(bvh, { tris, count, maxLeaf, bins, order, nodes, leaves: 0, depth: 0,
+                         bounds: new Float64Array(nodes * 6), meta: new Int32Array(nodes * 3) });
+    const M = bvh.meta, Bd = bvh.bounds, T = tris;
+    // the old part: same topology, shifted by `off`, leaves at their compacted ranges
+    for (let nd = 0; nd < prev.nodes; nd++) {
+        const q = (nd + off) * 3;
+        if (prev.meta[nd * 3] < 0) { M[q] = -1; M[q + 1] = newStart[nd]; M[q + 2] = newCount[nd]; bvh.leaves++; }
+        else { M[q] = prev.meta[nd * 3] + off; M[q + 1] = prev.meta[nd * 3 + 1] + off; M[q + 2] = 0; }
+    }
+    // refit, children before parents: a depth-first build allocates every child after its parent
+    for (let nd = prev.nodes - 1; nd >= 0; nd--) {
+        const n = nd + off, b = n * 6;
+        let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
+        if (M[n * 3] < 0) {
+            for (let k = M[n * 3 + 1], e = k + M[n * 3 + 2]; k < e; k++) {
+                const o = order[k] * 9;
+                for (let c = 0; c < 9; c += 3) {
+                    const x = T[o + c], y = T[o + c + 1], z = T[o + c + 2];
+                    if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; if (z < z0) z0 = z; if (z > z1) z1 = z;
+                }
+            }
+        } else {
+            for (const ch of [M[n * 3], M[n * 3 + 1]]) {
+                const cb = ch * 6;
+                if (Bd[cb] < x0) x0 = Bd[cb]; if (Bd[cb + 1] < y0) y0 = Bd[cb + 1]; if (Bd[cb + 2] < z0) z0 = Bd[cb + 2];
+                if (Bd[cb + 3] > x1) x1 = Bd[cb + 3]; if (Bd[cb + 4] > y1) y1 = Bd[cb + 4]; if (Bd[cb + 5] > z1) z1 = Bd[cb + 5];
+            }
+        }
+        Bd[b] = x0; Bd[b + 1] = y0; Bd[b + 2] = z0; Bd[b + 3] = x1; Bd[b + 4] = y1; Bd[b + 5] = z1;
+    }
+    bvh.depth = prev.depth + off;
+    if (sub) {
+        // the new part: its own tree, shifted to `base`, its ranges after the survivors, its order back in `tris` indices
+        for (let k = 0; k < sub.count; k++) order[survivors + k] = fresh[sub.order[k]];
+        for (let nd = 0; nd < sub.nodes; nd++) {
+            const q = (nd + base) * 3;
+            if (sub.meta[nd * 3] < 0) { M[q] = -1; M[q + 1] = sub.meta[nd * 3 + 1] + survivors; M[q + 2] = sub.meta[nd * 3 + 2]; bvh.leaves++; }
+            else { M[q] = sub.meta[nd * 3] + base; M[q + 1] = sub.meta[nd * 3 + 1] + base; M[q + 2] = 0; }
+            for (let k = 0; k < 6; k++) Bd[(nd + base) * 6 + k] = sub.bounds[nd * 6 + k];
+        }
+        M[0] = 1; M[1] = base; M[2] = 0;
+        for (let k = 0; k < 3; k++) { Bd[k] = Math.min(Bd[6 + k], Bd[base * 6 + k]); Bd[k + 3] = Math.max(Bd[6 + k + 3], Bd[base * 6 + k + 3]); }
+        bvh.depth = Math.max(bvh.depth, sub.depth + 1);
+    }
+    bvh.derived = (prev.derived || 0) + 1;
+    bvh.appended = (prev.appended || 0) + fresh.length;
+    return bvh;
 }
 
 export default MeshBVH;

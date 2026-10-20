@@ -1,480 +1,811 @@
 // WebGLEngine/physics/mesh/triArrangement.mjs
 //
-// *** ROUND 9 OF THE BVH-CSG ARC: SEGMENT-BOUNDED CUTTING. ONE TRIANGLE OF A, CUT ALONG THE ACTUAL SEGMENTS
-// *** WHERE B CROSSES IT -- NOT ALONG B's INFINITE PLANES -- INTO FACES THAT B DOES NOT CROSS.
+// *** ROUND 9 OF THE BVH-CSG ARC: SEGMENT-BOUNDED CUTTING. *** triFragmentAccumulate.mjs's ROUND 8 paragraph named
+// the two costs its spatial index could not touch, both scaling with fragment count: (1) a cut ran a B-triangle's
+// whole PLANE across the fragment it split, so early cuts left long slivers later members cut again (37,458
+// fragments from 5,360 candidates at subdiv 64; over 65,536 on ONE wall triangle at 128, which capped and came
+// back wrong); (2) pointInMesh() fired five rays per fragment, ~85% of the time. It named the fix: cut triA only
+// along the actual intersection SEGMENTS, find the regions they enclose, classify once per region. THIS FILE.
 //
-// Rounds 5-8 (triFragmentAccumulate.mjs) split a triangle of A by every candidate B-triangle's PLANE, run across
-// the whole fragment it splits. Round 8 measured what that costs: 37,458 fragments from 5,360 candidates at
-// jaggedBlob subdiv 64, more than 65,536 on ONE wall triangle at 128 (capped, and wrong), and pointInMesh() --
-// five full rays -- run on every fragment. Both scale with how many planes a cut drags across the triangle,
-// not with how much of B actually meets it.
+// THE ALGORITHM, per triangle triA of one mesh against its candidate B-triangles of the other:
+//   1. SEGMENTS: round 2's triTriIntersect() for every candidate whose box meets triA's. "coplanar" or
+//      "degenerate" (a vertex within 1e-9 of the other's plane) REFUSES the whole triangle -- see FALLBACK.
+//      A segment no longer than the snap distance is a point contact and is dropped (counted).
+//   2. A 2D FRAME on triA's plane: drop the dominant normal axis, local origin at triA's first corner, mirrored
+//      so triA runs counter-clockwise -- faces then come out wound like triA with no per-face test.
+//   3. VERTICES, SNAPPED: triA's corners, then every segment end, merged with any existing vertex within
+//      SNAP_EPS (1e-9, absolute -- the same scale as triTriIntersect's and triClip's EPS). A merged vertex keeps
+//      the FIRST coordinates it was given; nothing is projected or averaged.
+//   4. EDGES, SPLIT: triA's sides and the segments; every proper crossing between two of them adds a vertex
+//      (none on a manifold, non-self-intersecting B -- counted), and every vertex within snap of an edge's
+//      interior splits it (segment ends on triA's sides; T-junctions between segments). Duplicates collapse.
+//   5. A VERTEX OF DEGREE 1 REFUSES: a segment chain that stops inside triA means B's surface crosses the face it
+//      sits in, and no single point could then speak for that face. Refused, not pruned.
+//   6. FACES by the standard walk (next(u->v) = v->w, w the neighbour of v clockwise-next after u; faces on the
+//      left). Positive cycles are faces; the negative cycle through triA's first corner is the outside; every
+//      other negative cycle is a HOLE (a loop B cuts strictly inside triA -- a spike through a wall face),
+//      given to the smallest face of ANOTHER connected component that contains it. Checks, each a refusal:
+//      no cycle thinner than snap (|area| <= snap x perimeter), the outside's area is -area(triA), and faces
+//      minus holes sum to area(triA) -- all to snap x perimeter (see TOLERANCES).
+//   7. TRIANGULATION: vendored three.js's Earcut (ShapeUtils.triangulateShape, holes supported; importing
+//      three.core.js in Node measured 42 ms). Each ring is SIMPLIFIED first and the absorbed vertices fanned
+//      back (see SLIVERS). Triangle areas must sum to the face's; every face vertex must be used.
+//   Then meshBoolean.mjs classifies each face ONCE, at the centroid of its largest triangle, and gives every
+//   triangle of the face that label.
 //
-// THIS FILE: for one triangle of A, ask triTriIntersect() for the segment each candidate B-triangle actually
-// shares with it; snap their endpoints together (TOL); check that the segments form a clean planar graph
-// inside the triangle (no crossings, no T-junctions, no loose ends); walk its faces; give each closed curve
-// floating inside a face to that face as a hole; triangulate each face with its holes (Earcut, through the
-// vendored three.js). The caller classifies ONE point per face: no face has B crossing its interior, because
-// every place B crosses this triangle is a segment, and every segment is a face boundary -- TO WITHIN TOL: a crossing
-// shorter than TOL collapses to a point and is dropped, so B can cross a face by less than that (bounded by TOL x
-// perimeter; a review measured -9.1e-11 on a cube whose top face held a 0.9e-9 needle before thin triangles were
-// refused, 4.8e-12 after).
+// *** WHY THE OUTPUT IS WATERTIGHT RAW, WHICH NO EARLIER ROUND'S WAS. *** triTriIntersect(a, b) and
+// triTriIntersect(b, a) compute each segment end by the same formula from the same numbers (the Moller interval
+// of whichever triangle's edge it lies on), so A's arrangement and B's receive the SAME points, bit for bit --
+// 224 of 224 intersecting pairs on the subdiv-16 blast (triArrangement-selfcheck section 4) -- and both keep them
+// as given. The plane path derived each side's cut from a representative plane and interpolated through a
+// different chain of clips per side: 16 of 33 seam vertices within 1e-6 on meshBoolean-selfcheck's primary
+// fixture, 3 bit-identical; here 22 of 22, bit-identical. Raw unmatched edges (meshCSG's watertight(), 1e-6
+// key), one blast, wall minus jaggedBlob subdiv n: arrangement 0 at n = 8, 16, 32, 48, 64, 96, 128; plane path
+// 481, 1,169, 5,012, 12,057, 23,478, 66,178. The twelve-blast chain ends at 0 raw.
 //
-// IT NEVER COMPUTES A VERTEX. Every output vertex is one of triA's three corners or an endpoint triTriIntersect()
-// returned, bit for bit (triArrangement-selfcheck.mjs checks it). Snapping MERGES two endpoints into one of them;
-// it does not move either. A consequence, measured in the gate rather than hidden (1h): an endpoint within TOL of
-// triA's edge is treated as ON the edge but stays where it is, so the output can leave a sub-TOL strip along the
-// edge uncovered -- 2.75e-9 of 50 on that fixture -- bounded by TOL x perimeter and checked as such.
+// FALLBACK, PER TRIANGLE, NEVER A WRONG FACE: a refused triangle goes to triFragmentAccumulate.mjs's plane path
+// exactly as before round 9 (meshBoolean.mjs does this; reasons are counted in its stats.fallbackReasons). In
+// practice only flush and coincident contacts refuse -- coplanar or degenerate pairs: 120 of 5,907 arranged
+// triangles over a 153-run battery (flush faces, identical boxes, through-flush), each then equal to the plane
+// path's own result. Zero refusals on 40 rotated boxes, 6 blob pairs, every blast size 8..128, and the
+// twelve-blast chain. The refusals no fixture reaches are listed by name in the gate's census (section 5).
 //
-// IT REFUSES RATHER THAN GUESSES. A refusal sends the triangle back to the plane-cut path (meshBoolean.mjs), which
-// was gated for every case refused here; a WRONG acceptance is the only real failure, and the gate's defence
-// against it is hand-derived faces, bit-exact provenance, and per-triangle classification audits on real
-// workloads. Refused: a degenerate triA, or one no higher than 4 TOL; any candidate triTriIntersect() calls "coplanar" or "degenerate" (flush
-// faces, shared edges -- the contacts the plane-cut path's own gates exist for); an endpoint outside triA by more
-// than TOL; two segments crossing; an endpoint within TOL of another segment it does not end on (T-junction);
-// collinear overlap; an interior vertex of odd degree (a curve with a loose end -- B is not closed there); a face
-// walk that does not close; a component with other than one outer cycle; a cycle of exactly zero area; a hole
-// with no face to sit in; a triangulation that turns clockwise or loses area; faces that do not tile the boundary
-// walked; a boundary further from triA than TOL allows (those last two are assertions no input reaches -- see where
-// they are made). Any exception is a refusal too, never an abort.
+// MEASURED, ONE BLAST (wall minus jaggedBlob subdiv n; arrangement / plane path / meshCSG BSP; one machine, the
+// plane and BSP runs at 64 and 96 contended by a parallel job):
+//   n=8     26 ms / 32 ms          280 vs 473 triangles       330 vs 952 classifications
+//   n=32   112 ms / 554 ms         3,220 vs 6,141             4,749 vs 12,824
+//   n=48   355 ms / 2.42 s         7,106 vs 14,519            10,668 vs 30,194
+//   n=64   0.80 s / 7.3 s / BSP 2.4 s        12,354 vs 28,164 triangles
+//   n=96   1.7 s / 45.7 s / BSP 5.7 s        27,906 vs 76,408
+//   n=128  3.9 s / capped and wrong at round 8 (129.5 s) / BSP 12.6 s     49,520 triangles, uncapped
+// Classifications per blob triangle: 1.47, 1.25, 1.20, 1.18, 1.18, 1.17 for n = 8, 16, 32, 48, 64, 128 -- flat;
+// the plane path's 4.25 at n=8, then 3.1 at 16 rising to 4.3 at 96. Volumes: the arrangement matches the plane
+// path wherever the plane path is uncapped -- worst 5.0e-13 at n=96 (1.8e-14 relative; 3.8e-13 at 64, 1.5e-13 at
+// 32). At n=128, where only the BSP is left to compare, the two disagree by 1.5e-5 -- and at 1000x scale the BSP
+// and the arrangement agree to 1e-15 relative, the arrangement at 1x meets that reference to 1.9e-14, the BSP at
+// 1x missed it by 5.6e-7 at its EPS of the time, 1e-5 (round 10 of this arc set 1e-8, and it meets it to
+// 8.5e-14). WHERE THE TIME GOES NOW (n=128): arranging 3.35 s, classifying 0.48 s -- the opposite of round 8's profile. One wall triangle carries 2,735 segments and takes
+// 733 ms: steps 3 and 4 are brute force (snapping O(V) per vertex, crossings O(k^2), vertex-on-edge O(V x E)).
+// A grid over triA's plane is the next piece if a larger workload needs it; not built.
 //
-// COST, MEASURED BY THE REVIEW AND NAMED RATHER THAN FIXED: one triangle holding a dense curve stays superlinear.
-// 200 long slabs beside an 8000-gon took 15 s before the validation grid was changed and 2.8 s after (18.8 million
-// tests where the curve packs ~400 segments into each of a few dozen cells); Earcut is superlinear on a face holding a
-// big hole -- 4.5 s of 5.8 s for a 14000-gon -- and on thousands of holes (3,160 squares, 2.2 s). The blast workloads
-// are far from this (n=128: 1.3 s for the whole boolean), but a mesh far denser than its partner can reach it.
+// WHAT THIS ROUND'S OWN RUNS FOUND IN ITS OWN FIRST DRAFTS (each now pinned in triArrangement-selfcheck.mjs):
+//   (a) THE MIRROR SIGN. The 2D frame was mirrored by the sign of the dropped normal component alone; with y
+//       dropped, (x,z) is a left-handed pair, so every y-dominant triangle came out clockwise and refused -- 28
+//       of 224 blob triangles at n=8, 137 at n=32. The area check turned the bug into fallbacks, not wrong
+//       faces. (Gate 1k: the same cut in all six orientations.)
+//   (b) EARCUT DROPS AN EXACTLY COLLINEAR VERTEX -- a box face is two coplanar triangles whose segments meet
+//       at the diagonal's crossing, collinear with their other ends; the face across keeps that vertex, so
+//       dropping it left a T-junction: 3 unmatched edges on 10 of 120 rotated-box runs. (Gate 1c.)
+//   (c) SLIVERS. Vertices on triA's straight sides are collinear only to rounding, and Earcut cut ears between
+//       them: triangles of area 1e-17..7e-21 on the twelve-blast chain, whose normals are noise; meshCSG's
+//       settle() could not merge them (467 unmatched after settle at shot 12) and, fed back in as later shots'
+//       triA, they were refused ('outer face'). FIXED by simplifying each ring before Earcut -- a vertex goes if
+//       it and every vertex already absorbed beside it lie within snap of the segment joining its surviving
+//       neighbours -- and fanning each absorbed run back into the one triangle that owns that edge. Every vertex
+//       comes back; no triangle is thinner than snap (gate section 2: thinnest height 6.1e-5 over 200 cases).
+//   (d) A DEGENERATE CYCLE WAS "SMALL AGAINST triA" (|area| <= 1e-9 x area(triA)). A spike tip grazing the wall
+//       face encloses a genuine loop of area 9.3e-10 or 2.0e-8; two wall triangles fell back at n=64 and their
+//       plane-path fragments opened 12,970 edges. It is "thinner than snap" now: |area| <= snap x perimeter.
+//       (Gates 1i, refused; 1l, a 5e-9 loop accepted.)
+//   (e) AREA TOLERANCES WERE RELATIVE TO AREA. A segment end 1e-10 off triA's side moves the outside's area by
+//       up to snap x perimeter, not by a fraction of the area: outer cycle -0.024136561511 against triA
+//       0.024136561575 on chain shot 6, refused. TOLERANCES below. (Gate 1j, at 1/100 of 1d's size.)
+//   (f) THE SHOELACE RAN ABOUT triA's CORNER, and a 5e-9 face near (1,1) lost 3.0e-17 (6e-9 relative) to
+//       cancellation. Each cycle is measured about its own first vertex now: 1.1e-20. (Gate 1l.)
 //
-// TOLERANCE: ARRANGE_TOL is ABSOLUTE (1e-9), like every other tolerance in this pipeline (triTriIntersect's EPS,
-// triClip's, pointInMesh's). Snapping merges endpoints closer than TOL; "on an edge" means within TOL of it.
-// Coordinates are taken in a 2D frame in triA's plane anchored at its first corner.
+// TOLERANCES: vertex snap SNAP_EPS; a cycle is degenerate below snap x its perimeter; the outside and the face
+// sum must match area(triA) to snap x perimeter(triA) + 1e-9 x area(triA); a face's triangles must sum to its
+// area to snap x its rings' perimeter. Every vertex may sit up to snap from where exact arithmetic would put it,
+// and moving a polygon's vertices by d moves its area by at most d x its perimeter. Consequence, pinned in gate
+// 1d: a segment end within snap INSIDE triA's side is kept where it is and split into the side, leaving an
+// uncovered sliver of (side length) x (offset) / 2 -- 2e-10 there, by hand. The neighbouring triangle across
+// that side receives the same point, so the mesh stays conforming; the sliver is geometry, not a crack.
 //
-// THE ROUND-9 REVIEWS, AND WHAT THEY CHANGED (two adversarial reviewers, measured on this file's first version):
-//   - A triangle was dropped as a "sliver" if its area was under 1e-14 of triA's. That dropped REAL faces: a box
-//     intersected with a rod 2e-7 wide lost its whole end cap -- an open hole, so its volume depends on where it
-//     is measured from: 22% short about the world origin, 17% about the rod's axis -- and a needle 3e-7 wide lost
-//     both caps (-33%). Now a triangle is dropped only if it is negligible in area AND its three corners lie within
-//     TOL of one line: the one kind of triangle that represents nothing this pipeline can resolve.
-//   - The clockwise-triangle refusal was claimed never to fire. It fired: on collinear triangles of area ~ -3e-17
-//     of triA's (rounding noise), in 5 of 6 twelve-blast chains and 3 times in meshBoolean-selfcheck's own random
-//     sweep -- needless fallbacks. Those are slivers and are dropped before the sign test now.
-//   - A cycle's signed area was a shoelace in coordinates measured from triA's corner, which loses the sign of
-//     loops below ~n*eps*L^2: a 2e-8 loop in a size-10 triangle read 0 for both its cycles, both were treated as
-//     holes, and the square simply vanished. The area is now a fan from the cycle's own first vertex, and a cycle
-//     of exactly zero area is refused.
-// THIS FILE WAS REBUILT after the first version was lost uncommitted (the container was reclaimed). The rebuild
-// was written against the reconstructed gates, which carry every fixture the reviews added; the review numbers
-// quoted above were measured on the first version, and the rebuild's own are in tools/ship/nextRounds.mjs.
+// KNOWN AND NOT FIXED HERE:
+//   - ABSOLUTE SNAP. 1e-9 is a length, like every tolerance in this arc: below ~1e-4 scale it is no longer small
+//     against the geometry. ROUND 11 answered that for uniform scale in meshBoolean(), which hands this file
+//     operands whose joint extent is in [1, 16); it did not for a part far from the origin (coordinates, not extent,
+//     set the ULP) or for a feature tiny against its part (meshBoolean.mjs's ROUND 11 paragraph has both measured).
+//     A caller of arrangeTriangle() other than meshBoolean() gets no normalisation. Two vertices 1.07e-9 apart -- jaggedBlob's
+//     north pole is offset by an absolute 1e-9 -- stay distinct here and coincide under meshCSG's 1e-6 census
+//     key, which reads them as a T-junction: 2 unmatched edges on shots 7..11 of the twelve-blast chain, 0 at 12.
+//   - COPLANAR AND DEGENERATE CONTACTS go to the plane path whole, with the plane path's known flush-contact
+//     gaps (meshBoolean.mjs header; round 12). The flush rod in meshBoolean-selfcheck section 15 is one: open,
+//     its cap missing, identical on both paths. [ROUND 12: resolved when opts.contacts is set -- below.]
+//   - ONE LABEL PER FACE RESTS ON STEP 5 AND ON THE CANDIDATE LIST. A face is classified once only because no
+//     segment crosses it -- gate section 2 checks exactly that on 200 random cases, and section 3 audits
+//     per-face against per-triangle labels (1,120 triangles, 0 disagree) -- but a B-triangle missing from the
+//     candidate list (bvhPairOverlap.mjs's conservative-superset contract says it cannot be) would now mislabel
+//     a whole face, where the plane path would have mislabelled one fragment. meshBoolean.mjs says so too.
+//   - meshCSG's settle() MAKES THIS OUTPUT WORSE: its coplanar merge opens edges its weld cannot all close (3
+//     left on the twelve-blast chain, from 0 raw). The output needs no settle; meshBooleanBlast section 5.
+//
+// *** ROUND 12: opts.contacts (meshBoolean passes it; every other caller gets round 9's behaviour, pair for pair). ***
+//   - A pair triTriIntersect calls "coplanar" or "degenerate" is resolved by triContact.mjs instead of refusing the
+//     triangle: a DEGENERATE pair gives a segment (onPlane when it is a whole edge lying in triA's plane); a COPLANAR
+//     one gives no cut but goes on a list, and each face whose sample lies in or ON THE EDGE of one of those
+//     triangles is labelled `on` = its orientation. The test is INCLUSIVE because a sample can land exactly on the
+//     edge two same-facing coplanar triangles share (a box face's diagonal: flush-box fuzz case 78, 4.7e-2 off
+//     while it was strict). The region's rim needs no cut from here -- B is closed, and the triangle past the rim
+//     leaves the plane, so its contact is a segment. (Clipping the coplanar triangles' edges in was built, measured
+//     redundant once the test was inclusive -- 1,350 box runs unchanged, 33 more fallbacks on rotated copies -- and
+//     removed.)
+//   - opts.sidePoints: points to put on triA's sides -- meshBoolean's edge-conformity pass gives each triangle the
+//     splits its neighbour made on their shared edge; `sideVerts` in the result is what this triangle made.
+//   - Thin cycles (|area| <= snap x perimeter) are DROPPED and counted (stats.droppedThin), not refused: a face tilted
+//     1e-9..2e-9 past the contact tolerance encloses one. Its area is inside the face-sum tolerance.
+//   - Step 5 no longer refuses at once. Repeated to a fixed point: a DANGLING on-plane contact is pruned (B touching
+//     triA's plane along an edge ends where B leaves it); a CORNER left with one edge -- a contact point just past
+//     snap from it but within snap of both its sides -- has that edge contracted into it; a chain end within JOIN x
+//     snap (8e-9) of triA's boundary is joined to it (stats.joined, joinedMax -- the distance moved). What still
+//     dangles is refused as before. Without the join, the rotated-copy family falls back 357 times, not 87.
+//
+// *** ROUND 13: THE PAGE'S WORKLOAD (blastEngine-selfcheck -- destructible.html's blasts, chained). *** Round 9's
+// chain never reached two defects, each a refusal whose plane-path fragments then opened ~400 edges. Both fixes are
+// contacts-only:
+//   - "lost edge": Earcut ran a DIAGONAL through face vertices lying on it (collinear, from earlier shots), and the
+//     fan lost the edges to them. A diagonal is now split at every face vertex within snap of it, fanned from the
+//     opposite corner (stats.splitEdges). Only diagonals -- ring edges are left alone: splitting them too added 6
+//     fallbacks on round 12's rotated-copy family (87 -> 93).
+//   - "outer face": a SLIVER -- height <= JOIN x snap over its longest side, e.g. 3e-9 wide, fed back from an earlier
+//     shot -- has no planar arrangement worth the name. sliverFace() bypasses it: every segment end and side point
+//     goes on a side, a segment whose ends are on different sides is a chord, the outline is cut along the chords
+//     and each piece fanned from its centroid and classified there (its `on` by the inclusive test).
+//   - opts.sidePoints may now be {p, side}: a point goes on the side it is given. Near a sliver's sharp corner the
+//     two long sides are closer together than rounding at wall-size coordinates, and by distance alone 292 of 2,000
+//     such points (section 6 of the gate) went on the wrong side. A bare point still goes on the nearest.
+//
+// *** ROUND 16 (contacts). ***
+//   - A NEAR-PARALLEL pair -- planes within NEAR_PARALLEL (sine 1e-6) of parallel -- places its seam only to within
+//     snap / NEAR_PARALLEL, a thousandth of a unit and worse: on a copy of a mesh rotated 1e-9..3e-8, such segments ran
+//     0.1..0.9 long and ended 3e-8..8e-8 from any other, and the dangling chain refused the triangle to the plane path,
+//     whose rays cannot classify a face 1e-9 from the other surface. Such a segment is now marked like an on-plane
+//     contact, so a chain of them that dangles is pruned rather than refusing the triangle. Rotated family: fallbacks
+//     84 -> 39, rotated 3e-8 about (1,2,3) 1.3e-3 -> 8.2e-10 off; insensitive across 1e-7..1e-5.
+//   - opts.canon: the seam's points as meshBoolean's seamConsensus agreed them, applied to every segment's ends before
+//     anything else, so a segment no longer than snap is one point here exactly as across the edge.
+//   - opts.pairOf(triB): the pair's result as meshBoolean already found it (a missing pair does not touch).
+//
+// *** ROUND 16d: THE TWIN JOIN. *** A triangle CROSSED by a near-parallel twin -- an intersecting pair within NEAR_PARALLEL
+// (stats.twinCrossed): two surfaces 1e-9..1e-7 apart that are not the same -- joins a dangling chain end to its boundary
+// within JOIN_TWIN (64) snaps instead of JOIN (8). Measured on round 16c's KNOWN (a blob minus its copy rotated 3e-8 about
+// z): the ends that stopped the chains were not near corners -- one 2.6e-8 from a corner, one 1.1e-7, one 0.3 from any
+// vertex -- but where a twin's EDGE pierces this triangle's plane, its own side's twin 1e-8..5e-8 away, so the seam
+// stops that far inside the side. Hot pixels at vertices (round 16c's plan) would have reached one of the three. A corner
+// is still joined only within JOIN; past it the nearest SIDE is taken, then a corner within the twin join: contracted
+// into the corner, an end 1.1e-7 from it slid the point that far and the outline no longer closed ('outer face', at 128
+// snaps). With that order the result is the same from 64 snaps up (64..512 measured, same bits at 128) and the 32- and
+// 48-snap joins leave the cone: the join must reach the twins' separation, ~5e-8 in the band. The page's chains never
+// have such a pair (60 shots bit for bit the 8-snap join's), nor do the 1,350 flush boxes (exactly coplanar, never crossed).
+//
+// *** ROUND 19b: A FLAT EAR. *** Earcut can join three EXACTLY collinear ring vertices into a triangle of zero area: a hole
+// whose edge points straight at a vertex of the outer ring (the page's workload -- a blob's edge on the line of an
+// earlier seam). That refused the triangle ('earcut'), and its plane-path pieces opened 44 edges on one shot of a
+// 100-shot session (round 19's soak). Now the flat triangle (p, m, q) goes and the triangle across its long edge is
+// split at m, fanned from its opposite corner (stats.flatEars); with nothing across, it is refused as before.
+// opts.flatEars:false is the old refusal (blastEngine-selfcheck section 10's control).
 "use strict";
 
-import { triTriIntersect } from "./triTriIntersect.mjs";
 import { ShapeUtils, Vector2 } from "../../vendor/three/three.core.js";
+import { triTriIntersect, triTriIntersectExact } from "./triTriIntersect.mjs";
+import { contactPair } from "./triContact.mjs";
 
-export const ARRANGE_TOL = 1e-9;
-const TOL = ARRANGE_TOL;
+export const SNAP_EPS = 1e-9;
+// round 16: two triangles' planes within this sine of parallel -- the seam between them placed only to within
+// snap / NEAR_PARALLEL (1e-3) of where it is. Measured insensitive across 1e-7..1e-5 on the rotated-copy family.
+export const NEAR_PARALLEL = 1e-6;
+function nearParallel(T, U) {
+    const n1 = cross(sub(T[1], T[0]), sub(T[2], T[0])), n2 = cross(sub(U[1], U[0]), sub(U[2], U[0]));
+    const c = cross(n1, n2), d = Math.hypot(n1[0], n1[1], n1[2]) * Math.hypot(n2[0], n2[1], n2[2]);
+    return d > 0 && Math.hypot(c[0], c[1], c[2]) < NEAR_PARALLEL * d;
+}
+const JOIN = 8;   // round 12, contacts: a dangling chain end within JOIN x snap of triA's boundary is joined to it
+// round 16d: the same join, in a triangle CROSSED BY A NEAR-PARALLEL TWIN (a pair within NEAR_PARALLEL that intersects --
+// two surfaces 1e-9..1e-7 apart, not touching). See the ROUND 16d note.
+export const JOIN_TWIN = 64;
+const AREA_REL = 1e-9;
 
-const refuse = (reason) => ({ ok: false, reason });
-const orient = (a, b, c) => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
-
-// Signed area as a fan from the ring's OWN first vertex. A round-9 review found the plain shoelace -- products of
-// coordinates measured from triA's corner -- losing the sign of loops below ~n*eps*L^2: a 2e-8 loop in a size-10
-// triangle read area 0 for both of its cycles, and both were then treated as holes. Differences from a nearby
-// vertex keep the precision the loop's own size allows.
-function polyArea(pts) {
-    const x0 = pts[0][0], y0 = pts[0][1];
+function sub(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
+function cross(a, b) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; }
+function readTri(tris, t) {
+    const o = t * 9;
+    return [
+        [tris[o], tris[o + 1], tris[o + 2]],
+        [tris[o + 3], tris[o + 4], tris[o + 5]],
+        [tris[o + 6], tris[o + 7], tris[o + 8]],
+    ];
+}
+function box3(tri, pad) {
+    const b = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
+    for (const v of tri) for (let c = 0; c < 3; c++) { if (v[c] < b[c]) b[c] = v[c]; if (v[c] > b[3 + c]) b[3 + c] = v[c]; }
+    for (let c = 0; c < 3; c++) { b[c] -= pad; b[3 + c] += pad; }
+    return b;
+}
+function boxesMeet(a, b) {
+    return a[0] <= b[3] && b[0] <= a[3] && a[1] <= b[4] && b[1] <= a[4] && a[2] <= b[5] && b[2] <= a[5];
+}
+// Shoelace about the polygon's OWN first vertex: about a far origin a small face loses its area to cancellation
+// (a 5e-9 loop near (1,1) read 3.0e-17 short about triA's corner -- 6e-9 relative; about itself, exact).
+function area2(pts) {
     let a = 0;
-    for (let i = 1; i + 1 < pts.length; i++) {
-        a += (pts[i][0] - x0) * (pts[i + 1][1] - y0) - (pts[i + 1][0] - x0) * (pts[i][1] - y0);
+    const ox = pts[0][0], oy = pts[0][1];
+    for (let i = 1, n = pts.length; i + 1 < n; i++) {
+        const p = pts[i], q = pts[i + 1];
+        a += (p[0] - ox) * (q[1] - oy) - (q[0] - ox) * (p[1] - oy);
     }
     return a / 2;
 }
-
-function pointSegDist(p, a, b) {
+function triArea2(a, b, c) { return ((b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1])) / 2; }
+// Distance from q to segment ab, and the parameter of its foot along ab.
+function segDist(q, a, b) {
     const dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy;
-    let t = L2 > 0 ? ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2 : 0;
-    t = t < 0 ? 0 : t > 1 ? 1 : t;
-    return { d: Math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy)), t };
+    if (L2 === 0) return { d: Math.hypot(q[0] - a[0], q[1] - a[1]), t: 0 };
+    const t = ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / L2;
+    const tc = t < 0 ? 0 : (t > 1 ? 1 : t);
+    return { d: Math.hypot(q[0] - a[0] - tc * dx, q[1] - a[1] - tc * dy), t };
 }
-
-// Even-odd ray cast. Called only on a hole vertex against another component's face: every vertex is more than
-// TOL from every segment it does not end on (the T-junction check), so the point is never on the polygon.
-function pointInPoly(p, poly) {
+function pointInPoly(q, poly) {
     let inside = false;
     for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
         const a = poly[i], b = poly[j];
-        if ((a[1] > p[1]) !== (b[1] > p[1]) && p[0] < (b[0] - a[0]) * (p[1] - a[1]) / (b[1] - a[1]) + a[0]) inside = !inside;
+        if ((a[1] > q[1]) !== (b[1] > q[1]) && q[0] < (b[0] - a[0]) * (q[1] - a[1]) / (b[1] - a[1]) + a[0]) inside = !inside;
     }
     return inside;
 }
 
-/**
- * Arrange B's intersection segments inside triangle `triA` of `trisA` and triangulate the faces.
- *
- * @param {Float64Array|Float32Array} trisA   flat 9-floats-per-triangle buffer
- * @param {number} triA                       triangle index into trisA
- * @param {Float64Array|Float32Array} trisB
- * @param {Iterable<number>} candidateTriBs   B-triangle indices whose boxes overlap triA's (any superset is fine)
- * @returns {{ok:true, faces:{tris:{tri:number[][], area:number}[], area:number}[], segments:number, validationTests:number} |
- *           {ok:false, reason:string}}
- *   faces: a partition of triA. face.area is the face's net area (holes removed); each output triangle carries its
- *     own area, wound with triA, and its vertices are triA's corners or triTriIntersect() endpoints, bit for bit.
- *     A face can have no triangles only if every one was a TOL-sliver. segments: interior segments kept.
- *     validationTests: vertex-segment and segment-segment tests the validation grid made (its work, for gates).
- *   On refusal, reason names the check; the caller should fall back to the plane-cut path.
- */
-export function arrangeTriangle(trisA, triA, trisB, candidateTriBs) {
-    try { return arrangeUnguarded(trisA, triA, trisB, candidateTriBs); }
-    catch (e) { return refuse("exception: " + (e && e.message ? e.message : String(e))); }
-}
+const refuse = (reason, extra = {}) => ({ status: "fallback", reason, ...extra });
 
-function arrangeUnguarded(trisA, triA, trisB, candidateTriBs) {
-    const o = triA * 9;
-    const C = [[trisA[o], trisA[o + 1], trisA[o + 2]], [trisA[o + 3], trisA[o + 4], trisA[o + 5]], [trisA[o + 6], trisA[o + 7], trisA[o + 8]]];
-    const e1 = [C[1][0] - C[0][0], C[1][1] - C[0][1], C[1][2] - C[0][2]], e2 = [C[2][0] - C[0][0], C[2][1] - C[0][1], C[2][2] - C[0][2]];
-    const n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
-    const nLen = Math.hypot(n[0], n[1], n[2]), e1Len = Math.hypot(e1[0], e1[1], e1[2]);
-    const triArea = nLen / 2;
-    if (!(triArea > 0) || !Number.isFinite(triArea) || !(e1Len > 0)) return refuse("degenerate triA");
-    // A TRIANGLE NARROWER THAN A FEW TOL CANNOT HOLD A CROSSING THE SNAP CAN RESOLVE. Every point in it is within TOL of
-    // two edges, so a crossing's ends are both classified onto edges and the crossing is skipped as boundary: a round-9
-    // review built a triangle 1.5e-9 wide with B over a fifth of it and got ONE face and no segments, and a cube whose
-    // top face held a 0.9e-9 needle came back 9.1e-11 short with 11 unmatched edges, where the plane-cut path was exact.
-    {
-        const l1 = Math.hypot(C[2][0] - C[1][0], C[2][1] - C[1][1], C[2][2] - C[1][2]);
-        const l2 = Math.hypot(C[0][0] - C[2][0], C[0][1] - C[2][1], C[0][2] - C[2][2]);
-        if (2 * triArea / Math.max(e1Len, l1, l2) <= 4 * TOL) return refuse("thin triA");
-    }
-
-    // 2D frame in triA's plane: u along edge 0, v = n x u, so triA is counter-clockwise (positive area).
-    const u = [e1[0] / e1Len, e1[1] / e1Len, e1[2] / e1Len];
-    const w = [(n[1] * u[2] - n[2] * u[1]) / nLen, (n[2] * u[0] - n[0] * u[2]) / nLen, (n[0] * u[1] - n[1] * u[0]) / nLen];
-    const proj = (p) => {
-        const dx = p[0] - C[0][0], dy = p[1] - C[0][1], dz = p[2] - C[0][2];
-        return [dx * u[0] + dy * u[1] + dz * u[2], dx * w[0] + dy * w[1] + dz * w[2]];
-    };
-    const C2 = C.map(proj);
-    // Edge k runs corner k -> corner k+1; its inward unit normal makes signedDist(p, k) positive inside triA.
-    const E = [0, 1, 2].map((k) => {
-        const a = C2[k], b = C2[(k + 1) % 3], dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy);
-        return { a, dx: dx / len, dy: dy / len, len };
-    });
-    const signedDist = (p, k) => E[k].dx * (p[1] - E[k].a[1]) - E[k].dy * (p[0] - E[k].a[0]);
-
-    // ---- vertices: the three corners first (ids 0..2), then snapped segment endpoints ----------------------------
-    const V = [];
-    const cell = TOL * 4, snapGrid = new Map();
-    const snapKey = (i, j) => i + "," + j;
-    function insertSnap(id) {
-        const p = V[id].p2, k = snapKey(Math.floor(p[0] / cell), Math.floor(p[1] / cell));
-        const l = snapGrid.get(k);
-        if (l) l.push(id); else snapGrid.set(k, [id]);
-    }
-    for (let k = 0; k < 3; k++) { V.push({ p2: C2[k], p3: C[k], corner: k, edge: -1, t: 0 }); insertSnap(k); }
-    function addPoint(p3) {
-        const p2 = proj(p3);
-        if (!Number.isFinite(p2[0]) || !Number.isFinite(p2[1])) return -1;
-        const ci = Math.floor(p2[0] / cell), cj = Math.floor(p2[1] / cell);
-        for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) {
-            const l = snapGrid.get(snapKey(ci + di, cj + dj));
-            if (l) for (const id of l) if (Math.hypot(V[id].p2[0] - p2[0], V[id].p2[1] - p2[1]) <= TOL) return id;
-        }
-        let edge = -1, best = Infinity;
-        for (let k = 0; k < 3; k++) {
-            const d = signedDist(p2, k);
-            if (d < -TOL) return -1;                                   // outside triA by more than TOL
-            if (Math.abs(d) <= TOL && Math.abs(d) < best) { best = Math.abs(d); edge = k; }
-        }
-        const t = edge >= 0 ? (p2[0] - E[edge].a[0]) * E[edge].dx + (p2[1] - E[edge].a[1]) * E[edge].dy : 0;
-        V.push({ p2, p3, corner: -1, edge, t });
-        insertSnap(V.length - 1);
-        return V.length - 1;
-    }
-    // A corner lies on edges k-1 and k; an edge vertex on its own edge; an interior vertex on none.
-    const edgesOfVertex = (v) => v.corner >= 0 ? [(v.corner + 2) % 3, v.corner] : v.edge >= 0 ? [v.edge] : [];
-
-    // ---- segments ----------------------------------------------------------------------------------------------
-    const segs = [], segKey = new Set();
-    for (const j of candidateTriBs) {
-        const r = triTriIntersect(trisA, triA, trisB, j);
-        if (r.status === "none") continue;
-        if (r.status !== "intersect") return refuse(r.status);       // "coplanar" | "degenerate": not ours to cut
-        const a = addPoint(r.p0), b = addPoint(r.p1);
-        if (a < 0 || b < 0) return refuse("endpoint outside triA");
-        if (a === b) continue;                                        // shorter than TOL: collapses to a point
-        // Both ends on one edge of triA: the segment lies within TOL of that edge, which already bounds the faces.
-        // (Reached only within TOL: a segment exactly along the edge means B's triangle contains the edge, which
-        // triTriIntersect() reports as degenerate before this runs.)
-        const ea = edgesOfVertex(V[a]), eb = edgesOfVertex(V[b]);
-        if (ea.some((e) => eb.includes(e))) continue;
-        const k = a < b ? a + "," + b : b + "," + a;
-        if (segKey.has(k)) continue;
-        segKey.add(k);
-        segs.push([a, b]);
-    }
-    if (segs.length === 0) {
-        return { ok: true, faces: [{ tris: [{ tri: [C[0], C[1], C[2]], area: triArea }], area: triArea }], segments: 0, validationTests: 0, validationVisits: 0 };
-    }
-
-    // ---- the graph: vertices that carry a segment, plus the corners ---------------------------------------------
-    // A vertex no kept segment touches (its segment collapsed to a point, or lay along an edge) is LEFT OUT: it
-    // bounds nothing, and kept in -- splitting a boundary edge right beside another vertex -- it is how a scrambled
-    // walk gets built (the first version refused such a case only at the outer-face count).
-    const deg = new Int32Array(V.length);
-    for (const [a, b] of segs) { deg[a]++; deg[b]++; }
-    const live = [];
-    for (let i = 0; i < V.length; i++) if (V[i].corner >= 0 || deg[i] > 0) live.push(i);
-
-    // ---- validation: crossings, T-junctions, collinear overlap, on a uniform grid over triA ---------------------
-    // Geometry before degree: a curve ending ON another one has a loose end too, and "T-junction" says why.
-    const work = { tests: 0, visits: 0 };
-    const bad = validate(V, live, segs, C2, work);
-    if (bad) return refuse(bad);
-    // An interior vertex of odd degree is a curve with a loose end: B is not closed there.
-    for (let i = 0; i < V.length; i++) if (V[i].corner < 0 && V[i].edge < 0 && (deg[i] & 1)) return refuse("dangling");
-
-    // ---- half-edges: every segment both ways, every boundary piece both ways ------------------------------------
-    const edges = segs.slice();
-    for (let k = 0; k < 3; k++) {
-        const on = [];
-        for (const i of live) if (V[i].corner < 0 && V[i].edge === k) on.push(i);
-        on.sort((p, q) => V[p].t - V[q].t);
-        const chain = [k, ...on, (k + 1) % 3];
-        for (let i = 0; i + 1 < chain.length; i++) edges.push([chain[i], chain[i + 1]]);
-    }
-    const H = edges.length * 2;
-    const from = new Int32Array(H), to = new Int32Array(H);
-    edges.forEach(([a, b], i) => { from[2 * i] = a; to[2 * i] = b; from[2 * i + 1] = b; to[2 * i + 1] = a; });
-    const twin = (h) => h ^ 1;
-    const out = new Map();
-    for (let h = 0; h < H; h++) { const l = out.get(from[h]); if (l) l.push(h); else out.set(from[h], [h]); }
-    const ang = new Float64Array(H);
-    for (let h = 0; h < H; h++) ang[h] = Math.atan2(V[to[h]].p2[1] - V[from[h]].p2[1], V[to[h]].p2[0] - V[from[h]].p2[0]);
-    const slot = new Int32Array(H);
-    for (const l of out.values()) { l.sort((p, q) => ang[p] - ang[q]); l.forEach((h, i) => { slot[h] = i; }); }
-
-    // ---- union-find components --------------------------------------------------------------------------------
-    const parent = new Map();
-    const find = (x) => { let r = x; while (parent.get(r) !== r) r = parent.get(r); while (parent.get(x) !== r) { const nx = parent.get(x); parent.set(x, r); x = nx; } return r; };
-    for (const i of live) parent.set(i, i);
-    for (const [a, b] of edges) { const ra = find(a), rb = find(b); if (ra !== rb) parent.set(ra, rb); }
-
-    // ---- face walk: next = the edge just clockwise of the twin, so a face lies to the LEFT of its edges --------
-    const seen = new Uint8Array(H);
-    const cycles = [];
-    for (let h0 = 0; h0 < H; h0++) {
-        if (seen[h0]) continue;
-        const vs = [];
-        let h = h0, steps = 0;
-        do {
-            if (seen[h] || steps++ > H) return refuse("face walk");
-            seen[h] = 1;
-            vs.push(from[h]);
-            const t = twin(h), l = out.get(to[h]);
-            h = l[(slot[t] - 1 + l.length) % l.length];
-        } while (h !== h0);
-        const area = polyArea(vs.map((i) => V[i].p2));
-        if (area === 0) return refuse("zero-area cycle");      // its side cannot be told: never guess which it is
-        cycles.push({ vs, area, comp: find(vs[0]) });
-    }
-    const mainComp = find(0);
-    const bounded = [], negByComp = new Map();
-    for (const c of cycles) {
-        if (c.area > 0) bounded.push(c);
-        else negByComp.set(c.comp, (negByComp.get(c.comp) || []).concat([c]));
-    }
-    // Every connected component has exactly one outer (clockwise) cycle: for the one holding triA's boundary it is
-    // the walk around triA itself; for a closed curve floating inside, it is that curve's outline -- a hole.
-    for (const [comp, l] of negByComp) if (l.length !== 1) return refuse("outer face");
-    if (!negByComp.has(mainComp)) return refuse("outer face");
-
-    // ---- holes: each floating outline goes to the SMALLEST face of another component that contains it ---------
-    for (const f of bounded) {
-        f.holes = []; f.poly = f.vs.map((i) => V[i].p2);
-        f.box = [Infinity, Infinity, -Infinity, -Infinity];
-        for (const q of f.poly) { if (q[0] < f.box[0]) f.box[0] = q[0]; if (q[1] < f.box[1]) f.box[1] = q[1]; if (q[0] > f.box[2]) f.box[2] = q[0]; if (q[1] > f.box[3]) f.box[3] = q[1]; }
-    }
-    for (const [comp, [h]] of negByComp) {
-        if (comp === mainComp) continue;
-        const p = V[h.vs[0]].p2;
+// Round 13 (contacts): a SLIVER is not arranged. Its outline is its corners with every segment end and every injected
+// side point put on its nearest side (dropped within snap of a corner, merged within snap of each other). A segment
+// crosses a sliver from one long side to the other, so each is a CHORD between two outline vertices: the outline is
+// cut along every chord, and each piece is fanned from its own centroid -- strictly inside a convex piece, so every
+// fan triangle has positive area however thin -- and classified there. (The planar arrangement merged side points
+// ACROSS the sliver, 3e-9 wide, under its 1e-9 snap and could not close the outline; keeping the sliver whole instead
+// left 4 cracks where the blob's surface crossed it.)
+function sliverFace(T, e, L, segs, sidePoints, coplanar, snap, pointContacts) {
+    const onSide = [[], [], []];
+    // put q on its nearest side; returns the vertex it became (an existing one within snap), or null near a corner
+    const place = (q, only = -1) => {
         let best = null;
-        for (const f of bounded) {
-            if (f.comp === h.comp) continue;
-            if (p[0] < f.box[0] || p[0] > f.box[2] || p[1] < f.box[1] || p[1] > f.box[3]) continue;
-            if ((!best || f.area < best.area) && pointInPoly(p, f.poly)) best = f;
+        for (let k = 0; k < 3; k++) {
+            if (only >= 0 && k !== only) continue;
+            const A0 = T[k], d = e[k], w = sub(q, A0), t = (w[0] * d[0] + w[1] * d[1] + w[2] * d[2]) / (L[k] * L[k]);
+            if (!(t * L[k] > snap && (1 - t) * L[k] > snap)) continue;
+            const f = [w[0] - d[0] * t, w[1] - d[1] * t, w[2] - d[2] * t], dist = Math.hypot(f[0], f[1], f[2]);
+            if (!best || dist < best.dist) best = { dist, k, t };
         }
-        if (!best) return refuse("orphan hole");
-        best.holes.push(h);
-    }
-
-    // ---- triangulate each face with its holes ------------------------------------------------------------------
-    const faces = [];
-    let facesTotal = 0;
-    for (const f of bounded) {
-        const ids = f.vs.slice();
-        const contour = f.vs.map((i) => new Vector2(V[i].p2[0], V[i].p2[1]));
-        const holes = f.holes.map((h) => { ids.push(...h.vs); return h.vs.map((i) => new Vector2(V[i].p2[0], V[i].p2[1])); });
-        let faceArea = f.area;
-        for (const h of f.holes) faceArea += h.area;                 // a hole's outline is clockwise: negative
-        facesTotal += faceArea;
-        const ts = [];
-        let sum = 0;
-        for (const [ia, ib, ic] of ShapeUtils.triangulateShape(contour, holes)) {
-            const a = ids[ia], b = ids[ib], c = ids[ic];
-            const pa = V[a].p2, pb = V[b].p2, pc = V[c].p2;
-            const ar = orient(pa, pb, pc) / 2;
-            sum += ar;
-            // A SLIVER IS DEGENERATE AT THIS FILE'S TOLERANCE, NOT MERELY SMALL. The first version dropped any
-            // triangle under 1e-14 of triA's area, and two round-9 reviewers each found that drops REAL faces: a
-            // box intersected with a rod 2e-7 wide lost its whole end cap -- an open hole, so its volume depends on
-            // where it is measured from: 22% short about the world origin, 17% about the rod's axis -- and a 3e-7
-            // needle through a box lost both caps (-33%). A triangle is now dropped only if it is negligible
-            // in area AND its height over its longest edge is within TOL -- i.e. its three corners lie within TOL
-            // of one line, the one kind of triangle that represents nothing this pipeline can resolve.
-            const maxEdge = Math.max(Math.hypot(pb[0] - pa[0], pb[1] - pa[1]), Math.hypot(pc[0] - pb[0], pc[1] - pb[1]),
-                                     Math.hypot(pa[0] - pc[0], pa[1] - pc[1]));
-            if (Math.abs(ar) <= 1e-14 * triArea && 2 * Math.abs(ar) <= TOL * maxEdge) continue;
-            // Earcut (three's ShapeUtils) emits its triangles counter-clockwise. The first version REFUSED any
-            // clockwise triangle and claimed the check never fired; the reviews measured it firing -- on collinear
-            // triangles of area ~ -3e-17 of triA's, rounding noise, needlessly sending the triangle to the fallback
-            // in 5 of 6 twelve-blast chains. Those are slivers and are dropped just above; a clockwise triangle
-            // that is NOT a sliver is still refused, because guessing a fix is how a face ships inside out.
-            if (ar < 0) return refuse("triangulation orientation");
-            ts.push({ tri: [V[a].p3, V[b].p3, V[c].p3], area: ar });
+        if (!best) return null;
+        const old = onSide[best.k].find((o) => Math.abs(o.t - best.t) * L[best.k] <= snap);
+        if (old) return old;
+        const d = e[best.k], A0 = T[best.k];
+        const o = { t: best.t, k: best.k, p: [A0[0] + d[0] * best.t, A0[1] + d[1] * best.t, A0[2] + d[2] * best.t] };
+        onSide[best.k].push(o);
+        return o;
+    };
+    const chords = [];
+    for (const sg of segs) { const a = place(sg.p0), b = place(sg.p1); if (a && b && a.k !== b.k) chords.push([a, b]); }
+    // an injected point goes on the side it came from: a sliver's two long sides are within snap of each other, and
+    // by distance alone it lands on the wrong one (seed 107 of the page gate: 4 cracks, one needle 1.7e-9 wide)
+    for (const sp of sidePoints) place(sp.p, sp.side);
+    const ring = [];
+    for (let k = 0; k < 3; k++) { ring.push({ p: T[k] }); for (const o of onSide[k].sort((x, y) => x.t - y.t)) ring.push(o); }
+    // cut the outline along each chord (a segment across the sliver, side to side): a polygon holding both ends
+    // splits in two at them. The outline is convex and every piece stays so.
+    let polys = [ring];
+    for (const [a, b] of chords) {
+        const next = [];
+        for (const P of polys) {
+            const i = P.indexOf(a), j = P.indexOf(b);
+            if (i < 0 || j < 0 || Math.abs(i - j) === 1 || Math.abs(i - j) === P.length - 1) { next.push(P); continue; }
+            const [u, v] = i < j ? [i, j] : [j, i];
+            next.push(P.slice(u, v + 1), [...P.slice(v), ...P.slice(0, u + 1)]);
         }
-        if (!(Math.abs(sum - faceArea) <= 1e-9 * triArea)) return refuse("triangulation area");
-        faces.push({ tris: ts, area: faceArea });
+        polys = next;
     }
-    // TWO BACKSTOPS, AND WHAT THEY CAN AND CANNOT SEE -- corrected after a round-9 review measured them. The first
-    // version compared the faces with triA itself, and refused 7 healthy triangles of the twelve-blast chain: an
-    // endpoint within TOL of an edge counts as on it but is never moved, so the walked boundary can sit up to TOL
-    // inside triA (strips of 1e-11..1e-10 on triangles of area 0.002-0.04). So the question was split in two -- and
-    // the comment here then claimed the first half catches "a broken walk or a lost hole". IT CANNOT CATCH A BROKEN
-    // WALK: every walk that pairs each edge with its twin gives cycles whose signed areas sum to zero per component, so
-    // the faces equal the walked boundary for ANY such walk (measured: 4.3e-16 of triA over 300 random cases, 2.8e-16
-    // with the walk reversed). What it does guard is the hole bookkeeping -- a hole assigned twice or silently dropped
-    // breaks the sum -- and the code refuses an unassigned hole earlier ("orphan hole"), so no input reaches it. The
-    // second half cannot fire either: addPoint refuses anything outside triA by more than TOL, which bounds the strip.
-    // Both stay as assertions of those two facts; a broken walk is caught by "outer face" and "triangulation area".
-    const outerArea = -negByComp.get(mainComp)[0].area, perimeter = E[0].len + E[1].len + E[2].len;
-    if (!(Math.abs(facesTotal - outerArea) <= 1e-9 * triArea)) return refuse("face area sum");
-    if (!(Math.abs(triArea - outerArea) <= TOL * perimeter + 1e-9 * triArea)) return refuse("boundary strip");
-    return { ok: true, faces, segments: segs.length, validationTests: work.tests, validationVisits: work.visits };
+    const nA = cross(e[0], sub(T[2], T[0])), faces = [];
+    for (const P of polys) {
+        const vs = P.map((o) => o.p), c = [0, 0, 0];
+        for (const v of vs) { c[0] += v[0] / vs.length; c[1] += v[1] / vs.length; c[2] += v[2] / vs.length; }
+        const tris = vs.map((v, i) => [c, v, vs[(i + 1) % vs.length]]);
+        let on = 0;
+        for (const cp of coplanar) if (inTriangle3(c, cp.U, snap)) { on = cp.orient; break; }
+        let area = 0;
+        for (const t of tris) { const m = cross(sub(t[1], t[0]), sub(t[2], t[0])); area += (m[0] * nA[0] + m[1] * nA[1] + m[2] * nA[2]) / Math.hypot(nA[0], nA[1], nA[2]) / 2; }
+        faces.push({ tris, sample: c, area, holes: 0, on });
+    }
+    return { status: "ok", faces, sideVerts: onSide.map((l) => l.map((o) => o.p)),
+             stats: { segments: segs.length, sliver: true, chords: chords.length, pieces: polys.length, pointContacts } };
+}
+// q in (or on the edge of) triangle U, measured in U's own plane
+function inTriangle3(q, U, snap) {
+    const n = cross(sub(U[1], U[0]), sub(U[2], U[0])), L = Math.hypot(n[0], n[1], n[2]);
+    if (!(L > 0)) return false;
+    for (let k = 0; k < 3; k++) {
+        const a = U[k], b = U[(k + 1) % 3], m = cross(sub(b, a), sub(q, a));
+        if ((m[0] * n[0] + m[1] * n[1] + m[2] * n[2]) / L < -snap * Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2])) return false;
+    }
+    return true;
 }
 
-// Crossings, T-junctions and collinear overlap among the kept segments, tested only between segments and vertices
-// that share a cell of a uniform grid over triA. Returns a refusal reason, or null; work.tests counts the tests made.
-//
-// A segment is registered in the cells it PASSES THROUGH, column strip by column strip, padded by TOL -- not in every
-// cell of its bounding box, and pairs are de-duplicated by a per-segment marker rather than a Set of pairs. A round-9
-// review measured the first version on 200 long diagonal slabs beside an 8000-gon: each slab's box covered the whole
-// grid, so every slab met every polygon segment in every cell -- 15 s for ONE triangle, 13 s of it here -- and at 400
-// slabs and a 16000-gon the pair Set overflowed ("Set maximum size exceeded", refused, 47 s spent first). The grid is
-// also finer (2 sqrt(n) a side rather than sqrt(n)), because a dense curve concentrates its segments in a few cells.
-//
-// Why a point within TOL of a segment is still found: it lies within TOL of some point q of the segment, so q's x is
-// within TOL of the point's column and q's y lies between the segment's y at that column's edges widened by TOL; the
-// registration covers exactly that range, widened by TOL again. Two segments that cross share the crossing point's cell.
-function validate(V, live, segs, C2, work) {
-    const x0 = Math.min(C2[0][0], C2[1][0], C2[2][0]) - 2 * TOL, x1 = Math.max(C2[0][0], C2[1][0], C2[2][0]) + 2 * TOL;
-    const y0 = Math.min(C2[0][1], C2[1][1], C2[2][1]) - 2 * TOL, y1 = Math.max(C2[0][1], C2[1][1], C2[2][1]) + 2 * TOL;
-    const G = Math.max(1, Math.min(1024, Math.ceil(2 * Math.sqrt(segs.length))));
-    const cw = (x1 - x0) / G;
-    const ix = (x) => { const k = Math.floor((x - x0) / (x1 - x0) * G); return k < 0 ? 0 : k >= G ? G - 1 : k; };
-    const iy = (y) => { const k = Math.floor((y - y0) / (y1 - y0) * G); return k < 0 ? 0 : k >= G ? G - 1 : k; };
-    const segCells = new Map(), vertCells = new Map(), cellsOf = new Array(segs.length);
-    const push = (m, k, v) => { const l = m.get(k); if (l) l.push(v); else m.set(k, [v]); };
-    segs.forEach(([a, b], s) => {
-        const pa = V[a].p2, pb = V[b].p2, dx = pb[0] - pa[0], dy = pb[1] - pa[1];
-        const lo = Math.min(pa[0], pb[0]) - TOL, hi = Math.max(pa[0], pb[0]) + TOL;
-        const cells = [];
-        for (let ci = ix(lo), c1 = ix(hi); ci <= c1; ci++) {
-            // The clamped first and last columns reach past the grid, so they are unbounded on their outer side.
-            const xa = Math.max(lo, ci === 0 ? -Infinity : x0 + ci * cw - TOL);
-            const xb = Math.min(hi, ci === G - 1 ? Infinity : x0 + (ci + 1) * cw + TOL);
-            let ya, yb;
-            if (dx === 0) { ya = Math.min(pa[1], pb[1]); yb = Math.max(pa[1], pb[1]); }
-            else {
-                const ta = Math.min(1, Math.max(0, (xa - pa[0]) / dx)), tb = Math.min(1, Math.max(0, (xb - pa[0]) / dx));
-                ya = pa[1] + ta * dy; yb = pa[1] + tb * dy;
-                if (ya > yb) { const t = ya; ya = yb; yb = t; }
-            }
-            for (let cj = iy(ya - TOL), d1 = iy(yb + TOL); cj <= d1; cj++) { const k = ci * G + cj; push(segCells, k, s); cells.push(k); }
-        }
-        cellsOf[s] = cells;
-    });
-    for (const i of live) push(vertCells, ix(V[i].p2[0]) * G + iy(V[i].p2[1]), i);
+/**
+ * The planar arrangement of triangle `triA` (in `trisA`) cut by the intersection SEGMENTS of `candidateTriBs`
+ * (indices into `trisB`) -- not by their planes. See this file's header.
+ *
+ * @param {{snapEps?:number, contacts?:boolean}} [opts]  contacts (round 12): resolve the pairs triTriIntersect()
+ *   calls "coplanar" or "degenerate" with triContact.mjs instead of refusing the triangle; faces then carry `on`.
+ * @returns one of
+ *   {status:"untouched"}  -- no candidate crosses triA: triA is one face (the caller classifies it whole)
+ *   {status:"ok", faces:{tris:number[][][], sample:number[], area:number, holes:number}[], stats:object}
+ *   {status:"fallback", reason:string}  -- the arrangement refused; the caller must use the plane path
+ */
+export function arrangeTriangle(trisA, triA, trisB, candidateTriBs, opts = {}) {
+    const snap = opts.snapEps ?? SNAP_EPS;
+    const T = readTri(trisA, triA);
+    const tb = box3(T, snap);
 
-    // Every vertex against every segment it does not end on: within TOL is a T-junction (or a near-miss the snap
-    // did not merge -- the same thing to the walk).
-    for (const [k, vl] of vertCells) {
-        const sl = segCells.get(k);
-        if (!sl) continue;
-        for (const p of vl) for (const s of sl) {
-            const [s0, s1] = segs[s];
-            if (p === s0 || p === s1) continue;
-            work.tests++;
-            if (pointSegDist(V[p].p2, V[s0].p2, V[s1].p2).d <= TOL) return "T-junction";
+    // ---- 1. the segments (round 2's triTriIntersect), refusing whatever it leaves unresolved -------------------
+    const segs = [];
+    const seen = new Set();
+    const coplanar = [];          // round 12: {U (triB's corners), orient}
+    let pointContacts = 0, contactSegs = 0, twinCrossed = false;
+    for (const triB of candidateTriBs || []) {
+        if (seen.has(triB)) continue;
+        seen.add(triB);
+        if (!boxesMeet(tb, box3(readTri(trisB, triB), 0))) continue;
+        // round 16: meshBoolean's seamConsensus has already found every pair once, for both meshes
+        const cached = opts.pairOf ? opts.pairOf(triB) : undefined;
+        if (opts.pairOf && !cached) continue;     // not in meshBoolean's list: the pair does not touch
+        const r = cached ? cached.r : (opts.exact ? triTriIntersectExact : triTriIntersect)(trisA, triA, trisB, triB);
+        if (r.status === "none") continue;
+        let p0, p1, onPlane = false;
+        if (r.status === "intersect") {
+            p0 = r.p0; p1 = r.p1;
+            // BVH-CSG round 16: a pair within NEAR_PARALLEL of parallel places its seam to within snap / sin(angle) -- a
+            // thousandth of the triangle and worse -- so a chain of such segments that dangles is not a cut the data
+            // supports: it is pruned like an on-plane contact rather than refusing the triangle (see the ROUND 16 note)
+            if (opts.contacts && nearParallel(T, readTri(trisB, triB))) { onPlane = true; twinCrossed = true; }
+        }
+        else if (opts.contacts) {
+            // coplanar/degenerate: resolved here (triContact.mjs)
+            const U = readTri(trisB, triB), c = cached && cached.c ? cached.c : contactPair(T, U);
+            if (c.kind === "none" || c.kind === "point") continue;
+            if (c.kind === "coplanar") { coplanar.push({ U, orient: c.orient, triB }); continue; }
+            p0 = c.p0; p1 = c.p1; onPlane = c.onPlane || nearParallel(T, U); contactSegs++;
+        } else return refuse(r.status, { triB });
+        // round 16: the seam's points as every arrangement agrees on them (meshBoolean's seamConsensus), so a segment
+        // shorter than snap collapses to one point here exactly as in the triangles across from it
+        if (opts.canon) { p0 = opts.canon(p0); p1 = opts.canon(p1); }
+        const d = sub(p1, p0);
+        if (Math.hypot(d[0], d[1], d[2]) <= snap) { pointContacts++; continue; }
+        segs.push({ p0, p1, triB, onPlane });
+    }
+    // Round 12: points the triangle ACROSS one of triA's sides put on that side (meshBoolean's second pass). Without
+    // them the two disagree along their shared edge -- a T-junction: a B edge crossing A's face exactly on the diagonal
+    // two A-triangles share gives one of them a segment ending there and the other only a point contact, dropped.
+    // each {p, side} (meshBoolean's pass 2 says which side of triA the point belongs on) or a bare point
+    const sidePoints = (opts.sidePoints || []).map((x) => (Array.isArray(x) ? { p: x, side: -1 } : x));
+    // Round 13 (contacts): a SLIVER -- triA no taller than JOIN x snap -- is below what the arrangement resolves: a
+    // segment across it is shorter than the snapping its ends get, and the area checks cannot hold (destructible's
+    // workload: a 0.15 x 3.1e-9 output triangle of an earlier shot, fed back as triA, refused 'outer face' and its
+    // plane-path fragments opened 416 edges). It takes no cut: each segment end is put on its nearest side instead,
+    // so the sliver splits where its neighbours do and stays one face, classified whole.
+    if (opts.contacts && (segs.length || sidePoints.length)) {
+        const e = [sub(T[1], T[0]), sub(T[2], T[1]), sub(T[0], T[2])];
+        const L = e.map((v) => Math.hypot(v[0], v[1], v[2])), cr = cross(e[0], sub(T[2], T[0]));
+        if (Math.hypot(cr[0], cr[1], cr[2]) / Math.max(L[0], L[1], L[2]) <= JOIN * snap) return sliverFace(T, e, L, segs, sidePoints, coplanar, snap, pointContacts);
+    }
+    if (segs.length === 0 && coplanar.length === 0 && sidePoints.length === 0) return { status: "untouched", pointContacts };
+
+    // ---- 2. a 2D frame on triA's plane: drop the dominant normal axis, local origin at T[0], mirrored if needed so
+    // that triA itself runs counter-clockwise (faces are then found counter-clockwise and wound like triA) ----------
+    const n = cross(sub(T[1], T[0]), sub(T[2], T[0]));
+    const an = n.map(Math.abs);
+    const drop = an[0] >= an[1] && an[0] >= an[2] ? 0 : (an[1] >= an[2] ? 1 : 2);
+    const ax = drop === 0 ? 1 : 0, bx = drop === 2 ? 1 : 2;
+    // (x,z) is a left-handed pair when y is dropped: the 2D area there is -n.y/2, not +n.y/2
+    const mirror = (drop === 1 ? -n[drop] : n[drop]) < 0 ? -1 : 1;
+    const o = T[0];
+    const to2 = (p) => [p[ax] - o[ax], (p[bx] - o[bx]) * mirror];
+
+    const V2 = [], V3 = [], kind = [];
+    function addVertex(p3, k) {
+        const q = to2(p3);
+        for (let i = 0; i < V2.length; i++) {
+            if (Math.abs(V2[i][0] - q[0]) <= snap && Math.abs(V2[i][1] - q[1]) <= snap &&
+                Math.hypot(V2[i][0] - q[0], V2[i][1] - q[1]) <= snap) return i;
+        }
+        V2.push(q); V3.push(p3); kind.push(k);
+        return V2.length - 1;
+    }
+    for (let k = 0; k < 3; k++) addVertex(T[k], "corner");
+    if (V2.length < 3) return refuse("degenerate triangle");
+    const areaT = triArea2(V2[0], V2[1], V2[2]);
+    if (!(areaT > 0)) return refuse("degenerate triangle");
+
+    const edges = [[0, 1], [1, 2], [2, 0]];
+    const touch = [false, false, false];   // round 12: an edge that is only an on-plane contact may be pruned
+    for (const sp of sidePoints) addVertex(sp.p, "side point");
+    for (const s of segs) {
+        const a = addVertex(s.p0, "segment"), b = addVertex(s.p1, "segment");
+        if (a !== b) { edges.push([a, b]); touch.push(!!s.onPlane); }
+    }
+    // Round 12: a coplanar B-triangle adds NO cut of its own. The RIM of B's coplanar region is cut anyway -- B is
+    // closed, so the triangle beyond it leaves the plane and its contact is a segment -- and the edges INSIDE the
+    // region (a box face's diagonal) need no cut, because the ON test (step 7) is inclusive: a sample on the edge two
+    // same-facing coplanar triangles share is on both. Built first with those edges clipped in as well, which was
+    // needed only while the ON test was strict (flush-box fuzz case 78: a sample exactly on the other box's diagonal
+    // failed both triangles' tests -- 4.7e-2 off, 5 cracks); inclusive, the clipping changed no box result over 1,350
+    // runs and cost 33 extra fallbacks on the rotated-copy family, and was removed.
+
+
+    // ---- 3. proper crossings between edges (a manifold, non-self-intersecting B gives none; counted) -----------
+    // Registering the crossing on both edges here is REDUNDANT on every fixture gated: step 4 re-finds it within
+    // snap of both (sabotages A10/A10b, one or both registrations removed: 0 red in all three gates). It matters
+    // only if the crossing snaps onto an existing vertex more than snap from one of the two edges -- no fixture
+    // builds that. Kept because it is the correct split there and costs nothing; named so it is not read as tested.
+    let crossings = 0;
+    const onEdge = edges.map(() => []);
+    const baseEdges = edges.length;
+    for (let i = 0; i < baseEdges; i++) {
+        for (let j = i + 1; j < baseEdges; j++) {
+            const [a, b] = edges[i], [c, d] = edges[j];
+            if (a === c || a === d || b === c || b === d) continue;
+            const A = V2[a], B = V2[b], C = V2[c], D = V2[d];
+            const lab = Math.hypot(B[0] - A[0], B[1] - A[1]), lcd = Math.hypot(D[0] - C[0], D[1] - C[1]);
+            const dc = 2 * triArea2(A, B, C) / lab, dd = 2 * triArea2(A, B, D) / lab;
+            const da = 2 * triArea2(C, D, A) / lcd, db = 2 * triArea2(C, D, B) / lcd;
+            if (!((dc > snap && dd < -snap) || (dc < -snap && dd > snap))) continue;
+            if (!((da > snap && db < -snap) || (da < -snap && db > snap))) continue;
+            const t = da / (da - db);
+            const pa = V3[a], pb = V3[b];
+            const p3 = [pa[0] + (pb[0] - pa[0]) * t, pa[1] + (pb[1] - pa[1]) * t, pa[2] + (pb[2] - pa[2]) * t];
+            const v = addVertex(p3, "crossing");
+            onEdge[i].push(v); onEdge[j].push(v);
+            crossings++;
         }
     }
-    // Segment pairs: a proper crossing, or two segments leaving a shared vertex along one line. mark[t] === s says the
-    // pair (s, t) was already tested from another cell the two share.
-    const mark = new Int32Array(segs.length).fill(-1);
-    for (let s = 0; s < segs.length; s++) {
-        const [a, b] = segs[s];
-        for (const k of cellsOf[s]) for (const t of segCells.get(k)) {
-            work.visits++;
-            if (t <= s || mark[t] === s) continue;
-            mark[t] = s;
-            work.tests++;
-            const [c, d] = segs[t];
-            const shared = a === c || a === d ? a : b === c || b === d ? b : -1;
-            if (shared < 0) {
-                const pa = V[a].p2, pb = V[b].p2, pc = V[c].p2, pd = V[d].p2;
-                const o1 = orient(pa, pb, pc), o2 = orient(pa, pb, pd), o3 = orient(pc, pd, pa), o4 = orient(pc, pd, pb);
-                if (o1 * o2 < 0 && o3 * o4 < 0) return "segments cross";
+
+    // ---- 4. every vertex lying on an edge's interior splits it (segment ends on triA's sides, T-junctions) -------
+    for (let e = 0; e < edges.length; e++) {
+        const [a, b] = edges[e];
+        for (let v = 0; v < V2.length; v++) {
+            if (v === a || v === b) continue;
+            const { d, t } = segDist(V2[v], V2[a], V2[b]);
+            if (d <= snap && t > 0 && t < 1) onEdge[e].push(v);
+        }
+    }
+    const adj = V2.map(() => new Set());
+    const touchKey = new Set(), plainKey = new Set();
+    for (let e = 0; e < edges.length; e++) {
+        const [a, b] = edges[e];
+        const A = V2[a], dx = V2[b][0] - A[0], dy = V2[b][1] - A[1];
+        const chain = [...new Set(onEdge[e])].map((v) => ({ v, t: (V2[v][0] - A[0]) * dx + (V2[v][1] - A[1]) * dy }))
+            .sort((p, q) => p.t - q.t).map((p) => p.v);
+        let prev = a;
+        for (const v of [...chain, b]) {
+            if (v !== prev) {
+                adj[prev].add(v); adj[v].add(prev);
+                const K = touch[e] ? touchKey : plainKey;
+                K.add(prev + "," + v); K.add(v + "," + prev);
+            }
+            prev = v;
+        }
+    }
+
+    // ---- 5. a vertex of degree 1 is a segment chain that stops inside triA: B's surface would cross the face it
+    // sits in, so no face could be classified by one point. Refused, not pruned -- EXCEPT (round 12, contacts) a
+    // chain made only of on-plane contacts: B's edge lying in triA's plane with B on one side touches triA without
+    // crossing it, and ends where B leaves the plane. Those are pruned, one end at a time, and counted. ------------
+    let pruned = 0, contracted = 0, joined = 0, joinedMax = 0;
+    const join = (twinCrossed ? (opts.joinTwin ?? JOIN_TWIN) : JOIN) * snap;
+    for (let pass = 0; opts.contacts && pass < 8; pass++) {
+        const before = pruned + contracted + joined;
+        // A contact point just outside snap of one of triA's corners can still lie within snap of BOTH sides that meet
+        // there (at 45 degrees, anything up to 2.6 x snap from the corner): both sides split at it and the corner is
+        // left with one edge. Measured at a face tilted 1e-9 (1.4e-9 from the corner). That edge is contracted into
+        // the corner -- the corner stays where it is, every neighbour of the point is joined to it -- and counted.
+        for (let v = 0; v < 3; v++) {
+            if (adj[v].size !== 1) continue;
+            const u = [...adj[v]][0];
+            if (u < 3 || Math.hypot(V2[u][0] - V2[v][0], V2[u][1] - V2[v][1]) > 4 * snap) continue;
+            for (const x of adj[u]) {
+                adj[x].delete(u);
+                if (x !== v) { adj[x].add(v); adj[v].add(x); plainKey.add(x + "," + v); plainKey.add(v + "," + x); }
+            }
+            adj[u].clear(); contracted++;
+        }
+        let again = true;
+        while (again) {
+            again = false;
+            for (let v = 0; v < V2.length; v++) {
+                if (adj[v].size !== 1) continue;
+                const w = [...adj[v]][0];
+                if (!touchKey.has(v + "," + w) || plainKey.has(v + "," + w)) continue;
+                adj[v].delete(w); adj[w].delete(v); pruned++; again = true;
+            }
+        }
+        // A crossing chain that ends just short of triA's boundary: at a near-coincidence (a copy of the mesh rotated
+        // 1e-8 -- every edge 1e-9..1e-8 from its twin) one triangle's side is snapped whole into the other's plane
+        // while the twin's crossing points stay a few 1e-9 off it, and the chain stops 5e-9 short of a corner. An end
+        // within JOIN x snap of the boundary is joined to it -- contracted into the corner, or moved onto the side --
+        // and the distance moved is recorded (stats.joined, stats.joinedMax).
+        for (let v = 3; v < V2.length; v++) {
+            if (adj[v].size !== 1) continue;
+            // a corner within JOIN x snap first (a point that near a corner is near both its sides); then the nearest side
+            // within the join; then a corner within it. Round 16d: with the twin join wider than JOIN, the end that is
+            // 1.1e-7 from a corner but 5e-8 from a side goes onto the side -- contracted into the corner, the point slides
+            // 1e-7 and the outline no longer closes ('outer face', measured at a join of 128 snaps)
+            let best = null;
+            const corner = (lim) => { for (let k = 0; k < 3; k++) {
+                const dc = Math.hypot(V2[v][0] - V2[k][0], V2[v][1] - V2[k][1]);
+                if (dc <= lim && (!best || dc < best.d)) best = { d: dc, corner: k };
+            } };
+            corner(JOIN * snap);
+            if (!best) for (let k = 0; k < 3; k++) {
+                const r = segDist(V2[v], V2[k], V2[(k + 1) % 3]);
+                if (r.d <= join && r.t > 0 && r.t < 1 && (!best || r.d < best.d)) best = { d: r.d, side: k, t: r.t };
+            }
+            if (!best) corner(join);
+            if (!best) continue;
+            joined++; joinedMax = Math.max(joinedMax, best.d);
+            if (best.corner !== undefined) {
+                const c = best.corner;
+                for (const x of adj[v]) { adj[x].delete(v); if (x !== c) { adj[x].add(c); adj[c].add(x); plainKey.add(x + "," + c); plainKey.add(c + "," + x); } }
+                adj[v].clear();
                 continue;
             }
-            const q = shared === a ? b : a, r = shared === c ? d : c, P = V[shared].p2;
-            const ox = V[q].p2[0] - P[0], oy = V[q].p2[1] - P[1], qx = V[r].p2[0] - P[0], qy = V[r].p2[1] - P[1];
-            if (Math.abs(ox * qy - oy * qx) <= TOL * Math.max(Math.hypot(ox, oy), Math.hypot(qx, qy)) &&
-                ox * qx + oy * qy > 0) return "overlap";
+            // move v onto side k and splice it into whichever piece of that side it now lies on
+            const k = best.side, P = V2[k], Q = V2[(k + 1) % 3], t = best.t;
+            V2[v] = [P[0] + (Q[0] - P[0]) * t, P[1] + (Q[1] - P[1]) * t];
+            const P3 = V3[k], Q3 = V3[(k + 1) % 3];
+            V3[v] = [P3[0] + (Q3[0] - P3[0]) * t, P3[1] + (Q3[1] - P3[1]) * t, P3[2] + (Q3[2] - P3[2]) * t];
+            for (let p = 0; p < V2.length; p++) for (const q of adj[p]) {
+                if (p === v || q === v) continue;
+                const r = segDist(V2[v], V2[p], V2[q]);
+                if (r.d <= snap && r.t > 0 && r.t < 1 && segDist(V2[p], P, Q).d <= snap && segDist(V2[q], P, Q).d <= snap) {
+                    adj[p].delete(q); adj[q].delete(p);
+                    for (const x of [p, q]) { adj[x].add(v); adj[v].add(x); plainKey.add(x + "," + v); plainKey.add(v + "," + x); }
+                    p = V2.length; break;
+                }
+            }
         }
+        if (pruned + contracted + joined === before) break;
     }
-    return null;
-}
+    for (let v = 0; v < V2.length; v++) if (adj[v].size === 1) {
+        if (opts.debug) return refuse("dangling", { v, V3, kind, edges: [...adj.entries()].map(([i, st]) => [i, [...st]]), touch, edgesRaw: edges });
+        return refuse("dangling");
+    }
 
-// ---- THE FRONT DOOR (round 9, on v4778's BVH-CSG pattern) -------------------------------------------------------
-//
-// v4778 gave the six BVH-CSG modules before this one a no-argument reportLines() that runs their own gate's
-// hand-checkable fixtures, so instrument-bench.html can serve them (physics/instruments.mjs). This is the same
-// split: the gate's own right triangle A = (0,0,0),(10,0,0),(0,10,0), area 50, against closed prisms over axis-aligned
-// squares, whose face areas need no code. A REPORT, NOT A VERDICT -- triArrangement-selfcheck.mjs is what exits nonzero.
-export function reportLines() {
-    const buf = (tris) => new Float64Array(tris.flat(2));
-    const prism = (x0, y0, x1, y1) => {
-        const c = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]], T = [];
-        for (let i = 0; i < 4; i++) {
-            const [ax, ay] = c[i], [bx, by] = c[(i + 1) % 4];
-            T.push([[ax, ay, -1], [bx, by, -1], [bx, by, 1]], [[ax, ay, -1], [bx, by, 1], [ax, ay, 1]]);
+    // ---- 6. faces: next(u->v) = v->w, w the neighbour of v clockwise-next after u; faces lie to the left --------
+    const order = adj.map((s, v) => [...s].sort((p, q) =>
+        Math.atan2(V2[p][1] - V2[v][1], V2[p][0] - V2[v][0]) - Math.atan2(V2[q][1] - V2[v][1], V2[q][0] - V2[v][0])));
+    const used = new Set();
+    const cycles = [];
+    let halfEdges = 0;
+    for (let u = 0; u < V2.length; u++) for (const v of order[u]) {
+        halfEdges++;
+        if (used.has(u + "," + v)) continue;
+        const cyc = [];
+        let a = u, b = v, guard = 0;
+        while (!used.has(a + "," + b)) {
+            used.add(a + "," + b);
+            cyc.push(a);
+            const nb = order[b], i = nb.indexOf(a);
+            const w = nb[(i - 1 + nb.length) % nb.length];
+            a = b; b = w;
+            if (++guard > 4 * halfEdges + 16 * V2.length) return refuse("face walk");
         }
-        T.push([[x0, y0, -1], [x1, y1, -1], [x1, y0, -1]], [[x0, y0, -1], [x0, y1, -1], [x1, y1, -1]]);
-        T.push([[x0, y0, 1], [x1, y0, 1], [x1, y1, 1]], [[x0, y0, 1], [x1, y1, 1], [x0, y1, 1]]);
-        return T;
-    };
-    const A = buf([[[0, 0, 0], [10, 0, 0], [0, 10, 0]]]);
-    const fmt = (a) => a >= 1e-3 ? String(+a.toFixed(9)) : a.toExponential(3);
-    const out = ["[triArrangement] one triangle of A cut along the segments where mesh B actually crosses it",
-                 "  A = (0,0,0),(10,0,0),(0,10,0), area 50; B = closed prisms over squares, z from -1 to 1:"];
-    for (const [label, T, hand] of [
-        ["a 1x1 square hole, [2,3]^2", prism(2, 2, 3, 3), "1, 49"],
-        ["nested squares, [1,4]^2 around [2,3]^2", [...prism(1, 1, 4, 4), ...prism(2, 2, 3, 3)], "1, 8, 41"],
-        ["a square across A's edge x=0, [-1,1]x[4,5]", prism(-1, 4, 1, 5), "1, 49"],
-        ["a square 2e-7 across, at (2,2)", prism(2, 2, 2 + 2e-7, 2 + 2e-7), "4e-14 and the rest"],
-    ]) {
-        const r = arrangeTriangle(A, 0, buf(T), T.map((_, i) => i));
-        out.push("    " + label.padEnd(44) + (r.ok ? "faces " + r.faces.map((f) => f.area).sort((x, y) => x - y).map(fmt).join(", ") +
-                 "   by hand " + hand + "   (" + r.segments + " segments)" : "REFUSED: " + r.reason));
+        if (a !== u || b !== v) return refuse("face walk");
+        cycles.push({ vs: cyc, area: area2(cyc.map((i) => V2[i])) });
     }
-    const flat = arrangeTriangle(A, 0, buf([[[1, 1, 0], [3, 1, 0], [1, 3, 0]]]), [0]);
-    out.push("    " + "a B-triangle lying in A's own plane".padEnd(44) + (flat.ok ? "ACCEPTED" : "refused: " + flat.reason));
-    out.push("  It never computes a vertex, and a refusal sends the triangle back to meshBoolean.mjs's plane-cut path");
-    return out;
+
+    // components, so a hole is never assigned to a face of its own component
+    const comp = V2.map((_, i) => i);
+    const find = (i) => { while (comp[i] !== i) { comp[i] = comp[comp[i]]; i = comp[i]; } return i; };
+    for (let v = 0; v < V2.length; v++) for (const w of adj[v]) comp[find(v)] = find(w);
+
+    // Area tolerances are snap x perimeter: every vertex may sit up to snap from where exact arithmetic would put it
+    // (a segment end on triA's side, a vertex absorbed into a straight run), and moving a polygon's vertices by d
+    // moves its area by at most d x its perimeter. A tolerance relative to area alone refused a triangle whose
+    // segment end lay 1e-10 off its side: outer cycle -0.024136561511 against triA 0.024136561575 (chain shot 6).
+    const perim = (c) => c.vs.reduce((s, v, i) => { const w = c.vs[(i + 1) % c.vs.length];
+        return s + Math.hypot(V2[w][0] - V2[v][0], V2[w][1] - V2[v][1]); }, 0);
+    const tolA = snap * perim({ vs: [0, 1, 2] }) + AREA_REL * areaT;
+    // A cycle is degenerate when it is thinner than the snap distance -- |area| <= snap x perimeter -- not when it
+    // is small against triA: a spike tip grazing a wall face encloses a genuine loop of area ~1e-9 (measured, n=64).
+    const isThin = (c) => Math.abs(c.area) <= snap * perim(c);
+    const thin = cycles.filter(isThin);
+    // Round 12 (contacts): a cycle thinner than snap is below what the arrangement resolves -- two contacts 1e-9 to
+    // 2e-9 apart (a face tilted just past CONTACT_EPS) enclose one -- so it is DROPPED, counted, not refused: its area
+    // is at most snap x its perimeter, inside the face-sum tolerance below. The outside is never thin (triA is not).
+    if (thin.length && !opts.contacts) return refuse("zero-area cycle", { thin: thin.length });
+    const live = opts.contacts ? cycles.filter((c) => !isThin(c)) : cycles;
+    const droppedThin = cycles.length - live.length;
+    const pos = live.filter((c) => c.area > 0);
+    const neg = live.filter((c) => c.area < 0);
+    // the outer face: the one negative cycle around triA's own boundary, of area -area(triA)
+    const outerIdx = neg.findIndex((c) => c.vs.includes(0));
+    if (outerIdx < 0 || Math.abs(neg[outerIdx].area + areaT) > tolA) return refuse("outer face");
+    const holes = neg.filter((_, i) => i !== outerIdx);
+    const faces = pos.map((c) => ({ ...c, comp: find(c.vs[0]), holes: [] }));
+    for (const h of holes) {
+        const hc = find(h.vs[0]), q = V2[h.vs[0]];
+        let best = null;
+        for (const f of faces) {
+            if (f.comp === hc) continue;
+            if (!pointInPoly(q, f.vs.map((i) => V2[i]))) continue;
+            if (!best || f.area < best.area) best = f;
+        }
+        if (!best) return refuse("hole unassigned");
+        best.holes.push(h);
+    }
+    let sum = 0;
+    for (const f of faces) sum += f.area + f.holes.reduce((s, h) => s + h.area, 0);
+    if (Math.abs(sum - areaT) > tolA) return refuse("face area sum", { sum, areaT });
+
+    // ---- 7. triangulate each face (vendored three.js Earcut, holes supported), wound like triA ------------------
+    // Vertices on triA's own straight sides (and on any straight run of segments) are collinear only to rounding,
+    // and Earcut cuts ears between them: slivers of area ~1e-17..1e-21, measured on a twelve-blast chain, whose
+    // normals are noise to everything downstream. So each ring is SIMPLIFIED first -- a vertex goes if it, and
+    // every vertex already absorbed beside it, lies within snap of the segment joining its surviving neighbours --
+    // Earcut sees only the corners, and each absorbed run is put back by fanning the one triangle that owns that
+    // edge from its opposite vertex. Every vertex comes back, so the face still meets its neighbours edge for edge.
+    const out = [];
+    let absorbedTotal = 0, onConflicts = 0, splitEdges = 0, flatEars = 0;
+    for (const f of faces) {
+        const want = f.area + f.holes.reduce((s, h) => s + h.area, 0);
+        const absorbed = new Map();          // "p,q" (a surviving ring edge) -> the vertices strictly between, in order
+        const rings = [];
+        for (const vs of [f.vs, ...f.holes.map((h) => h.vs)]) {
+            const n = vs.length, alive = vs.map(() => true);
+            const nx = vs.map((_, i) => (i + 1) % n), pv = vs.map((_, i) => (i - 1 + n) % n);
+            const abs = vs.map(() => []);    // abs[i]: vertices absorbed between node i and nx[i]
+            let live = n, changed = true;
+            while (changed && live > 3) {
+                changed = false;
+                for (let i = 0; i < n && live > 3; i++) {
+                    if (!alive[i]) continue;
+                    const a = pv[i], b = nx[i];
+                    const run = [...abs[a], vs[i], ...abs[i]];
+                    if (!run.every((v) => { const r = segDist(V2[v], V2[vs[a]], V2[vs[b]]); return r.d <= snap && r.t > 0 && r.t < 1; })) continue;
+                    alive[i] = false; live--; changed = true;
+                    abs[a] = run; nx[a] = b; pv[b] = a;
+                }
+            }
+            if (live < 3) return refuse("thin face");
+            const ring = [];
+            for (let i = 0; i < n; i++) if (alive[i]) {
+                ring.push(vs[i]);
+                if (abs[i].length) { absorbed.set(vs[i] + "," + vs[nx[i]], abs[i]); absorbedTotal += abs[i].length; }
+            }
+            rings.push(ring);
+        }
+        const flat = rings.flat();
+        const idx = ShapeUtils.triangulateShape(rings[0].map((i) => new Vector2(V2[i][0], V2[i][1])),
+            rings.slice(1).map((r) => r.map((i) => new Vector2(V2[i][0], V2[i][1]))));
+        let T3 = [];
+        let got = 0;
+        const flatTris = [];
+        for (const [i, j, k] of idx) {
+            const a = flat[i];
+            let b = flat[j], c = flat[k];
+            let ar = triArea2(V2[a], V2[b], V2[c]);
+            if (ar < 0) { [b, c] = [c, b]; ar = -ar; }
+            if (ar === 0) { if (opts.flatEars === false) return refuse("earcut", { zeroArea: true }); flatTris.push([a, b, c]); continue; }
+            got += ar;
+            T3.push([a, b, c]);
+        }
+        // BVH-CSG round 19b: Earcut can join three EXACTLY collinear ring vertices into a triangle of zero area -- a hole's
+        // edge pointing straight at a vertex of the outer ring (the page's workload: a blob's edge on the line of an
+        // earlier seam; round 19's soak, 44 edges opened by the refusal). Refused, the whole triangle went to the plane
+        // path. The flat triangle (p, m, q), m strictly between p and q, covers nothing: it goes, and the triangle across
+        // its long edge p-q is split at m, fanned from its opposite corner -- both pieces positive, every edge paired
+        // again, the face's area unchanged. With nothing across p-q it is refused as before.
+        for (const [x, y, z] of flatTris) {
+            const P = [x, y, z], d2 = (u, v) => (V2[u][0] - V2[v][0]) ** 2 + (V2[u][1] - V2[v][1]) ** 2;
+            let mi = 0, best = -1;   // the middle vertex: opposite the longest side
+            for (let k = 0; k < 3; k++) { const L = d2(P[(k + 1) % 3], P[(k + 2) % 3]); if (L > best) { best = L; mi = k; } }
+            const m = P[mi], p0 = P[(mi + 1) % 3], q0 = P[(mi + 2) % 3];
+            let hit = -1, e = -1;
+            for (let ti = 0; ti < T3.length && hit < 0; ti++) for (let k = 0; k < 3; k++) {
+                const u = T3[ti][k], v = T3[ti][(k + 1) % 3];
+                if ((u === p0 && v === q0) || (u === q0 && v === p0)) { hit = ti; e = k; break; }
+            }
+            if (hit < 0 || !(best > 0)) return refuse("earcut", { zeroArea: true });
+            const u = T3[hit][e], v = T3[hit][(e + 1) % 3], r = T3[hit][(e + 2) % 3];
+            if (!(triArea2(V2[u], V2[m], V2[r]) > 0 && triArea2(V2[m], V2[v], V2[r]) > 0)) return refuse("earcut", { zeroArea: true });
+            T3.splice(hit, 1, [u, m, r], [m, v, r]);
+            flatEars++;
+        }
+        // the triangles must still tile the face: summed again after the repair, so the check below holds it too
+        if (flatTris.length) { got = 0; for (const [a, b, c] of T3) got += triArea2(V2[a], V2[b], V2[c]); }
+        const tolF = snap * (perim(f) + f.holes.reduce((s, h) => s + perim(h), 0)) + AREA_REL * areaT;
+        if (T3.length === 0 || Math.abs(got - want) > tolF) return refuse("earcut", { got, want });
+        // Round 13 (contacts): Earcut can run ONE triangle edge straight through other face vertices lying on its line
+        // -- a hole whose edge is collinear with a stretch of the outer ring: destructible.html's workload, a blob
+        // edge on the same line as a wall seam -- and the ring edge those vertices bound is then in no triangle
+        // ("lost edge", 2 of the page's 23 test chains). Such an edge is split at every face vertex on it, the
+        // triangle fanned from its opposite corner, until none is left. Every piece keeps positive area.
+        if (opts.contacts) {
+            const faceV = [...new Set(flat)];
+            // only Earcut's own diagonals: a RING edge is the face's boundary as simplified, and the absorbed run it
+            // carries is put back below -- splitting one of those at a surviving vertex within snap of it made the
+            // fan-back lose it (6 more fallbacks on the rotated-copy family before this was restricted)
+            const ringEdge = new Set();
+            for (const r of rings) for (let m = 0; m < r.length; m++) { const u = r[m], v = r[(m + 1) % r.length]; ringEdge.add(u + "," + v); ringEdge.add(v + "," + u); }
+            for (let pass = 0, again = true; again && pass < 16; pass++) {
+                again = false;
+                for (let ti = 0; ti < T3.length && !again; ti++) for (let k = 0; k < 3 && !again; k++) {
+                    const a = T3[ti][k], b = T3[ti][(k + 1) % 3], c = T3[ti][(k + 2) % 3];
+                    if (ringEdge.has(a + "," + b)) continue;
+                    const on = [];
+                    for (const v of faceV) {
+                        if (v === a || v === b || v === c) continue;
+                        const r = segDist(V2[v], V2[a], V2[b]);
+                        if (r.d <= snap && r.t > 0 && r.t < 1) on.push([r.t, v]);
+                    }
+                    if (!on.length) continue;
+                    on.sort((x, y) => x[0] - y[0]);
+                    const chain = [a, ...on.map((x) => x[1]), b], fan = [];
+                    for (let m = 0; m + 1 < chain.length; m++) fan.push([chain[m], chain[m + 1], c]);
+                    T3.splice(ti, 1, ...fan);
+                    splitEdges++; again = true;
+                }
+            }
+        }
+        // put each absorbed run back: the triangle holding directed ring edge p->q becomes a fan from its third vertex
+        for (const [key, run] of absorbed) {
+            const [p, q] = key.split(",").map(Number);
+            let hit = -1, e = -1;
+            for (let ti = 0; ti < T3.length && hit < 0; ti++) for (let k = 0; k < 3; k++) {
+                if (T3[ti][k] === p && T3[ti][(k + 1) % 3] === q) { hit = ti; e = k; break; }
+            }
+            if (hit < 0) return refuse("lost edge", opts.debug ? { p, q, run, rings, T3, V2, face: f.vs, holes: f.holes.map((h) => h.vs) } : {});
+            const r = T3[hit][(e + 2) % 3], chain = [p, ...run, q], fan = [];
+            for (let k = 0; k + 1 < chain.length; k++) fan.push([chain[k], chain[k + 1], r]);
+            T3.splice(hit, 1, ...fan);
+        }
+        const usedV = new Set(T3.flat());
+        for (const v of [f.vs, ...f.holes.map((h) => h.vs)].flat()) if (!usedV.has(v)) return refuse("dropped vertex");
+        let best = 0, bestA = -Infinity;
+        for (let ti = 0; ti < T3.length; ti++) {
+            const ar = triArea2(V2[T3[ti][0]], V2[T3[ti][1]], V2[T3[ti][2]]);
+            if (ar > bestA) { bestA = ar; best = ti; }
+        }
+        const tris = T3.map(([a, b, c]) => [V3[a], V3[b], V3[c]]);
+        const t = tris[best];
+        const sample = [(t[0][0] + t[1][0] + t[2][0]) / 3, (t[0][1] + t[1][1] + t[2][1]) / 3, (t[0][2] + t[1][2] + t[2][2]) / 3];
+        // round 12: is the face ON a coplanar B-triangle? Its sample is interior to the face, and the face is bounded
+        // by that triangle's edges, so it is either well inside the triangle's projection or well outside it.
+        let on = 0;
+        if (coplanar.length) {
+            const q = to2(sample);
+            for (const c of coplanar) {
+                const Q2 = c.U.map(to2);
+                // INCLUSIVE: a sample on the edge two coplanar B-triangles share (a box face's diagonal) is on both --
+                // they face the same way. The rim of B's coplanar region is always a face boundary, never under a sample.
+                const s0 = triArea2(Q2[0], Q2[1], q), s1 = triArea2(Q2[1], Q2[2], q), s2 = triArea2(Q2[2], Q2[0], q);
+                const e = snap * Math.max(Math.hypot(Q2[1][0] - Q2[0][0], Q2[1][1] - Q2[0][1]), Math.hypot(Q2[2][0] - Q2[1][0], Q2[2][1] - Q2[1][1]), Math.hypot(Q2[0][0] - Q2[2][0], Q2[0][1] - Q2[2][1]));
+                if ((s0 >= -e && s1 >= -e && s2 >= -e) || (s0 <= e && s1 <= e && s2 <= e)) {
+                    if (on && on !== c.orient) onConflicts++;
+                    on = on || c.orient;
+                }
+            }
+        }
+        out.push({ tris, sample, area: want, holes: f.holes.length, on });
+    }
+    // round 12: the vertices on each of triA's sides, for meshBoolean's edge-conformity pass
+    const sideVerts = [0, 1, 2].map((k) => V2.map((q, v) => v).filter((v) => {
+        if (v < 3 || adj[v].size === 0) return false;
+        const r = segDist(V2[v], V2[k], V2[(k + 1) % 3]);
+        return r.d <= snap && r.t > 0 && r.t < 1;
+    }).map((v) => V3[v]));
+    return {
+        status: "ok",
+        faces: out,
+        sideVerts,
+        stats: { segments: segs.length, vertices: V2.length, crossings, pointContacts, absorbed: absorbedTotal,
+                 faceCount: out.length, holeCount: holes.length, coplanar: coplanar.length, contactSegs,
+                 pruned, contracted, joined, joinedMax, twinCrossed, onConflicts, droppedThin, splitEdges, flatEars },
+    };
 }

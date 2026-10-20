@@ -65,9 +65,50 @@
 "use strict";
 
 import { MeshBVH } from "../../mesh/meshBVH.mjs";
+import { pointInMesh } from "./meshPointClassify.mjs";
 
-/** Plane classification epsilon. A vertex within EPS of a plane is ON it, not in front or behind. */
-export const EPS = 1e-5;
+/**
+ * Plane classification epsilon. A vertex within EPS of a plane is ON it, not in front or behind.
+ *
+ * *** 1e-8 SINCE ROUND 10 OF THE BVH-CSG ARC (it was 1e-5). *** EPS is a LENGTH: a vertex up to EPS from a plane is
+ * rounded onto it, so a cutter that penetrates a face by d < EPS is cut as if flush and the volume is off by
+ * (contact area) x d. At 1e-5 that was the cause of the twelve-blast cracks this file's gate had carried as "cause
+ * unknown", and of a drift nobody had attributed. Every row below changes ONLY EPS, on copies of this file; the
+ * reference is the arrangement path (physics/mesh/triArrangement.mjs) at 1000x scale, which meshBooleanBlast-
+ * selfcheck section 3 licenses:
+ *                                     1e-5        1e-6        1e-7        1e-8        1e-9
+ *   twelve blasts, subdiv 8   error   5.71e-9     1.75e-12    1.75e-12    1.75e-12    1.75e-12  (fixture floor)
+ *                             open    15          0           0           0           0         (after settle)
+ *   one blast, subdiv 64      error   4.1e-9      4.8e-10     3.9e-14     3.9e-14     4.0e-14
+ *                             open    125         29          2           2           4
+ *   one blast, subdiv 128     error   5.6e-7      5.7e-8      6.1e-12     8.5e-14     8.5e-14
+ *                             open    1,078       116         5           0           2
+ *   twelve blasts, splits             37,708      37,726      37,727      37,727      37,806
+ * ("open" = watertight()'s unmatched edges after settle(); on the chain they are the same 15 the gate's uncovered-
+ * edge census counts as cracks, on the single blasts they are not yet split into cracks and T-junctions.)
+ * THE ERROR IS A FUNCTION OF EPS OVER FEATURE SIZE: 1e-5 at 1x and 1e-8 at 0.001x both read exactly 5.71e-9, and
+ * a subdiv-128 blob's facets are sixteen times finer than subdiv 8's -- so a constant that is enough for the coarse
+ * chain (1e-6 was: the BVH-CSG arc's round-9 notes proposed it from that chain alone) is 10x short at subdiv 128.
+ * 1e-8 is the largest value at the floor with the fewest open edges on every workload; 1e-9 is where rounding noise
+ * starts (79 extra splits on the chain and more open edges at 64 and 128), identically with the wall at the origin,
+ * at (1000, -2000, 500) and at (1e5, 5e4, -2e4) -- so the margin to the noise is a decade, and it does not shrink
+ * with world position. It does with model SCALE: below ~1e-3 scale 1e-8 is again large against the geometry, and
+ * a relative EPS is the arc's round-11 subject. Across destructible.html's own slider range (radius 0.2-1.4,
+ * facets 4-14, jaggedness 0.6-0.9, twelve shots) open edges went 608 -> 68 and the worst EPS-limited drift 4.7e-8 ->
+ * 1.3e-11; what remained there was NOT EPS but blast()'s localisation, fixed at round 10b (subtractLocal()).
+ * NEAR-FLUSH CONTACTS DID NOT REOPEN, the risk named before the change: the eight degenerate-contact fixtures of the
+ * gate's section 9, each shifted by +-1e-9..2e-5 along each axis (432 cases, exact interval-overlap oracle): off by
+ * more than 1e-9 went 80 -> 22, the worst 2.4e-4 -> 4.8e-7 (both exactly 48 x d, the wall's top rounded flush),
+ * and no case got worse. A shift beyond EPS is exact (4.3e-14). Gate section 10.
+ * *** WHAT NO CONSTANT FIXES: TWO NEARLY PARALLEL FACES ~EPS APART. *** Each mesh measures the other against ITS OWN
+ * plane, so a vertex of B can sit just beyond EPS of A's plane while the matching vertex of A sits just within EPS
+ * of B's (tilted) plane: B's piece is FRONT, A's is COPLANAR, each is outside the other, and the cap between them
+ * is lost -- 0.1..0.2 units of volume on a unit fixture. At 1e-5 a cutter whose top face is tilted by exactly
+ * 1e-5 about the wall's top edge line lost it (0.2); at 1e-8 that geometry is exact, and the hazard sits in a
+ * band a few ulps wide near slope 2e-8 about an off-centre axis (4 of 601 slopes within 3e-7 relative). It moves
+ * with EPS and narrows; it is not removed. Pinned in the gate's section 10, not claimed fixed.
+ */
+export const EPS = 1e-8;
 
 const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const cross3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
@@ -90,7 +131,8 @@ const COPLANAR = 0, FRONT = 1, BACK = 2, SPANNING = 3;
  * end up with no partner and NO COVERAGE either -- a real hole, not a T-junction, and tolerance-insensitive
  * (identical at weld tolerances from 1e-9 to 1e-7, and worse if loosened). This counter is what let that be
  * attributed rather than guessed at, and it is exported so the gate can assert the rate rather than the
- * absence.
+ * absence. (Round 10 of the BVH-CSG arc: the counter read 0 drops all along; the 20 edges were EPS=1e-5's
+ * rounding, and at 1e-8 they are 0 -- see EPS above.)
  */
 export const SPLIT_STATS = { splits: 0, dropped: 0 };
 export const resetSplitStats = () => { SPLIT_STATS.splits = 0; SPLIT_STATS.dropped = 0; };
@@ -129,8 +171,8 @@ export function splitPolygon(pl, poly, coplanarFront, coplanarBack, front, back)
     // A split can leave a 2-vertex sliver when the polygon only grazes the plane; those are not polygons.
     SPLIT_STATS.splits++;
     // The tag rides along: a fragment of A's surface is still A's surface, however many times it was split.
-    if (fv.length >= 3) front.push({ vs: fv, pl: poly.pl, src: poly.src }); else SPLIT_STATS.dropped++;
-    if (bv.length >= 3) back.push({ vs: bv, pl: poly.pl, src: poly.src }); else SPLIT_STATS.dropped++;
+    if (fv.length >= 3) front.push({ vs: fv, pl: poly.pl, src: poly.src, cop: poly.cop }); else SPLIT_STATS.dropped++;
+    if (bv.length >= 3) back.push({ vs: bv, pl: poly.pl, src: poly.src, cop: poly.cop }); else SPLIT_STATS.dropped++;
 }
 
 /** A BSP node: a splitting plane, the polygons ON it, and the two subtrees. */
@@ -198,16 +240,26 @@ const clonePolys = (ps) => ps.map((p) => ({ vs: p.vs.map((v) => v.slice()), pl: 
  * no texture coordinates, because nothing unwrapped a surface that had not been made yet.
  *
  * Tagging costs one string per polygon and is checkable by construction: every polygon tagged CUT must lie
- * on one of B's planes, and no polygon tagged SKIN may.
+ * on one of B's planes, and no polygon tagged SKIN may. Over a CHAIN of blasts, "B" is every blob so far: A's
+ * polygons keep the tag they arrived with (keepTag), so a face cut by shot 1 is still CUT after shot 2 splits it.
  */
 export const SKIN = "skin";      // came from A: the surface that was always on the outside
 export const CUT  = "cut";       // came from B: the face the boolean created
 
 const tag = (ps, src) => ps.map((p) => ({ ...p, src }));
+// A's side KEEPS a tag it already has. A wall that has been blasted before carries CUT faces from earlier shots, and
+// re-tagging it SKIN wholesale (as subtract() and subtractLocal() did until BVH-CSG round 13) turned every earlier cut
+// face near the new blast back into skin: after a second overlapping blast, 953 polygons with 3.85 units of area, all
+// lying on the first blob's surface, came back SKIN. A polygon with no tag is original surface.
+const keepTag = (ps) => ps.map((p) => ({ ...p, src: p.src ?? SKIN }));
+// ...and a far polygon that passes through untouched is tagged too, if it has no tag yet -- copied only then, so from a
+// wall's second shot on nothing is copied. Before round 13 an untagged original face stayed untagged through blast(),
+// and a caller filtering `p.src === SKIN` (uvUnwrap's `only`) did not see it.
+const bareSkin = (ps) => ps.map((p) => (p.src ? p : { ...p, src: SKIN }));
 
 /** A - B. The polygons of A that lie outside B, plus the polygons of B that lie inside A, facing inward. */
 export function subtract(A, B) {
-    const a = new Node(clonePolys(tag(A, SKIN))), b = new Node(clonePolys(tag(B, CUT)));
+    const a = new Node(clonePolys(keepTag(A))), b = new Node(clonePolys(tag(B, CUT)));
     a.invert(); a.clipTo(b); b.clipTo(a); b.invert(); b.clipTo(a); b.invert();
     a.build(b.allPolygons()); a.invert();
     return a.allPolygons();
@@ -326,12 +378,14 @@ export function mergeCoplanar(polys, { quantum = 1e-6, maxRounds = 8 } = {}) {
     const convexAt = (u, v, w, n) => dot3(cross3(sub3(v, u), sub3(w, v)), n) >= -1e-9;
     const collinear = (u, v, w) => Math.hypot(...cross3(sub3(v, u), sub3(w, v))) < 1e-9;
 
-    let cur = polys.map((p) => ({ vs: p.vs.slice(), pl: p.pl }));
+    let cur = polys.map((p) => ({ vs: p.vs.slice(), pl: p.pl, src: p.src }));
     let merged = 0;
     for (let round = 0; round < maxRounds; round++) {
         const groups = new Map();
         cur.forEach((p, i) => {
-            const k = planeKey(p.pl);
+            // BVH-CSG round 13: by tag as well -- a SKIN face and a CUT face are never one polygon (they are not
+            // coplanar-adjacent on any blast this tree makes, and if they were, which tag would the merge carry?)
+            const k = planeKey(p.pl) + "|" + p.src;
             if (!groups.has(k)) groups.set(k, []);
             groups.get(k).push(i);
         });
@@ -393,7 +447,7 @@ export function mergeCoplanar(polys, { quantum = 1e-6, maxRounds = 8 } = {}) {
                         });
                         if (cleaned.length < 3) continue;
                         dead.add(i); dead.add(j);
-                        out.push({ vs: cleaned, pl: P.pl });
+                        out.push({ vs: cleaned, pl: P.pl, src: P.src });
                         merged++; did++; done = true;
                         break;
                     }
@@ -452,7 +506,7 @@ export function snapVertices(polys, { tol = 1e-9 } = {}) {
             vs.push(r);
         }
         while (vs.length > 1 && vs[0][0] === vs[vs.length - 1][0] && vs[0][1] === vs[vs.length - 1][1] && vs[0][2] === vs[vs.length - 1][2]) vs.pop();
-        return { vs, pl: p.pl };
+        return { vs, pl: p.pl, src: p.src };
     }).filter((p) => p.vs.length >= 3);
     return { polys: out, moved, vertices: reps.length };
 }
@@ -474,8 +528,9 @@ export function snapVertices(polys, { tol = 1e-9 } = {}) {
  * mergeCoplanar MAKES THIS WORSE, from 24.8% to 55.8%, because a merged face has long edges that its
  * neighbours are still subdivided against. So the order is snap -> merge -> weld, and weld is last.
  *
- * *** ON ONE BLAST THIS REACHES 100.0%: EVERY EDGE MATCHED, ZERO T-JUNCTIONS, ZERO GAPS. OVER TWELVE IT DOES
- * NOT, AND THE REASON IS NOT KNOWN. *** 15 of 12,847 directed edges (0.12%) survive settle() on a wall that
+ * *** ON ONE BLAST THIS REACHES 100.0%: EVERY EDGE MATCHED, ZERO T-JUNCTIONS, ZERO GAPS. OVER TWELVE IT DID
+ * NOT, AND THE REASON WAS NOT KNOWN UNTIL ROUND 10 OF THE BVH-CSG ARC: IT WAS EPS. *** (What follows is the record
+ * as it stood at EPS=1e-5, kept because the three refutations are still true.) 15 of 12,847 directed edges (0.12%) survive settle() on a wall that
  * has taken twelve overlapping blasts, and they are UNCOVERED -- real cracks, not T-junctions. Three
  * explanations were proposed and all three were MEASURED AND REFUTED:
  *
@@ -491,23 +546,48 @@ export function snapVertices(polys, { tol = 1e-9 } = {}) {
  * merge and weld, and A - B plus A AND B reconstruct A to 9.7e-14. So the solid is right and a hairline of
  * its surface is not sewn. That is written down as an open limit with its measurements rather than rounded
  * off, because a gate that asserted "watertight" here would be asserting something false.
+ *
+ * *** ROUND 10: THE FOURTH EXPLANATION, MEASURED TRUE. *** EPS -- a vertex within 1e-5 of a plane was rounded
+ * onto it. The chain rerun on a copy with ONLY EPS changed: 1e-5 -> 15 uncovered after settle (20 in the
+ * weld-only census above), 1e-6 / 1e-7 / 1e-8 / 1e-9 -> 0 and 0. EPS is 1e-8 (the finer blobs decided that --
+ * see EPS) and the gate asserts zero. The
+ * volume moved with it, from 20.112588161 to 20.112588046 (1.15e-7), onto the 1000x reference to 1.75e-12
+ * relative, where 20.112588161 had been 5.71e-9 off it: "to the last digit across snap, merge and weld" was
+ * true, and was a statement about those three passes, not about the cut.
+ */
+/*
+ * *** ROUND 10B: THE WELD PROJECTS WHAT IT INSERTS, AND MOVES THE VERTEX TO MATCH. *** It used to insert a vertex v
+ * found within `tol` (1e-7) of an edge at v's OWN position. Round 10 put EPS at 1e-8, below that tolerance, and the
+ * BSP now leaves vertices a few 1e-9 off a neighbour's edge line that it used to round onto the plane: inserted as
+ * they stood, they dented the receiving polygon, and the fan triangulator below is only correct on convex polygons.
+ * Measured before the change: after settle(), a reflex vertex on 2 of 25 random eight-shot walls with round 10's own
+ * blast() (dent up to 6.7e-9), 0 of 25 at EPS 1e-5..1e-7 -- a round-10 regression that its gate's chain happened to
+ * miss -- and 1 of 50 with round 10b's blast() at 1e-7 and at 1e-8 alike, so moving EPS back was no cure. Lowering
+ * the weld tolerance traded the dents for open edges (at 3e-9: 0 reflex, unmatched 2 -> 4 over 25 walls, 0 -> 3 on
+ * the gate's chain). So v is now inserted AT ITS PROJECTION onto the edge, and moved there in every polygon that
+ * uses it: nothing dents, nothing opens. Over the same 26 walls: reflex 2 -> 0, unmatched unchanged (2), settle's
+ * volume change unchanged (3e-11). A move is at most `tol`, and is reported (`moved`, `maxMove`).
  */
 export function weldTJunctions(polys, { tol = 1e-7, quantum = 1e-9, maxRounds = 4 } = {}) {
     // *** THIS LOOP IS DEFENSIVE AND THE MEASUREMENT SAYS SO, AGAINST WHAT I WROTE HERE FIRST. *** The first
     // version of this comment claimed one pass was not enough and that iterating was what closed the last
-    // edges. It is not: on a twelve-blast wall the pass inserts 2,853 vertices and leaves 53 edges unmatched
-    // at maxRounds 1, 2, 4 AND 8 -- identical, because the second pass inserts nothing at all. The argument
+    // edges. It is not: on a twelve-blast wall (settle's snap + merge first) the pass inserts 2,853 vertices and
+    // leaves 15 edges unmatched at maxRounds 1, 2, 4 AND 8 -- identical, because the second pass inserts nothing
+    // at all. (Re-measured at round 10 of the BVH-CSG arc: this comment said 53, a count that no longer matched
+    // the code at EPS=1e-5 either. At EPS=1e-8: 2,865 inserted, 0 unmatched, again identical at 1, 2, 4 and 8. At
+    // round 10b, with blast()'s new polygons and the projecting weld: 2,527 inserted, 8 moved by at most 4.4e-9,
+    // 0 unmatched, 0 reflex -- identical at 1, 2, 4 and 8.) The argument
     // for iterating is still sound in principle (inserting a vertex makes two shorter edges, and a vertex
     // outside the old span can fall inside a new one) but it has never once fired here. Kept as a guard,
     // labelled as one, and NOT counted as a check -- sabotaging it back to a single pass changes no number
     // in the gate, which is exactly what a defensive guard looks like.
-    let cur = polys, total = 0;
+    let cur = polys, total = 0, moved = 0, maxMove = 0;
     for (let round = 0; round < maxRounds; round++) {
         const r = weldPass(cur, tol, quantum);
-        cur = r.polys; total += r.inserted;
+        cur = r.polys; total += r.inserted; moved += r.moved; maxMove = Math.max(maxMove, r.maxMove);
         if (!r.inserted) break;
     }
-    return { polys: cur, inserted: total };
+    return { polys: cur, inserted: total, moved, maxMove };
 }
 
 function weldPass(polys, tol, quantum) {
@@ -526,7 +606,9 @@ function weldPass(polys, tol, quantum) {
     for (const v of verts.values()) { const k = ck(v); if (!grid.has(k)) grid.set(k, []); grid.get(k).push(v); }
 
     let inserted = 0;
-    const out = polys.map((p) => {
+    const moves = new Map();
+    let maxMove = 0;
+    const woven = polys.map((p) => {
         const vs = [];
         for (let i = 0; i < p.vs.length; i++) {
             const a = p.vs[i], b = p.vs[(i + 1) % p.vs.length];
@@ -549,15 +631,21 @@ function weldPass(polys, tol, quantum) {
                     const t = dot3(av, u);
                     if (t <= tol || t >= L - tol) continue;
                     const perp = Math.hypot(av[0] - t * u[0], av[1] - t * u[1], av[2] - t * u[2]);
-                    if (perp < tol) on.push([t, v]);
+                    if (perp < tol) {
+                        on.push([t, v]);
+                        // insert v AT its projection onto this edge, and move v there wherever else it is used
+                        // (below) -- see the ROUND 10B paragraph above weldTJunctions()
+                        if (perp > 1e-13 && !moves.has(kk)) { moves.set(kk, [a[0] + t * u[0], a[1] + t * u[1], a[2] + t * u[2]]); if (perp > maxMove) maxMove = perp; }
+                    }
                 }
             }
             on.sort((m, n) => m[0] - n[0]);
             for (const [, v] of on) { vs.push(v); inserted++; }
         }
-        return { vs, pl: p.pl };
+        return { vs, pl: p.pl, src: p.src };
     });
-    return { polys: out, inserted };
+    const out = moves.size ? woven.map((p) => ({ vs: p.vs.map((v) => moves.get(key(v)) || v), pl: p.pl, src: p.src })) : woven;
+    return { polys: out, inserted, moved: moves.size, maxMove };
 }
 
 // ---- THE LOCALISED PATH, WHICH IS THE ONLY ONE THAT IS REAL TIME --------------------------------------------
@@ -586,8 +674,36 @@ const boxesMeet = (a, lo, hi) => a.lo[0] <= hi[0] && a.hi[0] >= lo[0] && a.lo[1]
  * be touched by B, so leaving it alone is not an approximation. `select` is the hook the BVH plugs into --
  * pass one and it decides which polygons are near; pass none and the AABB test above is used directly, which
  * is what makes this file testable without an acceleration structure present.
+ *
+ * *** FOUND AT ROUND 10 OF THE BVH-CSG ARC, FIXED AT ROUND 10B: THAT ARGUMENT COVERED A's POLYGONS AND NOT B's. ***
+ * Leaving the far polygons alone IS exact. But this function then called subtract(near, B), which builds a BSP from
+ * `near` -- an OPEN patch of A -- and kept or dropped B's surface by where that patch's planes said it was, not by
+ * where A's solid is:
+ *   - a blob wholly INSIDE the solid met no polygon, `near` was empty, and the cavity was never cut. destructible.html
+ *     centres every blast on the wall's mid-plane (z = 0, half-thickness 0.35), so at blast radius 0.20..0.35 --
+ *     4 of its slider's 25 positions -- Hit removed NOTHING: 20 of 20 first shots at each radius.
+ *   - where `near` was non-empty, B could reach interior space the patch's planes misclassify: a seven-shot chain
+ *     (radius 1.4, 14 facets) departed from subtract() at shot 7 by 7.3e-4; on 1,500 random states the next shot
+ *     was wrong 82 times, by up to 0.072. At every EPS from 1e-5 to 1e-8: not EPS.
+ * THE FIX, WHICH IS WHAT THE CODE BELOW DOES: A's side is unchanged (the patch clipped by B's BSP -- B is closed, so
+ * that was always exact). B's ORIGINAL polygons are split by the patch's planes exactly as the clip would split them,
+ * and every fragment is kept with the verdict the patch gave it; then each is asked of the WHOLE solid, by ray parity
+ * (meshPointClassify.mjs's pointInMesh, five directions) from its vertex average, on the BVH bvhSelect() already
+ * builds for `select` (built here from A if none is given). One point speaks for the whole fragment: it lies in one
+ * cell of the patch's BSP, so no near polygon crosses it, and far polygons miss B's box. The patch's verdict stands
+ * for fragments that sat on a node's plane on the way down (flush contacts, where subtract()'s coplanar buckets and
+ * its second clip are what make them exact -- that clip is kept, for those fragments only) and where the five rays
+ * disagree (counted as `ambiguous`; 0 in every run measured). `reclassified` counts fragments the solid overrode.
+ * MEASURED: page conditions 140 first shots exact to 1.4e-13 (radius 0.2..0.8); 3,000 two-shot and 300 six-shot
+ * random chains, 0 departures from subtract() (worst 5.3e-13); on 1,500 states built by this code, round 10's rule
+ * wrong on the next shot 82 times, this one 0 (worst 3.8e-13), 244 fragments reclassified; the 8 degenerate contacts
+ * shifted by 0..1e-5 (288 runs) never worse than subtract(). AND IT IS FASTER AND SMALLER, because B is no longer cut
+ * by its own planes (b.allPolygons() came out of B's own BSP) nor rebuilt through A's tree (subtract()'s
+ * a.build(b.allPolygons()) only splits, never removes): twelve blasts, paired, median of 4 -- subdiv 8 920 -> 675 ms
+ * and 15,066 -> 12,047 polygons; subdiv 14 (the page's maximum) 8.4 -> 4.3 s and 62,221 -> 44,346. A radius-0.2
+ * blast inside the wall came back as 1,127 polygons from a 224-triangle blob before that; 230 after.
  */
-export function subtractLocal(A, B, { select = null } = {}) {
+export function subtractLocal(A, B, { select = null, bvh = null } = {}) {
     const { lo, hi } = polysAABB(B);
     const near = [], far = [];
     if (select) {
@@ -596,9 +712,69 @@ export function subtractLocal(A, B, { select = null } = {}) {
     } else {
         for (const p of A) (boxesMeet(polyAABB(p), lo, hi) ? near : far).push(p);
     }
-    if (!near.length) return { polys: A.slice(), far: A.slice(), cut: [], touched: 0, skipped: far.length };
-    const cut = subtract(near, B);
-    return { polys: far.concat(cut), far, cut, touched: near.length, skipped: far.length };
+    // B's box misses A's box entirely: nothing of B can be inside A, and nothing of A is touched.
+    const ab = polysAABB(A);
+    if (!A.length || !boxesMeet(ab, lo, hi)) { const all = bareSkin(A); return { polys: all, far: all.slice(), cut: [], touched: 0, skipped: A.length, reclassified: 0 }; }
+
+    // A's side, exactly as subtract(): the near patch keeps what lies outside B -- B is closed, so its BSP is
+    // an exact solid and this step was always right.
+    const a = new Node(clonePolys(keepTag(near))), b = new Node(clonePolys(tag(B, CUT)));
+    a.invert(); a.clipTo(b);
+
+    // B's side, which is what was wrong (see this function's KNOWN paragraph, now FIXED): split B by the near
+    // patch's BSP exactly as b.clipTo(a) would, but keep EVERY fragment with the verdict the patch gave it, then
+    // ask the WHOLE solid. A fragment lies in one cell of that BSP, so no near polygon crosses it (each lies on a
+    // plane the fragment is entirely to one side of, or on), and no far polygon can reach it (far polygons miss
+    // B's box) -- so one interior point speaks for the whole fragment. Two kinds keep the patch's verdict:
+    // fragments that went COPLANAR at some node (flush contacts: the BSP's coplanar buckets and the second clip
+    // below are what make those exact), and fragments whose ray directions disagree (the point is too close to
+    // the surface for parity to be trusted -- which is exactly where the patch is present and right).
+    // B's ORIGINAL polygons, not b.allPolygons(): building b's tree (which a.clipTo(b) needs) cut a non-convex B by
+    // its own planes, and only A's planes have any business cutting B's surface.
+    const frags = [];
+    passThrough(a, clonePolys(tag(B, CUT)), frags);
+    if (!bvh) bvh = select && select.bvh ? select.bvh : new MeshBVH(toTriangleBuffer(A));
+    const keep = [], copKept = [];
+    let reclassified = 0, ambiguous = 0;
+    for (const { poly, kept } of frags) {
+        if (poly.cop) { if (kept) copKept.push(poly); continue; }
+        const n = poly.vs.length, c = [0, 0, 0];
+        for (const v of poly.vs) { c[0] += v[0] / n; c[1] += v[1] / n; c[2] += v[2] / n; }
+        const q = pointInMesh(bvh, c[0], c[1], c[2]);
+        let inside = kept;
+        if (q.agreement === 1) inside = q.inside; else ambiguous++;
+        if (inside !== kept) reclassified++;
+        if (inside) keep.push(poly);
+    }
+    // subtract()'s second clip -- b.invert(); b.clipTo(a); b.invert() -- drops a B face lying ON an A face that
+    // faces the same way. It only ever touches coplanar fragments (any other kept fragment sits in an inside cell
+    // and passes through untouched), so it runs on those alone; run on a fragment the whole solid kept against
+    // the patch's verdict, it would drop it again.
+    const inv = (p) => ({ vs: p.vs.slice().reverse(), pl: { n: [-p.pl.n[0], -p.pl.n[1], -p.pl.n[2]], w: -p.pl.w }, src: p.src });
+    for (const p of a.clipPolygons(copKept.map(inv))) keep.push(inv(p));
+    // subtract() ends a.build(b.allPolygons()); a.invert() -- inserting B's survivors into A's tree only to read
+    // them straight back out. Insertion never removes a polygon; it only splits it by A's planes (and, with an
+    // empty patch, by B's own: a radius-0.2 blast inside the wall came back as 1,127 polygons from a 224-triangle
+    // blob). So the two sides are concatenated instead: A's in its own orientation, B's turned to face the cavity.
+    a.invert();
+    const cut = a.allPolygons().concat(keep.map(inv));
+    const farT = bareSkin(far);
+    return { polys: farT.concat(cut), far: farT, cut, touched: near.length, skipped: far.length, reclassified, ambiguous };
+}
+
+/**
+ * b.clipTo(a)'s split, keeping what it would have dropped: every fragment of `polys` after `node`'s BSP, with
+ * `kept` = the clip's verdict (a front leaf keeps, a missing back child drops) and poly.cop set on any fragment
+ * that sat on a node's plane on the way down.
+ */
+function passThrough(node, polys, out) {
+    if (!node.pl) { for (const p of polys) out.push({ poly: p, kept: true }); return; }
+    const f = [], bk = [], cf = [], cb = [];
+    for (const p of polys) splitPolygon(node.pl, p, cf, cb, f, bk);
+    for (const p of cf) { p.cop = true; f.push(p); }
+    for (const p of cb) { p.cop = true; bk.push(p); }
+    if (node.front) passThrough(node.front, f, out); else for (const p of f) out.push({ poly: p, kept: true });
+    if (node.back) passThrough(node.back, bk, out); else for (const p of bk) out.push({ poly: p, kept: false });
 }
 
 /**
@@ -617,7 +793,9 @@ export function bvhSelect(polys) {
     tris.forEach((v, i) => { buf[i * 3] = v[0]; buf[i * 3 + 1] = v[1]; buf[i * 3 + 2] = v[2]; });
     const bvh = new MeshBVH(buf);
     const map = Int32Array.from(triToPoly);
-    return { bvh, select: (lo, hi) => bvh.trianglesInBox(lo, hi).map((t) => map[t]) };
+    const select = (lo, hi) => bvh.trianglesInBox(lo, hi).map((t) => map[t]);
+    select.bvh = bvh;   // subtractLocal() classifies B's fragments against the whole solid with it
+    return { bvh, select };
 }
 
 /**
@@ -651,8 +829,8 @@ export function blast(polys, blob, { select = null, merge = false } = {}) {
     // costs 1981 ms over twelve shots against 719 ms. Neither is what blast() should do, so blast() does not
     // merge at all: settle() merges, once, on a closed mesh, and that is the only place it is sound.
     if (merge && false) { const m = mergeCoplanar(out); out = m.polys; mergedCount = m.merged; }
-    return { polys: out, stats: { touched: r.touched, skipped: r.skipped, afterCut,
-                                  merged: mergedCount, ms: Date.now() - t0 } };
+    return { polys: out, stats: { touched: r.touched, skipped: r.skipped, afterCut, merged: mergedCount,
+                                  reclassified: r.reclassified, ambiguous: r.ambiguous, ms: Date.now() - t0 } };
 }
 
 /**
@@ -780,7 +958,8 @@ export function degenerateFan(polys, eps = DEGENERATE_FLATNESS) {
 }
 
 /**
- * Fan triangulation, minus the triangles that are not triangles.
+ * Fan triangulation, minus the triangles that are not triangles -- and, since round 20c of the BVH-CSG arc, without
+ * losing the points that made them.
  *
  * *** THE WELD IS WHAT MAKES THEM AND THE FAN IS WHERE THEY LAND. *** weldTJunctions() inserts a vertex into
  * every edge that has one lying on it -- 2,853 of them on the twelve-blast wall -- and every inserted vertex
@@ -790,20 +969,47 @@ export function degenerateFan(polys, eps = DEGENERATE_FLATNESS) {
  * On one blast -- the case this file's gate calls "100.0% matched, zero T-junctions, zero gaps" -- it is 136
  * of 596 (22.8%), and again none before the weld.
  *
- * Dropping them is LOSSLESS and not merely cheap: they carry 1.7e-11 of a 120.06 surface, they cover a set of
- * measure zero, and the remaining fan triangles still tile the polygon, so the union is unchanged. The
- * T-junction the weld went in to sew is sewn by the VERTEX BEING ON THE BOUNDARY, which is a polygon
- * property; nothing about it needed a triangle of zero width to represent it.
+ * Dropping them loses no AREA (they carry 1.7e-11 of a 120.06 surface) -- but it loses the POINT. This comment
+ * said the T-junction "is sewn by the vertex being on the boundary, which is a polygon property; nothing about
+ * it needed a triangle of zero width". At the polygon level, yes. At the triangle level the dropped triangle was
+ * the only one with the edges v0-vi and vi-vi+1: the fan that remains runs v0-vi+1 past vi, and the neighbour's
+ * triangles stop at vi -- the T-junction the weld sewed, reopened in what every triangle consumer reads (round
+ * 20's manifoldAudit: a page wall settled to 15 unmatched polygon edges read 5,850 open edges as triangles; the
+ * twelve-blast wall 0 and 3,491).
+ *
+ * *** SO THE FAN MOVES INSTEAD. *** A polygon whose fan from vs[0] drops nothing is fanned from vs[0] exactly as
+ * before (bit for bit -- every polygon without a welded point on a side through vs[0]). Otherwise it is fanned
+ * from the first vertex whose fan drops nothing (a corner whose two sides carry no welded point), and failing
+ * that -- every corner has one beside it -- from its centroid, one point more, n triangles. Measured: those walls
+ * read exactly their polygon census as triangles (15 / 12 / 4 / 0 open edges), no pinched vertex.
  *
  * volume() and surfaceArea() inline their own fans and do NOT come through here, deliberately -- the
- * instrument that grades the drop must not be computed by the code that drops.
+ * instrument that grades the triangulation must not be computed by the code that triangulates.
  */
 export function toTriangles(polys, { eps = DEGENERATE_FLATNESS } = {}) {
     const out = [];
-    for (const p of polys) for (let i = 1; i + 1 < p.vs.length; i++) {
-        const a = p.vs[0], b = p.vs[i], c = p.vs[i + 1];
-        if (flatness(a, b, c) <= eps) continue;
-        out.push([a, b, c]);
+    // the fan of vs from apex k, or null if any of its triangles is flat
+    const fanFrom = (vs, k) => {
+        const n = vs.length, f = [];
+        for (let i = 1; i + 1 < n; i++) {
+            const a = vs[k], b = vs[(k + i) % n], c = vs[(k + i + 1) % n];
+            if (flatness(a, b, c) <= eps) return null;
+            f.push([a, b, c]);
+        }
+        return f;
+    };
+    for (const p of polys) {
+        const vs = p.vs;
+        let f = fanFrom(vs, 0);
+        for (let k = 1; !f && k < vs.length; k++) f = fanFrom(vs, k);
+        if (f) { for (const t of f) out.push(t); continue; }
+        // every corner has a welded point beside it: fan from the centroid (and drop what is still flat -- a polygon
+        // with no area at all, as before)
+        const g = [0, 1, 2].map((c) => vs.reduce((sum, v) => sum + v[c], 0) / vs.length);
+        for (let i = 0; i < vs.length; i++) {
+            const a = vs[i], b = vs[(i + 1) % vs.length];
+            if (flatness(g, a, b) > eps) out.push([g, a, b]);
+        }
     }
     return out;
 }

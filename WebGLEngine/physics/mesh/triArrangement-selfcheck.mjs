@@ -2,418 +2,449 @@
 //
 // Run: node physics/mesh/triArrangement-selfcheck.mjs
 //
-// GATES physics/mesh/triArrangement.mjs -- round 9 of the BVH-CSG arc, segment-bounded cutting: the planar
-// arrangement of B's actual intersection segments inside one triangle of A, its faces, their triangulation.
+// ROUND 9 OF THE BVH-CSG ARC: the gate for physics/mesh/triArrangement.mjs, the segment-bounded cutter. What
+// it can be wrong about, and the section that would see it:
+//   1. THE ARRANGEMENT BY HAND -- face counts, face areas, holes, and the refusals, on fixtures whose answer
+//      needs no code: one T, a handful of B's, every number derived on paper first.
+//   2. PARTITION PROPERTIES ON 200 RANDOM CASES -- faces tile T (areas), every triangle wound like T and on T's
+//      plane, every segment end kept as a vertex, and NO SEGMENT CROSSES ANY OUTPUT TRIANGLE'S INTERIOR (the
+//      property per-face classification rests on).
+//   3. THE CLASSIFICATION AUDIT -- per-face classification (one pointInMesh per face) against each triangle's
+//      own, on the blast workload. Triangles whose OWN classification, or whose face's, is not unanimous (some
+//      ray direction disagreed) are skipped and COUNTED, not silently folded in.
+//   4. THE SEAM IS BUILT ONCE -- triTriIntersect(a, b) and triTriIntersect(b, a) return bit-identical endpoint
+//      sets, which is why A's and B's arrangements meet vertex for vertex; measured over every intersecting pair
+//      of the blast workload.
+//   5. THE REFUSAL CENSUS -- which refusal reasons a fixture in this file actually reaches, and which remain
+//      defensive only, printed by name rather than implied covered.
 //
-// ORACLES, NONE OF THEM triArrangement.mjs's OWN CODE:
-//   - Hand-derived face areas. A is the right triangle (0,0,0),(10,0,0),(0,10,0) (area 50) in the plane z=0; B is
-//     built from vertical PRISMS over axis-aligned squares, z from -1 to 1, so B meets z=0 exactly along the
-//     squares' outlines and every face area is a sum of rectangle areas computable with no code.
-//   - Vertex provenance: every output vertex must be BIT-IDENTICAL to one of A's corners or to an endpoint
-//     triTriIntersect() returns -- the module claims it never computes a vertex; this checks it.
-//   - Orientation and partition, recomputed here in 3D: every output triangle's normal points with A's, and
-//     the triangles' 3D areas sum to A's.
-//   - Classification consistency: on real workloads, every output triangle's OWN centroid, classified by
-//     pointInMesh() against B, must agree with its face's classification (one point per face, taken from the
-//     face's largest triangle). A face that B crossed would split its triangles between the two answers.
+// FIVE FIXTURES HERE, AND THE CENSUS, WERE WRONG BEFORE THE MODULE WAS: 1d's first B was never built (the draft left scratch code);
+// 1i's first loop (a 1 x 1.5e-9 rectangle) lost its short sides as point contacts and was refused 'dangling';
+// 1l's hand value ignored that 1+1e-4 is not representable, and its tolerance then ignored the input's own
+// rounding; 1m's first squares overhung T's hypotenuse and crossed on diagonal midpoints; 1n's outer square
+// touched the hypotenuse at (2,2). In each, the module's answer was right for the geometry actually built --
+// found by computing the geometry by hand a second time, not by loosening the check. The census's first draft
+// read only literal reasons and went red on 'coplanar'/'degenerate', which reach refuse() as r.status.
 //
-// SABOTAGE LOG -- RUN ON THE REBUILT MODULE, AND RE-RUN WHOLE AFTER THE REVIEW OF THE REBUILD CHANGED IT (validation grid,
-// thin-triA refusal, hole box precheck, and new fixtures 1c' and 2i). These are the re-run's numbers; the first run's
-// differed only where checks added since -- 1c', 2i, and both gates' front-door sections from the v4831 merge -- add reds. Each applied to the real file, THIS gate / meshBoolean-selfcheck /
-// meshBooleanBlast-selfcheck run, the file restored in a `finally` and the restore verified by md5sum:
-//   A1  snap disabled for segment endpoints (corners only) -> 23 / 4 / 3 (every shared midpoint a T-junction)
-//   A2  hole given to the LARGEST containing face -> 4 / 0 / 0 (1c and 1c', refused at 'triangulation area'; 1f)
-//   A3  face walk turns the wrong way -> 12 / 4 / 5
-//   A4  crossing check removed -> 1 / 0 / 0 (2c: still refused, one check later, at 'triangulation area')
-//   A5  dangling check disabled -> 1 / 0 / 0 (2d; section 4's 30-TOL crack is refused by a later check, which it accepts)
-//   A6  a clockwise non-sliver triangle emitted instead of refused -> 0 / 0 / 0, EXPECTED: the only clockwise triangles
-//       ever measured are rounding-noise slivers, which the sliver rule drops first; no fixture builds another.
-//   A7  meshBoolean reusing one face's classification for every face of a triangle -> 0 / 12 / 12
-//   A8  coplanar/degenerate candidates ignored instead of refused -> 3 / 7 / 0
-//   A9  segments along triA's boundary kept -> 2 / 0 / 1 (1h, the near-edge fixture built for it)
-//   A10 (control) validation grid minimum of two cells -> 0 / 0 / 0, as a correctness-neutral change must
-//   A11 the exception guard removed -> 1 / 0 / 0 (2g)
-//   F1  the reviews' sliver fix reverted (drop anything under 1e-14 of triA) -> 2 / 2 / 0 (1g; the rod, the needle)
-//   F2  the orientation refusal moved back before the sliver drop -> 0 / 1 / 0 (section 15's zero-refusal sweep)
-//   F3  cycle area back to the plain shoelace from triA's corner -> 3 / 0 / 0 (1g's 2e-8 square; the front door's)
-//   F4  the zero-area-cycle refusal removed -> 0 / 0 / 0: no fixture builds a cycle of exactly zero area (a backstop)
-//   F5  face-area check back to 'faces sum to triA' -> 0 / 0 / 1 (section 8's chain: refusals over sub-TOL strips)
-//   F6  vertices no segment touches kept in the graph -> 1 / 0 / 1 (2h)
-//   F7  the faces-tile-the-walked-boundary check removed -> 0 / 0 / 0, and it CANNOT be otherwise: the review showed it
-//       is an identity for any walk that pairs every edge (see the module); it guards hole bookkeeping, not the walk
-//   R1  hole given to the FIRST containing face, not the smallest -> 1 / 0 / 0 (1c', refused at 'triangulation area')
-//   R2  R1 with the triangulation-area refusal removed too -> 1 / 0 / 0 (1c' -- WRONG faces 0.25, 4, 4.75, 41). The
-//       review's construction: before 1c' this pair went 0 / 0 / 0 while three nested squares came back 2.25 over
-//   R3  T-junction check removed -> 1 / 0 / 0 (2e)
-//   R4  collinear-overlap check removed -> 0 / 0 / 0, EXPECTED: an overlap from a shared vertex puts the shorter
-//       segment's far end on the longer one, which the T-junction check refuses first
-//   R5  thin-triA refusal removed -> 1 / 0 / 0 (2i)
-//   R6  validation grid back to bounding-box registration -> 1 / 0 / 0 (2i's visit count)
-//   R7  hole assignment's box precheck removed -> 0 / 0 / 0, EXPECTED: it only skips ray casts that would say no
-//   N4  a face classified at its FIRST triangle, not its largest -> 0 / 1 / 0 (meshBoolean-selfcheck's faceSamplePoint
-//       unit check; 0 / 0 / 0 before that check existed -- the rebuild's first triangles agree on all 8,581 multi-
-//       triangle faces of four twelve-blast chains)
-//   N7  ambiguity dropped for arranged faces -> 0 / 1 / 0 (meshBoolean-selfcheck section 15's dirs:[] fixture)
-//   N18 pointInMeshOpts not passed for arranged faces -> 0 / 1 / 0 (the same fixture)
+// SABOTAGE LOG -- each applied to the real file, all three round-9 gates run (THIS / meshBoolean-selfcheck /
+// meshBooleanBlast-selfcheck), file restored in a `finally` and md5 verified. Reds counted on the final files:
+//   A1  mirror by the dropped normal's sign alone (the round's bug (a))      -> 1 / 4 / 5   (1k)
+//   A2  no ring simplification before Earcut (bug (c))                       -> 2 / 1 / 2   (1c, sliver height)
+//   A3  absorbed runs never fanned back                                      -> 6 / 3 / 5
+//   A4  degenerate cycle = |area| <= 1e-9 x area(T) (bug (d))                -> 1 / 0 / 2   (1l)
+//   A5  area tolerances relative to area only (bug (e))                      -> 1 / 0 / 2   (1j)
+//   A6  shoelace about T's corner, not the face's own vertex (bug (f))       -> 12 / 4 / 6
+//   A7  a degree-1 vertex not refused                                        -> 2 / 0 / 0   (1g; the census,
+//       incidentally -- its literal is gone)
+//   A8  a hole given to the LARGEST containing face                          -> 1 / 0 / 0   (1n; added for it)
+//   A9  coplanar/degenerate pairs skipped instead of refusing the triangle   -> 3 / 7 / 0
+//   A11 vertex-on-edge splitting only on T's own sides                       -> 1 / 0 / 0   (1o -- which went 0/0/0
+//       on its first run; 1o was added for it)
+//   A10 a crossing registered on only one of its two edges                   -> 0 / 0 / 0
+//   A10b ...on neither                                                       -> 0 / 0 / 0
+//       NOT A MISSING CHECK, A REDUNDANCY, MEASURED: step 4 re-finds every crossing within snap of both edges
+//       (1m's two crossings come out the same). The registration matters only when a crossing snaps onto an
+//       existing vertex more than snap from one edge; no fixture builds that. Stated in the module at step 3.
+//   M1  meshBoolean drops a refused triangle instead of taking the plane path -> 0 / 11 / 2
+//   M2  MESH_BOOLEAN_DEFAULT_CUTTING back to "plane"                        -> 0 / 5 / 6
+//   M3  every face classified at its triangle's centroid, not its own sample  -> 0 / 12 / 12
 "use strict";
 
-import { arrangeTriangle, ARRANGE_TOL, reportLines } from "./triArrangement.mjs";
+import { arrangeTriangle, SNAP_EPS } from "./triArrangement.mjs";
 import { triTriIntersect } from "./triTriIntersect.mjs";
 import { pairOverlap } from "./bvhPairOverlap.mjs";
 import { groupCandidatesByTriA } from "./triFragmentAccumulate.mjs";
 import { pointInMesh } from "./meshPointClassify.mjs";
 import { MeshBVH } from "../../mesh/meshBVH.mjs";
-import * as CSG from "./meshCSG.mjs";   // fixture shapes only (jaggedBlob, boxPolys, toTriangleBuffer)
+import * as M from "./meshCSG.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
-const close = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
-
-function mkBuf(tris) {
-    const b = new Float64Array(tris.length * 9);
-    tris.forEach((t, i) => { for (let v = 0; v < 3; v++) for (let c = 0; c < 3; c++) b[i * 9 + v * 3 + c] = t[v][c]; });
-    return b;
-}
-const A_TRI = [[0, 0, 0], [10, 0, 0], [0, 10, 0]];
-const A = mkBuf([A_TRI]);
-const AREA_A = 50;
-
-// A closed vertical prism over the axis-aligned square [x0,x1]x[y0,y1], z in [-1,1], outward-wound.
-function prism(x0, y0, x1, y1) {
-    const c = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]], T = [];
-    for (let i = 0; i < 4; i++) {
-        const [ax, ay] = c[i], [bx, by] = c[(i + 1) % 4];
-        T.push([[ax, ay, -1], [bx, by, -1], [bx, by, 1]], [[ax, ay, -1], [bx, by, 1], [ax, ay, 1]]);
+const info = (s) => console.log("  ..... " + s);
+const buf = (tris) => { const b = new Float64Array(tris.length * 9); tris.forEach((t, i) => t.forEach((v, j) => v.forEach((x, c) => { b[i * 9 + j * 3 + c] = x; }))); return b; };
+const all = (b) => [...Array(b.length / 9).keys()];
+const T = buf([[[0, 0, 0], [4, 0, 0], [0, 4, 0]]]);   // area 8, in z=0, counter-clockwise seen from +z
+const reached = new Set();
+const run = (B) => { const r = arrangeTriangle(T, 0, B, all(B)); if (r.status === "fallback") reached.add(r.reason); return r; };
+const areas = (r) => r.faces.map((f) => f.area).sort((a, b) => a - b);
+// a vertical prism over the 2D polygon `poly`, z in [z0, z1], closed, outward-wound, sides as two triangles each
+function prism(poly, z0, z1) {
+    const out = [], n = poly.length;
+    for (let i = 0; i < n; i++) {
+        const [a, b] = [poly[i], poly[(i + 1) % n]];
+        const a0 = [a[0], a[1], z0], b0 = [b[0], b[1], z0], a1 = [a[0], a[1], z1], b1 = [b[0], b[1], z1];
+        out.push([a0, b0, b1], [a0, b1, a1]);
     }
-    T.push([[x0, y0, -1], [x1, y1, -1], [x1, y0, -1]], [[x0, y0, -1], [x0, y1, -1], [x1, y1, -1]]);
-    T.push([[x0, y0, 1], [x1, y0, 1], [x1, y1, 1]], [[x0, y0, 1], [x1, y1, 1], [x0, y1, 1]]);
-    return T;
-}
-const all = (tris) => tris.map((_, i) => i);
-function arrange(bTris) { const B = mkBuf(bTris); return { B, r: arrangeTriangle(A, 0, B, all(bTris)) }; }
-const faceAreas = (r) => r.faces.map((f) => f.area).sort((a, b) => a - b);
-const triArea3 = (t) => { const u = [t[1][0]-t[0][0], t[1][1]-t[0][1], t[1][2]-t[0][2]], v = [t[2][0]-t[0][0], t[2][1]-t[0][1], t[2][2]-t[0][2]];
-    return 0.5 * Math.hypot(u[1]*v[2]-u[2]*v[1], u[2]*v[0]-u[0]*v[2], u[0]*v[1]-u[1]*v[0]); };
-const normalZ = (t) => (t[1][0]-t[0][0]) * (t[2][1]-t[0][1]) - (t[1][1]-t[0][1]) * (t[2][0]-t[0][0]);
-function provenanceOk(r, B, nB, trisA = A, triA = 0) {
-    const allowed = [];
-    const o = triA * 9;
-    for (let v = 0; v < 3; v++) allowed.push([trisA[o + v * 3], trisA[o + v * 3 + 1], trisA[o + v * 3 + 2]]);
-    for (let j = 0; j < nB; j++) { const s = triTriIntersect(trisA, triA, B, j); if (s.status === "intersect") allowed.push(s.p0, s.p1); }
-    const same = (p, q) => p[0] === q[0] && p[1] === q[1] && p[2] === q[2];
-    for (const f of r.faces) for (const t of f.tris) for (const p of t.tri) if (!allowed.some((q) => same(p, q))) return false;
-    return true;
+    for (let i = 1; i + 1 < n; i++) {
+        out.push([[poly[0][0], poly[0][1], z1], [poly[i][0], poly[i][1], z1], [poly[i + 1][0], poly[i + 1][1], z1]]);
+        out.push([[poly[0][0], poly[0][1], z0], [poly[i + 1][0], poly[i + 1][1], z0], [poly[i][0], poly[i][1], z0]]);
+    }
+    return buf(out);
 }
 
 // =============================================================================================================
-console.log("\n1. *** HAND-DERIVED FACES ***");
+console.log("1. *** THE ARRANGEMENT BY HAND ***");
 {
-    // 1a. one closed curve inside A: a 1x1 hole. Faces: the square (1) and A minus the square (49).
-    const { B, r } = arrange(prism(2, 2, 3, 3));
-    ok("1a. a square hole inside A: two faces, areas 1 and 49 exactly",
-        r.ok && r.faces.length === 2 && close(faceAreas(r)[0], 1) && close(faceAreas(r)[1], 49),
-        r.ok ? "faces " + JSON.stringify(faceAreas(r)) + ", segments " + r.segments : "refused: " + r.reason);
-    ok("1a. every output vertex is an A corner or a triTriIntersect endpoint, BIT FOR BIT -- no vertex computed",
-        r.ok && provenanceOk(r, B, 12));
-    // The prism's side quads are split along a diagonal, so each side crosses z=0 as TWO segments meeting at the
-    // diagonal's midpoint -- a point computed separately by two B-triangles, which the snap must merge.
-    // (A round-9 review found this label claiming 8 interior vertices while only the segment count was asserted.)
-    const interior = new Set();
-    if (r.ok) for (const f of r.faces) for (const t of f.tris) for (const p of t.tri)
-        if (!A_TRI.some((q) => q[0] === p[0] && q[1] === p[1] && q[2] === p[2])) interior.add(p.join(","));
-    ok("1a. ...and the shared midpoints were merged: 8 segments, 8 distinct interior vertices in the output",
-        r.ok && r.segments === 8 && interior.size === 8, "segments " + (r.ok ? r.segments : "-") + ", interior vertices " + interior.size);
+    // 1a. nothing to cut: a B far away, and a B whose box meets T's but which misses it.
+    const far = run(buf([[[10, 10, -1], [11, 10, -1], [10, 11, 1]]]));
+    const near = run(buf([[[3, 3, -1], [4, 3, -1], [3.5, 3.5, 1]]]));   // above the hypotenuse x+y=4: misses T
+    ok("1a. no candidate crosses T -> 'untouched' (the caller classifies T whole)",
+        far.status === "untouched" && near.status === "untouched", far.status + " / " + near.status);
 
-    // 1b. a curve that leaves A through its edge x=0: square [-1,1]x[4,5]; inside A only [0,1]x[4,5].
-    const b = arrange(prism(-1, 4, 1, 5));
-    ok("1b. a square crossing A's boundary: two faces, 1 and 49",
-        b.r.ok && b.r.faces.length === 2 && close(faceAreas(b.r)[0], 1) && close(faceAreas(b.r)[1], 49),
-        b.r.ok ? JSON.stringify(faceAreas(b.r)) : "refused: " + b.r.reason);
+    // 1b. one straight cut: B is a big vertical triangle in the plane x=1; at z=0 it spans y in [-5,5], so the
+    // segment is (1,0)-(1,3), both ends on T's sides. By hand: x<1 is int_0^1 (4-x) dx = 3.5, the rest 4.5.
+    const b = run(buf([[[1, -10, -5], [1, 10, -5], [1, 0, 5]]]));
+    const ab = b.status === "ok" ? areas(b) : [];
+    ok("1b. one straight cut -> 2 faces of area 3.5 and 4.5 (by hand), no holes",
+        b.status === "ok" && ab.length === 2 && Math.abs(ab[0] - 3.5) < 1e-14 && Math.abs(ab[1] - 4.5) < 1e-14 &&
+        b.stats.holeCount === 0, b.status + " " + JSON.stringify(ab));
 
-    // 1c. nested closed curves: [1,4]^2 (area 9) around [2,3]^2 (area 1). Faces: 1, the ring 8, and 50-9 = 41.
-    // (The first draft used [1,6]^2, whose corner (6,6) lies outside A's hypotenuse x+y=10 -- the module's answer
-    // [1,22,27] was right for that shape and the gate's hand-derivation was wrong.)
-    const c = arrange([...prism(1, 1, 4, 4), ...prism(2, 2, 3, 3)]);
-    ok("1c. nested holes go to their INNERMOST containing face: faces 1, 8, 41",
-        c.r.ok && c.r.faces.length === 3 && close(faceAreas(c.r)[0], 1) && close(faceAreas(c.r)[1], 8) && close(faceAreas(c.r)[2], 41),
-        c.r.ok ? JSON.stringify(faceAreas(c.r)) : "refused: " + c.r.reason);
-
-    // 1c'. THREE DEEP. A round-9 review gave each hole to the FIRST face containing it instead of the smallest, and
-    // with the triangulation-area check also off, every gate stayed green while three nested squares came back with
-    // 2.25 too much area and 7.25 of it classified the wrong way: no fixture nested deeper than two. [1,4]^2 around
-    // [1.5,3.5]^2 around [2.5,3]^2: faces 0.25, 4 - 0.25 = 3.75, 9 - 4 = 5 and 50 - 9 = 41.
-    const c3 = arrange([...prism(1, 1, 4, 4), ...prism(1.5, 1.5, 3.5, 3.5), ...prism(2.5, 2.5, 3, 3)]);
-    ok("1c'. three nested squares: every hole to its innermost face -- faces 0.25, 3.75, 5, 41",
-        c3.r.ok && c3.r.faces.length === 4 && [0.25, 3.75, 5, 41].every((want, i) => close(faceAreas(c3.r)[i], want)),
-        c3.r.ok ? JSON.stringify(faceAreas(c3.r)) : "refused: " + c3.r.reason);
-
-    // 1d. two disjoint holes: [1,2]^2 and [4,5]x[1,2]. Faces 1, 1, 48.
-    const d = arrange([...prism(1, 1, 2, 2), ...prism(4, 1, 5, 2)]);
-    ok("1d. two disjoint holes in one face: faces 1, 1, 48",
-        d.r.ok && d.r.faces.length === 3 && close(faceAreas(d.r)[0], 1) && close(faceAreas(d.r)[1], 1) && close(faceAreas(d.r)[2], 48),
-        d.r.ok ? JSON.stringify(faceAreas(d.r)) : "refused: " + d.r.reason);
-
-    // 1e. nothing crosses: a prism entirely outside A (its box still overlaps A's box).
-    const e = arrange(prism(7, 7, 8, 8));
-    ok("1e. a candidate that crosses nothing inside A: one face, A itself, untouched",
-        e.r.ok && e.r.faces.length === 1 && e.r.faces[0].tris.length === 1 && close(e.r.faces[0].area, 50) &&
-        JSON.stringify(e.r.faces[0].tris[0].tri) === JSON.stringify(A_TRI), e.r.ok ? "segments " + e.r.segments : e.r.reason);
-
-    // 1g. TINY FACES ARE FACES. The first version dropped every triangle under 1e-14 of triA's area as a "sliver";
-    // two round-9 reviews found that dropping REAL faces (a 2e-7 rod's end cap, a 3e-7 needle's two caps). A
-    // square 2e-7 across (area 4e-14, under that cutoff) must keep its triangles, and so its area.
-    const g1 = arrange(prism(2, 2, 2 + 2e-7, 2 + 2e-7));
-    const small = g1.r.ok ? g1.r.faces.reduce((m, f) => (!m || f.area < m.area ? f : m), null) : null;
-    const smallA3 = small ? small.tris.reduce((acc, t) => acc + triArea3(t.tri), 0) : 0;
-    ok("1g. a square hole 2e-7 across keeps its face's triangles: output area 4e-14 to 1e-6 relative",
-        g1.r.ok && g1.r.faces.length === 2 && small.tris.length > 0 && Math.abs(smallA3 - 4e-14) < 1e-6 * 4e-14,
-        g1.r.ok ? "small face " + (small ? small.tris.length : 0) + " triangles, 3D area " + smallA3.toExponential(6) +
-        " (first version: 0 triangles, a hole)" : "refused: " + g1.r.reason);
-    // A square 2e-8 across: its cycles' areas (4e-16) are below what the plain shoelace -- products of coordinates
-    // measured from triA's corner, ~2 units away -- can resolve. The first version read BOTH cycles as area 0,
-    // treated both as holes, and returned ONE uncut face of area 50: the square was simply not there. A cycle's
-    // area is now a fan from its own first vertex.
-    const g2 = arrange(prism(2, 2, 2 + 2e-8, 2 + 2e-8));
-    const small2 = g2.r.ok ? g2.r.faces.reduce((m, f) => (!m || f.area < m.area ? f : m), null) : null;
-    const small2A3 = small2 ? small2.tris.reduce((acc, t) => acc + triArea3(t.tri), 0) : 0;
-    ok("1g. ...and a square 2e-8 across is still told apart from A around it: two faces, 4e-16 to 1e-6 relative",
-        g2.r.ok && g2.r.faces.length === 2 && small2.tris.length > 0 && Math.abs(small2A3 - 4e-16) < 1e-6 * 4e-16,
-        g2.r.ok ? g2.r.faces.length + " faces, small face 3D area " + small2A3.toExponential(6) +
-        " (first version: 1 face of area 50)" : "refused: " + g2.r.reason);
-
-    // 1h. A SEGMENT WITHIN TOL OF triA's EDGE, WITHOUT ANY DEGENERACY. A round-9 review built it: a tetrahedron
-    // whose bottom face crosses z=0 along y = 2.5e-10..7.5e-10 -- inside TOL of A's edge y=0 -- while its apex
-    // (4.5, 2, 0.3) takes the rest of it into A's interior. triTriIntersect() calls that bottom crossing a plain
-    // "intersect"; the arrangement must skip it as lying on the boundary (the curve is closed by A's own edge) and
-    // cut the trapezoid out. Its area comes from the tetra's edge crossings, interpolated here by hand.
-    const Pt = [[4, 0, -1], [5, 1e-9, -1], [4.5, 5e-10, 1], [4.5, 2, 0.3]];
-    const Tt = [[Pt[0], Pt[1], Pt[2]], [Pt[0], Pt[3], Pt[1]], [Pt[1], Pt[3], Pt[2]], [Pt[2], Pt[3], Pt[0]]];
-    const hcross = (p, q) => { const u = -p[2] / (q[2] - p[2]); return [p[0] + u * (q[0] - p[0]), p[1] + u * (q[1] - p[1])]; };
-    const quad = [hcross(Pt[0], Pt[2]), hcross(Pt[1], Pt[2]), hcross(Pt[1], Pt[3]), hcross(Pt[0], Pt[3])];
-    let q2 = 0;
-    for (let i = 0; i < 4; i++) { const p = quad[i], q = quad[(i + 1) % 4]; q2 += p[0] * q[1] - q[0] * p[1]; }
-    // AND IT LEAVES A SLIVER, BY DESIGN, MEASURED HERE RATHER THAN HIDDEN: the two crossing points it closes
-    // against the edge lie 2.5e-10 and 7.5e-10 inside A, and the module never moves a vertex. So the output does
-    // not cover the strip between A's edge and the path (0,0)->(4.25,2.5e-10)->(4.75,7.5e-10)->(10,0) -- a sub-TOL
-    // sliver of 2.75e-9 by hand. The module checks its faces against the boundary it actually walked, and that
-    // boundary against triA within TOL x perimeter (3.4e-8 here) -- the strip is the tolerance, not a lost face.
-    // The first draft of this fixture expected a perfect partition and went red on exactly that amount.
-    let sl2 = 0;
-    const edgePath = [[0, 0], [10, 0], quad[1], quad[0]];
-    for (let i = 0; i < 4; i++) { const p = edgePath[i], q = edgePath[(i + 1) % 4]; sl2 += p[0] * q[1] - q[0] * p[1]; }
-    const sliver = sl2 / 2;
-    const h = arrange(Tt);
-    const hCover = h.r.ok ? h.r.faces.reduce((acc, f) => acc + f.tris.reduce((a2, t) => a2 + triArea3(t.tri), 0), 0) : 0;
-    ok("1h. a crossing within TOL of A's edge closes against it: faces " + (q2 / 2).toFixed(4) + " (hand) and the rest, 3 segments kept",
-        h.r.ok && h.r.faces.length === 2 && close(faceAreas(h.r)[0], q2 / 2, 1e-12) &&
-        close(faceAreas(h.r)[1], 50 - q2 / 2 - sliver, 1e-12) && h.r.segments === 3 && provenanceOk(h.r, h.B, 4),
-        h.r.ok ? "faces " + JSON.stringify(faceAreas(h.r)) + ", segments " + h.r.segments : "refused: " + h.r.reason);
-    ok("1h. ...and the only area it leaves uncovered is that hand-computed sub-TOL strip along the edge",
-        h.r.ok && Math.abs(sliver - 2.75e-9) < 1e-15 && close(hCover, 50 - sliver, 1e-12),
-        "uncovered " + (50 - hCover).toExponential(4) + ", strip by hand " + sliver.toExponential(4));
-
-    // Orientation and partition over every fixture above, recomputed in 3D.
-    let orientOk = true, partOk = true;
-    for (const x of [{ r }, b, c, d, e, g1, g2]) {
-        if (!x.r.ok) { orientOk = partOk = false; continue; }
-        let s = 0;
-        for (const f of x.r.faces) for (const t of f.tris) { s += triArea3(t.tri); if (normalZ(t.tri) <= 0) orientOk = false; }
-        if (!close(s, AREA_A, 1e-9)) partOk = false;
+    // 1c. a closed loop inside T: a vertical triangular prism over (1,1),(2,1),(1,2), z in [-1,1]. Each side is
+    // two triangles whose segments are COLLINEAR, meeting where the quad's diagonal crosses z=0 -- the vertex
+    // Earcut would drop and triArrangement.mjs absorbs and puts back. By hand: inner 0.5, outer 7.5 with a hole.
+    const c = run(prism([[1, 1], [2, 1], [1, 2]], -1, 1));
+    const ac = c.status === "ok" ? areas(c) : [];
+    const cHoles = c.status === "ok" ? c.faces.map((f) => f.holes).sort() : [];
+    ok("1c. a loop strictly inside T -> 2 faces, 0.5 and 7.5 (by hand), the larger with ONE hole",
+        c.status === "ok" && ac.length === 2 && Math.abs(ac[0] - 0.5) < 1e-14 && Math.abs(ac[1] - 7.5) < 1e-14 &&
+        JSON.stringify(cHoles) === "[0,1]", c.status + " " + JSON.stringify(ac) + " holes " + JSON.stringify(cHoles));
+    // the three diagonal crossings are on the loop, collinear with its corners: all six loop vertices must be
+    // used by BOTH faces' triangles, or the two faces would meet with a T-junction
+    if (c.status === "ok") {
+        const key = (p) => p.join(",");
+        const used = c.faces.map((f) => new Set(f.tris.flat().map(key)));
+        const loop = [];
+        for (let i = 0; i < c.faces.length; i++) if (c.faces[i].holes === 0) for (const t of c.faces[i].tris) for (const p of t) loop.push(key(p));
+        const loopSet = new Set(loop);
+        ok("1c. ...its 6 loop vertices (3 corners, 3 collinear diagonal crossings) appear in BOTH faces' triangles",
+            loopSet.size === 6 && [...loopSet].every((k) => used[0].has(k) && used[1].has(k)) && c.stats.absorbed >= 3,
+            "loop vertices " + loopSet.size + ", absorbed and put back " + c.stats.absorbed);
     }
-    ok("1f. every output triangle is wound with A (normal +z), and their 3D areas sum to A's 50 (1a-1e, 1g; 1h has its own)", orientOk && partOk);
+
+    // 1d. a segment end 1e-10 INSIDE the hypotenuse (within snap): B in the plane x=1 spanning y in [-5, 3-e] at
+    // z=0, e=1e-10. The end is kept where it is and split into the hypotenuse, so the two faces leave the thin
+    // triangle (4,0),(0,4),(1,3-e) uncovered: by hand 0.5 * |(-4)(3-e) - 4(-3)| = 2e = 2e-10. Pinned, not
+    // required to be zero -- it is within the module's own area tolerance (snap x perimeter), by design.
+    {
+        const e = 1e-10, yTop = 3 - e;
+        // a triangle in x=1: edge (y=-5,z=-1)-(y=-5,z=1) crosses z=0 at y=-5; edge (y=-5,z=1)-(y=2yTop+5,z=-1)
+        // crosses it at y = yTop. So its z=0 section is y in [-5, yTop]: from below T to 1e-10 short of T's side.
+        const P = [[1, -5, -1], [1, -5, 1], [1, 2 * yTop + 5, -1]];
+        const r = run(buf([P]));
+        const seg = triTriIntersect(T, 0, buf([P]), 0);
+        const yEnd = seg.status === "intersect" ? Math.max(seg.p0[1], seg.p1[1]) : NaN;
+        const sum = r.status === "ok" ? r.faces.reduce((s, f) => s + f.area, 0) : NaN;
+        const want = 8 - 2 * (3 - yEnd);   // the uncovered sliver is 2 x (distance along y below the hypotenuse)
+        ok("1d. a segment end 1e-10 inside T's hypotenuse is accepted, and the faces fall short of 8 by exactly the sliver",
+            r.status === "ok" && r.faces.length === 2 && Math.abs(3 - yEnd - e) < 1e-15 && Math.abs(sum - want) < 1e-14 && 8 - sum > 1e-10,
+            "end at y=3-" + (3 - yEnd).toExponential(3) + ", faces sum " + sum + " = 8 - " + (8 - sum).toExponential(3) +
+            " (by hand 2e = " + (2 * e).toExponential(1) + ")");
+    }
+
+    // 1j. THE SAME CONSTRUCTION AT 1/100 SIZE -- the chain-shot-6 regression. A tolerance relative to T's area
+    // alone (the first draft's: 1e-9 x area) refused a triangle whose segment end lay 1e-10 off its side as
+    // 'outer face'. Here T has sides 0.04 (area 8e-4, so that tolerance is 8e-13) and the sliver is s*e/2 = 2e-12;
+    // the tolerance is snap x perimeter (1.4e-10) now, and the arrangement is accepted.
+    {
+        const s = 0.04, e = 1e-10, yTop = 0.03 - e;
+        const Ts = buf([[[0, 0, 0], [s, 0, 0], [0, s, 0]]]);
+        const P = [[0.01, -0.05, -0.01], [0.01, -0.05, 0.01], [0.01, 2 * yTop + 0.05, -0.01]];
+        const r = arrangeTriangle(Ts, 0, buf([P]), [0]);
+        if (r.status === "fallback") reached.add(r.reason);
+        const sum = r.status === "ok" ? r.faces.reduce((a, f) => a + f.area, 0) : NaN;
+        ok("1j. ...and at 1/100 size, where an area-relative tolerance refused it ('outer face', chain shot 6), it is accepted",
+            r.status === "ok" && r.faces.length === 2 && Math.abs(s * s / 2 - sum - s * e / 2) < 1e-15,
+            r.status + (r.reason ? " " + r.reason : "") + ", faces short of T by " + (s * s / 2 - sum).toExponential(3) +
+            " (by hand s*e/2 = " + (s * e / 2).toExponential(1) + ")");
+    }
+
+    // 1k. 1b's cut in all six axis orientations of T (dominant normal +-x, +-y, +-z). The first draft mirrored the
+    // 2D frame by the sign of the dropped normal component alone; with y dropped, (x,z) is a left-handed pair, so
+    // every y-dominant triangle came out clockwise and was refused -- 28 of 224 blob triangles at subdiv 8.
+    {
+        const perm = [(p) => p, (p) => [p[1], p[2], p[0]], (p) => [p[2], p[0], p[1]]];   // z-, x-, y-dominant
+        const flip = (t) => [t[0], t[2], t[1]];
+        const res = [];
+        for (const f of perm) for (const neg of [false, true]) {
+            const t = [[0, 0, 0], [4, 0, 0], [0, 4, 0]].map(f), b = [[1, -10, -5], [1, 10, -5], [1, 0, 5]].map(f);
+            const r = arrangeTriangle(buf([neg ? flip(t) : t]), 0, buf([b]), [0]);
+            if (r.status === "fallback") reached.add(r.reason);
+            res.push(r.status === "ok" ? JSON.stringify(areas(r)) : r.status + ":" + r.reason);
+        }
+        ok("1k. the same cut in all six orientations (+-x, +-y, +-z dominant) -> 3.5 / 4.5 every time",
+            res.every((x) => x === "[3.5,4.5]"), res.join(" "));
+    }
+    // 1l. a GENUINE loop far smaller than T: a prism over a right triangle of legs 1e-4 inside T -- area 5e-9,
+    // perimeter 3.4e-4, so 5e-9 >> snap x perimeter (3.4e-13). The first draft called a cycle degenerate below
+    // 1e-9 x area(T) (8e-9 here) and refused it; at subdiv 64 two wall triangles fell back that way, over spike
+    // tips grazing the wall face (loops of area 9.3e-10 and 2.0e-8).
+    {
+        const L = 1e-4;
+        const r = run(prism([[1, 1], [1 + L, 1], [1, 1 + L]], -1, 1));
+        const a = r.status === "ok" ? areas(r) : [];
+        ok("1l. a genuine loop of area 5e-9 inside T -> accepted as its own face (not refused as degenerate)",
+            // By hand ((1+L)-1)^2/2 (1+1e-4 is not representable). Bound 1e-19: the loop's corners are interpolated
+            // points near (1,1), each ~1e-16 off, times its perimeter 3.4e-4. The first draft's shoelace ran about
+            // T's corner and read 3.0e-17 short; about the face's own vertex it reads 1.1e-20 (triArrangement.mjs).
+            r.status === "ok" && a.length === 2 && Math.abs(a[0] - ((1 + L) - 1) ** 2 / 2) < 1e-19,
+            r.status + (r.reason ? " " + r.reason : "") + " " + JSON.stringify(a) + ", off by " +
+            (a[0] - ((1 + L) - 1) ** 2 / 2).toExponential(2));
+    }
+
+    // 1m. STEP 3's CROSSINGS. A manifold B never makes two segments cross, so nothing else here reaches them: B
+    // is two OVERLAPPING square prisms, (0.5,0.5)-(1.5,1.5) and (1.1,0.8)-(2.1,1.8), as one soup, both inside T.
+    // Their outlines cross at (1.5,0.8) and (1.1,1.5) -- away from every quad diagonal's crossing (the sides'
+    // midpoints), so those two vertices can only come from step 3. By hand: the overlap 0.4 x 0.7 = 0.28, each
+    // square's own part 0.72, the rest of T 8 - 1.72 = 6.28 with ONE hole (the union's outline) -- 4 faces.
+    // (The first draft of this fixture overhung T's hypotenuse and put its crossings on diagonal midpoints; the
+    // module's answer, 0.125/0.125/0.25/0.75/6.75, was right for that geometry and the hand values were not.)
+    {
+        const sq = (x0, y0, x1, y1) => [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+        const P1 = prism(sq(0.5, 0.5, 1.5, 1.5), -1, 1), P2 = prism(sq(1.1, 0.8, 2.1, 1.8), -1, 1);
+        const B = new Float64Array(P1.length + P2.length); B.set(P1); B.set(P2, P1.length);
+        const r = run(B);
+        const a = r.status === "ok" ? areas(r) : [];
+        ok("1m. two crossing outlines -> 2 crossings, 4 faces of 0.28 / 0.72 / 0.72 / 6.28 (by hand), one hole",
+            r.status === "ok" && r.stats.crossings === 2 && a.length === 4 && r.stats.holeCount === 1 &&
+            [0.28, 0.72, 0.72, 6.28].every((x, i) => Math.abs(a[i] - x) < 1e-14),
+            r.status + (r.reason ? " " + r.reason : "") + " crossings " + (r.stats ? r.stats.crossings : "-") + " " + JSON.stringify(a));
+    }
+
+    // 1n. NESTED LOOPS: square (0.8,0.8)-(1.8,1.8) around square (1.1,1.1)-(1.5,1.5), one soup. The inner
+    // outline's hole must go to the ANNULUS (the smallest face containing it, of another component), not to T's
+    // outer face, which contains it too. By hand: inner 0.16, annulus 0.84 with one hole, the rest 7 with one hole.
+    // (The first draft used (1,1)-(2,2): its corner (2,2) is ON T's hypotenuse, the square joins T's boundary, and
+    // there is no hole to assign -- the module said 7 with 0 holes, correctly.)
+    {
+        const sq = (x0, y0, x1, y1) => [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+        const P1 = prism(sq(0.8, 0.8, 1.8, 1.8), -1, 1), P2 = prism(sq(1.1, 1.1, 1.5, 1.5), -1, 1);
+        const B = new Float64Array(P1.length + P2.length); B.set(P1); B.set(P2, P1.length);
+        const r = run(B);
+        const fs = r.status === "ok" ? r.faces.map((f) => [f.area, f.holes]).sort((p, q) => p[0] - q[0]) : [];
+        ok("1n. nested loops -> 0.16 (no hole) / 0.84 (one hole) / 7 (one hole): each hole in the SMALLEST face around it",
+            fs.length === 3 && [[0.16, 0], [0.84, 1], [7, 1]].every(([a, h], i) => Math.abs(fs[i][0] - a) < 1e-14 && fs[i][1] === h),
+            r.status + (r.reason ? " " + r.reason : "") + " " + JSON.stringify(fs));
+    }
+
+    // 1o. STEP 4 ON SEGMENTS, NOT ONLY ON T's SIDES: a square prism (0.5,0.5)-(1.5,1.5) and a rectangle prism
+    // (1.5,0.7)-(2.5,1.3) sharing the line x=1.5 for y in [0.7,1.3]. The rectangle's corners (1.5,0.7) and
+    // (1.5,1.3) land INSIDE the square's segments (a T-junction a manifold B never makes), and the shared stretch
+    // is two collinear copies of one edge. By hand: the square 1, the rectangle 0.6, the rest 8 - 1.6 = 6.4 with
+    // ONE hole (their joint outline). Added after sabotage A11 (split only T's sides) went 0 red in every gate.
+    {
+        const sq = (x0, y0, x1, y1) => [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+        const P1 = prism(sq(0.5, 0.5, 1.5, 1.5), -1, 1), P2 = prism(sq(1.5, 0.7, 2.5, 1.3), -1, 1);
+        const B = new Float64Array(P1.length + P2.length); B.set(P1); B.set(P2, P1.length);
+        const r = run(B);
+        const fs = r.status === "ok" ? r.faces.map((f) => [f.area, f.holes]).sort((p, q) => p[0] - q[0]) : [];
+        ok("1o. segment ends inside other segments -> split there: faces 0.6 / 1 / 6.4 (one hole), by hand",
+            fs.length === 3 && [[0.6, 0], [1, 0], [6.4, 1]].every(([a, h], i) => Math.abs(fs[i][0] - a) < 1e-14 && fs[i][1] === h),
+            r.status + (r.reason ? " " + r.reason : "") + " " + JSON.stringify(fs));
+    }
+
+    // 1e..1h. the refusals a fixture can reach, each the plane path's to take instead.
+    const cop = run(buf([[[1, 1, 0], [2, 1, 0], [1, 2, 0]]]));
+    ok("1e. a B-triangle coplanar with T -> refused 'coplanar'", cop.status === "fallback" && cop.reason === "coplanar", cop.reason);
+    const deg = run(buf([[[-1, -1, -5], [5, 5, -5], [2, 2, 5]]]));   // plane x=y passes through T's corner (0,0,0)
+    ok("1f. a B plane through T's corner (a vertex on the other's plane) -> refused 'degenerate'",
+        deg.status === "fallback" && deg.reason === "degenerate", deg.reason);
+    const dang = run(buf([[[1, 1, -1], [3, 1, -1], [2, 1, 1]]]));   // open B: a segment y=1, x in [1.5,2.5], ends inside T
+    ok("1g. an OPEN B whose segment ends inside T -> refused 'dangling' (the face it sits in could not be classified by one point)",
+        dang.status === "fallback" && dang.reason === "dangling", dang.reason);
+    // a loop thinner than snap: prism over (1,1),(2,1),(1.5,1+4e-10). Its apex is within snap of the base edge,
+    // so it is split into it, the loop collapses onto a path, and the path's ends dangle.
+    const thin = run(prism([[1, 1], [2, 1], [1.5, 1 + 4e-10]], -1, 1));
+    ok("1h. a closed loop thinner than snap collapses to a path and is refused (never classified as a face)",
+        thin.status === "fallback" && (thin.reason === "dangling" || thin.reason === "zero-area cycle"), thin.reason);
+    // a loop whose every vertex is more than snap from every other edge (so nothing collapses) but whose area is
+    // under snap x perimeter: a triangle, base 1, apex 3e-9 high -- area 1.5e-9 against 1e-9 x 2.0 = 2.0e-9. (A
+    // 1 x 1.5e-9 RECTANGLE does not reach this: its 1.5e-9 sides are cut in two by the quads' diagonals, each half
+    // is shorter than snap and dropped as a point contact, and the open loop is refused 'dangling' instead.)
+    const sliver = run(prism([[1, 1], [2, 1], [1.5, 1 + 3e-9]], -1, 1));
+    ok("1i. a closed loop of area 1.5e-9 and perimeter 2 (under snap x perimeter) -> refused 'zero-area cycle'",
+        sliver.status === "fallback" && sliver.reason === "zero-area cycle", sliver.status + " " + sliver.reason);
+    info("snap distance SNAP_EPS = " + SNAP_EPS + " (absolute, like every tolerance in this arc -- round 11 makes them relative)");
 }
 
 // =============================================================================================================
-console.log("\n2. *** THE REFUSALS A FIXTURE CAN REACH, EACH ON THE CASE THAT CAUSES IT ***");
+console.log("\n2. *** PARTITION PROPERTIES ON 200 RANDOM CASES (a random T against a random closed B) ***");
 {
-    const reason = (bTris, cands) => { const B = mkBuf(bTris); const r = arrangeTriangle(A, 0, B, cands || all(bTris)); return r.ok ? "ok" : r.reason; };
-    ok("2a. a B-triangle lying in A's plane is refused as 'coplanar'",
-        reason([[[1, 1, 0], [3, 1, 0], [1, 3, 0]]]) === "coplanar");
-    ok("2b. a B-triangle with a vertex on A's plane is refused as 'degenerate'",
-        reason([[[2, 2, 0], [4, 2, 1], [4, 2, -1]]]) === "degenerate");
-    // Two overlapping closed prisms (a self-intersecting B): their outlines cross. (The first draft used [1,3]^2
-    // and [2,4]^2, whose outlines cross exactly at a side's diagonal midpoint -- a segment ENDPOINT -- so the module
-    // correctly refused it as a T-junction instead; the squares are offset so the crossing falls mid-segment.)
-    ok("2c. crossing segments (a self-intersecting B) are refused as 'segments cross'",
-        reason([...prism(1, 1, 3.2, 3.2), ...prism(2, 2, 4, 4)]) === "segments cross",
-        reason([...prism(1, 1, 3.2, 3.2), ...prism(2, 2, 4, 4)]));
-    // One open vertical triangle whose crossing stops inside A: a curve with an end.
-    ok("2d. a curve that ends inside A (an open B) is refused as 'dangling'",
-        reason([[[2, 2, -1], [4, 2, -1], [3, 2, 1]]]) === "dangling");
-    // A segment ending exactly on another's interior.
-    ok("2e. an endpoint on another segment's interior is refused as 'T-junction'",
-        reason([[[1, 2, -1], [6, 2, -1], [3.5, 2, 1]], [[3, 2, -1], [3, 2, 1], [3, 5, 0.5]]]) === "T-junction");
-    // 2g. the exception guard: a malformed candidate list (null) throws inside; the module must REFUSE, not throw,
-    // because a refusal falls back to the plane-cut path and an exception aborts the boolean. Added after a
-    // sabotage removing the guard went 0 red: nothing else in this gate ever threw.
-    let threw = false, g = null;
-    try { g = arrangeTriangle(A, 0, mkBuf(prism(2, 2, 3, 3)), null); } catch (e) { threw = true; }
-    ok("2g. an input that throws inside is refused ('exception: ...'), never propagated",
-        !threw && g && g.ok === false && g.reason.startsWith("exception"), threw ? "THREW" : (g && g.reason));
-    ok("2f. a zero-area triA is refused as 'degenerate triA'",
-        arrangeTriangle(mkBuf([[[0, 0, 0], [1, 0, 0], [2, 0, 0]]]), 0, mkBuf(prism(0, -1, 1, 1)), all(prism(0, 0, 1, 1))).reason === "degenerate triA");
-    // 2h. NOT A REFUSAL ANY MORE, AND THAT IS THE POINT. The soundness review's construction: an arch standing on
-    // A's edge y=0, plus a tetrahedron whose apex is 2e-9 above z=0 right beside the arch's foot. The tetra's
-    // crossing is smaller than TOL and collapses to a point, but its ends were classified onto the edge -- vertices
-    // that bound nothing. The first version kept them in the graph, splitting the boundary right beside the arch's
-    // foot; the walk around them scrambled, and it was refused only at the outer-face count (the review found
-    // 17,833 accepted scenes containing such vertices elsewhere, every scramble refused there or at the area sum).
-    // The rebuild leaves a vertex no kept segment touches out of the graph entirely, so it cannot scramble
-    // anything: the answer must be the arch's own, bit for bit, wherever the sub-TOL tetra sits beside its foot.
-    const arch = [], ap = [[5 - 1.5e-3, -1e-3], [8 + 1.5e-3, -1e-3], [6.5, 1]];
-    for (let i = 0; i < 3; i++) {
-        const [ax, ay] = ap[i], [bx, by] = ap[(i + 1) % 3];
-        arch.push([[ax, ay, -1], [bx, by, -1], [bx, by, 1]], [[ax, ay, -1], [bx, by, 1], [ax, ay, 1]]);
+    let s = 12345;
+    const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+    let okCases = 0, untouched = 0, refused = 0, faces = 0, holes = 0;
+    let worstArea = 0, worstPlane = 0, badWinding = 0, lostEnds = 0, crossed = 0, triTotal = 0, minHeight = Infinity;
+    for (let i = 0; i < 200; i++) {
+        const P = [0, 1, 2].map(() => [rnd() * 4 - 2, rnd() * 4 - 2, rnd() * 1 - 0.5]);
+        const TA = buf([P]);
+        const Bp = i % 2 ? M.jaggedBlob([rnd() - 0.5, rnd() - 0.5, rnd() - 0.5], 0.6 + rnd(), 6, 1 + i)
+                         : M.boxPolys([rnd() - 0.5, rnd() - 0.5, rnd() - 0.5], [0.2 + rnd(), 0.2 + rnd(), 0.2 + rnd()]);
+        const TB = M.toTriangleBuffer(Bp);
+        const r = arrangeTriangle(TA, 0, TB, all(TB));
+        if (r.status === "untouched") { untouched++; continue; }
+        if (r.status !== "ok") { refused++; reached.add(r.reason); continue; }
+        okCases++; faces += r.faces.length; holes += r.stats.holeCount;
+        const e1 = [P[1][0] - P[0][0], P[1][1] - P[0][1], P[1][2] - P[0][2]], e2 = [P[2][0] - P[0][0], P[2][1] - P[0][1], P[2][2] - P[0][2]];
+        const n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+        const nl = Math.hypot(...n), un = n.map((x) => x / nl), areaT = nl / 2;
+        let sum = 0;
+        const outTris = r.faces.flatMap((f) => f.tris);
+        triTotal += outTris.length;
+        for (const t of outTris) {
+            const longest = Math.max(...[0, 1, 2].map((k) => Math.hypot(t[(k + 1) % 3][0] - t[k][0], t[(k + 1) % 3][1] - t[k][1], t[(k + 1) % 3][2] - t[k][2])));
+            const f1 = [t[1][0] - t[0][0], t[1][1] - t[0][1], t[1][2] - t[0][2]], f2 = [t[2][0] - t[0][0], t[2][1] - t[0][1], t[2][2] - t[0][2]];
+            const m = [f1[1] * f2[2] - f1[2] * f2[1], f1[2] * f2[0] - f1[0] * f2[2], f1[0] * f2[1] - f1[1] * f2[0]];
+            const dotn = m[0] * un[0] + m[1] * un[1] + m[2] * un[2];
+            if (!(dotn > 0)) badWinding++;
+            minHeight = Math.min(minHeight, dotn / longest);
+            sum += dotn / 2;
+            for (const p of t) worstPlane = Math.max(worstPlane, Math.abs((p[0] - P[0][0]) * un[0] + (p[1] - P[0][1]) * un[1] + (p[2] - P[0][2]) * un[2]));
+        }
+        worstArea = Math.max(worstArea, Math.abs(sum - areaT) / areaT);
+        // every segment end is an output vertex (within snap), and no segment crosses a triangle's interior
+        const verts = outTris.flat();
+        for (let b = 0; b < TB.length / 9; b++) {
+            const g = triTriIntersect(TA, 0, TB, b);
+            if (g.status !== "intersect") continue;
+            for (const e of [g.p0, g.p1]) if (!verts.some((v) => Math.hypot(v[0] - e[0], v[1] - e[1], v[2] - e[2]) <= SNAP_EPS)) lostEnds++;
+            for (const t of outTris) if (segmentCrossesInterior(g.p0, g.p1, t, un)) crossed++;
+        }
     }
-    arch.push([[ap[0][0], ap[0][1], -1], [ap[2][0], ap[2][1], -1], [ap[1][0], ap[1][1], -1]], [[ap[0][0], ap[0][1], 1], [ap[1][0], ap[1][1], 1], [ap[2][0], ap[2][1], 1]]);
-    const tet = (nx, ny) => {
-        const apex = [nx, ny, 2e-9], bs = [0, 1, 2].map((k) => { const a = 0.5 + k * 2 * Math.PI / 3; return [nx + 0.05 * Math.cos(a), ny + 0.05 * Math.sin(a), -1]; });
-        return [[bs[0], bs[2], bs[1]], [bs[0], bs[1], apex], [bs[1], bs[2], apex], [bs[2], bs[0], apex]];
-    };
-    const archAlone = arrange(arch).r;
-    ok("2h. the arch alone arranges into faces 1.5 and 48.5",
-        archAlone.ok && archAlone.faces.length === 2 && close(faceAreas(archAlone)[0], 1.5) && close(faceAreas(archAlone)[1], 48.5),
-        archAlone.ok ? JSON.stringify(faceAreas(archAlone)) : "refused: " + archAlone.reason);
-    const placements = [[1.1e-9, 0.9e-9], [1.2e-9, 0.95e-9], [0, 0], [3e-9, 0.5e-9], [0.5e-9, 0.2e-9]];
-    const orphanRuns = placements.map(([dx, ny]) => arrange([...arch, ...tet(5 + dx, ny)]).r);
-    ok("2h. ...and a sub-TOL tetra beside its foot leaves the answer bit-identical: its stray edge vertices bound nothing",
-        archAlone.ok && orphanRuns.every((q) => q.ok && JSON.stringify(faceAreas(q)) === JSON.stringify(faceAreas(archAlone)) && q.segments === archAlone.segments),
-        orphanRuns.map((q) => q.ok ? JSON.stringify(faceAreas(q)) : "refused " + q.reason).join(" ") + " (first version: (1.1e-9, 0.9e-9) refused as 'outer face')");
+    ok("   non-vacuous: most random cases cut, and the population includes holes and many-face triangles",
+        okCases > 80 && faces > 3 * okCases / 2 && holes > 0,
+        okCases + " arranged, " + untouched + " untouched, " + refused + " refused; " + faces + " faces, " + holes + " holes, " + triTotal + " triangles");
+    ok("!! the faces TILE T: triangle areas sum to T's within 1e-9 relative, every triangle wound like T",
+        worstArea < 1e-9 && badWinding === 0, "worst relative area gap " + worstArea.toExponential(2) + ", mis-wound " + badWinding);
+    // Earcut cuts ears between vertices that are collinear only to rounding (every segment end on T's sides) --
+    // slivers of area 1e-17..1e-21 on the twelve-blast chain, which meshCSG's settle() then could not merge. Rings
+    // are simplified before Earcut and the absorbed vertices fanned back in, so no triangle is thinner than snap.
+    ok("!! no output triangle is a sliver: every triangle's height exceeds snap",
+        minHeight > SNAP_EPS, "thinnest height " + minHeight.toExponential(2));
+    ok("!! every output vertex lies on T's plane (to 1e-12), and every segment end is kept as a vertex",
+        worstPlane < 1e-12 && lostEnds === 0, "worst off-plane " + worstPlane.toExponential(2) + ", segment ends lost " + lostEnds);
+    ok("!! *** NO SEGMENT CROSSES THE INTERIOR OF ANY OUTPUT TRIANGLE *** (what one classification per face rests on)",
+        crossed === 0, crossed + " crossings");
+}
+// Does segment p0-p1 (on T's plane) pass through the interior of triangle t by more than a snap-wide margin?
+// Cyrus-Beck in t's plane: clip the segment to t's three edges pulled inward by 10 x snap; any remaining piece
+// longer than snap is inside.
+function segmentCrossesInterior(p0, p1, t, un) {
+    let lo = 0, hi = 1;
+    const d = [p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]];
+    for (let k = 0; k < 3; k++) {
+        const a = t[k], b = t[(k + 1) % 3];
+        const e = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+        const inward = [un[1] * e[2] - un[2] * e[1], un[2] * e[0] - un[0] * e[2], un[0] * e[1] - un[1] * e[0]];
+        const il = Math.hypot(...inward);
+        const w = inward.map((x) => x / il);
+        const f0 = (p0[0] - a[0]) * w[0] + (p0[1] - a[1]) * w[1] + (p0[2] - a[2]) * w[2] - 10 * SNAP_EPS;
+        const fd = d[0] * w[0] + d[1] * w[1] + d[2] * w[2];
+        if (Math.abs(fd) < 1e-300) { if (f0 <= 0) return false; continue; }
+        const tt = -f0 / fd;
+        if (fd > 0) lo = Math.max(lo, tt); else hi = Math.min(hi, tt);
+        if (lo >= hi) return false;
+    }
+    return (hi - lo) * Math.hypot(...d) > SNAP_EPS;
 }
 
 // =============================================================================================================
-console.log("\n2i. *** A TRIANGLE TOO THIN FOR THE SNAP, AND THE GRID'S WORK ***");
+console.log("\n3. *** THE CLASSIFICATION AUDIT: ONE CLASSIFICATION PER FACE AGAINST EACH TRIANGLE'S OWN ***");
 {
-    // 2i. A triangle 1.5e-9 high: every point in it is within TOL of two edges, so a crossing's ends were both put on
-    // edges and skipped -- a review got ONE face and no segments with B over a fifth of it. Now refused.
-    const thin = mkBuf([[[0, 0, 0], [10, 0, 0], [10, 1.5e-9, 0]]]);
-    const P = prism(4, -1, 6, 1), r = arrangeTriangle(thin, 0, mkBuf(P), all(P));
-    ok("2i. a triangle no higher than 4 TOL is refused as 'thin triA'", !r.ok && r.reason === "thin triA", r.ok ? "ACCEPTED, " + r.faces.length + " faces" : r.reason);
-    // The validation grid registers a segment in the cells it passes through, not every cell of its box. A review's 200
-    // long diagonal slabs beside an 8000-gon took 15 s in one triangle with box registration; this smaller copy (60 slabs,
-    // an 800-gon) measured 426,734 visits to cell lists against 5,660,908 with box registration.
-    const slabs = [];
-    const ring = (cx, cy, rad, n) => Array.from({ length: n }, (_, i) => [cx + rad * Math.cos(2 * Math.PI * i / n), cy + rad * Math.sin(2 * Math.PI * i / n)]);
-    const sides = (poly) => poly.flatMap(([ax, ay], i) => { const [bx, by] = poly[(i + 1) % poly.length]; return [[[ax, ay, -1], [bx, by, -1], [bx, by, 1]], [[ax, ay, -1], [bx, by, 1], [ax, ay, 1]]]; });
-    for (let i = 0; i < 60; i++) {
-        const u = 0.6 + 5.4 * i / 60, w = 5.4 / 60 / 3, d = 1 / Math.SQRT2, L = 20;
-        slabs.push(...sides([[u * d - L * d, u * d + L * d], [u * d + L * d, u * d - L * d], [(u + w) * d + L * d, (u + w) * d - L * d], [(u + w) * d - L * d, (u + w) * d + L * d]]));
-    }
-    slabs.push(...sides(ring(0.2, 0.2, 0.12, 800)));
-    const g = arrangeTriangle(A, 0, mkBuf(slabs), all(slabs));
-    const cover = g.ok ? g.faces.reduce((acc, f) => acc + f.area, 0) : 0;
-    ok("2i. 60 long slabs beside an 800-gon: arranged, faces cover A, and the grid visits under 1.5 million cell entries",
-        g.ok && Math.abs(cover - AREA_A) < 1e-9 && g.validationVisits < 1.5e6,
-        g.ok ? g.faces.length + " faces, " + g.validationVisits + " visits, " + g.validationTests + " tests (box registration: 5,660,908 visits)" : "refused: " + g.reason);
-}
-
-// =============================================================================================================
-console.log("\n3. *** REAL WORKLOADS: NO FACE SPANS BOTH SIDES OF B ***");
-{
-    // For every triangle of A with candidates, arrange it, classify the face once (the module's contract), and
-    // classify every output triangle's OWN centroid independently. Any disagreement is a face B crossed.
-    const cen = (t) => [(t[0][0] + t[1][0] + t[2][0]) / 3, (t[0][1] + t[1][1] + t[2][1]) / 3, (t[0][2] + t[1][2] + t[2][2]) / 3];
-    function audit(X, Y) {
-        const bY = new MeshBVH(Y);
-        let arranged = 0, refused = 0, faces = 0, tris = 0, disagree = 0, nonUnanimous = 0, provFail = 0, orientFail = 0, partFail = 0;
-        const reasons = {};
-        for (const [t, c] of groupCandidatesByTriA(pairOverlap(new MeshBVH(X), bY))) {
-            const r = arrangeTriangle(X, t, Y, c);
-            if (!r.ok) { refused++; reasons[r.reason] = (reasons[r.reason] || 0) + 1; continue; }
-            arranged++;
-            const o = t * 9, tA = [[X[o], X[o+1], X[o+2]], [X[o+3], X[o+4], X[o+5]], [X[o+6], X[o+7], X[o+8]]];
-            const nA = [(tA[1][1]-tA[0][1])*(tA[2][2]-tA[0][2])-(tA[1][2]-tA[0][2])*(tA[2][1]-tA[0][1]),
-                        (tA[1][2]-tA[0][2])*(tA[2][0]-tA[0][0])-(tA[1][0]-tA[0][0])*(tA[2][2]-tA[0][2]),
-                        (tA[1][0]-tA[0][0])*(tA[2][1]-tA[0][1])-(tA[1][1]-tA[0][1])*(tA[2][0]-tA[0][0])];
-            let s = 0;
+    // meshCSG's wall against a subdiv-16 jagged blob, both directions: every arranged face's label (one ray
+    // bundle from its largest triangle's centroid) against every one of its triangles' own centroid label.
+    const W = M.toTriangleBuffer(M.boxPolys([0, 0, 0], [4, 3, 0.3])), Bl = M.toTriangleBuffer(M.jaggedBlob([0, 0, 0], 1.0, 16, 12345));
+    const bW = new MeshBVH(W), bB = new MeshBVH(Bl);
+    let facesChecked = 0, multi = 0, trisChecked = 0, disagree = 0, skippedFace = 0, skippedTri = 0;
+    for (const [X, bX, Y, bY] of [[W, bW, Bl, bB], [Bl, bB, W, bW]]) {
+        const g = groupCandidatesByTriA(pairOverlap(bX, bY));
+        for (const [t, cands] of g) {
+            const r = arrangeTriangle(X, t, Y, cands);
+            if (r.status !== "ok") continue;
             for (const f of r.faces) {
-                if (!f.tris.length) continue;
-                faces++;
-                let big = f.tris[0]; for (const ft of f.tris) if (ft.area > big.area) big = ft;
-                const fc = pointInMesh(bY, ...cen(big.tri));
-                for (const ft of f.tris) {
-                    tris++;
-                    // A centroid whose five rays do not agree sits within rounding of B's surface, where the
-                    // answer can go either way -- a round-9 review found one such 2.5e-12 sliver on the twelve-blast
-                    // chain (agreement 0.6). It says nothing about a face B crossed, so it is counted, not judged.
-                    const tc = pointInMesh(bY, ...cen(ft.tri));
-                    if (fc.agreement < 1 || tc.agreement < 1) nonUnanimous++;
-                    else if (tc.inside !== fc.inside) disagree++;
-                    const q = ft.tri, n = [(q[1][1]-q[0][1])*(q[2][2]-q[0][2])-(q[1][2]-q[0][2])*(q[2][1]-q[0][1]),
-                        (q[1][2]-q[0][2])*(q[2][0]-q[0][0])-(q[1][0]-q[0][0])*(q[2][2]-q[0][2]),
-                        (q[1][0]-q[0][0])*(q[2][1]-q[0][1])-(q[1][1]-q[0][1])*(q[2][0]-q[0][0])];
-                    if (n[0]*nA[0] + n[1]*nA[1] + n[2]*nA[2] <= 0) orientFail++;
-                    s += triArea3(q);
+                const fc = pointInMesh(bY, ...f.sample);
+                if (fc.agreement < 1) { skippedFace++; continue; }
+                facesChecked++; if (f.tris.length > 1) multi++;
+                for (const tri of f.tris) {
+                    const c = [0, 1, 2].map((k) => (tri[0][k] + tri[1][k] + tri[2][k]) / 3);
+                    const tc = pointInMesh(bY, ...c);
+                    if (tc.agreement < 1) { skippedTri++; continue; }
+                    trisChecked++;
+                    if (tc.inside !== fc.inside) disagree++;
                 }
             }
-            if (!close(s, triArea3(tA), 1e-9 * Math.max(1, triArea3(tA)))) partFail++;
-            if (!provenanceOk(r, Y, Y.length / 9, X, t)) provFail++;
         }
-        return { arranged, refused, reasons, faces, tris, disagree, nonUnanimous, provFail, orientFail, partFail };
     }
-    const wall = CSG.toTriangleBuffer(CSG.boxPolys([0, 0, 0], [4, 3, 0.3]));
-    const blob = CSG.toTriangleBuffer(CSG.jaggedBlob([0, 0, 0], 1.0, 12, 12345));
-    const b1 = CSG.toTriangleBuffer(CSG.jaggedBlob([0, 0, 0], 1.0, 8, 7)), b2 = CSG.toTriangleBuffer(CSG.jaggedBlob([0.4, 0.2, 0.1], 0.9, 8, 99));
-    for (const [name, X, Y] of [["wall vs blob", wall, blob], ["blob vs wall", blob, wall], ["blob vs blob", b1, b2], ["blob vs blob (reverse)", b2, b1]]) {
-        const a = audit(X, Y);
-        ok("3. " + name + ": every triangle's own classification agrees with its face's; wound with A; partitions A; no new vertices",
-            a.arranged > 0 && a.disagree === 0 && a.nonUnanimous * 100 <= a.tris && a.orientFail === 0 && a.partFail === 0 &&
-            a.provFail === 0 && a.refused === 0,
-            a.arranged + " triangles arranged into " + a.faces + " faces / " + a.tris + " output triangles; disagreements " +
-            a.disagree + " (non-unanimous, not judged: " + a.nonUnanimous + "), orientation " + a.orientFail + ", partition " +
-            a.partFail + ", provenance " + a.provFail +
-            ", refused " + a.refused + " " + JSON.stringify(a.reasons));
-    }
+    ok("!! every triangle's own classification agrees with its face's (unanimous ones; the rest counted, not folded in)",
+        disagree === 0 && trisChecked > 500 && multi > 50,
+        trisChecked + " triangles in " + facesChecked + " faces (" + multi + " with >1 triangle): " + disagree + " disagree; skipped as " +
+        "non-unanimous: " + skippedFace + " faces, " + skippedTri + " triangles");
 }
 
 // =============================================================================================================
-console.log("\n4. *** THE SNAP TOLERANCE IS A REAL TOLERANCE, NOT A HOPE ***");
+console.log("\n4. *** THE SEAM IS BUILT ONCE: triTriIntersect(a, b) AND (b, a) GIVE THE SAME POINTS, BIT FOR BIT ***");
 {
-    // Crack B on purpose: move the prism corner (3,3,1) by `gap` in x in ONE triangle only, so the two B-triangles
-    // that share it no longer agree -- the crossing points they compute on z=0 then differ by gap/2. Under TOL the
-    // snap must merge them (a closed curve, two faces); well over TOL it must NOT, and the arrangement must refuse
-    // (a curve with loose ends) rather than guess. (The first draft moved the vertex in EVERY triangle, which keeps
-    // B closed and tested nothing -- it passed 30 TOL as readily as 0.3.)
-    function cracked(gap) {
-        const P = prism(2, 2, 3, 3);
-        const k = P.findIndex((t) => t.some((v) => v[0] === 3 && v[1] === 3 && v[2] === 1));
-        P[k] = P[k].map((v) => (v[0] === 3 && v[1] === 3 && v[2] === 1) ? [3 + gap, 3, 1] : v);
-        return arrange(P).r;
+    const W = M.toTriangleBuffer(M.boxPolys([0, 0, 0], [4, 3, 0.3])), Bl = M.toTriangleBuffer(M.jaggedBlob([0, 0, 0], 1.0, 16, 12345));
+    const pairs = pairOverlap(new MeshBVH(W), new MeshBVH(Bl));
+    let hits = 0, same = 0;
+    const k = (p) => p[0] + "," + p[1] + "," + p[2];
+    for (const [a, b] of pairs) {
+        const x = triTriIntersect(W, a, Bl, b), y = triTriIntersect(Bl, b, W, a);
+        if (x.status !== "intersect") continue;
+        hits++;
+        if (y.status === "intersect" && [k(x.p0), k(x.p1)].sort().join("|") === [k(y.p0), k(y.p1)].sort().join("|")) same++;
     }
-    const under = cracked(0.3 * ARRANGE_TOL), over = cracked(30 * ARRANGE_TOL);
-    ok("4. a crack of 0.3 TOL in B (endpoints 0.15 TOL apart) is merged: still a closed curve, two faces",
-        under.ok && under.faces.length === 2, under.ok ? "faces " + under.faces.length : "refused: " + under.reason);
-    ok("   ...and a crack of 30 TOL is NOT merged -- the arrangement refuses rather than guessing",
-        !over.ok, over.ok ? "accepted with " + over.faces.length + " faces" : "refused: " + over.reason);
+    ok("!! every intersecting (wall, blob) pair gives bit-identical segment ends in both argument orders",
+        hits > 100 && same === hits, same + " of " + hits + " pairs");
 }
 
-// THE FRONT DOOR. triArrangement.mjs has a no-argument reportLines() on v4778's BVH-CSG pattern, so instrument-bench.html
-// can serve it (physics/instruments.mjs, row "tri-arrangement"). A report is not a verdict, but an export no gate names is
-// what definitionGates counts, so this section reads the report's own hand-checkable numbers back.
-console.log("\nTHE FRONT DOOR");
+// =============================================================================================================
+console.log("\n5. *** THE REFUSAL CENSUS ***");
 {
-    const L = reportLines();
-    const faces = (re) => { const l = L.find((x) => re.test(x)); const m = l && l.match(/faces ([-+0-9.e]+(?:, [-+0-9.e]+)*)/); return m ? m[1].split(", ").map(Number) : null; };
-    const same = (got, want) => got && got.length === want.length && got.every((g, i) => Math.abs(g - want[i]) <= 1e-9 * Math.max(1, want[i]));
-    const tiny = faces(/2e-7 across/);
-    ok("reportLines prints the hand-derived faces: 1 and 49, the nested 1, 8 and 41, and 1 and 49 across A's edge",
-        /triArrangement/.test(L[0]) && same(faces(/1x1 square hole/), [1, 49]) && same(faces(/nested squares/), [1, 8, 41]) &&
-        same(faces(/across A's edge/), [1, 49]), L.slice(2, 5).map((l) => l.trim().replace(/\s{2,}/g, " ")).join(" | "));
-    ok("...the 2e-7 square's own face at 4e-14, and the coplanar triangle REFUSED",
-        tiny && Math.abs(tiny[0] - 4e-14) < 1e-6 * 4e-14 && L.some((l) => /own plane\s+refused: coplanar$/.test(l)),
-        (tiny ? "tiny face " + tiny[0] : "UNPARSED") + "; " + (L.find((l) => /own plane/.test(l)) || "").trim());
-    ok("...and no report line stringifies a missing field as the literal word \"undefined\"", L.every((l) => !/\bundefined\b/.test(l)));
+    const KNOWN = ["coplanar", "degenerate", "degenerate triangle", "dangling", "face walk", "zero-area cycle", "outer face",
+                   "hole unassigned", "face area sum", "thin face", "earcut", "lost edge", "dropped vertex"];
+    const src = (await import("node:fs")).readFileSync(new URL("./triArrangement.mjs", import.meta.url), "utf8");
+    // literal reasons, plus triTriIntersect's two unresolved statuses, which reach refuse() as r.status
+    const inSource = [...src.matchAll(/refuse\("([^"]+)"/g)].map((m) => m[1]);
+    if (/refuse\(r\.status/.test(src)) inSource.push("coplanar", "degenerate");
+    ok("   this census names every refusal reason triArrangement.mjs can return (read from its source)",
+        inSource.every((r) => KNOWN.includes(r)) && KNOWN.every((r) => inSource.includes(r)),
+        "in source: " + [...new Set(inSource)].join(", "));
+    info("REACHED by a fixture in this file: " + [...reached].sort().join(", "));
+    info("NOT REACHED (defensive; each returns the plane path, never a wrong face): " +
+         KNOWN.filter((r) => !reached.has(r)).join(", "));
+}
+
+console.log("\n6. *** ROUND 13: A SLIVER'S SIDE POINT GOES ON THE SIDE IT CAME FROM, NOT THE NEAREST ONE ***");
+{
+    // A sliver (height <= 8 snap over its longest side) bypasses the planar arrangement (sliverFace), and the points
+    // meshBoolean's edge-conformity pass hands it -- a neighbour's split of a shared edge -- must land on THAT edge.
+    // Near a sharp tip the two long sides are closer together than rounding at wall-size coordinates, so the nearest
+    // side is a coin toss there. Measured before this row: 2,888 of 20,000 such points went on the wrong side by
+    // distance alone. The page workload hands a sliver only 2 side points in 21 chains, both on their nearest side,
+    // so no end-to-end gate can see this -- this row does. Slivers 2e-10..3.2e-9 high, 0.2..2.2 long, anywhere in
+    // destructible.html's wall, turned every way; the point 2e-9 x len .. 2e-3 x len from the sharp corner.
+    let s0 = 12345; const r = () => { s0 = (s0 * 1664525 + 1013904223) >>> 0; return s0 / 4294967296; };
+    let n = 0, wrong = 0, bareWrong = 0, notSliver = 0;
+    for (let trial = 0; trial < 2000; trial++) {
+        const h = 2e-10 + r() * 3e-9, len = 0.2 + r() * 2, s = Math.exp(Math.log(2e-9 / len) + r() * Math.log(1e6));
+        const O = [(r() * 2 - 1) * 4, (r() * 2 - 1) * 3, (r() * 2 - 1) * 0.35], a = r() * 6.283, b = r() * 3.1416;
+        const u = [Math.cos(a) * Math.sin(b), Math.sin(a) * Math.sin(b), Math.cos(b)];
+        let v = [-u[1], u[0], 0]; const vl = Math.hypot(...v) || 1; v = v.map((x) => x / vl);
+        const P = (x, y) => [O[0] + u[0] * x + v[0] * y, O[1] + u[1] * x + v[1] * y, O[2] + u[2] * x + v[2] * y];
+        const Tr = [P(0, 0), P(len, 0), P(len, h)], A = Float64Array.from(Tr.flat());
+        const side = r() < 0.5 ? 0 : 2;          // the two long sides, meeting at the sharp corner Tr[0]
+        const p = side === 2 ? Tr[2].map((c, k) => c + (Tr[0][k] - c) * (1 - s)) : Tr[0].map((c, k) => c + (Tr[1][k] - c) * s);
+        const given = arrangeTriangle(A, 0, new Float64Array(0), [], { contacts: true, sidePoints: [{ p, side }] });
+        const bare = arrangeTriangle(A, 0, new Float64Array(0), [], { contacts: true, sidePoints: [p] });
+        if (given.status !== "ok" || !given.stats.sliver) { notSliver++; continue; }
+        n++;
+        const got = given.sideVerts.findIndex((l) => l.length), gotBare = bare.sideVerts.findIndex((l) => l.length);
+        if (got !== side) wrong++;
+        if (gotBare >= 0 && gotBare !== side) bareWrong++;
+    }
+    ok("!! a side point near a sliver's sharp corner lands on the side it was given (2,000 slivers at wall scale)",
+        n === 2000 && wrong === 0, n + " slivers, " + wrong + " on the wrong side; " + notSliver + " not taken as slivers");
+    info("control: the same points given without a side (nearest side wins) -- " + bareWrong + " of " + n + " on the wrong side");
 }
 
 console.log(`\ntriArrangement-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);
-console.log("unchecked here, named honestly: robustness beyond the refusals -- any refusal sends the triangle to the " +
-    "plane-cut path, so a refusal is safe but a WRONG acceptance is not, and sections 1-3 are the defence; Earcut's " +
-    "own robustness on near-degenerate faces is trusted to the area checks, not proven; TOL is absolute (1e-9), so " +
-    "very large or very small coordinates are exactly as limited here as in the rest of the pipeline. NO FIXTURE HERE " +
-    "REACHES these refusals, which are backstops: 'endpoint outside triA' (triTriIntersect's segments lie in triA), " +
-    "'overlap' (a collinear overlap from a shared vertex trips the T-junction test first), 'face walk', 'outer face', " +
-    "'zero-area cycle', 'orphan hole', 'triangulation orientation' (only rounding-noise slivers ever measured clockwise, " +
-    "and those are dropped first), 'triangulation area', 'face area sum' and 'boundary strip'. Section 2's title says " +
-    "so; the first version of it said 'every refusal'.");
 process.exit(fails ? 1 : 0);
-

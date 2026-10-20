@@ -31,6 +31,7 @@
 // (union 7.833333333333333 vs expected 8; subtract -0.16666666666666666 vs expected 0, note the wrong SIGN;
 // intersect 0.16666666666666666 vs expected 0) before being written into this gate.
 //
+// [ROUND 12: both gaps below are FIXED -- sections 8, 13 and 17, and the ROUND 12 paragraph further down.]
 // *** THE REAL, MEASURED, NOT-FIXED-THIS-ROUND GAP, REPRODUCED DIRECTLY (NOT JUST DESCRIBED): *** of the 8
 // degenerate-contact fixtures, 3 involve a cutter face sitting FLUSH against a wall face with otherwise ZERO
 // interior overlap. Section 8 below runs all 8 through meshBoolean() and asserts the 5 that match the oracle
@@ -56,6 +57,45 @@
 //   R1 plane dedup reverted -> 1 (section 14's roof, 0.048).  R2 pre-filter removed -> 0 (perf-only; pinned in
 //   triFragmentAccumulate-selfcheck 14i).  R3 pre-filter keeps only "intersect" -> 6.  R4 accOpts plain spread
 //   -> 1 (section 14).  R5 "coplanar" treated as not meeting -> 1, incidental (section 5's drop demo).
+//
+// ROUND 9 (segment-bounded cutting, physics/mesh/triArrangement.mjs, now meshBoolean's default): every check that
+// tests the PLANE path's own machinery -- the fragment cap and top-level `capped` (section 8), round 6's ungated
+// baseline and the gated seam baseline (section 11), the roof on both plane paths and the accOpts merge (section
+// 14) -- now asks for cutting:"plane" by name; under the arrangement those options do not apply and those checks
+// went red for testing nothing. So THE ROUND-7 COUNTS ABOVE ARE HISTORICAL: measured with the plane path as the
+// default, not re-measured; a plane-path sabotage now reaches this gate only through checks that name it and
+// through triangles the arrangement refuses. Section 11 gained the arrangement's claim (22 of 22 A-side seam
+// vertices bit-identical to B-side ones, raw output watertight; the plane path 16 of 33 within 1e-6), section 14
+// holds the arrangement to the roof as well, and section 15 is new: 48 rotated-box runs against the plane path
+// and the BSP, 9 blob-pair runs against their own 1000x reference, zero fallbacks and zero unmatched edges on all
+// 57, a needle exact by hand at the origin and 1000 units out, and the flush rod pinned as a known gap.
+// Sabotage counts for the round-9 files are in triArrangement-selfcheck.mjs's header (A1-A11, M1-M3).
+//
+// ROUND 12 (contacts: triContact.mjs, and meshBoolean.mjs's ROUND 12 paragraph): sections 8 and 13 turned from KNOWN
+// rows pinned at their wrong numbers into exact asserts, each keeping contacts:false as a control that must still
+// give round 11's number; section 5 measures the ambiguous-fragment policy on contacts:false, the path that still
+// has ambiguity, and shows the default resolves the same fixture with none; section 7 asserts the flush union
+// watertight (round 11: 8 of 62 open); section 15's flush rod is exact and closed; section 16's raw-path control no
+// longer falls back (1.5e-5 off, 0 fallbacks -- at 1e-6 scale every pair is inside the contact tolerance); section
+// 17 is new: 1,350 flush-box runs, 12 tilts, 36 zero-volume runs, two operands with themselves, 18 rotated copies,
+// and the rotated band pinned as KNOWN. Sabotages on the real files, restored in `finally`, md5 verified, against
+// triContact-selfcheck / THIS / triArrangement-selfcheck / meshBooleanBlast-selfcheck:
+//   T1 contacts off by default 0/14/0/0.  T2 ON rule same/opposite swapped 0/13/0/0.  T3 B's ON copy kept 0/12/0/0.
+//   T4 broad phase unpadded 0/5/0/0.  T5 coplanar orientation always +1 2/8/0/0.  T6 contactPair's canonical order
+//   removed 1/0/0/0 -- 0 red everywhere on the first battery; triContact-selfcheck's bit-for-bit symmetry section
+//   was written for it.  T8 ON test strict again 0/1/0/0 (fuzz case 78).  T9 ON test off 0/8/0/0.  T10 near-side
+//   test off (rays) 2/1/0/0.  T11 pseudo-normal replaced by the nearest plane 1/0/0/0 -- 0 red on the first
+//   battery; the knife-edge section was written for it.  T12 thin cycles refused again 0/4/0/0.  T13 corner
+//   contraction off 0/3/0/0.  T14 join off 0/1/0/0 -- 0 red on the first battery; section 17's fallback ceiling
+//   (87 against 357) was added for it.  T15 on-plane prune off 0/2/0/0.  T16 edge-conformity pass off 0/4/0/0.
+//   T17 conformity injects near-duplicates 0/1/0/1.  T18 empty-solid rule off 0/4/0/0.  T19 empty-solid threshold
+//   x1e6 0/2/0/0 (the needle and the small cutter, both real solids, read as empty).  T20 contact snap 1e-12 0/1/0/0.
+//   19 of 19 red. The first battery also had coplanar-edge clipping disabled at 0 red: it was measured redundant
+//   once the ON test was inclusive and removed (triArrangement.mjs's ROUND 12 paragraph).
+// Round 6's A-F below, re-measured on the final files: A 19 red, B 28, C 1, D 2, E 18, F 5 -- all red. Their
+// per-section lists are round 6's and name rows that sections 8 and 13 no longer have; the counts here are current.
+// F kept its meaning only because the new empty-operand path carries its own copy of the op guard, not one at the
+// top of meshBooleanCore (which made F green until moved).
 //
 // SABOTAGE LOG -- each applied to the real physics/mesh/meshBoolean.mjs, gate run, exit read, file restored
 // byte for byte (restore verified via md5sum against a saved copy before every sabotage). Sabotages A-E were
@@ -118,13 +158,113 @@
 //           fix and its gate section exist to catch.
 //
 // Run: node physics/mesh/meshBoolean-selfcheck.mjs
+// SABOTAGE LOG (BVH-CSG round 16) -- triTriIntersect.mjs, triArrangement.mjs, meshBoolean.mjs; five gates (triTriIntersect /
+// triArrangement / THIS / meshBooleanBlast / blastEngine), each on the real file, restored in a `finally`, md5 verified.
+// 11 of 11 red on the final files:
+//   H1  a crossing interpolated from the lone end again          -> 1 / 0 / 0 / 0 / 3
+//   H2  normals scaled by the reciprocal again                   -> 0 / 1 / 2 / 0 / 0
+//   H3  the seam consensus off by default                        -> 0 / 0 / 1 / 0 / 1
+//   H4  the arrangement ignores canon                            -> 0 / 0 / 1 / 0 / 1
+//   H5  the consensus joins two input vertices                   -> 0 / 0 / 1 / 0 / 0   (0 on the first battery;
+//   H6  the representative ignores input vertices                -> 0 / 0 / 1 / 0 / 0    section 19's by-hand rows)
+//   H7  the B side reads the pair results in A's order           -> 0 / 0 / 21 / 13 / 10
+//   H8  near-parallel pruning off                                -> 0 / 0 / 1 / 0 / 0
+//   H9  fins not cancelled by default                            -> 0 / 0 / 1 / 0 / 0
+//   H10 a same-winding duplicate cancelled as a fin              -> 0 / 0 / 1 / 0 / 0   (0 first; by-hand row added)
+//   H11 `from` not remapped after cancelling (B side)            -> 0 / 0 / 1 / 0 / 0   (0 first: the fin was LAST in
+//       its operand, so cancelling it renumbered nothing; the fixture now puts it first and checks every `from`)
+// SABOTAGE LOG (BVH-CSG round 16c) -- meshBoolean.mjs's vertexRound and its wiring; two gates (THIS / meshBooleanBlast),
+// each on the real file, restored in a `finally`, md5 verified. 10 of 11 red; meshBooleanBlast is 0 on every one (the
+// page's blobs never come within the radius of the wall, so nothing there is rounded -- measured, 60 shots):
+//   Y1  the radius 0 (no rounding)                               -> 11 / 0
+//   Y2  the pairing not mutual                                   -> 1 / 0   (section 21's by-hand pair)
+//   Y3  no collapse/turn-over refusal                            -> 1 / 0   (section 21's needle)
+//   Y4  a tie to the larger point                                -> 1 / 0
+//   Y5  a vertex moved in one of its triangles only              -> 5 / 0
+//   Y6  the radius in the caller's units, not the normalised band -> 2 / 0   (section 21's 4096x row, and section 16's
+//       1e-100 / 1e100 row: at 1e-100 such a radius rounds everything, 6.6e-2 off)
+//   Y7  B's BVH not rebuilt after rounding                       -> 0 / 0   NOT CAUGHT, and named: rays would then
+//       cross B's triangles up to 8e-9 from where the arrangements put them, but every point within MESH_BOOLEAN_NEAR
+//       (1e-8) of B is sided locally from the rounded triangles, never by rays, so no fixture reaches the difference.
+//       The rebuild stays: a tree over the triangles it is asked about is the only correct one.
+//   Y8  the radius 30 snaps                                      -> 2 / 0   (the tilt at 1e-8; a copy rotated 1e-7, 4e-9)
+//   Y9  the stats not recorded                                   -> 2 / 0
+//   Y10 the grid searched in one cell                            -> 8 / 0
+//   Y11 rounding off by default                                  -> 6 / 0
+// SABOTAGE LOG (BVH-CSG round 16d) -- triArrangement.mjs's twin join and meshBoolean.mjs's joinTwin wiring; three gates
+// (THIS / triArrangement / meshBooleanBlast), each on the real file, restored in a `finally`, md5 verified. 5 of 6 red:
+//   Z1  the twin join 8 snaps (round 16c)                        -> 4 / 0 / 0
+//   Z2  a crossing twin never marked                             -> 3 / 0 / 0
+//   Z3  a contact ON a plane marked a twin as well               -> 0 / 0 / 0   NOT CAUGHT, and named: no workload has
+//       a touching (not crossing) triangle with a chain end 8..64 snaps from its side -- the 1,350 flush boxes, the
+//       rotated families, and the page's chains (60 shots, measured with the sabotage in: bit for bit the 8-snap join's)
+//       all come out the same. The join stays limited to crossing twins, the mechanism measured.
+//   Z4  corners first at the twin join                           -> 2 / 0 / 0   (the 128-snap row)
+//   Z5  the first-pass arrangement ignores opts.joinTwin         -> 1 / 0 / 0   (section 22's control)
+//   Z6  the twin join 32 snaps                                   -> 3 / 0 / 0
+// SABOTAGE LOG (BVH-CSG round 16e) -- round 16e built nothing (four fixes measured, none kept); its one new row pins the
+// four cases left (section 22). Against it, on the real files, restored and md5 verified:
+//   W1  vertex rounding off by default                           -> 5 red, none of them the pin
+//   W2  the twin join 8 snaps                                    -> 4 red, none of them the pin
+//   W3  near-parallel at a sine of 1e-9                          -> 3 red, none of them the pin
+//   The pin is held by none of them, and that is measured, not a gap in it: the four cases do not depend on rounds
+//   16c-16d's mechanisms (each removed, they come out the same or better -- seed 7 about x: 4.71e-2, 3.75e-2 without
+//   the rounding). The pin guards those four against what comes next; the mechanisms are held by the rows that went red.
+// SABOTAGE LOG (BVH-CSG round 17) -- meshBoolean.mjs's translation; two gates (THIS / blastEngine), each on the real file,
+// restored in a `finally`, md5 verified. 6 of 7 red on the final file:
+//   T1  no translation                                           -> 4 / 1
+//   T2  t far below the coordinates (x 0.3): the check refuses it -> 3 / 1   (so nothing is moved)
+//   T3  the result not moved back                                -> 5 / 1
+//   T4  every axis moved, near the origin too                    -> 2 / 0   (the page's wall is centred: t = 0, unmoved)
+//   T5  moved back the wrong way                                 -> 5 / 1
+//   T7  the TwoSum exactness check ignored                       -> 0 / 0   NOT CAUGHT, by construction: under the
+//       condition (max |x| > 2 x span) x and t are within a factor of 2, and Sterbenz makes every x - t exact -- the
+//       check never refuses. It stays, so a change to the condition cannot make the move silently inexact:
+//   T8  T2's t AND the check ignored (an inexact move)           -> 3 / 1
+//   The first battery also dropped t's rounding to a multiple of ulp(max |x|), and tried an off-grid t with the check
+//   in: 0 red both, for the same reason -- the rounding was redundant and was removed.
+// SABOTAGE LOG (BVH-CSG round 18) -- round 18 audited, built nothing; its section 24 against meshBoolean.mjs's keep rules
+// for union and intersect, each on the real file, restored and md5 verified. 4 of 4 red, every one in section 24 itself
+// (rows red in the whole gate / in section 24):
+//   U1  union keeps an opposite-facing ON piece                  -> 9 / 1   (touching at a face)
+//   U2  union turns B's pieces round                             -> 32 / 7
+//   U3  intersect turns B's pieces round                         -> 25 / 6
+//   U4  union keeps B's pieces inside A too                      -> 21 / 6
+// SABOTAGE LOG (round 16f) -- in exactArrangement-selfcheck.mjs's header: 15 sabotages across implicitPoints.mjs,
+// exactArrangement.mjs, meshBoolean.mjs and blastEngine.mjs, with this gate's red rows in their column.
+// SABOTAGE LOG (round 16g) -- in blastEngine-selfcheck.mjs's header: 8 sabotages (W1-W8), 8 red; THIS gate red on W1 (4),
+// W3 (1), W6 (7) and W8 (13: this gate's SNAPPED pin dropped).
+// SABOTAGE LOG (round 16h) -- in blastEngine-selfcheck.mjs's header: 8 sabotages (V1-V8) of conformNear, 8 red; THIS gate red
+// on V1, V3, V5, V6 and V7 (1 each; V6 and V7 by section 25(g)'s fixtures, added when the first battery left them 0 red).
+// SABOTAGE LOG (round 20b) -- in blastEngine-selfcheck.mjs's header: 8 sabotages (Y1-Y8) of embedRounded, 7 red, 1 named;
+// THIS gate red on Y2 (2), Y3 (1) and Y5 (1), by section 26's fixtures, built when the first battery left them 0 red.
+// SABOTAGE LOG (round 25, can the snapped path go?) -- meshBoolean.mjs, on the real file, restored and md5 verified; this
+// gate. 2 of 3 red on the round-25 row, 1 named:
+//   X1 conforming off by default                                       3 red (the round-25 row: 60 of 60 fall back)
+//   X2 no decline: the exact path runs on what conforming leaves        5 red (the round-25 row: 0 fall back; and the four
+//        16g/16h rows that assert a decline -- the rows a retirement of the fallback would rewrite)
+//   X3 the exact path without embedRounded                             0 red -- NAMED: the sweep's box operands make no
+//        rounded crossing, so this row cannot see embedRounded; blastEngine-selfcheck sections 16-17 guard it
 "use strict";
 import { MeshBVH } from "../../mesh/meshBVH.mjs";
 import { pairOverlap } from "./bvhPairOverlap.mjs";
 import { groupCandidatesByTriA, accumulateFragments } from "./triFragmentAccumulate.mjs";
 import { pointInMesh } from "./meshPointClassify.mjs";
-import { classifyMeshAgainstOther, assembleBoolean, meshBoolean, MESH_BOOLEAN_MAX_FRAGMENTS, faceSamplePoint, reportLines } from "./meshBoolean.mjs";
+import { embedRounded } from "./meshBoolean.mjs";
+import { manifoldAudit } from "./manifoldAudit.mjs";
+import { classifyMeshAgainstOther, assembleBoolean, meshBoolean, seamConsensus, joinSeamEnds, reverseTwins, vertexRound, VERTEX_ROUND, translationFor, MESH_BOOLEAN_MAX_FRAGMENTS } from "./meshBoolean.mjs";
 import * as M from "./meshCSG.mjs";
+import { closestOnTriangle } from "./triContact.mjs";
+import { stats as implicitStats } from "./implicitPoints.mjs";
+// round 16g: meshBoolean's default arrangement is exact. A row whose subject is the SNAPPED path's own mechanism (vertex
+// rounding, the seam consensus, the conformity pass, the joins, round 11's normalisation as a necessity) runs it by name.
+const SNAPPED = { exactArrangement: false };
+// and an output is closed when every directed edge has its twin on the very same two doubles -- a key census would merge
+// the exact arrangement's distinct close points (jaggedBlob's north pole: two vertices 1.07e-9 apart read as a T-junction
+// at the 1e-6 key)
+const bitsOpen = (buf) => { const key = (o) => buf[o] + "," + buf[o + 1] + "," + buf[o + 2], E = new Map();
+    for (let o = 0; o < buf.length; o += 9) { const k = [key(o), key(o + 3), key(o + 6)]; for (let i = 0; i < 3; i++) if (k[i] !== k[(i + 1) % 3]) { const e = k[i] + "|" + k[(i + 1) % 3]; E.set(e, (E.get(e) || 0) + 1); } }
+    let c = 0; for (const [e, n] of E) { const [a, b] = e.split("|"); if ((E.get(b + "|" + a) || 0) !== n) c++; } return c; };
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -266,9 +406,19 @@ let FLUSH;
     const oracle = M.volume(M.union(Apolys, Bpolys));
     ok("!! oracle sanity: two unit-half-extent boxes glued face-to-face union to volume 16", close(oracle, 16, 1e-9), "oracle=" + oracle);
 
-    const classifiedA = classifyMeshAgainstOther(bufA, bvhA, bufB, bvhB);
-    const classifiedB = classifyMeshAgainstOther(bufB, bvhB, bufA, bvhA);
-    ok("!! this fixture genuinely produces ambiguous fragments (a vacuous toggle test would prove nothing)",
+    // ROUND 12: the default no longer produces an ambiguous fragment here -- the glued faces are ON each other and are
+    // decided by orientation (section 17) -- so the policy is measured where it still applies: the round-11 pipeline,
+    // contacts:false, which is also what a triangle falling back to the plane path gets.
+    const classifiedA = classifyMeshAgainstOther(bufA, bvhA, bufB, bvhB, { contacts: false });
+    const classifiedB = classifyMeshAgainstOther(bufB, bvhB, bufA, bvhA, { contacts: false });
+    {
+        const dA = classifyMeshAgainstOther(bufA, bvhA, bufB, bvhB), dB = classifyMeshAgainstOther(bufB, bvhB, bufA, bvhA);
+        const amb = dA.fragments.filter((f) => f.ambiguous).length + dB.fragments.filter((f) => f.ambiguous).length;
+        ok("!! ROUND 12: by default the same glued faces classify with NO ambiguous fragment -- every shared-face fragment is ON the other, opposite-facing",
+            amb === 0 && dA.stats.onFaces > 0 && dB.stats.onFaces > 0 && [...dA.fragments, ...dB.fragments].every((f) => f.on !== 1),
+            "ambiguous " + amb + ", on-faces A/B " + dA.stats.onFaces + "/" + dB.stats.onFaces);
+    }
+    ok("!! with contacts:false this fixture genuinely produces ambiguous fragments (a vacuous toggle test would prove nothing)",
         classifiedA.fragments.some(f => f.ambiguous) || classifiedB.fragments.some(f => f.ambiguous),
         "A ambiguous=" + classifiedA.fragments.filter(f=>f.ambiguous).length + " B ambiguous=" + classifiedB.fragments.filter(f=>f.ambiguous).length);
 
@@ -341,16 +491,19 @@ console.log("\n6. *** THE EMPTY-CANDIDATE SHORTCUT IS STRUCTURALLY EQUIVALENT TO
 }
 
 // =============================================================================================================
-console.log("\n7. *** FLUSH-FACE UNION: EXACT VOLUME AND WATERTIGHTNESS MEASURED (NOT ASSERTED ZERO-CRACK) ***");
+console.log("\n7. *** FLUSH-FACE UNION: EXACT, AND SINCE ROUND 12 WATERTIGHT ***");
 {
     const { bufA, bvhA, bufB, bvhB, oracle } = FLUSH;
-    const r = meshBoolean(bufA, bvhA, bufB, bvhB, "union");
-    const got = M.volume(wrapAsPolys(r.tris));
-    ok("!! meshBoolean() union matches the oracle exactly despite a high ambiguous-fragment count",
-        close(got, oracle, 1e-9), "got " + got + ", ambiguous=" + r.ambiguousTriIndices.length + "/" + r.triCount);
-    const wt = M.watertight(wrapAsPolys(r.tris));
-    console.log("  ..... watertight (raw, no snap/weld -- see meshBoolean.mjs's own header): ok=" + wt.ok +
-        " unmatched=" + wt.unmatched + "/" + wt.edges + " -- MEASURED baseline, not asserted zero, out of scope this round");
+    const r0 = meshBoolean(bufA, bvhA, bufB, bvhB, "union", { contacts: false });
+    ok("!! round 11's path (contacts:false) matches the oracle exactly despite a high ambiguous-fragment count",
+        close(M.volume(wrapAsPolys(r0.tris)), oracle, 1e-9), "got " + M.volume(wrapAsPolys(r0.tris)) + ", ambiguous=" + r0.ambiguousTriIndices.length + "/" + r0.triCount);
+    const wt0 = M.watertight(wrapAsPolys(r0.tris));
+    // ROUND 12: the glued faces are dropped from both sides by orientation, and the result is closed
+    const r = meshBoolean(bufA, bvhA, bufB, bvhB, "union"), wt = M.watertight(wrapAsPolys(r.tris));
+    ok("!! ROUND 12: by default the union is exact, has no ambiguous fragment, and is WATERTIGHT raw (round 11: 8 of 62 edges open)",
+        close(M.volume(wrapAsPolys(r.tris)), oracle, 1e-9) && r.ambiguousTriIndices.length === 0 && wt.unmatched === 0 && wt0.unmatched === 8,
+        "volume " + M.volume(wrapAsPolys(r.tris)) + ", ambiguous " + r.ambiguousTriIndices.length + ", unmatched " + wt.unmatched + "/" + wt.edges +
+        " (contacts:false: " + wt0.unmatched + "/" + wt0.edges + ")");
 }
 
 // =============================================================================================================
@@ -372,55 +525,52 @@ console.log("\n8. *** REUSING meshCSG-selfcheck.mjs's OWN 8 DEGENERATE-CONTACT F
         ["a cutter that IS the wall",         [0, 0, 0],      [4.0, 3.0, 0.3], true],
         ["a corner on a face interior",       [0, 0, 0.8],    [0.5, 0.5, 0.5], 0.00347],
     ];
+    // ROUND 12: the three flush cases were KNOWN (their 4th field held round 6's measured relative error). The root
+    // cause traced then -- a 5.55e-17 gap left the flush faces with NO candidate pair, so whole face-sized triangles
+    // were classified by rays at a point on the other surface -- is what round 12 answers: a padded broad phase, the
+    // pair resolved as coplanar (triContact.mjs), the overlap cut and decided by orientation. All eight are exact now,
+    // for all three operations; contacts:false still reproduces round 11's numbers, as the control.
     const A = M.boxPolys(WC, WH), VA = M.volume(A);
     const { buf: bufA, bvh: bvhA } = buildBVH(A);
-    let exactCount = 0, expectExact = 0, knownGapUnresolvedSeen = 0;
+    let exactCount = 0, runs = 0, ambSeen = 0, fbSeen = 0, openSeen = 0;
+    const control = [];
     for (const [name, c, h, mode] of cases) {
-        const B = M.boxPolys(c, h), exp = overlapVol(WC, WH, c, h);
-        const expVol = VA - exp;
+        const B = M.boxPolys(c, h), ov = overlapVol(WC, WH, c, h), VB = M.volume(B);
         const { buf: bufB, bvh: bvhB } = buildBVH(B);
-        const r = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract");
-        const got = M.volume(wrapAsPolys(r.tris));
-        const abs = Math.abs(got - expVol);
-        if (mode === true) {
-            expectExact++;
-            ok("!! " + name, abs < 1e-9, "expected " + expVol.toFixed(6) + " got " + got.toFixed(6) + " err " + abs.toExponential(3));
-            if (abs < 1e-9) exactCount++;
-        } else {
-            // KNOWN, MEASURED, UNRESOLVED GAP -- reported, not asserted as a pass. See meshBoolean.mjs's own
-            // header for the root-cause investigation (traced precisely during this round's own follow-up fix
-            // pass: every triangle here takes the EMPTY-CANDIDATE SHORTCUT, since a sub-ULP floating-point gap
-            // in boxPolys's own c-h subtraction means pairOverlap finds zero true AABB-overlapping candidates
-            // between the "flush" faces -- the resulting whole, face-sized, unsplit triangles get correctly
-            // flagged ambiguous by pointInMesh's own agreement<1 signal, but "keep ambiguous" has no size
-            // awareness, so a kept whole face-sized triangle distorts volume far more than a kept sliver
-            // would). Bound (not asserted zero) so a future regression that makes this MUCH worse is caught.
-            const rel = Math.abs(expVol) > 1e-9 ? abs / Math.abs(expVol) : abs;
-            const bound = mode * 2.5;
-            console.log("  KNOWN  " + name + "   expected " + expVol.toFixed(6) + " got " + got.toFixed(6) +
-                " absErr " + abs.toExponential(3) + " relErr " + (rel*100).toFixed(2) + "% (baseline " + (mode*100).toFixed(2) +
-                "%) -- touching/zero-volume-contact gap, not fixed this round -- emptyCandidateShortcuts a/b=" +
-                r.stats.a.emptyCandidateShortcuts + "/" + r.stats.a.triCount + " " + r.stats.b.emptyCandidateShortcuts + "/" + r.stats.b.triCount +
-                " ambiguous=" + r.ambiguousTriIndices.length);
-            ok("!! " + name + " (known gap) error stays within 2.5x its own measured baseline -- a regression alarm, not a correctness claim",
-                rel < bound, "relErr=" + (rel*100).toFixed(3) + "% bound=" + (bound*100).toFixed(3) + "%");
-            ok("!! " + name + " (known gap) confirms the traced root cause: every triangle of both meshes takes the empty-candidate shortcut, and at least one output fragment is flagged ambiguous",
-                r.stats.a.emptyCandidateShortcuts === r.stats.a.triCount && r.stats.b.emptyCandidateShortcuts === r.stats.b.triCount && r.ambiguousTriIndices.length > 0,
-                "a=" + r.stats.a.emptyCandidateShortcuts + "/" + r.stats.a.triCount + " b=" + r.stats.b.emptyCandidateShortcuts + "/" + r.stats.b.triCount + " ambiguous=" + r.ambiguousTriIndices.length);
+        const want = { union: VA + VB - ov, subtract: VA - ov, intersect: ov };
+        let worst = 0;
+        for (const op of ["union", "subtract", "intersect"]) {
+            const r = meshBoolean(bufA, bvhA, bufB, bvhB, op);
+            worst = Math.max(worst, Math.abs(M.volume(wrapAsPolys(r.tris)) - want[op]));
+            ambSeen += r.ambiguousTriIndices.length; fbSeen += r.stats.a.fallbackTris + r.stats.b.fallbackTris;
+            if (op === "subtract") openSeen += M.watertight(wrapAsPolys(r.tris)).unmatched;
+            runs++;
+        }
+        ok("!! " + name + (mode === true ? "" : " (round 11: KNOWN, " + (mode * 100).toFixed(2) + "% off)") + ": union, subtract and intersect exact",
+            worst < 1e-9, "worst |err| " + worst.toExponential(3));
+        if (worst < 1e-9) exactCount++;
+        if (mode !== true) {
+            const r0 = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract", { contacts: false });
+            const rel0 = Math.abs(M.volume(wrapAsPolys(r0.tris)) - want.subtract) / want.subtract;
+            control.push([name, rel0, mode, r0.stats.a.emptyCandidateShortcuts === r0.stats.a.triCount && r0.stats.b.emptyCandidateShortcuts === r0.stats.b.triCount]);
         }
     }
-    ok("!! " + expectExact + " of " + expectExact + " non-flush degenerate-contact fixtures match the oracle exactly",
-        exactCount === expectExact, exactCount + "/" + expectExact);
+    ok("!! all 8 degenerate-contact fixtures exact for all 3 operations, with no ambiguous fragment, no fallback, and every subtract WATERTIGHT raw",
+        exactCount === 8 && ambSeen === 0 && fbSeen === 0 && openSeen === 0,
+        exactCount + "/8 exact over " + runs + " runs, ambiguous " + ambSeen + ", fallback triangles " + fbSeen + ", unmatched (subtract) " + openSeen);
+    ok("   control: contacts:false (round 11's pipeline) reproduces each former KNOWN error to 1e-4 of its own baseline, every triangle taking the empty-candidate shortcut",
+        control.every(([, rel0, base, shortcut]) => Math.abs(rel0 - base) < 1e-4 && shortcut),
+        control.map(([n, r0, b, sc]) => n + " " + (r0 * 100).toFixed(2) + "% (baseline " + (b * 100).toFixed(2) + "%, all-shortcut " + sc + ")").join("; "));
     // An adversarial review of this round's own gate found stats.capped propagation (classifyMeshAgainstOther's
     // `if (acc.capped) capped = true`) was exercised ONLY on the always-false path (sections 2 and 9), never on
     // genuinely true input -- a regression that broke the accumulation (e.g. `capped = acc.capped`, losing an
     // earlier triangle's true value, instead of OR-accumulating) would pass silently. Force it true directly
     // via a deliberately tiny maxFragments on the primary fixture and confirm meshBoolean() surfaces it.
     {
-        // Round 9: the fragment cap belongs to the plane-cut path -- the arrangement default never caps -- so
-        // every capped check in this block pins that path with arrangement:false.
         const { bufA, bvhA, bufB, bvhB } = PRIMARY;
-        const rCapped = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract", { arrangement: false, accOpts: { maxFragments: 3 } });
+        // Round 9: the fragment cap is the PLANE path's (the arrangement has none -- see triArrangement.mjs), so
+        // these three checks now ask for that path by name.
+        const rCapped = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract", { cutting: "plane", accOpts: { maxFragments: 3 } });
         ok("!! stats.capped correctly reports true when accOpts.maxFragments is forced tiny (exercises the true/nonzero propagation path, not just false)",
             rCapped.stats.a.capped === true || rCapped.stats.b.capped === true,
             "statsA.capped=" + rCapped.stats.a.capped + " statsB.capped=" + rCapped.stats.b.capped);
@@ -428,7 +578,7 @@ console.log("\n8. *** REUSING meshCSG-selfcheck.mjs's OWN 8 DEGENERATE-CONTACT F
         // 0.74% on meshCSG's own blast fixture), so meshBoolean() now surfaces it at the TOP LEVEL rather than
         // leaving it in stats.a/stats.b where round 6 left it. Both directions checked: true when forced, false
         // on the same fixture at the default cap.
-        const rDefault = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract", { arrangement: false });
+        const rDefault = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract", { cutting: "plane" });
         ok("!! round 7: the top-level `capped` is true when either side capped, and false at the default cap",
             rCapped.capped === true && rDefault.capped === false &&
             rCapped.capped === (rCapped.stats.a.capped || rCapped.stats.b.capped),
@@ -441,7 +591,7 @@ console.log("\n8. *** REUSING meshCSG-selfcheck.mjs's OWN 8 DEGENERATE-CONTACT F
         const blobBuf = M.toTriangleBuffer(M.jaggedBlob([0, 0, 0], 1.0, 8, 12345));
         const wallBuf = M.toTriangleBuffer(M.boxPolys([0, 0, 0], [4, 3, 0.3]));
         const rB = meshBoolean(blobBuf, new MeshBVH(blobBuf), wallBuf, new MeshBVH(wallBuf), "union",
-            { arrangement: false, accOpts: { gateByIntersection: false, maxFragments: 256 } });
+            { cutting: "plane", accOpts: { gateByIntersection: false, maxFragments: 256 } });
         ok("!! round 7: the top-level `capped` is true when ONLY side B capped",
             rB.stats.a.capped === false && rB.stats.b.capped === true && rB.capped === true,
             "stats.a.capped=" + rB.stats.a.capped + " stats.b.capped=" + rB.stats.b.capped + " capped=" + rB.capped);
@@ -485,15 +635,19 @@ console.log("\n10. *** DISJOINT BOXES: THE 'NOTHING TO CUT' EDGE CASE ***");
 }
 
 // =============================================================================================================
-console.log("\n11. *** THE A-VS-B SEAM DOES NOT COINCIDE, MEASURED AS A NAMED, NON-REGRESSION BASELINE ***");
+console.log("\n11. *** THE A-VS-B SEAM: COINCIDENT UNDER THE ARRANGEMENT (ROUND 9), A MEASURED BASELINE UNDER THE PLANE PATH ***");
 {
     // meshBoolean.mjs's own header names this: A's and B's independently-clipped cut-boundary vertices do
     // NOT land on top of each other, even on a clean fixture. Measured directly here (not merely asserted)
     // and gated as a NON-REGRESSION baseline -- an increase far beyond the measured baseline would signal a
     // real regression; the baseline itself is not claimed to be good.
+    // ROUND 9: the default path now builds each seam vertex ONCE -- triTriIntersect(a, b) and triTriIntersect(b, a)
+    // compute the same point by the same formula, and both meshes' arrangements keep that point as given -- so
+    // the seam coincides and the raw output is watertight. Both paths are measured below, each by name.
     const { Apolys, Bpolys, bufA, bvhA, bufB, bvhB } = PRIMARY;
-    const classifiedA = classifyMeshAgainstOther(bufA, bvhA, bufB, bvhB);
-    const classifiedB = classifyMeshAgainstOther(bufB, bvhB, bufA, bvhA);
+    function seam(cutting) {
+    const classifiedA = classifyMeshAgainstOther(bufA, bvhA, bufB, bvhB, { cutting });
+    const classifiedB = classifyMeshAgainstOther(bufB, bvhB, bufA, bvhA, { cutting });
     function origCorners(polys) {
         const s = new Set();
         for (const p of polys) for (const v of p.vs) s.add(v.map(x => x.toFixed(6)).join(","));
@@ -517,43 +671,39 @@ console.log("\n11. *** THE A-VS-B SEAM DOES NOT COINCIDE, MEASURED AS A NAMED, N
         for (const bv of bCutVerts) { const d = Math.hypot(av[0]-bv[0], av[1]-bv[1], av[2]-bv[2]); if (d < best) best = d; }
         if (best < 1e-6) matched++;
     }
+    let exact = 0;
+    for (const av of aCutVerts) if (bCutVerts.some((bv) => bv[0] === av[0] && bv[1] === av[1] && bv[2] === av[2])) exact++;
     const matchRate = aCutVerts.length ? matched / aCutVerts.length : 1;
-    console.log("  ..... default path (round 9 arrangement): A cut verts=" + aCutVerts.length + " B cut verts=" + bCutVerts.length +
-        " matched-within-1e-6=" + matched + " (" + (matchRate*100).toFixed(1) + "%) -- measured, not a correctness claim");
-    // ROUND 9: the default path now cuts each triangle along the ACTUAL intersection segments (triArrangement.mjs),
-    // and a face's vertices are only triA's own corners and triTriIntersect()'s own segment endpoints -- never a
-    // point a plane cut invented. On this fixture that makes A's and B's cut boundaries meet everywhere within
-    // watertight()'s 1e-6 quantum: measured 0/114 (22 A-side cut vertices, all 22 matched), against the plane-cut
-    // path's 29/117 below. THAT IS THIS FIXTURE, NOT A GUARANTEE: triTriIntersect(a, b) and (b, a) are separate
-    // float computations of the same crossing, and the twelve-blast chain still has 1,143 raw unmatched edges on
-    // this path (meshBooleanBlast-selfcheck.mjs section 8). Pinned at zero because zero is what it measures.
-    const r = meshBoolean(PRIMARY.bufA, PRIMARY.bvhA, PRIMARY.bufB, PRIMARY.bvhB, "subtract");
+    console.log("  ..... " + cutting + ": A cut verts=" + aCutVerts.length + " B cut verts=" + bCutVerts.length +
+        " matched-within-1e-6=" + matched + " (" + (matchRate*100).toFixed(1) + "%), bit-identical=" + exact);
+    return { aCut: aCutVerts.length, matched, exact };
+    }
+    const sa = seam("arrangement"), sp = seam("plane");
+    const ra = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract");
+    const wta = M.watertight(wrapAsPolys(ra.tris));
+    ok("!! *** ROUND 9: every A-side seam vertex is BIT-IDENTICAL to a B-side one, and the raw output is watertight ***",
+        sa.aCut > 10 && sa.exact === sa.aCut && wta.ok && ra.stats.a.fallbackTris + ra.stats.b.fallbackTris === 0,
+        sa.exact + "/" + sa.aCut + " bit-identical; unmatched " + wta.unmatched + "/" + wta.edges +
+        " (the plane path: " + sp.matched + "/" + sp.aCut + " within 1e-6)");
+    const r = meshBoolean(PRIMARY.bufA, PRIMARY.bvhA, PRIMARY.bufB, PRIMARY.bvhB, "subtract", { cutting: "plane" });
     const wt = M.watertight(wrapAsPolys(r.tris));
-    ok("!! ROUND 9 DEFAULT (arrangement): the primary fixture's subtract has NO unmatched edge",
-        wt.unmatched === 0 && r.stats.a.arrangedTriangles + r.stats.b.arrangedTriangles > 0,
-        "unmatched=" + wt.unmatched + "/" + wt.edges + " arranged a=" + r.stats.a.arrangedTriangles +
-        " b=" + r.stats.b.arrangedTriangles + " (measured 0/114 at round 9)");
-    const rp = meshBoolean(PRIMARY.bufA, PRIMARY.bvhA, PRIMARY.bufB, PRIMARY.bvhB, "subtract", { arrangement: false });
-    const wtp = M.watertight(wrapAsPolys(rp.tris));
-    // ROUND 7 RE-BASELINE, NOT A LOOSENING -- kept since round 9 as the PLANE-CUT path's own reproduction, which
-    // is what runs wherever the arrangement refuses a triangle. Round 7 gated accumulation by actual intersection
-    // (see triFragmentAccumulate.mjs's own ROUND 7 paragraph). The same fixture measured 37/189
+    // ROUND 7 RE-BASELINE, NOT A LOOSENING: meshBoolean() now gates accumulation by actual intersection by
+    // default (see triFragmentAccumulate.mjs's own ROUND 7 paragraph). The same fixture measured 37/189
     // unmatched with 104 A-side cut vertices (17.3% coinciding with a B-side one) under round 6's ungated path;
     // gated it measured 32/120 with 36 A-side cut vertices (47.2%), and 29/117 with 33 (48.5%) once round 7's
     // review added the per-plane group pre-filter (a group missing the whole triangle no longer splits it). The
-    // ceiling was TIGHTENED from 45 to 35 for the gated path, and round 6's ungated number is kept as its own
+    // ceiling is TIGHTENED from 45 to 35 for the default path, and round 6's ungated number is kept as its own
     // reproduction so the comparison stays in the gate rather than only in this comment. (An adversarial review
     // noted the gated unmatched RATIO is worse -- 29/117 is 25% against 37/189's 20% -- the count and the mesh
     // are smaller, the fraction of seam edges is not; stated here rather than letting "improved" stand alone.)
-    ok("!! plane-cut path: watertight() unmatched-edge count on the primary fixture stays within the measured baseline (non-regression, not zero-crack)",
-        wtp.unmatched <= 35 && rp.stats.a.arrangedTriangles + rp.stats.b.arrangedTriangles === 0,
-        "unmatched=" + wtp.unmatched + "/" + wtp.edges + " (gated plane-cut path, measured 29/117 at rounds 7-9)");
+    ok("!! watertight() unmatched-edge count on the primary fixture stays within the measured baseline (non-regression, not zero-crack)",
+        wt.unmatched <= 35, "unmatched=" + wt.unmatched + "/" + wt.edges + " (gated default, measured 29/117 at round 7)");
     const r6 = meshBoolean(PRIMARY.bufA, PRIMARY.bvhA, PRIMARY.bufB, PRIMARY.bvhB, "subtract",
-        { arrangement: false, accOpts: { gateByIntersection: false } });
+        { cutting: "plane", accOpts: { gateByIntersection: false } });
     const wt6 = M.watertight(wrapAsPolys(r6.tris));
     ok("   ...and round 6's ungated path, kept reachable by option, still measures its own round-6 baseline",
-        wt6.unmatched <= 45 && wt6.edges > wtp.edges && r6.triCount > rp.triCount,
-        "ungated unmatched=" + wt6.unmatched + "/" + wt6.edges + " tris=" + r6.triCount + " vs gated tris=" + rp.triCount +
+        wt6.unmatched <= 45 && wt6.edges > wt.edges && r6.triCount > r.triCount,
+        "ungated unmatched=" + wt6.unmatched + "/" + wt6.edges + " tris=" + r6.triCount + " vs gated tris=" + r.triCount +
         " (round 6 measured 37/189)");
 }
 
@@ -582,7 +732,7 @@ console.log("\n12. *** AN UNRECOGNIZED op THROWS RATHER THAN SILENTLY RETURNING 
 }
 
 // =============================================================================================================
-console.log("\n13. *** A DEGENERATE (ZERO-VOLUME) OPERAND -- A NEW, MEASURED, NOT-FIXED-THIS-ROUND GAP ***");
+console.log("\n13. *** A DEGENERATE (ZERO-VOLUME) OPERAND -- FOUND AT ROUND 6, FIXED AT ROUND 12 ***");
 {
     // An adversarial review of this round's own diff found this by direct numerical probing, not by reading
     // the code: a zero-volume operand (a box with one half-extent forced to 0, a flat rectangle) embedded
@@ -597,20 +747,21 @@ console.log("\n13. *** A DEGENERATE (ZERO-VOLUME) OPERAND -- A NEW, MEASURED, NO
     const { buf: bufA, bvh: bvhA } = buildBVH(Apolys), { buf: bufB, bvh: bvhB } = buildBVH(Bpolys);
     const expected = { union: 8, subtract: 0, intersect: 0 };
     const measuredBaseline = { union: 7.833333333333333, subtract: -0.16666666666666666, intersect: 0.16666666666666666 };
+    // ROUND 12: FIXED. An operand whose mean thickness (2 x volume / area) is under CONTACT_EPS encloses nothing, and
+    // the regularised answer needs no classification: union is the other operand, subtract A - (empty) is A, anything
+    // minus or intersected with it is empty. contacts:false keeps round 11's numbers, as the control.
     for (const op of ["union", "subtract", "intersect"]) {
-        const r = meshBoolean(bufA, bvhA, bufB, bvhB, op);
-        const got = M.volume(wrapAsPolys(r.tris));
-        console.log("  KNOWN  degenerate-operand " + op + "   expected " + expected[op] + " got " + got +
-            " (baseline " + measuredBaseline[op] + ") -- zero-volume-operand gap, not fixed this round");
-        // Bound to the exact measured baseline (float64-exact reproduction expected, since this is a fully
-        // deterministic fixture) rather than a percentage -- this is a regression trip-wire on THIS EXACT
-        // number, not a claim that the number itself is acceptable.
-        ok("!! degenerate-operand " + op + " matches the exact measured baseline (regression trip-wire, NOT a correctness claim -- see meshBoolean.mjs's own header)",
-            close(got, measuredBaseline[op], 1e-9), "got " + got + " baseline " + measuredBaseline[op]);
+        const r = meshBoolean(bufA, bvhA, bufB, bvhB, op), got = M.volume(wrapAsPolys(r.tris));
+        const r0 = meshBoolean(bufA, bvhA, bufB, bvhB, op, { contacts: false }), got0 = M.volume(wrapAsPolys(r0.tris));
+        ok("!! ROUND 12: degenerate-operand " + op + " is exact (" + expected[op] + "), the operand recognised as empty",
+            close(got, expected[op], 1e-12) && r.emptyOperand === "a" && M.watertight(wrapAsPolys(r.tris)).unmatched === 0,
+            "got " + got + ", emptyOperand " + r.emptyOperand + " -- control contacts:false: " + got0 + " (round 11 baseline " + measuredBaseline[op] + ")");
+        ok("   control: contacts:false still gives round 11's number", close(got0, measuredBaseline[op], 1e-9), "got " + got0);
     }
-    ok("!! ...and confirms the wrong-SIGN symptom specifically: subtract of a zero-volume operand yields a NEGATIVE volume (mathematically impossible for a real subtract result)",
-        (() => { const r = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract"); return M.volume(wrapAsPolys(r.tris)) < 0; })(),
-        "confirms the review's own headline finding, not merely a magnitude error");
+    // the empty-operand path returns before assembleBoolean(), so it carries section 12's guard itself
+    let threwEmpty = 0;
+    for (const bad of ["Subtract", "difference", undefined]) { try { meshBoolean(bufA, bvhA, bufB, bvhB, bad); } catch { threwEmpty++; } }
+    ok("   ...and an unrecognized op still throws when an operand is empty (that path skips assembleBoolean)", threwEmpty === 3, threwEmpty + " of 3 threw");
 }
 
 // =============================================================================================================
@@ -634,38 +785,31 @@ console.log("\n14. *** ROUND 7 REVIEW FIXES: THE PLANE-DEDUP ROOF, AND accOpts T
         T.forEach((t, i) => { for (let v = 0; v < 3; v++) for (let c = 0; c < 3; c++) buf[i * 9 + v * 3 + c] = t[v][c]; });
         return buf;
     }
-    // Round 9: three arms, each pinned by option -- the arrangement (the default, which never merges planes: it
-    // cuts along each B triangle's own segment), the gated plane-cut path, and round 6's ungated one. Before
-    // round 9's review the second and third arms ran with the default, so the fix this section guards was being
-    // checked on the arrangement instead of on the plane path it lives in.
-    let worstArr = 0, worst = 0, worstUngated = 0, arranged = 0, detail = [];
+    let worst = 0, worstUngated = 0, worstArr = 0, detail = [];
     for (const z0 of [0, 5]) for (const s of [2e-5, 1e-5, 1e-6]) {
         const bufB = roofPrism(s, z0);
         const bufA = M.toTriangleBuffer(M.boxPolys([0, 0, z0], [1, 60, 0.5]));
         const bA = new MeshBVH(bufA), bB = new MeshBVH(bufB);
         const exact = 2 * (60 + s * 3600);
-        const rd = meshBoolean(bufA, bA, bufB, bB, "subtract");
-        const d = M.volume(wrapAsPolys(rd.tris)) - exact;
-        arranged += rd.stats.a.arrangedTriangles + rd.stats.b.arrangedTriangles;
-        const g = M.volume(wrapAsPolys(meshBoolean(bufA, bA, bufB, bB, "subtract", { arrangement: false }).tris)) - exact;
+        const g = M.volume(wrapAsPolys(meshBoolean(bufA, bA, bufB, bB, "subtract", { cutting: "plane" }).tris)) - exact;
         const u = M.volume(wrapAsPolys(meshBoolean(bufA, bA, bufB, bB, "subtract",
-            { arrangement: false, accOpts: { gateByIntersection: false, maxFragments: 256 } }).tris)) - exact;
-        worstArr = Math.max(worstArr, Math.abs(d)); worst = Math.max(worst, Math.abs(g)); worstUngated = Math.max(worstUngated, Math.abs(u));
+            { cutting: "plane", accOpts: { gateByIntersection: false, maxFragments: 256 } }).tris)) - exact;
+        const ar = M.volume(wrapAsPolys(meshBoolean(bufA, bA, bufB, bB, "subtract").tris)) - exact;
+        worst = Math.max(worst, Math.abs(g)); worstUngated = Math.max(worstUngated, Math.abs(u));
+        worstArr = Math.max(worstArr, Math.abs(ar));
         detail.push("z0=" + z0 + ",s=" + s + ":" + g.toExponential(1));
     }
-    ok("!! shallow roof ridge (dihedral 4e-6..4e-5 rad) subtracted from a box: exact on every slope and centring, plane-cut paths",
-        worst < 1e-9 && worstUngated < 1e-9,
-        "worst |err| gated " + worst.toExponential(2) + ", round-6 path " + worstUngated.toExponential(2) +
+    ok("!! shallow roof ridge (dihedral 4e-6..4e-5 rad) subtracted from a box: exact on every slope and centring",
+        worst < 1e-9 && worstUngated < 1e-9 && worstArr < 1e-9,
+        "worst |err| arrangement " + worstArr.toExponential(2) + ", plane gated " + worst.toExponential(2) +
+        ", round-6 path " + worstUngated.toExponential(2) +
         " (before the fix: 0.048 / 0.024 / 0.0024 on both) -- " + detail.join(" "));
-    ok("!! ...and on the round-9 arrangement default, which arranged triangles on every case",
-        worstArr < 1e-9 && arranged >= 6 * 12,
-        "worst |err| " + worstArr.toExponential(2) + ", triangles arranged " + arranged + " (measured 12 per case)");
 
     // {maxFragments: undefined} used to spread over the default and fall through to triFragmentAccumulate's own
     // 256; {gateByIntersection: undefined} used to turn the gate off. Both must now leave the defaults alone.
     const { bufA, bvhA, bufB, bvhB } = PRIMARY;
-    const d0 = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract", { arrangement: false });
-    const dU = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract", { arrangement: false, accOpts: { gateByIntersection: undefined, maxFragments: null } });
+    const d0 = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract", { cutting: "plane" });
+    const dU = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract", { cutting: "plane", accOpts: { gateByIntersection: undefined, maxFragments: null } });
     ok("!! accOpts keys that are present but undefined/null do NOT override meshBoolean's defaults",
         dU.triCount === d0.triCount && dU.stats.a.gateTested === d0.stats.a.gateTested && dU.stats.a.gateTested > 0,
         "default tris=" + d0.triCount + " gateTested=" + d0.stats.a.gateTested + "; with undefined/null keys tris=" +
@@ -673,182 +817,1106 @@ console.log("\n14. *** ROUND 7 REVIEW FIXES: THE PLANE-DEDUP ROOF, AND accOpts T
 }
 
 // =============================================================================================================
-console.log("\n15. *** ROUND 9: THE ARRANGEMENT IS THE DEFAULT; THE PLANE-CUT PATH IS ITS FALLBACK ***");
+console.log("\n15. *** ROUND 9: SEGMENT-BOUNDED CUTTING (triArrangement.mjs) AGAINST THE PLANE PATH, THE BSP, AND BY HAND ***");
 {
-    // Every volume above is now computed through triArrangement.mjs where it accepts a triangle. Here, the same
-    // fixtures both ways: the random general-position sweep (section 9's generator re-run) must agree to float
-    // noise, and the degenerate-contact fixtures -- flush faces, shared edges -- must be REFUSED (coplanar or
-    // degenerate), never arranged, so the plane-cut path's gated handling of them is what runs.
-    const Apolys = M.boxPolys([0, 0, 0], [1, 1, 1]);
-    const bufA = M.toTriangleBuffer(Apolys), bvhA = new MeshBVH(bufA);
-    let s = 17; const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
-    let worst = 0, arranged = 0, faces = 0;
-    const sweepRefusals = {};
-    for (let i = 0; i < 30; i++) {
-        const c = [rnd() * 2 - 1, rnd() * 2 - 1, rnd() * 2 - 1], h = [0.2 + rnd(), 0.2 + rnd(), 0.2 + rnd()];
-        const bufB = M.toTriangleBuffer(M.boxPolys(c, h)), bvhB = new MeshBVH(bufB);
-        for (const op of ["subtract", "union", "intersect"]) {
-            const ar = meshBoolean(bufA, bvhA, bufB, bvhB, op), pl = meshBoolean(bufA, bvhA, bufB, bvhB, op, { arrangement: false });
-            worst = Math.max(worst, Math.abs(M.volume(wrapAsPolys(ar.tris)) - M.volume(wrapAsPolys(pl.tris))));
-            for (const st of [ar.stats.a, ar.stats.b]) {
-                arranged += st.arrangedTriangles; faces += st.arrangementFaces;
-                for (const [k, v] of Object.entries(st.arrangementRefusals)) sweepRefusals[k] = (sweepRefusals[k] || 0) + v;
-            }
-        }
-    }
-    ok("!! 30 random box pairs x 3 ops: arrangement and plane-cut path give the same volume to float noise",
-        worst < 1e-12 && arranged > 0, "worst |dV| " + worst.toExponential(2) + ", triangles arranged " + arranged);
-    // The volume agreement above holds whether or not the arrangement runs -- a refused triangle goes to the
-    // plane-cut path and still gets the right answer. So it could not see the first version refusing 3 general-
-    // position triangles as "triangulation orientation" (rounding-noise slivers; see triArrangement.mjs). These
-    // fixtures are in general position: nothing may be refused, and triangles must really be split into faces.
-    ok("!! ...and the arrangement REFUSED NOTHING on them, and split triangles into more than one face each on average",
-        Object.keys(sweepRefusals).length === 0 && faces > arranged,
-        "refusals " + JSON.stringify(sweepRefusals) + ", faces " + faces + " from " + arranged +
-        " arranged triangles (measured {} and 2190 from 1008 at round 9)");
-
-    // TINY FEATURES -- A FACE IS NOT A SLIVER FOR BEING SMALL. The first version dropped any triangle under 1e-14
-    // of triA's area. Two reviewers each found it dropping REAL faces: a rod 2e-7 wide intersected with a box lost
-    // its whole end cap, and a needle 3e-7 wide lost both caps -- open holes, volumes 17% and 33% short measured
-    // about their own axes. Volumes here are taken about a point on the solid's axis: vol() about the world origin
-    // sums determinants of coordinates ~5 units out, whose rounding (~1e-14 per triangle) is larger than these
-    // solids' own errors, and an OPEN mesh's volume depends on that origin besides.
+    // Volumes here are taken about a LOCAL origin (the fixture's own centre). About (0,0,0), a needle cut 1000
+    // units out reads 4.3e-8 wrong on the arrangement and 7.9e-8 on the plane path -- rounding in the volume
+    // integral, not in either mesh: about its own centre the same outputs read 6.2e-15 and 3.9e-14.
     const volAbout = (buf, o) => {
         let v = 0;
         for (let i = 0; i < buf.length; i += 9) {
             const a = [buf[i] - o[0], buf[i + 1] - o[1], buf[i + 2] - o[2]], b = [buf[i + 3] - o[0], buf[i + 4] - o[1], buf[i + 5] - o[2]];
-            const q = [buf[i + 6] - o[0], buf[i + 7] - o[1], buf[i + 8] - o[2]];
-            v += a[0] * (b[1] * q[2] - b[2] * q[1]) - a[1] * (b[0] * q[2] - b[2] * q[0]) + a[2] * (b[0] * q[1] - b[1] * q[0]);
+            const c = [buf[i + 6] - o[0], buf[i + 7] - o[1], buf[i + 8] - o[2]];
+            v += a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0]) + a[2] * (b[0] * c[1] - b[1] * c[0]);
         }
         return v / 6;
     };
-    {
-        // Rod: A = [-1,1]^3, B = a 2e-7-square rod along z over [-0.5,1.5]. A n B = 4s^2 x 1.5 = 6e-14 by hand, and
-        // its end cap is A's own top face (z = 1 exactly), area 4s^2 = 4e-14.
-        const sr = 1e-7, cen = [0.3137, -0.2718, 0.5];
-        const bufR = M.toTriangleBuffer(M.boxPolys(cen, [sr, sr, 1]));
-        const r = meshBoolean(bufA, bvhA, bufR, new MeshBVH(bufR), "intersect");
-        const relV = (volAbout(r.tris, [cen[0], cen[1], 0.25]) - 6 * sr * sr) / (6 * sr * sr);
-        let cap = 0, capTris = 0;
-        for (let i = 0; i < r.tris.length; i += 9) if (r.tris[i + 2] === 1 && r.tris[i + 5] === 1 && r.tris[i + 8] === 1) {
-            cap += ((r.tris[i + 3] - r.tris[i]) * (r.tris[i + 7] - r.tris[i + 1]) - (r.tris[i + 4] - r.tris[i + 1]) * (r.tris[i + 6] - r.tris[i])) / 2;
-            capTris++;
-        }
-        const relCap = (cap - 4 * sr * sr) / (4 * sr * sr);
-        ok("!! a box intersected with a 2e-7-wide rod keeps its end cap and its volume (arrangement default)",
-            Math.abs(relV) < 1e-8 && Math.abs(relCap) < 1e-8 && r.stats.a.arrangedTriangles > 0,
-            "volume rel err " + relV.toExponential(2) + ", cap " + capTris + " triangles, area rel err " + relCap.toExponential(2) +
-            ", A triangles arranged " + r.stats.a.arrangedTriangles + " (first version: cap 0 triangles, volume -1.67e-1)");
-    }
-    {
-        // Needle: a quadrilateral prism 3e-7 across, through the top and bottom of a 10-unit box. Exact A n B is
-        // the quad's shoelace area times the box's height 10.
-        const w = 3e-7, c = [1.234567, -0.7654321];
-        const poly = [[c[0], c[1]], [c[0] + w, c[1] + 0.1 * w], [c[0] + 0.9 * w, c[1] + w], [c[0] - 0.05 * w, c[1] + 0.8 * w]];
-        const T = [];
-        for (let i = 0; i < 4; i++) {
-            const [ax, ay] = poly[i], [bx, by] = poly[(i + 1) % 4];
-            T.push([[ax, ay, -7.3], [bx, by, -7.3], [bx, by, 7.1]], [[ax, ay, -7.3], [bx, by, 7.1], [ax, ay, 7.1]]);
-        }
-        for (let i = 1; i < 3; i++) {
-            T.push([[poly[0][0], poly[0][1], -7.3], [poly[i + 1][0], poly[i + 1][1], -7.3], [poly[i][0], poly[i][1], -7.3]]);
-            T.push([[poly[0][0], poly[0][1], 7.1], [poly[i][0], poly[i][1], 7.1], [poly[i + 1][0], poly[i + 1][1], 7.1]]);
-        }
-        const bufN = new Float64Array(T.length * 9);
-        T.forEach((t, i) => { for (let v = 0; v < 3; v++) for (let k = 0; k < 3; k++) bufN[i * 9 + v * 3 + k] = t[v][k]; });
-        const bufX = M.toTriangleBuffer(M.boxPolys([0, 0, 0], [5, 5, 5]));
-        let a2 = 0;
-        for (let i = 0; i < 4; i++) { const p = poly[i], q = poly[(i + 1) % 4]; a2 += (p[0] - c[0]) * (q[1] - c[1]) - (q[0] - c[0]) * (p[1] - c[1]); }
-        const exact = a2 / 2 * 10;
-        const r = meshBoolean(bufX, new MeshBVH(bufX), bufN, new MeshBVH(bufN), "intersect");
-        const rel = (volAbout(r.tris, [c[0], c[1], 0]) - exact) / exact;
-        ok("!! a 3e-7-wide needle through a box keeps both caps: intersect volume exact to 1e-8 relative (arrangement default)",
-            Math.abs(rel) < 1e-8 && r.stats.a.arrangedTriangles > 0,
-            "rel err " + rel.toExponential(2) + " of " + exact.toExponential(4) + ", A triangles arranged " +
-            r.stats.a.arrangedTriangles + " (measured 2.2e-11; plane-cut path 3.9e-10; first version -3.33e-1)");
-    }
-    {
-        // AMBIGUITY REACHES EVERY TRIANGLE OF A FACE. With no rays, pointInMesh() reports agreement 0, so every
-        // classification is ambiguous and so must every output triangle be. A review mutated the face path to
-        // drop the flag, and separately to ignore opts.pointInMeshOpts there: both went 0 red in every gate.
-        const { bufA: pA, bvhA: pbA, bufB: pB, bvhB: pbB } = PRIMARY;
-        const r = meshBoolean(pA, pbA, pB, pbB, "subtract", { pointInMeshOpts: { dirs: [] } });
-        ok("!! pointInMeshOpts reaches the arrangement's per-face classification, and its ambiguity reaches every face triangle",
-            r.triCount > 0 && r.ambiguousTriIndices.length === r.triCount && r.stats.a.arrangementFaces > 0,
-            "ambiguous " + r.ambiguousTriIndices.length + " of " + r.triCount + " output triangles, A faces " + r.stats.a.arrangementFaces);
-    }
-    const W = M.boxPolys([0, 0, 0], [2, 1.5, 0.3]), bufW = M.toTriangleBuffer(W), bvhW = new MeshBVH(bufW);
-    const reasons = {};
-    for (const [c, h] of [[[2, 0, 0], [0.5, 0.5, 0.3]], [[0, 0, 0.55], [0.5, 0.5, 0.25]], [[0, 0, 0], [2, 1.5, 0.3]], [[0, 0, 0], [0.5, 0.5, 0.3]]]) {
-        const bufC = M.toTriangleBuffer(M.boxPolys(c, h));
-        const r = meshBoolean(bufW, bvhW, bufC, new MeshBVH(bufC), "subtract");
-        for (const side of [r.stats.a, r.stats.b]) for (const [k, v] of Object.entries(side.arrangementRefusals)) reasons[k] = (reasons[k] || 0) + v;
-    }
-    const keys = Object.keys(reasons);
-    ok("!! flush / shared-face contacts are refused as coplanar or degenerate -- never arranged -- and nothing else is refused",
-        keys.length > 0 && keys.every((k) => k === "coplanar" || k === "degenerate"), JSON.stringify(reasons));
+    const fb = (r) => r.stats.a.fallbackTris + r.stats.b.fallbackTris;
+    const rot = (P, ax, ay, az, c) => {
+        const [cx, sx, cy, sy, cz, sz] = [Math.cos(ax), Math.sin(ax), Math.cos(ay), Math.sin(ay), Math.cos(az), Math.sin(az)];
+        return P.map((p) => {
+            const vs = p.vs.map((v) => {
+                let [x, y, z] = [v[0] - c[0], v[1] - c[1], v[2] - c[2]];
+                [y, z] = [y * cx - z * sx, y * sx + z * cx]; [x, z] = [x * cy + z * sy, -x * sy + z * cy]; [x, y] = [x * cz - y * sz, x * sz + y * cz];
+                return [x + c[0], y + c[1], z + c[2]];
+            });
+            return { vs, pl: M.planeOf(vs) };
+        });
+    };
 
-    // WHICH POINT SPEAKS FOR A FACE. A sliver listed first must not be the one sampled: on round 9's first build that
-    // choice turned five blast checks red; on the rebuild no workload reaches it (classifying by the first triangle
-    // agrees on all 8,581 multi-triangle faces of four twelve-blast chains), so it is pinned here, directly.
-    const sliverFirst = { tris: [{ tri: [[0, 0, 0], [1, 1e-12, 0], [2, 0, 0]], area: 1e-12 }, { tri: [[0, 0, 0], [2, 0, 0], [1, 3, 0]], area: 3 }] };
-    const sp = faceSamplePoint(sliverFirst);
-    ok("!! a face is classified at its LARGEST triangle's centroid, not at a sliver listed first",
-        close(sp[0], 1, 1e-12) && close(sp[1], 1, 1e-12) && sp[2] === 0, "sample point " + JSON.stringify(sp) + " (largest's centroid (1, 1, 0))");
+    // (a) general position: 16 randomly rotated boxes in a unit cube, 3 jagged blob pairs; all three ops. Boxes are
+    // held to the plane path and the BSP. Blobs are held to their OWN run at 1000x scale, where every absolute
+    // tolerance is a million times smaller relatively (meshBooleanBlast-selfcheck.mjs section 3's reference), and
+    // that reference is licensed by the plane path agreeing with it there: on blob pair 1 BOTH paths at 1x sit
+    // ~1e-12 from it, on opposite sides (arrangement -1.0e-12, plane +8.2e-13), and the BSP 2.5e-7 -- absolute
+    // tolerances all three share at 1x (round 11's subject), so comparing the paths to each other at 1e-12 was
+    // the wrong test. Measured before this section was written.
+    const scaleP = (P, k) => P.map((p) => { const vs = p.vs.map((v) => [v[0] * k, v[1] * k, v[2] * k]); return { vs, pl: M.planeOf(vs) }; });
+    const cases = [];
+    const r = lcg(42);
+    for (let i = 0; i < 16; i++) {
+        const c = [r() - 0.5, r() - 0.5, r() - 0.5];
+        cases.push(["rot" + i, M.boxPolys([0, 0, 0], [1, 1, 1]), rot(M.boxPolys(c, [0.3 + r() * 0.7, 0.3 + r() * 0.7, 0.3 + r() * 0.7]), r() * 6, r() * 6, r() * 6, c)]);
+    }
+    for (let k = 0; k < 3; k++) cases.push(["blob" + k, M.jaggedBlob([0, 0, 0], 1, 8, 100 + k), M.jaggedBlob([0.5 * k - 0.5, 0.2, 0.1], 0.9, 8, 500 + k)]);
+    let worstPlane = 0, worstBsp = 0, worstRef = 0, worstRefAgree = 0, refK = 0, open = 0, falls = 0, runs = 0;
+    let clsArr = 0, clsPlane = 0, trisArr = 0, trisPlane = 0;
+    for (const [name, PA, PB] of cases) {
+        const bufA = M.toTriangleBuffer(PA), bufB = M.toTriangleBuffer(PB), bA = new MeshBVH(bufA), bB = new MeshBVH(bufB);
+        const blob = name.startsWith("blob");
+        let bufA3, bufB3, bA3, bB3;
+        if (blob) {
+            bufA3 = M.toTriangleBuffer(scaleP(PA, 1000)); bufB3 = M.toTriangleBuffer(scaleP(PB, 1000));
+            bA3 = new MeshBVH(bufA3); bB3 = new MeshBVH(bufB3);
+        }
+        for (const op of ["union", "subtract", "intersect"]) {
+            const ra = meshBoolean(bufA, bA, bufB, bB, op), rp = meshBoolean(bufA, bA, bufB, bB, op, { cutting: "plane" });
+            const va = volAbout(ra.tris, [0, 0, 0]), vp = volAbout(rp.tris, [0, 0, 0]);
+            if (blob) {
+                // normalize:false -- round 11 made meshBoolean() scale-invariant, and a 1000x run is a reference only
+                // with its absolute tolerances left a million times smaller (meshBooleanBlast-selfcheck section 3)
+                const r3 = meshBoolean(bufA3, bA3, bufB3, bB3, op, { normalize: false });
+                const r3P = meshBoolean(bufA3, bA3, bufB3, bB3, op, { cutting: "plane", normalize: false });
+                const ref = volAbout(r3.tris, [0, 0, 0]) / 1e9, refP = volAbout(r3P.tris, [0, 0, 0]) / 1e9;
+                refK = Math.max(refK, Math.abs(r3.scaleExponent), Math.abs(r3P.scaleExponent));
+                worstRef = Math.max(worstRef, Math.abs(va - ref));
+                worstRefAgree = Math.max(worstRefAgree, Math.abs(ref - refP));
+            } else {
+                worstPlane = Math.max(worstPlane, Math.abs(va - vp));
+                worstBsp = Math.max(worstBsp, Math.abs(va - M.volume(M[op](PA, PB))));
+            }
+            open += bitsOpen(ra.tris); falls += fb(ra); runs++;          // round 16g: at the exact-bits key
+            clsArr += ra.stats.a.classifications + ra.stats.b.classifications;
+            clsPlane += rp.stats.a.classifications + rp.stats.b.classifications;
+            trisArr += ra.triCount; trisPlane += rp.triCount;
+        }
+    }
+    ok("!! 48 rotated-box runs (16 boxes x 3 ops): the arrangement matches the plane path to 1e-13 and meshCSG's BSP to 1e-12",
+        worstPlane < 1e-13 && worstBsp < 1e-12, "worst |diff| plane " + worstPlane.toExponential(2) + ", BSP " + worstBsp.toExponential(2));
+    ok("!! 9 blob-pair runs: at 1000x the arrangement and the plane path agree to 1e-13 -- that value is the reference",
+        worstRefAgree < 1e-13 && refK === 0, "worst |diff| at 1000x " + worstRefAgree.toExponential(2) +
+        ", reference scale exponent " + refK + " (0: really run at 1000x; round 11's step would make it 8)");
+    ok("!! ...and the arrangement at 1x is within 3e-12 of it (both paths share ~1e-12 of absolute-tolerance error at 1x)",
+        worstRef < 3e-12, "worst |diff| " + worstRef.toExponential(2) + " (measured 1.0e-12, blob pair 1)");
+    ok("!! all " + runs + " runs: no fallback to the plane path, and every raw output WATERTIGHT (zero unmatched edges at the exact-bits key, no weld)",
+        falls === 0 && open === 0, "fallback triangles " + falls + ", unmatched edges summed over all runs " + open);
+    ok("   ...classifying well under half as often, and emitting fewer triangles, than the plane path",
+        clsArr * 2 < clsPlane && trisArr < trisPlane,
+        "pointInMesh calls " + clsArr + " vs " + clsPlane + "; triangles " + trisArr + " vs " + trisPlane);
+
+    // (b) a needle 2e-3 across through the unit cube, upright and tilted 0.3 rad, at the origin and 1000 units
+    // out. Exact by hand (Cavalieri): 8 - (2w)^2 * 2 / cos(theta).
+    let worstNeedle = 0, needleOpen = 0, needleFb = 0;
+    for (const C of [[0, 0, 0], [1000, -2000, 500]]) for (const th of [0, 0.3]) {
+        const w = 1e-3;
+        const needle = rot(M.boxPolys([C[0] + 0.2, C[1] + 0.1, C[2]], [w, w, 3]), th, 0, 0, C);
+        const bufA = M.toTriangleBuffer(M.boxPolys(C, [1, 1, 1])), bufB = M.toTriangleBuffer(needle);
+        const rn = meshBoolean(bufA, new MeshBVH(bufA), bufB, new MeshBVH(bufB), "subtract");
+        worstNeedle = Math.max(worstNeedle, Math.abs(volAbout(rn.tris, C) - (8 - (2 * w) * (2 * w) * 2 / Math.cos(th))));
+        needleOpen += M.watertight(wrapAsPolys(rn.tris)).unmatched; needleFb += fb(rn);
+    }
+    ok("!! a 2e-3 needle through the cube, upright and tilted, at the origin and 1000 units out: exact by hand to 1e-13",
+        worstNeedle < 1e-13 && needleOpen === 0 && needleFb === 0,
+        "worst |err| " + worstNeedle.toExponential(2) + " (measured 6.2e-15), unmatched " + needleOpen + ", fallbacks " + needleFb);
+
+    // (c) a rod whose end is FLUSH with the cube's top face. Round 11: its flush triangles were coplanar with the
+    // cube's, the arrangement refused them, and the plane path left the result open (28 unmatched), its z=1 cap
+    // missing, its volume depending on where it was measured from (7.9467 about the origin). ROUND 12: FIXED -- the
+    // pairs resolve as contacts, the cap is the cube's own face cut along the rod's rim, and it is decided ON.
+    {
+        const bufA = M.toTriangleBuffer(M.boxPolys([0, 0, 0], [1, 1, 1])), bufB = M.toTriangleBuffer(M.boxPolys([0.2, 0.1, 0.5], [0.1, 0.1, 0.5]));
+        const bA = new MeshBVH(bufA), bB = new MeshBVH(bufB);
+        const ra = meshBoolean(bufA, bA, bufB, bB, "subtract"), wa = M.watertight(wrapAsPolys(ra.tris));
+        const r0 = meshBoolean(bufA, bA, bufB, bB, "subtract", { contacts: false }), w0 = M.watertight(wrapAsPolys(r0.tris));
+        const vO = volAbout(ra.tris, [0, 0, 0]), vC = volAbout(ra.tris, [0.2, 0.1, 1]);
+        ok("!! ROUND 12: the flush rod is exact about the origin AND about the cap (7.96), watertight raw, with no fallback",
+            Math.abs(vO - 7.96) < 1e-12 && Math.abs(vC - 7.96) < 1e-12 && wa.unmatched === 0 && fb(ra) === 0,
+            "about origin " + vO.toFixed(15) + ", about cap " + vC.toFixed(15) + ", unmatched " + wa.unmatched + "/" + wa.edges + ", fallbacks " + fb(ra) +
+            " -- contacts:false: " + volAbout(r0.tris, [0, 0, 0]).toFixed(6) + ", " + w0.unmatched + " unmatched, " + fb(r0) + " fallbacks");
+        ok("   control: contacts:false is round 11's result (28 unmatched, fallbacks)", w0.unmatched === 28 && fb(r0) > 0, w0.unmatched + " unmatched");
+    }
+
+    // (d) a cutting mode that is not one of the two throws, as an unknown op does (section 12).
+    let threw = false;
+    try { meshBoolean(PRIMARY.bufA, PRIMARY.bvhA, PRIMARY.bufB, PRIMARY.bvhB, "subtract", { cutting: "segments" }); } catch { threw = true; }
+    ok("   an unrecognized `cutting` throws rather than silently choosing a path", threw);
 }
 
-// v4778 -- THE FRONT DOOR. meshBoolean.mjs grew a no-argument reportLines() at the rtx merge so instrument-bench.html
-// can serve it (physics/instruments.mjs, the BVH-CSG rows). A report is not a verdict, but an export no gate
-// names is what definitionGates counts, so this section reads the report's own hand-checkable numbers back.
-console.log("\nTHE FRONT DOOR");
+// =============================================================================================================
+console.log("\n16. *** ROUND 11: SCALE -- EVERY TOLERANCE IS A LENGTH, SO THE OPERANDS ARE BROUGHT TO THE TOLERANCES ***");
 {
-    const L = reportLines();
-    // 1e-12 is the report's own print resolution (toFixed(12)); section 4 above holds the volumes to 3.6e-15.
-    const rows = L.filter((l) => /by hand/.test(l)).map((l) => l.match(/^\s+(\w+)\s+volume (\S+)\s+by hand (\S+)/));
-    ok("reportLines prints all three ops on both box pairs, each volume within 1e-12 of the interval-overlap answer",
-        /meshBoolean/.test(L[0]) && rows.length === 6 && rows.every((m) => m && Math.abs(+m[2] - +m[3]) < 1e-12),
-        rows.map((m) => m ? m[1] + " " + (+m[2]).toFixed(6) : "UNPARSED").join(" | "));
-    ok("...with no fragment budget capped, and the NOT WATERTIGHT limit stated on the page",
-        L.every((l) => !/CAPPED/.test(l)) && L.some((l) => /NOT WATERTIGHT/.test(l)));
-    ok("...and no report line stringifies a missing field as the literal word \"undefined\"", L.every((l) => !/\bundefined\b/.test(l)));
+    // meshBoolean() divides both operands by the power of two that puts their joint extent in [1, 16)
+    // (MESH_BOOLEAN_SCALE_BAND), runs, and multiplies back -- exact both ways. Before round 11, measured over 28
+    // runs per scale: 1e-6 and 1e-5 up to 115% of volume wrong with 303 fallbacks and 3,365 open edges, 1e-4 19%
+    // wrong, 1e6 271 open edges; after, every scale 1e-6..1e6 matched its own scale-1 result to 5.9e-15, no fallback,
+    // no open edge. Every fixture in sections 1-15 lies in the band, so its exponent is 0 and nothing there changed
+    // (their full output compared line for line against round 10b's: identical).
+    const volAt = (buf, o = [0, 0, 0]) => {
+        let v = 0;
+        for (let i = 0; i < buf.length; i += 9) {
+            const a = [buf[i] - o[0], buf[i + 1] - o[1], buf[i + 2] - o[2]], b = [buf[i + 3] - o[0], buf[i + 4] - o[1], buf[i + 5] - o[2]];
+            const c = [buf[i + 6] - o[0], buf[i + 7] - o[1], buf[i + 8] - o[2]];
+            v += a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0]) + a[2] * (b[0] * c[1] - b[1] * c[0]);
+        }
+        return v / 6;
+    };
+    const tf = (P, k, o = [0, 0, 0]) => P.map((p) => { const vs = p.vs.map((v) => [v[0] * k + o[0], v[1] * k + o[1], v[2] * k + o[2]]); return { vs, pl: M.planeOf(vs) }; });
+    const run = (PA, PB, op, opts) => { const A = M.toTriangleBuffer(PA), B = M.toTriangleBuffer(PB); return meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), op, opts); };
+    const blobA = M.jaggedBlob([0, 0, 0], 1, 8, 101), blobB = M.jaggedBlob([0, 0.2, 0.1], 0.9, 8, 501);
+    const boxA = M.boxPolys([0, 0, 0], [1, 1, 1]), boxB = M.boxPolys([0.3, -0.2, 0.1], [0.6, 0.7, 0.5]).map((p) => {
+        const c = Math.cos(0.7), sn = Math.sin(0.7), vs = p.vs.map((v) => [v[0] * c - v[1] * sn, v[0] * sn + v[1] * c, v[2]]);
+        return { vs, pl: M.planeOf(vs) };
+    });
+    const pairs = [["blob pair", blobA, blobB], ["rotated box", boxA, boxB]];
+    let worst = 0, fb = 0, open = 0;
+    for (const [, PA, PB] of pairs) {
+        const v1 = volAt(run(PA, PB, "subtract").tris);
+        for (const k of [1e-6, 1e-3, 1e3, 1e6]) {
+            const r = run(tf(PA, k), tf(PB, k), "subtract");
+            worst = Math.max(worst, Math.abs(volAt(r.tris) / k ** 3 - v1) / v1);
+            fb += r.stats.a.fallbackTris + r.stats.b.fallbackTris;
+            open += bitsOpen(r.tris);
+        }
+    }
+    ok("!! *** A BLOB PAIR AND A ROTATED BOX AT 1e-6, 1e-3, 1e3 AND 1e6: THE SCALE-1 VOLUME TO 1e-13, NO FALLBACK, NO OPEN EDGE ***",
+        worst < 1e-13 && fb === 0 && open === 0, "worst relative " + worst.toExponential(2) + ", fallbacks " + fb + ", unmatched edges (exact bits) " + open);
+    // control: the same 1e-6 run with the step switched off is still wrong. Not by the pre-round 115% -- that figure
+    // included the ray-test bug fixed below, which hurt the raw path too -- but measured at 2.0e-5 with 29 fallbacks
+    // at round 11, 1.5e-5 with none since round 12 (at 1e-6 scale every pair is inside the 1e-9 contact tolerance,
+    // and round 12 resolves those instead of refusing them), 2.1e-5 since round 13 (at that scale most triangles are
+    // narrower than 8e-9 and take the sliver path): still ten orders of magnitude above the normalized run.
+    // (round 16g: on the SNAPPED path -- the exact arrangement has no absolute tolerance to bring the operands to, and the
+    // same un-normalised 1e-6 pair comes out within 1.9e-15)
+    const raw = run(tf(blobA, 1e-6), tf(blobB, 1e-6), "subtract", { normalize: false, ...SNAPPED }), v1b = volAt(run(blobA, blobB, "subtract").tris);
+    const rawErr = Math.abs(volAt(raw.tris) / 1e-18 - v1b) / v1b, rawFb = raw.stats.a.fallbackTris + raw.stats.b.fallbackTris;
+    ok("   ...and with normalize:false the same 1e-6 blob pair is still wrong on the snapped path -- the step, not luck, is what fixed it there",
+        rawErr > 1e-9 && raw.scaleExponent === 0, "relative " + rawErr.toExponential(2) + " off, " + rawFb + " fallbacks, exponent " + raw.scaleExponent);
+
+    // EXACT: the output at 2^-20 IS the output of the in-band run it was mapped to, times 2^k, bit for bit. The blob
+    // pair spans ~2, so 2^-20 maps by k = -19 to scale 1/2, not 1: the guarantee is against the scale-1/2 run. That
+    // it ALSO equals the scale-1 output x 2^-20 is a fact about this fixture (no tolerance fires between 1/2 and 1),
+    // not a property of the step, so it is printed, not gated.
+    const f = 2 ** -20, e = run(tf(blobA, f), tf(blobB, f), "subtract"), g = f * 2 ** -e.scaleExponent;
+    const same = (u, m) => u.tris.length === e.tris.length && u.tris.every((x, i) => e.tris[i] === x * m);
+    const inBand = run(tf(blobA, g), tf(blobB, g), "subtract"), unit = run(blobA, blobB, "subtract");
+    ok("!! at scale 2^-20 the output is the in-band run's output x 2^k, bit for bit (a power of two scales every operation exactly)",
+        e.scaleExponent !== 0 && inBand.scaleExponent === 0 && same(inBand, 2 ** e.scaleExponent),
+        "exponent " + e.scaleExponent + " (ran at scale " + g + "), identical: " + same(inBand, 2 ** e.scaleExponent) +
+        "; also identical to scale 1 x 2^-20 on this fixture: " + same(unit, f));
+    const ext = [1e-100, 1e100].map((k) => { const r = run(tf(blobA, k), tf(blobB, k), "subtract"); const b = new Float64Array(r.tris.length); for (let i = 0; i < b.length; i++) b[i] = r.tris[i] / k; return Math.abs(volAt(b) - v1b) / v1b; });
+    ok("   ...and at 1e-100 and 1e100 the same to 1e-13 (measured in scale-1 units; subnormals, below ~1e-290, are not claimed)",
+        ext.every((x) => x < 1e-13), ext.map((x) => x.toExponential(2)).join(", "));
+
+    // WHAT THE STEP EXPOSED, AND ROUND 11 FIXED: a small cutter on a big wall. Normalising to the JOINT extent put a
+    // 0.01-unit cutter on a 2000-unit wall at 7.8e-5 units, and pointInMesh's rays passed straight through its
+    // triangles: mesh/meshBVH.mjs's rayTriangle() called a ray parallel when |det| < eps, and det is an area. The cut
+    // face read outside, its cap was dropped, and the volume came back 6.5% off -- for every cutter smaller than
+    // 1/2e5 of the wall, a cliff, not a slope. The classifier's test is dimensionless now (meshPointClassify.mjs's
+    // RAY_PARALLEL_REL); what is left grows smoothly: 1.4e-13 at 1:1e5, 3.2e-12 at 1:1e6, 1.9e-11 at 1:1e7.
+    const unitBlob = M.jaggedBlob([0, 0, 0], 1, 8, 777);
+    const eU = volAt(run(unitBlob, M.boxPolys([0, 0, -5.123], [10, 10, 5]), "intersect").tris);
+    const cliff = [2e5, 1e6].map((ratio) => {
+        const W = 1000, c = 2 * W / ratio, top = W / 10, C = [0, 0, top + 0.123 * c];
+        const r = run(M.boxPolys([0, 0, 0], [W, W, top]), tf(unitBlob, c, C), "intersect");
+        return { ratio, err: Math.abs(volAt(r.tris, C) - eU * c ** 3) / (eU * c ** 3), tris: r.triCount };
+    });
+    ok("!! a cutter 1/200,000 and 1/1,000,000 the size of the wall it cuts: the cap is kept and the volume right to 1e-10",
+        cliff.every((x) => x.err < 1e-10), cliff.map((x) => "1:" + x.ratio.toExponential(0) + " " + x.err.toExponential(2) + " (" + x.tris + " triangles)").join(", ") +
+        " -- 6.5% off and 135 triangles each before the ray test became dimensionless");
+}
+
+// =============================================================================================================
+console.log("\n17. *** ROUND 12: PIECES OF ONE SURFACE LYING ON THE OTHER -- FLUSH, NEAR-FLUSH, EMPTY, IDENTICAL, ROTATED ***");
+{
+    // Round 12's families, each against an exact oracle, each with contacts:false (round 11's pipeline) as control.
+    // A CRACK is an edge whose forward and backward counts differ (at the 1e-6 census key); an edge used twice each way
+    // is two solids meeting along a line -- non-manifold, and correct -- and is reported, not failed.
+    const cracks = (buf) => {
+        const key = (o) => Math.round(buf[o] / 1e-6) + "," + Math.round(buf[o + 1] / 1e-6) + "," + Math.round(buf[o + 2] / 1e-6);
+        const E = new Map();
+        for (let o = 0; o < buf.length; o += 9) {
+            const k = [key(o), key(o + 3), key(o + 6)];
+            for (let i = 0; i < 3; i++) if (k[i] !== k[(i + 1) % 3]) { const e = k[i] + "|" + k[(i + 1) % 3]; E.set(e, (E.get(e) || 0) + 1); }
+        }
+        let crack = 0, nm = 0;
+        for (const [e, n] of E) { const [a, b] = e.split("|"), back = E.get(b + "|" + a) || 0; if (n !== back) crack++; else if (n > 1) nm++; }
+        return { crack, nm };
+    };
+    const run = (PA, PB, op, opts) => { const A = M.toTriangleBuffer(PA), B = M.toTriangleBuffer(PB); return meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), op, opts); };
+    const vol = (r) => {
+        const t = r.tris; let v = 0;
+        for (let o = 0; o < t.length; o += 9) v += t[o] * (t[o + 4] * t[o + 8] - t[o + 5] * t[o + 7]) - t[o + 1] * (t[o + 3] * t[o + 8] - t[o + 5] * t[o + 6]) + t[o + 2] * (t[o + 3] * t[o + 7] - t[o + 4] * t[o + 6]);
+        return v / 6;
+    };
+    const fbk = (r) => r.stats.a.fallbackTris + r.stats.b.fallbackTris;
+    const OPS = ["union", "subtract", "intersect"];
+    const boxTruth = (c1, h1, c2, h2) => { const i = overlapVol(c1, h1, c2, h2), a = 8 * h1[0] * h1[1] * h1[2], b = 8 * h2[0] * h2[1] * h2[2]; return { union: a + b - i, subtract: a - i, intersect: i }; };
+    const stat = (r, k) => (r.stats.a[k] || 0) + (r.stats.b[k] || 0);
+
+    // (a) FLUSH-BOX FUZZ: corners on a 1/4 grid, so faces are flush, edges collinear and corners coincident at random;
+    // as built, rotated 0.7 rad about z (flush only to rounding), and shifted 0.1 (grid values no longer exact)
+    {
+        let runs = 0, worst = 0, fbs = 0, amb = 0, crack = 0, nm = 0, rearr = 0, bad0 = 0, conformDiff = 0, scanned = 0, scannedAll = 0, twinDiff = 0;
+        for (const variant of ["grid", "rot0.7", "shift0.1"]) {
+            let st = 4242 >>> 0; const rnd = () => { st = (st * 1664525 + 1013904223) >>> 0; return st / 4294967296; };
+            const q = () => Math.round((rnd() * 2 - 1) * 4) / 4, hq = () => (1 + Math.floor(rnd() * 4)) / 4;
+            const rz = (P) => P.map((p) => { const vs = p.vs.map((v) => [v[0] * Math.cos(0.7) - v[1] * Math.sin(0.7), v[0] * Math.sin(0.7) + v[1] * Math.cos(0.7), v[2]]); return { vs, pl: M.planeOf(vs) }; });
+            for (let k = 0; k < 150; k++) {   // 150, not 40: case 78 puts a face's sample exactly on the other box's diagonal (the inclusive ON test, triArrangement.mjs)
+                const c1 = [q(), q(), q()], h1 = [hq(), hq(), hq()], c2 = [q(), q(), q()], h2 = [hq(), hq(), hq()];
+                const sh = variant === "shift0.1" ? 0.1 : 0;
+                let A = M.boxPolys(c1.map((x) => x + sh), h1), B = M.boxPolys(c2.map((x) => x + sh), h2);
+                if (variant === "rot0.7") { A = rz(A); B = rz(B); }
+                const T = boxTruth(c1, h1, c2, h2);
+                for (const op of OPS) {
+                    const r = run(A, B, op), c = cracks(r.tris), e = Math.abs(vol(r) - T[op]);
+                    runs++; worst = Math.max(worst, e); fbs += fbk(r); amb += r.ambiguousTriIndices.length; crack += c.crack; nm += c.nm;
+                    // the conformity pass and the twin join are the snapped path's (round 16g: the default is exact)
+                    const rS = run(A, B, op, SNAPPED); rearr += stat(rS, "rearranged");
+                    const r0 = run(A, B, op, { contacts: false });
+                    if (Math.abs(vol(r0) - T[op]) > 1e-9 || cracks(r0.tris).crack) bad0++;
+                    // round 15: the conformity pass scans only the triangles the BVH says touch a split one; conformAll
+                    // scans every triangle, as rounds 12-14 did -- the very same bits, or the restriction lost a split
+                    const rAll = run(A, B, op, { conformAll: true, ...SNAPPED });
+                    if (rAll.tris.length !== rS.tris.length || rAll.tris.some((x, i) => x !== rS.tris[i]) || rAll.from.some((x, i) => x !== rS.from[i])) conformDiff++;
+                    scanned += stat(rS, "conformScanned"); scannedAll += stat(rAll, "conformScanned");
+                    // round 16d: the twin join widens only in a triangle crossed by a near-parallel pair; flush faces are
+                    // exactly coplanar (or a rounding apart, and rounded together), never crossed -- the 8-snap join's bits
+                    const r8 = run(A, B, op, { joinTwin: 8, ...SNAPPED });
+                    if (r8.tris.length !== rS.tris.length || r8.tris.some((x, i) => x !== rS.tris[i])) twinDiff++;
+                }
+            }
+        }
+        ok("!! *** " + runs + " FLUSH-BOX RUNS (grid, rotated, shifted; 3 ops): EXACT TO 1e-13, NO FALLBACK, NO AMBIGUOUS FRAGMENT, NO CRACK ***",
+            worst < 1e-13 && fbs === 0 && amb === 0 && crack === 0,
+            "worst |err| " + worst.toExponential(2) + ", fallback triangles " + fbs + ", ambiguous " + amb + ", cracks " + crack +
+            ", non-manifold edges (solids meeting on a line) " + nm + ", triangles re-arranged for edge conformity " + rearr);
+        ok("   control: contacts:false is wrong or cracked on a large share of the same runs", bad0 > runs / 4, bad0 + " of " + runs);
+        ok("   the edge-conformity pass ran (a triangle got its neighbour's split point) -- the T-junction it closes is in this set", rearr > 0, rearr + " re-arrangements");
+        ok("!! round 15: the conformity pass over only the triangles touching a split one gives the SAME BITS as over all of them, on every run (where conformity was born)",
+            conformDiff === 0 && scanned < scannedAll, conformDiff + " of " + runs + " runs differing; triangles scanned " + scanned + " against " + scannedAll);
+        ok("!! round 16d: the twin join changes no flush-box run -- the same bits as with the 8-snap join, on every run (no flush face is crossed by a near-parallel twin)",
+            twinDiff === 0, twinDiff + " of " + runs + " runs differing");
+    }
+
+    // (b) NEAR-FLUSH TILT: B sits on the unit box A=[0,1]^3 with its bottom face tilted by slope s about the x=0 edge,
+    // z = 1 - s x: s > 0 dips into A (overlap s/2), s < 0 lifts off. Round 11: 0.33 off for |s| <= 3e-10.
+    {
+        const tilt = (sl) => {
+            const Ap = M.boxPolys([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]), P = [];
+            for (let i = 0; i < 8; i++) P.push([i & 1 ? 1 : 0, i & 2 ? 1 : 0, i & 4 ? 2 : 1 - sl * (i & 1 ? 1 : 0)]);
+            const Bp = [[0, 4, 6, 2], [1, 3, 7, 5], [0, 1, 5, 4], [2, 6, 7, 3], [0, 2, 3, 1], [4, 5, 7, 6]].map((ix) => { const vs = ix.map((i) => P[i].slice()); return { vs, pl: M.planeOf(vs) }; });
+            return { Ap, Bp };
+        };
+        // round 16c: with vertex rounding (the default) B's two lifted corners are given A's when |s| <= VERTEX_ROUND, and
+        // the wedge between the faces -- s/2 -- is flattened: the bound is the wedge itself, no more (the rounding radius
+        // is the most a vertex moves, so it is the most a face is moved). Beyond the radius nothing is rounded and the
+        // bound is 1e-12, as before. Round 12's bound -- 5.01e-10 where |s| <= 3e-9, s/2 of the 1e-9 contact snap -- is
+        // held on the same slopes with vertexRound:false: the pipeline under the rounding still resolves the wedge.
+        let worstIn = 0, worstOut = 0, fbs = 0, crack = 0, near = 0, overWedge = 0, worstIn0 = 0, worstOut0 = 0, fbs0 = 0, crack0 = 0;
+        const slopes = [1e-12, 1e-10, 3e-10, 1e-9, 3e-9, 1e-8, 1e-7, 1e-6, 1e-4, -1e-10, -1e-9, -1e-8];
+        for (const sl of slopes) {
+            const { Ap, Bp } = tilt(sl), VB = 1 + sl / 2, i = sl > 0 ? sl / 2 : 0, T = { union: 1 + VB - i, subtract: 1 - i, intersect: i };
+            for (const op of OPS) {
+                const r = run(Ap, Bp, op), e = Math.abs(vol(r) - T[op]);
+                if (Math.abs(sl) <= VERTEX_ROUND) { worstIn = Math.max(worstIn, e); if (e > Math.abs(sl) / 2 + 1e-12) overWedge++; } else worstOut = Math.max(worstOut, e);
+                fbs += fbk(r); crack += cracks(r.tris).crack; near += stat(r, "nearSided");
+                const r0 = run(Ap, Bp, op, { vertexRound: false }), e0 = Math.abs(vol(r0) - T[op]);
+                if (Math.abs(sl) <= 3e-9) worstIn0 = Math.max(worstIn0, e0); else worstOut0 = Math.max(worstOut0, e0);
+                fbs0 += fbk(r0); crack0 += cracks(r0.tris).crack;
+            }
+        }
+        const { Ap, Bp } = tilt(1e-10), r0 = run(Ap, Bp, "intersect", { contacts: false });
+        ok("!! *** NEAR-FLUSH TILT, 12 slopes 1e-12..1e-4 and lifted: within the wedge s/2 where |s| <= VERTEX_ROUND (8e-9: rounded flat), 1e-12 beyond; no fallback, no crack ***",
+            overWedge === 0 && worstOut < 1e-12 && fbs === 0 && crack === 0 && near > 0,
+            "runs over their wedge " + overWedge + ", worst |err| " + worstIn.toExponential(2) + " / " + worstOut.toExponential(2) + ", fallbacks " + fbs + ", cracks " + crack + ", faces sided locally (within 1e-8) " + near +
+            " -- control contacts:false, s=1e-10 intersect: " + vol(r0).toExponential(3) + " (true 5e-11)");
+        ok("!! the same slopes with vertexRound:false: round 12's bound, within 5.01e-10 where |s| <= 3e-9 and 1e-12 beyond, no fallback, no crack",
+            worstIn0 < 5.01e-10 && worstOut0 < 1e-12 && fbs0 === 0 && crack0 === 0,
+            "worst |err| " + worstIn0.toExponential(2) + " / " + worstOut0.toExponential(2) + ", fallbacks " + fbs0 + ", cracks " + crack0);
+    }
+
+    // (c) ZERO-VOLUME OPERANDS: a flat rectangle, flattened along each axis, inside the box or lying on its face, as A or B
+    {
+        const box = M.boxPolys([0, 0, 0], [1, 1, 1]);
+        let n = 0, worst = 0, crack = 0, flagged = 0, bad0 = 0;
+        for (const ax of [0, 1, 2]) for (const onFace of [false, true]) for (const asA of [true, false]) {
+            const h = [0.5, 0.5, 0.5]; h[ax] = 0; const c = [0, 0, 0]; if (onFace) c[ax] = 1;
+            const flat = M.boxPolys(c, h), [PA, PB] = asA ? [flat, box] : [box, flat];
+            const T = asA ? { union: 8, subtract: 0, intersect: 0 } : { union: 8, subtract: 8, intersect: 0 };
+            for (const op of OPS) {
+                const r = run(PA, PB, op); n++;
+                worst = Math.max(worst, Math.abs(vol(r) - T[op])); crack += cracks(r.tris).crack; if (r.emptyOperand) flagged++;
+                const r0 = run(PA, PB, op, { contacts: false }); if (Math.abs(vol(r0) - T[op]) > 1e-9 || cracks(r0.tris).crack) bad0++;
+            }
+        }
+        // Round 11 happened to be right on these 36 by volume (only section 13's full-span sheet was wrong); what the
+        // empty-solid rule rescues is round 12's own ON rule, which alone read a sheet lying on a face as one kept
+        // face -- 0.33 off on 9 of these runs (subtract and intersect with the sheet as A, union with it as B, each axis), measured before the rule was added.
+        ok("!! zero-volume operands (" + n + " runs: 3 axes, inside or on a face, as A or as B): exact, recognised as empty, no crack",
+            worst < 1e-12 && crack === 0 && flagged === n, "worst |err| " + worst.toExponential(2) + ", flagged empty " + flagged + "/" + n + ", cracks " + crack +
+            " (contacts:false wrong or cracked on " + bad0 + " of " + n + ")");
+    }
+
+    // (d) AN OPERAND WITH ITSELF: every face ON its twin, same-facing
+    {
+        let worst = 0, crack = 0, fbs = 0; const ctrl = [];
+        for (const P of [M.boxPolys([0.1, 0, 0], [1, 0.7, 0.4]), M.jaggedBlob([0, 0, 0], 1, 8, 7)]) {
+            const V = M.volume(P), T = { union: V, subtract: 0, intersect: V };
+            for (const op of OPS) {
+                const r = run(P, P, op); worst = Math.max(worst, Math.abs(vol(r) - T[op])); crack += cracks(r.tris).crack; fbs += fbk(r);
+                ctrl.push(Math.abs(vol(run(P, P, op, { contacts: false })) - T[op]));
+            }
+        }
+        ok("!! a box and a jagged blob, each with ITSELF, all 3 ops: exact to 1e-13, no crack, no fallback",
+            worst < 1e-13 && crack === 0 && fbs === 0, "worst |err| " + worst.toExponential(2) + ", cracks " + crack + ", fallbacks " + fbs +
+            " -- control contacts:false worst " + Math.max(...ctrl).toExponential(2));
+    }
+
+    // (e) A BLOB AGAINST ITS OWN COPY ROTATED BY theta (first-order oracle: theta/2 x the integral of |(w x p).n| over
+    // the surface). Outside a band the result is right; INSIDE it, KNOWN -- see meshBoolean.mjs's ROUND 12 paragraph.
+    {
+        const blob = M.jaggedBlob([0.1, 0.05, 0], 1, 8, 101), Vb = M.volume(blob);
+        const rot = (P, w, th) => {
+            const c = Math.cos(th), sn = Math.sin(th), C = 1 - c, [x, y, z] = w;
+            const R = [[c + x * x * C, x * y * C - z * sn, x * z * C + y * sn], [y * x * C + z * sn, c + y * y * C, y * z * C - x * sn], [z * x * C - y * sn, z * y * C + x * sn, c + z * z * C]];
+            return P.map((p) => { const vs = p.vs.map((v) => [0, 1, 2].map((r) => R[r][0] * v[0] + R[r][1] * v[1] + R[r][2] * v[2])); return { vs, pl: M.planeOf(vs) }; });
+        };
+        // first-order symmetric difference for rotation about unit axis w through the origin: (theta/2) sum |(w x p).n| dA
+        const bufB = M.toTriangleBuffer(blob);
+        const firstOrder = (w) => {
+            let S = 0;
+            for (let o = 0; o < bufB.length; o += 9) {
+                const a = [bufB[o], bufB[o + 1], bufB[o + 2]], e1 = [bufB[o + 3] - a[0], bufB[o + 4] - a[1], bufB[o + 5] - a[2]], e2 = [bufB[o + 6] - a[0], bufB[o + 7] - a[1], bufB[o + 8] - a[2]];
+                const nn = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]], A2 = Math.hypot(...nn);
+                const K = 24; let acc = 0, cnt = 0;
+                for (let i = 0; i < K; i++) for (let j = 0; j < K - i; j++) for (const [du, dv] of j < K - i - 1 ? [[1 / 3, 1 / 3], [2 / 3, 2 / 3]] : [[1 / 3, 1 / 3]]) {
+                    const u = (i + du) / K, v = (j + dv) / K, p = [a[0] + u * e1[0] + v * e2[0], a[1] + u * e1[1] + v * e2[1], a[2] + u * e1[2] + v * e2[2]];
+                    const wp = [w[1] * p[2] - w[2] * p[1], w[2] * p[0] - w[0] * p[2], w[0] * p[1] - w[1] * p[0]];
+                    acc += Math.abs((wp[0] * nn[0] + wp[1] * nn[1] + wp[2] * nn[2]) / A2); cnt++;
+                }
+                S += acc / cnt * A2 / 2;
+            }
+            return S;
+        };
+        const outside = [], inside = [];
+        let ctrlBand = 0, ctrl8 = 0, same128 = true;
+        for (const w0 of [[0, 0, 1], [1, 2, 3]]) {
+            const L = Math.hypot(...w0), w = w0.map((x) => x / L), S = firstOrder(w);
+            for (const th of [1e-12, 1e-10, 3e-10, 1e-9, 3e-9, 1e-8, 3e-8, 1e-7, 1e-6]) {
+                const fo = th * S / 2, T = { union: Vb + fo, subtract: fo, intersect: Vb - fo };
+                let wst = 0, f = 0;
+                for (const op of OPS) { const r = run(blob, rot(blob, w, th), op); wst = Math.max(wst, Math.abs(vol(r) - T[op])); f += fbk(r); }
+                (th >= 1e-9 && th <= 3e-8 ? inside : outside).push([th, wst, f, w0.join(""), fo]);
+                // round 16c: the control -- round 16's pipeline, unrounded, on the band's worst case
+                if (w0[0] === 1 && th === 1e-9) ctrlBand = Math.abs(vol(run(blob, rot(blob, w, th), "subtract", { vertexRound: false, ...SNAPPED })) - T.subtract);
+                // round 16d: the controls -- round 16c's 8-snap join, and a join twice as wide (the window is open upward:
+                // past a corner's 8 snaps an end goes onto the nearest side, so a wider join reaches nothing new)
+                if (w0[0] === 0 && th === 3e-8) for (const op of OPS) {
+                    ctrl8 = Math.max(ctrl8, Math.abs(vol(run(blob, rot(blob, w, th), op, { joinTwin: 8, ...SNAPPED })) - T[op]));
+                    const a = run(blob, rot(blob, w, th), op), b = run(blob, rot(blob, w, th), op, { joinTwin: 128 });
+                    if (a.tris.length !== b.tris.length || a.tris.some((x, i) => x !== b.tris[i])) same128 = false;
+                }
+            }
+        }
+        ok("!! rotated by 1e-12, 1e-10, 3e-10, 1e-7 or 1e-6 rad, about z and about (1,2,3): all 3 ops within 3e-9 of the first-order oracle (round 11: up to 0.2)",
+            outside.every(([, w]) => w < 3e-9), outside.map(([t, w, f, ax]) => ax + " " + t.toExponential(0) + ": " + w.toExponential(1) + " (" + f + " fb)").join(", "));
+        console.log("  ..... fallback triangles by angle, inside the band: " + inside.map(([t, , f, ax]) => ax + " " + t.toExponential(0) + ": " + f).join(", "));
+        const fbAll = [...outside, ...inside].reduce((n, [, , f]) => n + f, 0);
+        // round 16: 87 -> 33, by a dangling chain of seam segments from a NEAR-PARALLEL pair being pruned instead of refusing
+        // the triangle (triArrangement's ROUND 16 note: 84 -> 39), and the seam consensus (39 -> 33); round 16c: 33 -> 15,
+        // twin triangles within VERTEX_ROUND made the same triangle by vertex rounding; round 16d: 15 -> 6, the twin join
+        ok("   the rotated family's plane-path fallbacks stay at or under the 6 measured -- 15 at round 16c, 33 at round 16, 87 at round 12, 357 without triArrangement's join of chain ends stopping short of the boundary",
+            fbAll <= 6, fbAll + " fallback triangles over 54 runs");
+        // round 16c/16d: inside the band, an angle whose twins are all rounded together comes out as the copy unrotated --
+        // off by its own first-order volume fo, no more; since round 16d EVERY angle is within fo (+3e-9): no cone
+        const coned = inside.filter(([, w, , , fo]) => w > 1.01 * fo + 3e-9);
+        const bandWorst = Math.max(...inside.map(([, w]) => w));
+        ok("!! *** ROUND 16d: THE BAND CLOSED -- every angle 1e-9..3e-8, about z and about (1,2,3), all 3 ops within its own first-order volume (+3e-9): no worse than calling the copy identical, no cone ***",
+            coned.length === 0, coned.length + " beyond; worst " + bandWorst.toExponential(2) + " -- " + inside.map(([t, w, , ax]) => ax + " " + t.toExponential(0) + ": " + w.toExponential(1)).join(", "));
+        ok("   control: without the rounding the snapped path's band worst case is still the cone round 16 left (round 16: 2.8e-2)", ctrlBand > 1e-3, "vertexRound:false, (1,2,3) 1e-9 subtract: " + ctrlBand.toExponential(2));
+        ok("   control: with round 16c's 8-snap join, the snapped path about z by 3e-8 is still the cone round 16c left (5.6e-5)", ctrl8 > 1e-6, "joinTwin:8: " + ctrl8.toExponential(2));
+        ok("   a twin join of 128 snaps gives the same bits as 64 there: the window is open upward (a corner is joined only within 8 snaps; past them, the nearest side)",
+            same128, same128 ? "same bits, all 3 ops" : "differ");
+    }
+}
+
+console.log("\n18. *** ROUND 13: PROVENANCE -- EVERY OUTPUT TRIANGLE NAMES THE INPUT TRIANGLE IT IS A PIECE OF ***");
+{
+    // blastEngine.mjs gives a piece of the wall its source polygon's plane and tag, and a piece of the blob the blob
+    // polygon's plane turned round, by `from` alone -- so `from` is checked here geometrically, not by the adapter's
+    // results: every vertex of an output triangle lies on the triangle `from` names (within 1e-9 of the operands'
+    // size), and it faces that triangle's way (turned round for B under subtract). Jagged blobs, whose neighbouring
+    // triangles are rarely coplanar, so an index off by one lands on a triangle the piece does not lie on.
+    const tri = (buf, i) => [[buf[i * 9], buf[i * 9 + 1], buf[i * 9 + 2]], [buf[i * 9 + 3], buf[i * 9 + 4], buf[i * 9 + 5]], [buf[i * 9 + 6], buf[i * 9 + 7], buf[i * 9 + 8]]];
+    const nrm = (t) => { const u = [0, 1, 2].map((c) => t[1][c] - t[0][c]), w = [0, 1, 2].map((c) => t[2][c] - t[0][c]); return [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]]; };
+    const cases = [
+        ["blob - blob", M.jaggedBlob([0, 0, 0], 1, 8, 101), M.jaggedBlob([0.4, 0.2, 0.1], 0.9, 8, 501), 1],
+        ["box - blob (flush-free)", M.boxPolys([0, 0, 0], [1.2, 0.9, 0.35]), M.jaggedBlob([0.3, -0.2, 0], 0.7, 10, 7), 1],
+        ["blob - blob at scale 1e3 (normalised)", M.jaggedBlob([0, 0, 0], 1e3, 8, 102), M.jaggedBlob([300, 200, 100], 900, 8, 502), 1e3],
+    ];
+    for (const [name, PA, PB, s] of cases) for (const op of ["union", "subtract", "intersect"]) {
+        const A = M.toTriangleBuffer(PA), B = M.toTriangleBuffer(PB);
+        const r = meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), op);
+        let unknown = 0, off = 0, facing = 0, worst = 0, fromA = 0, fromB = 0;
+        const nA = A.length / 9, nB = B.length / 9;
+        for (let i = 0; i < r.triCount; i++) {
+            const f = r.from[i];
+            if (!(f >= 0 && f < nA) && !(f < 0 && -f - 1 < nB)) { unknown++; continue; }
+            const S = f >= 0 ? tri(A, f) : tri(B, -f - 1), T = tri(r.tris, i);
+            if (f >= 0) fromA++; else fromB++;
+            let d = 0;
+            for (const v of T) d = Math.max(d, Math.sqrt(closestOnTriangle(v, S[0], S[1], S[2]).d2));
+            worst = Math.max(worst, d / s);
+            if (d > 1e-9 * s) off++;
+            const nT = nrm(T), nS = nrm(S), c = nT[0] * nS[0] + nT[1] * nS[1] + nT[2] * nS[2];
+            const want = f < 0 && op === "subtract" ? -1 : 1;
+            if (Math.hypot(...nT) > 1e-12 * s * s && c * want <= 0) facing++;
+        }
+        ok("!! " + name + ", " + op + ": every triangle's `from` names a triangle it lies on and faces with",
+            r.from.length === r.triCount && unknown === 0 && off === 0 && facing === 0 && fromA > 0 && fromB > 0,
+            r.triCount + " triangles (" + fromA + " from A, " + fromB + " from B), " + unknown + " without, " + off + " off their source, " +
+            facing + " facing wrong; worst distance " + worst.toExponential(1) + " x size");
+    }
+}
+
+console.log("\n19. *** ROUND 16: A ZERO-THICKNESS FIN, AND THE SEAM AGREED BEFORE CUTTING ***");
+{
+    const OPS = ["union", "subtract", "intersect"];
+    const run = (PA, PB, op, opts) => { const A = M.toTriangleBuffer(PA), B = M.toTriangleBuffer(PB); return meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), op, opts); };
+    const vol = (r) => { const t = r.tris; let v = 0; for (let o = 0; o < t.length; o += 9) v += t[o] * (t[o + 4] * t[o + 8] - t[o + 5] * t[o + 7]) - t[o + 1] * (t[o + 3] * t[o + 8] - t[o + 5] * t[o + 6]) + t[o + 2] * (t[o + 3] * t[o + 7] - t[o + 4] * t[o + 6]); return v / 6; };
+    // (a) A ZERO-THICKNESS FIN: the box [-1,1]^3 with a sheet standing on its top face (x = 0.2, z 1..1.8, |y| <= 0.6)
+    // -- two faces on the same vertices, wound opposite ways -- the top face split along its base so every edge is used
+    // equally both ways. It has no volume, so every op must give exactly what the plain box (split the same way) gives.
+    // Measured before round 16: 5.2e-2 off with B through the fin, 1.8e-2 with B BESIDE it, not touching (rays crossing
+    // the sheet hit its two faces at one point, which pointInMesh welds into one hit, and the parity flips).
+    const P = (vs) => ({ vs, pl: M.planeOf(vs) }), x0 = 0.2;
+    const finBox = (fin, exact = true) => {
+        const box = M.boxPolys([0, 0, 0], [1, 1, 1]).filter((p) => !(p.pl.n[2] > 0.5)).map((p) => {
+            if (Math.abs(p.pl.n[1]) < 0.5) return p;
+            const vs = []; for (let i = 0; i < p.vs.length; i++) { const u = p.vs[i], v = p.vs[(i + 1) % p.vs.length]; vs.push(u); if (u[2] === 1 && v[2] === 1) vs.push([x0, u[1], 1]); }
+            return { vs, pl: p.pl };
+        });
+        const top = [P([[-1, -1, 1], [x0, -1, 1], [x0, -0.6, 1], [x0, 0.6, 1], [x0, 1, 1], [-1, 1, 1]]), P([[x0, -1, 1], [1, -1, 1], [1, 1, 1], [x0, 1, 1], [x0, 0.6, 1], [x0, -0.6, 1]])];
+        if (!fin) return [...box, ...top];
+        const a = [x0, -0.6, 1], b = [x0, 0.6, 1], c = [x0, 0.6, 1.8], d = [x0, -0.6, 1.8];
+        // the fin FIRST: cancelling it renumbers every triangle after it, so `from` must be remapped to be right
+        return [P([a, b, c, d]), exact ? P([a, d, c, b]) : P([d, c, b, a]), ...box, ...top];   // exact: the same two triangles, reversed
+    };
+    const Bs = [M.boxPolys([0.2, 0, 1.3], [0.5, 0.3, 0.4]), M.boxPolys([0.6, 0, 0.5], [0.3, 0.3, 0.8]), M.boxPolys([3, 0, 0], [0.5, 0.5, 0.5])];
+    let worst = 0, worst0 = 0, worstOther = 0, runs = 0, cancelled = 0, offSource = 0;
+    for (const B of Bs) for (const op of OPS) for (const finIsA of [true, false]) {
+        const pair = (F) => (finIsA ? [F, B] : [B, F]);
+        const truth = vol(run(...pair(finBox(false)), op));
+        const r = run(...pair(finBox(true)), op);
+        worst = Math.max(worst, Math.abs(vol(r) - truth)); cancelled += (r.stats.a.finsCancelled || 0) + (r.stats.b.finsCancelled || 0);
+        // `from` names the CALLER's triangles after a cancel: every output triangle lies on the one it names
+        const [PA, PB] = pair(finBox(true)), TA = M.toTriangleBuffer(PA), TB = M.toTriangleBuffer(PB);
+        for (let i = 0; i < r.triCount; i++) {
+            const f = r.from[i], src = f >= 0 ? TA : TB, k = f >= 0 ? f : -f - 1;
+            if (k * 9 >= src.length) { offSource++; continue; }
+            const S = [0, 1, 2].map((c) => [src[k * 9 + c * 3], src[k * 9 + c * 3 + 1], src[k * 9 + c * 3 + 2]]);
+            for (let c = 0; c < 3; c++) if (closestOnTriangle([r.tris[i * 9 + c * 3], r.tris[i * 9 + c * 3 + 1], r.tris[i * 9 + c * 3 + 2]], S[0], S[1], S[2]).d2 > 1e-24) { offSource++; break; }
+        }
+        worst0 = Math.max(worst0, Math.abs(vol(run(...pair(finBox(true)), op, { cancelFins: false })) - truth));
+        worstOther = Math.max(worstOther, Math.abs(vol(run(...pair(finBox(true, false)), op)) - truth));
+        runs++;
+    }
+    ok("!! a zero-thickness fin (its two faces the same triangles reversed): " + runs + " runs (3 B's, 3 ops, fin as A and as B) exactly what the plain box gives",
+        worst < 1e-12 && cancelled === 4 * runs && offSource === 0, "worst |err| " + worst.toExponential(2) + ", fin triangles cancelled " + cancelled + " (two quads: 2 reversed pairs a run), output triangles off the source `from` names " + offSource);
+    ok("   control: cancelFins:false leaves the fin in and is wrong (pointInMesh's welded hits)", worst0 > 1e-2, "worst |err| " + worst0.toExponential(2));
+    console.log("  KNOWN  a fin whose two faces are triangulated DIFFERENTLY (each quad fanned from a different corner) is not cancelled -- that needs the operand arranged against itself: worst |err| " + worstOther.toExponential(2));
+    // (b) THE PAIR CACHE IS TRANSPARENT: where the seam consensus joins nothing, the arrangements reading meshBoolean's
+    // pair results give the very bits they gave computing every pair themselves
+    let same = true, joinedNone = true;
+    for (const [PA, PB] of [[M.boxPolys([0, 0, 0], [1, 1, 1]), M.boxPolys([0.31, 0.27, 0.19], [0.7, 0.8, 0.9])], [M.jaggedBlob([0, 0, 0], 1, 8, 101), M.jaggedBlob([0.4, 0.2, 0.1], 0.9, 8, 501)]]) for (const op of OPS) {
+        const r = run(PA, PB, op, SNAPPED), r0 = run(PA, PB, op, { seamConsensus: false, ...SNAPPED });
+        // read robustly: a run that never reached the seam consensus leaves no `last` -- the row fails by name, the gate
+        // runs on (round 16f: a sabotage that took the exact path by default threw here, and section 25 never ran)
+        joinedNone = joinedNone && (seamConsensus.last || {}).joined === 0;
+        same = same && r.tris.length === r0.tris.length && r.tris.every((x, i) => x === r0.tris[i]);
+    }
+    ok("   the pair results meshBoolean shares with both arrangements change nothing where the consensus joins nothing (a box pair, a blob pair, 3 ops: bit for bit)",
+        same && joinedNone, "identical " + same + ", consensus joined nothing on all " + joinedNone);
+    // (c) BY HAND -- no workload here puts an input vertex in a seam cluster or a same-winding duplicate in an operand,
+    // so the rules are held directly. joinSeamEnds: an input vertex never moves, two are never one point, a chain of
+    // short segments is one point (its smallest, when no input vertex is in it).
+    const v = [1, 1, 1], q = [1 - 5e-10, 1, 1], w = [1 + 5e-10, 1, 1];
+    const j1 = joinSeamEnds([{ p0: v, p1: q, c0: true, c1: false }]);
+    const j2 = joinSeamEnds([{ p0: v, p1: w, c0: true, c1: true }]);
+    const j3 = joinSeamEnds([{ p0: w, p1: v, c0: false, c1: false }, { p0: v, p1: q, c0: false, c1: false }]);
+    ok("   by hand: a short seam segment from an input vertex joins ONTO it (though the other end is smaller); two input vertices are never joined; a chain is one point",
+        j1.canon && j1.canon(q) === v && j1.canon(v) === v && j2.canon === null && j2.stats.refused === 1 && j3.canon && j3.canon(w) === q && j3.canon(v) === q,
+        "onto the vertex " + (j1.canon && j1.canon(q) === v) + ", vertices kept apart " + (j2.canon === null) + ", chain to its smallest " + (j3.canon && j3.canon(w) === q));
+    // reverseTwins: the same triangle twice wound opposite ways (from any starting corner) cancels; twice the SAME way
+    // is a doubled face, not a fin, and stays
+    const T = [0, 0, 0, 1, 0, 0, 0, 1, 0], Tr = [1, 0, 0, 0, 0, 0, 0, 1, 0], Tr2 = [0, 1, 0, 1, 0, 0, 0, 0, 0], Tsame = [1, 0, 0, 0, 1, 0, 0, 0, 0];
+    const k1 = reverseTwins(Float64Array.from([...T, ...Tr])), k2 = reverseTwins(Float64Array.from([...T, ...Tr2])), k3 = reverseTwins(Float64Array.from([...T, ...Tsame]));
+    ok("   by hand: a triangle and itself reversed cancel, from either starting corner; the same triangle twice with the same winding does not",
+        k1 && k1.length === 0 && k2 && k2.length === 0 && k3 === null, "reversed " + (k1 && k1.length) + " kept, rotated-reversed " + (k2 && k2.length) + " kept, same winding " + (k3 === null ? "untouched" : "cancelled"));
+}
+
+console.log("\n20. *** ROUND 16b: EXACT SEAM TOPOLOGY, AN OPTION -- MEASURED NOT TO BE ENOUGH ON ITS OWN ***");
+{
+    const OPS = ["union", "subtract", "intersect"];
+    const run = (PA, PB, op, opts) => { const A = M.toTriangleBuffer(PA), B = M.toTriangleBuffer(PB); return meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), op, opts); };
+    const vol = (r) => { const t = r.tris; let v = 0; for (let o = 0; o < t.length; o += 9) v += t[o] * (t[o + 4] * t[o + 8] - t[o + 5] * t[o + 7]) - t[o + 1] * (t[o + 3] * t[o + 8] - t[o + 5] * t[o + 6]) + t[o + 2] * (t[o + 3] * t[o + 7] - t[o + 4] * t[o + 6]); return v / 6; };
+    // opts.exactSeam: every pair decided by triTriIntersectExact (orient3d signs of input points) instead of the 1e-9
+    // snapped distances. In general position it is the same answer: a box against a box offset off every grid.
+    const A = M.boxPolys([0, 0, 0], [1, 1, 1]), B = M.boxPolys([0.31, 0.27, 0.19], [0.7, 0.8, 0.9]);
+    const I = [0, 1, 2].reduce((p, k) => p * (Math.min(1, [0.31, 0.27, 0.19][k] + [0.7, 0.8, 0.9][k]) - Math.max(-1, [0.31, 0.27, 0.19][k] - [0.7, 0.8, 0.9][k])), 1);
+    const T = { union: 8 + 8 * 0.7 * 0.8 * 0.9 - I, subtract: 8 - I, intersect: I };
+    let worst = 0;
+    for (const op of OPS) worst = Math.max(worst, Math.abs(vol(run(A, B, op, { exactSeam: true })) - T[op]));
+    ok("   asked for, exactSeam on a box pair in general position comes out exact (the path is kept working)",
+        worst < 1e-12, "worst |err| " + worst.toExponential(2));
+    // KNOWN: near-coincidence. A blob against its copy rotated 1e-12: every twin pair now INTERSECTS exactly, along a
+    // sliver the arrangement then snaps at 1e-9 triangle by triangle -- the inconsistency moved one level down. Round 16b
+    // measured, exactSeam against the default: rotated family fallbacks 6 against 33, but the band's worst 4.7e-2 against
+    // 2.8e-2 and outside it 9e-3 against 1.4e-9; flush boxes 3 of 900 wrong (1.2e-2) against 0. It needs the arrangement
+    // snap-rounded GLOBALLY (near-coincident surfaces made exactly coincident, then the exact-zero contact path) --
+    // backlog bvh-csg-r16c-global-snap-rounding.
+    const blob = M.jaggedBlob([0.1, 0.05, 0], 1, 8, 101), c = Math.cos(1e-12), sn = Math.sin(1e-12);
+    const rotB = blob.map((p) => { const vs = p.vs.map((v) => [c * v[0] - sn * v[1], sn * v[0] + c * v[1], v[2]]); return { vs, pl: M.planeOf(vs) }; });
+    // round 16c: vertex rounding (the default) makes this copy the blob itself -- every vertex within 1.5e-12 of its twin --
+    // and both paths are then exact. The comparison is therefore made unrounded (vertexRound:false), where they differ.
+    let wDef = 0, wEx = 0, wR = 0, wRx = 0;
+    const Vb = M.volume(blob), NR = { vertexRound: false, ...SNAPPED };
+    for (const op of ["union", "intersect"]) {
+        wDef = Math.max(wDef, Math.abs(vol(run(blob, rotB, op, NR)) - Vb));
+        wEx = Math.max(wEx, Math.abs(vol(run(blob, rotB, op, { ...NR, exactSeam: true })) - Vb));
+        wR = Math.max(wR, Math.abs(vol(run(blob, rotB, op, SNAPPED)) - Vb));
+        wRx = Math.max(wRx, Math.abs(vol(run(blob, rotB, op, { exactSeam: true, ...SNAPPED })) - Vb));
+    }
+    // and it is OFF unless asked for: where the two paths differ, the default is the snapped path, bit for bit
+    const rDef = run(blob, rotB, "union", NR), rOff = run(blob, rotB, "union", { ...NR, exactSeam: false }), rOn = run(blob, rotB, "union", { ...NR, exactSeam: true });
+    const same = (x, y) => x.tris.length === y.tris.length && x.tris.every((v, i) => v === y.tris[i]);
+    ok("!! exactSeam is OFF unless asked for: on the rotated copy (unrounded) the default output is the snapped path's, bit for bit, and not the exact path's",
+        same(rDef, rOff) && !same(rDef, rOn), "default = exactSeam:false " + same(rDef, rOff) + ", default = exactSeam:true " + same(rDef, rOn));
+    console.log("  KNOWN  a blob against its copy rotated 1e-12 (union, intersect), unrounded: default |err| " + wDef.toExponential(1) + ", exactSeam " + wEx.toExponential(1) +
+        " -- exact topology without rounding; with round 16c's vertex rounding (the default) both are exact: " + wR.toExponential(1) + ", " + wRx.toExponential(1));
+}
+
+console.log("\n21. *** ROUND 16c: VERTEX ROUNDING -- B'S VERTICES WITHIN VERTEX_ROUND OF A'S TAKE A'S COORDINATES ***");
+{
+    const OPS = ["union", "subtract", "intersect"];
+    const buf = (P) => M.toTriangleBuffer(P);
+    const vol = (t) => { let v = 0; for (let o = 0; o < t.length; o += 9) v += t[o] * (t[o + 4] * t[o + 8] - t[o + 5] * t[o + 7]) - t[o + 1] * (t[o + 3] * t[o + 8] - t[o + 5] * t[o + 6]) + t[o + 2] * (t[o + 3] * t[o + 7] - t[o + 4] * t[o + 6]); return v / 6; };
+    // a closed mesh, by its exact bits: every directed edge has its reverse
+    const closed = (t) => { const k = (o) => t[o] + "," + t[o + 1] + "," + t[o + 2], E = new Map();
+        for (let o = 0; o < t.length; o += 9) for (let i = 0; i < 3; i++) { const e = k(o + i * 3) + "|" + k(o + ((i + 1) % 3) * 3); E.set(e, (E.get(e) || 0) + 1); }
+        for (const [e, n] of E) { const [a, b] = e.split("|"); if ((E.get(b + "|" + a) || 0) !== n) return false; } return true; };
+    let st = 99 >>> 0; const rnd = () => { st = (st * 1664525 + 1013904223) >>> 0; return st / 4294967296; };
+    // (a) a blob and a copy whose every vertex is nudged up to 0.9 x VERTEX_ROUND (the same nudge wherever a vertex is
+    // used): rounded back onto the blob, bit for bit -- the twin IS the blob, and every op is the blob with itself
+    {
+        const blob = M.jaggedBlob([0.1, 0.05, 0], 1, 8, 101), A = buf(blob), nudge = new Map(), B = Float64Array.from(A);
+        for (let o = 0; o < B.length; o += 3) {
+            const k = A[o] + "," + A[o + 1] + "," + A[o + 2];
+            if (!nudge.has(k)) { const d = [rnd() - 0.5, rnd() - 0.5, rnd() - 0.5], L = Math.hypot(...d); nudge.set(k, d.map((x) => x / L * 0.9 * VERTEX_ROUND * rnd())); }
+            const d = nudge.get(k); B[o] += d[0]; B[o + 1] += d[1]; B[o + 2] += d[2];
+        }
+        const r = vertexRound(A, new MeshBVH(A), B);
+        const back = r.tris && r.tris.every((x, i) => x === A[i]);
+        const V = vol(A), T = { union: V, subtract: 0, intersect: V };
+        let worst = 0; for (const op of OPS) worst = Math.max(worst, Math.abs(vol(meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), op, SNAPPED).tris) - T[op]));
+        ok("!! a copy with every vertex nudged up to 0.9 x VERTEX_ROUND is rounded back onto the original, bit for bit, and all 3 ops are the blob with itself (exact to 1e-13)",
+            back && worst < 1e-13, "bits back " + back + ", moved " + r.stats.moved + " of " + nudge.size + ", max move " + r.stats.maxMove.toExponential(2) + ", worst |err| " + worst.toExponential(2));
+        // the same nudges scaled to 1.5 x VERTEX_ROUND: nothing within the radius, nothing moves
+        const B2 = Float64Array.from(A);
+        for (let o = 0; o < B2.length; o += 3) { const d = nudge.get(A[o] + "," + A[o + 1] + "," + A[o + 2]), L = Math.hypot(...d); if (L > 0) for (let c = 0; c < 3; c++) B2[o + c] += d[c] / L * 1.5 * VERTEX_ROUND; }
+        const r2 = vertexRound(A, new MeshBVH(A), B2);
+        ok("   nudged 1.5 x VERTEX_ROUND instead, no vertex is within the radius and none moves", r2.tris === null && r2.stats.moved === 0, "moved " + r2.stats.moved + ", candidates " + r2.stats.candidates);
+        // round 11's normalisation: the rounding runs on the operands brought into the band, so its radius scales with
+        // them. The blob at 4x (extent ~8, in the band: not rescaled) with a copy nudged up to 0.9 x VERTEX_ROUND, against
+        // the same pair at 4096x -- which meshBoolean brings back down by exactly 2^10 to the 4x pair: rounded the same,
+        // the output 1024x the 4x one, bit for bit. (A radius applied before the normalisation would round nothing at 4096x.)
+        const s4 = (t, f) => t.map((x) => x * f), A4 = s4(A, 4), B4 = Float64Array.from(A4);
+        for (let o = 0; o < B4.length; o += 3) { const d = nudge.get(A[o] + "," + A[o + 1] + "," + A[o + 2]); for (let c = 0; c < 3; c++) B4[o + c] += d[c]; }
+        const A4k = s4(A4, 1024), B4k = s4(B4, 1024);
+        const r1 = meshBoolean(A4, new MeshBVH(A4), B4, new MeshBVH(B4), "union", SNAPPED), rs = meshBoolean(A4k, new MeshBVH(A4k), B4k, new MeshBVH(B4k), "union", SNAPPED);
+        ok("   at 4096x the nudged copy is rounded as at 4x: the result is 1024x the 4x one, bit for bit (the radius is a length in the normalised band)",
+            rs.scaleExponent === 10 && r1.scaleExponent === 0 && r1.tris.length > 0 && rs.tris.length === r1.tris.length && rs.tris.every((x, i) => x === r1.tris[i] * 1024) && (r1.stats.b.vertexRound?.moved ?? 0) > 0,
+            rs.tris.length / 9 + " triangles against " + r1.tris.length / 9 + ", scale exponents " + rs.scaleExponent + " / " + r1.scaleExponent + ", rounded at 4x " + (r1.stats.b.vertexRound?.moved ?? "none"));
+    }
+    // (b) by hand: a's nearest B vertex must be b itself -- two B vertices within the radius of one A vertex, the nearer
+    // moves and the other does not (no two vertices of B on one point, no triangle collapsed)
+    {
+        const A = Float64Array.from([0, 0, 0, 1, 0, 0, 0, 1, 0]);
+        const B = Float64Array.from([2e-9, 0, 1e-9, -5e-9, 0, 0, 0, -1, 1]);
+        const r = vertexRound(A, new MeshBVH(A), B), t = r.tris || B;
+        const p0 = [t[0], t[1], t[2]], p1 = [t[3], t[4], t[5]];
+        ok("!! two B vertices within the radius of one A vertex: only the nearer takes it (the pairing is mutual), the triangle keeps three points",
+            p0.join() === "0,0,0" && p1.join() === [-5e-9, 0, 0].join() && r.stats.refused === 1, "moved " + p0.join() + " / " + p1.join() + ", refused " + r.stats.refused);
+    }
+    // (c) by hand: a move that would turn a B triangle over is refused -- a needle 2e-9 tall whose apex has an A vertex
+    // 4e-9 away on the far side of its base
+    {
+        const A = Float64Array.from([0.5, -2e-9, 0, 0.5, -2e-9, 5, 3, 3, 3]);
+        const B = Float64Array.from([0, 0, 0, 1, 0, 0, 0.5, 2e-9, 0]);
+        const r = vertexRound(A, new MeshBVH(A), B);
+        ok("!! a move that would turn a B triangle over (a needle's apex across its own base) is refused, and the triangle is left as it was",
+            r.tris === null && r.stats.refused === 1, "refused " + r.stats.refused + ", moved " + r.stats.moved);
+    }
+    // (d) by hand: an A vertex exactly as far from b as another -- the lexicographically smaller is taken, whatever the
+    // order of A's triangles
+    {
+        const t1 = [1e-9, 0, 0, 1, 1, 1, 1, 2, 1], t2 = [-1e-9, 0, 0, -1, 1, 1, -1, 2, 1];
+        const B = Float64Array.from([0, 0, 0, 0, -1, 3, 2, -1, 3]);
+        const pick = (A) => { const r = vertexRound(A, new MeshBVH(A), B); return r.tris ? r.tris[0] : NaN; };
+        const x1 = pick(Float64Array.from([...t1, ...t2])), x2 = pick(Float64Array.from([...t2, ...t1]));
+        ok("   two A vertices equally near: the lexicographically smaller is taken, in either order of A's triangles", x1 === -1e-9 && x2 === -1e-9, x1 + " / " + x2);
+    }
+    // (e) closedness: a box whose corners are nudged within the radius of a second box's corners, both closed; after the
+    // rounding B is still closed, by its bits, and the union is exact
+    {
+        const A = buf(M.boxPolys([0, 0, 0], [1, 1, 1])), B0 = buf(M.boxPolys([2, 2, 2], [1, 1, 1]));
+        const n = new Map(), B = Float64Array.from(B0);
+        for (let o = 0; o < B.length; o += 3) { const k = B0[o] + "," + B0[o + 1] + "," + B0[o + 2]; if (!n.has(k)) n.set(k, [3e-9 * (rnd() - 0.5), 3e-9 * (rnd() - 0.5), 3e-9 * (rnd() - 0.5)]); const d = n.get(k); for (let c = 0; c < 3; c++) B[o + c] += d[c]; }
+        const r = vertexRound(A, new MeshBVH(A), B);
+        ok("!! a box touching another at one corner, its corners nudged by up to 1.5e-9: B moves only the shared corner and stays closed, by its bits",
+            r.stats.moved === 1 && closed(r.tris || B), "moved " + r.stats.moved + ", closed " + closed(r.tris || B));
+    }
+    // (f) the switch: vertexRound:false is round 16's pipeline (same bits as the unrounded operands), and the default
+    // rounds (section 17's tilt and band rows measure what it buys)
+    {
+        const blob = M.jaggedBlob([0.1, 0.05, 0], 1, 8, 101), A = buf(blob), c = Math.cos(1e-9), sn = Math.sin(1e-9);
+        const B = buf(blob.map((p) => { const vs = p.vs.map((v) => [c * v[0] - sn * v[1], sn * v[0] + c * v[1], v[2]]); return { vs, pl: M.planeOf(vs) }; }));
+        const rOff = meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), "subtract", { vertexRound: false, ...SNAPPED });
+        const rDef = meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), "subtract", SNAPPED);
+        const vr = rDef.stats.b.vertexRound;
+        ok("!! vertex rounding is ON by default on the snapped path (the copy rotated 1e-9 about z has its vertices rounded) and vertexRound:false turns it off (none recorded)",
+            vr && vr.moved > 0 && !rOff.stats.b.vertexRound, "default moved " + (vr ? vr.moved : "none") + ", off: " + (rOff.stats.b.vertexRound ? "rounded" : "not rounded"));
+    }
+}
+
+console.log("\n22. *** ROUND 16d: BEYOND THE FIXTURE -- OTHER BLOBS, OTHER AXES ***");
+{
+    // Round 16d measured a wider family -- 3 blobs x 4 axes x 7 angles 1e-9..3e-8 x 3 ops, 252 runs -- against each one's
+    // first-order oracle: beyond fo + 3e-9 on 118 runs at round 16 (worst 1.2e-1, 606 fallbacks), 24 at round 16c
+    // (4.7e-2, 75), 12 with the twin join (4.7e-2, 48). Too slow for this gate whole; two of its cases are held here.
+    const vol = (t) => { let v = 0; for (let o = 0; o < t.length; o += 9) v += t[o] * (t[o + 4] * t[o + 8] - t[o + 5] * t[o + 7]) - t[o + 1] * (t[o + 3] * t[o + 8] - t[o + 5] * t[o + 6]) + t[o + 2] * (t[o + 3] * t[o + 7] - t[o + 4] * t[o + 6]); return v / 6; };
+    const rot = (P, w, th) => { const c = Math.cos(th), sn = Math.sin(th), C = 1 - c, [x, y, z] = w;
+        const R = [[c + x * x * C, x * y * C - z * sn, x * z * C + y * sn], [y * x * C + z * sn, c + y * y * C, y * z * C - x * sn], [z * x * C - y * sn, z * y * C + x * sn, c + z * z * C]];
+        return P.map((p) => { const vs = p.vs.map((v) => [0, 1, 2].map((r) => R[r][0] * v[0] + R[r][1] * v[1] + R[r][2] * v[2])); return { vs, pl: M.planeOf(vs) }; }); };
+    const firstOrder = (buf, w) => { let S = 0;
+        for (let o = 0; o < buf.length; o += 9) {
+            const a = [buf[o], buf[o + 1], buf[o + 2]], e1 = [buf[o + 3] - a[0], buf[o + 4] - a[1], buf[o + 5] - a[2]], e2 = [buf[o + 6] - a[0], buf[o + 7] - a[1], buf[o + 8] - a[2]];
+            const nn = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]], A2 = Math.hypot(...nn), K = 24; let acc = 0, cnt = 0;
+            for (let i = 0; i < K; i++) for (let j = 0; j < K - i; j++) for (const [du, dv] of j < K - i - 1 ? [[1 / 3, 1 / 3], [2 / 3, 2 / 3]] : [[1 / 3, 1 / 3]]) {
+                const u = (i + du) / K, v = (j + dv) / K, p = [a[0] + u * e1[0] + v * e2[0], a[1] + u * e1[1] + v * e2[1], a[2] + u * e1[2] + v * e2[2]];
+                acc += Math.abs(((w[1] * p[2] - w[2] * p[1]) * nn[0] + (w[2] * p[0] - w[0] * p[2]) * nn[1] + (w[0] * p[1] - w[1] * p[0]) * nn[2]) / A2); cnt++;
+            }
+            S += acc / cnt * A2 / 2;
+        } return S; };
+    const worstOf = (seed, facets, c, w0, th, opts) => {
+        const blob = M.jaggedBlob(c, 1, facets, seed), A = M.toTriangleBuffer(blob), Vb = M.volume(blob), L = Math.hypot(...w0), w = w0.map((x) => x / L);
+        const fo = th * firstOrder(A, w) / 2, T = { union: Vb + fo, subtract: fo, intersect: Vb - fo }, B = M.toTriangleBuffer(rot(blob, w, th));
+        let e = 0; for (const op of ["union", "subtract", "intersect"]) e = Math.max(e, Math.abs(vol(meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), op, { ...SNAPPED, ...opts }).tris) - T[op]));
+        return { e, fo };
+    };
+    const f = worstOf(33, 10, [0.2, -0.1, 0.05], [1, 2, 3], 2e-8, {}), f8 = worstOf(33, 10, [0.2, -0.1, 0.05], [1, 2, 3], 2e-8, { joinTwin: 8 });
+    ok("!! a second blob (seed 33) against its copy rotated 2e-8 about (1,2,3): all 3 ops within the first-order volume (+3e-9) -- round 16c's 8-snap join left a cone there",
+        f.e <= 1.01 * f.fo + 3e-9 && f8.e > 1e-6, "worst " + f.e.toExponential(2) + " (fo " + f.fo.toExponential(1) + "); joinTwin:8 " + f8.e.toExponential(2));
+    // the four cases left beyond first-order (12 runs: each of them, all 3 ops), each pinned at 2.5x its measured worst.
+    // Round 16e measured four per-pair fixes for them, all worse -- see meshBoolean.mjs's ROUND 16e paragraph.
+    const known = [[7, 8, [0, 0, 0], [1, 0, 0], 1e-8, 4.71e-2], [202, 6, [-0.15, 0.1, 0.2], [1, 0, 0], 2e-8, 1.7e-2],
+                   [7, 8, [0, 0, 0], [0, 0, 1], 3e-8, 2.9e-3], [33, 10, [0.2, -0.1, 0.05], [-2, 1, 1], 3e-8, 1.2e-3]];
+    const got = known.map(([seed, fc, c, w0, th, was]) => ({ seed, w0, th, was, ...worstOf(seed, fc, c, w0, th, {}) }));
+    console.log("  KNOWN  blobs against their copies rotated in the band, beyond their first-order volume: " +
+        got.map((g) => "seed " + g.seed + " about (" + g.w0.join(",") + ") " + g.th.toExponential(0) + ": " + g.e.toExponential(2) + " (fo " + g.fo.toExponential(1) + ")").join("; ") +
+        " -- the worst traced: a twin pair whose vertices sit 5e-10, 7e-10 and 1.7e-9 off each other's plane straddles the 1e-9 snap, is taken as a TOUCH where it crosses, the face is not split, and both copies are kept whole. On the SNAPPED path (exactArrangement:false); the exact arrangement, the default since round 16g, closes them (section 25).");
+    ok("   (KNOWN, pinned) each of those four stays within 2.5x its measured worst -- a regression alarm, not a correctness claim",
+        got.every((g) => g.e < 2.5 * g.was), got.map((g) => g.e.toExponential(2) + " / " + g.was.toExponential(1)).join(", "));
+}
+
+console.log("\n23. *** ROUND 17: FAR FROM THE ORIGIN -- THE OPERANDS MOVED TO IT, EXACTLY ***");
+{
+    const OPS = ["union", "subtract", "intersect"];
+    const vol = (t, c = 0) => { let v = 0; for (let o = 0; o < t.length; o += 9) { const a = [t[o] - c, t[o + 1] - c, t[o + 2] - c], b = [t[o + 3] - c, t[o + 4] - c, t[o + 5] - c], d = [t[o + 6] - c, t[o + 7] - c, t[o + 8] - c]; v += a[0] * (b[1] * d[2] - b[2] * d[1]) - a[1] * (b[0] * d[2] - b[2] * d[0]) + a[2] * (b[0] * d[1] - b[1] * d[0]); } return v / 6; };
+    const area = (t) => { let s = 0; for (let o = 0; o < t.length; o += 9) { const e1 = [t[o + 3] - t[o], t[o + 4] - t[o + 1], t[o + 5] - t[o + 2]], e2 = [t[o + 6] - t[o], t[o + 7] - t[o + 1], t[o + 8] - t[o + 2]]; s += Math.hypot(e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]) / 2; } return s; };
+    const cracks = (buf, D) => { const Q = 1e-6, key = (o) => Math.round((buf[o] - D) / Q) + "," + Math.round((buf[o + 1] - D) / Q) + "," + Math.round((buf[o + 2] - D) / Q), E = new Map();
+        for (let o = 0; o < buf.length; o += 9) { const k = [key(o), key(o + 3), key(o + 6)]; for (let i = 0; i < 3; i++) if (k[i] !== k[(i + 1) % 3]) { const e = k[i] + "|" + k[(i + 1) % 3]; E.set(e, (E.get(e) || 0) + 1); } }
+        let c = 0; for (const [e, n] of E) { const [a, b] = e.split("|"); if ((E.get(b + "|" + a) || 0) !== n) c++; } return c; };
+    const run = (A, B, op, o = {}) => meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), op, o);
+    const rotz = (P, a) => P.map((p) => { const vs = p.vs.map(([x, y, z]) => [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a), z]); return { vs, pl: M.planeOf(vs) }; });
+    // the operands are BUILT far away -- x = fl(p + D), exact doubles out there -- and moved back by D exactly (Sterbenz:
+    // every x is within a factor 2 of D), so the oracle is the same geometry at the origin, where the pipeline is trusted
+    const far = (P, D) => { const t = M.toTriangleBuffer(P), o = new Float64Array(t.length); for (let i = 0; i < t.length; i++) o[i] = t[i] + D; return o; };
+    const back = (X, D) => X.map((x) => x - D);
+    const pairs = [["two blobs", M.jaggedBlob([0, 0, 0], 1, 8, 11), M.jaggedBlob([0.4, 0.3, -0.2], 0.9, 8, 12)],
+                   ["a box and a rotated box", M.boxPolys([0, 0, 0], [1, 1, 1]), rotz(M.boxPolys([0.3, 0.2, 0.1], [0.7, 0.8, 0.9]), 0.4)],
+                   ["a blob and its copy rotated 1e-6", M.jaggedBlob([0, 0, 0], 1, 8, 7), rotz(M.jaggedBlob([0, 0, 0], 1, 8, 7), 1e-6)]];
+    let over = 0, fbs = 0, crk = 0, ident = 0, n = 0, worstRel = 0;
+    const ctrl = {};
+    for (const e of [13, 20, 27]) {
+        const D = 2 ** e, ulp = 2 ** (e - 52);
+        for (const [name, P, Q] of pairs) {
+            const X = far(P, D), Y = far(Q, D), X0 = back(X, D), Y0 = back(Y, D), bound = ulp * (area(X0) + area(Y0));
+            for (const op of OPS) {
+                const r = run(X, Y, op), r0 = run(X0, Y0, op), err = Math.abs(vol(r.tris, D) - vol(r0.tris));
+                n++; if (err > bound) over++; worstRel = Math.max(worstRel, err / bound);
+                // cracks at the 1e-6 census beyond those the same geometry has at the origin (a copy rotated 1e-6 has 5
+                // there: its twins are a census key apart)
+                fbs += r.stats.a.fallbackTris + r.stats.b.fallbackTris; crk += Math.max(0, cracks(r.tris, D) - cracks(r0.tris, 0));
+                // the far result IS the result for the operands moved by -t, moved back by +t, bit for bit: the move in is
+                // exact, so the pipeline saw exactly those operands
+                const t = r.translation, Xt = t && X.map((x, i) => x - t[i % 3]), Yt = t && Y.map((x, i) => x - t[i % 3]);
+                const rt = t && run(Xt, Yt, op);
+                if (!t || rt.translation || rt.tris.length !== r.tris.length || r.tris.some((x, i) => x !== rt.tris[i] + t[i % 3])) ident++;
+                if (op === "union" && (e === 13 || e === 27)) { const rc = run(X, Y, op, { translate: false, ...SNAPPED }); ctrl[name + " 2^" + e] = [Math.abs(vol(rc.tris, D) - vol(r0.tris)), rc.stats.a.fallbackTris + rc.stats.b.fallbackTris]; }
+            }
+        }
+    }
+    ok("!! *** THREE PAIRS AT 2^13, 2^20 AND 2^27 FROM THE ORIGIN, 3 OPS: WITHIN ulp(D) x THEIR AREA OF THE SAME GEOMETRY AT THE ORIGIN, NO FALLBACK, NO CRACK IT DOES NOT HAVE THERE ***",
+        over === 0 && fbs === 0 && crk === 0, over + " of " + n + " beyond (worst " + worstRel.toFixed(3) + " of the bound), fallbacks " + fbs + ", cracks " + crk);
+    ok("!! the far result IS the result for the operands moved by -t (exactly), moved back by +t, bit for bit, on every one of those runs",
+        ident === 0, ident + " of " + n + " differ");
+    const c13 = ctrl["a blob and its copy rotated 1e-6 2^13"], c27 = ctrl["a box and a rotated box 2^27"];
+    ok("   control: translate:false on the snapped path -- round 11's pipeline, scaled but not moved -- is off there (a blob and its copy rotated 1e-6 at 2^13; the boxes at 2^27)",
+        c13[0] > 1e-9 && c13[1] > 0 && c27[0] > 1e-3, Object.entries(ctrl).map(([k, [e, f]]) => k + ": " + e.toExponential(1) + " (" + f + " fb)").join(", "));
+    // input vertices come back bit for bit: two far boxes apart -- the union is their triangles, untouched
+    {
+        const X = far(M.boxPolys([0, 0, 0], [1, 1, 1]), 2 ** 30), Y = far(M.boxPolys([3.1, 0.2, 0.3], [1, 1, 1]), 2 ** 30), r = run(X, Y, "union");
+        const key = (b, o) => b[o] + "," + b[o + 1] + "," + b[o + 2], inp = new Set();
+        for (const b of [X, Y]) for (let o = 0; o < b.length; o += 3) inp.add(key(b, o));
+        let foreign = 0; for (let o = 0; o < r.tris.length; o += 3) if (!inp.has(key(r.tris, o))) foreign++;
+        ok("   two disjoint boxes at 2^30, moved in and back: every output vertex is an input vertex, bit for bit", r.translation && foreign === 0 && r.triCount === 24, "foreign vertices " + foreign + ", triangles " + r.triCount);
+    }
+    // by hand: near the origin nothing moves; only a far axis moves; t lands on the coordinates' own grid
+    {
+        const A = M.toTriangleBuffer(M.boxPolys([0, 0, 0], [1, 1, 1])), B = M.toTriangleBuffer(M.boxPolys([0.5, 0.5, 0.5], [1, 1, 1]));
+        const near = translationFor(A, B);
+        const shiftX = (b, D) => b.map((x, i) => (i % 3 === 0 ? x + D : x)), t = translationFor(shiftX(A, 1e6), shiftX(B, 1e6));
+        ok("   by hand: a pair at the origin is not moved; the same pair 1e6 along x is moved along x only, by a value within its spread",
+            near === null && t && t[1] === 0 && t[2] === 0 && t[0] > 1e6 - 1 && t[0] < 1e6 + 1.5, "near " + JSON.stringify(near) + ", far " + JSON.stringify(t));
+    }
+    // moved AND scaled: a pair 1e-3 across at 2^10 (moved in, then scaled up by 2^10) and one 1e4 across at 2^40
+    {
+        let worst = 0, bad = 0;
+        for (const [ext, D] of [[1e-3, 2 ** 10], [1e4, 2 ** 40]]) {
+            const P = M.jaggedBlob([0, 0, 0], ext, 8, 21), Q = M.jaggedBlob([0.3 * ext, 0.2 * ext, -0.1 * ext], 0.9 * ext, 8, 22);
+            const X = far(P, D), Y = far(Q, D), X0 = back(X, D), Y0 = back(Y, D), bound = 2 ** (Math.floor(Math.log2(D)) - 52) * (area(X0) + area(Y0)) + 1e-12 * ext ** 3;
+            for (const op of OPS) { const r = run(X, Y, op), e = Math.abs(vol(r.tris, D) - vol(run(X0, Y0, op).tris)); worst = Math.max(worst, e / bound); if (e > bound || !r.translation) bad++; }
+        }
+        ok("   moved and scaled together: a pair 1e-3 across at 2^10 and one 1e4 across at 2^40, within the same bound", bad === 0, bad + " beyond, worst " + worst.toFixed(3) + " of the bound");
+    }
+}
+
+const HALF_PAGE = [4, 3, 0.35];   // destructible.html's wall (blastEngine-selfcheck's HALF)
+function pageBlastsAudit(seed, n) {   // destructible.html's blast, seeded (blastEngine-selfcheck's pageBlasts)
+    let st = seed >>> 0; const r = () => { st = (st * 1664525 + 1013904223) >>> 0; return st / 4294967296; }, out = [];
+    for (let k = 0; k < n; k++) { const rad = 0.2 + r() * 1.2, rough = r() * 0.9, sub = 4 + Math.floor(r() * 11);
+        const c = [(r() * 2 - 1) * (HALF_PAGE[0] - rad), (r() * 2 - 1) * (HALF_PAGE[1] - rad), 0]; out.push(M.jaggedBlob(c, rad, sub, k + 1, { rough, floor: 1 - rough })); }
+    return out;
+}
+console.log("\n24. *** ROUND 18: UNION AND INTERSECT HELD TO SUBTRACT'S DEPTH -- A CSG PROPERTY-LIST AUDIT ***");
+{
+    // Nothing in the engine calls union or intersect (a blast is a subtract); this is the audit before a second caller.
+    // Sections 8, 15-20, 22 and 23 already run all three ops; what subtract had and they did not: an independent
+    // randomized oracle (section 9 is box-minus-box), the algebra, outputs fed back in, an orientation check, the
+    // containment and touching cases, and a workload that ADDS material.
+    const vol = (t) => { let v = 0; for (let o = 0; o < t.length; o += 9) v += t[o] * (t[o + 4] * t[o + 8] - t[o + 5] * t[o + 7]) - t[o + 1] * (t[o + 3] * t[o + 8] - t[o + 5] * t[o + 6]) + t[o + 2] * (t[o + 3] * t[o + 7] - t[o + 4] * t[o + 6]); return v / 6; };
+    const census = (buf, Q) => { const key = (o) => Math.round(buf[o] / Q) + "," + Math.round(buf[o + 1] / Q) + "," + Math.round(buf[o + 2] / Q), E = new Map();
+        for (let o = 0; o < buf.length; o += 9) { const k = [key(o), key(o + 3), key(o + 6)]; for (let i = 0; i < 3; i++) if (k[i] !== k[(i + 1) % 3]) { const e = k[i] + "|" + k[(i + 1) % 3]; E.set(e, (E.get(e) || 0) + 1); } }
+        let c = 0; for (const [e, n] of E) { const [a, b] = e.split("|"); if ((E.get(b + "|" + a) || 0) !== n) c++; } return c; };
+    const run = (A, B, op) => meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), op);
+    // ORIENTATION, by rays against the result itself: a point 1e-6 off each triangle along its normal is outside, 1e-6
+    // the other way inside (at 1e-4 the probe crosses thin features -- 19 false alarms of 19,843 on (d); none at 1e-6, 1e-8)
+    const facing = (buf, h = 1e-6) => {
+        const bvh = new MeshBVH(buf); let wrong = 0, n = 0;
+        for (let o = 0; o < buf.length; o += 9) {
+            const e1 = [buf[o + 3] - buf[o], buf[o + 4] - buf[o + 1], buf[o + 5] - buf[o + 2]], e2 = [buf[o + 6] - buf[o], buf[o + 7] - buf[o + 1], buf[o + 8] - buf[o + 2]];
+            const nn = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]], L = Math.hypot(...nn); if (L < 1e-6) continue;
+            const c = [0, 1, 2].map((k) => (buf[o + k] + buf[o + 3 + k] + buf[o + 6 + k]) / 3), u = nn.map((x) => x / L);
+            n++; if (pointInMesh(bvh, c[0] + u[0] * h, c[1] + u[1] * h, c[2] + u[2] * h).inside || !pointInMesh(bvh, c[0] - u[0] * h, c[1] - u[1] * h, c[2] - u[2] * h).inside) wrong++;
+        }
+        return { wrong, n };
+    };
+    const rng = (seed) => { let st = seed >>> 0; return () => { st = (st * 1664525 + 1013904223) >>> 0; return st / 4294967296; }; };
+    // (a) twelve random blob triples: the algebra, an independent oracle (meshCSG's BSP union / intersect / subtract), and
+    // (b) outputs fed back in -- absorption and associativity
+    {
+        const R = { partition: 0, inclusionExclusion: 0, threeWay: 0, commuteU: 0, commuteI: 0, bspU: 0, bspI: 0, bspS: 0, absorbU: 0, absorbI: 0, assocU: 0, assocI: 0 };
+        let fbs = 0, crk = 0, neg = 0, wrong = 0, faces = 0;
+        const up = (k, x) => { R[k] = Math.max(R[k], Math.abs(x)); };
+        for (let seed = 1; seed <= 12; seed++) {
+            const r = rng(seed), blob = (k) => M.jaggedBlob([(r() - 0.5) * 1.2, (r() - 0.5) * 1.2, (r() - 0.5) * 0.6], 0.3 + r() * 0.9, 4 + Math.floor(r() * 8), seed * 10 + k, { rough: r() * 0.9, floor: 0.5 });
+            const PA = blob(1), PB = blob(2), PC = blob(3), A = M.toTriangleBuffer(PA), B = M.toTriangleBuffer(PB), C = M.toTriangleBuffer(PC), vA = vol(A), vB = vol(B);
+            const out = {}; for (const op of ["union", "intersect", "subtract"]) { const x = run(A, B, op); out[op] = x; fbs += x.stats.a.fallbackTris + x.stats.b.fallbackTris; crk += census(x.tris, 1e-9); if (vol(x.tris) < 0) neg++; }
+            const U = vol(out.union.tris), I = vol(out.intersect.tris), S = vol(out.subtract.tris), S2 = vol(run(B, A, "subtract").tris);
+            up("partition", S + I - vA); up("inclusionExclusion", U + I - vA - vB); up("threeWay", S + S2 + I - U);
+            up("commuteU", vol(run(B, A, "union").tris) - U); up("commuteI", vol(run(B, A, "intersect").tris) - I);
+            up("bspU", M.volume(M.union(PA, PB)) - U); up("bspI", M.volume(M.intersect(PA, PB)) - I); up("bspS", M.volume(M.subtract(PA, PB)) - S);
+            const chained = [run(A, out.intersect.tris, "union"), run(A, out.union.tris, "intersect"), run(out.union.tris, C, "union"), run(A, run(B, C, "union").tris, "union"),
+                             run(out.intersect.tris, C, "intersect"), run(A, run(B, C, "intersect").tris, "intersect")];
+            up("absorbU", vol(chained[0].tris) - vA); up("absorbI", vol(chained[1].tris) - vA);
+            up("assocU", vol(chained[2].tris) - vol(chained[3].tris)); up("assocI", vol(chained[4].tris) - vol(chained[5].tris));
+            for (const x of chained) { crk += census(x.tris, 1e-9); fbs += x.stats.a.fallbackTris + x.stats.b.fallbackTris; }
+            for (const op of ["union", "intersect"]) { const f = facing(out[op].tris); wrong += f.wrong; faces += f.n; }
+        }
+        const worstAlg = Math.max(R.partition, R.inclusionExclusion, R.threeWay, R.commuteU, R.commuteI), worstBsp = Math.max(R.bspU, R.bspI, R.bspS), worstChain = Math.max(R.absorbU, R.absorbI, R.assocU, R.assocI);
+        ok("!! *** 12 RANDOM BLOB PAIRS: |A-B| + |AnB| = |A|, |AuB| + |AnB| = |A| + |B|, |A-B| + |B-A| + |AnB| = |AuB|, u and n commute -- to 1e-13 ***",
+            worstAlg < 1e-13, Object.entries(R).slice(0, 5).map(([k, v]) => k + " " + v.toExponential(1)).join(", "));
+        ok("!! union, intersect and subtract each within 1e-12 of meshCSG's BSP on the same pairs (an oracle that shares no code)",
+            worstBsp < 1e-12, "union " + R.bspU.toExponential(1) + ", intersect " + R.bspI.toExponential(1) + ", subtract " + R.bspS.toExponential(1));
+        ok("!! OUTPUTS FED BACK IN: A u (A n B) = A, A n (A u B) = A, (A u B) u C = A u (B u C), (A n B) n C = A n (B n C) -- to 1e-13",
+            worstChain < 1e-13, "absorption " + R.absorbU.toExponential(1) + " / " + R.absorbI.toExponential(1) + ", associativity " + R.assocU.toExponential(1) + " / " + R.assocI.toExponential(1));
+        ok("   all of those runs: no fallback, closed at the page's 1e-9 census, no negative volume, and every union and intersect triangle faces out (rays, 1e-6 off it)",
+            fbs === 0 && crk === 0 && neg === 0 && wrong === 0, "fallbacks " + fbs + ", open edges " + crk + ", negative volumes " + neg + ", wrong-facing " + wrong + " of " + faces);
+    }
+    // (c) containment, disjoint, touching at a face, an edge, a corner: each op exact against intervals, closed, facing out
+    {
+        const box = (c, h) => M.toTriangleBuffer(M.boxPolys(c, h)), V = (h) => 8 * h[0] * h[1] * h[2], small = [0.3, 0.4, 0.5];
+        const cases = [["B inside A", box([0, 0, 0], [1, 1, 1]), box([0.1, 0.2, -0.1], small), { union: 8, intersect: V(small), subtract: 8 - V(small) }],
+                       ["A inside B", box([0.1, 0.2, -0.1], small), box([0, 0, 0], [1, 1, 1]), { union: 8, intersect: V(small), subtract: 0 }],
+                       ["disjoint", box([0, 0, 0], [1, 1, 1]), box([3, 0, 0], [1, 1, 1]), { union: 16, intersect: 0, subtract: 8 }],
+                       ["touching at a face", box([0, 0, 0], [1, 1, 1]), box([2, 0.2, 0.1], [1, 0.5, 0.5]), { union: 10, intersect: 0, subtract: 8 }],
+                       ["touching at an edge", box([0, 0, 0], [1, 1, 1]), box([2, 2, 0.3], [1, 1, 0.5]), { union: 12, intersect: 0, subtract: 8 }],
+                       ["touching at a corner", box([0, 0, 0], [1, 1, 1]), box([2, 2, 2], [1, 1, 1]), { union: 16, intersect: 0, subtract: 8 }]];
+        let worst = 0, crk = 0, wrong = 0, faces = 0, n = 0;
+        for (const [, A, B, T] of cases) for (const op of ["union", "intersect", "subtract"]) {
+            const r = run(A, B, op); n++; worst = Math.max(worst, Math.abs(vol(r.tris) - T[op])); crk += census(r.tris, 1e-9); const f = facing(r.tris); wrong += f.wrong; faces += f.n;
+        }
+        ok("!! containment both ways, disjoint, touching at a face, an edge and a corner -- all 3 ops (" + n + " runs): exact to 1e-13, closed, every triangle facing out, an empty result empty",
+            worst < 1e-13 && crk === 0 && wrong === 0, "worst |err| " + worst.toExponential(2) + ", open edges " + crk + ", wrong-facing " + wrong + " of " + faces);
+        // the instrument sees a turned triangle: one triangle of a union turned round is found, and only it
+        const u = run(cases[3][1], cases[3][2], "union").tris, t = Float64Array.from(u);
+        for (let c = 0; c < 3; c++) { const x = t[3 + c]; t[3 + c] = t[6 + c]; t[6 + c] = x; }
+        const f = facing(t);
+        ok("   control: in that union with ONE triangle turned round, the orientation check finds exactly one", f.wrong === 1, f.wrong + " of " + f.n);
+    }
+    // (d) a workload that ADDS material: the page's wall, five chains of ten ops -- even shots ADD a page blob (union), odd
+    // shots blast one (subtract), every fourth keeps only what lies inside a big blob (intersect) -- against the same chain
+    // through meshCSG's BSP
+    {
+        let worst = 0, fbs = 0, crk6 = 0, crk9 = 0, wrong = 0, faces = 0, ops = 0;
+        for (const seed of [1, 2, 3, 107, 202]) {
+            let wall = M.toTriangleBuffer(M.boxPolys([0, 0, 0], HALF_PAGE)), bsp = M.boxPolys([0, 0, 0], HALF_PAGE);
+            pageBlastsAudit(seed, 10).forEach((b, k) => {
+                const op = k % 4 === 3 ? "intersect" : (k % 2 === 0 ? "union" : "subtract"), P = op === "intersect" ? M.jaggedBlob([0, 0, 0], 3.6, 10, seed * 7 + k) : b, B = M.toTriangleBuffer(P);
+                const r = run(wall, B, op); wall = r.tris; ops++; fbs += r.stats.a.fallbackTris + r.stats.b.fallbackTris;
+                bsp = M[op](bsp, P); worst = Math.max(worst, Math.abs(vol(wall) - M.volume(bsp)) / M.volume(bsp));
+                crk6 += census(wall, 1e-6); crk9 += census(wall, 1e-9);
+            });
+            const f = facing(wall); wrong += f.wrong; faces += f.n;
+        }
+        ok("!! *** " + ops + " OPS ON THE PAGE'S WALL, ADDING, BLASTING AND TRIMMING: within 1e-10 (relative) of the same chains through the BSP, no fallback, closed at the arc's 1e-6 census at every step, every triangle facing out ***",
+            worst < 1e-10 && fbs === 0 && crk6 === 0 && wrong === 0, "worst " + worst.toExponential(2) + ", fallbacks " + fbs + ", open edges at 1e-6 " + crk6 + ", wrong-facing " + wrong + " of " + faces);
+        console.log("  KNOWN  raw, at the page's 1e-9 census, those steps leave " + crk9 + " open edges in all: seam ends 1.4e-9..3.5e-9 apart, the near-misses every op's raw output can carry (20 five-op chains each: union 0 edges, subtract 3, intersect 21). The page's blasts close them with round 14's finishing (blastEngine.mjs), which only the subtract adapter has -- backlog bvh-csg-r18b-finish-any-op.");
+    }
+}
+
+console.log("\n25. *** ROUND 16f: THE EXACT ARRANGEMENT (opts.exactArrangement) -- THE NEAR-COINCIDENT FAMILY CLOSED ***");
+{
+    // exactArrangement.mjs on implicitPoints.mjs: every seam point exact, every arrangement decision an exact sign, the
+    // triangulation Delaunay, a face a rounding from the other surface classified by an exact ray. The default since round 16g.
+    const vol = (t) => { let v = 0; for (let o = 0; o < t.length; o += 9) v += t[o] * (t[o + 4] * t[o + 8] - t[o + 5] * t[o + 7]) - t[o + 1] * (t[o + 3] * t[o + 8] - t[o + 5] * t[o + 6]) + t[o + 2] * (t[o + 3] * t[o + 7] - t[o + 4] * t[o + 6]); return v / 6; };
+    const open = (buf, q) => { const key = q ? (o) => Math.round(buf[o] / q) + "," + Math.round(buf[o + 1] / q) + "," + Math.round(buf[o + 2] / q) : (o) => buf[o] + "," + buf[o + 1] + "," + buf[o + 2], E = new Map();
+        for (let o = 0; o < buf.length; o += 9) { const k = [key(o), key(o + 3), key(o + 6)]; for (let i = 0; i < 3; i++) if (k[i] !== k[(i + 1) % 3]) { const e = k[i] + "|" + k[(i + 1) % 3]; E.set(e, (E.get(e) || 0) + 1); } }
+        let c = 0; for (const [e, n] of E) { const [a, b] = e.split("|"); if ((E.get(b + "|" + a) || 0) !== n) c++; } return c; };
+    const rot = (P, w, th) => { const c = Math.cos(th), sn = Math.sin(th), C = 1 - c, [x, y, z] = w;
+        const R = [[c + x * x * C, x * y * C - z * sn, x * z * C + y * sn], [y * x * C + z * sn, c + y * y * C, y * z * C - x * sn], [z * x * C - y * sn, z * y * C + x * sn, c + z * z * C]];
+        return P.map((p) => { const vs = p.vs.map((v) => [0, 1, 2].map((r) => R[r][0] * v[0] + R[r][1] * v[1] + R[r][2] * v[2])); return { vs, pl: M.planeOf(vs) }; }); };
+    const firstOrder = (buf, w) => { let S = 0;
+        for (let o = 0; o < buf.length; o += 9) {
+            const a = [buf[o], buf[o + 1], buf[o + 2]], e1 = [buf[o + 3] - a[0], buf[o + 4] - a[1], buf[o + 5] - a[2]], e2 = [buf[o + 6] - a[0], buf[o + 7] - a[1], buf[o + 8] - a[2]];
+            const nn = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]], A2 = Math.hypot(...nn), K = 24; let acc = 0, cnt = 0;
+            for (let i = 0; i < K; i++) for (let j = 0; j < K - i; j++) for (const [du, dv] of j < K - i - 1 ? [[1 / 3, 1 / 3], [2 / 3, 2 / 3]] : [[1 / 3, 1 / 3]]) {
+                const u = (i + du) / K, v = (j + dv) / K, p = [a[0] + u * e1[0] + v * e2[0], a[1] + u * e1[1] + v * e2[1], a[2] + u * e1[2] + v * e2[2]];
+                acc += Math.abs(((w[1] * p[2] - w[2] * p[1]) * nn[0] + (w[2] * p[0] - w[0] * p[2]) * nn[1] + (w[0] * p[1] - w[1] * p[0]) * nn[2]) / A2); cnt++;
+            }
+            S += acc / cnt * A2 / 2;
+        } return S; };
+    const band = (seed, facets, c, w0, th, opts) => {
+        const blob = M.jaggedBlob(c, 1, facets, seed), A = M.toTriangleBuffer(blob), Vb = M.volume(blob), L = Math.hypot(...w0), w = w0.map((x) => x / L);
+        const fo = th * firstOrder(A, w) / 2, T = { union: Vb + fo, subtract: fo, intersect: Vb - fo }, B = M.toTriangleBuffer(rot(blob, w, th));
+        let e = 0, fb = 0, o9 = 0;
+        for (const op of ["union", "subtract", "intersect"]) { const r = meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), op, opts); e = Math.max(e, Math.abs(vol(r.tris) - T[op])); fb += r.stats.a.fallbackTris + r.stats.b.fallbackTris; o9 += open(r.tris, 1e-9); }
+        return { e, fo, fb, o9, beyond: e > 1.01 * fo + 3e-9 };
+    };
+    // (a) section 22's four KNOWN cases, its seed-33 row, and a copy rotated 1e-12 (below any snap ever tried)
+    const cases = [[7, 8, [0, 0, 0], [1, 0, 0], 1e-8], [202, 6, [-0.15, 0.1, 0.2], [1, 0, 0], 2e-8], [7, 8, [0, 0, 0], [0, 0, 1], 3e-8], [33, 10, [0.2, -0.1, 0.05], [-2, 1, 1], 3e-8],
+                   [33, 10, [0.2, -0.1, 0.05], [1, 2, 3], 2e-8], [7, 8, [0, 0, 0], [1, 2, 3], 1e-12]];
+    const ex = cases.map((k) => band(...k, { exactArrangement: true })), df = cases.slice(0, 4).map((k) => band(...k, SNAPPED));
+    ok("!! *** THE FOUR CASES SECTION 22 PINS, ITS SEED-33 ROW AND A COPY ROTATED 1e-12, EXACT ARRANGEMENT: EVERY OP WITHIN ITS FIRST-ORDER VOLUME, NO FALLBACK, CLOSED AT THE PAGE'S 1e-9 CENSUS ***",
+        ex.every((g) => !g.beyond && g.fb === 0 && g.o9 === 0), ex.map((g) => g.e.toExponential(1) + (g.fb ? " fb" + g.fb : "") + (g.o9 ? " open" + g.o9 : "")).join(", "));
+    ok("   control: the same four cases on the snapped path (exactArrangement:false) are still the KNOWN ones (beyond first-order)", df.every((g) => g.beyond), df.map((g) => g.e.toExponential(1)).join(", "));
+    // (b) the family's worst blob (round 16d: seed 7 held 6 of its 12 cases beyond first-order), every axis and angle
+    let runs = 0, beyond = 0, fb = 0, o9 = 0;
+    for (const w0 of [[0, 0, 1], [1, 0, 0], [1, 2, 3], [-2, 1, 1]]) for (const th of [1e-9, 2e-9, 3e-9, 5e-9, 1e-8, 2e-8, 3e-8]) {
+        const g = band(7, 8, [0, 0, 0], w0, th, { exactArrangement: true }); runs += 3; if (g.beyond) beyond += 3; fb += g.fb; o9 += g.o9;
+    }
+    ok("!! " + runs + " runs (seed 7's blob, 4 axes x 7 angles 1e-9..3e-8 x 3 ops): none beyond its first-order volume, no fallback, closed at 1e-9 (round 16d's 252-run family, measured whole: 12 -> 0, fallbacks 51 -> 0, open runs 113 -> 0)",
+        beyond === 0 && fb === 0 && o9 === 0, beyond + " beyond, " + fb + " fallbacks, " + o9 + " open edges");
+    // (c) section 17's flush boxes rotated 0.7 about z: faces flush only to rounding, 1e-17 apart -- exactly, they cross
+    {
+        let st = 4242 >>> 0; const rnd = () => { st = (st * 1664525 + 1013904223) >>> 0; return st / 4294967296; };
+        const q = () => Math.round((rnd() * 2 - 1) * 4) / 4, hq = () => (1 + Math.floor(rnd() * 4)) / 4;
+        const rz = (P) => P.map((p) => { const vs = p.vs.map((v) => [v[0] * Math.cos(0.7) - v[1] * Math.sin(0.7), v[0] * Math.sin(0.7) + v[1] * Math.cos(0.7), v[2]]); return { vs, pl: M.planeOf(vs) }; });
+        let n = 0, worst = 0, crack = 0, amb = 0, fbk = 0, ctrl = 0;
+        for (let k = 0; k < 150; k++) {
+            const c1 = [q(), q(), q()], h1 = [hq(), hq(), hq()], c2 = [q(), q(), q()], h2 = [hq(), hq(), hq()];
+            const A = M.toTriangleBuffer(rz(M.boxPolys(c1, h1))), B = M.toTriangleBuffer(rz(M.boxPolys(c2, h2)));
+            const i = overlapVol(c1, h1, c2, h2), a = 8 * h1[0] * h1[1] * h1[2], b = 8 * h2[0] * h2[1] * h2[2], T = { union: a + b - i, subtract: a - i, intersect: i };
+            for (const op of ["union", "subtract", "intersect"]) {
+                const r = meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), op, { exactArrangement: true });
+                n++; worst = Math.max(worst, Math.abs(vol(r.tris) - T[op])); crack += open(r.tris, 1e-6); amb += r.ambiguousTriIndices.length; fbk += r.stats.a.fallbackTris + r.stats.b.fallbackTris;
+                if (k === 11 && op === "subtract") { const r0 = meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), op, { exactArrangement: true, exactNear: 0 }); ctrl = Math.abs(vol(r0.tris) - T[op]); }
+            }
+        }
+        ok("!! " + n + " flush-box runs rotated 0.7 (section 17's): exact to 1e-13, no fallback, no ambiguous fragment, no crack -- the faces CROSS, a rounding apart, and are cut and classified as they are",
+            worst < 1e-13 && fbk === 0 && amb === 0 && crack === 0, "worst " + worst.toExponential(2) + ", fallbacks " + fbk + ", ambiguous " + amb + ", cracks " + crack);
+        ok("   control: classified by float sides and rays (exactNear:0), case 11 is a large share of a box off", ctrl > 1e-2, "subtract off by " + ctrl.toExponential(2));
+    }
+    // (d) round 16g: ON by default -- a default run builds implicit points; exactArrangement:false builds none
+    const built = () => implicitStats.lpi + implicitStats.lli + implicitStats.tpi;
+    const A0 = M.toTriangleBuffer(M.jaggedBlob([0, 0, 0], 1, 8, 7)), B0 = M.toTriangleBuffer(rot(M.jaggedBlob([0, 0, 0], 1, 8, 7), [1, 0, 0], 1e-8));
+    const b0 = built(); meshBoolean(A0, new MeshBVH(A0), B0, new MeshBVH(B0), "union"); const onDef = built() - b0;
+    const b1 = built(); meshBoolean(A0, new MeshBVH(A0), B0, new MeshBVH(B0), "union", SNAPPED); const onOff = built() - b1;
+    ok("!! round 16g: the exact arrangement is ON by default (a default run builds implicit points) and exactArrangement:false is the snapped path (none)",
+        onDef > 0 && onOff === 0, "default " + onDef + ", exactArrangement:false " + onOff);
+    // (e) round 16g: the exact arrangement's precondition -- conforming where the operands meet -- and round 16h: an operand
+    // that is not is first made conforming there (merge within CONFORM_MERGE, split within CONFORM_SPLIT: meshCSG's EPS).
+    // A box whose top face has a T-junction: one triangle's diagonal a-c against two triangles meeting at m on (or near) it.
+    const tBox = (zf, m, m2 = m) => { const out = [], src = M.toTriangleBuffer(M.boxPolys([0, 0, 0], [1, 1, 1]));
+        for (let o = 0; o < src.length; o += 9) if (!(src[o + 2] === zf && src[o + 5] === zf && src[o + 8] === zf)) out.push(...src.subarray(o, o + 9));
+        const a = [-1, -1], b = [1, -1], c = [1, 1], d = [-1, 1], up = zf > 0;
+        for (const t of [[a, b, c], [m, c, d], [a, m2, d]]) { const u = up ? t : [t[0], t[2], t[1]]; for (const v of u) out.push(v[0], v[1], zf); }
+        return new Float64Array(out); };
+    const cutter = M.toTriangleBuffer(M.boxPolys([0.1, 0.05, 1], [0.3, 0.3, 0.3])), CV = 8 - 0.6 * 0.6 * 0.3;
+    const tj = (zf, ms, o) => { const A = tBox(zf, ...ms), r = meshBoolean(A, new MeshBVH(A), cutter, new MeshBVH(cutter), "subtract", o); return { r, err: Math.abs(vol(r.tris) - CV), open: bitsOpen(r.tris) }; };
+    const onTop = tj(1, [[0, 0]], { conform: false }), bot = tj(-1, [[0, 0]], { conform: false });
+    ok("!! round 16g: a T-junction where the operands meet, not conformed (conform:false), declines the exact arrangement (stats.a.exactDeclined) for the snapped path, which is right; one on the far face is not looked at",
+        onTop.r.exact === false && onTop.r.stats.a.exactDeclined > 0 && onTop.err < 1e-12 && bot.r.exact === true && !bot.r.stats.a.exactDeclined && bot.err < 1e-12,
+        "top: exact " + onTop.r.exact + ", declined " + onTop.r.stats.a.exactDeclined + ", off " + onTop.err.toExponential(1) + "; bottom: exact " + bot.r.exact + ", off " + bot.err.toExponential(1));
+    // (f) round 16h: conformed, then exact -- the T-junction on the line, 7e-10 off it (a BSP wall's), and with a near-miss
+    // 1e-14 beside it (the BSP's split points, computed per polygon): split / merged, exact, closed bit for bit, right
+    const fam = [["on the line", [[0, 0]]], ["7e-10 off it", [[5e-10, -5e-10]]], ["and a 1e-14 near-miss", [[5e-10, -5e-10], [5e-10 + 1e-14, -5e-10]]]];
+    const fx = fam.map(([n, ms]) => ({ n, d: tj(1, ms), c: tj(1, ms, { conform: false }) }));
+    ok("!! *** round 16h: A T-JUNCTION, ON ITS LONG SIDE OR 7e-10 OFF IT, AND A 1e-14 NEAR-MISS: CONFORMED (stats.a.conformed), THEN EXACT -- CLOSED BIT FOR BIT, THE VOLUME TO 1e-14 ***",
+        fx.every((x) => x.d.r.exact === true && x.d.r.stats.a.conformed && x.d.r.stats.a.conformed.split > 0 && x.d.open === 0 && x.d.err < 1e-14) && fx[2].d.r.stats.a.conformed.merged > 0,
+        fx.map((x) => x.n + ": exact " + x.d.r.exact + ", " + JSON.stringify(x.d.r.stats.a.conformed) + ", open " + x.d.open + ", off " + x.d.err.toExponential(1)).join("; "));
+    ok("   control: not conformed (conform:false) each declines to the snapped path, whose raw output is open there", fx.every((x) => x.c.r.exact === false && x.c.open > 0),
+        fx.map((x) => x.n + ": exact " + x.c.r.exact + ", open " + x.c.open + ", off " + x.c.err.toExponential(1)).join("; "));
+    // and what is not a T-junction or a near-miss at meshCSG's EPS is not made one: a crack 1.4e-6 wide, a near-miss 2e-8
+    const crack = tj(1, [[1e-6, -1e-6]]), nm = tj(1, [[0, 0], [2e-8, 0]]);
+    ok("!! round 16h: a crack 1.4e-6 wide and a near-miss 2e-8 apart -- beyond meshCSG's EPS -- are not conformed: both decline to the snapped path",
+        crack.r.exact === false && crack.r.stats.a.exactDeclined > 0 && nm.r.exact === false && nm.r.stats.a.exactDeclined > 0,
+        "crack: exact " + crack.r.exact + ", declined " + crack.r.stats.a.exactDeclined + "; near-miss 2e-8: exact " + nm.r.exact + ", declined " + nm.r.stats.a.exactDeclined);
+    // (g) round 16h: what conforming must not do -- keep a triangle the merge collapsed, or a split that turns one over
+    const degen = (b) => { let n = 0; for (let o = 0; o < b.length; o += 9) { const eq = (u, v) => b[o + u] === b[o + v] && b[o + u + 1] === b[o + v + 1] && b[o + u + 2] === b[o + v + 2]; if (eq(0, 3) || eq(3, 6) || eq(6, 0)) n++; } return n; };
+    const topFace = (ts) => { const out = [], src = M.toTriangleBuffer(M.boxPolys([0, 0, 0], [1, 1, 1]));
+        for (let o = 0; o < src.length; o += 9) if (!(src[o + 2] === 1 && src[o + 5] === 1 && src[o + 8] === 1)) out.push(...src.subarray(o, o + 9));
+        for (const t of ts) for (const v of t) out.push(v[0], v[1], 1); return new Float64Array(out); };
+    const qa = [-1, -1], qb = [1, -1], qc = [1, 1], qd = [-1, 1], run = (A) => meshBoolean(A, new MeshBVH(A), cutter, new MeshBVH(cutter), "subtract");
+    // a sliver (m2, m, d) between two near-miss points 5e-9 apart: merged, it is an edge, not a face
+    const C1 = run(topFace([[qa, qb, qc], [[0, 0], qc, qd], [[5e-9, 0], [0, 0], qd], [qa, [5e-9, 0], qd]]));
+    ok("!! round 16h: a sliver between two near-miss points 5e-9 apart collapses when they merge and is dropped -- exact, closed, no degenerate triangle in the output, the volume to 1e-14",
+        C1.exact === true && C1.stats.a.conformed && C1.stats.a.conformed.collapsed === 1 && bitsOpen(C1.tris) === 0 && degen(C1.tris) === 0 && Math.abs(vol(C1.tris) - CV) < 1e-14,
+        "exact " + C1.exact + ", " + JSON.stringify(C1.stats.a.conformed) + ", open " + bitsOpen(C1.tris) + ", degenerate " + degen(C1.tris) + ", off " + Math.abs(vol(C1.tris) - CV).toExponential(1));
+    // the diagonal's triangle a sliver (a, s, c), s 1e-9 off a-c towards b; the other half meets at m 5e-9 off towards b --
+    // splitting the sliver at m would turn a piece over: the shot declines instead
+    const r2 = Math.SQRT2, C2 = run(topFace([[qa, qb, [0.5 + 1e-9 / r2, 0.5 - 1e-9 / r2]], [[0.5 + 1e-9 / r2, 0.5 - 1e-9 / r2], qb, qc], [qa, [0.5 + 1e-9 / r2, 0.5 - 1e-9 / r2], qc],
+        [[0.3 + 5e-9 / r2, 0.3 - 5e-9 / r2], qc, qd], [qa, [0.3 + 5e-9 / r2, 0.3 - 5e-9 / r2], qd]]));
+    ok("!! round 16h: a split that would turn a triangle over (a point 5e-9 off a sliver 1e-9 wide) is refused -- the shot declines to the snapped path",
+        C2.exact === false && C2.stats.a.exactDeclined > 0, "exact " + C2.exact + ", declined " + C2.stats.a.exactDeclined);
+
+    // (h) ROUND 25: CAN THE SNAPPED PATH GO? -- the inputs that still reach it. The page's workloads never do: 0 of 1,690
+    // default operations declined (12 x 100 soak shots, 440 switching-chain BVH shots -- 117 of them conformed first --
+    // 50 union/subtract/intersect); its only production caller (destructible.html) passes no option. What declines is
+    // non-conformity BEYOND what conforming fixes: cracks and near-misses wider than meshCSG's EPS, and splits conforming
+    // refuses. Here they are swept -- 1e-9..1e-4 wide, cracks and near-misses, five cutters across the junction -- and
+    // wherever the default fell back, the exact arrangement forced onto the same operands (exactConforming:false) is set
+    // beside it. Round 16g's reason for the fallback (6.2 units of a switching chain's wall lost) was non-conformity WITHIN
+    // EPS, which conforming now closes before the check (section 15's n3 control in blastEngine-selfcheck is that loss).
+    {
+        const tB = (m, m2 = m) => { const out = [], src = M.toTriangleBuffer(M.boxPolys([0, 0, 0], [1, 1, 1]));
+            for (let o = 0; o < src.length; o += 9) if (!(src[o + 2] === 1 && src[o + 5] === 1 && src[o + 8] === 1)) out.push(...src.subarray(o, o + 9));
+            const a = [-1, -1], b = [1, -1], c = [1, 1], d = [-1, 1];
+            for (const t of [[a, b, c], [m, c, d], [a, m2, d]]) for (const v of t) out.push(v[0], v[1], 1);
+            return new Float64Array(out); };
+        let cases = 0, fell = 0, snapVol = 0, snapOpen = 0, exactOpen = 0, worstDv = 0;
+        for (const w of [1e-9, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4]) for (const kind of ["crack", "near-miss"]) for (const [cx, cy, h] of [[0.1, 0.05, 0.3], [0, 0, 0.2], [-0.2, 0.15, 0.25], [0.3, -0.3, 0.4], [0.05, 0.1, 0.1]]) {
+            const A = tB(...(kind === "crack" ? [[w / Math.SQRT2, -w / Math.SQRT2]] : [[0, 0], [w, 0]])), C = M.toTriangleBuffer(M.boxPolys([cx, cy, 1], [h, h, 0.3]));
+            const want = vol(A) - 4 * h * h * 0.3, go = (o) => { const r = meshBoolean(A, new MeshBVH(A), C, new MeshBVH(C), "subtract", o); return { exact: r.exact, err: Math.abs(vol(r.tris) - want), open: bitsOpen(r.tris) }; };
+            const d = go({}); cases++;
+            if (d.exact) continue;
+            const x = go({ exactConforming: false }); fell++;
+            worstDv = Math.max(worstDv, d.err - x.err);
+            if (d.err < x.err - 1e-14) snapVol++;
+            if (d.open < x.open) snapOpen++; if (x.open < d.open) exactOpen++;
+        }
+        ok("!! *** round 25: where the default still falls back to the snapped path, the exact arrangement forced is NEVER WORSE -- not in volume (beyond a rounding), not in open edges ***",
+            fell === 40 && snapVol === 0 && snapOpen === 0,
+            cases + " cases, " + fell + " fell back; the snapped answer smaller in volume error in " + snapVol + " (worst " + worstDv.toExponential(1) + "), fewer open edges in " +
+            snapOpen + "; the forced exact fewer open edges in " + exactOpen + ". The fallback buys nothing measurable on what reaches it.");
+    }
+}
+
+console.log("\n26. *** ROUND 20b: embedRounded ON HAND-BUILT CROSSINGS -- WHAT IT MAY MOVE, WHAT IT REFUSES, WHAT IT TESTS ***");
+{
+    // Two slivers sharing a corner, crossing by 1e-16 (manifoldAudit-selfcheck's pair): S1 in z = 0, 4e-10 wide at x = 1;
+    // S2's far side from z = -1e-16 to +1e-16 across it. Every case below is the repair called directly on such an output.
+    const F = (...ts) => new Float64Array(ts.flat(2)), far = F([[9, 9, 9], [9, 8, 9], [8, 9, 9]]), other = [[7, 7, 7], [7, 6, 7], [6, 7, 7]];
+    const S1 = [[0, 0, 0], [1, 0, 0], [1, 4e-10, 0]], S2 = [[0, 0, 0], [1, 1e-10, -1e-16], [1, 3e-10, 1e-16]];
+    const run = (out, from, A) => embedRounded(out, Int32Array.from(from), A, new MeshBVH(A), far, new MeshBVH(far));
+    const has = (buf, p) => { for (let o = 0; o < buf.length; o += 3) if (buf[o] === p[0] && buf[o + 1] === p[1] && buf[o + 2] === p[2]) return true; return false; };
+    // (a) S2's short side is two vertices of an operand: the collapse takes S1's side instead (4e-10), not S2's (2e-10)
+    const ra = run(F(S1, S2), [1, 1], F([S2[1], S2[2], [5, 5, 5]], other));
+    ok("!! the shortest side of a crossing joins two OPERAND vertices: they stay; the next side, an arrangement point's, collapses -- and the crossing is gone",
+        has(ra.tris, S2[1]) && has(ra.tris, S2[2]) && ra.stats.collapsed === 1 && ra.stats.left === 0 && manifoldAudit(ra.tris).crossings === 0, JSON.stringify(ra.stats));
+    // (b) a triangle T3 on S2's corner (1, 1e-10), beyond the line through (1, 2e-10): moving that corner onto (1, 3e-10)
+    // would turn T3 over -- refused; the other way round is taken
+    const T3 = [S2[1], [1.5, 2.5e-10, -1e-16], [2, 3e-10, -1e-16]], rb = run(F(S1, S2, T3), [0, 0, 0], F(other));
+    const nrm = (T) => { const u = [0, 1, 2].map((c) => T[1][c] - T[0][c]), v = [0, 1, 2].map((c) => T[2][c] - T[0][c]); return [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]]; };
+    let t3 = null; for (let o = 0; o < rb.tris.length; o += 9) if (rb.tris[o + 3] === 1.5 && rb.tris[o + 6] === 2) t3 = [0, 1, 2].map((c) => [rb.tris[o + c * 3], rb.tris[o + c * 3 + 1], rb.tris[o + c * 3 + 2]]);
+    const n0 = nrm(T3), n1 = t3 ? nrm(t3) : [0, 0, 0];
+    ok("!! a collapse that would turn a neighbouring triangle over is refused (stats.refused) and the crossing removed the other way; the neighbour keeps its side",
+        rb.stats.refused >= 1 && rb.stats.left === 0 && !!t3 && n0[0] * n1[0] + n0[1] * n1[1] + n0[2] * n1[2] > 0 && manifoldAudit(rb.tris).crossings === 0, JSON.stringify(rb.stats));
+    // (c) an OLD sliver (S1, its operand's own triangle) crossed by a NEW triangle that is no sliver: found, though nothing
+    // there may move (S1's corners are an operand's; the new triangle's sides are long) -- counted in stats.left
+    const rc = run(F(S1, [[0, 0, 0], [1, 2e-10, -1e-16], [0.9, -0.5, 1e-3]]), [0, 1], F(S1, other));
+    ok("!! a new triangle crossing an OLD sliver is found (a new triangle is tested against every sliver near it), and what cannot be collapsed is counted",
+        rc.stats.crossings === 1 && rc.stats.left === 1 && rc.stats.collapsed === 0, JSON.stringify(rc.stats));
 }
 
 console.log(`\nmeshBoolean-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);
-console.log("unchecked here, named honestly: only `subtract` is required to pass this gate on axis-aligned " +
-    "box fixtures (per this round's own scope decision, see meshBoolean.mjs's own header) -- `union` and " +
-    "`intersect` are exercised in sections 4, 7, and 12 but not with the same fixture-count depth as subtract's " +
-    "own sections 1/2/8/9. A SECOND adversarial review (run after the first fix pass) found and this file's " +
+console.log("unchecked here, named honestly: round 6 required only `subtract` to pass on axis-aligned box fixtures " +
+    "(sections 1/2/9 are subtract's alone); since round 12 sections 8 and 15-23 run all three ops, and round 18's " +
+    "audit (section 24) holds union and intersect to subtract's depth -- the algebra, the BSP as oracle on random " +
+    "blob pairs, outputs fed back in, containment and touching, orientation by rays, and a workload that adds material. " +
+    "Self-intersection away from shared edges, pinched vertices and doubled shells, which neither the volume nor the " +
+    "ray-orientation check can see, are checked since round 20 by manifoldAudit.mjs -- on the page's walls and on union and " +
+    "intersect chains (blastEngine-selfcheck section 16), not in this file. A SECOND adversarial review (run after the first fix pass) found and this file's " +
     "own fixes address: (a) an unrecognized `op` silently returned an empty mesh with no error -- FIXED, gated " +
     "in section 12; (b) a DEGENERATE (zero-volume) operand embedded in the other mesh's interior yields a " +
-    "wrong-SIGN volume error -- a NEW manifestation of the same root cause as the touching-contact gap below, " +
-    "NOT fixed, reproduced with exact numbers in section 13 as a regression trip-wire (not a correctness " +
-    "claim); (c) the original sabotage log's entry A wrongly claimed section 3 catches that sabotage -- " +
+    "wrong-SIGN volume error -- a NEW manifestation of the same root cause as the touching-contact gap below; " +
+    "FIXED at round 12 (an empty solid, regularised answer), section 13, with round 11's numbers kept as its control; (c) the original sabotage log's entry A wrongly claimed section 3 catches that sabotage -- " +
     "CORRECTED after re-measuring (section 3 hand-derives its own flip independent of bKeepAndFlip and provides " +
     "no regression coverage for the real flip decision, an honest gap named in the corrected log rather than " +
     "silently left standing); (d) section 8's shared 2%-relative known-gap bound gave uneven regression " +
     "headroom across its 3 cases -- FIXED, each case now bounded at 2.5x its own measured baseline; (e) " +
     "stats.capped propagation was only exercised on the always-false path -- FIXED, section 8 now forces it " +
     "true via a deliberately tiny maxFragments and asserts it surfaces correctly. The TOUCHING/ZERO-VOLUME-" +
-    "CONTACT gap (section 8's 3 KNOWN cases) is measured and bounded, not fixed -- root-cause TRACED precisely " +
+    "CONTACT gap (section 8's 3 former KNOWN cases) is FIXED at round 12 -- the tiebreak it named, by orientation, " +
+    "on a padded broad phase; section 17 extends it to 1,350 flush-box runs. Its root cause, as round 6 TRACED it " +
     "during this round's own follow-up fix pass (an earlier version of this header guessed wrong and was " +
     "corrected after actually instrumenting it): every triangle of both meshes takes the empty-candidate " +
     "shortcut because a sub-ULP floating-point gap in boxPolys's own c-h subtraction makes pairOverlap() find " +
     "zero true AABB-overlapping candidates between the \"flush\" faces, so whole, unsplit, face-sized " +
     "triangles get classified directly -- correctly flagged ambiguous by pointInMesh, but the keep-ambiguous " +
     "policy has no size awareness, so a kept whole face-sized triangle distorts volume proportional to its " +
-    "own area. The A-vs-B SEAM NON-COINCIDENCE gap " +
-    "(section 11) came from triFragmentAccumulate.mjs's own independent-representative-plane design; since round " +
-    "9 the DEFAULT path cuts along triTriIntersect()'s own segments instead, and the primary fixture measures " +
-    "0 unmatched edges on it -- but each side still computes its crossing separately (triTriIntersect(a, b) and " +
-    "(b, a)), nothing shares one boundary into both meshes, and the twelve-blast chain keeps 1,143 raw unmatched " +
-    "edges (meshBooleanBlast-selfcheck.mjs section 8). The plane-cut path, which still runs for every triangle " +
-    "the arrangement refuses, keeps its 29/117 baseline, gated as non-regression, not correctness. True edge-" +
-    "exact watertightness still needs a meshCSG.mjs-style snap/merge/weld subsystem or one shared boundary per " +
-    "tri-tri pair; neither is built. Every ROUND 4/5 residual risk this file's own header " +
+    "own area. Round 12's own KNOWN: a copy rotated by 1e-9..3e-8 rad (section 17, up to 2.8e-2, pinned). The A-vs-B SEAM NON-COINCIDENCE gap " +
+    "(section 11) was the plane path's, from triFragmentAccumulate.mjs's independent-representative-plane design; " +
+    "ROUND 9 built the redesign this sentence used to ask for -- each tri-tri boundary computed once by round 2's " +
+    "triTriIntersect.mjs and kept as given by both meshes' arrangements (triArrangement.mjs) -- and on that path, " +
+    "the default, the seam is bit-identical and the raw output watertight (sections 11 and 15). It is NOT closed " +
+    "where a triangle falls back to the plane path (since round 12 no box fixture here does; the rotated-copy band " +
+    "still does), and cutting:\"plane\" keeps the old baseline, still gated. Every ROUND 4/5 residual risk this file's own header " +
     "inherits (meshPointClassify's ~1e-9 thin-feature weld risk; triFragmentAccumulate's near-duplicate-plane " +
     "sliver cascade and maxFragments starvation) applies unchanged here and is not re-gated in this file -- see " +
-    "those files' own gates. Non-box, non-axis-aligned fixtures are not covered. Performance at realistic " +
-    "mesh sizes (many triangles per mesh, not two 12-triangle boxes) is not measured here. A formal CSG " +
+    "those files' own gates. Non-box fixtures are covered only by section 15 (rotated boxes, jagged blob pairs, " +
+    "a needle); performance at realistic mesh sizes is meshBooleanBlast-selfcheck.mjs's, not this file's. A formal CSG " +
     "property-list audit comparable to meshCSG-selfcheck.mjs's own is tools/ship/nextRounds.mjs backlog item " +
     "#25, for the EXISTING BSP path, and has not happened yet either -- this round does not attempt an " +
     "equivalent audit for the new path.");

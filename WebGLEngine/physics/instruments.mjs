@@ -2411,6 +2411,54 @@ export const INSTRUMENTS = [
       measures: "A plain relu network (20 -> 32 -> 32 -> 4, 1,860 weights) as a helicopter pilot, taking the same 20 features and giving the same four controls as the fruit fly's circuit, so the two are compared on one task.",
       key: "THE HAND WEIGHTS ARE THE HAND PILOT THROUGH EIGHT RELU CHANNELS OF EACH LAYER: 36 of the 1,860 weights are non-zero and they are autopilotRotor.mjs's laws, flying the same flight. The module prints this itself.",
       gate: "brain/pilotRotorMlp-selfcheck.mjs" },
+    {
+        id: "rigid-body-6dof", page: "instrument-bench.html", name: "A dynamical 6DOF rigid body -- force, torque, F = ma and Euler's equations", area: "mechanics",
+        measures: "physics/mechanics/rigidBody6dof.mjs: real forces and torques integrated against mass and an inertia tensor (freeRotation.mjs's solver with an applied-torque term), alongside ev/flightModel3d.js's kinematic arcade model rather than in place of it.",
+        key: "2 s of an engine mounted 0.3 m off-axis and 2.4 m aft, thrust 40 along local +z, on a 12 kg hull: pos -0.874, 0, 6.634; vel -1.680, 0, 6.254; w 0, -0.8333, 0 -- off-centre thrust induces real spin. Registered at round 21 (the suite-green round of the BVH-CSG arc), which found this module exporting reportLines() with no entry; the numbers are its own reportLines() output on that tree, and the claims are its gate's.",
+        gate: "physics/mechanics/rigidBody6dof-selfcheck.mjs",
+    },
+    {
+        id: "rigid-body-6dof-collision", page: "instrument-bench.html", name: "6DOF collision -- OBB contact and a hand-derived impulse response", area: "mechanics",
+        measures: "physics/mechanics/rigidBody6dofCollision.mjs: physics/obbOverlap.js's OBB contact test and a normal-plus-Coulomb-friction impulse, proven in its gate against closed forms and conservation laws.",
+        key: "A contact of depth 0.400 along +x: impulse j = 28.814, friction jt = -5.678; positional correction takes the depth 0.400 -> 0.322 in one call. Registered at round 21 (the suite-green round of the BVH-CSG arc), which found this module exporting reportLines() with no entry; the numbers are its own reportLines() output on that tree, and the claims are its gate's.",
+        gate: "physics/mechanics/rigidBody6dofCollision-selfcheck.mjs",
+    },
+    {
+        id: "rigid-body-6dof-weapon", page: "instrument-bench.html", name: "6DOF weapons -- a straight projectile hit-tested exactly against an OBB", area: "mechanics",
+        measures: "physics/mechanics/rigidBody6dofWeapon.mjs: a straight-line projectile (no gravity, no drag) fired along the shooter's forward, hit-tested with an exact segment-vs-OBB slab test.",
+        key: "A hit after flight on target B at point 11.88, 0, 0. Registered at round 21 (the suite-green round of the BVH-CSG arc), which found this module exporting reportLines() with no entry; the numbers are its own reportLines() output on that tree, and the claims are its gate's.",
+        gate: "physics/mechanics/rigidBody6dofWeapon-selfcheck.mjs",
+    },
+    {
+        id: "aero-surface", page: "instrument-bench.html", name: "Per-surface aerodynamics -- lift and drag on one lifting surface", area: "mechanics",
+        measures: "physics/mechanics/aeroSurface.mjs: a closed-form thin-airfoil-style Cl/Cd per surface, applied through rigidBody6dof.mjs's own applyForceAtPoint().",
+        key: "Wing at alpha 2.86 deg: cl 0.285, cd 0.0243, |F| 65.59 N; tail at 1.43 deg: cl 0.112, cd 0.0162, |F| 3.48 N; the two lever arms put a net body torque of 3.118 about y in one tick. Registered at round 21 (the suite-green round of the BVH-CSG arc), which found this module exporting reportLines() with no entry; the numbers are its own reportLines() output on that tree, and the claims are its gate's.",
+        gate: "physics/mechanics/aeroSurface-selfcheck.mjs",
+    },
+    {
+        id: "aircraft-assembly", page: "instrument-bench.html", name: "An aircraft -- wing halves with ailerons, elevator and rudder, three-axis mixing", area: "mechanics",
+        measures: "physics/mechanics/aircraftAssembly.mjs: aeroSurface.mjs's force model assembled into wing halves, elevator and rudder on a rigidBody6dof.mjs body, driven by three-axis control mixing.",
+        key: "A roll command of 0.6 sets the wing halves to +4.81 and -4.81 deg alpha and leaves elevator and rudder at cl 0; one tick later w = -6.9878, 0, 0 -- roll authority isolated to the roll axis. Registered at round 21 (the suite-green round of the BVH-CSG arc), which found this module exporting reportLines() with no entry; the numbers are its own reportLines() output on that tree, and the claims are its gate's.",
+        gate: "physics/mechanics/aircraftAssembly-selfcheck.mjs",
+    },
+    {
+        id: "autopilot-6dof", page: "instrument-bench.html", name: "A torque/thrust autopilot for 6DOF ships", area: "control",
+        measures: "brain/autopilot6dof.mjs: a PD attitude controller turning 'where is the target' into torque and thrust for rigidBody6dof.mjs ships, gated for convergence and lead-aim.",
+        key: "From a 180-degree starting error toward a stationary target: aligned and in range after 73 ticks. Registered at round 21 (the suite-green round of the BVH-CSG arc), which found this module exporting reportLines() with no entry; the numbers are its own reportLines() output on that tree, and the claims are its gate's.",
+        gate: "brain/autopilot6dof-selfcheck.mjs",
+    },
+    {
+        id: "autopilot-aircraft", page: "instrument-bench.html", name: "A heading-hold autopilot for aircraftAssembly aircraft", area: "control",
+        measures: "brain/autopilotAircraft.mjs: pitch and yaw through autopilot6dof.mjs's pointingError(), roll through a bank-angle controller that banks in proportion to the yaw error so wing lift turns the aircraft.",
+        key: "A 10-degree general-axis perturbation, 20 s against the real nonlinear aircraft: heading alignment 0.9870 -> 0.9997, peak commanded bank 2.83 deg, actual bank 1.4698 deg at the end. Registered at round 21 (the suite-green round of the BVH-CSG arc), which found this module exporting reportLines() with no entry; the numbers are its own reportLines() output on that tree, and the claims are its gate's.",
+        gate: "brain/autopilotAircraft-selfcheck.mjs",
+    },
+    {
+        id: "fleet-assign", page: "instrument-bench.html", name: "Fleet target assignment -- one greedy nearest-pair pass per team per tick", area: "brain",
+        measures: "brain/fleetAssign.mjs: one greedy nearest-pair assignment per team per tick in place of each ship choosing its nearest enemy alone (closes ai-fleet-target-deconfliction).",
+        key: "3 v 3, evenly spread: A#2 -> B#0, A#1 -> B#1, A#0 -> B#2 -- every target different, which is the deconfliction property. Registered at round 21 (the suite-green round of the BVH-CSG arc), which found this module exporting reportLines() with no entry; the numbers are its own reportLines() output on that tree, and the claims are its gate's.",
+        gate: "brain/fleetAssign-selfcheck.mjs",
+    },
 ];
 
 export const AREAS = [...new Set(INSTRUMENTS.map((i) => i.area))];

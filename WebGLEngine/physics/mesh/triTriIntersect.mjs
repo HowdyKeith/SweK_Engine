@@ -35,6 +35,8 @@
 //   same wall, a mesh authored with coincident seams -- will not get a resolved segment from THIS function
 //   for that specific triangle pair; a future round needs to handle it (perturbation, exact predicates, or a
 //   dedicated coincident-boundary path), named here rather than silently risking a wrong answer today.
+//   [BVH-CSG ROUND 12: that path is physics/mesh/triContact.mjs, which triArrangement.mjs asks about exactly the
+//   pairs this function reports coplanar or degenerate. This function is unchanged.]
 //
 // WHAT THIS DOES NOT DO: build on physics/mesh/bvhPairOverlap.mjs at all (it operates on an EXPLICIT pair of
 // triangle indices, one per caller-supplied buffer -- wiring pairOverlap()'s own candidate list into this
@@ -44,7 +46,17 @@
 // whether the two functions' own assumptions actually line up for that future integration: trisA and trisB
 // must already share ONE coordinate frame -- no relative transform is applied, exactly the same constraint
 // bvhPairOverlap.mjs's own header names for the same reason.
+//
+// *** BVH-CSG ROUND 16: A SEAM CROSSING IS A FUNCTION OF (EDGE, PLANE) ALONE. *** Where the seam crosses an edge two
+// triangles share, both pairs compute the crossing. It was interpolated from whichever end of the edge sat alone on its
+// side of the other plane, and the normals were scaled by a reciprocal where triContact.mjs divides -- so two pairs, or
+// this file and triContact, put one crossing in two places: measured with round 15's file, 691 of 1,838 random shared-edge
+// configurations disagreed (this file's gate, ROUND 16 section), and round 14's finishing weld moved 12,376 vertices by
+// an ULP on the page's 99 chains. The crossing is now triContact's edgeCross, the edge in canonical order, with the
+// normals divided: 1,838 of 1,838 identical, and the weld's ULP moves 12,376 -> 711.
 "use strict";
+
+import { edgeCross } from "./triContact.mjs";
 
 const EPS = 1e-9;
 
@@ -70,8 +82,11 @@ function computeInterval(p0, p1, p2, d0, d1, d2, axis) {
     if (d0 * d1 > 0) { iso = p2; o1 = p0; o2 = p1; diso = d2; do1 = d0; do2 = d1; }
     else if (d0 * d2 > 0) { iso = p1; o1 = p0; o2 = p2; diso = d1; do1 = d0; do2 = d2; }
     else { iso = p0; o1 = p1; o2 = p2; diso = d0; do1 = d1; do2 = d2; }
-    const Pa = add(iso, scale(sub(o1, iso), diso / (diso - do1)));
-    const Pb = add(iso, scale(sub(o2, iso), diso / (diso - do2)));
+    // BVH-CSG ROUND 16: the crossing of an edge with the other plane is triContact.mjs's edgeCross -- the edge taken in
+    // canonical order -- so it is a function of (edge, plane) alone: every pair that shares the edge, through either
+    // file, gets the same point bit for bit (it was interpolated from whichever end sat alone, an ULP apart)
+    const Pa = edgeCross(iso, o1, diso, do1);
+    const Pb = edgeCross(iso, o2, diso, do2);
     return { Pa, Pb, ta: Pa[axis], tb: Pb[axis] };
 }
 
@@ -107,7 +122,7 @@ export function triTriIntersect(trisA, triA, trisB, triB) {
     let n1 = cross(e1, e2);
     const n1len = Math.hypot(n1[0], n1[1], n1[2]);
     if (n1len < 1e-300) return { status: "degenerate" };   // triangle A itself has ~zero area
-    n1 = scale(n1, 1 / n1len);
+    n1 = [n1[0] / n1len, n1[1] / n1len, n1[2] / n1len];   // round 16: as triContact.mjs's planeDists divides
     const d1c = -dot(n1, v0);
     let du0 = dot(n1, u0) + d1c, du1 = dot(n1, u1) + d1c, du2 = dot(n1, u2) + d1c;
     if (Math.abs(du0) < EPS) du0 = 0;
@@ -120,7 +135,7 @@ export function triTriIntersect(trisA, triA, trisB, triB) {
     let n2 = cross(f1, f2);
     const n2len = Math.hypot(n2[0], n2[1], n2[2]);
     if (n2len < 1e-300) return { status: "degenerate" };   // triangle B itself has ~zero area
-    n2 = scale(n2, 1 / n2len);
+    n2 = [n2[0] / n2len, n2[1] / n2len, n2[2] / n2len];
     const d2c = -dot(n2, u0);
     let dv0 = dot(n2, v0) + d2c, dv1 = dot(n2, v1) + d2c, dv2 = dot(n2, v2) + d2c;
     if (Math.abs(dv0) < EPS) dv0 = 0;
@@ -154,28 +169,86 @@ export function triTriIntersect(trisA, triA, trisB, triB) {
     return { status: "intersect", p0: lo.P, p1: hi.P };
 }
 
-// ---- THE FRONT DOOR (v4778) ---------------------------------------------------------------------------------
-//
-// The v3327 split, grown at the rtx merge so instrument-bench.html can serve this module: its instruments row
-// is what gives the BVH-CSG line a way in (physicsReach counted six of its modules with no door at all). The
-// bench calls reportLines() with NO argument, so the no-argument case has to BE a measurement: the gate's own
-// hand-derived pair, and one pair for each of the three other answers this function can give, so all four
-// statuses are on the page. A REPORT, NOT A VERDICT -- triTriIntersect-selfcheck.mjs is what exits nonzero.
-export function reportLines() {
-    const T = (...v) => new Float64Array(v.flat());
-    const A = [0, 0, 0], B = [4, 0, 0], C = [0, 4, 0];
-    const fmt = (p) => p.map((x) => +x.toFixed(9)).join(",");
-    const show = (r) => r.status === "intersect" ? "intersect  (" + fmt(r.p0) + ") - (" + fmt(r.p1) + ")" : r.status;
-    const cases = [
-        ["T2 in the x=1 plane (hand-derived: (1,0,0)-(1,2,0))", [[1, -1, -1], [1, -1, 3], [1, 3, -1]]],
-        ["the same T2 moved +10 in y, both planes still straddled", [[1, 9, -1], [1, 9, 3], [1, 13, -1]]],
-        ["a triangle lying in T1's own plane", [[1, 1, 0], [3, 1, 0], [1, 3, 0]]],
-        ["a triangle sharing T1's edge (0,0,0)-(4,0,0)", [A, B, [2, 0, -3]]],
-    ];
-    const out = ["[triTriIntersect] triangle against triangle, one pair at a time (Moller 1997, as structure)",
-                 "  T1 = (0,0,0),(4,0,0),(0,4,0) in the z=0 plane, against:"];
-    for (const [label, tri] of cases) out.push("    " + label.padEnd(58) + show(triTriIntersect(T(A, B, C), 0, T(...tri), 0)));
-    out.push("  arguments swapped on the first pair:  " + show(triTriIntersect(T(...cases[0][1]), 0, T(A, B, C), 0)));
-    out.push("  coplanar and degenerate are REPORTED, not resolved -- this module's own header says why");
-    return out;
+// ---- BVH-CSG ROUND 16b: THE SAME QUESTION, DECIDED EXACTLY --------------------------------------------------------
+// Guigue & Devillers ("Fast and Robust Triangle-Triangle Overlap Test Using Orientation Predicates", 2003): every
+// decision -- does either triangle lie wholly to one side of the other's plane, which vertex is alone, do the two
+// intervals on the planes' common line overlap, and which crossings bound the segment -- is the sign of orient3d of
+// four INPUT points, computed exactly (exactPredicates.mjs). So two pairs that share an edge cannot decide it two ways.
+// No EPS anywhere: a pair is "coplanar" only when every vertex lies exactly on the other's plane. The segment's ends are
+// still constructed in floating point, as triContact's canonical edgeCross of the edge with the other plane, from the
+// raw (unsnapped) distances -- a function of (edge, plane) alone, the same bits in every pair that asks.
+import { orient3d } from "./exactPredicates.mjs";
+
+function rawDist(T, p) {
+    const n = cross(sub(T[1], T[0]), sub(T[2], T[0])), L = Math.hypot(n[0], n[1], n[2]);
+    const m = [n[0] / L, n[1] / L, n[2] / L];
+    return dot(m, p) + -dot(m, T[0]);
+}
+// the crossing of edge (a, b) with the plane of triangle T
+function crossing(a, b, T) {
+    const da = rawDist(T, a), db = rawDist(T, b);
+    if (da === db) return cmpPt(a, b) <= 0 ? a.slice() : b.slice();   // both on the plane to rounding: an end
+    const p = edgeCross(a, b, da, db);
+    return p;
+}
+const cmpPt = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+
+// p1 is alone on its side of triangle 2's plane, and triangle 2 is ordered so the tests below read one way. T1 and T2
+// are the triangles in their STORED vertex order: a crossing's plane is computed from them, never from a permutation,
+// so it is the same plane -- to the bit -- in every pair
+function construct(p1, q1, r1, p2, q2, r2, T1, T2) {
+    if (orient3d(q1, r2, p2, p1) > 0) {
+        if (orient3d(r1, r2, p2, p1) <= 0) {
+            if (orient3d(r1, q2, p2, p1) > 0) return { status: "intersect", p0: crossing(p1, r1, T2), p1: crossing(p2, r2, T1) };
+            return { status: "intersect", p0: crossing(p2, q2, T1), p1: crossing(p2, r2, T1) };
+        }
+        return { status: "none" };
+    }
+    if (orient3d(q1, q2, p2, p1) < 0) return { status: "none" };
+    if (orient3d(r1, q2, p2, p1) >= 0) return { status: "intersect", p0: crossing(p1, q1, T2), p1: crossing(p1, r1, T2) };
+    return { status: "intersect", p0: crossing(p1, q1, T2), p1: crossing(p2, q2, T1) };
+}
+function inter(p1, q1, r1, p2, q2, r2, dp2, dq2, dr2, T1, T2) {
+    if (dp2 > 0) {
+        if (dq2 > 0) return construct(p1, r1, q1, r2, p2, q2, T1, T2);
+        if (dr2 > 0) return construct(p1, r1, q1, q2, r2, p2, T1, T2);
+        return construct(p1, q1, r1, p2, q2, r2, T1, T2);
+    }
+    if (dp2 < 0) {
+        if (dq2 < 0) return construct(p1, q1, r1, r2, p2, q2, T1, T2);
+        if (dr2 < 0) return construct(p1, q1, r1, q2, r2, p2, T1, T2);
+        return construct(p1, r1, q1, p2, q2, r2, T1, T2);
+    }
+    if (dq2 < 0) return dr2 >= 0 ? construct(p1, r1, q1, q2, r2, p2, T1, T2) : construct(p1, q1, r1, p2, q2, r2, T1, T2);
+    if (dq2 > 0) return dr2 > 0 ? construct(p1, r1, q1, p2, q2, r2, T1, T2) : construct(p1, q1, r1, q2, r2, p2, T1, T2);
+    if (dr2 > 0) return construct(p1, q1, r1, r2, p2, q2, T1, T2);
+    if (dr2 < 0) return construct(p1, r1, q1, r2, p2, q2, T1, T2);
+    return { status: "coplanar" };
+}
+
+/** triTriIntersect's contract, decided by exact orientation predicates: "intersect" | "none" | "coplanar". */
+export function triTriIntersectExact(trisA, triA, trisB, triB) {
+    const T1 = readTri(trisA, triA), T2 = readTri(trisB, triB);
+    const [p1, q1, r1] = T1, [p2, q2, r2] = T2;
+    // the side of each vertex as Guigue & Devillers read it, dot(v - r2, N2): positive where the normal points -- the
+    // opposite of Shewchuk's orient3d convention, hence the minus
+    const dp1 = -orient3d(p2, q2, r2, p1), dq1 = -orient3d(p2, q2, r2, q1), dr1 = -orient3d(p2, q2, r2, r1);
+    if (dp1 * dq1 > 0 && dp1 * dr1 > 0) return { status: "none" };
+    const dp2 = -orient3d(p1, q1, r1, p2), dq2 = -orient3d(p1, q1, r1, q2), dr2 = -orient3d(p1, q1, r1, r2);
+    if (dp2 * dq2 > 0 && dp2 * dr2 > 0) return { status: "none" };
+    if (dp1 > 0) {
+        if (dq1 > 0) return inter(r1, p1, q1, p2, r2, q2, dp2, dr2, dq2, T1, T2);
+        if (dr1 > 0) return inter(q1, r1, p1, p2, r2, q2, dp2, dr2, dq2, T1, T2);
+        return inter(p1, q1, r1, p2, q2, r2, dp2, dq2, dr2, T1, T2);
+    }
+    if (dp1 < 0) {
+        if (dq1 < 0) return inter(r1, p1, q1, p2, q2, r2, dp2, dq2, dr2, T1, T2);
+        if (dr1 < 0) return inter(q1, r1, p1, p2, q2, r2, dp2, dq2, dr2, T1, T2);
+        return inter(p1, q1, r1, p2, r2, q2, dp2, dr2, dq2, T1, T2);
+    }
+    if (dq1 < 0) return dr1 >= 0 ? inter(q1, r1, p1, p2, r2, q2, dp2, dr2, dq2, T1, T2) : inter(p1, q1, r1, p2, q2, r2, dp2, dq2, dr2, T1, T2);
+    if (dq1 > 0) return dr1 > 0 ? inter(p1, q1, r1, p2, r2, q2, dp2, dr2, dq2, T1, T2) : inter(q1, r1, p1, p2, q2, r2, dp2, dq2, dr2, T1, T2);
+    if (dr1 > 0) return inter(r1, p1, q1, p2, q2, r2, dp2, dq2, dr2, T1, T2);
+    if (dr1 < 0) return inter(r1, p1, q1, p2, r2, q2, dp2, dr2, dq2, T1, T2);
+    return { status: "coplanar" };
 }

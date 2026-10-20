@@ -115,6 +115,14 @@ const EPS = 1e-9;
 // randomized rotation/translation/scale sweep found (3.4e-13 absolute at t~761).
 const WELD_EPS_ABS = 1e-9;
 const WELD_EPS_REL = 1e-9;
+// BVH-CSG ROUND 11: mesh/meshBVH.mjs's rayTriangle() called a ray parallel to a triangle when |det| < eps, and det is
+// an area: with eps = 1e-9 every triangle with edges under ~3e-5 was skipped at any angle, so a point inside a small
+// solid found no crossing and read OUTSIDE. Found when meshBoolean()'s scale normalisation put a 0.01-unit cutter on
+// a 2000-unit wall at 7.8e-5 units: the cut face's classification came back outside (agreement 0.6 and 0.8, rays with
+// 0 hits) and the cap was dropped -- a 6.5% volume error, constant for every smaller cutter. The test is now the
+// dimensionless |det| <= RAY_PARALLEL_REL x |e1| x |e2|: 1e-9 is what the old test meant for edges of ~1, the scale
+// the pipeline's tolerances are tuned at.
+const RAY_PARALLEL_REL = 1e-9;
 
 // Deliberately non-axis-aligned, mutually well-spread unit directions -- chosen to minimize the chance of
 // coincidentally grazing an edge/vertex of typical (often axis-aligned) test geometry in this tree, the exact
@@ -173,7 +181,7 @@ export function rayAllHits(bvh, ox, oy, oz, dx, dy, dz, eps = EPS) {
             const start = bvh.meta[node * 3 + 1], n = bvh.meta[node * 3 + 2];
             for (let s = start; s < start + n; s++) {
                 const tri = bvh.order[s];
-                const t = rayTriangle(ox, oy, oz, dx, dy, dz, bvh.tris, tri * 9, eps);
+                const t = rayTriangle(ox, oy, oz, dx, dy, dz, bvh.tris, tri * 9, eps, RAY_PARALLEL_REL);
                 if (t !== null) hits.push({ t, tri });
             }
             continue;
