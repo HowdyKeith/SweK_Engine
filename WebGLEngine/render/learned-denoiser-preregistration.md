@@ -6274,3 +6274,6 @@ pass; the Intel's r18u is 1.16-1.37 s):
 
 **Seen first, here, on SwiftShader -- a CPU's times, deciding nothing.** At the gate's pilot size (64 x 36 to 128 x 72) the
 chain ran 2.0-2.1 x as fast as the full-size network alone, before the mask was counted on the page's side.
+At 1920 x 1080, forced on SwiftShader once (`SWEK_HALFCHAIN_RIGSIZE=1`) to drive the rig's path: the fill filled on 87 of
+its 96 rings, the CPU's count exactly, and every step of the chain was timed. The network at 1920 x 1080 was not: its pass was
+predicted at 111 s, over the cap, so that run's section-93 row was red, and no ratio was made. On a GPU the pass is 0.07-1.4 s.
