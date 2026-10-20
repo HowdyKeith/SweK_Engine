@@ -1,6 +1,6 @@
 // WebGLEngine/tools/selfPlaySubTactics-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/selfPlaySubTactics-selfcheck.mjs      (~4 s)
+// Run: node tools/selfPlaySubTactics-selfcheck.mjs      (~2 s)
 //
 // THE SELF-PLAY TOOL'S CORE HELD TO ITS DEFINITION. tools/selfPlaySubTactics.mjs fights one tactician against another in BOTH SEATS; this gate holds `match`, `crossMatrix` and `mutateTheta`:
 //   match(X, Y, seeds) = { asA, asB, mean }: asA is X's mean duel score in seat A against Y as the opponent; asB is X's mean score in seat B (scoreFor of the swapped duel); mean is their average -- each recomputed
