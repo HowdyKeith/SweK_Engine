@@ -279,8 +279,8 @@ export const PARITY_BASELINE = Object.freeze({
     // census diff against 3677d747, the commit before it -- the only file that moved -- and missed for four commits,
     // because this gate was not in that round's battery. Keith's rig run read it first: measured 162, recorded 161.
     // v4877 -- +1 to glslBearing, glslFramework and glslOnly: render/spaceBackdrop.js (the rotorcraft/space-battle branch) writes its GLSL for three.js's ShaderMaterial, which prepends the version header itself, and ships no WGSL half.
-    glslBearing: 167,
-    glslDirective: 148,  // v4880: +4 with the orrery-seeded merge; raw WebGL2 -- the file writes its own version header
+    glslBearing: 168,   // v4883: +1, ocean-default.html writes its GLSL (raw WebGL2, its own #version header) and ships no WGSL half: a page for the water every GPU can draw, WebGL2 only on purpose
+    glslDirective: 149,  // v4880: +4 with the orrery-seeded merge; raw WebGL2 -- the file writes its own version header
     glslFramework: 19,   // three.js prepends it: badTvPass, aquarellePass, grassField, solidTexture, atmosphere, ...
     // v4392 -- 57 -> 58, and the file is a GATE rather than a shipping module. tools/ship/shipyard-selfcheck.mjs
     // section 8 embeds a WGSL compute shader to run the four float32 encodings on a real device, so it bears WGSL
@@ -354,7 +354,7 @@ export const PARITY_BASELINE = Object.freeze({
     // refuses. Compute, so no GLSL half; the same file is why wgslOnly moves too; nothing else changed.
     wgslBearing: 114,
     both: 26,            // v4778: +1, fly-connectome.html (above); before that +2 for fae26dbf's specularProbeLit pair
-    glslOnly: 141,       // v4778 rig run 4: +1, tools/ship/realGpuRun.mjs (above); v4877: +1, render/spaceBackdrop.js
+    glslOnly: 142,       // v4778 rig run 4: +1, tools/ship/realGpuRun.mjs (above); v4877: +1, render/spaceBackdrop.js
     wgslOnly: 88,        // the denoiser arc, round 1: +1, brain/conv2d.mjs; round 12: +1, render/denoiseDevice.mjs; v4854: +1, tools/ship/threeTextureBarrier-selfcheck.mjs (see wgslBearing)
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.

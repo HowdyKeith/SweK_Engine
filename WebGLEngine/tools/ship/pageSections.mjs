@@ -770,6 +770,7 @@ export const UNPLACED = new Map([
     // records that as Keith's call ("THE RATCHET IS SUPPOSED TO GO DOWN AGAIN when a new section is named --
     // and naming it is Keith's call"). So the twelve are linked, findable, and each says what it is waiting
     // for, which is a different state from unexamined.
+     ["ocean-default.html", "the default water drawn from the CPU Gerstner surface the physics stands on (slice 2 of ocean-optin-surface), with buoys; whether it joins a water drawer, a graphics drawer or the physics bench is Keith's, and waits for the opt-in sea (slice 4) so the two ocean pages can be placed together"],
      ["ocean-spike.html", "a level-1 SPIKE of noniv/web-ocean in a frame, unnumbered and awaiting its first rig reading; whether it becomes a water drawer page, a graphics page or is dropped is the level-2 decision, which is Keith's and waits on that reading"],
     ["sfx.html", "audio/sfxModel.mjs -- THERE IS NO AUDIO DRAWER IN THIS TREE. Twenty-four sections and none of them is about sound, which is a gap a placement cannot close"],
     ["spellbook.html", "world/spellBook.mjs over physics/voxel/fracture.js and audio/sfxPlay.js -- it spans world, physics and audio, so any single drawer would be a third of the answer"],

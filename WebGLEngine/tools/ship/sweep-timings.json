@@ -2183,7 +2183,9 @@
   "tools/ship/pipelineGaps-selfcheck.mjs": 308,
   "tools/ship/shaderEmitters-selfcheck.mjs": 1858,
   "tools/ship/stereoDevice-selfcheck.mjs": 1677,
-  "physics/ocean/oceanSurface-selfcheck.mjs": 468
+  "physics/ocean/oceanSurface-selfcheck.mjs": 120,
+  "world/oceanWater-selfcheck.mjs": 120,
+  "tools/ship/oceanDefaultPage-selfcheck.mjs": 5811
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -4243,7 +4245,9 @@
   "tools/ship/pipelineGaps-selfcheck.mjs": 0,
   "tools/ship/shaderEmitters-selfcheck.mjs": 0,
   "tools/ship/stereoDevice-selfcheck.mjs": 0,
-  "physics/ocean/oceanSurface-selfcheck.mjs": 0
+  "physics/ocean/oceanSurface-selfcheck.mjs": 0,
+  "world/oceanWater-selfcheck.mjs": 0,
+  "tools/ship/oceanDefaultPage-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-10-20T19:37:51.490Z",
@@ -6303,7 +6307,9 @@
   "tools/ship/pipelineGaps-selfcheck.mjs": "2026-10-20T19:37:51.490Z",
   "tools/ship/shaderEmitters-selfcheck.mjs": "2026-10-20T19:37:51.490Z",
   "tools/ship/stereoDevice-selfcheck.mjs": "2026-10-20T19:37:51.490Z",
-  "physics/ocean/oceanSurface-selfcheck.mjs": "2026-10-20T19:37:51.490Z"
+  "physics/ocean/oceanSurface-selfcheck.mjs": "2026-10-20T21:07:54.172Z",
+  "world/oceanWater-selfcheck.mjs": "2026-10-20T21:07:47.863Z",
+  "tools/ship/oceanDefaultPage-selfcheck.mjs": "2026-10-20T21:07:53.862Z"
  },
  "capAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 20000,
@@ -8338,7 +8344,9 @@
   "tools/ship/pipelineGaps-selfcheck.mjs": 20000,
   "tools/ship/shaderEmitters-selfcheck.mjs": 20000,
   "tools/ship/stereoDevice-selfcheck.mjs": 20000,
-  "physics/ocean/oceanSurface-selfcheck.mjs": 20000
+  "physics/ocean/oceanSurface-selfcheck.mjs": 100000,
+  "world/oceanWater-selfcheck.mjs": 100000,
+  "tools/ship/oceanDefaultPage-selfcheck.mjs": 100000
  },
  "finished": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": true,
@@ -10393,7 +10401,9 @@
   "tools/ship/pipelineGaps-selfcheck.mjs": true,
   "tools/ship/shaderEmitters-selfcheck.mjs": true,
   "tools/ship/stereoDevice-selfcheck.mjs": true,
-  "physics/ocean/oceanSurface-selfcheck.mjs": true
+  "physics/ocean/oceanSurface-selfcheck.mjs": true,
+  "world/oceanWater-selfcheck.mjs": true,
+  "tools/ship/oceanDefaultPage-selfcheck.mjs": true
  },
  "crossings": {
   "brain/gunnerPolicy-selfcheck.mjs": 2,
@@ -12568,7 +12578,9 @@
   "tools/ship/oceanSpikePage-selfcheck.mjs": 1193,
   "tools/ship/pipelineGaps-selfcheck.mjs": 155,
   "tools/ship/shaderEmitters-selfcheck.mjs": 1045,
-  "physics/ocean/oceanSurface-selfcheck.mjs": 89
+  "physics/ocean/oceanSurface-selfcheck.mjs": 120,
+  "world/oceanWater-selfcheck.mjs": 120,
+  "tools/ship/oceanDefaultPage-selfcheck.mjs": 5811
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-10-20T04:24:34.828Z",
@@ -14519,7 +14531,9 @@
   "tools/ship/oceanSpikePage-selfcheck.mjs": "2026-10-20T19:37:36.238Z",
   "tools/ship/pipelineGaps-selfcheck.mjs": "2026-10-20T16:25:35.630Z",
   "tools/ship/shaderEmitters-selfcheck.mjs": "2026-10-20T16:25:35.630Z",
-  "physics/ocean/oceanSurface-selfcheck.mjs": "2026-10-20T18:28:02.699Z"
+  "physics/ocean/oceanSurface-selfcheck.mjs": "2026-10-20T21:07:54.172Z",
+  "world/oceanWater-selfcheck.mjs": "2026-10-20T21:07:47.863Z",
+  "tools/ship/oceanDefaultPage-selfcheck.mjs": "2026-10-20T21:07:53.862Z"
  },
  "serialRing": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": [
@@ -24115,7 +24129,14 @@
    1045
   ],
   "physics/ocean/oceanSurface-selfcheck.mjs": [
-   89
+   89,
+   120
+  ],
+  "world/oceanWater-selfcheck.mjs": [
+   120
+  ],
+  "tools/ship/oceanDefaultPage-selfcheck.mjs": [
+   5811
   ]
  },
  "contended": {
@@ -26067,7 +26088,9 @@
   "tools/ship/pipelineGaps-selfcheck.mjs": true,
   "tools/ship/shaderEmitters-selfcheck.mjs": true,
   "tools/ship/stereoDevice-selfcheck.mjs": false,
-  "physics/ocean/oceanSurface-selfcheck.mjs": true
+  "physics/ocean/oceanSurface-selfcheck.mjs": false,
+  "world/oceanWater-selfcheck.mjs": false,
+  "tools/ship/oceanDefaultPage-selfcheck.mjs": false
  },
  "kinds": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "loaded",
@@ -28127,6 +28150,8 @@
   "tools/ship/pipelineGaps-selfcheck.mjs": "loaded",
   "tools/ship/shaderEmitters-selfcheck.mjs": "loaded",
   "tools/ship/stereoDevice-selfcheck.mjs": "alone",
-  "physics/ocean/oceanSurface-selfcheck.mjs": "loaded"
+  "physics/ocean/oceanSurface-selfcheck.mjs": "alone",
+  "world/oceanWater-selfcheck.mjs": "alone",
+  "tools/ship/oceanDefaultPage-selfcheck.mjs": "alone"
  }
 }

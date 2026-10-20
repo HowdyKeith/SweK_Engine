@@ -947,8 +947,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4880 -- one new gate (tools/ship/oceanSpikePage-selfcheck.mjs, the ocean spike), spelling ok(label, cond, note) like the tree's majority: gates 2041 -> 2042, usesOk 2020 -> 2021, definesOk 2012 -> 2013, nameFirst 1910 -> 1911.
     // v4880 -- the orrery-seeded merge: twelve gates, each spelling ok(name, cond, detail): gates 2042 -> 2054, usesOk 2021 -> 2033, definesOk 2013 -> 2025, nameFirst 1911 -> 1923 (read off the code, not typed).
     // v4881 -- one new gate (physics/ocean/oceanSurface-selfcheck.mjs, the CPU sea), spelling ok(name, cond, detail): gates 2054 -> 2055, usesOk 2033 -> 2034, definesOk 2025 -> 2026, nameFirst 1923 -> 1924 (read off the code).
-    gates: 2055, usesOk: 2034, definesOk: 2026, importsOk: 0,
-    distinctDefinitions: 45, nameFirst: 1924, condFirst: 99, unknownSignature: 11,
+    // v4883 -- two new gates (world/oceanWater-selfcheck.mjs and tools/ship/oceanDefaultPage-selfcheck.mjs, the default water), each spelling ok(name, cond, detail) or ok(label, cond, note): gates 2055 -> 2057, usesOk 2034 -> 2036, definesOk 2026 -> 2028, nameFirst 1924 -> 1926 (read off the code).
+    gates: 2057, usesOk: 2036, definesOk: 2028, importsOk: 0,
+    distinctDefinitions: 45, nameFirst: 1926, condFirst: 99, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

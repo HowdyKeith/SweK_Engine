@@ -15800,6 +15800,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "the trough while still reaching exactly +-A. A spectrum whose steepness sum reaches 0.95 is refused, and a control just under it is accepted. Unchecked, said " +
                  "plainly: that the heights look like a sea, bit-equality across engines (one engine here), and that anything in the engine reads it yet.",
     }),
+    since587: Object.freeze({
+        at: "v4883", swept: 2, green: 2, red: 0,
+        added: Object.freeze(["world/oceanWater-selfcheck.mjs", "tools/ship/oceanDefaultPage-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "both green on this box, run singly, and each sabotaged until it went red by name (seven on the mesh gate, twelve on the page gate). The default water (slice 2 of " +
+                 "ocean-optin-surface): a mesh whose vertices are the physics surface's own points, so what is drawn and what floats are one function. The mesh gate's centre row asks the " +
+                 "physics surface again for 400 drawn vertices, by the inverting route slice 1 grades, and they agree to float32 rounding (1.6e-6 m); with controls that a sea one second " +
+                 "later, and a different seed, do NOT agree. Every triangle faces up at the default steepness, a coarse grid is exactly a subset of a fine one, foam is highest at a steep " +
+                 "wave's crests and zero in its troughs and nowhere with no steepness, and the module reads no clock, random source, global, DOM or graphics API. The page gate runs the " +
+                 "real page in headless Chromium on WebGL2: it draws, the HUD's agreement is a measurement under 1e-4 m, the default mesh is 9,409 vertices and 18,432 triangles with five " +
+                 "buoys, detail and seed selectors rebuild the mesh and the SURFACE, Pause really stops the clock, the canvas is a picture, and with WebGL2 taken away the page says so and " +
+                 "throws nothing. *** THE PAGE GATE'S FIRST DRAFT PASSED A PAGE WHOSE SEED SELECTOR DID NOTHING: *** the row checked that the HUD named seed 2, and the sabotage that stopped " +
+                 "the sea being rebuilt went 0 red; the row that freezes time and compares the origin's height across seeds is what caught it. Unchecked, said plainly: that it looks like " +
+                 "water to a person (a screenshot is written for that), the frame time on any GPU, and the opt-in sea.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
