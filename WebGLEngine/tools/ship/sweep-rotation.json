@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it. `poolHorizon` (v4816) is the stamp of the first pool entry that run did NOT take: it reached every entry stamped earlier and none stamped at or after it.",
- "at": "2026-10-20T02:45:44.912Z",
+ "at": "2026-10-20T03:06:38.743Z",
  "poolAt": "2026-10-20T02:25:29.454Z",
  "poolHorizon": "2026-10-16T15:42:42.299Z",
  "budgetMs": 3000,
@@ -1101,10 +1101,10 @@
   },
   {
    "gate": "physics/render/microsurfaceWalk-selfcheck.mjs",
-   "ms": 2498,
+   "ms": 2814,
    "code": 0,
-   "priorMs": 2711,
-   "at": "2026-10-11T21:59:50.915Z"
+   "priorMs": 2783,
+   "at": "2026-10-20T03:06:38.743Z"
   },
   {
    "gate": "physics/render/misWgsl-selfcheck.mjs",

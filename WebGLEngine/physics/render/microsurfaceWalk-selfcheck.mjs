@@ -42,7 +42,9 @@ console.log("microsurfaceWalk-selfcheck -- the ground truth, validated before it
 // ---- 1. CONSERVATION IS A LAW, NOT A FIT ---------------------------------------------------------------
 console.log("1. a lossless conductor must return everything it was given");
 
-const cons = [0.16, 0.49, 1.0].map((a) => ({ a, r: albedo(0.7, a, ONE, { n: 60000, seed: 11 }) }));
+// v4879 -- n 60000 -> 20000: the law is exact per path (error 0.0, escaped fraction 1, the same mean bounces to two decimals at both sizes), so the sample size buys nothing here, and this gate is the sole guardian of KC_ERROR_AT_V4446
+// (recordReach) and sat at 3.0-3.2 s against the 3 s line, which left that record unchecked at ship time on this box.
+const cons = [0.16, 0.49, 1.0].map((a) => ({ a, r: albedo(0.7, a, ONE, { n: 20000, seed: 11 }) }));
 for (const c of cons) say(`alpha ${String(c.a).padEnd(5)} albedo ${c.r.value.toFixed(6)}  mean bounces ${c.r.meanBounces.toFixed(3)}`);
 ok("!! *** with Fresnel identically one the walk conserves EXACTLY, at every roughness ***",
    cons.every((c) => Math.abs(c.r.value - 1) < 1e-9),
@@ -69,7 +71,7 @@ ok("!! the walk reproduces microfacet.directionalAlbedo, which it shares no code
 // *** THE TRAP, KEPT BECAUSE IT COST THE ROUND AN HOUR. *** Single scatter is "one bounce AND THEN ESCAPES".
 const truncated = (() => {
     const rand = rng(5);
-    let s = 0; const n = 200000;
+    let s = 0; const n = 20000;   // v4879: 200000 -> 20000; the claim is a 40%+ effect (0.5875 against a 1.4x threshold of 0.5304, and 0.5879 at the old size)
     for (let k = 0; k < n; k++) { const r = walk(0.7, 1.0, ONE, rand, { maxBounces: 1 }); if (r.bounces === 1) s += r.energy; }
     return s / n;
 })();
