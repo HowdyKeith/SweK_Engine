@@ -24,6 +24,7 @@ import { decompose, orient3dExact } from "./exactPredicates.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
+import { reportLines } from "./implicitPoints.mjs";   // v4879: the bench calls it with no argument, so the no-argument report is graded here
 console.log("implicitPoints-selfcheck -- implicit seam points and exact predicates on them\n");
 let s0 = 1616; const rnd = () => { s0 = (s0 * 1664525 + 1013904223) >>> 0; return s0 / 4294967296; };
 const R3 = (k = 1) => [(rnd() * 2 - 1) * k, (rnd() * 2 - 1) * k, (rnd() * 2 - 1) * k];
@@ -214,6 +215,12 @@ console.log("\n5. *** THE OTHER POINTS AND PREDICATES: TWO COPLANAR LINES, THREE
     const T = [[0, 0, 0.5], [1, 0, 0.5], [0, 1, 0.5]];
     for (let i = 0; i < 3000; i++) { const q = [0, 1, 2, 3].map(() => lpiPoint([rnd() * 2 - 1, rnd() * 2 - 1, -1], [rnd() * 2 - 1, rnd() * 2 - 1, 2], T)); icn++; if (incircle(...q, 0, 1) !== incircleExact(...q, 0, 1)) ic++; }
     ok("!! in-circle: the filter equals the BigInt path on " + icn + " quadruples, input points and crossings", ic === 0, ic + " differ");
+}
+
+// v4879 -- THE BENCH REPORT. reportLines() is what physics/instruments.mjs's row for this module asks for; graded here so the export is gated rather than merely present.
+{
+    const L = reportLines(), R = reportLines();
+    ok("!! reportLines() is the same report twice and its one seam point is the hand-derived origin, built through exactly 1 lpi construction", Array.isArray(L) && L.length === 4 && L.join("\n") === R.join("\n") && L[0].startsWith("[implicitPoints]") && L[2].includes("(0, 0, 0)") && L[3].includes("1 lpi construction"), L.slice(2).join(" | "));
 }
 
 console.log(`\nimplicitPoints-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

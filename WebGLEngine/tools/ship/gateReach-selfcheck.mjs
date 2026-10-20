@@ -221,6 +221,12 @@ for (const l of reachLines(r)) console.log("        " + l);
     //          reconciles:true: physics/mechanics/flightModel6dof.mjs, real flight's trainer (be0c27bd, v4866, on
     //          main), gated in its own flightModel6dof-selfcheck. Growth only, live work. Re-recorded with --write
     //          AFTER compare() had been read.
+    //   579 -> v4879 -- found RED at the merge of the BVH-CSG arc, which is the first thing to run this gate since v4871. compare(), read
+    //          BEFORE writing, reports GREW, 19 ADDED, 0 REMOVED, reconciles:true: physics/mechanics +12 (the submarine and rotorcraft
+    //          lines and the guns arc, v4874 to v4877: bomber, capitalShip, flightGuns, froudeScale, gunSeats, rotorcraftModel6dof,
+    //          subActuators, subHulls, subModel6dof, subSonar, subTorpedo and terrain, each gated in its own selfcheck) and physics/mesh +7 (the
+    //          arc's blastEngine, exactArrangement, exactPredicates, implicitPoints, manifoldAudit, triContact and triArrangement, each gated
+    //          in its own selfcheck). Growth only, live work. Re-recorded with --write AFTER compare() had been read.
     //
     // *** AND THE ROW HAD A DEFECT OF ITS OWN, WHICH IS WHY IT NOW ASKS THE MODULE RATHER THAN THE DISK. ***
     // It read the record with fs.readFileSync("tools/ship/population-census.json") -- A RELATIVE PATH -- so

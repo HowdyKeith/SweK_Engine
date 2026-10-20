@@ -864,4 +864,14 @@ console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "made dent polygons by a few 1e-9, now projects what it inserts (sections 5 and 6). STILL " +
     "UNCHECKED by that audit: self-intersection away from shared edges, which needs a pairwise triangle test " +
     "this gate does not have, and doubled shells, which neither the volume nor the parity can see.");
+// v4879 -- EXPORTS THE BVH-CSG ARC LEFT UNGATED (definitionGates' ratchets only go down): each exercised on a case checkable by hand.
+{
+    const P = M.polyAABB({ vs: [[0, 0, 0], [1, 2, 3], [-1, 5, 1]] }), PS = M.polysAABB([{ vs: [[0, 0, 0], [1, 2, 3]] }, { vs: [[-1, 5, 1]] }]);
+    const n0 = new M.Node([]), nb = new M.Node(M.boxPolys([0, 0, 0], [1, 1, 1]));
+    const count = (n) => n ? n.polys.length + count(n.front) + count(n.back) : 0;
+    ok("!! polyAABB and polysAABB are the min and max of the corners -- lo (-1,0,0), hi (1,5,3) for the three-corner polygon and for the same corners split over two polygons -- and a Node of no polygons is an empty leaf while a Node of a unit box holds a splitting plane and at least its 6 faces",
+       JSON.stringify(P) === JSON.stringify({ lo: [-1, 0, 0], hi: [1, 5, 3] }) && JSON.stringify(PS) === JSON.stringify(P) && n0.pl === null && n0.polys.length === 0 && n0.front === null && n0.back === null && nb.pl !== null && count(nb) >= 6,
+       JSON.stringify(P) + " " + JSON.stringify(PS) + " box node holds " + count(nb) + " polygons");
+}
+
 process.exit(fails ? 1 : 0);

@@ -60,6 +60,8 @@ import * as M from "./meshCSG.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
+import * as TAv from "./triArrangement.mjs";
+import { reportLines } from "./triArrangement.mjs";   // v4879: the bench calls it with no argument, so the no-argument report is graded here
 const info = (s) => console.log("  ..... " + s);
 const buf = (tris) => { const b = new Float64Array(tris.length * 9); tris.forEach((t, i) => t.forEach((v, j) => v.forEach((x, c) => { b[i * 9 + j * 3 + c] = x; }))); return b; };
 const all = (b) => [...Array(b.length / 9).keys()];
@@ -444,6 +446,18 @@ console.log("\n6. *** ROUND 13: A SLIVER'S SIDE POINT GOES ON THE SIDE IT CAME F
     ok("!! a side point near a sliver's sharp corner lands on the side it was given (2,000 slivers at wall scale)",
         n === 2000 && wrong === 0, n + " slivers, " + wrong + " on the wrong side; " + notSliver + " not taken as slivers");
     info("control: the same points given without a side (nearest side wins) -- " + bareWrong + " of " + n + " on the wrong side");
+}
+
+// v4879 -- THE BENCH REPORT. reportLines() is what physics/instruments.mjs's row for this module asks for; graded here so the export is gated rather than merely present.
+{
+    const L = reportLines(), R = reportLines();
+    ok("!! reportLines() is the same report twice and headed by the module's own name", Array.isArray(L) && L.length >= 4 && L.join("\n") === R.join("\n") && L[0].startsWith("[triArrangement]"), L.length + " lines");
+}
+
+// v4879 -- EXPORTS THE BVH-CSG ARC LEFT UNGATED (definitionGates' ratchets only go down): each exercised on a case checkable by hand.
+{
+    ok("!! the arrangement's named thresholds stand: NEAR_PARALLEL 1e-6 (far looser than SNAP_EPS 1e-9, so a near-parallel plane pair is told apart from a coincident one) and JOIN_TWIN 64 snaps (eight times the 8-snap boundary join)",
+       TAv.NEAR_PARALLEL === 1e-6 && TAv.SNAP_EPS === 1e-9 && TAv.NEAR_PARALLEL > TAv.SNAP_EPS && TAv.JOIN_TWIN === 64 && TAv.JOIN_TWIN === 8 * 8, TAv.NEAR_PARALLEL + " " + TAv.SNAP_EPS + " " + TAv.JOIN_TWIN);
 }
 
 console.log(`\ntriArrangement-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

@@ -25,6 +25,7 @@ import { manifoldAudit, crossingDepth } from "./manifoldAudit.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
+import { reportLines } from "./manifoldAudit.mjs";   // v4879: the bench calls it with no argument, so the no-argument report is graded here
 console.log("manifoldAudit-selfcheck -- is a triangle mesh two-manifold, at exact bits\n");
 
 const B = (c, h) => M.toTriangleBuffer(M.boxPolys(c, h));
@@ -84,6 +85,12 @@ console.log("\n3. *** MESHES THAT KEEP EVERY PROPERTY ***");
     ok("!! 60 of the page's jagged blobs (its radius, roughness and facet ranges): every one clean", bad === 0, bad + " of " + n + " with a defect");
     const rot = M.toTriangleBuffer(M.boxPolys([0.3, -0.2, 0.1], [0.7, 0.4, 1.1]).map((p) => { const vs = p.vs.map((v) => [v[0] * Math.cos(0.7) - v[1] * Math.sin(0.7), v[0] * Math.sin(0.7) + v[1] * Math.cos(0.7), v[2]]); return { vs, pl: M.planeOf(vs) }; }));
     ok("!! a box rotated 0.7 about z (no coordinate exact): clean", KEYS.every((x) => manifoldAudit(rot)[x] === 0), show(manifoldAudit(rot)));
+}
+
+// v4879 -- THE BENCH REPORT. reportLines() is what physics/instruments.mjs's row for this module asks for; graded here so the export is gated rather than merely present.
+{
+    const L = reportLines(), R = reportLines();
+    ok("!! reportLines() is the same report twice: a unit box is clean and the same box with one face doubled reads open 6, nonManifoldEdges 3", Array.isArray(L) && L.length === 3 && L.join("\n") === R.join("\n") && L[0].startsWith("[manifoldAudit]") && L[1].endsWith("-> clean") && L[2].endsWith("-> open 6, nonManifoldEdges 3"), L.slice(1).join(" | "));
 }
 
 console.log(`\nmanifoldAudit-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

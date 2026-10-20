@@ -214,6 +214,7 @@ import { rebarDistance } from "../../render/rebar.mjs";
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
+import { WALL_TREE_APPENDED as WTA } from "./blastEngine.mjs";
 const report = (m) => console.log("  ....  " + m);
 // round 16g: meshBoolean's default arrangement is exact; a row whose subject is the snapped path's own mechanism (the 8e-9
 // weld's moves, the seam consensus and its folds, the conformity pass, the flat-ear repair, round 17's translation as a
@@ -1112,6 +1113,11 @@ console.log("\n18. *** ROUND 23: THE WALL'S TREE CARRIED FROM SHOT TO SHOT -- BI
             bitsOf(a.polys) === bitsOf(b.polys) && bitsOf(c.polys) === bitsOf(d.polys) && changed > 0 && c.stats.wallTreeMapped === mappedSame - changed,
             "carried " + mappedSame + " -> " + c.stats.wallTreeMapped + "; " + changedTris + " triangles share the moved point, in " + hit.size + " polygons of " + changed + " triangles");
     }
+}
+
+// v4879 -- EXPORTS THE BVH-CSG ARC LEFT UNGATED (definitionGates' ratchets only go down): each exercised on a case checkable by hand.
+{
+    ok("!! WALL_TREE_APPENDED is 0.25 -- a quarter of the wall's triangles placed by small builds is the line past which the derived tree is rebuilt in full", WTA === 0.25 && WTA > 0 && WTA < 1, String(WTA));
 }
 
 console.log(`\nblastEngine-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

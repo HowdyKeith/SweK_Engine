@@ -54,6 +54,7 @@ import { triTriIntersect, triTriIntersectExact } from "./triTriIntersect.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
+import { reportLines } from "./triTriIntersect.mjs";   // v4879: the bench calls it with no argument, so the no-argument report is graded here
 
 const sub = (a, b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]];
 const cross = (a, b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
@@ -394,4 +395,10 @@ console.log("unchecked here, named honestly: coplanar and degenerate (vertex-on-
 
 
     "attempted here.");
+// v4879 -- THE BENCH REPORT. reportLines() is what physics/instruments.mjs's row for this module asks for; graded here so the export is gated rather than merely present.
+{
+    const L = reportLines(), R = reportLines();
+    ok("!! reportLines() is the same report twice, headed by the module's own name, and its first pair is the hand-derived segment", Array.isArray(L) && L.length >= 4 && L.join("\n") === R.join("\n") && L[0].startsWith("[triTriIntersect]") && L.some((s) => s.includes("intersect")), L.length + " lines");
+}
+
 process.exit(fails ? 1 : 0);

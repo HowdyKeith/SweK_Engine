@@ -277,3 +277,14 @@ export function incircleExact(P, Q, R, S, i, j) {
 export function rounded(P) { return P.r; }
 /** The point's exact coordinates as {X, Y, Z, W, E}: X*2^E/W (exported for the gate). */
 export function exactCoords(P) { return exactOf(P); }
+
+// v4879 -- a REPORT, NOT A VERDICT (implicitPoints-selfcheck.mjs is what exits nonzero): one seam point built the way the arrangement builds it, as the line through a and b met by the plane of triangle T, kept exact and rounded only for the print.
+export function reportLines() {
+    const before = { ...stats };
+    const a = [0, 0, -1], b = [0, 0, 1], T = [[-1, -1, 0], [2, -1, 0], [-1, 2, 0]];
+    const P = lpiPoint(a, b, T);
+    return ["[implicitPoints] seam points kept implicit: lpiPoint(a, b, T) is where the line a-b meets the plane of triangle T, exact; coordinates are rounded only on output",
+            "  a = (0,0,-1), b = (0,0,1) against T = (-1,-1,0),(2,-1,0),(-1,2,0) in the z=0 plane:",
+            "  lpiPoint -> (" + rounded(P).join(", ") + ")   (hand-derived: the origin)",
+            "  built through " + (stats.lpi - before.lpi) + " lpi construction"];
+}

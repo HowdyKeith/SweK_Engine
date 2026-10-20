@@ -268,6 +268,8 @@ const bitsOpen = (buf) => { const key = (o) => buf[o] + "," + buf[o + 1] + "," +
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
+import * as MBv from "./meshBoolean.mjs";   // v4879: namespace, so these names cannot clash with the named imports above
+import { reportLines } from "./meshBoolean.mjs";   // v4879: the bench calls it with no argument, so the no-argument report is graded here
 const close = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
 
 function wrapAsPolys(buf) {
@@ -1878,6 +1880,28 @@ console.log("\n26. *** ROUND 20b: embedRounded ON HAND-BUILT CROSSINGS -- WHAT I
     const rc = run(F(S1, [[0, 0, 0], [1, 2e-10, -1e-16], [0.9, -0.5, 1e-3]]), [0, 1], F(S1, other));
     ok("!! a new triangle crossing an OLD sliver is found (a new triangle is tested against every sliver near it), and what cannot be collapsed is counted",
         rc.stats.crossings === 1 && rc.stats.left === 1 && rc.stats.collapsed === 0, JSON.stringify(rc.stats));
+}
+
+// v4879 -- THE BENCH REPORT. reportLines() is what physics/instruments.mjs's row for this module asks for; graded here so the export is gated rather than merely present.
+{
+    const L = reportLines(), R = reportLines();
+    ok("!! reportLines() is the same report twice and headed by the module's own name", Array.isArray(L) && L.length >= 4 && L.join("\n") === R.join("\n") && L[0].startsWith("[meshBoolean]"), L.length + " lines");
+}
+
+// v4879 -- EXPORTS THE BVH-CSG ARC LEFT UNGATED (definitionGates' ratchets only go down): each exercised on a case checkable by hand.
+{
+    const tri = new Float64Array([0, 0, 0, 4, 0, 0, 0, 4, 0]);
+    const below = MBv.nearSide([1, 1, -5e-9], tri, [0]), above = MBv.nearSide([1, 1, 5e-9], tri, [0]), on = MBv.nearSide([1, 1, 0], tri, [0]), far = MBv.nearSide([1, 1, 1], tri, [0]);
+    ok("!! nearSide sides a sample within MESH_BOOLEAN_NEAR of the triangle z = 0 (normal +z) by its plane: 5e-9 below is inside, 5e-9 above is outside, exactly on it is an edge, 1 away is null (a question for rays)",
+       below && below.inside === true && above && above.inside === false && on && on.edge === true && far === null, JSON.stringify([below, above, on, far]));
+    ok("!! isEmptySolid: no triangles, and a lone triangle through the origin (area 4 * 2, volume 0), are empty; a unit box is not",
+       MBv.isEmptySolid(new Float64Array(0)) === true && MBv.isEmptySolid(tri) === true && MBv.isEmptySolid(M.toTriangleBuffer(M.boxPolys([0, 0, 0], [1, 1, 1]))) === false);
+    const bA = M.toTriangleBuffer(M.boxPolys([0, 0, 0], [1, 1, 1])), bB = M.toTriangleBuffer(M.boxPolys([1, 0.5, 0.5], [1, 1, 1]));
+    const rDef = MBv.meshBoolean(bA, new MeshBVH(bA), bB, new MeshBVH(bB), "union"), rExp = MBv.meshBoolean(bA, new MeshBVH(bA), bB, new MeshBVH(bB), "union", { cutting: MBv.MESH_BOOLEAN_DEFAULT_CUTTING });
+    let threw = false; try { MBv.meshBoolean(bA, new MeshBVH(bA), bB, new MeshBVH(bB), "union", { cutting: "bogus" }); } catch { threw = true; }
+    ok("!! the default cutting IS MESH_BOOLEAN_DEFAULT_CUTTING = 'arrangement' (naming it changes no bit of a union of two boxes), an unknown cutting throws, and the exported tolerances stand: FOLD_SNAPS 16, EMBED_ROUNDING 1e-14",
+       MBv.MESH_BOOLEAN_DEFAULT_CUTTING === "arrangement" && rDef.tris.length === rExp.tris.length && rDef.tris.every((v, i) => Object.is(v, rExp.tris[i])) && threw && MBv.FOLD_SNAPS === 16 && MBv.EMBED_ROUNDING === 1e-14,
+       rDef.tris.length / 9 + " triangles either way");
 }
 
 console.log(`\nmeshBoolean-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

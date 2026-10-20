@@ -25,6 +25,7 @@
 // blobs' z = 0 equators, rounded to doubles; since round 20b none (meshBoolean's embedRounded). meshCSG's BSP on the same
 // 20 shots: tens of thousands of open edges raw, real crossings up to 6.8e-3 deep; after settle thousands at its triangles
 // until round 20c (meshCSG's fan dropped the points settle welded), its polygon census since. See blastEngine-selfcheck 16.
+import * as M from "./meshCSG.mjs";
 "use strict";
 
 import { MeshBVH } from "../../mesh/meshBVH.mjs";
@@ -139,4 +140,15 @@ export function manifoldAudit(buf, { selfIntersection = true, detail = null } = 
         if (e.pts.some((X) => !isShared(X)) || P.some((X) => inside(X, Q, sgnB)) || Q.some((X) => inside(X, P, sgnA))) R.coplanarOverlaps++;
     }
     return R;
+}
+
+// v4879 -- a REPORT, NOT A VERDICT (manifoldAudit-selfcheck.mjs is what exits nonzero): the audit's seven counts on a clean box and on the same box with one face doubled.
+export function reportLines() {
+    const box = M.toTriangleBuffer(M.boxPolys([0, 0, 0], [1, 1, 1]));
+    const doubled = new Float64Array(box.length + 9); doubled.set(box); doubled.set(box.slice(0, 9), box.length);
+    const KEYS = ["degenerate", "open", "nonManifoldEdges", "pinchedVertices", "crossings", "touches", "coplanarOverlaps"];
+    const show = (r) => KEYS.filter((k) => r[k]).map((k) => k + " " + r[k]).join(", ") || "clean";
+    return ["[manifoldAudit] is a triangle mesh two-manifold? seven counts, each at the exact bits of the coordinates: " + KEYS.join(", "),
+            "  a unit box (12 triangles) -> " + show(manifoldAudit(box)),
+            "  the same box with one face doubled (13 triangles) -> " + show(manifoldAudit(doubled))];
 }

@@ -26,6 +26,8 @@ import * as M from "./meshCSG.mjs";
 
 let fails = 0;
 const ok = (name, cond, info = "") => { if (!cond) fails++; console.log((cond ? "  PASS  " : "  FAIL  ") + name + (info ? "   " + info : "")); };
+import { edgeCross } from "./triContact.mjs";
+import { reportLines } from "./triContact.mjs";   // v4879: the bench calls it with no argument, so the no-argument report is graded here
 const rd = (T, i) => [[T[i * 9], T[i * 9 + 1], T[i * 9 + 2]], [T[i * 9 + 3], T[i * 9 + 4], T[i * 9 + 5]], [T[i * 9 + 6], T[i * 9 + 7], T[i * 9 + 8]]];
 const same = (a, b) => a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
 
@@ -159,6 +161,18 @@ console.log("\n4. *** nearSide AT A KNIFE EDGE: THE PSEUDO-NORMAL, NOT THE NEARE
     let inWrong = 0;
     for (const y of [-1e-10, 0, 1e-10]) { const r = nearSide([-5e-9, y * 0.1, 0.1], buf, cands); if (!r || r.edge || !r.inside) inWrong++; }
     ok("...and points 5e-9 inside the tip inside", inWrong === 0, inWrong + " wrong of 3");
+}
+
+// v4879 -- THE BENCH REPORT. reportLines() is what physics/instruments.mjs's row for this module asks for; graded here so the export is gated rather than merely present.
+{
+    const L = reportLines(), R = reportLines();
+    ok("!! reportLines() is the same report twice and reads coplanar +1, coplanar -1, none for the same-winding, reversed and apart placements", Array.isArray(L) && L.length === 5 && L.join("\n") === R.join("\n") && L[0].startsWith("[triContact]") && L[2].endsWith("-> coplanar, orient +1") && L[3].endsWith("-> coplanar, orient -1") && L[4].endsWith("-> none"), L.slice(2).join(" | "));
+}
+
+// v4879 -- EXPORTS THE BVH-CSG ARC LEFT UNGATED (definitionGates' ratchets only go down): each is exercised on a case checkable by hand.
+{
+    const p = edgeCross([0, 0, 0], [4, 0, 0], 1, -3), q = edgeCross([4, 0, 0], [0, 0, 0], -3, 1), r = edgeCross([0, 0, -1], [0, 0, 1], -1, 1);
+    ok("!! edgeCross puts the point where the signed distances change sign -- (1,0,0) for distances 1 and -3 along a 4-long edge, the origin for -1 and 1 -- and gives the SAME bits whichever way the edge is passed", p[0] === 1 && p[1] === 0 && p[2] === 0 && q[0] === p[0] && q[1] === p[1] && q[2] === p[2] && r[0] === 0 && r[1] === 0 && r[2] === 0, JSON.stringify(p) + " " + JSON.stringify(q) + " " + JSON.stringify(r));
 }
 
 console.log(`\ntriContact-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

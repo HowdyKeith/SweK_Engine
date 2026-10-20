@@ -132,3 +132,14 @@ export function angleAt(q, a, b, c, tol) {
     }
     return Math.PI;
 }
+
+// v4879 -- a REPORT, NOT A VERDICT (triContact-selfcheck.mjs is what exits nonzero): contactPair on three placements triTriIntersect() refuses or resolves, with the orientation the coplanar answer carries.
+export function reportLines() {
+    const T = [[0, 0, 0], [2, 0, 0], [0, 2, 0]];
+    const up = [[0.5, 0.5, 0], [1.5, 0.5, 0], [0.5, 1.5, 0]], down = [[0.5, 0.5, 0], [0.5, 1.5, 0], [1.5, 0.5, 0]];
+    const away = [[0.5, 0.5, 3], [1.5, 0.5, 3], [0.5, 1.5, 3]];
+    const row = (name, Q) => { const r = contactPair(T, Q); return "  " + name + " -> " + r.kind + (r.kind === "coplanar" ? ", orient " + (r.orient > 0 ? "+1" : "-1") : ""); };
+    return ["[triContact] contactPair(P, Q): the pairs triTriIntersect() answers 'coplanar' or 'degenerate' to, resolved (within CONTACT_EPS = " + CONTACT_EPS + ")",
+            "  P = (0,0,0),(2,0,0),(0,2,0) in the z=0 plane, against:",
+            row("the same plane, same winding", up), row("the same plane, reversed", down), row("the plane z=3, apart", away)];
+}

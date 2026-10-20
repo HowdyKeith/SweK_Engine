@@ -414,3 +414,15 @@ export function arrangeTriangleExact(trisA, triA, trisB, candidateTriBs, opts = 
              stats: { segments: segs.length, vertices: V.length, faceCount: faces.length, coplanar: coplanar.length, triangles: tri.filter((_, t) => alive[t]).length,
                       pointsOnEdge, pointsInside, splitsAt, forced, flips, delaunayFlips, crossings, onConflicts } };
 }
+
+// v4879 -- a REPORT, NOT A VERDICT (exactArrangement-selfcheck.mjs is what exits nonzero): the same four triangle pairs triTriIntersect's report uses, decided here by exact signs with no tolerance.
+export function reportLines() {
+    const A = [[0, 0, 0], [4, 0, 0], [0, 4, 0]];
+    const pairs = [["T2 in the x=1 plane (hand-derived segment (1,0,0)-(1,2,0))", [[1, -1, -1], [1, -1, 3], [1, 3, -1]]],
+                   ["the same T2 moved +10 in y", [[1, 9, -1], [1, 9, 3], [1, 13, -1]]],
+                   ["a triangle lying in T1's own plane", [[1, 1, 0], [3, 1, 0], [1, 3, 0]]],
+                   ["a triangle sharing T1's edge (0,0,0)-(4,0,0)", [A[0], A[1], [2, 0, -3]]]];
+    return ["[exactArrangement] exactPair(TA, TB): the intersection of two triangles by exact orient3d signs -- none, a segment, a point, or coplanar -- with no tolerance anywhere",
+            "  TA = (0,0,0),(4,0,0),(0,4,0), against:",
+            ...pairs.map(([name, B]) => { const r = exactPair(A, B); return "  " + name + " -> " + r.kind; })];
+}

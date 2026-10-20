@@ -49,6 +49,7 @@ import * as M from "./meshCSG.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
+import { reportLines } from "./exactArrangement.mjs";   // v4879: the bench calls it with no argument, so the no-argument report is graded here
 console.log("exactArrangement-selfcheck -- the per-triangle arrangement, decided exactly\n");
 let s0 = 2718; const rnd = () => { s0 = (s0 * 1664525 + 1013904223) >>> 0; return s0 / 4294967296; };
 const R3 = (k = 1) => [(rnd() * 2 - 1) * k, (rnd() * 2 - 1) * k, (rnd() * 2 - 1) * k];
@@ -235,6 +236,12 @@ console.log("\n4. *** A WHOLE MESH, CLOSED BIT FOR BIT ***");
         }
     }
     ok("!! " + runs + " blob-pair runs, exact arrangement: every edge's twin is the same two doubles (closed at the exact-bits key), no fallback", open === 0 && fb === 0, open + " open, " + fb + " fallbacks");
+}
+
+// v4879 -- THE BENCH REPORT. reportLines() is what physics/instruments.mjs's row for this module asks for; graded here so the export is gated rather than merely present.
+{
+    const L = reportLines(), R = reportLines();
+    ok("!! reportLines() is the same report twice and reads segment, none, coplanar, segment for the four hand-placed pairs", Array.isArray(L) && L.length === 6 && L.join("\n") === R.join("\n") && L[0].startsWith("[exactArrangement]") && L[2].endsWith("-> segment") && L[3].endsWith("-> none") && L[4].endsWith("-> coplanar") && L[5].endsWith("-> segment"), L.slice(2).join(" | "));
 }
 
 console.log(`\nexactArrangement-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

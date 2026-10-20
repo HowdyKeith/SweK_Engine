@@ -136,6 +136,27 @@ export const INSTRUMENTS = [
     // Round 9 of the BVH-CSG arc, after v4778: the seventh module, and the one meshBoolean now tries first. Every number
     // in its key is printed by triArrangement-selfcheck.mjs or meshBooleanBlast-selfcheck.mjs, except the speed figure,
     // which meshBoolean.mjs's own header records from a sweep the gates do not run.
+    // v4879 -- the BVH-CSG arc's five modules that had no door (physicsReach counted 12 unreachable against a baseline of 7). each of the five now exports reportLines() (a hand-checkable report, not a verdict), so each is a bench row.
+    { id: "exact-predicates", page: "instrument-bench.html", name: "An exact orient3d for the boolean's decisions", area: "voxels",
+      measures: "orient3d(a, b, c, d) as the sign of the determinant of the input coordinates, exactly: a floating-point evaluation trusted when it clears Shewchuk's a-priori error bound, an exact evaluation over the doubles' mantissas otherwise.",
+      key: "A DECISION TAKEN FROM AN EXACT SIGN IS THE SAME IN EVERY PAIR THAT ASKS IT: d = (0.5, 0.5, 1e-30), above the plane by far less than any tolerance, reads -1, and d ON the plane reads 0; round 16 measured that two pairs sharing an edge could decide differently under a 1e-9 snap.",
+      gate: "physics/mesh/exactPredicates-selfcheck.mjs" },
+    { id: "implicit-points", page: "instrument-bench.html", name: "Seam points kept exact: implicit points and their predicates", area: "voxels",
+      measures: "Seam points as the edge-crosses-plane, line-meets-line and three-planes constructions they come from (lpiPoint, lliPoint, tpiPoint) rather than as rounded coordinates, with exact predicates on them; coordinates are rounded only on output.",
+      key: "WHAT BREAKS THE NEAR-COINCIDENT FAMILY IS THE 1e-9 DECISION ON A SEAM POINT, NOT THE PAIR VERDICT (round 16e): the z axis met by the plane z = 0 is built through 1 lpi construction and reads (0, 0, 0), kept exact and rounded only on output.",
+      gate: "physics/mesh/implicitPoints-selfcheck.mjs" },
+    { id: "exact-arrangement", page: "instrument-bench.html", name: "The per-triangle arrangement, decided exactly", area: "voxels",
+      measures: "triArrangement's job with no tolerance anywhere: exactPair for a pair of triangles by exact orient3d signs, and arrangeTriangleExact as a constrained triangulation of one triangle, behind meshBoolean's opts.exactArrangement.",
+      key: "IT REPLACES EVERY SNAP WITH AN EXACT SIGN: four triangle pairs read segment, none, coplanar and segment with no tolerance anywhere, and on slivers 1e-9 to 1e-8 wide two snapped arrangements decide the same sliver differently while this one cannot. Off by default (opts.exactArrangement).",
+      gate: "physics/mesh/exactArrangement-selfcheck.mjs" },
+    { id: "manifold-audit", page: "instrument-bench.html", name: "Is a triangle mesh two-manifold? An exact audit", area: "voxels",
+      measures: "Counts degenerate triangles, open edges, non-manifold edges, pinched vertices, crossings, touches and coplanar overlaps, each taken at the exact bits of the coordinates with the exact predicates.",
+      key: "IT GRADES THE PROPERTY THE BOOLEAN LIBRARY IT WAS MODELLED ON SAYS IT CANNOT ALWAYS KEEP: a unit box (12 triangles) audits clean and the same box with one face doubled reads open 6, nonManifoldEdges 3, across 7 counts taken at the exact bits.",
+      gate: "physics/mesh/manifoldAudit-selfcheck.mjs" },
+    { id: "tri-contact", page: "instrument-bench.html", name: "The contacts triTriIntersect refuses: coplanar and on-plane pairs", area: "voxels",
+      measures: "contactPair(P, Q) resolves the two statuses triTriIntersect returns without an answer, coplanar and degenerate, as a coplanar relation with an orientation, a segment, or none, within CONTACT_EPS.",
+      key: "A PIECE OF SURFACE LYING ON THE OTHER MESH'S SURFACE HAS NO ANSWER IN THE PLANE PATH: same winding reads coplanar orient +1, reversed reads orient -1, and a parallel plane 3 apart reads none; called only for the pairs triTriIntersect() refuses.",
+      gate: "physics/mesh/triContact-selfcheck.mjs" },
     { id: "tri-arrangement", page: "instrument-bench.html", name: "One triangle cut along the segments that cross it", area: "voxels",
       measures: "The planar arrangement of the segments where mesh B actually crosses ONE triangle of mesh A -- endpoints snapped, checked for crossings and loose ends, walked into faces, each closed curve given as a hole to the face that holds it, each face triangulated -- so a boolean classifies one point per face instead of one per plane-cut fragment. It never computes a vertex, and it REFUSES rather than guesses: a refused triangle goes back to the plane-cut path.",
       key: "A 1x1 square hole in the right triangle (0,0,0),(10,0,0),(0,10,0) gives faces of EXACTLY 1 and 49, every output vertex bit-identical to a corner or a triTriIntersect endpoint; nested squares give 1, 8 and 41, the hole going to its innermost face. A square 2e-7 across keeps its own face at 4e-14 -- the first build dropped it as a sliver, and a rod that thin lost its whole end cap. A crossing within the 1e-9 tolerance of A's edge closes against it and leaves a 2.75e-9 strip uncovered, measured rather than hidden. Through meshBoolean the twelve-blast chain refuses 0 of 4,893 arranged triangles and needs 29,747 classifications against the plane-cut path's 55,191; meshBoolean.mjs's header records wall minus a 65,024-triangle blob in 1.3 s against the BSP's 10.9 s.",
@@ -2411,54 +2432,6 @@ export const INSTRUMENTS = [
       measures: "A plain relu network (20 -> 32 -> 32 -> 4, 1,860 weights) as a helicopter pilot, taking the same 20 features and giving the same four controls as the fruit fly's circuit, so the two are compared on one task.",
       key: "THE HAND WEIGHTS ARE THE HAND PILOT THROUGH EIGHT RELU CHANNELS OF EACH LAYER: 36 of the 1,860 weights are non-zero and they are autopilotRotor.mjs's laws, flying the same flight. The module prints this itself.",
       gate: "brain/pilotRotorMlp-selfcheck.mjs" },
-    {
-        id: "rigid-body-6dof", page: "instrument-bench.html", name: "A dynamical 6DOF rigid body -- force, torque, F = ma and Euler's equations", area: "mechanics",
-        measures: "physics/mechanics/rigidBody6dof.mjs: real forces and torques integrated against mass and an inertia tensor (freeRotation.mjs's solver with an applied-torque term), alongside ev/flightModel3d.js's kinematic arcade model rather than in place of it.",
-        key: "2 s of an engine mounted 0.3 m off-axis and 2.4 m aft, thrust 40 along local +z, on a 12 kg hull: pos -0.874, 0, 6.634; vel -1.680, 0, 6.254; w 0, -0.8333, 0 -- off-centre thrust induces real spin. Registered at round 21 (the suite-green round of the BVH-CSG arc), which found this module exporting reportLines() with no entry; the numbers are its own reportLines() output on that tree, and the claims are its gate's.",
-        gate: "physics/mechanics/rigidBody6dof-selfcheck.mjs",
-    },
-    {
-        id: "rigid-body-6dof-collision", page: "instrument-bench.html", name: "6DOF collision -- OBB contact and a hand-derived impulse response", area: "mechanics",
-        measures: "physics/mechanics/rigidBody6dofCollision.mjs: physics/obbOverlap.js's OBB contact test and a normal-plus-Coulomb-friction impulse, proven in its gate against closed forms and conservation laws.",
-        key: "A contact of depth 0.400 along +x: impulse j = 28.814, friction jt = -5.678; positional correction takes the depth 0.400 -> 0.322 in one call. Registered at round 21 (the suite-green round of the BVH-CSG arc), which found this module exporting reportLines() with no entry; the numbers are its own reportLines() output on that tree, and the claims are its gate's.",
-        gate: "physics/mechanics/rigidBody6dofCollision-selfcheck.mjs",
-    },
-    {
-        id: "rigid-body-6dof-weapon", page: "instrument-bench.html", name: "6DOF weapons -- a straight projectile hit-tested exactly against an OBB", area: "mechanics",
-        measures: "physics/mechanics/rigidBody6dofWeapon.mjs: a straight-line projectile (no gravity, no drag) fired along the shooter's forward, hit-tested with an exact segment-vs-OBB slab test.",
-        key: "A hit after flight on target B at point 11.88, 0, 0. Registered at round 21 (the suite-green round of the BVH-CSG arc), which found this module exporting reportLines() with no entry; the numbers are its own reportLines() output on that tree, and the claims are its gate's.",
-        gate: "physics/mechanics/rigidBody6dofWeapon-selfcheck.mjs",
-    },
-    {
-        id: "aero-surface", page: "instrument-bench.html", name: "Per-surface aerodynamics -- lift and drag on one lifting surface", area: "mechanics",
-        measures: "physics/mechanics/aeroSurface.mjs: a closed-form thin-airfoil-style Cl/Cd per surface, applied through rigidBody6dof.mjs's own applyForceAtPoint().",
-        key: "Wing at alpha 2.86 deg: cl 0.285, cd 0.0243, |F| 65.59 N; tail at 1.43 deg: cl 0.112, cd 0.0162, |F| 3.48 N; the two lever arms put a net body torque of 3.118 about y in one tick. Registered at round 21 (the suite-green round of the BVH-CSG arc), which found this module exporting reportLines() with no entry; the numbers are its own reportLines() output on that tree, and the claims are its gate's.",
-        gate: "physics/mechanics/aeroSurface-selfcheck.mjs",
-    },
-    {
-        id: "aircraft-assembly", page: "instrument-bench.html", name: "An aircraft -- wing halves with ailerons, elevator and rudder, three-axis mixing", area: "mechanics",
-        measures: "physics/mechanics/aircraftAssembly.mjs: aeroSurface.mjs's force model assembled into wing halves, elevator and rudder on a rigidBody6dof.mjs body, driven by three-axis control mixing.",
-        key: "A roll command of 0.6 sets the wing halves to +4.81 and -4.81 deg alpha and leaves elevator and rudder at cl 0; one tick later w = -6.9878, 0, 0 -- roll authority isolated to the roll axis. Registered at round 21 (the suite-green round of the BVH-CSG arc), which found this module exporting reportLines() with no entry; the numbers are its own reportLines() output on that tree, and the claims are its gate's.",
-        gate: "physics/mechanics/aircraftAssembly-selfcheck.mjs",
-    },
-    {
-        id: "autopilot-6dof", page: "instrument-bench.html", name: "A torque/thrust autopilot for 6DOF ships", area: "control",
-        measures: "brain/autopilot6dof.mjs: a PD attitude controller turning 'where is the target' into torque and thrust for rigidBody6dof.mjs ships, gated for convergence and lead-aim.",
-        key: "From a 180-degree starting error toward a stationary target: aligned and in range after 73 ticks. Registered at round 21 (the suite-green round of the BVH-CSG arc), which found this module exporting reportLines() with no entry; the numbers are its own reportLines() output on that tree, and the claims are its gate's.",
-        gate: "brain/autopilot6dof-selfcheck.mjs",
-    },
-    {
-        id: "autopilot-aircraft", page: "instrument-bench.html", name: "A heading-hold autopilot for aircraftAssembly aircraft", area: "control",
-        measures: "brain/autopilotAircraft.mjs: pitch and yaw through autopilot6dof.mjs's pointingError(), roll through a bank-angle controller that banks in proportion to the yaw error so wing lift turns the aircraft.",
-        key: "A 10-degree general-axis perturbation, 20 s against the real nonlinear aircraft: heading alignment 0.9870 -> 0.9997, peak commanded bank 2.83 deg, actual bank 1.4698 deg at the end. Registered at round 21 (the suite-green round of the BVH-CSG arc), which found this module exporting reportLines() with no entry; the numbers are its own reportLines() output on that tree, and the claims are its gate's.",
-        gate: "brain/autopilotAircraft-selfcheck.mjs",
-    },
-    {
-        id: "fleet-assign", page: "instrument-bench.html", name: "Fleet target assignment -- one greedy nearest-pair pass per team per tick", area: "brain",
-        measures: "brain/fleetAssign.mjs: one greedy nearest-pair assignment per team per tick in place of each ship choosing its nearest enemy alone (closes ai-fleet-target-deconfliction).",
-        key: "3 v 3, evenly spread: A#2 -> B#0, A#1 -> B#1, A#0 -> B#2 -- every target different, which is the deconfliction property. Registered at round 21 (the suite-green round of the BVH-CSG arc), which found this module exporting reportLines() with no entry; the numbers are its own reportLines() output on that tree, and the claims are its gate's.",
-        gate: "brain/fleetAssign-selfcheck.mjs",
-    },
 ];
 
 export const AREAS = [...new Set(INSTRUMENTS.map((i) => i.area))];

@@ -67,3 +67,13 @@ export function orient3d(a, b, c, d) {
     return orient3dExact(a, b, c, d);
 }
 orient3d.stats = { filtered: 0, exact: 0 };
+
+// v4879 -- a REPORT, NOT A VERDICT (exactPredicates-selfcheck.mjs is what exits nonzero): the bench calls reportLines() with no argument, so the no-argument case is a measurement -- the sign of the determinant on three
+// hand-checkable placements of d against the plane through a = (0,0,0), b = (1,0,0), c = (0,1,0), counter-clockwise seen from +z.
+export function reportLines() {
+    const a = [0, 0, 0], b = [1, 0, 0], c = [0, 1, 0];
+    const rows = [["d = (0,0,-1), below the plane", [0, 0, -1]], ["d = (0.5,0.5,0), ON the plane", [0.5, 0.5, 0]], ["d = (0.5,0.5,1e-30), above it by far less than any tolerance", [0.5, 0.5, 1e-30]]];
+    return ["[exactPredicates] orient3d(a, b, c, d): the sign of a determinant of the input coordinates, exactly (Shewchuk's convention: + when d is below the plane a->b->c seen counter-clockwise)",
+            "  a = (0,0,0), b = (1,0,0), c = (0,1,0):",
+            ...rows.map(([name, d]) => "  " + name + " -> " + (orient3d(a, b, c, d) > 0 ? "+1" : orient3d(a, b, c, d) < 0 ? "-1" : " 0"))];
+}

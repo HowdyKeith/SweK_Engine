@@ -32,6 +32,7 @@ import { orient3d, orient3dExact, decompose } from "./exactPredicates.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
+import { reportLines } from "./exactPredicates.mjs";   // v4879: the bench calls it with no argument, so the no-argument report is graded here
 console.log("exactPredicates-selfcheck -- orient3d, filtered and exact\n");
 let s0 = 1616; const rnd = () => { s0 = (s0 * 1664525 + 1013904223) >>> 0; return s0 / 4294967296; };
 const P = (k = 1) => [(rnd() * 2 - 1) * k, (rnd() * 2 - 1) * k, (rnd() * 2 - 1) * k];
@@ -103,6 +104,12 @@ console.log("\n3. *** THE FILTER NEVER DISAGREES WITH THE EXACT PATH ***");
     }
     ok("!! " + m + " nearly coplanar sets (three scales, off the origin): filtered sign = exact sign", bad2 === 0,
         bad2 + " disagree; the exact path decided " + orient3d.stats.exact + "; the NAIVE float sign was wrong on " + naiveWrong);
+}
+
+// v4879 -- THE BENCH REPORT. reportLines() is what physics/instruments.mjs's row for this module asks for; graded here so the export is gated rather than merely present.
+{
+    const L = reportLines(), R = reportLines();
+    ok("!! reportLines() is the same report twice and its three signs are orient3d's own: below +1, on the plane 0, 1e-30 above -1", Array.isArray(L) && L.length === 5 && L.join("\n") === R.join("\n") && L[0].startsWith("[exactPredicates]") && L[2].endsWith("-> +1") && L[3].endsWith("->  0") && L[4].endsWith("-> -1") && orient3d([0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, -1]) === 1 && orient3d([0, 0, 0], [1, 0, 0], [0, 1, 0], [0.5, 0.5, 0]) === 0 && orient3d([0, 0, 0], [1, 0, 0], [0, 1, 0], [0.5, 0.5, 1e-30]) === -1, L.slice(2).join(" | "));
 }
 
 console.log(`\nexactPredicates-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

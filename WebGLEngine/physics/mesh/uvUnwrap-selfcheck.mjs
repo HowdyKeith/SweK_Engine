@@ -17,6 +17,7 @@ import { writeSceneGlb } from "../../tools/export/sceneGlb.mjs";
 
 let fails = 0;
 const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  ") + name + (detail ? "   " + detail : "")); if (!cond) fails++; };
+import { defaultSubject, reportLines as uvReportLines } from "./uvUnwrap.mjs";
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 
 const cube = (cx, cy, cz, r) => {
@@ -270,4 +271,12 @@ console.log("\n6. *** THE CALLER THAT ASKED, ANSWERED ***");
        err ? "threw " + err : "n " + d.n + ", min " + d.min + ", max " + d.max + ", spread " + d.spread);
 }
 console.log(fails ? "\nuvUnwrap-selfcheck: " + fails + " FAILED" : "\nuvUnwrap-selfcheck: all checks pass");
+// v4879 -- EXPORTS THE BVH-CSG ARC LEFT UNGATED (definitionGates' ratchets only go down): each exercised on a case checkable by hand.
+{
+    const dS = defaultSubject(), area = (p) => { const [a, b, c] = p.vs; const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], w = [c[0] - a[0], c[1] - a[1], c[2] - a[2]]; return Math.hypot(u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]); };
+    const uvL = uvReportLines(), uvR = uvReportLines();
+    ok("!! defaultSubject is six 4-corner faces of the 2x2x2 cube, total area 24 (6 faces of 2 x 2), and the no-argument reportLines() is the same non-empty report twice",
+       dS.length === 6 && dS.every((p) => p.vs.length === 4) && Math.abs(dS.reduce((s, p) => s + area(p), 0) - 24) < 1e-12 && Array.isArray(uvL) && uvL.length >= 3 && uvL.join("\n") === uvR.join("\n"), dS.length + " faces, " + uvL.length + " lines");
+}
+
 process.exit(fails ? 1 : 0);

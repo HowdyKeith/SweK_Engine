@@ -70,8 +70,11 @@ for (const [text, want, why] of [
 // in exactly one identifier and a plain \b finds none of them.
 const meshBvhSrc = fs.readFileSync(path.join(ENG, "mesh", "meshBVH.mjs"), "utf8");
 ok("the tree's ray-triangle BVH is found by tokenMatch", tokenMatch(meshBvhSrc, "bvh"));
+// v4879 -- THE REAL FILE STOPPED BEING THE EXAMPLE. The BVH-CSG arc's rounds 10-25 added a standalone `bvh` identifier to mesh/meshBVH.mjs itself, so a plain \b now finds the term in that file's
+// code and this row, which asserted the miss ON the file, went red on a premise that had changed rather than on a defect. The miss is a property of the identifier, so it is reproduced on the identifier;
+// the row above still grades tokenMatch against the real file.
 ok("...and a plain \\b word boundary does NOT find it in its code -- the miss, reproduced",
-   !/\bbvh\b/i.test(meshBvhSrc.replace(/\/\/[^\n]*/g, "").replace(/\/\*[\s\S]*?\*\//g, "")),
+   !/\bbvh\b/i.test("export class MeshBVH { constructor(mesh) { this.root = build(mesh); } }") && tokenMatch("export class MeshBVH { }", "bvh"),
    "identifier is MeshBVH; there is no boundary between Mesh and BVH");
 // *** SABOTAGE C READ ZERO RED AND THAT IS THE FINDING. *** Removing the path check from scan() cost nothing,
 // because once tokenMatch understood camel humps EVERY file in this tree named for the term also spells it in
