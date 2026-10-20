@@ -374,6 +374,16 @@ export const RECORD_HANDOVERS = Object.freeze([
         evidence: "Keith's answer \"yes, hand over the record\" to the record-owner question on 2026-10-19. boxId() reads linux-x64-4c-16gb-420793 at v4877; the shared record still named 142c0d, captured 2026-10-18T04:53Z. " +
                   "The round's rotation (22 readings, twice) and its four single-gate readings went to sweep-timings.local.json and refused the shared record; those local files and their ledger are deleted at the handover, as at v4818, v4838 and v4850. " +
                   "142c0d held the record from v4850 to v4877." }),
+    // v4880 -- AND TO 142c0d, BECAUSE THE SANDBOX CAME BACK ON THE OTHER HOST AGAIN AND THE ROUND'S GATES HAD NOWHERE TO BE RECORDED. The
+    // orrery-seeded merge brought twelve gates and the ocean spike one; three verdicts on 142c0d each ended on the same three reds
+    // (declaredCost naming oceanSpikePage as untimed, observedGates reading a shared record that has never seen the merge's gates,
+    // sweepCoverage's share at 28.8% against 28.7%), all of them readings of a record only its owner can write. Keith's answer was
+    // "i do give permission for the timing handover" on 2026-10-20, to the record-owner question put to him in the same session.
+    Object.freeze({ at: "v4880", from: "linux-x64-4c-16gb-420793", to: "linux-x64-4c-16gb-142c0d",
+        decidedBy: "Keith",
+        evidence: "boxId() reads linux-x64-4c-16gb-142c0d at v4880; the shared record still names 420793, captured by the v4877 round. " +
+                  "The round's sweeps wrote tools/ship/sweep-timings.linux-x64-4c-16gb-142c0d.json and refused the shared record; " +
+                  "that local file and its ledger are deleted at the handover, as at v4818, v4838 and v4850. 420793 held the record from v4877 to v4880." }),
 ]);
 
 /** The box that may write a record whose `host` reads `host`, after following every handover. */
