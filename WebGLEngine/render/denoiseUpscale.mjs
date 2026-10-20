@@ -88,6 +88,39 @@ export function fillEmitters(img3, cov, w, h) {
     }
 }
 
+/**
+ * Round 31 (denoise-halfres-rig-timing): fillEmitters as a GPU runs it -- at most `maxRings` rings, because a device cannot
+ * loop until nothing changes without reading back, so render/denoiseUpscaleGPU.mjs dispatches a fixed number. Each ring is
+ * fillEmitters' rule exactly; a pixel no ring reached is 0 (never the emitter's own radiance). { y, rings, left }: the
+ * frame, the rings that filled anything, and the pixels left. With rings below maxRings and left 0 it is fillEmitters'
+ * frame, value for value -- the selfcheck holds that. A frame whose every pixel is an emitter's leaves them all, at 0.
+ */
+export function fillEmittersBounded(img3, cov, w, h, maxRings) {
+    if (img3.length !== w * h * 3 || cov.length !== w * h) throw new Error(`denoiseUpscale: ${img3.length} values and ${cov.length} coverages are not a ${w} x ${h} frame`);
+    if (!Number.isInteger(maxRings) || maxRings < 0) throw new Error(`denoiseUpscale: maxRings is a whole number of rings -- got ${maxRings}`);
+    const y = Float64Array.from(img3), known = Uint8Array.from(cov, (c) => (c > 0 ? 0 : 1));
+    let rings = 0;
+    for (let r = 0; r < maxRings; r++) {
+        const ring = [];
+        for (let py = 0; py < h; py++) for (let px = 0; px < w; px++) {
+            const p = py * w + px;
+            if (known[p]) continue;
+            let n = 0, s0 = 0, s1 = 0, s2 = 0;
+            for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+                const qx = px + dx, qy = py + dy, q = qy * w + qx;
+                if ((dx || dy) && qx >= 0 && qx < w && qy >= 0 && qy < h && known[q]) { n++; s0 += y[q * 3]; s1 += y[q * 3 + 1]; s2 += y[q * 3 + 2]; }
+            }
+            if (n) ring.push(p, s0 / n, s1 / n, s2 / n);
+        }
+        if (!ring.length) break;
+        rings++;
+        for (let k = 0; k < ring.length; k += 4) { const p = ring[k]; y[p * 3] = ring[k + 1]; y[p * 3 + 1] = ring[k + 2]; y[p * 3 + 2] = ring[k + 3]; known[p] = 1; }
+    }
+    let left = 0;
+    for (let p = 0; p < w * h; p++) if (!known[p]) { left++; y[p * 3] = 0; y[p * 3 + 1] = 0; y[p * 3 + 2] = 0; }
+    return { y, rings, left };
+}
+
 /** Section 91: the emitters put back -- E + (1 - cov) x the frame, per pixel; { cov, E } is render/denoiseMask.mjs's emitterRadiance at the frame's size. */
 export function compositeEmitters(img3, { cov, E }) {
     if (img3.length !== cov.length * 3 || E.length !== img3.length) throw new Error(`denoiseUpscale: ${img3.length} values against ${cov.length} coverages and ${E.length} emissions`);

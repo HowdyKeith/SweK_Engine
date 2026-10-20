@@ -26,6 +26,8 @@
 //   U10 the aware upscale without its fill                                         1 RED -- the chain row: the emitter leaks out again
 //   U11 the share near an emitter ignoring its reach                               1 RED
 //   U12 only whole emitter pixels filled (cov >= 1), the rim kept                  3 RED -- never-reads, ring by ring, the chain's leak
+//   U13 (round 31) fillEmittersBounded leaves an unreached pixel at its value      1 RED -- the bounded row
+//   U14 (round 31) the bound runs one ring fewer than asked                         1 RED -- the bounded row
 "use strict";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -33,7 +35,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
 const U = await imp("render/denoiseUpscale.mjs");
-const { GAMMA, RCAS_SHARPNESS, RCAS_DENOISE, UPSCALES, toPerceptual, fromPerceptual, upscale, renderSeedsUpscale, renderUpscaleImages, fillEmitters, compositeEmitters, emitterAwareUpscale, nearEmitterShare } = U;
+const { GAMMA, RCAS_SHARPNESS, RCAS_DENOISE, UPSCALES, toPerceptual, fromPerceptual, upscale, renderSeedsUpscale, renderUpscaleImages, fillEmitters, fillEmittersBounded, compositeEmitters, emitterAwareUpscale, nearEmitterShare } = U;
 const same = (a, b) => a.length === b.length && a.every((v, i) => Object.is(v, b[i]));
 const { fsr1CPU, easuCPU, bilinearCPU } = await imp("fx/fsr/fsr.js");
 const { renderSeeds, isDatasetSeed, SPLITS_FSR1 } = await imp("render/denoiseScenes.mjs");
@@ -130,6 +132,13 @@ console.log("\n4. SECTION 91: THE EMITTERS TAKEN OUT OF THE UPSCALE -- THE FILL,
     const maxKnown = Math.max(...[...cov.keys()].filter(known).flatMap((p) => [0, 1, 2].map((c) => img[p * 3 + c])));
     ok("!! *** and it never reads an emitter pixel's own value: the patch at 25 or at 1e9 fills to the same bits, every filled value inside the range of the light beside it ***",
         same(fillEmitters(loud, cov, w, h), F) && holes.every((p) => [0, 1, 2].every((c) => F[p * 3 + c] <= maxKnown && F[p * 3 + c] > 0)), `${holes.length} holes`);
+    // round 31: the bounded form a device runs (render/denoiseUpscaleGPU.mjs) -- with rings to spare it is fillEmitters to the
+    // bit; one ring short it stops, and what no ring reached is 0, never the patch's 25
+    const B8 = fillEmittersBounded(img, cov, w, h, 8), B1 = fillEmittersBounded(img, cov, w, h, B8.rings - 1);
+    ok("!! round 31: fillEmittersBounded with rings to spare is fillEmitters bit for bit; one ring short, it leaves the last ring's pixels at 0",
+        B8.left === 0 && B8.rings >= 2 && same(B8.y, F) && B1.rings === B8.rings - 1 && B1.left > 0 &&
+        holes.every((p) => [0, 1, 2].every((c) => B1.y[p * 3 + c] === 0 || Object.is(B1.y[p * 3 + c], F[p * 3 + c]))),
+        `${B8.rings} rings; ${B1.left} of ${holes.length} left one ring short`);
     // ring by ring: a first-ring pixel is the mean of its KNOWN 8-neighbours as they were, and the order of visit does not
     // matter -- the frame mirrored left to right fills to the mirror, to the last few bits of a reordered sum
     const q0 = 2 * w + 5, ns = [];   // (5, 2): a rim pixel of the patch, filled in the first ring
