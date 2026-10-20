@@ -255,18 +255,25 @@ export const KEY_DRIFT_V4460 = Object.freeze({
             cause: "vendor/three-webgpu-r185, the r185 build kept for the r185 drafts and their patches, is a new BODY with " +
                    "its own orbit, stock and prices -- v4504's field, for one body. Nothing in the engine imports it",
             control: "on today's tree, dropping three-webgpu-r185 alone gives 35e84789, the key of the move above" }),
+        // *** v4880 -- ONE NEW BODY, BROUGHT BY THE OCEAN SPIKE, AND OWED HERE BEFORE THE KEY WAS RE-BAKED. *** vendor/web-ocean (noniv/web-ocean, MIT) is a new directory under vendor/,
+        // so orrery.json gained a body with its own orbit, stock and prices -- v4504's field, for one body. Measured on the merged tree by dropping it, not read off a diff.
+        Object.freeze({ version: "v4880", commit: "085367af", hash: "f0fde581", file: "orrery.json",
+            field: "bodies", bodiesTouched: 1,
+            cause: "vendor/web-ocean, the WebGPU sea the ocean spike frames, is a new BODY with its own orbit, stock and prices -- v4504's field, for one body. " +
+                   "Only ocean-spike.html and its gate depend on it",
+            control: "on today's tree, dropping web-ocean alone gives bcb7d3bc, the key of the move above" }),
     ]),
-    current: "bcb7d3bc",
+    current: "f0fde581",
     // *** MEASURED AND NEGATIVE, AND IT CORRECTS MY OWN FIRST WRITING OF THE ENTRY ABOVE. *** The re-bake's
     // diff moved TWO fields on 16 bodies each, `arrived` and `sha`, and I wrote "arrived + sha" into this
     // record straight off that diff -- the exact mistake bytesDoNotReachTheEconomy exists to record, made
     // again in the same file four moves later. `sha` reaches NOTHING: each of the 18 bodies' sha set to
     // forty zeros in turn, one at a time, and the hash never moved. A DIFF NAMES WHAT CHANGED, NOT WHAT
     // COUNTED, and the only way to tell them apart is to run it.
-    shaDoesNotReachTheEconomy: Object.freeze({ bodiesTried: 23, movedTheHash: 0,
+    shaDoesNotReachTheEconomy: Object.freeze({ bodiesTried: 24, movedTheHash: 0,
         note: "against `arrived`, the same probe on the same 22 bodies: 22 of 22 moved the hash. 18 at " +
               "v4534; xatlas made it 19 at v4560; draco-encoder made it 20 at v4535; male-cns and mikktspace " +
-              "made it 22 at v4778; three-webgpu-r185 made it 23 at v4819, and the probe is re-run rather than the count adjusted" }),
+              "made it 22 at v4778; three-webgpu-r185 made it 23 at v4819; web-ocean made it 24 at v4880, and the probe is re-run rather than the count adjusted" }),
     // WHY THE 2026-09-07 DRIFT SHIPPED ANYWAY, read from tools/ship/sweep-timings.json rather than argued:
     // the gate is over the ship-time budget, so quickSweep does not run it, so its recorded verdict is a
     // snapshot of a tree that no longer exists. The RELATION (gate slower than budget) is asserted live in
