@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "6d3ba3113b30e2152bb70c2838c7df50d85c9763",
+ "head": "e608b7df96aac65e5fac2ba7c5518b35d55b2cd8",
  "bodies": {
   "box3d": [
    {
@@ -1370,7 +1370,7 @@
    {
     "path": "tools/ship/oceanSpikePage-selfcheck.mjs",
     "bytes": 15599,
-    "sha": "085367af2f3c9aa42eccf43cee6ad0e14f98b14c"
+    "sha": "e608b7df96aac65e5fac2ba7c5518b35d55b2cd8"
    }
   ],
   "xatlas": [

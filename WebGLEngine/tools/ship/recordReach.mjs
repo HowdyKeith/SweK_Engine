@@ -393,7 +393,7 @@ export const REACH_AT_V4548 = Object.freeze({
     // v4840 -- 157 -> 158: DOORS_AT_V4840 in tools/ship/wasmTeardown.mjs, the computed-door census measured under the hook. GUARDED --
     // v4880 -- 158 -> 170: the orrery-seeded merge, twelve guarded records. Read off the gate, not typed.
     // wasmTeardown-selfcheck reads it and grades every gate reaching a door against it.
-    total: 170,
+    total: 171,
     // *** READ OFF THE INSTRUMENT, NOT PREDICTED. *** The first draft of this record guessed 53/21/19/40 from
     // which gates the round had sped up, and was wrong on three of the four: the comment-strip fix below
     // moved two records the other way at the same time, and a guess cannot see two changes at once.
@@ -448,7 +448,12 @@ export const REACH_AT_V4548 = Object.freeze({
     // variance across which over-budget gates straddled the 3,000 ms line this run, the same wobble
     // reportDoors-selfcheck's own note beside `after` already documents (69/27/0, then 73/22/1 minutes
     // later on the same code). unguarded held at 14, so unchecked is 36 + 14 = 50.
-    checked: 64, overBudget: 36, unguarded: 14, unchecked: 50,
+    // v4880 -- RE-TAKEN at the orrery-seeded merge, read off reach(): total 158 -> 171 (the branch's twelve records and the later fleet record), checked 64 -> 116,
+    // overBudget 36 -> 39, unguarded 14 -> 16, so unchecked 50 -> 55. WHICH ARE THE NEW ONES, by name: four records whose only guardian runs over the 3,000 ms line on this box
+    // (MEASURED_AT_V4488 in render/deviceReach.mjs, 4.1 s; MEASURED_AT_V4487 in render/emitterCompile.mjs, 6.3 s; MEASURED_AT_V4482 in render/littlePlanet.mjs, 5.9 s;
+    // MEASURED_AT_V4489 in render/parallaxSampler.mjs, 4.3 s -- the branch timed them under the line on its box, and this one is slower) and two documentary records nothing guards
+    // (STALE_EXILE_V4473, REFUSAL_ATTRIBUTION_V4481). The ratchet refuses a rise it cannot name; this one is named, and it is not a target.
+    checked: 116, overBudget: 39, unguarded: 16, unchecked: 55,
     // v4550 -- the UNMEASURED class was split out of over-budget after this gate went red twice inside full
     // sweeps and passed 68 times under load; the trigger was a concurrent REWRITE of sweep-timings.json, not
     // contention. Zero records sit in it on a settled tree, which is the expected reading.
@@ -637,7 +642,7 @@ export const UNGUARDED_SPLIT_V4577 = Object.freeze({
     // v4819 -- 156 -> 157, COMMIT_BELT_DRIFT_V4819 re-taken above; `unguarded` does not move.
     // v4840 -- 157 -> 158, DOORS_AT_V4840 re-taken above; `unguarded` does not move.
     // v4880 -- 158 -> 170: twelve records arrive with the orrery-seeded merge; `unguarded` does not move (16 of 170, all documentary). Read off the gate.
-    structural: Object.freeze({ total: 170, unguarded: 16, documentaryOfThose: 16, readByCodeOfThose: 0 }),
+    structural: Object.freeze({ total: 171, unguarded: 16, documentaryOfThose: 16, readByCodeOfThose: 0 }),
     // BEFORE, on the tree this round opened on:
     before: Object.freeze({ total: 104, checked: 72, overBudget: 20, unmeasured: 0, unguarded: 12, unchecked: 32 }),
     // AFTER, as one reading rather than as a constant -- see the note above. Taken with the round's own

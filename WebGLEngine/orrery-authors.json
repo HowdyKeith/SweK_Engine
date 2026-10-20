@@ -1,6 +1,6 @@
 {
  "note": "WHO the bytes say wrote each vendored body, read from the copyright line in its licence and from a PROVENANCE.md where one records an upstream. Baked by tools/ship/orreryAuthorScan.mjs. A body whose author cannot be read is in `unattributed` -- never dropped, never given a placeholder.",
- "built": "2026-10-08",
+ "built": "2026-10-20",
  "bodies": [
   {
    "name": "box3d",
@@ -356,6 +356,22 @@
    "bytes": 810948
   },
   {
+   "name": "web-ocean",
+   "kind": "person",
+   "who": "Maksymilian Dendura",
+   "line": "Copyright (c) 2026 Maksymilian Dendura",
+   "licenceFile": "LICENSE",
+   "licences": 1,
+   "upstreamFile": "PROVENANCE.txt",
+   "alsoHolders": [],
+   "upstream": {
+    "url": "https://github.com/noniv/web-ocean",
+    "owner": "noniv",
+    "repo": "web-ocean"
+   },
+   "bytes": 104800
+  },
+  {
    "name": "xatlas",
    "kind": "person",
    "who": "Jonathan Young",
@@ -473,6 +489,14 @@
    "bytes": 119532
   },
   {
+   "author": "Maksymilian Dendura",
+   "kind": "person",
+   "bodies": [
+    "web-ocean"
+   ],
+   "bytes": 104800
+  },
+  {
    "author": "Morten S. Mikkelsen",
    "kind": "person",
    "bodies": [
@@ -531,13 +555,13 @@
   }
  ],
  "counts": {
-  "bodies": 23,
-  "attributed": 20,
-  "authors": 17,
-  "covered": 20,
+  "bodies": 24,
+  "attributed": 21,
+  "authors": 18,
+  "covered": 21,
   "missing": 3,
-  "withUpstream": 18,
-  "person": 15,
+  "withUpstream": 19,
+  "person": 16,
   "collective": 5,
   "disclaimed": 2,
   "prose": 1,

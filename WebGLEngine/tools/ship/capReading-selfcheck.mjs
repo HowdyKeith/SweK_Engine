@@ -281,12 +281,14 @@ export const LET_FINISH_V4573 = Object.freeze({
         // on a quiet box, each filed by `sweepRotation --gate g --cap-s 300 --write` as it was taken, read 12,538 / 12,865 /
         // 12,753. The table's 67,823 was contention, not the gate.
         // v4870 -- RE-TAKEN: the 80-slot rotation filed 11,428; three quiet runs, each filed as taken: 10,720 / 11,092 / 11,610 (median 11,092, filed 11,610 -- 4.7% from it). The v4838 minute is kept in earlierRuns.
-        Object.freeze({ gate: "tools/ship/gateSelection-selfcheck.mjs", table: 67823, now: 11610,
-            runs: Object.freeze([10720, 11092, 11610]),
-            earlierRuns: Object.freeze([Object.freeze([14413, 13997]), Object.freeze([12538, 12865, 12753])]),
+        // v4880 -- RE-TAKEN: the 80-slot rotation on the record's new owner filed 13,453 (the verdict walk read it slower than the v4870 minute, and the owner changed host); three alone runs,
+        // each filed by `sweepRotation --gate tools/ship/gateSelection-selfcheck.mjs --cap-s 300 --write` as it was taken: 11,728 / 11,820 / 12,056 (median 11,820, filed 12,056 -- 2.0% from it). The v4870 minute is kept in earlierRuns.
+        Object.freeze({ gate: "tools/ship/gateSelection-selfcheck.mjs", table: 67823, now: 12056,
+            runs: Object.freeze([11728, 11820, 12056]),
+            earlierRuns: Object.freeze([Object.freeze([14413, 13997]), Object.freeze([12538, 12865, 12753]), Object.freeze([10720, 11092, 11610])]),
             why: "67,823 at the cap pass, a LOADED reading (a 2026-09-09 sweep filed 69,346 the same way, and it stood as the gate's " +
                  "only reading until v4838); 13,997-14,413 alone straight after v4838's handover, and 12,538-12,865 across three " +
-                 "quiet runs, the alone reading filed 12,753 -- the median; and 10,720-11,610 at v4870, filed 11,610. Its header's ~14s was right all along.",
+                 "quiet runs, the alone reading filed 12,753 -- the median; 10,720-11,610 at v4870, filed 11,610; and 11,728-12,056 at v4880, filed 12,056. Its header's ~14s was right all along.",
         }),
     ]);
     // A roll entry earns its exemption only if its own runs corroborate the FILED reading -- otherwise
