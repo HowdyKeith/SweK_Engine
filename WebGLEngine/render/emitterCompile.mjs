@@ -152,6 +152,21 @@ export const ROWS = Object.freeze([
     Object.freeze({ file: "tools/ship/wgslLayout-selfcheck.mjs", langs: Object.freeze(["wgsl"]),
         source: SOURCE.OWN_GATE, evidence: EVIDENCE.ELSEWHERE, distinct: null,
         note: "v4486's disarmed row: it compiles its own fixture, and hides its stage marker from the census" }),
+    // v4880 -- SEVEN EMITTERS THE KEY GREW BY (render/shaderEmitters.mjs HAND_VERIFIED, read by hand at the orrery-seeded merge). Each is owned by a gate that already runs it on a device; this census records that and does not re-run them.
+    Object.freeze({ file: "render/exactHash.mjs", langs: Object.freeze(["glsl", "wgsl"]), source: SOURCE.EXPORT, evidence: EVIDENCE.ELSEWHERE, distinct: null,
+        note: "tools/ship/exactHash-selfcheck.mjs owns the receipt: it holds the WGSL and GLSL hash to the CPU twin by value" }),
+    Object.freeze({ file: "render/frameInterpGPU-selfcheck.mjs", langs: Object.freeze(["wgsl"]), source: SOURCE.OWN_GATE, evidence: EVIDENCE.ELSEWHERE, distinct: null,
+        note: "a gate that compiles and runs its own small probe kernel on the device" }),
+    Object.freeze({ file: "render/skyStars.mjs", langs: Object.freeze(["glsl"]), source: SOURCE.EXPORT, evidence: EVIDENCE.ELSEWHERE, distinct: null,
+        note: "tools/ship/skyStars-selfcheck.mjs owns the receipt for the sky-star GLSL" }),
+    Object.freeze({ file: "render/starField.mjs", langs: Object.freeze(["wgsl"]), source: SOURCE.EXPORT, evidence: EVIDENCE.ELSEWHERE, distinct: null,
+        note: "tools/ship/starField-selfcheck.mjs owns the receipt for STARFIELD_WGSL" }),
+    Object.freeze({ file: "tools/ship/deviceFeatures-selfcheck.mjs", langs: Object.freeze(["wgsl"]), source: SOURCE.OWN_GATE, evidence: EVIDENCE.ELSEWHERE, distinct: null,
+        note: "a gate that compiles its own one-line compute kernel to read the device's feature list" }),
+    Object.freeze({ file: "tools/ship/deviceUnused-selfcheck.mjs", langs: Object.freeze(["wgsl"]), source: SOURCE.OWN_GATE, evidence: EVIDENCE.ELSEWHERE, distinct: null,
+        note: "a gate that compiles its own binding fixtures to test the unused-binding report" }),
+    Object.freeze({ file: "tools/ship/mpmDevice-selfcheck.mjs", langs: Object.freeze(["wgsl"]), source: SOURCE.OWN_GATE, evidence: EVIDENCE.ELSEWHERE, distinct: null,
+        note: "a gate that assembles and runs its own kernel over mpm's helper functions" }),
 ]);
 
 /**
@@ -189,12 +204,12 @@ export const SWIRL_THREE_WAY = Object.freeze({
 /** What the census reports over the tree at v4487. */
 export const MEASURED_AT_V4487 = Object.freeze({
     at: "v4487",
-    rows: 14,
+    rows: 21,              // 14 at v4487; 21 at v4880 (seven hand-read emitters added to the key)
     compiledHere: 9,       // ROWS this gate hands to a driver itself
     programsCompiled: 11,  // ...which is 11 PROGRAMS, because dither and vorton each ship a pair
     glslPrograms: 9, wgslPrograms: 2,
     gradedHere: 2,         // ...of which these two rows are compared by VALUE and not merely accepted
-    receiptElsewhere: 4,   // stereographic, glslFloatPack, tslIsing, wgslLayout
+    receiptElsewhere: 11,  // 4 at v4487, +7 at v4880. stereographic, glslFloatPack, tslIsing, wgslLayout
     notAShader: 1,         // shaderPairs-selfcheck's detector fixture
     compileFailures: 0,
     // The one compile error of the round was a probe calling holoFoil with its arguments in the wrong order.

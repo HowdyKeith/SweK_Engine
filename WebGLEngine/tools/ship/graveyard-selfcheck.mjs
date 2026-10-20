@@ -460,7 +460,7 @@ function isAnalysisRecord(full) {
 // v4819 -- AT THE MERGE OF THE TWO LINES, MEASURED: 188, main's ceiling, with nothing added. The exported-functions line's 184
 // are inside main's 188 by name -- main's v4778 count already took that line's modules in through the v4776 merge -- and none
 // of the line's rounds since the split (v4779-v4812) left a new orphan utility. Run over the merged tree, 188 now vs 188.
-const ORPHAN_UTIL_BASELINE = 188;   // v3451 (100); v3673 door-aware (88); v3674 livePanel+viewLayout wired (86); v4000 (90); v4145 (92); v4153 (93); merge-of-main re-baseline (159, see above); v4778 the v4776 and v4778 merges caught up by name, four paid down by the detector (188).
+const ORPHAN_UTIL_BASELINE = 189;   // v4880: 188 -> 189, BY NAME: tools/ship/register-audit-v4490.mjs, the auditCap gate's frozen thirty-row snapshot, which only that gate reads (the live audit is wired through redCensus). A record kept for its gate, not a utility nobody calls;   // v3451 (100); v3673 door-aware (88); v3674 livePanel+viewLayout wired (86); v4000 (90); v4145 (92); v4153 (93); merge-of-main re-baseline (159, see above); v4778 the v4776 and v4778 merges caught up by name, four paid down by the detector (188).
 const ORPHAN_BASELINE = 1;
 
 const r = scan();

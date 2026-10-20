@@ -258,7 +258,7 @@ const WHERE = GRAPH.where;
 // named the one arrival: vendor/three-webgpu-r185/three.tsl.js, the r185 build kept for the r185 drafts (its note is above).
 // 332 + 1 = 333, the reading; the arithmetic of two named lists, not a member-by-member diff, and said as such.
 // v4880 -- 333 -> 342 AT THE MERGE OF THE ORRERY-SEEDED BRANCH, MEASURED (342 over the merged tree): the branch's thirteen renumbered ledger closings (since573..585) name the paths of its modules in prose, and the census counts a module a sentence names as rescued. Caught up to what the merge brought, not loosened by hand; nothing here is wired or deleted by it.
-const RESCUED_CEILING = 342;
+const RESCUED_CEILING = 343;   // v4880: +1, tools/ship/register-audit-v4490.mjs named in prose by the auditCap gate and the ledger
 
 const rescued = [];
 {

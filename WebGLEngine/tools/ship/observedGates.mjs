@@ -80,6 +80,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
+const VM = createRequire(import.meta.url)("./versionMarker.js");
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const LEDGER_PATH = path.join(HERE, "observed-gates.json");
@@ -149,8 +151,7 @@ export const MEASURED_AT_V4485 = Object.freeze({
 // ---- the writer, when asked ---------------------------------------------------------------------------------
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
     const at = (() => {
-        try { return (fs.readFileSync(path.join(HERE, "..", "..", "main.js"), "utf8")
-                        .match(/const ENGINE_VERSION = "(v\d+)"/) || [])[1] || "unknown"; }
+        try { return VM.engineVersion(path.join(HERE, "..", "..")) || "unknown"; }
         catch { return "unknown"; }
     })();
     let sweep = {};

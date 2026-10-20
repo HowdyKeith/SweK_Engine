@@ -64,14 +64,16 @@
 </div>
 <div id="stage">
   <iframe id="sea" title="web-ocean" allow="fullscreen"></iframe>
-  <div id="nogpu">This browser has no WebGPU, so the sea is not started. The sea needs it and has no fallback; the engine's other water pages are unaffected.</div>
+  <div id="nogpu">WebGPU is not available on this page, so the sea is not started (an insecure origin withholds it too). The sea needs it and has no fallback; the engine's other water pages are unaffected.</div>
 </div>
 <footer>
   <div class="small">Readings (the sea's own HUD, copied as text with the resolution that was chosen):</div>
   <pre id="log"></pre>
   <div class="small">Ocean: web-ocean (github.com/noniv/web-ocean) by Maksymilian Dendura, MIT licence, vendored unmodified at vendor/web-ocean (see its LICENSE and PROVENANCE.txt).</div>
 </footer>
+<script type="module" src="/ui/originNotice.js"></script>
 <script type="module">
+  import { adapterOptions } from "/ui/webgpuProbe.mjs";
   const $ = (id) => document.getElementById(id);
   const SEA = "/vendor/web-ocean/ocean.html";
   const sea = $("sea"), dot = $("gpuDot"), word = $("gpuWord"), detail = $("gpuDetail"), logEl = $("log");
@@ -79,9 +81,9 @@
 
   // the sea needs WebGPU; say so rather than let the frame show its own error. The adapter's name goes in as text.
   async function probe() {
-    if (typeof navigator === "undefined" || !navigator.gpu) { word.textContent = "no WebGPU"; dot.style.background = "#ff7a7a"; detail.textContent = "navigator.gpu is absent in this browser"; return false; }
+    if (typeof navigator === "undefined" || !navigator.gpu) { word.textContent = "no WebGPU"; dot.style.background = "#ff7a7a"; detail.textContent = window.isSecureContext ? "navigator.gpu is absent here" : "navigator.gpu is withheld on an insecure origin (use localhost or https)"; return false; }
     let adapter = null;
-    try { adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" }); } catch (e) { adapter = null; }
+    try { adapter = await navigator.gpu.requestAdapter(adapterOptions("high-performance")); } catch (e) { adapter = null; }
     if (!adapter) { word.textContent = "no adapter"; dot.style.background = "#ff7a7a"; detail.textContent = "WebGPU is present but no adapter was returned"; return false; }
     const info = adapter.info || {};
     const name = [info.vendor, info.architecture, info.description].filter(Boolean).join(" ") || "adapter";
