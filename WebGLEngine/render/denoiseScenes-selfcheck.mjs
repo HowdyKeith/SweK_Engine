@@ -485,6 +485,29 @@ console.log("\n14. ROUND 30'S SPLIT (pre-registration section 91)");
         `${refused} of 12 refused`);
 }
 
+console.log("\n15. ROUND 32'S SPLIT (pre-registration section 95)");
+{
+    const { SPLITS_TEMPORALUP, SPLITS_EMITTER, SPLITS_HALFRES, SPLITS_FSR1, SPLITS_MESH } = D;
+    const S1 = SPLITS_TEMPORALUP.T1, earlier = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER]
+        .flatMap((S) => Object.values(S).flatMap((x) => x.seeds)));
+    let refused = 0;
+    S1.seeds.forEach((s2, i) => { try { renderImages(familyOf(S1, i), s2, { w: 2, h: 2, sppIn: 1, sppRef: 1 }); } catch (e) { if (/dataset seed/.test(e.message)) refused++; } });
+    ok("!! SPLITS_TEMPORALUP: one test set, 6 new scenes of R (46000) then 6 of C (47000), each its own family, on seeds no earlier split used, every one refused without harvest",
+        Object.keys(SPLITS_TEMPORALUP).join() === "T1" && S1.seeds.length === 12 && S1.seeds.slice(0, 6).every((s2, i) => s2 === 46000 + i && familyOf(S1, i) === "R") &&
+        S1.seeds.slice(6).every((s2, i) => s2 === 47000 + i && familyOf(S1, 6 + i) === "C") && S1.seeds.every((s2) => !earlier.has(s2)) && refused === 12,
+        `${refused} of 12 refused`);
+}
+
+// round 32: guideBuffers' offset shifts the grid as the path tracer's pixelOffset does -- none and [0, 0] the same buffers, and a
+// one-pixel offset pixel x's guides what pixel x + 1's were
+{
+    const S = D.makeScene("R", 990000), g0 = D.guideBuffers(S, 24, 16), gz = D.guideBuffers(S, 24, 16, [0, 0]), g1 = D.guideBuffers(S, 24, 16, [1, 0]);
+    let k = 0, n = 0;
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 23; x++) for (let c = 0; c < 3; c++) { n += 2; k += Object.is(g1.albedo[(y * 24 + x) * 3 + c], g0.albedo[(y * 24 + x + 1) * 3 + c]) + Object.is(g1.normal[(y * 24 + x) * 3 + c], g0.normal[(y * 24 + x + 1) * 3 + c]); }
+    ok("round 32: guideBuffers with offset [0, 0] is guideBuffers bit for bit, and a one-pixel offset is the next pixel's guides",
+       g0.albedo.every((v, i) => Object.is(v, gz.albedo[i])) && g0.normal.every((v, i) => Object.is(v, gz.normal[i])) && k === n && new Set(Array.from(g0.normal)).size > 10, `${k} of ${n}`);
+}
+
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
     "\nnot closed here: whether these scenes are a FAIR test. That is a judgement the pre-registration made in prose; " +
     "this gate holds the code to that prose, not the prose to the world.");

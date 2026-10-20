@@ -6325,3 +6325,91 @@ every kernel table, and `fx/fsr`.
 - **`denoise-halfres-fixed-costs`** records the levers: a fill over the lights' bounding boxes, or one that stops once nothing
   is left, exact against `fillEmittersBounded`; and fewer coverage rays, which changes the guide and so is a new quality
   question, not the same chain made faster.
+
+## 95. ROUND 32 -- THE TEMPORAL UPSCALE: ROUND 30's CHAIN OVER EIGHT JITTERED FRAMES, FIXED BEFORE ANY OF ITS TEST SCENES EXIST
+
+Committed with the code that implements it. No scene of this round's test set has been rendered.
+
+**Why this round.** Section 94's rule: the half-size chain is cheaper than today's page at 1080p on both rigs (round 31), as
+well as better at equal samples (round 30). That made `denoise-fsr2-temporal` the next round: temporal reuse over the chain,
+where real-time path tracing gets most of its samples. Keith chose the design: the history goes after the chain, at full size,
+as FSR2 and TAA put it, so the shipped network never sees an input it was not trained on. And the half-size frames are jittered.
+
+> **Over eight frames of a moving camera, each traced at half size and jittered, does accumulating round 30's chain at full
+> size bring the measured frame closer to the reference than the same chain on that frame alone, and than full size at the
+> same samples a frame, accumulated the same way?**
+
+**Nothing is trained or tuned.** The network is round 11's seed 1, from the file the page loads; its sha-256 goes beside the
+results.
+
+**The sequence** (`render/denoiseTemporalUpscale.mjs`, on round 4's `render/denoiseTemporal.mjs`).
+- Round 4's camera path: the camera orbits the scene's look point for `FRAMES` = 8 frames, 1.5-4 degrees a frame drawn per
+  scene, and arrives at the scene's own eye. The measured frame is the last.
+- **The jitter:** frame f's pixel grid is shifted by `JITTER[f]`, `render/jitter.mjs`'s first 8 centred Halton(2, 3) offsets,
+  in that frame's own pixels. It is done through the path tracer's new `pixelOffset`, and through the same offset in
+  `guideBuffers` and in the emitter coverage, so a jittered frame's albedo, normals and mask are its own. All three are
+  default-off and held bit for bit at offset 0 by their own gates.
+- Each frame, two renders: half size (128 x 128) at 4 samples, and full size (256 x 256) at 1 sample. A full-size pixel gets
+  the same number of samples from either. The reference and second reference are 256 x 256 at 1,024 samples, from the
+  measured frame's eye, unjittered.
+
+**The arms, each against the measured frame's reference.**
+- **Bt, the candidate.** Every frame goes through round 30's chain up to EASU: the shipped network at half size, the light
+  sources filled out from that frame's own coverage, and EASU to full size. Then the frames are accumulated:
+  1. each frame is resampled to its own unjittered grid. A half-size offset is twice that at full size (`halfShift`), and the
+     resample is bilinear;
+  2. the history is reprojected by round 4's rule (same object, same point, same facing) and clamped per channel to the
+     current frame's 3 x 3 range;
+  3. it is averaged with n = min(n + 1, 8).
+
+  The light sources are composited once, after the accumulation, from the measured frame's unjittered `emitterRadiance`.
+  Composited every frame, the history would carry their radiance through the clamp into the pixels beside them: the leak round
+  30 took out of the upscale.
+- **B1:** the same chain on the measured frame alone (its own jittered frame, resampled and composited), with no history. The
+  measured frame's data is the same as Bt's, so H1 tests the history and nothing else.
+- **Dt:** every frame at full size, 1 sample, denoised, accumulated the same way, not composited, as round 30's D was not.
+
+**The test.**
+- **H1:** Bt beats B1. **H2:** Bt beats Dt.
+- d = ln relMSE(comparator) - ln relMSE(candidate); the sign-flip test; Holm over {H1, H2} at 0.05.
+- **C1:** both frames of a hypothesis beat its noisy frame on 11 of 12.
+  - H1's noisy frame: the measured frame's half-size input through the same fill, a bilinear upscale, its shift and the
+    composite.
+  - H2's: the measured frame's 1-sample input, shifted.
+- **C2** is cited from round 11. **C3:** no image near its floor (the second reference).
+- **C4:** the candidate's whole chain run again on the first image, bit for bit. **C5:** all 216 render seeds distinct.
+- **The images:** `SPLITS_TEMPORALUP`, 6 new R scenes (46000-46005) and 6 new C scenes (47000-47005). Every seed is reserved.
+
+**Reported, never tested:**
+- Bt without the clamp.
+- D1, the measured frame alone at full size, against Dt.
+- Dt with the light sources composited.
+- The history length: mean n, and the share of pixels at 8.
+
+**What each outcome does.**
+- **Both supported:** temporal reuse over the half-size chain holds at equal samples a frame. The accumulation goes to the
+  device as one more pass of `render/denoiseUpscaleGPU.mjs` and is timed on the rig: `denoise-temporalup-device`.
+- **H1 alone:** history helps the chain, but full size with the same history catches up, so the half-size lead was a
+  single-frame effect. The backlog records it, and the page stays as it is.
+- **H1 not supported:** the accumulation as built does not help. The backlog names the suspects: the resample's blur, the
+  clamp, and eight frames being a quarter of FSR2's 32 phases at a 2x upscale.
+- **Not reported (C1):** nothing is decided, and the backlog records which frame failed which noisy frame.
+- **Nothing changes in any case:** the page, the network, the filter, every kernel table, `fx/fsr`.
+
+**Predicted:**
+- **P1, H1 supported:** mean d between +0.05 and +0.40, on at least 10 of 12.
+- **P2, H2 supported:** mean d between +0.5 and +3.0, on at least 10 of 12. It is largest where a light is in view, where the
+  1-sample full-size frames carry the most noise.
+- **P3, C1:** holds on both hypotheses.
+- **P4:** the clamp helps. Bt beats Bt-without-clamp on the mean.
+- **P5:** the mean history length is between 3 and 7 frames.
+
+**Seen first, on three scenes outside every split (R 990000, C 990001, R 990004), at 128 x 128 with a 256-sample reference.**
+- The candidate beat B1 on all three, with d +0.08, +0.20 and +0.27.
+- It beat Dt on all three, with d +0.28, +4.1 and +5.7. The last two have a large light in view, and there the 1-sample
+  full-size frames stayed far from the reference however they were accumulated.
+- The clamp helped on all three.
+- The mean history was 3.7-5.6 frames.
+- At 32 x 32, with a 32-sample reference, the same pilot had the candidate behind B1 on two of the three. The shifts were then
+  checked and are held exact by the gate. What caused it at that size was not pinned down: resampling blur on a frame that
+  small is a suspect, not a finding.

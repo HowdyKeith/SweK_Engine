@@ -625,6 +625,23 @@ console.log("\n17. ROUND 30: THE EMITTERS TAKEN OUT OF THE UPSCALE (pre-registra
     } else ok("!! section 92 reads render/denoise-results-emitter.json, and it is not there", false);
 }
 
+console.log("\n18. ROUND 32: THE TEMPORAL UPSCALE (pre-registration section 95)");
+{
+    const { runTemporalUpscaleStudy, temporalUpFrames, temporalUpSets, ROUND_TEMPORALUP, RESULTS_TEMPORALUP } = await imp("render/denoiseStudy.mjs");
+    const { SPLITS_TEMPORALUP } = await imp("render/denoiseScenes.mjs");
+    ok("!! ROUND_TEMPORALUP is section 95's: SPLITS_TEMPORALUP at 256 x 256, the sign-flip test, the results file named, and temporalUpSets the two hypotheses' columns",
+        ROUND_TEMPORALUP.splits === SPLITS_TEMPORALUP && ROUND_TEMPORALUP.image === 256 && ROUND_TEMPORALUP.test === "signflip" && ROUND_TEMPORALUP.results === RESULTS_TEMPORALUP &&
+        RESULTS_TEMPORALUP === "render/denoise-results-temporalup.json" && temporalUpSets({ B1: 1, Bt: 2, Dt: 3 }).H1.filter === 1 && temporalUpSets({ B1: 1, Bt: 2, Dt: 3 }).H2.filter === 3 &&
+        typeof temporalUpFrames === "function");
+    // the whole study, end to end, on three scenes outside every split at 24 x 24: every table filled, C4 and C5 held, a verdict made
+    const shipped = JSON.parse(fs.readFileSync(path.join(ENG, "render", "denoise-net-r11.json"), "utf8")), { decodeNet } = await imp("render/denoiseDevice.mjs");
+    const out = runTemporalUpscaleStudy({ splits: { T1: { family: "R+C", families: ["R", "C", "R"], seeds: [990000, 990001, 990004] } }, net: decodeNet(shipped.net), image: 24, sppIn: 2, sppRef: 8 });
+    ok("  runTemporalUpscaleStudy end to end on three scenes outside every split: every table three long and finite, C4 and C5 held, the verdict made",
+        ["Bt", "B1", "Dt", "D1", "BtNoClamp", "DtAware", "noisyHalf", "noisyFull1", "floor"].every((k) => out.tables[k].length === 3 && out.tables[k].every(Number.isFinite)) &&
+        out.determinism === true && out.seedsDistinct === true && out.seedCount === 54 && !!out.verdict && !!out.verdict.run && out.secondary.history.length === 3,
+        `run ${out.verdict.run}`);
+}
+
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
     "\nnot closed here: the study itself. `node tools/denoiseStudy.mjs --harvest-r11 --cache <dir> --workers 4` is round 11's one command, and " +
     "no gate runs it.");

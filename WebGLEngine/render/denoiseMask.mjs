@@ -27,12 +27,13 @@ export const COVERAGE_GRID = 8;  // 8 x 8 rays per pixel, at the centres of an e
  * The emitter coverage of scene S as its camera sees it, H x W: the fraction of COVERAGE_GRID^2 rays across each pixel,
  * at the centres of an even grid, whose first hit is an emitter. Deterministic -- it is a guide, not a render.
  */
-export function emitterCoverage(S, w, h) {
-    const B = cameraBasis(S), n = COVERAGE_GRID, cov = new Float64Array(w * h);
+export function emitterCoverage(S, w, h, offset = null) {
+    // round 32: `offset` [dx, dy] shifts the grid as the path tracer's pixelOffset does (a jittered frame's own mask); null adds nothing
+    const B = cameraBasis(S), n = COVERAGE_GRID, cov = new Float64Array(w * h), ox = offset ? offset[0] : 0, oy = offset ? offset[1] : 0;
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
         let k = 0;
         for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
-            const hit = intersect(S.eye, pixelRay(x, y, (i + 0.5) / n, (j + 0.5) / n, w, h, B), S.scene);
+            const hit = intersect(S.eye, pixelRay(x, y, (i + 0.5) / n + ox, (j + 0.5) / n + oy, w, h, B), S.scene);
             if (hit && hit.sphere.emit) k++;
         }
         cov[y * w + x] = k / (n * n);
@@ -47,12 +48,12 @@ export function emitterCoverage(S, w, h) {
  * meets an emitter returns exactly its emission (physics/render/pathTracer.mjs: radiance 0 plus throughput 1 times emit,
  * at depth 0, before any bounce), so a pixel the emitters cover whole is E there, with no noise and nothing traced.
  */
-export function emitterRadiance(S, w, h) {
-    const B = cameraBasis(S), n = COVERAGE_GRID, cov = new Float64Array(w * h), E = new Float64Array(w * h * 3);
+export function emitterRadiance(S, w, h, offset = null) {
+    const B = cameraBasis(S), n = COVERAGE_GRID, cov = new Float64Array(w * h), E = new Float64Array(w * h * 3), ox = offset ? offset[0] : 0, oy = offset ? offset[1] : 0;
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
         let k = 0, r = 0, g = 0, b = 0;
         for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
-            const hit = intersect(S.eye, pixelRay(x, y, (i + 0.5) / n, (j + 0.5) / n, w, h, B), S.scene);
+            const hit = intersect(S.eye, pixelRay(x, y, (i + 0.5) / n + ox, (j + 0.5) / n + oy, w, h, B), S.scene);
             if (!hit || !hit.sphere.emit) continue;
             const e = hit.sphere.emit;
             k++;

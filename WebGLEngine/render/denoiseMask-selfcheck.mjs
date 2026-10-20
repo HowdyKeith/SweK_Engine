@@ -188,6 +188,17 @@ console.log("\n7. SECTION 91: THE EMITTERS' OWN LIGHT, FROM THE GEOMETRY (emitte
         inner.length > 10 && inner.every((p) => [0, 1, 2].every((k) => Object.is(img[p * 3 + k], R2.E[p * 3 + k]))), `${inner.length} inner pixels`);
 }
 
+// round 32: emitterCoverage's and emitterRadiance's offset shift the grid as the path tracer's pixelOffset does -- [0, 0] the same,
+// and a one-pixel offset pixel x's coverage and emission what pixel x + 1's were, on a scene with its light in view
+{
+    const S = (await imp("render/denoiseScenes.mjs")).makeScene("R", 990000), c0 = emitterCoverage(S, 48, 27), cz = emitterCoverage(S, 48, 27, [0, 0]), c1 = emitterCoverage(S, 48, 27, [1, 0]);
+    const r0 = emitterRadiance(S, 48, 27), r1 = emitterRadiance(S, 48, 27, [1, 0]);
+    let k = 0, n = 0;
+    for (let y = 0; y < 27; y++) for (let x = 0; x < 47; x++) { n += 2; k += Object.is(c1[y * 48 + x], c0[y * 48 + x + 1]) + Object.is(r1.E[(y * 48 + x) * 3], r0.E[(y * 48 + x + 1) * 3]); }
+    ok("round 32: the coverage and the emission with offset [0, 0] are unchanged, and a one-pixel offset is the next pixel's -- with a light in view",
+       c0.every((v, j) => Object.is(v, cz[j])) && k === n && c0.some((v) => v > 0 && v < 1), `${k} of ${n}; ${c0.filter((v) => v > 0).length} px in view`);
+}
+
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
     "\nnot closed here: whether the mask lets either method transfer to family C. That is section 21's measurement.");
 process.exit(fails ? 1 : 0);

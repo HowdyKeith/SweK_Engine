@@ -637,11 +637,12 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4878 -- the BVH-CSG round 9 branch (physics/mesh/triArrangement.mjs and its gate): files 4813 -> 4815, ES modules 4506 -> 4508, closures 4347 -> 4349, typed arrays 1357 -> 1359; the other rows held.
     // v4879 -- the BVH-CSG arc (rounds 10-25: twelve new files, the rest changed): files 4815 -> 4827, ES modules 4508 -> 4520, closures 4349 -> 4361, async/await 1826 -> 1828, typed arrays 1359 -> 1367, Promises 449 -> 450, performance.now 259 -> 260; the other rows held.
     // v4880 -- the ocean spike (ocean-spike.html and its gate): files 4827 -> 4828, ES modules 4520 -> 4521, closures 4361 -> 4362, async/await 1828 -> 1829, Promises 450 -> 451, WebGPU 63 -> 64; the other rows held.
+    // round 32 (unshipped) -- the temporal upscale (render/denoiseTemporalUpscale.mjs and its gate): files 4857 -> 4859, ES modules 4550 -> 4552, closures 4387 -> 4389, async/await 1839 -> 1840, typed arrays 1373 -> 1375; the other rows held. Read off the gate.
     // round 31 (unshipped) -- the emitter-aware chain on a device (render/denoiseUpscaleGPU.mjs and its gate): files 4855 -> 4857, ES modules 4548 -> 4550, closures 4385 -> 4387, async/await 1837 -> 1839, typed arrays 1371 -> 1373, WebGL 202 -> 203 (the gate's refused-WebGL2 row), WebGPU 65 -> 66; the other rows held. Read off the gate. Then its timing (DenoiseUpscaleGPU's time, timeHalfChain): Promises 452 -> 453, performance.now 261 -> 262.
     // v4881 -- the CPU sea (physics/ocean/oceanSurface.mjs and its gate): files 4853 -> 4855, ES modules 4546 -> 4548, closures 4383 -> 4385, performance.now 260 -> 261 (the gate names it in its list of things the module must not read); the other rows held.
     // v4880 (later) -- tools/ship/register-audit-v4490.mjs, the auditCap snapshot: files 4852 -> 4853, ES modules 4545 -> 4546, WebAssembly 27 -> 28 (read off the gate).
     // v4880 -- the orrery-seeded merge (24 files): files 4828 -> 4852, ES modules 4521 -> 4545, closures 4362 -> 4383, async/await 1829 -> 1837, typed arrays 1367 -> 1371, Promises 451 -> 452, WebGL 200 -> 202, WebGPU 64 -> 65; the other rows held. Read off the gate, not typed.
-    files: 4857,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
+    files: 4859,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
     // (v4691 note, carried)                               // v4691 -- RE-DERIVED: tools/ship/textureInProbe.mjs arrived, one ES module with a closure and top-level await -- four rows moved (files, ES modules, closures, async/await) and eight held.
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
@@ -1275,7 +1276,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4875 -- the submarine line (40 source files and the 17 gates over main's v4874): files 4748 -> 4789 (the last file is tools/evalSubMission.mjs, which gave brain/missionTask.mjs a caller), ES modules 4443 -> 4482, closures 4285 -> 4325, async/await 1803 -> 1813, typed arrays 1337 -> 1346, Promises 440 -> 444,
     // fetch/XHR 252 -> 253, requestAnimationFrame 127 -> 128 (the aquarium page's frame loop); the other rows held.
     // v4877 -- the rotorcraft branch and the sub work since v4875 (files 4789 -> 4813): ES modules 4482 -> 4506, closures 4325 -> 4347, async/await 1813 -> 1826, typed arrays 1346 -> 1357, Promises 444 -> 449, performance.now 255 -> 259; the other rows held.
-    esModules: 4550, closures: 4387, asyncAwait: 1839, typedArrays: 1373, promises: 453,
+    esModules: 4552, closures: 4389, asyncAwait: 1840, typedArrays: 1375, promises: 453,
     fetchXhr: 253, performanceNow: 262, raf: 128, webgl: 203, webgpu: 66, threads: 26, wasm: 28,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

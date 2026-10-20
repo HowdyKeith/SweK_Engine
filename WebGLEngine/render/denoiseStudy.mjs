@@ -21,7 +21,7 @@
 // Without it everything is computed, as before; with it the result is the same, bit for bit
 // (render/denoiseCache-selfcheck.mjs). A scene rendered under --harvest is never served to a run without it.
 "use strict";
-import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
+import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, SPLITS_TEMPORALUP, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
 import { renderSequence, temporalChannels, sequenceSeeds } from "./denoiseTemporal.mjs";
 import { withMask, emitterCoverage, emitterRadiance, MASK_STRIDE, MASK_CHANNEL, COVERAGE_GRID } from "./denoiseMask.mjs";
 import { jointBilateral, tuneFilter } from "./denoiseFilter.mjs";
@@ -30,6 +30,7 @@ import { relMSE, verdict, trainFit, historyFit, trainSanity, effects } from "./d
 import { cached, cachedMany, hashArrays } from "./denoiseCache.mjs";
 import { upscale, renderUpscaleImages, renderSeedsUpscale, emitterAwareUpscale, fillEmitters, compositeEmitters, nearEmitterShare, RCAS_SHARPNESS, RCAS_DENOISE, GAMMA } from "./denoiseUpscale.mjs";
 import { trainParallel } from "./denoisePool.mjs";
+import { renderTemporalUpscaleImages, temporalUpscaleSeeds, accumulateUpscaled, shiftResample, sequenceGeometry, halfShift, JITTER } from "./denoiseTemporalUpscale.mjs";
 
 export const SEEDS = Object.freeze([1, 2, 3]);
 export const RESULTS = "render/denoise-results.json";
@@ -304,6 +305,71 @@ export function runEmitterAwareStudy({ splits = ROUND_EMITTER.splits, net, test 
     const secondary = { priceOfHalf: effects(tables.B, tables.A), awareVsPlainEasu: effects(tables.plainEasu, tables.B), dAwareVsB: effects(tables.Daware, tables.B),
                         nearEmitter: { B: near("B"), C: near("C"), plainEasu: near("plainEasu"), D: near("D") },
                         emitterPixels: full.map((f) => f.cov.reduce((a, v) => a + (v > 0 ? 1 : 0), 0)) };
+    return { verdict: V, tables, secondary, timings, determinism, seedsDistinct, seedCount: allSeeds.length, config };
+}
+
+/**
+ * Section 95, ROUND 32, THE TEMPORAL UPSCALE: round 30's chain over a sequence of FRAMES jittered frames, accumulated at full
+ * size (render/denoiseTemporalUpscale.mjs). Per image, against the measured frame's full-size reference:
+ *   Bt  the CANDIDATE -- every frame half size at 4 samples, denoised, filled, EASU; accumulated; the light sources composited
+ *   B1  the same chain on the measured frame alone, no history -- the same frame's data, so H1 is the history and nothing else
+ *   Dt  every frame full size at 1 sample (the same samples a full-size pixel gets), denoised, accumulated the same way
+ * H1: Bt beats B1. H2: Bt beats Dt. H1's noisy frame is the measured frame's half-size input through the same fill, bilinear
+ * upscale, shift and composite (round 30's noisyHalfAware); H2's is the measured frame's 1-sample input, shifted. Reported,
+ * never tested: Bt without the clamp, D1 (the measured frame alone at full size), Dt with the light sources composited, the
+ * history length, and round 30's B on this round's images is NOT among them (it would need a frame no arm uses).
+ */
+export const RESULTS_TEMPORALUP = "render/denoise-results-temporalup.json";
+export const ROUND_TEMPORALUP = Object.freeze({ splits: SPLITS_TEMPORALUP, image: 256, test: "signflip", c2Prior: ROUND_MESH.c2Prior, results: RESULTS_TEMPORALUP });
+/** Section 95's two hypotheses over a round 32 table, by name, so the run and the verdict's re-derivation read one definition. */
+export const temporalUpSets = (t) => ({ H1: { noisy: t.noisyHalf, filter: t.B1, net: [t.Bt], floor: t.floor },
+                                        H2: { noisy: t.noisyFull1, filter: t.Dt, net: [t.Bt], floor: t.floor } });
+/** One image's frames, every arm, from its rendered sequence: pure in (sequence, net), so C4 re-runs it whole. */
+export function temporalUpFrames(seq, net) {
+    const W = seq.w, H = seq.h, w = W / 2, h = H / 2, den = (fr) => denoise(net, fr.x, fr.h, fr.w).y, last = seq.frames.length - 1;
+    const geo = sequenceGeometry(seq.family, seq.seed, seq.frames.map((f) => f.eye), W, H);
+    const up = (img, cov, kind) => upscale(fillEmitters(img, cov, w, h), w, h, W, H, kind);
+    const halfY = seq.frames.map((f) => ({ y: up(den(f.half), f.half.cov, "easu"), shift: halfShift(f.jitter) }));
+    const fullY = seq.frames.map((f) => ({ y: den(f.full1), shift: [f.jitter[0], f.jitter[1]] }));
+    const one = (fr) => shiftResample(fr.y, W, H, fr.shift[0], fr.shift[1]);
+    const acc = accumulateUpscaled(halfY, geo, W, H), accNoClamp = accumulateUpscaled(halfY, geo, W, H, { clamp: false }), accD = accumulateUpscaled(fullY, geo, W, H);
+    const m = seq.frames[last], comp = (y) => compositeEmitters(y, seq.full);
+    return { light: acc.A, Bt: comp(acc.A), B1: comp(one(halfY[last])), Dt: accD.A, D1: one(fullY[last]), BtNoClamp: comp(accNoClamp.A),
+             DtAware: compositeEmitters(fillEmitters(accD.A, seq.full.cov, W, H), seq.full),
+             noisyHalf: comp(one({ y: up(m.half.input, m.half.cov, "bilinear"), shift: halfY[last].shift })), noisyFull1: one({ y: m.full1.input, shift: fullY[last].shift }),
+             history: { meanN: acc.n.reduce((a, v) => a + v, 0) / acc.n.length, full: acc.n.filter((v) => v === seq.frames.length).length / acc.n.length } };
+}
+export function runTemporalUpscaleStudy({ splits = ROUND_TEMPORALUP.splits, net, test = ROUND_TEMPORALUP.test, c2Prior = ROUND_TEMPORALUP.c2Prior,
+                                          harvest = false, image = IMAGE, sppIn = SPP_IN, sppRef = SPP_REF, cache = null, log = () => {} } = {}) {
+    if (!net) throw new Error("denoiseStudy: runTemporalUpscaleStudy needs the shipped network, decoded by its caller");
+    const t0 = Date.now(), timings = {}, split = splits.T1;
+    const lap = (k) => { timings[k] = Date.now() - t0; log(`${k} at ${(timings[k] / 1000).toFixed(1)} s`); };
+    const config = { image, half: image / 2, sppIn, sppRef, harvest, test, c2Prior, frames: JITTER.length, jitter: JITTER,
+                     accumulate: "reproject (round 4's rule) on each frame's unjittered grid, clamp to the current 3 x 3 range, n = min(n + 1, FRAMES)",
+                     composite: "once, after the accumulation: E + (1 - cov) x it, emitterRadiance at full size from the measured frame's eye",
+                     trained: "nothing -- the shipped network", split: { family: split.family, n: split.seeds.length, first: split.seeds[0] },
+                     hypotheses: { H1: "Bt (the temporal upscale) against B1 (the same chain on the measured frame alone)", H2: "Bt against Dt (full size at 1 sample a frame, accumulated the same way)" } };
+    // ONE IMAGE AT A TIME: a sequence is 16 frames, and twelve of them held at once is most of a gigabyte
+    const keys = ["Bt", "B1", "Dt", "D1", "BtNoClamp", "DtAware", "noisyHalf", "noisyFull1"], tables = Object.fromEntries(keys.map((k) => [k, []]));
+    tables.floor = [];
+    const history = [];
+    let determinism = true;
+    split.seeds.forEach((seed, i) => {
+        const fam = familyOf(split, i);
+        const seq = cached(cache, `temporalup-${fam}-${seed}-${image}-${sppIn}-${sppRef}-${harvest ? "harvest" : "gate"}`,
+            () => renderTemporalUpscaleImages(fam, seed, { harvest, w: image, h: image, sppIn, sppRef }));
+        const F = temporalUpFrames(seq, net);
+        for (const k of keys) tables[k].push(relMSE(F[k], seq.ref));
+        tables.floor.push(relMSE(seq.ref2, seq.ref));
+        history.push(F.history);
+        // C4: the candidate's whole chain again on the first image, bit for bit -- the network, the fill, EASU, the shifts, the accumulation, the composite
+        if (i === 0) determinism = temporalUpFrames(seq, net).Bt.every((v, j) => Object.is(v, F.Bt[j]));
+        lap(`image ${i + 1} of ${split.seeds.length} (${fam} ${seed})`);
+    });
+    const allSeeds = split.seeds.flatMap((s) => { const r = temporalUpscaleSeeds(s); return [...r.half, ...r.full1, r.ref, r.ref2]; });
+    const seedsDistinct = new Set(allSeeds).size === allSeeds.length;
+    const V = verdict({ sets: temporalUpSets(tables), shuffled: null, c2Prior, determinism, seedsDistinct, test });
+    const secondary = { clamp: effects(tables.BtNoClamp, tables.Bt), historyAtFull: effects(tables.D1, tables.Dt), dAwareVsBt: effects(tables.DtAware, tables.Bt), history };
     return { verdict: V, tables, secondary, timings, determinism, seedsDistinct, seedCount: allSeeds.length, config };
 }
 

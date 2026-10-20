@@ -1963,6 +1963,8 @@ export const NEXT_ROUNDS = [
         blocker: "OPEN",
         // v4871+: OFF ITS BLOCKER at round 30 -- section 92 reported the spatial half-size chain, emitters composited, supported on both
         // hypotheses at 256 x 256, which is what this entry waited on. The upstream line below is kept as the record of what it was.
+        // round 32 (section 95, unshipped): IN PROGRESS -- pre-registered and gated (render/denoiseTemporalUpscale.mjs and its gate); the
+        // harvest is `node tools/denoiseStudy.mjs --harvest-temporalup`, and section 96 will be its verdict.
         // round 31 (section 94): THE ARC'S NEXT ROUND, by section 93's rule -- the half-size chain is cheaper than today's page at 1080p
         // on both rigs as well as better at equal samples, so temporal reuse over it is what follows.
         what: "FSR2's temporal upscale on denoised path-traced frames: jittered renders, motion vectors and history.",
