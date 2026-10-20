@@ -54,7 +54,7 @@ function scan() {
                 if (!CLAIM_RE.test(line) || !HERE_RE.test(line)) continue;
                 // gfx/device.js's runtime message is about a PIPELINE lacking WGSL, not about this box.
                 if (/no WGSL/.test(line)) continue;
-                const rel = path.relative(ENG, p);
+                const rel = path.relative(ENG, p).split(path.sep).join("/")   /* v4880: posix, as CLAIMS names them -- the rig is win32 */;
                 if (!hits.has(rel)) hits.set(rel, line.trim());
             }
         }

@@ -42,7 +42,7 @@ function M_files() {
         const io = {
             readdir: (d) => fs.readdirSync(d, { withFileTypes: true }),
             readFile: (p) => codeOnly(fs.readFileSync(p, "utf8")),
-            join: path.join, relative: path.relative,
+            join: path.join, relative: (a, b) => path.relative(a, b).split(path.sep).join("/"),   // v4880: posix, as HAND_VERIFIED names files -- the rig is win32
         };
         CENSUS = E.census(ENG, io, classify);
     }
