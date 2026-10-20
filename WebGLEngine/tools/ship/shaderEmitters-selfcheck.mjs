@@ -177,29 +177,31 @@ function M_files() {
     // v4487 -- STATED AS A SHAPE, NOT A PAIR OF LITERALS. This row read "31 of 32" until a round added one
     // file to the tree, and the honest edit turned out to be a number rather than a rethink. What the claim
     // actually is: the shipped thresholds miss exactly one row, whatever the key holds.
-    ok("*** the shipped thresholds agree with all but ONE hand-read row, and the claim is never a clean sweep ***",
-        truth.size - disagree.length === M.agreement && M.agreement === M.rows - 1 &&
-        M.rows === E.HAND_VERIFIED.length,
+    ok("*** the shipped thresholds agree with all but the rows RESIDUALS names (two since v4880), and the claim is never a clean sweep ***",
+        truth.size - disagree.length === M.v4880.agreement && M.v4880.agreement === M.v4880.rows - E.RESIDUALS.length &&
+        M.v4880.rows === E.HAND_VERIFIED.length,
         `${truth.size - disagree.length}/${truth.size}`);
-    ok("...and the ONE disagreement is the row RESIDUAL names, not some other row",
-        disagree.length === 1 && disagree[0] === E.RESIDUAL.file,
-        `${disagree.join(", ")} -- ${E.RESIDUAL.reason}`);
-    ok("...so the reported totals are one over the hand count on the emitter side and one under on the other",
-        c.emitters.length === M.reportedEmitters && c.quoters.length === M.reportedQuoters &&
-        M.reportedEmitters === M.handVerifiedEmitters + 1 && M.reportedQuoters === M.handVerifiedQuoters - 1,
-        `reported ${c.emitters.length}/${c.quoters.length}, hand ${M.handVerifiedEmitters}/${M.handVerifiedQuoters}`);
+    ok("...and the disagreements are exactly the rows RESIDUALS names, each in the direction it says, not some other row",
+        disagree.length === E.RESIDUALS.length && E.RESIDUALS.every((r) => disagree.includes(r.file) &&
+            truth.get(r.file) === r.truth && got.get(r.file) === r.reported),
+        E.RESIDUALS.map((r) => `${r.file}: ${r.truth} read as ${r.reported}`).join("; "));
+    ok("...so the reported totals are the hand count moved by the residuals: one emitter read as a quoter, one quoter read as an emitter, and the two cancel",
+        c.emitters.length === M.v4880.reportedEmitters && c.quoters.length === M.v4880.reportedQuoters &&
+        M.v4880.reportedEmitters === M.v4880.handVerifiedEmitters + E.RESIDUALS.filter((r) => r.reported === "emitter").length - E.RESIDUALS.filter((r) => r.truth === "emitter").length &&
+        M.v4880.reportedQuoters === M.v4880.handVerifiedQuoters - E.RESIDUALS.filter((r) => r.reported === "emitter").length + E.RESIDUALS.filter((r) => r.truth === "emitter").length,
+        `reported ${c.emitters.length}/${c.quoters.length}, hand ${M.v4880.handVerifiedEmitters}/${M.v4880.handVerifiedQuoters}`);
     ok("the tree has not shrunk under the scan", c.scanned >= M.scanned, `${c.scanned} >= ${M.scanned}`);
 
     // The finding itself, stated as a number the next round can check.
     const emitters = E.HAND_VERIFIED.filter((h) => h.kind === "emitter");
-    ok("*** FOURTEEN files carry runnable shader text that the preamble census calls none ***",
-        emitters.length === M.handVerifiedEmitters && M.handVerifiedEmitters === 14,
+    ok("*** TWENTY-ONE files carry runnable shader text that the preamble census calls none (fourteen at v4486, seven more read by hand at v4880) ***",
+        emitters.length === M.v4880.handVerifiedEmitters && M.v4880.handVerifiedEmitters === 21,
         `against ${M.preambleCensus.glslBearing} GLSL-bearing and ${M.preambleCensus.wgslBearing} WGSL-bearing`);
     ok("...and every one of them carries a REASON it is invisible, from the four the module names",
         emitters.every((h) => Object.values(E.REASONS).includes(h.why)) &&
         E.HAND_VERIFIED.filter((h) => h.kind === "quoter").every((h) => h.why === null),
         Object.values(E.REASONS).map((r) => r + "=" + emitters.filter((h) => h.why === r).length).join(", "));
-    ok("...only TWO of the fourteen could be recovered by widening a pattern; the other twelve are structural",
+    ok("...only TWO of the original fourteen could be recovered by widening a pattern; the others are structural",
         emitters.filter((h) => h.why === E.REASONS.NO_UNIFORM).length === M.fixableByPattern &&
         M.fixableByPattern === 2,
         "a framework tell is a uniform declaration, and a vertex shader need not have one");
@@ -218,8 +220,8 @@ function M_files() {
         mismatched === 0, `${Object.keys(E.TUNING.byRadius).length} radii x ${E.TUNING.floors.length} floors`);
 
     const P = E.TUNING.peak, S = E.TUNING.shipped;
-    ok("the setting that scores a perfect 32 really does score 32",
-        score(P.radius, P.floor) === P.agreement && P.agreement === E.HAND_VERIFIED.length);
+    ok("the best setting in the sweep scores what it says, one row short of the key (a perfect sweep is not available with two residuals)",
+        score(P.radius, P.floor) === P.agreement && P.agreement === E.HAND_VERIFIED.length - 1);
     ok("*** and it is NOT shipped, because it is a spike: all four of its neighbours score lower ***",
         P.shipped === false &&
         [score(P.radius, P.floor - 1), score(P.radius, P.floor + 1), score(100, P.floor), score(200, P.floor)]

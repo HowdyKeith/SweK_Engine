@@ -391,8 +391,9 @@ export const REACH_AT_V4548 = Object.freeze({
     // v4819 -- 156 -> 157: COMMIT_BELT_DRIFT_V4819 in world/orreryFleet.mjs. GUARDED -- orreryFleet-selfcheck reads it and grades
     // v4778's beside it.
     // v4840 -- 157 -> 158: DOORS_AT_V4840 in tools/ship/wasmTeardown.mjs, the computed-door census measured under the hook. GUARDED --
+    // v4880 -- 158 -> 170: the orrery-seeded merge, twelve guarded records. Read off the gate, not typed.
     // wasmTeardown-selfcheck reads it and grades every gate reaching a door against it.
-    total: 158,
+    total: 170,
     // *** READ OFF THE INSTRUMENT, NOT PREDICTED. *** The first draft of this record guessed 53/21/19/40 from
     // which gates the round had sped up, and was wrong on three of the four: the comment-strip fix below
     // moved two records the other way at the same time, and a guess cannot see two changes at once.
@@ -635,7 +636,8 @@ export const UNGUARDED_SPLIT_V4577 = Object.freeze({
     // v4819 -- 155 -> 156, RETURNED_AT_V4800 re-taken above; `unguarded` does not move, read off splitUnguarded().
     // v4819 -- 156 -> 157, COMMIT_BELT_DRIFT_V4819 re-taken above; `unguarded` does not move.
     // v4840 -- 157 -> 158, DOORS_AT_V4840 re-taken above; `unguarded` does not move.
-    structural: Object.freeze({ total: 158, unguarded: 16, documentaryOfThose: 16, readByCodeOfThose: 0 }),
+    // v4880 -- 158 -> 170: twelve records arrive with the orrery-seeded merge; `unguarded` does not move (16 of 170, all documentary). Read off the gate.
+    structural: Object.freeze({ total: 170, unguarded: 16, documentaryOfThose: 16, readByCodeOfThose: 0 }),
     // BEFORE, on the tree this round opened on:
     before: Object.freeze({ total: 104, checked: 72, overBudget: 20, unmeasured: 0, unguarded: 12, unchecked: 32 }),
     // AFTER, as one reading rather than as a constant -- see the note above. Taken with the round's own

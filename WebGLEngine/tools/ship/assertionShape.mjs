@@ -945,8 +945,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4878 -- one new gate (physics/mesh/triArrangement-selfcheck.mjs, the BVH-CSG round 9 branch), spelling ok(name, cond, detail): gates 2034 -> 2035, usesOk 2013 -> 2014, definesOk 2005 -> 2006, nameFirst 1903 -> 1904.
     // v4879 -- six new gates (the BVH-CSG arc: blastEngine, exactArrangement, exactPredicates, implicitPoints, manifoldAudit, triContact), each spelling ok(name, cond, detail): gates 2035 -> 2041, usesOk 2014 -> 2020, definesOk 2006 -> 2012, nameFirst 1904 -> 1910; distinctDefinitions 44 -> 45 (one of the six defines its own ok()).
     // v4880 -- one new gate (tools/ship/oceanSpikePage-selfcheck.mjs, the ocean spike), spelling ok(label, cond, note) like the tree's majority: gates 2041 -> 2042, usesOk 2020 -> 2021, definesOk 2012 -> 2013, nameFirst 1910 -> 1911.
-    gates: 2042, usesOk: 2021, definesOk: 2013, importsOk: 0,
-    distinctDefinitions: 45, nameFirst: 1911, condFirst: 99, unknownSignature: 11,
+    // v4880 -- the orrery-seeded merge: twelve gates, each spelling ok(name, cond, detail): gates 2042 -> 2054, usesOk 2021 -> 2033, definesOk 2013 -> 2025, nameFirst 1911 -> 1923 (read off the code, not typed).
+    gates: 2054, usesOk: 2033, definesOk: 2025, importsOk: 0,
+    distinctDefinitions: 45, nameFirst: 1923, condFirst: 99, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

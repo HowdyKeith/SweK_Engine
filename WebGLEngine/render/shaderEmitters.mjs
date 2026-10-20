@@ -272,6 +272,14 @@ export const HAND_VERIFIED = Object.freeze([
     Object.freeze({ file: "tools/ship/shaderPairs-selfcheck.mjs", kind: "emitter", why: REASONS.EMITTED }),
     Object.freeze({ file: "tools/ship/tslIsing-selfcheck.mjs", kind: "emitter", why: REASONS.ASSEMBLED }),
     Object.freeze({ file: "tools/ship/wgslLayout-selfcheck.mjs", kind: "emitter", why: REASONS.DISARMED }),
+    // v4880 -- THIRTEEN FILES THE TREE GREW SINCE THE KEY WAS READ, each read by hand at the orrery-seeded merge: seven emitters (exactHash, skyStars and starField export the shader text; four gates assemble a small real kernel and run it) and six quoters (regex tests over a generated shader).
+    Object.freeze({ file: "render/exactHash.mjs", kind: "emitter", why: REASONS.EMITTED }),
+    Object.freeze({ file: "render/frameInterpGPU-selfcheck.mjs", kind: "emitter", why: REASONS.ASSEMBLED }),
+    Object.freeze({ file: "render/skyStars.mjs", kind: "emitter", why: REASONS.EMITTED }),
+    Object.freeze({ file: "render/starField.mjs", kind: "emitter", why: REASONS.EMITTED }),
+    Object.freeze({ file: "tools/ship/deviceFeatures-selfcheck.mjs", kind: "emitter", why: REASONS.ASSEMBLED }),
+    Object.freeze({ file: "tools/ship/deviceUnused-selfcheck.mjs", kind: "emitter", why: REASONS.ASSEMBLED }),
+    Object.freeze({ file: "tools/ship/mpmDevice-selfcheck.mjs", kind: "emitter", why: REASONS.ASSEMBLED }),
     Object.freeze({ file: "krbn-lyapunov.html", kind: "quoter", why: null }),
     Object.freeze({ file: "physics/render/microfacetWgsl-selfcheck.mjs", kind: "quoter", why: null }),
     // v4487 -- the compile census. It NAMES the fourteen emitters and quotes none of their source, so it
@@ -293,30 +301,45 @@ export const HAND_VERIFIED = Object.freeze([
     Object.freeze({ file: "tools/ship/tslPhysics-selfcheck.mjs", kind: "quoter", why: null }),
     Object.freeze({ file: "tools/ship/tslSource-selfcheck.mjs", kind: "quoter", why: null }),
     Object.freeze({ file: "volume-cache.html", kind: "quoter", why: null }),
+    Object.freeze({ file: "brain/conv2d-selfcheck.mjs", kind: "quoter", why: null }),
+    Object.freeze({ file: "physics/render/rtPipeline-selfcheck.mjs", kind: "quoter", why: null }),
+    Object.freeze({ file: "render/denoiseDevice-selfcheck.mjs", kind: "quoter", why: null }),
+    Object.freeze({ file: "tools/ship/murmurKit-selfcheck.mjs", kind: "quoter", why: null }),
+    Object.freeze({ file: "tools/ship/tslLoopBound-selfcheck.mjs", kind: "quoter", why: null }),
+    Object.freeze({ file: "tools/ship/tslWide-selfcheck.mjs", kind: "quoter", why: null }),
 ]);
 
-/** The single row the shipped thresholds get wrong, named rather than excluded. See the header. */
-export const RESIDUAL = Object.freeze({
+/** The rows the shipped thresholds get wrong, named rather than excluded. See the header. One at v4486; two since v4880. */
+export const RESIDUALS = Object.freeze([Object.freeze({
     file: "tools/ship/swiftShaders-selfcheck.mjs",
     truth: "quoter",
     reported: "emitter",
     reason: "a gate proving a generated shader correct quotes the whole thing, and then the quote IS the shader",
     precedent: "v4381, brainTsl-selfcheck: 'it asserts against brain/mlp.js's kernel BY QUOTING IT'",
-});
+}),
+    // v4880 -- THE SECOND ROW THE SHIPPED THRESHOLDS GET WRONG, found when the key grew by thirteen. render/starField.mjs exports STARFIELD_WGSL, built as EXACT_HASH3_WGSL + a template literal, so its shader body sits inside a template whose density tokens are few: the census reports it a quoter and it is an emitter. It is the opposite error to swiftShaders-selfcheck's, which is why the reported totals still match the hand count (one emitter gained, one lost).
+    Object.freeze({
+        file: "render/starField.mjs",
+        truth: "emitter",
+        reported: "quoter",
+        reason: "a module that exports its shader as a concatenation of an imported constant and a short template carries too few density tokens in any one window",
+        precedent: "the same trade the sweep below prices: widening the window to catch it would move other quoters",
+    }),
+]);
 
-/** The sweep behind WINDOW.density and DENSITY_FLOOR: rows are radii, columns floors 2..8, values agreement/32. */
+/** The sweep behind WINDOW.density and DENSITY_FLOOR: rows are radii, columns floors 2..8, values agreement over the key (32 rows at v4486, 46 since v4880 -- re-derived by the gate). */
 export const TUNING = Object.freeze({
     floors: Object.freeze([2, 3, 4, 5, 6, 7, 8]),
     byRadius: Object.freeze({
-        80: Object.freeze([32, 32, 29, 28, 28, 27, 25]),
-        100: Object.freeze([32, 32, 30, 29, 28, 28, 27]),
-        140: Object.freeze([32, 32, 33, 31, 29, 28, 27]),
-        200: Object.freeze([31, 32, 32, 32, 32, 29, 27]),
-        300: Object.freeze([30, 30, 31, 31, 32, 31, 31]),
+        80: Object.freeze([44, 44, 40, 38, 37, 35, 31]),
+        100: Object.freeze([44, 44, 41, 39, 38, 37, 35]),
+        140: Object.freeze([44, 44, 45, 42, 40, 38, 37]),
+        200: Object.freeze([43, 44, 44, 44, 44, 40, 37]),
+        300: Object.freeze([42, 42, 43, 43, 44, 42, 42]),
     }),
-    peak: Object.freeze({ radius: 140, floor: 4, agreement: 33, shipped: false,
+    peak: Object.freeze({ radius: 140, floor: 4, agreement: 45, shipped: false,
         note: "a spike -- every neighbour reads lower -- which is what a threshold fitted to its own key looks like" }),
-    shipped: Object.freeze({ radius: 200, floor: 5, agreement: 32,
+    shipped: Object.freeze({ radius: 200, floor: 5, agreement: 44,
         note: "inside the widest run at the best non-spike score: FOUR floors wide (3 through 6), where every other radius manages at most two" }),
     // Derived by the gate from byRadius, not typed: the length of each radius' longest run at its own best score.
     runAtBest: Object.freeze({ 80: 2, 100: 2, 140: 1, 200: 4, 300: 1 }),
@@ -357,19 +380,21 @@ export const MEASURED_AT_V4486 = Object.freeze({
     at: "v4486",
     scanned: 4344,
     // The count the round is about: files carrying shader body text that backendParity calls `none`.
-    handVerifiedEmitters: 14,
+    handVerifiedEmitters: 14,   // v4486; 21 at v4880 -- see handVerifiedEmittersNow
     handVerifiedQuoters: 19,   // 19 at v4487: render/emitterCompile.mjs
     // The shipped thresholds report 15 emitters and 17 quoters -- one row over, and RESIDUAL names it.
     reportedEmitters: 15,
     reportedQuoters: 18,
     agreement: 32,
     rows: 33,
+    // v4880 -- the key grew by thirteen files read by hand (seven emitters, six quoters); the thresholds miss two of the 46 rows.
+    v4880: Object.freeze({ rows: 46, agreement: 44, handVerifiedEmitters: 21, handVerifiedQuoters: 25, reportedEmitters: 21, reportedQuoters: 25 }),
     // Against backendParity's own figures, unchanged and deliberately not widened.
-    preambleCensus: Object.freeze({ glslBearing: 150, wgslBearing: 72, both: 16 }),
+    preambleCensus: Object.freeze({ glslBearing: 167, wgslBearing: 114, both: 26 }),   // v4880: were 150 / 72 / 16 at v4486; restated with backendParity
     // Of the fourteen, how many are invisible for a reason a wider PATTERN could fix: the two whose only
     // problem is that the framework tell is a uniform declaration. The other twelve are structural.
     fixableByPattern: 2,
     // Which rejection actually rejects, over every tell in the tree. See the header: escapeOnly is 0 today and
     // the gate reports it rather than pinning it, because the day it stops being 0 is the day it starts working.
-    rejections: Object.freeze({ escapeOnly: 0, callOnly: 16, both: 16, neither: 58 }),
+    rejections: Object.freeze({ escapeOnly: 2, callOnly: 20, both: 20, neither: 73 }),   // v4880: was 0 / 16 / 16 / 58; the escape test now catches two tells the call test does not
 });

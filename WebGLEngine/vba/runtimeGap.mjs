@@ -637,7 +637,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4878 -- the BVH-CSG round 9 branch (physics/mesh/triArrangement.mjs and its gate): files 4813 -> 4815, ES modules 4506 -> 4508, closures 4347 -> 4349, typed arrays 1357 -> 1359; the other rows held.
     // v4879 -- the BVH-CSG arc (rounds 10-25: twelve new files, the rest changed): files 4815 -> 4827, ES modules 4508 -> 4520, closures 4349 -> 4361, async/await 1826 -> 1828, typed arrays 1359 -> 1367, Promises 449 -> 450, performance.now 259 -> 260; the other rows held.
     // v4880 -- the ocean spike (ocean-spike.html and its gate): files 4827 -> 4828, ES modules 4520 -> 4521, closures 4361 -> 4362, async/await 1828 -> 1829, Promises 450 -> 451, WebGPU 63 -> 64; the other rows held.
-    files: 4828,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
+    // v4880 -- the orrery-seeded merge (24 files): files 4828 -> 4852, ES modules 4521 -> 4545, closures 4362 -> 4383, async/await 1829 -> 1837, typed arrays 1367 -> 1371, Promises 451 -> 452, WebGL 200 -> 202, WebGPU 64 -> 65; the other rows held. Read off the gate, not typed.
+    files: 4852,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
     // (v4691 note, carried)                               // v4691 -- RE-DERIVED: tools/ship/textureInProbe.mjs arrived, one ES module with a closure and top-level await -- four rows moved (files, ES modules, closures, async/await) and eight held.
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
@@ -1271,8 +1272,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4875 -- the submarine line (40 source files and the 17 gates over main's v4874): files 4748 -> 4789 (the last file is tools/evalSubMission.mjs, which gave brain/missionTask.mjs a caller), ES modules 4443 -> 4482, closures 4285 -> 4325, async/await 1803 -> 1813, typed arrays 1337 -> 1346, Promises 440 -> 444,
     // fetch/XHR 252 -> 253, requestAnimationFrame 127 -> 128 (the aquarium page's frame loop); the other rows held.
     // v4877 -- the rotorcraft branch and the sub work since v4875 (files 4789 -> 4813): ES modules 4482 -> 4506, closures 4325 -> 4347, async/await 1813 -> 1826, typed arrays 1346 -> 1357, Promises 444 -> 449, performance.now 255 -> 259; the other rows held.
-    esModules: 4521, closures: 4362, asyncAwait: 1829, typedArrays: 1367, promises: 451,
-    fetchXhr: 253, performanceNow: 260, raf: 128, webgl: 200, webgpu: 64, threads: 26, wasm: 27,
+    esModules: 4545, closures: 4383, asyncAwait: 1837, typedArrays: 1371, promises: 452,
+    fetchXhr: 253, performanceNow: 260, raf: 128, webgl: 202, webgpu: 65, threads: 26, wasm: 27,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.

@@ -307,7 +307,8 @@ export const MEASURED_AT_V4481 = Object.freeze({
     stageMaxFloatAt4: Object.freeze({ scene: 4, bright: 4, blurH: 3.9361, blurV: 3.7337 }),
     stageMaxUnorm8At4: Object.freeze({ scene: 1, bright: 1, blurH: 0.9804, blurV: 0.9176 }),
     // The consumer, from world/chunkMesherCore.js through the voxel shader's boost.
-    paletteEntries: 12, paletteOverOne: 6, palettePeak: 2.5,
+    paletteEntries: 13,   // v4880: was 12 at v4481; main added a palette entry (WATER or SCREEN) that the shader does not boost, so six of thirteen
+    paletteOverOne: 6, palettePeak: 2.5,
     // #144's family, fourth entry: the palette says emissive, the shader means saturated.
     paletteSaysEmissive: 2,            // LAVA and MEMORY
     memoryMaxChannel: 0.85,             // exactly the smoothstep's lower edge

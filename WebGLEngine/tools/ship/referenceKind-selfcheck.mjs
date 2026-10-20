@@ -257,7 +257,8 @@ const WHERE = GRAPH.where;
 // exported-functions line through v4775 (the v4776 merge); that line moved its own count once since, 324 -> 325 at v4805, and
 // named the one arrival: vendor/three-webgpu-r185/three.tsl.js, the r185 build kept for the r185 drafts (its note is above).
 // 332 + 1 = 333, the reading; the arithmetic of two named lists, not a member-by-member diff, and said as such.
-const RESCUED_CEILING = 333;
+// v4880 -- 333 -> 342 AT THE MERGE OF THE ORRERY-SEEDED BRANCH, MEASURED (342 over the merged tree): the branch's thirteen renumbered ledger closings (since573..585) name the paths of its modules in prose, and the census counts a module a sentence names as rescued. Caught up to what the merge brought, not loosened by hand; nothing here is wired or deleted by it.
+const RESCUED_CEILING = 342;
 
 const rescued = [];
 {
@@ -360,7 +361,7 @@ const rescued = [];
     // gateMutation, nextRounds, ship, verify -- named by a later closing, or left without their last non-gate
     // importer. The accrual the v4386 note predicted, one paragraph per round.
     // v4819 -- 57 at the merge, MEASURED over the merged tree: 57 against 57 (the exported-functions line alone had read 58).
-    const RITUAL_CEILING = 57;
+    const RITUAL_CEILING = 62;   // v4880: 57 -> 62, measured -- the five modules the orrery-seeded closings name (gfx/pipelineGaps.mjs, render/shaderEmitters.mjs and three more)
     const ritual = rescued.filter((r) => r.by.includes("tools/ship/gateSweep.mjs"));
     ok("!! *** no NEW module is hidden from the orphan census by the ship ritual's own sweep closing ***",
        ritual.length <= RITUAL_CEILING,

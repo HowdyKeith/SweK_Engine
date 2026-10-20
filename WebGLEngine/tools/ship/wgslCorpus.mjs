@@ -968,6 +968,8 @@ export const EXCLUDED = Object.freeze([
     // v4526 MERGE -- four lit VARIANTS this branch's rounds left unaccounted (crossBackend is over the quick sweep's budget,
     // so the census that names them had not run since v4514): each is litSphere's generator with an `extra` mode, so the
     // shader text is litSphere's, which the corpus grades; the variant is a mode and not a module (backendParity's v4520 rule).
+    // v4880 -- the orrery-seeded merge: render/stereographic.js's stereoWGSL() is the spherical projection function (the corpus holds render/stereographic.mjs's FRAGMENT_WGSL above, a different file); it is graded through a real device by tools/ship/stereoDevice-selfcheck.mjs, so it is accounted for here and not hidden.
+    Object.freeze({ id: "stereoWGSL", kind: "generator, graded through the device", why: "render/stereographic.js's stereoWGSL() emits the stereographic projection function in WGSL; tools/ship/stereoDevice-selfcheck.mjs runs it against its GLSL twin and the JS by value" }),
     Object.freeze({ id: "probeLit.probeLitWgsl", kind: "lit variant, graded through the device", why: "litSphere's pipeline with the SH volume read by integer texel; tools/ship/probeLit-selfcheck.mjs holds it to shadeAt on both backends" }),
     Object.freeze({ id: "probeLit.PROBE_LIT_WGSL", kind: "lit variant, graded through the device", why: "the same text as a constant, for the census; graded by tools/ship/probeLit-selfcheck.mjs" }),
     Object.freeze({ id: "voxelBodies.BODY_LIT_WGSL", kind: "lit variant, graded through the device", why: "litSphere's quat mode for the sandbox's box3d bodies; tools/ship/voxelBodies-selfcheck.mjs draws it on both backends" }),

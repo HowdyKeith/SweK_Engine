@@ -15,7 +15,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as A from "./auditCap.mjs";
-import { REGISTER_AUDIT } from "./register-audit.mjs";
+import { REGISTER_AUDIT } from "./register-audit-v4490.mjs";   // v4880: the branch's thirty-row snapshot; the live audit was emptied at v4879
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const read = (...p) => fs.readFileSync(path.join(ENG, ...p), "utf8");

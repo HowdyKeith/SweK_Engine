@@ -249,5 +249,11 @@ const SELF = "observedGates-selfcheck.mjs";
         "holds milliseconds and a verdict here would have to be invented");
 }
 
+// v4880 -- the two paths the ledger and the sweep are read from are the module's public surface; name them, and check they sit beside it.
+ok("the ledger and the sweep it folds are paths beside the module, named",
+    O.LEDGER_PATH === path.join(path.dirname(fileURLToPath(import.meta.url)), "observed-gates.json") &&
+    O.SWEEP_PATH === path.join(path.dirname(fileURLToPath(import.meta.url)), "sweep-timings.json"),
+    "O.LEDGER_PATH and O.SWEEP_PATH");
+
 console.log("observedGates-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));
 process.exit(fails ? 1 : 0);

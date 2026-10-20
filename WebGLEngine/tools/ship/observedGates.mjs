@@ -164,6 +164,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToP
               "about. It is NOT a budget: tools/ship/gate-timings.json is the curated register for that, and " +
               "nothing merges machine output into it. Written by tools/ship/observedGates.mjs --write; graded " +
               "by tools/ship/observedGates-selfcheck.mjs, which does not write it.",
+        generatedFrom: "tools/ship/observedGates.mjs --write",
         firstWritten: prev.firstWritten || at,
         lastWritten: at,
         gates: r.next.gates,
