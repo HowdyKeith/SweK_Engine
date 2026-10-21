@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/oceanReadingsPage-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/oceanReadingsPage-selfcheck.mjs      (~4 s with a browser; section 1 alone ~0.1 s)
+// Run: node tools/ship/oceanReadingsPage-selfcheck.mjs      (~1 s with a browser; section 1 alone ~0.1 s)
 //
 // THE READINGS PAGE, HELD TO WHAT IT SAYS. ocean-readings.html prints a table, bars and a pixel-cost line, every figure computed by ui/oceanReadings.mjs from the stored HUD lines.
 // The module is graded by ui/oceanReadings-selfcheck.mjs; this gate grades the PAGE: that it types no figure of its own, builds everything through textContent and createElementNS,
