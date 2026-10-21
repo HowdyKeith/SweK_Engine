@@ -73,6 +73,12 @@
 //   Z5  section 98's owed run taken as the LAST 1080 run, not the first 1 RED (the owed-run row)
 //   Z6  section 98's verdict read off the green extra-a run            1 RED (the owed-run row)
 //   Z7  the Intel's predicted list fill narrowed to 15-20 ms           1 RED (the predictions row)
+//   and section 9's verdict (section 102), by the same runner:
+//   A1  the rule asks the Intel alone                                  1 RED (the rule row)
+//   A2  the 1080's runs' commit, bc6fbed2, left out of section 99's    2 RED (the read-back row; the rule row)
+//   A3  H holding with the list fill up to 5 % slower                  1 RED (the rule row)
+//   A4  a solo run's trace swapped for r34-a's, which is not whole     1 RED (round 35's row)
+//   A5  the 1080's missed prediction read against 30 ms, not 6         1 RED (the predictions row)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -585,6 +591,64 @@ console.log("\n8. SECTION 100: ROUND 34'S VERDICT, AND SECTION 98'S OWED RUN, RE
     // reported: the timing gate on the 1080 since round 33, run by realGpuRun
     const all1080 = [["a", "denoise-rig-r33-a-gtx1080.json"], ["b", "denoise-rig-r33-b-gtx1080.json"]].map(([k, f]) => readRun(load(f), k)).concat(N);
     say(`section 100, gtx1080: the timing gate died in ${all1080.filter((r) => tg(r)).length} of ${all1080.length} realGpuRun runs (${all1080.filter((r) => tg(r)).map((r) => `${r.file} at ${(tg(r).ms / 1000).toFixed(1)} s`).join(", ")}), each with no FAIL line, and once more run alone -- reported, deciding nothing`);
+}
+
+console.log("\n9. SECTION 102: ROUND 35'S CRASH RUNS AND ROUND 34 ON THE GTX 1080, RE-DERIVED FROM THE FILES AS COMMITTED");
+{
+    // section 101 named the 1080's round-34 runs as its step 2, at the branch head it was run from; bc6fbed2 carries sections 99-101
+    const SECTION99_COMMITS = Object.freeze(["3abe4471", "bc6fbed2"]), ROUND35_COMMIT = "bc6fbed2";
+    const num = (re, t) => { const m = t.match(re); return m ? Number(m[1]) : null; };
+    const rd = (f) => fs.readFileSync(path.join(ENG, "render", f), "utf8");
+    const readRun = (rep, file) => {
+        const g = rep.gates.find((x) => x.gate === "render/denoiseUpscaleGPU-selfcheck.mjs"), m = (g && g.measured) || [];
+        const a = m.find((l) => /^section 93: .*kernels/.test(l)) || "", b = m.find((l) => /^section 93: the chain's steps/.test(l)) || "", d = m.find((l) => /^section 99: /.test(l)) || "";
+        const tg = rep.gates.find((x) => x.gate === "render/denoiseTiming-selfcheck.mjs") || {};
+        const clk = (re, t) => (t.match(re) || [])[1] || null;
+        return { file, commit: String(rep.commit || "").slice(0, 8), allGreen: rep.gates.length === 4 && rep.gates.every((x) => x.ok),
+            exits: rep.gates.map((x) => (x.exit ? x.exit.status : undefined)), adapter: clk(/^section 93: ([^,]+),/, a),
+            netClocks: [clk(/1920 x 1080 [0-9.]+ ms \((\w+)\)/, a), clk(/at 960 x 540 [0-9.]+ ms \((\w+)\)/, a)], rings: num(/; (\d+) of 96 rings filled/, b),
+            fill: num(/fill ([0-9.]+) ms \(wall\)/, d), fillList: num(/fillList ([0-9.]+) ms \(wall\)/, d), listed: num(/the list fill (\d+) listed/, d),
+            listRings: num(/listed, (\d+) of 96 rings/, d), listLeft: num(/rings, (\d+) left/, d), ratioList: num(/with the list fill [0-9.]+ ms, ratio ([0-9.]+) x/, d),
+            r27wNative: num(/^native r27w: 1920 x 1080: ([0-9.]+) ms a pass/, (tg.measured || []).find((l) => /^native r27w: 1920 x 1080:/.test(l)) || ""),
+            r27wPage: num(/^page r27w: 1920 x 1080: ([0-9.]+) ms a pass/, (tg.measured || []).find((l) => /^page r27w: 1920 x 1080:/.test(l)) || "") };
+    };
+    // section 99's rule, unchanged: at a commit carrying it, every gate green (C1), the ring fill short of 96 rings and the checked list
+    // fill reaching every listed pixel in the same count (C2), both networks on the device's clock (C3); H: fillList below fill in both runs
+    const counts = (r) => SECTION99_COMMITS.includes(r.commit) && r.allGreen && r.rings > 0 && r.rings < 96 && r.listLeft === 0 && r.listRings === r.rings && r.listed > 0 &&
+        r.netClocks.every((c) => c === "device") && [r.fill, r.fillList].every((v) => Number.isFinite(v) && v > 0);
+    const H = (runs) => (runs.length === 2 && runs.every(counts) ? (runs.every((r) => r.fillList < r.fill) ? "holds" : "fails") : "no verdict");
+    const rule = (byGpu) => { const v = Object.values(byGpu).map(H); return v.every((x) => x === "holds") ? "the list fill becomes the chain's" : v.includes("no verdict") ? "owed again" : "the ring fill stays"; };
+    const R = { "intel-gen9": ["a", "b"].map((k) => readRun(JSON.parse(rd(`denoise-rig-r34-${k}-intel-gen9.json`)), k)),
+                gtx1080: ["a", "b"].map((k) => readRun(JSON.parse(rd(`denoise-rig-r34-${k}-gtx1080.json`)), k)) };
+    const N = R.gtx1080;
+    ok("!! section 102: the GTX 1080's round-34 runs read back -- at bc6fbed2, every gate green with exit 0, both fills 87 rings, all 25,765 listed pixels reached, both networks on the device's clock",
+        N.every((r) => r.commit === ROUND35_COMMIT && counts(r) && r.adapter === "nvidia / pascal" && r.exits.every((e) => e === 0) && r.rings === 87 && r.listRings === 87 && r.listed === 25765),
+        N.map((r) => `run ${r.file}: fill ${r.fill} ms, fillList ${r.fillList} ms, exits ${r.exits.join("/")}`).join("; "));
+    const slow = (r) => ({ ...r, fillList: r.fill }), red = (r) => ({ ...r, allGreen: false });
+    ok("!! *** section 102's rule, as section 99 fixed it: H holds on both GPUs -- so the list fill becomes the chain's fill: backlog denoise-listfill-default ***",
+        H(R["intel-gen9"]) === "holds" && H(N) === "holds" && rule(R) === "the list fill becomes the chain's" &&
+        rule({ ...R, gtx1080: [N[0], slow(N[1])] }) === "the ring fill stays" && rule({ ...R, gtx1080: [N[0], red(N[1])] }) === "owed again",
+        `the 1080's list fill ${N.map((r) => (100 * (1 - r.fillList / r.fill)).toFixed(1) + " %").join(" and ")} below its ring fill; the Intel's ${R["intel-gen9"].map((r) => (r.fill / r.fillList).toFixed(1) + " x").join(" and ")} faster`);
+    ok("  section 102's account of section 99's 1080 predictions: the list fill was NOT 1-6 ms, and the chain was NOT 1.9-2.3 x -- both missed",
+        N.every((r) => r.fillList > 6) && N.every((r) => r.ratioList < 1.9),
+        `fillList ${N.map((r) => r.fillList).join(", ")} ms; full / halfList ${N.map((r) => r.ratioList).join(", ")} x`);
+    // ROUND 35: the three solo runs (the console and their traces) and the two realGpuRun runs' timing gates
+    const con = rd("denoise-rig-r35-console-gtx1080.txt").replace(/\r/g, "");
+    const levels = [...con.matchAll(/echo %ERRORLEVEL%\n(-?\d+)\n/g)].map((m) => Number(m[1])), greens = (con.match(/^ALL GREEN \(\d+ ms\)$/gm) || []).length;
+    const tr = (k) => rd(`denoise-rig-r35-trace-${k}-gtx1080.txt`).split("\n").filter(Boolean);
+    const whole = (t) => t.some((l) => /native: the ladder returned$/.test(l)) && /the gate ends, 0 fail\(s\)$/.test(t[t.length - 1] || "");
+    const solo = ["alone-1", "alone-2", "alone-3"].map(tr), pair = ["r34-a", "r34-b"].map(tr);
+    const deaths = levels.filter((v) => v !== 0).length + N.filter((r) => !r.exits.every((e) => e === 0)).length;
+    ok("!! *** section 102, round 35: no run died -- three solo timing-gate runs exit 0 and ALL GREEN with whole traces, and both realGpuRun runs' gates exit 0 -- so the crash is NOT REPRODUCED ***",
+        con.includes(`HEAD -> ccr-6c3eeb7c-pxz6kx`) && con.includes(ROUND35_COMMIT) && levels.length === 3 && greens === 3 && deaths === 0 && solo.every(whole),
+        `exit codes ${levels.join(", ")}; ${greens} ALL GREEN; solo traces ${solo.map((t) => t.length + " lines").join(", ")}, each to "the gate ends, 0 fail(s)"`);
+    // reported, not deciding: the one trace that is not whole as received, though its gate (which reads it) passed; and r27w's stall
+    ok("  ...and the one trace that is not whole is named: r34-a's ends mid-ladder as received, while that run's timing gate -- whose own row reads the trace to its end -- passed",
+        !whole(pair[0]) && whole(pair[1]) && /native 1920x1080: round 2 time r27w$/.test(pair[0][pair[0].length - 1]) && N[0].allGreen,
+        `r34-a: ${pair[0].length} lines, last "${pair[0][pair[0].length - 1]}"; r34-b: ${pair[1].length} lines, whole`);
+    say(`section 102, gtx1080: r27w at 1920 x 1080 -- native ${N.map((r) => r.r27wNative).join(" / ")} ms a pass, page ${N.map((r) => r.r27wPage).join(" / ")} ms (about 250 ms is its usual reading) -- reported, deciding nothing`);
+    REPORT.table("section 102: round 34 on both GPUs, the ring fill against the list fill at 960 x 540, ms", ["GPU", "run", "ring fill", "list fill", "chain ratio with the list fill", "all gates green"],
+        Object.entries(R).flatMap(([g, rs]) => rs.map((r) => [g, r.file, r.fill, r.fillList, r.ratioList, r.allGreen ? "yes" : "no"])));
 }
 
 console.log(fails ? `\nFAIL -- ${fails} check(s)` : "\nALL GREEN");

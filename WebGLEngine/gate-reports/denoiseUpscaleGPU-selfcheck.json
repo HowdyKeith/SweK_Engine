@@ -134,6 +134,52 @@
     ]
    ],
    "note": null
+  },
+  {
+   "title": "section 102: round 34 on both GPUs, the ring fill against the list fill at 960 x 540, ms",
+   "columns": [
+    "GPU",
+    "run",
+    "ring fill",
+    "list fill",
+    "chain ratio with the list fill",
+    "all gates green"
+   ],
+   "rows": [
+    [
+     "intel-gen9",
+     "a",
+     301.6,
+     23.9,
+     2.042,
+     "yes"
+    ],
+    [
+     "intel-gen9",
+     "b",
+     302.8,
+     23,
+     2.179,
+     "yes"
+    ],
+    [
+     "gtx1080",
+     "a",
+     26.9,
+     24,
+     1.424,
+     "yes"
+    ],
+    [
+     "gtx1080",
+     "b",
+     26.2,
+     25.4,
+     1.395,
+     "yes"
+    ]
+   ],
+   "note": null
   }
  ],
  "notes": [],

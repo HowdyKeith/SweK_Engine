@@ -2243,7 +2243,7 @@ export const NEXT_ROUNDS = [
         blocker: "OPEN",
         what: "The half-size chain's own steps made cheaper: the emitter coverage (64 rays a pixel at both sizes) and the bounded fill (96 ring passes over every pixel).",
         how: "Two levers, each to be held to its CPU reference before any rig time: a fill that runs over the lights' bounding boxes only, or skips rings once nothing is left (indirect dispatch), exact against fillEmittersBounded; and a coverage with fewer rays, which is a different guide and so a new quality question against section 92's chain, not a speed-up of the same one.",
-        why: "Section 94: the coverage and fill together were 681-771 ms on the Intel against a 308-347 ms network, and 41-45 ms against 18 ms on the 1080 -- the chain kept its lead only because the full-size network is four times the half-size one. The full-size coverage is also 274 ms of today's page on the Intel. ROUND 34 (unshipped), THE FILL LEVER: fill(..., { list: true }) runs the same rings over the lights' pixels only, in place, sized by an indirect dispatch. It matches fillEmittersBounded within 1e-5, and round 31's device fill float for float on SwiftShader (render/denoiseUpscaleGPU-selfcheck.mjs section 3). Section 99 is the pre-registration. SECTION 100: H holds on the Intel (the list fill 23.0-23.9 ms against 301.6-302.8; the chain 2.04-2.18 x against today's page, from 1.47-1.52). STILL OWED: the 1080's two runs, which are round 35's step 2 (denoise-1080-native-crash). The coverage lever is untouched.",
+        why: "Section 94: the coverage and fill together were 681-771 ms on the Intel against a 308-347 ms network, and 41-45 ms against 18 ms on the 1080 -- the chain kept its lead only because the full-size network is four times the half-size one. The full-size coverage is also 274 ms of today's page on the Intel. ROUND 34 (unshipped), THE FILL LEVER: fill(..., { list: true }) runs the same rings over the lights' pixels only, in place, sized by an indirect dispatch. It matches fillEmittersBounded within 1e-5, and round 31's device fill float for float on SwiftShader (render/denoiseUpscaleGPU-selfcheck.mjs section 3). Section 99 is the pre-registration. SECTION 100: H holds on the Intel (the list fill 23.0-23.9 ms against 301.6-302.8; the chain 2.04-2.18 x against today's page, from 1.47-1.52). SECTION 102: H holds on the 1080 too (24.0 and 25.4 ms against 26.9 and 26.2), so by section 99's rule the list fill becomes the chain's fill in a round of its own. The fill lever is closed. The 1080 barely moved: its fill is about 99 small passes on the wall clock, not pixels, so a fill with fewer passes is the next lever there. The coverage lever is untouched.",
     },
     {
         id: "denoise-halfres-page",
@@ -2334,8 +2334,15 @@ export const NEXT_ROUNDS = [
         id: "denoise-1080-native-crash",
         blocker: "OPEN",
         what: "On the GTX 1080, render/denoiseTiming-selfcheck.mjs dies inside its native ladder (node-webgpu 0.6.2, D3D12, DXC) in most runs, with no FAIL line: 3 of 5 realGpuRun runs since round 33, and once more run alone.",
-        how: "Round 35 (section 101): the ladder traces every step to a file before it runs, and realGpuRun keeps each gate's exit code and stderr tail. Three solo runs and round 34's two runs on the 1080 say where it dies and how. Round 36 then changes that step, or probes it alone if the steps differ.",
+        how: "Round 35 (section 101): the ladder traces every step to a file before it runs, and realGpuRun keeps each gate's exit code and stderr tail. SECTION 102: NOT REPRODUCED -- five runs at bc6fbed2, none died, every exit 0. The traces stay armed in every run, so the next death names its step. The one abnormal reading: r27w at 1920 x 1080 stalled to 15,100 ms a pass natively (run a) and 10,247 ms on the page (run b), against about 249; reported, not proposed as the cause.",
         why: "Sections 98 and 100: the 1080 has no verdict for rounds 33 and 34 because of it, and any round that asks the 1080 for a green denoise group can fail C1 for a reason that is not the round's.",
+    },
+    {
+        id: "denoise-listfill-default",
+        blocker: "OPEN",
+        what: "Make round 34's list fill the half-size chain's default fill in render/denoiseUpscaleGPU.mjs, as section 102's rule asks, and keep the ring fill as the reference it is held to.",
+        how: "A round of its own: the default flips, every chain row is held to the same CPU references, and the page's 'the half-size chain in all' row then reports the list fill. On the 1080 the remaining cost is the fill's ~99 passes on the wall clock, so a fill that runs its rings in fewer passes (for example several rings a pass in workgroup memory) is the follow-up there.",
+        why: "Section 102: H held on both GPUs -- the Intel 13 x faster, the 1080 3-11 % -- so the chain is cheaper with it everywhere it was timed.",
     },
     {
         id: "denoise-fsr3-framegen",

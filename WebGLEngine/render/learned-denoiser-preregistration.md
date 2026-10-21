@@ -6807,3 +6807,59 @@ set SWEK_TIMING_TRACE=
 ```
 `git log -1 --oneline` must show this branch's latest commit, not 468766f9. Send back the console output with its three
 `echo` lines, the five trace files and the two JSON files.
+
+## 102. ROUNDS 34 AND 35 -- THE VERDICT: THE 1080 DID NOT CRASH IN FIVE RUNS, AND THE LIST FILL HOLDS ON BOTH GPUS
+
+**What arrived.** Eight files from the GTX 1080, all at bc6fbed2, the branch head carrying sections 99-101. They were committed
+as received at cbdb2c13, before this section was written:
+- section 101's step 1: the timing gate run alone three times, with its console (`render/denoise-rig-r35-console-gtx1080.txt`)
+  and three traces (`render/denoise-rig-r35-trace-alone-{1,2,3}-gtx1080.txt`);
+- section 101's step 2, which is also round 34 on the 1080: two `realGpuRun --only denoise` runs
+  (`render/denoise-rig-r34-{a,b}-gtx1080.json`) and their traces (`render/denoise-rig-r35-trace-r34-{a,b}-gtx1080.txt`).
+
+`render/denoiseUpscaleGPU-selfcheck.mjs`'s section 9 re-derives every figure here from those files. Sabotaged A1-A5.
+
+**Round 35, by section 101's rule: the crash is NOT REPRODUCED.**
+- All three solo runs ended ALL GREEN with exit code 0. Each trace runs to "the ladder returned" and "the gate ends, 0 fail(s)",
+  through all six sizes.
+- In both `realGpuRun` runs every gate was green, and every gate's exit is now recorded: 0, with nothing on stderr.
+- **The predictions all missed.** None of the five died, so there was no 0xC0000005 and no last device step.
+- The crash stays open in the backlog (`denoise-1080-native-crash`), named, with these five traces as its record. The only
+  abnormal behaviour in the five runs is below. It is reported, not proposed as the cause.
+
+**Reported, deciding nothing.**
+- **r27w at 1920 x 1080 stalled twice.** In run a's native ladder it took 15,100.6 ms a pass, against about 249 ms in the
+  other four, nearly all of it in one layer (13,921.5 ms). That run's trace shows two of its timing rounds there taking about
+  30 s each (75.3 -> 106.4 -> 136.7 s). In run b the page's r27w at the same size took 10,247.4 ms a pass. A GPU stall that long
+  is the kind of event that could end a process, but nothing here shows the earlier deaths were one.
+- **Run a's trace, as received, is not whole.** It stops at 149.4 s on "round 2 time r27w" at 1920 x 1080, yet that run's
+  timing gate passed, including the row that reads the trace to its return. So the file read inside the run was whole and the
+  one sent was not. That is unexplained here.
+
+**Round 34 on the 1080, by section 99's rule, with section 101 naming these runs: H holds.**
+
+| GPU | Ring fill (a / b) | List fill (a / b) | Chain against today's page with the list fill | H |
+|---|---|---|---|---|
+| Intel gen-9 (section 100) | 301.6 / 302.8 ms | 23.9 / 23.0 ms | 2.042 / 2.179 x | holds |
+| GTX 1080 | 26.9 / 26.2 ms | **24.0 / 25.4 ms** | 1.424 / 1.395 x | **holds** |
+
+C1 (every gate green), C2 (87 rings, 25,765 listed, 0 left) and C3 (both networks on the device's clock) held in both runs.
+
+**So, by section 99's rule: the list fill becomes the chain's fill, in a round of its own** that changes the runner's
+default and holds the change to today's rows. The fill lever of `denoise-halfres-fixed-costs` is closed; the coverage lever
+stays open.
+
+**The predictions for the 1080 missed, and by a lot.**
+- **The list fill:** predicted 1-6 ms, measured 24.0 and 25.4 ms.
+- **The ratio:** predicted 1.9-2.3 x, measured 1.424 and 1.395 x.
+- **Why:** on the 1080 the fill was never the pixels. Cutting them to 5 % of the frame took 3-11 % off. What remains is about
+  99 small passes, each a compute pass on its own, timed by the wall clock. On the Intel, where each ring pass over the frame
+  cost about 3 ms, the same change was 13 x. A fill that runs its rings inside fewer passes is the lever this points to on the
+  1080; the list fill does not reach it.
+
+**Round 33 on the 1080, stated so it is not decided by default.** These two runs also carry section 97's line: the chain with
+its history at 1.325 and 1.341 x, every gate green. Section 98 closed round 33 for the 1080 ("no verdict; the next round is
+the crash"), and nothing in section 101 re-opened it. As in sections 76 and 100, it stays closed: the numbers are reported and
+do not count.
+
+**Nothing changes in this section:** the chain's default fill, the page, the network, every kernel table, and `fx/fsr`.
