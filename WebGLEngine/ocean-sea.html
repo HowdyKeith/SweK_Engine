@@ -80,6 +80,7 @@
 <script type="module">
   import * as OT from "/ui/oceanTier.mjs";
   import * as OS from "/ui/oceanSea.mjs";
+  import * as LT from "/ui/oceanLiveTune.mjs";
   import { defaultSurface } from "/physics/ocean/oceanSurface.mjs";
   import { adapterOptions } from "/ui/webgpuProbe.mjs";
   const $ = (id) => document.getElementById(id);
@@ -166,7 +167,21 @@
 
   tierSel.value = OT.loadPreference(storage());
   tierSel.addEventListener("change", () => { OT.savePreference(storage(), tierSel.value); begin(); });
-  setSel.addEventListener("change", () => { showMatch(); begin(); });
+  // v4895 step 1 of ocean-src-integration: with the sea already running, the setting is applied through the sea's own sliders (no reload, no re-timing: the FFT size and so the
+  // cost are not among the tunables). If the panel is not built yet, or the frame cannot be reached, it falls back to the reload it always did.
+  function liveApply() {
+    if (!state.loaded || !declared) return false;
+    const m = applied(), target = {};
+    for (const k of ["swellHs", "swellLength"]) target[k] = m && m.tunables[k] !== undefined ? m.tunables[k] : declared[k].value;
+    let doc = null; try { doc = sea.contentDocument; } catch { doc = null; }
+    if (!doc) return false;
+    const res = LT.liveTune(doc, target);
+    state.live = { applied: res.applied, missing: res.missing, got: Object.fromEntries(res.steps.map((s) => [s.key, s.got])) };
+    if (res.missing.length) return false;
+    $("match").textContent += "\n\napplied live, through the sea's own sliders (no reload, not re-timed):\n" + LT.reportLines(res).join("\n");
+    return true;
+  }
+  setSel.addEventListener("change", () => { showMatch(); if (!liveApply()) begin(); });
   $("retimeBtn").addEventListener("click", () => { try { storage() && storage().removeItem(OS.PROBE_KEY); } catch { /* ignore */ } begin(); });
 
   (async () => {

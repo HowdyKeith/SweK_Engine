@@ -6,7 +6,7 @@
 // reading of the sea's own HUD says it holds the frame budget. The pure half is graded in ui/oceanSea-selfcheck.mjs; this gate grades the PAGE.
 //   1  THE PAGE'S SOURCE   it imports the tier and sea modules and the physics surface; never turns data into markup; every reading reaches the DOM through textContent; loads
 //                          nothing from outside; builds the sea's URL only through seaUrl(); carries the origin notice and the demo: meta tags; says what it is NOT
-//   2  THE LIVE PAGE       (needs a browser; SKIPPED, and said, without one) SIX SCENARIOS IN PARALLEL, each with navigator.gpu stood in and the sea's frame replaced by a stand-in page
+//   2  THE LIVE PAGE       (needs a browser; SKIPPED, and said, without one) SEVEN SCENARIOS IN PARALLEL (the seventh, v4895, has the sea's real panel code in its stand-in and checks the live retune), each with navigator.gpu stood in and the sea's frame replaced by a stand-in page
 //                          that prints a HUD line in the sea's own format -- the sandbox has no WebGPU adapter, so this grades the PAGE'S LOGIC against a frame, and says it is not the sea:
 //                          a fast GPU under auto (probed, kept, remembered, and NOT probed again on reload); a slow one under auto (probed, unloaded, the reason names the reading);
 //                          the same slow one under on (kept, and says how slow); no WebGPU (the frame is never requested); off (the frame is never requested); a sea that prints nothing
@@ -17,6 +17,7 @@
 //
 // SABOTAGE LOG -- each applied in place, the gate run with a real browser, the file restored and md5-compared; every one red by name (number of rows red):
 //   P1 a slow sea is never unloaded 1 | P2 the reading is not remembered 1 | P3 a remembered reading is ignored 1 | P4 off still loads the sea 2 | P5 the give-up branch removed 1
+//   P9 (v4895) the page never retunes live, always reloads 2 (the live-tune rows) |
 //   P6 no-WebGPU claims WebGPU 1 | P7 the page reaches into the frame (contentWindow) 1 | P8 a frame time compared to a number of the page's own 1 (that mutation was also a syntax error, so it
 //   proves less than the others: the source row that reads for it was exercised only in company)
 "use strict";
@@ -25,6 +26,7 @@ import path from "node:path";
 import http from "node:http";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
+import { declaredDefaults } from "../../ui/oceanSea.mjs";
 import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 
 const require_ = createRequire(import.meta.url);
@@ -77,13 +79,19 @@ console.log("\n2. THE LIVE PAGE");
         const base = "http://127.0.0.1:" + server.address().port;
         const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: webglLaunchArgs().args });
         // the stand-in for the sea's frame: prints a HUD line in the sea's own format every 100 ms (or never)
-        const standIn = (line) => `<!doctype html><meta charset="utf-8"><div id="fps">${line === null ? "" : "starting"}</div><script>${line === null ? "" : `setInterval(() => { document.getElementById("fps").textContent = ${JSON.stringify(line)}; }, 100);`}</script>`;
+        // v4895: with `withPanel` the stand-in also carries UPSTREAM'S OWN panel-building block, cut out of the bundle's text and unmodified, over a P block holding the bundle's declared defaults,
+        // so the page's live path (ui/oceanLiveTune.mjs) meets the sea's real listeners; window.__P and window.__flags() show what they did
+        const bundleText = fs.readFileSync(path.join(ENG, "vendor/web-ocean/ocean.html"), "utf8");
+        const pa = bundleText.indexOf("const panel = document.getElementById('panel');"), pEnd = "panel.appendChild(row);\n  }", pb = bundleText.indexOf(pEnd, pa);
+        const panelBlock = pa > 0 && pb > pa ? bundleText.slice(pa, pb + pEnd.length) : "", pDefaults = Object.fromEntries(Object.entries(declaredDefaults(bundleText)).map(([k, v]) => [k, v.value]));
+        const panelScript = (withPanel) => !withPanel ? "" : `<div id="panel" class="hidden"></div><script>const P = ${JSON.stringify(pDefaults)}; let needSpectrum = false, needLUT = false, envFull = 0; window.__P = P; window.__flags = () => ({ needSpectrum, needLUT, envFull });\n${panelBlock}</script>`;
+        const standIn = (line, withPanel = false) => `<!doctype html><meta charset="utf-8"><div id="fps">${line === null ? "" : "starting"}</div><script>${line === null ? "" : `setInterval(() => { document.getElementById("fps").textContent = ${JSON.stringify(line)}; }, 100);`}</script>${panelScript(withPanel)}`;
         const GPUS = {
             fast: { info: { vendor: "nvidia", architecture: "pascal", description: "NVIDIA GeForce GTX 1080" }, line: "120 fps  8.33 ms  |  GPU 6.00 ms  |  3000 nodes  640x360" },
             slow: { info: { vendor: "intel", architecture: "gen-9", description: "Intel(R) UHD Graphics 620" }, line: "10 fps  100.00 ms  |  GPU 228.04 ms  |  3000 nodes  1653x493" },
             mute: { info: { vendor: "nvidia", architecture: "pascal", description: "NVIDIA GeForce GTX 1080" }, line: null },
         };
-        async function scenario({ gpu, pref, noWebgpu = false }) {
+        async function scenario({ gpu, pref, noWebgpu = false, panel = false }) {
             const ctx = await b.newContext({ viewport: { width: 1100, height: 760 } });
             const cfg = gpu ? GPUS[gpu] : null;
             if (!noWebgpu && cfg) await ctx.addInitScript((info) => { Object.defineProperty(navigator, "gpu", { configurable: true, value: { requestAdapter: async () => ({ info, isFallbackAdapter: false, features: new Set() }) } }); }, cfg.info);
@@ -91,7 +99,7 @@ console.log("\n2. THE LIVE PAGE");
             const frameRequests = [];
             await ctx.route("**/vendor/web-ocean/ocean.html*", (route) => {
                 // the frame is a NAVIGATION; the page's own fetch of the bundle's text (for the declared defaults) is not, and gets the real file
-                if (route.request().isNavigationRequest()) { frameRequests.push(route.request().url()); return route.fulfill({ status: 200, contentType: "text/html", body: standIn(cfg ? cfg.line : "1 fps  1000.00 ms") }); }
+                if (route.request().isNavigationRequest()) { frameRequests.push(route.request().url()); return route.fulfill({ status: 200, contentType: "text/html", body: standIn(cfg ? cfg.line : "1 fps  1000.00 ms", panel) }); }
                 return route.continue();
             });
             const pg = await ctx.newPage(); const errs = [];
@@ -112,6 +120,7 @@ console.log("\n2. THE LIVE PAGE");
                 none: scenario({ pref: "auto", noWebgpu: true }),
                 off: scenario({ gpu: "fast", pref: "off" }),
                 mute: scenario({ gpu: "mute", pref: "auto" }),
+                live: scenario({ gpu: "fast", pref: "auto", panel: true }),
             };
             for (const k of Object.keys(run)) S[k] = await run[k];
             // the no-WebGPU and off pages answer at once; the others are measuring. Wait for each by what it must reach.
@@ -151,6 +160,20 @@ console.log("\n2. THE LIVE PAGE");
                 await until(S.fast.pg, () => !/swellHs/.test(window.__sea.seaSrc || "") && window.__sea.settings === "defaults", 8000);
                 const back = await S.fast.pg.evaluate(() => window.__sea.seaSrc);
                 ok("  and choosing the defaults again takes the tunables off the URL", !/swellHs|swellLength/.test(back), back);
+            }
+            {   // v4895 step 1: a sea that already has its panel is retuned through the panel's own sliders -- no new frame request, no reload, the frame's P changes
+                const lv = S.live, ready = await settled(lv.pg, 30000), nReq = lv.frameRequests.length, srcBefore = await lv.pg.evaluate(() => document.getElementById("sea").getAttribute("src"));
+                await lv.pg.selectOption("#setSel", "matched");
+                await until(lv.pg, () => window.__sea.live && window.__sea.live.applied.length === 2, 8000);
+                const fr = () => lv.pg.evaluate(() => { const w = document.getElementById("sea").contentWindow; return { P: { swellHs: w.__P.swellHs, swellLength: w.__P.swellLength, windSpeed: w.__P.windSpeed }, flags: w.__flags(), src: document.getElementById("sea").getAttribute("src"), live: window.__sea.live, match: document.getElementById("match").textContent }; });
+                const a = await fr();
+                ok("!! *** LIVE TUNE: with the sea already running and its panel built, choosing 'matched' retunes it through the sea's own sliders -- NO new frame request, the frame's src unchanged, P.swellHs 2 (1.99 snapped to the 0.05 step) and P.swellLength 60, needSpectrum raised ***",
+                    ready && lv.frameRequests.length === nReq && a.src === srcBefore && a.P.swellHs === 2 && a.P.swellLength === 60 && a.P.windSpeed === 7 && a.flags.needSpectrum === true && a.live.applied.join() === "swellHs,swellLength" && a.live.missing.length === 0, JSON.stringify({ req: lv.frameRequests.length, P: a.P, flags: a.flags }));
+                ok("  and the page says what it did: 'applied live', that nothing was reloaded or re-timed, and the snapped value", /applied live/.test(a.match) && /not re-timed/.test(a.match) && /snapped to the slider's step/.test(a.match), a.match.split("\n").slice(-3).join(" | ").slice(0, 200));
+                await lv.pg.selectOption("#setSel", "defaults");
+                await until(lv.pg, () => window.__sea.settings === "defaults" && document.getElementById("sea").contentWindow.__P.swellHs === 1.8, 8000);
+                const d = await fr();
+                ok("  and choosing the defaults sets the sea's own declared values back (swellHs 1.8, swellLength 120) the same way, still with no reload", d.P.swellHs === 1.8 && d.P.swellLength === 120 && lv.frameRequests.length === nReq, JSON.stringify(d.P));
             }
             const mDone = await settled(S.mute.pg, 40000);
             const m = await snap(S.mute.pg);
