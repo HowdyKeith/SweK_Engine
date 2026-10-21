@@ -1960,17 +1960,17 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "denoise-fsr2-temporal",
+        blocker: "CLOSED",
+        what: "DONE as the denoiser arc's round 32 (pre-registration sections 95-96), unshipped on the feature branch at this writing. REPORTED, BOTH SUPPORTED: round 30's chain over eight jittered frames, accumulated at full size, beat the same chain on the measured frame alone (H1, mean d +0.259, 12 of 12, p 1/4096) and full size at 1 sample a frame accumulated the same way (H2, +3.016, 11 of 12).",
+        how: "render/denoiseTemporalUpscale.mjs: round 4's camera path, Halton jitter through the path tracer's pixelOffset, each frame through the chain up to EASU, then reprojection (round 4's rule), a 3 x 3 clamp and n = min(n + 1, 8) on each frame's unjittered grid, the light sources composited once after. render/denoise-results-temporalup.json; the verdict re-derived in render/denoiseStudy-selfcheck.mjs section 18.",
+        why: "*** H2's SIZE IS THE 1-SAMPLE FRAMES', NOT THE CANDIDATE'S. *** On eight images H2's noisy frame was over 0.1 relMSE and Dt stayed near it; history moved full size by d +0.068 on the mean against the chain's +0.259. One camera move from a cold start, nothing in the scene moving, eight of FSR2's 32 phases, nothing timed. P2 missed by 0.016 (predicted at most +3.0).",
+    },
+    {
+        id: "denoise-temporalup-device",
         blocker: "OPEN",
-        // v4871+: OFF ITS BLOCKER at round 30 -- section 92 reported the spatial half-size chain, emitters composited, supported on both
-        // hypotheses at 256 x 256, which is what this entry waited on. The upstream line below is kept as the record of what it was.
-        // round 32 (section 95, unshipped): IN PROGRESS -- pre-registered and gated (render/denoiseTemporalUpscale.mjs and its gate); the
-        // harvest is `node tools/denoiseStudy.mjs --harvest-temporalup`, and section 96 will be its verdict.
-        // round 31 (section 94): THE ARC'S NEXT ROUND, by section 93's rule -- the half-size chain is cheaper than today's page at 1080p
-        // on both rigs as well as better at equal samples, so temporal reuse over it is what follows.
-        what: "FSR2's temporal upscale on denoised path-traced frames: jittered renders, motion vectors and history.",
-        how: "fx/fsr/fsrTemporalTsl.mjs drives a three.js scene; the path tracer is neither a three.js scene nor does it make motion vectors or jitter. Those are the work.",
-        why: "Temporal reuse is where real-time path tracing gets most of its samples.",
-        upstream: "CLEARED -- denoise-halfres-emitter-aware: rounds 26 and 29 were not reported; round 30 (section 92) was, with the half-size chain ahead of full size at equal samples on 12 of 12 images once the emitters were composited.",
+        what: "Round 32's accumulation on the device -- reprojection, the 3 x 3 clamp, the blend, and each frame's shift to its unjittered grid -- as passes of render/denoiseUpscaleGPU.mjs, held to render/denoiseTemporalUpscale.mjs's CPU reference, then timed on the rig against round 31's chain.",
+        how: "WGSL for shiftResample and accumulateUpscaled (the reprojection needs each frame's first hits on the device, which the coverage kernel's ray loop already nearly is); gate them against the CPU here on SwiftShader; then a pre-registered rig round adding the accumulation's cost to section 93's ledger.",
+        why: "Section 96's rule: both hypotheses supported, so the accumulation goes to the device and is timed. Round 31 found the chain's own steps already cost more than its network; whether a history pass fits beside them is the question.",
     },
     {
         id: "denoise-fsr3-framegen",

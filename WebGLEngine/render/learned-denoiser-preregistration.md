@@ -6413,3 +6413,61 @@ results.
 - At 32 x 32, with a 32-sample reference, the same pilot had the candidate behind B1 on two of the three. The shifts were then
   checked and are held exact by the gate. What caused it at that size was not pinned down: resampling blur on a frame that
   small is a suspect, not a finding.
+
+## 96. ROUND 32 -- REPORTED, BOTH HYPOTHESES SUPPORTED: THE HISTORY HELPS THE HALF-SIZE CHAIN, AND THE CHAIN KEEPS ITS LEAD
+
+**What arrived.** `render/denoise-results-temporalup.json`, written by `tools/denoiseStudy.mjs --harvest-temporalup` at 75052a02,
+the commit carrying section 95, and committed as written at 473a8927 before it was read. A container restart killed the first
+run while it rendered the last image. It was run again against the same cache, at the same commit with a clean tree, so the
+first eleven sequences were reused as rendered. The network's sha-256 in the file is the page's `render/denoise-net-r11.json`'s.
+
+**The run is reported, and both hypotheses are supported.**
+
+| | Bt (the temporal upscale) against | mean d (positive: Bt better) | Bt won | sign-flip p | Holm threshold |
+|---|---|---|---|---|---|
+| **H1** | B1, the same chain on the measured frame alone | **+0.259** | 12 of 12 | 0.00024 | 0.025 |
+| **H2** | Dt, full size at 1 sample a frame, accumulated the same way | **+3.016** | 11 of 12 | 0.00073 | 0.05 |
+
+- H1's p is 1/4096, the smallest a sign-flip test over 12 images can give.
+- **Every control held.** C1 held at 12 of 12 for all four frames against their noisy frames. C2 is cited from round 11. C3:
+  no image was near its floor. C4 held, and so did C5 over 216 distinct render seeds.
+- **`render/denoiseStudy-selfcheck.mjs` re-derives all of it** from the file's own tables, through `temporalUpSets`, the one
+  definition of the hypotheses' columns. It also holds the file's commit and network, section 95's rule as code, and the
+  five predictions. Sabotaged R69-R72; none was 0 red.
+- Geometric-mean relMSE:
+
+  | frame | relMSE |
+  |---|---|
+  | Bt | 0.0026 |
+  | B1 | 0.0033 |
+  | Dt | 0.0524 |
+  | H1's noisy frame | 0.0102 |
+  | H2's noisy frame | 0.1930 |
+
+**So, by section 95's rule: the accumulation goes to the device and is timed on the rig.** That is
+`denoise-temporalup-device`: one more pass of `render/denoiseUpscaleGPU.mjs`, and the round after it on the rig. Nothing
+changes in this round: the page, the network, the filter, every kernel table, `fx/fsr`.
+
+**The predictions.** They decided nothing; the gate reads each off the file.
+- **P1 held:** H1 at +0.259, inside +0.05 to +0.40, on 12 of 12.
+- **P2 missed, narrowly:** H2 at +3.016, over its predicted +0.5 to +3.0. It was on 11 of 12, where at least 10 were
+  predicted.
+- **P3 held:** C1 on both hypotheses.
+- **P4 held:** the clamp helped on the mean (d +0.463 against Bt without it), on 10 of 12. It hurt on R 46002 (-0.05) and
+  R 46004 (-0.21).
+- **P5 held:** the mean history was 4.2-6.0 frames. 33-58% of each image's pixels reached all 8.
+
+**What it says, and where it stops.**
+- **H2's size is the full-size 1-sample frames', not the candidate's.** On eight of the twelve images, H2's noisy frame was
+  above 0.1 relMSE (0.14-1.33). Dt stayed close to it there: the shipped network does not take a 1-sample frame of those
+  scenes near the reference, and eight frames of the same history barely moved it. D1 against Dt was d +0.068 on the mean,
+  at most +0.36. On the other four, H2's d was +3.26, +0.03, +0.18 and -0.10. The one loss is C 47003, where Dt reached
+  0.0017 against Bt's 0.0019.
+- **The history did more for the half-size chain than for full size at the same samples:** +0.259 against +0.068. This is
+  reported, not tested.
+- **This is one camera move, from a cold start.** An eight-frame orbit of 1.5-4 degrees a frame, ending at the measured frame,
+  with nothing in the scene moving. Disocclusion is only what the orbit uncovers. No moving object is tested, and nothing
+  about a longer history.
+- **Eight frames are a quarter of FSR2's 32 phases at a 2x upscale.** The history ran on the first 8 Halton offsets.
+- **Nothing here is timed.** The accumulation is one reprojection, a 3 x 3 clamp and a blend a frame, and its cost on a GPU
+  is the next round's to measure.

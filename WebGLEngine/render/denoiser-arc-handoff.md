@@ -37,9 +37,10 @@ node tools/ship/versionPreflight.mjs --next    # the next free version and sweep
 
 ## What is next -- Keith picks
 
-1. **`denoise-fsr2-temporal`.** Round 31 (sections 93-94) found the half-size chain cheaper than today's page at
-   1080p on both GPUs (1.44-1.48 x on the 1080, 1.38-1.54 x on the Intel), so by its rule this is the arc's next round.
-   **`denoise-halfres-fixed-costs`** sits beside it: the chain's coverage and fill cost more than its network.
+1. **`denoise-temporalup-device`.** Round 32 (sections 95-96): the half-size chain over eight jittered frames,
+   accumulated at full size, beat the same chain on one frame (mean d +0.259, 12 of 12) and full size at the same samples
+   accumulated the same way (+3.016, 11 of 12). By its rule the accumulation goes to the device next, then a rig timing.
+   **`denoise-halfres-fixed-costs`** sits beside it: round 31 found the chain's coverage and fill cost more than its network.
 2. **`denoise-f16-intel`** (gen-9 only). Half-precision kernels, now known to be exposed there.
 3. **`denoise-subgroup-reduction`** (GTX 1080 only). Subgroup kernels, now known to be exposed there.
 
