@@ -34,6 +34,8 @@ const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "F
 const report = (l) => console.log("  ----  " + l);
 const raw = fs.readFileSync(path.join(ENG, "ocean-sea.html"), "utf8");
 const sm = /<script type="module">([\s\S]*?)<\/script>/.exec(raw), code = sm ? sm[1] : "";
+// the page's header comment WRAPS its prose across lines; a phrase is matched against the text with its whitespace collapsed, never against the wrapped source
+const flat = raw.replace(/\s+/g, " ");
 const noComments = (s) => s.replace(/<!--[\s\S]*?-->/g, "").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
 console.log("oceanSeaPage-selfcheck -- the opt-in sea, behind the tier switch\n");
@@ -52,7 +54,7 @@ console.log("1. THE PAGE'S SOURCE");
     const ext = [...body.matchAll(/(?:src|href|action)\s*=\s*"(https?:\/\/[^"]+)"|fetch\(\s*"(https?:\/\/[^"]+)"|url\(\s*"?(https?:\/\/[^")]+)|import\s+[^;]*"(https?:\/\/[^"]+)"/g)].filter((m) => !/github\.com\/noniv/.test(m[0]));
     ok("!! the page loads NOTHING from outside (the attribution is text, not a request)", ext.length === 0, ext.map((m) => m[0]).join(" | "));
     ok("the page carries the origin notice, the demo: meta tags, a <title>, and links to the default water and server.html", /ui\/originNotice\.js/.test(raw) && /name="demo:title"/.test(raw) && /name="demo:desc"/.test(raw) && /name="demo:category"/.test(raw) && /<title>/.test(raw) && /href="\/ocean-default\.html"/.test(raw) && /href="\/server\.html"/.test(raw));
-    ok("!! the page SAYS what it is not: not lined up, not read by physics, not depth-composited, not seen to render here", /NOT LINED UP WITH THE PHYSICS SURFACE/.test(raw) && /NOT READ BY ANY PHYSICS/.test(raw) && /NOT DEPTH-COMPOSITED/.test(raw) && /NOT SEEN TO RENDER WHERE IT WAS BUILT/.test(raw));
+    ok("!! the page SAYS what it is not: not lined up, not read by physics, not depth-composited, not seen to render here", /NOT LINED UP WITH THE PHYSICS SURFACE/.test(flat) && /NOT READ BY ANY PHYSICS/.test(flat) && /NOT DEPTH-COMPOSITED/.test(flat) && /NOT SEEN TO RENDER WHERE IT WAS BUILT/.test(flat));
     ok("  and the decision is the tier switch's, not the page's: the page calls chooseTier and compares no frame time to a number of its own", /OT\.chooseTier\(/.test(js) && !/\b(33|30|16|60)\b\s*(?:ms|fps)/.test(js) && /OT\.BUDGET_MS/.test(js));
 }
 
