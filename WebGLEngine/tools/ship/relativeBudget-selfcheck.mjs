@@ -168,7 +168,11 @@ sec("3. *** THE CLAMP AT 1: A FAST PASS MOVES NOTHING, AND ON THIS FILE THAT SAV
         `own measured 1.5% box variation, and a symmetric correction throws every one of them out -- for a ` +
         `box that was never slow.`);
     ok("  and the correction is live rather than inert: readings did move",
-        norm.rescaled.length > 0 && norm.rescaled.every((r) => r.scale > 0 && r.ms !== r.raw),
+        // v4886 -- LIVE MEANS "THE SCALE WAS LOOKED UP AND APPLIED", NOT "A READING MOVED". The clamp at 1 is the rule: on a pass whose box ran at or
+        // under its own history (0.9926 at the v4886 verdict) nothing is divided, correctly, and the old condition read that as inert. So movement is
+        // required only when some applicable scale exceeds 1; otherwise the measured population must be non-empty and every scale in it well-formed.
+        (scales.some((x) => x > 1) ? norm.rescaled.length > 0 : measured.length > 0 && scales.every((x) => x > 0)) &&
+        norm.rescaled.every((r) => r.scale > 0 && r.ms !== r.raw),
         `${norm.rescaled.length} readings divided by a measured scale. A run where this went to zero would ` +
         `mean the whole rule had quietly stopped applying, which is the failure a green subset row cannot see.`);
 }
