@@ -1,0 +1,16 @@
+snowflow_demo (Noniv/snowflow_demo)
+MIT (Copyright (c) 2026 Maksymilian Dendura -- see LICENSE beside this file)
+https://github.com/Noniv/snowflow_demo
+commit 545039733b74eec742862f161990142c7ca7c7ec (the head of main when these files were taken, 2026-10-21)
+vendored v4895 (unnumbered until shipped): FIVE FILES, byte for byte, each fetched from raw.githubusercontent.com at that commit and compared with the copy the v4895 survey had read:
+  LICENSE                                   (the permission notice; it travels with every portion, as the licence requires)
+  src/shaders/deformSim.fragment.wgsl       242 lines   the toroidal deformation pass: scroll, relax (diffusion, wind infill, slump, decay), splat, clamp
+  src/shaders/lib/noise.wgsl                            snowNoise: the hashes and the gradient noise the pass's brush edge uses
+  src/shaders/lib/deform.wgsl               74 lines    how the terrain material reads the buffer (not adapted yet)
+  src/terrain/deformation.js                295 lines   the driver: ping-pong targets, brush queue, the banked-time rule
+tools/ship/snowflowVendor-selfcheck.mjs pins every file's sha256 and states what each is.
+WHAT IT IS: the surface-deformation half of a WebGPU snow demo built on Babylon.js. Its shaders are Babylon-flavoured WGSL (#include<...>, loose `uniform name: type;` declarations,
+FragmentInputs/FragmentOutputs), so they do NOT run as they are; render/toroidalDeform.mjs is SweK's own adaptation, a compute kernel over plain storage buffers whose function bodies are
+these files' bodies, with a CPU twin that grades it. NOTHING NOT LISTED ABOVE WAS TAKEN: the rest of the repository (the character, cloth, spells, water and sky passes, the Babylon wiring,
+README and package files) is not here, and nothing here depends on Babylon.js or Vite.
+NOT VERIFIED BY RUNNING UPSTREAM: the sandbox did not run the demo; its README's frame-time figure is its own claim. What IS run is our adaptation, against our own CPU twin.
