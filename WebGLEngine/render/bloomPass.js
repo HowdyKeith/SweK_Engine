@@ -17,6 +17,8 @@
 // sun disc, lava, memory blocks, queen marker pulses. Diffuse-lit
 // terrain stays clean.
 
+import { FRAGMENT_GLSL as ZOOM_BLUR_FS } from "./zoomBlur.mjs";   // v4895 -- the zoom blur's generated GLSL, graded by tools/ship/zoomBlur-selfcheck.mjs and wired by zoomBlurWiring-selfcheck
+
 const PASSTHROUGH_VS = `#version 300 es
 layout(location=0) in vec2 aPos;
 out vec2 vUV;
@@ -24,6 +26,10 @@ void main() {
     vUV = aPos * 0.5 + 0.5;
     gl_Position = vec4(aPos, 0.0, 1.0);
 }`;
+
+// v4895 -- the zoom pass's vertex shader is the passthrough one with the varying NAMED the way zoomBlur.mjs's fragment shader reads it (vUv, not vUV). The march is in this pass's own uv space,
+// which here is GL's (v = 0 at the bottom, like uSunPosUV), so the centre knob is given in that space too.
+const ZOOM_BLUR_VS = PASSTHROUGH_VS.replace(/vUV/g, "vUv");
 
 const BRIGHT_FS = `#version 300 es
 precision highp float;
@@ -377,6 +383,12 @@ export class BloomPass {
         this.heatRadii = new Float32Array(8);
         this.heatStrength = new Float32Array(8);
         this.heatCount = 0;
+        // v4895 -- zoom blur: a radial march toward a centre that REPLACES the scene colour for every pass after it (render/zoomBlur.mjs). 0 = off, and off means the pass is not run at all, its programs
+        // and targets are never created, and apply() reads the scene texture exactly as it did before this field existed. The centre is in GL uv (v = 0 at the bottom). Depth-based passes (SSAO,
+        // the outline, the god-ray depth gate) keep reading the UNBLURRED depth: the blur is of colour only.
+        this.zoomBlurStrength = 0;
+        this.zoomBlurCentre   = [0.5, 0.5];
+        this.zoomTex = null; this.zoomFBO = null; this.zoomProg = null;
         this.sunPosUV        = [0.5, 0.5];
         this.sunVisibility   = 0.0;     // updated each frame from main
 
@@ -534,6 +546,8 @@ export class BloomPass {
         this.halfH = halfH;
 
         // Clean up previous resources
+        if (this.zoomTex) { gl.deleteTexture(this.zoomTex); this.zoomTex = null; }      // v4895 -- recreated lazily at the new size
+        if (this.zoomFBO) { gl.deleteFramebuffer(this.zoomFBO); this.zoomFBO = null; }
         if (this.sceneTex) gl.deleteTexture(this.sceneTex);
         if (this.brightTex) gl.deleteTexture(this.brightTex);
         if (this.blurTexH) gl.deleteTexture(this.blurTexH);
@@ -717,6 +731,39 @@ export class BloomPass {
      *                 not overwrite each other, while the clamp in the shader is what stops the READS
      *                 crossing -- both are needed and neither substitutes for the other.
      */
+    /** v4895 -- build the zoom pass's program and full-size target the first time it is asked for. Never called while zoomBlurStrength is 0. */
+    _ensureZoom() {
+        const gl = this.gl;
+        if (!this.zoomProg) this.zoomProg = this._compileProgram(ZOOM_BLUR_VS, ZOOM_BLUR_FS, "zoomBlur");
+        if (!this.zoomTex) {
+            this.zoomTex = this._createColorTex(this.width, this.height);
+            this.zoomFBO = this._createFBO(this.zoomTex, null);
+        }
+    }
+
+    /**
+     * v4895 -- run the zoom blur: sceneTex -> zoomTex at full size, centre and strength from the two fields. Returns the texture the later passes should read. The caller has the VAO bound or not; this
+     * binds it. Leaves FRAMEBUFFER bound to zoomFBO (every pass after it binds its own).
+     */
+    _runZoomBlur(fullScissor = null) {
+        const gl = this.gl;
+        this._ensureZoom();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.zoomFBO);
+        gl.viewport(0, 0, this.width, this.height);
+        if (fullScissor) gl.scissor(...fullScissor);
+        gl.useProgram(this.zoomProg);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, this.sceneTex);
+        gl.uniform1i(gl.getUniformLocation(this.zoomProg, "tScene"), 0);
+        gl.uniform1f(gl.getUniformLocation(this.zoomProg, "cx"), this.zoomBlurCentre[0]);
+        gl.uniform1f(gl.getUniformLocation(this.zoomProg, "cy"), this.zoomBlurCentre[1]);
+        gl.uniform1f(gl.getUniformLocation(this.zoomProg, "strength"), this.zoomBlurStrength);
+        gl.bindVertexArray(this.vao);
+        gl.disable(gl.DEPTH_TEST);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        return this.zoomTex;
+    }
+
     apply(outRect = null) {
         const gl = this.gl;
         const eyeScissor = outRect ? {
@@ -729,13 +776,17 @@ export class BloomPass {
         const scissorFull = () => { if (eyeScissor) gl.scissor(...eyeScissor.full); };
         scissorHalf();
 
+        // v4895 -- Pass 0: the zoom blur, when it is on. `sceneSrc` is the colour every pass below reads; with the blur off it IS this.sceneTex, so nothing below changes.
+        let sceneSrc = this.sceneTex;
+        if (this.zoomBlurStrength > 0) sceneSrc = this._runZoomBlur(eyeScissor ? eyeScissor.full : null);
+
         // Pass 1 — brightness extract: scene → brightTex (half res)
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.brightFBO);
         gl.viewport(0, 0, this.halfW, this.halfH);
         scissorHalf();
         gl.useProgram(this.brightProg);
         gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, this.sceneTex);
+        gl.bindTexture(gl.TEXTURE_2D, sceneSrc);
         gl.uniform1i(gl.getUniformLocation(this.brightProg, "uScene"), 0);
         gl.uniform1f(gl.getUniformLocation(this.brightProg, "uThreshold"), this.threshold);
         gl.bindVertexArray(this.vao);
@@ -782,7 +833,7 @@ export class BloomPass {
             gl.viewport(0, 0, this.halfW, this.halfH);
             gl.useProgram(this.godRayProg);
             gl.activeTexture(gl.TEXTURE0);
-            gl.bindTexture(gl.TEXTURE_2D, this.sceneTex);
+            gl.bindTexture(gl.TEXTURE_2D, sceneSrc);
             gl.uniform1i(gl.getUniformLocation(this.godRayProg, "uScene"), 0);
             gl.activeTexture(gl.TEXTURE1);
             gl.bindTexture(gl.TEXTURE_2D, this.sceneDepth);
@@ -803,7 +854,7 @@ export class BloomPass {
         else gl.viewport(0, 0, this.width, this.height);
         gl.useProgram(this.compositeProg);
         gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, this.sceneTex);
+        gl.bindTexture(gl.TEXTURE_2D, sceneSrc);
         gl.uniform1i(gl.getUniformLocation(this.compositeProg, "uScene"), 0);
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, this.blurTexV);

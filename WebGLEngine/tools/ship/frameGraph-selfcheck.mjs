@@ -26,13 +26,19 @@ const ok = (c, name, detail) => {
     if (!c) fails++;
 };
 const sec = (t) => console.log("\n" + t);
-const G = FG.parsePasses(SRC);
+// v4895 -- the chain is apply()'s six draws. render/bloomPass.js now also holds a seventh gl.drawArrays in _runZoomBlur(), the zoom blur's pass 0, which apply() reaches through a helper and only
+// behind `zoomBlurStrength > 0`; the lexer cannot follow a helper (it reports such call sites rather than counting them), so the chain is parsed from apply() and the zoom draw has its own rows.
+const WHOLE = FG.parsePasses(SRC);
+const APPLY_AT = SRC.indexOf("    apply(outRect = null) {");
+const G = FG.parsePasses(SRC.slice(APPLY_AT));
 
 // ---------------------------------------------------------------------------------------------------------
 sec("1. THE CHAIN CAN BE READ OFF THE SOURCE, IN ORDER, WITH EACH DRAW ATTRIBUTED");
 // ---------------------------------------------------------------------------------------------------------
 {
-    ok(G.draws.length === 6, "six draws are found in bloomPass.js", `${G.draws.length} gl.drawArrays sites`);
+    ok(APPLY_AT > 0 && G.draws.length === 6, "six draws are found in bloomPass.js's apply()", `${G.draws.length} gl.drawArrays sites in apply()`);
+    ok(WHOLE.draws.length === 7 && WHOLE.draws.filter((d) => d.program === "this.zoomProg" || d.program === "zoomProg").length === 1 && /sceneSrc = this\._runZoomBlur\(/.test(SRC.slice(APPLY_AT)) && /zoomBlurStrength > 0/.test(SRC.slice(APPLY_AT)),
+       "*** and the seventh draw in the file is the zoom blur's, outside apply(): reached through _runZoomBlur() and only behind `zoomBlurStrength > 0` ***", `${WHOLE.draws.length} sites file-wide; programs ${WHOLE.draws.map((d) => d.program).join(", ")}`);
     const progs = G.draws.map((d) => d.program);
     ok(progs.every((p) => typeof p === "string" && p.length > 0),
        "every draw is attributed to the program bound before it", progs.join(" -> "));
@@ -101,7 +107,7 @@ sec("3. ROUND_TRIPS IS DERIVED, PROVEN BY MOVING THE SOURCE AND WATCHING IT FOLL
         "        gl.useProgram(this.extraProg);\n        gl.drawArrays(gl.TRIANGLES, 0, 3);\n\n        // Round 52 — Pass 3.5: SSAO at half-res from sceneDepth.");
     ok(injected !== SRC, "the mutation applied to the copy", "if this failed the checks below would be vacuous");
 
-    const G2 = FG.parsePasses(injected);
+    const G2 = FG.parsePasses(injected.slice(injected.indexOf("    apply(outRect = null) {")));   // v4895 -- the chain is apply()'s, as G is
     ok(G2.draws.length === G.draws.length + 1,
        "one extra draw in the source yields one extra draw in the graph", `${G.draws.length} -> ${G2.draws.length}`);
 
@@ -129,9 +135,9 @@ sec("3. ROUND_TRIPS IS DERIVED, PROVEN BY MOVING THE SOURCE AND WATCHING IT FOLL
 sec("4. THE LEXER REPORTS WHAT IT CANNOT SEE, RATHER THAN COUNTING ZERO AND MOVING ON");
 // ---------------------------------------------------------------------------------------------------------
 {
-    ok(G.unrecognised.length > 0,
-       "it flags call sites that might issue draws through a helper", `${G.unrecognised.length} flagged`);
-    ok(G.unrecognised.every((u) => /_compileProgram/.test(u.text)),
+    ok(WHOLE.unrecognised.length > 0,
+       "it flags call sites that might issue draws through a helper", `${WHOLE.unrecognised.length} flagged`);
+    ok(WHOLE.unrecognised.every((u) => /_compileProgram/.test(u.text)),
        "*** and on this file all of them are program COMPILATION, which correctly is not a draw ***",
        "the caution fired five times and was right five times -- a lexer that reported nothing here would be one that cannot report");
     ok(!/drawArrays/.test(G.unrecognised.map((u) => u.text).join(" ")),

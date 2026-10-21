@@ -87,8 +87,9 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "zoom-blur-wiring",
-        blocker: "OPEN",
-        what: "Wire render/zoomBlur.mjs's generated GLSL into bloomPass.js's post chain as a real pass.",
+        blocker: "CLOSED",
+        closed: "CLOSED at v4895 (unshipped) for the wiring; ONE SMALL PIECE REMAINS, said here so it is not lost: nothing sets BloomPass.zoomBlurStrength, so no page can turn it on yet. render/bloomPass.js now runs the zoom blur as a lazy pass 0 behind `zoomBlurStrength > 0` (default 0, so default behaviour is the code path it was), with its program and full-size target created only on first use and dropped on resize; apply() reads one local sceneSrc in the bright, god-ray and composite passes. tools/ship/zoomBlurWiring-selfcheck.mjs runs it in headless Chromium's real WebGL2 context -- the thing v4504 could not do -- and measured: the GLSL compiles and links with no GL error; the pass agrees with the CPU twin to 0.58 of an 8-bit level at an off-centre march on a 64x48 frame; apply() with the blur on composites the BLURRED scene (equal to the twin-blurred scene fed in with the blur off, within 1 level); a fresh BloomPass builds nothing. ONE CORRECTION TO THE ENTRY'S WHY: strength 0 is NOT bit-exact in GL (max difference 3.8e-6 on the half-float scene target, because the interpolated uv is off the texel centre and the bilinear sample bleeds ~4e-6 of a neighbour -- the v4478 bit-exactness was the WebGPU reading); OFF is exact because the wiring does not run the pass at all. Not covered: stereo (the eye rect is ignored), a real GPU, the WebGPU twin of the wiring.",
+        what: "WAS: Wire render/zoomBlur.mjs's generated GLSL into bloomPass.js's post chain as a real pass.",
         how: "A framebuffer, three uniforms (uScene, uCentre, uStrength) and a slot in the composite. The shader is already generated and its summation order is graded; what is missing is the plumbing.",
         why: "v4478 built and graded the kernel and deliberately did not wire it: no WebGL context has compiled the GLSL here, because this box has headless WebGPU and no headless GL. The claim a wiring round rests on is already measured -- strength 0 is a BIT-EXACT identity on real hardware, so the pass cannot move a pixel until somebody turns it on.",
     },
