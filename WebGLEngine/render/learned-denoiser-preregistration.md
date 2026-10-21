@@ -6595,3 +6595,91 @@ node render/denoiseTiming-selfcheck.mjs
 node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r33-b2.json
 ```
 Send back the console output of the first line and the JSON file.
+
+**Added before the 1080 ran, at Keith's call: the run is pinned to 468766f9.** Round 34 (section 99) changes
+`render/denoiseUpscaleGPU.mjs`, so "any later commit" no longer has the chain's code unchanged. The owed run is made from a
+checkout of 468766f9, this section's commit. The rule above is unchanged.
+```
+git checkout 468766f9
+```
+
+## 99. ROUND 34 -- THE FILL OVER THE LIGHTS' PIXELS ONLY, TIMED ON THE RIG AT 1920 x 1080: FIXED BEFORE THE RIG RUNS IT
+
+**Why this round.** Section 94 found that the half-size chain's own steps cost more than its network. The fill was the largest
+of them: 20-23 ms on the GTX 1080 and 300-323 ms on the Intel gen-9 in round 33's runs, for 96 ring passes over every one of
+960 x 540 pixels. On R 990000, 25,765 of those pixels are the light's, 5.0 % of the frame (measured here on the CPU, 64 rays a
+pixel), and they fill in 87 rings. The other 95 % are known, and every ring pass reads and copies them anyway.
+`denoise-halfres-fixed-costs` names two levers. This round takes the exact one; the coverage lever is a quality question and
+waits.
+
+> **At 1920 x 1080 output, on each GPU, is the fill over the lights' pixels only faster than round 31's fill over the whole
+> frame -- and by how much does it move the half-size chain against today's page?**
+
+**What exists for it (committed before this section).** `render/denoiseUpscaleGPU.mjs` gains four kernels and
+`fill(..., { list: true })`, also accepted by `chain`:
+- `FILL_LIST_WGSL`, once over the frame: each pixel's ring is 0 if known, else UNKNOWN and its index goes on a list;
+- `FILL_ARGS_WGSL`, one thread: the list's length as an indirect dispatch's workgroups, so nothing is read back to size the rings;
+- `FILL_LISTRING_WGSL`, one ring over the list, in place: a pixel still UNKNOWN takes the mean of its 8-neighbours whose ring
+  is below this one's. A neighbour filled in this ring reads as this ring or UNKNOWN, never below it, so the rule is round 31's
+  with no copy of the known pixels and no ping-pong;
+- `FILL_LISTLEFT_WGSL`: a pixel no ring reached is 0.
+
+`render/denoiseUpscaleGPU-selfcheck.mjs`'s section 3 holds it, on SwiftShader here and on each GPU's own adapter in the rig's run:
+- against `fillEmittersBounded`, at round 31's tolerance (1e-5): the same rings and pixels left, on a 24 x 20 frame and a 96 x 64
+  one whose fill takes 16 rings, with rings to spare and short of them;
+- against round 31's device fill: the same count in every ring, the same pixels left, values within 1e-6. On SwiftShader not
+  one float differs, on any frame, nor in the four chains built on it. The two kernels add the same neighbours in the same order;
+- on a frame of all emitter and one of none, and with the list's length read back, so a run of the rings in its place shows.
+Sabotaged Y1-Y7. Y7 (the rings run whatever is asked) went 0 red until the list's length was read back.
+`tools/ship/wgslCorpus.mjs` now accounts for the chain's thirteen kernels from rounds 31, 33 and 34. Those rounds had left them
+out, and `crossBackend` and `harnessLiveness` were red on it; each kernel is now listed with the reason it is graded by its own
+gate.
+
+`time()` adds `fillList` and `wholeList`, and `timeHalfChain` adds `halfList` and `temporalList`: `half` and `temporal` with
+`fillList` in the fill's place. The page's table has three more rows. On a GPU, the gate's section 4 prints a `section 99:`
+line, and a checked list fill at 960 x 540 must reach every listed pixel in the ring fill's count of rings.
+
+**The arms, at 1920 x 1080 output, on R 990000, as in sections 93 and 97.**
+- **The ring fill, `fill`:** round 31's, 96 ring passes over 960 x 540 and its left pass.
+- **The list fill, `fillList`:** the list pass, the args pass, 96 ring passes over the list and its left pass.
+- Both by the wall clock (more than 30 passes), in the same run, on the same buffers, from the same frame.
+
+**The test.** On each GPU, two runs of `realGpuRun --only denoise`, at a commit carrying this section:
+- **H (per GPU):** `fillList` is below `fill` in both runs.
+- **C1:** every denoise gate is green in both runs, the list fill's device rows among them.
+- **C2:** the ring fill filled on fewer than 96 rings, and the checked list fill reached every listed pixel in the same count.
+- **C3:** both networks on the device's clock, as in section 93.
+- **Reported, deciding nothing:** `full / halfList` and `full / temporalList` beside section 97's two ratios, and the two
+  runs' spread.
+
+**Predicted, before any of it ran on a GPU:**
+- **The GTX 1080:** H holds. `fillList` is 1-6 ms against `fill`'s 20-23. The list is 5 % of the frame, so its ring passes do
+  about a twentieth of the work. What is left is the cost of 99 small passes. `full / halfList` is 1.9-2.3, against 1.45-1.53
+  for `full / half`.
+- **The Intel gen-9:** H holds. `fillList` is 15-80 ms against 300-323. `full / halfList` is 1.8-2.2 (round 33's `half` with the fill swapped, at both ends of these ranges).
+- **C1 and C2 hold on both GPUs.** C1 on the 1080 is the least sure: its timing gate died in round 33's run b, and that is not
+  understood yet.
+
+**What each outcome does.**
+- **H holds on both GPUs:** the list fill becomes the chain's fill, in a round of its own that changes the runner's default.
+  The fill lever of `denoise-halfres-fixed-costs` is closed, and its coverage lever stays open.
+- **H fails on a GPU:** that GPU's passes are named from the run, and the ring fill stays.
+- **No verdict on a GPU** (a red gate, a short fill, a wall-clock network): its two runs are owed again.
+- **Nothing changes in this round:** the chain's default fill, the page's own denoise, the network, every kernel table, and
+  `fx/fsr`.
+
+**Seen first, here, on SwiftShader -- a CPU's times, deciding nothing:** at the pilot size (64 x 36 half), the ring fill was
+21.2-22.5 ms and the list fill 15.5-16.6 ms. Both are mostly the cost of the passes at that size. At the rig's size, run once
+here with `SWEK_HALFCHAIN_RIGSIZE=1`: the ring fill 3,237 ms, the list fill 305 ms. The checked list fill listed 25,765 pixels,
+the CPU's count, and reached all of them in 87 rings. That run's section 93 row was red only because SwiftShader's network at
+1920 x 1080 is over the ladder's 5,000 ms cap, as it would be in any such run.
+
+**On the rig.** The 1080's owed round-33 run first, from 468766f9 (section 98). Then, on each GPU, from a fresh clone of a
+commit carrying this section:
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r34-a.json
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r34-b.json
+```
+Don't commit or pull between runs. Send back all four JSON files.

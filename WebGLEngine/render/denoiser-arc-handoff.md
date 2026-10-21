@@ -41,8 +41,9 @@ node tools/ship/versionPreflight.mjs --next    # the next free version and sweep
    jittered frames, accumulated at full size, beat the same chain on one frame and full size at the same samples. Round 33
    (sections 97-98) put the accumulation on the device. On the Intel, the chain with its history is still cheaper than
    today's page at 1080p (1.330 and 1.316 x). The 1080's run b does not count: its timing gate died. One run is owed there,
-   with the gate run alone first. Section 98 fixes how it is read.
-   **`denoise-halfres-fixed-costs`** sits beside it: round 31 found the chain's coverage and fill cost more than its network.
+   with the gate run alone first, from a checkout of 468766f9. Section 98 fixes how it is read.
+   **`denoise-halfres-fixed-costs`, round 34 (section 99), the fill lever:** the same fill over the lights' pixels only. It is
+   exact on SwiftShader and waits on the rig's two runs on each GPU.
 2. **`denoise-f16-intel`** (gen-9 only). Half-precision kernels, now known to be exposed there.
 3. **`denoise-subgroup-reduction`** (GTX 1080 only). Subgroup kernels, now known to be exposed there.
 

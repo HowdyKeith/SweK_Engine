@@ -492,10 +492,11 @@ node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r33-b.json
 
 **The outcome so far (section 98): on the Intel the chain with its history is still cheaper than today's page.** It was 1.330
 and 1.316 x, with every gate green, and the history's passes cost 83-86 ms. The 1080's run a was green at 1.405 x. Its run b
-does not count: `render/denoiseTiming-selfcheck.mjs` died 17.7 s in, with no FAIL line. **The 1080 owes one run**, on a fresh
-clone of this branch:
+does not count: `render/denoiseTiming-selfcheck.mjs` died 17.7 s in, with no FAIL line. **The 1080 owes one run**, from a
+checkout of 468766f9 (section 98's commit; later commits change the chain's code):
 
 ```
+git checkout 468766f9
 cd WebGLEngine
 set SWEK_WEBGPU=
 node render/denoiseTiming-selfcheck.mjs
@@ -504,6 +505,24 @@ node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r33-b2.json
 
 - **Send back the first line's console output and the JSON file.** The first line runs the timing gate alone. It reports where
   the gate dies and decides nothing.
+
+### Round 34: the fill over the lights' pixels only, timed at 1920 x 1080 (pre-registration section 99)
+
+On the 1080, do round 33's owed run above first. Then, on each GPU, in a fresh clone of a commit carrying section 99:
+
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r34-a.json
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r34-b.json
+```
+
+- **What is new:** the chain gate also runs round 31's fill over the lights' pixels only, and checks it against the CPU and
+  against the whole-frame fill on the GPU. A `section 99:` line times the two fills side by side.
+- **Section 99 predicts:** the list fill is faster on both GPUs: 1-6 ms against 20-23 on the 1080, and 15-80 ms against
+  300-323 on the Intel. Every gate is green.
+- **Don't commit or pull between runs.**
+- **Send back all four JSON files.**
 
 ## Send back
 

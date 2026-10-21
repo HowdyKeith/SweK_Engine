@@ -55,13 +55,22 @@
 //   W4  H holding at 0.9 x                                             1 RED (the rule row)
 //   W5  the Intel's predicted history cost widened to 90 ms            1 RED (the predictions row)
 //   W6  H read off the chain without its history                       1 RED (the rule row)
+//   and section 3's list fill (round 34), by the same runner:
+//   Y1  a ring reads neighbours filled in the same ring (<= for <)     3 RED (against the CPU; against round 31's fill; the chain)
+//   Y2  the args kernel rounds the list's workgroups down              4 RED (the constants row; the same three)
+//   Y3  the rings counted from 0, so the known pixels are no ring below 3 RED (the same three)
+//   Y4  the left pass counts a pixel no ring reached but keeps its value 2 RED (against the CPU; against round 31's fill)
+//   Y5  timeHalfChain's halfList sums the ring fill                    1 RED (section 4's list sum row)
+//   Y6  the page's table without the list fill's row                   1 RED (the page row: 13 rows, not 14)
+//   Y7  fill() runs the rings whatever it is asked                     1 RED (the row against round 31's fill). 0 RED at first: the
+//       two fills agree float for float, so nothing could tell which ran; the list's length, read back as `listed`, is the fix
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { runInEngineOrigin } from "../tools/ship/webgpuHarness.mjs";
 import { validateWgsl } from "./wgslSpec.mjs";
-import { COVERAGE_WGSL, FILL_RING_WGSL, FILL_LEFT_WGSL, TO_T_WGSL, COMPOSITE_WGSL, COVERAGE_GRID_WGSL, SPHERE_STRIDE, packSpheres, cameraUniform, DenoiseUpscaleGPU, TEMPORAL_CONSTANTS, GEO_STRIDE, FIRSTHITS_WGSL, SHIFT_WGSL, ACCUM_WGSL, FINAL_WGSL, accumUniform, packGeometry } from "./denoiseUpscaleGPU.mjs";
+import { COVERAGE_WGSL, FILL_RING_WGSL, FILL_LEFT_WGSL, FILL_LIST_WGSL, FILL_ARGS_WGSL, FILL_LISTRING_WGSL, FILL_LISTLEFT_WGSL, FILL_UNKNOWN, FILL_LIST_WG, TO_T_WGSL, COMPOSITE_WGSL, COVERAGE_GRID_WGSL, SPHERE_STRIDE, packSpheres, cameraUniform, DenoiseUpscaleGPU, TEMPORAL_CONSTANTS, GEO_STRIDE, FIRSTHITS_WGSL, SHIFT_WGSL, ACCUM_WGSL, FINAL_WGSL, accumUniform, packGeometry } from "./denoiseUpscaleGPU.mjs";
 import { fillEmitters, fillEmittersBounded, emitterAwareUpscale, GAMMA } from "./denoiseUpscale.mjs";
 import { emitterRadiance, COVERAGE_GRID } from "./denoiseMask.mjs";
 import { makeScene } from "./denoiseScenes.mjs";
@@ -112,7 +121,7 @@ const F1 = synth(24, 20, [[6, 6, 3.2], [17, 13, 5.5], [23, 1, 2]]);
 
 console.log("\n2. THE KERNELS");
 {
-    const ks = { COVERAGE_WGSL, FILL_RING_WGSL, FILL_LEFT_WGSL, TO_T_WGSL, COMPOSITE_WGSL, FIRSTHITS_WGSL, SHIFT_WGSL, ACCUM_WGSL, FINAL_WGSL };
+    const ks = { COVERAGE_WGSL, FILL_RING_WGSL, FILL_LEFT_WGSL, TO_T_WGSL, COMPOSITE_WGSL, FIRSTHITS_WGSL, SHIFT_WGSL, ACCUM_WGSL, FINAL_WGSL, FILL_LIST_WGSL, FILL_ARGS_WGSL, FILL_LISTRING_WGSL, FILL_LISTLEFT_WGSL };
     const bad = Object.entries(ks).map(([k, s]) => [k, validateWgsl(s)]).filter(([, p]) => p.length);
     ok("every kernel validates against the spec scanner", !bad.length, bad.map(([k, p]) => `${k}: ${p.join("; ")}`).join(" | "));
     ok("  the constants the kernels carry are the CPU's: the coverage grid, the transfer's gamma, its top below the pole",
@@ -122,6 +131,10 @@ console.log("\n2. THE KERNELS");
     const S = makeScene("R", 44001), sp = packSpheres(S.scene), em = S.scene.findIndex((s) => s.emit);
     ok("  a scene packs as SPHERE_STRIDE floats a sphere, its emitter flagged and its emission spread to rgb",
         SPHERE_STRIDE === 8 && sp.length === S.scene.length * 8 && sp[em * 8 + 7] === 1 && sp[7] === 0 && sp[em * 8 + 4] === Math.fround(typeof S.scene[em].emit === "number" ? S.scene[em].emit : S.scene[em].emit[0]));
+    // round 34: the list fill's marker is no ring a fill can reach, and its kernels carry it and the workgroup the runner sizes by
+    ok("  round 34: the list fill's UNKNOWN ring is u32's top, written into the list and both list kernels, and its rings and left pass run FILL_LIST_WG to a workgroup, as the args kernel counts them",
+        FILL_UNKNOWN === 0xffffffff && FILL_LIST_WG === 64 && [FILL_LIST_WGSL, FILL_LISTRING_WGSL, FILL_LISTLEFT_WGSL].every((k) => k.includes(`${FILL_UNKNOWN}u`)) &&
+        [FILL_LISTRING_WGSL, FILL_LISTLEFT_WGSL].every((k) => k.includes(`@workgroup_size(${FILL_LIST_WG},1,1)`)) && FILL_ARGS_WGSL.includes(`/ ${FILL_LIST_WG}u`) && FILL_ARGS_WGSL.includes(`+ ${FILL_LIST_WG - 1}u`));
     let mesh = null; try { packSpheres([{ bvh: {} }]); } catch (e) { mesh = e.message; }
     ok("  ...and a scene with a mesh is refused by name -- the coverage kernel intersects spheres only", /spheres only/.test(mesh || ""));
     // round 33: the accumulation's uniform (two cameras, then w h clamp frames, then the scales and tolerances) and the packed geometry
@@ -159,7 +172,9 @@ const chainIn = CPU.map(({ half }) => {
     return img;
 });
 const RINGS = 24;
-const payload = { scenes: SCENES.map(wire), fill: { img: Array.from(F1.img), cov: Array.from(F1.cov) }, chainIn: chainIn.map((a) => Array.from(a)),
+// round 34's list fill on a frame whose fill is long: a disc 22 pixels in radius and two more, one cut by the frame's corner
+const F2 = synth(96, 64, [[30, 30, 22], [70, 40, 14], [95, 0, 6]]);
+const payload = { scenes: SCENES.map(wire), fill: { img: Array.from(F1.img), cov: Array.from(F1.cov) }, fill2: { img: Array.from(F2.img), cov: Array.from(F2.cov) }, chainIn: chainIn.map((a) => Array.from(a)),
     covHalf: CPU.map((c) => Array.from(c.half.cov)), full: CPU.map((c) => ({ cov: Array.from(c.full.cov), E: Array.from(c.full.E) })), W, Hh, RINGS };
 const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 900000, args: { payload }, script: `async (a) => {
     const P = a.payload;
@@ -174,16 +189,25 @@ const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 900000, args: { 
     for (const S of P.scenes) { const f = await g.coverage(S, P.W, P.W), h = await g.coverage(S, P.Hh, P.Hh); cov.push({ full: { cov: A(f.cov), E: A(f.E) }, half: { cov: A(h.cov), E: A(h.E) } }); }
     const fills = [];
     for (const m of [16, 2]) { const f = await g.fill(Float64Array.from(P.fill.img), Float64Array.from(P.fill.cov), 24, 20, m); fills.push({ ...f, y: A(f.y) }); }
+    // round 34: the list fill beside round 31's, on the same frames and ring budgets, and on a frame of all emitter and one of none
+    const lists = [];
+    for (const [k, F, w, h, m] of [["F1/16", P.fill, 24, 20, 16], ["F1/2", P.fill, 24, 20, 2], ["F2/40", P.fill2, 96, 64, 40], ["F2/8", P.fill2, 96, 64, 8],
+                                   ["all", { img: new Array(12).fill(5), cov: new Array(4).fill(1) }, 2, 2, 4], ["none", { img: P.fill.img, cov: new Array(24 * 20).fill(0) }, 24, 20, 4]]) {
+        const ring = await g.fill(Float64Array.from(F.img), Float64Array.from(F.cov), w, h, m), list = await g.fill(Float64Array.from(F.img), Float64Array.from(F.cov), w, h, m, { list: true });
+        lists.push({ k, m, ring: { ...ring, y: A(ring.y) }, list: { ...list, y: A(list.y) } });
+    }
     const chains = [];
     for (let i = 0; i < P.chainIn.length; i++) {
         const c = await g.chain(Float64Array.from(P.chainIn[i]), Float64Array.from(P.covHalf[i]), P.Hh, P.Hh, P.W, P.W,
             { cov: Float64Array.from(P.full[i].cov), E: Float64Array.from(P.full[i].E) }, P.RINGS);
-        chains.push({ ...c, y: A(c.y) });
+        const cl = await g.chain(Float64Array.from(P.chainIn[i]), Float64Array.from(P.covHalf[i]), P.Hh, P.Hh, P.W, P.W,
+            { cov: Float64Array.from(P.full[i].cov), E: Float64Array.from(P.full[i].E) }, P.RINGS, { list: true });
+        chains.push({ ...c, y: A(c.y), list: { ...cl, y: A(cl.y) } });
     }
     let wrongBackend = null;
     try { new DenoiseUpscaleGPU(await requestDevice(document.createElement("canvas"), { backend: "webgl2", offscreen: true })); } catch (e) { wrongBackend = String(e.message).slice(0, 160); }
     const ad = await navigator.gpu.requestAdapter(), info = ad.info || {};
-    return { cov, fills, chains, errs, backend: dev.backend, wrongBackend, adapter: [info.vendor, info.architecture, info.description].filter(Boolean).join(" / ") };
+    return { cov, fills, lists, chains, errs, backend: dev.backend, wrongBackend, adapter: [info.vendor, info.architecture, info.description].filter(Boolean).join(" / ") };
 }` });
 
 if (r.skipped) console.log("  SKIP  " + r.reason);
@@ -221,6 +245,29 @@ else {
     ok("!! the whole chain on one encoder -- bounded fill, transfer, EASU, inverse, composite -- is emitterAwareUpscale's with EASU, within 1e-3, every emitter pixel reached",
         ch.length === 4 && ch.every((c) => c.rel <= 1e-3 && c.left === 0 && c.rings > 0 && c.rings < RINGS),
         ch.map((c) => `${c.k}: worst ${c.rel.toExponential(1)}, ${c.rings} rings, ${c.left} left`).join("; "));
+    // ROUND 34, THE LIST FILL (Y7 -- fill() running the rings whatever it is asked -- went 0 RED before `listed`: the two fills agree,
+    // so only the list's own length, read back, says which ran): the same rule as round 31's device fill, run over the lights' pixels only and in place. Against
+    // fillEmittersBounded at round 31's tolerance, and against round 31's device fill: the same sums in the same order, so the same
+    // floats wherever the two compilers keep them -- held at 1e-6, the count of floats that differ at all reported
+    const cpuOf = { F1: [F1, 24, 20], F2: [F2, 96, 64] };
+    const L = R.lists.map((x) => {
+        const [F, w, h] = cpuOf[x.k.split("/")[0]] || [null], ref = F ? fillEmittersBounded(F.img, F.cov, w, h, x.m) : null;
+        let diff = 0; for (let i = 0; i < x.list.y.length; i++) if (!Object.is(x.list.y[i], x.ring.y[i])) diff++;
+        return { ...x, ref, diff, vsRing: maxRel(x.list.y, x.ring.y), vsCpu: ref ? maxRel(x.list.y, ref.y) : null };
+    });
+    const same = (a, b) => a.rings === b.rings && a.left === b.left && a.perRing.length === b.perRing.length && a.perRing.every((v, i) => v === b.perRing[i]);
+    ok("!! round 34: the list fill is fillEmittersBounded's -- the same rings, ring by ring, and pixels left, every value within 1e-5 -- with rings to spare and short of them, on a 24 x 20 and a 96 x 64 frame",
+        L.filter((x) => x.ref).length === 4 && L.filter((x) => x.ref).every((x) => x.list.rings === x.ref.rings && x.list.left === x.ref.left && x.vsCpu <= 1e-5) &&
+        L.some((x) => x.ref && x.list.left === 0 && x.list.rings > 8) && L.some((x) => x.ref && x.list.left > 0),
+        L.filter((x) => x.ref).map((x) => `${x.k}: ${x.list.rings} rings, ${x.list.left} left, worst ${x.vsCpu.toExponential(1)}`).join("; "));
+    ok("!! ...and it is round 31's device fill: the same filled count in every ring, the same pixels left, every value within 1e-6 -- and on a frame of all emitter or of none",
+        L.length === 6 && L.every((x) => same(x.list, x.ring) && x.vsRing <= 1e-6 && x.ring.listed === 0) && L.every((x) => x.list.listed === (x.k === "none" ? 0 : x.k === "all" ? 4 : cpuOf[x.k.split("/")[0]][0].cov.filter((c) => c > 0).length)) && L.find((x) => x.k === "all").list.left === 4 && L.find((x) => x.k === "all").list.rings === 0 &&
+        L.find((x) => x.k === "none").list.rings === 0 && L.find((x) => x.k === "none").list.left === 0 && maxRel(L.find((x) => x.k === "none").list.y, F1.img) <= 1e-6,
+        L.map((x) => `${x.k}: ${x.list.listed} listed, ${x.diff} of ${x.list.y.length} floats differ, worst ${x.vsRing.toExponential(1)}`).join("; "));
+    const chL = R.chains.map((c, i) => ({ k: `R ${SCENES[i].seed}`, rel: maxRel(c.list.y, ref[i]), vs: maxRel(c.list.y, c.y), same: same(c.list, c) }));
+    ok("!! ...and the whole chain with it is emitterAwareUpscale's within 1e-3, and round 31's chain within 1e-6, every emitter pixel reached",
+        chL.length === 4 && chL.every((c) => c.rel <= 1e-3 && c.vs <= 1e-6 && c.same) && R.chains.every((c, i) => c.list.left === 0 && c.listed === 0 && c.list.listed === CPU[i].half.cov.filter((v) => v > 0).length),
+        chL.map((c) => `${c.k}: worst ${c.rel.toExponential(1)} against the CPU, ${c.vs.toExponential(1)} against round 31's`).join("; "));
 }
 
 console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at its pilot size, in Chromium");
@@ -239,10 +286,10 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
     if (pg.skipped) console.log("  SKIP  " + pg.reason);
     else {
         let J = null; try { J = JSON.parse(pg.result?.json || "null"); } catch {}
-        const st = J && J.chain && J.chain.steps, keys = ["covHalf", "covFull", "fill", "rest", "whole", "hits", "shift", "accum", "final"];
+        const st = J && J.chain && J.chain.steps, keys = ["covHalf", "covFull", "fill", "rest", "whole", "hits", "shift", "accum", "final", "fillList", "wholeList"];
         const fine = (x) => !!x && Number.isFinite(x.ms) && x.ms > 0 && (x.clock === "device" || x.clock === "wall");
         ok("!! the page timed every step of the chain and both networks at its pilot size -- each a positive time on a named clock, the table shown, no page error",
-            pg.ok && !!st && keys.every((k) => fine(st[k])) && fine(J.networkFull) && fine(J.networkHalf) && !!J.full && !!J.half && !!J.temporal && pg.result.shown && pg.result.rows === 11 && !pg.pageErrors.length,
+            pg.ok && !!st && keys.every((k) => fine(st[k])) && fine(J.networkFull) && fine(J.networkHalf) && !!J.full && !!J.half && !!J.temporal && !!J.halfList && !!J.temporalList && pg.result.shown && pg.result.rows === 14 && !pg.pageErrors.length,
             pg.ok ? (pg.result?.status || "").slice(0, 200) : pg.reason);
         if (st) {
             // the network times are the ladder's rows, w x h then W x H (T4 went 0 RED before this held which was which); today's page
@@ -259,6 +306,13 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
             ok("  round 33: the chain with its history is the half-size chain plus the history's four passes -- first hits, shift, accumulation, composite -- each one pass, on the device's clock where the device has one",
                 !!J.temporal && Math.abs(J.temporal.ms - (J.half.ms + hist.reduce((a, k) => a + st[k].ms, 0))) < 1e-9 && hist.every((k) => st[k].clock === st.covHalf.clock),
                 hist.map((k) => `${k} ${st[k].ms.toFixed(2)} ms (${st[k].clock})`).join(", "));
+            // round 34: the chain with the list fill is the same sum with fillList in fill's place, and with its history the same
+            const listSum = med(halfRow) + ["covHalf", "covFull", "fillList", "rest"].reduce((a, k) => a + st[k].ms, 0);
+            ok("  round 34: the chain with the list fill is the half-size chain with fillList in the fill's place, by the wall clock as the fill is, and with its history the history's four passes more",
+                !!J.halfList && Math.abs(J.halfList.ms - listSum) < 1e-9 && st.fillList.clock === "wall" && st.wholeList.clock === "wall" &&
+                !!J.temporalList && Math.abs(J.temporalList.ms - (listSum + hist.reduce((a, k) => a + st[k].ms, 0))) < 1e-9 &&
+                !!J.chain.listCheck && J.chain.listCheck.listed === J.chain.inView && J.chain.listCheck.rings === J.chain.rings && J.chain.listCheck.left === 0,
+                `the list fill: ${J.chain.listCheck ? `${J.chain.listCheck.listed} listed, ${J.chain.listCheck.rings} rings, ${J.chain.listCheck.left} left` : "not checked"}; fill ${st.fill.ms.toFixed(2)} ms, the list fill ${st.fillList.ms.toFixed(2)} ms; whole ${st.whole.ms.toFixed(2)}, with the list fill ${st.wholeList.ms.toFixed(2)}`);
         }
         // ON A GPU, THE RIG'S SIZE (pre-registration section 93): 960 x 540 -> 1920 x 1080, every step a measured line the rig's
         // report keeps. Not on a software adapter: SwiftShader's 1080p would be minutes of a CPU's time that decides nothing.
@@ -268,8 +322,9 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
             const rg = await drive("1920x1080", 1500000);
             let K = null; try { K = JSON.parse(rg.result?.json || "null"); } catch {}
             const ks = K && K.chain && K.chain.steps;
-            ok("!! section 93: at 1920 x 1080 the page timed both networks and every step of the chain, the fill reaching every pixel in its 96 rings",
-                rg.ok && !!ks && keys.every((k) => fine(ks[k])) && fine(K.networkFull) && fine(K.networkHalf) && !!K.full && !!K.half && !!K.temporal && K.chain.rings > 0 && K.chain.rings < 96 && !rg.pageErrors.length,
+            ok("!! section 93: at 1920 x 1080 the page timed both networks and every step of the chain, the fill reaching every pixel in its 96 rings -- and round 34's list fill the same, every listed pixel reached",
+                rg.ok && !!ks && keys.every((k) => fine(ks[k])) && fine(K.networkFull) && fine(K.networkHalf) && !!K.full && !!K.half && !!K.temporal && !!K.halfList && !!K.temporalList && K.chain.rings > 0 && K.chain.rings < 96 && !rg.pageErrors.length &&
+                !!K.chain.listCheck && K.chain.listCheck.listed === K.chain.inView && K.chain.listCheck.rings === K.chain.rings && K.chain.listCheck.left === 0,
                 rg.ok ? (rg.result?.status || "").slice(0, 200) : rg.reason);
             if (ks) {
                 const row = (x) => (x.skipped ? `not measured (${x.reason})` : `${(x.gpu ? x.gpu.median : x.wall.median).toFixed(3)} ms (${x.gpu ? "device" : "wall"})`), [lh, lf] = K.ladder.rows[K.kernels];
@@ -280,6 +335,10 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
                 // round 33 (section 97): the history's passes and the chain with them, in a line of their own -- section 94 reads the two above
                 say("section 97: the history's passes -- " + ["hits", "shift", "accum", "final"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; ") +
                     (K.full && K.temporal ? `; the half-size chain with its history ${K.temporal.ms.toFixed(3)} ms (${K.temporal.clocks.join(" + ")}); ratio ${(K.full.ms / K.temporal.ms).toFixed(3)} x` : "; no ratio: a part was not measured"));
+                // round 34 (section 99): the fill over the lights' pixels, beside round 31's, in a line of its own
+                say("section 99: the fills -- " + ["fill", "fillList", "whole", "wholeList"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; ") +
+                    (K.chain.listCheck ? `; the list fill ${K.chain.listCheck.listed} listed, ${K.chain.listCheck.rings} of 96 rings, ${K.chain.listCheck.left} left` : "; the list fill not checked") +
+                    (K.full && K.halfList && K.temporalList ? `; the half-size chain with the list fill ${K.halfList.ms.toFixed(3)} ms, ratio ${(K.full.ms / K.halfList.ms).toFixed(3)} x; with its history ${K.temporalList.ms.toFixed(3)} ms, ratio ${(K.full.ms / K.temporalList.ms).toFixed(3)} x` : "; no ratio: a part was not measured"));
             }
         }
     }
