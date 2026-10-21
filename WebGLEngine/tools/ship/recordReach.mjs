@@ -467,7 +467,12 @@ export const REACH_AT_V4548 = Object.freeze({
     // unguarded 16 -> 17, unchecked 59 -> 61. THE RISE IS THE ROUND'S FINDING AND NOT A REGRESSION OF THE TREE: a guardian now has to USE the name in code, and
     // twenty-odd records lost a guardian that only wrote the name in a message or held it inside another identifier. Three moved class: ADDED_AT_V4403 lost its
     // only guardian (a mention) and is now unguarded; MEASURED_AT_V4415 and KEY_DRIFT_V4460 kept one real guardian, and it is over the sweep's line.
-    checked: 120, overBudget: 44, unguarded: 17, unchecked: 61,
+    // v4890 -- 61 -> 62 and checked 120 -> 119, overBudget 44 -> 45, NAMED: WASM_AT_V4663's guardians are tools/ship/wasmDoors-selfcheck.mjs and wasmTeardown-selfcheck.mjs, and wasmDoors crossed the 3,000 ms line
+    // (ring 3,051 / 2,804 / 3,137 serial; 3,386 ms measured alone just now). It is a CENSUS gate: a `git grep --untracked` over the whole tree (about 1.5 s of its 3 s is spawnSync) plus the comment lexer
+    // (0.6 s), so it grows with the tree and this round added three more files. It sat at 2,804 for the v4887 reading and flipped back and forth through v4889 and v4890's verdicts (61 / 62 / 61 / 62), which is the
+    // flake that was reported and not understood until now: not noise, a gate AT the line. The ceiling is 62 because 62 is what the tree holds when it reads over; the fix that would lower it is a cheaper census in
+    // wasmTeardown.mjs (one pass instead of a grep per door), not a re-timing. The ratchet still refuses growth beyond this.
+    checked: 119, overBudget: 45, unguarded: 17, unchecked: 62,
     // v4550 -- the UNMEASURED class was split out of over-budget after this gate went red twice inside full
     // sweeps and passed 68 times under load; the trigger was a concurrent REWRITE of sweep-timings.json, not
     // contention. Zero records sit in it on a settled tree, which is the expected reading.
