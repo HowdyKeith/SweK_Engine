@@ -207,8 +207,21 @@ export function perturb(body, kind = "auto") {
     }
     if (kind === "drop") {
         // Remove one element AND its separator, so the literal stays valid and the LENGTH changes.
-        const m = codeOnly(body, /(["'])((?:[^"'\\\n]|\\.){3,})\1\s*,\s*/);
-        if (m) return { body: body.replace(m[0], ""), kind: "drop", what: `dropped "${m[2].slice(0, 40)}"` };
+        //
+        // *** ROUND 22: AN ELEMENT OF A LIST, NOT THE VALUE OF A FIELD -- AND THE FIRST CUT COULD NOT TELL. ***
+        // It removed the first quoted string followed by a comma, and in `at: "v4578",` that is a FIELD's value:
+        // the record then read `at: ` followed by the next key, and the FILE NO LONGER PARSED. Every gate that
+        // imports the file then failed on a SyntaxError and was filed NOTICED -- a gate noticing that a module
+        // cannot load, not that a record is false. Measured over the census: 94 of the 108 drops this function
+        // offered left the file unparseable. A list element is one whose last code character before it is `[`
+        // or `,`; a field value's is `:`.
+        const bare = stripComments(body), g = /(["'])((?:[^"'\\\n]|\\.){3,})\1\s*,\s*/g;
+        let m;
+        while ((m = g.exec(body))) {
+            if (!bare.includes(m[0])) continue;                       // a comment's text, as codeOnly refuses
+            const before = body.slice(0, m.index).replace(/\s+$/, "").slice(-1);
+            if (before === "[" || before === ",") return { body: body.slice(0, m.index) + body.slice(m.index + m[0].length), kind: "drop", what: `dropped "${m[2].slice(0, 40)}"` };
+        }
         return null;
     }
     return null;
@@ -257,6 +270,9 @@ export function defaultRecords({ root = ENG } = {}) {
     });
 }
 
+/** Does the file, as it now stands on disk, parse? node's own --check, so .js keeps its package's module type. */
+export const parses = (file) => spawnSync(process.execPath, ["--check", file], { encoding: "utf8" }).status === 0;
+
 const runGate = (gate, root, capMs) => {
     const r = spawnSync(process.execPath, [path.join(root, gate)], { cwd: root, encoding: "utf8", timeout: capMs });
     const killed = !!r.signal || (r.error && /ETIMEDOUT/.test(String(r.error.code)));
@@ -298,7 +314,8 @@ function armRestore(touched) {
     return () => { process.removeListener("exit", restore); };
 }
 
-export function probe({ records = null, root = ENG, capMs = 180000, onProgress = null, kinds = null } = {}) {
+// round 22: `perturbWith` replaces perturb() -- the gate's seam for a mutation that breaks the parse, which perturb() no longer makes
+export function probe({ records = null, root = ENG, capMs = 180000, onProgress = null, kinds = null, perturbWith = null } = {}) {
     // *** A GATE'S OWN FROZEN VALUES ARE FIXTURES, AND THE CENSUS CANNOT TELL. ***
     //
     // MEASURED, on this round's own gate: recordProbe-selfcheck.mjs contains example records in its section
@@ -346,9 +363,19 @@ export function probe({ records = null, root = ENG, capMs = 180000, onProgress =
         // Try the kinds in order and stop as soon as SOMETHING notices -- "unnoticed" then means every
         // corruption this record can take went unseen by every guardian that could answer.
         for (const kind of (kinds || row.kinds)) {
-            const p = perturb(body, kind);
+            const p = (perturbWith || perturb)(body, kind);
             if (!p) continue;
             fs.writeFileSync(file, src.slice(0, idx) + p.body + src.slice(idx + body.length));
+            // *** ROUND 22: A CORRUPTION THAT BREAKS THE PARSE IS NOT A CORRUPTION OF THE RECORD. *** Every gate
+            // importing the file fails on the SyntaxError, which says the module cannot load and nothing about
+            // whether anything reads the record. Checked before a single gate is asked; such a mutation is filed
+            // `unparseable` and never counts as noticed.
+            if (!parses(file)) {
+                fs.writeFileSync(file, src);
+                if (fs.readFileSync(file, "utf8") !== src) throw new Error("recordProbe: RESTORE FAILED for " + rec.file);
+                row.tried.push({ kind, what: p.what, unparseable: true, pairs: [] });
+                continue;
+            }
             const seen = guardians.map((g) => {
                 const b = base(g);
                 if (b.killed || b.code !== 0) return { gate: g, verdict: "unmeasurable", why: b.killed ? "killed at cap" : "red at baseline" };
@@ -408,6 +435,8 @@ export function summarise(res) {
         // A partition is a CLAIM, so it is checked: every record once, and only once.
         partition: { total, distinct: seen.size, complete: total === rows.length && seen.size === rows.length },
         byKind: rows.reduce((a, r) => { for (const t of r.tried) a[t.kind] = (a[t.kind] || 0) + 1; return a; }, {}),
+        // round 22: mutations refused because the mutated file did not parse -- tried, never asked of a gate
+        unparseable: rows.reduce((a, r) => a + r.tried.filter((t) => t.unparseable).length, 0),
     };
 }
 

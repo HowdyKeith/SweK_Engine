@@ -1276,7 +1276,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4875 -- the submarine line (40 source files and the 17 gates over main's v4874): files 4748 -> 4789 (the last file is tools/evalSubMission.mjs, which gave brain/missionTask.mjs a caller), ES modules 4443 -> 4482, closures 4285 -> 4325, async/await 1803 -> 1813, typed arrays 1337 -> 1346, Promises 440 -> 444,
     // fetch/XHR 252 -> 253, requestAnimationFrame 127 -> 128 (the aquarium page's frame loop); the other rows held.
     // v4877 -- the rotorcraft branch and the sub work since v4875 (files 4789 -> 4813): ES modules 4482 -> 4506, closures 4325 -> 4347, async/await 1813 -> 1826, typed arrays 1346 -> 1357, Promises 444 -> 449, performance.now 255 -> 259; the other rows held.
-    esModules: 4572, closures: 4408, asyncAwait: 1850, typedArrays: 1374, promises: 453,
+    esModules: 4572, closures: 4408, asyncAwait: 1850, typedArrays: 1375, promises: 453,
     fetchXhr: 253, performanceNow: 262, raf: 129, webgl: 203, webgpu: 65, threads: 26, wasm: 28,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
