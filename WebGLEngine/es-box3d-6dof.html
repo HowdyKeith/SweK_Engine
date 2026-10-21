@@ -152,7 +152,7 @@ const shotPoints = new THREE.Points(shotGeo, new THREE.PointsMaterial({ color: 0
 scene.add(shotPoints);
 
 // ---- combat state ----
-let A = [], B = [], shots = [], tick = 0, wins = { A: 0, B: 0 };
+let A = [], B = [], shots = [], tick = 0, wins = { A: 0, B: 0, draws: 0 };   // v4895: a battle that ends with BOTH fleets dead was counted for neither side; it is a draw and is counted as one
 function spawnFleet(team, baseX, faceQ, rng) {
   const list = [];
   for (let i = 0; i < FLEET_SIZE; i++) {
@@ -265,7 +265,7 @@ function syncScene() {
 function frame() {
   const dt = 1 / 30, nowMs = tick * dt * 1000;
   const liveA = A.some((s) => !s.dead), liveB = B.some((s) => !s.dead);
-  if (!liveA || !liveB) { if (liveA) wins.A++; else if (liveB) wins.B++; newBattle(); }
+  if (!liveA || !liveB) { if (liveA) wins.A++; else if (liveB) wins.B++; else wins.draws++; newBattle(); }
   else {
     stepFleet(A, B, FA.assignTargets(A, B), dt, nowMs, pilotAi("A"));
     stepFleet(B, A, FA.assignTargets(B, A), dt, nowMs, pilotAi("B"));
@@ -276,7 +276,7 @@ function frame() {
   syncScene(); controls.update();
   renderer.render(scene, camera);
   document.getElementById("stat").textContent =
-    `A ${A.filter((s) => !s.dead).length}/${FLEET_SIZE}  vs  B ${B.filter((s) => !s.dead).length}/${FLEET_SIZE}  ·  battles A:${wins.A} B:${wins.B}  ·  shots ${shots.length}  ·  tick ${tick}`;
+    `A ${A.filter((s) => !s.dead).length}/${FLEET_SIZE}  vs  B ${B.filter((s) => !s.dead).length}/${FLEET_SIZE}  ·  battles A:${wins.A} B:${wins.B} draws:${wins.draws}  ·  shots ${shots.length}  ·  tick ${tick}`;
   requestAnimationFrame(frame);
 }
 // ---- v4829 -- LOAD PILOTS: brain/pilotRoster.mjs behind two selects ------------------------------------------------------------------------------------------------------------
@@ -317,7 +317,7 @@ function renderRoster() {
     sel.onchange = () => { specs = { ...specs, [t]: sel.value }; saveSpecs(); };
   }
 }
-function startFight() { wins.A = 0; wins.B = 0; newBattle(); pilotAi("A"); pilotAi("B"); return true; }
+function startFight() { wins.A = 0; wins.B = 0; wins.draws = 0; newBattle(); pilotAi("A"); pilotAi("B"); return true; }
 document.getElementById("rosterBtn").onclick = () => { const p = document.getElementById("rosterPanel"); p.style.display = p.style.display === "none" ? "block" : "none"; renderRoster(); };
 document.getElementById("startFight").onclick = () => { startFight(); };
 document.getElementById("rosterReset").onclick = () => { specs = PR.defaultSpecs(); saveSpecs(); renderRoster(); };

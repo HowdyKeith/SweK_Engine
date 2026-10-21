@@ -96,13 +96,13 @@ else {
             // battle "initial" opened. The real-time ceiling is only a backstop for a stalled page.
             win.__sixdof.newBattle();
             const initial = win.__sixdof.state();
-            let mid = initial, battleEnded = false, finiteThroughout = allFinite(initial), samples = 1;
+            let mid = initial, battleEnded = false, endWins = initial.wins, finiteThroughout = allFinite(initial), samples = 1;
             globalThis.__swekStep = "letting the fight run";
             const fightT0 = performance.now();
             while (performance.now() - fightT0 < 90000) {
                 await wait(20);
                 const st = win.__sixdof.state(); samples++;
-                if (st.tick < mid.tick || st.wins.A !== mid.wins.A || st.wins.B !== mid.wins.B) { battleEnded = true; break; }
+                if (st.tick < mid.tick || st.wins.A !== mid.wins.A || st.wins.B !== mid.wins.B || st.wins.draws !== mid.wins.draws) { battleEnded = true; endWins = st.wins; break; }
                 if (!allFinite(st)) finiteThroughout = false;
                 mid = st;
                 globalThis.__swekStep = "fight tick " + st.tick;
@@ -130,7 +130,7 @@ else {
                 initialTick: initial.tick, midTick: mid.tick,
                 initialA0: initial.A[0], midA0: mid.A[0],
                 initialHpSum: hpSum(initial), midHpSum: hpSum(mid),
-                midShots: mid.shots, battleEnded, samples, fightMs,
+                midShots: mid.shots, battleEnded, samples, fightMs, winsBefore: initial.wins, winsAfter: endWins,
                 allFiniteInitial: allFinite(initial), allFiniteMid: finiteThroughout,
                 afterResetTick: afterReset.tick, afterResetHpSum: hpSum(afterReset),
                 afterResetRunningTick: afterResetRunning.tick, allFiniteAfterReset: allFinite(afterResetRunning),
@@ -159,6 +159,11 @@ else {
         ok("!! every ship's position/velocity/orientation stays finite -- no NaN/Infinity blowup, initial state", r.allFiniteInitial);
         ok("!! ...and at every 20 ms sample of that battle", r.allFiniteMid);
 
+        {   // v4895: every battle that ENDS is counted -- as an A win, a B win or a draw. Since the one-to-one target assignment (bbb5bb3e) every battle ends with both fleets dead, which the page counted for neither side ("battles A:0 B:0" for ever)
+            const tot = (w) => w.A + w.B + w.draws;
+            ok("!! *** a battle that ended was COUNTED: A wins + B wins + draws went up by exactly one (a mutual kill is a draw, not a nothing) ***", !r.battleEnded || tot(r.winsAfter) === tot(r.winsBefore) + 1, `${JSON.stringify(r.winsBefore)} -> ${JSON.stringify(r.winsAfter)} (${r.battleEnded ? "the battle ended" : "no end seen in the window"})`);
+            report("battles counted on this run (A / B / draws)", `${r.winsAfter.A} / ${r.winsAfter.B} / ${r.winsAfter.draws}`);
+        }
         ok("!! Reset button (newBattle()) actually resets the tick counter", r.afterResetTick < r.midTick, `tick was ${r.midTick}, reads ${r.afterResetTick} right after reset`);
         ok("!! ...and restores full fleet hp (600 = 2 x 3 ships x 100 hp)", r.afterResetHpSum === 600, `${r.afterResetHpSum}`);
         ok("!! ...and the RESET fight keeps running afterward (tick advances again post-reset)", r.afterResetRunningTick > r.afterResetTick, `${r.afterResetTick} -> ${r.afterResetRunningTick}`);
