@@ -1,11 +1,11 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it. `poolHorizon` (v4816) is the stamp of the first pool entry that run did NOT take: it reached every entry stamped earlier and none stamped at or after it.",
- "at": "2026-10-21T15:44:43.973Z",
+ "at": "2026-10-21T16:32:13.743Z",
  "poolAt": "2026-10-21T15:44:43.973Z",
  "poolHorizon": "2026-10-20T03:04:12.461Z",
  "budgetMs": 3000,
- "lastRun": 65,
+ "lastRun": 1,
  "rotated": [
   {
    "gate": "ai-bridge/assetSync-perf-selfcheck.mjs",
@@ -4298,10 +4298,10 @@
   },
   {
    "gate": "tools/ship/multigrid3dTiming-selfcheck.mjs",
-   "ms": 2079,
+   "ms": 2004,
    "code": 0,
-   "priorMs": 3671,
-   "at": "2026-10-21T15:44:43.973Z"
+   "priorMs": 1785,
+   "at": "2026-10-21T16:32:13.743Z"
   },
   {
    "gate": "tools/ship/murmurClock-selfcheck.mjs",
