@@ -44,7 +44,7 @@ console.log("\n1. THE HUD LINE, AS THE SEA PRINTS IT");
         "228.04 / 16.67 / 16.67 / null");
     ok("  and it is what the tier switch reads: the UHD 620's line puts auto on the default water, a 9 ms line puts it on the sea",
         OT.chooseTier({ preference: "auto", webgpu: true, adapter: { description: "Intel(R) UHD Graphics 620" }, probeMs: S.probeMsFromHud(h) }).tier === "default"
-        && OT.chooseTier({ preference: "auto", webgpu: true, adapter: { description: "NVIDIA GeForce GTX 1080 Ti" }, probeMs: S.probeMsFromHud(S.parseHud("120 fps  8.33 ms  |  GPU 6.00 ms")) }).tier === "sea", "");
+        && OT.chooseTier({ preference: "auto", webgpu: true, adapter: { description: "NVIDIA GeForce GTX 1080" }, probeMs: S.probeMsFromHud(S.parseHud("120 fps  8.33 ms  |  GPU 6.00 ms")) }).tier === "sea", "");
     const txt = (ms) => `${(1000 / ms).toFixed(0)} fps  ${ms.toFixed(2)} ms  |  GPU ${(ms * 0.9).toFixed(2)} ms  |  100 nodes  640x360`;
     ok("!! *** the median of a run drops the warmup readings, and one slow outlier does not move it ***",
         S.medianProbe([txt(900), txt(700), txt(10), txt(11), txt(12), txt(400), txt(11), txt(10)]) === 11 && S.medianProbe([txt(900), txt(700)]) === null && S.medianProbe([]) === null && S.medianProbe(["junk", "", txt(10)], 0) === 10,
@@ -66,7 +66,7 @@ console.log("\n3. THE REMEMBERED READING BELONGS TO ONE ADAPTER");
 {
     const mem = () => { const d = new Map(); return { getItem: (k) => (d.has(k) ? d.get(k) : null), setItem: (k, v) => { d.set(k, String(v)); }, removeItem: (k) => d.delete(k) }; };
     const s = mem(), t0 = 1_000_000_000_000;
-    ok("!! *** a stored reading comes back for the adapter it was taken on and for no other ***", S.rememberProbe(s, "Intel UHD 620", 228, t0) && S.recallProbe(s, "Intel UHD 620", t0 + 1000) === 228 && S.recallProbe(s, "NVIDIA GTX 1080 Ti", t0 + 1000) === null, "228 for the UHD, null for the 1080 Ti");
+    ok("!! *** a stored reading comes back for the adapter it was taken on and for no other ***", S.rememberProbe(s, "Intel UHD 620", 228, t0) && S.recallProbe(s, "Intel UHD 620", t0 + 1000) === 228 && S.recallProbe(s, "NVIDIA GTX 1080", t0 + 1000) === null, "228 for the UHD, null for the 1080");
     ok("  a week-old reading is taken again", S.recallProbe(s, "Intel UHD 620", t0 + S.PROBE_TTL_MS + 1) === null && S.recallProbe(s, "Intel UHD 620", t0 + S.PROBE_TTL_MS - 1) === 228, "TTL " + S.PROBE_TTL_MS / 3600000 + " h");
     ok("  a reading dated in the future, a poisoned entry and a missing storage all read as nothing", (() => { const f = mem(); f.setItem(S.PROBE_KEY, JSON.stringify({ label: "x", ms: 5, at: t0 + 10 * 60000 })); const p = mem(); p.setItem(S.PROBE_KEY, "{not json"); const z = mem(); z.setItem(S.PROBE_KEY, JSON.stringify({ label: "x", ms: -3, at: t0 })); return S.recallProbe(f, "x", t0) === null && S.recallProbe(p, "x", t0) === null && S.recallProbe(z, "x", t0) === null && S.recallProbe(null, "x", t0) === null; })(), "");
     ok("  a refused write is not an error, and a nonsense reading is not stored", S.rememberProbe({ setItem() { throw new Error("blocked"); } }, "x", 5) === false && S.rememberProbe(mem(), "x", 0) === false && S.rememberProbe(mem(), "", 5) === false && S.rememberProbe(null, "x", 5) === false, "");

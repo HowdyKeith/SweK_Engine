@@ -8,7 +8,7 @@
      WHAT THIS PAGE IS NOT, SAID PLAINLY:
        - NOT A BENCHMARK OF THE ENGINE. It is the vendored web-ocean sea, run in a frame, on the adapters listed in the record; no SweK object is drawn in it.
        - NOT A FIT YOU CAN LEAN ON. The pixel-cost line is three medians through two parameters, extrapolated to zero pixels; the page prints its residuals and calls it a model.
-       - NOT A DISCRETE-GPU RESULT. None has been read yet; when its lines are added to the record this page recomputes.
+       - NOT A DISCRETE-GPU SURVEY. One NVIDIA Pascal card, one reading per size; no model string came with it, a second discrete model is not read, and when more lines are added to the record this page recomputes.
      Nothing is ever put in this page as markup: every cell and sentence goes in with textContent (the bars are SVG elements made with createElementNS).
      The page loads nothing from outside the engine's own origin. -->
 <html lang="en">
@@ -16,7 +16,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="demo:title" content="Ocean readings">
-<meta name="demo:desc" content="What the vendored web-ocean sea costs, from the rig's own HUD lines: GPU time per resolution on an Intel UHD 620, the multiple of the 30 fps budget, and a computed pixel-cost line with its residuals, all derived from the stored readings.">
+<meta name="demo:desc" content="What the vendored web-ocean sea costs, from the rig's own HUD lines: GPU time per resolution on an Intel UHD 620 and an NVIDIA Pascal, the multiple of the 30 fps budget, and a computed pixel-cost line with its residuals, all derived from the stored readings.">
 <meta name="demo:category" content="graphics">
 <title>SweK &middot; Ocean readings</title>
 <style>
@@ -42,12 +42,10 @@
 <p class="desc">The vendored web-ocean sea, read from its own HUD on the rig. Every figure is computed from the stored lines in <code>ui/oceanReadings.mjs</code>; none is typed here.
   The sea itself is on <a href="/ocean-sea.html">ocean-sea.html</a> (timed and kept only if it holds the budget) and the bare spike with its resolution selector is <a href="/ocean-spike.html">ocean-spike.html</a>.
   The default water every GPU can draw is <a href="/ocean-default.html">ocean-default.html</a>. <a href="/server.html">Back to the server page</a>.</p>
-<h2 id="adapter">adapter</h2>
-<div id="adapterLine">loading&hellip;</div>
-<h2>GPU time by resolution (median of the readings; the HUD's frame time is its 100 ms clamp and is not used)</h2>
-<table id="tbl"><thead><tr><th>resolution</th><th>size</th><th>readings</th><th>GPU median ms</th><th>range ms</th><th>x the budget</th><th>fps</th></tr></thead><tbody></tbody></table>
-<svg id="bars" width="640" height="150" role="img" aria-label="GPU time per resolution against the frame budget"></svg>
-<h2>the pixel-cost line, and how far to trust it</h2>
+<div id="sets"></div>
+<h2>all of them against the budget (one scale, so the gap between the adapters is the gap in the picture)</h2>
+<svg id="bars" width="680" height="10" role="img" aria-label="GPU time per resolution and adapter against the frame budget"></svg>
+<h2>the pixel-cost lines, the comparison between adapters, and how far to trust them</h2>
 <pre id="fit">loading&hellip;</pre>
 <h2>the opt-in page's own probe on the same adapter</h2>
 <pre id="probes">loading&hellip;</pre>
@@ -56,38 +54,44 @@
   import * as R from "/ui/oceanReadings.mjs";
   import { BUDGET_MS } from "/ui/oceanTier.mjs";
   const $ = (id) => document.getElementById(id);
-  const state = { rows: 0, groups: [], fit: null, report: [] };
+  const state = { rows: 0, sets: [], report: [] };
   window.__readings = state;
-  const rec = R.READINGS_AT_V4892, gs = R.groups(rec), fit = R.fitLine(gs);
-  state.groups = gs; state.fit = fit; state.report = R.reportLines(rec);
-  $("adapterLine").textContent = rec.adapter + " · " + rec.adapterKind + " · taken " + rec.takenOn + " · " + rec.box;
-
-  const tb = $("tbl").tBodies[0];
-  const cell = (tr, text, cls) => { const td = document.createElement("td"); td.textContent = text; if (cls) td.className = cls; tr.appendChild(td); };
-  for (const g of gs) {
-    const tr = document.createElement("tr");
-    cell(tr, g.resolution); cell(tr, g.width + "x" + g.height); cell(tr, String(g.n));
-    cell(tr, g.gpuMedian.toFixed(1), g.gpuMedian > BUDGET_MS ? "over" : "ok");
-    cell(tr, g.gpuMin.toFixed(1) + " - " + g.gpuMax.toFixed(1));
-    cell(tr, "x" + g.budgetMultiple.toFixed(1), g.gpuMedian > BUDGET_MS ? "over" : "ok");
-    cell(tr, g.fps.toFixed(1));
-    tb.appendChild(tr); state.rows++;
+  const rec = R.READINGS_AT_V4892;
+  state.report = R.reportAll(rec);
+  const mk = (tag, text, cls) => { const e = document.createElement(tag); if (text != null) e.textContent = text; if (cls) e.className = cls; return e; };
+  const all = [];
+  for (const set of rec.sets) {
+    const gs = R.groups(set), fit = R.fitLine(gs);
+    state.sets.push({ adapter: set.adapter, kind: set.adapterKind, groups: gs, fit });
+    $("sets").appendChild(mk("h2", set.adapter + (set.named ? " = " + set.named + " (named by Keith; the browser reported only the first part" + (set.alsoReportedAs ? "; he also sees it reported as 1080 somewhere" : "") + ")" : "") + " \u00b7 " + set.adapterKind + " \u00b7 taken " + set.takenOn));
+    const tbl = mk("table"); tbl.className = "set"; tbl.dataset.adapter = set.adapter;
+    const head = tbl.createTHead().insertRow();
+    for (const h of ["resolution", "size", "readings", "GPU median ms", "range ms", "x the budget", "fps"]) head.appendChild(mk("th", h));
+    const tb = tbl.createTBody();
+    for (const g of gs) {
+      const tr = tb.insertRow(), over = g.gpuMedian > BUDGET_MS ? "over" : "ok";
+      for (const [text, cls] of [[g.resolution], [g.width + "x" + g.height], [String(g.n)], [g.gpuMedian.toFixed(1), over], [g.gpuMin.toFixed(1) + " - " + g.gpuMax.toFixed(1)], ["x" + g.budgetMultiple.toFixed(g.budgetMultiple < 1 ? 2 : 1), over], [g.fps.toFixed(1)]]) tr.appendChild(mk("td", text, cls));
+      state.rows++; all.push({ adapter: set.adapter, kind: set.adapterKind, g });
+    }
+    $("sets").appendChild(tbl);
   }
 
-  // bars: GPU median per resolution against a vertical line at the budget
-  const svg = $("bars"), NS = "http://www.w3.org/2000/svg", W = 640, left = 110, scale = (W - left - 20) / Math.max(...gs.map((g) => g.gpuMax), BUDGET_MS) ;
+  // bars: one scale for every adapter, GPU median per resolution, against a vertical line at the budget
+  const svg = $("bars"), NS = "http://www.w3.org/2000/svg", W = 680, left = 210, rowH = 30;
+  const scale = (W - left - 90) / Math.max(...all.map((a) => a.g.gpuMax), BUDGET_MS), H = 12 + all.length * rowH + 22;
+  svg.setAttribute("height", String(H));
   const el = (name, attrs, text) => { const e = document.createElementNS(NS, name); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; svg.appendChild(e); return e; };
-  gs.forEach((g, i) => {
-    const y = 14 + i * 38;
-    el("text", { x: 8, y: y + 16, fill: "#dbe7ff", "font-size": 12 }, g.resolution);
-    el("rect", { x: left, y, width: Math.max(1, g.gpuMedian * scale), height: 24, fill: g.gpuMedian > BUDGET_MS ? "#ff7a7a" : "#5fe08a", "data-ms": g.gpuMedian.toFixed(2) });
-    el("text", { x: left + g.gpuMedian * scale + 6, y: y + 16, fill: "#dbe7ff", "font-size": 12 }, g.gpuMedian.toFixed(1) + " ms");
+  all.forEach((a, i) => {
+    const y = 8 + i * rowH;
+    el("text", { x: 8, y: y + 15, fill: "#dbe7ff", "font-size": 11 }, (a.kind === "integrated" ? "UHD 620" : a.adapter) + " " + a.g.resolution);
+    el("rect", { x: left, y, width: Math.max(1, a.g.gpuMedian * scale), height: 20, fill: a.g.gpuMedian > BUDGET_MS ? "#ff7a7a" : "#5fe08a", "data-ms": a.g.gpuMedian.toFixed(2), "data-adapter": a.adapter });
+    el("text", { x: left + a.g.gpuMedian * scale + 6, y: y + 15, fill: "#dbe7ff", "font-size": 11 }, a.g.gpuMedian.toFixed(1) + " ms");
   });
-  el("line", { x1: left + BUDGET_MS * scale, x2: left + BUDGET_MS * scale, y1: 4, y2: 140, stroke: "#f6a623", "stroke-width": 2, "stroke-dasharray": "4 3" });
-  el("text", { x: left + BUDGET_MS * scale + 4, y: 146, fill: "#f6a623", "font-size": 11 }, "budget " + BUDGET_MS.toFixed(1) + " ms (30 fps)");
+  el("line", { x1: left + BUDGET_MS * scale, x2: left + BUDGET_MS * scale, y1: 2, y2: H - 18, stroke: "#f6a623", "stroke-width": 2, "stroke-dasharray": "4 3" });
+  el("text", { x: left + BUDGET_MS * scale + 4, y: H - 4, fill: "#f6a623", "font-size": 11 }, "budget " + BUDGET_MS.toFixed(1) + " ms (30 fps)");
 
-  $("fit").textContent = state.report.filter((l) => /pixel-cost|if this model|extrapolation|clamp|budget|discrete/.test(l)).join("\n");
-  $("probes").textContent = "auto: " + rec.pageProbesMs.auto + " ms (the sea was unloaded for the default water)\non: " + rec.pageProbesMs.on.join(", ") + " ms\n" + rec.pageProbesNote;
+  $("fit").textContent = state.report.filter((l) => /pixel-cost|if this model|extrapolation|clamp|display rate|budget|discrete|between adapters|^  at /.test(l)).join("\n");
+  $("probes").textContent = "auto: " + rec.pageProbesMs.auto + " ms (the sea was unloaded for the default water) on " + rec.pageProbesMs.adapter + "\non: " + rec.pageProbesMs.on.join(", ") + " ms\n" + rec.pageProbesNote;
 </script>
 </body>
 </html>

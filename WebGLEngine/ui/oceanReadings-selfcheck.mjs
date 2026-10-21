@@ -7,13 +7,14 @@
 // the report changes its verdict when the data does (a synthetic discrete GPU that holds the budget flips the last line).
 //
 // WHAT IT DOES NOT GRADE, said plainly: that the readings are true. They are the rig's HUD text as received; the gate grades the arithmetic done on them.
-// And not a discrete GPU: none has been read, and the fit is three points through two parameters, so the gate asserts the residuals are small AND that the
+// The discrete GPU has ONE reading per size, so no spread is graded for it; and the fit is three points through two parameters, so the gate asserts the residuals are small AND that the
 // report says "if this model holds" -- it does not assert the model.
 // SABOTAGES, each applied to the real ui/oceanReadings.mjs, restored, md5 verified. 9 of 9 red, two only after a fixture was added that could tell them apart (the real nine lines
 // are all clamped and all one size, so the cap test and the same-size flag could not fail on them -- the first run of S4 and S9 passed, which is the finding):
 //   S1 the median is a mean 3 rows | S2 the slope sign flipped 3 | S3 a line without a GPU time accepted 1 | S4 the cap test ignores the clamp 0 -> 1 (synthetic 33.33/120 line)
 //   S5 every label grouped as one 2 | S6 budget pixels returned though the intercept is over it 1 | S7 the verdict line hard-coded 1 | S8 the frame clock used for the probe 1
-//   S9 sameSize always true 0 -> 1 (synthetic two-size label)
+//   S9 sameSize always true 0 -> 1 (synthetic two-size label) | S11 the named card merged into the adapter 1 | S12 the cross-adapter ratio inverted 1
+//   S10 (native compared between adapters, label guard removed) stays green BY DESIGN: the same-size guard beside it already refuses native, whose two sizes differ -- a redundant guard, not a gap
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -25,7 +26,8 @@ let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const say = (m) => console.log("  ----  " + m);
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const REC = R.READINGS_AT_V4892;
+const REC_ALL = R.READINGS_AT_V4892;
+const REC = REC_ALL.sets[0];       // the UHD 620's set: sections 1-4 grade it; section 7 grades the second adapter and the comparison
 const BUNDLE = fs.readFileSync(path.join(HERE, "..", "vendor", "web-ocean", "ocean.html"), "utf8");
 
 // an independent reading of the raw text: label, GPU ms, size. NOT parseHud.
@@ -87,16 +89,32 @@ console.log("\n4. THE PIXEL-COST LINE, AGAINST NORMAL EQUATIONS WRITTEN HERE");
 
 console.log("\n5. THE REPORT CHANGES ITS VERDICT WHEN THE DATA DOES");
 {
-    const fast = { ...REC, adapter: "nvidia pascal NVIDIA GeForce GTX 1080 Ti", adapterKind: "discrete", lines: [
+    const fast = { ...REC, adapter: "nvidia pascal NVIDIA GeForce GTX 1080", adapterKind: "discrete", lines: [
         "native | 120 fps  8.33 ms  |  GPU 6.40 ms  |  1186 nodes  1653x493", "native | 120 fps  8.33 ms  |  GPU 6.20 ms  |  1186 nodes  1653x493",
         "1280x720 | 120 fps  8.33 ms  |  GPU 6.90 ms  |  906 nodes  1280x720", "960x540 | 120 fps  8.33 ms  |  GPU 4.10 ms  |  906 nodes  960x540"] };
     const lines = R.reportLines(fast);
     ok("!! *** a synthetic GPU that holds the budget makes the report say which resolutions are inside it, and stop saying none is ***", lines.some((l) => /inside the budget: native \(6\.3 ms\), 1280x720/.test(l)) && !lines.some((l) => /none of these readings holds the budget/.test(l)), lines[lines.length - 1].trim());
-    ok("  and for the rig's real data the last line says none holds it and that no discrete GPU has been read", /none of these readings holds the budget; no discrete GPU has been read yet/.test(R.reportLines(REC).slice(-1)[0]), "");
-    ok("  the page probes are kept OUT of the table and the fit (their frame size was not noted), and are in the range the sized readings span", !R.groups(REC).some((g) => /probe/i.test(g.resolution)) && REC.pageProbesMs.auto === 238.1 && REC.pageProbesMs.on.join() === "262.2,155.2,98.3" && /resized/.test(REC.pageProbesNote), "238.1 auto; 262.2 / 155.2 / 98.3 on");
+    ok("  and for the UHD 620's data the last line says none holds it (and no longer claims no discrete GPU has been read)", /none of these readings holds the budget/.test(R.reportLines(REC).slice(-1)[0]) && !/no discrete GPU/.test(R.reportLines(REC).slice(-1)[0]), "");
+    ok("  the page probes are kept OUT of the table and the fit (their frame size was not noted), and are in the range the sized readings span", !R.groups(REC).some((g) => /probe/i.test(g.resolution)) && REC_ALL.pageProbesMs.auto === 238.1 && REC_ALL.pageProbesMs.on.join() === "262.2,155.2,98.3" && /resized/.test(REC_ALL.pageProbesNote), "238.1 auto; 262.2 / 155.2 / 98.3 on");
 }
 
-console.log("\n6. THE MODULE TOUCHES NOTHING");
+console.log("\n6. THE SECOND ADAPTER, AND THE COMPARISON BETWEEN THEM");
+{
+    const D = REC_ALL.sets[1], gs = R.groups(D), fit = R.fitLine(gs);
+    const rawD = D.lines.map((l) => { const m = /^(\S+) \|.*GPU ([0-9.]+) ms.*?(\d+)x(\d+)\s*$/.exec(l); return m ? { label: m[1], gpu: +m[2], w: +m[3], h: +m[4] } : null; });
+    ok("!! *** the discrete GPU's three lines parse, one per size, and its medians are the lines' own GPU times (8.25 / 5.74 / 4.02) read by an independent regex ***", rawD.every(Boolean) && gs.length === 3 && gs.every((g, i) => g.n === 1 && g.gpuMedian === rawD[i].gpu) && gs.map((g) => g.gpuMedian).join() === "8.25,5.74,4.02", gs.map((g) => g.resolution + " " + g.gpuMedian).join(", "));
+    ok("!! *** three things are kept APART and each keeps its source: the browser reported 'nvidia pascal', Keith named the card a GTX 1070 Ti, and he also saw it reported as a 1080 somewhere -- the record settles none of them, and the report prints all ***", D.adapter === "nvidia pascal" && D.adapterKind === "discrete" && !/10[78]0|GTX|RTX/i.test(D.adapter) && D.named === "GTX 1070 Ti" && /Keith/.test(D.namedBy) && /not reported by the browser/.test(D.namedBy) && /GTX 1080/.test(D.alsoReportedAs) && /source of that report was not given/.test(D.alsoReportedAs) && R.reportLines(D)[0].startsWith("nvidia pascal = GTX 1070 Ti (Keith") && /\[also: GTX 1080/.test(R.reportLines(D)[0]), R.reportLines(D)[0].slice(0, 110));
+    ok("!! *** it holds the budget at every size it was read at: 8.25 ms native is a quarter of 33.3 ms, and the report names the three as inside ***", gs.every((g) => g.gpuMedian <= BUDGET_MS) && Math.abs(gs[0].budgetMultiple - 8.25 / BUDGET_MS) < 1e-9 && R.reportLines(D).some((l) => /inside the budget: native \(8\.3 ms\), 1280x720 \(5\.7 ms\), 960x540 \(4\.0 ms\)/.test(l)), gs.map((g) => "x" + g.budgetMultiple.toFixed(2)).join(" "));
+    ok("  its frame clock is the display rate (16.70 ms), NOT the 100 ms clamp, and the report says so instead of repeating the other adapter's sentence", R.cappedFrame(D).length === 0 && R.reportLines(D).some((l) => /display rate \(16\.70 ms\), not the 100 ms clamp/.test(l)) && !R.reportLines(D).some((l) => /step clamp in/.test(l)), "0 of 3 clamped");
+    ok("!! *** its own line has a small fixed part (about 2 ms, under the budget), so the budget IS reachable on the model -- and the report says how far past the measured range that is (5x) and that it is not a law ***", fit.a < 5 && fit.a > 0 && R.pixelsAtBudget(fit) > fit.measuredRange[1] && R.reportLines(D).some((l) => /the budget is reached near \d+\.\d megapixels, \d+\.\dx the largest size measured/.test(l)) && R.reportLines(D).some((l) => /not a law/.test(l)), `a ${fit.a.toFixed(2)} ms, ${(R.pixelsAtBudget(fit) / 1e6).toFixed(1)} MP`);
+    const all = R.reportAll(REC_ALL), joined = all.join("\n");
+    const r720 = 217.09 / 5.74, r540 = 147.855 / 4.02;
+    ok("!! *** the comparison between adapters uses only sizes both read (1280x720 and 960x540) and never native, whose size differs: x37.8 and x36.8 ***", new RegExp("at 1280x720 .* x" + r720.toFixed(1)).test(joined) && new RegExp("at 960x540 .* x" + r540.toFixed(1)).test(joined) && !/at native/.test(joined), r720.toFixed(1) + " and " + r540.toFixed(1));
+    ok("  the two adapters sit on opposite sides of the budget in the combined report, and each keeps its own fit (the UHD's 54 ms fixed part is not the Pascal's 2 ms)", /no resolution passes/.test(joined) && /the budget is reached near/.test(joined) && Math.abs(R.fitLine(R.groups(REC)).a - 54.42) < 0.01 && Math.abs(fit.a - 2.2) < 0.1, "");
+    ok("  what the page's probe would do with each adapter's native line: the UHD's is over the budget, the Pascal's is inside -- the same decision ui/oceanTier.mjs makes", R.probeMsOfLine(REC.lines[0]) > BUDGET_MS && R.probeMsOfLine(D.lines[0]) <= BUDGET_MS, R.probeMsOfLine(REC.lines[0]).toFixed(1) + " vs " + R.probeMsOfLine(D.lines[0]).toFixed(2));
+}
+
+console.log("\n7. THE MODULE TOUCHES NOTHING");
 {
     const src = fs.readFileSync(path.join(HERE, "oceanReadings.mjs"), "utf8").replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
     const imports = [...src.matchAll(/import\s+[^;]*?from\s+["']([^"']+)["']/g)].map((m) => m[1]);
@@ -104,6 +122,6 @@ console.log("\n6. THE MODULE TOUCHES NOTHING");
     ok("!! it imports only the page's own parser and the tier budget, and reads no clock, storage or global: the record is its only input", imports.join() === "./oceanSea.mjs,./oceanTier.mjs" && bad.length === 0, bad.length ? "found: " + bad.join(", ") : imports.join(", "));
 }
 
-say("UNCHECKED, said plainly: that the rig's lines are true readings (the gate grades the arithmetic on them); any discrete GPU (none has been read); that three points justify the intercept (the report says they do not prove it); behaviour at 1920x1080, which was offered and not taken.");
+say("UNCHECKED, said plainly: that the rig's lines are true readings (the gate grades the arithmetic on them); a spread on the Pascal (one reading per size); a second discrete model; that three points justify the intercept (the report says they do not prove it); behaviour at 1920x1080, which was offered and not taken.");
 console.log("oceanReadings-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));
 process.exit(fails ? 1 : 0);

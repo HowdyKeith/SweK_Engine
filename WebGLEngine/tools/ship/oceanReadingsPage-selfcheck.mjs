@@ -11,7 +11,8 @@
 //
 // SABOTAGE LOG -- each applied in place, the gate run with a real browser, the file restored and md5-compared; every one red by name (number of rows red):
 //   P1 a median typed in the page 2 | P2 the bars not scaled by the median 1 | P3 a row set as innerHTML 2 | P4 the fit paragraph without its caveats 2 | P5 an outside <script src> 2
-//   P6 the "not a fit you can lean on" line dropped 1 | P7 a stray extra table row 2 (all seven run on this file; restored md5-identical after each)
+//   P6 the "not a fit you can lean on" line dropped 1 | P7 a stray extra table row 2 | after the second adapter: the second adapter dropped from the page 1, the card shown as the browser's 1,
+//   a row built through innerHTML 1, a hard-coded bar scale 0 -> 1 and a budget line moved or removed 0 -> 1 (both passed until a row read the scale back from the bars) (restored md5-identical after each)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -39,11 +40,11 @@ console.log("1. THE PAGE'S SOURCE");
     ok("!! the page TYPES no figure of its own: no millisecond value, no resolution size and no fit coefficient is spelled in its script", !/\b\d{2,3}\.\d{1,2}\b/.test(js.replace(/"\d+ \d+"/g, "")) && !/\b(1653|1280|960|493|720|540)\b/.test(js) && !/54\.4|0\.187/.test(js), "every number on the page comes from R.groups / R.fitLine / R.reportLines");
     const hits = ["innerHTML", "outerHTML", "insertAdjacentHTML", "document.write", "eval(", "new Function", "setAttribute(\"on", "srcdoc"].filter((w) => body.includes(w));
     ok("!! the page NEVER turns data into markup", hits.length === 0, hits.join(", "));
-    ok("!! every cell and sentence reaches the DOM through textContent, and the bars are SVG made with createElementNS", /td\.textContent\s*=/.test(js) && /\$\("fit"\)\.textContent\s*=/.test(js) && /\$\("probes"\)\.textContent\s*=/.test(js) && /createElementNS\(NS/.test(js));
+    ok("!! every cell and sentence reaches the DOM through textContent, and the bars are SVG made with createElementNS", /e\.textContent\s*=/.test(js) && /\$\("fit"\)\.textContent\s*=/.test(js) && /\$\("probes"\)\.textContent\s*=/.test(js) && /createElementNS\(NS/.test(js));
     const ext = [...body.matchAll(/(?:src|href|action)\s*=\s*"(https?:\/\/[^"]+)"|fetch\(\s*"(https?:\/\/[^"]+)"|url\(\s*"?(https?:\/\/[^")]+)|import\s+[^;]*"(https?:\/\/[^"]+)"/g)].filter((m) => !/github\.com\/noniv/.test(m[0]));
     ok("!! the page loads NOTHING from outside (the attribution is text, not a request)", ext.length === 0, ext.map((m) => m[0]).join(" | "));
     ok("the page has the demo: meta tags, a <title>, and links to the opt-in page, the spike, the default water and server.html", /name="demo:title"/.test(raw) && /name="demo:desc"/.test(raw) && /name="demo:category"/.test(raw) && /<title>/.test(raw) && ["/ocean-sea.html", "/ocean-spike.html", "/ocean-default.html", "/server.html"].every((h) => raw.includes('href="' + h + '"')));
-    ok("!! the page SAYS what it is not: not a benchmark of the engine, not a fit to lean on, not a discrete-GPU result", /NOT A BENCHMARK OF THE ENGINE/.test(flat) && /NOT A FIT YOU CAN LEAN ON/.test(flat) && /NOT A DISCRETE-GPU RESULT/.test(flat));
+    ok("!! the page SAYS what it is not: not a benchmark of the engine, not a fit to lean on, not a discrete-GPU survey", /NOT A BENCHMARK OF THE ENGINE/.test(flat) && /NOT A FIT YOU CAN LEAN ON/.test(flat) && /NOT A DISCRETE-GPU SURVEY/.test(flat));
 }
 
 console.log("\n2. THE LIVE PAGE");
@@ -69,19 +70,26 @@ console.log("\n2. THE LIVE PAGE");
             pg.on("pageerror", (e) => errs.push(String(e.message))); pg.on("console", (m) => { if (m.type() === "error") errs.push(m.text()); });
             await pg.goto(base + "/ocean-readings.html", { waitUntil: "load" });
             await pg.waitForFunction(() => window.__readings && window.__readings.rows > 0, null, { timeout: 8000 }).catch(() => {});
-            const gs = R.groups(R.READINGS_AT_V4892), fit = R.fitLine(gs);
+            const rec = R.READINGS_AT_V4892;
             const dom = await pg.evaluate(() => ({
-                rows: [...document.querySelectorAll("#tbl tbody tr")].map((tr) => [...tr.cells].map((c) => c.textContent)),
-                bars: [...document.querySelectorAll("#bars rect")].map((r) => ({ ms: r.getAttribute("data-ms"), w: +r.getAttribute("width") })),
-                fit: document.getElementById("fit").textContent, probes: document.getElementById("probes").textContent, adapter: document.getElementById("adapterLine").textContent,
+                tables: [...document.querySelectorAll("table.set")].map((t) => ({ adapter: t.dataset.adapter, rows: [...t.tBodies[0].rows].map((tr) => [...tr.cells].map((c) => c.textContent)) })),
+                heads: [...document.querySelectorAll("#sets h2")].map((h) => h.textContent),
+                bars: [...document.querySelectorAll("#bars rect")].map((r) => ({ ms: r.getAttribute("data-ms"), adapter: r.getAttribute("data-adapter"), w: +r.getAttribute("width") })),
+                budgetX: [...document.querySelectorAll("#bars line")].map((l) => +l.getAttribute("x1")), svgW: +document.getElementById("bars").getAttribute("width"),
+                fit: document.getElementById("fit").textContent, probes: document.getElementById("probes").textContent,
             }));
-            const want = gs.map((g) => [g.resolution, g.width + "x" + g.height, String(g.n), g.gpuMedian.toFixed(1), g.gpuMin.toFixed(1) + " - " + g.gpuMax.toFixed(1), "x" + g.budgetMultiple.toFixed(1), g.fps.toFixed(1)]);
-            ok("!! *** the table's cells are the module's numbers, to the printed digit: 3 rows, medians 219.7 / 217.1 / 147.9 ***", JSON.stringify(dom.rows) === JSON.stringify(want) && dom.rows.length === 3, dom.rows.map((r) => r[0] + " " + r[3]).join(", "));
-            ok("!! *** the bars are drawn from the same medians and their lengths order as the milliseconds do (the 960x540 bar is the shortest) ***", dom.bars.length === 3 && dom.bars.every((x, i) => x.ms === gs[i].gpuMedian.toFixed(2)) && dom.bars[2].w < dom.bars[1].w && dom.bars[2].w < dom.bars[0].w && Math.abs(dom.bars[0].w / dom.bars[2].w - gs[0].gpuMedian / gs[2].gpuMedian) < 0.02, dom.bars.map((x) => x.w.toFixed(0)).join(" / ") + " px");
-            ok("!! *** the fit paragraph carries its caveats: 'if this model holds', 'not a law' and the residual, and prints the intercept 54.4 ms ***", /if this model holds, no resolution passes/.test(dom.fit) && /not a law/.test(dom.fit) && new RegExp("worst residual " + (fit.worst * 100).toFixed(1) + "%").test(dom.fit) && dom.fit.includes(fit.a.toFixed(1) + " ms"), dom.fit.split("\n")[0].slice(0, 100));
-            ok("  and the page says no discrete GPU has been read, in the same words the module reports", /no discrete GPU has been read yet/.test(dom.fit), "");
-            ok("  the opt-in probe's numbers are printed apart from the table (238.1 auto; 262.2, 155.2, 98.3 on) with the reason they are not fitted", /238\.1 ms/.test(dom.probes) && /262\.2, 155\.2, 98\.3/.test(dom.probes) && /resized/.test(dom.probes) && dom.rows.length === 3, "");
-            ok("  the adapter line names the adapter, its class and the day", /Intel\(R\) UHD Graphics 620/.test(dom.adapter) && /integrated/.test(dom.adapter) && /2026-10-21/.test(dom.adapter), dom.adapter.slice(0, 80));
+            const wantRows = (set) => R.groups(set).map((g) => [g.resolution, g.width + "x" + g.height, String(g.n), g.gpuMedian.toFixed(1), g.gpuMin.toFixed(1) + " - " + g.gpuMax.toFixed(1), "x" + g.budgetMultiple.toFixed(g.budgetMultiple < 1 ? 2 : 1), g.fps.toFixed(1)]);
+            ok("!! *** one table per adapter, and every cell is the module's number to the printed digit: the UHD 620's 219.7 / 217.1 / 147.9 and the Pascal's 8.3 / 5.7 / 4.0 ***", dom.tables.length === 2 && rec.sets.every((set, i) => dom.tables[i].adapter === set.adapter && JSON.stringify(dom.tables[i].rows) === JSON.stringify(wantRows(set))), dom.tables.map((t) => t.adapter + ": " + t.rows.map((r) => r[3]).join("/")).join("  |  "));
+            ok("  the second adapter's heading names the card as Keith named it, says the browser did not, and carries the 1080 report", /nvidia pascal = GTX 1070 Ti \(named by Keith; the browser reported only the first part; he also sees it reported as 1080 somewhere\)/.test(dom.heads[1]) && !/GTX/.test(dom.heads[0]), dom.heads[1].slice(0, 100));
+            const all = rec.sets.flatMap((set) => R.groups(set).map((g) => ({ set, g })));
+            ok("!! *** the bars share ONE scale across both adapters: six bars drawn from the medians, the longest 3.8x... the UHD 620's native bar is about 27 times the Pascal's native bar ***", dom.bars.length === 6 && dom.bars.every((x, i) => x.ms === all[i].g.gpuMedian.toFixed(2)) && Math.abs(dom.bars[0].w / dom.bars[3].w - all[0].g.gpuMedian / all[3].g.gpuMedian) < 0.03 && dom.bars[5].w < dom.bars[4].w && dom.bars[4].w < dom.bars[3].w && dom.bars[2].w < dom.bars[1].w, dom.bars.map((x) => x.w.toFixed(0)).join(" / ") + " px");
+            {   // the scale itself: pixels per millisecond from any bar; the longest bar must use most of the drawable width, and the budget line must sit at 33.3 ms on THAT scale
+                const k = dom.bars[0].w / (+dom.bars[0].ms), left = 210;
+                ok("!! *** the shared scale is the right one: the longest bar fills most of the drawing (so a hard-coded scale shows) and the budget line stands at 33.3 ms on the bars' own scale ***", dom.budgetX.length === 1 && Math.abs(dom.budgetX[0] - (left + (1000 / 30) * k)) < 1.5 && dom.bars[0].w > 0.7 * (dom.svgW - left - 90) && dom.bars[0].w <= dom.svgW - left - 90 + 1, `scale ${k.toFixed(3)} px/ms, budget line at x ${dom.budgetX[0]}`);
+            }
+            ok("!! *** the fit text carries both adapters' lines and their caveats: the UHD's 'no resolution passes', the Pascal's megapixels at 'x the largest size measured', and 'not a law' ***", /no resolution passes/.test(dom.fit) && /the budget is reached near \d+\.\d megapixels, \d+\.\dx the largest size measured/.test(dom.fit) && (dom.fit.match(/not a law/g) || []).length === 2 && /display rate \(16\.70 ms\)/.test(dom.fit), "");
+            ok("  and the comparison between adapters is printed for the sizes both read and not for native", /at 1280x720 .* x37\.8/.test(dom.fit) && /at 960x540 .* x36\.8/.test(dom.fit) && !/at native/.test(dom.fit), "");
+            ok("  the opt-in probe's numbers are printed apart from the tables (238.1 auto; 262.2, 155.2, 98.3 on) with the reason they are not fitted, and name their adapter", /238\.1 ms/.test(dom.probes) && /262\.2, 155\.2, 98\.3/.test(dom.probes) && /resized/.test(dom.probes) && /UHD Graphics 620/.test(dom.probes), "");
             ok("!! the page made no script error and no console error", errs.length === 0, errs.join(" | ").slice(0, 200));
             try { await pg.screenshot({ path: process.env.OCEAN_READINGS_SHOT || "/tmp/ocean-readings.png" }); } catch {}
             await ctx.close();

@@ -78,9 +78,9 @@ console.log("\n2. THE LIVE PAGE");
         // the stand-in for the sea's frame: prints a HUD line in the sea's own format every 100 ms (or never)
         const standIn = (line) => `<!doctype html><meta charset="utf-8"><div id="fps">${line === null ? "" : "starting"}</div><script>${line === null ? "" : `setInterval(() => { document.getElementById("fps").textContent = ${JSON.stringify(line)}; }, 100);`}</script>`;
         const GPUS = {
-            fast: { info: { vendor: "nvidia", architecture: "pascal", description: "NVIDIA GeForce GTX 1080 Ti" }, line: "120 fps  8.33 ms  |  GPU 6.00 ms  |  3000 nodes  640x360" },
+            fast: { info: { vendor: "nvidia", architecture: "pascal", description: "NVIDIA GeForce GTX 1080" }, line: "120 fps  8.33 ms  |  GPU 6.00 ms  |  3000 nodes  640x360" },
             slow: { info: { vendor: "intel", architecture: "gen-9", description: "Intel(R) UHD Graphics 620" }, line: "10 fps  100.00 ms  |  GPU 228.04 ms  |  3000 nodes  1653x493" },
-            mute: { info: { vendor: "nvidia", architecture: "pascal", description: "NVIDIA GeForce GTX 1080 Ti" }, line: null },
+            mute: { info: { vendor: "nvidia", architecture: "pascal", description: "NVIDIA GeForce GTX 1080" }, line: null },
         };
         async function scenario({ gpu, pref, noWebgpu = false }) {
             const ctx = await b.newContext({ viewport: { width: 1100, height: 760 } });
@@ -132,7 +132,7 @@ console.log("\n2. THE LIVE PAGE");
             const quick = await until(S.fast.pg, () => window.__sea && window.__sea.phase === "sea" && window.__sea.remembered === true, 2500);
             const f2 = await snap(S.fast.pg);
             ok("!! *** a reload on the same adapter does NOT time the sea again: the stored reading is for this adapter, and the sea is shown within 2.5 s (a probe takes 8) ***",
-                stored && stored.label === f.kind + "" || (stored && /1080 Ti/.test(stored.label)) ? quick && f2.remembered === true && f2.samples === 0 && Math.abs(f2.probeMs - 8.33) < 0.01 : false, JSON.stringify({ stored: stored && stored.label, quick, samples: f2.samples }));
+                stored && stored.label === f.kind + "" || (stored && /1080/.test(stored.label)) ? quick && f2.remembered === true && f2.samples === 0 && Math.abs(f2.probeMs - 8.33) < 0.01 : false, JSON.stringify({ stored: stored && stored.label, quick, samples: f2.samples }));
             // "Time the sea again" forgets the reading and measures again
             await S.fast.pg.click("#retimeBtn");
             const retimed = await until(S.fast.pg, () => window.__sea && window.__sea.remembered === false && window.__sea.samples.length > 0, 12000);
