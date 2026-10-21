@@ -121,7 +121,7 @@ export function savePreference(storage, preference) {
 }
 
 /** What the page prints. */
-export function reportLines(decision) {
+export function reportLines(decision = chooseTier()) {
     const d = decision || {};
     return [
         "tier: " + (d.tier || "?") + "   preference: " + (d.preference || "?") + "   adapter: " + (d.adapterKind || "?"),
