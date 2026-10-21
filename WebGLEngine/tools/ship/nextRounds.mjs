@@ -2384,8 +2384,9 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "sweep-timings-stray-host-files",
-        blocker: "OPEN",
-        what: "Delete tools/ship/sweep-timings.linux-x64-4c-16093mb-420793.json and ...-16095mb-420793.json: per-host timing files from an older host-naming, committed by the denoiser arc's rounds 7 and 14.",
+        blocker: "CLOSED",
+        closed: "CLOSED at v4895 (unshipped). Both files were removed after the check the entry asked for: with them moved out of the tree, the timing gates (declaredCost, recordDrift, timingKind, sweepCoverage, boxTimings, budgetEvidence, timingProvenance, timingRecords, timingLoad, timingSemantics, timingSurvivors, timingCoverage, hostScale, capReading, sweepRotation, recordReach) failed exactly the same rows as with them present (the failures that run showed were the round's own unshipped state, not these files), and a search of the tree finds the two names only in prose comments (render/ringFloorCost-selfcheck.mjs, tools/ship/sweepCoverage.mjs, hostScale.mjs), never as a path anything opens.",
+        what: "WAS: Delete tools/ship/sweep-timings.linux-x64-4c-16093mb-420793.json and ...-16095mb-420793.json: per-host timing files from an older host-naming, committed by the denoiser arc's rounds 7 and 14.",
         how: "Confirm nothing reads them (every check was green with them present at v4838), then remove.",
         why: "Two files that name a box under a key no tool uses.",
     },

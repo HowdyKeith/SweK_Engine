@@ -2202,7 +2202,8 @@
   "render/denoiseTemporalUpscale-selfcheck.mjs": 1307,
   "render/denoiseUpscaleGPU-selfcheck.mjs": 24287,
   "ui/oceanReadings-selfcheck.mjs": 204,
-  "tools/ship/oceanReadingsPage-selfcheck.mjs": 1527
+  "tools/ship/oceanReadingsPage-selfcheck.mjs": 1527,
+  "tools/ship/oceanSrcRebuild-selfcheck.mjs": 303
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -4281,7 +4282,8 @@
   "render/denoiseTemporalUpscale-selfcheck.mjs": 0,
   "render/denoiseUpscaleGPU-selfcheck.mjs": 0,
   "ui/oceanReadings-selfcheck.mjs": 0,
-  "tools/ship/oceanReadingsPage-selfcheck.mjs": 0
+  "tools/ship/oceanReadingsPage-selfcheck.mjs": 0,
+  "tools/ship/oceanSrcRebuild-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-10-21T20:06:04.729Z",
@@ -6360,7 +6362,8 @@
   "render/denoiseTemporalUpscale-selfcheck.mjs": "2026-10-21T20:06:04.729Z",
   "render/denoiseUpscaleGPU-selfcheck.mjs": "2026-10-21T13:57:39.527Z",
   "ui/oceanReadings-selfcheck.mjs": "2026-10-21T20:06:04.729Z",
-  "tools/ship/oceanReadingsPage-selfcheck.mjs": "2026-10-21T20:06:04.729Z"
+  "tools/ship/oceanReadingsPage-selfcheck.mjs": "2026-10-21T20:06:04.729Z",
+  "tools/ship/oceanSrcRebuild-selfcheck.mjs": "2026-10-21T20:45:07.676Z"
  },
  "capAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 20000,
@@ -8414,7 +8417,8 @@
   "render/denoiseTemporalUpscale-selfcheck.mjs": 20000,
   "render/denoiseUpscaleGPU-selfcheck.mjs": 300000,
   "ui/oceanReadings-selfcheck.mjs": 20000,
-  "tools/ship/oceanReadingsPage-selfcheck.mjs": 20000
+  "tools/ship/oceanReadingsPage-selfcheck.mjs": 20000,
+  "tools/ship/oceanSrcRebuild-selfcheck.mjs": 60000
  },
  "finished": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": true,
@@ -10488,7 +10492,8 @@
   "render/denoiseTemporalUpscale-selfcheck.mjs": true,
   "render/denoiseUpscaleGPU-selfcheck.mjs": true,
   "ui/oceanReadings-selfcheck.mjs": true,
-  "tools/ship/oceanReadingsPage-selfcheck.mjs": true
+  "tools/ship/oceanReadingsPage-selfcheck.mjs": true,
+  "tools/ship/oceanSrcRebuild-selfcheck.mjs": true
  },
  "crossings": {
   "brain/gunnerPolicy-selfcheck.mjs": 2,
@@ -12660,7 +12665,8 @@
   "render/denoiseTemporalUpscale-selfcheck.mjs": 1307,
   "render/denoiseUpscaleGPU-selfcheck.mjs": 20053,
   "ui/oceanReadings-selfcheck.mjs": 134,
-  "tools/ship/oceanReadingsPage-selfcheck.mjs": 626
+  "tools/ship/oceanReadingsPage-selfcheck.mjs": 626,
+  "tools/ship/oceanSrcRebuild-selfcheck.mjs": 303
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-10-21T08:57:00.373Z",
@@ -14630,7 +14636,8 @@
   "render/denoiseTemporalUpscale-selfcheck.mjs": "2026-10-21T20:05:48.658Z",
   "render/denoiseUpscaleGPU-selfcheck.mjs": "2026-10-21T14:18:38.040Z",
   "ui/oceanReadings-selfcheck.mjs": "2026-10-21T19:35:07.583Z",
-  "tools/ship/oceanReadingsPage-selfcheck.mjs": "2026-10-21T19:35:08.367Z"
+  "tools/ship/oceanReadingsPage-selfcheck.mjs": "2026-10-21T19:35:08.367Z",
+  "tools/ship/oceanSrcRebuild-selfcheck.mjs": "2026-10-21T20:45:07.676Z"
  },
  "serialRing": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": [
@@ -24334,6 +24341,9 @@
   ],
   "tools/ship/oceanReadingsPage-selfcheck.mjs": [
    626
+  ],
+  "tools/ship/oceanSrcRebuild-selfcheck.mjs": [
+   303
   ]
  },
  "contended": {
@@ -26304,7 +26314,8 @@
   "render/denoiseTemporalUpscale-selfcheck.mjs": false,
   "render/denoiseUpscaleGPU-selfcheck.mjs": false,
   "ui/oceanReadings-selfcheck.mjs": true,
-  "tools/ship/oceanReadingsPage-selfcheck.mjs": true
+  "tools/ship/oceanReadingsPage-selfcheck.mjs": true,
+  "tools/ship/oceanSrcRebuild-selfcheck.mjs": false
  },
  "kinds": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "loaded",
@@ -28383,7 +28394,8 @@
   "render/denoiseTemporalUpscale-selfcheck.mjs": "alone",
   "render/denoiseUpscaleGPU-selfcheck.mjs": "alone",
   "ui/oceanReadings-selfcheck.mjs": "loaded",
-  "tools/ship/oceanReadingsPage-selfcheck.mjs": "loaded"
+  "tools/ship/oceanReadingsPage-selfcheck.mjs": "loaded",
+  "tools/ship/oceanSrcRebuild-selfcheck.mjs": "alone"
  },
  "boxScale": {
   "2026-10-21T02:26:26.907Z": {
