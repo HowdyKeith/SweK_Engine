@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "a1271dca16be84d63cd1c61dc738a1564d1e7d74",
+ "head": "906c8ac71b0f0fef8fcc2a6a7c9dd4bd179645e0",
  "bodies": {
   "box3d": [
    {
@@ -341,7 +341,7 @@
    {
     "path": "server.html",
     "bytes": 895726,
-    "sha": "60f2555250f5aaba692d1b6a54b137bdbc5713e8"
+    "sha": "906c8ac71b0f0fef8fcc2a6a7c9dd4bd179645e0"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
@@ -752,7 +752,7 @@
    {
     "path": "main.js",
     "bytes": 3698175,
-    "sha": "bfba20652ba2d515c6152c2db7ec6f8322669c7c"
+    "sha": "906c8ac71b0f0fef8fcc2a6a7c9dd4bd179645e0"
    },
    {
     "path": "mpm3d.html",
@@ -802,7 +802,7 @@
    {
     "path": "server.html",
     "bytes": 895726,
-    "sha": "60f2555250f5aaba692d1b6a54b137bdbc5713e8"
+    "sha": "906c8ac71b0f0fef8fcc2a6a7c9dd4bd179645e0"
    },
    {
     "path": "shipavatar.html",
@@ -1390,12 +1390,12 @@
    {
     "path": "ui/oceanSea-selfcheck.mjs",
     "bytes": 13599,
-    "sha": null
+    "sha": "906c8ac71b0f0fef8fcc2a6a7c9dd4bd179645e0"
    },
    {
     "path": "ui/oceanSea.mjs",
-    "bytes": 9985,
-    "sha": null
+    "bytes": 9990,
+    "sha": "906c8ac71b0f0fef8fcc2a6a7c9dd4bd179645e0"
    }
   ],
   "xatlas": [
