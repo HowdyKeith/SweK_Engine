@@ -364,7 +364,7 @@ sec("4. *** THE SHIPPED KERNEL ON REAL HARDWARE, NOT A JS COPY OF IT ***");
             r.ok ? `${cases.length} cases x ${PX} pixels in one run, adapter ${r.adapter && r.adapter.architecture}`
                  : r.reason + " " + JSON.stringify(r.errors || []).slice(0, 200));
         if (r.ok) {
-            let worstAll = 0, flatExact = true, zeroExact = true;
+            let worstAll = 0, flatExact = true, zeroExact = true; const zeroWorst = {};
             const cell = (c) => r.values.subarray ? r.values.subarray(cases.indexOf(c) * PX, (cases.indexOf(c) + 1) * PX)
                                                   : r.values.slice(cases.indexOf(c) * PX, (cases.indexOf(c) + 1) * PX);
             cases.forEach((c, ci) => {
@@ -376,7 +376,10 @@ sec("4. *** THE SHIPPED KERNEL ON REAL HARDWARE, NOT A JS COPY OF IT ***");
                     if (u > w) w = u;
                 }
                 if (c.key === "flat" && w !== 0) flatExact = false;
-                if (c.strength === 0 && w !== 0) zeroExact = false;
+                // v4884 -- at strength 0 the blur averages 32 copies of the pixel's own value, so any gap IS the image function's. flat and linear use + - * only and must be exact; radial takes a sqrt, which WGSL
+                // allows 2.5 ulp on (Intel gen-9 measured 1, on 300 of 4096 pixels) -- so it is held to SQRT_ULP instead of to zero, and the row says so.
+                if (c.strength === 0 && (Z.IMAGES[c.key].exactOnGpu === false ? w > Z.SQRT_ULP : w !== 0)) zeroExact = false;
+                if (c.strength === 0) zeroWorst[c.key] = w;
                 if (w > worstAll) worstAll = w;
                 say(`${c.key.padEnd(7)} s=${String(c.strength).padEnd(5)} worst ${w} ulp, ${diff} of ${PX} differing`);
             });
@@ -386,10 +389,10 @@ sec("4. *** THE SHIPPED KERNEL ON REAL HARDWARE, NOT A JS COPY OF IT ***");
                 `0 ulp on all ${Z.GPU_STRENGTHS.length} strengths. The pairwise tree's exactness is a property ` +
                 "of IEEE-754 rather than of an implementation, so a machine that disagreed here would be a " +
                 "finding about the machine");
-            ok("!! *** P2 HOLDS ON THE GPU: strength 0 is bit-identical for every image ***",
+            ok("!! *** P2 HOLDS ON THE GPU: strength 0 is the identity -- bit-identical for every image built from + - *, and within sqrt's own " + Z.SQRT_ULP + " ulp for the one that takes a square root ***",
                 zeroExact,
-                `0 ulp for ${Z.GPU_ARMS.join(", ")} at strength 0 -- the identity survives the trip to hardware, ` +
-                "which is the claim a wiring round would actually rest on");
+                `worst at strength 0: ${Z.GPU_ARMS.map((k) => k + " " + zeroWorst[k] + " ulp").join(", ")}. The identity survives the trip to hardware, which is the claim a wiring round would actually rest on; ` +
+                "the radial image's gap is its sqrt (WGSL allows 2.5 ulp and does not promise IEEE), not the kernel's -- at strength 0 the kernel averages 32 copies of one value");
             ok("images that VARY along the ray agree within the frozen budget",
                 worstAll <= ULP_BUDGET,
                 `worst ${worstAll} ulp against a budget of ${ULP_BUDGET} derived from the reduction depth. ` +

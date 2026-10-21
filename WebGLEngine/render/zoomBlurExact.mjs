@@ -144,13 +144,14 @@ export function zoomBlurSequential(image, uv, centre, strength, samples = ZOOM.S
 /** The analytic images the properties are stated over. IMAGES[k].cpu and the shader arm k are the same image. */
 export const IMAGES = Object.freeze({
     // P1. Any constant; 0.1 is chosen because it is one of the values sequential summation gets wrong.
-    flat:   Object.freeze({ arm: 0, transcendental: false, cpu: () => Math.fround(0.1) }),
-    // P5. Distance from the centre. sqrt is correctly rounded in IEEE-754, so this is comparable bit-for-bit.
-    radial: Object.freeze({ arm: 1, transcendental: false,
+    flat:   Object.freeze({ arm: 0, transcendental: false, exactOnGpu: true, cpu: () => Math.fround(0.1) }),
+    // P5. Distance from the centre. sqrt is correctly rounded in IEEE-754, but WGSL does not promise IEEE here: the spec allows sqrt 2.5 ulp, and the first real GPU this ran on (Intel gen-9, v4884) returned
+    // values 1 ulp from the CPU's at strength 0 on 300 of 4096 pixels -- where the blur does nothing, so the gap is the IMAGE FUNCTION'S, not the kernel's. exactOnGpu: false marks it, and SQRT_ULP is the bound.
+    radial: Object.freeze({ arm: 1, transcendental: false, exactOnGpu: false,
         cpu: (u, v) => Math.fround(Math.sqrt(Math.fround(Math.fround(u - 0.5) * Math.fround(u - 0.5)) +
                                              Math.fround(Math.fround(v - 0.5) * Math.fround(v - 0.5)))) }),
     // A plane. Its blur has a closed form, so it grades the sample POSITIONS and not merely their agreement.
-    linear: Object.freeze({ arm: 2, transcendental: false, cpu: (u, v) => Math.fround(u + v) }),
+    linear: Object.freeze({ arm: 2, transcendental: false, exactOnGpu: true, cpu: (u, v) => Math.fround(u + v) }),
     // P4. Constant along every ray from (0.5, 0.5) -- it depends on angle alone. CPU-ONLY, and the reason is
     // stated where it is used: atan2 is not bit-identical across implementations, so a GPU comparison on this
     // image would be measuring two libraries rather than one kernel.
@@ -208,6 +209,8 @@ void main() {
  * exactly that. Collapsing the matrix into ONE dispatch is the repair. It is not a budget dodge: the gate
  * still runs every case, and what shrinks is the number of times it takes the device.
  */
+/** How far a GPU's sqrt may sit from the CPU's, in ulp: WGSL allows 2.5, rounded up. Measured at 1 on Intel gen-9 (v4884). */
+export const SQRT_ULP = 3;
 export const GPU_ARMS = Object.freeze(["flat", "radial", "linear"]);
 export const GPU_STRENGTHS = Object.freeze([0, 0.25, 0.5, 0.7, 0.9, 1.0]);
 
