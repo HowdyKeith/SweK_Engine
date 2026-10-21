@@ -16115,6 +16115,18 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "platform with SIGKILL (S11) and the journal's restore rules on a hand-written journal (S12) -- the probe's own write and a torn prefix restored, a later edit left alone. " +
                  "Seven sabotages, all red; P6 went 0 red until S11 read the journal's own entry",
     }),
+    since604: Object.freeze({
+        at: "v4893", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        elsewhere: Object.freeze([
+            Object.freeze({ gate: "tools/ship/recordProbe-selfcheck.mjs", was: "red", now: "green",
+                why: "red on the rig's win32 verify of v4892 as of v4891: the kill rows' child imported the probe by a bare C:\\ path, which is no ES module " +
+                     "specifier on Windows, so it threw before its first line and the rows never saw a mutation. Imported by file:// URL now, with the child's " +
+                     "stderr quoted when it never mutates; green on the rig's win32 box run alone at 7fbce89e, the journal restoring where the handler did not." }),
+        ]),
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
