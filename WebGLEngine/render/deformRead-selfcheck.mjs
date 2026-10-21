@@ -42,6 +42,7 @@ console.log("1. LIFTED");
     ok("!! the three functions are upstream's lib/deform.wgsl statement for statement, the texture fetch aside", missing.length === 0, stmts.length + " statements in both" + (missing.length ? "; MISSING " + missing.map((m) => m.slice(0, 40)).join(" | ") : ""));
 }
 
+ok("  DEFORM_READ_WGSL, the slice a shader includes, holds the three functions and no kernel entry point", ["fn deformUV(", "fn deformFalloff(", "fn deformHeight("].every((f) => DR.DEFORM_READ_WGSL.includes(f)) && !DR.DEFORM_READ_WGSL.includes("@compute") && DR.READ_KERNEL_WGSL.includes(DR.DEFORM_READ_WGSL));
 console.log("\n2. THE TWIN");
 {
     const c = [0, 0], size = 8;

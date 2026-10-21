@@ -50,6 +50,7 @@ console.log("1. LIFTED");
     ok("  the twin's table is the same twelve points", PS.POISSON.length === 12 && PS.POISSON[0][0] === -0.326 && PS.POISSON[11][1] === -0.598);
 }
 
+ok("  PCSS_WGSL, the slice a shader includes, holds the Poisson table and pcssShadow and no kernel entry point", PS.PCSS_WGSL.includes("const POISSON") && PS.PCSS_WGSL.includes("fn pcssShadow(") && !PS.PCSS_WGSL.includes("@compute") && PS.PCSS_KERNEL_WGSL.includes(PS.PCSS_WGSL));
 console.log("\n2. THE TWIN");
 {
     const open = mapOf(() => 1), wall = mapOf(() => 0.2);

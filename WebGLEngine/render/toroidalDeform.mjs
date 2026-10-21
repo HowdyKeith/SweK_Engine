@@ -272,6 +272,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 }
 `;
 
+/** upstream's noise (hash21, grad2, noised, noise2) as WGSL text, for any shader that wants the same function the kernel uses */
+export const NOISE_WGSL = KERNEL_WGSL.slice(KERNEL_WGSL.indexOf("// ---- upstream lib/noise.wgsl"), KERNEL_WGSL.indexOf("// ---- ours"));
+
 /** The uniform block's 12 floats, in the kernel's field order. */
 export const packParams = (P) => [P.center[0], P.center[1], P.prevCenter[0], P.prevCenter[1], P.size, P.res, P.dt, P.brushCount, P.refillRate, P.maxDepth, P.maxBerm, P.windAngle];
 
@@ -302,16 +305,25 @@ export class DeformField {
     /** The inputs the kernel takes this frame (after update() has set the centre and the banked dt). */
     params() { return { center: this.center, prevCenter: this.prevCenter, size: this.size, res: this.res, dt: this.lastRelaxDt, brushCount: this.brushCount, refillRate: this.refillRate, maxDepth: this.maxDepth, maxBerm: this.maxBerm, windAngle: this.windAngle }; }
     brushes() { return this._brushes; }
-    /** Advance one frame: snap the centre to a texel boundary, bank the time, spend it only in steps of RELAX_STEP, run the pass, clear the queue. */
-    update(dt, focus) {
+    /**
+     * The bookkeeping of a frame WITHOUT the pass: snap the centre to a texel boundary, clear the stale brush tail, bank the time and spend it only in steps of RELAX_STEP. A GPU driver calls this, hands params()
+     * and brushes() to the kernel, then calls endFrame(); update() is advance + the CPU twin's pass + endFrame.
+     */
+    advance(dt, focus) {
         this.prevCenter = [this.center[0], this.center[1]];
         this.center = [Math.round(focus.x / this.texel) * this.texel, Math.round(focus.z / this.texel) * this.texel];
         for (let i = this.brushCount; i < MAX_BRUSHES; i++) this._brushes[i * 4 + 2] = 0;
         this.relaxOwed += dt; this.lastRelaxDt = 0;
         if (this.relaxOwed >= RELAX_STEP) { this.lastRelaxDt = this.relaxOwed; this.relaxOwed = 0; }
+        return this.params();
+    }
+    endFrame() { this.brushCount = 0; }
+    /** Advance one frame: bookkeeping, the CPU twin's pass, clear the queue. */
+    update(dt, focus) {
+        this.advance(dt, focus);
         stepField(this.state, this._next, this.params(), this._brushes);
         [this.state, this._next] = [this._next, this.state];
-        this.brushCount = 0;
+        this.endFrame();
         return this.state;
     }
     /** Net height offset (piled mass minus depression, metres) at a world position, bilinear, or null outside the window. */

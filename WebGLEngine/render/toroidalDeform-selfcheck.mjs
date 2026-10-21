@@ -64,6 +64,7 @@ console.log("1. LIFTED, NOT RETYPED");
         /0\.004 \* k/.test(fs.readFileSync(path.join(ENG, "render/toroidalDeform.mjs"), "utf8")) && /0\.012 \* k/.test(fs.readFileSync(path.join(ENG, "render/toroidalDeform.mjs"), "utf8")) && /-dt \* refillRate \/ 900/.test(fs.readFileSync(path.join(ENG, "render/toroidalDeform.mjs"), "utf8")));
 }
 
+ok("  NOISE_WGSL, the slice other shaders include, holds the four noise functions and nothing of the kernel", ["fn hash21(", "fn grad2(", "fn noised(", "fn noise2("].every((f) => TD.NOISE_WGSL.includes(f)) && !TD.NOISE_WGSL.includes("@compute") && TD.KERNEL_WGSL.includes(TD.NOISE_WGSL));
 const mkBrushes = (list) => { const f = new TD.DeformField({ res: 8, size: 8 }); f.center = [0, 0]; for (const b of list) f.brush(...b); return f; };
 const P0 = (o = {}) => ({ center: [0, 0], prevCenter: [0, 0], size: 8, res: 64, dt: 0, brushCount: 0, refillRate: 1, maxDepth: 0.55, maxBerm: 0.34, windAngle: 0, ...o });
 const rng = (seed) => () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };

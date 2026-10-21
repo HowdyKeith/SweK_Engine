@@ -48,6 +48,7 @@ console.log("1. LIFTED");
     ok("  the bicubic B-spline weights are upstream's four polynomials (found in upstream's text, and the twin spells the same four)", bicubic.every((s) => up.includes(s)) && /\(1 - 3 \* f \+ 3 \* f2 - f3\) \/ 6/.test(js) && /\(4 - 6 \* f2 \+ 3 \* f3\) \/ 6/.test(js) && /\(1 \+ 3 \* f \+ 3 \* f2 - 3 \* f3\) \/ 6/.test(js) && /f3 \/ 6\]/.test(js));
 }
 
+ok("  CLIPMAP_WGSL, the slice a vertex stage includes, is the placement function and its struct and nothing of the kernel around them", CM.CLIPMAP_WGSL.includes("fn placeClipmapVertex(") && CM.CLIPMAP_WGSL.includes("struct ClipmapVertex") && !CM.CLIPMAP_WGSL.includes("@compute") && CM.PLACE_KERNEL_WGSL.includes(CM.CLIPMAP_WGSL));
 console.log("\n2. THE MESH");
 {
     const m = CM.buildClipmap();

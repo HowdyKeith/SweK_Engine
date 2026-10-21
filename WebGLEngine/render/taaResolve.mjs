@@ -226,6 +226,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 }
 `;
 
+/** historyCatmullRom and resolve as WGSL text; a shader that includes it defines uniforms, dims(), sampleCur, sampleHist, sampleDepth and the tonemap helpers */
+export const TAA_WGSL = RESOLVE_KERNEL_WGSL.slice(RESOLVE_KERNEL_WGSL.indexOf("// ---- upstream post/taa.fragment.wgsl"), RESOLVE_KERNEL_WGSL.indexOf("@compute"));
+
 export function reportLines() {
     const j = buildHalton(8);
     return ["[taaResolve] depth-reprojected TAA: five-tap Catmull-Rom history, 3x3 variance clip at 1.35 sigma in tonemap-weighted space, feedback to 0.97 falling with motion and clipping",

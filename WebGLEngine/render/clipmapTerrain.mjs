@@ -145,6 +145,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 }
 `;
 
+/** upstream's placeClipmapVertex and its ClipmapVertex struct as WGSL text, for the vertex stage that uses the same function the placement kernel does */
+export const CLIPMAP_WGSL = PLACE_KERNEL_WGSL.slice(PLACE_KERNEL_WGSL.indexOf("struct ClipmapVertex"), PLACE_KERNEL_WGSL.indexOf("@compute"));
+
 export function reportLines(m = null) {
     const g = m || { gridN: GRID_N, levels: LEVELS, vertices: (GRID_N + 1) * (GRID_N + 1) * LEVELS, triangles: null };
     const L = ["[clipmapTerrain] " + g.levels + " nested rings of " + g.gridN + " quads, spacing doubling from " + BASE_SPACING + " m: " + g.vertices + " vertices in one buffer, out to " + outerExtent(g.gridN, BASE_SPACING, g.levels).toFixed(0) + " m"];

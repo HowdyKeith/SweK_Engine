@@ -128,6 +128,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 }
 `;
 
+/** POISSON and pcssShadow as WGSL text; a shader that includes it defines sampleMap(uv: vec2f) -> f32 over its own shadow map */
+export const PCSS_WGSL = PCSS_KERNEL_WGSL.slice(PCSS_KERNEL_WGSL.indexOf("const POISSON"), PCSS_KERNEL_WGSL.indexOf("@compute"));
+
 export function reportLines() {
     return ["[pcssShadow] percentage-closer SOFT shadows in world units: 8-tap blocker search, penumbra = blocker distance x 0.0093 x softness, 12-tap PCF, depth compared on the receiver's own plane",
         "  cascade selection, the normal-offset bias and the render-target Y flip are Babylon's and are not lifted"];

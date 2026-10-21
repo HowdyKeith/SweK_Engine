@@ -108,6 +108,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 }
 `;
 
+/** upstream's deformUV / deformFalloff / deformHeight as WGSL text; a shader that includes it defines textureSampleLevelWrap(uv: vec2f) -> vec4f over its own copy of the field */
+export const DEFORM_READ_WGSL = READ_KERNEL_WGSL.slice(READ_KERNEL_WGSL.indexOf("// ---- upstream lib/deform.wgsl"), READ_KERNEL_WGSL.indexOf("@compute"));
+
 export function reportLines() {
     const L = ["[deformRead] the read side of the toroidal field: a 3x3 binomial (taps one lattice spacing apart) times the falloff (1 to 0 between 0.80 and 0.96 of the half-window)"];
     L.push("  first zero of the filter at the lattice Nyquist (wavelength 2 x spacing); a trench of 8 x spacing passes at " + (100 * (2 + 2 * Math.cos(Math.PI / 4)) / 4).toFixed(1) + "%");

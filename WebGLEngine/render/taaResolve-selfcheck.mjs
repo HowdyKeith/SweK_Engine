@@ -61,6 +61,7 @@ console.log("1. LIFTED");
     ok("  mulMat4Vec4 is column-major like WGSL: the identity returns the vector, and a translation in the fourth column moves a point (1, 2, 3, 1) to (6, 8, 10, 1) and a direction (w = 0) not at all", T.mulMat4Vec4(IDENT, [1, 2, 3, 1]).join() === "1,2,3,1" && T.mulMat4Vec4(trans, [1, 2, 3, 1]).join() === "6,8,10,1" && T.mulMat4Vec4(trans, [1, 2, 3, 0]).join() === "1,2,3,0");
 }
 
+ok("  TAA_WGSL, the slice a shader includes, holds historyCatmullRom and resolve and no kernel entry point", T.TAA_WGSL.includes("fn historyCatmullRom(") && T.TAA_WGSL.includes("fn resolve(") && !T.TAA_WGSL.includes("@compute") && T.RESOLVE_KERNEL_WGSL.includes(T.TAA_WGSL));
 console.log("\n2. THE GATES");
 {
     const r = rng(4), S = state(); fill(S.cur, () => [r(), r(), r()]); fill(S.hist, () => [r(), r(), r()]);
