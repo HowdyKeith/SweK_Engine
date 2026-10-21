@@ -2200,7 +2200,9 @@
   "ui/oceanSea-selfcheck.mjs": 211,
   "tools/ship/oceanSeaPage-selfcheck.mjs": 23963,
   "render/denoiseTemporalUpscale-selfcheck.mjs": 1458,
-  "render/denoiseUpscaleGPU-selfcheck.mjs": 24287
+  "render/denoiseUpscaleGPU-selfcheck.mjs": 24287,
+  "ui/oceanReadings-selfcheck.mjs": 134,
+  "tools/ship/oceanReadingsPage-selfcheck.mjs": 626
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -4277,7 +4279,9 @@
   "ui/oceanSea-selfcheck.mjs": 0,
   "tools/ship/oceanSeaPage-selfcheck.mjs": 0,
   "render/denoiseTemporalUpscale-selfcheck.mjs": 0,
-  "render/denoiseUpscaleGPU-selfcheck.mjs": 0
+  "render/denoiseUpscaleGPU-selfcheck.mjs": 0,
+  "ui/oceanReadings-selfcheck.mjs": 0,
+  "tools/ship/oceanReadingsPage-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-10-21T18:18:31.386Z",
@@ -6354,7 +6358,9 @@
   "ui/oceanSea-selfcheck.mjs": "2026-10-21T18:18:31.386Z",
   "tools/ship/oceanSeaPage-selfcheck.mjs": "2026-10-21T11:54:59.127Z",
   "render/denoiseTemporalUpscale-selfcheck.mjs": "2026-10-21T18:18:31.386Z",
-  "render/denoiseUpscaleGPU-selfcheck.mjs": "2026-10-21T13:57:39.527Z"
+  "render/denoiseUpscaleGPU-selfcheck.mjs": "2026-10-21T13:57:39.527Z",
+  "ui/oceanReadings-selfcheck.mjs": "2026-10-21T19:35:07.583Z",
+  "tools/ship/oceanReadingsPage-selfcheck.mjs": "2026-10-21T19:35:08.367Z"
  },
  "capAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 20000,
@@ -8406,7 +8412,9 @@
   "ui/oceanSea-selfcheck.mjs": 20000,
   "tools/ship/oceanSeaPage-selfcheck.mjs": 120000,
   "render/denoiseTemporalUpscale-selfcheck.mjs": 20000,
-  "render/denoiseUpscaleGPU-selfcheck.mjs": 300000
+  "render/denoiseUpscaleGPU-selfcheck.mjs": 300000,
+  "ui/oceanReadings-selfcheck.mjs": 60000,
+  "tools/ship/oceanReadingsPage-selfcheck.mjs": 60000
  },
  "finished": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": true,
@@ -10478,7 +10486,9 @@
   "ui/oceanSea-selfcheck.mjs": true,
   "tools/ship/oceanSeaPage-selfcheck.mjs": true,
   "render/denoiseTemporalUpscale-selfcheck.mjs": true,
-  "render/denoiseUpscaleGPU-selfcheck.mjs": true
+  "render/denoiseUpscaleGPU-selfcheck.mjs": true,
+  "ui/oceanReadings-selfcheck.mjs": true,
+  "tools/ship/oceanReadingsPage-selfcheck.mjs": true
  },
  "crossings": {
   "brain/gunnerPolicy-selfcheck.mjs": 2,
@@ -12646,7 +12656,9 @@
   "ui/oceanSea-selfcheck.mjs": 67,
   "tools/ship/oceanSeaPage-selfcheck.mjs": 23963,
   "render/denoiseTemporalUpscale-selfcheck.mjs": 1458,
-  "render/denoiseUpscaleGPU-selfcheck.mjs": 20053
+  "render/denoiseUpscaleGPU-selfcheck.mjs": 20053,
+  "ui/oceanReadings-selfcheck.mjs": 134,
+  "tools/ship/oceanReadingsPage-selfcheck.mjs": 626
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-10-21T08:57:00.373Z",
@@ -14614,7 +14626,9 @@
   "ui/oceanSea-selfcheck.mjs": "2026-10-21T11:54:34.973Z",
   "tools/ship/oceanSeaPage-selfcheck.mjs": "2026-10-21T11:54:59.127Z",
   "render/denoiseTemporalUpscale-selfcheck.mjs": "2026-10-21T18:18:16.343Z",
-  "render/denoiseUpscaleGPU-selfcheck.mjs": "2026-10-21T14:18:38.040Z"
+  "render/denoiseUpscaleGPU-selfcheck.mjs": "2026-10-21T14:18:38.040Z",
+  "ui/oceanReadings-selfcheck.mjs": "2026-10-21T19:35:07.583Z",
+  "tools/ship/oceanReadingsPage-selfcheck.mjs": "2026-10-21T19:35:08.367Z"
  },
  "serialRing": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": [
@@ -24310,6 +24324,12 @@
    20044,
    24287,
    20053
+  ],
+  "ui/oceanReadings-selfcheck.mjs": [
+   134
+  ],
+  "tools/ship/oceanReadingsPage-selfcheck.mjs": [
+   626
   ]
  },
  "contended": {
@@ -26278,7 +26298,9 @@
   "ui/oceanSea-selfcheck.mjs": true,
   "tools/ship/oceanSeaPage-selfcheck.mjs": false,
   "render/denoiseTemporalUpscale-selfcheck.mjs": false,
-  "render/denoiseUpscaleGPU-selfcheck.mjs": false
+  "render/denoiseUpscaleGPU-selfcheck.mjs": false,
+  "ui/oceanReadings-selfcheck.mjs": false,
+  "tools/ship/oceanReadingsPage-selfcheck.mjs": false
  },
  "kinds": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "loaded",
@@ -28355,7 +28377,9 @@
   "ui/oceanSea-selfcheck.mjs": "loaded",
   "tools/ship/oceanSeaPage-selfcheck.mjs": "alone",
   "render/denoiseTemporalUpscale-selfcheck.mjs": "alone",
-  "render/denoiseUpscaleGPU-selfcheck.mjs": "alone"
+  "render/denoiseUpscaleGPU-selfcheck.mjs": "alone",
+  "ui/oceanReadings-selfcheck.mjs": "alone",
+  "tools/ship/oceanReadingsPage-selfcheck.mjs": "alone"
  },
  "boxScale": {
   "2026-10-21T01:37:11.099Z": {

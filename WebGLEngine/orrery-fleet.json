@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "7fbce89e091720d0b7f80142f37350006854f609",
+ "head": "8b8bbc3a97415d0c0553716694fc1369338fedc1",
  "bodies": {
   "box3d": [
    {
@@ -340,7 +340,7 @@
    },
    {
     "path": "server.html",
-    "bytes": 895726,
+    "bytes": 895942,
     "sha": "906c8ac71b0f0fef8fcc2a6a7c9dd4bd179645e0"
    },
    {
@@ -751,8 +751,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3697562,
-    "sha": "98ee18760cdc6b7e478855d939c94f97b04bc5e7"
+    "bytes": 3698567,
+    "sha": "1c64e7afa9da85a0d127510899673de4a887ca1a"
    },
    {
     "path": "mpm3d.html",
@@ -801,7 +801,7 @@
    },
    {
     "path": "server.html",
-    "bytes": 895726,
+    "bytes": 895942,
     "sha": "906c8ac71b0f0fef8fcc2a6a7c9dd4bd179645e0"
    },
    {
@@ -1388,9 +1388,14 @@
     "sha": "e608b7df96aac65e5fac2ba7c5518b35d55b2cd8"
    },
    {
+    "path": "ui/oceanReadings-selfcheck.mjs",
+    "bytes": 18610,
+    "sha": "2edefc717647d297f8857fb7bdf83e8aa8e52aea"
+   },
+   {
     "path": "ui/oceanSea-selfcheck.mjs",
-    "bytes": 13599,
-    "sha": "906c8ac71b0f0fef8fcc2a6a7c9dd4bd179645e0"
+    "bytes": 13590,
+    "sha": "da4b0cfc6076256c643b6abce168e39cf185f93e"
    },
    {
     "path": "ui/oceanSea.mjs",

@@ -203,6 +203,7 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "ocean-spike.html",
         "tools/ship/oceanSpikePage-selfcheck.mjs",
         // v4890 -- the opt-in sea (slice 4): the module that builds the sea's URL and reads its declared defaults, and its gate, which pins the bundle's hash and reads its qs.get calls.
+        "ui/oceanReadings-selfcheck.mjs",
         "ui/oceanSea-selfcheck.mjs",
         "ui/oceanSea.mjs",
     ]),

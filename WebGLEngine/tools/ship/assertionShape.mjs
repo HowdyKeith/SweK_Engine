@@ -950,8 +950,8 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4883 -- two new gates (world/oceanWater-selfcheck.mjs and tools/ship/oceanDefaultPage-selfcheck.mjs, the default water), each spelling ok(name, cond, detail) or ok(label, cond, note): gates 2055 -> 2057, usesOk 2034 -> 2036, definesOk 2026 -> 2028, nameFirst 1924 -> 1926 (read off the code).
     // v4884 -- five new gates from the long-silence branch (corroborationSubmit, deviceReport, sensitivitySweep, deferralCensus, zoomBlurExact), each spelling ok(name, cond, detail): gates 2057 -> 2062, usesOk 2036 -> 2041, definesOk 2028 -> 2033, nameFirst 1926 -> 1931 (read off the code).
     // v4891 -- two new gates (render/denoiseUpscaleGPU-selfcheck.mjs and render/denoiseTemporalUpscale-selfcheck.mjs, the denoiser arc), each spelling ok(label, cond, note): gates 2070 -> 2072, usesOk 2049 -> 2051, definesOk 2041 -> 2043, nameFirst 1939 -> 1941; the reading rows held.
-    gates: 2072, usesOk: 2051, definesOk: 2043, importsOk: 0,
-    distinctDefinitions: 45, nameFirst: 1941, condFirst: 99, unknownSignature: 11,
+    gates: 2074, usesOk: 2053, definesOk: 2045, importsOk: 0,
+    distinctDefinitions: 45, nameFirst: 1943, condFirst: 99, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

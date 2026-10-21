@@ -16127,6 +16127,16 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                      "stderr quoted when it never mutates; green on the rig's win32 box run alone at 7fbce89e, the journal restoring where the handler did not." }),
         ]),
     }),
+    since605: Object.freeze({
+        at: "v4894", swept: 2, green: 2, red: 0,
+        added: Object.freeze(["ui/oceanReadings-selfcheck.mjs", "tools/ship/oceanReadingsPage-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "the ocean readings (slice 5): the record's arithmetic against an independent recomputation (medians, spread, a least-squares line by normal equations), the 100 ms step clamp read out of the " +
+                 "vendored bundle's text, grouping by label AND size (the rig's native frame was three heights), the card named by Keith kept apart from what the browser reported, the comparison between " +
+                 "adapters at shared sizes only; thirteen sabotages, thirteen red. And its page: one table per adapter whose cells are the module's numbers, bars on one scale with the budget line at 33.3 ms " +
+                 "on that scale, the caveats printed with the fit; sabotages of the page, all red",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

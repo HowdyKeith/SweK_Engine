@@ -402,7 +402,8 @@ export const REACH_AT_V4548 = Object.freeze({
     // v4880 -- 158 -> 170: the orrery-seeded merge, twelve guarded records. Read off the gate, not typed.
     // wasmTeardown-selfcheck reads it and grades every gate reaching a door against it.
     // v4886 -- 178 -> 180: PROBE_AT_V4675 and one more, both guarded by recordProbe-selfcheck / frozenRecords; read off the gate.
-    total: 181,
+    // v4894 -- 181 -> 182: READINGS_AT_V4892 (ui/oceanReadings.mjs), GUARDED by ui/oceanReadings-selfcheck.mjs at about 130 ms.
+    total: 182,
     // *** READ OFF THE INSTRUMENT, NOT PREDICTED. *** The first draft of this record guessed 53/21/19/40 from
     // which gates the round had sped up, and was wrong on three of the four: the comment-strip fix below
     // moved two records the other way at the same time, and a guess cannot see two changes at once.
@@ -472,7 +473,9 @@ export const REACH_AT_V4548 = Object.freeze({
     // (0.6 s), so it grows with the tree and this round added three more files. It sat at 2,804 for the v4887 reading and flipped back and forth through v4889 and v4890's verdicts (61 / 62 / 61 / 62), which is the
     // flake that was reported and not understood until now: not noise, a gate AT the line. The ceiling is 62 because 62 is what the tree holds when it reads over; the fix that would lower it is a cheaper census in
     // wasmTeardown.mjs (one pass instead of a grep per door), not a re-timing. The ratchet still refuses growth beyond this.
-    checked: 119, overBudget: 45, unguarded: 17, unchecked: 62,
+    // v4894 -- READ OFF reach() after merging v4893: checked 122, overBudget 43, unguarded 17, unchecked 60. The ceiling below stays at 62 on purpose: wasmDoors-selfcheck is still at the 3 s line
+    // (the v4890 note), so the count can read 62 again on a loaded sweep, and a ceiling lowered to the quiet reading would turn that into a red nobody caused.
+    checked: 122, overBudget: 43, unguarded: 17, unchecked: 62,
     // v4550 -- the UNMEASURED class was split out of over-budget after this gate went red twice inside full
     // sweeps and passed 68 times under load; the trigger was a concurrent REWRITE of sweep-timings.json, not
     // contention. Zero records sit in it on a settled tree, which is the expected reading.
@@ -661,7 +664,7 @@ export const UNGUARDED_SPLIT_V4577 = Object.freeze({
     // v4819 -- 156 -> 157, COMMIT_BELT_DRIFT_V4819 re-taken above; `unguarded` does not move.
     // v4840 -- 157 -> 158, DOORS_AT_V4840 re-taken above; `unguarded` does not move.
     // v4880 -- 158 -> 170: twelve records arrive with the orrery-seeded merge; `unguarded` does not move (16 of 170, all documentary). Read off the gate.
-    structural: Object.freeze({ total: 181, unguarded: 17, documentaryOfThose: 16, readByCodeOfThose: 1 }),
+    structural: Object.freeze({ total: 182, unguarded: 17, documentaryOfThose: 16, readByCodeOfThose: 1 }),
     // BEFORE, on the tree this round opened on:
     before: Object.freeze({ total: 104, checked: 72, overBudget: 20, unmeasured: 0, unguarded: 12, unchecked: 32 }),
     // AFTER, as one reading rather than as a constant -- see the note above. Taken with the round's own
