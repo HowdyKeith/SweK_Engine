@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "cd4e364b37c88d1b632db1b32dd3e2f45dba5661",
+ "head": "4113c05af8cac727b1586be05db3228bc67d07d2",
  "bodies": {
   "box3d": [
    {
@@ -437,6 +437,11 @@
     "path": "tools/krbnVendor-selfcheck.mjs",
     "bytes": 6881,
     "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+   },
+   {
+    "path": "tools/ship/orphanSets.mjs",
+    "bytes": 37440,
+    "sha": "af97fe9ffc2504eda49cd0166a6c9fb925ae351e"
    }
   ],
   "male-cns": [
@@ -746,8 +751,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3698424,
-    "sha": "19a418c5d4e7517fc2b9f753c600e26433c9801d"
+    "bytes": 3697652,
+    "sha": "064405e6e5793f6c993c6a3bf30f4337a4a5eb7d"
    },
    {
     "path": "mpm3d.html",
@@ -873,6 +878,11 @@
     "path": "tools/ship/fbxIngest-selfcheck.mjs",
     "bytes": 105144,
     "sha": "fa8a6c7d4f57021b30063e2e03b9d2a7314e1ab3"
+   },
+   {
+    "path": "tools/ship/orphanSets.mjs",
+    "bytes": 37440,
+    "sha": "af97fe9ffc2504eda49cd0166a6c9fb925ae351e"
    },
    {
     "path": "tools/ship/pipboyWireframe-selfcheck.mjs",
@@ -1208,7 +1218,7 @@
    },
    {
     "path": "tools/ship/aiPresenceOrb-selfcheck.mjs",
-    "bytes": 47276,
+    "bytes": 49321,
     "sha": "22faf54c99259df4936b00cf5f565a26ef8efa04"
    },
    {
@@ -1327,6 +1337,11 @@
     "path": "render/renderNow-selfcheck.mjs",
     "bytes": 12536,
     "sha": "e42a281a36cd5d4c329b3eba073186d2bc029fb2"
+   },
+   {
+    "path": "tools/ship/orphanSets.mjs",
+    "bytes": 37440,
+    "sha": "af97fe9ffc2504eda49cd0166a6c9fb925ae351e"
    },
    {
     "path": "tools/ship/threePatch.mjs",

@@ -16055,6 +16055,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "and NAME the eight. The new criterion survives the correction: it disagrees with the v2905 " +
                  "magnitude rule on six of 66 movers, in both directions. Three sabotages, three red by name",
     }),
+    since599: Object.freeze({
+        at: "v4886", swept: 5, green: 5, red: 0,
+        added: Object.freeze([
+            "tools/ship/backlogIntegrity-selfcheck.mjs",
+            "tools/ship/gateParses-selfcheck.mjs",
+            "tools/ship/orphanSets-selfcheck.mjs",
+            "tools/ship/recordProbe-selfcheck.mjs",
+            "tools/ship/relativeBudget-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "the five tooling gates of the v4661-v4675 chain, merged at v4886 with its murmur/orb half dropped " +
+                 "(superseded by main's v4825-v4829 parity round; its nine gates deleted, not ported). The chain's " +
+                 "renumbered ledger slots were already in the file, so these are the only gates it adds. orphanSets " +
+                 "needed its three recorded sets restated to the merged tree by name before it would pass -- 28/6, " +
+                 "53/9 and 22/7 arrived/left -- and backlogIntegrity needed one orb entry's verdict to carry its " +
+                 "reason again. relativeBudget reads the stored per-pass scales, which this round's sweep rewrites",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
