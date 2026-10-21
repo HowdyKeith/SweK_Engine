@@ -396,8 +396,8 @@ function fromSection2(gitOut) {
         // v4536: this module now carries TWO records -- the v4487 sweep and the v4536 re-run that supersedes it --
         // so the delta is DERIVED from what the module actually declares rather than typed as a number. The row
         // that mattered is unchanged: the count moves by exactly the records this file adds, and no more.
-        const MINE = ["PROBE_AT_V4487", "PROBE_AT_V4536"];
-        ok(`!! *** counting this module adds EXACTLY ${MINE.length} records, which are ${MINE.join(" and ")} ***`,
+        const MINE = ["PROBE_AT_V4487", "PROBE_AT_V4536", "PROBE_AT_V4675"];
+        ok(`!! *** counting this module adds EXACTLY ${MINE.length} records, which are ${MINE.join(", ")} ***`,
             all.records.length - without.records.length === MINE.length &&
             MINE.every((n) => all.records.some((r) => r.name === n)) &&
             MINE.every((n) => !without.records.some((r) => r.name === n)),
@@ -598,10 +598,10 @@ function fromSection2(gitOut) {
     {
         const F = REC;
         ok("!! the with-module and without-module readings differ by exactly this module's own records",
-            F.currentIncludingModule.records - F.excluding.records === 2 &&
-            F.currentIncludingModule.withFields - F.excluding.withFields === 2,
+            F.currentIncludingModule.records - F.excluding.records === 3 &&
+            F.currentIncludingModule.withFields - F.excluding.withFields === 3,
             `${F.currentIncludingModule.records} including against ${F.excluding.records} excluding -- ` +
-            "PROBE_AT_V4536 and PROBE_AT_V4487, the two records this file holds. A pair of numbers that drifted " +
+            "PROBE_AT_V4675, PROBE_AT_V4536 and PROBE_AT_V4487, the three records this file holds (v4675 added the third). A pair of numbers that drifted " +
             "apart by anything else would mean the exclude pattern had stopped matching this module.");
     }
     ok("!! *** the method is stated, so a later sweep can be compared rather than merely disagreed with ***",

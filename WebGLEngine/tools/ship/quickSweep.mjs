@@ -1269,7 +1269,11 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = sw
             // A gate this run swept has an OBSERVED kind and leaves the list. Every other entry keeps whatever
             // it had, because this run learned nothing about it.
             kindsInferred: (prior.kindsInferred || []).filter((g) => !sweptNow.has(g)),
-            captured: out.at, budgetMs, capMs, timings, codes, at, capAt, finished, crossings, serial, serialAt, serialRing, contended, kinds, boxScale,
+            captured: out.at, budgetMs, capMs, timings, codes, at, capAt, finished, crossings, serial, serialAt, serialRing, contended, kinds,
+            // v4886 -- A SCALE NO READING REFERENCES IS NOT EVIDENCE, IT IS A FOSSIL. Rotation re-times gates and moves their
+            // `at`/`serialAt` stamps; once nothing carries a stamp, its scale describes no stored number, and relativeBudget's
+            // alias row reads three such entries as "orphaned". Kept only while a reading still points at the pass.
+            boxScale: Object.fromEntries(Object.entries(boxScale).filter(([k]) => Object.values(at).includes(k) || Object.values(serialAt).includes(k))),
         }, null, 1) + "\n");
     }
     return out;

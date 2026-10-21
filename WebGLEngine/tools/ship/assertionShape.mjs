@@ -949,8 +949,8 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4881 -- one new gate (physics/ocean/oceanSurface-selfcheck.mjs, the CPU sea), spelling ok(name, cond, detail): gates 2054 -> 2055, usesOk 2033 -> 2034, definesOk 2025 -> 2026, nameFirst 1923 -> 1924 (read off the code).
     // v4883 -- two new gates (world/oceanWater-selfcheck.mjs and tools/ship/oceanDefaultPage-selfcheck.mjs, the default water), each spelling ok(name, cond, detail) or ok(label, cond, note): gates 2055 -> 2057, usesOk 2034 -> 2036, definesOk 2026 -> 2028, nameFirst 1924 -> 1926 (read off the code).
     // v4884 -- five new gates from the long-silence branch (corroborationSubmit, deviceReport, sensitivitySweep, deferralCensus, zoomBlurExact), each spelling ok(name, cond, detail): gates 2057 -> 2062, usesOk 2036 -> 2041, definesOk 2028 -> 2033, nameFirst 1926 -> 1931 (read off the code).
-    gates: 2062, usesOk: 2041, definesOk: 2033, importsOk: 0,
-    distinctDefinitions: 45, nameFirst: 1931, condFirst: 99, unknownSignature: 11,
+    gates: 2067, usesOk: 2046, definesOk: 2038, importsOk: 0,
+    distinctDefinitions: 45, nameFirst: 1936, condFirst: 99, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

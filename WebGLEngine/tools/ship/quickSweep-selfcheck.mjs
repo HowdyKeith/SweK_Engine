@@ -1060,6 +1060,30 @@ console.log("\n7. *** WHOSE RECORD IT IS, AND WHAT A GATE THAT DIED SILENTLY SAI
        `here: ${W()} at once on this box`);
 }
 
+// ---------------------------------------------------------------------------------------------------------
+sec("N. THE v4672 SCALE API IS NAMED HERE, BECAUSE THIS IS THE GATE definitionGates ASKS (relativeBudget-selfcheck grades the rule; this grades the pieces)");
+// ---------------------------------------------------------------------------------------------------------
+{
+    // 40 gates, each re-timed twice, the second reading 1.5x the first: a measured pass at scale 1.5.
+    const ring = {}, at = {};
+    for (let i = 0; i < 40; i++) { ring["g" + i] = [100, 150]; at["g" + i] = "S"; }
+    const bs = Q.boxScaleOf(ring, at, "S");
+    ok(bs.measured && bs.scale === 1.5 && bs.n === 40, "boxScaleOf takes the median of new/prior over the gates the pass re-ran", `scale ${bs.scale} over ${bs.n}`);
+    const few = Q.boxScaleOf({ g0: [100, 150] }, { g0: "S" }, "S");
+    ok(!few.measured && few.n === 1 && Q.SCALE_MIN_N === 30, "...and fewer than SCALE_MIN_N gates is no scale at all, not a scale of 1", few.why);
+    const prior = { at: { a: "S", b: "T" }, boxScale: { S: bs } };
+    const sa = Q.scaleOfGate(prior, "a"), sb = Q.scaleOfGate(prior, "b");
+    ok(sa.measured && sa.scale === 1.5 && !sb.measured && sb.scale === 1, "scaleOfGate answers by the pass that PRODUCED the reading, and says unmeasured otherwise", `a ${sa.scale}, b ${sb.scale}`);
+    ok(Q.scaleLookup(prior)("a") === 1.5 && Q.scaleLookup(prior)("zz") === 1, "scaleLookup is that answer as the function selectGates wants", "1.5 and 1");
+    ok(Q.normalisedMs(3000, 1.5) === 2000 && Q.normalisedMs(3000, 0.5) === 3000 && Q.normalisedMs(3000, 9) === 3000 / Q.SCALE_MAX,
+       "normalisedMs divides by the scale, clamped to [1, SCALE_MAX] -- a fast box never tightens the wall", `SCALE_MAX ${Q.SCALE_MAX}`);
+    const audit = Q.boxScaleAudit(ring, at, { S: bs });
+    ok(audit.intact.length === 1 && audit.bad.length === 0 && audit.aged.length === 0, "boxScaleAudit finds an intact entry and it reproduces to the digit", JSON.stringify(audit));
+    const hand = Q.boxScaleAudit(ring, at, { S: { ...bs, scale: 1.9 } });
+    ok(hand.bad.length === 1, "...and an entry edited to 1.9 under an intact population is caught", JSON.stringify(hand.bad));
+    ok(Q.SKIP_LINE.test("x-selfcheck: SKIPPED (no gpu)") && !Q.SKIP_LINE.test("x-selfcheck: all checks pass"), "SKIP_LINE matches a gate's own skip line and nothing that merely passes", "both directions");
+}
+
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the gates over the budget THE ROTATION HAS NOT REACHED YET. v4408 answered the older " +
     "version of this line -- that a regression in a 40-second gate is found by the full sweep and by nothing at " +

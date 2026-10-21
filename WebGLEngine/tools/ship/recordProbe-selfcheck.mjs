@@ -79,6 +79,12 @@ sec("1. *** A DECLARATION IS NOT A MENTION, AND THE FIRST DRAFT COULD NOT TELL *
         const at = src.indexOf("export const Q_V4675");
         return RP.isCodeOffset(src, at) !== want;
     }).map(([n]) => n);
+    {
+        const src = "// export const Q_V4675 = 1;\nexport const Q_V4675 = 2;";
+        const re = /export const (Q_V4675)\b/g, hits = [];
+        let m; while ((m = re.exec(src))) hits.push(RP.isCode(src, m));
+        ok("isCode refuses the commented declaration and accepts the live one", hits.length === 2 && hits[0] === false && hits[1] === true, JSON.stringify(hits));
+    }
     say(`isCodeOffset over ${cases.length} hand-built positions: ${cases.length - wrong.length} correct`);
     ok("!! *** a declaration is code only when it is not quoted, commented, or inside an interpolation ***",
         wrong.length === 0,

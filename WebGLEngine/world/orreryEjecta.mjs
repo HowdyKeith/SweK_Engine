@@ -346,6 +346,8 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "render/holoPicture-selfcheck.mjs",
         "tools/krbn/krbnCompareLive-selfcheck.mjs",
         "tools/krbnVendor-selfcheck.mjs",
+        // v4886 -- orphanSets.mjs NAMES vendor paths of this body as recorded orphans (strings, not imports); the census reads a name as a dependant.
+        "tools/ship/orphanSets.mjs",
     ]),
     "slug": Object.freeze([
     ]),
@@ -464,6 +466,8 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "warp-map.html",
         "wasm-bench.html",
         "wear-field.html",
+        // v4886 -- orphanSets.mjs NAMES vendor paths of this body as recorded orphans (strings, not imports); the census reads a name as a dependant.
+        "tools/ship/orphanSets.mjs",
     ]),
     "three-webgpu": Object.freeze([
         // backlog #31/#49/#51 -- the AI-presence orb (krispuckett/murmur-web ported into tslSource.mjs) is a
@@ -573,6 +577,8 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         // symlink is refused, and compares it with the vendored copy: a real read of this body, by name. v4819: the copy it
         // compares with is r185's since the merge, the build threePatch links into each patched slot since v4805.
         "tools/ship/threeUpstream-selfcheck.mjs",
+        // v4886 -- orphanSets.mjs NAMES vendor paths of this body as recorded orphans (strings, not imports); the census reads a name as a dependant.
+        "tools/ship/orphanSets.mjs",
     ]),
     "wasm": Object.freeze([
         "ai-bridge/wasmDemoBridge.js",
