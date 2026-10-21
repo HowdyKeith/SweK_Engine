@@ -243,6 +243,10 @@
 //   X1 conforming off by default                                       3 red (the round-25 row: 60 of 60 fall back)
 //   X2 no decline: the exact path runs on what conforming leaves        5 red (the round-25 row: 0 fall back; and the four
 //        16g/16h rows that assert a decline -- the rows a retirement of the fallback would rewrite)
+// ROUND 26 (bvh-csg-retire-snapped-fallback, step 1): X2 made real. The decline is gone from meshBoolean.mjs; the four rows
+// that asserted it (16g's T-junction, 16h's control, 16h's crack/near-miss, 16h's turned-over split) now assert the report
+// (stats.a.nonConforming) and the exact run, and the round-25 row asserts 0 fall back, 40 reported, 20 closed by conforming.
+// Restoring the decline (exactArr = false after a failed conformNear) turns those five red again.
 //   X3 the exact path without embedRounded                             0 red -- NAMED: the sweep's box operands make no
 //        rounded crossing, so this row cannot see embedRounded; blastEngine-selfcheck sections 16-17 guard it
 "use strict";
@@ -1788,9 +1792,10 @@ console.log("\n25. *** ROUND 16f: THE EXACT ARRANGEMENT (opts.exactArrangement) 
     const cutter = M.toTriangleBuffer(M.boxPolys([0.1, 0.05, 1], [0.3, 0.3, 0.3])), CV = 8 - 0.6 * 0.6 * 0.3;
     const tj = (zf, ms, o) => { const A = tBox(zf, ...ms), r = meshBoolean(A, new MeshBVH(A), cutter, new MeshBVH(cutter), "subtract", o); return { r, err: Math.abs(vol(r.tris) - CV), open: bitsOpen(r.tris) }; };
     const onTop = tj(1, [[0, 0]], { conform: false }), bot = tj(-1, [[0, 0]], { conform: false });
-    ok("!! round 16g: a T-junction where the operands meet, not conformed (conform:false), declines the exact arrangement (stats.a.exactDeclined) for the snapped path, which is right; one on the far face is not looked at",
-        onTop.r.exact === false && onTop.r.stats.a.exactDeclined > 0 && onTop.err < 1e-12 && bot.r.exact === true && !bot.r.stats.a.exactDeclined && bot.err < 1e-12,
-        "top: exact " + onTop.r.exact + ", declined " + onTop.r.stats.a.exactDeclined + ", off " + onTop.err.toExponential(1) + "; bottom: exact " + bot.r.exact + ", off " + bot.err.toExponential(1));
+    // round 26: the decline is retired -- the exact arrangement runs and the T-junction is REPORTED (stats.a.nonConforming)
+    ok("!! round 26 (was round 16g's decline): a T-junction where the operands meet, not conformed (conform:false), is REPORTED (stats.a.nonConforming) and the exact arrangement runs; one on the far face is not looked at",
+        onTop.r.exact === true && onTop.r.stats.a.nonConforming > 0 && onTop.err < 1e-12 && bot.r.exact === true && !bot.r.stats.a.nonConforming && bot.err < 1e-12,
+        "top: exact " + onTop.r.exact + ", nonConforming " + onTop.r.stats.a.nonConforming + ", off " + onTop.err.toExponential(1) + "; bottom: exact " + bot.r.exact + ", off " + bot.err.toExponential(1));
     // (f) round 16h: conformed, then exact -- the T-junction on the line, 7e-10 off it (a BSP wall's), and with a near-miss
     // 1e-14 beside it (the BSP's split points, computed per polygon): split / merged, exact, closed bit for bit, right
     const fam = [["on the line", [[0, 0]]], ["7e-10 off it", [[5e-10, -5e-10]]], ["and a 1e-14 near-miss", [[5e-10, -5e-10], [5e-10 + 1e-14, -5e-10]]]];
@@ -1798,13 +1803,14 @@ console.log("\n25. *** ROUND 16f: THE EXACT ARRANGEMENT (opts.exactArrangement) 
     ok("!! *** round 16h: A T-JUNCTION, ON ITS LONG SIDE OR 7e-10 OFF IT, AND A 1e-14 NEAR-MISS: CONFORMED (stats.a.conformed), THEN EXACT -- CLOSED BIT FOR BIT, THE VOLUME TO 1e-14 ***",
         fx.every((x) => x.d.r.exact === true && x.d.r.stats.a.conformed && x.d.r.stats.a.conformed.split > 0 && x.d.open === 0 && x.d.err < 1e-14) && fx[2].d.r.stats.a.conformed.merged > 0,
         fx.map((x) => x.n + ": exact " + x.d.r.exact + ", " + JSON.stringify(x.d.r.stats.a.conformed) + ", open " + x.d.open + ", off " + x.d.err.toExponential(1)).join("; "));
-    ok("   control: not conformed (conform:false) each declines to the snapped path, whose raw output is open there", fx.every((x) => x.c.r.exact === false && x.c.open > 0),
+    ok("   control: not conformed (conform:false) the exact arrangement runs anyway (round 26): the on-the-line case closes, the two off-line cases come out OPEN (the gap round 16g found) -- which is what conforming is for",
+        fx.every((x) => x.c.r.exact === true) && fx[0].c.open === 0 && fx[1].c.open > 0 && fx[2].c.open > 0,
         fx.map((x) => x.n + ": exact " + x.c.r.exact + ", open " + x.c.open + ", off " + x.c.err.toExponential(1)).join("; "));
     // and what is not a T-junction or a near-miss at meshCSG's EPS is not made one: a crack 1.4e-6 wide, a near-miss 2e-8
     const crack = tj(1, [[1e-6, -1e-6]]), nm = tj(1, [[0, 0], [2e-8, 0]]);
-    ok("!! round 16h: a crack 1.4e-6 wide and a near-miss 2e-8 apart -- beyond meshCSG's EPS -- are not conformed: both decline to the snapped path",
-        crack.r.exact === false && crack.r.stats.a.exactDeclined > 0 && nm.r.exact === false && nm.r.stats.a.exactDeclined > 0,
-        "crack: exact " + crack.r.exact + ", declined " + crack.r.stats.a.exactDeclined + "; near-miss 2e-8: exact " + nm.r.exact + ", declined " + nm.r.stats.a.exactDeclined);
+    ok("!! round 26 (was round 16h's decline): a crack 1.4e-6 wide and a near-miss 2e-8 apart -- beyond meshCSG's EPS -- are not conformed: both are REPORTED (stats.a.nonConforming) and run exact, the volume within 1e-5",
+        crack.r.exact === true && crack.r.stats.a.nonConforming > 0 && crack.err < 1e-5 && nm.r.exact === true && nm.r.stats.a.nonConforming > 0 && nm.err < 1e-5,
+        "crack: exact " + crack.r.exact + ", nonConforming " + crack.r.stats.a.nonConforming + ", off " + crack.err.toExponential(1) + ", open " + crack.open + "; near-miss 2e-8: exact " + nm.r.exact + ", nonConforming " + nm.r.stats.a.nonConforming + ", off " + nm.err.toExponential(1) + ", open " + nm.open);
     // (g) round 16h: what conforming must not do -- keep a triangle the merge collapsed, or a split that turns one over
     const degen = (b) => { let n = 0; for (let o = 0; o < b.length; o += 9) { const eq = (u, v) => b[o + u] === b[o + v] && b[o + u + 1] === b[o + v + 1] && b[o + u + 2] === b[o + v + 2]; if (eq(0, 3) || eq(3, 6) || eq(6, 0)) n++; } return n; };
     const topFace = (ts) => { const out = [], src = M.toTriangleBuffer(M.boxPolys([0, 0, 0], [1, 1, 1]));
@@ -1817,11 +1823,11 @@ console.log("\n25. *** ROUND 16f: THE EXACT ARRANGEMENT (opts.exactArrangement) 
         C1.exact === true && C1.stats.a.conformed && C1.stats.a.conformed.collapsed === 1 && bitsOpen(C1.tris) === 0 && degen(C1.tris) === 0 && Math.abs(vol(C1.tris) - CV) < 1e-14,
         "exact " + C1.exact + ", " + JSON.stringify(C1.stats.a.conformed) + ", open " + bitsOpen(C1.tris) + ", degenerate " + degen(C1.tris) + ", off " + Math.abs(vol(C1.tris) - CV).toExponential(1));
     // the diagonal's triangle a sliver (a, s, c), s 1e-9 off a-c towards b; the other half meets at m 5e-9 off towards b --
-    // splitting the sliver at m would turn a piece over: the shot declines instead
+    // splitting the sliver at m would turn a piece over: the split is refused and the shot runs exact on what is left, reported
     const r2 = Math.SQRT2, C2 = run(topFace([[qa, qb, [0.5 + 1e-9 / r2, 0.5 - 1e-9 / r2]], [[0.5 + 1e-9 / r2, 0.5 - 1e-9 / r2], qb, qc], [qa, [0.5 + 1e-9 / r2, 0.5 - 1e-9 / r2], qc],
         [[0.3 + 5e-9 / r2, 0.3 - 5e-9 / r2], qc, qd], [qa, [0.3 + 5e-9 / r2, 0.3 - 5e-9 / r2], qd]]));
-    ok("!! round 16h: a split that would turn a triangle over (a point 5e-9 off a sliver 1e-9 wide) is refused -- the shot declines to the snapped path",
-        C2.exact === false && C2.stats.a.exactDeclined > 0, "exact " + C2.exact + ", declined " + C2.stats.a.exactDeclined);
+    ok("!! round 26 (was round 16h's decline): a split that would turn a triangle over (a point 5e-9 off a sliver 1e-9 wide) is refused -- the shot is REPORTED (stats.a.nonConforming) and runs exact, the volume within 1e-5",
+        C2.exact === true && C2.stats.a.nonConforming > 0 && Math.abs(vol(C2.tris) - CV) < 1e-5, "exact " + C2.exact + ", nonConforming " + C2.stats.a.nonConforming + ", off " + Math.abs(vol(C2.tris) - CV).toExponential(1) + ", open " + bitsOpen(C2.tris));
 
     // (h) ROUND 25: CAN THE SNAPPED PATH GO? -- the inputs that still reach it. The page's workloads never do: 0 of 1,690
     // default operations declined (12 x 100 soak shots, 440 switching-chain BVH shots -- 117 of them conformed first --
@@ -1837,21 +1843,21 @@ console.log("\n25. *** ROUND 16f: THE EXACT ARRANGEMENT (opts.exactArrangement) 
             const a = [-1, -1], b = [1, -1], c = [1, 1], d = [-1, 1];
             for (const t of [[a, b, c], [m, c, d], [a, m2, d]]) for (const v of t) out.push(v[0], v[1], 1);
             return new Float64Array(out); };
-        let cases = 0, fell = 0, snapVol = 0, snapOpen = 0, exactOpen = 0, worstDv = 0;
+        let cases = 0, fell = 0, reported = 0, sameAsForced = 0, closed = 0, worstVol = 0;
         for (const w of [1e-9, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4]) for (const kind of ["crack", "near-miss"]) for (const [cx, cy, h] of [[0.1, 0.05, 0.3], [0, 0, 0.2], [-0.2, 0.15, 0.25], [0.3, -0.3, 0.4], [0.05, 0.1, 0.1]]) {
             const A = tB(...(kind === "crack" ? [[w / Math.SQRT2, -w / Math.SQRT2]] : [[0, 0], [w, 0]])), C = M.toTriangleBuffer(M.boxPolys([cx, cy, 1], [h, h, 0.3]));
-            const want = vol(A) - 4 * h * h * 0.3, go = (o) => { const r = meshBoolean(A, new MeshBVH(A), C, new MeshBVH(C), "subtract", o); return { exact: r.exact, err: Math.abs(vol(r.tris) - want), open: bitsOpen(r.tris) }; };
-            const d = go({}); cases++;
-            if (d.exact) continue;
-            const x = go({ exactConforming: false }); fell++;
-            worstDv = Math.max(worstDv, d.err - x.err);
-            if (d.err < x.err - 1e-14) snapVol++;
-            if (d.open < x.open) snapOpen++; if (x.open < d.open) exactOpen++;
+            const go = (o) => meshBoolean(A, new MeshBVH(A), C, new MeshBVH(C), "subtract", o);
+            const want = vol(A) - 4 * h * h * 0.3, d = go({}), x = go({ exactConforming: false }); cases++;
+            if (!d.exact) fell++;
+            if (d.stats.a.nonConforming > 0 || d.stats.b.nonConforming > 0) reported++;
+            // the default conforms what it can and reads a rebuilt tree, so it is not bit-identical to the forced run; it is never worse
+            // beyond meshCSG's EPS the default answers the forced exact's volume error and open-edge count (the triangle order may differ: the default reads a rebuilt tree); within it conforming closes what the forced run leaves open
+            if (Math.abs(vol(d.tris) - want) === Math.abs(vol(x.tris) - want) && bitsOpen(d.tris) === bitsOpen(x.tris)) sameAsForced++;
+            else if (bitsOpen(d.tris) === 0 && bitsOpen(x.tris) > 0) { closed++; worstVol = Math.max(worstVol, Math.abs(vol(d.tris) - want)); }
         }
-        ok("!! *** round 25: where the default still falls back to the snapped path, the exact arrangement forced is NEVER WORSE -- not in volume (beyond a rounding), not in open edges ***",
-            fell === 40 && snapVol === 0 && snapOpen === 0,
-            cases + " cases, " + fell + " fell back; the snapped answer smaller in volume error in " + snapVol + " (worst " + worstDv.toExponential(1) + "), fewer open edges in " +
-            snapOpen + "; the forced exact fewer open edges in " + exactOpen + ". The fallback buys nothing measurable on what reaches it.");
+        ok("!! *** round 26 (round 25's measurement, kept as the evidence): no case falls back any more -- every one runs exact; what conforming leaves is REPORTED, and answers what the forced exact answers; what conforming closes, it closes ***",
+            fell === 0 && reported === 40 && sameAsForced === 40 && closed === 20 && worstVol < 1e-8,
+            cases + " cases, " + fell + " fell back; " + reported + " reported non-conforming, " + sameAsForced + " with the volume error and open-edge count of exactConforming:false (all 40 beyond EPS), " + closed + " (within EPS, 1e-9..1e-8) conformed to zero open edges where the forced run leaves some, the volume off by at most " + worstVol.toExponential(1) + " (round 25 measured the forced exact never worse than the snapped answer on the 40 that fell back then: volume and open edges).");
     }
 }
 

@@ -538,7 +538,7 @@
 //     and near-miss vertices besides). The other mesh's plane crosses "the same" line at distinct points, the seam has a gap, and a region floods through it: a session switching engines every 25 shots lost 6.2 units
 //     of the wall by shot 100. The exact path now runs only where both operands are conforming near the seam
 //     (nonConformingNear, below), and otherwise declines to the snapped path, whose snap closes such gaps
-//     (stats.exactDeclined; result.exact says which ran). Seed 3, 10 bvh / 10 bsp / 10 bvh shots: the default within
+//     (stats.exactDeclined; result.exact says which ran -- RETIRED at round 26: the exact run goes on and stats.nonConforming reports it). Seed 3, 10 bvh / 10 bsp / 10 bvh shots: the default within
 //     3.9e-12 of the snapped chain (8 of the last 10 declined); unchecked (opts.exactConforming:false) 6.9e-3 off.
 // MEASURED on the final code, the page's 12 x 100-shot soak, default against snapped: fallbacks 0 / 6; shots ending open at
 // the exact-bits key 0 / 42 (seed 8 open from shot 84, 10 edges at the end; seed 11 26 shots, up to 43); the same solid to
@@ -1739,7 +1739,7 @@ function meshBooleanCore(trisA, bvhA, trisB, bvhB, op, opts) {
     // whose middle vertex lies up to 1.03e-9 off it, measured at 16h) the plane of the other mesh crosses "the same" line at
     // distinct points, the chain has a gap, and the region floods through it -- a blob triangle classified whole (page session,
     // engines switched every 25 shots: 6.2 units of the wall lost by shot 100). Where the precondition fails the operation
-    // takes the snapped path, whose 1e-9 snap closes such gaps (stats.exactDeclined); opts.exactConforming:false skips the
+    // runs on (round 26: it no longer takes the snapped path; stats.nonConforming reports it); opts.exactConforming:false skips the
     // check (the gate's control).
     let pairsX = null, declined = null;
     if (exactArr) {
@@ -1764,7 +1764,9 @@ function meshBooleanCore(trisA, bvhA, trisB, bvhB, op, opts) {
                     return r;
                 }
             }
-            if (a || b) { exactArr = false; declined = { a, b }; opts = { ...opts, exactArrangement: false }; }
+            // round 26: no decline. Round 25 measured the exact arrangement forced onto what conforming leaves as never worse than the
+            // snapped path (volume, open edges); the remainder is REPORTED (stats.nonConforming) and the exact run goes on
+            if (a || b) declined = { a, b };
         }
     }
     if (!exactArr) { bvhA = freshTree(bvhA, trisA); bvhB = freshTree(bvhB, trisB); }   // round 23: see canonPairs
@@ -1800,7 +1802,7 @@ function meshBooleanCore(trisA, bvhA, trisB, bvhB, op, opts) {
         outTris = e.tris; outFrom = e.from; outAmb = e.amb; classifiedA.stats.embed = e.stats;
     }
     if (rounded) classifiedB.stats.vertexRound = rounded.stats;
-    if (declined) { classifiedA.stats.exactDeclined = declined.a; classifiedB.stats.exactDeclined = declined.b; }
+    if (declined) { classifiedA.stats.nonConforming = declined.a; classifiedB.stats.nonConforming = declined.b; }
     return { tris: outTris, triCount: outTris.length / 9, ambiguousTriIndices: outAmb, capped, from: Int32Array.from(outFrom), exact: exactArr,
              stats: { a: classifiedA.stats, b: classifiedB.stats } };
 }

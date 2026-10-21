@@ -898,10 +898,12 @@ console.log("\n14. *** ROUND 16g: THE EXACT ARRANGEMENT IS THE DEFAULT -- A ROUN
     // (round 16h makes such a wall conforming first; these rows pin 16g's precondition and its weld, so they run without)
     const md = mixed({ conform: false }), ms = mixed(SNAPPED), mu = mixed({ conform: false, exactConforming: false });
     const dd = Math.abs(md.vol - ms.vol), du = Math.abs(mu.vol - ms.vol);
-    ok("!! *** A SESSION SWITCHING ENGINES (10 bvh / 10 bsp / 10 bvh, seed 3), NOT CONFORMED: THE EXACT PATH DECLINES ON THE BSP'S WALL AND MATCHES THE SNAPPED CHAIN TO 1e-9 ***",
-        md.declined > 0 && dd < 1e-9, "declined " + md.declined + " of the 10 shots after the BSP's (exact " + md.exactAfter + "), |volume - snapped| " + dd.toExponential(1));
-    // the weld is the one for the path that RAN: a declined shot's snapped output gets the 8e-9 weld, which closes its near-misses
-    ok("   a declined shot is finished by the snapped path's weld (moves past EXACT_FINISH_WELD), not the rounding one", md.moveDeclined > EXACT_FINISH_WELD && md.moveDeclined <= WELD,
+    // round 26 (bvh-csg-retire-snapped-fallback): the decline is gone, so the three rows that pinned it now pin its COST. Asked NOT to
+    // conform, the exact path runs on the BSP's wall and floods through its T-junctions (the loss 16g found); nothing in production asks
+    ok("!! *** round 26 -- A SESSION SWITCHING ENGINES (seed 3), NOT CONFORMED (conform:false): THE EXACT PATH NO LONGER DECLINES ON THE BSP'S WALL; IT RUNS EVERY SHOT AND THE CHAIN IS OFF THE SNAPPED ONE BY THE 16g LOSS ***",
+        md.declined === 0 && md.exactAfter === 10 && dd > 1e-3, "declined " + md.declined + " of the 10 shots after the BSP's (exact " + md.exactAfter + "), |volume - snapped| " + dd.toExponential(1));
+    // the weld is the one for the path that RAN: every shot is exact now, so the rounding weld finishes it
+    ok("   every shot is finished by the rounding weld (moves nothing past EXACT_FINISH_WELD), the snapped path's 8e-9 weld no longer runs", md.moveDeclined === 0,
         "largest move on a declined shot " + md.moveDeclined.toExponential(2));
     ok("   control: without the precondition (exactConforming:false) the exact path floods through the BSP wall's T-junctions", du > 1e-6, "|volume - snapped| " + du.toExponential(1));
 }
@@ -939,7 +941,7 @@ console.log("\n15. *** ROUND 16h: A WALL THE BSP HAS CUT, MADE CONFORMING NEAR T
     ok("!! *** SEED 3, 10 bvh / 10 bsp / 10 bvh: EVERY SHOT AFTER THE BSP'S EXACT (CONFORMED), NO FALLBACK, NO OPENING OF ITS OWN OR ON THE BLOB'S SIDE, THE SNAPPED CHAIN'S SOLID TO 1e-9 ***",
         c3.exact === 10 && c3.declined === 0 && c3.fb === 0 && c3.seam === 0 && c3.own === 0 && dv < 1e-9,
         "exact " + c3.exact + ", declined " + c3.declined + ", fallbacks " + c3.fb + ", new open edges: blob's side " + c3.seam + ", own " + c3.own + ", along the wall's own cracks " + c3.inherited + "; |volume - snapped| " + dv.toExponential(1));
-    ok("   control: not conformed (conform:false), most of them decline (round 16g)", n3.declined >= 5, "declined " + n3.declined + " of 10");
+    ok("   control (round 26): not conformed (conform:false), none decline -- all 10 run exact, as the report says (round 16g: most declined)", n3.declined === 0 && n3.exact === 10, "declined " + n3.declined + " of 10, exact " + n3.exact);
     // seed 12, shot 28: a sliver 1.4e-8 wide beside a region's rim -- the edge census must reach every twin (round 16h's own
     // first draft read an edge on the rim as open and split it at a point its twin already had: 5 edges doubled)
     const c12 = chain(12, 29, {});
