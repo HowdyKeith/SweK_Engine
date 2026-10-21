@@ -402,6 +402,9 @@ console.log("\n5. SECTION 94: ROUND 31'S VERDICT, RE-DERIVED FROM THE FOUR REPOR
         P.ratio1080 && P.net1080 && P.rest1080 && P.rings && !P.ratioIntel && !P.cov1080 && !P.fill1080 && all.every((r) => r.fill.clock === "wall" && r.whole.clock === "wall" && r.covFull.clock === "device"),
         `Intel ratio ${I.map((r) => r.ratio).join(", ")} (2.0-4.0 predicted); 1080 coverage ${N.map((r) => cov(r).toFixed(1)).join(", ")} ms (1-10), fill ${N.map((r) => r.fill.ms).join(", ")} ms (3-15)`);
     // reported: what the chain's own steps cost against the half-size network they sit beside
+    // the verdict's numbers, kept past the terminal (tools/ship/gateReport.mjs)
+    REPORT.table("section 94: today's page against the half-size chain at 1920 x 1080, ms", ["GPU", "run", "today's page", "the chain", "ratio", "rings"],
+        Object.entries(R).flatMap(([g, rs]) => rs.map((r, i) => [g, "ab"[i], r.full, r.half, r.ratio, r.rings])));
     for (const [g, rs] of Object.entries(R)) say(`section 94, ${g}: the network at 960 x 540 ${rs.map((r) => r.netHalf.ms.toFixed(1)).join(" / ")} ms; the chain's own steps (both coverages, the fill, the rest) ${rs.map((r) => (r.half - r.netHalf.ms).toFixed(1)).join(" / ")} ms -- reported, deciding nothing`);
 }
 
@@ -517,6 +520,8 @@ console.log("\n7. SECTION 98: ROUND 33'S VERDICT, RE-DERIVED FROM THE FOUR REPOR
     ok("  section 98's account of section 97's predictions: both ratios and the 1080's history cost held, as did C2; the Intel's history cost did not, and C1 did not on the 1080",
         P.ratio1080 && P.ratioIntel && P.hist1080 && P.rings && !P.histIntel && !Nb.allGreen,
         `history passes: Intel ${I.map((r) => histMs(r).toFixed(1)).join(", ")} ms (15-60 predicted), 1080 ${N.map((r) => histMs(r).toFixed(2)).join(", ")} ms (1-4)`);
+    REPORT.table("section 98: today's page against the chain with its history at 1920 x 1080, ms", ["GPU", "run", "today's page", "the chain with its history", "the history's passes", "ratio", "all gates green"],
+        Object.entries(R).flatMap(([g, rs]) => rs.map((r, i) => [g, "ab"[i], r.full, r.temporal, histMs(r), r.ratio, r.allGreen ? "yes" : "no"])));
     for (const [g, rs] of Object.entries(R)) say(`section 98, ${g}: the history's four passes ${rs.map((r) => histMs(r).toFixed(2)).join(" / ")} ms, the accumulation ${rs.map((r) => r.hist.accum.ms.toFixed(2)).join(" / ")} of it; the chain without them ${rs.map((r) => (r.full / r.half).toFixed(3)).join(" / ")} x -- reported, deciding nothing`);
 }
 
@@ -575,6 +580,8 @@ console.log("\n8. SECTION 100: ROUND 34'S VERDICT, AND SECTION 98'S OWED RUN, RE
     ok("  section 100's account of section 99's predictions: on the Intel the list fill was inside 15-80 ms and the chain 1.8-2.2 x against today's page, as predicted; on the 1080 none was reached",
         within(I, (r) => r.fillList, 15, 80) && within(I, (r) => r.ratioList, 1.8, 2.2) && N99.length === 0,
         `Intel fillList ${I.map((r) => r.fillList).join(", ")} ms, full / halfList ${I.map((r) => r.ratioList).join(", ")} x, with its history ${I.map((r) => r.ratioListHist).join(", ")} x`);
+    REPORT.table("section 100: the ring fill against the list fill at 960 x 540, ms", ["GPU", "run", "ring fill", "list fill", "listed", "rings", "left", "chain ratio with the list fill"],
+        I.map((r) => ["intel-gen9", r.file, r.fill, r.fillList, r.listed, r.listRings, r.listLeft, r.ratioList]));
     // reported: the timing gate on the 1080 since round 33, run by realGpuRun
     const all1080 = [["a", "denoise-rig-r33-a-gtx1080.json"], ["b", "denoise-rig-r33-b-gtx1080.json"]].map(([k, f]) => readRun(load(f), k)).concat(N);
     say(`section 100, gtx1080: the timing gate died in ${all1080.filter((r) => tg(r)).length} of ${all1080.length} realGpuRun runs (${all1080.filter((r) => tg(r)).map((r) => `${r.file} at ${(tg(r).ms / 1000).toFixed(1)} s`).join(", ")}), each with no FAIL line, and once more run alone -- reported, deciding nothing`);

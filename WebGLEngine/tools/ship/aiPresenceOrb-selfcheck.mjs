@@ -116,11 +116,17 @@ sec("7. *** THE STATE TABLE AND THE ORCHESTRATOR: EXACT VALUES, AND A REAL TRANS
        `STATE_NAMES is ${ST.STATE_NAMES.join(", ")}. The first six are murmur's own src/state.ts table in ` +
        `its own order; ${ST.STATE_NAMES.length - 6} beyond it are this tree's, and they are named in ` +
        `render/aiPresenceOrbState.mjs as not-murmur's rather than left to look transcribed.`);
+    // v4891 -- RESTATED AGAINST v4831's DESIGN, WHICH THIS ROW HAD NOT CAUGHT UP WITH. render/aiPresenceOrbState.mjs keeps the
+    // added states out of STATE_NAMES altogether, in BRAIN_STATES, each naming the murmur state it renders AS, and shaderIndexOf()
+    // hands the shader that state's index (tools/ship/brainStages-selfcheck.mjs holds the same design). This row asked for a
+    // `renders` field and a STATE_RENDER_INDEX table the module no longer has, and went red on main when the rotation brought it
+    // back under budget. What it protects is unchanged: no state the shader is handed sits outside murmur's six. SABOTAGED v4891:
+    // shaderIndexOf handing searching and weaving their raw positions, 6 and 7 -> 1 red, this row; restored, sha-256 identical.
+    const ADDED = Object.keys(ST.BRAIN_STATES || {});
     ok("!! ...and every state this tree added RENDERS AS one of murmur's six, so the shader never sees a 7th index",
-       ST.STATE_NAMES.every((n) => MURMUR_SIX.includes(ST.STATES[n].renders)) &&
-       ST.STATE_NAMES.slice(0, 6).every((n) => ST.STATES[n].renders === n) &&
-       ST.STATE_NAMES.slice(6).every((n) => ST.STATE_RENDER_INDEX[n] < 6),
-       `murmur's six each render as themselves; ${ST.STATE_NAMES.slice(6).map((n) => n + " -> " + ST.STATES[n].renders).join(", ") || "(none)"}. ` +
+       ADDED.length > 0 && ADDED.every((n) => MURMUR_SIX.includes(ST.BRAIN_STATES[n].as) && !(n in ST.STATE_INDEX) && ST.shaderIndexOf(n) === ST.STATE_INDEX[ST.BRAIN_STATES[n].as]) &&
+       ST.STATE_NAMES.every((n, i) => ST.shaderIndexOf(n) === i) && ST.ALL_STATE_NAMES.every((n) => ST.shaderIndexOf(n) >= 0 && ST.shaderIndexOf(n) < 6),
+       `murmur's six each render as themselves; ${ADDED.map((n) => n + " -> " + ST.BRAIN_STATES[n].as).join(", ") || "(none)"}. ` +
        `kit.ts's mh_live and mh_state compare the index against half-unit windows and an index of 6 is ` +
        `outside ALL of them -- so a host state fed raw would render with less cadence than thinking, which ` +
        `for a state meaning "searching" is exactly backwards. The mapping is what stops that, and the last ` +
@@ -146,7 +152,7 @@ sec("7. *** THE STATE TABLE AND THE ORCHESTRATOR: EXACT VALUES, AND A REAL TRANS
        `resting weights on both signals and ignites nothing.`);
     ok("...and the index is DERIVED from the one ordering rather than typed out a second time",
        ST.STATE_NAMES.every((n, i) => IX[n] === i) && Object.keys(IX).length === ST.STATE_NAMES.length &&
-       Object.keys(ST.STATE_RENDER_INDEX).length === ST.STATE_NAMES.length,
+       ST.ALL_STATE_NAMES.length === ST.STATE_NAMES.length + ADDED.length,
        `all ${ST.STATE_NAMES.length} names map to their own position in STATE_NAMES and there is no sixth ` +
        `spelling of the order anywhere. Two copies of one ordering is the shape this tree has repaired in its ` +
        `own records three times.`);
