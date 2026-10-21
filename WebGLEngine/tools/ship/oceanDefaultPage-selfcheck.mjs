@@ -58,6 +58,7 @@ console.log("1. THE PAGE'S SOURCE");
     ok("the detail selector offers 24, 48 and 96 cells", opts.join(",") === "24,48,96", opts.join(","));
     const maxN = Math.max(...opts), maxV = (/const MAXV = (\d+) \* (\d+)/.exec(code) || []).slice(1).map(Number);
     ok("!! the vertex and index buffers are sized for the LARGEST detail option, so a fine mesh cannot overrun them (bufferSubData past the end is a GL error, silently)", maxV.length === 2 && maxV[0] === maxN + 1 && maxV[1] === maxN + 1 && /96 \* 96 \* 6 \* 4/.test(code), `MAXV ${maxV.join(" x ")} for ${maxN} cells`);
+    ok("the page imports the tier switch and names the storage it uses only through it", /import \* as OT from "\/ui\/oceanTier\.mjs"/.test(raw) && !/localStorage\.(get|set)Item\(\s*["']swek\.ocean/.test(raw), "ui/oceanTier.mjs");
     ok("the credit line says the agreement is a measurement and not a caption", /The agreement line is a measurement/.test(raw));
 }
 
@@ -120,6 +121,19 @@ console.log("\n2. THE LIVE PAGE");
                 const label = await pg.textContent("#pauseBtn");
                 await pg.click("#pauseBtn"); await pg.waitForTimeout(700); const r2 = await tOf();
                 ok("!! the clock runs, Pause stops it (the label says Resume), and Resume restarts it", a2 > a1 && p2 === p1 && label === "Resume" && r2 > p2, `running ${a1} -> ${a2}; paused ${p1} -> ${p2}; resumed -> ${r2}`);
+                {   // slice 3: the tier switch is on the page, decided from what the browser reports, remembered, and never claims the sea unmeasured
+                    await pg.waitForFunction(() => window.__ocean.tier != null, null, { timeout: 8000 }).catch(() => {});
+                    const t0 = await pg.evaluate(() => ({ tier: window.__ocean.tier, sel: document.getElementById("tierSel").value, hud: document.getElementById("hud").textContent }));
+                    ok("!! the page decides a tier from the browser's own report, and with no probe it is the default water, never the sea", !!t0.tier && t0.tier.tier === "default" && t0.tier.preference === "auto" && t0.sel === "auto", JSON.stringify(t0.tier).slice(0, 160));
+                    ok("  and the HUD prints the tier and its reason as text", /tier: default/.test(t0.hud) && t0.tier && t0.hud.includes(t0.tier.reason.slice(0, 20)), (t0.hud.split("\n").find((l) => /^tier:/.test(l)) || "").slice(0, 100));
+                    await pg.selectOption("#tierSel", "on");
+                    const kept = await pg.evaluate(() => window.localStorage.getItem("swek.ocean.tier"));
+                    await pg.reload({ waitUntil: "load" });
+                    await pg.waitForFunction(() => window.__ocean && window.__ocean.tier != null, null, { timeout: 15000 }).catch(() => {});
+                    const t1 = await pg.evaluate(() => ({ sel: document.getElementById("tierSel").value, pref: window.__ocean.tier && window.__ocean.tier.preference }));
+                    ok("!! choosing a tier is remembered across a reload (localStorage, the shared key), and the decision follows it", kept === "on" && t1.sel === "on" && t1.pref === "on", JSON.stringify({ kept, ...t1 }));
+                    await pg.selectOption("#tierSel", "auto");
+                }
                 ok("!! the page made no script error and no console error through all of that", errs.length === 0, errs.join(" | ").slice(0, 200));
                 try { await pg.screenshot({ path: process.env.OCEAN_DEFAULT_SHOT || "/tmp/ocean-default.png" }); } catch {}
                 await ctx.close();

@@ -16073,6 +16073,15 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "53/9 and 22/7 arrived/left -- and backlogIntegrity needed one orb entry's verdict to carry its " +
                  "reason again. relativeBudget reads the stored per-pass scales, which this round's sweep rewrites",
     }),
+    since600: Object.freeze({
+        at: "v4889", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["ui/oceanTier-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "the ocean tier switch's gate (slice 3): classifyAdapter on fourteen adapter spellings, chooseTier on one row per branch " +
+                 "(off never, auto only when measured, on says how slow, no WebGPU and software adapters never), the probe harness on a fake " +
+                 "clock, and a storage that throws. Nine sabotages, nine red -- seven by a FAIL row and two by a crash, which is red by exit status",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

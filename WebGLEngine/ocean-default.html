@@ -58,6 +58,11 @@
     <option value="3">seed 3</option>
     <option value="4">seed 4</option>
   </select></label>
+  <label>water tier <select id="tierSel" title="off: always this water. auto: the GPU sea only once it has been timed on this GPU. on: the GPU sea whenever WebGPU can run it.">
+    <option value="auto" selected>auto</option>
+    <option value="off">off (this water)</option>
+    <option value="on">on (the GPU sea)</option>
+  </select></label>
   <button id="pauseBtn" type="button">Pause</button>
 </div>
 <div id="stage">
@@ -71,12 +76,31 @@
 <script type="module">
   import { defaultSurface } from "/physics/ocean/oceanSurface.mjs";
   import { buildWater, buoy } from "/world/oceanWater.mjs";
+  import * as OT from "/ui/oceanTier.mjs";
 
   const $ = (id) => document.getElementById(id);
   const cv = $("cv"), hud = $("hud");
   const gl = cv.getContext("webgl2", { antialias: true });
   const state = { frames: 0, agreement: null, originHeight: null, n: 96, seed: 1, vertices: 0, triangles: 0, buoys: 0, error: "" };
   window.__ocean = state;
+  // slice 3: the tier switch. The sea itself is slice 4, so "sea" here is what WOULD be chosen; the water drawn below is always this one.
+  const tierSel = $("tierSel");
+  tierSel.value = OT.loadPreference(safeStorage());
+  state.tier = null;
+  function safeStorage() { try { return window.localStorage; } catch { return null; } }
+  async function decideTier() {
+    let webgpu = false, adapter = null;
+    try {
+      if (navigator.gpu) {
+        const a = await navigator.gpu.requestAdapter();
+        if (a) { webgpu = true; adapter = a.info || (a.requestAdapterInfo ? await a.requestAdapterInfo() : null); if (a.isFallbackAdapter) adapter = { ...(adapter || {}), isFallbackAdapter: true }; }
+      }
+    } catch { webgpu = false; }
+    state.tier = OT.chooseTier({ preference: tierSel.value, webgpu, adapter, probeMs: null });
+    state.webgpu = webgpu;
+  }
+  tierSel.addEventListener("change", () => { OT.savePreference(safeStorage(), tierSel.value); decideTier(); });
+  decideTier();
   if (!gl) { $("nogl").style.display = "block"; hud.textContent = "no WebGL2"; state.error = "no WebGL2"; }
   else start();
 
@@ -196,7 +220,8 @@
       state.frames++; state.originHeight = sea.sample(0, 0, simT).h; state.agreement = worst; state.vertices = m.count; state.triangles = m.indices.length / 3; state.buoys = BUOYS.length;
       fpsAcc += dt; fpsN++; if (fpsAcc >= 0.5) { fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0; }
       hud.textContent = `${fps.toFixed(0)} fps   ${m.count} vertices   ${m.indices.length / 3} triangles   t = ${simT.toFixed(1)} s\n` +
-        `physics vs drawn, 32 vertices re-asked: largest height gap ${worst.toExponential(1)} m\nseed ${state.seed}, ${sea.components.length} waves, steepness ${sea.steepness.toFixed(2)}`;
+        `physics vs drawn, 32 vertices re-asked: largest height gap ${worst.toExponential(1)} m\nseed ${state.seed}, ${sea.components.length} waves, steepness ${sea.steepness.toFixed(2)}` +
+        (state.tier ? `\n${OT.reportLines(state.tier).join("\n")}\nthe GPU sea itself arrives with slice 4; this page always draws the water above` : "");
       requestAnimationFrame(frame);
     }
     requestAnimationFrame(frame);
