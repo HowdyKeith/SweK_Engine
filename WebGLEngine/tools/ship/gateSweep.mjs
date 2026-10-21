@@ -16101,10 +16101,16 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "round 32's temporal upscale against its CPU twin. Sabotaged G1-G9, T1-T4, V1-V5, X1-X7, W1-W6, Y1-Y7, Z1-Z7 and S1-S7; every 0-red result is named in its gate's header, and all but X5 (an equivalent mutant) were fixed",
     }),
     since603: Object.freeze({
-        at: "v4892", swept: 1, green: 1, red: 0,
+        at: "v4892", swept: 0, green: 0, red: 0,
         added: Object.freeze([]),
         redOnArrival: Object.freeze([]),
         widened: Object.freeze([]),
+        elsewhere: Object.freeze([
+            Object.freeze({ gate: "tools/ship/recordProbe-selfcheck.mjs", was: "red", now: "green",
+                why: "red on the rig's win32 verify of v4891 and green on Linux since v4675: its kill row needs a signal handler to run, and on Windows " +
+                     "kill() is TerminateProcess, which runs nothing. The probe now journals before every mutation and the next probe restores; the " +
+                     "gate drives that kill on every platform with SIGKILL. Green here; the rig's next verify is its first win32 reading." }),
+        ]),
         verdict: "the record probe's journal: tools/ship/recordProbe-selfcheck.mjs, red on the rig's win32 verify of v4891 (TerminateProcess runs no handler), now drives that kill on every " +
                  "platform with SIGKILL (S11) and the journal's restore rules on a hand-written journal (S12) -- the probe's own write and a torn prefix restored, a later edit left alone. " +
                  "Seven sabotages, all red; P6 went 0 red until S11 read the journal's own entry",
