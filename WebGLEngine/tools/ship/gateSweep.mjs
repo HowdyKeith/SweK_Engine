@@ -16091,6 +16091,15 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "bundle's own text, the computed comparison with the physics surface; eleven sabotages, eleven red) and the page against a stand-in frame (a fast GPU timed and kept and not " +
                  "timed again on reload, a slow one unloaded, the same slow one kept under on, no WebGPU and off never requesting the frame, a mute sea given up on; eight page sabotages, all red)",
     }),
+    since602: Object.freeze({
+        at: "v4891", swept: 2, green: 2, red: 0,
+        added: Object.freeze(["render/denoiseUpscaleGPU-selfcheck.mjs", "render/denoiseTemporalUpscale-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "the denoiser arc's rounds 31-35: the half-size emitter-aware chain on the device, held to its CPU references (coverage, the bounded fill, the chain, the history's four " +
+                 "passes, round 34's list fill float for float round 31's), the page's timing caller, and four rig verdicts re-derived from the committed reports (sections 94, 98 and 100); " +
+                 "round 32's temporal upscale against its CPU twin. Sabotaged G1-G9, T1-T4, V1-V5, X1-X7, W1-W6, Y1-Y7, Z1-Z7 and S1-S7; every 0-red result is named in its gate's header, and all but X5 (an equivalent mutant) were fixed",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
