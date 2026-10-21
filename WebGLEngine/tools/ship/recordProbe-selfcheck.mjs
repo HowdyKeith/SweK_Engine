@@ -18,7 +18,7 @@ import os from "node:os";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import * as RP from "./recordProbe.mjs";
 import * as FR from "./frozenRecords.mjs";
 import { PROBE_AT_V4675 as P, PROBE_AT_V4675_R22 as P22 } from "./frozenRecords.mjs";
@@ -321,10 +321,14 @@ sec("6. *** IT WRITES TO TRACKED SOURCE, SO THE RESTORE IS AUDITED RATHER THAN A
         fs.writeFileSync(path.join(tmp, recFile), original);
         const driver = path.join(tmp, "drive.mjs");
         fs.writeFileSync(driver,
-            'import { probe } from ' + JSON.stringify(path.join(ENG, "tools", "ship", "recordProbe.mjs")) + ';\n' +
+            // v4893 -- A file:// URL, never a bare path. MEASURED on the rig: on Windows `import "C:\\..."` is not a valid module
+            // specifier, so the child threw before its first line and both kill rows waited 30 s for a mutation that never came.
+            // stderr is kept now, so a child that dies early says why in the row instead of going quiet.
+            'import { probe } from ' + JSON.stringify(pathToFileURL(path.join(ENG, "tools", "ship", "recordProbe.mjs")).href) + ';\n' +
             'probe({ root: ' + JSON.stringify(tmp) + ', records: [{ name: "FIX_V4675", file: ' + JSON.stringify(recFile) +
             ', guardians: [' + JSON.stringify(slowGate) + '], fields: [] }] });\n');
-        const child = spawn(process.execPath, [driver], { stdio: "ignore" });
+        const child = spawn(process.execPath, [driver], { stdio: ["ignore", "ignore", "pipe"] });
+        let childErr = ""; child.stderr.on("data", (d) => { childErr += d; });
         // Wait until the file is actually corrupted, then kill -- so the test cannot pass by killing too early.
         let sawCorruption = false;
         // v4893 -- 30 s, not 3: on the rig (win32, four gates at once, a slower box) the child's Node start, its imports and its
@@ -349,7 +353,7 @@ sec("6. *** IT WRITES TO TRACKED SOURCE, SO THE RESTORE IS AUDITED RATHER THAN A
         say(`corruption observed mid-run: ${sawCorruption}; restored by the signal handler: ${byHandler}; journal left: ${journalLeft}; restored after recovery: ${restored} (${rec.restored.length} file(s) put back from the journal)`);
         ok("!! *** a run killed WHILE a file is corrupted still restores it -- by its handler where one runs, by its journal where none can ***",
             sawCorruption && restored && (process.platform === "win32" ? true : byHandler && !journalLeft),
-            `${process.platform}: corruption seen ${sawCorruption}${sawCorruption ? "" : " (waited " + ((Date.now() - t0kill) / 1000).toFixed(1) + " s)"}; ` +
+            `${process.platform}: corruption seen ${sawCorruption}${sawCorruption ? "" : " (waited " + ((Date.now() - t0kill) / 1000).toFixed(1) + " s; the child's stderr: " + (childErr.trim().split("\n").slice(-2).join(" | ").slice(0, 300) || "none") + ")"}; ` +
             `restored by the handler ${byHandler}; journal left ${journalLeft}; restored after recovery ${restored} (${rec.restored.length} put back, ${(rec.skipped || []).length} skipped). ` +
             `The kill is delivered only after the corruption is SEEN on disk, so this cannot pass by racing ` +
             `ahead of the mutation, and the wait is on the child's ACTUAL exit rather than a timer. Without the ` +
@@ -366,7 +370,8 @@ sec("6. *** IT WRITES TO TRACKED SOURCE, SO THE RESTORE IS AUDITED RATHER THAN A
         // that case on every platform -- the journal written before the first mutation is what puts the tree back, and
         // the next probe() over it does so before measuring anything.
         fs.writeFileSync(path.join(tmp, recFile), original);
-        const child2 = spawn(process.execPath, [driver], { stdio: "ignore" });
+        const child2 = spawn(process.execPath, [driver], { stdio: ["ignore", "ignore", "pipe"] });
+        let childErr2 = ""; child2.stderr.on("data", (d) => { childErr2 += d; });
         let saw2 = false;
         const t0kill2 = Date.now(), deadline2 = t0kill2 + 30000;
         while (Date.now() < deadline2) {
@@ -384,7 +389,7 @@ sec("6. *** IT WRITES TO TRACKED SOURCE, SO THE RESTORE IS AUDITED RATHER THAN A
         say(`SIGKILL: corruption observed ${saw2}; left corrupted by the kill ${left2}; journal on disk ${journal2}, holding the pending write ${pend2}; put back by the next probe ${back2}`);
         ok("!! *** a run killed with NO handler able to run (SIGKILL; every kill on Windows) leaves a journal, and the next probe puts the tree back from it ***",
             saw2 && left2 && journal2 && pend2 && back2,
-            `${process.platform}: corruption seen ${saw2}; left corrupted ${left2}; journal on disk ${journal2}, holding the pending write ${pend2}; put back by the next probe ${back2}. ` +
+            `${process.platform}: corruption seen ${saw2}${saw2 ? "" : " (the child's stderr: " + (childErr2.trim().split("\n").slice(-2).join(" | ").slice(0, 300) || "none") + ")"}; left corrupted ${left2}; journal on disk ${journal2}, holding the pending write ${pend2}; put back by the next probe ${back2}. ` +
             `The kill left the record corrupted, as it must when nothing in the process runs, and recoverInterrupted -- which ` +
             `probe() calls before it measures anything -- restored it from the journal written before the first mutation.`);
 
