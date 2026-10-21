@@ -184,7 +184,15 @@ export function reach({ budgetMs = null, timings = null, census = null, root = E
     // stand there. Sorted slowest first, because the three at the cap are a different problem from the
     // three that are a few hundred milliseconds over.
     const blockers = new Map();
-    for (const r of overBudget) for (const g of r.guardians) {
+    // *** v4675 -- A GUARDIAN WITH NO READING IS NOT KNOWN TO BE OVER BUDGET, AND THIS PUT ONE IN THE TIER. ***
+    // The loop took EVERY guardian of an over-budget record. A record is OVER_BUDGET when its cheapest TIMED
+    // guardian is dear; its other guardians may simply never have been swept -- a gate added this round has no
+    // entry at all. MEASURED: adding tools/ship/recordProbe-selfcheck.mjs, which runs in about two seconds,
+    // made it a blocker of MEASURED_AT_V4415 at `null` ms, and recordTier's own row reported "cheapest is 0 ms
+    // against a 3,000 ms budget". The tier would then have run it at ship time on no evidence, which is the
+    // fault v4674 repaired one level up: a population sized from a number that is not there. An untimed
+    // guardian belongs to UNMEASURED, which this function already counts, and not to the tier.
+    for (const r of overBudget) for (const g of r.guardians.filter((x) => timed(x) && !runsAtShipTime(x))) {
         if (!blockers.has(g)) blockers.set(g, { gate: g, ms: t.timings?.[g] ?? null, records: [] });
         blockers.get(g).records.push(r.name);
     }

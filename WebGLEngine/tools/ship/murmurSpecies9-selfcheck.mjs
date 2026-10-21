@@ -56,8 +56,16 @@ const FRAMES = [
     SL(UP, { prom: 0.0, corona: 0.0 }), SL(UP, { prom: 1.0, corona: 0.0 }),             // 4,5
     SL(FLAT, { prom: 0.0, corona: 0.0 }), SL(FLAT, { prom: 1.0, corona: 0.0 }),         // 6,7
     SL(UP, { corona: 0.0 }), SL(UP, { corona: 1.0 }),                  // 8,9
+    // *** THE GRANULATION'S CLOCK, ADDED AT v4662. *** sol.ts samples the noise at
+    // uniforms.time * (0.35 + 0.75 * live.pace) and this port spelled exactly that until v4662 -- a
+    // pace-modulated rate times elapsed time, which jumps by t * dPace the moment the cadence moves: 270.0
+    // units of noise space in one 1/60 s frame after half an hour, measured in
+    // tools/ship/murmurClock3-selfcheck.mjs. It reads the PACE INTEGRAL now, and these two frames are what
+    // says the integral reaches the picture. Both hold simmer at 1.0, so the only difference is the history.
+    SL(UP, { simmer: 1.0, glintRate: 1.0, paceInt: 0 }), SL(UP, { simmer: 1.0, glintRate: 1.0, paceInt: 14 }),  // 10,11
 ];
-const F = { ref: 0, neb: 1, simLo: 2, simHi: 3, upLo: 4, upHi: 5, flatLo: 6, flatHi: 7, corLo: 8, corHi: 9 };
+const F = { ref: 0, neb: 1, simLo: 2, simHi: 3, upLo: 4, upHi: 5, flatLo: 6, flatHi: 7, corLo: 8, corHi: 9,
+            paceLo: 10, paceHi: 11 };
 const run = await renderSpecies(FRAMES);
 const okRun = run.ok && run.frames && run.frames.length === FRAMES.length;
 if (!okRun) ok("!! the species render ran", false, `could not render: ${run.reason || "frames " + (run.frames ? run.frames.length : "none")}`);
@@ -170,6 +178,36 @@ sec("2. *** THE GRANULATION IS TEXTURE, NOT LEVEL, AND IT MUST NOT NOTCH THE OUT
         // light, and a notch bitten out of a 48-pixel outline at that amplitude is under the frame's own
         // resolution. The weighting is still right and it is still transcribed; what is retracted is the
         // claim that these rows defend it.
+        // *** AND THE GRANULATION HAS A CLOCK, WHICH IS WHAT v4662 REPAIRED. *** Until that round the noise
+        // was sampled at uniforms.time * (0.35 + 0.75 * live.pace): a rate that moves, multiplied by elapsed
+        // time. It is base * (t + 2.142857 * paceInt) now, and this pair sweeps the integral with every
+        // other input held -- same tau, same knobs, same instant -- so what differs between the two frames
+        // is the accumulated cadence and nothing else.
+        //
+        // *** IT IS MEASURED HERE AND NOT IN THE ROUND'S OWN GATE, AND THE REASON IS AN INSTRUMENT. *** A
+        // byte count at the default operating point reads 0.0% and worst 1 of 255 on this term, at 48 px
+        // and at 128 px -- v4662 nearly recorded it as "cannot be seen at all" on that evidence. A
+        // zero-mean noise on a bright disc moves almost no bytes and a great deal of TEXTURE, which is the
+        // statistic this file already had. The dimmed operating point is the other half of it.
+        const pLo = texture(fr(F.paceLo)), pHi = texture(fr(F.paceHi));
+        const pBytes = (() => { const a = fr(F.paceLo), b = fr(F.paceHi); let n = 0, mx = 0;
+            for (let i = 0; i < a.length; i++) { const d = Math.abs(a[i] - b[i]); if (d) n++; if (d > mx) mx = d; }
+            return { pct: 100 * n / a.length, mx }; })();
+        say(`paceInt 0 -> 14 at simmer 1: texture ${pLo.tex.toFixed(5)} -> ${pHi.tex.toFixed(5)}, ` +
+            `${pBytes.pct.toFixed(1)}% of bytes move, worst ${pBytes.mx}`);
+        ok("!! *** THE GRANULATION IS CARRIED BY THE PACE INTEGRAL, and until v4662 it was carried by pace * t ***",
+            Math.abs(pHi.tex - pLo.tex) > 0.005 && pBytes.mx > 15 &&
+            Math.abs(pHi.mean / pLo.mean - 1) < 0.10,
+            `fourteen radian-seconds of accumulated cadence move the texture ${pLo.tex.toFixed(5)} -> ` +
+            `${pHi.tex.toFixed(5)} and ${pBytes.mx} counts of 255 at its worst, while the disc's MEAN moves ` +
+            `${(100 * (pHi.mean / pLo.mean - 1)).toFixed(1)}% -- the pattern is carried past, not brightened, ` +
+            `which is what a phase does to a zero-mean noise and what a gain could not. THE SPELLING IT ` +
+            `REPLACED WOULD HAVE MOVED THE SAMPLE POINT 270.0 UNITS IN ONE FRAME after half an hour on ` +
+            `screen, against 0.0121 integrated: granScale is ${K.MH_SOL.granScale}, so that is thirty-two ` +
+            `body radii of noise space crossed between two frames. The granulation was not drifting there, ` +
+            `it was being replaced. FOUR ROUNDS OF CLOCK CENSUSES MISSED IT because every one of them ` +
+            `inspected mh_drift call sites and this is a bare product inside a noise lookup.`);
+
         ok("!! *** SIMMER RAISES THE TEXTURE AND LEAVES THE OUTLINE ALONE -- both halves, or it is the bug ***",
             t1.tex > t0.tex * 1.3 && Math.abs(t1.mean / t0.mean - 1) < 0.08 &&
             Math.abs(o1.round - o0.round) < 0.01 && o1.round < 0.06,

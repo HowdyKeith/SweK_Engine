@@ -33,7 +33,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { runQuickSweep, selectGates, DEFAULTS } from "./quickSweep.mjs";
+import { runQuickSweep, selectGates, scaleLookup, DEFAULTS } from "./quickSweep.mjs";
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -44,7 +44,13 @@ export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".
  * and a rewrite that skips the skipped is fine if nothing is ever excluded. Together they absorb.
  */
 export const ABSORBING = Object.freeze({
-    skipRule: "selectGates: a gate is skipped when its LAST RECORDED time exceeds the budget",
+    // *** v4672 -- "LAST RECORDED time" WAS THE WHOLE RULE FOR 247 ROUNDS AND IS NOW HALF OF IT. *** The
+    // reading is divided by the measured scale of the pass that took it before the comparison, so a gate
+    // over budget only because the box was slow that hour is no longer exiled for it. Restated here because
+    // the field below asserts the CONSEQUENCE, and a consequence stated from a rule that has moved is the
+    // shape this file exists to complain about.
+    skipRule: "selectGates: a gate is skipped when its LAST RECORDED time, divided by the measured scale of " +
+              "the capture pass that took it (never below 1, never above SCALE_MAX), exceeds the budget",
     writeRule: "runQuickSweep: timings are rewritten only for gates that RAN",
     consequence: "a skipped gate's time can never decrease, so the skip is permanent",
     escapes: "raising --budget, or editing the file by hand. Nothing automatic, and no round has done either.",
@@ -75,9 +81,15 @@ export async function demonstrateAbsorbing({ gate = "ev/tools/es-tactics-selfche
     }
 }
 
-/** The skip decision alone, for a hand-made timings map. */
-export function exiled(gates, timings, budgetMs = DEFAULTS.budgetMs) {
-    return selectGates(gates, timings, budgetMs).skipped;
+/**
+ * The skip decision alone, for a hand-made timings map.
+ *
+ * v4672: `record` is the sweep-timings record the readings CAME FROM, and it is what supplies the per-pass
+ * box scale. A caller with only a bare map passes none and gets the unnormalised decision, which is what
+ * every existing caller wants -- a map invented in a fixture has no capture pass and no scale to apply.
+ */
+export function exiled(gates, timings, budgetMs = DEFAULTS.budgetMs, record = null) {
+    return selectGates(gates, timings, budgetMs, record ? { scaleOf: scaleLookup(record) } : {}).skipped;
 }
 
 // ==== MEASURED_V4425 ====
