@@ -171,7 +171,7 @@ export function matchRows(stats, declared, applied = {}) {
 }
 
 /** What the page prints under the frame. `match` is matchedTunables(stats) when the matched settings are applied, else null. */
-export function reportLines(rows, match = null) {
+export function reportLines(rows = null, match = null) {
     const out = ["the GPU sea against the physics surface (computed from the bundle's own declared defaults and slice 1's six waves; the sea's settings: " + (match ? "MATCHED" : "its defaults") + "):"];
     for (const r of rows || [])
         out.push("  " + r.quantity.padEnd(18) + r.verdict.padEnd(15) + "physics " + r.physics + "  |  sea " + r.sea + (r.ratio != null ? "  (x" + r.ratio.toFixed(2) + ")" : ""));

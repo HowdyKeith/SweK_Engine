@@ -26,3 +26,9 @@ contains no http string and nothing leaves the origin; they are still requests, 
 NOT TAKEN: upstream's server.mjs, ocean.min.html, package.json/package-lock.json, docs/ and README (nothing here runs a build, and esbuild is not a dependency of this tree).
 NOTHING IN THE ENGINE IMPORTS THESE FILES YET. They are here so a later round can adapt them (expose the water height the shader already computes, set the parameters
 programmatically, composite SweK objects against the sea) with the upstream bytes beside the changes and a gate that says exactly what moved.
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+ADDED v4895, STEP 2 (unnumbered until shipped): THE SENTENCE "NOTHING IN THE ENGINE IMPORTS THESE FILES YET" ABOVE IS NO LONGER TRUE. tools/ship/seaPatch.mjs is a recorded list of three patches over js/main.js
+(the five './wgsl/' imports made absolute; `export const seaApi`, a setParams that sets any key of upstream's P -- swellSpread, which has no panel slider, included -- and raises the flag upstream raises;
+a three-line hook that gives the api its closure over the flags and over waterH) and world/ocean/seaMain.mjs is the generated result. NO BYTE IN THIS DIRECTORY CHANGED: the vendored files are still
+the pinned upstream bytes, and tools/ship/seaPatch-selfcheck.mjs runs the patches backwards on seaMain.mjs to prove it. No page loads seaMain.mjs yet; ocean-sea.html still loads the single-file bundle.

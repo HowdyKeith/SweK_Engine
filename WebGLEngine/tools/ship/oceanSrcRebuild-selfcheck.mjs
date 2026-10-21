@@ -10,7 +10,7 @@
 //   3  holds this gate's copy of that rule to upstream's build.mjs (the two regexes and the module order are read out of the vendored build.mjs, so the rule cannot drift from it quietly);
 //   4  states what the sources show about the bundle: `export const P` exists in js/main.js and not in ocean.html (the build strips it), yet the bundle applies every P key from the URL;
 //   5  lists every network call the sources make (three, all to its own origin: log() to /__log and the ?shot= screenshot path to /__shot), and that no source names an http(s) address;
-//   6  checks that nothing in the engine imports the vendored sources yet (they are here to be adapted, not wired).
+//   6  checks that only the patch layer (tools/ship/seaPatch.mjs, its generated seaMain.mjs) and the gates that read the sources name them -- no page loads them.
 //
 // SABOTAGES, each applied in place, restored, md5 verified; every one red by name (rows red): a line appended to js/main.js 2 | a renamed symbol in build.mjs 1 | a log call pointed off-origin 4 |
 // the licence's copyright changed 2 | one byte appended to ocean.html 2 | an engine file importing the sources 1 | main.js no longer exporting P 3.
@@ -112,7 +112,10 @@ console.log("\n6. NOTHING IN THE ENGINE IMPORTS THEM YET");
             if (/vendor\/web-ocean\/js\//.test(t) || /web-ocean\/index\.html/.test(t)) hits.push(path.relative(ENG, p).split(path.sep).join("/"));
         }
     })(ENG);
-    ok("  no engine file imports or loads the vendored sources: they are here to be adapted, and the opt-in page still loads the single-file bundle", hits.length === 0, hits.join(", ") || "0 importers");
+    // v4895 step 2: the patch layer (tools/ship/seaPatch.mjs and its generated seaMain.mjs, which imports the wgsl modules by absolute path) and the two gates that READ the sources are
+    // the only files that name them; no page loads them, and the opt-in page still loads the single-file bundle
+    const ALLOWED = ["tools/ship/seaPatch-selfcheck.mjs", "tools/ship/seaPatch.mjs", "ui/oceanLiveTune-selfcheck.mjs", "world/ocean/seaMain.mjs"];
+    ok("  only the patch layer and the gates that read the sources name the vendored sources: no page loads them, and the opt-in page still loads the single-file bundle", JSON.stringify(hits.sort()) === JSON.stringify(ALLOWED), hits.join(", ") || "0 importers");
 }
 
 say("UNCHECKED, said plainly: that the sea renders from the modular form (it is the same code, but this sandbox has no WebGPU); that upstream's main still equals these files; the minified bundle and upstream's server.mjs, which were not taken.");
