@@ -305,7 +305,7 @@ fn main(@builtin(workgroup_id) wg:vec3<u32>, @builtin(local_invocation_index) li
     for (var k = 0u; k < u.rings; k++) {
         // rings count from 1, the known pixels being ring 0: a neighbour counts when its ring is below this one
         let r = u.ring + k + 1u;
-        // phase 1: every UNKNOWN cell's mean of the neighbours before this ring, kept in registers. The `< r` alone would keep
+        // phase 1: every UNKNOWN cell's mean of the neighbours before this ring, kept in registers. The < r alone would keep
         // this ring's fills out of the mean, as the list fill's in place does (sabotage C1's control: one phase, < r, is green);
         // the two phases are kept so no read of workgroup memory races a write to it
         var nv:array<vec3<f32>, PER>;
