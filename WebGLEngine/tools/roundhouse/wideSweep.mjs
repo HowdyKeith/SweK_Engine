@@ -17,7 +17,7 @@
 // an admitted line from a stale one.
 import { execFile } from "node:child_process";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { eligibleDevices } from "./deviceReport.mjs";
 import { deviceModeTable } from "./deviceModes.mjs";
@@ -77,4 +77,15 @@ export async function wideSweep({ capMs = MODE_CAP_MS, onMode = null, devices = 
         ranked: ranked.slice(0, 10),
         totalMs: Object.values(cost).reduce((a, b) => a + b, 0),
     };
+}
+
+// v4884 -- A FRONT DOOR. This library had no caller outside its own round's prose, so orphanScan named it the moment the long-silence branch merged; the way a corroboration sweep is actually run is a
+// command, and this is it: `node tools/roundhouse/wideSweep.mjs [--cap-s N]` prints one line per mode as it finishes and then the summary. It writes nothing.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+    const i = process.argv.indexOf("--cap-s");
+    const capMs = i > 0 ? Number(process.argv[i + 1]) * 1000 : MODE_CAP_MS;
+    if (!(capMs > 0)) { console.error("wideSweep: --cap-s needs a positive number of seconds"); process.exit(2); }
+    const r = await wideSweep({ capMs, onMode: (m) => console.log(`  ${m.overCap ? "OVER CAP" : m.error ? "ERROR   " : "ok      "} ${String(m.ms).padStart(7)} ms  ${m.device}.${m.mode}`) });
+    console.log(`wideSweep: ${r.devicesSwept} devices, ${r.modesSwept} modes swept, ${r.modesOverCap} over the ${capMs} ms cap, ${r.errored.length} errored; ${r.count} observables, ${r.movers} moved; ${r.totalMs} ms`);
+    if (r.maxAt) console.log(`  largest amplification ${r.maxAmplification} at ${r.maxAt}`);
 }
