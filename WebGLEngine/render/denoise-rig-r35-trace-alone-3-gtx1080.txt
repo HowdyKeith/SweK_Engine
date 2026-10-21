@@ -1,0 +1,149 @@
+0.454 s  pid 20408  native: the ladder starts, sets r12,r15,r18t,r18u,r27w
+0.455 s  pid 20408  native 64x64: requestAdapter
+0.456 s  pid 20408  native 64x64: requestDevice for r12,r15,r18t,r18u,r27w
+0.496 s  pid 20408  native 64x64: build r12
+0.614 s  pid 20408  native 64x64: build r15
+2.355 s  pid 20408  native 64x64: build r18t
+4.496 s  pid 20408  native 64x64: build r18u
+7.953 s  pid 20408  native 64x64: build r27w
+9.243 s  pid 20408  native 64x64: round 0 time r12
+9.405 s  pid 20408  native 64x64: round 0 time r15
+9.421 s  pid 20408  native 64x64: round 0 time r18t
+9.436 s  pid 20408  native 64x64: round 0 time r18u
+9.450 s  pid 20408  native 64x64: round 0 time r27w
+9.464 s  pid 20408  native 64x64: round 1 time r27w
+9.478 s  pid 20408  native 64x64: round 1 time r18u
+9.490 s  pid 20408  native 64x64: round 1 time r18t
+9.502 s  pid 20408  native 64x64: round 1 time r15
+9.514 s  pid 20408  native 64x64: round 1 time r12
+9.579 s  pid 20408  native 64x64: round 2 time r12
+9.641 s  pid 20408  native 64x64: round 2 time r15
+9.652 s  pid 20408  native 64x64: round 2 time r18t
+9.665 s  pid 20408  native 64x64: round 2 time r18u
+9.677 s  pid 20408  native 64x64: round 2 time r27w
+9.690 s  pid 20408  native 64x64: output check r12
+9.697 s  pid 20408  native 64x64: output check r15
+9.702 s  pid 20408  native 64x64: output check r18t
+9.705 s  pid 20408  native 64x64: output check r18u
+9.745 s  pid 20408  native 64x64: output check r27w
+9.748 s  pid 20408  native 64x64: destroy the denoisers
+9.749 s  pid 20408  native 64x64: destroy the device
+9.761 s  pid 20408  native 128x128: requestAdapter
+9.762 s  pid 20408  native 128x128: requestDevice for r12,r15,r18t,r18u,r27w
+9.806 s  pid 20408  native 128x128: build r12
+9.902 s  pid 20408  native 128x128: build r15
+11.202 s  pid 20408  native 128x128: build r18t
+12.662 s  pid 20408  native 128x128: build r18u
+16.107 s  pid 20408  native 128x128: build r27w
+17.366 s  pid 20408  native 128x128: round 0 time r12
+17.468 s  pid 20408  native 128x128: round 0 time r15
+17.483 s  pid 20408  native 128x128: round 0 time r18t
+17.501 s  pid 20408  native 128x128: round 0 time r18u
+17.532 s  pid 20408  native 128x128: round 0 time r27w
+17.561 s  pid 20408  native 128x128: round 1 time r27w
+17.590 s  pid 20408  native 128x128: round 1 time r18u
+17.608 s  pid 20408  native 128x128: round 1 time r18t
+17.624 s  pid 20408  native 128x128: round 1 time r15
+17.639 s  pid 20408  native 128x128: round 1 time r12
+17.741 s  pid 20408  native 128x128: round 2 time r12
+17.842 s  pid 20408  native 128x128: round 2 time r15
+17.858 s  pid 20408  native 128x128: round 2 time r18t
+17.873 s  pid 20408  native 128x128: round 2 time r18u
+17.891 s  pid 20408  native 128x128: round 2 time r27w
+17.919 s  pid 20408  native 128x128: destroy the denoisers
+17.920 s  pid 20408  native 128x128: destroy the device
+17.934 s  pid 20408  native 256x256: requestAdapter
+17.935 s  pid 20408  native 256x256: requestDevice for r12,r15,r18t,r18u,r27w
+17.989 s  pid 20408  native 256x256: build r12
+18.138 s  pid 20408  native 256x256: build r15
+19.495 s  pid 20408  native 256x256: build r18t
+20.967 s  pid 20408  native 256x256: build r18u
+24.308 s  pid 20408  native 256x256: build r27w
+25.632 s  pid 20408  native 256x256: round 0 time r12
+26.126 s  pid 20408  native 256x256: round 0 time r15
+26.184 s  pid 20408  native 256x256: round 0 time r18t
+26.221 s  pid 20408  native 256x256: round 0 time r18u
+26.273 s  pid 20408  native 256x256: round 0 time r27w
+26.368 s  pid 20408  native 256x256: round 1 time r27w
+26.462 s  pid 20408  native 256x256: round 1 time r18u
+26.550 s  pid 20408  native 256x256: round 1 time r18t
+26.587 s  pid 20408  native 256x256: round 1 time r15
+26.624 s  pid 20408  native 256x256: round 1 time r12
+27.134 s  pid 20408  native 256x256: round 2 time r12
+27.654 s  pid 20408  native 256x256: round 2 time r15
+27.692 s  pid 20408  native 256x256: round 2 time r18t
+27.729 s  pid 20408  native 256x256: round 2 time r18u
+27.781 s  pid 20408  native 256x256: round 2 time r27w
+27.918 s  pid 20408  native 256x256: destroy the denoisers
+27.919 s  pid 20408  native 256x256: destroy the device
+27.930 s  pid 20408  native 512x512: requestAdapter
+27.931 s  pid 20408  native 512x512: requestDevice for r12,r15,r18t,r18u,r27w
+27.995 s  pid 20408  native 512x512: build r12
+28.107 s  pid 20408  native 512x512: build r15
+29.439 s  pid 20408  native 512x512: build r18t
+30.940 s  pid 20408  native 512x512: build r18u
+34.280 s  pid 20408  native 512x512: build r27w
+35.569 s  pid 20408  native 512x512: round 0 time r12
+36.531 s  pid 20408  native 512x512: round 0 time r15
+36.667 s  pid 20408  native 512x512: round 0 time r18t
+36.799 s  pid 20408  native 512x512: round 0 time r18u
+37.001 s  pid 20408  native 512x512: round 0 time r27w
+37.358 s  pid 20408  native 512x512: round 1 time r27w
+37.721 s  pid 20408  native 512x512: round 1 time r18u
+37.932 s  pid 20408  native 512x512: round 1 time r18t
+38.058 s  pid 20408  native 512x512: round 1 time r15
+38.207 s  pid 20408  native 512x512: round 1 time r12
+39.156 s  pid 20408  native 512x512: round 2 time r12
+39.933 s  pid 20408  native 512x512: round 2 time r15
+40.066 s  pid 20408  native 512x512: round 2 time r18t
+40.192 s  pid 20408  native 512x512: round 2 time r18u
+40.384 s  pid 20408  native 512x512: round 2 time r27w
+40.741 s  pid 20408  native 512x512: destroy the denoisers
+40.742 s  pid 20408  native 512x512: destroy the device
+40.762 s  pid 20408  native 1024x1024: requestAdapter
+40.763 s  pid 20408  native 1024x1024: requestDevice for r12,r15,r18t,r18u,r27w
+40.963 s  pid 20408  native 1024x1024: build r12
+41.135 s  pid 20408  native 1024x1024: build r15
+42.456 s  pid 20408  native 1024x1024: build r18t
+43.997 s  pid 20408  native 1024x1024: build r18u
+47.343 s  pid 20408  native 1024x1024: build r27w
+48.596 s  pid 20408  native 1024x1024: round 0 time r12
+50.610 s  pid 20408  native 1024x1024: round 0 time r15
+51.125 s  pid 20408  native 1024x1024: round 0 time r18t
+51.610 s  pid 20408  native 1024x1024: round 0 time r18u
+52.282 s  pid 20408  native 1024x1024: round 0 time r27w
+53.031 s  pid 20408  native 1024x1024: round 1 time r27w
+53.841 s  pid 20408  native 1024x1024: round 1 time r18u
+54.530 s  pid 20408  native 1024x1024: round 1 time r18t
+55.029 s  pid 20408  native 1024x1024: round 1 time r15
+55.540 s  pid 20408  native 1024x1024: round 1 time r12
+57.518 s  pid 20408  native 1024x1024: round 2 time r12
+59.509 s  pid 20408  native 1024x1024: round 2 time r15
+60.023 s  pid 20408  native 1024x1024: round 2 time r18t
+60.505 s  pid 20408  native 1024x1024: round 2 time r18u
+61.183 s  pid 20408  native 1024x1024: round 2 time r27w
+61.913 s  pid 20408  native 1024x1024: destroy the denoisers
+61.914 s  pid 20408  native 1024x1024: destroy the device
+61.952 s  pid 20408  native 1920x1080: requestAdapter
+61.953 s  pid 20408  native 1920x1080: requestDevice for r15,r18t,r18u,r27w
+62.304 s  pid 20408  native 1920x1080: build r15
+63.666 s  pid 20408  native 1920x1080: build r18t
+65.265 s  pid 20408  native 1920x1080: build r18u
+68.743 s  pid 20408  native 1920x1080: build r27w
+70.095 s  pid 20408  native 1920x1080: round 0 time r15
+70.963 s  pid 20408  native 1920x1080: round 0 time r18t
+71.721 s  pid 20408  native 1920x1080: round 0 time r18u
+72.606 s  pid 20408  native 1920x1080: round 0 time r27w
+73.533 s  pid 20408  native 1920x1080: round 1 time r27w
+74.668 s  pid 20408  native 1920x1080: round 1 time r18u
+75.474 s  pid 20408  native 1920x1080: round 1 time r18t
+76.196 s  pid 20408  native 1920x1080: round 1 time r15
+76.996 s  pid 20408  native 1920x1080: round 2 time r15
+77.786 s  pid 20408  native 1920x1080: round 2 time r18t
+78.507 s  pid 20408  native 1920x1080: round 2 time r18u
+79.283 s  pid 20408  native 1920x1080: round 2 time r27w
+80.174 s  pid 20408  native 1920x1080: destroy the denoisers
+80.175 s  pid 20408  native 1920x1080: destroy the device
+80.228 s  pid 20408  native ladder done
+80.229 s  pid 20408  native: the ladder returned
+159.087 s  pid 20408  the gate ends, 0 fail(s)

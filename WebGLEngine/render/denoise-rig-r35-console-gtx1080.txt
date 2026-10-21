@@ -1,0 +1,718 @@
+C:\SweK_r33>git log -1 --oneline
+bc6fbed2 (HEAD -> ccr-6c3eeb7c-pxz6kx, origin/ccr-6c3eeb7c-pxz6kx) v4893: record the release
+
+C:\SweK_r33>cd WebGLEngine
+
+C:\SweK_r33\WebGLEngine>set SWEK_WEBGPU=
+
+C:\SweK_r33\WebGLEngine>set SWEK_TIMING_TRACE=%CD%\trace35-alone-1.txt
+
+C:\SweK_r33\WebGLEngine>node render/denoiseTiming-selfcheck.mjs
+1. THE LADDER'S ARITHMETIC
+  PASS    summarize is nearest rank: the median, the 10th and the 90th of ten times
+  PASS    the ladder runs from the trained 64 x 64 to a 1080p frame, each size more pixels than the last
+  PASS    a pass's largest buffer is the head's 81 logits a pixel: 672 MB at 1080p, what a device's storage limit is checked against
+  PASS    round 15: a pass's buffers are the input, every layer's output and the image -- and r15 allocates no logits, 81 channels a pixel fewer than r14   at 1080p: r14 1756 MiB, r15 1115 MiB
+  PASS    round 19: both ladders time r12, r15, r18t, r18u and (round 27) r27w -- r12 first, the reference every speedup is read against -- and natively on a D3D12 adapter by the run's compiler: under FXC, none named or one unread, r12 and r15 alone; under DXC all five; on Vulkan all five   D3D12: FXC r12,r15, none r12,r15, DXC r12,r15,r18t,r18u,r27w; Vulkan: r12,r15,r18t,r18u,r27w -- section 60: node-webgpu 0.6.0's FXC stopped on r18t's kernel and crashed on r18u's; section 65: 0.6.2's DXC built both
+  PASS  !! round 19: a native run's plan is read off its package WITH ITS DEVICE'S FLAGS -- 0.6.2 shipping DXC on D3D12: DXC, all five sets, and the FXC ladder; 0.6.0, 0.6.1 with the DLL copied beside, or a package unread: FXC, r12 and r15, no FXC ladder; the FXC child's own flags on 0.6.2: FXC; Linux: no D3D compiler, all five, no FXC ladder   DXC: r12,r15,r18t,r18u,r27w; FXC ladder runs  /  FXC: r12,r15; FXC ladder skipped  /  FXC: r12,r15; FXC ladder skipped  /  FXC: r12,r15; FXC ladder skipped  /  FXC: r12,r15; FXC ladder skipped  /  none: r12,r15,r18t,r18u,r27w; FXC ladder skipped
+  PASS  !! section 87: the FXC ladder is retired -- 0.6.2 on D3D12 skips it by default with the retirement's reason and runs it under SWEK_DENOISE_FXC=all; 0.6.0 and linux keep their own reasons   0.6.2: skipped, all: runs; 0.6.0: the package's compiler as shipped is FXC
+  PASS  !! round 19: the FXC child's device flags are ONE disable entry carrying use_dxc AND the fine clock, and no dump_shaders -- two entries would let Dawn keep the last (section 49), compiling with DXC or rounding the clock; a dump would fill a timed child's stdout -- and the child times r12 and r15   ["disable-dawn-features=use_dxc,timestamp_quantization"]
+  PASS  !! round 19: the file's ONE create call makes the FXC child's device with FXC_FLAGS and the gate's with the fine clock alone; the child -- spawned by the gate with --fxc-ladder and its result file -- runs its ladder in that mode and writes the file   1 create call(s): create(flags = fxc ? FXC_FLAGS : [H.FINE_CLOCK_FLAG]);; the child block 11 lines
+  PASS    section 87: the gate decides the FXC ladder by fxcLadderSkip(plan), and spawns it only where that names no reason   2 mention(s) of the ladder's function, called (its definition and the one call)
+  PASS  !! round 19: each "rXX against r15" line is r15's median over the set's -- a native ladder's tagged section 66, the page's section 61   native: r18t against r15 at 256 x 256: 1.500 x as fast, on the device's clock -- section 66  /  page: r18u against r15 at 256 x 256: 1.500 x as fast, on the device's clock -- section 61
+  PASS  !! round 27: each "r27w against rXX" line is that set's median over r27w's, tagged section 83 on either ladder -- the ratio section 83's rule reads   native: r27w against r18t at 1920 x 1080: 1.250 x as fast, on the device's clock -- section 83 / page: r27w against r18u at 1024 x 1024: 1.250 x as fast, on the wall clock -- section 83
+  PASS  !! round 19: r15 under FXC against a set under DXC is read at the largest size BOTH ladders measured, r15's FXC median over the set's DXC one, the line marked unpaired -- and no line where no size is common   native: r18t against r15 under FXC at 256 x 256: 2.000 x as fast, on the device's clock -- unpaired: two processes, one after the other -- section 66
+  PASS    a time is on Dawn's rounded grid when it is a whole number of 65,536 ns -- section 60's finding, read off round 17's native times
+  PASS    the input is the same every time, in the network's ranges, with both sides of a mask
+  PASS    an adapter is software by the spec's own flag, else by its name: SwiftShader is, a named GPU is not -- and it says whether it offers timestamps
+
+2. NATIVE: node-webgpu's default adapter (on the rig, the GPU)
+  ----  native: the trace is C:\SweK_r33\WebGLEngine\trace35-alone-1.txt
+  ----  native adapter: nvidia / pascal / D3D12 driver version 32.0.15.8180 (hardware); compiler, from the package: DXC
+  ----  native: this adapter's key for section 66's table: win32/nvidia/pascal
+  ----  native: node-webgpu 0.6.2; compiler, read off the package with this device's flags: DXC; sets timed: r12, r15, r18t, r18u, r27w
+  PASS    round 35: the trace holds the native ladder step by step -- its start, a device asked for at every size it measured, every set built there, and its return -- before each step ran   148 lines in C:\SweK_r33\WebGLEngine\trace35-alone-1.txt; sizes measured 64x64, 128x128, 256x256, 512x512, 1024x1024, 1920x1080
+  PASS  !! native r12: the first size, 64 x 64, measured; every time finite and positive; every skip says why   5 of 6 sizes measured on nvidia / pascal / D3D12 driver version 32.0.15.8180
+  PASS  !! native r12: the wall clock sits inside the guard, and where the device has timestamp queries its span inside the wall clock and the passes inside its span   timestamps, timestamps, timestamps, timestamps, timestamps
+  PASS    native r12: and timestamp queries were asked for wherever the adapter offers them -- a run without them says less than it could   the adapter offers them
+  PASS  !! native r12: timing changes nothing -- the image a timed pass wrote is an untimed run's, bit for bit
+  PASS    native r12: and the cap skips only the sizes the last measured pass predicts past 1500 ms
+  PASS  !! native r15: the first size, 64 x 64, measured; every time finite and positive; every skip says why   6 of 6 sizes measured on nvidia / pascal / D3D12 driver version 32.0.15.8180
+  PASS  !! native r15: the wall clock sits inside the guard, and where the device has timestamp queries its span inside the wall clock and the passes inside its span   timestamps, timestamps, timestamps, timestamps, timestamps, timestamps
+  PASS    native r15: and timestamp queries were asked for wherever the adapter offers them -- a run without them says less than it could   the adapter offers them
+  PASS  !! native r15: timing changes nothing -- the image a timed pass wrote is an untimed run's, bit for bit
+  PASS    native r15: and the cap skips only the sizes the last measured pass predicts past 1500 ms
+  PASS  !! native r18t: the first size, 64 x 64, measured; every time finite and positive; every skip says why   6 of 6 sizes measured on nvidia / pascal / D3D12 driver version 32.0.15.8180
+  PASS  !! native r18t: the wall clock sits inside the guard, and where the device has timestamp queries its span inside the wall clock and the passes inside its span   timestamps, timestamps, timestamps, timestamps, timestamps, timestamps
+  PASS    native r18t: and timestamp queries were asked for wherever the adapter offers them -- a run without them says less than it could   the adapter offers them
+  PASS  !! native r18t: timing changes nothing -- the image a timed pass wrote is an untimed run's, bit for bit
+  PASS    native r18t: and the cap skips only the sizes the last measured pass predicts past 1500 ms
+  PASS  !! native r18u: the first size, 64 x 64, measured; every time finite and positive; every skip says why   6 of 6 sizes measured on nvidia / pascal / D3D12 driver version 32.0.15.8180
+  PASS  !! native r18u: the wall clock sits inside the guard, and where the device has timestamp queries its span inside the wall clock and the passes inside its span   timestamps, timestamps, timestamps, timestamps, timestamps, timestamps
+  PASS    native r18u: and timestamp queries were asked for wherever the adapter offers them -- a run without them says less than it could   the adapter offers them
+  PASS  !! native r18u: timing changes nothing -- the image a timed pass wrote is an untimed run's, bit for bit
+  PASS    native r18u: and the cap skips only the sizes the last measured pass predicts past 1500 ms
+  PASS  !! native r27w: the first size, 64 x 64, measured; every time finite and positive; every skip says why   6 of 6 sizes measured on nvidia / pascal / D3D12 driver version 32.0.15.8180
+  PASS  !! native r27w: the wall clock sits inside the guard, and where the device has timestamp queries its span inside the wall clock and the passes inside its span   timestamps, timestamps, timestamps, timestamps, timestamps, timestamps
+  PASS    native r27w: and timestamp queries were asked for wherever the adapter offers them -- a run without them says less than it could   the adapter offers them
+  PASS  !! native r27w: timing changes nothing -- the image a timed pass wrote is an untimed run's, bit for bit
+  PASS    native r27w: and the cap skips only the sizes the last measured pass predicts past 1500 ms
+  PASS  !! native: every set (r12, r15, r18t, r18u, r27w) measured at the first size, on one device, taking turns -- r12 r15 r18t r18u r27w r27w r18u r18t r15 r12 r12 r15 r18t r18u r27w -- each set's passes pooled across the rounds   5 size(s) with every set; 30, 30, 30, 30, 30 passes at the first
+  PASS    native: and they are different kernels -- r12 tiled,tiled,tiled,tiled,direct|apply; r15 fast,fast,fast,fast,head_apply|head_apply; r18t tile_inline,tile_inline,tile_inline,tile_inline,head_apply|head_apply; r18u fast_unroll,fast_unroll,fast_unroll,fast_unroll,head_apply|head_apply; r27w wino,wino,wino,wino,head_apply|head_apply   r12: tiled,tiled,tiled,tiled,direct|apply; r15: fast,fast,fast,fast,head_apply|head_apply; r18t: tile_inline,tile_inline,tile_inline,tile_inline,head_apply|head_apply; r18u: fast_unroll,fast_unroll,fast_unroll,fast_unroll,head_apply|head_apply; r27w: wino,wino,wino,wino,head_apply|head_apply
+  PASS  !! native: each set's speedup at every size it and r12 measured is r12's median over its own, on the device's clock where both have one -- section 43's K1, read off the rig   r15: 64 x 64 10.68 x, 128 x 128 11.52 x, 256 x 256 23.76 x, 512 x 512 24.47 x, 1024 x 1024 24.85 x; r18t: 64 x 64 8.53 x, 128 x 128 10.98 x, 256 x 256 25.17 x, 512 x 512 26.05 x, 1024 x 1024 27.02 x; r18u: 64 x 64 8.81 x, 128 x 128 8.51 x, 256 x 256 15.80 x, 512 x 512 15.49 x, 1024 x 1024 15.80 x; r27w: 64 x 64 7.07 x, 128 x 128 4.70 x, 256 x 256 7.56 x, 512 x 512 7.65 x, 1024 x 1024 7.79 x
+  ----  native: adapter nvidia / pascal / D3D12 driver version 32.0.15.8180 (hardware)
+  ----  native r12: 64 x 64: 4.971 ms a pass (10th-90th 4.842-5.462, 30 passes); on the device's clock 4.639 ms; 0.824 Mpx/s; conv 59.5 GFLOP/s; 3 MiB of buffers; layer 0 0.433, layer 1 1.286, layer 2 1.234, layer 3 1.234, layer 4 0.371, kernel 0.078
+  ----  native r12: 128 x 128: 9.238 ms a pass (10th-90th 8.852-10.228, 30 passes); on the device's clock 8.926 ms; 1.774 Mpx/s; conv 133.7 GFLOP/s; 14 MiB of buffers; layer 0 0.558, layer 1 1.512, layer 2 1.516, layer 3 1.514, layer 4 3.015, kernel 0.517
+  ----  native r12: 256 x 256: 59.264 ms a pass (10th-90th 58.760-73.733, 25 passes); on the device's clock 58.771 ms; 1.106 Mpx/s; conv 77.1 GFLOP/s; 56 MiB of buffers; layer 0 1.784, layer 1 4.960, layer 2 4.977, layer 3 4.982, layer 4 39.583, kernel 2.060
+  ----  native r12: 512 x 512: 232.843 ms a pass (10th-90th 231.057-256.209, 9 passes); on the device's clock 232.192 ms; 1.126 Mpx/s; conv 77.9 GFLOP/s; 222 MiB of buffers; layer 0 7.760, layer 1 19.583, layer 2 19.569, layer 3 19.472, layer 4 156.648, kernel 8.684
+  ----  native r12: 1024 x 1024: 983.452 ms a pass (10th-90th 946.127-1003.151, 3 passes); on the device's clock 964.819 ms; 1.066 Mpx/s; conv 75.3 GFLOP/s; 888 MiB of buffers; layer 0 27.419, layer 1 75.570, layer 2 81.999, layer 3 83.410, layer 4 653.614, kernel 39.002
+  ----  native r12: 1920 x 1080 skipped -- predicted 1945 ms a pass, over the 1500 ms cap
+  ----  native r15: 64 x 64: 0.622 ms a pass (10th-90th 0.611-1.156, 30 passes); on the device's clock 0.434 ms; 6.583 Mpx/s; conv (hidden layers) 714.8 GFLOP/s; 2 MiB of buffers; layer 0 0.041, layer 1 0.103, layer 2 0.103, layer 3 0.102, layer 4 and kernel 0.083
+  ----  native r15: 128 x 128: 1.004 ms a pass (10th-90th 0.956-1.130, 30 passes); on the device's clock 0.775 ms; 16.319 Mpx/s; conv (hidden layers) 1753.9 GFLOP/s; 9 MiB of buffers; layer 0 0.061, layer 1 0.169, layer 2 0.170, layer 3 0.170, layer 4 and kernel 0.206
+  ----  native r15: 256 x 256: 2.678 ms a pass (10th-90th 2.649-2.993, 30 passes); on the device's clock 2.474 ms; 24.475 Mpx/s; conv (hidden layers) 2076.3 GFLOP/s; 35 MiB of buffers; layer 0 0.198, layer 1 0.577, layer 2 0.578, layer 3 0.575, layer 4 and kernel 0.544
+  ----  native r15: 512 x 512: 9.800 ms a pass (10th-90th 9.477-10.082, 30 passes); on the device's clock 9.489 ms; 26.750 Mpx/s; conv (hidden layers) 2215.5 GFLOP/s; 141 MiB of buffers; layer 0 0.722, layer 1 2.167, layer 2 2.167, layer 3 2.169, layer 4 and kernel 1.966
+  ----  native r15: 1024 x 1024: 39.180 ms a pass (10th-90th 38.461-39.568, 30 passes); on the device's clock 38.822 ms; 26.763 Mpx/s; conv (hidden layers) 2137.3 GFLOP/s; 564 MiB of buffers; layer 0 2.912, layer 1 9.094, layer 2 8.884, layer 3 9.064, layer 4 and kernel 8.738
+  ----  native r15: 1920 x 1080: 80.278 ms a pass (10th-90th 78.804-120.148, 19 passes); on the device's clock 79.908 ms; 25.830 Mpx/s; conv (hidden layers) 2106.1 GFLOP/s; 1115 MiB of buffers; layer 0 5.913, layer 1 18.057, layer 2 18.067, layer 3 18.076, layer 4 and kernel 19.707
+  ----  native r18t: 64 x 64: 0.726 ms a pass (10th-90th 0.699-0.776, 30 passes); on the device's clock 0.544 ms; 5.645 Mpx/s; conv (hidden layers) 543.0 GFLOP/s; 2 MiB of buffers; layer 0 0.052, layer 1 0.136, layer 2 0.136, layer 3 0.136, layer 4 and kernel 0.084
+  ----  native r18t: 128 x 128: 1.043 ms a pass (10th-90th 0.989-1.936, 30 passes); on the device's clock 0.813 ms; 15.710 Mpx/s; conv (hidden layers) 1644.6 GFLOP/s; 9 MiB of buffers; layer 0 0.069, layer 1 0.180, layer 2 0.180, layer 3 0.179, layer 4 and kernel 0.205
+  ----  native r18t: 256 x 256: 2.556 ms a pass (10th-90th 2.514-2.713, 30 passes); on the device's clock 2.335 ms; 25.641 Mpx/s; conv (hidden layers) 2225.7 GFLOP/s; 35 MiB of buffers; layer 0 0.186, layer 1 0.536, layer 2 0.538, layer 3 0.539, layer 4 and kernel 0.517
+  ----  native r18t: 512 x 512: 9.231 ms a pass (10th-90th 9.014-9.517, 30 passes); on the device's clock 8.914 ms; 28.399 Mpx/s; conv (hidden layers) 2358.3 GFLOP/s; 141 MiB of buffers; layer 0 0.661, layer 1 2.042, layer 2 2.048, layer 3 2.036, layer 4 and kernel 2.026
+  ----  native r18t: 1024 x 1024: 36.093 ms a pass (10th-90th 35.721-37.827, 30 passes); on the device's clock 35.705 ms; 29.052 Mpx/s; conv (hidden layers) 2365.4 GFLOP/s; 564 MiB of buffers; layer 0 2.607, layer 1 8.251, layer 2 7.934, layer 3 8.274, layer 4 and kernel 8.508
+  ----  native r18t: 1920 x 1080: 74.358 ms a pass (10th-90th 73.654-78.274, 21 passes); on the device's clock 73.900 ms; 27.887 Mpx/s; conv (hidden layers) 2336.3 GFLOP/s; 1115 MiB of buffers; layer 0 5.214, layer 1 16.347, layer 2 16.377, layer 3 16.252, layer 4 and kernel 19.724
+  ----  native r18u: 64 x 64: 0.711 ms a pass (10th-90th 0.681-0.804, 30 passes); on the device's clock 0.526 ms; 5.757 Mpx/s; conv (hidden layers) 565.3 GFLOP/s; 2 MiB of buffers; layer 0 0.068, layer 1 0.125, layer 2 0.125, layer 3 0.125, layer 4 and kernel 0.084
+  ----  native r18u: 128 x 128: 1.236 ms a pass (10th-90th 1.220-1.336, 30 passes); on the device's clock 1.049 ms; 13.258 Mpx/s; conv (hidden layers) 1177.3 GFLOP/s; 9 MiB of buffers; layer 0 0.078, layer 1 0.256, layer 2 0.258, layer 3 0.258, layer 4 and kernel 0.201
+  ----  native r18u: 256 x 256: 3.967 ms a pass (10th-90th 3.910-5.105, 30 passes); on the device's clock 3.720 ms; 16.520 Mpx/s; conv (hidden layers) 1259.4 GFLOP/s; 35 MiB of buffers; layer 0 0.314, layer 1 0.956, layer 2 0.955, layer 3 0.951, layer 4 and kernel 0.538
+  ----  native r18u: 512 x 512: 15.303 ms a pass (10th-90th 15.020-15.473, 30 passes); on the device's clock 14.994 ms; 17.130 Mpx/s; conv (hidden layers) 1264.2 GFLOP/s; 141 MiB of buffers; layer 0 1.063, layer 1 3.870, layer 2 3.865, layer 3 3.864, layer 4 and kernel 1.982
+  ----  native r18u: 1024 x 1024: 61.502 ms a pass (10th-90th 60.962-68.347, 25 passes); on the device's clock 61.060 ms; 17.050 Mpx/s; conv (hidden layers) 1225.5 GFLOP/s; 564 MiB of buffers; layer 0 4.304, layer 1 15.970, layer 2 15.988, layer 3 15.978, layer 4 and kernel 8.909
+  ----  native r18u: 1920 x 1080: 123.428 ms a pass (10th-90th 122.605-128.420, 14 passes); on the device's clock 123.117 ms; 16.800 Mpx/s; conv (hidden layers) 1222.2 GFLOP/s; 1115 MiB of buffers; layer 0 8.926, layer 1 31.461, layer 2 31.562, layer 3 31.635, layer 4 and kernel 19.492
+  ----  native r27w: 64 x 64: 0.843 ms a pass (10th-90th 0.812-0.970, 30 passes); on the device's clock 0.656 ms; 4.858 Mpx/s; conv (hidden layers) 438.5 GFLOP/s; 2 MiB of buffers; layer 0 0.062, layer 1 0.169, layer 2 0.170, layer 3 0.169, layer 4 and kernel 0.084
+  ----  native r27w: 128 x 128: 2.133 ms a pass (10th-90th 2.079-4.669, 30 passes); on the device's clock 1.900 ms; 7.680 Mpx/s; conv (hidden layers) 581.8 GFLOP/s; 9 MiB of buffers; layer 0 0.162, layer 1 0.520, layer 2 0.519, layer 3 0.518, layer 4 and kernel 0.182
+  ----  native r27w: 256 x 256: 7.988 ms a pass (10th-90th 7.715-8.394, 30 passes); on the device's clock 7.778 ms; 8.204 Mpx/s; conv (hidden layers) 574.9 GFLOP/s; 35 MiB of buffers; layer 0 0.681, layer 1 2.093, layer 2 2.098, layer 3 2.088, layer 4 and kernel 0.535
+  ----  native r27w: 512 x 512: 30.704 ms a pass (10th-90th 30.219-31.266, 30 passes); on the device's clock 30.354 ms; 8.538 Mpx/s; conv (hidden layers) 572.3 GFLOP/s; 141 MiB of buffers; layer 0 2.661, layer 1 8.500, layer 2 8.313, layer 3 8.492, layer 4 and kernel 1.988
+  ----  native r27w: 1024 x 1024: 124.367 ms a pass (10th-90th 123.945-137.938, 14 passes); on the device's clock 123.843 ms; 8.431 Mpx/s; conv (hidden layers) 555.6 GFLOP/s; 564 MiB of buffers; layer 0 11.190, layer 1 34.735, layer 2 34.658, layer 3 34.647, layer 4 and kernel 8.517
+  ----  native r27w: 1920 x 1080: 249.077 ms a pass (10th-90th 247.943-281.132, 8 passes); on the device's clock 248.165 ms; 8.325 Mpx/s; conv (hidden layers) 554.0 GFLOP/s; 1115 MiB of buffers; layer 0 22.038, layer 1 68.878, layer 2 68.850, layer 3 68.746, layer 4 and kernel 19.370
+  ----  native: r15 against r12 at 64 x 64: 10.68 x as fast, on the device's clock
+  ----  native: r15 against r12 at 128 x 128: 11.52 x as fast, on the device's clock
+  ----  native: r15 against r12 at 256 x 256: 23.76 x as fast, on the device's clock
+  ----  native: r15 against r12 at 512 x 512: 24.47 x as fast, on the device's clock
+  ----  native: r15 against r12 at 1024 x 1024: 24.85 x as fast, on the device's clock
+  ----  native: r18t against r12 at 64 x 64: 8.53 x as fast, on the device's clock
+  ----  native: r18t against r12 at 128 x 128: 10.98 x as fast, on the device's clock
+  ----  native: r18t against r12 at 256 x 256: 25.17 x as fast, on the device's clock
+  ----  native: r18t against r12 at 512 x 512: 26.05 x as fast, on the device's clock
+  ----  native: r18t against r12 at 1024 x 1024: 27.02 x as fast, on the device's clock
+  ----  native: r18u against r12 at 64 x 64: 8.81 x as fast, on the device's clock
+  ----  native: r18u against r12 at 128 x 128: 8.51 x as fast, on the device's clock
+  ----  native: r18u against r12 at 256 x 256: 15.80 x as fast, on the device's clock
+  ----  native: r18u against r12 at 512 x 512: 15.49 x as fast, on the device's clock
+  ----  native: r18u against r12 at 1024 x 1024: 15.80 x as fast, on the device's clock
+  ----  native: r27w against r12 at 64 x 64: 7.07 x as fast, on the device's clock
+  ----  native: r27w against r12 at 128 x 128: 4.70 x as fast, on the device's clock
+  ----  native: r27w against r12 at 256 x 256: 7.56 x as fast, on the device's clock
+  ----  native: r27w against r12 at 512 x 512: 7.65 x as fast, on the device's clock
+  ----  native: r27w against r12 at 1024 x 1024: 7.79 x as fast, on the device's clock
+  ----  native: r18t against r15 at 64 x 64: 0.798 x as fast, on the device's clock -- section 66
+  ----  native: r18t against r15 at 128 x 128: 0.953 x as fast, on the device's clock -- section 66
+  ----  native: r18t against r15 at 256 x 256: 1.060 x as fast, on the device's clock -- section 66
+  ----  native: r18t against r15 at 512 x 512: 1.065 x as fast, on the device's clock -- section 66
+  ----  native: r18t against r15 at 1024 x 1024: 1.087 x as fast, on the device's clock -- section 66
+  ----  native: r18t against r15 at 1920 x 1080: 1.081 x as fast, on the device's clock -- section 66
+  ----  native: r18u against r15 at 64 x 64: 0.825 x as fast, on the device's clock -- section 66
+  ----  native: r18u against r15 at 128 x 128: 0.739 x as fast, on the device's clock -- section 66
+  ----  native: r18u against r15 at 256 x 256: 0.665 x as fast, on the device's clock -- section 66
+  ----  native: r18u against r15 at 512 x 512: 0.633 x as fast, on the device's clock -- section 66
+  ----  native: r18u against r15 at 1024 x 1024: 0.636 x as fast, on the device's clock -- section 66
+  ----  native: r18u against r15 at 1920 x 1080: 0.649 x as fast, on the device's clock -- section 66
+  ----  native: r27w against r15 at 64 x 64: 0.661 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r15 at 128 x 128: 0.408 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r15 at 256 x 256: 0.318 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r15 at 512 x 512: 0.313 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r15 at 1024 x 1024: 0.313 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r15 at 1920 x 1080: 0.322 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r18t at 64 x 64: 0.828 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r18t at 128 x 128: 0.428 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r18t at 256 x 256: 0.300 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r18t at 512 x 512: 0.294 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r18t at 1024 x 1024: 0.288 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r18t at 1920 x 1080: 0.298 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r18u at 64 x 64: 0.802 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r18u at 128 x 128: 0.552 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r18u at 256 x 256: 0.478 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r18u at 512 x 512: 0.494 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r18u at 1024 x 1024: 0.493 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r18u at 1920 x 1080: 0.496 x as fast, on the device's clock -- section 83
+  PASS  !! section 61: the native device's clock is not Dawn's rounded one -- not every time is a whole number of 65,536 ns, as every native time in round 17's probes was   70 of 4525 device times on the 65,536 ns grid
+  PASS    round 19: the adapter noted for the rig's report is the ladder's own -- its name and whether it is software -- and its key for section 66's table is this platform's, its vendor's and its architecture's   nvidia / pascal / D3D12 driver version 32.0.15.8180; key win32/nvidia/pascal
+
+2b. NATIVE, r15 UNDER FXC: the same package with use_dxc disabled, in a child process (section 66)
+  SKIP  native FXC ladder: retired by section 87 (v4871) -- the denoiser's FXC paths fed condition 4 alone, which section 75 dropped; SWEK_DENOISE_FXC=all runs it
+
+3. THE PAGE: denoise.html's "Time the network", in Chromium (on the rig, the browser's GPU)
+  PASS  !! the page timed the network on its own device, showed the table, and named the adapter -- no page error   google / swiftshader -- A SOFTWARE ADAPTER: these are a CPU's times, not a GPU's; timing left the image unchanged: r12 true, r15 true, r18t true, r18u true, r27
+  PASS  !! page r12: the first size, 64 x 64, measured; every time finite and positive; every skip says why   1 of 6 sizes measured on google / swiftshader
+  PASS  !! page r12: the wall clock sits inside the guard, and where the device has timestamp queries its span inside the wall clock and the passes inside its span   timestamps
+  PASS    page r12: and timestamp queries were asked for wherever the adapter offers them -- a run without them says less than it could   the adapter offers them
+  PASS  !! page r12: timing changes nothing -- the image a timed pass wrote is an untimed run's, bit for bit
+  PASS    page r12: and the cap skips only the sizes the last measured pass predicts past 1500 ms
+  PASS  !! page r15: the first size, 64 x 64, measured; every time finite and positive; every skip says why   2 of 6 sizes measured on google / swiftshader
+  PASS  !! page r15: the wall clock sits inside the guard, and where the device has timestamp queries its span inside the wall clock and the passes inside its span   timestamps, timestamps
+  PASS    page r15: and timestamp queries were asked for wherever the adapter offers them -- a run without them says less than it could   the adapter offers them
+  PASS  !! page r15: timing changes nothing -- the image a timed pass wrote is an untimed run's, bit for bit
+  PASS    page r15: and the cap skips only the sizes the last measured pass predicts past 1500 ms
+  PASS  !! page r18t: the first size, 64 x 64, measured; every time finite and positive; every skip says why   2 of 6 sizes measured on google / swiftshader
+  PASS  !! page r18t: the wall clock sits inside the guard, and where the device has timestamp queries its span inside the wall clock and the passes inside its span   timestamps, timestamps
+  PASS    page r18t: and timestamp queries were asked for wherever the adapter offers them -- a run without them says less than it could   the adapter offers them
+  PASS  !! page r18t: timing changes nothing -- the image a timed pass wrote is an untimed run's, bit for bit
+  PASS    page r18t: and the cap skips only the sizes the last measured pass predicts past 1500 ms
+  PASS  !! page r18u: the first size, 64 x 64, measured; every time finite and positive; every skip says why   1 of 6 sizes measured on google / swiftshader
+  PASS  !! page r18u: the wall clock sits inside the guard, and where the device has timestamp queries its span inside the wall clock and the passes inside its span   timestamps
+  PASS    page r18u: and timestamp queries were asked for wherever the adapter offers them -- a run without them says less than it could   the adapter offers them
+  PASS  !! page r18u: timing changes nothing -- the image a timed pass wrote is an untimed run's, bit for bit
+  PASS    page r18u: and the cap skips only the sizes the last measured pass predicts past 1500 ms
+  PASS  !! page r27w: the first size, 64 x 64, measured; every time finite and positive; every skip says why   2 of 6 sizes measured on google / swiftshader
+  PASS  !! page r27w: the wall clock sits inside the guard, and where the device has timestamp queries its span inside the wall clock and the passes inside its span   timestamps, timestamps
+  PASS    page r27w: and timestamp queries were asked for wherever the adapter offers them -- a run without them says less than it could   the adapter offers them
+  PASS  !! page r27w: timing changes nothing -- the image a timed pass wrote is an untimed run's, bit for bit
+  PASS    page r27w: and the cap skips only the sizes the last measured pass predicts past 1500 ms
+  PASS  !! page: every set (r12, r15, r18t, r18u, r27w) measured at the first size, on one device, taking turns -- r12 r15 r18t r18u r27w r27w r18u r18t r15 r12 r12 r15 r18t r18u r27w -- each set's passes pooled across the rounds   1 size(s) with every set; 6, 15, 18, 6, 15 passes at the first
+  PASS    page: and they are different kernels -- r12 tiled,tiled,tiled,tiled,direct|apply; r15 fast,fast,fast,fast,head_apply|head_apply; r18t tile_inline,tile_inline,tile_inline,tile_inline,head_apply|head_apply; r18u fast_unroll,fast_unroll,fast_unroll,fast_unroll,head_apply|head_apply; r27w wino,wino,wino,wino,head_apply|head_apply   r12: tiled,tiled,tiled,tiled,direct|apply; r15: fast,fast,fast,fast,head_apply|head_apply; r18t: tile_inline,tile_inline,tile_inline,tile_inline,head_apply|head_apply; r18u: fast_unroll,fast_unroll,fast_unroll,fast_unroll,head_apply|head_apply; r27w: wino,wino,wino,wino,head_apply|head_apply
+  PASS  !! page: each set's speedup at every size it and r12 measured is r12's median over its own, on the device's clock where both have one -- section 43's K1, read off the rig   r15: 64 x 64 2.77 x; r18t: 64 x 64 3.89 x; r18u: 64 x 64 1.14 x; r27w: 64 x 64 2.91 x
+  ----  page: adapter google / swiftshader -- SOFTWARE: these are a CPU's times, not a GPU's
+  ----  page r12: 64 x 64: 432.500 ms a pass (10th-90th 423.000-460.300, 6 passes); on the device's clock 431.086 ms; 0.009 Mpx/s; conv 0.6 GFLOP/s; 3 MiB of buffers; layer 0 41.557, layer 1 108.717, layer 2 103.901, layer 3 109.127, layer 4 57.284, kernel 5.508
+  ----  page r12: 128 x 128 skipped -- predicted 1730 ms a pass, over the 1500 ms cap
+  ----  page r12: 256 x 256 skipped -- predicted 6922 ms a pass, over the 1500 ms cap
+  ----  page r12: 512 x 512 skipped -- predicted 27686 ms a pass, over the 1500 ms cap
+  ----  page r12: 1024 x 1024 skipped -- predicted 110746 ms a pass, over the 1500 ms cap
+  ----  page r12: 1920 x 1080 skipped -- predicted 219004 ms a pass, over the 1500 ms cap
+  ----  page r15: 64 x 64: 156.300 ms a pass (10th-90th 153.900-163.900, 15 passes); on the device's clock 155.633 ms; 0.026 Mpx/s; conv (hidden layers) 1.9 GFLOP/s; 2 MiB of buffers; layer 0 15.938, layer 1 39.528, layer 2 40.137, layer 3 39.500, layer 4 and kernel 19.985
+  ----  page r15: 128 x 128: 649.700 ms a pass (10th-90th 639.800-669.400, 5 passes); on the device's clock 648.060 ms; 0.025 Mpx/s; conv (hidden layers) 1.8 GFLOP/s; 9 MiB of buffers; layer 0 70.971, layer 1 166.671, layer 2 165.887, layer 3 163.565, layer 4 and kernel 77.168
+  ----  page r15: 256 x 256 skipped -- predicted 2599 ms a pass, over the 1500 ms cap
+  ----  page r15: 512 x 512 skipped -- predicted 10397 ms a pass, over the 1500 ms cap
+  ----  page r15: 1024 x 1024 skipped -- predicted 41587 ms a pass, over the 1500 ms cap
+  ----  page r15: 1920 x 1080 skipped -- predicted 82240 ms a pass, over the 1500 ms cap
+  ----  page r18t: 64 x 64: 111.600 ms a pass (10th-90th 107.000-122.400, 18 passes); on the device's clock 110.856 ms; 0.037 Mpx/s; conv (hidden layers) 2.5 GFLOP/s; 2 MiB of buffers; layer 0 11.809, layer 1 29.101, layer 2 28.749, layer 3 28.959, layer 4 and kernel 18.464
+  ----  page r18t: 128 x 128: 425.500 ms a pass (10th-90th 409.600-443.600, 6 passes); on the device's clock 423.880 ms; 0.039 Mpx/s; conv (hidden layers) 2.8 GFLOP/s; 9 MiB of buffers; layer 0 40.225, layer 1 102.099, layer 2 102.659, layer 3 107.800, layer 4 and kernel 71.804
+  ----  page r18t: 256 x 256 skipped -- predicted 1702 ms a pass, over the 1500 ms cap
+  ----  page r18t: 512 x 512 skipped -- predicted 6810 ms a pass, over the 1500 ms cap
+  ----  page r18t: 1024 x 1024 skipped -- predicted 27238 ms a pass, over the 1500 ms cap
+  ----  page r18t: 1920 x 1080 skipped -- predicted 53865 ms a pass, over the 1500 ms cap
+  ----  page r18u: 64 x 64: 381.000 ms a pass (10th-90th 376.100-403.600, 6 passes); on the device's clock 379.276 ms; 0.011 Mpx/s; conv (hidden layers) 0.7 GFLOP/s; 2 MiB of buffers; layer 0 47.710, layer 1 102.392, layer 2 106.963, layer 3 104.220, layer 4 and kernel 19.977
+  ----  page r18u: 128 x 128 skipped -- predicted 1525 ms a pass, over the 1500 ms cap
+  ----  page r18u: 256 x 256 skipped -- predicted 6099 ms a pass, over the 1500 ms cap
+  ----  page r18u: 512 x 512 skipped -- predicted 24397 ms a pass, over the 1500 ms cap
+  ----  page r18u: 1024 x 1024 skipped -- predicted 97587 ms a pass, over the 1500 ms cap
+  ----  page r18u: 1920 x 1080 skipped -- predicted 192983 ms a pass, over the 1500 ms cap
+  ----  page r27w: 64 x 64: 149.000 ms a pass (10th-90th 138.500-154.900, 15 passes); on the device's clock 148.251 ms; 0.027 Mpx/s; conv (hidden layers) 1.9 GFLOP/s; 2 MiB of buffers; layer 0 18.220, layer 1 36.586, layer 2 37.175, layer 3 36.468, layer 4 and kernel 19.987
+  ----  page r27w: 128 x 128: 594.800 ms a pass (10th-90th 573.300-670.200, 5 passes); on the device's clock 594.384 ms; 0.028 Mpx/s; conv (hidden layers) 1.9 GFLOP/s; 9 MiB of buffers; layer 0 72.025, layer 1 151.210, layer 2 151.316, layer 3 157.482, layer 4 and kernel 80.439
+  ----  page r27w: 256 x 256 skipped -- predicted 2380 ms a pass, over the 1500 ms cap
+  ----  page r27w: 512 x 512 skipped -- predicted 9522 ms a pass, over the 1500 ms cap
+  ----  page r27w: 1024 x 1024 skipped -- predicted 38086 ms a pass, over the 1500 ms cap
+  ----  page r27w: 1920 x 1080 skipped -- predicted 75317 ms a pass, over the 1500 ms cap
+  ----  page: r15 against r12 at 64 x 64: 2.77 x as fast, on the device's clock
+  ----  page: r18t against r12 at 64 x 64: 3.89 x as fast, on the device's clock
+  ----  page: r18u against r12 at 64 x 64: 1.14 x as fast, on the device's clock
+  ----  page: r27w against r12 at 64 x 64: 2.91 x as fast, on the device's clock
+  ----  page: r18t against r15 at 64 x 64: 1.404 x as fast, on the device's clock -- section 61
+  ----  page: r18t against r15 at 128 x 128: 1.529 x as fast, on the device's clock -- section 61
+  ----  page: r18u against r15 at 64 x 64: 0.410 x as fast, on the device's clock -- section 61
+  ----  page: r27w against r15 at 64 x 64: 1.050 x as fast, on the device's clock -- section 83
+  ----  page: r27w against r15 at 128 x 128: 1.090 x as fast, on the device's clock -- section 83
+  ----  page: r27w against r18t at 64 x 64: 0.748 x as fast, on the device's clock -- section 83
+  ----  page: r27w against r18t at 128 x 128: 0.713 x as fast, on the device's clock -- section 83
+  ----  page: r27w against r18u at 64 x 64: 2.558 x as fast, on the device's clock -- section 83
+  ----  page: this adapter's key for section 61's table: Windows/google/swiftshader
+  PASS    round 18: the page's report carries its adapter's key -- platform, vendor and architecture -- or says it has none   Windows/google/swiftshader
+  PASS    the page and the harness agree on what the device is   harness says software
+
+ALL GREEN (173389 ms)
+not closed here: any number. What a pass costs is printed above and asserted nowhere -- on SwiftShader it is a CPU's, and on a GPU it is what tools/ship/realGpuRun.mjs carries back.
+
+C:\SweK_r33\WebGLEngine>echo %ERRORLEVEL%
+0
+
+C:\SweK_r33\WebGLEngine>set SWEK_TIMING_TRACE=%CD%\trace35-alone-2.txt
+
+C:\SweK_r33\WebGLEngine>node render/denoiseTiming-selfcheck.mjs
+1. THE LADDER'S ARITHMETIC
+  PASS    summarize is nearest rank: the median, the 10th and the 90th of ten times
+  PASS    the ladder runs from the trained 64 x 64 to a 1080p frame, each size more pixels than the last
+  PASS    a pass's largest buffer is the head's 81 logits a pixel: 672 MB at 1080p, what a device's storage limit is checked against
+  PASS    round 15: a pass's buffers are the input, every layer's output and the image -- and r15 allocates no logits, 81 channels a pixel fewer than r14   at 1080p: r14 1756 MiB, r15 1115 MiB
+  PASS    round 19: both ladders time r12, r15, r18t, r18u and (round 27) r27w -- r12 first, the reference every speedup is read against -- and natively on a D3D12 adapter by the run's compiler: under FXC, none named or one unread, r12 and r15 alone; under DXC all five; on Vulkan all five   D3D12: FXC r12,r15, none r12,r15, DXC r12,r15,r18t,r18u,r27w; Vulkan: r12,r15,r18t,r18u,r27w -- section 60: node-webgpu 0.6.0's FXC stopped on r18t's kernel and crashed on r18u's; section 65: 0.6.2's DXC built both
+  PASS  !! round 19: a native run's plan is read off its package WITH ITS DEVICE'S FLAGS -- 0.6.2 shipping DXC on D3D12: DXC, all five sets, and the FXC ladder; 0.6.0, 0.6.1 with the DLL copied beside, or a package unread: FXC, r12 and r15, no FXC ladder; the FXC child's own flags on 0.6.2: FXC; Linux: no D3D compiler, all five, no FXC ladder   DXC: r12,r15,r18t,r18u,r27w; FXC ladder runs  /  FXC: r12,r15; FXC ladder skipped  /  FXC: r12,r15; FXC ladder skipped  /  FXC: r12,r15; FXC ladder skipped  /  FXC: r12,r15; FXC ladder skipped  /  none: r12,r15,r18t,r18u,r27w; FXC ladder skipped
+  PASS  !! section 87: the FXC ladder is retired -- 0.6.2 on D3D12 skips it by default with the retirement's reason and runs it under SWEK_DENOISE_FXC=all; 0.6.0 and linux keep their own reasons   0.6.2: skipped, all: runs; 0.6.0: the package's compiler as shipped is FXC
+  PASS  !! round 19: the FXC child's device flags are ONE disable entry carrying use_dxc AND the fine clock, and no dump_shaders -- two entries would let Dawn keep the last (section 49), compiling with DXC or rounding the clock; a dump would fill a timed child's stdout -- and the child times r12 and r15   ["disable-dawn-features=use_dxc,timestamp_quantization"]
+  PASS  !! round 19: the file's ONE create call makes the FXC child's device with FXC_FLAGS and the gate's with the fine clock alone; the child -- spawned by the gate with --fxc-ladder and its result file -- runs its ladder in that mode and writes the file   1 create call(s): create(flags = fxc ? FXC_FLAGS : [H.FINE_CLOCK_FLAG]);; the child block 11 lines
+  PASS    section 87: the gate decides the FXC ladder by fxcLadderSkip(plan), and spawns it only where that names no reason   2 mention(s) of the ladder's function, called (its definition and the one call)
+  PASS  !! round 19: each "rXX against r15" line is r15's median over the set's -- a native ladder's tagged section 66, the page's section 61   native: r18t against r15 at 256 x 256: 1.500 x as fast, on the device's clock -- section 66  /  page: r18u against r15 at 256 x 256: 1.500 x as fast, on the device's clock -- section 61
+  PASS  !! round 27: each "r27w against rXX" line is that set's median over r27w's, tagged section 83 on either ladder -- the ratio section 83's rule reads   native: r27w against r18t at 1920 x 1080: 1.250 x as fast, on the device's clock -- section 83 / page: r27w against r18u at 1024 x 1024: 1.250 x as fast, on the wall clock -- section 83
+  PASS  !! round 19: r15 under FXC against a set under DXC is read at the largest size BOTH ladders measured, r15's FXC median over the set's DXC one, the line marked unpaired -- and no line where no size is common   native: r18t against r15 under FXC at 256 x 256: 2.000 x as fast, on the device's clock -- unpaired: two processes, one after the other -- section 66
+  PASS    a time is on Dawn's rounded grid when it is a whole number of 65,536 ns -- section 60's finding, read off round 17's native times
+  PASS    the input is the same every time, in the network's ranges, with both sides of a mask
+  PASS    an adapter is software by the spec's own flag, else by its name: SwiftShader is, a named GPU is not -- and it says whether it offers timestamps
+
+2. NATIVE: node-webgpu's default adapter (on the rig, the GPU)
+  ----  native: the trace is C:\SweK_r33\WebGLEngine\trace35-alone-2.txt
+  ----  native adapter: nvidia / pascal / D3D12 driver version 32.0.15.8180 (hardware); compiler, from the package: DXC
+  ----  native: this adapter's key for section 66's table: win32/nvidia/pascal
+  ----  native: node-webgpu 0.6.2; compiler, read off the package with this device's flags: DXC; sets timed: r12, r15, r18t, r18u, r27w
+  PASS    round 35: the trace holds the native ladder step by step -- its start, a device asked for at every size it measured, every set built there, and its return -- before each step ran   148 lines in C:\SweK_r33\WebGLEngine\trace35-alone-2.txt; sizes measured 64x64, 128x128, 256x256, 512x512, 1024x1024, 1920x1080
+  PASS  !! native r12: the first size, 64 x 64, measured; every time finite and positive; every skip says why   5 of 6 sizes measured on nvidia / pascal / D3D12 driver version 32.0.15.8180
+  PASS  !! native r12: the wall clock sits inside the guard, and where the device has timestamp queries its span inside the wall clock and the passes inside its span   timestamps, timestamps, timestamps, timestamps, timestamps
+  PASS    native r12: and timestamp queries were asked for wherever the adapter offers them -- a run without them says less than it could   the adapter offers them
+  PASS  !! native r12: timing changes nothing -- the image a timed pass wrote is an untimed run's, bit for bit
+  PASS    native r12: and the cap skips only the sizes the last measured pass predicts past 1500 ms
+  PASS  !! native r15: the first size, 64 x 64, measured; every time finite and positive; every skip says why   6 of 6 sizes measured on nvidia / pascal / D3D12 driver version 32.0.15.8180
+  PASS  !! native r15: the wall clock sits inside the guard, and where the device has timestamp queries its span inside the wall clock and the passes inside its span   timestamps, timestamps, timestamps, timestamps, timestamps, timestamps
+  PASS    native r15: and timestamp queries were asked for wherever the adapter offers them -- a run without them says less than it could   the adapter offers them
+  PASS  !! native r15: timing changes nothing -- the image a timed pass wrote is an untimed run's, bit for bit
+  PASS    native r15: and the cap skips only the sizes the last measured pass predicts past 1500 ms
+  PASS  !! native r18t: the first size, 64 x 64, measured; every time finite and positive; every skip says why   6 of 6 sizes measured on nvidia / pascal / D3D12 driver version 32.0.15.8180
+  PASS  !! native r18t: the wall clock sits inside the guard, and where the device has timestamp queries its span inside the wall clock and the passes inside its span   timestamps, timestamps, timestamps, timestamps, timestamps, timestamps
+  PASS    native r18t: and timestamp queries were asked for wherever the adapter offers them -- a run without them says less than it could   the adapter offers them
+  PASS  !! native r18t: timing changes nothing -- the image a timed pass wrote is an untimed run's, bit for bit
+  PASS    native r18t: and the cap skips only the sizes the last measured pass predicts past 1500 ms
+  PASS  !! native r18u: the first size, 64 x 64, measured; every time finite and positive; every skip says why   6 of 6 sizes measured on nvidia / pascal / D3D12 driver version 32.0.15.8180
+  PASS  !! native r18u: the wall clock sits inside the guard, and where the device has timestamp queries its span inside the wall clock and the passes inside its span   timestamps, timestamps, timestamps, timestamps, timestamps, timestamps
+  PASS    native r18u: and timestamp queries were asked for wherever the adapter offers them -- a run without them says less than it could   the adapter offers them
+  PASS  !! native r18u: timing changes nothing -- the image a timed pass wrote is an untimed run's, bit for bit
+  PASS    native r18u: and the cap skips only the sizes the last measured pass predicts past 1500 ms
+  PASS  !! native r27w: the first size, 64 x 64, measured; every time finite and positive; every skip says why   6 of 6 sizes measured on nvidia / pascal / D3D12 driver version 32.0.15.8180
+  PASS  !! native r27w: the wall clock sits inside the guard, and where the device has timestamp queries its span inside the wall clock and the passes inside its span   timestamps, timestamps, timestamps, timestamps, timestamps, timestamps
+  PASS    native r27w: and timestamp queries were asked for wherever the adapter offers them -- a run without them says less than it could   the adapter offers them
+  PASS  !! native r27w: timing changes nothing -- the image a timed pass wrote is an untimed run's, bit for bit
+  PASS    native r27w: and the cap skips only the sizes the last measured pass predicts past 1500 ms
+  PASS  !! native: every set (r12, r15, r18t, r18u, r27w) measured at the first size, on one device, taking turns -- r12 r15 r18t r18u r27w r27w r18u r18t r15 r12 r12 r15 r18t r18u r27w -- each set's passes pooled across the rounds   5 size(s) with every set; 30, 30, 30, 30, 30 passes at the first
+  PASS    native: and they are different kernels -- r12 tiled,tiled,tiled,tiled,direct|apply; r15 fast,fast,fast,fast,head_apply|head_apply; r18t tile_inline,tile_inline,tile_inline,tile_inline,head_apply|head_apply; r18u fast_unroll,fast_unroll,fast_unroll,fast_unroll,head_apply|head_apply; r27w wino,wino,wino,wino,head_apply|head_apply   r12: tiled,tiled,tiled,tiled,direct|apply; r15: fast,fast,fast,fast,head_apply|head_apply; r18t: tile_inline,tile_inline,tile_inline,tile_inline,head_apply|head_apply; r18u: fast_unroll,fast_unroll,fast_unroll,fast_unroll,head_apply|head_apply; r27w: wino,wino,wino,wino,head_apply|head_apply
+  PASS  !! native: each set's speedup at every size it and r12 measured is r12's median over its own, on the device's clock where both have one -- section 43's K1, read off the rig   r15: 64 x 64 11.11 x, 128 x 128 11.38 x, 256 x 256 23.61 x, 512 x 512 23.95 x, 1024 x 1024 24.42 x; r18t: 64 x 64 8.81 x, 128 x 128 10.93 x, 256 x 256 24.61 x, 512 x 512 25.85 x, 1024 x 1024 26.50 x; r18u: 64 x 64 9.15 x, 128 x 128 8.49 x, 256 x 256 15.67 x, 512 x 512 15.48 x, 1024 x 1024 15.52 x; r27w: 64 x 64 7.13 x, 128 x 128 4.67 x, 256 x 256 7.41 x, 512 x 512 7.72 x, 1024 x 1024 7.68 x
+  ----  native: adapter nvidia / pascal / D3D12 driver version 32.0.15.8180 (hardware)
+  ----  native r12: 64 x 64: 5.639 ms a pass (10th-90th 5.117-14.226, 30 passes); on the device's clock 5.369 ms; 0.726 Mpx/s; conv 51.4 GFLOP/s; 3 MiB of buffers; layer 0 0.507, layer 1 1.446, layer 2 1.446, layer 3 1.446, layer 4 0.433, kernel 0.091
+  ----  native r12: 128 x 128: 9.186 ms a pass (10th-90th 8.947-9.431, 30 passes); on the device's clock 8.919 ms; 1.784 Mpx/s; conv 132.9 GFLOP/s; 14 MiB of buffers; layer 0 0.561, layer 1 1.528, layer 2 1.527, layer 3 1.527, layer 4 3.026, kernel 0.520
+  ----  native r12: 256 x 256: 59.069 ms a pass (10th-90th 58.583-70.212, 26 passes); on the device's clock 58.593 ms; 1.109 Mpx/s; conv 77.3 GFLOP/s; 56 MiB of buffers; layer 0 1.806, layer 1 5.010, layer 2 4.942, layer 3 4.991, layer 4 39.384, kernel 2.331
+  ----  native r12: 512 x 512: 233.854 ms a pass (10th-90th 233.264-294.246, 8 passes); on the device's clock 233.511 ms; 1.121 Mpx/s; conv 77.8 GFLOP/s; 222 MiB of buffers; layer 0 7.128, layer 1 20.101, layer 2 19.581, layer 3 19.737, layer 4 156.613, kernel 9.923
+  ----  native r12: 1024 x 1024: 949.410 ms a pass (10th-90th 949.335-962.158, 3 passes); on the device's clock 949.006 ms; 1.104 Mpx/s; conv 76.1 GFLOP/s; 888 MiB of buffers; layer 0 27.203, layer 1 77.101, layer 2 76.241, layer 3 77.571, layer 4 654.131, kernel 36.907
+  ----  native r12: 1920 x 1080 skipped -- predicted 1878 ms a pass, over the 1500 ms cap
+  ----  native r15: 64 x 64: 0.708 ms a pass (10th-90th 0.628-2.470, 30 passes); on the device's clock 0.483 ms; 5.786 Mpx/s; conv (hidden layers) 637.7 GFLOP/s; 2 MiB of buffers; layer 0 0.045, layer 1 0.116, layer 2 0.116, layer 3 0.116, layer 4 and kernel 0.090
+  ----  native r15: 128 x 128: 1.004 ms a pass (10th-90th 0.978-1.166, 30 passes); on the device's clock 0.784 ms; 16.311 Mpx/s; conv (hidden layers) 1729.0 GFLOP/s; 9 MiB of buffers; layer 0 0.062, layer 1 0.172, layer 2 0.172, layer 3 0.172, layer 4 and kernel 0.206
+  ----  native r15: 256 x 256: 2.696 ms a pass (10th-90th 2.664-3.205, 30 passes); on the device's clock 2.482 ms; 24.310 Mpx/s; conv (hidden layers) 2061.1 GFLOP/s; 35 MiB of buffers; layer 0 0.201, layer 1 0.582, layer 2 0.578, layer 3 0.582, layer 4 and kernel 0.535
+  ----  native r15: 512 x 512: 10.023 ms a pass (10th-90th 9.553-10.188, 30 passes); on the device's clock 9.748 ms; 26.153 Mpx/s; conv (hidden layers) 2186.4 GFLOP/s; 141 MiB of buffers; layer 0 0.732, layer 1 2.198, layer 2 2.195, layer 3 2.195, layer 4 and kernel 1.974
+  ----  native r15: 1024 x 1024: 39.236 ms a pass (10th-90th 38.595-39.828, 30 passes); on the device's clock 38.863 ms; 26.725 Mpx/s; conv (hidden layers) 2118.7 GFLOP/s; 564 MiB of buffers; layer 0 2.946, layer 1 9.020, layer 2 9.141, layer 3 9.110, layer 4 and kernel 8.595
+  ----  native r15: 1920 x 1080: 80.265 ms a pass (10th-90th 79.256-107.312, 19 passes); on the device's clock 79.834 ms; 25.834 Mpx/s; conv (hidden layers) 2093.3 GFLOP/s; 1115 MiB of buffers; layer 0 5.917, layer 1 18.254, layer 2 18.200, layer 3 18.110, layer 4 and kernel 19.354
+  ----  native r18t: 64 x 64: 0.816 ms a pass (10th-90th 0.741-1.066, 30 passes); on the device's clock 0.609 ms; 5.020 Mpx/s; conv (hidden layers) 481.8 GFLOP/s; 2 MiB of buffers; layer 0 0.058, layer 1 0.154, layer 2 0.154, layer 3 0.154, layer 4 and kernel 0.090
+  ----  native r18t: 128 x 128: 1.016 ms a pass (10th-90th 1.002-1.075, 30 passes); on the device's clock 0.816 ms; 16.129 Mpx/s; conv (hidden layers) 1636.8 GFLOP/s; 9 MiB of buffers; layer 0 0.069, layer 1 0.181, layer 2 0.180, layer 3 0.180, layer 4 and kernel 0.205
+  ----  native r18t: 256 x 256: 2.581 ms a pass (10th-90th 2.510-3.040, 30 passes); on the device's clock 2.381 ms; 25.391 Mpx/s; conv (hidden layers) 2184.5 GFLOP/s; 35 MiB of buffers; layer 0 0.189, layer 1 0.547, layer 2 0.549, layer 3 0.547, layer 4 and kernel 0.521
+  ----  native r18t: 512 x 512: 9.300 ms a pass (10th-90th 9.047-9.615, 30 passes); on the device's clock 9.034 ms; 28.186 Mpx/s; conv (hidden layers) 2337.1 GFLOP/s; 141 MiB of buffers; layer 0 0.671, layer 1 2.058, layer 2 2.057, layer 3 2.062, layer 4 and kernel 1.966
+  ----  native r18t: 1024 x 1024: 36.145 ms a pass (10th-90th 35.698-36.871, 30 passes); on the device's clock 35.808 ms; 29.010 Mpx/s; conv (hidden layers) 2381.7 GFLOP/s; 564 MiB of buffers; layer 0 2.628, layer 1 8.006, layer 2 8.229, layer 3 8.019, layer 4 and kernel 8.479
+  ----  native r18t: 1920 x 1080: 74.015 ms a pass (10th-90th 73.352-75.363, 21 passes); on the device's clock 73.500 ms; 28.016 Mpx/s; conv (hidden layers) 2321.8 GFLOP/s; 1115 MiB of buffers; layer 0 5.233, layer 1 16.507, layer 2 16.358, layer 3 16.432, layer 4 and kernel 19.116
+  ----  native r18u: 64 x 64: 0.789 ms a pass (10th-90th 0.721-1.092, 30 passes); on the device's clock 0.587 ms; 5.194 Mpx/s; conv (hidden layers) 503.6 GFLOP/s; 2 MiB of buffers; layer 0 0.074, layer 1 0.141, layer 2 0.140, layer 3 0.141, layer 4 and kernel 0.090
+  ----  native r18u: 128 x 128: 1.248 ms a pass (10th-90th 1.236-1.328, 30 passes); on the device's clock 1.051 ms; 13.130 Mpx/s; conv (hidden layers) 1175.6 GFLOP/s; 9 MiB of buffers; layer 0 0.077, layer 1 0.257, layer 2 0.258, layer 3 0.259, layer 4 and kernel 0.200
+  ----  native r18u: 256 x 256: 3.970 ms a pass (10th-90th 3.925-4.332, 30 passes); on the device's clock 3.740 ms; 16.506 Mpx/s; conv (hidden layers) 1251.6 GFLOP/s; 35 MiB of buffers; layer 0 0.316, layer 1 0.962, layer 2 0.962, layer 3 0.957, layer 4 and kernel 0.532
+  ----  native r18u: 512 x 512: 15.392 ms a pass (10th-90th 15.213-15.638, 30 passes); on the device's clock 15.081 ms; 17.031 Mpx/s; conv (hidden layers) 1252.8 GFLOP/s; 141 MiB of buffers; layer 0 1.075, layer 1 3.902, layer 2 3.900, layer 3 3.897, layer 4 and kernel 1.932
+  ----  native r18u: 1024 x 1024: 61.478 ms a pass (10th-90th 60.812-79.063, 23 passes); on the device's clock 61.135 ms; 17.056 Mpx/s; conv (hidden layers) 1218.8 GFLOP/s; 564 MiB of buffers; layer 0 4.323, layer 1 16.060, layer 2 16.078, layer 3 16.067, layer 4 and kernel 8.613
+  ----  native r18u: 1920 x 1080: 123.070 ms a pass (10th-90th 122.831-138.665, 14 passes); on the device's clock 122.726 ms; 16.849 Mpx/s; conv (hidden layers) 1217.1 GFLOP/s; 1115 MiB of buffers; layer 0 8.844, layer 1 31.722, layer 2 31.743, layer 3 31.716, layer 4 and kernel 18.757
+  ----  native r27w: 64 x 64: 0.955 ms a pass (10th-90th 0.873-1.123, 30 passes); on the device's clock 0.753 ms; 4.290 Mpx/s; conv (hidden layers) 379.8 GFLOP/s; 2 MiB of buffers; layer 0 0.072, layer 1 0.197, layer 2 0.196, layer 3 0.195, layer 4 and kernel 0.090
+  ----  native r27w: 128 x 128: 2.124 ms a pass (10th-90th 2.099-2.290, 30 passes); on the device's clock 1.908 ms; 7.714 Mpx/s; conv (hidden layers) 580.1 GFLOP/s; 9 MiB of buffers; layer 0 0.161, layer 1 0.519, layer 2 0.522, layer 3 0.522, layer 4 and kernel 0.182
+  ----  native r27w: 256 x 256: 8.182 ms a pass (10th-90th 7.902-8.430, 30 passes); on the device's clock 7.902 ms; 8.010 Mpx/s; conv (hidden layers) 561.3 GFLOP/s; 35 MiB of buffers; layer 0 0.700, layer 1 2.141, layer 2 2.142, layer 3 2.145, layer 4 and kernel 0.539
+  ----  native r27w: 512 x 512: 30.553 ms a pass (10th-90th 30.275-30.809, 30 passes); on the device's clock 30.231 ms; 8.580 Mpx/s; conv (hidden layers) 567.1 GFLOP/s; 141 MiB of buffers; layer 0 2.667, layer 1 8.522, layer 2 8.477, layer 3 8.557, layer 4 and kernel 1.943
+  ----  native r27w: 1024 x 1024: 124.616 ms a pass (10th-90th 123.790-144.841, 12 passes); on the device's clock 123.596 ms; 8.414 Mpx/s; conv (hidden layers) 555.3 GFLOP/s; 564 MiB of buffers; layer 0 11.266, layer 1 34.802, layer 2 34.605, layer 3 34.628, layer 4 and kernel 8.554
+  ----  native r27w: 1920 x 1080: 247.860 ms a pass (10th-90th 246.757-302.464, 9 passes); on the device's clock 247.426 ms; 8.366 Mpx/s; conv (hidden layers) 552.8 GFLOP/s; 1115 MiB of buffers; layer 0 22.072, layer 1 69.124, layer 2 69.022, layer 3 68.821, layer 4 and kernel 18.625
+  ----  native: r15 against r12 at 64 x 64: 11.11 x as fast, on the device's clock
+  ----  native: r15 against r12 at 128 x 128: 11.38 x as fast, on the device's clock
+  ----  native: r15 against r12 at 256 x 256: 23.61 x as fast, on the device's clock
+  ----  native: r15 against r12 at 512 x 512: 23.95 x as fast, on the device's clock
+  ----  native: r15 against r12 at 1024 x 1024: 24.42 x as fast, on the device's clock
+  ----  native: r18t against r12 at 64 x 64: 8.81 x as fast, on the device's clock
+  ----  native: r18t against r12 at 128 x 128: 10.93 x as fast, on the device's clock
+  ----  native: r18t against r12 at 256 x 256: 24.61 x as fast, on the device's clock
+  ----  native: r18t against r12 at 512 x 512: 25.85 x as fast, on the device's clock
+  ----  native: r18t against r12 at 1024 x 1024: 26.50 x as fast, on the device's clock
+  ----  native: r18u against r12 at 64 x 64: 9.15 x as fast, on the device's clock
+  ----  native: r18u against r12 at 128 x 128: 8.49 x as fast, on the device's clock
+  ----  native: r18u against r12 at 256 x 256: 15.67 x as fast, on the device's clock
+  ----  native: r18u against r12 at 512 x 512: 15.48 x as fast, on the device's clock
+  ----  native: r18u against r12 at 1024 x 1024: 15.52 x as fast, on the device's clock
+  ----  native: r27w against r12 at 64 x 64: 7.13 x as fast, on the device's clock
+  ----  native: r27w against r12 at 128 x 128: 4.67 x as fast, on the device's clock
+  ----  native: r27w against r12 at 256 x 256: 7.41 x as fast, on the device's clock
+  ----  native: r27w against r12 at 512 x 512: 7.72 x as fast, on the device's clock
+  ----  native: r27w against r12 at 1024 x 1024: 7.68 x as fast, on the device's clock
+  ----  native: r18t against r15 at 64 x 64: 0.793 x as fast, on the device's clock -- section 66
+  ----  native: r18t against r15 at 128 x 128: 0.961 x as fast, on the device's clock -- section 66
+  ----  native: r18t against r15 at 256 x 256: 1.043 x as fast, on the device's clock -- section 66
+  ----  native: r18t against r15 at 512 x 512: 1.079 x as fast, on the device's clock -- section 66
+  ----  native: r18t against r15 at 1024 x 1024: 1.085 x as fast, on the device's clock -- section 66
+  ----  native: r18t against r15 at 1920 x 1080: 1.086 x as fast, on the device's clock -- section 66
+  ----  native: r18u against r15 at 64 x 64: 0.823 x as fast, on the device's clock -- section 66
+  ----  native: r18u against r15 at 128 x 128: 0.746 x as fast, on the device's clock -- section 66
+  ----  native: r18u against r15 at 256 x 256: 0.664 x as fast, on the device's clock -- section 66
+  ----  native: r18u against r15 at 512 x 512: 0.646 x as fast, on the device's clock -- section 66
+  ----  native: r18u against r15 at 1024 x 1024: 0.636 x as fast, on the device's clock -- section 66
+  ----  native: r18u against r15 at 1920 x 1080: 0.651 x as fast, on the device's clock -- section 66
+  ----  native: r27w against r15 at 64 x 64: 0.642 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r15 at 128 x 128: 0.411 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r15 at 256 x 256: 0.314 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r15 at 512 x 512: 0.322 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r15 at 1024 x 1024: 0.314 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r15 at 1920 x 1080: 0.323 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r18t at 64 x 64: 0.809 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r18t at 128 x 128: 0.428 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r18t at 256 x 256: 0.301 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r18t at 512 x 512: 0.299 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r18t at 1024 x 1024: 0.290 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r18t at 1920 x 1080: 0.297 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r18u at 64 x 64: 0.780 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r18u at 128 x 128: 0.551 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r18u at 256 x 256: 0.473 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r18u at 512 x 512: 0.499 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r18u at 1024 x 1024: 0.495 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r18u at 1920 x 1080: 0.496 x as fast, on the device's clock -- section 83
+  PASS  !! section 61: the native device's clock is not Dawn's rounded one -- not every time is a whole number of 65,536 ns, as every native time in round 17's probes was   56 of 4507 device times on the 65,536 ns grid
+  PASS    round 19: the adapter noted for the rig's report is the ladder's own -- its name and whether it is software -- and its key for section 66's table is this platform's, its vendor's and its architecture's   nvidia / pascal / D3D12 driver version 32.0.15.8180; key win32/nvidia/pascal
+
+2b. NATIVE, r15 UNDER FXC: the same package with use_dxc disabled, in a child process (section 66)
+  SKIP  native FXC ladder: retired by section 87 (v4871) -- the denoiser's FXC paths fed condition 4 alone, which section 75 dropped; SWEK_DENOISE_FXC=all runs it
+
+3. THE PAGE: denoise.html's "Time the network", in Chromium (on the rig, the browser's GPU)
+  PASS  !! the page timed the network on its own device, showed the table, and named the adapter -- no page error   google / swiftshader -- A SOFTWARE ADAPTER: these are a CPU's times, not a GPU's; timing left the image unchanged: r12 true, r15 true, r18t true, r18u true, r27
+  PASS  !! page r12: the first size, 64 x 64, measured; every time finite and positive; every skip says why   1 of 6 sizes measured on google / swiftshader
+  PASS  !! page r12: the wall clock sits inside the guard, and where the device has timestamp queries its span inside the wall clock and the passes inside its span   timestamps
+  PASS    page r12: and timestamp queries were asked for wherever the adapter offers them -- a run without them says less than it could   the adapter offers them
+  PASS  !! page r12: timing changes nothing -- the image a timed pass wrote is an untimed run's, bit for bit
+  PASS    page r12: and the cap skips only the sizes the last measured pass predicts past 1500 ms
+  PASS  !! page r15: the first size, 64 x 64, measured; every time finite and positive; every skip says why   2 of 6 sizes measured on google / swiftshader
+  PASS  !! page r15: the wall clock sits inside the guard, and where the device has timestamp queries its span inside the wall clock and the passes inside its span   timestamps, timestamps
+  PASS    page r15: and timestamp queries were asked for wherever the adapter offers them -- a run without them says less than it could   the adapter offers them
+  PASS  !! page r15: timing changes nothing -- the image a timed pass wrote is an untimed run's, bit for bit
+  PASS    page r15: and the cap skips only the sizes the last measured pass predicts past 1500 ms
+  PASS  !! page r18t: the first size, 64 x 64, measured; every time finite and positive; every skip says why   2 of 6 sizes measured on google / swiftshader
+  PASS  !! page r18t: the wall clock sits inside the guard, and where the device has timestamp queries its span inside the wall clock and the passes inside its span   timestamps, timestamps
+  PASS    page r18t: and timestamp queries were asked for wherever the adapter offers them -- a run without them says less than it could   the adapter offers them
+  PASS  !! page r18t: timing changes nothing -- the image a timed pass wrote is an untimed run's, bit for bit
+  PASS    page r18t: and the cap skips only the sizes the last measured pass predicts past 1500 ms
+  PASS  !! page r18u: the first size, 64 x 64, measured; every time finite and positive; every skip says why   1 of 6 sizes measured on google / swiftshader
+  PASS  !! page r18u: the wall clock sits inside the guard, and where the device has timestamp queries its span inside the wall clock and the passes inside its span   timestamps
+  PASS    page r18u: and timestamp queries were asked for wherever the adapter offers them -- a run without them says less than it could   the adapter offers them
+  PASS  !! page r18u: timing changes nothing -- the image a timed pass wrote is an untimed run's, bit for bit
+  PASS    page r18u: and the cap skips only the sizes the last measured pass predicts past 1500 ms
+  PASS  !! page r27w: the first size, 64 x 64, measured; every time finite and positive; every skip says why   2 of 6 sizes measured on google / swiftshader
+  PASS  !! page r27w: the wall clock sits inside the guard, and where the device has timestamp queries its span inside the wall clock and the passes inside its span   timestamps, timestamps
+  PASS    page r27w: and timestamp queries were asked for wherever the adapter offers them -- a run without them says less than it could   the adapter offers them
+  PASS  !! page r27w: timing changes nothing -- the image a timed pass wrote is an untimed run's, bit for bit
+  PASS    page r27w: and the cap skips only the sizes the last measured pass predicts past 1500 ms
+  PASS  !! page: every set (r12, r15, r18t, r18u, r27w) measured at the first size, on one device, taking turns -- r12 r15 r18t r18u r27w r27w r18u r18t r15 r12 r12 r15 r18t r18u r27w -- each set's passes pooled across the rounds   1 size(s) with every set; 6, 15, 19, 6, 15 passes at the first
+  PASS    page: and they are different kernels -- r12 tiled,tiled,tiled,tiled,direct|apply; r15 fast,fast,fast,fast,head_apply|head_apply; r18t tile_inline,tile_inline,tile_inline,tile_inline,head_apply|head_apply; r18u fast_unroll,fast_unroll,fast_unroll,fast_unroll,head_apply|head_apply; r27w wino,wino,wino,wino,head_apply|head_apply   r12: tiled,tiled,tiled,tiled,direct|apply; r15: fast,fast,fast,fast,head_apply|head_apply; r18t: tile_inline,tile_inline,tile_inline,tile_inline,head_apply|head_apply; r18u: fast_unroll,fast_unroll,fast_unroll,fast_unroll,head_apply|head_apply; r27w: wino,wino,wino,wino,head_apply|head_apply
+  PASS  !! page: each set's speedup at every size it and r12 measured is r12's median over its own, on the device's clock where both have one -- section 43's K1, read off the rig   r15: 64 x 64 2.78 x; r18t: 64 x 64 3.84 x; r18u: 64 x 64 1.15 x; r27w: 64 x 64 3.04 x
+  ----  page: adapter google / swiftshader -- SOFTWARE: these are a CPU's times, not a GPU's
+  ----  page r12: 64 x 64: 437.000 ms a pass (10th-90th 432.000-456.500, 6 passes); on the device's clock 436.099 ms; 0.009 Mpx/s; conv 0.6 GFLOP/s; 3 MiB of buffers; layer 0 42.685, layer 1 112.361, layer 2 110.883, layer 3 107.380, layer 4 58.591, kernel 6.111
+  ----  page r12: 128 x 128 skipped -- predicted 1749 ms a pass, over the 1500 ms cap
+  ----  page r12: 256 x 256 skipped -- predicted 6995 ms a pass, over the 1500 ms cap
+  ----  page r12: 512 x 512 skipped -- predicted 27981 ms a pass, over the 1500 ms cap
+  ----  page r12: 1024 x 1024 skipped -- predicted 111923 ms a pass, over the 1500 ms cap
+  ----  page r12: 1920 x 1080 skipped -- predicted 221332 ms a pass, over the 1500 ms cap
+  ----  page r15: 64 x 64: 157.400 ms a pass (10th-90th 152.000-166.800, 15 passes); on the device's clock 156.619 ms; 0.026 Mpx/s; conv (hidden layers) 1.8 GFLOP/s; 2 MiB of buffers; layer 0 18.166, layer 1 37.920, layer 2 40.261, layer 3 39.832, layer 4 and kernel 20.128
+  ----  page r15: 128 x 128: 609.200 ms a pass (10th-90th 603.700-629.600, 6 passes); on the device's clock 607.843 ms; 0.027 Mpx/s; conv (hidden layers) 1.9 GFLOP/s; 9 MiB of buffers; layer 0 59.660, layer 1 158.238, layer 2 152.200, layer 3 155.918, layer 4 and kernel 72.195
+  ----  page r15: 256 x 256 skipped -- predicted 2438 ms a pass, over the 1500 ms cap
+  ----  page r15: 512 x 512 skipped -- predicted 9750 ms a pass, over the 1500 ms cap
+  ----  page r15: 1024 x 1024 skipped -- predicted 39002 ms a pass, over the 1500 ms cap
+  ----  page r15: 1920 x 1080 skipped -- predicted 77127 ms a pass, over the 1500 ms cap
+  ----  page r18t: 64 x 64: 115.100 ms a pass (10th-90th 105.500-134.300, 19 passes); on the device's clock 113.691 ms; 0.036 Mpx/s; conv (hidden layers) 2.6 GFLOP/s; 2 MiB of buffers; layer 0 11.857, layer 1 27.825, layer 2 28.026, layer 3 29.182, layer 4 and kernel 19.889
+  ----  page r18t: 128 x 128: 423.000 ms a pass (10th-90th 404.100-473.400, 6 passes); on the device's clock 421.557 ms; 0.039 Mpx/s; conv (hidden layers) 2.8 GFLOP/s; 9 MiB of buffers; layer 0 41.135, layer 1 107.087, layer 2 103.160, layer 3 100.529, layer 4 and kernel 72.572
+  ----  page r18t: 256 x 256 skipped -- predicted 1693 ms a pass, over the 1500 ms cap
+  ----  page r18t: 512 x 512 skipped -- predicted 6771 ms a pass, over the 1500 ms cap
+  ----  page r18t: 1024 x 1024 skipped -- predicted 27085 ms a pass, over the 1500 ms cap
+  ----  page r18t: 1920 x 1080 skipped -- predicted 53561 ms a pass, over the 1500 ms cap
+  ----  page r18u: 64 x 64: 381.700 ms a pass (10th-90th 375.600-407.100, 6 passes); on the device's clock 380.721 ms; 0.011 Mpx/s; conv (hidden layers) 0.7 GFLOP/s; 2 MiB of buffers; layer 0 49.371, layer 1 105.164, layer 2 105.626, layer 3 102.805, layer 4 and kernel 17.402
+  ----  page r18u: 128 x 128 skipped -- predicted 1527 ms a pass, over the 1500 ms cap
+  ----  page r18u: 256 x 256 skipped -- predicted 6109 ms a pass, over the 1500 ms cap
+  ----  page r18u: 512 x 512 skipped -- predicted 24435 ms a pass, over the 1500 ms cap
+  ----  page r18u: 1024 x 1024 skipped -- predicted 97741 ms a pass, over the 1500 ms cap
+  ----  page r18u: 1920 x 1080 skipped -- predicted 193286 ms a pass, over the 1500 ms cap
+  ----  page r27w: 64 x 64: 144.400 ms a pass (10th-90th 140.500-163.800, 15 passes); on the device's clock 143.404 ms; 0.028 Mpx/s; conv (hidden layers) 2.0 GFLOP/s; 2 MiB of buffers; layer 0 17.474, layer 1 34.867, layer 2 36.568, layer 3 36.367, layer 4 and kernel 20.094
+  ----  page r27w: 128 x 128: 566.900 ms a pass (10th-90th 551.800-597.300, 6 passes); on the device's clock 565.400 ms; 0.029 Mpx/s; conv (hidden layers) 2.0 GFLOP/s; 9 MiB of buffers; layer 0 64.514, layer 1 142.606, layer 2 144.718, layer 3 136.691, layer 4 and kernel 71.535
+  ----  page r27w: 256 x 256 skipped -- predicted 2268 ms a pass, over the 1500 ms cap
+  ----  page r27w: 512 x 512 skipped -- predicted 9072 ms a pass, over the 1500 ms cap
+  ----  page r27w: 1024 x 1024 skipped -- predicted 36288 ms a pass, over the 1500 ms cap
+  ----  page r27w: 1920 x 1080 skipped -- predicted 71761 ms a pass, over the 1500 ms cap
+  ----  page: r15 against r12 at 64 x 64: 2.78 x as fast, on the device's clock
+  ----  page: r18t against r12 at 64 x 64: 3.84 x as fast, on the device's clock
+  ----  page: r18u against r12 at 64 x 64: 1.15 x as fast, on the device's clock
+  ----  page: r27w against r12 at 64 x 64: 3.04 x as fast, on the device's clock
+  ----  page: r18t against r15 at 64 x 64: 1.378 x as fast, on the device's clock -- section 61
+  ----  page: r18t against r15 at 128 x 128: 1.442 x as fast, on the device's clock -- section 61
+  ----  page: r18u against r15 at 64 x 64: 0.411 x as fast, on the device's clock -- section 61
+  ----  page: r27w against r15 at 64 x 64: 1.092 x as fast, on the device's clock -- section 83
+  ----  page: r27w against r15 at 128 x 128: 1.075 x as fast, on the device's clock -- section 83
+  ----  page: r27w against r18t at 64 x 64: 0.793 x as fast, on the device's clock -- section 83
+  ----  page: r27w against r18t at 128 x 128: 0.746 x as fast, on the device's clock -- section 83
+  ----  page: r27w against r18u at 64 x 64: 2.655 x as fast, on the device's clock -- section 83
+  ----  page: this adapter's key for section 61's table: Windows/google/swiftshader
+  PASS    round 18: the page's report carries its adapter's key -- platform, vendor and architecture -- or says it has none   Windows/google/swiftshader
+  PASS    the page and the harness agree on what the device is   harness says software
+
+ALL GREEN (160926 ms)
+not closed here: any number. What a pass costs is printed above and asserted nowhere -- on SwiftShader it is a CPU's, and on a GPU it is what tools/ship/realGpuRun.mjs carries back.
+
+C:\SweK_r33\WebGLEngine>echo %ERRORLEVEL%
+0
+
+C:\SweK_r33\WebGLEngine>set SWEK_TIMING_TRACE=%CD%\trace35-alone-3.txt
+
+C:\SweK_r33\WebGLEngine>node render/denoiseTiming-selfcheck.mjs
+1. THE LADDER'S ARITHMETIC
+  PASS    summarize is nearest rank: the median, the 10th and the 90th of ten times
+  PASS    the ladder runs from the trained 64 x 64 to a 1080p frame, each size more pixels than the last
+  PASS    a pass's largest buffer is the head's 81 logits a pixel: 672 MB at 1080p, what a device's storage limit is checked against
+  PASS    round 15: a pass's buffers are the input, every layer's output and the image -- and r15 allocates no logits, 81 channels a pixel fewer than r14   at 1080p: r14 1756 MiB, r15 1115 MiB
+  PASS    round 19: both ladders time r12, r15, r18t, r18u and (round 27) r27w -- r12 first, the reference every speedup is read against -- and natively on a D3D12 adapter by the run's compiler: under FXC, none named or one unread, r12 and r15 alone; under DXC all five; on Vulkan all five   D3D12: FXC r12,r15, none r12,r15, DXC r12,r15,r18t,r18u,r27w; Vulkan: r12,r15,r18t,r18u,r27w -- section 60: node-webgpu 0.6.0's FXC stopped on r18t's kernel and crashed on r18u's; section 65: 0.6.2's DXC built both
+  PASS  !! round 19: a native run's plan is read off its package WITH ITS DEVICE'S FLAGS -- 0.6.2 shipping DXC on D3D12: DXC, all five sets, and the FXC ladder; 0.6.0, 0.6.1 with the DLL copied beside, or a package unread: FXC, r12 and r15, no FXC ladder; the FXC child's own flags on 0.6.2: FXC; Linux: no D3D compiler, all five, no FXC ladder   DXC: r12,r15,r18t,r18u,r27w; FXC ladder runs  /  FXC: r12,r15; FXC ladder skipped  /  FXC: r12,r15; FXC ladder skipped  /  FXC: r12,r15; FXC ladder skipped  /  FXC: r12,r15; FXC ladder skipped  /  none: r12,r15,r18t,r18u,r27w; FXC ladder skipped
+  PASS  !! section 87: the FXC ladder is retired -- 0.6.2 on D3D12 skips it by default with the retirement's reason and runs it under SWEK_DENOISE_FXC=all; 0.6.0 and linux keep their own reasons   0.6.2: skipped, all: runs; 0.6.0: the package's compiler as shipped is FXC
+  PASS  !! round 19: the FXC child's device flags are ONE disable entry carrying use_dxc AND the fine clock, and no dump_shaders -- two entries would let Dawn keep the last (section 49), compiling with DXC or rounding the clock; a dump would fill a timed child's stdout -- and the child times r12 and r15   ["disable-dawn-features=use_dxc,timestamp_quantization"]
+  PASS  !! round 19: the file's ONE create call makes the FXC child's device with FXC_FLAGS and the gate's with the fine clock alone; the child -- spawned by the gate with --fxc-ladder and its result file -- runs its ladder in that mode and writes the file   1 create call(s): create(flags = fxc ? FXC_FLAGS : [H.FINE_CLOCK_FLAG]);; the child block 11 lines
+  PASS    section 87: the gate decides the FXC ladder by fxcLadderSkip(plan), and spawns it only where that names no reason   2 mention(s) of the ladder's function, called (its definition and the one call)
+  PASS  !! round 19: each "rXX against r15" line is r15's median over the set's -- a native ladder's tagged section 66, the page's section 61   native: r18t against r15 at 256 x 256: 1.500 x as fast, on the device's clock -- section 66  /  page: r18u against r15 at 256 x 256: 1.500 x as fast, on the device's clock -- section 61
+  PASS  !! round 27: each "r27w against rXX" line is that set's median over r27w's, tagged section 83 on either ladder -- the ratio section 83's rule reads   native: r27w against r18t at 1920 x 1080: 1.250 x as fast, on the device's clock -- section 83 / page: r27w against r18u at 1024 x 1024: 1.250 x as fast, on the wall clock -- section 83
+  PASS  !! round 19: r15 under FXC against a set under DXC is read at the largest size BOTH ladders measured, r15's FXC median over the set's DXC one, the line marked unpaired -- and no line where no size is common   native: r18t against r15 under FXC at 256 x 256: 2.000 x as fast, on the device's clock -- unpaired: two processes, one after the other -- section 66
+  PASS    a time is on Dawn's rounded grid when it is a whole number of 65,536 ns -- section 60's finding, read off round 17's native times
+  PASS    the input is the same every time, in the network's ranges, with both sides of a mask
+  PASS    an adapter is software by the spec's own flag, else by its name: SwiftShader is, a named GPU is not -- and it says whether it offers timestamps
+
+2. NATIVE: node-webgpu's default adapter (on the rig, the GPU)
+  ----  native: the trace is C:\SweK_r33\WebGLEngine\trace35-alone-3.txt
+  ----  native adapter: nvidia / pascal / D3D12 driver version 32.0.15.8180 (hardware); compiler, from the package: DXC
+  ----  native: this adapter's key for section 66's table: win32/nvidia/pascal
+  ----  native: node-webgpu 0.6.2; compiler, read off the package with this device's flags: DXC; sets timed: r12, r15, r18t, r18u, r27w
+  PASS    round 35: the trace holds the native ladder step by step -- its start, a device asked for at every size it measured, every set built there, and its return -- before each step ran   148 lines in C:\SweK_r33\WebGLEngine\trace35-alone-3.txt; sizes measured 64x64, 128x128, 256x256, 512x512, 1024x1024, 1920x1080
+  PASS  !! native r12: the first size, 64 x 64, measured; every time finite and positive; every skip says why   5 of 6 sizes measured on nvidia / pascal / D3D12 driver version 32.0.15.8180
+  PASS  !! native r12: the wall clock sits inside the guard, and where the device has timestamp queries its span inside the wall clock and the passes inside its span   timestamps, timestamps, timestamps, timestamps, timestamps
+  PASS    native r12: and timestamp queries were asked for wherever the adapter offers them -- a run without them says less than it could   the adapter offers them
+  PASS  !! native r12: timing changes nothing -- the image a timed pass wrote is an untimed run's, bit for bit
+  PASS    native r12: and the cap skips only the sizes the last measured pass predicts past 1500 ms
+  PASS  !! native r15: the first size, 64 x 64, measured; every time finite and positive; every skip says why   6 of 6 sizes measured on nvidia / pascal / D3D12 driver version 32.0.15.8180
+  PASS  !! native r15: the wall clock sits inside the guard, and where the device has timestamp queries its span inside the wall clock and the passes inside its span   timestamps, timestamps, timestamps, timestamps, timestamps, timestamps
+  PASS    native r15: and timestamp queries were asked for wherever the adapter offers them -- a run without them says less than it could   the adapter offers them
+  PASS  !! native r15: timing changes nothing -- the image a timed pass wrote is an untimed run's, bit for bit
+  PASS    native r15: and the cap skips only the sizes the last measured pass predicts past 1500 ms
+  PASS  !! native r18t: the first size, 64 x 64, measured; every time finite and positive; every skip says why   6 of 6 sizes measured on nvidia / pascal / D3D12 driver version 32.0.15.8180
+  PASS  !! native r18t: the wall clock sits inside the guard, and where the device has timestamp queries its span inside the wall clock and the passes inside its span   timestamps, timestamps, timestamps, timestamps, timestamps, timestamps
+  PASS    native r18t: and timestamp queries were asked for wherever the adapter offers them -- a run without them says less than it could   the adapter offers them
+  PASS  !! native r18t: timing changes nothing -- the image a timed pass wrote is an untimed run's, bit for bit
+  PASS    native r18t: and the cap skips only the sizes the last measured pass predicts past 1500 ms
+  PASS  !! native r18u: the first size, 64 x 64, measured; every time finite and positive; every skip says why   6 of 6 sizes measured on nvidia / pascal / D3D12 driver version 32.0.15.8180
+  PASS  !! native r18u: the wall clock sits inside the guard, and where the device has timestamp queries its span inside the wall clock and the passes inside its span   timestamps, timestamps, timestamps, timestamps, timestamps, timestamps
+  PASS    native r18u: and timestamp queries were asked for wherever the adapter offers them -- a run without them says less than it could   the adapter offers them
+  PASS  !! native r18u: timing changes nothing -- the image a timed pass wrote is an untimed run's, bit for bit
+  PASS    native r18u: and the cap skips only the sizes the last measured pass predicts past 1500 ms
+  PASS  !! native r27w: the first size, 64 x 64, measured; every time finite and positive; every skip says why   6 of 6 sizes measured on nvidia / pascal / D3D12 driver version 32.0.15.8180
+  PASS  !! native r27w: the wall clock sits inside the guard, and where the device has timestamp queries its span inside the wall clock and the passes inside its span   timestamps, timestamps, timestamps, timestamps, timestamps, timestamps
+  PASS    native r27w: and timestamp queries were asked for wherever the adapter offers them -- a run without them says less than it could   the adapter offers them
+  PASS  !! native r27w: timing changes nothing -- the image a timed pass wrote is an untimed run's, bit for bit
+  PASS    native r27w: and the cap skips only the sizes the last measured pass predicts past 1500 ms
+  PASS  !! native: every set (r12, r15, r18t, r18u, r27w) measured at the first size, on one device, taking turns -- r12 r15 r18t r18u r27w r27w r18u r18t r15 r12 r12 r15 r18t r18u r27w -- each set's passes pooled across the rounds   5 size(s) with every set; 30, 30, 30, 30, 30 passes at the first
+  PASS    native: and they are different kernels -- r12 tiled,tiled,tiled,tiled,direct|apply; r15 fast,fast,fast,fast,head_apply|head_apply; r18t tile_inline,tile_inline,tile_inline,tile_inline,head_apply|head_apply; r18u fast_unroll,fast_unroll,fast_unroll,fast_unroll,head_apply|head_apply; r27w wino,wino,wino,wino,head_apply|head_apply   r12: tiled,tiled,tiled,tiled,direct|apply; r15: fast,fast,fast,fast,head_apply|head_apply; r18t: tile_inline,tile_inline,tile_inline,tile_inline,head_apply|head_apply; r18u: fast_unroll,fast_unroll,fast_unroll,fast_unroll,head_apply|head_apply; r27w: wino,wino,wino,wino,head_apply|head_apply
+  PASS  !! native: each set's speedup at every size it and r12 measured is r12's median over its own, on the device's clock where both have one -- section 43's K1, read off the rig   r15: 64 x 64 10.87 x, 128 x 128 10.59 x, 256 x 256 16.25 x, 512 x 512 23.69 x, 1024 x 1024 24.09 x; r18t: 64 x 64 8.56 x, 128 x 128 10.20 x, 256 x 256 17.12 x, 512 x 512 25.05 x, 1024 x 1024 25.90 x; r18u: 64 x 64 8.96 x, 128 x 128 7.89 x, 256 x 256 11.05 x, 512 x 512 15.19 x, 1024 x 1024 15.43 x; r27w: 64 x 64 7.08 x, 128 x 128 4.27 x, 256 x 256 5.37 x, 512 x 512 7.70 x, 1024 x 1024 7.81 x
+  ----  native: adapter nvidia / pascal / D3D12 driver version 32.0.15.8180 (hardware)
+  ----  native r12: 64 x 64: 5.613 ms a pass (10th-90th 5.133-14.229, 30 passes); on the device's clock 5.300 ms; 0.730 Mpx/s; conv 51.9 GFLOP/s; 3 MiB of buffers; layer 0 0.502, layer 1 1.446, layer 2 1.425, layer 3 1.427, layer 4 0.427, kernel 0.090
+  ----  native r12: 128 x 128: 8.795 ms a pass (10th-90th 8.612-9.003, 30 passes); on the device's clock 8.380 ms; 1.863 Mpx/s; conv 138.6 GFLOP/s; 14 MiB of buffers; layer 0 0.607, layer 1 1.536, layer 2 1.537, layer 3 1.536, layer 4 2.616, kernel 0.538
+  ----  native r12: 256 x 256: 41.803 ms a pass (10th-90th 40.741-43.006, 30 passes); on the device's clock 41.459 ms; 1.568 Mpx/s; conv 110.6 GFLOP/s; 56 MiB of buffers; layer 0 1.817, layer 1 5.043, layer 2 5.059, layer 3 5.051, layer 4 22.265, kernel 2.084
+  ----  native r12: 512 x 512: 232.964 ms a pass (10th-90th 232.307-290.490, 8 passes); on the device's clock 232.415 ms; 1.125 Mpx/s; conv 78.1 GFLOP/s; 222 MiB of buffers; layer 0 6.812, layer 1 19.677, layer 2 19.758, layer 3 19.621, layer 4 156.494, kernel 9.502
+  ----  native r12: 1024 x 1024: 951.208 ms a pass (10th-90th 949.107-953.164, 3 passes); on the device's clock 950.814 ms; 1.102 Mpx/s; conv 76.3 GFLOP/s; 888 MiB of buffers; layer 0 27.034, layer 1 76.694, layer 2 76.455, layer 3 77.165, layer 4 653.422, kernel 39.487
+  ----  native r12: 1920 x 1080 skipped -- predicted 1881 ms a pass, over the 1500 ms cap
+  ----  native r15: 64 x 64: 0.718 ms a pass (10th-90th 0.679-1.008, 30 passes); on the device's clock 0.487 ms; 5.702 Mpx/s; conv (hidden layers) 629.7 GFLOP/s; 2 MiB of buffers; layer 0 0.046, layer 1 0.118, layer 2 0.116, layer 3 0.118, layer 4 and kernel 0.091
+  ----  native r15: 128 x 128: 0.996 ms a pass (10th-90th 0.973-1.089, 30 passes); on the device's clock 0.791 ms; 16.448 Mpx/s; conv (hidden layers) 1716.9 GFLOP/s; 9 MiB of buffers; layer 0 0.063, layer 1 0.172, layer 2 0.174, layer 3 0.173, layer 4 and kernel 0.206
+  ----  native r15: 256 x 256: 2.769 ms a pass (10th-90th 2.736-3.116, 30 passes); on the device's clock 2.552 ms; 23.665 Mpx/s; conv (hidden layers) 2036.3 GFLOP/s; 35 MiB of buffers; layer 0 0.201, layer 1 0.589, layer 2 0.589, layer 3 0.587, layer 4 and kernel 0.585
+  ----  native r15: 512 x 512: 10.135 ms a pass (10th-90th 9.752-10.548, 30 passes); on the device's clock 9.811 ms; 25.866 Mpx/s; conv (hidden layers) 2186.1 GFLOP/s; 141 MiB of buffers; layer 0 0.733, layer 1 2.196, layer 2 2.196, layer 3 2.195, layer 4 and kernel 2.189
+  ----  native r15: 1024 x 1024: 39.911 ms a pass (10th-90th 39.319-40.320, 30 passes); on the device's clock 39.473 ms; 26.273 Mpx/s; conv (hidden layers) 2117.9 GFLOP/s; 564 MiB of buffers; layer 0 2.948, layer 1 9.076, layer 2 9.086, layer 3 9.120, layer 4 and kernel 9.158
+  ----  native r15: 1920 x 1080: 80.965 ms a pass (10th-90th 80.204-90.123, 21 passes); on the device's clock 80.601 ms; 25.611 Mpx/s; conv (hidden layers) 2096.3 GFLOP/s; 1115 MiB of buffers; layer 0 5.877, layer 1 18.229, layer 2 18.218, layer 3 18.070, layer 4 and kernel 20.028
+  ----  native r18t: 64 x 64: 0.829 ms a pass (10th-90th 0.802-1.140, 30 passes); on the device's clock 0.619 ms; 4.940 Mpx/s; conv (hidden layers) 473.4 GFLOP/s; 2 MiB of buffers; layer 0 0.058, layer 1 0.157, layer 2 0.157, layer 3 0.157, layer 4 and kernel 0.090
+  ----  native r18t: 128 x 128: 1.016 ms a pass (10th-90th 1.007-1.322, 30 passes); on the device's clock 0.821 ms; 16.126 Mpx/s; conv (hidden layers) 1622.8 GFLOP/s; 9 MiB of buffers; layer 0 0.070, layer 1 0.182, layer 2 0.182, layer 3 0.182, layer 4 and kernel 0.205
+  ----  native r18t: 256 x 256: 2.650 ms a pass (10th-90th 2.605-2.950, 30 passes); on the device's clock 2.421 ms; 24.731 Mpx/s; conv (hidden layers) 2195.3 GFLOP/s; 35 MiB of buffers; layer 0 0.188, layer 1 0.545, layer 2 0.545, layer 3 0.545, layer 4 and kernel 0.586
+  ----  native r18t: 512 x 512: 9.549 ms a pass (10th-90th 9.227-10.069, 30 passes); on the device's clock 9.278 ms; 27.453 Mpx/s; conv (hidden layers) 2348.1 GFLOP/s; 141 MiB of buffers; layer 0 0.671, layer 1 2.048, layer 2 2.047, layer 3 2.050, layer 4 and kernel 2.157
+  ----  native r18t: 1024 x 1024: 37.093 ms a pass (10th-90th 36.565-37.596, 30 passes); on the device's clock 36.713 ms; 28.269 Mpx/s; conv (hidden layers) 2347.5 GFLOP/s; 564 MiB of buffers; layer 0 2.614, layer 1 8.340, layer 2 7.987, layer 3 8.330, layer 4 and kernel 9.221
+  ----  native r18t: 1920 x 1080: 74.292 ms a pass (10th-90th 73.570-126.743, 19 passes); on the device's clock 73.942 ms; 27.911 Mpx/s; conv (hidden layers) 2347.4 GFLOP/s; 1115 MiB of buffers; layer 0 5.240, layer 1 16.256, layer 2 16.153, layer 3 16.286, layer 4 and kernel 19.960
+  ----  native r18u: 64 x 64: 0.788 ms a pass (10th-90th 0.736-0.817, 30 passes); on the device's clock 0.592 ms; 5.201 Mpx/s; conv (hidden layers) 499.4 GFLOP/s; 2 MiB of buffers; layer 0 0.074, layer 1 0.142, layer 2 0.142, layer 3 0.142, layer 4 and kernel 0.090
+  ----  native r18u: 128 x 128: 1.261 ms a pass (10th-90th 1.251-1.397, 30 passes); on the device's clock 1.062 ms; 12.992 Mpx/s; conv (hidden layers) 1165.7 GFLOP/s; 9 MiB of buffers; layer 0 0.078, layer 1 0.258, layer 2 0.261, layer 3 0.261, layer 4 and kernel 0.202
+  ----  native r18u: 256 x 256: 4.011 ms a pass (10th-90th 3.966-4.396, 30 passes); on the device's clock 3.751 ms; 16.341 Mpx/s; conv (hidden layers) 1243.7 GFLOP/s; 35 MiB of buffers; layer 0 0.319, layer 1 0.963, layer 2 0.969, layer 3 0.967, layer 4 and kernel 0.532
+  ----  native r18u: 512 x 512: 15.584 ms a pass (10th-90th 15.461-15.651, 30 passes); on the device's clock 15.302 ms; 16.821 Mpx/s; conv (hidden layers) 1256.8 GFLOP/s; 141 MiB of buffers; layer 0 1.080, layer 1 3.888, layer 2 3.882, layer 3 3.885, layer 4 and kernel 2.177
+  ----  native r18u: 1024 x 1024: 61.990 ms a pass (10th-90th 61.738-83.824, 24 passes); on the device's clock 61.605 ms; 16.915 Mpx/s; conv (hidden layers) 1222.8 GFLOP/s; 564 MiB of buffers; layer 0 4.366, layer 1 15.999, layer 2 15.992, layer 3 16.002, layer 4 and kernel 9.239
+  ----  native r18u: 1920 x 1080: 123.228 ms a pass (10th-90th 122.772-137.196, 13 passes); on the device's clock 122.883 ms; 16.827 Mpx/s; conv (hidden layers) 1225.3 GFLOP/s; 1115 MiB of buffers; layer 0 9.026, layer 1 31.500, layer 2 31.393, layer 3 31.410, layer 4 and kernel 19.697
+  ----  native r27w: 64 x 64: 0.945 ms a pass (10th-90th 0.866-1.002, 30 passes); on the device's clock 0.749 ms; 4.332 Mpx/s; conv (hidden layers) 382.8 GFLOP/s; 2 MiB of buffers; layer 0 0.071, layer 1 0.198, layer 2 0.190, layer 3 0.195, layer 4 and kernel 0.090
+  ----  native r27w: 128 x 128: 2.201 ms a pass (10th-90th 2.161-2.456, 30 passes); on the device's clock 1.962 ms; 7.445 Mpx/s; conv (hidden layers) 565.0 GFLOP/s; 9 MiB of buffers; layer 0 0.164, layer 1 0.536, layer 2 0.536, layer 3 0.536, layer 4 and kernel 0.190
+  ----  native r27w: 256 x 256: 7.998 ms a pass (10th-90th 7.704-8.967, 30 passes); on the device's clock 7.724 ms; 8.194 Mpx/s; conv (hidden layers) 581.9 GFLOP/s; 35 MiB of buffers; layer 0 0.687, layer 1 2.062, layer 2 2.060, layer 3 2.067, layer 4 and kernel 0.574
+  ----  native r27w: 512 x 512: 30.516 ms a pass (10th-90th 30.134-30.846, 30 passes); on the device's clock 30.197 ms; 8.590 Mpx/s; conv (hidden layers) 576.2 GFLOP/s; 141 MiB of buffers; layer 0 2.680, layer 1 8.497, layer 2 8.154, layer 3 8.446, layer 4 and kernel 2.174
+  ----  native r27w: 1024 x 1024: 122.167 ms a pass (10th-90th 121.829-167.760, 13 passes); on the device's clock 121.757 ms; 8.583 Mpx/s; conv (hidden layers) 567.7 GFLOP/s; 564 MiB of buffers; layer 0 11.352, layer 1 33.716, layer 2 33.817, layer 3 33.890, layer 4 and kernel 9.288
+  ----  native r27w: 1920 x 1080: 249.378 ms a pass (10th-90th 248.249-268.786, 7 passes); on the device's clock 249.073 ms; 8.315 Mpx/s; conv (hidden layers) 553.1 GFLOP/s; 1115 MiB of buffers; layer 0 22.426, layer 1 68.191, layer 2 68.377, layer 3 69.908, layer 4 and kernel 19.969
+  ----  native: r15 against r12 at 64 x 64: 10.87 x as fast, on the device's clock
+  ----  native: r15 against r12 at 128 x 128: 10.59 x as fast, on the device's clock
+  ----  native: r15 against r12 at 256 x 256: 16.25 x as fast, on the device's clock
+  ----  native: r15 against r12 at 512 x 512: 23.69 x as fast, on the device's clock
+  ----  native: r15 against r12 at 1024 x 1024: 24.09 x as fast, on the device's clock
+  ----  native: r18t against r12 at 64 x 64: 8.56 x as fast, on the device's clock
+  ----  native: r18t against r12 at 128 x 128: 10.20 x as fast, on the device's clock
+  ----  native: r18t against r12 at 256 x 256: 17.12 x as fast, on the device's clock
+  ----  native: r18t against r12 at 512 x 512: 25.05 x as fast, on the device's clock
+  ----  native: r18t against r12 at 1024 x 1024: 25.90 x as fast, on the device's clock
+  ----  native: r18u against r12 at 64 x 64: 8.96 x as fast, on the device's clock
+  ----  native: r18u against r12 at 128 x 128: 7.89 x as fast, on the device's clock
+  ----  native: r18u against r12 at 256 x 256: 11.05 x as fast, on the device's clock
+  ----  native: r18u against r12 at 512 x 512: 15.19 x as fast, on the device's clock
+  ----  native: r18u against r12 at 1024 x 1024: 15.43 x as fast, on the device's clock
+  ----  native: r27w against r12 at 64 x 64: 7.08 x as fast, on the device's clock
+  ----  native: r27w against r12 at 128 x 128: 4.27 x as fast, on the device's clock
+  ----  native: r27w against r12 at 256 x 256: 5.37 x as fast, on the device's clock
+  ----  native: r27w against r12 at 512 x 512: 7.70 x as fast, on the device's clock
+  ----  native: r27w against r12 at 1024 x 1024: 7.81 x as fast, on the device's clock
+  ----  native: r18t against r15 at 64 x 64: 0.787 x as fast, on the device's clock -- section 66
+  ----  native: r18t against r15 at 128 x 128: 0.963 x as fast, on the device's clock -- section 66
+  ----  native: r18t against r15 at 256 x 256: 1.054 x as fast, on the device's clock -- section 66
+  ----  native: r18t against r15 at 512 x 512: 1.057 x as fast, on the device's clock -- section 66
+  ----  native: r18t against r15 at 1024 x 1024: 1.075 x as fast, on the device's clock -- section 66
+  ----  native: r18t against r15 at 1920 x 1080: 1.090 x as fast, on the device's clock -- section 66
+  ----  native: r18u against r15 at 64 x 64: 0.824 x as fast, on the device's clock -- section 66
+  ----  native: r18u against r15 at 128 x 128: 0.745 x as fast, on the device's clock -- section 66
+  ----  native: r18u against r15 at 256 x 256: 0.680 x as fast, on the device's clock -- section 66
+  ----  native: r18u against r15 at 512 x 512: 0.641 x as fast, on the device's clock -- section 66
+  ----  native: r18u against r15 at 1024 x 1024: 0.641 x as fast, on the device's clock -- section 66
+  ----  native: r18u against r15 at 1920 x 1080: 0.656 x as fast, on the device's clock -- section 66
+  ----  native: r27w against r15 at 64 x 64: 0.651 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r15 at 128 x 128: 0.403 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r15 at 256 x 256: 0.330 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r15 at 512 x 512: 0.325 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r15 at 1024 x 1024: 0.324 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r15 at 1920 x 1080: 0.324 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r18t at 64 x 64: 0.828 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r18t at 128 x 128: 0.419 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r18t at 256 x 256: 0.313 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r18t at 512 x 512: 0.307 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r18t at 1024 x 1024: 0.302 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r18t at 1920 x 1080: 0.297 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r18u at 64 x 64: 0.791 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r18u at 128 x 128: 0.541 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r18u at 256 x 256: 0.486 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r18u at 512 x 512: 0.507 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r18u at 1024 x 1024: 0.506 x as fast, on the device's clock -- section 83
+  ----  native: r27w against r18u at 1920 x 1080: 0.493 x as fast, on the device's clock -- section 83
+  PASS  !! section 61: the native device's clock is not Dawn's rounded one -- not every time is a whole number of 65,536 ns, as every native time in round 17's probes was   71 of 4529 device times on the 65,536 ns grid
+  PASS    round 19: the adapter noted for the rig's report is the ladder's own -- its name and whether it is software -- and its key for section 66's table is this platform's, its vendor's and its architecture's   nvidia / pascal / D3D12 driver version 32.0.15.8180; key win32/nvidia/pascal
+
+2b. NATIVE, r15 UNDER FXC: the same package with use_dxc disabled, in a child process (section 66)
+  SKIP  native FXC ladder: retired by section 87 (v4871) -- the denoiser's FXC paths fed condition 4 alone, which section 75 dropped; SWEK_DENOISE_FXC=all runs it
+
+3. THE PAGE: denoise.html's "Time the network", in Chromium (on the rig, the browser's GPU)
+  PASS  !! the page timed the network on its own device, showed the table, and named the adapter -- no page error   google / swiftshader -- A SOFTWARE ADAPTER: these are a CPU's times, not a GPU's; timing left the image unchanged: r12 true, r15 true, r18t true, r18u true, r27
+  PASS  !! page r12: the first size, 64 x 64, measured; every time finite and positive; every skip says why   1 of 6 sizes measured on google / swiftshader
+  PASS  !! page r12: the wall clock sits inside the guard, and where the device has timestamp queries its span inside the wall clock and the passes inside its span   timestamps
+  PASS    page r12: and timestamp queries were asked for wherever the adapter offers them -- a run without them says less than it could   the adapter offers them
+  PASS  !! page r12: timing changes nothing -- the image a timed pass wrote is an untimed run's, bit for bit
+  PASS    page r12: and the cap skips only the sizes the last measured pass predicts past 1500 ms
+  PASS  !! page r15: the first size, 64 x 64, measured; every time finite and positive; every skip says why   2 of 6 sizes measured on google / swiftshader
+  PASS  !! page r15: the wall clock sits inside the guard, and where the device has timestamp queries its span inside the wall clock and the passes inside its span   timestamps, timestamps
+  PASS    page r15: and timestamp queries were asked for wherever the adapter offers them -- a run without them says less than it could   the adapter offers them
+  PASS  !! page r15: timing changes nothing -- the image a timed pass wrote is an untimed run's, bit for bit
+  PASS    page r15: and the cap skips only the sizes the last measured pass predicts past 1500 ms
+  PASS  !! page r18t: the first size, 64 x 64, measured; every time finite and positive; every skip says why   2 of 6 sizes measured on google / swiftshader
+  PASS  !! page r18t: the wall clock sits inside the guard, and where the device has timestamp queries its span inside the wall clock and the passes inside its span   timestamps, timestamps
+  PASS    page r18t: and timestamp queries were asked for wherever the adapter offers them -- a run without them says less than it could   the adapter offers them
+  PASS  !! page r18t: timing changes nothing -- the image a timed pass wrote is an untimed run's, bit for bit
+  PASS    page r18t: and the cap skips only the sizes the last measured pass predicts past 1500 ms
+  PASS  !! page r18u: the first size, 64 x 64, measured; every time finite and positive; every skip says why   1 of 6 sizes measured on google / swiftshader
+  PASS  !! page r18u: the wall clock sits inside the guard, and where the device has timestamp queries its span inside the wall clock and the passes inside its span   timestamps
+  PASS    page r18u: and timestamp queries were asked for wherever the adapter offers them -- a run without them says less than it could   the adapter offers them
+  PASS  !! page r18u: timing changes nothing -- the image a timed pass wrote is an untimed run's, bit for bit
+  PASS    page r18u: and the cap skips only the sizes the last measured pass predicts past 1500 ms
+  PASS  !! page r27w: the first size, 64 x 64, measured; every time finite and positive; every skip says why   2 of 6 sizes measured on google / swiftshader
+  PASS  !! page r27w: the wall clock sits inside the guard, and where the device has timestamp queries its span inside the wall clock and the passes inside its span   timestamps, timestamps
+  PASS    page r27w: and timestamp queries were asked for wherever the adapter offers them -- a run without them says less than it could   the adapter offers them
+  PASS  !! page r27w: timing changes nothing -- the image a timed pass wrote is an untimed run's, bit for bit
+  PASS    page r27w: and the cap skips only the sizes the last measured pass predicts past 1500 ms
+  PASS  !! page: every set (r12, r15, r18t, r18u, r27w) measured at the first size, on one device, taking turns -- r12 r15 r18t r18u r27w r27w r18u r18t r15 r12 r12 r15 r18t r18u r27w -- each set's passes pooled across the rounds   1 size(s) with every set; 6, 14, 18, 6, 15 passes at the first
+  PASS    page: and they are different kernels -- r12 tiled,tiled,tiled,tiled,direct|apply; r15 fast,fast,fast,fast,head_apply|head_apply; r18t tile_inline,tile_inline,tile_inline,tile_inline,head_apply|head_apply; r18u fast_unroll,fast_unroll,fast_unroll,fast_unroll,head_apply|head_apply; r27w wino,wino,wino,wino,head_apply|head_apply   r12: tiled,tiled,tiled,tiled,direct|apply; r15: fast,fast,fast,fast,head_apply|head_apply; r18t: tile_inline,tile_inline,tile_inline,tile_inline,head_apply|head_apply; r18u: fast_unroll,fast_unroll,fast_unroll,fast_unroll,head_apply|head_apply; r27w: wino,wino,wino,wino,head_apply|head_apply
+  PASS  !! page: each set's speedup at every size it and r12 measured is r12's median over its own, on the device's clock where both have one -- section 43's K1, read off the rig   r15: 64 x 64 2.85 x; r18t: 64 x 64 3.83 x; r18u: 64 x 64 1.14 x; r27w: 64 x 64 3.02 x
+  ----  page: adapter google / swiftshader -- SOFTWARE: these are a CPU's times, not a GPU's
+  ----  page r12: 64 x 64: 442.000 ms a pass (10th-90th 413.500-455.500, 6 passes); on the device's clock 441.332 ms; 0.009 Mpx/s; conv 0.6 GFLOP/s; 3 MiB of buffers; layer 0 50.877, layer 1 105.158, layer 2 108.681, layer 3 106.314, layer 4 50.347, kernel 6.095
+  ----  page r12: 128 x 128 skipped -- predicted 1769 ms a pass, over the 1500 ms cap
+  ----  page r12: 256 x 256 skipped -- predicted 7075 ms a pass, over the 1500 ms cap
+  ----  page r12: 512 x 512 skipped -- predicted 28301 ms a pass, over the 1500 ms cap
+  ----  page r12: 1024 x 1024 skipped -- predicted 113203 ms a pass, over the 1500 ms cap
+  ----  page r12: 1920 x 1080 skipped -- predicted 223864 ms a pass, over the 1500 ms cap
+  ----  page r15: 64 x 64: 155.400 ms a pass (10th-90th 149.000-172.500, 14 passes); on the device's clock 154.630 ms; 0.026 Mpx/s; conv (hidden layers) 1.9 GFLOP/s; 2 MiB of buffers; layer 0 15.558, layer 1 39.807, layer 2 38.530, layer 3 40.868, layer 4 and kernel 18.066
+  ----  page r15: 128 x 128: 622.800 ms a pass (10th-90th 570.300-689.700, 4 passes); on the device's clock 622.165 ms; 0.026 Mpx/s; conv (hidden layers) 1.8 GFLOP/s; 9 MiB of buffers; layer 0 65.944, layer 1 162.148, layer 2 158.579, layer 3 166.930, layer 4 and kernel 66.119
+  ----  page r15: 256 x 256 skipped -- predicted 2492 ms a pass, over the 1500 ms cap
+  ----  page r15: 512 x 512 skipped -- predicted 9966 ms a pass, over the 1500 ms cap
+  ----  page r15: 1024 x 1024 skipped -- predicted 39866 ms a pass, over the 1500 ms cap
+  ----  page r15: 1920 x 1080 skipped -- predicted 78836 ms a pass, over the 1500 ms cap
+  ----  page r18t: 64 x 64: 116.000 ms a pass (10th-90th 107.000-122.000, 18 passes); on the device's clock 115.084 ms; 0.035 Mpx/s; conv (hidden layers) 2.5 GFLOP/s; 2 MiB of buffers; layer 0 12.013, layer 1 29.367, layer 2 29.125, layer 3 28.954, layer 4 and kernel 19.447
+  ----  page r18t: 128 x 128: 434.900 ms a pass (10th-90th 392.000-451.900, 6 passes); on the device's clock 433.666 ms; 0.038 Mpx/s; conv (hidden layers) 2.8 GFLOP/s; 9 MiB of buffers; layer 0 42.511, layer 1 101.705, layer 2 104.508, layer 3 104.986, layer 4 and kernel 72.951
+  ----  page r18t: 256 x 256 skipped -- predicted 1740 ms a pass, over the 1500 ms cap
+  ----  page r18t: 512 x 512 skipped -- predicted 6960 ms a pass, over the 1500 ms cap
+  ----  page r18t: 1024 x 1024 skipped -- predicted 27840 ms a pass, over the 1500 ms cap
+  ----  page r18t: 1920 x 1080 skipped -- predicted 55055 ms a pass, over the 1500 ms cap
+  ----  page r18u: 64 x 64: 387.100 ms a pass (10th-90th 383.100-389.500, 6 passes); on the device's clock 386.020 ms; 0.011 Mpx/s; conv (hidden layers) 0.7 GFLOP/s; 2 MiB of buffers; layer 0 49.837, layer 1 104.193, layer 2 104.450, layer 3 102.517, layer 4 and kernel 18.319
+  ----  page r18u: 128 x 128 skipped -- predicted 1549 ms a pass, over the 1500 ms cap
+  ----  page r18u: 256 x 256 skipped -- predicted 6197 ms a pass, over the 1500 ms cap
+  ----  page r18u: 512 x 512 skipped -- predicted 24787 ms a pass, over the 1500 ms cap
+  ----  page r18u: 1024 x 1024 skipped -- predicted 99149 ms a pass, over the 1500 ms cap
+  ----  page r18u: 1920 x 1080 skipped -- predicted 196071 ms a pass, over the 1500 ms cap
+  ----  page r27w: 64 x 64: 146.900 ms a pass (10th-90th 138.900-154.900, 15 passes); on the device's clock 146.195 ms; 0.028 Mpx/s; conv (hidden layers) 2.0 GFLOP/s; 2 MiB of buffers; layer 0 18.134, layer 1 36.377, layer 2 36.213, layer 3 36.232, layer 4 and kernel 19.876
+  ----  page r27w: 128 x 128: 561.800 ms a pass (10th-90th 550.300-624.000, 6 passes); on the device's clock 559.960 ms; 0.029 Mpx/s; conv (hidden layers) 2.0 GFLOP/s; 9 MiB of buffers; layer 0 70.271, layer 1 137.782, layer 2 142.751, layer 3 143.775, layer 4 and kernel 73.221
+  ----  page r27w: 256 x 256 skipped -- predicted 2248 ms a pass, over the 1500 ms cap
+  ----  page r27w: 512 x 512 skipped -- predicted 8992 ms a pass, over the 1500 ms cap
+  ----  page r27w: 1024 x 1024 skipped -- predicted 35968 ms a pass, over the 1500 ms cap
+  ----  page r27w: 1920 x 1080 skipped -- predicted 71128 ms a pass, over the 1500 ms cap
+  ----  page: r15 against r12 at 64 x 64: 2.85 x as fast, on the device's clock
+  ----  page: r18t against r12 at 64 x 64: 3.83 x as fast, on the device's clock
+  ----  page: r18u against r12 at 64 x 64: 1.14 x as fast, on the device's clock
+  ----  page: r27w against r12 at 64 x 64: 3.02 x as fast, on the device's clock
+  ----  page: r18t against r15 at 64 x 64: 1.344 x as fast, on the device's clock -- section 61
+  ----  page: r18t against r15 at 128 x 128: 1.435 x as fast, on the device's clock -- section 61
+  ----  page: r18u against r15 at 64 x 64: 0.401 x as fast, on the device's clock -- section 61
+  ----  page: r27w against r15 at 64 x 64: 1.058 x as fast, on the device's clock -- section 83
+  ----  page: r27w against r15 at 128 x 128: 1.111 x as fast, on the device's clock -- section 83
+  ----  page: r27w against r18t at 64 x 64: 0.787 x as fast, on the device's clock -- section 83
+  ----  page: r27w against r18t at 128 x 128: 0.774 x as fast, on the device's clock -- section 83
+  ----  page: r27w against r18u at 64 x 64: 2.640 x as fast, on the device's clock -- section 83
+  ----  page: this adapter's key for section 61's table: Windows/google/swiftshader
+  PASS    round 18: the page's report carries its adapter's key -- platform, vendor and architecture -- or says it has none   Windows/google/swiftshader
+  PASS    the page and the harness agree on what the device is   harness says software
+
+ALL GREEN (159087 ms)
+not closed here: any number. What a pass costs is printed above and asserted nowhere -- on SwiftShader it is a CPU's, and on a GPU it is what tools/ship/realGpuRun.mjs carries back.
+
+C:\SweK_r33\WebGLEngine>echo %ERRORLEVEL%
+0
+
+C:\SweK_r33\WebGLEngine>set SWEK_TIMING_TRACE=%CD%\trace35-r34-a.txt
+
+C:\SweK_r33\WebGLEngine>node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r34-a-1080.json
+
+the FSR, frame-generation and denoiser gates, with the harness logging each call's adapter (win32)
+  PASS  render/denoiseCompile-selfcheck.mjs  [timing]  43.8 s  on nvidia pascal  (2 SKIP)
+  PASS  render/denoiseDevice-selfcheck.mjs  [exact]  55.0 s  on nvidia pascal D3D12 driver version 32.0.15.8180 (native), nvidia pascal
+  PASS  render/denoiseTiming-selfcheck.mjs  [timing]  229.2 s  on nvidia pascal D3D12 driver version 32.0.15.8180 (native), nvidia pascal  (1 SKIP)
+  PASS  render/denoiseUpscaleGPU-selfcheck.mjs  [exact]  24.4 s  on nvidia pascal
+  features on nvidia pascal: atomic-vec2u-min-max, bgra8unorm-storage, chromium-experimental-multi-draw-indirect, chromium-experimental-sampling-resource-table, chromium-experimental-timestamp-query-inside-passes, clip-distances, core-features-and-limits, depth-clip-control, depth32float-stencil8, dual-source-blending, float32-blendable, float32-filterable, indirect-first-instance, primitive-index, rg11b10ufloat-renderable, subgroup-size-control, subgroups, texture-component-swizzle, texture-compression-bc, texture-compression-bc-sliced-3d, texture-compression-unaligned, texture-formats-tier1, texture-formats-tier2, timestamp-query; subgroups 32-32; workgroup storage 32768 B
+  features on nvidia pascal D3D12 driver version 32.0.15.8180 (native): atomic-vec2u-min-max, bgra8unorm-storage, clip-distances, core-features-and-limits, depth-clip-control, depth32float-stencil8, dual-source-blending, float32-blendable, float32-filterable, indirect-first-instance, primitive-index, rg11b10ufloat-renderable, subgroup-size-control, subgroups, texture-component-swizzle, texture-compression-bc, texture-compression-bc-sliced-3d, texture-compression-unaligned, texture-formats-tier1, texture-formats-tier2, timestamp-query; subgroups 32-32; workgroup storage 32768 B
+  on bc6fbed2 2026-10-21 v4893: record the release; node-webgpu 0.6.2 (the resolver's list) at C:\Users\howdy\AppData\Roaming\npm\node_modules\webgpu; dxcompiler.dll beside dawn.node: yes; predicted compiler: DXC
+
+a real-hardware run on nvidia pascal; nvidia pascal D3D12 driver version 32.0.15.8180 (native)
+exact 2/2, quality 0/0, timing 2/2  --  the report: C:\SweK_r33\WebGLEngine\denoise-rig-r34-a-1080.json
+
+C:\SweK_r33\WebGLEngine>set SWEK_TIMING_TRACE=%CD%\trace35-r34-b.txt
+
+C:\SweK_r33\WebGLEngine>node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r34-b-1080.json
+
+the FSR, frame-generation and denoiser gates, with the harness logging each call's adapter (win32)
+  PASS  render/denoiseCompile-selfcheck.mjs  [timing]  42.6 s  on nvidia pascal  (2 SKIP)
+  PASS  render/denoiseDevice-selfcheck.mjs  [exact]  54.9 s  on nvidia pascal D3D12 driver version 32.0.15.8180 (native), nvidia pascal
+  PASS  render/denoiseTiming-selfcheck.mjs  [timing]  211.2 s  on nvidia pascal D3D12 driver version 32.0.15.8180 (native), nvidia pascal  (1 SKIP)
+  PASS  render/denoiseUpscaleGPU-selfcheck.mjs  [exact]  24.2 s  on nvidia pascal
+  features on nvidia pascal: atomic-vec2u-min-max, bgra8unorm-storage, chromium-experimental-multi-draw-indirect, chromium-experimental-sampling-resource-table, chromium-experimental-timestamp-query-inside-passes, clip-distances, core-features-and-limits, depth-clip-control, depth32float-stencil8, dual-source-blending, float32-blendable, float32-filterable, indirect-first-instance, primitive-index, rg11b10ufloat-renderable, subgroup-size-control, subgroups, texture-component-swizzle, texture-compression-bc, texture-compression-bc-sliced-3d, texture-compression-unaligned, texture-formats-tier1, texture-formats-tier2, timestamp-query; subgroups 32-32; workgroup storage 32768 B
+  features on nvidia pascal D3D12 driver version 32.0.15.8180 (native): atomic-vec2u-min-max, bgra8unorm-storage, clip-distances, core-features-and-limits, depth-clip-control, depth32float-stencil8, dual-source-blending, float32-blendable, float32-filterable, indirect-first-instance, primitive-index, rg11b10ufloat-renderable, subgroup-size-control, subgroups, texture-component-swizzle, texture-compression-bc, texture-compression-bc-sliced-3d, texture-compression-unaligned, texture-formats-tier1, texture-formats-tier2, timestamp-query; subgroups 32-32; workgroup storage 32768 B
+  on bc6fbed2 2026-10-21 v4893: record the release; node-webgpu 0.6.2 (the resolver's list) at C:\Users\howdy\AppData\Roaming\npm\node_modules\webgpu; dxcompiler.dll beside dawn.node: yes; predicted compiler: DXC
+
+a real-hardware run on nvidia pascal; nvidia pascal D3D12 driver version 32.0.15.8180 (native)
+exact 2/2, quality 0/0, timing 2/2  --  the report: C:\SweK_r33\WebGLEngine\denoise-rig-r34-b-1080.json
+
+C:\SweK_r33\WebGLEngine>set SWEK_TIMING_TRACE=
+
+C:\SweK_r33\WebGLEngine>
+ Virus-free.www.avast.com
