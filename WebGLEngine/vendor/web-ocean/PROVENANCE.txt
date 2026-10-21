@@ -11,3 +11,18 @@ WHAT THE BUNDLE DOES NOT DO: it makes no network request (the file contains no h
 water height under its camera back from the GPU a few frames late. See ocean-spike.html for what that means for using it.
 VERIFIED BY READING AND BY HASH, NOT BY RUNNING: the sandbox this was vendored in has no WebGPU adapter, so the page was not seen to render here. The hash is the
 only claim; tools/ship/oceanSpikePage-selfcheck.mjs holds the file to it.
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+ADDED v4895 (unnumbered until shipped): THE MODULAR SOURCES the bundle above is built from, taken byte for byte from the same repository (raw.githubusercontent.com, main):
+  index.html, build.mjs, js/main.js, js/wgsl/common.js, js/wgsl/sim.js, js/wgsl/sky.js, js/wgsl/ocean.js, js/wgsl/post.js        (LICENSE was already here and is identical to upstream's)
+PROVED, NOT ASSUMED: running upstream's own readable-bundle rule over these files (build.mjs: strip each file's import lines and the `export` keyword, concatenate in the order
+common, sim, sky, ocean, post, main, drop the result into index.html in place of its <script src="js/main.js"> tag) reproduces ocean.html BYTE FOR BYTE (102,283 bytes, sha256
+61e4fe5e...). tools/ship/oceanSrcRebuild-selfcheck.mjs redoes that rebuild on every run and pins every file's sha256, so a changed source, a changed rule or a changed bundle goes red.
+WHAT THE SOURCES ADD: `export const P` in js/main.js. The bundle's build strips that `export`, which is why P is invisible INSIDE the bundle -- but upstream applies every P key from the
+URL anyway (the loop on the bundle's line 2193), so the sea is tunable from the query string either way. v4890 and v4894 said the opposite and were wrong; see ui/oceanSea.mjs.
+CORRECTION TO THE PARAGRAPH ABOVE: "it makes no network request" is not true. js/main.js makes three calls, all POSTs to the page's OWN origin: log() sends each log line to /__log, and the
+?shot= screenshot path sends the image to /__shot twice over. The engine's server answers /__log with a 404; /__shot is reached only when a page is loaded with ?shot=. The file
+contains no http string and nothing leaves the origin; they are still requests, and tools/ship/oceanSrcRebuild-selfcheck.mjs counts them.
+NOT TAKEN: upstream's server.mjs, ocean.min.html, package.json/package-lock.json, docs/ and README (nothing here runs a build, and esbuild is not a dependency of this tree).
+NOTHING IN THE ENGINE IMPORTS THESE FILES YET. They are here so a later round can adapt them (expose the water height the shader already computes, set the parameters
+programmatically, composite SweK objects against the sea) with the upstream bytes beside the changes and a gate that says exactly what moved.
