@@ -64,8 +64,8 @@ export function recordGuardians(r = null) {
 // line (or never timed) a gate goes on the plan; under it the sweep already runs it and it is left off.
 export const TREE_RATCHETS = Object.freeze([
     Object.freeze({ gate: "tools/ship/definitionGates-selfcheck.mjs", holds: Object.freeze(["BASELINE_WIDE", "BASELINE_SHAPES", "BASELINE_OWNED"]) }),
-    Object.freeze({ gate: "tools/ship/referenceKind-selfcheck.mjs", holds: Object.freeze(["RESCUED_CEILING"]) }),
-    Object.freeze({ gate: "tools/ship/graveyard-selfcheck.mjs", holds: Object.freeze(["ORPHAN_UTIL_BASELINE"]) }),
+    Object.freeze({ gate: "tools/ship/referenceKind-selfcheck.mjs", holds: Object.freeze(["orphanSets.mjs"]) }),   // v4886: the count became a recorded SET (orphanSets.RECORDED), a file the gate reads
+    Object.freeze({ gate: "tools/ship/graveyard-selfcheck.mjs", holds: Object.freeze(["orphanSets.mjs"]) }),
     Object.freeze({ gate: "tools/ship/unknownNotDefault-selfcheck.mjs", holds: Object.freeze(["BASELINE"]) }),
     Object.freeze({ gate: "tools/ship/orphanScan-selfcheck.mjs", holds: Object.freeze(["orphan-baseline.json"]) }),
 ]);

@@ -105,7 +105,7 @@ console.log("\n3b. v4846 -- a tree-wide count a merge moves is graded whenever t
 {
     const { noComments } = await import("./sourceScan.mjs");
     const missing = AV.TREE_RATCHETS.flatMap((x) => { let c = ""; try { c = noComments(fs.readFileSync(path.join(ENG, x.gate), "utf8")); } catch { return [x.gate + " (no such gate)"]; }
-        return x.holds.filter((h) => !new RegExp((/\.json$/.test(h) ? "" : "\\b(?:const|let)\\s+") + h.replace(/\./g, "\\.") + (/\.json$/.test(h) ? "" : "\\s*=\\s*\\d")).test(c)).map((h) => x.gate + ": " + h); });
+        return x.holds.filter((h) => !new RegExp((/\.(json|mjs)$/.test(h) ? "" : "\\b(?:const|let)\\s+") + h.replace(/\./g, "\\.") + (/\.(json|mjs)$/.test(h) ? "" : "\\s*=\\s*\\d")).test(c)).map((h) => x.gate + ": " + h); });
     ok("!! every TREE_RATCHETS gate exists and freezes the number it is listed for -- a constant declared in its code, or the file it reads",
         missing.length === 0, missing.length ? "NOT FOUND: " + missing.join(", ") : AV.TREE_RATCHETS.map((x) => path.basename(x.gate, "-selfcheck.mjs") + " " + x.holds.join("/")).join("; "));
     const T = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-timings.json"), "utf8"));

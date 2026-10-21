@@ -36,6 +36,8 @@ import { fileURLToPath } from "node:url";
 import { readTimings, selectGates, boxScaleOf, boxScaleAudit, scaleOfGate, scaleLookup, normalisedMs, runQuickSweep,
          SCALE_MIN_N, SCALE_MAX, DEFAULTS } from "./quickSweep.mjs";
 import { enumerateGates } from "./gateSweep.mjs";
+import { gateReport } from "./gateReport.mjs";
+const REPORT = gateReport("tools/ship/relativeBudget-selfcheck.mjs");
 import { ABSORBING } from "./budgetExile.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -146,6 +148,8 @@ sec("3. *** THE CLAMP AT 1: A FAST PASS MOVES NOTHING, AND ON THIS FILE THAT SAV
     const measured = ALL.filter((g) => scaleOfGate(REC, g).measured);
     const scales = [...new Set(measured.map((g) => (REC.boxScale[AT[g]] || {}).scale))].sort((a, b) => a - b);
     say(`${ALL.length} gates, ${measured.length} with a measured pass scale; scales in the file: ${scales.join(", ")}`);
+    REPORT.table("stored pass scales and the gates each one prices", ["scale", "gates priced by it"],
+        scales.map((x) => [x, measured.filter((g) => (REC.boxScale[AT[g]] || {}).scale === x).length]));
     say(`base: ${base.run.length} run / ${base.skipped.length} skipped -- normalised: ${norm.run.length} / ${norm.skipped.length}, ` +
         `${norm.rescaled.length} readings moved, ${norm.admitted.length} readmitted`);
 
@@ -422,4 +426,5 @@ console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "width of one gate." +
     "\nAND NOT CLAIMED: that any gate's recorded time is right. This grades the comparison, not the reading. " +
     "tools/ship/sweepRotation.mjs is what re-measures, and costOf() is what a consumer should ask for a cost.");
+REPORT.write();
 process.exit(fails ? 1 : 0);

@@ -1,0 +1,22 @@
+{
+ "gate": "tools/ship/relativeBudget-selfcheck.mjs",
+ "at": "2026-10-21",
+ "tables": [
+  {
+   "title": "stored pass scales and the gates each one prices",
+   "columns": [
+    "scale",
+    "gates priced by it"
+   ],
+   "rows": [
+    [
+     0.9772,
+     1506
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}
