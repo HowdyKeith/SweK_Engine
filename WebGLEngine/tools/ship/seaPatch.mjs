@@ -11,6 +11,13 @@
 //             no panel slider) and raises the flag upstream raises for it (needSpectrum for the wave spectrum, needLUT for haze); ready, waterHeight() and raise() are filled in by main()
 //             once its flags exist;
 //   hook      three lines after upstream's `let needSpectrum = true, needLUT = true, envFull = 2;` that give the api its closure over the flags and over waterH.
+//   v4895 (second layer)
+//   canvas    the sea draws into seaApi.canvas when a page supplies one (upstream: the element #c), and takes its pixel size from seaApi.size when set (a cost lever: the sea's price is mostly fixed, but the
+//             pixel part is ours to choose);
+//   camera    when a page sets seaApi.camera ({x, y, z, yaw, pitch, fovY}, radians, upstream's own camera convention) updateCamera() copies it in and returns: no keys, no pointer lock, no clamp;
+//   probe     the sea's one-point height readback (upstream: the water under ITS camera) becomes 1 + 64 points: seaApi.setPoints([x, z, ...]) names up to 64 world positions and seaApi.heights
+//             receives their displaced heights, a few frames late, from a patched HEIGHT_PROBE that finds the label whose displaced position lands on each point (upstream's own 4-iteration fixed point).
+//             The patched WGSL is a SECOND generated file, world/ocean/seaOceanWgsl.mjs, because the probe lives in vendor/web-ocean/js/wgsl/ocean.js.
 // WHAT THEY DO NOT DO, said plainly: no external canvas or camera (the sea still owns #c and its own camera), no height at an arbitrary point (waterHeight() is the height under the SEA'S camera,
 // read back from the GPU a few frames late, which is all upstream computes), no depth composite. Those are the next steps. NOT SEEN HERE: any of it on a GPU.
 "use strict";
@@ -22,20 +29,24 @@ import { fileURLToPath } from "node:url";
 export const UPSTREAM_PATH = "vendor/web-ocean/js/main.js";
 export const PATCHED_PATH = "world/ocean/seaMain.mjs";
 export const UPSTREAM_SHA256 = "ceca4404e1514cb8dd94990faf043bd8de2cb0fd201cbc2da803f150e34e3834";
-export const PATCHED_SHA256 = "d0faa922233cc97e6362ba09e8203ede4951d1de0f0ba067da49f71297478ed0";
+export const PATCHED_SHA256 = "39d21f44811c6e335561d91982ab3403f1407348b5bdc14d0d2a14beb0eff9b7";
 
 const SPEC_KEYS = "windSpeed,windDir,fetchKm,swellHs,swellLength,swellDir,swellSpread,choppy";
 
 /** Each patch: id, the exact upstream text it anchors on, how many times that text occurs, and the text that replaces it. */
 export const PATCHES = Object.freeze([
-    { id: "imports", count: 5, find: "from './wgsl/", replace: "from '/vendor/web-ocean/js/wgsl/" },
+    { id: "ocean-import", count: 1, find: "from './wgsl/ocean.js'", replace: "from '/world/ocean/seaOceanWgsl.mjs'" },
+    { id: "imports", count: 4, find: "from './wgsl/", replace: "from '/vendor/web-ocean/js/wgsl/" },
     {
         id: "api", count: 1,
         find: "const CASC_L = [1103.0, 211.3, 39.7, 7.43, 1.393, 0.2617];\n",
         replace: "const CASC_L = [1103.0, 211.3, 39.7, 7.43, 1.393, 0.2617];\n" +
             "// SweK patch (tools/ship/seaPatch.mjs): the page's handle on the sea. P is upstream's block; raise/waterHeight/ready are filled in by main() once its flags exist.\n" +
+            "// canvas/size/camera are set by the page BEFORE the module starts (canvas, size) or at any time (camera); points/heights are the multi-point height probe.\n" +
             "export const seaApi = {\n" +
             "  P, ready: false, raise: null, waterHeight: null,\n" +
+            "  canvas: null, size: null, camera: null,\n" +
+            "  MAX_POINTS: 64, points: new Float32Array(128), heights: new Float32Array(64), count: 0, heightFrame: -1,\n" +
             "  SPEC: new Set('" + SPEC_KEYS + "'.split(',')),\n" +
             "  setParams(o) {\n" +
             "    const applied = [];\n" +
@@ -45,6 +56,12 @@ export const PATCHES = Object.freeze([
             "    }\n" +
             "    if (this.raise) this.raise(applied.some((k) => this.SPEC.has(k)), applied.includes('haze'));\n" +
             "    return applied;\n" +
+            "  },\n" +
+            "  setPoints(xz) {\n" +
+            "    const n = Math.min(this.MAX_POINTS, Math.floor(xz.length / 2));\n" +
+            "    for (let i = 0; i < n * 2; i++) this.points[i] = Number(xz[i]) || 0;\n" +
+            "    this.count = n;\n" +
+            "    return n;\n" +
             "  },\n" +
             "};\n",
     },
@@ -56,6 +73,75 @@ export const PATCHES = Object.freeze([
             "  seaApi.waterHeight = () => waterH;\n" +
             "  seaApi.ready = true;\n",
     },
+    { id: "canvas", count: 1, find: "const canvas = document.getElementById('c');", replace: "const canvas = seaApi.canvas || document.getElementById('c');" },
+    {
+        id: "size", count: 1,
+        find: "const fw = Number(qs.get('w')) || 0, fh = Number(qs.get('h')) || 0;",
+        replace: "const fw = Number(qs.get('w')) || (seaApi.size ? seaApi.size.w : 0), fh = Number(qs.get('h')) || (seaApi.size ? seaApi.size.h : 0);",
+    },
+    {
+        id: "camera", count: 1,
+        find: "  function updateCamera(dt) {\n",
+        replace: "  function updateCamera(dt) {\n" +
+            "    if (seaApi.camera) { const c = seaApi.camera; cam.x = c.x; cam.y = c.y; cam.z = c.z; cam.yaw = c.yaw; cam.pitch = c.pitch; if (c.fovY) cam.fovY = c.fovY; return; }\n",
+    },
+    {
+        id: "lock", count: 1,
+        find: "canvas.addEventListener('click', () => { if (document.pointerLockElement !== canvas) canvas.requestPointerLock(); });",
+        replace: "canvas.addEventListener('click', () => { if (!seaApi.camera && document.pointerLockElement !== canvas) canvas.requestPointerLock(); });",
+    },
+    {
+        id: "probe-buffers", count: 1,
+        find: "  const probeOut = mkBuf(16, GU.STORAGE | GU.COPY_SRC, 'probe out');\n  const probeRead = mkBuf(16, GU.MAP_READ | GU.COPY_DST, 'probe read');\n  const bgProbe = bg(probePipe, [{ buffer: frameUBO }, fullArr(dispTex), samplerSim, { buffer: probeOut }], 'probe');\n",
+        replace: "  const PROBE_N = 1 + seaApi.MAX_POINTS;   // slot 0 is upstream's (the water under the sea's camera), slots 1.. are the page's points\n" +
+            "  const probeOut = mkBuf(PROBE_N * 4, GU.STORAGE | GU.COPY_SRC, 'probe out');\n" +
+            "  const probeRead = mkBuf(PROBE_N * 4, GU.MAP_READ | GU.COPY_DST, 'probe read');\n" +
+            "  const probePts = mkBuf(seaApi.MAX_POINTS * 8, GU.STORAGE | GU.COPY_DST, 'probe points');\n" +
+            "  const bgProbe = bg(probePipe, [{ buffer: frameUBO }, fullArr(dispTex), samplerSim, { buffer: probeOut }, { buffer: probePts }], 'probe');\n",
+    },
+    {
+        id: "probe-read", count: 1,
+        find: "    waterH = new Float32Array(probeRead.getMappedRange(0, 16))[0];\n",
+        replace: "    const hh = new Float32Array(probeRead.getMappedRange(0, PROBE_N * 4));\n" +
+            "    waterH = hh[0];\n" +
+            "    seaApi.heights.set(hh.subarray(1, PROBE_N)); seaApi.heightFrame = frameIndex;\n",
+    },
+    {
+        id: "probe-write", count: 1,
+        find: "    writeFrame(simTime);\n    writeSimStatic();\n",
+        replace: "    writeFrame(simTime);\n    writeSimStatic();\n    device.queue.writeBuffer(probePts, 0, seaApi.points);\n",
+    },
+    {
+        id: "probe-dispatch", count: 1,
+        find: "    cp.setBindGroup(0, bgProbe);\n    cp.dispatchWorkgroups(1);\n",
+        replace: "    cp.setBindGroup(0, bgProbe);\n    cp.dispatchWorkgroups(1 + seaApi.count);\n",
+    },
+    {
+        id: "probe-copy", count: 1,
+        find: "      enc.copyBufferToBuffer(probeOut, 0, probeRead, 0, 16);\n",
+        replace: "      enc.copyBufferToBuffer(probeOut, 0, probeRead, 0, PROBE_N * 4);\n",
+    },
+]);
+
+/** The patches over vendor/web-ocean/js/wgsl/ocean.js: the height probe takes its sample point from a storage buffer (slot 0 stays the camera), and the file's own imports go absolute. */
+export const OCEAN_UPSTREAM_PATH = "vendor/web-ocean/js/wgsl/ocean.js";
+export const OCEAN_PATCHED_PATH = "world/ocean/seaOceanWgsl.mjs";
+export const OCEAN_UPSTREAM_SHA256 = "6da8a8bb45b5ca3807013f491981141682a0a371c16a247fb7bcc5a54406a98a";
+export const OCEAN_PATCHED_SHA256 = "af3a022d9c59e6d9905f27d082cbd317755b35a81600f1d05d53390863306623";
+export const OCEAN_PATCHES = Object.freeze([
+    { id: "wgsl-imports-common", count: 1, find: "from './common.js'", replace: "from '/vendor/web-ocean/js/wgsl/common.js'" },
+    { id: "wgsl-imports-sky", count: 1, find: "from './sky.js'", replace: "from '/vendor/web-ocean/js/wgsl/sky.js'" },
+    {
+        id: "probe-bindings", count: 1,
+        find: "@group(0) @binding(3) var<storage, read_write> outH: array<f32, 4>;\n",
+        replace: "@group(0) @binding(3) var<storage, read_write> outH: array<f32>;\n@group(0) @binding(4) var<storage, read> pts: array<vec2f>;\n",
+    },
+    {
+        id: "probe-main", count: 1,
+        find: "fn main() {\n  let goal = F.camPos.xz;\n",
+        replace: "fn main(@builtin(global_invocation_id) gid: vec3u) {\n  var goal = F.camPos.xz;\n  if (gid.x > 0u) { goal = pts[gid.x - 1u]; }\n",
+    },
+    { id: "probe-out", count: 1, find: "  outH[0] = dispAt(x0).y;\n", replace: "  outH[gid.x] = dispAt(x0).y;\n" },
 ]);
 
 export const sha256 = (b) => crypto.createHash("sha256").update(b).digest("hex");
@@ -81,9 +167,12 @@ export function reportLines(upstreamText = null, patches = PATCHES) {
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
     const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-    const up = fs.readFileSync(path.join(ENG, UPSTREAM_PATH));
-    if (sha256(up) !== UPSTREAM_SHA256) { console.error("upstream main.js is not the pinned one"); process.exit(1); }
-    const out = applyPatches(up.toString("utf8"));
-    if (process.argv.includes("--write")) { fs.writeFileSync(path.join(ENG, PATCHED_PATH), out); console.log("wrote " + PATCHED_PATH + " " + out.length + " bytes sha256 " + sha256(out)); }
-    else console.log(reportLines(up.toString("utf8")).join("\n"));
+    const jobs = [[UPSTREAM_PATH, UPSTREAM_SHA256, PATCHES, PATCHED_PATH], [OCEAN_UPSTREAM_PATH, OCEAN_UPSTREAM_SHA256, OCEAN_PATCHES, OCEAN_PATCHED_PATH]];
+    for (const [src, pin, list, dst] of jobs) {
+        const up = fs.readFileSync(path.join(ENG, src));
+        if (sha256(up) !== pin) { console.error(src + " is not the pinned one"); process.exit(1); }
+        const out = applyPatches(up.toString("utf8"), list);
+        if (process.argv.includes("--write")) { fs.writeFileSync(path.join(ENG, dst), out); console.log("wrote " + dst + " " + out.length + " bytes sha256 " + sha256(out)); }
+        else console.log(reportLines(up.toString("utf8"), list).join("\n"));
+    }
 }

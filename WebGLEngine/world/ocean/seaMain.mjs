@@ -5,7 +5,7 @@
 import { N, CASCADES, SKY_W, SKY_H, ENV_SIZE, ENV_MIPS } from '/vendor/web-ocean/js/wgsl/common.js';
 import { SIM_INIT, SIM_EVOLVE, FFT_ROWS, FFT_COLS, SIM_MIPS, FOAM_TEX, RGBA8_MIPS, FOAM_UPDATE, ARRAY16_MIPS, FOAM_RES } from '/vendor/web-ocean/js/wgsl/sim.js';
 import { TRANS_LUT, MS_LUT, SKYVIEW_LUT, ENV_CUBE, CUBE_MIPS, SUN_VIS } from '/vendor/web-ocean/js/wgsl/sky.js';
-import { OCEAN, SKY_BG, HEIGHT_PROBE } from '/vendor/web-ocean/js/wgsl/ocean.js';
+import { OCEAN, SKY_BG, HEIGHT_PROBE } from '/world/ocean/seaOceanWgsl.mjs';
 import { BLOOM_DOWN, BLOOM_UP, COMPOSITE } from '/vendor/web-ocean/js/wgsl/post.js';
 
 const qs = new URLSearchParams(location.search);
@@ -38,8 +38,11 @@ export const P = {
 };
 const CASC_L = [1103.0, 211.3, 39.7, 7.43, 1.393, 0.2617];
 // SweK patch (tools/ship/seaPatch.mjs): the page's handle on the sea. P is upstream's block; raise/waterHeight/ready are filled in by main() once its flags exist.
+// canvas/size/camera are set by the page BEFORE the module starts (canvas, size) or at any time (camera); points/heights are the multi-point height probe.
 export const seaApi = {
   P, ready: false, raise: null, waterHeight: null,
+  canvas: null, size: null, camera: null,
+  MAX_POINTS: 64, points: new Float32Array(128), heights: new Float32Array(64), count: 0, heightFrame: -1,
   SPEC: new Set('windSpeed,windDir,fetchKm,swellHs,swellLength,swellDir,swellSpread,choppy'.split(',')),
   setParams(o) {
     const applied = [];
@@ -49,6 +52,12 @@ export const seaApi = {
     }
     if (this.raise) this.raise(applied.some((k) => this.SPEC.has(k)), applied.includes('haze'));
     return applied;
+  },
+  setPoints(xz) {
+    const n = Math.min(this.MAX_POINTS, Math.floor(xz.length / 2));
+    for (let i = 0; i < n * 2; i++) this.points[i] = Number(xz[i]) || 0;
+    this.count = n;
+    return n;
   },
 };
 
@@ -88,7 +97,7 @@ async function main() {
   device.lost.then((i) => log('device lost: ' + i.message));
   device.onuncapturederror = (e) => log('GPU error: ' + e.error.message);
 
-  const canvas = document.getElementById('c');
+  const canvas = seaApi.canvas || document.getElementById('c');
   const ctx = canvas.getContext('webgpu');
   const swapFormat = navigator.gpu.getPreferredCanvasFormat();
   ctx.configure({ device, format: swapFormat, alphaMode: 'opaque', usage: TU.RENDER_ATTACHMENT | TU.COPY_SRC });
@@ -309,12 +318,16 @@ async function main() {
   // Water height under the camera (async readback, a few frames of latency) so the
   // floating camera rides above passing crests instead of clipping into them.
   const probePipe = await computePipe(HEIGHT_PROBE, 'height probe');
-  const probeOut = mkBuf(16, GU.STORAGE | GU.COPY_SRC, 'probe out');
-  const probeRead = mkBuf(16, GU.MAP_READ | GU.COPY_DST, 'probe read');
-  const bgProbe = bg(probePipe, [{ buffer: frameUBO }, fullArr(dispTex), samplerSim, { buffer: probeOut }], 'probe');
+  const PROBE_N = 1 + seaApi.MAX_POINTS;   // slot 0 is upstream's (the water under the sea's camera), slots 1.. are the page's points
+  const probeOut = mkBuf(PROBE_N * 4, GU.STORAGE | GU.COPY_SRC, 'probe out');
+  const probeRead = mkBuf(PROBE_N * 4, GU.MAP_READ | GU.COPY_DST, 'probe read');
+  const probePts = mkBuf(seaApi.MAX_POINTS * 8, GU.STORAGE | GU.COPY_DST, 'probe points');
+  const bgProbe = bg(probePipe, [{ buffer: frameUBO }, fullArr(dispTex), samplerSim, { buffer: probeOut }, { buffer: probePts }], 'probe');
   let probePending = false, waterH = 0;
   const onProbe = () => {
-    waterH = new Float32Array(probeRead.getMappedRange(0, 16))[0];
+    const hh = new Float32Array(probeRead.getMappedRange(0, PROBE_N * 4));
+    waterH = hh[0];
+    seaApi.heights.set(hh.subarray(1, PROBE_N)); seaApi.heightFrame = frameIndex;
     probeRead.unmap();
     probePending = false;
   };
@@ -366,7 +379,7 @@ async function main() {
   let downPasses = [], upPasses = [], downBGs = [], upBGs = [], bgComp = null;
 
   function resize() {
-    const fw = Number(qs.get('w')) || 0, fh = Number(qs.get('h')) || 0;
+    const fw = Number(qs.get('w')) || (seaApi.size ? seaApi.size.w : 0), fh = Number(qs.get('h')) || (seaApi.size ? seaApi.size.h : 0);
     const dpr = window.devicePixelRatio || 1;
     const w = fw || Math.max(1, Math.round(canvas.clientWidth * dpr));
     const h = fh || Math.max(1, Math.round(canvas.clientHeight * dpr));
@@ -469,7 +482,7 @@ async function main() {
   addEventListener('keydown', (e) => { keys[e.code] = true; if (e.code === 'KeyH') togglePanel(); });
   addEventListener('keyup', (e) => { keys[e.code] = false; });
   addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
-  canvas.addEventListener('click', () => { if (document.pointerLockElement !== canvas) canvas.requestPointerLock(); });
+  canvas.addEventListener('click', () => { if (!seaApi.camera && document.pointerLockElement !== canvas) canvas.requestPointerLock(); });
   let dragging = false;
   canvas.addEventListener('mousedown', (e) => { if (e.button === 2) dragging = true; });
   addEventListener('mouseup', () => { dragging = false; });
@@ -485,6 +498,7 @@ async function main() {
   }, { passive: true });
 
   function updateCamera(dt) {
+    if (seaApi.camera) { const c = seaApi.camera; cam.x = c.x; cam.y = c.y; cam.z = c.z; cam.yaw = c.yaw; cam.pitch = c.pitch; if (c.fovY) cam.fovY = c.fovY; return; }
     const cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw), cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
     let mx = 0, my = 0, mz = 0;
     const fwd = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0);
@@ -743,6 +757,7 @@ async function main() {
 
     writeFrame(simTime);
     writeSimStatic();
+    device.queue.writeBuffer(probePts, 0, seaApi.points);
     simF[52] = simTime; simF[53] = dt;
     device.queue.writeBuffer(simUBO, 0, simF);
     writeFoamUniforms(dt);
@@ -771,7 +786,7 @@ async function main() {
     encodeSim(cp);
     cp.setPipeline(probePipe);
     cp.setBindGroup(0, bgProbe);
-    cp.dispatchWorkgroups(1);
+    cp.dispatchWorkgroups(1 + seaApi.count);
     cp.setPipeline(skyViewPipe);
     cp.setBindGroup(0, bgSkyView);
     cp.dispatchWorkgroups(Math.ceil(SKY_W / 8), Math.ceil(SKY_H / 8));
@@ -832,7 +847,7 @@ async function main() {
 
     let doProbe = false;
     if (!probePending && (frameIndex & 7) === 0) {
-      enc.copyBufferToBuffer(probeOut, 0, probeRead, 0, 16);
+      enc.copyBufferToBuffer(probeOut, 0, probeRead, 0, PROBE_N * 4);
       doProbe = true;
     }
     let doTs = false;
