@@ -354,6 +354,12 @@ export const INSCOPE_ARRIVALS_SINCE_V4435 = Object.freeze([
         why: "makeSceneMesh (c4ff58d2): each voxel structure, lathed or extruded solid is a mesh entry the path tracer reads as `bvh: new MeshBVH(tris)` -- a USER of meshBVH's build, at test-scene scale" }),
     Object.freeze({ file: "render/denoiseScenes-selfcheck.mjs", at: "v4868",
         why: "its gate's section 11 (c4ff58d2), which reads each mesh scene's BVH back -- its triangle count and footprint against the mesh it was built from" }),
+    // v4891 -- the denoiser arc's rounds 31-34 (pre-registration sections 93-100). Found by the ship verdict's quick sweep, not by the
+    // rounds -- the fourth arrival here seen by a sweep rather than by its author. Neither builds or walks a BVH: each names one to refuse it.
+    Object.freeze({ file: "render/denoiseUpscaleGPU.mjs", at: "v4891",
+        why: "packSpheres refuses a scene entry carrying `bvh` by name: the coverage kernel intersects spheres only, so a mesh scene is an error, not a BVH user" }),
+    Object.freeze({ file: "render/denoiseUpscaleGPU-selfcheck.mjs", at: "v4891",
+        why: "its section 2 hands packSpheres a `{ bvh: {} }` entry to see that refusal by name -- the term as a fixture, with no BVH built" }),
 ]);
 
 /**

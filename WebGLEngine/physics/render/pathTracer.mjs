@@ -473,6 +473,10 @@ export function render(scene, { w = 48, h = 48, spp = 64, seed = 1, eye = [0, 0,
                                 strat = false, plantNoJitter = false, plantOneStratum = false,
                                 // v3500 -- stratify the PATH dimensions as well as the pixel ones.
                                 pathStrat = false,
+                                // denoiser arc, round 32 -- a SUB-PIXEL OFFSET of the whole pixel grid, [dx, dy] in pixels: every ray of pixel
+                                // (x, y) leaves through (x + dx + fx, y + dy + fy). A temporal upscale's jitter. Off (null) it adds nothing,
+                                // and an offset of [0, 0] is the same frame bit for bit (fx + 0 is fx).
+                                pixelOffset = null,
                                 ...rest } = {}) {
     // v3475 -- PER-PIXEL SEEDING, AND IT IS A CORRECTNESS REQUIREMENT RATHER THAN A TIDINESS ONE. With one
     // streamed generator, rendering a 64x64 REGION consumes a different random sequence than rendering the same
@@ -490,6 +494,7 @@ export function render(scene, { w = 48, h = 48, spp = 64, seed = 1, eye = [0, 0,
     const streamed = streamRng ? rng(seed >>> 0) : null;
     const pixelRand = (x, y) => streamed || rng(((seed * 73856093) ^ (x * 19349663) ^ (y * 83492791)) >>> 0);
     const B = cameraBasis({ eye, look, up, fovDeg });
+    const ox = pixelOffset ? pixelOffset[0] : 0, oy = pixelOffset ? pixelOffset[1] : 0;
     // A REGION is a sub-rectangle of the SAME camera, never a re-aimed one: the frustum is unchanged and only
     // which pixels get walked changes. Re-aiming would give a different projection and the crop identity below
     // would quietly stop holding.
@@ -538,7 +543,7 @@ export function render(scene, { w = 48, h = 48, spp = 64, seed = 1, eye = [0, 0,
                     fx = (cx + (plantNoJitter ? 0.5 : r1)) / nStrat;
                     fy = (cy + (plantNoJitter ? 0.5 : r2)) / nStrat;
                 } else { fx = r1; fy = r2; }
-                const dir = pixelRay(x, y, fx, fy, w, h, B);
+                const dir = pixelRay(x, y, fx + ox, fy + oy, w, h, B);
                 const L = trace(eye, dir, scene, rand,
                                 { maxDepth, rrQ, sky, nee, plantGlobalGuard, plantDoubleCount, rgb,
                                   strata: pathStrat ? { n: nStrat, i: s, shuffle: perm } : null, ...rest });

@@ -715,9 +715,12 @@ export async function timingDevice(adapter, bytes) {
  * Returns { adapter, sets, rows: { [set]: [{ H, W, skipped, reason, wall, gpu, perPass, timestamps, mpxPerS, order }] },
  * speedup: { [set]: [{ H, W, measured, clock, ratio }] } -- for each set after the first, the first set's median over its
  * own, on the device's clock where both have one (round 14: three sets, r12 the reference) -- and invisible: { [set]: bool } }.
+ * `trace` (round 35, section 101): called with a short line BEFORE each step -- a size's adapter and device, each set's build,
+ * each round's timing, the output check, the device's release -- so a process that dies in the ladder leaves its last step
+ * behind where the caller writes it. It changes nothing the ladder does.
  */
 export async function timingLadder(net, newAdapter, { sizes = TIMING_SIZES, sets = KERNEL_SETS, rounds = 3, capMs = 1500, totalMs = 120000, C = net.layers[0].Cin,
-                                                      warmup = 2, minReps = 3, maxReps = 30, budgetMs = 2000 } = {}) {
+                                                      warmup = 2, minReps = 3, maxReps = 30, budgetMs = 2000, trace = () => {} } = {}) {
     const now = () => (globalThis.performance ?? Date).now(), start = now();
     const rows = Object.fromEntries(sets.map((s) => [s, []])), last = {}, invisible = {};
     let adapter = null;
@@ -729,23 +732,28 @@ export async function timingLadder(net, newAdapter, { sizes = TIMING_SIZES, sets
         }
         const live = sets.filter((s) => !skip[s]);
         if (!live.length) { for (const s of sets) rows[s].push({ H, W, skipped: true, reason: skip[s] }); continue; }
+        trace(`${W}x${H}: requestAdapter`);
         const a = await newAdapter();
         adapter = adapter || adapterOf(a);
+        trace(`${W}x${H}: requestDevice for ${live.join(",")}`);
         const dev = await timingDevice(a, bytes);
         if (!dev) { for (const s of sets) rows[s].push({ H, W, skipped: true, reason: skip[s] || `a ${(bytes / 2 ** 20).toFixed(0)} MiB buffer is over the adapter's limit` }); continue; }
         try {
             const x = timingInput(H, W, C), Ds = {}, got = {}, order = [];
-            for (const s of live) { Ds[s] = await createDeviceDenoiser(dev, net, { H, W, C, kernels: s }); got[s] = { wall: [], gpu: [], perPass: [], elapsed: [], timestamps: false, passes: null }; }
+            for (const s of live) { trace(`${W}x${H}: build ${s}`); Ds[s] = await createDeviceDenoiser(dev, net, { H, W, C, kernels: s }); got[s] = { wall: [], gpu: [], perPass: [], elapsed: [], timestamps: false, passes: null }; }
             for (let r = 0; r < rounds; r++) for (const s of (r % 2 ? [...live].reverse() : live)) {
+                trace(`${W}x${H}: round ${r} time ${s}`);
                 const t = await Ds[s].time(x, { warmup: r ? 1 : warmup, minReps: Math.ceil(minReps / rounds), maxReps: Math.ceil(maxReps / rounds), budgetMs: budgetMs / rounds });
                 const g = got[s]; order.push(s);
                 g.wall.push(...t.wall); g.elapsed.push(...t.elapsed); g.timestamps = t.timestamps; g.passes = t.passes;
                 if (t.gpu) { g.gpu.push(...t.gpu); g.perPass.push(...t.perPass); }
             }
             for (const s of live) if (invisible[s] === undefined) {
+                trace(`${W}x${H}: output check ${s}`);
                 const timed = await Ds[s].output(), plain = (await Ds[s].run(x)).y;
                 invisible[s] = timed.length === plain.length && timed.every((v, i) => Object.is(v, plain[i]));
             }
+            trace(`${W}x${H}: destroy the denoisers`);
             for (const s of live) Ds[s].destroy();
             for (const s of sets) {
                 if (skip[s]) { rows[s].push({ H, W, skipped: true, reason: skip[s] }); continue; }
@@ -756,8 +764,9 @@ export async function timingLadder(net, newAdapter, { sizes = TIMING_SIZES, sets
                                mpxPerS: (H * W / 1e6) / (wall.median / 1000) });
                 last[s] = { ms: elapsed.median, px: H * W };
             }
-        } finally { dev.destroy(); }
+        } finally { trace(`${W}x${H}: destroy the device`); dev.destroy(); }
     }
+    trace("ladder done");
     const A = sets[0], speedup = {};
     for (const B of sets.slice(1)) speedup[B] = rows[A].map((a, i) => {
         const b = rows[B][i];

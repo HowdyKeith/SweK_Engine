@@ -163,9 +163,13 @@ export const SPLITS_HALFRES = Object.freeze({
 export const SPLITS_EMITTER = Object.freeze({
     T1: Object.freeze({ family: "R+C", families: Object.freeze([...rep("R", 6), ...rep("C", 6)]), seeds: Object.freeze([...range(44000, 6), ...range(45000, 6)]) }),
 });
+/** Round 32 (section 95): twelve new images for the temporal upscale, six R and six C as round 30's, on seeds no round has used. */
+export const SPLITS_TEMPORALUP = Object.freeze({
+    T1: Object.freeze({ family: "R+C", families: Object.freeze([...rep("R", 6), ...rep("C", 6)]), seeds: Object.freeze([...range(46000, 6), ...range(47000, 6)]) }),
+});
 /** The family of a split's i-th scene: its own entry in `families` when the split mixes them, else the split's. */
 export const familyOf = (split, i) => (split.families ? split.families[i] : split.family);
-const RESERVED = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER].flatMap((S) => Object.values(S).flatMap((s) => s.seeds)));
+const RESERVED = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, SPLITS_TEMPORALUP].flatMap((S) => Object.values(S).flatMap((s) => s.seeds)));
 export const isDatasetSeed = (seed) => RESERVED.has(seed);
 
 /** The render seeds of a scene: the input, the reference and the second reference -- distinct for every scene seed. */
@@ -382,10 +386,11 @@ function makeSceneMesh(family, seed) {
  * microfacet one, 1 where the ray meets the sky or an emitter -- neither has a surface colour to divide out) and the
  * unit normal (0 on sky). Both H x W x 3, channels last.
  */
-export function guideBuffers(S, w = IMAGE, h = IMAGE) {
-    const B = cameraBasis(S), albedo = new Float64Array(w * h * 3), normal = new Float64Array(w * h * 3);
+export function guideBuffers(S, w = IMAGE, h = IMAGE, offset = null) {
+    // round 32: `offset` [dx, dy] shifts the pixel grid as the path tracer's pixelOffset does, so a jittered frame's guides are its own
+    const B = cameraBasis(S), albedo = new Float64Array(w * h * 3), normal = new Float64Array(w * h * 3), ox = offset ? offset[0] : 0, oy = offset ? offset[1] : 0;
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-        const hit = intersect(S.eye, pixelRay(x, y, 0.5, 0.5, w, h, B), S.scene), i = (y * w + x) * 3;
+        const hit = intersect(S.eye, pixelRay(x, y, 0.5 + ox, 0.5 + oy, w, h, B), S.scene), i = (y * w + x) * 3;
         let c = [1, 1, 1];
         if (hit && !hit.sphere.emit) {
             const src = hit.sphere.roughness !== undefined ? (hit.sphere.F0 ?? 1) : hit.sphere.albedo;

@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "906c8ac71b0f0fef8fcc2a6a7c9dd4bd179645e0",
+ "head": "7fbce89e091720d0b7f80142f37350006854f609",
  "bodies": {
   "box3d": [
    {
@@ -751,8 +751,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3698175,
-    "sha": "906c8ac71b0f0fef8fcc2a6a7c9dd4bd179645e0"
+    "bytes": 3697562,
+    "sha": "98ee18760cdc6b7e478855d939c94f97b04bc5e7"
    },
    {
     "path": "mpm3d.html",
@@ -1218,8 +1218,8 @@
    },
    {
     "path": "tools/ship/aiPresenceOrb-selfcheck.mjs",
-    "bytes": 49321,
-    "sha": "22faf54c99259df4936b00cf5f565a26ef8efa04"
+    "bytes": 50237,
+    "sha": "adaf1b9a8b109db0b04b7e114b845257419707d2"
    },
    {
     "path": "tools/ship/aiPresenceOrbPresent-selfcheck.mjs",

@@ -92,6 +92,10 @@
 //   R66 the committed results' first D-composited effect edited to -20           2 RED -- the rule row and P6
 //   R67 the committed results' network sha-256 edited                            1 RED
 //   R68 the committed results' B at an emitter-free image moved one digit        2 RED -- the verdict row (its d) and the bit-for-bit row
+//   R69 (section 96) section 95's rule sending both-supported to single-frame     1 RED -- the rule row
+//   R70 the rule ignoring H2                                                     1 RED -- the rule row
+//   R71 temporalUpSets' H2 comparator swapped to B1                               3 RED -- the round's config row, the verdict row, the predictions
+//   R72 P2's bound widened to +3.1 (so the miss would read as a hit)              1 RED -- the predictions row
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -623,6 +627,52 @@ console.log("\n17. ROUND 30: THE EMITTERS TAKEN OUT OF THE UPSCALE (pre-registra
         ok("  ...and section 91's seven predictions, read off the file: all seven held", Object.values(P).every(Boolean),
             Object.entries(P).map(([k, v]) => `${k} ${v ? "held" : "FAILED"}`).join(", "));
     } else ok("!! section 92 reads render/denoise-results-emitter.json, and it is not there", false);
+}
+
+console.log("\n18. ROUND 32: THE TEMPORAL UPSCALE (pre-registration section 95)");
+{
+    const { runTemporalUpscaleStudy, temporalUpFrames, temporalUpSets, ROUND_TEMPORALUP, RESULTS_TEMPORALUP } = await imp("render/denoiseStudy.mjs");
+    const { SPLITS_TEMPORALUP } = await imp("render/denoiseScenes.mjs");
+    ok("!! ROUND_TEMPORALUP is section 95's: SPLITS_TEMPORALUP at 256 x 256, the sign-flip test, the results file named, and temporalUpSets the two hypotheses' columns",
+        ROUND_TEMPORALUP.splits === SPLITS_TEMPORALUP && ROUND_TEMPORALUP.image === 256 && ROUND_TEMPORALUP.test === "signflip" && ROUND_TEMPORALUP.results === RESULTS_TEMPORALUP &&
+        RESULTS_TEMPORALUP === "render/denoise-results-temporalup.json" && temporalUpSets({ B1: 1, Bt: 2, Dt: 3 }).H1.filter === 1 && temporalUpSets({ B1: 1, Bt: 2, Dt: 3 }).H2.filter === 3 &&
+        typeof temporalUpFrames === "function");
+    // the whole study, end to end, on three scenes outside every split at 24 x 24: every table filled, C4 and C5 held, a verdict made
+    const shipped = JSON.parse(fs.readFileSync(path.join(ENG, "render", "denoise-net-r11.json"), "utf8")), { decodeNet } = await imp("render/denoiseDevice.mjs");
+    const out = runTemporalUpscaleStudy({ splits: { T1: { family: "R+C", families: ["R", "C", "R"], seeds: [990000, 990001, 990004] } }, net: decodeNet(shipped.net), image: 24, sppIn: 2, sppRef: 8 });
+    ok("  runTemporalUpscaleStudy end to end on three scenes outside every split: every table three long and finite, C4 and C5 held, the verdict made",
+        ["Bt", "B1", "Dt", "D1", "BtNoClamp", "DtAware", "noisyHalf", "noisyFull1", "floor"].every((k) => out.tables[k].length === 3 && out.tables[k].every(Number.isFinite)) &&
+        out.determinism === true && out.seedsDistinct === true && out.seedCount === 54 && !!out.verdict && !!out.verdict.run && out.secondary.history.length === 3,
+        `run ${out.verdict.run}`);
+    // SECTION 96: round 32's verdict, re-derived from the committed results file -- verdict() over its own tables through
+    // temporalUpSets, the one definition of the hypotheses' columns, and section 95's rule as code
+    const tfile = path.join(ENG, RESULTS_TEMPORALUP);
+    if (!fs.existsSync(tfile)) console.log(`  SKIP  section 96: ${RESULTS_TEMPORALUP} not in this tree`);
+    else {
+        const res = JSON.parse(fs.readFileSync(tfile, "utf8")), T = res.tables, X = res.secondary, crypto = await import("node:crypto");
+        ok("!! section 96: the file is the harvest of the commit carrying section 95, at 256 x 256 over eight jittered frames, with the network the page ships",
+            res.commit === "75052a02" && res.config.image === 256 && res.config.frames === 8 && res.config.split.n === 12 &&
+            res.shipped.sha256 === crypto.createHash("sha256").update(fs.readFileSync(path.join(ENG, "render", "denoise-net-r11.json"))).digest("hex"),
+            `${res.commit}; sha-256 ${res.shipped.sha256.slice(0, 12)}`);
+        const again = verdict({ sets: temporalUpSets(T), shuffled: null, c2Prior: ROUND_TEMPORALUP.c2Prior, determinism: res.determinism, seedsDistinct: res.seedsDistinct, test: ROUND_TEMPORALUP.test });
+        const H = again.hypotheses;
+        ok("!! *** section 96: verdict() over the committed round 32 tables gives the file's verdict -- REPORTED, H1 SUPPORTED (12 of 12, p 1/4096 under 0.025), H2 SUPPORTED (11 of 12, p 0.00073 under 0.05) ***",
+            JSON.stringify(again) === JSON.stringify(res.verdict) && again.run === "reported" && H.H1.status === "supported" && H.H1.k === 12 && H.H1.p === 1 / 4096 &&
+            H.H2.status === "supported" && H.H2.k === 11 && Math.abs(H.H2.p - 3 / 4096) < 1e-15 && H.H1.c1.ok && H.H2.c1.ok && res.determinism && res.seedsDistinct && res.seedCount === 216,
+            `H1 mean d ${H.H1.meanD.toFixed(3)}, H2 mean d ${H.H2.meanD.toFixed(3)}`);
+        // section 95's rule: both supported -> the accumulation to the device; H1 alone -> the half-size lead was a single frame's; H1 not -> the suspects
+        const rule96 = (v) => (v.run !== "reported" ? "recorded" : v.hypotheses.H1.status !== "supported" ? "suspects" : v.hypotheses.H2.status === "supported" ? "device" : "single-frame");
+        const flip = (k) => ({ ...again, hypotheses: { ...again.hypotheses, [k]: { ...again.hypotheses[k], status: "not supported" } } });
+        ok("!! *** section 96's rule, as section 95 fixed it: both supported, so the accumulation goes to the device and is timed on the rig -- denoise-temporalup-device ***",
+            rule96(again) === "device" && rule96(flip("H2")) === "single-frame" && rule96(flip("H1")) === "suspects" && rule96({ ...again, run: "not reported" }) === "recorded");
+        // the five predictions, read off the file -- they decided nothing, and section 96 says which held
+        const mean = (a) => a.reduce((x, v) => x + v, 0) / a.length;
+        const P = { P1: H.H1.meanD >= 0.05 && H.H1.meanD <= 0.40 && H.H1.k >= 10, P2: H.H2.meanD >= 0.5 && H.H2.meanD <= 3.0 && H.H2.k >= 10, P3: H.H1.c1.ok && H.H2.c1.ok,
+                    P4: mean(X.clamp) > 0, P5: X.history.every((h) => h.meanN >= 3 && h.meanN <= 7) };
+        ok("  section 96's account of section 95's predictions: P1, P3, P4 and P5 held; P2 missed -- H2's mean d +3.016 is over its predicted +3.0",
+            P.P1 && !P.P2 && P.P3 && P.P4 && P.P5 && H.H2.meanD > 3.0 && H.H2.meanD < 3.05 && H.H2.k === 11,
+            `clamp mean d ${mean(X.clamp).toFixed(3)} (${X.clamp.filter((v) => v > 0).length} of 12); history ${Math.min(...X.history.map((h) => h.meanN)).toFixed(2)}-${Math.max(...X.history.map((h) => h.meanN)).toFixed(2)} frames`);
+    }
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +

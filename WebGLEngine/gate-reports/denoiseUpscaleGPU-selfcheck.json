@@ -1,0 +1,141 @@
+{
+ "gate": "render/denoiseUpscaleGPU-selfcheck.mjs",
+ "at": "2026-10-21",
+ "tables": [
+  {
+   "title": "section 94: today's page against the half-size chain at 1920 x 1080, ms",
+   "columns": [
+    "GPU",
+    "run",
+    "today's page",
+    "the chain",
+    "ratio",
+    "rings"
+   ],
+   "rows": [
+    [
+     "intel-gen9",
+     "a",
+     1591.538,
+     1035.266,
+     1.537,
+     87
+    ],
+    [
+     "intel-gen9",
+     "b",
+     1606.13,
+     1167.586,
+     1.376,
+     87
+    ],
+    [
+     "gtx1080",
+     "a",
+     92.192,
+     64.079,
+     1.439,
+     87
+    ],
+    [
+     "gtx1080",
+     "b",
+     89.517,
+     60.543,
+     1.479,
+     87
+    ]
+   ],
+   "note": null
+  },
+  {
+   "title": "section 98: today's page against the chain with its history at 1920 x 1080, ms",
+   "columns": [
+    "GPU",
+    "run",
+    "today's page",
+    "the chain with its history",
+    "the history's passes",
+    "ratio",
+    "all gates green"
+   ],
+   "rows": [
+    [
+     "intel-gen9",
+     "a",
+     1369.106,
+     1029.191,
+     86.12700000000001,
+     1.33,
+     "yes"
+    ],
+    [
+     "intel-gen9",
+     "b",
+     1410.696,
+     1071.738,
+     83.07199999999999,
+     1.316,
+     "yes"
+    ],
+    [
+     "gtx1080",
+     "a",
+     92.337,
+     65.709,
+     1.915,
+     1.405,
+     "yes"
+    ],
+    [
+     "gtx1080",
+     "b",
+     92.735,
+     62.573,
+     1.875,
+     1.482,
+     "no"
+    ]
+   ],
+   "note": null
+  },
+  {
+   "title": "section 100: the ring fill against the list fill at 960 x 540, ms",
+   "columns": [
+    "GPU",
+    "run",
+    "ring fill",
+    "list fill",
+    "listed",
+    "rings",
+    "left",
+    "chain ratio with the list fill"
+   ],
+   "rows": [
+    [
+     "intel-gen9",
+     "a",
+     301.6,
+     23.9,
+     25765,
+     87,
+     0,
+     2.042
+    ],
+    [
+     "intel-gen9",
+     "b",
+     302.8,
+     23,
+     25765,
+     87,
+     0,
+     2.179
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

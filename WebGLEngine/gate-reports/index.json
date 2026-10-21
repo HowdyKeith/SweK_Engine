@@ -13,6 +13,7 @@
   "conv2d-selfcheck.json",
   "denoiseDevice-selfcheck.json",
   "denoiseTiming-selfcheck.json",
+  "denoiseUpscaleGPU-selfcheck.json",
   "detourScale-selfcheck.json",
   "dielectricWalk-selfcheck.json",
   "emitReproducibility-selfcheck.json",

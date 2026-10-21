@@ -449,6 +449,126 @@ node tools/denoiseDevice.mjs --which
   200 s on the Intel and under 120 s on the 1080.
 - **Send back the JSON file and the `--which` line from each GPU.**
 
+### Round 31: the half-size chain timed at 1920 x 1080 (pre-registration section 93)
+
+On each GPU, in a fresh clone of a commit carrying section 93:
+
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r31-a.json
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r31-b.json
+```
+
+- **What is new:** the denoise group now has a fourth gate, `render/denoiseUpscaleGPU-selfcheck.mjs`. On a GPU it times round
+  30's chain at 1920 x 1080 against today's page, in two `section 93:` lines.
+- **Section 93 predicts:** the chain is faster on both GPUs, by 1.4-3.0 x on the 1080 and 2.0-4.0 x on the Intel; every gate
+  green; the fill uses fewer than its 96 rings.
+- **Don't commit or pull between runs.**
+- **Send back all four JSON files.**
+
+**The outcome (section 94): the half-size chain is cheaper than today's page at 1080p on both GPUs.** 1.439 and 1.479 x on
+the 1080, and 1.537 and 1.376 x on the Intel. Every gate was green, and the fill reached every pixel in 87 of its 96 rings. The
+chain's own steps cost more than its network, so the next speed work is `denoise-halfres-fixed-costs`. By section 93's rule the
+arc's next round is `denoise-fsr2-temporal`. Nothing to install.
+
+### Round 33: the history on the device, timed at 1920 x 1080 (pre-registration section 97)
+
+On each GPU, in a fresh clone of a commit carrying section 97:
+
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r33-a.json
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r33-b.json
+```
+
+- **What is new:** the chain gate also runs round 32's history on the GPU: first hits, the shift, the accumulation and the
+  composite. Its section 6 checks them against the CPU, and on a GPU a `section 97:` line times them beside section 93's.
+- **Section 97 predicts:** the chain with its history is faster than today's page, by 1.3-1.5 x on the 1080 and 1.25-1.55 x on
+  the Intel; every gate green.
+- **Don't commit or pull between runs.**
+- **Send back all four JSON files.**
+
+**The outcome so far (section 98): on the Intel the chain with its history is still cheaper than today's page.** It was 1.330
+and 1.316 x, with every gate green, and the history's passes cost 83-86 ms. The 1080's run a was green at 1.405 x. Its run b
+does not count: `render/denoiseTiming-selfcheck.mjs` died 17.7 s in, with no FAIL line. **The 1080 owes one run**, from a
+checkout of 468766f9 (section 98's commit; later commits change the chain's code):
+
+```
+git checkout 468766f9
+cd WebGLEngine
+set SWEK_WEBGPU=
+node render/denoiseTiming-selfcheck.mjs
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r33-b2.json
+```
+
+- **Send back the first line's console output and the JSON file.** The first line runs the timing gate alone. It reports where
+  the gate dies and decides nothing.
+
+### Round 34: the fill over the lights' pixels only, timed at 1920 x 1080 (pre-registration section 99)
+
+On the 1080, do round 33's owed run above first. Then, on each GPU, in a fresh clone of a commit carrying section 99:
+
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r34-a.json
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r34-b.json
+```
+
+- **What is new:** the chain gate also runs round 31's fill over the lights' pixels only, and checks it against the CPU and
+  against the whole-frame fill on the GPU. A `section 99:` line times the two fills side by side.
+- **Section 99 predicts:** the list fill is faster on both GPUs: 1-6 ms against 20-23 on the 1080, and 15-80 ms against
+  300-323 on the Intel. Every gate is green.
+- **Don't commit or pull between runs.**
+- **Send back all four JSON files.**
+
+**The outcome so far (section 100): on the Intel the list fill holds.** It took 23.9 and 23.0 ms against the old fill's 301.6
+and 302.8. The chain went from 1.47-1.52 x to 2.04-2.18 x against today's page, with every gate green. The 1080 has no run
+yet: its clone was still on the detached 468766f9 checkout, and `git pull` does not move a detached checkout. Its two runs are
+part of round 35, below.
+
+### Round 35: the GTX 1080's native crash (pre-registration section 101)
+
+The GTX 1080 only. First put the clone back on the branch. `git pull` alone will not do it after `git checkout 468766f9`:
+
+```
+cd C:\SweK_r33
+git fetch origin ccr-6c3eeb7c-pxz6kx
+git checkout ccr-6c3eeb7c-pxz6kx
+git pull origin ccr-6c3eeb7c-pxz6kx
+git log -1 --oneline
+```
+
+`git log -1 --oneline` must show the branch's latest commit, not 468766f9. Then:
+
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+set SWEK_TIMING_TRACE=%CD%\trace35-alone-1.txt
+node render/denoiseTiming-selfcheck.mjs
+echo %ERRORLEVEL%
+set SWEK_TIMING_TRACE=%CD%\trace35-alone-2.txt
+node render/denoiseTiming-selfcheck.mjs
+echo %ERRORLEVEL%
+set SWEK_TIMING_TRACE=%CD%\trace35-alone-3.txt
+node render/denoiseTiming-selfcheck.mjs
+echo %ERRORLEVEL%
+set SWEK_TIMING_TRACE=%CD%\trace35-r34-a.txt
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r34-a-1080.json
+set SWEK_TIMING_TRACE=%CD%\trace35-r34-b.txt
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r34-b-1080.json
+set SWEK_TIMING_TRACE=
+```
+
+- **What is new:** the timing gate writes each step of its native ladder to the trace file before running it, so a crash
+  leaves its last step behind. The JSON report now keeps each gate's exit code and the end of its stderr.
+- **Section 101 predicts:** at least one of the three solo runs dies, with exit code 3221225477, and its trace ends on a
+  device step: requestAdapter, requestDevice or destroy.
+- **Don't commit or pull between runs.**
+- **Send back** the console output with its three `echo` lines, the five `trace35-*.txt` files, and the two JSON files.
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and

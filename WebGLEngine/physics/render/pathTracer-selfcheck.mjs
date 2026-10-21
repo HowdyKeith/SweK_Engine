@@ -145,5 +145,19 @@ const stats = (img, mask) => {
        "v3471 proved q is a parameter that must not matter for a two-state system; here it must not matter for an IMAGE either, which is a different claim about the same property.");
 }
 
+// denoiser arc, round 32: pixelOffset, a temporal upscale's jitter. [0, 0] is the frame unchanged, bit for bit; and with every
+// ray at its pixel's centre (one stratified sample, no jitter) and only first hits counted (maxDepth 1, no NEE), a one-pixel
+// offset makes pixel x what pixel x + 1 was -- on a scene whose sky is in view, so the frame is not all zeros
+{
+    const scene = [{ centre: [0, -100, 0], radius: 100, albedo: [0.5, 0.5, 0.5] }, { centre: [0, 1, 0], radius: 0.5, albedo: 0, emit: [6, 5, 4] }];
+    const o = (x) => ({ w: 24, h: 16, spp: 1, strat: true, plantNoJitter: true, maxDepth: 1, nee: false, rgb: true, eye: [0, 1, 4], look: [0, 0.6, 0],
+                        fovDeg: 50, sky: (d) => 0.5 + 0.5 * d[1], seed: 5, ...x });
+    const a = render(scene, o({})), z = render(scene, o({ pixelOffset: [0, 0] })), s1 = render(scene, o({ pixelOffset: [1, 0] }));
+    let shift = 0, n = 0;
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 23; x++) for (let c = 0; c < 3; c++) { n++; if (Object.is(s1[(y * 24 + x) * 3 + c], a[(y * 24 + x + 1) * 3 + c])) shift++; }
+    ok("round 32: pixelOffset [0, 0] is the frame bit for bit, and a one-pixel offset is the next pixel's first hit, exactly",
+       a.every((v, i) => Object.is(v, z[i])) && shift === n && new Set(Array.from(a)).size > 3, `${shift} of ${n} values; ${new Set(Array.from(a)).size} distinct in the frame`);
+}
+
 console.log(fails ? "\npathTracer-selfcheck: " + fails + " FAILED" : "\npathTracer-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);

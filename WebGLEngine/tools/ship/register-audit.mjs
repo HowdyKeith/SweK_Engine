@@ -10,7 +10,7 @@
  * reading stdout. Rewritten by tools/ship/freezeRegisterAudit.mjs.
  */
 export const REGISTER_AUDIT = Object.freeze({
- "at": "v4879",
- "capMs": 120000,
+ "at": "v4892",
+ "capMs": 900000,
  "rows": []
 });

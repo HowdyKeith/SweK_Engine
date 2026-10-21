@@ -45,7 +45,7 @@ export function gateList(root = ENG) {
     // (what a pass costs, 64 x 64 up to a 1080p frame -- render/learned-denoiser-preregistration.md section 37); round 14
     // adds its compile gate (each kernel's build and pass time under each native compiler and in the browser, section 43)
     return [...pick("fx/fsr", /-selfcheck\.mjs$/), ...pick("render", /Tsl.*-selfcheck\.mjs$/), ...pick("render", /^translucentLayer-selfcheck\.mjs$/),
-            ...pick("render", /^denoise(Device|Timing|Compile)-selfcheck\.mjs$/)].sort();
+            ...pick("render", /^denoise(Device|Timing|Compile|UpscaleGPU)-selfcheck\.mjs$/)].sort();
 }
 
 /**
@@ -146,10 +146,15 @@ export function readAdapterLog(text, gate) {
     return { names: [...new Set(recs.map(adapterLabel))], adapters };
 }
 
-/** A gate's report entry from what its run left: its source (for its kind), its exit, its time, its stdout and the adapter log. */
-export function gateEntry({ gate, src, status, ms, stdout = "", logText = "" }) {
+/**
+ * A gate's report entry from what its run left: its source (for its kind), its exit, its time, its stdout and the adapter log.
+ * Round 35 (section 101): also the exit itself -- its status and signal -- and the last lines of its stderr. A gate on the GTX
+ * 1080 died three times with no FAIL line and the report could not say how: the status was read for `ok` and dropped.
+ */
+export function gateEntry({ gate, src, status, signal = null, ms, stdout = "", stderr = "", logText = "" }) {
     const rows = parseRows(stdout), seen = readAdapterLog(logText, gate);
-    return { entry: { gate, category: categorize(src), ok: status === 0, ms, adapters: seen.names,
+    const stderrTail = String(stderr).split(/\r?\n/).map((l) => l.trimEnd()).filter(Boolean).slice(-5).map((l) => l.slice(0, 300));
+    return { entry: { gate, category: categorize(src), ok: status === 0, ms, exit: { status: status ?? null, signal: signal ?? null }, stderrTail, adapters: seen.names,
                       software: seen.adapters.length ? seen.adapters.some((x) => x.software !== false) : null,
                       fails: rows.fails, measured: rows.measured, skips: rows.skips },
              adapters: seen.adapters };
@@ -235,8 +240,8 @@ export function runGates({ root = ENG, only = null, native = false, log = consol
         const r = spawnSync(process.execPath, [g], { cwd: root, encoding: "utf8", timeout: GATE_TIMEOUT_MS,
                                                     env: { ...process.env, SWEK_ADAPTER_LOG: logFile, ...(launchArgs ? { SWEK_LAUNCH_ARGS: launchArgs.join(" ") } : {}) } });
         // v4851 (section 66): the entry and its adapters are gateEntry's, a pure function the gate drives with fixtures
-        const { entry, adapters } = gateEntry({ gate: g, src: fs.readFileSync(path.join(root, g), "utf8"), status: r.status, ms: Date.now() - t0,
-                                                stdout: r.stdout || "", logText: fs.existsSync(logFile) ? fs.readFileSync(logFile, "utf8") : "" });
+        const { entry, adapters } = gateEntry({ gate: g, src: fs.readFileSync(path.join(root, g), "utf8"), status: r.status, signal: r.signal, ms: Date.now() - t0,
+                                                stdout: r.stdout || "", stderr: r.stderr || "", logText: fs.existsSync(logFile) ? fs.readFileSync(logFile, "utf8") : "" });
         report.gates.push(entry);
         addAdapters(report.adapters, adapters);
         log(`  ${entry.ok ? "PASS" : "FAIL"}  ${g}  [${entry.category}]  ${(entry.ms / 1000).toFixed(1)} s  on ${entry.adapters.join(", ") || "no adapter"}` +

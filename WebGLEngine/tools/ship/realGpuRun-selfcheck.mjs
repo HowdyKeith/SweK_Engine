@@ -40,9 +40,11 @@ console.log("\n1. WHAT THE RUN COVERS, AND HOW IT SORTS IT");
 const gates = gateList(ENG);
 const fsr = fs.readdirSync(path.join(ENG, "fx/fsr")).filter((f) => f.endsWith("-selfcheck.mjs")).length;
 const tsl = fs.readdirSync(path.join(ENG, "render")).filter((f) => /Tsl.*-selfcheck\.mjs$/.test(f)).length;
-ok(`every fx/fsr gate (${fsr}), every render/*Tsl* gate (${tsl}), the translucent layer's and the denoiser's three: ${gates.length} gates`,
-   gates.length === fsr + tsl + 4 && gates.includes("render/translucentLayer-selfcheck.mjs") && gates.includes("render/temporalTslCompute-selfcheck.mjs") &&
-   gates.includes("render/denoiseDevice-selfcheck.mjs") && gates.includes("render/denoiseTiming-selfcheck.mjs") && gates.includes("render/denoiseCompile-selfcheck.mjs"));
+// round 31 adds the denoiser's fourth, the half-size chain's (render/denoiseUpscaleGPU-selfcheck.mjs), which times the chain at 1080p on a GPU
+ok(`every fx/fsr gate (${fsr}), every render/*Tsl* gate (${tsl}), the translucent layer's and the denoiser's four: ${gates.length} gates`,
+   gates.length === fsr + tsl + 5 && gates.includes("render/translucentLayer-selfcheck.mjs") && gates.includes("render/temporalTslCompute-selfcheck.mjs") &&
+   gates.includes("render/denoiseDevice-selfcheck.mjs") && gates.includes("render/denoiseTiming-selfcheck.mjs") && gates.includes("render/denoiseCompile-selfcheck.mjs") &&
+   gates.includes("render/denoiseUpscaleGPU-selfcheck.mjs"));
 ok(`  ...and each may run ${GATE_TIMEOUT_MS / 60000} minutes -- the rig's Intel took 498 s over one denoiser gate when the cap was 600 s (section 42)`,
    GATE_TIMEOUT_MS >= 3 * 498000);
 const kinds = Object.fromEntries(gates.map((g) => [g, categorize(fs.readFileSync(path.join(ENG, g), "utf8"))]));
@@ -367,6 +369,16 @@ console.log("\n6. ROUND 19 (section 66, v4851): NATIVE ADAPTERS NAMED, EACH GATE
     ok(`  ...and the report entry carries them (${ge.entry.skips.length}), built by gateEntry inside runGates, its adapters merged by addAdapters`,
        JSON.stringify(ge.entry.skips) === JSON.stringify(pr.skips) && /const \{ entry, adapters \} = gateEntry\(\{ gate: g,/.test(runSrc) &&
        /report\.gates\.push\(entry\);\s*addAdapters\(report\.adapters, adapters\);/.test(runSrc));
+    // round 35 (section 101): how a gate ended -- a native crash on Windows exits 3221225477 (0xC0000005) with no FAIL line, and
+    // the report used to keep only ok: false. SABOTAGED round 35: the stderr tail cut to four lines -> 1 red; runGates not handing
+    // the signal -> 1 red; restored, sha-256 identical.
+    const died = gateEntry({ gate: GATE, src: "", status: 3221225477, signal: null, ms: 9, stdout: "", stderr: "a\r\n\r\nb\nc\nd\ne\nf\n" });
+    const killed = gateEntry({ gate: GATE, src: "", status: null, signal: "SIGTERM", ms: 9 });
+    ok("  round 35: the report entry keeps the gate's exit -- its status and its signal -- and the last five lines of its stderr, which runGates hands it",
+       died.entry.ok === false && died.entry.exit.status === 3221225477 && died.entry.exit.signal === null && JSON.stringify(died.entry.stderrTail) === JSON.stringify(["b", "c", "d", "e", "f"]) &&
+       killed.entry.exit.status === null && killed.entry.exit.signal === "SIGTERM" && killed.entry.stderrTail.length === 0 && ge.entry.exit.status === 0 &&
+       /signal: r\.signal/.test(runSrc) && /stderr: r\.stderr \|\| ""/.test(runSrc),
+       JSON.stringify(died.entry.exit) + " " + JSON.stringify(died.entry.stderrTail));
 
     // the package, and the compiler it predicts -- nativeCompiler, the rule the native gates choose their sets by
     const rec = (pkg, platform, env = {}) => nodeWebgpuRecord({ from: "/pkgs/webgpu-x/index.js", pkg, platform, env });

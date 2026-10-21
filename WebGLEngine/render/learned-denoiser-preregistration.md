@@ -6208,3 +6208,602 @@ page loads.
 
 **What it does not change.** The page, the network, the filter, every kernel table. The emitter-aware chain is a CPU reference
 until the rig round puts it on a GPU.
+
+## 93. ROUND 31 -- THE HALF-SIZE CHAIN TIMED ON THE RIG AT 1920 x 1080: FIXED BEFORE THE RIG RUNS IT
+
+**Why this round.** Section 92 supported both hypotheses at 256 x 256: a frame traced and denoised at a quarter of the pixels,
+its light sources filled out before EASU and put back at full size from the geometry, beat the full-size frame at equal samples
+on 12 of 12 images. Its rule (`rule92`) sent the arc here, as `denoise-halfres-rig-timing`: does the saving survive at 1080p on
+a GPU, once the fill, EASU, the composite and the coverage guide are paid for?
+
+> **At 1920 x 1080 output, on each GPU, is round 30's chain -- the network at 960 x 540, the coverage at both sizes, the fill,
+> EASU and the composite -- faster than today's page, the network at 1920 x 1080 with its mask?**
+
+**What exists for it (committed before this section).**
+- `render/denoiseUpscaleGPU.mjs`: the chain's kernels and their runner, through `gfx/device.js`. Coverage is
+  `render/denoiseMask.mjs`'s `emitterRadiance`, 64 rays a pixel, over the scene's spheres. The fill is round 30's ring rule, run
+  as a fixed number of ring passes, because a device cannot loop until nothing changes without a readback.
+  `fillEmittersBounded` in `render/denoiseUpscale.mjs` is that bounded form's CPU reference. Then the transfer, `fx/fsr`'s EASU
+  kernel, the clamp, the inverse and the composite, all on one encoder.
+- `render/denoiseUpscaleGPU-selfcheck.mjs` holds every step to its CPU reference. On SwiftShader: coverage 1 ray different in 8
+  frames, the fill within 1.2e-7, the whole chain within 2.3e-6 of `emitterAwareUpscale(..., "easu")`. Sabotaged G1-G9, T1-T4.
+  The gate joins `realGpuRun --only denoise`, and on a GPU its section 4 also runs the rig's size.
+- `denoise.html`'s "Time the half-size chain" (`timeHalfChain`) times both networks with the page's own `timingLadder`, on
+  the page's kernel set for the adapter (r18u on the Intel, r18t on the 1080, section 63), and each step of the chain on its own.
+
+**The arms, at 1920 x 1080 output.**
+- **Today's page, `full`:** the network at 1920 x 1080, plus the coverage at 1920 x 1080. The network reads the coverage as its
+  mask, so a GPU frame of today's page pays for it too.
+- **The chain, `half`:** the network at 960 x 540, the coverage at 960 x 540 (its mask and the fill's), the coverage at 1920 x
+  1080 (the composite's guide), the fill, and the transfer, EASU and the composite.
+- **The scene is R 990000**, not a dataset seed. Its light covers 25,765 of the half-size frame's pixels, and the fill needs 87
+  rings there (measured on the CPU). That is near the worst of the arc's: 77 for R 44004, 36 and 29 for R 44002 and 44001.
+- **The fill's budget is 96 rings, every frame.** Every ring pass runs over every pixel whether it fills any or not, so the fill
+  costs the same on any scene. A scene needing more than 96 would leave pixels at 0; the gate holds that it needed fewer.
+
+**The clocks.** The networks are timed on the device's clock wherever the adapter offers timestamps, as every timing round
+has been. The coverages and the transfer/EASU/composite step are also on the device's clock (one and three passes a frame). The
+fill is 97 passes, more than `gfx/device.js` timestamps in one frame (30), so it is on the wall clock: `performance.now()` around
+the frame and the queue's `onSubmittedWorkDone`. That includes the submit and the wait, so it can only overstate the fill. Each
+sum names the clocks it was made of. A fifth number, every step of the chain in one frame on the wall clock, is reported as a
+cross-check on the sum and decides nothing.
+
+**The test.** On each GPU, two runs of `realGpuRun --only denoise`, at a commit carrying this section:
+- **H (per GPU):** the ratio `full / half` is above 1.0 in both runs.
+- **C1:** every denoise gate is green in both runs. That includes `render/denoiseUpscaleGPU-selfcheck.mjs`'s device rows:
+  coverage, fill and chain held to the CPU on that GPU's own Chrome adapter.
+- **C2:** the fill reaches every pixel in its 96 rings, and fills on fewer than 96.
+- **C3:** both networks are on the device's clock. A run where either is on the wall clock has no verdict for that GPU.
+- **C4, reported:** the two runs' ratios, and how far apart they are.
+
+**Predicted, before any of it ran on a GPU** (from rounds 27-28's page ladders: the 1080's r18t at 1920 x 1080 is 73-75 ms a
+pass; the Intel's r18u is 1.16-1.37 s):
+- **GTX 1080:** H holds, with the ratio between 1.4 and 3.0. The network at 960 x 540 is 18-25 ms (a quarter of the pixels; a
+  smaller frame uses the GPU less well). The coverages are 1-10 ms together, the fill 3-15 ms, the rest 1-3 ms.
+- **Intel gen-9:** H holds, with the ratio between 2.0 and 4.0. The network is a larger share of its frame, so the fixed costs
+  weigh less.
+- **C2 holds** on both: the fill uses 87 rings at 960 x 540, as on the CPU.
+
+**What each outcome does.**
+- **H holds on both GPUs:** the half-size chain is cheaper than today's page at 1080p on both rigs, as well as better at equal
+  samples (section 92). Then `denoise-fsr2-temporal` (temporal accumulation over the half-size chain) is the arc's next round,
+  and putting the chain on the page as an option becomes a backlog item. The page itself does not change in this round.
+- **H fails on a GPU:** the steps are named from the run, and the backlog records where the saving went -- the fill's fixed 97
+  passes, the full-size coverage, or the network's poorer use of a smaller frame.
+- **Nothing changes in either case:** the page, the network, the filter, every kernel table, and `fx/fsr`.
+
+**Seen first, here, on SwiftShader -- a CPU's times, deciding nothing.** At the gate's pilot size (64 x 36 to 128 x 72) the
+chain ran 2.0-2.1 x as fast as the full-size network alone, before the mask was counted on the page's side.
+At 1920 x 1080, forced on SwiftShader once (`SWEK_HALFCHAIN_RIGSIZE=1`) to drive the rig's path: the fill filled on 87 of
+its 96 rings, the CPU's count exactly, and every step of the chain was timed. The network at 1920 x 1080 was not: its pass was
+predicted at 111 s, over the cap, so that run's section-93 row was red, and no ratio was made. On a GPU the pass is 0.07-1.4 s.
+
+## 94. ROUND 31 -- THE VERDICT: THE HALF-SIZE CHAIN IS CHEAPER THAN TODAY'S PAGE AT 1080p ON BOTH GPUS
+
+**What arrived.** Two `realGpuRun --only denoise` runs on each GPU, `SWEK_WEBGPU` cleared: the Intel gen-9 at 1c60b346 (the
+commit that carried section 93), and the GTX 1080 at 77aaece5 (the same, plus one sentence of section 93). Committed as received
+at 7706ce4c, before this section was written: `render/denoise-rig-r31-{a,b}-{intel-gen9,gtx1080}.json`.
+
+**Section 93's rule, read off the reports.** `render/denoiseUpscaleGPU-selfcheck.mjs`'s section 5 re-derives every figure
+here from those four files: their commits, every gate's verdict, and the chain gate's two `section 93:` lines.
+
+| | Run a | Run b | H |
+|---|---|---|---|
+| GTX 1080 (r18t): today's page against the chain, at 1920 x 1080 | 92.2 / 64.1 ms = **1.439 x** | 89.5 / 60.5 ms = **1.479 x** | **holds** |
+| Intel gen-9 (r18u) | 1,591.5 / 1,035.3 ms = **1.537 x** | 1,606.1 / 1,167.6 ms = **1.376 x** | **holds** |
+
+- **C1:** every denoise gate was green in all four runs, the chain's own device rows among them.
+- **C2:** the fill filled on 87 of its 96 rings in every run, the CPU's count, so it reached every pixel.
+- **C3:** both networks were on the device's clock in every run.
+- **C4, reported:** the 1080's two runs were 3% apart, and the Intel's 11%.
+
+**So, by section 93's rule: `denoise-fsr2-temporal` is the arc's next round.** At 1080p the half-size chain is cheaper than
+today's page on both rigs, as well as closer to the reference at equal samples (section 92). Putting the chain on the page as
+an option becomes `denoise-halfres-page` in the backlog. Nothing changes in this round: the page, the network, the filter,
+every kernel table, and `fx/fsr`.
+
+**The predictions.** They decided nothing. Section 5's last row reads each one off the reports.
+- **Held:** the 1080's ratio (1.4-3.0 predicted); its network at 960 x 540 (18.4 ms both runs, 18-25 predicted); its transfer,
+  EASU and composite (1.0 ms, 1-3 predicted); and the 87 rings on both GPUs.
+- **Missed:** the Intel's ratio, 1.376-1.537 against 2.0-4.0 predicted. The 1080's two coverages, 21.1-21.3 ms against 1-10.
+  Its fill, 20.0-23.4 ms against 3-15.
+- **Why they missed:** the chain's fixed costs were underestimated on both GPUs. The prediction for the Intel was that the
+  network would be "a larger share of its frame, so the fixed costs weigh less". That was wrong: they weighed more.
+
+**What it says, and where it stops.**
+- **The chain's own steps cost more than the network they sit beside.** Both coverages, the fill, and the transfer, EASU and
+  composite together were 42-46 ms against an 18 ms network on the 1080. On the Intel they were 728-821 ms against 308-347 ms.
+  The chain kept its lead because the network at 1920 x 1080 costs about four times the one at 960 x 540 (72.7-75.2 ms
+  against 18.4 on the 1080; 1,317-1,333 ms against 308-347 on the Intel).
+- **The full-size coverage is part of today's page too.** It was 17 ms of the 1080's page and 274 ms of the Intel's, at 64
+  rays a pixel. It is the mask the network reads, so the chain was not charged for it alone.
+- **The fill was by the wall clock, and so can only be overstated.** The chain's steps in one frame, also by the wall clock,
+  were 40.6-40.7 ms on the 1080 and 728-795 ms on the Intel. That cross-check is close to the sum of the parts.
+- **The ratios are one scene's: R 990000, a large light, 87 rings.** Every ring pass runs over every pixel, so the fill costs
+  the same on any scene with 96 rings budgeted. The coverage's cost scales with the number of spheres, and this scene's six are
+  typical of family R.
+- **`denoise-halfres-fixed-costs`** records the levers: a fill over the lights' bounding boxes, or one that stops once nothing
+  is left, exact against `fillEmittersBounded`; and fewer coverage rays, which changes the guide and so is a new quality
+  question, not the same chain made faster.
+
+## 95. ROUND 32 -- THE TEMPORAL UPSCALE: ROUND 30's CHAIN OVER EIGHT JITTERED FRAMES, FIXED BEFORE ANY OF ITS TEST SCENES EXIST
+
+Committed with the code that implements it. No scene of this round's test set has been rendered.
+
+**Why this round.** Section 94's rule: the half-size chain is cheaper than today's page at 1080p on both rigs (round 31), as
+well as better at equal samples (round 30). That made `denoise-fsr2-temporal` the next round: temporal reuse over the chain,
+where real-time path tracing gets most of its samples. Keith chose the design: the history goes after the chain, at full size,
+as FSR2 and TAA put it, so the shipped network never sees an input it was not trained on. And the half-size frames are jittered.
+
+> **Over eight frames of a moving camera, each traced at half size and jittered, does accumulating round 30's chain at full
+> size bring the measured frame closer to the reference than the same chain on that frame alone, and than full size at the
+> same samples a frame, accumulated the same way?**
+
+**Nothing is trained or tuned.** The network is round 11's seed 1, from the file the page loads; its sha-256 goes beside the
+results.
+
+**The sequence** (`render/denoiseTemporalUpscale.mjs`, on round 4's `render/denoiseTemporal.mjs`).
+- Round 4's camera path: the camera orbits the scene's look point for `FRAMES` = 8 frames, 1.5-4 degrees a frame drawn per
+  scene, and arrives at the scene's own eye. The measured frame is the last.
+- **The jitter:** frame f's pixel grid is shifted by `JITTER[f]`, `render/jitter.mjs`'s first 8 centred Halton(2, 3) offsets,
+  in that frame's own pixels. It is done through the path tracer's new `pixelOffset`, and through the same offset in
+  `guideBuffers` and in the emitter coverage, so a jittered frame's albedo, normals and mask are its own. All three are
+  default-off and held bit for bit at offset 0 by their own gates.
+- Each frame, two renders: half size (128 x 128) at 4 samples, and full size (256 x 256) at 1 sample. A full-size pixel gets
+  the same number of samples from either. The reference and second reference are 256 x 256 at 1,024 samples, from the
+  measured frame's eye, unjittered.
+
+**The arms, each against the measured frame's reference.**
+- **Bt, the candidate.** Every frame goes through round 30's chain up to EASU: the shipped network at half size, the light
+  sources filled out from that frame's own coverage, and EASU to full size. Then the frames are accumulated:
+  1. each frame is resampled to its own unjittered grid. A half-size offset is twice that at full size (`halfShift`), and the
+     resample is bilinear;
+  2. the history is reprojected by round 4's rule (same object, same point, same facing) and clamped per channel to the
+     current frame's 3 x 3 range;
+  3. it is averaged with n = min(n + 1, 8).
+
+  The light sources are composited once, after the accumulation, from the measured frame's unjittered `emitterRadiance`.
+  Composited every frame, the history would carry their radiance through the clamp into the pixels beside them: the leak round
+  30 took out of the upscale.
+- **B1:** the same chain on the measured frame alone (its own jittered frame, resampled and composited), with no history. The
+  measured frame's data is the same as Bt's, so H1 tests the history and nothing else.
+- **Dt:** every frame at full size, 1 sample, denoised, accumulated the same way, not composited, as round 30's D was not.
+
+**The test.**
+- **H1:** Bt beats B1. **H2:** Bt beats Dt.
+- d = ln relMSE(comparator) - ln relMSE(candidate); the sign-flip test; Holm over {H1, H2} at 0.05.
+- **C1:** both frames of a hypothesis beat its noisy frame on 11 of 12.
+  - H1's noisy frame: the measured frame's half-size input through the same fill, a bilinear upscale, its shift and the
+    composite.
+  - H2's: the measured frame's 1-sample input, shifted.
+- **C2** is cited from round 11. **C3:** no image near its floor (the second reference).
+- **C4:** the candidate's whole chain run again on the first image, bit for bit. **C5:** all 216 render seeds distinct.
+- **The images:** `SPLITS_TEMPORALUP`, 6 new R scenes (46000-46005) and 6 new C scenes (47000-47005). Every seed is reserved.
+
+**Reported, never tested:**
+- Bt without the clamp.
+- D1, the measured frame alone at full size, against Dt.
+- Dt with the light sources composited.
+- The history length: mean n, and the share of pixels at 8.
+
+**What each outcome does.**
+- **Both supported:** temporal reuse over the half-size chain holds at equal samples a frame. The accumulation goes to the
+  device as one more pass of `render/denoiseUpscaleGPU.mjs` and is timed on the rig: `denoise-temporalup-device`.
+- **H1 alone:** history helps the chain, but full size with the same history catches up, so the half-size lead was a
+  single-frame effect. The backlog records it, and the page stays as it is.
+- **H1 not supported:** the accumulation as built does not help. The backlog names the suspects: the resample's blur, the
+  clamp, and eight frames being a quarter of FSR2's 32 phases at a 2x upscale.
+- **Not reported (C1):** nothing is decided, and the backlog records which frame failed which noisy frame.
+- **Nothing changes in any case:** the page, the network, the filter, every kernel table, `fx/fsr`.
+
+**Predicted:**
+- **P1, H1 supported:** mean d between +0.05 and +0.40, on at least 10 of 12.
+- **P2, H2 supported:** mean d between +0.5 and +3.0, on at least 10 of 12. It is largest where a light is in view, where the
+  1-sample full-size frames carry the most noise.
+- **P3, C1:** holds on both hypotheses.
+- **P4:** the clamp helps. Bt beats Bt-without-clamp on the mean.
+- **P5:** the mean history length is between 3 and 7 frames.
+
+**Seen first, on three scenes outside every split (R 990000, C 990001, R 990004), at 128 x 128 with a 256-sample reference.**
+- The candidate beat B1 on all three, with d +0.08, +0.20 and +0.27.
+- It beat Dt on all three, with d +0.28, +4.1 and +5.7. The last two have a large light in view, and there the 1-sample
+  full-size frames stayed far from the reference however they were accumulated.
+- The clamp helped on all three.
+- The mean history was 3.7-5.6 frames.
+- At 32 x 32, with a 32-sample reference, the same pilot had the candidate behind B1 on two of the three. The shifts were then
+  checked and are held exact by the gate. What caused it at that size was not pinned down: resampling blur on a frame that
+  small is a suspect, not a finding.
+
+## 96. ROUND 32 -- REPORTED, BOTH HYPOTHESES SUPPORTED: THE HISTORY HELPS THE HALF-SIZE CHAIN, AND THE CHAIN KEEPS ITS LEAD
+
+**What arrived.** `render/denoise-results-temporalup.json`, written by `tools/denoiseStudy.mjs --harvest-temporalup` at 75052a02,
+the commit carrying section 95, and committed as written at 473a8927 before it was read. A container restart killed the first
+run while it rendered the last image. It was run again against the same cache, at the same commit with a clean tree, so the
+first eleven sequences were reused as rendered. The network's sha-256 in the file is the page's `render/denoise-net-r11.json`'s.
+
+**The run is reported, and both hypotheses are supported.**
+
+| | Bt (the temporal upscale) against | mean d (positive: Bt better) | Bt won | sign-flip p | Holm threshold |
+|---|---|---|---|---|---|
+| **H1** | B1, the same chain on the measured frame alone | **+0.259** | 12 of 12 | 0.00024 | 0.025 |
+| **H2** | Dt, full size at 1 sample a frame, accumulated the same way | **+3.016** | 11 of 12 | 0.00073 | 0.05 |
+
+- H1's p is 1/4096, the smallest a sign-flip test over 12 images can give.
+- **Every control held.** C1 held at 12 of 12 for all four frames against their noisy frames. C2 is cited from round 11. C3:
+  no image was near its floor. C4 held, and so did C5 over 216 distinct render seeds.
+- **`render/denoiseStudy-selfcheck.mjs` re-derives all of it** from the file's own tables, through `temporalUpSets`, the one
+  definition of the hypotheses' columns. It also holds the file's commit and network, section 95's rule as code, and the
+  five predictions. Sabotaged R69-R72; none was 0 red.
+- Geometric-mean relMSE:
+
+  | frame | relMSE |
+  |---|---|
+  | Bt | 0.0026 |
+  | B1 | 0.0033 |
+  | Dt | 0.0524 |
+  | H1's noisy frame | 0.0102 |
+  | H2's noisy frame | 0.1930 |
+
+**So, by section 95's rule: the accumulation goes to the device and is timed on the rig.** That is
+`denoise-temporalup-device`: one more pass of `render/denoiseUpscaleGPU.mjs`, and the round after it on the rig. Nothing
+changes in this round: the page, the network, the filter, every kernel table, `fx/fsr`.
+
+**The predictions.** They decided nothing; the gate reads each off the file.
+- **P1 held:** H1 at +0.259, inside +0.05 to +0.40, on 12 of 12.
+- **P2 missed, narrowly:** H2 at +3.016, over its predicted +0.5 to +3.0. It was on 11 of 12, where at least 10 were
+  predicted.
+- **P3 held:** C1 on both hypotheses.
+- **P4 held:** the clamp helped on the mean (d +0.463 against Bt without it), on 10 of 12. It hurt on R 46002 (-0.05) and
+  R 46004 (-0.21).
+- **P5 held:** the mean history was 4.2-6.0 frames. 33-58% of each image's pixels reached all 8.
+
+**What it says, and where it stops.**
+- **H2's size is the full-size 1-sample frames', not the candidate's.** On eight of the twelve images, H2's noisy frame was
+  above 0.1 relMSE (0.14-1.33). Dt stayed close to it there: the shipped network does not take a 1-sample frame of those
+  scenes near the reference, and eight frames of the same history barely moved it. D1 against Dt was d +0.068 on the mean,
+  at most +0.36. On the other four, H2's d was +3.26, +0.03, +0.18 and -0.10. The one loss is C 47003, where Dt reached
+  0.0017 against Bt's 0.0019.
+- **The history did more for the half-size chain than for full size at the same samples:** +0.259 against +0.068. This is
+  reported, not tested.
+- **This is one camera move, from a cold start.** An eight-frame orbit of 1.5-4 degrees a frame, ending at the measured frame,
+  with nothing in the scene moving. Disocclusion is only what the orbit uncovers. No moving object is tested, and nothing
+  about a longer history.
+- **Eight frames are a quarter of FSR2's 32 phases at a 2x upscale.** The history ran on the first 8 Halton offsets.
+- **Nothing here is timed.** The accumulation is one reprojection, a 3 x 3 clamp and a blend a frame, and its cost on a GPU
+  is the next round's to measure.
+
+## 97. ROUND 33 -- ROUND 32's HISTORY ON THE DEVICE, TIMED ON THE RIG AT 1920 x 1080: FIXED BEFORE THE RIG RUNS IT
+
+**Why this round.** Section 96's rule: both hypotheses were supported, so the accumulation goes to the device and is timed.
+Round 31 found the half-size chain cheaper than today's page at 1080p on both rigs (1.44-1.48 x on the GTX 1080, 1.38-1.54 x
+on the Intel gen-9). It also found the chain's own steps cost more than its network.
+
+> **At 1920 x 1080 output, on each GPU, is the half-size chain WITH round 32's history -- its first hits, the shift to the
+> unjittered grid, the accumulation and the composite after it -- still faster than today's page?**
+
+**What exists for it (committed before this section).**
+- `render/denoiseUpscaleGPU.mjs` gains four kernels, each held to its CPU reference by
+  `render/denoiseUpscaleGPU-selfcheck.mjs`'s section 6 on SwiftShader:
+  - `FIRSTHITS_WGSL`, against round 4's `firstHits`: no sphere flipped at either eye, position and normal within 1.7e-4;
+  - `SHIFT_WGSL`, against `shiftResample`;
+  - `ACCUM_WGSL`, against `accumulateUpscaled`: given the CPU's first hits, the history length within 3.1e-5 and the light
+    within 5.5e-7, clamped and not;
+  - `FINAL_WGSL`, against `compositeEmitters`: within 4.4e-7.
+- With its own first hits, the device's accumulation stays within 5.1e-5 of the CPU's history length and 2.6e-6 of its light.
+- The accumulation binds five storage buffers, inside the eight a default WebGPU device allows. The gate holds the kernel's
+  tolerances to round 4's, exactly. Sabotaged X1-X7: X5 is an equivalent mutant, named in the header, and X7 went 0 red until
+  the constants row.
+- `denoise.html`'s "Time the half-size chain" also times the history's four passes, and `timeHalfChain` returns their sum
+  with the chain as `temporal`. On a GPU the gate's section 4 prints them in a `section 97:` line.
+
+**The arms, at 1920 x 1080 output, on scene R 990000 as in section 93.**
+- **Today's page, `full`:** the network at 1920 x 1080 and its mask at 1920 x 1080, as in section 93.
+- **The chain with its history, `temporal`:** section 93's `half`, plus one frame of the history's four passes at 1920 x 1080.
+  A frame of the temporal upscale costs exactly that, once its history is warm.
+
+**The clocks:** as section 93's. The history's four passes are one pass each, so each is on the device's clock wherever the
+adapter offers timestamps.
+
+**The test.** On each GPU, two runs of `realGpuRun --only denoise`, at a commit carrying this section:
+- **H (per GPU):** `full / temporal` is above 1.0 in both runs.
+- **C1:** every denoise gate is green in both runs. That includes section 6's device rows, which hold the history to the CPU on
+  that GPU's own Chrome adapter.
+- **C2:** the fill reaches every pixel in its 96 rings.
+- **C3:** both networks and the history's four passes are on the device's clock.
+- **C4, reported:** the two runs' ratios and how far apart they are.
+
+**Predicted, before any of it ran on a GPU** (from section 94's ledger):
+- **The GTX 1080:** H holds, `full / temporal` between 1.3 and 1.5. The history's four passes are 1-4 ms together: one ray a
+  pixel where the coverage is 64, and three passes over 2 million pixels.
+- **The Intel gen-9:** H holds, between 1.25 and 1.55. Its four passes are 15-60 ms together.
+- **C1 and C2 hold** on both.
+
+**What each outcome does.**
+- **H holds on both GPUs:** a frame of the temporal upscale is cheaper than today's page at 1080p on both rigs. It was also
+  better at equal samples a frame at 256 x 256 (section 96). `denoise-halfres-page` then carries the history with the chain.
+  It still waits on `denoise-halfres-fixed-costs`, or on Keith's call.
+- **H fails on a GPU:** the history's passes are named from the run, and the backlog records what to make cheaper.
+- **Nothing changes in either case:** the page's own denoise, the network, the filter, every kernel table, and `fx/fsr`.
+
+**Seen first, here, on SwiftShader -- a CPU's times, deciding nothing:**
+- at the pilot size (128 x 72), the history's passes were 1.4 ms (first hits), 0.6 ms (shift), 2.8 ms (accumulation) and
+  0.6 ms (composite);
+- section 4's rows hold their sum to the chain's.
+
+## 98. ROUND 33 -- THE VERDICT: THE HISTORY KEEPS THE CHAIN CHEAPER ON THE INTEL; THE 1080 IS OWED ITS RUN b, WHOSE TIMING GATE DIED
+
+**What arrived.** Two `realGpuRun --only denoise` runs on each GPU, `SWEK_WEBGPU` cleared, all four at e5908338 (the commit
+that carried section 97). They were committed as received at 89fe435d, before this section was written:
+`render/denoise-rig-r33-{a,b}-{intel-gen9,gtx1080}.json`.
+
+**Section 97's rule, read off the reports.** `render/denoiseUpscaleGPU-selfcheck.mjs`'s section 7 re-derives every figure here
+from those four files: their commit, every gate's verdict, and the chain gate's `section 93:` and `section 97:` lines.
+
+| | Run a | Run b | H |
+|---|---|---|---|
+| Intel gen-9 (r18u): today's page against the chain with its history, at 1920 x 1080 | 1,369.1 / 1,029.2 ms = **1.330 x** | 1,410.7 / 1,071.7 ms = **1.316 x** | **holds** |
+| GTX 1080 (r18t) | 92.3 / 65.7 ms = **1.405 x** | 92.7 / 62.6 ms = 1.482 x, **does not count** | **no verdict** |
+
+- **C1:** every denoise gate was green in both Intel runs and in the 1080's run a. In the 1080's run b,
+  `render/denoiseTiming-selfcheck.mjs` went red after 17.7 s with no FAIL line. Its output stops after its first three lines,
+  which name the adapter, DXC and the sets to be timed, and before the first set's adapter line. In run a, on the same box, the
+  same gate ran 124 s and printed 166 lines. The report holds no exit code, so the cause is not known here. The gate's process
+  ended inside the native ladder, before any row. The chain's own gate was green in that run, so its ratio is printed above.
+  By the rule it does not count.
+- **C2:** the fill reached every pixel in 87 of its 96 rings in all four runs.
+- **C3:** both networks and all four history passes were on the device's clock in all four runs.
+- **C4, reported:** the Intel's two ratios were 1.1 % apart. The 1080's were 5.5 % apart, but run b does not count.
+
+**So, by section 97's rule: H holds on the Intel, and the 1080 has no verdict.** The verdict waits on the 1080. Nothing
+changes: the page, the network, the filter, every kernel table, and `fx/fsr`. `denoise-temporalup-device` stays open.
+
+**What the 1080 is owed, fixed now, before it runs.** Section 97 asks for two runs at a commit carrying it, and the 1080's run a
+is one. It is owed one run in place of run b. That run is at any later commit of this branch: each carries section 97
+unchanged, and the chain's code is the same as at e5908338. The red run b stays committed as received.
+- **If the new run counts** (every gate green, C2 and C3), H on the 1080 is read off run a and the new run. Section 97's
+  outcomes then apply as written.
+- **If its timing gate dies again,** the 1080 stays without a verdict, and the next round is that crash, as in sections 76-77.
+- **Before it, once, reported and deciding nothing:** `node render/denoiseTiming-selfcheck.mjs` run alone, with its console
+  output sent back. It shows whether the gate dies outside `realGpuRun`, and where.
+- **Predicted:** no crash. The new run's ratio is between 1.3 and 1.5, as section 97 predicted. The one native crash like this
+  on record, in section 76, did not repeat in section 78's four runs.
+
+**The predictions.** They decided nothing. Section 7's last row reads each one off the reports, the 1080's run b as a report.
+- **Held:** both GPUs' ratios (1.405 and 1.482 on the 1080, 1.3-1.5 predicted; 1.330 and 1.316 on the Intel, 1.25-1.55
+  predicted). The 1080's history passes (1.92 and 1.88 ms, 1-4 predicted). C2, with 87 rings in all four runs.
+- **Missed:** the Intel's history passes, 86.1 and 83.1 ms against 15-60 predicted. Also C1 on the 1080, by run b.
+- **Why the Intel's cost missed:** the accumulation alone was 44.8 and 43.6 ms. For each of 2 million pixels it reads four
+  bilinear taps of the previous history with their geometry, and the current frame's 3 x 3 neighbourhood. The 15-60 ms
+  prediction was the 1080's 1-4 ms scaled by about 15 x, near the two networks' ratio (15-16 x in these runs). The history's
+  passes cost 44 x the 1080's instead. The likely reason is that they move memory with little arithmetic, where the network is
+  mostly arithmetic. This round does not measure that.
+
+**What it says, and where it stops.**
+- **On the Intel, the history costs 8 % of the chain's frame and a fifth of its lead.** The chain alone was 1.452 and 1.427 x
+  in these runs, and 1.330 and 1.316 x with its history. Today's page minus the chain was 426 and 422 ms; the history was 86 and
+  83 ms. On the 1080 the history was under 2 ms, 3 % of the chain's frame.
+- **The ratios are one scene's: R 990000, as in section 94.** The history's four passes run over every pixel whatever the scene,
+  so their cost does not change with the scene. The coverage's cost does, with the number of spheres.
+- **One frame of history at steady state is what was timed.** A frame of the temporal upscale costs that once its history is
+  full. The first frames after a cut cost the same and are noisier (section 96).
+
+**On the rig.** On the GTX 1080, from a fresh clone of this branch, `SWEK_WEBGPU` cleared:
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node render/denoiseTiming-selfcheck.mjs
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r33-b2.json
+```
+Send back the console output of the first line and the JSON file.
+
+**Added before the 1080 ran, at Keith's call: the run is pinned to 468766f9.** Round 34 (section 99) changes
+`render/denoiseUpscaleGPU.mjs`, so "any later commit" no longer has the chain's code unchanged. The owed run is made from a
+checkout of 468766f9, this section's commit. The rule above is unchanged.
+```
+git checkout 468766f9
+```
+
+## 99. ROUND 34 -- THE FILL OVER THE LIGHTS' PIXELS ONLY, TIMED ON THE RIG AT 1920 x 1080: FIXED BEFORE THE RIG RUNS IT
+
+**Why this round.** Section 94 found that the half-size chain's own steps cost more than its network. The fill was the largest
+of them: 20-23 ms on the GTX 1080 and 300-323 ms on the Intel gen-9 in round 33's runs, for 96 ring passes over every one of
+960 x 540 pixels. On R 990000, 25,765 of those pixels are the light's, 5.0 % of the frame (measured here on the CPU, 64 rays a
+pixel), and they fill in 87 rings. The other 95 % are known, and every ring pass reads and copies them anyway.
+`denoise-halfres-fixed-costs` names two levers. This round takes the exact one; the coverage lever is a quality question and
+waits.
+
+> **At 1920 x 1080 output, on each GPU, is the fill over the lights' pixels only faster than round 31's fill over the whole
+> frame -- and by how much does it move the half-size chain against today's page?**
+
+**What exists for it (committed before this section).** `render/denoiseUpscaleGPU.mjs` gains four kernels and
+`fill(..., { list: true })`, also accepted by `chain`:
+- `FILL_LIST_WGSL`, once over the frame: each pixel's ring is 0 if known, else UNKNOWN and its index goes on a list;
+- `FILL_ARGS_WGSL`, one thread: the list's length as an indirect dispatch's workgroups, so nothing is read back to size the rings;
+- `FILL_LISTRING_WGSL`, one ring over the list, in place: a pixel still UNKNOWN takes the mean of its 8-neighbours whose ring
+  is below this one's. A neighbour filled in this ring reads as this ring or UNKNOWN, never below it, so the rule is round 31's
+  with no copy of the known pixels and no ping-pong;
+- `FILL_LISTLEFT_WGSL`: a pixel no ring reached is 0.
+
+`render/denoiseUpscaleGPU-selfcheck.mjs`'s section 3 holds it, on SwiftShader here and on each GPU's own adapter in the rig's run:
+- against `fillEmittersBounded`, at round 31's tolerance (1e-5): the same rings and pixels left, on a 24 x 20 frame and a 96 x 64
+  one whose fill takes 16 rings, with rings to spare and short of them;
+- against round 31's device fill: the same count in every ring, the same pixels left, values within 1e-6. On SwiftShader not
+  one float differs, on any frame, nor in the four chains built on it. The two kernels add the same neighbours in the same order;
+- on a frame of all emitter and one of none, and with the list's length read back, so a run of the rings in its place shows.
+Sabotaged Y1-Y7. Y7 (the rings run whatever is asked) went 0 red until the list's length was read back.
+`tools/ship/wgslCorpus.mjs` now accounts for the chain's thirteen kernels from rounds 31, 33 and 34. Those rounds had left them
+out, and `crossBackend` and `harnessLiveness` were red on it; each kernel is now listed with the reason it is graded by its own
+gate.
+
+`time()` adds `fillList` and `wholeList`, and `timeHalfChain` adds `halfList` and `temporalList`: `half` and `temporal` with
+`fillList` in the fill's place. The page's table has three more rows. On a GPU, the gate's section 4 prints a `section 99:`
+line, and a checked list fill at 960 x 540 must reach every listed pixel in the ring fill's count of rings.
+
+**The arms, at 1920 x 1080 output, on R 990000, as in sections 93 and 97.**
+- **The ring fill, `fill`:** round 31's, 96 ring passes over 960 x 540 and its left pass.
+- **The list fill, `fillList`:** the list pass, the args pass, 96 ring passes over the list and its left pass.
+- Both by the wall clock (more than 30 passes), in the same run, on the same buffers, from the same frame.
+
+**The test.** On each GPU, two runs of `realGpuRun --only denoise`, at a commit carrying this section:
+- **H (per GPU):** `fillList` is below `fill` in both runs.
+- **C1:** every denoise gate is green in both runs, the list fill's device rows among them.
+- **C2:** the ring fill filled on fewer than 96 rings, and the checked list fill reached every listed pixel in the same count.
+- **C3:** both networks on the device's clock, as in section 93.
+- **Reported, deciding nothing:** `full / halfList` and `full / temporalList` beside section 97's two ratios, and the two
+  runs' spread.
+
+**Predicted, before any of it ran on a GPU:**
+- **The GTX 1080:** H holds. `fillList` is 1-6 ms against `fill`'s 20-23. The list is 5 % of the frame, so its ring passes do
+  about a twentieth of the work. What is left is the cost of 99 small passes. `full / halfList` is 1.9-2.3, against 1.45-1.53
+  for `full / half`.
+- **The Intel gen-9:** H holds. `fillList` is 15-80 ms against 300-323. `full / halfList` is 1.8-2.2 (round 33's `half` with the fill swapped, at both ends of these ranges).
+- **C1 and C2 hold on both GPUs.** C1 on the 1080 is the least sure: its timing gate died in round 33's run b, and that is not
+  understood yet.
+
+**What each outcome does.**
+- **H holds on both GPUs:** the list fill becomes the chain's fill, in a round of its own that changes the runner's default.
+  The fill lever of `denoise-halfres-fixed-costs` is closed, and its coverage lever stays open.
+- **H fails on a GPU:** that GPU's passes are named from the run, and the ring fill stays.
+- **No verdict on a GPU** (a red gate, a short fill, a wall-clock network): its two runs are owed again.
+- **Nothing changes in this round:** the chain's default fill, the page's own denoise, the network, every kernel table, and
+  `fx/fsr`.
+
+**Seen first, here, on SwiftShader -- a CPU's times, deciding nothing:** at the pilot size (64 x 36 half), the ring fill was
+21.2-22.5 ms and the list fill 15.5-16.6 ms. Both are mostly the cost of the passes at that size. At the rig's size, run once
+here with `SWEK_HALFCHAIN_RIGSIZE=1`: the ring fill 3,237 ms, the list fill 305 ms. The checked list fill listed 25,765 pixels,
+the CPU's count, and reached all of them in 87 rings. That run's section 93 row was red only because SwiftShader's network at
+1920 x 1080 is over the ladder's 5,000 ms cap, as it would be in any such run.
+
+**On the rig.** The 1080's owed round-33 run first, from 468766f9 (section 98). Then, on each GPU, from a fresh clone of a
+commit carrying this section:
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r34-a.json
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r34-b.json
+```
+Don't commit or pull between runs. Send back all four JSON files.
+
+## 100. ROUND 34 -- THE VERDICT: THE LIST FILL HOLDS ON THE INTEL; THE 1080 HAS NO RUN, AND ITS ROUND-33 RUN DIED AGAIN
+
+**What arrived.** Six files, committed as received at f04471ed before this section was written:
+- the Intel gen-9's two round-34 runs at 3abe4471, the commit carrying section 99:
+  `render/denoise-rig-r34-{a,b}-intel-gen9.json`;
+- the GTX 1080's three `realGpuRun` runs, all at 468766f9:
+  - b2, section 98's owed run: `render/denoise-rig-r33-b2-gtx1080.json`;
+  - two more that arrived named r34 but were made from the same checkout: `render/denoise-rig-r33-extra-{a,b}-gtx1080.json`;
+- the 1080's console from `render/denoiseTiming-selfcheck.mjs` run alone: `render/denoise-rig-r33-b2-gtx1080-timing-alone.txt`.
+
+The 1080's clone was still on the detached checkout section 98 asked for. A `git pull` there does not move it, so every 1080 run
+since then is at 468766f9 and carries no section 99 line. `render/denoiseUpscaleGPU-selfcheck.mjs`'s section 8 re-derives every
+figure below from these files.
+
+**Section 99's rule, read off the reports.**
+
+| | Run a | Run b | H |
+|---|---|---|---|
+| Intel gen-9: the ring fill against the list fill, 960 x 540, R 990000 | 301.6 / **23.9 ms** | 302.8 / **23.0 ms** | **holds** |
+| GTX 1080 | no run at a commit carrying section 99 | | **no verdict** |
+
+- **C1:** every denoise gate was green in both Intel runs.
+- **C2:** the ring fill filled on 87 rings in both. The checked list fill listed 25,765 pixels, the CPU's count, and reached
+  all of them in the same 87 rings.
+- **C3:** both networks were on the device's clock.
+- **Reported:** with the list fill, the chain against today's page was 2.042 and 2.179 x on the Intel, against 1.472 and
+  1.524 x with the ring fill in the same runs. With its history it was 1.829 and 1.928 x, against 1.358 and 1.397 x. A whole
+  frame of the chain's steps fell from 649.7 and 646.8 ms to 389.9 and 382.3 ms.
+
+**So, by section 99's rule: H holds on the Intel, and round 34 is owed on the 1080.** Nothing changes: the chain's default
+fill, the page's denoise, the network, every kernel table, and `fx/fsr`.
+
+**Section 98's owed run: b2, and its timing gate died again.** b2 is the 1080's first report at 468766f9 after section 98, by
+its start time. Three of its four gates were red, none with a FAIL line:
+- `render/denoiseDevice-selfcheck.mjs` after 20.2 s, its output stopping at the native adapter's line;
+- `render/denoiseTiming-selfcheck.mjs` after 6.5 s, stopping after "sets timed", as in round 33's run b;
+- `render/denoiseUpscaleGPU-selfcheck.mjs` after 2.1 s, with no line at all.
+
+**So, by section 98's rule: the 1080 keeps no verdict for round 33, and the next round is the crash.** extra-a, run next at
+the same commit, was green in every gate (1.308 x with the history). It is not the owed run. Reading it in would be choosing
+the run after seeing the data, as section 76 declined to.
+
+**The crash, as far as these files go.** On the 1080 the timing gate has died in 3 of 5 `realGpuRun` runs since round 33, at
+17.7, 6.5 and 40.4 s, and once more run alone. Each time it stopped after its third line, with no FAIL line, and no exit
+code was kept. The ladder prints its rows only once it returns, so the files say only that the process died somewhere inside
+the native ladder. That ladder takes about two minutes on the 1080 in a green run. The other two gates in b2 dying too, the
+browser's among them, may mean the device was not yet back from the crash before it, but nothing here shows that.
+
+**The predictions.** On the Intel: the list fill was 23.0-23.9 ms (15-80 predicted) and `full / halfList` was 2.042-2.179
+(1.8-2.2 predicted), so both held. On the 1080 none was reached. The 1080's ring fill was slower in its three runs (26.9-27.9
+ms, against 19.9-23.4 in rounds 31 and 33), so its ratios fell to 1.339-1.345 x for the chain and 1.302-1.308 x with its
+history. This is reported, deciding nothing.
+
+## 101. ROUND 35 -- THE GTX 1080's NATIVE CRASH: WHERE AND HOW THE TIMING GATE DIES, FIXED BEFORE THE RIG RUNS IT
+
+**Why this round.** Sections 98 and 100 leave the 1080 without a verdict for rounds 33 and 34. The reason is the same in both:
+`render/denoiseTiming-selfcheck.mjs` dies inside its native ladder in most runs on that box. Until that is understood, every
+round that asks the 1080 for a green denoise group can fail its C1 for a reason that is not the round's.
+
+> **On the GTX 1080, where in the native ladder does the timing gate die, and with what exit code?**
+
+**What exists for it (committed before this section).**
+- `render/denoiseDevice.mjs`'s `timingLadder` takes a `trace` callback. It is called before each step: a size's adapter, its
+  device, each set's build, each round's timing, the output check, and the release of the denoisers and of the device. It
+  changes nothing the ladder does.
+- `render/denoiseTiming-selfcheck.mjs` appends each trace line to a file, synchronously, before the step runs. The file is the
+  one `SWEK_TIMING_TRACE` names, else one in the temp directory. Each line carries the time since the gate began and the
+  process id. The gate prints the file's path before the ladder starts. A new row holds the trace to the ladder it ran: its
+  start, a device asked for at every size measured, every set built there, and its return. On SwiftShader here: 48 lines, green.
+- `tools/ship/realGpuRun.mjs` keeps each gate's exit status and signal and the last five lines of its stderr in the report.
+  Until now the status was read for `ok` and dropped, and stderr was not kept at all.
+- Sabotaged K1-K4, each 1 red.
+
+**The test, on the GTX 1080.** From a clone on this branch's head, as below:
+- **Step 1:** the timing gate alone, three times one after another, each with its own trace file and its exit code printed.
+- **Step 2:** round 34's two runs (section 99), each with its own trace file. These are also the 1080's round-34 runs, read by
+  section 99's rule as written. A red timing gate leaves them owed.
+
+**What each outcome does.**
+- **No crash in five runs:** the crash is not reproduced. Round 34 on the 1080 is read off step 2. The crash stays open in the
+  backlog, named, with these traces as its record.
+- **A crash whose trace ends on the same step every time:** that step is round 36's subject. For example, a requestDevice or a
+  destroy would make round 36 change how the ladder makes or releases devices. That change is held to the same rows as today's
+  ladder before the rig runs it.
+- **Crashes ending on different steps:** named as such. Round 36 is a smaller probe that repeats one step, to find which one
+  the process cannot survive.
+- **The exit code** is reported either way. 3221225477 (0xC0000005) is an access violation inside native code, as in section 76.
+
+**Predicted, before it runs:**
+- At least one of the three alone runs dies. The gate died in 4 of the last 6 runs on that box.
+- Each death exits 3221225477.
+- Each trace's last line is a device step: a requestAdapter, a requestDevice or a destroy, not a timing round or a build. The
+  ladder makes and releases a fresh device at every size (section 35). The nearest precedent, v4855's Dawn crash, came from a
+  second Dawn instance made late inside one gate.
+
+**Nothing else changes in this round:** every kernel, the page, the network, and every table.
+
+**On the rig: the GTX 1080 only.** The Intel has nothing owed.
+```
+cd C:\SweK_r33
+git fetch origin ccr-6c3eeb7c-pxz6kx
+git checkout ccr-6c3eeb7c-pxz6kx
+git pull origin ccr-6c3eeb7c-pxz6kx
+git log -1 --oneline
+cd WebGLEngine
+set SWEK_WEBGPU=
+set SWEK_TIMING_TRACE=%CD%\trace35-alone-1.txt
+node render/denoiseTiming-selfcheck.mjs
+echo %ERRORLEVEL%
+set SWEK_TIMING_TRACE=%CD%\trace35-alone-2.txt
+node render/denoiseTiming-selfcheck.mjs
+echo %ERRORLEVEL%
+set SWEK_TIMING_TRACE=%CD%\trace35-alone-3.txt
+node render/denoiseTiming-selfcheck.mjs
+echo %ERRORLEVEL%
+set SWEK_TIMING_TRACE=%CD%\trace35-r34-a.txt
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r34-a-1080.json
+set SWEK_TIMING_TRACE=%CD%\trace35-r34-b.txt
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r34-b-1080.json
+set SWEK_TIMING_TRACE=
+```
+`git log -1 --oneline` must show this branch's latest commit, not 468766f9. Send back the console output with its three
+`echo` lines, the five trace files and the two JSON files.
