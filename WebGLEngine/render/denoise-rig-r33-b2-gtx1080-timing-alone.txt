@@ -1,0 +1,25 @@
+C:\SweK_r33\WebGLEngine>set SWEK_WEBGPU=
+
+C:\SweK_r33\WebGLEngine>node render/denoiseTiming-selfcheck.mjs
+1. THE LADDER'S ARITHMETIC
+  PASS    summarize is nearest rank: the median, the 10th and the 90th of ten times
+  PASS    the ladder runs from the trained 64 x 64 to a 1080p frame, each size more pixels than the last
+  PASS    a pass's largest buffer is the head's 81 logits a pixel: 672 MB at 1080p, what a device's storage limit is checked against
+  PASS    round 15: a pass's buffers are the input, every layer's output and the image -- and r15 allocates no logits, 81 channels a pixel fewer than r14   at 1080p: r14 1756 MiB, r15 1115 MiB
+  PASS    round 19: both ladders time r12, r15, r18t, r18u and (round 27) r27w -- r12 first, the reference every speedup is read against -- and natively on a D3D12 adapter by the run's compiler: under FXC, none named or one unread, r12 and r15 alone; under DXC all five; on Vulkan all five   D3D12: FXC r12,r15, none r12,r15, DXC r12,r15,r18t,r18u,r27w; Vulkan: r12,r15,r18t,r18u,r27w -- section 60: node-webgpu 0.6.0's FXC stopped on r18t's kernel and crashed on r18u's; section 65: 0.6.2's DXC built both
+  PASS  !! round 19: a native run's plan is read off its package WITH ITS DEVICE'S FLAGS -- 0.6.2 shipping DXC on D3D12: DXC, all five sets, and the FXC ladder; 0.6.0, 0.6.1 with the DLL copied beside, or a package unread: FXC, r12 and r15, no FXC ladder; the FXC child's own flags on 0.6.2: FXC; Linux: no D3D compiler, all five, no FXC ladder   DXC: r12,r15,r18t,r18u,r27w; FXC ladder runs  /  FXC: r12,r15; FXC ladder skipped  /  FXC: r12,r15; FXC ladder skipped  /  FXC: r12,r15; FXC ladder skipped  /  FXC: r12,r15; FXC ladder skipped  /  none: r12,r15,r18t,r18u,r27w; FXC ladder skipped
+  PASS  !! section 87: the FXC ladder is retired -- 0.6.2 on D3D12 skips it by default with the retirement's reason and runs it under SWEK_DENOISE_FXC=all; 0.6.0 and linux keep their own reasons   0.6.2: skipped, all: runs; 0.6.0: the package's compiler as shipped is FXC
+  PASS  !! round 19: the FXC child's device flags are ONE disable entry carrying use_dxc AND the fine clock, and no dump_shaders -- two entries would let Dawn keep the last (section 49), compiling with DXC or rounding the clock; a dump would fill a timed child's stdout -- and the child times r12 and r15   ["disable-dawn-features=use_dxc,timestamp_quantization"]
+  PASS  !! round 19: the file's ONE create call makes the FXC child's device with FXC_FLAGS and the gate's with the fine clock alone; the child -- spawned by the gate with --fxc-ladder and its result file -- runs its ladder in that mode and writes the file   1 create call(s): create(flags = fxc ? FXC_FLAGS : [H.FINE_CLOCK_FLAG]);; the child block 11 lines
+  PASS    section 87: the gate decides the FXC ladder by fxcLadderSkip(plan), and spawns it only where that names no reason   2 mention(s) of the ladder's function, called (its definition and the one call)
+  PASS  !! round 19: each "rXX against r15" line is r15's median over the set's -- a native ladder's tagged section 66, the page's section 61   native: r18t against r15 at 256 x 256: 1.500 x as fast, on the device's clock -- section 66  /  page: r18u against r15 at 256 x 256: 1.500 x as fast, on the device's clock -- section 61
+  PASS  !! round 27: each "r27w against rXX" line is that set's median over r27w's, tagged section 83 on either ladder -- the ratio section 83's rule reads   native: r27w against r18t at 1920 x 1080: 1.250 x as fast, on the device's clock -- section 83 / page: r27w against r18u at 1024 x 1024: 1.250 x as fast, on the wall clock -- section 83
+  PASS  !! round 19: r15 under FXC against a set under DXC is read at the largest size BOTH ladders measured, r15's FXC median over the set's DXC one, the line marked unpaired -- and no line where no size is common   native: r18t against r15 under FXC at 256 x 256: 2.000 x as fast, on the device's clock -- unpaired: two processes, one after the other -- section 66
+  PASS    a time is on Dawn's rounded grid when it is a whole number of 65,536 ns -- section 60's finding, read off round 17's native times
+  PASS    the input is the same every time, in the network's ranges, with both sides of a mask
+  PASS    an adapter is software by the spec's own flag, else by its name: SwiftShader is, a named GPU is not -- and it says whether it offers timestamps
+
+2. NATIVE: node-webgpu's default adapter (on the rig, the GPU)
+  ----  native adapter: nvidia / pascal / D3D12 driver version 32.0.15.8180 (hardware); compiler, from the package: DXC
+  ----  native: this adapter's key for section 66's table: win32/nvidia/pascal
+  ----  native: node-webgpu 0.6.2; compiler, read off the package with this device's flags: DXC; sets timed: r12, r15, r18t, r18u, r27w
