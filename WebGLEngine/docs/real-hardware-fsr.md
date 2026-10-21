@@ -490,6 +490,21 @@ node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r33-b.json
 - **Don't commit or pull between runs.**
 - **Send back all four JSON files.**
 
+**The outcome so far (section 98): on the Intel the chain with its history is still cheaper than today's page.** It was 1.330
+and 1.316 x, with every gate green, and the history's passes cost 83-86 ms. The 1080's run a was green at 1.405 x. Its run b
+does not count: `render/denoiseTiming-selfcheck.mjs` died 17.7 s in, with no FAIL line. **The 1080 owes one run**, on a fresh
+clone of this branch:
+
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node render/denoiseTiming-selfcheck.mjs
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r33-b2.json
+```
+
+- **Send back the first line's console output and the JSON file.** The first line runs the timing gate alone. It reports where
+  the gate dies and decides nothing.
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and

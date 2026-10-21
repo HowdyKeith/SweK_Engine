@@ -6529,3 +6529,69 @@ adapter offers timestamps.
 - at the pilot size (128 x 72), the history's passes were 1.4 ms (first hits), 0.6 ms (shift), 2.8 ms (accumulation) and
   0.6 ms (composite);
 - section 4's rows hold their sum to the chain's.
+
+## 98. ROUND 33 -- THE VERDICT: THE HISTORY KEEPS THE CHAIN CHEAPER ON THE INTEL; THE 1080 IS OWED ITS RUN b, WHOSE TIMING GATE DIED
+
+**What arrived.** Two `realGpuRun --only denoise` runs on each GPU, `SWEK_WEBGPU` cleared, all four at e5908338 (the commit
+that carried section 97). They were committed as received at 89fe435d, before this section was written:
+`render/denoise-rig-r33-{a,b}-{intel-gen9,gtx1080}.json`.
+
+**Section 97's rule, read off the reports.** `render/denoiseUpscaleGPU-selfcheck.mjs`'s section 7 re-derives every figure here
+from those four files: their commit, every gate's verdict, and the chain gate's `section 93:` and `section 97:` lines.
+
+| | Run a | Run b | H |
+|---|---|---|---|
+| Intel gen-9 (r18u): today's page against the chain with its history, at 1920 x 1080 | 1,369.1 / 1,029.2 ms = **1.330 x** | 1,410.7 / 1,071.7 ms = **1.316 x** | **holds** |
+| GTX 1080 (r18t) | 92.3 / 65.7 ms = **1.405 x** | 92.7 / 62.6 ms = 1.482 x, **does not count** | **no verdict** |
+
+- **C1:** every denoise gate was green in both Intel runs and in the 1080's run a. In the 1080's run b,
+  `render/denoiseTiming-selfcheck.mjs` went red after 17.7 s with no FAIL line. Its output stops after its first three lines,
+  which name the adapter, DXC and the sets to be timed, and before the first set's adapter line. In run a, on the same box, the
+  same gate ran 124 s and printed 166 lines. The report holds no exit code, so the cause is not known here. The gate's process
+  ended inside the native ladder, before any row. The chain's own gate was green in that run, so its ratio is printed above.
+  By the rule it does not count.
+- **C2:** the fill reached every pixel in 87 of its 96 rings in all four runs.
+- **C3:** both networks and all four history passes were on the device's clock in all four runs.
+- **C4, reported:** the Intel's two ratios were 1.1 % apart. The 1080's were 5.5 % apart, but run b does not count.
+
+**So, by section 97's rule: H holds on the Intel, and the 1080 has no verdict.** The verdict waits on the 1080. Nothing
+changes: the page, the network, the filter, every kernel table, and `fx/fsr`. `denoise-temporalup-device` stays open.
+
+**What the 1080 is owed, fixed now, before it runs.** Section 97 asks for two runs at a commit carrying it, and the 1080's run a
+is one. It is owed one run in place of run b. That run is at any later commit of this branch: each carries section 97
+unchanged, and the chain's code is the same as at e5908338. The red run b stays committed as received.
+- **If the new run counts** (every gate green, C2 and C3), H on the 1080 is read off run a and the new run. Section 97's
+  outcomes then apply as written.
+- **If its timing gate dies again,** the 1080 stays without a verdict, and the next round is that crash, as in sections 76-77.
+- **Before it, once, reported and deciding nothing:** `node render/denoiseTiming-selfcheck.mjs` run alone, with its console
+  output sent back. It shows whether the gate dies outside `realGpuRun`, and where.
+- **Predicted:** no crash. The new run's ratio is between 1.3 and 1.5, as section 97 predicted. The one native crash like this
+  on record, in section 76, did not repeat in section 78's four runs.
+
+**The predictions.** They decided nothing. Section 7's last row reads each one off the reports, the 1080's run b as a report.
+- **Held:** both GPUs' ratios (1.405 and 1.482 on the 1080, 1.3-1.5 predicted; 1.330 and 1.316 on the Intel, 1.25-1.55
+  predicted). The 1080's history passes (1.92 and 1.88 ms, 1-4 predicted). C2, with 87 rings in all four runs.
+- **Missed:** the Intel's history passes, 86.1 and 83.1 ms against 15-60 predicted. Also C1 on the 1080, by run b.
+- **Why the Intel's cost missed:** the accumulation alone was 44.8 and 43.6 ms. For each of 2 million pixels it reads four
+  bilinear taps of the previous history with their geometry, and the current frame's 3 x 3 neighbourhood. The 15-60 ms
+  prediction was the 1080's 1-4 ms scaled by about 15 x, near the two networks' ratio (15-16 x in these runs). The history's
+  passes cost 44 x the 1080's instead. The likely reason is that they move memory with little arithmetic, where the network is
+  mostly arithmetic. This round does not measure that.
+
+**What it says, and where it stops.**
+- **On the Intel, the history costs 8 % of the chain's frame and a fifth of its lead.** The chain alone was 1.452 and 1.427 x
+  in these runs, and 1.330 and 1.316 x with its history. Today's page minus the chain was 426 and 422 ms; the history was 86 and
+  83 ms. On the 1080 the history was under 2 ms, 3 % of the chain's frame.
+- **The ratios are one scene's: R 990000, as in section 94.** The history's four passes run over every pixel whatever the scene,
+  so their cost does not change with the scene. The coverage's cost does, with the number of spheres.
+- **One frame of history at steady state is what was timed.** A frame of the temporal upscale costs that once its history is
+  full. The first frames after a cut cost the same and are noisier (section 96).
+
+**On the rig.** On the GTX 1080, from a fresh clone of this branch, `SWEK_WEBGPU` cleared:
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node render/denoiseTiming-selfcheck.mjs
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r33-b2.json
+```
+Send back the console output of the first line and the JSON file.

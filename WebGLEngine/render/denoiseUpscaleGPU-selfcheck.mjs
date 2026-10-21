@@ -48,6 +48,13 @@
 //   V4  C2 dropped -- any ring count                                   1 RED (the rule row). 0 RED at first: no fixture's fill
 //       used all 96 rings; one does now
 //   V5  the Intel's predicted range widened to 1.3                     1 RED (the predictions row)
+//   and section 7's verdict (section 98), by the same runner:
+//   W1  the rule asks the Intel alone                                  1 RED (the rule row)
+//   W2  C1 dropped -- a run counts with a red gate                     1 RED (the rule row: the 1080 would hold)
+//   W3  C3 dropped for the history's passes                            1 RED (the rule row: a pass on the wall clock must leave it owed)
+//   W4  H holding at 0.9 x                                             1 RED (the rule row)
+//   W5  the Intel's predicted history cost widened to 90 ms            1 RED (the predictions row)
+//   W6  H read off the chain without its history                       1 RED (the rule row)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -387,6 +394,62 @@ console.log("\n6. ROUND 33: ROUND 32'S ACCUMULATION ON THE DEVICE, AGAINST rende
         ok("  ...and with its own first hits the whole accumulation has at most 1 in 1,000 pixels with a history length off by over 1e-4, and the light within 1e-3",
             cOwn.nDiff <= N * N / 1000 && cOwn.worst <= 1e-3, `${cOwn.nDiff} of ${N * N} pixels' n differ by over 1e-4 (worst ${cOwn.nWorst.toExponential(1)}); light worst ${cOwn.worst.toExponential(1)}`);
     }
+}
+
+console.log("\n7. SECTION 98: ROUND 33'S VERDICT, RE-DERIVED FROM THE FOUR REPORTS AS COMMITTED");
+{
+    // the commit that carries section 97 and that the rig ran, all four runs. Section 98 owes the 1080 one run, in place of its run b:
+    // when it arrives it is committed as received, read in here, and its commit -- a later one, carrying section 97 -- added
+    const SECTION97_COMMITS = Object.freeze(["e5908338"]);
+    const GPUS = { "intel-gen9": "intel / gen-9", gtx1080: "nvidia / pascal" }, HIST = ["hits", "shift", "accum", "final"];
+    const num = (re, t) => { const m = t.match(re); return m ? Number(m[1]) : null; };
+    // one report: its commit, every gate's verdict, and the chain gate's section-93 and section-97 lines, read back to numbers
+    const readRun = (rep) => {
+        const g = rep.gates.find((x) => x.gate === "render/denoiseUpscaleGPU-selfcheck.mjs"), m = (g && g.measured) || [];
+        const a = m.find((l) => /^section 93: .*kernels/.test(l)) || "", b = m.find((l) => /^section 93: the chain's steps/.test(l)) || "", c = m.find((l) => /^section 97: /.test(l)) || "";
+        const step = (k, t) => ({ ms: num(new RegExp(`${k} ([0-9.]+) ms`), t), clock: (t.match(new RegExp(`${k} [0-9.]+ ms \\((\\w+)\\)`)) || [])[1] || null });
+        const red = rep.gates.filter((x) => !x.ok);
+        return { commit: String(rep.commit || "").slice(0, 8), allGreen: rep.gates.length === 4 && !red.length, red: red.map((x) => ({ gate: x.gate, fails: (x.fails || []).length, ms: x.ms })),
+            chainGreen: !!g && g.ok, adapter: (a.match(/^section 93: ([^,]+),/) || [])[1] || null, kernels: (a.match(/kernels (\w+);/) || [])[1] || null,
+            netFull: step("1920 x 1080", a), netHalf: step("at 960 x 540", a), full: num(/today's page \(network and mask\) ([0-9.]+) ms/, a),
+            half: num(/the half-size chain ([0-9.]+) ms/, a), temporal: num(/the half-size chain with its history ([0-9.]+) ms/, c), ratio: num(/ratio ([0-9.]+) x/, c),
+            hist: Object.fromEntries(HIST.map((k) => [k, step(k, c)])), rings: num(/; (\d+) of 96 rings filled/, b) };
+    };
+    const histMs = (r) => HIST.reduce((s, k) => s + r.hist[k].ms, 0);
+    // section 97's rule: a run counts when it is at a commit carrying section 97, every denoise gate is green (C1), the fill filled on
+    // fewer than 96 rings (C2), and both networks and the history's four passes are on the device's clock (C3); H holds on a GPU when
+    // both its runs count and full / temporal, re-made from the two times, is above 1.0 in each
+    const counts = (r) => SECTION97_COMMITS.includes(r.commit) && r.allGreen && r.rings > 0 && r.rings < 96 && r.netFull.clock === "device" && r.netHalf.clock === "device" &&
+        HIST.every((k) => r.hist[k].clock === "device" && Number.isFinite(r.hist[k].ms)) && [r.full, r.temporal, r.ratio].every((v) => Number.isFinite(v) && v > 0) && Math.abs(r.full / r.temporal - r.ratio) < 0.002;
+    const H = (runs) => (runs.length === 2 && runs.every(counts) ? (runs.every((r) => r.full / r.temporal > 1) ? "holds" : "fails") : "no verdict");
+    const rule98 = (byGpu) => { const v = Object.values(byGpu).map(H); return v.every((x) => x === "holds") ? "the page carries the history" : v.includes("no verdict") ? "owed again" : "name the passes"; };
+    const R = {};
+    for (const g of Object.keys(GPUS)) R[g] = ["a", "b"].map((k) => readRun(JSON.parse(fs.readFileSync(path.join(ENG, "render", `denoise-rig-r33-${k}-${g}.json`), "utf8"))));
+    const all = Object.values(R).flat(), [Na, Nb] = R.gtx1080;
+    ok("!! section 98: the four reports read back -- each at the commit carrying section 97, on its GPU's adapter and kernel set, the chain's gate green with the fill short of its 96 rings and every network and history pass on the device's clock",
+        Object.entries(R).every(([g, rs]) => rs.every((r) => SECTION97_COMMITS.includes(r.commit) && r.chainGreen && r.adapter === GPUS[g] && r.kernels === (g === "gtx1080" ? "r18t" : "r18u") && r.rings === 87 &&
+            r.netFull.clock === "device" && r.netHalf.clock === "device" && HIST.every((k) => r.hist[k].clock === "device") && Math.abs(r.full / r.temporal - r.ratio) < 0.002)),
+        all.map((r) => `${r.adapter} ${r.commit}: ${r.kernels}, ${r.rings} rings, ratio ${r.ratio}`).join("; "));
+    // C1, as the reports have it: three runs all green; the 1080's run b red in the timing gate alone, with no FAIL line, 17.7 s in
+    ok("!! section 98's C1: the Intel's two runs and the 1080's run a are green in every gate; the 1080's run b is red in render/denoiseTiming-selfcheck.mjs alone, with no FAIL line",
+        R["intel-gen9"].every((r) => r.allGreen) && Na.allGreen && !Nb.allGreen && Nb.red.length === 1 && Nb.red[0].gate === "render/denoiseTiming-selfcheck.mjs" && Nb.red[0].fails === 0,
+        `1080 run b: ${Nb.red.map((x) => `${x.gate} red after ${(x.ms / 1000).toFixed(1)} s, ${x.fails} FAIL line(s)`).join("; ")}`);
+    const green = (r) => ({ ...r, allGreen: true }), slow = (r) => ({ ...r, temporal: r.full * 1.01, ratio: Math.round(100000 / 1.01) / 100000 });
+    const stale = (r) => ({ ...r, commit: "1c60b346" }), wall = (r) => ({ ...r, hist: { ...r.hist, accum: { ...r.hist.accum, clock: "wall" } } }), full96 = (r) => ({ ...r, rings: 96 });
+    ok("!! *** section 98's rule, as section 97 fixed it: H holds on the Intel; the 1080 has no verdict, its run b red -- so the 1080's run b is owed again ***",
+        H(R["intel-gen9"]) === "holds" && H(R.gtx1080) === "no verdict" && rule98(R) === "owed again" &&
+        rule98({ ...R, gtx1080: [Na, green(Nb)] }) === "the page carries the history" && rule98({ ...R, gtx1080: [Na, slow(green(Nb))] }) === "name the passes" &&
+        rule98({ ...R, "intel-gen9": [stale(R["intel-gen9"][0]), R["intel-gen9"][1]] }) === "owed again" && H([wall(R["intel-gen9"][0]), R["intel-gen9"][1]]) === "no verdict" &&
+        H([full96(R["intel-gen9"][0]), R["intel-gen9"][1]]) === "no verdict" && H(R["intel-gen9"].slice(0, 1)) === "no verdict",
+        Object.entries(R).map(([g, rs]) => `${g}: ${rs.map((r) => (r.full / r.temporal).toFixed(3)).join(" and ")} x, ${H(rs)}`).join("; "));
+    // the predictions, read off the reports: they decided nothing, and section 98 says which held. The 1080's run b is read for them
+    // as a report, not as a run that counts
+    const within = (rs, f, lo, hi) => rs.every((r) => f(r) >= lo && f(r) <= hi), I = R["intel-gen9"], N = R.gtx1080;
+    const P = { ratio1080: within(N, (r) => r.ratio, 1.3, 1.5), ratioIntel: within(I, (r) => r.ratio, 1.25, 1.55), hist1080: within(N, histMs, 1, 4), histIntel: within(I, histMs, 15, 60), rings: all.every((r) => r.rings === 87) };
+    ok("  section 98's account of section 97's predictions: both ratios and the 1080's history cost held, as did C2; the Intel's history cost did not, and C1 did not on the 1080",
+        P.ratio1080 && P.ratioIntel && P.hist1080 && P.rings && !P.histIntel && !Nb.allGreen,
+        `history passes: Intel ${I.map((r) => histMs(r).toFixed(1)).join(", ")} ms (15-60 predicted), 1080 ${N.map((r) => histMs(r).toFixed(2)).join(", ")} ms (1-4)`);
+    for (const [g, rs] of Object.entries(R)) say(`section 98, ${g}: the history's four passes ${rs.map((r) => histMs(r).toFixed(2)).join(" / ")} ms, the accumulation ${rs.map((r) => r.hist.accum.ms.toFixed(2)).join(" / ")} of it; the chain without them ${rs.map((r) => (r.full / r.half).toFixed(3)).join(" / ")} x -- reported, deciding nothing`);
 }
 
 console.log(fails ? `\nFAIL -- ${fails} check(s)` : "\nALL GREEN");

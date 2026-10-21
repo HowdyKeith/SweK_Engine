@@ -37,9 +37,11 @@ node tools/ship/versionPreflight.mjs --next    # the next free version and sweep
 
 ## What is next -- Keith picks
 
-1. **`denoise-temporalup-device`.** Round 32 (sections 95-96): the half-size chain over eight jittered frames,
-   accumulated at full size, beat the same chain on one frame (mean d +0.259, 12 of 12) and full size at the same samples
-   accumulated the same way (+3.016, 11 of 12). By its rule the accumulation goes to the device next, then a rig timing.
+1. **`denoise-temporalup-device`: the 1080's owed run.** Round 32 (sections 95-96): the half-size chain over eight
+   jittered frames, accumulated at full size, beat the same chain on one frame and full size at the same samples. Round 33
+   (sections 97-98) put the accumulation on the device. On the Intel, the chain with its history is still cheaper than
+   today's page at 1080p (1.330 and 1.316 x). The 1080's run b does not count: its timing gate died. One run is owed there,
+   with the gate run alone first. Section 98 fixes how it is read.
    **`denoise-halfres-fixed-costs`** sits beside it: round 31 found the chain's coverage and fill cost more than its network.
 2. **`denoise-f16-intel`** (gen-9 only). Half-precision kernels, now known to be exposed there.
 3. **`denoise-subgroup-reduction`** (GTX 1080 only). Subgroup kernels, now known to be exposed there.
