@@ -91,6 +91,20 @@ console.log("\n4. THE MAP AND THE HAZE");
     report(SB.reportLines().join(" | "));
 }
 
+{
+    // the two phase functions are probability densities over the sphere: each integrates to 1 (a closed-form property of Rayleigh and Henyey-Greenstein-style Mie as upstream writes them)
+    const integrate = (f) => { let sum = 0; const N = 4000; for (let i = 0; i < N; i++) { const mu = -1 + 2 * (i + 0.5) / N; sum += f(mu) * (2 * Math.PI) * (2 / N); } return sum; };
+    ok("!! phaseRayleigh integrates to 1 over the sphere (" + integrate(SB.phaseRayleigh).toFixed(5) + ") and phaseMie(g = 0.76) to about 1 (" + integrate((mu) => SB.phaseMie(mu, 0.76)).toFixed(4) + "; the Cornette-Shanks form upstream writes is normalised)", Math.abs(integrate(SB.phaseRayleigh) - 1) < 1e-4 && Math.abs(integrate((mu) => SB.phaseMie(mu, 0.76)) - 1) < 0.03);
+    ok("  raySphereFar: from inside a sphere straight up it is radius - height; a ray that misses returns -1", Math.abs(SB.raySphereFar([0, 100, 0], [0, 1, 0], 150) - 50) < 1e-9 && SB.raySphereFar([0, 200, 0], [1, 0, 0], 150) === -1);
+    const d = SB.threeEquirectDir(0.5, 0.5), d2 = SB.threeEquirectDir(0.75, 0.5), top = SB.threeEquirectDir(0.3, 1);
+    const threeSrc = fs.readFileSync(path.join(ENG, "vendor/three/three.core.js"), "utf8") + fs.readFileSync(path.join(ENG, "vendor/three/three.module.js"), "utf8");
+    ok("!! three's equirect convention: u = atan(dir.z, dir.x) / 2pi + 0.5 (read out of the vendored three.js's equirectUv) and v from asin(dir.y), so u = 0.5 is +x, u = 0.75 is +z and the top row is straight up", /float u = atan\( dir\.z, dir\.x \) \* RECIPROCAL_PI2 \+ 0\.5/.test(threeSrc) && Math.abs(d[0] - 1) < 1e-12 && Math.abs(d2[2] - 1) < 1e-9 && Math.abs(top[1] - 1) < 1e-12);
+    const sun = SB.sunFrom(13, 60), tb = SB.bakeSkyThree(16, 8, sun, 20, GB), tc = SB.nishitaSky(SB.threeEquirectDir((5 + 0.5) / 16, 1 - (2 + 0.5) / 8), sun, 20, GB);
+    ok("  bakeSkyThree's texel (5, 2) is nishitaSky at that texel's direction in three's convention, rows top-down", Math.abs(tb[(2 * 16 + 5) * 4] - tc[0]) < 1e-5 && Math.abs(tb[(2 * 16 + 5) * 4 + 2] - tc[2]) < 1e-5);
+    const px = SB.lutToRGBA8(new Float32Array([0, 0, 0, 1, 1, 1, 1, 1, 1000, 1000, 1000, 1]), 1);
+    ok("  lutToRGBA8 (exposure, Reinhard, sRGB gamma): black stays 0, 1.0 maps to 186, a huge value approaches but never passes 255, alpha is 255", px[0] === 0 && px[4] === 186 && px[8] >= 254 && px[8] <= 255 && px[3] === 255 && px[11] === 255, Array.from(px).join(","));
+}
+
 console.log("\n5. THE KERNEL");
 {
     const skip = headlessGpuSkipReason(require_);

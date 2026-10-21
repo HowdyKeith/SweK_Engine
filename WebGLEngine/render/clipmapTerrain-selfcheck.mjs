@@ -120,6 +120,8 @@ console.log("\n5. THE FETCH");
     ok("!! it LOW-PASSES (approximates, does not interpolate): a +-1 checkerboard sampled at a texel centre reads about 0.11, not 1, as upstream says ('gently low-passes the bake')", Math.abs(CM.bicubicHeight(chk, res, 8.5 / res, 8.5 / res)) < 0.2, "reads " + CM.bicubicHeight(chk, res, 8.5 / res, 8.5 / res).toFixed(3));
 }
 
+ok("  the bench report names the rings, the vertex count and the 870 m reach", /8 nested rings of 160 quads/.test(CM.reportLines()[0]) && /207368 vertices/.test(CM.reportLines()[0]) && /870 m/.test(CM.reportLines()[0]) && /snap to 2 x spacing/.test(CM.reportLines()[1]));
+
 console.log("\n6. THE KERNEL");
 {
     const skip = headlessGpuSkipReason(require_);

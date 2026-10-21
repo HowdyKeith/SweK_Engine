@@ -222,6 +222,23 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 }
 `;
 
+/**
+ * three.js's equirectangular convention (EquirectangularReflectionMapping, a texture with flipY): u = atan2(dir.z, dir.x) / 2pi + 0.5, v (up) = asin(dir.y) / pi + 0.5. The LUT above is upstream's own
+ * mapping (u from atan2(x, z), v from acos(y), top row = zenith); a page that hands the sky to three.js bakes in THIS one instead, so the dome appears the right way round. `row0IsTop` = canvas order.
+ */
+export function threeEquirectDir(u, vUp) { const phi = (u - 0.5) * 2 * PI, lat = (vUp - 0.5) * PI, c = Math.cos(lat); return [c * Math.cos(phi), Math.sin(lat), c * Math.sin(phi)]; }
+export function bakeSkyThree(w, h, sunDir, sunIntensity, groundBounce) {
+    const out = new Float32Array(w * h * 4);
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) { const c = nishitaSky(threeEquirectDir((i + 0.5) / w, 1 - (j + 0.5) / h), sunDir, sunIntensity, groundBounce), o = (j * w + i) * 4; out[o] = c[0]; out[o + 1] = c[1]; out[o + 2] = c[2]; out[o + 3] = 1; }
+    return out;
+}
+/** linear radiance -> display bytes: exposure, Reinhard, sRGB gamma. Returns Uint8ClampedArray rgba. */
+export function lutToRGBA8(lut, exposure = 1) {
+    const out = new Uint8ClampedArray(lut.length);
+    for (let i = 0; i < lut.length; i += 4) for (let c = 0; c < 3; c++) { const x = lut[i + c] * exposure, t = x / (1 + x); out[i + c] = Math.round(255 * Math.pow(Math.max(0, t), 1 / 2.2)); out[i + 3] = 255; }
+    return out;
+}
+
 /** a sun direction from elevation and azimuth in degrees (azimuth 0 along +z, turning toward +x) */
 export function sunFrom(elevDeg, azimDeg) { const e = elevDeg * PI / 180, a = azimDeg * PI / 180; return [Math.cos(e) * Math.sin(a), Math.sin(e), Math.cos(e) * Math.cos(a)]; }
 

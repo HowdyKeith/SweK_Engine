@@ -56,6 +56,11 @@ console.log("1. LIFTED");
     ok("!! buildHalton(8) is Halton(2,3) on [-0.5, 0.5]: the first points are (0, -1/6), (-1/4, 1/6), (1/4, -7/18), (-3/8, -1/18), and the table is upstream's postChain.js builder verbatim", Math.abs(hj[0] - 0) < 1e-6 && Math.abs(hj[1] + 1 / 6) < 1e-6 && Math.abs(hj[2] + 0.25) < 1e-6 && Math.abs(hj[3] - 1 / 6) < 1e-6 && Math.abs(hj[4] - 0.25) < 1e-6 && Math.abs(hj[5] + 7 / 18) < 1e-6 && Math.abs(hj[6] + 0.375) < 1e-6 && /function radical\(i, base\)/.test(fs.readFileSync(path.join(ENG, "vendor/snowflow/src/post/postChain.js"), "utf8")) && T.radical(5, 2) === 0.625);
 }
 
+{
+    const trans = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 5, 6, 7, 1];   // column-major: the last four numbers are the translation column
+    ok("  mulMat4Vec4 is column-major like WGSL: the identity returns the vector, and a translation in the fourth column moves a point (1, 2, 3, 1) to (6, 8, 10, 1) and a direction (w = 0) not at all", T.mulMat4Vec4(IDENT, [1, 2, 3, 1]).join() === "1,2,3,1" && T.mulMat4Vec4(trans, [1, 2, 3, 1]).join() === "6,8,10,1" && T.mulMat4Vec4(trans, [1, 2, 3, 0]).join() === "1,2,3,0");
+}
+
 console.log("\n2. THE GATES");
 {
     const r = rng(4), S = state(); fill(S.cur, () => [r(), r(), r()]); fill(S.hist, () => [r(), r(), r()]);

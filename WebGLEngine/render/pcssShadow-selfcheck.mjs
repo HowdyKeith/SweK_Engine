@@ -58,6 +58,11 @@ console.log("\n2. THE TWIN");
     ok("  the lit fraction is a multiple of 1/12 (twelve taps), over 100 random edges and rotations", multiple);
 }
 
+{
+    const m = new Float32Array(4 * 4); for (let i = 0; i < 16; i++) m[i] = i;
+    ok("  sampleDepth is bilinear and clamped with texel centres at (i + 0.5) / res: the centre of texel (1, 2) reads 9, halfway to (2, 2) reads 9.5, and outside the map clamps to the edge texel", PS.sampleDepth(m, 4, 1.5 / 4, 2.5 / 4) === 9 && Math.abs(PS.sampleDepth(m, 4, 2 / 4, 2.5 / 4) - 9.5) < 1e-6 && PS.sampleDepth(m, 4, -3, -3) === 0 && PS.sampleDepth(m, 4, 5, 5) === 15);
+}
+
 console.log("\n3. UPSTREAM'S CLAIMS");
 {
     // a straight shadow edge at u = 0.5: the map is `depth` for u < 0.5 and 1 (open) beyond; the receiver at depth 0.6 is probed across the edge
