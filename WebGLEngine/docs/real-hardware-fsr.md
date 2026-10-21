@@ -579,6 +579,24 @@ No run is owed. The chain gate now runs the list fill unless asked for the old o
 report keeps the `section 93:`, `section 97:` and `section 99:` lines with the same meanings, and adds a `section 103:` line
 that names the default fill. Any later rig run of the chain gate checks the change on that GPU as it goes.
 
+### Round 37: the fill eight rings a pass, in tiles (pre-registration section 104)
+
+On each GPU, in a clone on the branch at a commit carrying section 104 (`git log -1 --oneline` shows it):
+
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r37-a.json
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r37-b.json
+```
+
+- **What is new:** the chain gate also runs the tile fill, checks it against the CPU and against the list fill bit for bit,
+  and times it. A `section 104:` line puts the two fills side by side.
+- **Section 104 predicts:** on the 1080, 2-10 ms against the list fill's 24-25. On the Intel, nothing either way. Every
+  gate is green.
+- **Don't commit or pull between runs.**
+- **Send back all four JSON files.**
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and

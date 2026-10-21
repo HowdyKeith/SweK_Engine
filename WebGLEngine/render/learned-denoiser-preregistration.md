@@ -6909,3 +6909,87 @@ No rig run is owed: the kernels, their order and every timed step are round 34's
 102. The next rig run of this gate checks rows 1-4 on that GPU as it goes.
 
 **Nothing else changes:** the network, every kernel table, the kernels themselves, and `fx/fsr`.
+
+## 104. ROUND 37 -- A FILL THAT RUNS EIGHT RINGS A PASS, IN TILES: FIXED BEFORE THE RIG RUNS IT
+
+**The question.** Section 102 found the 1080's fill cost is passes, not pixels: the list fill cut the pixels it touches to
+about 5 % of the frame and took 3-11 % off, leaving about 99 compute passes of roughly 0.25 ms each on the wall clock. Does a
+fill that runs several rings in one pass, in workgroup memory, take the 1080's fill well below the list fill's, without
+losing on the Intel? (`denoise-fill-fewer-passes`.)
+
+**The fill, `fill(..., { tile: true })` and `chain(..., { tile: true })`.**
+- One init pass turns the known flags into each pixel's ring: 0 if known, UNKNOWN (0xffffffff) if not.
+- Then one pass per FILL_TILE_RINGS = 8 rings. Each workgroup of 16 x 16 threads loads a 32 x 32 tile into workgroup
+  memory: its 16 x 16 interior and a halo of 8 on every side. It runs up to 8 rings there. Each ring is two phases split by
+  barriers: every cell still UNKNOWN works out the mean of its 8-neighbours whose ring is below this one, and only then do
+  the cells that found one take that value and this ring's number. It writes back the interior alone, ping-ponging the
+  image and the rings between two buffers.
+- A ring at a pixel reads only pixels one step away, so after k rings a value is exact wherever the tile holds every pixel
+  within k of it. With a halo of 8 and at most 8 rings a pass, every interior pixel is exact. Cells outside the frame are
+  a third mark that is never below any ring and is never filled, which is the CPU's bounds check.
+- A left pass then zeroes each pixel still UNKNOWN and counts it.
+- The sums run in the CPU's order, dy then dx, in f32, as the list fill's do, so the floats should be the list fill's bit
+  for bit. Each interior fill counts in its ring's `filled`, once.
+- The tile kernel counts its passes into a buffer that is read back (`tilePasses`). As round 34's Y7 showed, two fills that
+  agree float for float cannot otherwise tell which one ran.
+- At the chain's 96 rings: 14 passes (init, 12 tile passes, left), against the list fill's 99 and the ring fill's 97.
+
+**Timed.** `time()` adds `fillTile` and `wholeTile` by the wall clock, as the list fill is timed (one clock across the
+fills, though 14 passes would fit the device's 30). `timeHalfChain` adds `halfTile` and `temporalTile`. The page adds three
+rows (18): the tile fill, the half-size chain with it, and that with the history. A `section 104:` line carries them for the
+rig. The default stays the list fill (section 103) until this round's verdict says otherwise.
+
+**The rows (the gate's sections 2-4).**
+1. The tile kernel validates and holds its constants: 32 = 16 + 2 x 8, and 16 KB of workgroup memory, within WebGPU's
+   default limit.
+2. The tile fill is fillEmittersBounded's within 1e-5, with the same rings ring by ring and the same pixels left, on round
+   34's six frames. It is also the list fill's bit for bit, on those six frames and on the 96 x 64 frame at 13 rings, where
+   the last pass runs 5. `tilePasses` is ceil(maxRings / 8).
+3. The chain with the tile fill is the list fill's chain, bit for bit, on all four scenes.
+4. At the pilot size, `halfTile` is the half-size chain with `fillTile` in the fill's place and `temporalTile` that with the
+   history. The page has 18 rows. The `section 104:` line carries both figures.
+
+**The rig run.** On each GPU, in a fresh clone of a commit carrying this section, two
+`realGpuRun --only denoise` runs, as in round 34.
+
+**The rule (H37), per GPU, on the two runs' `section 104:` and `section 99:` lines.**
+- **C1:** every gate is green.
+- **C2:** the tile fill reaches every pixel: its rings equal the list fill's, and 0 are left.
+- **H37 holds on a GPU** when, in both runs, the tile fill is at least 10 % faster than the list fill (fillTile <=
+  0.9 x fillList).
+- **What it buys:**
+  - If it holds on the 1080 and the Intel's tile fill is no slower than its list fill in both runs, the tile fill
+    becomes the default, in a round of its own, as round 36 was.
+  - If it holds on one GPU only, it is reported and choosing the fill per adapter goes to the backlog.
+  - If it holds on neither, the tile fill is kept as a measured negative, and the 1080's fill lever is closed.
+
+**Predictions (stated so they can miss).**
+- **GTX 1080:** the tile fill 2-10 ms against the list fill's 24-25. That is 14 passes at the ~0.25 ms each section 102
+  implies, plus the tiles' work. H37 holds.
+- **Intel gen-9:** a ring pass over the whole frame there cost about 3 ms. A tile pass reads the frame four times over
+  (32^2 for 16^2) and does 8 rings of work in workgroup memory, so 12 of them could cost 10-60 ms against the list fill's
+  23-24. H37 is not predicted either way on the Intel.
+- Every gate is green on both.
+
+**Sabotages, by the byte-safe runner (C1-C7):**
+- a ring reading neighbours filled in the same ring (one barrier instead of two phases);
+- a halo of 7 with 8 rings a pass;
+- the cells outside the frame marked UNKNOWN;
+- the interior fills not counted;
+- the tile option running the list fill;
+- `halfTile` summing `fillList`;
+- the page without the tile fill's chain row.
+
+Each must turn at least one row red.
+
+**Nothing else changes:** the default fill (still the list fill), the network, every kernel table, and `fx/fsr`.
+
+**Two corrections and one report, made before the round was committed and before anything was measured on a GPU.**
+- The page has 18 rows, not 17: section 103's 15, and three more.
+- Sabotage C1 as first written (`<=` for `<`) went 0 RED. Under two phases, no cell carries this ring's number while the
+  means are taken, so `<=` changes nothing. The sabotage now does what its name says: one phase that writes as it goes and
+  reads this ring's fills. That turns four rows red. Its control, one phase with `<`, is green, as it should be: that is the
+  list fill's in-place rule. The two phases are kept so that no read of workgroup memory races a write; the answer does not
+  need them.
+- Reported, deciding nothing: on SwiftShader, a CPU emulating workgroup memory, the tile fill took 193.9 ms against the
+  list fill's 11.4 ms at the pilot size.

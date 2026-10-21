@@ -2348,7 +2348,7 @@ export const NEXT_ROUNDS = [
         id: "denoise-fill-fewer-passes",
         blocker: "OPEN",
         what: "A fill that runs several rings a pass -- for example in workgroup memory over tiles -- so the GTX 1080's fill stops being ~99 compute passes on the wall clock.",
-        how: "Pre-register against round 36's default (the list fill) and round 31's ring fill, both kept as references: the same rings and pixels left as fillEmittersBounded, then timed on the rig. The tile's halo bounds how many rings a pass can run.",
+        how: "Round 37 (pre-registration section 104) built it and waits on the rig: fill(..., { tile: true }) runs FILL_TILE_RINGS = 8 rings a pass in 32 x 32 workgroup tiles (a 16 x 16 interior, a halo of 8), 14 passes at 96 rings against the list fill's 99. On SwiftShader it is fillEmittersBounded's within 1e-5 and the list fill's bit for bit; sabotaged C1-C7. Owed: two realGpuRun --only denoise runs on each GPU, read by section 104's rule (H37: fillTile <= 0.9 x fillList in both runs).",
         why: "Section 102: on the 1080 the list fill cut the pixels to 5 % of the frame and took only 3-11 % off; what is left is the passes, not the pixels.",
     },
     {

@@ -37,9 +37,10 @@ node tools/ship/versionPreflight.mjs --next    # the next free version and sweep
 
 ## What is next -- Keith picks
 
-1. **`denoise-fill-fewer-passes`.** Round 36 (section 103) made the list fill the chain's default, with round 31's ring
-   fill kept as its reference (`{ list: false }`); it ships with the next version and owes no rig run. On the 1080 the fill's
-   remaining cost is its ~99 passes, not pixels, so the next fill runs several rings a pass.
+1. **`denoise-fill-fewer-passes`, round 37 (section 104): owed two runs on each GPU.** The tile fill runs eight rings a pass
+   in workgroup memory, 14 passes at 96 rings against the list fill's 99, and is the list fill bit for bit on SwiftShader.
+   Section 104 predicts 2-10 ms on the 1080 (against 24-25) and nothing either way on the Intel. Round 36 (section 103) made
+   the list fill the chain's default, with round 31's ring fill kept as its reference (`{ list: false }`); no rig run owed.
    **`denoise-1080-native-crash`:** round 35 did not reproduce it in five runs (section 102). The traces stay armed.
    **Earlier, `denoise-1080-native-crash`, round 35 (section 101).** On the 1080 the timing gate dies inside its native ladder in most
    runs. The 1080 has no verdict for rounds 33 and 34 until this is settled. Round 35 traces the ladder step by step and keeps
