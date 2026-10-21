@@ -86,8 +86,8 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
        "NOTHING imports it, so this is the property the old ORPHAN_UTIL_BASELINE === 0 check was reaching for. " +
        "*** IT REACHED FOR IT THROUGH A TREE-WIDE COUNT THAT v3223 REDEFINED, and had been red ever since. ***");
     ok("...and the tree-wide census is still RATCHETED rather than unbounded, which is graveyard's job not this one's",
-       /const ORPHAN_UTIL_BASELINE = \d+;/.test(g) && /RAISED FROM \d+ TO \d+|LOWERED/.test(g),
-       "the literal is still in the source with its history beside it. THIS GATE NO LONGER ASSERTS ITS VALUE: " +
+       /ratchet\("orphanUtils"/.test(g) || (/const ORPHAN_UTIL_BASELINE = \d+;/.test(g) && /RAISED FROM \d+ TO \d+|LOWERED/.test(g)),
+       "the ratchet (v4886: a recorded SET in orphanSets) or the literal with its history is still in the source. THIS GATE NO LONGER ASSERTS ITS VALUE: " +
        "a number two gates disagree about is a number one of them should not be reading");
     ok("...and the census still distinguishes records from orphans", /isAnalysisRecord/.test(g),
        "analysis records are not debt -- their consumer is correctly the gate that re-derives them");

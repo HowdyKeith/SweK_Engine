@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "cd4e364b37c88d1b632db1b32dd3e2f45dba5661",
+ "head": "906c8ac71b0f0fef8fcc2a6a7c9dd4bd179645e0",
  "bodies": {
   "box3d": [
    {
@@ -340,8 +340,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 895514,
-    "sha": "60f2555250f5aaba692d1b6a54b137bdbc5713e8"
+    "bytes": 895726,
+    "sha": "906c8ac71b0f0fef8fcc2a6a7c9dd4bd179645e0"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
@@ -437,6 +437,11 @@
     "path": "tools/krbnVendor-selfcheck.mjs",
     "bytes": 6881,
     "sha": "66db97c45b5286d98d1c018506effca552f05a23"
+   },
+   {
+    "path": "tools/ship/orphanSets.mjs",
+    "bytes": 37440,
+    "sha": "af97fe9ffc2504eda49cd0166a6c9fb925ae351e"
    }
   ],
   "male-cns": [
@@ -746,8 +751,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3698424,
-    "sha": "19a418c5d4e7517fc2b9f753c600e26433c9801d"
+    "bytes": 3698175,
+    "sha": "906c8ac71b0f0fef8fcc2a6a7c9dd4bd179645e0"
    },
    {
     "path": "mpm3d.html",
@@ -796,8 +801,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 895514,
-    "sha": "60f2555250f5aaba692d1b6a54b137bdbc5713e8"
+    "bytes": 895726,
+    "sha": "906c8ac71b0f0fef8fcc2a6a7c9dd4bd179645e0"
    },
    {
     "path": "shipavatar.html",
@@ -873,6 +878,11 @@
     "path": "tools/ship/fbxIngest-selfcheck.mjs",
     "bytes": 105144,
     "sha": "fa8a6c7d4f57021b30063e2e03b9d2a7314e1ab3"
+   },
+   {
+    "path": "tools/ship/orphanSets.mjs",
+    "bytes": 37440,
+    "sha": "af97fe9ffc2504eda49cd0166a6c9fb925ae351e"
    },
    {
     "path": "tools/ship/pipboyWireframe-selfcheck.mjs",
@@ -1208,7 +1218,7 @@
    },
    {
     "path": "tools/ship/aiPresenceOrb-selfcheck.mjs",
-    "bytes": 47276,
+    "bytes": 49321,
     "sha": "22faf54c99259df4936b00cf5f565a26ef8efa04"
    },
    {
@@ -1329,6 +1339,11 @@
     "sha": "e42a281a36cd5d4c329b3eba073186d2bc029fb2"
    },
    {
+    "path": "tools/ship/orphanSets.mjs",
+    "bytes": 37440,
+    "sha": "af97fe9ffc2504eda49cd0166a6c9fb925ae351e"
+   },
+   {
     "path": "tools/ship/threePatch.mjs",
     "bytes": 21567,
     "sha": "aff5ba3934aa930e51f9f8631108e51f72c7f4aa"
@@ -1371,6 +1386,16 @@
     "path": "tools/ship/oceanSpikePage-selfcheck.mjs",
     "bytes": 15599,
     "sha": "e608b7df96aac65e5fac2ba7c5518b35d55b2cd8"
+   },
+   {
+    "path": "ui/oceanSea-selfcheck.mjs",
+    "bytes": 13599,
+    "sha": "906c8ac71b0f0fef8fcc2a6a7c9dd4bd179645e0"
+   },
+   {
+    "path": "ui/oceanSea.mjs",
+    "bytes": 9990,
+    "sha": "906c8ac71b0f0fef8fcc2a6a7c9dd4bd179645e0"
    }
   ],
   "xatlas": [

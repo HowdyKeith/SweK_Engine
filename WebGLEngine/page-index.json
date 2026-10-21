@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 487,
+ "count": 488,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -2072,6 +2072,13 @@
    "f": "ocean-default.html",
    "t": "SweK &middot; Default ocean",
    "d": "The cheap default water: a Gerstner sea drawn as a mesh from the very surface the physics stands on, with buoys that float on it. The HUD re-asks the physics about drawn vertices every frame and prints how far apart the two answers are. WebGL2, no WebGPU needed.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "ocean-sea.html",
+   "t": "SweK &middot; Ocean (opt-in GPU sea)",
+   "d": "The opt-in water mode: the vendored web-ocean WebGPU sea behind a tier switch, kept only if it holds the frame budget on this GPU (it is timed from its own HUD), with a computed table of where it does not match the physics surface.",
    "g": "",
    "p": 0
   },

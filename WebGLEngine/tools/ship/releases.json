@@ -1,7 +1,7 @@
 {
   "generatedFrom": "tools/ship/refreshReleases.mjs",
   "note": "WHAT IS ACTUALLY PUBLISHED ON THE RELEASES PAGE -- the record the offline gate reads, refreshed from the GitHub API by tools/ship/refreshReleases.mjs rather than believed. THE FLEET DOWNLOADS releases/latest, so this file is the only thing in the tree that knows what the fleet will actually run.",
-  "refreshedAt": "2026-10-21T01:20:52.551Z",
+  "refreshedAt": "2026-10-21T13:23:06.623Z",
   "source": "GET /repos/HowdyKeith/SweK_Engine/releases (per_page=100)",
   "baseline": {
     "throughVersion": 4660,
@@ -22,6 +22,26 @@
     ]
   },
   "releases": [
+    {
+      "tag": "v4890",
+      "publishedAt": "2026-10-21T13:22:52Z"
+    },
+    {
+      "tag": "v4889",
+      "publishedAt": "2026-10-21T11:37:14Z"
+    },
+    {
+      "tag": "v4888",
+      "publishedAt": "2026-10-21T04:16:43Z"
+    },
+    {
+      "tag": "v4887",
+      "publishedAt": "2026-10-21T03:48:09Z"
+    },
+    {
+      "tag": "v4886",
+      "publishedAt": "2026-10-21T03:04:22Z"
+    },
     {
       "tag": "v4885",
       "publishedAt": "2026-10-21T01:20:34Z"
@@ -352,8 +372,8 @@
     }
   ],
   "ratchet": {
-    "minReleases": 82,
-    "minLatest": 4885,
+    "minReleases": 87,
+    "minLatest": 4890,
     "note": "A RELEASE THE FLEET WAS ALREADY RUNNING MUST NOT VANISH. Found by sabotage 2: deleting the newest row moved the reported lag from 10 to 148 and turned NOTHING red, because the lag is reported rather than asserted. These two numbers may only RISE, and refreshReleases raises them when it writes. A release deleted upstream -- or a ledger truncated by a bad merge -- now fails here instead of quietly telling the fleet to run something older."
   },
   "lagBudget": {

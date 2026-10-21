@@ -16055,6 +16055,42 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "and NAME the eight. The new criterion survives the correction: it disagrees with the v2905 " +
                  "magnitude rule on six of 66 movers, in both directions. Three sabotages, three red by name",
     }),
+    since599: Object.freeze({
+        at: "v4886", swept: 5, green: 5, red: 0,
+        added: Object.freeze([
+            "tools/ship/backlogIntegrity-selfcheck.mjs",
+            "tools/ship/gateParses-selfcheck.mjs",
+            "tools/ship/orphanSets-selfcheck.mjs",
+            "tools/ship/recordProbe-selfcheck.mjs",
+            "tools/ship/relativeBudget-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "the five tooling gates of the v4661-v4675 chain, merged at v4886 with its murmur/orb half dropped " +
+                 "(superseded by main's v4825-v4829 parity round; its nine gates deleted, not ported). The chain's " +
+                 "renumbered ledger slots were already in the file, so these are the only gates it adds. orphanSets " +
+                 "needed its three recorded sets restated to the merged tree by name before it would pass -- 28/6, " +
+                 "53/9 and 22/7 arrived/left -- and backlogIntegrity needed one orb entry's verdict to carry its " +
+                 "reason again. relativeBudget reads the stored per-pass scales, which this round's sweep rewrites",
+    }),
+    since600: Object.freeze({
+        at: "v4889", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["ui/oceanTier-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "the ocean tier switch's gate (slice 3): classifyAdapter on fourteen adapter spellings, chooseTier on one row per branch " +
+                 "(off never, auto only when measured, on says how slow, no WebGPU and software adapters never), the probe harness on a fake " +
+                 "clock, and a storage that throws. Nine sabotages, nine red -- seven by a FAIL row and two by a crash, which is red by exit status",
+    }),
+    since601: Object.freeze({
+        at: "v4890", swept: 2, green: 2, red: 0,
+        added: Object.freeze(["ui/oceanSea-selfcheck.mjs", "tools/ship/oceanSeaPage-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "the opt-in sea (slice 4): the pure half (the HUD line parsed the way the sea prints it, the probe median, the per-adapter remembered reading, the declared defaults read from the " +
+                 "bundle's own text, the computed comparison with the physics surface; eleven sabotages, eleven red) and the page against a stand-in frame (a fast GPU timed and kept and not " +
+                 "timed again on reload, a slow one unloaded, the same slow one kept under on, no WebGPU and off never requesting the frame, a mute sea given up on; eight page sabotages, all red)",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

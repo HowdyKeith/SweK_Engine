@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // WebGLEngine/tools/ship/deferralCensus-selfcheck.mjs -- v4479
 //
-// Run: node tools/ship/deferralCensus-selfcheck.mjs   (~1s)
+// Run: node tools/ship/deferralCensus-selfcheck.mjs   (~2s -- MEASURED 2.1 s on the shared record at v4888; its header said ~1s)
 // Gated by tools/ship/selfchecks.mjs (discovery gate -- found by name, not by a list).
 //
 // *** THE BACKLOG BUILT TO STOP DEFERRALS LIVING IN PROSE HAD ITSELF BEEN LIVING IN PROSE FOR 925 VERSIONS. ***

@@ -8,7 +8,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { redRegister, selectGates, readTimings, DEFAULTS } from "./quickSweep.mjs";
+import { redRegister, selectGates, scaleLookup, readTimings, DEFAULTS } from "./quickSweep.mjs";
 import { enumerateGates } from "./gateSweep.mjs";
 import {
     ENG, ABSORBING, MEASURED_V4425, STALE_FAILURES,
@@ -58,14 +58,24 @@ console.log("\n1. *** THE SKIP IS PERMANENT, DEMONSTRATED THROUGH THE REAL SWEEP
 console.log("\n2. *** WHO IS IN THERE ***");
 {
     const all = enumerateGates(ENG);
-    const sel = selectGates(all, T, DEFAULTS.budgetMs);
+    // *** v4672 -- THE SCALE GOES IN, BECAUSE THE SHIP PUTS IT IN. *** This row read the unnormalised
+    // decision and described it as "the exiled set", which stopped being the ship's exiled set the moment
+    // runQuickSweep started dividing by the measured pass scale. A gate grading the rule the ship does not
+    // use is the shape this whole module is about, one level up.
+    const sel = selectGates(all, T, DEFAULTS.budgetMs, { scaleOf: scaleLookup(prior) });
     const reg = redRegister();
     const unreg = sel.skipped.filter((g) => !reg.has(g));
     report(`${sel.skipped.length} of ${all.length} gates are exiled over the ${DEFAULTS.budgetMs}ms budget; ` +
-        `${unreg.length} of those are on no register at all`);
-    ok("*** the exiled set is exactly the gates whose RECORDED time is over budget ***",
-        sel.skipped.every((g) => T[g] > DEFAULTS.budgetMs) && sel.run.every((g) => T[g] == null || T[g] <= DEFAULTS.budgetMs),
-        "no other property of a gate takes part in the decision -- not its register entry, not its exit code");
+        `${unreg.length} of those are on no register at all` +
+        (sel.rescaled.length ? `; ${sel.rescaled.length} readings were divided by their pass's measured box ` +
+                               `scale first, and ${sel.admitted.length} gate(s) were readmitted by it` : ""));
+    ok("*** the exiled set is exactly the gates whose RECORDED time, normalised for the box, is over budget ***",
+        sel.skipped.every((g) => T[g] > DEFAULTS.budgetMs) &&
+        sel.run.every((g) => T[g] == null || T[g] <= DEFAULTS.budgetMs || sel.admitted.includes(g)),
+        "no other property of a gate takes part in the decision -- not its register entry, not its exit code. " +
+        "The one thing that does, since v4672, is how fast the box was when the reading was taken, and a gate " +
+        "readmitted on that count is named in `admitted` rather than quietly widening the second clause. " +
+        "tools/ship/relativeBudget-selfcheck.mjs owns that rule; this row only refuses to misdescribe it.");
     // *** THE REPAIR MAKES THE FINDING VISIBLE IN THE FILE ITSELF. *** A row with no observation stamp is a
     // row no sweep has been able to refresh since the field existed -- and every one of them is an exile. The
     // containment is the assertable direction: a gate released from exile gets stamped on its next run, so

@@ -184,7 +184,15 @@ export function reach({ budgetMs = null, timings = null, census = null, root = E
     // stand there. Sorted slowest first, because the three at the cap are a different problem from the
     // three that are a few hundred milliseconds over.
     const blockers = new Map();
-    for (const r of overBudget) for (const g of r.guardians) {
+    // *** v4675 -- A GUARDIAN WITH NO READING IS NOT KNOWN TO BE OVER BUDGET, AND THIS PUT ONE IN THE TIER. ***
+    // The loop took EVERY guardian of an over-budget record. A record is OVER_BUDGET when its cheapest TIMED
+    // guardian is dear; its other guardians may simply never have been swept -- a gate added this round has no
+    // entry at all. MEASURED: adding tools/ship/recordProbe-selfcheck.mjs, which runs in about two seconds,
+    // made it a blocker of MEASURED_AT_V4415 at `null` ms, and recordTier's own row reported "cheapest is 0 ms
+    // against a 3,000 ms budget". The tier would then have run it at ship time on no evidence, which is the
+    // fault v4674 repaired one level up: a population sized from a number that is not there. An untimed
+    // guardian belongs to UNMEASURED, which this function already counts, and not to the tier.
+    for (const r of overBudget) for (const g of r.guardians.filter((x) => timed(x) && !runsAtShipTime(x))) {
         if (!blockers.has(g)) blockers.set(g, { gate: g, ms: t.timings?.[g] ?? null, records: [] });
         blockers.get(g).records.push(r.name);
     }
@@ -393,7 +401,8 @@ export const REACH_AT_V4548 = Object.freeze({
     // v4840 -- 157 -> 158: DOORS_AT_V4840 in tools/ship/wasmTeardown.mjs, the computed-door census measured under the hook. GUARDED --
     // v4880 -- 158 -> 170: the orrery-seeded merge, twelve guarded records. Read off the gate, not typed.
     // wasmTeardown-selfcheck reads it and grades every gate reaching a door against it.
-    total: 178,
+    // v4886 -- 178 -> 180: PROBE_AT_V4675 and one more, both guarded by recordProbe-selfcheck / frozenRecords; read off the gate.
+    total: 181,
     // *** READ OFF THE INSTRUMENT, NOT PREDICTED. *** The first draft of this record guessed 53/21/19/40 from
     // which gates the round had sped up, and was wrong on three of the four: the comment-strip fix below
     // moved two records the other way at the same time, and a guess cannot see two changes at once.
@@ -454,7 +463,16 @@ export const REACH_AT_V4548 = Object.freeze({
     // MEASURED_AT_V4489 in render/parallaxSampler.mjs, 4.3 s -- the branch timed them under the line on its box, and this one is slower) and two documentary records nothing guards
     // (STALE_EXILE_V4473, REFUSAL_ATTRIBUTION_V4481). The ratchet refuses a rise it cannot name; this one is named, and it is not a target.
     // v4884 -- RE-TAKEN at the merge of long-silence-elements-check, read off reach(): total 171 -> 178, checked 116 -> 119, overBudget 39 -> 43, unguarded held at 16, unchecked 55 -> 59. The four new over-budget records among the seven that arrived are PORTABILITY_AT_V4481, CONDITIONING_AT_V4484, WIDE_AT_V4485, WIDE_AT_V4486, LAB_AT_V4480 and SWEEP_AT_V4488 (six rows over four net, some already counted), whose guardians are the branch's corroboration tools: corroborationSubmit-selfcheck 4.2 s, deviceReport-selfcheck 4.5 s and sensitivitySweep-selfcheck 9.1 s, all over the 3,000 ms line on this box. A ceiling re-taken at a merge, by name, and not a target.
-    checked: 119, overBudget: 43, unguarded: 16, unchecked: 59,
+    // round 22 (v4887) -- RE-TAKEN at its merge, read off reach(): total 180 -> 181 (PROBE_AT_V4675_R22, guarded), checked 119 -> 120, overBudget 43 -> 44,
+    // unguarded 16 -> 17, unchecked 59 -> 61. THE RISE IS THE ROUND'S FINDING AND NOT A REGRESSION OF THE TREE: a guardian now has to USE the name in code, and
+    // twenty-odd records lost a guardian that only wrote the name in a message or held it inside another identifier. Three moved class: ADDED_AT_V4403 lost its
+    // only guardian (a mention) and is now unguarded; MEASURED_AT_V4415 and KEY_DRIFT_V4460 kept one real guardian, and it is over the sweep's line.
+    // v4890 -- 61 -> 62 and checked 120 -> 119, overBudget 44 -> 45, NAMED: WASM_AT_V4663's guardians are tools/ship/wasmDoors-selfcheck.mjs and wasmTeardown-selfcheck.mjs, and wasmDoors crossed the 3,000 ms line
+    // (ring 3,051 / 2,804 / 3,137 serial; 3,386 ms measured alone just now). It is a CENSUS gate: a `git grep --untracked` over the whole tree (about 1.5 s of its 3 s is spawnSync) plus the comment lexer
+    // (0.6 s), so it grows with the tree and this round added three more files. It sat at 2,804 for the v4887 reading and flipped back and forth through v4889 and v4890's verdicts (61 / 62 / 61 / 62), which is the
+    // flake that was reported and not understood until now: not noise, a gate AT the line. The ceiling is 62 because 62 is what the tree holds when it reads over; the fix that would lower it is a cheaper census in
+    // wasmTeardown.mjs (one pass instead of a grep per door), not a re-timing. The ratchet still refuses growth beyond this.
+    checked: 119, overBudget: 45, unguarded: 17, unchecked: 62,
     // v4550 -- the UNMEASURED class was split out of over-budget after this gate went red twice inside full
     // sweeps and passed 68 times under load; the trigger was a concurrent REWRITE of sweep-timings.json, not
     // contention. Zero records sit in it on a settled tree, which is the expected reading.
@@ -643,7 +661,7 @@ export const UNGUARDED_SPLIT_V4577 = Object.freeze({
     // v4819 -- 156 -> 157, COMMIT_BELT_DRIFT_V4819 re-taken above; `unguarded` does not move.
     // v4840 -- 157 -> 158, DOORS_AT_V4840 re-taken above; `unguarded` does not move.
     // v4880 -- 158 -> 170: twelve records arrive with the orrery-seeded merge; `unguarded` does not move (16 of 170, all documentary). Read off the gate.
-    structural: Object.freeze({ total: 178, unguarded: 16, documentaryOfThose: 16, readByCodeOfThose: 0 }),
+    structural: Object.freeze({ total: 181, unguarded: 17, documentaryOfThose: 16, readByCodeOfThose: 1 }),
     // BEFORE, on the tree this round opened on:
     before: Object.freeze({ total: 104, checked: 72, overBudget: 20, unmeasured: 0, unguarded: 12, unchecked: 32 }),
     // AFTER, as one reading rather than as a constant -- see the note above. Taken with the round's own

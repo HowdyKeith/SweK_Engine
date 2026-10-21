@@ -167,8 +167,8 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
         }
     })(ENGINE);
     ok("!! NOTHING IN THE ENGINE CONSUMES THE MIXWELL EXPRESSIONS",
-       importers.filter((f) => f !== "tools/ship/reportingTools.mjs").length === 0,
-       "only its own gate and the tools registry -- the greedyMesh3d rule, and the reason this round GRADES " +
+       importers.filter((f) => f !== "tools/ship/reportingTools.mjs" && f !== "tools/ship/orphanSets.mjs").length === 0,
+       "only its own gate, the tools registry and the orphan register (v4886: orphanSets records it BY NAME as debt) -- the greedyMesh3d rule, and the reason this round GRADES " +
        "rather than ADOPTS" + (importers.length ? " (saw: " + importers.join(", ") + ")" : ""));
     ok("the mirror is NAMED so nobody proposes it", (MEASURED_V3611.theMirrorNamed || "").includes("drift1D"),
        "their drift1D returns rdLine1DS -- a round-trip key would grade the function against itself");

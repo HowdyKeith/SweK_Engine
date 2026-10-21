@@ -1,5 +1,5 @@
 {
- "built": "2026-10-20",
+ "built": "2026-10-21",
  "reports": [
   "backendRouting-selfcheck.json",
   "brainStages-selfcheck.json",
@@ -81,6 +81,7 @@
   "raceKnob-selfcheck.json",
   "realGpuRun-selfcheck.json",
   "registerDrift-selfcheck.json",
+  "relativeBudget-selfcheck.json",
   "reportDoors-selfcheck.json",
   "retroRaster-selfcheck.json",
   "rigidCouple-selfcheck.json",
