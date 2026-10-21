@@ -327,7 +327,10 @@ sec("6. *** IT WRITES TO TRACKED SOURCE, SO THE RESTORE IS AUDITED RATHER THAN A
         const child = spawn(process.execPath, [driver], { stdio: "ignore" });
         // Wait until the file is actually corrupted, then kill -- so the test cannot pass by killing too early.
         let sawCorruption = false;
-        const deadline = Date.now() + 3000;
+        // v4893 -- 30 s, not 3: on the rig (win32, four gates at once, a slower box) the child's Node start, its imports and its
+        // baseline guardian run took past 3 s, so neither kill row ever saw the corruption it waits for. A bound, not a cost:
+        // the loop leaves the moment the file changes, which is about 0.2 s here.
+        const t0kill = Date.now(), deadline = t0kill + 30000;
         while (Date.now() < deadline) {
             if (fs.readFileSync(path.join(tmp, recFile), "utf8") !== original) { sawCorruption = true; break; }
         }
@@ -346,7 +349,9 @@ sec("6. *** IT WRITES TO TRACKED SOURCE, SO THE RESTORE IS AUDITED RATHER THAN A
         say(`corruption observed mid-run: ${sawCorruption}; restored by the signal handler: ${byHandler}; journal left: ${journalLeft}; restored after recovery: ${restored} (${rec.restored.length} file(s) put back from the journal)`);
         ok("!! *** a run killed WHILE a file is corrupted still restores it -- by its handler where one runs, by its journal where none can ***",
             sawCorruption && restored && (process.platform === "win32" ? true : byHandler && !journalLeft),
-            `the kill is delivered only after the corruption is SEEN on disk, so this cannot pass by racing ` +
+            `${process.platform}: corruption seen ${sawCorruption}${sawCorruption ? "" : " (waited " + ((Date.now() - t0kill) / 1000).toFixed(1) + " s)"}; ` +
+            `restored by the handler ${byHandler}; journal left ${journalLeft}; restored after recovery ${restored} (${rec.restored.length} put back, ${(rec.skipped || []).length} skipped). ` +
+            `The kill is delivered only after the corruption is SEEN on disk, so this cannot pass by racing ` +
             `ahead of the mutation, and the wait is on the child's ACTUAL exit rather than a timer. Without the ` +
             `handler the sentinel survives -- which is how one reached tools/ship/orphanSets.mjs during this ` +
             `round, where git status could not tell it from somebody's work in progress.`);
@@ -363,7 +368,7 @@ sec("6. *** IT WRITES TO TRACKED SOURCE, SO THE RESTORE IS AUDITED RATHER THAN A
         fs.writeFileSync(path.join(tmp, recFile), original);
         const child2 = spawn(process.execPath, [driver], { stdio: "ignore" });
         let saw2 = false;
-        const deadline2 = Date.now() + 3000;
+        const t0kill2 = Date.now(), deadline2 = t0kill2 + 30000;
         while (Date.now() < deadline2) {
             if (fs.readFileSync(path.join(tmp, recFile), "utf8") !== original) { saw2 = true; break; }
         }
@@ -379,7 +384,8 @@ sec("6. *** IT WRITES TO TRACKED SOURCE, SO THE RESTORE IS AUDITED RATHER THAN A
         say(`SIGKILL: corruption observed ${saw2}; left corrupted by the kill ${left2}; journal on disk ${journal2}, holding the pending write ${pend2}; put back by the next probe ${back2}`);
         ok("!! *** a run killed with NO handler able to run (SIGKILL; every kill on Windows) leaves a journal, and the next probe puts the tree back from it ***",
             saw2 && left2 && journal2 && pend2 && back2,
-            `the kill left the record corrupted, as it must when nothing in the process runs, and recoverInterrupted -- which ` +
+            `${process.platform}: corruption seen ${saw2}; left corrupted ${left2}; journal on disk ${journal2}, holding the pending write ${pend2}; put back by the next probe ${back2}. ` +
+            `The kill left the record corrupted, as it must when nothing in the process runs, and recoverInterrupted -- which ` +
             `probe() calls before it measures anything -- restored it from the journal written before the first mutation.`);
 
         // *** S12 (v4891): THE JOURNAL RESTORES ONLY THE PROBE'S OWN WRITE, AND IS GONE AFTERWARDS. *** Driven on a journal
