@@ -9,6 +9,11 @@
 // (the UHD 620's 10 fps / 100 ms / GPU 228.04 ms is one of them) plus hand-made variants; whether a future bundle formats its HUD the same way is what
 // the SHA row below is for -- the bundle is pinned, so a changed format means a changed file. The page that uses all this is graded in
 // tools/ship/oceanSeaPage-selfcheck.mjs against a stand-in frame.
+// v4895 -- CORRECTED: sections 2 and 4 asserted that the sea's tunables are unreachable from the URL ("no wave parameter is on the list") and that the physics sea is x1.55 the sea's height.
+// The first was false (the bundle's line 2193 applies every key of its parameter block from the query string) and the second compared a total with a swell-only figure. Both rows are
+// replaced by rows that read the bundle's generic loop and its parameter block out of its own text. Eleven further sabotages of the new code, all red: swellHs from the total height 3 rows,
+// swellLength from the shortest wave 3, non-numeric tunables passed 1, a tunable missing from the list 1, matchRows ignoring what was applied 1, the total-height row given a ratio 2,
+// the report without its NOT matched line 1, unknown keys passed through 1, a ratio against a typed 60 1, setBy always "default" 1, an invented extra tunable 1.
 // SABOTAGES, each applied to the real ui/oceanSea.mjs, restored, md5 verified. 11 of 11 red (rows red in brackets):
 //   S1 the probe number ignores the GPU clock [1]          S2 a "0 fps" line parses as a frame [1]          S3 the warmup is not dropped [1]
 //   S4 a remembered reading is served to any adapter [1]   S5 a remembered reading never expires [1]      S6 seaUrl passes keys the bundle never reads [1]
@@ -51,15 +56,18 @@ console.log("\n1. THE HUD LINE, AS THE SEA PRINTS IT");
         "[10,11,12,400,11,10] -> 11");
 }
 
-console.log("\n2. THE URL TAKES ONLY WHAT THE BUNDLE READS");
+console.log("\n2. THE URL TAKES ONLY WHAT THE BUNDLE READS -- INCLUDING ITS OWN TUNABLES (v4895: v4890 SAID THEY WERE UNREACHABLE, AND THAT WAS WRONG)");
 {
-    ok("!! *** seaUrl passes the size, view and clock and drops everything else -- including a key that tries to reach a wave parameter ***",
-        S.seaUrl({ w: 640, h: 360, ui: 1, windSpeed: 30, swellHs: 9, dbg: 1, cam: "0,5,0" }) === "/vendor/web-ocean/ocean.html?w=640&h=360&ui=1&cam=0%2C5%2C0"
-        && S.seaUrl({}) === "/vendor/web-ocean/ocean.html" && S.seaUrl({ ui: "" , w: null }) === "/vendor/web-ocean/ocean.html", S.seaUrl({ w: 640, ui: 1, windSpeed: 30 }));
+    const declared = S.declaredDefaults(BUNDLE);
+    ok("!! *** seaUrl passes the view, the size and the sea's own tunables, and drops everything else: an unknown key and a non-numeric tunable never reach the URL ***",
+        S.seaUrl({ w: 640, h: 360, ui: 1, windSpeed: 12, swellHs: 2, dbg: 1, junk: "x", cam: "0,5,0" }) === "/vendor/web-ocean/ocean.html?w=640&h=360&ui=1&cam=0%2C5%2C0&windSpeed=12&swellHs=2"
+        && S.seaUrl({}) === "/vendor/web-ocean/ocean.html" && S.seaUrl({ ui: "", w: null }) === "/vendor/web-ocean/ocean.html" && S.seaUrl({ windSpeed: "abc", swellHs: NaN, choppy: Infinity }) === "/vendor/web-ocean/ocean.html", S.seaUrl({ w: 640, ui: 1, windSpeed: 12, junk: 1 }));
     const read = [...BUNDLE.matchAll(/qs\.get\('([a-z]+)'\)/g)].map((m) => m[1]);
-    const missing = S.SEA_PARAMS.filter((k) => !read.includes(k));
-    ok("!! *** every parameter the page may set is one the bundle really reads (checked in the bundle's own text) ***", missing.length === 0, missing.length ? "NOT READ BY THE BUNDLE: " + missing.join(", ") : S.SEA_PARAMS.join(", ") + " all appear as qs.get(...)");
-    ok("  and no wave parameter is on the list: the sea's tunables are in a module scope this page cannot reach", !S.SEA_PARAMS.some((k) => /wind|swell|choppy|foam|fetch/i.test(k)), "");
+    const missing = S.SEA_VIEW_PARAMS.filter((k) => !read.includes(k));
+    ok("!! *** every view key the page may set is one the bundle reads by name (checked in the bundle's own text) ***", missing.length === 0, missing.length ? "NOT READ BY THE BUNDLE: " + missing.join(", ") : S.SEA_VIEW_PARAMS.join(", ") + " all appear as qs.get(...)");
+    ok("!! *** THE CORRECTION: the bundle applies EVERY key of its parameter block from the URL, in one generic loop -- the line v4890 did not find ***", /for \(const k of Object\.keys\(P\)\) if \(qs\.has\(k\)\) P\[k\] = Number\(qs\.get\(k\)\);/.test(BUNDLE), "for (const k of Object.keys(P)) if (qs.has(k)) P[k] = Number(qs.get(k))");
+    ok("!! *** SEA_TUNABLES is EXACTLY the key set of the bundle's `const P` block, read from the bundle's text: no tunable missing, none invented ***", declared && S.SEA_TUNABLES.length === Object.keys(declared).length && S.SEA_TUNABLES.every((k) => k in declared) && Object.keys(declared).every((k) => S.SEA_TUNABLES.includes(k)), `${S.SEA_TUNABLES.length} keys: ` + S.SEA_TUNABLES.slice(0, 5).join(", ") + ", ...");
+    ok("  and the list the page may pass is the view keys followed by the tunables, nothing else", S.SEA_PARAMS.length === S.SEA_VIEW_PARAMS.length + S.SEA_TUNABLES.length && S.SEA_PARAMS.join() === [...S.SEA_VIEW_PARAMS, ...S.SEA_TUNABLES].join(), S.SEA_PARAMS.length + " keys");
 }
 
 console.log("\n3. THE REMEMBERED READING BELONGS TO ONE ADAPTER");
@@ -72,7 +80,7 @@ console.log("\n3. THE REMEMBERED READING BELONGS TO ONE ADAPTER");
     ok("  a refused write is not an error, and a nonsense reading is not stored", S.rememberProbe({ setItem() { throw new Error("blocked"); } }, "x", 5) === false && S.rememberProbe(mem(), "x", 0) === false && S.rememberProbe(mem(), "", 5) === false && S.rememberProbe(null, "x", 5) === false, "");
 }
 
-console.log("\n4. WHERE THE GPU SEA AND THE PHYSICS SURFACE DISAGREE, COMPUTED FROM THE BUNDLE'S OWN TEXT");
+console.log("\n4. WHERE THE GPU SEA AND THE PHYSICS SURFACE AGREE AND DISAGREE, COMPUTED FROM THE BUNDLE'S OWN TEXT");
 {
     const declared = S.declaredDefaults(BUNDLE);
     ok("!! *** the sea's declared defaults are read out of the bundle: wind 7 m/s, swell 1.8 m high and 120 m long, choppy 1.25 ***",
@@ -81,21 +89,30 @@ console.log("\n4. WHERE THE GPU SEA AND THE PHYSICS SURFACE DISAGREE, COMPUTED F
     ok("  a bundle with no parameter block yields null, never an invented set", S.declaredDefaults("<html></html>") === null && S.declaredDefaults("") === null && S.declaredDefaults(null) === null, "");
     const sea1 = defaultSurface(1), stats = S.surfaceStats(sea1);
     const sig = Math.sqrt(sea1.components.reduce((a, c) => a + c.A * c.A / 2, 0));
-    ok("!! *** slice 1's statistics are derived, not typed: Hs is 4 sigma over the components, and the longest wavelength is the longest component ***", Math.abs(stats.hs - 4 * sig) < 1e-12 && stats.longest === Math.max(...sea1.components.map((c) => c.wavelength)) && stats.waves === 6, `Hs ${stats.hs.toFixed(3)} m, longest ${stats.longest} m`);
-    const one = createSurface({ components: [{ ...sea1.components[0] }] }), s1 = S.surfaceStats(one);
-    ok("  and for a single wave Hs is 4 * A / sqrt(2), the closed form", Math.abs(s1.hs - 4 * one.components[0].A / Math.SQRT2) < 1e-12, s1.hs.toFixed(4));
-    const rows = S.matchRows(stats, declared);
-    const byQ = Object.fromEntries(rows.map((r) => [r.quantity, r]));
-    ok("!! *** the default physics sea is NOT the GPU sea's size: its height is x1.55 the swell's and its longest wave half as long -- and the table says differs for both ***",
-        byQ["wave height"].verdict === "differs" && Math.abs(byQ["wave height"].ratio - stats.hs / 1.8) < 1e-12 && byQ["longest wavelength"].verdict === "differs" && Math.abs(byQ["longest wavelength"].ratio - stats.longest / 120) < 1e-12,
-        `height x${byQ["wave height"].ratio.toFixed(2)}, wavelength x${byQ["longest wavelength"].ratio.toFixed(2)}`);
-    ok("!! *** rows that are not the same quantity carry no verdict and a reason: heading, sharpness, method ***", ["heading", "sharpness", "method"].every((q) => byQ[q].verdict === "not comparable" && byQ[q].ratio === null && byQ[q].why.length > 10), "3 rows");
-    const tuned = S.matchRows({ hs: 1.8 * 1.2, longest: 120 * 0.9, steepness: 0.6, waves: 6 }, declared);
-    ok("  the tolerance is real: within 25% of the sea's figure reads matches, beyond it reads differs, in both directions",
-        tuned[0].verdict === "matches" && tuned[1].verdict === "matches" && S.matchRows({ hs: 1.8 * 1.5, longest: 120 * 0.5, steepness: 0.6, waves: 6 }, declared).every((r, i) => i > 1 || r.verdict === "differs") && S.matchRows({ hs: 0.5, longest: 400, steepness: 0.6, waves: 6 }, declared).slice(0, 2).every((r) => r.verdict === "differs"), "x1.2 and x0.9 match; x1.5, x0.5, x0.28, x3.3 differ");
-    const lines = S.reportLines(rows);
-    ok("!! *** the report says the two seas are NOT lined up, and prints a number for every compared row ***", /NOT lined up/.test(lines[lines.length - 1]) && lines.some((l) => /wave height\s+differs/.test(l) && /x\d\.\d\d/.test(l)), lines[1].trim().slice(0, 110));
-    ok("  a missing declared set degrades to the rows that need no declaration, not to a crash or an invented number", (() => { const r = S.matchRows(stats, null); return r.length === 3 && r.every((x) => x.verdict === "not comparable"); })(), "3 rows");
+    const long = sea1.components.reduce((m, c) => (c.wavelength > m.wavelength ? c : m));
+    ok("!! *** slice 1's statistics are derived, not typed: total Hs is 4 sigma, the longest wave is the longest component, and ITS height is 4 A / sqrt 2 ***", Math.abs(stats.hs - 4 * sig) < 1e-12 && stats.longest === long.wavelength && Math.abs(stats.longestAmp - long.A) < 1e-15 && Math.abs(stats.longestHs - 4 * long.A / Math.SQRT2) < 1e-12 && stats.waves === 6, `total ${stats.hs.toFixed(3)} m, longest wave ${stats.longest} m, its Hs ${stats.longestHs.toFixed(3)} m`);
+    const one = createSurface({ components: [{ ...long }] }), s1 = S.surfaceStats(one);
+    ok("  and for a single wave the total and the longest-wave heights are the same closed form, 4 A / sqrt 2", Math.abs(s1.hs - s1.longestHs) < 1e-12 && Math.abs(s1.hs - 4 * one.components[0].A / Math.SQRT2) < 1e-12, s1.hs.toFixed(4));
+    const rows = S.matchRows(stats, declared), byQ = Object.fromEntries(rows.map((r) => [r.quantity, r]));
+    ok("!! *** at the sea's DEFAULTS the swell height already matches slice 1's longest wave (1.99 against 1.8 m, x1.10) and the swell wavelength does not (60 against 120 m, x0.50) -- v4890's 'x1.55 differs' compared a total with a swell and was not that ***",
+        byQ["swell height"].verdict === "matches" && Math.abs(byQ["swell height"].ratio - stats.longestHs / 1.8) < 1e-12 && byQ["swell wavelength"].verdict === "differs" && Math.abs(byQ["swell wavelength"].ratio - stats.longest / 120) < 1e-12 && byQ["swell height"].setBy === "default",
+        `height x${byQ["swell height"].ratio.toFixed(2)}, wavelength x${byQ["swell wavelength"].ratio.toFixed(2)}`);
+    ok("!! *** the TOTAL height is not compared with anything: the sea's wind-sea height is computed in its shader, so the row carries no ratio and no verdict ***", byQ["total height"].verdict === "not comparable" && byQ["total height"].ratio === null && /MEASURED/.test(byQ["total height"].why), "");
+    ok("!! *** rows that are not the same quantity carry no verdict and a reason: total height, heading, sharpness, method ***", ["total height", "heading", "sharpness", "method"].every((q) => byQ[q].verdict === "not comparable" && byQ[q].ratio === null && byQ[q].why.length > 10), "4 rows");
+    const m = S.matchedTunables(stats);
+    ok("!! *** the matched settings are TWO inputs, derived: swellHs = the longest wave's height (1.99) and swellLength = its wavelength (60) -- nothing else is set, and the rest is listed as NOT matched with a reason ***",
+        Object.keys(m.tunables).join() === "swellHs,swellLength" && m.tunables.swellHs === +stats.longestHs.toFixed(2) && m.tunables.swellLength === +stats.longest.toFixed(0) && m.unmatched.length >= 4 && m.unmatched.every(([k, why]) => k && why.length > 10)
+        && Object.keys(m.tunables).every((k) => S.SEA_TUNABLES.includes(k)), JSON.stringify(m.tunables));
+    const after = Object.fromEntries(S.matchRows(stats, declared, m.tunables).map((r) => [r.quantity, r]));
+    ok("!! *** applying them makes both swell rows match (x1.00) AND says they now come from the URL, while every other row is unchanged ***", after["swell height"].verdict === "matches" && after["swell wavelength"].verdict === "matches" && Math.abs(after["swell wavelength"].ratio - 1) < 1e-9 && after["swell height"].setBy === "url" && after["swell wavelength"].setBy === "url"
+        && ["total height", "heading", "sharpness", "method"].every((q) => after[q].verdict === "not comparable"), `x${after["swell height"].ratio.toFixed(3)}, x${after["swell wavelength"].ratio.toFixed(3)}`);
+    ok("  a non-numeric applied value is ignored (the sea would read NaN), so the row falls back to the declared default and says so", S.matchRows(stats, declared, { swellLength: "abc" }).find((r) => r.quantity === "swell wavelength").setBy === "default", "");
+    const tuned = S.matchRows({ ...stats, longestHs: 1.8 * 1.2, longest: 120 * 0.9 }, declared);
+    ok("  the tolerance is real: within 25% reads matches, beyond it differs, in both directions", tuned[0].verdict === "matches" && tuned[1].verdict === "matches" && S.matchRows({ ...stats, longestHs: 1.8 * 1.5, longest: 120 * 0.5 }, declared).slice(0, 2).every((r) => r.verdict === "differs") && S.matchRows({ ...stats, longestHs: 0.5, longest: 400 }, declared).slice(0, 2).every((r) => r.verdict === "differs"), "x1.2 and x0.9 match; x1.5, x0.5, x0.28, x3.3 differ");
+    const d0 = S.reportLines(S.matchRows(stats, declared), null).join("\n"), d1 = S.reportLines(S.matchRows(stats, declared, m.tunables), m).join("\n");
+    ok("!! *** the report says what was and was not matched: with defaults it offers 'matched'; with matched settings it names the two inputs, lists what was NOT matched, and says the realized height has not been measured -- and it no longer says the seas CANNOT be lined up ***",
+        /its defaults/.test(d0) && /choose 'matched'/.test(d0) && /MATCHED/.test(d1) && /swellHs=1\.99, swellLength=60 -- two inputs, nothing else/.test(d1) && /NOT matched: windSpeed/.test(d1) && /realized height has not been measured/.test(d1) && !/cannot be set|NOT lined up/.test(d0 + d1), d1.split("\n").slice(-2)[0].slice(0, 100));
+    ok("  a missing declared set degrades to the rows that need no declaration, not to a crash or an invented number", (() => { const r = S.matchRows(stats, null); return r.length === 4 && r.every((x) => x.verdict === "not comparable"); })(), "4 rows");
 }
 
 console.log("\n5. THE BUNDLE IS STILL THE BUNDLE, AND THIS MODULE TOUCHES NOTHING");

@@ -46,7 +46,7 @@ console.log("1. THE PAGE'S SOURCE");
     ok("!! the page imports the tier switch, the sea module and the physics surface from the engine's own paths",
         /import \* as OT from "\/ui\/oceanTier\.mjs"/.test(code) && /import \* as OS from "\/ui\/oceanSea\.mjs"/.test(code) && /import \{ defaultSurface \} from "\/physics\/ocean\/oceanSurface\.mjs"/.test(code)
         && ["ui/oceanTier.mjs", "ui/oceanSea.mjs", "physics/ocean/oceanSurface.mjs"].every((f) => fs.existsSync(path.join(ENG, f))));
-    ok("!! the sea is loaded ONLY through seaUrl(): the page spells no path to the bundle and no query string of its own", /sea\.src = OS\.seaUrl\(/.test(js) && !/vendor\/web-ocean/.test(js) && !/["'`][^"'`]*\?[a-z]+=/.test(js.replace(/\$\{[^}]*\}/g, "")));
+    ok("!! the sea is loaded ONLY through seaUrl(): the page spells no path to the bundle and no query string of its own", /state\.seaSrc = OS\.seaUrl\(/.test(js) && /sea\.src = state\.seaSrc/.test(js) && !/vendor\/web-ocean/.test(js) && !/["'`][^"'`]*\?[a-z]+=/.test(js.replace(/\$\{[^}]*\}/g, "")));
     ok("!! the page never edits the bundle: no srcdoc, no contentWindow.eval, no postMessage into the frame, and the frame is only READ (its HUD text)", !/srcdoc|contentWindow|\.eval\(|postMessage/.test(js) && /contentDocument/.test(js));
     const hits = ["innerHTML", "outerHTML", "insertAdjacentHTML", "document.write", "eval(", "new Function", "setAttribute(\"on", "srcdoc"].filter((w) => body.includes(w));
     ok("!! the page NEVER turns data into markup", hits.length === 0, hits.join(", "));
@@ -54,7 +54,8 @@ console.log("1. THE PAGE'S SOURCE");
     const ext = [...body.matchAll(/(?:src|href|action)\s*=\s*"(https?:\/\/[^"]+)"|fetch\(\s*"(https?:\/\/[^"]+)"|url\(\s*"?(https?:\/\/[^")]+)|import\s+[^;]*"(https?:\/\/[^"]+)"/g)].filter((m) => !/github\.com\/noniv/.test(m[0]));
     ok("!! the page loads NOTHING from outside (the attribution is text, not a request)", ext.length === 0, ext.map((m) => m[0]).join(" | "));
     ok("the page carries the origin notice, the demo: meta tags, a <title>, and links to the default water and server.html", /ui\/originNotice\.js/.test(raw) && /name="demo:title"/.test(raw) && /name="demo:desc"/.test(raw) && /name="demo:category"/.test(raw) && /<title>/.test(raw) && /href="\/ocean-default\.html"/.test(raw) && /href="\/server\.html"/.test(raw));
-    ok("!! the page SAYS what it is not: not lined up, not read by physics, not depth-composited, not seen to render here", /NOT LINED UP WITH THE PHYSICS SURFACE/.test(flat) && /NOT READ BY ANY PHYSICS/.test(flat) && /NOT DEPTH-COMPOSITED/.test(flat) && /NOT SEEN TO RENDER WHERE IT WAS BUILT/.test(flat));
+    ok("!! the page SAYS what it is not: not the physics surface (and that v4890 said the opposite wrongly), not read by physics, not depth-composited, not seen to render here", /NOT THE PHYSICS SURFACE/.test(flat) && /v4890 and v4894 said the opposite and were WRONG/.test(flat) && /NOT READ BY ANY PHYSICS/.test(flat) && /NOT DEPTH-COMPOSITED/.test(flat) && /NOT SEEN TO RENDER WHERE IT WAS BUILT/.test(flat));
+    ok("!! *** the page does not repeat the v4890 claim that was WRONG: nowhere does it say the sea cannot be tuned, cannot be set, or is out of reach in a module scope ***", !/cannot be tuned|cannot be set|NOT lined up|module scope|inside their module|no page can reach/i.test(noComments(raw).replace(/\s+/g, " ").replace(/v4890 and v4894 said the opposite and were WRONG[^.]*\./, "")), "the one allowed mention is the correction itself");
     ok("  and the decision is the tier switch's, not the page's: the page calls chooseTier and compares no frame time to a number of its own", /OT\.chooseTier\(/.test(js) && !/\b(33|30|16|60)\b\s*(?:ms|fps)/.test(js) && /OT\.BUDGET_MS/.test(js));
 }
 
@@ -125,7 +126,7 @@ console.log("\n2. THE LIVE PAGE");
             ok("!! *** the same slow GPU under ON keeps the sea, as asked, and the banner says how slow ***", slowOnProbed && so.tier === "sea" && so.loaded === true && so.fallback === "none" && /as asked/.test(so.reason) && /4 fps/.test(so.reason), so.reason);
             ok("!! *** with no WebGPU the sea's frame is never requested and the default water is named ***", n.phase === "default" && n.loaded === false && S.none.frameRequests.length === 0 && /no usable WebGPU/.test(n.reason), n.reason.slice(0, 90));
             ok("!! *** under off the frame is never requested, even on a fast GPU ***", o.phase === "default" && S.off.frameRequests.length === 0 && o.loaded === false && /by choice/.test(o.reason), o.reason);
-            ok("  the comparison table is on the page, computed: the heights differ and the page says the seas are not lined up", /wave height\s+differs/.test(f.match) && /longest wavelength\s+differs/.test(f.match) && /NOT lined up/.test(f.match) && /not comparable/.test(f.match), f.match.split("\n")[1] ? f.match.split("\n")[1].slice(0, 120) : "(none)");
+            ok("  the comparison table is on the page, computed, at the sea's DEFAULTS: the swell height matches, the swell wavelength differs, the total is not comparable, and the page offers 'matched'", /swell height\s+matches/.test(f.match) && /swell wavelength\s+differs/.test(f.match) && /total height\s+not comparable/.test(f.match) && /choose 'matched'/.test(f.match) && !/NOT lined up|cannot be set/.test(f.match), f.match.split("\n")[1] ? f.match.split("\n")[1].slice(0, 120) : "(none)");
             // reload the fast page: the reading is remembered for this adapter, so the sea is shown without a second timing
             const stored = await S.fast.pg.evaluate(() => JSON.parse(localStorage.getItem("swek.ocean.probe") || "null"));
             await S.fast.pg.reload({ waitUntil: "load" });
@@ -137,6 +138,20 @@ console.log("\n2. THE LIVE PAGE");
             await S.fast.pg.click("#retimeBtn");
             const retimed = await until(S.fast.pg, () => window.__sea && window.__sea.remembered === false && window.__sea.samples.length > 0, 12000);
             ok("  the Time-the-sea-again button forgets the stored reading and measures again", retimed, "");
+            {   // the correction: 'matched' puts the sea's own tunables on the frame's URL, two of them, and the table follows
+                const before = await snap(S.fast.pg);
+                await S.fast.pg.selectOption("#setSel", "matched");
+                await until(S.fast.pg, () => /swellHs=/.test(window.__sea.seaSrc || ""), 8000);
+                const mt = await S.fast.pg.evaluate(() => ({ src: window.__sea.seaSrc, match: document.getElementById("match").textContent, settings: window.__sea.settings }));
+                ok("!! *** THE CORRECTION, LIVE: choosing 'matched' loads the sea with its swell height and length set from slice 1's longest wave (swellHs=1.99, swellLength=60) and NOTHING else of the sea's tunables ***",
+                    before.src && !/swellHs|swellLength|windSpeed/.test(before.src) && /\?ui=1&swellHs=1\.99&swellLength=60$/.test(mt.src) && !/windSpeed|windDir|choppy|swellDir/.test(mt.src) && mt.settings === "matched", mt.src);
+                ok("  and the table follows: both swell rows read matches and now come from the URL, the report names the two inputs and lists what was not matched, and says the realized height has not been measured",
+                    /swell height\s+matches/.test(mt.match) && /swell wavelength\s+matches/.test(mt.match) && /\(url\)/.test(mt.match) && /swellHs=1\.99, swellLength=60 -- two inputs, nothing else/.test(mt.match) && /NOT matched: windSpeed/.test(mt.match) && /realized height has not been measured/.test(mt.match), mt.match.split("\n").slice(-2)[0].slice(0, 100));
+                await S.fast.pg.selectOption("#setSel", "defaults");
+                await until(S.fast.pg, () => !/swellHs/.test(window.__sea.seaSrc || "") && window.__sea.settings === "defaults", 8000);
+                const back = await S.fast.pg.evaluate(() => window.__sea.seaSrc);
+                ok("  and choosing the defaults again takes the tunables off the URL", !/swellHs|swellLength/.test(back), back);
+            }
             const mDone = await settled(S.mute.pg, 40000);
             const m = await snap(S.mute.pg);
             ok("!! *** a sea that prints nothing is GIVEN UP ON, not waited for forever: the default water, with a reason that says it was never shown to hold the budget ***", mDone && m.phase === "default" && m.loaded === false && /no readable frame time/.test(m.fallbackText) && /never shown to hold the budget/.test(m.fallbackText) && m.error !== "", JSON.stringify({ phase: m.phase, error: m.error }));

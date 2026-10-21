@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- ocean-sea.html -- UNNUMBERED (the version is chosen at ship time).
+<!-- ocean-sea.html -- v4895 corrected (first shipped as v4890).
 
      THE OPT-IN SEA. Slice 4 of the ocean-optin-surface item in tools/ship/todo.mjs.
      The vendored web-ocean sea (vendor/web-ocean/ocean.html, byte-identical to upstream, pinned by tools/ship/oceanSpikePage-selfcheck.mjs) in a frame, behind the tier
@@ -8,8 +8,9 @@
      In off, no sea is ever loaded. The reading is remembered for this adapter, so a reload does not time the sea twice.
 
      WHAT THIS PAGE IS NOT, SAID PLAINLY:
-       - NOT LINED UP WITH THE PHYSICS SURFACE. The sea's wave parameters are a const inside its module script; the URL takes only the camera, the clock and the size. The table
-         under the frame COMPUTES the disagreement (height, wavelength) from the bundle's own declared defaults and slice 1's six waves, and prints it.
+       - NOT THE PHYSICS SURFACE. The sea's inputs can be set from the URL (its own parameter block is read from the query string; v4890 and v4894 said the opposite and were WRONG, see
+         ui/oceanSea.mjs), and the "matched" setting sets two of them -- swell height and swell length -- from slice 1's longest wave. The wind sea, headings, sharpness and sky are left at
+         the sea's defaults, and the sea's REALIZED height is not measured here. The table under the frame COMPUTES, row by row, what matches and what does not.
        - NOT READ BY ANY PHYSICS. A boat, buoyancy or the submarine reads physics/ocean/oceanSurface.mjs and nothing in the frame.
        - NOT DEPTH-COMPOSITED. The sea is its own canvas with its own camera, sky and post-processing (level 3, not promised).
        - NOT SEEN TO RENDER WHERE IT WAS BUILT. The sandbox has no WebGPU adapter, so the live probe is exercised against a stand-in for the frame; a real reading is the rig's.
@@ -50,7 +51,7 @@
   <h1>Ocean &mdash; the opt-in GPU sea</h1>
   <p class="desc">The vendored web-ocean sea behind a tier switch. In <b>auto</b> it is timed on this GPU first and unloaded if it cannot hold 30 frames per second; in <b>on</b> it stays and the
     reading says how slow it is; in <b>off</b> it is never loaded. The default water that every GPU can draw is <a href="/ocean-default.html">ocean-default.html</a>.
-    The sea does not match the physics surface and the table below says by how much. <a href="/server.html">Back to the server page</a>.</p>
+    The sea can be asked to match the physics sea's swell height and length (the <b>matched</b> setting); the table below says what that does and does not line up. <a href="/server.html">Back to the server page</a>.</p>
 </header>
 <div class="bar">
   <span class="chip"><span class="dot" id="gpuDot"></span><span id="gpuWord">checking&hellip;</span></span>
@@ -59,6 +60,10 @@
     <option value="auto" selected>auto</option>
     <option value="off">off (never load)</option>
     <option value="on">on (keep it)</option>
+  </select></label>
+  <label>sea settings <select id="setSel" title="defaults: the sea's own. matched: its swell height and length set from the physics surface's longest wave (two inputs; the table says what stays unmatched).">
+    <option value="defaults" selected>the sea's defaults</option>
+    <option value="matched">matched to the physics sea (swell)</option>
   </select></label>
   <button id="retimeBtn" type="button">Time the sea again</button>
 </div>
@@ -78,8 +83,8 @@
   import { defaultSurface } from "/physics/ocean/oceanSurface.mjs";
   import { adapterOptions } from "/ui/webgpuProbe.mjs";
   const $ = (id) => document.getElementById(id);
-  const sea = $("sea"), banner = $("banner"), fallback = $("fallback"), tierSel = $("tierSel");
-  const state = { phase: "starting", webgpu: false, adapterLabel: "", adapterKind: "unknown", decision: null, probeMs: null, remembered: false, samples: [], loaded: false, error: "" };
+  const sea = $("sea"), banner = $("banner"), fallback = $("fallback"), tierSel = $("tierSel"), setSel = $("setSel");
+  const state = { settings: "defaults", seaSrc: "", phase: "starting", webgpu: false, adapterLabel: "", adapterKind: "unknown", decision: null, probeMs: null, remembered: false, samples: [], loaded: false, error: "" };
   window.__sea = state;
   const storage = () => { try { return window.localStorage; } catch { return null; } };
   let timer = null, token = 0;
@@ -94,7 +99,15 @@
     fallback.style.whiteSpace = "pre-wrap";
   }
   function showSea() { fallback.style.display = "none"; banner.style.display = "block"; }
-  function load() { showSea(); sea.src = OS.seaUrl({ ui: 1 }); state.loaded = true; }
+  let stats = null, declared = null;
+  const applied = () => (setSel.value === "matched" && stats ? OS.matchedTunables(stats) : null);
+  function load() { showSea(); const m = applied(); state.seaSrc = OS.seaUrl({ ui: 1, ...(m ? m.tunables : {}) }); sea.src = state.seaSrc; state.loaded = true; }
+  function showMatch() {
+    if (!stats || !declared) return;
+    const m = applied(), rows = OS.matchRows(stats, declared, m ? m.tunables : {});
+    state.match = rows; state.settings = setSel.value;
+    $("match").textContent = OS.reportLines(rows, m).join("\n");
+  }
   function hudText() { try { const el = sea.contentDocument && sea.contentDocument.getElementById("fps"); return el ? el.textContent : ""; } catch { return ""; } }
 
   async function adapter() {
@@ -153,16 +166,16 @@
 
   tierSel.value = OT.loadPreference(storage());
   tierSel.addEventListener("change", () => { OT.savePreference(storage(), tierSel.value); begin(); });
+  setSel.addEventListener("change", () => { showMatch(); begin(); });
   $("retimeBtn").addEventListener("click", () => { try { storage() && storage().removeItem(OS.PROBE_KEY); } catch { /* ignore */ } begin(); });
 
   (async () => {
     try {
       const r = await fetch(OS.SEA_PATH);
       const text = r.ok ? await r.text() : "";
-      const declared = OS.declaredDefaults(text);
-      const rows = OS.matchRows(OS.surfaceStats(defaultSurface(1)), declared);
-      state.match = rows;
-      $("match").textContent = declared ? OS.reportLines(rows).join("\n") : "the sea's declared defaults could not be read from the bundle, so no comparison is printed";
+      declared = OS.declaredDefaults(text);
+      stats = OS.surfaceStats(defaultSurface(1));
+      if (declared) showMatch(); else $("match").textContent = "the sea's declared defaults could not be read from the bundle, so no comparison is printed";
     } catch (e) { $("match").textContent = "the comparison could not be computed: " + String((e && e.message) || e); }
   })();
   begin();
