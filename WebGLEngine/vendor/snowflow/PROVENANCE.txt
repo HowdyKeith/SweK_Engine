@@ -25,3 +25,12 @@ FragmentInputs/FragmentOutputs), so they do NOT run as they are; render/toroidal
 these files' bodies, with a CPU twin that grades it. NOTHING NOT LISTED ABOVE WAS TAKEN: the rest of the repository (the character, cloth, spells, water and sky passes, the Babylon wiring,
 README and package files) is not here, and nothing here depends on Babylon.js or Vite.
 NOT VERIFIED BY RUNNING UPSTREAM: the sandbox did not run the demo; its README's frame-time figure is its own claim. What IS run is our adaptation, against our own CPU twin.
+
+APPENDIX (v4895): seven more files, fetched from the same commit 545039733b74eec742862f161990142c7ca7c7ec, for the snow shading / cascade / aerial lift
+  src/shaders/snow.fragment.wgsl            597 lines   the shading: GGX, wrap diffuse, sub-surface, glints, SH ambient, the composition
+  src/shaders/snow.vertex.wgsl              121 lines   the vertex stage (read for the sastrugi displacement)
+  src/shaders/lib/terrain.wgsl              247 lines   terrainFine, terrainFineFiltered, windLocal, windMat
+  src/shaders/lib/ridge.wgsl                268 lines   ridged and damped noise with derivatives
+  src/core/settings.js                      269 lines   the defaults the shading reads
+  src/shaders/detailBake.fragment.wgsl       94 lines   the baked detail normal
+  src/shaders/auxBake.fragment.wgsl          61 lines   the baked macro height / curvature

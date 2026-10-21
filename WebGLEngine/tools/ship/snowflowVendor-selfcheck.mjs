@@ -40,6 +40,13 @@ const PINS = Object.freeze({
     "src/terrain/clipmapMesh.js": "ab72aa51aad542b3aa5030ecc8b1062a4b5199e1cdc620b07570eb05ff6413f7",
     "src/terrain/deformation.js": "caa36652e3be43cdc478344580fc13d182b602b9dd24ce31facbab0b4f8e5d5b",
     "src/terrain/heightfield.js": "baf79e3119f3dfdb6bfeefe25e1b9d6ff56fab9df94d71d07231c27de9588b8f",
+    "src/core/settings.js": "739d1fb8e260e670b447e7811474466fa9f5b6d45a5746987a34f30714d0b07e",
+    "src/shaders/auxBake.fragment.wgsl": "952d703cc76bd0fad02987f0d955025ccfe546883fe7e26875c9ffb2f9d00ed6",
+    "src/shaders/detailBake.fragment.wgsl": "d84c8ec07c86855d516c46eb7bb872de45d307b54a84f15afba644a279043d9b",
+    "src/shaders/lib/ridge.wgsl": "66eba6bd789d4e109285dc077891d94111af6b0fabce6b20ab43ec88c5f5757d",
+    "src/shaders/lib/terrain.wgsl": "2927e0866c3ef2d2526e2a6d9b758457032b79fbe2aa3d876f5f516b4cc623ca",
+    "src/shaders/snow.fragment.wgsl": "6c72494570f51aed147746971daa8c5ee6f12c49b4b85b13df528bde33dc8c60",
+    "src/shaders/snow.vertex.wgsl": "2a53af258f0bdbfefe667f4f38cc9521f9225d95de5a26e51c8fc84f27dba8be",
 });
 const COMMIT = "545039733b74eec742862f161990142c7ca7c7ec";
 const read = (rel) => fs.readFileSync(path.join(DIR, rel));
@@ -59,7 +66,7 @@ console.log("\n2. THE NOTICE");
 console.log("\n3. THE DIRECTORY");
 {
     const files = walk(DIR).filter((f) => f !== "PROVENANCE.txt").sort();
-    ok("!! vendor/snowflow holds exactly the sixteen recorded files and PROVENANCE.txt, nothing else", JSON.stringify(files) === JSON.stringify(Object.keys(PINS).sort()), files.length + " files");
+    ok("!! vendor/snowflow holds exactly the twenty-three recorded files and PROVENANCE.txt, nothing else", JSON.stringify(files) === JSON.stringify(Object.keys(PINS).sort()), files.length + " files");
 }
 
 console.log("\n4. WHAT THEY ARE");
@@ -80,7 +87,7 @@ console.log("\n5. NOTHING LOADS THEM");
             if (/vendor\/snowflow\//.test(fs.readFileSync(p, "utf8"))) hits.push(path.relative(ENG, p).split(path.sep).join("/"));
         }
     })(ENG);
-    const ALLOWED = ["render/clipmapTerrain-selfcheck.mjs", "render/deformRead-selfcheck.mjs", "render/deformRead.mjs", "render/pcssShadow-selfcheck.mjs", "render/skyBake-selfcheck.mjs", "render/snowGpu-selfcheck.mjs", "render/taaResolve-selfcheck.mjs", "render/toroidalDeform-selfcheck.mjs", "render/toroidalDeform.mjs", "tools/ship/snowflowVendor-selfcheck.mjs"];
+    const ALLOWED = ["render/aerial-selfcheck.mjs", "render/clipmapTerrain-selfcheck.mjs", "render/deformRead-selfcheck.mjs", "render/deformRead.mjs", "render/pcssShadow-selfcheck.mjs", "render/skyBake-selfcheck.mjs", "render/snowGpu-selfcheck.mjs", "render/taaResolve-selfcheck.mjs", "render/toroidalDeform-selfcheck.mjs", "render/toroidalDeform.mjs", "tools/ship/snowflowVendor-selfcheck.mjs"];
     ok("!! only the adaptations and the gates that read the originals name the vendored paths: no page or module loads them", JSON.stringify(hits.sort()) === JSON.stringify(ALLOWED.slice().sort()), hits.join(", "));
 }
 

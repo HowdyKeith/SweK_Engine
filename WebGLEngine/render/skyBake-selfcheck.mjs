@@ -121,5 +121,15 @@ console.log("\n5. THE KERNEL");
     }
 }
 
+// the mip chain and the Mie phase the aerial gate builds on (v4895): named here so this gate owns them
+{
+    const W = 8, H = 4, lut = new Float32Array(W * H * 4).map((_, i) => (i % 4 === 3 ? 1 : ((i * 7) % 13) / 13));
+    const chain = SB.buildSkyMips(lut, W, H);
+    ok("  mip chain: SKY_LEVELS " + SB.SKY_LEVELS + " levels, mipSize halves, mipOffset sums the levels, mipFloats is their total", SB.SKY_LEVELS >= 4 && SB.mipSize(W, H, 1)[0] === 4 && SB.mipOffset(W, H, 1) === W * H * 4 && SB.mipFloats(W, H) === chain.length);
+    const s0 = SB.sampleSkyLevel(chain, W, H, [0, 1, 0], 0), s2 = SB.sampleSkyLevel(chain, W, H, [0, 1, 0], 2);
+    ok("  sampleSkyLevel reads finite values at level 0 and 2", s0.every(Number.isFinite) && s2.every(Number.isFinite));
+    ok("  MIP_KERNEL_WGSL, SKY_MIP_SAMPLE_WGSL and PHASE_MIE_WGSL are WGSL text, the phase one containing phaseMie", /fn\s/.test(SB.MIP_KERNEL_WGSL) && /fn\s/.test(SB.SKY_MIP_SAMPLE_WGSL) && SB.PHASE_MIE_WGSL.includes("fn phaseMie"));
+}
+
 console.log(`\nskyBake-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);
 exitCleanly(fails === 0 ? 0 : 1);

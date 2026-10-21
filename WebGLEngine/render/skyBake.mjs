@@ -239,6 +239,106 @@ export function lutToRGBA8(lut, exposure = 1) {
     return out;
 }
 
+// ------------------------------------------------------------------------------------------------------------------------------ the mip chain
+/**
+ * Upstream samples its sky LUT at a MIP LEVEL for two things: the near-sky colour that fills a short haze path (mip 3, tilted upward) and the roughness-selected sky reflection (mip = sqrt(roughness) * 6).
+ * The chain here is the box filter: each level is the 2 x 2 average of the one above (the LUT is a power-of-two wide and high, so the average is exact and the longitude wraps by construction).
+ * Levels are stored back to back in one buffer: level l is (w >> l) x (h >> l) rgba f32 at float offset mipOffset(l).
+ */
+export const SKY_LEVELS = 6;
+export const mipSize = (w, h, l) => [Math.max(1, w >> l), Math.max(1, h >> l)];
+export function mipOffset(w, h, l) { let o = 0; for (let k = 0; k < l; k++) { const [a, b] = mipSize(w, h, k); o += a * b * 4; } return o; }
+export const mipFloats = (w, h, levels = SKY_LEVELS) => mipOffset(w, h, levels);
+export function buildSkyMips(lut, w, h, levels = SKY_LEVELS) {
+    const out = new Float32Array(mipFloats(w, h, levels)); out.set(lut, 0);
+    for (let l = 1; l < levels; l++) {
+        const [pw, ph] = mipSize(w, h, l - 1), [cw, ch] = mipSize(w, h, l), po = mipOffset(w, h, l - 1), co = mipOffset(w, h, l);
+        for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) for (let c = 0; c < 4; c++) {
+            const x0 = Math.min(pw - 1, x * 2), x1 = Math.min(pw - 1, x * 2 + 1), y0 = Math.min(ph - 1, y * 2), y1 = Math.min(ph - 1, y * 2 + 1);
+            out[co + (y * cw + x) * 4 + c] = (out[po + (y0 * pw + x0) * 4 + c] + out[po + (y0 * pw + x1) * 4 + c] + out[po + (y1 * pw + x0) * 4 + c] + out[po + (y1 * pw + x1) * 4 + c]) / 4;
+        }
+    }
+    return out;
+}
+/** The LUT sampled at a (fractional) mip level in upstream's lat-long mapping: bilinear in each of the two nearest levels (longitude wraps, latitude clamps), blended by the fraction. */
+export function sampleSkyLevel(chain, w, h, dir, mip, levels = SKY_LEVELS) {
+    const len = Math.hypot(dir[0], dir[1], dir[2]), uv = dirToLatLong([dir[0] / len, dir[1] / len, dir[2] / len]), m = Math.min(levels - 1, Math.max(0, mip)), l0 = Math.floor(m), l1 = Math.min(levels - 1, l0 + 1), f = m - l0;
+    const one = (l) => {
+        const [lw, lh] = mipSize(w, h, l), o = mipOffset(w, h, l), px = uv[0] * lw - 0.5, py = uv[1] * lh - 0.5, x0 = Math.floor(px), y0 = Math.floor(py), fx = px - x0, fy = py - y0;
+        const at = (ix, iy, c) => chain[o + (Math.min(lh - 1, Math.max(0, iy)) * lw + (((ix % lw) + lw) % lw)) * 4 + c];
+        return [0, 1, 2].map((c) => (at(x0, y0, c) * (1 - fx) + at(x0 + 1, y0, c) * fx) * (1 - fy) + (at(x0, y0 + 1, c) * (1 - fx) + at(x0 + 1, y0 + 1, c) * fx) * fy);
+    };
+    const a = one(l0), b = one(l1); return a.map((v, i) => v + (b[i] - v) * f);
+}
+/** The mip chain as a compute kernel: one dispatch per level l >= 1, bindings 0 (rw buffer holding every level), 1 (uniform: w, h, level, 0). Dispatch (ceil(cw / 8), ceil(ch / 8)). */
+export const MIP_KERNEL_WGSL = /* wgsl */ `
+struct MipParams { w: f32, h: f32, level: f32, pad: f32 };
+@group(0) @binding(0) var<storage, read_write> chain: array<f32>;
+@group(0) @binding(1) var<uniform> U: MipParams;
+fn sizeAt(l: u32) -> vec2u { return vec2u(max(1u, u32(U.w) >> l), max(1u, u32(U.h) >> l)); }
+fn offsetAt(l: u32) -> u32 {
+    var o = 0u;
+    for (var k = 0u; k < l; k++) { let s = sizeAt(k); o += s.x * s.y * 4u; }
+    return o;
+}
+@compute @workgroup_size(8, 8)
+fn main(@builtin(global_invocation_id) gid: vec3u) {
+    let l = u32(U.level);
+    let cs = sizeAt(l);
+    if (gid.x >= cs.x || gid.y >= cs.y) { return; }
+    let ps = sizeAt(l - 1u);
+    let po = offsetAt(l - 1u);
+    let co = offsetAt(l);
+    let x0 = min(ps.x - 1u, gid.x * 2u);
+    let x1 = min(ps.x - 1u, gid.x * 2u + 1u);
+    let y0 = min(ps.y - 1u, gid.y * 2u);
+    let y1 = min(ps.y - 1u, gid.y * 2u + 1u);
+    for (var c = 0u; c < 4u; c++) {
+        chain[co + (gid.y * cs.x + gid.x) * 4u + c] = (chain[po + (y0 * ps.x + x0) * 4u + c] + chain[po + (y0 * ps.x + x1) * 4u + c] + chain[po + (y1 * ps.x + x0) * 4u + c] + chain[po + (y1 * ps.x + x1) * 4u + c]) * 0.25;
+    }
+}
+`;
+/** WGSL for a shader that owns a buffer \`skyLut\` holding the chain (declared by the includer): the sample at a fractional mip. Level sizes are the constants 64 x 32 >> l. */
+export const SKY_MIP_SAMPLE_WGSL = /* wgsl */ `
+fn skyDirToLatLong(d: vec3f) -> vec2f {
+    return vec2f(atan2(d.x, d.z) / (2.0 * PI) + 0.5, acos(clamp(d.y, -1.0, 1.0)) / PI);
+}
+fn mipOff(l: i32) -> i32 {
+    var o = 0;
+    for (var k = 0; k < l; k++) { o += max(1, SKY_W >> u32(k)) * max(1, SKY_H >> u32(k)) * 4; }
+    return o;
+}
+fn skyLevelTexel(l: i32, ix: i32, iy: i32) -> vec3f {
+    let lw = max(1, SKY_W >> u32(l));
+    let lh = max(1, SKY_H >> u32(l));
+    let x = ((ix % lw) + lw) % lw;
+    let y = clamp(iy, 0, lh - 1);
+    let o = u32(mipOff(l) + (y * lw + x) * 4);
+    return vec3f(skyLut[o], skyLut[o + 1u], skyLut[o + 2u]);
+}
+fn skyLevelBilinear(uv: vec2f, l: i32) -> vec3f {
+    let lw = max(1, SKY_W >> u32(l));
+    let lh = max(1, SKY_H >> u32(l));
+    let p = vec2f(uv.x * f32(lw) - 0.5, uv.y * f32(lh) - 0.5);
+    let b = floor(p);
+    let f = p - b;
+    let x0 = i32(b.x);
+    let y0 = i32(b.y);
+    return mix(mix(skyLevelTexel(l, x0, y0), skyLevelTexel(l, x0 + 1, y0), f.x), mix(skyLevelTexel(l, x0, y0 + 1), skyLevelTexel(l, x0 + 1, y0 + 1), f.x), f.y);
+}
+// what textureSampleLevel(skyLUT, sampler, dirToLatLong(d), mip) returns over a mipmapped, trilinear sampler (the levels are the box-filtered chain)
+fn skyAtLevel(d: vec3f, mip: f32) -> vec3f {
+    let uv = skyDirToLatLong(normalize(d));
+    let m = clamp(mip, 0.0, f32(SKY_LEVELS - 1));
+    let l0 = i32(floor(m));
+    let l1 = min(SKY_LEVELS - 1, l0 + 1);
+    return mix(skyLevelBilinear(uv, l0), skyLevelBilinear(uv, l1), m - f32(l0));
+}
+`;
+
+/** upstream's phaseMie as WGSL text (cut from the bake kernel), for a shader that needs it without the whole sky integral */
+export const PHASE_MIE_WGSL = BAKE_KERNEL_WGSL.slice(BAKE_KERNEL_WGSL.indexOf("fn phaseMie("), BAKE_KERNEL_WGSL.indexOf("fn nishitaSky("));
+
 /** a sun direction from elevation and azimuth in degrees (azimuth 0 along +z, turning toward +x) */
 export function sunFrom(elevDeg, azimDeg) { const e = elevDeg * PI / 180, a = azimDeg * PI / 180; return [Math.cos(e) * Math.sin(a), Math.sin(e), Math.cos(e) * Math.cos(a)]; }
 
