@@ -116,6 +116,17 @@ console.log("\n5. A BUOY SITS ON THE SAME SEA");
     ok("the buoy is drawn within a cell's worth of slope of the mesh it floats on", Math.abs(by - b.y) < 2 * best + 1e-3 && best < 4, `nearest vertex ${best.toFixed(2)} m away, heights differ by ${Math.abs(by - b.y).toFixed(3)} m`);
 }
 
+console.log("\n5b. REFILLING IN PLACE IS BUILDING AGAIN (v4895)");
+{
+    const m = W.buildWater(sea, { half: 60, n: 24, t: 0 }), fresh = W.buildWater(sea, { half: 60, n: 24, t: 7.25 });
+    const refs = [m.positions, m.normals, m.foam], back = W.refillWater(m, sea, 7.25);
+    const same = (a, b) => a.length === b.length && a.every((v, i) => Object.is(v, b[i]));
+    ok("!! refillWater(mesh, surface, t) leaves the mesh's arrays the SAME objects and fills them with exactly what buildWater at t builds, bit for bit (positions, normals, foam), and returns t",
+        refs[0] === m.positions && refs[1] === m.normals && refs[2] === m.foam && back === 7.25 && same(m.positions, fresh.positions) && same(m.normals, fresh.normals) && same(m.foam, fresh.foam) && same(m.labels, fresh.labels) && same(m.indices, fresh.indices));
+    const before = Float32Array.from(m.positions); W.refillWater(m, sea, 7.25 + 2.5);
+    ok("  and a later time moves the surface (the sea is not frozen by being refilled), without changing the labels or the index list", m.positions.some((v, i) => v !== before[i]) && same(m.labels, fresh.labels) && same(m.indices, fresh.indices));
+}
+
 console.log("\n6. THE MODULE READS NOTHING IT SHOULD NOT");
 {
     const src = fs.readFileSync(path.join(HERE, "oceanWater.mjs"), "utf8").replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");

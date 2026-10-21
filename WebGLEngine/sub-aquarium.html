@@ -65,6 +65,9 @@
     <canvas id="plan" width="1000" height="600" aria-label="Plan view of the tank"></canvas>
     <div style="height:10px"></div>
     <canvas id="sideView" width="1000" height="220" aria-label="Side view of the tank: depth against length"></canvas>
+    <div style="height:10px"></div>
+    <canvas id="view3d" width="1000" height="420" aria-label="Three-dimensional view of the tank: the physics sea above, the subs beneath it" style="width:100%;cursor:grab"></canvas>
+    <div class="small" id="view3dNote" style="color:#7c93b8;font-size:12px">3D: the sea is the physics surface a hull would float on (render/seaThree.mjs); subs are tinted toward the water colour by depth. Drag to orbit, wheel to zoom.</div>
   </div>
   <div class="side" id="list"></div>
 </main>
@@ -72,10 +75,22 @@
 <script type="module">
 import { createTank, LENGTH, WIDTH, DEPTH_MIN, DEPTH_MAX } from "/render/subAquariumSim.mjs";
 import { LABELS } from "/physics/mechanics/subHulls.mjs";
+import { createView3d } from "/render/subAquarium3d.mjs";
 
 const $ = (id) => document.getElementById(id);
 const plan = $("plan"), side = $("sideView"), pg = plan.getContext("2d"), sg = side.getContext("2d");
 const tank = createTank();
+let view3d = null;
+try {   // v4895: the tank in 3D. A page without WebGL keeps its two 2D views.
+    const THREE = await import("/vendor/three/three.module.js"), cv = $("view3d");
+    view3d = createView3d(THREE, cv, { length: LENGTH, width: WIDTH, depthMax: 50 });
+    view3d.resize(cv.width, cv.height);
+    let drag = null; const V = () => view3d.getView();
+    cv.addEventListener("pointerdown", (e) => { drag = { x: e.clientX, y: e.clientY, v: V() }; cv.setPointerCapture(e.pointerId); cv.style.cursor = "grabbing"; });
+    cv.addEventListener("pointermove", (e) => { if (!drag) return; view3d.setView(drag.v.yaw - (e.clientX - drag.x) * 0.006, drag.v.pitch + (e.clientY - drag.y) * 0.004, drag.v.dist); });
+    cv.addEventListener("pointerup", () => { drag = null; cv.style.cursor = "grab"; });
+    cv.addEventListener("wheel", (e) => { e.preventDefault(); const v = V(); view3d.setView(v.yaw, v.pitch, v.dist * (e.deltaY < 0 ? 0.9 : 1.1)); }, { passive: false });
+} catch (e) { view3d = null; $("view3d").style.display = "none"; $("view3dNote").textContent = "3D view unavailable here (" + String((e && e.message) || e).slice(0, 80) + "); the plan and side views are unaffected."; }
 {   // the hull picker: the labels are text; changing it puts every sub back in the water on the new vessel
     const sel = $("hullSel");
     for (const [name, label] of Object.entries(LABELS)) { const o = document.createElement("option"); o.value = name; o.textContent = label; sel.appendChild(o); }
@@ -150,6 +165,7 @@ function render() {
     drawSub(pg, s.x * sx, s.y * sy, s.heading, s.hue, 16, sel); drawSub(sg, s.x * dx, s.depth * dz, -s.pitch, s.hue, 12, sel);
     pg.fillStyle = sel ? "#fff" : "#dbe7ff"; pg.font = "13px monospace"; pg.fillText(s.name, s.x * sx + 20, s.y * sy - 8);
   }
+  if (view3d) view3d.render(snap, performance.now() / 1000);
   updateStats(snap);
 }
 function frame(now) {

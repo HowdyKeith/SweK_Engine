@@ -58,6 +58,21 @@ export function buildWater(surface, { cx = 0, cz = 0, half = 120, n = 64, t = 0 
     return Object.freeze({ n, side, count, half, cx, cz, t, positions, normals, foam, labels, indices });
 }
 
+/**
+ * Carry the SAME grid of labels to a new time, IN PLACE: positions, normals and foam are rewritten in the arrays `mesh` already holds (no allocation, so a page can call it every frame), and the
+ * mesh's `t` is not changed (the object is frozen); the new time is returned. The result is exactly what buildWater(surface, same options, t) would have built -- the gate holds it to that bit for bit.
+ */
+export function refillWater(mesh, surface, t) {
+    const { count, positions, normals, foam, labels } = mesh;
+    for (let v = 0; v < count; v++) {
+        const a = surface.atLabel(labels[v * 2], labels[v * 2 + 1], t);
+        positions[v * 3] = a.x; positions[v * 3 + 1] = a.y; positions[v * 3 + 2] = a.z;
+        normals[v * 3] = a.nx; normals[v * 3 + 1] = a.ny; normals[v * 3 + 2] = a.nz;
+        foam[v] = foamOf(a.jacobian);
+    }
+    return t;
+}
+
 /** The vertex at grid cell (i, j) of a mesh, as plain numbers. */
 export function vertexAt(mesh, i, j) {
     const v = j * mesh.side + i;
