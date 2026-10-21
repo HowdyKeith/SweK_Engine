@@ -1,11 +1,11 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it. `poolHorizon` (v4816) is the stamp of the first pool entry that run did NOT take: it reached every entry stamped earlier and none stamped at or after it.",
- "at": "2026-10-21T13:39:28.080Z",
+ "at": "2026-10-21T14:05:35.392Z",
  "poolAt": "2026-10-21T13:39:28.080Z",
  "poolHorizon": "2026-10-20T02:25:29.454Z",
  "budgetMs": 3000,
- "lastRun": 45,
+ "lastRun": 1,
  "rotated": [
   {
    "gate": "ai-bridge/assetSync-perf-selfcheck.mjs",
@@ -1564,10 +1564,24 @@
    "at": "2026-10-08T02:06:18.427Z"
   },
   {
+   "gate": "render/denoiseTemporalUpscale-selfcheck.mjs",
+   "ms": 1325,
+   "code": 0,
+   "priorMs": 1395,
+   "at": "2026-10-21T13:57:41.028Z"
+  },
+  {
    "gate": "render/denoiseTiming-selfcheck.mjs",
    "ms": 157656,
    "code": 0,
    "at": "2026-10-11T22:07:07.355Z"
+  },
+  {
+   "gate": "render/denoiseUpscaleGPU-selfcheck.mjs",
+   "ms": 24287,
+   "code": 0,
+   "priorMs": 20044,
+   "at": "2026-10-21T13:57:39.527Z"
   },
   {
    "gate": "render/flightViews-selfcheck.mjs",
@@ -3744,10 +3758,10 @@
   },
   {
    "gate": "tools/ship/frameVerdicts-selfcheck.mjs",
-   "ms": 20030,
-   "code": "timeout/signal",
-   "priorMs": 18728,
-   "at": "2026-10-21T13:39:28.080Z"
+   "ms": 14170,
+   "code": 0,
+   "priorMs": 20030,
+   "at": "2026-10-21T14:04:34.712Z"
   },
   {
    "gate": "tools/ship/frameVertical-selfcheck.mjs",
@@ -3863,10 +3877,10 @@
   },
   {
    "gate": "tools/ship/gateReport-selfcheck.mjs",
-   "ms": 16938,
-   "code": 1,
-   "priorMs": 17383,
-   "at": "2026-10-21T13:39:28.080Z"
+   "ms": 16874,
+   "code": 0,
+   "priorMs": 16938,
+   "at": "2026-10-21T13:57:58.089Z"
   },
   {
    "gate": "tools/ship/gateSelection-selfcheck.mjs",
@@ -5385,10 +5399,10 @@
   },
   {
    "gate": "tools/ship/traderGraph-selfcheck.mjs",
-   "ms": 2508,
+   "ms": 2867,
    "code": 0,
-   "priorMs": 4709,
-   "at": "2026-10-16T01:38:26.332Z"
+   "priorMs": 2550,
+   "at": "2026-10-21T14:05:35.392Z"
   },
   {
    "gate": "tools/ship/traderPolicy-selfcheck.mjs",
