@@ -6683,3 +6683,127 @@ node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r34-a.json
 node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r34-b.json
 ```
 Don't commit or pull between runs. Send back all four JSON files.
+
+## 100. ROUND 34 -- THE VERDICT: THE LIST FILL HOLDS ON THE INTEL; THE 1080 HAS NO RUN, AND ITS ROUND-33 RUN DIED AGAIN
+
+**What arrived.** Six files, committed as received at f04471ed before this section was written:
+- the Intel gen-9's two round-34 runs at 3abe4471, the commit carrying section 99:
+  `render/denoise-rig-r34-{a,b}-intel-gen9.json`;
+- the GTX 1080's three `realGpuRun` runs, all at 468766f9:
+  - b2, section 98's owed run: `render/denoise-rig-r33-b2-gtx1080.json`;
+  - two more that arrived named r34 but were made from the same checkout: `render/denoise-rig-r33-extra-{a,b}-gtx1080.json`;
+- the 1080's console from `render/denoiseTiming-selfcheck.mjs` run alone: `render/denoise-rig-r33-b2-gtx1080-timing-alone.txt`.
+
+The 1080's clone was still on the detached checkout section 98 asked for. A `git pull` there does not move it, so every 1080 run
+since then is at 468766f9 and carries no section 99 line. `render/denoiseUpscaleGPU-selfcheck.mjs`'s section 8 re-derives every
+figure below from these files.
+
+**Section 99's rule, read off the reports.**
+
+| | Run a | Run b | H |
+|---|---|---|---|
+| Intel gen-9: the ring fill against the list fill, 960 x 540, R 990000 | 301.6 / **23.9 ms** | 302.8 / **23.0 ms** | **holds** |
+| GTX 1080 | no run at a commit carrying section 99 | | **no verdict** |
+
+- **C1:** every denoise gate was green in both Intel runs.
+- **C2:** the ring fill filled on 87 rings in both. The checked list fill listed 25,765 pixels, the CPU's count, and reached
+  all of them in the same 87 rings.
+- **C3:** both networks were on the device's clock.
+- **Reported:** with the list fill, the chain against today's page was 2.042 and 2.179 x on the Intel, against 1.472 and
+  1.524 x with the ring fill in the same runs. With its history it was 1.829 and 1.928 x, against 1.358 and 1.397 x. A whole
+  frame of the chain's steps fell from 649.7 and 646.8 ms to 389.9 and 382.3 ms.
+
+**So, by section 99's rule: H holds on the Intel, and round 34 is owed on the 1080.** Nothing changes: the chain's default
+fill, the page's denoise, the network, every kernel table, and `fx/fsr`.
+
+**Section 98's owed run: b2, and its timing gate died again.** b2 is the 1080's first report at 468766f9 after section 98, by
+its start time. Three of its four gates were red, none with a FAIL line:
+- `render/denoiseDevice-selfcheck.mjs` after 20.2 s, its output stopping at the native adapter's line;
+- `render/denoiseTiming-selfcheck.mjs` after 6.5 s, stopping after "sets timed", as in round 33's run b;
+- `render/denoiseUpscaleGPU-selfcheck.mjs` after 2.1 s, with no line at all.
+
+**So, by section 98's rule: the 1080 keeps no verdict for round 33, and the next round is the crash.** extra-a, run next at
+the same commit, was green in every gate (1.308 x with the history). It is not the owed run. Reading it in would be choosing
+the run after seeing the data, as section 76 declined to.
+
+**The crash, as far as these files go.** On the 1080 the timing gate has died in 3 of 5 `realGpuRun` runs since round 33, at
+17.7, 6.5 and 40.4 s, and once more run alone. Each time it stopped after its third line, with no FAIL line, and no exit
+code was kept. The ladder prints its rows only once it returns, so the files say only that the process died somewhere inside
+the native ladder. That ladder takes about two minutes on the 1080 in a green run. The other two gates in b2 dying too, the
+browser's among them, may mean the device was not yet back from the crash before it, but nothing here shows that.
+
+**The predictions.** On the Intel: the list fill was 23.0-23.9 ms (15-80 predicted) and `full / halfList` was 2.042-2.179
+(1.8-2.2 predicted), so both held. On the 1080 none was reached. The 1080's ring fill was slower in its three runs (26.9-27.9
+ms, against 19.9-23.4 in rounds 31 and 33), so its ratios fell to 1.339-1.345 x for the chain and 1.302-1.308 x with its
+history. This is reported, deciding nothing.
+
+## 101. ROUND 35 -- THE GTX 1080's NATIVE CRASH: WHERE AND HOW THE TIMING GATE DIES, FIXED BEFORE THE RIG RUNS IT
+
+**Why this round.** Sections 98 and 100 leave the 1080 without a verdict for rounds 33 and 34. The reason is the same in both:
+`render/denoiseTiming-selfcheck.mjs` dies inside its native ladder in most runs on that box. Until that is understood, every
+round that asks the 1080 for a green denoise group can fail its C1 for a reason that is not the round's.
+
+> **On the GTX 1080, where in the native ladder does the timing gate die, and with what exit code?**
+
+**What exists for it (committed before this section).**
+- `render/denoiseDevice.mjs`'s `timingLadder` takes a `trace` callback. It is called before each step: a size's adapter, its
+  device, each set's build, each round's timing, the output check, and the release of the denoisers and of the device. It
+  changes nothing the ladder does.
+- `render/denoiseTiming-selfcheck.mjs` appends each trace line to a file, synchronously, before the step runs. The file is the
+  one `SWEK_TIMING_TRACE` names, else one in the temp directory. Each line carries the time since the gate began and the
+  process id. The gate prints the file's path before the ladder starts. A new row holds the trace to the ladder it ran: its
+  start, a device asked for at every size measured, every set built there, and its return. On SwiftShader here: 48 lines, green.
+- `tools/ship/realGpuRun.mjs` keeps each gate's exit status and signal and the last five lines of its stderr in the report.
+  Until now the status was read for `ok` and dropped, and stderr was not kept at all.
+- Sabotaged K1-K4, each 1 red.
+
+**The test, on the GTX 1080.** From a clone on this branch's head, as below:
+- **Step 1:** the timing gate alone, three times one after another, each with its own trace file and its exit code printed.
+- **Step 2:** round 34's two runs (section 99), each with its own trace file. These are also the 1080's round-34 runs, read by
+  section 99's rule as written. A red timing gate leaves them owed.
+
+**What each outcome does.**
+- **No crash in five runs:** the crash is not reproduced. Round 34 on the 1080 is read off step 2. The crash stays open in the
+  backlog, named, with these traces as its record.
+- **A crash whose trace ends on the same step every time:** that step is round 36's subject. For example, a requestDevice or a
+  destroy would make round 36 change how the ladder makes or releases devices. That change is held to the same rows as today's
+  ladder before the rig runs it.
+- **Crashes ending on different steps:** named as such. Round 36 is a smaller probe that repeats one step, to find which one
+  the process cannot survive.
+- **The exit code** is reported either way. 3221225477 (0xC0000005) is an access violation inside native code, as in section 76.
+
+**Predicted, before it runs:**
+- At least one of the three alone runs dies. The gate died in 4 of the last 6 runs on that box.
+- Each death exits 3221225477.
+- Each trace's last line is a device step: a requestAdapter, a requestDevice or a destroy, not a timing round or a build. The
+  ladder makes and releases a fresh device at every size (section 35). The nearest precedent, v4855's Dawn crash, came from a
+  second Dawn instance made late inside one gate.
+
+**Nothing else changes in this round:** every kernel, the page, the network, and every table.
+
+**On the rig: the GTX 1080 only.** The Intel has nothing owed.
+```
+cd C:\SweK_r33
+git fetch origin ccr-6c3eeb7c-pxz6kx
+git checkout ccr-6c3eeb7c-pxz6kx
+git pull origin ccr-6c3eeb7c-pxz6kx
+git log -1 --oneline
+cd WebGLEngine
+set SWEK_WEBGPU=
+set SWEK_TIMING_TRACE=%CD%\trace35-alone-1.txt
+node render/denoiseTiming-selfcheck.mjs
+echo %ERRORLEVEL%
+set SWEK_TIMING_TRACE=%CD%\trace35-alone-2.txt
+node render/denoiseTiming-selfcheck.mjs
+echo %ERRORLEVEL%
+set SWEK_TIMING_TRACE=%CD%\trace35-alone-3.txt
+node render/denoiseTiming-selfcheck.mjs
+echo %ERRORLEVEL%
+set SWEK_TIMING_TRACE=%CD%\trace35-r34-a.txt
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r34-a-1080.json
+set SWEK_TIMING_TRACE=%CD%\trace35-r34-b.txt
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r34-b-1080.json
+set SWEK_TIMING_TRACE=
+```
+`git log -1 --oneline` must show this branch's latest commit, not 468766f9. Send back the console output with its three
+`echo` lines, the five trace files and the two JSON files.

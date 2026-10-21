@@ -120,6 +120,12 @@ const onGrid = (ms) => Math.round(ms * 1e6) % GRID_NS === 0;
 // Round 19 (section 66): every native ladder's options but its budget -- the gate's ladder 600 s, the FXC child's 300 s, the
 // child itself stopped at 420 s (FXC rebuilds every pipeline at every size: about 20-25 s of builds a size for r15 on the 1080)
 const LADDER = { capMs: CAP, warmup: 1, minReps: 3, budgetMs: 1500 }, NATIVE_MS = 600000, FXC_MS = 300000, FXC_CHILD_MS = 420000;
+// ROUND 35 (section 101): THE TRACE. On the GTX 1080 this gate has died inside the native ladder with no line, no FAIL and no
+// exit code read: the ladder prints only once it returns, so nothing said where. Each step is now appended to a file,
+// synchronously, BEFORE it runs, so a process that dies leaves its last step on disk. SWEK_TIMING_TRACE names the file;
+// otherwise it is one in the temp directory, named for the process.
+const TRACE_FILE = process.env.SWEK_TIMING_TRACE ? path.resolve(process.env.SWEK_TIMING_TRACE) : path.join(os.tmpdir(), `swek-denoise-timing-trace-${process.pid}.txt`);
+const trace = (line) => { try { fs.appendFileSync(TRACE_FILE, `${((Date.now() - t0) / 1000).toFixed(3)} s  pid ${process.pid}  ${line}\n`); } catch {} };
 // the FXC child's sets and device flags: r15 for section 66's fourth test, r12 so its K1 lines read as rounds 15's and 18's
 // FXC ladders did; use_dxc disabled and the fine clock in ONE disable entry -- Dawn keeps the last of two entries with one key
 // (section 49), so two would let it compile with DXC or round the clock -- and no dump_shaders, which would fill a timed child's stdout
@@ -301,7 +307,10 @@ async function nativeLadder(W, { fxc = false, totalMs, onPlan = () => {} }) {
     const plan = { ...nativePlan({ adapter, pkg, platform: process.platform, flags }), flags, pkg };
     if (fxc) plan.sets = [...FXC_SETS];
     onPlan(adapter, plan);
-    return { plan, r: await timingLadder(net, () => gpu.requestAdapter(), { sets: plan.sets, ...LADDER, totalMs }) };
+    trace(`native${fxc ? " FXC" : ""}: the ladder starts, sets ${plan.sets.join(",")}`);
+    const r = await timingLadder(net, () => gpu.requestAdapter(), { sets: plan.sets, ...LADDER, totalMs, trace: (l) => trace(`native${fxc ? " FXC" : ""} ${l}`) });
+    trace(`native${fxc ? " FXC" : ""}: the ladder returned`);
+    return { plan, r };
 }
 // the FXC ladder, from the gate: this file again in a child (spawnSync, stopped at FXC_CHILD_MS), its ladder back through a file --
 // on Windows a pipe can lose the last line a process writes (section 45; render/denoiseCompile-selfcheck.mjs's children)
@@ -444,6 +453,8 @@ if (W0.refused) ok(`!! ${H.WEBGPU_ENV} names a node-webgpu package this box can 
 else if (skip) console.log("  SKIP  " + skip);
 else {
     let r = null, err = null, plan = null, noted = null, key = null, vendor = null;
+    // printed before the ladder, so a run that dies still names its trace
+    say(`native: the trace is ${TRACE_FILE}`);
     try {
         // section 61: the device's clock unrounded -- Dawn otherwise rounds every timestamp down to a whole 65,536 ns.
         // round 14 (section 43): natively r12 against r14 -- r13's native failure is section 42's finding, and each native
@@ -468,6 +479,16 @@ else {
     } catch (e) { err = String(e && e.message || e); }
     if (err) ok("!! the native ladder ran", false, err.slice(0, 200));
     else {
+        // round 35: the trace holds this run's ladder, step by step -- a device asked for at every size it measured, and its end.
+        // SABOTAGED round 35: timingLadder not tracing its requestDevice -> 1 red; the gate not handing timingLadder its trace -> 1 red;
+        // restored, sha-256 identical.
+        let tl = []; try { tl = fs.readFileSync(TRACE_FILE, "utf8").split("\n").filter((l) => l.includes(`pid ${process.pid}  native `) || l.includes(`pid ${process.pid}  native:`)); } catch {}
+        const measured = [...new Set(NATIVE_SETS.flatMap((s) => r.rows[s].filter((x) => !x.skipped).map((x) => `${x.W}x${x.H}`)))];
+        ok("  round 35: the trace holds the native ladder step by step -- its start, a device asked for at every size it measured, every set built there, and its return -- before each step ran",
+            tl.length > 0 && /the ladder starts/.test(tl[0]) && /the ladder returned/.test(tl[tl.length - 1]) && tl.some((l) => /native ladder done/.test(l)) &&
+            measured.every((sz) => tl.some((l) => l.includes(`native ${sz}: requestDevice`))) &&
+            measured.every((sz) => NATIVE_SETS.every((st) => !r.rows[st].some((x) => !x.skipped && `${x.W}x${x.H}` === sz) || tl.some((l) => l.includes(`native ${sz}: build ${st}`)))),
+            `${tl.length} lines in ${TRACE_FILE}; sizes measured ${measured.join(", ")}`);
         pairedHolds("native", r, NATIVE_SETS); report("native", r);
         clockRow("native", r, NATIVE_SETS);
         ok("  round 19: the adapter noted for the rig's report is the ladder's own -- its name and whether it is software -- and its key for section 66's table is this platform's, its vendor's and its architecture's",
@@ -528,6 +549,7 @@ console.log("\n3. THE PAGE: denoise.html's \"Time the network\", in Chromium (on
     }
 }
 
+trace(`the gate ends, ${fails} fail(s)`);
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
     "\nnot closed here: any number. What a pass costs is printed above and asserted nowhere -- on SwiftShader it is a CPU's, and " +
     "on a GPU it is what tools/ship/realGpuRun.mjs carries back.");

@@ -64,6 +64,15 @@
 //   Y6  the page's table without the list fill's row                   1 RED (the page row: 13 rows, not 14)
 //   Y7  fill() runs the rings whatever it is asked                     1 RED (the row against round 31's fill). 0 RED at first: the
 //       two fills agree float for float, so nothing could tell which ran; the list's length, read back as `listed`, is the fix
+//   and section 8's verdict (section 100), by the same runner:
+//   Z1  the rule asks the Intel alone                                  1 RED (the rule row)
+//   Z2  C1 dropped -- a run counts with a red gate                     1 RED (the rule row). 0 RED at first: both Intel runs were
+//       green and no fixture had a red gate; one does now
+//   Z3  a run counts at any commit                                     1 RED (the rule row)
+//   Z4  H holding with the list fill up to 5 % slower                  1 RED (the rule row)
+//   Z5  section 98's owed run taken as the LAST 1080 run, not the first 1 RED (the owed-run row)
+//   Z6  section 98's verdict read off the green extra-a run            1 RED (the owed-run row)
+//   Z7  the Intel's predicted list fill narrowed to 15-20 ms           1 RED (the predictions row)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -509,6 +518,66 @@ console.log("\n7. SECTION 98: ROUND 33'S VERDICT, RE-DERIVED FROM THE FOUR REPOR
         P.ratio1080 && P.ratioIntel && P.hist1080 && P.rings && !P.histIntel && !Nb.allGreen,
         `history passes: Intel ${I.map((r) => histMs(r).toFixed(1)).join(", ")} ms (15-60 predicted), 1080 ${N.map((r) => histMs(r).toFixed(2)).join(", ")} ms (1-4)`);
     for (const [g, rs] of Object.entries(R)) say(`section 98, ${g}: the history's four passes ${rs.map((r) => histMs(r).toFixed(2)).join(" / ")} ms, the accumulation ${rs.map((r) => r.hist.accum.ms.toFixed(2)).join(" / ")} of it; the chain without them ${rs.map((r) => (r.full / r.half).toFixed(3)).join(" / ")} x -- reported, deciding nothing`);
+}
+
+console.log("\n8. SECTION 100: ROUND 34'S VERDICT, AND SECTION 98'S OWED RUN, RE-DERIVED FROM THE REPORTS AS COMMITTED");
+{
+    // the commit that carries section 99, and the one section 98 pinned the 1080's owed run to
+    const SECTION99_COMMITS = Object.freeze(["3abe4471"]), PINNED98 = "468766f9";
+    const num = (re, t) => { const m = t.match(re); return m ? Number(m[1]) : null; };
+    const load = (f) => JSON.parse(fs.readFileSync(path.join(ENG, "render", f), "utf8"));
+    const readRun = (rep, file) => {
+        const g = rep.gates.find((x) => x.gate === "render/denoiseUpscaleGPU-selfcheck.mjs"), m = (g && g.measured) || [];
+        const a = m.find((l) => /^section 93: .*kernels/.test(l)) || "", b = m.find((l) => /^section 93: the chain's steps/.test(l)) || "", d = m.find((l) => /^section 99: /.test(l)) || "";
+        const clk = (re, t) => (t.match(re) || [])[1] || null;
+        return { file, at: rep.at, commit: String(rep.commit || "").slice(0, 8), allGreen: rep.gates.length === 4 && rep.gates.every((x) => x.ok),
+            red: rep.gates.filter((x) => !x.ok).map((x) => ({ gate: x.gate, fails: (x.fails || []).length, ms: x.ms, measured: (x.measured || []).length })),
+            adapter: clk(/^section 93: ([^,]+),/, a), netClocks: [clk(/1920 x 1080 [0-9.]+ ms \((\w+)\)/, a), clk(/at 960 x 540 [0-9.]+ ms \((\w+)\)/, a)],
+            rings: num(/; (\d+) of 96 rings filled/, b), has99: !!d, fill: num(/fill ([0-9.]+) ms \(wall\)/, d), fillList: num(/fillList ([0-9.]+) ms \(wall\)/, d),
+            listed: num(/the list fill (\d+) listed/, d), listRings: num(/listed, (\d+) of 96 rings/, d), listLeft: num(/rings, (\d+) left/, d),
+            ratioList: num(/with the list fill [0-9.]+ ms, ratio ([0-9.]+) x/, d), ratioListHist: num(/with its history [0-9.]+ ms, ratio ([0-9.]+) x/, d), ratio97: num(/^section 97: .*ratio ([0-9.]+) x/, m.find((l) => /^section 97: /.test(l)) || "") };
+    };
+    // section 99's rule: a run counts when it is at a commit carrying section 99, every denoise gate is green (C1), the ring fill
+    // filled on fewer than 96 rings and the checked list fill reached every listed pixel in that count (C2), and both networks are
+    // on the device's clock (C3); H holds on a GPU when both its runs count and fillList is below fill in each
+    const counts = (r) => SECTION99_COMMITS.includes(r.commit) && r.allGreen && r.has99 && r.rings > 0 && r.rings < 96 && r.listLeft === 0 && r.listRings === r.rings && r.listed > 0 &&
+        r.netClocks.every((c) => c === "device") && [r.fill, r.fillList].every((v) => Number.isFinite(v) && v > 0);
+    const H = (runs) => (runs.length === 2 && runs.every(counts) ? (runs.every((r) => r.fillList < r.fill) ? "holds" : "fails") : "no verdict");
+    const rule100 = (byGpu) => { const v = Object.values(byGpu).map(H); return v.every((x) => x === "holds") ? "the list fill becomes the chain's" : v.includes("no verdict") ? "owed again" : "the ring fill stays"; };
+    const I = ["a", "b"].map((k) => readRun(load(`denoise-rig-r34-${k}-intel-gen9.json`), k));
+    // the GTX 1080's reports after section 98, all at the pinned commit: b2, section 98's owed run, and two more that arrived named r34
+    const N = [["b2", "denoise-rig-r33-b2-gtx1080.json"], ["extra-a", "denoise-rig-r33-extra-a-gtx1080.json"], ["extra-b", "denoise-rig-r33-extra-b-gtx1080.json"]].map(([k, f]) => readRun(load(f), k));
+    const N99 = N.filter((r) => SECTION99_COMMITS.includes(r.commit));
+    ok("!! section 100: the Intel's two round-34 runs read back -- at the commit carrying section 99, every gate green, the ring fill and the checked list fill both 87 rings, all 25,765 listed pixels reached, both networks on the device's clock",
+        I.every((r) => counts(r) && r.adapter === "intel / gen-9" && r.rings === 87 && r.listRings === 87 && r.listed === 25765 && r.listLeft === 0),
+        I.map((r) => `run ${r.file}: fill ${r.fill} ms, fillList ${r.fillList} ms, ${r.listed} listed, ${r.listRings} rings, ${r.listLeft} left`).join("; "));
+    ok("!! ...and the GTX 1080 has no run at a commit carrying section 99: its three reports since section 98 are all at 468766f9, and none carries a section 99 line",
+        N99.length === 0 && N.every((r) => r.commit === PINNED98 && !r.has99), N.map((r) => `${r.file}: ${r.commit}, ${r.has99 ? "a" : "no"} section 99 line`).join("; "));
+    // and a run with a red gate, the 1080's own failure (Z2 -- C1 dropped -- went 0 RED before this fixture: both Intel runs are green)
+    const slow = (r) => ({ ...r, fillList: r.fill * 1.01 }), stale = (r) => ({ ...r, commit: "e5908338" }), short = (r) => ({ ...r, listLeft: 3 }), offby = (r) => ({ ...r, listRings: r.rings + 1 });
+    const redGate = (r) => ({ ...r, allGreen: false });
+    ok("!! *** section 100's rule, as section 99 fixed it: H holds on the Intel; the 1080 has no verdict, with no run -- so round 34 is owed on the 1080 ***",
+        H(I) === "holds" && H(N99) === "no verdict" && rule100({ "intel-gen9": I, gtx1080: N99 }) === "owed again" &&
+        rule100({ "intel-gen9": I, gtx1080: I }) === "the list fill becomes the chain's" && rule100({ "intel-gen9": [I[0], slow(I[1])], gtx1080: I }) === "the ring fill stays" &&
+        H([stale(I[0]), I[1]]) === "no verdict" && H([short(I[0]), I[1]]) === "no verdict" && H([offby(I[0]), I[1]]) === "no verdict" && H([I[0], redGate(I[1])]) === "no verdict",
+        `Intel: ${I.map((r) => (r.fill / r.fillList).toFixed(1)).join(" and ")} x faster, ${H(I)}; GTX 1080: ${N99.length} runs, ${H(N99)}`);
+    // SECTION 98's OWED RUN: the 1080's first report at the pinned commit after section 98 -- by its start time, b2. Section 98 fixed
+    // that if its timing gate died again the 1080 keeps no verdict and the next round is the crash. A later green run at the same
+    // commit is not the owed run: reading it in would be choosing the run after the data (section 76).
+    const owed = [...N].sort((x, y) => String(x.at).localeCompare(String(y.at)))[0], tg = (r) => r.red.find((x) => x.gate === "render/denoiseTiming-selfcheck.mjs");
+    const verdict98 = (o) => (o.allGreen ? "read H off run a and the owed run" : tg(o) ? "no verdict -- the crash is next" : "no verdict");
+    ok("!! *** section 98's owed run is b2, and its timing gate died again -- so the 1080 keeps no verdict for round 33, and round 35 is the crash ***",
+        owed.file === "b2" && !owed.allGreen && !!tg(owed) && tg(owed).fails === 0 && verdict98(owed) === "no verdict -- the crash is next" &&
+        N.find((r) => r.file === "extra-a").allGreen && verdict98({ ...owed, allGreen: true, red: [] }) === "read H off run a and the owed run",
+        `b2 (${owed.at}): ${owed.red.map((x) => `${x.gate.split("/").pop()} red after ${(x.ms / 1000).toFixed(1)} s, ${x.fails} FAIL, ${x.measured} measured line(s)`).join("; ")}`);
+    // the predictions, read off the reports: the Intel's held; the 1080's were not reached
+    const within = (rs, f, lo, hi) => rs.every((r) => f(r) >= lo && f(r) <= hi);
+    ok("  section 100's account of section 99's predictions: on the Intel the list fill was inside 15-80 ms and the chain 1.8-2.2 x against today's page, as predicted; on the 1080 none was reached",
+        within(I, (r) => r.fillList, 15, 80) && within(I, (r) => r.ratioList, 1.8, 2.2) && N99.length === 0,
+        `Intel fillList ${I.map((r) => r.fillList).join(", ")} ms, full / halfList ${I.map((r) => r.ratioList).join(", ")} x, with its history ${I.map((r) => r.ratioListHist).join(", ")} x`);
+    // reported: the timing gate on the 1080 since round 33, run by realGpuRun
+    const all1080 = [["a", "denoise-rig-r33-a-gtx1080.json"], ["b", "denoise-rig-r33-b-gtx1080.json"]].map(([k, f]) => readRun(load(f), k)).concat(N);
+    say(`section 100, gtx1080: the timing gate died in ${all1080.filter((r) => tg(r)).length} of ${all1080.length} realGpuRun runs (${all1080.filter((r) => tg(r)).map((r) => `${r.file} at ${(tg(r).ms / 1000).toFixed(1)} s`).join(", ")}), each with no FAIL line, and once more run alone -- reported, deciding nothing`);
 }
 
 console.log(fails ? `\nFAIL -- ${fails} check(s)` : "\nALL GREEN");

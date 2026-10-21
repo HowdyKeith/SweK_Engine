@@ -369,6 +369,16 @@ console.log("\n6. ROUND 19 (section 66, v4851): NATIVE ADAPTERS NAMED, EACH GATE
     ok(`  ...and the report entry carries them (${ge.entry.skips.length}), built by gateEntry inside runGates, its adapters merged by addAdapters`,
        JSON.stringify(ge.entry.skips) === JSON.stringify(pr.skips) && /const \{ entry, adapters \} = gateEntry\(\{ gate: g,/.test(runSrc) &&
        /report\.gates\.push\(entry\);\s*addAdapters\(report\.adapters, adapters\);/.test(runSrc));
+    // round 35 (section 101): how a gate ended -- a native crash on Windows exits 3221225477 (0xC0000005) with no FAIL line, and
+    // the report used to keep only ok: false. SABOTAGED round 35: the stderr tail cut to four lines -> 1 red; runGates not handing
+    // the signal -> 1 red; restored, sha-256 identical.
+    const died = gateEntry({ gate: GATE, src: "", status: 3221225477, signal: null, ms: 9, stdout: "", stderr: "a\r\n\r\nb\nc\nd\ne\nf\n" });
+    const killed = gateEntry({ gate: GATE, src: "", status: null, signal: "SIGTERM", ms: 9 });
+    ok("  round 35: the report entry keeps the gate's exit -- its status and its signal -- and the last five lines of its stderr, which runGates hands it",
+       died.entry.ok === false && died.entry.exit.status === 3221225477 && died.entry.exit.signal === null && JSON.stringify(died.entry.stderrTail) === JSON.stringify(["b", "c", "d", "e", "f"]) &&
+       killed.entry.exit.status === null && killed.entry.exit.signal === "SIGTERM" && killed.entry.stderrTail.length === 0 && ge.entry.exit.status === 0 &&
+       /signal: r\.signal/.test(runSrc) && /stderr: r\.stderr \|\| ""/.test(runSrc),
+       JSON.stringify(died.entry.exit) + " " + JSON.stringify(died.entry.stderrTail));
 
     // the package, and the compiler it predicts -- nativeCompiler, the rule the native gates choose their sets by
     const rec = (pkg, platform, env = {}) => nodeWebgpuRecord({ from: "/pkgs/webgpu-x/index.js", pkg, platform, env });

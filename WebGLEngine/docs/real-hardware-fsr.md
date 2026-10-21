@@ -524,6 +524,51 @@ node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r34-b.json
 - **Don't commit or pull between runs.**
 - **Send back all four JSON files.**
 
+**The outcome so far (section 100): on the Intel the list fill holds.** It took 23.9 and 23.0 ms against the old fill's 301.6
+and 302.8. The chain went from 1.47-1.52 x to 2.04-2.18 x against today's page, with every gate green. The 1080 has no run
+yet: its clone was still on the detached 468766f9 checkout, and `git pull` does not move a detached checkout. Its two runs are
+part of round 35, below.
+
+### Round 35: the GTX 1080's native crash (pre-registration section 101)
+
+The GTX 1080 only. First put the clone back on the branch. `git pull` alone will not do it after `git checkout 468766f9`:
+
+```
+cd C:\SweK_r33
+git fetch origin ccr-6c3eeb7c-pxz6kx
+git checkout ccr-6c3eeb7c-pxz6kx
+git pull origin ccr-6c3eeb7c-pxz6kx
+git log -1 --oneline
+```
+
+`git log -1 --oneline` must show the branch's latest commit, not 468766f9. Then:
+
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+set SWEK_TIMING_TRACE=%CD%\trace35-alone-1.txt
+node render/denoiseTiming-selfcheck.mjs
+echo %ERRORLEVEL%
+set SWEK_TIMING_TRACE=%CD%\trace35-alone-2.txt
+node render/denoiseTiming-selfcheck.mjs
+echo %ERRORLEVEL%
+set SWEK_TIMING_TRACE=%CD%\trace35-alone-3.txt
+node render/denoiseTiming-selfcheck.mjs
+echo %ERRORLEVEL%
+set SWEK_TIMING_TRACE=%CD%\trace35-r34-a.txt
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r34-a-1080.json
+set SWEK_TIMING_TRACE=%CD%\trace35-r34-b.txt
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r34-b-1080.json
+set SWEK_TIMING_TRACE=
+```
+
+- **What is new:** the timing gate writes each step of its native ladder to the trace file before running it, so a crash
+  leaves its last step behind. The JSON report now keeps each gate's exit code and the end of its stderr.
+- **Section 101 predicts:** at least one of the three solo runs dies, with exit code 3221225477, and its trace ends on a
+  device step: requestAdapter, requestDevice or destroy.
+- **Don't commit or pull between runs.**
+- **Send back** the console output with its three `echo` lines, the five `trace35-*.txt` files, and the two JSON files.
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and

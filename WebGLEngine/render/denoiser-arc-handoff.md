@@ -37,13 +37,16 @@ node tools/ship/versionPreflight.mjs --next    # the next free version and sweep
 
 ## What is next -- Keith picks
 
-1. **`denoise-temporalup-device`: the 1080's owed run.** Round 32 (sections 95-96): the half-size chain over eight
+1. **`denoise-1080-native-crash`, round 35 (section 101).** On the 1080 the timing gate dies inside its native ladder in most
+   runs. The 1080 has no verdict for rounds 33 and 34 until this is settled. Round 35 traces the ladder step by step and keeps
+   each gate's exit code; it waits on the 1080's five runs. Round 34 (section 100) holds on the Intel: the fill over the
+   lights' pixels only is about 13 x faster, and the chain went from about 1.5 x to 2.0-2.2 x against today's page.
+   **`denoise-temporalup-device`: the 1080's owed run.** Round 32 (sections 95-96): the half-size chain over eight
    jittered frames, accumulated at full size, beat the same chain on one frame and full size at the same samples. Round 33
    (sections 97-98) put the accumulation on the device. On the Intel, the chain with its history is still cheaper than
    today's page at 1080p (1.330 and 1.316 x). The 1080's run b does not count: its timing gate died. One run is owed there,
-   with the gate run alone first, from a checkout of 468766f9. Section 98 fixes how it is read.
-   **`denoise-halfres-fixed-costs`, round 34 (section 99), the fill lever:** the same fill over the lights' pixels only. It is
-   exact on SwiftShader and waits on the rig's two runs on each GPU.
+   with the gate run alone first, from a checkout of 468766f9. Section 98 fixes how it is read. Section 100: it died again,
+   so this waits on the crash.
 2. **`denoise-f16-intel`** (gen-9 only). Half-precision kernels, now known to be exposed there.
 3. **`denoise-subgroup-reduction`** (GTX 1080 only). Subgroup kernels, now known to be exposed there.
 
