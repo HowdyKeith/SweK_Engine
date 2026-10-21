@@ -108,8 +108,9 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "release-publish-backlog",
-        blocker: "HARDWARE",
-        what: "Publish the unreleased versions so the fleet stops running v4460.",
+        blocker: "CLOSED",
+        closed: "CLOSED at v4895 (unshipped), by reading it against the releases that exist: the entry was written when 11 versions were owed against a budget of 3 and the fleet ran v4460. The rig has published every version since, one at a time (the releases page now runs v4894, v4893, v4890, v4889, v4888, v4887, v4886, v4885, v4883, v4882, ...), and tools/ship/releaseLedger-selfcheck.mjs reads 'nothing owed at all. Baseline v4660, tree v4894, budget 3' -- 0 of 3. The versions that are missing from the page (v4880, v4881, v4884 and the other chat's v4891 and v4892) were superseded by the next round by design, and the ledger counts them as not owed. The gate this entry called the one blocking main is green.",
+        what: "WAS: Publish the unreleased versions so the fleet stops running v4460.",
         how: "On the rig: GitHub panel -> Releases, step 3 (Clone -> verify) then step 4 (Publish the verified clone), per the ship skill's step 7. The zip is not byte-reproducible, so it has to be the rig.",
         why: "releaseLedger reads 11 against a budget of 3 and the fleet is 18 versions behind. It is the one gate blocking v4478 from main, and it is right to: the rule is publish before shipping again. Nothing in the sandbox can clear it -- publishing from here would replace the artifact the rig built with different bytes for the same commit.",
     },
