@@ -23,7 +23,7 @@ const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..
 let fails = 0;
 const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
 const report = (l) => console.log("  ----  " + l);
-const raw = fs.readFileSync(path.join(ENG, "snow-deform.html"), "utf8"), js = raw.slice(raw.indexOf('<script type="module">'));
+const raw = fs.readFileSync(path.join(ENG, "snow-deform.html"), "utf8"), flat = raw.replace(/\s+/g, " "), js = raw.slice(raw.indexOf('<script type="module">'));
 
 console.log("snowDeformPage-selfcheck -- snow-deform.html\n");
 console.log("1. THE SOURCE");
@@ -34,7 +34,7 @@ console.log("1. THE SOURCE");
     ok("!! nothing is turned into markup: no innerHTML, outerHTML, insertAdjacentHTML, document.write, eval, new Function or srcdoc; every status line goes in with textContent", bad.length === 0 && /textContent/.test(js), bad.join(", "));
     const ext = [...raw.matchAll(/(?:src|href)=["'](https?:)?\/\/[^"']+["']|import\s*\(\s*["']https?:|from\s+["']https?:/g)].filter((m) => !/github\.com|noniv/i.test(m[0]));
     ok("!! the page loads nothing from outside the engine's own origin", ext.length === 0, ext.map((m) => m[0]).join(" | "));
-    ok("  it carries the demo: meta tags and a link back to the server page, credits the lift (Noniv/snowflow_demo, MIT, vendor/snowflow), and says what it is NOT", /name="demo:title"/.test(raw) && /name="demo:desc"/.test(raw) && /name="demo:category"/.test(raw) && /href="\/server\.html"/.test(raw) && /Noniv\/snowflow_demo/.test(raw) && /NOT THE DEMO IT IS LIFTED FROM/.test(raw) && /NOT FAST/.test(raw) && /NOT SEEN ON A REAL GPU/.test(raw));
+    ok("  it carries the demo: meta tags and a link back to the server page, credits the lift (Noniv/snowflow_demo, MIT, vendor/snowflow), and says what it is NOT", /name="demo:title"/.test(raw) && /name="demo:desc"/.test(raw) && /name="demo:category"/.test(raw) && /href="\/server\.html"/.test(raw) && /Noniv\/snowflow_demo/.test(raw) && flat.includes("NOT THE DEMO IT IS LIFTED FROM") && flat.includes("NOT FAST") && flat.includes("NOT SEEN ON A REAL GPU"));
     ok("  the clipmap's winding is flipped for a right-handed scene, as render/clipmapTerrain-selfcheck.mjs found it must be", /idx\[t \+ 1\] = idx\[t \+ 2\]/.test(js));
 }
 
