@@ -16082,6 +16082,15 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "(off never, auto only when measured, on says how slow, no WebGPU and software adapters never), the probe harness on a fake " +
                  "clock, and a storage that throws. Nine sabotages, nine red -- seven by a FAIL row and two by a crash, which is red by exit status",
     }),
+    since601: Object.freeze({
+        at: "v4890", swept: 2, green: 2, red: 0,
+        added: Object.freeze(["ui/oceanSea-selfcheck.mjs", "tools/ship/oceanSeaPage-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "the opt-in sea (slice 4): the pure half (the HUD line parsed the way the sea prints it, the probe median, the per-adapter remembered reading, the declared defaults read from the " +
+                 "bundle's own text, the computed comparison with the physics surface; eleven sabotages, eleven red) and the page against a stand-in frame (a fast GPU timed and kept and not " +
+                 "timed again on reload, a slow one unloaded, the same slow one kept under on, no WebGPU and off never requesting the frame, a mute sea given up on; eight page sabotages, all red)",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

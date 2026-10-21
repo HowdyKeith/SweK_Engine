@@ -1,0 +1,171 @@
+<!doctype html>
+<!-- ocean-sea.html -- UNNUMBERED (the version is chosen at ship time).
+
+     THE OPT-IN SEA. Slice 4 of the ocean-optin-surface item in tools/ship/todo.mjs.
+     The vendored web-ocean sea (vendor/web-ocean/ocean.html, byte-identical to upstream, pinned by tools/ship/oceanSpikePage-selfcheck.mjs) in a frame, behind the tier
+     switch of slice 3 (ui/oceanTier.mjs). Whether the frame is kept is decided by a MEASUREMENT: in auto, the page loads the sea, reads its own HUD line for a few seconds,
+     takes the median frame time, and unloads it again if that is over the 33.3 ms budget. In on, the sea stays whatever it costs and the reason line says how slow it is.
+     In off, no sea is ever loaded. The reading is remembered for this adapter, so a reload does not time the sea twice.
+
+     WHAT THIS PAGE IS NOT, SAID PLAINLY:
+       - NOT LINED UP WITH THE PHYSICS SURFACE. The sea's wave parameters are a const inside its module script; the URL takes only the camera, the clock and the size. The table
+         under the frame COMPUTES the disagreement (height, wavelength) from the bundle's own declared defaults and slice 1's six waves, and prints it.
+       - NOT READ BY ANY PHYSICS. A boat, buoyancy or the submarine reads physics/ocean/oceanSurface.mjs and nothing in the frame.
+       - NOT DEPTH-COMPOSITED. The sea is its own canvas with its own camera, sky and post-processing (level 3, not promised).
+       - NOT SEEN TO RENDER WHERE IT WAS BUILT. The sandbox has no WebGPU adapter, so the live probe is exercised against a stand-in for the frame; a real reading is the rig's.
+     Nothing is ever put in this page as markup: every status line goes in with textContent. The page loads nothing from outside the engine's own origin. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Ocean (opt-in GPU sea)">
+<meta name="demo:desc" content="The opt-in water mode: the vendored web-ocean WebGPU sea behind a tier switch, kept only if it holds the frame budget on this GPU (it is timed from its own HUD), with a computed table of where it does not match the physics surface.">
+<meta name="demo:category" content="graphics">
+<title>SweK &middot; Ocean (opt-in GPU sea)</title>
+<style>
+  :root { --bg:#050a12; --panel:#0b131f; --line:#1c2c44; --fg:#dbe7ff; --dim:#7c93b8; --cyan:#59d1ff; --amber:#f6a623; --green:#5fe08a; --red:#ff7a7a; }
+  * { box-sizing:border-box; }
+  html, body { height:100%; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:13px ui-monospace, Menlo, monospace; display:flex; flex-direction:column; }
+  header { padding:12px 16px 6px; flex:none; }
+  h1 { font-size:15px; letter-spacing:.13em; text-transform:uppercase; color:var(--cyan); margin:0 0 6px; }
+  .desc { color:var(--dim); max-width:980px; line-height:1.55; margin:0 0 6px; }
+  .bar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; padding:6px 16px 8px; flex:none; }
+  .chip { border:1px solid var(--line); background:var(--panel); border-radius:6px; padding:4px 9px; display:inline-flex; gap:7px; align-items:center; }
+  .dot { width:9px; height:9px; border-radius:50%; background:var(--amber); display:inline-block; }
+  select, button { background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:6px; padding:4px 9px; font:inherit; cursor:pointer; }
+  button:hover, select:hover { border-color:var(--cyan); }
+  a { color:var(--cyan); }
+  #stage { flex:1 1 auto; min-height:300px; margin:0 16px; border:1px solid var(--line); border-radius:6px; overflow:hidden; background:#000; position:relative; }
+  #sea { position:absolute; inset:0; width:100%; height:100%; border:0; display:block; }
+  #banner { position:absolute; left:10px; top:10px; right:10px; padding:6px 9px; background:rgba(5,10,18,.78); border:1px solid var(--line); border-radius:6px; white-space:pre-wrap; line-height:1.5; z-index:2; }
+  #fallback { position:absolute; inset:0; display:none; padding:28px; color:var(--amber); line-height:1.7; background:#050a12; z-index:3; }
+  footer { padding:8px 16px 12px; flex:none; color:var(--dim); }
+  pre { margin:6px 0 0; white-space:pre-wrap; color:var(--fg); }
+  .small { font-size:12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Ocean &mdash; the opt-in GPU sea</h1>
+  <p class="desc">The vendored web-ocean sea behind a tier switch. In <b>auto</b> it is timed on this GPU first and unloaded if it cannot hold 30 frames per second; in <b>on</b> it stays and the
+    reading says how slow it is; in <b>off</b> it is never loaded. The default water that every GPU can draw is <a href="/ocean-default.html">ocean-default.html</a>.
+    The sea does not match the physics surface and the table below says by how much. <a href="/server.html">Back to the server page</a>.</p>
+</header>
+<div class="bar">
+  <span class="chip"><span class="dot" id="gpuDot"></span><span id="gpuWord">checking&hellip;</span></span>
+  <span class="chip small" id="gpuDetail">&nbsp;</span>
+  <label>water tier <select id="tierSel" title="off: never load the sea. auto: load it, time it, keep it only if it holds the budget. on: keep it whatever it costs.">
+    <option value="auto" selected>auto</option>
+    <option value="off">off (never load)</option>
+    <option value="on">on (keep it)</option>
+  </select></label>
+  <button id="retimeBtn" type="button">Time the sea again</button>
+</div>
+<div id="stage">
+  <iframe id="sea" title="web-ocean" allow="fullscreen"></iframe>
+  <div id="banner">starting&hellip;</div>
+  <div id="fallback"></div>
+</div>
+<footer>
+  <pre id="match" class="small">comparing&hellip;</pre>
+  <div class="small">Ocean: web-ocean (github.com/noniv/web-ocean) by Maksymilian Dendura, MIT licence, vendored unmodified at vendor/web-ocean (see its LICENSE and PROVENANCE.txt).</div>
+</footer>
+<script type="module" src="/ui/originNotice.js"></script>
+<script type="module">
+  import * as OT from "/ui/oceanTier.mjs";
+  import * as OS from "/ui/oceanSea.mjs";
+  import { defaultSurface } from "/physics/ocean/oceanSurface.mjs";
+  import { adapterOptions } from "/ui/webgpuProbe.mjs";
+  const $ = (id) => document.getElementById(id);
+  const sea = $("sea"), banner = $("banner"), fallback = $("fallback"), tierSel = $("tierSel");
+  const state = { phase: "starting", webgpu: false, adapterLabel: "", adapterKind: "unknown", decision: null, probeMs: null, remembered: false, samples: [], loaded: false, error: "" };
+  window.__sea = state;
+  const storage = () => { try { return window.localStorage; } catch { return null; } };
+  let timer = null, token = 0;
+
+  function say(text) { banner.textContent = text; }
+  function stop() { if (timer) { clearInterval(timer); timer = null; } }
+  function unload() { sea.removeAttribute("src"); sea.src = "about:blank"; state.loaded = false; }
+  function showDefault(reason) {
+    stop(); unload(); state.phase = "default";
+    fallback.style.display = "block"; banner.style.display = "none";
+    fallback.textContent = "The default water, not the GPU sea.\n\n" + reason + "\n\nThe default water is drawn on ocean-default.html.";
+    fallback.style.whiteSpace = "pre-wrap";
+  }
+  function showSea() { fallback.style.display = "none"; banner.style.display = "block"; }
+  function load() { showSea(); sea.src = OS.seaUrl({ ui: 1 }); state.loaded = true; }
+  function hudText() { try { const el = sea.contentDocument && sea.contentDocument.getElementById("fps"); return el ? el.textContent : ""; } catch { return ""; } }
+
+  async function adapter() {
+    if (!navigator.gpu) { $("gpuWord").textContent = "no WebGPU"; $("gpuDot").style.background = "#ff7a7a"; $("gpuDetail").textContent = window.isSecureContext ? "navigator.gpu is absent here" : "this origin is not secure, so the browser withholds WebGPU"; return null; }
+    let a = null;
+    try { a = await navigator.gpu.requestAdapter(adapterOptions("high-performance")); } catch { a = null; }
+    if (!a) { $("gpuWord").textContent = "no adapter"; $("gpuDot").style.background = "#ff7a7a"; $("gpuDetail").textContent = "WebGPU is present but no adapter was returned"; return null; }
+    let info = a.info || null;
+    try { if (!info && a.requestAdapterInfo) info = await a.requestAdapterInfo(); } catch { info = null; }
+    if (a.isFallbackAdapter) info = { ...(info || {}), isFallbackAdapter: true };
+    return info || {};
+  }
+
+  function decide(probeMs) {
+    const d = OT.chooseTier({ preference: tierSel.value, webgpu: state.webgpu, adapter: state.info, probeMs });
+    state.decision = d; return d;
+  }
+
+  async function begin() {
+    const my = ++token; stop(); unload(); state.samples = []; state.probeMs = null; state.remembered = false; state.error = "";
+    showSea(); say("looking at this GPU…");
+    const info = await adapter();
+    if (my !== token) return;
+    state.webgpu = info !== null; state.info = info;
+    const cls = OT.classifyAdapter(info);
+    state.adapterLabel = cls.label; state.adapterKind = cls.kind;
+    if (state.webgpu) { $("gpuWord").textContent = "WebGPU"; $("gpuDot").style.background = "#5fe08a"; $("gpuDetail").textContent = cls.label + " · " + cls.kind; }
+    const recalled = tierSel.value === "auto" ? OS.recallProbe(storage(), cls.label) : null;
+    if (recalled != null) { state.remembered = true; state.probeMs = recalled; }
+    const d = decide(state.probeMs);
+    if (d.tier === "default" && !d.needsProbe) return showDefault(d.reason);
+    // the sea is wanted (on, or a remembered reading under the budget) or must be measured (auto, never timed): load it
+    load();
+    state.phase = d.tier === "sea" ? "sea" : "probing";
+    say(d.tier === "sea" ? d.reason : "timing the sea on " + cls.label + " (about " + Math.round((OS.PROBE_SETTLE_MS + OS.PROBE_SAMPLES * OS.PROBE_SAMPLE_MS) / 1000) + " s) … it is kept only if it holds " + OT.BUDGET_MS.toFixed(1) + " ms a frame");
+    if (d.tier === "sea" && (state.remembered || tierSel.value !== "auto") && tierSel.value !== "on") return;   // a remembered, affordable reading needs no new timing
+    const t0 = performance.now();
+    timer = setInterval(() => {
+      if (my !== token) return stop();
+      const since = performance.now() - t0;
+      const txt = hudText(), hud = OS.parseHud(txt);
+      if (since >= OS.PROBE_SETTLE_MS && hud) state.samples.push(txt);
+      if (state.samples.length >= OS.PROBE_SAMPLES) {
+        stop();
+        state.probeMs = OS.medianProbe(state.samples);
+        if (tierSel.value === "auto") OS.rememberProbe(storage(), cls.label, state.probeMs);
+        const f = decide(state.probeMs);
+        if (f.tier === "sea") { state.phase = "sea"; say(f.reason); } else showDefault(f.reason);
+      } else if (since > OS.PROBE_SETTLE_MS + OS.PROBE_SAMPLES * OS.PROBE_SAMPLE_MS * 4) {
+        stop(); state.error = "the sea produced no readable HUD line";
+        if (tierSel.value === "on") say("on: the sea is loaded, but it has printed no readable HUD line (" + cls.label + "); it may have failed to start");
+        else showDefault("auto: the sea printed no readable frame time on " + cls.label + ", so it was never shown to hold the budget; the default water");
+      }
+    }, OS.PROBE_SAMPLE_MS);
+  }
+
+  tierSel.value = OT.loadPreference(storage());
+  tierSel.addEventListener("change", () => { OT.savePreference(storage(), tierSel.value); begin(); });
+  $("retimeBtn").addEventListener("click", () => { try { storage() && storage().removeItem(OS.PROBE_KEY); } catch { /* ignore */ } begin(); });
+
+  (async () => {
+    try {
+      const r = await fetch(OS.SEA_PATH);
+      const text = r.ok ? await r.text() : "";
+      const declared = OS.declaredDefaults(text);
+      const rows = OS.matchRows(OS.surfaceStats(defaultSurface(1)), declared);
+      state.match = rows;
+      $("match").textContent = declared ? OS.reportLines(rows).join("\n") : "the sea's declared defaults could not be read from the bundle, so no comparison is printed";
+    } catch (e) { $("match").textContent = "the comparison could not be computed: " + String((e && e.message) || e); }
+  })();
+  begin();
+</script>
+</body>
+</html>

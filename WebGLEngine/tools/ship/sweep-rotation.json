@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it. `poolHorizon` (v4816) is the stamp of the first pool entry that run did NOT take: it reached every entry stamped earlier and none stamped at or after it.",
- "at": "2026-10-21T08:58:30.294Z",
+ "at": "2026-10-21T11:54:59.127Z",
  "poolAt": "2026-10-20T17:22:34.460Z",
  "poolHorizon": "2026-10-19T20:27:51.134Z",
  "budgetMs": 3000,
@@ -4477,6 +4477,12 @@
    "at": "2026-10-10T22:54:28.625Z"
   },
   {
+   "gate": "tools/ship/oceanSeaPage-selfcheck.mjs",
+   "ms": 23963,
+   "code": 0,
+   "at": "2026-10-21T11:54:59.127Z"
+  },
+  {
    "gate": "tools/ship/orphanDisposition-selfcheck.mjs",
    "ms": 84739,
    "code": 0,
@@ -5698,6 +5704,12 @@
    "ms": 513,
    "code": 0,
    "at": "2026-10-20T22:54:26.086Z"
+  },
+  {
+   "gate": "ui/oceanSea-selfcheck.mjs",
+   "ms": 67,
+   "code": 0,
+   "at": "2026-10-21T11:54:34.973Z"
   },
   {
    "gate": "ui/oceanTier-selfcheck.mjs",

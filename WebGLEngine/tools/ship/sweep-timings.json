@@ -2196,7 +2196,9 @@
   "tools/ship/orphanSets-selfcheck.mjs": 361,
   "tools/ship/recordProbe-selfcheck.mjs": 2496,
   "tools/ship/relativeBudget-selfcheck.mjs": 1188,
-  "ui/oceanTier-selfcheck.mjs": 133
+  "ui/oceanTier-selfcheck.mjs": 133,
+  "ui/oceanSea-selfcheck.mjs": 67,
+  "tools/ship/oceanSeaPage-selfcheck.mjs": 23963
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -4269,7 +4271,9 @@
   "tools/ship/orphanSets-selfcheck.mjs": 0,
   "tools/ship/recordProbe-selfcheck.mjs": 0,
   "tools/ship/relativeBudget-selfcheck.mjs": 0,
-  "ui/oceanTier-selfcheck.mjs": 0
+  "ui/oceanTier-selfcheck.mjs": 0,
+  "ui/oceanSea-selfcheck.mjs": 0,
+  "tools/ship/oceanSeaPage-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-10-21T09:27:24.453Z",
@@ -6342,7 +6346,9 @@
   "tools/ship/orphanSets-selfcheck.mjs": "2026-10-21T09:27:24.453Z",
   "tools/ship/recordProbe-selfcheck.mjs": "2026-10-21T09:27:24.453Z",
   "tools/ship/relativeBudget-selfcheck.mjs": "2026-10-21T09:27:24.453Z",
-  "ui/oceanTier-selfcheck.mjs": "2026-10-21T09:27:24.453Z"
+  "ui/oceanTier-selfcheck.mjs": "2026-10-21T09:27:24.453Z",
+  "ui/oceanSea-selfcheck.mjs": "2026-10-21T11:54:34.973Z",
+  "tools/ship/oceanSeaPage-selfcheck.mjs": "2026-10-21T11:54:59.127Z"
  },
  "capAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 20000,
@@ -8390,7 +8396,9 @@
   "tools/ship/orphanSets-selfcheck.mjs": 20000,
   "tools/ship/recordProbe-selfcheck.mjs": 20000,
   "tools/ship/relativeBudget-selfcheck.mjs": 20000,
-  "ui/oceanTier-selfcheck.mjs": 20000
+  "ui/oceanTier-selfcheck.mjs": 20000,
+  "ui/oceanSea-selfcheck.mjs": 60000,
+  "tools/ship/oceanSeaPage-selfcheck.mjs": 120000
  },
  "finished": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": true,
@@ -10458,7 +10466,9 @@
   "tools/ship/orphanSets-selfcheck.mjs": true,
   "tools/ship/recordProbe-selfcheck.mjs": true,
   "tools/ship/relativeBudget-selfcheck.mjs": true,
-  "ui/oceanTier-selfcheck.mjs": true
+  "ui/oceanTier-selfcheck.mjs": true,
+  "ui/oceanSea-selfcheck.mjs": true,
+  "tools/ship/oceanSeaPage-selfcheck.mjs": true
  },
  "crossings": {
   "brain/gunnerPolicy-selfcheck.mjs": 2,
@@ -12655,7 +12665,9 @@
   "tools/ship/relativeBudget-selfcheck.mjs": 430,
   "tools/ship/backlogIntegrity-selfcheck.mjs": 64,
   "tools/ship/orphanSets-selfcheck.mjs": 92,
-  "ui/oceanTier-selfcheck.mjs": 66
+  "ui/oceanTier-selfcheck.mjs": 66,
+  "ui/oceanSea-selfcheck.mjs": 67,
+  "tools/ship/oceanSeaPage-selfcheck.mjs": 23963
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-10-21T08:57:00.373Z",
@@ -14619,7 +14631,9 @@
   "tools/ship/relativeBudget-selfcheck.mjs": "2026-10-21T03:19:31.832Z",
   "tools/ship/backlogIntegrity-selfcheck.mjs": "2026-10-21T01:37:11.099Z",
   "tools/ship/orphanSets-selfcheck.mjs": "2026-10-21T01:37:11.099Z",
-  "ui/oceanTier-selfcheck.mjs": "2026-10-21T08:58:30.294Z"
+  "ui/oceanTier-selfcheck.mjs": "2026-10-21T08:58:30.294Z",
+  "ui/oceanSea-selfcheck.mjs": "2026-10-21T11:54:34.973Z",
+  "tools/ship/oceanSeaPage-selfcheck.mjs": "2026-10-21T11:54:59.127Z"
  },
  "serialRing": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": [
@@ -24290,6 +24304,12 @@
   "ui/oceanTier-selfcheck.mjs": [
    63,
    66
+  ],
+  "ui/oceanSea-selfcheck.mjs": [
+   67
+  ],
+  "tools/ship/oceanSeaPage-selfcheck.mjs": [
+   23963
   ]
  },
  "contended": {
@@ -26254,7 +26274,9 @@
   "tools/ship/orphanSets-selfcheck.mjs": true,
   "tools/ship/recordProbe-selfcheck.mjs": false,
   "tools/ship/relativeBudget-selfcheck.mjs": true,
-  "ui/oceanTier-selfcheck.mjs": true
+  "ui/oceanTier-selfcheck.mjs": true,
+  "ui/oceanSea-selfcheck.mjs": false,
+  "tools/ship/oceanSeaPage-selfcheck.mjs": false
  },
  "kinds": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "loaded",
@@ -28327,7 +28349,9 @@
   "tools/ship/orphanSets-selfcheck.mjs": "loaded",
   "tools/ship/recordProbe-selfcheck.mjs": "alone",
   "tools/ship/relativeBudget-selfcheck.mjs": "loaded",
-  "ui/oceanTier-selfcheck.mjs": "loaded"
+  "ui/oceanTier-selfcheck.mjs": "loaded",
+  "ui/oceanSea-selfcheck.mjs": "alone",
+  "tools/ship/oceanSeaPage-selfcheck.mjs": "alone"
  },
  "boxScale": {
   "2026-10-21T01:37:11.099Z": {
