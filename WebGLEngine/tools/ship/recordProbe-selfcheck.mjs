@@ -227,7 +227,8 @@ sec("6. *** IT WRITES TO TRACKED SOURCE, SO THE RESTORE IS AUDITED RATHER THAN A
     const src = fs.readFileSync(path.join(ENG, "tools", "ship", "recordProbe.mjs"), "utf8");
     ok("!! *** every touched file is verified byte-for-byte, and a failure THROWS instead of reporting ***",
         /RESTORE FAILED for/.test(src) && /FILES LEFT MODIFIED/.test(src) &&
-        /touched\.has\(file\)\) touched\.set\(file, src\)/.test(src),
+        // v4891: and journalled in the same statement, before the first mutation (see S11)
+        /touched\.has\(file\)\) \{ touched\.set\(file, src\); writeJournal\(root, touched, pending\); \}/.test(src),
         `at any instant during a run one tracked record is corrupted on disk, and git status cannot tell ` +
         `that from somebody's work in progress. The original bytes of every touched file are held and ` +
         `re-checked at the end; a run that cannot restore refuses to hand back results at all.`);
@@ -337,14 +338,63 @@ sec("6. *** IT WRITES TO TRACKED SOURCE, SO THE RESTORE IS AUDITED RATHER THAN A
         // ONE guardian's runtime, not by zero. The first cut of this row busy-waited and read the file before
         // the child could act, and reported a working restore as broken.
         await once(child, "exit");
-        const restored = fs.readFileSync(path.join(tmp, recFile), "utf8") === original;
-        say(`corruption observed mid-run: ${sawCorruption}; restored after SIGTERM: ${restored}`);
-        ok("!! *** a run killed WHILE a file is corrupted still restores it ***",
-            sawCorruption && restored,
+        // v4891: on Windows the kill is TerminateProcess and no handler runs, so the restore there is the journal's, on the
+        // next probe over the same tree -- asked here directly. On POSIX the handler restored it and left no journal.
+        const byHandler = fs.readFileSync(path.join(tmp, recFile), "utf8") === original;
+        const journalLeft = fs.existsSync(RP.journalPath(tmp)), rec = RP.recoverInterrupted(tmp);
+        const restored = fs.readFileSync(path.join(tmp, recFile), "utf8") === original && !fs.existsSync(RP.journalPath(tmp));
+        say(`corruption observed mid-run: ${sawCorruption}; restored by the signal handler: ${byHandler}; journal left: ${journalLeft}; restored after recovery: ${restored} (${rec.restored.length} file(s) put back from the journal)`);
+        ok("!! *** a run killed WHILE a file is corrupted still restores it -- by its handler where one runs, by its journal where none can ***",
+            sawCorruption && restored && (process.platform === "win32" ? true : byHandler && !journalLeft),
             `the kill is delivered only after the corruption is SEEN on disk, so this cannot pass by racing ` +
             `ahead of the mutation, and the wait is on the child's ACTUAL exit rather than a timer. Without the ` +
             `handler the sentinel survives -- which is how one reached tools/ship/orphanSets.mjs during this ` +
             `round, where git status could not tell it from somebody's work in progress.`);
+
+        // SABOTAGED v4891, by the byte-safe runner (render/denoiser-arc-handoff.md), each restored sha-256 identical:
+        //   P1 no journal written -> 1 red (S11); P2 probe() not recovering first -> 1 red (S11); P3 recovery leaving the
+        //   journal -> 1 red (S12); P4 a clean end leaving the journal -> 1 red (S10); P5 recovery restoring an edited file
+        //   -> 1 red (S12); P6 the pending write never journalled -> 0 RED at first, 1 red after S11 read the journal's
+        //   entry; P7 a torn write not recognised -> 2 red (S11, S12).
+        // *** S11 (v4891): THE KILL NO HANDLER SURVIVES -- SIGKILL here, which is what every kill is on Windows. ***
+        // The rig's win32 run of the row above went red: TerminateProcess runs nothing in the dying process. This drives
+        // that case on every platform -- the journal written before the first mutation is what puts the tree back, and
+        // the next probe() over it does so before measuring anything.
+        fs.writeFileSync(path.join(tmp, recFile), original);
+        const child2 = spawn(process.execPath, [driver], { stdio: "ignore" });
+        let saw2 = false;
+        const deadline2 = Date.now() + 3000;
+        while (Date.now() < deadline2) {
+            if (fs.readFileSync(path.join(tmp, recFile), "utf8") !== original) { saw2 = true; break; }
+        }
+        child2.kill("SIGKILL");
+        await once(child2, "exit");
+        const left2 = fs.readFileSync(path.join(tmp, recFile), "utf8") !== original, journal2 = fs.existsSync(RP.journalPath(tmp));
+        // and the journal carries the bytes the probe was writing, not only the original (P6 -- the pending write never
+        // journalled -- went 0 RED before this: the kill lands on a torn, empty file, and empty is a prefix of anything)
+        let pend2 = false; try { const e = JSON.parse(fs.readFileSync(RP.journalPath(tmp), "utf8")).files[path.join(tmp, recFile)]; pend2 = !!e && e.cur !== e.orig && e.orig === original; } catch {}
+        // the NEXT probe over the tree is what recovers it -- asked with no records, so recovery is all it does
+        RP.probe({ root: tmp, records: [] });
+        const back2 = fs.readFileSync(path.join(tmp, recFile), "utf8") === original && !fs.existsSync(RP.journalPath(tmp));
+        say(`SIGKILL: corruption observed ${saw2}; left corrupted by the kill ${left2}; journal on disk ${journal2}, holding the pending write ${pend2}; put back by the next probe ${back2}`);
+        ok("!! *** a run killed with NO handler able to run (SIGKILL; every kill on Windows) leaves a journal, and the next probe puts the tree back from it ***",
+            saw2 && left2 && journal2 && pend2 && back2,
+            `the kill left the record corrupted, as it must when nothing in the process runs, and recoverInterrupted -- which ` +
+            `probe() calls before it measures anything -- restored it from the journal written before the first mutation.`);
+
+        // *** S12 (v4891): THE JOURNAL RESTORES ONLY THE PROBE'S OWN WRITE, AND IS GONE AFTERWARDS. *** Driven on a journal
+        // written here in the module's own shape: one file still holding the probe's write, one edited by somebody since.
+        const fA = path.join(tmp, "a.mjs"), fB = path.join(tmp, "b.mjs");
+        const fC = path.join(tmp, "c.mjs");
+        fs.writeFileSync(fA, "probe's write\n"); fs.writeFileSync(fB, "somebody's later edit\n"); fs.writeFileSync(fC, "probe's");
+        fs.writeFileSync(RP.journalPath(tmp), JSON.stringify({ root: tmp, files: { [fA]: { orig: "a original\n", cur: "probe's write\n" }, [fB]: { orig: "b original\n", cur: "probe's write\n" },
+                                                                             [fC]: { orig: "c original\n", cur: "probe's write\n" } } }));
+        const r12 = RP.recoverInterrupted(tmp);
+        ok("!! *** recovery puts back the file that holds the probe's write and the one holding a TORN prefix of it, leaves the one edited since, and deletes the journal ***",
+            fs.readFileSync(fA, "utf8") === "a original\n" && fs.readFileSync(fB, "utf8") === "somebody's later edit\n" && fs.readFileSync(fC, "utf8") === "c original\n" &&
+            JSON.stringify(r12) === JSON.stringify({ restored: ["a.mjs", "c.mjs"], skipped: ["b.mjs"] }) && !fs.existsSync(RP.journalPath(tmp)) &&
+            JSON.stringify(RP.recoverInterrupted(tmp)) === JSON.stringify({ restored: [], skipped: [] }),
+            `${JSON.stringify(r12)}. A stale journal replayed blindly would put old source over new work; the second call finds no journal at all.`);
     } finally {
         fs.rmSync(tmp, { recursive: true, force: true });
     }

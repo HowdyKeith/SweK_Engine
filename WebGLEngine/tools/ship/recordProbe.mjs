@@ -38,7 +38,9 @@
 // the direction that makes this round look important, which is the direction to be most careful about.
 "use strict";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import * as FR from "./frozenRecords.mjs";
@@ -298,20 +300,65 @@ const runGate = (gate, root, capMs) => {
  * cleanly. It is idempotent, synchronous (an async restore in an exit handler does not finish) and it runs on
  * SIGINT, SIGTERM, an uncaught throw and a plain exit alike.
  */
-function armRestore(touched) {
+/**
+ * *** v4891 -- AND ON WINDOWS NO HANDLER RUNS AT ALL, SO THE RESTORE ALSO TRAVELS IN A JOURNAL. ***
+ *
+ * MEASURED on the rig (win32, a fresh clone of v4891): the gate's kill row went red, because on Windows
+ * `kill("SIGTERM")` is TerminateProcess -- the process is ended outright and no signal handler, exit handler or
+ * finally block in it runs. A probe killed there left its corruption in tracked source, which is the v4675
+ * defect again on a platform the handler cannot reach. So each touched file's ORIGINAL bytes are written to a
+ * journal (one per tree, in the temp directory) BEFORE its first mutation, synchronously, and the journal is
+ * deleted only once every file reads back clean. The next probe() over the same tree restores whatever a hard
+ * kill left behind before it measures anything; recoverInterrupted() does the same on its own.
+ *
+ * *** AND IT RESTORES ONLY WHAT IS STILL THE PROBE'S OWN WRITE. *** The journal also carries the bytes the probe
+ * was about to write (`cur`), set before each mutation. A file that no longer holds exactly those bytes was edited
+ * by somebody after the kill, and putting the journal's original over it would destroy their work -- so it is left
+ * alone and reported as `skipped`. Without this a stale journal replays old source over new. A PREFIX of those bytes
+ * counts as the probe's write too: a kill inside writeFileSync leaves the file torn, empty or cut short.
+ */
+export const journalPath = (root = ENG) =>
+    path.join(os.tmpdir(), `swek-recordProbe-journal-${createHash("sha256").update(path.resolve(root)).digest("hex").slice(0, 16)}.json`);
+function writeJournal(root, touched, cur = new Map()) {
+    const files = Object.fromEntries([...touched].map(([f, orig]) => [f, { orig, cur: cur.has(f) ? cur.get(f) : orig }]));
+    fs.writeFileSync(journalPath(root), JSON.stringify({ root: path.resolve(root), files }));
+}
+/**
+ * Restore every file a killed probe over `root` left holding its own write, from the journal; the journal is then
+ * gone. { restored, skipped }: relative paths put back, and paths left alone because they changed after the kill.
+ */
+export function recoverInterrupted(root = ENG) {
+    const jp = journalPath(root);
+    let j = null; try { j = JSON.parse(fs.readFileSync(jp, "utf8")); } catch { return { restored: [], skipped: [] }; }
+    const restored = [], skipped = [];
+    for (const [f, e] of Object.entries((j && j.files) || {})) {
+        try {
+            const now = fs.readFileSync(f, "utf8");
+            if (now === e.orig) continue;
+            // the probe's write, or a TORN one -- a kill inside writeFileSync leaves a prefix of it, an empty file included
+            // (measured: the gate's watcher reads mid-write and kills there). An edit made after the kill is neither.
+            if (e.cur.startsWith(now)) { fs.writeFileSync(f, e.orig); restored.push(path.relative(root, f)); } else skipped.push(path.relative(root, f));
+        } catch { /* best effort */ }
+    }
+    try { fs.unlinkSync(jp); } catch { /* already gone */ }
+    return { restored, skipped };
+}
+function armRestore(touched, root = ENG) {
     let done = false;
     const restore = () => {
         if (done) return; done = true;
+        let clean = true;
         for (const [f, orig] of touched) {
-            try { if (fs.readFileSync(f, "utf8") !== orig) fs.writeFileSync(f, orig); } catch { /* best effort */ }
+            try { if (fs.readFileSync(f, "utf8") !== orig) fs.writeFileSync(f, orig); } catch { clean = false; /* best effort */ }
         }
+        if (clean) try { fs.unlinkSync(journalPath(root)); } catch { /* none written */ }
     };
     const onSignal = (sig) => { restore(); process.removeListener(sig, onSignal); process.kill(process.pid, sig); };
     process.on("exit", restore);
     process.on("SIGINT", onSignal);
     process.on("SIGTERM", onSignal);
     process.on("uncaughtException", (e) => { restore(); throw e; });
-    return () => { process.removeListener("exit", restore); };
+    return () => { process.removeListener("exit", restore); try { fs.unlinkSync(journalPath(root)); } catch { /* none written */ } };
 }
 
 // round 22: `perturbWith` replaces perturb() -- the gate's seam for a mutation that breaks the parse, which perturb() no longer makes
@@ -327,6 +374,8 @@ export function probe({ records = null, root = ENG, capMs = 180000, onProgress =
     // A gate's frozen value is an example of a record, never a record: nothing in the tree depends on it, and
     // corrupting one asks no question worth an answer. Same law as v3223's "a register of orphans is not a
     // consumer of them", one shape over. Callers that pass `records` explicitly keep whatever they asked for.
+    // v4891: a probe killed outright (TerminateProcess on Windows) left its journal; put that tree back first
+    recoverInterrupted(root);
     const all = records || defaultRecords();
     // *** THE BASELINE IS TAKEN BEFORE ANYTHING IS CORRUPTED, AND THE FIRST DRAFT TOOK IT LAZILY INSIDE THE
     // MUTATION LOOP. *** That is an ordering bug with an inverted result: a gate first encountered while some
@@ -344,12 +393,13 @@ export function probe({ records = null, root = ENG, capMs = 180000, onProgress =
     const base = (g) => baseline.get(g) || { code: 1, killed: false };
     const rows = [];
     const touched = new Map();                       // file -> original bytes, for the restore audit
-    const disarm = armRestore(touched);
+    const pending = new Map();                       // file -> the bytes about to be written, journalled first (v4891)
+    const disarm = armRestore(touched, root);
     let done = 0;
     for (const rec of all) {
         const file = path.join(root, rec.file);
         const src = fs.readFileSync(file, "utf8");
-        if (!touched.has(file)) touched.set(file, src);
+        if (!touched.has(file)) { touched.set(file, src); writeJournal(root, touched, pending); }
         const idx = declarationOf(src, rec.name);
         const { body, balanced } = idx < 0 ? { body: null, balanced: false } : FR.recordBody(src, idx);
         const guardians = rec.guardians || [];
@@ -365,6 +415,8 @@ export function probe({ records = null, root = ENG, capMs = 180000, onProgress =
         for (const kind of (kinds || row.kinds)) {
             const p = (perturbWith || perturb)(body, kind);
             if (!p) continue;
+            // v4891: the bytes about to be written go in the journal first, so a recovery can tell them from a later edit
+            pending.set(file, src.slice(0, idx) + p.body + src.slice(idx + body.length)); writeJournal(root, touched, pending);
             fs.writeFileSync(file, src.slice(0, idx) + p.body + src.slice(idx + body.length));
             // *** ROUND 22: A CORRUPTION THAT BREAKS THE PARSE IS NOT A CORRUPTION OF THE RECORD. *** Every gate
             // importing the file fails on the SyntaxError, which says the module cannot load and nothing about
