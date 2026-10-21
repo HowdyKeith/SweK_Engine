@@ -114,7 +114,7 @@ console.log("\n6. NOTHING IN THE ENGINE IMPORTS THEM YET");
     })(ENG);
     // v4895 step 2: the patch layer (tools/ship/seaPatch.mjs and its generated seaMain.mjs, which imports the wgsl modules by absolute path) and the two gates that READ the sources are
     // the only files that name them; no page loads them, and the opt-in page still loads the single-file bundle
-    const ALLOWED = ["tools/ship/seaPatch-selfcheck.mjs", "tools/ship/seaPatch.mjs", "ui/oceanLiveTune-selfcheck.mjs", "world/ocean/seaMain.mjs", "world/ocean/seaOceanWgsl.mjs"];
+    const ALLOWED = ["tools/ship/seaPatch-selfcheck.mjs", "tools/ship/seaPatch.mjs", "ui/oceanLiveTune-selfcheck.mjs", "ui/seaFrame-selfcheck.mjs", "world/ocean/seaMain.mjs", "world/ocean/seaOceanWgsl.mjs"];
     ok("  only the patch layer and the gates that read the sources name the vendored sources: no page loads them, and the opt-in page still loads the single-file bundle", JSON.stringify(hits.sort()) === JSON.stringify(ALLOWED), hits.join(", ") || "0 importers");
 }
 

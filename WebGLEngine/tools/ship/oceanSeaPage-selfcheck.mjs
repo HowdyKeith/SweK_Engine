@@ -6,7 +6,7 @@
 // reading of the sea's own HUD says it holds the frame budget. The pure half is graded in ui/oceanSea-selfcheck.mjs; this gate grades the PAGE.
 //   1  THE PAGE'S SOURCE   it imports the tier and sea modules and the physics surface; never turns data into markup; every reading reaches the DOM through textContent; loads
 //                          nothing from outside; builds the sea's URL only through seaUrl(); carries the origin notice and the demo: meta tags; says what it is NOT
-//   2  THE LIVE PAGE       (needs a browser; SKIPPED, and said, without one) SEVEN SCENARIOS IN PARALLEL (the seventh, v4895, has the sea's real panel code in its stand-in and checks the live retune), each with navigator.gpu stood in and the sea's frame replaced by a stand-in page
+//   2  THE LIVE PAGE       (needs a browser; SKIPPED, and said, without one) EIGHT SCENARIOS IN PARALLEL (the seventh, v4895, has the sea's real panel code in its stand-in and checks the live retune; the eighth stands in for the PATCHED host's seaApi and checks the realized-height readout), each with navigator.gpu stood in and the sea's frame replaced by a stand-in page
 //                          that prints a HUD line in the sea's own format -- the sandbox has no WebGPU adapter, so this grades the PAGE'S LOGIC against a frame, and says it is not the sea:
 //                          a fast GPU under auto (probed, kept, remembered, and NOT probed again on reload); a slow one under auto (probed, unloaded, the reason names the reading);
 //                          the same slow one under on (kept, and says how slow); no WebGPU (the frame is never requested); off (the frame is never requested); a sea that prints nothing
@@ -18,6 +18,7 @@
 // SABOTAGE LOG -- each applied in place, the gate run with a real browser, the file restored and md5-compared; every one red by name (number of rows red):
 //   P1 a slow sea is never unloaded 1 | P2 the reading is not remembered 1 | P3 a remembered reading is ignored 1 | P4 off still loads the sea 2 | P5 the give-up branch removed 1
 //   P9 (v4895) the page never retunes live, always reloads 2 (the live-tune rows) |
+//   P10 (v4895) the patched source never loads the host (always the bundle) 2 | (log: measured with the seventh and eighth scenarios)
 //   P6 no-WebGPU claims WebGPU 1 | P7 the page reaches into the frame (contentWindow) 1 | P8 a frame time compared to a number of the page's own 1 (that mutation was also a syntax error, so it
 //   proves less than the others: the source row that reads for it was exercised only in company)
 "use strict";
@@ -48,8 +49,8 @@ console.log("1. THE PAGE'S SOURCE");
     ok("!! the page imports the tier switch, the sea module and the physics surface from the engine's own paths",
         /import \* as OT from "\/ui\/oceanTier\.mjs"/.test(code) && /import \* as OS from "\/ui\/oceanSea\.mjs"/.test(code) && /import \{ defaultSurface \} from "\/physics\/ocean\/oceanSurface\.mjs"/.test(code)
         && ["ui/oceanTier.mjs", "ui/oceanSea.mjs", "physics/ocean/oceanSurface.mjs"].every((f) => fs.existsSync(path.join(ENG, f))));
-    ok("!! the sea is loaded ONLY through seaUrl(): the page spells no path to the bundle and no query string of its own", /state\.seaSrc = OS\.seaUrl\(/.test(js) && /sea\.src = state\.seaSrc/.test(js) && !/vendor\/web-ocean/.test(js) && !/["'`][^"'`]*\?[a-z]+=/.test(js.replace(/\$\{[^}]*\}/g, "")));
-    ok("!! the page never edits the bundle: no srcdoc, no contentWindow.eval, no postMessage into the frame, and the frame is only READ (its HUD text)", !/srcdoc|contentWindow|\.eval\(|postMessage/.test(js) && /contentDocument/.test(js));
+    ok("!! the sea is loaded ONLY through seaUrl() or hostUrl() (which is seaUrl on the host page): the page spells no path to the bundle and no query string of its own", /state\.seaSrc = \(srcSel\.value === "patched" \? SF\.hostUrl : OS\.seaUrl\)\(/.test(js) && /sea\.src = state\.seaSrc/.test(js) && !/vendor\/web-ocean/.test(js) && !/["'`][^"'`]*\?[a-z]+=/.test(js.replace(/\$\{[^}]*\}/g, "")));
+    ok("!! the page never edits the bundle: no srcdoc, no eval, no postMessage into the frame, the frame's HUD is only READ, and the one thing reached in the PATCHED host is its published handle (contentWindow.seaApi, nothing else of contentWindow)", !/srcdoc|\.eval\(|postMessage/.test(js) && /contentDocument/.test(js) && (js.match(/contentWindow/g) || []).length === 2 && (js.match(/contentWindow && sea\.contentWindow\.seaApi/g) || []).length === 1);
     const hits = ["innerHTML", "outerHTML", "insertAdjacentHTML", "document.write", "eval(", "new Function", "setAttribute(\"on", "srcdoc"].filter((w) => body.includes(w));
     ok("!! the page NEVER turns data into markup", hits.length === 0, hits.join(", "));
     ok("!! every status line and reading reaches the DOM through textContent (banner, fallback, comparison, adapter chip)", /banner\.textContent\s*=/.test(js) && /fallback\.textContent\s*=/.test(js) && /\$\("match"\)\.textContent\s*=/.test(js) && /\$\("gpuWord"\)\.textContent\s*=/.test(js));
@@ -97,6 +98,15 @@ console.log("\n2. THE LIVE PAGE");
             if (!noWebgpu && cfg) await ctx.addInitScript((info) => { Object.defineProperty(navigator, "gpu", { configurable: true, value: { requestAdapter: async () => ({ info, isFallbackAdapter: false, features: new Set() }) } }); }, cfg.info);
             if (pref) await ctx.addInitScript((p) => { try { localStorage.setItem("swek.ocean.tier", p); } catch {} }, pref);
             const frameRequests = [];
+            await ctx.route("**/sea-host.html*", (route) => {
+                // the PATCHED host: a stand-in that publishes a seaApi like the real one (ready, setPoints, a heights array refilled every 150 ms from a fixed pattern of sigma 0.6) and prints the HUD line
+                if (!route.request().isNavigationRequest()) return route.continue();
+                frameRequests.push(route.request().url());
+                return route.fulfill({ status: 200, contentType: "text/html", body: standIn(cfg ? cfg.line : "1 fps  1000.00 ms", true) + `<script>
+                    window.seaApi = { ready: true, count: 0, points: new Float32Array(128), heights: new Float32Array(64), heightFrame: -1, setPoints(a) { this.count = Math.min(64, a.length / 2); this.set = Array.from(a); return this.count; } };
+                    let f = 0; setInterval(() => { f += 8; for (let i = 0; i < 64; i++) window.seaApi.heights[i] = 0.6 * ((i % 2 ? 1 : -1) * (1 + (i % 5) * 0.1) * Math.cos(f * 0.37 + i)); window.seaApi.heightFrame = f; }, 150);
+                </script>` });
+            });
             await ctx.route("**/vendor/web-ocean/ocean.html*", (route) => {
                 // the frame is a NAVIGATION; the page's own fetch of the bundle's text (for the declared defaults) is not, and gets the real file
                 if (route.request().isNavigationRequest()) { frameRequests.push(route.request().url()); return route.fulfill({ status: 200, contentType: "text/html", body: standIn(cfg ? cfg.line : "1 fps  1000.00 ms", panel) }); }
@@ -121,6 +131,7 @@ console.log("\n2. THE LIVE PAGE");
                 off: scenario({ gpu: "fast", pref: "off" }),
                 mute: scenario({ gpu: "mute", pref: "auto" }),
                 live: scenario({ gpu: "fast", pref: "auto", panel: true }),
+                patched: scenario({ gpu: "fast", pref: "on", panel: true }),
             };
             for (const k of Object.keys(run)) S[k] = await run[k];
             // the no-WebGPU and off pages answer at once; the others are measuring. Wait for each by what it must reach.
@@ -174,6 +185,16 @@ console.log("\n2. THE LIVE PAGE");
                 await until(lv.pg, () => window.__sea.settings === "defaults" && document.getElementById("sea").contentWindow.__P.swellHs === 1.8, 8000);
                 const d = await fr();
                 ok("  and choosing the defaults sets the sea's own declared values back (swellHs 1.8, swellLength 120) the same way, still with no reload", d.P.swellHs === 1.8 && d.P.swellLength === 120 && lv.frameRequests.length === nReq, JSON.stringify(d.P));
+            }
+            {   // v4895 step 3: the patched source -- the page loads sea-host.html, gives the sea 64 points, collects the heights it reads back and prints the sea's realized Hs
+                const pp = S.patched.pg;
+                await until(pp, () => window.__sea && window.__sea.loaded === true, 10000);
+                await pp.selectOption("#srcSel", "patched");
+                const got = await until(pp, () => window.__sea && window.__sea.realized, 20000);
+                const rz = await pp.evaluate(() => ({ src: window.__sea.seaSrc, realized: window.__sea.realized, text: document.getElementById("realized").textContent, set: document.getElementById("sea").contentWindow.seaApi.set && document.getElementById("sea").contentWindow.seaApi.set.length, req: 0 }));
+                ok("!! *** THE PATCHED SOURCE: choosing it loads sea-host.html (not the bundle), hands the sea 64 world points (128 numbers), and prints the sea's REALIZED significant height, computed from the heights the sea reports ***",
+                    got && /^\/sea-host\.html\?/.test(rz.src) && rz.set === 128 && rz.realized && rz.realized.points === 64 && rz.realized.sigma > 0.3 && rz.realized.sigma < 0.9 && Math.abs(rz.realized.hs - 4 * rz.realized.sigma) < 1e-9 && /Hs \(4 sigma\)/.test(rz.text), JSON.stringify({ src: rz.src, sigma: rz.realized && rz.realized.sigma, set: rz.set }));
+                ok("  and it says the physics surface is a different sea (the first figure of the GPU sea's own height exists; no agreement is claimed)", /a different sea/.test(rz.text) && /physics surface's total Hs/.test(rz.text));
             }
             const mDone = await settled(S.mute.pg, 40000);
             const m = await snap(S.mute.pg);

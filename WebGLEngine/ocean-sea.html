@@ -65,6 +65,10 @@
     <option value="defaults" selected>the sea's defaults</option>
     <option value="matched">matched to the physics sea (swell)</option>
   </select></label>
+  <label>sea source <select id="srcSel" title="bundle: upstream's single file, byte for byte. patched: the same code with SweK's recorded patches (sea-host.html), which lets this page read the sea's realized wave height from the GPU.">
+    <option value="bundle" selected>the vendored bundle</option>
+    <option value="patched">the patched source (reads heights)</option>
+  </select></label>
   <button id="retimeBtn" type="button">Time the sea again</button>
 </div>
 <div id="stage">
@@ -74,6 +78,7 @@
 </div>
 <footer>
   <pre id="match" class="small">comparing&hellip;</pre>
+  <pre id="realized" class="small"></pre>
   <div class="small">Ocean: web-ocean (github.com/noniv/web-ocean) by Maksymilian Dendura, MIT licence, vendored unmodified at vendor/web-ocean (see its LICENSE and PROVENANCE.txt).</div>
 </footer>
 <script type="module" src="/ui/originNotice.js"></script>
@@ -81,10 +86,11 @@
   import * as OT from "/ui/oceanTier.mjs";
   import * as OS from "/ui/oceanSea.mjs";
   import * as LT from "/ui/oceanLiveTune.mjs";
+  import * as SF from "/ui/seaFrame.mjs";
   import { defaultSurface } from "/physics/ocean/oceanSurface.mjs";
   import { adapterOptions } from "/ui/webgpuProbe.mjs";
   const $ = (id) => document.getElementById(id);
-  const sea = $("sea"), banner = $("banner"), fallback = $("fallback"), tierSel = $("tierSel"), setSel = $("setSel");
+  const sea = $("sea"), banner = $("banner"), fallback = $("fallback"), tierSel = $("tierSel"), setSel = $("setSel"), srcSel = $("srcSel");
   const state = { settings: "defaults", seaSrc: "", phase: "starting", webgpu: false, adapterLabel: "", adapterKind: "unknown", decision: null, probeMs: null, remembered: false, samples: [], loaded: false, error: "" };
   window.__sea = state;
   const storage = () => { try { return window.localStorage; } catch { return null; } };
@@ -102,7 +108,28 @@
   function showSea() { fallback.style.display = "none"; banner.style.display = "block"; }
   let stats = null, declared = null;
   const applied = () => (setSel.value === "matched" && stats ? OS.matchedTunables(stats) : null);
-  function load() { showSea(); const m = applied(); state.seaSrc = OS.seaUrl({ ui: 1, ...(m ? m.tunables : {}) }); sea.src = state.seaSrc; state.loaded = true; }
+  function load() { showSea(); const m = applied(); state.source = srcSel.value; state.seaSrc = (srcSel.value === "patched" ? SF.hostUrl : OS.seaUrl)({ ui: 1, ...(m ? m.tunables : {}) }); sea.src = state.seaSrc; state.loaded = true; startRealized(); }
+  // v4895: with the patched source the page asks the SEA for its heights: 64 world points, read back from the GPU a few frames late, collected over time into the sea's realized Hs.
+  // The only thing reached in the frame is the handle the host publishes (window.seaApi); the bundle is never reached into.
+  let rtimer = null, rounds = [], lastHF = -1, pointsSet = false;
+  const seaApi = () => { try { return sea.contentWindow && sea.contentWindow.seaApi || null; } catch { return null; } };
+  function startRealized() {
+    if (rtimer) { clearInterval(rtimer); rtimer = null; }
+    rounds = []; lastHF = -1; pointsSet = false; state.realized = null; $("realized").textContent = "";
+    if (srcSel.value !== "patched") return;
+    $("realized").textContent = "the patched sea is starting; its heights are read once it reports ready\u2026";
+    rtimer = setInterval(() => {
+      const api = seaApi();
+      if (!api || !api.ready) return;
+      if (!pointsSet) { api.setPoints(SF.gridPoints(8, 300)); pointsSet = true; }
+      if (api.heightFrame >= 0 && api.heightFrame !== lastHF) { lastHF = api.heightFrame; rounds.push(Float32Array.from(api.heights)); if (rounds.length > 120) rounds.shift(); }
+      const st = SF.realizedStats(rounds, api.count);
+      if (st) {
+        state.realized = st;
+        $("realized").textContent = SF.reportLines(st).join("\n") + "\nthe physics surface's total Hs by the same 4-sigma rule: " + (stats ? stats.hs.toFixed(2) + " m" : "?") + " (a different sea; the two are not expected to agree, and this is the first time the GPU sea's own figure exists)";
+      }
+    }, 400);
+  }
   function showMatch() {
     if (!stats || !declared) return;
     const m = applied(), rows = OS.matchRows(stats, declared, m ? m.tunables : {});
@@ -182,6 +209,7 @@
     return true;
   }
   setSel.addEventListener("change", () => { showMatch(); if (!liveApply()) begin(); });
+  srcSel.addEventListener("change", () => { begin(); });
   $("retimeBtn").addEventListener("click", () => { try { storage() && storage().removeItem(OS.PROBE_KEY); } catch { /* ignore */ } begin(); });
 
   (async () => {
