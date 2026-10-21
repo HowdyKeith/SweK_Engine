@@ -6471,3 +6471,61 @@ changes in this round: the page, the network, the filter, every kernel table, `f
 - **Eight frames are a quarter of FSR2's 32 phases at a 2x upscale.** The history ran on the first 8 Halton offsets.
 - **Nothing here is timed.** The accumulation is one reprojection, a 3 x 3 clamp and a blend a frame, and its cost on a GPU
   is the next round's to measure.
+
+## 97. ROUND 33 -- ROUND 32's HISTORY ON THE DEVICE, TIMED ON THE RIG AT 1920 x 1080: FIXED BEFORE THE RIG RUNS IT
+
+**Why this round.** Section 96's rule: both hypotheses were supported, so the accumulation goes to the device and is timed.
+Round 31 found the half-size chain cheaper than today's page at 1080p on both rigs (1.44-1.48 x on the GTX 1080, 1.38-1.54 x
+on the Intel gen-9). It also found the chain's own steps cost more than its network.
+
+> **At 1920 x 1080 output, on each GPU, is the half-size chain WITH round 32's history -- its first hits, the shift to the
+> unjittered grid, the accumulation and the composite after it -- still faster than today's page?**
+
+**What exists for it (committed before this section).**
+- `render/denoiseUpscaleGPU.mjs` gains four kernels, each held to its CPU reference by
+  `render/denoiseUpscaleGPU-selfcheck.mjs`'s section 6 on SwiftShader:
+  - `FIRSTHITS_WGSL`, against round 4's `firstHits`: no sphere flipped at either eye, position and normal within 1.7e-4;
+  - `SHIFT_WGSL`, against `shiftResample`;
+  - `ACCUM_WGSL`, against `accumulateUpscaled`: given the CPU's first hits, the history length within 3.1e-5 and the light
+    within 5.5e-7, clamped and not;
+  - `FINAL_WGSL`, against `compositeEmitters`: within 4.4e-7.
+- With its own first hits, the device's accumulation stays within 5.1e-5 of the CPU's history length and 2.6e-6 of its light.
+- The accumulation binds five storage buffers, inside the eight a default WebGPU device allows. The gate holds the kernel's
+  tolerances to round 4's, exactly. Sabotaged X1-X7: X5 is an equivalent mutant, named in the header, and X7 went 0 red until
+  the constants row.
+- `denoise.html`'s "Time the half-size chain" also times the history's four passes, and `timeHalfChain` returns their sum
+  with the chain as `temporal`. On a GPU the gate's section 4 prints them in a `section 97:` line.
+
+**The arms, at 1920 x 1080 output, on scene R 990000 as in section 93.**
+- **Today's page, `full`:** the network at 1920 x 1080 and its mask at 1920 x 1080, as in section 93.
+- **The chain with its history, `temporal`:** section 93's `half`, plus one frame of the history's four passes at 1920 x 1080.
+  A frame of the temporal upscale costs exactly that, once its history is warm.
+
+**The clocks:** as section 93's. The history's four passes are one pass each, so each is on the device's clock wherever the
+adapter offers timestamps.
+
+**The test.** On each GPU, two runs of `realGpuRun --only denoise`, at a commit carrying this section:
+- **H (per GPU):** `full / temporal` is above 1.0 in both runs.
+- **C1:** every denoise gate is green in both runs. That includes section 6's device rows, which hold the history to the CPU on
+  that GPU's own Chrome adapter.
+- **C2:** the fill reaches every pixel in its 96 rings.
+- **C3:** both networks and the history's four passes are on the device's clock.
+- **C4, reported:** the two runs' ratios and how far apart they are.
+
+**Predicted, before any of it ran on a GPU** (from section 94's ledger):
+- **The GTX 1080:** H holds, `full / temporal` between 1.3 and 1.5. The history's four passes are 1-4 ms together: one ray a
+  pixel where the coverage is 64, and three passes over 2 million pixels.
+- **The Intel gen-9:** H holds, between 1.25 and 1.55. Its four passes are 15-60 ms together.
+- **C1 and C2 hold** on both.
+
+**What each outcome does.**
+- **H holds on both GPUs:** a frame of the temporal upscale is cheaper than today's page at 1080p on both rigs. It was also
+  better at equal samples a frame at 256 x 256 (section 96). `denoise-halfres-page` then carries the history with the chain.
+  It still waits on `denoise-halfres-fixed-costs`, or on Keith's call.
+- **H fails on a GPU:** the history's passes are named from the run, and the backlog records what to make cheaper.
+- **Nothing changes in either case:** the page's own denoise, the network, the filter, every kernel table, and `fx/fsr`.
+
+**Seen first, here, on SwiftShader -- a CPU's times, deciding nothing:**
+- at the pilot size (128 x 72), the history's passes were 1.4 ms (first hits), 0.6 ms (shift), 2.8 ms (accumulation) and
+  0.6 ms (composite);
+- section 4's rows hold their sum to the chain's.

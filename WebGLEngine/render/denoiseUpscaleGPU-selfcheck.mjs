@@ -29,6 +29,18 @@
 //   T3  the page's table without the fill's row                        1 RED (the page row: 7 rows, not 8)
 //   T4  the full-size page timed from the half-size row                1 RED (the sum row). 0 RED at first: nothing held which
 //       ladder row each network time came from; the row now names both
+//   and section 6's accumulation on the device (round 33), by the same runner:
+//   X1  the accumulation kernel ignores its clamp                      3 RED (given the CPU's hits; the composite; with its own hits)
+//   X2  the history lengthens by two a frame                           3 RED (the same three)
+//   X3  the first hits' normal left unnormalised                       2 RED (the hits row; the accumulation with its own hits)
+//   X4  the shift kernel the wrong way                                 3 RED (the three accumulation rows)
+//   X5  frame 0 reprojected onto itself, not onto sky                  0 RED, AND IT IS AN EQUIVALENT MUTANT: the history starts at
+//       zero with n = 0, so whatever frame 0 finds is clamped into the current range and blended at n = 0 + 1 = 1 -- the current
+//       frame either way. The buffer of sky stays, so the rule is stated rather than relied on.
+//   X6  the temporal sum without the composite                         1 RED (the timing sum row)
+//   X7  the position tolerance at 30 footprints                        2 RED (the constants row; the uniform's layout row, which
+//       reads the tolerance at its offset). 0 RED at first: on smooth spheres
+//       a looser tolerance turns no tap valid; the row holding the kernel's constants to round 4's is the fix
 //   and section 5's verdict (section 94), by the same runner:
 //   V1  the rule asks one GPU, not both                                1 RED (the rule row)
 //   V2  a run counts at any commit                                     1 RED (the rule row: a stale run must leave it owed)
@@ -39,10 +51,10 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { runInEngineOrigin } from "../tools/ship/webgpuHarness.mjs";
 import { validateWgsl } from "./wgslSpec.mjs";
-import { COVERAGE_WGSL, FILL_RING_WGSL, FILL_LEFT_WGSL, TO_T_WGSL, COMPOSITE_WGSL, COVERAGE_GRID_WGSL, SPHERE_STRIDE, packSpheres, cameraUniform, DenoiseUpscaleGPU } from "./denoiseUpscaleGPU.mjs";
+import { COVERAGE_WGSL, FILL_RING_WGSL, FILL_LEFT_WGSL, TO_T_WGSL, COMPOSITE_WGSL, COVERAGE_GRID_WGSL, SPHERE_STRIDE, packSpheres, cameraUniform, DenoiseUpscaleGPU, TEMPORAL_CONSTANTS, GEO_STRIDE, FIRSTHITS_WGSL, SHIFT_WGSL, ACCUM_WGSL, FINAL_WGSL, accumUniform, packGeometry } from "./denoiseUpscaleGPU.mjs";
 import { fillEmitters, fillEmittersBounded, emitterAwareUpscale, GAMMA } from "./denoiseUpscale.mjs";
 import { emitterRadiance, COVERAGE_GRID } from "./denoiseMask.mjs";
 import { makeScene } from "./denoiseScenes.mjs";
@@ -93,7 +105,7 @@ const F1 = synth(24, 20, [[6, 6, 3.2], [17, 13, 5.5], [23, 1, 2]]);
 
 console.log("\n2. THE KERNELS");
 {
-    const ks = { COVERAGE_WGSL, FILL_RING_WGSL, FILL_LEFT_WGSL, TO_T_WGSL, COMPOSITE_WGSL };
+    const ks = { COVERAGE_WGSL, FILL_RING_WGSL, FILL_LEFT_WGSL, TO_T_WGSL, COMPOSITE_WGSL, FIRSTHITS_WGSL, SHIFT_WGSL, ACCUM_WGSL, FINAL_WGSL };
     const bad = Object.entries(ks).map(([k, s]) => [k, validateWgsl(s)]).filter(([, p]) => p.length);
     ok("every kernel validates against the spec scanner", !bad.length, bad.map(([k, p]) => `${k}: ${p.join("; ")}`).join(" | "));
     ok("  the constants the kernels carry are the CPU's: the coverage grid, the transfer's gamma, its top below the pole",
@@ -105,6 +117,12 @@ console.log("\n2. THE KERNELS");
         SPHERE_STRIDE === 8 && sp.length === S.scene.length * 8 && sp[em * 8 + 7] === 1 && sp[7] === 0 && sp[em * 8 + 4] === Math.fround(typeof S.scene[em].emit === "number" ? S.scene[em].emit : S.scene[em].emit[0]));
     let mesh = null; try { packSpheres([{ bvh: {} }]); } catch (e) { mesh = e.message; }
     ok("  ...and a scene with a mesh is refused by name -- the coverage kernel intersects spheres only", /spheres only/.test(mesh || ""));
+    // round 33: the accumulation's uniform (two cameras, then w h clamp frames, then the scales and tolerances) and the packed geometry
+    const au = new DataView(accumUniform(S, S.eye, S.eye, 32, 24).buffer), pg0 = packGeometry({ pos: [1, 2, 3], nrm: [0, 1, 0], obj: [4] }, 1);
+    ok("  round 33: the accumulation's uniform is the kernel's struct (five vec4, w h clamp frames, then prevScale aspect curScale posTol normalDot), and a pixel's geometry packs as GEO_STRIDE floats",
+        au.byteLength === 128 && au.getUint32(80, true) === 32 && au.getUint32(84, true) === 24 && au.getUint32(88, true) === 1 && au.getUint32(92, true) === 8 &&
+        Math.abs(au.getFloat32(100, true) - 32 / 24) < 1e-6 && au.getFloat32(108, true) === 3 && Math.abs(au.getFloat32(112, true) - 0.9) < 1e-7 &&
+        pg0.length === GEO_STRIDE && pg0[0] === 1 && pg0[4] === 1 && pg0[6] === 4);
     const cu = new DataView(cameraUniform(S, 32, 24, 6).buffer);
     ok("  the camera uniform's layout is the kernel's struct: four vec4, w h nSph grid, scale and aspect",
         cu.byteLength === 96 && cu.getUint32(64, true) === 32 && cu.getUint32(68, true) === 24 && cu.getUint32(72, true) === 6 && cu.getUint32(76, true) === 8 &&
@@ -214,10 +232,10 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
     if (pg.skipped) console.log("  SKIP  " + pg.reason);
     else {
         let J = null; try { J = JSON.parse(pg.result?.json || "null"); } catch {}
-        const st = J && J.chain && J.chain.steps, keys = ["covHalf", "covFull", "fill", "rest", "whole"];
+        const st = J && J.chain && J.chain.steps, keys = ["covHalf", "covFull", "fill", "rest", "whole", "hits", "shift", "accum", "final"];
         const fine = (x) => !!x && Number.isFinite(x.ms) && x.ms > 0 && (x.clock === "device" || x.clock === "wall");
         ok("!! the page timed every step of the chain and both networks at its pilot size -- each a positive time on a named clock, the table shown, no page error",
-            pg.ok && !!st && keys.every((k) => fine(st[k])) && fine(J.networkFull) && fine(J.networkHalf) && !!J.full && !!J.half && pg.result.shown && pg.result.rows === 9 && !pg.pageErrors.length,
+            pg.ok && !!st && keys.every((k) => fine(st[k])) && fine(J.networkFull) && fine(J.networkHalf) && !!J.full && !!J.half && !!J.temporal && pg.result.shown && pg.result.rows === 11 && !pg.pageErrors.length,
             pg.ok ? (pg.result?.status || "").slice(0, 200) : pg.reason);
         if (st) {
             // the network times are the ladder's rows, w x h then W x H (T4 went 0 RED before this held which was which); today's page
@@ -229,6 +247,11 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
                 J.networkFull.ms === med(fullRow) && J.networkHalf.ms === med(halfRow) && Math.abs(J.full.ms - (med(fullRow) + st.covFull.ms)) < 1e-9 && st.whole.clock === "wall" && J.chain.maxRings === 96 && J.chain.rings > 0 && J.chain.rings < 96 &&
                 J.chain.inView > 0 && JSON.stringify(J.scene) === JSON.stringify(["R", 990000]) && J.chain.W === 128 && J.chain.w === 64,
                 `${J.chain.rings} of 96 rings filled; ${J.chain.inView} px in view at 64 x 36; ${keys.map((k) => `${k} ${st[k].ms.toFixed(2)} ms (${st[k].clock})`).join(", ")}`);
+            // round 33: the chain with its history is the chain and round 32's four passes, each one pass on the device's clock where it has one
+            const hist = ["hits", "shift", "accum", "final"];
+            ok("  round 33: the chain with its history is the half-size chain plus the history's four passes -- first hits, shift, accumulation, composite -- each one pass, on the device's clock where the device has one",
+                !!J.temporal && Math.abs(J.temporal.ms - (J.half.ms + hist.reduce((a, k) => a + st[k].ms, 0))) < 1e-9 && hist.every((k) => st[k].clock === st.covHalf.clock),
+                hist.map((k) => `${k} ${st[k].ms.toFixed(2)} ms (${st[k].clock})`).join(", "));
         }
         // ON A GPU, THE RIG'S SIZE (pre-registration section 93): 960 x 540 -> 1920 x 1080, every step a measured line the rig's
         // report keeps. Not on a software adapter: SwiftShader's 1080p would be minutes of a CPU's time that decides nothing.
@@ -239,7 +262,7 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
             let K = null; try { K = JSON.parse(rg.result?.json || "null"); } catch {}
             const ks = K && K.chain && K.chain.steps;
             ok("!! section 93: at 1920 x 1080 the page timed both networks and every step of the chain, the fill reaching every pixel in its 96 rings",
-                rg.ok && !!ks && keys.every((k) => fine(ks[k])) && fine(K.networkFull) && fine(K.networkHalf) && !!K.full && !!K.half && K.chain.rings > 0 && K.chain.rings < 96 && !rg.pageErrors.length,
+                rg.ok && !!ks && keys.every((k) => fine(ks[k])) && fine(K.networkFull) && fine(K.networkHalf) && !!K.full && !!K.half && !!K.temporal && K.chain.rings > 0 && K.chain.rings < 96 && !rg.pageErrors.length,
                 rg.ok ? (rg.result?.status || "").slice(0, 200) : rg.reason);
             if (ks) {
                 const row = (x) => (x.skipped ? `not measured (${x.reason})` : `${(x.gpu ? x.gpu.median : x.wall.median).toFixed(3)} ms (${x.gpu ? "device" : "wall"})`), [lh, lf] = K.ladder.rows[K.kernels];
@@ -247,6 +270,9 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
                     (K.full && K.half ? `today's page (network and mask) ${K.full.ms.toFixed(3)} ms (${K.full.clocks.join(" + ")}); the half-size chain ${K.half.ms.toFixed(3)} ms (${K.half.clocks.join(" + ")}); ratio ${(K.full.ms / K.half.ms).toFixed(3)} x` : "no ratio: a part was not measured"));
                 say("section 93: the chain's steps -- " + ["covHalf", "covFull", "fill", "rest", "whole"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; ") +
                     `; ${K.chain.rings} of 96 rings filled`);
+                // round 33 (section 97): the history's passes and the chain with them, in a line of their own -- section 94 reads the two above
+                say("section 97: the history's passes -- " + ["hits", "shift", "accum", "final"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; ") +
+                    (K.full && K.temporal ? `; the half-size chain with its history ${K.temporal.ms.toFixed(3)} ms (${K.temporal.clocks.join(" + ")}); ratio ${(K.full.ms / K.temporal.ms).toFixed(3)} x` : "; no ratio: a part was not measured"));
             }
         }
     }
@@ -302,6 +328,65 @@ console.log("\n5. SECTION 94: ROUND 31'S VERDICT, RE-DERIVED FROM THE FOUR REPOR
         `Intel ratio ${I.map((r) => r.ratio).join(", ")} (2.0-4.0 predicted); 1080 coverage ${N.map((r) => cov(r).toFixed(1)).join(", ")} ms (1-10), fill ${N.map((r) => r.fill.ms).join(", ")} ms (3-15)`);
     // reported: what the chain's own steps cost against the half-size network they sit beside
     for (const [g, rs] of Object.entries(R)) say(`section 94, ${g}: the network at 960 x 540 ${rs.map((r) => r.netHalf.ms.toFixed(1)).join(" / ")} ms; the chain's own steps (both coverages, the fill, the rest) ${rs.map((r) => (r.half - r.netHalf.ms).toFixed(1)).join(" / ")} ms -- reported, deciding nothing`);
+}
+
+console.log("\n6. ROUND 33: ROUND 32'S ACCUMULATION ON THE DEVICE, AGAINST render/denoiseTemporalUpscale.mjs");
+{
+    const { firstHits: hitsCPU, cameraPath } = await import(pathToFileURL(path.join(ENG, "render", "denoiseTemporal.mjs")).href);
+    const { accumulateUpscaled, JITTER, halfShift } = await import(pathToFileURL(path.join(ENG, "render", "denoiseTemporalUpscale.mjs")).href);
+    const { compositeEmitters } = await import(pathToFileURL(path.join(ENG, "render", "denoiseUpscale.mjs")).href);
+    // the constants the accumulation kernel carries are round 4's, exactly (X7 -- the position tolerance at 30 -- went 0 RED before this
+    // row: on a sequence of smooth spheres a looser tolerance turns no tap valid that 3 footprints did not)
+    const RT = await import(pathToFileURL(path.join(ENG, "render", "denoiseTemporal.mjs")).href);
+    ok("  round 33: the accumulation kernel's constants are render/denoiseTemporal.mjs's -- POS_TOL, NORMAL_DOT and FRAMES -- and its geometry is GEO_STRIDE floats a pixel",
+        TEMPORAL_CONSTANTS.posTol === RT.POS_TOL && TEMPORAL_CONSTANTS.normalDot === RT.NORMAL_DOT && TEMPORAL_CONSTANTS.frames === RT.FRAMES && GEO_STRIDE === 8 && Object.isFrozen(TEMPORAL_CONSTANTS),
+        JSON.stringify(TEMPORAL_CONSTANTS));
+    const N = 64, S = makeScene("R", 990000), eyes = cameraPath(S).eyes, geo = eyes.map((e) => hitsCPU(S, e, N, N)), full = emitterRadiance(S, N, N);
+    let sd2 = 77; const r2 = () => (sd2 = (sd2 * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+    // each frame smooth light with grain, on its jittered grid -- the shape of an upscaled frame, cost and content aside
+    const frames = eyes.map((_, f) => ({ y: Float64Array.from({ length: N * N * 3 }, (_, i) => 0.3 + 0.4 * ((i / 3 | 0) % N) / N + 0.1 * (i % 3) + 0.05 * r2()), shift: halfShift(JITTER[f]) }));
+    const ref = accumulateUpscaled(frames, geo, N, N), refNo = accumulateUpscaled(frames, geo, N, N, { clamp: false }), refY = compositeEmitters(ref.A, full);
+    const wireS = { scene: S.scene, eye: S.eye, look: S.look, up: S.up, fovDeg: S.fovDeg };
+    const A = (x) => Array.from(x), g64 = geo.map((g) => ({ pos: A(g.pos), nrm: A(g.nrm), obj: A(g.obj) }));
+    const pl = { S: wireS, eyes, N, frames: frames.map((f) => ({ y: A(f.y), shift: f.shift })), geo: g64, full: { cov: A(full.cov), E: A(full.E) } };
+    const q = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 600000, args: { pl }, script: `async (a) => {
+        const P = a.pl, { requestDevice } = await import("/gfx/device.js"), { DenoiseUpscaleGPU } = await import("/render/denoiseUpscaleGPU.mjs");
+        const cv = document.createElement("canvas"); cv.width = 8; cv.height = 8;
+        const dev = await requestDevice(cv, { backend: "webgpu", offscreen: true }), errs = [];
+        if (dev.gpu && dev.gpu.addEventListener) dev.gpu.addEventListener("uncapturederror", (e) => errs.push(String(e.error && e.error.message).slice(0, 200)));
+        const g = new DenoiseUpscaleGPU(dev), A = (x) => Array.from(x), fr = P.frames.map((f) => ({ y: Float64Array.from(f.y), shift: f.shift }));
+        const hits = []; for (const e of [P.eyes[0], P.eyes[P.eyes.length - 1]]) { const h = await g.firstHits(P.S, e, P.N, P.N); hits.push({ pos: A(h.pos), nrm: A(h.nrm), obj: A(h.obj) }); }
+        const geo = P.geo.map((x) => ({ pos: Float64Array.from(x.pos), nrm: Float64Array.from(x.nrm), obj: Int32Array.from(x.obj) })), full = { cov: Float64Array.from(P.full.cov), E: Float64Array.from(P.full.E) };
+        const withCpuGeo = await g.accumulate(P.S, P.eyes, fr, P.N, P.N, { geo, full }), noClamp = await g.accumulate(P.S, P.eyes, fr, P.N, P.N, { geo, clamp: false });
+        const ownGeo = await g.accumulate(P.S, P.eyes, fr, P.N, P.N, { full });
+        const pk = (r) => ({ A: A(r.A), n: A(r.n), y: A(r.y) });
+        return { hits, withCpuGeo: pk(withCpuGeo), noClamp: pk(noClamp), ownGeo: pk(ownGeo), errs };
+    }` });
+    if (q.skipped) console.log("  SKIP  " + q.reason);
+    else if (!q.ok) ok("!! round 33: the device ran the accumulation", false, `${q.reason || "no result"} ${JSON.stringify(q.pageErrors || []).slice(0, 300)}`);
+    else {
+        const Q = q.result;
+        // FIRST HITS: an object index differing is a ray that went to another sphere; f32 against f64 can flip one at a silhouette.
+        // First run on SwiftShader: no flip at either eye, position and normal within 1.7e-4 (relative to 1 + |x|) -- the ground is a
+        // sphere of radius 100, and its ray-sphere arithmetic cancels in f32. Held at 1 in 1,000 pixels and 1e-3.
+        const hitCmp = Q.hits.map((h, k) => { const c = geo[k ? geo.length - 1 : 0]; let flips = 0, worst = 0;
+            for (let p = 0; p < N * N; p++) { if (h.obj[p] !== c.obj[p]) { flips++; continue; } if (c.obj[p] < 0) continue;
+                for (let i = 0; i < 3; i++) worst = Math.max(worst, Math.abs(h.pos[p * 3 + i] - c.pos[p * 3 + i]) / (1 + Math.abs(c.pos[p * 3 + i])), Math.abs(h.nrm[p * 3 + i] - c.nrm[p * 3 + i])); }
+            return { flips, worst }; });
+        ok("!! round 33: the device's first hits are render/denoiseTemporal.mjs's -- the same sphere at all but 1 in 1,000 pixels, position and normal within 1e-3 where it agrees",
+            !Q.errs.length && hitCmp.every((h) => h.flips <= N * N / 1000 && h.worst <= 1e-3), hitCmp.map((h, k) => `eye ${k ? "last" : "first"}: ${h.flips} flip(s), worst ${h.worst.toExponential(1)}`).join("; ") + (Q.errs.length ? "; " + Q.errs[0] : ""));
+        // the history length n is a weighted sum of the taps' lengths, so it is fractional and f32 moves it: first run, within 3.1e-5
+        // given the CPU's hits and 5.1e-5 with the device's own; the light within 5.5e-7 and 2.6e-6. Held at 1e-4 and 1e-5 / 1e-3.
+        const cmp = (d, r) => { let nDiff = 0, worst = 0, nWorst = 0; for (let p = 0; p < N * N; p++) { nWorst = Math.max(nWorst, Math.abs(d.n[p] - r.n[p])); if (Math.abs(d.n[p] - r.n[p]) > 1e-4) nDiff++; for (let c = 0; c < 3; c++) worst = Math.max(worst, Math.abs(d.A[p * 3 + c] - r.A[p * 3 + c]) / (Math.abs(r.A[p * 3 + c]) + 1e-3)); } return { nDiff, worst, nWorst }; };
+        const c1 = cmp(Q.withCpuGeo, ref), c0 = cmp(Q.noClamp, refNo), cOwn = cmp(Q.ownGeo, ref);
+        ok("!! round 33: given the CPU's first hits, the device's accumulation is accumulateUpscaled's -- the history length within 1e-4 at every pixel, the light within 1e-5, clamped and not",
+            c1.nDiff === 0 && c1.worst <= 1e-5 && c0.nDiff === 0 && c0.worst <= 1e-5 && Q.noClamp.A.some((v, i) => Math.abs(v - Q.withCpuGeo.A[i]) > 1e-4),
+            `clamped: ${c1.nDiff} n differ by over 1e-4 (worst ${c1.nWorst.toExponential(1)}), light worst ${c1.worst.toExponential(1)}; unclamped: ${c0.nDiff}, ${c0.worst.toExponential(1)}`);
+        let yw = 0; for (let i = 0; i < refY.length; i++) yw = Math.max(yw, Math.abs(Q.withCpuGeo.y[i] - refY[i]) / (Math.abs(refY[i]) + 1e-3));
+        ok("  ...and its composite is compositeEmitters on the accumulated light, within 1e-5", yw <= 1e-5, `worst ${yw.toExponential(1)}`);
+        ok("  ...and with its own first hits the whole accumulation has at most 1 in 1,000 pixels with a history length off by over 1e-4, and the light within 1e-3",
+            cOwn.nDiff <= N * N / 1000 && cOwn.worst <= 1e-3, `${cOwn.nDiff} of ${N * N} pixels' n differ by over 1e-4 (worst ${cOwn.nWorst.toExponential(1)}); light worst ${cOwn.worst.toExponential(1)}`);
+    }
 }
 
 console.log(fails ? `\nFAIL -- ${fails} check(s)` : "\nALL GREEN");

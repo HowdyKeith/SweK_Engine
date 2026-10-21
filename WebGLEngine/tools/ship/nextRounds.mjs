@@ -2061,7 +2061,7 @@ export const NEXT_ROUNDS = [
         blocker: "OPEN",
         what: "Round 32's accumulation on the device -- reprojection, the 3 x 3 clamp, the blend, and each frame's shift to its unjittered grid -- as passes of render/denoiseUpscaleGPU.mjs, held to render/denoiseTemporalUpscale.mjs's CPU reference, then timed on the rig against round 31's chain.",
         how: "WGSL for shiftResample and accumulateUpscaled (the reprojection needs each frame's first hits on the device, which the coverage kernel's ray loop already nearly is); gate them against the CPU here on SwiftShader; then a pre-registered rig round adding the accumulation's cost to section 93's ledger.",
-        why: "Section 96's rule: both hypotheses supported, so the accumulation goes to the device and is timed. Round 31 found the chain's own steps already cost more than its network; whether a history pass fits beside them is the question.",
+        why: "Section 96's rule: both hypotheses supported, so the accumulation goes to the device and is timed. Round 31 found the chain's own steps already cost more than its network; whether a history pass fits beside them is the question. ROUND 33 (unshipped): the four kernels exist and are held to the CPU (render/denoiseUpscaleGPU-selfcheck.mjs section 6), the page times them, and section 97 is the pre-registration. STILL OWED: the rig's two runs on each GPU, and section 98's verdict.",
     },
     {
         id: "denoise-fsr3-framegen",

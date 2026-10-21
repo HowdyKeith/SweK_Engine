@@ -472,6 +472,24 @@ the 1080, and 1.537 and 1.376 x on the Intel. Every gate was green, and the fill
 chain's own steps cost more than its network, so the next speed work is `denoise-halfres-fixed-costs`. By section 93's rule the
 arc's next round is `denoise-fsr2-temporal`. Nothing to install.
 
+### Round 33: the history on the device, timed at 1920 x 1080 (pre-registration section 97)
+
+On each GPU, in a fresh clone of a commit carrying section 97:
+
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r33-a.json
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r33-b.json
+```
+
+- **What is new:** the chain gate also runs round 32's history on the GPU: first hits, the shift, the accumulation and the
+  composite. Its section 6 checks them against the CPU, and on a GPU a `section 97:` line times them beside section 93's.
+- **Section 97 predicts:** the chain with its history is faster than today's page, by 1.3-1.5 x on the 1080 and 1.25-1.55 x on
+  the Intel; every gate green.
+- **Don't commit or pull between runs.**
+- **Send back all four JSON files.**
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and
