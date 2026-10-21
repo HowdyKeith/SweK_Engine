@@ -108,6 +108,31 @@ export const METHOD = Object.freeze({
  *
  * `ms` and `fails` are still on every entry, so every reader keeps working. They are GETTERS over the audit.
  */
+/*
+ * v4482 -- *** FIVE ENTRIES LEAVE, AND FOUR OF THEM WERE NEVER ABOUT THE TREE. ***
+ *
+ * Keith pasted eighteen red gate readings off his rig in one sitting. Six of them reproduced here and were
+ * repaired this round; five of those six were on this list, and they came off it by the rule section 2 of the
+ * selfcheck states -- a repaired red must be deleted by hand, because a list nobody prunes is how
+ * gate-timings.json ended up accusing thirteen working gates.
+ *
+ * WHAT THE FIVE HAD IN COMMON IS WORTH MORE THAN THE FIVE. Four were checks pinned to an ARRANGEMENT that a
+ * later, correct round changed, so the gate went red BECAUSE THE WORK IT ASKED FOR WAS DONE -- the same
+ * sentence this file already carries at v4430 about its own claim:
+ *   unattendedHold + supersededFlag  grepped "ALREADY OWNS PORT 8787" after v4134 gave the port one
+ *                                    derivation and the refusal correctly started echoing %SWEK_PORT%
+ *   pairlaneBridge                   pinned label: "File Transfer Utils" through v4211's rename to "Peer 2 Peer"
+ *   sunshineHost                     asserted ROUTES.length === 7 under a label reading "every route ... is
+ *                                    reachable", and a seventh-to-eighth route is not a broken bridge
+ * The fifth, bfcache, was a REAL page defect (camera-effects.html tore down on pagehide without checking
+ * event.persisted) and is fixed in the page, not in the gate.
+ *
+ * SO THE LIST'S OWN DOCTRINE HAS A GAP IT CANNOT SEE. The header below says the name list is "a claim about a
+ * MOMENT". It is also a claim about a BOX: of the eighteen readings Keith sent, SIX are green in this sandbox
+ * and red on his Windows rig -- three of them (contactOverlay, range, localModelResolve) printing every check
+ * PASS and then aborting with a libuv teardown assertion, so an exit code decides a verdict the checks did
+ * not. Nothing in this register can represent that, and it is written down here rather than left implied.
+ */
 const RED_AT_V4279_GATES = Object.freeze([
     // engine/frameDirtyCensus-selfcheck.mjs REMOVED, repaired: see FIXED_SINCE_V4279. Fixed by this round's
     // drift-fix pass (post-full-sweep triage, commit cba0f571's follow-on); freshly re-run direct at the

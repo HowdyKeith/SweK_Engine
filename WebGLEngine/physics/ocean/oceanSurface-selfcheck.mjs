@@ -65,6 +65,25 @@ console.log("\n2. THE HEIGHT AT A WORLD POINT IS THE HEIGHT OF THE PARTICLE THAT
         maxRes <= S.TOLERANCE && maxIt < S.MAX_ITERATIONS, `worst residual ${maxRes.toExponential(2)} m, most iterations ${maxIt} of ${S.MAX_ITERATIONS}`);
 }
 
+console.log("\n2b. atLabel IS THE SAME ARITHMETIC SAMPLE ENDS WITH, WITHOUT THE INVERSION (slice 2 draws from it)");
+{
+    const sea = S.defaultSurface(4);
+    let dp = 0, dj = 0, flatJ = 0;
+    const r = S.rng(21);
+    for (let i = 0; i < 300; i++) {
+        const X1 = (r() - 0.5) * 300, X2 = (r() - 0.5) * 300, t = r() * 600;
+        const a = sea.atLabel(X1, X2, t), p = sea.particle(X1, X2, t), back = sea.sample(a.x, a.z, t);
+        dp = Math.max(dp, Math.hypot(a.x - p[0], a.y - p[1], a.z - p[2]), Math.abs(back.h - a.y), Math.hypot(back.nx - a.nx, back.ny - a.ny, back.nz - a.nz));
+        dj = Math.max(dj, a.jacobian > 0 ? 0 : 1);
+    }
+    ok("atLabel returns the particle's position, and sampling at that position returns its height and normal again (the two routes meet)", dp < 1e-9, `worst ${dp.toExponential(2)}`);
+    ok("the Jacobian of the horizontal map is positive everywhere at the default steepness (the surface does not fold)", dj === 0);
+    const flat = S.createSurface({ components: [S.component({ wavelength: 20, heading: 0.4, slope: 0.3, q: 0 })] });
+    for (let i = 0; i < 50; i++) flatJ = Math.max(flatJ, Math.abs(flat.atLabel(i * 3.1, i * -2.3, i).jacobian - 1));
+    ok("with no steepness the Jacobian is exactly 1 (particles do not bunch), and below 1 at a steep crest",
+        flatJ < 1e-12 && S.createSurface({ components: [S.component({ wavelength: 30, heading: 0, slope: 0.6, q: 1 })] }).atLabel(30 / 4, 0, 0).jacobian < 0.5, `flat ${flatJ.toExponential(1)}`);
+}
+
 console.log("\n3. THE NORMAL IS THE SURFACE'S OWN, AND IS A UNIT VECTOR");
 {
     const sea = S.defaultSurface(3);

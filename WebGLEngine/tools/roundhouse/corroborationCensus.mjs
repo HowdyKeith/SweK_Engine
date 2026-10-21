@@ -152,14 +152,40 @@ export const KEYED_RE = /err|error|residual|delta|deviation/i;
  * from it has NO DECLARED WAY to be refined, and its unkeyed numbers are reported as convergence-untested
  * rather than quietly passing. Filling this table in is the follow-on work, one device at a time.
  */
-export const REFINEMENT_KNOBS = {
-    lens: { key: "mapN", values: [9, 13, 21], modes: ["map"] },
-    optics: { key: "nSamples", values: [512, 1024, 2048], modes: ["airy", "slit"] },
-    ct: { key: "nAngles", values: [64, 128, 256], modes: ["parallel", "fan"] },
-};
-
-/** Numbers that are structural rather than physical -- counts, indices, flags. Grading them is noise. */
-const STRUCTURAL_RE = /^(n|count|cells|steps|iters|index|i|j|k|mode|seed|size|len|length)$|Count$|Cells$|Steps$|^is[A-Z]|^has[A-Z]/;
+/*
+ * *** v4483 -- THE SECOND TABLE IS GONE, AND EVERY ONE OF ITS THREE ENTRIES WAS WRONG ABOUT SOMETHING. ***
+ *
+ * This file used to declare its OWN REFINEMENT_KNOBS, in a different shape ({key, values, modes} against the
+ * canonical {mode, param, why, values}) and under the same name. v4480 measured the disagreement: the two
+ * tables shared only lens and optics and disagreed about BOTH. It was named there rather than migrated
+ * because the flag it drives sits on every row of a slow census. This is that round, and the migration is
+ * not a tidy-up -- each entry was making a false claim:
+ *
+ *   lens: { key: "mapN", modes: ["map"] }        A KNOB THAT REFINES NOTHING. Measured over mapN 9, 13, 21,
+ *       31: mapPeak, mapPeakExact, mapPeakErrFrac, mapSpan and sourceRho are BIT-IDENTICAL across the whole
+ *       sweep, and the only field that moves is mapCells = mapN^2. The canonical table says lens.deflect on
+ *       dphi, which converges. This flag has called lens.map refinable since v4036.
+ *   ct: { values: [64, 128, 256] }               A VALUE THE DEVICE CANNOT REACH. nAngles CLAMPS AT 240:
+ *       240, 248, 256 and 512 return bit-identical values on every field, so the declared third point was a
+ *       coerced duplicate of the second. ct is PROMOTED to the canonical table at [32, 64, 128, 240].
+ *   optics: { modes: ["airy", "slit"] }          THE ONE THAT WAS RIGHT, AND IT IS LOST. slit genuinely
+ *       refines -- slitFirstMinErrFrac 5.04e-5 -> 1.25e-5 -> 4.00e-6 over nSamples 512/1024/2048 -- but the
+ *       canonical table is ONE MODE PER DEVICE and optics already holds airy. That is a shape limit, not a
+ *       judgement about slit, and it is written down here rather than left to be rediscovered.
+ *
+ * NET, MEASURED AT v4483 BY DRIVING deviceModeTable(): 9 of 484 device/modes change their flag. SIX GAIN one
+ * (blackhole.escape, kepler.conserve, quantum.well, chaos.feigenbaum, splat.integral, lens.deflect -- devices
+ * this table had never heard of) and THREE LOSE one (lens.map, ct.fan, optics.slit). Of the three, two SHOULD
+ * lose it and the third is optics.slit's shape limit above.
+ *
+ * *** THE NUMBER v4482 WROTE DOWN FOR THIS WAS 10, AND IT COUNTED ct.parallel AS LOST. *** That was true of the
+ * plan it was measured under -- migrate, and ct disappears entirely -- and stopped being true the moment this
+ * round PROMOTED ct at mode "parallel", which keeps its flag while ct.fan loses one. The stored projection went
+ * stale against a decision taken after it, which is the same shape as everything else this session has been
+ * pulling out of registers, so it is corrected here by re-deriving rather than by being quietly edited.
+ */
+import { REFINEMENT_KNOBS, STRUCTURAL_RE } from "./refinementKnobs.mjs";
+export { REFINEMENT_KNOBS, STRUCTURAL_RE };
 
 const isFinite_ = (x) => typeof x === "number" && Number.isFinite(x);
 
@@ -300,8 +326,10 @@ export async function corroborationCensus({ modes = null, verbose = false,
                 else unkeyed.push(k);
             }
 
+            // v4483 -- the canonical entry names ONE mode and its knob as `param`; the deleted table named a
+            // list of modes and its knob as `key`. Both fields are read from the one table now.
             const knob = REFINEMENT_KNOBS[name];
-            const refinable = !!(knob && (!knob.modes || knob.modes.includes(mode)));
+            const refinable = !!(knob && knob.mode === mode);
 
             rows.push({
                 device: name, mode,
@@ -314,7 +342,7 @@ export async function corroborationCensus({ modes = null, verbose = false,
                 ms: Date.now() - t0,
                 sites: port.sites, byFn: port.byFn,
                 refinable,
-                knob: refinable ? knob.key : null,
+                knob: refinable ? knob.param : null,
             });
             if (verbose) console.log(`    ${name}.${mode}: ${unkeyed.length} unkeyed, ${port.rawCalls} raw libm calls`);
             done++;

@@ -207,6 +207,13 @@ function handle(req, res) {
                     "swek-ising-bench": "ising-bench.json",   // v3283 -- third kernel, ZERO tolerance; hub re-grades via tools/roundhouse/isingGpu.mjs mirror
                     "swek-android-transcript": "android-phone.json",
                     "swek-consistency-route": "consistency-route.json",   // v3285 -- ONE SIDE of a board pair; hub assembles and RE-GRADES via physics/consistencyFleet.mjs
+                    // v4481 -- THE SEVENTH KIND, AND THE FIRST THAT CARRIES A MEASUREMENT RATHER THAN A BENCH.
+                    // Corroboration's fourth criterion asks whether another architecture gets the SAME BITS.
+                    // Twenty of the lab's twenty-seven keyless observables touch libm and cannot be settled on
+                    // one machine; the other six kinds are all GPU benches and transcripts, so until now the
+                    // fleet had no way to answer. The hub re-grades via tools/roundhouse/corroborationSubmit.mjs
+                    // -- the device sends values and never a verdict.
+                    "swek-corroboration-observables": "corroboration-observables.json",
                 };
                 const name = KINDS[j && j.kind];
                 if (!name) return sendJson(res, { ok: false, error: "unrecognised kind: " + String(j && j.kind).slice(0, 60) + " -- accepted: " + Object.keys(KINDS).join(", ") }, 400);
@@ -222,6 +229,17 @@ function handle(req, res) {
                 // to run `perfLedger.mjs fold` by hand, so in practice it stayed empty and every timing gauge read
                 // a dash. A transcript already carries per-check ms; folding it here means performance data
                 // accumulates as a side effect of peers reporting, which is the only way it ever will.
+                // v4481 -- AUTO-FOLD CORROBORATION SUBMISSIONS, for the reason v2973 gave about timings: a
+                // ledger nobody folds by hand stays empty, so the fold happens as a side effect of a peer
+                // reporting. The ledger APPENDS -- a second device can never erase the first.
+                if (j.kind === "swek-corroboration-observables") {
+                    try {
+                        const cs = await import("../tools/roundhouse/corroborationSubmit.mjs");
+                        const lf = path.join(dir, "corroboration-ledger.json");
+                        let led; try { led = JSON.parse(fs.readFileSync(lf, "utf8")); } catch { led = cs.emptyLedger(); }
+                        fs.writeFileSync(lf, JSON.stringify(cs.foldSubmission(led, j), null, 2) + "\n");
+                    } catch {}
+                }
                 if (j.kind === "swek-android-transcript") {
                     try {
                         const pl = await import("../tools/roundhouse/perfLedger.mjs");

@@ -1,0 +1,206 @@
+<!doctype html>
+<!-- ocean-default.html -- UNNUMBERED (the version is chosen at ship time).
+
+     THE DEFAULT WATER: THE SEA THE PHYSICS STANDS ON, DRAWN. Slice 2 of the ocean-optin-surface item in tools/ship/todo.mjs.
+     Every vertex on this page is a point of physics/ocean/oceanSurface.mjs's Gerstner surface (world/oceanWater.mjs builds the mesh from it), and the buoys
+     float on the SAME function, so what you see and what a hull would float on agree -- the HUD re-asks the physics surface about 32 drawn vertices every frame
+     and prints how far apart the two answers are (float32 rounding, a few micrometres), which is a measurement and not a caption.
+
+     WHAT THIS PAGE IS NOT, SAID PLAINLY:
+       - NOT THE OPT-IN SEA. The vendored web-ocean FFT sea (ocean-spike.html) is slice 4 and costs far more; this is the water every GPU can draw.
+       - NOT A FITTED SEA STATE. Six seeded Gerstner waves; they look like swell, not like any measured spectrum.
+       - NOT LIT LIKE THE ENGINE. A one-pass WebGL2 shader (sky tint by Fresnel, a sun glint, foam where the particles bunch); the engine's own lighting is not applied.
+       - NOT YET READ BY ANYTHING ELSE. The submarine and the boats take their water height from the physics surface when a later slice wires them.
+     Nothing is ever put in this page as markup: every status line goes in with textContent. The page loads nothing from outside the engine's own origin. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Default ocean">
+<meta name="demo:desc" content="The cheap default water: a Gerstner sea drawn as a mesh from the very surface the physics stands on, with buoys that float on it. The HUD re-asks the physics about drawn vertices every frame and prints how far apart the two answers are. WebGL2, no WebGPU needed.">
+<meta name="demo:category" content="graphics">
+<title>SweK &middot; Default ocean</title>
+<style>
+  :root { --bg:#050a12; --panel:#0b131f; --line:#1c2c44; --fg:#dbe7ff; --dim:#7c93b8; --cyan:#59d1ff; --amber:#f6a623; --green:#5fe08a; --red:#ff7a7a; }
+  * { box-sizing:border-box; }
+  html, body { height:100%; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:13px ui-monospace, Menlo, monospace; display:flex; flex-direction:column; }
+  header { padding:12px 16px 6px; flex:none; }
+  h1 { font-size:15px; letter-spacing:.13em; text-transform:uppercase; color:var(--cyan); margin:0 0 6px; }
+  .desc { color:var(--dim); max-width:980px; line-height:1.55; margin:0 0 6px; }
+  .bar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; padding:6px 16px 8px; flex:none; }
+  select, button { background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:6px; padding:4px 9px; font:inherit; cursor:pointer; }
+  button:hover, select:hover { border-color:var(--cyan); }
+  a { color:var(--cyan); }
+  #stage { flex:1 1 auto; min-height:320px; margin:0 16px; border:1px solid var(--line); border-radius:6px; overflow:hidden; background:#000; position:relative; }
+  #cv { position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; cursor:grab; }
+  #nogl { position:absolute; inset:0; display:none; padding:28px; color:var(--amber); line-height:1.6; }
+  #hud { position:absolute; left:10px; top:10px; padding:6px 9px; background:rgba(5,10,18,.72); border:1px solid var(--line); border-radius:6px; white-space:pre; line-height:1.5; pointer-events:none; }
+  footer { padding:8px 16px 12px; flex:none; color:var(--dim); }
+  .small { font-size:12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Default ocean &mdash; the physics surface, drawn</h1>
+  <p class="desc">Six seeded Gerstner waves. The mesh is built from the same function a boat or a submarine would float on, and the buoys sit on it. Drag to orbit, wheel to zoom.
+    It is not the opt-in GPU sea (<a href="/ocean-spike.html">ocean-spike.html</a>) and not a fitted sea state. <a href="/server.html">Back to the server page</a>.</p>
+</header>
+<div class="bar">
+  <label>detail <select id="detailSel">
+    <option value="24">coarse (24 cells)</option>
+    <option value="48">medium (48 cells)</option>
+    <option value="96" selected>fine (96 cells)</option>
+  </select></label>
+  <label>sea <select id="seedSel">
+    <option value="1" selected>seed 1</option>
+    <option value="2">seed 2</option>
+    <option value="3">seed 3</option>
+    <option value="4">seed 4</option>
+  </select></label>
+  <button id="pauseBtn" type="button">Pause</button>
+</div>
+<div id="stage">
+  <canvas id="cv"></canvas>
+  <div id="hud">starting&hellip;</div>
+  <div id="nogl">This browser has no WebGL2, so the water is not drawn. The physics surface does not need it.</div>
+</div>
+<footer>
+  <div class="small">The agreement line is a measurement: 32 drawn vertices are asked of the physics surface again every frame (sampled at the vertex's world x, z) and the largest height gap is printed.</div>
+</footer>
+<script type="module">
+  import { defaultSurface } from "/physics/ocean/oceanSurface.mjs";
+  import { buildWater, buoy } from "/world/oceanWater.mjs";
+
+  const $ = (id) => document.getElementById(id);
+  const cv = $("cv"), hud = $("hud");
+  const gl = cv.getContext("webgl2", { antialias: true });
+  const state = { frames: 0, agreement: null, originHeight: null, n: 96, seed: 1, vertices: 0, triangles: 0, buoys: 0, error: "" };
+  window.__ocean = state;
+  if (!gl) { $("nogl").style.display = "block"; hud.textContent = "no WebGL2"; state.error = "no WebGL2"; }
+  else start();
+
+  function start() {
+    const VS = `#version 300 es
+    precision highp float; precision highp int;
+    in vec3 aPos; in vec3 aNormal; in float aFoam;
+    uniform mat4 uVP; uniform mat3 uBasis; uniform vec3 uOffset; uniform int uMode;
+    out vec3 vN; out vec3 vW; out float vFoam;
+    void main() {
+      vec3 p = uMode == 1 ? uBasis * aPos + uOffset : aPos;
+      vN = uMode == 1 ? uBasis * aNormal : aNormal; vW = p; vFoam = aFoam;
+      gl_Position = uVP * vec4(p, 1.0);
+    }`;
+    const FS = `#version 300 es
+    precision highp float; precision highp int;
+    in vec3 vN; in vec3 vW; in float vFoam;
+    uniform vec3 uEye; uniform int uMode;
+    out vec4 o;
+    vec3 sky(vec3 d) { float h = clamp(d.y * 0.5 + 0.5, 0.0, 1.0); return mix(vec3(0.62, 0.74, 0.86), vec3(0.16, 0.34, 0.62), pow(h, 0.7)); }
+    void main() {
+      vec3 n = normalize(vN), v = normalize(uEye - vW);
+      if (uMode == 1) { float d = max(dot(n, normalize(vec3(0.4, 0.8, 0.3))), 0.0); o = vec4(vec3(0.95, 0.35, 0.18) * (0.35 + 0.65 * d), 1.0); return; }
+      float f = pow(1.0 - max(dot(n, v), 0.0), 3.0);
+      vec3 deep = vec3(0.02, 0.12, 0.2), refl = sky(reflect(-v, n));
+      vec3 c = mix(deep, refl, 0.12 + 0.88 * f);
+      vec3 sun = normalize(vec3(0.4, 0.55, 0.3));
+      c += vec3(1.0, 0.92, 0.75) * pow(max(dot(reflect(-sun, n), v), 0.0), 220.0) * 1.4;
+      c = mix(c, vec3(0.93, 0.97, 1.0), clamp(vFoam * 0.85, 0.0, 1.0));
+      o = vec4(c, 1.0);
+    }`;
+    const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
+    const prog = gl.createProgram();
+    try { gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS)); gl.bindAttribLocation(prog, 0, "aPos"); gl.bindAttribLocation(prog, 1, "aNormal"); gl.bindAttribLocation(prog, 2, "aFoam"); gl.linkProgram(prog);
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog)); }
+    catch (e) { state.error = String(e.message || e); hud.textContent = "shader error: " + state.error; return; }
+    const U = (n) => gl.getUniformLocation(prog, n);
+    const uVP = U("uVP"), uBasis = U("uBasis"), uOffset = U("uOffset"), uMode = U("uMode"), uEye = U("uEye");
+
+    // ---- the water: buffers sized for the largest grid, filled every frame ----
+    const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+    const mkBuf = (target, bytes) => { const b = gl.createBuffer(); gl.bindBuffer(target, b); gl.bufferData(target, bytes, gl.DYNAMIC_DRAW); return b; };
+    const MAXV = 97 * 97;
+    const bPos = mkBuf(gl.ARRAY_BUFFER, MAXV * 12); gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+    const bNor = mkBuf(gl.ARRAY_BUFFER, MAXV * 12); gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, 0);
+    const bFoam = mkBuf(gl.ARRAY_BUFFER, MAXV * 4); gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 1, gl.FLOAT, false, 0, 0);
+    const bIdx = mkBuf(gl.ELEMENT_ARRAY_BUFFER, 96 * 96 * 6 * 4);
+    // ---- the buoys: one small octahedron, drawn at a handful of points ----
+    const oct = (() => { const P = [[0, 0.7, 0], [0.45, 0, 0], [0, 0, 0.45], [-0.45, 0, 0], [0, 0, -0.45], [0, -0.35, 0]];
+      const T = [[0, 1, 2], [0, 2, 3], [0, 3, 4], [0, 4, 1], [5, 2, 1], [5, 3, 2], [5, 4, 3], [5, 1, 4]];
+      const pos = [], nor = [], fo = [];
+      for (const t of T) { const a = P[t[0]], b = P[t[1]], c = P[t[2]]; const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], w = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+        let n = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]]; const l = Math.hypot(...n) || 1; n = n.map((x) => x / l);
+        for (const q of [a, b, c]) { pos.push(...q); nor.push(...n); fo.push(0); } }
+      return { pos: new Float32Array(pos), nor: new Float32Array(nor), fo: new Float32Array(fo), count: pos.length / 3 }; })();
+    const vaoB = gl.createVertexArray(); gl.bindVertexArray(vaoB);
+    for (const [loc, data, size] of [[0, oct.pos, 3], [1, oct.nor, 3], [2, oct.fo, 1]]) { const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 0, 0); }
+    gl.enable(gl.DEPTH_TEST); gl.clearColor(0.55, 0.68, 0.82, 1);
+
+    // ---- small matrix helpers, column-major ----
+    const persp = (fy, asp, n, f) => { const t = 1 / Math.tan(fy / 2); return [t / asp, 0, 0, 0, 0, t, 0, 0, 0, 0, (f + n) / (n - f), -1, 0, 0, 2 * f * n / (n - f), 0]; };
+    const look = (e, c, up) => { let z = [e[0] - c[0], e[1] - c[1], e[2] - c[2]]; let l = Math.hypot(...z); z = z.map((x) => x / l);
+      let x = [up[1] * z[2] - up[2] * z[1], up[2] * z[0] - up[0] * z[2], up[0] * z[1] - up[1] * z[0]]; l = Math.hypot(...x); x = x.map((q) => q / l);
+      const y = [z[1] * x[2] - z[2] * x[1], z[2] * x[0] - z[0] * x[2], z[0] * x[1] - z[1] * x[0]];
+      return [x[0], y[0], z[0], 0, x[1], y[1], z[1], 0, x[2], y[2], z[2], 0, -(x[0] * e[0] + x[1] * e[1] + x[2] * e[2]), -(y[0] * e[0] + y[1] * e[1] + y[2] * e[2]), -(z[0] * e[0] + z[1] * e[1] + z[2] * e[2]), 1]; };
+    const mul = (a, b) => { const r = new Array(16).fill(0); for (let c = 0; c < 4; c++) for (let rr = 0; rr < 4; rr++) for (let k = 0; k < 4; k++) r[c * 4 + rr] += a[k * 4 + rr] * b[c * 4 + k]; return r; };
+
+    // ---- controls ----
+    let sea = defaultSurface(1), n = 96, paused = false, simT = 0, last = performance.now(), yaw = 0.6, pitch = 0.42, dist = 150;
+    $("detailSel").addEventListener("change", () => { n = +$("detailSel").value; state.n = n; });
+    $("seedSel").addEventListener("change", () => { state.seed = +$("seedSel").value; sea = defaultSurface(state.seed); });
+    $("pauseBtn").addEventListener("click", () => { paused = !paused; $("pauseBtn").textContent = paused ? "Resume" : "Pause"; });
+    let drag = null;
+    cv.addEventListener("pointerdown", (e) => { drag = [e.clientX, e.clientY]; cv.setPointerCapture(e.pointerId); cv.style.cursor = "grabbing"; });
+    cv.addEventListener("pointermove", (e) => { if (!drag) return; yaw -= (e.clientX - drag[0]) * 0.006; pitch = Math.min(1.45, Math.max(0.06, pitch + (e.clientY - drag[1]) * 0.005)); drag = [e.clientX, e.clientY]; });
+    const endDrag = () => { drag = null; cv.style.cursor = "grab"; };
+    cv.addEventListener("pointerup", endDrag); cv.addEventListener("pointercancel", endDrag);
+    cv.addEventListener("wheel", (e) => { e.preventDefault(); dist = Math.min(320, Math.max(30, dist * (e.deltaY > 0 ? 1.1 : 0.91))); }, { passive: false });
+
+    const BUOYS = [[0, 0], [22, -14], [-30, 18], [45, 40], [-55, -38]];
+    let fpsAcc = 0, fpsN = 0, fps = 0;
+    function frame(now) {
+      const dt = Math.min(0.1, (now - last) / 1000); last = now;
+      if (!paused) simT += dt;
+      const w = Math.max(1, cv.clientWidth), h = Math.max(1, cv.clientHeight), dpr = Math.min(2, window.devicePixelRatio || 1);
+      if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+      gl.viewport(0, 0, cv.width, cv.height);
+      const m = buildWater(sea, { half: 150, n, t: simT });
+      gl.bindVertexArray(vao);
+      gl.bindBuffer(gl.ARRAY_BUFFER, bPos); gl.bufferSubData(gl.ARRAY_BUFFER, 0, m.positions);
+      gl.bindBuffer(gl.ARRAY_BUFFER, bNor); gl.bufferSubData(gl.ARRAY_BUFFER, 0, m.normals);
+      gl.bindBuffer(gl.ARRAY_BUFFER, bFoam); gl.bufferSubData(gl.ARRAY_BUFFER, 0, m.foam);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bIdx); gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, m.indices);
+      const eye = [Math.sin(yaw) * Math.cos(pitch) * dist, Math.sin(pitch) * dist + 2, Math.cos(yaw) * Math.cos(pitch) * dist];
+      const vp = mul(persp(0.9, w / h, 0.5, 2000), look(eye, [0, 0, 0], [0, 1, 0]));
+      gl.useProgram(prog); gl.uniformMatrix4fv(uVP, false, new Float32Array(vp)); gl.uniform3fv(uEye, eye);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      gl.uniform1i(uMode, 0); gl.drawElements(gl.TRIANGLES, m.indices.length, gl.UNSIGNED_INT, 0);
+      // buoys: on the physics surface, leaning with its normal
+      gl.bindVertexArray(vaoB); gl.uniform1i(uMode, 1);
+      for (const [bx, bz] of BUOYS) {
+        const b = buoy(sea, bx, bz, simT);
+        let ax = [1, 0, 0]; const ny = [b.nx, b.ny, b.nz];
+        let t1 = [ny[1] * ax[2] - ny[2] * ax[1], ny[2] * ax[0] - ny[0] * ax[2], ny[0] * ax[1] - ny[1] * ax[0]]; const l1 = Math.hypot(...t1); t1 = t1.map((x) => x / l1);
+        const t2 = [ny[1] * t1[2] - ny[2] * t1[1], ny[2] * t1[0] - ny[0] * t1[2], ny[0] * t1[1] - ny[1] * t1[0]];
+        const S = 3;   // a buoy a few metres across, so it reads at the orbit distance
+        gl.uniformMatrix3fv(uBasis, false, new Float32Array([t2[0] * S, t2[1] * S, t2[2] * S, ny[0] * S, ny[1] * S, ny[2] * S, t1[0] * S, t1[1] * S, t1[2] * S]));
+        gl.uniform3f(uOffset, b.x, b.y, b.z); gl.drawArrays(gl.TRIANGLES, 0, oct.count);
+      }
+      // the measurement: re-ask the physics about 32 drawn vertices
+      let worst = 0;
+      for (let k = 0; k < 32; k++) {
+        const i = (k * 37 + state.frames * 5) % m.side, j = (k * 59 + state.frames * 3) % m.side, v = j * m.side + i;
+        const s = sea.sample(m.positions[v * 3], m.positions[v * 3 + 2], m.t);
+        worst = Math.max(worst, Math.abs(s.h - m.positions[v * 3 + 1]));
+      }
+      state.frames++; state.originHeight = sea.sample(0, 0, simT).h; state.agreement = worst; state.vertices = m.count; state.triangles = m.indices.length / 3; state.buoys = BUOYS.length;
+      fpsAcc += dt; fpsN++; if (fpsAcc >= 0.5) { fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0; }
+      hud.textContent = `${fps.toFixed(0)} fps   ${m.count} vertices   ${m.indices.length / 3} triangles   t = ${simT.toFixed(1)} s\n` +
+        `physics vs drawn, 32 vertices re-asked: largest height gap ${worst.toExponential(1)} m\nseed ${state.seed}, ${sea.components.length} waves, steepness ${sea.steepness.toFixed(2)}`;
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
+</script>
+</body>
+</html>

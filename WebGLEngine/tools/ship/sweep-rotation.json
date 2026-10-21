@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it. `poolHorizon` (v4816) is the stamp of the first pool entry that run did NOT take: it reached every entry stamped earlier and none stamped at or after it.",
- "at": "2026-10-20T18:28:02.699Z",
+ "at": "2026-10-20T22:54:26.086Z",
  "poolAt": "2026-10-20T17:22:34.460Z",
  "poolHorizon": "2026-10-19T20:27:51.134Z",
  "budgetMs": 3000,
@@ -1015,9 +1015,10 @@
   },
   {
    "gate": "physics/ocean/oceanSurface-selfcheck.mjs",
-   "ms": 89,
+   "ms": 120,
    "code": 0,
-   "at": "2026-10-20T18:28:02.699Z"
+   "priorMs": 468,
+   "at": "2026-10-20T21:07:54.172Z"
   },
   {
    "gate": "physics/optics/fresnel-selfcheck.mjs",
@@ -2084,6 +2085,12 @@
    "at": "2026-09-09T17:59:42.840Z"
   },
   {
+   "gate": "tools/roundhouse/corroborationSubmit-selfcheck.mjs",
+   "ms": 4216,
+   "code": 0,
+   "at": "2026-10-20T22:54:09.372Z"
+  },
+  {
    "gate": "tools/roundhouse/crossDevice-selfcheck.mjs",
    "ms": 2036,
    "code": 0,
@@ -2110,6 +2117,12 @@
    "code": "timeout/signal",
    "priorMs": 20018,
    "at": "2026-09-09T17:59:42.840Z"
+  },
+  {
+   "gate": "tools/roundhouse/deviceReport-selfcheck.mjs",
+   "ms": 4505,
+   "code": 0,
+   "at": "2026-10-20T22:54:14.090Z"
   },
   {
    "gate": "tools/roundhouse/diffusion-selfcheck.mjs",
@@ -2635,6 +2648,12 @@
    "code": "timeout/signal",
    "priorMs": 20024,
    "at": "2026-09-09T17:59:42.840Z"
+  },
+  {
+   "gate": "tools/roundhouse/sensitivitySweep-selfcheck.mjs",
+   "ms": 9057,
+   "code": 0,
+   "at": "2026-10-20T22:54:23.316Z"
   },
   {
    "gate": "tools/roundhouse/slitQuantisation-selfcheck.mjs",
@@ -3281,6 +3300,12 @@
    "code": 0,
    "priorMs": 2088,
    "at": "2026-10-05T19:35:01.442Z"
+  },
+  {
+   "gate": "tools/ship/deferralCensus-selfcheck.mjs",
+   "ms": 1930,
+   "code": 0,
+   "at": "2026-10-20T22:54:25.412Z"
   },
   {
    "gate": "tools/ship/definitionGates-selfcheck.mjs",
@@ -4437,6 +4462,12 @@
    "code": 0,
    "priorMs": 3329,
    "at": "2026-09-09T12:57:13.333Z"
+  },
+  {
+   "gate": "tools/ship/oceanDefaultPage-selfcheck.mjs",
+   "ms": 5811,
+   "code": 0,
+   "at": "2026-10-20T21:07:53.862Z"
   },
   {
    "gate": "tools/ship/oceanPopulation-selfcheck.mjs",
@@ -5663,6 +5694,12 @@
    "at": "2026-10-20T02:25:29.454Z"
   },
   {
+   "gate": "tools/ship/zoomBlurExact-selfcheck.mjs",
+   "ms": 513,
+   "code": 0,
+   "at": "2026-10-20T22:54:26.086Z"
+  },
+  {
    "gate": "ui/stageInfo-selfcheck.mjs",
    "ms": 7234,
    "code": 0,
@@ -5675,6 +5712,12 @@
    "code": 0,
    "priorMs": 9286,
    "at": "2026-10-20T16:36:19.705Z"
+  },
+  {
+   "gate": "world/oceanWater-selfcheck.mjs",
+   "ms": 120,
+   "code": 0,
+   "at": "2026-10-20T21:07:47.863Z"
   },
   {
    "gate": "world/rootArch-selfcheck.mjs",

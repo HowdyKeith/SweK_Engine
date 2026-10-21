@@ -390,7 +390,7 @@ export const MEASURED_AT_V4486 = Object.freeze({
     // v4880 -- the key grew by thirteen files read by hand (seven emitters, six quoters); the thresholds miss two of the 46 rows.
     v4880: Object.freeze({ rows: 46, agreement: 44, handVerifiedEmitters: 21, handVerifiedQuoters: 25, reportedEmitters: 21, reportedQuoters: 25 }),
     // Against backendParity's own figures, unchanged and deliberately not widened.
-    preambleCensus: Object.freeze({ glslBearing: 167, wgslBearing: 114, both: 26 }),   // v4880: were 150 / 72 / 16 at v4486; restated with backendParity
+    preambleCensus: Object.freeze({ glslBearing: 169, wgslBearing: 115, both: 27 }),   // v4880: were 150 / 72 / 16 at v4486; restated with backendParity
     // Of the fourteen, how many are invisible for a reason a wider PATTERN could fix: the two whose only
     // problem is that the framework tell is a uniform declaration. The other twelve are structural.
     fixableByPattern: 2,

@@ -91,13 +91,17 @@ export function createSurface({ components = defaultComponents(1), level = 0 } =
         return { X1, X2, iterations: it, residual };
     }
 
-    /** The surface at world (x, z), time t: height, unit normal, and how the inversion did. */
-    function sample(x, z, t = 0) {
-        const { X1, X2, iterations, residual } = invert(x, z, t);
-        let y = level, j11 = 1, j12 = 0, j21 = 0, j22 = 1, yx = 0, yz = 0;
+    /**
+     * The surface AT A LABEL, with no inversion: where particle (X1, X2) is at time t, its unit up-normal, and the Jacobian of the horizontal map
+     * (1 on a flat sea, falling toward 0 where particles bunch at a crest -- the number a foam rule wants). This is what a mesh whose vertices are
+     * labelled on a regular grid draws, and it is the same arithmetic sample() ends with, so a drawn vertex and a sampled point cannot disagree.
+     */
+    function atLabel(X1, X2, t = 0) {
+        let px = X1, pz = X2, y = level, j11 = 1, j12 = 0, j21 = 0, j22 = 1, yx = 0, yz = 0;
         for (const c of comps) {
             const th = c.k * (c.dx * X1 + c.dz * X2) - c.omega * t + c.phase;
             const sn = Math.sin(th), cs = Math.cos(th);
+            px += c.Q * c.A * c.dx * cs; pz += c.Q * c.A * c.dz * cs;
             y += c.A * sn;
             const qak = c.Q * c.A * c.k;
             j11 -= qak * c.dx * c.dx * sn; j12 -= qak * c.dx * c.dz * sn;
@@ -106,9 +110,16 @@ export function createSurface({ components = defaultComponents(1), level = 0 } =
         }
         // tangents of the particle map in (x, y, z): Tx = dP/dX1, Tz = dP/dX2; the up normal is Tz x Tx
         const tx = [j11, yx, j21], tz = [j12, yz, j22];
-        let nx = tz[1] * tx[2] - tz[2] * tx[1], ny = tz[2] * tx[0] - tz[0] * tx[2], nz = tz[0] * tx[1] - tz[1] * tx[0];
+        const nx = tz[1] * tx[2] - tz[2] * tx[1], ny = tz[2] * tx[0] - tz[0] * tx[2], nz = tz[0] * tx[1] - tz[1] * tx[0];
         const len = Math.hypot(nx, ny, nz);
-        return { h: y, nx: nx / len, ny: ny / len, nz: nz / len, iterations, residual };
+        return { x: px, y, z: pz, nx: nx / len, ny: ny / len, nz: nz / len, jacobian: j11 * j22 - j12 * j21 };
+    }
+
+    /** The surface at world (x, z), time t: height, unit normal, and how the inversion did. */
+    function sample(x, z, t = 0) {
+        const { X1, X2, iterations, residual } = invert(x, z, t);
+        const a = atLabel(X1, X2, t);
+        return { h: a.y, nx: a.nx, ny: a.ny, nz: a.nz, iterations, residual };
     }
 
     const height = (x, z, t = 0) => sample(x, z, t).h;
@@ -117,7 +128,7 @@ export function createSurface({ components = defaultComponents(1), level = 0 } =
     /** The speed a crest travels at, m/s: omega / k = sqrt(g / k) for deep water. */
     const phaseSpeed = (i) => comps[i].omega / comps[i].k;
 
-    return Object.freeze({ components: comps, level, steepness, maxHeight, particle, invert, sample, height, submergence, phaseSpeed });
+    return Object.freeze({ components: comps, level, steepness, maxHeight, particle, invert, atLabel, sample, height, submergence, phaseSpeed });
 }
 
 /** The seeded default surface; the same seed is the same sea on every machine. */

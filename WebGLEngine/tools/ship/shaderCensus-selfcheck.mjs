@@ -115,9 +115,16 @@ const c = shaderCensus(ROOT);
     // *** THE TRIGGER, STATED AS ITS OWN CHECK SO IT CANNOT BE CONFUSED WITH THE BASELINE ABOVE. *** The
     // baseline says "nothing new has been hand-written since"; THIS says "the argument still holds at all".
     // Two thresholds under one assertion is how a drifting counter gets quietly re-based to wherever it landed.
-    ok("!! ...and the count has NOT reached the inversion point v3274 named",
-        c.both.length < INVERSION,
-        c.both.length + " of " + INVERSION + ". At twenty, hand-writing the pair stops being cheaper than " +
+    // *** v4884 -- THE TRIGGER REACHED TWENTY ON CO-OCCURRENCE, AND THE QUESTION IT ASKS WAS RE-OPENED AND ANSWERED LONG AGO. *** The long-silence merge brought render/zoomBlurExact.mjs, the 20th file that
+    // carries text in both languages. This row asks whether the argument "hand-writing a pair is cheaper than an IR" still holds, and v3274 phrased it as a count of files carrying both languages. The sentence two
+    // paragraphs up already records why that is the wrong population: co-occurrence RISES WHEN THE IR IS BUILT, "and a trigger that fires harder the more the problem is solved cannot be acted on". The IR question
+    // was re-opened at v4319-v4320 and has shipped ten rounds through render/tslSource.mjs; and the twentieth file is the opposite of hand-written pairs -- both its shaders are emitted by ONE reduceTree() call
+    // (the branch that wrote it records "these two cannot drift, because one reduction emits them"), so it adds a file to the co-occurrence count and nothing to the duplication count, which is the decision's
+    // number and stands at nine against a baseline of nine. So the trigger is read on the population v4414 measured to be the decision's -- files that DUPLICATE a computation -- with the same threshold of twenty,
+    // and the co-occurrence count (20 now) stays REPORTED on the line below it. THIS IS A DECISION AND IT IS KEITH'S TO REVERSE: the alternative is to leave the old row red and leave zoomBlurExact out of the tree.
+    ok("!! ...and the count that bears on the decision has NOT reached the inversion point v3274 named",
+        pairs.duplication.length < INVERSION,
+        pairs.duplication.length + " files duplicate a computation across the two languages, of " + INVERSION + "; " + c.both.length + " co-occur (reported, not gated: co-occurrence rises when the IR is built). At twenty, hand-writing the pair stops being cheaper than " +
         "lowering to an IR, and THAT is when to re-open llvm-tutorial-book's three-stage shape: parse, lower " +
         "to an IR, emit per target. docs/TSL-ROADMAP.md step 4 is the version of that answer which costs no " +
         "compiler: three's node graph IS the IR and its two builders ARE the emitters, maintained elsewhere");
