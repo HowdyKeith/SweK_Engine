@@ -6863,3 +6863,49 @@ the crash"), and nothing in section 101 re-opened it. As in sections 76 and 100,
 do not count.
 
 **Nothing changes in this section:** the chain's default fill, the page, the network, every kernel table, and `fx/fsr`.
+
+## 103. ROUND 36 -- THE LIST FILL BECOMES THE CHAIN'S DEFAULT, WITH ROUND 31'S RING FILL KEPT AS ITS REFERENCE
+
+**Why now.** Section 102's rule: the list fill held on both GPUs, so it becomes the chain's fill, in a round of its own that
+changes the runner's default and holds the change to today's rows. This is that round (`denoise-listfill-default`). It
+measures nothing new, so it has no prediction to miss and no rig run to wait for. It is fixed here before its code.
+
+**What changes, in `render/denoiseUpscaleGPU.mjs`:**
+- `fill(...)` and `chain(...)` run the list fill unless asked `{ list: false }`, which runs round 31's ring fill. The ring fill
+  stays, unchanged, as the reference the default is held to.
+- `timeHalfChain`'s `half` and `temporal` sum the list fill (`fillList`), and the result says so: `fill: "list"`.
+  `halfRing` and `temporalRing` are round 31's and round 33's sums with the ring fill (`fill`). `halfList` and `temporalList`
+  go, as they would be `half` and `temporal` under a second name. A report with no `fill` key is from before this round, and its
+  `half` and `temporal` are the ring fill's.
+- The step keys do not change. `fill` and `whole` are still the ring fill's steps; `fillList` and `wholeList` the list fill's.
+
+**What changes on the page (`denoise.html`'s "Time the half-size chain"):** the fill row, "the half-size chain in all", the
+one-frame row and "the half-size chain with its history, in all" report the list fill. Round 31's ring fill keeps four rows
+of its own, as the reference: its fill, its steps in one frame, its chain in all, and that with the history. 15 rows, not 14.
+The status line's ratio is the default chain's, with the ring fill's beside it.
+
+**What does NOT change: the lines the rig's reports carry.** Sections 94, 98, 100 and 102 read `section 93:`, `section 97:`
+and `section 99:` lines out of committed reports. Each keeps its meaning from this round on: section 93's and 97's chain is
+the ring fill's (`halfRing`, `temporalRing`), section 99's "with the list fill" is the list fill's (now `half`, `temporal`).
+A new `section 103:` line names the default fill and gives its chain and ratio. The four lines are made by one function, and
+the pilot-size row checks each line's figure against the sum it names, so a line cannot change meaning with no row red.
+
+**The rows that hold the change (the gate's sections 3 and 4):**
+1. `fill()` with nothing asked is the list fill: the same `listed` count, and the same floats, bit for bit, as
+   `{ list: true }`, on all six of round 34's frames. `{ list: false }` lists nothing and stays fillEmittersBounded's.
+2. `chain()` with nothing asked is the list fill's chain, bit for bit, on all four scenes. `{ list: false }` stays round 31's
+   chain within 1e-3 of emitterAwareUpscale, and the default stays within 1e-6 of it.
+3. At the pilot size the page's `half` is the half-size network plus coverage at both sizes, `fillList` and the rest;
+   `temporal` that plus the history's four passes; `halfRing` and `temporalRing` the same with `fill`; `fill` is `"list"`;
+   the table has 15 rows.
+4. The four rig lines, made from the pilot's report, each carry the figure of the sum named above.
+
+**Sabotages, by the byte-safe runner (B1-B6):** `fill()`'s default back to the ring fill; `chain()`'s the same; `half`
+summing `fill`; `halfRing` summing `fillList`; the page without the ring fill's chain row; and section 93's line made from
+`half`. Each must turn at least one row red. A sabotage that goes 0 red is a finding to fix before the round is committed.
+
+**The rule.** The round holds when rows 1-4 pass on SwiftShader and every gate the branch runs stays as green as it was.
+No rig run is owed: the kernels, their order and every timed step are round 34's, measured on both GPUs in sections 100 and
+102. The next rig run of this gate checks rows 1-4 on that GPU as it goes.
+
+**Nothing else changes:** the network, every kernel table, the kernels themselves, and `fx/fsr`.

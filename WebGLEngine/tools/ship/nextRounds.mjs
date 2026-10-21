@@ -2339,10 +2339,17 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "denoise-listfill-default",
-        blocker: "OPEN",
-        what: "Make round 34's list fill the half-size chain's default fill in render/denoiseUpscaleGPU.mjs, as section 102's rule asks, and keep the ring fill as the reference it is held to.",
-        how: "A round of its own: the default flips, every chain row is held to the same CPU references, and the page's 'the half-size chain in all' row then reports the list fill. On the 1080 the remaining cost is the fill's ~99 passes on the wall clock, so a fill that runs its rings in fewer passes (for example several rings a pass in workgroup memory) is the follow-up there.",
+        blocker: "CLOSED",
+        what: "DONE in round 36 (pre-registration section 103), shipping with the next version. render/denoiseUpscaleGPU.mjs's fill() and chain() run round 34's list fill unless asked { list: false }, which runs round 31's ring fill, kept as the reference; timeHalfChain's half and temporal sum the list fill, halfRing and temporalRing the ring fill, and its result says fill: \"list\".",
+        how: "The page's 'the half-size chain in all' row reports the list fill, and the ring fill keeps four reference rows (15, not 14). The rig's section 93/97/99 lines keep their meanings and a section 103 line names the default; one function makes all four and a pilot-size row holds each figure to its sum. render/denoiseUpscaleGPU-selfcheck.mjs holds the default to the list fill bit for bit; sabotaged B1-B6, each red. No rig run owed: the kernels and timed steps are round 34's.",
         why: "Section 102: H held on both GPUs -- the Intel 13 x faster, the 1080 3-11 % -- so the chain is cheaper with it everywhere it was timed.",
+    },
+    {
+        id: "denoise-fill-fewer-passes",
+        blocker: "OPEN",
+        what: "A fill that runs several rings a pass -- for example in workgroup memory over tiles -- so the GTX 1080's fill stops being ~99 compute passes on the wall clock.",
+        how: "Pre-register against round 36's default (the list fill) and round 31's ring fill, both kept as references: the same rings and pixels left as fillEmittersBounded, then timed on the rig. The tile's halo bounds how many rings a pass can run.",
+        why: "Section 102: on the 1080 the list fill cut the pixels to 5 % of the frame and took only 3-11 % off; what is left is the passes, not the pixels.",
     },
     {
         id: "denoise-fsr3-framegen",

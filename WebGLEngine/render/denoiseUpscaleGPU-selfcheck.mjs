@@ -79,6 +79,13 @@
 //   A3  H holding with the list fill up to 5 % slower                  1 RED (the rule row)
 //   A4  a solo run's trace swapped for r34-a's, which is not whole     1 RED (round 35's row)
 //   A5  the 1080's missed prediction read against 30 ms, not 6         1 RED (the predictions row)
+//   and round 36's default (section 103), by the same runner:
+//   B1  fill()'s default back to round 31's ring fill                  1 RED (the default fill row)
+//   B2  chain()'s default back to round 31's ring fill                 1 RED (the default chain row)
+//   B3  timeHalfChain's half sums the ring fill                        1 RED (section 4's default sum row)
+//   B4  timeHalfChain's halfRing sums the list fill                    2 RED (section 4's ring sum row; the history row on it)
+//   B5  the page's table without the ring fill's chain row             1 RED (the page row: 14 rows, not 15)
+//   B6  section 93's line made from half, not halfRing                 1 RED (the rig lines row)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -203,21 +210,25 @@ const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 900000, args: { 
     const cov = [];
     for (const S of P.scenes) { const f = await g.coverage(S, P.W, P.W), h = await g.coverage(S, P.Hh, P.Hh); cov.push({ full: { cov: A(f.cov), E: A(f.E) }, half: { cov: A(h.cov), E: A(h.E) } }); }
     const fills = [];
-    for (const m of [16, 2]) { const f = await g.fill(Float64Array.from(P.fill.img), Float64Array.from(P.fill.cov), 24, 20, m); fills.push({ ...f, y: A(f.y) }); }
+    for (const m of [16, 2]) { const f = await g.fill(Float64Array.from(P.fill.img), Float64Array.from(P.fill.cov), 24, 20, m, { list: false }); fills.push({ ...f, y: A(f.y) }); }
     // round 34: the list fill beside round 31's, on the same frames and ring budgets, and on a frame of all emitter and one of none
     const lists = [];
     for (const [k, F, w, h, m] of [["F1/16", P.fill, 24, 20, 16], ["F1/2", P.fill, 24, 20, 2], ["F2/40", P.fill2, 96, 64, 40], ["F2/8", P.fill2, 96, 64, 8],
                                    ["all", { img: new Array(12).fill(5), cov: new Array(4).fill(1) }, 2, 2, 4], ["none", { img: P.fill.img, cov: new Array(24 * 20).fill(0) }, 24, 20, 4]]) {
-        const ring = await g.fill(Float64Array.from(F.img), Float64Array.from(F.cov), w, h, m), list = await g.fill(Float64Array.from(F.img), Float64Array.from(F.cov), w, h, m, { list: true });
-        lists.push({ k, m, ring: { ...ring, y: A(ring.y) }, list: { ...list, y: A(list.y) } });
+        const ring = await g.fill(Float64Array.from(F.img), Float64Array.from(F.cov), w, h, m, { list: false }), list = await g.fill(Float64Array.from(F.img), Float64Array.from(F.cov), w, h, m, { list: true });
+        // round 36: and the fill with nothing asked, which is the list fill
+        const dflt = await g.fill(Float64Array.from(F.img), Float64Array.from(F.cov), w, h, m);
+        lists.push({ k, m, ring: { ...ring, y: A(ring.y) }, list: { ...list, y: A(list.y) }, dflt: { ...dflt, y: A(dflt.y) } });
     }
     const chains = [];
     for (let i = 0; i < P.chainIn.length; i++) {
         const c = await g.chain(Float64Array.from(P.chainIn[i]), Float64Array.from(P.covHalf[i]), P.Hh, P.Hh, P.W, P.W,
-            { cov: Float64Array.from(P.full[i].cov), E: Float64Array.from(P.full[i].E) }, P.RINGS);
+            { cov: Float64Array.from(P.full[i].cov), E: Float64Array.from(P.full[i].E) }, P.RINGS, { list: false });
         const cl = await g.chain(Float64Array.from(P.chainIn[i]), Float64Array.from(P.covHalf[i]), P.Hh, P.Hh, P.W, P.W,
             { cov: Float64Array.from(P.full[i].cov), E: Float64Array.from(P.full[i].E) }, P.RINGS, { list: true });
-        chains.push({ ...c, y: A(c.y), list: { ...cl, y: A(cl.y) } });
+        const cd = await g.chain(Float64Array.from(P.chainIn[i]), Float64Array.from(P.covHalf[i]), P.Hh, P.Hh, P.W, P.W,
+            { cov: Float64Array.from(P.full[i].cov), E: Float64Array.from(P.full[i].E) }, P.RINGS);
+        chains.push({ ...c, y: A(c.y), list: { ...cl, y: A(cl.y) }, dflt: { ...cd, y: A(cd.y) } });
     }
     let wrongBackend = null;
     try { new DenoiseUpscaleGPU(await requestDevice(document.createElement("canvas"), { backend: "webgl2", offscreen: true })); } catch (e) { wrongBackend = String(e.message).slice(0, 160); }
@@ -283,6 +294,15 @@ else {
     ok("!! ...and the whole chain with it is emitterAwareUpscale's within 1e-3, and round 31's chain within 1e-6, every emitter pixel reached",
         chL.length === 4 && chL.every((c) => c.rel <= 1e-3 && c.vs <= 1e-6 && c.same) && R.chains.every((c, i) => c.list.left === 0 && c.listed === 0 && c.list.listed === CPU[i].half.cov.filter((v) => v > 0).length),
         chL.map((c) => `${c.k}: worst ${c.rel.toExponential(1)} against the CPU, ${c.vs.toExponential(1)} against round 31's`).join("; "));
+    // ROUND 36 (section 103), THE DEFAULT: fill() and chain() asked nothing are the list fill, bit for bit -- the same floats and
+    // the same list, read back -- and round 31's fill, asked { list: false }, lists nothing (the rows above hold it to the CPU)
+    const bits = (a, b) => a.length === b.length && a.every((v, i) => Object.is(v, b[i]));
+    ok("!! round 36: fill() asked nothing is the list fill -- the same pixels listed, the same rings, ring by ring, and the same floats bit for bit, on all six frames",
+        L.length === 6 && L.every((x) => x.dflt.listed === x.list.listed && same(x.dflt, x.list) && bits(x.dflt.y, x.list.y)) && L.some((x) => x.dflt.listed > 0),
+        L.map((x) => `${x.k}: ${x.dflt.listed} listed, ${x.dflt.rings} rings`).join("; "));
+    ok("!! ...and chain() asked nothing is the list fill's chain, bit for bit, every emitter pixel listed, on all four scenes",
+        R.chains.length === 4 && R.chains.every((c, i) => c.dflt.listed === c.list.listed && c.dflt.listed === CPU[i].half.cov.filter((v) => v > 0).length && same(c.dflt, c.list) && bits(c.dflt.y, c.list.y)),
+        R.chains.map((c, i) => `R ${SCENES[i].seed}: ${c.dflt.listed} listed, ${c.dflt.rings} rings`).join("; "));
 }
 
 console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at its pilot size, in Chromium");
@@ -303,15 +323,37 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
         let J = null; try { J = JSON.parse(pg.result?.json || "null"); } catch {}
         const st = J && J.chain && J.chain.steps, keys = ["covHalf", "covFull", "fill", "rest", "whole", "hits", "shift", "accum", "final", "fillList", "wholeList"];
         const fine = (x) => !!x && Number.isFinite(x.ms) && x.ms > 0 && (x.clock === "device" || x.clock === "wall");
+        // THE RIG'S LINES, from a report: sections 94, 98, 100 and 102 read them out of committed reports, so each keeps its meaning
+        // (section 103) -- 93's and 97's chain is round 31's ring fill (halfRing, temporalRing), 99's "with the list fill" the list
+        // fill (half, temporal since round 36); 103's names the default fill
+        const rigLines = (K) => {
+            const ks = K.chain.steps, row = (x) => (x.skipped ? `not measured (${x.reason})` : `${(x.gpu ? x.gpu.median : x.wall.median).toFixed(3)} ms (${x.gpu ? "device" : "wall"})`), [lh, lf] = K.ladder.rows[K.kernels];
+            const at = (W, H) => `${W} x ${H}`, [Wf, Hf, Wh, Hh2] = [lf.W, lf.H, lh.W, lh.H];
+            return [`section 93: ${K.ladder.adapter.name}, kernels ${K.kernels}; the network at ${at(Wf, Hf)} ${row(lf)}, at ${at(Wh, Hh2)} ${row(lh)}; ` +
+                    (K.full && K.halfRing ? `today's page (network and mask) ${K.full.ms.toFixed(3)} ms (${K.full.clocks.join(" + ")}); the half-size chain ${K.halfRing.ms.toFixed(3)} ms (${K.halfRing.clocks.join(" + ")}); ratio ${(K.full.ms / K.halfRing.ms).toFixed(3)} x` : "no ratio: a part was not measured"),
+                "section 93: the chain's steps -- " + ["covHalf", "covFull", "fill", "rest", "whole"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; ") +
+                    `; ${K.chain.rings} of ${K.chain.maxRings} rings filled`,
+                // round 33 (section 97): the history's passes and the chain with them, in a line of their own -- section 94 reads the two above
+                "section 97: the history's passes -- " + ["hits", "shift", "accum", "final"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; ") +
+                    (K.full && K.temporalRing ? `; the half-size chain with its history ${K.temporalRing.ms.toFixed(3)} ms (${K.temporalRing.clocks.join(" + ")}); ratio ${(K.full.ms / K.temporalRing.ms).toFixed(3)} x` : "; no ratio: a part was not measured"),
+                // round 34 (section 99): the fill over the lights' pixels, beside round 31's, in a line of its own
+                "section 99: the fills -- " + ["fill", "fillList", "whole", "wholeList"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; ") +
+                    (K.chain.listCheck ? `; the list fill ${K.chain.listCheck.listed} listed, ${K.chain.listCheck.rings} of ${K.chain.maxRings} rings, ${K.chain.listCheck.left} left` : "; the list fill not checked") +
+                    (K.full && K.half && K.temporal ? `; the half-size chain with the list fill ${K.half.ms.toFixed(3)} ms, ratio ${(K.full.ms / K.half.ms).toFixed(3)} x; with its history ${K.temporal.ms.toFixed(3)} ms, ratio ${(K.full.ms / K.temporal.ms).toFixed(3)} x` : "; no ratio: a part was not measured"),
+                // round 36 (section 103): which fill the default chain runs, and its chain
+                `section 103: the default fill ${K.fill || "ring (a report from before round 36)"}` +
+                    (K.full && K.half ? `; the half-size chain ${K.half.ms.toFixed(3)} ms, ratio ${(K.full.ms / K.half.ms).toFixed(3)} x` : "; no ratio: a part was not measured") +
+                    (K.full && K.temporal ? `; with its history ${K.temporal.ms.toFixed(3)} ms, ratio ${(K.full.ms / K.temporal.ms).toFixed(3)} x` : "")];
+        };
         ok("!! the page timed every step of the chain and both networks at its pilot size -- each a positive time on a named clock, the table shown, no page error",
-            pg.ok && !!st && keys.every((k) => fine(st[k])) && fine(J.networkFull) && fine(J.networkHalf) && !!J.full && !!J.half && !!J.temporal && !!J.halfList && !!J.temporalList && pg.result.shown && pg.result.rows === 14 && !pg.pageErrors.length,
+            pg.ok && !!st && keys.every((k) => fine(st[k])) && fine(J.networkFull) && fine(J.networkHalf) && !!J.full && !!J.half && !!J.temporal && !!J.halfRing && !!J.temporalRing && J.fill === "list" && pg.result.shown && pg.result.rows === 15 && !pg.pageErrors.length,
             pg.ok ? (pg.result?.status || "").slice(0, 200) : pg.reason);
         if (st) {
             // the network times are the ladder's rows, w x h then W x H (T4 went 0 RED before this held which was which); today's page
             // is the full-size network and its mask, the chain the half-size network and every step
             const [halfRow, fullRow] = J.ladder.rows[J.kernels], med = (x) => (x.gpu ? x.gpu.median : x.wall.median);
-            const parts = J.half ? J.half.ms : NaN, sum = med(halfRow) + ["covHalf", "covFull", "fill", "rest"].reduce((a, k) => a + st[k].ms, 0);
-            ok("  ...the chain in all is the half-size network plus the four steps, today's page the full-size network and its mask, each network its own ladder row, the fill by the wall clock, on scene R 990000 with its light in view, every ring budgeted and some used",
+            const parts = J.halfRing ? J.halfRing.ms : NaN, sum = med(halfRow) + ["covHalf", "covFull", "fill", "rest"].reduce((a, k) => a + st[k].ms, 0);
+            ok("  ...round 31's chain in all (halfRing since round 36) is the half-size network plus the four steps, today's page the full-size network and its mask, each network its own ladder row, the fill by the wall clock, on scene R 990000 with its light in view, every ring budgeted and some used",
                 Math.abs(parts - sum) < 1e-9 && st.fill.clock === "wall" && fullRow.W === 128 && fullRow.H === 72 && halfRow.W === 64 && halfRow.H === 36 &&
                 J.networkFull.ms === med(fullRow) && J.networkHalf.ms === med(halfRow) && Math.abs(J.full.ms - (med(fullRow) + st.covFull.ms)) < 1e-9 && st.whole.clock === "wall" && J.chain.maxRings === 96 && J.chain.rings > 0 && J.chain.rings < 96 &&
                 J.chain.inView > 0 && JSON.stringify(J.scene) === JSON.stringify(["R", 990000]) && J.chain.W === 128 && J.chain.w === 64,
@@ -319,15 +361,22 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
             // round 33: the chain with its history is the chain and round 32's four passes, each one pass on the device's clock where it has one
             const hist = ["hits", "shift", "accum", "final"];
             ok("  round 33: the chain with its history is the half-size chain plus the history's four passes -- first hits, shift, accumulation, composite -- each one pass, on the device's clock where the device has one",
-                !!J.temporal && Math.abs(J.temporal.ms - (J.half.ms + hist.reduce((a, k) => a + st[k].ms, 0))) < 1e-9 && hist.every((k) => st[k].clock === st.covHalf.clock),
+                !!J.temporalRing && Math.abs(J.temporalRing.ms - (J.halfRing.ms + hist.reduce((a, k) => a + st[k].ms, 0))) < 1e-9 && hist.every((k) => st[k].clock === st.covHalf.clock),
                 hist.map((k) => `${k} ${st[k].ms.toFixed(2)} ms (${st[k].clock})`).join(", "));
             // round 34: the chain with the list fill is the same sum with fillList in fill's place, and with its history the same
             const listSum = med(halfRow) + ["covHalf", "covFull", "fillList", "rest"].reduce((a, k) => a + st[k].ms, 0);
-            ok("  round 34: the chain with the list fill is the half-size chain with fillList in the fill's place, by the wall clock as the fill is, and with its history the history's four passes more",
-                !!J.halfList && Math.abs(J.halfList.ms - listSum) < 1e-9 && st.fillList.clock === "wall" && st.wholeList.clock === "wall" &&
-                !!J.temporalList && Math.abs(J.temporalList.ms - (listSum + hist.reduce((a, k) => a + st[k].ms, 0))) < 1e-9 &&
+            ok("  round 36: the default chain (half) is the half-size chain with fillList in the fill's place, by the wall clock as the fill is, and with its history (temporal) the history's four passes more",
+                !!J.half && Math.abs(J.half.ms - listSum) < 1e-9 && st.fillList.clock === "wall" && st.wholeList.clock === "wall" &&
+                !!J.temporal && Math.abs(J.temporal.ms - (listSum + hist.reduce((a, k) => a + st[k].ms, 0))) < 1e-9 &&
                 !!J.chain.listCheck && J.chain.listCheck.listed === J.chain.inView && J.chain.listCheck.rings === J.chain.rings && J.chain.listCheck.left === 0,
                 `the list fill: ${J.chain.listCheck ? `${J.chain.listCheck.listed} listed, ${J.chain.listCheck.rings} rings, ${J.chain.listCheck.left} left` : "not checked"}; fill ${st.fill.ms.toFixed(2)} ms, the list fill ${st.fillList.ms.toFixed(2)} ms; whole ${st.whole.ms.toFixed(2)}, with the list fill ${st.wholeList.ms.toFixed(2)}`);
+            // round 36 (section 103): the rig's four lines, made from this report, each carry the figure of the sum it names
+            const [l93, , l97, l99, l103] = rigLines(J), n = (re, t) => { const m = t.match(re); return m ? Number(m[1]) : NaN; }, at3 = (x) => Number(x.ms.toFixed(3));
+            ok("  round 36: the rig's lines keep their meaning -- section 93's and 97's chain the ring fill's, section 99's \"with the list fill\" and section 103's the default's, which is the list fill",
+                n(/the half-size chain ([0-9.]+) ms/, l93) === at3(J.halfRing) && n(/with its history ([0-9.]+) ms/, l97) === at3(J.temporalRing) &&
+                n(/with the list fill ([0-9.]+) ms/, l99) === at3(J.half) && n(/with its history ([0-9.]+) ms/, l99) === at3(J.temporal) &&
+                /^section 103: the default fill list; the half-size chain ([0-9.]+) ms/.test(l103) && n(/the half-size chain ([0-9.]+) ms/, l103) === at3(J.half) && n(/with its history ([0-9.]+) ms/, l103) === at3(J.temporal),
+                l103);
         }
         // ON A GPU, THE RIG'S SIZE (pre-registration section 93): 960 x 540 -> 1920 x 1080, every step a measured line the rig's
         // report keeps. Not on a software adapter: SwiftShader's 1080p would be minutes of a CPU's time that decides nothing.
@@ -338,22 +387,11 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
             let K = null; try { K = JSON.parse(rg.result?.json || "null"); } catch {}
             const ks = K && K.chain && K.chain.steps;
             ok("!! section 93: at 1920 x 1080 the page timed both networks and every step of the chain, the fill reaching every pixel in its 96 rings -- and round 34's list fill the same, every listed pixel reached",
-                rg.ok && !!ks && keys.every((k) => fine(ks[k])) && fine(K.networkFull) && fine(K.networkHalf) && !!K.full && !!K.half && !!K.temporal && !!K.halfList && !!K.temporalList && K.chain.rings > 0 && K.chain.rings < 96 && !rg.pageErrors.length &&
+                rg.ok && !!ks && keys.every((k) => fine(ks[k])) && fine(K.networkFull) && fine(K.networkHalf) && !!K.full && !!K.half && !!K.temporal && !!K.halfRing && !!K.temporalRing && K.fill === "list" && K.chain.rings > 0 && K.chain.rings < 96 && !rg.pageErrors.length &&
                 !!K.chain.listCheck && K.chain.listCheck.listed === K.chain.inView && K.chain.listCheck.rings === K.chain.rings && K.chain.listCheck.left === 0,
                 rg.ok ? (rg.result?.status || "").slice(0, 200) : rg.reason);
             if (ks) {
-                const row = (x) => (x.skipped ? `not measured (${x.reason})` : `${(x.gpu ? x.gpu.median : x.wall.median).toFixed(3)} ms (${x.gpu ? "device" : "wall"})`), [lh, lf] = K.ladder.rows[K.kernels];
-                say(`section 93: ${K.ladder.adapter.name}, kernels ${K.kernels}; the network at 1920 x 1080 ${row(lf)}, at 960 x 540 ${row(lh)}; ` +
-                    (K.full && K.half ? `today's page (network and mask) ${K.full.ms.toFixed(3)} ms (${K.full.clocks.join(" + ")}); the half-size chain ${K.half.ms.toFixed(3)} ms (${K.half.clocks.join(" + ")}); ratio ${(K.full.ms / K.half.ms).toFixed(3)} x` : "no ratio: a part was not measured"));
-                say("section 93: the chain's steps -- " + ["covHalf", "covFull", "fill", "rest", "whole"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; ") +
-                    `; ${K.chain.rings} of 96 rings filled`);
-                // round 33 (section 97): the history's passes and the chain with them, in a line of their own -- section 94 reads the two above
-                say("section 97: the history's passes -- " + ["hits", "shift", "accum", "final"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; ") +
-                    (K.full && K.temporal ? `; the half-size chain with its history ${K.temporal.ms.toFixed(3)} ms (${K.temporal.clocks.join(" + ")}); ratio ${(K.full.ms / K.temporal.ms).toFixed(3)} x` : "; no ratio: a part was not measured"));
-                // round 34 (section 99): the fill over the lights' pixels, beside round 31's, in a line of its own
-                say("section 99: the fills -- " + ["fill", "fillList", "whole", "wholeList"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; ") +
-                    (K.chain.listCheck ? `; the list fill ${K.chain.listCheck.listed} listed, ${K.chain.listCheck.rings} of 96 rings, ${K.chain.listCheck.left} left` : "; the list fill not checked") +
-                    (K.full && K.halfList && K.temporalList ? `; the half-size chain with the list fill ${K.halfList.ms.toFixed(3)} ms, ratio ${(K.full.ms / K.halfList.ms).toFixed(3)} x; with its history ${K.temporalList.ms.toFixed(3)} ms, ratio ${(K.full.ms / K.temporalList.ms).toFixed(3)} x` : "; no ratio: a part was not measured"));
+                for (const l of rigLines(K)) say(l);
             }
         }
     }

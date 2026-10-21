@@ -569,6 +569,16 @@ set SWEK_TIMING_TRACE=
 - **Don't commit or pull between runs.**
 - **Send back** the console output with its three `echo` lines, the five `trace35-*.txt` files, and the two JSON files.
 
+**The outcome (section 102): no crash in five runs, and the list fill holds on the 1080 too.** All three solo runs and both
+`realGpuRun` runs exited 0 with every gate green. The list fill took 24.0 and 25.4 ms against the old fill's 26.9 and 26.2.
+The crash stays open, with these traces as its record.
+
+### Round 36: the list fill is the chain's default (pre-registration section 103)
+
+No run is owed. The chain gate now runs the list fill unless asked for the old one, and checks the two bit for bit. Its
+report keeps the `section 93:`, `section 97:` and `section 99:` lines with the same meanings, and adds a `section 103:` line
+that names the default fill. Any later rig run of the chain gate checks the change on that GPU as it goes.
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and

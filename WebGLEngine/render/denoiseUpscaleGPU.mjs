@@ -582,8 +582,11 @@ export class DenoiseUpscaleGPU {
     }
     _free(bufs) { for (const v of Object.values(bufs)) for (const b of [].concat(v)) b.destroy(); }
 
-    /** fillEmittersBounded on the device: { y, rings, left, perRing }. `list` (round 34) runs it over the lights' pixels only. */
-    async fill(img3, cov, w, h, maxRings, { list = false } = {}) {
+    /**
+     * fillEmittersBounded on the device: { y, rings, left, perRing, listed }. Round 36: over the lights' pixels only (round 34's
+     * list fill) unless asked `{ list: false }`, which runs round 31's ring fill -- the reference the default is held to.
+     */
+    async fill(img3, cov, w, h, maxRings, { list = true } = {}) {
         if (!Number.isInteger(maxRings) || maxRings < 0) throw new Error(`denoiseUpscaleGPU.fill: maxRings is a whole number of rings -- got ${maxRings}`);
         if (img3.length !== w * h * 3 || cov.length !== w * h) throw new Error(`denoiseUpscaleGPU.fill: ${img3.length} values and ${cov.length} coverages are not a ${w} x ${h} frame`);
         const bufs = this._fillBufs(img3, cov, w, h, maxRings);
@@ -597,9 +600,10 @@ export class DenoiseUpscaleGPU {
     /**
      * The emitter-aware chain on one encoder: the w x h frame (rgb), its coverage covHalf, filled in at most maxRings rings,
      * through the transfer, EASU to W x H, the clamp and inverse, and the composite with `full` ({ cov, E } at W x H).
-     * Returns { y (W*H*3), rings, left, perRing, tMax }. `list` (round 34) fills over the lights' pixels only.
+     * Returns { y (W*H*3), rings, left, perRing, listed, tMax }. Round 36: the fill is round 34's list fill unless asked
+     * `{ list: false }`, round 31's ring fill.
      */
-    async chain(img3, covHalf, w, h, W, H, full, maxRings, { list = false } = {}) {
+    async chain(img3, covHalf, w, h, W, H, full, maxRings, { list = true } = {}) {
         if (full.cov.length !== W * H || full.E.length !== W * H * 3) throw new Error(`denoiseUpscaleGPU.chain: the full-size guide is not ${W} x ${H}`);
         const dev = this.device, bufs = this._fillBufs(img3, covHalf, w, h, maxRings);
         const tMax = dev.buffer({ data: new Uint32Array(1), usage: ["storage"] }), uT = dev.buffer({ data: u4(w, h), usage: "uniform" });
@@ -750,12 +754,15 @@ export class DenoiseUpscaleGPU {
  * Round 31, WHAT THE PAGE TIMES (denoise.html's "Time the half-size chain"): the shipped network at w x h and at W x H on the
  * page's own kernel set (render/denoiseDevice.mjs's timingLadder, the ladder the page already runs), and the chain's steps on
  * scene S (DenoiseUpscaleGPU's time). `device` is a gfx/device.js webgpu device; `newAdapter` makes the ladder's adapters.
- * Returns { ladder, chain, networkHalf, networkFull, full, half, temporal, halfList, temporalList }, each sum on the clocks its parts were read on, named:
+ * Returns { ladder, chain, networkHalf, networkFull, fill, full, half, temporal, halfRing, temporalRing }, each sum on the clocks
+ * its parts were read on, named:
  *   full   today's page at W x H: the network at W x H, and the emitter coverage at W x H, which is the mask it reads
  *   half   the chain: the network at w x h, the coverage at w x h (its mask, and the fill's), the coverage at W x H (the
  *          composite's guide), the fill, and the transfer, EASU and the composite
  *   temporal  round 33: the chain and round 32's history a frame -- the first hits, the shift, the accumulation, the composite
- *   halfList, temporalList  round 34: half and temporal with the fill over the lights' pixels only (fillList for fill)
+ *   fill   round 36: "list" -- half and temporal's fill is round 34's over the lights' pixels (fillList). A report without
+ *          this key is from before round 36, and its half and temporal are the ring fill's
+ *   halfRing, temporalRing  round 36: half and temporal with round 31's ring fill (fill), the reference the default is held to
  * The ladder's cap is 5000 ms a pass, not its default 1500: the Intel gen-9's page pass at 1920 x 1080 is 1.2-1.4 s (rounds 27
  * and 28), close enough to 1500 that a prediction from the smaller size could skip the very row being compared.
  */
@@ -767,10 +774,10 @@ export async function timeHalfChain({ device, net, newAdapter, kernels, S, w, h,
     const st = chain.steps, sum = (parts) => (parts.every((x) => x && x.ms != null)
         ? { ms: parts.reduce((a, x) => a + x.ms, 0), clocks: [...new Set(parts.map((x) => x.clock))] } : null);
     return { ladder, chain, kernels, networkHalf, networkFull,
-             full: sum([networkFull, st.covFull]), half: sum([networkHalf, st.covHalf, st.covFull, st.fill, st.rest]),
+             fill: "list", full: sum([networkFull, st.covFull]), half: sum([networkHalf, st.covHalf, st.covFull, st.fillList, st.rest]),
              // round 33: the chain with round 32's history -- its four passes a frame added to the half-size chain
-             temporal: sum([networkHalf, st.covHalf, st.covFull, st.fill, st.rest, st.hits, st.shift, st.accum, st.final]),
-             // round 34: the same two with the fill over the lights' pixels only
-             halfList: sum([networkHalf, st.covHalf, st.covFull, st.fillList, st.rest]),
-             temporalList: sum([networkHalf, st.covHalf, st.covFull, st.fillList, st.rest, st.hits, st.shift, st.accum, st.final]) };
+             temporal: sum([networkHalf, st.covHalf, st.covFull, st.fillList, st.rest, st.hits, st.shift, st.accum, st.final]),
+             // round 36: the same two with round 31's ring fill, the reference
+             halfRing: sum([networkHalf, st.covHalf, st.covFull, st.fill, st.rest]),
+             temporalRing: sum([networkHalf, st.covHalf, st.covFull, st.fill, st.rest, st.hits, st.shift, st.accum, st.final]) };
 }

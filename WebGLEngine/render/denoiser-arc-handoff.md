@@ -37,8 +37,9 @@ node tools/ship/versionPreflight.mjs --next    # the next free version and sweep
 
 ## What is next -- Keith picks
 
-1. **`denoise-listfill-default`.** Section 102: the list fill held on both GPUs (13 x on the Intel, 3-11 % on the 1080), so
-   it becomes the chain's default in a round of its own. On the 1080 the fill's remaining cost is its ~99 passes, not pixels.
+1. **`denoise-fill-fewer-passes`.** Round 36 (section 103) made the list fill the chain's default, with round 31's ring
+   fill kept as its reference (`{ list: false }`); it ships with the next version and owes no rig run. On the 1080 the fill's
+   remaining cost is its ~99 passes, not pixels, so the next fill runs several rings a pass.
    **`denoise-1080-native-crash`:** round 35 did not reproduce it in five runs (section 102). The traces stay armed.
    **Earlier, `denoise-1080-native-crash`, round 35 (section 101).** On the 1080 the timing gate dies inside its native ladder in most
    runs. The 1080 has no verdict for rounds 33 and 34 until this is settled. Round 35 traces the ladder step by step and keeps
