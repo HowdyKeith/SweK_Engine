@@ -44,7 +44,7 @@
   The default water every GPU can draw is <a href="/ocean-default.html">ocean-default.html</a>. <a href="/server.html">Back to the server page</a>.</p>
 <div id="sets"></div>
 <h2>all of them against the budget (one scale, so the gap between the adapters is the gap in the picture)</h2>
-<svg id="bars" width="680" height="10" role="img" aria-label="GPU time per resolution and adapter against the frame budget"></svg>
+<svg id="bars" width="700" height="10" role="img" aria-label="GPU time per resolution and adapter against the frame budget"></svg>
 <h2>the pixel-cost lines, the comparison between adapters, and how far to trust them</h2>
 <pre id="fit">loading&hellip;</pre>
 <h2>the opt-in page's own probe on the same adapter</h2>
@@ -77,13 +77,13 @@
   }
 
   // bars: one scale for every adapter, GPU median per resolution, against a vertical line at the budget
-  const svg = $("bars"), NS = "http://www.w3.org/2000/svg", W = 680, left = 210, rowH = 30;
+  const svg = $("bars"), NS = "http://www.w3.org/2000/svg", W = 700, left = 210, rowH = 30;
   const scale = (W - left - 90) / Math.max(...all.map((a) => a.g.gpuMax), BUDGET_MS), H = 12 + all.length * rowH + 22;
   svg.setAttribute("height", String(H));
   const el = (name, attrs, text) => { const e = document.createElementNS(NS, name); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; svg.appendChild(e); return e; };
   all.forEach((a, i) => {
     const y = 8 + i * rowH;
-    el("text", { x: 8, y: y + 15, fill: "#dbe7ff", "font-size": 11 }, (a.kind === "integrated" ? "UHD 620" : a.adapter) + " " + a.g.resolution);
+    el("text", { x: 8, y: y + 15, fill: "#dbe7ff", "font-size": 11 }, (a.kind === "integrated" ? "UHD 620" : "Pascal") + " " + (a.g.resolution === "native" ? a.g.width + "x" + a.g.height : a.g.resolution));
     el("rect", { x: left, y, width: Math.max(1, a.g.gpuMedian * scale), height: 20, fill: a.g.gpuMedian > BUDGET_MS ? "#ff7a7a" : "#5fe08a", "data-ms": a.g.gpuMedian.toFixed(2), "data-adapter": a.adapter });
     el("text", { x: left + a.g.gpuMedian * scale + 6, y: y + 15, fill: "#dbe7ff", "font-size": 11 }, a.g.gpuMedian.toFixed(1) + " ms");
   });
