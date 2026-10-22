@@ -37,7 +37,9 @@ node tools/ship/versionPreflight.mjs --next    # the next free version and sweep
 
 ## What is next -- Keith picks
 
-1. **`denoise-f16-intel`, round 41 (section 109): owed two runs on each GPU.** r41h, r18u's hidden layers in f16 on the
+1. **`denoise-rest-split`, round 42 (section 110): read off the same runs.** The rest's three passes timed apart, and the
+   transfer without its single-word atomicMax, to choose the next lever on the Intel's fixed costs.
+   **`denoise-f16-intel`, round 41 (section 109): owed two runs on each GPU.** r41h, r18u's hidden layers in f16 on the
    Intel, its image within 1e-2 of the f64 network; its f16 kernel first compiles on the Intel (SwiftShader has no shader-f16),
    the packing held here through an unpack2x16float emulation. Section 109 predicts 1.1-1.8 x r18u at 1080p; no entry moves
    before a quality round.

@@ -7396,3 +7396,56 @@ H3 1, H4 1, H5 2, H6 1 and H7 1. H3 was caught only by the packing row: f16bits 
 mostly packed to the same words. H2 left the three-group 1 x 1 case alone, since it reads through the z-group index. As this
 section says, no sabotage of the f16 kernel's own type tokens can be seen before the Intel compiles it.
 
+
+## 110. ROUND 42 -- THE CHAIN'S "REST", SPLIT INTO ITS THREE PASSES: A MEASUREMENT, FIXED BEFORE THE RIG RUNS IT
+
+**The question.** The step every round has called "rest" is three passes: the transfer at w x h (`toT`, which also finds the
+frame's brightest t), EASU to W x H, and the composite at W x H. In round 37's runs it was 41.1-42.8 ms on the Intel at
+960 x 540 -> 1920 x 1080 and 1.0 ms on the 1080. With rounds 38-41 aimed at the fill, the coverage and the network, it is the
+Intel's next fixed cost beside the history's accumulation. Nothing has timed its passes apart. One of them is suspect by its
+shape: `toT` finds the brightest t with an `atomicMax` that every one of its 518,400 threads sends to **the same 32-bit
+word**. This round measures; it moves nothing.
+
+**What is timed (`time()`, one pass each, on the device's clock where the device has one, as `rest` is):**
+- `restToT` -- the transfer alone;
+- `restEasu` -- EASU alone;
+- `restComp` -- the composite alone;
+- `restToTFree` -- **a diagnostic, never run in any chain**: the transfer with its `atomicMax` line removed (TO_T_FREE_WGSL,
+  made from TO_T_WGSL by deleting that one line). `restToT - restToTFree` is what the single-word atomic costs.
+- A `section 110:` line carries the four and `rest` beside them.
+
+**The rows.**
+1. TO_T_FREE_WGSL is TO_T_WGSL less exactly its `atomicMax` line, and nothing else.
+2. At the pilot size each new step is one pass on `rest`'s clock, positive and finite, and the line carries them.
+3. The chain's kernels, its sums and every earlier row are unchanged: the new steps are timed beside the chain, not in it.
+
+**The rig run** is the same pair of runs per GPU as rounds 38-41, at a commit carrying this section.
+
+**Reading it (no rule moves anything; this fixes how the next round is chosen).**
+- On the Intel, with both runs' passes on the device's clock: the pass that is at least half of `restToT + restEasu +
+  restComp` in both runs is the next round's target.
+- If `restToT - restToTFree` is at least half of `restToT` in both runs, that target is the brightest t's reduction (a
+  workgroup reduction, then one atomic a workgroup), whichever pass is largest.
+- If no pass is half, the rest is reported as spread and dropped from the backlog's levers.
+
+**Predictions (stated so they can miss), on the Intel at 960 x 540 -> 1920 x 1080.**
+- EASU is the largest: 20-35 ms of the ~42. It runs 12 taps at each of 2,073,600 output pixels.
+- The composite: 4-12 ms.
+- `restToT`: 2-12 ms, of which the atomic is a third or more.
+- On the 1080 the three sum to about its 1.0 ms. Nothing there is read.
+
+**Sabotages, by the byte-safe runner (I1-I3):**
+- TO_T_FREE_WGSL keeping the atomic;
+- `restEasu` timing the composite;
+- the split steps run inside the `rest` frame (no longer one pass each).
+
+Each must turn at least one row red.
+
+**Nothing else changes:** every kernel the chain runs, every sum, every table, and `fx/fsr`.
+
+**Before commit.** I1-I3 each turned at least one row red. I2 (`restEasu` timing the composite) could not have gone red as the
+rows were first written, because a time does not say which kernel made it. So the rest steps now record which of the
+runner's pipelines they dispatched, through a wrapper on those five steps alone, so no other step's timing changes. The
+split row holds each step to its kernel. Reported, deciding nothing: on SwiftShader at the pilot size the transfer took
+0.48 ms and the transfer without its atomic 0.16 ms.
+

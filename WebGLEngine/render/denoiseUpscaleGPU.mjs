@@ -502,6 +502,11 @@ fn main(@builtin(global_invocation_id) g:vec3<u32>) {
     atomicMax(&tMax[0], bitcast<u32>(m));
 }
 `;
+/**
+ * Round 42 (section 110): A TIMING DIAGNOSTIC, NEVER RUN IN ANY CHAIN -- TO_T_WGSL less its one atomicMax line, so the difference
+ * between the two passes' times is what every thread sending its brightest t to the same word costs.
+ */
+export const TO_T_FREE_WGSL = TO_T_WGSL.replace("    atomicMax(&tMax[0], bitcast<u32>(m));\n", "");
 
 export const COMPOSITE_WGSL = /* wgsl */`
 struct P { w:u32, h:u32, pad0:u32, pad1:u32 };
@@ -759,7 +764,7 @@ export class DenoiseUpscaleGPU {
                 "without one uses render/denoiseUpscale.mjs's CPU chain by asking for it.");
         this.device = device;
         this.p = {};
-        for (const [k, wgsl] of [["cov", COVERAGE_WGSL], ["covB", COVERAGE_BOUND_WGSL], ["ring", FILL_RING_WGSL], ["left", FILL_LEFT_WGSL], ["toT", TO_T_WGSL], ["comp", COMPOSITE_WGSL], ["easu", EASU_WGSL],
+        for (const [k, wgsl] of [["cov", COVERAGE_WGSL], ["covB", COVERAGE_BOUND_WGSL], ["ring", FILL_RING_WGSL], ["left", FILL_LEFT_WGSL], ["toT", TO_T_WGSL], ["toTFree", TO_T_FREE_WGSL], ["comp", COMPOSITE_WGSL], ["easu", EASU_WGSL],
                                   ["hits", FIRSTHITS_WGSL], ["shift", SHIFT_WGSL], ["accum", ACCUM_WGSL], ["final", FINAL_WGSL],
                                   ["list", FILL_LIST_WGSL], ["args", FILL_ARGS_WGSL], ["lring", FILL_LISTRING_WGSL], ["lleft", FILL_LISTLEFT_WGSL],
                                   ["tinit", FILL_TILEINIT_WGSL], ["tile", FILL_TILE_WGSL], ["tleft", FILL_TILELEFT_WGSL],
@@ -994,6 +999,7 @@ export class DenoiseUpscaleGPU {
      *   fillTile, wholeTile        round 37: fill and whole with the fill FILL_TILE_RINGS rings a pass in tiles, by the wall clock
      *   fillLTile, wholeLTile      round 38: the same over the listed tiles only, by the wall clock
      *   covHalfB, covFullB         round 39: the coverage bounded, at w x h and W x H, one pass each
+     *   restToT, restEasu, restComp  round 42: rest's three passes, one each; restToTFree the transfer without its atomic (a diagnostic)
      * A step is on the device's clock where the device grants timestamps and the step has 30 passes or fewer, else the wall
      * clock (performance.now() around the frame and the queue's onSubmittedWorkDone). Each row says which. Returns medians.
      */
@@ -1034,11 +1040,18 @@ export class DenoiseUpscaleGPU {
             accum: (pass) => { this.p.accum.bind("prevGeo", geoB).bind("curGeo", geoB).bind("prevHist", hA).bind("cur", curB).bind("outHist", hB).bind("u", uAc); pass.dispatch(this.p.accum, groups(W, H)); },
             final: (pass) => { this.p.final.bind("hist", hB).bind("cov", cF).bind("emis", eF).bind("dst", outB).bind("u", uC); pass.dispatch(this.p.final, groups(W, H)); },
         };
-        const step = { covHalf: [], covFull: [], fill: [], rest: [], whole: [], hits: [], shift: [], accum: [], final: [], fillList: [], wholeList: [], fillTile: [], wholeTile: [], fillLTile: [], wholeLTile: [], covHalfB: [], covFullB: [] }, clock = {};
+        const step = { covHalf: [], covFull: [], fill: [], rest: [], whole: [], hits: [], shift: [], accum: [], final: [], fillList: [], wholeList: [], fillTile: [], wholeTile: [], fillLTile: [], wholeLTile: [], covHalfB: [], covFullB: [], restToT: [], restEasu: [], restComp: [], restToTFree: [] }, clock = {};
+        // round 42 (section 110): the rest steps record which of this runner's pipelines they dispatched, so a split step is held to its
+        // one kernel -- through a thin wrapper on those steps alone, so no other step's timing changes
+        const nameOf = (pipe) => Object.keys(this.p).find((n) => this.p[n] === pipe) || "?", dispatched = {};
         const run = async (k, ops, passes) => {
-            const dc = stamps && passes <= 30;
+            const dc = stamps && passes <= 30, seen = /^rest/.test(k) ? [] : null;
             await gpu.queue.onSubmittedWorkDone();
-            const t0 = now(), res = dev.frame(({ pass }) => { ops(pass); pass.clear([0, 0, 0, 1]); }, { offscreen: true, ...(dc ? { timing: true } : {}) });
+            const t0 = now(), res = dev.frame(({ pass }) => {
+                ops(seen ? { dispatch: (pipe, wg) => { seen.push(nameOf(pipe)); pass.dispatch(pipe, wg); } } : pass);
+                pass.clear([0, 0, 0, 1]);
+            }, { offscreen: true, ...(dc ? { timing: true } : {}) });
+            if (seen) dispatched[k] = seen;
             if (dc) { const g = await res; step[k].push(g.gpuMs.compute); } else { await gpu.queue.onSubmittedWorkDone(); step[k].push(now() - t0); }
             clock[k] = dc ? "device" : "wall";
         };
@@ -1050,6 +1063,11 @@ export class DenoiseUpscaleGPU {
             await run("covFullB", (pass) => covBOps(pass, cFb, eFb, uF, W, H), 1);
             reset(); await run("fill", (pass) => { filled = this._fillOps(pass, bufs, w, h, maxRings); }, 31);
             await run("rest", (pass) => restOps(pass, filled), 3);
+            // round 42 (section 110): rest's three passes one at a time, and the transfer without its atomic (a diagnostic) -- one pass each
+            await run("restToT", (pass) => { this.p.toT.bind("img", filled).bind("tMax", tMax).bind("u", uT); pass.dispatch(this.p.toT, groups(w, h)); }, 1);
+            await run("restToTFree", (pass) => { this.p.toTFree.bind("img", filled).bind("u", uT); pass.dispatch(this.p.toTFree, groups(w, h)); }, 1);
+            await run("restEasu", (pass) => { this.p.easu.bind("src", filled).bind("dst", up).bind("u", uE); pass.dispatch(this.p.easu, groups(W, H)); }, 1);
+            await run("restComp", (pass) => { this.p.comp.bind("up", up).bind("cov", cF).bind("emis", eF).bind("tMax", tMax).bind("dst", dst).bind("u", uC); pass.dispatch(this.p.comp, groups(W, H)); }, 1);
             reset(); await run("whole", (pass) => { covOps(pass, cH, eH, uH, w, h); covOps(pass, cF, eF, uF, W, H); restOps(pass, this._fillOps(pass, bufs, w, h, maxRings)); }, 31);
             for (const k of ["hits", "shift", "accum", "final"]) await run(k, histOps[k], 1);
             // round 34: the list fill alone, and the chain's steps in one frame with it -- by the wall clock, as the fill is
@@ -1079,7 +1097,7 @@ export class DenoiseUpscaleGPU {
         const ltc = await this.fill(img, covHalf, w, h, maxRings, { tile: "listed" }), ltileCheck = { rings: ltc.rings, left: ltc.left, passes: ltc.tilePasses, tiles: ltc.tilesListed, of: nT };
         const med = (a) => { const b = [...a].sort((x, y) => x - y); return b.length ? b[(b.length - 1) >> 1] : null; };
         return { w, h, W, H, maxRings, reps, rings: c.rings, inView: covHalf.filter((v) => v > 0).length, listCheck, tileCheck, ltileCheck, boundCheck,
-                 steps: Object.fromEntries(Object.keys(step).map((k) => [k, { ms: med(step[k]), clock: clock[k], runs: step[k] }])) };
+                 steps: Object.fromEntries(Object.keys(step).map((k) => [k, { ms: med(step[k]), clock: clock[k], runs: step[k], ...(dispatched[k] ? { kernels: dispatched[k] } : {}) }])) };
     }
 }
 

@@ -672,6 +672,12 @@ node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r41-b.json
 - **Don't commit or pull between runs.**
 - **Send back all four JSON files.**
 
+### Round 42: the chain's rest, split into its passes (pre-registration section 110)
+
+Nothing extra to run: the same two runs on each GPU carry it, at a commit carrying section 110. The chain gate adds a
+`section 110:` line with the rest's three passes timed apart and the transfer without its atomic. Section 110 predicts EASU
+the largest on the Intel (20-35 ms of ~42), and the atomic a third or more of the transfer's own time.
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and

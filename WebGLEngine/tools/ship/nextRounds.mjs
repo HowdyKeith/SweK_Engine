@@ -2370,6 +2370,13 @@ export const NEXT_ROUNDS = [
         why: "Section 105's runs: the coverage at 1920 x 1080 is the chain's largest step now, 248-253 ms on the Intel and 17-18 on the 1080, for 64 rays a pixel of which about 5 % of the frame can see a light. The page's own mask is the same coverage, so the saving is today's page's too.",
     },
     {
+        id: "denoise-rest-split",
+        blocker: "OPEN",
+        what: "Round 42 (pre-registration section 110): the chain's 'rest' -- the transfer at w x h, EASU and the composite at W x H, 41-43 ms on the Intel at 1080p -- timed pass by pass, with a diagnostic transfer without its atomicMax, which every thread sends to one word. A measurement: it moves nothing.",
+        how: "Waiting on the rig's runs (the same pair as rounds 38-41). Section 110 fixes how the next round is chosen from it: the pass that is half the three or more in both runs is the target; if the atomic is half the transfer's own time, the target is the brightest t's reduction.",
+        why: "With rounds 38-41 aimed at the fill, the coverage and the network, the rest and the history's accumulation are the Intel's next fixed costs, and nothing has timed the rest's passes apart.",
+    },
+    {
         id: "denoise-fsr3-framegen",
         blocker: "UPSTREAM",
         what: "FSR3's frame generation between denoised, upscaled frames -- fx/fsr/fsr3Tsl.mjs's arrangement, on the path tracer's output.",

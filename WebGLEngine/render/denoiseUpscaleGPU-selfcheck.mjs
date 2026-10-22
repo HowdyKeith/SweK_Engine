@@ -122,13 +122,20 @@
 //                                                                         and the gate died before those rows: red, but for the wrong reason
 //   F5  timeHalfChain's halfBound sums covFull                         1 RED (section 4's bounded sum row)
 //   F6  the page's table without the bounded chain's row               1 RED (the page row: 24 rows, not 25)
+//   and round 42's split of the rest (section 110), by the same runner:
+//   I1  TO_T_FREE_WGSL keeping its atomic                              2 RED (the kernel row; the page row -- the diagnostic, given no tMax,
+//                                                                         no longer builds)
+//   I2  restEasu timing the composite                                  1 RED (the split row, by the kernels each step dispatched). It could
+//                                                                         not have gone red before the steps recorded what they dispatched:
+//                                                                         a time does not say which kernel made it
+//   I3  restToT run as the whole rest frame                            1 RED (the split row, by the same record)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { runInEngineOrigin } from "../tools/ship/webgpuHarness.mjs";
 import { validateWgsl } from "./wgslSpec.mjs";
-import { COVERAGE_WGSL, FILL_RING_WGSL, FILL_LEFT_WGSL, FILL_LIST_WGSL, FILL_ARGS_WGSL, FILL_LISTRING_WGSL, FILL_LISTLEFT_WGSL, FILL_UNKNOWN, FILL_LIST_WG, FILL_TILEINIT_WGSL, FILL_TILE_WGSL, FILL_TILELEFT_WGSL, FILL_TILE_RINGS, FILL_TILE_INNER, FILL_TILE_SIDE, FILL_OUT, FILL_LTINIT_WGSL, FILL_LTARGS_WGSL, FILL_LTILE_WGSL, COVERAGE_BOUND_WGSL, COVERAGE_BOUND_SLACK, COVERAGE_BOUND_ARC, coverageMayHit, TO_T_WGSL, COMPOSITE_WGSL, COVERAGE_GRID_WGSL, SPHERE_STRIDE, packSpheres, cameraUniform, DenoiseUpscaleGPU, TEMPORAL_CONSTANTS, GEO_STRIDE, FIRSTHITS_WGSL, SHIFT_WGSL, ACCUM_WGSL, FINAL_WGSL, accumUniform, packGeometry } from "./denoiseUpscaleGPU.mjs";
+import { COVERAGE_WGSL, FILL_RING_WGSL, FILL_LEFT_WGSL, FILL_LIST_WGSL, FILL_ARGS_WGSL, FILL_LISTRING_WGSL, FILL_LISTLEFT_WGSL, FILL_UNKNOWN, FILL_LIST_WG, FILL_TILEINIT_WGSL, FILL_TILE_WGSL, FILL_TILELEFT_WGSL, FILL_TILE_RINGS, FILL_TILE_INNER, FILL_TILE_SIDE, FILL_OUT, FILL_LTINIT_WGSL, FILL_LTARGS_WGSL, FILL_LTILE_WGSL, COVERAGE_BOUND_WGSL, COVERAGE_BOUND_SLACK, COVERAGE_BOUND_ARC, coverageMayHit, TO_T_WGSL, TO_T_FREE_WGSL, COMPOSITE_WGSL, COVERAGE_GRID_WGSL, SPHERE_STRIDE, packSpheres, cameraUniform, DenoiseUpscaleGPU, TEMPORAL_CONSTANTS, GEO_STRIDE, FIRSTHITS_WGSL, SHIFT_WGSL, ACCUM_WGSL, FINAL_WGSL, accumUniform, packGeometry } from "./denoiseUpscaleGPU.mjs";
 import { fillEmitters, fillEmittersBounded, emitterAwareUpscale, GAMMA } from "./denoiseUpscale.mjs";
 import { emitterRadiance, COVERAGE_GRID } from "./denoiseMask.mjs";
 import { makeScene } from "./denoiseScenes.mjs";
@@ -179,7 +186,7 @@ const F1 = synth(24, 20, [[6, 6, 3.2], [17, 13, 5.5], [23, 1, 2]]);
 
 console.log("\n2. THE KERNELS");
 {
-    const ks = { COVERAGE_WGSL, FILL_RING_WGSL, FILL_LEFT_WGSL, TO_T_WGSL, COMPOSITE_WGSL, FIRSTHITS_WGSL, SHIFT_WGSL, ACCUM_WGSL, FINAL_WGSL, FILL_LIST_WGSL, FILL_ARGS_WGSL, FILL_LISTRING_WGSL, FILL_LISTLEFT_WGSL, FILL_TILEINIT_WGSL, FILL_TILE_WGSL, FILL_TILELEFT_WGSL, FILL_LTINIT_WGSL, FILL_LTARGS_WGSL, FILL_LTILE_WGSL, COVERAGE_BOUND_WGSL };
+    const ks = { COVERAGE_WGSL, FILL_RING_WGSL, FILL_LEFT_WGSL, TO_T_WGSL, COMPOSITE_WGSL, FIRSTHITS_WGSL, SHIFT_WGSL, ACCUM_WGSL, FINAL_WGSL, FILL_LIST_WGSL, FILL_ARGS_WGSL, FILL_LISTRING_WGSL, FILL_LISTLEFT_WGSL, FILL_TILEINIT_WGSL, FILL_TILE_WGSL, FILL_TILELEFT_WGSL, FILL_LTINIT_WGSL, FILL_LTARGS_WGSL, FILL_LTILE_WGSL, COVERAGE_BOUND_WGSL, TO_T_FREE_WGSL };
     const bad = Object.entries(ks).map(([k, s]) => [k, validateWgsl(s)]).filter(([, p]) => p.length);
     ok("every kernel validates against the spec scanner", !bad.length, bad.map(([k, p]) => `${k}: ${p.join("; ")}`).join(" | "));
     ok("  the constants the kernels carry are the CPU's: the coverage grid, the transfer's gamma, its top below the pole",
@@ -218,6 +225,11 @@ console.log("\n2. THE KERNELS");
         inOrder && bl.length - cl.length === 20 && COVERAGE_BOUND_ARC === 1.6 && COVERAGE_BOUND_SLACK === 2e-3 && COVERAGE_BOUND_WGSL.includes(`* ${COVERAGE_BOUND_ARC};`) &&
         COVERAGE_BOUND_WGSL.includes(`+ pxHalf + ${COVERAGE_BOUND_SLACK})`) && /if \(!may\) \{ cov\[p0\] = 0\.0; emis\[p0 \* 3u\] = 0\.0;/.test(COVERAGE_BOUND_WGSL) && /sph\[b \+ 7u\] > 0\.5\) \{\n\s+let oc/.test(COVERAGE_BOUND_WGSL),
         `${bl.length - cl.length} line(s) added to round 31's ${cl.length}`);
+    // round 42 (section 110): the transfer's diagnostic is the transfer less exactly its one atomicMax line -- the only line that touches tMax
+    const tl0 = TO_T_WGSL.split("\n"), tf0 = TO_T_FREE_WGSL.split("\n"), gone42 = tl0.filter((l) => !tf0.includes(l));
+    ok("  round 42: TO_T_FREE_WGSL, a timing diagnostic, is TO_T_WGSL less exactly its one atomicMax line, and nothing else",
+        tl0.length - tf0.length === 1 && gone42.length === 1 && /^\s*atomicMax\(&tMax\[0\], bitcast<u32>\(m\)\);$/.test(gone42[0]) && tf0.every((l) => tl0.includes(l)) && !/atomicMax/.test(TO_T_FREE_WGSL),
+        gone42.join(" | ").trim());
     let mesh = null; try { packSpheres([{ bvh: {} }]); } catch (e) { mesh = e.message; }
     ok("  ...and a scene with a mesh is refused by name -- the coverage kernel intersects spheres only", /spheres only/.test(mesh || ""));
     // round 33: the accumulation's uniform (two cameras, then w h clamp frames, then the scales and tolerances) and the packed geometry
@@ -452,7 +464,7 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
     if (pg.skipped) console.log("  SKIP  " + pg.reason);
     else {
         let J = null; try { J = JSON.parse(pg.result?.json || "null"); } catch {}
-        const st = J && J.chain && J.chain.steps, keys = ["covHalf", "covFull", "fill", "rest", "whole", "hits", "shift", "accum", "final", "fillList", "wholeList", "fillTile", "wholeTile", "fillLTile", "wholeLTile", "covHalfB", "covFullB"];
+        const st = J && J.chain && J.chain.steps, keys = ["covHalf", "covFull", "fill", "rest", "whole", "hits", "shift", "accum", "final", "fillList", "wholeList", "fillTile", "wholeTile", "fillLTile", "wholeLTile", "covHalfB", "covFullB", "restToT", "restEasu", "restComp", "restToTFree"];
         const fine = (x) => !!x && Number.isFinite(x.ms) && x.ms > 0 && (x.clock === "device" || x.clock === "wall");
         // THE RIG'S LINES, from a report: sections 94, 98, 100 and 102 read them out of committed reports, so each keeps its meaning
         // (section 103) -- 93's and 97's chain is round 31's ring fill (halfRing, temporalRing), 99's "with the list fill" the list
@@ -486,7 +498,9 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
                 // round 39 (section 107): the coverage bounded beside round 31's, at both sizes, in a line of its own
                 "section 107: the bounded coverage -- " + ["covHalf", "covHalfB", "covFull", "covFullB"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; ") +
                     (K.chain.boundCheck ? `; traced ${K.chain.boundCheck.half} of ${K.chain.boundCheck.ofHalf} and ${K.chain.boundCheck.full} of ${K.chain.boundCheck.ofFull}; bit for bit ${K.chain.boundCheck.sameHalf && K.chain.boundCheck.sameFull ? "at both sizes" : "NOT at both sizes"}` : "; the bounded coverage not checked") +
-                    (K.fullBound && K.halfBound && K.temporalBound ? `; today's page with it ${K.fullBound.ms.toFixed(3)} ms; the half-size chain with it ${K.halfBound.ms.toFixed(3)} ms, ratio ${(K.fullBound.ms / K.halfBound.ms).toFixed(3)} x; with its history ${K.temporalBound.ms.toFixed(3)} ms, ratio ${(K.fullBound.ms / K.temporalBound.ms).toFixed(3)} x` : "; no ratio: a part was not measured")];
+                    (K.fullBound && K.halfBound && K.temporalBound ? `; today's page with it ${K.fullBound.ms.toFixed(3)} ms; the half-size chain with it ${K.halfBound.ms.toFixed(3)} ms, ratio ${(K.fullBound.ms / K.halfBound.ms).toFixed(3)} x; with its history ${K.temporalBound.ms.toFixed(3)} ms, ratio ${(K.fullBound.ms / K.temporalBound.ms).toFixed(3)} x` : "; no ratio: a part was not measured"),
+                // round 42 (section 110): rest's three passes timed apart, and the transfer without its atomic (a diagnostic), beside rest
+                "section 110: rest's passes -- " + ["rest", "restToT", "restEasu", "restComp", "restToTFree"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; ")];
         };
         ok("!! the page timed every step of the chain and both networks at its pilot size -- each a positive time on a named clock, the table shown, no page error",
             pg.ok && !!st && keys.every((k) => fine(st[k])) && fine(J.networkFull) && fine(J.networkHalf) && !!J.full && !!J.half && !!J.temporal && !!J.halfRing && !!J.temporalRing && !!J.halfTile && !!J.temporalTile && !!J.halfLTile && !!J.temporalLTile && !!J.fullBound && !!J.halfBound && !!J.temporalBound && J.fill === "list" && pg.result.shown && pg.result.rows === 25 && !pg.pageErrors.length,
@@ -550,6 +564,13 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
                 !!bc && bc.sameHalf && bc.sameFull && Math.abs(bc.half - tH) <= Math.max(1, 0.02 * tH) && Math.abs(bc.full - tF) <= Math.max(1, 0.02 * tF) && bc.full < bc.ofFull / 4 &&
                 n(/today's page with it ([0-9.]+) ms/, l107) === at3(J.fullBound) && n(/the half-size chain with it ([0-9.]+) ms/, l107) === at3(J.halfBound) && n(/with its history ([0-9.]+) ms/, l107) === at3(J.temporalBound),
                 `${l107.slice(0, 260)}; twin ${tH} / ${tF}`);
+            // round 42 (section 110): the split steps, one pass each on rest's own clock, and the line carrying each one's figure
+            const l110 = rigLines(J)[8], split = ["restToT", "restEasu", "restComp", "restToTFree"];
+            ok("  round 42: rest's three passes and the transfer's diagnostic, each timed alone as one pass on rest's own clock, and the rig's section 110 line carries each figure",
+                split.every((k) => fine(st[k]) && st[k].clock === st.rest.clock && st[k].runs.length === st.rest.runs.length) &&
+                JSON.stringify(["rest", ...split].map((k) => st[k].kernels)) === JSON.stringify([["toT", "easu", "comp"], ["toT"], ["easu"], ["comp"], ["toTFree"]]) &&
+                split.every((k) => n(new RegExp(`${k} ([0-9.]+) ms`), l110) === at3(st[k])) && n(/rest ([0-9.]+) ms/, l110) === at3(st.rest),
+                `${l110}; dispatched ${["rest", ...split].map((k) => `${k} ${(st[k].kernels || []).join("+")}`).join(", ")}`);
         }
         // ON A GPU, THE RIG'S SIZE (pre-registration section 93): 960 x 540 -> 1920 x 1080, every step a measured line the rig's
         // report keeps. Not on a software adapter: SwiftShader's 1080p would be minutes of a CPU's time that decides nothing.
