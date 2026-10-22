@@ -113,13 +113,22 @@
 //   E4  the listed option running the tile fill                        3 RED (the fills' row, by tilesListed; the chain; the pilot)
 //   E5  timeHalfChain's halfLTile sums fillTile                        1 RED (section 4's listed tile sum row)
 //   E6  the page's table without the listed tile fill's chain row      1 RED (the page row: 20 rows, not 21)
+//   and round 39's bounded coverage (section 107), by the same runner:
+//   F1  the slack and the arc factor dropped (asin alone)              3 RED (the kernel row; the device row, rim pixels lost; the pilot)
+//   F2  the bound tested against every sphere, not the emitters        3 RED (the kernel row; the device row, the floor traced; the pilot)
+//   F3  a skipped pixel's coverage written 1, not 0                    3 RED (the kernel row; the device row; the pilot)
+//   F4  bound: true running round 31's kernel, its counter unbound     2 RED (the device row, by traced; the pilot). As first written,
+//       (pre-registered as round 31's kernel alone)                       with the counter still bound, the device refused the binding
+//                                                                         and the gate died before those rows: red, but for the wrong reason
+//   F5  timeHalfChain's halfBound sums covFull                         1 RED (section 4's bounded sum row)
+//   F6  the page's table without the bounded chain's row               1 RED (the page row: 24 rows, not 25)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { runInEngineOrigin } from "../tools/ship/webgpuHarness.mjs";
 import { validateWgsl } from "./wgslSpec.mjs";
-import { COVERAGE_WGSL, FILL_RING_WGSL, FILL_LEFT_WGSL, FILL_LIST_WGSL, FILL_ARGS_WGSL, FILL_LISTRING_WGSL, FILL_LISTLEFT_WGSL, FILL_UNKNOWN, FILL_LIST_WG, FILL_TILEINIT_WGSL, FILL_TILE_WGSL, FILL_TILELEFT_WGSL, FILL_TILE_RINGS, FILL_TILE_INNER, FILL_TILE_SIDE, FILL_OUT, FILL_LTINIT_WGSL, FILL_LTARGS_WGSL, FILL_LTILE_WGSL, TO_T_WGSL, COMPOSITE_WGSL, COVERAGE_GRID_WGSL, SPHERE_STRIDE, packSpheres, cameraUniform, DenoiseUpscaleGPU, TEMPORAL_CONSTANTS, GEO_STRIDE, FIRSTHITS_WGSL, SHIFT_WGSL, ACCUM_WGSL, FINAL_WGSL, accumUniform, packGeometry } from "./denoiseUpscaleGPU.mjs";
+import { COVERAGE_WGSL, FILL_RING_WGSL, FILL_LEFT_WGSL, FILL_LIST_WGSL, FILL_ARGS_WGSL, FILL_LISTRING_WGSL, FILL_LISTLEFT_WGSL, FILL_UNKNOWN, FILL_LIST_WG, FILL_TILEINIT_WGSL, FILL_TILE_WGSL, FILL_TILELEFT_WGSL, FILL_TILE_RINGS, FILL_TILE_INNER, FILL_TILE_SIDE, FILL_OUT, FILL_LTINIT_WGSL, FILL_LTARGS_WGSL, FILL_LTILE_WGSL, COVERAGE_BOUND_WGSL, COVERAGE_BOUND_SLACK, COVERAGE_BOUND_ARC, coverageMayHit, TO_T_WGSL, COMPOSITE_WGSL, COVERAGE_GRID_WGSL, SPHERE_STRIDE, packSpheres, cameraUniform, DenoiseUpscaleGPU, TEMPORAL_CONSTANTS, GEO_STRIDE, FIRSTHITS_WGSL, SHIFT_WGSL, ACCUM_WGSL, FINAL_WGSL, accumUniform, packGeometry } from "./denoiseUpscaleGPU.mjs";
 import { fillEmitters, fillEmittersBounded, emitterAwareUpscale, GAMMA } from "./denoiseUpscale.mjs";
 import { emitterRadiance, COVERAGE_GRID } from "./denoiseMask.mjs";
 import { makeScene } from "./denoiseScenes.mjs";
@@ -170,7 +179,7 @@ const F1 = synth(24, 20, [[6, 6, 3.2], [17, 13, 5.5], [23, 1, 2]]);
 
 console.log("\n2. THE KERNELS");
 {
-    const ks = { COVERAGE_WGSL, FILL_RING_WGSL, FILL_LEFT_WGSL, TO_T_WGSL, COMPOSITE_WGSL, FIRSTHITS_WGSL, SHIFT_WGSL, ACCUM_WGSL, FINAL_WGSL, FILL_LIST_WGSL, FILL_ARGS_WGSL, FILL_LISTRING_WGSL, FILL_LISTLEFT_WGSL, FILL_TILEINIT_WGSL, FILL_TILE_WGSL, FILL_TILELEFT_WGSL, FILL_LTINIT_WGSL, FILL_LTARGS_WGSL, FILL_LTILE_WGSL };
+    const ks = { COVERAGE_WGSL, FILL_RING_WGSL, FILL_LEFT_WGSL, TO_T_WGSL, COMPOSITE_WGSL, FIRSTHITS_WGSL, SHIFT_WGSL, ACCUM_WGSL, FINAL_WGSL, FILL_LIST_WGSL, FILL_ARGS_WGSL, FILL_LISTRING_WGSL, FILL_LISTLEFT_WGSL, FILL_TILEINIT_WGSL, FILL_TILE_WGSL, FILL_TILELEFT_WGSL, FILL_LTINIT_WGSL, FILL_LTARGS_WGSL, FILL_LTILE_WGSL, COVERAGE_BOUND_WGSL };
     const bad = Object.entries(ks).map(([k, s]) => [k, validateWgsl(s)]).filter(([, p]) => p.length);
     ok("every kernel validates against the spec scanner", !bad.length, bad.map(([k, p]) => `${k}: ${p.join("; ")}`).join(" | "));
     ok("  the constants the kernels carry are the CPU's: the coverage grid, the transfer's gamma, its top below the pole",
@@ -201,6 +210,14 @@ console.log("\n2. THE KERNELS");
         gone.length === 2 && gone.every((l) => /let o[xy] = i32\(wg\.[xy] \* INNER\) - HALO;/.test(l)) && tl.length === 90 &&
         FILL_LTINIT_WGSL.includes(`${FILL_UNKNOWN}u`) && FILL_LTINIT_WGSL.includes(`/ ${FILL_TILE_INNER}u`) && /args\[0\] = tcnt\[0\];/.test(FILL_LTARGS_WGSL),
         `${only.length} line(s) only in the listed kernel, ${gone.length} only in round 37's; round 37's kernel ${tl.length} lines`);
+    // round 39: the bounded coverage kernel is round 31's line for line with the bound added before the rays -- every line of round
+    // 31's kernel still in it, in order -- and it carries the bound's slack and arc factor
+    const cl = COVERAGE_WGSL.split("\n"), bl = COVERAGE_BOUND_WGSL.split("\n");
+    let at = 0; const inOrder = cl.every((l) => { const i = bl.indexOf(l, at); if (i < 0) return false; at = i + 1; return true; });
+    ok("  round 39: the bounded coverage kernel is round 31's coverage kernel with the bound added -- every line of round 31's, in order -- carrying COVERAGE_BOUND_ARC (1.6) and COVERAGE_BOUND_SLACK (2e-3), and its skip writing 0",
+        inOrder && bl.length - cl.length === 20 && COVERAGE_BOUND_ARC === 1.6 && COVERAGE_BOUND_SLACK === 2e-3 && COVERAGE_BOUND_WGSL.includes(`* ${COVERAGE_BOUND_ARC};`) &&
+        COVERAGE_BOUND_WGSL.includes(`+ pxHalf + ${COVERAGE_BOUND_SLACK})`) && /if \(!may\) \{ cov\[p0\] = 0\.0; emis\[p0 \* 3u\] = 0\.0;/.test(COVERAGE_BOUND_WGSL) && /sph\[b \+ 7u\] > 0\.5\) \{\n\s+let oc/.test(COVERAGE_BOUND_WGSL),
+        `${bl.length - cl.length} line(s) added to round 31's ${cl.length}`);
     let mesh = null; try { packSpheres([{ bvh: {} }]); } catch (e) { mesh = e.message; }
     ok("  ...and a scene with a mesh is refused by name -- the coverage kernel intersects spheres only", /spheres only/.test(mesh || ""));
     // round 33: the accumulation's uniform (two cameras, then w h clamp frames, then the scales and tolerances) and the packed geometry
@@ -229,6 +246,11 @@ const OCCLUDED = { seed: "occluded", eye: [0, 1.5, 5], look: [0, 1.5, 0], up: [0
     { centre: [-0.35, 1.5, 2.2], radius: 0.3, albedo: [0.6, 0.6, 0.6] },
     { centre: [0.35, 1.5, 0.5], radius: 0.6, albedo: [0.6, 0.6, 0.6] }] };
 const SCENES = [...[44001, 44002, 44004].map((s) => makeScene("R", s)), OCCLUDED];
+// round 39: the light behind the camera -- the bounded coverage must trace nothing, and still be round 31's (all 0)
+const BEHIND = { seed: "behind", eye: [0, 1.5, 5], look: [0, 1.5, 0], up: [0, 1, 0], fovDeg: 40, scene: [
+    { centre: [0, -100, 0], radius: 100, albedo: [0.5, 0.5, 0.5] },
+    { centre: [0, 1.5, 8], radius: 0.6, albedo: 0, emit: [12, 10, 8] },
+    { centre: [0.35, 1.5, 0.5], radius: 0.6, albedo: [0.6, 0.6, 0.6] }] };
 const W = 64, Hh = 32, wire = (S) => ({ scene: S.scene, eye: S.eye, look: S.look, up: S.up, fovDeg: S.fovDeg });
 const CPU = SCENES.map((S) => ({ full: emitterRadiance(S, W, W), half: emitterRadiance(S, Hh, Hh) }));
 // each chain's input: smooth light, and the emitters' own radiance where they cover a pixel -- what a traced frame holds there
@@ -240,7 +262,7 @@ const chainIn = CPU.map(({ half }) => {
 const RINGS = 24;
 // round 34's list fill on a frame whose fill is long: a disc 22 pixels in radius and two more, one cut by the frame's corner
 const F2 = synth(96, 64, [[30, 30, 22], [70, 40, 14], [95, 0, 6]]);
-const payload = { scenes: SCENES.map(wire), fill: { img: Array.from(F1.img), cov: Array.from(F1.cov) }, fill2: { img: Array.from(F2.img), cov: Array.from(F2.cov) }, chainIn: chainIn.map((a) => Array.from(a)),
+const payload = { scenes: SCENES.map(wire), behind: wire(BEHIND), fill: { img: Array.from(F1.img), cov: Array.from(F1.cov) }, fill2: { img: Array.from(F2.img), cov: Array.from(F2.cov) }, chainIn: chainIn.map((a) => Array.from(a)),
     covHalf: CPU.map((c) => Array.from(c.half.cov)), full: CPU.map((c) => ({ cov: Array.from(c.full.cov), E: Array.from(c.full.E) })), W, Hh, RINGS };
 const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 900000, args: { payload }, script: `async (a) => {
     const P = a.payload;
@@ -253,6 +275,15 @@ const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 900000, args: { 
     const g = new DenoiseUpscaleGPU(dev), A = (x) => Array.from(x);
     const cov = [];
     for (const S of P.scenes) { const f = await g.coverage(S, P.W, P.W), h = await g.coverage(S, P.Hh, P.Hh); cov.push({ full: { cov: A(f.cov), E: A(f.E) }, half: { cov: A(h.cov), E: A(h.E) } }); }
+    // round 39: the bounded coverage on the same scenes and sizes, held to round 31's bit for bit here, and on the light behind the camera
+    const bitsEq = (x, y) => x.length === y.length && x.every((v, i) => Object.is(v, y[i]));
+    const covB = [];
+    for (const [i, S] of P.scenes.entries()) for (const [k, n] of [["full", P.W], ["half", P.Hh]]) {
+        const u = await g.coverage(S, n, n), b = await g.coverage(S, n, n, { bound: true });
+        covB.push({ i, k, n, traced: b.traced, unboundedTraced: u.traced, same: bitsEq(A(u.cov), A(b.cov)) && bitsEq(A(u.E), A(b.E)), litMissed: A(u.cov).filter((c, p) => c > 0 && b.cov[p] === 0).length });
+    }
+    const bh = await g.coverage(P.behind, P.W, P.W, { bound: true }), bhu = await g.coverage(P.behind, P.W, P.W);
+    const behind = { traced: bh.traced, same: bitsEq(A(bh.cov), A(bhu.cov)), lit: A(bhu.cov).filter((c) => c > 0).length };
     const fills = [];
     for (const m of [16, 2]) { const f = await g.fill(Float64Array.from(P.fill.img), Float64Array.from(P.fill.cov), 24, 20, m, { list: false }); fills.push({ ...f, y: A(f.y) }); }
     // round 34: the list fill beside round 31's, on the same frames and ring budgets, and on a frame of all emitter and one of none
@@ -289,7 +320,7 @@ const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 900000, args: { 
     let wrongBackend = null;
     try { new DenoiseUpscaleGPU(await requestDevice(document.createElement("canvas"), { backend: "webgl2", offscreen: true })); } catch (e) { wrongBackend = String(e.message).slice(0, 160); }
     const ad = await navigator.gpu.requestAdapter(), info = ad.info || {};
-    return { cov, fills, lists, t13, chains, errs, backend: dev.backend, wrongBackend, adapter: [info.vendor, info.architecture, info.description].filter(Boolean).join(" / ") };
+    return { cov, covB, behind, fills, lists, t13, chains, errs, backend: dev.backend, wrongBackend, adapter: [info.vendor, info.architecture, info.description].filter(Boolean).join(" / ") };
 }` });
 
 if (r.skipped) console.log("  SKIP  " + r.reason);
@@ -314,6 +345,20 @@ else {
     ok("!! coverage on the device is emitterRadiance's: per frame, no more rays different than 1 in 10,000, and E within 1e-5 where the count agrees -- on frames with an emitter in view",
         cmp.length === 8 && cmp.every((c) => c.rays <= c.budget && c.eMax <= 1e-5) && cmp.every((c) => c.inView > 0),
         cmp.map((c) => `${c.k}: ${c.rays} ray(s) (of ${c.budget} allowed), E ${c.eMax.toExponential(1)}, ${c.inView} px in view`).join("; "));
+    // ROUND 39 (section 107), THE BOUNDED COVERAGE: round 31's bit for bit wherever it traces or skips, every lit pixel traced, its
+    // traced count the CPU twin's within 2 % (the twin is f64, the kernel f32, so a pixel on the bound's edge may go either way)
+    const twin = SCENES.map((S) => ({ full: coverageMayHit(S, W, W), half: coverageMayHit(S, Hh, Hh) }));
+    const sumOf = (a) => a.reduce((x, y) => x + y, 0);
+    ok("!! round 39: the bounded coverage is round 31's bit for bit on the four scenes at both sizes, every lit pixel traced, its traced count the CPU twin's within 2 % and well short of the frame -- and with the light behind the camera it traces nothing",
+        R.covB.length === 8 && R.covB.every((c) => c.same && c.litMissed === 0 && c.unboundedTraced === 0 && Math.abs(c.traced - sumOf(twin[c.i][c.k])) <= Math.max(1, 0.02 * sumOf(twin[c.i][c.k])) && c.traced < c.n * c.n / 4) &&
+        R.behind.traced === 0 && R.behind.same && R.behind.lit === 0,
+        R.covB.map((c) => `${SCENES[c.i].seed} ${c.k}: ${c.traced} traced (twin ${sumOf(twin[c.i][c.k])}) of ${c.n * c.n}`).join("; ") + `; behind: ${R.behind.traced} traced`);
+    // and the twin itself, on the CPU: it traces every pixel emitterRadiance lights, on these views and the pilot's scene
+    const tw = [...SCENES.flatMap((S, i) => [[twin[i].full, CPU[i].full.cov], [twin[i].half, CPU[i].half.cov]]),
+                (() => { const S = makeScene("R", 990000); return [coverageMayHit(S, 128, 72), emitterRadiance(S, 128, 72).cov]; })()];
+    ok("!! ...and its CPU twin traces every pixel emitterRadiance lights, on the four scenes at both sizes and R 990000 at 128 x 72, and skips most of each frame",
+        tw.length === 9 && tw.every(([m, c]) => c.every((v, p) => !(v > 0) || m[p] === 1) && sumOf(m) < m.length / 4),
+        tw.map(([m, c]) => `${sumOf(m)} traced for ${c.filter((v) => v > 0).length} lit`).join("; "));
     // THE FILL: each ring's mean in f32 against f64. First run: worst relative difference 1.2e-7. Held at 1e-5.
     const b16 = fillEmittersBounded(F1.img, F1.cov, 24, 20, 16), b2 = fillEmittersBounded(F1.img, F1.cov, 24, 20, 2), [g16, g2] = R.fills;
     ok("!! the bounded fill on the device is fillEmittersBounded's: the same rings and pixels left, and every value within 1e-5 -- with rings to spare and short of them",
@@ -407,7 +452,7 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
     if (pg.skipped) console.log("  SKIP  " + pg.reason);
     else {
         let J = null; try { J = JSON.parse(pg.result?.json || "null"); } catch {}
-        const st = J && J.chain && J.chain.steps, keys = ["covHalf", "covFull", "fill", "rest", "whole", "hits", "shift", "accum", "final", "fillList", "wholeList", "fillTile", "wholeTile", "fillLTile", "wholeLTile"];
+        const st = J && J.chain && J.chain.steps, keys = ["covHalf", "covFull", "fill", "rest", "whole", "hits", "shift", "accum", "final", "fillList", "wholeList", "fillTile", "wholeTile", "fillLTile", "wholeLTile", "covHalfB", "covFullB"];
         const fine = (x) => !!x && Number.isFinite(x.ms) && x.ms > 0 && (x.clock === "device" || x.clock === "wall");
         // THE RIG'S LINES, from a report: sections 94, 98, 100 and 102 read them out of committed reports, so each keeps its meaning
         // (section 103) -- 93's and 97's chain is round 31's ring fill (halfRing, temporalRing), 99's "with the list fill" the list
@@ -437,10 +482,14 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
                 // round 38 (section 106): the tile fill over the lights' tiles beside the list fill, in a line of its own
                 "section 106: the listed tile fill -- " + ["fillList", "fillLTile", "wholeList", "wholeLTile"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; ") +
                     (K.chain.ltileCheck ? `; the listed tile fill ${K.chain.ltileCheck.tiles} of ${K.chain.ltileCheck.of} tiles, ${K.chain.ltileCheck.passes} passes, ${K.chain.ltileCheck.rings} of ${K.chain.maxRings} rings, ${K.chain.ltileCheck.left} left` : "; the listed tile fill not checked") +
-                    (K.full && K.halfLTile && K.temporalLTile ? `; the half-size chain with the listed tile fill ${K.halfLTile.ms.toFixed(3)} ms, ratio ${(K.full.ms / K.halfLTile.ms).toFixed(3)} x; with its history ${K.temporalLTile.ms.toFixed(3)} ms, ratio ${(K.full.ms / K.temporalLTile.ms).toFixed(3)} x` : "; no ratio: a part was not measured")];
+                    (K.full && K.halfLTile && K.temporalLTile ? `; the half-size chain with the listed tile fill ${K.halfLTile.ms.toFixed(3)} ms, ratio ${(K.full.ms / K.halfLTile.ms).toFixed(3)} x; with its history ${K.temporalLTile.ms.toFixed(3)} ms, ratio ${(K.full.ms / K.temporalLTile.ms).toFixed(3)} x` : "; no ratio: a part was not measured"),
+                // round 39 (section 107): the coverage bounded beside round 31's, at both sizes, in a line of its own
+                "section 107: the bounded coverage -- " + ["covHalf", "covHalfB", "covFull", "covFullB"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; ") +
+                    (K.chain.boundCheck ? `; traced ${K.chain.boundCheck.half} of ${K.chain.boundCheck.ofHalf} and ${K.chain.boundCheck.full} of ${K.chain.boundCheck.ofFull}; bit for bit ${K.chain.boundCheck.sameHalf && K.chain.boundCheck.sameFull ? "at both sizes" : "NOT at both sizes"}` : "; the bounded coverage not checked") +
+                    (K.fullBound && K.halfBound && K.temporalBound ? `; today's page with it ${K.fullBound.ms.toFixed(3)} ms; the half-size chain with it ${K.halfBound.ms.toFixed(3)} ms, ratio ${(K.fullBound.ms / K.halfBound.ms).toFixed(3)} x; with its history ${K.temporalBound.ms.toFixed(3)} ms, ratio ${(K.fullBound.ms / K.temporalBound.ms).toFixed(3)} x` : "; no ratio: a part was not measured")];
         };
         ok("!! the page timed every step of the chain and both networks at its pilot size -- each a positive time on a named clock, the table shown, no page error",
-            pg.ok && !!st && keys.every((k) => fine(st[k])) && fine(J.networkFull) && fine(J.networkHalf) && !!J.full && !!J.half && !!J.temporal && !!J.halfRing && !!J.temporalRing && !!J.halfTile && !!J.temporalTile && !!J.halfLTile && !!J.temporalLTile && J.fill === "list" && pg.result.shown && pg.result.rows === 21 && !pg.pageErrors.length,
+            pg.ok && !!st && keys.every((k) => fine(st[k])) && fine(J.networkFull) && fine(J.networkHalf) && !!J.full && !!J.half && !!J.temporal && !!J.halfRing && !!J.temporalRing && !!J.halfTile && !!J.temporalTile && !!J.halfLTile && !!J.temporalLTile && !!J.fullBound && !!J.halfBound && !!J.temporalBound && J.fill === "list" && pg.result.shown && pg.result.rows === 25 && !pg.pageErrors.length,
             pg.ok ? (pg.result?.status || "").slice(0, 200) : pg.reason);
         if (st) {
             // the network times are the ladder's rows, w x h then W x H (T4 went 0 RED before this held which was which); today's page
@@ -491,6 +540,16 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
                 !!lc6 && lc6.passes === Math.ceil(J.chain.maxRings / FILL_TILE_RINGS) && lc6.rings === J.chain.rings && lc6.left === 0 && lc6.tiles === pT.size && lc6.of === 12 && lc6.tiles < lc6.of &&
                 n(/with the listed tile fill ([0-9.]+) ms/, l106) === at3(J.halfLTile) && n(/with its history ([0-9.]+) ms/, l106) === at3(J.temporalLTile),
                 l106);
+            // round 39 (section 107): the page and the chain with the bounded coverage, their sums; its check bit for bit at both sizes
+            // and its traced counts the CPU twin's within 2 %; the rig's line carries the sums
+            const bc = J.chain.boundCheck, l107 = rigLines(J)[7], twinN = (ww, hh) => coverageMayHit(makeScene(...J.scene), ww, hh).reduce((a, b) => a + b, 0);
+            const hb = med(halfRow) + ["covHalfB", "covFullB", "fillList", "rest"].reduce((a, k) => a + st[k].ms, 0), tH = twinN(J.chain.w, J.chain.h), tF = twinN(J.chain.W, J.chain.H);
+            ok("  round 39: today's page and the chain with the bounded coverage are their sums with covHalfB and covFullB, each one pass on the coverage's clock; its check is round 31's bit for bit at both sizes, tracing the twin's count within 2 %; the rig's line carries the sums",
+                !!J.halfBound && Math.abs(J.halfBound.ms - hb) < 1e-9 && Math.abs(J.fullBound.ms - (med(fullRow) + st.covFullB.ms)) < 1e-9 &&
+                Math.abs(J.temporalBound.ms - (hb + hist.reduce((a, k) => a + st[k].ms, 0))) < 1e-9 && st.covHalfB.clock === st.covHalf.clock && st.covFullB.clock === st.covFull.clock &&
+                !!bc && bc.sameHalf && bc.sameFull && Math.abs(bc.half - tH) <= Math.max(1, 0.02 * tH) && Math.abs(bc.full - tF) <= Math.max(1, 0.02 * tF) && bc.full < bc.ofFull / 4 &&
+                n(/today's page with it ([0-9.]+) ms/, l107) === at3(J.fullBound) && n(/the half-size chain with it ([0-9.]+) ms/, l107) === at3(J.halfBound) && n(/with its history ([0-9.]+) ms/, l107) === at3(J.temporalBound),
+                `${l107.slice(0, 260)}; twin ${tH} / ${tF}`);
         }
         // ON A GPU, THE RIG'S SIZE (pre-registration section 93): 960 x 540 -> 1920 x 1080, every step a measured line the rig's
         // report keeps. Not on a software adapter: SwiftShader's 1080p would be minutes of a CPU's time that decides nothing.
@@ -504,7 +563,8 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
                 rg.ok && !!ks && keys.every((k) => fine(ks[k])) && fine(K.networkFull) && fine(K.networkHalf) && !!K.full && !!K.half && !!K.temporal && !!K.halfRing && !!K.temporalRing && !!K.halfTile && !!K.temporalTile && !!K.halfLTile && !!K.temporalLTile && K.fill === "list" && K.chain.rings > 0 && K.chain.rings < 96 && !rg.pageErrors.length &&
                 !!K.chain.listCheck && K.chain.listCheck.listed === K.chain.inView && K.chain.listCheck.rings === K.chain.rings && K.chain.listCheck.left === 0 &&
                 !!K.chain.tileCheck && K.chain.tileCheck.rings === K.chain.rings && K.chain.tileCheck.left === 0 && K.chain.tileCheck.passes === 12 &&
-                !!K.chain.ltileCheck && K.chain.ltileCheck.rings === K.chain.rings && K.chain.ltileCheck.left === 0 && K.chain.ltileCheck.passes === 12 && K.chain.ltileCheck.tiles > 0 && K.chain.ltileCheck.tiles < K.chain.ltileCheck.of,
+                !!K.chain.ltileCheck && K.chain.ltileCheck.rings === K.chain.rings && K.chain.ltileCheck.left === 0 && K.chain.ltileCheck.passes === 12 && K.chain.ltileCheck.tiles > 0 && K.chain.ltileCheck.tiles < K.chain.ltileCheck.of &&
+                !!K.chain.boundCheck && K.chain.boundCheck.sameHalf && K.chain.boundCheck.sameFull && !!K.fullBound && !!K.halfBound,
                 rg.ok ? (rg.result?.status || "").slice(0, 200) : rg.reason);
             if (ks) {
                 for (const l of rigLines(K)) say(l);

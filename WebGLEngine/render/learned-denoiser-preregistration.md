@@ -7111,3 +7111,90 @@ went red on their first run here; the fill itself was bit for bit in every case.
   for. The row now asks for 0 passes where no tile is listed.
 - Reported, deciding nothing: at the pilot size on SwiftShader, the listed tile fill took 83.7 ms against the list fill's
   16.3, over 4 of the 12 tiles. That is a CPU's time.
+
+## 107. ROUND 39 -- THE COVERAGE BOUNDED TO THE PIXELS THAT CAN SEE A LIGHT: FIXED BEFORE THE RIG RUNS IT
+
+**The question.** The fill lever is being settled (sections 103-106), which leaves `denoise-halfres-fixed-costs`'s other
+lever: the coverage. In round 37's runs (section 105) it is now the chain's largest step. The coverage at 1920 x 1080 took
+247.6-252.8 ms on the Intel and 17.2-17.8 ms on the 1080; at 960 x 540, 59.9-66.4 and 4.3-4.6 ms. Every pixel traces 64 rays
+against every sphere, though about 5 % of the frame can see a light. Does a coverage pass that skips the pixels no ray of
+which can meet an emitter, with the same answer bit for bit, cut that cost at least in half on both GPUs?
+
+**The bound, `coverage(..., { bound: true })` (COVERAGE_BOUND_WGSL).**
+- **The test.** Before its 64 rays, a pixel compares its centre ray with each emitter sphere. It traces if the eye is inside
+  or at the sphere (distance <= 1.001 r + 1e-4). It also traces if the angle from its centre ray to the sphere's centre is
+  within all three of these together:
+  - the sphere's angular radius, asin(r / d);
+  - the pixel's half-diagonal on the image plane, times COVERAGE_BOUND_ARC = 1.6;
+  - COVERAGE_BOUND_SLACK = 2e-3 rad.
+- **Why the margins.** An arc is at most pi / 2 times its chord, and the chord is within the pixel on a plane at distance
+  >= 1. f32's acos near 1 is good to about 5e-4.
+- **Otherwise** the pixel writes 0 coverage and 0 emission, untraced. Those are the values its 64 rays would give, since no
+  ray of it meets an emitter, and they are the same bits (+0).
+- **Unchanged otherwise.** The kernel is round 31's text from one template, round 31's own unchanged byte for byte. A traced
+  pixel runs the same code, so the answer is the same bits everywhere. `traced` counts the pixels traced.
+- **The CPU twin**, `coverageMayHit`, makes the same test in f64.
+
+**Measured on the CPU before this section was written, as properties of the fixtures and the rig's scene:**
+- The twin traced every pixel `emitterRadiance` lights, missing none, on 13 views: R 44001, 44002, 44004 and 990000 at
+  32 x 32, 64 x 64 and 128 x 72, and R 990000 at 960 x 540.
+- At the rig's sizes it traces 27,023 of 518,400 pixels (5.2 %) at 960 x 540, and **106,709 of 2,073,600 (5.1 %) at
+  1920 x 1080**.
+
+**Timed.** `time()` adds `covHalfB` and `covFullB`: one pass each, on the device's clock where the device has one, as the
+coverage is.
+- It also compares the bounded coverage's last frames with round 31's, bit for bit at both sizes (`boundCheck.sameHalf`,
+  `sameFull`), and reads back what each traced.
+- `timeHalfChain` adds `fullBound` (today's page with the bounded mask; the page's own mask is this coverage at W x H),
+  `halfBound` and `temporalBound` (the chain with its default fill and the bounded coverage).
+- The page gains four rows (25). A `section 107:` line carries them for the rig.
+- Nothing's default changes in this round.
+
+**The rows (the gate's sections 2-4).**
+1. The bounded kernel is round 31's text plus the bound, and round 31's own text is unchanged. It carries
+   COVERAGE_BOUND_ARC and COVERAGE_BOUND_SLACK.
+2. On the device, on the four scenes at both sizes, the bounded coverage is round 31's bit for bit. Its traced count is
+   within 2 % of the twin's, and every pixel round 31's lights is traced. On the scene with the light behind the camera, it
+   traces nothing.
+3. The twin traces every lit pixel on the CPU views above.
+4. At the pilot size, `halfBound` and `fullBound` are their sums, the page has 25 rows, `boundCheck` is bit for bit at both
+   sizes, and the `section 107:` line carries the sums.
+
+**The rig run.** On each GPU, two `realGpuRun --only denoise` runs, at a commit carrying this section.
+
+**The rule (H39), per GPU, on the two runs' `section 107:` lines.**
+- **C1:** every gate is green with exit 0.
+- **C2:** at both sizes the bounded coverage is round 31's bit for bit (`sameHalf`, `sameFull`), and it traced 106,709 +-
+  2 % at 1920 x 1080.
+- **C3:** both coverages at both sizes are on the device's clock.
+- **H39 holds on a GPU** when, in both runs, covFullB <= 0.5 x covFull.
+- **What it buys:**
+  - If it holds on both GPUs, the bounded coverage becomes the chain's and the page's mask, in a round of its own, and the
+    coverage lever closes.
+  - If it holds on one, it is reported and the coverage per adapter goes to the backlog.
+  - If it holds on neither, it is a measured negative.
+- **Reported, deciding nothing:** the chain's ratio against today's page, since the page's mask gets the same saving.
+
+**Predictions (stated so they can miss).** The coverage's cost is its rays, so the bounded pass should cost about the
+traced share of it, rounded up for 8 x 8 workgroups that hold both kinds of pixel, plus the bound's own test over the frame.
+- **Intel gen-9:** covFullB 10-40 ms against covFull's ~250, and covHalfB 3-15 ms against ~63.
+- **GTX 1080:** covFullB 1-4 ms against ~17.5, and covHalfB 0.3-1.5 ms against ~4.5.
+- H39 holds on both, and every gate is green.
+
+**Sabotages, by the byte-safe runner (F1-F6):**
+- the slack and the arc factor dropped (`asin` alone);
+- the bound tested against every sphere, not the emitters;
+- the bound's skipped pixels writing the emitter's colour (1 for coverage);
+- `coverage(..., { bound: true })` running round 31's kernel;
+- `halfBound` summing `covFull`;
+- the page without the bounded chain's row.
+
+Each must turn at least one row red.
+
+**Nothing else changes:** the default coverage, the fill, the network, every kernel table, and `fx/fsr`.
+
+**One correction to the rows, made before the round was committed and before anything was measured on a GPU.** Row 1 held
+the bound to 23 added lines, a number written without counting. It adds 20, and the row now holds it to that. The other
+rows passed on their first run here, the device tracing exactly the twin's count on all eight views. Reported, deciding
+nothing: at the pilot size on SwiftShader the bounded coverage at 128 x 72 took 4.7 ms against round 31's 51.3. That is a
+CPU's time.

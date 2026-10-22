@@ -16,6 +16,8 @@
 //
 // Every image on the device is rgba f32, four floats a pixel, alpha 1 -- the layout fx/fsr/fsrKernels.js's EASU reads, so the
 // chain hands EASU its input without a repack. The kernels, in the chain's order:
+//   COVERAGE_BOUND_WGSL  round 39 (denoise-halfres-fixed-costs, the coverage lever): COVERAGE_WGSL's text with a bound first -- a
+//                   pixel whose centre ray is too far from every emitter for any of its rays to meet one is 0, untraced
 //   COVERAGE_WGSL   emitterRadiance (render/denoiseMask.mjs): COVERAGE_GRID^2 rays across each pixel, at the centres of an
 //                   even grid, the first hit over the scene's spheres; cov = k / n^2 and E = the mean emission met. Run at
 //                   half size it is the network's mask (the fill's coverage); at full size, the composite's guide.
@@ -57,13 +59,42 @@ export const COVERAGE_GRID_WGSL = 8;
 /** A sphere in the scene buffer: centre xyz, radius, emission rgb, emitter flag -- eight floats. */
 export const SPHERE_STRIDE = 8;
 
-export const COVERAGE_WGSL = /* wgsl */`
+/**
+ * Round 39: the coverage bound's slack, in radians, over the sphere's angular radius and the pixel's -- f32's acos near 1 is good
+ * to about 5e-4, so this is four times that -- and the arc factor over the pixel's half-diagonal on the image plane (an arc is at
+ * most pi / 2 times its chord; 1.6 covers it).
+ */
+export const COVERAGE_BOUND_SLACK = 2e-3;
+export const COVERAGE_BOUND_ARC = 1.6;
+
+/**
+ * Round 39, the coverage bound's CPU twin: for each pixel of a w x h view of scene S, 1 if any of its rays COULD hit an emitter
+ * sphere -- the angle from the pixel's centre ray to the sphere's centre within the sphere's angular radius, the pixel's own
+ * half-diagonal (times COVERAGE_BOUND_ARC) and COVERAGE_BOUND_SLACK; or the eye inside or at the sphere -- else 0. A pixel at 0
+ * has no ray that meets an emitter at all, so its coverage and emission are 0 without tracing. The kernel tests the same.
+ */
+export function coverageMayHit(S, w, h) {
+    const B = cameraBasis(S), out = new Uint8Array(w * h), nrm = (a) => { const l = Math.hypot(...a); return a.map((x) => x / l); };
+    const half = Math.hypot(B.scale * (w / h) / w, B.scale / h) * COVERAGE_BOUND_ARC;
+    const em = S.scene.filter((s) => s.emit).map((s) => { const oc = [0, 1, 2].map((i) => s.centre[i] - S.eye[i]), d = Math.hypot(...oc);
+        return { inside: d <= s.radius * 1.001 + 1e-4, dir: oc.map((x) => x / d), ang: Math.asin(Math.min(1, s.radius / d)) }; });
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const u = ((x + 0.5) / w * 2 - 1) * B.scale * (w / h), v = (1 - (y + 0.5) / h * 2) * B.scale;
+        const dc = nrm([0, 1, 2].map((i) => B.fwd[i] + B.right[i] * u + B.camUp[i] * v));
+        out[y * w + x] = em.some((e) => e.inside || Math.acos(Math.max(-1, Math.min(1, dc[0] * e.dir[0] + dc[1] * e.dir[1] + dc[2] * e.dir[2]))) <= e.ang + half + COVERAGE_BOUND_SLACK) ? 1 : 0;
+    }
+    return out;
+}
+
+// round 39: the coverage kernel is made by one function, over every pixel (round 31's, its text unchanged) or bounded: a pixel
+// whose centre ray is, by coverageMayHit's test, too far from every emitter for any of its rays to meet one writes 0 untraced
+const coverageWgsl = (bounded) => /* wgsl */`
 struct Cam { eye:vec4<f32>, fwd:vec4<f32>, right:vec4<f32>, up:vec4<f32>, w:u32, h:u32, nSph:u32, grid:u32, scale:f32, aspect:f32, pad0:f32, pad1:f32 };
 @group(0) @binding(0) var<storage,read> sph:array<f32>;
 @group(0) @binding(1) var<storage,read_write> cov:array<f32>;
 @group(0) @binding(2) var<storage,read_write> emis:array<f32>;
 @group(0) @binding(3) var<uniform> c:Cam;
-
+${bounded ? "@group(0) @binding(4) var<storage,read_write> traced:array<atomic<u32>>;\n" : ""}
 // physics/render/occlusion.mjs's raySphere, eps 1e-6: the nearer root past eps, else the farther, else none (-1)
 fn hitT(o:vec3<f32>, d:vec3<f32>, k:u32) -> f32 {
     let b = k * ${SPHERE_STRIDE}u;
@@ -84,7 +115,26 @@ fn hitT(o:vec3<f32>, d:vec3<f32>, k:u32) -> f32 {
 @compute @workgroup_size(8,8,1)
 fn main(@builtin(global_invocation_id) g:vec3<u32>) {
     if (g.x >= c.w || g.y >= c.h) { return; }
-    let n = c.grid;
+${bounded ? `    // the bound (coverageMayHit): could any ray of this pixel meet an emitter? If not, its coverage and emission are 0, untraced
+    let pu = ((f32(g.x) + 0.5) / f32(c.w) * 2.0 - 1.0) * c.scale * c.aspect;
+    let pv = (1.0 - (f32(g.y) + 0.5) / f32(c.h) * 2.0) * c.scale;
+    let dc = normalize(c.fwd.xyz + c.right.xyz * pu + c.up.xyz * pv);
+    let pxHalf = length(vec2<f32>(c.scale * c.aspect / f32(c.w), c.scale / f32(c.h))) * ${COVERAGE_BOUND_ARC};
+    var may = false;
+    for (var s = 0u; s < c.nSph; s++) {
+        let b = s * ${SPHERE_STRIDE}u;
+        if (sph[b + 7u] > 0.5) {
+            let oc = vec3<f32>(sph[b], sph[b + 1u], sph[b + 2u]) - c.eye.xyz;
+            let dd = length(oc);
+            let rr = sph[b + 3u];
+            if (dd <= rr * 1.001 + 1e-4) { may = true; }
+            else if (acos(clamp(dot(dc, oc / dd), -1.0, 1.0)) <= asin(min(1.0, rr / dd)) + pxHalf + ${COVERAGE_BOUND_SLACK}) { may = true; }
+        }
+    }
+    let p0 = g.y * c.w + g.x;
+    if (!may) { cov[p0] = 0.0; emis[p0 * 3u] = 0.0; emis[p0 * 3u + 1u] = 0.0; emis[p0 * 3u + 2u] = 0.0; return; }
+    atomicAdd(&traced[0], 1u);
+` : ""}    let n = c.grid;
     var k = 0u;
     var e = vec3<f32>(0.0);
     for (var j = 0u; j < n; j++) {
@@ -109,6 +159,9 @@ fn main(@builtin(global_invocation_id) g:vec3<u32>) {
     emis[p * 3u] = e.x / nn; emis[p * 3u + 1u] = e.y / nn; emis[p * 3u + 2u] = e.z / nn;
 }
 `;
+export const COVERAGE_WGSL = coverageWgsl(false);
+/** Round 39: the coverage kernel bounded -- a pixel no ray of which can meet an emitter is 0, untraced, and `traced` counts the rest. */
+export const COVERAGE_BOUND_WGSL = coverageWgsl(true);
 
 export const FILL_RING_WGSL = /* wgsl */`
 struct P { w:u32, h:u32, ring:u32, pad:u32 };
@@ -706,7 +759,7 @@ export class DenoiseUpscaleGPU {
                 "without one uses render/denoiseUpscale.mjs's CPU chain by asking for it.");
         this.device = device;
         this.p = {};
-        for (const [k, wgsl] of [["cov", COVERAGE_WGSL], ["ring", FILL_RING_WGSL], ["left", FILL_LEFT_WGSL], ["toT", TO_T_WGSL], ["comp", COMPOSITE_WGSL], ["easu", EASU_WGSL],
+        for (const [k, wgsl] of [["cov", COVERAGE_WGSL], ["covB", COVERAGE_BOUND_WGSL], ["ring", FILL_RING_WGSL], ["left", FILL_LEFT_WGSL], ["toT", TO_T_WGSL], ["comp", COMPOSITE_WGSL], ["easu", EASU_WGSL],
                                   ["hits", FIRSTHITS_WGSL], ["shift", SHIFT_WGSL], ["accum", ACCUM_WGSL], ["final", FINAL_WGSL],
                                   ["list", FILL_LIST_WGSL], ["args", FILL_ARGS_WGSL], ["lring", FILL_LISTRING_WGSL], ["lleft", FILL_LISTLEFT_WGSL],
                                   ["tinit", FILL_TILEINIT_WGSL], ["tile", FILL_TILE_WGSL], ["tleft", FILL_TILELEFT_WGSL],
@@ -716,15 +769,27 @@ export class DenoiseUpscaleGPU {
         }
     }
 
-    /** emitterRadiance on the device: { cov, E }, Float64Arrays of w*h and w*h*3. */
-    async coverage(S, w, h) {
+    /**
+     * emitterRadiance on the device: { cov, E, traced }, Float64Arrays of w*h and w*h*3. `bound` (round 39) skips each pixel no ray
+     * of which can meet an emitter (coverageMayHit's test), writing its 0s untraced; `traced` counts the pixels traced (0 unbounded).
+     */
+    async coverage(S, w, h, { bound = false } = {}) {
         const dev = this.device, n = w * h, sph = packSpheres(S.scene);
         const bS = dev.buffer({ data: sph, usage: ["storage"] }), bC = dev.buffer({ data: new Float32Array(n), usage: ["storage"] });
         const bE = dev.buffer({ data: new Float32Array(n * 3), usage: ["storage"] }), u = dev.buffer({ data: cameraUniform(S, w, h, S.scene.length), usage: "uniform" });
-        dev.frame(({ pass }) => { this.p.cov.bind("sph", bS).bind("cov", bC).bind("emis", bE).bind("c", u); pass.dispatch(this.p.cov, groups(w, h)); pass.clear([0, 0, 0, 1]); }, { offscreen: true });
+        const bT = dev.buffer({ data: new Uint32Array(1), usage: ["storage"] });
+        dev.frame(({ pass }) => { this._covOps(pass, bound, bS, bC, bE, u, bT, w, h); pass.clear([0, 0, 0, 1]); }, { offscreen: true });
         const cov = Float64Array.from(new Float32Array(await dev.read(bC))), E = Float64Array.from(new Float32Array(await dev.read(bE)));
-        for (const b of [bS, bC, bE, u]) b.destroy();
-        return { cov, E };
+        const traced = new Uint32Array(await dev.read(bT))[0];
+        for (const b of [bS, bC, bE, u, bT]) b.destroy();
+        return { cov, E, traced };
+    }
+    // the coverage dispatch, round 31's or (round 39) bounded, counting what it traced into `bT`
+    _covOps(pass, bound, bS, bC, bE, u, bT, w, h) {
+        const k = bound ? this.p.covB : this.p.cov;
+        k.bind("sph", bS).bind("cov", bC).bind("emis", bE).bind("c", u);
+        if (bound) k.bind("traced", bT);
+        pass.dispatch(k, groups(w, h));
     }
 
     // the bounded fill's dispatches, on an open frame: rgba `src` and coverage `cov` in, the filled rgba out (returned buffer)
@@ -928,6 +993,7 @@ export class DenoiseUpscaleGPU {
      *   fillList, wholeList        round 34: fill and whole with the fill over the lights' pixels only, by the wall clock
      *   fillTile, wholeTile        round 37: fill and whole with the fill FILL_TILE_RINGS rings a pass in tiles, by the wall clock
      *   fillLTile, wholeLTile      round 38: the same over the listed tiles only, by the wall clock
+     *   covHalfB, covFullB         round 39: the coverage bounded, at w x h and W x H, one pass each
      * A step is on the device's clock where the device grants timestamps and the step has 30 passes or fewer, else the wall
      * clock (performance.now() around the frame and the queue's onSubmittedWorkDone). Each row says which. Returns medians.
      */
@@ -937,6 +1003,9 @@ export class DenoiseUpscaleGPU {
         const bS = dev.buffer({ data: sph, usage: ["storage"] }), cH = mk(w * h), eH = mk(w * h * 3), cF = mk(W * H), eF = mk(W * H * 3);
         const uH = dev.buffer({ data: cameraUniform(S, w, h, S.scene.length), usage: "uniform" }), uF = dev.buffer({ data: cameraUniform(S, W, H, S.scene.length), usage: "uniform" });
         const covOps = (pass, c, e, u, ww, hh) => { this.p.cov.bind("sph", bS).bind("cov", c).bind("emis", e).bind("c", u); pass.dispatch(this.p.cov, groups(ww, hh)); };
+        // round 39: the bounded coverage, into buffers of its own so the chain's steps keep reading round 31's
+        const cHb = mk(w * h), eHb = mk(w * h * 3), cFb = mk(W * H), eFb = mk(W * H * 3), bTr = dev.buffer({ data: new Uint32Array(1), usage: ["storage"] });
+        const covBOps = (pass, c, e, u, ww, hh) => this._covOps(pass, true, bS, c, e, u, bTr, ww, hh);
         // the half-size coverage once, read back outside every time, for the fill's known flags; the frame is smooth light
         dev.frame(({ pass }) => { covOps(pass, cH, eH, uH, w, h); pass.clear([0, 0, 0, 1]); }, { offscreen: true });
         const covHalf = Float64Array.from(new Float32Array(await dev.read(cH)));
@@ -965,7 +1034,7 @@ export class DenoiseUpscaleGPU {
             accum: (pass) => { this.p.accum.bind("prevGeo", geoB).bind("curGeo", geoB).bind("prevHist", hA).bind("cur", curB).bind("outHist", hB).bind("u", uAc); pass.dispatch(this.p.accum, groups(W, H)); },
             final: (pass) => { this.p.final.bind("hist", hB).bind("cov", cF).bind("emis", eF).bind("dst", outB).bind("u", uC); pass.dispatch(this.p.final, groups(W, H)); },
         };
-        const step = { covHalf: [], covFull: [], fill: [], rest: [], whole: [], hits: [], shift: [], accum: [], final: [], fillList: [], wholeList: [], fillTile: [], wholeTile: [], fillLTile: [], wholeLTile: [] }, clock = {};
+        const step = { covHalf: [], covFull: [], fill: [], rest: [], whole: [], hits: [], shift: [], accum: [], final: [], fillList: [], wholeList: [], fillTile: [], wholeTile: [], fillLTile: [], wholeLTile: [], covHalfB: [], covFullB: [] }, clock = {};
         const run = async (k, ops, passes) => {
             const dc = stamps && passes <= 30;
             await gpu.queue.onSubmittedWorkDone();
@@ -976,6 +1045,9 @@ export class DenoiseUpscaleGPU {
         for (let r = 0; r < reps + 1; r++) {         // the first rep warms every pipeline and is not kept
             await run("covHalf", (pass) => covOps(pass, cH, eH, uH, w, h), 1);
             await run("covFull", (pass) => covOps(pass, cF, eF, uF, W, H), 1);
+            // round 39: the bounded coverage at both sizes, one pass each, on the device's clock where it has one
+            await run("covHalfB", (pass) => covBOps(pass, cHb, eHb, uH, w, h), 1);
+            await run("covFullB", (pass) => covBOps(pass, cFb, eFb, uF, W, H), 1);
             reset(); await run("fill", (pass) => { filled = this._fillOps(pass, bufs, w, h, maxRings); }, 31);
             await run("rest", (pass) => restOps(pass, filled), 3);
             reset(); await run("whole", (pass) => { covOps(pass, cH, eH, uH, w, h); covOps(pass, cF, eF, uF, W, H); restOps(pass, this._fillOps(pass, bufs, w, h, maxRings)); }, 31);
@@ -993,7 +1065,12 @@ export class DenoiseUpscaleGPU {
         }
         const c = await this._fillCounts(bufs);
         this._free(bufs);
-        for (const b of [bS, cH, eH, cF, eF, uH, uF, tMax, uT, up, uE, dst, uC, geoB, curB, hA, hB, outB, uSh, uAc]) b.destroy();
+        // round 39: the bounded coverage's last frames against round 31's, float for float, read back outside every time
+        const eq = async (x, y) => { const a = new Uint32Array(await dev.read(x)), b = new Uint32Array(await dev.read(y)); return a.length === b.length && a.every((v, i) => v === b[i]); };
+        const sameHalf = (await eq(cH, cHb)) && (await eq(eH, eHb)), sameFull = (await eq(cF, cFb)) && (await eq(eF, eFb));
+        for (const b of [bS, cH, eH, cF, eF, uH, uF, tMax, uT, up, uE, dst, uC, geoB, curB, hA, hB, outB, uSh, uAc, cHb, eHb, cFb, eFb, bTr]) b.destroy();
+        const th = (await this.coverage(S, w, h, { bound: true })).traced, tf = (await this.coverage(S, W, H, { bound: true })).traced;
+        const boundCheck = { half: th, full: tf, ofHalf: w * h, ofFull: W * H, sameHalf, sameFull };
         // round 34: the list fill once more at this size, outside every time, read back -- its rings, the pixels it listed and left
         const lc = await this.fill(img, covHalf, w, h, maxRings, { list: true }), listCheck = { rings: lc.rings, left: lc.left, listed: lc.listed };
         // round 37: the tile fill the same way -- its rings, the pixels it left, and the passes it ran
@@ -1001,7 +1078,7 @@ export class DenoiseUpscaleGPU {
         // round 38: the listed tile fill the same way -- and the tiles it listed, of all the frame's
         const ltc = await this.fill(img, covHalf, w, h, maxRings, { tile: "listed" }), ltileCheck = { rings: ltc.rings, left: ltc.left, passes: ltc.tilePasses, tiles: ltc.tilesListed, of: nT };
         const med = (a) => { const b = [...a].sort((x, y) => x - y); return b.length ? b[(b.length - 1) >> 1] : null; };
-        return { w, h, W, H, maxRings, reps, rings: c.rings, inView: covHalf.filter((v) => v > 0).length, listCheck, tileCheck, ltileCheck,
+        return { w, h, W, H, maxRings, reps, rings: c.rings, inView: covHalf.filter((v) => v > 0).length, listCheck, tileCheck, ltileCheck, boundCheck,
                  steps: Object.fromEntries(Object.keys(step).map((k) => [k, { ms: med(step[k]), clock: clock[k], runs: step[k] }])) };
     }
 }
@@ -1021,6 +1098,7 @@ export class DenoiseUpscaleGPU {
  *   halfRing, temporalRing  round 36: half and temporal with round 31's ring fill (fill), the reference the default is held to
  *   halfTile, temporalTile  round 37: half and temporal with the tile fill (fillTile)
  *   halfLTile, temporalLTile  round 38: half and temporal with the tile fill over the listed tiles (fillLTile)
+ *   fullBound, halfBound, temporalBound  round 39: full, half and temporal with the bounded coverage (covHalfB, covFullB)
  * The ladder's cap is 5000 ms a pass, not its default 1500: the Intel gen-9's page pass at 1920 x 1080 is 1.2-1.4 s (rounds 27
  * and 28), close enough to 1500 that a prediction from the smaller size could skip the very row being compared.
  */
@@ -1043,5 +1121,9 @@ export async function timeHalfChain({ device, net, newAdapter, kernels, S, w, h,
              temporalTile: sum([networkHalf, st.covHalf, st.covFull, st.fillTile, st.rest, st.hits, st.shift, st.accum, st.final]),
              // round 38: the same two with the tile fill over the listed tiles
              halfLTile: sum([networkHalf, st.covHalf, st.covFull, st.fillLTile, st.rest]),
-             temporalLTile: sum([networkHalf, st.covHalf, st.covFull, st.fillLTile, st.rest, st.hits, st.shift, st.accum, st.final]) };
+             temporalLTile: sum([networkHalf, st.covHalf, st.covFull, st.fillLTile, st.rest, st.hits, st.shift, st.accum, st.final]),
+             // round 39: today's page and the chain (its default fill, the list fill) with the bounded coverage -- the page's own mask
+             // is the coverage at W x H, so the bound serves it too
+             fullBound: sum([networkFull, st.covFullB]), halfBound: sum([networkHalf, st.covHalfB, st.covFullB, st.fillList, st.rest]),
+             temporalBound: sum([networkHalf, st.covHalfB, st.covFullB, st.fillList, st.rest, st.hits, st.shift, st.accum, st.final]) };
 }

@@ -1109,6 +1109,8 @@ export const EXCLUDED = Object.freeze([
                     why: "eight rings of the fill a pass in workgroup memory, ping-ponging the image and the rings, dispatched ceil(rings / 8) times; graded as a chain, bit for bit against the list fill, by render/denoiseUpscaleGPU-selfcheck.mjs" }),
     Object.freeze({ id: "denoiseUpscaleGPU.FILL_TILELEFT_WGSL", kind: "ordered multi-dispatch chain, graded against a CPU twin",
                     why: "the tile fill's last pass, meaningful only after the tile passes; graded with them by render/denoiseUpscaleGPU-selfcheck.mjs" }),
+    Object.freeze({ id: "denoiseUpscaleGPU.COVERAGE_BOUND_WGSL", kind: "ordered multi-dispatch chain, graded against a CPU twin",
+                    why: "round 39's coverage, round 31's kernel with a bound before its rays; graded bit for bit against round 31's kernel on the device, and its traced count against coverageMayHit, its CPU twin, by render/denoiseUpscaleGPU-selfcheck.mjs" }),
     Object.freeze({ id: "denoiseUpscaleGPU.FILL_LTINIT_WGSL", kind: "ordered multi-dispatch chain, graded against a CPU twin",
                     why: "round 38's listed tile fill, its first pass: both ring buffers, the second image and the list of tiles holding an unknown pixel, which only the passes after it read; graded as a chain against fillEmittersBounded and both fills by render/denoiseUpscaleGPU-selfcheck.mjs" }),
     Object.freeze({ id: "denoiseUpscaleGPU.FILL_LTARGS_WGSL", kind: "ordered multi-dispatch chain, graded against a CPU twin",

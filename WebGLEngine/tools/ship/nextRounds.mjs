@@ -2367,6 +2367,13 @@ export const NEXT_ROUNDS = [
         upstream: "denoise-fill-listed-tiles first.",
     },
     {
+        id: "denoise-coverage-bound",
+        blocker: "OPEN",
+        what: "Round 39 (pre-registration section 107): the coverage bounded to the pixels that can see a light -- coverage(..., { bound: true }) skips each pixel whose centre ray is too far from every emitter for any of its rays to meet one, writing its 0s untraced, round 31's answer bit for bit. The coverage lever of denoise-halfres-fixed-costs.",
+        how: "Built and waiting on the rig. coverageMayHit is its CPU twin: it traces every lit pixel on 13 views and 106,709 of 2,073,600 (5.1 %) at the rig's 1920 x 1080. On SwiftShader the device traces exactly the twin's count on all eight views and is round 31's bit for bit; sabotaged F1-F6. Owed: two realGpuRun --only denoise runs on each GPU, read by section 107's rule (H39: covFullB <= 0.5 x covFull in both runs).",
+        why: "Section 105's runs: the coverage at 1920 x 1080 is the chain's largest step now, 248-253 ms on the Intel and 17-18 on the 1080, for 64 rays a pixel of which about 5 % of the frame can see a light. The page's own mask is the same coverage, so the saving is today's page's too.",
+    },
+    {
         id: "denoise-fsr3-framegen",
         blocker: "UPSTREAM",
         what: "FSR3's frame generation between denoised, upscaled frames -- fx/fsr/fsr3Tsl.mjs's arrangement, on the path tracer's output.",

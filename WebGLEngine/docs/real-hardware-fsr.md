@@ -619,6 +619,24 @@ node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r38-b.json
 - **Don't commit or pull between runs.**
 - **Send back all four JSON files.**
 
+### Round 39: the coverage bounded to the pixels that can see a light (pre-registration section 107)
+
+On each GPU, in a clone on the branch at a commit carrying section 107 (`git log -1 --oneline` shows it):
+
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r39-a.json
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r39-b.json
+```
+
+- **What is new:** the chain gate also runs the coverage with a bound that skips the pixels no ray of which can meet a light,
+  checks it against the old coverage bit for bit at both sizes, and times it. A `section 107:` line puts the two side by side.
+- **Section 107 predicts:** at 1920 x 1080, 10-40 ms against ~250 on the Intel and 1-4 ms against ~17.5 on the 1080. Every gate
+  is green.
+- **Don't commit or pull between runs.**
+- **Send back all four JSON files.**
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and

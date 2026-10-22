@@ -37,7 +37,10 @@ node tools/ship/versionPreflight.mjs --next    # the next free version and sweep
 
 ## What is next -- Keith picks
 
-1. **`denoise-fill-listed-tiles`, round 38 (section 106): owed two runs on each GPU.** Round 37's tile kernel over the tiles
+1. **`denoise-coverage-bound`, round 39 (section 107): owed two runs on each GPU.** The coverage traces only the pixels
+   that can see a light, 5.1 % at 1080p, bit for bit round 31's on SwiftShader. Section 107 predicts the 1080p coverage
+   falls from ~250 to 10-40 ms on the Intel and from ~17.5 to 1-4 ms on the 1080. The page's own mask gains it too.
+   **`denoise-fill-listed-tiles`, round 38 (section 106): owed two runs on each GPU.** Round 37's tile kernel over the tiles
    holding a light pixel only, 123 of 2,040 at the rig's size, both fills' bit for bit on SwiftShader. Section 106 predicts
    2-8 ms on the 1080 and 5-15 ms on the Intel, against the list fill's 22-25, which would make it the default. Round 37
    (sections 104-105): the tile fill held on the 1080 and lost on the Intel; `denoise-fill-per-adapter` waits on round 38.
