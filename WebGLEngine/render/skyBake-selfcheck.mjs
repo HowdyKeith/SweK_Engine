@@ -19,7 +19,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import * as SB from "./skyBake.mjs";
-import { runWgslComputeNative, headlessGpuSkipReason, exitCleanly } from "../tools/ship/headlessGpu.mjs";
+import { reading, runWgslComputeNative, headlessGpuSkipReason, exitCleanly } from "../tools/ship/headlessGpu.mjs";
 
 const require_ = createRequire(import.meta.url);
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -116,6 +116,7 @@ console.log("\n5. THE KERNEL");
         else {
             let worstRel = 0, worstAbs = 0, at = -1, over5 = 0, n = 0; for (let i = 0; i < twin.length; i++) { if (i % 4 === 3) continue; const d = Math.abs(g.values[i] - twin[i]), rel = d / Math.max(Math.abs(twin[i]), 0.02); n++; if (rel > worstRel) { worstRel = rel; at = i; } worstAbs = Math.max(worstAbs, d); if (rel > 0.05) over5++; }
             ok("!! the bake kernel equals the CPU bake over a 64 x 32 LUT (sun 13 deg up, 40 deg round): worst relative difference " + (worstRel * 100).toFixed(2) + "% (under 5%), " + over5 + " of " + n + " values over 5%", worstRel < 0.05 && !g.wroteNothing, "worst abs " + worstAbs.toExponential(2) + " at " + at + ", adapter " + ((g.adapter && g.adapter.description) || "?"));
+            reading("skyBake: bake kernel vs CPU bake, 64x32 LUT (relative)", worstRel, 0.05, n, ((g.adapter && g.adapter.description) || "?"));
             report("the f32 / f64 gap is the kernel computing h = length(p) - 6.36e6 in single precision (ulp 0.5 m): the same arithmetic upstream's fragment shader runs on a GPU.");
         }
     }

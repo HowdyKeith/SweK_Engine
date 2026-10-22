@@ -20,7 +20,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import * as CM from "./clipmapTerrain.mjs";
-import { runWgslComputeNative, headlessGpuSkipReason, exitCleanly } from "../tools/ship/headlessGpu.mjs";
+import { reading, runWgslComputeNative, headlessGpuSkipReason, exitCleanly } from "../tools/ship/headlessGpu.mjs";
 
 const require_ = createRequire(import.meta.url);
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -135,6 +135,7 @@ console.log("\n6. THE KERNEL");
         else {
             let worst = 0, worstMorph = 0, morphing = 0; for (let i = 0; i < N; i++) { const t = CM.placeVertex(v[i * 3], v[i * 3 + 2], v[i * 3 + 1], cam); worst = Math.max(worst, Math.abs(g.values[i * 4] - t.x), Math.abs(g.values[i * 4 + 1] - t.z), Math.abs(g.values[i * 4 + 2] - t.spacing)); worstMorph = Math.max(worstMorph, Math.abs(g.values[i * 4 + 3] - t.morph)); if (t.morph > 0 && t.morph < 1) morphing++; }
             ok("!! the placement kernel equals the twin over 4096 vertices of the real mesh, camera at (123.5, -78.9): positions and spacing within 1e-3 m (f32 at up to 870 m), morph within 1e-5 (" + morphing + " vertices mid-morph)", worst < 1e-3 && worstMorph < 1e-5 && morphing > 50 && !g.wroteNothing, "worst " + worst.toExponential(2) + " m, morph " + worstMorph.toExponential(1));
+            reading("clipmapTerrain: placement kernel vs twin, positions and spacing (metres)", worst, 1e-3, N * 3, ((g.adapter && g.adapter.description) || "?")); reading("clipmapTerrain: placement kernel vs twin, morph weight", worstMorph, 1e-5, N, ((g.adapter && g.adapter.description) || "?"));
         }
     }
 }

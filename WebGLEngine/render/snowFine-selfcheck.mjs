@@ -17,7 +17,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import * as SF from "./snowFine.mjs";
-import { runWgslComputeNative, headlessGpuSkipReason, exitCleanly } from "../tools/ship/headlessGpu.mjs";
+import { reading, runWgslComputeNative, headlessGpuSkipReason, exitCleanly } from "../tools/ship/headlessGpu.mjs";
 
 const require_ = createRequire(import.meta.url);
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -109,6 +109,11 @@ else {
     else {
         const stat = (lo, hi, k) => { let worstH = 0, n = 0, within = 0; const sl = []; for (let i = lo; i < hi; i++) if (i % 4 === k) { worstH = Math.max(worstH, Math.abs(g.values[i * 4] - tw[i][0])); sl.push(Math.max(Math.abs(g.values[i * 4 + 1] - tw[i][1]), Math.abs(g.values[i * 4 + 2] - tw[i][2]), Math.abs(g.values[i * 4 + 3] - tw[i][3]))); n++; if (sl[sl.length - 1] < 5e-3 && Math.abs(g.values[i * 4] - tw[i][0]) < 5e-3) within++; } sl.sort((a, b) => a - b); return { worst: worstH, med: sl[Math.floor(sl.length / 2)], n, within }; };
         const near = [0, 1, 2, 3].map((k) => stat(0, 120, k)), far = [0, 1].map((k) => stat(120, 240, k));
+        const AD = (g.adapter && g.adapter.description) || "?";
+        reading("snowFine: terrainFine height vs twin within 5 m (metres)", near[0].worst, 5e-3, near[0].n, AD);
+        reading("snowFine: terrainFineFiltered height vs twin within 5 m (metres)", near[1].worst, 5e-3, near[1].n, AD);
+        reading("snowFine: windLocal vs twin within 5 m", near[2].worst, 1e-2, near[2].n, AD);
+        reading("snowFine: detailTexel median error within 5 m", near[3].med, 2e-2, near[3].n, AD);
         ok("!! within 5 m of the origin the WGSL equals the twin to the f32 hash's bound: worst height error terrainFine " + near[0].worst.toExponential(1) + " (median slope error " + near[0].med.toExponential(1) + "), terrainFineFiltered " + near[1].worst.toExponential(1) + " (" + near[1].med.toExponential(1) + "), windLocal " + near[2].worst.toExponential(1) + ", detailTexel " + near[3].worst.toExponential(1) + " (median " + near[3].med.toExponential(1) + ") over " + near[0].n + " queries each", near[0].worst < 5e-3 && near[0].med < 5e-3 && near[1].worst < 5e-3 && near[1].med < 5e-3 && near[2].worst < 1e-2 && near[3].med < 2e-2 && !g.wroteNothing, "adapter " + ((g.adapter && g.adapter.description) || "?"));
         console.log("  ----  FINDING: the f32 hash is not portable at distance. Out to 80 m the same function on the adapter agrees with the twin on only " + far[0].within + " of " + far[0].n + " terrainFine and " + far[1].within + " of " + far[1].n + " terrainFineFiltered queries to 5e-3 (worst " + far[0].worst.toFixed(3) + " m): the rotated, scaled lattice coordinates grow and the hash's fract chain throws away the bits. The page is its own reference; the twin grades the arithmetic near the origin.");
     }

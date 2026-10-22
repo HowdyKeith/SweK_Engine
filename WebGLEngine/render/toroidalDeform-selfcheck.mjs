@@ -20,7 +20,7 @@ import crypto from "node:crypto";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import * as TD from "./toroidalDeform.mjs";
-import { runWgslComputeNative, headlessGpuSkipReason, doubleToHalf, halfToDouble, exitCleanly } from "../tools/ship/headlessGpu.mjs";
+import { reading, runWgslComputeNative, headlessGpuSkipReason, doubleToHalf, halfToDouble, exitCleanly } from "../tools/ship/headlessGpu.mjs";
 
 const require_ = createRequire(import.meta.url);
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -159,6 +159,8 @@ console.log("\n4. THE KERNEL");
             return { g, w, nz, over, adapter: (g.adapter && g.adapter.description) || "?" };
         };
         const a = await runKernel(mkF(0), 0.8, 3), b = await runKernel(mkF(0), 0, 0), c = await runKernel(mkF(1), 0.8, 3);
+        for (const [nm, r] of [["relaxation on, window moved", a], ["no relaxation, window still", b]]) ["depression", "berm", "compression", "ice"].forEach((ch, i) => reading("toroidalDeform: " + ch + " channel vs twin, " + nm, r.w[i], i === 1 ? 3e-4 : 1e-6, null, r.adapter));
+        ["depression", "berm", "compression", "ice"].forEach((ch, i) => reading("toroidalDeform: " + ch + " channel vs twin, rim wobble ON", c.w[i], 5e-3, null, c.adapter));
         const fmt = (r) => "per channel worst [" + r.w.map((v) => v.toExponential(1)).join(", ") + "], " + r.over + " values over 1e-4, " + r.nz + " nonzero, adapter " + r.adapter;
         ok("!! the compute kernel equals the twin with the rim wobble OFF, relaxation on, the window moved 3 texels, four brushes (two across the seam): depression, compression and ice to 1e-6, the berm (its grain noise stays) to 3e-4", a.g.ok && !a.g.wroteNothing && a.nz > 1000 && a.w[0] < 1e-6 && a.w[2] < 1e-6 && a.w[3] < 1e-6 && a.w[1] < 3e-4, fmt(a));
         ok("!! ... and with no relaxation and the window still (dt = 0), the same bounds", b.g.ok && b.nz > 1000 && b.w[0] < 1e-6 && b.w[2] < 1e-6 && b.w[3] < 1e-6 && b.w[1] < 3e-4, fmt(b));

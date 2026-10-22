@@ -24,7 +24,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { makeKnowledge } from "../../tv/tvPackages.mjs";
+import { makeKnowledge, loadKnowledge } from "../../tv/tvPackages.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const REC_FILE = path.join(ENG, "tv", "tvPackages.json");
@@ -48,6 +48,12 @@ console.log("1. PROVENANCE");
     ok("!! the 227-TV survey is in it: more than 200 TVs, and a bounded table of packages seen on three or more",
         rec.vibehack.devices > 200 && Object.keys(rec.vibehack.freq).length > 100 && Object.keys(rec.vibehack.freq).length < 2000,
         rec.vibehack.devices + " TVs, " + Object.keys(rec.vibehack.freq).length + " packages in the table");
+}
+
+{
+    const L = await loadKnowledge();
+    ok("!! loadKnowledge (the Node-side reader the commands use) gives the same verdicts as makeKnowledge over the file read here, for every package in the record",
+        JSON.stringify(L.census()) === JSON.stringify(K.census()) && L.conflicts().length === K.conflicts().length && L.devices === rec.vibehack.devices, JSON.stringify(L.census().byClass));
 }
 
 console.log("\n2. THE RECORD'S SHAPE");

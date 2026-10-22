@@ -11,6 +11,9 @@
 //   goes only when the saved Wi-Fi networks were read and are not its own; already-disabled and not-installed are never planned,
 //   so undo cannot turn on something the owner had off; the module has no I/O at all.
 //
+// SECTION 8 (the command, tools/ship/takeTvPlan.mjs) SABOTAGES, same rule -- a disable-user write added to the --adb reads: 2 red (exactly-four; no-writes) | a fifth read: 1 | the plan file always
+// written: 1 | the --adb value not checked: 1 | the plan no longer saying it changed nothing: 1 | the undo script with an enable for every installed package: 1, AFTER IT WENT 0 RED THE FIRST TIME --
+// the row only asked that every undo line be shaped like an enable, and the sabotaged ones were; it now compares the undo's packages to the plan's, reversed.
 // SABOTAGES (each applied to the real tv/tvDebloat.mjs, run, restored md5-identical; every one red BY NAME; the number is rows red):
 //   name validation off ........................... 1 (the eight injection shapes)        core refusal off ............................. 2 (core row + the whole-record property)
 //   never refusal off ............................. 2 (never row + the property)          unnamed contested allowed .................... 1
@@ -22,7 +25,9 @@
 //   unreadable-Wi-Fi one threw a TypeError on null (same). Both redone as clean edits that load -- a sabotage that crashes the gate proves nothing about the row.
 "use strict";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { makeKnowledge } from "../../tv/tvPackages.mjs";
 import { planDebloat, parsePmList, parseHomeClaims, parseWifiOwners, SETUPWRAITH } from "../../tv/tvDebloat.mjs";
@@ -129,6 +134,54 @@ console.log("\n7. NOT INSTALLED, ALREADY OFF, AND NO I/O");
     const src = fs.readFileSync(path.join(ENG, "tv", "tvDebloat.mjs"), "utf8").split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join("\n");
     ok("!! the module has NO I/O: no import, no require, no process, no fetch, no child_process, no fs -- it cannot execute a plan, only describe one",
         !/\bimport\s|\brequire\s*\(|\bprocess\.|\bfetch\s*\(|child_process|\bfs\b|XMLHttpRequest|WebSocket/.test(src), "checked on the code with comments stripped");
+}
+
+console.log("\n8. THE COMMAND (tools/ship/takeTvPlan.mjs): FILES IN, A PLAN OUT, AND WITH --adb ONLY FOUR READS");
+{
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "swek-tvplan-"));
+    const w = (n, t) => { const f = path.join(dir, n); fs.writeFileSync(f, t); return f; };
+    const pm = w("pm.txt", "package:com.google.android.feedback\r\npackage:com.google.android.play.games\r\npackage:com.android.systemui\r\npackage:com.google.android.gms\r\npackage:com.google.android.apps.tv.launcherx\r\n");
+    const pmd = w("pmd.txt", "package:com.google.android.play.games\n"), home = w("home.txt", "priority=0\ncom.google.android.apps.tv.launcherx/.home.HomeActivity\n"), wifi = w("wifi.txt", "netId=1 cname=android.uid.system\n");
+    const cmd = path.join(ENG, "tools", "ship", "takeTvPlan.mjs");
+    const run = (args, env = {}) => spawnSync(process.execPath, [cmd, ...args], { encoding: "utf8", cwd: dir, env: { ...process.env, ...env } });
+    const before = fs.readdirSync(dir).sort().join();
+    const r = run(["--installed", pm, "--disabled", pmd, "--home", home, "--wifi", wifi, "--request", "com.google.android.feedback,com.google.android.play.games,com.android.systemui,com.google.android.gms,com.google.android.apps.tv.launcherx"]);
+    ok("!! files in, a plan out: it disables only the one safe, installed, not-already-off package; core and never are REFUSED; the launcher stays (nothing else answers Home); and it says it changed nothing", r.status === 0 &&
+        /would disable 1, skipped 2, refused 2/.test(r.stdout) && /disable  com\.google\.android\.feedback/.test(r.stdout) && /REFUSED  com\.android\.systemui/.test(r.stdout) && /REFUSED  com\.google\.android\.gms/.test(r.stdout) && /NOTHING WAS CHANGED ON THE TV/.test(r.stdout), r.stdout.split("\n")[2]);
+    ok("!! it writes NOTHING unless asked: no --out and no --undo leaves the directory as it was", fs.readdirSync(dir).sort().join() === before);
+    const out = path.join(dir, "plan.json"), undo = path.join(dir, "undo.sh");
+    run(["--installed", pm, "--disabled", pmd, "--home", home, "--wifi", wifi, "--out", out, "--undo", undo]);
+    const plan = JSON.parse(fs.readFileSync(out, "utf8"));
+    ok("--out holds the plan and the backup of the state before it, --undo re-enables exactly the planned packages", plan.executes === false && plan.backup.installed.length === 5 && plan.backup.disabled[0] === "com.google.android.play.games" &&
+        JSON.stringify(fs.readFileSync(undo, "utf8").split("\n").filter((l) => l.startsWith("adb ")).map((l) => l.split(" ").pop())) === JSON.stringify(plan.steps.map((x) => x.pkg).reverse()) &&
+        fs.readFileSync(undo, "utf8").split("\n").filter((l) => l.startsWith("adb ")).every((l) => /shell pm enable [\w.]+$/.test(l)));
+    ok("no input is refused with a usage line and exit 2, and an unknown option is refused rather than ignored", run([]).status === 2 && run(["--installed", pm, "--disable-everything"]).status === 2);
+    ok("!! --adb takes a host or host:port, and a shell-shaped value is refused before anything runs", run(["--adb", "tv; reboot"]).status === 2 && run(["--adb", "$(id)"]).status === 2);
+    if (process.platform === "win32") say("the fake-adb check SKIPPED on win32 (its adb stand-in is a shell script). THAT IS A SKIP, NOT A PASS: the four-reads claim is graded on the Linux and macOS boxes.");
+    else {
+        // a fake adb that records every argument list and answers the four reads
+        const bin = path.join(dir, "bin"); fs.mkdirSync(bin);
+        const log = path.join(dir, "adb.log");
+        fs.writeFileSync(path.join(bin, "adb"), `#!/bin/sh
+echo "$@" >> "${log}"
+case "$*" in
+  *"shell pm list packages -d"*) printf 'package:com.google.android.play.games\n' ;;
+  *"shell pm list packages"*) printf 'package:com.google.android.feedback\npackage:com.google.android.play.games\npackage:com.android.systemui\n' ;;
+  *query-activities*) printf 'com.example.home/.Home\n' ;;
+  *"shell dumpsys wifi"*) printf 'netId=1 cname=android.uid.system\n' ;;
+esac
+exit 0
+`, { mode: 0o755 });
+        const a = run(["--adb", "192.168.1.50:5555"], { PATH: bin + path.delimiter + process.env.PATH });
+        const calls = fs.existsSync(log) ? fs.readFileSync(log, "utf8").split("\n").filter(Boolean) : [];
+        const shellCalls = calls.filter((c) => / shell /.test(c));
+        const FORBIDDEN = /\b(disable|disable-user|enable|install|uninstall|reboot|clear|settings|svc|setprop|am |monkey|rm |su )\b/;
+        ok("!! with --adb it runs EXACTLY four reads on the TV -- the package list, the disabled list, who answers Home, the saved Wi-Fi owners -- and connects once", a.status === 0 && shellCalls.length === 4 && calls.filter((c) => c.startsWith("connect ")).length === 1 &&
+            shellCalls.some((c) => /pm list packages$/.test(c)) && shellCalls.some((c) => /pm list packages -d$/.test(c)) && shellCalls.some((c) => /query-activities/.test(c)) && shellCalls.some((c) => /dumpsys wifi$/.test(c)), calls.length + " adb calls: " + calls.map((c) => c.replace("-s 192.168.1.50:5555 ", "")).join(" | ").slice(0, 200));
+        ok("!! and not one of those calls is a write: no disable, enable, install, uninstall, reboot, clear, settings, svc or setprop", !calls.some((c) => FORBIDDEN.test(c.replace(/pm list packages -d/, "pm list packages"))), "checked " + calls.length + " calls");
+        ok("the plan the fake TV's answers produce is the expected one by default: only feedback is disabled (play.games is SKIPPED: already off; the system UI is not even asked about), and Home is read from the query", /would disable 1, skipped 1, refused 0/.test(a.stdout) && /disable  com\.google\.android\.feedback/.test(a.stdout) && /Home answered by com\.example\.home/.test(a.stdout), a.stdout.split("\n")[2]);
+    }
+    fs.rmSync(dir, { recursive: true, force: true });
 }
 
 console.log(`\ntvDebloat-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

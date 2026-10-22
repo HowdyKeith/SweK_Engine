@@ -2164,6 +2164,13 @@ export const NEXT_ROUNDS = [
     },
     // ---- v4896 (unshipped): the three TV repositories (tv-detox, tv-vibehack/CleanYourTV, free-my-tv), assessed against what SweK already has.
     {
+        id: "snow-d3d12-readings-from-the-rig",
+        blocker: "OPEN",
+        what: "Run the snow stack's kernel gates and the snow-gpu.html gate on the Windows rig and file the reading lines: node tools\\ship\\realGpuRun.mjs --native --only render/ --out snow-native-d3d12.json, then node tools\\ship\\realGpuRun.mjs --only snowGpu --out snow-browser-d3d12.json (docs/real-hardware-snow.md).",
+        how: "Every snow kernel-versus-twin comparison prints `reading <name>: worst W against a limit of L, margin Mx over N values, adapter A` (tools/ship/headlessGpu.mjs reading()), which realGpuRun keeps as measured lines; the browser gate prints the live loop's frame rate. Enter the D3D12 numbers beside the software ones and look for margins under about 3x: that is the next TAA bug.",
+        why: "v4895's TAA resolve read its frame size as u32(1.0 / invRes): D3D12 gave 23.999998, the cut gave 23, the gate printed `worst 1.00e+6` and nothing before it to compare with. The repair is shipped and unverified on D3D12; tools/ship/truncationGuard-selfcheck.mjs finds the shape in WGSL (and found a second site the first fix covered, vec2i(dims()) in snowGpu.mjs).",
+    },
+    {
         id: "tv-home-first-run-on-a-rig",
         blocker: "OPEN",
         what: "SweK Home (android/swek-webview LauncherActivity) has never run on a TV or an emulator: build the APK on the rig, install it, check that Android offers it as a home screen, that the D-pad walks the shelf, that the three SweK tiles open their pages through MainActivity, that long-press pins, and that Back does nothing.",

@@ -524,6 +524,15 @@ sec("9. THE TEXTURE READ-BACK ARITHMETIC");
         HG.ICD_LEAF);
 }
 
+// v4896 -- readingLine and reading: the measured line a kernel-versus-twin gate prints for the real-hardware report. The full grading (format, margin, NaN, the parser carrying it)
+// is tools/ship/snowReadings-selfcheck.mjs; the two are named here, beside the module that owns them, with the one property a rig run leans on.
+{
+    const line = HG.readingLine("probe: kernel vs twin", 1.5e-7, 1e-3, 64, "Some Adapter");
+    const printed = []; const log = console.log; console.log = (l) => printed.push(l); const returned = HG.reading("probe: kernel vs twin", 1.5e-7, 1e-3, 64, "Some Adapter"); console.log = log;
+    ok("readingLine builds a '----' measured line (the only kind realGpuRun keeps besides FAIL rows), and reading() prints exactly that line and returns it",
+        /^  ----  reading probe: kernel vs twin: worst 1\.50e-7 against a limit of 1\.00e-3, margin 6666\.7x over 64 values, adapter Some Adapter$/.test(line) && printed.length === 1 && printed[0] === line && returned === line, line);
+}
+
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log(`unchecked here: ${SOFT ? "ANY GPU WORTH THE NAME. Both backends land on the same SOFTWARE rasteriser (" + ADAPTER_NAME + "), so nothing above says how Dawn behaves on real hardware, where the driver -- not the harness -- decides the numbers."
                                 : "HOW THIS COMPARES TO A SOFTWARE RASTERISER. Both backends land on REAL SILICON here (" + ADAPTER_NAME + "), which is the case the first sixteen rounds of this file never saw; what is now unread is the software side it was written against."} ` +

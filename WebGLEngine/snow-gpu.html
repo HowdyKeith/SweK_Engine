@@ -7,7 +7,7 @@
        finds its normal; the fragment lights it with a PCSS shadow and fades it into the sky by aerial perspective)  ->  a depth-reprojected TAA resolve of the jittered HDR frame  ->  a tone-mapped present.
      WHAT THIS PAGE IS NOT, SAID PLAINLY:
        - NOT THE DEMO IT IS LIFTED FROM. No glints, sastrugi or SSS; ONE shadow cascade; the haze mixes toward the exact sky sample (no near-sky blur, no forward lobe); no character.
-       - NOT SEEN ON A REAL GPU. tools/ship/snowGpuPage-selfcheck.mjs runs it on a software WebGPU adapter and holds each stage to its CPU twin; speed and looks on your GPU are a rig reading.
+       - NOT SEEN ON A REAL GPU. render/snowGpu-selfcheck.mjs runs it on a software WebGPU adapter and holds each stage to its CPU twin; speed and looks on your GPU are a rig reading.
        - NEEDS WEBGPU. Without it the page says so and snow-deform.html is the CPU version of the same scene.
      Nothing is ever put in this page as markup: every status line goes in with textContent. The page loads nothing from outside the engine's own origin. -->
 <html lang="en">
