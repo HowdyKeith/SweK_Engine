@@ -429,9 +429,7 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "mpm3d.html",
         "physics/box3dMeshOverlay.js",
         "physics/fire/fireMesh.js",
-        // BVH-CSG round 9 -- triangulates each face of its per-triangle arrangement with three's ShapeUtils (Earcut),
-        // imported from vendor/three/three.core.js: ejecting three breaks meshBoolean's default path. 80 -> 81.
-        "physics/mesh/triArrangement.mjs",
+        // (physics/mesh/triArrangement.mjs, round 9's importer of three's Earcut, was removed at round 27 with the snapped arrangement: 81 -> 80)
         "pipboy-models.html",
         "render/svgExtrude.js",
         "render/tools/meshopt-selfcheck.mjs",

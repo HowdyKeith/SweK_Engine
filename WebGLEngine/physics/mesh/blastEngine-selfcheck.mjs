@@ -201,7 +201,8 @@ import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import * as M from "./meshCSG.mjs";
 import { blastWith, blastBVH, booleanBVH, settleWith, finishPieces, BLAST_ENGINES, DEFAULT_BLAST_ENGINE, FINISH_WELD_SNAPS, EXACT_FINISH_WELD, WALL_TREE_DERIVE_MAX } from "./blastEngine.mjs";
-import { meshBoolean, MESH_BOOLEAN_EXACT_DEFAULT, EMBED_SLIVER } from "./meshBoolean.mjs";
+import { meshBoolean, EMBED_SLIVER } from "./meshBoolean.mjs";
+const MESH_BOOLEAN_EXACT_DEFAULT = true;
 import { MeshBVH } from "../../mesh/meshBVH.mjs";
 import { exactPair } from "./exactArrangement.mjs";
 import { pairOverlap } from "./bvhPairOverlap.mjs";
@@ -219,7 +220,7 @@ const report = (m) => console.log("  ....  " + m);
 // round 16g: meshBoolean's default arrangement is exact; a row whose subject is the snapped path's own mechanism (the 8e-9
 // weld's moves, the seam consensus and its folds, the conformity pass, the flat-ear repair, round 17's translation as a
 // necessity) runs it by name
-const SNAPPED = { exactArrangement: false };
+const SNAPPED = {};   // TEMPORARY (round 27): the snapped path is gone; every row that passed this is being triaged
 console.log("blastEngine-selfcheck -- meshBoolean behind a flag, on the page's own workload\n");
 
 const HALF = [4, 3, 0.35];                                    // destructible.html's wall
