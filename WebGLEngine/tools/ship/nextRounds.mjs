@@ -2285,10 +2285,8 @@ export const NEXT_ROUNDS = [
     {
         id: "denoise-f16-intel",
         blocker: "OPEN",
-        // OFF ITS BLOCKER after v4873: the first features reading shows gen-9 exposing shader-f16 natively and in Chrome, and the 1080 not
-        // exposing it at all -- so "the GTX 1080 must never get this set" is now enforced by the device as well as by the plan.
-        what: "A half-precision-arithmetic kernel set for the Intel gen-9 ONLY, chosen per adapter as section 63's page table and section 67's native table already choose.",
-        how: "The scratch study measured f16 arithmetic throughout at 2.8e-3 (max relative) from the f64 network and a largest shift in any image's d of 3.3e-4 -- invisible to every verdict in the arc. Gen-9 runs f16 at twice its f32 rate. The GTX 1080's GP104 runs f16 at 1/64 of f32 -- general knowledge, not measured here -- so it must never get this set.",
+        what: "A half-precision-arithmetic kernel set for the Intel gen-9 ONLY, chosen per adapter as section 63's page table and section 67's native table already choose. ROUND 41 (pre-registration section 109) built it, waiting on the rig: r41h, r18u's written-out kernel with arith f16 (fast_unroll_h).",
+        how: "brain/conv2d.mjs's conv2dFastAltWgsl takes arith f32 (r18u's text, frozen by sha256), f16 (enable f16: an f16 tile, vec4<f16> accumulators, weights f16-rounded and packed two vec4s to a uniform vec4<u32>, read by bitcast) or f16emu (the same words through unpack2x16float, every type f32 -- a test instrument). conv2dCpuF16 and its fused mirror are the twin; F16_IMAGE_TOL 1e-2 against the f64 network (the twin measured 1.75e-3 on the gate's fixture). SwiftShader has no shader-f16, so the f16 kernel's first compile and K0h are the Intel's; the emulation holds the packing here. Owed: two realGpuRun runs on each GPU, read by section 109's rule (H41: r41h >= 1.05 x r18u at 1920 x 1080). No table entry moves on H41 alone: the quality question (d on the arc's images) comes first. The earlier scratch study's figures (2.8e-3, a d shift of 3.3e-4) are not in the tree.",
         why: "The Intel's hidden layers sit at ~20% of its f32 peak (section 54); doubling the ALU rate is the one lever aimed at it.",
         upstream: "CLEARED -- rig-adapter-features-probe: gen-9's D3D12 driver (31.0.101.2137) exposes shader-f16 natively and in Chrome (render/denoise-rig-features-intel-gen9.json).",
     },

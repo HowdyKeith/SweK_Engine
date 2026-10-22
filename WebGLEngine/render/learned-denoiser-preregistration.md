@@ -7296,3 +7296,103 @@ now catches the throw, and the runner now counts a gate that exits non-zero with
 Reported, deciding nothing: on SwiftShader at 64 x 64, r40s took about 9-10 x r18t's time on both ladders. Those are a CPU's
 4-lane subgroups, half of every subgroup halo.
 
+
+## 109. ROUND 41 -- THE INTEL'S HIDDEN LAYERS IN HALF PRECISION: FIXED BEFORE THE RIG RUNS IT
+
+**The question.** On the Intel gen-9 the network is the half-size chain's largest cost by far: r18u at 960 x 540 took
+274-283 ms in round 37's runs, against tens of ms for each other step once rounds 38-39 land. Gen-9 runs f16 arithmetic at
+twice its f32 rate, and both its paths expose `shader-f16` (the features probe). Does r18u with its hidden layers' arithmetic
+in f16 run the Intel's network faster, its image held to a bound against the f64 network that this section fixes before it
+is run? (`denoise-f16-intel`.)
+
+**This round's first measurements are on the rig.** SwiftShader exposes no `shader-f16`, natively or in Chromium, so the
+f16 kernel cannot compile here. What can be held here is held: the f32 setting of the template is r18u's text byte for byte;
+an emulation that reads the same packed f16 weights through `unpack2x16float` and computes in f32 runs on SwiftShader against
+conv2dCpu on f16-rounded weights; and the twin, the packing and the bound are CPU rows. The f16 type tokens themselves -- the
+tile, the accumulators, the literals, the conversions -- are first compiled and run on the Intel.
+
+**The kernel: `conv2dFastAltWgsl(L, { reads: "f32", unroll: true, arith: "f16" })`, and the set `r41h`.**
+- r18u's kernel, one block written out, with `enable f16;`. The input tile holds f16, converted once at the load. The 8
+  accumulators are `vec4<f16>`, starting from the bias converted once. Every multiply-add is f16, and the output is written f32.
+- The weights are rounded to f16 on the host and packed two vec4s of f16 to a uniform `vec4<u32>`, read with
+  `bitcast<vec4<f16>>`. That is half r18u's weight bytes. Element 0 is the low half of the first u32, little-endian, as
+  WebGPU is.
+- `arith: "f16emu"` is the same kernel with f32 types, decoding the same packed words with `unpack2x16float`. It is a test
+  instrument, never a set's kernel.
+- **The set `r41h`** is r18u with every layer r18u runs on `fast_unroll` (all four 3 x 3 layers, the first with its 10
+  channels) on the f16 kernel, called `fast_unroll_h`. The head is r15's fused `head_apply`, in f32: the softmax over 81
+  logits stays f32. It needs the `shader-f16` feature, and `featureSetsFor` leaves it out by name wherever that is missing,
+  the 1080 and SwiftShader among them. It is in FXC_UNTRIED_SETS, since FXC has no 16-bit types.
+
+**Its twin and its key.**
+- `conv2dCpuF16` does the kernel's order, the canonical one (b, then block by block, ky, kx, ci). Every input, weight and
+  bias is rounded to f16 (`f16round`, ties to even) and every product and sum too. `conv2dCpuF16Fma` rounds each multiply-add
+  once.
+- **K0h:** every f16 layer's cells are the twin's or the mirror's, given the device's own input. The f32 head's image is
+  within APPLY_TOL. And the bridge to f64: the image within **F16_IMAGE_TOL = 1e-2 relative** of the f64 network on every value.
+- **Measured on the CPU before this section was written**, the r41h twin against the f64 network on the device gate's
+  fixture (the large random network, 21 x 19): at most 1.75e-3 relative, 2.6e-4 on average. At 64 x 64, 3.45e-3. The
+  shipped network on the ladder's input reached 1.25e-2 relative, but only on values near zero; its largest absolute
+  difference is 3.4e-3. The bound holds the gate's fixture, at about 5.7 x its largest.
+- The f32 twin, for comparison, is within 6.6e-7.
+
+**What K0h does NOT settle.** Every other set is within f32 rounding of the network the arc measured; r41h's image is not.
+Whether 1e-3-level differences move any denoise verdict -- the arc's d -- is not measured here. So **no table entry can move on
+H41 alone:** if it holds, the quality question is a round of its own before the Intel's entries change.
+
+**Timed.** Both ladders add `r41h` to TIMED_SETS where the adapter has `shader-f16`, with `r41h against r18u` and
+`against r15` lines tagged section 109.
+
+**The rows.**
+1. `f16round` and `f16bits` on exact cases: ties to even, subnormals, 65504, and the overflow at 65520.
+2. The template's f32 setting is r18u's text byte for byte.
+3. The f16 kernel's text is r18u's line for line but for its types, its weight reads and its conversions.
+4. The packed weights, decoded as `bitcast` would, are the f16-rounded weights.
+5. On the device here, the emulation kernel is conv2dCpu on f16-rounded weights, cell for cell, on odd sizes and partial
+   blocks.
+6. The f16 twin is f16-valued, differs from the f32 twin, and is within the bound on the gate's fixture.
+7. r41h's layers and features, its refusal on a device without the feature, and the ladder standing it aside.
+8. K0h natively and in the browser, where the feature exists: the Intel. Here those rows SKIP by name.
+
+**The rule (H41), on the Intel gen-9, per path (native under DXC, and the page in Chrome).**
+- **C1:** every gate is green with exit 0.
+- **C2:** K0h held on that path in both runs, read off its measured line.
+- **C3:** both sets' 1920 x 1080 passes are on the device's clock.
+- **H41 holds on a path** when, in both runs, r41h is at least 1.05 x as fast as r18u at 1920 x 1080.
+- **What it buys:**
+  - If it holds on either path, the next round measures r41h's quality on the arc's images, its d against r18u's, before any
+    table entry moves.
+  - If it holds on neither, r41h is kept as a measured negative and `denoise-f16-intel` closes.
+  - If K0h fails, the fault is the kernel's, named by its rows, and it is fixed before any timing is read.
+
+**Predictions (stated so they can miss).**
+- **r41h against r18u at 1920 x 1080 on the Intel: 1.1-1.8 x, on both paths.** f16 doubles the ALU rate, but section 54 put
+  the hidden layers at about a fifth of the f32 peak, so not all of the cost is arithmetic. The tile in f16 halves its
+  workgroup memory, and the weights are half the bytes.
+- K0h holds on both paths, and every gate is green on both GPUs. On the 1080, r41h stands aside.
+
+**Sabotages, by the byte-safe runner (H1-H7):**
+- the packing's halves swapped (zw for xy);
+- a weight's vec4 index off by one within a pair;
+- the packed weights not rounded to f16 first (truncated);
+- the f32 setting changed;
+- the twin rounding to f32, not f16;
+- the bound widened to 1e-1;
+- r41h built on a device without `shader-f16`.
+
+Each must turn at least one row red here, or, where only the Intel can see it, the section says so.
+
+**Nothing else changes:** every table entry, every other kernel, and `fx/fsr`.
+
+**Two changes to the rows, made before the round was committed and before anything was measured on a GPU.**
+- The kernel-text row's list of what an f16 line may carry was written too narrow and went red on the kernel as intended.
+  It missed the `0.0h` literal and the store's `f32(...)` conversion, which are in the design above. The list now names them.
+- Sabotage H4 (the f32 setting changed) could not have gone red as the rows stood. They compared the f32 setting with the
+  default, which would change with it, and a cosmetic change moves no cell. So r18u's kernel text is now frozen by sha256 at
+  both of its shapes. The hashes were taken at the commit before this round and after it alike, and they match.
+
+**Sabotages, by the byte-safe runner, before commit: H1-H7 each turned at least one row red here.** H1 turned 4 rows red, H2 3,
+H3 1, H4 1, H5 2, H6 1 and H7 1. H3 was caught only by the packing row: f16bits rounds the mantissa itself, so unrounded weights
+mostly packed to the same words. H2 left the three-group 1 x 1 case alone, since it reads through the z-group index. As this
+section says, no sabotage of the f16 kernel's own type tokens can be seen before the Intel compiles it.
+

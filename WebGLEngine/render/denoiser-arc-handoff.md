@@ -37,7 +37,11 @@ node tools/ship/versionPreflight.mjs --next    # the next free version and sweep
 
 ## What is next -- Keith picks
 
-1. **`denoise-subgroup-reduction`, round 40 (section 108): owed two runs on each GPU.** The 1080's hidden layers on a kernel
+1. **`denoise-f16-intel`, round 41 (section 109): owed two runs on each GPU.** r41h, r18u's hidden layers in f16 on the
+   Intel, its image within 1e-2 of the f64 network; its f16 kernel first compiles on the Intel (SwiftShader has no shader-f16),
+   the packing held here through an unpack2x16float emulation. Section 109 predicts 1.1-1.8 x r18u at 1080p; no entry moves
+   before a quality round.
+   **`denoise-subgroup-reduction`, round 40 (section 108): owed two runs on each GPU.** The 1080's hidden layers on a kernel
    that shares inputs across a subgroup (r40s), exact to conv2dCpu, green on SwiftShader; it stands aside on the Intel, which
    has no subgroups. Section 108 predicts 0.8-1.3 x r18t at 1080p and does not call H40.
    **`denoise-coverage-bound`, round 39 (section 107): owed two runs on each GPU.** The coverage traces only the pixels

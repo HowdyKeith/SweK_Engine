@@ -64,7 +64,7 @@
 import { conv2dWgsl, conv2dTiledWgsl, conv2dSubWgsl, packSubUniforms, subShape, subWorkgroups, conv2dFastWgsl, conv2dHeadWgsl, packProbeUniforms, packFastUniforms, packHeadUniforms, fastShape, headShape,
          conv2dTileWgsl, packTileUniforms, tileShape, tileWorkgroups, conv2dFastAltWgsl, packFastAltUniforms, fastAltShape,
          planarToChannelsLast, conv2dCpu, conv2dCpuFma, TILE, K_MAX, COUT_MAX,
-         conv2dWinoWgsl, packWinoUniforms, winoShape, winoWorkgroups, conv2dCpuWino, conv2dCpuWinoFma } from "../brain/conv2d.mjs";
+         conv2dWinoWgsl, packWinoUniforms, winoShape, winoWorkgroups, conv2dCpuWino, conv2dCpuWinoFma, conv2dCpuF16, conv2dCpuF16Fma } from "../brain/conv2d.mjs";
 import { KERNEL_RADIUS, KERNEL_TAPS, headOf } from "./denoiseNet.mjs";
 import { ALBEDO_FLOOR, strideOf } from "./denoiseScenes.mjs";
 import { maskChannelOf } from "./denoiseMask.mjs";
@@ -314,7 +314,7 @@ export function kernelApplyCpu(x, logits, H, W) {
 }
 
 /** The kernel sets a pass can run on: round 12's, round 13's fast kernel (section 39), round 14's (section 43), round 15's (section 46), round 18's two (section 61), round 27's Winograd set (section 83). */
-export const KERNEL_SETS = Object.freeze(["r12", "r13", "r14", "r15", "r18t", "r18u", "r27w", "r40s"]);
+export const KERNEL_SETS = Object.freeze(["r12", "r13", "r14", "r15", "r18t", "r18u", "r27w", "r40s", "r41h"]);
 /**
  * Round 18 (section 61): the kernel each round-18 set runs its hidden layers on, and that kernel's configuration --
  * brain/conv2d.mjs's pixel-tiled kernel (tileShape's cfg) or its fast kernel written another way (fastAltShape's opts).
@@ -336,15 +336,27 @@ export const R27_KERNELS = Object.freeze({ r27w: Object.freeze({ kernel: "wino",
 export const R40_KERNELS = Object.freeze({ r40s: Object.freeze({ kernel: "sub", cfg: Object.freeze({ rows: 2, g4: 8 }) }) });
 /** Round 40: the sets that need the adapter's `subgroups` feature -- left out, by name, wherever the adapter does not offer it. */
 export const SUBGROUP_SETS = Object.freeze(["r40s"]);
-/** `sets` less those an adapter without the `subgroups` feature cannot build (SUBGROUP_SETS): what a ladder or gate may run on it. */
-export const featureSetsFor = (adapter, sets) => (adapter && adapter.features && adapter.features.has("subgroups") ? [...sets] : sets.filter((s) => !SUBGROUP_SETS.includes(s)));
+/**
+ * Round 41 (section 109): the half-precision set -- r18u with every layer it writes out (fast_unroll) doing its arithmetic in f16
+ * (fast_unroll_h: brain/conv2d.mjs's arith "f16"), r15's fused head in f32. For the Intel gen-9, which runs f16 at twice its f32 rate.
+ */
+export const R41_KERNELS = Object.freeze({ r41h: Object.freeze({ kernel: "fast_unroll_h", cfg: Object.freeze({ reads: "f32", unroll: true, arith: "f16" }) }) });
+/** Round 41: the sets that need the adapter's `shader-f16` feature. */
+export const F16_SETS = Object.freeze(["r41h"]);
+/** Round 41: the feature each such set needs -- r40s subgroups, r41h shader-f16. */
+export const SET_FEATURES = Object.freeze({ r40s: "subgroups", r41h: "shader-f16" });
+/** `sets` less those whose feature (SET_FEATURES) the adapter does not offer: what a ladder or gate may run on it. */
+export const featureSetsFor = (adapter, sets) => sets.filter((s) => !Object.hasOwn(SET_FEATURES, s) || !!(adapter && adapter.features && adapter.features.has(SET_FEATURES[s])));
+/** Round 41: the image's bound against the f64 network for r41h (section 109) -- 5.7 x the CPU twin's largest on the device gate's fixture. */
+export const F16_IMAGE_TOL = 1e-2;
 /**
  * Round 27: the sets no gate builds natively on a D3D12 adapter whose compiler is FXC because nobody has tried -- FXC_UNBUILT_SETS
  * is the sets FXC was SEEN to fail. Since section 70 the pin's compiler is DXC, and an FXC that never finishes a pipeline stops a
  * gate for its whole budget (section 56), so an untried kernel stands aside under FXC on the safe side.
  */
 // round 40 (section 108): r40s too -- its subgroup kernel is wave operations, shader model 6, which FXC does not compile at all
-export const FXC_UNTRIED_SETS = Object.freeze(["r27w", "r40s"]);
+// round 41 (section 109): and r41h -- FXC has no 16-bit types
+export const FXC_UNTRIED_SETS = Object.freeze(["r27w", "r40s", "r41h"]);
 /**
  * The sets no gate builds natively on a D3D12 adapter whose compiler is FXC: node-webgpu 0.6.0's FXC stopped on r18t's kernel
  * and crashed on r18u's (section 60). Round 18 called them browser-only; 0.6.2's DXC built both natively (section 65).
@@ -365,7 +377,7 @@ export const nativeSetsFor = (adapter, sets, { compiler = null } = {}) =>
  * round 18's two (section 61) and round 27's (section 83) -- on the page always, natively where nativeSetsFor allows (since section 66, a DXC run on D3D12 too). Section 54 added round 16's two
  * candidates and section 57 withdrew them; r13 and r14 are decided (sections 49 and 50) and left out.
  */
-export const TIMED_SETS = Object.freeze(["r12", "r15", "r18t", "r18u", "r27w", "r40s"]);
+export const TIMED_SETS = Object.freeze(["r12", "r15", "r18t", "r18u", "r27w", "r40s", "r41h"]);
 /** The set a pass runs unless told otherwise: r15, by section 46's default rule on both GPUs (section 50) -- 9.25 x against r14's 6.33. */
 export const DEFAULT_KERNELS = "r15";
 /** The set denoise.html runs on an adapter PAGE_KERNELS_BY_ADAPTER does not name: r15, by section 46's page rule on both GPUs (section 50) -- 9.25 x against r13's 6.49 and r14's 6.33. */
@@ -437,9 +449,10 @@ export async function createNativeDenoiser(adapter, dev, net, { H, W, C, compile
 export const kernelFor = (L, set = DEFAULT_KERNELS, last = false) => {
     if (!KERNEL_SETS.includes(set)) throw new Error(`denoiseDevice: no kernel set "${set}" -- the sets are ${KERNEL_SETS.join(", ")}`);
     if (set === "r14" && last && headShape(L).fits) return "head";
-    if ((set === "r15" || set in R18_KERNELS || set in R27_KERNELS || set in R40_KERNELS) && last && L.Cout === KERNEL_TAPS && headShape(L).fits) return "head_apply";
+    if ((set === "r15" || set in R18_KERNELS || set in R27_KERNELS || set in R40_KERNELS || set in R41_KERNELS) && last && L.Cout === KERNEL_TAPS && headShape(L).fits) return "head_apply";
     if (set === "r27w" && winoShape(L, R27_KERNELS.r27w.cfg).fits) return "wino";
     if (set === "r40s" && subShape(L, R40_KERNELS.r40s.cfg).fits) return "sub";
+    if (set === "r41h" && fastAltShape(L, R41_KERNELS.r41h.cfg).fits) return "fast_unroll_h";
     if (set === "r18t" && tileShape(L, R18_KERNELS.r18t.cfg).fits) return "tile_inline";
     if (set === "r18u" && fastAltShape(L, R18_KERNELS.r18u.cfg).fits) return "fast_unroll";
     return set !== "r12" && fastShape(L).fits ? "fast" : L.k <= K_MAX && L.Cout <= COUT_MAX ? "tiled" : "direct";
@@ -462,7 +475,9 @@ export function deviceLayers(net, set = DEFAULT_KERNELS) {
  * conv2dCpuWinoFma for the Winograd kernel, which adds other numbers in another order; conv2dCpu and conv2dCpuFma for every
  * other kernel, which all add in the canonical one. { twin, mirror }.
  */
-export const twinsOf = (L) => (L.kernel === "wino" ? { twin: conv2dCpuWino, mirror: conv2dCpuWinoFma } : { twin: conv2dCpu, mirror: conv2dCpuFma });
+export const twinsOf = (L) => (L.kernel === "wino" ? { twin: conv2dCpuWino, mirror: conv2dCpuWinoFma }
+    // round 41 (section 109): a half-precision layer is held to the half-precision twin and its fused mirror
+    : L.kernel === "fast_unroll_h" ? { twin: conv2dCpuF16, mirror: conv2dCpuF16Fma } : { twin: conv2dCpu, mirror: conv2dCpuFma });
 /** The whole pass's twin in `set`, layer by layer through each layer's twin (twinsOf), then kernelApplyCpu: { y, acts } -- the device's order exactly. */
 export function denoiseTwin(net, x, H, W, set = DEFAULT_KERNELS) {
     const layers = deviceLayers(net, set), acts = [];
@@ -498,6 +513,10 @@ export async function createDeviceDenoiser(dev, net, { H, W, C, kernels = DEFAUL
     if (used.has("sub") && !(dev.features && dev.features.has("subgroups")))
         throw new Error(`denoiseDevice: the ${kernels} set's subgroup kernel needs a device with the "subgroups" feature -- this one has none (section 108)`);
     for (const [i, L] of layers.entries()) if (L.kernel === "sub") await build("sub" + i, conv2dSubWgsl(L, R40_KERNELS.r40s.cfg), "k_conv_sub");
+    // round 41: the half-precision kernel needs a device made with the `shader-f16` feature -- refused by name on one without it
+    if (used.has("fast_unroll_h") && !(dev.features && dev.features.has("shader-f16")))
+        throw new Error(`denoiseDevice: the ${kernels} set's half-precision kernel needs a device with the "shader-f16" feature -- this one has none (section 109)`);
+    for (const [i, L] of layers.entries()) if (L.kernel === "fast_unroll_h") await build("fast_unroll_h" + i, conv2dFastAltWgsl(L, R41_KERNELS.r41h.cfg), "k_conv_fast_alt");
     // its dispatch is by the adapter's smallest subgroup size: given, else the device's adapter's, else WebGPU's least, 4
     const sgMin = subgroupMinSize || (dev.adapterInfo && dev.adapterInfo.subgroupMinSize) || 4;
     for (const [i, L] of layers.entries()) if (L.kernel === "head") await build("head" + i, conv2dHeadWgsl(L), "k_head");
@@ -552,6 +571,13 @@ export async function createDeviceDenoiser(dev, net, { H, W, C, kernels = DEFAUL
         if (L.kernel === "fast_unroll") {
             // round 18's r18u: the fast kernel's thread, bindings and dispatch, its weights packed block by block
             const cfg = R18_KERNELS.r18u.cfg, p = pipe["fast_unroll" + i], uni = packFastAltUniforms({ H, W, layer: L }, cfg);
+            return { p, wg: [...groups, fastAltShape(L, cfg).groups], bind: dev.createBindGroup({ layout: p.getBindGroupLayout(0), entries: [
+                { binding: 0, resource: { buffer: outs[i] } }, { binding: 1, resource: { buffer: buffer(uni.byteLength, BU.UNIFORM | BU.COPY_DST, uni) } },
+                { binding: 2, resource: { buffer: i ? outs[i - 1] : xBuf } }] }) };
+        }
+        if (L.kernel === "fast_unroll_h") {
+            // round 41's r41h: r18u's thread, bindings and dispatch, its weights f16-rounded and packed two vec4s to a word
+            const cfg = R41_KERNELS.r41h.cfg, p = pipe["fast_unroll_h" + i], uni = packFastAltUniforms({ H, W, layer: L }, cfg);
             return { p, wg: [...groups, fastAltShape(L, cfg).groups], bind: dev.createBindGroup({ layout: p.getBindGroupLayout(0), entries: [
                 { binding: 0, resource: { buffer: outs[i] } }, { binding: 1, resource: { buffer: buffer(uni.byteLength, BU.UNIFORM | BU.COPY_DST, uni) } },
                 { binding: 2, resource: { buffer: i ? outs[i - 1] : xBuf } }] }) };
@@ -726,7 +752,8 @@ export async function timingDevice(adapter, bytes) {
     if (bytes > cap) return null;
     const want = Math.max(bytes, Math.min(cap, 134217728));
     // round 40: and the subgroups feature where the adapter offers it, for SUBGROUP_SETS -- requesting it changes no other set's kernels
-    return adapter.requestDevice({ requiredFeatures: ["timestamp-query", "subgroups"].filter((f) => adapter.features.has(f)),
+    // round 41: and shader-f16, for F16_SETS
+    return adapter.requestDevice({ requiredFeatures: ["timestamp-query", "subgroups", "shader-f16"].filter((f) => adapter.features.has(f)),
                                    requiredLimits: { maxStorageBufferBindingSize: want, maxBufferSize: want } });
 }
 /**
@@ -762,7 +789,8 @@ export async function timingLadder(net, newAdapter, { sizes = TIMING_SIZES, sets
         const a = await newAdapter();
         adapter = adapter || adapterOf(a);
         // round 40: a set the adapter's features cannot build stands aside by name, at every size
-        for (const s of live.filter((x) => !featureSetsFor(a, [x]).length)) skip[s] = "the adapter has no subgroups feature, which this set's kernel needs (section 108)";
+        for (const s of live.filter((x) => !featureSetsFor(a, [x]).length))
+            skip[s] = `the adapter has no ${SET_FEATURES[s]} feature, which this set's kernel needs (${s === "r41h" ? "section 109" : "section 108"})`;
         for (let n = live.length - 1; n >= 0; n--) if (skip[live[n]]) live.splice(n, 1);
         if (!live.length) { for (const s of sets) rows[s].push({ H, W, skipped: true, reason: skip[s] }); continue; }
         trace(`${W}x${H}: requestDevice for ${live.join(",")}`);

@@ -56,12 +56,13 @@ function check(H, W, layer) {
 
 /**
  * The reference forward pass in f64, or -- with `round` -- in f32 with a rounding after every operation, which is
- * the twin. `pre` returns the value before the activation, which the backward pass needs.
+ * the twin. `pre` returns the value before the activation, which the backward pass needs. Round 41: `round` may be a
+ * rounding function instead of true -- f16round, for the half-precision twin (every value an f16 is also an f32).
  */
 function forward(x, H, W, layer, round, fused, pre) {
     check(H, W, layer);
     const { Cin, Cout, k } = layer, r = (k - 1) / 2, relu = String(layer.act ?? "none") === "relu";
-    const f = round ? Math.fround : (v) => v;
+    const f = round === true ? Math.fround : round ? round : (v) => v;
     const y = round ? new Float32Array(H * W * Cout) : new Float64Array(H * W * Cout);
     const z = pre ? new Float64Array(H * W * Cout) : null;
     for (let py = 0; py < H; py++) for (let px = 0; px < W; px++) for (let co = 0; co < Cout; co++) {
@@ -91,6 +92,36 @@ export function conv2dForward(x, H, W, layer) { return forward(x, H, W, layer, f
 export function conv2dCpu(x, H, W, layer) { return forward(x, H, W, layer, true, false, false); }
 /** The fused mirror: each multiply-add rounded once, as a compiler that contracts it to an fma would. */
 export function conv2dCpuFma(x, H, W, layer) { return forward(x, H, W, layer, true, true, false); }
+
+// ---- HALF PRECISION (the denoiser arc, round 41: pre-registration section 109) -------------------------------------------
+/**
+ * x rounded to the nearest IEEE binary16 value, ties to even, as a WGSL f16 operation rounds (its +, - and * are correctly
+ * rounded): subnormals below 2^-14, the largest finite 65504, and anything from 65520 up (half way to the next binade) infinite.
+ * Node 22 has no Math.f16round. Exact: the quantum is a power of two, so every step is exact in f64.
+ */
+export function f16round(x) {
+    if (!Number.isFinite(x) || x === 0) return x;
+    const s = x < 0 ? -1 : 1, a = Math.abs(x);
+    let e = Math.floor(Math.log2(a));
+    if (2 ** e > a) e--; else if (2 ** (e + 1) <= a) e++;
+    const q = 2 ** (Math.max(e, -14) - 10), r = a / q, fl = Math.floor(r), d = r - fl;
+    const n = d > 0.5 ? fl + 1 : d < 0.5 ? fl : fl % 2 === 0 ? fl : fl + 1, v = n * q;
+    return v > 65504 ? s * Infinity : s * v;
+}
+/** A binary16's 16 bits, from a value f16round leaves as it is: sign, five exponent bits, ten mantissa bits. */
+export function f16bits(v) {
+    if (Number.isNaN(v)) return 0x7e00;
+    const s = v < 0 || Object.is(v, -0) ? 0x8000 : 0, a = Math.abs(v);
+    if (a === Infinity) return s | 0x7c00;
+    if (a === 0) return s;
+    if (a < 2 ** -14) return s | Math.round(a / 2 ** -24);                       // subnormal: the mantissa alone
+    const e = Math.floor(Math.log2(a)), E = 2 ** e > a ? e - 1 : 2 ** (e + 1) <= a ? e + 1 : e;
+    return s | ((E + 15) << 10) | Math.round((a / 2 ** E - 1) * 1024);
+}
+/** The half-precision twin: every input, weight and bias taken as f16, every product and sum rounded to f16, in the kernels' order. */
+export function conv2dCpuF16(x, H, W, layer) { return forward(x, H, W, layer, f16round, false, false); }
+/** Its fused mirror: each f16 multiply-add rounded once, as a compiler that contracts it to an fma would. */
+export function conv2dCpuF16Fma(x, H, W, layer) { return forward(x, H, W, layer, f16round, true, false); }
 
 /**
  * The f64 backward pass. `dY` is the loss's gradient with respect to this layer's OUTPUT (after the activation).
@@ -342,18 +373,29 @@ export function packFastUniforms({ H, W, layer }) {
 // order -- so either way, and both, are held to the same twin, cell for cell, at zero.
 const FAST_READS = Object.freeze(["f32", "vec4"]);
 /**
- * The fast kernel's other ways' shape for a layer and { reads, unroll }: the fast kernel's, but with unroll the uniform
- * block holds whole blocks of CB channels (the last padded with zero weights), block-major.
+ * Round 41 (section 109): the arithmetic a written-out fast kernel does -- "f32" (r18u's, its text unchanged); "f16" (enable f16:
+ * the tile, the accumulators and every multiply-add in half precision, the weights f16-rounded and packed two vec4s of f16 to a
+ * uniform vec4<u32>, read with bitcast); "f16emu" (a TEST INSTRUMENT, never a set's kernel: the same packed words decoded with
+ * unpack2x16float, every type f32, so the packing and indexing run on a device without shader-f16).
  */
-export function fastAltShape({ Cin, Cout, k }, { reads = "f32", unroll = false } = {}) {
-    const F = fastShape({ Cin, Cout, k }), blocks = Math.ceil(Cin / CB), perBlock = k * k * CB * F.C4;
-    const bytes = unroll ? 16 + 16 * F.C4 + 16 * blocks * perBlock : F.bytes;
-    return { ...F, reads, unroll, blocks, perBlock, bytes, fits: F.fits && FAST_READS.includes(reads) && bytes <= UNIFORM_MAX };
+export const FAST_ARITH = Object.freeze(["f32", "f16", "f16emu"]);
+/**
+ * The fast kernel's other ways' shape for a layer and { reads, unroll, arith }: the fast kernel's, but with unroll the uniform
+ * block holds whole blocks of CB channels (the last padded with zero weights), block-major -- in half the bytes when the weights
+ * are packed f16, which needs f32 reads, the block written out, and an even number of vec4s wherever the z group lands.
+ */
+export function fastAltShape({ Cin, Cout, k }, { reads = "f32", unroll = false, arith = "f32" } = {}) {
+    const F = fastShape({ Cin, Cout, k }), blocks = Math.ceil(Cin / CB), perBlock = k * k * CB * F.C4, half = arith !== "f32";
+    const bytes = unroll ? 16 + 16 * F.C4 + 16 * blocks * (half ? perBlock / 2 : perBlock) : F.bytes;
+    const packs = !half || (unroll && reads === "f32" && perBlock % 2 === 0 && (F.groups === 1 || F.g4 % 2 === 0));
+    return { ...F, reads, unroll, arith, blocks, perBlock, bytes, fits: F.fits && FAST_READS.includes(reads) && FAST_ARITH.includes(arith) && packs && bytes <= UNIFORM_MAX };
 }
-/** The fast kernel written another way (entry k_conv_fast_alt): { reads: "f32" | "vec4", unroll: false | true }. */
-export function conv2dFastAltWgsl({ Cin, Cout, k, act = "none" }, { reads = "f32", unroll = false } = {}) {
-    const S = fastAltShape({ Cin, Cout, k }, { reads, unroll });
-    if (!S.fits) throw new Error(`conv2d: the fast kernel's other ways hold reads ${FAST_READS.join(" or ")} and a layer whose weights fit one ${UNIFORM_MAX}-byte uniform binding -- got reads ${reads}, ${S.bytes} bytes for ${Cin} -> ${Cout}, k ${k}${unroll ? " written out" : ""}`);
+/** The fast kernel written another way (entry k_conv_fast_alt): { reads: "f32" | "vec4", unroll: false | true, arith: FAST_ARITH }. */
+export function conv2dFastAltWgsl({ Cin, Cout, k, act = "none" }, { reads = "f32", unroll = false, arith = "f32" } = {}) {
+    const S = fastAltShape({ Cin, Cout, k }, { reads, unroll, arith });
+    if (!S.fits) throw new Error(`conv2d: the fast kernel's other ways hold reads ${FAST_READS.join(" or ")}, arith ${FAST_ARITH.join(" or ")} (the f16 ways with f32 reads, written out) and a layer whose weights fit one ${UNIFORM_MAX}-byte uniform binding -- got reads ${reads}, arith ${arith}, ${S.bytes} bytes for ${Cin} -> ${Cout}, k ${k}${unroll ? " written out" : ""}`);
+    // round 41: the types and the four places f16 differs -- the tile's value, the weight read, the accumulators' start, the store
+    const h = arith === "f16", T16 = h ? "f16" : "f32", V16 = `vec4<${T16}>`;
     const R = (k - 1) / 2, HW = TILE + k - 1, G = S.g4, js = Array.from({ length: G }, (_, j) => j), lanes = ["x", "y", "z", "w"];
     const v4 = reads === "vec4", Q = CB / 4, partial = Cin % CB !== 0, full = Math.floor(Cin / CB), tail = Cin - full * CB;
     // the tile load: f32 as the fast kernel's (pixel t, channel cj at t nb + cj); vec4 as Q vec4s a pixel, lanes past nb zero
@@ -369,8 +411,8 @@ export function conv2dFastAltWgsl({ Cin, Cout, k, act = "none" }, { reads = "f32
         }`
         : `for (var i = lid.y * ${TILE}u + lid.x; i < ${HW * HW}u * ${nb}; i = i + ${TILE * TILE}u) {
             let cj = i % ${nb}; let t = i / ${nb}; let sx = ox + i32(t % ${HW}u); let sy = oy + i32(t / ${HW}u);
-            var v = 0.0;
-            if (sx >= 0 && sx < i32(F.W) && sy >= 0 && sy < i32(F.H)) { v = X[(u32(sy) * F.W + u32(sx)) * ${Cin}u + ${c0} + cj]; }
+            var v = ${h ? "0.0h" : "0.0"};
+            if (sx >= 0 && sx < i32(F.W) && sy >= 0 && sy < i32(F.H)) { v = ${h ? "f16(" : ""}X[(u32(sy) * F.W + u32(sx)) * ${Cin}u + ${c0} + cj]${h ? ")" : ""}; }
             T[i] = v;
         }`;
     // one channel's adds into every accumulator, from x, in the order j -- each lane a cell of its own
@@ -407,7 +449,12 @@ export function conv2dFastAltWgsl({ Cin, Cout, k, act = "none" }, { reads = "f32
     }`;
     } else {
         // one block written out: its taps and nb channels are constants; the block (b) and the pixel's base in the tile are not
-        const wAt = (tap, cj, j) => { const c = (tap * CB + cj) * S.C4 + j; return S.groups === 1 ? `F.w[b][${c}u]` : `F.w[b][g * ${G}u + ${c}u]`; };
+        // round 41: packed f16, vec4 c of a block is half of word c / 2 -- xy for an even c, zw for an odd one (G even, so the z group's
+        // offset g G keeps c's parity); bitcast for f16, unpack2x16float for the emulation
+        const wAt = arith === "f32"
+            ? (tap, cj, j) => { const c = (tap * CB + cj) * S.C4 + j; return S.groups === 1 ? `F.w[b][${c}u]` : `F.w[b][g * ${G}u + ${c}u]`; }
+            : (tap, cj, j) => { const c = (tap * CB + cj) * S.C4 + j, wd = S.groups === 1 ? `F.w[b][${c >> 1}u]` : `F.w[b][g * ${G / 2}u + ${c >> 1}u]`, hl = c % 2 ? "zw" : "xy";
+                return h ? `bitcast<vec4<f16>>(${wd}.${hl})` : `vec4<f32>(unpack2x16float(${wd}.${hl[0]}), unpack2x16float(${wd}.${hl[1]}))`; };
         const taps = (nb) => Array.from({ length: k }, (_, ky) => `{ let sy = i32(py) ${ky >= R ? "+ " + (ky - R) : "- " + (R - ky)};
             if (sy >= 0 && sy < i32(F.H)) {
 ` + Array.from({ length: k }, (_, kx) => {
@@ -438,25 +485,25 @@ ${block(`${full * CB}u`, tail, true)}
     }
 ` : "");
     }
-    const wDecl = unroll ? `array<array<vec4<f32>, ${S.perBlock}>, ${S.blocks}>` : `array<vec4<f32>, ${k * k * Cin * S.C4}>`;
-    return `
+    const wDecl = arith !== "f32" ? `array<array<vec4<u32>, ${S.perBlock / 2}>, ${S.blocks}>` : unroll ? `array<array<vec4<f32>, ${S.perBlock}>, ${S.blocks}>` : `array<vec4<f32>, ${k * k * Cin * S.C4}>`;
+    return `${h ? "enable f16;" : ""}
 struct FP { H: u32, W: u32, pad0: u32, pad1: u32, b: array<vec4<f32>, ${S.C4}>, w: ${wDecl} };
 @group(0) @binding(0) var<storage, read_write> Y: array<f32>;   // H x W x ${Cout}
 @group(0) @binding(1) var<uniform> F: FP;                        // packFastAltUniforms
 @group(0) @binding(2) var<storage, read>       X: array<f32>;   // H x W x ${Cin}
-var<workgroup> T: array<${v4 ? "vec4<f32>" : "f32"}, ${HW * HW * (v4 ? Q : CB)}>;
+var<workgroup> T: array<${v4 ? "vec4<f32>" : T16}, ${HW * HW * (v4 ? Q : CB)}>;
 @compute @workgroup_size(${TILE}, ${TILE}, 1)
 fn k_conv_fast_alt(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>,
                    @builtin(workgroup_id) wid: vec3<u32>) {
     let ox = i32(wid.x * ${TILE}u) - ${R}; let oy = i32(wid.y * ${TILE}u) - ${R};
     let px = gid.x; let py = gid.y; let g = wid.z;
     let inside = px < F.W && py < F.H;
-    ${js.map((j) => `var a${j} = F.b[g * ${G}u + ${j}u];`).join("\n    ")}
+    ${js.map((j) => `var a${j} = ${h ? "vec4<f16>(" : ""}F.b[g * ${G}u + ${j}u]${h ? ")" : ""};`).join("\n    ")}
 ${body}
     if (!inside) { return; }
     let o = (py * F.W + px) * ${Cout}u; let c = g * ${G * 4}u;
-    ${js.map((j) => (act === "relu" ? `a${j} = max(a${j}, vec4<f32>(0.0));\n    ` : "") +
-        lanes.map((l, n) => `if (c + ${4 * j + n}u < ${Cout}u) { Y[o + c + ${4 * j + n}u] = a${j}.${l}; }`).join(" ")).join("\n    ")}
+    ${js.map((j) => (act === "relu" ? `a${j} = max(a${j}, ${V16}(${h ? "0.0h" : "0.0"}));\n    ` : "") +
+        lanes.map((l, n) => `if (c + ${4 * j + n}u < ${Cout}u) { Y[o + c + ${4 * j + n}u] = ${h ? `f32(a${j}.${l})` : `a${j}.${l}`}; }`).join(" ")).join("\n    ")}
 }
 `;
 }
@@ -472,6 +519,16 @@ export function packFastAltUniforms({ H, W, layer }, opts = {}) {
     const buf = new ArrayBuffer(S.bytes), u = new Uint32Array(buf), f = new Float32Array(buf), w0 = 4 + 4 * S.C4;
     u[0] = H; u[1] = W;
     for (let co = 0; co < Cout; co++) f[4 + co] = layer.b[co];
+    if (S.arith !== "f32") {
+        // round 41: the same vec4 order as below, each weight f16-rounded and stored as its 16 bits -- vec4 v of a block at bytes
+        // 8 v of the weights, so word v / 2 holds vec4 v in its xy half (v even) or zw half (v odd), little-endian
+        const h16 = new Uint16Array(buf), hw0 = 2 * w0;
+        for (let co = 0; co < Cout; co++) for (let ky = 0; ky < k; ky++) for (let kx = 0; kx < k; kx++) for (let ci = 0; ci < Cin; ci++) {
+            const b = Math.floor(ci / CB), cj = ci % CB;
+            h16[hw0 + 4 * (b * S.perBlock + ((ky * k + kx) * CB + cj) * S.C4) + co] = f16bits(f16round(layer.W[((co * k + ky) * k + kx) * Cin + ci]));
+        }
+        return f;
+    }
     for (let co = 0; co < Cout; co++) for (let ky = 0; ky < k; ky++) for (let kx = 0; kx < k; kx++) for (let ci = 0; ci < Cin; ci++) {
         const b = Math.floor(ci / CB), cj = ci % CB;
         f[w0 + 4 * (b * S.perBlock + ((ky * k + kx) * CB + cj) * S.C4) + co] = layer.W[((co * k + ky) * k + kx) * Cin + ci];

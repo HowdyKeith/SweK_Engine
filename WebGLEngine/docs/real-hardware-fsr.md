@@ -654,6 +654,24 @@ node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r40-b.json
 - **Don't commit or pull between runs.**
 - **Send back all four JSON files.**
 
+### Round 41: the Intel's hidden layers in half precision (pre-registration section 109)
+
+The same two runs on each GPU serve rounds 38 to 41, at a commit carrying section 109 (`git log -1 --oneline` shows it):
+
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r41-a.json
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r41-b.json
+```
+
+- **What is new:** on the Intel, both ladders also time `r41h` (shader-f16), with `r41h against r18u` lines tagged section 109;
+  the device and conv2d gates hold it cell for cell against its f16 twin, natively and in Chrome. **This is the first time
+  the f16 kernel is compiled anywhere** -- a red here names the kernel. On the 1080 it stands aside by name.
+- **Section 109 predicts:** r41h 1.1-1.8 x r18u at 1920 x 1080 on the Intel. Every gate green.
+- **Don't commit or pull between runs.**
+- **Send back all four JSON files.**
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and

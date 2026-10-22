@@ -22,6 +22,16 @@
 //   G4  a row outside the image read from the edge row, not skipped    9 RED (the same nine)
 //   G5  the channels before the taps within a row (cj before kx)       8 RED (the five here; K0s natively and in the browser, the
 //                                                                          small network -- r15's bits row holds only where nothing fused)
+// Round 41 (section 109): FAST_ARITH, f16round, f16bits, conv2dCpuF16, conv2dCpuF16Fma -- the half-precision template (f32: r18u's text,
+// frozen by sha256; f16; f16emu, the test instrument) and its twin. The f16 device rows SKIP here (no shader-f16) and run on the Intel.
+// Sabotaged with render/denoiseDevice-selfcheck.mjs, by the byte-safe runner, each restored byte-identical (sha256):
+//   H1  the packing's halves swapped (zw for xy)                       4 RED (every emulation case)
+//   H2  a weight's word index one on (c + 1 over 2)                    3 RED (the three one-group cases; the three-group 1 x 1 reads
+//                                                                          through the z-group index, which H2 leaves alone)
+//   H3  the packed weights not f16-rounded first                       1 RED (the packing row). f16bits rounds the mantissa itself, so the
+//                                                                          emulation saw nearly the same words: the packing row is the catch
+//   H4  r18u's f32 text changed (0.00 for 0.0)                         1 RED (the sha256 row -- added because no cell moves)
+//   H5  conv2dCpuF16 rounding to f32                                   2 RED (the twin row; r41h's image row in the device gate)
 //
 // What it holds: the twin to the f64 reference within f32 rounding; the identity kernel exact through every pass;
 // a 1x1 convolution BIT-IDENTICAL to the GPU Brain's dense layer (render/brainTsl.mjs's mlpLayerCpu), so the dense
@@ -120,6 +130,7 @@
 // have read it, every time. On a real GPU the same defect would be intermittent; here it is deterministic.
 "use strict";
 import fs from "node:fs";
+import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -130,7 +141,8 @@ const { TILE, K_MAX, CB, COUT_MAX, conv2dForward, conv2dCpu, conv2dCpuFma, conv2
         packProbeUniforms, probeFixture, probeCpu, keyCpu, PROBES, FAST_GROUP, UNIFORM_MAX, fastShape, conv2dFastWgsl, packFastUniforms,
         headShape, conv2dHeadWgsl, packHeadUniforms, planarToChannelsLast, tileShape, conv2dTileWgsl, packTileUniforms, tileWorkgroups,
         fastAltShape, conv2dFastAltWgsl, packFastAltUniforms, WINO_CB, WINO_G4S, winoShape, winoFilter, conv2dCpuWino, conv2dCpuWinoFma, conv2dWinoWgsl,
-        packWinoUniforms, winoWorkgroups, SUB_WG, subShape, subSpan, subWorkgroups, packSubUniforms, conv2dSubWgsl } = C;
+        packWinoUniforms, winoWorkgroups, SUB_WG, subShape, subSpan, subWorkgroups, packSubUniforms, conv2dSubWgsl,
+        FAST_ARITH, f16round, f16bits, conv2dCpuF16, conv2dCpuF16Fma } = C;
 const { mlpLayerCpu } = await imp("render/brainTsl.mjs");
 const H = await imp("tools/ship/headlessGpu.mjs");
 // v4838: the device cases as a report table (tools/ship/gateReport.mjs) -- the counts every PASS line prints, kept past the terminal
@@ -169,10 +181,12 @@ function nativeStandAside(adapter, compiler, round) {
     if (!fxcAdapter(adapter)) return null;
     // v4868 -- round 27 (section 83): the Winograd kernel runs under DXC, which built every shape the rig was handed (sections 65, 71),
     // and stands aside under FXC, where nobody has built it -- an FXC that never finishes a pipeline stops this gate (section 56)
-    if ((round === 16 || round === 17 || round === 27 || round === 40) && compiler === "DXC") return null;
+    if ((round === 16 || round === 17 || round === 27 || round === 40 || round === 41) && compiler === "DXC") return null;
     const said = compiler === "DXC" || compiler === "FXC" ? compiler : `an unread compiler (${JSON.stringify(compiler ?? null)}), counted as FXC`;
     if (round === 17) return `${FXC_SKIP_R17}; this run compiles with ${said}, and under DXC (node-webgpu 0.6.2) they run (section 66)`;
     if (round === 16) return `${FXC_SKIP}; this run compiles with ${said}, and under DXC (node-webgpu 0.6.2) they run (section 71)`;
+    // round 41 (section 109): FXC has no 16-bit types
+    if (round === 41) return `round 41's half-precision kernel needs 16-bit types, shader model 6.2, which FXC cannot compile; this run compiles with ${said}, and under DXC it runs (section 109)`;
     // round 40 (section 108): the subgroup kernel's wave operations are shader model 6, which FXC does not compile
     if (round === 40) return `round 40's subgroup kernel uses wave operations, shader model 6, which FXC cannot compile; this run compiles with ${said}, and under DXC it runs (section 108)`;
     if (round === 27) return `round 27's Winograd kernel has never been built under FXC, and stands aside there on the safe side; this run compiles with ${said}, and under DXC it runs (section 83)`;
@@ -437,6 +451,11 @@ console.log("\n5e. WHICH ROUNDS' DEVICE ROWS STAND ASIDE, BY ADAPTER AND COMPILE
             return why.includes("section 108") && /shader model 6/.test(why) && (c === "FXC" ? /this run compiles with FXC,/.test(why) : why.includes(`an unread compiler (${JSON.stringify(c ?? null)}), counted as FXC`)); })) &&
             OFF.every((a) => [...NOT_DXC, "DXC"].every((c) => runs(a, c, 40))),
         `the 1080: under DXC ${runs(gtx, "DXC", 40) ? "runs" : "aside"}, under FXC ${runs(gtx, "FXC", 40) ? "runs" : "aside"}; SwiftShader under FXC ${runs(OFF[0], "FXC", 40) ? "runs" : "aside"}`);
+    // round 41 (section 109): the half-precision kernel's device rows the same way
+    ok("!! round 41 (section 109): on a D3D12 adapter the half-precision kernel's device rows run under DXC and stand aside under FXC, an unread compiler or none, naming 16-bit types and section 109; off D3D12 they run under any compiler",
+        RIG.every((a) => runs(a, "DXC", 41) && NOT_DXC.every((c) => { const why = nativeStandAside(a, c, 41) || ""; return why.includes("section 109") && /16-bit types/.test(why); })) &&
+            OFF.every((a) => [...NOT_DXC, "DXC"].every((c) => runs(a, c, 41))),
+        `the Intel: under DXC ${runs(intel, "DXC", 41) ? "runs" : "aside"}, under FXC ${runs(intel, "FXC", 41) ? "runs" : "aside"}`);
     // SABOTAGED v4851: every adapter stands aside unless the compiler is DXC (the D3D12 test made compiler-only) -> RED by name (this row alone; SwiftShader's own
     //   round-16 and round-17 device rows then printed SKIP, 82 PASS falling to 53 with no other red -- why this row has to exist); restored.
     ok("  round 19: off D3D12 -- SwiftShader, Vulkan, Metal, an adapter with no description, none -- both rounds run whatever compiler is named, and round 17's inline rows keep the hoisted tile as their comparator",
@@ -575,6 +594,57 @@ console.log("\n5g. THE SUBGROUP KERNEL'S SHAPE, UNIFORM BLOCK AND TEXT, ON THE C
         /^enable subgroups;/.test(code) && /fn k_conv_sub/.test(code) && (code.match(/subgroupShuffle\(/g) || []).length === 4 * 2 * 8 && !/workgroupBarrier|var<workgroup>|atomic/.test(code) &&
         /let slot = subgroupBroadcastFirst\(li\) \/ ss;/.test(code) && /@workgroup_size\(64, 1, 1\)/.test(code),
         `${code.split("\n").length} lines, ${(code.match(/subgroupShuffle\(/g) || []).length} shuffles`);
+}
+
+console.log("\n5h. HALF PRECISION: THE ROUNDING, THE TWIN, THE PACKING AND THE KERNEL'S TEXT, ON THE CPU (round 41, section 109)");
+{
+    // f16round and f16bits on cases worked by hand: ties to even both ways, the smallest subnormal and half of it, the largest
+    // finite, the last value that rounds to it and the first that overflows, and two values with no exact f16
+    const H16 = [[1, 1, 0x3c00], [65504, 65504, 0x7bff], [65519, 65504, 0x7bff], [65520, Infinity, 0x7c00], [2 ** -24, 2 ** -24, 1], [2 ** -25, 0, 0],
+                 [1.5 * 2 ** -25, 2 ** -24, 1], [1 + 2 ** -11, 1, 0x3c00], [1 + 3 * 2 ** -11, 1 + 2 ** -9, 0x3c02], [-2.5, -2.5, 0xc100], [0.1, 0.0999755859375, 0x2e66],
+                 [2 ** -14, 2 ** -14, 0x0400], [1 / 3, 0.333251953125, 0x3555]];
+    ok("  round 41: f16round is binary16's round to nearest, ties to even -- subnormals, 65504, 65520 overflowing -- and f16bits its bits",
+        H16.every(([x, v, b]) => f16round(x) === v && f16bits(f16round(x)) === b) && f16round(-0) === -0 && f16bits(-0) === 0x8000 && Number.isNaN(f16round(NaN)),
+        H16.filter(([x, v, b]) => !(f16round(x) === v && f16bits(f16round(x)) === b)).map(([x]) => x).join(", ") || `${H16.length} cases`);
+    // the twin: every value an f16, the f32 twin's bits nowhere it matters, and the mirror another rounding of the same sums
+    const F = probeFixture({ H: 9, W: 7, Cin: 19, Cout: 12, k: 3, act: "relu", seed: 61 }), t16 = conv2dCpuF16(F.x, F.H, F.W, F.layer), m16 = conv2dCpuF16Fma(F.x, F.H, F.W, F.layer), t32 = conv2dCpu(F.x, F.H, F.W, F.layer);
+    ok("  round 41: conv2dCpuF16 is f16-valued everywhere, not the f32 twin, and its fused mirror is f16-valued and close to it",
+        t16.every((v) => f16round(v) === v) && m16.every((v) => f16round(v) === v) && diffCount(Array.from(t16), Array.from(t32)) > t16.length / 2 &&
+        Array.from(t16).every((v, i) => Math.abs(v - m16[i]) <= 1e-2 * (Math.abs(v) + 1)),
+        `${diffCount(Array.from(t16), Array.from(t32))} of ${t16.length} cells differ from the f32 twin, ${diffCount(Array.from(t16), Array.from(m16))} from the mirror`);
+    // the template: the f32 setting is the default's text; the f16 kernel's every other line carries its types, its weight read or its
+    // conversions; the emulation is the f16 kernel with f32 types and unpack2x16float -- the same lines elsewhere
+    const L32 = { Cin: 32, Cout: 32, k: 3, act: "relu" }, R18 = { reads: "f32", unroll: true };
+    const base = conv2dFastAltWgsl(L32, R18), k16 = conv2dFastAltWgsl(L32, { ...R18, arith: "f16" }), kem = conv2dFastAltWgsl(L32, { ...R18, arith: "f16emu" });
+    const bl = base.split("\n"), hl = k16.split("\n"), el = kem.split("\n"), d16 = hl.filter((l, i) => l !== bl[i]), dem = el.filter((l, i) => l !== bl[i]);
+    ok("  round 41: the template's f32 setting is r18u's own kernel, the f16 kernel is it line for line but where its types, weight reads and conversions differ, and the emulation differs only in its weight reads",
+        conv2dFastAltWgsl(L32, { ...R18, arith: "f32" }) === base && hl.length === bl.length && el.length === bl.length && /^enable f16;/.test(k16) && !/enable f16/.test(kem) &&
+        d16.every((l) => /f16|bitcast|vec4<u32>|0\.0h|= f32\(a\d\.[xyzw]\)/.test(l)) && dem.every((l) => /unpack2x16float|vec4<u32>/.test(l)) && (k16.match(/bitcast<vec4<f16>>/g) || []).length === 9 * 8 * 8 &&
+        /var<workgroup> T: array<f16,/.test(k16) && /= f32\(a0\.x\);/.test(k16) && /max\(a0, vec4<f16>\(0\.0h\)\)/.test(k16) && /v = f16\(X\[/.test(k16) && !/f16/.test(kem.replace(/2x16float/g, "")),
+        `${d16.length} line(s) differ in the f16 kernel, ${dem.length} in the emulation, of ${bl.length}`);
+    // the packing: decoded as bitcast<vec4<f16>> reads it -- word v / 2 of a block, its xy half for an even v, zw for an odd -- every
+    // weight is the f16-rounded weight, in the same order as the f32 block; the bias stays f32; half the weight bytes
+    const L = probeFixture({ H: 2, W: 2, Cin: 19, Cout: 16, k: 3, seed: 62 }).layer, P16 = { ...R18, arith: "f16" }, S16 = fastAltShape(L, P16), S32 = fastAltShape(L, R18);
+    const p16 = packFastAltUniforms({ H: 2, W: 2, layer: L }, P16), p32 = packFastAltUniforms({ H: 2, W: 2, layer: L }, R18);
+    const u16 = new Uint16Array(p16.buffer), w0 = 4 + 4 * S16.C4, back = (bits) => { const e = (bits >> 10) & 31, m = bits & 1023, sg = bits & 0x8000 ? -1 : 1; return sg * (e ? (1 + m / 1024) * 2 ** (e - 15) : m * 2 ** -24); };
+    let bad = 0;
+    for (let b = 0; b < S16.blocks; b++) for (let v = 0; v < S16.perBlock; v++) for (let lane = 0; lane < 4; lane++) {
+        const word = b * (S16.perBlock / 2) + (v >> 1), half = v % 2 ? 2 : 0, bits = u16[2 * w0 + 2 * (4 * word + half + (lane >> 1)) + (lane & 1)];
+        if (back(bits) !== f16round(p32[w0 + 4 * (b * S32.perBlock + v) + lane])) bad++;
+    }
+    ok("  round 41: the packed f16 weights, decoded as bitcast<vec4<f16>> reads them, are the f32 block's weights f16-rounded, in its order; the bias stays f32; the weights take half the bytes",
+        bad === 0 && Array.from(p16.slice(0, w0)).every((v, i) => Object.is(v, p32[i])) && S16.bytes - (16 + 16 * S16.C4) === (S32.bytes - (16 + 16 * S32.C4)) / 2 && S16.fits,
+        `${S16.blocks} blocks x ${S16.perBlock} vec4s; ${bad} weight(s) wrong; ${S16.bytes} bytes against ${S32.bytes}`);
+    // r18u's own kernel text, frozen at the round that made it a template's f32 setting: the sha256 of both its shapes, taken at the
+    // commit before round 41 and after it alike -- so a change to r18u's text is red even where it moves no cell
+    const sha = (t) => crypto.createHash("sha256").update(t).digest("hex");
+    ok("!! round 41 (section 109): r18u's kernel text is what it was before the template -- 32 -> 32 and the 10 -> 32 first layer, by sha256",
+        sha(base) === "1102b3dc38f811deab6e3584716c0fbf19519b6b9c33971946e30ae73940956e" &&
+        sha(conv2dFastAltWgsl({ Cin: 10, Cout: 32, k: 3, act: "relu" }, R18)) === "52f968042a427267c1743515127de260f0a67e68e62908bd85b2d6251721c7d9",
+        `${sha(base).slice(0, 12)}...`);
+    ok("  round 41: and the half-precision ways refuse what they cannot pack -- vec4 reads, a block not written out, an unknown arithmetic",
+        !fastAltShape(L32, { reads: "vec4", unroll: true, arith: "f16" }).fits && !fastAltShape(L32, { reads: "f32", unroll: false, arith: "f16" }).fits &&
+        !fastAltShape(L32, { ...R18, arith: "bf16" }).fits && FAST_ARITH.join() === "f32,f16,f16emu" && /arith f32 or f16 or f16emu/.test((() => { try { conv2dFastAltWgsl(L32, { reads: "vec4", unroll: true, arith: "f16" }); } catch (e) { return e.message; } })() || ""));
 }
 
 console.log("\n6. *** EVERY KERNEL ON THE DEVICE, CELL FOR CELL AGAINST THE TWIN ***");
@@ -789,6 +859,35 @@ else {
             const K = keyCpu({ H: 9, W: 21, C: 8 }), kt = await H.runWgslComputeNative({ code: conv2dSubWgsl(K.layer, { rows: 2, g4: 2 }), entryPoint: "k_conv_sub", outCount: K.x.length,
                 uniforms: packSubUniforms({ H: K.H, W: K.W, layer: K.layer }, { rows: 2, g4: 2 }), workgroups: subWorkgroups(K.H, K.W, K.layer, { rows: 2, g4: 2 }, minSize), inputs: [{ binding: 2, data: K.x }], features: ["subgroups"] });
             ok("  round 40: the identity key on the device, 9 x 21, eight channels: the subgroup kernel returns its input bit for bit", kt.ok && K.x.every((v, i) => Math.fround(kt.values[i]) === v), kt.ok ? "" : kt.reason);
+        }
+    }
+    // round 41 (section 109): the half-precision kernel -- here as its emulation (the same packed words through unpack2x16float, f32
+    // types), held to conv2dCpu on f16-rounded weights; and as itself where the adapter offers shader-f16, held to conv2dCpuF16 or its
+    // mirror. Odd sizes, partial channel blocks (10 and 19 inputs), three z groups. Under FXC on D3D12 they stand aside (no 16-bit types).
+    const aside41 = nativeStandAside(adapter, COMPILER, 41);
+    if (aside41) console.log(`  SKIP  round 41's device cases: ${aside41}`);
+    else {
+        const R18 = { reads: "f32", unroll: true };
+        const alt16 = (a, arith, features = []) => { const F = probeFixture(a), cfg = { ...R18, arith }; return H.runWgslComputeNative({ code: conv2dFastAltWgsl(a, cfg), entryPoint: "k_conv_fast_alt", outCount: a.H * a.W * a.Cout,
+            uniforms: packFastAltUniforms({ H: a.H, W: a.W, layer: F.layer }, cfg), workgroups: [Math.ceil(a.W / TILE), Math.ceil(a.H / TILE), fastAltShape(a, cfg).groups], inputs: [{ binding: 2, data: F.x }], features }); };
+        const judgeWith = (r, a, tw, fm) => { let unexplained = 0, fused = 0; for (let i = 0; i < tw.length; i++) { const v = Math.fround(r.values[i]); if (v === tw[i]) continue; if (v === fm[i]) fused++; else unexplained++; } return { unexplained, fused, n: tw.length }; };
+        const CASES41 = [{ H: 19, W: 13, Cin: 32, Cout: 32, k: 3, act: "relu", seed: 43 }, { H: 21, W: 19, Cin: 10, Cout: 32, k: 3, act: "relu", seed: 41 },
+                         { H: 11, W: 7, Cin: 19, Cout: 12, k: 3, act: "none", seed: 53 }, { H: 9, W: 17, Cin: 32, Cout: 80, k: 1, act: "none", seed: 47 }];
+        for (const a of CASES41) {
+            const F = probeFixture(a), Lr = { ...F.layer, W: Float64Array.from(F.layer.W, f16round) }, r = await alt16(a, "f16emu");
+            const j = r.ok ? judgeWith(r, a, conv2dCpu(F.x, a.H, a.W, Lr), conv2dCpuFma(F.x, a.H, a.W, Lr)) : null;
+            if (j) CASES.push(["conv2d.conv2dFastAltWgsl f16emu", a.H, a.W, a.Cin, a.Cout, j.n - j.fused, j.fused, j.unexplained]);
+            ok(`!! round 41: the half-precision kernel's emulation, ${a.H} x ${a.W}, ${a.Cin} -> ${a.Cout}, k ${a.k} (${fastAltShape(a, { ...R18, arith: "f16emu" }).groups} z group(s)): every cell conv2dCpu's on the f16-rounded weights, or its fused mirror's -- the packed words read in the right order`,
+                r.ok && j.unexplained === 0, r.ok ? `${j.n - j.fused} plain, ${j.fused} fused, ${j.unexplained} unexplained` : r.reason + " " + (r.errors || []).join("; "));
+        }
+        const probe16 = await alt16(CASES41[2], "f16", ["shader-f16"]);
+        if (probe16.skipped) console.log(`  SKIP  round 41's f16 device cases: ${probe16.reason} -- the Intel gen-9 has it, natively and in Chrome (section 109)`);
+        else for (const a of CASES41) {
+            const F = probeFixture(a), r = a === CASES41[2] ? probe16 : await alt16(a, "f16", ["shader-f16"]);
+            const j = r.ok ? judgeWith(r, a, conv2dCpuF16(F.x, a.H, a.W, F.layer), conv2dCpuF16Fma(F.x, a.H, a.W, F.layer)) : null;
+            if (j) CASES.push(["conv2d.conv2dFastAltWgsl f16", a.H, a.W, a.Cin, a.Cout, j.n - j.fused, j.fused, j.unexplained]);
+            ok(`!! round 41: the half-precision kernel, ${a.H} x ${a.W}, ${a.Cin} -> ${a.Cout}, k ${a.k}: every cell conv2dCpuF16's or its fused mirror's`,
+                r.ok && j.unexplained === 0, r.ok ? `${j.n - j.fused} plain, ${j.fused} fused, ${j.unexplained} unexplained` : r.reason + " " + (r.errors || []).join("; "));
         }
     }
     {
