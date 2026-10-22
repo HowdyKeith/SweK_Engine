@@ -208,3 +208,19 @@ WebGPU on Android ships by default for **Android 12+ with Qualcomm/ARM GPUs**. T
 WebGPU probably no**, which makes the Shield a *display / console / presence* node rather than a GPU-audition
 or compute peer. That is a prediction from release notes, **not a measurement** — open `/webgpu-llm.html` on
 the device and let the page answer it.
+
+## SweK Home -- the TV's home screen (v4896, unshipped)
+
+A second launcher activity in this same APK (`LauncherActivity`): a shelf with SweK's own tiles first (the engine, the **Android peer**,
+the page index), then the TV's apps. Hold OK on an app to pin it to the front. It is offered when the owner picks a home screen
+(`HOME` + `DEFAULT`); this APK never sets itself as Home and never turns another app off -- it declares no permission beyond
+`INTERNET` and `ACCESS_NETWORK_STATE`, and reads the app list through two `<queries>` intents, not `QUERY_ALL_PACKAGES`.
+
+- `Shelf.java` is the logic with no android import, compiled and driven by plain `javac` in `tools/ship/swekTvLauncher-selfcheck.mjs`
+  (`ShelfCheck.java`). `LauncherActivity.java` is type-checked there against an API-16 `android.jar` when one is cached at
+  `~/.cache/swek/android-4.1.1.4.jar` (Maven Central: `com.google.android:android:4.1.1.4`).
+- A tile opens a page of the **same server** through `MainActivity` (extra `com.swek.webview.PATH`), and `Shelf.safePath` refuses
+  anything that is not a plain relative path, so another app's intent cannot send the web view to a site of its own.
+- **Not run**: no TV and no emulator has run this. Looks, D-pad feel and "Android keeps it as Home" are the first thing to check on a rig.
+- The debloat side lives on the server, not here: `tv/tvPackages.mjs` (what three MIT projects say about each package) and
+  `tv/tvDebloat.mjs` (a dry-run planner that executes nothing). See `tv/tvPackages.mjs` for how the three disagree.

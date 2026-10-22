@@ -8,6 +8,20 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- v4896 -- SweK HOME needs to SEE which apps can be launched, and on Android 11+ an app sees almost nothing by default. These two
+         <queries> intents are the narrow way: the launcher categories and nothing else. QUERY_ALL_PACKAGES is NOT declared on purpose --
+         it is the broad permission, Play-restricted, and a home screen does not need to read the whole package list to draw a shelf. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+        </intent>
+    </queries>
     <!-- <uses-permission android:name="android.permission.CAMERA" /> -->
     <!-- <uses-permission android:name="android.permission.RECORD_AUDIO" /> -->
 
@@ -48,6 +62,26 @@
                      home screen lists LEANBACK_LAUNCHER only; a plain LAUNCHER category is invisible to it, so
                      the app can only be started with adb or a sideload file manager. Both categories are kept,
                      because the same APK still has to be a normal phone app. -->
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- v4896 -- SWEK HOME. A SECOND launcher activity in the same APK (one install, one signing key). HOME + DEFAULT is what makes
+             Android offer it when the owner chooses a home screen; it is NEVER made the home screen by this APK, and the stock one is
+             never disabled by it. LEANBACK_LAUNCHER also lists it in the TV's app row, so it can be started once without being Home. -->
+        <activity
+            android:name=".LauncherActivity"
+            android:label="@string/home_name"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:stateNotNeeded="true"
+            android:excludeFromRecents="true"
+            android:screenOrientation="landscape"
+            android:theme="@android:style/Theme.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>

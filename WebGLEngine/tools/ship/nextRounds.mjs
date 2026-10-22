@@ -2162,6 +2162,28 @@ export const NEXT_ROUNDS = [
         how: "Change HP/damage/standoff in the duel and the page together (the gate reads the page's source), run tools/ship/train6dofPilot.mjs and train6dofLeague.mjs, restate the pilot's own `by` record, re-run pilot6dofPolicy, pilotRoster, train6dofPilot, train6dofLeague, shipCollision6dof. 17 hits kill instead of 6, so the pilot's reward shaping (hit, waste, damageTaken) may want re-weighting.",
         why: "Found by trying the re-tune: the pilots' training duel mirrors the page's balance, so the page's balance cannot move alone.",
     },
+    // ---- v4896 (unshipped): the three TV repositories (tv-detox, tv-vibehack/CleanYourTV, free-my-tv), assessed against what SweK already has.
+    {
+        id: "tv-home-first-run-on-a-rig",
+        blocker: "OPEN",
+        what: "SweK Home (android/swek-webview LauncherActivity) has never run on a TV or an emulator: build the APK on the rig, install it, check that Android offers it as a home screen, that the D-pad walks the shelf, that the three SweK tiles open their pages through MainActivity, that long-press pins, and that Back does nothing.",
+        how: "cd android/swek-webview && gradle assembleDebug on the rig (an Android SDK is there, not in the sandbox), adb install -r, then Settings -> Device Preferences -> Home screen. Start on a TV that can be factory-reset; the stock home screen is never disabled by this APK, so the way back is the same setting.",
+        why: "tools/ship/swekTvLauncher-selfcheck.mjs grades the manifest, Shelf.java's logic (compiled and run with javac) and that the activity type-checks against an API-16 android.jar; it cannot show how the screen looks or that it behaves as Home. Those are the first thing a rig shows.",
+    },
+    {
+        id: "tv-menu-reorg-with-the-peer",
+        blocker: "OPEN",
+        what: "Reorganise the TV menu so the Android peer is a first-class entry rather than a link: today SweK Home carries three fixed tiles (engine, /android-peer.html, /server.html). Decide what the TV menu is -- which pages, grouped how -- and whether the peer's live status (/android/status) shows on its tile.",
+        how: "Start from tools/ship/pageSections.mjs's smarthome drawer and the pages androidTvNav-selfcheck already drives; keep the tile list in LauncherActivity.swekTiles() short, and let the grouping come from the server (a JSON the page index already has) rather than a second list in Java.",
+        why: "Keith's brief for the TV round: the existing Android peer should be built into the TV menu reorg. The launcher exists; the menu's contents were deliberately left as the smallest honest set.",
+    },
+    {
+        id: "tv-debloat-executor-needs-a-tv-to-lose",
+        blocker: "OPEN",
+        what: "tv/tvDebloat.mjs PLANS and executes nothing. The executor -- run a confirmed step over adb, one package per shell call, re-read the state after, stop on the first surprise, restart once and check the TV comes back -- is not written, and must not be written without a TV that can be factory-reset.",
+        how: "Two routes, both read but neither adopted: tv-vibehack's tools/disable.sh (laptop-side, refuses core packages, guards Home and Wi-Fi) and free-my-tv's HomeMode/Adb.java (the app talks to the TV's own adb on 127.0.0.1:5555 with its own key, so no laptop). The first fits ai-bridge's existing adb routes (shieldDebugPanel); the second needs an ADB wire-protocol client in Java and a hardware test.",
+        why: "tv-detox's README: some TVs got stuck at the logo or kept restarting and only a factory reset cured it; tv-vibehack's issue 884: an original Mi TV Stick never booted again. The planner refuses core and never packages with no override and every contested one unless named; an executor must keep that and add the per-step confirmation and the restart check, on hardware.",
+    },
     // ---- v4573: an ashawkey (Jiaxiang Tang -- NeRF/3D-vision researcher) repository sweep -- two findings, one a
     // verified gap in THIS TREE'S OWN asset pipeline (found while checking his fbxloader, which is a weak fit for
     // it), one a genuinely complementary capability next to an already-adopted AI asset tool.
