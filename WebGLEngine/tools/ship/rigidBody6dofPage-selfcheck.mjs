@@ -125,8 +125,11 @@ else {
                 afterResetRunning = win.__sixdof.state();
             }
 
+            // v4895: THE BALANCE, measured the way the page re-tuned it -- 120 battles run headless from seed 1 (no drawing), after everything above has been read
+            const w0 = win.__sixdof.state().wins, rb = win.__sixdof.runBattles(120, 1, 4000), w1 = win.__sixdof.state().wins, tk = rb.map((x) => x.ticks).sort((a, b) => a - b);
+            const bal = { A: rb.filter((x) => x.w === "A").length, B: rb.filter((x) => x.w === "B").length, draw: rb.filter((x) => x.w === "draw").length, timeout: rb.filter((x) => x.timeout).length, counted: [w1.A - w0.A, w1.B - w0.B, w1.draws - w0.draws, w1.timeouts - w0.timeouts], medianTicks: tk[tk.length >> 1], n: rb.length };
             return {
-                booted: true,
+                booted: true, bal,
                 initialTick: initial.tick, midTick: mid.tick,
                 initialA0: initial.A[0], midA0: mid.A[0],
                 initialHpSum: hpSum(initial), midHpSum: hpSum(mid),
@@ -163,6 +166,15 @@ else {
             const tot = (w) => w.A + w.B + w.draws;
             ok("!! *** a battle that ended was COUNTED: A wins + B wins + draws went up by exactly one (a mutual kill is a draw, not a nothing) ***", !r.battleEnded || tot(r.winsAfter) === tot(r.winsBefore) + 1, `${JSON.stringify(r.winsBefore)} -> ${JSON.stringify(r.winsAfter)} (${r.battleEnded ? "the battle ended" : "no end seen in the window"})`);
             report("battles counted on this run (A / B / draws)", `${r.winsAfter.A} / ${r.winsAfter.B} / ${r.winsAfter.draws}`);
+        }
+        {   // v4895: the balance the page was re-tuned to (nextRounds: sixdof-page-every-battle-a-draw). 120 headless battles: a draw was 100% of them before; now the winner is decided, neither side owns it, and a fight lasts
+            const b = r.bal, decided = b.A + b.B;
+            report("120 headless battles (A / B / draws / undecided at 60 s)", `${b.A} / ${b.B} / ${b.draw} / ${b.timeout}   median ${(b.medianTicks / 30).toFixed(1)} s`);
+            ok("!! *** every one of those 120 battles was COUNTED by the page itself (wins.A / wins.B / wins.draws rose by exactly the tally, and each timeout is counted as one) ***", b.counted[0] === b.A && b.counted[1] === b.B && b.counted[2] === b.draw && b.counted[3] === b.timeout, `counted ${b.counted.join(" / ")} against ${b.A} / ${b.B} / ${b.draw} / ${b.timeout}`);
+            ok("!! *** the paired fight is DECIDED: a winner in at least 90% of 120 battles (it was a mutual kill in 22 of 22 before the first shot was staggered) ***", decided >= 0.9 * b.n, `${decided} of ${b.n}`);
+            ok("!! ...neither side owns it: each fleet wins at least 35% of the decided battles (a coin: ~50% +- 9 at this n)", b.A >= 0.35 * decided && b.B >= 0.35 * decided, `A ${b.A}, B ${b.B}`);
+            ok("!! ...draws (a mutual kill or equal hp at the 60 s timeout) are under 10%, and few battles run out the clock", b.draw < 0.1 * b.n && b.timeout < 0.15 * b.n, `draws ${b.draw}, undecided at the timeout ${b.timeout}`);
+            ok("!! ...and a battle lasts: the median is over 10 simulated seconds (it was 3.7 s with 18 damage a hit)", b.medianTicks > 300, `${(b.medianTicks / 30).toFixed(1)} s`);
         }
         ok("!! Reset button (newBattle()) actually resets the tick counter", r.afterResetTick < r.midTick, `tick was ${r.midTick}, reads ${r.afterResetTick} right after reset`);
         ok("!! ...and restores full fleet hp (600 = 2 x 3 ships x 100 hp)", r.afterResetHpSum === 600, `${r.afterResetHpSum}`);
