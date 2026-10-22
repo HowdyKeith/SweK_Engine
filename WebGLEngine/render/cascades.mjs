@@ -60,7 +60,7 @@ export function cascadeBlend(viewDist, splits = SPLITS) {
     const t = clamp((viewDist - splits[2] * FAR_FADE) / (splits[2] - splits[2] * FAR_FADE)); return { c: 2, blend: 0, fade: t * t * (3 - 2 * t) };
 }
 
-// ---- WGSL: the lookup over three depth textures. Needs the includer's `F` Frame with cascVP: array<mat4x4f, 3>, cascParams: array<vec4f, 3> (depth range m, ortho width m), splits: vec4f, sunDir, params (z softness, w bias, y map res).
+// ---- WGSL: the lookup over three depth textures. Needs the includer's `F` Frame with debug (y forces a cascade), cascVP: array<mat4x4f, 3>, cascParams: array<vec4f, 3> (depth range m, ortho width m), splits: vec4f, sunDir, params (z softness, w bias, y map res).
 const perCascade = (i) => `
 @group(0) @binding(${3 + i}) var shadowMap${i}: texture_depth_2d;
 fn mapAt${i}(x: i32, y: i32) -> f32 {
@@ -108,6 +108,8 @@ fn sunShadow(world: vec3f, geoN: vec3f, viewDist: f32, noiseRot: f32) -> f32 {
     let biasWorld = F.params.w;
     let sp = F.splits;
     let soft = F.params.z;
+    // the gate's lever: debug.y = 1, 2 or 3 reads that cascade alone, whatever the distance
+    if (F.debug.y > 0.5) { return sampleCascadeTex(i32(F.debug.y) - 1, world, geoN, biasWorld, soft, noiseRot); }
     if (viewDist >= sp.z) { return 1.0; }
     if (viewDist < sp.x) {
         let s = sampleCascadeTex(0, world, geoN, biasWorld, soft, noiseRot);

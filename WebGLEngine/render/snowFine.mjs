@@ -260,6 +260,47 @@ fn detailHeight(uv: vec2f) -> vec2f {
     return vec2f(h, cav);
 }
 `;
+/** one texel of upstream's detail bake from its uv (the body of detailBake's main, as a function): rgba = normal.xy * 0.5 + 0.5, cavity, height. Needs DETAIL_WGSL and hash22. */
+export const DETAIL_TEXEL_WGSL = /* wgsl */ `
+fn detailTexel(uv: vec2f, res: f32, gs: f32) -> vec4f {
+    let e = 1.0 / res;
+    let c = detailHeight(uv);
+    let hL = detailHeight(uv - vec2f(e, 0.0)).x;
+    let hR = detailHeight(uv + vec2f(e, 0.0)).x;
+    let hD = detailHeight(uv - vec2f(0.0, e)).x;
+    let hU = detailHeight(uv + vec2f(0.0, e)).x;
+    let dx = (hR - hL) / (2.0 * e);
+    let dz = (hU - hD) / (2.0 * e);
+    let n = normalize(vec3f(-dx * gs, -dz * gs, 1.0));
+    return vec4f(n.x * 0.5 + 0.5, n.y * 0.5 + 0.5, c.y, c.x);
+}
+`;
+/** the bake at level 0 into a storage texture (rgba16float): binding 0 the texture, binding 1 uniform (res, grainScale, 0, 0); dispatch ceil(res / 8) squared. Prepend hash22 (FINE_NOISE_WGSL). */
+export const DETAIL_BAKE_KERNEL_WGSL = /* wgsl */ `
+${FINE_NOISE_WGSL.slice(0, FINE_NOISE_WGSL.indexOf("fn rot2"))}
+${DETAIL_WGSL}
+${DETAIL_TEXEL_WGSL}
+@group(0) @binding(0) var outTex: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(1) var<uniform> P: vec4f;
+@compute @workgroup_size(8, 8)
+fn main(@builtin(global_invocation_id) gid: vec3u) {
+    if (f32(gid.x) >= P.x || f32(gid.y) >= P.x) { return; }
+    textureStore(outTex, vec2i(gid.xy), detailTexel((vec2f(gid.xy) + 0.5) / P.x, P.x, P.y));
+}
+`;
+/** one 2 x 2 box-filter step down the mip chain: binding 0 the level above (texture), binding 1 the level to write (storage); dispatch over the level being written */
+export const DETAIL_MIP_KERNEL_WGSL = /* wgsl */ `
+@group(0) @binding(0) var src: texture_2d<f32>;
+@group(0) @binding(1) var dst: texture_storage_2d<rgba16float, write>;
+@compute @workgroup_size(8, 8)
+fn main(@builtin(global_invocation_id) gid: vec3u) {
+    let d = textureDimensions(dst);
+    if (gid.x >= d.x || gid.y >= d.y) { return; }
+    let b = vec2i(gid.xy) * 2;
+    textureStore(dst, vec2i(gid.xy), (textureLoad(src, b, 0) + textureLoad(src, b + vec2i(1, 0), 0) + textureLoad(src, b + vec2i(0, 1), 0) + textureLoad(src, b + vec2i(1, 1), 0)) * 0.25);
+}
+`;
+export const DETAIL_LEVELS = 9;
 /** the table kernel: bindings 0 out (4 f32 per query), 2 queries (8 f32: kind, x, z, wind, exposure, amp, footprint, pad). kind 0 terrainFine, 1 terrainFineFiltered, 2 windLocal, 3 detailTexel(x=u, z=v, wind=res, exposure=grainScale) */
 export const FINE_QSTRIDE = 8;
 export const FINE_KERNEL_WGSL = /* wgsl */ `
@@ -297,18 +338,7 @@ fn noise2(p: vec2f) -> f32 { return noised(p).x; }
 ${FINE_NOISE_WGSL}
 ${FINE_TERRAIN_WGSL}
 ${DETAIL_WGSL}
-fn detailTexel(uv: vec2f, res: f32, gs: f32) -> vec4f {
-    let e = 1.0 / res;
-    let c = detailHeight(uv);
-    let hL = detailHeight(uv - vec2f(e, 0.0)).x;
-    let hR = detailHeight(uv + vec2f(e, 0.0)).x;
-    let hD = detailHeight(uv - vec2f(0.0, e)).x;
-    let hU = detailHeight(uv + vec2f(0.0, e)).x;
-    let dx = (hR - hL) / (2.0 * e);
-    let dz = (hU - hD) / (2.0 * e);
-    let n = normalize(vec3f(-dx * gs, -dz * gs, 1.0));
-    return vec4f(n.x * 0.5 + 0.5, n.y * 0.5 + 0.5, c.y, c.x);
-}
+${DETAIL_TEXEL_WGSL}
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
     let i = gid.x;

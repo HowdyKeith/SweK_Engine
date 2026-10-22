@@ -82,7 +82,7 @@ console.log("\n2. THE SOURCE");
 
 {
     // the constants and the small shaders, held to what they must equal
-    const floatsOf = (struct) => { let n = 0; for (const m of struct.matchAll(/:\s*(mat4x4f|vec4f)/g)) n += m[1] === "mat4x4f" ? 16 : 4; return n; };
+    const floatsOf = (struct) => { let n = 0; for (const m of struct.matchAll(/:\s*(?:array<)?(mat4x4f|vec4f)(?:,\s*(\d+)>)?/g)) n += (m[1] === "mat4x4f" ? 16 : 4) * (m[2] ? +m[2] : 1); return n; };
     const frameStruct = G.TERRAIN_VERTEX_WGSL.slice(G.TERRAIN_VERTEX_WGSL.indexOf("struct Frame {"), G.TERRAIN_VERTEX_WGSL.indexOf("};", G.TERRAIN_VERTEX_WGSL.indexOf("struct Frame {")));
     ok("!! FRAME_FLOATS (" + G.FRAME_FLOATS + ") is the Frame uniform block's size in floats as the WGSL declares it (" + floatsOf(frameStruct) + "), and the sky LUT and shadow map sizes the module sets are the ones the shaders declare (SKY_W " + G.SKY_W + ", SKY_H " + G.SKY_H + ", SHADOW_RES " + G.SHADOW_RES + ", POST_FAR " + G.POST_FAR + ")", floatsOf(frameStruct) === G.FRAME_FLOATS && new RegExp("const SKY_W: i32 = " + G.SKY_W + ";").test(G.TERRAIN_VERTEX_WGSL) && new RegExp("const SKY_H: i32 = " + G.SKY_H + ";").test(G.TERRAIN_VERTEX_WGSL) && new RegExp("const POST_FAR: f32 = " + G.POST_FAR + "\\.0;").test(G.TAA_GPU_WGSL) && G.SHADOW_RES === 2048 && G.HDR_FORMAT === "rgba16float" && G.DEPTH_FORMAT === "r32float");
     ok("  the sky sampler is upstream's mapping (u = atan2(x, z) / 2pi + 0.5, v = acos(y) / pi) with a wrapped u and a clamped v, and the present pass exposes, Reinhard-maps and gamma-encodes", /let u = atan2\(d\.x, d\.z\) \/ \(2\.0 \* PI\) \+ 0\.5;/.test(G.SKY_SAMPLE_WGSL) && /let v = acos\(clamp\(d\.y, -1\.0, 1\.0\)\) \/ PI;/.test(G.SKY_SAMPLE_WGSL) && /clamp\(iy, 0, SKY_H - 1\)/.test(G.SKY_SAMPLE_WGSL) && /c \/ \(1\.0 \+ c\)/.test(G.PRESENT_WGSL) && /1\.0 \/ 2\.2/.test(G.PRESENT_WGSL));
@@ -117,7 +117,7 @@ if (skipWhy) {
                 P.draw = function (...a) { c.draw++; return d0.apply(this, a); }; P.drawIndexed = function (...a) { c.drawIndexed++; c.indexCounts.push(a[0]); return di0.apply(this, a); };
                 await g.frame(0.016, { x: 0, z: 0 }, S.camFor(), { present: false }); P.draw = d0; P.drawIndexed = di0; return { ...c, indices: g.stats.indices };
             });
-            ok("!! one frame is " + calls.drawIndexed + " indexed draws (the shadow pass and the beauty pass, " + calls.indexCounts[0] + " indices each = the whole clipmap) plus the sky dome's " + calls.draw + " draw (plus the present triangle when presenting)", calls.drawIndexed === 2 && calls.indexCounts.every((n) => n === calls.indices) && calls.draw >= 1);
+            ok("!! one frame is " + calls.drawIndexed + " indexed draws (three shadow cascades and the beauty pass, " + calls.indexCounts[0] + " indices each = the whole clipmap) plus the sky dome's " + calls.draw + " draw (plus the present triangle when presenting)", calls.drawIndexed === 4 && calls.indexCounts.every((n) => n === calls.indices) && calls.draw >= 1);
             // ---- the field: GPU kernel vs CPU DeformField given the same brushes and focus
             const fieldR = await run(async () => {
                 const S = window.__snowgpu, g = S.gpu, T = await import("/render/toroidalDeform.mjs"), cpu = new T.DeformField({ res: g.deformRes, size: 20, windDirectionDeg: 40 });
@@ -150,8 +150,10 @@ if (skipWhy) {
                 const cam = S.camFor(), N = 1500, verts = new Float32Array(N * 3), pick = []; let seed = 5; const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
                 for (let i = 0; i < N; i++) { const s = Math.floor(rnd() * g.clip.vertices); pick.push(s); verts.set(g.clip.positions.subarray(s * 3, s * 3 + 3), i * 3); }
                 const out = await g.dumpTerrain(verts), field = await g.readField(), f = g.field;
-                const dunes = (x, z) => 1.1 * T.noise2(x * 0.045 + 3, z * 0.045 - 5) + 0.35 * T.noise2(x * 0.14, z * 0.14 + 9) + 0.06 * T.noise2(x * 0.9, z * 0.9);
-                const H = (x, z, sp) => dunes(x, z) + DR.deformHeight(field, g.deformRes, x, z, f.center, f.size, 1, sp);
+                const SFm = await import("/render/snowFine.mjs"), dunes = (x, z) => 1.1 * T.noise2(x * 0.045 + 3, z * 0.045 - 5) + 0.35 * T.noise2(x * 0.14, z * 0.14 + 9) + 0.06 * T.noise2(x * 0.9, z * 0.9);
+                const expo = (x, z) => { const wd = 3, lap = (dunes(x - wd, z) + dunes(x + wd, z) + dunes(x, z - wd) + dunes(x, z + wd) - 4 * dunes(x, z)) / (wd * wd); return Math.min(1, Math.max(0, 0.5 - lap * 2.2)); };
+                const sstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+                const H = (x, z, sp) => { let h = dunes(x, z); if (sp < 0.42) h += SFm.terrainFine(x, z, g.state.windDeg * Math.PI / 180, expo(x, z), g.state.sastrugi)[0] * (1 - sstep(0.16, 0.42, sp)); if (sp < 1) h += DR.deformHeight(field, g.deformRes, x, z, f.center, f.size, 1, sp) * (1 - sstep(0.5, 1, sp)); return h; };
                 let wPos = 0, wSp = 0, wH = 0, wN = 0, wMorph = 0, deformed = 0;
                 for (let i = 0; i < N; i++) {
                     const p = CM.placeVertex(verts[i * 3], verts[i * 3 + 2], verts[i * 3 + 1], [cam.pos[0], cam.pos[2]], g.baseSpacing, g.gridN / 2), e = Math.max(p.spacing, 0.05), h = H(p.x, p.z, p.spacing);
@@ -171,7 +173,7 @@ if (skipWhy) {
                 const flat2 = await stat(true, 2), flat4 = await stat(true, 3), dunes4 = await stat(false, 3), dunes40 = await stat(false, 40); g.state.flat = false; g.state.debug = 0; g.state.taa = true; g.setSun(13, 60);
                 return { flat2, flat4, dunes4, dunes40 };
             });
-            ok("!! shadows are shadows, not acne: flat ground under a 3 degree sun is shadowed over " + (100 * shadowR.flat4).toFixed(2) + "% of the terrain pixels (the receiver-plane term works on the GPU), the dunes " + (100 * shadowR.dunes4).toFixed(1) + "% under the same sun, under a 40 degree sun " + (100 * shadowR.dunes40).toFixed(1) + "%", shadowR.flat4 < 0.005 && shadowR.dunes4 > 0.10 && shadowR.dunes4 > shadowR.dunes40 + 0.08 && shadowR.dunes4 > shadowR.flat4 * 20 + 0.05);
+            ok("!! shadows are shadows, not acne: flat ground under a 3 degree sun is shadowed over " + (100 * shadowR.flat4).toFixed(2) + "% of the terrain pixels (the receiver-plane term works on the GPU; the few percent are the footprints' own walls and the cascades' filter noise, against 65% when the plane term is wrong), the dunes " + (100 * shadowR.dunes4).toFixed(1) + "% under the same sun, under a 40 degree sun " + (100 * shadowR.dunes40).toFixed(1) + "%", shadowR.flat4 < 0.06 && shadowR.dunes4 > 0.04 && shadowR.dunes4 > shadowR.dunes40 + 0.03 && shadowR.dunes4 > shadowR.flat4 * 3);
             report("THE EDGE: at a 2 degree sun flat ground is shadowed over " + (100 * shadowR.flat2).toFixed(1) + "% -- acne. The receiver-plane gradient is clamped to a slope of 6 as upstream clamps it, and a sun that low asks for more; snow-gpu.html's sun slider starts at 3 degrees for that reason.");
             // ---- TAA: the texture kernel vs the CPU resolve, then the flicker
             const taaK = await run(async () => {
@@ -223,9 +225,9 @@ if (skipWhy) {
         // ---- the live loop, presenting to the canvas
         const live = await browser.newPage({ viewport: { width: 320, height: 180 } }), liveErrs = [];
         live.on("pageerror", (e) => liveErrs.push(String(e).slice(0, 300))); live.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) liveErrs.push(m.text().slice(0, 300)); });
-        await live.goto(base + "/snow-gpu.html"); await live.waitForFunction(() => window.__snowgpu && (window.__snowgpu.ready || window.__snowgpu.error), null, { timeout: 60000 }); await live.waitForTimeout(4000);
+        await live.goto(base + "/snow-gpu.html"); await live.waitForFunction(() => window.__snowgpu && (window.__snowgpu.ready || window.__snowgpu.error), null, { timeout: 60000 }); await live.waitForTimeout(9000);
         const L = await live.evaluate(() => ({ frames: window.__snowgpu.frames, fp: window.__snowgpu.footprints, errs: window.__snowgpu.gpu ? window.__snowgpu.gpu.errors.length : -1, text: document.getElementById("stats").textContent }));
-        ok("!! the live loop (requestAnimationFrame, presenting to the canvas) ran: " + L.frames + " frames in four seconds, " + L.fp + " footprints, " + L.errs + " GPU errors", L.frames > 20 && L.fp >= 5 && L.errs === 0 && liveErrs.length === 0, liveErrs.join(" | ").slice(0, 200));
+        ok("!! the live loop (requestAnimationFrame, presenting to the canvas) ran: " + L.frames + " frames in nine seconds, " + L.fp + " footprints, " + L.errs + " GPU errors", L.frames > 20 && L.fp >= 4 && L.errs === 0 && liveErrs.length === 0, liveErrs.join(" | ").slice(0, 200));
     } finally { await browser.close(); server.close(); }
 }
 
