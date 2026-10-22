@@ -7449,3 +7449,118 @@ runner's pipelines they dispatched, through a wrapper on those five steps alone,
 split row holds each step to its kernel. Reported, deciding nothing: on SwiftShader at the pilot size the transfer took
 0.48 ms and the transfer without its atomic 0.16 ms.
 
+
+## 111. ROUNDS 38-42 -- THE VERDICTS: THE LISTED TILE FILL AND THE BOUNDED COVERAGE HOLD ON BOTH GPUS, THE SUBGROUP KERNEL LOSES, THE f16 KERNEL IS OWED, AND EASU IS NEXT
+
+**What arrived.** Four reports: two `realGpuRun --only denoise` runs on each GPU, all at ce1cca35, the commit carrying
+sections 106-110. They were committed as received at 2e80def5, before this section was written:
+`render/denoise-rig-r42-{a,b}-{intel-gen9,gtx1080}.json`. **One of them was read first.** The Intel's run a was shown in
+the session as it arrived, before the commit; the other three were committed unread. The rules were fixed in sections
+106-110 before any of them ran, so the order changed nothing that could be chosen, but the method asks for the commit
+first, and it was not first for that one.
+- `render/denoiseUpscaleGPU-selfcheck.mjs`'s section 11 re-derives sections 106, 107 and 110 from the four files.
+- `render/denoiseDevice-selfcheck.mjs` re-derives sections 108 and 109, each rule with fixtures that move it.
+
+**C1 held in all four runs:** every gate green with exit 0, at ce1cca35.
+
+**H38, by section 106's rule.** In every run the listed tile fill reached 87 rings, the list fill's count, in 12 passes over
+123 tiles, with 0 left (C2).
+
+| GPU | List fill (a / b) | Listed tile fill (a / b) | Listed / list | H38 |
+|---|---|---|---|---|
+| GTX 1080 | 31.1 / 24.9 ms | **17.1 / 17.5 ms** | 0.550 / 0.703 | **holds** |
+| Intel gen-9 | 22.2 / 25.3 ms | **18.7 / 17.4 ms** | 0.842 / 0.688 | **holds** |
+
+**So, by the rule: it holds on both GPUs.** The listed tile fill becomes the chain's default (`denoise-listedtile-default`), and
+`denoise-fill-per-adapter` closes unbuilt.
+- **The predictions missed, both of them.** The 1080 was predicted 2-8 ms and the Intel 5-15 ms; each took 17-19 ms. The
+  prediction scaled the tile passes' work by the 6 % of tiles listed. On the 1080 the listed tile fill (17.1 / 17.5) costs
+  what round 37's whole-frame tile fill did (16.8 / 16.7). So on that GPU its passes' fixed costs, not their tiles, are
+  most of it. The prediction priced those at 0.25 ms a pass, and they are about 1.2 ms. H38 held on both, as predicted.
+- **The fill is timed by the wall clock.** The 1080's list fill read 31.1 ms in run a, against 22.6-24.9 in its other three
+  runs since round 37. Both runs still hold.
+
+**H39, by section 107's rule.** In every run the bounded coverage was round 31's bit for bit at both sizes. It traced 106,709
+(the 1080) and 106,622 (the Intel) at 1920 x 1080, both within 2 % (C2). Every coverage was on the device's clock (C3).
+
+| GPU | covFull (a / b) | covFullB (a / b) | Bounded / full | covHalf (a / b) | covHalfB (a / b) | H39 |
+|---|---|---|---|---|---|---|
+| GTX 1080 | 17.08 / 16.86 ms | **1.22 / 1.23 ms** | 0.072 / 0.073 | 4.23 / 4.26 ms | 0.35 / 0.36 ms | **holds** |
+| Intel gen-9 | 297.3 / 252.1 ms | **26.4 / 22.4 ms** | 0.089 / 0.089 | 76.4 / 62.9 ms | 6.67 / 5.61 ms | **holds** |
+
+**So, by the rule: it holds on both GPUs.** The bounded coverage becomes the chain's and the page's mask
+(`denoise-coverage-bound-default`), and the coverage lever closes.
+- **All four predictions were met**, in both runs.
+- **Reported, deciding nothing.**
+  - The Intel traced 87 pixels fewer than the twin at 1920 x 1080, and 29 fewer at 960 x 540. Its output was bit for bit
+    all the same, so no pixel it skipped had a ray meeting a light. The 1080 traced exactly the twin's counts.
+  - The half-size chain with the bounded coverage, against today's page given the same mask: 1.454 / 1.641 x on the 1080
+    and 3.015 / 3.496 x on the Intel.
+
+**H40, by section 108's rule, on the GTX 1080.**
+- C1, C2 and C3 held on both paths. K0s was green natively in both runs ("4 of 4 native rows"). In the browser its row
+  passed, which prints no line: the gate was green and that row was not skipped. Both sets' 1920 x 1080 passes were on the
+  device's clock.
+
+| Path | r40s against r18t at 1920 x 1080 (a / b) | H40 |
+|---|---|---|
+| native (DXC) | **0.273 / 0.263 x** | **fails** |
+| page (Chrome) | **0.269 / 0.266 x** | **fails** |
+
+**So, by the rule: it fails on both paths.** r40s is kept as a measured negative. Both of the 1080's entries stay r18t, and
+its network lever goes back to the backlog.
+- **The prediction (0.8-1.3 x) missed:** r40s took 3.4-3.8 x r18t's time at every size from 128 x 128 up. Its hidden layers
+  ran at about 500 GFLOP/s against r18t's 2,350, about 83 ms a layer against 16. The prediction said it did not know which
+  side would win, and it was not close. The cause is not measured here. The kernel's 2 x 8 vec4 accumulators a thread with
+  streamed rows, and the shuffles in place of one staged tile, are candidates. Neither is tested.
+- On the Intel, r40s stood aside by name (no subgroups feature), as predicted.
+
+**H41, by section 109's rule, on the Intel gen-9: NO VERDICT on either path.**
+- **C1 held.** Every gate was green with exit 0.
+- **C2 held.** K0h was green natively in both runs ("2 of 2 native rows"). In the browser its row passed: the gate was
+  green and that row was not skipped. **The f16 kernel compiled and was exact on its first hardware.**
+- **C3 was not met.** The ladder's 1500 ms cap skipped r41h's 1920 x 1080 pass on both paths in both runs. Its predicted
+  pass times were 2192-2485 ms. With no pass at that size there is no ratio there, so the rule decides nothing.
+- **What was measured, reported, deciding nothing:** r41h ran at **0.49-0.61 x** r18u's speed at every size it reached, 64 x 64
+  to 1024 x 1024, on both paths and in both runs. At 1024 x 1024 that was 0.514 / 0.490 x natively and 0.522 / 0.516 x on
+  the page. **The prediction, 1.1-1.8 x, missed at every size measured.**
+- **What follows.** No table entry moves. `denoise-f16-intel` stays open, owed to a reading that can meet C3. A rerun as
+  things stand cannot meet it, because the cap would skip the same pass again. The two ways on are:
+  - a round that times r41h and r18u at 1920 x 1080 under a cap that admits them, fixed before it runs; or
+  - closing the entry on these figures, as a judgement and not this rule's outcome.
+  Neither is taken here.
+- On the 1080, r41h stood aside by name (no shader-f16 feature), as predicted.
+
+**Section 110's reading, on the Intel at 960 x 540 -> 1920 x 1080.** Every pass was on the device's clock.
+
+| Run | rest | toT | EASU | composite | toT without its atomic | EASU's share of the three |
+|---|---|---|---|---|---|---|
+| a | 54.9 ms | 2.36 ms | **30.06 ms** | 22.67 ms | 2.40 ms | 0.546 |
+| b | 44.4 ms | 1.56 ms | **25.74 ms** | 17.13 ms | 1.63 ms | 0.579 |
+
+- **EASU is at least half of the three passes in both runs, so EASU is the next round's target** (section 110's first
+  reading).
+- **The single-word atomic costs nothing measurable.** The transfer without it took slightly longer in both runs. So the
+  brightest t's reduction is not the target (the second reading).
+- **The predictions, as made:**
+  - EASU 20-35 ms: met in both runs.
+  - The composite 4-12 ms: missed in both (22.7 and 17.1). It is the second largest pass, not a small one.
+  - restToT 2-12 ms: met in run a (2.36) and missed in run b (1.56).
+  - The atomic a third or more of the transfer: missed.
+  - The 1080's three passes summing to about its 1.0 ms: met (1.006 and 1.003 against rest's 1.003 and 1.000).
+- The Intel's rest read 54.9 and 44.4 ms, against 41.1-42.8 in round 37's runs. That is the run-to-run spread on that GPU.
+  The coverage and the rest read high in run a, though the network at 1920 x 1080 did not (1228 against 1308 ms).
+
+**A label that moved, reported and not changed.** realGpuRun now files `render/denoiseDevice-selfcheck.mjs` as a timing
+gate, not an exact one: the summary reads "exact 1/1, timing 3/3", where round 37's read "exact 2/2, timing 2/2".
+`categorize` reads the gate's source. Round 40's ladder-proxy row, which checks that the ladder stands r40s aside on an
+adapter with the feature hidden, calls `timingLadder(`, and that call is what flips the label. The gate's rows are
+unchanged, and no rule here reads the category.
+
+**Sabotages, by the byte-safe runner (J1-J6), each restored byte-identical:** J1, H38 at 0.5 x, 1 red; J2, the traced
+count read off the half size, 2 red; J3, EASU read off the composite's figure, 2 red; J4, H40's margin at 0.25 x, 2 red;
+J5, C3 dropped, 1 red; J6, the chain's verdict read off round 37's reports, 7 red.
+
+**What changes in this section: nothing in the code but the verdict rows.** The default fill and coverage, every kernel
+table, the network and `fx/fsr` are as section 110 left them. The two defaults that H38 and H39 move to are the backlog's
+`denoise-listedtile-default` and `denoise-coverage-bound-default`.

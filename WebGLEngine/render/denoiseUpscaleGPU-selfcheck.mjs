@@ -129,6 +129,11 @@
 //                                                                         not have gone red before the steps recorded what they dispatched:
 //                                                                         a time does not say which kernel made it
 //   I3  restToT run as the whole rest frame                            1 RED (the split row, by the same record)
+//   and section 11's verdicts (section 111), by the same runner:
+//   J1  H38 at 0.5 x, not 0.9 x                                        1 RED (the H38 row: 0.55-0.84 x is no hold at 0.5)
+//   J2  the 1920 x 1080 traced count read off the half size           2 RED (H39 owed again; the traced-count row)
+//   J3  EASU read off the composite's figure                           2 RED (the reading row: spread, not EASU; the predictions row)
+//   J6  the verdict read off round 37's reports                        7 RED (every row: no section 106-110 line, and not at ce1cca35)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -938,6 +943,89 @@ console.log("\n10. SECTION 105: ROUND 37'S TILE FILL ON BOTH GPUS, RE-DERIVED FR
     say(`section 105: the half-size chain against today's page with the tile fill -- 1080 ${R.gtx1080.map((r) => r.ratioTile).join(" / ")} x, with the list fill ${R.gtx1080.map((r) => r.ratioList).join(" / ")} x; Intel ${R["intel-gen9"].map((r) => r.ratioTile).join(" / ")} x, with the list fill ${R["intel-gen9"].map((r) => r.ratioList).join(" / ")} x -- reported, deciding nothing`);
     REPORT.table("section 105: round 37 on both GPUs, the list fill against the tile fill at 960 x 540, ms", ["GPU", "run", "list fill", "tile fill", "tile / list", "chain ratio, tile", "chain ratio, list"],
         Object.entries(R).flatMap(([g, rs]) => rs.map((r) => [g, r.file, r.fillList, r.fillTile, Number((r.fillTile / r.fillList).toFixed(3)), r.ratioTile, r.ratioList])));
+}
+
+console.log("\n11. SECTION 111: ROUNDS 38, 39 AND 42 ON BOTH GPUS, RE-DERIVED FROM THE FOUR REPORTS AS COMMITTED");
+{
+    // the rig ran ce1cca35, which carries sections 106-110 (first carried by 2721c3ac, 3d3f8bc7 and ce1cca35); only the rig's commit counts
+    const RIG_COMMITS = Object.freeze(["ce1cca35"]);
+    const num = (re, t) => { const m = t.match(re); return m ? Number(m[1]) : null; };
+    const rd = (f) => fs.readFileSync(path.join(ENG, "render", f), "utf8");
+    const readRun = (rep, file) => {
+        const g = rep.gates.find((x) => x.gate === "render/denoiseUpscaleGPU-selfcheck.mjs"), m = (g && g.measured) || [];
+        const line = (n) => m.find((l) => l.startsWith(`section ${n}: `)) || "", e = line(106), c = line(107), r = line(110);
+        const a = m.find((l) => /^section 93: .*kernels/.test(l)) || "", st = m.find((l) => /^section 93: the chain's steps/.test(l)) || "";
+        const dev = (k, t) => num(new RegExp(`\\b${k} ([0-9.]+) ms \\(device\\)`), t);
+        return { file, commit: String(rep.commit || "").slice(0, 8), allGreen: rep.gates.length === 4 && rep.gates.every((x) => x.ok && x.exit && x.exit.status === 0),
+            adapter: (a.match(/^section 93: ([^,]+),/) || [])[1] || null, listRings: num(/; (\d+) of 96 rings filled/, st),
+            fillList: num(/fillList ([0-9.]+) ms \(wall\)/, e), fillLTile: num(/fillLTile ([0-9.]+) ms \(wall\)/, e),
+            tiles: num(/the listed tile fill (\d+) of 2040 tiles/, e), passes: num(/ tiles, (\d+) passes/, e), rings: num(/passes, (\d+) of 96 rings/, e), left: num(/of 96 rings, (\d+) left/, e),
+            covHalf: dev("covHalf", c), covHalfB: dev("covHalfB", c), covFull: dev("covFull", c), covFullB: dev("covFullB", c),
+            tracedFull: num(/ and (\d+) of 2073600;/, c), tracedHalf: num(/traced (\d+) of 518400/, c), same: /; bit for bit at both sizes;/.test(c),
+            ratioBound: num(/the half-size chain with it [0-9.]+ ms, ratio ([0-9.]+) x/, c),
+            rest: dev("rest", r), toT: dev("restToT", r), easu: dev("restEasu", r), comp: dev("restComp", r), toTFree: dev("restToTFree", r) };
+    };
+    const R = Object.fromEntries(["intel-gen9", "gtx1080"].map((g) => [g, ["a", "b"].map((k) => readRun(JSON.parse(rd(`denoise-rig-r42-${k}-${g}.json`)), k))]));
+    const GPU = { "intel-gen9": "intel / gen-9", gtx1080: "nvidia / pascal" };
+    const c1 = (r) => RIG_COMMITS.includes(r.commit) && r.allGreen;
+    ok("!! section 111: the four reports read back -- each at ce1cca35 on its GPU, every gate green with exit 0, and the section 106, 107 and 110 lines whole",
+        Object.entries(R).every(([g, rs]) => rs.every((r) => c1(r) && r.adapter === GPU[g] && [r.fillList, r.fillLTile, r.covFull, r.covFullB, r.rest, r.toT, r.easu, r.comp, r.toTFree].every((v) => Number.isFinite(v) && v > 0))),
+        Object.entries(R).map(([g, rs]) => rs.map((r) => `${g} ${r.file}: ${r.commit}, ${r.adapter}`).join("; ")).join("; "));
+
+    // H38 (section 106): C2 the listed tile fill reaches the list fill's rings, 0 left, 12 passes, 123 tiles; holds when fillLTile <= 0.9 x fillList in both runs
+    const counts38 = (r) => c1(r) && r.left === 0 && r.rings === r.listRings && r.rings > 0 && r.passes === 12 && r.tiles === 123;
+    const H38 = (runs) => (runs.length === 2 && runs.every(counts38) ? (runs.every((r) => r.fillLTile <= 0.9 * r.fillList) ? "holds" : "fails") : "no verdict");
+    const rule38 = (byGpu) => { const h = [H38(byGpu["intel-gen9"]), H38(byGpu.gtx1080)]; const n = h.filter((x) => x === "holds").length;
+        return h.includes("no verdict") ? "owed again" : n === 2 ? "the listed tile fill becomes the default; the fill per adapter closes unbuilt" : n === 1 ? "the fill per adapter goes ahead" : "a measured negative; the fill per adapter goes ahead on round 37's figures"; };
+    const shift = (D, k, f) => ({ ...D, [k]: D[k].map((r, i) => (i === 1 ? f(r) : r)) });
+    const fx38 = [rule38(shift(R, "gtx1080", (r) => ({ ...r, left: 2 }))), rule38(shift(R, "intel-gen9", (r) => ({ ...r, fillLTile: 0.95 * r.fillList }))),
+                  rule38({ "intel-gen9": R["intel-gen9"].map((r) => ({ ...r, fillLTile: r.fillList })), gtx1080: R.gtx1080.map((r) => ({ ...r, fillLTile: r.fillList })) })];
+    ok("!! *** section 111, by section 106's rule: H38 HOLDS ON BOTH GPUS -- the listed tile fill 87 rings in 12 passes over 123 tiles, none left, at 0.55-0.84 x the list fill -- so it becomes the default as denoise-listedtile-default, and the fill per adapter closes unbuilt ***",
+        H38(R["intel-gen9"]) === "holds" && H38(R.gtx1080) === "holds" && rule38(R) === "the listed tile fill becomes the default; the fill per adapter closes unbuilt" &&
+        fx38[0] === "owed again" && fx38[1] === "the fill per adapter goes ahead" && fx38[2] === "a measured negative; the fill per adapter goes ahead on round 37's figures",
+        `${Object.entries(R).map(([g, rs]) => `${g} ${rs.map((r) => `${r.fillLTile} / ${r.fillList} = ${(r.fillLTile / r.fillList).toFixed(3)}`).join(", ")}`).join("; ")}; fixtures: ${fx38.join(" | ")}`);
+    ok("  ...and section 106's predictions are read as made: the 1080's 2-8 ms and the Intel's 5-15 ms both MISSED in both runs (17-19 ms on each); H38 held on both, as predicted",
+        R.gtx1080.every((r) => !(r.fillLTile >= 2 && r.fillLTile <= 8)) && R["intel-gen9"].every((r) => !(r.fillLTile >= 5 && r.fillLTile <= 15)),
+        `1080 ${R.gtx1080.map((r) => r.fillLTile).join(" / ")} ms against 2-8; Intel ${R["intel-gen9"].map((r) => r.fillLTile).join(" / ")} ms against 5-15`);
+
+    // H39 (section 107): C2 bit for bit at both sizes and 106,709 +- 2 % traced at 1920 x 1080; C3 every coverage on the device's clock
+    // (readRun reads only "(device)" figures, so a wall-clock one is null); holds when covFullB <= 0.5 x covFull in both runs
+    const counts39 = (r) => c1(r) && r.same && Math.abs(r.tracedFull - 106709) <= 0.02 * 106709 && [r.covHalf, r.covHalfB, r.covFull, r.covFullB].every((v) => Number.isFinite(v) && v > 0);
+    const H39 = (runs) => (runs.length === 2 && runs.every(counts39) ? (runs.every((r) => r.covFullB <= 0.5 * r.covFull) ? "holds" : "fails") : "no verdict");
+    const fx39 = [H39(R.gtx1080.map((r, i) => (i ? { ...r, same: false } : r))), H39(R.gtx1080.map((r, i) => (i ? { ...r, tracedFull: 100000 } : r))),
+                  H39(R.gtx1080.map((r, i) => (i ? { ...r, covFull: null } : r))), H39(R.gtx1080.map((r, i) => (i ? { ...r, covFullB: 0.6 * r.covFull } : r)))];
+    ok("!! *** section 111, by section 107's rule: H39 HOLDS ON BOTH GPUS -- the bounded coverage bit for bit at both sizes, on the device's clock, at 0.07-0.09 x round 31's at 1920 x 1080 -- so it becomes the chain's and the page's mask as denoise-coverage-bound-default, and the coverage lever closes ***",
+        H39(R["intel-gen9"]) === "holds" && H39(R.gtx1080) === "holds" && fx39.slice(0, 3).every((x) => x === "no verdict") && fx39[3] === "fails",
+        `${Object.entries(R).map(([g, rs]) => `${g} ${rs.map((r) => `${r.covFullB} / ${r.covFull} = ${(r.covFullB / r.covFull).toFixed(3)}, traced ${r.tracedFull}`).join(", ")}`).join("; ")}; fixtures: ${fx39.join(" | ")}`);
+    const inR = (v, a, b) => v >= a && v <= b;
+    ok("  ...and section 107's predictions are read as made: all four MET in both runs -- the Intel's covFullB in 10-40 ms and covHalfB in 3-15, the 1080's in 1-4 and 0.3-1.5",
+        R["intel-gen9"].every((r) => inR(r.covFullB, 10, 40) && inR(r.covHalfB, 3, 15)) && R.gtx1080.every((r) => inR(r.covFullB, 1, 4) && inR(r.covHalfB, 0.3, 1.5)),
+        Object.entries(R).map(([g, rs]) => `${g} full ${rs.map((r) => r.covFullB).join(" / ")}, half ${rs.map((r) => r.covHalfB).join(" / ")}`).join("; "));
+    // reported, deciding nothing: the Intel traced 106,622 and 26,994 where the twin traces 106,709 and 27,023 -- 87 and 29 pixels fewer,
+    // bit for bit all the same, so every pixel it skipped and the twin traced had no ray meeting a light; the 1080 traced the twin's counts
+    ok("  ...and the traced counts are named: the 1080 traced exactly the twin's 106,709 and 27,023 in both runs; the Intel 87 and 29 fewer, bit for bit all the same",
+        R.gtx1080.every((r) => r.tracedFull === 106709 && r.tracedHalf === 27023) && R["intel-gen9"].every((r) => r.tracedFull === 106622 && r.tracedHalf === 26994 && r.same),
+        Object.entries(R).map(([g, rs]) => `${g} ${rs.map((r) => `${r.tracedFull} / ${r.tracedHalf}`).join(", ")}`).join("; "));
+
+    // section 110's reading, on the Intel: the pass at least half of toT + easu + comp in both runs is the target; the brightest t's
+    // reduction instead if toT - toTFree is at least half of toT in both runs; neither half: the rest is spread
+    const read110 = (runs) => {
+        if (!runs.every((r) => c1(r) && [r.toT, r.easu, r.comp, r.toTFree].every((v) => Number.isFinite(v) && v > 0))) return "owed again";
+        if (runs.every((r) => r.toT - r.toTFree >= 0.5 * r.toT)) return "the brightest t's reduction";
+        const big = ["toT", "easu", "comp"].find((k) => runs.every((r) => r[k] >= 0.5 * (r.toT + r.easu + r.comp)));
+        return big ? { toT: "the transfer", easu: "EASU", comp: "the composite" }[big] : "spread";
+    };
+    const it = R["intel-gen9"], fx110 = [read110(it.map((r) => ({ ...r, toTFree: 0.4 * r.toT }))), read110(it.map((r) => ({ ...r, easu: r.comp }))), read110(it.map((r, i) => (i ? { ...r, easu: null } : r)))];
+    ok("!! *** section 111, by section 110's reading: ON THE INTEL, EASU IS AT LEAST HALF OF THE REST'S THREE PASSES IN BOTH RUNS, AND THE SINGLE-WORD ATOMIC COSTS NOTHING MEASURABLE -- EASU is the next round's target ***",
+        read110(it) === "EASU" && it.every((r) => r.toT - r.toTFree < 0.05 * r.toT) && fx110[0] === "the brightest t's reduction" && fx110[1] === "spread" && fx110[2] === "owed again",
+        `${it.map((r) => `run ${r.file}: toT ${r.toT}, easu ${r.easu} (${(r.easu / (r.toT + r.easu + r.comp)).toFixed(3)} of the three), comp ${r.comp}, toT less its atomic ${r.toTFree}`).join("; ")}; fixtures: ${fx110.join(" | ")}`);
+    ok("  ...and section 110's predictions are read as made: EASU's 20-35 ms MET in both runs, the composite's 4-12 MISSED in both (17-23), restToT's 2-12 met in run a and MISSED in run b, the atomic's third MISSED; the 1080's three sum to its 1.0 ms (met)",
+        it.every((r) => inR(r.easu, 20, 35) && !inR(r.comp, 4, 12) && r.toT - r.toTFree < r.toT / 3) && inR(it[0].toT, 2, 12) && !inR(it[1].toT, 2, 12) &&
+        R.gtx1080.every((r) => Math.abs(r.toT + r.easu + r.comp - r.rest) <= 0.05 * r.rest),
+        `Intel easu ${it.map((r) => r.easu).join(" / ")}, comp ${it.map((r) => r.comp).join(" / ")}, toT ${it.map((r) => r.toT).join(" / ")}; 1080 ${R.gtx1080.map((r) => (r.toT + r.easu + r.comp).toFixed(3)).join(" / ")} against rest ${R.gtx1080.map((r) => r.rest).join(" / ")}`);
+    say(`section 111: the half-size chain against today's page with the bounded coverage -- 1080 ${R.gtx1080.map((r) => r.ratioBound).join(" / ")} x, Intel ${it.map((r) => r.ratioBound).join(" / ")} x (each against today's page with the bounded mask too) -- reported, deciding nothing`);
+    REPORT.table("section 111: rounds 38, 39 and 42 on both GPUs, ms", ["GPU", "run", "list fill", "listed tile fill", "covFull", "covFullB", "toT", "EASU", "composite", "toT, no atomic"],
+        Object.entries(R).flatMap(([g, rs]) => rs.map((r) => [g, r.file, r.fillList, r.fillLTile, r.covFull, r.covFullB, r.toT, r.easu, r.comp, r.toTFree])));
 }
 
 console.log(fails ? `\nFAIL -- ${fails} check(s)` : "\nALL GREEN");

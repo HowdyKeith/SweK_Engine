@@ -677,6 +677,66 @@ console.log("1. THE KERNEL'S TWIN, ON THE CPU");
                 fusedW.every((m) => m.length === 2 && m.every((x) => +x[1] === 131072 && +x[2] === 0 && +x[3] === 0)),
                 `the Winograd kernel's compile-gate job, as shipped and use_dxc, per run: ${fusedW.map((m) => m.map((x) => `${x[1]} plain + ${x[2]} fused`).join(" / ")).join("; ")}`);
         }
+        // ROUNDS 40 AND 41'S VERDICTS (section 111): sections 108 and 109's rules, per path, read off the four committed reports
+        // Sabotaged by the byte-safe runner, each restored byte-identical: J4 H40's margin at 0.25 x, 2 RED (the H40 row and its fixtures);
+        // J5 C3 dropped, 1 RED (the H41 row: no pass at 1920 x 1080 is no longer what keeps it from a verdict)
+        // (render/denoise-rig-r42-{a,b}-*.json, realGpuRun --only denoise at ce1cca35, which carries both sections). A path's key holds when
+        // its row is not skipped and the gate is green: K0s and K0h passing in the browser print no line, natively they print one.
+        {
+            const RIG_COMMITS = Object.freeze(["ce1cca35"]);   // the rig's commit; sections 108 and 109 were first carried by 3e0f7155 and 190bb8e0
+            const rig = (f) => JSON.parse(fs.readFileSync(path.join(ENG, "render", f), "utf8"));
+            const R = { intel: ["a", "b"].map((r) => rig(`denoise-rig-r42-${r}-intel-gen9.json`)), gtx1080: ["a", "b"].map((r) => rig(`denoise-rig-r42-${r}-gtx1080.json`)) };
+            // one run, one set against its entry, per path: C1 every gate green with exit 0 at the commit; C2 the key natively (its line) and
+            // in the browser (no SKIP, the gate green); C3 both sets' 1920 x 1080 passes on the device's clock; the ratio at 1920 x 1080
+            const read = (rep, set, vs, key, round) => {
+                const dev = rigGate(rep, "denoiseDevice"), tim = rigGate(rep, "denoiseTiming"), T = rigLines(tim), D = rigLines(dev), S = (dev && dev.skips) || [];
+                const c1 = RIG_COMMITS.includes(String(rep.commit || "").slice(0, 8)) && (rep.gates || []).length === 4 && rep.gates.every((g) => g.ok === true && g.exit && g.exit.status === 0);
+                const nat = new RegExp(`^native ${key} for round ${round}'s set on .*: ${set} green \\(\\d+ of \\d+ native rows\\)$`), skipB = new RegExp(`^SKIP  ${key} in the browser for ${set}:`);
+                const pass = (p, s) => T.find((l) => l.startsWith(`${p} ${s}: 1920 x 1080: `)) || T.find((l) => l.startsWith(`${p} ${s}: 1920 x 1080 skipped`)) || "";
+                return Object.fromEntries(["native", "page"].map((p) => {
+                    const c2 = p === "native" ? D.some((l) => nat.test(l)) : !!dev && dev.ok && D.some((l) => nat.test(l)) &&
+                        S.filter((l) => /browser|chromium/i.test(l)).every((l) => !skipB.test(l) && /^SKIP  K0[sh] in the browser for r4[01][sh]: /.test(l));
+                    const c3 = [set, vs].every((s) => /: 1920 x 1080: [\d.]+ ms a pass .*; on the device's clock [\d.]+ ms;/.test(pass(p, s)));
+                    const m = T.map((l) => l.match(new RegExp(`^${p}: ${set} against ${vs} at 1920 x 1080: ([\\d.]+) x as fast, on the device's clock`))).find(Boolean);
+                    const big = sizeRatios(T, `${p}: ${set} against ${vs} at `);
+                    return [p, { c1, c2, c3, r: m ? +m[1] : null, at: big.length ? big[big.length - 1] : null, skipped: /skipped/.test(pass(p, set)) ? pass(p, set).replace(/^.*skipped -- /, "") : null }];
+                }));
+            };
+            const H = (runs, p) => (runs.every((e) => e[p].c1 && e[p].c2 && e[p].c3 && e[p].r !== null) ? (runs.every((e) => e[p].r >= 1.05) ? "holds" : "fails") : "no verdict");
+            const r40 = R.gtx1080.map((rep) => read(rep, "r40s", "r18t", "K0s", 40)), r41 = R.intel.map((rep) => read(rep, "r41h", "r18u", "K0h", 41));
+            const fmt = (runs, p) => runs.map((e, i) => `run ${"ab"[i]} ${e[p].r !== null ? `${e[p].r} x` : `no 1920 x 1080 ratio (${e[p].skipped || "not timed"}; at ${e[p].at ? `${e[p].at.size} ${e[p].at.r} x` : "no size"})`}`).join(", ");
+            for (const p of ["native", "page"]) console.log(`  ----  section 111 on the 1080, ${p}: r40s against r18t, ${fmt(r40, p)}; on the Intel, ${p}: r41h against r18u, ${fmt(r41, p)}`);
+            ok("!! *** section 111, by section 108's rule: H40 FAILS ON BOTH OF THE 1080's PATHS -- every gate green at ce1cca35, K0s held natively and in the browser, both passes on the device's clock, r40s about 0.27 x r18t at 1920 x 1080 -- so r40s is a measured negative and both 1080 entries stay r18t ***",
+                H(r40, "native") === "fails" && H(r40, "page") === "fails" && r40.every((e) => e.native.r < 0.3 && e.page.r < 0.3) &&
+                NATIVE_KERNELS_BY_ADAPTER["win32/nvidia/pascal"] === "r18t" && PAGE_KERNELS_BY_ADAPTER["Windows/nvidia/pascal"] === "r18t",
+                `native ${H(r40, "native")} (${fmt(r40, "native")}); page ${H(r40, "page")} (${fmt(r40, "page")})`);
+            // H41 is owed on both paths, not failed: C3 asks for r41h's 1920 x 1080 pass, and the ladder's 1500 ms cap skipped it in all four
+            // readings (predicted 2192-2485 ms). C1 and C2 held. What it measured -- 0.49-0.61 x r18u at every size it ran -- is reported
+            const capped = r41.every((e) => ["native", "page"].every((p) => e[p].c1 && e[p].c2 && !e[p].c3 && e[p].r === null && /over the 1500 ms cap$/.test(e[p].skipped || "")));
+            const below = r41.every((e) => ["native", "page"].every((p) => sizeRatios(rigLines(rigGate(R.intel[r41.indexOf(e)], "denoiseTiming")), `${p}: r41h against r18u at `).every((x) => x.r < 0.65)));
+            ok("!! *** section 111, by section 109's rule: H41 HAS NO VERDICT ON EITHER INTEL PATH -- every gate green, K0h held natively and in the browser, but C3 is unmet: r41h's 1920 x 1080 pass was over the ladder's 1500 ms cap in both runs on both paths ***",
+                H(r41, "native") === "no verdict" && H(r41, "page") === "no verdict" && capped && below &&
+                NATIVE_KERNELS_BY_ADAPTER["win32/intel/gen-9"] === "r18u" && PAGE_KERNELS_BY_ADAPTER["Windows/intel/gen-9"] === "r18u",
+                `native: ${fmt(r41, "native")}; page: ${fmt(r41, "page")}; below 0.65 x at every size timed: ${below}`);
+            // the rule's fixtures: a 1080 lifted to 1.06 x in both runs holds on that path alone; in one run it fails; a browser SKIP takes the
+            // page's C2; the Intel given a 1920 x 1080 line at 1.10 x on both runs holds natively
+            const lift = (rep, re, line) => { const c = JSON.parse(JSON.stringify(rep)); const g = rigGate(c, "denoiseTiming"); g.measured = g.measured.map((l) => (re.test(l) ? l.replace(/: [\d.]+ x as fast/, ": 1.060 x as fast") : l)).concat(line || []); return c; };
+            const nvUp = R.gtx1080.map((r) => read(lift(r, /^native: r40s against r18t at 1920 x 1080/), "r40s", "r18t", "K0s", 40));
+            const nvSkip = R.gtx1080.map((r) => { const c = JSON.parse(JSON.stringify(r)); rigGate(c, "denoiseDevice").skips.push("SKIP  K0s in the browser for r40s: no browser"); return read(c, "r40s", "r18t", "K0s", 40); });
+            const itUp = R.intel.map((r) => { const c = lift(r, /^$/, ["native: r41h against r18u at 1920 x 1080: 1.100 x as fast, on the device's clock -- section 109"]); const g = rigGate(c, "denoiseTiming");
+                g.measured = g.measured.map((l) => l.replace(/^native r41h: 1920 x 1080 skipped -- .*$/, "native r41h: 1920 x 1080: 1000.000 ms a pass (10th-90th 990.000-1010.000, 3 passes); on the device's clock 999.000 ms; 2.0 Mpx/s")); return read(c, "r41h", "r18u", "K0h", 41); });
+            ok("  ...and it discriminates: the 1080 lifted to 1.06 x natively in both runs holds there and not on the page, in one run it fails; a browser SKIP leaves the page no verdict; the Intel given a 1920 x 1080 pass at 1.10 x holds natively",
+                H(nvUp, "native") === "holds" && H(nvUp, "page") === "fails" && H([nvUp[0], r40[1]], "native") === "fails" && H(nvSkip, "page") === "no verdict" && H(nvSkip, "native") === "fails" &&
+                H(itUp, "native") === "holds" && H(itUp, "page") === "no verdict",
+                `lifted: native ${H(nvUp, "native")}, page ${H(nvUp, "page")}, one run ${H([nvUp[0], r40[1]], "native")}; browser skipped: page ${H(nvSkip, "page")}; Intel lifted: native ${H(itUp, "native")}`);
+            // the predictions as made: r40s 0.8-1.3 x (MISSED, both paths, both runs); r41h 1.1-1.8 x (MISSED at every size it ran); each set
+            // standing aside by name on the other GPU (held)
+            const aside = R.intel.every((r) => (rigGate(r, "denoiseDevice").skips || []).some((l) => /^SKIP  K0s natively for r40s: the adapter has no subgroups feature/.test(l))) &&
+                R.gtx1080.every((r) => (rigGate(r, "denoiseDevice").skips || []).some((l) => /^SKIP  K0h natively for r41h: the adapter has no shader-f16 feature/.test(l)));
+            ok("  ...and sections 108 and 109's predictions are read as made: r40s MISSED its 0.8-1.3 x on both paths in both runs, r41h MISSED its 1.1-1.8 x at every size it ran, and each set stood aside by name on the other GPU",
+                r40.every((e) => ["native", "page"].every((p) => !(e[p].r >= 0.8 && e[p].r <= 1.3))) && below && aside,
+                `r40s ${fmt(r40, "native")} natively; r41h at most ${Math.max(...R.intel.flatMap((r) => ["native", "page"].flatMap((p) => sizeRatios(rigLines(rigGate(r, "denoiseTiming")), `${p}: r41h against r18u at `).map((x) => x.r))))} x; stood aside ${aside}`);
+        }
         // v4852+ -- SECTION 68'S OUTCOME (round 20): the rig's six --which lines per GPU, held to the table fixed before they ran, and
         // each re-derived from nativePick on the adapter and compiler the line itself names -- so the rig's reasons are this code's
         {

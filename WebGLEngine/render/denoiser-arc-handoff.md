@@ -37,22 +37,19 @@ node tools/ship/versionPreflight.mjs --next    # the next free version and sweep
 
 ## What is next -- Keith picks
 
-1. **`denoise-rest-split`, round 42 (section 110): read off the same runs.** The rest's three passes timed apart, and the
-   transfer without its single-word atomicMax, to choose the next lever on the Intel's fixed costs.
-   **`denoise-f16-intel`, round 41 (section 109): owed two runs on each GPU.** r41h, r18u's hidden layers in f16 on the
-   Intel, its image within 1e-2 of the f64 network; its f16 kernel first compiles on the Intel (SwiftShader has no shader-f16),
-   the packing held here through an unpack2x16float emulation. Section 109 predicts 1.1-1.8 x r18u at 1080p; no entry moves
-   before a quality round.
-   **`denoise-subgroup-reduction`, round 40 (section 108): owed two runs on each GPU.** The 1080's hidden layers on a kernel
-   that shares inputs across a subgroup (r40s), exact to conv2dCpu, green on SwiftShader; it stands aside on the Intel, which
-   has no subgroups. Section 108 predicts 0.8-1.3 x r18t at 1080p and does not call H40.
-   **`denoise-coverage-bound`, round 39 (section 107): owed two runs on each GPU.** The coverage traces only the pixels
-   that can see a light, 5.1 % at 1080p, bit for bit round 31's on SwiftShader. Section 107 predicts the 1080p coverage
-   falls from ~250 to 10-40 ms on the Intel and from ~17.5 to 1-4 ms on the 1080. The page's own mask gains it too.
-   **`denoise-fill-listed-tiles`, round 38 (section 106): owed two runs on each GPU.** Round 37's tile kernel over the tiles
-   holding a light pixel only, 123 of 2,040 at the rig's size, both fills' bit for bit on SwiftShader. Section 106 predicts
-   2-8 ms on the 1080 and 5-15 ms on the Intel, against the list fill's 22-25, which would make it the default. Round 37
-   (sections 104-105): the tile fill held on the 1080 and lost on the Intel; `denoise-fill-per-adapter` waits on round 38.
+1. **Section 111 read rounds 38-42 off four rig runs at ce1cca35** (`render/denoise-rig-r42-{a,b}-*.json`, committed at
+   2e80def5; the Intel's run a was seen before that commit, the other three were not):
+   - **H38 held on both GPUs:** the listed tile fill took 17-19 ms against the list fill's 22-31. Next is
+     **`denoise-listedtile-default`**, a round in round 36's shape. `denoise-fill-per-adapter` closed unbuilt.
+   - **H39 held on both GPUs:** the bounded coverage took 0.07-0.09 x round 31's at 1080p, bit for bit. Next is
+     **`denoise-coverage-bound-default`**, for the chain's mask and the page's.
+   - **H40 failed on both of the 1080's paths:** r40s ran at 0.26-0.27 x r18t. It is a measured negative, and both entries
+     stay r18t.
+   - **H41 has no verdict.** K0h was green on the Intel, so the f16 kernel compiled and was exact. But the 1500 ms cap
+     skipped r41h's 1080p pass, and r41h ran at 0.49-0.61 x r18u wherever it was timed. `denoise-f16-intel` waits on Keith:
+     either a capped-for round, or closing it on these figures.
+   - **Section 110:** EASU is at least half the rest on the Intel, and the atomic costs nothing. Next is
+     **`denoise-easu-cost`**.
    Round 36 (section 103) made the list fill the default, with round 31's ring fill kept as its reference.
    **`denoise-1080-native-crash`:** round 35 did not reproduce it in five runs (section 102). The traces stay armed.
    **Earlier, `denoise-1080-native-crash`, round 35 (section 101).** On the 1080 the timing gate dies inside its native ladder in most
