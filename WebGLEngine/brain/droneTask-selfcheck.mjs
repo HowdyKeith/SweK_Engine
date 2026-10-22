@@ -22,6 +22,9 @@ import * as AD from "./autopilotDrone.mjs";
 import * as Q from "../physics/mechanics/multirotorModel6dof.mjs";
 
 let fails = 0;
+// A THROW IS A RED ROW BY NAME, NOT A STACK TRACE (the first sabotage run crashed this gate with a TypeError on T48, a hover with no wind, and the harness counted it 0 red): whatever throws, the gate says so as a failed row and exits 1
+const died = (e) => { console.log("  FAIL  !! THE GATE THREW before it finished, which is a failure of whatever it was asking: " + String((e && e.stack) || e).split("\n").slice(0, 3).join(" | ").slice(0, 400)); process.exit(1); };
+process.on("uncaughtException", died); process.on("unhandledRejection", died);
 function ok(name, cond, detail) { console.log(`  ${cond ? "PASS" : "FAIL"}  ${name}${detail ? "   " + detail : ""}`); if (!cond) fails++; }
 const near = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
 const f = (v, d = 3) => (Number.isFinite(v) ? v.toFixed(d) : String(v));
@@ -60,9 +63,9 @@ console.log("1. SCENARIOS");
     ok("!! HOVER stays inside its ranges over 60 seeds: 30..50 m up, within 0.1 rad of level, 2 m/s horizontally and 1 m/s vertically of rest, a point 5..25 m away, a height within 8 m of the start's, a heading within 1.5 rad, a wind mean of up to 5 m/s a side (0.3 up) with gusts of 0.5..2 m/s a side",
         all("hover", (c) => within(c.start.pos[2], 30, 50) && Math.abs(c.start.pitch) <= 0.1 && Math.abs(c.start.bank) <= 0.1 && Math.abs(c.start.velocity[0]) <= 2 && Math.abs(c.start.velocity[1]) <= 2 && Math.abs(c.start.velocity[2]) <= 1
             && within(dist(c), 5, 25) && Math.abs(c.target.altitude - c.start.pos[2]) <= 8 && Math.abs(c.target.heading) <= 1.5 && c.failure === null
-            && Math.abs(c.wind.mean[0]) <= 5 && Math.abs(c.wind.mean[1]) <= 5 && Math.abs(c.wind.mean[2]) <= 0.3 && within(c.wind.amp[0], 0.5, 2) && within(c.wind.amp[1], 0.5, 2) && within(c.wind.amp[2], 0.2, 0.6)));
+            && c.wind && Math.abs(c.wind.mean[0]) <= 5 && Math.abs(c.wind.mean[1]) <= 5 && Math.abs(c.wind.mean[2]) <= 0.3 && within(c.wind.amp[0], 0.5, 2) && within(c.wind.amp[1], 0.5, 2) && within(c.wind.amp[2], 0.2, 0.6)));
     ok("!! ...and really reaches the ends of them over 60 seeds (starts under 32 m and over 48, points under 8 m away and over 22, wind means past 4 m/s)",
-        lowAndHigh("hover", (c) => c.start.pos[2], 32, 48) && lowAndHigh("hover", dist, 8, 22) && Math.max(...col("hover", (c) => Math.abs(c.wind.mean[0]))) > 4 && Math.max(...col("hover", (c) => c.wind.amp[0])) > 1.8);
+        lowAndHigh("hover", (c) => c.start.pos[2], 32, 48) && lowAndHigh("hover", dist, 8, 22) && Math.max(...col("hover", (c) => (c.wind ? Math.abs(c.wind.mean[0]) : 0))) > 4 && Math.max(...col("hover", (c) => (c.wind ? c.wind.amp[0] : 0))) > 1.8);
     ok("!! RECOVERY stays inside its ranges: 35..55 m up, banked within 2.2 rad (126 degrees) and pitched within 0.8, 6 m/s horizontally and 8 vertically, turning at up to 3 rad/s (2 yawing), a point 5..20 m away, still air -- and over 60 seeds really reaches past 2.0 rad of bank, 7 m/s of fall or climb and 0.7 of pitch",
         all("recovery", (c) => within(c.start.pos[2], 35, 55) && Math.abs(c.start.pitch) <= 0.8 && Math.abs(c.start.bank) <= 2.2 && Math.abs(c.start.velocity[0]) <= 6 && Math.abs(c.start.velocity[1]) <= 6 && Math.abs(c.start.velocity[2]) <= 8
             && Math.abs(c.start.w[0]) <= 3 && Math.abs(c.start.w[1]) <= 3 && Math.abs(c.start.w[2]) <= 2 && within(dist(c), 5, 20) && Math.abs(c.target.altitude - c.start.pos[2]) <= 8 && Math.abs(c.target.heading) <= 1.5 && c.wind === null && c.failure === null)
@@ -73,8 +76,10 @@ console.log("1. SCENARIOS");
         && lowAndHigh("motor", (c) => c.start.pos[2], 25, 110) && lowAndHigh("motor", (c) => c.start.velocity[0], 1, 7) && lowAndHigh("motor", (c) => c.failure.at, 0.7, 2.3) && new Set(col("motor", (c) => c.failure.motor)).size === 4);
     ok("!! GOTO starts a quadrotor near a hover 20..40 m up (within 0.05 rad of level, 1 m/s of rest horizontally, 0.5 vertically) in a mild wind (a mean of up to 4 m/s a side, gusts of 0.3..1) and asks for a point 40..90 m away at a height of 15..60 m and a heading within 1.5 rad -- and over 60 seeds reaches both ends of the distance and the height, and asks for a height 15 m or more above the start and 15 m or more below it",
         all("goto", (c) => within(c.start.pos[2], 20, 40) && Math.abs(c.start.pitch) <= 0.05 && Math.abs(c.start.bank) <= 0.05 && Math.abs(c.start.velocity[0]) <= 1 && Math.abs(c.start.velocity[1]) <= 1 && Math.abs(c.start.velocity[2]) <= 0.5 && Math.abs(c.start.w[0]) <= 0.1
-            && within(dist(c), 40, 90) && within(c.target.altitude, 15, 60) && Math.abs(c.target.heading) <= 1.5 && c.failure === null && Math.abs(c.wind.mean[0]) <= 4 && Math.abs(c.wind.mean[1]) <= 4 && within(c.wind.amp[0], 0.3, 1) && within(c.wind.amp[1], 0.3, 1))
+            && within(dist(c), 40, 90) && within(c.target.altitude, 15, 60) && Math.abs(c.target.heading) <= 1.5 && c.failure === null && c.wind && Math.abs(c.wind.mean[0]) <= 4 && Math.abs(c.wind.mean[1]) <= 4 && within(c.wind.amp[0], 0.3, 1) && within(c.wind.amp[1], 0.3, 1))
         && lowAndHigh("goto", dist, 45, 85) && lowAndHigh("goto", (c) => c.target.altitude, 20, 55) && Math.max(...col("goto", (c) => c.target.altitude - c.start.pos[2])) > 15 && Math.min(...col("goto", (c) => c.target.altitude - c.start.pos[2])) < -15);
+    ok("!! HOVER AND GOTO BLOW A WIND AND RECOVERY AND MOTOR DO NOT: over 20 seeds every hover and goto scenario has a wind (a mean, an amplitude, two frequencies and two phases an axis) and every recovery and motor scenario has none (null: still air), by name of kind",
+        Array.from({ length: 20 }, (_, i) => i + 1).every((sd) => ["hover", "goto"].every((k) => { const w = DT.scenario(sd, k).wind; return w && w.mean.length === 3 && w.amp.length === 3 && w.freq.every((q) => q.length === 2) && w.phase.every((q) => q.length === 2); }) && ["recovery", "motor"].every((k) => DT.scenario(sd, k).wind === null)));
     // the flight starts from the scenario's start: the first state the pilot is shown is createState(start)
     const rec = DT.scenario(8, "recovery"); let first = null;
     DT.fly((s) => { if (!first) first = s; return { thrust: 0.4, pitch: 0, roll: 0, yaw: 0 }; }, rec);
