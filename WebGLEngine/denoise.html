@@ -279,9 +279,9 @@ $("chain").onclick = async () => {
         const r = await timeHalfChain({ device, net, newAdapter: () => navigator.gpu.requestAdapter(), kernels, S: makeScene(...CHAIN_SCENE), w, h, W, H, maxRings: CHAIN_RINGS });
         const f = (x) => (x ? `${x.ms.toFixed(2)} (${x.clock || x.clocks.join(" + ")})` : "not measured");
         const st = r.chain.steps, rows = [[`the network at ${W} x ${H}`, f(r.networkFull)], [`the network at ${w} x ${h}`, f(r.networkHalf)],
-            [`coverage at ${w} x ${h}`, f(st.covHalf)], [`coverage at ${W} x ${H}`, f(st.covFull)], [`the fill over the lights' pixels, ${CHAIN_RINGS} rings (${r.chain.rings} filled anything)`, f(st.fillList)],
+            [`coverage at ${w} x ${h}`, f(st.covHalf)], [`coverage at ${W} x ${H}`, f(st.covFull)], [`the fill in tiles over the lights' tiles, ${CHAIN_RINGS} rings (${r.chain.rings} filled anything; ${r.chain.ltileCheck ? `${r.chain.ltileCheck.tiles} of ${r.chain.ltileCheck.of}` : "?"} tiles)`, f(st.fillLTile)],
             ["the transfer, EASU and the composite", f(st.rest)], [`today's page in all: the network and its mask at ${W} x ${H}`, f(r.full)],
-            ["the half-size chain in all", f(r.half)], ["the chain's steps in one frame (no network)", f(st.wholeList)],
+            ["the half-size chain in all", f(r.half)], ["the chain's steps in one frame (no network)", f(st.wholeLTile)],
             ["round 32's history: first hits, shift, accumulation, composite", ["hits", "shift", "accum", "final"].map((k) => f(st[k])).join(" / ")],
             ["the half-size chain with its history, in all", f(r.temporal)],
             // round 36: round 31's ring fill over the whole frame, the reference the default fill is held to
@@ -290,9 +290,9 @@ $("chain").onclick = async () => {
             // round 37: the same fill eight rings a pass, in tiles
             [`the fill in tiles, eight rings a pass (${r.chain.tileCheck ? r.chain.tileCheck.passes : "?"} passes)`, f(st.fillTile)], ["...the half-size chain with it, in all", f(r.halfTile)],
             ["...and with its history, in all", f(r.temporalTile)],
-            // round 38: the tile fill over the lights' tiles only
-            [`the fill in tiles over the lights' tiles only (${r.chain.ltileCheck ? `${r.chain.ltileCheck.tiles} of ${r.chain.ltileCheck.of}` : "?"} tiles)`, f(st.fillLTile)],
-            ["...the half-size chain with it, in all", f(r.halfLTile)], ["...and with its history, in all", f(r.temporalLTile)],
+            // round 43: round 34's fill over the lights' pixels, the default in rounds 36-42, a reference since
+            [`the reference: round 34's fill over the lights' pixels (${r.chain.listCheck ? r.chain.listCheck.listed : "?"} listed)`, f(st.fillList)], ["...its chain's steps in one frame", f(st.wholeList)],
+            ["...the half-size chain with it, in all", f(r.halfList)], ["...and with its history, in all", f(r.temporalList)],
             // round 39: the coverage bounded to the pixels that can see a light -- the page's own mask is this coverage at full size
             [`the coverage bounded, at ${w} x ${h} / ${W} x ${H} (${r.chain.boundCheck ? `${r.chain.boundCheck.half} / ${r.chain.boundCheck.full}` : "?"} pixels traced)`, `${f(st.covHalfB)} / ${f(st.covFullB)}`],
             ["today's page with the bounded mask, in all", f(r.fullBound)], ["...the half-size chain with it, in all", f(r.halfBound)], ["...and with its history, in all", f(r.temporalBound)]];
@@ -300,7 +300,7 @@ $("chain").onclick = async () => {
         $("chainTable").querySelector("tbody").innerHTML = rows.map(([k, v]) => `<tr><td style="padding:2px 10px">${k}</td><td style="padding:2px 10px;text-align:right">${v}</td></tr>`).join("");
         $("chainTable").style.display = "";
         $("chainStatus").textContent = `${r.ladder.adapter.name}${r.ladder.adapter.software ? " -- A SOFTWARE ADAPTER: these are a CPU's times, not a GPU's" : ""}; kernels ${kernels}; ` +
-            (r.full && r.half ? `the half-size chain is ${(r.full.ms / r.half.ms).toFixed(2)} x as fast as today's page, the network and its mask at full size` + (r.temporal ? `; with its history, ${(r.full.ms / r.temporal.ms).toFixed(2)} x` : "") + (r.halfRing ? `; with round 31's fill over the frame, ${(r.full.ms / r.halfRing.ms).toFixed(2)} x` : "") + (r.halfTile ? `; with the fill in tiles, ${(r.full.ms / r.halfTile.ms).toFixed(2)} x` : "") + (r.halfLTile ? `; in the lights' tiles only, ${(r.full.ms / r.halfLTile.ms).toFixed(2)} x` : "") + (r.fullBound && r.halfBound ? `; both with the bounded coverage, ${(r.fullBound.ms / r.halfBound.ms).toFixed(2)} x` : "") : "the comparison was not measured") + `; this adapter's key: ${key || "none (no platform reported)"}`;
+            (r.full && r.half ? `the half-size chain is ${(r.full.ms / r.half.ms).toFixed(2)} x as fast as today's page, the network and its mask at full size` + (r.temporal ? `; with its history, ${(r.full.ms / r.temporal.ms).toFixed(2)} x` : "") + (r.halfRing ? `; with round 31's fill over the frame, ${(r.full.ms / r.halfRing.ms).toFixed(2)} x` : "") + (r.halfTile ? `; with the fill in tiles, ${(r.full.ms / r.halfTile.ms).toFixed(2)} x` : "") + (r.halfList ? `; with round 34's fill over the lights' pixels, ${(r.full.ms / r.halfList.ms).toFixed(2)} x` : "") + (r.fullBound && r.halfBound ? `; both with the bounded coverage, ${(r.fullBound.ms / r.halfBound.ms).toFixed(2)} x` : "") : "the comparison was not measured") + `; this adapter's key: ${key || "none (no platform reported)"}`;
         $("chainJson").textContent = JSON.stringify({ ...r, pageKey: key, scene: CHAIN_SCENE, size: [W, H] });
         device.destroy && device.destroy();
     } catch (e) { $("chainStatus").textContent = "failed: " + e.message; }

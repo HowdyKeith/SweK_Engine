@@ -46,6 +46,8 @@
 //                       tile holding an unknown pixel listed once -- a tile not listed never changes, so both buffers hold it alike
 //   FILL_LTARGS_WGSL    one thread: the list's length as the tile passes' indirect dispatch
 //   FILL_LTILE_WGSL     FILL_TILE_WGSL's text, its workgroup's tile read from the list
+//   round 43 (denoise-listedtile-default): fill() and chain() with nothing asked run round 38's listed tile fill; { list: true }
+//   still runs round 34's list fill and { list: false } round 31's ring fill, the references the default is held to
 //   TO_T_WGSL       upscale's transfer: t = (x / (1 + x))^(1 / GAMMA) per channel, and the frame's brightest t by atomicMax
 //                   on its bits (t >= 0, so a float's bits order as the float does).
 //   COMPOSITE_WGSL  the clamp to [0, the brightest t], the transfer's inverse, and compositeEmitters: E + (1 - cov) x it.
@@ -862,6 +864,8 @@ export class DenoiseUpscaleGPU {
         return src;
     }
     _fillOpsFor(o) { return o.tile === "listed" ? this._fillLTileOps : o.tile ? this._fillTileOps : o.list ? this._fillListOps : this._fillOps; }
+    // round 43: with nothing asked, the listed tile fill; a caller that names its fill (list or tile) gets the one it names
+    _fillChoice({ list, tile } = {}) { return tile !== undefined ? { list: list ?? true, tile } : list !== undefined ? { list, tile: false } : { list: true, tile: "listed" }; }
     _fillBufs(img3, cov, w, h, maxRings) {
         const dev = this.device, n = w * h;
         return { a: dev.buffer({ data: rgba(img3, n), usage: ["storage"] }), b: dev.buffer({ data: new Float32Array(n * 4), usage: ["storage"] }),
@@ -892,17 +896,17 @@ export class DenoiseUpscaleGPU {
     _free(bufs) { for (const v of Object.values(bufs)) for (const b of [].concat(v)) b.destroy(); }
 
     /**
-     * fillEmittersBounded on the device: { y, rings, left, perRing, listed }. Round 36: over the lights' pixels only (round 34's
-     * list fill) unless asked `{ list: false }`, which runs round 31's ring fill -- the reference the default is held to.
+     * fillEmittersBounded on the device: { y, rings, left, perRing, listed }. Round 43: with nothing asked, round 38's listed
+     * tile fill. `{ list: true }` runs round 34's list fill over the lights' pixels; `{ list: false }` round 31's ring fill.
      * `{ tile: true }` (round 37) runs the fill FILL_TILE_RINGS rings a pass in workgroup tiles; tilePasses counts its passes.
      * `{ tile: "listed" }` (round 38) runs those passes over the tiles holding an unknown pixel only; tilesListed counts them.
      */
-    async fill(img3, cov, w, h, maxRings, { list = true, tile = false } = {}) {
+    async fill(img3, cov, w, h, maxRings, opts = {}) {
         if (!Number.isInteger(maxRings) || maxRings < 0) throw new Error(`denoiseUpscaleGPU.fill: maxRings is a whole number of rings -- got ${maxRings}`);
         if (img3.length !== w * h * 3 || cov.length !== w * h) throw new Error(`denoiseUpscaleGPU.fill: ${img3.length} values and ${cov.length} coverages are not a ${w} x ${h} frame`);
         const bufs = this._fillBufs(img3, cov, w, h, maxRings);
         let out = null;
-        this.device.frame(({ pass }) => { out = this._fillOpsFor({ list, tile }).call(this, pass, bufs, w, h, maxRings); pass.clear([0, 0, 0, 1]); }, { offscreen: true });
+        this.device.frame(({ pass }) => { out = this._fillOpsFor(this._fillChoice(opts)).call(this, pass, bufs, w, h, maxRings); pass.clear([0, 0, 0, 1]); }, { offscreen: true });
         const y = rgbOf(new Float32Array(await this.device.read(out)), w * h), c = await this._fillCounts(bufs);
         this._free(bufs);
         return { y, ...c };
@@ -911,10 +915,10 @@ export class DenoiseUpscaleGPU {
     /**
      * The emitter-aware chain on one encoder: the w x h frame (rgb), its coverage covHalf, filled in at most maxRings rings,
      * through the transfer, EASU to W x H, the clamp and inverse, and the composite with `full` ({ cov, E } at W x H).
-     * Returns { y (W*H*3), rings, left, perRing, listed, tMax }. Round 36: the fill is round 34's list fill unless asked
-     * `{ list: false }`, round 31's ring fill; `{ tile: true }` round 37's tile fill; `{ tile: "listed" }` round 38's over the listed tiles.
+     * Returns { y (W*H*3), rings, left, perRing, listed, tMax }. Round 43: the fill is round 38's listed tile fill unless asked
+     * `{ list: true }`, round 34's list fill; `{ list: false }` round 31's ring fill; `{ tile: true }` round 37's tile fill.
      */
-    async chain(img3, covHalf, w, h, W, H, full, maxRings, { list = true, tile = false } = {}) {
+    async chain(img3, covHalf, w, h, W, H, full, maxRings, opts = {}) {
         if (full.cov.length !== W * H || full.E.length !== W * H * 3) throw new Error(`denoiseUpscaleGPU.chain: the full-size guide is not ${W} x ${H}`);
         const dev = this.device, bufs = this._fillBufs(img3, covHalf, w, h, maxRings);
         const tMax = dev.buffer({ data: new Uint32Array(1), usage: ["storage"] }), uT = dev.buffer({ data: u4(w, h), usage: "uniform" });
@@ -922,7 +926,7 @@ export class DenoiseUpscaleGPU {
         const fc = dev.buffer({ data: Float32Array.from(full.cov), usage: ["storage"] }), fE = dev.buffer({ data: Float32Array.from(full.E), usage: ["storage"] });
         const dst = dev.buffer({ data: new Float32Array(W * H * 3), usage: ["storage"] }), uC = dev.buffer({ data: u4(W, H), usage: "uniform" });
         dev.frame(({ pass }) => {
-            const filled = this._fillOpsFor({ list, tile }).call(this, pass, bufs, w, h, maxRings);
+            const filled = this._fillOpsFor(this._fillChoice(opts)).call(this, pass, bufs, w, h, maxRings);
             this.p.toT.bind("img", filled).bind("tMax", tMax).bind("u", uT); pass.dispatch(this.p.toT, groups(w, h));
             this.p.easu.bind("src", filled).bind("dst", up).bind("u", uE); pass.dispatch(this.p.easu, groups(W, H));
             this.p.comp.bind("up", up).bind("cov", fc).bind("emis", fE).bind("tMax", tMax).bind("dst", dst).bind("u", uC); pass.dispatch(this.p.comp, groups(W, H));
@@ -1105,18 +1109,20 @@ export class DenoiseUpscaleGPU {
  * Round 31, WHAT THE PAGE TIMES (denoise.html's "Time the half-size chain"): the shipped network at w x h and at W x H on the
  * page's own kernel set (render/denoiseDevice.mjs's timingLadder, the ladder the page already runs), and the chain's steps on
  * scene S (DenoiseUpscaleGPU's time). `device` is a gfx/device.js webgpu device; `newAdapter` makes the ladder's adapters.
- * Returns { ladder, chain, networkHalf, networkFull, fill, full, half, temporal, halfRing, temporalRing }, each sum on the clocks
+ * Returns { ladder, chain, networkHalf, networkFull, fill, full, half, temporal, halfList, temporalList, halfRing, temporalRing, ... }, each sum on the clocks
  * its parts were read on, named:
  *   full   today's page at W x H: the network at W x H, and the emitter coverage at W x H, which is the mask it reads
  *   half   the chain: the network at w x h, the coverage at w x h (its mask, and the fill's), the coverage at W x H (the
  *          composite's guide), the fill, and the transfer, EASU and the composite
  *   temporal  round 33: the chain and round 32's history a frame -- the first hits, the shift, the accumulation, the composite
- *   fill   round 36: "list" -- half and temporal's fill is round 34's over the lights' pixels (fillList). A report without
- *          this key is from before round 36, and its half and temporal are the ring fill's
+ *   fill   round 43: "listedTile" -- half and temporal's fill is round 38's over the listed tiles (fillLTile). A report with
+ *          fill "list" is from rounds 36-42, its half and temporal the list fill's and halfLTile the listed tile fill's; one
+ *          without the key is from before round 36, and its half and temporal are the ring fill's
+ *   halfList, temporalList  round 43: half and temporal with round 34's list fill (fillList), the default in rounds 36-42
  *   halfRing, temporalRing  round 36: half and temporal with round 31's ring fill (fill), the reference the default is held to
  *   halfTile, temporalTile  round 37: half and temporal with the tile fill (fillTile)
- *   halfLTile, temporalLTile  round 38: half and temporal with the tile fill over the listed tiles (fillLTile)
- *   fullBound, halfBound, temporalBound  round 39: full, half and temporal with the bounded coverage (covHalfB, covFullB)
+ *   fullBound, halfBound, temporalBound  round 39: full, half and temporal with the bounded coverage (covHalfB, covFullB), the
+ *          chain on its default fill (fillLTile from round 43, fillList before)
  * The ladder's cap is 5000 ms a pass, not its default 1500: the Intel gen-9's page pass at 1920 x 1080 is 1.2-1.4 s (rounds 27
  * and 28), close enough to 1500 that a prediction from the smaller size could skip the very row being compared.
  */
@@ -1128,20 +1134,20 @@ export async function timeHalfChain({ device, net, newAdapter, kernels, S, w, h,
     const st = chain.steps, sum = (parts) => (parts.every((x) => x && x.ms != null)
         ? { ms: parts.reduce((a, x) => a + x.ms, 0), clocks: [...new Set(parts.map((x) => x.clock))] } : null);
     return { ladder, chain, kernels, networkHalf, networkFull,
-             fill: "list", full: sum([networkFull, st.covFull]), half: sum([networkHalf, st.covHalf, st.covFull, st.fillList, st.rest]),
+             fill: "listedTile", full: sum([networkFull, st.covFull]), half: sum([networkHalf, st.covHalf, st.covFull, st.fillLTile, st.rest]),
              // round 33: the chain with round 32's history -- its four passes a frame added to the half-size chain
-             temporal: sum([networkHalf, st.covHalf, st.covFull, st.fillList, st.rest, st.hits, st.shift, st.accum, st.final]),
+             temporal: sum([networkHalf, st.covHalf, st.covFull, st.fillLTile, st.rest, st.hits, st.shift, st.accum, st.final]),
+             // round 43: the same two with round 34's list fill, the default in rounds 36-42 and a reference since
+             halfList: sum([networkHalf, st.covHalf, st.covFull, st.fillList, st.rest]),
+             temporalList: sum([networkHalf, st.covHalf, st.covFull, st.fillList, st.rest, st.hits, st.shift, st.accum, st.final]),
              // round 36: the same two with round 31's ring fill, the reference
              halfRing: sum([networkHalf, st.covHalf, st.covFull, st.fill, st.rest]),
              temporalRing: sum([networkHalf, st.covHalf, st.covFull, st.fill, st.rest, st.hits, st.shift, st.accum, st.final]),
              // round 37: the same two with the tile fill
              halfTile: sum([networkHalf, st.covHalf, st.covFull, st.fillTile, st.rest]),
              temporalTile: sum([networkHalf, st.covHalf, st.covFull, st.fillTile, st.rest, st.hits, st.shift, st.accum, st.final]),
-             // round 38: the same two with the tile fill over the listed tiles
-             halfLTile: sum([networkHalf, st.covHalf, st.covFull, st.fillLTile, st.rest]),
-             temporalLTile: sum([networkHalf, st.covHalf, st.covFull, st.fillLTile, st.rest, st.hits, st.shift, st.accum, st.final]),
-             // round 39: today's page and the chain (its default fill, the list fill) with the bounded coverage -- the page's own mask
-             // is the coverage at W x H, so the bound serves it too
-             fullBound: sum([networkFull, st.covFullB]), halfBound: sum([networkHalf, st.covHalfB, st.covFullB, st.fillList, st.rest]),
-             temporalBound: sum([networkHalf, st.covHalfB, st.covFullB, st.fillList, st.rest, st.hits, st.shift, st.accum, st.final]) };
+             // round 39: today's page and the chain (on its default fill, the listed tile fill since round 43) with the bounded
+             // coverage -- the page's own mask is the coverage at W x H, so the bound serves it too
+             fullBound: sum([networkFull, st.covFullB]), halfBound: sum([networkHalf, st.covHalfB, st.covFullB, st.fillLTile, st.rest]),
+             temporalBound: sum([networkHalf, st.covHalfB, st.covFullB, st.fillLTile, st.rest, st.hits, st.shift, st.accum, st.final]) };
 }

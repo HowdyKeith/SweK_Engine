@@ -7564,3 +7564,73 @@ J5, C3 dropped, 1 red; J6, the chain's verdict read off round 37's reports, 7 re
 **What changes in this section: nothing in the code but the verdict rows.** The default fill and coverage, every kernel
 table, the network and `fx/fsr` are as section 110 left them. The two defaults that H38 and H39 move to are the backlog's
 `denoise-listedtile-default` and `denoise-coverage-bound-default`.
+
+## 112. ROUND 43 -- THE LISTED TILE FILL BECOMES THE CHAIN'S DEFAULT, WITH THE LIST FILL AND THE RING FILL KEPT AS REFERENCES
+
+**Why now.** Section 111, by section 106's rule: H38 held on both GPUs, so the listed tile fill becomes the chain's fill, in
+a round of its own that changes the runner's default and holds the change to today's rows. This is that round
+(`denoise-listedtile-default`), in round 36's shape (section 103). It measures nothing new, so it has no prediction to miss
+and no rig run to wait for. It is fixed here before its code.
+
+**What changes, in `render/denoiseUpscaleGPU.mjs`:**
+- **`fill(...)` and `chain(...)` with nothing asked run the listed tile fill.** Every explicit option keeps its meaning:
+  - `{ list: true }` runs round 34's list fill, as it always has;
+  - `{ list: false }` runs round 31's ring fill;
+  - `{ tile: true }` runs round 37's tile fill;
+  - `{ tile: "listed" }` runs round 38's listed tile fill.
+  So no caller that names its fill gets a different one. A caller that names none gets the new default.
+- **`timeHalfChain`'s `half` and `temporal` sum the listed tile fill (`fillLTile`)**, and the result says so: `fill: "listedTile"`.
+  - `halfList` and `temporalList` are new: the same two sums with the list fill (`fillList`), the reference.
+  - `halfLTile` and `temporalLTile` go. They would be `half` and `temporal` under a second name, as `halfList` was in round 36.
+  - `halfBound` and `temporalBound` are section 107's "chain with its default fill and the bounded coverage", so they now
+    sum `fillLTile`.
+- The step keys do not change. `fillList`, `fillLTile` and their `whole` steps keep their meanings.
+
+**What changes on the page (`denoise.html`'s "Time the half-size chain"):**
+- The default rows report the listed tile fill: the fill row, "the half-size chain in all", the one-frame row and "the
+  half-size chain with its history, in all".
+- Round 34's list fill takes the place of round 38's group as a reference with four rows: its fill, its steps in one frame,
+  its chain in all, and that with the history. That makes 26 rows, not 25.
+- The status line's ratio is the default chain's, with the list fill's beside it.
+
+**What does NOT change: the lines the rig's reports carry.** Each keeps its meaning from this round on.
+- Section 93's and 97's lines: the ring fill's chain.
+- Section 99's "with the list fill": the list fill's chain, now `halfList` and `temporalList`.
+- Section 103's line: the default fill by name and the default chain.
+- Section 106's "with the listed tile fill": the listed tile fill's chain, now `half` and `temporal`.
+- Section 107's line: the chain with the default fill and the bounded coverage. Its figure moves with the default, as its
+  definition says.
+- Sections 105 and 111 read committed reports from before this round, whose keys are as they were.
+- The pilot-size row checks each line's figure against the sum it names, so no line can change meaning with no row red.
+
+**The rows that hold the change (the gate's sections 3 and 4):**
+1. **`fill()` with nothing asked is the listed tile fill.** It has the same `tilesListed`, the same `tilePasses` and the same
+   floats, bit for bit, as `{ tile: "listed" }`, on all six of round 34's frames. `{ list: true }` is still round 34's (its
+   `listed` count, no tiles listed), and `{ list: false }` lists nothing and stays fillEmittersBounded's.
+2. **`chain()` with nothing asked is the listed tile fill's chain**, bit for bit, on all four scenes. It stays within 1e-6
+   of emitterAwareUpscale, as the list fill's did.
+3. **At the pilot size:**
+   - the page's `half` is the half-size network, the coverage at both sizes, `fillLTile` and the rest;
+   - `temporal` is that plus the history's four passes;
+   - `halfList` and `temporalList` are the same with `fillList`;
+   - `fill` is `"listedTile"`, and the table has 26 rows.
+4. **The rig lines**, made from the pilot's report, each carry the figure of the sum named above.
+
+**Sabotages, by the byte-safe runner (K1-K6):**
+- `fill()`'s default back to the list fill;
+- `chain()`'s the same;
+- `{ list: true }` running the listed tile fill;
+- `half` summing `fillList`;
+- `halfList` summing `fillLTile`;
+- the page without the list fill's chain row.
+Each must turn at least one row red. A sabotage that goes 0 red is a finding to fix before the round is committed.
+
+**The rule.** The round holds when rows 1-4 pass on SwiftShader and every gate the branch runs stays as green as it was.
+No rig run is owed: the kernels, their order and every timed step are round 38's, measured on both GPUs in section 111.
+The next rig run of this gate checks rows 1-4 on that GPU as it goes.
+
+**Nothing else changes:** the coverage (section 107's default round is `denoise-coverage-bound-default`, after this one),
+the network, every kernel table, the kernels themselves, and `fx/fsr`.
+
+**Before commit.** Rows 1-4 passed on their first run here. K1-K6 each turned at least one row red and were restored
+byte-identical: K1 1 red, K2 1, K3 5, K4 1, K5 1, K6 1.

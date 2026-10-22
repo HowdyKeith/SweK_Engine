@@ -40,7 +40,8 @@ node tools/ship/versionPreflight.mjs --next    # the next free version and sweep
 1. **Section 111 read rounds 38-42 off four rig runs at ce1cca35** (`render/denoise-rig-r42-{a,b}-*.json`, committed at
    2e80def5; the Intel's run a was seen before that commit, the other three were not):
    - **H38 held on both GPUs:** the listed tile fill took 17-19 ms against the list fill's 22-31. Next is
-     **`denoise-listedtile-default`**, a round in round 36's shape. `denoise-fill-per-adapter` closed unbuilt.
+     **`denoise-listedtile-default`**, done as round 43 (section 112): the chain's default fill now, the list fill and the ring
+     fill kept as references. `denoise-fill-per-adapter` closed unbuilt.
    - **H39 held on both GPUs:** the bounded coverage took 0.07-0.09 x round 31's at 1080p, bit for bit. Next is
      **`denoise-coverage-bound-default`**, for the chain's mask and the page's.
    - **H40 failed on both of the 1080's paths:** r40s ran at 0.26-0.27 x r18t. It is a measured negative, and both entries

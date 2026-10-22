@@ -2377,10 +2377,10 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "denoise-listedtile-default",
-        blocker: "OPEN",
-        what: "Section 106's rule, carried out: the listed tile fill becomes fill()'s and chain()'s default, with the list fill and the ring fill kept as references, as round 36 made the list fill the default.",
-        how: "A round in round 36's shape: the default switched, timeHalfChain's half and temporal summing the listed tile fill, the list fill keeping reference rows, held bit for bit to the list fill on every scene. No rig run owed: the kernels and timed steps are round 38's.",
-        why: "Section 111: H38 held on both GPUs.",
+        blocker: "CLOSED",
+        what: "DONE as round 43 (pre-registration section 112), shipping with the next version. fill() and chain() asked nothing run round 38's listed tile fill; { list: true } still runs round 34's list fill and { list: false } round 31's ring fill, the references. timeHalfChain's half and temporal sum fillLTile and say fill: \"listedTile\"; halfList and temporalList are the list fill's; halfLTile and temporalLTile are gone (they would be half and temporal again).",
+        how: "The page's default rows report the listed tile fill and the list fill keeps four reference rows (26, not 25). The rig's section 93/97/99/103/106/107 lines keep their meanings; the pilot-size rows hold each figure to its sum. render/denoiseUpscaleGPU-selfcheck.mjs holds the default to the listed tile fill bit for bit, on six frames and four scenes; sabotaged K1-K6. No rig run owed: the kernels and timed steps are round 38's.",
+        why: "Section 111: H38 held on both GPUs (section 106's rule).",
     },
     {
         id: "denoise-coverage-bound-default",
