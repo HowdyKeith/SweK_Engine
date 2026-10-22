@@ -872,7 +872,8 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4886 -- RE-TAKEN 178/93/515 -> 180/94/521 at the merge of the v4661-v4675 chain: PROBE_AT_V4675 (recordProbe's run) and one record from the tooling it brought, read off the live census.
     // round 22 -- 180/94/521 -> 181/95/530: PROBE_AT_V4675_R22 (one record, 9 fields); `excluding` does not move.
     // v4894 -- 181 -> 182: READINGS_AT_V4892 in ui/oceanReadings.mjs (nested lines, so no counted field); excluding below moves with it.
-    currentIncludingModule: Object.freeze({ records: 182, withFields: 95, fields: 530 }),
+    // v4895 -- 182 / 95 / 530 -> 183 / 96 / 531: COMMIT_BELT_DRIFT_V4895 in world/orreryFleet.mjs (one field on its own line, bodiesNow); excluding moves with it (178/91/495 -> 179/92/496).
+    currentIncludingModule: Object.freeze({ records: 183, withFields: 96, fields: 531 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -1092,7 +1093,7 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4840 -- 155 / 72 / 381 -> 156 / 73 / 382: DOORS_AT_V4840 (tools/ship/wasmTeardown.mjs), read off census() excluding this module.
     // v4880 -- 156 / 73 / 382 -> 168 / 85 / 465 (including this module 170 / 87 / 485): the orrery-seeded merge brought twelve MEASURED_AT records, read off census().
     // v4886 -- 176 -> 177: the chain's orphanSets.ADMITTED_V4673 arrives as a record outside this module (fields held at 91/495).
-    excluding: Object.freeze({ records: 178, withFields: 91, fields: 495 }),
+    excluding: Object.freeze({ records: 179, withFields: 92, fields: 496 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,

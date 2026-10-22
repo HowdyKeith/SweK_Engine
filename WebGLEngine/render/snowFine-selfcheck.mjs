@@ -10,6 +10,7 @@
 //                 (sastrugi taller at exposure 1 than 0, ripples the other way); "sastrugi stands proud" is MEASURED, not asserted (the height range printed);
 //   4  THE KERNEL (needs the software WebGPU adapter; SKIPPED, and said, without one) the WGSL over a table equals the twin within the f32 hash's stated bound.
 // NOT GRADED, said plainly: the look, a real GPU, GRAIN_SCALE and the bake resolution (set here, not upstream's).
+// SABOTAGE LOG (v4895): the WGSL sastrugi amplitude 0.125 -> 0.2 -> 2 red by name (the lifted-bodies row, and the kernel row: terrainFine 2.1e-2 off); the detail mip kernel's box filter * 0.25 -> * 0.5 -> 3 red in snowGpu-selfcheck (the mip row by name; the brighter picture also reddens the SSS and glint rows).
 "use strict";
 import fs from "node:fs";
 import path from "node:path";

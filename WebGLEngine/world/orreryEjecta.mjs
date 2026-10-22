@@ -206,6 +206,33 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "ui/oceanReadings-selfcheck.mjs",
         "ui/oceanSea-selfcheck.mjs",
         "ui/oceanSea.mjs",
+        // v4895 -- the sea patch layer and its generated modules, the live-tune and frame gates, and the ocean source rebuild; the orphan ratchet names the vendored original as data.
+        "tools/ship/oceanSeaPage-selfcheck.mjs",
+        "tools/ship/oceanSrcRebuild-selfcheck.mjs",
+        "tools/ship/orphanSets.mjs",
+        "tools/ship/seaPatch-selfcheck.mjs",
+        "tools/ship/seaPatch.mjs",
+        "ui/oceanLiveTune-selfcheck.mjs",
+        "ui/seaFrame-selfcheck.mjs",
+        "world/ocean/seaMain.mjs",
+        "world/ocean/seaOceanWgsl.mjs",
+    ]),
+    // v4895 -- vendor/snowflow (Noniv/snowflow_demo, MIT) arrived with the snow GPU lift: 23 pinned originals, read by the adaptations in render/ and their gates and loaded by none.
+    "snowflow": Object.freeze([
+        "render/aerial-selfcheck.mjs",
+        "render/cascades-selfcheck.mjs",
+        "render/clipmapTerrain-selfcheck.mjs",
+        "render/deformRead-selfcheck.mjs",
+        "render/pcssShadow-selfcheck.mjs",
+        "render/skyBake-selfcheck.mjs",
+        "render/snowFine-selfcheck.mjs",
+        "render/snowGpu-selfcheck.mjs",
+        "render/snowShading-selfcheck.mjs",
+        "render/taaResolve-selfcheck.mjs",
+        "render/toroidalDeform-selfcheck.mjs",
+        "tools/ship/orphanSets.mjs",
+        "tools/ship/snowflowVendor-selfcheck.mjs",
+        "tools/ship/wgslCorpus.mjs",
     ]),
     "box3d": Object.freeze([
         "ai-bridge/doctorBridge.js",
@@ -470,6 +497,14 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "wear-field.html",
         // v4886 -- orphanSets.mjs NAMES vendor paths of this body as recorded orphans (strings, not imports); the census reads a name as a dependant.
         "tools/ship/orphanSets.mjs",
+        // v4895 -- the shared three.js sea surface, the sub-aquarium 3D view, the snow deform page and the gates that read them.
+        "render/seaThree-selfcheck.mjs",
+        "render/skyBake-selfcheck.mjs",
+        "render/subAquarium3d-selfcheck.mjs",
+        "snow-deform.html",
+        "sub-aquarium.html",
+        "ui/seaDepthTint-selfcheck.mjs",
+        "ui/seaFrame-selfcheck.mjs",
     ]),
     "three-webgpu": Object.freeze([
         // backlog #31/#49/#51 -- the AI-presence orb (krispuckett/murmur-web ported into tslSource.mjs) is a

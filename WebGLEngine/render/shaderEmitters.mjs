@@ -307,6 +307,13 @@ export const HAND_VERIFIED = Object.freeze([
     Object.freeze({ file: "tools/ship/murmurKit-selfcheck.mjs", kind: "quoter", why: null }),
     Object.freeze({ file: "tools/ship/tslLoopBound-selfcheck.mjs", kind: "quoter", why: null }),
     Object.freeze({ file: "tools/ship/tslWide-selfcheck.mjs", kind: "quoter", why: null }),
+    // v4895 -- SIX FILES THE SNOW AND SEA ROUNDS ADDED, each read by hand: two emitters (render/cascades.mjs exports the cascade lookup's WGSL as a function-body fragment; tools/ship/seaPatch.mjs builds the patched sea's WGSL from the vendored text) and four quoters (the gates of aerial, skyBake, seaPatch and seaDepthTint, which quote statements of WGSL to compare them with upstream's and export none).
+    Object.freeze({ file: "render/aerial-selfcheck.mjs", kind: "quoter", why: null }),
+    Object.freeze({ file: "render/cascades.mjs", kind: "emitter", why: REASONS.EMITTED }),
+    Object.freeze({ file: "render/skyBake-selfcheck.mjs", kind: "quoter", why: null }),
+    Object.freeze({ file: "tools/ship/seaPatch.mjs", kind: "emitter", why: REASONS.ASSEMBLED }),
+    Object.freeze({ file: "tools/ship/seaPatch-selfcheck.mjs", kind: "quoter", why: null }),
+    Object.freeze({ file: "ui/seaDepthTint-selfcheck.mjs", kind: "quoter", why: null }),
 ]);
 
 /** The rows the shipped thresholds get wrong, named rather than excluded. See the header. One at v4486; two since v4880. */
@@ -325,21 +332,33 @@ export const RESIDUALS = Object.freeze([Object.freeze({
         reason: "a module that exports its shader as a concatenation of an imported constant and a short template carries too few density tokens in any one window",
         precedent: "the same trade the sweep below prices: widening the window to catch it would move other quoters",
     }),
+    // v4895 -- TWO MORE QUOTERS READ AS EMITTERS: a gate that holds a module's shader to upstream's text quotes whole statements of it, and a run of quoted statements is dense enough to look like the shader
+    Object.freeze({
+        file: "render/aerial-selfcheck.mjs", truth: "quoter", reported: "emitter",
+        reason: "it quotes eight statements of applyAerial and the sky sampler to compare them with upstream's, and runs the module's own kernel text through Dawn; it defines no shader",
+        precedent: "tools/ship/swiftShaders-selfcheck.mjs, above: the quote IS the shader to a density window",
+    }),
+    Object.freeze({
+        file: "render/skyBake-selfcheck.mjs", truth: "quoter", reported: "emitter",
+        reason: "it quotes the Nishita march's statements to compare them with upstream's lib/atmosphere.wgsl and runs the bake kernel text through Dawn; it defines no shader",
+        precedent: "tools/ship/swiftShaders-selfcheck.mjs, above",
+    }),
 ]);
 
 /** The sweep behind WINDOW.density and DENSITY_FLOOR: rows are radii, columns floors 2..8, values agreement over the key (32 rows at v4486, 46 since v4880 -- re-derived by the gate). */
 export const TUNING = Object.freeze({
     floors: Object.freeze([2, 3, 4, 5, 6, 7, 8]),
     byRadius: Object.freeze({
-        80: Object.freeze([44, 44, 40, 38, 37, 35, 31]),
-        100: Object.freeze([44, 44, 41, 39, 38, 37, 35]),
-        140: Object.freeze([44, 44, 45, 42, 40, 38, 37]),
-        200: Object.freeze([43, 44, 44, 44, 44, 40, 37]),
-        300: Object.freeze([42, 42, 43, 43, 44, 42, 42]),
+        // v4895: every cell +4 -- the six files added by hand, four of which the thresholds classify as read (the two they do not are the new residuals); the SHAPE is unchanged: the same spike, the same four-wide run
+        80: Object.freeze([48, 48, 44, 41, 40, 38, 34]),
+        100: Object.freeze([48, 48, 45, 43, 42, 40, 38]),
+        140: Object.freeze([48, 48, 49, 46, 44, 42, 40]),
+        200: Object.freeze([47, 48, 48, 48, 48, 44, 41]),
+        300: Object.freeze([46, 46, 47, 47, 48, 46, 46]),
     }),
-    peak: Object.freeze({ radius: 140, floor: 4, agreement: 45, shipped: false,
+    peak: Object.freeze({ radius: 140, floor: 4, agreement: 49, shipped: false,
         note: "a spike -- every neighbour reads lower -- which is what a threshold fitted to its own key looks like" }),
-    shipped: Object.freeze({ radius: 200, floor: 5, agreement: 44,
+    shipped: Object.freeze({ radius: 200, floor: 5, agreement: 48,
         note: "inside the widest run at the best non-spike score: FOUR floors wide (3 through 6), where every other radius manages at most two" }),
     // Derived by the gate from byRadius, not typed: the length of each radius' longest run at its own best score.
     runAtBest: Object.freeze({ 80: 2, 100: 2, 140: 1, 200: 4, 300: 1 }),
@@ -389,12 +408,14 @@ export const MEASURED_AT_V4486 = Object.freeze({
     rows: 33,
     // v4880 -- the key grew by thirteen files read by hand (seven emitters, six quoters); the thresholds miss two of the 46 rows.
     v4880: Object.freeze({ rows: 46, agreement: 44, handVerifiedEmitters: 21, handVerifiedQuoters: 25, reportedEmitters: 21, reportedQuoters: 25 }),
+    // v4895 -- six files read by hand (two emitters, four quoters); the thresholds now miss four of the 52 rows (two more quoters read as emitters).
+    v4895: Object.freeze({ rows: 52, agreement: 48, handVerifiedEmitters: 23, handVerifiedQuoters: 29, reportedEmitters: 25, reportedQuoters: 27 }),
     // Against backendParity's own figures, unchanged and deliberately not widened.
-    preambleCensus: Object.freeze({ glslBearing: 169, wgslBearing: 116, both: 27 }),   // v4880: were 150 / 72 / 16 at v4486; restated with backendParity; v4891: wgslBearing 115 -> 116 with it (render/denoiseUpscaleGPU.mjs)
+    preambleCensus: Object.freeze({ glslBearing: 170, wgslBearing: 132, both: 27 }),   // v4880: were 150 / 72 / 16 at v4486; restated with backendParity; v4891: wgslBearing 115 -> 116 with it (render/denoiseUpscaleGPU.mjs)
     // Of the fourteen, how many are invisible for a reason a wider PATTERN could fix: the two whose only
     // problem is that the framework tell is a uniform declaration. The other twelve are structural.
     fixableByPattern: 2,
     // Which rejection actually rejects, over every tell in the tree. See the header: escapeOnly is 0 today and
     // the gate reports it rather than pinning it, because the day it stops being 0 is the day it starts working.
-    rejections: Object.freeze({ escapeOnly: 2, callOnly: 20, both: 20, neither: 73 }),   // v4880: was 0 / 16 / 16 / 58; the escape test now catches two tells the call test does not
+    rejections: Object.freeze({ escapeOnly: 2, callOnly: 20, both: 23, neither: 81 }),   // v4895: were 2 / 20 / 20 / 73 at v4880 (0 / 16 / 16 / 58 before); the new snow/aerial/skyBake sources add 3 + 8 tells
 });

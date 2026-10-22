@@ -16135,6 +16135,13 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "adapters at shared sizes only; thirteen sabotages, thirteen red. And its page: one table per adapter whose cells are the module's numbers, bars on one scale with the budget line at 33.3 ms " +
                  "on that scale, the caveats printed with the fit; sabotages of the page, all red",
     }),
+    since606: Object.freeze({
+        at: "v4895", swept: 21, green: 21, red: 0,
+        added: Object.freeze(["render/aerial-selfcheck.mjs", "render/cascades-selfcheck.mjs", "render/clipmapTerrain-selfcheck.mjs", "render/deformRead-selfcheck.mjs", "render/pcssShadow-selfcheck.mjs", "render/seaThree-selfcheck.mjs", "render/skyBake-selfcheck.mjs", "render/snowFine-selfcheck.mjs", "render/snowGpu-selfcheck.mjs", "render/snowShading-selfcheck.mjs", "render/subAquarium3d-selfcheck.mjs", "render/taaResolve-selfcheck.mjs", "render/toroidalDeform-selfcheck.mjs", "tools/ship/oceanSrcRebuild-selfcheck.mjs", "tools/ship/seaPatch-selfcheck.mjs", "tools/ship/snowDeformPage-selfcheck.mjs", "tools/ship/snowflowVendor-selfcheck.mjs", "tools/ship/zoomBlurWiring-selfcheck.mjs", "ui/oceanLiveTune-selfcheck.mjs", "ui/seaDepthTint-selfcheck.mjs", "ui/seaFrame-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "the snow and sea lift: the clipmap, deform read, PCSS, TAA, sky bake, snow shading (glints, sastrugi, SSS), three cascades and aerial perspective each against a JS twin and against Dawn, snowGpu end to end on SwiftShader, the vendored originals pinned by hash, and the shared three.js sea (patch, frame, depth tint, live tune, sub-aquarium); all 21 run alone and serially at v4895, all green",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

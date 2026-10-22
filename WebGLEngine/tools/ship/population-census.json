@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/populationCensus.mjs",
  "roots": "physics,simulation,fluid",
- "total": 580,
+ "total": 579,
  "areas": {
   "fluid": 8,
   "physics/acoustics": 2,
@@ -29,7 +29,7 @@
   "physics/langevin": 1,
   "physics/md": 13,
   "physics/mechanics": 26,
-  "physics/mesh": 34,
+  "physics/mesh": 33,
   "physics/mpm": 14,
   "physics/nuclear": 4,
   "physics/ocean": 1,
@@ -260,7 +260,6 @@
   "physics/mesh/strokeMorph.mjs",
   "physics/mesh/svgProfile.mjs",
   "physics/mesh/tetReconstruct.mjs",
-  "physics/mesh/triArrangement.mjs",
   "physics/mesh/triClip.mjs",
   "physics/mesh/triContact.mjs",
   "physics/mesh/triFragmentAccumulate.mjs",

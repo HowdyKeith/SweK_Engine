@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "models named as whole string literals by non-gate files that import gpu/khronosSamples.mjs",
- "head": "660cbecb4c6530380398240946c081c473325323",
+ "head": "54bebfb3f6ec991249239feb44710232f0cd6527",
  "catalogue": 150,
  "coverage": {
   "total": 150,
@@ -25,7 +25,7 @@
  "wideTop": [
   {
    "name": "DirectionalLight",
-   "hits": 73
+   "hits": 76
   },
   {
    "name": "Fox",
@@ -49,12 +49,12 @@
   },
   {
    "name": "Triangle",
-   "hits": 21
+   "hits": 20
   },
   {
    "name": "BrainStem",
    "hits": 18
   }
  ],
- "registerSources": 57
+ "registerSources": 58
 }

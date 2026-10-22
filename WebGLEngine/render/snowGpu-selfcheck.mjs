@@ -21,6 +21,7 @@
 //   AND, in the frame: the GPU-baked detail map equals the CPU bake and its mip chain is the box filter; the sky buffer is the whole mip chain; all three shadow maps hold terrain and the cascades describe the SAME shadows
 //   (each read alone over the near ground); sastrugi and detail are in the picture (local contrast x17); subsurface lights the snow looking into the sun and not away; glints are grazing-only (none looking straight down).
 // NOT GRADED, said plainly: speed or looks on a real GPU (the adapter is a software rasteriser), the sun's disc and the ground bounce, AgX and film grain.
+// SABOTAGE LOG (v4895): see cascades-selfcheck (the plane sign: 2 red) and snowFine-selfcheck (the mip kernel: 3 red); each on the real file, restored.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";

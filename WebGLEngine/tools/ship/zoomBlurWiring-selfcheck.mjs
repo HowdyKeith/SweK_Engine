@@ -3,7 +3,7 @@
 // Run: node tools/ship/zoomBlurWiring-selfcheck.mjs
 //
 // THE ZOOM BLUR, WIRED INTO render/bloomPass.js AND HELD TO THE KERNEL IT WIRES. v4504 built render/zoomBlur.mjs (the generated GLSL + WGSL, a CPU twin, tools/ship/zoomBlur-selfcheck.mjs) and
-// deliberately did not wire it: "no WebGL context has compiled the GLSL here". This gate runs in headless Chromium, which DOES have a WebGL2 context (SwiftShader), and so compiles it:
+// deliberately did not wire it: that the GLSL had never been compiled by a live context. This gate runs in headless Chromium, which DOES have a WebGL2 context (SwiftShader), and so compiles it:
 //   1  THE SOURCE      bloomPass.js imports the GLSL from zoomBlur.mjs instead of spelling a second copy; the pass is off by default (zoomBlurStrength 0); its program and targets are created lazily, only
 //                      behind that strength; apply() reads one local `sceneSrc` in the bright, god-ray and composite passes and the blur is the only thing that changes it;
 //   2  THE LIVE PASS   (needs a browser; SKIPPED, and said, without one) in a real WebGL2 context:
@@ -18,7 +18,7 @@
 // the centre's y flipped 3 | the strength uniform ignored 2 | the stale-size target kept on resize 2 | the program compiled eagerly in _initPrograms 3 | the default strength 0.1 3.
 //
 // NOT GRADED, said plainly: stereo (the pass runs on the whole target and ignores the eye rect), a WebGPU twin of the wiring (the WGSL kernel is graded by zoomBlur-selfcheck), and any real GPU:
-// SwiftShader is a software rasteriser. A page that turns the blur on is also not written yet; the field exists and nothing sets it.
+// SwiftShader is a software rasteriser. A page that turns the blur on is also not written yet; the field exists and no page sets it.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";

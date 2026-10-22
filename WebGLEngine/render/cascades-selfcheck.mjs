@@ -11,6 +11,7 @@
 //                 and 2 degrees; the depth range grows like cot(elevation) ("4.33 m per metre at 13 degrees") and is bounded by the 2 degree clamp;
 //   3  THE LOOKUP the cascade a distance reads, the cross-fade over the last 12% of each slice and the fade to lit past the last, as plain functions (continuous across every split).
 // NOT GRADED, said plainly: the WGSL lookup (snowGpu-selfcheck draws with it), the look.
+// SABOTAGE LOG (v4895): MARGIN 12 -> 10 -> 1 red by name (the constants-are-shadows.js row); the lookup's receiver-plane gradient sign (vec2f(grad.x, -grad.y) -> (grad.x, grad.y)) -> 2 red in snowGpu-selfcheck by name (flat ground 62.4% shadowed against under 6%, and the cascades no longer agreeing).
 "use strict";
 import fs from "node:fs";
 import path from "node:path";

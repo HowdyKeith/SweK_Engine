@@ -116,7 +116,7 @@ sec("2. THE PAGE USES THE MODULE, AND NOTHING ELSE RESOLVES A CONTACT");
     const html = fs.readFileSync(path.join(ENG, "es-box3d-6dof.html"), "utf8"), code = html.split("\n").filter((l) => !l.trim().startsWith("//")).join("\n");
     ok("the page imports brain/shipCollision6dof.mjs", /import \* as SC from "\/brain\/shipCollision6dof\.mjs"/.test(html));
     ok("...and resolveCollisions is the module's function on the page's hull, not a second copy (no contact test, manifold or impulse solver left in the page's own code)", /const resolveCollisions = \(all\) => SC\.resolveShipCollisions\(all, HALF\);/.test(code) && !/RBC\.|OM\.|resolveManifold|positionalCorrection|checkContact/.test(code));
-    const fr = code.slice(code.indexOf("function frame()"));
+    const fr = code.slice(code.indexOf("function simStep()"));   // v4895: the simulation step is simStep() (frame() draws around it, and the headless balance run calls it alone)
     const iFleet = fr.indexOf("stepFleet(B, A"), iCol = fr.indexOf("resolveCollisions(A.concat(B))"), iShots = fr.indexOf("stepWeapons(A.concat(B), dt)");
     ok("the page's order is kept: both fleets move, THEN contact is resolved, THEN shots (the duel does the same)", iFleet > 0 && iCol > iFleet && iShots > iCol, `at ${iFleet} < ${iCol} < ${iShots}`);
     const num = (re) => { const m = code.match(re); return m ? JSON.parse(m[1]) : null; };

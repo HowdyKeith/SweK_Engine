@@ -164,8 +164,9 @@ console.log("\n4. the widest rule in the tree, checked in the direction nobody c
     // v4805: 26 -> 27, vendor/three-webgpu-r185/LICENSE -- three's MIT grant byte for byte, beside the r185 build kept for the r185
     // drafts when vendor/three-webgpu moved to r186. A new body's licence, landing in the bake as this row expects.
     // v4880: 27 -> 28, vendor/web-ocean/LICENSE -- noniv/web-ocean's MIT grant with the author's name, vendored byte for byte by the ocean spike; a new body's licence, landing in the bake as this row expects.
+    // v4895: 28 -> 29, the snowflow body's LICENSE -- Noniv/snowflow_demo's MIT grant, vendored byte for byte by the snow GPU lift; a new body's licence, landing in the bake as this row expects.
     ok("!! ...and the constraint costs the rule NOTHING: every vendored licence is still matched",
-        vendorLicences === 28, `${vendorLicences} of 28 -- measured before the change and after, again at the Racing city 0 re-bake, and again when xatlas, draco-encoder and three-webgpu-r185 arrived`);
+        vendorLicences === 29, `${vendorLicences} of 29 -- measured before the change and after, again at the Racing city 0 re-bake, and again when xatlas, draco-encoder and three-webgpu-r185 arrived`);
     ok("...and one owner holds the rule, so the two copies cannot drift",
         // NOT a source pattern -- the first version of this row matched the exact `export { x } from "y"` line
         // and went red the moment that had to become an import plus an export, which it did, because a

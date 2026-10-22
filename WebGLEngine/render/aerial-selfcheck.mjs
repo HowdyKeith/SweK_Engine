@@ -10,6 +10,7 @@
 //                 colour is untouched, with a lot it is the sky; the near sky is the BLURRED sky (mip 3), not the exact one;
 //   4  THE KERNEL (needs the software WebGPU adapter; SKIPPED, and said, without one) applyAerial as a compute kernel over the chain equals the twin over 200 queries.
 // NOT GRADED, said plainly: the look, a real GPU.
+// SABOTAGE LOG (v4895, each on the real file, restored, git-clean verified): the Mie g 0.62 -> 0.5 in the JS twin's lobe -> 1 red by name (the kernel-vs-twin row, 34.7% off).
 "use strict";
 import fs from "node:fs";
 import path from "node:path";

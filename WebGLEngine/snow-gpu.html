@@ -51,7 +51,7 @@
   const manual = new URLSearchParams(location.search).has("manual");
   const dunes = null;
   try {
-    if (!navigator.gpu) throw new Error("WebGPU is not available in this browser; snow-deform.html is the CPU version of this scene");
+    if (!navigator.gpu) throw new Error("there is no WebGPU here -- the page may be on an insecure origin (use https or localhost) or the browser lacks it; snow-deform.html is the CPU version of this scene");
     const adapter = await navigator.gpu.requestAdapter();
     if (!adapter) throw new Error("no WebGPU adapter was returned");
     const device = await adapter.requestDevice();
@@ -88,5 +88,6 @@
     else $("stats").textContent = "manual mode: frames are driven from outside";
   } catch (e) { S.error = String((e && e.message) || e); $("stats").textContent = "could not start: " + S.error; }
 </script>
+<script type="module" src="/ui/originNotice.js"></script>
 </body>
 </html>

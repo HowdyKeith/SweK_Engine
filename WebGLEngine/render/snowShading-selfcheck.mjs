@@ -12,6 +12,7 @@
 //                 in every direction (the property the nine-coefficient form must keep) and of the real baked sky it follows the brute-force cosine integral (the error measured and printed);
 //   4  THE KERNEL (needs the software WebGPU adapter; SKIPPED, and said, without one) every function as WGSL over a table equals the twin.
 // NOT GRADED, said plainly: the look, a real GPU.
+// SABOTAGE LOG (v4895): backScatter's H = L + N d -> L - N d in the WGSL -> 2 red by name (the lifted-bodies row, and the kernel row: snowSubsurface 7.2e-2 off).
 "use strict";
 import fs from "node:fs";
 import path from "node:path";

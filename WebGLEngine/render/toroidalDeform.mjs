@@ -29,7 +29,7 @@ export const CHANNELS = 4;
 // ---------------------------------------------------------------------------------------------------------------- the twin
 const fract = (x) => x - Math.floor(x);
 const smoothstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
-/** WGSL round(): half to even, which Math.round (half up) is not. */
+/** WGSL's rounding of a tie goes to the even neighbour, which Math.round (half up) does not. */
 export function roundHalfEven(x) { const r = Math.round(x); return Math.abs(x % 1) === 0.5 && r % 2 !== 0 ? r - 1 : r; }
 
 /**

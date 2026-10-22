@@ -15,7 +15,7 @@ import fs from "node:fs";
 import path from "node:path";
 import http from "node:http";
 import { createRequire } from "node:module";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import * as ST from "./seaThree.mjs";
 import { buildWater } from "../world/oceanWater.mjs";
 import { createSurface, defaultComponents, defaultSurface } from "../physics/ocean/oceanSurface.mjs";
@@ -32,7 +32,7 @@ const same = (a, b) => a.length === b.length && a.every((v, i) => Object.is(v, b
 console.log("seaThree-selfcheck -- the physics sea as a three.js mesh\n");
 console.log("1. THE GEOMETRY");
 {
-    const THREE = await import(path.join(ENG, "vendor/three/three.module.js"));
+    const THREE = await import(pathToFileURL(path.join(ENG, "vendor/three/three.module.js")).href);
     const surface = createSurface({ components: defaultComponents(1, ST.CALM_OPTIONS) });
     const sea = ST.createSeaMesh(THREE, surface, { half: 40, n: 20, t: 0 });
     const pos = sea.geometry.getAttribute("position"), nor = sea.geometry.getAttribute("normal"), col = sea.geometry.getAttribute("color");

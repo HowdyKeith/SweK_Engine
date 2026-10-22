@@ -15,7 +15,7 @@ import fs from "node:fs";
 import path from "node:path";
 import http from "node:http";
 import { createRequire } from "node:module";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import * as SF from "./seaFrame.mjs";
 import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "../tools/ship/playwrightResolve.mjs";
 
@@ -42,7 +42,7 @@ console.log("1. THE CAMERA");
         c.x === 110 && c.y === 20 && c.z === 25 && c.yaw === 0 && c.pitch === 0 && Math.abs(c.fovY - Math.PI / 3) < 1e-12 && SF.seaCameraFromView([0, 0, 0], [0, 1, -1]).pitch > 0 && SF.seaCameraFromView([0, 0, 0], [1, 0, -1]).yaw > 0);
     let threw = false; try { SF.seaCameraFromView([0, 0, 0], [0, 0, 0]); } catch { threw = true; }
     ok("  a zero forward vector throws rather than producing NaN angles", threw);
-    let three = null; try { three = await import(path.join(ENG, "vendor/three/three.module.js")); } catch (e) { three = null; }
+    let three = null; try { three = await import(pathToFileURL(path.join(ENG, "vendor/three/three.module.js")).href); } catch (e) { three = null; }
     if (!three) report("three.js did not import in node here -- the real-camera row is SKIPPED");
     else {
         const cam = new three.PerspectiveCamera(58, 1.5, 0.1, 1000); let wt = 0; const rr = rng(9);

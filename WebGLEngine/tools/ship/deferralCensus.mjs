@@ -200,14 +200,14 @@ export const CENSUS_AT_V4479 = Object.freeze({
     // comment landed in main.js and brain/brain.js -- two more `history` hits, because a round note about
     // deferrals is full of deferral phrases. It reported "drifted: history 49 -> 51" rather than a total that
     // had changed, which is v4399's rule doing its job on the round that wrote it.
-    total: 290,         // v4884: 183 -> 288, the whole census re-derived at the merge (history 51 -> 57, substring 2 -> 3, satisfied 5 -> 8, undecided 118 -> 213; negated and antidote held)
+    total: 291,         // v4884: 183 -> 288, the whole census re-derived at the merge (history 51 -> 57, substring 2 -> 3, satisfied 5 -> 8, undecided 118 -> 213; negated and antidote held)
     history: 58,        // inside a shipped round note -- the changelog is not a backlog
     substring: 3,       // v4884: 2 -> 3 at the merge (main's tree grew since v4479). "its own roundING": the phrase is not there at all
     negated: 2,         // "rather than in its own round": says the opposite
     satisfied: 8,       // v4884: 5 -> 8 at the merge. marked SETTLED adjacent to the claim -- 2 before this round, 5 after
     antidote: 5,        // an ANTIDOTE block: a deferral that IS watched, which is the state to want more of
-    undecided: 214,     // v4884: 118 -> 213, RE-DERIVED at the merge of long-silence-elements-check into a tree 400 versions on; the class names above are v4479's reading and these three moved with the tree, as the header says they are supposed to
-    undecidedFiles: 173,
+    undecided: 215,     // v4895: 214 -> 215, one more undecided phrase in this round's notes (the 6DOF page's balance comment or a module header naming what is not done), re-derived. v4884: 118 -> 213, RE-DERIVED at the merge of long-silence-elements-check into a tree 400 versions on; the class names above are v4479's reading and these three moved with the tree, as the header says they are supposed to
+    undecidedFiles: 174,
     // *** WHAT THE ROUND FOUND BY HAND, WHICH IS WHY THE UNDECIDED NUMBER MATTERS. *** Two files were opened
     // and THREE stale notes came out, two of them in one paragraph. Each was settled within four rounds of
     // being written and went on advertising itself for sixty-six versions. Checked against EXPORTS, never

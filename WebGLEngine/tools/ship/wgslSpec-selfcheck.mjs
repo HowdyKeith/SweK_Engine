@@ -46,7 +46,9 @@ function* walk(dir) {
         if (e.isDirectory()) yield* walk(p); else yield p;
     }
 }
-const WGSL_FILES = [...walk(ENG)].filter((f) => f.endsWith(".wgsl")).sort();
+// v4895: vendor/ is counted apart, as it is for requiredLimits below -- vendor/snowflow holds nine .wgsl files in Babylon.js's flavour (`#include<...>`, loose `uniform name: type;` blocks, FragmentInputs), which are not WGSL until
+// render/*.mjs rewrites them and are held by tools/ship/snowflowVendor-selfcheck.mjs instead; the tree's own ports of them are the strings in render/, graded by their own gates
+const WGSL_FILES = [...walk(ENG)].filter((f) => f.endsWith(".wgsl") && !path.relative(ENG, f).split(path.sep).includes("vendor")).sort();
 
 // 1) *** PARSING, AGAINST THE TREE'S OWN SHADERS. ***
 {
