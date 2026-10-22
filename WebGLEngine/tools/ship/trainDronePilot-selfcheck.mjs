@@ -12,7 +12,20 @@
 // NOT IN THIS GATE: the shipped files (brain/pilotDroneWeightsDefault.json, brain/pilotDroneMlpWeightsDefault.json): the helicopter's gate has a section 9 that recomputes every number in a shipped file's `by`; this one gets it when a file is shipped, and not before -- a file
 // is written only when a champion qualifies, and whether one does is the experiment.
 //
-// SABOTAGE LOG: (filled in below once run)
+// SABOTAGE LOG (each applied to tools/ship/trainDronePilot.mjs in a scratch copy, together with a COPY of the command file tools/ship/trainPilotDrone.mjs so that the gate's child processes run the mutated library and not the real
+//   one, the gate run on the tree, the tree discarded; the number is how many rows went red): 40 mutants, none left at 0. They are the helicopter's trainer mutants written again for this module's text.
+// TWO THINGS WERE FOUND BY THE FIRST RUN. (1) 'THE COMMAND RUNS SEARCH K+1' (M) WENT 0 RED, FOR TWO REASONS: the rows that compared search 1 with the in-process search 1 could not tell it from search 2, because two short searches
+//   (two iterations on a seventh of the training scenarios) both end at the hand weights after pruning; and the scratch tree symlinked the command file, so the gate's child processes resolved it to the real tree and ran the
+//   unmutated library. The rows now compare search 0, which keeps weights that differ from the hand pilot's, and assert that it does (so that the comparison cannot be empty again), and the harness copies the command file. (2) The
+//   stale run, made before the copy, was discarded and all 40 were re-run.
+//   A parseArgs reads an unknown option 3; B qualifies: the audit-score clause dropped 2; C qualifies: held-out > loosened to >= 2; D finish: eligibility ignored 5; E finish: the champion picked on the train score 2; F blobOf:
+//   the count of weights that differ left out 1; G command: --write writes though the champion does not qualify 1; H RECIPE iterations 800 1; I qualifies: the reserve-score clause dropped 2; J qualifies: the kind clause dropped
+//   3; K qualifies: better > worse loosened to >= 1; L tailReasons: the fresh-crash clause dropped 10; M command --one: runs search K+1 3; N searchOne: the prune skipped 1; O dumpOf: the weights left out 1; P SETS: the pool is
+//   the safety audit 2; Q KIND_SLACK 0.05 2; R finish: eligibility judged on the held-out set 4; S qualifies: the safety-audit clause dropped 2; T BRAINS not frozen 1; U brainOf defaults to the GPU Brain 10; V setsOf always the
+//   fruit fly's 1; W SETS_GPU's audit is the fruit fly's 1; X endedEarly: an motor flight judged on its status 1; Y searchOne ignores --slice 2; Z the write refusal with --slice dropped 1; AA the child does not get --slice 1; AB
+//   a brain's own seed ignored 1; AC blob score is the audit's 1; AD hand safety read from the pool 3; AF an unknown brain accepted 1; AG tails counts nothing 7; AH reserve crash clause dropped 2; AI audit crash clause dropped 2;
+//   AJ the champion's vs read against the wrong set 1; AK the --workers children not in run order 1; AL --dump not written 1; AM the blob's citation is the other brain's 1; AN the blob's policy is the fruit fly's 1; AO blobOf
+//   leaves the known limits out of `by` 1.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
