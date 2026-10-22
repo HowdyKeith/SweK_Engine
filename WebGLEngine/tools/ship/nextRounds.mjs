@@ -2393,7 +2393,7 @@ export const NEXT_ROUNDS = [
         id: "denoise-easu-cost",
         blocker: "OPEN",
         what: "EASU's pass to W x H on the Intel gen-9: 30.1 / 25.7 ms at 960 x 540 -> 1920 x 1080, at least half of the rest's three passes in both of section 111's runs, so section 110 names it the next round's target. The composite, 22.7 / 17.1 ms, is the second.",
-        how: "Not designed. A round would pre-register a cheaper EASU against today's, held to fx/fsr's own reference, before the rig times it.",
+        how: "ROUND 46 (pre-registration section 115) built it and waits on the rig: EASU four output pixels a thread (EASU_QUAD_WGSL) -- at the chain's exact 2 x a 2 x 2 quad shares one 12-tap footprint, so its loads and lumas are made once -- and the same fused with the composite (EASU_COMP_WGSL), the up buffer never written. Every piece of text is sliced from fx/fsr's EASU_WGSL and COMPOSITE_WGSL, unchanged; on SwiftShader both are bit for bit on four scenes and two odd sizes. Owed: the same two Intel runs section 114 asks for, read by section 115's rule (H46: restEasuComp <= 0.8 x (restEasu + restComp) in both runs). Sabotaged N1-N6.",
         why: "Section 110's reading of round 42's runs. On the 1080 the whole rest is about 1.0 ms, so this is the Intel's lever.",
     },
     {

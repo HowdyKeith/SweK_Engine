@@ -705,6 +705,12 @@ node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r45-b.json
 - **Don't commit or pull between runs.**
 - **Send back the JSON files.**
 
+### Round 46: EASU in quads, and fused with the composite (pre-registration section 115)
+
+Nothing extra to run: the same two Intel runs carry it, if they are made at a commit carrying section 115 as well. The chain
+gate holds both new kernels bit for bit against EASU then the composite, and adds a `section 115:` line. Section 115
+predicts the fused pass at 0.55-0.80 x EASU and the composite together on the Intel, which would hold H46.
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and

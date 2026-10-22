@@ -151,13 +151,24 @@
 //   L5  fullUnbound summing covFullB                                   1 RED (section 4's round 31 row)
 //   L6  the page without round 31's mask's page row                    1 RED (the page's 26 rows)
 //   L7  section 93's line made from full                               1 RED (the lines row: section 93's page is round 31's mask)
+//   and round 46's quads (section 115), by the same runner:
+//   N1  the quad's base texel at q, not q - 1                          2 RED (the text row; the bit-for-bit row)
+//   N2  an output's sub-texel offset from the quad's first output      2 RED (the same two)
+//   N3  a quad's fourth output skipped                                 1 RED (the bit-for-bit row)
+//   N4  the fused pass with its neighbour's coverage                   2 RED (the text row's composite line; the bit-for-bit row). As
+//                                                                         first written N4 dropped the clamp to tMax, which cannot go red:
+//                                                                         EASU's dering keeps every output within its nearest texels
+//   N5  restEasuComp timing EASU_QUAD_WGSL                             1 RED (the step row: it dispatches easuC alone)
+//   N6  a ratio of 3 accepted                                          2 RED (the refusal rows, on the CPU and on the device)
 "use strict";
 import fs from "node:fs";
+import crypto from "node:crypto";
+import { EASU_WGSL } from "../fx/fsr/fsrKernels.js";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { runInEngineOrigin } from "../tools/ship/webgpuHarness.mjs";
 import { validateWgsl } from "./wgslSpec.mjs";
-import { COVERAGE_WGSL, FILL_RING_WGSL, FILL_LEFT_WGSL, FILL_LIST_WGSL, FILL_ARGS_WGSL, FILL_LISTRING_WGSL, FILL_LISTLEFT_WGSL, FILL_UNKNOWN, FILL_LIST_WG, FILL_TILEINIT_WGSL, FILL_TILE_WGSL, FILL_TILELEFT_WGSL, FILL_TILE_RINGS, FILL_TILE_INNER, FILL_TILE_SIDE, FILL_OUT, FILL_LTINIT_WGSL, FILL_LTARGS_WGSL, FILL_LTILE_WGSL, COVERAGE_BOUND_WGSL, COVERAGE_BOUND_SLACK, COVERAGE_BOUND_ARC, coverageMayHit, TO_T_WGSL, TO_T_FREE_WGSL, COMPOSITE_WGSL, COVERAGE_GRID_WGSL, SPHERE_STRIDE, packSpheres, cameraUniform, DenoiseUpscaleGPU, TEMPORAL_CONSTANTS, GEO_STRIDE, FIRSTHITS_WGSL, SHIFT_WGSL, ACCUM_WGSL, FINAL_WGSL, accumUniform, packGeometry } from "./denoiseUpscaleGPU.mjs";
+import { COVERAGE_WGSL, FILL_RING_WGSL, FILL_LEFT_WGSL, FILL_LIST_WGSL, FILL_ARGS_WGSL, FILL_LISTRING_WGSL, FILL_LISTLEFT_WGSL, FILL_UNKNOWN, FILL_LIST_WG, FILL_TILEINIT_WGSL, FILL_TILE_WGSL, FILL_TILELEFT_WGSL, FILL_TILE_RINGS, FILL_TILE_INNER, FILL_TILE_SIDE, FILL_OUT, FILL_LTINIT_WGSL, FILL_LTARGS_WGSL, FILL_LTILE_WGSL, COVERAGE_BOUND_WGSL, COVERAGE_BOUND_SLACK, COVERAGE_BOUND_ARC, coverageMayHit, TO_T_WGSL, TO_T_FREE_WGSL, COMPOSITE_WGSL, EASU_QUAD_WGSL, EASU_COMP_WGSL, EASU_PIECES, easuQuadRefusal, COVERAGE_GRID_WGSL, SPHERE_STRIDE, packSpheres, cameraUniform, DenoiseUpscaleGPU, TEMPORAL_CONSTANTS, GEO_STRIDE, FIRSTHITS_WGSL, SHIFT_WGSL, ACCUM_WGSL, FINAL_WGSL, accumUniform, packGeometry } from "./denoiseUpscaleGPU.mjs";
 import { fillEmitters, fillEmittersBounded, emitterAwareUpscale, GAMMA } from "./denoiseUpscale.mjs";
 import { emitterRadiance, COVERAGE_GRID } from "./denoiseMask.mjs";
 import { makeScene } from "./denoiseScenes.mjs";
@@ -208,7 +219,7 @@ const F1 = synth(24, 20, [[6, 6, 3.2], [17, 13, 5.5], [23, 1, 2]]);
 
 console.log("\n2. THE KERNELS");
 {
-    const ks = { COVERAGE_WGSL, FILL_RING_WGSL, FILL_LEFT_WGSL, TO_T_WGSL, COMPOSITE_WGSL, FIRSTHITS_WGSL, SHIFT_WGSL, ACCUM_WGSL, FINAL_WGSL, FILL_LIST_WGSL, FILL_ARGS_WGSL, FILL_LISTRING_WGSL, FILL_LISTLEFT_WGSL, FILL_TILEINIT_WGSL, FILL_TILE_WGSL, FILL_TILELEFT_WGSL, FILL_LTINIT_WGSL, FILL_LTARGS_WGSL, FILL_LTILE_WGSL, COVERAGE_BOUND_WGSL, TO_T_FREE_WGSL };
+    const ks = { COVERAGE_WGSL, FILL_RING_WGSL, FILL_LEFT_WGSL, TO_T_WGSL, COMPOSITE_WGSL, FIRSTHITS_WGSL, SHIFT_WGSL, ACCUM_WGSL, FINAL_WGSL, FILL_LIST_WGSL, FILL_ARGS_WGSL, FILL_LISTRING_WGSL, FILL_LISTLEFT_WGSL, FILL_TILEINIT_WGSL, FILL_TILE_WGSL, FILL_TILELEFT_WGSL, FILL_LTINIT_WGSL, FILL_LTARGS_WGSL, FILL_LTILE_WGSL, COVERAGE_BOUND_WGSL, TO_T_FREE_WGSL, EASU_QUAD_WGSL, EASU_COMP_WGSL };
     const bad = Object.entries(ks).map(([k, s]) => [k, validateWgsl(s)]).filter(([, p]) => p.length);
     ok("every kernel validates against the spec scanner", !bad.length, bad.map(([k, p]) => `${k}: ${p.join("; ")}`).join(" | "));
     ok("  the constants the kernels carry are the CPU's: the coverage grid, the transfer's gamma, its top below the pole",
@@ -252,6 +263,19 @@ console.log("\n2. THE KERNELS");
     ok("  round 42: TO_T_FREE_WGSL, a timing diagnostic, is TO_T_WGSL less exactly its one atomicMax line, and nothing else",
         tl0.length - tf0.length === 1 && gone42.length === 1 && /^\s*atomicMax\(&tMax\[0\], bitcast<u32>\(m\)\);$/.test(gone42[0]) && tf0.every((l) => tl0.includes(l)) && !/atomicMax/.test(TO_T_FREE_WGSL),
         gone42.join(" | ").trim());
+    // round 46 (section 115): the quad kernels are EASU_WGSL's own text, sliced -- its head (uniform, bindings, four functions), its
+    // 12 loads, and its per-pixel statements from the edge analysis through pix -- and COMPOSITE_WGSL's fromT and line; EASU_WGSL
+    // itself is frozen by sha256, taken at fx/fsr/fsrKernels.js's last commit (8325eaec) before this round
+    const sha = (t) => crypto.createHash("sha256").update(t).digest("hex"), has = (k, t) => k.includes(t);
+    const pieces = [EASU_PIECES.head, EASU_PIECES.loads, EASU_PIECES.body], cline = "dst[p * 3u + ch] = emis[p * 3u + ch] + (1.0 - cov[p]) * x;";
+    ok("  round 46: EASU_QUAD_WGSL and EASU_COMP_WGSL carry EASU_WGSL's head, loads and per-pixel statements byte for byte, the fused one COMPOSITE_WGSL's fromT and its line, and EASU_WGSL is unchanged (sha256)",
+        sha(EASU_WGSL) === "610abfb492a5bd8f45bd9095b91078b52b711bce5ec89e6d2de97f8dd1cec49b" && pieces.every((t) => t.length > 100 && has(EASU_WGSL, t) && has(EASU_QUAD_WGSL, t) && has(EASU_COMP_WGSL, t)) &&
+        /let pix = min\(mx, max\(mn, t\.c \/ t\.w\)\);\n$/.test(EASU_PIECES.body) && has(EASU_PIECES.body, "a = easuSet(a, (1.0 - ppx) * (1.0 - ppy), lB, lE, lF, lG, lJ);") &&
+        has(COMPOSITE_WGSL, EASU_PIECES.fromT) && has(EASU_COMP_WGSL, EASU_PIECES.fromT) && has(COMPOSITE_WGSL, cline) && has(EASU_COMP_WGSL, cline) && !has(EASU_QUAD_WGSL, "fromT") &&
+        has(EASU_QUAD_WGSL, "let fx = i32(q.x) - 1;") && has(EASU_QUAD_WGSL, "var ppx = (f32(ox) + 0.5) * f32(u.rw) / f32(u.dw) - 0.5;"),
+        `head ${EASU_PIECES.head.length} chars, loads ${EASU_PIECES.loads.length}, body ${EASU_PIECES.body.length}; EASU_WGSL ${sha(EASU_WGSL).slice(0, 12)}`);
+    ok("  ...and the quads run at exactly 2 x only: any other ratio is refused by name",
+        easuQuadRefusal(480, 270, 960, 540) === null && easuQuadRefusal(13, 9, 26, 18) === null && /exactly 2 x only -- 13 x 9 -> 39 x 27 is not/.test(easuQuadRefusal(13, 9, 39, 27) || "") && !!easuQuadRefusal(13, 9, 26, 19));
     let mesh = null; try { packSpheres([{ bvh: {} }]); } catch (e) { mesh = e.message; }
     ok("  ...and a scene with a mesh is refused by name -- the coverage kernel intersects spheres only", /spheres only/.test(mesh || ""));
     // round 33: the accumulation's uniform (two cameras, then w h clamp frames, then the scales and tolerances) and the packed geometry
@@ -294,9 +318,17 @@ const chainIn = CPU.map(({ half }) => {
     return img;
 });
 const RINGS = 24;
+// round 46: the rest's fixtures -- each scene's chain input with its full-size guide, and two odd half sizes (partial quads at the
+// right and bottom edges) of a seeded, rough image with values past the transfer's top and an emitter-like guide
+const lcg = (seed) => { let x = seed >>> 0; return () => ((x = (Math.imul(x, 1664525) + 1013904223) >>> 0) / 2 ** 32); };
+const oddRest = [[13, 9, 71], [7, 11, 72]].map(([w, h, seed]) => {
+    const r = lcg(seed), img = Array.from({ length: w * h * 3 }, () => (r() < 0.1 ? 4 + 8 * r() : r())), W2 = 2 * w, H2 = 2 * h;
+    const cov = Array.from({ length: W2 * H2 }, () => (r() < 0.2 ? r() : 0)), E = cov.flatMap((c) => [c * 3, c * 2, c]);
+    return { w, h, img, full: { cov, E } };
+});
 // round 34's list fill on a frame whose fill is long: a disc 22 pixels in radius and two more, one cut by the frame's corner
 const F2 = synth(96, 64, [[30, 30, 22], [70, 40, 14], [95, 0, 6]]);
-const payload = { scenes: SCENES.map(wire), behind: wire(BEHIND), fill: { img: Array.from(F1.img), cov: Array.from(F1.cov) }, fill2: { img: Array.from(F2.img), cov: Array.from(F2.cov) }, chainIn: chainIn.map((a) => Array.from(a)),
+const payload = { scenes: SCENES.map(wire), behind: wire(BEHIND), fill: { img: Array.from(F1.img), cov: Array.from(F1.cov) }, fill2: { img: Array.from(F2.img), cov: Array.from(F2.cov) }, chainIn: chainIn.map((a) => Array.from(a)), oddRest,
     covHalf: CPU.map((c) => Array.from(c.half.cov)), full: CPU.map((c) => ({ cov: Array.from(c.full.cov), E: Array.from(c.full.E) })), W, Hh, RINGS };
 const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 900000, args: { payload }, script: `async (a) => {
     const P = a.payload;
@@ -357,7 +389,19 @@ const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 900000, args: { 
     let wrongBackend = null;
     try { new DenoiseUpscaleGPU(await requestDevice(document.createElement("canvas"), { backend: "webgl2", offscreen: true })); } catch (e) { wrongBackend = String(e.message).slice(0, 160); }
     const ad = await navigator.gpu.requestAdapter(), info = ad.info || {};
-    return { cov, covB, behind, fills, lists, t13, chains, errs, backend: dev.backend, wrongBackend, adapter: [info.vendor, info.architecture, info.description].filter(Boolean).join(" / ") };
+    // round 46 (section 115): the rest three ways on each fixture -- EASU then the composite, EASU in quads then the composite, and
+    // the fused pass -- compared bit for bit here, so only counts cross back; and a ratio other than 2 refused on the device too
+    const bitsSame = (x, y) => { let d = 0; for (let i = 0; i < x.length; i++) if (!Object.is(x[i], y[i])) d++; return d; };
+    const restCases = [...P.chainIn.map((img, i) => ({ k: "scene " + i, w: P.Hh, h: P.Hh, img, full: P.full[i] })), ...P.oddRest.map((o) => ({ k: o.w + " x " + o.h, ...o }))];
+    const rests = [];
+    for (const c of restCases) {
+        const args = [Float64Array.from(c.img), c.w, c.h, 2 * c.w, 2 * c.h, { cov: Float64Array.from(c.full.cov), E: Float64Array.from(c.full.E) }];
+        const e = await g.rest(...args, "easu"), q = await g.rest(...args, "quad"), f = await g.rest(...args, "fused");
+        rests.push({ k: c.k, n: e.y.length, upDiff: bitsSame(e.up, q.up), yQuadDiff: bitsSame(e.y, q.y), yFusedDiff: bitsSame(e.y, f.y), tMax: e.tMax, clamped: e.y.some((v) => v > 0) && e.tMax > 0,
+                     lenOk: e.up.length === q.up.length && e.y.length === f.y.length && f.up === null });
+    }
+    let restRefused = null; try { await g.rest(new Float64Array(13 * 9 * 3), 13, 9, 39, 27, { cov: new Float64Array(39 * 27), E: new Float64Array(39 * 27 * 3) }, "fused"); } catch (e) { restRefused = String(e.message).slice(0, 160); }
+    return { cov, covB, behind, fills, lists, t13, chains, rests, restRefused, errs, backend: dev.backend, wrongBackend, adapter: [info.vendor, info.architecture, info.description].filter(Boolean).join(" / ") };
 }` });
 
 if (r.skipped) console.log("  SKIP  " + r.reason);
@@ -484,6 +528,12 @@ else {
     ok("!! ...and the whole chain with it is the list fill's chain bit for bit, every emitter pixel reached, over the CPU's count of tiles, on all four scenes",
         R.chains.length === 4 && R.chains.every((c, i) => same(c.lt, c.list) && bits(c.lt.y, c.list.y) && c.lt.left === 0 && c.lt.tilePasses === passesFor(RINGS) && c.lt.tilesListed === tilesOf(CPU[i].half.cov, Hh, Hh)),
         R.chains.map((c, i) => `R ${SCENES[i].seed}: ${c.lt.tilesListed} tiles, ${c.lt.rings} rings`).join("; "));
+    // ROUND 46 (section 115): EASU in quads is EASU's buffer bit for bit, and the fused pass is EASU then the composite bit for bit,
+    // on the four scenes and at two odd half sizes whose right and bottom quads are partial -- and the device refuses other ratios
+    ok("!! round 46: EASU in 2 x 2 quads writes EASU's buffer bit for bit, and so its composite; the fused pass is EASU then the composite, bit for bit -- on the four scenes and at 13 x 9 and 7 x 11, partial quads at the edges",
+        R.rests.length === 6 && R.rests.every((c) => c.lenOk && c.upDiff === 0 && c.yQuadDiff === 0 && c.yFusedDiff === 0 && c.clamped),
+        R.rests.map((c) => `${c.k}: ${c.upDiff} / ${c.yQuadDiff} / ${c.yFusedDiff} of ${c.n} differ, tMax ${c.tMax.toFixed(3)}`).join("; "));
+    ok("  ...and on the device a ratio other than 2 is refused by name, before any pass", /exactly 2 x only -- 13 x 9 -> 39 x 27 is not/.test(R.restRefused || ""), R.restRefused || "not refused");
 }
 
 console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at its pilot size, in Chromium");
@@ -502,7 +552,7 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
     if (pg.skipped) console.log("  SKIP  " + pg.reason);
     else {
         let J = null; try { J = JSON.parse(pg.result?.json || "null"); } catch {}
-        const st = J && J.chain && J.chain.steps, keys = ["covHalf", "covFull", "fill", "rest", "whole", "hits", "shift", "accum", "final", "fillList", "wholeList", "fillTile", "wholeTile", "fillLTile", "wholeLTile", "covHalfB", "covFullB", "restToT", "restEasu", "restComp", "restToTFree"];
+        const st = J && J.chain && J.chain.steps, keys = ["covHalf", "covFull", "fill", "rest", "whole", "hits", "shift", "accum", "final", "fillList", "wholeList", "fillTile", "wholeTile", "fillLTile", "wholeLTile", "covHalfB", "covFullB", "restToT", "restEasu", "restComp", "restToTFree", "restEasuQ", "restEasuComp"];
         const fine = (x) => !!x && Number.isFinite(x.ms) && x.ms > 0 && (x.clock === "device" || x.clock === "wall");
         // THE RIG'S LINES, from a report: sections 94, 98, 100 and 102 read them out of committed reports, so each keeps its meaning
         // (section 103) -- 93's and 97's chain is round 31's ring fill (halfRing, temporalRing), 99's "with the list fill" the list
@@ -538,7 +588,9 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
                     (K.chain.boundCheck ? `; traced ${K.chain.boundCheck.half} of ${K.chain.boundCheck.ofHalf} and ${K.chain.boundCheck.full} of ${K.chain.boundCheck.ofFull}; bit for bit ${K.chain.boundCheck.sameHalf && K.chain.boundCheck.sameFull ? "at both sizes" : "NOT at both sizes"}` : "; the bounded coverage not checked") +
                     (K.full && K.half && K.temporal ? `; today's page with it ${K.full.ms.toFixed(3)} ms; the half-size chain with it ${K.half.ms.toFixed(3)} ms, ratio ${(K.full.ms / K.half.ms).toFixed(3)} x; with its history ${K.temporal.ms.toFixed(3)} ms, ratio ${(K.full.ms / K.temporal.ms).toFixed(3)} x` : "; no ratio: a part was not measured"),
                 // round 42 (section 110): rest's three passes timed apart, and the transfer without its atomic (a diagnostic), beside rest
-                "section 110: rest's passes -- " + ["rest", "restToT", "restEasu", "restComp", "restToTFree"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; ")];
+                "section 110: rest's passes -- " + ["rest", "restToT", "restEasu", "restComp", "restToTFree"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; "),
+                // round 46 (section 115): EASU in quads, and fused with the composite, beside the two passes they stand in for
+                "section 115: EASU in quads -- " + ["restEasu", "restComp", "restEasuQ", "restEasuComp"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; ")];
         };
         ok("!! the page timed every step of the chain and both networks at its pilot size -- each a positive time on a named clock, the table shown, no page error",
             pg.ok && !!st && keys.every((k) => fine(st[k])) && fine(J.networkFull) && fine(J.networkHalf) && !!J.full && !!J.half && !!J.temporal && !!J.halfRing && !!J.temporalRing && !!J.halfTile && !!J.temporalTile && !!J.halfList && !!J.temporalList && !J.halfLTile && !J.temporalLTile && !!J.fullUnbound && !!J.halfUnbound && !!J.temporalUnbound && !J.fullBound && !J.halfBound && !J.temporalBound && J.fill === "listedTile" && J.coverage === "bound" && pg.result.shown && pg.result.rows === 26 && !pg.pageErrors.length,
@@ -609,6 +661,14 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
                 JSON.stringify(["rest", ...split].map((k) => st[k].kernels)) === JSON.stringify([["toT", "easu", "comp"], ["toT"], ["easu"], ["comp"], ["toTFree"]]) &&
                 split.every((k) => n(new RegExp(`${k} ([0-9.]+) ms`), l110) === at3(st[k])) && n(/rest ([0-9.]+) ms/, l110) === at3(st.rest),
                 `${l110}; dispatched ${["rest", ...split].map((k) => `${k} ${(st[k].kernels || []).join("+")}`).join(", ")}`);
+            // round 46 (section 115): the quad EASU and the fused pass, one pass each on rest's own clock, each dispatching its own
+            // kernel alone, and the rig's section 115 line carrying each figure
+            const l115 = rigLines(J)[9], q46 = ["restEasuQ", "restEasuComp"];
+            ok("  round 46: EASU in quads and the fused pass are each one pass on rest's own clock, dispatching easuQ and easuC alone, and the rig's section 115 line carries each figure beside restEasu and restComp",
+                q46.every((k) => fine(st[k]) && st[k].clock === st.rest.clock && st[k].runs.length === st.rest.runs.length) &&
+                JSON.stringify(q46.map((k) => st[k].kernels)) === JSON.stringify([["easuQ"], ["easuC"]]) && /^section 115: /.test(l115 || "") &&
+                ["restEasu", "restComp", ...q46].every((k) => n(new RegExp(`${k} ([0-9.]+) ms`), l115) === at3(st[k])),
+                `${l115}; dispatched ${q46.map((k) => `${k} ${(st[k].kernels || []).join("+")}`).join(", ")}`);
         }
         // ON A GPU, THE RIG'S SIZE (pre-registration section 93): 960 x 540 -> 1920 x 1080, every step a measured line the rig's
         // report keeps. Not on a software adapter: SwiftShader's 1080p would be minutes of a CPU's time that decides nothing.

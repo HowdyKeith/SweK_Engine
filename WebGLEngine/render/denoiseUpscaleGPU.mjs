@@ -539,6 +539,62 @@ fn main(@builtin(global_invocation_id) g:vec3<u32>) {
 }
 `;
 
+// Round 46 (section 115, denoise-easu-cost): EASU FOUR OUTPUT PIXELS A THREAD, and optionally fused with the composite. At the
+// chain's exact 2 x, outputs 2q - 1 and 2q (and rows likewise) share base texel q - 1 and so one 12-tap footprint: a thread loads
+// it and its lumas once, then runs EASU's own per-pixel statements for each of its four outputs. Every piece of text is SLICED
+// from EASU_WGSL (fx/fsr/fsrKernels.js, unchanged) and COMPOSITE_WGSL, never rewritten, so each output is the same arithmetic on
+// the same values -- held bit for bit to EASU then the composite (render/denoiseUpscaleGPU-selfcheck.mjs section 3).
+const sliceBetween = (t, a, b) => { const i = t.indexOf(a), j = t.indexOf(b, i); if (i < 0 || j < 0) throw new Error(`easuQuadWgsl: "${a}" .. "${b}" not found`); return t.slice(i, j); };
+/** EASU_WGSL's uniform, bindings and four functions; its per-pixel statements; COMPOSITE_WGSL's fromT -- the pieces the quad kernels are made of. */
+export const EASU_PIECES = Object.freeze({
+    head: EASU_WGSL.slice(0, EASU_WGSL.indexOf("@compute")),
+    body: sliceBetween(EASU_WGSL, "  // edge analysis at f, g, j, k", "\n  let o = (g.y * u.dw + g.x) * 4u;"),
+    loads: sliceBetween(EASU_WGSL, "  let cB = ld(fx, fy - 1);", "\n  // edge analysis at f, g, j, k"),
+    fromT: sliceBetween(COMPOSITE_WGSL, "fn fromT(t:f32) -> f32 {", "\n@compute"),
+});
+export function easuQuadWgsl({ fused = false } = {}) {
+    const P = EASU_PIECES;
+    return `${P.head}${fused ? `@group(0) @binding(3) var<storage,read> cov:array<f32>;
+@group(0) @binding(4) var<storage,read> emis:array<f32>;
+@group(0) @binding(5) var<storage,read> tMax:array<u32>;
+
+${P.fromT}
+` : ""}
+// one thread, the 2 x 2 outputs whose base texel is (q.x - 1, q.y - 1); dispatched over (rw + 1) x (rh + 1) quads
+@compute @workgroup_size(8,8,1)
+fn main(@builtin(global_invocation_id) q:vec3<u32>) {
+  if (q.x > u.rw || q.y > u.rh) { return; }
+  let fx = i32(q.x) - 1;
+  let fy = i32(q.y) - 1;
+${P.loads}
+${fused ? "  let top = bitcast<f32>(tMax[0]);\n" : ""}  for (var k = 0u; k < 4u; k++) {
+    let ox = 2 * i32(q.x) - 1 + i32(k & 1u);
+    let oy = 2 * i32(q.y) - 1 + i32(k >> 1u);
+    if (ox < 0 || oy < 0 || ox >= i32(u.dw) || oy >= i32(u.dh)) { continue; }
+    // EASU's own sub-texel offset, for this output
+    var ppx = (f32(ox) + 0.5) * f32(u.rw) / f32(u.dw) - 0.5;
+    var ppy = (f32(oy) + 0.5) * f32(u.rh) / f32(u.dh) - 0.5;
+    ppx = ppx - floor(ppx);
+    ppy = ppy - floor(ppy);
+${P.body}
+    let p = u32(oy) * u.dw + u32(ox);
+${fused ? `    let c = array<f32, 3>(pix.x, pix.y, pix.z);
+    for (var ch = 0u; ch < 3u; ch++) {
+        let x = fromT(min(max(c[ch], 0.0), top));
+        dst[p * 3u + ch] = emis[p * 3u + ch] + (1.0 - cov[p]) * x;
+    }` : `    let o = p * 4u;
+    dst[o] = pix.x; dst[o + 1u] = pix.y; dst[o + 2u] = pix.z; dst[o + 3u] = 1.0;`}
+  }
+}
+`;
+}
+/** Round 46: EASU in quads, writing EASU's buffer. */
+export const EASU_QUAD_WGSL = easuQuadWgsl();
+/** Round 46: EASU in quads, compositing in-register -- EASU then COMPOSITE_WGSL in one pass, the up buffer never written. */
+export const EASU_COMP_WGSL = easuQuadWgsl({ fused: true });
+/** Round 46: the quads share a footprint only at exactly 2 x; any other ratio is refused by name. */
+export function easuQuadRefusal(w, h, W, H) { return W === 2 * w && H === 2 * h ? null : `the quad EASU runs at exactly 2 x only -- ${w} x ${h} -> ${W} x ${H} is not`; }
+
 // ---- ROUND 33 (backlog denoise-temporalup-device): round 32's accumulation on the device ---------------------------------
 // render/denoiseTemporalUpscale.mjs is the CPU reference of all four, and render/denoiseTemporal.mjs's firstHits and reproject the
 // reference of the first and third. A frame's first hits are one buffer, GEO_STRIDE floats a pixel (position, normal, the index
@@ -767,7 +823,7 @@ export class DenoiseUpscaleGPU {
                 "without one uses render/denoiseUpscale.mjs's CPU chain by asking for it.");
         this.device = device;
         this.p = {};
-        for (const [k, wgsl] of [["cov", COVERAGE_WGSL], ["covB", COVERAGE_BOUND_WGSL], ["ring", FILL_RING_WGSL], ["left", FILL_LEFT_WGSL], ["toT", TO_T_WGSL], ["toTFree", TO_T_FREE_WGSL], ["comp", COMPOSITE_WGSL], ["easu", EASU_WGSL],
+        for (const [k, wgsl] of [["cov", COVERAGE_WGSL], ["covB", COVERAGE_BOUND_WGSL], ["ring", FILL_RING_WGSL], ["left", FILL_LEFT_WGSL], ["toT", TO_T_WGSL], ["toTFree", TO_T_FREE_WGSL], ["comp", COMPOSITE_WGSL], ["easu", EASU_WGSL], ["easuQ", EASU_QUAD_WGSL], ["easuC", EASU_COMP_WGSL],
                                   ["hits", FIRSTHITS_WGSL], ["shift", SHIFT_WGSL], ["accum", ACCUM_WGSL], ["final", FINAL_WGSL],
                                   ["list", FILL_LIST_WGSL], ["args", FILL_ARGS_WGSL], ["lring", FILL_LISTRING_WGSL], ["lleft", FILL_LISTLEFT_WGSL],
                                   ["tinit", FILL_TILEINIT_WGSL], ["tile", FILL_TILE_WGSL], ["tleft", FILL_TILELEFT_WGSL],
@@ -915,6 +971,36 @@ export class DenoiseUpscaleGPU {
     }
 
     /**
+     * Round 46 (section 115): the rest after the transfer, three ways, on one filled w x h frame (rgb) and the full-size guide
+     * ({ cov, E }): "easu" EASU then the composite (the chain's), "quad" EASU in quads then the composite, "fused" the quad EASU
+     * compositing in-register. Each runs the transfer first, for tMax. Returns { up (W*H*4, null for "fused"), y (W*H*3), tMax }.
+     */
+    async rest(img3, w, h, W, H, full, mode = "easu") {
+        if (!["easu", "quad", "fused"].includes(mode)) throw new Error(`denoiseUpscaleGPU.rest: mode is easu, quad or fused -- got ${mode}`);
+        const no = mode === "easu" ? null : easuQuadRefusal(w, h, W, H);
+        if (no) throw new Error(`denoiseUpscaleGPU.rest: ${no}`);
+        const dev = this.device, src = dev.buffer({ data: rgba(img3, w * h), usage: ["storage"] });
+        const tMax = dev.buffer({ data: new Uint32Array(1), usage: ["storage"] }), uT = dev.buffer({ data: u4(w, h), usage: "uniform" });
+        const up = dev.buffer({ data: new Float32Array(W * H * 4), usage: ["storage"] }), uE = dev.buffer({ data: u4(w, h, W, H), usage: "uniform" });
+        const fc = dev.buffer({ data: Float32Array.from(full.cov), usage: ["storage"] }), fE = dev.buffer({ data: Float32Array.from(full.E), usage: ["storage"] });
+        const dst = dev.buffer({ data: new Float32Array(W * H * 3), usage: ["storage"] }), uC = dev.buffer({ data: u4(W, H), usage: "uniform" });
+        dev.frame(({ pass }) => {
+            this.p.toT.bind("img", src).bind("tMax", tMax).bind("u", uT); pass.dispatch(this.p.toT, groups(w, h));
+            if (mode === "fused") { this.p.easuC.bind("src", src).bind("dst", dst).bind("u", uE).bind("cov", fc).bind("emis", fE).bind("tMax", tMax); pass.dispatch(this.p.easuC, groups(w + 1, h + 1)); }
+            else {
+                if (mode === "quad") { this.p.easuQ.bind("src", src).bind("dst", up).bind("u", uE); pass.dispatch(this.p.easuQ, groups(w + 1, h + 1)); }
+                else { this.p.easu.bind("src", src).bind("dst", up).bind("u", uE); pass.dispatch(this.p.easu, groups(W, H)); }
+                this.p.comp.bind("up", up).bind("cov", fc).bind("emis", fE).bind("tMax", tMax).bind("dst", dst).bind("u", uC); pass.dispatch(this.p.comp, groups(W, H));
+            }
+            pass.clear([0, 0, 0, 1]);
+        }, { offscreen: true });
+        const upOut = mode === "fused" ? null : new Float32Array(await dev.read(up)), y = new Float32Array(await dev.read(dst));
+        const tm = new Float32Array(new Uint32Array(await dev.read(tMax)).buffer)[0];
+        for (const b of [src, tMax, uT, up, uE, fc, fE, dst, uC]) b.destroy();
+        return { up: upOut, y, tMax: tm };
+    }
+
+    /**
      * The emitter-aware chain on one encoder: the w x h frame (rgb), its coverage covHalf, filled in at most maxRings rings,
      * through the transfer, EASU to W x H, the clamp and inverse, and the composite with `full` ({ cov, E } at W x H).
      * Returns { y (W*H*3), rings, left, perRing, listed, tMax }. Round 43: the fill is round 38's listed tile fill unless asked
@@ -1006,6 +1092,7 @@ export class DenoiseUpscaleGPU {
      *   fillLTile, wholeLTile      round 38: the same over the listed tiles only, by the wall clock
      *   covHalfB, covFullB         round 39: the coverage bounded, at w x h and W x H, one pass each
      *   restToT, restEasu, restComp  round 42: rest's three passes, one each; restToTFree the transfer without its atomic (a diagnostic)
+     *   restEasuQ, restEasuComp  round 46: EASU in 2 x 2 quads alone, and fused with the composite (EASU_QUAD_WGSL, EASU_COMP_WGSL)
      * A step is on the device's clock where the device grants timestamps and the step has 30 passes or fewer, else the wall
      * clock (performance.now() around the frame and the queue's onSubmittedWorkDone). Each row says which. Returns medians.
      */
@@ -1046,7 +1133,7 @@ export class DenoiseUpscaleGPU {
             accum: (pass) => { this.p.accum.bind("prevGeo", geoB).bind("curGeo", geoB).bind("prevHist", hA).bind("cur", curB).bind("outHist", hB).bind("u", uAc); pass.dispatch(this.p.accum, groups(W, H)); },
             final: (pass) => { this.p.final.bind("hist", hB).bind("cov", cF).bind("emis", eF).bind("dst", outB).bind("u", uC); pass.dispatch(this.p.final, groups(W, H)); },
         };
-        const step = { covHalf: [], covFull: [], fill: [], rest: [], whole: [], hits: [], shift: [], accum: [], final: [], fillList: [], wholeList: [], fillTile: [], wholeTile: [], fillLTile: [], wholeLTile: [], covHalfB: [], covFullB: [], restToT: [], restEasu: [], restComp: [], restToTFree: [] }, clock = {};
+        const step = { covHalf: [], covFull: [], fill: [], rest: [], whole: [], hits: [], shift: [], accum: [], final: [], fillList: [], wholeList: [], fillTile: [], wholeTile: [], fillLTile: [], wholeLTile: [], covHalfB: [], covFullB: [], restToT: [], restEasu: [], restComp: [], restToTFree: [], restEasuQ: [], restEasuComp: [] }, clock = {};
         // round 42 (section 110): the rest steps record which of this runner's pipelines they dispatched, so a split step is held to its
         // one kernel -- through a thin wrapper on those steps alone, so no other step's timing changes
         const nameOf = (pipe) => Object.keys(this.p).find((n) => this.p[n] === pipe) || "?", dispatched = {};
@@ -1074,6 +1161,9 @@ export class DenoiseUpscaleGPU {
             await run("restToTFree", (pass) => { this.p.toTFree.bind("img", filled).bind("u", uT); pass.dispatch(this.p.toTFree, groups(w, h)); }, 1);
             await run("restEasu", (pass) => { this.p.easu.bind("src", filled).bind("dst", up).bind("u", uE); pass.dispatch(this.p.easu, groups(W, H)); }, 1);
             await run("restComp", (pass) => { this.p.comp.bind("up", up).bind("cov", cF).bind("emis", eF).bind("tMax", tMax).bind("dst", dst).bind("u", uC); pass.dispatch(this.p.comp, groups(W, H)); }, 1);
+            // round 46 (section 115): EASU in quads alone, and fused with the composite -- (w + 1) x (h + 1) quads each
+            await run("restEasuQ", (pass) => { this.p.easuQ.bind("src", filled).bind("dst", up).bind("u", uE); pass.dispatch(this.p.easuQ, groups(w + 1, h + 1)); }, 1);
+            await run("restEasuComp", (pass) => { this.p.easuC.bind("src", filled).bind("dst", dst).bind("u", uE).bind("cov", cF).bind("emis", eF).bind("tMax", tMax); pass.dispatch(this.p.easuC, groups(w + 1, h + 1)); }, 1);
             reset(); await run("whole", (pass) => { covOps(pass, cH, eH, uH, w, h); covOps(pass, cF, eF, uF, W, H); restOps(pass, this._fillOps(pass, bufs, w, h, maxRings)); }, 31);
             for (const k of ["hits", "shift", "accum", "final"]) await run(k, histOps[k], 1);
             // round 34: the list fill alone, and the chain's steps in one frame with it -- by the wall clock, as the fill is

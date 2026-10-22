@@ -7781,3 +7781,89 @@ The sabotages, each restored byte-identical:
 - M3 redone, 1 red;
 - M4, 2 red.
 
+## 115. ROUND 46 -- EASU IN 2 x 2 QUADS, AND FUSED WITH THE COMPOSITE: FIXED BEFORE THE RIG RUNS IT
+
+**The question.** Section 111, by section 110's reading: EASU is at least half of the rest's three passes on the Intel
+(30.1 / 25.7 ms at 960 x 540 -> 1920 x 1080), and the composite is the second (22.7 / 17.1). This round is
+`denoise-easu-cost`. Each EASU thread loads 12 texels and computes 12 lumas for one output pixel. The composite then reads
+EASU's whole W x H buffer back, four floats a pixel, to write three. Does one pass that runs EASU four output pixels a thread
+and composites in-register cost the Intel at most 0.8 x the two passes it replaces, with every output bit the same?
+
+**Why a quad shares its loads exactly.** The chain upscales by exactly 2. An output column x maps to
+`(x + 0.5) * w / W - 0.5`, which is `x / 2 - 0.25`. So the outputs 2q - 1 and 2q both have base texel q - 1. In f32 the
+product and the quotient are exact at these sizes, since every value is a multiple of a quarter below 2^24. Rows do the
+same. So the 2 x 2 outputs (2q - 1 .. 2q, 2r - 1 .. 2r) share one base texel and one 12-tap footprint.
+
+**The kernels (`render/denoiseUpscaleGPU.mjs`, from one template, `easuQuadWgsl({ fused })`):**
+- **Its text is EASU's own, sliced, never rewritten.** It takes `fx/fsr/fsrKernels.js`'s EASU_WGSL text: its uniform, its
+  bindings and its four functions (`ld`, `lum`, `easuSet`, `easuTap`). From its `main` it takes the statements from the edge
+  analysis through `let pix = ...;`, verbatim. `fx/fsr` itself does not change.
+- **A thread is a quad.** It loads the 12 texels around base (q - 1, r - 1) once and computes their lumas once. Then, for
+  each of its four outputs inside the frame, it computes that output's sub-texel offset with EASU's own expression and runs
+  the sliced statements. The dispatch is (w + 1) x (h + 1) quads, so the frame's edge columns and rows are covered.
+- **`EASU_QUAD_WGSL`** writes `pix` as EASU does: four floats a pixel, alpha 1.
+- **`EASU_COMP_WGSL`** composites `pix` instead, with COMPOSITE_WGSL's own `fromT` (sliced from its text) and its own line:
+  `emis + (1 - cov) x fromT(min(max(pix, 0), tMax))`. It writes three floats a pixel to the chain's output, and the `up`
+  buffer is never written. The transfer still runs first, since it finds tMax.
+- **Exact 2 x only.** The host refuses any other ratio by name. The chain's is always 2.
+- No default changes in this round. The chain runs EASU and the composite as before.
+
+**Timed (`time()`, one pass each, on rest's clock):** `restEasuQ`, the quad EASU alone, and `restEasuComp`, the fused pass.
+The `section 115:` line carries them beside `restEasu` and `restComp`.
+
+**The rows (the gate's sections 3 and 4):**
+1. The template's text: the four functions and the sliced statements are EASU_WGSL's byte for byte, and `fromT` is
+   COMPOSITE_WGSL's. EASU_WGSL's own text is unchanged (sha256).
+2. On the device, on the four scenes and at odd half sizes (an odd w and h leave partial quads):
+   - `EASU_QUAD_WGSL`'s buffer is EASU_WGSL's, bit for bit;
+   - `EASU_COMP_WGSL`'s output is EASU then the composite, bit for bit;
+   - `chain()`'s output is matched by the fused pass, bit for bit.
+3. A ratio other than 2 is refused by name.
+4. At the pilot size the two new steps are one pass each on rest's clock, each dispatching its own kernel alone, and the
+   line carries them.
+
+**The rig run.** The same two `realGpuRun --only denoise` runs on the Intel that section 114 asks for, at a commit carrying
+both sections. They serve both rounds. On the 1080 the optional run reports the figures, and no rule reads them.
+
+**The rule (H46), on the Intel gen-9, on the two runs' `section 115:` lines.**
+- **C1:** every gate green with exit 0. That includes rows 1-4 on the Intel, so a pass that is not bit for bit there fails
+  C1, and the kernel is at fault.
+- **C2:** all four steps on the device's clock.
+- **H46 holds** when, in both runs, restEasuComp <= 0.8 x (restEasu + restComp).
+- **What it buys:**
+  - If it holds, the fused pass becomes the chain's EASU and composite, in a round in the shape of rounds 43 and 44.
+  - If not, it is kept as a measured negative, and `restEasuQ` against `restEasu` says whether the quads or the fusion
+    failed.
+- **Reported, deciding nothing:** restEasuQ / restEasu on both GPUs, and the 1080's figures.
+
+**Predictions (stated so they can miss), on the Intel.**
+- `restEasuQ` about 0.5-0.8 x `restEasu`. The loads and lumas fall to a quarter, while the arithmetic a pixel stays.
+- `restEasuComp` 0.55-0.80 x `restEasu + restComp`. The composite's read of `up` and EASU's write of it go, and the
+  composite's `pow`s stay. **H46 holds.**
+- Every gate green, the kernels bit for bit on both GPUs.
+
+**Sabotages, by the byte-safe runner (N1-N6):**
+- the quad's base texel at q, not q - 1;
+- an output's sub-texel offset taken from the quad's base, not its own;
+- a quad's fourth output skipped;
+- the fused pass compositing with its neighbour's coverage (as first written this was "without the clamp to tMax", which
+  cannot go red: EASU's dering clamp keeps every output within its four nearest texels, so the clamp to tMax never binds
+  on EASU's output);
+- `restEasuComp` timing EASU_QUAD_WGSL;
+- a ratio of 3 accepted.
+
+Each must turn at least one row red.
+
+**Nothing else changes:** every default, the network, every table, the fill, the coverage, and `fx/fsr`.
+
+**Before commit.** Rows 1-4 passed here: on SwiftShader both kernels were bit for bit on all six fixtures (0 floats differ in
+the buffer, the quad composite and the fused output). Two corrections were made before commit:
+- The text row's pattern for the sliced statements first missed their trailing newline.
+- The device script first used a template string inside the gate's own template literal.
+
+The sabotages, each restored byte-identical:
+- N1, 2 red; N2, 2 red; N3, 1 red; N4 (the neighbour's coverage), 2 red; N5, 1 red; N6, 2 red.
+- Row 2 above names N4's change from "without the clamp to tMax", and why.
+- Reported, deciding nothing: on SwiftShader at the pilot size the quad EASU took 1.42 ms against EASU's 1.84, and the fused
+  pass 2.59 ms against EASU and the composite's 3.10. Those are a CPU's times.
+
