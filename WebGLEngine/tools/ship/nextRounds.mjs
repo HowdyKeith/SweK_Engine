@@ -2390,6 +2390,13 @@ export const NEXT_ROUNDS = [
         why: "Section 111: H39 held on both GPUs (section 107's rule).",
     },
     {
+        id: "denoise-history-cost",
+        blocker: "OPEN",
+        what: "The history's four passes on the Intel gen-9 -- 112.8 / 87.6 ms a frame at 1920 x 1080 in section 111's runs (the 1080: ~1.9) -- of which the accumulation is half in both (56.5 / 46.1 ms). ROUND 48 (pre-registration section 117) built ACCUM_TILE_WGSL, the accumulation with its 3 x 3 clamp read from a workgroup tile of the current frame, and waits on the rig.",
+        how: "Made from ACCUM_WGSL's text by exactly three edits (ACCUM_TILE_EDITS); bit for bit with it on SwiftShader, clamped and not and at 61 x 45 with partial tiles. Owed: the same two Intel runs sections 114 and 115 ask for, read by section 117's rule (H48: accumT <= 0.8 x accum in both runs). Sabotaged P1-P5.",
+        why: "With the fill, the coverage and the rest in hand, the history is the Intel's other fixed cost; the clamp's 27 reads a pixel are the part a tile can share exactly.",
+    },
+    {
         id: "denoise-easu-cost",
         blocker: "OPEN",
         what: "EASU's pass to W x H on the Intel gen-9: 30.1 / 25.7 ms at 960 x 540 -> 1920 x 1080, at least half of the rest's three passes in both of section 111's runs, so section 110 names it the next round's target. The composite, 22.7 / 17.1 ms, is the second.",

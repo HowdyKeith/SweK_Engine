@@ -711,6 +711,12 @@ Nothing extra to run: the same two Intel runs carry it, if they are made at a co
 gate holds both new kernels bit for bit against EASU then the composite, and adds a `section 115:` line. Section 115
 predicts the fused pass at 0.55-0.80 x EASU and the composite together on the Intel, which would hold H46.
 
+### Round 48: the accumulation's clamp read from a workgroup tile (pre-registration section 117)
+
+Nothing extra to run: the same two Intel runs carry it, if they are made at a commit carrying section 117 as well. The chain
+gate holds the tiled accumulation bit for bit against the accumulation, and adds a `section 117:` line. Section 117 predicts
+0.60-0.85 x the accumulation on the Intel, which would hold H48, narrowly.
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and

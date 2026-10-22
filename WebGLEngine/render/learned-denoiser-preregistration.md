@@ -7955,3 +7955,77 @@ Each must turn at least one row red.
 
 **Before commit.** Every new row passed on its first run here, and the miniature ran the w16 primary with the large network
 beside it. O1-O5 each turned 1 row red and were restored byte-identical.
+
+## 117. ROUND 48 -- THE ACCUMULATION's 3 x 3 CLAMP READ FROM A WORKGROUP TILE: FIXED BEFORE THE RIG RUNS IT
+
+**The question.** Rounds 43-46 took the fill, the coverage and the rest in hand. On the Intel the history's four passes are
+the chain's other fixed cost: 112.8 and 87.6 ms a frame at 1920 x 1080 in section 111's runs, against about 1.9 ms on the
+1080. The accumulation is half of them in both runs (56.5 and 46.1 ms; 0.501 and 0.526). It reads 27 floats of the current
+frame a pixel for its 3 x 3 clamp, and an 8 x 8 workgroup's neighbourhoods overlap almost wholly. Does an accumulation that
+stages the current frame's 10 x 10 around each workgroup once, and clamps from that, cost the Intel at most 0.8 x
+ACCUM_WGSL, with every output bit the same? (`denoise-history-cost`.)
+
+**The kernel, `ACCUM_TILE_WGSL` (`accumTileWgsl()` in render/denoiseUpscaleGPU.mjs).** It is made from ACCUM_WGSL's text by
+exactly three replacements (ACCUM_TILE_EDITS). Each must land once, or the generator refuses:
+1. a workgroup array of 100 vec3s;
+2. at the top of `main`, before its first return: every thread loads its share of the 10 x 10 around its workgroup (the
+   pixels outside the frame are never read), then one `workgroupBarrier()`, then the bounds check as before;
+3. the clamp's one load line, now reading the tile at the thread's own position plus (dx, dy).
+
+Every other line is the accumulation's own: its reprojection, its taps, its history length and its blend. The clamp takes
+min and max over the same nine values, so the result is the same bits.
+
+**What changes elsewhere:**
+- `accumulate(..., { tile: true })` runs it; nothing else does, and no chain or default moves.
+- `time()` adds `accumT`, one pass on the accumulation's clock, and records the kernel it dispatched, as the rest steps do.
+- The chain gate gains a `section 117:` line with `accum` and `accumT`.
+
+**The rows (the gate's sections 2, 4 and 6):**
+1. The kernel's text is ACCUM_WGSL with exactly its three edits. Three of ACCUM_WGSL's lines are gone and no other, one
+   barrier sits before the first return, and the tile is read twice (the load and the clamp). An edit that does not land
+   once is refused.
+2. On the device, `accumulate` with the tile matches it without, bit for bit: the light, the history length and the
+   composite. That holds clamped and unclamped on round 33's 64 x 64 sequence, and at 61 x 45 with the device's own hits,
+   where the right and bottom tiles are partial. The clamp moves values there, so it is exercised.
+3. At the pilot size `accumT` is one pass on the accumulation's clock and dispatches its own kernel alone, and the line
+   carries both figures.
+
+**The rig run.** The same two `realGpuRun --only denoise` runs on the Intel that sections 114 and 115 ask for, at a commit
+carrying all three sections. They serve all three rounds. On the 1080 the optional run reports the figures, and no rule reads
+them.
+
+**The rule (H48), on the Intel gen-9, on the two runs' `section 117:` lines.**
+- **C1:** every gate green with exit 0, rows 1-3 included on the Intel. So a kernel that is not bit for bit there fails C1,
+  and the kernel is at fault.
+- **C2:** both steps on the device's clock.
+- **H48 holds** when, in both runs, accumT <= 0.8 x accum.
+- **What it buys:**
+  - If it holds, the tiled accumulation becomes the history's, in a round in the shape of rounds 43 and 44.
+  - If not, it is a measured negative. The accumulation's cost is then the reprojected taps and the history's reads, not
+    the clamp.
+
+**Predictions (stated so they can miss).**
+- **accumT 0.60-0.85 x accum on the Intel.** The clamp's reads are about 27 of a pixel's roughly 70 loads, and the tile costs
+  one barrier and about 1.6 loads a pixel. **H48 is predicted to hold, narrowly.**
+- On SwiftShader, before this section was written, the tiled pass took 16.6 ms against 6.6 at the pilot size. That is a
+  CPU's time, where a barrier is costly, and it decides nothing.
+- Every gate green, the kernel bit for bit on both GPUs.
+
+**Sabotages, by the byte-safe runner (P1-P5):**
+- the tile's columns loaded one to the right;
+- the clamp reading the tile one column left;
+- the barrier removed;
+- `accumulate({ tile: true })` running the plain kernel;
+- the `accumT` step timing the plain kernel.
+
+Each must turn at least one row red, or the section says why it cannot.
+
+**Nothing else changes:** every default, the chain, the network, every table, and `fx/fsr`.
+
+**Before commit.** Rows 1-3 passed here, the kernel bit for bit at both sizes, clamped and not.
+- **The sabotages, each restored byte-identical:** P1, 1 red; P2, 1 red; P3, 2 red; P5, 1 red.
+- **P5 needed a record.** As drafted, `time()` recorded dispatched kernels for the rest steps alone. So `accumT` now records
+  its own, and its row asks for it.
+- **P4 went 0 red as first written.** The tiled run that secretly ran the plain kernel matched the plain run bit for bit,
+  so nothing could see it. `accumulate` now returns the kernel it dispatched, and the row asks for it. Redone, P4 went red.
+

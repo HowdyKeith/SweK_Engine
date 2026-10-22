@@ -750,6 +750,32 @@ fn main(@builtin(global_invocation_id) g:vec3<u32>) {
     outHist[p * 4u] = A.x; outHist[p * 4u + 1u] = A.y; outHist[p * 4u + 2u] = A.z; outHist[p * 4u + 3u] = nn;
 }
 `;
+// Round 48 (section 117): THE ACCUMULATION WITH ITS 3 x 3 CLAMP READ FROM A WORKGROUP TILE. ACCUM_WGSL reads 27 floats of the current
+// frame a pixel for the clamp, and an 8 x 8 workgroup's neighbourhoods overlap almost wholly; here the workgroup stages the 10 x 10
+// around it once, every thread loading before any return, and the clamp reads the tile. Made from ACCUM_WGSL's text by exactly
+// three replacements -- the tile's declaration, the load and its barrier before the first return, the clamp's one load line --
+// so every other line is the accumulation's own. min and max over the same nine values, so the same bits (section 3 holds it).
+const ACCUM_TILE_EDITS = Object.freeze([
+    ["@group(0) @binding(5) var<uniform> u:A;\n", "@group(0) @binding(5) var<uniform> u:A;\nvar<workgroup> T:array<vec3<f32>, 100>;\n"],
+    ["fn main(@builtin(global_invocation_id) g:vec3<u32>) {\n    if (g.x >= u.w || g.y >= u.h) { return; }\n",
+     "fn main(@builtin(global_invocation_id) g:vec3<u32>, @builtin(local_invocation_index) li:u32, @builtin(workgroup_id) wg:vec3<u32>) {\n" +
+     "    // the current frame's 10 x 10 around this workgroup, staged once -- every thread loads, before any return\n" +
+     "    for (var t = li; t < 100u; t += 64u) {\n" +
+     "        let tx = i32(wg.x * 8u) + i32(t % 10u) - 1;\n" +
+     "        let ty = i32(wg.y * 8u) + i32(t / 10u) - 1;\n" +
+     "        if (tx >= 0 && ty >= 0 && tx < i32(u.w) && ty < i32(u.h)) { let ts = (u32(ty) * u.w + u32(tx)) * 3u; T[t] = vec3<f32>(cur[ts], cur[ts + 1u], cur[ts + 2u]); }\n" +
+     "    }\n    workgroupBarrier();\n    if (g.x >= u.w || g.y >= u.h) { return; }\n"],
+    ["                let s = (u32(sy) * u.w + u32(sx)) * 3u;\n                let v = vec3<f32>(cur[s], cur[s + 1u], cur[s + 2u]);\n",
+     "                let v = T[u32(i32(g.y % 8u) + dy + 1) * 10u + u32(i32(g.x % 8u) + dx + 1)];\n"],
+]);
+export function accumTileWgsl(text = ACCUM_WGSL) {
+    let out = text;
+    for (const [a, b] of ACCUM_TILE_EDITS) { const n = out.split(a).length - 1; if (n !== 1) throw new Error(`accumTileWgsl: an edit's text occurs ${n} times in the accumulation, not once`); out = out.replace(a, b); }
+    return out;
+}
+/** Round 48: the accumulation, its clamp read from a workgroup tile of the current frame. */
+export const ACCUM_TILE_WGSL = accumTileWgsl();
+export { ACCUM_TILE_EDITS };
 
 export const FINAL_WGSL = /* wgsl */`
 struct P { w:u32, h:u32, pad0:u32, pad1:u32 };
@@ -824,7 +850,7 @@ export class DenoiseUpscaleGPU {
         this.device = device;
         this.p = {};
         for (const [k, wgsl] of [["cov", COVERAGE_WGSL], ["covB", COVERAGE_BOUND_WGSL], ["ring", FILL_RING_WGSL], ["left", FILL_LEFT_WGSL], ["toT", TO_T_WGSL], ["toTFree", TO_T_FREE_WGSL], ["comp", COMPOSITE_WGSL], ["easu", EASU_WGSL], ["easuQ", EASU_QUAD_WGSL], ["easuC", EASU_COMP_WGSL],
-                                  ["hits", FIRSTHITS_WGSL], ["shift", SHIFT_WGSL], ["accum", ACCUM_WGSL], ["final", FINAL_WGSL],
+                                  ["hits", FIRSTHITS_WGSL], ["shift", SHIFT_WGSL], ["accum", ACCUM_WGSL], ["accumT", ACCUM_TILE_WGSL], ["final", FINAL_WGSL],
                                   ["list", FILL_LIST_WGSL], ["args", FILL_ARGS_WGSL], ["lring", FILL_LISTRING_WGSL], ["lleft", FILL_LISTLEFT_WGSL],
                                   ["tinit", FILL_TILEINIT_WGSL], ["tile", FILL_TILE_WGSL], ["tleft", FILL_TILELEFT_WGSL],
                                   ["ltinit", FILL_LTINIT_WGSL], ["ltargs", FILL_LTARGS_WGSL], ["ltile", FILL_LTILE_WGSL]]) {
@@ -1041,9 +1067,11 @@ export class DenoiseUpscaleGPU {
     /**
      * render/denoiseTemporalUpscale.mjs's accumulateUpscaled on the device, and the composite after it. `frames[f]` is { y (W x H
      * rgb), shift [dx, dy] }, `eyes[f]` the frame's eye in scene S; `geo` (optional) the CPU's first hits of every frame, else the
-     * device traces them. With `full` ({ cov, E } at W x H) the result is composited as section 95's Bt is. Returns { A, n, y }.
+     * device traces them. With `full` ({ cov, E } at W x H) the result is composited as section 95's Bt is. `tile` (round 48) runs
+     * ACCUM_TILE_WGSL. Returns { A, n, y, kernel }, kernel naming the accumulation it dispatched.
      */
-    async accumulate(S, eyes, frames, W, H, { clamp = true, geo = null, full = null } = {}) {
+    async accumulate(S, eyes, frames, W, H, { clamp = true, geo = null, full = null, tile = false } = {}) {
+        const acc = tile ? this.p.accumT : this.p.accum;   // round 48: the clamp read from a workgroup tile
         const dev = this.device, n = W * H, F = frames.length;
         if (eyes.length !== F || (geo && geo.length !== F)) throw new Error(`denoiseUpscaleGPU.accumulate: ${F} frames against ${eyes.length} eyes and ${geo ? geo.length : 0} first-hit buffers`);
         const bS = dev.buffer({ data: packSpheres(S.scene), usage: ["storage"] }), mk = (k) => dev.buffer({ data: new Float32Array(k), usage: ["storage"] });
@@ -1063,8 +1091,8 @@ export class DenoiseUpscaleGPU {
             for (let f = 0; f < F; f++) {
                 this.p.shift.bind("src", src[f]).bind("dst", cur).bind("u", uSh[f]); pass.dispatch(this.p.shift, groups(W, H));
                 // the first frame starts every pixel at its own value: its "previous" geometry is a buffer of sky, which no tap matches
-                this.p.accum.bind("prevGeo", f ? G[f - 1] : sky).bind("curGeo", G[f]).bind("prevHist", a).bind("cur", cur).bind("outHist", b).bind("u", uAc[f]);
-                pass.dispatch(this.p.accum, groups(W, H));
+                acc.bind("prevGeo", f ? G[f - 1] : sky).bind("curGeo", G[f]).bind("prevHist", a).bind("cur", cur).bind("outHist", b).bind("u", uAc[f]);
+                pass.dispatch(acc, groups(W, H));
                 [a, b] = [b, a];
             }
             last = a;
@@ -1075,7 +1103,8 @@ export class DenoiseUpscaleGPU {
         const A = new Float64Array(n * 3), N = new Float64Array(n);
         for (let p = 0; p < n; p++) { for (let c = 0; c < 3; c++) A[p * 3 + c] = h[p * 4 + c]; N[p] = h[p * 4 + 3]; }
         for (const bb of [bS, ...G, ...uCam, ...src, cur, ...uSh, ...uAc, H0, H1, dst, uF, fc, fE, sky]) bb.destroy();
-        return { A, n: N, y };
+        // round 48: which accumulation ran, so a run asked for the tile is held to having dispatched it
+        return { A, n: N, y, kernel: acc === this.p.accumT ? "accumT" : "accum" };
     }
     /**
      * Round 31: THE CHAIN'S STEPS TIMED, apart from the denoise, on scene S's geometry with the w x h frame upscaled to W x H.
@@ -1093,6 +1122,7 @@ export class DenoiseUpscaleGPU {
      *   covHalfB, covFullB         round 39: the coverage bounded, at w x h and W x H, one pass each
      *   restToT, restEasu, restComp  round 42: rest's three passes, one each; restToTFree the transfer without its atomic (a diagnostic)
      *   restEasuQ, restEasuComp  round 46: EASU in 2 x 2 quads alone, and fused with the composite (EASU_QUAD_WGSL, EASU_COMP_WGSL)
+     *   accumT             round 48: the accumulation with its clamp read from a workgroup tile (ACCUM_TILE_WGSL), one pass
      * A step is on the device's clock where the device grants timestamps and the step has 30 passes or fewer, else the wall
      * clock (performance.now() around the frame and the queue's onSubmittedWorkDone). Each row says which. Returns medians.
      */
@@ -1131,14 +1161,16 @@ export class DenoiseUpscaleGPU {
             hits: (pass) => { this.p.hits.bind("sph", bS).bind("geo", geoB).bind("c", uF); pass.dispatch(this.p.hits, groups(W, H)); },
             shift: (pass) => { this.p.shift.bind("src", dst).bind("dst", curB).bind("u", uSh); pass.dispatch(this.p.shift, groups(W, H)); },
             accum: (pass) => { this.p.accum.bind("prevGeo", geoB).bind("curGeo", geoB).bind("prevHist", hA).bind("cur", curB).bind("outHist", hB).bind("u", uAc); pass.dispatch(this.p.accum, groups(W, H)); },
+            // round 48 (section 117): the same pass with its clamp read from a workgroup tile -- timed beside it, in no chain
+            accumT: (pass) => { this.p.accumT.bind("prevGeo", geoB).bind("curGeo", geoB).bind("prevHist", hA).bind("cur", curB).bind("outHist", hB).bind("u", uAc); pass.dispatch(this.p.accumT, groups(W, H)); },
             final: (pass) => { this.p.final.bind("hist", hB).bind("cov", cF).bind("emis", eF).bind("dst", outB).bind("u", uC); pass.dispatch(this.p.final, groups(W, H)); },
         };
-        const step = { covHalf: [], covFull: [], fill: [], rest: [], whole: [], hits: [], shift: [], accum: [], final: [], fillList: [], wholeList: [], fillTile: [], wholeTile: [], fillLTile: [], wholeLTile: [], covHalfB: [], covFullB: [], restToT: [], restEasu: [], restComp: [], restToTFree: [], restEasuQ: [], restEasuComp: [] }, clock = {};
+        const step = { covHalf: [], covFull: [], fill: [], rest: [], whole: [], hits: [], shift: [], accum: [], final: [], fillList: [], wholeList: [], fillTile: [], wholeTile: [], fillLTile: [], wholeLTile: [], covHalfB: [], covFullB: [], restToT: [], restEasu: [], restComp: [], restToTFree: [], restEasuQ: [], restEasuComp: [], accumT: [] }, clock = {};
         // round 42 (section 110): the rest steps record which of this runner's pipelines they dispatched, so a split step is held to its
         // one kernel -- through a thin wrapper on those steps alone, so no other step's timing changes
         const nameOf = (pipe) => Object.keys(this.p).find((n) => this.p[n] === pipe) || "?", dispatched = {};
         const run = async (k, ops, passes) => {
-            const dc = stamps && passes <= 30, seen = /^rest/.test(k) ? [] : null;
+            const dc = stamps && passes <= 30, seen = /^rest|^accumT$/.test(k) ? [] : null;   // round 48: and the tiled accumulation
             await gpu.queue.onSubmittedWorkDone();
             const t0 = now(), res = dev.frame(({ pass }) => {
                 ops(seen ? { dispatch: (pipe, wg) => { seen.push(nameOf(pipe)); pass.dispatch(pipe, wg); } } : pass);
@@ -1165,7 +1197,7 @@ export class DenoiseUpscaleGPU {
             await run("restEasuQ", (pass) => { this.p.easuQ.bind("src", filled).bind("dst", up).bind("u", uE); pass.dispatch(this.p.easuQ, groups(w + 1, h + 1)); }, 1);
             await run("restEasuComp", (pass) => { this.p.easuC.bind("src", filled).bind("dst", dst).bind("u", uE).bind("cov", cF).bind("emis", eF).bind("tMax", tMax); pass.dispatch(this.p.easuC, groups(w + 1, h + 1)); }, 1);
             reset(); await run("whole", (pass) => { covOps(pass, cH, eH, uH, w, h); covOps(pass, cF, eF, uF, W, H); restOps(pass, this._fillOps(pass, bufs, w, h, maxRings)); }, 31);
-            for (const k of ["hits", "shift", "accum", "final"]) await run(k, histOps[k], 1);
+            for (const k of ["hits", "shift", "accum", "final", "accumT"]) await run(k, histOps[k], 1);
             // round 34: the list fill alone, and the chain's steps in one frame with it -- by the wall clock, as the fill is
             reset(); await run("fillList", (pass) => { this._fillListOps(pass, bufs, w, h, maxRings); }, 31);
             reset(); await run("wholeList", (pass) => { covOps(pass, cH, eH, uH, w, h); covOps(pass, cF, eF, uF, W, H); restOps(pass, this._fillListOps(pass, bufs, w, h, maxRings)); }, 31);

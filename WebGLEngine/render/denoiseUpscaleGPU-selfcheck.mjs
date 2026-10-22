@@ -160,6 +160,14 @@
 //                                                                         EASU's dering keeps every output within its nearest texels
 //   N5  restEasuComp timing EASU_QUAD_WGSL                             1 RED (the step row: it dispatches easuC alone)
 //   N6  a ratio of 3 accepted                                          2 RED (the refusal rows, on the CPU and on the device)
+//   and round 48's tiled accumulation (section 117), by the same runner:
+//   P1  the tile's columns loaded one to the right                     1 RED (the bit-for-bit row)
+//   P2  the clamp reading the tile one column left                     1 RED (the same)
+//   P3  the barrier removed                                            2 RED (the text row; the bit-for-bit row)
+//   P4  accumulate({ tile: true }) running the plain kernel            0 RED as first written: plain against plain is bit for bit. So
+//                                                                         accumulate returns the kernel it dispatched and the row asks
+//                                                                         for it; redone, 1 RED
+//   P5  the accumT step timing the plain kernel                        1 RED (the step row: accumT records its kernel, as rest's do)
 "use strict";
 import fs from "node:fs";
 import crypto from "node:crypto";
@@ -168,7 +176,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { runInEngineOrigin } from "../tools/ship/webgpuHarness.mjs";
 import { validateWgsl } from "./wgslSpec.mjs";
-import { COVERAGE_WGSL, FILL_RING_WGSL, FILL_LEFT_WGSL, FILL_LIST_WGSL, FILL_ARGS_WGSL, FILL_LISTRING_WGSL, FILL_LISTLEFT_WGSL, FILL_UNKNOWN, FILL_LIST_WG, FILL_TILEINIT_WGSL, FILL_TILE_WGSL, FILL_TILELEFT_WGSL, FILL_TILE_RINGS, FILL_TILE_INNER, FILL_TILE_SIDE, FILL_OUT, FILL_LTINIT_WGSL, FILL_LTARGS_WGSL, FILL_LTILE_WGSL, COVERAGE_BOUND_WGSL, COVERAGE_BOUND_SLACK, COVERAGE_BOUND_ARC, coverageMayHit, TO_T_WGSL, TO_T_FREE_WGSL, COMPOSITE_WGSL, EASU_QUAD_WGSL, EASU_COMP_WGSL, EASU_PIECES, easuQuadRefusal, COVERAGE_GRID_WGSL, SPHERE_STRIDE, packSpheres, cameraUniform, DenoiseUpscaleGPU, TEMPORAL_CONSTANTS, GEO_STRIDE, FIRSTHITS_WGSL, SHIFT_WGSL, ACCUM_WGSL, FINAL_WGSL, accumUniform, packGeometry } from "./denoiseUpscaleGPU.mjs";
+import { COVERAGE_WGSL, FILL_RING_WGSL, FILL_LEFT_WGSL, FILL_LIST_WGSL, FILL_ARGS_WGSL, FILL_LISTRING_WGSL, FILL_LISTLEFT_WGSL, FILL_UNKNOWN, FILL_LIST_WG, FILL_TILEINIT_WGSL, FILL_TILE_WGSL, FILL_TILELEFT_WGSL, FILL_TILE_RINGS, FILL_TILE_INNER, FILL_TILE_SIDE, FILL_OUT, FILL_LTINIT_WGSL, FILL_LTARGS_WGSL, FILL_LTILE_WGSL, COVERAGE_BOUND_WGSL, COVERAGE_BOUND_SLACK, COVERAGE_BOUND_ARC, coverageMayHit, TO_T_WGSL, TO_T_FREE_WGSL, COMPOSITE_WGSL, EASU_QUAD_WGSL, EASU_COMP_WGSL, EASU_PIECES, easuQuadRefusal, COVERAGE_GRID_WGSL, SPHERE_STRIDE, packSpheres, cameraUniform, DenoiseUpscaleGPU, TEMPORAL_CONSTANTS, GEO_STRIDE, FIRSTHITS_WGSL, SHIFT_WGSL, ACCUM_WGSL, ACCUM_TILE_WGSL, ACCUM_TILE_EDITS, accumTileWgsl, FINAL_WGSL, accumUniform, packGeometry } from "./denoiseUpscaleGPU.mjs";
 import { fillEmitters, fillEmittersBounded, emitterAwareUpscale, GAMMA } from "./denoiseUpscale.mjs";
 import { emitterRadiance, COVERAGE_GRID } from "./denoiseMask.mjs";
 import { makeScene } from "./denoiseScenes.mjs";
@@ -219,7 +227,7 @@ const F1 = synth(24, 20, [[6, 6, 3.2], [17, 13, 5.5], [23, 1, 2]]);
 
 console.log("\n2. THE KERNELS");
 {
-    const ks = { COVERAGE_WGSL, FILL_RING_WGSL, FILL_LEFT_WGSL, TO_T_WGSL, COMPOSITE_WGSL, FIRSTHITS_WGSL, SHIFT_WGSL, ACCUM_WGSL, FINAL_WGSL, FILL_LIST_WGSL, FILL_ARGS_WGSL, FILL_LISTRING_WGSL, FILL_LISTLEFT_WGSL, FILL_TILEINIT_WGSL, FILL_TILE_WGSL, FILL_TILELEFT_WGSL, FILL_LTINIT_WGSL, FILL_LTARGS_WGSL, FILL_LTILE_WGSL, COVERAGE_BOUND_WGSL, TO_T_FREE_WGSL, EASU_QUAD_WGSL, EASU_COMP_WGSL };
+    const ks = { COVERAGE_WGSL, FILL_RING_WGSL, FILL_LEFT_WGSL, TO_T_WGSL, COMPOSITE_WGSL, FIRSTHITS_WGSL, SHIFT_WGSL, ACCUM_WGSL, FINAL_WGSL, FILL_LIST_WGSL, FILL_ARGS_WGSL, FILL_LISTRING_WGSL, FILL_LISTLEFT_WGSL, FILL_TILEINIT_WGSL, FILL_TILE_WGSL, FILL_TILELEFT_WGSL, FILL_LTINIT_WGSL, FILL_LTARGS_WGSL, FILL_LTILE_WGSL, COVERAGE_BOUND_WGSL, TO_T_FREE_WGSL, EASU_QUAD_WGSL, EASU_COMP_WGSL, ACCUM_TILE_WGSL };
     const bad = Object.entries(ks).map(([k, s]) => [k, validateWgsl(s)]).filter(([, p]) => p.length);
     ok("every kernel validates against the spec scanner", !bad.length, bad.map(([k, p]) => `${k}: ${p.join("; ")}`).join(" | "));
     ok("  the constants the kernels carry are the CPU's: the coverage grid, the transfer's gamma, its top below the pole",
@@ -274,6 +282,15 @@ console.log("\n2. THE KERNELS");
         has(COMPOSITE_WGSL, EASU_PIECES.fromT) && has(EASU_COMP_WGSL, EASU_PIECES.fromT) && has(COMPOSITE_WGSL, cline) && has(EASU_COMP_WGSL, cline) && !has(EASU_QUAD_WGSL, "fromT") &&
         has(EASU_QUAD_WGSL, "let fx = i32(q.x) - 1;") && has(EASU_QUAD_WGSL, "var ppx = (f32(ox) + 0.5) * f32(u.rw) / f32(u.dw) - 0.5;"),
         `head ${EASU_PIECES.head.length} chars, loads ${EASU_PIECES.loads.length}, body ${EASU_PIECES.body.length}; EASU_WGSL ${sha(EASU_WGSL).slice(0, 12)}`);
+    // round 48 (section 117): the tiled accumulation is ACCUM_WGSL with exactly its three edits -- the tile, its load before any
+    // return, and the clamp's one load line -- every other line the accumulation's own, and the tile read only by the clamp
+    const al = ACCUM_WGSL.split("\n"), atl = ACCUM_TILE_WGSL.split("\n"), gone48 = al.filter((l) => !atl.includes(l));
+    let refusedEdit = null; try { accumTileWgsl(ACCUM_WGSL.replace("let v = vec3<f32>(cur[s], cur[s + 1u], cur[s + 2u]);", "let v = vec3<f32>(cur[s]);")); } catch (e) { refusedEdit = e.message; }
+    ok("  round 48: ACCUM_TILE_WGSL is ACCUM_WGSL with exactly three edits -- the tile, its load and barrier before the first return, the clamp's load from it -- and an edit that does not land once is refused",
+        ACCUM_TILE_EDITS.length === 3 && gone48.length === 3 && gone48.some((l) => /fn main\(@builtin\(global_invocation_id\) g:vec3<u32>\) \{$/.test(l)) && gone48.some((l) => /let v = vec3<f32>\(cur\[s\]/.test(l)) &&
+        (ACCUM_TILE_WGSL.match(/workgroupBarrier\(\);/g) || []).length === 1 && ACCUM_TILE_WGSL.indexOf("workgroupBarrier();") < ACCUM_TILE_WGSL.indexOf("return;") &&
+        (ACCUM_TILE_WGSL.match(/T\[/g) || []).length === 2 && /exactly|not once/.test(refusedEdit || ""),
+        `${gone48.length} lines replaced: ${gone48.map((l) => l.trim().slice(0, 40)).join(" | ")}`);
     ok("  ...and the quads run at exactly 2 x only: any other ratio is refused by name",
         easuQuadRefusal(480, 270, 960, 540) === null && easuQuadRefusal(13, 9, 26, 18) === null && /exactly 2 x only -- 13 x 9 -> 39 x 27 is not/.test(easuQuadRefusal(13, 9, 39, 27) || "") && !!easuQuadRefusal(13, 9, 26, 19));
     let mesh = null; try { packSpheres([{ bvh: {} }]); } catch (e) { mesh = e.message; }
@@ -552,7 +569,7 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
     if (pg.skipped) console.log("  SKIP  " + pg.reason);
     else {
         let J = null; try { J = JSON.parse(pg.result?.json || "null"); } catch {}
-        const st = J && J.chain && J.chain.steps, keys = ["covHalf", "covFull", "fill", "rest", "whole", "hits", "shift", "accum", "final", "fillList", "wholeList", "fillTile", "wholeTile", "fillLTile", "wholeLTile", "covHalfB", "covFullB", "restToT", "restEasu", "restComp", "restToTFree", "restEasuQ", "restEasuComp"];
+        const st = J && J.chain && J.chain.steps, keys = ["covHalf", "covFull", "fill", "rest", "whole", "hits", "shift", "accum", "final", "fillList", "wholeList", "fillTile", "wholeTile", "fillLTile", "wholeLTile", "covHalfB", "covFullB", "restToT", "restEasu", "restComp", "restToTFree", "restEasuQ", "restEasuComp", "accumT"];
         const fine = (x) => !!x && Number.isFinite(x.ms) && x.ms > 0 && (x.clock === "device" || x.clock === "wall");
         // THE RIG'S LINES, from a report: sections 94, 98, 100 and 102 read them out of committed reports, so each keeps its meaning
         // (section 103) -- 93's and 97's chain is round 31's ring fill (halfRing, temporalRing), 99's "with the list fill" the list
@@ -590,7 +607,9 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
                 // round 42 (section 110): rest's three passes timed apart, and the transfer without its atomic (a diagnostic), beside rest
                 "section 110: rest's passes -- " + ["rest", "restToT", "restEasu", "restComp", "restToTFree"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; "),
                 // round 46 (section 115): EASU in quads, and fused with the composite, beside the two passes they stand in for
-                "section 115: EASU in quads -- " + ["restEasu", "restComp", "restEasuQ", "restEasuComp"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; ")];
+                "section 115: EASU in quads -- " + ["restEasu", "restComp", "restEasuQ", "restEasuComp"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; "),
+                // round 48 (section 117): the accumulation with its clamp read from a workgroup tile, beside the accumulation
+                "section 117: the accumulation tiled -- " + ["accum", "accumT"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; ")];
         };
         ok("!! the page timed every step of the chain and both networks at its pilot size -- each a positive time on a named clock, the table shown, no page error",
             pg.ok && !!st && keys.every((k) => fine(st[k])) && fine(J.networkFull) && fine(J.networkHalf) && !!J.full && !!J.half && !!J.temporal && !!J.halfRing && !!J.temporalRing && !!J.halfTile && !!J.temporalTile && !!J.halfList && !!J.temporalList && !J.halfLTile && !J.temporalLTile && !!J.fullUnbound && !!J.halfUnbound && !!J.temporalUnbound && !J.fullBound && !J.halfBound && !J.temporalBound && J.fill === "listedTile" && J.coverage === "bound" && pg.result.shown && pg.result.rows === 26 && !pg.pageErrors.length,
@@ -669,6 +688,11 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
                 JSON.stringify(q46.map((k) => st[k].kernels)) === JSON.stringify([["easuQ"], ["easuC"]]) && /^section 115: /.test(l115 || "") &&
                 ["restEasu", "restComp", ...q46].every((k) => n(new RegExp(`${k} ([0-9.]+) ms`), l115) === at3(st[k])),
                 `${l115}; dispatched ${q46.map((k) => `${k} ${(st[k].kernels || []).join("+")}`).join(", ")}`);
+            // round 48 (section 117): the tiled accumulation, one pass on the accumulation's own clock, and the line carrying both
+            const l117 = rigLines(J)[10];
+            ok("  round 48: the tiled accumulation is one pass on the accumulation's own clock, and the rig's section 117 line carries it beside accum",
+                fine(st.accumT) && st.accumT.clock === st.accum.clock && st.accumT.runs.length === st.accum.runs.length && JSON.stringify(st.accumT.kernels) === '["accumT"]' && !st.accum.kernels && /^section 117: /.test(l117 || "") &&
+                n(/accum ([0-9.]+) ms/, l117) === at3(st.accum) && n(/accumT ([0-9.]+) ms/, l117) === at3(st.accumT), l117);
         }
         // ON A GPU, THE RIG'S SIZE (pre-registration section 93): 960 x 540 -> 1920 x 1080, every step a measured line the rig's
         // report keeps. Not on a software adapter: SwiftShader's 1080p would be minutes of a CPU's time that decides nothing.
@@ -777,7 +801,15 @@ console.log("\n6. ROUND 33: ROUND 32'S ACCUMULATION ON THE DEVICE, AGAINST rende
         const withCpuGeo = await g.accumulate(P.S, P.eyes, fr, P.N, P.N, { geo, full }), noClamp = await g.accumulate(P.S, P.eyes, fr, P.N, P.N, { geo, clamp: false });
         const ownGeo = await g.accumulate(P.S, P.eyes, fr, P.N, P.N, { full });
         const pk = (r) => ({ A: A(r.A), n: A(r.n), y: A(r.y) });
-        return { hits, withCpuGeo: pk(withCpuGeo), noClamp: pk(noClamp), ownGeo: pk(ownGeo), errs };
+        // round 48 (section 117): the accumulation with its clamp read from a workgroup tile, against the kernel's own, bit for bit --
+        // clamped and not on this fixture, and at 61 x 45 with the device's own hits, where the right and bottom tiles are partial
+        const diff = (x, y) => { let d = 0; for (const k of ["A", "n", "y"]) for (let i = 0; i < x[k].length; i++) if (!Object.is(x[k][i], y[k][i])) d++; return d; };
+        const tl = await g.accumulate(P.S, P.eyes, fr, P.N, P.N, { geo, full, tile: true }), tlNo = await g.accumulate(P.S, P.eyes, fr, P.N, P.N, { geo, clamp: false, tile: true });
+        const W2 = 61, H2 = 45, fr2 = fr.map((f, k) => ({ y: Float64Array.from({ length: W2 * H2 * 3 }, (_, i) => 0.2 + 0.5 * ((i * 7 + k * 13) % 97) / 97), shift: f.shift }));
+        const odd = await g.accumulate(P.S, P.eyes, fr2, W2, H2, {}), oddT = await g.accumulate(P.S, P.eyes, fr2, W2, H2, { tile: true });
+        const tile48 = { clamped: diff(withCpuGeo, tl), unclamped: diff(noClamp, tlNo), odd: diff(odd, oddT), oddN: odd.A.length, clampBites: diff(withCpuGeo, noClamp),
+                         kernels: [withCpuGeo, tl, tlNo, odd, oddT].map((r) => r.kernel) };
+        return { hits, withCpuGeo: pk(withCpuGeo), noClamp: pk(noClamp), ownGeo: pk(ownGeo), tile48, errs };
     }` });
     if (q.skipped) console.log("  SKIP  " + q.reason);
     else if (!q.ok) ok("!! round 33: the device ran the accumulation", false, `${q.reason || "no result"} ${JSON.stringify(q.pageErrors || []).slice(0, 300)}`);
@@ -796,6 +828,11 @@ console.log("\n6. ROUND 33: ROUND 32'S ACCUMULATION ON THE DEVICE, AGAINST rende
         // given the CPU's hits and 5.1e-5 with the device's own; the light within 5.5e-7 and 2.6e-6. Held at 1e-4 and 1e-5 / 1e-3.
         const cmp = (d, r) => { let nDiff = 0, worst = 0, nWorst = 0; for (let p = 0; p < N * N; p++) { nWorst = Math.max(nWorst, Math.abs(d.n[p] - r.n[p])); if (Math.abs(d.n[p] - r.n[p]) > 1e-4) nDiff++; for (let c = 0; c < 3; c++) worst = Math.max(worst, Math.abs(d.A[p * 3 + c] - r.A[p * 3 + c]) / (Math.abs(r.A[p * 3 + c]) + 1e-3)); } return { nDiff, worst, nWorst }; };
         const c1 = cmp(Q.withCpuGeo, ref), c0 = cmp(Q.noClamp, refNo), cOwn = cmp(Q.ownGeo, ref);
+        const T48 = Q.tile48;
+        ok("!! round 48: the accumulation with its clamp read from a workgroup tile is the accumulation's own, bit for bit -- light, history length and composite -- clamped and not, and at 61 x 45 with partial tiles",
+            !!T48 && T48.clamped === 0 && T48.unclamped === 0 && T48.odd === 0 && T48.oddN === 61 * 45 * 3 && T48.clampBites > 0 && !Q.errs.length &&
+                T48.kernels.join() === "accum,accumT,accumT,accum,accumT",
+            T48 ? `${T48.clamped} / ${T48.unclamped} / ${T48.odd} values differ; the clamp moves ${T48.clampBites} values, so it is exercised; kernels ${T48.kernels.join(", ")}` : "no result");
         ok("!! round 33: given the CPU's first hits, the device's accumulation is accumulateUpscaled's -- the history length within 1e-4 at every pixel, the light within 1e-5, clamped and not",
             c1.nDiff === 0 && c1.worst <= 1e-5 && c0.nDiff === 0 && c0.worst <= 1e-5 && Q.noClamp.A.some((v, i) => Math.abs(v - Q.withCpuGeo.A[i]) > 1e-4),
             `clamped: ${c1.nDiff} n differ by over 1e-4 (worst ${c1.nWorst.toExponential(1)}), light worst ${c1.worst.toExponential(1)}; unclamped: ${c0.nDiff}, ${c0.worst.toExponential(1)}`);
