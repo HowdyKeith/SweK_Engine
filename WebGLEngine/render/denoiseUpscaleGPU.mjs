@@ -39,6 +39,11 @@
 //                       cell's mean of the neighbours below this ring, then the cells that found one take it), and writes back the
 //                       interior alone. A ring reads one step, so the halo keeps the interior exact; cells outside the frame are OUT
 //   FILL_TILELEFT_WGSL  over the frame: a pixel no ring reached is 0
+//   round 38 (denoise-fill-listed-tiles), THE TILE FILL OVER THE LISTED TILES ONLY -- fill(..., { tile: "listed" }):
+//   FILL_LTINIT_WGSL    once, over the frame: each pixel's ring into both ring buffers, its value into the second image, and each
+//                       tile holding an unknown pixel listed once -- a tile not listed never changes, so both buffers hold it alike
+//   FILL_LTARGS_WGSL    one thread: the list's length as the tile passes' indirect dispatch
+//   FILL_LTILE_WGSL     FILL_TILE_WGSL's text, its workgroup's tile read from the list
 //   TO_T_WGSL       upscale's transfer: t = (x / (1 + x))^(1 / GAMMA) per channel, and the frame's brightest t by atomicMax
 //                   on its bits (t >= 0, so a float's bits order as the float does).
 //   COMPOSITE_WGSL  the clamp to [0, the brightest t], the transfer's inverse, and compositeEmitters: E + (1 - cov) x it.
@@ -266,7 +271,9 @@ fn main(@builtin(global_invocation_id) g:vec3<u32>) {
 }
 `;
 
-export const FILL_TILE_WGSL = /* wgsl */`
+// round 38: the tile kernel is made by one function, over every tile (round 37's, its text unchanged) or over the listed tiles,
+// whose index the workgroup reads from the list -- the rest of the kernel is the same text
+const tileFillWgsl = (listed) => /* wgsl */`
 struct P { w:u32, h:u32, ring:u32, rings:u32 };
 @group(0) @binding(0) var<storage,read> srcImg:array<f32>;
 @group(0) @binding(1) var<storage,read> srcRing:array<u32>;
@@ -275,7 +282,7 @@ struct P { w:u32, h:u32, ring:u32, rings:u32 };
 @group(0) @binding(4) var<storage,read_write> filled:array<atomic<u32>>;
 @group(0) @binding(5) var<storage,read_write> passes:array<atomic<u32>>;
 @group(0) @binding(6) var<uniform> u:P;
-
+${listed ? "@group(0) @binding(7) var<storage,read> tiles:array<u32>;\n" : ""}
 const SIDE = ${FILL_TILE_SIDE}u;
 const HALO = ${FILL_TILE_RINGS}i;
 const INNER = ${FILL_TILE_INNER}u;
@@ -289,8 +296,13 @@ var<workgroup> tring:array<u32, ${FILL_TILE_SIDE * FILL_TILE_SIDE}>;
 @compute @workgroup_size(${FILL_TILE_INNER},${FILL_TILE_INNER},1)
 fn main(@builtin(workgroup_id) wg:vec3<u32>, @builtin(local_invocation_index) li:u32) {
     if (li == 0u && wg.x == 0u && wg.y == 0u) { atomicAdd(&passes[0], 1u); }
-    let ox = i32(wg.x * INNER) - HALO;
-    let oy = i32(wg.y * INNER) - HALO;
+${listed ? `    // the tile this workgroup fills, from the list the init pass built
+    let t = tiles[wg.x];
+    let tx = t % ((u.w + INNER - 1u) / INNER);
+    let ty = t / ((u.w + INNER - 1u) / INNER);
+    let ox = i32(tx * INNER) - HALO;
+    let oy = i32(ty * INNER) - HALO;` : `    let ox = i32(wg.x * INNER) - HALO;
+    let oy = i32(wg.y * INNER) - HALO;`}
     // the tile in: interior and halo, a cell outside the frame marked OUT
     for (var j = 0u; j < PER; j++) {
         let c = li + j * INNER * INNER;
@@ -354,6 +366,49 @@ fn main(@builtin(workgroup_id) wg:vec3<u32>, @builtin(local_invocation_index) li
         dstImg[p * 4u] = tr[c]; dstImg[p * 4u + 1u] = tg[c]; dstImg[p * 4u + 2u] = tb[c]; dstImg[p * 4u + 3u] = 1.0;
         dstRing[p] = tring[c];
     }
+}
+`;
+export const FILL_TILE_WGSL = tileFillWgsl(false);
+/** Round 38: the tile fill over the listed tiles only -- those holding an unknown pixel when the fill starts. */
+export const FILL_LTILE_WGSL = tileFillWgsl(true);
+
+// round 38: once, over the frame -- each pixel's ring into BOTH ring buffers and its value into the second image, so a tile no
+// pass writes holds the same in both (an unlisted tile has no unknown pixel and never changes); each tile with an unknown pixel
+// is flagged once and appended to the list
+export const FILL_LTINIT_WGSL = /* wgsl */`
+struct P { w:u32, h:u32, pad0:u32, pad1:u32 };
+@group(0) @binding(0) var<storage,read> known:array<u32>;
+@group(0) @binding(1) var<storage,read> img:array<f32>;
+@group(0) @binding(2) var<storage,read_write> ringA:array<u32>;
+@group(0) @binding(3) var<storage,read_write> ringB:array<u32>;
+@group(0) @binding(4) var<storage,read_write> imgB:array<f32>;
+@group(0) @binding(5) var<storage,read_write> flag:array<atomic<u32>>;
+@group(0) @binding(6) var<storage,read_write> tiles:array<u32>;
+@group(0) @binding(7) var<storage,read_write> tcnt:array<atomic<u32>>;
+@group(0) @binding(8) var<uniform> u:P;
+
+@compute @workgroup_size(8,8,1)
+fn main(@builtin(global_invocation_id) g:vec3<u32>) {
+    if (g.x >= u.w || g.y >= u.h) { return; }
+    let p = g.y * u.w + g.x;
+    let r = select(${FILL_UNKNOWN}u, 0u, known[p] == 1u);
+    ringA[p] = r; ringB[p] = r;
+    imgB[p * 4u] = img[p * 4u]; imgB[p * 4u + 1u] = img[p * 4u + 1u]; imgB[p * 4u + 2u] = img[p * 4u + 2u]; imgB[p * 4u + 3u] = 1.0;
+    if (r == ${FILL_UNKNOWN}u) {
+        let t = (g.y / ${FILL_TILE_INNER}u) * ((u.w + ${FILL_TILE_INNER - 1}u) / ${FILL_TILE_INNER}u) + g.x / ${FILL_TILE_INNER}u;
+        if (atomicExchange(&flag[t], 1u) == 0u) { tiles[atomicAdd(&tcnt[0], 1u)] = t; }
+    }
+}
+`;
+
+// round 38: one thread -- the tile list's length as the tile passes' indirect workgroup count
+export const FILL_LTARGS_WGSL = /* wgsl */`
+@group(0) @binding(0) var<storage,read> tcnt:array<u32>;
+@group(0) @binding(1) var<storage,read_write> args:array<u32>;
+
+@compute @workgroup_size(1,1,1)
+fn main() {
+    args[0] = tcnt[0]; args[1] = 1u; args[2] = 1u;
 }
 `;
 
@@ -654,7 +709,8 @@ export class DenoiseUpscaleGPU {
         for (const [k, wgsl] of [["cov", COVERAGE_WGSL], ["ring", FILL_RING_WGSL], ["left", FILL_LEFT_WGSL], ["toT", TO_T_WGSL], ["comp", COMPOSITE_WGSL], ["easu", EASU_WGSL],
                                   ["hits", FIRSTHITS_WGSL], ["shift", SHIFT_WGSL], ["accum", ACCUM_WGSL], ["final", FINAL_WGSL],
                                   ["list", FILL_LIST_WGSL], ["args", FILL_ARGS_WGSL], ["lring", FILL_LISTRING_WGSL], ["lleft", FILL_LISTLEFT_WGSL],
-                                  ["tinit", FILL_TILEINIT_WGSL], ["tile", FILL_TILE_WGSL], ["tleft", FILL_TILELEFT_WGSL]]) {
+                                  ["tinit", FILL_TILEINIT_WGSL], ["tile", FILL_TILE_WGSL], ["tleft", FILL_TILELEFT_WGSL],
+                                  ["ltinit", FILL_LTINIT_WGSL], ["ltargs", FILL_LTARGS_WGSL], ["ltile", FILL_LTILE_WGSL]]) {
             const p = this.p[k] = device.compute({ wgsl });
             if (p && p.error) throw new Error(`render/denoiseUpscaleGPU: the ${k} kernel did not compile -- ${p.error}`);
         }
@@ -717,7 +773,25 @@ export class DenoiseUpscaleGPU {
         pass.dispatch(this.p.tleft, groups(w, h));
         return src;
     }
-    _fillOpsFor(o) { return o.tile ? this._fillTileOps : o.list ? this._fillListOps : this._fillOps; }
+    // round 38: the tile fill over the listed tiles only -- the init pass (rings into both buffers, the image into the second, the
+    // tiles listed), the list's length as the dispatch, the tile passes over the list, the left pass over the frame
+    _fillLTileOps(pass, bufs, w, h, maxRings) {
+        const { a, b, kA, filled, left, uLeft, ringOf, ringB, uTiles, tilePasses, tFlag, tList, tCnt, tArgs } = bufs;
+        this.p.ltinit.bind("known", kA).bind("img", a).bind("ringA", ringOf).bind("ringB", ringB).bind("imgB", b).bind("flag", tFlag).bind("tiles", tList).bind("tcnt", tCnt).bind("u", uLeft);
+        pass.dispatch(this.p.ltinit, groups(w, h));
+        this.p.ltargs.bind("tcnt", tCnt).bind("args", tArgs);
+        pass.dispatch(this.p.ltargs, [1, 1, 1]);
+        let src = a, dst = b, rin = ringOf, rout = ringB;
+        for (const u of uTiles) {
+            this.p.ltile.bind("srcImg", src).bind("srcRing", rin).bind("dstImg", dst).bind("dstRing", rout).bind("filled", filled).bind("passes", tilePasses).bind("u", u).bind("tiles", tList);
+            pass.dispatchIndirect(this.p.ltile, tArgs);
+            [src, dst] = [dst, src]; [rin, rout] = [rout, rin];
+        }
+        this.p.tleft.bind("ringOf", rin).bind("img", src).bind("left", left).bind("u", uLeft);
+        pass.dispatch(this.p.tleft, groups(w, h));
+        return src;
+    }
+    _fillOpsFor(o) { return o.tile === "listed" ? this._fillLTileOps : o.tile ? this._fillTileOps : o.list ? this._fillListOps : this._fillOps; }
     _fillBufs(img3, cov, w, h, maxRings) {
         const dev = this.device, n = w * h;
         return { a: dev.buffer({ data: rgba(img3, n), usage: ["storage"] }), b: dev.buffer({ data: new Float32Array(n * 4), usage: ["storage"] }),
@@ -729,6 +803,10 @@ export class DenoiseUpscaleGPU {
                  cnt: dev.buffer({ data: new Uint32Array(1), usage: ["storage"] }), args: dev.buffer({ data: new Uint32Array(3), usage: ["storage", "indirect"] }),
                  // round 37's tile fill: the rings' second buffer, a uniform a pass (its first ring and how many), and its passes, counted
                  ringB: dev.buffer({ data: new Uint32Array(n), usage: ["storage"] }), tilePasses: dev.buffer({ data: new Uint32Array(1), usage: ["storage"] }),
+                 // round 38's listed tiles: a flag a tile, the list, its length, and the tile passes' indirect dispatch
+                 ...(() => { const nT = Math.ceil(w / FILL_TILE_INNER) * Math.ceil(h / FILL_TILE_INNER);
+                     return { tFlag: dev.buffer({ data: new Uint32Array(nT), usage: ["storage"] }), tList: dev.buffer({ data: new Uint32Array(nT), usage: ["storage"] }),
+                              tCnt: dev.buffer({ data: new Uint32Array(1), usage: ["storage"] }), tArgs: dev.buffer({ data: new Uint32Array(3), usage: ["storage", "indirect"] }) }; })(),
                  uTiles: Array.from({ length: Math.ceil(maxRings / FILL_TILE_RINGS) }, (_, i) => dev.buffer({ data: u4(w, h, i * FILL_TILE_RINGS, Math.min(FILL_TILE_RINGS, maxRings - i * FILL_TILE_RINGS)), usage: "uniform" })) };
     }
     async _fillCounts(bufs) {
@@ -737,7 +815,9 @@ export class DenoiseUpscaleGPU {
         const listed = new Uint32Array(await this.device.read(bufs.cnt))[0];
         // tilePasses: the passes round 37's tile fill ran -- 0 when another fill ran
         const tilePasses = new Uint32Array(await this.device.read(bufs.tilePasses))[0];
-        return { rings: per.filter((k) => k > 0).length, perRing: Array.from(per), left, listed, tilePasses };
+        // tilesListed: the tiles round 38's listed tile fill dispatched over -- 0 when another fill ran
+        const tilesListed = new Uint32Array(await this.device.read(bufs.tCnt))[0];
+        return { rings: per.filter((k) => k > 0).length, perRing: Array.from(per), left, listed, tilePasses, tilesListed };
     }
     _free(bufs) { for (const v of Object.values(bufs)) for (const b of [].concat(v)) b.destroy(); }
 
@@ -745,6 +825,7 @@ export class DenoiseUpscaleGPU {
      * fillEmittersBounded on the device: { y, rings, left, perRing, listed }. Round 36: over the lights' pixels only (round 34's
      * list fill) unless asked `{ list: false }`, which runs round 31's ring fill -- the reference the default is held to.
      * `{ tile: true }` (round 37) runs the fill FILL_TILE_RINGS rings a pass in workgroup tiles; tilePasses counts its passes.
+     * `{ tile: "listed" }` (round 38) runs those passes over the tiles holding an unknown pixel only; tilesListed counts them.
      */
     async fill(img3, cov, w, h, maxRings, { list = true, tile = false } = {}) {
         if (!Number.isInteger(maxRings) || maxRings < 0) throw new Error(`denoiseUpscaleGPU.fill: maxRings is a whole number of rings -- got ${maxRings}`);
@@ -761,7 +842,7 @@ export class DenoiseUpscaleGPU {
      * The emitter-aware chain on one encoder: the w x h frame (rgb), its coverage covHalf, filled in at most maxRings rings,
      * through the transfer, EASU to W x H, the clamp and inverse, and the composite with `full` ({ cov, E } at W x H).
      * Returns { y (W*H*3), rings, left, perRing, listed, tMax }. Round 36: the fill is round 34's list fill unless asked
-     * `{ list: false }`, round 31's ring fill; `{ tile: true }` round 37's tile fill.
+     * `{ list: false }`, round 31's ring fill; `{ tile: true }` round 37's tile fill; `{ tile: "listed" }` round 38's over the listed tiles.
      */
     async chain(img3, covHalf, w, h, W, H, full, maxRings, { list = true, tile = false } = {}) {
         if (full.cov.length !== W * H || full.E.length !== W * H * 3) throw new Error(`denoiseUpscaleGPU.chain: the full-size guide is not ${W} x ${H}`);
@@ -846,6 +927,7 @@ export class DenoiseUpscaleGPU {
      *   hits, shift, accum, final   round 33: the history's four passes a frame, at W x H
      *   fillList, wholeList        round 34: fill and whole with the fill over the lights' pixels only, by the wall clock
      *   fillTile, wholeTile        round 37: fill and whole with the fill FILL_TILE_RINGS rings a pass in tiles, by the wall clock
+     *   fillLTile, wholeLTile      round 38: the same over the listed tiles only, by the wall clock
      * A step is on the device's clock where the device grants timestamps and the step has 30 passes or fewer, else the wall
      * clock (performance.now() around the frame and the queue's onSubmittedWorkDone). Each row says which. Returns medians.
      */
@@ -861,7 +943,10 @@ export class DenoiseUpscaleGPU {
         const img = new Float64Array(w * h * 3); for (let p = 0; p < w * h; p++) for (let c = 0; c < 3; c++) img[p * 3 + c] = 0.2 + 0.5 * ((p % w) / w) + 0.1 * c;
         const bufs = this._fillBufs(img, covHalf, w, h, maxRings), rgba0 = rgba(img, w * h), known0 = Uint32Array.from(covHalf, (c) => (c > 0 ? 0 : 1));
         const zero1 = new Uint32Array(1);
-        const reset = () => { gpu.queue.writeBuffer(bufs.a.gpu, 0, rgba0); gpu.queue.writeBuffer(bufs.kA.gpu, 0, known0); gpu.queue.writeBuffer(bufs.cnt.gpu, 0, zero1); };
+        const nT = Math.ceil(w / FILL_TILE_INNER) * Math.ceil(h / FILL_TILE_INNER), zeroT = new Uint32Array(nT);
+        // round 38: and the listed tiles' flags and count, which the init pass builds afresh
+        const reset = () => { gpu.queue.writeBuffer(bufs.a.gpu, 0, rgba0); gpu.queue.writeBuffer(bufs.kA.gpu, 0, known0); gpu.queue.writeBuffer(bufs.cnt.gpu, 0, zero1);
+                              gpu.queue.writeBuffer(bufs.tFlag.gpu, 0, zeroT); gpu.queue.writeBuffer(bufs.tCnt.gpu, 0, zero1); };
         const tMax = dev.buffer({ data: new Uint32Array(1), usage: ["storage"] }), uT = dev.buffer({ data: u4(w, h), usage: "uniform" });
         const up = mk(W * H * 4), uE = dev.buffer({ data: u4(w, h, W, H), usage: "uniform" }), dst = mk(W * H * 3), uC = dev.buffer({ data: u4(W, H), usage: "uniform" });
         let filled = null;
@@ -880,7 +965,7 @@ export class DenoiseUpscaleGPU {
             accum: (pass) => { this.p.accum.bind("prevGeo", geoB).bind("curGeo", geoB).bind("prevHist", hA).bind("cur", curB).bind("outHist", hB).bind("u", uAc); pass.dispatch(this.p.accum, groups(W, H)); },
             final: (pass) => { this.p.final.bind("hist", hB).bind("cov", cF).bind("emis", eF).bind("dst", outB).bind("u", uC); pass.dispatch(this.p.final, groups(W, H)); },
         };
-        const step = { covHalf: [], covFull: [], fill: [], rest: [], whole: [], hits: [], shift: [], accum: [], final: [], fillList: [], wholeList: [], fillTile: [], wholeTile: [] }, clock = {};
+        const step = { covHalf: [], covFull: [], fill: [], rest: [], whole: [], hits: [], shift: [], accum: [], final: [], fillList: [], wholeList: [], fillTile: [], wholeTile: [], fillLTile: [], wholeLTile: [] }, clock = {};
         const run = async (k, ops, passes) => {
             const dc = stamps && passes <= 30;
             await gpu.queue.onSubmittedWorkDone();
@@ -901,6 +986,9 @@ export class DenoiseUpscaleGPU {
             // round 37: the tile fill alone, and the chain's steps with it -- by the wall clock, as the list fill is, so the fills share a clock
             reset(); await run("fillTile", (pass) => { this._fillTileOps(pass, bufs, w, h, maxRings); }, 31);
             reset(); await run("wholeTile", (pass) => { covOps(pass, cH, eH, uH, w, h); covOps(pass, cF, eF, uF, W, H); restOps(pass, this._fillTileOps(pass, bufs, w, h, maxRings)); }, 31);
+            // round 38: the tile fill over the listed tiles, alone and with the chain's steps -- by the wall clock, as the other fills are
+            reset(); await run("fillLTile", (pass) => { this._fillLTileOps(pass, bufs, w, h, maxRings); }, 31);
+            reset(); await run("wholeLTile", (pass) => { covOps(pass, cH, eH, uH, w, h); covOps(pass, cF, eF, uF, W, H); restOps(pass, this._fillLTileOps(pass, bufs, w, h, maxRings)); }, 31);
             if (r === 0) for (const k of Object.keys(step)) step[k].length = 0;
         }
         const c = await this._fillCounts(bufs);
@@ -910,8 +998,10 @@ export class DenoiseUpscaleGPU {
         const lc = await this.fill(img, covHalf, w, h, maxRings, { list: true }), listCheck = { rings: lc.rings, left: lc.left, listed: lc.listed };
         // round 37: the tile fill the same way -- its rings, the pixels it left, and the passes it ran
         const tc = await this.fill(img, covHalf, w, h, maxRings, { tile: true }), tileCheck = { rings: tc.rings, left: tc.left, passes: tc.tilePasses };
+        // round 38: the listed tile fill the same way -- and the tiles it listed, of all the frame's
+        const ltc = await this.fill(img, covHalf, w, h, maxRings, { tile: "listed" }), ltileCheck = { rings: ltc.rings, left: ltc.left, passes: ltc.tilePasses, tiles: ltc.tilesListed, of: nT };
         const med = (a) => { const b = [...a].sort((x, y) => x - y); return b.length ? b[(b.length - 1) >> 1] : null; };
-        return { w, h, W, H, maxRings, reps, rings: c.rings, inView: covHalf.filter((v) => v > 0).length, listCheck, tileCheck,
+        return { w, h, W, H, maxRings, reps, rings: c.rings, inView: covHalf.filter((v) => v > 0).length, listCheck, tileCheck, ltileCheck,
                  steps: Object.fromEntries(Object.keys(step).map((k) => [k, { ms: med(step[k]), clock: clock[k], runs: step[k] }])) };
     }
 }
@@ -930,6 +1020,7 @@ export class DenoiseUpscaleGPU {
  *          this key is from before round 36, and its half and temporal are the ring fill's
  *   halfRing, temporalRing  round 36: half and temporal with round 31's ring fill (fill), the reference the default is held to
  *   halfTile, temporalTile  round 37: half and temporal with the tile fill (fillTile)
+ *   halfLTile, temporalLTile  round 38: half and temporal with the tile fill over the listed tiles (fillLTile)
  * The ladder's cap is 5000 ms a pass, not its default 1500: the Intel gen-9's page pass at 1920 x 1080 is 1.2-1.4 s (rounds 27
  * and 28), close enough to 1500 that a prediction from the smaller size could skip the very row being compared.
  */
@@ -949,5 +1040,8 @@ export async function timeHalfChain({ device, net, newAdapter, kernels, S, w, h,
              temporalRing: sum([networkHalf, st.covHalf, st.covFull, st.fill, st.rest, st.hits, st.shift, st.accum, st.final]),
              // round 37: the same two with the tile fill
              halfTile: sum([networkHalf, st.covHalf, st.covFull, st.fillTile, st.rest]),
-             temporalTile: sum([networkHalf, st.covHalf, st.covFull, st.fillTile, st.rest, st.hits, st.shift, st.accum, st.final]) };
+             temporalTile: sum([networkHalf, st.covHalf, st.covFull, st.fillTile, st.rest, st.hits, st.shift, st.accum, st.final]),
+             // round 38: the same two with the tile fill over the listed tiles
+             halfLTile: sum([networkHalf, st.covHalf, st.covFull, st.fillLTile, st.rest]),
+             temporalLTile: sum([networkHalf, st.covHalf, st.covFull, st.fillLTile, st.rest, st.hits, st.shift, st.accum, st.final]) };
 }

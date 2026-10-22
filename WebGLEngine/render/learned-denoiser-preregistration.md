@@ -7034,3 +7034,80 @@ at 12. That is `denoise-fill-listed-tiles`. It would be pre-registered against b
 
 **Nothing changes in this section:** the default fill (the list fill), the page, the network, every kernel table, and
 `fx/fsr`.
+
+## 106. ROUND 38 -- THE TILE FILL OVER THE LIGHTS' TILES ONLY: FIXED BEFORE THE RIG RUNS IT
+
+**The question.** Section 105: the list fill cut the pixels, which is the Intel's cost, and the tile fill cut the passes,
+which is the 1080's. Does a tile fill dispatched only over the tiles holding an unknown pixel cut both, and beat the
+default list fill on both GPUs? (`denoise-fill-listed-tiles`.)
+
+**The fill, `fill(..., { tile: "listed" })` and `chain(..., { tile: "listed" })`.**
+- **The init pass** writes each pixel's ring into both ring buffers and its value into the second image. It also flags each
+  16 x 16 tile holding an unknown pixel and appends it to a list, once.
+- **One thread** writes the list's length as an indirect dispatch's workgroup count, as round 34's args kernel does.
+- **The tile passes** are round 37's kernel, from the same template; round 37's own text is unchanged, byte for byte. Each
+  workgroup reads its tile from the list and fills it, ping-ponging as before. There are 12 at 96 rings.
+- **The left pass** is round 37's, over the frame. That makes 15 passes at 96 rings.
+- **Why skipping is exact.** A tile with no unknown pixel when the fill starts never gets one, because a ring only turns
+  UNKNOWN into a ring. Its pixels need no pass. Because the init pass wrote both buffers alike, whichever buffer the last pass
+  leaves as the answer holds those tiles unchanged. The listed tiles are written by every pass. Their halos are read from the
+  buffer the pass before left, and that buffer is exact for the listed tiles' interiors and unchanged elsewhere.
+- **What is read back:** `tilesListed`, the list's length.
+
+**Measured on the CPU, before this section was written, as a property of the fixture:** at 960 x 540 the rig's scene,
+R 990000, has 25,765 pixels in view of its light (the rig's own count). They lie in **123 of the frame's 2,040 tiles, 6.0 %**.
+
+**Timed.** `time()` adds `fillLTile` and `wholeLTile` by the wall clock. `timeHalfChain` adds `halfLTile` and
+`temporalLTile`. The page gains three rows (21). A `section 106:` line carries them for the rig. The default stays the list
+fill.
+
+**The rows (the gate's sections 2-4).**
+1. The listed tile kernel is the tile kernel's text with the tile read from the list. Every other line is the same, and round
+   37's text is unchanged.
+2. The listed tile fill is fillEmittersBounded's within 1e-5, and the list fill's and the tile fill's bit for bit. That holds
+   on round 34's six frames and at 13 rings. `tilesListed` is the CPU's count of tiles with an unknown pixel, frame by frame.
+3. The chain with it is the list fill's chain bit for bit, on all four scenes.
+4. At the pilot size, `halfLTile` is the half-size chain with `fillLTile`, and the `section 106:` line carries it. The
+   pilot's check lists exactly the CPU's count of tiles.
+
+**The rig run.** On each GPU, two `realGpuRun --only denoise` runs, at a commit carrying this section.
+
+**The rule (H38), per GPU, on the two runs' `section 106:` lines.**
+- **C1:** every gate is green with exit 0.
+- **C2:** the listed tile fill reaches the list fill's rings with 0 left, in 12 passes, over 123 tiles.
+- **H38 holds on a GPU** when, in both runs, fillLTile <= 0.9 x fillList, the default.
+- **What it buys:**
+  - If it holds on both GPUs, the listed tile fill becomes the default, in a round of its own, and
+    `denoise-fill-per-adapter` closes unbuilt.
+  - If it holds on one GPU, `denoise-fill-per-adapter` goes ahead, naming each GPU's fastest fill from these runs.
+  - If it holds on neither, it is kept as a measured negative and `denoise-fill-per-adapter` goes ahead with round 37's
+    figures.
+
+**Predictions (stated so they can miss).** Section 105's per-pass figures, split into a fixed cost and work that scales with
+the tiles: about 0.25 ms fixed a pass, the rest of round 37's tile pass scaled by 6 %.
+- **GTX 1080:** the listed tile fill 2-8 ms against the list fill's 22.6-23.1. H38 holds.
+- **Intel gen-9:** 5-15 ms against 22.3-24.6. The init and left passes over the whole frame are most of it. H38 holds.
+- So the listed tile fill becomes the default, and every gate is green on both.
+
+**Sabotages, by the byte-safe runner (E1-E6):**
+- the init pass writing the second ring buffer and not the second image;
+- a tile listed by its column alone;
+- the args kernel dispatching every tile (the tile fill again);
+- the listed option running the tile fill;
+- `halfLTile` summing `fillTile`;
+- the page without the listed tile fill's chain row.
+
+Each must turn at least one row red.
+
+**Nothing else changes:** the default fill (still the list fill), round 37's tile kernel, the network, every kernel table,
+and `fx/fsr`.
+
+**Two corrections to the rows, made before the round was committed and before anything was measured on a GPU.** Both rows
+went red on their first run here; the fill itself was bit for bit in every case.
+- Row 1 asked round 37's kernel for 120 lines, a number written without counting. It has 90, and the row now holds it to
+  that.
+- Row 2 asked the frame with no unknown pixel for 1 tile pass, and read 0. No tile is listed there, so every tile pass
+  dispatches no workgroup and none is counted. A frame with nothing to fill does no tile work, which is what the fill is
+  for. The row now asks for 0 passes where no tile is listed.
+- Reported, deciding nothing: at the pilot size on SwiftShader, the listed tile fill took 83.7 ms against the list fill's
+  16.3, over 4 of the 12 tiles. That is a CPU's time.

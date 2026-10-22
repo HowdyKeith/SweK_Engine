@@ -2355,7 +2355,7 @@ export const NEXT_ROUNDS = [
         id: "denoise-fill-listed-tiles",
         blocker: "OPEN",
         what: "Round 37's tile fill dispatched only over the tiles that hold an unknown pixel: a list of those tiles, its length as an indirect dispatch as round 34's list fill does, so the work scales with the lights and the passes stay at ceil(rings / 8).",
-        how: "Pre-register against both fills as they are (the list fill, the default, and the tile fill), bit for bit against them and within 1e-5 of fillEmittersBounded, then two runs on each GPU. A tile whose interior holds no unknown pixel writes back what it read, so skipping it changes nothing -- but the fill ping-pongs two buffers, so a skipped tile's interior must still reach the other one (a copy, or a fill in place). Each needs its own row.",
+        how: "Round 38 (pre-registration section 106) built it and waits on the rig: fill(..., { tile: \"listed\" }) -- an init pass writes both ring buffers and the second image alike and lists the tiles holding an unknown pixel (123 of 2,040 at the rig's size, measured on the CPU), then round 37's kernel over the list alone, 15 passes at 96 rings. On SwiftShader it is fillEmittersBounded's within 1e-5 and both fills' bit for bit; sabotaged E1-E6. Owed: two realGpuRun --only denoise runs on each GPU, read by section 106's rule (H38: fillLTile <= 0.9 x fillList in both runs).",
         why: "Section 105: the list fill cut the pixels (the Intel's cost) and the tile fill the passes (the 1080's). The tile fill lost on the Intel because it works over the whole frame again, about 20 times the lights' pixels.",
     },
     {

@@ -601,6 +601,24 @@ node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r37-b.json
 against the list fill's 22.6 and 23.1. On the Intel it took 67.3 and 68.9 against 22.3 and 24.6. Every gate was green on
 both. The default stays the list fill.
 
+### Round 38: the tile fill over the lights' tiles only (pre-registration section 106)
+
+On each GPU, in a clone on the branch at a commit carrying section 106 (`git log -1 --oneline` shows it):
+
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r38-a.json
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r38-b.json
+```
+
+- **What is new:** the chain gate also runs round 37's tile fill over the tiles that hold a light pixel only, checks it
+  against the CPU and both fills bit for bit, and times it. A `section 106:` line puts it beside the list fill.
+- **Section 106 predicts:** 2-8 ms on the 1080 and 5-15 ms on the Intel, against the list fill's 22-25 on both. Every gate is
+  green.
+- **Don't commit or pull between runs.**
+- **Send back all four JSON files.**
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and
