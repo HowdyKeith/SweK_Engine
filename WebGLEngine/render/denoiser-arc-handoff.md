@@ -43,7 +43,8 @@ node tools/ship/versionPreflight.mjs --next    # the next free version and sweep
      **`denoise-listedtile-default`**, done as round 43 (section 112): the chain's default fill now, the list fill and the ring
      fill kept as references. `denoise-fill-per-adapter` closed unbuilt.
    - **H39 held on both GPUs:** the bounded coverage took 0.07-0.09 x round 31's at 1080p, bit for bit. Next is
-     **`denoise-coverage-bound-default`**, for the chain's mask and the page's.
+     **`denoise-coverage-bound-default`**, done as round 44 (section 113): the chain's and the page's mask now, round
+     31's kept as the reference. Both of `denoise-halfres-fixed-costs`'s levers are closed.
    - **H40 failed on both of the 1080's paths:** r40s ran at 0.26-0.27 x r18t. It is a measured negative, and both entries
      stay r18t.
    - **H41 has no verdict.** K0h was green on the Intel, so the f16 kernel compiled and was exact. But the 1500 ms cap

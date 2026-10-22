@@ -141,6 +141,16 @@
 //   K4  half summing fillList                                          1 RED (section 4's default sum row)
 //   K5  halfList summing fillLTile                                     1 RED (section 4's list fill sum row)
 //   K6  the page without the list fill's chain row                     1 RED (the page's 26 rows)
+//   and round 44's default (section 113), by the same runner:
+//   L1  coverage()'s default back to round 31's                        1 RED (round 44's coverage-default row)
+//   L2  { bound: false } running the bounded kernel                    as first written it left "traced" unbound, so the device threw
+//                                                                         and no row judged it; redone with the binding whole: 2 RED
+//                                                                         (round 39's row and round 44's: round 31's pass counts nothing)
+//   L3  full summing covFull                                           1 RED (section 4's default sum row)
+//   L4  half summing covHalf                                           1 RED (the same row)
+//   L5  fullUnbound summing covFullB                                   1 RED (section 4's round 31 row)
+//   L6  the page without round 31's mask's page row                    1 RED (the page's 26 rows)
+//   L7  section 93's line made from full                               1 RED (the lines row: section 93's page is round 31's mask)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -298,16 +308,19 @@ const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 900000, args: { 
     if (dev.gpu && dev.gpu.addEventListener) dev.gpu.addEventListener("uncapturederror", (e) => errs.push(String(e.error && e.error.message).slice(0, 200)));
     const g = new DenoiseUpscaleGPU(dev), A = (x) => Array.from(x);
     const cov = [];
-    for (const S of P.scenes) { const f = await g.coverage(S, P.W, P.W), h = await g.coverage(S, P.Hh, P.Hh); cov.push({ full: { cov: A(f.cov), E: A(f.E) }, half: { cov: A(h.cov), E: A(h.E) } }); }
+    for (const S of P.scenes) { const f = await g.coverage(S, P.W, P.W, { bound: false }), h = await g.coverage(S, P.Hh, P.Hh, { bound: false }); cov.push({ full: { cov: A(f.cov), E: A(f.E) }, half: { cov: A(h.cov), E: A(h.E) } }); }
     // round 39: the bounded coverage on the same scenes and sizes, held to round 31's bit for bit here, and on the light behind the camera
     const bitsEq = (x, y) => x.length === y.length && x.every((v, i) => Object.is(v, y[i]));
     const covB = [];
     for (const [i, S] of P.scenes.entries()) for (const [k, n] of [["full", P.W], ["half", P.Hh]]) {
-        const u = await g.coverage(S, n, n), b = await g.coverage(S, n, n, { bound: true });
-        covB.push({ i, k, n, traced: b.traced, unboundedTraced: u.traced, same: bitsEq(A(u.cov), A(b.cov)) && bitsEq(A(u.E), A(b.E)), litMissed: A(u.cov).filter((c, p) => c > 0 && b.cov[p] === 0).length });
+        const u = await g.coverage(S, n, n, { bound: false }), b = await g.coverage(S, n, n, { bound: true });
+        // round 44: and the coverage with nothing asked, which is the bounded one
+        const d = await g.coverage(S, n, n);
+        covB.push({ i, k, n, traced: b.traced, unboundedTraced: u.traced, same: bitsEq(A(u.cov), A(b.cov)) && bitsEq(A(u.E), A(b.E)), litMissed: A(u.cov).filter((c, p) => c > 0 && b.cov[p] === 0).length,
+                    dflt: { traced: d.traced, sameAsBound: bitsEq(A(d.cov), A(b.cov)) && bitsEq(A(d.E), A(b.E)) } });
     }
-    const bh = await g.coverage(P.behind, P.W, P.W, { bound: true }), bhu = await g.coverage(P.behind, P.W, P.W);
-    const behind = { traced: bh.traced, same: bitsEq(A(bh.cov), A(bhu.cov)), lit: A(bhu.cov).filter((c) => c > 0).length };
+    const bh = await g.coverage(P.behind, P.W, P.W, { bound: true }), bhu = await g.coverage(P.behind, P.W, P.W, { bound: false }), bhd = await g.coverage(P.behind, P.W, P.W);
+    const behind = { traced: bh.traced, same: bitsEq(A(bh.cov), A(bhu.cov)), lit: A(bhu.cov).filter((c) => c > 0).length, dflt: { traced: bhd.traced, sameAsBound: bitsEq(A(bhd.cov), A(bh.cov)) && bitsEq(A(bhd.E), A(bh.E)) } };
     const fills = [];
     for (const m of [16, 2]) { const f = await g.fill(Float64Array.from(P.fill.img), Float64Array.from(P.fill.cov), 24, 20, m, { list: false }); fills.push({ ...f, y: A(f.y) }); }
     // round 34: the list fill beside round 31's, on the same frames and ring budgets, and on a frame of all emitter and one of none
@@ -377,6 +390,12 @@ else {
         R.covB.length === 8 && R.covB.every((c) => c.same && c.litMissed === 0 && c.unboundedTraced === 0 && Math.abs(c.traced - sumOf(twin[c.i][c.k])) <= Math.max(1, 0.02 * sumOf(twin[c.i][c.k])) && c.traced < c.n * c.n / 4) &&
         R.behind.traced === 0 && R.behind.same && R.behind.lit === 0,
         R.covB.map((c) => `${SCENES[c.i].seed} ${c.k}: ${c.traced} traced (twin ${sumOf(twin[c.i][c.k])}) of ${c.n * c.n}`).join("; ") + `; behind: ${R.behind.traced} traced`);
+    // ROUND 44 (section 113), THE DEFAULT: coverage() asked nothing is the bounded coverage -- the same pixels traced, the same bits --
+    // and { bound: false } is round 31's, which counts nothing (the rows above hold it to emitterRadiance)
+    ok("!! round 44: coverage() asked nothing is the bounded coverage -- the same pixels traced and the same bits -- on the four scenes at both sizes and with the light behind the camera, and { bound: false } traces nothing",
+        R.covB.length === 8 && R.covB.every((c) => c.dflt.traced === c.traced && c.dflt.sameAsBound && c.unboundedTraced === 0) && R.covB.some((c) => c.dflt.traced > 0) &&
+        R.behind.dflt.traced === R.behind.traced && R.behind.dflt.sameAsBound,
+        R.covB.map((c) => `${SCENES[c.i].seed} ${c.k}: ${c.dflt.traced} traced`).join("; ") + `; behind: ${R.behind.dflt.traced}`);
     // and the twin itself, on the CPU: it traces every pixel emitterRadiance lights, on these views and the pilot's scene
     const tw = [...SCENES.flatMap((S, i) => [[twin[i].full, CPU[i].full.cov], [twin[i].half, CPU[i].half.cov]]),
                 (() => { const S = makeScene("R", 990000); return [coverageMayHit(S, 128, 72), emitterRadiance(S, 128, 72).cov]; })()];
@@ -492,37 +511,37 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
             const ks = K.chain.steps, row = (x) => (x.skipped ? `not measured (${x.reason})` : `${(x.gpu ? x.gpu.median : x.wall.median).toFixed(3)} ms (${x.gpu ? "device" : "wall"})`), [lh, lf] = K.ladder.rows[K.kernels];
             const at = (W, H) => `${W} x ${H}`, [Wf, Hf, Wh, Hh2] = [lf.W, lf.H, lh.W, lh.H];
             return [`section 93: ${K.ladder.adapter.name}, kernels ${K.kernels}; the network at ${at(Wf, Hf)} ${row(lf)}, at ${at(Wh, Hh2)} ${row(lh)}; ` +
-                    (K.full && K.halfRing ? `today's page (network and mask) ${K.full.ms.toFixed(3)} ms (${K.full.clocks.join(" + ")}); the half-size chain ${K.halfRing.ms.toFixed(3)} ms (${K.halfRing.clocks.join(" + ")}); ratio ${(K.full.ms / K.halfRing.ms).toFixed(3)} x` : "no ratio: a part was not measured"),
+                    (K.fullUnbound && K.halfRing ? `today's page (network and mask) ${K.fullUnbound.ms.toFixed(3)} ms (${K.fullUnbound.clocks.join(" + ")}); the half-size chain ${K.halfRing.ms.toFixed(3)} ms (${K.halfRing.clocks.join(" + ")}); ratio ${(K.fullUnbound.ms / K.halfRing.ms).toFixed(3)} x` : "no ratio: a part was not measured"),
                 "section 93: the chain's steps -- " + ["covHalf", "covFull", "fill", "rest", "whole"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; ") +
                     `; ${K.chain.rings} of ${K.chain.maxRings} rings filled`,
                 // round 33 (section 97): the history's passes and the chain with them, in a line of their own -- section 94 reads the two above
                 "section 97: the history's passes -- " + ["hits", "shift", "accum", "final"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; ") +
-                    (K.full && K.temporalRing ? `; the half-size chain with its history ${K.temporalRing.ms.toFixed(3)} ms (${K.temporalRing.clocks.join(" + ")}); ratio ${(K.full.ms / K.temporalRing.ms).toFixed(3)} x` : "; no ratio: a part was not measured"),
+                    (K.fullUnbound && K.temporalRing ? `; the half-size chain with its history ${K.temporalRing.ms.toFixed(3)} ms (${K.temporalRing.clocks.join(" + ")}); ratio ${(K.fullUnbound.ms / K.temporalRing.ms).toFixed(3)} x` : "; no ratio: a part was not measured"),
                 // round 34 (section 99): the fill over the lights' pixels, beside round 31's, in a line of its own
                 "section 99: the fills -- " + ["fill", "fillList", "whole", "wholeList"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; ") +
                     (K.chain.listCheck ? `; the list fill ${K.chain.listCheck.listed} listed, ${K.chain.listCheck.rings} of ${K.chain.maxRings} rings, ${K.chain.listCheck.left} left` : "; the list fill not checked") +
-                    (K.full && K.halfList && K.temporalList ? `; the half-size chain with the list fill ${K.halfList.ms.toFixed(3)} ms, ratio ${(K.full.ms / K.halfList.ms).toFixed(3)} x; with its history ${K.temporalList.ms.toFixed(3)} ms, ratio ${(K.full.ms / K.temporalList.ms).toFixed(3)} x` : "; no ratio: a part was not measured"),
+                    (K.fullUnbound && K.halfList && K.temporalList ? `; the half-size chain with the list fill ${K.halfList.ms.toFixed(3)} ms, ratio ${(K.fullUnbound.ms / K.halfList.ms).toFixed(3)} x; with its history ${K.temporalList.ms.toFixed(3)} ms, ratio ${(K.fullUnbound.ms / K.temporalList.ms).toFixed(3)} x` : "; no ratio: a part was not measured"),
                 // round 36 (section 103): which fill the default chain runs, and its chain
-                `section 103: the default fill ${K.fill || "ring (a report from before round 36)"}` +
+                `section 103: the default fill ${K.fill || "ring (a report from before round 36)"}, coverage ${K.coverage || "round 31's (a report from before round 44)"}` +
                     (K.full && K.half ? `; the half-size chain ${K.half.ms.toFixed(3)} ms, ratio ${(K.full.ms / K.half.ms).toFixed(3)} x` : "; no ratio: a part was not measured") +
                     (K.full && K.temporal ? `; with its history ${K.temporal.ms.toFixed(3)} ms, ratio ${(K.full.ms / K.temporal.ms).toFixed(3)} x` : ""),
                 // round 37 (section 104): the tile fill beside the list fill, in a line of its own
                 "section 104: the tile fill -- " + ["fillList", "fillTile", "wholeList", "wholeTile"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; ") +
                     (K.chain.tileCheck ? `; the tile fill ${K.chain.tileCheck.passes} passes, ${K.chain.tileCheck.rings} of ${K.chain.maxRings} rings, ${K.chain.tileCheck.left} left` : "; the tile fill not checked") +
-                    (K.full && K.halfTile && K.temporalTile ? `; the half-size chain with the tile fill ${K.halfTile.ms.toFixed(3)} ms, ratio ${(K.full.ms / K.halfTile.ms).toFixed(3)} x; with its history ${K.temporalTile.ms.toFixed(3)} ms, ratio ${(K.full.ms / K.temporalTile.ms).toFixed(3)} x` : "; no ratio: a part was not measured"),
+                    (K.fullUnbound && K.halfTile && K.temporalTile ? `; the half-size chain with the tile fill ${K.halfTile.ms.toFixed(3)} ms, ratio ${(K.fullUnbound.ms / K.halfTile.ms).toFixed(3)} x; with its history ${K.temporalTile.ms.toFixed(3)} ms, ratio ${(K.fullUnbound.ms / K.temporalTile.ms).toFixed(3)} x` : "; no ratio: a part was not measured"),
                 // round 38 (section 106): the tile fill over the lights' tiles beside the list fill, in a line of its own
                 "section 106: the listed tile fill -- " + ["fillList", "fillLTile", "wholeList", "wholeLTile"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; ") +
                     (K.chain.ltileCheck ? `; the listed tile fill ${K.chain.ltileCheck.tiles} of ${K.chain.ltileCheck.of} tiles, ${K.chain.ltileCheck.passes} passes, ${K.chain.ltileCheck.rings} of ${K.chain.maxRings} rings, ${K.chain.ltileCheck.left} left` : "; the listed tile fill not checked") +
-                    (K.full && K.half && K.temporal ? `; the half-size chain with the listed tile fill ${K.half.ms.toFixed(3)} ms, ratio ${(K.full.ms / K.half.ms).toFixed(3)} x; with its history ${K.temporal.ms.toFixed(3)} ms, ratio ${(K.full.ms / K.temporal.ms).toFixed(3)} x` : "; no ratio: a part was not measured"),
+                    (K.fullUnbound && K.halfUnbound && K.temporalUnbound ? `; the half-size chain with the listed tile fill ${K.halfUnbound.ms.toFixed(3)} ms, ratio ${(K.fullUnbound.ms / K.halfUnbound.ms).toFixed(3)} x; with its history ${K.temporalUnbound.ms.toFixed(3)} ms, ratio ${(K.fullUnbound.ms / K.temporalUnbound.ms).toFixed(3)} x` : "; no ratio: a part was not measured"),
                 // round 39 (section 107): the coverage bounded beside round 31's, at both sizes, in a line of its own
                 "section 107: the bounded coverage -- " + ["covHalf", "covHalfB", "covFull", "covFullB"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; ") +
                     (K.chain.boundCheck ? `; traced ${K.chain.boundCheck.half} of ${K.chain.boundCheck.ofHalf} and ${K.chain.boundCheck.full} of ${K.chain.boundCheck.ofFull}; bit for bit ${K.chain.boundCheck.sameHalf && K.chain.boundCheck.sameFull ? "at both sizes" : "NOT at both sizes"}` : "; the bounded coverage not checked") +
-                    (K.fullBound && K.halfBound && K.temporalBound ? `; today's page with it ${K.fullBound.ms.toFixed(3)} ms; the half-size chain with it ${K.halfBound.ms.toFixed(3)} ms, ratio ${(K.fullBound.ms / K.halfBound.ms).toFixed(3)} x; with its history ${K.temporalBound.ms.toFixed(3)} ms, ratio ${(K.fullBound.ms / K.temporalBound.ms).toFixed(3)} x` : "; no ratio: a part was not measured"),
+                    (K.full && K.half && K.temporal ? `; today's page with it ${K.full.ms.toFixed(3)} ms; the half-size chain with it ${K.half.ms.toFixed(3)} ms, ratio ${(K.full.ms / K.half.ms).toFixed(3)} x; with its history ${K.temporal.ms.toFixed(3)} ms, ratio ${(K.full.ms / K.temporal.ms).toFixed(3)} x` : "; no ratio: a part was not measured"),
                 // round 42 (section 110): rest's three passes timed apart, and the transfer without its atomic (a diagnostic), beside rest
                 "section 110: rest's passes -- " + ["rest", "restToT", "restEasu", "restComp", "restToTFree"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; ")];
         };
         ok("!! the page timed every step of the chain and both networks at its pilot size -- each a positive time on a named clock, the table shown, no page error",
-            pg.ok && !!st && keys.every((k) => fine(st[k])) && fine(J.networkFull) && fine(J.networkHalf) && !!J.full && !!J.half && !!J.temporal && !!J.halfRing && !!J.temporalRing && !!J.halfTile && !!J.temporalTile && !!J.halfList && !!J.temporalList && !J.halfLTile && !J.temporalLTile && !!J.fullBound && !!J.halfBound && !!J.temporalBound && J.fill === "listedTile" && pg.result.shown && pg.result.rows === 26 && !pg.pageErrors.length,
+            pg.ok && !!st && keys.every((k) => fine(st[k])) && fine(J.networkFull) && fine(J.networkHalf) && !!J.full && !!J.half && !!J.temporal && !!J.halfRing && !!J.temporalRing && !!J.halfTile && !!J.temporalTile && !!J.halfList && !!J.temporalList && !J.halfLTile && !J.temporalLTile && !!J.fullUnbound && !!J.halfUnbound && !!J.temporalUnbound && !J.fullBound && !J.halfBound && !J.temporalBound && J.fill === "listedTile" && J.coverage === "bound" && pg.result.shown && pg.result.rows === 26 && !pg.pageErrors.length,
             pg.ok ? (pg.result?.status || "").slice(0, 200) : pg.reason);
         if (st) {
             // the network times are the ladder's rows, w x h then W x H (T4 went 0 RED before this held which was which); today's page
@@ -531,7 +550,7 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
             const parts = J.halfRing ? J.halfRing.ms : NaN, sum = med(halfRow) + ["covHalf", "covFull", "fill", "rest"].reduce((a, k) => a + st[k].ms, 0);
             ok("  ...round 31's chain in all (halfRing since round 36) is the half-size network plus the four steps, today's page the full-size network and its mask, each network its own ladder row, the fill by the wall clock, on scene R 990000 with its light in view, every ring budgeted and some used",
                 Math.abs(parts - sum) < 1e-9 && st.fill.clock === "wall" && fullRow.W === 128 && fullRow.H === 72 && halfRow.W === 64 && halfRow.H === 36 &&
-                J.networkFull.ms === med(fullRow) && J.networkHalf.ms === med(halfRow) && Math.abs(J.full.ms - (med(fullRow) + st.covFull.ms)) < 1e-9 && st.whole.clock === "wall" && J.chain.maxRings === 96 && J.chain.rings > 0 && J.chain.rings < 96 &&
+                J.networkFull.ms === med(fullRow) && J.networkHalf.ms === med(halfRow) && Math.abs(J.fullUnbound.ms - (med(fullRow) + st.covFull.ms)) < 1e-9 && st.whole.clock === "wall" && J.chain.maxRings === 96 && J.chain.rings > 0 && J.chain.rings < 96 &&
                 J.chain.inView > 0 && JSON.stringify(J.scene) === JSON.stringify(["R", 990000]) && J.chain.W === 128 && J.chain.w === 64,
                 `${J.chain.rings} of 96 rings filled; ${J.chain.inView} px in view at 64 x 36; ${keys.map((k) => `${k} ${st[k].ms.toFixed(2)} ms (${st[k].clock})`).join(", ")}`);
             // round 33: the chain with its history is the chain and round 32's four passes, each one pass on the device's clock where it has one
@@ -548,10 +567,10 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
                 `the list fill: ${J.chain.listCheck ? `${J.chain.listCheck.listed} listed, ${J.chain.listCheck.rings} rings, ${J.chain.listCheck.left} left` : "not checked"}; fill ${st.fill.ms.toFixed(2)} ms, the list fill ${st.fillList.ms.toFixed(2)} ms; whole ${st.whole.ms.toFixed(2)}, with the list fill ${st.wholeList.ms.toFixed(2)}`);
             // round 36 (section 103): the rig's four lines, made from this report, each carry the figure of the sum it names
             const [l93, , l97, l99, l103] = rigLines(J), n = (re, t) => { const m = t.match(re); return m ? Number(m[1]) : NaN; }, at3 = (x) => Number(x.ms.toFixed(3));
-            ok("  round 43: the rig's lines keep their meaning -- section 93's and 97's chain the ring fill's, section 99's \"with the list fill\" the list fill's (halfList), section 103's the default's, which is the listed tile fill",
+            ok("  rounds 43 and 44: the rig's lines keep their meaning -- section 93's page round 31's mask (fullUnbound) and its and 97's chain the ring fill's, section 99's \"with the list fill\" the list fill's (halfList), section 103's the default's, which is the listed tile fill on the bounded coverage",
                 n(/the half-size chain ([0-9.]+) ms/, l93) === at3(J.halfRing) && n(/with its history ([0-9.]+) ms/, l97) === at3(J.temporalRing) &&
                 n(/with the list fill ([0-9.]+) ms/, l99) === at3(J.halfList) && n(/with its history ([0-9.]+) ms/, l99) === at3(J.temporalList) &&
-                /^section 103: the default fill listedTile; the half-size chain ([0-9.]+) ms/.test(l103) && n(/the half-size chain ([0-9.]+) ms/, l103) === at3(J.half) && n(/with its history ([0-9.]+) ms/, l103) === at3(J.temporal),
+                /^section 103: the default fill listedTile, coverage bound; the half-size chain ([0-9.]+) ms/.test(l103) && n(/^section 93: .*today's page \(network and mask\) ([0-9.]+) ms/, l93) === at3(J.fullUnbound) && n(/the half-size chain ([0-9.]+) ms/, l103) === at3(J.half) && n(/with its history ([0-9.]+) ms/, l103) === at3(J.temporal),
                 l103);
             // round 37 (section 104): the chain with the tile fill is the same sum with fillTile in the fill's place, by the wall
             // clock as the list fill is, its check filling every pixel in view in ceil(96 / 8) passes; the rig's line carries both
@@ -567,21 +586,21 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
             const ltSum = med(halfRow) + ["covHalf", "covFull", "fillLTile", "rest"].reduce((a, k) => a + st[k].ms, 0), l106 = rigLines(J)[6], lc6 = J.chain.ltileCheck;
             const pc = emitterRadiance(makeScene(...J.scene), J.chain.w, J.chain.h).cov, pT = new Set();
             for (let y = 0; y < J.chain.h; y++) for (let x = 0; x < J.chain.w; x++) if (pc[y * J.chain.w + x] > 0) pT.add(Math.floor(y / FILL_TILE_INNER) * Math.ceil(J.chain.w / FILL_TILE_INNER) + Math.floor(x / FILL_TILE_INNER));
-            ok("  rounds 38 and 43: the default chain (half) is the half-size chain with fillLTile in the fill's place, by the wall clock, and with its history (temporal) the four passes more; its check lists the CPU's tiles in 12 passes; the rig's section 106 line carries both sums",
-                !!J.half && Math.abs(J.half.ms - ltSum) < 1e-9 && st.fillLTile.clock === "wall" && st.wholeLTile.clock === "wall" &&
-                !!J.temporal && Math.abs(J.temporal.ms - (ltSum + hist.reduce((a, k) => a + st[k].ms, 0))) < 1e-9 &&
+            ok("  rounds 38, 43 and 44: the listed tile fill's chain on round 31's coverage (halfUnbound) is the half-size chain with fillLTile in the fill's place, by the wall clock, and with its history (temporalUnbound) the four passes more; its check lists the CPU's tiles in 12 passes; the rig's section 106 line carries both sums",
+                !!J.halfUnbound && Math.abs(J.halfUnbound.ms - ltSum) < 1e-9 && st.fillLTile.clock === "wall" && st.wholeLTile.clock === "wall" &&
+                !!J.temporalUnbound && Math.abs(J.temporalUnbound.ms - (ltSum + hist.reduce((a, k) => a + st[k].ms, 0))) < 1e-9 &&
                 !!lc6 && lc6.passes === Math.ceil(J.chain.maxRings / FILL_TILE_RINGS) && lc6.rings === J.chain.rings && lc6.left === 0 && lc6.tiles === pT.size && lc6.of === 12 && lc6.tiles < lc6.of &&
-                n(/with the listed tile fill ([0-9.]+) ms/, l106) === at3(J.half) && n(/with its history ([0-9.]+) ms/, l106) === at3(J.temporal),
+                n(/with the listed tile fill ([0-9.]+) ms/, l106) === at3(J.halfUnbound) && n(/with its history ([0-9.]+) ms/, l106) === at3(J.temporalUnbound),
                 l106);
             // round 39 (section 107): the page and the chain with the bounded coverage, their sums; its check bit for bit at both sizes
             // and its traced counts the CPU twin's within 2 %; the rig's line carries the sums
             const bc = J.chain.boundCheck, l107 = rigLines(J)[7], twinN = (ww, hh) => coverageMayHit(makeScene(...J.scene), ww, hh).reduce((a, b) => a + b, 0);
             const hb = med(halfRow) + ["covHalfB", "covFullB", "fillLTile", "rest"].reduce((a, k) => a + st[k].ms, 0), tH = twinN(J.chain.w, J.chain.h), tF = twinN(J.chain.W, J.chain.H);
-            ok("  round 39: today's page and the chain with the bounded coverage are their sums with covHalfB and covFullB, each one pass on the coverage's clock; its check is round 31's bit for bit at both sizes, tracing the twin's count within 2 %; the rig's line carries the sums",
-                !!J.halfBound && Math.abs(J.halfBound.ms - hb) < 1e-9 && Math.abs(J.fullBound.ms - (med(fullRow) + st.covFullB.ms)) < 1e-9 &&
-                Math.abs(J.temporalBound.ms - (hb + hist.reduce((a, k) => a + st[k].ms, 0))) < 1e-9 && st.covHalfB.clock === st.covHalf.clock && st.covFullB.clock === st.covFull.clock &&
+            ok("  rounds 39 and 44: today's page and the chain, their defaults (full, half, temporal), are their sums with covHalfB and covFullB, each one pass on the coverage's clock; its check is round 31's bit for bit at both sizes, tracing the twin's count within 2 %; the rig's section 107 line carries the sums",
+                !!J.half && Math.abs(J.half.ms - hb) < 1e-9 && Math.abs(J.full.ms - (med(fullRow) + st.covFullB.ms)) < 1e-9 &&
+                Math.abs(J.temporal.ms - (hb + hist.reduce((a, k) => a + st[k].ms, 0))) < 1e-9 && st.covHalfB.clock === st.covHalf.clock && st.covFullB.clock === st.covFull.clock &&
                 !!bc && bc.sameHalf && bc.sameFull && Math.abs(bc.half - tH) <= Math.max(1, 0.02 * tH) && Math.abs(bc.full - tF) <= Math.max(1, 0.02 * tF) && bc.full < bc.ofFull / 4 &&
-                n(/today's page with it ([0-9.]+) ms/, l107) === at3(J.fullBound) && n(/the half-size chain with it ([0-9.]+) ms/, l107) === at3(J.halfBound) && n(/with its history ([0-9.]+) ms/, l107) === at3(J.temporalBound),
+                n(/today's page with it ([0-9.]+) ms/, l107) === at3(J.full) && n(/the half-size chain with it ([0-9.]+) ms/, l107) === at3(J.half) && n(/with its history ([0-9.]+) ms/, l107) === at3(J.temporal),
                 `${l107.slice(0, 260)}; twin ${tH} / ${tF}`);
             // round 42 (section 110): the split steps, one pass each on rest's own clock, and the line carrying each one's figure
             const l110 = rigLines(J)[8], split = ["restToT", "restEasu", "restComp", "restToTFree"];
@@ -600,11 +619,11 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
             let K = null; try { K = JSON.parse(rg.result?.json || "null"); } catch {}
             const ks = K && K.chain && K.chain.steps;
             ok("!! section 93: at 1920 x 1080 the page timed both networks and every step of the chain, the fill reaching every pixel in its 96 rings -- and round 34's list fill the same, every listed pixel reached",
-                rg.ok && !!ks && keys.every((k) => fine(ks[k])) && fine(K.networkFull) && fine(K.networkHalf) && !!K.full && !!K.half && !!K.temporal && !!K.halfRing && !!K.temporalRing && !!K.halfTile && !!K.temporalTile && !!K.halfList && !!K.temporalList && K.fill === "listedTile" && K.chain.rings > 0 && K.chain.rings < 96 && !rg.pageErrors.length &&
+                rg.ok && !!ks && keys.every((k) => fine(ks[k])) && fine(K.networkFull) && fine(K.networkHalf) && !!K.full && !!K.half && !!K.temporal && !!K.halfRing && !!K.temporalRing && !!K.halfTile && !!K.temporalTile && !!K.halfList && !!K.temporalList && K.fill === "listedTile" && K.coverage === "bound" && !!K.fullUnbound && !!K.halfUnbound && K.chain.rings > 0 && K.chain.rings < 96 && !rg.pageErrors.length &&
                 !!K.chain.listCheck && K.chain.listCheck.listed === K.chain.inView && K.chain.listCheck.rings === K.chain.rings && K.chain.listCheck.left === 0 &&
                 !!K.chain.tileCheck && K.chain.tileCheck.rings === K.chain.rings && K.chain.tileCheck.left === 0 && K.chain.tileCheck.passes === 12 &&
                 !!K.chain.ltileCheck && K.chain.ltileCheck.rings === K.chain.rings && K.chain.ltileCheck.left === 0 && K.chain.ltileCheck.passes === 12 && K.chain.ltileCheck.tiles > 0 && K.chain.ltileCheck.tiles < K.chain.ltileCheck.of &&
-                !!K.chain.boundCheck && K.chain.boundCheck.sameHalf && K.chain.boundCheck.sameFull && !!K.fullBound && !!K.halfBound,
+                !!K.chain.boundCheck && K.chain.boundCheck.sameHalf && K.chain.boundCheck.sameFull,
                 rg.ok ? (rg.result?.status || "").slice(0, 200) : rg.reason);
             if (ks) {
                 for (const l of rigLines(K)) say(l);

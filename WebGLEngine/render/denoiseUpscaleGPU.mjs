@@ -18,6 +18,7 @@
 // chain hands EASU its input without a repack. The kernels, in the chain's order:
 //   COVERAGE_BOUND_WGSL  round 39 (denoise-halfres-fixed-costs, the coverage lever): COVERAGE_WGSL's text with a bound first -- a
 //                   pixel whose centre ray is too far from every emitter for any of its rays to meet one is 0, untraced
+//                   -- coverage()'s default since round 44 (denoise-coverage-bound-default); { bound: false } is round 31's
 //   COVERAGE_WGSL   emitterRadiance (render/denoiseMask.mjs): COVERAGE_GRID^2 rays across each pixel, at the centres of an
 //                   even grid, the first hit over the scene's spheres; cov = k / n^2 and E = the mean emission met. Run at
 //                   half size it is the network's mask (the fill's coverage); at full size, the composite's guide.
@@ -777,10 +778,11 @@ export class DenoiseUpscaleGPU {
     }
 
     /**
-     * emitterRadiance on the device: { cov, E, traced }, Float64Arrays of w*h and w*h*3. `bound` (round 39) skips each pixel no ray
-     * of which can meet an emitter (coverageMayHit's test), writing its 0s untraced; `traced` counts the pixels traced (0 unbounded).
+     * emitterRadiance on the device: { cov, E, traced }, Float64Arrays of w*h and w*h*3. The bound (round 39, the default since
+     * round 44) skips each pixel no ray of which can meet an emitter (coverageMayHit's test), writing its 0s untraced -- round 31's
+     * answer bit for bit; `{ bound: false }` runs round 31's pass, the reference. `traced` counts the pixels traced (0 unbounded).
      */
-    async coverage(S, w, h, { bound = false } = {}) {
+    async coverage(S, w, h, { bound = true } = {}) {
         const dev = this.device, n = w * h, sph = packSpheres(S.scene);
         const bS = dev.buffer({ data: sph, usage: ["storage"] }), bC = dev.buffer({ data: new Float32Array(n), usage: ["storage"] });
         const bE = dev.buffer({ data: new Float32Array(n * 3), usage: ["storage"] }), u = dev.buffer({ data: cameraUniform(S, w, h, S.scene.length), usage: "uniform" });
@@ -1109,7 +1111,7 @@ export class DenoiseUpscaleGPU {
  * Round 31, WHAT THE PAGE TIMES (denoise.html's "Time the half-size chain"): the shipped network at w x h and at W x H on the
  * page's own kernel set (render/denoiseDevice.mjs's timingLadder, the ladder the page already runs), and the chain's steps on
  * scene S (DenoiseUpscaleGPU's time). `device` is a gfx/device.js webgpu device; `newAdapter` makes the ladder's adapters.
- * Returns { ladder, chain, networkHalf, networkFull, fill, full, half, temporal, halfList, temporalList, halfRing, temporalRing, ... }, each sum on the clocks
+ * Returns { ladder, chain, networkHalf, networkFull, fill, coverage, full, half, temporal, fullUnbound, halfUnbound, temporalUnbound, halfList, ... }, each sum on the clocks
  * its parts were read on, named:
  *   full   today's page at W x H: the network at W x H, and the emitter coverage at W x H, which is the mask it reads
  *   half   the chain: the network at w x h, the coverage at w x h (its mask, and the fill's), the coverage at W x H (the
@@ -1121,8 +1123,10 @@ export class DenoiseUpscaleGPU {
  *   halfList, temporalList  round 43: half and temporal with round 34's list fill (fillList), the default in rounds 36-42
  *   halfRing, temporalRing  round 36: half and temporal with round 31's ring fill (fill), the reference the default is held to
  *   halfTile, temporalTile  round 37: half and temporal with the tile fill (fillTile)
- *   fullBound, halfBound, temporalBound  round 39: full, half and temporal with the bounded coverage (covHalfB, covFullB), the
- *          chain on its default fill (fillLTile from round 43, fillList before)
+ *   coverage  round 44: "bound" -- full, half and temporal take round 39's bounded coverage (covHalfB, covFullB). In reports of
+ *          rounds 39-43 those were fullBound, halfBound and temporalBound, and full, half and temporal had round 31's
+ *   fullUnbound, halfUnbound, temporalUnbound  round 44: full, half and temporal with round 31's coverage (covHalf, covFull),
+ *          the reference. Every other reference sum (halfRing, halfTile, halfList and their temporals) keeps round 31's coverage
  * The ladder's cap is 5000 ms a pass, not its default 1500: the Intel gen-9's page pass at 1920 x 1080 is 1.2-1.4 s (rounds 27
  * and 28), close enough to 1500 that a prediction from the smaller size could skip the very row being compared.
  */
@@ -1134,9 +1138,12 @@ export async function timeHalfChain({ device, net, newAdapter, kernels, S, w, h,
     const st = chain.steps, sum = (parts) => (parts.every((x) => x && x.ms != null)
         ? { ms: parts.reduce((a, x) => a + x.ms, 0), clocks: [...new Set(parts.map((x) => x.clock))] } : null);
     return { ladder, chain, kernels, networkHalf, networkFull,
-             fill: "listedTile", full: sum([networkFull, st.covFull]), half: sum([networkHalf, st.covHalf, st.covFull, st.fillLTile, st.rest]),
+             fill: "listedTile", coverage: "bound", full: sum([networkFull, st.covFullB]), half: sum([networkHalf, st.covHalfB, st.covFullB, st.fillLTile, st.rest]),
              // round 33: the chain with round 32's history -- its four passes a frame added to the half-size chain
-             temporal: sum([networkHalf, st.covHalf, st.covFull, st.fillLTile, st.rest, st.hits, st.shift, st.accum, st.final]),
+             temporal: sum([networkHalf, st.covHalfB, st.covFullB, st.fillLTile, st.rest, st.hits, st.shift, st.accum, st.final]),
+             // round 44: the same three with round 31's coverage, the reference -- the defaults of rounds 43 and before
+             fullUnbound: sum([networkFull, st.covFull]), halfUnbound: sum([networkHalf, st.covHalf, st.covFull, st.fillLTile, st.rest]),
+             temporalUnbound: sum([networkHalf, st.covHalf, st.covFull, st.fillLTile, st.rest, st.hits, st.shift, st.accum, st.final]),
              // round 43: the same two with round 34's list fill, the default in rounds 36-42 and a reference since
              halfList: sum([networkHalf, st.covHalf, st.covFull, st.fillList, st.rest]),
              temporalList: sum([networkHalf, st.covHalf, st.covFull, st.fillList, st.rest, st.hits, st.shift, st.accum, st.final]),
@@ -1145,9 +1152,5 @@ export async function timeHalfChain({ device, net, newAdapter, kernels, S, w, h,
              temporalRing: sum([networkHalf, st.covHalf, st.covFull, st.fill, st.rest, st.hits, st.shift, st.accum, st.final]),
              // round 37: the same two with the tile fill
              halfTile: sum([networkHalf, st.covHalf, st.covFull, st.fillTile, st.rest]),
-             temporalTile: sum([networkHalf, st.covHalf, st.covFull, st.fillTile, st.rest, st.hits, st.shift, st.accum, st.final]),
-             // round 39: today's page and the chain (on its default fill, the listed tile fill since round 43) with the bounded
-             // coverage -- the page's own mask is the coverage at W x H, so the bound serves it too
-             fullBound: sum([networkFull, st.covFullB]), halfBound: sum([networkHalf, st.covHalfB, st.covFullB, st.fillLTile, st.rest]),
-             temporalBound: sum([networkHalf, st.covHalfB, st.covFullB, st.fillLTile, st.rest, st.hits, st.shift, st.accum, st.final]) };
+             temporalTile: sum([networkHalf, st.covHalf, st.covFull, st.fillTile, st.rest, st.hits, st.shift, st.accum, st.final]) };
 }

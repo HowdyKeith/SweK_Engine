@@ -7634,3 +7634,83 @@ the network, every kernel table, the kernels themselves, and `fx/fsr`.
 
 **Before commit.** Rows 1-4 passed on their first run here. K1-K6 each turned at least one row red and were restored
 byte-identical: K1 1 red, K2 1, K3 5, K4 1, K5 1, K6 1.
+
+## 113. ROUND 44 -- THE BOUNDED COVERAGE BECOMES THE CHAIN'S MASK AND THE PAGE'S, WITH ROUND 31'S KEPT AS THE REFERENCE
+
+**Why now.** Section 111, by section 107's rule: H39 held on both GPUs, so the bounded coverage becomes the chain's and the
+page's mask, and the coverage lever closes. This is that round (`denoise-coverage-bound-default`), in the shape of rounds 36
+and 43 (sections 103 and 112). The bounded coverage is round 31's bit for bit, so no image moves. The round measures nothing
+new, so it has no prediction to miss and no rig run to wait for. It is fixed here before its code.
+
+**What changes, in `render/denoiseUpscaleGPU.mjs`:**
+- **`coverage(S, w, h)` with nothing asked runs the bounded coverage** (`COVERAGE_BOUND_WGSL`, round 39). `{ bound: false }`
+  runs round 31's, which stays unchanged as the reference. `{ bound: true }` keeps its meaning.
+- **`timeHalfChain`'s defaults take the bounded coverage at both sizes,** and the result says so: `coverage: "bound"`.
+  - `full` (today's page) is the network at W x H plus `covFullB`.
+  - `half` and `temporal` are the chain on its default fill (the listed tile fill, section 112) with `covHalfB` and
+    `covFullB`.
+- **The reference keeps round 31's coverage:** `fullUnbound`, `halfUnbound` and `temporalUnbound` are new. They are the same
+  three sums with `covHalf` and `covFull`.
+- `fullBound`, `halfBound` and `temporalBound` go. They would be `full`, `half` and `temporal` under a second name.
+- **The other references keep round 31's coverage,** so their figures stay comparable with every earlier round's: the ring
+  fill's (`halfRing`, `temporalRing`), the tile fill's (`halfTile`, `temporalTile`) and the list fill's (`halfList`,
+  `temporalList`).
+- The step keys do not change. `covHalf` and `covFull` are round 31's; `covHalfB` and `covFullB` the bounded pass.
+
+**What changes on the page (`denoise.html`'s "Time the half-size chain"):**
+- The two coverage rows report the bounded coverage, with the pixels it traced. The rows that follow from them change with
+  them: "today's page in all", "the half-size chain in all" and "with its history".
+- Round 39's group of four rows becomes round 31's coverage as the reference: its coverage at both sizes, today's page with
+  that mask, the chain with it, and that with the history. The table stays at 26 rows.
+- The status line's ratio is the default page against the default chain, with round 31's coverage's beside it.
+
+**What does NOT change: the lines the rig's reports carry.** Each keeps its meaning from this round on.
+- **Section 93's line:** "today's page" is round 31's mask (`fullUnbound`) against the ring fill's chain (`halfRing`). Its
+  ratio is the one sections 94 and 98 read.
+- **Section 97's line:** the ring fill's chain with its history, against `fullUnbound`.
+- **The ratios of sections 99, 104 and 106:** each fill's chain against today's page with round 31's mask (`fullUnbound`),
+  as they were measured.
+  - Section 106's "with the listed tile fill" is `halfUnbound` and `temporalUnbound`. That is the listed tile fill with
+    round 31's coverage, which was `half` before this round.
+- **Section 103's line:** the default fill by name, and the default chain against the default page. Both are bounded now,
+  and the line names the coverage as well as the fill.
+- **Section 107's line:** today's page "with it" (`full`), and the chain "with it" on the default fill (`half`). That is the
+  sum section 107 defined.
+- Sections 105 and 111 read committed reports, whose keys are as they were.
+- The pilot-size row checks each line's figure against the sum it names.
+
+**The rows that hold the change (the gate's sections 3 and 4):**
+1. **`coverage()` with nothing asked is the bounded coverage.** On the four scenes at both sizes and on the light behind the
+   camera, it has the same `traced` and the same bits as `{ bound: true }`. `{ bound: false }` traces 0, as round 31's
+   kernel counts nothing, and is round 31's.
+2. **At the pilot size:**
+   - `full` is the network at W x H plus `covFullB`;
+   - `half` is the network at w x h, `covHalfB`, `covFullB`, `fillLTile` and the rest, and `temporal` that plus the four
+     history passes;
+   - `fullUnbound`, `halfUnbound` and `temporalUnbound` are the same with `covHalf` and `covFull`;
+   - `coverage` is `"bound"`, `fill` is `"listedTile"`, and the table has 26 rows.
+3. **The rig lines**, made from the pilot's report, each carry the figure of the sum named above.
+
+**Sabotages, by the byte-safe runner (L1-L7):**
+- `coverage()`'s default back to round 31's;
+- `{ bound: false }` running the bounded kernel;
+- `full` summing `covFull`;
+- `half` summing `covHalf`;
+- `fullUnbound` summing `covFullB`;
+- the page without round 31's mask's page row;
+- section 93's line made from `full`.
+Each must turn at least one row red. A sabotage that goes 0 red is a finding to fix before the round is committed.
+
+**The rule.** The round holds when rows 1-3 pass on SwiftShader and every gate the branch runs stays as green as it was.
+No rig run is owed: the kernel and every timed step are round 39's, measured on both GPUs in section 111.
+
+**Nothing else changes:** the fill (section 112's), the network, every kernel table, the kernels themselves, and `fx/fsr`.
+With this round both of `denoise-halfres-fixed-costs`'s levers are closed. The Intel's next fixed cost is EASU
+(`denoise-easu-cost`).
+
+**Before commit.** Rows 1-3 passed on their first run here. L1-L7 each turned at least one row red and were restored
+byte-identical: L1, L3, L4, L5, L6 and L7 one red each.
+- **L2, as first written, left the bounded kernel's `traced` buffer unbound.** The device threw before any row could judge
+  it. It was red, but not by a row. Redone with the binding whole, it turned 2 rows red: round 39's and this round's, since
+  round 31's pass counts nothing.
+
