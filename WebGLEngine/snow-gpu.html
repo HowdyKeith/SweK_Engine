@@ -37,7 +37,9 @@
   <label>sun elevation <input id="sun" type="range" min="3" max="60" value="13" step="1"> <span id="sunv">13&deg;</span></label>
   <label><input id="walk" type="checkbox" checked> walker</label>
   <label><input id="taa" type="checkbox" checked> TAA</label>
-  <label>view <select id="dbg"><option value="0">beauty</option><option value="1">shadow visibility</option><option value="2">normals</option></select></label>
+  <label>view <select id="dbg"><option value="0">beauty</option><option value="1">shadow visibility</option><option value="2">normals</option><option value="3">cascades</option><option value="4">albedo</option><option value="5">fine normal</option></select></label>
+  <label>glints <input id="glint" type="range" min="0" max="2" value="0.55" step="0.01"> sastrugi <input id="sas" type="range" min="0" max="2" value="1" step="0.01"></label>
+  <label>subsurface <input id="sss" type="range" min="0" max="3" value="1" step="0.01"> haze <input id="haze" type="range" min="0" max="0.03" value="0.0072" step="0.0001"></label>
   <pre id="stats">starting&hellip;</pre>
   <div style="color:var(--dim);margin-top:4px">Lifted from Noniv/snowflow_demo (MIT, Maksymilian Dendura): vendor/snowflow.</div>
 </div>
@@ -71,6 +73,7 @@
     $("sun").addEventListener("input", (e) => { $("sunv").textContent = e.target.value + "°"; gpu.setSun(Number(e.target.value)); });
     $("taa").addEventListener("change", (e) => { gpu.state.taa = e.target.checked; gpu.state.historyValid = 0; });
     $("dbg").addEventListener("change", (e) => { gpu.state.debug = Number(e.target.value); });
+    for (const [id, k] of [["glint", "glint"], ["sas", "sastrugi"], ["sss", "sss"], ["haze", "aerial"]]) $(id).addEventListener("input", (e) => { gpu.state[k] = Number(e.target.value); });
     let clock = performance.now() / 1000, t0 = clock, fpsN = 0;
     async function loop() {
       const now = performance.now() / 1000, dt = Math.min(0.1, now - clock); clock = now;

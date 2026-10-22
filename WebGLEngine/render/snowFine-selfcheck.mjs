@@ -88,6 +88,9 @@ console.log("\n3. THE CLAIMS");
     ok("  exposure scours: sastrugi dominate the relief, so mean |height| is " + rip(1).toFixed(4) + " at exposure 1 against " + rip(0).toFixed(4) + " at 0", rip(1) > rip(0));
 }
 
+{
+    ok("  DETAIL_TEXEL_WGSL, the bake kernel and the mip kernel are WGSL, the chain is " + SF.DETAIL_LEVELS + " levels down from " + SF.DETAIL_RES + " px to 1", SF.DETAIL_TEXEL_WGSL.includes("fn detailTexel(") && SF.DETAIL_BAKE_KERNEL_WGSL.includes("textureStore(outTex") && SF.DETAIL_BAKE_KERNEL_WGSL.includes(SF.DETAIL_TEXEL_WGSL.trim().slice(0, 40)) && SF.DETAIL_MIP_KERNEL_WGSL.includes("0.25") && SF.DETAIL_LEVELS === Math.log2(SF.DETAIL_RES) + 1);
+}
 console.log("\n4. THE KERNEL");
 const skip = headlessGpuSkipReason(require_);
 if (skip) console.log("  SKIPPED  " + skip);
@@ -108,6 +111,10 @@ else {
         ok("!! within 5 m of the origin the WGSL equals the twin to the f32 hash's bound: worst height error terrainFine " + near[0].worst.toExponential(1) + " (median slope error " + near[0].med.toExponential(1) + "), terrainFineFiltered " + near[1].worst.toExponential(1) + " (" + near[1].med.toExponential(1) + "), windLocal " + near[2].worst.toExponential(1) + ", detailTexel " + near[3].worst.toExponential(1) + " (median " + near[3].med.toExponential(1) + ") over " + near[0].n + " queries each", near[0].worst < 5e-3 && near[0].med < 5e-3 && near[1].worst < 5e-3 && near[1].med < 5e-3 && near[2].worst < 1e-2 && near[3].med < 2e-2 && !g.wroteNothing, "adapter " + ((g.adapter && g.adapter.description) || "?"));
         console.log("  ----  FINDING: the f32 hash is not portable at distance. Out to 80 m the same function on the adapter agrees with the twin on only " + far[0].within + " of " + far[0].n + " terrainFine and " + far[1].within + " of " + far[1].n + " terrainFineFiltered queries to 5e-3 (worst " + far[0].worst.toFixed(3) + " m): the rotated, scaled lattice coordinates grow and the hash's fract chain throws away the bits. The page is its own reference; the twin grades the arithmetic near the origin.");
     }
+}
+if (!skip) {
+    const cb = await runWgslComputeNative({ code: SF.DETAIL_BAKE_KERNEL_WGSL, compileOnly: true, requireFn: require_ }), cm = await runWgslComputeNative({ code: SF.DETAIL_MIP_KERNEL_WGSL, compileOnly: true, requireFn: require_ });
+    ok("!! the detail bake kernel and the mip kernel COMPILE on the adapter (they are run, and their output read back, by snowGpu-selfcheck)", cb.ok && cm.ok, [...(cb.errors || []), ...(cm.errors || [])].join(" | ").slice(0, 200));
 }
 console.log(`\nsnowFine-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);
 exitCleanly(fails === 0 ? 0 : 1);

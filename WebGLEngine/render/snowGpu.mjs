@@ -1,6 +1,6 @@
 // WebGLEngine/render/snowGpu.mjs -- UNNUMBERED (the version is chosen at ship time).
 //
-// *** THE SNOWFLOW LIFT ON THE GPU: THE FOUR PIECES THE CPU PAGE COULD NOT DO. *** Slice 8 of snowflow-lift; snow-gpu.html drives it, tools/ship/snowGpuPage-selfcheck.mjs holds it.
+// *** THE SNOWFLOW LIFT ON THE GPU: THE FOUR PIECES THE CPU PAGE COULD NOT DO, THEN THE MATERIAL, THE CASCADES AND THE AERIAL LOBE. *** Slice 8 of snowflow-lift; snow-gpu.html drives it, tools/ship/snowGpuPage-selfcheck.mjs holds it.
 // render/toroidalDeform, deformRead, clipmapTerrain, skyBake, pcssShadow and taaResolve are each a CPU twin and a WGSL kernel graded against it. snow-deform.html puts them on the screen through the CPU. THIS is
 // the real path, one WebGPU frame:
 //   1  deform step      the compute kernel steps the toroidal field in a pair of storage buffers (the CPU keeps only the brush queue and the banked-time rule: DeformField.advance);
@@ -14,8 +14,16 @@
 //   6  present          tone map the history to the canvas.
 // The camera helpers (perspective with Halton jitter, view basis, inverse view, the light's orthographic fit) are pure and graded in node.
 //
-// NOT DONE, said plainly: upstream's snow shading (glints, sastrugi, SSS), cascaded shadows (one cascade here), the near-sky blur and forward lobe of applyAerial (the haze mixes toward the exact sky sample), a
-// character or any spell, and any timing on a real GPU -- the gate runs on this box's software adapter.
+// THE SNOW MATERIAL, THREE CASCADES, AND THE FULL AERIAL PERSPECTIVE (added after the first eight slices; each is its own module with a CPU twin and gate):
+//   shading      snow.fragment.wgsl's main, statement for statement where the inputs exist here (render/snowShading.mjs: GGX, wrap, subsurface, glints, SH ambient, RNM; render/snowFine.mjs: the filtered sastrugi, ripples
+//                and grain and the baked detail map, sampled with explicit gradients from a mipped texture the GPU bakes at start); the fine relief also displaces vertices where the ring resolves it (spacing < 0.42, faded) and
+//                the shadow pass sees it too, because it is the same surfaceOf;
+//   cascades     three shadow maps fitted per frame (render/cascades.mjs), three shadow passes, the lifted selection and cross-fade;
+//   aerial       the sky buffer is a MIP CHAIN (the bake, then five box-filter passes); applyAerial reads the blurred near sky (mip 3) and the Mie forward lobe, crossfaded to the exact sky.
+// SUBSTITUTIONS, all in fsTerrain: the baked macro texture (aux) is our own dunes -- the slope by central difference over 0.5 m and the exposure from auxBake's wide-stencil Laplacian on it; rockMask is 0 (no rock); the deformation texture is the
+// state buffer read through textureSampleLevelWrap; the spell lights are omitted; the sun's irradiance is sunColor x pi (the form's INV_PI then gives the old albedo x sunColor look); the shadow dither is animated with the frame index (TAA resolves it);
+// the sky specular reads skyAtLevel over the chain; the sun-visibility debug views are ours. NOT LIFTED: ridge.wgsl's far mountains, the character and spell passes.
+// NOT DONE, said plainly: speed or looks on a real GPU (the adapter is a software rasteriser), the ground-bounce solve (the sky's bounce is the bake's own constant), terrainMacro itself (our dunes stand in), film grain and AgX (the present pass is Reinhard).
 "use strict";
 import { KERNEL_WGSL, NOISE_WGSL, DeformField, MAX_BRUSHES, packParams } from "./toroidalDeform.mjs";
 import { DEFORM_READ_WGSL } from "./deformRead.mjs";
@@ -594,7 +602,7 @@ export async function createSnowGpu(device, { canvas = null, format = "bgra8unor
     // ---- textures
     const tex = (size, fmt, usage, label) => device.createTexture({ size, format: fmt, usage, label });
     let W = width, H = height, hdr, depthCol, sceneDepth, hist;
-    const shadowTex = Array.from({ length: CASCADE_COUNT }, (_, i) => tex([shadowRes, shadowRes], "depth32float", TU.RENDER_ATTACHMENT | TU.TEXTURE_BINDING, "shadow map " + i));
+    const shadowTex = Array.from({ length: CASCADE_COUNT }, (_, i) => tex([shadowRes, shadowRes], "depth32float", TU.RENDER_ATTACHMENT | TU.TEXTURE_BINDING | TU.COPY_SRC, "shadow map " + i));
     const detailTex = device.createTexture({ size: [DETAIL_RES, DETAIL_RES], format: "rgba16float", mipLevelCount: DETAIL_LEVELS, usage: TU.STORAGE_BINDING | TU.TEXTURE_BINDING | TU.COPY_SRC, label: "snow detail" });
     const detailSampler = device.createSampler({ addressModeU: "repeat", addressModeV: "repeat", magFilter: "linear", minFilter: "linear", mipmapFilter: "linear" });
     function makeTargets() {
