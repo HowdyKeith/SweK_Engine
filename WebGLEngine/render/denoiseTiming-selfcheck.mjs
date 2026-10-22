@@ -99,7 +99,7 @@ const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SELF = fileURLToPath(import.meta.url);
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
 const { TIMING_SIZES, largestBuffer, passBytes, timingInput, summarize, adapterOf, timingLadder, decodeNet, KERNEL_SETS, TIMED_SETS, SUBGROUP_SETS, SET_FEATURES, FXC_UNBUILT_SETS, FXC_UNTRIED_SETS, nativeSetsFor,
-        isDxcCompiler, nativeAdapterKey } = await imp("render/denoiseDevice.mjs");
+        isDxcCompiler, nativeAdapterKey, SET_CAP_MS, capSkip } = await imp("render/denoiseDevice.mjs");
 const { dawnFlags } = await imp("render/denoiseCompile.mjs");
 const H = await imp("tools/ship/headlessGpu.mjs");
 const { runInEngineOrigin } = await imp("tools/ship/webgpuHarness.mjs");
@@ -133,7 +133,18 @@ const FXC_SETS = Object.freeze(["r12", "r15"]), FXC_FLAGS = dawnFlags(["disable-
 const FXC_CHILD = process.argv.includes("--fxc-ladder"), RESULT = process.argv.includes("--result") ? process.argv[process.argv.indexOf("--result") + 1] : null;
 
 // what any ladder must be, wherever it ran: returns the rows that were measured
-function holds(label, r) {
+// SABOTAGED round 45 (section 114), each restored byte-identical: M1 SET_CAP_MS at 2000, 2 red; M2 timingLadder reading capMs for
+// every set, 1 red (the mini ladder's row); M3 the cap row reading CAP for every set went 0 RED as first written -- on SwiftShader no
+// set has a cap of its own -- so the lookup is capOfSet with a row over section 111's r41h, and M3 redone turned that row red; M4 the
+// cap given to r18u as well, 2 red
+// round 45: the cap a set's skips are judged by -- its own (SET_CAP_MS) where it has one, the ladder's CAP otherwise; and the cap
+// row's test, apart, so a fixture can hold both (on SwiftShader no set has a cap of its own, so a live ladder cannot)
+const capOfSet = (set) => (set && Object.hasOwn(SET_CAP_MS, set) ? SET_CAP_MS[set] : CAP);
+const capRowHolds = (rows, cap) => { let last = null, capped = true;
+    for (const x of rows) { if (!x.skipped) { last = x; continue; } if (/cap/.test(x.reason)) capped &&= !!last && last.elapsed.median * (x.H * x.W) / (last.H * last.W) > cap && x.reason.endsWith(`over the ${cap} ms cap`); }
+    return capped; };
+function holds(label, r, set = null) {
+    const capOf = capOfSet(set);
     const done = r ? r.rows.filter((x) => !x.skipped) : [];
     ok(`!! ${label}: the first size, ${TIMING_SIZES[0].join(" x ")}, measured; every time finite and positive; every skip says why`,
         !!r && done.length >= 1 && !r.rows[0].skipped && done.every((x) => [...x.raw.wall, ...(x.raw.gpu || [])].every((v) => Number.isFinite(v) && v > 0)) &&
@@ -150,12 +161,7 @@ function holds(label, r) {
         !!r && done.every((x) => x.timestamps === r.adapter.timestamps), `the adapter ${r?.adapter?.timestamps ? "offers" : "does not offer"} them`);
     ok(`!! ${label}: timing changes nothing -- the image a timed pass wrote is an untimed run's, bit for bit`, !!r && r.invisible === true);
     // a size is skipped by the cap only when the last measured pass, scaled by pixels, really predicts past it
-    let last = null, capped = true;
-    for (const x of r ? r.rows : []) {
-        if (!x.skipped) { last = x; continue; }
-        if (/cap/.test(x.reason)) capped &&= !!last && last.elapsed.median * (x.H * x.W) / (last.H * last.W) > CAP;
-    }
-    ok(`  ${label}: and the cap skips only the sizes the last measured pass predicts past ${CAP} ms`, capped);
+    ok(`  ${label}: and the cap skips only the sizes the last measured pass predicts past ${capOf} ms, its own cap`, capRowHolds(r ? r.rows : [], capOf));
     return done;
 }
 // the conv layers' multiply-adds a pixel, for a GFLOP/s figure beside each measured size (section 38's arithmetic)
@@ -268,7 +274,7 @@ function pairedHolds(label, r, wantAll = KERNEL_SETS) {
     const aside = r ? wantAll.filter((s) => Object.hasOwn(SET_FEATURES, s) && r.rows[s] && r.rows[s].every((x) => x.skipped && x.reason === `the adapter has no ${SET_FEATURES[s]} feature, which this set's kernel needs (${s === "r41h" ? "section 109" : "section 108"})`)) : [];
     for (const s of aside) console.log(`  SKIP  ${label} ${s}: ${r.rows[s][0].reason}`);
     const want = wantAll.filter((s) => !aside.includes(s));
-    for (const s of want) holds(`${label} ${s}`, r ? { adapter: r.adapter, rows: r.rows[s], invisible: r.invisible[s] } : null);
+    for (const s of want) holds(`${label} ${s}`, r ? { adapter: r.adapter, rows: r.rows[s], invisible: r.invisible[s] } : null, s);
     const A = want[0], others = want.slice(1);
     const turns = [...want, ...[...want].reverse(), ...want].join();
     // the sizes every set measured: there the sets took turns on one device, in the stated order
@@ -340,7 +346,7 @@ async function nativeLadder(W, { fxc = false, totalMs, onPlan = () => {} }) {
     trace(`native${fxc ? " FXC" : ""}: the ladder starts, sets ${plan.sets.join(",")}`);
     const r = await timingLadder(net, () => gpu.requestAdapter(), { sets: plan.sets, ...LADDER, totalMs, trace: (l) => trace(`native${fxc ? " FXC" : ""} ${l}`) });
     trace(`native${fxc ? " FXC" : ""}: the ladder returned`);
-    return { plan, r };
+    return { plan, r, gpu };
 }
 // the FXC ladder, from the gate: this file again in a child (spawnSync, stopped at FXC_CHILD_MS), its ladder back through a file --
 // on Windows a pipe can lose the last line a process writes (section 45; render/denoiseCompile-selfcheck.mjs's children)
@@ -377,6 +383,28 @@ console.log("1. THE LADDER'S ARITHMETIC");
         TIMING_SIZES[0].join() === "64,64" && TIMING_SIZES.at(-1).join() === "1920,1080" && TIMING_SIZES.every((z, i) => !i || z[0] * z[1] > TIMING_SIZES[i - 1][0] * TIMING_SIZES[i - 1][1]));
     ok("  a pass's largest buffer is the head's 81 logits a pixel: 672 MB at 1080p, what a device's storage limit is checked against",
         largestBuffer(net, 1080, 1920) === 1920 * 1080 * 81 * 4 && largestBuffer(net, 64, 64) === 64 * 64 * 81 * 4);
+    // ROUND 45 (section 114): r41h's own cap, so its 1920 x 1080 pass runs where section 111's predicted 2192-2485 ms; every
+    // other set keeps the ladder's. capSkip is the ladder's own skip (timingLadder calls it), so these rows are its arithmetic
+    ok("  round 45: SET_CAP_MS gives r41h alone a cap of its own, 4000 ms, and names only sets the device knows",
+        JSON.stringify(SET_CAP_MS) === JSON.stringify({ r41h: 4000 }) && Object.keys(SET_CAP_MS).every((k) => KERNEL_SETS.includes(k)) && Object.isFrozen(SET_CAP_MS),
+        JSON.stringify(SET_CAP_MS));
+    {
+        // the cap row's own judgement, on section 111's r41h: a 1080p pass predicted at 2373 ms is skipped rightly by the ladder's 1500
+        // ms cap and wrongly by r41h's own 4000 -- so the row must judge r41h by 4000, and r18u by 1500 (M3 went 0 red before this)
+        const fx = (reason) => [{ W: 1024, H: 1024, skipped: false, elapsed: { median: 1200 } }, { W: 1920, H: 1080, skipped: true, reason }];
+        const old = fx(`predicted 2373 ms a pass, over the ${CAP} ms cap`);
+        ok("  round 45: the cap row judges each set by its own cap -- r41h by 4000 ms, so section 111's skip at a predicted 2373 ms is wrong for it and right for r18u at 1500",
+            capOfSet("r41h") === 4000 && capOfSet("r18u") === CAP && capOfSet(null) === CAP &&
+            capRowHolds(old, capOfSet("r18u")) === true && capRowHolds(old, capOfSet("r41h")) === false && capRowHolds(fx("predicted 4351 ms a pass, over the 4000 ms cap").map((x, i) => (i ? x : { ...x, elapsed: { median: 2200 } })), capOfSet("r41h")) === true,
+            `r41h ${capOfSet("r41h")} ms, r18u ${capOfSet("r18u")} ms`);
+        const last = { ms: 1200, px: 1024 * 1024 }, at1080 = 1920 * 1080;   // 1200 ms at 1024 x 1024 predicts about 2373 at 1080p, section 111's r41h
+        const r41 = capSkip("r41h", last, at1080, { capMs: CAP }), r18 = capSkip("r18u", last, at1080, { capMs: CAP });
+        const over = capSkip("r41h", { ms: 2200, px: 1024 * 1024 }, at1080, { capMs: CAP }), none = capSkip("r41h", null, at1080, { capMs: CAP });
+        const flat = capSkip("r41h", last, at1080, { capMs: CAP, capBySet: {} });
+        ok("  round 45: a prediction between the two caps runs r41h and skips another set, a prediction past r41h's own cap skips it by that cap, and without the table it falls back to the ladder's",
+            r41 === null && r18 === `predicted 2373 ms a pass, over the ${CAP} ms cap` && over === "predicted 4351 ms a pass, over the 4000 ms cap" && none === null && flat === r18,
+            `r41h ${r41}; r18u ${r18}; r41h at 2200 ms ${over}; no table ${flat}`);
+    }
     const px = 1920 * 1080;
     ok("  round 15: a pass's buffers are the input, every layer's output and the image -- and r15 allocates no logits, 81 channels a pixel fewer than r14",
         passBytes(net, 1080, 1920, "r14") === px * 4 * (10 + 4 * 32 + 81 + 3) && passBytes(net, 1080, 1920, "r15") === passBytes(net, 1080, 1920, "r14") - px * 81 * 4 &&
@@ -487,7 +515,7 @@ console.log("\n2. NATIVE: node-webgpu's default adapter (on the rig, the GPU)");
 if (W0.refused) ok(`!! ${H.WEBGPU_ENV} names a node-webgpu package this box can load -- a refused one is a red here, never a skip`, false, W0.refused);
 else if (skip) console.log("  SKIP  " + skip);
 else {
-    let r = null, err = null, plan = null, noted = null, key = null, vendor = null;
+    let r = null, err = null, plan = null, noted = null, key = null, vendor = null, nativeGpu = null;
     // printed before the ladder, so a run that dies still names its trace
     say(`native: the trace is ${TRACE_FILE}`);
     try {
@@ -496,7 +524,7 @@ else {
         // fast pipeline cost minutes to build under the D3D12 compiler node-webgpu 0.6.0 ships -- with a 600 s ladder budget;
         // round 15 (section 46) adds r15, whose hidden layers are r14's; since section 57, r12 and r15; since section 61,
         // TIMED_SETS less what nativeSetsFor leaves out on this adapter; since section 66, by the compiler read off the package
-        ({ r, plan } = await nativeLadder(W0, { totalMs: NATIVE_MS, onPlan: (adapter, p) => {
+        ({ r, plan, gpu: nativeGpu } = await nativeLadder(W0, { totalMs: NATIVE_MS, onPlan: (adapter, p) => {
             plan = p; NATIVE_SETS = p.sets;
             // the rig's report names every adapter a gate ran on; this one is not reached through the browser harness, so it
             // says itself -- a "----" line realGpuRun keeps, and the SWEK_ADAPTER_LOG record it reads adapters from
@@ -513,6 +541,18 @@ else {
         } }));
     } catch (e) { err = String(e && e.message || e); }
     if (err) ok("!! the native ladder ran", false, err.slice(0, 200));
+    // ROUND 45 (section 114): the ladder itself reads a set's own cap -- r41h's cannot be seen here (no shader-f16), so a set this
+    // adapter builds is given one: r15 a cap no pass reaches and r12 none, under a capMs the first size already predicts past.
+    // r15 climbs to the second size and r12 stops there, by its cap's own words
+    if (!err && r && nativeGpu) {
+        let mini = null, mErr = null;
+        try { mini = await timingLadder(net, () => nativeGpu.requestAdapter(), { sizes: [[64, 64], [128, 128]], sets: ["r15", "r12"], rounds: 1, capMs: 0.001, capBySet: { r15: 1e9 }, warmup: 1, minReps: 1, maxReps: 2, budgetMs: 50, totalMs: 120000 }); }
+        catch (e) { mErr = String(e && e.message || e); }
+        const r15 = mini && mini.rows.r15[1], r12 = mini && mini.rows.r12[1];
+        ok("  round 45: the ladder reads a set's own cap -- given r15 one no pass reaches and r12 none, under a cap the first size predicts past, r15 runs its second size and r12 is skipped by the ladder's cap",
+            !!r15 && !r15.skipped && !!r12 && r12.skipped && /over the 0\.001 ms cap$/.test(r12.reason || ""),
+            mErr || (r12 ? `r15 ${r15.skipped ? "skipped: " + r15.reason : "ran"}; r12 ${r12.skipped ? r12.reason : "ran"}` : "no ladder"));
+    }
     else {
         // round 35: the trace holds this run's ladder, step by step -- a device asked for at every size it measured, and its end.
         // SABOTAGED round 35: timingLadder not tracing its requestDevice -> 1 red; the gate not handing timingLadder its trace -> 1 red;

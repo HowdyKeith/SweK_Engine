@@ -7714,3 +7714,70 @@ byte-identical: L1, L3, L4, L5, L6 and L7 one red each.
   it. It was red, but not by a row. Redone with the binding whole, it turned 2 rows red: round 39's and this round's, since
   round 31's pass counts nothing.
 
+
+## 114. ROUND 45 -- r41h's 1080p PASS UNDER A CAP THAT ADMITS IT: SECTION 109's RULE, OWED AGAIN, FIXED BEFORE THE RIG RUNS IT
+
+**Why now.** Section 111: H41 had no verdict. C3 asks for both sets' 1920 x 1080 passes on the device's clock, and the
+ladder's 1500 ms cap skipped r41h's in all four readings, because its predicted passes were 2192-2485 ms. A rerun as things
+stood could not meet C3. Keith chose the round that lifts the cap for that pass, over closing `denoise-f16-intel` on
+section 111's figures.
+
+**What changes, in `render/denoiseDevice.mjs`:**
+- **`SET_CAP_MS = { r41h: 4000 }`**, a cap a pass for the sets that need one above the ladder's own. `timingLadder` reads a
+  set's cap there and every other set's from `capMs`, as before.
+- The default stays `capMs`. So the gate's native ladder, its page ladder and the page's own ladder (`denoise.html`) each
+  take r41h's cap with no change of their own.
+- **Why 4000.** r41h's largest predicted pass was 2485 ms, so 4000 is 1.6 x over it. That leaves room for run-to-run spread
+  on the Intel; section 111's runs differed by up to 12 % at 1024 x 1024. It also stays under the gate's minutes: three
+  timed passes and one warmup at about 2.4 s add about 10 s a path.
+- **r18u keeps 1500 ms.** It ran its 1920 x 1080 pass in all four of section 111's readings (1121-1181 ms).
+- **No other set's cap moves**, and no kernel, table or ladder size changes.
+
+**The rows (the timing gate's arithmetic section, and the device gate):**
+1. `SET_CAP_MS` is exactly `{ r41h: 4000 }`, and every set it names is in KERNEL_SETS.
+2. On a fixture ladder, a set with a cap of its own is skipped only past that cap, and every other set at `capMs`. A
+   prediction between the two runs r41h and skips another set.
+3. The gate's "the cap skips only the sizes the last pass predicts past" row reads each set's own cap.
+
+**The rig run.** **On the Intel gen-9: two `realGpuRun --only denoise` runs**, at a commit carrying this section, read by
+**section 109's rule unchanged (H41)**:
+- C1 every gate green with exit 0;
+- C2 K0h on that path in both runs;
+- C3 both sets' 1920 x 1080 passes on the device's clock;
+- H41 holds on a path when r41h is at least 1.05 x as fast as r18u at 1920 x 1080 in both runs;
+- what it buys is section 109's.
+
+**On the GTX 1080 nothing is owed.** r41h needs `shader-f16`, which the 1080 does not offer, so it stands aside by name
+whatever its cap. An optional run there checks rounds 43 and 44's defaults (sections 112-113) on hardware, which no rule
+reads.
+
+**Predictions (stated so they can miss).** From section 111's ratios, r41h at 0.49-0.61 x r18u at every size it ran, falling
+slightly with size:
+- **r41h against r18u at 1920 x 1080: 0.45-0.60 x, on both paths, in both runs. H41 fails on both paths**, so r41h is
+  kept as a measured negative and `denoise-f16-intel` closes.
+- r41h's 1920 x 1080 pass is 1900-2700 ms, under the new cap.
+- Every gate is green.
+
+**Sabotages, by the byte-safe runner (M1-M4):**
+- `SET_CAP_MS` at 2000, which would still skip it;
+- `timingLadder` reading `capMs` for every set;
+- the gate's cap row reading `capMs` for every set;
+- the cap given to r18u as well.
+Each must turn at least one row red.
+
+**Nothing else changes:** every kernel, every table entry, the ladder's sizes, every other set's cap, and `fx/fsr`.
+
+**Before commit.** Rows 1-3 passed here, and the timing gate is green, with no r41h on SwiftShader. Two rows were added before
+commit:
+- **The mini ladder.** Rows 1 and 2 held the arithmetic and not the ladder's use of it. So a small real ladder now gives r15
+  a cap of its own and r12 none, and reads which one ran. Its first spelling made a second `create` call, which round 19's
+  one-create row turned red. It now reuses the native ladder's instance.
+- **The cap lookup.** M3 (the gate's cap row reading CAP for every set) went 0 red as first written, because no set here
+  has a cap of its own. So the lookup is now one function, with a row over section 111's r41h figures.
+
+The sabotages, each restored byte-identical:
+- M1, 2 red;
+- M2, 1 red (the mini ladder's row);
+- M3 redone, 1 red;
+- M4, 2 red.
+

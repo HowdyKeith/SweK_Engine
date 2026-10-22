@@ -48,8 +48,8 @@ node tools/ship/versionPreflight.mjs --next    # the next free version and sweep
    - **H40 failed on both of the 1080's paths:** r40s ran at 0.26-0.27 x r18t. It is a measured negative, and both entries
      stay r18t.
    - **H41 has no verdict.** K0h was green on the Intel, so the f16 kernel compiled and was exact. But the 1500 ms cap
-     skipped r41h's 1080p pass, and r41h ran at 0.49-0.61 x r18u wherever it was timed. `denoise-f16-intel` waits on Keith:
-     either a capped-for round, or closing it on these figures.
+     skipped r41h's 1080p pass, and r41h ran at 0.49-0.61 x r18u wherever it was timed. Keith chose the capped-for round:
+     **round 45 (section 114)**, r41h's cap at 4000 ms, owed two runs on the Intel (the 1080 optional).
    - **Section 110:** EASU is at least half the rest on the Intel, and the atomic costs nothing. Next is
      **`denoise-easu-cost`**.
    Round 36 (section 103) made the list fill the default, with round 31's ring fill kept as its reference.

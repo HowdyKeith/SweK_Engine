@@ -347,6 +347,17 @@ export const F16_SETS = Object.freeze(["r41h"]);
 export const SET_FEATURES = Object.freeze({ r40s: "subgroups", r41h: "shader-f16" });
 /** `sets` less those whose feature (SET_FEATURES) the adapter does not offer: what a ladder or gate may run on it. */
 export const featureSetsFor = (adapter, sets) => sets.filter((s) => !Object.hasOwn(SET_FEATURES, s) || !!(adapter && adapter.features && adapter.features.has(SET_FEATURES[s])));
+/**
+ * Round 45 (section 114): a cap a pass for the sets that need one above the ladder's own capMs -- r41h, whose 1920 x 1080 pass
+ * (predicted 2192-2485 ms on the Intel gen-9, section 111) the 1500 ms cap skipped, so section 109's C3 could not be met. Every
+ * other set takes capMs, as before.
+ */
+export const SET_CAP_MS = Object.freeze({ r41h: 4000 });
+/** The ladder's skip, as a pure function: why `set` does not run at px pixels, given its last measured pass ({ ms, px }), or null. */
+export function capSkip(set, last, px, { capMs = 1500, capBySet = SET_CAP_MS } = {}) {
+    const cap = Object.hasOwn(capBySet, set) ? capBySet[set] : capMs, predicted = last ? last.ms * px / last.px : 0;
+    return last && predicted > cap ? `predicted ${predicted.toFixed(0)} ms a pass, over the ${cap} ms cap` : null;
+}
 /** Round 41: the image's bound against the f64 network for r41h (section 109) -- 5.7 x the CPU twin's largest on the device gate's fixture. */
 export const F16_IMAGE_TOL = 1e-2;
 /**
@@ -762,7 +773,7 @@ export async function timingDevice(adapter, bytes) {
  * (round 13, section 39): `rounds` rounds, the sets' order reversed each round, so a device that warms up or throttles
  * during a size shares it between them -- each set's passes are pooled across the rounds. A size is skipped when the
  * adapter's buffers cannot hold it; a set is left out at a size its own last GUARD median (time()'s `elapsed`), scaled by
- * pixels, predicts past `capMs`, so the faster set can climb past where the slower one stops; and nothing runs once
+ * pixels, predicts past `capMs` (or its own cap in `capBySet`, SET_CAP_MS by default -- round 45), so the faster set can climb past where the slower one stops; and nothing runs once
  * `totalMs` is spent. On the first size each set measures, it also checks that timing changes nothing: the image a timed
  * pass wrote is an untimed run's, bit for bit.
  * Returns { adapter, sets, rows: { [set]: [{ H, W, skipped, reason, wall, gpu, perPass, timestamps, mpxPerS, order }] },
@@ -772,7 +783,7 @@ export async function timingDevice(adapter, bytes) {
  * each round's timing, the output check, the device's release -- so a process that dies in the ladder leaves its last step
  * behind where the caller writes it. It changes nothing the ladder does.
  */
-export async function timingLadder(net, newAdapter, { sizes = TIMING_SIZES, sets = KERNEL_SETS, rounds = 3, capMs = 1500, totalMs = 120000, C = net.layers[0].Cin,
+export async function timingLadder(net, newAdapter, { sizes = TIMING_SIZES, sets = KERNEL_SETS, rounds = 3, capMs = 1500, capBySet = SET_CAP_MS, totalMs = 120000, C = net.layers[0].Cin,
                                                       warmup = 2, minReps = 3, maxReps = 30, budgetMs = 2000, trace = () => {} } = {}) {
     const now = () => (globalThis.performance ?? Date).now(), start = now();
     const rows = Object.fromEntries(sets.map((s) => [s, []])), last = {}, invisible = {};
@@ -781,7 +792,7 @@ export async function timingLadder(net, newAdapter, { sizes = TIMING_SIZES, sets
         const bytes = largestBuffer(net, H, W), skip = {};
         for (const s of sets) {
             if (now() - start > totalMs) skip[s] = `the ladder's ${totalMs / 1000} s budget is spent`;
-            else if (last[s] && last[s].ms * (H * W) / last[s].px > capMs) skip[s] = `predicted ${(last[s].ms * (H * W) / last[s].px).toFixed(0)} ms a pass, over the ${capMs} ms cap`;
+            else if (capSkip(s, last[s], H * W, { capMs, capBySet })) skip[s] = capSkip(s, last[s], H * W, { capMs, capBySet });
         }
         const live = sets.filter((s) => !skip[s]);
         if (!live.length) { for (const s of sets) rows[s].push({ H, W, skipped: true, reason: skip[s] }); continue; }

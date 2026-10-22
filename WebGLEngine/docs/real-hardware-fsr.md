@@ -678,6 +678,33 @@ Nothing extra to run: the same two runs on each GPU carry it, at a commit carryi
 `section 110:` line with the rest's three passes timed apart and the transfer without its atomic. Section 110 predicts EASU
 the largest on the Intel (20-35 ms of ~42), and the atomic a third or more of the transfer's own time.
 
+### Rounds 43 and 44: the listed tile fill and the bounded coverage are the chain's defaults (sections 112 and 113)
+
+No run is owed. Both swap a default for a pass the rig already measured (rounds 38 and 39), bit for bit. The chain gate
+holds each default to its reference and keeps every rig line's meaning. Any later rig run of the chain gate checks both on
+that GPU as it goes.
+
+### Round 45: r41h's 1080p pass under a cap that admits it (pre-registration section 114)
+
+**On the Intel gen-9, two runs**, at a commit carrying section 114 (`git log -1 --oneline` shows it):
+
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r45-a.json
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r45-b.json
+```
+
+- **What is new:** r41h's ladder cap is 4000 ms (`SET_CAP_MS`), so its 1920 x 1080 pass runs on both ladders, native and
+  page. Every other set keeps 1500. Expect the timing gate to take about 20 s longer.
+- **Section 114 predicts:** r41h at 0.45-0.60 x r18u at 1920 x 1080, so H41 fails and `denoise-f16-intel` closes. Every gate
+  green.
+- **On the GTX 1080, nothing is owed.** r41h stands aside by name, since the 1080 has no shader-f16. One run with the same
+  command (`--out denoise-rig-r45-a_1080.json`) is optional, a hardware check of rounds 43 and 44's defaults that no rule
+  reads.
+- **Don't commit or pull between runs.**
+- **Send back the JSON files.**
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and
