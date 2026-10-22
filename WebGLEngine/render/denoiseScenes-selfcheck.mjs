@@ -498,6 +498,22 @@ console.log("\n15. ROUND 32'S SPLIT (pre-registration section 95)");
         `${refused} of 12 refused`);
 }
 
+console.log("\n16. ROUND 47'S SPLITS (pre-registration section 116)");
+{
+    const { SPLITS_R47, SPLITS_TEMPORALUP, SPLITS_EMITTER, SPLITS_HALFRES, SPLITS_FSR1, SPLITS_MESH } = D;
+    const earlier = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, SPLITS_TEMPORALUP]
+        .flatMap((S) => Object.values(S).flatMap((x) => x.seeds)));
+    const tests = [...SPLITS_R47.T1.seeds.map((s2) => ["R", s2]), ...SPLITS_R47.T2.seeds.map((s2) => ["C", s2])];
+    let refused = 0;
+    for (const [f, s2] of tests) { try { renderImages(f, s2, { w: 2, h: 2, sppIn: 1, sppRef: 1 }); } catch (e) { if (/dataset seed/.test(e.message)) refused++; } }
+    ok("!! SPLITS_R47: round 11's training and val scenes exactly (the same objects), H1 on 12 new scenes of R (48000) and H2 on 12 of C (49000), on seeds no earlier split used, every test seed refused without harvest",
+        Object.keys(SPLITS_R47).join() === "train,val,T1,T2" && SPLITS_R47.train === SPLITS_R11.train && SPLITS_R47.val === SPLITS_R11.val &&
+        SPLITS_R47.T1.family === "R" && SPLITS_R47.T1.seeds.every((s2, i) => s2 === 48000 + i) && SPLITS_R47.T1.seeds.length === 12 &&
+        SPLITS_R47.T2.family === "C" && SPLITS_R47.T2.seeds.every((s2, i) => s2 === 49000 + i) && SPLITS_R47.T2.seeds.length === 12 &&
+        tests.every(([, s2]) => !earlier.has(s2)) && refused === 24,
+        `${refused} of 24 refused`);
+}
+
 // round 32: guideBuffers' offset shifts the grid as the path tracer's pixelOffset does -- none and [0, 0] the same buffers, and a
 // one-pixel offset pixel x's guides what pixel x + 1's were
 {

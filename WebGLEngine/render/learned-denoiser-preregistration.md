@@ -7867,3 +7867,91 @@ The sabotages, each restored byte-identical:
 - Reported, deciding nothing: on SwiftShader at the pilot size the quad EASU took 1.42 ms against EASU's 1.84, and the fused
   pass 2.59 ms against EASU and the composite's 3.10. Those are a CPU's times.
 
+
+## 116. ROUND 47 -- THE NETWORK AT 16 CHANNELS, ON ROUND 11's SCENES: FIXED BEFORE ANY OF ITS TEST SCENES EXIST
+
+Committed with the code that implements it. No scene of this round's T1 or T2 has been rendered, and no network of this
+round has been trained.
+
+**The question.** Rounds 12-46 made the shipped network cheaper without changing a weight. It is still the chain's largest
+cost on both GPUs: on the Intel, r18u at 960 x 540 took 283-306 ms in section 111's runs, against tens of ms for every other
+step. `denoise-smaller-network` is the largest single lever, because the hidden layers' arithmetic goes with the square of
+their width. It is also the one that reopens the quality question, which is why section 39 kept it out of every kernel
+round. Keith chose it for this round.
+
+> **Trained as the shipped network was trained, on the same scenes, does a network of half its width still beat the
+> filter on new scenes of both families?**
+
+**One deliberate change from round 11: the hidden layers are 16 channels, not 32 (`size: "w16"`, SHAPE_KERNEL_W16).**
+- **What stays:** the same four 3 x 3 layers, the same 9 x 9 receptive field (the window the kernel weighs), and the same
+  1 x 1 head of 81 taps. That makes 9,793 parameters with the mask, against 33,329.
+- **The cost:** the hidden layers' arithmetic is about a quarter of the shipped network's. Measured here, a training step
+  took 236 ms against 832 ms (0.28 x).
+- **Everything else is round 11's,** option by option (render/denoiseStudy-selfcheck.mjs holds ROUND47 to ROUND11 except the
+  names below):
+  - the 192 training scenes (round 7's 96 of R and round 10's 96 of C, the same objects) and its 8 val scenes;
+  - 4,500 steps, seeds 1, 2 and 3, Adam at 1e-3, zero-last init, the emitter mask;
+  - the filter and its grid, tuned on the 192;
+  - the sign-flip test, Holm over {H1, H2}, and C0-C5 with the stop before the tests.
+- **H1 is new scenes of R; H2 is new scenes of C,** as in round 11.
+
+**Splits (`SPLITS_R47`):**
+
+| Split | Scenes | Seeds |
+|---|---|---|
+| train | round 11's 96 of R and 96 of C | 20000-20095 and 30000-30095 |
+| val | round 11's 4 of R and 4 of C | 21000-21003 and 31000-31003 |
+| T1 -> **H1** | 12 of R | **48000-48011** |
+| T2 -> **H2** | 12 of C | **49000-49011** |
+
+Both test ranges are new, and render/denoiseScenes-selfcheck.mjs refuses every test seed without the harvest's flag.
+
+**Secondary (reported, never tested): the 32-channel network beside it** (`compareSize: { size: "large", train: TRAIN_LONG }`).
+- This is round 11's network, trained again from nothing on the same scenes with the same schedule and seeds, and
+  measured on this round's test images.
+- Its statistics against the same filter are reported for both hypotheses. So what the narrowing costs is read on one set
+  of images, not across rounds.
+- The 1- and 16-sample inputs, val and time are reported, as always.
+
+**What was seen first.**
+- Everything in sections 1-115.
+- **No pilot.** No network of this width has been trained on these scenes, and none of their figures has been seen. The one
+  measurement is the step time above, on random data.
+- Round 9 is the nearest evidence. There, round 8's small network (three layers of 16, a 7 x 7 field, 1,500 steps) won 11 of
+  12 on held-out R with error 28 % above the large one's. This network has the large one's depth and field and its
+  4,500 steps.
+
+**Predictions (stated so they can miss).**
+- **C0 and C1 hold** on the training images.
+- **H1 supported:** mean d +0.30 to +0.50, against round 11's +0.548 for the large network on its own test set.
+- **H2 supported:** mean d +0.40 to +0.70, against round 11's +0.765.
+- **The w16 network's error 10-25 % above the large network's** on each family, on this round's own images (the secondary).
+
+**The command:** `node tools/denoiseStudy.mjs --harvest-r47 --cache <dir> --workers 4` -> `render/denoise-results-r47.json`.
+- It refuses if the file exists.
+- It trains 10 networks: four of w16 (seeds 1-3, and C4's second seed 1), three shuffled-target ones of w16, and three large
+  ones.
+- It renders 224 scenes, plus the secondary inputs. Expect about 2.5-3 hours on this host and one resume past the
+  background limit (sections 24 and 30).
+
+**The outcomes:**
+- **H1 and H2 supported:** the narrower network beats one filter on new scenes of both families it was trained on.
+  - It goes to the device, in rounds of its own: the export, its kernel sets, the tables and the rig's timing.
+  - The secondary's gap to the large network is reported beside it.
+- **H1 only, or H2 only, or neither:** it does not go to the device. The large network on the same images says whether the
+  narrowing lost what round 11's network had.
+- **Not reported:** C0 or C1 fired on the training images, or C4 or C5 fired.
+
+**Sabotages, by the byte-safe runner (O1-O5):**
+- ROUND47 training the large network as its primary;
+- T1 on round 11's test range (34000);
+- SPLITS_R47 left out of the dataset refusal;
+- the w16 network's hidden layers at 24 channels;
+- the comparison network dropped.
+
+Each must turn at least one row red.
+
+**Nothing else changes:** the shipped network and every page and device path, every kernel table, and `fx/fsr`.
+
+**Before commit.** Every new row passed on its first run here, and the miniature ran the w16 primary with the large network
+beside it. O1-O5 each turned 1 row red and were restored byte-identical.

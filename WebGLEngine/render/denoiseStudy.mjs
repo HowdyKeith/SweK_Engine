@@ -21,7 +21,7 @@
 // Without it everything is computed, as before; with it the result is the same, bit for bit
 // (render/denoiseCache-selfcheck.mjs). A scene rendered under --harvest is never served to a run without it.
 "use strict";
-import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, SPLITS_TEMPORALUP, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
+import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, SPLITS_TEMPORALUP, SPLITS_R47, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
 import { renderSequence, temporalChannels, sequenceSeeds } from "./denoiseTemporal.mjs";
 import { withMask, emitterCoverage, emitterRadiance, MASK_STRIDE, MASK_CHANNEL, COVERAGE_GRID } from "./denoiseMask.mjs";
 import { jointBilateral, tuneFilter } from "./denoiseFilter.mjs";
@@ -44,6 +44,7 @@ export const RESULTS_R8 = "render/denoise-results-r8.json";
 export const RESULTS_R9 = "render/denoise-results-r9.json";
 export const RESULTS_R10 = "render/denoise-results-r10.json";
 export const RESULTS_R11 = "render/denoise-results-r11.json";
+export const RESULTS_R47 = "render/denoise-results-r47.json";
 
 /**
  * The two harvests, each exactly as its section of the pre-registration fixed it. ROUND1 is kept so its recorded run
@@ -111,10 +112,19 @@ export const ROUND11 = Object.freeze({ splits: SPLITS_R11, init: INIT, c0: true,
                                        temporal: false, emitterMask: true, c1OnTraining: true, test: "signflip",
                                        compareTrainSplits: Object.freeze({ R: SPLITS_R7.train, C: SPLITS_R10.train }), results: RESULTS_R11 });
 /**
+ * Section 116, round 47 (denoise-smaller-network): round 11 exactly -- its 192 training scenes, schedule, seeds, test and
+ * controls -- with ONE change, the network 16 channels wide (size "w16", SHAPE_KERNEL_W16), on new test scenes of both families.
+ * Secondary: the 32-channel network round 11 shipped, trained again on the same scenes with the same schedule (compareSize),
+ * measured on the same test images, so what the narrowing costs is read on one set of images.
+ */
+export const ROUND47 = Object.freeze({ ...ROUND11, splits: SPLITS_R47, size: "w16", compareTrainSplits: null,
+                                       compareSize: Object.freeze({ size: "large", train: TRAIN_LONG }), results: RESULTS_R47 });
+/**
  * tools/denoiseStudy.mjs's commands, each to its round, newest first (section 33). --secondary-r11 is round 11 exactly, writing its own file: the harvest's
  * results (render/denoise-results-r11.json) were written without section 32's secondary, and are never overwritten.
  */
 export const HARVESTS = Object.freeze({
+    "--harvest-r47": ROUND47,
     "--secondary-r11": Object.freeze({ ...ROUND11, results: "render/denoise-results-r11-secondary.json" }),
     "--harvest-r11": ROUND11, "--harvest-r10": ROUND10, "--harvest-r9": ROUND9, "--harvest-r8": ROUND8, "--harvest-r7": ROUND7, "--harvest-r6": ROUND6,
     "--harvest-r5": ROUND5, "--harvest-r4": ROUND4, "--harvest-r3": ROUND3, "--harvest-r2": ROUND2, "--harvest-r1": ROUND1,

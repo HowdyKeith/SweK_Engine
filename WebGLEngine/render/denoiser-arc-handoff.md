@@ -52,6 +52,12 @@ node tools/ship/versionPreflight.mjs --next    # the next free version and sweep
      **round 45 (section 114)**, r41h's cap at 4000 ms, owed two runs on the Intel (the 1080 optional).
    - **Section 110:** EASU is at least half the rest on the Intel, and the atomic costs nothing. Next is
      **`denoise-easu-cost`**.
+2. **Since section 111:** rounds 43-44 made the listed tile fill and the bounded coverage the defaults (sections 112-113).
+   - Round 45 (section 114) lifts r41h's cap for H41.
+   - Round 46 (section 115) is EASU in quads, fused with the composite.
+   - Rounds 45 and 46 share two Intel rig runs.
+   - **Round 47 (section 116)** trains the network at 16 channels on round 11's scenes. Its harvest runs here, not on the
+     rig.
    Round 36 (section 103) made the list fill the default, with round 31's ring fill kept as its reference.
    **`denoise-1080-native-crash`:** round 35 did not reproduce it in five runs (section 102). The traces stay armed.
    **Earlier, `denoise-1080-native-crash`, round 35 (section 101).** On the 1080 the timing gate dies inside its native ladder in most

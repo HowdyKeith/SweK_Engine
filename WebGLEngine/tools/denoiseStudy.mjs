@@ -10,6 +10,7 @@
 //                                                     upscale and composited at full size -> render/denoise-results-emitter.json
 //       node tools/denoiseStudy.mjs --harvest-mesh  the SHIPPED network and filter on the engine's own geometry, nothing trained (section 79)
 //                                                  -> render/denoise-results-mesh.json
+//       node tools/denoiseStudy.mjs --harvest-r47  round 11 with the network 16 channels wide, the 32-channel one beside it (section 116) -> render/denoise-results-r47.json
 //       node tools/denoiseStudy.mjs --harvest-r11  one large network trained on families R and C together (section 32) -> render/denoise-results-r11.json
 //       node tools/denoiseStudy.mjs --secondary-r11  round 11 again, for section 32's secondary the first run skipped (section 33)
 //                                                    -> render/denoise-results-r11-secondary.json
@@ -166,7 +167,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         // section 33: the verdict is in the file, which is committed before it is read -- the log says only that it was written
         console.log(`[denoiseStudy] wrote ${round.results}`);
     } else {
-        console.log("usage: node tools/denoiseStudy.mjs --mini | --harvest-temporalup | --harvest-emitter | --harvest-halfres | --harvest-fsr1 | --harvest-mesh | --secondary-r11 | --harvest-r11 | --harvest-r10 | --harvest-r9 | --harvest-r8 | --harvest-r7 | --harvest-r6 | --harvest-r5 | --harvest-r4 | --harvest-r3 | --harvest-r2 | --harvest-r1 [--cache <dir>] [--workers <n>]   (a harvest renders the pre-registered dataset; see render/learned-denoiser-preregistration.md)");
+        console.log("usage: node tools/denoiseStudy.mjs --mini | --harvest-temporalup | --harvest-emitter | --harvest-halfres | --harvest-fsr1 | --harvest-mesh | --harvest-r47 | --secondary-r11 | --harvest-r11 | --harvest-r10 | --harvest-r9 | --harvest-r8 | --harvest-r7 | --harvest-r6 | --harvest-r5 | --harvest-r4 | --harvest-r3 | --harvest-r2 | --harvest-r1 [--cache <dir>] [--workers <n>]   (a harvest renders the pre-registered dataset; see render/learned-denoiser-preregistration.md)");
         process.exit(2);
     }
 }

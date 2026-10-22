@@ -32,7 +32,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
-const { SHAPE, TRAIN, INITS, INIT, HEADS, KERNEL_RADIUS, KERNEL_TAPS, SHAPE_KERNEL, SHAPE_KERNEL_LARGE, SIZES, TRAIN_LONG, headOf, shapeFor, makeDenoiser, paramCount,
+const { SHAPE, TRAIN, INITS, INIT, HEADS, KERNEL_RADIUS, KERNEL_TAPS, SHAPE_KERNEL, SHAPE_KERNEL_LARGE, SHAPE_KERNEL_W16, SIZES, TRAIN_LONG, headOf, shapeFor, makeDenoiser, paramCount,
         denoise, lossAndGrads, cropAt, trainDenoiser } = await imp("render/denoiseNet.mjs");
 const { cloneNet } = await imp("brain/convNet.mjs");
 const { relMSE } = await imp("render/denoiseStats.mjs");
@@ -195,10 +195,18 @@ console.log("\n8. THE LARGER NETWORK, TRAINED LONGER (pre-registration section 2
     // four 3 x 3 layers see 2 * 4 + 1 = 9 pixels across: the window the kernel weighs. The small one's three see 7.
     const conv3 = SHAPE_KERNEL_LARGE.filter((L) => (L[3] ?? 3) === 3).length, reach = 2 * conv3 + 1;
     ok("!! the large network: four 3 x 3 layers of 32 -- a receptive field of exactly the 9 x 9 window it weighs -- and the same 1 x 1 head; 33,329 parameters with the mask",
-        SIZES.join() === "small,large" && conv3 === 4 && reach === 2 * KERNEL_RADIUS + 1 && SHAPE_KERNEL_LARGE.slice(0, 4).every((L) => L[1] === 32 && L[2] === "relu") &&
+        SIZES.join() === "small,large,w16" && conv3 === 4 && reach === 2 * KERNEL_RADIUS + 1 && SHAPE_KERNEL_LARGE.slice(0, 4).every((L) => L[1] === 32 && L[2] === "relu") &&
         JSON.stringify(SHAPE_KERNEL_LARGE[4]) === JSON.stringify([32, 81, "none", 1]) && paramCount(makeDenoiser(1, INIT, "kernel", 10, "large")) === 33329 &&
         paramCount(makeDenoiser(1, INIT, "kernel", 9, "large")) === 33041 && paramCount(makeDenoiser(1, INIT, "kernel", 10)) === 7473,
         `receptive field ${reach} x ${reach}; the small one's ${2 * SHAPE_KERNEL.filter((L) => (L[3] ?? 3) === 3).length + 1}`);
+    // ROUND 47 (section 116): the same four layers and 9 x 9 field at 16 channels -- the width alone differs from the large one
+    const w16 = shapeFor("kernel", 10, "w16");
+    ok("!! round 47: the w16 network is the large one's shape with every hidden width 16 -- four 3 x 3 layers, the 9 x 9 field, the same 1 x 1 head -- 9,793 parameters with the mask, and a residual w16 refused",
+        SHAPE_KERNEL_W16.length === SHAPE_KERNEL_LARGE.length && SHAPE_KERNEL_W16.every((L, i) => L[2] === SHAPE_KERNEL_LARGE[i][2] && (L[3] ?? 3) === (SHAPE_KERNEL_LARGE[i][3] ?? 3) &&
+            L[0] === (i ? 16 : SHAPE_KERNEL_LARGE[0][0]) && L[1] === (i < 4 ? 16 : KERNEL_TAPS)) &&
+        w16[0][0] === 10 && paramCount(makeDenoiser(1, INIT, "kernel", 10, "w16")) === 9793 && shapeFor("kernel", 9, "w16") === SHAPE_KERNEL_W16 &&
+        (() => { try { shapeFor("residual", 9, "w16"); return false; } catch (e) { return /w16 network is a kernel-predicting network/.test(e.message); } })(),
+        `${SHAPE_KERNEL_W16.map((L) => `${L[0]}->${L[1]}`).join(", ")}; ${paramCount(makeDenoiser(1, INIT, "kernel", 10, "w16"))} parameters`);
     ok("  the small network is the default everywhere, a large residual network and an unknown size are refused",
         shapeFor("kernel", 9) === SHAPE_KERNEL && shapeFor("kernel", 9, "large") === SHAPE_KERNEL_LARGE &&
         [() => shapeFor("residual", 9, "large"), () => shapeFor("kernel", 9, "huge")].every((f) => { try { f(); return false; } catch { return true; } }));

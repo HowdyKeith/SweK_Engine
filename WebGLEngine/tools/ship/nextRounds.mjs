@@ -2309,7 +2309,7 @@ export const NEXT_ROUNDS = [
         id: "denoise-smaller-network",
         blocker: "OPEN",
         what: "A narrower network -- 24 hidden channels (~0.56x the hidden layers' cost) or 16 (~0.25x) -- trained and tested against the filter.",
-        how: "A round in round 11's shape: train on the same 192 R + C scenes, a pre-registered harvest against the filter on new test scenes. Hours here, no rig needed for the quality question.",
+        how: "A round in round 11's shape: train on the same 192 R + C scenes, a pre-registered harvest against the filter on new test scenes. Hours here, no rig needed for the quality question. ROUND 47 (pre-registration section 116), Keith's choice, is that round at 16 channels (size w16: the large network's four layers and 9 x 9 field, 9,793 parameters, a training step 0.28 x the large one's here), with the 32-channel network trained again beside it on the same test images (48000 R, 49000 C). Owed: its harvest here, node tools/denoiseStudy.mjs --harvest-r47 --cache <dir> --workers 4; section 116 predicts H1 and H2 supported, mean d +0.30-0.50 and +0.40-0.70.",
         why: "The largest single speed lever, and the one that reopens the quality question -- which is why section 39 kept it out of every kernel round.",
     },
     {
