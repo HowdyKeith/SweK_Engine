@@ -637,6 +637,23 @@ node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r39-b.json
 - **Don't commit or pull between runs.**
 - **Send back all four JSON files.**
 
+### Round 40: the 1080's hidden layers sharing inputs across a subgroup (pre-registration section 108)
+
+The same two runs on each GPU serve rounds 38, 39 and 40, at a commit carrying section 108 (`git log -1 --oneline` shows it):
+
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r40-a.json
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r40-b.json
+```
+
+- **What is new:** both ladders also time `r40s` where the adapter has subgroups (the 1080), with `r40s against r18t` lines
+  tagged section 108; the device gate holds it cell for cell natively and in Chrome. On the Intel it stands aside by name.
+- **Section 108 predicts:** r40s 0.8-1.3 x r18t at 1920 x 1080 on the 1080; H40 is not called either way. Every gate green.
+- **Don't commit or pull between runs.**
+- **Send back all four JSON files.**
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and

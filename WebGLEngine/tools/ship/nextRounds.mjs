@@ -2295,11 +2295,9 @@ export const NEXT_ROUNDS = [
     {
         id: "denoise-subgroup-reduction",
         blocker: "OPEN",
-        // OFF ITS BLOCKER after v4873, FOR THE GTX 1080 ONLY: the first features reading shows the 1080 exposing subgroups (size 32, with
-        // subgroup-size-control) natively and in Chrome, and gen-9 NOT exposing the feature on driver 31.0.101.2137, though its info names 16.
-        what: "Kernels that share inputs or reduce sums across a subgroup -- the order the scratch study's tree sum stands in for (1.6e-7 from f64, as exact as today's path).",
-        how: "Needs the subgroups feature, natively (Dawn over DXC's wave ops) and in Chrome; then the same restated key as Winograd.",
-        why: "No multiply saved, so its gain is occupancy and shared-memory traffic -- uncertain enough that it waits behind Winograd.",
+        what: "Kernels that share inputs or reduce sums across a subgroup -- the order the scratch study's tree sum stands in for (1.6e-7 from f64, as exact as today's path). ROUND 40 (pre-registration section 108) built the input-sharing half: brain/conv2d.mjs's k_conv_sub and the set r40s, waiting on the rig.",
+        how: "r40s: r18t's work a thread (2 rows of a column, 8 vec4s) with its inputs shared across a subgroup by subgroupShuffle instead of staged in workgroup memory -- no barrier, the canonical order, so held to conv2dCpu cell for cell (K0s): green natively and in the browser on SwiftShader's 4-lane subgroups, every hidden layer r15's bits where nothing fused. Stands aside by name without the subgroups feature (the Intel) and under FXC. Owed: two realGpuRun --only denoise runs on each GPU, read by section 108's rule (H40: r40s >= 1.05 x r18t at 1920 x 1080 in both runs, per path, on the 1080). The reduction half (a tree sum across lanes) is not built: it would move the order and need a restated key.",
+        why: "No multiply saved, so its gain is occupancy and shared-memory traffic -- uncertain enough that it waited behind Winograd, which lost (section 86). With the fill and coverage levers in hand (sections 103-107), the network is the 1080's largest cost, and this is the lever testable before the rig.",
         upstream: "CLEARED for the 1080 only -- rig-adapter-features-probe: subgroups at size 32 natively and in Chrome (render/denoise-rig-features-gtx1080.json); gen-9 does not expose the feature. The restated exactness key it also waited on held on hardware in section 86 (round 27: K0w natively and in Chrome on both GPUs).",
     },
     {

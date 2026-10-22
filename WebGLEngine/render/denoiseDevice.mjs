@@ -61,7 +61,7 @@
 // unless told otherwise; section 39's outcome rule, read off the rig, is what may change it. The timing ladder times
 // the sets it is handed, taking turns on one device.
 "use strict";
-import { conv2dWgsl, conv2dTiledWgsl, conv2dFastWgsl, conv2dHeadWgsl, packProbeUniforms, packFastUniforms, packHeadUniforms, fastShape, headShape,
+import { conv2dWgsl, conv2dTiledWgsl, conv2dSubWgsl, packSubUniforms, subShape, subWorkgroups, conv2dFastWgsl, conv2dHeadWgsl, packProbeUniforms, packFastUniforms, packHeadUniforms, fastShape, headShape,
          conv2dTileWgsl, packTileUniforms, tileShape, tileWorkgroups, conv2dFastAltWgsl, packFastAltUniforms, fastAltShape,
          planarToChannelsLast, conv2dCpu, conv2dCpuFma, TILE, K_MAX, COUT_MAX,
          conv2dWinoWgsl, packWinoUniforms, winoShape, winoWorkgroups, conv2dCpuWino, conv2dCpuWinoFma } from "../brain/conv2d.mjs";
@@ -314,7 +314,7 @@ export function kernelApplyCpu(x, logits, H, W) {
 }
 
 /** The kernel sets a pass can run on: round 12's, round 13's fast kernel (section 39), round 14's (section 43), round 15's (section 46), round 18's two (section 61), round 27's Winograd set (section 83). */
-export const KERNEL_SETS = Object.freeze(["r12", "r13", "r14", "r15", "r18t", "r18u", "r27w"]);
+export const KERNEL_SETS = Object.freeze(["r12", "r13", "r14", "r15", "r18t", "r18u", "r27w", "r40s"]);
 /**
  * Round 18 (section 61): the kernel each round-18 set runs its hidden layers on, and that kernel's configuration --
  * brain/conv2d.mjs's pixel-tiled kernel (tileShape's cfg) or its fast kernel written another way (fastAltShape's opts).
@@ -330,11 +330,21 @@ export const R18_KERNELS = Object.freeze({
  */
 export const R27_KERNELS = Object.freeze({ r27w: Object.freeze({ kernel: "wino", cfg: Object.freeze({ g4: 1 }) }) });
 /**
+ * Round 40 (section 108): the kernel the subgroup set runs its hidden layers on, and its configuration (subShape's cfg): r18t's
+ * work a thread -- 2 rows of one column, 8 vec4s of output channels -- its inputs shared across a subgroup, not staged.
+ */
+export const R40_KERNELS = Object.freeze({ r40s: Object.freeze({ kernel: "sub", cfg: Object.freeze({ rows: 2, g4: 8 }) }) });
+/** Round 40: the sets that need the adapter's `subgroups` feature -- left out, by name, wherever the adapter does not offer it. */
+export const SUBGROUP_SETS = Object.freeze(["r40s"]);
+/** `sets` less those an adapter without the `subgroups` feature cannot build (SUBGROUP_SETS): what a ladder or gate may run on it. */
+export const featureSetsFor = (adapter, sets) => (adapter && adapter.features && adapter.features.has("subgroups") ? [...sets] : sets.filter((s) => !SUBGROUP_SETS.includes(s)));
+/**
  * Round 27: the sets no gate builds natively on a D3D12 adapter whose compiler is FXC because nobody has tried -- FXC_UNBUILT_SETS
  * is the sets FXC was SEEN to fail. Since section 70 the pin's compiler is DXC, and an FXC that never finishes a pipeline stops a
  * gate for its whole budget (section 56), so an untried kernel stands aside under FXC on the safe side.
  */
-export const FXC_UNTRIED_SETS = Object.freeze(["r27w"]);
+// round 40 (section 108): r40s too -- its subgroup kernel is wave operations, shader model 6, which FXC does not compile at all
+export const FXC_UNTRIED_SETS = Object.freeze(["r27w", "r40s"]);
 /**
  * The sets no gate builds natively on a D3D12 adapter whose compiler is FXC: node-webgpu 0.6.0's FXC stopped on r18t's kernel
  * and crashed on r18u's (section 60). Round 18 called them browser-only; 0.6.2's DXC built both natively (section 65).
@@ -355,7 +365,7 @@ export const nativeSetsFor = (adapter, sets, { compiler = null } = {}) =>
  * round 18's two (section 61) and round 27's (section 83) -- on the page always, natively where nativeSetsFor allows (since section 66, a DXC run on D3D12 too). Section 54 added round 16's two
  * candidates and section 57 withdrew them; r13 and r14 are decided (sections 49 and 50) and left out.
  */
-export const TIMED_SETS = Object.freeze(["r12", "r15", "r18t", "r18u", "r27w"]);
+export const TIMED_SETS = Object.freeze(["r12", "r15", "r18t", "r18u", "r27w", "r40s"]);
 /** The set a pass runs unless told otherwise: r15, by section 46's default rule on both GPUs (section 50) -- 9.25 x against r14's 6.33. */
 export const DEFAULT_KERNELS = "r15";
 /** The set denoise.html runs on an adapter PAGE_KERNELS_BY_ADAPTER does not name: r15, by section 46's page rule on both GPUs (section 50) -- 9.25 x against r13's 6.49 and r14's 6.33. */
@@ -421,13 +431,15 @@ export async function createNativeDenoiser(adapter, dev, net, { H, W, C, compile
  * only the last, because only k_apply_fast reads a planar layer. r15: r13's, except that the last layer, when it is the 1 x 1
  * head of KERNEL_TAPS logits and fits, runs with the kernel apply as one pass, k_head_apply. r18t and r18u: r15's last layer;
  * every other layer on the set's R18_KERNELS kernel when it fits, else r15's kernel for it. r27w: the same, on R27_KERNELS's
- * Winograd kernel, which holds 3 x 3 layers only.
+ * Winograd kernel, which holds 3 x 3 layers only. r40s (round 40): the same, on R40_KERNELS's subgroup kernel, which holds an odd k
+ * and input channels in whole blocks -- so the network's first layer (10 channels) runs r15's kernel.
  */
 export const kernelFor = (L, set = DEFAULT_KERNELS, last = false) => {
     if (!KERNEL_SETS.includes(set)) throw new Error(`denoiseDevice: no kernel set "${set}" -- the sets are ${KERNEL_SETS.join(", ")}`);
     if (set === "r14" && last && headShape(L).fits) return "head";
-    if ((set === "r15" || set in R18_KERNELS || set in R27_KERNELS) && last && L.Cout === KERNEL_TAPS && headShape(L).fits) return "head_apply";
+    if ((set === "r15" || set in R18_KERNELS || set in R27_KERNELS || set in R40_KERNELS) && last && L.Cout === KERNEL_TAPS && headShape(L).fits) return "head_apply";
     if (set === "r27w" && winoShape(L, R27_KERNELS.r27w.cfg).fits) return "wino";
+    if (set === "r40s" && subShape(L, R40_KERNELS.r40s.cfg).fits) return "sub";
     if (set === "r18t" && tileShape(L, R18_KERNELS.r18t.cfg).fits) return "tile_inline";
     if (set === "r18u" && fastAltShape(L, R18_KERNELS.r18u.cfg).fits) return "fast_unroll";
     return set !== "r12" && fastShape(L).fits ? "fast" : L.k <= K_MAX && L.Cout <= COUT_MAX ? "tiled" : "direct";
@@ -465,7 +477,7 @@ export function denoiseTwin(net, x, H, W, set = DEFAULT_KERNELS) {
  * pipelines are built once -- only the kernels the set uses, the fast kernel once per layer, as it is generated for one;
  * destroy() frees the buffers.
  */
-export async function createDeviceDenoiser(dev, net, { H, W, C, kernels = DEFAULT_KERNELS }) {
+export async function createDeviceDenoiser(dev, net, { H, W, C, kernels = DEFAULT_KERNELS, subgroupMinSize = null }) {
     const layers = deviceLayers(net, kernels);
     if (layers[0].Cin !== C) throw new Error(`denoiseDevice: a network of ${layers[0].Cin} input channels was handed an input of ${C}`);
     const used = new Set(layers.map((L) => L.kernel)), errors = [], pipe = {};
@@ -482,6 +494,12 @@ export async function createDeviceDenoiser(dev, net, { H, W, C, kernels = DEFAUL
     for (const [i, L] of layers.entries()) if (L.kernel === "tile_inline") await build("tile_inline" + i, conv2dTileWgsl(L, R18_KERNELS.r18t.cfg), "k_conv_tile");
     for (const [i, L] of layers.entries()) if (L.kernel === "fast_unroll") await build("fast_unroll" + i, conv2dFastAltWgsl(L, R18_KERNELS.r18u.cfg), "k_conv_fast_alt");
     for (const [i, L] of layers.entries()) if (L.kernel === "wino") await build("wino" + i, conv2dWinoWgsl(L, R27_KERNELS.r27w.cfg), "k_conv_wino");
+    // round 40: the subgroup kernel needs a device made with the `subgroups` feature -- refused by name on one without it
+    if (used.has("sub") && !(dev.features && dev.features.has("subgroups")))
+        throw new Error(`denoiseDevice: the ${kernels} set's subgroup kernel needs a device with the "subgroups" feature -- this one has none (section 108)`);
+    for (const [i, L] of layers.entries()) if (L.kernel === "sub") await build("sub" + i, conv2dSubWgsl(L, R40_KERNELS.r40s.cfg), "k_conv_sub");
+    // its dispatch is by the adapter's smallest subgroup size: given, else the device's adapter's, else WebGPU's least, 4
+    const sgMin = subgroupMinSize || (dev.adapterInfo && dev.adapterInfo.subgroupMinSize) || 4;
     for (const [i, L] of layers.entries()) if (L.kernel === "head") await build("head" + i, conv2dHeadWgsl(L), "k_head");
     for (const [i, L] of layers.entries()) if (L.kernel === "head_apply") await build("head_apply" + i, kernelHeadApplyWgsl(L), "k_head_apply");
     const apply = applyFor(layers);
@@ -535,6 +553,13 @@ export async function createDeviceDenoiser(dev, net, { H, W, C, kernels = DEFAUL
             // round 18's r18u: the fast kernel's thread, bindings and dispatch, its weights packed block by block
             const cfg = R18_KERNELS.r18u.cfg, p = pipe["fast_unroll" + i], uni = packFastAltUniforms({ H, W, layer: L }, cfg);
             return { p, wg: [...groups, fastAltShape(L, cfg).groups], bind: dev.createBindGroup({ layout: p.getBindGroupLayout(0), entries: [
+                { binding: 0, resource: { buffer: outs[i] } }, { binding: 1, resource: { buffer: buffer(uni.byteLength, BU.UNIFORM | BU.COPY_DST, uni) } },
+                { binding: 2, resource: { buffer: i ? outs[i - 1] : xBuf } }] }) };
+        }
+        if (L.kernel === "sub") {
+            // round 40's r40s: the tile kernel's uniform block at 1 pixel, the fast kernel's bindings, a workgroup per span of columns
+            const cfg = R40_KERNELS.r40s.cfg, p = pipe["sub" + i], uni = packSubUniforms({ H, W, layer: L }, cfg);
+            return { p, wg: subWorkgroups(H, W, L, cfg, sgMin), bind: dev.createBindGroup({ layout: p.getBindGroupLayout(0), entries: [
                 { binding: 0, resource: { buffer: outs[i] } }, { binding: 1, resource: { buffer: buffer(uni.byteLength, BU.UNIFORM | BU.COPY_DST, uni) } },
                 { binding: 2, resource: { buffer: i ? outs[i - 1] : xBuf } }] }) };
         }
@@ -700,7 +725,8 @@ export async function timingDevice(adapter, bytes) {
     const cap = Math.min(adapter.limits.maxStorageBufferBindingSize, adapter.limits.maxBufferSize);
     if (bytes > cap) return null;
     const want = Math.max(bytes, Math.min(cap, 134217728));
-    return adapter.requestDevice({ requiredFeatures: adapter.features.has("timestamp-query") ? ["timestamp-query"] : [],
+    // round 40: and the subgroups feature where the adapter offers it, for SUBGROUP_SETS -- requesting it changes no other set's kernels
+    return adapter.requestDevice({ requiredFeatures: ["timestamp-query", "subgroups"].filter((f) => adapter.features.has(f)),
                                    requiredLimits: { maxStorageBufferBindingSize: want, maxBufferSize: want } });
 }
 /**
@@ -735,12 +761,16 @@ export async function timingLadder(net, newAdapter, { sizes = TIMING_SIZES, sets
         trace(`${W}x${H}: requestAdapter`);
         const a = await newAdapter();
         adapter = adapter || adapterOf(a);
+        // round 40: a set the adapter's features cannot build stands aside by name, at every size
+        for (const s of live.filter((x) => !featureSetsFor(a, [x]).length)) skip[s] = "the adapter has no subgroups feature, which this set's kernel needs (section 108)";
+        for (let n = live.length - 1; n >= 0; n--) if (skip[live[n]]) live.splice(n, 1);
+        if (!live.length) { for (const s of sets) rows[s].push({ H, W, skipped: true, reason: skip[s] }); continue; }
         trace(`${W}x${H}: requestDevice for ${live.join(",")}`);
         const dev = await timingDevice(a, bytes);
         if (!dev) { for (const s of sets) rows[s].push({ H, W, skipped: true, reason: skip[s] || `a ${(bytes / 2 ** 20).toFixed(0)} MiB buffer is over the adapter's limit` }); continue; }
         try {
             const x = timingInput(H, W, C), Ds = {}, got = {}, order = [];
-            for (const s of live) { trace(`${W}x${H}: build ${s}`); Ds[s] = await createDeviceDenoiser(dev, net, { H, W, C, kernels: s }); got[s] = { wall: [], gpu: [], perPass: [], elapsed: [], timestamps: false, passes: null }; }
+            for (const s of live) { trace(`${W}x${H}: build ${s}`); Ds[s] = await createDeviceDenoiser(dev, net, { H, W, C, kernels: s, subgroupMinSize: a.info && a.info.subgroupMinSize }); got[s] = { wall: [], gpu: [], perPass: [], elapsed: [], timestamps: false, passes: null }; }
             for (let r = 0; r < rounds; r++) for (const s of (r % 2 ? [...live].reverse() : live)) {
                 trace(`${W}x${H}: round ${r} time ${s}`);
                 const t = await Ds[s].time(x, { warmup: r ? 1 : warmup, minReps: Math.ceil(minReps / rounds), maxReps: Math.ceil(maxReps / rounds), budgetMs: budgetMs / rounds });

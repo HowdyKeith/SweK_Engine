@@ -655,6 +655,97 @@ export function packTileUniforms({ H, W, layer }, cfg = {}) {
 /** The pixel-tiled kernel's dispatch at H x W: a workgroup per TILE PX x TILE pixels, a z group per G4 vec4s. */
 export const tileWorkgroups = (H, W, layer, cfg = {}) => { const S = tileShape(layer, cfg); return [Math.ceil(W / (TILE * S.px)), Math.ceil(H / TILE), S.groups]; };
 
+// ---- THE SUBGROUP KERNEL (the denoiser arc, round 40: pre-registration section 108) ------------------------------------
+//
+// The pixel-tiled kernel's work -- `rows` output rows of one column a thread, `g4` vec4s of output channels each, from the same
+// uniform block of weights (packTileUniforms at 1 pixel) -- with its inputs SHARED ACROSS A SUBGROUP instead of staged in
+// workgroup memory behind two barriers a block:
+//   - a workgroup is SUB_WG threads in a row; each subgroup in it takes the span of columns its first thread's index names
+//     (that index over the subgroup size), which assumes a subgroup is a contiguous, aligned run of a workgroup's threads --
+//     WGSL does not promise it, so every cell row would go red on an adapter that broke it. A workgroup atomic was the first
+//     way: on SwiftShader it returned 0 to every subgroup (section 108). Every size is read from the subgroup_size builtin;
+//   - each lane loads ITS column of each input row the block reads, and takes its neighbours' columns with subgroupShuffle;
+//     the subgroup's R lanes at each end are halo only, so a subgroup of S lanes writes S - 2R columns (subSpan);
+//   - the input rows are streamed, each fed to the output rows that read it, and within a block every tap and channel is
+//     written out with the block's weights at a constant offset from c0 -- the block loop stays a loop, as r18u's does,
+//     because SwiftShader's pipeline build crashed on four written-out blocks of the fast kernel (section 59).
+// *** NOT ONE CELL'S ORDER MOVES. *** Each accumulator adds b, then block by block, ky, kx, ci: a row outside the image is
+// skipped, as every kernel skips it; a column outside adds the zero its lane loaded, as the tile kernel's zero edge does. So it
+// is held to conv2dCpu, or its fused mirror, cell for cell, at zero. It needs the device's `subgroups` feature.
+export const SUB_WG = 64;                                   // a workgroup's threads, one row of them
+const SUB_ROWS = Object.freeze([1, 2, 4]);
+/**
+ * The subgroup kernel's shape for a layer and { rows, g4 }: G vec4s a row keeps (at most the layer's own), groups of them across
+ * z, C4 vec4s of padded output channels (the tile kernel's), the uniform block's bytes, and whether it holds the layer -- an odd
+ * k and input channels in whole blocks of CB.
+ */
+export function subShape({ Cin, Cout, k }, { rows = 2, g4 = 8 } = {}) {
+    const c4 = Math.ceil(Cout / 4), G = Math.min(g4, c4), groups = Math.ceil(c4 / G), C4 = groups * G;
+    const bytes = 16 + 16 * C4 + 16 * k * k * Cin * C4;
+    return { rows, g4: G, groups, C4, bytes, R: (k - 1) / 2, fits: k % 2 === 1 && Cin % CB === 0 && SUB_ROWS.includes(rows) && g4 >= 1 && bytes <= UNIFORM_MAX };
+}
+/** The columns a subgroup of `size` lanes writes for a k x k layer: its lanes less the halo at each end. */
+export const subSpan = (size, k) => size - (k - 1);
+/** The subgroup kernel's dispatch at H x W, by the adapter's smallest subgroup size: a larger one leaves trailing workgroups idle. */
+export const subWorkgroups = (H, W, layer, cfg = {}, minSize = 4) => {
+    const S = subShape(layer, cfg);
+    return [Math.ceil(W / ((SUB_WG / minSize) * subSpan(minSize, layer.k))), Math.ceil(H / S.rows), S.groups];
+};
+/** The subgroup kernel's uniform block: the pixel-tiled kernel's at 1 pixel and the same vec4s, bit for bit. */
+export function packSubUniforms({ H, W, layer }, cfg = {}) {
+    const S = subShape(layer, cfg);
+    if (!S.fits) throw new Error(`conv2d: the subgroup kernel cannot hold ${layer.Cin} -> ${layer.Cout}, k ${layer.k}, rows ${cfg.rows}: it needs an odd k, input channels in whole blocks of ${CB} and ${S.bytes} bytes of weights in one ${UNIFORM_MAX}-byte uniform binding`);
+    return packTileUniforms({ H, W, layer }, { px: 1, g4: S.g4 });
+}
+
+/** The subgroup kernel (entry k_conv_sub), generated for one layer and one { rows, g4 }. */
+export function conv2dSubWgsl({ Cin, Cout, k, act = "none" }, cfg = {}) {
+    const S = subShape({ Cin, Cout, k }, cfg);
+    if (!S.fits) throw new Error(`conv2d: the subgroup kernel holds an odd k, rows in ${SUB_ROWS.join("/")}, input channels in whole blocks of ${CB} and its weights in one ${UNIFORM_MAX}-byte uniform binding -- got ${Cin} -> ${Cout}, k ${k}, rows ${cfg.rows}, ${S.bytes} bytes`);
+    const R = S.R, G = S.g4, P = S.rows, js = Array.from({ length: G }, (_, j) => j), qs = Array.from({ length: P }, (_, q) => q);
+    const cjs = Array.from({ length: CB }, (_, c) => c), kxs = Array.from({ length: k }, (_, x) => x), lanes = ["x", "y", "z", "w"], a = (q, j) => `a${q}_${j}`;
+    // input row r of a block is image row py + r - R; output row q reads it at ky = r - q
+    const rowCode = (r) => {
+        const uses = qs.filter((q) => r - q >= 0 && r - q < k);
+        const body = kxs.map((kx) => cjs.map((cj) => {
+            const n = kx === R ? `v${cj}` : `subgroupShuffle(v${cj}, u32(clamp(i32(sl) + ${kx - R}, 0, i32(ss) - 1)))`;
+            return `{ let n = ${n};\n                ` + uses.map((q) => js.map((j) => `${a(q, j)} = ${a(q, j)} + n * F.w[wc + ${(((r - q) * k + kx) * Cin + cj) * S.C4 + j}u];`).join(" ")).join("\n                ") + " }";
+        }).join("\n            ")).join("\n            ");
+        return `// input row ${r}: image row py ${r - R >= 0 ? "+" : "-"} ${Math.abs(r - R)}, read by output row${uses.length > 1 ? "s" : ""} ${uses.join(" and ")}
+        let sy${r} = i32(py) + ${r - R};
+        if (sy${r} >= 0 && sy${r} < i32(F.H)) {
+            let bi = (u32(sy${r}) * F.W + u32(clamp(x, 0, i32(F.W) - 1))) * ${Cin}u + c0;
+            ${cjs.map((cj) => `let v${cj} = select(0.0, X[bi + ${cj}u], inx);`).join(" ")}
+            ${body}
+        }`;
+    };
+    return `enable subgroups;
+struct FP { H: u32, W: u32, pad0: u32, pad1: u32, b: array<vec4<f32>, ${S.C4}>, w: array<vec4<f32>, ${k * k * Cin * S.C4}> };
+@group(0) @binding(0) var<storage, read_write> Y: array<f32>;   // H x W x ${Cout}
+@group(0) @binding(1) var<uniform> F: FP;                        // packSubUniforms (the tile kernel's at 1 pixel)
+@group(0) @binding(2) var<storage, read>       X: array<f32>;   // H x W x ${Cin}
+@compute @workgroup_size(${SUB_WG}, 1, 1)
+fn k_conv_sub(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_index) li: u32, @builtin(subgroup_invocation_id) sl: u32, @builtin(subgroup_size) ss: u32) {
+    // this subgroup's span of columns, named by its first thread's index: a subgroup of ss lanes writes ss - ${2 * R} of them
+    let slot = subgroupBroadcastFirst(li) / ss;
+    let span = ss - ${2 * R}u;
+    let x = i32((wid.x * (${SUB_WG}u / ss) + slot) * span + sl) - ${R};
+    let inx = x >= 0 && x < i32(F.W);
+    let py = wid.y * ${P}u; let g = wid.z;
+    ${qs.map((q) => js.map((j) => `var ${a(q, j)} = F.b[g * ${G}u + ${j}u];`).join(" ")).join("\n    ")}
+    for (var c0 = 0u; c0 < ${Cin}u; c0 = c0 + ${CB}u) {
+        let wc = c0 * ${S.C4}u + g * ${G}u;
+        ${Array.from({ length: P + k - 1 }, (_, r) => rowCode(r)).join("\n        ")}
+    }
+    // the halo lanes, and lanes past the image, write nothing
+    if (sl < ${R}u || sl >= ss - ${R}u || !inx) { return; }
+    let c = g * ${G * 4}u;
+    ${qs.map((q) => `if (py + ${q}u < F.H) {\n        let o = ((py + ${q}u) * F.W + u32(x)) * ${Cout}u;\n        ` + js.map((j) => (act === "relu" ? `${a(q, j)} = max(${a(q, j)}, vec4<f32>(0.0)); ` : "") +
+        lanes.map((l, n) => `if (c + ${4 * j + n}u < ${Cout}u) { Y[o + c + ${4 * j + n}u] = ${a(q, j)}.${l}; }`).join(" ")).join("\n        ") + "\n    }").join("\n    ")}
+}
+`;
+}
+
 // ---- THE WINOGRAD KERNEL (the denoiser arc, round 27: pre-registration section 83) --------------------------------------
 //
 // Winograd's F(2 x 2, 3 x 3): a 2 x 2 block of outputs from a 4 x 4 block of inputs in 16 multiplies an input channel and an

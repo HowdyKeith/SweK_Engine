@@ -446,7 +446,7 @@ function instanceFor(mod) {
 export async function runWgslComputeNative({ code, entryPoint = "main", outCount, uniforms = null,
                                              workgroups = 1, compileOnly = false, requireFn = null,
                                              inputs = null, outInit = null, texture = null,
-                                             outBinding = 0, uniformBinding = 1 } = {}) {
+                                             outBinding = 0, uniformBinding = 1, features = [] } = {}) {
     const skip = headlessGpuSkipReason(requireFn);
     if (skip) return { ok: false, skipped: true, reason: skip, values: [], errors: [] };
     const icd = configureVulkanIcd();
@@ -460,7 +460,11 @@ export async function runWgslComputeNative({ code, entryPoint = "main", outCount
         const meta = { from, icd: icd.path,
                        adapter: { vendor: info.vendor || null, architecture: info.architecture || null,
                                   description: info.description || null } };
-        const dev = await adapter.requestDevice();
+        // features (round 40: "subgroups"): requested of the device; one the adapter lacks is a skip, by name, not a failure
+        const lacking = features.filter((f) => !adapter.features.has(f));
+        if (lacking.length) return { ok: false, skipped: true, reason: `the adapter has no ${lacking.join(", ")}`, values: [], errors: [], ...meta };
+        const dev = await adapter.requestDevice(features.length ? { requiredFeatures: features } : undefined);
+        meta.subgroups = features.includes("subgroups") ? { min: info.subgroupMinSize ?? null, max: info.subgroupMaxSize ?? null } : null;
 
         const shader = dev.createShaderModule({ code });
         // getCompilationInfo is how a WGSL error becomes a REPORT rather than a crash, same as the browser path.

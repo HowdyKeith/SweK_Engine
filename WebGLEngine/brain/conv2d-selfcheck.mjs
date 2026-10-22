@@ -11,6 +11,17 @@
 // v4868): WINO_CB, WINO_G4S, winoShape, winoFilter, conv2dCpuWino, conv2dCpuWinoFma, conv2dWinoWgsl, packWinoUniforms, winoWorkgroups.
 // Round 19 (section 66, v4851): which rounds' device rows stand aside, by adapter and by the run's compiler (nativeStandAside).
 // Round 22 (section 71, v4859): round 16's rows run on D3D12 under DXC too, so only FXC (or an unread compiler) stands aside there.
+// Round 40 (section 108): SUB_WG, subShape, subSpan, subWorkgroups, packSubUniforms, conv2dSubWgsl -- the subgroup kernel, cell for
+// cell against conv2dCpu natively where the adapter has subgroups (standing aside on D3D12 under FXC), and its CPU shape and text.
+// Sabotaged with render/denoiseDevice-selfcheck.mjs, by the byte-safe runner, each restored byte-identical (sha256); the reds in
+// both gates together:
+//   G1  the shuffle reading lane + kx, not lane + kx - 1                9 RED (five device cases here; K0s natively and in the
+//                                                                          browser, the small network, r15's bits there)
+//   G2  a halo lane writing its column                                 9 RED (the same nine)
+//   G3  the span taken as S, not S - 2                                 10 RED (the same nine and the identity key here)
+//   G4  a row outside the image read from the edge row, not skipped    9 RED (the same nine)
+//   G5  the channels before the taps within a row (cj before kx)       8 RED (the five here; K0s natively and in the browser, the
+//                                                                          small network -- r15's bits row holds only where nothing fused)
 //
 // What it holds: the twin to the f64 reference within f32 rounding; the identity kernel exact through every pass;
 // a 1x1 convolution BIT-IDENTICAL to the GPU Brain's dense layer (render/brainTsl.mjs's mlpLayerCpu), so the dense
@@ -119,7 +130,7 @@ const { TILE, K_MAX, CB, COUT_MAX, conv2dForward, conv2dCpu, conv2dCpuFma, conv2
         packProbeUniforms, probeFixture, probeCpu, keyCpu, PROBES, FAST_GROUP, UNIFORM_MAX, fastShape, conv2dFastWgsl, packFastUniforms,
         headShape, conv2dHeadWgsl, packHeadUniforms, planarToChannelsLast, tileShape, conv2dTileWgsl, packTileUniforms, tileWorkgroups,
         fastAltShape, conv2dFastAltWgsl, packFastAltUniforms, WINO_CB, WINO_G4S, winoShape, winoFilter, conv2dCpuWino, conv2dCpuWinoFma, conv2dWinoWgsl,
-        packWinoUniforms, winoWorkgroups } = C;
+        packWinoUniforms, winoWorkgroups, SUB_WG, subShape, subSpan, subWorkgroups, packSubUniforms, conv2dSubWgsl } = C;
 const { mlpLayerCpu } = await imp("render/brainTsl.mjs");
 const H = await imp("tools/ship/headlessGpu.mjs");
 // v4838: the device cases as a report table (tools/ship/gateReport.mjs) -- the counts every PASS line prints, kept past the terminal
@@ -158,10 +169,12 @@ function nativeStandAside(adapter, compiler, round) {
     if (!fxcAdapter(adapter)) return null;
     // v4868 -- round 27 (section 83): the Winograd kernel runs under DXC, which built every shape the rig was handed (sections 65, 71),
     // and stands aside under FXC, where nobody has built it -- an FXC that never finishes a pipeline stops this gate (section 56)
-    if ((round === 16 || round === 17 || round === 27) && compiler === "DXC") return null;
+    if ((round === 16 || round === 17 || round === 27 || round === 40) && compiler === "DXC") return null;
     const said = compiler === "DXC" || compiler === "FXC" ? compiler : `an unread compiler (${JSON.stringify(compiler ?? null)}), counted as FXC`;
     if (round === 17) return `${FXC_SKIP_R17}; this run compiles with ${said}, and under DXC (node-webgpu 0.6.2) they run (section 66)`;
     if (round === 16) return `${FXC_SKIP}; this run compiles with ${said}, and under DXC (node-webgpu 0.6.2) they run (section 71)`;
+    // round 40 (section 108): the subgroup kernel's wave operations are shader model 6, which FXC does not compile
+    if (round === 40) return `round 40's subgroup kernel uses wave operations, shader model 6, which FXC cannot compile; this run compiles with ${said}, and under DXC it runs (section 108)`;
     if (round === 27) return `round 27's Winograd kernel has never been built under FXC, and stands aside there on the safe side; this run compiles with ${said}, and under DXC it runs (section 83)`;
     return `round ${round}'s kernels are not named by section 66 and stand aside on a D3D12 adapter under any compiler; this run compiles with ${said}`;
 }
@@ -418,6 +431,12 @@ console.log("\n5e. WHICH ROUNDS' DEVICE ROWS STAND ASIDE, BY ADAPTER AND COMPILE
             return why.includes("section 83") && (c === "FXC" ? /this run compiles with FXC,/.test(why) : why.includes(`an unread compiler (${JSON.stringify(c ?? null)}), counted as FXC`)); })) &&
             OFF.every((a) => [...NOT_DXC, "DXC"].every((c) => runs(a, c, 27))),
         `the 1080: under DXC ${runs(gtx, "DXC", 27) ? "runs" : "aside"}, under FXC ${runs(gtx, "FXC", 27) ? "runs" : "aside"}; SwiftShader under FXC ${runs(OFF[0], "FXC", 27) ? "runs" : "aside"}`);
+    // round 40 (section 108): the subgroup kernel's device rows as round 27's are -- under DXC on D3D12, anywhere else whatever the compiler
+    ok("!! round 40 (section 108): on a D3D12 adapter the subgroup kernel's device rows run under DXC and stand aside under FXC, an unread compiler or none, the SKIP line naming the compiler and section 108; off D3D12 they run under any compiler",
+        RIG.every((a) => runs(a, "DXC", 40) && NOT_DXC.every((c) => { const why = nativeStandAside(a, c, 40) || "";
+            return why.includes("section 108") && /shader model 6/.test(why) && (c === "FXC" ? /this run compiles with FXC,/.test(why) : why.includes(`an unread compiler (${JSON.stringify(c ?? null)}), counted as FXC`)); })) &&
+            OFF.every((a) => [...NOT_DXC, "DXC"].every((c) => runs(a, c, 40))),
+        `the 1080: under DXC ${runs(gtx, "DXC", 40) ? "runs" : "aside"}, under FXC ${runs(gtx, "FXC", 40) ? "runs" : "aside"}; SwiftShader under FXC ${runs(OFF[0], "FXC", 40) ? "runs" : "aside"}`);
     // SABOTAGED v4851: every adapter stands aside unless the compiler is DXC (the D3D12 test made compiler-only) -> RED by name (this row alone; SwiftShader's own
     //   round-16 and round-17 device rows then printed SKIP, 82 PASS falling to 53 with no other red -- why this row has to exist); restored.
     ok("  round 19: off D3D12 -- SwiftShader, Vulkan, Metal, an adapter with no description, none -- both rounds run whatever compiler is named, and round 17's inline rows keep the hoisted tile as their comparator",
@@ -533,6 +552,29 @@ function winoByMatrices(x, H, W, L, f32) {
         /fn k_conv_wino/.test(c1) && (c1.match(/var m\d+_\d+ = vec4<f32>\(0\.0\);/g) || []).length === 16 && (c2.match(/var m\d+_\d+ = vec4<f32>\(0\.0\);/g) || []).length === 32 &&
             /@binding\(3\) var<storage, read>\s+U: array<vec4<f32>>/.test(c1) && /struct WP \{ H: u32, W: u32, pad0: u32, pad1: u32, b: array<vec4<f32>, 8> \}/.test(c1),
         `g4 1: ${(c1.match(/var m\d+_\d+/g) || []).length} accumulators, g4 2: ${(c2.match(/var m\d+_\d+/g) || []).length}`);
+}
+
+console.log("\n5g. THE SUBGROUP KERNEL'S SHAPE, UNIFORM BLOCK AND TEXT, ON THE CPU (round 40, section 108)");
+{
+    const L32 = { Cin: 32, Cout: 32, k: 3, act: "relu" }, S = subShape(L32), F = probeFixture({ H: 7, W: 9, Cin: 16, Cout: 11, k: 3, act: "none", seed: 5 });
+    const refuse = (f) => { try { f(); return null; } catch (e) { return e.message; } };
+    // the uniform block is the pixel-tiled kernel's at one pixel and the same vec4s -- every byte -- and the shape's vec4s are the tile's
+    const pu = packSubUniforms({ H: 7, W: 9, layer: F.layer }, { rows: 2, g4: 2 }), tu = packTileUniforms({ H: 7, W: 9, layer: F.layer }, { px: 1, g4: 2 });
+    ok("  round 40: the subgroup kernel holds 32 -> 32 at 3 x 3 in 8 vec4s and 2 rows, one z group, the tile kernel's C4; its uniform block is the tile kernel's at 1 pixel, bit for bit; a subgroup of 32 writes 30 columns and of 4 writes 2",
+        S.fits && S.g4 === 8 && S.rows === 2 && S.groups === 1 && S.C4 === tileShape(L32, { px: 1, g4: 8 }).C4 && S.R === 1 &&
+        same(Array.from(pu), Array.from(tu)) && subSpan(32, 3) === 30 && subSpan(4, 3) === 2 && subSpan(32, 1) === 32 && SUB_WG === 64 &&
+        same(subWorkgroups(1080, 1920, L32, {}, 32), [Math.ceil(1920 / 60), 540, 1]) && same(subWorkgroups(13, 19, L32, { rows: 4 }, 4), [Math.ceil(19 / 32), 4, 1]),
+        `${S.bytes} bytes of weights; 1920 x 1080 at 32 lanes: ${subWorkgroups(1080, 1920, L32, {}, 32).join(" x ")} workgroups`);
+    ok("  round 40: and it refuses, by name, what it cannot hold -- input channels not in whole blocks of 8 (the network's first layer, 10 -> 32), an even k, 3 rows",
+        /whole blocks of 8/.test(refuse(() => conv2dSubWgsl({ Cin: 10, Cout: 32, k: 3 })) || "") && !subShape({ Cin: 10, Cout: 32, k: 3 }).fits &&
+        /odd k/.test(refuse(() => conv2dSubWgsl({ Cin: 8, Cout: 8, k: 2 })) || "") && /rows in 1\/2\/4/.test(refuse(() => conv2dSubWgsl(L32, { rows: 3 })) || "") &&
+        /cannot hold 10 -> 32/.test(refuse(() => packSubUniforms({ H: 2, W: 2, layer: { Cin: 10, Cout: 32, k: 3, W: new Float32Array(2880), b: new Float32Array(32) } })) || ""));
+    // the text: the subgroups extension, shuffles and no barrier or workgroup memory at all; the span named by the subgroup's first index
+    const code = conv2dSubWgsl(L32);
+    ok("  round 40: its WGSL enables subgroups, shuffles its neighbours' columns, keeps no workgroup memory and passes no barrier, and names a subgroup's span by its first thread's index over the subgroup size",
+        /^enable subgroups;/.test(code) && /fn k_conv_sub/.test(code) && (code.match(/subgroupShuffle\(/g) || []).length === 4 * 2 * 8 && !/workgroupBarrier|var<workgroup>|atomic/.test(code) &&
+        /let slot = subgroupBroadcastFirst\(li\) \/ ss;/.test(code) && /@workgroup_size\(64, 1, 1\)/.test(code),
+        `${code.split("\n").length} lines, ${(code.match(/subgroupShuffle\(/g) || []).length} shuffles`);
 }
 
 console.log("\n6. *** EVERY KERNEL ON THE DEVICE, CELL FOR CELL AGAINST THE TWIN ***");
@@ -713,6 +755,41 @@ else {
         for (const g4 of [1, 2]) { const r = await wino(I, { g4 }, { H: I.H, W: I.W, x: xi, layer: LI }); outI.push(r.ok && refI.every((v, i) => Math.fround(r.values[i]) === v)); }
         ok("!! round 27's exact key on the device: integers in, integer weights -- the Winograd kernel gives conv2dForward's bits at 1 and 2 vec4s a thread, whatever order a compiler kept",
             outI.every(Boolean), outI.join(", "));
+    }
+    // round 40 (section 108): the subgroup kernel against conv2dCpu and its fused mirror, and against the pixel-tiled kernel's
+    // bits (edge zero, the r18t configuration's way with a tap outside) where neither fused -- 32 -> 32 on odd sizes at 1, 2 and 4
+    // rows, 16 -> 11 on a wide image (partial spans and a partial vec4 group), the 1 x 1 head (no halo), and a 5 x 3 image
+    // narrower than one span. It needs the subgroups feature: an adapter without it skips the rows by name. 4 rows at 8 vec4s (128
+    // accumulator floats a thread) is not a case: natively here it crashed SwiftShader's pipeline build, the process dying with no row,
+    // as written-out blocks of the fast kernel did (section 59); 4 rows run at 2 vec4s, and the set runs 2 rows (section 108).
+    const aside40 = nativeStandAside(adapter, COMPILER, 40);
+    if (aside40) console.log(`  SKIP  round 40's device cases: ${aside40}`);
+    else {
+        const sub = (a, cfg, minSize) => { const F = probeFixture(a); return H.runWgslComputeNative({ code: conv2dSubWgsl(a, cfg), entryPoint: "k_conv_sub", outCount: a.H * a.W * a.Cout,
+            uniforms: packSubUniforms({ H: a.H, W: a.W, layer: F.layer }, cfg), workgroups: subWorkgroups(a.H, a.W, a, cfg, minSize), inputs: [{ binding: 2, data: F.x }], features: ["subgroups"] }); };
+        const tile = (a, cfg) => { const F = probeFixture(a); return H.runWgslComputeNative({ code: conv2dTileWgsl(a, cfg), entryPoint: "k_conv_tile", outCount: a.H * a.W * a.Cout,
+            uniforms: packTileUniforms({ H: a.H, W: a.W, layer: F.layer }, cfg), workgroups: tileWorkgroups(a.H, a.W, a, cfg), inputs: [{ binding: 2, data: F.x }] }); };
+        const probe = await sub({ H: 1, W: 1, Cin: 8, Cout: 4, k: 1, act: "none", seed: 1 }, { rows: 1, g4: 1 }, 4);
+        if (probe.skipped) console.log(`  SKIP  round 40's device cases: ${probe.reason}`);
+        else {
+            const minSize = (probe.subgroups && probe.subgroups.min) || 4;
+            for (const [a, cfgs] of [[{ H: 19, W: 13, Cin: 32, Cout: 32, k: 3, act: "relu", seed: 43 }, [{ rows: 2, g4: 8 }, { rows: 1, g4: 4 }]],
+                                     [{ H: 11, W: 37, Cin: 16, Cout: 11, k: 3, act: "none", seed: 53 }, [{ rows: 2, g4: 2 }, { rows: 4, g4: 2 }]],
+                                     [{ H: 9, W: 17, Cin: 32, Cout: 81, k: 1, act: "none", seed: 47 }, [{ rows: 2, g4: 8 }]],
+                                     [{ H: 5, W: 3, Cin: 8, Cout: 6, k: 3, act: "relu", seed: 3 }, [{ rows: 2, g4: 8 }]]]) {
+                const rt = await tile(a, { px: 1, g4: 8, edge: "zero", weights: "inline" }), jt = rt.ok ? judge(rt, a) : null;
+                for (const cfg of cfgs) {
+                    const r = await sub(a, cfg, minSize), j = r.ok ? judge(r, a) : null, S = subShape(a, cfg);
+                    if (j) CASES.push([`conv2d.conv2dSubWgsl rows ${cfg.rows} g4 ${S.g4}`, a.H, a.W, a.Cin, a.Cout, j.n - j.fused, j.fused, j.unexplained]);
+                    ok(`!! round 40: the subgroup kernel, ${a.H} x ${a.W}, ${a.Cin} -> ${a.Cout}, k ${a.k}, ${cfg.rows} row${cfg.rows > 1 ? "s" : ""} x ${S.g4} vec4s (${S.groups} z group${S.groups > 1 ? "s" : ""}), subgroups of ${minSize}: every cell explained -- and where neither fused, the pixel-tiled kernel's own bits`,
+                        r.ok && rt.ok && j.unexplained === 0 && (j.fused || jt.fused || same(Array.from(r.values), Array.from(rt.values))),
+                        r.ok && rt.ok ? `sub ${j.fused} fused, tile ${jt.fused} fused of ${j.n}` : (r.reason || rt.reason) + " " + (r.errors || []).join("; "));
+                }
+            }
+            const K = keyCpu({ H: 9, W: 21, C: 8 }), kt = await H.runWgslComputeNative({ code: conv2dSubWgsl(K.layer, { rows: 2, g4: 2 }), entryPoint: "k_conv_sub", outCount: K.x.length,
+                uniforms: packSubUniforms({ H: K.H, W: K.W, layer: K.layer }, { rows: 2, g4: 2 }), workgroups: subWorkgroups(K.H, K.W, K.layer, { rows: 2, g4: 2 }, minSize), inputs: [{ binding: 2, data: K.x }], features: ["subgroups"] });
+            ok("  round 40: the identity key on the device, 9 x 21, eight channels: the subgroup kernel returns its input bit for bit", kt.ok && K.x.every((v, i) => Math.fround(kt.values[i]) === v), kt.ok ? "" : kt.reason);
+        }
     }
     {
         const K1 = keyCpu({ k: 1, C: 5 }), n = K1.H * K1.W, ka1 = { H: K1.H, W: K1.W, Cin: K1.layer.Cin, Cout: K1.layer.Cout, k: 1, act: "none" };

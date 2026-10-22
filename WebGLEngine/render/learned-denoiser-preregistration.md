@@ -7198,3 +7198,101 @@ the bound to 23 added lines, a number written without counting. It adds 20, and 
 rows passed on their first run here, the device tracing exactly the twin's count on all eight views. Reported, deciding
 nothing: at the pilot size on SwiftShader the bounded coverage at 128 x 72 took 4.7 ms against round 31's 51.3. That is a
 CPU's time.
+
+## 108. ROUND 40 -- THE GTX 1080's HIDDEN LAYERS SHARING THEIR INPUTS ACROSS A SUBGROUP: FIXED BEFORE THE RIG RUNS IT
+
+**The question.** With the fill and the coverage in hand (sections 103-107), the network is the chain's largest cost on both
+GPUs. On the 1080 it is r18t: ~18 ms at 960 x 540 and ~75 ms at 1920 x 1080 natively, its hidden layers at ~2.2-2.3
+TFLOP/s, about a quarter of the GPU's peak. Of the backlog's levers for the network, `denoise-subgroup-reduction` is the one
+that can be built and tested in this sandbox before the rig sees it: SwiftShader exposes `subgroups` here, natively and in
+Chromium, and not `shader-f16`. Does a hidden-layer kernel that shares its input values across a subgroup, in place of
+r18t's tile in workgroup memory, run the 1080's network faster than r18t, with every cell still explained?
+
+**The kernel, `k_conv_sub` (brain/conv2d.mjs's `conv2dSubWgsl`), and the set `r40s`.**
+- **A thread's work is r18t's:** 2 output rows (`rows: 2`, as r18t's 2 pixels) and all 32 output channels, as 8 vec4
+  accumulators a row (`g4: 8`), from r18t's own uniform block of weights (`packTileUniforms` at 1 pixel, 8 vec4s).
+- **The inputs are not staged.** A workgroup is 64 threads in a row. Each subgroup claims a span of columns through a
+  workgroup atomic, so nothing assumes which threads share a subgroup or in what order. Each lane loads its own column. It
+  gets its left and right neighbours' values with `subgroupShuffle`, and the subgroup's two edge lanes serve as halo only. A
+  subgroup of S lanes writes S - 2 columns: 30 on the 1080, 2 on SwiftShader's 4. Every size is read from the
+  `subgroup_size` builtin, and the host dispatches by the adapter's smallest subgroup size. A larger one leaves the
+  workgroups past the image idle.
+- **No barrier, and no workgroup memory but the atomic.**
+- **The input rows are streamed** one at a time and fed to the output rows that use them. Every block's channels and taps are
+  unrolled at generation, so no array is indexed at run time.
+- **THE ORDER DOES NOT MOVE.** Each accumulator adds the bias, then block by block, ky, kx, ci. A row outside the image is
+  skipped, as r18t skips it. A column outside adds the zero its lane loaded, as r18t's zero edge does. So the kernel is held
+  to conv2dCpu, or its fused mirror, cell for cell, at zero. That is the key every set but r27w is held to; no restated
+  tolerance is needed.
+- **The set `r40s`** is r18t with every hidden layer the kernel holds on `k_conv_sub`, and r15's fused head. It needs the
+  adapter's `subgroups` feature (SUBGROUP_SETS). On an adapter without it, the Intel gen-9 among them, it is left out by name
+  and nothing else changes. Its devices request `subgroups` where the adapter offers it.
+
+**Timed.** Both ladders, native and the page's, add `r40s` to TIMED_SETS where the adapter has subgroups. The sets keep
+taking turns. New lines, `native: r40s against r18t at W x H` and `page: ...`, are r18t's median over r40s's, tagged section
+108, beside a line against r15.
+
+**The rows.**
+1. `conv2dSubWgsl`'s shape, its refusals, and its uniform block (r18t's at 1 pixel, 8 vec4s, bit for bit).
+2. On the device, natively and in Chromium, at odd sizes that leave partial spans and rows and blocks of fewer than 8
+   channels: every cell is explained by conv2dCpu or its fused mirror, at zero.
+3. `r40s`'s layers: every hidden layer on `sub`, the head on `head_apply`, and a layer the kernel cannot hold falling back
+   to r15's kernel.
+4. K0s: the whole pass on the device is the twin's, every layer's cells explained, natively and in the browser, under the
+   key every set but r27w is held to.
+5. An adapter without subgroups drops `r40s` by name, from the ladders and from any request.
+
+**The rig run.** On each GPU, two `realGpuRun --only denoise` runs, at a commit carrying this section. On the Intel they
+check that `r40s` stands aside by name and that the rest is unchanged.
+
+**The rule (H40), on the GTX 1080, per path (native under DXC, and the page in Chrome).**
+- **C1:** every gate is green with exit 0.
+- **C2:** K0s holds on that path in both runs.
+- **C3:** both sets' 1920 x 1080 passes are on the device's clock.
+- **H40 holds on a path** when, in both runs, r40s is at least 1.05 x as fast as r18t at 1920 x 1080 (section 66's margin).
+- **What it buys:**
+  - If it holds on both paths, the 1080's two table entries (PAGE_KERNELS_BY_ADAPTER, NATIVE_KERNELS_BY_ADAPTER) move to
+    r40s, in a round of its own.
+  - If it holds on one, that path's entry moves in that round and the other stays r18t.
+  - If it holds on neither, r40s is kept as a measured negative and the 1080's network lever goes back to the backlog.
+- On the Intel nothing can move: `r40s` must stand aside by name, with every other line as before.
+
+**Predictions (stated so they can miss).**
+- **r40s against r18t at 1920 x 1080 on the 1080: 0.8-1.3 x, on both paths.** The kernel trades r18t's cooperative
+  staging and two barriers a block for four global loads and eight shuffles a lane a block. It also gives up 2 of every 32
+  lanes to halo. Which of those wins is not known from here. H40 is not predicted either way.
+- Every gate is green on both GPUs. On the Intel, r40s stands aside.
+
+**Sabotages, by the byte-safe runner (G1-G7):**
+- the shuffle reading lane + kx instead of lane + kx - 1;
+- a halo lane writing its column;
+- the span taken as S, not S - 2;
+- a row outside the image read from the image's edge row, not skipped (a row "added as zeros" would change only the
+  sign of a zero, which the cell check does not see, so it would test nothing);
+- the channel blocks summed out of order (cj before kx);
+- `r40s` built on a device without subgroups;
+- the ladder keeping `r40s` on an adapter without subgroups.
+
+Each must turn at least one row red.
+
+**Nothing else changes:** every table entry, the default fill and coverage, every other kernel, and `fx/fsr`.
+
+**A correction to the kernel, made before anything was committed or measured on a GPU.** As first written, each subgroup
+claimed its span of columns through a workgroup atomic. On SwiftShader that atomic returned 0 to every subgroup's first lane,
+so every subgroup wrote the same columns and most cells came out wrong (6,688 of 7,904 at 19 x 13, 32 -> 32). A probe showed
+SwiftShader's subgroups to be contiguous, aligned runs of a workgroup's threads (first indices 0, 4, 8, ...). So a subgroup
+now takes the span its first thread's index names: that index over the subgroup size. WGSL does not promise that layout.
+An adapter that broke it would turn the cell-for-cell rows red, on the rig as here, so it cannot pass unseen.
+
+**And one case dropped from the conv2d gate.** At 4 rows and 8 vec4s, 128 accumulator floats a thread, the kernel crashed
+SwiftShader's native pipeline build. The process died with a segmentation fault and no row, as written-out blocks of the fast
+kernel did in section 59. `r40s` runs 2 rows, so that configuration is not a case. 4 rows are tested at 2 vec4s.
+
+**Sabotages, by the byte-safe runner, before commit.** G1-G5 turned 8-10 rows red each, across the conv2d gate's device
+cases, K0s natively and in the browser, and the small network. G6 turned 1 red (the refusal row) and G7 1 red (the ladder row
+on an adapter with the feature hidden). G7 needed that row. This box's adapter has subgroups, so nothing exercised the ladder
+standing aside, and a ladder that threw would have killed the gate with no FAIL line, which the runner counted as 0. The row
+now catches the throw, and the runner now counts a gate that exits non-zero with no FAIL line as a crash, red.
+Reported, deciding nothing: on SwiftShader at 64 x 64, r40s took about 9-10 x r18t's time on both ladders. Those are a CPU's
+4-lane subgroups, half of every subgroup halo.
+

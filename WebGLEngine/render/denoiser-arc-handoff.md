@@ -37,7 +37,10 @@ node tools/ship/versionPreflight.mjs --next    # the next free version and sweep
 
 ## What is next -- Keith picks
 
-1. **`denoise-coverage-bound`, round 39 (section 107): owed two runs on each GPU.** The coverage traces only the pixels
+1. **`denoise-subgroup-reduction`, round 40 (section 108): owed two runs on each GPU.** The 1080's hidden layers on a kernel
+   that shares inputs across a subgroup (r40s), exact to conv2dCpu, green on SwiftShader; it stands aside on the Intel, which
+   has no subgroups. Section 108 predicts 0.8-1.3 x r18t at 1080p and does not call H40.
+   **`denoise-coverage-bound`, round 39 (section 107): owed two runs on each GPU.** The coverage traces only the pixels
    that can see a light, 5.1 % at 1080p, bit for bit round 31's on SwiftShader. Section 107 predicts the 1080p coverage
    falls from ~250 to 10-40 ms on the Intel and from ~17.5 to 1-4 ms on the 1080. The page's own mask gains it too.
    **`denoise-fill-listed-tiles`, round 38 (section 106): owed two runs on each GPU.** Round 37's tile kernel over the tiles

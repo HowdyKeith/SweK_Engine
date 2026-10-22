@@ -1023,6 +1023,8 @@ export const EXCLUDED = Object.freeze([
                     why: "four bindings (uniform, instances, indirect commands, records) and an atomicAdd -- outside the one-buffer harness signature; graded by gpuDriven-selfcheck through gfx/device.js" }),
     Object.freeze({ id: "gpuHaul.haulWgsl", kind: "lives on its own gate",
                     why: "reads a flights buffer and writes a records buffer -- two storage bindings; graded against the economy's own positions by gpuUniverse-selfcheck" }),
+    Object.freeze({ id: "conv2d.conv2dSubWgsl", kind: "lives on its own gate",
+                    why: "round 40's subgroup kernel (section 108): it needs a device made with the subgroups feature, which this corpus's devices are not, and enables the extension, so it cannot even compile here; graded cell for cell against conv2dCpu by brain/conv2d-selfcheck.mjs natively and by render/denoiseDevice-selfcheck.mjs natively and in the browser" }),
     Object.freeze({ id: "gpuOrbits.orbitWgsl", kind: "lives on its own gate",
                     why: "reads an elements buffer and writes a records buffer -- two storage bindings, outside the one-buffer harness signature; graded against positionAt by gpuOrbits-selfcheck" }),
     Object.freeze({ id: "gpuDriven.OCC_FN_WGSL", kind: "source fragment",
