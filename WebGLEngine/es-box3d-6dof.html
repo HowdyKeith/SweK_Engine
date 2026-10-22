@@ -75,7 +75,7 @@ import { weightsHash } from "/brain/drivePolicy.mjs";
 const HALF = [1.6, 0.7, 0.7];              // ship OBB half-extents; nose (local +X) is the long axis
 const ENGINE_MOUNT = [-1.4, 0, 0];          // on-axis at the tail -- thrust alone induces no torque
 const SHIP_MASS = 8;
-const HP_MAX = 100, SHOT_DAMAGE = 6, BATTLE_TIMEOUT_TICKS = 1800;   // v4895: damage re-tuned 18 -> 6 for the paired fight (see PAGE_AUTOPILOT's note); a battle still undecided after 60 simulated s goes to the fleet with more hp left   // ram damage (v4848): brain/shipCollision6dof.mjs's RAM_DAMAGE_PER_IMPULSE and RAM_DAMAGE_CAP
+const HP_MAX = 100, SHOT_DAMAGE = 18, BATTLE_TIMEOUT_TICKS = 900;   // v4895: a battle still undecided after 30 simulated s goes to the fleet with more hp left (a draw if equal)   // ram damage (v4848): brain/shipCollision6dof.mjs's RAM_DAMAGE_PER_IMPULSE and RAM_DAMAGE_CAP
 const FLEET_SIZE = 3, SPAWN_X = 42, SPAWN_SPREAD = 18, SPAWN_STAGGER = 8;
 const FACE_B = [0, 0, 1, 0];                // 180deg about Y -- forward (+X) becomes -X, facing team A
 // AUTOPILOT's own defaults (thrustForce 40, standoff 40) are tuned for the isolated convergence cases in
@@ -89,11 +89,12 @@ const FACE_B = [0, 0, 1, 0];                // 180deg about Y -- forward (+X) be
 // lower closing speed to actually shoot at each other with: the SAME scenario re-run at THRUST=16,
 // STANDOFF=50 flew a real 60s dogfight -- 377 shots, 19 hits, zero ship-ship collisions, two kills, no
 // instant joust -- before this page shipped.
-// v4895 -- RE-TUNED AGAINST THE PAIRED FIGHT (brain/fleetAssign.mjs's one-to-one assignment turned every battle into a mutual duel: 22 of 22 ended with both fleets dead). MEASURED headless, 300 battles each
-// (window.__sixdof.runBattles; tools/ship/rigidBody6dofPage-selfcheck.mjs holds the figures): with the staggered first shot and SHOT_DAMAGE 6, standoff 50 left 16-19% of battles undecided at 60 s (survivors
-// hovering ~90 m apart), 70 left 15%, 100 and 120 decided every battle but ended 15% in a draw (both fleets stop at the standoff and trade fire together), and 85 gave A 146 / B 149 / draws 5 / undecided 6, a median
-// battle of 18.8 s. thrustForce 24 and standoff 30 were both worse (58-69% undecided); fireAngle, thrustAngle and fireRange moved nothing that mattered.
-const PAGE_AUTOPILOT = { thrustForce: 16, standoff: 85 };
+// v4895 -- THE RE-TUNE WAS TRIED AND NOT ADOPTED. Measured headless, 300 battles each (window.__sixdof.runBattles), with the staggered first shot: SHOT_DAMAGE 6 and standoff 85 gave A 146 / B 149 / draws 5 / undecided 6 and a
+// median battle of 18.8 s (against 3.8 s now); standoff 100 and 120 left 15% draws. BUT brain/pilot6dofPolicy.mjs trains and judges the shipped pilot in a duel that mirrors THIS page's damage and standoff (its gate reads
+// them from this file's source): matching it moved the held-out score, broke the shipped pilot's own record of itself (the `by` text, the pruning fixed point, the champion rule) and the league gate -- the pilot would have to be
+// RETRAINED at damage 6, which is a different round. So damage stays 18 and standoff 50, and the page is balanced by what does not touch the pilot's duel: the staggered first shot, the draw result and the 30 s timeout.
+// At these settings: A 132 / B 136 / draws 32 / of which 60 battles ran out the clock (hovering survivors, decided by hp). thrustForce 24 and standoff 30 were worse (58-69% undecided).
+const PAGE_AUTOPILOT = { thrustForce: 16, standoff: 50 };
 
 function makeRng(seed) { let s = (seed >>> 0) || 1; return () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; }; }
 

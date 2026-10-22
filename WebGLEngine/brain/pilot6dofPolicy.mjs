@@ -122,8 +122,8 @@ export function perturb(w, sigma, rng) { const o = Float32Array.from(w); for (le
 // es-box3d-6dof.html's own ship (the same hull, mass, engine mount, weapon, hit points and damage), one on one, headless. Ship-ship collisions are resolved ONLY when asked for (`collisions: true`, v4848: brain/shipCollision6dof.mjs, the page's own
 // function moved out, ram damage to both ships). Off by default because every number pinned before v4848 -- the shipped pilots' scores, their audits, the fingerprints -- was measured with them off, and stays true of the
 // duel it was measured on; the league trainer turns them on. A duel with them off asks who steers and shoots better; with them on it also asks who can be near a ship and not hit it.
-export const HALF = [1.6, 0.7, 0.7], ENGINE_MOUNT = [-1.4, 0, 0], SHIP_MASS = 8, HP_MAX = 100, SHOT_DAMAGE = 6, SPAWN_X = 42;
-export const PAGE_AUTOPILOT = { thrustForce: 16, standoff: 85 };
+export const HALF = [1.6, 0.7, 0.7], ENGINE_MOUNT = [-1.4, 0, 0], SHIP_MASS = 8, HP_MAX = 100, SHOT_DAMAGE = 18, SPAWN_X = 42;
+export const PAGE_AUTOPILOT = { thrustForce: 16, standoff: 50 };
 const makeRng = (seed) => { let s = (seed >>> 0) || 1; return () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; }; };
 
 /**
