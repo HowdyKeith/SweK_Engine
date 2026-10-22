@@ -31,8 +31,10 @@ export const KINDS = Object.freeze(["hover", "recovery", "motor", "goto"]);
 const MOTOR_SECONDS = 40, SETTLE_SECONDS = 4;
 /** THE LANDING CHARGE: 0.4 x min(1, sink / SINK_LIMIT) + 0.4 x min(LANDING_GS_CAP, gs / LANDING_GS); and the crash's: 3 + 4 x min(1, speed / CRASH_SCALE). */
 export const SINK_LIMIT = 6, LANDING_GS = 5, LANDING_GS_CAP = 5, CRASH_SCALE = 25, NEVER_LANDS = 7;
-export const landingCost = (sink, gs) => 0.4 * Math.min(1, sink / SINK_LIMIT) + 0.4 * Math.min(LANDING_GS_CAP, gs / LANDING_GS);
-export const crashCost = (speed) => 3 + 4 * Math.min(1, Math.max(speed, 0) / CRASH_SCALE);
+// A NON-FINITE NUMBER IS CHARGED AS THE WORST OF ITS KIND, NEVER LEFT AS NaN (the first sabotage run found a flight started from a non-finite state -- status "lost" -- scoring NaN, which would poison a mean and every comparison made with it): a speed or sink of NaN or Infinity is read as past the cap
+const worst = (v) => (Number.isFinite(v) ? v : Infinity);
+export const landingCost = (sink, gs) => 0.4 * Math.min(1, worst(sink) / SINK_LIMIT) + 0.4 * Math.min(LANDING_GS_CAP, worst(gs) / LANDING_GS);
+export const crashCost = (speed) => 3 + 4 * Math.min(1, Math.max(worst(speed), 0) / CRASH_SCALE);
 
 const mulberry = (a) => () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 

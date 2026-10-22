@@ -169,7 +169,7 @@ console.log("\n3. THE SCORE");
         for (let i = 0; i < 4800; i++) {
             if (i * DT.DT >= sc.failure.at) s = { ...s, health: s.health.map((x, k) => (k === sc.failure.motor ? 0 : x)) };
             const o = Q.stepMultirotor(model, s, pilot(s, sc.target, [0, 0, 0], {}), DT.DT, [0, 0, 0]); s = o.state;
-            if (o.status !== "airborne") return { i, status: o.status, sink: o.sink || 0, gs: Math.hypot(s.vel[0], s.vel[1]), speed: Math.hypot(s.vel[0], s.vel[1], s.vel[2]) };
+            if (o.status !== "airborne") return { i, status: o.status, sink: o.sink || 0, gs: Math.hypot(s.vel[0], s.vel[1]), speed: Math.hypot(s.vel[0], s.vel[1], s.vel[2]), vx: s.vel[0], vy: s.vel[1] };
         }
         return null;
     };
@@ -197,6 +197,15 @@ console.log("\n3. THE SCORE");
     const rfl = mflight(landScenario(), flipper);
     ok("!! A TOUCHDOWN THAT IS NOT STANDING FOUR SECONDS LATER IS CHARGED AS A CRASH OF THE SPEED AT FIRST CONTACT (not as the soft landing it began as): the landing at 0.75 m/s followed, a second later, by full thrust and full roll ends 'crashed', touchdown 'landed', not settled, charged exactly 3 + 4 x 0.75 / 25",
         rfl.touchdown === "landed" && rfl.status === "crashed" && !rfl.settled && rfl.speed === c0.speed && near(rfl.score, -DT.crashCost(c0.speed), 1e-12) && rfl.score < -3 && rfl.score > -3.2, `${rfl.touchdown} ${rfl.status} ${f(rfl.score, 5)} (${rfl.why})`);
+    // a diagonal drift: the ground speed is the whole horizontal speed, not one axis of it (the first sabotage run found 'the forward component only' going 0 red: both landings above drifted along x)
+    const diag = landScenario({ start: { pos: [0, 0, 6], velocity: [2, 2, 0] } }), rdg = mflight(diag, lander([2, 2])), cdg = contact(lander([2, 2]), diag);
+    ok("!! THE GROUND SPEED IS THE HORIZONTAL SPEED, BOTH AXES: a landing that drifts at 2 m/s east and 2 north has the independent loop's gs (the hypot of the two velocity components at the contact, larger than either alone), and the cost is the formula's on it", cdg && rdg.gs === cdg.gs && near(cdg.gs, Math.hypot(cdg.vx, cdg.vy), 1e-12) && Math.abs(cdg.vx) > 0.5 && Math.abs(cdg.vy) > 0.5 && rdg.gs > Math.abs(cdg.vx) + 0.3 && rdg.gs > Math.abs(cdg.vy) + 0.3 && near(rdg.score, -DT.landingCost(cdg.sink, cdg.gs), 1e-12), `gs ${f(rdg.gs, 4)} cost ${f(-rdg.score, 5)}`);
+    // a flight that starts from a state that is not finite is 'lost' at once and is CHARGED, not scored NaN
+    const nanMotor = custom({ kind: "motor", start: { pos: [0, 0, 30], velocity: [NaN, 0, 0] }, target: { altitude: 30 }, failure: { motor: 0, at: 1e9 } }), rln = mflight(nanMotor);
+    const nanHover = custom({ start: { pos: [0, 0, 30], velocity: [NaN, 0, 0] }, target: { pos: [0, 0], altitude: 30, heading: 0 } }), rlh = DT.fly(hand, nanHover);
+    ok("!! A STATE THAT IS NOT FINITE IS 'LOST' AT ONCE AND IS CHARGED, NEVER SCORED NaN: a motor flight started with a NaN velocity ends on its first tick, touchdown and status 'lost', not settled, charged exactly the worst crash, 7; a hover started the same way ends 'lost' with 0 ticks flown and scores the worst tick for every tick, -9 (the first run of this gate scored the motor flight NaN, which would have poisoned any mean it was in)",
+        rln.status === "lost" && rln.touchdown === "lost" && !rln.settled && rln.ticks === 1 && rln.score === -7 && rlh.status === "lost" && rlh.ticks === 0 && rlh.score === -9, `${rln.status} ${rln.score} ${rln.ticks} / ${rlh.status} ${rlh.score}`);
+    ok("!! AND THE COSTS ARE NaN-SAFE ON THEIR OWN: crashCost of NaN or Infinity is 7 (the worst crash), landingCost of a NaN sink or ground speed is the worst landing, 2.4, and a finite number is charged as before", DT.crashCost(NaN) === 7 && DT.crashCost(Infinity) === 7 && DT.crashCost(-Infinity) === 7 && near(DT.landingCost(NaN, 0), 0.4, 1e-12) && near(DT.landingCost(0, NaN), 2.0, 1e-12) && near(DT.landingCost(NaN, NaN), 2.4, 1e-12) && near(DT.crashCost(12.5), 5, 1e-12));
     const never = custom({ kind: "motor", start: { pos: [0, 0, 5000] }, target: { altitude: 5000 }, failure: { motor: 0, at: 1e9 } });
     const rnv = mflight(never, holder(5000));
     ok("!! A FLIGHT THAT NEVER TOUCHES DOWN IN ITS 40 SECONDS COSTS 7 (it is not a landing and it is not free): a hover at 5,000 m scores -7, 'airborne', no touchdown, and runs the 40 s ceiling, 4,800 ticks",
