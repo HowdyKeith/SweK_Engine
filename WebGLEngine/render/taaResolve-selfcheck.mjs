@@ -111,6 +111,10 @@ console.log("\n3. UPSTREAM'S CLAIMS");
 
 console.log("\n4. THE KERNEL");
 {
+    // v4895 -- FOUND ON THE RIG'S D3D12, NOT HERE: the kernel read its frame size as 1.0 / invRes and took u32() of it. A reciprocal that comes back 23.999998 for 24 makes the row stride 23, so every pixel lands in the wrong place and the tail keeps the liveness sentinel (worst 1.00e+6 over all 1152 values). Lavapipe divides exactly, so this box could not see it; the size is ROUNDED now, and this row holds the source to that.
+    ok("!! the kernel's frame size is ROUNDED from the reciprocal, not truncated from it (D3D12 reads 1/(1/24) as 23.999998)",
+        /fn dims\(\) -> vec2f \{ return floor\(1\.0 \/ uniforms\.invRes \+ 0\.5\); \}/.test(T.RESOLVE_KERNEL_WGSL) && !/1\.0 \/ uniforms\.invRes\)/.test(T.RESOLVE_KERNEL_WGSL.replace(/floor\(1\.0 \/ uniforms\.invRes \+ 0\.5\)/g, "")),
+        "SABOTAGE (v4895): dims() put back to `return 1.0 / uniforms.invRes;` -> this row red; restored.");
     const skip = headlessGpuSkipReason(require_);
     if (skip) { report("kernel half SKIPPED -- " + skip); report("*** THAT IS A SKIP AND NOT A PASS: sections 1-3 never run the WGSL"); }
     else {

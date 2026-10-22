@@ -97,7 +97,7 @@ fn lumaPost(c: vec3f) -> f32 { return dot(c, vec3f(0.2126, 0.7152, 0.0722)); }
 fn tonemapWeight(c: vec3f) -> vec3f { return c / (1.0 + lumaPost(c)); }
 fn tonemapUnweight(c: vec3f) -> vec3f { return c / max(1e-4, 1.0 - lumaPost(c)); }
 
-fn dims() -> vec2f { return 1.0 / uniforms.invRes; }
+fn dims() -> vec2f { return floor(1.0 / uniforms.invRes + 0.5); }   // ROUNDED: D3D12 divides with a reciprocal that can read 23.999998 for 24, and u32() of that is 23 -- the row stride, and the rig found it at v4895
 fn imgAt(buf: ptr<storage, array<f32>, read>, x: i32, y: i32) -> vec3f {
     let d = dims();
     let cx = clamp(x, 0, i32(d.x) - 1);
@@ -198,7 +198,7 @@ fn resolve(uv: vec2f) -> vec3f {
     let lo = mu - sigma * 1.35;
     let hi = mu + sigma * 1.35;
 
-    var raw = tonemapWeight(historyCatmullRom(prevUV, 1.0 / uniforms.invRes));
+    var raw = tonemapWeight(historyCatmullRom(prevUV, dims()));
     if (any(raw != raw)) { raw = mu; }
     let hist = clamp(raw, lo, hi);
 

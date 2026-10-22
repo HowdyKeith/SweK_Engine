@@ -22,7 +22,7 @@ import path from "node:path";
 import http from "node:http";
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import * as SP from "./seaPatch.mjs";
 import os from "node:os";
 import { headlessGpuSkipReason, resolveWebgpu, configureVulkanIcd, exitCleanly } from "./headlessGpu.mjs";
@@ -154,10 +154,10 @@ console.log("\n6. THE HEIGHT PROBE ON THE DEVICE");
     } else {
         // load the patched wgsl module in node: its absolute '/vendor/...' imports become file URLs
         const tmp = path.join(os.tmpdir(), "seaOceanWgsl-" + process.pid + ".mjs");
-        const vendorUrl = "file://" + path.join(ENG, "vendor/web-ocean/js/wgsl/");
+        const vendorUrl = pathToFileURL(path.join(ENG, "vendor/web-ocean/js/wgsl")).href + "/";   // a raw "file://" + C:\... path is no URL on Windows (the rig found it at v4895)
         fs.writeFileSync(tmp, ocOnDisk.toString("utf8").split("'/vendor/web-ocean/js/wgsl/").join("'" + vendorUrl));
-        const W = await import("file://" + tmp); fs.unlinkSync(tmp);
-        const probeUp = (await import("file://" + path.join(ENG, "vendor/web-ocean/js/wgsl/ocean.js"))).HEIGHT_PROBE;
+        const W = await import(pathToFileURL(tmp).href); fs.unlinkSync(tmp);
+        const probeUp = (await import(pathToFileURL(path.join(ENG, "vendor/web-ocean/js/wgsl/ocean.js")).href)).HEIGHT_PROBE;
         ok("!! the patched probe differs from upstream's only by the three patches (it names pts, gid and the runtime-sized output) and the unpatched one does not", /var<storage, read> pts: array<vec2f>/.test(W.HEIGHT_PROBE) && /outH\[gid\.x\]/.test(W.HEIGHT_PROBE) && !/pts/.test(probeUp) && /array<f32, 4>/.test(probeUp));
         // a synthetic displacement field: six 8x8 layers of rgba16float whose values are exact in half float, a smooth ramp plus one bump, wrapped
         const L = 8, CASC = 6, invL = [1 / 100, 1 / 37, 1 / 11, 1 / 5, 1 / 3, 1 / 2];

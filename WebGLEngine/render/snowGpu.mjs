@@ -511,7 +511,7 @@ fn lumaPost(c: vec3f) -> f32 { return dot(c, vec3f(0.2126, 0.7152, 0.0722)); }
 fn tonemapWeight(c: vec3f) -> vec3f { return c / (1.0 + lumaPost(c)); }
 fn tonemapUnweight(c: vec3f) -> vec3f { return c / max(1e-4, 1.0 - lumaPost(c)); }
 
-fn dims() -> vec2f { return 1.0 / uniforms.invRes; }
+fn dims() -> vec2f { return floor(1.0 / uniforms.invRes + 0.5); }   // ROUNDED: D3D12 divides with a reciprocal that can read 23.999998 for 24, and u32() of that is 23 -- the row stride, and the rig found it at v4895
 fn rowOf(uvY: f32) -> f32 { return (1.0 - uvY) * dims().y - 0.5; }
 fn loadCur(x: i32, y: i32) -> vec3f { let d = vec2i(dims()); return textureLoad(curTex, vec2i(clamp(x, 0, d.x - 1), clamp(y, 0, d.y - 1)), 0).rgb; }
 fn loadHist(x: i32, y: i32) -> vec3f { let d = vec2i(dims()); return textureLoad(histTex, vec2i(clamp(x, 0, d.x - 1), clamp(y, 0, d.y - 1)), 0).rgb; }
