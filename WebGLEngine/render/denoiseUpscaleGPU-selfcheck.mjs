@@ -98,6 +98,12 @@
 //   C5  the tile option running the list fill                          3 RED (the list fill row, by tilePasses; the chain; the pilot)
 //   C6  timeHalfChain's halfTile sums fillList                         1 RED (section 4's tile sum row)
 //   C7  the page's table without the tile fill's chain row             1 RED (the page row: 17 rows, not 18)
+//   and section 10's verdict (section 105), by the same runner:
+//   D1  the rule asks the 1080 alone -- the Intel's no-slower dropped   1 RED (the rule row: the tile fill would become the default)
+//   D2  a run counts at any commit                                     1 RED (the rule row's fixture: a run at 468766f9 must leave it owed)
+//   D3  C2 dropped -- a run counts with a pixel left                   1 RED (the rule row's fixture)
+//   D4  H37 at 1.0 x, not 0.9 x                                        1 RED (the rule row's fixture: 0.95 x is no hold)
+//   D5  the 1080's predicted tile fill widened to 2-20 ms              1 RED (the predictions row)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -743,6 +749,60 @@ console.log("\n9. SECTION 102: ROUND 35'S CRASH RUNS AND ROUND 34 ON THE GTX 108
     say(`section 102, gtx1080: r27w at 1920 x 1080 -- native ${N.map((r) => r.r27wNative).join(" / ")} ms a pass, page ${N.map((r) => r.r27wPage).join(" / ")} ms (about 250 ms is its usual reading) -- reported, deciding nothing`);
     REPORT.table("section 102: round 34 on both GPUs, the ring fill against the list fill at 960 x 540, ms", ["GPU", "run", "ring fill", "list fill", "chain ratio with the list fill", "all gates green"],
         Object.entries(R).flatMap(([g, rs]) => rs.map((r) => [g, r.file, r.fill, r.fillList, r.ratioList, r.allGreen ? "yes" : "no"])));
+}
+
+console.log("\n10. SECTION 105: ROUND 37'S TILE FILL ON BOTH GPUS, RE-DERIVED FROM THE FOUR REPORTS AS COMMITTED");
+{
+    // section 104 was carried by 49e124cb and 3d2ae54c; 49e124cb's module did not load (its kernel comment closed the WGSL template),
+    // so no gate at it could pass and only 3d2ae54c, the rig's commit, can count
+    const SECTION104_COMMITS = Object.freeze(["3d2ae54c"]);
+    const num = (re, t) => { const m = t.match(re); return m ? Number(m[1]) : null; };
+    const rd = (f) => fs.readFileSync(path.join(ENG, "render", f), "utf8");
+    const readRun = (rep, file) => {
+        const g = rep.gates.find((x) => x.gate === "render/denoiseUpscaleGPU-selfcheck.mjs"), m = (g && g.measured) || [];
+        const e = m.find((l) => /^section 104: /.test(l)) || "", a = m.find((l) => /^section 93: .*kernels/.test(l)) || "";
+        return { file, commit: String(rep.commit || "").slice(0, 8), allGreen: rep.gates.length === 4 && rep.gates.every((x) => x.ok && x.exit && x.exit.status === 0),
+            adapter: (a.match(/^section 93: ([^,]+),/) || [])[1] || null,
+            fillList: num(/fillList ([0-9.]+) ms \(wall\)/, e), fillTile: num(/fillTile ([0-9.]+) ms \(wall\)/, e),
+            passes: num(/the tile fill (\d+) passes/, e), tileRings: num(/passes, (\d+) of 96 rings/, e), tileLeft: num(/of 96 rings, (\d+) left/, e),
+            listRings: num(/^section 93: the chain's steps.*; (\d+) of 96 rings filled/, m.find((l) => /^section 93: the chain's steps/.test(l)) || ""),
+            ratioTile: num(/with the tile fill [0-9.]+ ms, ratio ([0-9.]+) x/, e), ratioList: num(/^section 103: .*the half-size chain [0-9.]+ ms, ratio ([0-9.]+) x/, m.find((l) => /^section 103: /.test(l)) || "") };
+    };
+    // section 104's rule: at its commit, every gate green with exit 0 (C1); the tile fill's rings the list fill's, none left, in 12 passes (C2);
+    // H37 on a GPU when, in both runs, fillTile <= 0.9 x fillList
+    const counts = (r) => SECTION104_COMMITS.includes(r.commit) && r.allGreen && r.tileLeft === 0 && r.tileRings === r.listRings && r.tileRings > 0 && r.passes === 12 &&
+        [r.fillList, r.fillTile].every((v) => Number.isFinite(v) && v > 0);
+    const H = (runs) => (runs.length === 2 && runs.every(counts) ? (runs.every((r) => r.fillTile <= 0.9 * r.fillList) ? "holds" : "fails") : "no verdict");
+    const rule = (byGpu) => {
+        const h = { intel: H(byGpu["intel-gen9"]), nv: H(byGpu.gtx1080) };
+        if (Object.values(h).includes("no verdict")) return "owed again";
+        if (h.nv === "holds" && byGpu["intel-gen9"].every((r) => r.fillTile <= r.fillList)) return "the tile fill becomes the default";
+        const n = Object.values(h).filter((x) => x === "holds").length;
+        return n === 1 ? "one GPU only: reported, the fill per adapter to the backlog" : n === 0 ? "neither: a measured negative, the 1080's fill lever closed" : "the tile fill becomes the default";
+    };
+    const R = Object.fromEntries(["intel-gen9", "gtx1080"].map((g) => [g, ["a", "b"].map((k) => readRun(JSON.parse(rd(`denoise-rig-r37-${k}-${g}.json`)), k))]));
+    const GPU = { "intel-gen9": "intel / gen-9", gtx1080: "nvidia / pascal" };
+    ok("!! section 105: the four reports read back -- each at 3d2ae54c on its GPU, every gate green with exit 0, the tile fill 87 rings in 12 passes with none left, as the list fill's",
+        Object.entries(R).every(([g, rs]) => rs.every((r) => counts(r) && r.adapter === GPU[g] && r.tileRings === 87)),
+        Object.entries(R).map(([g, rs]) => rs.map((r) => `${g} ${r.file}: list ${r.fillList} ms, tile ${r.fillTile} ms (${(r.fillTile / r.fillList).toFixed(3)} x)`).join("; ")).join("; "));
+    const v = rule(R);
+    // the rule's own fixtures: a run at another commit, or with a pixel left, leaves it owed; a 1080 short of 10 % is no hold; an Intel
+    // whose tile fill is no slower in both runs, though short of 10 %, lets the 1080's hold make it the default
+    const shift = (k, f) => ({ ...R, [k]: R[k].map((r, i) => (i === 1 ? f(r) : r)) });
+    const fx = [rule(shift("gtx1080", (r) => ({ ...r, commit: "468766f9" }))), rule(shift("gtx1080", (r) => ({ ...r, tileLeft: 3 }))),
+                rule(shift("gtx1080", (r) => ({ ...r, fillTile: 0.95 * r.fillList }))), rule({ ...R, "intel-gen9": R["intel-gen9"].map((r) => ({ ...r, fillTile: 0.95 * r.fillList })) })];
+    ok("!! *** section 105, by section 104's rule: H37 HOLDS ON THE GTX 1080 AND FAILS ON THE INTEL -- one GPU only, so the default stays the list fill and the fill per adapter goes to the backlog ***",
+        H(R.gtx1080) === "holds" && H(R["intel-gen9"]) === "fails" && v === "one GPU only: reported, the fill per adapter to the backlog" &&
+        fx[0] === "owed again" && fx[1] === "owed again" && fx[2] === "neither: a measured negative, the 1080's fill lever closed" && fx[3] === "the tile fill becomes the default",
+        `1080 ${H(R.gtx1080)}, Intel ${H(R["intel-gen9"])} -> ${v}; fixtures: ${fx.join(" | ")}`);
+    // the predictions, stated so they could miss: the 1080 2-10 ms (missed); the Intel 10-60 ms "could cost", no call on H37 (outside it)
+    const nv = R.gtx1080.map((r) => r.fillTile), it = R["intel-gen9"].map((r) => r.fillTile);
+    ok("  ...and section 104's predictions are read as made: the 1080's tile fill MISSED its 2-10 ms in both runs, and the Intel's fell outside the 10-60 ms it could cost",
+        nv.every((x) => !(x >= 2 && x <= 10)) && it.every((x) => !(x >= 10 && x <= 60)),
+        `1080 ${nv.join(" / ")} ms against 2-10; Intel ${it.join(" / ")} ms against 10-60`);
+    say(`section 105: the half-size chain against today's page with the tile fill -- 1080 ${R.gtx1080.map((r) => r.ratioTile).join(" / ")} x, with the list fill ${R.gtx1080.map((r) => r.ratioList).join(" / ")} x; Intel ${R["intel-gen9"].map((r) => r.ratioTile).join(" / ")} x, with the list fill ${R["intel-gen9"].map((r) => r.ratioList).join(" / ")} x -- reported, deciding nothing`);
+    REPORT.table("section 105: round 37 on both GPUs, the list fill against the tile fill at 960 x 540, ms", ["GPU", "run", "list fill", "tile fill", "tile / list", "chain ratio, tile", "chain ratio, list"],
+        Object.entries(R).flatMap(([g, rs]) => rs.map((r) => [g, r.file, r.fillList, r.fillTile, Number((r.fillTile / r.fillList).toFixed(3)), r.ratioTile, r.ratioList])));
 }
 
 console.log(fails ? `\nFAIL -- ${fails} check(s)` : "\nALL GREEN");

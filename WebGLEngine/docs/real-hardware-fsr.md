@@ -597,6 +597,10 @@ node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r37-b.json
 - **Don't commit or pull between runs.**
 - **Send back all four JSON files.**
 
+**The outcome (section 105): the tile fill holds on the 1080 and loses on the Intel.** On the 1080 it took 16.8 and 16.7 ms
+against the list fill's 22.6 and 23.1. On the Intel it took 67.3 and 68.9 against 22.3 and 24.6. Every gate was green on
+both. The default stays the list fill.
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and

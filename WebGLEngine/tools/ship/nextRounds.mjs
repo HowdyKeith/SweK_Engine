@@ -2346,10 +2346,25 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "denoise-fill-fewer-passes",
+        blocker: "CLOSED",
+        what: "DONE in round 37 (pre-registration sections 104-105), shipping with the next version. fill(..., { tile: true }) runs eight rings a pass in 32 x 32 workgroup tiles, 14 passes at 96 rings against the list fill's 99, the list fill's bit for bit. H37 held on the GTX 1080 (16.8 / 16.7 ms against the list fill's 22.6 / 23.1) and failed on the Intel (67.3 / 68.9 against 22.3 / 24.6), so the default stays the list fill.",
+        how: "*** BOTH PREDICTIONS MISSED. *** The 1080's 2-10 ms priced a pass at the list fill's ~0.25 ms; a tile pass cost ~1.2 ms, its own work over every tile of the frame. The Intel's 67-69 ms fell outside the 10-60 it could cost. render/denoiseUpscaleGPU-selfcheck.mjs section 10 re-derives the verdict from render/denoise-rig-r37-{a,b}-{intel-gen9,gtx1080}.json; sabotaged D1-D5.",
+        why: "Section 102: on the 1080 the list fill cut the pixels to 5 % of the frame and took only 3-11 % off; what was left was the passes. The tile fill cut those, at the cost of the pixels again.",
+    },
+    {
+        id: "denoise-fill-listed-tiles",
         blocker: "OPEN",
-        what: "A fill that runs several rings a pass -- for example in workgroup memory over tiles -- so the GTX 1080's fill stops being ~99 compute passes on the wall clock.",
-        how: "Round 37 (pre-registration section 104) built it and waits on the rig: fill(..., { tile: true }) runs FILL_TILE_RINGS = 8 rings a pass in 32 x 32 workgroup tiles (a 16 x 16 interior, a halo of 8), 14 passes at 96 rings against the list fill's 99. On SwiftShader it is fillEmittersBounded's within 1e-5 and the list fill's bit for bit; sabotaged C1-C7. Owed: two realGpuRun --only denoise runs on each GPU, read by section 104's rule (H37: fillTile <= 0.9 x fillList in both runs).",
-        why: "Section 102: on the 1080 the list fill cut the pixels to 5 % of the frame and took only 3-11 % off; what is left is the passes, not the pixels.",
+        what: "Round 37's tile fill dispatched only over the tiles that hold an unknown pixel: a list of those tiles, its length as an indirect dispatch as round 34's list fill does, so the work scales with the lights and the passes stay at ceil(rings / 8).",
+        how: "Pre-register against both fills as they are (the list fill, the default, and the tile fill), bit for bit against them and within 1e-5 of fillEmittersBounded, then two runs on each GPU. A tile whose interior holds no unknown pixel writes back what it read, so skipping it changes nothing -- but the fill ping-pongs two buffers, so a skipped tile's interior must still reach the other one (a copy, or a fill in place). Each needs its own row.",
+        why: "Section 105: the list fill cut the pixels (the Intel's cost) and the tile fill the passes (the 1080's). The tile fill lost on the Intel because it works over the whole frame again, about 20 times the lights' pixels.",
+    },
+    {
+        id: "denoise-fill-per-adapter",
+        blocker: "OPEN",
+        what: "Choose the chain's fill per adapter -- the tile fill on the GTX 1080, the list fill on the Intel gen-9 -- by the adapter key the page already reads, as section 66's kernel table does for the network.",
+        how: "Only if denoise-fill-listed-tiles does not win on both GPUs: a fill that wins everywhere needs no table. If it is built, the table names each adapter's fill with the section that measured it, and an adapter not in it gets the list fill.",
+        why: "Section 105: H37 held on one GPU only, which section 104 sends to the backlog. The 1080's chain goes from about 1.44 x to 1.59 x against today's page with the tile fill.",
+        upstream: "denoise-fill-listed-tiles first.",
     },
     {
         id: "denoise-fsr3-framegen",

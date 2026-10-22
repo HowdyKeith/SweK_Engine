@@ -1,6 +1,6 @@
 {
  "gate": "render/denoiseUpscaleGPU-selfcheck.mjs",
- "at": "2026-10-21",
+ "at": "2026-10-22",
  "tables": [
   {
    "title": "section 94: today's page against the half-size chain at 1920 x 1080, ms",
@@ -177,6 +177,57 @@
      25.4,
      1.395,
      "yes"
+    ]
+   ],
+   "note": null
+  },
+  {
+   "title": "section 105: round 37 on both GPUs, the list fill against the tile fill at 960 x 540, ms",
+   "columns": [
+    "GPU",
+    "run",
+    "list fill",
+    "tile fill",
+    "tile / list",
+    "chain ratio, tile",
+    "chain ratio, list"
+   ],
+   "rows": [
+    [
+     "intel-gen9",
+     "a",
+     22.3,
+     67.3,
+     3.018,
+     1.935,
+     2.066
+    ],
+    [
+     "intel-gen9",
+     "b",
+     24.6,
+     68.9,
+     2.801,
+     1.978,
+     2.113
+    ],
+    [
+     "gtx1080",
+     "a",
+     22.6,
+     16.8,
+     0.743,
+     1.601,
+     1.454
+    ],
+    [
+     "gtx1080",
+     "b",
+     23.1,
+     16.7,
+     0.723,
+     1.571,
+     1.417
     ]
    ],
    "note": null

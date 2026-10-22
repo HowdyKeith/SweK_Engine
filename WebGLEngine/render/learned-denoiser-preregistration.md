@@ -6993,3 +6993,44 @@ Each must turn at least one row red.
   need them.
 - Reported, deciding nothing: on SwiftShader, a CPU emulating workgroup memory, the tile fill took 193.9 ms against the
   list fill's 11.4 ms at the pilot size.
+
+## 105. ROUND 37 -- THE VERDICT: THE TILE FILL HOLDS ON THE GTX 1080 AND LOSES ON THE INTEL, SO THE DEFAULT STAYS THE LIST FILL
+
+**What arrived.** Four reports: two `realGpuRun --only denoise` runs on each GPU, all at 3d2ae54c, the commit carrying
+section 104 with its kernel fixed. They were committed as received at f8686aaf, before this section was written:
+`render/denoise-rig-r37-{a,b}-{intel-gen9,gtx1080}.json`. 49e124cb also carried section 104, but its module did not load,
+so no run at it could count; the rule counts 3d2ae54c alone. `render/denoiseUpscaleGPU-selfcheck.mjs`'s section 10
+re-derives every figure here from the four files. Sabotaged D1-D5.
+
+**C1 and C2 held in all four runs.**
+- **C1:** every gate was green with exit 0.
+- **C2:** the tile fill reached 87 rings, the list fill's count, in 12 passes, with 0 left.
+
+**H37, by section 104's rule:**
+
+| GPU | List fill (a / b) | Tile fill (a / b) | Tile / list | H37 | Chain against today's page, tile / list |
+|---|---|---|---|---|---|
+| GTX 1080 | 22.6 / 23.1 ms | **16.8 / 16.7 ms** | 0.743 / 0.723 | **holds** | 1.601 / 1.571 x against 1.454 / 1.417 x |
+| Intel gen-9 | 22.3 / 24.6 ms | **67.3 / 68.9 ms** | 3.018 / 2.801 | **fails** | 1.935 / 1.978 x against 2.066 / 2.113 x |
+
+**So, by the rule: it holds on one GPU only.** The default stays the list fill (section 103), and choosing the fill per
+adapter goes to the backlog (`denoise-fill-per-adapter`). On the 1080 the tile fill takes about a quarter off the fill and
+lifts the chain from about 1.44 x to 1.59 x against today's page. On the Intel it costs about three times the list fill.
+
+**The predictions missed, both of them.**
+- **GTX 1080:** predicted 2-10 ms, measured 16.8 and 16.7. The prediction priced a pass at the ~0.25 ms that the list fill's 99
+  passes imply (22.6 ms). The tile fill's 14 passes cost about 1.2 ms each. So the tile passes' own work dominates, not their
+  number: every pass loads every tile of the frame four times over (32^2 for 16^2) and runs 8 rings over all 1,024 cells,
+  while the lights' pixels are about 5 % of the frame (25,765 of 518,400). The list fill touches that 5 % alone.
+- **Intel gen-9:** "could cost 10-60 ms", measured 67.3 and 68.9. On the Intel, where the ring fill over the whole frame
+  cost ~300 ms and the list fill 23, the pixels are the cost. A fill that works over the whole frame again, even in 12
+  passes, loses to one that works over 5 % of it in 99.
+- Every gate was green on both GPUs, as predicted.
+
+**What this points to, reported and not decided here.** The two fills each cut one cost: the list fill the pixels, the tile
+fill the passes. A tile fill dispatched only over the tiles that hold an unknown pixel would cut both. With a list of those
+tiles, its length as an indirect dispatch as round 34 did, the work would scale with the lights and the passes would stay
+at 12. That is `denoise-fill-listed-tiles`. It would be pre-registered against both fills as they are now.
+
+**Nothing changes in this section:** the default fill (the list fill), the page, the network, every kernel table, and
+`fx/fsr`.
