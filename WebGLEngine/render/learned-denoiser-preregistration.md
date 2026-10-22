@@ -8093,3 +8093,73 @@ Geometric means of relMSE on the test images:
 **Sabotages, by the byte-safe runner (Q1-Q3):** the verdict read off round 11's file, Q1; the rule's fixture shifted too
 little to move it, Q2; and C's gap read as within its prediction, Q3. Each was restored byte-identical: Q1 turned 2 rows red, Q2 1
 and Q3 1.
+
+## 119. ROUND 49 -- THE w16 NETWORK EXPORTED, HELD ON THE DEVICE, AND TIMED NATIVELY: FIXED BEFORE THE RIG RUNS IT
+
+**Why now.** Section 118, by section 116's rule: the w16 network beat the filter on both families, so it goes to the device.
+Its error is 1.117 x the shipped network's on R and 1.297 x on C. So `denoise-w16-device` first asked which network a device
+runs. **Keith chose: the w16 network on the Intel gen-9 only**, where the network is the chain's bottleneck (r18u at
+960 x 540 took 283-306 ms in section 111's runs). The shipped network stays wherever it is fast enough: the 1080, about 18 ms.
+Following the arc's rule that no table entry moves without the rig's measurement, this round builds, holds and times. The
+Intel's entry moves in the round after it, if this one's rule holds.
+
+**One finding first, from round 47's cache.** The 32-channel network section 118 compared against was trained again from
+nothing, and its seed 1 has the shipped network's cache key (`net-8f65da8060752453-22465a5eb663642f`). Its 33,329 weights are
+the shipped file's, bit for bit. So section 118's comparison network IS the shipped network, not a replica of it, and its
+gap figures are against the network the page runs.
+
+**What this round adds:**
+- **The export.** `node tools/denoiseDevice.mjs --export-r47 --cache <round 47's cache> --key
+  net-8f65da8060752453-5668b0251a72b854` wrote `render/denoise-net-r47-w16.json`, in the same record format as round 11's
+  export. It holds the seed-1 w16 network, and the filter its harvest tuned (round 11's setting exactly). It refuses a record
+  that is not the w16 shape. Read back, it is the cache's network bit for bit, 9,793 values.
+- **On the device (render/denoiseDevice-selfcheck.mjs).** The exported network on r15 and on the round-18 sets the compiler
+  builds natively (the Intel's r18u among them). Every hidden layer's cells are explained against conv2dCpu or its fused
+  mirror, given the device's own input, and the fused head's image is within APPLY_TOL. That is the key the shipped network
+  is held to. A `native K0 for round 49's w16 network` line carries it for the rig.
+- **Timed (render/denoiseTiming-selfcheck.mjs).** After the shipped network's native ladder, a second native ladder times
+  the w16 network on the same sets with the same cap and budget. `native: w16 against the shipped network on <set> at
+  W x H` lines give the shipped network's median over the w16's, on the device's clock, tagged section 119. The page's
+  ladder is unchanged: the page's network choice is the next round's.
+- **Nothing moves:** every table, the page's network, every kernel and `fx/fsr`.
+
+**Measured here, on SwiftShader, before this section was written:**
+- every row green;
+- the w16 network on r15, r18t and r18u within 5.8e-7 of the f64 network;
+- the w16 network 1.4-2.6 x as fast as the shipped one at 64 x 64 and 128 x 128 (the cap stops a CPU there).
+
+Those are a CPU's times, and they decide nothing.
+
+**The rig run.** **On the Intel gen-9: two `realGpuRun --only denoise` runs** at a commit carrying this section.
+- The runs Keith is making now are at 90ebf7f3, before it. They serve rounds 45, 46 and 48, and this round is owed its own.
+- On the 1080 the same run is optional and reported.
+
+**The rule (H49), on the Intel gen-9, natively.**
+- **C1:** every gate green with exit 0.
+- **C2:** the `native K0 for round 49's w16 network` line green on r18u in both runs.
+- **C3:** both networks' 1920 x 1080 passes on r18u on the device's clock.
+- **H49 holds** when, in both runs, the w16 network on r18u is at least 1.5 x as fast as the shipped network on r18u at
+  1920 x 1080.
+- **What it buys:**
+  - If it holds, the Intel gen-9's entries run the w16 network: a network table beside the kernel tables, the page and the
+    native caller each loading it by adapter key, in the next round.
+  - If not, the w16 network stays exported and off every table, and the reason is read off the per-layer times.
+
+**Predictions (stated so they can miss).**
+- **The w16 network 2.5-3.5 x as fast as the shipped one on r18u at 1920 x 1080 on the Intel.** Its hidden layers are a
+  quarter of the arithmetic. The head (81 taps from 16 channels instead of 32) and the kernel apply are a smaller share that
+  does not fall as fast.
+- **H49 holds.** Every gate green.
+
+**Sabotages, by the byte-safe runner (R1-R4):**
+- the device row judging the shipped network;
+- the device row dropping r18u;
+- the w16 ladder timing the shipped network;
+- the w16 ladder leaving out r18u.
+
+Each must turn at least one row red.
+
+**Before commit.** Every row passed here. The sabotages R1-R4 each turned 1 row red and were restored byte-identical. Two of
+the rows were widened before the sabotages ran, so that R2 and R4 could be seen:
+- the device row asks for r18u wherever the compiler builds it;
+- the ladder row asks that its network is the w16 shape and includes r18u wherever the shipped ladder ran it.

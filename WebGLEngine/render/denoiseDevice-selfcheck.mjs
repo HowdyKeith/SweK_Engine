@@ -1127,6 +1127,23 @@ else try {
             L.rows.r40s.length === 2 && L.rows.r40s.every((x) => x.skipped && /no subgroups feature/.test(x.reason) && /section 108/.test(x.reason)) && L.rows.r15.every((x) => !x.skipped && x.wall.median > 0),
             `r40s: ${L.rows.r40s.map((x) => x.reason).join(" | ")}; r15 ${L.rows.r15.map((x) => (x.skipped ? "skipped" : x.wall.median.toFixed(1) + " ms")).join(", ")}`);
     }
+    // ROUND 49 (section 119): the w16 network AS EXPORTED (render/denoise-net-r47-w16.json) on the sets the tables use -- r15, the
+    // shipped default, and both round-18 sets, the Intel's r18u among them -- every hidden layer's cells explained against conv2dCpu or
+    // its fused mirror on the device's own input, and the fused head's image within APPLY_TOL: the key the shipped network is held to
+    const W16 = [];
+    {
+        const j16 = JSON.parse(fs.readFileSync(path.join(ENG, "render", "denoise-net-r47-w16.json"), "utf8")), net16 = decodeNet(j16.net), x16 = synth(15, 13, 10, 49);
+        for (const set of ["r15", ...native18]) {
+            const r16 = await job(net16, x16, 15, 13, 10, set), L16 = deviceLayers(net16, set), J16 = judge(net16, x16, 15, 13, r16.acts, set);
+            const h16 = judgeHeadApply(x16, r16.acts[L16.length - 2], L16[L16.length - 1], r16.y, 15, 13), w64 = worstRel(r16.y, denoise(net16, x16, 15, 13).y, 1e-12);
+            W16.push({ set, ok: J16.slice(0, -1).every((jj) => jj.unexplained === 0) && h16.worst <= APPLY_TOL && L16.slice(0, -1).every((L) => L.Cout === 16), kernels: L16.map((L) => L.kernel).join(","), w: h16.worst, w64 });
+        }
+        ok("!! round 49: the exported w16 network on the device -- r15 and the round-18 sets this compiler builds -- every hidden layer's cells explained, the head's image within APPLY_TOL, natively",
+            j16.source.seed === 1 && j16.source.cacheKey === "net-8f65da8060752453-5668b0251a72b854" && net16.layers.map((L) => L.Cout).join("/") === "16/16/16/16/81" &&
+            W16.length >= 1 && W16.every((o) => o.ok) && W16[0].set === "r15" && native18.every((s2) => W16.some((o) => o.set === s2)), W16.map((o) => `${o.set} [${o.kernels}] head ${o.w.toExponential(2)}, against f64 ${o.w64.toExponential(2)}`).join("; "));
+    }
+    console.log(`  ----  native K0 for round 49's w16 network on ${nativeAdapterKey(NATIVE && NATIVE.info, process.platform) || "(an adapter with no vendor)"}, compiler ${compilerSaid}: ` +
+        W16.map((o) => `${o.set} ${o.ok ? "green" : "RED"}`).join("; "));
     // v4849 -- round 19 (section 66)'s condition (1), readable off the rig's report: realGpuRun keeps measured and failing lines,
     // never a PASS or a SKIP, so which round-18 sets' native rows ran here, under which compiler, and whether every one was green
     // is said on one measured line -- by the key nativeAdapterKey gives this adapter

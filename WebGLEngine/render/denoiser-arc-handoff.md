@@ -59,7 +59,8 @@ node tools/ship/versionPreflight.mjs --next    # the next free version and sweep
    - **Round 47 (sections 116 and 118): reported, both supported.**
      - The 16-channel network beats the filter on new R (10 of 12, +0.376) and new C (11 of 12, +0.425).
      - Its error is 1.117 x the shipped network's on R and 1.297 x on C.
-     - Next is **`denoise-w16-device`**, which first decides which network a device runs.
+     - Next is **`denoise-w16-device`**. Keith decided: w16 on the Intel only. Round 49 (section 119) exports it, holds it
+       and times it natively, and is owed two Intel runs of its own.
    - Round 48 (section 117) is the accumulation's clamp read from a tile, on the same Intel runs as rounds 45 and 46.
    Round 36 (section 103) made the list fill the default, with round 31's ring fill kept as its reference.
    **`denoise-1080-native-crash`:** round 35 did not reproduce it in five runs (section 102). The traces stay armed.

@@ -2302,7 +2302,7 @@ export const NEXT_ROUNDS = [
         id: "denoise-w16-device",
         blocker: "OPEN",
         what: "Round 47's w16 network on the device (section 118): exported from the harvest's cache as round 11's seed 1 was (tools/denoiseDevice.mjs --export-r11's shape), with kernel sets for 16 channels, held to the CPU twin cell for cell as every set is, and timed on the rig against the shipped network.",
-        how: "Not designed. First decided, before any timing is read: which network a device runs -- the w16 in place of the shipped one, beside it, or only on an adapter where the network is the bottleneck (the Intel gen-9) -- given section 118's gap (1.117 x the shipped network's error on R, 1.297 x on C).",
+        how: "DECIDED by Keith before any timing: the w16 network on the Intel gen-9 only, the shipped network everywhere else. ROUND 49 (pre-registration section 119) exported it (render/denoise-net-r47-w16.json, tools/denoiseDevice.mjs --export-r47), holds it cell for cell on r15 and the round-18 sets natively, and times it natively against the shipped network on the same sets. Owed: two Intel realGpuRun --only denoise runs at a commit carrying section 119, read by its rule (H49: w16 on r18u >= 1.5 x the shipped network on r18u at 1920 x 1080 in both runs); then the network table and the page and native callers loading by adapter key. Section 119 predicts 2.5-3.5 x.",
         why: "Section 116's rule: both hypotheses held, so it goes to the device. Its hidden layers are a quarter of the shipped network's arithmetic.",
     },
     {

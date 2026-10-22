@@ -717,6 +717,24 @@ Nothing extra to run: the same two Intel runs carry it, if they are made at a co
 gate holds the tiled accumulation bit for bit against the accumulation, and adds a `section 117:` line. Section 117 predicts
 0.60-0.85 x the accumulation on the Intel, which would hold H48, narrowly.
 
+### Round 49: the w16 network on the Intel, timed natively (pre-registration section 119)
+
+**On the Intel gen-9, two more runs**, at a commit carrying section 119 (`git log -1 --oneline` shows it). These are not the
+round 45 runs, which were made before it. Pull first, then:
+
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r49-a.json
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r49-b.json
+```
+
+- **What is new:** the device gate holds the exported w16 network cell for cell natively, and the timing gate's native
+  ladder times it beside the shipped network, adding `native: w16 against the shipped network` lines tagged section 119.
+  Expect the timing gate to take about a minute longer.
+- **Section 119 predicts** 2.5-3.5 x at 1920 x 1080 on r18u, so H49 holds.
+- On the 1080, one run is optional.
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and

@@ -553,6 +553,28 @@ else {
             !!r15 && !r15.skipped && !!r12 && r12.skipped && /over the 0\.001 ms cap$/.test(r12.reason || ""),
             mErr || (r12 ? `r15 ${r15.skipped ? "skipped: " + r15.reason : "ran"}; r12 ${r12.skipped ? r12.reason : "ran"}` : "no ladder"));
     }
+    // ROUND 49 (section 119): round 47's w16 network, as exported, timed natively on the sets the tables use that this ladder ran --
+    // r15 and the round-18 sets -- against the shipped network on the same set at every size both measured. Its own lines, not
+    // report()'s: report() counts the shipped network's arithmetic
+    if (!err && r && nativeGpu) {
+        const net16 = decodeNet(JSON.parse(fs.readFileSync(path.join(ENG, "render", "denoise-net-r47-w16.json"), "utf8")).net);
+        const sets16 = ["r15", "r18t", "r18u"].filter((s2) => r.sets.includes(s2));
+        let r16 = null, e16 = null;
+        try { r16 = await timingLadder(net16, () => nativeGpu.requestAdapter(), { sets: sets16, ...LADDER, totalMs: NATIVE_MS, trace: (l) => trace(`native w16 ${l}`) }); } catch (e) { e16 = String(e && e.message || e); }
+        if (e16) ok("!! round 49: the w16 network's native ladder ran", false, e16.slice(0, 200));
+        else {
+            for (const s2 of sets16) holds(`native w16 ${s2}`, { adapter: r16.adapter, rows: r16.rows[s2], invisible: r16.invisible[s2] }, s2);
+            for (const s2 of sets16) for (const x of r16.rows[s2]) say(x.skipped ? `native w16 ${s2}: ${x.W} x ${x.H} skipped -- ${x.reason}` :
+                `native w16 ${s2}: ${x.W} x ${x.H}: ${x.wall.median.toFixed(3)} ms a pass (10th-90th ${x.wall.p10.toFixed(3)}-${x.wall.p90.toFixed(3)}, ${x.wall.n} passes)` +
+                (x.gpu ? `; on the device's clock ${x.gpu.median.toFixed(3)} ms` : "; no timestamp queries"));
+            const vs16 = sets16.flatMap((s2) => r16.rows[s2].map((b) => [s2, b, r.rows[s2].find((a2) => a2.W === b.W && a2.H === b.H)]).filter(([, b, a2]) => a2 && !a2.skipped && !b.skipped));
+            for (const [s2, b, a2] of vs16) say(vsSetLine("native", "w16", `the shipped network on ${s2}`, b, a2, "section 119"));
+            ok("  round 49: the w16 network's native ladder timed every set it was given at the first size, and each is set against the shipped network on the same set at every size both measured",
+                net16.layers.map((L) => L.Cout).join("/") === "16/16/16/16/81" && sets16.includes("r18u") === r.sets.includes("r18u") &&
+                sets16.length >= 1 && sets16.every((s2) => r16.rows[s2] && !r16.rows[s2][0].skipped) && vs16.length >= sets16.length,
+                `${sets16.join(", ")}; ${vs16.length} sizes compared`);
+        }
+    }
     else {
         // round 35: the trace holds this run's ladder, step by step -- a device asked for at every size it measured, and its end.
         // SABOTAGED round 35: timingLadder not tracing its requestDevice -> 1 red; the gate not handing timingLadder its trace -> 1 red;
