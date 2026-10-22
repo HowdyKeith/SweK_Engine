@@ -87,7 +87,7 @@ console.log("\n5. NOTHING LOADS THEM");
             if (/vendor\/snowflow\//.test(fs.readFileSync(p, "utf8"))) hits.push(path.relative(ENG, p).split(path.sep).join("/"));
         }
     })(ENG);
-    const ALLOWED = ["render/aerial-selfcheck.mjs", "render/snowFine-selfcheck.mjs", "render/snowShading-selfcheck.mjs", "render/clipmapTerrain-selfcheck.mjs", "render/deformRead-selfcheck.mjs", "render/deformRead.mjs", "render/pcssShadow-selfcheck.mjs", "render/skyBake-selfcheck.mjs", "render/snowGpu-selfcheck.mjs", "render/taaResolve-selfcheck.mjs", "render/toroidalDeform-selfcheck.mjs", "render/toroidalDeform.mjs", "tools/ship/snowflowVendor-selfcheck.mjs"];
+    const ALLOWED = ["render/aerial-selfcheck.mjs", "render/snowFine-selfcheck.mjs", "render/cascades-selfcheck.mjs", "render/snowShading-selfcheck.mjs", "render/clipmapTerrain-selfcheck.mjs", "render/deformRead-selfcheck.mjs", "render/deformRead.mjs", "render/pcssShadow-selfcheck.mjs", "render/skyBake-selfcheck.mjs", "render/snowGpu-selfcheck.mjs", "render/taaResolve-selfcheck.mjs", "render/toroidalDeform-selfcheck.mjs", "render/toroidalDeform.mjs", "tools/ship/snowflowVendor-selfcheck.mjs"];
     ok("!! only the adaptations and the gates that read the originals name the vendored paths: no page or module loads them", JSON.stringify(hits.sort()) === JSON.stringify(ALLOWED.slice().sort()), hits.join(", "));
 }
 
