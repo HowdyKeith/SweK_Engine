@@ -70,6 +70,8 @@ export function guidance(state, target = TARGET_DEFAULT, wind = [0, 0, 0], opts 
     const fwd = [Math.cos(h), -Math.sin(h)], right = [-Math.sin(h), -Math.cos(h)], cosTilt = clamp(a.up[2], 0.2, 1);
     const agl = pos[2] - T.legDrop * cosTilt, land = !!target.land;
     const working = state.health.filter((x) => x >= 0.5).length, motorOut = working < 4;
+    let failedFB = 0, failedLR = 0;   // where the failed motor(s) are, in the nose's frame: +1 front / left, -1 rear / right (the annunciator knows which; the learned pilots are told)
+    model.spec.motors.forEach((mo, i) => { if (state.health[i] < 0.5) { failedFB += Math.sign(mo.pos[0]); failedLR += Math.sign(mo.pos[1]); } });
     // ---- where to go
     let vCmd = [0, 0], ePosF = 0, ePosR = 0;
     const speedCap = Math.max(0, fin(target.speed ?? g.speed));
@@ -99,7 +101,7 @@ export function guidance(state, target = TARGET_DEFAULT, wind = [0, 0, 0], opts 
     return {
         att: a, rates: r, climb, agl, land, motorOut, working, vCmd, vMag, zCmd, tiltMax,
         pitchErr: pitchCmd - a.pitch, bankErr: wrapAngle(bankCmd - a.bank), climbErr, vsCmd, onGround, headingErr, yawRateCmd,
-        yawRateErr: motorOut ? 0 : yawRateCmd - r.yaw, thrustFF, charge: Q.charge(model, state), ePosF, ePosR,
+        yawRateErr: motorOut ? 0 : yawRateCmd - r.yaw, thrustFF, charge: Q.charge(model, state), ePosF, ePosR, failedFB, failedLR,
     };
 }
 

@@ -7,7 +7,8 @@
 //   FEATURES   the hand pilot's own intermediate quantities (brain/autopilotDrone.mjs guidance()), scaled to about 1 so that a mutation of 0.3 means the same thing everywhere, then twelve more it does not use that a learned pilot may:
 //              0 bias; 1 the attitude error in pitch / 0.1 rad; 2 pitch rate / 0.5; 3 the bank error / 0.1 rad; 4 roll rate / 0.5; 5 (the yaw rate asked for, less the yaw rate flown) / 0.5 -- zero when a motor is out; 6 the thrust the loops feed forward (the hover's, times 1 / (cos bank cos pitch), times 4 over
 //              the motors working); 7 the climb error / 5 m/s -- features 1 to 7 are the hand pilot's, and what the hand pilot's laws are is a SUM of the first eight (the bias is the constant 1 and no law uses it);
-//              THEN the extras: 8 height over the ground / 50 m; 9 climb rate / 5; 10 the speed along the nose / 10; 11 the speed to the right / 10; 12 bank / 0.5; 13 pitch / 0.5; 14 heading error / pi; 15 the motor-out flag (1 when a motor's health is under a half); 16 the battery's charge (0..1);
+//              THEN the extras: 8 height over the ground / 50 m; 9 WHERE THE FAILED MOTOR IS, to the left (+1 left, -1 right, 0 none or one of each); 10 the speed along the nose / 10; 11 the speed to the right / 10; 12 bank / 0.5; 13 pitch / 0.5; 14 heading error / pi; 15 the motor-out flag (1 when a motor's health is under a half);
+//              16 WHERE THE FAILED MOTOR IS, to the front (+1 front, -1 rear, 0 none or one of each) -- with 9 it says WHICH motor: the counter-yaw for a clockwise motor has the other sign from a counter-clockwise one's, and the imbalance in roll and pitch follows the corner;
 //              17 the point to hold, ahead in the nose's frame / 20 m; 18 the same to the right; 19 the yaw rate / 1 rad/s.
 //   OUTPUTS    thrust CLAMPED to [0, 1], pitch, roll and yaw to [-1, 1] -- the ranges the quadrotor model takes -- so that the hand weights are the pilot's laws and not an approximation of them.
 //
@@ -22,7 +23,7 @@ import * as DT from "./droneTask.mjs";
 
 export const FEATURES = 20, HIDDEN = Topo.NEURON_ORDER.length, OUTPUTS = 4;
 export const REC_STEPS = 3, REC_EDGES = Topo.EDGES.length;
-export const FEATURE_NAMES = Object.freeze(["bias", "pitchErr", "pitchRate", "bankErr", "rollRate", "yawRateErr", "thrustFF", "climbErr", "agl", "climb", "speedFwd", "speedRight", "bank", "pitch", "headingErr", "motorOut", "charge", "pointFwd", "pointRight", "yawRate"]);
+export const FEATURE_NAMES = Object.freeze(["bias", "pitchErr", "pitchRate", "bankErr", "rollRate", "yawRateErr", "thrustFF", "climbErr", "agl", "failedLeft", "speedFwd", "speedRight", "bank", "pitch", "headingErr", "motorOut", "failedFront", "pointFwd", "pointRight", "yawRate"]);
 export const OUTPUT_NAMES = Object.freeze(["thrust", "pitch", "roll", "yaw"]);
 export const WEIGHT_COUNT = FEATURES * HIDDEN + HIDDEN + REC_EDGES + HIDDEN * OUTPUTS + OUTPUTS;   // 680 + 34 + 313 + 136 + 4 = 1167
 export const zeroWeights = () => new Float32Array(WEIGHT_COUNT);
@@ -83,7 +84,7 @@ export function featuresFrom(gd, state) {
     const r = gd.rates, a = gd.att, h = a.heading, vx = state.vel[0], vy = state.vel[1];
     return [
         1, clamp(gd.pitchErr / 0.1, -12, 12), clamp(r.pitch / 0.5, -30, 30), clamp(gd.bankErr / 0.1, -32, 32), clamp(r.roll / 0.5, -30, 30), clamp(gd.yawRateErr / 0.5, -30, 30), gd.thrustFF, clamp(gd.climbErr / 5, -12, 12),
-        clamp(gd.agl / 50, -1, 4), clamp(gd.climb / 5, -6, 6), clamp((vx * Math.cos(h) - vy * Math.sin(h)) / 10, -4, 4), clamp((-vx * Math.sin(h) - vy * Math.cos(h)) / 10, -4, 4), clamp(a.bank / 0.5, -7, 7), clamp(a.pitch / 0.5, -4, 4), gd.headingErr / Math.PI, gd.motorOut ? 1 : 0, gd.charge,
+        clamp(gd.agl / 50, -1, 4), clamp(gd.failedLR, -2, 2), clamp((vx * Math.cos(h) - vy * Math.sin(h)) / 10, -4, 4), clamp((-vx * Math.sin(h) - vy * Math.cos(h)) / 10, -4, 4), clamp(a.bank / 0.5, -7, 7), clamp(a.pitch / 0.5, -4, 4), gd.headingErr / Math.PI, gd.motorOut ? 1 : 0, clamp(gd.failedFB, -2, 2),
         clamp(gd.ePosF / 20, -4, 4), clamp(gd.ePosR / 20, -4, 4), clamp(r.yaw, -6, 6),
     ].map(fin);
 }
