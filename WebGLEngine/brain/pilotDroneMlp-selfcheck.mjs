@@ -14,7 +14,16 @@
 //
 // NOT IN THIS GATE: a GPU row. The GPU Brain's batched kernel (brain/mlp.js's BatchedMLP) is held to mlpLayerCpu for the aeroplane pilot in brain/pilotFlightGpu-selfcheck.mjs on a WebGPU adapter; this network has the same layer shape and is held here to the same mirror.
 //
-// SABOTAGE LOG: (filled in below once run)
+// SABOTAGE LOG (each applied to brain/pilotDroneMlp.mjs in a scratch copy, the gate run on the copy, the copy discarded; the number is how many rows went red): 40 mutants, none left at 0. They are the helicopter's gate's mutants written again for this module's text
+//   (M01-M32 the forward pass, the layout, the twin, the hand weights, the training functions, the defaults and the shared senses; G01-G08 prune's group testing). M13 is "the pilot drops its options" here (the helicopter's was its terrain), and the options-reach-the-features
+//   row was written for it.
+//   M01 the second block's offset one late 7; M02 no relu on the first layer 2; M03 no relu on the second layer 2; M04 the readout bias ignored 2; M05 a NaN feature not zeroed 2; M06 thrust clamped to [-1, 1] 2; M07 a
+//   non-finite roll not guarded 1; M08 the second layer linear in layersOf 2; M09 layersOf copies instead of viewing 1; M10 the identity on the second layer halved 5; M11 only four of the eight channels copied 7; M12 the
+//   readout of the negative channel flipped 6; M13 the pilot drops its options 1; M14 gain overrides not carried 1; M15 the second layer reads the wrong neuron 6; M16 the first-layer bias read one off 2; M17 mutation ignores
+//   maxK 1; M18 mutation moves one more 1; M19 search accepts worse children 1; M20 prune keeps a revert that costs 3; M21 prune does not repeat 1; M22 prune never reverts 2; M23 search ignores its start 1; M24 the readout
+//   offset one early 7; M25 the zero weights shared 11; M26 noise doubled 1; M27 the first-layer coefficients are not the fruit fly's 5; M28 the first layer rows swapped 5; M29 features not the fruit fly's 2; M30 evaluate
+//   defaults to the held-out set 1; M31 train defaults to the held-out set 1; M32 train ignores its seed 1; G01 group phase accepts every block 3; G02 group phase never accepts a block 3; G03 group phase drops the second
+//   half 2; G04 group phase drops the first half 1; G05 a failed block is not restored 3; G06 group phase is skipped 3; G07 group phase does not update the best score 1; G08 group phase restores the wrong values 3.
 "use strict";
 import * as MR from "./pilotDroneMlp.mjs";
 import * as PP from "./pilotDronePolicy.mjs";
