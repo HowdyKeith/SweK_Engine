@@ -1764,8 +1764,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "f16-codec-mantissa-carry",
-        blocker: "OPEN",
-        what: "tools/ship/headlessGpu.mjs doubleToHalf (and, per its own comment, the browser harness's copy in webgpuHarness.mjs, 'unchanged') does not carry a rounded-up mantissa into the exponent: doubleToHalf(0.4999924) encodes 0.25, not 0.5.",
+        blocker: "CLOSED",
+        what: "FIXED at v4895 (unshipped), by keith's call: both codecs (headlessGpu.doubleToHalf and webgpuHarness enc16) now carry a rounded-up mantissa into the exponent (0.4999924 -> 0.5, 65520 -> infinity), gated by a row in headlessGpu-selfcheck; toroidalDeform-selfcheck's pinning row flipped to assert the fix. THE ORIGINAL ENTRY: tools/ship/headlessGpu.mjs doubleToHalf (and, per its own comment, the browser harness's copy in webgpuHarness.mjs, 'unchanged') does not carry a rounded-up mantissa into the exponent: doubleToHalf(0.4999924) encodes 0.25, not 0.5.",
         how: "For a value within half a half-float ULP below a power of two, Math.round((v / 2^e - 1) * 1024) is 1024, which `& 0x3ff` masks to 0 with the exponent left at e: the result is 2^e (a binade LOW), not 2^(e+1). Found at v4895 when a draft of render/toroidalDeform-selfcheck.mjs 'confirmed' a half-float decay collapse that was this bug (0.5 fell to 0.00006 in 60 s). The fix is one line in each codec (carry: if the rounded mantissa reaches 1024, add 1 to the exponent field and zero the mantissa) plus a gate row; it changes uploaded input bits only for values in that window, so the corpus's other gates need re-running, not re-reasoning. The toroidal gate carries its own rounding and a row that pins the bug as a finding (it goes red the day the codec is fixed, which is the cue to flip it).",
         why: "Every gate that uploads sampled half-float input through this codec can be one ULP-binade wrong at exactly the values a slowly decaying field produces; nothing has been seen to depend on it, which is not the same as nothing depending on it.",
     },

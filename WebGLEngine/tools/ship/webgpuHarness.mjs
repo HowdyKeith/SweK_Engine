@@ -853,7 +853,8 @@ export async function runWgslComputeToTexture({ code, entryPoint = "main", n = 6
         if (e < -14) return s | Math.round(v / Math.pow(2, -24));
         if (e > 15) return s | 0x7c00;
         const m = Math.round((v / Math.pow(2, e) - 1) * 1024);
-        return s | ((e + 15) << 10) | (m & 0x3ff);
+        if (m === 1024) return e + 1 > 15 ? s | 0x7c00 : s | ((e + 16) << 10);   // the rounded-up mantissa carries into the exponent
+        return s | ((e + 15) << 10) | m;
     };
     let inputBits = null;
     if (inputTexel) {

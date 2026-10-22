@@ -135,7 +135,7 @@ console.log("\n3. THE HALF-FLOAT FINDING");
         Math.abs(rows.rne.step - ideal) < 0.01 && Math.abs(rows.rtz.step - ideal) < 0.1 && Math.abs(rows.rtz.step - ideal) < Math.abs(rows.rtz.frame - ideal) / 3, "");
     report("WHICH ROUNDING A GPU USES FOR A RENDER-TARGET STORE is not read here: upstream observed the collapse (round-toward-zero behaviour), the spec's default is round-to-nearest-even, and this box has only a software adapter. The rig can say.");
     const cod = { in: 0.4999924 }, hd = doubleToHalf(cod.in), back = halfToDouble(hd);
-    ok("  FINDING ABOUT THE HARNESS (not the field): tools/ship/headlessGpu.mjs doubleToHalf(0.4999924) returns " + back + ", not 0.5 -- a rounded-up mantissa is masked instead of carried", back !== f16(cod.in, "rne") && back === 0.25, "see nextRounds f16-codec-mantissa-carry");
+    ok("  the harness codec carries a rounded-up mantissa (fixed at v4895: tools/ship/headlessGpu.mjs doubleToHalf(0.4999924) was 0.25 and is " + back + "), so it agrees with this gate's own round-to-nearest", back === f16(cod.in, "rne") && back === 0.5, "nextRounds f16-codec-mantissa-carry")
 }
 
 console.log("\n4. THE KERNEL");

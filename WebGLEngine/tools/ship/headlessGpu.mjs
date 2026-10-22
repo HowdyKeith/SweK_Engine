@@ -591,7 +591,10 @@ export function doubleToHalf(v) {
     const e = Math.floor(Math.log2(v));
     if (e < -14) return s | Math.round(v / Math.pow(2, -24));
     if (e > 15) return s | 0x7c00;
-    return s | ((e + 15) << 10) | (Math.round((v / Math.pow(2, e) - 1) * 1024) & 0x3ff);
+    const m = Math.round((v / Math.pow(2, e) - 1) * 1024);
+    // a mantissa that rounds up to 1024 carries into the exponent (0.4999924 is 0.5, not 0.25); at the top it reaches 0x7c00, which is infinity, as the format does
+    if (m === 1024) return e + 1 > 15 ? s | 0x7c00 : s | ((e + 16) << 10);
+    return s | ((e + 15) << 10) | m;
 }
 
 export const BYTES_PER_TEXEL = Object.freeze({ rgba16float: 8, rgba8unorm: 4 });
