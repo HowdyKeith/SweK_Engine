@@ -8029,3 +8029,67 @@ Each must turn at least one row red, or the section says why it cannot.
 - **P4 went 0 red as first written.** The tiled run that secretly ran the plain kernel matched the plain run bit for bit,
   so nothing could see it. `accumulate` now returns the kernel it dispatched, and the row asks for it. Redone, P4 went red.
 
+
+## 118. ROUND 47 -- REPORTED: H1 SUPPORTED, H2 SUPPORTED -- THE NETWORK AT 16 CHANNELS STILL BEATS THE FILTER ON BOTH FAMILIES
+
+**What ran.** `node tools/denoiseStudy.mjs --harvest-r47 --cache <scratch> --workers 4` at c912e1ff, the commit carrying
+section 116. It ran in one go, 13,423 s, from an empty cache (0 hits, 283 misses), with no resume. The rig's runs for rounds
+45, 46 and 48 were not involved. `render/denoise-results-r47.json` was committed at 4e4f99ff as written, before any of it was
+read. render/denoiseStudy-selfcheck.mjs section 12c re-derives the verdict from that file with the study's own `verdict()`.
+The one input it carries in, not re-derives, is C2: the shuffled-target networks' errors are not kept in the file.
+
+**The controls held, all of them.**
+- **C0:** the three w16 networks fit the training images at 0.185, 0.177 and 0.188 x the noisy error (needs <= 0.8).
+- **C1, on the training images:** the network beat the noisy input on 192 of 192 and the filter on 189 (needs 176).
+- **C2:** the shuffled-target networks lost to the filter on H1's set by a mean d of -1.614 (needs <= 0).
+- **C4:** seed 1 trained twice came out bit for bit.
+- **C5:** 672 render seeds, all distinct.
+- **The filter tuned on the 192 chose round 11's setting exactly:** sS 1, sN 1, sA 0.2, sI 4.
+
+**H1 and H2, by the sign-flip test with Holm (section 116's rule):**
+
+| | Network wins (of 12) | mean d | sign-flip p | (sign test p) | Status |
+|---|---|---|---|---|---|
+| **H1**, new scenes of R (48000) | 10 | **+0.376** | 0.0012 | (0.019) | **supported** |
+| **H2**, new scenes of C (49000) | 11 | **+0.425** | 0.00049 | (0.0032) | **supported** |
+
+Geometric means of relMSE on the test images:
+
+| | noisy | filter | **w16 network**, seeds 1-3 | large network, seeds 1-3 (secondary) | floor |
+|---|---|---|---|---|---|
+| R (T1) | 0.0299 | 0.0072 | **0.0049** | 0.0044 | 0.00032 |
+| C (T2) | 0.0125 | 0.0046 | **0.0030** | 0.0023 | 0.00010 |
+
+**So, by section 116's rule: both supported.**
+- The narrower network, trained as the shipped one was on the same scenes, beats the one filter on new scenes of both
+  families it was trained on.
+- It goes to the device, in the rounds `denoise-w16-device` names: the export, its kernel sets, the tables and the rig's
+  timing.
+- As section 11's outcome said of round 11, this claims nothing for any family outside R and C.
+
+**What the narrowing costs, on the same images (the secondary, reported and never tested).**
+- The 32-channel network, trained again here, won 12 of 12 on both sets: mean d +0.487 on R and +0.685 on C, each sign-flip
+  p 0.00024. Round 11's network had +0.548 and +0.765 on its own test sets.
+- The w16 network's error over the large one's, as a geometric mean of the seed-mean errors, is **1.117 x on R and 1.297 x on
+  C**. On R it gives up a fifth of the large network's lead over the filter. On C it gives up over a third.
+- Every other figure is in the file and decides nothing: the w16 network against the filter at 1 sample (0.0136 against
+  0.0196 on R, 0.0050 against 0.0115 on C) and at 16 (0.0034 against 0.0043, and 0.0018 against 0.0029), and val
+  (0.0043 against 0.0061).
+
+**The predictions, as made.**
+- **C0 and C1 hold:** met.
+- **H1 +0.30 to +0.50:** met (+0.376). **H2 +0.40 to +0.70:** met (+0.425, near its floor).
+- **The w16 error 10-25 % above the large network's:** met on R (11.7 %), **missed on C (29.7 %)**. The narrowing costs C
+  more than R, which the prediction did not foresee.
+
+**What this does NOT settle.**
+- **Whether the gap matters on screen.** The verdict is against the filter, as every round's has been. The w16 network is
+  measurably worse than the shipped one on both families, by the figures above. Whether to ship it in place of the shipped
+  network, beside it, or only where the network is the bottleneck (the Intel) is the next round's question, decided before
+  its timing is read.
+- **The speed itself.** A training step here was 0.28 x the large one's, but no kernel has run it on either GPU. Its hidden
+  layers are a quarter of the arithmetic; what the device kernels make of that is for the rig.
+
+**Sabotages, by the byte-safe runner (Q1-Q3):** the verdict read off round 11's file, Q1; the rule's fixture shifted too
+little to move it, Q2; and C's gap read as within its prediction, Q3. Each was restored byte-identical: Q1 turned 2 rows red, Q2 1
+and Q3 1.

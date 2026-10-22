@@ -356,6 +356,37 @@ console.log("\n12b. ROUND 47: THE NARROWER NETWORK (pre-registration section 116
         big.some((X, i) => X.net[0].some((v, j) => v !== out.tables[["T1", "T2"][i]].net[0][j])), runErr || (out ? `H1 w16 mean d ${out.verdict.hypotheses.H1.meanD.toFixed(3)}, large ${big[0].meanD.toFixed(3)}` : ""));
 }
 
+console.log("\n12c. ROUND 47'S VERDICT (pre-registration section 118), RE-DERIVED FROM render/denoise-results-r47.json AS COMMITTED");
+{
+    // SABOTAGED (section 118), each restored byte-identical: Q1 the verdict read off round 11's file, 2 red; Q2 the fixture's shift
+    // too small to move the rule, 1 red; Q3 C's gap read as within its prediction, 1 red
+    const res = JSON.parse(fs.readFileSync(path.join(ENG, RESULTS_R47), "utf8")), V0 = res.verdict;
+    // the verdict again from the file's own tables and controls -- C2 is the file's own shuffled-target figure, whose networks'
+    // errors the file does not keep, so it is carried in as a prior of this round's own (the one input not re-derived here)
+    const again = (tables) => verdict({ sets: { H1: tables.T1, H2: tables.T2 }, shuffled: null, determinism: res.determinism, seedsDistinct: res.seedsDistinct,
+        c0: res.trainFit, c1Train: res.trainSanity, c2Prior: { round: 47, meanD: V0.controls.C2.meanD, ok: V0.controls.C2.ok }, test: "signflip" });
+    const V = again(res.tables), pick = (h) => [h.status, h.k, h.n, h.meanD, h.p, h.reject].join("|");
+    ok("!! *** section 118, by section 116's rule: ROUND 47 IS REPORTED, H1 AND H2 SUPPORTED -- the 16-channel network beats the filter on new scenes of R (10 of 12, mean d +0.376) and of C (11 of 12, +0.425), every control held -- so it goes to the device, as denoise-w16-device ***",
+        V0.run === "reported" && V.run === "reported" && ["H1", "H2"].every((h) => pick(V.hypotheses[h]) === pick(V0.hypotheses[h]) && V.hypotheses[h].status === "supported") &&
+        V0.hypotheses.H1.k === 10 && V0.hypotheses.H2.k === 11 && res.config.size === "w16" && res.config.splits.T1.first === 48000 && res.config.splits.T2.first === 49000 &&
+        res.trainFit.ratios.every((x) => x <= 0.8) && res.trainSanity.netWins >= 176 && res.trainSanity.filterWins >= 176 && res.determinism && res.seedsDistinct && V0.controls.C2.meanD <= 0,
+        `H1 ${V.hypotheses.H1.k} of 12, mean d ${V.hypotheses.H1.meanD.toFixed(3)}, p ${V.hypotheses.H1.p}; H2 ${V.hypotheses.H2.k} of 12, mean d ${V.hypotheses.H2.meanD.toFixed(3)}, p ${V.hypotheses.H2.p}; C2 ${V0.controls.C2.meanD.toFixed(3)}`);
+    // the rule moves: the network's errors on C raised by e^0.5 leave H2 unsupported; on both, neither
+    const scale = (T, f) => ({ ...T, net: T.net.map((row) => row.map((x) => x * f)) });
+    const fx = [again({ ...res.tables, T2: scale(res.tables.T2, Math.exp(0.5)) }), again({ T1: scale(res.tables.T1, Math.exp(0.5)), T2: scale(res.tables.T2, Math.exp(0.5)) })];
+    ok("  ...and the rule moves: the w16 network's errors on C raised by e^0.5 leave H2 unsupported and H1 standing; on both, neither stands",
+        fx[0].hypotheses.H1.status === "supported" && fx[0].hypotheses.H2.status !== "supported" && fx[1].hypotheses.H1.status !== "supported" && fx[1].hypotheses.H2.status !== "supported",
+        `${fx[0].hypotheses.H2.status}; ${fx[1].hypotheses.H1.status} / ${fx[1].hypotheses.H2.status}`);
+    // the secondary: what the narrowing costs, on the same images -- the seed-mean errors, w16 over large, as a geometric mean
+    const gap = (name) => { const w = res.tables[name].net, L = res.secondary[`${name}@large`].net, n = w[0].length;
+        const m = (rows, i) => rows.reduce((a, r) => a + r[i], 0) / rows.length; let s2 = 0; for (let i = 0; i < n; i++) s2 += Math.log(m(w, i) / m(L, i)); return Math.exp(s2 / n); };
+    const gR = gap("T1"), gC = gap("T2");
+    ok("  ...and section 116's predictions are read as made: H1's +0.30-0.50 and H2's +0.40-0.70 MET; the w16 error 10-25 % above the large network's MET on R (+11.7 %) and MISSED on C (+29.7 %)",
+        V.hypotheses.H1.meanD >= 0.30 && V.hypotheses.H1.meanD <= 0.50 && V.hypotheses.H2.meanD >= 0.40 && V.hypotheses.H2.meanD <= 0.70 &&
+        gR >= 1.10 && gR <= 1.25 && gC > 1.25 && Math.abs(gR - Math.exp(res.secondary["T1@large"].meanD - V.hypotheses.H1.meanD)) < 1e-9,
+        `w16 / large error: R ${gR.toFixed(4)}, C ${gC.toFixed(4)}; the large network's mean d ${res.secondary["T1@large"].meanD.toFixed(3)} / ${res.secondary["T2@large"].meanD.toFixed(3)}`);
+}
+
 console.log("\n13. THE RUNNER HANDS THE STUDY EVERY OPTION A ROUND NAMES (pre-registration section 33)");
 {
     // round 11's harvest ran without its secondary: the runner passed options one by one, and compareTrainSplits was not one

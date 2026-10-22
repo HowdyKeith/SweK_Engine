@@ -56,8 +56,11 @@ node tools/ship/versionPreflight.mjs --next    # the next free version and sweep
    - Round 45 (section 114) lifts r41h's cap for H41.
    - Round 46 (section 115) is EASU in quads, fused with the composite.
    - Rounds 45 and 46 share two Intel rig runs.
-   - **Round 47 (section 116)** trains the network at 16 channels on round 11's scenes. Its harvest runs here, not on the
-     rig.
+   - **Round 47 (sections 116 and 118): reported, both supported.**
+     - The 16-channel network beats the filter on new R (10 of 12, +0.376) and new C (11 of 12, +0.425).
+     - Its error is 1.117 x the shipped network's on R and 1.297 x on C.
+     - Next is **`denoise-w16-device`**, which first decides which network a device runs.
+   - Round 48 (section 117) is the accumulation's clamp read from a tile, on the same Intel runs as rounds 45 and 46.
    Round 36 (section 103) made the list fill the default, with round 31's ring fill kept as its reference.
    **`denoise-1080-native-crash`:** round 35 did not reproduce it in five runs (section 102). The traces stay armed.
    **Earlier, `denoise-1080-native-crash`, round 35 (section 101).** On the 1080 the timing gate dies inside its native ladder in most

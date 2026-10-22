@@ -2299,6 +2299,13 @@ export const NEXT_ROUNDS = [
         upstream: "CLEARED for the 1080 only -- rig-adapter-features-probe: subgroups at size 32 natively and in Chrome (render/denoise-rig-features-gtx1080.json); gen-9 does not expose the feature. The restated exactness key it also waited on held on hardware in section 86 (round 27: K0w natively and in Chrome on both GPUs).",
     },
     {
+        id: "denoise-w16-device",
+        blocker: "OPEN",
+        what: "Round 47's w16 network on the device (section 118): exported from the harvest's cache as round 11's seed 1 was (tools/denoiseDevice.mjs --export-r11's shape), with kernel sets for 16 channels, held to the CPU twin cell for cell as every set is, and timed on the rig against the shipped network.",
+        how: "Not designed. First decided, before any timing is read: which network a device runs -- the w16 in place of the shipped one, beside it, or only on an adapter where the network is the bottleneck (the Intel gen-9) -- given section 118's gap (1.117 x the shipped network's error on R, 1.297 x on C).",
+        why: "Section 116's rule: both hypotheses held, so it goes to the device. Its hidden layers are a quarter of the shipped network's arithmetic.",
+    },
+    {
         id: "denoise-f16-storage",
         blocker: "OPEN",
         what: "Activations stored in half precision between layers, arithmetic in f32 -- half the memory traffic.",
@@ -2307,10 +2314,10 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "denoise-smaller-network",
-        blocker: "OPEN",
-        what: "A narrower network -- 24 hidden channels (~0.56x the hidden layers' cost) or 16 (~0.25x) -- trained and tested against the filter.",
-        how: "A round in round 11's shape: train on the same 192 R + C scenes, a pre-registered harvest against the filter on new test scenes. Hours here, no rig needed for the quality question. ROUND 47 (pre-registration section 116), Keith's choice, is that round at 16 channels (size w16: the large network's four layers and 9 x 9 field, 9,793 parameters, a training step 0.28 x the large one's here), with the 32-channel network trained again beside it on the same test images (48000 R, 49000 C). Owed: its harvest here, node tools/denoiseStudy.mjs --harvest-r47 --cache <dir> --workers 4; section 116 predicts H1 and H2 supported, mean d +0.30-0.50 and +0.40-0.70.",
-        why: "The largest single speed lever, and the one that reopens the quality question -- which is why section 39 kept it out of every kernel round.",
+        blocker: "CLOSED",
+        what: "DONE as round 47 (pre-registration sections 116 and 118). REPORTED, BOTH SUPPORTED: a network 16 channels wide (size w16: the large network's four layers and 9 x 9 field, 9,793 parameters), trained on round 11's 192 scenes with round 11's schedule, beat the filter on new scenes of R (10 of 12, mean d +0.376, sign-flip p 0.0012) and of C (11 of 12, +0.425, p 0.00049); every control held.",
+        how: "render/denoise-results-r47.json (committed before it was read), re-derived in render/denoiseStudy-selfcheck.mjs section 12c. The 32-channel network trained again beside it on the same images: 12 of 12 on both, +0.487 and +0.685. The w16 error over it: 1.117 x on R, 1.297 x on C.",
+        why: "*** ONE PREDICTION MISSED: the narrowing's cost on C (29.7 %, against 10-25 %). *** The question it leaves is which network a device runs, which denoise-w16-device carries.",
     },
     {
         id: "denoise-fsr2-temporal",
