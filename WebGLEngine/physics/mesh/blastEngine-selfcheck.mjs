@@ -220,7 +220,7 @@ const report = (m) => console.log("  ....  " + m);
 // round 16g: meshBoolean's default arrangement is exact; a row whose subject is the snapped path's own mechanism (the 8e-9
 // weld's moves, the seam consensus and its folds, the conformity pass, the flat-ear repair, round 17's translation as a
 // necessity) runs it by name
-const SNAPPED = {};   // TEMPORARY (round 27): the snapped path is gone; every row that passed this is being triaged
+// round 27: the snapped path is gone, and with it this gate's SNAPPED pin; the rows that ran on it were removed or now run the default
 console.log("blastEngine-selfcheck -- meshBoolean behind a flag, on the page's own workload\n");
 
 const HALF = [4, 3, 0.35];                                    // destructible.html's wall
@@ -375,7 +375,7 @@ console.log("\n2. *** THE PAGE'S WORKLOAD, BOTH ENGINES ***");
     for (let seed = 1; seed <= 20; seed++) chains.push(pageBlasts(seed, 5));
     chains.push(pageBlasts(107, 30));   // the chain that found round 13's three arrangement defects
     for (const blobs of chains) {
-        const a = run("bsp", blobs), b = run("bvh", blobs), raw = run("bvh", blobs, undefined, { finish: false, ...SNAPPED });
+        const a = run("bsp", blobs), b = run("bvh", blobs), raw = run("bvh", blobs, undefined, { finish: false });
         const va = M.volume(a.wall), vb = M.volume(b.wall);
         worstRel = Math.max(worstRel, Math.abs(va - vb) / va);
         const ta = tagBad(a.wall, blobs), tb = tagBad(b.wall, blobs, WELD);
@@ -395,10 +395,7 @@ console.log("\n2. *** THE PAGE'S WORKLOAD, BOTH ENGINES ***");
         pageUn === 0 && crackAll === 0 && fb === 0 && unknown === 0,
         "unmatched (page census) " + pageUn + ", cracks " + crackAll + ", fallback triangles " + fb + ", untraced triangles " + unknown +
         "; the BSP's raw wall: " + bspUn.n + " -- the page's settle exists for that");
-    ok("   control, finish:false on the snapped path (round 13's raw triangles): open at the page's 1e-9 census of the time where the seam left two points apart, every one of them under 1e-7",
-        rawCrack7 === 0 && rawZero >= MEASURED_ZERO && rawZero < runs && rawUn > 0 && rawUn <= 2.5 * MEASURED_PAGE_UN,
-        "unmatched 0 on " + rawZero + " of " + runs + " chains, " + rawUn + " edges in all (measured " + MEASURED_ZERO + " and " + MEASURED_PAGE_UN +
-        "), cracks at a 1e-7 key " + rawCrack7);
+    /* round 27: the snapped path's raw control (measured 18 and 52 open) went with it */
     report("timings (printed, not asserted): BSP " + ms.bsp + " ms, BVH " + ms.bvh + " ms finished (" + ms.raw + " raw) over " + runs + " chains (" +
         (ms.bsp / ms.bvh).toFixed(2) + "x); polygons at the end, summed: BSP " + polys.bsp + ", BVH " + polys.bvh + " finished (" + rawPolys + " raw triangles)");
 }
@@ -524,15 +521,7 @@ console.log("\n5. *** ROUND 14: FINISHING -- THE WELD AND THE MERGE, ON SEEDS IT
         un === 0 && fb === 0 && rawUn > 0 && worstMove <= WELD,
         "finished " + un + " unmatched; raw " + rawUn + " on " + rawChains + " chains; fallbacks " + fb + "; largest weld move " + worstMove.toExponential(2) + " (tolerance " + WELD + ")");
     report("finishing took " + finishMs + " ms of " + ms + " (" + (100 * finishMs / ms).toFixed(0) + "%)");
-    // (b) the weld's tolerance is a length at the operands' scale: the same chains 1024x larger close the same way
-    let unS = 0, worstS = 0;
-    for (const blobs of sets.slice(0, 10)) {
-        let wall = scaled(M.boxPolys([0, 0, 0], HALF), 1024);
-        for (const b of blobs) { const r = blastWith("bvh", wall, scaled(b, 1024), SNAPPED); wall = r.polys; worstS = Math.max(worstS, r.stats.maxMove); }   // the snapped weld's scaling
-        unS += pageCensus(wall);                                  // round 16g: at the exact-bits key, scale-free
-    }
-    ok("!! at 1024x scale (10 of those chains), the snapped path: closed at the page's census (exact bits), the 8e-9 weld scaled too",
-        unS === 0 && worstS > WELD && worstS <= 1024 * WELD, "unmatched " + unS + ", largest weld move " + worstS.toExponential(2) + " (tolerance " + (1024 * WELD).toExponential(2) + ")");
+    /* round 27: the snapped weld's scaling row */
     // (c) what the weld must never do: move a vertex the wall already had -- and what it must keep: an untouched
     // polygon is passed through as the same object
     let keptSame = 0, keptStat = 0, newNearOld = 0;
@@ -607,11 +596,11 @@ console.log("\n6. *** ROUND 15: WHAT A SHOT COSTS ON A BIG WALL -- THE SAME OUTP
     // not the wall. (Round 15's fixed-cost measurement put the pin INSIDE the wall, where it cuts no face at all and
     // leaves a cavity -- the cost of a shot that cuts nothing, i.e. the wall's. This one cuts.)
     const pin = M.jaggedBlob([3.7, -2.7, HALF[2]], 0.02, 6, 99, { rough: 0, floor: 1 });
-    const r = blastWith("bvh", last, pin, SNAPPED), s = r.stats;          // the conformity scan is the snapped path's
+    const r = blastWith("bvh", last, pin), s = r.stats;          // the conformity scan is the snapped path's
     // (measured: the scan takes 279 triangles, 2.1% -- the triangles the pin splits are big face triangles whose boxes
     // reach across much of the wall, and the BVH returns all that touch them. The bound is 5%, against 100% before.)
-    ok("!! a pin-prick on the 30-shot wall (" + s.wallTriangles + " triangles) scans and rebuilds only its neighbourhood: conformity scan under 5% of the wall, pieces under 1%, the rest kept whole",
-        s.conformScanned < 0.05 * s.wallTriangles && s.piecesBuilt < 0.01 * s.wallTriangles && s.kept > 0.99 * last.length && s.kept < last.length && s.conformScanned > 0,
+    ok("!! a pin-prick on the 30-shot wall (" + s.wallTriangles + " triangles) scans and rebuilds only its neighbourhood: pieces under 1% (the conformity scan was the snapped path's), the rest kept whole",
+        s.piecesBuilt < 0.01 * s.wallTriangles && s.kept > 0.99 * last.length && s.kept < last.length,
         "conformity scan " + s.conformScanned + " triangles, pieces built " + s.piecesBuilt + ", polygons kept " + s.kept + " of " + last.length);
     const t = []; for (let i = 0; i < 5; i++) { const t0 = performance.now(); blastWith("bvh", last, pin); t.push(performance.now() - t0); }
     report("that pin-prick: " + t.sort((x, y) => x - y)[2].toFixed(1) + " ms (median of 5), printed, not asserted. Round 15 measured one inside the wall (no face cut) at 71.5 ms before, 25.7 ms after: conformity 33.4 -> 2.6, BVH build 21.8 -> 12.4, pieces and finishing 6.4 -> ~2");
@@ -629,10 +618,8 @@ console.log("\n7. *** ROUND 16: WHAT THE FINISHING WELD STILL FINDS, NOW THE ARR
         for (const blobs of chains) { let w = M.boxPolys([0, 0, 0], HALF); for (const b of blobs) { const r = blastWith("bvh", w, b, opts); w = r.polys; for (const k in t) t[k] += (r.stats.weldMoves || {})[k] ?? NaN; } }
         return t;
     };
-    const on = tally(SNAPPED), off = tally({ seamConsensus: false, ...SNAPPED });     // the 8e-9 weld's moves: the snapped path's
-    ok("!! the weld moves NO vertex by more than an ULP and up to snap any more -- those were sub-snap seam segments, now one point before cutting",
-        on.subSnap === 0 && off.subSnap > 0 && on.ulp < off.ulp,
-        "sub-snap moves " + on.subSnap + " (consensus off: " + off.subSnap + "); ULP-level " + on.ulp + " (" + off.ulp + "); beyond snap " + on.overSnap + " (" + off.overSnap + ")");
+    const on = tally({});     // the finishing weld's moves by size
+    /* round 27: the seam consensus's weld row (the consensus is gone) */
     report("KNOWN, left to the weld: the " + on.overSnap + " moves beyond snap join two seam ends 1.2e-9..7e-9 apart, each the end of a triTriIntersect segment of a different pair (measured; why the two pairs end apart is not traced). Merging such ends before cutting (all within 8 snaps that share a triangle) closed 37 of 65 on 99 chains -- and wrecked the rotated-copy family (its band 2.8e-2 -> 1e-1, outside it 1.4e-9 -> 1.1e-4), whose twin surfaces are dense with genuinely distinct points that close. Tried and not kept.");
 }
 
@@ -656,12 +643,11 @@ console.log("\n8. *** ROUND 17: THE WALL FAR FROM THE ORIGIN -- A BIG LEVEL ***"
         }
         return { fb, open, worst };
     };
-    const on = go({}), offR = go({ translate: false, ...SNAPPED });
+    const on = go({});
     // the blobs' own rounding out there moves their surface by up to ulp(2^27)/2 = 7.5e-9: over ~1e2 of blob area, 1e-6
     ok("!! three ten-shot chains with the wall at 2^27: closed at the page's census, no fallback, within 1e-6 of the same chains at the origin (the blobs' own rounding out there)",
         on.open === 0 && on.fb === 0 && on.worst < 1e-6, "open edges " + on.open + ", fallback triangles " + on.fb + ", |volume - at the origin| " + on.worst.toExponential(2));
-    ok("   control: translate:false on the snapped path -- the shots worked out there -- falls back and opens the wall", offR.fb > 0 && offR.open > 0,
-        "fallback triangles " + offR.fb + ", open edges " + offR.open + ", |volume - at the origin| " + offR.worst.toExponential(2));
+    /* round 27: the snapped path's translate:false control */
 }
 
 console.log("\n9. *** ROUND 19: THE SOAK THAT MADE \"bvh\" THE DEFAULT ***");
@@ -720,18 +706,13 @@ console.log("\n10. *** ROUND 19b: TWO OF THE SOAK'S OPENINGS, ROOT-CAUSED AND CL
         const out = blastWith("bvh", wall, blob); wall = out.polys; fb += out.stats.fallbackTris || 0;
         worst = Math.max(worst, pageCensus(wall));
     }
-    const ctrlA = pageCensus(blastWith("bvh", at98.wall, at98.blob, { flatEars: false, ...SNAPPED }).polys);
     ok("!! a session of the page's range of blasts, 100 shots: the wall closed at the page's census after EVERY shot, no fallback",
         worst === 0 && fb === 0, "worst open edges after any shot " + worst + ", fallback triangles " + fb);
-    ok("   control: on the snapped path with the flat-triangle repair off (flatEars:false), shot 98 opens the wall again", ctrlA > 0, ctrlA + " open edges");
+    /* round 27: the flatEars control */
     // (b) the soak's seed 8, shot 80: two pairs' segments meet at b, where a wall edge crosses the blob's plane 4e-10 from
     // a blob edge, and the next pair's segment runs 1.5e-8 straight back -- a FOLD. The triangle across split a-b at its
     // far end, the triangles beyond kept a-b whole: 3 edges open, past the weld. The seam consensus joins a fold's ends.
-    let w8 = M.boxPolys([0, 0, 0], HALF); const b8 = pageBlasts(8, 81);
-    for (let k = 0; k < 80; k++) w8 = blastWith("bvh", w8, b8[k], SNAPPED).polys;
-    const on = pageCensus(blastWith("bvh", w8, b8[80], SNAPPED).polys), off = pageCensus(blastWith("bvh", w8, b8[80], { seamFolds: false, ...SNAPPED }).polys);
-    ok("!! the soak's seed 8, shot 80, on the snapped path: closed at the page's census -- with the seam's folds joined -- where seamFolds:false opens it",
-        on === 0 && off > 0, "open " + on + "; seamFolds:false " + off);
+    /* round 27: the seamFolds row */
 }
 
 console.log("\n11. *** ROUND 18b: THE FINISHING FOR EVERY OP -- booleanBVH ***");
@@ -759,13 +740,13 @@ console.log("\n11. *** ROUND 18b: THE FINISHING FOR EVERY OP -- booleanBVH ***")
             const r = booleanBVH(fin, P, op); fin = r.polys; fb += r.stats.fallbackTris || 0; ops++;
             bsp = M[op](bsp, P); worst = Math.max(worst, Math.abs(M.volume(fin) - M.volume(bsp)) / M.volume(bsp));
             open += pageCensus(fin);
-            const Bb = M.toTriangleBuffer(P); raw = meshBoolean(raw, new MeshBVH(raw), Bb, new MeshBVH(Bb), op, SNAPPED).tris; rawOpen += cracksBuf(raw);
+            const Bb = M.toTriangleBuffer(P); raw = meshBoolean(raw, new MeshBVH(raw), Bb, new MeshBVH(Bb), op, {}).tris; rawOpen += cracksBuf(raw);
         });
         for (const p of fin) if (!p.src || !p.pl) bare++;
     }
     ok("!! *** " + ops + " OPS THAT ADD, BLAST AND TRIM THE PAGE'S WALL, FINISHED: CLOSED AT THE PAGE'S CENSUS AFTER EVERY STEP, THE BSP'S SOLID TO 1e-10, NO FALLBACK, EVERY POLYGON TAGGED ON ITS PLANE ***",
         open === 0 && worst < 1e-10 && fb === 0 && bare === 0, "open (summed over every step) " + open + ", |volume - BSP| " + worst.toExponential(1) + ", fallbacks " + fb + ", untagged " + bare);
-    ok("   control: the same steps raw on the snapped path (meshBoolean alone) are open at a 1e-9 census", rawOpen > 0, "open (summed over every step) " + rawOpen);
+    /* round 27: the raw snapped control */
     // the tags and planes each op gives the other operand's pieces
     const wall = M.boxPolys([0, 0, 0], HALF), blob = M.jaggedBlob([0.5, 0.2, 0], 0.9, 8, 3), big = M.jaggedBlob([0, 0, 0], 3.6, 10, 9);
     const rule = (polys, other, op, want, turned) => {
@@ -816,10 +797,10 @@ console.log("\n12. *** ROUND 16f: THE EXACT ARRANGEMENT ON THE PAGE'S CHAIN (opt
         let maxMove = 0;
         for (const b of pageBlasts(1, 20)) { const r = blastWith("bvh", wall, b, opts); wall = r.polys; fb += r.stats.fallbackTris || 0; welded += r.stats.welded || 0; maxMove = Math.max(maxMove, r.stats.maxMove || 0); if (bitsOpen(wall)) openShots++; }
         return { wall, fb, openShots, welded, maxMove }; };
-    const ex = chain({ exactArrangement: true }), df = chain(SNAPPED), nd = chain({ exactArrangement: true, delaunay: false });
-    const sx = selfCross(ex.wall), sn = selfCross(nd.wall), dv = Math.abs(M.volume(ex.wall) - M.volume(df.wall));
-    ok("!! *** SEED 1, 20 SHOTS, EXACT ARRANGEMENT: NO FALLBACK, CLOSED BIT FOR BIT AFTER EVERY SHOT, WELDED ONLY WITHIN A ROUNDING (EXACT_FINISH_WELD), THE SNAPPED ENGINE'S SOLID TO 1e-10 ***",
-        ex.fb === 0 && ex.openShots === 0 && ex.maxMove <= EXACT_FINISH_WELD && dv < 1e-10, "fallbacks " + ex.fb + ", shots open at bits " + ex.openShots + ", welded " + ex.welded + " (largest move " + ex.maxMove.toExponential(1) + "), |volume - snapped| " + dv.toExponential(1));
+    const ex = chain({}), nd = chain({ delaunay: false });
+    const sx = selfCross(ex.wall), sn = selfCross(nd.wall);
+    ok("!! *** SEED 1, 20 SHOTS, EXACT ARRANGEMENT: NO FALLBACK, CLOSED BIT FOR BIT AFTER EVERY SHOT, WELDED ONLY WITHIN A ROUNDING (EXACT_FINISH_WELD) ***",
+        ex.fb === 0 && ex.openShots === 0 && ex.maxMove <= EXACT_FINISH_WELD, "fallbacks " + ex.fb + ", shots open at bits " + ex.openShots + ", welded " + ex.welded + " (largest move " + ex.maxMove.toExponential(1) + ")");
     ok("!! the wall never crosses itself (Delaunay, and since round 16g the rounding weld, which joins the folds finer than a rounding that merge-only left, 7.5e-17 long); without Delaunay (delaunay:false) needles beside nearly straight seams turn over when rounded and it does",
         sx.n === 0 && sn.L > 1e-3, "longest self-crossing " + sx.L.toExponential(1) + " (" + sx.n + "), delaunay:false " + sn.L.toExponential(1) + " (" + sn.n + ")");
     report("the soak since round 16g (12 chains x 100 shots, the default): 0 fallbacks, closed bit for bit after every shot; seed 11's T-junction 3.5e-18 wide (open 26 shots, merge-only) is joined by the rounding weld. Section 14 has the weld and the precondition.");
@@ -842,9 +823,9 @@ console.log("\n13. *** ROUND 19c: SEED 8'S SHOT 84 -- A FAN OF SLIVERS AS THIN A
     const toBuf = (polys) => { const tris = []; for (const p of polys) for (const t of p.tris || M.toTriangles([p])) tris.push(t); const b = new Float64Array(tris.length * 9); tris.forEach((t, i) => { for (let v = 0; v < 3; v++) for (let c = 0; c < 3; c++) b[i * 9 + v * 3 + c] = t[v][c]; }); return b; };
     const bl = pageBlasts(8, 100);
     let w = M.boxPolys([0, 0, 0], HALF);
-    for (let k = 0; k < 84; k++) w = blastWith("bvh", w, bl[k], SNAPPED).polys;
+    for (let k = 0; k < 84; k++) w = blastWith("bvh", w, bl[k]).polys;
     const A = toBuf(w), B = toBuf(bl[84]);
-    const raw = meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), "subtract", SNAPPED), ex = meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), "subtract", { exactArrangement: true });
+    const raw = meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), "subtract", {}), ex = meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), "subtract", {});
     // which output triangles carry the raw openings, and how thin their source triangles are
     const ro = bitsT(raw.tris), at = new Set(ro.flatMap((e) => e.split("|")));
     let slivers = 0;
@@ -855,14 +836,13 @@ console.log("\n13. *** ROUND 19c: SEED 8'S SHOT 84 -- A FAN OF SLIVERS AS THIN A
         const L = Math.max(Math.hypot(...u), Math.hypot(...v), Math.hypot(v[0] - u[0], v[1] - u[1], v[2] - u[2])), h = Math.hypot(u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]) / L;
         if (h <= 4e-9) slivers++;
     }
-    ok("   the reproduction: the snapped engine's raw output of shot 84 is open, at wall pieces of slivers no higher than 4e-9 (round 19's 29 edges)",
-        ro.length > 0 && slivers > 0, ro.length + " open directed edges, " + slivers + " output triangles of slivers on them");
+    /* round 27: the snapped reproduction of shot 84 */
     const xo = bitsT(ex.tris);
     ok("!! *** THE SAME INPUT THROUGH THE EXACT ARRANGEMENT: CLOSED BIT FOR BIT, NO FALLBACK ***", xo.length === 0 && ex.stats.a.fallbackTris + ex.stats.b.fallbackTris === 0,
         xo.length + " open, " + (ex.stats.a.fallbackTris + ex.stats.b.fallbackTris) + " fallbacks");
     // and the whole chain, exact: closed bit for bit after every shot
     let we = M.boxPolys([0, 0, 0], HALF), openShots = 0, fbe = 0;
-    for (const b of bl) { const r = blastWith("bvh", we, b, { exactArrangement: true }); we = r.polys; fbe += r.stats.fallbackTris || 0; if (bitsP(we)) openShots++; }
+    for (const b of bl) { const r = blastWith("bvh", we, b, {}); we = r.polys; fbe += r.stats.fallbackTris || 0; if (bitsP(we)) openShots++; }
     ok("!! seed 8's 100 shots through the exact arrangement: closed bit for bit after every shot, no fallback (the default: open from shot 84, 10 edges at the end)",
         openShots === 0 && fbe === 0, "shots open " + openShots + ", fallbacks " + fbe);
 }
@@ -897,16 +877,16 @@ console.log("\n14. *** ROUND 16g: THE EXACT ARRANGEMENT IS THE DEFAULT -- A ROUN
             if (eng === "bvh" && k >= 20) { if (r.stats.exact) exactAfter++; else { declined++; moveDeclined = Math.max(moveDeclined, r.stats.maxMove || 0); } } }
         return { vol: M.volume(w), declined, exactAfter, moveDeclined }; };
     // (round 16h makes such a wall conforming first; these rows pin 16g's precondition and its weld, so they run without)
-    const md = mixed({ conform: false }), ms = mixed(SNAPPED), mu = mixed({ conform: false, exactConforming: false });
+    const md = mixed({ conform: false }), ms = mixed({}), mu = mixed({ conform: false, exactConforming: false });
     const dd = Math.abs(md.vol - ms.vol), du = Math.abs(mu.vol - ms.vol);
     // round 26 (bvh-csg-retire-snapped-fallback): the decline is gone, so the three rows that pinned it now pin its COST. Asked NOT to
     // conform, the exact path runs on the BSP's wall and floods through its T-junctions (the loss 16g found); nothing in production asks
-    ok("!! *** round 26 -- A SESSION SWITCHING ENGINES (seed 3), NOT CONFORMED (conform:false): THE EXACT PATH NO LONGER DECLINES ON THE BSP'S WALL; IT RUNS EVERY SHOT AND THE CHAIN IS OFF THE SNAPPED ONE BY THE 16g LOSS ***",
-        md.declined === 0 && md.exactAfter === 10 && dd > 1e-3, "declined " + md.declined + " of the 10 shots after the BSP's (exact " + md.exactAfter + "), |volume - snapped| " + dd.toExponential(1));
+    ok("!! *** round 26 -- A SESSION SWITCHING ENGINES (seed 3), NOT CONFORMED (conform:false): THE EXACT PATH NO LONGER DECLINES ON THE BSP'S WALL; IT RUNS EVERY SHOT AND THE CHAIN IS OFF THE CONFORMED ONE BY THE 16g LOSS ***",
+        md.declined === 0 && md.exactAfter === 10 && dd > 1e-3, "declined " + md.declined + " of the 10 shots after the BSP's (exact " + md.exactAfter + "), |volume - conformed| " + dd.toExponential(1));
     // the weld is the one for the path that RAN: every shot is exact now, so the rounding weld finishes it
     ok("   every shot is finished by the rounding weld (moves nothing past EXACT_FINISH_WELD), the snapped path's 8e-9 weld no longer runs", md.moveDeclined === 0,
         "largest move on a declined shot " + md.moveDeclined.toExponential(2));
-    ok("   control: without the precondition (exactConforming:false) the exact path floods through the BSP wall's T-junctions", du > 1e-6, "|volume - snapped| " + du.toExponential(1));
+    ok("   control: without the precondition (exactConforming:false) the exact path floods through the BSP wall's T-junctions", du > 1e-6, "|volume - conformed| " + du.toExponential(1));
 }
 
 console.log("\n15. *** ROUND 16h: A WALL THE BSP HAS CUT, MADE CONFORMING NEAR THE SEAM -- THEN EXACT ***");
@@ -938,10 +918,10 @@ console.log("\n15. *** ROUND 16h: A WALL THE BSP HAS CUT, MADE CONFORMING NEAR T
             w = blastWith(eng, w, bl[k], { select: eng === "bsp" ? M.bvhSelect(w).select : null, ...opts }).polys;
         }
         return { exact, declined, fb, seam, own, inherited, vol: M.volume(w) }; };
-    const c3 = chain(3, 30, {}), s3 = chain(3, 30, SNAPPED), n3 = chain(3, 30, { conform: false }), dv = Math.abs(c3.vol - s3.vol);
-    ok("!! *** SEED 3, 10 bvh / 10 bsp / 10 bvh: EVERY SHOT AFTER THE BSP'S EXACT (CONFORMED), NO FALLBACK, NO OPENING OF ITS OWN OR ON THE BLOB'S SIDE, THE SNAPPED CHAIN'S SOLID TO 1e-9 ***",
-        c3.exact === 10 && c3.declined === 0 && c3.fb === 0 && c3.seam === 0 && c3.own === 0 && dv < 1e-9,
-        "exact " + c3.exact + ", declined " + c3.declined + ", fallbacks " + c3.fb + ", new open edges: blob's side " + c3.seam + ", own " + c3.own + ", along the wall's own cracks " + c3.inherited + "; |volume - snapped| " + dv.toExponential(1));
+    const c3 = chain(3, 30, {}), n3 = chain(3, 30, { conform: false });
+    ok("!! *** SEED 3, 10 bvh / 10 bsp / 10 bvh: EVERY SHOT AFTER THE BSP'S EXACT (CONFORMED), NO FALLBACK, NO OPENING OF ITS OWN OR ON THE BLOB'S SIDE ***",
+        c3.exact === 10 && c3.declined === 0 && c3.fb === 0 && c3.seam === 0 && c3.own === 0,
+        "exact " + c3.exact + ", declined " + c3.declined + ", fallbacks " + c3.fb + ", new open edges: blob's side " + c3.seam + ", own " + c3.own + ", along the wall's own cracks " + c3.inherited);
     ok("   control (round 26): not conformed (conform:false), none decline -- all 10 run exact, as the report says (round 16g: most declined)", n3.declined === 0 && n3.exact === 10, "declined " + n3.declined + " of 10, exact " + n3.exact);
     // seed 12, shot 28: a sliver 1.4e-8 wide beside a region's rim -- the edge census must reach every twin (round 16h's own
     // first draft read an edge on the rim as open and split it at a point its twin already had: 5 edges doubled)
@@ -1072,14 +1052,7 @@ console.log("\n18. *** ROUND 23: THE WALL'S TREE CARRIED FROM SHOT TO SHOT -- BI
     ok("!! and it is the derived tree that ran: most shots derived, a full build again within " + WALL_TREE_DERIVE_MAX + " derivations",
         derived > shots / 2 && rebuilt > 0 && longest <= WALL_TREE_DERIVE_MAX, derived + " of " + shots + " derived, " + rebuilt + " rebuilt, longest run " + longest);
     report("triangles + tree: " + tFull + " ms full build, " + tReuse + " ms carried; the chains " + msFull.toFixed(0) + " -> " + msReuse.toFixed(0) + " ms (printed, not asserted)");
-    // the snapped path reads the tree's traversal order as GEOMETRY (meshBoolean's canonPairs note): a carried tree is
-    // built in full before it runs (freshTree), so a chain forced onto it is still bit for bit a full build's
-    {
-        const bl = pageBlasts(5, 30), snapped = (reuse) => { let w = M.boxPolys([0, 0, 0], HALF); const h = [], how = { built: 0, derived: 0, rebuilt: 0 }; for (const b of bl) { const r = blastWith("bvh", w, b, { reuseWallTree: reuse, exactArrangement: false }); how[r.stats.wallTree]++; w = r.polys; h.push(bitsOf(w)); } return { h, how }; };
-        const f = snapped(false), c = snapped(true), d = firstDiff(f, c);
-        ok("!! seed 5's 30 shots on the SNAPPED path (exactArrangement:false), the tree carried: every shot bit for bit a full build's",
-            d < 0 && c.how.derived > 10, (d < 0 ? "all 30 equal" : "first differs at shot " + (d + 1)) + "; " + c.how.derived + " shots handed a derived tree, rebuilt inside meshBoolean");
-    }
+    // (round 27: the carried-tree row for the snapped path went with it; the exact path reads no traversal order)
     // a pin-prick on the 30-shot wall maps nearly all of it
     const pin = M.jaggedBlob([3.7, -2.7, HALF[2]], 0.02, 6, 99, { rough: 0, floor: 1 });
     const pp = blastWith("bvh", reused107.wall, pin), had = new Set(reused107.before);

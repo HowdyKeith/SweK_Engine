@@ -9732,10 +9732,8 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // BVH-CSG round 9, at its merge onto main's v4831 -- ONE new gate file: physics/mesh/triArrangement-selfcheck.mjs, the per-triangle
     // arrangement the mesh boolean now tries first. The round is a branch round and wears no version, so `at` names the merge it closed at.
     since568: Object.freeze({
-        at: "v4831+bvh-csg-round-9", swept: 1, green: 1, red: 0,
-        added: Object.freeze([
-            "physics/mesh/triArrangement-selfcheck.mjs",
-        ]),
+        at: "v4831+bvh-csg-round-9", swept: 0, green: 0, red: 0,   // round 27: its one gate, physics/mesh/triArrangement-selfcheck.mjs, was removed with the snapped arrangement (bvh-csg-retire-snapped-fallback, step 2)
+        added: Object.freeze([]),
         widened: Object.freeze([]),
         redOnArrival: Object.freeze([]),
         verdict: "*** SEGMENT-BOUNDED CUTTING: ONE TRIANGLE OF A CUT ALONG THE SEGMENTS WHERE B ACTUALLY CROSSES IT, NOT ALONG B's PLANES. *** " +
