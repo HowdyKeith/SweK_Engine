@@ -140,7 +140,9 @@ console.log("\n3. THE SCORE");
     // the pilot is handed the scenario's own target and no options
     let tgt = null, opt = null; const sc = DT.scenario(2, "goto");
     DT.fly((s, t, w, c) => { if (!tgt) { tgt = t; opt = c; } return AD.pilot(s, t, w); }, sc);
-    ok("!! THE PILOT IS HANDED THE SCENARIO'S TARGET (the object itself) AND AN EMPTY OPTIONS OBJECT -- the job is the same for every pilot", tgt === sc.target && opt && Object.keys(opt).length === 0);
+    let tgtM = null, optM = null, windM = null; const scM = DT.scenario(2, "motor");
+    DT.fly((s, t, w, c) => { if (!tgtM) { tgtM = t; optM = c; windM = w; } return AD.pilot(s, t, w); }, scM);
+    ok("!! THE PILOT IS HANDED THE SCENARIO'S TARGET (the object itself) AND AN EMPTY OPTIONS OBJECT, in a goto flight and in a motor flight alike (the first sabotage run found the motor flight's options going 0 red) -- the job is the same for every pilot; and a motor flight is flown in still air, [0, 0, 0]", tgt === sc.target && opt && Object.keys(opt).length === 0 && tgtM === scM.target && optM && Object.keys(optM).length === 0 && JSON.stringify(windM) === "[0,0,0]");
 
     // ---- the motor flight
     const mflight = (sc, pilot = hand) => DT.fly(pilot, sc);
