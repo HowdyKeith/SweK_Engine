@@ -1209,9 +1209,9 @@ export const EXCLUDED = Object.freeze([
     Object.freeze({ id: "snowGpu.BEAUTY_WGSL", kind: "render stage, graded as a frame",
                     why: "the beauty fragment stage: needs the frame, the field, the sky chain, three shadow maps and the detail map; graded as a rendered frame by render/snowGpu-selfcheck.mjs" }),
     Object.freeze({ id: "snowGpu.TAA_GPU_WGSL", kind: "render stage, graded as a frame",
-                    why: "a texture kernel (rgba16float history, r32float depth, storage output); equals the CPU resolve to 0.05% in render/snowGpu-selfcheck.mjs" }),
+                    why: "a texture kernel (rgba16float history, r32float depth, storage output); equals the CPU resolve to 0.05% in render/snowGpuTaa-selfcheck.mjs" }),
     Object.freeze({ id: "snowGpu.PRESENT_WGSL", kind: "render stage, graded as a frame",
-                    why: "the tone-map and gamma present triangle; drawn to the canvas and to a readable target in render/snowGpu-selfcheck.mjs" }),
+                    why: "the tone-map and gamma present triangle; drawn to the canvas by render/snowGpuLive-selfcheck.mjs and to a readable target by render/snowGpu-selfcheck.mjs" }),
 ]);
 
 /**

@@ -1,4 +1,4 @@
-// WebGLEngine/render/snowGpu-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time). (~40 s with a browser; sections 1-2 alone ~0.5 s)
+// WebGLEngine/render/snowGpu-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time). (~16 s with a browser; sections 1-2 alone ~0.5 s)
 //
 // Run: node render/snowGpu-selfcheck.mjs
 //
@@ -21,7 +21,16 @@
 //   AND, in the frame: the GPU-baked detail map equals the CPU bake and its mip chain is the box filter; the sky buffer is the whole mip chain; all three shadow maps hold terrain and the cascades describe the SAME shadows
 //   (each read alone over the near ground); sastrugi and detail are in the picture (local contrast x17); subsurface lights the snow looking into the sun and not away; glints are grazing-only (none looking straight down).
 // NOT GRADED, said plainly: speed or looks on a real GPU (the adapter is a software rasteriser), the sun's disc and the ground bounce, AgX and film grain.
+// SABOTAGES OF THE SPLIT (v4896), each applied to the real source, the part run alone, restored md5-identical; every one red BY NAME, so the split lost no wiring: snowGpuField -- the stamp
+// no-op'd (the field row); snowGpuLookB -- the glint intensity zeroed in the Frame uniform (the glint row); snowGpuLookA -- the subsurface strength zeroed in the material (the subsurface
+// row); snowGpuTaa -- rowOf's y flip removed (the TAA kernel row); snowGpuLive -- the page's rAF loop stopped (the live-loop row: 1 frame in nine seconds); and THIS file -- the mip kernel
+// reading its x0 sample twice (the mip-chain row). Measured alone on the box that split it: this 15 s, Field 13 s, Live 10 s, LookA 18 s, LookB 15 s, Taa 17 s -- none capped.
 // SABOTAGE LOG (v4895): see cascades-selfcheck (the plane sign: 2 red) and snowFine-selfcheck (the mip kernel: 3 red); each on the real file, restored.
+// v4896 -- SPLIT. This file was the whole snow frame on the GPU and took 38-57 s, past the quick sweep's 20 s cap: no sweep ever recorded it finishing, and gateBudget carried it as UNRESOLVED.
+// The browser blocks are unchanged (but for the look gates' sizes, said in them) and live in five siblings now, each well under the cap alone: snowGpuField (the compute-stepped deformation field against the CPU DeformField),
+// snowGpuTaa (the TAA texture kernel, the flicker with the jitter held still, the sky dome), snowGpuLookA (the shadow maps and cascades, fine relief, subsurface scattering), snowGpuLookB (glints) and snowGpuLive (the live loop
+// and its rate, which realGpuRun reads). THIS file keeps sections 1-2 (maths and text) and the core stages: the page boot, the draw calls, the sky bake, the vertex stage, the
+// shadows, the detail map and the mip chain.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -128,21 +137,6 @@ if (skipWhy) {
                 await g.frame(0.016, { x: 0, z: 0 }, S.camFor(), { present: false }); P.draw = d0; P.drawIndexed = di0; return { ...c, indices: g.stats.indices };
             });
             ok("!! one frame is " + calls.drawIndexed + " indexed draws (three shadow cascades and the beauty pass, " + calls.indexCounts[0] + " indices each = the whole clipmap) plus the sky dome's " + calls.draw + " draw (plus the present triangle when presenting)", calls.drawIndexed === 4 && calls.indexCounts.every((n) => n === calls.indices) && calls.draw >= 1);
-            // ---- the field: GPU kernel vs CPU DeformField given the same brushes and focus
-            const fieldR = await run(async () => {
-                const S = window.__snowgpu, g = S.gpu, T = await import("/render/toroidalDeform.mjs"), cpu = new T.DeformField({ res: g.deformRes, size: 20, windDirectionDeg: 40 });
-                const stamps = [[3, 1, 0.5, 0.12, 0.08, 0.6, 0.3, 0.4, 1.8, 0], [-2, 4, 0.4, 0.1, 0.05, 0.5, 0, 1.1, 1, 0], [0.3, -1, 0.7, 0.15, 0.1, 0.8, 0.5, 0, 1, 0], [9.8, 0.2, 0.5, 0.1, 0.05, 0.5, 0, 0, 1, 0]];
-                const focuses = Array.from({ length: 14 }, (_, i) => ({ x: i * 0.31, z: i * 0.12 })), cam = S.camFor();
-                for (let i = 0; i < 14; i++) {
-                    if (i === 2) for (const s of stamps) { g.stamp(...s); cpu.brush(...s); }
-                    const dt = i % 5 === 4 ? 0.45 : 0.05;   // a banked step is spent on frames 4, 9, 14
-                    await g.frame(dt, focuses[i], cam, { present: false }); cpu.update(dt, focuses[i]);
-                }
-                const gf = await g.readField(), w = [0, 0, 0, 0]; let nz = 0;
-                for (let i = 0; i < gf.length; i++) { w[i % 4] = Math.max(w[i % 4], Math.abs(gf[i] - cpu.state[i])); if (cpu.state[i] !== 0) nz++; }
-                return { worst: w, nonzero: nz, total: gf.length };
-            });
-            ok("!! the compute-stepped field equals a CPU DeformField given the same four brushes, focus moving over 14 frames, relaxation spent on three of them: per channel worst " + fieldR.worst.map((v) => v.toExponential(1)).join(", ") + " (" + fieldR.nonzero + " nonzero texels of " + fieldR.total / 4 + ")", fieldR.nonzero > 200 && fieldR.worst[0] < 2e-4 && fieldR.worst[2] < 2e-4 && fieldR.worst[3] < 2e-4 && fieldR.worst[1] < 5e-4);
             // ---- the sky
             const skyR = await run(async () => {
                 const S = window.__snowgpu, g = S.gpu, SB = await import("/render/skyBake.mjs"), b0 = g.stats.bakes, lut = await g.readSky(), sun = g.sun;
@@ -153,6 +147,12 @@ if (skipWhy) {
                 return { worstRel, b0, b1, b2, moved };
             });
             ok("!! the sky buffer the GPU baked equals skyBake's CPU bake over 64 x 32 texels (worst relative difference " + (skyR.worstRel * 100).toFixed(2) + "%), and moving the sun re-bakes exactly once (" + skyR.b0 + " -> " + skyR.b1 + " -> " + skyR.b2 + " bakes) and changes the buffer", skyR.worstRel < 0.05 && skyR.b1 === skyR.b0 + 1 && skyR.b2 === skyR.b1 && skyR.moved > 10);
+            // the vertex block below reads the field's trail, so give it one: the same four brushes the field gate stamps (snowGpuField-selfcheck.mjs grades the field itself), carried in by three frames
+            await run(async () => {
+                const S = window.__snowgpu, g = S.gpu, cam = S.camFor();
+                for (const st of [[3, 1, 0.5, 0.12, 0.08, 0.6, 0.3, 0.4, 1.8, 0], [-2, 4, 0.4, 0.1, 0.05, 0.5, 0, 1.1, 1, 0], [0.3, -1, 0.7, 0.15, 0.1, 0.8, 0.5, 0, 1, 0], [9.8, 0.2, 0.5, 0.1, 0.05, 0.5, 0, 0, 1, 0]]) g.stamp(...st);
+                for (let i = 0; i < 3; i++) await g.frame(0.05, { x: i * 0.31, z: i * 0.12 }, cam, { present: false });
+            });
             // ---- the vertex stage's own function, read back
             const vtx = await run(async () => {
                 const S = window.__snowgpu, g = S.gpu, CM = await import("/render/clipmapTerrain.mjs"), DR = await import("/render/deformRead.mjs"), T = await import("/render/toroidalDeform.mjs");
@@ -185,49 +185,6 @@ if (skipWhy) {
             });
             ok("!! shadows are shadows, not acne: flat ground under a 3 degree sun is shadowed over " + (100 * shadowR.flat4).toFixed(2) + "% of the terrain pixels (the receiver-plane term works on the GPU; the few percent are the footprints' own walls and the cascades' filter noise, against 65% when the plane term is wrong), the dunes " + (100 * shadowR.dunes4).toFixed(1) + "% under the same sun, under a 40 degree sun " + (100 * shadowR.dunes40).toFixed(1) + "%", shadowR.flat4 < 0.06 && shadowR.dunes4 > 0.04 && shadowR.dunes4 > shadowR.dunes40 + 0.03 && shadowR.dunes4 > shadowR.flat4 * 3);
             report("THE EDGE: at a 2 degree sun flat ground is shadowed over " + (100 * shadowR.flat2).toFixed(1) + "% -- acne. The receiver-plane gradient is clamped to a slope of 6 as upstream clamps it, and a sun that low asks for more; snow-gpu.html's sun slider starts at 3 degrees for that reason.");
-            // ---- TAA: the texture kernel vs the CPU resolve, then the flicker
-            const taaK = await run(async () => {
-                const S = window.__snowgpu, g = S.gpu, d = g.device, M = await import("/render/snowGpu.mjs"), T = await import("/render/taaResolve.mjs");
-                const w = 24, h = 16, TU = GPUTextureUsage, f16 = (v) => { const f = new Float32Array([v]), u = new Uint32Array(f.buffer)[0]; const s = (u >>> 16) & 0x8000, e = ((u >>> 23) & 0xff) - 127 + 15, m = (u >>> 13) & 0x3ff; if (v === 0 || Math.abs(v) < 6.2e-5) return 0; return s | (e << 10) | m; };
-                const d16 = (b) => { const s = (b & 0x8000) ? -1 : 1, e = (b >> 10) & 31, m = b & 1023; return e === 0 ? s * Math.pow(2, -14) * (m / 1024) : s * Math.pow(2, e - 15) * (1 + m / 1024); };
-                let seed = 21; const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
-                const mk = (fn) => { const a = new Float32Array(w * h * 4), q = new Uint16Array(w * h * 4); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const c = fn(x, y), o = (y * w + x) * 4; for (let k = 0; k < 3; k++) { q[o + k] = f16(c[k]); a[o + k] = d16(q[o + k]); } q[o + 3] = f16(1); a[o + 3] = 1; } return { a, q }; };
-                const cur = mk((x, y) => [0.4 + 0.3 * Math.sin(x * 0.4) + 0.1 * rnd(), 0.3 + 0.2 * Math.cos(y * 0.5), 0.5 + 0.1 * rnd()]), hist = mk((x, y) => [0.4 + 0.3 * Math.sin(x * 0.4 + 0.2) + 0.1 * rnd(), 0.3 + 0.2 * Math.cos(y * 0.5), 0.5]);
-                const depth = new Float32Array(w * h); for (let i = 0; i < depth.length; i++) depth[i] = 15 + 10 * rnd();
-                const tanX = 0.9, tanY = 0.6, vp = new Array(16).fill(0); vp[0] = 1 / tanX; vp[5] = 1 / tanY; vp[10] = 1; vp[11] = 1; const vp2 = vp.slice(); vp2[12] = 0.04; vp2[13] = -0.02;
-                const iv = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1], jit = [0.02, -0.03];
-                const flip = (img) => { const o = new Float32Array(img.length); for (let y = 0; y < h; y++) o.set(img.subarray(y * w * 4, (y + 1) * w * 4), (h - 1 - y) * w * 4); return o; };
-                const S2 = { w, h, cur: flip(cur.a), hist: flip(hist.a), depth: (() => { const o = new Float32Array(w * h); for (let y = 0; y < h; y++) o.set(depth.subarray(y * w, (y + 1) * w), (h - 1 - y) * w); return o; })(), prevViewProj: vp2, invView: iv, projInfo: [tanX, tanY], jitterNdc: jit, historyValid: 1, enabled: 1, feedback: 0.9 };
-                const twin = flip(T.resolveFrame(S2));
-                const mkTex = (fmt, usage) => d.createTexture({ size: [w, h], format: fmt, usage });
-                const tc = mkTex("rgba16float", TU.TEXTURE_BINDING | TU.COPY_DST), th = mkTex("rgba16float", TU.TEXTURE_BINDING | TU.COPY_DST), td = mkTex("r32float", TU.TEXTURE_BINDING | TU.COPY_DST), to = mkTex("rgba16float", TU.STORAGE_BINDING | TU.COPY_SRC);
-                d.queue.writeTexture({ texture: tc }, cur.q, { bytesPerRow: w * 8 }, [w, h]); d.queue.writeTexture({ texture: th }, hist.q, { bytesPerRow: w * 8 }, [w, h]); d.queue.writeTexture({ texture: td }, depth, { bytesPerRow: w * 4 }, [w, h]);
-                const u = new Float32Array(44); u.set(vp2, 0); u.set(iv, 16); u.set([tanX, tanY, 1 / w, 1 / h, jit[0], jit[1], 1, 1, 0.9, 0, 0, 0], 32);
-                const ub = d.createBuffer({ size: 176, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }); d.queue.writeBuffer(ub, 0, u);
-                const pipe = d.createComputePipeline({ layout: "auto", compute: { module: d.createShaderModule({ code: M.TAA_GPU_WGSL }), entryPoint: "main" } });
-                const bg = d.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: ub } }, { binding: 1, resource: tc.createView() }, { binding: 2, resource: th.createView() }, { binding: 3, resource: td.createView() }, { binding: 4, resource: to.createView() }] });
-                const bpr = 256, rb = d.createBuffer({ size: bpr * h, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }), e = d.createCommandEncoder(), cp = e.beginComputePass(); cp.setPipeline(pipe); cp.setBindGroup(0, bg); cp.dispatchWorkgroups(3, 2); cp.end();
-                e.copyTextureToBuffer({ texture: to }, { buffer: rb, bytesPerRow: bpr }, [w, h]); d.queue.submit([e.finish()]); await rb.mapAsync(GPUMapMode.READ);
-                const raw = new Uint16Array(rb.getMappedRange().slice(0)); let worst = 0; for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) for (let k = 0; k < 3; k++) worst = Math.max(worst, Math.abs(d16(raw[y * (bpr / 2) + x * 4 + k]) - twin[(y * w + x) * 4 + k]) / Math.max(Math.abs(twin[(y * w + x) * 4 + k]), 0.05));
-                return { worst };
-            });
-            ok("!! the TAA texture kernel (rgba16float history and frame, r32float depth, storage-texture output, rows flipped to upstream's y-up) equals the CPU resolve on the same images with a moving camera and a jittered ray: worst relative difference " + (taaK.worst * 100).toFixed(2) + "% (half-float output)", taaK.worst < 0.01);
-            const flick = await run(async () => {
-                const S = window.__snowgpu, g = S.gpu, cam = { pos: [0, 2.2, -9], target: [0, 0.5, 0], fovY: 60 };
-                const mean = async (taa) => { g.state.taa = true; g.state.resolve = taa; g.state.jitter = true; g.state.historyValid = 0; for (let i = 0; i < 6; i++) await g.frame(0.016, { x: 0, z: 0 }, cam, { present: false }); const shots = []; for (let i = 0; i < 6; i++) shots.push((await g.shot(0.016, { x: 0, z: 0 }, cam)).pixels);
-                    let d = 0, n = 0; for (let i = 1; i < shots.length; i++) for (let k = 0; k < shots[i].length; k++) if (k % 4 !== 3) { d += Math.abs(shots[i][k] - shots[i - 1][k]); n++; } return d / n; };
-                const off = await mean(false), on = await mean(true); g.state.taa = true; g.state.resolve = true; return { off, on };
-            });
-            ok("!! with a jittered camera held still the frame-to-frame change is " + flick.off.toFixed(3) + " grey levels with the jitter on and the resolve off, and " + flick.on.toFixed(3) + " with the resolve on (TAA integrates the jitter instead of flickering with it)", flick.on < flick.off * 0.7 && flick.off > 0.05);
-            // ---- the sky dome the right way round
-            const dome = await run(async () => {
-                const S = window.__snowgpu, g = S.gpu; g.state.taa = false; g.state.jitter = false; g.state.historyValid = 0; g.setSun(13, 60); const sd = g.sun;
-                const look = async (dir) => { const cam = { pos: [0, 40, 0], target: [dir[0] * 50, 40 + dir[1] * 50, dir[2] * 50], fovY: 60 }; await g.frame(0.016, { x: 0, z: 0 }, cam, { present: false }); const sh = await g.shot(0.016, { x: 0, z: 0 }, cam), w = sh.width, h = sh.height, px = (x, y) => Array.from(sh.pixels.slice((y * w + x) * 4, (y * w + x) * 4 + 3)); return { top: px(w >> 1, 4), mid: px(w >> 1, h >> 1) }; };
-                const toward = await look([sd[0], 0.2, sd[2]]), away = await look([-sd[0], 0.2, -sd[2]]); g.state.taa = true; g.state.jitter = true;
-                const lum = (p) => 0.3 * p[0] + 0.42 * p[1] + 0.28 * p[2];
-                return { towardTop: toward.top, awayTop: away.top, towardMid: lum(toward.mid), awayMid: lum(away.mid) };
-            });
-            ok("!! the sky dome is the right way round: looking toward the sun is brighter at the horizon (" + dome.towardMid.toFixed(0) + ") than looking away (" + dome.awayMid.toFixed(0) + "), and the zenith is blue (b " + dome.towardTop[2] + " > r " + dome.towardTop[0] + ")", dome.towardMid > dome.awayMid + 10 && dome.towardTop[2] > dome.towardTop[0] && dome.awayTop[2] > dome.awayTop[0]);
             // ---- the detail map: baked on the GPU, graded against the CPU bake, and its mip chain
             const det = await run(async () => {
                 const S = window.__snowgpu, g = S.gpu, d = g.device, SFm = await import("/render/snowFine.mjs");
@@ -250,50 +207,10 @@ if (skipWhy) {
                 return { worst, n: ch.length, expect: SB.mipFloats(64, 32) };
             });
             ok("!! the sky buffer is the whole MIP CHAIN (" + chainR.n + " floats = 64 x 32 + 32 x 16 + ... x 4): the GPU's five mip passes equal the CPU box filter over the baked level 0 (worst relative difference " + chainR.worst.toExponential(1) + ")", chainR.n === chainR.expect && chainR.worst < 1e-4);
-            // ---- the three shadow maps, and the cascades agreeing with each other
-            const casc = await run(async () => {
-                const S = window.__snowgpu, g = S.gpu, d = g.device; g.state.taa = false; g.state.jitter = false; g.state.debug = 1; g.state.flat = false; g.setSun(8, 60); g.state.historyValid = 0;
-                const covers = []; await g.frame(0.016, { x: 0, z: 0 }, S.camFor(), { present: false });
-                for (let c = 0; c < 3; c++) { const bpr = 2048 * 4, rb = d.createBuffer({ size: bpr * 2048, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }), e = d.createCommandEncoder(); e.copyTextureToBuffer({ texture: g.shadowTex[c], aspect: "depth-only" }, { buffer: rb, bytesPerRow: bpr }, [2048, 2048]); d.queue.submit([e.finish()]); await rb.mapAsync(GPUMapMode.READ); const f = new Float32Array(rb.getMappedRange().slice(0)); let n = 0, mn = 1; for (let i = 0; i < f.length; i += 5) { if (f[i] < 1) n++; if (f[i] < mn) mn = f[i]; } rb.unmap(); rb.destroy(); covers.push([n / (f.length / 5), mn]); }
-                const imgs = []; for (const k of [1, 2, 3]) { g.state.forceCascade = k; await g.frame(0.016, { x: 0, z: 0 }, S.camFor(), { present: false }); imgs.push((await g.shot(0.016, { x: 0, z: 0 }, S.camFor())).pixels); } g.state.forceCascade = 0;
-                const sh = await g.shot(0.016, { x: 0, z: 0 }, S.camFor()), w = sh.width, h = sh.height, diff = (a, b) => { let s = 0, n = 0; for (let y = Math.floor(h * 0.7); y < h; y++) for (let x = 0; x < w; x++) { s += Math.abs(a[(y * w + x) * 4] - b[(y * w + x) * 4]); n++; } return s / n / 158; };
-                const dark = (a) => { let s = 0, n = 0; for (let y = Math.floor(h * 0.7); y < h; y++) for (let x = 0; x < w; x++) { n++; if (a[(y * w + x) * 4] < 140) s++; } return s / n; };
-                g.state.debug = 0; g.state.taa = true; g.state.jitter = true; g.setSun(13, 60);
-                return { covers, d01: diff(imgs[0], imgs[1]), d02: diff(imgs[0], imgs[2]), d12: diff(imgs[1], imgs[2]), dark: imgs.map(dark) };
-            });
-            ok("!! all three shadow maps hold terrain at an 8 degree sun (texels written: " + casc.covers.map((c) => (c[0] * 100).toFixed(2) + "%").join(" / ") + " -- low because at a grazing sun the ground is edge-on to the light and fills a thin band of each map; nearest depth " + casc.covers.map((c) => c[1].toFixed(3)).join(" / ") + ")", casc.covers.every((c) => c[0] > 0.0005 && c[1] < 0.9));
-            ok("!! the cascades describe the SAME shadows: reading each alone over the near ground, the visibility images differ by " + (casc.d01 * 100).toFixed(1) + "% (0 against 1), " + (casc.d12 * 100).toFixed(1) + "% (1 against 2) and " + (casc.d02 * 100).toFixed(1) + "% (0 against 2) of full visibility; the shadowed fraction is " + casc.dark.map((v) => (v * 100).toFixed(1) + "%").join(" / "), casc.d01 < 0.12 && casc.d12 < 0.12 && casc.dark.every((v) => Math.abs(v - casc.dark[0]) < 0.12));
-            // ---- the shading, one term at a time
-            const shade = await run(async () => {
-                const S = window.__snowgpu, g = S.gpu; g.rebuildSize(640, 360); g.state.taa = false; g.state.jitter = false; g.state.historyValid = 0; g.state.debug = 0; g.setSun(13, 60); const sd = g.sun;
-                const lum = (p, i) => 0.2126 * p[i] + 0.7152 * p[i + 1] + 0.0722 * p[i + 2];
-                const take = async (cam, over) => { const old = {}; for (const k in over) { old[k] = g.state[k]; g.state[k] = over[k]; } g.state.frame = 100; await g.frame(0.016, { x: 0, z: 0 }, cam, { present: false }); g.state.frame = 101; const sh = await g.shot(0.016, { x: 0, z: 0 }, cam); for (const k in old) g.state[k] = old[k]; return sh; };   // the frame index feeds the shadow filter's dither, so both renders of a pair use the same one
-                const toward = { pos: [0, 1.5, 0], target: [sd[0] * 20, 1.0, sd[2] * 20], fovY: 60 }, away = { pos: [0, 1.5, 0], target: [-sd[0] * 20, 1.0, -sd[2] * 20], fovY: 60 };
-                const stats = (sh) => { const w = sh.width, h = sh.height; let sum = 0, n = 0, lap = 0, bright = 0; for (let y = Math.floor(h * 0.6); y < h - 1; y++) for (let x = 1; x < w - 1; x++) { const i = (y * w + x) * 4, l = lum(sh.pixels, i); sum += l; n++; lap += Math.abs(4 * l - lum(sh.pixels, i - 4) - lum(sh.pixels, i + 4) - lum(sh.pixels, i - w * 4) - lum(sh.pixels, i + w * 4)); if (l > 235) bright++; } return { mean: sum / n, lap: lap / n, bright }; };
-                const near = { pos: [0, 2.2, -9], target: [0, 0.5, 0], fovY: 60 };
-                const base = stats(await take(near, {})), flatter = stats(await take(near, { sastrugi: 0, detail: 0 }));
-                const tOn = stats(await take(toward, {})), tOff = stats(await take(toward, { sss: 0 })), aOn = stats(await take(away, {})), aOff = stats(await take(away, { sss: 0 }));
-                const glintDiff = async (cam) => { const I = await take(cam, {}), O = await take(cam, { glint: 0 }); let sum = 0, mx = 0, n = 0; for (let i = 0; i < I.pixels.length; i += 4) { const dl = lum(I.pixels, i) - lum(O.pixels, i); sum += Math.abs(dl); mx = Math.max(mx, dl); if (dl > 5) n++; } return { sum: sum / (I.pixels.length / 4), max: mx, n }; };
-                g.setSun(20, 60); const sd10 = g.sun, gOn = await glintDiff({ pos: [0, 0.25, 0], target: [sd10[0], 0.0, sd10[2]], fovY: 40 }), gOff = await glintDiff({ pos: [0, 2.0, 0], target: [0, 0, 0.01], fovY: 40 }); g.setSun(13, 60);
-                g.rebuildSize(320, 180); g.state.taa = true; g.state.jitter = true;
-                return { base, flatter, tOn, tOff, aOn, aOff, gOn, gOff };
-            });
-            ok("!! the fine relief and the detail normals are in the picture: the local contrast of the near ground is " + shade.base.lap.toFixed(2) + " grey levels with them and " + shade.flatter.lap.toFixed(2) + " with sastrugi and detail off (a ratio of " + (shade.base.lap / shade.flatter.lap).toFixed(2) + ")", shade.base.lap > shade.flatter.lap * 1.3);
-            ok("!! subsurface scattering lights the snow looking INTO the sun and not looking away: mean luminance of the ground " + shade.tOff.mean.toFixed(1) + " -> " + shade.tOn.mean.toFixed(1) + " toward the sun (x" + (shade.tOn.mean / shade.tOff.mean).toFixed(3) + "), " + shade.aOff.mean.toFixed(1) + " -> " + shade.aOn.mean.toFixed(1) + " away (x" + (shade.aOn.mean / shade.aOff.mean).toFixed(3) + ")", shade.tOn.mean > shade.tOff.mean * 1.002 && shade.aOn.mean < shade.aOff.mean * 1.0005 && shade.tOn.mean / shade.tOff.mean > shade.aOn.mean / shade.aOff.mean + 0.002);
-            ok("!! glints are grazing-only: looking across the snow toward a 20 degree sun from 25 cm up (the crystals are sparse by design: a facet must lie within a degree or two of the half-vector), " + shade.gOn.n + " pixels are more than 5 grey levels brighter with the glints on (brightest +" + shade.gOn.max.toFixed(0) + ", mean change " + shade.gOn.sum.toFixed(3) + "); looking straight down the glints change " + shade.gOff.n + " pixels (mean change " + shade.gOff.sum.toFixed(4) + ")", shade.gOn.n >= 8 && shade.gOn.sum > 0.0008 && shade.gOff.n === 0 && shade.gOff.sum < 1e-3);
             const errs = await run(() => window.__snowgpu.gpu.errors.slice());
             ok("!! no GPU error was raised (uncaptured validation or out-of-memory) in the whole run", errs.length === 0, errs.join(" | ").slice(0, 300));
         }
         ok("  no page or console error", pageErrs.length === 0, pageErrs.join(" | ").slice(0, 300));
-        // ---- the live loop, presenting to the canvas
-        const live = await browser.newPage({ viewport: { width: 320, height: 180 } }), liveErrs = [];
-        live.on("pageerror", (e) => liveErrs.push(String(e).slice(0, 300))); live.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) liveErrs.push(m.text().slice(0, 300)); });
-        await live.goto(base + "/snow-gpu.html"); await live.waitForFunction(() => window.__snowgpu && (window.__snowgpu.ready || window.__snowgpu.error), null, { timeout: 60000 }); await live.waitForTimeout(9000);
-        const L = await live.evaluate(() => ({ adapter: window.__snowgpu.adapter || "?", frames: window.__snowgpu.frames, fp: window.__snowgpu.footprints, errs: window.__snowgpu.gpu ? window.__snowgpu.gpu.errors.length : -1, text: document.getElementById("stats").textContent }));
-        ok("!! the live loop (requestAnimationFrame, presenting to the canvas) ran: " + L.frames + " frames in nine seconds, " + L.fp + " footprints, " + L.errs + " GPU errors", L.frames > 20 && L.fp >= 4 && L.errs === 0 && liveErrs.length === 0, liveErrs.join(" | ").slice(0, 200));
-        // v4896 -- a TIMING reading for the real-hardware report (tools/ship/realGpuRun.mjs keeps "----" lines): the whole frame graph, presenting, at 320x180, on whatever adapter the browser found.
-        // On the software adapter this is a CPU rasteriser's rate; on a D3D12 GPU it is the number that says whether the graph (deform, sky bake, 3 shadow passes, clipmap, TAA) is cheap.
-        console.log("  ----  reading snowGpu: live loop " + L.frames + " frames in 9 s (" + (L.frames / 9).toFixed(1) + " fps) at 320x180, " + L.fp + " footprints, adapter " + L.adapter);
     } finally { await browser.close(); server.close(); }
 }
 

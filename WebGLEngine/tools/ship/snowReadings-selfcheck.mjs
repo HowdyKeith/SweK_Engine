@@ -45,13 +45,13 @@ const NATIVE = ["taaResolve", "snowShading", "aerial", "skyBake", "pcssShadow", 
 {
     const native = nativeGateList(ENG);
     ok("!! each of the nine native kernel gates is in realGpuRun's native sweep (derived from the code, so it joins without a list)", NATIVE.every((g) => native.includes(`render/${g}-selfcheck.mjs`)), NATIVE.length + " gates");
-    ok("!! and the snow stack's browser gate is in the real-hardware run's own list", gateList(ENG).includes("render/snowGpu-selfcheck.mjs"));
+    ok("!! and the snow stack's six browser gates are in the real-hardware run's own list", ["snowGpu", "snowGpuField", "snowGpuTaa", "snowGpuLookA", "snowGpuLookB", "snowGpuLive"].every((n) => gateList(ENG).includes(`render/${n}-selfcheck.mjs`)));
     for (const g of NATIVE) {
         const src = code(`render/${g}-selfcheck.mjs`);
         const calls = (src.match(/\breading\(/g) || []).length;
         ok(`${g}: imports reading from headlessGpu and calls it where it compares the kernel to its twin`, /import \{[^}]*\breading\b[^}]*\} from "\.\.\/tools\/ship\/headlessGpu\.mjs"/.test(src) && calls >= 1, calls + " call site" + (calls === 1 ? "" : "s"));
     }
-    ok("snowGpu: the live loop prints its rate as a reading line", /console\.log\("  ----  reading snowGpu: live loop "/.test(code("render/snowGpu-selfcheck.mjs")));
+    ok("snowGpuLive: the live loop prints its rate as a reading line", /console\.log\("  ----  reading snowGpu: live loop "/.test(code("render/snowGpuLive-selfcheck.mjs")));
 }
 
 console.log("\n3. THE READINGS A RUN ACTUALLY PRODUCES (the two cheapest gates, run here)");
