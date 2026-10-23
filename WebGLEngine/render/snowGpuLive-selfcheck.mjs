@@ -2,7 +2,7 @@
 //
 // Run: node render/snowGpuLive-selfcheck.mjs
 //
-// THE LIVE LOOP OF THE SNOW FRAME: snow-gpu.html left to run on requestAnimationFrame, presenting to the canvas, for nine seconds; it steps the walker, stamps footprints and raises no GPU
+// THE LIVE LOOP OF THE SNOW FRAME: snow-gpu.html left to run on requestAnimationFrame, presenting to the canvas, until it has run 12 frames and 4 footprints over at least 3 s (120 s ceiling); it steps the walker, stamps footprints and raises no GPU
 // error. Split out of render/snowGpu-selfcheck.mjs at v4896 (see that file: the whole thing took 38-57 s, past the sweep's 20 s cap). It prints the frame rate as a "reading" line,
 // which tools/ship/realGpuRun.mjs keeps in its report: on the software adapter about 11-15 fps at 320x180; on a D3D12 GPU, the first honest look at what the graph costs.
 "use strict";
@@ -35,12 +35,23 @@ if (skipWhy) {
     try {
         const live = await browser.newPage({ viewport: { width: 320, height: 180 } }), liveErrs = [];
         live.on("pageerror", (e) => liveErrs.push(String(e).slice(0, 300))); live.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) liveErrs.push(m.text().slice(0, 300)); });
-        await live.goto(base + "/snow-gpu.html"); await live.waitForFunction(() => window.__snowgpu && (window.__snowgpu.ready || window.__snowgpu.error), null, { timeout: 60000 }); await live.waitForTimeout(9000);
-        const L = await live.evaluate(() => ({ adapter: window.__snowgpu.adapter || "?", frames: window.__snowgpu.frames, fp: window.__snowgpu.footprints, errs: window.__snowgpu.gpu ? window.__snowgpu.gpu.errors.length : -1, text: document.getElementById("stats").textContent }));
-        ok("!! the live loop (requestAnimationFrame, presenting to the canvas) ran: " + L.frames + " frames in nine seconds, " + L.fp + " footprints, " + L.errs + " GPU errors", L.frames > 20 && L.fp >= 4 && L.errs === 0 && liveErrs.length === 0, liveErrs.join(" | ").slice(0, 200));
+        await live.goto(base + "/snow-gpu.html"); await live.waitForFunction(() => window.__snowgpu && (window.__snowgpu.ready || window.__snowgpu.error), null, { timeout: 60000 });
+        // v4896 -- WAIT FOR THE LOOP TO PROVE IT RUNS, NOT FOR NINE SECONDS TO PASS. The rig's first run (2026-10-23, Windows, the headless shell on a software adapter) got 4 frames in nine
+        // seconds -- 0.4 fps, against the 11-15 fps this gate was written on -- and the row demanded more than 20, so a slow CPU rasteriser read as a dead loop. What the row is FOR is that the
+        // requestAnimationFrame loop steps the walker, stamps footprints and presents without a GPU error; how fast it does so is a READING, printed below and kept by realGpuRun. So: at least
+        // 12 frames and 4 footprints and 3 s of running (so a fast GPU's rate is read over enough frames), with a 120 s ceiling that a loop which really is dead still hits.
+        // SABOTAGE: the page's frame loop stopped after its first frame -> RED by name at the 120 s ceiling ("0 frames in 120.0 s"); restored identical. A 25x CPU throttle did NOT slow the software rasteriser (7.9 fps), so it does not stand in for the rig's 0.4 fps: that case rests on the rig's own report.
+        const t0 = await live.evaluate(() => { window.__t0 = performance.now(); return window.__snowgpu.frames; });
+        let L = null, why = "";
+        try {
+            await live.waitForFunction(() => { const g = window.__snowgpu; return g.frames >= 12 && g.footprints >= 4 && performance.now() - window.__t0 >= 3000; }, null, { timeout: 120000, polling: 250 });
+        } catch (e) { why = "the loop did not reach 12 frames and 4 footprints in 120 s: " + String(e).slice(0, 120); }
+        L = await live.evaluate(() => ({ adapter: window.__snowgpu.adapter || "?", frames: window.__snowgpu.frames, fp: window.__snowgpu.footprints, errs: window.__snowgpu.gpu ? window.__snowgpu.gpu.errors.length : -1, secs: (performance.now() - window.__t0) / 1000 }));
+        const ran = L.frames - t0, fps = ran / L.secs;
+        ok("!! the live loop (requestAnimationFrame, presenting to the canvas) ran: " + ran + " frames in " + L.secs.toFixed(1) + " s, " + L.fp + " footprints, " + L.errs + " GPU errors", !why && ran >= 12 && L.fp >= 4 && L.errs === 0 && liveErrs.length === 0, (why + " " + liveErrs.join(" | ")).trim().slice(0, 240));
         // v4896 -- a TIMING reading for the real-hardware report (tools/ship/realGpuRun.mjs keeps "----" lines): the whole frame graph, presenting, at 320x180, on whatever adapter the browser found.
         // On the software adapter this is a CPU rasteriser's rate; on a D3D12 GPU it is the number that says whether the graph (deform, sky bake, 3 shadow passes, clipmap, TAA) is cheap.
-        console.log("  ----  reading snowGpu: live loop " + L.frames + " frames in 9 s (" + (L.frames / 9).toFixed(1) + " fps) at 320x180, " + L.fp + " footprints, adapter " + L.adapter);
+        console.log("  ----  reading snowGpu: live loop " + ran + " frames in " + L.secs.toFixed(1) + " s (" + fps.toFixed(1) + " fps) at 320x180, " + L.fp + " footprints, adapter " + L.adapter);
     } finally { await browser.close(); server.close(); }
 }
 

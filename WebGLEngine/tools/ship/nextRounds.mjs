@@ -2172,9 +2172,16 @@ export const NEXT_ROUNDS = [
     {
         id: "snow-d3d12-readings-from-the-rig",
         blocker: "OPEN",
-        what: "Run the snow stack's kernel gates and the snow-gpu.html gate on the Windows rig and file the reading lines: node tools\\ship\\realGpuRun.mjs --native --only render/ --out snow-native-d3d12.json, then node tools\\ship\\realGpuRun.mjs --only snowGpu --out snow-browser-d3d12.json (docs/real-hardware-snow.md).",
+        what: "PART DONE at v4896, 2026-10-23: the NATIVE half ran on the rig (Intel gen-9, D3D12, driver 31.0.101.2137) and every snow kernel gate passed with its readings filed in docs/real-hardware-snow.md -- taaResolve 226.7x margin; toroidalDeform ice/berm 1.0x-2.6x identical on SwiftShader, so inherent. The BROWSER half reached only the software adapter (the headless shell does not get the GPU for WebGPU on this rig), so the snow frame RATE on a real GPU is still unmeasured, and snowGpuLive demanded 20 frames in 9 s of a CPU rasteriser (it got 4) and was restated to wait for 12 frames and report the rate. OPEN: a hardware frame rate, which needs a native frame loop (snow-native-frame-timing).",
         how: "Every snow kernel-versus-twin comparison prints `reading <name>: worst W against a limit of L, margin Mx over N values, adapter A` (tools/ship/headlessGpu.mjs reading()), which realGpuRun keeps as measured lines; the browser gate prints the live loop's frame rate. Enter the D3D12 numbers beside the software ones and look for margins under about 3x: that is the next TAA bug.",
         why: "FIRST ATTEMPT 2026-10-22 WAS ON THE WRONG CHECKOUT: the two reports that came back (snow-native-d3d12.json, snow-browser-d3d12.json) say commit ce1cca35 (branch ccr-6c3eeb7c-pxz6kx, the denoiser arc), which has none of v4895, so `--only snowGpu` matched NO gate (\"NOTHING RAN\") and the native sweep ran only that branch's own render/ gates -- on a real Intel gen-9 through D3D12, which is a useful denoiser reading and no reading of the snow stack. Check `git log -1` shows a commit that contains render/snowGpuLive-selfcheck.mjs before running. v4895's TAA resolve read its frame size as u32(1.0 / invRes): D3D12 gave 23.999998, the cut gave 23, the gate printed `worst 1.00e+6` and nothing before it to compare with. The repair is shipped and unverified on D3D12; tools/ship/truncationGuard-selfcheck.mjs finds the shape in WGSL (and found a second site the first fix covered, vec2i(dims()) in snowGpu.mjs).",
+    },
+    {
+        id: "snow-native-frame-timing",
+        blocker: "HARDWARE",
+        what: "Time the snow frame graph on a real GPU: run the frame (deform, sky bake, three shadow passes, clipmap, TAA) for N frames natively through node-webgpu on D3D12 and print the per-frame time as a reading line, because the browser route cannot reach the GPU on the Windows rig (the headless shell lands on the software adapter, 0.4 fps).",
+        how: "A command beside render/snowGpu.mjs that builds the frame as snowGpuLive's page does, submits N frames and waits on queue.onSubmittedWorkDone between batches (the wall clock around a GPU frame is the only timer node-webgpu offers without timestamp queries), and a gate that drives the same loop on Dawn/SwiftShader for a few frames so the loop is proven here. Then one realGpuRun --native on the rig.",
+        why: "The 2026-10-23 rig run measured the kernels (all pass) but not the frame; the only frame rate in the report is a CPU rasteriser's.",
     },
     {
         id: "tv-home-first-run-on-a-rig",
