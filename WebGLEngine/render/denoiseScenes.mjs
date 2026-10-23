@@ -16,6 +16,7 @@ import { buildVoxelMeshGreedy } from "../mesh/voxelMeshGreedy.js";
 import { lathe } from "../mesh/lathe.mjs";
 import { extrudePolygon } from "../mesh/extrudePolygon.mjs";
 import { MeshBVH } from "../mesh/meshBVH.mjs";
+import { buildTable } from "../physics/render/energyCompensation.mjs";
 
 export const IMAGE = 64;          // the pre-registration's 64 x 64
 export const SPP_IN = 4;
@@ -146,6 +147,11 @@ export const SPLITS_MESH = Object.freeze({
  * H1 on 12 scenes of family VC (C's scene, voxel structures, 50000), H2 on 12 of MC (C's scene, lathed and extruded
  * solids, 51000), on ranges no earlier split touched.
  */
+/**
+ * Round 58's split (pre-registration section 131): path-tracer.html's own six scenes, once each, nothing trained -- H1 on
+ * family P at 52000-52005, where seed s draws the page's scene s mod 6 in PAGE_SCENES' order.
+ */
+export const SPLITS_PAGE = Object.freeze({ T1: Object.freeze({ family: "P", seeds: range(52000, 6) }) });
 export const SPLITS_MESH_C = Object.freeze({
     T1: Object.freeze({ family: "VC", seeds: range(50000, 12) }),
     T2: Object.freeze({ family: "MC", seeds: range(51000, 12) }),
@@ -183,7 +189,7 @@ export const SPLITS_TEMPORALUP = Object.freeze({
 export const SPLITS_R47 = Object.freeze({ train: SPLITS_R11.train, val: SPLITS_R11.val, T1: Object.freeze({ family: "R", seeds: range(48000, 12) }), T2: Object.freeze({ family: "C", seeds: range(49000, 12) }) });
 /** The family of a split's i-th scene: its own entry in `families` when the split mixes them, else the split's. */
 export const familyOf = (split, i) => (split.families ? split.families[i] : split.family);
-const RESERVED = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, SPLITS_TEMPORALUP, SPLITS_R47, SPLITS_MESH_C].flatMap((S) => Object.values(S).flatMap((s) => s.seeds)));
+const RESERVED = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, SPLITS_TEMPORALUP, SPLITS_R47, SPLITS_MESH_C, SPLITS_PAGE].flatMap((S) => Object.values(S).flatMap((s) => s.seeds)));
 export const isDatasetSeed = (seed) => RESERVED.has(seed);
 
 /** The render seeds of a scene: the input, the reference and the second reference -- distinct for every scene seed. */
@@ -198,7 +204,8 @@ export function makeScene(family, seed) {
     if (family === "C") return makeSceneC(seed);
     if (family === "R") return makeSceneR(seed);
     if (family === "V" || family === "M" || family === "VC" || family === "MC") return makeSceneMesh(family, seed);
-    if (family !== "A" && family !== "B") throw new Error("denoiseScenes: family is A, B, C, R, V, M, VC or MC, got " + family);
+    if (family === "P") return makeScenePage(seed);
+    if (family !== "A" && family !== "B") throw new Error("denoiseScenes: family is A, B, C, R, V, M, VC, MC or P, got " + family);
     const r = rng(((seed >>> 0) * 2654435761 + (family === "A" ? 17 : 29)) >>> 0);
     const U = (a, b) => a + (b - a) * r();
     const scene = [{ centre: [0, -100, 0], radius: 100, albedo: [U(0.3, 0.7), U(0.3, 0.7), U(0.3, 0.7)] }];
@@ -402,6 +409,29 @@ function makeSceneMesh(family, seed) {
 }
 
 /**
+ * Family P (round 58, pre-registration section 131): path-tracer.html's own scenes, as its SCENES object writes them -- RHO
+ * 0.18, roughcomp's table built as the page builds it -- seen from its camera (eye (0, 0, 4) at the origin, 40 degrees) at its
+ * default depth, the slider's 6 bounces. Seed s draws scene s mod 6, in this order. render/denoiseScenes-selfcheck.mjs holds
+ * each scene's literal to the page's text.
+ */
+export const PAGE_SCENES = Object.freeze(["furnace", "gradient", "pair", "enclosed", "rough", "roughcomp"]);
+export const PAGE_DEPTH = 6;
+const PAGE_RHO = 0.18;
+let pageTable = null;   // buildTable is 24 quadratures: built once, on first use, as the page builds it at load
+function makeScenePage(seed) {
+    const name = PAGE_SCENES[((seed % 6) + 6) % 6];
+    const def = {
+        furnace: () => ({ scene: [{ centre: [0, 0, 0], radius: 1, albedo: PAGE_RHO }], sky: () => 1 }),
+        gradient: () => ({ scene: [{ centre: [0, 0, 0], radius: 1, albedo: 0.6 }], sky: (d) => 0.25 + 1.75 * Math.max(0, d[1]) }),
+        pair: () => ({ scene: [{ centre: [0, -0.4, 0], radius: 1, albedo: 0.7 }, { centre: [0.9, 1.5, 0.4], radius: 0.7, albedo: 0.35 }], sky: (d) => 0.3 + 1.4 * Math.max(0, d[1]) }),
+        enclosed: () => ({ scene: [{ centre: [0, 0, 0], radius: 1, albedo: PAGE_RHO }, { centre: [0, 0, 0], radius: 40, emit: 1, albedo: 0 }], sky: () => 0 }),
+        rough: () => ({ scene: [{ centre: [0, 0, 0], radius: 1, roughness: 0.8 }], sky: () => 1 }),
+        roughcomp: () => ({ scene: [{ centre: [0, 0, 0], radius: 1, roughness: 0.8, msTable: (pageTable ||= buildTable(0.8, { K: 24, N: 140, M: 140 })) }], sky: () => 1 }),
+    }[name]();
+    return { family: "P", seed, page: name, ...def, skyKind: name, lightRadius: null, eye: [0, 0, 4], look: [0, 0, 0], up: [0, 1, 0], fovDeg: 40, maxDepth: PAGE_DEPTH };
+}
+
+/**
  * The guide buffers at each pixel's CENTRE ray's first hit: base colour (albedo on a Lambertian surface, F0 on a
  * microfacet one, 1 where the ray meets the sky or an emitter -- neither has a surface colour to divide out) and the
  * unit normal (0 on sky). Both H x W x 3, channels last.
@@ -430,7 +460,8 @@ export function guideBuffers(S, w = IMAGE, h = IMAGE, offset = null) {
 export function renderImages(family, seed, { harvest = false, ref2 = false, w = IMAGE, h = IMAGE, sppIn = SPP_IN, sppRef = SPP_REF } = {}) {
     if (isDatasetSeed(seed) && !harvest) throw new Error(`denoiseScenes: seed ${seed} is a dataset seed -- rendering it needs { harvest: true }`);
     const S = makeScene(family, seed), rs = renderSeeds(seed);
-    const opts = (spp, s) => ({ w, h, spp, seed: s, rgb: true, eye: S.eye, look: S.look, up: S.up, fovDeg: S.fovDeg, sky: S.sky });
+    // round 58: a scene that names its depth (family P, the page's 6 bounces) is rendered at it; every other family at the tracer's default
+    const opts = (spp, s) => ({ w, h, spp, seed: s, rgb: true, eye: S.eye, look: S.look, up: S.up, fovDeg: S.fovDeg, sky: S.sky, ...(S.maxDepth ? { maxDepth: S.maxDepth } : {}) });
     const out = { family, seed, w, h, seeds: rs, input: render(S.scene, opts(sppIn, rs.input)), ref: render(S.scene, opts(sppRef, rs.ref)), ...guideBuffers(S, w, h) };
     if (ref2) out.ref2 = render(S.scene, opts(sppRef, rs.ref2));
     return out;

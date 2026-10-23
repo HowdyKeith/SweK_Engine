@@ -2509,9 +2509,9 @@ export const NEXT_ROUNDS = [
     {
         id: "denoise-pathtracer-page-scenes",
         blocker: "OPEN",
-        what: "The shipped pair on path-tracer.html's own six scenes (furnace, gradient, pair, enclosed, rough, rough with compensation), which denoise-mesh-other-materials once named beside C's materials.",
-        how: "Not a family to sample: six fixed scenes with no seed, scalar albedos, sky light and no emitter in four, and a furnace built to render flat. A round needs its own design for C3 (a 4-sample furnace may sit at its reference's floor), for the guide channels (scalar albedos, a rough sphere with no F0), and for a test of six images, whose smallest one-sided sign-flip p is 1/64.",
-        why: "Section 127 split it off: folded into the mesh round, those scenes would have decided a question that round did not pre-register.",
+        what: "The shipped pair on path-tracer.html's own six scenes (furnace, gradient, pair, enclosed, rough, rough with compensation). ROUND 58 (pre-registration section 131) is that round: family P, the page's SCENES evaluated from its own text, its camera and its default depth; one test set of six, one hypothesis, C1 at 5 of 6. Its harvest is committed before it is read, and section 132 is its verdict.",
+        how: "node tools/denoiseStudy.mjs --harvest-page -> render/denoise-results-page.json. Six images, one picture twice (furnace and enclosed render the same reference), and a smallest sign-flip p of 1/64.",
+        why: "Section 127 split it off denoise-mesh-other-materials: the page's scenes are diagnostic, not a family to sample, and needed their own design.",
     },
     {
         id: "denoise-trained-on-mesh",

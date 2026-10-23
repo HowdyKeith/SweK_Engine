@@ -8925,7 +8925,9 @@ family no longer matches it and the gate says so.
   channels, a microfacet hit with no F0 as 1.
 - **Enclosed's camera sits inside its emitter.** The emitter mask runs as on any scene, and nothing is special-cased.
 
-**Splits** (`SPLITS_PAGE`): T1 -> **H1**, 6 of P, seeds **52000-52005** (each scene once, in order). No earlier split
+**Splits** (`SPLITS_PAGE`): T1 -> **H1**, 6 of P, seeds **52000-52005**, each scene once. (Corrected before any test
+image was rendered: this first said "in order", but seed s draws scene s mod 6, so 52000 draws rough, then roughcomp,
+furnace, gradient, pair, enclosed.) No earlier split
 touched them. C5 holds over the 18 render seeds.
 
 **H1** is supported iff the mean d over the 6 images is > 0 and the exact one-sided sign-flip p is < 0.05.
@@ -8970,6 +8972,13 @@ touched them. C5 holds over the 18 render seeds.
   - The guide channels carried 0.18, 0.60, 0.35 and 0.70 as albedos, and 1 for the sky and the microfacet spheres.
   - The pilot ran at 8 bounces, the tracer's default. The round runs at 6, the page's.
 - Nothing of the test set has been rendered.
+
+**The code, gated before the harvest.**
+- `verdict()` takes `c1Min` (11 unless a round says otherwise), and `runShippedStudy` runs the split's own test sets.
+- `render/denoiseScenes-selfcheck.mjs` section 18 evaluates path-tracer.html's `SCENES` from the page's text and holds
+  family P to it.
+- `render/denoiseStudy-selfcheck.mjs` section 14c runs the shipped pair on the six scenes, on seeds outside every split.
+- Sabotages D47-D50, R78-R80 and S81 each turned red. R79 needed the miniature's row to ask which C1 judged it.
 
 **The command:** `node tools/denoiseStudy.mjs --harvest-page --cache <dir>` -> `render/denoise-results-page.json`.
 - It refuses if the file exists.

@@ -58,10 +58,16 @@
 //   D44 a mesh given a fixed grey albedo instead of its sphere's material        2 RED (section 11's material row and section 17's)
 //   D45 SPLITS_MESH_C left out of the dataset refusal                             1 RED here (and 1 in denoiseStudy-selfcheck: the refusal row)
 //   D46 MC drawing only lathes                                                    1 RED here (and 1 in section 11: M draws only lathes too)
+//   D47 (section 131) the page's gradient sky drawn at 1.5 for 1.75                1 RED (the page's own SCENES row)
+//   D48 renderImages ignoring a scene's depth                                     1 RED (the depth row: at 12 x 12 and at 24 x 24 the two
+//       depths drew the same pixels -- measured -- so it renders the pair at 32 x 32, where they do not)
+//   D49 SPLITS_PAGE left out of the dataset refusal                               2 RED (the split row; the study gate's refusal row)
+//   D50 PAGE_DEPTH 8, the tracer's default                                        2 RED (the camera and depth row; the depth row)
 //   D4  an emitter's base colour taken from its albedo (0) instead of 1          1 RED
 //   D5  remodulate multiplying by the raw albedo, not the floored one            1 RED -- ZERO on the first draft, whose
 //       round trip never saw an albedo under the floor; the near-black row was written for it
 "use strict";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -590,6 +596,47 @@ console.log("\n17. ROUND 56: FAMILIES VC AND MC, THE SAME SHAPES IN FAMILY C'S M
         Object.keys(SPLITS_MESH_C).join() === "T1,T2" && SPLITS_MESH_C.T1.family === "VC" && SPLITS_MESH_C.T1.seeds[0] === 50000 && SPLITS_MESH_C.T1.seeds.length === 12 &&
         SPLITS_MESH_C.T2.family === "MC" && SPLITS_MESH_C.T2.seeds[0] === 51000 && SPLITS_MESH_C.T2.seeds.length === 12 && mc.every((s2) => !earlier.has(s2)) &&
         refused === 24 && new Set(rs).size === 72, `${refused} of 24 refused`);
+}
+
+console.log("\n18. ROUND 58: FAMILY P, path-tracer.html'S OWN SIX SCENES (pre-registration section 131)");
+{
+    const { SPLITS_PAGE, PAGE_SCENES, PAGE_DEPTH, SPLITS_MESH_C, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, SPLITS_TEMPORALUP, SPLITS_R47 } = D;
+    const { render } = await import(pathToFileURL(path.join(ENG, "physics", "render", "pathTracer.mjs")).href);
+    const { buildTable } = await import(pathToFileURL(path.join(ENG, "physics", "render", "energyCompensation.mjs")).href);
+    // the page's own SCENES object, evaluated from its text with its own RHO and its own table builder -- so family P is the page's
+    // scenes, not a copy of them, and a change to the page shows here
+    const page = fs.readFileSync(path.join(ENG, "path-tracer.html"), "utf8");
+    const block = (page.match(/const RHO = [\d.]+;\s*const SCENES = \{[\s\S]*?\n\};/) || [""])[0];
+    const mkLine = (page.match(/const mkTable = \(a\) => \(_tables\[a\] \|\|= mkT\(a, (\{[^}]*\})\)\);/) || [])[1] || "";
+    let P = null, err = null;
+    try { const _tables = {}, mkT = buildTable, mkTable = (a) => (_tables[a] ||= mkT(a, Function(`return (${mkLine})`)()));
+          P = Function("mkTable", `${block}\nreturn { RHO, SCENES };`)(mkTable); } catch (e) { err = e.message; }
+    const cam = page.match(/const CAM = \{ w:\d+, h:\d+, eye:\[([^\]]*)\], look:\[([^\]]*)\], fovDeg:(\d+) \};/), dep = page.match(/<input id="dep" [^>]*value="(\d+)"/);
+    const dirs = [[0, 1, 0], [0, -1, 0], [0.6, 0.2, 0.77], [0.3, 0.9, -0.3]], same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+    const ours = PAGE_SCENES.map((nm, i) => makeScene("P", 52000 + ((i - 52000 % 6 + 6) % 6)));
+    const match = !!P && PAGE_SCENES.join() === Object.keys(P.SCENES).sort((a, b) => PAGE_SCENES.indexOf(a) - PAGE_SCENES.indexOf(b)).join() && Object.keys(P.SCENES).length === 6 &&
+        ours.every((S, i) => { const pg = P.SCENES[PAGE_SCENES[i]]; return S.page === PAGE_SCENES[i] && same(S.scene, pg.scene) && dirs.every((d) => S.sky(d) === pg.sky(d)); });
+    ok("!! family P is path-tracer.html's own SCENES, evaluated from the page's text with its RHO and its table builder -- every scene's spheres, materials, table and sky the same, in the page's six",
+        match && P.RHO === 0.18 && /K: 24, N: 140, M: 140/.test(mkLine), err || PAGE_SCENES.map((nm, i) => `${nm} ${ours[i].scene.length}`).join(", "));
+    ok("!! ...seen from the page's camera, eye (0, 0, 4) at the origin, 40 degrees, at its slider's default depth of 6 bounces",
+        !!cam && cam[1].replace(/\s/g, "") === "0,0,4" && cam[2].replace(/\s/g, "") === "0,0,0" && cam[3] === "40" && !!dep && +dep[1] === PAGE_DEPTH && PAGE_DEPTH === 6 &&
+        ours.every((S) => same(S.eye, [0, 0, 4]) && same(S.look, [0, 0, 0]) && S.fovDeg === 40 && S.maxDepth === 6), cam ? cam[0] : "no CAM line");
+    // renderImages renders a scene at the depth it names: the pair at 6 bounces is the tracer's own at 6, and not its default's 8
+    // at 32 x 32 and 16 samples on this seed: smaller, no path of the pair's lives past 6 bounces and the depths cannot be told apart (measured)
+    const pr = makeScene("P", 990806), ri = renderImages("P", 990806, { w: 32, h: 32, sppIn: 16, sppRef: 1 }), rs = D.renderSeeds(990806);
+    const at = (dpt) => render(pr.scene, { w: 32, h: 32, spp: 16, seed: rs.input, rgb: true, eye: pr.eye, look: pr.look, up: pr.up, fovDeg: pr.fovDeg, sky: pr.sky, ...(dpt ? { maxDepth: dpt } : {}) });
+    const d6 = at(6), d8 = at(null);
+    ok("  renderImages renders family P at its depth: the pair's input is the tracer's at 6 bounces bit for bit, and not its default's",
+        pr.page === "pair" && ri.input.every((v, i) => Object.is(v, d6[i])) && !d8.every((v, i) => Object.is(v, d6[i])));
+    // the split: one test set, every scene once, on seeds no earlier split used, refused without harvest, 18 distinct render seeds
+    const earlier = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, SPLITS_TEMPORALUP, SPLITS_R47, SPLITS_MESH_C].flatMap((S) => Object.values(S).flatMap((x) => x.seeds)));
+    const ps = SPLITS_PAGE.T1.seeds;
+    let refused = 0;
+    for (const s2 of ps) { try { renderImages("P", s2, { w: 2, h: 2, sppIn: 1, sppRef: 1 }); } catch (e) { if (/dataset seed/.test(e.message)) refused++; } }
+    const rsd = ps.flatMap((s2) => { const r = D.renderSeeds(s2); return [r.input, r.ref, r.ref2]; });
+    ok("!! SPLITS_PAGE: one test set, T1 of P at 52000-52005, each of the six scenes once, no seed an earlier split used, every one refused without harvest, 18 distinct render seeds",
+        Object.keys(SPLITS_PAGE).join() === "T1" && SPLITS_PAGE.T1.family === "P" && ps[0] === 52000 && ps.length === 6 && new Set(ps.map((s2) => makeScene("P", s2).page)).size === 6 &&
+        ps.every((s2) => !earlier.has(s2)) && refused === 6 && new Set(rsd).size === 18, `${ps.map((s2) => makeScene("P", s2).page).join(", ")}; ${refused} of 6 refused`);
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +

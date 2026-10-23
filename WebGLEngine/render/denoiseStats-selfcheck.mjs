@@ -196,6 +196,19 @@ console.log("\n7. C2 CITED FROM THE ROUND THAT TRAINED THE NETWORK (pre-registra
         throws({ shuffled: null, c2Prior: { round: 11, ok: true } }) && throws({ shuffled: null, c2Prior: { round: 11, meanD: -1 } }));
 }
 
+// round 58 (section 131), by the byte-safe runner: S81 verdict ignoring c1Min -- 1 RED (this section's row)
+console.log("\n8. ROUND 58 (pre-registration section 131): ONE SET OF SIX, C1 AT 5 OF 6");
+{
+    // six images, the network winning five over the filter and over the noisy input, the sixth worse than the noisy input
+    const S6 = { noisy: [1, 1, 1, 1, 1, 1], filter: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5], net: [[0.25, 0.25, 0.25, 0.25, 0.25, 2]], floor: [1e-3, 1e-3, 1e-3, 1e-3, 1e-3, 1e-3] };
+    const prior = { round: 11, meanD: -1.8564223228700172, ok: true }, base = { sets: { H1: S6 }, shuffled: null, c2Prior: prior, determinism: true, seedsDistinct: true, test: "signflip" };
+    const v5 = verdict({ ...base, c1Min: 5 }), v11 = verdict(base);
+    ok("!! verdict()'s c1Min: at 5 of 6 the set's C1 holds and its one hypothesis is tested at 0.05, Holm over one; asked nothing it is 11, and the same six are not reported",
+        v5.run === "reported" && v5.controls.C1 === true && v5.hypotheses.H1.c1.ok === true && v5.hypotheses.H1.threshold === 0.05 && Object.keys(v5.hypotheses).join() === "H1" &&
+        v11.run === "not reported" && v11.reasons.some((r) => /both need 11/.test(r)) && verdict({ ...base, c1Min: 6 }).run === "not reported",
+        `5 of 6: ${v5.run}, H1 ${v5.hypotheses.H1.status} at ${v5.hypotheses.H1.threshold} (p ${v5.hypotheses.H1.p}); default: ${v11.run}`);
+}
+
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"}` +
     "\nnot closed here: that the measured errors handed to verdict() are the right ones. That is the harness's, next round.");
 process.exit(fails ? 1 : 0);

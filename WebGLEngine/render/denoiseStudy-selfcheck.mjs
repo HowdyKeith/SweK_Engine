@@ -101,6 +101,10 @@
 //   R75 (section 128) the file's H2 typed as supported                           1 RED -- the re-derivation row
 //   R76 the page's scope note claiming C's materials on the meshes               1 RED -- the scope row
 //   R77 VC's second image's network error typed as 0.03                          2 RED -- the re-derivation row and the one-image row
+//   R78 (section 131) ROUND_PAGE's C1 at 11                                         1 RED -- the ROUND_PAGE row
+//   R79 runShippedStudy not handing c1Min to verdict                              1 RED -- the miniature row, once it asked which C1 judged
+//       it (as first written it read only the config, which still said 5)
+//   R80 --harvest-page without its C1                                            1 RED -- the command row
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -500,7 +504,7 @@ console.log("\n14b. ROUND 56: THE SAME SHAPES IN FAMILY C'S MATERIALS AND LIGHT,
         `run ${V.run}; ${JSON.stringify(out.config.splits)}`);
     // the command: section 79's branch on ROUND_MESH_C, writing its own file and never an existing one, logging no verdict
     const cli = fs.readFileSync(path.join(ENG, "tools/denoiseStudy.mjs"), "utf8");
-    const b0 = cli.indexOf('} else if (args.includes("--harvest-mesh-c")) {'), branch = b0 >= 0 ? cli.slice(b0, cli.indexOf("} else if (round) {", b0)) : "";
+    const b0 = cli.indexOf('} else if (args.includes("--harvest-mesh-c")) {'), branch = b0 >= 0 ? cli.slice(b0, cli.indexOf('} else if (args.includes("--harvest-page")) {', b0)) : "";
     const code = branch.replace(/\/\/.*$/gm, "");
     ok("!! --harvest-mesh-c decodes the shipped file with decodeNet, runs runShippedStudy on ROUND_MESH_C's splits under harvest, writes ROUND_MESH_C.results and never an existing one, and logs no verdict",
         branch.length > 400 && /decodeNet\(shipped\.net\)/.test(code) && /filter: shipped\.filter/.test(code) && /runShippedStudy\(\{ splits: ROUND_MESH_C\.splits,/.test(code) && /harvest: true/.test(code) &&
@@ -534,6 +538,37 @@ console.log("\n14b. ROUND 56: THE SAME SHAPES IN FAMILY C'S MATERIALS AND LIGHT,
         ok("!! ...and the page's scope note stays as section 80 left it: section 80 cited, no other material, light or sky claimed, nothing of round 56's families",
             /section 80/.test(scope) && /any other\s+material, light or sky/.test(scope) && !/section 128|VC|MC|C's materials/.test(scope));
     } else ok("!! section 128 reads render/denoise-results-mesh-c.json, and it is not there", false);
+}
+
+console.log("\n14c. ROUND 58: path-tracer.html'S OWN SIX SCENES, THE SHIPPED PAIR, NOTHING TRAINED (pre-registration section 131)");
+{
+    const { runShippedStudy, ROUND_MESH, ROUND_PAGE, RESULTS_PAGE, SHIPPED_NET } = await imp("render/denoiseStudy.mjs");
+    const { SPLITS_PAGE } = await imp("render/denoiseScenes.mjs");
+    const { decodeNet } = await imp("render/denoiseDevice.mjs");
+    const shipped = JSON.parse(fs.readFileSync(path.join(ENG, SHIPPED_NET), "utf8")), net = decodeNet(shipped.net);
+    ok("!! ROUND_PAGE: the page's split, the emitter mask, the sign-flip test, C2 cited from round 11 as section 79 cites it, C1 at 5 of 6 -- its own results file",
+        ROUND_PAGE.splits === SPLITS_PAGE && ROUND_PAGE.emitterMask === true && ROUND_PAGE.test === "signflip" && ROUND_PAGE.c2Prior === ROUND_MESH.c2Prior && ROUND_PAGE.c1Min === 5 &&
+        ROUND_PAGE.results === RESULTS_PAGE && RESULTS_PAGE === "render/denoise-results-page.json");
+    let threw = null; try { runShippedStudy({ splits: SPLITS_PAGE, c1Min: 5, net, filter: shipped.filter, image: 4, sppIn: 1, sppRef: 1 }); } catch (e) { threw = e.message; }
+    ok("!! on the REAL split without harvest it is refused at its first scene", /seed 52000 is a dataset seed/.test(threw || ""), threw);
+    // the miniature: the six page scenes on seeds outside every split, 16 x 16 -- the PLUMBING, no number read for its value
+    const mini = Object.freeze({ T1: Object.freeze({ family: "P", seeds: Object.freeze([960300, 960301, 960302, 960303, 960304, 960305]) }) });
+    const out = runShippedStudy({ splits: mini, c1Min: 5, net, filter: shipped.filter, image: 16, sppIn: 4, sppRef: 16 });
+    const V = out.verdict, T = out.tables;
+    const shapeOk = Object.keys(T).join() === "T1" && ["noisy", "filter", "floor"].every((k) => T.T1[k].length === 6 && T.T1[k].every(Number.isFinite)) && T.T1.net.length === 1 && T.T1.net[0].length === 6;
+    ok("!! end to end on the miniature: ONE test set of the six page scenes, one hypothesis tested at 0.05 (Holm over one), one network column, C1 judged at 5 of 6, C4, C5, C2 cited from round 11",
+        shapeOk && Object.keys(V.hypotheses).join() === "H1" && V.hypotheses.H1.threshold === 0.05 && V.hypotheses.H1.test === "signflip" && out.config.c1Min === 5 &&
+        out.determinism === true && out.seedsDistinct === true && out.seedCount === 18 && V.controls.C2.citedFrom === 11 && V.controls.C4 === true && V.controls.C5 === true &&
+        out.config.splits.T1.family === "P" && !("T2" in out.config.splits) && !V.reasons.some((r) => /both need 11/.test(r)),
+        `run ${V.run}; ${JSON.stringify(out.config.splits)}${V.reasons.length ? "; " + V.reasons.join(" | ") : ""}`);
+    // the command: section 79's branch on ROUND_PAGE, with its C1, writing its own file and never an existing one, logging no verdict
+    const cli = fs.readFileSync(path.join(ENG, "tools/denoiseStudy.mjs"), "utf8");
+    const b0 = cli.indexOf('} else if (args.includes("--harvest-page")) {'), branch = b0 >= 0 ? cli.slice(b0, cli.indexOf("} else if (round) {", b0)) : "";
+    const code = branch.replace(/\/\/.*$/gm, "");
+    ok("!! --harvest-page decodes the shipped file with decodeNet, runs runShippedStudy on ROUND_PAGE's split with its C1 under harvest, writes ROUND_PAGE.results and never an existing one, and logs no verdict",
+        branch.length > 400 && /decodeNet\(shipped\.net\)/.test(code) && /filter: shipped\.filter/.test(code) && /runShippedStudy\(\{ splits: ROUND_PAGE\.splits, c1Min: ROUND_PAGE\.c1Min,/.test(code) && /harvest: true/.test(code) &&
+        /path\.join\(ENG, ROUND_PAGE\.results\)/.test(code) && /existsSync\(file\)/.test(code) && /sha256/.test(code) && !/ROUND_MESH(_C)?\./.test(code) && !/verdict|status|supported/.test(code));
+    ok("  its results are not yet written: section 132 reads them once the harvest's file is committed", !fs.existsSync(path.join(ENG, RESULTS_PAGE)));
 }
 
 console.log("\n15. THE UPSCALE ROUND: HALF SIZE + FSR1 AGAINST THE FRAMES IT COULD BE INSTEAD (pre-registration section 81)");
