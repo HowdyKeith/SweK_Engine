@@ -71,3 +71,21 @@ unspent. Counted honestly: a champion from this batch is the best of the eligibl
 read of the audit, which no earlier search has seen.
 If this batch is also entirely ineligible, the next step is NOT more seeds: it is a change of recipe -- a larger training set on fresh seeds and a crash guard in the objective, as the drones' second round had -- decided
 in writing before it runs.
+
+## A correction to the reading above, and what to take into the flight-characteristics round (nothing built; parked at Keith's word)
+
+The reading in the first-try section ("the objective sees a crash a handful of times and trades it away") treated the lost fights as ground losses. A throwaway probe (flown from both seats on the 100 league-pool duels,
+height and sink rate read each tick; NOT committed, NOT gated -- these numbers are unchecked until a gated tool reproduces them) says they are not all that:
+
+* the hand-flown twin: 0 fights lost to the ground, 4 collisions;
+* the search of seed 12003 (22 lost): **0 to the ground, 22 collisions** -- it learned to fly into the opponent (a collision inside 6 m loses the fight for both), and no ground alert could help it;
+* the search of seed 12002 (39 lost): **26 to the ground and 13 collisions**.
+The other two searches were not examined. So "crash guard in the objective" in the retry terms above means a guard on collisions as well as on the ground, and the first thing the recipe-change round has to do is look at which.
+
+A GROUND ALERT, as Keith asked (what real jets give a pilot): the same probe tried two alert rules on the 26 ground losses of seed 12002 and on its 161 fights that were not lost to the ground or a collision.
+  * time to impact (height / sink rate) under 5 s: warned 26 of 26, 4.1 to 4.6 s ahead of the impact; fired in 1 of the 161 other fights (0.02% of the time). Under 8 s: 5.8 to 6.9 s ahead, 10 of 161 fights (0.6% of the time).
+  * a pull-out rule (the height a 4 g pull-out from here would lose, plus 1 s of reaction, against the height left): warned 26 of 26, 3.3 to 4.4 s ahead, in none of the 161 other fights; on the hand-flown twin's 196 other fights neither rule ever fired.
+  * at the alert the aircraft was at about 200 m/s with the wings banked about 80 degrees (none inverted): a recovery has to level the wings before it can pull, so 3 to 4 s is not slack. NOT CHECKED: that a pilot (hand or network) can recover from that state in that time; the 4 g is an assumption, not the jet's measured limit.
+  * how the networks would receive it is a design question for that round: the fruit fly's eighteen features have no slot named for it (the jet's layout is already spent on the schedule and the limiter), and the alert could instead be a protection layer around ANY pilot (what the F-16's automatic ground collision avoidance is) that
+    needs no change to the network at all. Neither was built.
+Parked together with stall, afterburner and the other characteristics the jet model leaves out, for after the named work is done.
