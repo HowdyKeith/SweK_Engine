@@ -8320,3 +8320,51 @@ Section 121's figures are not those runs. Nothing here changes how any of those 
 - the cap lookup ignoring the table it is handed.
 
 Each must turn at least one row red. Both did, 1 row each, restored byte-identical. The timing gate is green here.
+
+## 123. ROUNDS 46, 48 AND 49 -- THE VERDICTS: ALL THREE HOLD ON THE INTEL
+
+**What arrived.** Two `realGpuRun --only denoise` runs on the Intel gen-9 at 7b871372, the commit carrying sections 115, 117,
+119, 120 and 122. They were committed as received at 1c31213c, **before either was read**. Every gate was green with exit
+0 in both, so C1 holds for every rule here. Section 121's runs at d77592b2 do not count: their timing gate died.
+- render/denoiseUpscaleGPU-selfcheck.mjs section 12 re-derives H46 and H48 from the two files.
+- render/denoiseDevice-selfcheck.mjs re-derives H49. Each rule has fixtures that move it.
+
+**H46, by section 115's rule: holds, at its edge.** Every step was on the device's clock (C2).
+
+| run | restEasu | restComp | restEasuComp (fused) | fused / both | restEasuQ (quads alone) |
+|---|---|---|---|---|---|
+| a | 25.64 ms | 15.57 ms | 32.71 ms | **0.794** | 26.02 ms (1.015 x EASU) |
+| b | 24.46 ms | 15.00 ms | 31.52 ms | **0.799** | 25.76 ms (1.053 x EASU) |
+
+- **So the fused pass becomes the chain's EASU and composite**, as `denoise-easu-fused-default`, a round in the shape of rounds
+  43-44. It saves about 8.5 ms a frame on the Intel at 1080p.
+- **The quads alone are no faster than EASU.** The saving is the fusion's, the `up` buffer's write and read, not the shared
+  footprint's.
+- **Predictions:** the fused pass's 0.55-0.80 was met, at its edge. The quads' 0.5-0.8 x EASU **missed**.
+
+**H48, by section 117's rule: holds.** Both steps were on the device's clock (C2). The tiled accumulation took **0.523 and
+0.544 x** the accumulation (22.79 / 43.60 ms and 23.18 / 42.61 ms).
+- **So the tiled accumulation becomes the history's**, as `denoise-accum-tile-default`. It saves about 20 ms a frame on the
+  Intel.
+- **The prediction (0.60-0.85) missed, on the fast side.** The clamp's 27 reads a pixel cost more than their share of the
+  pass's loads, and one barrier cost less than predicted.
+
+**H49, by section 119's rule, natively: holds.**
+- C2: the w16 network's native K0 was green on r18u in both runs.
+- C3: both 1920 x 1080 passes on r18u were on the device's clock. The shipped network took 1455.6 and 1358.4 ms; the w16
+  network took 513.2 and 511.5 ms.
+- **The w16 network was 2.836 and 2.656 x as fast as the shipped one** on r18u at 1920 x 1080 (needs 1.5 x).
+- **So the Intel gen-9's two network entries name it**, as `denoise-w16-intel-entries`: `NATIVE_NETWORKS_BY_ADAPTER` and
+  `PAGE_NETWORKS_BY_ADAPTER`, `win32/intel/gen-9` and `Windows/intel/gen-9` to `w16`. Both tables stay empty until that round.
+- **The prediction (2.5-3.5 x) was met in both runs.**
+- **The page (section 120, reported and deciding nothing):** 2.743 and 2.688 x on r18u at 1920 x 1080 in Chrome. That is the
+  same gain on the path the page runs.
+
+**Reported, deciding nothing.** The shipped network's native 1080p pass on r18u (1455.6 ms in run a) is within 50 ms of the
+ladder's cap and about 0.5 s of the GPU's timeout. On this GPU the w16 network takes the network well clear of both.
+
+**Sabotages, by the byte-safe runner (V1-V4), each restored byte-identical:**
+- H46 at 0.79, not 0.8: 1 red;
+- H48's tiled time read off the plain accumulation's figure: 2 red;
+- H49 at 3.0 x, not 1.5: 1 red;
+- H49 read at section 121's commit: 1 red.

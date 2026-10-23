@@ -1,6 +1,6 @@
 {
  "gate": "render/denoiseUpscaleGPU-selfcheck.mjs",
- "at": "2026-10-22",
+ "at": "2026-10-23",
  "tables": [
   {
    "title": "section 94: today's page against the half-size chain at 1920 x 1080, ms",

@@ -738,6 +738,30 @@ console.log("1. THE KERNEL'S TWIN, ON THE CPU");
                 r40.every((e) => ["native", "page"].every((p) => !(e[p].r >= 0.8 && e[p].r <= 1.3))) && below && aside,
                 `r40s ${fmt(r40, "native")} natively; r41h at most ${Math.max(...R.intel.flatMap((r) => ["native", "page"].flatMap((p) => sizeRatios(rigLines(rigGate(r, "denoiseTiming")), `${p}: r41h against r18u at `).map((x) => x.r))))} x; stood aside ${aside}`);
         }
+        // ROUND 49'S VERDICT (section 123): section 119's rule, natively, read off the two Intel reports at 7b871372 (render/denoise-rig-r52-
+        // {a,b}-intel-gen9.json, committed before they were read). C1 every gate green with exit 0; C2 the w16 network's native K0 green on
+        // r18u; C3 both networks' 1920 x 1080 passes on r18u on the device's clock; H49 the w16 network >= 1.5 x the shipped one there in both
+        {
+            const rig = (f) => JSON.parse(fs.readFileSync(path.join(ENG, "render", f), "utf8"));
+            const read49 = (rep) => {
+                const dev = rigGate(rep, "denoiseDevice"), T = rigLines(rigGate(rep, "denoiseTiming")), D = rigLines(dev);
+                const c1 = String(rep.commit || "").startsWith("7b871372") && (rep.gates || []).length === 4 && rep.gates.every((g) => g.ok === true && g.exit && g.exit.status === 0);
+                const c2 = D.some((l) => /^native K0 for round 49's w16 network on win32\/intel\/gen-9, .*: .*\br18u green\b/.test(l));
+                const c3 = ["native r18u: 1920 x 1080: ", "native w16 r18u: 1920 x 1080: "].every((h) => T.some((l) => l.startsWith(h) && /; on the device's clock [\d.]+ ms/.test(l)));
+                const m = T.map((l) => l.match(/^native: w16 against the shipped network on r18u at 1920 x 1080: ([\d.]+) x as fast, on the device's clock -- section 119$/)).find(Boolean);
+                const pg = T.map((l) => l.match(/^page: w16 against the shipped network on r18u at 1920 x 1080: ([\d.]+) x as fast, on the device's clock -- section 120$/)).find(Boolean);
+                return { c1, c2, c3, r: m ? +m[1] : null, page: pg ? +pg[1] : null };
+            };
+            const H49 = (rs) => (rs.every((e) => e.c1 && e.c2 && e.c3 && e.r !== null) ? (rs.every((e) => e.r >= 1.5) ? "holds" : "fails") : "no verdict");
+            const R49 = ["a", "b"].map((k) => read49(rig(`denoise-rig-r52-${k}-intel-gen9.json`)));
+            const fx49 = [H49(R49.map((e, i) => (i ? { ...e, r: 1.4 } : e))), H49(R49.map((e, i) => (i ? { ...e, c2: false } : e))), H49(R49.map((e, i) => (i ? { ...e, c1: false } : e)))];
+            ok("!! *** section 123, by section 119's rule: H49 HOLDS -- every gate green at 7b871372, the w16 network's native K0 green on r18u, both 1080p passes on the device's clock, the w16 network 2.84 and 2.66 x as fast as the shipped one on r18u at 1920 x 1080 -- so the Intel gen-9's two network entries name it, as denoise-w16-intel-entries ***",
+                H49(R49) === "holds" && fx49[0] === "fails" && fx49[1] === "no verdict" && fx49[2] === "no verdict" &&
+                Object.keys(NATIVE_NETWORKS_BY_ADAPTER).length === 0 && Object.keys(PAGE_NETWORKS_BY_ADAPTER).length === 0,
+                `native ${R49.map((e) => e.r).join(" / ")} x; page (reported, section 120) ${R49.map((e) => e.page).join(" / ")} x; fixtures: ${fx49.join(" | ")}`);
+            ok("  ...and section 119's prediction is read as made: 2.5-3.5 x MET in both runs (2.84 / 2.66); the page, reported, 2.74 / 2.69",
+                R49.every((e) => e.r >= 2.5 && e.r <= 3.5 && e.page !== null), R49.map((e) => `${e.r} native, ${e.page} page`).join("; "));
+        }
         // v4852+ -- SECTION 68'S OUTCOME (round 20): the rig's six --which lines per GPU, held to the table fixed before they ran, and
         // each re-derived from nativePick on the adapter and compiler the line itself names -- so the rig's reasons are this code's
         {

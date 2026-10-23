@@ -1158,6 +1158,41 @@ console.log("\n11. SECTION 111: ROUNDS 38, 39 AND 42 ON BOTH GPUS, RE-DERIVED FR
         Object.entries(R).flatMap(([g, rs]) => rs.map((r) => [g, r.file, r.fillList, r.fillLTile, r.covFull, r.covFullB, r.toT, r.easu, r.comp, r.toTFree])));
 }
 
+console.log("\n12. SECTION 123: ROUNDS 46 AND 48 ON THE INTEL, RE-DERIVED FROM THE TWO REPORTS AS COMMITTED");
+{
+    // the rig ran 7b871372, which carries sections 115 and 117 (first carried by a9162ea4 and fec43b2c); only the rig's commit counts.
+    // Section 121's runs at d77592b2 do not: their timing gate died, so C1 failed there
+    const RIG_COMMITS = Object.freeze(["7b871372"]);
+    const rd = (f) => JSON.parse(fs.readFileSync(path.join(ENG, "render", f), "utf8"));
+    const dev = (k, t) => { const m = t.match(new RegExp(`\\b${k} ([0-9.]+) ms \\(device\\)`)); return m ? Number(m[1]) : null; };
+    const readRun = (rep, file) => {
+        const g = rep.gates.find((x) => x.gate === "render/denoiseUpscaleGPU-selfcheck.mjs"), m = (g && g.measured) || [];
+        const l115 = m.find((l) => l.startsWith("section 115: ")) || "", l117 = m.find((l) => l.startsWith("section 117: ")) || "";
+        return { file, commit: String(rep.commit || "").slice(0, 8), allGreen: rep.gates.length === 4 && rep.gates.every((x) => x.ok && x.exit && x.exit.status === 0),
+            easu: dev("restEasu", l115), comp: dev("restComp", l115), quad: dev("restEasuQ", l115), fused: dev("restEasuComp", l115), accum: dev("accum", l117), accumT: dev("accumT", l117) };
+    };
+    const runs = ["a", "b"].map((k) => readRun(rd(`denoise-rig-r52-${k}-intel-gen9.json`), k));
+    const c1 = (r) => RIG_COMMITS.includes(r.commit) && r.allGreen;
+    // section 115's rule (H46): C1; C2 all four steps on the device's clock (dev() reads "(device)" figures only); restEasuComp <= 0.8 x (restEasu + restComp) in both
+    const H46 = (rs) => (rs.every((r) => c1(r) && [r.easu, r.comp, r.quad, r.fused].every((v) => Number.isFinite(v) && v > 0)) ? (rs.every((r) => r.fused <= 0.8 * (r.easu + r.comp)) ? "holds" : "fails") : "no verdict");
+    // section 117's rule (H48): C1; C2 both steps on the device's clock; accumT <= 0.8 x accum in both
+    const H48 = (rs) => (rs.every((r) => c1(r) && [r.accum, r.accumT].every((v) => Number.isFinite(v) && v > 0)) ? (rs.every((r) => r.accumT <= 0.8 * r.accum) ? "holds" : "fails") : "no verdict");
+    const shift = (f) => runs.map((r, i) => (i ? f(r) : r));
+    const fx = [H46(shift((r) => ({ ...r, fused: 0.81 * (r.easu + r.comp) }))), H46(shift((r) => ({ ...r, commit: "d77592b2" }))), H48(shift((r) => ({ ...r, accumT: 0.81 * r.accum }))), H48(shift((r) => ({ ...r, accumT: null })))];
+    ok("!! *** section 123, by section 115's rule: H46 HOLDS -- every gate green at 7b871372, the fused EASU and composite at 0.794 and 0.799 x the two passes it replaces, both inside 0.8 -- so it becomes the chain's, as denoise-easu-fused-default ***",
+        H46(runs) === "holds" && fx[0] === "fails" && fx[1] === "no verdict",
+        `${runs.map((r) => `run ${r.file}: ${r.fused} / ${(r.easu + r.comp).toFixed(3)} = ${(r.fused / (r.easu + r.comp)).toFixed(3)}`).join("; ")}; fixtures: ${fx[0]} | ${fx[1]}`);
+    ok("!! *** section 123, by section 117's rule: H48 HOLDS -- the tiled accumulation at 0.523 and 0.544 x the accumulation, on the device's clock in both runs -- so it becomes the history's, as denoise-accum-tile-default ***",
+        H48(runs) === "holds" && fx[2] === "fails" && fx[3] === "no verdict",
+        `${runs.map((r) => `run ${r.file}: ${r.accumT} / ${r.accum} = ${(r.accumT / r.accum).toFixed(3)}`).join("; ")}; fixtures: ${fx[2]} | ${fx[3]}`);
+    // the predictions as made: H46's fused pass 0.55-0.80 (met, at its edge); the quads alone 0.5-0.8 x EASU (MISSED: no faster);
+    // H48's 0.60-0.85 (MISSED, faster than predicted)
+    const inR = (v, a2, b2) => v >= a2 && v <= b2;
+    ok("  ...and sections 115 and 117's predictions are read as made: the fused pass's 0.55-0.80 MET at its edge; the quads alone 0.5-0.8 x EASU MISSED (1.015 / 1.053); the tiled accumulation's 0.60-0.85 MISSED, faster (0.523 / 0.544)",
+        runs.every((r) => inR(r.fused / (r.easu + r.comp), 0.55, 0.80) && !inR(r.quad / r.easu, 0.5, 0.8) && r.quad >= r.easu && !inR(r.accumT / r.accum, 0.60, 0.85) && r.accumT / r.accum < 0.60),
+        runs.map((r) => `run ${r.file}: quads ${(r.quad / r.easu).toFixed(3)} x EASU, tiled ${(r.accumT / r.accum).toFixed(3)} x`).join("; "));
+}
+
 console.log(fails ? `\nFAIL -- ${fails} check(s)` : "\nALL GREEN");
 console.log("not read here: any time section 4 printed. On SwiftShader a kernel's time is a CPU's; the rig round reads them (backlog denoise-halfres-rig-timing).");
 REPORT.write();
