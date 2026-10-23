@@ -16149,6 +16149,26 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         widened: Object.freeze([]),
         verdict: "the snowGpu browser half split into five gates under the 20 s cap beside the trimmed core, the D3D12 readings and the truncation guard (found by mutating the real snowGpu.mjs, which the first detector missed), the TV package knowledge, the dry-run planner that executes nothing, and SweK Home's launcher (a pure Shelf.java driven by javac); each run alone and green, and each sabotaged to go red by name",
     }),
+    // since608, from `versionPreflight --next` (highest declared: since607). TWENTY gate files, all the unnumbered line's: the jet league (its sets, its trainer rows, the networks' mutate and perturb), the front doors of the jet autopilot and the multirotor
+    // model, the drone and fish gates, the dogfight tournament's two gates, and the CAVE export script's stand-in server. `at` names the line, as the ocean spike's closing did, because the version is chosen at ship time.
+    since608: Object.freeze({
+        at: "unnumbered line", swept: 20, green: 20, red: 0,
+        added: Object.freeze([
+            "brain/autopilotDrone-selfcheck.mjs", "brain/autopilotJet-selfcheck.mjs", "brain/dogfightTournament-selfcheck.mjs", "brain/droneTask-selfcheck.mjs",
+            "brain/jetFight-selfcheck.mjs", "brain/jetLeagueSets-selfcheck.mjs", "brain/pilotDroneMlp-selfcheck.mjs", "brain/pilotDronePolicy-selfcheck.mjs",
+            "brain/pilotJetMlp-selfcheck.mjs", "brain/pilotJetPolicy-selfcheck.mjs", "brain/pilotSubFish-selfcheck.mjs", "physics/mechanics/atmosphereISA-selfcheck.mjs",
+            "physics/mechanics/multirotorModel6dof-selfcheck.mjs", "tools/fishCaveExport-selfcheck.mjs", "tools/fishCircuit-selfcheck.mjs", "tools/ship/tournamentDogfight-selfcheck.mjs",
+            "tools/ship/tournamentDogfightShipped-selfcheck.mjs", "tools/ship/trainDogfightLeague-selfcheck.mjs", "tools/ship/trainDronePilot-selfcheck.mjs", "tools/ship/trainSubPilot-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "the unnumbered line's twenty gates, each run alone and serially on the merged tree (main at v4896 in), all green, none red on arrival: the jet league (sets on seeds 15000 and up, the " +
+                 "trainer's jet path with its cache keys unchanged for the trainers, the jet networks' mutate and perturb), the jet autopilot's and the multirotor model's front doors, the drone and " +
+                 "dogfight tournament gates, the fish pilot, and the CAVE export script's stand-in server (the big-neuron finder, with numpy integers from the server). Nineteen of them were sabotaged " +
+                 "and went red by name, the 0-red results and the equivalent mutants named in each gate's header. tools/ship/tournamentDogfightShipped-selfcheck.mjs was committed with its sabotage log reading " +
+                 "'filled in below once run' and it had NOT been run: that run is in progress as this is written. NOT CLOSED: that sabotage until its header says otherwise, and the sweep-timings readings for these " +
+                 "twenty, a ship-time step not taken here",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
