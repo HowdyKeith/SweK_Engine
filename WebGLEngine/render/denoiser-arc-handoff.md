@@ -74,6 +74,9 @@ node tools/ship/versionPreflight.mjs --next    # the next free version and sweep
      r57p ran 0.95-1.04 x r18u at 1080p. `denoise-f16-storage` is closed as a measured negative (Keith).
    - **Round 58 (sections 131-132): on path-tracer.html's own six scenes the network beat the filter** (mean d 0.480,
      p 0.031). The page's note says so; the furnace pair are ties.
+   - **Round 59 (sections 133-134): FSR3's generator between two chain frames -- not reported (C1).** It carries the light
+     sources across their silhouettes; the next round generates between light-free frames and composites them at the
+     generated time.
    - Every default that the Intel's runs at 7b871372 decided is now carried out. The denoiser entries still open, after
      rounds 56-58, are `denoise-subgroup-reduction`, `denoise-temporalup-device` and `denoise-1080-native-crash` (all three
      owed the GTX 1080), and `denoise-fsr3-framegen`, whose upstream is closed.

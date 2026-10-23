@@ -110,6 +110,9 @@
 //   R83 the furnace's network error typed below its input                        3 RED -- the re-derivation row, the reading row, the predictions row
 //   R84 (section 133) frameGenSets' H1 against the repeated frame                  1 RED -- the frameGenSets row
 //   R85 --harvest-framegen at the default image size                             1 RED -- the command row
+//   R86 (section 134) G's first image typed far below the noisy frame              2 RED -- the re-derivation row, the figures row
+//   R87 the first image's field typed as no better moved                          1 RED -- the field row
+//   R88 the round re-derived with the cross-fade as both comparators              3 RED -- frameGenSets' row, the re-derivation, the figures
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -633,7 +636,28 @@ console.log("\n14d. ROUND 59: FSR3's FRAME GENERATION BETWEEN TWO OF ROUND 32's 
     ok("!! --harvest-framegen decodes the shipped file with decodeNet, runs runFrameGenStudy on ROUND_FRAMEGEN at its size under harvest, writes ROUND_FRAMEGEN.results and never an existing one, records its commit, and logs no verdict",
         branch.length > 400 && /decodeNet\(shipped\.net\)/.test(code) && /runFrameGenStudy\(\{ splits: ROUND_FRAMEGEN\.splits, image: ROUND_FRAMEGEN\.image,/.test(code) && /harvest: true/.test(code) &&
         /path\.join\(ENG, ROUND_FRAMEGEN\.results\)/.test(code) && /existsSync\(file\)/.test(code) && /sha256/.test(code) && /out\.commit = /.test(code) && !/ROUND_TEMPORALUP/.test(code) && !/verdict|status|supported/.test(code));
-    ok("  its results are not yet written: section 134 reads them once the harvest's file is committed", !fs.existsSync(path.join(ENG, RESULTS_FRAMEGEN)));
+    // section 134: the committed results read back by code -- the verdict re-derived from the file's tables under ROUND_FRAMEGEN's
+    // rule: NOT REPORTED, C1 firing on both hypotheses because G beat the noisy frame on 5 of 12; the figures section 134 reports
+    const ffile = path.join(ENG, RESULTS_FRAMEGEN);
+    if (fs.existsSync(ffile)) {
+        const res = JSON.parse(fs.readFileSync(ffile, "utf8"));
+        const again = verdict({ sets: frameGenSets(res.tables), shuffled: null, c2Prior: ROUND_FRAMEGEN.c2Prior, determinism: res.determinism, seedsDistinct: res.seedsDistinct, test: ROUND_FRAMEGEN.test });
+        const H1 = again.hypotheses.H1, H2 = again.hypotheses.H2, wins = (a, b) => a.filter((v, i) => v < b[i]).length;
+        ok("!! *** section 134: verdict() over the committed results' own tables gives the file's verdict -- NOT REPORTED, C1 firing on both hypotheses: G beat the noisy frame on 5 of 12 ***",
+            again.run === "not reported" && res.verdict.run === "not reported" && again.controls.C1 === false && again.reasons.length === 2 &&
+            H1.c1.netWins === 5 && H1.c1.filterWins === 12 && H2.c1.filterWins === 10 && wins(res.tables.G, res.tables.noisy) === 5 &&
+            again.controls.C4 === true && again.controls.C5 === true && res.commit === "5f1f344c" && /^f1a84d47/.test(res.shipped.sha256),
+            again.reasons.join(" | "));
+        const mean = (a) => a.reduce((x, v) => x + v, 0) / a.length, F = res.secondary.field;
+        ok("  ...and section 134's figures: G won 2 of 12 against the cross-fade and 3 of 12 against the repeated frame; the midpoint traced alone beat G on 11 of 12 (mean d 4.37); the fill helped on 5 (mean d 0.248)",
+            H1.k === 2 && H2.k === 3 && Math.abs(H1.meanD + 1.728) < 1e-3 && Math.abs(H2.meanD + 1.103) < 1e-3 &&
+            res.secondary.midTraced.filter((v) => v < 0).length === 11 && Math.abs(mean(res.secondary.midTraced) + 4.370) < 1e-3 &&
+            res.secondary.fill.filter((v) => v > 0).length === 5 && Math.abs(mean(res.secondary.fill) - 0.248) < 1e-3,
+            `H1 ${H1.k}/12, H2 ${H2.k}/12; Bmid1 beat G on ${res.secondary.midTraced.filter((v) => v < 0).length}; fill ${res.secondary.fill.filter((v) => v > 0).length}/12`);
+        ok("  ...and the field held on every image: moved along it, a pixel's surface point within 0.02 of the newer frame's against 0.06-0.16 unmoved, no hole left after the fill",
+            F.length === 12 && F.every((f) => f.pointWarped < 0.02 && f.pointStill > 0.06 && f.pointStill < 0.16 && f.holes === 0 && f.holesNoFill > 1000),
+            F.map((f) => `${f.pointWarped.toFixed(3)}/${f.pointStill.toFixed(3)}`).join(" "));
+    } else ok("!! section 134 reads render/denoise-results-framegen.json, and it is not there", false);
 }
 
 console.log("\n15. THE UPSCALE ROUND: HALF SIZE + FSR1 AGAINST THE FRAMES IT COULD BE INSTEAD (pre-registration section 81)");

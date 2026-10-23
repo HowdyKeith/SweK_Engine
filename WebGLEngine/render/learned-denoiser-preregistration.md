@@ -9144,3 +9144,58 @@ is round 32's split shape, on seeds no earlier split touched.
 - It refuses if the file exists.
 - It runs here, about as long as round 32's harvest (35 minutes).
 - The file is committed byte for byte before it is read, and section 134 reads it.
+
+## 134. ROUND 59 -- NOT REPORTED: C1 FIRED. THE GENERATED FRAME CARRIES THE LIGHT SOURCES ACROSS THEIR SILHOUETTES
+
+**What arrived.** `render/denoise-results-framegen.json` (sha-256 `6e58cb01...`).
+- It was written by `--harvest-framegen` at 5f1f344c, the commit carrying section 133's code. It was committed byte for
+  byte (1bfe900e) before it was read. The shipped file is section 79's (`f1a84d47...`).
+- It took 6,057 s, about 8 minutes an image, against section 133's guess of 35 minutes in all. That guess was round 32's
+  time, and this round's sequences cost about four times as much here. Nothing else ran beside it.
+
+**The run is NOT REPORTED.** C1 fired on both hypotheses: the candidate G beat the noisy frame on only 5 of 12, where C1
+needs 11. The comparators beat it on 12 (X) and 10 (R). C2-C5 held, and no image was near its floor.
+
+| | H1: G against the cross-fade X | H2: G against repeating O6 |
+|---|---|---|
+| mean d (reported, decides nothing) | -1.728 | -1.103 |
+| images G won | 2 of 12 | 3 of 12 |
+| sign-flip p | 0.999 | 0.951 |
+
+By section 133's rule nothing moves. The device round is not owed.
+
+**What G did, measured on the test images after the verdict was fixed: descriptive, not a test.** These figures come from
+the harvest's own cached sequences, re-made with the committed code.
+- **G puts light where there is none.** In 8 of 12 images, between 79 and 1,293 of G's pixels are brighter than the truth
+  by more than 1. On C 54000, the worst, 0.1% of the pixels carry 99% of G's error.
+- **The mechanism**, from a pixel on a pilot scene outside the split (R 990923): a sky pixel at a light source's edge,
+  where O6, O7 and the truth all read 0.59, comes out of the generator at 15.3.
+  - Its vector is the sky's, -7.8 px. The sky moves faster across the screen than the light source in front of it.
+  - So the gather's taps, half a vector back in O6 and half forward in O7, land on the light source as it stood in the
+    other frame.
+  - It is the generator's disocclusion error. Here it is fatal because the frames are linear radiance with light sources
+    near 30, so one wrong tap costs about 1,800 in relMSE at that pixel.
+  - The cross-fade never samples off its own pixel, so it cannot make this error.
+- **It is not only the scale.** Graded in display space instead (round 26's transfer, Reinhard then gamma 2.2), G beats X
+  on 4 of 12, is level on a fifth (C 54003), and loses on 7. fsr-three.html's frames were display frames all along, which
+  is where its +0.15 to +1.00 dB over the cross-fade was measured.
+- **Two checks that this is the generator's doing and not the code's:**
+  - The field held on all 12. Moved along it, a pixel's surface point lay 0.004-0.019 from the newer frame's, against
+    0.064-0.151 unmoved, on motions of 5-20 px.
+  - G is `interpolateFrameCPU`'s own frame, which the round's gate holds bit for bit.
+- **The fill is not the cause.** With its holes left black G was worse, not better: by a mean d of 0.248, the fill helped
+  on 5 of 12.
+
+**The predictions.**
+- **P1 FAILED:** C1 did not hold, on either hypothesis.
+- **P2 and P3** have no reading: the run is not reported. Descriptively, both point the other way.
+- **P4 HELD, emphatically.** Bmid1, the midpoint traced alone, beat G on 11 of 12, by a mean d of 4.37. A traced frame's
+  light sources are where the scene puts them.
+
+**What it says for FSR3 on the path tracer.** The arrangement as fsr-three.html runs it does not carry over unchanged. The
+light sources are the problem, and the arc already has the answer for that shape of problem:
+- round 30 took the light sources out of the upscale and put them back from the geometry (section 91);
+- v4755 composited FSR3's UI at the generated time instead of warping it.
+
+A round that generates between light-free frames, and composites `emitterRadiance` from the geometry at the generated
+time, is the next question. It is `denoise-fsr3-framegen`'s next step, pre-registered on its own and not this round.
