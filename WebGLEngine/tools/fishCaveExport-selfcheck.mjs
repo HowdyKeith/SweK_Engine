@@ -34,6 +34,20 @@
 //   out of them and the synapses into them, which edges.csv counted twice in the --hops 1 case (the fixture has such a synapse now). A THIRD CAME FROM RUNNING THE SCRIPT'S CONSTRUCTOR AGAINST THE REAL LIBRARY IN THE SANDBOX: caveclient talks to the server
 //   when the client is built, which the sandbox's proxy refuses, and the script died with a traceback; it now says what failed and what to check.
 //   ONCE, BY HAND, AGAINST THE REAL LIBRARY (not in the mutant runs): `selftest-signatures` on caveclient 8.2.1 in a scratch venv: 13 of 13 probes bind. The script has never talked to the real server.
+//
+// VERSION 2 (the first real export's three gaps: labels for the given cells, a per-cell summary, honest sizes; sections 5 and 10), SABOTAGED -- 37 mutants of tools/fishCaveExport.py, every one red by name, run with FISH_CAVE_PYTHON set to a Python with caveclient 8.2.1 and pandas:
+//   V01 the label lookup filters on the wrong column 2 | V02 the filter keeps only the first id 5 | V03 the label lookup is unfiltered 3 | V04 the label lookup limit is 10 rows 1 |
+//   V05 the label lookup queries the synapse table too 1 | V06 the label lookup does not skip tables over the limit 2 | V07 the label rows lose their whole-row JSON 1 | V08 a given-cells export never looks labels up 5 |
+//   V09 a search export looks labels up again 2 | V10 labels.csv drops row_json 2 | V11 the lookup report is lost 2 | V12 position columns misnamed 1 | V13 the outgoing count reads the post column 4 |
+//   V14 the incoming count reads the pre column 3 | V15 partnersOut counts the pre side 2 | V16 partnersIn counts the post side 2 | V17 noSynapses needs only one side empty 1 | V18 the box ignores the incoming synapses 1 |
+//   V19 the box takes the pre position for incoming too 1 | V20 the box minimum and maximum are swapped 1 | V21 the centroid divides by one too many 1 | V22 the extent in micrometres is rounded to a whole number 1 |
+//   V23 the extent in micrometres uses nanometres 1 | V24 the voxel size is not given to the summary 2 | V25 a zero size column is summed as real 1 | V26 total_size is a zero where it should be blank 1 |
+//   V27 the zero-size warning does not say where the sizes are 1 | V28 the zero-size warning is not printed 1 | V29 a cell with no synapse is not flagged in the console 1 |
+//   V30 a cell with no synapse has no warning in the manifest 1 | V31 the no-synapse warning does not name the way out 1 | V32 the summary lists the circuit and not the cells 4 | V33 the console line loses the partner counts 2 |
+//   V34 the signature probe for the filtered query is dropped 2 | V35 the signature probe names a keyword the library lacks 1 | V36 the metadata lookup for the voxel size is lost 2 |
+//   V37 the label lookup ids go in unsorted-wrong (a set of one) 3
+// THE SCRIPT HAS NOW TALKED TO THE REAL SERVER (2026-10-23, Keith's machine): `discover` listed three datastacks and nine tables for fish1_full, and `export --root-ids` wrote a folder; version 2 then ran against it and its label lookup and summary worked, with one table (somas_distance_to_landmark) answering HTTP 500 to a filtered query, which the lookup records as skipped and goes on. The header sentence above that the script has never talked to the server is the state before that day.
+// WHAT THE REAL EXPORT FOUND THAT NO FIXTURE HAD: labels.csv was empty because --root-ids skipped the only label step; the synapse table's size column is 0 in every row; and one of the two root ids was a 0.5 micrometre fragment with two synapses and no soma, which nothing in the folder said. The summary says all three now. `selftest-signatures` has a 14th probe (the filtered query), bound to caveclient 8.2.1: 14 of 14.
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
