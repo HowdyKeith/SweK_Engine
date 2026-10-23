@@ -72,9 +72,11 @@ node tools/ship/versionPreflight.mjs --next    # the next free version and sweep
      MC 0.182 (p 0.036 against Holm's 0.025). The scope note stands; `denoise-mesh-other-materials` is closed.
    - **Rounds 57 (sections 129-130): r57p, activations stored as packed f16.** On the Intel, K0p went red natively and
      r57p ran 0.95-1.04 x r18u at 1080p. `denoise-f16-storage` is closed as a measured negative (Keith).
-   - Every default that the Intel's runs at 7b871372 decided is now carried out. The denoiser entries still open are
-     `denoise-subgroup-reduction`, `denoise-f16-storage`, `denoise-temporalup-device`, `denoise-1080-native-crash` and
-     `denoise-mesh-other-materials`.
+   - **Round 58 (sections 131-132): on path-tracer.html's own six scenes the network beat the filter** (mean d 0.480,
+     p 0.031). The page's note says so; the furnace pair are ties.
+   - Every default that the Intel's runs at 7b871372 decided is now carried out. The denoiser entries still open, after
+     rounds 56-58, are `denoise-subgroup-reduction`, `denoise-temporalup-device` and `denoise-1080-native-crash` (all three
+     owed the GTX 1080), and `denoise-fsr3-framegen`, whose upstream is closed.
    - Round 48 (section 117) is the accumulation's clamp read from a tile, on the same Intel runs as rounds 45 and 46.
    Round 36 (section 103) made the list fill the default, with round 31's ring fill kept as its reference.
    **`denoise-1080-native-crash`:** round 35 did not reproduce it in five runs (section 102). The traces stay armed.

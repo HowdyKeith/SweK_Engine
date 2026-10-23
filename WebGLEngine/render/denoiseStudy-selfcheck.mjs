@@ -105,6 +105,9 @@
 //   R79 runShippedStudy not handing c1Min to verdict                              1 RED -- the miniature row, once it asked which C1 judged
 //       it (as first written it read only the config, which still said 5)
 //   R80 --harvest-page without its C1                                            1 RED -- the command row
+//   R81 (section 132) the file's H1 typed as not supported                       1 RED -- the re-derivation row
+//   R82 the page's note without the furnace                                      1 RED -- the scope row
+//   R83 the furnace's network error typed below its input                        3 RED -- the re-derivation row, the reading row, the predictions row
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -568,7 +571,33 @@ console.log("\n14c. ROUND 58: path-tracer.html'S OWN SIX SCENES, THE SHIPPED PAI
     ok("!! --harvest-page decodes the shipped file with decodeNet, runs runShippedStudy on ROUND_PAGE's split with its C1 under harvest, writes ROUND_PAGE.results and never an existing one, and logs no verdict",
         branch.length > 400 && /decodeNet\(shipped\.net\)/.test(code) && /filter: shipped\.filter/.test(code) && /runShippedStudy\(\{ splits: ROUND_PAGE\.splits, c1Min: ROUND_PAGE\.c1Min,/.test(code) && /harvest: true/.test(code) &&
         /path\.join\(ENG, ROUND_PAGE\.results\)/.test(code) && /existsSync\(file\)/.test(code) && /sha256/.test(code) && !/ROUND_MESH(_C)?\./.test(code) && !/verdict|status|supported/.test(code));
-    ok("  its results are not yet written: section 132 reads them once the harvest's file is committed", !fs.existsSync(path.join(ENG, RESULTS_PAGE)));
+    // section 132: the committed results read back by code -- the verdict re-derived from the file's tables under ROUND_PAGE's rule,
+    // the furnace pair named as the ties they are, the predictions as made, and the page's note widened exactly so far
+    const pfile = path.join(ENG, RESULTS_PAGE);
+    if (fs.existsSync(pfile)) {
+        const res = JSON.parse(fs.readFileSync(pfile, "utf8")), { makeScene } = await imp("render/denoiseScenes.mjs");
+        const again = verdict({ sets: { H1: res.tables.T1 }, shuffled: null, c2Prior: ROUND_PAGE.c2Prior, determinism: res.determinism, seedsDistinct: res.seedsDistinct,
+                                test: ROUND_PAGE.test, c1Min: ROUND_PAGE.c1Min });
+        const H1 = again.hypotheses.H1, f = res.verdict.hypotheses.H1;
+        ok("!! *** section 132: verdict() over the committed results' own table gives the file's verdict -- reported, H1 SUPPORTED: mean d 0.480, 5 of 6, p 0.031 against 0.05 ***",
+            again.run === "reported" && res.verdict.run === "reported" && H1.status === "supported" && f.status === "supported" && H1.k === f.k && Object.is(H1.meanD, f.meanD) &&
+            H1.k === 5 && H1.threshold === 0.05 && Math.abs(H1.p - 2 / 64) < 1e-12 && Math.abs(H1.meanD - 0.4798) < 1e-4 && again.controls.C1 === true && res.config.c1Min === 5 &&
+            res.config.splits.T1.family === "P" && res.shipped && res.shipped.file === SHIPPED_NET && /^f1a84d47/.test(res.shipped.sha256),
+            `H1 ${H1.status} (mean d ${H1.meanD.toFixed(3)}, ${H1.k}/6, p ${H1.p}); C1 net ${H1.c1.netWins}, filter ${H1.c1.filterWins} of 6`);
+        const T = res.tables.T1, names = SPLITS_PAGE.T1.seeds.map((s2) => makeScene("P", s2).page), d = T.filter.map((x, i) => Math.log(x) - Math.log(T.net[0][i]));
+        const worse = names.filter((n, i) => T.net[0][i] > T.noisy[i] || T.filter[i] > T.noisy[i]), ties = names.filter((n, i) => Math.abs(d[i]) < 0.05);
+        ok("  ...and section 132's reading: both methods worse than the input on the furnace alone; the furnace and enclosed ties (|d| < 0.05); the four others won by more than 0.4",
+            worse.join() === "furnace" && T.net[0][names.indexOf("furnace")] > T.noisy[names.indexOf("furnace")] && T.filter[names.indexOf("furnace")] > T.noisy[names.indexOf("furnace")] &&
+            ties.sort().join() === "enclosed,furnace" && names.filter((n, i) => d[i] > 0.4).sort().join() === "gradient,pair,rough,roughcomp",
+            names.map((n, i) => `${n} ${d[i].toFixed(3)}`).join(", "));
+        // section 131's predictions, read as made: P1 held; P2 (not supported) FAILED; P3 half -- rough the largest, roughcomp not second
+        const order = names.map((n, i) => [n, d[i]]).sort((a, b) => b[1] - a[1]).map((x) => x[0]);
+        ok("  section 131's predictions, read as made: P1 held, P2 FAILED (H1 held), P3 half right -- the largest win on rough, roughcomp's only fourth",
+            again.controls.C1 === true && H1.status === "supported" && order[0] === "rough" && order.indexOf("roughcomp") === 3, order.join(" > "));
+        const page = fs.readFileSync(path.join(ENG, "denoise.html"), "utf8"), scope = (page.match(/<p class="scope" id="scope">([\s\S]*?)<\/p>/) || [, ""])[1];
+        ok("!! ...and the page's scope note widens exactly as section 131 allowed: the path tracer page's six scenes, section 132 cited, the furnace named, no other material, light or sky",
+            /path tracer page's own six\s+scenes/.test(scope) && /section 132/.test(scope) && /furnace/.test(scope) && /any other material, light or sky/.test(scope));
+    } else ok("!! section 132 reads render/denoise-results-page.json, and it is not there", false);
 }
 
 console.log("\n15. THE UPSCALE ROUND: HALF SIZE + FSR1 AGAINST THE FRAMES IT COULD BE INSTEAD (pre-registration section 81)");

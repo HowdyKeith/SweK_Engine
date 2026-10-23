@@ -2508,10 +2508,10 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "denoise-pathtracer-page-scenes",
-        blocker: "OPEN",
-        what: "The shipped pair on path-tracer.html's own six scenes (furnace, gradient, pair, enclosed, rough, rough with compensation). ROUND 58 (pre-registration section 131) is that round: family P, the page's SCENES evaluated from its own text, its camera and its default depth; one test set of six, one hypothesis, C1 at 5 of 6. Its harvest is committed before it is read, and section 132 is its verdict.",
-        how: "node tools/denoiseStudy.mjs --harvest-page -> render/denoise-results-page.json. Six images, one picture twice (furnace and enclosed render the same reference), and a smallest sign-flip p of 1/64.",
-        why: "Section 127 split it off denoise-mesh-other-materials: the page's scenes are diagnostic, not a family to sample, and needed their own design.",
+        blocker: "CLOSED",
+        what: "DONE as round 58 (pre-registration sections 131-132): on path-tracer.html's own six scenes, as the page draws them, the shipped network beat the shipped filter -- mean d 0.480, 5 of 6, sign-flip p 0.031 against 0.05, SUPPORTED. The page's scope note says so, and names the furnace, where both methods made the 4-sample input slightly worse.",
+        how: "Family P (the page's SCENES evaluated from its text), SPLITS_PAGE 52000-52005, --harvest-page -> render/denoise-results-page.json, committed before it was read (b50b3bd9); render/denoiseStudy-selfcheck.mjs section 14c re-derives it. The support rests on four images (rough, gradient, pair, roughcomp); the furnace and enclosed, one picture lit two ways, are ties.",
+        why: "Section 127 split it off denoise-mesh-other-materials; the backlog named the page's scenes beside C's materials.",
     },
     {
         id: "denoise-trained-on-mesh",

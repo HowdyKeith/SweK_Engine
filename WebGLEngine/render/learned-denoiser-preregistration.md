@@ -8984,3 +8984,51 @@ touched them. C5 holds over the 18 render seeds.
 - It refuses if the file exists.
 - It runs here, in minutes.
 - The file is committed byte for byte before it is read, and section 132 reads it.
+
+## 132. ROUND 58 -- THE VERDICT: H1 SUPPORTED. THE SHIPPED NETWORK BEATS THE SHIPPED FILTER ON path-tracer.html's OWN SIX SCENES
+
+**What arrived.** `render/denoise-results-page.json` (sha-256 `a3ac73d1...`). It was written by
+`tools/denoiseStudy.mjs --harvest-page` at a32550c1, the commit carrying section 131's code, and committed byte for byte
+(b50b3bd9) before it was read. The shipped file it ran is section 79's (`f1a84d47...`). It took 39 s to render and 5 s to
+measure.
+
+**The run is reported. Every control held.**
+- **C1, at 5 of 6:** the network and the filter each beat the noisy input on 5 of 6. Each lost once, on the furnace.
+- **C2:** cited from round 11.
+- **C3:** no image within 2 x of its floor.
+- **C4:** the forward pass twice, bit for bit.
+- **C5:** 18 distinct render seeds.
+
+| scene (seed) | d | noisy | network | filter | floor |
+|---|---|---|---|---|---|
+| rough (52000) | **0.833** | 1.22e-1 | 4.63e-3 | 1.07e-2 | 9.6e-4 |
+| roughcomp (52001) | 0.489 | 7.17e-2 | 3.63e-3 | 5.92e-3 | 5.5e-4 |
+| furnace (52002) | -0.012 | 4.87e-3 | 5.20e-3 | 5.14e-3 | 2.9e-5 |
+| gradient (52003) | 0.807 | 4.53e-2 | 1.71e-3 | 3.83e-3 | 3.4e-4 |
+| pair (52004) | 0.741 | 3.95e-2 | 2.11e-3 | 4.43e-3 | 3.2e-4 |
+| enclosed (52005) | 0.021 | 3.87e-3 | 3.49e-3 | 3.57e-3 | 3.3e-5 |
+
+- **H1: mean d 0.480, 5 of 6 won, sign-flip p 0.031 against 0.05: SUPPORTED.**
+- The sign test is reported, not tested: p 0.109.
+
+**So the page's scope note widens, as section 131 allowed.** It now says the shipped network beat the filter on the path
+tracer page's own six scenes as that page draws them. It names the furnace, where both methods made the input worse, and
+it still says nothing of any other material, light or sky.
+
+**What the six say, beyond the verdict.**
+- **The wins are on the four scenes that are not flat:** rough, gradient, pair and roughcomp, by about 2-2.3 x in relMSE.
+- **The furnace and enclosed are ties.** They are the one picture lit two ways, as section 131 said. On the furnace both
+  methods are a hair WORSE than the 4-sample input: the network 5.20e-3 and the filter 5.14e-3 against the input's
+  4.87e-3. A flat grey disc in a white sky leaves nothing to denoise, and smoothing it only adds error. The test held,
+  but those two images decide nothing.
+- So the support rests on four images. With six, the smallest p is 1/64, and this one is 2/64. Section 131 said so before
+  any image existed.
+
+**The predictions.**
+- **P1 held:** C1 held.
+- **P2 FAILED.** I predicted H1 would not hold, because these are sky-lit validation scenes unlike the training families.
+  It held, by margins (0.74-0.83 on three scenes) larger than section 80's M.
+- **P3 is half right.** The largest win is on rough, as predicted, but roughcomp's (0.489) is only fourth, below gradient
+  and pair.
+
+**What it does not change.** No kernel, table, weight or filter changes, only the page's note.
