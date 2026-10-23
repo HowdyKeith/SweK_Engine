@@ -24,6 +24,13 @@
 // static thrust that fades linearly to zero at 90 m/s (thrust = 4000 * throttle * max(0, 1 - V/90)). Wings, tail and fin all stall (aeroSurface.STALL: 15 degrees to separate, 8 to finish). From those numbers:
 // stall speed ~26.5 m/s, trim at 45 m/s needs 3.0 degrees of pitch and 0.66 throttle, the top level speed is ~52 m/s.
 //
+// *** THE JET (unnumbered). *** The same module also flies JET_TRAINER, a light jet trainer of an L-39-class number set (every number invented, in that class), because a spec can now say three things the trainer's does not: spec.engine = { kind: "jet", ... } (a thrust that does NOT fade with speed:
+// thrustMax x (idle + (1 - idle) spool) x (rho / rho0)^0.8 x (1 - 0.35 Mach), where `spool` is the engine's own state -- the throttle after a first-order lag of 1.5 s, carried on the flight state, defaulting to the throttle itself for a state that has none, as a trim's or a hand-built one does);
+// spec.atmosphere = "isa" (the lift, the drag and the engine fly in physics/mechanics/atmosphereISA.mjs's air at the aircraft's own height, and the Mach number is its speed over that height's speed of sound); and spec.machCrit / spec.waveCoeff (a drag-area rise of wing area x 20 (M - 0.78)^4 past the
+// critical Mach number, Lock's fourth-power law). THE TRAINER SAYS NONE OF THIS, and flies as it always did, TO THE BIT (the gate holds a 1,200-tick flight in wind to the number it had before). trim() takes an `altitude` (500 m by default; only a jet's trim depends on it).
+// WHAT THE JET DOES NOT HAVE, SAID PLAINLY: no compressibility effect on the lift or on the control surfaces (no Prandtl-Glauert, no shock stall, no Mach tuck: the airframe's top speed is thrust-limited at Mach 0.6 and never reaches the drag rise), no afterburner, no engine failure, no flaps or slats (so the
+// landing speed is the clean stall speed plus a margin, 70 m/s and not 45), no ground roll (the same first-contact-ends-the-flight ground), no air above 11,000 m, and a thrust that is the same for every Mach number at a height except the linear fade.
+//
 // WHAT IS NOT IN IT, SAID PLAINLY (each is a thing a better model has, and none of them is hidden by a gate that happens to pass): no air-density change with altitude (the trainer flies the lowest few hundred
 // metres), no dihedral effect (a slip does not roll the wings), no fuselage lift or side force, no downwash or prop wash on the tail, no flaps, no gyroscopic or torque effect from the engine, the thrust line
 // passes through the centre of mass (no thrust-pitch coupling), and no ground model beyond classification: the first contact ENDS the flight as a touchdown or a crash (below). Takeoff and landing rolls are a later
@@ -41,6 +48,7 @@ import { createBody, step, createAccumulator, applyForceAtPoint, worldToBody, ro
 import { applySurfaceForce, STALL } from "./aeroSurface.mjs";
 import { createAircraft, mixControls, withDeflection } from "./aircraftAssembly.mjs";
 import { FLAT, asTerrain } from "./terrain.mjs";
+import { atmosphere } from "./atmosphereISA.mjs";
 
 export const GRAVITY = 9.80665, DT = 1 / 60;
 export { STALL };
@@ -57,7 +65,27 @@ export const TRAINER = Object.freeze({
     touchdown: Object.freeze({ maxSink: 3, maxBank: 15 * Math.PI / 180, minPitch: -10 * Math.PI / 180, maxPitch: 15 * Math.PI / 180, maxSlope: 5 * Math.PI / 180 }),   // maxSlope INVENTED: wheels down on ground steeper than this are a crash, not a touchdown
 });
 
-export const AIR_DENSITY = 1.225;   // the value aeroSurface.mjs uses; flightModel6dof does not vary it (see the header)
+/**
+ * A LIGHT JET TRAINER (an L-39-class number set; EVERY NUMBER IS INVENTED to be in that class, none is fitted to an aircraft, and the gate holds them only to the closed forms they produce): 4,500 kg, a 18.8 m^2 wing of aspect ratio 4.7, a tail sized for a tail volume of about 0.4,
+ * a 16.9 kN engine. The engine is the JET law (see the header): thrust that does not die with speed, thins with the air, takes `spoolTime` to answer the throttle, and falls off with Mach number. It flies in the ISA troposphere (physics/mechanics/atmosphereISA.mjs) and
+ * its drag rises past the critical Mach number. Stall is the same flat-plate stall the trainer has (15 degrees to separate), which at this wing loading is a stall speed of about 60 m/s at 1,000 m (the elevator runs out a metre per second sooner, at 61 m/s at sea level);
+ * level flight is possible from there to about 194 m/s at sea level (Mach 0.57: thrust meets drag, well under the critical Mach number) and from 83 to 198 m/s at 6,000 m. MEASURED, in the gate.
+ */
+export const JET_TRAINER = Object.freeze({
+    name: "jet trainer", mass: 4500, inertia: Object.freeze([5200, 9500, 13500]),
+    airframe: Object.freeze({
+        wingSpanHalf: 2.35, wingArea: 9.4, wingAspectRatio: 4.7, wingClAlpha: 4.5, tailMountX: -5.6, tailArea: 3.2, tailAspectRatio: 3.2, tailClAlpha: 3.8, rudderArea: 2.0,
+        elevatorMaxDeflection: 0.4, aileronMaxDeflection: 0.15, rudderMaxDeflection: 0.4,   // the aileron is cut to 0.15 rad: at 140 m/s the trainer's 0.4 rolls a jet at 550 degrees a second (steady roll rate = effectiveness x deflection x V / the wing's arm)
+    }),
+    wingIncidence: 0.035, stall: STALL, parasiteArea: 0.12, thrustMax: 16900, thrustPoint: Object.freeze([-2, 0, 0]),
+    engine: Object.freeze({ kind: "jet", idle: 0.04, spoolTime: 1.5, densityExp: 0.8, machDecay: 0.35 }),   // INVENTED: idle thrust 4% of full, a 1.5 s first-order spool, thrust ~ density^0.8, losing 35% of itself per Mach number
+    atmosphere: "isa", machCrit: 0.78, waveCoeff: 20,   // INVENTED: the drag-divergence Mach number, and Lock's fourth-power law for the rise past it: CdA += wing area x 20 (M - Mcrit)^4
+    wheels: Object.freeze([[3.2, 0, -1.6], [-0.4, 1.7, -1.6], [-0.4, -1.7, -1.6]]),
+    hull: Object.freeze([[0, 4.7, 0], [0, -4.7, 0], [-6.5, 0, 0.4], [4.0, 0, 0.2]]),
+    touchdown: Object.freeze({ maxSink: 3.5, maxBank: 12 * Math.PI / 180, minPitch: -8 * Math.PI / 180, maxPitch: 14 * Math.PI / 180, maxSlope: 5 * Math.PI / 180 }),
+});
+
+export const AIR_DENSITY = 1.225;   // the value aeroSurface.mjs uses; the trainer does not vary it (see the header) and a model with spec.atmosphere "isa" (the jet) does
 
 /** Build a flight model from an airframe spec (default TRAINER). Returns { spec, aircraft, mass, inertia, weight }. The aircraft is aircraftAssembly's four surfaces with the wing incidence set and every surface given the stall. */
 export function createFlightModel(spec = TRAINER) {
@@ -79,20 +107,41 @@ export function sanitize(c = {}) {
 const deflectionsOf = (model, c) => mixControls(model.aircraft, { pitch: -c.pitch, roll: -c.roll, yaw: -c.yaw });
 export function surfaceDeflections(model, controls) { return deflectionsOf(model, sanitize(controls)); }
 
+/** The extra drag area (m^2) of a model whose spec has a critical Mach number: wing area x waveCoeff x (M - Mcrit)^4 past it (Lock's fourth-power law), 0 for a model without one and below it. `air` is atmosphere() at the aircraft's height. */
+function waveArea(model, V, air) {
+    const spec = model.spec;
+    if (!(spec.machCrit > 0) || !air) return 0;
+    const M = V / air.a; if (!(M > spec.machCrit)) return 0;
+    return model.aircraft.surfaces.leftWing.area * 2 * spec.waveCoeff * Math.pow(M - spec.machCrit, 4);
+}
+
+/**
+ * The engine's thrust (N) at a throttle, an airspeed and a height. The PROPELLER law (a spec without an `engine`; the trainer): thrustMax x throttle x (1 - V / propSpeed), a thrust that dies at propSpeed. The JET law (spec.engine.kind "jet"):
+ *   thrustMax x (idle + (1 - idle) x spool) x (rho / rho0)^densityExp x max(0, 1 - machDecay x M),
+ * where `spool` is the engine's own state (state.spool, 0..1: the throttle after a first-order lag of spoolTime seconds) and defaults to the throttle itself when the state has none -- a trim, or a state a caller built by hand, is a steady state. M = V / a at the height.
+ */
+function thrustOf(spec, throttle, V, air, spool) {
+    const e = spec.engine;
+    if (!e || e.kind !== "jet") return spec.thrustMax * throttle * Math.max(0, 1 - V / spec.propSpeed);
+    const a = air || atmosphere(0), s = spool === undefined ? throttle : spool;
+    return spec.thrustMax * (e.idle + (1 - e.idle) * s) * Math.pow(a.rho / AIR_DENSITY, e.densityExp) * Math.max(0, 1 - e.machDecay * (V / a.a));
+}
+
 /** The force and moment sum for ALREADY-SANITISED controls. trim() calls this directly: it must be able to ask for a throttle of 1.13 to learn that a speed is out of reach, which the clamp would hide. */
 function evaluate(model, state, c, windWorld) {
     const spec = model.spec, defl = deflectionsOf(model, c), acc = createAccumulator();
-    const air = [state.vel[0] - windWorld[0], state.vel[1] - windWorld[1], state.vel[2] - windWorld[2]], vb = worldToBody(state.q, air), perSurface = {};
+    const wind = [state.vel[0] - windWorld[0], state.vel[1] - windWorld[1], state.vel[2] - windWorld[2]], vb = worldToBody(state.q, wind), perSurface = {};
+    const air = spec.atmosphere === "isa" ? atmosphere(state.pos[2]) : null, rho = air ? air.rho : AIR_DENSITY;   // the trainer holds the sea-level density; a model that says "isa" flies in the standard atmosphere at its own height
     for (const name of Object.keys(model.aircraft.surfaces)) {
         const s = withDeflection(model.aircraft.surfaces[name], defl[name]), r = cross3(state.w, s.mount);
-        perSurface[name] = applySurfaceForce(acc, [vb[0] + r[0], vb[1] + r[1], vb[2] + r[2]], s);
+        perSurface[name] = applySurfaceForce(acc, [vb[0] + r[0], vb[1] + r[1], vb[2] + r[2]], s, rho);
     }
     const V = Math.hypot(vb[0], vb[1], vb[2]);
-    if (V > 1e-6) { const k = -0.5 * AIR_DENSITY * V * spec.parasiteArea; applyForceAtPoint(acc, [k * vb[0], k * vb[1], k * vb[2]], [0, 0, 0]); }
-    const thrust = spec.thrustMax * c.throttle * Math.max(0, 1 - V / spec.propSpeed);
+    if (V > 1e-6) { const k = -0.5 * rho * V * (spec.parasiteArea + waveArea(model, V, air)); applyForceAtPoint(acc, [k * vb[0], k * vb[1], k * vb[2]], [0, 0, 0]); }
+    const thrust = thrustOf(spec, c.throttle, V, air, state.spool);
     applyForceAtPoint(acc, [thrust, 0, 0], spec.thrustPoint);
     applyForceAtPoint(acc, worldToBody(state.q, [0, 0, -state.mass * GRAVITY]), [0, 0, 0]);   // the state's own mass: the same one the integrator divides by
-    return { acc, perSurface, airspeed: V, thrust };
+    return { acc, perSurface, airspeed: V, thrust, mach: air ? V / air.a : null };
 }
 
 /**
@@ -166,6 +215,8 @@ export function stepFlight(model, state, controls, dt = DT, windWorld = [0, 0, 0
     const before = classify(model, state, terrain);
     if (before.status !== "airborne") return { state, ...before };
     const next = step(state, forcesAndMoments(model, state, controls, windWorld).acc, dt);
+    const e = model.spec.engine;
+    if (e && e.kind === "jet") { const t = sanitize(controls).throttle, s0 = state.spool === undefined ? t : state.spool; next.spool = s0 + (t - s0) * (1 - Math.exp(-dt / e.spoolTime)); }   // the engine's answer to the throttle: a state that has none starts AT the throttle
     return { state: next, ...classify(model, next, terrain) };
 }
 
@@ -176,9 +227,9 @@ export function stepFlight(model, state, controls, dt = DT, windWorld = [0, 0, 0
  * moment. Returns { speed, gamma, pitchAttitude, alpha, pitch, throttle, residual: [Fx, Fz, My], converged, feasible }: `pitch` is the stick (+ = back), `feasible` is converged with the throttle in 0..1, the
  * stick within +-1 and the wing below its stall angle -- an aircraft below its stall speed has a "solution" the aircraft cannot hold.
  */
-export function trim(model, speed, { gamma = 0 } = {}) {
+export function trim(model, speed, { gamma = 0, altitude = 500 } = {}) {   // `altitude` matters only to a model that flies in the standard atmosphere (the jet): the trainer's trim is the same at every height
     const resid = (x) => {
-        const s = createState({ pos: [0, 0, 500], speed, pitch: x[0], gamma, mass: model.mass, inertia: model.inertia }), f = evaluate(model, s, { pitch: x[1], roll: 0, yaw: 0, throttle: x[2] }, [0, 0, 0]).acc;
+        const s = createState({ pos: [0, 0, altitude], speed, pitch: x[0], gamma, mass: model.mass, inertia: model.inertia }), f = evaluate(model, s, { pitch: x[1], roll: 0, yaw: 0, throttle: x[2] }, [0, 0, 0]).acc;
         return [f.force[0], f.force[2], f.torque[1]];
     };
     let x = [gamma + 0.05, 0, 0.6], converged = false;
@@ -211,6 +262,10 @@ export function reportLines() {
     const m = createFlightModel(), lines = [`[flightModel6dof] ${m.spec.name}: ${m.mass} kg, ${(m.aircraft.surfaces.leftWing.area * 2).toFixed(0)} m^2 of wing, ${m.spec.thrustMax} N static thrust, weight ${m.weight.toFixed(0)} N`];
     for (const V of [30, 38, 45, 52]) { const t = trim(m, V); lines.push(`  trim ${V} m/s: pitch ${(t.pitchAttitude * 180 / Math.PI).toFixed(2)} deg  stick ${t.pitch.toFixed(3)}  throttle ${t.throttle.toFixed(3)}  ${t.feasible ? "feasible" : "NOT feasible"}`); }
     lines.push(`  top level speed ${maxLevelSpeed(m).toFixed(1)} m/s`);
+    const j = createFlightModel(JET_TRAINER), a0 = atmosphere(0), slow = (() => { let lo = 40, hi = 120; for (let i = 0; i < 40; i++) { const mid = (lo + hi) / 2; if (trim(j, mid, { altitude: 1000 }).feasible) hi = mid; else lo = mid; } return hi; })(), top = maxLevelSpeed(j, 100, 300);
+    lines.push(`[flightModel6dof] ${j.spec.name}: ${j.mass} kg, ${(j.aircraft.surfaces.leftWing.area * 2).toFixed(0)} m^2 of wing, ${j.spec.thrustMax} N static thrust (a jet: it does not fade with speed, it thins with the air), weight ${j.weight.toFixed(0)} N`);
+    for (const V of [100, 140, 180]) { const t = trim(j, V, { altitude: 1000 }); lines.push(`  jet trim ${V} m/s at 1,000 m: pitch ${(t.pitchAttitude * 180 / Math.PI).toFixed(2)} deg  stick ${t.pitch.toFixed(3)}  throttle ${t.throttle.toFixed(3)}  ${t.feasible ? "feasible" : "NOT feasible"}`); }
+    lines.push(`  jet level flight from ${slow.toFixed(1)} m/s to ${top.toFixed(1)} m/s (Mach ${(top / a0.a).toFixed(2)} at the top, at 500 m)`);
     return lines;
 }
 
