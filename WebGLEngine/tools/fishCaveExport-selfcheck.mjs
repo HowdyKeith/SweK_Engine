@@ -147,15 +147,23 @@ class _Mat:
         _write({"call": "get_annotation_count", "table": table_name, "version": version}); return _fix["tables"][table_name]["count"]
     def get_table_metadata(self, table_name, datastack_name=None, version=None, log_warning=True):
         _write({"call": "get_table_metadata", "table": table_name, "version": version}); t = _fix["tables"][table_name]
-        return {"schema": t["schema"], "description": "stand-in table " + table_name, "voxel_resolution": [8, 8, 30]}
-    def query_table(self, table, limit=None, split_positions=False, materialization_version=None, metadata=True, filter_in_dict=None, **kw):
-        _write({"call": "query_table", "table": table, "limit": limit, "split_positions": split_positions, "version": materialization_version, "metadata": metadata, "filter_in_dict": filter_in_dict})
-        rows = list(_fix["tables"][table]["rows"])
+        md = {"schema": t["schema"], "description": "stand-in table " + table_name, "voxel_resolution": t.get("voxel_resolution", [8, 8, 30])}
+        if _fix.get("no_voxel"): del md["voxel_resolution"]
+        return md
+    def query_table(self, table, limit=None, split_positions=False, materialization_version=None, metadata=True, filter_in_dict=None, select_columns=None, offset=None, random_sample=None, **kw):
+        _write({"call": "query_table", "table": table, "limit": limit, "split_positions": split_positions, "version": materialization_version, "metadata": metadata, "filter_in_dict": filter_in_dict, "select_columns": select_columns, "offset": offset, "random_sample": random_sample})
+        if table == _fix["datastack_info"].get("synapse_table") and _fix.get("query_synapses"):
+            rows = [{"id": 100000 + i, "pre_pt_root_id": a, "post_pt_root_id": b, "size": size} for i, (a, b, size) in enumerate(_fix["synapses"])]
+        else:
+            rows = list(_fix["tables"][table]["rows"])
         for col, vals in (filter_in_dict or {}).items():
             if rows and col not in rows[0]: raise ValueError("column %s is not in table %s" % (col, table))   # what the server answers for a column the table does not have
             rows = [r for r in rows if r.get(col) in set(vals)]
+        if random_sample: rows = rows[::max(1, len(rows) // random_sample)][:random_sample]
+        if offset: rows = rows[offset:]
         if limit is not None: rows = rows[:limit]
-        cols = list(rows[0].keys()) if rows else []
+        cols = list(select_columns) if select_columns else (list(rows[0].keys()) if rows else [])
+        if select_columns: rows = [{c: r.get(c) for c in cols} for r in rows]
         return _df(rows, cols)
     def synapse_query(self, pre_ids=None, post_ids=None, materialization_version=None, remove_autapses=True, include_zeros=True, limit=None, split_positions=False, metadata=True, **kw):
         _write({"call": "synapse_query", "pre_ids": pre_ids, "post_ids": post_ids, "version": materialization_version, "remove_autapses": remove_autapses, "include_zeros": include_zeros, "limit": limit, "split_positions": split_positions, "metadata": metadata})
@@ -356,11 +364,11 @@ sec("7. no token anywhere");
 sec("8. the real library");
 {
     const st = run(["selftest-signatures"], {});
-    ok("!! `selftest-signatures` FAILS (exit 1, a FAIL line a probe) against a library that lacks what the script calls: the stand-in has no materializationengine, infoservice or auth modules (12 of the 14 probes FAIL; the two constructor probes bind to the stand-in's own), and the report says so instead of passing", st.status === 1 && (st.stdout.match(/^FAIL /gm) || []).length === 12 && (st.stdout.match(/^ok /gm) || []).length === 2);
-    if (!hasMod(REAL, "caveclient")) note("NOT CHECKED HERE: no Python with caveclient installed (set FISH_CAVE_PYTHON to one). `selftest-signatures` binds every keyword the script passes to the installed library's signatures; it was run once by hand against caveclient 8.2.1, 14 of 14 ok (13 of 13 before the label lookup's filter_in_dict probe was added), and is recorded in this file's header.");
+    ok("!! `selftest-signatures` FAILS (exit 1, a FAIL line a probe) against a library that lacks what the script calls: the stand-in has no materializationengine, infoservice or auth modules (14 of the 16 probes FAIL; the two constructor probes bind to the stand-in's own), and the report says so instead of passing", st.status === 1 && (st.stdout.match(/^FAIL /gm) || []).length === 14 && (st.stdout.match(/^ok /gm) || []).length === 2);
+    if (!hasMod(REAL, "caveclient")) note("NOT CHECKED HERE: no Python with caveclient installed (set FISH_CAVE_PYTHON to one). `selftest-signatures` binds every keyword the script passes to the installed library's signatures; it was run once by hand against caveclient 8.2.1, 16 of 16 ok (13 of 13 before the label lookup's filter_in_dict probe, 14 of 14 before the giants pager and sampler), and is recorded in this file's header.");
     else {
         const r = spawnSync(REAL, [SCRIPT, "selftest-signatures"], { encoding: "utf8", env: { ...process.env, PYTHONPATH: "" } });
-        ok("!! `selftest-signatures` BINDS EVERY KEYWORD THE SCRIPT PASSES TO THE INSTALLED caveclient'S SIGNATURES (the client constructor, synapse_query, query_table with and without filter_in_dict, get_tables, get_table_metadata, get_annotation_count, most_recent_version, get_timestamp, get_datastacks, get_datastack_info, get_new_token, save_token): the only contact this gate has with the real library", r.status === 0 && (r.stdout.match(/^ok /gm) || []).length === 14 && !/FAIL/.test(r.stdout), r.stdout.trim().split("\n").length + " probes");
+        ok("!! `selftest-signatures` BINDS EVERY KEYWORD THE SCRIPT PASSES TO THE INSTALLED caveclient'S SIGNATURES (the client constructor, synapse_query, query_table with and without filter_in_dict and paged or sampled with select_columns, get_tables, get_table_metadata, get_annotation_count, most_recent_version, get_timestamp, get_datastacks, get_datastack_info, get_new_token, save_token): the only contact this gate has with the real library", r.status === 0 && (r.stdout.match(/^ok /gm) || []).length === 16 && !/FAIL/.test(r.stdout), r.stdout.trim().split("\n").length + " probes");
     }
 }
 
@@ -406,6 +414,94 @@ sec("10. the labels and the summary (the cells GIVEN with --root-ids, as the fir
     ok("and a size that is NOT zero is summed as before (the ordinary fixture: 1001>2001 600) with no size warning", csvRows(L, "edges.csv").find((r) => r.pre_root_id === "1001" && r.post_root_id === "2001").total_size === "600" && !man.warnings.some((w) => /size column/.test(w)));
     ok("!! A SEARCH THAT FOUND THE CELLS DOES NOT LOOK THEM UP AGAIN: the default export (the regexp search) makes exactly the three scan queries (soma, cell_types, notes) and no filtered one, and still writes labels.csv with its row_json and a cells_summary.json for the two cells it found",
         rx.log.filter((c) => c.call === "query_table").length === 3 && rx.log.filter((c) => c.call === "query_table").every((c) => !c.filter_in_dict) && fs.existsSync(path.join(X, "cells_summary.json")) && JSON.parse(rd(X, "cells_summary.json")).cells.map((c) => c.rootId).join() === "1001,1002" && Object.keys(csvRows(X, "labels.csv")[0]).join() === "root_id,table,text_columns,row_json" && JSON.parse(rd(X, "cells_summary.json")).labelLookup === null);
+}
+
+sec("11. the big-neuron finder (giants): a fixture with a mirror pair, a fragment, a lone giant and a small pair");
+{
+    // CELLS, in micrometres (front-back x 20..576, left-right y 10..184, top-bottom z 10..80); the midline is y = 100 (18 cells below it, 18 at or above, the first of the upper 18 AT 100)
+    const cells = [[1101, 400, 140, 51, 30], [1102, 402, 60, 51, 28], [1104, 300, 150, 39, 33], [1105, 100, 130, 21, 5], [1106, 101, 70, 21, 4]];
+    for (let k = 0; k < 15; k++) cells.push([2001 + k, 520 + 4 * k, 100 + 6 * k, 10 + 5 * k, 2]);   // the high side (2001 sits on the midline)
+    for (let k = 0; k < 16; k++) cells.push([2101 + k, 20 + 2 * k, 10 + 5 * k, 15 + 4 * k, 2]);       // the low side
+    const somaRows = cells.map(([root, x, y, z], i) => ({ id: 500 + i, pt_root_id: root, cell_type: i % 3 === 0 ? "exc" : i % 3 === 1 ? "inh" : "na", pt_position_x: x * 1000 / 8, pt_position_y: y * 1000 / 8, pt_position_z: z * 1000 / 30 }));
+    const G = []; let frag = 900000;
+    for (const [root, , , , d] of cells) for (let k = 0; k < d; k++) G.push([frag++, root, 1]);
+    for (let k = 0; k < 35; k++) G.push([frag++, 1103, 1]);          // a fragment with the most inputs of all: no soma, so never a cell
+    for (let k = 0; k < 3; k++) G.push([1101, 990001, 1]);           // 1101 sends three synapses to another fragment
+    G.push([1101, 1101, 1]); G.push([1101, 0, 1]); G.push([0, 1104, 1]);   // an autapse and two root-id-0 synapses: never counted
+    const GFIX = { datastacks: ["fish1_giants"], version: 77, timestamp: "2026-10-01T00:00:00+00:00", query_synapses: true,
+        datastack_info: { synapse_table: "synapses", viewer_resolution_x: 16, viewer_resolution_y: 16, viewer_resolution_z: 30 },
+        tables: { synapses: { count: G.length, schema: "synapse", rows: [], voxel_resolution: [16, 16, 30] }, somas: { count: somaRows.length, schema: "cell_type_local", rows: somaRows, voxel_resolution: [8, 8, 30] } }, synapses: G };
+    const total = G.length, topRoots = [1104, 1101, 1102, 1105, 1106, 2001, 2002, 2003];
+    const gArgs = (out, extra = []) => ["giants", "--datastack", "fish1_giants", "--out", out, "--chunk-rows", "80", "--top", "8", ...extra];
+    writeFixture(GFIX);
+    const A = outDir("giants"), ra = run(gArgs(A), { env: E }); watch(ra, A);
+    const top = csvRows(A, "giants_top.csv"), prs = csvRows(A, "giants_pairs.csv"), map = JSON.parse(rd(A, "soma_map.json")), man = JSON.parse(rd(A, "MANIFEST.json"));
+    const tq = ra.log.filter((c) => c.call === "query_table"), pages = tq.filter((c) => c.table === "synapses"), sq = ra.log.filter((c) => c.call === "synapse_query");
+    ok("!! THE PASS READS ONLY WHAT IT COUNTS, A PAGE AT A TIME: the soma table once, whole (the scan limit, split positions, no column selection); the synapse table in pages of 80 with ONLY the pre and post root-id columns, offsets 0, 80, 160 (the last page short, so the pass stops: " + total + " rows, 3 pages), no random sample, at the one version (77); then exactly two synapse queries for the eight top cells (post_ids, then pre_ids, in rank order)",
+        ra.status === 0 && tq.filter((c) => c.table === "somas").length === 1 && tq.find((c) => c.table === "somas").select_columns === null && tq.find((c) => c.table === "somas").limit === 300000 && tq.find((c) => c.table === "somas").split_positions === true
+        && pages.length === 3 && pages.map((c) => c.offset).join() === "0,80,160" && pages.every((c) => c.limit === 80 && c.select_columns.join() === "pre_pt_root_id,post_pt_root_id" && c.random_sample === null && c.version === 77) && total > 160 && total <= 240
+        && sq.length === 2 && sq[0].post_ids.join() === topRoots.join() && sq[0].pre_ids === null && sq[1].pre_ids.join() === topRoots.join() && sq[1].post_ids === null, `${total} rows`);
+    ok("!! THE RANKING IS THE CELLS WITH A SOMA, BY SYNAPSES RECEIVED: 1104 (33), 1101 (30), 1102 (28), 1105 (5), 1106 (4), then the smallest ids among the cells with 2 (2001, 2002, 2003) -- the fragment 1103, which has 35 inputs and no soma, is not there; the autapse and the two root-id-0 synapses are in no count; 1101's three outgoing synapses make its out_degree 3",
+        top.map((r) => r.root_id).join() === topRoots.join() && top.map((r) => r.in_degree).join() === "33,30,28,5,4,2,2,2" && !top.some((r) => r.root_id === "1103") && top.find((r) => r.root_id === "1101").out_degree === "3" && top.find((r) => r.root_id === "1104").out_degree === "0" && top.map((r) => r.rank).join() === "1,2,3,4,5,6,7,8");
+    const r1102 = top.find((r) => r.root_id === "1102");
+    ok("!! THE SOMA IS WHERE THE FIXTURE PUT IT, IN MICROMETRES FROM THE SOMA TABLE'S 8 x 8 x 30 nm VOXELS (not the synapse table's 16 x 16 x 30): 1102 at (402, 60, 51) um, its type from the table, the viewer position in the datastack's viewer voxels (16 x 16 x 30 nm: 25125, 3750, 1700), and the side of the midline",
+        Math.abs(Number(r1102.soma_x_um) - 402) < 0.06 && Math.abs(Number(r1102.soma_y_um) - 60) < 0.06 && Math.abs(Number(r1102.soma_z_um) - 51) < 0.06 && r1102.viewer_x === "25125" && r1102.viewer_y === "3750" && r1102.viewer_z === "1700" && r1102.side_of_midline === "below-midline" && top.find((r) => r.root_id === "1101").side_of_midline === "above-midline" && ["exc", "inh", "na"].includes(r1102.cell_type));
+    ok("!! THE AXES COME FROM THE SOMAS' SPREAD AND NOTHING ELSE: x is the longest (front-back), y the middle (left-right), z the shortest (top-bottom); the midline is the median of the somas along y, 100 um (the first of the upper eighteen), said with where it came from; 36 cells with a soma, their types counted, the soma voxel size 8 x 8 x 30 nm",
+        map.frontBack === "x" && map.leftRight === "y" && map.topBottom === "z" && map.midlineUm === 100 && /median of the somas/.test(map.midlineSource) && map.somas === 36 && map.cellTypes.exc + map.cellTypes.inh + map.cellTypes.na === 36 && map.somaVoxelNm.join() === "8,8,30");
+    ok("!! THE PAIRS ARE THE MIRROR IMAGES: (1101, 1102) first -- opposite sides of y = 100, 40 um from it each, 2 um apart front-back and top-bottom, 28 of 30 synapses, mirror error 2 -- then (1105, 1106) (4 of 5, error 1); the lone giant 1104 and the cell on the midline (2001) are in no pair; and each cell's mirror_partner column says it",
+        prs.length === 2 && prs[0].rootA === "1101" && prs[0].rootB === "1102" && prs[0].minIn === "28" && prs[0].maxIn === "30" && Math.abs(Number(prs[0].mirrorErrorUm) - 2) < 1e-9 && prs[1].rootA === "1105" && prs[1].rootB === "1106" && prs[1].minIn === "4" && Math.abs(Number(prs[1].mirrorErrorUm) - 1) < 1e-9
+        && top.find((r) => r.root_id === "1101").mirror_partner === "1102" && top.find((r) => r.root_id === "1102").mirror_partner === "1101" && top.find((r) => r.root_id === "1104").mirror_partner === "" && top.find((r) => r.root_id === "2001").mirror_partner === "");
+    const idx = (root) => G.map((x, i) => [x, i]).filter(([x]) => x[1] === root && x[0] !== 0 && x[0] !== root).map(([, i]) => i);   // the indices of the synapses INTO a cell
+    const ii = idx(1102), d = ii[ii.length - 1] - ii[0];
+    ok("!! THE EXACT PASS GIVES EACH TOP CELL'S EXTENT FROM ITS SYNAPSES' POSITIONS in the SYNAPSE table's voxels (16 x 16 x 30 nm): 1102's 28 inputs are rows " + ii[0] + ".." + ii[ii.length - 1] + " and the stand-in puts them at x 5000 + 5i, y 6000 + i, z 700 + 7i, so the box is 5d x d x 7d voxels, " + (5 * d * 16 / 1000).toFixed(2) + " x " + (d * 16 / 1000).toFixed(2) + " x " + (7 * d * 30 / 1000).toFixed(2) + " um",
+        r1102.partners_in === "28" && Math.abs(Number(r1102.extent_x_um) - Math.round(5 * d * 16 / 10) / 100) < 0.011 && Math.abs(Number(r1102.extent_y_um) - Math.round(d * 16 / 10) / 100) < 0.011 && Math.abs(Number(r1102.extent_z_um) - Math.round(7 * d * 30 / 10) / 100) < 0.011, `d = ${d}`);
+    ok("the manifest lists the files and what was read: giants_top.csv, giants_pairs.csv, soma_map.json, giants_counts.json, README.txt with their hashes (recomputed here); the whole table was read (" + total + " of " + total + " rows, 100%), the pass finished, and no partial counts file is left in the folder",
+        ["giants_top.csv", "giants_pairs.csv", "soma_map.json", "giants_counts.json", "README.txt"].every((f) => man.files.some((e) => e.name === f && e.sha256 === sha(path.join(A, f)))) && man.rowsRead === total && man.tableRows === total && man.coveragePercent === 100 && man.finished === true && man.mode === "pages" && !fs.existsSync(path.join(A, "giants_counts.partial.json")) && man.warnings.length === 0 && JSON.parse(rd(A, "giants_counts.json")).counts.some(([r, i, o]) => r === 1104 && i === 33 && o === 0));
+    // the options
+    const M60 = outDir("g_mid"), rm = run(gArgs(M60, ["--midline", "60"]), { env: E }); watch(rm, M60);
+    const T1 = outDir("g_tol"), rt = run(gArgs(T1, ["--pair-tol", "1"]), { env: E }); watch(rt, T1);
+    ok("!! --midline AND --pair-tol MOVE THE PAIRS: with the midline at 60 um (1102 is ON it, 1106 is above it) neither pair has two sides; with --pair-tol 1 the pair that mirrors to 2 um is dropped and the one that mirrors to 1 um stays; the midline is then said to be the one given",
+        csvRows(M60, "giants_pairs.csv").length === 0 && JSON.parse(rd(M60, "soma_map.json")).midlineUm === 60 && /--midline/.test(JSON.parse(rd(M60, "soma_map.json")).midlineSource) && csvRows(T1, "giants_pairs.csv").map((r) => r.rootA + "+" + r.rootB).join() === "1105+1106");
+    const C = outDir("g_chunk"), rc = run(gArgs(C).map((x) => (x === "80" ? String(total) : x)), { env: E }); watch(rc, C);
+    ok("!! A PAGE SIZE THAT DIVIDES THE TABLE EXACTLY ENDS ON AN EMPTY PAGE AND GIVES THE SAME ANSWER: with the page size equal to the " + total + " rows there are two pages (offsets 0 and " + total + ", the second empty) and giants_top.csv is byte for byte the 80-row run's; one page of a million rows gives it too",
+        rc.log.filter((c) => c.call === "query_table" && c.table === "synapses").map((c) => c.offset).join() === `0,${total}` && rd(C, "giants_top.csv") === rd(A, "giants_top.csv") && (() => { const O = outDir("g_one"), ro = run(gArgs(O).map((x) => (x === "80" ? "1000000" : x)), { env: E }); watch(ro, O); return ro.log.filter((c) => c.call === "query_table" && c.table === "synapses").length === 1 && rd(O, "giants_top.csv") === rd(A, "giants_top.csv"); })());
+    // a pass that stops, and picks up again
+    const P1 = outDir("g_part"), rp = run(gArgs(P1, ["--pages", "1"]), { env: E }); watch(rp, P1);
+    const mp = JSON.parse(rd(P1, "MANIFEST.json")), partial = path.join(P1, "giants_counts.partial.json");
+    ok("!! A PASS THAT WAS STOPPED SAYS SO AND LEAVES WHAT IT COUNTED: with --pages 1 the manifest and the console carry 'THE PASS DID NOT FINISH' with the rows read (80 of " + total + ") and the --resume line, the manifest says finished false and the coverage, and giants_counts.partial.json is in the folder with the offset 80",
+        rp.status === 0 && mp.finished === false && mp.rowsRead === 80 && mp.warnings.some((w) => /THE PASS DID NOT FINISH: 80 of/.test(w) && /--resume/.test(w)) && /THE PASS DID NOT FINISH/.test(rp.stdout) && fs.existsSync(partial) && JSON.parse(fs.readFileSync(partial, "utf8")).offset === 80 && Math.abs(mp.coveragePercent - 100 * 80 / total) < 1e-9);
+    const keep = path.join(work, "kept_partial.json"); fs.copyFileSync(partial, keep);
+    const R = outDir("g_resume"), rr = run(gArgs(R, ["--resume", keep]), { env: E }); watch(rr, R);
+    ok("!! --resume ADDS TO WHAT WAS COUNTED AND GIVES THE FULL RUN'S ANSWER: the pages it reads start at offset 80 (80, 160), giants_top.csv and giants_pairs.csv are byte for byte the uninterrupted run's, and the manifest says it resumed and finished",
+        rr.status === 0 && rr.log.filter((c) => c.call === "query_table" && c.table === "synapses").map((c) => c.offset).join() === "80,160" && rd(R, "giants_top.csv") === rd(A, "giants_top.csv") && rd(R, "giants_pairs.csv") === rd(A, "giants_pairs.csv") && JSON.parse(rd(R, "MANIFEST.json")).options.resume === true && JSON.parse(rd(R, "MANIFEST.json")).finished === true);
+    const bad = JSON.parse(fs.readFileSync(keep, "utf8")); bad.version = 76; const badf = path.join(work, "bad_partial.json"); fs.writeFileSync(badf, JSON.stringify(bad));
+    const RB = outDir("g_resume_bad"), rrb = run(gArgs(RB, ["--resume", badf]), { env: E }), RM = outDir("g_resume_missing"), rrm = run(gArgs(RM, ["--resume", path.join(work, "nope.json")]), { env: E });
+    ok("!! A RESUME FILE FROM ANOTHER SNAPSHOT IS REFUSED (counts of version 76 cannot be added to version 77's), and a file that is not there is refused by name: each exit 2, no synapse page read",
+        rrb.status === 2 && /another snapshot|cannot be added to/.test(rrb.stderr) && /version 76/.test(rrb.stderr) && rrm.status === 2 && /--resume could not read/.test(rrm.stderr) && rrb.log.filter((c) => c.call === "query_table" && c.table === "synapses").length === 0);
+    const SM = outDir("g_sample"), rs = run(gArgs(SM, ["--sample", "100"]), { env: E }); watch(rs, SM);
+    const ms = JSON.parse(rd(SM, "MANIFEST.json")), sp = rs.log.filter((c) => c.call === "query_table" && c.table === "synapses");
+    ok("!! --sample N IS ONE RANDOM-SAMPLE QUERY AND NO PAGING: a single synapse-table query with random_sample 100 and no offset, the two root-id columns, the manifest says mode sample, and the exact pass for the top cells is still made",
+        rs.status === 0 && sp.length === 1 && sp[0].random_sample === 100 && sp[0].offset === null && sp[0].select_columns.join() === "pre_pt_root_id,post_pt_root_id" && ms.mode === "sample" && ms.options.sample === 100 && rs.log.filter((c) => c.call === "synapse_query").length === 2 && csvRows(SM, "giants_top.csv").length === 8);
+    // refusals and warnings
+    const r0 = run(["giants", "--out", outDir("g_nods")], { env: E }), r1 = run(["giants", "--datastack", "fish1_giants", "--top", "1", "--out", outDir("g_top1")], { env: E }), r2 = run(["giants", "--datastack", "fish1_giants", "--chunk-rows", "0", "--out", outDir("g_chunk0")], { env: E });
+    const r3 = run(gArgs(outDir("g_limit"), ["--scan-max-rows", "10"]), { env: E });
+    ok("!! THE REFUSALS ARE BY NAME, BEFORE ANY PAGE IS READ: no --datastack, --top 1, --chunk-rows 0 and a soma table over --scan-max-rows each exit 2 with the reason (the last names the table and its 36 rows) and read no synapse page",
+        r0.status === 2 && /giants needs --datastack/.test(r0.stderr) && r1.status === 2 && /--top must be at least 2/.test(r1.stderr) && r2.status === 2 && /--chunk-rows must be at least 1/.test(r2.stderr) && r3.status === 2 && /soma table somas has 36 rows, over --scan-max-rows 10/.test(r3.stderr) && [r0, r1, r2, r3].every((r) => r.log.filter((c) => c.call === "query_table" && c.table === "synapses").length === 0));
+    const nf = JSON.parse(JSON.stringify(GFIX)); nf.no_voxel = true; writeFixture(nf);
+    const NV = outDir("g_novoxel"), rn = run(gArgs(NV), { env: E }), NV2 = outDir("g_voxel2"), rn2 = run(gArgs(NV2, ["--soma-voxel-nm", "16,16,60"]), { env: E }); watch(rn2, NV2);
+    ok("!! A SOMA TABLE WHOSE VOXEL SIZE IS NOT KNOWN IS NOT GUESSED AT: exit 2 naming the table and the override, and with --soma-voxel-nm 16,16,60 the positions are exactly twice what 8,8,30 gave (1102 at 804 x 120 x 102 um)",
+        rn.status === 2 && /voxel size of the soma table somas is not known/.test(rn.stderr) && /--soma-voxel-nm/.test(rn.stderr) && rn2.status === 0 && Math.abs(Number(csvRows(NV2, "giants_top.csv").find((r) => r.root_id === "1102").soma_x_um) - 804) < 0.06 && Math.abs(Number(csvRows(NV2, "giants_top.csv").find((r) => r.root_id === "1102").soma_y_um) - 120) < 0.06);
+    const sf = JSON.parse(JSON.stringify(GFIX)); sf.tables.synapses.count = total * 10; writeFixture(sf);
+    const SH = outDir("g_short"), rh = run(gArgs(SH), { env: E }); watch(rh, SH);
+    ok("!! A SERVER THAT PAGES FEWER ROWS THAN THE TABLE HOLDS IS SAID TO: with the table claiming " + total * 10 + " rows and serving " + total + ", the warning gives the rows read, the count and the percentage and calls the counts lower bounds, in the manifest and on the console, with coverage 10%",
+        rh.status === 0 && JSON.parse(rd(SH, "MANIFEST.json")).warnings.some((w) => new RegExp(`only ${total} of ${total * 10} rows were read \\(10\\.0%\\).*lower bounds`).test(w)) && /WARNING: only/.test(rh.stdout) && Math.abs(JSON.parse(rd(SH, "MANIFEST.json")).coveragePercent - 10) < 1e-9);
+    writeFixture(GFIX);
+    const TR = outDir("g_trunc"), rtr = run(gArgs(TR, ["--max-rows", "3"]), { env: E }); watch(rtr, TR);
+    ok("the exact pass over the top cells flags a query that hit --max-rows as TRUNCATED, as export does: with a limit of 3 the synapses into the top cells (many) and the synapses out of them (exactly 3, 1101's) both hit it, two warnings in the manifest and the run still finishes; with the ordinary limit neither does (the run above has no warning)", rtr.status === 0 && JSON.parse(rd(TR, "MANIFEST.json")).warnings.filter((w) => /^TRUNCATED:/.test(w)).length === 2);
+    const PD = REAL !== PY || hasMod(PY, "pandas") ? outDir("g_pandas") : null;
+    if (PD && hasMod(REAL, "pandas")) { const rpd = run(gArgs(PD), { env: E, py: REAL, pandas: true }); watch(rpd, PD); ok("!! WITH REAL pandas DataFrames THE PASS COUNTS THE SAME: giants_top.csv, giants_pairs.csv and giants_counts.json are byte for byte the plain stand-in's (the column read is df[name].tolist(), not a row at a time)", rpd.status === 0 && ["giants_top.csv", "giants_pairs.csv", "giants_counts.json"].every((f) => rd(PD, f) === rd(A, f))); }
+    else note("NOT CHECKED HERE: giants with real pandas DataFrames (no Python with pandas; set FISH_CAVE_PYTHON).");
+    writeFixture(FIXTURE);
 }
 
 try { fs.rmSync(work, { recursive: true, force: true }); } catch (e) { /* the temp folder is only scratch */ }

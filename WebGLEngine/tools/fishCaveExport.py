@@ -46,10 +46,11 @@ import json
 import os
 import re
 import sys
+import time
 from collections import Counter
 
 TOOL = "fishCaveExport"
-VERSION = "2"
+VERSION = "3"
 DEFAULT_SERVER = "https://global.brain-wire-test.org"
 DEFAULT_MATCH = r"mauthner|\bm[- ]?cell\b"
 DEFAULT_SCAN_MAX_ROWS = 300000
@@ -57,6 +58,7 @@ DEFAULT_MAX_PARTNERS = 40
 DEFAULT_MAX_ROWS = 5000000
 CITATION = "Petkova, M. D., Januszewski, M., et al. (2025). A connectomic resource for neural cataloguing and circuit dissection of the larval zebrafish brain. bioRxiv."
 SAMPLE_ROWS = 5
+PRE_ROOT, POST_ROOT = "pre_pt_root_id", "post_pt_root_id"
 
 
 class Refusal(Exception):
@@ -92,6 +94,14 @@ def kw_query_table_in(version, limit, column, ids):
     return kw
 
 
+def kw_query_table_page(version, limit, offset, columns):
+    return {"select_columns": list(columns), "limit": int(limit), "offset": int(offset), "materialization_version": version, "metadata": False}
+
+
+def kw_query_table_sample(version, n, columns):
+    return {"select_columns": list(columns), "random_sample": int(n), "materialization_version": version, "metadata": False}
+
+
 def kw_get_tables(version):
     return {"version": version}
 
@@ -112,6 +122,8 @@ def signature_probes():
         ("caveclient.materializationengine.MaterializationClient", "synapse_query", kw_synapse_query(1, 10, pre_ids=[1], post_ids=[2])),
         ("caveclient.materializationengine.MaterializationClient", "query_table", dict(kw_query_table(1, 10), table="t")),
         ("caveclient.materializationengine.MaterializationClient", "query_table", dict(kw_query_table_in(1, 10, "pt_root_id", [1]), table="t")),
+        ("caveclient.materializationengine.MaterializationClient", "query_table", dict(kw_query_table_page(1, 10, 0, ["a", "b"]), table="t")),
+        ("caveclient.materializationengine.MaterializationClient", "query_table", dict(kw_query_table_sample(1, 10, ["a", "b"]), table="t")),
         ("caveclient.materializationengine.MaterializationClient", "get_tables", kw_get_tables(1)),
         ("caveclient.materializationengine.MaterializationClient", "get_table_metadata", dict(kw_table_metadata(1), table_name="t")),
         ("caveclient.materializationengine.MaterializationClient", "get_annotation_count", dict(kw_annotation_count(1), table_name="t")),
@@ -604,6 +616,255 @@ def cmd_export(args):
     return 0
 
 
+
+# ---- giants: the big-neuron finder ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# WHY. fish1_full names no cell type but exc / inh / na, so the Mauthner cells cannot be searched for BY NAME. They can be searched for by what they ARE: one of the largest dendritic trees of the hindbrain, one on each side of the midline, mirror images of
+# each other. This reads the soma table (a root id that has a soma is a cell and not a fragment), counts in one pass over the whole synapse table the synapses that arrive on and leave each of those cells, ranks them, looks at the top ones again with
+# positions (how far apart their synapses sit), and lists the pairs of big cells that mirror each other across the midline. IT IS A HEURISTIC: it gives candidates to look at in the viewer, at coordinates it prints, and not an answer.
+def column_ints(df, name):
+    """One column of a query result as a list of python ints (None for 0 and for a missing value), without turning a million-row frame into a million dictionaries."""
+    if hasattr(df, "columns") and hasattr(df, "__getitem__"):
+        return [as_int(v) for v in df[name].tolist()]
+    return [as_int(r.get(name)) for r in rows_of(df)]
+
+
+def soma_points(rows, resolution):
+    """The cells that have a soma: { root id: { id, cell_type, um: [x, y, z] in micrometres } } -- the first soma row of a root, the position scaled by the SOMA table's voxel size (not the synapse table's)."""
+    cells = {}
+    for r in rows:
+        root = as_int(r.get("pt_root_id"))
+        if root is None or root in cells:
+            continue
+        try:
+            um = [float(r["pt_position_" + a]) * float(resolution[k]) / 1000.0 for k, a in enumerate("xyz")]
+        except (KeyError, TypeError, ValueError, IndexError):
+            continue
+        cells[root] = {"id": r.get("id"), "cell_type": r.get("cell_type"), "um": um}
+    return cells
+
+
+def percentile(sorted_values, q):
+    if not sorted_values:
+        return None
+    i = min(len(sorted_values) - 1, max(0, int(round(q * (len(sorted_values) - 1)))))
+    return sorted_values[i]
+
+
+def axis_roles(points):
+    """Which axis is which, from the spread of the somas alone: the LONGEST is front-to-back, the MIDDLE one is left-to-right, the SHORTEST is the section axis (top-to-bottom). The spread is the 1st to the 99th percentile, so a stray cell does not move it. Returns (roles, report)."""
+    spans = []
+    for k in range(3):
+        v = sorted(p[k] for p in points)
+        lo, hi = percentile(v, 0.01), percentile(v, 0.99)
+        spans.append({"axis": "xyz"[k], "lowUm": lo, "highUm": hi, "spanUm": hi - lo, "medianUm": percentile(v, 0.5)})
+    order = sorted(range(3), key=lambda k: -spans[k]["spanUm"])
+    roles = {"frontBack": order[0], "leftRight": order[1], "topBottom": order[2]}
+    return roles, {"axes": spans, "frontBack": "xyz"[order[0]], "leftRight": "xyz"[order[1]], "topBottom": "xyz"[order[2]]}
+
+
+def mirror_pairs(cands, roles, midline, tol):
+    """The pairs among `cands` ({root, um, inDegree}) that are mirror images across the midline: on opposite sides of it, at the same front-to-back and top-to-bottom position within `tol` micrometres, and equally far from the midline within `tol`.
+    Ranked by the smaller input count of the two (a pair is as big as its smaller cell), then by how well they mirror."""
+    fb, lr, tb = roles["frontBack"], roles["leftRight"], roles["topBottom"]
+    pairs = []
+    for i in range(len(cands)):
+        for j in range(i + 1, len(cands)):
+            a, b = cands[i], cands[j]
+            da, db = a["um"][lr] - midline, b["um"][lr] - midline
+            if da * db >= 0:
+                continue
+            err = max(abs(a["um"][fb] - b["um"][fb]), abs(da + db), abs(a["um"][tb] - b["um"][tb]))
+            if err > tol:
+                continue
+            lo, hi = sorted((a["inDegree"], b["inDegree"]))
+            pairs.append({"rootA": a["root"], "rootB": b["root"], "minIn": lo, "maxIn": hi, "ratio": (lo / hi) if hi else 0.0, "mirrorErrorUm": round(err, 2)})
+    pairs.sort(key=lambda p: (-p["minIn"], p["mirrorErrorUm"], p["rootA"], p["rootB"]))
+    return pairs
+
+
+def count_degrees(mat, table, version, args, wanted, state, folder):
+    """One pass over the synapse table, a page of --chunk-rows rows at a time, only the two root-id columns, counting for each cell in `wanted` (the roots that have a soma) the synapses that arrive on it and leave it (autapses and root id 0 left out).
+    `state` is { counts: { root: [in, out] }, offset, rows, done }. After every page the counts are written to giants_counts.partial.json in the output folder, so a pass that dies can be picked up with --resume."""
+    t0, pages = time.time(), 0
+    cols = [PRE_ROOT, POST_ROOT]
+    while True:
+        if args.pages and pages >= args.pages:
+            break
+        df = mat.query_table(table, **kw_query_table_page(version, args.chunk_rows, state["offset"], cols))
+        pre, post = column_ints(df, PRE_ROOT), column_ints(df, POST_ROOT)
+        n = len(pre)
+        counts = state["counts"]
+        for a, b in zip(pre, post):
+            if a is None or b is None or a == b:
+                continue
+            if b in wanted:
+                counts.setdefault(b, [0, 0])[0] += 1
+            if a in wanted:
+                counts.setdefault(a, [0, 0])[1] += 1
+        state["offset"] += n
+        state["rows"] += n
+        pages += 1
+        write_partial(folder, state, args, version)
+        say("page %d: rows %d to %d of about %s (%.1f%%), %d cells counted, %.0f s" % (pages, state["offset"] - n, state["offset"], fmt(state["total"]), 100.0 * state["offset"] / state["total"] if state.get("total") else 0.0, len(counts), time.time() - t0))
+        if n < args.chunk_rows:
+            state["done"] = True
+            break
+    return state
+
+
+def write_partial(folder, state, args, version):
+    with open(os.path.join(folder.path, "giants_counts.partial.json"), "w", encoding="utf-8") as f:
+        json.dump({"datastack": args.datastack, "version": version, "table": state["table"], "offset": state["offset"], "rows": state["rows"], "counts": {str(k): v for k, v in state["counts"].items()}}, f)
+
+
+def read_resume(path, args, version, table):
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            d = json.load(f)
+    except (OSError, ValueError) as e:
+        raise Refusal("--resume could not read %s (%s)" % (path, type(e).__name__))
+    if d.get("datastack") != args.datastack or d.get("version") != version or d.get("table") != table:
+        raise Refusal("--resume file is for datastack %r version %r table %r, not %r version %r table %r: counts from another snapshot cannot be added to" % (d.get("datastack"), d.get("version"), d.get("table"), args.datastack, version, table))
+    return {"counts": {int(k): list(v) for k, v in d["counts"].items()}, "offset": int(d["offset"]), "rows": int(d["rows"]), "done": False, "table": table}
+
+
+def cmd_giants(args):
+    server = check_server(args.server)
+    if not args.datastack:
+        raise Refusal("giants needs --datastack <name> (run `discover` first to see the names)")
+    if args.top < 2:
+        raise Refusal("--top must be at least 2")
+    if args.chunk_rows < 1:
+        raise Refusal("--chunk-rows must be at least 1")
+    out = Folder(args.out or "fish1_giants_" + now_utc().strftime("%Y%m%dT%H%M%SZ"))
+    client = make_client(args, args.datastack)
+    mat = client.materialize
+    version = args.version if args.version is not None else mat.most_recent_version()
+    stamp = fmt(mat.get_timestamp(version))
+    info = client.info.get_datastack_info(datastack_name=args.datastack)
+    syn_table = args.synapse_table or info.get("synapse_table")
+    if not syn_table:
+        raise Refusal("the datastack names no synapse table; give --synapse-table")
+    say("datastack %s, materialization version %s (%s), synapse table %s" % (args.datastack, version, stamp, syn_table))
+    # 1. the cells that have a soma
+    n_soma = mat.get_annotation_count(args.soma_table, **kw_annotation_count(version))
+    if n_soma is None or n_soma > args.scan_max_rows:
+        raise Refusal("the soma table %s has %s rows, over --scan-max-rows %d; raise it" % (args.soma_table, n_soma, args.scan_max_rows))
+    resolution = None
+    if args.soma_voxel_nm:
+        resolution = [float(x) for x in args.soma_voxel_nm.split(",")]
+    else:
+        try:
+            resolution = list(mat.get_table_metadata(args.soma_table, **kw_table_metadata(version)).get("voxel_resolution") or [])
+        except Exception:
+            resolution = None
+    if not resolution or len(resolution) != 3:
+        raise Refusal("the voxel size of the soma table %s is not known; give --soma-voxel-nm 8,8,30 (what its table description says)" % args.soma_table)
+    soma_rows = rows_of(mat.query_table(args.soma_table, **kw_query_table(version, args.scan_max_rows)))
+    cells = soma_points(soma_rows, resolution)
+    if len(cells) < 10:
+        raise Refusal("only %d cells with a soma were read from %s (columns pt_root_id, pt_position_x/y/z are needed)" % (len(cells), args.soma_table))
+    say("%d cells have a soma (%s, voxel %s nm)" % (len(cells), args.soma_table, "x".join(fmt(x) for x in resolution)))
+    roles, geometry = axis_roles([c["um"] for c in cells.values()])
+    lr = roles["leftRight"]
+    midline = args.midline if args.midline is not None else geometry["axes"][lr]["medianUm"]
+    geometry.update({"midlineUm": midline, "midlineSource": "--midline" if args.midline is not None else "the median of the somas along the left-right axis", "somas": len(cells),
+                     "cellTypes": dict(Counter(str(c["cell_type"]) for c in cells.values())), "somaVoxelNm": resolution})
+    say("axes from the somas: front-back %s, left-right %s (midline %.1f um), top-bottom %s" % (geometry["frontBack"], geometry["leftRight"], midline, geometry["topBottom"]))
+    # 2. the pass over the synapse table
+    total = mat.get_annotation_count(syn_table, **kw_annotation_count(version))
+    wanted = set(cells)
+    if args.resume:
+        state = read_resume(args.resume, args, version, syn_table)
+        say("resuming at row %d with %d cells already counted" % (state["offset"], len(state["counts"])))
+    else:
+        state = {"counts": {}, "offset": args.start_offset, "rows": 0, "done": False, "table": syn_table}
+    state["total"] = total
+    mode = "sample" if args.sample else "pages"
+    if args.sample:
+        df = mat.query_table(syn_table, **kw_query_table_sample(version, args.sample, [PRE_ROOT, POST_ROOT]))
+        pre, post = column_ints(df, PRE_ROOT), column_ints(df, POST_ROOT)
+        for a, b in zip(pre, post):
+            if a is None or b is None or a == b:
+                continue
+            if b in wanted:
+                state["counts"].setdefault(b, [0, 0])[0] += 1
+            if a in wanted:
+                state["counts"].setdefault(a, [0, 0])[1] += 1
+        state["rows"] = state["offset"] = len(pre)
+        state["done"] = True
+    else:
+        count_degrees(mat, syn_table, version, args, wanted, state, out)
+    coverage = (100.0 * state["rows"] / total) if total else None
+    if not state["done"]:
+        out.warnings.append("THE PASS DID NOT FINISH: %d of about %s rows were read (--pages %d stopped it); the counts are of those rows only. Resume with --resume %s" % (state["rows"], fmt(total), args.pages, os.path.join(out.path, "giants_counts.partial.json")))
+        say("WARNING: " + out.warnings[-1])
+    elif not args.sample and total and state["rows"] < 0.99 * total:
+        out.warnings.append("only %d of %s rows were read (%.1f%%): the server paged fewer rows than the table holds; the counts are lower bounds" % (state["rows"], fmt(total), coverage))
+        say("WARNING: " + out.warnings[-1])
+    # 3. rank, then look at the top again with positions
+    ranked = sorted((r for r in state["counts"] if r in cells), key=lambda r: (-state["counts"][r][0], r))
+    top = ranked[:args.top]
+    rows_in, rows_out, pre_c, post_c = [], [], None, None
+    if top:
+        q_in = mat.synapse_query(**kw_synapse_query(version, args.max_rows, post_ids=top))
+        q_out = mat.synapse_query(**kw_synapse_query(version, args.max_rows, pre_ids=top))
+        rows_in, rows_out = rows_of(q_in), rows_of(q_out)
+        for q, label in ((rows_in, "synapses into the top cells"), (rows_out, "synapses out of the top cells")):
+            if len(q) >= args.max_rows:
+                out.warnings.append("TRUNCATED: %s returned the --max-rows limit of %d; raise --max-rows" % (label, args.max_rows))
+                say("WARNING: " + out.warnings[-1])
+        pre_c, post_c = pre_post_columns(columns_of(q_in) or columns_of(q_out))
+    try:
+        syn_res = list(mat.get_table_metadata(syn_table, **kw_table_metadata(version)).get("voxel_resolution") or [])
+    except Exception:
+        syn_res = []
+    cands = []
+    for rank, root in enumerate(top, 1):
+        c = cells[root]
+        summ = cell_summary(root, rows_out, rows_in, pre_c, post_c, {}, syn_res) if top else None
+        box = (summ or {}).get("synapseBox") or {}
+        cands.append({"rank": rank, "root": root, "soma": c, "um": c["um"], "inDegree": state["counts"][root][0], "outDegree": state["counts"][root][1], "exactIn": summ["synapsesIn"], "exactOut": summ["synapsesOut"],
+                      "partnersIn": summ["partnersIn"], "extentUm": box.get("extentMicrometres"), "side": "below-midline" if c["um"][lr] < midline else "above-midline"})
+    pairs = mirror_pairs(cands, roles, midline, args.pair_tol)
+    mate = {}
+    for pr in pairs:
+        mate.setdefault(pr["rootA"], pr["rootB"])
+        mate.setdefault(pr["rootB"], pr["rootA"])
+    vr = [info.get("viewer_resolution_" + a) for a in "xyz"]
+    def viewer(um):
+        return [round(um[k] * 1000.0 / float(vr[k])) if vr[k] else "" for k in range(3)]
+    top_rows = []
+    for c in cands:
+        ext = c["extentUm"] or ["", "", ""]
+        v = viewer(c["um"])
+        top_rows.append({"rank": c["rank"], "root_id": c["root"], "soma_id": c["soma"]["id"], "cell_type": c["soma"]["cell_type"], "soma_x_um": round(c["um"][0], 1), "soma_y_um": round(c["um"][1], 1), "soma_z_um": round(c["um"][2], 1),
+                         "viewer_x": v[0], "viewer_y": v[1], "viewer_z": v[2], "in_degree": c["inDegree"], "out_degree": c["outDegree"], "partners_in": c["partnersIn"], "extent_x_um": ext[0], "extent_y_um": ext[1], "extent_z_um": ext[2],
+                         "side_of_midline": c["side"], "mirror_partner": mate.get(c["root"], "")})
+    out.csv("giants_top.csv", ["rank", "root_id", "soma_id", "cell_type", "soma_x_um", "soma_y_um", "soma_z_um", "viewer_x", "viewer_y", "viewer_z", "in_degree", "out_degree", "partners_in", "extent_x_um", "extent_y_um", "extent_z_um", "side_of_midline", "mirror_partner"], top_rows)
+    out.csv("giants_pairs.csv", ["rootA", "rootB", "minIn", "maxIn", "ratio", "mirrorErrorUm"], pairs)
+    out.json("soma_map.json", geometry)
+    if state["done"] and os.path.exists(os.path.join(out.path, "giants_counts.partial.json")):   # a finished pass has its counts in giants_counts.json; a stopped one keeps the partial file for --resume
+        os.remove(os.path.join(out.path, "giants_counts.partial.json"))
+    out.json("giants_counts.json", {"datastack": args.datastack, "version": version, "table": syn_table, "mode": mode, "rowsRead": state["rows"], "tableRows": total, "counts": [[r, v[0], v[1]] for r, v in sorted(state["counts"].items())]})
+    out.text("README.txt", "Fish1 big-neuron finder (tools/fishCaveExport.py giants) of datastack %s at materialization version %s (%s).\n"
+             "giants_top.csv: the %d cells with a soma that receive the most synapses, with the soma position in micrometres and in viewer voxels (paste viewer_x, viewer_y, viewer_z into the viewer's position box), the synapses in and out counted over the synapse table, "
+             "the box their synapses sit in, and the mirror partner if there is one. giants_pairs.csv: pairs of those cells that mirror each other across the midline (ranked by the smaller input count). soma_map.json: how the axes and the midline were chosen. "
+             "giants_counts.json: every cell's counts. MANIFEST.json: sha256 of every file and the options. THIS IS A HEURISTIC: it lists candidates to look at in the viewer, it does not name the Mauthner cells. NO TOKEN IS IN ANY OF THESE FILES.\nCite: %s\n" % (args.datastack, version, stamp, len(top_rows), CITATION))
+    import caveclient
+    out.manifest({"command": "giants", "datastack": args.datastack, "server": server, "materializationVersion": version, "timestamp": stamp, "caveclient": getattr(caveclient, "__version__", None), "mode": mode,
+                  "options": {"top": args.top, "chunkRows": args.chunk_rows, "pages": args.pages, "sample": args.sample, "midline": args.midline, "pairTol": args.pair_tol, "somaTable": args.soma_table, "synapseTable": syn_table, "resume": bool(args.resume), "maxRows": args.max_rows},
+                  "rowsRead": state["rows"], "tableRows": total, "coveragePercent": coverage, "finished": state["done"]}, token_from_env())
+    say("\nTop cells by synapses received:")
+    for r in top_rows[:15]:
+        say("  %2d  root %s  in %5d  out %4d  soma (%.0f, %.0f, %.0f) um  viewer %s %s %s%s" % (r["rank"], r["root_id"], r["in_degree"], r["out_degree"], r["soma_x_um"], r["soma_y_um"], r["soma_z_um"], r["viewer_x"], r["viewer_y"], r["viewer_z"], ("  mirrors " + str(r["mirror_partner"])) if r["mirror_partner"] else ""))
+    say("\nMirror pairs (%d), biggest first:" % len(pairs))
+    for pr in pairs[:5]:
+        say("  %s and %s: %d and %d synapses in, mirror error %.1f um" % (pr["rootA"], pr["rootB"], pr["minIn"], pr["maxIn"], pr["mirrorErrorUm"]))
+    say("\nWrote %s/ (%d files). Upload giants_top.csv, giants_pairs.csv, soma_map.json and MANIFEST.json (giants_counts.json is large and not needed)." % (out.path, len(out.files) + 1))
+    return 0
+
+
 # ---- selftest-signatures --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 def cmd_selftest_signatures(args):
     import importlib
@@ -625,7 +886,7 @@ def cmd_selftest_signatures(args):
 
 def build_parser():
     p = argparse.ArgumentParser(prog="fishCaveExport.py", description="Export the Fish1 Mauthner circuit from the CAVE server. No token on the command line, ever.", add_help=True)
-    p.add_argument("command", choices=["token-help", "save-token", "discover", "export", "selftest-signatures"])
+    p.add_argument("command", choices=["token-help", "save-token", "discover", "export", "giants", "selftest-signatures"])
     p.add_argument("--server", default=DEFAULT_SERVER)
     p.add_argument("--datastack")
     p.add_argument("--out")
@@ -637,6 +898,17 @@ def build_parser():
     p.add_argument("--max-partners", dest="max_partners", type=int, default=DEFAULT_MAX_PARTNERS)
     p.add_argument("--max-rows", dest="max_rows", type=int, default=DEFAULT_MAX_ROWS)
     p.add_argument("--version", type=int)
+    p.add_argument("--soma-table", dest="soma_table", default="somas")
+    p.add_argument("--synapse-table", dest="synapse_table")
+    p.add_argument("--soma-voxel-nm", dest="soma_voxel_nm")
+    p.add_argument("--top", type=int, default=60)
+    p.add_argument("--chunk-rows", dest="chunk_rows", type=int, default=1000000)
+    p.add_argument("--pages", type=int, default=0)
+    p.add_argument("--start-offset", dest="start_offset", type=int, default=0)
+    p.add_argument("--sample", type=int, default=0)
+    p.add_argument("--resume")
+    p.add_argument("--midline", type=float)
+    p.add_argument("--pair-tol", dest="pair_tol", type=float, default=25.0)
     return p
 
 
@@ -648,9 +920,9 @@ def main(argv=None):
             return 2
     args = build_parser().parse_args(argv)
     try:
-        if args.command in ("token-help", "save-token", "discover", "export"):
+        if args.command in ("token-help", "save-token", "discover", "export", "giants"):
             args.server = check_server(args.server)   # once, here: every client below is built from the CHECKED address (no trailing slash, https)
-        return {"token-help": cmd_token_help, "save-token": cmd_save_token, "discover": cmd_discover, "export": cmd_export, "selftest-signatures": cmd_selftest_signatures}[args.command](args)
+        return {"token-help": cmd_token_help, "save-token": cmd_save_token, "discover": cmd_discover, "export": cmd_export, "giants": cmd_giants, "selftest-signatures": cmd_selftest_signatures}[args.command](args)
     except Refusal as e:
         print("fishCaveExport: %s" % e, file=sys.stderr)
         return 2
