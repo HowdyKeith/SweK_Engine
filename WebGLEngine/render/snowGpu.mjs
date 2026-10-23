@@ -35,6 +35,7 @@ import { SHADING_WGSL, projectSH } from "./snowShading.mjs";
 import { CASCADE_SHADOW_WGSL, fitCascades, CASCADE_COUNT, SPLITS } from "./cascades.mjs";
 import { TAA_WGSL, buildHalton } from "./taaResolve.mjs";
 import { ablateWgsl } from "./snowAblate.mjs";
+import { packWgsl, deformSampleWgsl, DEFORM_SAMPLER } from "./deformTexture.mjs";
 
 export const SKY_W = 64, SKY_H = 32, SHADOW_RES = 2048, FRAME_FLOATS = 188, POST_FAR = 9000;
 export const HDR_FORMAT = "rgba16float", DEPTH_FORMAT = "r32float";
@@ -102,6 +103,7 @@ struct Frame {
 @group(0) @binding(0) var<uniform> F: Frame;
 @group(0) @binding(1) var<storage, read> deformState: array<f32>;
 @group(0) @binding(2) var<storage, read> skyLut: array<f32>;
+${deformSampleWgsl(0, 8, 9)}
 const PI: f32 = 3.14159265359;
 const SKY_W: i32 = ${SKY_W};
 const SKY_H: i32 = ${SKY_H};
@@ -113,21 +115,8 @@ const SURFACE_WGSL = /* wgsl */ `
 ${NOISE_WGSL}
 ${FINE_NOISE_WGSL}
 ${FINE_TERRAIN_WGSL}
-fn stateAt(ix: i32, iy: i32) -> vec4f {
-    let r = i32(F.deform.w);
-    let x = ((ix % r) + r) % r;
-    let y = ((iy % r) + r) % r;
-    let o = u32((y * r + x) * 4);
-    return vec4f(deformState[o], deformState[o + 1u], deformState[o + 2u], deformState[o + 3u]);
-}
-fn textureSampleLevelWrap(uv: vec2f) -> vec4f {
-    let p = uv * F.deform.w - 0.5;
-    let b = floor(p);
-    let f = p - b;
-    let x0 = i32(b.x);
-    let y0 = i32(b.y);
-    return mix(mix(stateAt(x0, y0), stateAt(x0 + 1, y0), f.x), mix(stateAt(x0, y0 + 1), stateAt(x0 + 1, y0 + 1), f.x), f.y);
-}
+// v4896 -- the field is read through textureSampleLevelWrap, now a hardware bilinear over the rgba16float copy the pack pass makes each frame (render/deformTexture.mjs); it was a manual bilinear over the storage buffer,
+// four wrapped loads a tap. deformState above stays bound (the deform kernel and the pack pass read it) and the buffer path is the CPU twin's, bilinearWrapCpu.
 ${DEFORM_READ_WGSL}
 // the landform: ours (upstream bakes terrainMacro into a texture; this is a smaller field of the same kind, three octaves of the same noise)
 fn dunes(x: f32, z: f32) -> f32 {
@@ -622,6 +611,8 @@ export async function createSnowGpu(device, { canvas = null, format = "bgra8unor
     const shadowTex = Array.from({ length: CASCADE_COUNT }, (_, i) => tex([shadowRes, shadowRes], "depth32float", TU.RENDER_ATTACHMENT | TU.TEXTURE_BINDING | TU.COPY_SRC, "shadow map " + i));
     const detailTex = device.createTexture({ size: [DETAIL_RES, DETAIL_RES], format: "rgba16float", mipLevelCount: DETAIL_LEVELS, usage: TU.STORAGE_BINDING | TU.TEXTURE_BINDING | TU.COPY_SRC, label: "snow detail" });
     const detailSampler = device.createSampler({ addressModeU: "repeat", addressModeV: "repeat", magFilter: "linear", minFilter: "linear", mipmapFilter: "linear" });
+    // the deformation field as a filterable texture (render/deformTexture.mjs): written by the pack pass each frame, sampled with hardware bilinear and a repeat sampler by the vertex and fragment stages
+    const deformTex = device.createTexture({ size: [deformRes, deformRes], format: "rgba16float", usage: TU.STORAGE_BINDING | TU.TEXTURE_BINDING, label: "deform field f16" }), deformSampler = device.createSampler(DEFORM_SAMPLER);
     function makeTargets() {
         for (const t of [hdr, depthCol, sceneDepth, ...(hist || [])]) t && t.destroy();
         hdr = tex([W, H], HDR_FORMAT, TU.RENDER_ATTACHMENT | TU.TEXTURE_BINDING, "hdr"); depthCol = tex([W, H], DEPTH_FORMAT, TU.RENDER_ATTACHMENT | TU.TEXTURE_BINDING, "view depth");
@@ -634,6 +625,8 @@ export async function createSnowGpu(device, { canvas = null, format = "bgra8unor
         { binding: 0, visibility: SS.VERTEX | SS.FRAGMENT | SS.COMPUTE, buffer: { type: "uniform" } },
         { binding: 1, visibility: SS.VERTEX | SS.FRAGMENT | SS.COMPUTE, buffer: { type: "read-only-storage" } },
         { binding: 2, visibility: SS.VERTEX | SS.FRAGMENT | SS.COMPUTE, buffer: { type: "read-only-storage" } },
+        { binding: 8, visibility: SS.VERTEX | SS.FRAGMENT | SS.COMPUTE, texture: { sampleType: "float" } },
+        { binding: 9, visibility: SS.VERTEX | SS.FRAGMENT | SS.COMPUTE, sampler: { type: "filtering" } },
         ...(withShadow ? [3, 4, 5].map((b) => ({ binding: b, visibility: SS.FRAGMENT, texture: { sampleType: "depth" } })).concat([{ binding: 6, visibility: SS.FRAGMENT, texture: { sampleType: "float" } }, { binding: 7, visibility: SS.FRAGMENT, sampler: { type: "filtering" } }]) : []),
     ] });
     const bglShadow = bgl0(false), bglMain = bgl0(true);
@@ -647,6 +640,7 @@ export async function createSnowGpu(device, { canvas = null, format = "bgra8unor
     const skyPipe = device.createRenderPipeline({ layout: mainLayout, vertex: { module: bModule, entryPoint: "vsSky" }, fragment: { module: bModule, entryPoint: "fsSky", targets }, primitive: { topology: "triangle-list" }, depthStencil: { format: "depth32float", depthWriteEnabled: false, depthCompare: "always" } });
     const dumpPipe = device.createComputePipeline({ layout: device.createPipelineLayout({ bindGroupLayouts: [bglShadow, bglDump] }), compute: { module: vModule, entryPoint: "dumpTerrain" } });
     const deformPipe = device.createComputePipeline({ layout: "auto", compute: { module: device.createShaderModule({ code: KERNEL_WGSL }), entryPoint: "main" } });
+    const packPipe = device.createComputePipeline({ layout: "auto", compute: { module: device.createShaderModule({ code: packWgsl(deformRes), label: "deform pack" }), entryPoint: "main" } });
     const bakePipe = device.createComputePipeline({ layout: "auto", compute: { module: device.createShaderModule({ code: BAKE_KERNEL_WGSL }), entryPoint: "main" } });
     const mipPipe = device.createComputePipeline({ layout: "auto", compute: { module: device.createShaderModule({ code: MIP_KERNEL_WGSL }), entryPoint: "main" } });
     const detailBakePipe = device.createComputePipeline({ layout: "auto", compute: { module: device.createShaderModule({ code: DETAIL_BAKE_KERNEL_WGSL, label: "detail bake" }), entryPoint: "main" } }), detailMipPipe = device.createComputePipeline({ layout: "auto", compute: { module: device.createShaderModule({ code: DETAIL_MIP_KERNEL_WGSL }), entryPoint: "main" } });
@@ -655,9 +649,10 @@ export async function createSnowGpu(device, { canvas = null, format = "bgra8unor
     const presentPipe = (fmt) => device.createRenderPipeline({ layout: "auto", vertex: { module: presentModule, entryPoint: "vs" }, fragment: { module: presentModule, entryPoint: "fs", targets: [{ format: fmt }] }, primitive: { topology: "triangle-list" } });
     const presentCanvas = presentPipe(format), presentShot = presentPipe("rgba8unorm");
     // ---- bind groups
-    const mk0 = (i, withShadow) => device.createBindGroup({ layout: withShadow ? bglMain : bglShadow, entries: [{ binding: 0, resource: { buffer: frameBuf } }, { binding: 1, resource: { buffer: stateBuf[i] } }, { binding: 2, resource: { buffer: skyBuf } }, ...(withShadow ? [...shadowTex.map((t, i) => ({ binding: 3 + i, resource: t.createView() })), { binding: 6, resource: detailTex.createView() }, { binding: 7, resource: detailSampler }] : [])] });
+    const mk0 = (i, withShadow) => device.createBindGroup({ layout: withShadow ? bglMain : bglShadow, entries: [{ binding: 0, resource: { buffer: frameBuf } }, { binding: 1, resource: { buffer: stateBuf[i] } }, { binding: 2, resource: { buffer: skyBuf } }, { binding: 8, resource: deformTex.createView() }, { binding: 9, resource: deformSampler }, ...(withShadow ? [...shadowTex.map((t, i) => ({ binding: 3 + i, resource: t.createView() })), { binding: 6, resource: detailTex.createView() }, { binding: 7, resource: detailSampler }] : [])] });
     const mainBG = [mk0(0, true), mk0(1, true)], shadowBG = [mk0(0, false), mk0(1, false)];
     const deformBG = [0, 1].map((i) => device.createBindGroup({ layout: deformPipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: stateBuf[1 - i] } }, { binding: 1, resource: { buffer: deformU } }, { binding: 2, resource: { buffer: stateBuf[i] } }, { binding: 3, resource: { buffer: brushBuf } }] }));   // [i] reads state i, writes 1 - i
+    const packBG = [0, 1].map((i) => device.createBindGroup({ layout: packPipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: stateBuf[i] } }, { binding: 1, resource: deformTex.createView() }] }));
     const bakeBG = device.createBindGroup({ layout: bakePipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: skyBuf } }, { binding: 1, resource: { buffer: skyU } }] });
     const mipBG = mipU.map((u) => device.createBindGroup({ layout: mipPipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: skyBuf } }, { binding: 1, resource: { buffer: u } }] }));
     // the detail map: baked once on the GPU into level 0, then the box-filtered chain (trilinear in the fragment stage)
@@ -710,6 +705,8 @@ export async function createSnowGpu(device, { canvas = null, format = "bgra8unor
         // field step (writes the other buffer), then the sky if the sun moved
         { const cp = enc.beginComputePass({ timestampWrites: tw("deform") }); cp.setPipeline(deformPipe); cp.setBindGroup(0, deformBG[cur]); cp.dispatchWorkgroups(deformRes / 8, deformRes / 8); cp.end(); }
         cur = 1 - cur; field.endFrame();
+        // the field just stepped, copied into the texture the vertex and fragment stages sample (stateBuf[cur] now holds the latest)
+        { const pp = enc.beginComputePass({ timestampWrites: tw("deformPack") }); pp.setPipeline(packPipe); pp.setBindGroup(0, packBG[cur]); pp.dispatchWorkgroups(Math.ceil(deformRes / 8), Math.ceil(deformRes / 8)); pp.end(); }
         if (skyDirty) {
             device.queue.writeBuffer(skyU, 0, new Float32Array([sun[0], sun[1], sun[2], SUN_I, GB[0], GB[1], GB[2], SKY_W, SKY_H, 0, 0, 0]));
             const cp = enc.beginComputePass({ timestampWrites: tw("skyBake") }); cp.setPipeline(bakePipe); cp.setBindGroup(0, bakeBG); cp.dispatchWorkgroups(SKY_W / 8, SKY_H / 8); cp.end();

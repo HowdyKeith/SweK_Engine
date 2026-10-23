@@ -71,7 +71,7 @@ console.log("\n2b. THE PER-PASS LINE, AND THE PASS-TIMED LINE");
     ok("the size, shadow size, frame count and adapter are on it and parse back; a line that is not ours does not parse", p && p.width === 320 && p.height === 180 && p.shadowRes === 1024 && p.frames === 4 && p.adapter === "intel gen-9 D3D12" && parsePassLine("reading snowFrame: native 1x1") === null);
     const tl = timingLine(r, "x"), tp = parseTimingLine(tl);
     ok("a pass-timed run has no throughput (every frame waits on a buffer map), and its frame line says so rather than printing a number it did not measure", /throughput n\/a \(pass-timed\)/.test(tl) && tp && tp.throughput === null && tp.width === 320, tl.slice(0, 160));
-    ok("PASS_ORDER is the order snowGpu.mjs's frame writes its passes in (the source names them in that order)", (() => { const src = fs.readFileSync(path.join(ENG, "render", "snowGpu.mjs"), "utf8"); const at = ["tw(\"deform\")", "tw(\"skyBake\")", "tw(\"skyMip\" + l)", "tw(\"shadow\" + c)", "tw(\"beauty\")", "tw(\"taa\")", "tw(\"present\")"].map((x) => src.indexOf(x)); return at.every((v, k) => v > 0 && (k === 0 || v > at[k - 1])) && PASS_ORDER[0] === "deform" && PASS_ORDER[PASS_ORDER.length - 1] === "present"; })());
+    ok("PASS_ORDER is the order snowGpu.mjs's frame writes its passes in (the source names them in that order)", (() => { const src = fs.readFileSync(path.join(ENG, "render", "snowGpu.mjs"), "utf8"); const at = ["tw(\"deform\")", "tw(\"deformPack\")", "tw(\"skyBake\")", "tw(\"skyMip\" + l)", "tw(\"shadow\" + c)", "tw(\"beauty\")", "tw(\"taa\")", "tw(\"present\")"].map((x) => src.indexOf(x)); return at.every((v, k) => v > 0 && (k === 0 || v > at[k - 1])) && PASS_ORDER[0] === "deform" && PASS_ORDER[PASS_ORDER.length - 1] === "present"; })());
 }
 
 console.log("\n3. THE ORBIT IS THE PAGE'S");
@@ -140,8 +140,8 @@ if (skip) {
         ok("the reading line parses and carries this adapter's name", p && p.adapter === name && p.width === 160 && p.height === 90 && p.frames === 3, line.slice(0, 120));
         report(line);
         if (hasTs) {
-            const names = Object.keys(r.passes), need = ["deform", "shadow0", "shadow1", "shadow2", "beauty", "taa"];
-            ok("!! the per-pass GPU timers answered: every pass of the steady frame (deform, three shadow cascades, beauty, TAA) has a positive time in each of the 3 timed frames", need.every((n) => r.passes[n] && r.passes[n].length === 3 && r.passes[n].every((v) => v > 0)), names.join(","));
+            const names = Object.keys(r.passes), need = ["deform", "deformPack", "shadow0", "shadow1", "shadow2", "beauty", "taa"];
+            ok("!! the per-pass GPU timers answered: every pass of the steady frame (deform, the deform pack, three shadow cascades, beauty, TAA) has a positive time in each of the 3 timed frames", need.every((n) => r.passes[n] && r.passes[n].length === 3 && r.passes[n].every((v) => v > 0)), names.join(","));
             const pl = passLine(r, name, s.median), pp = parsePassLine(pl);
             ok("the pass line parses, names this adapter, and its sum is a real fraction of the frame (0 to 200%: timestamps and wall clock are different clocks, and a software rasteriser overlaps passes)", pp && pp.adapter === name && pp.sum > 0 && pp.share > 0 && pp.share < 200, pl.slice(0, 200));
             report(pl);

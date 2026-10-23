@@ -81,7 +81,7 @@ export async function timeFrames(device, { width = 320, height = 180, warmup = W
 }
 
 /** The order the frame runs its passes in, for printing; a name not listed (a future pass) sorts after these, alphabetically. */
-export const PASS_ORDER = Object.freeze(["deform", "skyBake", "skyMip1", "skyMip2", "skyMip3", "skyMip4", "shadow0", "shadow1", "shadow2", "beauty", "taa", "present"]);
+export const PASS_ORDER = Object.freeze(["deform", "deformPack", "skyBake", "skyMip1", "skyMip2", "skyMip3", "skyMip4", "shadow0", "shadow1", "shadow2", "beauty", "taa", "present"]);
 /**
  * GPU milliseconds per pass, from the per-pass timers: the MEDIAN of each pass over the frames it ran in (the sky bake runs only when the sun moves, so it is absent from a steady orbit), the sum of those medians,
  * and what share of the frame's wall-clock latency the sum is -- the rest is what the GPU timestamps do not see (queue gaps between passes, the buffer map, the CPU). One line a size:
