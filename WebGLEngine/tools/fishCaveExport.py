@@ -34,7 +34,8 @@
 #                    A PASS OVER ~30 MILLION ROWS TAKES ABOUT AN HOUR AND THE SERVER IS NOT ALWAYS UP FOR IT. Three things make that survivable:
 #                    1. a page the server fails on (HTTP 500/502/503/504/429, a dropped connection, a timeout) is asked for again after a pause (--retries 6, waiting --retry-wait 5 s, then 15, 45, ... at most --retry-max-wait 300 s);
 #                       the second failure in a row halves the page (down to --min-chunk-rows 50000). Nothing is counted from a page that did not arrive.
-#                    2. when the tries run out (or you press Ctrl+C) it STOPS (exit 3), says the row it reached, and keeps giants_counts.partial.json in the output folder.
+#                    2. when the tries run out it STOPS (exit 3), says the row it reached, and keeps giants_counts.partial.json in the output folder; Ctrl+C does the same (exit 130).
+#                       --keep-trying N (default 0) makes it wait --cooldown seconds (600) and carry on from the saved counts by itself, up to N times, so a night's run needs no one at the keyboard.
 #                    3. THE SAME COMMAND RUN AGAIN CARRIES ON: it looks for an unfinished pass of the same datastack, snapshot and tables (in --out, or in the fish1_giants_* folders here, the furthest wins) and continues in that folder.
 #                       --fresh starts over; --pages N reads N pages and stops (run it again for the next N: a pass in pieces); --resume FILE picks a partial file from anywhere. Counts of another snapshot are never added to.
 #                    Other options: --top N (60), --chunk-rows N (1000000; the server returns at most 500000 a page, which is fine), --soma-table (somas), --midline UM, --pair-tol UM (25), --sample N (one random sample instead of the pass).
@@ -83,7 +84,11 @@ class Refusal(Exception):
 
 
 class Stopped(Exception):
-    """The server stopped answering, or the person pressed Ctrl+C, with everything done so far saved on disk; main() prints the message (which says how to carry on) and exits 3."""
+    """The server stopped answering (exit code 3), or the person pressed Ctrl+C (130), with everything done so far saved on disk; main() prints the message (which says how to carry on) and exits with the code."""
+
+    def __init__(self, message, code=3):
+        Exception.__init__(self, message)
+        self.code = code
 
 
 # ---- the calls made to caveclient, as keyword dictionaries built in ONE place, so that `selftest-signatures` binds exactly what the real calls pass --------------------------------------------------------------
@@ -195,7 +200,7 @@ def call_with_retries(args, what, fn, on_retry=None, progress=None):
         try:
             return fn()
         except KeyboardInterrupt:
-            raise Stopped("STOPPED by you (Ctrl+C) during %s. %s" % (what, progress() if progress else "Nothing was saved for this step; run the same command again."))
+            raise Stopped("STOPPED by you (Ctrl+C) during %s. %s" % (what, progress() if progress else "Nothing was saved for this step; run the same command again."), 130)
         except Exception as e:
             why = transient_reason(e)
             if why is None:
@@ -208,7 +213,7 @@ def call_with_retries(args, what, fn, on_retry=None, progress=None):
             try:
                 time.sleep(wait)
             except KeyboardInterrupt:
-                raise Stopped("STOPPED by you (Ctrl+C) while waiting to retry %s. %s" % (what, progress() if progress else "Run the same command again."))
+                raise Stopped("STOPPED by you (Ctrl+C) while waiting to retry %s. %s" % (what, progress() if progress else "Run the same command again."), 130)
 
 
 def check_server(url):
@@ -904,6 +909,21 @@ def find_unfinished(args, version, table):
 
 
 def cmd_giants(args):
+    """giants, and with --keep-trying N: when the server gives up on us (Stopped, exit 3), wait --cooldown seconds and carry on from the saved counts, up to N times; a Ctrl+C (130), a refusal or any other error is not tried again."""
+    rounds = 0
+    while True:
+        try:
+            return cmd_giants_once(args)
+        except Stopped as e:
+            if e.code != 3 or rounds >= args.keep_trying:
+                raise
+            rounds += 1
+            print("fishCaveExport: %s" % e, file=sys.stderr)
+            say("--keep-trying: waiting %g s, then carrying on from the saved counts (round %d of %d; Ctrl+C stops)" % (args.cooldown, rounds, args.keep_trying))
+            time.sleep(args.cooldown)
+
+
+def cmd_giants_once(args):
     server = check_server(args.server)
     if not args.datastack:
         raise Refusal("giants needs --datastack <name> (run `discover` first to see the names)")
@@ -911,8 +931,8 @@ def cmd_giants(args):
         raise Refusal("--top must be at least 2")
     if args.chunk_rows < 1:
         raise Refusal("--chunk-rows must be at least 1")
-    if args.retries < 0 or args.retry_wait < 0 or args.retry_max_wait < 0 or args.min_chunk_rows < 1:
-        raise Refusal("--retries, --retry-wait and --retry-max-wait cannot be negative, and --min-chunk-rows must be at least 1")
+    if args.retries < 0 or args.retry_wait < 0 or args.retry_max_wait < 0 or args.min_chunk_rows < 1 or args.keep_trying < 0 or args.cooldown < 0:
+        raise Refusal("--retries, --retry-wait, --retry-max-wait, --keep-trying and --cooldown cannot be negative, and --min-chunk-rows must be at least 1")
     if args.out:
         Folder.check(args.out, giants_reusable(args.out))   # before the network is touched
     client = make_client(args, args.datastack)
@@ -1049,7 +1069,7 @@ def cmd_giants(args):
              "giants_counts.json: every cell's counts. MANIFEST.json: sha256 of every file and the options. THIS IS A HEURISTIC: it lists candidates to look at in the viewer, it does not name the Mauthner cells. NO TOKEN IS IN ANY OF THESE FILES.\nCite: %s\n" % (args.datastack, version, stamp, len(top_rows), CITATION))
     import caveclient
     out.manifest({"command": "giants", "datastack": args.datastack, "server": server, "materializationVersion": version, "timestamp": stamp, "caveclient": getattr(caveclient, "__version__", None), "mode": mode,
-                  "options": {"top": args.top, "chunkRows": args.chunk_rows, "pages": args.pages, "sample": args.sample, "midline": args.midline, "pairTol": args.pair_tol, "somaTable": args.soma_table, "synapseTable": syn_table, "resume": resumed, "autoResume": auto, "fresh": bool(args.fresh), "retries": args.retries, "retryWait": args.retry_wait, "retryMaxWait": args.retry_max_wait, "minChunkRows": args.min_chunk_rows, "maxRows": args.max_rows},
+                  "options": {"top": args.top, "chunkRows": args.chunk_rows, "pages": args.pages, "sample": args.sample, "midline": args.midline, "pairTol": args.pair_tol, "somaTable": args.soma_table, "synapseTable": syn_table, "resume": resumed, "autoResume": auto, "fresh": bool(args.fresh), "keepTrying": args.keep_trying, "retries": args.retries, "retryWait": args.retry_wait, "retryMaxWait": args.retry_max_wait, "minChunkRows": args.min_chunk_rows, "maxRows": args.max_rows},
                   "rowsRead": state["rows"], "tableRows": total, "coveragePercent": coverage, "finished": state["done"]}, token_from_env())
     say("\nTop cells by synapses received:")
     for r in top_rows[:15]:
@@ -1104,6 +1124,8 @@ def build_parser():
     p.add_argument("--sample", type=int, default=0)
     p.add_argument("--resume")
     p.add_argument("--fresh", action="store_true")
+    p.add_argument("--keep-trying", dest="keep_trying", type=int, default=0)
+    p.add_argument("--cooldown", type=float, default=600.0)
     p.add_argument("--retries", type=int, default=DEFAULT_RETRIES)
     p.add_argument("--retry-wait", dest="retry_wait", type=float, default=DEFAULT_RETRY_WAIT)
     p.add_argument("--retry-max-wait", dest="retry_max_wait", type=float, default=DEFAULT_RETRY_MAX_WAIT)
@@ -1129,7 +1151,7 @@ def main(argv=None):
         return 2
     except Stopped as e:   # the server gave up on us, or the person did: what was done is saved, and the message says how to carry on
         print("fishCaveExport: %s" % e, file=sys.stderr)
-        return 3
+        return e.code
     except KeyboardInterrupt:
         print("fishCaveExport: stopped by you (Ctrl+C).", file=sys.stderr)
         return 130

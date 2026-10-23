@@ -194,6 +194,10 @@ def _maybe_fail(call, table=None):
         if kind == "timeout": raise TimeoutError()   # the builtin, with no message to read
         if kind == "text": raise Exception("server closed the connection unexpectedly")   # an error of no known class that says what the real one said
         if kind == "interrupt": raise KeyboardInterrupt()
+        if kind == "interrupt_while_waiting":   # a 500, and Ctrl+C a moment later: while the script sleeps before trying again
+            import threading, _thread
+            threading.Timer(0.3, _thread.interrupt_main).start()
+            raise _HttpError(500, "500 Server Error: the server hiccuped")
         raise ValueError("a mistake the server will make again")
 
 class _Info:
@@ -706,8 +710,8 @@ sec("11. the big-neuron finder (giants): a fixture with a mirror pair, a fragmen
     const icOffset = fs.existsSync(path.join(IC, "giants_counts.partial.json")) ? partOf(IC).offset : null;
     writeFixture(GFIX);
     const ric2 = run(gArgs(IC, RA), { env: E }); watch(ric2, IC);
-    ok("!! CTRL+C IS A STOP, NOT A TRACEBACK: pressed during the third page, the run exits 3 with 'STOPPED by you (Ctrl+C) during page 3', the row reached (160) and the instruction to run the same command again, no traceback is printed, the partial file holds offset 160; run again it carries on (offsets 160, 240) to the clean answer",
-        ric.status === 3 && /STOPPED by you \(Ctrl\+C\) during page 3 \(rows from 160\)\. Stopped at row 160/.test(ric.stderr) && /Run the SAME command again/.test(ric.stderr) && !/Traceback/.test(ric.stderr) && icOffset === 160
+    ok("!! CTRL+C IS A STOP, NOT A TRACEBACK: pressed during the third page, the run exits 130 (not 3: the server did not give up, the person did) with 'STOPPED by you (Ctrl+C) during page 3', the row reached (160) and the instruction to run the same command again, no traceback is printed, the partial file holds offset 160; run again it carries on (offsets 160, 240) to the clean answer",
+        ric.status === 130 && /STOPPED by you \(Ctrl\+C\) during page 3 \(rows from 160\)\. Stopped at row 160/.test(ric.stderr) && /Run the SAME command again/.test(ric.stderr) && !/Traceback/.test(ric.stderr) && icOffset === 160
         && ric2.status === 0 && pg(ric2).map((c) => c.offset).join() === "160,240" && sameAsA(IC), ric.stderr.slice(0, 200));
 
     for (const [kind, status, label] of [["http", 403, "a refused token (403)"], ["other", 0, "a mistake in the request"]]) {
@@ -748,9 +752,35 @@ sec("11. the big-neuron finder (giants): a fixture with a mirror pair, a fragmen
     flaky([{ call: "query_table", table: "somas", from: 1, to: 1, status: 502 }]);
     const SM2 = outDir("g_soma_retry"), rsm = run(gArgs(SM2, RA), { env: E }); watch(rsm, SM2);
     ok("the soma table's one big query is retried too (a 502 on the first try): the run says 'the soma table: the server answered HTTP 502' and gives the clean answer", rsm.status === 0 && /the soma table: the server answered HTTP 502/.test(rsm.stdout) && sameAsA(SM2), rsm.stderr.slice(0, 200));
+    // --keep-trying: a night's run with no one at the keyboard
+    flaky([{ call: "query_table", table: "synapses", from: 3, to: 5, status: 500 }]);
+    const KA = outDir("g_keep1"), tk0 = Date.now(), rka = run(gArgs(KA, [...RA, "--retries", "1", "--keep-trying", "3", "--cooldown", "0.8"]), { env: E }), tka = (Date.now() - tk0) / 1000; watch(rka, KA);
+    ok("!! --keep-trying CARRIES ON BY ITSELF WHEN THE SERVER GIVES UP: with 2 tries a page, --keep-trying 3 and --cooldown 0.8, the server refuses the third page three times in a row; the first round stops at row 160 (the STOPPED message is printed), the run waits 0.8 s (it took " + tka.toFixed(2) + " s in all) and says 'round 1 of 3', the second round finds its own saved counts (offsets 0, 80, 160, 160, then 160, 160, 240) and finishes with the clean run's answer, exit 0",
+        rka.status === 0 && pg(rka).map((c) => c.offset).join() === "0,80,160,160,160,160,240" && /--keep-trying: waiting 0\.8 s, then carrying on from the saved counts \(round 1 of 3; Ctrl\+C stops\)/.test(rka.stdout) && (rka.stdout.match(/--keep-trying: waiting/g) || []).length === 1 && /STOPPED: page 3/.test(rka.stderr)
+        && /found an unfinished pass in .*g_keep1: row 160/.test(rka.stdout) && tka >= 0.8 && sameAsA(KA) && manOf(KA).options.keepTrying === 3, rka.stderr.slice(0, 200));
+    flaky([{ call: "query_table", table: "synapses", from: 3, status: 500 }]);
+    const KB = outDir("g_keep2"), rkb = run(gArgs(KB, [...RA, "--retries", "1", "--keep-trying", "1", "--cooldown", "0.001"]), { env: E }); watch(rkb, KB);
+    ok("!! --keep-trying N TRIES N MORE ROUNDS AND NO MORE: with a server that never answers the third page, --keep-trying 1 makes two rounds (two STOPPED messages -- the second says page 1, because a round counts its pages from where it starts -- one 'waiting' line, offset 160 asked for four times in all) and ends with exit 3 and the counts saved at row 160",
+        rkb.status === 3 && (rkb.stderr.match(/STOPPED: page \d+ \(rows from 160\)/g) || []).length === 2 && (rkb.stdout.match(/--keep-trying: waiting/g) || []).length === 1 && pg(rkb).map((c) => c.offset).join() === "0,80,160,160,160,160" && partOf(KB).offset === 160 && fs.readdirSync(KB).join() === "giants_counts.partial.json", rkb.stderr.slice(0, 200));
+    flaky([{ call: "query_table", table: "synapses", from: 3, to: 3, kind: "interrupt" }]);
+    const KC = outDir("g_keep3"), rkc = run(gArgs(KC, [...RA, "--keep-trying", "2", "--cooldown", "0.001"]), { env: E }); watch(rkc, KC);
+    flaky([{ call: "query_table", table: "synapses", from: 2, to: 2, kind: "interrupt_while_waiting" }]);
+    const IW = outDir("g_ctrlc_wait"), riw = run(gArgs(IW, ["--retry-wait", "1"]), { env: E }); watch(riw, IW);
+    ok("!! CTRL+C WHILE THE RUN WAITS TO TRY AGAIN IS A STOP TOO: the second page fails with a 500, the run starts its one-second wait, Ctrl+C arrives during it; exit 130, 'STOPPED by you (Ctrl+C) while waiting to retry page 2 (rows from 80)', the row reached and the instruction to run again, no traceback, and the first page's counts are saved (offset 80)",
+        riw.status === 130 && /STOPPED by you \(Ctrl\+C\) while waiting to retry page 2 \(rows from 80\)\. Stopped at row 80/.test(riw.stderr) && /Run the SAME command again/.test(riw.stderr) && !/Traceback/.test(riw.stderr) && fs.existsSync(path.join(IW, "giants_counts.partial.json")) && partOf(IW).offset === 80, riw.stderr.slice(0, 300));
+    flaky([{ call: "query_table", table: "synapses", from: 3, to: 3, status: 500 }, { call: "query_table", table: "synapses", from: 4, to: 4, kind: "interrupt_while_waiting" }]);
+    const KW = outDir("g_ctrlc_cooldown"), rkw = run(gArgs(KW, [...RA, "--retries", "1", "--keep-trying", "2", "--cooldown", "1"]), { env: E }); watch(rkw, KW);
+    ok("!! CTRL+C DURING THE --keep-trying COOLDOWN ENDS THE RUN AT ONCE: the first round stops (STOPPED message), the run starts its one-second cooldown, Ctrl+C arrives during it; exit 130 with 'stopped by you (Ctrl+C).', no second round (page 3 asked for twice, never a third time), no traceback, and the counts are saved at row 160",
+        rkw.status === 130 && /stopped by you \(Ctrl\+C\)\./.test(rkw.stderr) && !/Traceback/.test(rkw.stderr) && pg(rkw).map((c) => c.offset).join() === "0,80,160,160" && (rkw.stdout.match(/--keep-trying: waiting/g) || []).length === 1 && fs.existsSync(path.join(KW, "giants_counts.partial.json")) && partOf(KW).offset === 160, rkw.stderr.slice(0, 300));
+    flaky([{ call: "query_table", table: "synapses", from: 2, to: 2, kind: "other" }]);
+    const KD = outDir("g_keep4"), rkd = run(gArgs(KD, [...RA, "--keep-trying", "2", "--cooldown", "0.001"]), { env: E }); watch(rkd, KD);
     writeFixture(GFIX);
-    const rv = [["--retries", "-1"], ["--min-chunk-rows", "0"], ["--retry-wait", "-1"]].map((x) => run(gArgs(outDir("g_badopt" + x[0]), x), { env: E }));
-    ok("the new options are checked before the network is touched: --retries -1, --min-chunk-rows 0 and --retry-wait -1 each exit 2 naming the options, with an empty stand-in log", rv.every((r) => r.status === 2 && /cannot be negative, and --min-chunk-rows must be at least 1/.test(r.stderr) && r.log.length === 0));
+    const rke = run(gArgs(OLD, ["--keep-trying", "2", "--cooldown", "0.001"]), { env: E });
+    ok("!! ONLY THE SERVER GIVING UP IS TRIED AGAIN: with --keep-trying 2, Ctrl+C exits 130 after ONE attempt (page 3 asked once, no 'waiting' line), a mistake in the request exits 1 after one attempt, and a refusal (the other snapshot's counts) exits 2 -- none of them loops",
+        rkc.status === 130 && pg(rkc).map((c) => c.offset).join() === "0,80,160" && !/--keep-trying: waiting/.test(rkc.stdout) && (rkc.stderr.match(/STOPPED by you/g) || []).length === 1 && rkd.status === 1 && pg(rkd).map((c) => c.offset).join() === "0,80" && !/--keep-trying: waiting/.test(rkd.stdout) && rke.status === 2 && !/--keep-trying: waiting/.test(rke.stdout), (rkc.stderr + rkd.stderr + rke.stderr).slice(0, 200));
+    writeFixture(GFIX);
+    const rv = [["--retries", "-1"], ["--min-chunk-rows", "0"], ["--retry-wait", "-1"], ["--keep-trying", "-1"], ["--cooldown", "-1"]].map((x) => run(gArgs(outDir("g_badopt" + x[0]), x), { env: E }));
+    ok("the new options are checked before the network is touched: --retries -1, --min-chunk-rows 0, --retry-wait -1, --keep-trying -1 and --cooldown -1 each exit 2 naming the options, with an empty stand-in log", rv.every((r) => r.status === 2 && /cannot be negative, and --min-chunk-rows must be at least 1/.test(r.stderr) && r.log.length === 0));
     writeFixture(FIXTURE);
 }
 
