@@ -16164,10 +16164,11 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         widened: Object.freeze([]),
         verdict: "the unnumbered line's twenty gates, each run alone and serially on the merged tree (main at v4896 in), all green, none red on arrival: the jet league (sets on seeds 15000 and up, the " +
                  "trainer's jet path with its cache keys unchanged for the trainers, the jet networks' mutate and perturb), the jet autopilot's and the multirotor model's front doors, the drone and " +
-                 "dogfight tournament gates, the fish pilot, and the CAVE export script's stand-in server (the big-neuron finder, with numpy integers from the server). Nineteen of them were sabotaged " +
-                 "and went red by name, the 0-red results and the equivalent mutants named in each gate's header. tools/ship/tournamentDogfightShipped-selfcheck.mjs was committed with its sabotage log reading " +
-                 "'filled in below once run' and it had NOT been run: that run is in progress as this is written. NOT CLOSED: that sabotage until its header says otherwise, and the sweep-timings readings for these " +
-                 "twenty, a ship-time step not taken here",
+                 "dogfight tournament gates, the fish pilot, and the CAVE export script's stand-in server (the big-neuron finder, with numpy integers from the server). All twenty were sabotaged " +
+                 "and went red by name, the 0-red results and the equivalent mutants named in each gate's header. ONE OF THEM HAD NOT BEEN WHEN THIS CLOSING WAS FIRST WRITTEN: tools/ship/tournamentDogfightShipped-selfcheck.mjs was committed with its sabotage log " +
+                 "reading 'filled in below once run' and had never been run; this closing found the placeholder, and the run (43 mutants, 40 red, 3 equivalent and said so) is now in its header. The closing's own sabotage found a hole in " +
+                 "tools/ship/gateSweep-selfcheck.mjs, which refused a surplus that was too small and not one that was too large: a gate claimed twice, with the counts made to add up, read green; a row now refuses it. NOT CLOSED: the sweep-timings " +
+                 "readings for these twenty, a ship-time step not taken here",
     }),
 });
 

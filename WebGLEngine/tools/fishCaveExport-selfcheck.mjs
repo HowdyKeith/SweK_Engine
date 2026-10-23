@@ -22,6 +22,15 @@
 //                           and says NOT CHECKED HERE when none is
 //   9  A REAL DATAFRAME     when that Python also has pandas, the stand-in returns real pandas DataFrames and the whole export is run again: numpy integers, NaN and the column types the real library returns reach the CSV as plain text
 //
+//  10  THE CELLS' LABELS AND SUMMARIES (labels.csv, cells_summary.json)        11  THE BIG-NEURON FINDER (giants): the pass, the ranking, the mirror pairs, the options, the numpy integers
+//  12  A SERVER THAT FAILS, AND A PASS THAT CARRIES ON BY ITSELF (added after the second real `giants` run died at page 25 of 59 on `500 ... server closed the connection unexpectedly`): the stand-in fails on demand (an HTTP status with the
+//      real error text, a dropped connection by the requests class's NAME, a bare TimeoutError, an error that only says what it says, Ctrl+C -- also while the script sleeps -- and a plain mistake) at chosen call numbers. Rows: a hiccup is
+//      asked for again at the same page and size and nothing is counted twice or skipped (the answer is the clean run's to the byte); a second failure in a row halves the page, starting from the server's cap and never making it bigger; the tries
+//      run out -> exit 3, the row reached, the progress file kept and nothing else written; the waits grow threefold up to a ceiling and are real waits; THE SAME COMMAND RUN AGAIN CARRIES ON (in --out, or the furthest fish1_giants_* folder,
+//      and not a folder that is not one) and replaces a half-answer; a pass in pieces (--pages 1 four times); --fresh; --start-offset; counts of another snapshot, datastack, synapse table or soma table are refused or left alone, never added
+//      to or overwritten; a finished run is never overwritten and the refusal comes before the network; Ctrl+C is exit 130 in a call, in a wait and in the --keep-trying cooldown; only a transient error is retried (a 403, an unlisted class
+//      and a mistake are not); the top-cell queries and the soma query are retried too, and a pass whose last step failed is not read again; --keep-trying N rounds and no more, and only for the server giving up.
+//
 // WHAT THIS CANNOT HOLD (SAID PLAINLY): that the server's tables are named what the script expects (it searches EVERY table, so the names do not matter, but the id columns must end in `root_id`, as the CAVE materialization's do); that `synapse_query`'s
 // columns are `pre_pt_root_id`/`post_pt_root_id`/`size` (the script finds the pre/post columns by their names and refuses with the column list if it cannot); that the account's token reaches the datastack; that a 5,000,000-row query finishes. `discover` is the
 // first thing to run for exactly this reason, and what it writes tells us which of these held.
@@ -71,6 +80,28 @@
 //   X06 plain_int turns None into zero 1 | X07 the partial file is written without its version 3 | Y01 an unknown synapse count is not handled (no short-page rule) 1 | Y02 an unknown soma count passes 1 | Y03 the unknown-count refusal does not point at discover 1
 // X06 went 0 red the first time (a count the server does not give became a zero that sailed past the 'is it over the limit' check): the soma-table refusal says the server did not say, the synapse-table case ends on the short page and writes null for the rows and the coverage, and one row holds both.
 // WHY NO FIXTURE HAD CAUGHT IT: the stand-in handed back python integers, and caveclient hands back numpy ones, which the json module cannot write and which a default=str dump writes as TEXT -- the real export's MANIFEST said "materializationVersion": "737" with the quotes. The stand-in has a numpy-like integer now (np_ints), plain_int() normalises the version and every row count, and the real server's other surprise -- `201 - Limited query to 500000 rows`, a cap on the rows of a query -- is what the capped-server row (50 rows) stands in for.
+//
+// THE SECOND REAL `giants` RUN DIED AT PAGE 25 OF 59 (2026-10-23, Keith's machine, 41% and eight minutes in: HTTP 500, `psycopg2.OperationalError: server closed the connection unexpectedly`), and the script could neither retry nor find its own
+// progress file again. SABOTAGED -- 58 mutants of tools/fishCaveExport.py, each applied in a scratch tree, the gate run on it with FISH_CAVE_PYTHON set to a Python that has caveclient 8.2.1 and pandas, EVERY ONE RED BY NAME (the number is how many rows
+// went red) AFTER TWO WERE FIXED, below:
+//   V01 a 500 is not a hiccup 11 | V02 every HTTP error is retried 1 | V03 every error is retried 3 | V04 the requests classes are not known by name 1 | V05 the builtin timeout is not known by type 1 | V06 an error is read only by its class 1
+//   V07 one try too few 8 | V08 the wait does not grow 2 | V09 the wait has no ceiling 1 | V10 the wait doubles 1 | V11 the wait is not waited 2 | V12 the first failure halves the page 6 | V13 the third failure halves it, not the second 2
+//   V14 the floor is ignored 1 | V15 a page can grow 1 | V16 halving ignores the server's cap 1 | V17 the cap is not remembered 1 | V18 the page size is not changed after halving 2 | V19 a stop exits 1 7 | V20 the stop does not say to run again 3
+//   V21 the progress file is not written 3 | V22 Ctrl+C is not caught in a call 2 | V23 a mistake is raised as a stop 4 | V24 nothing carries on by itself 12 | V25 --fresh is ignored 1 | V26 --start-offset is ignored 1
+//   V27 a snapshot that differs is not noticed 3 | V28 a datastack that differs 2 | V29 a synapse table that differs 1 | V30 a soma table that differs 1 | V31 the soma table is not written to the progress file 1 | V32 a partial with no soma table named is refused 1
+//   V33 the nearest folder wins, not the furthest 1 | V34 the carried-on run starts a new folder 1 | V35 a finished run can be overwritten 1 | V36 the progress file blocks its own folder 13 | V37 the folder is checked only after the network 1
+//   V38 a pass that was already read is read again 1 | V39 the top-cell queries are not retried 2 | V40 the soma query is not retried 1 | V41 the new options are not checked 1 | V42 a scan does not name the other snapshot's folder 1
+//   V43 the carry-on is not said to be by itself 1 | V44 the manifest does not say it resumed 1 | V45 the stop names no row 3 | V46 a stop in the top-cell queries does not say the pass is skipped 1 | V47 a scan takes a folder that is not ours 1
+//   V49 the wait message names no try 2 | V51 no keep-trying loop 3 | V52 one more round than asked 4 | V53 every stop is tried again, Ctrl+C too 1 | V54 the cooldown is not waited 2 | V55 Ctrl+C exits 3 2 | V56 a stop always exits 3 3
+//   V57 negative keep-trying and cooldown are accepted 1 | V58 the manifest does not record keep-trying 1 | V59 Ctrl+C while waiting to retry exits 3 1 | V60 Ctrl+C in the cooldown exits 1 1
+// THREE MUTANTS WERE NOT CLEAN THE FIRST TIME AND EACH GOT A ROW OR A FIX: V31 (the progress file's soma table was only ever checked on READ: the give-up row now reads the file's version and soma table as written) and V47 (the scan took any folder:
+// the furthest-wins row now has a decoy folder, not named fish1_giants_*, that holds a valid partial file further on than the real ones) read 0 red; V41 matched nothing after the option check grew (the pattern was moved, not the gate). V21 made the
+// gate THROW on the missing progress file, which hides every row after it: a missing file now reads as nulls, so the row that wanted it fails and the rest run. ALSO FOUND BY WRITING THE ROWS: the third failure of a page printed 'page 3' and the next
+// round 'page 1' -- a round counts its pages from where it starts, said in the keep-trying row; and two places where the script did the same thing twice (the builtin connection errors matched by name AND by type; the shrink bounded by a min() AND by a
+// guard) were each cut to one, because removing either copy would have changed nothing and a mutant of it could only have read 0 red.
+// NOT CHECKED: that the real server's 500 is the kind a pause cures (it may be a time limit on a deep OFFSET, in which case smaller pages help less than hoped and the answer is a different query); the real requests / urllib3 exception classes
+// (the stand-in builds classes of the same NAMES, which is all the script reads); a Ctrl+C on Windows (the gate raises it with _thread.interrupt_main, which is the same KeyboardInterrupt the console delivers, not the console event itself);
+// and any of section 12 against the real server.
 "use strict";
 import fs from "node:fs";
 import os from "node:os";

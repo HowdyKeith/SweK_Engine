@@ -10,7 +10,26 @@
 //   2  FLOWN AGAIN  every pair (counts exact; edge, standard error, z, means to 2e-6; kills, collisions and ground contacts exact), the ratings and their order, the field edges and their order, the cycles and the upsets, the stability rows, the seat biases
 //   3  WHAT IT SAYS  the sentences a note may quote, derived from the record and held to it: the fruit fly trained to fight leads every other pilot at two paired standard errors or more; the order by rating and the order by score; whether they agree; how many duels the ratings needed
 //
-// SABOTAGE LOG -- (filled in below once run)
+// SABOTAGE LOG -- 43 MUTANTS, EVERY ONE RED BY NAME EXCEPT THREE WHICH ARE SAID TO BE EQUIVALENT BELOW. *** THIS GATE WAS COMMITTED WITH THIS LINE READING "filled in below once run", AND IT HAD NOT BEEN RUN: the twenty-gate closing that swept it
+// (gateSweep since608) found the placeholder and says so. The run is below. *** Each mutant was applied in a scratch tree (a copy of the tree whose other files are symlinks, so the real files are never written), the gate flown in full (about
+// 170 s a mutant), the tree discarded. The number is how many rows went red. For the library mutants tools/ship/tournamentDogfight.mjs is a REAL COPY in the scratch tree: it imports ../../brain/dogfightTournament.mjs relative to where it lives, and
+// as a symlink it lives in the real tree and would have flown the unmutated library while only this gate's own import saw the mutant.
+//   THE RECORD (tools/ship/dogfightTournament-record.json) edited, the flight untouched -- the record must be the files' (20 of 21 red)
+//     R01 a pilot hash stale 2 | R02 a pilot label reworded 1 (the key-for-key row alone) | R03 121 scenarios 2 | R04 the set ends a seed early 2 | R05 a pair edge 3e-6 off 2 | R06 a win count one off 2 | R07 a kill count one off 2
+//     R08 not converged 2 | R09 a rating 4e-4 off 2 | R10 a seat mean 1e-4 off 3 | R11 a cycle appears 3 | R12 the upset z changed 2 | R13 a stability order flag flipped 3 | R14 a stability shift changed 3 | R15 an extra key 1
+//     R16 a key missing 2 | R17 a pilot names the wrong file 2 | R18 a seat standard error changed 2 | R19 a ground count (the note's 44) one off 3 | R20 a ground count (the note's 92) one off 3
+//     R05b A PAIR EDGE 1e-6 OFF READS 0 RED AND IS EQUIVALENT BY DESIGN: the record is rounded to 1e-6 and the gate holds the real numbers to 2e-6 (`same`), so a difference of one unit in the last place is not a difference. R05 (3e-6) is the same edit
+//     past the tolerance and goes red.
+//   THE LIBRARY (brain/dogfightTournament.mjs) mutated, the record untouched -- the record must be what the files fly (12 of 14 red)
+//     L01 DECISIVE 0.06 4 | L02 the Elo scale 3 | L03 the phantom game 0.5 3 | L04 a ground contact counts a collision 2 | L06 the second fight from the same seat 5 | L07 a draw counts for nothing in the fit 3 | L08 the field edge a sum 2
+//     L10 the seat bias B minus A 2 | L11 stability refits on the last scenarios 2 | L12 the edge from the first seat only 4 | L13 the standard error with n, not n-1 4 | L14 a ground contact for Y never counted 2
+//     L05 COLLISIONS COUNTED FROM THE OTHER SIDE READS 0 RED AND IS EQUIVALENT: brain/dogfightTask.mjs:168 sets BOTH craft's status to "collided" in the same statement (the arena does the same at dogfightArena.mjs:177), so statusX and
+//     statusY are "collided" together in every fight and the count is the same from either side.
+//     L09 MIN_Z 1 FOR 2 READS 0 RED AND IS EQUIVALENT ON THIS RECORD: the only pair with 1 <= |z| < 2 is flyFlight against gpuDogfight (z -1.997) and there the higher-rated pilot leads, so lowering the bar makes no upset and no cycle. The
+//     threshold itself is pinned by brain/dogfightTournament-selfcheck.mjs (`T.MIN_Z === 2`, and its M54), not here.
+//   THE RECORD TOOL (tools/ship/tournamentDogfight.mjs) mutated (8 of 8 red)
+//     T01 the record rounds to 1e-5 6 | T02 the hash is not the weights' hash 2 | T03 the fruit fly trained to fight is read from the flight file 7 | T04 the scenario count off by one 1 | T05 the seeds end one early 1
+//     T06 the seat table's standard error is its mean 2 | T07 the upsets carry the edge as z 2 | T08 the stability's order flag always true 2
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
