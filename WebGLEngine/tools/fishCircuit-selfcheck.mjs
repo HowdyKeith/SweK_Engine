@@ -2,7 +2,7 @@
 //
 // Run: node tools/fishCircuit-selfcheck.mjs      (~3 s)
 //
-// THE SIBLING GATE OF tools/fishCircuit.mjs, AND OF WHAT IT MADE: the rule that picks a circuit out of the Fish1 paper's open synapse table, held to known answers on graphs small enough to work out by hand, and the vendored circuit and the topology baked
+// THE SIBLING GATE OF tools/fishCircuitLib.mjs (the pure functions) AND tools/fishCircuit.mjs (the command, which has no exports), AND OF WHAT THEY MADE: the rule that picks a circuit out of the Fish1 paper's open synapse table, held to known answers on graphs small enough to work out by hand, and the vendored circuit and the topology baked
 // from it held to the claims vendor/zebrafish/PROVENANCE.md makes. The raw package (3.5 MB of CSV) is not in the tree, so the derivation from it is NOT re-run here; row 9 says so, and re-runs it whenever FISH_TEN_DIR names the unzipped folder.
 //
 //   1  parseCsv        plain rows, blank lines and CRLF handled, a quoted field refused by name
@@ -16,7 +16,10 @@
 //   8  THE COMMAND     run on a synthetic package of known answers in a scratch folder: a dry run writes nothing, --write makes the folder and the circuit, the selection record's counts are the data's, --k and --min-volume are honoured, --dir is required
 //   9  THE DERIVATION  when FISH_TEN_DIR is set: the vendored file is re-derived from the raw package and equals it (but for the time it was fetched)
 //
-// SABOTAGE LOG (55 mutants of tools/fishCircuit.mjs, each run alone against this gate in a scratch tree with the baker copied in, each one red BY NAME except the three below):
+// THE TOOL WAS SPLIT AFTER THE LOG BELOW WAS WRITTEN, and the whole log was re-run on the split: tools/fishCircuitLib.mjs (the pure functions, F01-F41) and tools/fishCircuit.mjs (the command, F42-F55; no exports, since nothing imports it -- a library
+// with a caller other than its gate, and a command with no exports, are how tools/ship/referenceKind-selfcheck.mjs tells a wired module from one held off its census by a sentence, and the first was the second). On the split F52 ("the command runs on import") no
+// longer exists: the command's guard against being imported was vestigial and is gone, so the command simply runs, as tools/ship/trainPilotSub.mjs does. Every other mutant is red again on the split (the counts differ by a row here and there from the log below, which stays as it was written); F06 and F28 stay equivalent, and nothing else is at 0.
+// SABOTAGE LOG (55 mutants of tools/fishCircuit.mjs before the split, each run alone against this gate in a scratch tree with the baker copied in, each one red BY NAME except the three below):
 //   parseCsv F01-F04 (CRLF, blank lines, quoted field, header), synapseRows F05-F13 (columns by position, the voxel size 8 x 8 x 8, z scaled by the y size, dropped rows uncounted, an empty field read as zero, a non-numeric
 //   field read as NaN, a header with a missing or only the last column missing), buildGraph F14-F20 (post sides as neurons, a partner outside the set, a self-loop, a non-strict threshold, an unweighted edge, the threshold
 //   argument ignored, the default one nm^3 higher), DEFAULTS F21 (core size 35: red once a row ties the constant to the vendored file, it was 0 red before), peelCore F22-F27 (one direction only, a tie to the larger id,
@@ -42,7 +45,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import * as FC from "./fishCircuit.mjs";
+import * as FC from "./fishCircuitLib.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 let fails = 0, sliceErr = "";

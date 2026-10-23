@@ -49,8 +49,9 @@ console.log("\n2. *** COUNTING BY FILENAME IS WRONG IN BOTH DIRECTIONS, AND HERE
     const naive = naiveUnpapered();
     // v4778 -- 4 -> 6 at the rtx merge: vendor/male-cns (grant in PROVENANCE.md) and vendor/mikktspace (grant in the
     // source header) arrived, and neither has a file a LICENSE pattern matches -- two more for the naive census to get wrong.
+    // UNNUMBERED (the fish round) -- 6 -> 7: vendor/zebrafish arrived, whose grant is the Fish1 DATA POLICY quoted in its PROVENANCE.md (no licence text exists to name), so a filename census cannot see it either.
     ok("!! a filename census flags " + naive.length + " directories as unpapered",
-        naive.length === 6, naive.join(", "));
+        naive.length === 7, naive.join(", "));
     const real = unpapered();
     ok("!! *** AND THE TRUE ANSWER IS " + real.length + ", SO EVERY ONE OF THE " + naive.length + " IS WRONG ***",
         real.length === 0,

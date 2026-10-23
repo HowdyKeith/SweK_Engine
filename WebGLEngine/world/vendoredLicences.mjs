@@ -152,6 +152,14 @@ export const VENDORED = Object.freeze([
             "and that the version was not independently re-confirmed against Janelia's publication terms -- verify " +
             "before any redistribution wider than this repo's demo use. CC-BY asks for attribution, which that " +
             "file carries." },
+    // THE FISH1 TEN-ANALYSIS CORE, AND THE GRANT HERE IS A DATA POLICY, NOT A LICENCE. Recorded the way male-cns is (the grant lives in PROVENANCE.md), but the facts differ and are said:
+    // the Fish1 data policy (https://fish1-release.storage.googleapis.com/data_policy.html) makes the release open access and asks that work using it cite the resource paper; it states NO licence text
+    // and names no licence, and PROVENANCE.md quotes it as that. The identifier below is an SPDX LicenseRef, a label for that policy, not a licence anyone granted by name.
+    { path: "vendor/zebrafish", kind: KIND.THIRD_PARTY, spdx: "LicenseRef-Fish1-data-policy", grant: GRANT.NAMED_OTHER, file: "PROVENANCE.md",
+      upstream: "https://storage.googleapis.com/fish1-release/paper_data/TEN_analysis.zip (Fish1 larval-zebrafish EM connectome, Petkova, Januszewski et al., 2025)", pin: "fish1_v250915, TEN_analysis.zip sha256 fa18e512cdf4eaceb195ae0ee4b9812ec0c85b3a0a20969a085ac38b2da4fe92",
+      note: "*** DATA, NOT CODE, AND THE GRANT IS A DATA POLICY WITH NO LICENCE TEXT. *** One baked circuit (the densest 34-neuron, 153-synapse core of the paper's TEN-analysis set) derived by tools/fishCircuit.mjs from an OPEN bucket, no " +
+            "token used. The policy asks for citation, which PROVENANCE.md and the baked topology's header carry. IT IS NOT CC-BY OR ANY NAMED LICENCE AND THE ENTRY MUST NOT BE READ AS ONE: " +
+            "verify the terms with the Fish1 team before any redistribution wider than this repo's demo use. This register accepts the policy as the grant the way it accepted male-cns's server declaration; a maintainer who does not should un-vendor the file." },
     { path: "vendor/mikktspace", kind: KIND.THIRD_PARTY, spdx: "Zlib",     grant: GRANT.IN_HEADER,    file: "mikktspace.h",
       upstream: "https://github.com/mmikk/MikkTSpace", pin: "3e895b49d05ea07e4c2133156cfa94369e19e409",
       note: "*** A REFERENCE ORACLE LIKE xatlas, AND PAPERED IN THE HEADER LIKE ui/vendor. *** (C) 2011 Morten S. " +

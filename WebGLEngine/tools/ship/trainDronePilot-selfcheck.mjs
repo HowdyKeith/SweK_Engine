@@ -44,8 +44,7 @@
 //   THE TWO SHIPPED V2 FILES (brain/pilotDroneMlpWeightsV2.json and brain/pilotDroneWeightsV2.json), 20 MUTANTS OF EACH FILE, applied to a copy in a scratch tree: FM01 the first weight that differs from the hand pilot's moved by 0.5; FM02 the last; FM03 the
 //   audit number in `by`; FM04 the limits paragraph renamed; FM05 the count of differing weights; FM06 the file's score; FM07 the policy named for the other network; FM08 the weight count; FM09 the recipe (800 children); FM10 THE HAND WEIGHTS SHIPPED AS THE TRAINED
 //   PILOT; FM11 the safety-audit count; FM12 the citation; FM13 the guard sentence removed; FM14 the fresh-audits sentence removed; FM15 the not-standing count; FM16 the reserve number; FM17 the better-than count; FM18 the champion's seed outside its runs;
-//   FM19 the guard slack in `by` (0.05); FM20 the motor-out-not-solved sentence removed -- ALL 40 RED, NONE AT 0, each by a row of sections 10 or 11 by name (in a scratch tree four rows are red for every mutant whatever it does -- the three that spawn the
-//   command file and the one that compares a default file's path with the scratch tree's -- and are not counted as the mutant's).
+//   FM19 the guard slack in `by` (0.05); FM20 the motor-out-not-solved sentence removed -- ALL 40 RED, NONE AT 0, each by a row of sections 10 or 11 by name (in a scratch tree THREE rows are red for every file mutant whatever it does -- an extra key in the file shows it -- because they compare the tool's default file paths with the scratch tree's; they are not counted as the mutant's, and every mutant's count is at least one more).
 //   A DEFECT THE NEW ROWS FOUND IN THE TOOL: `--workers` did not hand `--guard` to its child processes (a four-process guarded run would have trained the first recipe under the second recipe's name). Fixed, with the row that found it.
 "use strict";
 import fs from "node:fs";
