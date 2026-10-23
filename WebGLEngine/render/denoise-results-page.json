@@ -1,0 +1,140 @@
+{
+ "verdict": {
+  "run": "reported",
+  "reasons": [],
+  "hypotheses": {
+   "H1": {
+    "n": 6,
+    "meanD": 0.4798227675214382,
+    "k": 5,
+    "p": 0.03125,
+    "d": [
+     0.8330035029351377,
+     0.48911800748272594,
+     -0.012363989422277122,
+     0.8067775675553346,
+     0.7414748442117114,
+     0.02092667236599688
+    ],
+    "test": "signflip",
+    "pSign": 0.109375,
+    "pSignFlip": 0.03125,
+    "c1": {
+     "netWins": 5,
+     "filterWins": 5,
+     "ok": true
+    },
+    "c3": {
+     "nearFloor": 0,
+     "resolvable": true
+    },
+    "threshold": 0.05,
+    "reject": true,
+    "status": "supported"
+   }
+  },
+  "controls": {
+   "C4": true,
+   "C5": true,
+   "C1": true,
+   "C2": {
+    "meanD": -1.8564223228700172,
+    "ok": true,
+    "citedFrom": 11
+   }
+  }
+ },
+ "tables": {
+  "T1": {
+   "noisy": [
+    0.12158177897089716,
+    0.07168631866819226,
+    0.0048744509635260105,
+    0.045259277591282863,
+    0.03947708423071073,
+    0.0038701858493969733
+   ],
+   "filter": [
+    0.01065691912550177,
+    0.005923764119664562,
+    0.005136210587167288,
+    0.0038290780592066254,
+    0.004434250088419796,
+    0.003566979087752909
+   ],
+   "net": [
+    [
+     0.004633005814320243,
+     0.0036322564632800553,
+     0.005200108845231937,
+     0.0017088941938136167,
+     0.0021125244789105897,
+     0.003493109701029114
+    ]
+   ],
+   "floor": [
+    0.0009601426442773808,
+    0.0005527327072228555,
+    0.0000289938519199051,
+    0.0003397177782924273,
+    0.000317110577467105,
+    0.000033163835394587146
+   ]
+  }
+ },
+ "filter": {
+  "sS": 1,
+  "sN": 1,
+  "sA": 0.2,
+  "sI": 4
+ },
+ "timings": {
+  "tests rendered": 39390,
+  "measured": 44596
+ },
+ "determinism": true,
+ "seedsDistinct": true,
+ "seedCount": 18,
+ "config": {
+  "image": 64,
+  "sppIn": 4,
+  "sppRef": 1024,
+  "harvest": true,
+  "emitterMask": true,
+  "test": "signflip",
+  "c2Prior": {
+   "round": 11,
+   "meanD": -1.8564223228700172,
+   "ok": true
+  },
+  "filter": {
+   "sS": 1,
+   "sN": 1,
+   "sA": 0.2,
+   "sI": 4
+  },
+  "c1Min": 5,
+  "trained": "nothing -- the shipped network and filter",
+  "splits": {
+   "T1": {
+    "family": "P",
+    "n": 6,
+    "first": 52000
+   }
+  }
+ },
+ "shipped": {
+  "file": "render/denoise-net-r11.json",
+  "sha256": "f1a84d47db611e77a6c46dcca3bc2ed40d5756d0ca6480157b65b8bc2557e856",
+  "source": {
+   "results": "render/denoise-results-r11.json",
+   "harvest": "88fa9228",
+   "seed": 1,
+   "cacheKey": "net-8f65da8060752453-22465a5eb663642f"
+  }
+ },
+ "cache": {
+  "hits": 0,
+  "misses": 6
+ }
+}
