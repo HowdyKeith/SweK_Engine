@@ -49,7 +49,7 @@ import sys
 from collections import Counter
 
 TOOL = "fishCaveExport"
-VERSION = "1"
+VERSION = "2"
 DEFAULT_SERVER = "https://global.brain-wire-test.org"
 DEFAULT_MATCH = r"mauthner|\bm[- ]?cell\b"
 DEFAULT_SCAN_MAX_ROWS = 300000
@@ -86,6 +86,12 @@ def kw_query_table(version, limit):
     return {"limit": limit, "split_positions": True, "materialization_version": version, "metadata": False}
 
 
+def kw_query_table_in(version, limit, column, ids):
+    kw = kw_query_table(version, limit)
+    kw["filter_in_dict"] = {column: [int(i) for i in ids]}
+    return kw
+
+
 def kw_get_tables(version):
     return {"version": version}
 
@@ -105,6 +111,7 @@ def signature_probes():
         ("caveclient.CAVEclient", None, kw_client(DEFAULT_SERVER, None, None)),
         ("caveclient.materializationengine.MaterializationClient", "synapse_query", kw_synapse_query(1, 10, pre_ids=[1], post_ids=[2])),
         ("caveclient.materializationengine.MaterializationClient", "query_table", dict(kw_query_table(1, 10), table="t")),
+        ("caveclient.materializationengine.MaterializationClient", "query_table", dict(kw_query_table_in(1, 10, "pt_root_id", [1]), table="t")),
         ("caveclient.materializationengine.MaterializationClient", "get_tables", kw_get_tables(1)),
         ("caveclient.materializationengine.MaterializationClient", "get_table_metadata", dict(kw_table_metadata(1), table_name="t")),
         ("caveclient.materializationengine.MaterializationClient", "get_annotation_count", dict(kw_annotation_count(1), table_name="t")),
@@ -406,6 +413,70 @@ def scan_for_cells(client, info, tables, args, version, folder):
     return ids, labels, report
 
 
+def lookup_labels(client, tables, synapse_table, members, args, version):
+    """The rows that name the circuit's neurons, by root id, when the cells were GIVEN (--root-ids) and so no table was searched: for each table that is not the synapse table and is not over --scan-max-rows, the rows whose pt_root_id is one of `members`
+    (a filtered query, so the 187,000-row soma table is not downloaded to find forty rows). A table without a pt_root_id column answers with an error and is listed as skipped. Returns (labels by root id, the report)."""
+    labels, report = {}, {"looked": [], "skipped": []}
+    want = set(members)
+    for t in tables:
+        if t == synapse_table:
+            report["skipped"].append({"table": t, "why": "the synapse table"})
+            continue
+        try:
+            n = client.materialize.get_annotation_count(t, **kw_annotation_count(version))
+        except Exception as e:
+            report["skipped"].append({"table": t, "why": "count failed: %s" % type(e).__name__})
+            continue
+        if n is None or n > args.scan_max_rows:
+            report["skipped"].append({"table": t, "why": "%s rows is over --scan-max-rows %d" % (n, args.scan_max_rows)})
+            continue
+        try:
+            df = client.materialize.query_table(t, **kw_query_table_in(version, args.scan_max_rows, "pt_root_id", members))
+        except Exception as e:
+            report["skipped"].append({"table": t, "why": "query failed: %s: %s" % (type(e).__name__, str(e)[:150])})
+            continue
+        rows = rows_of(df)
+        report["looked"].append({"table": t, "rows": len(rows), "columns": columns_of(df)})
+        for r in rows:
+            texts = {c: v for c, v in r.items() if isinstance(v, str)}
+            for i in ids_in_row(r):
+                if i in want:
+                    labels.setdefault(i, []).append({"table": t, "text": texts, "row": {c: fmt(v) for c, v in r.items()}})
+    return labels, report
+
+
+def position_columns(root_col):
+    return [root_col.replace("root_id", "position_" + a) for a in "xyz"]
+
+
+def cell_summary(cid, rows_out, rows_in, pre_c, post_c, labels, resolution):
+    """What one cell looks like in the rows that were exported: how many synapses leave it and arrive on it, from how many partners, where they sit (the box and centre of the synapse positions, in voxels and, when the table's voxel size is known, in micrometres),
+    and every row of a label table that names it. A cell with no synapse at all is said to be."""
+    outs = [r for r in rows_out if as_int(r.get(pre_c)) == cid]
+    ins = [r for r in rows_in if as_int(r.get(post_c)) == cid]
+    pts = []
+    for rows, col in ((outs, pre_c), (ins, post_c)):
+        cx = position_columns(col)
+        for r in rows:
+            try:
+                pts.append([float(r[c]) for c in cx])
+            except (KeyError, TypeError, ValueError):
+                pass
+    box = None
+    if pts:
+        lo = [min(p[k] for p in pts) for k in range(3)]
+        hi = [max(p[k] for p in pts) for k in range(3)]
+        mid = [sum(p[k] for p in pts) / len(pts) for k in range(3)]
+        box = {"points": len(pts), "min": lo, "max": hi, "centroid": mid, "extentVoxels": [hi[k] - lo[k] for k in range(3)]}
+        if resolution and len(resolution) == 3:
+            box["voxelNm"] = list(resolution)
+            box["extentMicrometres"] = [round((hi[k] - lo[k]) * float(resolution[k]) / 1000.0, 2) for k in range(3)]
+    return {"rootId": cid, "synapsesOut": len(outs), "synapsesIn": len(ins),
+            "partnersOut": len({as_int(r.get(post_c)) for r in outs} - {None}), "partnersIn": len({as_int(r.get(pre_c)) for r in ins} - {None}),
+            "noSynapses": not outs and not ins, "synapseBox": box,
+            "labelRows": [{"table": e["table"], "row": e.get("row", e["text"])} for e in labels.get(cid, [])]}
+
+
 def cmd_export(args):
     server = check_server(args.server)
     if not args.datastack:
@@ -496,15 +567,34 @@ def cmd_export(args):
             a[1] += int(r.get(size_c)) if size_c else 0
         except (TypeError, ValueError):
             pass
-    out.csv("edges.csv", ["pre_root_id", "post_root_id", "synapses", "total_size"], [{"pre_root_id": k[0], "post_root_id": k[1], "synapses": v[0], "total_size": v[1] if size_c else ""} for k, v in sorted(agg.items())])
+    size_real = bool(size_c) and any(as_int(r.get(size_c)) for r in circuit_rows)
+    if size_c and not size_real:
+        out.warnings.append("the synapse table's %s column is 0 in every row exported, so edges.csv leaves total_size blank (the sizes of this stack are in a separate table: synapses_axon_to_dendrite_size)" % size_c)
+        say("WARNING: " + out.warnings[-1])
+    out.csv("edges.csv", ["pre_root_id", "post_root_id", "synapses", "total_size"], [{"pre_root_id": k[0], "post_root_id": k[1], "synapses": v[0], "total_size": v[1] if size_real else ""} for k, v in sorted(agg.items())])
+    label_report = None
+    if not labels:
+        labels, label_report = lookup_labels(client, tables, info.get("synapse_table"), members, args, version)
     lab_rows = []
     for i in members:
         for entry in labels.get(i, []):
-            lab_rows.append({"root_id": i, "table": entry["table"], "text_columns": json.dumps(entry["text"], sort_keys=True)})
-    out.csv("labels.csv", ["root_id", "table", "text_columns"], lab_rows)
+            lab_rows.append({"root_id": i, "table": entry["table"], "text_columns": json.dumps(entry["text"], sort_keys=True), "row_json": json.dumps(entry.get("row", {}), sort_keys=True)})
+    out.csv("labels.csv", ["root_id", "table", "text_columns", "row_json"], lab_rows)
+    try:
+        resolution = list(mat.get_table_metadata(info.get("synapse_table"), **kw_table_metadata(version)).get("voxel_resolution") or [])
+    except Exception:
+        resolution = []
+    summary = {"datastack": args.datastack, "materializationVersion": version, "synapseTable": info.get("synapse_table"), "synapseVoxelNm": resolution or None,
+               "cells": [cell_summary(c, rows_out, rows_in, pre_c, post_c, labels, resolution) for c in ids], "labelLookup": label_report}
+    out.json("cells_summary.json", summary)
+    for cs in summary["cells"]:
+        tabs = sorted({e["table"] for e in cs["labelRows"]})
+        say("cell %d: %d synapses out, %d in (%d / %d partners); named in: %s%s" % (cs["rootId"], cs["synapsesOut"], cs["synapsesIn"], cs["partnersOut"], cs["partnersIn"], ", ".join(tabs) if tabs else "no label table", "" if not cs["noSynapses"] else "  <-- NO SYNAPSES AT ALL at this version"))
+        if cs["noSynapses"]:
+            out.warnings.append("cell %d has no synapse in or out at version %s (a root id from the live viewer can be newer than the version; try --version, or it is not a cell with synapses in this table)" % (cs["rootId"], version))
     out.text("README.txt", "Fish1 Mauthner export (tools/fishCaveExport.py export) of datastack %s at materialization version %s (%s).\n"
              "mauthner_candidates.json: how the cells were found. synapses_out.csv / synapses_in.csv: every synapse of the cells, every column the server returned. partners.csv: the strongest partners. "
-             "synapses_circuit.csv (hops 2): the synapses among the cells and their top partners. edges.csv: one row per pre->post pair. labels.csv: the cell-type rows of the neurons in the circuit. "
+             "synapses_circuit.csv (hops 2): the synapses among the cells and their top partners. edges.csv: one row per pre->post pair. labels.csv: the rows of the label tables (somas and the like) that name the neurons in the circuit. cells_summary.json: for each cell its synapse counts, partners, the box its synapses sit in and every label row that names it. "
              "MANIFEST.json: sha256 of every file, the options and the caveclient version. NO TOKEN IS IN ANY OF THESE FILES.\nCite: %s\n" % (args.datastack, version, stamp, CITATION))
     import caveclient
     out.manifest({"command": "export", "datastack": args.datastack, "server": server, "materializationVersion": version, "timestamp": stamp, "caveclient": getattr(caveclient, "__version__", None),

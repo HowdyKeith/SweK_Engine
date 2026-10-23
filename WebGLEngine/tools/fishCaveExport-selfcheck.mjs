@@ -134,9 +134,12 @@ class _Mat:
     def get_table_metadata(self, table_name, datastack_name=None, version=None, log_warning=True):
         _write({"call": "get_table_metadata", "table": table_name, "version": version}); t = _fix["tables"][table_name]
         return {"schema": t["schema"], "description": "stand-in table " + table_name, "voxel_resolution": [8, 8, 30]}
-    def query_table(self, table, limit=None, split_positions=False, materialization_version=None, metadata=True, **kw):
-        _write({"call": "query_table", "table": table, "limit": limit, "split_positions": split_positions, "version": materialization_version, "metadata": metadata})
+    def query_table(self, table, limit=None, split_positions=False, materialization_version=None, metadata=True, filter_in_dict=None, **kw):
+        _write({"call": "query_table", "table": table, "limit": limit, "split_positions": split_positions, "version": materialization_version, "metadata": metadata, "filter_in_dict": filter_in_dict})
         rows = list(_fix["tables"][table]["rows"])
+        for col, vals in (filter_in_dict or {}).items():
+            if rows and col not in rows[0]: raise ValueError("column %s is not in table %s" % (col, table))   # what the server answers for a column the table does not have
+            rows = [r for r in rows if r.get(col) in set(vals)]
         if limit is not None: rows = rows[:limit]
         cols = list(rows[0].keys()) if rows else []
         return _df(rows, cols)
@@ -149,9 +152,9 @@ class _Mat:
             if post is not None and b not in post: continue
             if remove_autapses and a == b: continue
             if not include_zeros and not _fix.get("leak_zero") and (a == 0 or b == 0): continue
-            rows.append({"id": 100000 + i, "pre_pt_root_id": a, "post_pt_root_id": b, "size": (float("nan") if _fix.get("nan_size") and i == 0 else size), "ctr_pt_position_x": 10 * i, "ctr_pt_position_y": 20 * i, "ctr_pt_position_z": 3 * i})
+            rows.append({"id": 100000 + i, "pre_pt_root_id": a, "post_pt_root_id": b, "size": (float("nan") if _fix.get("nan_size") and i == 0 else (0 if _fix.get("zero_size") else size)), "ctr_pt_position_x": 10 * i, "ctr_pt_position_y": 20 * i, "ctr_pt_position_z": 3 * i, "pre_pt_position_x": 1000 + i, "pre_pt_position_y": 2000 + 2 * i, "pre_pt_position_z": 300 + 3 * i, "post_pt_position_x": 5000 + 5 * i, "post_pt_position_y": 6000 + i, "post_pt_position_z": 700 + 7 * i})
         if limit is not None: rows = rows[:limit]
-        return _df(rows, ["id", "pre_pt_root_id", "post_pt_root_id", "size", "ctr_pt_position_x", "ctr_pt_position_y", "ctr_pt_position_z"])
+        return _df(rows, ["id", "pre_pt_root_id", "post_pt_root_id", "size", "ctr_pt_position_x", "ctr_pt_position_y", "ctr_pt_position_z", "pre_pt_position_x", "pre_pt_position_y", "pre_pt_position_z", "post_pt_position_x", "post_pt_position_y", "post_pt_position_z"])
 
 class _Auth:
     def get_new_token(self, open=False, no_text=False):
@@ -266,7 +269,7 @@ sec("4. the synapses");
     const out = csvRows(X, "synapses_out.csv"), inn = csvRows(X, "synapses_in.csv");
     const pair = (rs, a, b) => rs.filter((r) => r.pre_pt_root_id === String(a) && r.post_pt_root_id === String(b)).length;
     ok("!! synapses_out.csv holds the 8 synapses out of the cells and synapses_in.csv the 9 into them (the one from cell 1001 onto cell 1002 is in both) -- the autapse (1001 -> 1001) and the two synapses onto root id 0 are NOT there, because the query asks the server to leave them out -- with every column the server returned (id, the pre and post root ids, size, the split position)", out.length === 8 && inn.length === 9 && pair(out, 1001, 1002) === 1 && pair(inn, 1001, 1002) === 1 && pair(out, 1001, 2001) === 3 && pair(out, 1001, 2002) === 1 && pair(out, 1002, 2001) === 2 && pair(out, 1002, 2003) === 1 && pair(inn, 2004, 1001) === 4 && pair(inn, 2001, 1001) === 1 && pair(inn, 2004, 1002) === 2 && pair(inn, 2005, 1002) === 1 && !out.some((r) => r.post_pt_root_id === "0" || r.pre_pt_root_id === r.post_pt_root_id)
-        && Object.keys(out[0]).join() === "id,pre_pt_root_id,post_pt_root_id,size,ctr_pt_position_x,ctr_pt_position_y,ctr_pt_position_z");
+        && Object.keys(out[0]).join() === "id,pre_pt_root_id,post_pt_root_id,size,ctr_pt_position_x,ctr_pt_position_y,ctr_pt_position_z,pre_pt_position_x,pre_pt_position_y,pre_pt_position_z,post_pt_position_x,post_pt_position_y,post_pt_position_z");
     const sq = rx.log.filter((c) => c.call === "synapse_query");
     ok("!! the synapse queries are the three the design says, in order, with the flags it says: pre_ids = the cells; post_ids = the cells; pre_ids = post_ids = the cells and their top partners (remove_autapses, include_zeros false, split_positions, no metadata, the --max-rows limit)", sq.length === 3 && sq[0].pre_ids.join() === "1001,1002" && sq[0].post_ids === null && sq[1].post_ids.join() === "1001,1002" && sq[1].pre_ids === null && sq[2].pre_ids.join() === sq[2].post_ids.join() && sq.every((c) => c.remove_autapses === true && c.include_zeros === false && c.split_positions === true && c.metadata === false && c.limit === 5000000));
     const part = csvRows(X, "partners.csv");
@@ -286,7 +289,8 @@ sec("5. the options");
     ok("!! --hops 1 writes NO circuit file and makes two synapse queries; its edges.csv holds only the 9 pairs between the cells and their partners (the cell-onto-cell synapse, which is in both queries, counted once) (no 2001 > 2002, no 2004 > 2001)", r1.status === 0 && !fs.existsSync(path.join(H, "synapses_circuit.csv")) && r1.log.filter((c) => c.call === "synapse_query").length === 2 && csvRows(H, "edges.csv").length === 9 && csvRows(H, "edges.csv").find((r) => r.pre_root_id === "1001" && r.post_root_id === "1002").synapses === "1" && !csvRows(H, "edges.csv").some((r) => r.pre_root_id === "2001" && r.post_root_id === "2002"));
     const R = outDir("rootids"), r2 = run(["export", "--datastack", "fish1_test", "--out", R, "--root-ids", "1002", "--max-partners", "2"], { env: E }); watch(r2, R);
     const c2 = JSON.parse(rd(R, "mauthner_candidates.json"));
-    ok("!! --root-ids SKIPS THE SEARCH: no query_table call at all, the candidates file says the ids were given, and the export runs for that one cell (the synapse queries name 1002 alone)", r2.status === 0 && r2.log.filter((c) => c.call === "query_table").length === 0 && /no search was made/.test(c2.note) && c2.ids.join() === "1002" && r2.log.find((c) => c.call === "synapse_query").pre_ids.join() === "1002" && JSON.parse(rd(R, "MANIFEST.json")).cells.join() === "1002");
+    const lq = r2.log.filter((c) => c.call === "query_table");
+    ok("!! --root-ids SKIPS THE SEARCH: the candidates file says the ids were given and no table is searched -- the only query_table calls are the LABEL LOOKUP, one per table that is neither the synapse table nor over --scan-max-rows (soma, cell_types, notes), each filtered to the circuit's neurons (1002 and its two strongest partners 2001 and 2004) -- and the export runs for that one cell (the synapse queries name 1002 alone)", r2.status === 0 && lq.map((c) => c.table).join() === "soma,cell_types,notes" && lq.every((c) => c.filter_in_dict && c.filter_in_dict.pt_root_id.join() === "1002,2001,2004") && /no search was made/.test(c2.note) && c2.ids.join() === "1002" && r2.log.find((c) => c.call === "synapse_query").pre_ids.join() === "1002" && JSON.parse(rd(R, "MANIFEST.json")).cells.join() === "1002");
     const RI = outDir("rootids2"), rri = run(["export", "--datastack", "fish1_test", "--out", RI, "--root-ids", "1002, 1001,1002,", "--hops", "1"], { env: E }); watch(rri, RI);
     ok("!! --root-ids takes SEVERAL ids, in any order, with spaces and a trailing comma, each once: the manifest's cells are 1001, 1002 and the first synapse query names both", rri.status === 0 && JSON.parse(rd(RI, "MANIFEST.json")).cells.join() === "1001,1002" && rri.log.find((c) => c.call === "synapse_query").pre_ids.join() === "1001,1002");
     const T = outDir("trunc"), r3 = run(["export", "--datastack", "fish1_test", "--out", T, "--root-ids", "1001,1002", "--max-rows", "5"], { env: E }); watch(r3, T);
@@ -338,11 +342,11 @@ sec("7. no token anywhere");
 sec("8. the real library");
 {
     const st = run(["selftest-signatures"], {});
-    ok("!! `selftest-signatures` FAILS (exit 1, a FAIL line a probe) against a library that lacks what the script calls: the stand-in has no materializationengine, infoservice or auth modules (11 of the 13 probes FAIL; the two constructor probes bind to the stand-in's own), and the report says so instead of passing", st.status === 1 && (st.stdout.match(/^FAIL /gm) || []).length === 11 && (st.stdout.match(/^ok /gm) || []).length === 2);
-    if (!hasMod(REAL, "caveclient")) note("NOT CHECKED HERE: no Python with caveclient installed (set FISH_CAVE_PYTHON to one). `selftest-signatures` binds every keyword the script passes to the installed library's signatures; it was run once by hand against caveclient 8.2.1, 13 of 13 ok, and is recorded in this file's header.");
+    ok("!! `selftest-signatures` FAILS (exit 1, a FAIL line a probe) against a library that lacks what the script calls: the stand-in has no materializationengine, infoservice or auth modules (12 of the 14 probes FAIL; the two constructor probes bind to the stand-in's own), and the report says so instead of passing", st.status === 1 && (st.stdout.match(/^FAIL /gm) || []).length === 12 && (st.stdout.match(/^ok /gm) || []).length === 2);
+    if (!hasMod(REAL, "caveclient")) note("NOT CHECKED HERE: no Python with caveclient installed (set FISH_CAVE_PYTHON to one). `selftest-signatures` binds every keyword the script passes to the installed library's signatures; it was run once by hand against caveclient 8.2.1, 14 of 14 ok (13 of 13 before the label lookup's filter_in_dict probe was added), and is recorded in this file's header.");
     else {
         const r = spawnSync(REAL, [SCRIPT, "selftest-signatures"], { encoding: "utf8", env: { ...process.env, PYTHONPATH: "" } });
-        ok("!! `selftest-signatures` BINDS EVERY KEYWORD THE SCRIPT PASSES TO THE INSTALLED caveclient'S SIGNATURES (the client constructor, synapse_query, query_table, get_tables, get_table_metadata, get_annotation_count, most_recent_version, get_timestamp, get_datastacks, get_datastack_info, get_new_token, save_token): the only contact this gate has with the real library", r.status === 0 && (r.stdout.match(/^ok /gm) || []).length === 13 && !/FAIL/.test(r.stdout), r.stdout.trim().split("\n").length + " probes");
+        ok("!! `selftest-signatures` BINDS EVERY KEYWORD THE SCRIPT PASSES TO THE INSTALLED caveclient'S SIGNATURES (the client constructor, synapse_query, query_table with and without filter_in_dict, get_tables, get_table_metadata, get_annotation_count, most_recent_version, get_timestamp, get_datastacks, get_datastack_info, get_new_token, save_token): the only contact this gate has with the real library", r.status === 0 && (r.stdout.match(/^ok /gm) || []).length === 14 && !/FAIL/.test(r.stdout), r.stdout.trim().split("\n").length + " probes");
     }
 }
 
@@ -354,6 +358,40 @@ sec("9. real pandas DataFrames");
         const same = ["synapses_out.csv", "synapses_in.csv", "edges.csv", "partners.csv", "synapses_circuit.csv"].every((f) => rd(P, f) === rd(X, f));
         ok("!! WITH REAL pandas DataFrames (numpy integers, the column dtypes the real library returns) the export writes the SAME CSV files to the byte as with the plain stand-in: no `np.int64(...)`, no `1.0` for an id, no NaN text", rp.status === 0 && same);
     }
+}
+
+sec("10. the labels and the summary (the cells GIVEN with --root-ids, as the first real export was)");
+{
+    writeFixture(FIXTURE);
+    const L = outDir("labels"), rl = run(["export", "--datastack", "fish1_test", "--out", L, "--root-ids", "1001,1002"], { env: E }); watch(rl, L);
+    const lq = rl.log.filter((c) => c.call === "query_table"), lab = csvRows(L, "labels.csv"), man = JSON.parse(rd(L, "MANIFEST.json")), sum = JSON.parse(rd(L, "cells_summary.json"));
+    ok("!! THE LABEL LOOKUP ASKS THE SERVER FOR THE CIRCUIT'S NEURONS AND NOTHING MORE: three filtered queries (soma, cell_types, notes), each with pt_root_id in exactly the seven neurons (the cells 1001, 1002 and their five partners, sorted), none for the synapse table and none for the table of ten million rows; the report says what was looked at and what was skipped and why",
+        rl.status === 0 && lq.map((c) => c.table).join() === "soma,cell_types,notes" && lq.every((c) => c.filter_in_dict.pt_root_id.join() === "1001,1002,2001,2002,2003,2004,2005" && c.limit === 300000 && c.split_positions === true && c.version === 42)
+        && sum.labelLookup.looked.map((x) => x.table).join() === "soma,cell_types,notes" && sum.labelLookup.skipped.some((x) => x.table === "synapses" && /synapse table/.test(x.why)) && sum.labelLookup.skipped.some((x) => x.table === "big_table" && /over --scan-max-rows/.test(x.why)));
+    const rowOf = (id, t) => lab.find((r) => r.root_id === String(id) && r.table === t);
+    ok("!! labels.csv IS NOT EMPTY WHEN THE CELLS ARE GIVEN (the first real export's was): 11 rows -- 4 soma rows, 5 cell-type rows, 2 notes (2004's and 2005's) -- each with its table, its text columns as JSON and the WHOLE ROW as JSON (the ids and the positions, as text), and none for a neuron outside the circuit (2006, 9999)",
+        lab.length === 11 && lab.filter((r) => r.table === "soma").length === 4 && lab.filter((r) => r.table === "cell_types").length === 5 && lab.filter((r) => r.table === "notes").length === 2 && !lab.some((r) => ["2006", "9999"].includes(r.root_id))
+        && JSON.parse(rowOf(1001, "cell_types").row_json).cell_type === "Mauthner cell, left" && JSON.parse(rowOf(1001, "cell_types").row_json).pt_root_id === "1001" && /Mauthner cell, left/.test(rowOf(1001, "cell_types").text_columns.replace(/""/g, '"')) && Object.keys(lab[0]).join() === "root_id,table,text_columns,row_json");
+    const c1 = sum.cells.find((c) => c.rootId === 1001), c2 = sum.cells.find((c) => c.rootId === 1002);
+    ok("!! cells_summary.json COUNTS WHAT EACH CELL HAS, worked out by hand from the fixture: cell 1001 sends 5 synapses (to 2001 x3, 2002, 1002) to 3 partners and receives 5 (from 2004 x4, 2001) from 2 partners; cell 1002 sends 3 to 2 partners and receives 4 from 3 partners (the one from 1001 counted for both); the autapse and the root-id-0 synapses are not there; each cell is named in cell_types and soma",
+        sum.cells.length === 2 && c1.synapsesOut === 5 && c1.synapsesIn === 5 && c1.partnersOut === 3 && c1.partnersIn === 2 && c2.synapsesOut === 3 && c2.synapsesIn === 4 && c2.partnersOut === 2 && c2.partnersIn === 3 && !c1.noSynapses && !c2.noSynapses
+        && c1.labelRows.map((x) => x.table).sort().join() === "cell_types,soma" && c2.labelRows.map((x) => x.table).sort().join() === "cell_types,soma" && sum.datastack === "fish1_test" && sum.materializationVersion === 42 && sum.synapseTable === "synapses");
+    const bx = c1.synapseBox, near = (a, b) => Math.abs(a - b) < 1e-9;
+    ok("!! THE BOX THE SYNAPSES SIT IN is worked out by hand for cell 1001: ten positions (its five outgoing synapses at the PRE position, its five incoming at the POST position), x 1000..5055, y 2000..6011, z 300..777, centre (3025.4, 4010.3, 540.2), extent 4055 x 4011 x 477 voxels, which at the table's 8 x 8 x 30 nm voxels is 32.44 x 32.09 x 14.31 micrometres",
+        bx && bx.points === 10 && bx.min.join() === "1000,2000,300" && bx.max.join() === "5055,6011,777" && near(bx.centroid[0], 3025.4) && near(bx.centroid[1], 4010.3) && near(bx.centroid[2], 540.2) && bx.extentVoxels.join() === "4055,4011,477" && bx.voxelNm.join() === "8,8,30" && bx.extentMicrometres.join() === "32.44,32.09,14.31" && sum.synapseVoxelNm.join() === "8,8,30");
+    const GH = outDir("ghost"), rg = run(["export", "--datastack", "fish1_test", "--out", GH, "--root-ids", "1001,4242"], { env: E }); watch(rg, GH);
+    const sg = JSON.parse(rd(GH, "cells_summary.json")), mg = JSON.parse(rd(GH, "MANIFEST.json")), g = sg.cells.find((c) => c.rootId === 4242);
+    ok("!! A CELL WITH NO SYNAPSE AT ALL IS SAID TO BE, not left as a zero among the others: a root id that is in no synapse (4242, as a stale id from the live viewer would be) is flagged noSynapses in the summary with an empty box and no label, the console line ends 'NO SYNAPSES AT ALL at this version', and the manifest carries a warning naming it and the way out (--version); the other cell is exported as before (exit 0)",
+        rg.status === 0 && g && g.noSynapses === true && g.synapsesOut === 0 && g.synapsesIn === 0 && g.synapseBox === null && g.labelRows.length === 0 && /cell 4242: 0 synapses out, 0 in .*NO SYNAPSES AT ALL at this version/.test(rg.stdout) && mg.warnings.some((w) => /cell 4242 has no synapse in or out at version 42/.test(w) && /--version/.test(w)) && sg.cells.find((c) => c.rootId === 1001).noSynapses === false);
+    ok("the console says what each cell has, one line each, so the person at the keyboard can judge it before uploading: 'cell 1001: 5 synapses out, 5 in (3 / 2 partners); named in: cell_types, soma'", /cell 1001: 5 synapses out, 5 in \(3 \/ 2 partners\); named in: cell_types, soma/.test(rl.stdout) && /cell 1002: 3 synapses out, 4 in \(2 \/ 3 partners\); named in: cell_types, soma/.test(rl.stdout));
+    const ZS = outDir("zerosize"), zf = JSON.parse(JSON.stringify(FIXTURE)); zf.zero_size = true; writeFixture(zf);
+    const rz = run(["export", "--datastack", "fish1_test", "--out", ZS, "--root-ids", "1001,1002"], { env: E }); watch(rz, ZS); writeFixture(FIXTURE);
+    const ez = csvRows(ZS, "edges.csv"), mz = JSON.parse(rd(ZS, "MANIFEST.json"));
+    ok("!! A SIZE COLUMN THAT IS ZERO IN EVERY ROW IS SAID TO BE, not summed into a column of zeros (the real stack's synapses_axde is exactly that): edges.csv leaves total_size BLANK, the manifest and the console carry a warning that names the column and where the sizes are, and the counts are unchanged (11 pairs among the seven neurons, 1001>2001 3)",
+        rz.status === 0 && ez.length === 11 && ez.every((r) => r.total_size === "") && ez.find((r) => r.pre_root_id === "1001" && r.post_root_id === "2001").synapses === "3" && mz.warnings.some((w) => /size column is 0 in every row/.test(w) && /synapses_axon_to_dendrite_size/.test(w)) && /WARNING: the synapse table's size column is 0/.test(rz.stdout));
+    ok("and a size that is NOT zero is summed as before (the ordinary fixture: 1001>2001 600) with no size warning", csvRows(L, "edges.csv").find((r) => r.pre_root_id === "1001" && r.post_root_id === "2001").total_size === "600" && !man.warnings.some((w) => /size column/.test(w)));
+    ok("!! A SEARCH THAT FOUND THE CELLS DOES NOT LOOK THEM UP AGAIN: the default export (the regexp search) makes exactly the three scan queries (soma, cell_types, notes) and no filtered one, and still writes labels.csv with its row_json and a cells_summary.json for the two cells it found",
+        rx.log.filter((c) => c.call === "query_table").length === 3 && rx.log.filter((c) => c.call === "query_table").every((c) => !c.filter_in_dict) && fs.existsSync(path.join(X, "cells_summary.json")) && JSON.parse(rd(X, "cells_summary.json")).cells.map((c) => c.rootId).join() === "1001,1002" && Object.keys(csvRows(X, "labels.csv")[0]).join() === "root_id,table,text_columns,row_json" && JSON.parse(rd(X, "cells_summary.json")).labelLookup === null);
 }
 
 try { fs.rmSync(work, { recursive: true, force: true }); } catch (e) { /* the temp folder is only scratch */ }
