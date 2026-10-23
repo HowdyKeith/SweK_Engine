@@ -212,6 +212,14 @@ def sha256_file(path):
     return h.hexdigest()
 
 
+def plain_int(v):
+    """A number from the server as a python int (None stays None): caveclient hands back numpy integers, which the json module cannot write at all (the first real `giants` run died on one) and which a `default=str` dump turns into text ("737" for 737)."""
+    try:
+        return int(v) if v is not None else None
+    except (TypeError, ValueError):
+        return v
+
+
 def as_int(v):
     try:
         i = int(v)
@@ -299,7 +307,7 @@ def table_report(client, name, version, synapse_table):
     mat = client.materialize
     rep = {"table": name}
     try:
-        rep["count"] = mat.get_annotation_count(name, **kw_annotation_count(version))
+        rep["count"] = plain_int(mat.get_annotation_count(name, **kw_annotation_count(version)))
     except Exception as e:
         rep["count"] = None
         rep["countError"] = "%s: %s" % (type(e).__name__, str(e)[:200])
@@ -334,7 +342,7 @@ def cmd_discover(args):
         entry = {}
         try:
             client = make_client(args, ds)
-            version = client.materialize.most_recent_version()
+            version = plain_int(client.materialize.most_recent_version())
             info = client.info.get_datastack_info(datastack_name=ds)
             entry["materializationVersion"] = version
             entry["timestamp"] = fmt(client.materialize.get_timestamp(version))
@@ -498,7 +506,7 @@ def cmd_export(args):
     out = Folder(args.out or "fish1_mauthner_export_" + now_utc().strftime("%Y%m%dT%H%M%SZ"))
     client = make_client(args, args.datastack)
     mat = client.materialize
-    version = args.version if args.version is not None else mat.most_recent_version()
+    version = args.version if args.version is not None else plain_int(mat.most_recent_version())
     stamp = fmt(mat.get_timestamp(version))
     info = client.info.get_datastack_info(datastack_name=args.datastack)
     say("datastack %s, materialization version %s (%s)" % (args.datastack, version, stamp))
@@ -743,7 +751,7 @@ def cmd_giants(args):
     out = Folder(args.out or "fish1_giants_" + now_utc().strftime("%Y%m%dT%H%M%SZ"))
     client = make_client(args, args.datastack)
     mat = client.materialize
-    version = args.version if args.version is not None else mat.most_recent_version()
+    version = args.version if args.version is not None else plain_int(mat.most_recent_version())
     stamp = fmt(mat.get_timestamp(version))
     info = client.info.get_datastack_info(datastack_name=args.datastack)
     syn_table = args.synapse_table or info.get("synapse_table")
@@ -751,8 +759,10 @@ def cmd_giants(args):
         raise Refusal("the datastack names no synapse table; give --synapse-table")
     say("datastack %s, materialization version %s (%s), synapse table %s" % (args.datastack, version, stamp, syn_table))
     # 1. the cells that have a soma
-    n_soma = mat.get_annotation_count(args.soma_table, **kw_annotation_count(version))
-    if n_soma is None or n_soma > args.scan_max_rows:
+    n_soma = plain_int(mat.get_annotation_count(args.soma_table, **kw_annotation_count(version)))
+    if n_soma is None:
+        raise Refusal("the server did not say how many rows the soma table %s has (is the name right? `discover` lists the tables)" % args.soma_table)
+    if n_soma > args.scan_max_rows:
         raise Refusal("the soma table %s has %s rows, over --scan-max-rows %d; raise it" % (args.soma_table, n_soma, args.scan_max_rows))
     resolution = None
     if args.soma_voxel_nm:
@@ -776,7 +786,7 @@ def cmd_giants(args):
                      "cellTypes": dict(Counter(str(c["cell_type"]) for c in cells.values())), "somaVoxelNm": resolution})
     say("axes from the somas: front-back %s, left-right %s (midline %.1f um), top-bottom %s" % (geometry["frontBack"], geometry["leftRight"], midline, geometry["topBottom"]))
     # 2. the pass over the synapse table
-    total = mat.get_annotation_count(syn_table, **kw_annotation_count(version))
+    total = plain_int(mat.get_annotation_count(syn_table, **kw_annotation_count(version)))
     wanted = set(cells)
     if args.resume:
         state = read_resume(args.resume, args, version, syn_table)

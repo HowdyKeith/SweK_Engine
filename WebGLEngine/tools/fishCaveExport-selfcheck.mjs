@@ -65,6 +65,12 @@
 // FOUR WENT 0 RED THE FIRST TIME AND EACH GOT A ROW OR A CELL: W15 (the top-bottom distance not asked for: no cell in the fixture was in line with another but at a different height -- 1109 is now, 40 um below 1104), W18 (pairs ranked by the larger cell: no two pairs whose smaller and larger cells ordered differently -- 1110/1111, 40 and 8 inputs, are now), W57 (the console listing no pairs: nothing read stdout -- a row does), and W40 (a fragment ranked) is EQUIVALENT: the pass counts only roots that have a soma, so no fragment is ever in the counts, and the filter in the ranking is a second line of defence nothing can reach.
 // THE GATE FOUND A BUG IN THE SCRIPT BEFORE THE MUTANTS: a pass that was stopped (--pages 1) deleted its own giants_counts.partial.json, the very file --resume reads; and the first page rule (a short page ends the pass) would have read a server that caps a query's rows as the end of the table after one page: the end is now the table's row count (a stand-in that caps at 50 rows has a row).
 // WHAT IS NOT CHECKED: that the real server pages synapses_axde by offset in a stable order (the pass compares the rows it read with the table's row count and says so below 99%), that a page of a million rows finishes before a timeout (--chunk-rows is the knob), and that the largest dendritic trees of the hindbrain are the Mauthner cells. `giants` has not run against the real server.
+//
+// THE FIRST REAL `giants` RUN DIED ON A NUMPY INTEGER (2026-10-23, Keith's machine: `TypeError: Object of type int64 is not JSON serializable` the moment the first page was saved), SABOTAGED -- 10 mutants of tools/fishCaveExport.py, every one red by name:
+//   X01 the giants version is a numpy integer 2 | X02 the export version is a numpy integer 1 | X03 the synapse table row count is a numpy integer 2 | X04 a table row count in discover is a numpy integer 1 | X05 plain_int turns a number into text 7 |
+//   X06 plain_int turns None into zero 1 | X07 the partial file is written without its version 3 | Y01 an unknown synapse count is not handled (no short-page rule) 1 | Y02 an unknown soma count passes 1 | Y03 the unknown-count refusal does not point at discover 1
+// X06 went 0 red the first time (a count the server does not give became a zero that sailed past the 'is it over the limit' check): the soma-table refusal says the server did not say, the synapse-table case ends on the short page and writes null for the rows and the coverage, and one row holds both.
+// WHY NO FIXTURE HAD CAUGHT IT: the stand-in handed back python integers, and caveclient hands back numpy ones, which the json module cannot write and which a default=str dump writes as TEXT -- the real export's MANIFEST said "materializationVersion": "737" with the quotes. The stand-in has a numpy-like integer now (np_ints), plain_int() normalises the version and every row count, and the real server's other surprise -- `201 - Limited query to 500000 rows`, a cap on the rows of a query -- is what the capped-server row (50 rows) stands in for.
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -147,6 +153,27 @@ def _df(rows, columns):
         return _pd.DataFrame(rows, columns=columns)
     return _MiniDF(rows, columns)
 
+class _NpInt:
+    """Stands in for a numpy integer: arithmetic, comparison and formatting work, the json module refuses it (as it refused the real one in the first giants run)."""
+    def __init__(self, v): self.v = int(v)
+    def __int__(self): return self.v
+    def __index__(self): return self.v
+    def __eq__(self, o): return self.v == int(o)
+    def __ne__(self, o): return self.v != int(o)
+    def __lt__(self, o): return self.v < int(o)
+    def __le__(self, o): return self.v <= int(o)
+    def __gt__(self, o): return self.v > int(o)
+    def __ge__(self, o): return self.v >= int(o)
+    def __hash__(self): return hash(self.v)
+    def __add__(self, o): return _NpInt(self.v + int(o))
+    __radd__ = __add__
+    def __str__(self): return str(self.v)
+    __repr__ = __str__
+    def item(self): return self.v
+
+def _np(v):
+    return _NpInt(v) if _fix.get("np_ints") else v
+
 class _Info:
     def get_datastacks(self):
         _write({"call": "get_datastacks"}); return list(_fix["datastacks"])
@@ -155,13 +182,15 @@ class _Info:
 
 class _Mat:
     def most_recent_version(self):
-        _write({"call": "most_recent_version"}); return _fix["version"]
+        _write({"call": "most_recent_version"}); return _np(_fix["version"])
     def get_timestamp(self, version=None, datastack_name=None):
         _write({"call": "get_timestamp", "version": version}); return _fix["timestamp"]
     def get_tables(self, datastack_name=None, version=None):
         _write({"call": "get_tables", "version": version}); return list(_fix["tables"])
     def get_annotation_count(self, table_name, datastack_name=None, version=None):
-        _write({"call": "get_annotation_count", "table": table_name, "version": version}); return _fix["tables"][table_name]["count"]
+        _write({"call": "get_annotation_count", "table": table_name, "version": version})
+        if _fix.get("count_none") and table_name in _fix["count_none"]: return None   # a table whose size the server does not give
+        return _np(_fix["tables"][table_name]["count"])
     def get_table_metadata(self, table_name, datastack_name=None, version=None, log_warning=True):
         _write({"call": "get_table_metadata", "table": table_name, "version": version}); t = _fix["tables"][table_name]
         md = {"schema": t["schema"], "description": "stand-in table " + table_name, "voxel_resolution": t.get("voxel_resolution", [8, 8, 30])}
@@ -529,6 +558,25 @@ sec("11. the big-neuron finder (giants): a fixture with a mirror pair, a fragmen
     const PD = REAL !== PY || hasMod(PY, "pandas") ? outDir("g_pandas") : null;
     if (PD && hasMod(REAL, "pandas")) { const rpd = run(gArgs(PD), { env: E, py: REAL, pandas: true }); watch(rpd, PD); ok("!! WITH REAL pandas DataFrames THE PASS COUNTS THE SAME: giants_top.csv, giants_pairs.csv and giants_counts.json are byte for byte the plain stand-in's (the column read is df[name].tolist(), not a row at a time)", rpd.status === 0 && ["giants_top.csv", "giants_pairs.csv", "giants_counts.json"].every((f) => rd(PD, f) === rd(A, f))); }
     else note("NOT CHECKED HERE: giants with real pandas DataFrames (no Python with pandas; set FISH_CAVE_PYTHON).");
+    // A TABLE WHOSE ROW COUNT THE SERVER DOES NOT GIVE
+    const cn = JSON.parse(JSON.stringify(GFIX)); cn.count_none = ["somas"]; writeFixture(cn);
+    const SN = outDir("g_somanone"), rsn = run(gArgs(SN), { env: E });
+    cn.count_none = ["synapses"]; writeFixture(cn);
+    const YN = outDir("g_synnone"), ryn = run(gArgs(YN), { env: E }); watch(ryn, YN);
+    ok("!! A ROW COUNT THE SERVER DOES NOT GIVE IS NOT A ZERO AND NOT A GUESS: for the soma table the run is refused (exit 2) saying the server did not say and suggesting `discover`, before any synapse page; for the synapse table the pass ends on the first SHORT page (the old rule, the only one left) -- four pages, the same giants_top.csv byte for byte -- and the manifest says the table's rows and the coverage are unknown (null) and that the pass finished",
+        rsn.status === 2 && /server did not say how many rows the soma table somas has/.test(rsn.stderr) && /discover/.test(rsn.stderr) && rsn.log.filter((c) => c.call === "query_table" && c.table === "synapses").length === 0
+        && ryn.status === 0 && ryn.log.filter((c) => c.call === "query_table" && c.table === "synapses").map((c) => c.offset).join() === "0,80,160,240" && rd(YN, "giants_top.csv") === rd(A, "giants_top.csv") && JSON.parse(rd(YN, "MANIFEST.json")).tableRows === null && JSON.parse(rd(YN, "MANIFEST.json")).coveragePercent === null && JSON.parse(rd(YN, "MANIFEST.json")).finished === true && !/NaN|undefined/.test(ryn.stdout), ryn.stderr.slice(0, 200));
+    // NUMBERS FROM THE SERVER ARE NUMPY INTEGERS: the first real run died writing one into the partial counts file
+    const npf = JSON.parse(JSON.stringify(GFIX)); npf.np_ints = true; writeFixture(npf);
+    const NP = outDir("g_np"), rnp = run(gArgs(NP, ["--pages", "1"]), { env: E }); watch(rnp, NP);
+    const npPartial = path.join(NP, "giants_counts.partial.json"), npMan = rnp.status === 0 ? JSON.parse(rd(NP, "MANIFEST.json")) : null;
+    ok("!! A VERSION AND A ROW COUNT THAT ARE NUMPY INTEGERS ARE WRITTEN AS NUMBERS (the first real `giants` run died on `Object of type int64 is not JSON serializable` the moment it saved its first page): with a stand-in whose version and counts json refuses, the run exits 0, the partial counts file holds the version 77 and the table 'synapses' and the offset 80 as numbers, and the manifest has the version and the table's row count as numbers and not as text",
+        rnp.status === 0 && fs.existsSync(npPartial) && (() => { const j = JSON.parse(fs.readFileSync(npPartial, "utf8")); return j.version === 77 && j.offset === 80 && j.table === "synapses" && typeof j.version === "number"; })() && npMan.materializationVersion === 77 && npMan.tableRows === total && typeof npMan.tableRows === "number" && typeof npMan.coveragePercent === "number", rnp.stderr.slice(0, 200));
+    const NR = outDir("g_np_resume"), rnr = run(gArgs(NR, ["--resume", npPartial]), { env: E }); watch(rnr, NR);
+    ok("and a partial file written that way is resumed (the version compares as a number with the server's), giving the uninterrupted run's answer", rnr.status === 0 && rd(NR, "giants_top.csv") === rd(A, "giants_top.csv"), rnr.stderr.slice(0, 200));
+    const NE = outDir("np_export"), rne = run(["export", "--datastack", "fish1_giants", "--out", NE, "--root-ids", "1101", "--hops", "1"], { env: E }); watch(rne, NE);
+    const ND = outDir("np_discover"), rnd = run(["discover", "--datastack", "fish1_giants", "--out", ND], { env: E }); watch(rnd, ND);
+    ok("!! THE OTHER COMMANDS WRITE THEIR NUMBERS AS NUMBERS TOO: export's manifest has materializationVersion 77 as a number, and discover.json has each table's row count as a number (the real discover.json had text for the version)", rne.status === 0 && JSON.parse(rd(NE, "MANIFEST.json")).materializationVersion === 77 && rnd.status === 0 && JSON.parse(rd(ND, "discover.json")).details.fish1_giants.tables.every((t) => typeof t.count === "number"), rne.stderr.slice(0, 200) + rnd.stderr.slice(0, 200));
     writeFixture(FIXTURE);
 }
 
