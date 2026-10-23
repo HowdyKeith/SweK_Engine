@@ -174,6 +174,28 @@ class _NpInt:
 def _np(v):
     return _NpInt(v) if _fix.get("np_ints") else v
 
+class _HttpError(Exception):
+    """What caveclient raises for a bad status: a message and a .response with the status code."""
+    def __init__(self, status, text):
+        Exception.__init__(self, text)
+        self.response = type("Response", (), {"status_code": status})()
+
+_calls = {}
+def _maybe_fail(call, table=None):
+    """The fixture's "flaky" list: [{ call, table?, from?, to?, kind?, status? }] -- the nth call of that kind (counted per call and table, from 1) between from and to fails the way kind says: http (a status), conn (a dropped connection), interrupt (Ctrl+C), other (a mistake a retry cannot fix)."""
+    key = call + ":" + str(table)
+    n = _calls[key] = _calls.get(key, 0) + 1
+    for f in _fix.get("flaky", []):
+        if f["call"] != call or (f.get("table") and f["table"] != table): continue
+        if not (f.get("from", 1) <= n <= f.get("to", 10 ** 9)): continue
+        kind = f.get("kind", "http")
+        if kind == "http": raise _HttpError(f.get("status", 500), str(f.get("status", 500)) + " Server Error: (psycopg2.OperationalError) server closed the connection unexpectedly\n        This probably means the server terminated abnormally\n        before or while processing the request.\n\n(Background on this error at: http://sqlalche.me/e/13/e3q8) for url: https://pcgv3local.example.invalid/material")
+        if kind == "conn": raise type(f.get("name", "ConnectionError"), (Exception,), {})("HTTPSConnectionPool(host='x', port=443): Max retries exceeded")   # the requests classes are not the builtin ones: only their NAMES say what they are
+        if kind == "timeout": raise TimeoutError()   # the builtin, with no message to read
+        if kind == "text": raise Exception("server closed the connection unexpectedly")   # an error of no known class that says what the real one said
+        if kind == "interrupt": raise KeyboardInterrupt()
+        raise ValueError("a mistake the server will make again")
+
 class _Info:
     def get_datastacks(self):
         _write({"call": "get_datastacks"}); return list(_fix["datastacks"])
@@ -198,6 +220,7 @@ class _Mat:
         return md
     def query_table(self, table, limit=None, split_positions=False, materialization_version=None, metadata=True, filter_in_dict=None, select_columns=None, offset=None, random_sample=None, **kw):
         _write({"call": "query_table", "table": table, "limit": limit, "split_positions": split_positions, "version": materialization_version, "metadata": metadata, "filter_in_dict": filter_in_dict, "select_columns": select_columns, "offset": offset, "random_sample": random_sample})
+        _maybe_fail("query_table", table)
         if table == _fix["datastack_info"].get("synapse_table") and _fix.get("query_synapses"):
             rows = [{"id": 100000 + i, "pre_pt_root_id": a, "post_pt_root_id": b, "size": size} for i, (a, b, size) in enumerate(_fix["synapses"])]
         else:
@@ -214,6 +237,7 @@ class _Mat:
         return _df(rows, cols)
     def synapse_query(self, pre_ids=None, post_ids=None, materialization_version=None, remove_autapses=True, include_zeros=True, limit=None, split_positions=False, metadata=True, **kw):
         _write({"call": "synapse_query", "pre_ids": pre_ids, "post_ids": post_ids, "version": materialization_version, "remove_autapses": remove_autapses, "include_zeros": include_zeros, "limit": limit, "split_positions": split_positions, "metadata": metadata})
+        _maybe_fail("synapse_query")
         pre = set(pre_ids) if pre_ids is not None else None; post = set(post_ids) if post_ids is not None else None
         rows = []
         for i, (a, b, size) in enumerate(_fix["synapses"]):
@@ -577,6 +601,156 @@ sec("11. the big-neuron finder (giants): a fixture with a mirror pair, a fragmen
     const NE = outDir("np_export"), rne = run(["export", "--datastack", "fish1_giants", "--out", NE, "--root-ids", "1101", "--hops", "1"], { env: E }); watch(rne, NE);
     const ND = outDir("np_discover"), rnd = run(["discover", "--datastack", "fish1_giants", "--out", ND], { env: E }); watch(rnd, ND);
     ok("!! THE OTHER COMMANDS WRITE THEIR NUMBERS AS NUMBERS TOO: export's manifest has materializationVersion 77 as a number, and discover.json has each table's row count as a number (the real discover.json had text for the version)", rne.status === 0 && JSON.parse(rd(NE, "MANIFEST.json")).materializationVersion === 77 && rnd.status === 0 && JSON.parse(rd(ND, "discover.json")).details.fish1_giants.tables.every((t) => typeof t.count === "number"), rne.stderr.slice(0, 200) + rnd.stderr.slice(0, 200));
+    // ---- 12. a server that fails, and a pass that carries on by itself ---------------------------------------------------------------------------------------------------------------------------------------------
+    sec("12. a server that fails and a pass that carries on by itself (the second real run died at page 25 of 59 on `500 ... server closed the connection unexpectedly`)");
+    const RA = ["--retry-wait", "0.001", "--retry-max-wait", "0.005", "--min-chunk-rows", "10"];   // waits of a thousandth of a second: the gate does not sleep
+    const pg = (r) => r.log.filter((c) => c.call === "query_table" && c.table === "synapses");
+    const flaky = (list, extra = {}) => { const f = JSON.parse(JSON.stringify(GFIX)); f.flaky = list; Object.assign(f, extra); writeFixture(f); };
+    const partOf = (d) => JSON.parse(fs.readFileSync(path.join(d, "giants_counts.partial.json"), "utf8"));
+    const manOf = (d) => JSON.parse(rd(d, "MANIFEST.json"));
+    const sameAsA = (d) => rd(d, "giants_top.csv") === rd(A, "giants_top.csv") && rd(d, "giants_pairs.csv") === rd(A, "giants_pairs.csv") && rd(d, "giants_counts.json") === rd(A, "giants_counts.json");
+    const mkdir = (n) => { const d = outDir(n); fs.mkdirSync(d, { recursive: true }); return d; };
+    const folders = (d) => fs.readdirSync(d).filter((n) => /^fish1_giants_/.test(n));
+    const watchIn = (r, d) => { watch(r); for (const f of folders(d)) watch({ stdout: "", stderr: "" }, path.join(d, f)); };   // a working folder holds folders: the token check reads each, not the folder itself
+    const GA = ["giants", "--datastack", "fish1_giants", "--chunk-rows", "80", "--top", "12"];
+    const tail = (from) => { const o = []; for (let k = from; k < total; k += 40) o.push(k); return o; };
+
+    flaky([{ call: "query_table", table: "synapses", from: 2, to: 2, status: 500 }]);
+    const F1 = outDir("g_flaky1"), rf1 = run(gArgs(F1, RA), { env: E }); watch(rf1, F1);
+    ok("!! A HICCUP IS ASKED FOR AGAIN, AT THE SAME PAGE AND THE SAME SIZE, AND NOTHING IS COUNTED TWICE OR SKIPPED: the server fails the second page once with the real error text; the pages asked for are offsets 0, 80, 80 (again), 160, 240, every one of 80 rows; the console says which page, what the server answered (HTTP 500 and its first line), the wait and 'try 2 of 7'; and giants_top.csv, giants_pairs.csv and giants_counts.json are byte for byte the clean run's, with no partial file left",
+        rf1.status === 0 && pg(rf1).map((c) => c.offset).join() === "0,80,80,160,240" && pg(rf1).every((c) => c.limit === 80)
+        && /page 2 \(rows from 80\): the server answered HTTP 500 \(500 Server Error: \(psycopg2\.OperationalError\) server closed the connection unexpectedly\); waiting 0\.001 s, then trying again \(try 2 of 7\)/.test(rf1.stdout)
+        && sameAsA(F1) && !fs.existsSync(path.join(F1, "giants_counts.partial.json")) && manOf(F1).finished === true, rf1.stderr.slice(0, 200));
+    flaky([{ call: "query_table", table: "synapses", from: 2, to: 3, status: 500 }]);
+    const F2 = outDir("g_flaky2"), rf2 = run(gArgs(F2, RA), { env: E }); watch(rf2, F2);
+    ok("!! A SECOND FAILURE IN A ROW HALVES THE PAGE, AND IT STAYS HALVED: the server fails the same page twice; the pages asked for are 80 rows at offset 80 (failed), 80 rows again (failed), then 40 rows at 80, and 40 rows from there on (offsets 120, 160, ...), the console says 'asking for 40 rows a page from now on' once, and the answer is still the clean run's to the byte",
+        rf2.status === 0 && pg(rf2).map((c) => c.offset).join() === [0, 80, 80, 80, ...tail(120)].join() && pg(rf2).map((c) => c.limit).join() === [80, 80, 80, 40, ...tail(120).map(() => 40)].join()
+        && (rf2.stdout.match(/asking for 40 rows a page from now on/g) || []).length === 1 && /try 3 of 7/.test(rf2.stdout) && sameAsA(F2), rf2.stderr.slice(0, 200));
+    const F3 = outDir("g_flaky3"), rf3 = run(gArgs(F3, ["--retry-wait", "0.001", "--min-chunk-rows", "1000"]), { env: E }); watch(rf3, F3);
+    ok("!! A PAGE IS NEVER MADE BIGGER BY A FAILURE: with --min-chunk-rows 1000 above the page of 80, the same two failures leave every page at 80 rows (offsets 0, 80, 80, 80, 160, 240), and the answer is the clean run's",
+        rf3.status === 0 && pg(rf3).map((c) => c.offset).join() === "0,80,80,80,160,240" && pg(rf3).every((c) => c.limit === 80) && !/rows a page from now on/.test(rf3.stdout) && sameAsA(F3), rf3.stderr.slice(0, 200));
+    flaky([{ call: "query_table", table: "synapses", from: 2, to: 3, status: 500 }], { row_cap: 50 });
+    const F4 = outDir("g_flaky_cap"), rf4 = run(gArgs(F4, [...RA, "--chunk-rows", "1000000"]), { env: E }); watch(rf4, F4);
+    ok("!! AGAINST A SERVER THAT CAPS A QUERY (the real one returns 500,000 rows to a page of a million), HALVING STARTS FROM THE CAP, not from the page asked for -- half of a million would change nothing: with the cap at 50 and a page of a million, two failures at offset 50 are followed by a page of 25 (the cap halved), and the answer is the clean run's",
+        rf4.status === 0 && pg(rf4).map((c) => c.limit).slice(0, 4).join() === "1000000,1000000,1000000,25" && pg(rf4).map((c) => c.offset).slice(0, 4).join() === "0,50,50,50" && /asking for 25 rows a page from now on/.test(rf4.stdout) && sameAsA(F4), rf4.stderr.slice(0, 200));
+
+    flaky([{ call: "query_table", table: "synapses", from: 3, status: 500 }]);
+    const F5 = outDir("g_gaveup"), rf5 = run(gArgs(F5, [...RA, "--retries", "2"]), { env: E }); watch(rf5, F5);
+    ok("!! WHEN THE TRIES RUN OUT IT STOPS, SAYS WHERE, AND KEEPS WHAT IT HAS: the server never answers the third page again; after 3 tries (2 retries, waiting 0.001 s and then 0.003 s) the run exits 3 with STOPPED, the page, the HTTP 500 and its first line, 'Stopped at row 160 of about N (P%)', the path of the saved counts and 'Run the SAME command again'; the folder holds the partial counts file (offset 160, 160 rows) and NOTHING else -- no half-finished answer",
+        rf5.status === 3 && pg(rf5).map((c) => c.offset).join() === "0,80,160,160,160" && /STOPPED: page 3 \(rows from 160\) got no good answer from the server after 3 tries \(HTTP 500: 500 Server Error/.test(rf5.stderr) && /Stopped at row 160 of about \d+ \(\d+\.\d%\)/.test(rf5.stderr)
+        && /giants_counts\.partial\.json/.test(rf5.stderr) && /Run the SAME command again/.test(rf5.stderr) && (rf5.stdout.match(/waiting 0\.001 s/g) || []).length === 1 && (rf5.stdout.match(/waiting 0\.003 s/g) || []).length === 1 && !/waiting 0\.009/.test(rf5.stdout)
+        && fs.readdirSync(F5).join() === "giants_counts.partial.json" && partOf(F5).offset === 160 && partOf(F5).rows === 160, rf5.stderr.slice(0, 300));
+    const RW = ["--retry-wait", "0.001", "--retry-max-wait", "0.002", "--retries", "3"], FB = outDir("g_waits");
+    flaky([{ call: "query_table", table: "synapses", from: 2, status: 500 }]);
+    const rfb = run(gArgs(FB, RW), { env: E });
+    ok("the waits grow by three times and stop at --retry-max-wait: with 0.001 s, a ceiling of 0.002 s and three retries the waits are 0.001, 0.002 and 0.002 (0.003 would have been the third)", rfb.status === 3 && (rfb.stdout.match(/waiting ([0-9.]+) s/g) || []).join("|") === "waiting 0.001 s|waiting 0.002 s|waiting 0.002 s");
+    writeFixture(GFIX);
+    const rc5 = run(gArgs(F5, RA), { env: E }); watch(rc5, F5);
+    ok("!! THE SAME COMMAND RUN AGAIN CARRIES ON BY ITSELF: with the server well again, the identical command (same --out) finds the unfinished pass, says so (the folder, row 160 of about N, the cells counted, and that --fresh starts over), reads ONLY the pages from offset 160 (160, 240), writes the clean run's answer to the byte in the same folder, leaves no partial file, and the manifest says resumed, resumed by itself, finished",
+        rc5.status === 0 && pg(rc5).map((c) => c.offset).join() === "160,240" && new RegExp("found an unfinished pass in .*g_gaveup: row 160 of about \\d+ \\(\\d+\\.\\d%\\), \\d+ cells counted -- carrying on from there \\(--fresh starts over\\)").test(rc5.stdout)
+        && sameAsA(F5) && !fs.existsSync(path.join(F5, "giants_counts.partial.json")) && manOf(F5).options.resume === true && manOf(F5).options.autoResume === true && manOf(F5).finished === true && manOf(F5).rowsRead === total, rc5.stderr.slice(0, 200));
+
+    const PP = outDir("g_pieces"), pieceRuns = [0, 1, 2, 3].map(() => { const r = run(gArgs(PP, ["--pages", "1"]), { env: E }); watch(r, PP); return { r, man: fs.existsSync(path.join(PP, "MANIFEST.json")) ? manOf(PP) : null, part: fs.existsSync(path.join(PP, "giants_counts.partial.json")) ? partOf(PP).offset : null }; });
+    ok("!! A PASS IN PIECES: --pages 1 four times with the same command reads offsets 0, then 80, then 160, then 240, one page each; after each of the first three the manifest says finished false and the partial file holds the offset reached (80, 160, 240) -- the half-answers of one piece are replaced by the next -- and after the fourth the folder holds the finished answer, the clean run's to the byte, and no partial file",
+        pieceRuns.every((p) => p.r.status === 0) && pieceRuns.map((p) => pg(p.r).map((c) => c.offset).join()).join("|") === "0|80|160|240" && pieceRuns.slice(0, 3).every((p, i) => p.man.finished === false && p.part === 80 * (i + 1)) && pieceRuns[3].man.finished === true && pieceRuns[3].part === null && sameAsA(PP), pieceRuns.map((p) => p.r.stderr).join(" ").slice(0, 200));
+
+    const CA = mkdir("cwd_a"), runA = (extra) => run([...GA, ...extra], { env: E, cwd: CA });
+    const ra1 = runA(["--pages", "1"]), ra2 = runA([]);
+    const fa = folders(CA); watchIn(ra1, CA); watchIn(ra2, CA);
+    ok("!! WITH NO --out THE FOLDER IS FOUND: a first command (--pages 1) makes one fish1_giants_<time> folder; the same command without --pages, run again, finds it in the working folder, reads offsets 80, 160, 240 and finishes IN THAT FOLDER -- one fish1_giants_* folder in all, holding the clean run's answer",
+        ra1.status === 0 && ra2.status === 0 && fa.length === 1 && pg(ra2).map((c) => c.offset).join() === "80,160,240" && /found an unfinished pass in \.[\\/]fish1_giants_\d{8}T\d{6}Z: row 80 of about/.test(ra2.stdout) && sameAsA(path.join(CA, fa[0])), (ra1.stderr + ra2.stderr).slice(0, 200));
+
+    const FH = outDir("g_fresh"); run(gArgs(FH, ["--pages", "1"]), { env: E });
+    const rfr = run(gArgs(FH, ["--fresh"]), { env: E }); watch(rfr, FH);
+    ok("!! --fresh STARTS OVER IN THE SAME FOLDER: with an unfinished pass in the folder, --fresh reads offsets 0, 80, 160, 240 (not 80...), says nothing of carrying on, replaces the half-answer, and finishes with the clean run's answer",
+        rfr.status === 0 && pg(rfr).map((c) => c.offset).join() === "0,80,160,240" && !/found an unfinished pass/.test(rfr.stdout) && manOf(FH).options.fresh === true && manOf(FH).options.resume === false && sameAsA(FH), rfr.stderr.slice(0, 200));
+
+    const SO = outDir("g_startoff"); run(gArgs(SO, ["--pages", "1"]), { env: E });
+    const rso = run(gArgs(SO, ["--start-offset", "160"]), { env: E }); watch(rso, SO);
+    ok("--start-offset IS A DECISION OF THE PERSON AND IS NOT OVERRIDDEN: with a partial file in the folder, --start-offset 160 starts at 160 (offsets 160, 240) and does not pick up the partial's 80",
+        rso.status === 0 && pg(rso).map((c) => c.offset).join() === "160,240" && !/found an unfinished pass/.test(rso.stdout) && manOf(SO).options.resume === false, rso.stderr.slice(0, 200));
+
+    const OLD = mkdir("g_other_snapshot");
+    const OS = outDir("g_other_snapshot_src"); run(gArgs(OS, ["--pages", "1"]), { env: E });
+    const other = partOf(OS); other.version = 76; fs.writeFileSync(path.join(OLD, "giants_counts.partial.json"), JSON.stringify(other));
+    const shaOld = sha(path.join(OLD, "giants_counts.partial.json")), rOld = run(gArgs(OLD), { env: E });
+    ok("!! COUNTS OF ANOTHER SNAPSHOT ARE NEVER ADDED TO, AND NEVER OVERWRITTEN: --out naming a folder whose partial file is for version 76 against the server's 77 exits 2 saying so, naming --version 76 (to carry on with it), --fresh and a new --out, reads no page, and leaves the file byte for byte as it was",
+        rOld.status === 2 && /unfinished pass in .*g_other_snapshot is for datastack 'fish1_giants' version 76/.test(rOld.stderr) && /--version 76/.test(rOld.stderr) && /--fresh/.test(rOld.stderr) && pg(rOld).length === 0 && sha(path.join(OLD, "giants_counts.partial.json")) === shaOld, rOld.stderr.slice(0, 300));
+    const CB = mkdir("cwd_b"), oldDir = path.join(CB, "fish1_giants_old"); fs.mkdirSync(oldDir); fs.writeFileSync(path.join(oldDir, "giants_counts.partial.json"), JSON.stringify(other));
+    const shaOld2 = sha(path.join(oldDir, "giants_counts.partial.json")), rcb = run([...GA], { env: E, cwd: CB }); watchIn(rcb, CB);
+    ok("and with no --out the other snapshot's folder is named and left alone: the run says 'note: ./fish1_giants_old holds an unfinished pass ... left alone (--version 76 carries it on)', starts at offset 0 in a NEW folder, finishes, and the old file is untouched",
+        rcb.status === 0 && /note: \.[\\/]fish1_giants_old holds an unfinished pass for datastack 'fish1_giants' version 76: left alone \(--version 76 carries it on\)/.test(rcb.stdout) && pg(rcb).map((c) => c.offset).join() === "0,80,160,240" && folders(CB).length === 2 && sha(path.join(oldDir, "giants_counts.partial.json")) === shaOld2, rcb.stderr.slice(0, 200));
+
+    const variants = [["datastack", (d) => { d.datastack = "fish1_other"; }, /datastack 'fish1_other' version 77/], ["table", (d) => { d.table = "synapses_other"; }, /table 'synapses_other'/], ["soma table", (d) => { d.somaTable = "somas_other"; }, /soma table 'somas_other', not 'somas'/]];
+    const vr = variants.map(([label, edit, re], i) => { const d = outDir("g_variant" + i); fs.mkdirSync(d); const o = JSON.parse(JSON.stringify(partOf(OS))); edit(o); fs.writeFileSync(path.join(d, "giants_counts.partial.json"), JSON.stringify(o)); const r = run(gArgs(d), { env: E }); return { label, r, re, d, o }; });
+    ok("!! A PARTIAL FILE FOR ANOTHER DATASTACK, SYNAPSE TABLE OR SOMA TABLE IS REFUSED TOO, by what differs: each exits 2 naming the difference (datastack 'fish1_other', table 'synapses_other', soma table 'somas_other' against 'somas'), reads no page, and leaves the file as it was",
+        vr.every(({ r, re, d, o }) => r.status === 2 && re.test(r.stderr) && pg(r).length === 0 && JSON.stringify(partOf(d)) === JSON.stringify(o)), vr.map(({ label, r }) => label + ": " + r.status + " " + r.stderr.slice(0, 80)).join(" | "));
+    const SA = outDir("g_soma_a"), SB = outDir("g_soma_b"); fs.mkdirSync(SA); fs.writeFileSync(path.join(SA, "giants_counts.partial.json"), JSON.stringify(Object.assign(JSON.parse(JSON.stringify(partOf(OS))), { somaTable: "somas" })));
+    const rsa = run(gArgs(SA), { env: E }); watch(rsa, SA);
+    const old = JSON.parse(JSON.stringify(partOf(OS))); delete old.somaTable; fs.mkdirSync(SB); fs.writeFileSync(path.join(SB, "giants_counts.partial.json"), JSON.stringify(old));
+    const rsb = run(gArgs(SB), { env: E }); watch(rsb, SB);
+    ok("a partial file that names the soma table it counted for, and the same name now, is carried on; and a partial file written by the version before this one (no soma table named in it, like the real one from the second run) is carried on too, because it cannot be told apart from a match",
+        rsa.status === 0 && pg(rsa).map((c) => c.offset).join() === "80,160,240" && sameAsA(SA) && rsb.status === 0 && pg(rsb).map((c) => c.offset).join() === "80,160,240" && sameAsA(SB), (rsa.stderr + rsb.stderr).slice(0, 200));
+    const CC = mkdir("cwd_c");
+    run([...GA, "--out", "fish1_giants_a", "--pages", "1"], { env: E, cwd: CC }); run([...GA, "--out", "fish1_giants_b", "--pages", "2"], { env: E, cwd: CC });
+    const shaA = sha(path.join(CC, "fish1_giants_a", "giants_counts.partial.json")), rcc = run([...GA], { env: E, cwd: CC }); watchIn(rcc, CC);
+    ok("!! OF SEVERAL UNFINISHED PASSES THE FURTHEST WINS: folders a (row 80) and b (row 160) both hold the same command's counts; the next run without --out carries on in b (offsets 160, 240), finishes there, and leaves a exactly as it was",
+        rcc.status === 0 && pg(rcc).map((c) => c.offset).join() === "160,240" && /found an unfinished pass in \.[\\/]fish1_giants_b: row 160/.test(rcc.stdout) && sameAsA(path.join(CC, "fish1_giants_b")) && sha(path.join(CC, "fish1_giants_a", "giants_counts.partial.json")) === shaA && folders(CC).length === 2, rcc.stderr.slice(0, 200));
+
+    const rfin = run(gArgs(A, RA), { env: E });
+    ok("!! A FINISHED RUN IS NEVER OVERWRITTEN, AND THE REFUSAL COMES BEFORE THE NETWORK: the same command into the folder of the finished first run exits 2 'is not empty', the stand-in is not called at all (an empty log), and the folder's answer is unchanged",
+        rfin.status === 2 && /is not empty/.test(rfin.stderr) && rfin.log.length === 0 && manOf(A).finished === true, rfin.stderr.slice(0, 200));
+
+    flaky([{ call: "query_table", table: "synapses", from: 3, to: 3, kind: "interrupt" }]);
+    const IC = outDir("g_ctrlc"), ric = run(gArgs(IC, RA), { env: E }); watch(ric, IC);
+    const icOffset = fs.existsSync(path.join(IC, "giants_counts.partial.json")) ? partOf(IC).offset : null;
+    writeFixture(GFIX);
+    const ric2 = run(gArgs(IC, RA), { env: E }); watch(ric2, IC);
+    ok("!! CTRL+C IS A STOP, NOT A TRACEBACK: pressed during the third page, the run exits 3 with 'STOPPED by you (Ctrl+C) during page 3', the row reached (160) and the instruction to run the same command again, no traceback is printed, the partial file holds offset 160; run again it carries on (offsets 160, 240) to the clean answer",
+        ric.status === 3 && /STOPPED by you \(Ctrl\+C\) during page 3 \(rows from 160\)\. Stopped at row 160/.test(ric.stderr) && /Run the SAME command again/.test(ric.stderr) && !/Traceback/.test(ric.stderr) && icOffset === 160
+        && ric2.status === 0 && pg(ric2).map((c) => c.offset).join() === "160,240" && sameAsA(IC), ric.stderr.slice(0, 200));
+
+    for (const [kind, status, label] of [["http", 403, "a refused token (403)"], ["other", 0, "a mistake in the request"]]) {
+        flaky([{ call: "query_table", table: "synapses", from: 2, to: 2, kind, status }]);
+        const D = outDir("g_nottransient_" + kind), r = run(gArgs(D, RA), { env: E }); watch(r, D);
+        ok("!! " + label.toUpperCase() + " IS NOT RETRIED: the second page fails once with it; the run asks for that page ONCE (offsets 0, 80), prints no 'waiting', exits 1 with the generic message (what failed, and what to check), and keeps the first page's counts in the folder",
+            r.status === 1 && pg(r).map((c) => c.offset).join() === "0,80" && !/waiting/.test(r.stdout) && /Check the network/.test(r.stderr) && fs.existsSync(path.join(D, "giants_counts.partial.json")) && partOf(D).offset === 80, r.stderr.slice(0, 200));
+    }
+    const netNames = ["ConnectionError", "ConnectTimeout", "ReadTimeout", "Timeout", "ChunkedEncodingError", "RemoteDisconnected", "ProtocolError"];
+    const netRuns = netNames.map((name) => { flaky([{ call: "query_table", table: "synapses", from: 2, to: 2, kind: "conn", name }]); const d = outDir("g_net_" + name), r = run(gArgs(d, RA), { env: E }); watch(r, d); return { name, r, d }; });
+    ok("!! THE LIBRARY'S OWN CONNECTION ERRORS ARE RETRIED BY NAME (they are not the builtin classes, so only the name says what they are): " + netNames.join(", ") + " each fail the second page once; each run says 'the server answered <name>', asks for the page again (offsets 0, 80, 80, 160, 240) and gives the clean answer",
+        netRuns.every(({ name, r, d }) => r.status === 0 && new RegExp("the server answered " + name).test(r.stdout) && pg(r).map((c) => c.offset).join() === "0,80,80,160,240" && sameAsA(d)), netRuns.filter(({ r }) => r.status !== 0).map(({ name, r }) => name + ": " + r.stderr.slice(0, 80)).join(" | "));
+    flaky([{ call: "query_table", table: "synapses", from: 2, to: 2, kind: "timeout" }]);
+    const TM = outDir("g_timeout"), rtm = run(gArgs(TM, RA), { env: E }); watch(rtm, TM);
+    flaky([{ call: "query_table", table: "synapses", from: 2, to: 2, kind: "text" }]);
+    const TX = outDir("g_text"), rtx = run(gArgs(TX, RA), { env: E }); watch(rtx, TX);
+    flaky([{ call: "query_table", table: "synapses", from: 2, to: 2, kind: "conn", name: "SSLCertVerificationProblem" }]);
+    const NL = outDir("g_unlisted"), rnl = run(gArgs(NL, RA), { env: E }); watch(rnl, NL);
+    ok("!! THE BUILTIN TIMEOUT IS RETRIED BY TYPE AND AN ERROR OF NO KNOWN CLASS BY WHAT IT SAYS, AND A CLASS NOBODY LISTED IS NOT RETRIED: a bare TimeoutError and an Exception reading 'server closed the connection unexpectedly' each fail the second page once and the run finishes with the clean answer; an error class that is not in the list (a certificate problem) is asked for once (offsets 0, 80), exits 1 and prints no 'waiting'",
+        rtm.status === 0 && pg(rtm).map((c) => c.offset).join() === "0,80,80,160,240" && sameAsA(TM) && rtx.status === 0 && pg(rtx).map((c) => c.offset).join() === "0,80,80,160,240" && sameAsA(TX) && rnl.status === 1 && pg(rnl).map((c) => c.offset).join() === "0,80" && !/waiting/.test(rnl.stdout), (rtm.stderr + rtx.stderr + rnl.stderr).slice(0, 200));
+    flaky([{ call: "query_table", table: "synapses", from: 2, to: 2, status: 500 }]);
+    const SL = outDir("g_sleep"), t0 = Date.now(), rsl = run(gArgs(SL, ["--retry-wait", "0.8"]), { env: E }), took = (Date.now() - t0) / 1000; watch(rsl, SL);
+    ok("!! THE WAIT IS A REAL WAIT: with --retry-wait 0.8 and one failure the whole run takes at least 0.8 seconds (it took " + took.toFixed(2) + ") and says 'waiting 0.8 s'; the runs above, at a thousandth of a second, are much faster than that",
+        rsl.status === 0 && took >= 0.8 && /waiting 0\.8 s/.test(rsl.stdout) && sameAsA(SL), rsl.stderr.slice(0, 200));
+
+    flaky([{ call: "synapse_query", from: 1, to: 1, status: 503 }]);
+    const SQ = outDir("g_synq"), rsq = run(gArgs(SQ, RA), { env: E }); watch(rsq, SQ);
+    ok("!! THE QUERIES FOR THE TOP CELLS ARE RETRIED TOO: the first synapse query (the synapses INTO the top cells) fails once with 503, is asked for again, and the answer is the clean run's; the stand-in saw three synapse queries (one failed)",
+        rsq.status === 0 && /the synapses into the top cells: the server answered HTTP 503/.test(rsq.stdout) && rsq.log.filter((c) => c.call === "synapse_query").length === 3 && sameAsA(SQ), rsq.stderr.slice(0, 200));
+    flaky([{ call: "synapse_query", from: 1, status: 503 }]);
+    const SX = outDir("g_synq_dead"), rsx = run(gArgs(SX, [...RA, "--retries", "1"]), { env: E }); watch(rsx, SX);
+    const sxFiles = fs.readdirSync(SX).join(), sxOffset = fs.existsSync(path.join(SX, "giants_counts.partial.json")) ? partOf(SX).offset : null;
+    writeFixture(GFIX);
+    const rsx2 = run(gArgs(SX, RA), { env: E }); watch(rsx2, SX);
+    ok("!! A SERVER THAT FAILS AFTER THE PASS COSTS NO PASS: when the queries for the top cells never answer, the run exits 3 saying so and where the counts are saved; the folder holds the partial file and nothing else, at offset " + total + " (the whole table); run again, the pass is SKIPPED (no synapse-table page is read at all) and the answer is the clean run's to the byte",
+        rsx.status === 3 && /STOPPED: the synapses into the top cells got no good answer from the server after 2 tries \(HTTP 503/.test(rsx.stderr) && /giants_counts\.partial\.json/.test(rsx.stderr) && /skips the pass/.test(rsx.stderr)
+        && sxFiles === "giants_counts.partial.json" && sxOffset === total && rsx2.status === 0 && pg(rsx2).length === 0 && sameAsA(SX), rsx.stderr.slice(0, 300));
+    flaky([{ call: "query_table", table: "somas", from: 1, to: 1, status: 502 }]);
+    const SM2 = outDir("g_soma_retry"), rsm = run(gArgs(SM2, RA), { env: E }); watch(rsm, SM2);
+    ok("the soma table's one big query is retried too (a 502 on the first try): the run says 'the soma table: the server answered HTTP 502' and gives the clean answer", rsm.status === 0 && /the soma table: the server answered HTTP 502/.test(rsm.stdout) && sameAsA(SM2), rsm.stderr.slice(0, 200));
+    writeFixture(GFIX);
+    const rv = [["--retries", "-1"], ["--min-chunk-rows", "0"], ["--retry-wait", "-1"]].map((x) => run(gArgs(outDir("g_badopt" + x[0]), x), { env: E }));
+    ok("the new options are checked before the network is touched: --retries -1, --min-chunk-rows 0 and --retry-wait -1 each exit 2 naming the options, with an empty stand-in log", rv.every((r) => r.status === 2 && /cannot be negative, and --min-chunk-rows must be at least 1/.test(r.stderr) && r.log.length === 0));
     writeFixture(FIXTURE);
 }
 

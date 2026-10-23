@@ -30,6 +30,15 @@
 #                    --max-rows N            (default 5000000: the most rows any one synapse query may return; a query that hits it is flagged TRUNCATED in the manifest)
 #                    --version N             (a materialization version; default the most recent one. ROOT IDS CHANGE WITH PROOFREADING: every query uses this one version, and the manifest records it)
 #
+#   giants           python3 tools/fishCaveExport.py giants --datastack <name>     # the big-neuron finder: one pass over the whole synapse table counting the synapses each cell with a soma receives, then the top cells and their mirror pairs
+#                    A PASS OVER ~30 MILLION ROWS TAKES ABOUT AN HOUR AND THE SERVER IS NOT ALWAYS UP FOR IT. Three things make that survivable:
+#                    1. a page the server fails on (HTTP 500/502/503/504/429, a dropped connection, a timeout) is asked for again after a pause (--retries 6, waiting --retry-wait 5 s, then 15, 45, ... at most --retry-max-wait 300 s);
+#                       the second failure in a row halves the page (down to --min-chunk-rows 50000). Nothing is counted from a page that did not arrive.
+#                    2. when the tries run out (or you press Ctrl+C) it STOPS (exit 3), says the row it reached, and keeps giants_counts.partial.json in the output folder.
+#                    3. THE SAME COMMAND RUN AGAIN CARRIES ON: it looks for an unfinished pass of the same datastack, snapshot and tables (in --out, or in the fish1_giants_* folders here, the furthest wins) and continues in that folder.
+#                       --fresh starts over; --pages N reads N pages and stops (run it again for the next N: a pass in pieces); --resume FILE picks a partial file from anywhere. Counts of another snapshot are never added to.
+#                    Other options: --top N (60), --chunk-rows N (1000000; the server returns at most 500000 a page, which is fine), --soma-table (somas), --midline UM, --pair-tol UM (25), --sample N (one random sample instead of the pass).
+#
 # WHAT IT WRITES (export): mauthner_candidates.json (what was searched and what matched), synapses_out.csv and synapses_in.csv (every column the server returns, positions split into x/y/z), edges.csv (one row per pre->post pair: the
 # synapse count and the summed size), partners.csv (the strongest partners), synapses_circuit.csv (hops 2), labels.csv (the cell-type rows of every neuron in the circuit), MANIFEST.json (sha256 of every file, the materialization version
 # and its timestamp, the caveclient version, every option -- and no token) and README.txt. THE SCHEMA IS WHATEVER THE SERVER RETURNS: this script was written without access to the server, against caveclient's documented API (the
@@ -50,7 +59,7 @@ import time
 from collections import Counter
 
 TOOL = "fishCaveExport"
-VERSION = "3"
+VERSION = "4"
 DEFAULT_SERVER = "https://global.brain-wire-test.org"
 DEFAULT_MATCH = r"mauthner|\bm[- ]?cell\b"
 DEFAULT_SCAN_MAX_ROWS = 300000
@@ -58,11 +67,23 @@ DEFAULT_MAX_PARTNERS = 40
 DEFAULT_MAX_ROWS = 5000000
 CITATION = "Petkova, M. D., Januszewski, M., et al. (2025). A connectomic resource for neural cataloguing and circuit dissection of the larval zebrafish brain. bioRxiv."
 SAMPLE_ROWS = 5
+PARTIAL_NAME = "giants_counts.partial.json"
+GIANTS_FILES = ("giants_top.csv", "giants_pairs.csv", "soma_map.json", "giants_counts.json", "README.txt", "MANIFEST.json")
+TRANSIENT_STATUS = (429, 500, 502, 503, 504)   # the server hiccuping, not the server saying no: a retry can fix these and cannot fix a 401, 403 or 404
+TRANSIENT_NAMES = ("ConnectionError", "ConnectTimeout", "ReadTimeout", "Timeout", "ChunkedEncodingError", "RemoteDisconnected", "ProtocolError")   # the requests / urllib3 classes by name (they are not the builtin ones); the builtin connection and timeout errors are matched by type
+DEFAULT_RETRIES = 6
+DEFAULT_RETRY_WAIT = 5.0         # seconds before the first retry; each later wait is three times the one before, up to DEFAULT_RETRY_MAX_WAIT
+DEFAULT_RETRY_MAX_WAIT = 300.0
+DEFAULT_MIN_CHUNK_ROWS = 50000   # the smallest page a pass shrinks to after the server keeps failing on it
 PRE_ROOT, POST_ROOT = "pre_pt_root_id", "post_pt_root_id"
 
 
 class Refusal(Exception):
     """A reason to stop that the person running the script can act on; main() prints it and exits 2."""
+
+
+class Stopped(Exception):
+    """The server stopped answering, or the person pressed Ctrl+C, with everything done so far saved on disk; main() prints the message (which says how to carry on) and exits 3."""
 
 
 # ---- the calls made to caveclient, as keyword dictionaries built in ONE place, so that `selftest-signatures` binds exactly what the real calls pass --------------------------------------------------------------
@@ -143,6 +164,51 @@ def now_utc():
 
 def say(msg):
     print(msg, flush=True)
+
+
+def transient_reason(e):
+    """None for an error that trying again cannot fix (a refused token, a table that is not there, a bad argument); otherwise a few words for what the server did: the HTTP status, or the kind of connection failure."""
+    status = getattr(getattr(e, "response", None), "status_code", None)
+    if status is not None:
+        return ("HTTP %s" % status) if status in TRANSIENT_STATUS else None
+    name = type(e).__name__
+    if name in TRANSIENT_NAMES or isinstance(e, (ConnectionError, TimeoutError)):
+        return name
+    text = str(e).lower()
+    if "server closed the connection" in text or "connection reset" in text or "timed out" in text:
+        return name
+    return None
+
+
+def brief(e):
+    """The first line of an error, short: what the server said, for a message to the person at the keyboard (a message from the HTTP layer carries a URL and never a token)."""
+    lines = [l.strip() for l in str(e).splitlines() if l.strip()]
+    return (lines[0] if lines else type(e).__name__)[:100]
+
+
+def call_with_retries(args, what, fn, on_retry=None, progress=None):
+    """fn(), and when the server hiccups (a 500, 502, 503, 504 or 429, a dropped connection, a timeout) a pause and another try: --retries more tries, waiting --retry-wait seconds before the first and three times as long before each later one,
+    never more than --retry-max-wait. An error a retry cannot fix is raised as it is. When the tries run out, or the person presses Ctrl+C, it raises Stopped whose message says where things stand (`progress()`, if given) and that running the same command again carries on.
+    `on_retry(attempt, error)` may change what the next try asks for and returns a few words saying how."""
+    tries = max(0, args.retries) + 1
+    for attempt in range(1, tries + 1):
+        try:
+            return fn()
+        except KeyboardInterrupt:
+            raise Stopped("STOPPED by you (Ctrl+C) during %s. %s" % (what, progress() if progress else "Nothing was saved for this step; run the same command again."))
+        except Exception as e:
+            why = transient_reason(e)
+            if why is None:
+                raise
+            if attempt >= tries:
+                raise Stopped("STOPPED: %s got no good answer from the server after %d tries (%s: %s). %s" % (what, tries, why, brief(e), progress() if progress else "Run the same command again later."))
+            wait = min(args.retry_max_wait, args.retry_wait * 3 ** (attempt - 1))
+            how = on_retry(attempt, e) if on_retry else ""
+            say("%s: the server answered %s (%s); waiting %g s, then trying again%s (try %d of %d)" % (what, why, brief(e), wait, how or "", attempt + 1, tries))
+            try:
+                time.sleep(wait)
+            except KeyboardInterrupt:
+                raise Stopped("STOPPED by you (Ctrl+C) while waiting to retry %s. %s" % (what, progress() if progress else "Run the same command again."))
 
 
 def check_server(url):
@@ -231,13 +297,19 @@ def as_int(v):
 class Folder:
     """The output folder: writes CSV/JSON/text, remembers each file for the manifest, and refuses to write into a folder that already holds something."""
 
-    def __init__(self, path):
+    def __init__(self, path, reuse=()):
+        Folder.check(path, reuse)
         self.path = path
-        if os.path.exists(path) and os.listdir(path):
-            raise Refusal("the output folder %r is not empty; give --out a new folder (this script never overwrites)" % path)
         os.makedirs(path, exist_ok=True)
         self.files = []
         self.warnings = []
+
+    @staticmethod
+    def check(path, reuse=()):
+        """Refuse a folder that holds anything but the names in `reuse` (files of an unfinished run of the same command, which the new run replaces or continues); said before the network is touched."""
+        blockers = sorted(n for n in os.listdir(path) if n not in reuse) if os.path.isdir(path) else []
+        if blockers:
+            raise Refusal("the output folder %r is not empty; give --out a new folder (this script never overwrites)" % path)
 
     def csv(self, name, columns, rows):
         p = os.path.join(self.path, name)
@@ -692,13 +764,33 @@ def mirror_pairs(cands, roles, midline, tol):
 
 def count_degrees(mat, table, version, args, wanted, state, folder):
     """One pass over the synapse table, a page of --chunk-rows rows at a time, only the two root-id columns, counting for each cell in `wanted` (the roots that have a soma) the synapses that arrive on it and leave it (autapses and root id 0 left out).
-    `state` is { counts: { root: [in, out] }, offset, rows, done }. After every page the counts are written to giants_counts.partial.json in the output folder, so a pass that dies can be picked up with --resume."""
+    `state` is { counts: { root: [in, out] }, offset, rows, done }. After every page the counts are written to giants_counts.partial.json in the output folder, so a pass that dies is picked up where it stopped by running the same command again.
+    A page the server fails on is asked for again after a pause (call_with_retries), the second time at half the size and so on down to --min-chunk-rows; nothing is counted from a page that did not arrive, so a retry never counts a row twice or skips one."""
     t0, pages = time.time(), 0
     cols = [PRE_ROOT, POST_ROOT]
+    where = os.path.join(folder.path, PARTIAL_NAME)
+
+    def progress():
+        of = ("of about %s (%.1f%%)" % (fmt(state["total"]), 100.0 * state["offset"] / state["total"])) if state.get("total") else "(the table's size is not known)"
+        return "Stopped at row %d %s; the counts so far (%d cells) are saved in %s. Run the SAME command again and it carries on from this row." % (state["offset"], of, len(state["counts"]), where)
+
+    def smaller(attempt, e):
+        if attempt < 2:
+            return ""   # the first failure is taken for a hiccup: the same page again; a second one in a row means the page is too heavy for the server just now
+        now = min(args.chunk_rows, state.get("serverCap") or args.chunk_rows)
+        new = max(args.min_chunk_rows, now // 2)
+        if new >= now:   # never bigger: a floor above the page asked for changes nothing
+            return ""
+        args.chunk_rows, state["serverCap"] = new, None
+        return ", asking for %d rows a page from now on" % new
+
     while True:
         if args.pages and pages >= args.pages:
             break
-        df = mat.query_table(table, **kw_query_table_page(version, args.chunk_rows, state["offset"], cols))
+        if state.get("total") and state["offset"] >= state["total"]:   # a pass picked up after its last page was already counted (it stopped in the step after the pass)
+            state["done"] = True
+            break
+        df = call_with_retries(args, "page %d (rows from %d)" % (pages + 1, state["offset"]), lambda: mat.query_table(table, **kw_query_table_page(version, args.chunk_rows, state["offset"], cols)), smaller, progress)
         pre, post = column_ints(df, PRE_ROOT), column_ints(df, POST_ROOT)
         n = len(pre)
         counts = state["counts"]
@@ -720,24 +812,95 @@ def count_degrees(mat, table, version, args, wanted, state, folder):
             break
         if n < args.chunk_rows and not state.get("capSaid"):
             state["capSaid"] = True
+            state["serverCap"] = n
             say("the server returned %d rows for a page of %d: it caps a query; the pass goes on from the row it reached" % (n, args.chunk_rows))
     return state
 
 
 def write_partial(folder, state, args, version):
-    with open(os.path.join(folder.path, "giants_counts.partial.json"), "w", encoding="utf-8") as f:
-        json.dump({"datastack": args.datastack, "version": version, "table": state["table"], "offset": state["offset"], "rows": state["rows"], "counts": {str(k): v for k, v in state["counts"].items()}}, f)
+    with open(os.path.join(folder.path, PARTIAL_NAME), "w", encoding="utf-8") as f:
+        json.dump({"datastack": args.datastack, "version": version, "table": state["table"], "somaTable": args.soma_table, "offset": state["offset"], "rows": state["rows"], "counts": {str(k): v for k, v in state["counts"].items()}}, f)
 
 
-def read_resume(path, args, version, table):
+def read_partial(path):
+    """A giants_counts.partial.json as a dict, or None when it is not there or is not one."""
     try:
         with open(path, "r", encoding="utf-8") as f:
             d = json.load(f)
-    except (OSError, ValueError) as e:
-        raise Refusal("--resume could not read %s (%s)" % (path, type(e).__name__))
+        int(d["offset"])
+        int(d["rows"])
+        d["counts"].items()
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        return None
+    return d
+
+
+def partial_mismatch(d, args, version, table):
+    """Why counts in the partial file `d` cannot be added to this run's (another datastack, snapshot, synapse table or soma table), or None when they can."""
     if d.get("datastack") != args.datastack or d.get("version") != version or d.get("table") != table:
-        raise Refusal("--resume file is for datastack %r version %r table %r, not %r version %r table %r: counts from another snapshot cannot be added to" % (d.get("datastack"), d.get("version"), d.get("table"), args.datastack, version, table))
+        return "datastack %r version %r table %r, not %r version %r table %r: counts from another snapshot cannot be added to" % (d.get("datastack"), d.get("version"), d.get("table"), args.datastack, version, table)
+    if d.get("somaTable") is not None and d.get("somaTable") != args.soma_table:
+        return "soma table %r, not %r: it counted another set of cells" % (d.get("somaTable"), args.soma_table)
+    return None
+
+
+def state_of(d, table):
     return {"counts": {int(k): list(v) for k, v in d["counts"].items()}, "offset": int(d["offset"]), "rows": int(d["rows"]), "done": False, "table": table}
+
+
+def read_resume(path, args, version, table):
+    d = read_partial(path)
+    if d is None:
+        raise Refusal("--resume could not read %s (it is not there, or it is not a giants_counts.partial.json)" % path)
+    why = partial_mismatch(d, args, version, table)
+    if why:
+        raise Refusal("--resume file is for %s" % why)
+    return state_of(d, table)
+
+
+def giants_reusable(path):
+    """The names a giants run may find already in its folder: its own partial counts file, and the files of an earlier run that did not finish (its MANIFEST says finished false), which the new run replaces. A finished run's files are never reusable."""
+    names = {PARTIAL_NAME}
+    try:
+        with open(os.path.join(path, "MANIFEST.json"), "r", encoding="utf-8") as f:
+            m = json.load(f)
+        if m.get("command") == "giants" and m.get("finished") is False:
+            names.update(GIANTS_FILES)
+    except (OSError, ValueError, AttributeError):
+        pass
+    return names
+
+
+def find_unfinished(args, version, table):
+    """Where an earlier run of this same command stopped: (folder, state, notes), folder None when there is nothing to carry on. With --out, only that folder is looked at (and a partial file in it that cannot be added to is refused, not overwritten); without it, every
+    fish1_giants_* folder here, and the one that got furthest wins. Folders whose counts are for another snapshot are named in `notes` and left alone."""
+    notes, found = [], []
+    if args.out:
+        folders = [args.out] if os.path.isdir(args.out) else []
+    else:
+        folders = sorted(os.path.join(".", n) for n in os.listdir(".") if n.startswith("fish1_giants_") and os.path.isdir(n))
+    for folder in folders:
+        path = os.path.join(folder, PARTIAL_NAME)
+        if not os.path.exists(path):
+            continue
+        d = read_partial(path)
+        if d is None:
+            if args.out:
+                raise Refusal("%s is not a readable giants_counts.partial.json; move it away or use a new --out" % path)
+            notes.append("%s holds a counts file that cannot be read: left alone" % folder)
+            continue
+        why = partial_mismatch(d, args, version, table)
+        if why:
+            if args.out:
+                raise Refusal("the unfinished pass in %s is for %s; give --version %s to carry on with it, --fresh to start over, or a new --out" % (args.out, why, d.get("version")))
+            notes.append("%s holds an unfinished pass for datastack %r version %r: left alone (--version %s carries it on)" % (folder, d.get("datastack"), d.get("version"), d.get("version")))
+            continue
+        found.append((int(d["offset"]), os.path.getmtime(path), folder, d))
+    if not found:
+        return None, None, notes
+    found.sort(key=lambda t: (t[0], t[1]))
+    _, _, folder, d = found[-1]
+    return folder, state_of(d, table), notes
 
 
 def cmd_giants(args):
@@ -748,7 +911,10 @@ def cmd_giants(args):
         raise Refusal("--top must be at least 2")
     if args.chunk_rows < 1:
         raise Refusal("--chunk-rows must be at least 1")
-    out = Folder(args.out or "fish1_giants_" + now_utc().strftime("%Y%m%dT%H%M%SZ"))
+    if args.retries < 0 or args.retry_wait < 0 or args.retry_max_wait < 0 or args.min_chunk_rows < 1:
+        raise Refusal("--retries, --retry-wait and --retry-max-wait cannot be negative, and --min-chunk-rows must be at least 1")
+    if args.out:
+        Folder.check(args.out, giants_reusable(args.out))   # before the network is touched
     client = make_client(args, args.datastack)
     mat = client.materialize
     version = args.version if args.version is not None else plain_int(mat.most_recent_version())
@@ -774,7 +940,7 @@ def cmd_giants(args):
             resolution = None
     if not resolution or len(resolution) != 3:
         raise Refusal("the voxel size of the soma table %s is not known; give --soma-voxel-nm 8,8,30 (what its table description says)" % args.soma_table)
-    soma_rows = rows_of(mat.query_table(args.soma_table, **kw_query_table(version, args.scan_max_rows)))
+    soma_rows = rows_of(call_with_retries(args, "the soma table", lambda: mat.query_table(args.soma_table, **kw_query_table(version, args.scan_max_rows))))
     cells = soma_points(soma_rows, resolution)
     if len(cells) < 10:
         raise Refusal("only %d cells with a soma were read from %s (columns pt_root_id, pt_position_x/y/z are needed)" % (len(cells), args.soma_table))
@@ -788,11 +954,25 @@ def cmd_giants(args):
     # 2. the pass over the synapse table
     total = plain_int(mat.get_annotation_count(syn_table, **kw_annotation_count(version)))
     wanted = set(cells)
+    resumed, auto, folder = False, False, None
     if args.resume:
         state = read_resume(args.resume, args, version, syn_table)
+        resumed = True
         say("resuming at row %d with %d cells already counted" % (state["offset"], len(state["counts"])))
     else:
-        state = {"counts": {}, "offset": args.start_offset, "rows": 0, "done": False, "table": syn_table}
+        state = None
+        if not (args.fresh or args.sample or args.start_offset):   # the same command run again carries on from where the last one stopped
+            folder, state, notes = find_unfinished(args, version, syn_table)
+            for n in notes:
+                say("note: " + n)
+            if state is not None:
+                resumed = auto = True
+                say("found an unfinished pass in %s: row %d of about %s (%s), %d cells counted -- carrying on from there (--fresh starts over)" % (
+                    folder, state["offset"], fmt(total), ("%.1f%%" % (100.0 * state["offset"] / total)) if total else "size unknown", len(state["counts"])))
+        if state is None:
+            state = {"counts": {}, "offset": args.start_offset, "rows": 0, "done": False, "table": syn_table}
+    where = folder or args.out or "fish1_giants_" + now_utc().strftime("%Y%m%dT%H%M%SZ")
+    out = Folder(where, giants_reusable(where))
     state["total"] = total
     mode = "sample" if args.sample else "pages"
     if args.sample:
@@ -811,7 +991,7 @@ def cmd_giants(args):
         count_degrees(mat, syn_table, version, args, wanted, state, out)
     coverage = (100.0 * state["rows"] / total) if total else None
     if not state["done"]:
-        out.warnings.append("THE PASS DID NOT FINISH: %d of about %s rows were read (--pages %d stopped it); the counts are of those rows only. Resume with --resume %s" % (state["rows"], fmt(total), args.pages, os.path.join(out.path, "giants_counts.partial.json")))
+        out.warnings.append("THE PASS DID NOT FINISH: %d of about %s rows were read (--pages %d stopped it); the counts are of those rows only. Run the same command again to carry on from there (or --resume %s)" % (state["rows"], fmt(total), args.pages, os.path.join(out.path, "giants_counts.partial.json")))
         say("WARNING: " + out.warnings[-1])
     elif not args.sample and total and state["rows"] < 0.99 * total:
         out.warnings.append("only %d of %s rows were read (%.1f%%): the server paged fewer rows than the table holds; the counts are lower bounds" % (state["rows"], fmt(total), coverage))
@@ -821,8 +1001,10 @@ def cmd_giants(args):
     top = ranked[:args.top]
     rows_in, rows_out, pre_c, post_c = [], [], None, None
     if top:
-        q_in = mat.synapse_query(**kw_synapse_query(version, args.max_rows, post_ids=top))
-        q_out = mat.synapse_query(**kw_synapse_query(version, args.max_rows, pre_ids=top))
+        def partial_note():
+            return ("The counts of the pass are saved in %s. " % os.path.join(out.path, PARTIAL_NAME) if os.path.exists(os.path.join(out.path, PARTIAL_NAME)) else "") + "Run the SAME command again: it skips the pass and asks for these two queries again."
+        q_in = call_with_retries(args, "the synapses into the top cells", lambda: mat.synapse_query(**kw_synapse_query(version, args.max_rows, post_ids=top)), None, partial_note)
+        q_out = call_with_retries(args, "the synapses out of the top cells", lambda: mat.synapse_query(**kw_synapse_query(version, args.max_rows, pre_ids=top)), None, partial_note)
         rows_in, rows_out = rows_of(q_in), rows_of(q_out)
         for q, label in ((rows_in, "synapses into the top cells"), (rows_out, "synapses out of the top cells")):
             if len(q) >= args.max_rows:
@@ -867,7 +1049,7 @@ def cmd_giants(args):
              "giants_counts.json: every cell's counts. MANIFEST.json: sha256 of every file and the options. THIS IS A HEURISTIC: it lists candidates to look at in the viewer, it does not name the Mauthner cells. NO TOKEN IS IN ANY OF THESE FILES.\nCite: %s\n" % (args.datastack, version, stamp, len(top_rows), CITATION))
     import caveclient
     out.manifest({"command": "giants", "datastack": args.datastack, "server": server, "materializationVersion": version, "timestamp": stamp, "caveclient": getattr(caveclient, "__version__", None), "mode": mode,
-                  "options": {"top": args.top, "chunkRows": args.chunk_rows, "pages": args.pages, "sample": args.sample, "midline": args.midline, "pairTol": args.pair_tol, "somaTable": args.soma_table, "synapseTable": syn_table, "resume": bool(args.resume), "maxRows": args.max_rows},
+                  "options": {"top": args.top, "chunkRows": args.chunk_rows, "pages": args.pages, "sample": args.sample, "midline": args.midline, "pairTol": args.pair_tol, "somaTable": args.soma_table, "synapseTable": syn_table, "resume": resumed, "autoResume": auto, "fresh": bool(args.fresh), "retries": args.retries, "retryWait": args.retry_wait, "retryMaxWait": args.retry_max_wait, "minChunkRows": args.min_chunk_rows, "maxRows": args.max_rows},
                   "rowsRead": state["rows"], "tableRows": total, "coveragePercent": coverage, "finished": state["done"]}, token_from_env())
     say("\nTop cells by synapses received:")
     for r in top_rows[:15]:
@@ -921,6 +1103,11 @@ def build_parser():
     p.add_argument("--start-offset", dest="start_offset", type=int, default=0)
     p.add_argument("--sample", type=int, default=0)
     p.add_argument("--resume")
+    p.add_argument("--fresh", action="store_true")
+    p.add_argument("--retries", type=int, default=DEFAULT_RETRIES)
+    p.add_argument("--retry-wait", dest="retry_wait", type=float, default=DEFAULT_RETRY_WAIT)
+    p.add_argument("--retry-max-wait", dest="retry_max_wait", type=float, default=DEFAULT_RETRY_MAX_WAIT)
+    p.add_argument("--min-chunk-rows", dest="min_chunk_rows", type=int, default=DEFAULT_MIN_CHUNK_ROWS)
     p.add_argument("--midline", type=float)
     p.add_argument("--pair-tol", dest="pair_tol", type=float, default=25.0)
     return p
@@ -940,6 +1127,12 @@ def main(argv=None):
     except Refusal as e:
         print("fishCaveExport: %s" % e, file=sys.stderr)
         return 2
+    except Stopped as e:   # the server gave up on us, or the person did: what was done is saved, and the message says how to carry on
+        print("fishCaveExport: %s" % e, file=sys.stderr)
+        return 3
+    except KeyboardInterrupt:
+        print("fishCaveExport: stopped by you (Ctrl+C).", file=sys.stderr)
+        return 130
     except Exception as e:   # a network or server error: say what, and what to check, without a traceback (a message from the HTTP layer carries a URL and never a token)
         print("fishCaveExport: %s: %s\nCheck the network (a VPN or proxy that blocks %s answers like this), the --server address and the token (python3 %s save-token)." % (type(e).__name__, str(e)[:300], args.server, sys.argv[0]), file=sys.stderr)
         return 1
