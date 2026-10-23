@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "26e15bb37c78d80087340a7bb983b4abf402c03e",
+ "head": "17006ed4d23db892909b13399545513d70cfc27f",
  "bodies": {
   "box3d": [
    {
@@ -550,7 +550,7 @@
    {
     "path": "render/snowGpu-selfcheck.mjs",
     "bytes": 31890,
-    "sha": "26e15bb37c78d80087340a7bb983b4abf402c03e"
+    "sha": "738376a73b1c59e2c11daaa37bab8bedb6779158"
    },
    {
     "path": "render/snowShading-selfcheck.mjs",
@@ -580,7 +580,7 @@
    {
     "path": "tools/ship/wgslCorpus.mjs",
     "bytes": 147922,
-    "sha": "73795feb626921ab015e3c9b64dd55387c7f7b24"
+    "sha": "738376a73b1c59e2c11daaa37bab8bedb6779158"
    }
   ],
   "taichi-js": [
@@ -708,8 +708,8 @@
    },
    {
     "path": "es-box3d-6dof.html",
-    "bytes": 38308,
-    "sha": "54bebfb3f6ec991249239feb44710232f0cd6527"
+    "bytes": 38196,
+    "sha": "d13237b453a095bcc6ddf81cbbfb79916081efe2"
    },
    {
     "path": "es-box3d-fly3d.html",
@@ -823,7 +823,7 @@
    },
    {
     "path": "main.js",
-    "bytes": 3702649,
+    "bytes": 3701891,
     "sha": "73795feb626921ab015e3c9b64dd55387c7f7b24"
    },
    {

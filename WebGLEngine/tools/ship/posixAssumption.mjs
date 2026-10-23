@@ -277,7 +277,8 @@ export const POSIX_AT_V4485 = Object.freeze({
     // v4826's tree (653e4703). Five new callers, EVERY ONE NORMALISING: tools/ship/afterVerdict.mjs (v4835), tools/ship/wasmTeardown.mjs (v4840),
     // tools/ship/adapterRecord-selfcheck.mjs (the definitionGates naming), tools/ship/headlessGpu.mjs (round 19's core) -- four, inside the band -- and
     // THIS round's tools/ship/realGpuRun.mjs (nativeGateList's relative paths), the fifth, one past it. NOTHING WAS UN-NORMALISED: a re-take, not a tolerance.
-    separator: Object.freeze({ callers: 187, calls: 254, normalised: 132, never: 55 }),
+    // v4896 -- 187 callers / 132 normalising -> 193 / 136: six more files that join a path (the TV commands and gates, the snowGpu split gates), four normalising and two not; calls 254 -> 272. Read off the gate, not typed.
+    separator: Object.freeze({ callers: 193, calls: 272, normalised: 136, never: 57 }),
     rulesTried: Object.freeze([53, 74, 90]),
     notClaimed: "that the 90 are defects. A relative path that is only printed is portable already; the ones " +
                 "that bite are compared against a stored form, and three static rules for 'compared against' " +

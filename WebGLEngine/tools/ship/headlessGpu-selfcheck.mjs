@@ -529,8 +529,8 @@ sec("9. THE TEXTURE READ-BACK ARITHMETIC");
 {
     const line = HG.readingLine("probe: kernel vs twin", 1.5e-7, 1e-3, 64, "Some Adapter");
     const printed = []; const log = console.log; console.log = (l) => printed.push(l); const returned = HG.reading("probe: kernel vs twin", 1.5e-7, 1e-3, 64, "Some Adapter"); console.log = log;
-    ok("readingLine builds a '----' measured line (the only kind realGpuRun keeps besides FAIL rows), and reading() prints exactly that line and returns it",
-        /^  ----  reading probe: kernel vs twin: worst 1\.50e-7 against a limit of 1\.00e-3, margin 6666\.7x over 64 values, adapter Some Adapter$/.test(line) && printed.length === 1 && printed[0] === line && returned === line, line);
+    ok(/^  ----  reading probe: kernel vs twin: worst 1\.50e-7 against a limit of 1\.00e-3, margin 6666\.7x over 64 values, adapter Some Adapter$/.test(line) && printed.length === 1 && printed[0] === line && returned === line,
+        "readingLine builds a '----' measured line (the only kind realGpuRun keeps besides FAIL rows), and reading() prints exactly that line and returns it", line);
 }
 
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");

@@ -9,8 +9,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-    <!-- v4896 -- SweK HOME needs to SEE which apps can be launched, and on Android 11+ an app sees almost nothing by default. These two
-         <queries> intents are the narrow way: the launcher categories and nothing else. QUERY_ALL_PACKAGES is NOT declared on purpose --
+    <!-- v4896: SweK HOME needs to SEE which apps can be launched, and on Android 11+ an app sees almost nothing by default. These two
+         <queries> intents are the narrow way: the launcher categories and nothing else. QUERY_ALL_PACKAGES is NOT declared on purpose:
          it is the broad permission, Play-restricted, and a home screen does not need to read the whole package list to draw a shelf. -->
     <queries>
         <intent>
@@ -66,7 +66,7 @@
             </intent-filter>
         </activity>
 
-        <!-- v4896 -- SWEK HOME. A SECOND launcher activity in the same APK (one install, one signing key). HOME + DEFAULT is what makes
+        <!-- v4896 - SWEK HOME. A SECOND launcher activity in the same APK (one install, one signing key). HOME + DEFAULT is what makes
              Android offer it when the owner chooses a home screen; it is NEVER made the home screen by this APK, and the stock one is
              never disabled by it. LEANBACK_LAUNCHER also lists it in the TV's app row, so it can be started once without being Home. -->
         <activity
