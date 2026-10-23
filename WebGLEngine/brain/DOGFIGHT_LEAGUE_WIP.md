@@ -42,3 +42,32 @@ parallel, the GPU Brain's 49 to 80.
   shipped one by the margin the rules ask for.
 * Not checked: whether a longer search (more iterations or runs) closes the GPU gap; whether the fruit fly's turning loss comes from the
   objective (duels only) or from the circuit's capacity; any league run against a THIRD opponent (the jets' fighters are not in the league).
+
+# The jets -- the fruit fly's league run (WIP note, unnumbered)
+
+`node tools/ship/trainLeagueDogfight.mjs --aircraft jet --brain fly --workers 4 --cache <dir> --dump <file> --write` (library `tools/ship/trainDogfightLeague.mjs`, sets `brain/jetLeagueSets.mjs`, gate
+`trainDogfightLeague-selfcheck.mjs`). The Giant Fiber Circuit (1,099 weights) starts from the jet autopilot's hand weights (hash 8d909ea0) -- there is no shipped jet fighter -- and is scored against the jet
+autopilot, itself (the hand twin) and the GPU Brain's hand twin (368e32cd), each fight flown from both seats with the jet's physics, gun and guidance. 4 runs x 400 iterations, search seeds 12000..12003.
+
+## First try (search seeds 12000..12003): NO CHAMPION, nothing written, the audit sets NOT read
+
+The shipped (hand-twin) fighter, for comparison: held-out 0.0133; on the league pool 4 fights lost to the ground or a collision against each opponent (of 200 fights each; a search may lose no more than 8); classic pool 0.8417.
+
+| run | seed | train | held-out | league pool, lost vs autopilot / self / other | classic pool |
+|---|---|---|---|---|---|
+| 1 | 12000 | 0.4650 | 0.3064 | 17 / 16 / 16 | 0.7829 |
+| 2 | 12001 | 0.3122 | 0.0615 | 11 / 11 / 11 | 0.5883 |
+| 3 | 12002 | 0.4246 | 0.1472 | 39 / 37 / 37 | 0.6455 |
+| 4 | 12003 | 0.4230 | 0.3168 | 22 / 22 / 22 | 0.9136 |
+
+All four are ineligible on the same count: they lose between 11 and 39 of 200 pool fights to the ground or a collision where the limit is 8. They did raise the score a great deal (held-out up to 0.317 against 0.013);
+what they bought it with is safety. The reading I take, said as a reading: the training set is 12 duels (72 fights) and the hand twin loses about one of them to the ground, so the objective sees a crash a handful of
+times at most and can trade it away; the pool (100 duels) sees it. NOT CHECKED: that reading, and whether any seed of this recipe can be eligible.
+
+## Retry, written down BEFORE it runs (search seeds 12100..12103)
+
+The same recipe and the same rules: only the search seeds change (`--seed 12100`, so runs 12100..12103). eligibility(), qualifies() and every set are untouched, and the audit sets are unread, so they are still
+unspent. Counted honestly: a champion from this batch is the best of the eligible among EIGHT searches drawn against the same pool and held-out sets (the four above and these four), and the verdict is still the one
+read of the audit, which no earlier search has seen.
+If this batch is also entirely ineligible, the next step is NOT more seeds: it is a change of recipe -- a larger training set on fresh seeds and a crash guard in the objective, as the drones' second round had -- decided
+in writing before it runs.
