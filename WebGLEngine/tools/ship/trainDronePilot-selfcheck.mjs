@@ -176,6 +176,18 @@ sec("5. finish(): eligibility, the champion, the audit");
     ok("a result with no champion still dumps (champion null, the hand pilot's audit null: it was never read)", noDump.champion === null && noDump.hand.audit === null && noDump.runs.length === 1 && noDump.runs[0].eligible === false);
 }
 
+sec("5b. finish() and run() grade on the sets the OPTIONS name (the sets argument left out)");
+{
+    // a stand-in that remembers which sets it was asked to fly: the hand weights first (the hand pilot's tails, then its audit, reserve and safety audit), then the champion's
+    const mk = () => { const seen = []; return { seen, handWeights: () => Float32Array.from([0, 0]), evaluate(w, set) { seen.push(set); return stand.evaluate(w, set); } }; };
+    const which = (seen) => ({ audit: seen.includes(DT.AUDIT_SET) ? "AUDIT" : seen.includes(DT.AUDIT_SET_V2) ? "AUDIT_V2" : seen.includes(DT.AUDIT2_SET) ? "AUDIT2" : seen.includes(DT.AUDIT2_SET_V2) ? "AUDIT2_V2" : "?", reserve: seen.includes(DT.BASELINE_SET) ? "BASELINE" : seen.includes(DT.BASELINE_SET_V2) ? "BASELINE_V2" : "?", safety: seen.includes(DT.SAFETY_AUDIT_SET) ? "SAFETY_AUDIT" : seen.includes(DT.SAFETY_AUDIT_SET_V2) ? "SAFETY_AUDIT_V2" : seen.includes(DT.SAFETY_AUDIT2_SET) ? "SAFETY_AUDIT2" : seen.includes(DT.SAFETY_AUDIT2_SET_V2) ? "SAFETY_AUDIT2_V2" : "?" });
+    const cases = [[{ brain: "fly", sets: "v1" }, "AUDIT/BASELINE/SAFETY_AUDIT"], [{ brain: "fly", sets: "v2" }, "AUDIT_V2/BASELINE_V2/SAFETY_AUDIT_V2"], [{ brain: "gpu", sets: "v1" }, "AUDIT2/BASELINE/SAFETY_AUDIT2"], [{ brain: "gpu", sets: "v2" }, "AUDIT2_V2/BASELINE_V2/SAFETY_AUDIT2_V2"]];
+    const got = cases.map(([o]) => { const P = mk(); TR.finish({ ...o, runs: 1, policy: P }, [SAFE], () => {}); const w = which(P.seen); return `${w.audit}/${w.reserve}/${w.safety}`; });
+    ok("!! finish() WITH NO SETS ARGUMENT GRADES ON THE SETS THE OPTIONS NAME: the fruit fly on the first recipe's audit, baseline and safety audit; the fruit fly on --sets v2 on the V2 audit, V2 baseline and V2 safety audit; the GPU Brain on its own first-recipe audits and on its own V2 audits (AUDIT2_V2, BASELINE_V2, SAFETY_AUDIT2_V2) -- a v2 verdict read on the spent audits would be graded on what a champion had already seen", got.join(" | ") === cases.map(([, e]) => e).join(" | "), got.join(" | "));
+    const runP = mk(), runR = TR.run({ brain: "fly", sets: "v2", runs: 1, iters: 1, slice: 30, policy: runP }, () => {});
+    ok("run() passes the same default on: a one-search run on --sets v2 (a thirtieth of the training scenarios, one iteration, the stand-in policy) reads the V2 audit, the V2 baseline and the V2 safety audit for its champion", runR.champion !== null && which(runP.seen).audit === "AUDIT_V2" && which(runP.seen).reserve === "BASELINE_V2" && which(runP.seen).safety === "SAFETY_AUDIT_V2", JSON.stringify(which(runP.seen)));
+}
+
 sec("6. a search, and the searches in child processes");
 const tiny = [DT.scenario(2, "hover"), DT.scenario(2, "goto")];
 const recipe = { runs: 2, iters: 4, seed: 8000, sigma: 0.3, maxK: 4, trainSet: tiny };
